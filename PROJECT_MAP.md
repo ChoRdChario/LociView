@@ -48,8 +48,11 @@ Project data and ordinary entry remain separate; todo owns the executed evidence
 The validation selector uses one content-inspected file input. Raw models/photos
 reveal name/create controls; packages retain their existing purpose/conversion
 services. `validationWorkspace.ts` owns selection generations and exact creation
-attempts, while an adopted Host owns durable retry. First-time backup restore into
-an absent Project remains separate from the existing opened-Project restore path.
+attempts, while an adopted Host owns durable retry. The approved
+[first-backup companion](docs/specs/06a-first-backup-open-proposal.md) adds a
+recovery-only entry for a provably absent original Project; it transfers the same
+root lease to the real selected generation without opening the original database.
+Existing ready-Project replacement remains the separate Start-1 path.
 
 Fresh photo selection uses `projectFiles/photo.ts`'s negative HEIF guidance only
 at the three fresh entry points. The product workspace owns explicit cancellation

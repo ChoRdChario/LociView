@@ -2,8 +2,8 @@ import { OpfsFS } from '../../platform/opfs';
 import { ProjectMutationCoordinator } from '../../platform/projectLock';
 import { OriginBlobStore } from '../../projectMetadata/blobStore';
 import { validationMetadataLimits, type FileValidationLimits } from '../../projectFiles/validation';
-import { initializeBrowserMetadata, openBrowserMetadataStorage, browserMetadataDatabaseNames } from './browserMetadataStorage';
-import { openValidationHost, validationArea } from './validationHost';
+import { initializeBrowserMetadata, openBrowserMetadataStorage, browserMetadataDatabaseNames, browserOriginalDatabasePresent } from './browserMetadataStorage';
+import { openValidationEntry, validationArea } from './validationHost';
 import { listValidationProjects } from './validationCatalog';
 import { createValidationWorkspace } from './validationWorkspace';
 import { prepareValidationResidents, prepareReadonlyResidents } from './validationRender';
@@ -24,6 +24,7 @@ export async function createValidationBrowserWorkspace(document: Document, run?:
   const options = { base, coordinator: ProjectMutationCoordinator.browser(locks), fileLimits: validationBrowserLimits, packageLocks: locks,
     generations: (id: string) => { const original = `${validationArea}-${id}`, prefix = `${original}-generation-`;
       return { listGenerations: async () => (await browserMetadataDatabaseNames()).filter(name => name.startsWith(prefix)).map(name => name.slice(prefix.length)),
+        originalDatabasePresent: () => browserOriginalDatabasePresent(original),
         open: (generation: string | null, create: boolean) => openBrowserMetadataStorage(generationDatabaseName(original, generation), create) };
     },
     store: new OriginBlobStore(base, { maxBlobBytes: validationBrowserLimits.maxFileBytes,
@@ -34,7 +35,7 @@ export async function createValidationBrowserWorkspace(document: Document, run?:
     storageEstimate: typeof navigator.storage?.estimate === 'function' ? () => navigator.storage.estimate() : undefined,
     productEditor: new URL(location.href).searchParams.get('editor') === 'project',
     list: () => listValidationProjects(options, storage),
-    open: (id, initial, mode, workspaceFile, reviewEdit) => openValidationHost({ ...options, run: id, initial, mode, workspaceFile, reviewEdit, openStorage: create => storage(id, create) }),
+    open: (id, initial, mode, workspaceFile, reviewEdit, firstBackup) => openValidationEntry({ ...options, run: id, initial, mode, workspaceFile, reviewEdit, firstBackup, openStorage: create => storage(id, create) }),
     renderModelCandidate: async (host, display) => {
       const resident = await prepareReadonlyResidents(display.models, { model: record => host.content.model(record, true) });
       return { factory: sceneViewportFactory(resident), dispose: () => resident.dispose() };

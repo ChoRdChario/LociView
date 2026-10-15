@@ -10,9 +10,10 @@ import { validationMetadataLimits, type FileValidationLimits } from '../../proje
 import { WorkspaceArchive } from '../../projectPackage/workspaceArchive';
 import { CleanArchive } from '../../projectPackage/cleanArchive';
 import { PackageArchive } from '../../projectPackage/zipArchive';
+import { BackupArchive } from '../../projectPackage/backupArchive';
 import type { PngDecoder } from '../../projectFiles/png';
 import { isJpeg, type JpegDecoder } from '../../projectFiles/jpeg';
-import type { openValidationHost } from './validationHost';
+import type { openValidationHost, ValidationHostOptions, ValidationNormalHost, FirstBackupRecovery } from './validationHost';
 import { createValidationModeHost, type ValidationDisplayHost } from './validationModeHost';
 import type { LocalOpenMode } from './savedHost';
 import type { ValidationProjectEntry } from './validationCatalog';
@@ -37,7 +38,8 @@ export interface ValidationWorkspacePorts {
   storageEstimate?(): Promise<Readonly<{ usage?: number; quota?: number }>>;
   lastProject?: { read(): ProjectResumeReference | null; remember(reference: ProjectResumeReference): void };
   list(): Promise<ValidationProjectEntry[]>;
-  open(run: string, initial?: ReturnType<typeof prepareValidationCreation>, mode?: LocalOpenMode, workspaceFile?: Blob, reviewEdit?: PreparedReviewEdit): Promise<Awaited<ReturnType<typeof openValidationHost>>>;
+  open(run: string, initial?: ReturnType<typeof prepareValidationCreation>, mode?: LocalOpenMode, workspaceFile?: Blob, reviewEdit?: PreparedReviewEdit,
+    firstBackup?: ValidationHostOptions['firstBackup']): Promise<ValidationNormalHost | FirstBackupRecovery>;
   render(host: ValidationDisplayHost): Promise<{ factory: ViewportFactory; dispose(): void }>;
   renderReview?(view: ReviewView): Promise<{ factory: ViewportFactory; dispose(): void }>;
   renderModelCandidate?(host: ValidationDisplayHost, display: Parameters<ModelCandidateRenderer>[0]): ReturnType<ModelCandidateRenderer>;
@@ -80,6 +82,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   navigation.append(heading, help, workspaceForm, form, listHeading, refresh, list); root.append(back, status, navigation, content);
   let host: Host | undefined, workspace: ReturnType<typeof createSavedWorkspace> | ReturnType<typeof createProductWorkspace> | undefined;
   let reviewWorkspace: ReturnType<typeof createReviewWorkspace> | undefined;
+  let firstRecovery: FirstBackupRecovery | undefined;
   let receiveTools: ReturnType<typeof createValidationReceiveControls> | undefined;
   let resident: Awaited<ReturnType<ValidationWorkspacePorts['render']>> | undefined;
   let busy = false, disposed = false, composing = false, selected: string | null = null, operation: Promise<void> | undefined;
@@ -89,14 +92,17 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   let lociDraft = 0, lociDecision: string | undefined;
   let selectionGeneration = 0, creationDraft = 0, selectionPending = false;
   let rawSelection: { models: ValidationFile[]; media: ValidationFile[] } | undefined;
-  let creationAttempt: { run: string; initial: ReturnType<typeof prepareValidationCreation>; opened?: true; candidate?: Awaited<ReturnType<ValidationWorkspacePorts['open']>> } | undefined;
+  let creationAttempt: { run: string; initial: ReturnType<typeof prepareValidationCreation>; opened?: true; candidate?: ValidationNormalHost } | undefined;
   let selectionHost: Host | undefined;
   const lociTuple = () => JSON.stringify([workbook.value, conversionTitle.value, relation.checked]);
   const lociCurrent = () => !!lociEvaluation && lociDecision === lociTuple();
   let reportUrl: string | undefined;
   let mounted = false, resumedLast = false, lastRemembered: string | undefined;
   let catalog: readonly ValidationProjectEntry[] = [];
-  const changed = () => !!workspace?.hasChanges() || !!reviewWorkspace?.hasChanges() || !!receiveTools?.hasChanges() || !!host?.hasPending();
+  const changed = () => !!workspace?.hasChanges() || !!reviewWorkspace?.hasChanges() || !!receiveTools?.hasChanges() || !!host?.hasPending() || !!firstRecovery;
+  const openNormal = async (...args: Parameters<ValidationWorkspacePorts['open']>): Promise<ValidationNormalHost> => {
+    const opened = await ports.open(...args); if ('kind' in opened) { await opened.dispose(); throw Error('バックアップの初回復元を一覧から再開してください。'); } return opened;
+  };
   const controls = () => { navigation.inert = busy; openFile.disabled = create.disabled = cancelConversion.disabled = busy || composing;
     workspaceInput.disabled = title.disabled = busy || !!creationAttempt;
     cancelSelection.disabled = busy || composing || !!creationAttempt;
@@ -127,6 +133,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     reviewWorkspace?.dispose(); reviewWorkspace = undefined;
     if (oldWorkspace) await oldWorkspace.dispose(); else await oldHost?.dispose(); oldResident?.dispose(); content.replaceChildren();
     receiveTools?.dispose(); receiveTools = undefined;
+    const oldRecovery = firstRecovery; firstRecovery = undefined; await oldRecovery?.dispose();
   };
   const ensureMaySwitch = () => {
     if (composing || changed()) throw Error('入力・更新を確定するか、取り消してからプロジェクトを切り替えてください。');
@@ -167,9 +174,9 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
       const row = document.createElement('p'), name = document.createElement('span');
       name.textContent = `${item.title} — ${item.state === 'ready' ? '再開用データ' : item.state === 'incomplete' ? '更新が未完了' : '要確認'} `;
       row.append(name);
-      for (const mode of ['view', 'edit'] as const) {
+      for (const mode of item.firstRestore === 'terminal' ? [] : item.firstRestore === 'pending' ? ['edit'] as const : ['view', 'edit'] as const) {
         const open = document.createElement('button'); open.type = 'button';
-        open.textContent = mode === 'view' ? '閲覧で開く' : '編集で開く';
+        open.textContent = item.firstRestore === 'pending' ? '復元を再開' : mode === 'view' ? '閲覧で開く' : '編集で開く';
         open.addEventListener('click', () => execute(async () => { ensureMayLeaveSelection(); await closeCurrent(); await openProject(item.run, undefined, mode); }));
         row.append(open);
       }
@@ -263,13 +270,16 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
       throw error;
     }
   };
-  const adoptProject = async (run: string, opened: Awaited<ReturnType<typeof openValidationHost>>, rememberedMode?: LocalOpenMode) => {
+  const adoptProject = async (run: string, opened: Awaited<ReturnType<typeof openValidationHost>>, rememberedMode?: LocalOpenMode,
+    prepared?: Awaited<ReturnType<ValidationWorkspacePorts['render']>>, preparation?: Parameters<ValidationDisplayHost['setDisplayPreparation']>[0]) => {
     if (disposed) { await opened.dispose(); return; }
-    host = createValidationModeHost(opened, nextMode => ports.open(run, undefined, nextMode), nextMode => ports.selected(run, nextMode));
+    host = createValidationModeHost(opened, nextMode => openNormal(run, undefined, nextMode), nextMode => ports.selected(run, nextMode));
     if (selectionPending) selectionHost = host;
     receiveTools = createValidationReceiveControls(document, host, () => workspace?.session,
       () => { workspace?.render(); controls(); }, async () => { if (!workspace && !disposed) await mount(); }, () => workspace?.inputPending() ?? false, restoreDisplay);
-    selected = run; ports.selected(run, host.mode!.current); navigation.hidden = true; await mount();
+    selected = run; ports.selected(run, host.mode!.current); navigation.hidden = true;
+    const detach = preparation ? host.setDisplayPreparation(preparation) : undefined;
+    await mount(prepared ? { factory: prepared.factory, dispose: () => { detach?.(); prepared.dispose(); } } : undefined);
     if (disposed) return;
     const current = currentResume();
     if (rememberedMode !== undefined && (!current || current.mode !== rememberedMode)) throw Error('最後のプロジェクトの再開用データを確認できません。');
@@ -283,7 +293,46 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   };
   const openProject = async (run: string, initial?: ReturnType<typeof prepareValidationCreation>, mode: LocalOpenMode = 'edit', workspaceFile?: Blob, remembered = false) => {
     status.textContent = initial ? 'プロジェクトを作成しています。' : '再開用データを確認しています。';
-    await adoptProject(run, await ports.open(run, initial, mode, workspaceFile), remembered ? mode : undefined);
+    const opened = await ports.open(run, initial, mode, workspaceFile);
+    if ('kind' in opened) { if (disposed) { await opened.dispose(); return; } firstRecovery = opened; selected = run; navigation.hidden = true; renderFirstRecovery(); return; }
+    await adoptProject(run, opened, remembered ? mode : undefined);
+  };
+  const renderFirstRecovery = () => {
+    const target = firstRecovery; if (!target || disposed) return;
+    const state = target.state(), panel = document.createElement('section'), note = document.createElement('p'), commands = document.createElement('div');
+    note.textContent = state.error || (state.phase === 'preview' ? state.replacing
+      ? 'バックアップの時点に切り替えます。現在の作業と元ファイルは残ります。' : 'このプロジェクトの再開用データはありません。バックアップから元のプロジェクトを復元します。元ファイルは変更しません。'
+      : state.phase === 'terminal' ? 'プロジェクトはまだありません。復元の記録は保持しています。ファイルを選択して開き直せます。' : 'バックアップの初回復元が未完了です。記録を使って再開するか、取りやめてください。');
+    const summary = document.createElement('p'); summary.textContent = `${state.title}${state.fileName ? ` — ${state.fileName}` : ''}${state.memo ? ` — ${state.memo}` : ''}`;
+    const button = (label: string, action: () => Promise<void>) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = label;
+      b.addEventListener('click', () => execute(action)); commands.append(b); };
+    const leave = async (cancel: boolean) => { if (cancel) await (state.phase === 'beforeStart' ? target.abandon() : target.cancel());
+      await closeCurrent(); clearSelection(); selected = null; ports.selected(null); navigation.hidden = false; await updateList(); status.textContent = ''; };
+    if (target.readOnly) button('編集を開始する', async () => {
+      try { const candidate = await target.edit(); if (disposed || firstRecovery !== target) { await candidate.dispose(); return; }
+        await closeCurrent();
+        if ('kind' in candidate) { firstRecovery = candidate; renderFirstRecovery(); } else await adoptProject(target.run, candidate);
+      } catch (error) { renderFirstRecovery(); throw error; }
+    });
+    else if (state.phase === 'preview' || state.phase === 'pending' && state.retryable) button(state.phase === 'preview' ? 'バックアップから復元' : '復元を再開', async () => {
+      let staged: Awaited<ReturnType<ValidationWorkspacePorts['render']>> | undefined,
+        preparation: Parameters<ValidationDisplayHost['setDisplayPreparation']>[0] | undefined, sourceContent: ValidationNormalHost['content'] | undefined;
+      try {
+        const opened = await target[state.phase === 'preview' ? 'confirm' : 'retry'](async (next, content) => {
+          if (disposed || firstRecovery !== target) throw Error('画面を閉じました。復元記録は保持しています。');
+          sourceContent = content; staged = await ports.render({ authority: { readOnly: true, read: () => next, write: () => { throw Error('復元先の確認中です。'); } },
+            content: { model: record => sourceContent!.model(record) },
+            setDisplayPreparation(callback) { preparation = callback; return () => { if (preparation === callback) preparation = undefined; }; } });
+          if (disposed || firstRecovery !== target) throw Error('画面を閉じました。復元記録は保持しています。');
+        });
+        if (disposed || firstRecovery !== target) { await opened.dispose(); return; }
+        sourceContent = opened.content; await closeCurrent();
+        const prepared = staged; staged = undefined; await adoptProject(target.run, opened, undefined, prepared, preparation);
+      } catch (error) { renderFirstRecovery(); throw error; } finally { staged?.dispose(); }
+    });
+    if ((!target.readOnly || state.phase === 'preview') && state.cancellable) button(state.phase === 'preview' ? 'キャンセル' : '復元を取りやめる', () => leave(true));
+    if (state.phase === 'terminal') button('一覧に戻る', () => leave(false));
+    panel.append(summary, note, commands); content.replaceChildren(panel); controls();
   };
   const invalidateLoci = () => { lociDraft++; lociEvaluation = null; lociDecision = undefined; conversion = null; controls(); };
   const clearConversion = () => { lociDraft++; lociDecision = undefined; conversion = null; lociPreview = null; lociEvaluation = null; lociChoices.hidden = true; conversionPanel.hidden = true; };
@@ -299,7 +348,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     if (!selectionCurrent(generation, context)) return false;
     ensureMaySwitch(); return true;
   };
-  const replaceSelection = async (run: string, opened: Awaited<ReturnType<ValidationWorkspacePorts['open']>>, generation: number, context: ReturnType<typeof selectionContext>) => {
+  const replaceSelection = async (run: string, opened: ValidationNormalHost, generation: number, context: ReturnType<typeof selectionContext>) => {
     try { if (!guardSelection(generation, context)) { await opened.dispose(); return; } }
     catch (error) { await opened.dispose(); throw error; }
     await closeCurrent(); await adoptProject(run, opened);
@@ -345,7 +394,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     status.textContent = 'プロジェクトを変換しています。';
     const initial = await (lociPreview ? lociEvaluation!.create() : conversion!.create()); if (!current()) return;
     const run = (initial.source.proof.identity.projectId as string).slice(4);
-    const opened = await ports.open(run, initial);
+    const opened = await openNormal(run, initial);
     try { if (!current()) { await opened.dispose(); return; } } catch (error) { await opened.dispose(); throw error; }
     await replaceSelection(run, opened, generation, context);
   }));
@@ -401,9 +450,15 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
       lociChoices.hidden = false; conversionPanel.hidden = false; await evaluateLoci(); status.textContent = ''; return;
     }
     const purpose = (await PackageArchive.inspect(file)).control.manifest.purpose; if (!guardSelection(generation, context)) return;
-    if (purpose === 'backup' || purpose === 'contribution') throw Error(purpose === 'backup'
-      ? 'バックアップです。対応するプロジェクトを開き、「バックアップから復元」を使ってください。'
-      : '更新用ファイルです。対応するプロジェクトを開き、更新を受け取ってください。');
+    if (purpose === 'backup') {
+      const archive = await BackupArchive.inspect(file, validationMetadataLimits); if (!guardSelection(generation, context)) return;
+      const run = (archive.source.proof.identity.projectId as string).slice(4), opened = await ports.open(run, undefined, 'edit', undefined, undefined,
+        { file, archive: { sha256: archive.archive.sha256, byteLength: archive.archive.byteLength } });
+      try { if (!guardSelection(generation, context)) { await opened.dispose(); return; } } catch (error) { await opened.dispose(); throw error; }
+      if (!('kind' in opened)) { await opened.dispose(); throw Error('バックアップの復元用の入口に接続できません。'); }
+      await closeCurrent(); firstRecovery = opened; selected = run; navigation.hidden = true; renderFirstRecovery(); return;
+    }
+    if (purpose === 'contribution') throw Error('更新用ファイルです。対応するプロジェクトを開き、更新を受け取ってください。');
     if (purpose === 'review') {
       const view = await prepareReviewView(file, ports.fileLimits, ports.decode, ports.jpeg, ports.photo);
       if (!ports.renderReview) throw Error('閲覧用シーンの表示が未接続です。');
@@ -417,7 +472,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
           status.textContent = '編集コピーを作成しています。';
           editAttempt ??= await PreparedReviewEdit.prepare(file, validationMetadataLimits);
           if (!guardSelection(editGeneration, editContext)) return;
-          const opened = await ports.open(editAttempt.run, undefined, 'edit', undefined, editAttempt);
+          const opened = await openNormal(editAttempt.run, undefined, 'edit', undefined, editAttempt);
           // Preserve the View, its windows and the exact attempt until an actual recovery-capable Host exists.
           await replaceSelection(editAttempt.run, opened, editGeneration, editContext);
         })); content.append(reviewWorkspace.root); reviewWorkspace.render();
@@ -430,7 +485,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     const inspected = purpose === 'clean' ? await CleanArchive.inspect(file, validationMetadataLimits) : await WorkspaceArchive.inspect(file, validationMetadataLimits);
     if (!guardSelection(generation, context)) return;
     const run = (inspected.source.proof.identity.projectId as string).slice(4);
-    const opened = await ports.open(run, undefined, 'edit', file);
+    const opened = await openNormal(run, undefined, 'edit', file);
     await replaceSelection(run, opened, generation, context);
   }); });
   form.addEventListener('submit', event => { event.preventDefault(); execute(async () => {
@@ -443,7 +498,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     }
     const attempt = creationAttempt, { run, initial } = attempt, generation = selectionGeneration, context = selectionContext(); status.textContent = 'プロジェクトを作成しています。';
     if (attempt.candidate?.hasPending()) await attempt.candidate.authority.retry!();
-    const opened = attempt.candidate ?? await ports.open(run, attempt.opened ? undefined : initial); attempt.candidate = opened;
+    const opened = attempt.candidate ?? await openNormal(run, attempt.opened ? undefined : initial); attempt.candidate = opened;
     const ready = opened.read();
     const releaseReopenable = async () => {
       if (ready.state === 'ready' && ready.publication && ready.source && !opened.hasPending()) attempt.opened = true;

@@ -18,8 +18,11 @@ Scene material slots. Latent chroma editing values stay only in source/report;
 old recipes/profiles and private-evidence export boundaries remain fixed.
 The validation file selector uses one content-inspected intent and conditional
 Project creation. Its cached initial/run and late-result guards are UI ownership,
-not a new package authority. Backup/Contribution guidance does not implement
-initial backup recovery into an absent Project; that needs a separate contract.
+not a new package authority. The approved 06a first-backup branch uses a proven
+absent predecessor and recovery-only entry before opening any original database.
+Prepared-2/Start-2 retain exact backup history/bases and select a dedicated generation;
+ready-Project Start-1 replacement and Contribution reception keep their old authority.
+Current todo owns the final executed evidence; this does not pass adoption gates.
 
 ## Resume safely
 

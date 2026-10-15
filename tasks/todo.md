@@ -35,6 +35,9 @@ The approved WebP/GIF companion connects the same photo workflow with original
 Blob animation behavior and four additive conversion domains; GLB profiles stay fixed.
 The named last-Project resume and guarded Project/file switching connection now
 uses only UI advisory run/mode, with explicit URL priority and actual-open checks.
+The approved 06a branch also connects first backup opening on a proven absent
+original Project to recovery-only confirmation, exact generation restore, typed
+editing/file output and selected cold reopen; the original database stays unopened.
 Fresh HEIF selection now explains separate local JPEG export and permits explicit
 unapplied-media cancellation; site storage estimates preserve pending save retry.
 LociMyu Scene shading/sidedness now survives conversion and selected-generation
@@ -132,12 +135,12 @@ design draft remained. This approval/status/plan precedes implementation.
 - [x] Close the concrete P2/S2/snapshot, absence/cancellation/selection/lifetime
   and import boundaries through independent review; empty canonical vector
   agrees between Node and independent .NET. Record PO ratification before code.
-- [ ] Add closed first-only Prepared-2/Start-2 and phase-bound absence checks to
+- [x] Add closed first-only Prepared-2/Start-2 and phase-bound absence checks to
   existing restore authority. Preserve ready Start-1 and all prior wire/seals.
-- [ ] Connect strict noncreating original-DB probe, recovery-only Host/catalog
+- [x] Connect strict noncreating original-DB probe, recovery-only Host/catalog
   before original opening, and unified backup confirmation/cancel/retry; no fake
   Session/provider. Hand the same lease once to the verified selected Host.
-- [ ] Reuse service fault cases and one backup → first restore → typed edit/file
+- [x] Reuse service fault cases and one backup → first restore → typed edit/file
   → selected cold flow, with terminal leftovers, unknown/probe/race/ack-loss and
   old-ready contrasts. Record actual canonical P2/S2/successor vectors.
 - [ ] Focus/early sceneCore for new imports, independent meaningful final review,
@@ -155,6 +158,60 @@ Stop only affected work for unprovable absence, unknown/partial/lost-ack evidenc
 changed lease/predecessor or a true need to weaken old-ready/Start-1 semantics.
 Existing budgets, warm-create/cold-noncreation, CAS no-repair and browser/device/
 offline/adoption exclusions remain; managed-browser denial is not retried.
+
+Implementation evidence in progress: core source typecheck passed; the first
+three service cases passed (65924, 13.51s). An initial sandbox Vitest invocation
+failed at node_modules realpath with EPERM before collecting tests; the approved
+local execution is separate evidence. Early sceneCore passed 12 cases for the
+two exact BackupArchive/contract import additions. Connected group 64229 passed
+four and exposed a test-only one-model expectation against the existing two-model
+fixture; 49296 then exposed its different second GLB and a disposed test scope.
+Those expectations now compare the actual original content/live backing factory.
+One new test syntax error prevented collection and was corrected. Focused 25966
+passed four service/recovery cases (32.75s), including new2 selected cold source
+proof/heads re-binding refusal, pre-Start provenance and cold noncreation. These
+editing checks are not the final checkpoint or browser/device evidence.
+
+The Host keeps its normal typed API; openValidationEntry adds the recovery-only
+union and transfers the same held lease only after actual Selection. Host and
+picker import BackupArchive (plus the existing contract type/limits in Host);
+the exact sceneCore allowlist is extended for these edges only. DB probe and
+recovery summary remain browser/UI adapters, outside package/storage authority.
+
+Final meaningful reviews closed with root and both read-only lanes, P1/P2 zero.
+Corrections bind new2 backup proof/heads to actual retained ZIP on selected cold
+opening, bind the cold first proof to the trusted run before DB probes/writes,
+retain readonly preview input through lock retries, and show actual source title/
+File name/memo. Terminal-only recovery does not invoke the pending-only reader.
+Focused 82034 passed three lock/summary/root cases (30.27s); 17039 passed the
+terminal/cancel/new-first regression (9.33s). The combined installed-Vitest group
+29159 passed 14 new/old-ready cases (100.23s), recorded in
+`.artifacts/traces/first-backup-focused-2026-10-16.log`. Its first CLI invocation
+had duplicate silent flags and collected no tests; that log is separately retained.
+Typecheck 65090 passed at the final runtime tree; diagnostic vector logging was
+then removed without changing assertions. No browser/bootstrap retry occurred.
+
+Actual Prepared-2/Start-2/cancelled successor vectors are captured in
+`.artifacts/traces/06a-canonical-vectors-2026-10-16.json` with their three exact
+canonical files. Node and independent .NET agree on bytes, sorted-key re-encoding,
+refs and the real owned synthetic archive binding; 06a records the three refs.
+Final serial checkpoint49729 started at 2026-10-15T19:30:53.804Z against
+`.artifacts/traces/first-backup-final-tested-tree-2026-10-16.json` (runtime10);
+the single owned log is `.artifacts/traces/first-backup-checkpoint-2026-10-16.log`.
+Runtime raw SHA/Git OIDs independently match the freeze. Checkpoint49729 passed:
+116 files / 2624 tests passed plus21 existing todo, suite898.03s; typecheck and all
+three builds passed (normal5.25s, harness4.46s, validation7.91s), CHECKPOINT_EXIT=0.
+The attempted preview launch found existing port4182 in use; no existing process
+was stopped or changed. Read-only HTTP verification against that listener matched
+all7 final build files exactly (status, bytes, SHA), no SW/manifest/samples, manifest
+`59f27e834d8a029e541d246c43c000bd5fefd81f41b6d051298dd64043378c2c`.
+Report: `.artifacts/traces/first-backup-http-2026-10-16.json`. This is HTTP identity
+only, not browser/IndexedDB/device/offline evidence. Outgoing scope18=runtime10+
+docs8, local links290/0missing, credential scan0; exact stage/Git/push remains.
+Next after this
+checkpoint: evaluate the remaining frozen-v1 material address/recipe decision as
+a concrete proposal; do not implement an unratified mapping or retry denied
+browser/device gates.
 
 ### Completed implementation — one file-opening intent
 

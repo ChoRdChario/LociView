@@ -1,12 +1,12 @@
 import type { ValidationHostOptions } from './validationHost';
 import { validationArea } from './validationHost';
-import { openValidationGeneration } from './validationGeneration';
+import { openValidationGeneration, inspectValidationFirstBackup } from './validationGeneration';
 import { WorkspaceReceiver } from '../../projectFiles/receiveWorkspace';
 import { WorkspaceSender } from '../../projectFiles/sendWorkspace';
 import { validationMetadataLimits } from '../../projectFiles/validation';
 import { reviewEditStates } from '../../projectPackage/reviewEditControls';
 
-export interface ValidationProjectEntry { run: string; title: string; state: 'ready' | 'incomplete' | 'unavailable' }
+export interface ValidationProjectEntry { run: string; title: string; state: 'ready' | 'incomplete' | 'unavailable'; firstRestore?: 'pending' | 'terminal' }
 export type ValidationStorage = (run: string, create: boolean) => ReturnType<ValidationHostOptions['openStorage']>;
 /** Read-only enumeration of this opt-in namespace, never an old Project or a mutable ready flag. */
 export async function listValidationProjects(options: Omit<ValidationHostOptions, 'run' | 'initial' | 'openStorage'>,
@@ -18,6 +18,9 @@ export async function listValidationProjects(options: Omit<ValidationHostOptions
     const lease = options.coordinator.openView(options.base, `${prefix}${run}`, `${validationArea}:${run}`);
     let storage: Awaited<ReturnType<typeof openValidationGeneration>> | undefined;
     try {
+      const first = await inspectValidationFirstBackup(lease.workspace, { ...options, run, openStorage: create => openStorage(run, create) });
+      if (first) { result.push({ run, title: first.controls.pending ? 'バックアップの初回復元が未完了' : 'プロジェクトなし・復元記録を保持',
+        state: first.controls.pending ? 'incomplete' : 'unavailable', firstRestore: first.controls.pending ? 'pending' : 'terminal' }); continue; }
       storage = await openValidationGeneration(lease.workspace, { ...options, run, openStorage: create => openStorage(run, create) });
       const { session, fs } = storage.service;
       const read = await session.read(), provider = read.provider;

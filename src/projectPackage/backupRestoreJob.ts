@@ -15,8 +15,8 @@ import { WorkspaceBaseStore } from './workspaceBases';
 import { receiveJobKeys, receiveInputState, openReceiveJob, receiveTerminal } from './receiveJobs';
 import { outputJobKeys, outputJobClass, openOutputJob, outputTerminal } from './outputJobs';
 import { checkAbort } from './zipChecks';
-import { checkRestoreCurrent, readRestoreControls, reconcileRestoreDatabases, reserveRestoreControls, writeRestoreControl, restoreEqual, restoreJobPath, restoreRef, restoreRoot,
-  type RestoreCurrent, type RestorePrepared, type RestoreStart, type RestoreControlJob, type GenerationSelection } from './restoreControls';
+import { checkRestoreCurrent, readRestoreControls, reconcileRestoreDatabases, reserveRestoreControls, writeRestoreControl, restoreEqual, restoreJobPath, restoreRef, restoreRoot, restoreBackupProof,
+  type AbsentSnapshot, type RestoreCurrent, type RestorePrepared, type RestoreStart, type RestoreControlJob, type GenerationSelection } from './restoreControls';
 
 /** Existing ready service, not UI-supplied heads or a filename-based Project identity. */
 export interface RestoreSourcePorts {
@@ -28,6 +28,8 @@ export interface RestoreSourcePorts {
 export interface RestoreDatabasePorts {
   /** Enumerate only this logical Project's dedicated generation DB IDs; failure must reject. */
   listGenerations(): Promise<string[]>;
+  /** First-backup only. Successful noncreating enumeration; unknown/error must reject. */
+  originalDatabasePresent?(): Promise<boolean>;
   open: GenerationStorageOpener;
 }
 const evidence = ({ sha256, byteLength }: EvidenceRef): EvidenceRef => ({ sha256, byteLength });
@@ -38,17 +40,20 @@ export class BackupRestoreJob {
   private warmCreate = false;
   private scopes = new WeakMap<ProjectWorkspaceFS, { factory: MetadataStorageFactory; check: () => Promise<void> }>();
   private constructor(private readonly root: ProjectWorkspaceFS, readonly id: string, private readonly limits: MetadataLimits,
-    readonly inspection: BackupArchive, private readonly file: Blob, readonly current: RestoreCurrent,
-    readonly previousSelection: EvidenceRef | null, readonly start: RestoreStart | null) {
-    this.current = cloneCanonicalValue(current, limits) as unknown as RestoreCurrent;
+    readonly inspection: BackupArchive, private readonly file: Blob, private readonly readyCurrent: RestoreCurrent | null,
+    readonly previousSelection: EvidenceRef | null, readonly start: RestoreStart | null, readonly absence: AbsentSnapshot | null = null) {
+    this.readyCurrent = cloneCanonicalValue(readyCurrent, limits) as unknown as RestoreCurrent | null;
+    this.absence = cloneCanonicalValue(absence, limits) as unknown as AbsentSnapshot | null;
     this.previousSelection = cloneCanonicalValue(previousSelection, limits) as EvidenceRef | null;
     this.start = cloneCanonicalValue(start, limits) as unknown as RestoreStart | null;
   }
+  get current(): RestoreCurrent { if (!this.readyCurrent) return fail('restore-no-ready-current'); return this.readyCurrent; }
   path(name: string) { return restoreJobPath(this.root, this.id, name); }
   private descriptor(): RestorePrepared {
     const archive = this.inspection.archive, manifest = archive.control.manifest;
     if (manifest.purpose !== 'backup') return fail('restore-purpose');
-    return { schema: 'lociview-local-restore-prepared-1', jobId: this.id,
+    return { ...(this.absence ? { schema: 'lociview-local-restore-prepared-2' as const, absence: this.absence,
+      backup: { proof: this.inspection.source.proof, heads: [...this.inspection.source.heads] } } : { schema: 'lociview-local-restore-prepared-1' as const }), jobId: this.id,
       archive: { sha256: archive.sha256, byteLength: archive.byteLength },
       manifest: evidence(archive.control.entries.find(e => e.path === 'manifest.json')!), metadata: evidence(manifest.metadata),
       protectedInventory: evidence(manifest.protectedInventory), exchangeBases: evidence(manifest.exchangeBases),
@@ -102,16 +107,70 @@ export class BackupRestoreJob {
     if (!restoreEqual(current.source.proof, inspection.source.proof)) fail('restore-project-identity');
     checkAbort(signal); return new BackupRestoreJob(root, newId(), checked, inspection, owned, current, state.selection, null);
   }
+  static async prepareFirstOpen(root: ProjectWorkspaceFS, file: Blob, limits: MetadataLimits, databases: RestoreDatabasePorts, signal?: AbortSignal) {
+    const checked = checkLimits(limits); restoreRoot(root); checkAbort(signal);
+    if (!(file instanceof Blob)) return fail('restore-file');
+    const owned = file.slice(0, file.size), inspection = await BackupArchive.inspect(owned, checked, signal);
+    const absence = await this.observeAbsence(root, checked, databases, inspection.source.proof);
+    checkAbort(signal); return new BackupRestoreJob(root, newId(), checked, inspection, owned, null, null, null, absence);
+  }
+  /** First-only observation. Never opens an original Repo or treats a failed probe as absence. */
+  static async observeAbsence(root: ProjectWorkspaceFS, limits: MetadataLimits, databases: RestoreDatabasePorts,
+    proof: BackupArchive['source']['proof'], ownJob?: string): Promise<AbsentSnapshot> {
+    if (!databases.originalDatabasePresent || await databases.originalDatabasePresent() !== false) return fail('restore-original-not-absent');
+    const state = await reconcileRestoreDatabases(root, limits, () => databases.listGenerations(), true), prefix = restoreRoot(root), paths = await root.list(prefix);
+    if (state.selection || state.pending && state.pending.id !== ownJob || paths.length > L.entryCount) return fail('restore-original-not-absent');
+    const retainedByJob = new Map<string, string[]>();
+    for (const path of paths) {
+      const relative = path.slice(prefix.length), match = /^v2\/(?:local-restore\/(?:jobs\/([0-9a-f]{32})\/|index\/([0-9a-f]{32})\.json$)|generations\/([0-9a-f]{32})\/)/.exec(relative);
+      if (!path.startsWith(prefix) || !match) return fail('restore-original-not-absent');
+      const id = match[1] ?? match[2] ?? match[3]!, retained = retainedByJob.get(id) ?? []; retained.push(relative); retainedByJob.set(id, retained);
+    }
+    const terminalJobs: AbsentSnapshot['terminalJobs'] = [];
+    for (const job of [...state.jobs].sort((a,b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0)) {
+      const p = job.prepared;
+      if (p?.schema !== 'lociview-local-restore-prepared-2') return fail('restore-absence-provenance');
+      if (!restoreEqual(p.backup.proof, proof) || job.start && job.start.schema !== 'lociview-local-restore-start-2') return fail('restore-absence-provenance');
+      if (job.id === ownJob) {
+        if (terminal(job) || job.start && (job.start.schema !== 'lociview-local-restore-start-2' || !restoreEqual(job.start.current.retained, restoreRef(p.absence)))) fail('restore-absence-owner');
+        if (job.start) {
+          const inspected = await this.inspectInput(root, job.id, p, limits);
+          if (!restoreEqual(inspected.source.proof, proof) || !restoreEqual([...inspected.source.heads], p.backup.heads)) fail('restore-project-identity');
+        } else if (job.indexed || job.dbOpened || job.destinationFiles.length || state.databaseIds.includes(job.id)) fail('restore-absence-owner');
+        continue;
+      }
+      if (!job.abandoned && job.result?.detail.kind !== 'cancelled') fail('restore-absence-provenance');
+      if (job.abandoned && (job.start || job.indexed || job.dbOpened || job.destinationFiles.length || state.databaseIds.includes(job.id))) fail('restore-absence-provenance');
+      if (job.start) {
+        const inspected = await this.inspectInput(root, job.id, p, limits);
+        const check = new BackupRestoreJob(root, job.id, limits, inspected, new Blob(), null, null, job.start, p.absence);
+        if (!restoreEqual(check.descriptor(), p)) fail('restore-input-descriptor');
+      }
+      terminalJobs.push({ jobId: job.id, prepared: restoreRef(p), start: job.start ? restoreRef(job.start) : null,
+        terminal: job.abandoned ? { kind: 'abandoned', evidence: restoreRef({ schema: 'lociview-local-restore-abandoned-1', jobId: job.id, stage: 'beforeStart' }) } : { kind: 'cancelled', evidence: restoreRef(job.result) },
+        dbOpened: job.dbOpened ? restoreRef({ schema: 'lociview-local-restore-db-opened-1', jobId: job.id, start: restoreRef(job.start), generationId: job.id }) : null,
+        retainedPaths: (retainedByJob.get(job.id) ?? []).sort(),
+        generationDatabase: state.databaseIds.includes(job.id) });
+    }
+    return cloneCanonicalValue({ originalPaths: [], originalDatabase: false, selection: null, terminalJobs }, limits) as unknown as AbsentSnapshot;
+  }
+  private async checkPredecessor(ports: RestoreSourcePorts | null, databases: RestoreDatabasePorts, state: Awaited<ReturnType<typeof readRestoreControls>>, ownJob?: string) {
+    if (this.absence) {
+      if (!restoreEqual(await BackupRestoreJob.observeAbsence(this.root, this.limits, databases, this.inspection.source.proof, ownJob), this.absence)) fail('restore-confirmation-stale');
+    } else if (!ports || !restoreEqual(await BackupRestoreJob.current(this.root, ports, this.limits, state, ownJob), this.current)) fail('restore-confirmation-stale');
+  }
   /** Explicit confirmation. Recheck the whole captured work before the first write under its original lease. */
-  async persist(ports: RestoreSourcePorts, databases: RestoreDatabasePorts, signal?: AbortSignal) {
+  async persist(ports: RestoreSourcePorts | null, databases: RestoreDatabasePorts, signal?: AbortSignal) {
     return underWriteLease(this.root, async () => {
       checkAbort(signal); if (this.start) return fail('restore-already-started');
       const state = await reconcileRestoreDatabases(this.root, this.limits, () => databases.listGenerations());
       if (state.jobs.some(job => job.id === this.id)) fail('restore-job-exists');
-      const current = await BackupRestoreJob.current(this.root, ports, this.limits, state);
-      if (!restoreEqual(current, this.current) || !restoreEqual(state.selection, this.previousSelection)) fail('restore-confirmation-stale');
-      const prepared = this.descriptor(), start: RestoreStart = { schema: 'lociview-local-restore-start-1', jobId: this.id,
-        prepared: restoreRef(prepared), previousSelection: this.previousSelection, current };
+      await this.checkPredecessor(ports, databases, state);
+      if (!restoreEqual(state.selection, this.previousSelection)) fail('restore-confirmation-stale');
+      const prepared = this.descriptor(), start: RestoreStart = this.absence ? { schema: 'lociview-local-restore-start-2', jobId: this.id,
+        prepared: restoreRef(prepared), previousSelection: null, current: { kind: 'absent', retained: restoreRef(this.absence) },
+        backup: { proof: this.inspection.source.proof, heads: [...this.inspection.source.heads] } } : { schema: 'lociview-local-restore-start-1', jobId: this.id,
+        prepared: restoreRef(prepared), previousSelection: this.previousSelection, current: this.current };
       // Reserve control and entry budgets before writing, not after leaving a new unresumable job.
       const startRef = restoreRef(start), futureRef = { sha256: 'f'.repeat(64), byteLength: L.controlBytes };
       const index = { schema: 'lociview-local-restore-index-1', jobId: this.id, start: startRef };
@@ -126,7 +185,8 @@ export class BackupRestoreJob {
         transform(chunk, controller) { checkAbort(signal); controller.enqueue(chunk); }, flush() { checkAbort(signal); },
       })));
       const saved = await BackupRestoreJob.inspectInput(this.root, this.id, prepared, this.limits, signal);
-      if (!restoreEqual(saved.source.proof, current.source.proof)) fail('restore-project-identity');
+      if (!restoreEqual(saved.source.proof, this.inspection.source.proof)) fail('restore-project-identity');
+      if (this.absence) await this.checkPredecessor(null, databases, await readRestoreControls(this.root, this.limits), this.id);
       checkAbort(signal); await this.write('start.json', start);
       await writeRestoreControl(this.root, `${restoreRoot(this.root)}v2/local-restore/index/${this.id}.json`, index, this.limits);
       const job = await BackupRestoreJob.open(this.root, this.id, this.limits, databases, signal);
@@ -145,12 +205,14 @@ export class BackupRestoreJob {
     const state = await reconcileRestoreDatabases(root, limits, () => databases.listGenerations()), job = state.jobs.find(j => j.id === id);
     if (!job?.start || !job.prepared || terminal(job) || state.tail?.jobId === id) return fail('restore-not-pending');
     const inspection = await this.inspectInput(root, id, job.prepared, limits, signal);
-    if (!restoreEqual(inspection.source.proof, job.start.current.source.proof)) fail('restore-project-identity');
+    if (!restoreEqual(inspection.source.proof, restoreBackupProof(job.start))) fail('restore-project-identity');
     const file = await root.readStream(restoreJobPath(root, id, 'input.zip'));
     if (!file?.blob) return fail('restore-input-missing');
     const owned = await file.blob(), result = new BackupRestoreJob(root, id, checkLimits(limits), inspection, owned,
-      job.start.current, job.start.previousSelection, job.start);
+      job.start.schema === 'lociview-local-restore-start-1' ? job.start.current : null, job.start.previousSelection, job.start,
+      job.prepared.schema === 'lociview-local-restore-prepared-2' ? job.prepared.absence : null);
     if (!restoreEqual(result.descriptor(), job.prepared)) fail('restore-input-descriptor');
+    if (result.absence) await result.checkPredecessor(null, databases, state, id);
     checkAbort(signal); return result;
   }
   private async pending(requireDb: boolean) {
@@ -204,10 +266,13 @@ export class BackupRestoreJob {
     limits: MetadataLimits, selected?: GenerationSelection) {
     if (!job.prepared) return fail('restore-destination-job');
     // Selection must not acknowledge a destination whose retained recovery archive is already corrupt.
-    await this.inspectInput(root, job.id, job.prepared, limits);
+    const inspection = await this.inspectInput(root, job.id, job.prepared, limits);
+    if (job.start?.schema === 'lociview-local-restore-start-2' && (job.prepared.schema !== 'lociview-local-restore-prepared-2' ||
+      !restoreEqual(job.start.backup, { proof: inspection.source.proof, heads: [...inspection.source.heads] }) || !restoreEqual(job.prepared.backup, job.start.backup)))
+      fail('restore-input-backup');
     const restored = await new TransactionJournal(ports.fs, limits).readRestoredBases();
     if (!job.prepared || !job.start || !job.dbOpened || !restored || restored.entry.start.transactionId !== job.id ||
-      !restoreEqual(restored.entry.start.proof, job.start.current.source.proof)) return fail('restore-destination-journal');
+      !restoreEqual(restored.entry.start.proof, restoreBackupProof(job.start))) return fail('restore-destination-journal');
     const original = restored.input.proof.source;
     for (const key of ['manifest', 'metadata', 'protectedInventory', 'exchangeBases', 'baseEvidence'] as const)
       if (!restoreEqual(original[key], job.prepared[key])) fail('restore-destination-originals');
@@ -251,7 +316,7 @@ export class BackupRestoreJob {
     } catch (error) { await scope.dispose().catch(() => {}); throw error; }
   }
   /** One authoritative switch. An already retained switch is completed, never rewritten or rolled back. */
-  async select(current: RestoreSourcePorts, destination: RestoreSourcePorts & { factory: MetadataStorageFactory }, databases: RestoreDatabasePorts,
+  async select(current: RestoreSourcePorts | null, destination: RestoreSourcePorts & { factory: MetadataStorageFactory }, databases: RestoreDatabasePorts,
     createSelectedPorts: (scope: Awaited<ReturnType<typeof openWorkspaceGeneration>>) => RestoreSourcePorts) {
     return underWriteLease(this.root, async () => {
       let state: Awaited<ReturnType<typeof readRestoreControls>> = await reconcileRestoreDatabases(this.root, this.limits, () => databases.listGenerations());
@@ -264,13 +329,12 @@ export class BackupRestoreJob {
       } else {
         await this.assertStaging(destination.fs, destination.factory);
         if (!restoreEqual(state.selection, this.previousSelection)) return fail('restore-confirmation-stale');
-        const now = await BackupRestoreJob.current(this.root, current, this.limits, state, this.id);
-        if (!restoreEqual(now, this.current)) return fail('restore-confirmation-stale');
+        await this.checkPredecessor(current, databases, state, this.id);
         const verified = await BackupRestoreJob.verifyDestination(this.root, destination, destination.factory, job, this.limits);
         // Recheck source and selection after streamed destination verification, inside the same root queue.
         state = await readRestoreControls(this.root, this.limits);
-        if (state.pending?.id !== this.id || !restoreEqual(state.selection, this.previousSelection) ||
-          !restoreEqual(await BackupRestoreJob.current(this.root, current, this.limits, state, this.id), this.current)) fail('restore-confirmation-stale');
+        if (state.pending?.id !== this.id || !restoreEqual(state.selection, this.previousSelection)) fail('restore-confirmation-stale');
+        await this.checkPredecessor(current, databases, state, this.id);
         const selection: GenerationSelection = { schema: 'lociview-local-generation-selection-1', jobId: this.id,
           previous: this.previousSelection, start: restoreRef(this.start), destination: verified.destination };
         await writeRestoreControl(this.root, `${restoreRoot(this.root)}v2/local-restore/selections/${restoreRef(selection).sha256}.json`, selection, this.limits);

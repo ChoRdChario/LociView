@@ -19,7 +19,7 @@ record executed evidence and connections; do not infer those from a document tit
 | Adoption, device/performance and release gates | [specification 03](specs/03-gates-and-delivery.md), [G0 coverage](g0/g0-coverage-map.md) |
 | LociMyu → Native conversion | [specification 04](specs/04-locimyu-conversion.md) |
 | Project/Scene team work and TEAM-FLOW-01 | [specification 05](specs/05-project-scene-team-workflow.md), especially §§7.5, 12.6, 13.2 |
-| Approved first backup opening when the original Project is absent | [First-backup companion](specs/06a-first-backup-open-proposal.md); exact absent predecessor/P2/S2 and recovery/selection contract approved 2026-10-16; not implemented or adopted |
+| Approved first backup opening when the original Project is absent | [First-backup companion](specs/06a-first-backup-open-proposal.md); exact absent predecessor/P2/S2 recovery implemented and Node-verified in bounded validation; not adopted |
 | Workspace, Contribution, backup, review, clean copy | [specification 06](specs/06-project-package-wire.md), especially §§8, 11–12 and section-local status |
 | One-time Native/v1/LociMyu conversion and cutover | [specification 07](specs/07-project-scene-migration.md); continued old-format updates were withdrawn by PO 2026-09-14; initial mapping/compatibility remains to be closed |
 | Approved bounded Native material conversion | [Appearance companion](specs/07a-native-appearance-conversion-proposal.md); recipe-2/profile/subset approved 2026-10-15; implementation/evidence remain in todo |

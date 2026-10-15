@@ -12,6 +12,14 @@ export async function browserMetadataDatabaseNames(): Promise<string[]> {
   if (typeof indexedDB.databases !== 'function') throw Error('このブラウザでは保存領域を安全に確認できません。');
   return (await indexedDB.databases()).flatMap(db => db.name ? [db.name] : []);
 }
+/** First-backup absence needs a complete successful observation; unnamed entries are unknown. */
+export async function browserOriginalDatabasePresent(name: string): Promise<boolean> {
+  if (typeof indexedDB.databases !== 'function') throw Error('このブラウザでは元の保存領域の未存在を確認できません。');
+  const databases = await indexedDB.databases();
+  if (!Array.isArray(databases) || databases.some(db => !db || typeof db.name !== 'string' || !db.name))
+    throw Error('元の保存領域を確認できません。既存データは変更していません。');
+  return databases.some(db => db.name === name);
+}
 export async function openBrowserMetadataStorage(name: string, allowCreate: boolean) {
   if (!(await browserMetadataDatabaseNames()).includes(name) && !allowCreate)
     throw Error('必要な保存領域がありません。既存データは保持しています。');

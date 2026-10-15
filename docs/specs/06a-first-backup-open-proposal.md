@@ -1,6 +1,6 @@
 # First backup opening into an absent Project
 
-Status: **APPROVED — exact companion ratified by PO 2026-10-16; bounded implementation authorized, not implemented or adopted.**
+Status: **APPROVED — exact companion ratified by PO 2026-10-16; Implemented in nondefault validation with Node/injected/recorded-DOM evidence, not adopted.**
 This additive companion to [06](06-project-package-wire.md) addresses the missing
 first-open path, separately from the existing ready-Project replacement restore.
 The accepted unified file selector does not authorize this storage branch.
@@ -234,3 +234,29 @@ deletion, release/deployment and managed-browser-denial retries are excluded.
 PO explicitly ratified this exact absent-predecessor/local-record and recovery/
 selection contract on 2026-10-16 and authorized its bounded implementation.
 That approval does not claim implementation, browser/device acceptance or adoption.
+
+## Bounded implementation evidence
+
+The nondefault validation route connects content-inspected backup confirmation
+to recovery-only opening, dedicated-generation initialization/selection, actual
+typed edits, file output and selected cold reopening. Normal Host/ready Start-1,
+wire/seals and existing profiles remain unchanged. The browser adapter adds only
+the strict noncreating original-name observation; injected enumeration tests do
+not count as actual browser storage evidence. Todo owns the passed final checks
+and HTTP identity evidence; ordinary/browser/device/offline gates remain separate.
+
+The real owned synthetic backup captured in the service acceptance was 19704
+bytes, SHA-256 `6b22328fd6ac885073cfc60e590050f4d79cc9ffecbc6e800c31728ecc4e8e31`.
+These three exact canonical UTF-8 records (no BOM or final LF) were captured from
+that test, then independently re-canonicalized and hashed with Node and .NET.
+They are local implementation evidence, not distributed input fixtures.
+
+| Record | Bytes | SHA-256 |
+|---|---:|---|
+| Prepared-2 | 1529 | `68891617508803a840fee420c80d7900702cf453282f59fd02e3c0ce2a84c34a` |
+| Start-2 | 942 | `e0c9aecc4c17b2ec668fcbc64bb69bdfd66483611b10553cdd82a45d91920ef6` |
+| Next absence snapshot after cancellation | 871 | `80b7528f399e24842712afbdf10676561297e28ab09ab777f379f67de8ff9544` |
+
+The Start binds that Prepared and its exact backup proof/heads; the next snapshot
+binds the actual cancelled job and retained paths. The acceptance also compares
+all three refs against an independent digest of the actual canonical bytes.

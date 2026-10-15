@@ -1788,10 +1788,12 @@ the existing explicit-map2 creation. Photos remain registered resources, without
 automatic Caption attachment. A single package keeps existing conversion order,
 recognized-invalid versus nonmatching behavior, purpose inspection and typed
 Workspace/Clean/read-only review paths. Reject multiple packages or a package
-mixed with raw files; never silently use just the first file. Backup/Contribution
-selection points to restore/receive in the corresponding opened Project. It does
-not bootstrap an absent Project, reinterpret a backup as Workspace or create a
-throwaway baseline; initial absent-Project restore is a separate storage decision.
+mixed with raw files; never silently use just the first file. Contribution
+selection points to receive in the corresponding opened Project. Backup selection
+uses the separately approved [06a first-backup contract](06a-first-backup-open-proposal.md)
+for a proven absent original, or existing ready-Project replacement confirmation.
+It never bootstraps a Project, reinterprets backup as Workspace or creates a
+throwaway baseline. Recovery-only controls precede an actual selected Host.
 
 The UI owns a selection generation, captured names/bytes and the matching title/
 prepared attempt. Capture count/combined-byte budgets before reads, and finish

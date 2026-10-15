@@ -41,7 +41,8 @@ import { assetMembershipGroups } from '../src/projectMetadata/membership';
 import { assetCopySource, prepareAssetMembershipCopy } from '../src/projectMetadata/modelMembership';
 import { pickResidentSurface } from '../src/harness/projectScene/viewportPicking';
 import { fixtureModelIds } from '../src/harness/projectScene/modelClosure';
-import { openValidationHost, validationArea } from '../src/harness/projectScene/validationHost';
+import { openValidationHost, openValidationEntry, validationArea } from '../src/harness/projectScene/validationHost';
+import { browserMetadataDatabaseNames, browserOriginalDatabasePresent } from '../src/harness/projectScene/browserMetadataStorage';
 import { createValidationModeHost } from '../src/harness/projectScene/validationModeHost';
 import { productSources } from '../src/harness/projectScene/productSources';
 import { projectCaptions, projectMediaResources, projectMediaUncertain, projectCaptionInventory } from '../src/ui/projectScene/projectRead';
@@ -570,15 +571,18 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     if(handoff&&backup){
       const peer=firstWorkspaceRecipient(decodeJpeg),databases=new Map<string,MetadataStorageFactory>();let received:Awaited<ReturnType<typeof openValidationHost>>|undefined;
       const peerStorage=async(key:string,create:boolean)=>{if(!databases.has(key)){if(!create)throw Error('missing');databases.set(key,storageFactory());}return{factory:databases.get(key)!,dispose:async()=>{}};};
-      const peerOptions={...options,base:peer.fs,coordinator:ProjectMutationCoordinator.browser(peer.locks),store:peer.store,packageLocks:peer.locks};
-      const opening=vi.fn<ValidationWorkspacePorts['open']>(async(key,initial,mode,workspaceFile)=>received=await openValidationHost({...peerOptions,run:key,initial,mode,workspaceFile,openStorage:create=>peerStorage(key,create)}));
+      const generations = new Map<string, MetadataStorageFactory>();
+      const peerOptions={...options,base:peer.fs,coordinator:ProjectMutationCoordinator.browser(peer.locks),store:peer.store,packageLocks:peer.locks,
+        generations:(key:string):RestoreDatabasePorts=>({originalDatabasePresent:async()=>databases.has(key),listGenerations:async()=>[...generations.keys()],open:async(id,create)=>{
+          if(id===null)return peerStorage(key,create);if(!generations.has(id)&&create)generations.set(id,storageFactory());const factory=generations.get(id);if(!factory)throw Error('missing generation');return{factory,dispose:async()=>{}};}})};
+      const opening=vi.fn<ValidationWorkspacePorts['open']>(async(key,initial,mode,workspaceFile,reviewEdit,firstBackup)=>{const result=await openValidationEntry({...peerOptions,run:key,initial,mode,workspaceFile,reviewEdit,firstBackup,openStorage:create=>peerStorage(key,create)});if(!('kind'in result))received=result;return result;});
       const next=owned(createValidationWorkspace(new RecordedDocument().asDocument(),{...peerOptions,productEditor:true,list:async()=>[],selected(){},render:async()=>({factory,dispose(){}}),open:opening})),page=record(next.root),input2=all(page).find(n=>n.attributes.get('aria-label')==='ファイルを選択')!;
       await vi.waitFor(()=>expect(all(page).find(n=>n.tag==='button'&&n.textContent==='ファイルを開く')!.disabled).toBe(false));
-      // First-time backup restore is a separate contract: provide the contextual route without bootstrapping a Project.
+      // First-backup confirmation remains read-only until the user explicitly accepts it.
       Object.assign(input2,{files:[backup]});input2.fire('change');input2.parent!.parent!.fire('submit',{preventDefault(){}});
-      await vi.waitFor(()=>expect(all(page).some(n=>n.textContent.includes('対応するプロジェクトを開き'))).toBe(true));
-      expect(opening).not.toHaveBeenCalled();expect(await peer.fs.list('')).toEqual([]);expect(databases.size).toBe(0);
-      all(page).find(n=>n.tag==='button'&&n.textContent==='選択を取り消す')!.fire('click');expect(next.hasChanges()).toBe(false);
+      await vi.waitFor(()=>expect(all(page).some(n=>n.textContent.includes('再開用データはありません'))).toBe(true));
+      expect(opening).toHaveBeenCalledOnce();expect(await peer.fs.list('')).toEqual([]);expect(databases.size).toBe(0);
+      all(page).filter(n=>n.tag==='button'&&n.textContent==='キャンセル').at(-1)!.fire('click');await vi.waitFor(()=>expect(next.hasChanges()).toBe(false));
       Object.assign(input2,{files:[handoff]});input2.fire('change');input2.parent!.parent!.fire('submit',{preventDefault(){}});
       await vi.waitFor(()=>expect(received?.read().state).toBe('ready'),{timeout:10000});
       await vi.waitFor(()=>expect(all(page).some(n=>n.className==='lv-project-workspace')).toBe(true));
@@ -1567,7 +1571,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     await vi.waitFor(() => expect(ui.selected).toBeTruthy());
     await vi.waitFor(() => expect(button('更新を再試行')?.hidden).toBe(false));
     const run = ui.selected!, originalChanges = host!.read().source?.originalChanges(); await ui.dispose(); fs.reject = () => false;
-    host = await ports.open(run); expect(host.read().state).toBe('pending'); expect(host.workspaceFiles.initialImport).toBe(false);
+    const resumed = await ports.open(run); if ('kind' in resumed) throw Error('normal conversion host'); host = resumed; expect(host.read().state).toBe('pending'); expect(host.workspaceFiles.initialImport).toBe(false);
     await host.authority.retry!(); expect(host.read().state).toBe('ready');
     if (originalChanges) expect(host.read().source!.originalChanges()).toEqual(originalChanges);
     const project = host.authority.read(), p = host.read().provider!;
@@ -1589,7 +1593,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     fs.reject = path => path.endsWith('/blobsVerified.json');
     await expect(Promise.resolve(host!.authority.write(host!.read().source!.token, { [`caption/${placed.id}/body`]: '通常編集の中断から復旧' })).then(() => undefined)).rejects.toThrow();
     fs.reject = () => false; await host.authority.retry!();
-    await host!.dispose(); host = await ports.open(run); expect(host.read().state).toBe('ready');
+    await host!.dispose(); const reopened = await ports.open(run); if ('kind' in reopened) throw Error('normal conversion host'); host = reopened; expect(host.read().state).toBe('ready');
     expect(host.authority.read().resources.captions[placed.id]!.body).toEqual({ kind: 'value', value: '通常編集の中断から復旧' });
     const edited = host!.read().source!, backupId = await host!.workspaceOutput.generateBackup(edited.token, '変換後の確認');
     const backup = await host!.workspaceOutput.download(backupId), inspectedBackup = await BackupArchive.inspect(backup, metadata);
@@ -1768,7 +1772,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       (prepared.records.captionsById as Record<string, JsonObject>)[captionId] = { id: captionId, title: '記録', body: '', colorSrgb: [1,0,0], lifecycle: lifecycle(),
         anchor: { kind: 'project', projectFrameId: (project.frame as JsonObject).id!, positionProject: [0,0,0] } };
       (prepared.records.sceneCaptionMembershipsById as Record<string, JsonObject>)[membershipId] = { id: membershipId, captionId, sceneId: project.defaultSceneId!, orderKey: 'A', lifecycle: lifecycle() };
-      const host = await ports.open(run, prepareValidationCreation(prepared,'map2')), source = host.read().source!; await host.dispose();
+      const host = await ports.open(run, prepareValidationCreation(prepared,'map2')); if ('kind' in host) throw Error('normal seed host'); const source = host.read().source!; await host.dispose();
       return { run, captionId, source };
     };
     const mount = (initialRun?: string, overrides: Partial<ValidationWorkspacePorts> = {}) => {
@@ -1853,7 +1857,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     let first = true; const list = async () => {
       const entries = await f.ports.list();
       if (first) { first = false;
-        if (kind === 'pending') { const host = await f.ports.open(a.run); f.fs.reject = p => p.endsWith('/published.json');
+        if (kind === 'pending') { const host = await f.ports.open(a.run); if ('kind' in host) throw Error('normal resume host'); f.fs.reject = p => p.endsWith('/published.json');
           await expect(host.dispatch(host.read().source!.token,{kind:'editCaption',captionId:a.captionId,edits:{body:'中断した更新'}})).rejects.toThrow(); f.fs.reject = () => false; await host.dispose(); }
         if (kind === 'lease') await f.ports.open(a.run);
       }
@@ -1925,6 +1929,210 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const prepare = () => BackupRestoreJob.prepare(f.fs, ports, file, metadata, databases);
     return { ...f, session, current, sender, backupFile: file, databases, factories, ports, prepare };
   }
+  async function firstBackupRecipient() {
+    const base = new TestFS(), locks = lockManager(), coordinator = ProjectMutationCoordinator.browser(locks), run = newId(),
+      lease = await coordinator.tryAcquire(base, `first-backup/${run}`, run), factories = new Map<string, MetadataStorageFactory>(),
+      store = new OriginBlobStore(base, { maxBlobBytes: budget.maxFileBytes, maxChunkBytes: 1_000_000, maxChunks: 10000, metadata }, locks);
+    owned({ dispose: async () => { lease.beginClose(); await lease.waitForWorkspaceIdle(); lease.sealWorkspaceWritesForRelease(); lease.release(); } });
+    const databases: RestoreDatabasePorts = { originalDatabasePresent: vi.fn(async () => false), listGenerations: async () => [...factories.keys()],
+      open: vi.fn(async (id, allowCreate) => { if (id === null) throw Error('original database must not open');
+        if (!factories.has(id) && allowCreate) factories.set(id, storageFactory());
+        const factory = factories.get(id); if (!factory) throw Error('database does not exist'); return { factory, dispose: async () => {} }; }) };
+    const ports = (scope: { fs: ProjectWorkspaceFS; factory: MetadataStorageFactory }) => ({ fs: scope.fs, factory: scope.factory, store,
+      session: validationProjectService(scope.fs, scope.factory, store, budget, decode).session });
+    return { base, lease, fs: lease.workspace, store, databases, factories, ports };
+  }
+  it('uses a strict noncreating original-database observation for first backups without changing old enumeration', async () => {
+    const before = Object.getOwnPropertyDescriptor(globalThis, 'indexedDB'), databases = vi.fn(), open = vi.fn();
+    Object.defineProperty(globalThis, 'indexedDB', { configurable: true, value: { databases, open } });
+    try {
+      databases.mockResolvedValue([{ name: 'original' }]); await expect(browserOriginalDatabasePresent('original')).resolves.toBe(true);
+      databases.mockResolvedValue([]); await expect(browserOriginalDatabasePresent('original')).resolves.toBe(false);
+      databases.mockResolvedValue([{}]); await expect(browserOriginalDatabasePresent('original')).rejects.toThrow('確認');
+      await expect(browserMetadataDatabaseNames()).resolves.toEqual([]); // Existing reader's behavior is retained.
+      databases.mockRejectedValue(Error('enumeration failed')); await expect(browserOriginalDatabasePresent('original')).rejects.toThrow('enumeration failed');
+      Object.defineProperty(globalThis, 'indexedDB', { configurable: true, value: { open } }); await expect(browserOriginalDatabasePresent('original')).rejects.toThrow('確認');
+      expect(open).not.toHaveBeenCalled();
+    } finally { if (before) Object.defineProperty(globalThis, 'indexedDB', before); else Reflect.deleteProperty(globalThis, 'indexedDB'); }
+  });
+  async function firstBackupHostFixture(file: Blob) {
+    const inspection = await BackupArchive.inspect(file, metadata), run = (inspection.source.proof.identity.projectId as string).slice(4),
+      base = new TestFS(), locks = lockManager(), factories = new Map<string, MetadataStorageFactory>(), store = new OriginBlobStore(base,
+        { maxBlobBytes: budget.maxFileBytes, maxChunkBytes: 1_000_000, maxChunks: 10000, metadata }, locks);
+    const openStorage = vi.fn(async () => { throw Error('original database must not open'); });
+    const databases: RestoreDatabasePorts = { originalDatabasePresent: vi.fn(async () => false), listGenerations: async () => [...factories.keys()],
+      open: vi.fn(async (id, create) => { if (id === null) return openStorage(); if (!factories.has(id) && create) factories.set(id, storageFactory());
+        const factory = factories.get(id); if (!factory) throw Error('database does not exist'); return { factory, dispose: async () => {} }; }) };
+    const options = { run, base, store, fileLimits: budget, decode, coordinator: ProjectMutationCoordinator.browser(locks), packageLocks: locks, generations: () => databases, openStorage };
+    return { options, databases, base, inspection, run, openStorage, firstBackup: { file, archive: { sha256: inspection.archive.sha256, byteLength: inspection.archive.byteLength } } };
+  }
+  it('opens first-backup recovery without a normal Session, cold-retries its acknowledged generation and hands the same lease to real editing', async () => {
+    const f = await restoreFileFixture(), r = await firstBackupHostFixture(f.backupFile), preview = owned(await openValidationEntry({ ...r.options, firstBackup: r.firstBackup }));
+    if (!('kind' in preview)) throw Error('first recovery'); expect('authority' in preview).toBe(false); expect(preview.state().phase).toBe('preview');
+    expect(await r.base.list('')).toEqual([]); expect(r.openStorage).not.toHaveBeenCalled();
+    r.base.reject = path => path.endsWith('/published.json'); await expect(preview.confirm(async () => {})).rejects.toThrow('injected quota');
+    expect(preview.state().phase).toBe('pending'); await preview.dispose(); r.base.reject = () => false;
+    const catalog = await listValidationProjects(r.options, r.openStorage); expect(catalog[0]).toMatchObject({ run: r.run, firstRestore: 'pending', state: 'incomplete' });
+    const view = owned(await openValidationEntry({ ...r.options, mode: 'view' })); if (!('kind' in view)) throw Error('view recovery');
+    expect(view.readOnly).toBe(true); const files = await r.base.list(''), bytes = await Promise.all(files.map(path => r.base.readBytes(path)));
+    await expect(view.retry(async () => {})).rejects.toThrow('編集'); expect(await Promise.all(files.map(path => r.base.readBytes(path)))).toEqual(bytes); await view.dispose();
+    const cold = owned(await openValidationEntry(r.options)); if (!('kind' in cold)) throw Error('cold recovery');
+    const prepared = vi.fn(async (next, content) => { expect(next.validationFiles).toBe(true); expect(next.modelVersions).toHaveLength(2);
+      for (const version of next.modelVersions!) expect((await content.model(version.closure.representation)).bytes).toEqual((await f.reopen().content.model(version.closure.representation)).bytes); });
+    const host = owned(await cold.retry(prepared)); expect(prepared).toHaveBeenCalledOnce(); expect(host.read().source!.originalChanges()).toEqual(r.inspection.source.originalChanges());
+    expect(host.authority.readOnly).toBe(false); await host.dispatch(host.read().source!.token, { kind: 'editCaption', captionId: f.captionId, edits: { body: '初回復元の実編集' } });
+    const edited = host.read().source!, sent = await host.workspaceOutput.download(await host.workspaceOutput.generateContribution(edited.token, host.workspaceOutput.bases[0]!.selection));
+    const accepted = await f.receiverService.receive((await f.receiver.session.read()).source!.token, sent); expect(accepted.state).toBe('ready');
+    await host.dispose(); const reopened = owned(await openValidationEntry(r.options)); if ('kind' in reopened) throw Error('selected normal Host');
+    expect(reopened.read().source!.originalChanges()).toEqual(edited.originalChanges()); expect(r.openStorage).not.toHaveBeenCalled();
+    expect(vi.mocked(r.databases.open).mock.calls.filter(([, create]) => create)).toHaveLength(1);
+  }, 60_000);
+  it('confirms and cancels first backup opening from the unified picker, then edits, saves and cold-reopens the selected Project', async () => {
+    const f = await restoreFileFixture(), r = await firstBackupHostFixture(f.backupFile); let current: Awaited<ReturnType<typeof openValidationHost>> | undefined;
+    const factory: ViewportFactory = () => ({ update() {}, setActive() {}, camera() {}, retry() {}, dispose() {}, read: () => ({ ready: true, display: undefined, token: '1', pickToken: '1', pins: [], issue: null, dragging: false, projection: 'perspective', axis: null }) });
+    const ui = owned(createValidationWorkspace(new RecordedDocument().asDocument(), { ...r.options, productEditor: true,
+      list: () => listValidationProjects(r.options, r.openStorage), selected() {}, render: async () => ({ factory, dispose() {} }),
+      open: async (run, initial, mode, workspaceFile, reviewEdit, firstBackup) => { const opened = await openValidationEntry({ ...r.options, run, initial, mode, workspaceFile, reviewEdit, firstBackup });
+        if (!('kind' in opened)) current = opened; else { const confirm = opened.confirm.bind(opened); opened.confirm = async prepare => current = await confirm(prepare); } return opened; } }));
+    const root = record(ui.root), all = (n: RecordedNode): RecordedNode[] => [n, ...n.children.flatMap(all)], input = all(root).find(n => n.attributes.get('aria-label') === 'ファイルを選択')!,
+      button = (label: string) => all(root).filter(n => n.tag === 'button' && n.textContent === label).at(-1)!;
+    await vi.waitFor(() => expect(button('ファイルを開く').disabled).toBe(false));
+    const choose = () => { Object.assign(input, { files: [new File([f.backupFile], '現地の保存.backup')] }); input.fire('change'); input.parent!.parent!.fire('submit', { preventDefault() {} }); };
+    choose(); await vi.waitFor(() => expect(button('バックアップから復元')).toBeTruthy()); expect(await r.base.list('')).toEqual([]);
+    const original = await r.inspection.source.inspectOriginal(metadata), project = original.candidates.unambiguousRecords.project as JsonObject;
+    expect(all(root).some(n => n.textContent === `${project.title} — 現地の保存.backup`)).toBe(true);
+    button('キャンセル').fire('click'); await vi.waitFor(() => expect(ui.hasChanges()).toBe(false)); expect(await r.base.list('')).toEqual([]);
+    choose(); await vi.waitFor(() => expect(button('バックアップから復元')?.disabled).toBe(false)); button('バックアップから復元').fire('click');
+    await vi.waitFor(() => expect(all(root).some(n => n.className === 'lv-project-workspace')).toBe(true), { timeout: 20000 });
+    expect(current!.read().source!.originalChanges()).toEqual(r.inspection.source.originalChanges());
+    await current!.dispatch(current!.read().source!.token, { kind: 'editCaption', captionId: f.captionId, edits: { body: '復元した端末での記録' } });
+    const edited = current!.read().source!, saved = await current!.workspaceOutput.download(await current!.workspaceOutput.generateBackup(edited.token, '初回復元後の保存'));
+    expect((await BackupArchive.inspect(saved, metadata)).source.originalChanges()).toEqual(edited.originalChanges());
+    await ui.dispose(); const cold = owned(await openValidationEntry(r.options)); if ('kind' in cold) throw Error('selected Host');
+    expect(cold.read().source!.originalChanges()).toEqual(edited.originalChanges()); expect(r.openStorage).not.toHaveBeenCalled();
+  }, 60_000);
+  it('keeps a read-only first-backup preview cancellable and retains its exact file through lock retry', async () => {
+    const f = await restoreFileFixture(), file = new File([f.backupFile], '選んだ保存点.backup'), r = await firstBackupHostFixture(file),
+      holder = await r.options.coordinator.tryAcquire(r.base, `${validationArea}/${r.run}`, `${validationArea}:${r.run}`);
+    owned({ dispose: async () => holder.release() });
+    const first = owned(await openValidationEntry({ ...r.options, firstBackup: r.firstBackup })); if (!('kind' in first)) throw Error('preview');
+    expect(first.readOnly).toBe(true); await first.cancel(); expect(await r.base.list('')).toEqual([]); await first.dispose();
+    const preview = owned(await openValidationEntry({ ...r.options, firstBackup: r.firstBackup })); if (!('kind' in preview)) throw Error('preview');
+    await expect(preview.edit()).rejects.toThrow('別のタブ'); expect(preview.state()).toMatchObject({ phase: 'preview', fileName: '選んだ保存点.backup' });
+    holder.release(); const editable = owned(await preview.edit()); if (!('kind' in editable)) throw Error('editable preview');
+    expect(editable.readOnly).toBe(false); expect(editable.state()).toMatchObject({ phase: 'preview', fileName: '選んだ保存点.backup' });
+    expect(await r.base.list('')).toEqual([]); const host = owned(await editable.confirm(async () => {})); expect(host.read().source!.originalChanges()).toEqual(r.inspection.source.originalChanges());
+  }, 60_000);
+  it('rejects cold first-restore controls rehomed under another Project before any database probe or write', async () => {
+    const f = await restoreFileFixture(), r = await firstBackupHostFixture(f.backupFile), warm = owned(await openValidationEntry({ ...r.options, firstBackup: r.firstBackup }));
+    if (!('kind' in warm)) throw Error('preview'); r.base.reject = path => path.endsWith('/published.json'); await expect(warm.confirm(async () => {})).rejects.toThrow(); r.base.reject = () => false; await warm.dispose();
+    const wrong = newId(), originalRoot = `${validationArea}/${r.run}/`, wrongRoot = `${validationArea}/${wrong}/`;
+    for (const path of await r.base.list(originalRoot)) await r.base.writeBytes(`${wrongRoot}${path.slice(originalRoot.length)}`, (await r.base.readBytes(path))!);
+    const paths = await r.base.list(''), bytes = await Promise.all(paths.map(path => r.base.readBytes(path))), probeCalls = vi.mocked(r.databases.originalDatabasePresent!).mock.calls.length,
+      opens = vi.mocked(r.databases.open).mock.calls.length;
+    await expect(openValidationEntry({ ...r.options, run: wrong })).rejects.toThrow('保存場所');
+    expect(vi.mocked(r.databases.originalDatabasePresent!).mock.calls).toHaveLength(probeCalls); expect(vi.mocked(r.databases.open).mock.calls).toHaveLength(opens);
+    expect(await Promise.all(paths.map(path => r.base.readBytes(path)))).toEqual(bytes); expect(r.openStorage).not.toHaveBeenCalled();
+  }, 60_000);
+  it('opens terminal-only cancelled first-backup records without a Project or a pending-only archive reader', async () => {
+    const f = await restoreFileFixture(), r = await firstBackupHostFixture(f.backupFile), preview = owned(await openValidationEntry({ ...r.options, firstBackup: r.firstBackup }));
+    if (!('kind' in preview)) throw Error('preview');
+    r.base.reject = path => path.endsWith('/published.json'); await expect(preview.confirm(async () => {})).rejects.toThrow(); r.base.reject = () => false;
+    await preview.cancel(); await preview.dispose();
+    expect((await listValidationProjects(r.options, r.openStorage))[0]).toMatchObject({ firstRestore: 'terminal', state: 'unavailable', title: 'プロジェクトなし・復元記録を保持' });
+    const files = await r.base.list(''), bytes = await Promise.all(files.map(path => r.base.readBytes(path))), terminal = owned(await openValidationEntry(r.options));
+    if (!('kind' in terminal)) throw Error('terminal recovery'); expect(terminal.state()).toMatchObject({ phase: 'terminal', title: '名前を確認できないプロジェクト' });
+    expect('authority' in terminal).toBe(false); expect(await Promise.all(files.map(path => r.base.readBytes(path)))).toEqual(bytes); expect(r.openStorage).not.toHaveBeenCalled(); await terminal.dispose();
+    const again = owned(await openValidationEntry({ ...r.options, firstBackup: r.firstBackup })); if (!('kind' in again)) throw Error('new preview');
+    expect(again.state().phase).toBe('preview'); await again.cancel(); expect(await Promise.all(files.map(path => r.base.readBytes(path)))).toEqual(bytes);
+  }, 60_000);
+  it('first-opens an absent original from exact backup history and bases without opening or creating the original database', async () => {
+    const f = await restoreFileFixture(), r = await firstBackupRecipient(), prepared = await BackupRestoreJob.prepareFirstOpen(r.fs, f.backupFile, metadata, r.databases);
+    expect(await r.fs.list(r.fs.projectRoot!)).toEqual([]); expect(r.databases.open).not.toHaveBeenCalled();
+    expect(prepared.absence).toEqual({ originalPaths: [], originalDatabase: false, selection: null, terminalJobs: [] });
+    expect(restoreRef(prepared.absence)).toEqual({ byteLength: 80, sha256: '660e5c4adda3b21a94ca15ab3c318893fe91f5d9027b3bb8e4880417d8e0085f' });
+    r.lease.activateNewProject(); const job = await prepared.persist(null, r.databases), staging = owned(await job.openStaging(r.databases)), destination = r.ports(staging);
+    const initial = await destination.session.initializeBackup(job);
+    expect(initial.source!.originalChanges()).toEqual(job.inspection.source.originalChanges()); expect(initial.source!.heads).toEqual(job.inspection.source.heads);
+    expect(await new WorkspaceBaseStore(staging.fs, metadata, initial.source!.proof).snapshot()).toEqual(await new WorkspaceBaseStore(f.fs, metadata, f.current.source!.proof).snapshot());
+    await job.select(null, destination, r.databases, r.ports); await staging.dispose();
+    const selected = owned(await BackupRestoreJob.openSelected(r.fs, metadata, r.databases, r.ports));
+    const edited = await r.ports(selected).session.editCaption(initial.source!.token, f.captionId, 'body', '初回復元後の追記'); await selected.dispose();
+    const cold = owned(await BackupRestoreJob.openSelected(r.fs, metadata, r.databases, r.ports));
+    expect((await cold.ports.session.read()).source!.originalChanges()).toEqual(edited.source!.originalChanges());
+    expect((await readRestoreControls(r.fs, metadata)).jobs[0]!.start!.schema).toBe('lociview-local-restore-start-2');
+    expect(vi.mocked(r.databases.open).mock.calls.every(([id]) => id !== null)).toBe(true);
+  }, 60_000);
+  it('requires successful original absence and rechecks it before first restore writes', async () => {
+    const f = await restoreFileFixture(), r = await firstBackupRecipient(), probe = vi.mocked(r.databases.originalDatabasePresent!);
+    probe.mockResolvedValueOnce(true); await expect(BackupRestoreJob.prepareFirstOpen(r.fs, f.backupFile, metadata, r.databases)).rejects.toThrow('restore-original-not-absent');
+    probe.mockRejectedValueOnce(Error('enumeration unavailable')); await expect(BackupRestoreJob.prepareFirstOpen(r.fs, f.backupFile, metadata, r.databases)).rejects.toThrow('enumeration unavailable');
+    await expect(BackupRestoreJob.prepareFirstOpen(r.fs, f.backupFile, metadata, { listGenerations: r.databases.listGenerations, open: r.databases.open })).rejects.toThrow();
+    const prepared = await BackupRestoreJob.prepareFirstOpen(r.fs, f.backupFile, metadata, r.databases); r.lease.activateNewProject();
+    probe.mockResolvedValueOnce(true); await expect(prepared.persist(null, r.databases)).rejects.toThrow('restore-original-not-absent');
+    expect(await r.fs.list(r.fs.projectRoot!)).toEqual([]); expect(r.databases.open).not.toHaveBeenCalled();
+    await r.fs.writeText(`${r.fs.projectRoot}/unknown`, 'retained');
+    await expect(prepared.persist(null, r.databases)).rejects.toThrow('restore-original-not-absent');
+    expect(await r.fs.readText(`${r.fs.projectRoot}/unknown`)).toBe('retained');
+  }, 60_000);
+  it('retains cancelled first-only jobs in the next absence snapshot and never admits ready-predecessor residue as absence', async () => {
+    const f = await restoreFileFixture(), r = await firstBackupRecipient(), p = await BackupRestoreJob.prepareFirstOpen(r.fs, f.backupFile, metadata, r.databases);
+    r.lease.activateNewProject(); const job = await p.persist(null, r.databases); await BackupRestoreJob.cancel(r.fs, job.id, metadata, r.databases);
+    const before = await r.fs.list(r.fs.projectRoot!), bytes = await Promise.all(before.map(path => r.fs.readBytes(path))),
+      again = await BackupRestoreJob.prepareFirstOpen(r.fs, f.backupFile, metadata, r.databases);
+    expect(again.absence!.terminalJobs).toHaveLength(1); expect(again.absence!.terminalJobs[0]!.terminal.kind).toBe('cancelled');
+    const controls = await readRestoreControls(r.fs, metadata), vectors = { prepared: controls.jobs[0]!.prepared!, start: controls.jobs[0]!.start!, successor: again.absence! };
+    for (const value of Object.values(vectors)) { const bytes = new TextEncoder().encode(json(value)); expect(restoreRef(value)).toEqual({ byteLength: bytes.length, sha256: await digest(bytes) }); }
+    const next = await again.persist(null, r.databases); expect(next.start!.schema).toBe('lociview-local-restore-start-2');
+    expect(await Promise.all(before.map(path => r.fs.readBytes(path)))).toEqual(bytes);
+    const old = await (await f.prepare()).persist(f.ports, f.databases); await BackupRestoreJob.cancel(f.fs, old.id, metadata, f.databases);
+    await expect(BackupRestoreJob.prepareFirstOpen(f.fs, f.backupFile, metadata, { ...f.databases, originalDatabasePresent: async () => false })).rejects.toThrow();
+  }, 60_000);
+  it('rejects fully rebound first-backup checkpoint heads on selected cold opening without rewriting any evidence', async () => {
+    const f = await restoreFileFixture(), r = await firstBackupRecipient(), prepared = await BackupRestoreJob.prepareFirstOpen(r.fs, f.backupFile, metadata, r.databases);
+    r.lease.activateNewProject(); const job = await prepared.persist(null, r.databases), staging = owned(await job.openStaging(r.databases)), destination = r.ports(staging);
+    await destination.session.initializeBackup(job); await job.select(null, destination, r.databases, r.ports); await staging.dispose();
+    const state = await readRestoreControls(r.fs, metadata), p = JSON.parse((await r.fs.readText(job.path('prepared.json')))!); p.backup.heads = ['a'.repeat(64)];
+    const start = { ...job.start!, prepared: restoreRef(p), backup: p.backup }, startRef = restoreRef(start), selection = { ...state.tail!, start: startRef }, selectedRef = restoreRef(selection), prefix = `${r.fs.projectRoot}/v2/local-restore/`;
+    await r.fs.writeText(job.path('prepared.json'), json(p)); await r.fs.writeText(job.path('start.json'), json(start));
+    await r.fs.writeText(`${prefix}index/${job.id}.json`, json({ schema: 'lociview-local-restore-index-1', jobId: job.id, start: startRef }));
+    await r.fs.writeText(job.path('db-opened.json'), json({ schema: 'lociview-local-restore-db-opened-1', jobId: job.id, start: startRef, generationId: job.id }));
+    await r.fs.remove(`${prefix}selections/${state.selection!.sha256}.json`); await r.fs.writeText(`${prefix}selections/${selectedRef.sha256}.json`, json(selection));
+    await r.fs.writeText(job.path('result.json'), json({ schema: 'lociview-local-restore-result-1', jobId: job.id, start: startRef, detail: { kind: 'selected', selection: selectedRef } }));
+    expect((await readRestoreControls(r.fs, metadata)).selection).toEqual(selectedRef);
+    const files = await r.fs.list(r.fs.projectRoot!), bytes = await Promise.all(files.map(path => r.fs.readBytes(path))), factory = r.factories.get(job.id)!, saved = await factory().loadRange([]);
+    await expect(BackupRestoreJob.openSelected(r.fs, metadata, r.databases, r.ports)).rejects.toThrow('restore-input-backup');
+    expect(await Promise.all(files.map(path => r.fs.readBytes(path)))).toEqual(bytes); expect(await factory().loadRange([])).toEqual(saved);
+  }, 60_000);
+  it('first-backup abandonment retains its acknowledged provenance and rejects old or unknown pre-Start residue', async () => {
+    const f = await restoreFileFixture(), r = await firstBackupRecipient(), prepared = await BackupRestoreJob.prepareFirstOpen(r.fs, f.backupFile, metadata, r.databases);
+    r.lease.activateNewProject(); r.base.reject = path => path.endsWith('/input.zip'); await expect(prepared.persist(null, r.databases)).rejects.toThrow('injected quota'); r.base.reject = () => false;
+    const p = (await readRestoreControls(r.fs, metadata, true)).pending!; expect(p.prepared!.schema).toBe('lociview-local-restore-prepared-2');
+    await BackupRestoreJob.abandon(r.fs, p.id, metadata, r.databases);
+    const next = await BackupRestoreJob.prepareFirstOpen(r.fs, f.backupFile, metadata, r.databases); expect(next.absence!.terminalJobs[0]).toMatchObject({ jobId: p.id, start: null, terminal: { kind: 'abandoned' }, generationDatabase: false });
+    const prior = JSON.parse((await r.fs.readText(prepared.path('prepared.json')))!) ; delete prior.backup; delete prior.absence; prior.schema = 'lociview-local-restore-prepared-1';
+    await r.fs.writeText(prepared.path('prepared.json'), json(prior));
+    expect((await readRestoreControls(r.fs, metadata)).jobs[0]!.abandoned).toBe(true); // Old abandon reader is unchanged.
+    await expect(BackupRestoreJob.prepareFirstOpen(r.fs, f.backupFile, metadata, r.databases)).rejects.toThrow('restore-absence-provenance');
+  }, 60_000);
+  it('first-backup cold opening never creates a lost generation and finishes only an existing empty same-job database', async () => {
+    const f = await restoreFileFixture(), r = await firstBackupRecipient(), p = await BackupRestoreJob.prepareFirstOpen(r.fs, f.backupFile, metadata, r.databases); r.lease.activateNewProject();
+    const job = await p.persist(null, r.databases), cold = await BackupRestoreJob.open(r.fs, job.id, metadata, r.databases);
+    await expect(cold.openStaging(r.databases)).rejects.toThrow('database does not exist'); expect(r.factories.size).toBe(0);
+    r.base.reject = path => path.endsWith('/db-opened.json'); await expect(job.openStaging(r.databases)).rejects.toThrow('injected quota'); r.base.reject = () => false;
+    expect(r.factories.size).toBe(1); const retry = await BackupRestoreJob.open(r.fs, job.id, metadata, r.databases), staging = owned(await retry.openStaging(r.databases)), service = r.ports(staging);
+    expect((await service.session.initializeBackup(retry)).state).toBe('ready');
+    const probe = vi.mocked(r.databases.originalDatabasePresent!); probe.mockResolvedValueOnce(true);
+    const before = await r.fs.list(r.fs.projectRoot!), bytes = await Promise.all(before.map(path => r.fs.readBytes(path)));
+    await expect(retry.select(null, service, r.databases, r.ports)).rejects.toThrow('restore-original-not-absent');
+    expect(await Promise.all(before.map(path => r.fs.readBytes(path)))).toEqual(bytes); expect((await readRestoreControls(r.fs, metadata)).selection).toBeNull();
+    r.base.reject = path => path.endsWith('/result.json'); await expect(retry.select(null, service, r.databases, r.ports)).rejects.toThrow('injected quota'); r.base.reject = () => false; await staging.dispose();
+    // A selected historical absence is not compared with today's original-DB observation.
+    probe.mockRejectedValue(Error('must not probe selected history')); const calls = probe.mock.calls.length;
+    await BackupRestoreJob.resumeSelection(r.fs, metadata, r.databases, r.ports);
+    const selected = owned(await BackupRestoreJob.openSelected(r.fs, metadata, r.databases, r.ports)); expect((await selected.ports.session.read()).state).toBe('ready'); expect(probe).toHaveBeenCalledTimes(calls);
+    expect(vi.mocked(r.databases.open).mock.calls.filter(([, create]) => create)).toHaveLength(1);
+  }, 60_000);
   it('initializes backup originals in the owned generation, preserves old work and keeps edits on reentry', async () => {
     const f = await restoreFileFixture(), originalFiles = await f.fs.list(''), originalBytes = await Promise.all(originalFiles.map(p => f.fs.readBytes(p))),
       originalDb = await f.factory().loadRange([]), job = await (await f.prepare()).persist(f.ports, f.databases), scope = await job.openStaging(f.databases);
@@ -6911,7 +7119,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     await vi.waitFor(() => expect(lateRender).toHaveBeenCalledOnce());
     const closing = late.dispose(); finish({ factory: () => { throw Error('must not mount after disposal'); }, dispose: lateRelease });
     await closing; expect(lateRelease).toHaveBeenCalledOnce();
-    const reopened = await ports.open(id); expect(reopened.authority.readOnly).toBe(false);
+    const reopened = await ports.open(id); if ('kind' in reopened) throw Error('normal selector host'); expect(reopened.authority.readOnly).toBe(false);
     // Publication may be ready while host-owned image/projection preparation has failed.
     let displayFailed = true; const originalRetry = reopened.authority.retry!;
     reopened.hasPending = () => displayFailed;

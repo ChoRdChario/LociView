@@ -7,11 +7,20 @@ import { packageByteHash } from './manifest';
 
 export type RestoreCurrent = { generationId: string | null; publicationId: string; publication: EvidenceRef;
   source: { proof: MetadataProof; heads: string[]; token: string }; bases: EvidenceRef };
-export type RestorePrepared = { schema: 'lociview-local-restore-prepared-1'; jobId: string;
+export type AbsentSnapshot = { originalPaths: []; originalDatabase: false; selection: null;
+  terminalJobs: { jobId: string; prepared: EvidenceRef; start: EvidenceRef | null;
+    terminal: { kind: 'abandoned' | 'cancelled'; evidence: EvidenceRef }; dbOpened: EvidenceRef | null;
+    retainedPaths: string[]; generationDatabase: boolean }[] };
+type RestoreDescriptor = { jobId: string;
   archive: EvidenceRef; manifest: EvidenceRef; metadata: EvidenceRef; protectedInventory: EvidenceRef;
   exchangeBases: EvidenceRef; baseEvidence: EvidenceRef[] };
-export type RestoreStart = { schema: 'lociview-local-restore-start-1'; jobId: string; prepared: EvidenceRef;
-  previousSelection: EvidenceRef | null; current: RestoreCurrent };
+export type RestoreBackup = { proof: MetadataProof; heads: string[] };
+export type RestorePrepared = RestoreDescriptor & ({ schema: 'lociview-local-restore-prepared-1' } |
+  { schema: 'lociview-local-restore-prepared-2'; backup: RestoreBackup; absence: AbsentSnapshot });
+export type RestoreStart = { jobId: string; prepared: EvidenceRef } & (
+  { schema: 'lociview-local-restore-start-1'; previousSelection: EvidenceRef | null; current: RestoreCurrent } |
+  { schema: 'lociview-local-restore-start-2'; previousSelection: null; current: { kind: 'absent'; retained: EvidenceRef }; backup: RestoreBackup });
+export const restoreBackupProof = (start: RestoreStart) => start.schema === 'lociview-local-restore-start-2' ? start.backup.proof : start.current.source.proof;
 export type GenerationSelection = { schema: 'lociview-local-generation-selection-1'; previous: EvidenceRef | null;
   jobId: string; start: EvidenceRef; destination: { journal: EvidenceRef; publication: EvidenceRef; baseBinding: EvidenceRef } };
 export type RestoreResult = { schema: 'lociview-local-restore-result-1'; jobId: string; start: EvidenceRef;
@@ -73,9 +82,34 @@ export function checkRestoreCurrent(value: RestoreCurrent, limits: MetadataLimit
   if (value.source.heads.length > L.heads || value.source.token !== `${value.source.proof.envelope.adapterFormatVersion}:${value.source.proof.envelope.lineageProof.rootChangeHash}:${value.source.heads.join(',')}`)
     fail('restore-current-source');
 }
-function prepared(value: RestorePrepared, id: string) {
-  shape(value, 'archive,baseEvidence,exchangeBases,jobId,manifest,metadata,protectedInventory,schema');
-  if (value.schema !== 'lociview-local-restore-prepared-1' || value.jobId !== id) fail('restore-prepared');
+function backup(value: RestoreBackup, limits: MetadataLimits) {
+  shape(value, 'heads,proof'); checkedProof(value.proof, limits); checkRemoteHeads(value.heads);
+  if (value.heads.length > L.heads) fail('restore-backup-heads');
+}
+function absentSnapshot(value: AbsentSnapshot) {
+  shape(value, 'originalDatabase,originalPaths,selection,terminalJobs');
+  if (value.originalDatabase !== false || value.selection !== null || !Array.isArray(value.originalPaths) || value.originalPaths.length ||
+    !Array.isArray(value.terminalJobs) || value.terminalJobs.length > L.entryCount) fail('restore-absence');
+  let prior = '';
+  for (const job of value.terminalJobs) {
+    shape(job, 'dbOpened,generationDatabase,jobId,prepared,retainedPaths,start,terminal'); technicalId(job.jobId);
+    if (job.jobId <= prior || typeof job.generationDatabase !== 'boolean') fail('restore-absence'); prior = job.jobId;
+    reference(job.prepared); if (job.start !== null) reference(job.start); if (job.dbOpened !== null) reference(job.dbOpened);
+    shape(job.terminal, 'evidence,kind'); reference(job.terminal.evidence);
+    if (job.terminal.kind !== 'abandoned' && job.terminal.kind !== 'cancelled' || !Array.isArray(job.retainedPaths) || job.retainedPaths.length > L.entryCount) fail('restore-absence');
+    let pathPrior = '';
+    for (const path of job.retainedPaths) {
+      if (typeof path !== 'string' || path <= pathPrior || path.includes('\\') || path.includes('\0') || path.split('/').some(p => !p || p === '.' || p === '..') ||
+        !path.startsWith(`v2/local-restore/jobs/${job.jobId}/`) && path !== `v2/local-restore/index/${job.jobId}.json` && !path.startsWith(`v2/generations/${job.jobId}/`)) fail('restore-absence-path');
+      pathPrior = path;
+    }
+  }
+}
+function prepared(value: RestorePrepared, id: string, limits: MetadataLimits) {
+  const first = value?.schema === 'lociview-local-restore-prepared-2';
+  shape(value, first ? 'absence,archive,backup,baseEvidence,exchangeBases,jobId,manifest,metadata,protectedInventory,schema' : 'archive,baseEvidence,exchangeBases,jobId,manifest,metadata,protectedInventory,schema');
+  if (!first && value.schema !== 'lociview-local-restore-prepared-1' || value.jobId !== id) fail('restore-prepared');
+  if (value.schema === 'lociview-local-restore-prepared-2') { backup(value.backup, limits); absentSnapshot(value.absence); }
   reference(value.archive, L.archiveBytes); reference(value.manifest); reference(value.metadata, L.sourceBytes);
   reference(value.exchangeBases); reference(value.protectedInventory);
   if (!Array.isArray(value.baseEvidence) || value.baseEvidence.length > L.baseEvidenceCount) fail('restore-evidence-budget');
@@ -87,7 +121,7 @@ function prepared(value: RestorePrepared, id: string) {
 }
 
 /** Structural control inspection only: never grants a selected destination capability. */
-export async function readRestoreControls(fs: ProjectWorkspaceFS, limits: MetadataLimits) {
+export async function readRestoreControls(fs: ProjectWorkspaceFS, limits: MetadataLimits, readFirstPrepared: boolean | 'detect' = false) {
   const prefix = `${restoreRoot(fs)}v2/local-restore/`, paths = await fs.list(prefix), readLimits = restoreLimits(limits);
   if (paths.length > L.entryCount || new Set(paths).size !== paths.length) fail('restore-control-budget');
   const byJob = new Map<string, Map<string, string>>(), selectionPaths: string[] = [], sizes = new Map<string, number>();
@@ -126,17 +160,31 @@ export async function readRestoreControls(fs: ProjectWorkspaceFS, limits: Metada
     if (!start) {
       if (files.has('index') || files.has('db-opened.json') || files.has('result.json')) fail('restore-start-missing');
       // Pre-Start bytes may be torn; abandonment does not trust or overwrite them.
-      jobs.push({ id, prepared: null, start: null, indexed: false, dbOpened: false, result: null, abandoned, destinationFiles: [] }); continue;
+      let description: RestorePrepared | null = null;
+      if (readFirstPrepared && files.has('prepared.json')) {
+        if (readFirstPrepared === 'detect') {
+          let candidate: RestorePrepared | undefined;
+          try { candidate = await readReceipt<RestorePrepared>(fs, files.get('prepared.json')!, readLimits) ?? undefined; } catch { /* Old torn pre-Start input stays abandonable. */ }
+          if (candidate?.schema === 'lociview-local-restore-prepared-2') { description = await read(files.get('prepared.json')!); prepared(description!, id, limits); }
+        } else { description = await read<RestorePrepared>(files.get('prepared.json')!); prepared(description, id, limits); }
+      }
+      jobs.push({ id, prepared: description, start: null, indexed: false, dbOpened: false, result: null, abandoned, destinationFiles: [] }); continue;
     }
     if (abandoned) fail('restore-input-state');
-    shape(start, 'current,jobId,prepared,previousSelection,schema');
-    if (start.schema !== 'lociview-local-restore-start-1' || start.jobId !== id) fail('restore-start');
+    const first = start.schema === 'lociview-local-restore-start-2';
+    shape(start, first ? 'backup,current,jobId,prepared,previousSelection,schema' : 'current,jobId,prepared,previousSelection,schema');
+    if (!first && start.schema !== 'lociview-local-restore-start-1' || start.jobId !== id) fail('restore-start');
     reference(start.prepared); if (start.previousSelection !== null) reference(start.previousSelection);
-    checkRestoreCurrent(start.current, limits);
-    if (start.current.generationId === id) fail('restore-start');
+    if (start.schema === 'lociview-local-restore-start-2') {
+      shape(start.current, 'kind,retained'); reference(start.current.retained); backup(start.backup, limits);
+      if (start.current.kind !== 'absent' || start.previousSelection !== null) fail('restore-start');
+    } else { checkRestoreCurrent(start.current, limits); if (start.current.generationId === id) fail('restore-start'); }
     const description = files.has('prepared.json') ? await read<RestorePrepared>(files.get('prepared.json')!) : null;
     if (!description || !restoreEqual(restoreRef(description), start.prepared)) return fail('restore-prepared-missing');
-    prepared(description, id);
+    prepared(description, id, limits);
+    if (start.schema === 'lociview-local-restore-start-2') {
+      if (description.schema !== 'lociview-local-restore-prepared-2' || !restoreEqual(start.backup, description.backup) || !restoreEqual(start.current.retained, restoreRef(description.absence))) fail('restore-absence-binding');
+    } else if (description.schema !== 'lociview-local-restore-prepared-1') fail('restore-prepared');
     if (!files.has('input.zip') || sizes.get(files.get('input.zip')!) !== description.archive.byteLength) fail('restore-input-missing');
     const indexed = files.has('index'), dbOpened = files.has('db-opened.json'), startRef = restoreRef(start);
     if (indexed && !restoreEqual(await read(files.get('index')!), { schema: 'lociview-local-restore-index-1', jobId: id, start: startRef })) fail('restore-index');
@@ -176,7 +224,7 @@ export async function readRestoreControls(fs: ProjectWorkspaceFS, limits: Metada
   for (const job of jobs) {
     if (!job.start) continue;
     const parent = job.start.previousSelection === null ? null : chain.find(s => restoreEqual(restoreRef(s), job.start!.previousSelection));
-    if (parent === undefined || job.start.current.generationId !== (parent?.jobId ?? null)) fail('restore-start-selection');
+    if (parent === undefined || (job.start.schema === 'lociview-local-restore-start-2' ? parent !== null : job.start.current.generationId !== (parent?.jobId ?? null))) fail('restore-start-selection');
     if (job.result?.detail.kind === 'selected') {
       const selected = chain.find(s => s.jobId === job.id);
       if (!selected || !restoreEqual(restoreRef(selected), job.result.detail.selection)) fail('restore-selected-missing');
@@ -190,19 +238,48 @@ export async function readRestoreControls(fs: ProjectWorkspaceFS, limits: Metada
     if (!job?.start || !job.indexed || !job.dbOpened || path.includes('\\') || path.includes('\0') || path.split('/').some(p => !p || p === '.' || p === '..')) return fail('restore-orphan-generation');
     job.destinationFiles.push(path);
   }
+  // Historical absence is not today's absence. Its terminal references and retained ownership still bind actual records.
+  const firstJobs = jobs.filter(job => job.prepared?.schema === 'lociview-local-restore-prepared-2'), inspected = new Set<string>();
+  const retainedByJob = new Map(firstJobs.length ? jobs.map(job => [job.id, [...byJob.get(job.id)!.values(), ...job.destinationFiles].map(path => path.slice(restoreRoot(fs).length)).sort()]) : []);
+  while (firstJobs.length) {
+    const owner = firstJobs.pop()!; if (inspected.has(owner.id)) continue; inspected.add(owner.id);
+    const p = owner.prepared!; if (p.schema !== 'lociview-local-restore-prepared-2') continue;
+    for (const observation of p.absence.terminalJobs) {
+      if (++work > L.inspectionWork) fail('restore-inspection-budget');
+      const prior = jobMap.get(observation.jobId);
+      if (!prior || prior === owner || !prior.abandoned && prior.result?.detail.kind !== 'cancelled') return fail('restore-absence-history');
+      if (!prior.prepared) {
+        prior.prepared = await read<RestorePrepared>(restoreJobPath(fs, prior.id, 'prepared.json')); prepared(prior.prepared, prior.id, limits);
+      }
+      if (prior.prepared.schema !== 'lociview-local-restore-prepared-2' || !restoreEqual(prior.prepared.backup.proof, p.backup.proof)) fail('restore-absence-history');
+      const startRef = prior.start ? restoreRef(prior.start) : null;
+      if (prior.start && prior.start.schema !== 'lociview-local-restore-start-2' || !restoreEqual(observation.prepared, restoreRef(prior.prepared)) ||
+        !restoreEqual(observation.start, startRef) || !restoreEqual(observation.terminal, prior.abandoned ?
+          { kind: 'abandoned', evidence: restoreRef({ schema: 'lociview-local-restore-abandoned-1', jobId: prior.id, stage: 'beforeStart' }) } :
+          { kind: 'cancelled', evidence: restoreRef(prior.result) }) || !restoreEqual(observation.dbOpened, prior.dbOpened ?
+          restoreRef({ schema: 'lociview-local-restore-db-opened-1', jobId: prior.id, start: startRef, generationId: prior.id }) : null)) fail('restore-absence-history');
+      const retained = retainedByJob.get(prior.id)!;
+      if (observation.retainedPaths.length !== retained.length) fail('restore-absence-history');
+      for (let i = 0; i < retained.length; i++) { work += retained[i]!.length; if (work > L.inspectionWork) fail('restore-inspection-budget');
+        if (observation.retainedPaths[i] !== retained[i]) fail('restore-absence-history'); }
+      firstJobs.push(prior);
+    }
+  }
   const pending = jobs.filter(job => !job.abandoned && !job.result && !chain.some(s => s.jobId === job.id));
   if (pending.length > 1 || pending.some(job => job.start && !restoreEqual(job.start.previousSelection, previous))) fail('restore-pending-chain');
   return { jobs, selections: chain, tail: chain.at(-1) ?? null, selection: previous, pending: pending[0] ?? null };
 }
 
 /** Host supplies successfully enumerated IDs for this logical Project's DB family. */
-export async function reconcileRestoreDatabases(fs: ProjectWorkspaceFS, limits: MetadataLimits, listGenerations: () => Promise<string[]>) {
-  const state = await readRestoreControls(fs, limits), ids = [...await listGenerations()];
+export async function reconcileRestoreDatabases(fs: ProjectWorkspaceFS, limits: MetadataLimits, listGenerations: () => Promise<string[]>, readFirstPrepared = false) {
+  const state = await readRestoreControls(fs, limits, readFirstPrepared), ids = [...await listGenerations()];
   if (ids.length > L.entryCount || new Set(ids).size !== ids.length) fail('restore-database-list');
   for (const id of ids) {
     technicalId(id); const job = state.jobs.find(job => job.id === id);
     if (!job?.start || !job.indexed || job.result?.detail.kind === 'cancelled' && job.result.detail.stage === 'beforeInitializationWithoutIndex') fail('restore-orphan-database');
   }
   for (const job of state.jobs) if (job.dbOpened && !ids.includes(job.id)) fail('restore-database-missing');
+  for (const job of state.jobs) if (job.prepared?.schema === 'lociview-local-restore-prepared-2') for (const prior of job.prepared.absence.terminalJobs)
+    if (prior.generationDatabase !== ids.includes(prior.jobId)) fail('restore-absence-history');
   return { ...state, databaseIds: ids };
 }

@@ -1,6 +1,6 @@
 import type { PhotoDecoder } from '../../projectFiles/photo';
 import type { WorkspaceFS } from '../../platform/fs';
-import { ProjectMutationCoordinator } from '../../platform/projectLock';
+import { ProjectMutationCoordinator, type ProjectMutationSession } from '../../platform/projectLock';
 import { technicalId, newId, metadataPath, json } from '../../projectMetadata/persistence';
 import { TransactionJournal } from '../../projectMetadata/journal';
 import type { MetadataStorageFactory } from '../../projectMetadata/repository';
@@ -42,7 +42,9 @@ import { CleanArchive } from '../../projectPackage/cleanArchive';
 import { PackageArchive } from '../../projectPackage/zipArchive';
 import { BackupRestoreJob, type RestoreDatabasePorts } from '../../projectPackage/backupRestoreJob';
 import { readRestoreControls } from '../../projectPackage/restoreControls';
-import { openValidationGeneration, validationGenerationDatabases, validationGenerationService } from './validationGeneration';
+import { PACKAGE_LIMITS, type EvidenceRef } from '../../projectPackage/contract';
+import { BackupArchive } from '../../projectPackage/backupArchive';
+import { openValidationGeneration, validationGenerationDatabases, validationGenerationService, inspectValidationFirstBackup } from './validationGeneration';
 
 export const validationArea = 'lociview-development-validation-1';
 export interface ValidationHostOptions {
@@ -51,15 +53,147 @@ export interface ValidationHostOptions {
   fileLimits: FileValidationLimits; decode?: PngDecoder; jpeg?: JpegDecoder; photo?: PhotoDecoder; initial?: ReturnType<typeof prepareValidationCreation>;
   workspaceFile?: Blob;
   reviewEdit?: PreparedReviewEdit;
+  firstBackup?: Readonly<{ file: Blob; archive: EvidenceRef }>;
   packageLocks?: LockManager | null;
   generations?: (run: string) => RestoreDatabasePorts;
   openStorage(allowCreate: boolean): Promise<{ factory: MetadataStorageFactory; dispose(): Promise<void> }>;
 }
+
+export type ValidationNormalHost = Awaited<ReturnType<typeof openValidationHost>>;
+type FirstRestoreDisplay = (next: SyntheticProject, content: ValidationNormalHost['content']) => Promise<void>;
+export interface FirstBackupRecovery {
+  readonly kind: 'first-backup-recovery'; readonly run: string; readonly readOnly: boolean;
+  state(): Readonly<{ phase: 'preview' | 'beforeStart' | 'pending' | 'terminal'; title: string; fileName: string | null; memo: string | null; error: string; replacing: boolean; cancellable: boolean; retryable: boolean }>;
+  confirm(prepare: FirstRestoreDisplay): Promise<ValidationNormalHost>;
+  retry(prepare: FirstRestoreDisplay): Promise<ValidationNormalHost>;
+  edit(): Promise<ValidationNormalHost | FirstBackupRecovery>;
+  cancel(): Promise<void>; abandon(): Promise<void>; dispose(): Promise<void>;
+}
+
+/** First-only recovery owns the root lease until a real selected Host accepts it once. */
+export async function openValidationEntry(options: ValidationHostOptions): Promise<ValidationNormalHost | FirstBackupRecovery> {
+  const run = technicalId(options.run), root = `${validationArea}/${run}`;
+  if (options.firstBackup && (options.initial || options.workspaceFile || options.reviewEdit || options.mode === 'view'))
+    throw Error('バックアップを一つ選択し、編集で復元してください。');
+  const input = options.firstBackup ? { file: options.firstBackup.file.slice(0), archive: { ...options.firstBackup.archive } } : undefined;
+  const archive = input ? await BackupArchive.inspect(input.file, limits) : undefined;
+  const inputName = options.firstBackup && 'name' in options.firstBackup.file && typeof options.firstBackup.file.name === 'string' ? options.firstBackup.file.name.slice(0, 256) : null;
+  if (archive && (archive.source.proof.identity.projectId !== `prj_${run}` || archive.archive.sha256 !== input!.archive.sha256 || archive.archive.byteLength !== input!.archive.byteLength))
+    throw Error('バックアップと開く場所が一致しません。');
+  const lease = options.mode === 'view' ? options.coordinator.openView(options.base, root, `${validationArea}:${run}`) :
+    await options.coordinator.tryAcquire(options.base, root, `${validationArea}:${run}`);
+  const ordinary = { ...options, firstBackup: undefined }, databases = validationGenerationDatabases(options);
+  let handedOff = false, closed = false, busy = false, operation: Promise<unknown> | undefined, failure = '', selectedRecovery = false;
+  let prepared: BackupRestoreJob | undefined, existing: ValidationNormalHost | undefined;
+  let title = '名前を確認できないプロジェクト', memo: string | null = null;
+  let control: Awaited<ReturnType<typeof inspectValidationFirstBackup>>;
+  const release = async () => { lease.beginClose(); await lease.waitForWorkspaceIdle(); lease.sealWorkspaceWritesForRelease(); lease.release(); };
+  try {
+    control = await inspectValidationFirstBackup(lease.workspace, options);
+    if (!input && !control) { const opened = await openNormalValidationHost(ordinary, lease); handedOff = true; return opened; }
+    if (input && !control) {
+      const controls = await readRestoreControls(lease.workspace, limits);
+      const rootPaths = await lease.workspace.list(`${root}/`);
+      if (controls.selection || rootPaths.some(path => !path.startsWith(`${root}/v2/local-restore/`)) || await databases.originalDatabasePresent?.() === true) {
+        existing = await openNormalValidationHost(ordinary, lease); await existing.backupRestore.prepare(input.file);
+      } else prepared = await BackupRestoreJob.prepareFirstOpen(lease.workspace, input.file, limits, databases);
+    } else if (input && control) {
+      if (control.controls.pending) throw Error('先に中断したバックアップの復元を確認してください。');
+      prepared = await BackupRestoreJob.prepareFirstOpen(lease.workspace, input.file, limits, databases);
+    }
+    const knownArchive = archive ?? (control?.controls.pending?.start ? (await BackupRestoreJob.open(lease.workspace, control.owner.id, limits, databases)).inspection : undefined);
+    if (knownArchive) {
+      const fields = (await knownArchive.source.inspectOriginal({ maxNodes: PACKAGE_LIMITS.inspectionNodes, maxWork: PACKAGE_LIMITS.inspectionWork })).candidates.fields,
+        field = fields.find(f => f.path.length === 2 && f.path[0] === 'project' && f.path[1] === 'title'), candidate = field?.valid && field.candidates.length === 1 ? field.candidates[0]?.value : undefined;
+      if (candidate?.kind === 'value' && typeof candidate.value === 'string' && candidate.value.trim()) title = candidate.value;
+      memo = knownArchive.archive.control.manifest.memo ?? null;
+    }
+  } catch (error) { if (existing) await existing.dispose(); else if (!handedOff) await release(); throw error; }
+  const reload = async () => { const records = await readRestoreControls(lease.workspace, limits); selectedRecovery = !!records.selection;
+    control = await inspectValidationFirstBackup(lease.workspace, options); if (control?.controls.pending || selectedRecovery) prepared = undefined; };
+  const activate = () => { if (!lease.holdsWriteLock || options.mode === 'view') throw Error('編集を開始して復元してください。');
+    if (lease.accessState !== 'editable') lease.activateNewProject(); };
+  const execute = async <T>(action: () => Promise<T>): Promise<T> => {
+    if (closed || busy || handedOff) throw Error('復元の処理を確認してください。'); busy = true; failure = '';
+    const work = action(); operation = work;
+    try { return await work; } catch (error) { failure = error instanceof Error ? error.message : '復元を完了できません。';
+      try { await reload(); } catch { /* Keep the first failure and retained bytes. */ } throw error;
+    } finally { busy = false; if (operation === work) operation = undefined; }
+  };
+  const adopt = async () => {
+    if (closed) throw Error('画面を閉じました。復元先は再度開いて確認してください。');
+    const opened = await openNormalValidationHost(ordinary, lease); handedOff = true; return opened;
+  };
+  const runJob = async (job: BackupRestoreJob, prepare: FirstRestoreDisplay) => {
+    const staging = await job.openStaging(databases), service = validationGenerationService(staging, options);
+    try {
+      const read = await service.session.initializeBackup(job), next = await validationProjectFrom(read, service.content);
+      if (!next) throw Error('復元先の表示を確認できません。');
+      await prepare(next, service.content);
+      if (closed) throw Error('画面を閉じました。復元記録は保持しています。');
+      await job.select(null, service, databases, scope => validationGenerationService(scope, options));
+    } finally { service.content.releasePreparedImages(); service.content.releasePreparedModels(); await staging.dispose(); }
+    return adopt();
+  };
+  return {
+    kind: 'first-backup-recovery', run, get readOnly() { return options.mode === 'view' || !lease.holdsWriteLock; },
+    state: () => ({ phase: selectedRecovery || existing && (existing.backupRestore.pending || existing.backupRestore.needsDisplay) ? 'pending' : prepared || existing ? 'preview' : control?.controls.pending ? control.owner.start ? 'pending' : 'beforeStart' : 'terminal',
+      title, fileName: inputName, memo, error: failure, replacing: !!existing,
+      cancellable: !selectedRecovery && (existing ? existing.backupRestore.cancellable || !existing.backupRestore.pending : !!prepared || !!control?.controls.pending),
+      retryable: !!existing?.backupRestore.retryable || selectedRecovery || !!control?.controls.pending?.indexed }),
+    confirm: prepare => execute(async () => {
+      if (existing) { await existing.backupRestore.confirm(prepare); handedOff = true; return existing; }
+      if (!prepared) throw Error('復元するファイルを確認してください。');
+      activate(); const job = await prepared.persist(null, databases); prepared = undefined; return runJob(job, prepare);
+    }),
+    retry: prepare => execute(async () => {
+      if (existing) { await existing.backupRestore.retry(prepare); handedOff = true; return existing; }
+      activate(); await reload();
+      const controls = await readRestoreControls(lease.workspace, limits);
+      if (controls.selection) { await BackupRestoreJob.resumeSelection(lease.workspace, limits, databases, scope => validationGenerationService(scope, options)); return adopt(); }
+      if (!control?.controls.pending?.start) throw Error('開始前の復元記録を取りやめ、ファイルを選び直してください。');
+      return runJob(await BackupRestoreJob.open(lease.workspace, control.owner.id, limits, databases), prepare);
+    }),
+    edit: () => execute(async () => {
+      if (lease.holdsWriteLock && options.mode !== 'view') throw Error('すでに編集用の復元を開いています。');
+      lease.release();
+      const candidate = await openValidationEntry({ ...options, mode: 'edit', firstBackup: input ? { ...input, file: inputName ? new File([input.file], inputName) : input.file } : undefined });
+      if ('kind' in candidate ? candidate.readOnly : candidate.authority.readOnly) { await candidate.dispose(); throw Error('別のタブで編集中です。この確認画面から再試行できます。'); }
+      handedOff = true; return candidate;
+    }),
+    cancel: () => execute(async () => {
+      if (existing) { if (existing.backupRestore.pending) await existing.backupRestore.cancel(); else existing.backupRestore.clearPreparation(); return; }
+      if (prepared) { prepared = undefined; return; }
+      activate(); await reload(); if (!control?.controls.pending?.start) throw Error('取りやめる復元を確認してください。');
+      await BackupRestoreJob.cancel(lease.workspace, control.owner.id, limits, databases); await reload();
+    }),
+    abandon: () => execute(async () => { activate(); await reload(); if (!control?.controls.pending || control.owner.start) throw Error('開始前の復元記録を確認してください。');
+      await BackupRestoreJob.abandon(lease.workspace, control.owner.id, limits, databases); await reload(); }),
+    async dispose() { if (closed) return; closed = true; try { await operation; } catch { /* Retain failed input. */ }
+      if (!handedOff) { if (existing) await existing.dispose(); else await release(); } },
+  };
+}
 const base64 = (bytes: Uint8Array) => { let text = ''; for (let n = 0; n < bytes.length; n += 8192)
   text += String.fromCharCode(...bytes.subarray(n, n + 8192)); return btoa(text); };
 
+async function validationProjectFrom(read: MetadataSessionRead, sourceContent: ReturnType<typeof validationProjectService>['content'], cache: Record<string, MediaImage> = {}) {
+  if (read.provider?.kind !== 'scene-provider') return;
+  const versions = await validationModelVersions(read.provider), unavailable = unreceivedWeakMedia(read.provider, limits), available: Record<string, MediaImage> = {};
+  for (const [id, field] of Object.entries(read.provider.details.immutable.mediaResourcesById)) {
+    if (unavailable.has(id)) continue;
+    if (field.kind !== 'value') throw Error('保存した画像の情報を確認できません。');
+    if (!cache[id]) cache[id] = { record: field.value as unknown as MediaImage['record'], base64: base64(await sourceContent.image(field.value)) };
+    available[id] = cache[id]!;
+  }
+  return { ...metadataProjectView(read.provider, available, versions), mediaChoices: Object.values(available).map(i => i.record), validationFiles: true };
+}
+
 /** New validation namespace only; no synthetic seed, guessed Project or old-store fallback. */
 export async function openValidationHost(options: ValidationHostOptions) {
+  if (options.firstBackup) throw Error('バックアップの初回復元用の入口を使ってください。');
+  return openNormalValidationHost(options);
+}
+async function openNormalValidationHost(options: ValidationHostOptions, inheritedLease?: ProjectMutationSession) {
   const run = technicalId(options.run), root = `${validationArea}/${run}`;
   if (options.mode === 'view' && options.initial) throw Error('閲覧ではプロジェクトを作成できません。');
   if (options.mode === 'view' && options.workspaceFile) throw Error('閲覧では作業一式を取り込めません。');
@@ -70,14 +204,15 @@ export async function openValidationHost(options: ValidationHostOptions) {
   const incoming = options.workspaceFile ? await inspectInput(options.workspaceFile) : undefined;
   if (incoming && incoming.source.proof.identity.projectId !== `prj_${run}`) throw Error('ファイルのプロジェクトと開く場所が一致しません。');
   if (options.initial && options.initial.source.proof.identity.projectId !== `prj_${run}`) throw Error('作成先を確認してください。');
-  const lease = options.mode === 'view' ? options.coordinator.openView(options.base, root, `${validationArea}:${run}`) :
-    await options.coordinator.tryAcquire(options.base, root, `${validationArea}:${run}`);
+  const lease = inheritedLease ?? (options.mode === 'view' ? options.coordinator.openView(options.base, root, `${validationArea}:${run}`) :
+    await options.coordinator.tryAcquire(options.base, root, `${validationArea}:${run}`));
   let connection: Awaited<ReturnType<typeof openValidationGeneration>> | undefined, operation: Promise<unknown> | undefined;
-  let closed = false, busy = false, failure = '';
-  const dispose = async () => { if (closed) return; closed = true; lease.beginClose();
+  let closed = false, busy = false, failure = '', ownsLease = !inheritedLease;
+  const dispose = async () => { if (closed) return; closed = true; if (ownsLease) lease.beginClose();
     try { await operation; } catch { /* Stored journal/initial input remain authoritative, never silently discarded. */ }
-    await lease.waitForWorkspaceIdle(); lease.sealWorkspaceWritesForRelease(); lease.release(); await connection?.dispose(); };
+    await lease.waitForWorkspaceIdle(); if (ownsLease) { lease.sealWorkspaceWritesForRelease(); lease.release(); } await connection?.dispose(); };
   try {
+    if (await inspectValidationFirstBackup(lease.workspace, options)) throw Error('バックアップの初回復元を専用の入口から再開してください。');
     const fresh = !(await options.base.list(`${root}/`)).length;
     if (fresh && (!(options.initial || incoming || options.reviewEdit) || !lease.holdsWriteLock)) throw Error('保存データがありません。プロジェクトを選び直してください。');
     if (!fresh && options.initial) throw Error('作成先に保存データがあります。既存データは変更していません。');
@@ -127,16 +262,7 @@ export async function openValidationHost(options: ValidationHostOptions) {
     let images: Record<string, MediaImage> = {};
     const projectFrom = async (read: MetadataSessionRead, sourceContent = content, cache = images) => {
       if (read.source && read.source.proof.identity.projectId !== `prj_${run}`) throw Error('保存領域とプロジェクトが一致しません。');
-      if (read.provider?.kind !== 'scene-provider') return;
-      const versions = await validationModelVersions(read.provider);
-      const unavailable = unreceivedWeakMedia(read.provider, limits), available: Record<string, MediaImage> = {};
-      for (const [id, field] of Object.entries(read.provider.details.immutable.mediaResourcesById)) {
-        if (unavailable.has(id)) continue;
-        if (field.kind !== 'value') throw Error('保存した画像の情報を確認できません。');
-        if (!cache[id]) cache[id] = { record: field.value as unknown as MediaImage['record'], base64: base64(await sourceContent.image(field.value)) };
-        available[id] = cache[id]!;
-      }
-      return { ...metadataProjectView(read.provider, available, versions), mediaChoices: Object.values(available).map(i => i.record), validationFiles: true };
+      return validationProjectFrom(read, sourceContent, cache);
     };
     const projectView = async (read: MetadataSessionRead) => {
       const next = await projectFrom(read); if (!next) return;
@@ -493,6 +619,7 @@ export async function openValidationHost(options: ValidationHostOptions) {
       refresh: () => execute(async () => { await reloadReceive(); last = await session.read(); await projectView(last); return last; }),
       resolve: async (token, command) => (await commitCommand(token, command)).display,
       dispose: async () => { await dispose(); content.releasePreparedImages(); content.releasePreparedModels(); prepareDisplay = undefined; } };
+    ownsLease = true;
     return { ...host, dispatch, get content() { return content; }, workspaceFiles, workspaceOutput, backupRestore, display: () => restoreRetired ? undefined : project,
       conversionReportAvailable: () => hasLociMyuConversion(fs, false),
       conversionReport: () => execute(async () => readLociMyuConversionReport(fs, options.fileLimits, `prj_${run}`, options.decode, options.jpeg, options.photo), true),
