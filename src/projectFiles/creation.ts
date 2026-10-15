@@ -3,36 +3,63 @@ import type { OriginBlobStore } from '../projectMetadata/blobStore';
 import { ProjectMetadataSource, type MetadataProof } from '../projectMetadata/source';
 import { MetadataProjectSession } from '../projectMetadata/session';
 import type { MetadataStorageFactory } from '../projectMetadata/repository';
-import { digest, equalBytes, metadataPath, readReceipt, underWriteLease, writeReceipt } from '../projectMetadata/persistence';
+import { digest, equalBytes, json, metadataPath, readReceipt, underWriteLease, writeReceipt } from '../projectMetadata/persistence';
 import { ValidationContent, readValidationBody } from './content';
 import { validationModelFacts } from './modelFacts';
 import type { PreparedValidationProject } from './initialProject';
 import type { PngDecoder } from './png';
 import { fileError, validationMetadataLimits as metadataLimits, type FileValidationLimits } from './validation';
 
-interface InitialReceipt { version: 'validation-initial-1'; proof: MetadataProof; byteLength: number; digest: string }
+type InitialReceipt = { proof: MetadataProof; byteLength: number; digest: string } & (
+  { version: 'validation-initial-1' } | { version: 'validation-initial-2'; originRecipe: 'v1-project-scene-migration-recipe-1' });
 const initialPath = (fs: ProjectWorkspaceFS) => metadataPath(fs, 'validation-initial.am');
 const receiptPath = (fs: ProjectWorkspaceFS) => metadataPath(fs, 'validation-initial.json');
+const originPath = (fs: ProjectWorkspaceFS) => metadataPath(fs, 'validation-origin.json');
+type InitialOrigin = { version: 'validation-origin-1'; originRecipe: 'v1-project-scene-migration-recipe-1'; proof: MetadataProof; byteLength: number; digest: string };
+async function readInitialOrigin(fs: ProjectWorkspaceFS) {
+  const r = await readReceipt<InitialOrigin>(fs, originPath(fs), metadataLimits);
+  if (r && (Object.keys(r).sort().join(',') !== 'byteLength,digest,originRecipe,proof,version' || r.version !== 'validation-origin-1' ||
+    r.originRecipe !== 'v1-project-scene-migration-recipe-1' || !Number.isSafeInteger(r.byteLength) || r.byteLength <= 0 ||
+    r.byteLength > metadataLimits.maxTotalBytes || !/^[0-9a-f]{64}$/.test(r.digest))) return fileError('作成途中の変換種別を確認できません。');
+  return r;
+}
 
 export async function readValidationInitial(fs: ProjectWorkspaceFS): Promise<ProjectMetadataSource> {
   return (await readValidationInitialRecord(fs)).source;
 }
 /** Return the proof of actual retained bytes, not a re-encoding of the loaded document. */
-export async function readValidationInitialRecord(fs: ProjectWorkspaceFS) {
-  const r = await readReceipt<InitialReceipt>(fs, receiptPath(fs), metadataLimits), file = await fs.readStream(initialPath(fs));
-  if (!r || r.version !== 'validation-initial-1' || Object.keys(r).sort().join(',') !== 'byteLength,digest,proof,version' ||
+async function readInitialReceipt(fs: ProjectWorkspaceFS) {
+  const r = await readReceipt<InitialReceipt>(fs, receiptPath(fs), metadataLimits);
+  if (!r) return null;
+  const bound = r.version === 'validation-initial-2' && r.originRecipe === 'v1-project-scene-migration-recipe-1';
+  if ((!bound && r.version !== 'validation-initial-1') || Object.keys(r).sort().join(',') !== (bound ? 'byteLength,digest,originRecipe,proof,version' : 'byteLength,digest,proof,version') ||
     !Number.isSafeInteger(r.byteLength) || r.byteLength <= 0 || r.byteLength > metadataLimits.maxTotalBytes ||
-    !file || file.size !== r.byteLength) return fileError('作成途中の初期記録を確認できません。');
+    typeof r.digest !== 'string') return fileError('作成途中の初期記録を確認できません。');
+  return r;
+}
+export async function validationInitialOrigin(fs: ProjectWorkspaceFS) {
+  const origin = await readInitialOrigin(fs); if (origin) return origin.originRecipe;
+  const r = await readInitialReceipt(fs); return r?.version === 'validation-initial-2' ? r.originRecipe : undefined;
+}
+export async function readValidationInitialRecord(fs: ProjectWorkspaceFS) {
+  const r = await readInitialReceipt(fs), file = await fs.readStream(initialPath(fs));
+  if (!r || !file || file.size !== r.byteLength) return fileError('作成途中の初期記録を確認できません。');
   const bytes = await readValidationBody(file, metadataLimits.maxTotalBytes);
   if (await digest(bytes) !== r.digest) return fileError('作成途中の記録が一致しません。');
   const source = ProjectMetadataSource.fromFullSource(bytes, r.proof, metadataLimits);
+  const origin = await readInitialOrigin(fs);
+  if ((r.version === 'validation-initial-2' || origin) && (!origin || r.version !== 'validation-initial-2' ||
+    json(origin) !== json({ version: 'validation-origin-1', originRecipe: r.originRecipe, proof: r.proof, byteLength: r.byteLength, digest: r.digest })))
+    return fileError('作成途中の変換種別と初期記録が一致しません。');
   if (source.originalChanges().length !== 2) return fileError('初期記録の履歴を確認できません。');
   return { source, receipt: r };
 }
-export async function writeValidationInitial(fs: ProjectWorkspaceFS, source: ProjectMetadataSource): Promise<void> {
+export async function writeValidationInitial(fs: ProjectWorkspaceFS, source: ProjectMetadataSource, originRecipe?: 'v1-project-scene-migration-recipe-1'): Promise<void> {
   const bytes = source.encodeFullSource();
+  if (originRecipe) await writeReceipt(fs, originPath(fs), { version: 'validation-origin-1', originRecipe, proof: source.proof, byteLength: bytes.length, digest: await digest(bytes) }, metadataLimits);
   // Manifest first binds the exact intended source; partial bytes stay repair state.
-  await writeReceipt(fs, receiptPath(fs), { version: 'validation-initial-1', proof: source.proof, byteLength: bytes.length, digest: await digest(bytes) }, metadataLimits);
+  await writeReceipt(fs, receiptPath(fs), { version: originRecipe ? 'validation-initial-2' : 'validation-initial-1',
+    ...(originRecipe ? { originRecipe } : {}), proof: source.proof, byteLength: bytes.length, digest: await digest(bytes) }, metadataLimits);
   const previous = await fs.readBytes(initialPath(fs));
   if (previous && !equalBytes(previous, bytes)) return fileError('作成途中の記録が一致しません。上書きはしていません。');
   if (!previous) await fs.writeBytes(initialPath(fs), bytes);
@@ -64,6 +91,7 @@ export async function resumeValidationCreation(fs: ProjectWorkspaceFS, session: 
   const state = await session.read();
   if (state.state === 'ready') return state;
   if (state.state !== 'pending' && state.state !== 'empty') return fileError('未完了の保存を確認してください。');
+  if (await validationInitialOrigin(fs)) return fileError('変換記録と元ファイルから変換を再開してください。');
   const source = await readValidationInitial(fs);
   if (expectedProjectId && source.proof.identity.projectId !== expectedProjectId)
     return fileError('保存領域と初期プロジェクトが一致しません。');

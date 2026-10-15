@@ -14,7 +14,7 @@ Initial Native/frozen-v1/LociMyu conversion and new-format teamwork remain requi
 Project/Scene identity, explicit conflict resolution, source preservation and the
 frozen v1/map-1/map-2/immutable-recipe boundaries remain unchanged.
 
-The latest verified implementation includes bounded Native GLB/PNG conversion →
+The latest verified implementation includes bounded Native/frozen-v1 GLB/PNG conversion →
 edit/first-place → named backup/Workspace → independent reopen, plus the typed
 product composition's edit → save/two-round exchange → cold-reopen workflow in
 the nondefault validation route, now including the model, Saved View and material
@@ -104,24 +104,41 @@ destructive boundary. Ordinary entry and temporary iPhone HTTPS need their exist
 exact-build/route approvals. Main, Pages, Service Worker, version/license, release,
 dependency changes and private/public fixture distribution are outside this unit.
 
-### Current decision — first frozen-v1 ProjectScene recipe
+### Completed implementation — frozen-v1 conversion/edit/file/reopen
 
 Outcome: self-contained frozen-v1 GLB/PNG Project ZIP → conversion preview → new
 Scenes/Caption/media/perspective Views → edit/first placement → named backup,
 Workspace/independent review and exact cold reopen. This required initial-converter
-scope is accepted; the new concrete recipe is not yet ratified. Keep durable
-conversion disabled until PO decides the [07b proposal](../docs/specs/07b-frozen-v1-conversion-proposal.md),
-as required by 05 §9 and 07 §5.2. No small user test is a development dependency.
+scope and exact [07b companion](../docs/specs/07b-frozen-v1-conversion-proposal.md)
+were ratified by PO on 2026-10-15. No small user test is a development dependency.
 
 - [x] Inspect relevant frozen contracts, actual parser/reducer/source behavior and
   existing golden boundaries without opening legacy repositories/private inputs.
 - [x] Define closed admission/mapping, every ID source key/preimage/collision rule,
   seven identity vectors, exact Caption/inventory bytes/hash, private source
   accounting and connected persistence/recovery acceptance. Independently review.
-- [ ] Receive PO's concrete recipe/subset decision; only then implement the one
-  connected file workflow through typed services and the existing validation UI.
+- [x] Receive PO's concrete recipe/subset decision.
+- [x] Implement bounded source inspection and exact mapping, private source/initial
+  receipt and interrupted/completed retry through existing metadata/blob services.
+- [x] Connect existing file-open/convert UI and cold initialization routing;
+  exercise product edit/placement/backup/Workspace/review/reopen with faults.
+- [x] Independently review the meaningful production/test diff; close source-kind,
+  ordering, map-2 and recovery-origin findings without weakening admission.
+- [x] Run the final serial checks; prepare the reviewed/tested checkpoint for
+  authorized g0-baseline push, with publication identity kept in Git.
 
-The proposal preserves standard identity-transform defaults, whole-input refusals,
+Ports before implementation: `projectFiles/frozenV1Source.ts` reads owned ZIP bytes
+through assets/zipio and frozen core manifest/JSONL/admission/reducer exports, never
+ProjectStore/importNewProject, returning a bounded plan and fingerprints. Mapping
+uses typed core records and inspected GLB/PNG facts to produce accepted target
+records, closed IDs and mapping. The conversion module owns private receipt/source
+I/O and calls existing initial-source/blob/Session publication. UI sees summary
+and a confirmed preparation object; host cold routing recognizes the private
+conversion evidence and independently bound initialization origin. No Native intermediate package, old-reader change, assets/io cycle
+expansion or directory-wide allowlist. Stop only for a real new contract conflict,
+unsupported architecture/scope or managed authority; retain pending browser gates.
+
+The approved implementation preserves standard identity-transform defaults, whole-input refusals,
 distinct equal-byte media, repeated attachments, source-authoritative v1 LWW and
 raw logs. Explicit default-View vs current-viewer behavior, legacy material-key
 addressing and transformed-pin semantics are recorded discrepancies, excluded
@@ -130,23 +147,48 @@ and malformed-line preservation discrepancy is also recorded; this new reader
 does not modify or claim to repair it. Broad v1/Native/LociMyu conversion remains
 required, including excluded inputs and the anonymized-real-source acceptance.
 
-Two independent read-only reviews closed the model-label/identity-default,
-missing/tied ordering and null/absent anchor/default-View ambiguities. Seven ID
-vectors, the 222-byte Caption and 257-byte admitted-operation inventory were
-independently recomputed. No remaining P1/P2 or approval-blocking ambiguity.
-Document math is not renderer/runtime/real-input evidence. Local links/diff and
-retained contracts are checked; this successor is documentation-only, so it
-does not repeat the already passed Native source-tree checkpoint below.
+Before ratification, two independent read-only reviews closed the model-label/
+identity-default, missing/tied ordering and null/absent anchor/default-View
+ambiguities. Seven ID vectors, the 222-byte Caption and 257-byte admitted-operation
+inventory were independently recomputed. That documentation checkpoint did not
+claim a converter. PO then authorized this implementation on 2026-10-15.
 
-Milestone audit: preceding Native production/test tree is independently reviewed,
-fully checked and committed on g0-baseline; this successor changes only the
-proposed recipe, documentation routes and current plan. No obvious unconnected
-workflow remains within the currently approved converter recipes. Continue by
-closing this next required compatibility decision, rather than adding unrelated
-controls or retrying denied browser initialization. Managed browser observation,
-physical-device/storage/profile adoption, ordinary entry and release gates remain
-separate. Existing Projects/jobs/recipes/frozen readers and private-source export
-boundaries are unchanged; no durable v1 converter is implemented in this proposal.
+Implemented in this exact bounded route: content-based frozen-v1 inspection before
+Native preparation (including DEFLATE ZIPs), closed retained-operation admission,
+map-2 mapping and private receipt/raw ZIP binding. Independent origin evidence
+prevents generic initialization from bypassing conversion verification when both
+private conversion files are lost or the initial receipt alone is downgraded.
+Legacy initial-1 bytes/ready behavior and later ordinary-edit retry are preserved.
+
+Focused execution covers source/mapping vectors and refusals, planned-receipt and
+publication interruptions, cold/completed retry, fully rebound map-1 refusal,
+lost-sidecar/downgrade refusal, and the integrated product edit/first-placement →
+named backup/Workspace/independent review → cold-reopen workflow. Three read-only
+reviews report no remaining P1/P2. The final source/test tree is captured in
+`.artifacts/traces/frozen-v1-tested-tree-2026-10-15.json`. Final serial
+`npm run check:checkpoint` passes: typecheck, 114 root files / 2,399 passed tests
+and 21 pre-existing todo, normal build, harness build and static validation build.
+Log: `.artifacts/traces/frozen-v1-checkpoint-2026-10-15.log`. The eight source/test
+hashes still match; no runtime recheck is needed for result prose/staging alone.
+These are synthetic GLB/PNG, memory storage and recorded-DOM evidence, not browser,
+GPU, physical-device, offline or anonymized-real-source acceptance.
+
+HTTP identity passes for all seven exact validation output files, with no Service
+Worker/webmanifest/public samples. Manifest SHA-256:
+`1be9be2474d76d1612d3a15caf4ffe2494e2f6bae5e91c9b0f7877997ac0dc67`.
+Trace: `.artifacts/traces/frozen-v1-http-2026-10-15.json`. This proves served bytes,
+not execution/rendering. The existing managed Chrome-runtime rejection remains;
+no alternative browser mechanism or repeat attempt was used for this unit.
+
+Milestone audit: this unit closes an approved initial-conversion workflow on
+g0-baseline without changing existing recipes/frozen readers or exposing private
+source in ordinary outputs. Final verification and the independent outgoing audit
+pass: no private input/binary fixture/dependency/entry/deploy changes. The actual
+branch is g0-baseline; its workflow validates only and does not deploy Pages.
+Broader converter/profile work remains required; prepare the next missing mapping
+within that scope. Managed browser observation, physical-device/storage/profile
+adoption, ordinary entry and release retain their separate gates. Do not retry
+denied browser initialization or turn individual PO tests into dependencies.
 
 ### Completed implementation — Native appearance conversion/edit/file/reopen
 

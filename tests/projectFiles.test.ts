@@ -102,6 +102,10 @@ import { remoteEvidenceBytes } from '../src/projectMetadata/packageRemote';
 import { Uint8ArrayReader, Uint8ArrayWriter, ZipWriter } from '@zip.js/zip.js';
 import { prepareNativeConversion, resumeNativeConversion } from '../src/projectFiles/nativeConversion';
 import { nativeConversionIds, nativeAppearanceRecipe } from '../src/projectFiles/nativeMapping';
+import { prepareFrozenV1Conversion, resumeFrozenV1Conversion } from '../src/projectFiles/frozenV1Conversion';
+import { frozenV1ConversionIds, frozenV1SourceKey } from '../src/projectFiles/frozenV1Mapping';
+import { frozenV1Recipe, inspectFrozenV1Source } from '../src/projectFiles/frozenV1Source';
+import { writeZipEntries } from '../src/assets/zipio';
 
 const budget: FileValidationLimits = { maxFileBytes: 1_000_000, maxJsonBytes: 100_000, maxItems: 10_000, maxValues: 100_000, maxPixels: 10_000 };
 const png = Uint8Array.from(atob(fixtureMedia[0]!.base64), c => c.charCodeAt(0));
@@ -196,6 +200,30 @@ async function nativeAppearanceFile(change: (snapshot: any) => void = () => {}, 
     change(s);
   }, false, model);
 }
+async function frozenV1File(change: (ops: any[]) => void = () => {}) {
+  const id = (prefix: string, n: number) => `${prefix}_${String(n).padStart(26, '0')}`, actor = 'a_0000000000001', ops: any[] = [];
+  const add = (e: string, n: number, v: Record<string, unknown>, t = 'create') => {
+    const op = ops.length + 1; ops.push({ op, hlc: `2026-10-15T00:00:00.000Z-${op.toString(16).padStart(4, '0')}-${actor}`, actor, user: '', t, e,
+      id: id(e === 'caption' ? 'cap' : e === 'asset' ? 'ast' : e === 'profile' ? 'usr' : e, n), ...(t === 'delete' ? {} : { v }) });
+  };
+  const model = glb(), imageSha = await digest(png);
+  add('set', 1, { name: '観察', order: 1 }); add('set', 2, { name: '全体', order: 2 });
+  add('asset', 1, { kind: 'model', path: 'models/model.glb', originalName: '模型.glb', mime: '', size: model.length, transform: { scale: 1, upAxis: 'Y' }, pinScale: 1.5 });
+  for (const n of [2, 3, 4]) add('asset', n, { kind: 'image', path: `media/image${n}.png`, originalName: `画像${n}.png`, mime: 'image/png', size: png.length, sha256: imageSha });
+  add('caption', 1, { setId: id('set', 1), title: '配置済み', body: '元の本文', color: '#eab308', tags: ['記録', '観察'], attachments: [id('ast', 2), id('ast', 3), id('ast', 2)],
+    anchor: { modelAssetId: id('ast', 1), position: [0.25, 0.5, 0], normal: [0, 0, 1] } });
+  add('caption', 2, { setId: id('set', 1), title: '', body: '', color: '#123456' });
+  add('caption', 3, { setId: id('set', 2), title: '親だけの記録', body: '', color: '#ff8000', anchor: { modelAssetId: id('ast', 1) } });
+  add('view', 1, { setId: id('set', 1), name: '透視図', cameraState: { eye: [1, 2, 5], target: [0, 0, 0], up: [0, 1, 0], fov: 60, ortho: false }, background: '#123456' });
+  add('profile', 1, { displayName: '過去の編集者', defaultPinColor: '#eab308' }); add('asset', 4, {}, 'delete');
+  change(ops);
+  const entries = [{ path: 'lociview.json', data: new TextEncoder().encode(JSON.stringify({ format: 'lociview-project', schemaVersion: 1, projectId: id('prj', 1), name: '旧形式の記録', createdAt: '2026-10-15T00:00:00.000Z', generator: 'synthetic-test' })) },
+    { path: `ops/${actor}.jsonl`, data: new TextEncoder().encode('  ' + ops.map(op => JSON.stringify(op)).join('\r\n') + '\r\n' + JSON.stringify(ops[0]) + '\r\n') },
+    { path: 'models/model.glb', data: model }, ...[2, 3, 4].map(n => ({ path: `media/image${n}.png`, data: png })),
+    { path: 'snapshot.json', data: new TextEncoder().encode('{"stale":true}') }, { path: 'captions.csv', data: new TextEncoder().encode('ignored cache') },
+    { path: 'thumbs/unused.png', data: png }];
+  return new Blob([(await writeZipEntries(entries)).slice().buffer]);
+}
 class TestFS extends MemoryFS {
   reject = (_: string) => false; reads = 0;
   override async writeText(path: string, text: string) { if (this.reject(path)) throw Error('injected quota'); return super.writeText(path, text); }
@@ -223,6 +251,147 @@ async function openFileCaption(modelBytes = glb()) {
 }
 
 describe('limited real-format validation (synthetic GLB bytes, injected PNG decoder, memory storage)', () => {
+  it('frozen v1 conversion fixes closed recipe identity vectors and preserves raw source-only accounting', async () => {
+    const ids = frozenV1ConversionIds('0'.repeat(32), '1'.repeat(64));
+    for (const [prefix, key, bytes, sha] of [
+      ['scn', ['set', 'set_00000000000000000000000001'], 205, '6002ade76d76b399b47c13171a906e9f430c72cced393a5e7fc887ae8f5b0df2'],
+      ['cap', ['caption', 'cap_00000000000000000000000001'], 209, '71172724b941b0de1371357e84cf734752732d584f534b41679ac86dba90555a'],
+      ['rep', ['model-representation', 'ast_00000000000000000000000001'], 222, '395a5d5d855c7c53a72aa3b7b6473d4c6cc25d09410126adb32e195c63d0acb7'],
+      ['slot', ['material-slot', 'ast_00000000000000000000000001', 'gltfMaterial', 0], 233, '9807e61650396c6f6ea3841de7a3777ec711cf2f8dfc73df20da121095acbfa0'],
+      ['att', ['attachment', 'cap_00000000000000000000000001', 1, 'ast_00000000000000000000000002'], 247, '420c7df9b3b2b6584b14ed2195efc331153e0d1fe0fdc1df3fed9f79d581d695'],
+      ['evt', ['initial-event', 'cap', ['caption', 'cap_00000000000000000000000001']], 233, 'c873e9d09f153fd3b25f099f48f1334c7cb32e28d391e04724b6e6b32158ecd9'],
+      ['tag', ['tag', '記録'], 181, 'd34965dc02d8a4e9c6169bb4960c5de514495a74c1ad1584cf024d0a00fcdc18'],
+    ] as const) {
+      const value = await ids.id(prefix, key), row = ids.report().find(r => r.id === value)!;
+      expect(row.sha256).toBe(sha); expect(new TextEncoder().encode(row.preimage)).toHaveLength(bytes); expect(value).toBe(`${prefix}_${sha.slice(0, 32)}`);
+    }
+    expect(frozenV1SourceKey('evt', ['wrong', 'cap', ['caption', 'x']])).toBe(false);
+    const file = await frozenV1File(), bytes = await file.arrayBuffer(), read = await inspectFrozenV1Source(file, budget, decode);
+    expect(read!.original).toEqual(new Uint8Array(bytes));
+    expect(read!.plan.report).toEqual({ models: 1, scenes: 2, captions: 3, media: 2, originalExcludedFromExports: true,
+      sourceOnly: { profiles: 1, deletedRecords: 1, caches: 2, deletedPayloads: 1, unlinkedPayloads: 1, anchorNormals: 1 } });
+    const preparation = await prepareFrozenV1Conversion(file, budget, decode), initial = await preparation!.create();
+    expect(await preparation!.create()).toBe(initial); expect(initial.source.semanticProfile).toBe('map2');
+    const records = (await initial.source.inspectOriginal({ maxNodes: metadata.maxNodes, maxWork: metadata.maxWork })).candidates.unambiguousRecords;
+    expect(Object.keys(records.captionsById as JsonObject)).toHaveLength(3);
+    expect(Object.values(records.captionAttachmentsById as JsonObject)).toHaveLength(3);
+    expect((Object.values(records.scenesById as JsonObject) as JsonObject[]).find(s => s.name === '全体')).not.toHaveProperty('defaultViewId');
+    expect(await file.arrayBuffer()).toEqual(bytes);
+  });
+  it.each(['unknown-kind', 'historical-image-field', 'divergent-op', 'unknown-field', 'material', 'position-null', 'default-view', 'orthographic', 'transform', 'order-tie', 'missing-order', 'entry-view-tie'] as const)(
+    'frozen v1 conversion refuses the whole %s input without changing its source', async kind => {
+      const file = await frozenV1File(ops => {
+        const image = ops.find(o => o.e === 'asset' && o.v?.path === 'media/image4.png'), scene = ops.find(o => o.e === 'set'), view = ops.find(o => o.e === 'view');
+        if (kind === 'historical-image-field') image.v.pinScale = 2;
+        if (kind === 'unknown-field') image.v.futureSafe = true;
+        if (kind === 'divergent-op') ops.push({ ...ops[0], v: { ...ops[0].v, name: '別の内容' } });
+        if (kind === 'unknown-kind' || kind === 'material') ops.push({ ...ops.at(-1), op: 99, e: kind === 'material' ? 'material' : 'toString', id: 'mat_00000000000000000000000001' });
+        if (kind === 'position-null') ops.find(o => o.e === 'caption').v.anchor.position = null;
+        if (kind === 'default-view') scene.v.defaultViewId = view.id;
+        if (kind === 'orthographic') view.v.cameraState.ortho = true;
+        if (kind === 'transform') ops.find(o => o.v?.kind === 'model').v.transform.scale = 2;
+        if (kind === 'order-tie') ops.filter(o => o.e === 'set')[1].v.order = scene.v.order;
+        if (kind === 'missing-order') { delete scene.v.order; ops.splice(ops.findIndex(o => o.e === 'set' && o.id !== scene.id), 1);
+          for (const c of ops.filter(o => o.e === 'caption')) c.v.setId = scene.id; }
+        if (kind === 'entry-view-tie') {
+          const duplicate = { ...view, op: 50, id: 'view_00000000000000000000000002', hlc: view.hlc.replace('-000a-', '-0032-') };
+          ops.push(duplicate); for (const [i, v] of [view, duplicate].entries()) ops.push({ ...v, op: 60 + i, t: 'update', hlc: '2026-10-15T00:00:00.000Z-0040-a_0000000000001', v: { name: `更新${i}` } });
+        }
+      }), bytes = await file.arrayBuffer();
+      await expect(prepareFrozenV1Conversion(file, budget, decode)).rejects.toThrow(); expect(await file.arrayBuffer()).toEqual(bytes);
+    });
+  it('frozen v1 conversion retains exact source and mappings through interrupted publication, cold recovery and completed retry', async () => {
+    const file = await frozenV1File(), bytes = await file.arrayBuffer(), initial = await (await prepareFrozenV1Conversion(file, budget, decode))!.create();
+    const fs = new TestFS(), locks = lockManager(), storage = storageFactory(), store = new OriginBlobStore(fs, { maxBlobBytes: budget.maxFileBytes, maxChunkBytes: 1_000_000, maxChunks: 10000, metadata }, locks);
+    const service = validationProjectService(fs, storage, store, budget, decode), projectId = initial.source.proof.identity.projectId as string;
+    fs.reject = p => p.endsWith('/published.json'); await expect(initial.persist(fs, store, service.session)).rejects.toThrow('quota'); fs.reject = () => false;
+    const path = (await fs.list('')).find(p => p.endsWith('/frozen-v1-conversion.json'))!, receiptBytes = (await fs.readBytes(path))!, receipt = JSON.parse(new TextDecoder().decode(receiptBytes));
+    expect(receipt.recipe).toBe(frozenV1Recipe);
+    const cold = validationProjectService(fs, storage, store, budget, decode), ready = await resumeFrozenV1Conversion(fs, store, cold.session, budget, projectId, decode);
+    expect(ready.source!.originalChanges()).toEqual(initial.source.originalChanges()); expect(await fs.readBytes(path)).toEqual(receiptBytes);
+    const p = ready.provider!; if (p.kind !== 'scene-provider') throw Error('provider'); const captionId = Object.keys(p.resources.captions)[0]!;
+    const later = await cold.session.edit(ready.source!.token, { kind: 'editCaption', captionId, edits: { body: '変換後の編集' } });
+    expect((await initial.persist(fs, store, cold.session)).source!.originalChanges()).toEqual(later.source!.originalChanges());
+    const forged = { ...receipt, mapping: receipt.mapping.slice(1) }; await fs.writeBytes(path, new TextEncoder().encode(json(forged)));
+    await expect(resumeFrozenV1Conversion(fs, store, cold.session, budget, projectId, decode)).rejects.toThrow('変換記録');
+    expect(JSON.parse(new TextDecoder().decode((await fs.readBytes(path))!))).toEqual(forged); expect((await cold.session.read()).source!.token).toBe(later.source!.token);
+    expect(await file.arrayBuffer()).toEqual(bytes);
+    expect(await fs.readBytes(path.replace('frozen-v1-conversion.json', 'frozen-v1-conversion-source.zip'))).toEqual(new Uint8Array(bytes));
+  });
+  it('frozen v1 conversion connects file preview/cancel to the same exact prepared initialization', async () => {
+    const open = vi.fn<ValidationWorkspacePorts['open']>(async () => { throw Error('injected opening failure'); });
+    const ui = createValidationWorkspace(new RecordedDocument().asDocument(), { fileLimits: budget, decode, selected() {}, list: async () => [], open,
+      render: async () => { throw Error('no rendering before confirmation'); } });
+    const root = record(ui.root), all = (n: RecordedNode): RecordedNode[] => [n, ...n.children.flatMap(all)];
+    const button = (name: string) => all(root).find(n => n.tag === 'button' && n.textContent === name)!;
+    const input = all(root).find(n => n.attributes.get('aria-label') === 'ファイルを選択')!;
+    await vi.waitFor(() => expect(button('ファイルを開く').disabled).toBe(false));
+    Object.assign(input, { files: [await frozenV1File()] }); const submit = () => input.parent!.parent!.fire('submit', { preventDefault() {} });
+    submit(); await vi.waitFor(() => expect(button('新しいプロジェクトに変換').parent!.hidden,
+      all(root).filter(n => n.tag === 'p').map(n => n.textContent).join(' | ')).toBe(false));
+    expect(all(root).some(n => n.textContent.includes('旧LociViewファイル：モデル 1・シーン 2・キャプション 3・メディア 2'))).toBe(true);
+    expect(all(root).some(n => n.textContent.includes('編集者情報 1・削除済み記録 1'))).toBe(true); expect(open).not.toHaveBeenCalled();
+    button('キャンセル').fire('click'); expect(button('新しいプロジェクトに変換').parent!.hidden).toBe(true); submit();
+    await vi.waitFor(() => expect(button('新しいプロジェクトに変換').parent!.hidden).toBe(false));
+    button('新しいプロジェクトに変換').fire('click'); await vi.waitFor(() => expect(open).toHaveBeenCalledTimes(1));
+    const captured = open.mock.calls[0]![1]!; expect(captured.source.semanticProfile).toBe('map2');
+    button('新しいプロジェクトに変換').fire('click'); await vi.waitFor(() => expect(open).toHaveBeenCalledTimes(2));
+    expect(open.mock.calls[1]![1]).toBe(captured); await ui.dispose();
+  });
+  it('frozen v1 conversion rejects a fully rebound equivalent map1 initialization without publishing or repairing it', async () => {
+    const file = await frozenV1File(ops => {
+      const model = ops.find(o => o.v?.kind === 'model'); delete model.v.pinScale;
+      for (const c of ops.filter(o => o.e === 'caption')) c.v.anchor = { modelAssetId: model.id, position: [0, 0, 0] };
+    }), initial = await (await prepareFrozenV1Conversion(file, budget, decode))!.create();
+    const fs = new TestFS(), locks = lockManager(), storage = storageFactory(), store = new OriginBlobStore(fs, { maxBlobBytes: budget.maxFileBytes, maxChunkBytes: 1_000_000, maxChunks: 10000, metadata }, locks);
+    fs.reject = p => p.endsWith('/published.json'); await expect(initial.persist(fs, store, validationProjectService(fs, storage, store, budget, decode).session)).rejects.toThrow(); fs.reject = () => false;
+    const records = (await initial.source.inspectOriginal({ maxNodes: metadata.maxNodes, maxWork: metadata.maxWork })).candidates.unambiguousRecords;
+    const map1 = ProjectMetadataSource.bootstrap(records.schema as JsonObject, records.identity as JsonObject, metadata).initialize(records);
+    expect(map1.semanticProfile).toBe('map1'); const bytes = map1.encodeFullSource(), proof = { byteLength: bytes.length, digest: await digest(bytes), proof: map1.proof };
+    const forged = new TestFS();
+    for (const p of (await fs.list('')).filter(p => /frozen-v1-conversion|validation-initial|validation-origin/.test(p))) await forged.writeBytes(p, (await fs.readBytes(p))!);
+    const paths = await forged.list(''), conversionPath = paths.find(p => p.endsWith('/frozen-v1-conversion.json'))!, receipt = JSON.parse(new TextDecoder().decode((await forged.readBytes(conversionPath))!));
+    await forged.writeBytes(conversionPath, new TextEncoder().encode(json({ ...receipt, initial: proof })));
+    await forged.writeBytes(paths.find(p => p.endsWith('/validation-initial.json'))!, new TextEncoder().encode(json({ version: 'validation-initial-2', originRecipe: frozenV1Recipe, ...proof })));
+    await forged.writeBytes(paths.find(p => p.endsWith('/validation-origin.json'))!, new TextEncoder().encode(json({ version: 'validation-origin-1', originRecipe: frozenV1Recipe, ...proof })));
+    await forged.writeBytes(paths.find(p => p.endsWith('/validation-initial.am'))!, bytes);
+    const ownStore = new OriginBlobStore(forged, { maxBlobBytes: budget.maxFileBytes, maxChunkBytes: 1_000_000, maxChunks: 10000, metadata }, locks);
+    const own = validationProjectService(forged, storageFactory(), ownStore, budget, decode), before = await forged.list('');
+    await expect(resumeFrozenV1Conversion(forged, ownStore, own.session, budget, initial.source.proof.identity.projectId as string, decode)).rejects.toThrow('変換記録');
+    expect(await forged.list('')).toEqual(before); expect((await own.session.read()).state).toBe('empty');
+  });
+  it('frozen v1 conversion retries a planned receipt failure from the held source without allocating another initialization', async () => {
+    const initial = await (await prepareFrozenV1Conversion(await frozenV1File(), budget, decode))!.create(), run = (initial.source.proof.identity.projectId as string).slice(4);
+    const fs = new TestFS(), locks = lockManager(), storage = storageFactory(), store = new OriginBlobStore(fs, { maxBlobBytes: budget.maxFileBytes, maxChunkBytes: 1_000_000, maxChunks: 10000, metadata }, locks);
+    fs.reject = p => p.endsWith('/frozen-v1-conversion.json');
+    const host = await openValidationHost({ run, base: fs, coordinator: ProjectMutationCoordinator.browser(locks), store, fileLimits: budget, decode, packageLocks: locks,
+      initial, openStorage: async () => ({ factory: storage, dispose: async () => {} }) });
+    expect(host.read().state).toBe('empty');
+    // The planned conversion receipt failed before original/initial acknowledgment.
+    expect((await fs.list('')).some(p => /validation-origin\.json|frozen-v1-conversion-source\.zip/.test(p))).toBe(false);
+    fs.reject = () => false; await host.authority.retry!(); expect(host.read().state).toBe('ready');
+    expect(host.read().source!.originalChanges()).toEqual(initial.source.originalChanges()); await host.dispose();
+  });
+  it('frozen v1 conversion refuses generic cold recovery when both acknowledged conversion sidecars disappear', async () => {
+    const initial = await (await prepareFrozenV1Conversion(await frozenV1File(), budget, decode))!.create(), run = (initial.source.proof.identity.projectId as string).slice(4);
+    const fs = new TestFS(), locks = lockManager(), storage = storageFactory(), store = new OriginBlobStore(fs, { maxBlobBytes: budget.maxFileBytes, maxChunkBytes: 1_000_000, maxChunks: 10000, metadata }, locks);
+    const options = { run, base: fs, coordinator: ProjectMutationCoordinator.browser(locks), store, fileLimits: budget, decode, packageLocks: locks,
+      openStorage: async () => ({ factory: storage, dispose: async () => {} }) };
+    fs.reject = p => p.endsWith('/published.json'); const first = await openValidationHost({ ...options, initial });
+    expect(first.read().state).toBe('pending'); const exact = initial.source.encodeFullSource(); await first.dispose(); fs.reject = () => false;
+    for (const p of (await fs.list('')).filter(p => /frozen-v1-conversion(?:-source\.zip|\.json)$/.test(p))) await fs.remove(p);
+    const retained = (await fs.list('')).find(p => p.endsWith('/validation-initial.json'))!, receipt = JSON.parse(new TextDecoder().decode((await fs.readBytes(retained))!));
+    expect(receipt).toMatchObject({ version: 'validation-initial-2', originRecipe: frozenV1Recipe });
+    const cold = await openValidationHost(options); await expect(cold.authority.retry!()).rejects.toThrow('変換記録');
+    expect(cold.read().state).toBe('pending');
+    expect(await fs.readBytes(retained.replace('validation-initial.json', 'validation-initial.am'))).toEqual(exact);
+    expect(JSON.parse(new TextDecoder().decode((await fs.readBytes(retained))!))).toEqual(receipt); await cold.dispose();
+    const downgraded = { ...receipt, version: 'validation-initial-1' }; delete downgraded.originRecipe;
+    await fs.writeBytes(retained, new TextEncoder().encode(json(downgraded)));
+    const wrong = await openValidationHost(options); await expect(wrong.authority.retry!()).rejects.toThrow('変換記録');
+    expect(wrong.read().state).toBe('pending'); expect(JSON.parse(new TextDecoder().decode((await fs.readBytes(retained))!))).toEqual(downgraded);
+    await wrong.dispose();
+  });
   it('Native appearance conversion fixes the approved recipe-2 identity vectors and distinct occurrence locators', async () => {
     expect(new TextEncoder().encode(occurrenceGlbProfileText)).toHaveLength(1198);
     expect(await occurrenceGlbProfile()).toEqual({ id: 'development-validation-glb-occurrence-1', specificationSha256: '9bbf1243a3786d54a6439104614c46e502a3cdfa20dc9e9d610ee1da42cf059f' });
@@ -1663,6 +1832,45 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       proposePin: (...args: Parameters<NonNullable<Parameters<ViewportFactory>[2]>>) => proposePin?.(...args),
       proposeModel: (...args: Parameters<NonNullable<Parameters<ViewportFactory>[3]>>) => proposeModel?.(...args) };
   }
+  it('frozen v1 conversion connects product editing/first placement to named backup, independent Workspace/review and exact cold reopen', async () => {
+    const file = await frozenV1File(), bytes = await file.arrayBuffer(), initial = await (await prepareFrozenV1Conversion(file, budget, decode))!.create();
+    const h = await productWorkspaceFixture(false, false, false, 'map2', initial), { host, editor, named, button, edited } = h;
+    const original = host.read().provider!; if (original.kind !== 'scene-provider') throw Error('provider');
+    const allCaptions = Object.values(original.resources.captions), placed = allCaptions.find(c => c.title.kind === 'value' && c.title.value === '配置済み')!;
+    const empty = allCaptions.find(c => c.title.kind === 'value' && c.title.value === '')!, owned = allCaptions.find(c => c.title.kind === 'value' && c.title.value === '親だけの記録')!;
+    expect(empty.anchor).toEqual({ kind: 'value', value: { kind: 'unplaced' } }); expect(owned.anchor).toMatchObject({ kind: 'value', value: { kind: 'unplaced', ownerAssetId: host.authority.read().modelVersions![0]!.assetId } });
+    expect(host.authority.read().mediaChoices).toHaveLength(2); expect(captionAttachments(host.authority.read().mediaData, placed.id).ready).toHaveLength(3);
+    const savedView = Object.values(original.resources.views)[0]!;
+    expect(savedView.camera).toMatchObject({ kind: 'value', value: { position: [1, 2, 5], target: [0, 0, 0], up: [0, 1, 0], projection: { kind: 'perspective', verticalFovRadians: 60 * Math.PI / 180 } } });
+    named('キャプション一覧', editor).children[0]!.children[0]!.fire('click');
+    const body = named('本文', editor); body.value = '変換後の追記'; body.fire('input'); h.f.fs.reject = p => p.endsWith('/staging.json');
+    button('変更を適用', editor).fire('click'); await vi.waitFor(() => expect(host.authority.status!().kind).toBe('failed'));
+    await vi.waitFor(() => expect(h.status.dataset.busy).toBe('false')); h.f.fs.reject = () => false;
+    const readStream = h.f.fs.readStream.bind(h.f.fs), privateRead = vi.spyOn(h.f.fs, 'readStream').mockImplementation(async p => {
+      if (p.endsWith('frozen-v1-conversion-source.zip')) throw Error('later edit must not retry initialization'); return readStream(p);
+    });
+    await edited(() => button('更新を再試行', editor).fire('click')); privateRead.mockRestore();
+    expect(host.authority.read().resources.captions[placed.id]!.body).toEqual({ kind: 'value', value: '変換後の追記' });
+    named('キャプション一覧', editor).children[1]!.children[0]!.fire('click'); button('ピンを配置', editor).fire('click');
+    const canvas = named('3Dモデルの表示', editor), pointer = { pointerId: 7, isPrimary: true, button: 0, clientX: 40, clientY: 50 };
+    canvas.fire('pointerdown', pointer); canvas.fire('pointerup', pointer); await Promise.resolve(); await edited(() => button('位置を確定', editor).fire('click'));
+    expect(host.authority.read().resources.captions[empty.id]!.anchor).toMatchObject({ kind: 'value', value: { kind: 'asset', positionAsset: [0.25, 0.5, 0] } });
+    expect(Object.keys(host.authority.read().resources.captions)).toHaveLength(3); expect(h.legacy).not.toHaveBeenCalled();
+    const output = named('ファイル'), name = named('名前（任意）', output); name.value = '旧形式からの保存'; name.fire('input'); button('ファイルに保存', output).fire('click');
+    await vi.waitFor(() => expect(h.downloads).toHaveBeenCalledOnce(), { timeout: 10000 }); const source = host.read().source!;
+    const backupJob = host.workspaceOutput.jobs.find(j => j.purpose === 'backup')!, backup = await BackupArchive.inspect(await host.workspaceOutput.download(backupJob.id), metadata);
+    expect(backupJob.label).toBe('旧形式からの保存'); expect(backup.source.originalChanges()).toEqual(source.originalChanges());
+    const workspace = await host.workspaceOutput.download(await host.workspaceOutput.generate(source.token)), peer = firstWorkspaceRecipient();
+    expect((await peer.receiver.importWorkspace(workspace)).state).toBe('ready'); expect((await peer.session.read()).source!.originalChanges()).toEqual(source.originalChanges());
+    expect((await peer.fs.list('')).some(p => p.includes('frozen-v1-conversion'))).toBe(false);
+    const review = await prepareReviewView(await host.workspaceOutput.download(await host.workspaceOutput.generateReview(source.token, { sceneId: h.display()!.sceneId })), budget, decode);
+    expect(review.images.size).toBe(2); expect(review.attachments).toHaveLength(3);
+    for (const archive of [backup.archive, (await WorkspaceArchive.inspect(workspace, metadata)).archive, review.inspection.archive])
+      expect(archive.control.entries.some(e => /frozen-v1|conversion|^ops\//.test(e.path))).toBe(false);
+    expect(await file.arrayBuffer()).toEqual(bytes); await h.ui.dispose(); const cold = await openValidationHost(h.f.options);
+    expect(cold.read().source!.originalChanges()).toEqual(source.originalChanges()); expect(captionAttachments(cold.authority.read().mediaData, placed.id).ready).toHaveLength(3);
+    expect(cold.authority.read().resources.captions[owned.id]!.anchor).toEqual(owned.anchor); await cold.dispose();
+  });
   it('Native appearance conversion connects product editing, occurrence clones, named backup, independent Workspace/review and exact cold reopen', async () => {
     const input = await nativeAppearanceFile(), inputBytes = await input.arrayBuffer();
     const initial = await (await prepareNativeConversion(input, budget, decode))!.create();

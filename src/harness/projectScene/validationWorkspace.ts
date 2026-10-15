@@ -2,6 +2,7 @@ import { newId } from '../../projectMetadata/persistence';
 import { prepareValidationProject, type ValidationFile } from '../../projectFiles/initialProject';
 import { prepareValidationCreation } from '../../projectFiles/creation';
 import { prepareNativeConversion } from '../../projectFiles/nativeConversion';
+import { prepareFrozenV1Conversion } from '../../projectFiles/frozenV1Conversion';
 import { validationMetadataLimits, type FileValidationLimits } from '../../projectFiles/validation';
 import { WorkspaceArchive } from '../../projectPackage/workspaceArchive';
 import { CleanArchive } from '../../projectPackage/cleanArchive';
@@ -68,7 +69,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   let receiveTools: ReturnType<typeof createValidationReceiveControls> | undefined;
   let resident: Awaited<ReturnType<ValidationWorkspacePorts['render']>> | undefined;
   let busy = false, disposed = false, composing = false, selected: string | null = null, operation: Promise<void> | undefined;
-  let conversion: Awaited<ReturnType<typeof prepareNativeConversion>> = null;
+  let conversion: Awaited<ReturnType<typeof prepareNativeConversion>> | Awaited<ReturnType<typeof prepareFrozenV1Conversion>> = null;
   const changed = () => !!workspace?.hasChanges() || !!reviewWorkspace?.hasChanges() || !!receiveTools?.hasChanges() || !!host?.hasPending();
   const controls = () => { navigation.inert = busy; openFile.disabled = create.disabled = convert.disabled = cancelConversion.disabled = busy || composing; back.disabled = busy; back.hidden = !host && !reviewWorkspace; };
   title.addEventListener('compositionstart', () => { composing = true; controls(); });
@@ -216,10 +217,13 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     ensureMaySwitch(); const file = workspaceInput.files?.[0]; if (!file) throw Error('ファイルを選択してください。');
     status.textContent = 'ファイルを確認しています。';
     clearConversion();
-    const native = await prepareNativeConversion(file, ports.fileLimits, ports.decode); if (disposed) return;
-    if (native) {
-      conversion = native; const n = native.summary;
-      conversionNote.textContent = `Nativeファイル：モデル ${n.models}・シーン ${n.scenes}・キャプション ${n.captions}・メディア ${n.media}`;
+    const legacy = await prepareFrozenV1Conversion(file, ports.fileLimits, ports.decode); if (disposed) return;
+    const native = legacy ? null : await prepareNativeConversion(file, ports.fileLimits, ports.decode); if (disposed) return;
+    if (native || legacy) {
+      conversion = native ?? legacy; const n = conversion!.summary;
+      conversionNote.textContent = `${native ? 'Native' : '旧LociView'}ファイル：モデル ${n.models}・シーン ${n.scenes}・キャプション ${n.captions}・メディア ${n.media}`;
+      if (legacy) { const s = legacy.summary.sourceOnly;
+        conversionNote.textContent += `。元ファイルだけに保持：編集者情報 ${s.profiles}・削除済み記録 ${s.deletedRecords}・キャッシュ ${s.caches}・削除済み本体 ${s.deletedPayloads}・未使用本体 ${s.unlinkedPayloads}・面の法線 ${s.anchorNormals}`; }
       conversionPanel.hidden = false; status.textContent = ''; return;
     }
     const purpose = (await PackageArchive.inspect(file)).control.manifest.purpose;

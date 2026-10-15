@@ -1,14 +1,20 @@
 # Frozen-v1 initial ProjectScene conversion companion
 
-Status: **PROPOSED — no durable implementation or adoption authorized.**
-This is the concrete next compatibility decision under [05 §9](05-project-scene-team-workflow.md#9-migration)
+Status: **PO ratified 2026-10-15 — approved for bounded implementation, not adoption.**
+PO authorized this exact recipe/subset after independent review under [05 §9](05-project-scene-team-workflow.md#9-migration)
 and [07](07-project-scene-migration.md). It does not amend the frozen v1 reader,
 `v1-migration-recipe-1`, existing Native recipes, Projects or interrupted jobs.
 Current work, review and checks belong to [todo](../../tasks/todo.md).
+The exact subset below is implemented in the isolated validation composition and
+exercised through conversion preview, product edit/first placement, file handoff
+and cold recovery with synthetic GLB/PNG, memory storage and recorded DOM. The
+serial checks and HTTP build identity pass; browser/GPU/device/offline and
+anonymized-real-source acceptance remain pending. This is bounded implementation,
+not full v1 conversion or ordinary-entry/profile/storage adoption.
 
 ## User outcome and decision
 
-Approve `v1-project-scene-migration-recipe-1` for the bounded file workflow below:
+The approved `v1-project-scene-migration-recipe-1` covers the bounded file workflow below:
 open a self-contained frozen-v1 GLB/PNG Project ZIP → inspect conversion effects →
 create a new Project with Scenes, Captions, media and perspective Views → edit,
 place an unplaced Caption, save a named backup/Workspace and reopen independently.
@@ -201,6 +207,13 @@ it. A receipt alone cannot change the retained recipe/source. Write/read back
 the original and exact initial source, put verified bodies through OriginBlobStore
 and publish only through existing metadata initialization/journal. Persist/cold
 retry uses captured IDs/changes; completed retry preserves later target edits.
+New v1 conversions bind `originRecipe: 'v1-project-scene-migration-recipe-1'` in
+a closed `validation-initial-2` initial receipt and an independent write-once
+`validation-origin-1` marker binding that recipe and exact initial proof/length/
+digest. Cold routing must retain this obligation if both private conversion files
+are lost, including a downgrade of the initial receipt alone. Generic creation
+recovery refuses either binding; converter recovery checks their agreement.
+Existing `validation-initial-1` bytes/read behavior stay unchanged.
 Keep private source/report out of backup/Workspace/review/Clean outputs.
 
 Use one code-generated success ZIP (GLB, equal-byte distinct PNG assets, two sets,
