@@ -2870,6 +2870,19 @@ inherits §7.3 sharing disclosure. No sanitization purpose, renderer backend,
 ordinary entry or adoption credit is introduced. Todo owns actual implementation
 checks and pending browser/device/offline acceptance.
 
+#### Approved additive WebP/GIF photo companion (2026-10-15)
+
+[07e](07e-webp-gif-project-scene-proposal.md) extends the same bounded route with
+WebP/GIF photos through direct creation/addition, conversion, editing, file handoff,
+generation restore and cold reopen. Its exact four additive recipes apply only
+to admitted retained photo resources; PNG/JPEG recipes and the four GLB profiles
+remain fixed. Complete bounded container inspection and temporary default/first
+bitmap decode precede admission. Original Blob display retains existing browser
+animation behavior; WebP Exif remains opaque, with raw-or-transpose geometry checks.
+No all-frame pixel/playback or orientation-equivalence guarantee is introduced.
+Original metadata inherits §7.3 disclosure. Todo owns executed evidence and the
+separate browser/device/offline and ordinary-entry/adoption conditions.
+
 ### 13.3 Approved scheduling exception — validators and UI components (2026-09-08)
 
 The PO explicitly approved advancing storage-neutral data validation and reusable

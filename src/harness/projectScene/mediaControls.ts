@@ -26,7 +26,7 @@ export function createMediaControls(document: Document, session: SyntheticMediaS
   const viewer = sharedViewer ?? createMediaViewer(document);
   const add = button('メディアを追加'), note = make('p', '開発用の合成画像です。ファイルの読込みは未接続です。'), list = make('div'), status = make('p'); status.setAttribute('role', 'status');
   const addFile = button('メディアを追加'), file = make('input'), cancelFile = button('選択を取り消す');
-  file.type = 'file'; file.accept = 'image/png,image/jpeg,.png,.jpg,.jpeg'; file.hidden = true; file.setAttribute('aria-label', 'メディアを追加');
+  file.type = 'file'; file.accept = 'image/png,image/jpeg,image/webp,image/gif,.png,.jpg,.jpeg'; file.hidden = true; file.setAttribute('aria-label', 'メディアを追加');
   const stored = make('details'), storedLabel = make('summary', '登録済みメディア'), target = make('p'); stored.append(storedLabel, target);
   const editor = make('section'), input = make('input'), apply = button('説明を適用'), cancel = button('取り消す'), retry = button('再試行');
   input.setAttribute('aria-label', 'メディアの説明'); editor.append(input, apply, cancel);
@@ -72,7 +72,7 @@ export function createMediaControls(document: Document, session: SyntheticMediaS
     addFile.disabled = Boolean(current.block || d || session.hasFileSelection);
     cancelFile.hidden = !session.hasFileSelection; cancelFile.disabled = Boolean(current.block);
     add.textContent = '選択したメディアを添付';
-    note.textContent = filesAvailable ? 'PNG/JPEGを追加できます。' : current.project.validationFiles ? choices.length ? '' : 'このプロジェクトには追加できるメディアがありません。' : '開発用の合成画像です。ファイルの読込みは未接続です。';
+    note.textContent = filesAvailable ? 'PNG/JPEG/WebP/GIFを追加できます。' : current.project.validationFiles ? choices.length ? '' : 'このプロジェクトには追加できるメディアがありません。' : '開発用の合成画像です。ファイルの読込みは未接続です。';
     note.hidden = !note.textContent;
     root.hidden = !current.captionId && !d && !session.hasFileSelection;
     add.disabled = Boolean(current.block || d || session.hasFileSelection) || !selected;

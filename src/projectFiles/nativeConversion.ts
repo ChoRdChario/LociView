@@ -1,3 +1,4 @@
+import { inspectProjectImage, projectImageMime, type PhotoDecoder } from './photo';
 import { readNativePortableConversionV1 } from '../nativeGs/portablePackage';
 import { nativeDisplaySetsV1, type NativeProjectSnapshotV1 } from '../nativeGs/schema';
 import { nativeMaterialSlotKey } from '../nativeGs/materialSlots';
@@ -10,11 +11,11 @@ import { readProjectScene } from '../scene/projectProvider';
 import { checkContentFacts } from '../domain/projectContentChecks';
 import { same } from '../domain/projectGraphSupport';
 import { cloneCanonicalValue, type JsonObject, type JsonValue } from '../domain/values';
-import { mapNativeProject, nativeConversionRecipe, nativeAppearanceRecipe, nativeJpegRecipe, nativeAppearanceJpegRecipe, nativeRecipeHasAppearance, nativeRecipeHasJpeg, nativeAppearanceIntent, type NativeConversionRecipe, type NativeMappingEntry, type NativeMaterialWitness, type NativeOccurrence } from './nativeMapping';
+import { mapNativeProject, nativeConversionRecipe, nativeAppearanceRecipe, nativeJpegRecipe, nativeAppearanceJpegRecipe, nativeRecipeHasAppearance, nativePhotoRecipe, nativeAppearancePhotoRecipe, nativeRecipeHasPhoto, nativeRecipeHasOrigin, nativeAppearanceIntent, type NativeConversionRecipe, type NativeMappingEntry, type NativeMaterialWitness, type NativeOccurrence } from './nativeMapping';
 import { inspectValidationGlb, inspectValidationJpegGlb, validationGlbUsesJpeg, type ValidatedGlb } from './glb';
 import { inspectOccurrenceGlb, inspectOccurrenceJpegGlb, decodeOccurrenceGlb } from './glbOccurrences';
 import type { PngDecoder } from './png';
-import { inspectValidationImage, type JpegDecoder } from './jpeg';
+import type { JpegDecoder } from './jpeg';
 import { identityPlacement } from './initialProject';
 import { readValidationBody } from './content';
 import { readValidationInitialRecord, writeValidationInitial, validationInitialOrigin } from './creation';
@@ -32,7 +33,7 @@ const receiptPath = (fs: ProjectWorkspaceFS) => metadataPath(fs, 'native-convers
 const sourcePath = (fs: ProjectWorkspaceFS) => metadataPath(fs, 'native-conversion-source.zip');
 const proof = async (bytes: Uint8Array): Promise<ByteProof> => ({ byteLength: bytes.length, digest: await digest(bytes) });
 export const hasNativeConversion = async (fs: ProjectWorkspaceFS, checkBoundInitial = true) => !!await fs.readStream(receiptPath(fs)) || !!await fs.readStream(sourcePath(fs)) ||
-  checkBoundInitial && [nativeJpegRecipe, nativeAppearanceJpegRecipe].includes(await validationInitialOrigin(fs) as typeof nativeJpegRecipe | typeof nativeAppearanceJpegRecipe);
+  checkBoundInitial && [nativeJpegRecipe, nativeAppearanceJpegRecipe, nativePhotoRecipe, nativeAppearancePhotoRecipe].includes(await validationInitialOrigin(fs) as NativeConversionRecipe);
 async function inspectNativeModel(bytes: Uint8Array, appearance: boolean, limits: FileValidationLimits, png?: PngDecoder, jpeg?: JpegDecoder) {
   const hasJpeg = validationGlbUsesJpeg(bytes, limits);
   const inspect = appearance ? hasJpeg ? inspectOccurrenceJpegGlb : inspectOccurrenceGlb : hasJpeg ? inspectValidationJpegGlb : inspectValidationGlb;
@@ -57,7 +58,7 @@ async function checkConversionReceipt(r: ConversionReceipt, projectId: string) {
     Object.keys(v).sort().join(',') === names.sort().join(',');
   const byteProof = (p: ByteProof) => keys(p, ['byteLength', 'digest']) && Number.isSafeInteger(p.byteLength) && p.byteLength > 0 && /^[0-9a-f]{64}$/.test(p.digest);
   if (!keys(r, ['recipe', 'conversionId', 'projectId', 'original', 'manifest', 'snapshot', 'initial', 'mapping', 'report', ...(nativeRecipeHasAppearance(r.recipe) ? ['materialWitness'] : [])]) ||
-    ![nativeConversionRecipe, nativeAppearanceRecipe, nativeJpegRecipe, nativeAppearanceJpegRecipe].includes(r.recipe) || r.projectId !== projectId || r.projectId !== `prj_${r.conversionId}` || !/^[0-9a-f]{32}$/.test(r.conversionId) ||
+    ![nativeConversionRecipe, nativeAppearanceRecipe, nativeJpegRecipe, nativeAppearanceJpegRecipe, nativePhotoRecipe, nativeAppearancePhotoRecipe].includes(r.recipe) || r.projectId !== projectId || r.projectId !== `prj_${r.conversionId}` || !/^[0-9a-f]{32}$/.test(r.conversionId) ||
     !byteProof(r.original) || !byteProof(r.manifest) || !byteProof(r.snapshot) || !keys(r.initial, ['byteLength', 'digest', 'proof']) ||
     !byteProof({ byteLength: r.initial.byteLength, digest: r.initial.digest }) || !Array.isArray(r.mapping) || !r.mapping.length ||
     !keys(r.report, ['models', 'scenes', 'captions', 'media', 'originalExcludedFromExports']) || r.report.originalExcludedFromExports !== true ||
@@ -75,7 +76,7 @@ async function checkConversionReceipt(r: ConversionReceipt, projectId: string) {
       !Array.isArray(value[3]) || entry.id !== `${value[2]}_${entry.sha256.slice(0, 32)}` || await digest(new TextEncoder().encode(entry.preimage)) !== entry.sha256)
       return fileError('変換時の対応表が一致しません。');
     if (nativeRecipeHasAppearance(r.recipe) && !appearanceSourceKey(value[2], value[3])) return fileError('材質変換の識別情報が不正です。');
-    if (nativeRecipeHasJpeg(r.recipe) && (entry.preimage !== `lociview:${r.recipe}:id:jcs-v1\n` + JSON.stringify(value) || hashes.has(entry.sha256) && hashes.get(entry.sha256) !== entry.preimage)) return fileError('変換時の対応表が一致しません。');
+    if (nativeRecipeHasOrigin(r.recipe) && (entry.preimage !== `lociview:${r.recipe}:id:jcs-v1\n` + JSON.stringify(value) || hashes.has(entry.sha256) && hashes.get(entry.sha256) !== entry.preimage)) return fileError('変換時の対応表が一致しません。');
     ids.add(entry.id); hashes.set(entry.sha256, entry.preimage);
   }
 }
@@ -163,9 +164,9 @@ async function verifyMaterialWitness(r: ConversionReceipt, source: ProjectMetada
   }
 }
 
-async function verifyJpegMapping(receipt: ConversionReceipt, source: ProjectMetadataSource, snapshot: NativeProjectSnapshotV1,
+async function verifyAdditiveMapping(receipt: ConversionReceipt, source: ProjectMetadataSource, snapshot: NativeProjectSnapshotV1,
   models: ReadonlyMap<string, ValidatedGlb>, rows: ReadonlyMap<string, readonly NativeOccurrence[]>) {
-  if (!nativeRecipeHasJpeg(receipt.recipe)) return;
+  if (!nativeRecipeHasOrigin(receipt.recipe)) return;
   if (source.semanticProfile !== 'map2' || snapshot.collaborationBaseline || !same(receipt.report, {
     models: snapshot.assets.length, scenes: nativeDisplaySetsV1(snapshot).length, captions: snapshot.captions.length,
     media: snapshot.mediaResources?.length ?? 0, originalExcludedFromExports: true,
@@ -182,7 +183,7 @@ async function verifyJpegMapping(receipt: ConversionReceipt, source: ProjectMeta
 }
 
 /** No IDs or persistent state are allocated until the user confirms create(). */
-export async function prepareNativeConversion(input: Blob, limits: FileValidationLimits, decode?: PngDecoder, jpeg?: JpegDecoder) {
+export async function prepareNativeConversion(input: Blob, limits: FileValidationLimits, decode?: PngDecoder, jpeg?: JpegDecoder, photo?: PhotoDecoder) {
   checkFileLimits(limits);
   const file = input.slice(0, input.size), native = await readNativePortableConversionV1(file, limits);
   if (!native) return null;
@@ -205,10 +206,10 @@ export async function prepareNativeConversion(input: Blob, limits: FileValidatio
       try { sourceWitness.set(r.id, decoded.occurrenceSlots.map(({ node: _node, ...row }) => row)); } finally { decoded.dispose(); } }
   }
   for (const m of snapshot.mediaResources ?? []) {
-    if (m.blob.mediaType !== 'image/png' && m.blob.mediaType !== 'image/jpeg') return fileError('この画像形式はまだ変換できません。');
+    if (!projectImageMime(m.blob.mediaType)) return fileError('この画像形式はまだ変換できません。');
     const bytes = native.bodies.get(native.manifest.media!.find(e => e.mediaId === m.id)!.entry)!;
     if (await digest(bytes) !== m.blob.digest) return fileError('画像本体が元の記録と一致しません。');
-    if (await inspectValidationImage(bytes, limits, decode, jpeg) !== m.blob.mediaType) return fileError('画像本体の形式が一致しません。'); blobs.push({ ref: { ...m.blob }, bytes });
+    if (await inspectProjectImage(bytes, limits, decode, jpeg, photo) !== m.blob.mediaType) return fileError('画像本体の形式が一致しません。'); blobs.push({ ref: { ...m.blob }, bytes });
   }
   if (appearance) checkAppearanceSubset(snapshot, models, sourceWitness, limits);
   const originalBytes = await readValidationBody({ size: file.size, stream: () => file.stream() }, limits.maxFileBytes);
@@ -255,13 +256,13 @@ export async function prepareNativeConversion(input: Blob, limits: FileValidatio
       original, manifest, snapshot: snapshotProof, initial: { ...await proof(bytes), proof: source.proof }, mapping: mapped.mapping, report,
       ...(appearance ? { materialWitness: mapped.materialWitness } : {}) };
     if (appearance) await verifyMaterialWitness(receipt, source, snapshot, models, sourceWitness, limits);
-    await verifyJpegMapping(receipt, source, snapshot, models, sourceWitness);
+    await verifyAdditiveMapping(receipt, source, snapshot, models, sourceWitness);
     return { source, async persist(fs: ProjectWorkspaceFS, store: OriginBlobStore, session: MetadataProjectSession) {
       const before = await session.read();
       const existing = await readReceipt<ConversionReceipt>(fs, receiptPath(fs), metadata);
       if (existing) {
         if (json(existing) !== json(receipt)) return fileError('作成先は別のプロジェクトです。');
-        return resumeNativeConversion(fs, store, session, limits, receipt.projectId, decode, jpeg);
+        return resumeNativeConversion(fs, store, session, limits, receipt.projectId, decode, jpeg, photo);
       }
       if (before.state !== 'empty') return fileError('作成先が空ではありません。');
       await underWriteLease(fs, async () => {
@@ -271,13 +272,13 @@ export async function prepareNativeConversion(input: Blob, limits: FileValidatio
         if (!old) await fs.writeBytes(sourcePath(fs), originalBytes);
         const saved = await fs.readBytes(sourcePath(fs));
         if (!saved || !equalBytes(saved, originalBytes)) return fileError('変換元の記録を保持できません。');
-        await writeValidationInitial(fs, source, receipt.recipe === nativeJpegRecipe || receipt.recipe === nativeAppearanceJpegRecipe ? receipt.recipe : undefined);
+        await writeValidationInitial(fs, source, nativeRecipeHasOrigin(receipt.recipe) ? receipt.recipe : undefined);
       });
-      if (appearance || nativeRecipeHasJpeg(receipt.recipe)) {
+      if (appearance || nativeRecipeHasOrigin(receipt.recipe)) {
         const saved = await readReceipt<ConversionReceipt>(fs, receiptPath(fs), metadata), retained = await readValidationInitialRecord(fs);
         if (json(saved) !== json(receipt) || retained.receipt.digest !== receipt.initial.digest) return fileError('変換時の材質記録が一致しません。');
         if (appearance) await verifyMaterialWitness(receipt, retained.source, snapshot, models, sourceWitness, limits);
-        await verifyJpegMapping(receipt, retained.source, snapshot, models, sourceWitness);
+        await verifyAdditiveMapping(receipt, retained.source, snapshot, models, sourceWitness);
       }
       for (const body of blobs) await store.put(new Blob([body.bytes.slice().buffer]).stream(), body.ref.mediaType, body.ref);
       return session.createFromSource(source);
@@ -288,12 +289,12 @@ export async function prepareNativeConversion(input: Blob, limits: FileValidatio
 
 /** Cold recovery checks retained input; it never regenerates IDs or initial Automerge changes. */
 export async function resumeNativeConversion(fs: ProjectWorkspaceFS, store: OriginBlobStore, session: MetadataProjectSession,
-  limits: FileValidationLimits, projectId: string, decode?: PngDecoder, jpeg?: JpegDecoder) {
+  limits: FileValidationLimits, projectId: string, decode?: PngDecoder, jpeg?: JpegDecoder, photo?: PhotoDecoder) {
   const receipt = await readReceipt<ConversionReceipt>(fs, receiptPath(fs), metadata);
   if (!receipt) return fileError('変換元の記録を確認できません。');
   await checkConversionReceipt(receipt, projectId);
   const { source, receipt: initial } = await readValidationInitialRecord(fs);
-  if ((nativeRecipeHasJpeg(receipt.recipe) ? initial.version !== 'validation-initial-2' || initial.originRecipe !== receipt.recipe : initial.version !== 'validation-initial-1') || source.proof.identity.projectId !== projectId || json(source.proof) !== json(receipt.initial.proof) || initial.byteLength !== receipt.initial.byteLength ||
+  if ((nativeRecipeHasOrigin(receipt.recipe) ? initial.version !== 'validation-initial-2' || initial.originRecipe !== receipt.recipe : initial.version !== 'validation-initial-1') || source.proof.identity.projectId !== projectId || json(source.proof) !== json(receipt.initial.proof) || initial.byteLength !== receipt.initial.byteLength ||
     initial.digest !== receipt.initial.digest) return fileError('変換時の初期記録が一致しません。');
   // A changed receipt must not downgrade retained recipe-2 source into the old retry path.
   if (receipt.recipe === nativeConversionRecipe && source.read().history.changes.some(c => c.writes.some(w =>
@@ -305,7 +306,7 @@ export async function resumeNativeConversion(fs: ProjectWorkspaceFS, store: Orig
   const original = await readValidationBody(saved, limits.maxFileBytes);
   if (await digest(original) !== receipt.original.digest) return fileError('変換元ファイルの記録が一致しません。');
   let checkedNative: NonNullable<Awaited<ReturnType<typeof readNativePortableConversionV1>>> | undefined;
-  if (nativeRecipeHasAppearance(receipt.recipe) || nativeRecipeHasJpeg(receipt.recipe)) {
+  if (nativeRecipeHasAppearance(receipt.recipe) || nativeRecipeHasOrigin(receipt.recipe)) {
     checkedNative = await readNativePortableConversionV1(new Blob([original.slice().buffer]), limits) ?? undefined;
     if (!checkedNative || json(await proof(checkedNative.manifestBytes)) !== json(receipt.manifest) || json(await proof(checkedNative.snapshotBytes)) !== json(receipt.snapshot)) return fileError('変換元の内容が記録と一致しません。');
     const models = new Map<string, ValidatedGlb>(), rows = new Map<string, readonly NativeOccurrence[]>(); let occurrenceCount = 0;
@@ -319,21 +320,21 @@ export async function resumeNativeConversion(fs: ProjectWorkspaceFS, store: Orig
         try { rows.set(r.id, decoded.occurrenceSlots.map(({ node: _node, ...row }) => row)); } finally { decoded.dispose(); }
       }
     }
-    if (nativeRecipeHasJpeg(receipt.recipe)) {
-      let hasJpeg = [...models.values()].some(m => m.jpeg);
+    if (nativeRecipeHasOrigin(receipt.recipe)) {
+      let hasJpeg = [...models.values()].some(m => m.jpeg), hasPhoto = false;
       for (const m of checkedNative.snapshot.mediaResources ?? []) {
         const body = checkedNative.bodies.get(checkedNative.manifest.media!.find(e => e.mediaId === m.id)!.entry)!;
-        if (await inspectValidationImage(body, limits, decode, jpeg) !== m.blob.mediaType) return fileError('元の画像形式が一致しません。');
-        hasJpeg ||= m.blob.mediaType === 'image/jpeg';
+        if (await inspectProjectImage(body, limits, decode, jpeg, photo) !== m.blob.mediaType) return fileError('元の画像形式が一致しません。');
+        hasJpeg ||= m.blob.mediaType === 'image/jpeg'; hasPhoto ||= m.blob.mediaType === 'image/webp' || m.blob.mediaType === 'image/gif';
       }
-      if (!hasJpeg || !!checkedNative.snapshot.meshMaterialAppearances?.length !== nativeRecipeHasAppearance(receipt.recipe))
+      if ((nativeRecipeHasPhoto(receipt.recipe) ? !hasPhoto : hasPhoto || !hasJpeg) || !!checkedNative.snapshot.meshMaterialAppearances?.length !== nativeRecipeHasAppearance(receipt.recipe))
         return fileError('変換の版と変換元が一致しません。');
     }
     if (nativeRecipeHasAppearance(receipt.recipe)) {
       checkAppearanceSubset(checkedNative.snapshot, models, rows, limits);
       await verifyMaterialWitness(receipt, source, checkedNative.snapshot, models, rows, limits);
     }
-    await verifyJpegMapping(receipt, source, checkedNative.snapshot, models, rows);
+    await verifyAdditiveMapping(receipt, source, checkedNative.snapshot, models, rows);
   }
   const before = await session.read();
   if (before.state === 'ready') {

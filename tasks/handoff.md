@@ -26,7 +26,7 @@ todo for its tested scope and remaining ordinary-entry/browser/device boundaries
 ## Non-negotiable distinctions
 
 - The goal is a practical team candidate, not a complete MVP or release authorization.
-- Ordinary Native, synthetic hosts and limited GLB/PNG validation have separate evidence.
+- Ordinary Native, synthetic hosts and limited GLB/photo validation have separate evidence.
 - Stored original bytes and failed/pending states remain visible; no inferred winner,
   relation, destructive operation or silent fallback. Internal resume is not external saving.
 - Map-1 and map-2 are selected by verified retained evidence, not a domain minor.

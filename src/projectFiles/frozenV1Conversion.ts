@@ -1,3 +1,4 @@
+import type { PhotoDecoder } from './photo';
 import type { ProjectWorkspaceFS } from '../platform/fs';
 import type { OriginBlobStore } from '../projectMetadata/blobStore';
 import { ProjectMetadataSource, type MetadataProof } from '../projectMetadata/source';
@@ -9,7 +10,7 @@ import { checkContentFacts } from '../domain/projectContentChecks';
 import { readProjectScene } from '../scene/projectProvider';
 import { readValidationBody } from './content';
 import { readValidationInitialRecord, writeValidationInitial, validationInitialOrigin } from './creation';
-import { frozenV1Recipe, frozenV1JpegRecipe, type FrozenV1Recipe, inspectFrozenV1Source, byteProof, type FrozenV1Plan } from './frozenV1Source';
+import { frozenV1Recipe, frozenV1JpegRecipe, frozenV1PhotoRecipe, type FrozenV1Recipe, inspectFrozenV1Source, byteProof, type FrozenV1Plan } from './frozenV1Source';
 import { mapFrozenV1Project, frozenV1SourceKey, type FrozenV1MappingEntry } from './frozenV1Mapping';
 import type { PngDecoder } from './png';
 import type { JpegDecoder } from './jpeg';
@@ -25,7 +26,7 @@ interface ConversionReceipt {
 const receiptPath = (fs: ProjectWorkspaceFS) => metadataPath(fs, 'frozen-v1-conversion.json');
 const sourcePath = (fs: ProjectWorkspaceFS) => metadataPath(fs, 'frozen-v1-conversion-source.zip');
 export const hasFrozenV1Conversion = async (fs: ProjectWorkspaceFS, checkBoundInitial = true) => !!await fs.readStream(receiptPath(fs)) || !!await fs.readStream(sourcePath(fs)) ||
-  checkBoundInitial && [frozenV1Recipe, frozenV1JpegRecipe].includes(await validationInitialOrigin(fs) as FrozenV1Recipe);
+  checkBoundInitial && [frozenV1Recipe, frozenV1JpegRecipe, frozenV1PhotoRecipe].includes(await validationInitialOrigin(fs) as FrozenV1Recipe);
 const fail = () => fileError('旧形式の変換記録が不足しているか一致しません。保持した記録は上書きしていません。');
 
 async function checkReceipt(r: ConversionReceipt, projectId: string) {
@@ -33,7 +34,7 @@ async function checkReceipt(r: ConversionReceipt, projectId: string) {
   const proof = (p: unknown): boolean => keys(p, ['byteLength', 'digest']) && Number.isSafeInteger((p as ConversionReceipt['original']).byteLength) &&
     (p as ConversionReceipt['original']).byteLength > 0 && /^[0-9a-f]{64}$/.test((p as ConversionReceipt['original']).digest);
   if (!keys(r, ['recipe', 'conversionId', 'projectId', 'original', 'initial', 'fingerprints', 'inventory', 'mapping', 'report']) ||
-    ![frozenV1Recipe, frozenV1JpegRecipe].includes(r.recipe) || !/^[0-9a-f]{32}$/.test(r.conversionId) || r.projectId !== projectId || projectId !== `prj_${r.conversionId}` ||
+    ![frozenV1Recipe, frozenV1JpegRecipe, frozenV1PhotoRecipe].includes(r.recipe) || !/^[0-9a-f]{32}$/.test(r.conversionId) || r.projectId !== projectId || projectId !== `prj_${r.conversionId}` ||
     !proof(r.original) || !keys(r.initial, ['byteLength', 'digest', 'proof']) || !proof({ byteLength: r.initial.byteLength, digest: r.initial.digest }) ||
     !Array.isArray(r.mapping) || !r.mapping.length) return fail();
   const ids = new Set<string>();
@@ -61,8 +62,8 @@ async function verifyRetained(r: ConversionReceipt, source: ProjectMetadataSourc
 }
 
 /** Null means no v1 identity, never a failed v1 read or unsupported conversion. */
-export async function prepareFrozenV1Conversion(input: Blob, limits: FileValidationLimits, decode?: PngDecoder, jpeg?: JpegDecoder) {
-  const opened = await inspectFrozenV1Source(input, limits, decode, jpeg); if (!opened) return null;
+export async function prepareFrozenV1Conversion(input: Blob, limits: FileValidationLimits, decode?: PngDecoder, jpeg?: JpegDecoder, photo?: PhotoDecoder) {
+  const opened = await inspectFrozenV1Source(input, limits, decode, jpeg, photo); if (!opened) return null;
   const { plan, original } = opened, originalProof = await byteProof(original);
   let attempt: Promise<Awaited<ReturnType<typeof create>>> | undefined;
   async function create() {
@@ -93,7 +94,7 @@ export async function prepareFrozenV1Conversion(input: Blob, limits: FileValidat
       const before = await session.read(), existing = await readReceipt<ConversionReceipt>(fs, receiptPath(fs), metadata);
       if (existing) {
         if (json(existing) !== json(receipt)) return fail();
-        return resumeFrozenV1Conversion(fs, store, session, limits, receipt.projectId, decode, jpeg);
+        return resumeFrozenV1Conversion(fs, store, session, limits, receipt.projectId, decode, jpeg, photo);
       }
       if (before.state !== 'empty') return fileError('作成先が空ではありません。既存の記録は変更していません。');
       await underWriteLease(fs, async () => {
@@ -114,14 +115,14 @@ export async function prepareFrozenV1Conversion(input: Blob, limits: FileValidat
 }
 
 export async function resumeFrozenV1Conversion(fs: ProjectWorkspaceFS, store: OriginBlobStore, session: MetadataProjectSession,
-  limits: FileValidationLimits, projectId: string, decode?: PngDecoder, jpeg?: JpegDecoder) {
+  limits: FileValidationLimits, projectId: string, decode?: PngDecoder, jpeg?: JpegDecoder, photo?: PhotoDecoder) {
   const receipt = await readReceipt<ConversionReceipt>(fs, receiptPath(fs), metadata); if (!receipt) return fail();
   await checkReceipt(receipt, projectId);
   const initial = await readValidationInitialRecord(fs);
   if (initial.receipt.byteLength !== receipt.initial.byteLength || initial.receipt.digest !== receipt.initial.digest || initial.receipt.version !== 'validation-initial-2' || initial.receipt.originRecipe !== receipt.recipe) return fail();
   const raw = await fs.readStream(sourcePath(fs)); if (!raw || raw.size !== receipt.original.byteLength) return fail();
   const original = await readValidationBody(raw, limits.maxFileBytes); if (await digest(original) !== receipt.original.digest) return fail();
-  const opened = await inspectFrozenV1Source(new Blob([original.slice().buffer]), limits, decode, jpeg); if (!opened) return fail();
+  const opened = await inspectFrozenV1Source(new Blob([original.slice().buffer]), limits, decode, jpeg, photo); if (!opened) return fail();
   await verifyRetained(receipt, initial.source, opened.plan);
   const before = await session.read();
   if (before.state === 'ready') { if (json(before.source!.proof) !== json(initial.source.proof)) return fail(); return before; }

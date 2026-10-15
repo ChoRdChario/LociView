@@ -17,8 +17,8 @@ owns feature coverage. Read [document authority](docs/README.md) for contracts.
 |---|---|---|
 | `index.html` → `src/main.ts` → `src/ui/app.ts` | Ordinary home and legacy v1 route, with Native entry | New ProjectScene adoption |
 | `src/nativeGs/app.ts` | Bounded Native Mesh/Point/GS, DisplaySets, media and package exchange | New continuing-history team workflow or general format support |
-| `dev.html` → `src/dev-entry.ts` → `src/harness/projectScene/entry.ts` | Nondefault ProjectScene development host; memory, old saved, metadata and limited GLB/PNG/JPEG validation routes | Ordinary-home, device, offline or release acceptance |
-| `project-scene-validation` build → `dev.html` → `validationEntry.ts` | Same limited GLB/PNG/JPEG validation screen, static-only entry; separate `validation-dist`, no public assets or Service Worker | Ordinary-home activation, offline/PWA, profile/device or release acceptance |
+| `dev.html` → `src/dev-entry.ts` → `src/harness/projectScene/entry.ts` | Nondefault ProjectScene development host; memory, old saved, metadata and limited static GLB plus PNG/JPEG/WebP/GIF photo validation routes | Ordinary-home, device, offline or release acceptance |
+| `project-scene-validation` build → `dev.html` → `validationEntry.ts` | Same limited GLB and photo validation screen, static-only entry; separate `validation-dist`, no public assets or Service Worker | Ordinary-home activation, offline/PWA, profile/device or release acceptance |
 
 Within validation, `editor=project` selects the bounded typed product composition
 in `src/ui/projectScene/projectWorkspace.ts`; its viewport/file adapter is
@@ -59,6 +59,13 @@ content/provider/display and file/generation ports carry inspected MIME/profile;
 photos keep their original bytes and metadata. Old PNG paths and prepared jobs
 retain their meanings. See 07d and todo for the bounded scope and evidence; this
 does not activate ordinary entry or complete browser/device/offline adoption.
+
+The approved WebP/GIF photo companion adds `projectFiles/photo.ts` for complete
+bounded container inspection and temporary default/first-bitmap validation. Its
+four additive conversion domains reuse the same source/content/file/recovery
+ports. The common viewer keeps original Blob bytes and browser animation behavior;
+the four PNG/JPEG GLB profiles remain fixed. See 07e and todo for exact scope and
+executed evidence, without broader browser/device or ordinary-entry credit.
 
 ## Current directories
 

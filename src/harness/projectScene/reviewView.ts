@@ -1,3 +1,4 @@
+import { inspectProjectImage, projectImageMime, type PhotoDecoder } from '../../projectFiles/photo';
 import * as THREE from 'three';
 import { canonical, list, object, same, string } from '../../domain/projectGraphSupport';
 import type { JsonObject } from '../../domain/values';
@@ -6,7 +7,7 @@ import { ReviewArchive } from '../../projectPackage/reviewArchive';
 import { inspectValidationGlb, inspectValidationJpegGlb, type ValidatedGlb } from '../../projectFiles/glb';
 import { inspectOccurrenceGlb, inspectOccurrenceJpegGlb } from '../../projectFiles/glbOccurrences';
 import type { PngDecoder } from '../../projectFiles/png';
-import { inspectValidationImage, type JpegDecoder } from '../../projectFiles/jpeg';
+import type { JpegDecoder } from '../../projectFiles/jpeg';
 import { validationGlbProfile, occurrenceGlbProfile, jpegGlbProfile, occurrenceJpegGlbProfile, validationMetadataLimits, type FileValidationLimits } from '../../projectFiles/validation';
 import { identityPlacement } from '../../projectFiles/initialProject';
 import { value } from '../../scene/types';
@@ -20,7 +21,7 @@ const table = (r: JsonObject, name: string) => object(r[name]) as Record<string,
 const ordered = (rows: JsonObject[]) => rows.sort((a, b) => string(a.orderKey).localeCompare(string(b.orderKey)) || string(a.id).localeCompare(string(b.id)));
 
 /** Inspected read-only file content. No storage, history, synthetic Project or commands. */
-export async function prepareReviewView(file: Blob, limits: FileValidationLimits, decode?: PngDecoder, jpeg?: JpegDecoder) {
+export async function prepareReviewView(file: Blob, limits: FileValidationLimits, decode?: PngDecoder, jpeg?: JpegDecoder, photo?: PhotoDecoder) {
   const original = file.slice(), inspection = await ReviewArchive.inspect(original, validationMetadataLimits), review = inspection.review;
   const snapshot = review.snapshot, scene = object(snapshot.scene), sceneId = string(scene.id), project = object(snapshot.project);
   if (review.closure.entries.reduce((n, b) => n + b.byteLength, 0) > limits.maxFileBytes)
@@ -47,9 +48,9 @@ export async function prepareReviewView(file: Blob, limits: FileValidationLimits
       assetToProject: asset.assetToProject as unknown as ReadonlyRenderModel['assetToProject'], representation: record as ReadonlyRenderModel['representation'] });
   }
   for (const record of Object.values(table(snapshot, 'mediaResourcesById'))) {
-    const blob = object(record.blob); if (record.mediaKind !== 'image' || blob.mediaType !== 'image/png' && blob.mediaType !== 'image/jpeg') throw Error('このメディアの表示形式は未対応です。');
+    const blob = object(record.blob); if (record.mediaKind !== 'image' || !projectImageMime(blob.mediaType)) throw Error('このメディアの表示形式は未対応です。');
     const bytes = await inspection.archive.entryBytes(`blobs/sha256/${string(blob.digest)}`, limits.maxFileBytes);
-    if (await inspectValidationImage(bytes, limits, decode, jpeg) !== blob.mediaType) throw Error('メディアの本体形式が一致しません。');
+    if (await inspectProjectImage(bytes, limits, decode, jpeg, photo) !== blob.mediaType) throw Error('メディアの本体形式が一致しません。');
     images.set(string(record.id), new Blob([bytes.slice().buffer], { type: blob.mediaType }));
   }
   const savedMaterials: Record<string, ValidationMaterialEffects> = {};

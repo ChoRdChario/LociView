@@ -1,3 +1,4 @@
+import { isAdditionalPhoto, type PhotoDecoder } from '../../projectFiles/photo';
 import { newId } from '../../projectMetadata/persistence';
 import { prepareValidationProject, type ValidationFile } from '../../projectFiles/initialProject';
 import { prepareValidationCreation } from '../../projectFiles/creation';
@@ -30,7 +31,7 @@ import { PreparedReviewEdit } from '../../projectPackage/reviewEdit';
 
 type Host = ReturnType<typeof createValidationModeHost>;
 export interface ValidationWorkspacePorts {
-  fileLimits: FileValidationLimits; decode?: PngDecoder; jpeg?: JpegDecoder;
+  fileLimits: FileValidationLimits; decode?: PngDecoder; jpeg?: JpegDecoder; photo?: PhotoDecoder;
   productEditor?: boolean;
   list(): Promise<ValidationProjectEntry[]>;
   open(run: string, initial?: ReturnType<typeof prepareValidationCreation>, mode?: LocalOpenMode, workspaceFile?: Blob, reviewEdit?: PreparedReviewEdit): Promise<Awaited<ReturnType<typeof openValidationHost>>>;
@@ -45,7 +46,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   const root = document.createElement('section'), navigation = document.createElement('section'), content = document.createElement('section');
   root.className = 'lv-validation-host'; navigation.className = 'lv-validation-home';
   const heading = document.createElement('h1'); heading.textContent = '実ファイルで検証';
-  const help = document.createElement('p'); help.textContent = '静的GLB（内蔵PNG/JPEG・外部参照なし）とPNG/JPEGで検証プロジェクトを作ります。作業一式の生成・受け渡しができます。ダウンロードだけではファイルへの保存は確認できません。通常画面のプロジェクトは変更しません。';
+  const help = document.createElement('p'); help.textContent = '静的GLB（内蔵PNG/JPEG・外部参照なし）とPNG/JPEG/WebP/GIF画像で検証プロジェクトを作ります。作業一式の生成・受け渡しができます。ダウンロードだけではファイルへの保存は確認できません。通常画面のプロジェクトは変更しません。';
   const form = document.createElement('form'), title = document.createElement('input'), files = document.createElement('input');
   title.value = '新しいプロジェクト'; title.maxLength = 256; title.setAttribute('aria-label', 'プロジェクト名');
   files.type = 'file'; files.multiple = true; files.setAttribute('aria-label', '3Dモデルとメディアを選択');
@@ -266,9 +267,9 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     ensureMaySwitch(); const file = workspaceInput.files?.[0]; if (!file) throw Error('ファイルを選択してください。');
     status.textContent = 'ファイルを確認しています。';
     clearConversion();
-    const legacy = await prepareFrozenV1Conversion(file, ports.fileLimits, ports.decode, ports.jpeg); if (disposed) return;
-    lociPreview = legacy ? null : await prepareLociMyuConversion(file, ports.fileLimits, ports.decode, ports.jpeg); if (disposed) return;
-    const native = legacy || lociPreview ? null : await prepareNativeConversion(file, ports.fileLimits, ports.decode, ports.jpeg); if (disposed) return;
+    const legacy = await prepareFrozenV1Conversion(file, ports.fileLimits, ports.decode, ports.jpeg, ports.photo); if (disposed) return;
+    lociPreview = legacy ? null : await prepareLociMyuConversion(file, ports.fileLimits, ports.decode, ports.jpeg, ports.photo); if (disposed) return;
+    const native = legacy || lociPreview ? null : await prepareNativeConversion(file, ports.fileLimits, ports.decode, ports.jpeg, ports.photo); if (disposed) return;
     if (native || legacy) {
       conversion = native ?? legacy; const n = conversion!.summary;
       conversionNote.textContent = `${native ? 'Native' : '旧LociView'}ファイル：モデル ${n.models}・シーン ${n.scenes}・キャプション ${n.captions}・メディア ${n.media}`;
@@ -283,7 +284,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     }
     const purpose = (await PackageArchive.inspect(file)).control.manifest.purpose;
     if (purpose === 'review') {
-      const view = await prepareReviewView(file, ports.fileLimits, ports.decode, ports.jpeg);
+      const view = await prepareReviewView(file, ports.fileLimits, ports.decode, ports.jpeg, ports.photo);
       if (!ports.renderReview) throw Error('閲覧用シーンの表示が未接続です。');
       const prepared = await ports.renderReview(view);
       try {
@@ -321,10 +322,10 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
       const bytes = new Uint8Array(await file.arrayBuffer()); if (disposed) return;
       const item = { label: file.name, bytes };
       if (bytes.length >= 4 && new DataView(bytes.buffer).getUint32(0, true) === 0x46546c67) models.push(item);
-      else if (isJpeg(bytes) || [137, 80, 78, 71, 13, 10, 26, 10].every((b, i) => bytes[i] === b)) media.push(item);
-      else throw Error('この検証では静的GLBとPNG/JPEGを選択してください。元のファイルは変更していません。');
+      else if (isAdditionalPhoto(bytes) || isJpeg(bytes) || [137, 80, 78, 71, 13, 10, 26, 10].every((b, i) => bytes[i] === b)) media.push(item);
+      else throw Error('この検証では静的GLBとPNG/JPEG/WebP/GIF画像を選択してください。元のファイルは変更していません。');
     }
-    const run = newId(), initial = prepareValidationCreation(await prepareValidationProject({ run, title: name, models, media }, ports.fileLimits, ports.decode, ports.jpeg), 'map2');
+    const run = newId(), initial = prepareValidationCreation(await prepareValidationProject({ run, title: name, models, media }, ports.fileLimits, ports.decode, ports.jpeg, ports.photo), 'map2');
     if (disposed) return; await closeCurrent(); await openProject(run, initial);
     // Clear the selection only after creation is actually ready; the host retains exact retry input otherwise.
     if (host?.read().state === 'ready') files.value = '';

@@ -1,11 +1,12 @@
 # WebP and GIF photo attachment companion
 
-Status: **PROPOSED — not ratified, not implemented, not adopted.**
-This is a separate candidate after [07d](07d-jpeg-project-scene-proposal.md),
-not part of the JPEG implementation checkpoint. PO approval is required before
-implementing these new immutable conversion domains.
+Status: **PO RATIFIED 2026-10-15 — bounded implementation verified in the nondefault route; not adopted.**
+The PO explicitly approved this exact companion on 2026-10-15. Executed checks and
+remaining evidence are recorded in [todo](../../tasks/todo.md). This is a separate
+connected implementation after [07d](07d-jpeg-project-scene-proposal.md); approval
+does not activate ordinary entry or pass browser/device/adoption gates.
 
-## Connected result and proposed decision
+## Connected result and ratified decision
 
 Add/open a WebP or GIF photo, or convert an admitted Native/frozen-v1/LociMyu
 input containing one → Caption editing/placement and image organization/viewing
@@ -31,7 +32,7 @@ conflicting reconstruction declarations, out-of-bounds frame rectangles, missing
 image payload or extra trailing/second-container bytes. Retain safe opaque
 metadata/unknown blocks in place; never follow their URLs or executable content.
 
-| Format | Proposed byte subset |
+| Format | Ratified byte subset |
 |---|---|
 | WebP | Exact RIFF/WEBP size and complete padded chunks; simple VP8/VP8L and extended VP8X, alpha and ANIM/ANMF forms. Check declared canvas, feature/reconstruction ordering, recognized chunk multiplicity, frame bounds and nested frame-image/alpha payload structure. Preserve bounded EXIF/XMP/ICCP and unknown chunks as opaque bytes. No new Exif parser, TIFF carrier interpretation or metadata-to-Project authority. |
 | GIF | Exact GIF87a/GIF89a header, positive logical canvas, complete global/local color tables, image descriptors/frame bounds, image-data subblocks and terminal trailer at EOF. Check LZW minimum-code-size/container framing and standard extension/control block lengths/references; retain application/comment/other bounded extension payloads without promoting them into Project text or controls. Require an image payload. No JavaScript LZW/pixel decoder. |
@@ -75,7 +76,7 @@ origin CAS does not. PNG/JPEG-only conversions keep their existing recipe.
 Mixed admitted WebP/GIF/JPEG/PNG uses one new recipe domain for all new records.
 Unrelated old-recipe refusal must not fall back to these domains.
 
-| Proposed recipe | Exact base mapping/key grammar inherited |
+| Ratified recipe | Exact base mapping/key grammar inherited |
 |---|---|
 | `native-project-scene-recipe-5` | 07d recipe-3 / original recipe-1 keys; no appearance records |
 | `native-project-scene-recipe-6` | 07d recipe-4 / 07a recipe-2 keys and admitted appearance subset |
@@ -151,4 +152,5 @@ browser/device lane; Node bitmap injection is not that evidence.
 
 Obtain independent compatibility/security/UI reviews and one final serial
 checkpoint at the connected source/test boundary. Stop affected work for a real
-contract/authority/scope conflict; do not implement before PO ratification.
+contract/authority/scope conflict. The recorded PO ratification authorizes this
+bounded implementation; ordinary implementation and checks need no renewed approval.

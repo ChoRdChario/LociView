@@ -1,3 +1,4 @@
+import { inspectProjectImage, projectImageMime, type PhotoDecoder } from './photo';
 import type { ProjectWorkspaceFS, WorkspaceReadableFile } from '../platform/fs';
 import type { ContentRequest, ProjectContentVerifier } from '../domain/projectContentChecks';
 import { checkContentFacts } from '../domain/projectContentChecks';
@@ -13,7 +14,7 @@ import type { StoredBlobRef } from '../projectMetadata/blobStore';
 import { inspectValidationGlb, inspectValidationJpegGlb, inspectFreshValidationGlb, type ValidatedGlb } from './glb';
 import { inspectOccurrenceGlb, inspectOccurrenceJpegGlb } from './glbOccurrences';
 import type { PngDecoder } from './png';
-import { inspectValidationImage, type JpegDecoder } from './jpeg';
+import type { JpegDecoder } from './jpeg';
 import { fileError, fileObject, validationGlbProfile, occurrenceGlbProfile, jpegGlbProfile, occurrenceJpegGlbProfile, validationMetadataLimits, type FileValidationLimits } from './validation';
 import { identityPlacement, prepareValidationModel, sealValidationRecord, validationFileLabel, type ValidationFile } from './initialProject';
 
@@ -36,13 +37,13 @@ export class ValidationContent implements MetadataMediaPort {
   private readonly preparedModels = new Map<string, Awaited<ReturnType<typeof prepareValidationModel>>>();
   constructor(private readonly fs: ProjectWorkspaceFS, readonly store: OriginBlobStore,
     readonly limits: FileValidationLimits, private readonly decode?: PngDecoder,
-    private readonly checkRead?: () => Promise<void>, private readonly jpeg?: JpegDecoder) {}
+    private readonly checkRead?: () => Promise<void>, private readonly jpeg?: JpegDecoder, private readonly photo?: PhotoDecoder) {}
   /** Owned input only; no body or Project write until the existing journal stages it. */
   async prepareImage(input: ValidationFile): Promise<JsonObject> {
     this.fs.mutationAuthority.assertWorkspaceWriteAuthorized();
     const label = validationFileLabel(input.label);
     if (!input.bytes.length || input.bytes.length > this.limits.maxFileBytes) return fileError('画像がこの検証の上限を超えています。');
-    const bytes = input.bytes.slice(), mediaType = await inspectValidationImage(bytes, this.limits, this.decode, this.jpeg);
+    const bytes = input.bytes.slice(), mediaType = await inspectProjectImage(bytes, this.limits, this.decode, this.jpeg, this.photo);
     const ref: StoredBlobRef = { algorithm: 'sha256', digest: await digest(bytes), byteLength: bytes.length, mediaType };
     const record = await sealValidationRecord('media-resource', { id: `med_${newId()}`, label, mediaKind: 'image', blob: ref as unknown as JsonObject });
     this.preparedImages.set(record.id as string, { record, bytes, ref });
@@ -88,7 +89,7 @@ export class ValidationContent implements MetadataMediaPort {
   }
   private imageDeclaration(record: JsonObject): JsonObject {
     const blob = fileObject(record.blob) as JsonObject;
-    if (record.mediaKind !== 'image' || blob.mediaType !== 'image/png' && blob.mediaType !== 'image/jpeg') return fileError('この画像形式にはまだ対応していません。');
+    if (record.mediaKind !== 'image' || !projectImageMime(blob.mediaType)) return fileError('この画像形式にはまだ対応していません。');
     return blob;
   }
   async image(record: JsonObject, readOnly = false): Promise<Uint8Array> {
@@ -98,7 +99,7 @@ export class ValidationContent implements MetadataMediaPort {
     await this.inspectImage(bytes, blob); await this.checkRead?.(); return bytes;
   }
   private async inspectImage(bytes: Uint8Array, blob: JsonObject) {
-    if (await inspectValidationImage(bytes, this.limits, this.decode, this.jpeg) !== blob.mediaType) return fileError('画像の本体形式が一致しません。');
+    if (await inspectProjectImage(bytes, this.limits, this.decode, this.jpeg, this.photo) !== blob.mediaType) return fileError('画像の本体形式が一致しません。');
   }
   private async inspectModel(record: JsonObject, bytes: Uint8Array) {
     const inspect = same(record.formatProfile, await occurrenceJpegGlbProfile()) ? inspectOccurrenceJpegGlb :
@@ -142,7 +143,7 @@ export class ValidationContent implements MetadataMediaPort {
   async verify(blobs: readonly JsonObject[]): Promise<void> {
     for (const blob of blobs) {
       const bytes = await readValidationBody(await this.store.open(blob), this.limits.maxFileBytes);
-      if (blob.mediaType === 'image/png' || blob.mediaType === 'image/jpeg') await this.inspectImage(bytes, blob);
+      if (projectImageMime(blob.mediaType)) await this.inspectImage(bytes, blob);
       else if (blob.mediaType === 'model/gltf-binary') await inspectFreshValidationGlb(bytes, this.limits, this.decode, this.jpeg);
       else return fileError('追加する本体形式が不正です。');
     }

@@ -44,13 +44,13 @@ The words **MUST**, **MUST NOT**, **SHOULD**, and **MAY** are normative. A metri
 | [`07-project-scene-migration.md`](07-project-scene-migration.md) | PO-approved one-time cutover (2026-09-14); initial conversion is not complete. The former old-update bridge and §11 approval request are superseded; reduced source/target mapping still precedes implementation |
 | [`07c-locimyu-project-scene-conversion-proposal.md`](07c-locimyu-project-scene-conversion-proposal.md) | Exact first LociMyu → ProjectScene recipe/subset approved 2026-10-15, retaining 04 source semantics; bounded implementation/evidence are recorded in todo, broader conversion/adoption remain open |
 | [`07d-jpeg-project-scene-proposal.md`](07d-jpeg-project-scene-proposal.md) | JPEG photos/embedded textures, two additive immutable profiles and four recipes approved 2026-10-15; bounded implementation/evidence in todo, not adopted |
+| [`07e-webp-gif-project-scene-proposal.md`](07e-webp-gif-project-scene-proposal.md) | WebP/GIF photos, four additive recipes and existing raw-image display approved 2026-10-15; bounded implementation/evidence in todo, not adopted |
 
 ### Proposed companions — not covered by the approval above
 
 | Document | Status / purpose |
 |---|---|
 | [`06-project-package-wire.md`](06-project-package-wire.md) | `PROPOSED / UNRATIFIED / NOT IMPLEMENTED`; five-purpose wire design under 05 §7.5, with explicit unresolved journal/base, budget and history-free-builder inputs; no format/version or production authorization |
-| [`07e-webp-gif-project-scene-proposal.md`](07e-webp-gif-project-scene-proposal.md) | `PROPOSED / UNRATIFIED / NOT IMPLEMENTED`; WebP/GIF photos through editing/file/recovery, with four additive recipes and existing raw-image display; no GLB profile or adoption change |
 
 ## Fixed versus conditional decisions
 

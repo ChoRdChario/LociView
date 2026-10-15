@@ -1,3 +1,4 @@
+import { inspectProjectImage, type PhotoDecoder } from './photo';
 import { immutableDigest } from '../domain/projectGraphSupport';
 import { admitProjectRecords, projectRecordMaps } from '../domain/projectRecords';
 import { cloneCanonicalValue, type JsonObject, type JsonValue } from '../domain/values';
@@ -5,7 +6,7 @@ import { digest, newId, technicalId } from '../projectMetadata/persistence';
 import type { StoredBlobRef } from '../projectMetadata/blobStore';
 import { inspectFreshValidationGlb, validationGlbUsesJpeg } from './glb';
 import type { PngDecoder } from './png';
-import { inspectValidationImage, type JpegDecoder } from './jpeg';
+import type { JpegDecoder } from './jpeg';
 import { checkFileLimits, fileError, validationGlbProfile, jpegGlbProfile, validationMetadataLimits, type FileValidationLimits } from './validation';
 
 export interface ValidationFile { readonly label: string; readonly bytes: Uint8Array }
@@ -52,7 +53,7 @@ export async function prepareValidationModel(input: ValidationFile, limits: File
 
 /** New local identities from inspected files, never inferred from filenames or another Project. */
 export async function prepareValidationProject(input: { run: string; title: string; models: readonly ValidationFile[]; media?: readonly ValidationFile[] },
-  limits: FileValidationLimits, decode?: PngDecoder, jpeg?: JpegDecoder): Promise<PreparedValidationProject> {
+  limits: FileValidationLimits, decode?: PngDecoder, jpeg?: JpegDecoder, photo?: PhotoDecoder): Promise<PreparedValidationProject> {
   checkFileLimits(limits);
   const run = technicalId(input.run), title = label(input.title), sceneId = fresh('scn'), frameId = fresh('frm');
   if (!input.models.length || input.models.length + (input.media?.length ?? 0) > limits.maxItems) return fileError('3Dモデルを選択してください。');
@@ -81,7 +82,7 @@ export async function prepareValidationProject(input: { run: string; title: stri
     add('sceneAssetMembershipsById', { id: fresh('sam'), sceneId, assetId: model.asset.id!, orderKey: `A${index.toString(36).padStart(8, '0')}`, lifecycle: active() });
   }
   for (const file of media) {
-    const name = label(file.label), bytes = file.bytes.slice(), mime = await inspectValidationImage(bytes, limits, decode, jpeg);
+    const name = label(file.label), bytes = file.bytes.slice(), mime = await inspectProjectImage(bytes, limits, decode, jpeg, photo);
     const ref = await blob(bytes, mime);
     add('mediaResourcesById', await sealValidationRecord('media-resource', { id: fresh('med'), label: name, mediaKind: 'image', blob: ref as unknown as JsonObject }));
   }

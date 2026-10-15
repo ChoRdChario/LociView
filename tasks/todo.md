@@ -14,7 +14,7 @@ Initial Native/frozen-v1/LociMyu conversion and new-format teamwork remain requi
 Project/Scene identity, explicit conflict resolution, source preservation and the
 frozen v1/map-1/map-2/immutable-recipe boundaries remain unchanged.
 
-The latest verified implementation includes bounded Native/frozen-v1/LociMyu GLB/PNG/JPEG conversion →
+The latest verified implementation includes bounded Native/frozen-v1/LociMyu GLB and PNG/JPEG/WebP/GIF image conversion →
 edit/first-place → named backup/Workspace → independent reopen, plus the typed
 product composition's edit → save/two-round exchange → cold-reopen workflow in
 the nondefault validation route, now including the model, Saved View and material
@@ -27,6 +27,8 @@ Scene-local add colors, guarded Shift/numeric placement, owner reveal, Asset-wid
 pin sizing and checked save/resume/help are also connected in this bounded route.
 The approved JPEG photo/embedded-texture extension now preserves original metadata
 through direct creation/addition, conversion, file exchange and generation restore.
+The approved WebP/GIF companion connects the same photo workflow with original
+Blob animation behavior and four additive conversion domains; GLB profiles stay fixed.
 Ordinary entry, broader profiles/converters, browser performance, physical-iPhone
 and offline acceptance remain open. Full details and earlier failures are in the
 [September checkpoint record](../docs/history/development-through-2026-09-21/tasks/todo.md).
@@ -106,14 +108,14 @@ destructive boundary. Ordinary entry and temporary iPhone HTTPS need their exist
 exact-build/route approvals. Main, Pages, Service Worker, version/license, release,
 dependency changes and private/public fixture distribution are outside this unit.
 
-### Next proposed unit — WebP/GIF photos/edit/file/reopen
+### Completed implementation — WebP/GIF photos/edit/file/reopen
 
 The [07e companion](../docs/specs/07e-webp-gif-project-scene-proposal.md) is independently
-reviewed, PROPOSED and not implemented. The concrete PO decision is four additive
+reviewed and PO ratified 2026-10-15. The explicit approval authorizes four additive
 immutable recipes for admitted WebP/GIF photos, retaining existing raw-image
-display and original metadata. Do not implement before ratification.
+display and original metadata; ordinary entry/adoption remain gated.
 
-Proposed outcome: direct addition or Native/v1/LociMyu conversion → Caption/image
+Outcome: direct creation/addition or Native/v1/LociMyu conversion → Caption/image
 editing and viewing → named backup/Workspace/review → restore/edit/cold reopen.
 Acceptance includes complete bounded container inspection, temporary decode/close,
 exact source/identity/origin and loss/retry fences, then independent review and the
@@ -121,6 +123,55 @@ final serial checkpoint. Existing PNG/JPEG APIs, recipes and four GLB profiles s
 fixed. GLB WebP/GIF, animation controls or playback guarantees, ordinary entry,
 dependencies and adoption/release are excluded. Stop affected work for a real new
 contract, authority or scope conflict; browser/device evidence remains separate.
+
+- [x] Implement bounded full-container WebP/GIF inspection and temporary decode,
+  then carry exact original MIME/bytes through the existing content/viewer ports.
+- [x] Connect the exact Native5/6, v1-3 and Loci3 source/mapping/origin/retry paths;
+  preserve old prepared jobs, profiles and warm retry lifetimes.
+- [x] Verify connected direct/conversion/file/restore/cold workflows and relevant
+  faults with focused tests, early exact isolation checks and independent reviews.
+- [x] Freeze final source/tests, run one serial check:checkpoint, verify HTTP
+  identity and outgoing scope, and prepare the suitable verified g0 checkpoint.
+
+Milestone audit: clean g0-baseline begins at the pushed 07e documentation
+checkpoint. This unit closes the approved photo workflow; no new PoC, renderer,
+dependency, public fixture or browser retry is introduced. One writer owns all
+changes; root and area reviewers remain read-only.
+
+Focused evidence: 25 service/product cases passed, including direct byte-classified
+creation and original WebP/GIF MIME/bytes, the four new conversion domains,
+captured initialization/cold/completed-later-edit retry, downgrade/sidecar-loss
+refusal, detached acknowledged loss and source-only non-dispatch. Existing JPEG
+variants remain in the same group. Native appearance with embedded JPEG and
+WebP/GIF addition/description/viewer → named backup/Workspace/independent review
+→ actual selected-generation restoration/edit/cold is covered. The final scanner
+and exact isolation group passed 33 cases (21 photo, 12 boundary). All seven tiny
+compressed fixtures were generated from owned synthetic pixels with existing
+Pillow and CPU-decoded; no private input or public binary is introduced.
+
+Independent parser/Native-compatibility, UI/MIME/restore and v1/Loci/source-receipt
+reviews closed concrete P2s: GCE consumes unknown graphic blocks, while VP8L's
+alpha hint is not transparency authority. Existing PNG/JPEG APIs, all four GLB
+profiles, old Native2 ready timing and later-edit/private-input fences remain.
+The temporary bitmap proves only default/first-image decode, not all-frame pixels,
+playback or browser/device behavior.
+
+Final serial check:checkpoint exited 0 on the reviewed 25-path source/test tree:
+typecheck, all 116 test files (2503 passed, 21 existing todo; suite 644.16s),
+ordinary/harness/validation builds passed. All frozen SHA-256/normalized Git
+hashes remain unchanged. The existing HTTP endpoint serves all seven final files
+byte-exact; manifest SHA-256
+`9eb61ab1805c39b4c861a342c2291144f2cc1968ea9c6275f2628693f103c85a`.
+No SW/manifest/samples are in the isolated output. This is HTTP identity only,
+not browser, GPU, all-frame playback, device, offline or product-latency evidence.
+Independent final reviews cover the 33 source/test/doc paths. The normal
+verified g0-baseline checkpoint retains all remaining adoption/ordinary-entry gates.
+
+Next accepted unit: S01/P02 last-Project resume with the actual name and guarded
+Project/file switching in the same nondefault route. Record its narrow UI-owned
+advisory reference and acceptance before source changes; no Project/journal/CAS
+schema or ordinary-home activation is included. New conversion companions beyond
+07e still need their concrete recipe decision before implementation.
 
 ### Completed implementation — JPEG photos/textures/edit/file/reopen
 

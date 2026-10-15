@@ -14,9 +14,13 @@ export const nativeConversionRecipe = 'native-project-scene-recipe-1';
 export const nativeAppearanceRecipe = 'native-project-scene-recipe-2';
 export const nativeJpegRecipe = 'native-project-scene-recipe-3';
 export const nativeAppearanceJpegRecipe = 'native-project-scene-recipe-4';
-export type NativeConversionRecipe = typeof nativeConversionRecipe | typeof nativeAppearanceRecipe | typeof nativeJpegRecipe | typeof nativeAppearanceJpegRecipe;
-export const nativeRecipeHasAppearance = (recipe: NativeConversionRecipe) => recipe === nativeAppearanceRecipe || recipe === nativeAppearanceJpegRecipe;
+export const nativePhotoRecipe = 'native-project-scene-recipe-5';
+export const nativeAppearancePhotoRecipe = 'native-project-scene-recipe-6';
+export type NativeConversionRecipe = typeof nativePhotoRecipe | typeof nativeAppearancePhotoRecipe | typeof nativeConversionRecipe | typeof nativeAppearanceRecipe | typeof nativeJpegRecipe | typeof nativeAppearanceJpegRecipe;
+export const nativeRecipeHasAppearance = (recipe: NativeConversionRecipe) => recipe === nativeAppearanceRecipe || recipe === nativeAppearanceJpegRecipe || recipe === nativeAppearancePhotoRecipe;
 export const nativeRecipeHasJpeg = (recipe: NativeConversionRecipe) => recipe === nativeJpegRecipe || recipe === nativeAppearanceJpegRecipe;
+export const nativeRecipeHasPhoto = (recipe: NativeConversionRecipe) => recipe === nativePhotoRecipe || recipe === nativeAppearancePhotoRecipe;
+export const nativeRecipeHasOrigin = (recipe: NativeConversionRecipe) => nativeRecipeHasJpeg(recipe) || nativeRecipeHasPhoto(recipe);
 export interface NativeMaterialWitness {
   nativeRepresentationId: string; sourceGlbSha256: string; childPath: readonly number[]; materialArraySlot: 0;
   nodeIndex: number; primitiveIndex: number; sourceMaterialIndex: number | null; slotIndex: number;
@@ -35,10 +39,10 @@ export function nativeConversionIds(conversionId: string, sourceZipSha256: strin
     const preimage = `lociview:${recipe}:id:jcs-v1\n` + JSON.stringify([conversionId, sourceZipSha256, prefix, key]);
     const existing = byPreimage.get(preimage); if (existing) return existing;
     const sha256 = await digest(new TextEncoder().encode(preimage)), value = `${prefix}_${sha256.slice(0, 32)}`, old = entries.get(value);
-    if (old && (old.sha256 !== sha256 || old.preimage !== preimage) || nativeRecipeHasJpeg(recipe) && full.has(sha256) && full.get(sha256) !== preimage) return fileError('変換先の識別情報が衝突しました。');
+    if (old && (old.sha256 !== sha256 || old.preimage !== preimage) || nativeRecipeHasOrigin(recipe) && full.has(sha256) && full.get(sha256) !== preimage) return fileError('変換先の識別情報が衝突しました。');
     entries.set(value, { id: value, sha256, preimage }); full.set(sha256, preimage); byPreimage.set(preimage, value); return value;
   };
-  return { id, report: () => nativeRecipeHasJpeg(recipe) ? [...entries.values()].sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0) : [...entries.values()] };
+  return { id, report: () => nativeRecipeHasOrigin(recipe) ? [...entries.values()].sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0) : [...entries.values()] };
 }
 const rank = (n: number) => `A${n.toString(36).padStart(8, '0')}`;
 const copy = (value: unknown) => cloneCanonicalValue(value, limits) as JsonObject;
@@ -58,7 +62,8 @@ export function nativeAppearanceIntent(a: NonNullable<NativeProjectSnapshotV1['m
 export async function mapNativeProject(snapshot: NativeProjectSnapshotV1, models: ReadonlyMap<string, ValidatedGlb>, conversionId: string, sourceSha256: string,
   sourceWitness?: ReadonlyMap<string, readonly NativeOccurrence[]>, capturedIdentity?: JsonObject) {
   const appearance = !!snapshot.meshMaterialAppearances?.length, jpeg = [...models.values()].some(m => m.jpeg) || snapshot.mediaResources?.some(m => m.blob.mediaType === 'image/jpeg');
-  const recipe: NativeConversionRecipe = appearance ? jpeg ? nativeAppearanceJpegRecipe : nativeAppearanceRecipe : jpeg ? nativeJpegRecipe : nativeConversionRecipe;
+  const photo = snapshot.mediaResources?.some(m => m.blob.mediaType === 'image/webp' || m.blob.mediaType === 'image/gif');
+  const recipe: NativeConversionRecipe = photo ? appearance ? nativeAppearancePhotoRecipe : nativePhotoRecipe : appearance ? jpeg ? nativeAppearanceJpegRecipe : nativeAppearanceRecipe : jpeg ? nativeJpegRecipe : nativeConversionRecipe;
   if (nativeRecipeHasAppearance(recipe) && !sourceWitness) return fileError('元の材質の対応記録が不足しています。');
   const ids = nativeConversionIds(conversionId, sourceSha256, recipe), id = ids.id;
   const one = (prefix: string, name: string, source: string) => id(prefix, [name, source]);

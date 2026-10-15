@@ -1,3 +1,4 @@
+import type { PhotoDecoder } from '../../projectFiles/photo';
 import type { WorkspaceFS } from '../../platform/fs';
 import { ProjectMutationCoordinator } from '../../platform/projectLock';
 import { technicalId, newId, metadataPath, json } from '../../projectMetadata/persistence';
@@ -47,7 +48,7 @@ export const validationArea = 'lociview-development-validation-1';
 export interface ValidationHostOptions {
   mode?: LocalOpenMode;
   run: string; base: WorkspaceFS; coordinator: ProjectMutationCoordinator; store: OriginBlobStore;
-  fileLimits: FileValidationLimits; decode?: PngDecoder; jpeg?: JpegDecoder; initial?: ReturnType<typeof prepareValidationCreation>;
+  fileLimits: FileValidationLimits; decode?: PngDecoder; jpeg?: JpegDecoder; photo?: PhotoDecoder; initial?: ReturnType<typeof prepareValidationCreation>;
   workspaceFile?: Blob;
   reviewEdit?: PreparedReviewEdit;
   packageLocks?: LockManager | null;
@@ -167,10 +168,10 @@ export async function openValidationHost(options: ValidationHostOptions) {
       const before = await session.read(), entries = await new TransactionJournal(fs, limits).entries();
       if (before.state === 'empty' && !localInitial) throw Error('作業一式を選択するか、プロジェクト一覧へ戻ってください。');
       const initializing = before.state === 'empty' || entries.length === 1 && entries[0]!.start.purpose === 'initialize' && !entries[0]!.publication && before.state !== 'ready';
-      const result = await ready(initializing && await hasNativeConversion(fs) ? await resumeNativeConversion(fs, options.store, session, options.fileLimits, `prj_${run}`, options.decode, options.jpeg) :
+      const result = await ready(initializing && await hasNativeConversion(fs) ? await resumeNativeConversion(fs, options.store, session, options.fileLimits, `prj_${run}`, options.decode, options.jpeg, options.photo) :
         before.state === 'empty' && options.initial ? await options.initial.persist(fs, options.store, session) :
-        initializing && await hasLociMyuConversion(fs) ? await resumeLociMyuConversion(fs, options.store, session, options.fileLimits, `prj_${run}`, options.decode, options.jpeg) :
-        initializing && await hasFrozenV1Conversion(fs) ? await resumeFrozenV1Conversion(fs, options.store, session, options.fileLimits, `prj_${run}`, options.decode, options.jpeg) :
+        initializing && await hasLociMyuConversion(fs) ? await resumeLociMyuConversion(fs, options.store, session, options.fileLimits, `prj_${run}`, options.decode, options.jpeg, options.photo) :
+        initializing && await hasFrozenV1Conversion(fs) ? await resumeFrozenV1Conversion(fs, options.store, session, options.fileLimits, `prj_${run}`, options.decode, options.jpeg, options.photo) :
         initializing ? await resumeValidationCreation(fs, session, `prj_${run}`) : await session.retry());
       content.releasePreparedImages(); content.releasePreparedModels(); return result;
     };
@@ -494,7 +495,7 @@ export async function openValidationHost(options: ValidationHostOptions) {
       dispose: async () => { await dispose(); content.releasePreparedImages(); content.releasePreparedModels(); prepareDisplay = undefined; } };
     return { ...host, dispatch, get content() { return content; }, workspaceFiles, workspaceOutput, backupRestore, display: () => restoreRetired ? undefined : project,
       conversionReportAvailable: () => hasLociMyuConversion(fs, false),
-      conversionReport: () => execute(async () => readLociMyuConversionReport(fs, options.fileLimits, `prj_${run}`, options.decode, options.jpeg), true),
+      conversionReport: () => execute(async () => readLociMyuConversionReport(fs, options.fileLimits, `prj_${run}`, options.decode, options.jpeg, options.photo), true),
       get accessDetail() { return options.mode === 'view' ? '閲覧専用です。' : lease.accessDetail; },
       setDisplayPreparation(callback: (next: SyntheticProject) => Promise<void>) {
       if (closed || prepareDisplay) throw Error('モデル表示の接続を確認してください。');

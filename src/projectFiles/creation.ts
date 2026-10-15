@@ -1,3 +1,4 @@
+import type { PhotoDecoder } from './photo';
 import type { ProjectWorkspaceFS } from '../platform/fs';
 import type { OriginBlobStore } from '../projectMetadata/blobStore';
 import { ProjectMetadataSource, type MetadataProof } from '../projectMetadata/source';
@@ -11,11 +12,12 @@ import type { PngDecoder } from './png';
 import type { JpegDecoder } from './jpeg';
 import { fileError, validationMetadataLimits as metadataLimits, type FileValidationLimits } from './validation';
 
-type InitialOriginRecipe = 'v1-project-scene-migration-recipe-1' | 'locimyu-project-scene-migration-recipe-1' |
+type InitialOriginRecipe = 'native-project-scene-recipe-5' | 'native-project-scene-recipe-6' | 'v1-project-scene-migration-recipe-3' | 'locimyu-project-scene-migration-recipe-3' | 'v1-project-scene-migration-recipe-1' | 'locimyu-project-scene-migration-recipe-1' |
   'v1-project-scene-migration-recipe-2' | 'locimyu-project-scene-migration-recipe-2' | 'native-project-scene-recipe-3' | 'native-project-scene-recipe-4';
 const originRecipeKnown = (value: unknown): value is InitialOriginRecipe => typeof value === 'string' && [
   'v1-project-scene-migration-recipe-1', 'locimyu-project-scene-migration-recipe-1',
   'v1-project-scene-migration-recipe-2', 'locimyu-project-scene-migration-recipe-2', 'native-project-scene-recipe-3', 'native-project-scene-recipe-4',
+  'native-project-scene-recipe-5', 'native-project-scene-recipe-6', 'v1-project-scene-migration-recipe-3', 'locimyu-project-scene-migration-recipe-3',
 ].includes(value);
 type InitialReceipt = { proof: MetadataProof; byteLength: number; digest: string } & (
   { version: 'validation-initial-1' } | { version: 'validation-initial-2'; originRecipe: InitialOriginRecipe });
@@ -75,8 +77,8 @@ export async function writeValidationInitial(fs: ProjectWorkspaceFS, source: Pro
     return fileError('初期記録の保存を確認できません。');
 }
 export function validationProjectService(fs: ProjectWorkspaceFS, storage: MetadataStorageFactory, store: OriginBlobStore,
-  limits: FileValidationLimits, decode?: PngDecoder, checkContentRead?: () => Promise<void>, jpeg?: JpegDecoder) {
-  const content = new ValidationContent(fs, store, limits, decode, checkContentRead, jpeg);
+  limits: FileValidationLimits, decode?: PngDecoder, checkContentRead?: () => Promise<void>, jpeg?: JpegDecoder, photo?: PhotoDecoder) {
+  const content = new ValidationContent(fs, store, limits, decode, checkContentRead, jpeg, photo);
   return { content, session: new MetadataProjectSession(fs, storage, metadataLimits, allow => content.verifier(allow), content, validationModelFacts(content)) };
 }
 /** Capture once; repeated execution uses identical source/IDs/bytes after a failed attempt. */
