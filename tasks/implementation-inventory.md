@@ -172,7 +172,7 @@ hidden ownerや別の位置調整中には比較previewを表示しない。失�
 | F07 | frozen v1を新Project/Sceneへ変換する | 新規実装 | 承認済み07bのGLB/PNGと07dのJPEG・07eのWebP/GIF写真追加・identity配置・透視視点の初回変換を、検証経路の内容判定→確認→編集／初回配置→backup・作業一式・閲覧用file→再開へ限定接続。raw ZIP／log・対応表を私的に保持し、通常出力へ含めない。対応外データは全体拒否。初期保存の中断／完了後retryと変換証拠欠落も検証。07fの明示開始Viewはrecipe-4で既存旧domainと分離し、exact元履歴・保存・世代復元後編集／coldへ接続。07gの追加recipe-5で非identity配置とモデル内pinを保持し、offsetの明示確認から同じ保存・実世代復元後編集／coldへ接続。材質・平行投影・inline camera・他形式／実入力・通常入口／実機受入れが残るため行全体の主分類は維持。凍結readerは変更しない。 | [docs/specs/07b-frozen-v1-conversion-proposal.md](../docs/specs/07b-frozen-v1-conversion-proposal.md) / [src/projectFiles/frozenV1Conversion.ts](../src/projectFiles/frozenV1Conversion.ts) / [tests/projectFiles.test.ts](../tests/projectFiles.test.ts) |
 | F08 | LociMyu ZIPを新Project/Sceneへ変換する | 新規実装 | 07cの単一GLB／exact PNG subsetと07dのJPEGと07eのWebP/GIF additive recipesを限定validationで接続。生原本／重複identity／known-owner unplaced／視点／独立report／中断復旧を保持。全形式・有効材質・実入力受入れは残るため群全体の分類件数は変えない。Google／曖昧relationは有効化しない。 | [07c](../docs/specs/07c-locimyu-project-scene-conversion-proposal.md) / [lociMyuConversion.ts](../src/projectFiles/lociMyuConversion.ts) / [tests](../tests/projectFiles.test.ts) |
 | F09 | 移行後に届いた旧Nativeの変更を受け入れる | 要件撤回 | PO判断 2026-09-14。移行後は新形式のファイルだけで編集・受け渡しを続ける。bridgeは実装対象外。初回変換・新形式同士の統合は維持。 | [docs/specs/07-project-scene-migration.md](../docs/specs/07-project-scene-migration.md) |
-| F10 | ファイル内容・影響を確認し、取消／不正入力から回復する | 別経路のみ | 限定GLBとPNG/JPEG/WebP/GIF画像のfile欄に内容由来のWorkspace／Contribution検査、形式・目的・影響の確認、失敗・未確定入力の保持、再選択／retry／明示取消を接続済み。backup出力と確認付き復元・専用再開／取消、独立コピーの件数・匿名化しない境界の確認／入力／中断復旧も接続。reviewのScene・件数・埋込情報保持の確認、readonly入力、凍結出力再開・保存先の別確認も接続。View自体の永続再開ではない。全purpose／移行元／通常homeを一つの利用者導線として完結する部分は残る。filenameからpurposeを推測しない。 | [tests/projectFiles.test.ts](../tests/projectFiles.test.ts) / [tests/nativeGs/homeUi.test.ts:476](../tests/nativeGs/homeUi.test.ts) / [docs/specs/06-project-package-wire.md:31](../docs/specs/06-project-package-wire.md) |
+| F10 | ファイル内容・影響を確認し、取消／不正入力から回復する | 別経路のみ | fresh HEIF選択の端末別JPEG案内、未適用のmedia-owned入力だけの明示取消／再選択と実保存失敗の同一retry保持を限定接続。限定GLBとPNG/JPEG/WebP/GIF画像のfile欄に内容由来のWorkspace／Contribution検査、形式・目的・影響の確認、失敗・未確定入力の保持、再選択／retry／明示取消を接続済み。backup出力と確認付き復元・専用再開／取消、独立コピーの件数・匿名化しない境界の確認／入力／中断復旧も接続。reviewのScene・件数・埋込情報保持の確認、readonly入力、凍結出力再開・保存先の別確認も接続。View自体の永続再開ではない。全purpose／移行元／通常homeを一つの利用者導線として完結する部分は残る。filenameからpurposeを推測しない。 | [tests/projectFiles.test.ts](../tests/projectFiles.test.ts) / [tests/nativeGs/homeUi.test.ts:476](../tests/nativeGs/homeUi.test.ts) / [docs/specs/06-project-package-wire.md:31](../docs/specs/06-project-package-wire.md) |
 
 F01–F05の限定validation UIは、名前付きの「保存」を標準とし、
 「相手に渡す」で作業一式／変更分を選ぶ構成へ接続。閲覧共有・独立コピーと
@@ -185,7 +185,7 @@ F01–F05の限定validation UIは、名前付きの「保存」を標準とし�
 | ID | 機能群／利用者の結果 | 状態 | 現在の境界・残り | コード／既存受入れ参照（行番号は監査時点） |
 |---|---|---|---|---|
 | H01 | 使い始め・記録・保存共有・困ったときの案内を開く | 別経路のみ | 限定product compositionに、開始／記録／保存と共有／復旧の4節helpを接続。Shift・数値代替と同一Project交換、ブラウザ再開データと確認済み外部ファイルを区別。通常入口／実browser受入れは未完で主分類は維持。 | [src/nativeGs/app.ts:2810](../src/nativeGs/app.ts) / [src/harness/projectScene/workspace.ts:78](../src/harness/projectScene/workspace.ts) |
-| H02 | 端末保存容量・オフライン準備を確認する | 別経路のみ | 旧homeの端末機能と新保存基盤は未統合。安全な清掃はGC gateと分離して明示、無確認削除をしない。 | [docs/ui-product-guidelines.md:134](../docs/ui-product-guidelines.md) / [docs/specs/03-gates-and-delivery.md](../docs/specs/03-gates-and-delivery.md) |
+| H02 | 端末保存容量・オフライン準備を確認する | 別経路のみ | 新validation productのヘルプにsite usage／quotaの読み取り専用推定照会を限定接続。不明／失敗／再確認、IME／未適用入力／保存失敗の保持、終了後結果の無効化を含む。Project容量・端末空き・保存成功・offline準備を保証しない。旧homeの端末機能全体と新保存基盤の統合は残り。persist要求や清掃／削除／GC／SWは非対象。 | [docs/ui-product-guidelines.md:134](../docs/ui-product-guidelines.md) / [docs/specs/03-gates-and-delivery.md](../docs/specs/03-gates-and-delivery.md) |
 
 ## 3. 元の41タスクとの全件対応
 
@@ -282,7 +282,7 @@ LociMyuからのタブ構成、Sceneに相当する記録切替、直接色選�
 | 任意baseColor入力 | 元materialの色保持・描画解釈はあるが入力UIなし。現在のaccepted editable fieldsとは別なので、勝手に新機能化しない |
 | タグ編集UI | 新規作成・編集・管理UIは旧parity §7で追加判断。既存タグの保持・copy・削除依存・package closureは必須で、C10/T04/F06–F08側へ含める。schemaの存在だけで管理画面を必須にしない |
 | ローカルprofile／表示名設定 | 旧homeにはあるが新hostは合成identity。新Projectの利用者向けidentity／来歴表示要件と接続範囲をチーム導入時に確認。クラウドaccountやrolesは作らない |
-| HEIC／video／audio | 現candidate非対象。PROD-16のpost-candidate要件を削除した意味ではない |
+| HEIC／video／audio | 直接decode／保存／表示は現candidate非対象。HEICのfresh選択には元画像を残して端末で別JPEGを書き出し再選択する案内を限定接続。PROD-16のpost-candidate要件を削除した意味ではない |
 | 自動同一モデル判定／relation推測／位置remap／conflict winner | 禁止。判断量削減で越えてはいけない境界 |
 | smooth-alpha一般保証、transmission、Compare、proxy自動生成／direct splat pick | 個別後続判断・research／gate。承認済み限定GS Proxyやhard chromaの継承とは別 |
 | license／version／main／Pages／Service Worker／release | 今回の監査・次sliceの非対象。デプロイ承認を意味しない |

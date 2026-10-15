@@ -14,6 +14,23 @@ export const browserPhotoDecoder: PhotoDecoder = async (bytes, mime) => {
 const ascii = (bytes: Uint8Array, at: number, n: number) => String.fromCharCode(...bytes.subarray(at, at + n));
 export const isAdditionalPhoto = (bytes: Uint8Array) =>
   ascii(bytes, 0, 4) === 'RIFF' && ascii(bytes, 8, 4) === 'WEBP' || /^GIF8[79]a$/.test(ascii(bytes, 0, 6));
+/** Fresh-selection refusal guidance only; never a format-admission or retained-read proof. */
+export function freshPhotoSelectionIssue(bytes: Uint8Array): string | null {
+  // Keep even damaged familiar image prefixes on their existing strict diagnostic path.
+  if (bytes[0] === 0xff && bytes[1] === 0xd8 || ascii(bytes, 0, 4) === '\x89PNG' ||
+    ascii(bytes, 0, 4) === 'RIFF' || ascii(bytes, 0, 4) === 'GIF8') return null;
+  if (bytes.length < 16 || ascii(bytes, 4, 4) !== 'ftyp') return null;
+  const size = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).getUint32(0);
+  if (size < 16 || size > bytes.length || size % 4) return null;
+  const brands = ['heic', 'heix', 'hevc', 'hevx', 'heim', 'heis', 'hevm', 'hevs', 'mif1', 'msf1'];
+  const known = (at: number) => brands.includes(ascii(bytes, at, 4));
+  if (!known(8)) {
+    let found = false;
+    for (let at = 16; at + 4 <= Math.min(size, 128); at += 4) if (known(at)) { found = true; break; }
+    if (!found) return null;
+  }
+  return 'HEIC/HEIF画像は直接読み込めません。元の画像を残し、端末で別のJPEGを書き出して選び直してください。';
+}
 const bad = (): never => fileError('WebP/GIFの構造が不正か、この検証の上限を超えています。');
 
 /** Complete container framing; compressed pixels stay with the actual decoder. */

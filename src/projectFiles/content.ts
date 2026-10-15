@@ -1,4 +1,4 @@
-import { inspectProjectImage, projectImageMime, type PhotoDecoder } from './photo';
+import { inspectProjectImage, projectImageMime, freshPhotoSelectionIssue, type PhotoDecoder } from './photo';
 import type { ProjectWorkspaceFS, WorkspaceReadableFile } from '../platform/fs';
 import type { ContentRequest, ProjectContentVerifier } from '../domain/projectContentChecks';
 import { checkContentFacts } from '../domain/projectContentChecks';
@@ -43,7 +43,8 @@ export class ValidationContent implements MetadataMediaPort {
     this.fs.mutationAuthority.assertWorkspaceWriteAuthorized();
     const label = validationFileLabel(input.label);
     if (!input.bytes.length || input.bytes.length > this.limits.maxFileBytes) return fileError('画像がこの検証の上限を超えています。');
-    const bytes = input.bytes.slice(), mediaType = await inspectProjectImage(bytes, this.limits, this.decode, this.jpeg, this.photo);
+    const bytes = input.bytes.slice(), issue = freshPhotoSelectionIssue(bytes); if (issue) return fileError(issue);
+    const mediaType = await inspectProjectImage(bytes, this.limits, this.decode, this.jpeg, this.photo);
     const ref: StoredBlobRef = { algorithm: 'sha256', digest: await digest(bytes), byteLength: bytes.length, mediaType };
     const record = await sealValidationRecord('media-resource', { id: `med_${newId()}`, label, mediaKind: 'image', blob: ref as unknown as JsonObject });
     this.preparedImages.set(record.id as string, { record, bytes, ref });

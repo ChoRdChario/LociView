@@ -14,7 +14,7 @@ type Host = ReturnType<typeof createValidationModeHost>;
 type Tools = ReturnType<typeof createValidationReceiveControls>;
 /** Validation-only adapter. No synthetic Session or string-map writes enter product UI. */
 export function createProductWorkspace(document: Document, host: Host, factory: ViewportFactory, tools?: Tools, renderCandidate?: ModelCandidateRenderer,
-  navigation?: { openProject(): void; resumedLastProject(): boolean; changed(): void }) {
+  navigation?: { openProject(): void; resumedLastProject(): boolean; changed(): void; storageEstimate?(): Promise<Readonly<{ usage?: number; quota?: number }>> }) {
   const root = document.createElement('section'), mode = document.createElement('button'), status = document.createElement('p');
   mode.type = 'button'; status.setAttribute('role', 'status');
   let disposed = false, switching = false, core: ReturnType<typeof createProjectWorkspace> | undefined;
@@ -38,7 +38,7 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
     if (disposed || core || startup?.busy() || startup?.recoveryPending() || host.hasPending() || !chooseStartupScene(read().state).sceneId) return;
     core = createProjectWorkspace(document, {
     ...productSources(host),
-    openProject: navigation?.openProject, resumedLastProject: navigation?.resumedLastProject,
+    openProject: navigation?.openProject, resumedLastProject: navigation?.resumedLastProject, storageEstimate: navigation?.storageEstimate,
     createModelPreview: renderCandidate ? () => {
       let token = '', sceneId = '';
       const preview = createModelCandidatePreview(document, renderCandidate, () => !disposed && token === read().token && sceneId === viewportScene);

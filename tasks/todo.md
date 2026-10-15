@@ -35,6 +35,8 @@ The approved WebP/GIF companion connects the same photo workflow with original
 Blob animation behavior and four additive conversion domains; GLB profiles stay fixed.
 The named last-Project resume and guarded Project/file switching connection now
 uses only UI advisory run/mode, with explicit URL priority and actual-open checks.
+Fresh HEIF selection now explains separate local JPEG export and permits explicit
+unapplied-media cancellation; site storage estimates preserve pending save retry.
 Ordinary entry, broader profiles/converters, browser performance, physical-iPhone
 and offline acceptance remain open. Full details and earlier failures are in the
 [September checkpoint record](../docs/history/development-through-2026-09-21/tasks/todo.md).
@@ -114,6 +116,59 @@ destructive boundary. Ordinary entry and temporary iPhone HTTPS need their exist
 exact-build/route approvals. Main, Pages, Service Worker, version/license, release,
 dependency changes and private/public fixture distribution are outside this unit.
 
+### Completed implementation — recover photo input and save work
+
+Outcome: fresh HEIC/HEIF selection → actionable local JPEG guidance → explicitly
+cancel/reselect → add once to the same Caption → named backup/cold reopen; from
+save trouble, inspect the site's estimated storage and return to the same retry.
+PROD-16/F10 and contextual H02 are already approved. The short boundary/ports in
+[05 §13.2](../docs/specs/05-project-scene-team-workflow.md#132-gated-storage-and-integrated-delivery)
+are recorded before code. Clean g0-baseline starts at pushed ce5fe71.
+
+- [x] Short milestone audit: close the accepted input/save recovery gap rather
+  than inventing the unresolved orthographic numerical policy. One writer and
+  read-only reviewers; keep the just-verified placement checkpoint separate.
+- [x] Add a fresh-only negative content hint and media-owned explicit cancellation;
+  preserve valid-byte admission and every retained/converter/durable retry fence.
+- [x] Pass optional read-only storage estimate through existing typed UI ports;
+  handle known/unknown/failure/retry/late results without changing command state.
+- [x] Verify the one connected recovery/file/cold flow and meaningful faults,
+  independently review, freeze and run one required final serial checkpoint;
+  check HTTP/identity/privacy/deploy scope for a suitable g0 checkpoint.
+
+Ports: photo helper → fresh ValidationContent/initial media/unknown-file classifier;
+optional storageEstimate on pure product ports → existing product UI options →
+validation workspace → browser adapter. No legacy Native/assets importer dependency,
+new module/framework/decoder/recipe, project setting, storage write, persist/SW/
+cleanup, capacity guarantee, ordinary entry or browser-denial retry. Stop affected
+work only for an actual authority/contract conflict or managed boundary. Existing
+Node fixtures prove no device-side conversion, browser playback or offline support.
+
+Focused evidence: 23 photo/hint cases and five fresh service/selection/product/
+capacity cases pass (the connected group takes 8.21s, 3.03s test time). Typecheck
+passes after correcting test-only recorded input/archive descriptor types. The
+connected case preserves exact FS bytes through HEIF/invalid-PNG rejection and
+explicit cancellation, then JPEG publication failure → read-only estimate → same
+retry → one attachment → named backup/cold original JPEG bytes. Capacity tests
+cover known/partial/invalid/failed/unavailable values, retry, IME node/raw-input
+preservation, double action and late disposed results. Root and both independent
+read-only reviewers have no remaining P1/P2. No new module/import boundary exists.
+The final serial checkpoint passes typecheck, all 116 test files (2,582 passed,
+21 existing todo; 1077.65s) and all three builds, exit0 in
+`input-save-recovery-checkpoint-2026-10-16.log`. All ten frozen source/test hashes
+match `input-save-recovery-tested-tree-2026-10-16.json`. Existing localhost:4182
+serves all seven validation files exactly; manifest SHA-256
+`be4797a2b3cc402563a0b0dc13183f4db91035293c9b17f235280e072ab06c44`.
+Five changed Markdown files have 236 local links and no missing target. The
+15-path checkpoint changes no dependency, public fixture or deployment trigger;
+the separate unratified material proposal is excluded. Git owns checkpoint and
+remote identity. HTTP is identity only; synthetic HEIF is a negative hint fixture,
+and JPEG decode, DOM and StorageEstimate are injected, not browser/device proof.
+
+Next: concretize the source-authoritative LociMyu Scene-material target/identity
+companion for one PO decision. It is not permission to implement a new recipe;
+the broader browser/device/ordinary-entry gates remain open.
+
 ### Completed implementation — frozen-v1 model placement
 
 PO ratified the exact [07g companion](../docs/specs/07g-frozen-v1-placement-proposal.md)
@@ -163,12 +218,8 @@ all seven validation files byte-for-byte; manifest SHA-256
 This is HTTP identity only; Node/recorded DOM are not browser/GPU/device/offline or
 anonymized-real-source evidence. Git owns checkpoint and remote identity.
 
-Next: close the already approved input/save recovery workflow (PROD-16/F10/H02):
-fresh unsupported photo → preserve original and select a separate device-written
-JPEG → continue the same Caption; read-only site storage estimate → return to
-existing save/retry. Record its narrow UI/port acceptance before code. Retained
-converter reports/recipes/profiles, durable retry and pending adoption gates stay
-fixed; no new decoder, persistence permission, cleanup or storage authority.
+The next accepted input/save recovery unit is recorded above. Retained converter
+reports/recipes/profiles, durable retry and pending adoption gates stay fixed.
 
 ### Completed implementation — frozen-v1 explicit default View
 

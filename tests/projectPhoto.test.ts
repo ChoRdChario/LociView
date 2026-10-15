@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { browserPhotoDecoder, inspectValidationPhoto, inspectProjectImage, photoStructure } from '../src/projectFiles/photo';
+import { browserPhotoDecoder, inspectValidationPhoto, inspectProjectImage, photoStructure, freshPhotoSelectionIssue } from '../src/projectFiles/photo';
 import { photoBytes, photoFixtures } from './helpers/photoFixtures';
 import { digest } from '../src/projectMetadata/persistence';
 import type { FileValidationLimits } from '../src/projectFiles/validation';
@@ -16,6 +16,26 @@ const bitmap = (width = 8, height = 4) => ({ width, height, close: vi.fn() });
 afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
 describe('07e owned photo containers and first/default bitmap admission (not browser animation evidence)', () => {
+  it('gives only bounded fresh HEIF hints without admitting or changing shared inspection', async () => {
+    const heif = new Uint8Array(24); new DataView(heif.buffer).setUint32(0,24); heif.set(ascii('ftypheic'),4);
+    expect(freshPhotoSelectionIssue(heif)).toContain('端末で別のJPEG');
+    const compatible = heif.slice(); compatible.set(ascii('isom'),8); compatible.set(ascii('mif1'),16);
+    expect(freshPhotoSelectionIssue(compatible)).toContain('元の画像を残し');
+    const offset = concat(new Uint8Array(3),compatible).subarray(3); expect(freshPhotoSelectionIssue(offset)).toBe(freshPhotoSelectionIssue(compatible));
+    const unknown = heif.slice(); unknown.set(ascii('avif'),8); expect(freshPhotoSelectionIssue(unknown)).toBeNull();
+    for (const bytes of [ascii('hevc'), heif.slice(0,15)]) expect(freshPhotoSelectionIssue(bytes)).toBeNull();
+    const late = new Uint8Array(140); new DataView(late.buffer).setUint32(0,140); late.set(ascii('ftypisom'),4); late.set(ascii('heic'),132);
+    expect(freshPhotoSelectionIssue(late)).toBeNull();
+    const decode = vi.fn(async () => bitmap());
+    const error = await inspectProjectImage(heif,limits,undefined,undefined,decode).catch(e => e as Error);
+    expect(error).toBeInstanceOf(Error); expect((error as Error).message).not.toContain('HEIC'); expect(decode).not.toHaveBeenCalled();
+  });
+  it('preserves strict corrupt-image diagnostics before any fresh ftyp hint', () => {
+    for (const magic of [new Uint8Array([0xff,0xd8,0xff]), ascii('\x89PNG'), ascii('RIFF'), ascii('GIF8')]) {
+      const bytes = new Uint8Array(24); new DataView(bytes.buffer).setUint32(0,24); bytes.set(ascii('ftypheic'),4); bytes.set(magic);
+      expect(freshPhotoSelectionIssue(bytes)).toBeNull();
+    }
+  });
   it.each(photoFixtures)('walks original compressed $name to EOF and closes the temporary decode', async fixture => {
     const bytes = photoBytes(fixture.name), image = bitmap(fixture.width, fixture.height), decode = vi.fn(async (_bytes: Uint8Array, _mime: string) => image);
     expect(await digest(bytes)).toBe(fixture.sha256);

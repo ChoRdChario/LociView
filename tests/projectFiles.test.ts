@@ -132,6 +132,8 @@ const decodeJpeg: JpegDecoder = async (bytes, use) => {
 const decodePhoto: PhotoDecoder = async bytes => { const shape = photoStructure(bytes, budget); return { width: shape.width, height: shape.height, close() {} }; };
 const photoMime = (bytes: Uint8Array) => isAdditionalPhoto(bytes) ? photoStructure(bytes, budget).mime : isJpeg(bytes) ? 'image/jpeg' : 'image/png';
 const imageFor = (format: 'jpeg' | 'webp' | 'gif') => format === 'jpeg' ? jpegBytes('rgb-exif-6') : photoBytes(format === 'webp' ? 'webp-animated' : 'gif-animated');
+/** Negative hint fixture only, with no compressed HEIF payload or decoder claim. */
+function syntheticHeif() { const bytes = new Uint8Array(24); new DataView(bytes.buffer).setUint32(0,24); bytes.set(new TextEncoder().encode('ftypheic'),4); return bytes; }
 const caseDisposals: (() => void | Promise<void>)[] = [];
 function owned<T extends { dispose(): void | Promise<void> }>(resource: T): T {
   caseDisposals.push(() => resource.dispose()); return resource;
@@ -486,6 +488,20 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     await expect(validationReceivedFacts(validationProjectService(r.fs, r.factory, r.store, budget, decode, undefined, decodeJpeg, decodePhoto).content, detached.source!, detached.source!, () => new Blob([photo.slice().buffer]), () => true)).rejects.toThrow();
     expect(writes).not.toHaveBeenCalled(); expect(puts).not.toHaveBeenCalled(); expect(await r.fs.list('')).toEqual(files);
   });
+  it('fresh photo recovery gives HEIF guidance before writes and preserves JPEG byte authority', async () => {
+    const r = firstWorkspaceRecipient(decodeJpeg), jpeg = vi.fn(decodeJpeg), content = new ValidationContent(r.fs,r.store,budget,decode,undefined,jpeg);
+    const before = await r.fs.list(''), heif = syntheticHeif(), put = vi.spyOn(r.store,'put');
+    await expect(underWriteLease(r.fs,() => content.prepareImage({label:'disguised.jpg',bytes:heif}))).rejects.toThrow('端末で別のJPEG');
+    expect(jpeg).not.toHaveBeenCalled(); expect(put).not.toHaveBeenCalled(); expect(await r.fs.list('')).toEqual(before);
+    const broken = jpegBytes('rgb-exif-6').slice(0,-1);
+    const error = await underWriteLease(r.fs,() => content.prepareImage({label:'broken.heic',bytes:broken})).catch(e => e as Error);
+    expect(error).toBeInstanceOf(Error); expect((error as Error).message).not.toContain('HEIC');
+    const photo = jpegBytes('rgb-exif-6'), record = await underWriteLease(r.fs,() => content.prepareImage({label:'photo.heic',bytes:photo}));
+    expect(record.label).toBe('photo.heic'); expect(record.blob).toMatchObject({mediaType:'image/jpeg',digest:await digest(photo)});
+    expect(jpeg).toHaveBeenCalledOnce(); expect(put).not.toHaveBeenCalled(); expect(await r.fs.list('')).toEqual(before); content.releasePreparedImages();
+    await expect(prepareValidationProject({run:newId(),title:'新規画像',models:[{label:'model',bytes:glb()}],media:[{label:'photo.jpg',bytes:heif}]},budget,decode,decodeJpeg)).rejects.toThrow('端末で別のJPEG');
+    expect(await r.fs.list('')).toEqual(before); expect(heif).toEqual(syntheticHeif());
+  });
   it.each(['jpeg', 'webp', 'gif'] as const)('photo companion %s creates a byte-classified project with misleading names and cold exact bytes', async format => {
     const r = firstWorkspaceRecipient(decodeJpeg), factories = new Map<string, MetadataStorageFactory>(); let host: Awaited<ReturnType<typeof openValidationHost>> | undefined;
     const options = { base: r.fs, coordinator: ProjectMutationCoordinator.browser(r.locks), store: r.store, fileLimits: budget, decode, jpeg: decodeJpeg, photo: decodePhoto, packageLocks: r.locks };
@@ -498,7 +514,13 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const root = record(ui.root), all = (n: RecordedNode): RecordedNode[] => [n, ...n.children.flatMap(all)], input = all(root).find(n => n.attributes.get('aria-label') === '3Dモデルとメディアを選択')!;
     await vi.waitFor(() => expect(all(root).find(n => n.tag === 'button' && n.textContent === 'プロジェクトを作成')!.disabled).toBe(false));
     const model = glb(j => { j.images[0].mimeType = 'image/jpeg'; }, true, jpegBytes('rgb-progressive')), photo = imageFor(format);
-    Object.assign(input, { files: [new File([model.slice().buffer], 'model.data', { type: 'text/plain' }), new File([photo.slice().buffer], 'photo.bin', { type: 'application/octet-stream' })] });
+    if (format === 'jpeg') {
+      Object.assign(input,{ files:[new File([model.slice().buffer],'model.data'),new File([syntheticHeif().buffer],'photo.jpg',{type:'image/jpeg'})] });
+      input.parent!.parent!.fire('submit',{preventDefault(){}});
+      await vi.waitFor(() => expect(all(root).some(n => n.textContent.includes('端末で別のJPEGを書き出して選び直してください。'))).toBe(true),{timeout:10000});
+      expect(host).toBeUndefined(); expect(await r.fs.list('')).toEqual([]); expect(factories.size).toBe(0);
+    }
+    Object.assign(input, { files: [new File([model.slice().buffer], 'model.data', { type: 'text/plain' }), new File([photo.slice().buffer], format === 'jpeg' ? 'photo.heic' : 'photo.bin', { type: 'application/octet-stream' })] });
     input.parent!.parent!.fire('submit', { preventDefault() {} });
     await vi.waitFor(() => expect(host?.read().state).toBe('ready'), { timeout: 10000 });
     await vi.waitFor(() => expect(all(root).some(n => n.className === 'lv-project-workspace'), all(root).filter(n => n.tag === 'p').map(n => n.textContent).join(' | ')).toBe(true));
@@ -2655,7 +2677,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
   }
   async function productWorkspaceFixture(includeInitial = false, duplicateModels = false, withTag = false, profile: 'map1' | 'map2' = 'map1',
     initial?: NonNullable<Parameters<typeof openValidationHost>[0]['initial']>,
-    setup: { jpeg?: JpegDecoder; photo?: PhotoDecoder; restoreGenerations?: boolean; initialWorkspace?: boolean; scenes?: readonly { id: string; name: string; orderKey: string }[] } = {}) {
+    setup: { jpeg?: JpegDecoder; photo?: PhotoDecoder; storageEstimate?: ValidationWorkspacePorts['storageEstimate']; restoreGenerations?: boolean; initialWorkspace?: boolean; scenes?: readonly { id: string; name: string; orderKey: string }[] } = {}) {
     const r = firstWorkspaceRecipient(setup.jpeg, setup.photo), run = initial ? (initial.source.proof.identity.projectId as string).slice(4) : newId(), captionId = `cap_${newId()}`;
     const generationFactories = new Map<string, MetadataStorageFactory>(), databases: RestoreDatabasePorts = {
       listGenerations: async () => [...generationFactories.keys()], open: async (id, create) => {
@@ -2725,7 +2747,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
           issue, notice: '検証用の表示通知', dragging: viewportDragging, projection: payload.camera.projection.kind, axis: null }) };
     };
     let opened = false, liveHost = host; const imageReads = [vi.spyOn(host.content, 'image')];
-    const ui = owned(createValidationWorkspace(document, { productEditor: true, fileLimits: budget, decode, jpeg: setup.jpeg, photo: setup.photo, list: async () => [], selected() {},
+    const ui = owned(createValidationWorkspace(document, { productEditor: true, fileLimits: budget, decode, jpeg: setup.jpeg, photo: setup.photo, storageEstimate: setup.storageEstimate, list: async () => [], selected() {},
       open: async (_run, _initial, mode) => { if (!opened) { opened = true; return host; } liveHost = await openValidationHost({ ...options, mode }); imageReads.push(vi.spyOn(liveHost.content, 'image')); return liveHost; },
       render: async () => ({ factory, dispose() {} }) }, f.run));
     const root = record(ui.root), all = (n: RecordedNode): RecordedNode[] => [n, ...n.children.flatMap(all)];
@@ -3739,6 +3761,82 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const cold = await openValidationHost(f.options);
     expect(cold.read().source!.originalChanges()).toEqual(exact); expect(cold.authority.read().resources.captions[captionId]!.body).toEqual({ kind: 'value', value: '相手の本文2' });
     expect(captionAttachments(cold.authority.read().mediaData, captionId).ready).toHaveLength(1); await cold.dispose();
+  });
+  it('recovers fresh photo selection and checks storage without discarding a durable retry, then saves and cold reopens exact JPEG bytes', async () => {
+    const estimate = vi.fn(async () => ({usage:1_200_000,quota:4_000_000_000}));
+    const h = await productWorkspaceFixture(true,false,false,'map2',undefined,{jpeg:decodeJpeg,storageEstimate:estimate});
+    const {host,editor,named,button,completed,edited,failed} = h, captionId = h.f.f.captionId;
+    named('キャプション一覧',editor).children[0]!.children[0]!.fire('click');
+    const input = named('メディアを追加',editor) as RecordedNode & {files?:File[]}, media = named('メディア',editor), cancel = () => button('選択を取り消す',media);
+    const original = host.read().source!, count = captionAttachments(host.authority.read().mediaData,captionId).ready.length;
+    const snapshot = async () => Promise.all((await h.f.fs.list('')).map(async p => [p,await h.f.fs.readBytes(p)]));
+    const before = await snapshot(), select = (bytes:Uint8Array,name:string) => { input.fire('click'); Object.assign(input,{files:[new File([bytes.slice().buffer],name,{type:'image/jpeg'})]}); };
+    for (const [bytes,name] of [[syntheticHeif(),'photo.jpg'],[new Uint8Array([137,80,78,71,13,10,26,10]),'broken.png']] as const) {
+      select(bytes,name); await completed(() => input.fire('change'));
+      expect(host.authority.status!().kind).toBe('idle'); expect(host.read().source!.token).toBe(original.token);
+      if (name === 'photo.jpg') { expect(h.status.textContent).toContain('端末で別のJPEG');
+        await completed(() => button('更新を再試行',editor).fire('click')); expect(h.status.textContent).toContain('端末で別のJPEG'); }
+      expect(cancel().disabled).toBe(false); cancel().fire('click'); expect(cancel().hidden).toBe(true);
+      expect(input.disabled).toBe(false); expect(h.ui.hasChanges()).toBe(false);
+      expect(captionAttachments(host.authority.read().mediaData,captionId).ready).toHaveLength(count); expect(await snapshot()).toEqual(before);
+    }
+    const photo = jpegBytes('rgb-exif-6'); select(photo,'別に書き出した写真.jpeg'); const selected = input.files![0]!;
+    h.f.fs.reject = p => p.endsWith('/published.json'); await failed(() => input.fire('change'));
+    expect(cancel().disabled).toBe(true); cancel().fire('click'); expect(input.files![0]).toBe(selected); expect(button('更新を再試行',editor).hidden).toBe(false);
+    expect(captionAttachments(host.authority.read().mediaData,captionId).ready).toHaveLength(count);
+    const paths = (await h.f.fs.list('')).filter(p => p.endsWith('.amchange')), parts = await Promise.all(paths.map(p => h.f.fs.readBytes(p)));
+    const retained = await snapshot(); button('保存容量を確認',editor).fire('click'); await estimate.mock.results[0]!.value;
+    expect(named('このサイトの保存容量',editor).children.at(-1)!.textContent).toContain('1.2 MB');
+    expect(host.authority.status!().kind).toBe('failed'); expect(host.read().source!.token).toBe(original.token); expect(cancel().disabled).toBe(true);
+    expect(input.files![0]).toBe(selected); expect(await snapshot()).toEqual(retained);
+    h.f.fs.reject = () => false; await edited(() => button('更新を再試行',editor).fire('click'));
+    expect(await Promise.all(paths.map(p => h.f.fs.readBytes(p)))).toEqual(parts);
+    const attachments = captionAttachments(host.authority.read().mediaData,captionId).ready;
+    expect(attachments).toHaveLength(count+1); const jpegRows = host.authority.read().mediaChoices!.filter(m => m.blob.mediaType === 'image/jpeg'); expect(jpegRows).toHaveLength(1);
+    expect(await host.content.image(jpegRows[0] as unknown as JsonObject,true)).toEqual(photo);
+    expect(input.value).toBe(''); expect(h.ui.hasChanges()).toBe(false); expect(h.legacy).not.toHaveBeenCalled();
+    const output = named('ファイル'), name = named('名前（任意）',output); name.value = '写真の作業'; name.fire('input'); button('ファイルに保存',output).fire('click');
+    await vi.waitFor(() => expect(h.downloads).toHaveBeenCalledOnce(),{timeout:10000});
+    const source = host.read().source!, job = host.workspaceOutput.jobs.find(j => j.purpose === 'backup')!;
+    expect(job.label).toBe('写真の作業'); const backup = await BackupArchive.inspect(await host.workspaceOutput.download(job.id),metadata);
+    expect(backup.source.originalChanges()).toEqual(source.originalChanges());
+    expect(backup.archive.control.manifest.blobs.some(b => b.sha256 === jpegRows[0]!.blob.digest)).toBe(true);
+    await h.ui.dispose(); const cold = owned(await openValidationHost(h.f.options));
+    expect(cold.read().source!.originalChanges()).toEqual(source.originalChanges()); expect(captionAttachments(cold.authority.read().mediaData,captionId).ready).toHaveLength(count+1);
+    expect(await cold.content.image(jpegRows[0] as unknown as JsonObject,true)).toEqual(photo); await cold.dispose();
+  });
+  it('checks estimated site storage through unknown/failure/retry without rerendering an IME draft', async () => {
+    type Estimate = Readonly<{usage?:number;quota?:number}>;
+    let next:() => Promise<Estimate> = async () => ({usage:1_200_000,quota:4_000_000_000});
+    const estimate = vi.fn(() => next()), h = await productWorkspaceFixture(true,false,false,'map2',undefined,{storageEstimate:estimate});
+    const {host,editor,named,button} = h, query = button('保存容量を確認',editor), help = named('このサイトの保存容量',editor), result = help.children.at(-1)!;
+    const source = host.read().source!.originalChanges(), paths = await h.f.fs.list('');
+    const check = async () => { query.fire('click'); const request = estimate.mock.results.at(-1)!.value; await request.catch(() => {}); expect(query.disabled).toBe(false); };
+    await check(); expect(result.textContent).toContain('1.2 MB'); expect(result.textContent).toContain('4 GB');
+    next = async () => ({usage:-1,quota:Infinity}); await check(); expect(result.textContent).toContain('確認できません');
+    next = async () => ({quota:8000}); await check(); expect(result.textContent).toContain('使用量の目安：不明'); expect(result.textContent).toContain('8 KB');
+    next = async () => {throw Error('denied');}; await check(); expect(result.textContent).toContain('もう一度確認できます');
+    let release!:(v:Estimate) => void; const held = new Promise<Estimate>(resolve => {release=resolve;});
+    caseDisposals.push(() => {release({usage:0,quota:1000});}); next = () => held;
+    named('キャプション一覧',editor).children[0]!.children[0]!.fire('click'); const body = named('本文',editor);
+    body.fire('compositionstart'); body.value = '未確定の入力'; body.fire('input'); query.fire('click'); expect(query.disabled).toBe(true);
+    const calls = estimate.mock.calls.length; query.fire('click'); expect(estimate).toHaveBeenCalledTimes(calls);
+    release({usage:0,quota:1000}); await held;
+    expect(query.disabled).toBe(false); expect(named('本文',editor)).toBe(body); expect(body.value).toBe('未確定の入力');
+    expect(button('変更を適用',editor).disabled).toBe(true); expect(h.ui.hasChanges()).toBe(true);
+    body.fire('compositionend'); expect(body.value).toBe('未確定の入力');
+    expect(host.read().source!.originalChanges()).toEqual(source); expect(await h.f.fs.list('')).toEqual(paths); expect(h.dispatch).not.toHaveBeenCalled();
+    await h.ui.dispose();
+  });
+  it('keeps missing and late storage estimates advisory after disposal', async () => {
+    const missing = await productWorkspaceFixture(); const unknown = missing.named('このサイトの保存容量',missing.editor).children.at(-1)!;
+    missing.button('保存容量を確認',missing.editor).fire('click'); await vi.waitFor(() => expect(unknown.textContent).toContain('確認できません')); await missing.ui.dispose();
+    let release!:(v:{usage:number;quota:number}) => void; const held = new Promise<{usage:number;quota:number}>(resolve => {release=resolve;});
+    const estimate = vi.fn(() => held), h = await productWorkspaceFixture(false,false,false,'map2',undefined,{storageEstimate:estimate});
+    caseDisposals.push(() => {release({usage:1,quota:2});}); const query = h.button('保存容量を確認',h.editor), result = h.named('このサイトの保存容量',h.editor).children.at(-1)!;
+    query.fire('click'); const before = result.textContent, source = h.host.read().source!.originalChanges(); await h.ui.dispose();
+    release({usage:2_000_000,quota:4_000_000_000}); await held; query.fire('click');
+    expect(result.textContent).toBe(before); expect(estimate).toHaveBeenCalledOnce(); expect(h.host.read().source!.originalChanges()).toEqual(source);
   });
   it('keeps product composition inputs through rejected edits and published display failure, with exact retry and renderer recovery (injected viewport)', async () => {
     const h = await productWorkspaceFixture(true), { host, editor, named, button, status, edited } = h;

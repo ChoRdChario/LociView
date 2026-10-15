@@ -31,6 +31,7 @@ export async function createValidationBrowserWorkspace(document: Document, run?:
   const storage = (id: string, create: boolean) => openBrowserMetadataStorage(`${validationArea}-${id}`, create);
   const uiState = createValidationUiState();
   const workspace = createValidationWorkspace(document, { ...options, lastProject: uiState.lastProject,
+    storageEstimate: typeof navigator.storage?.estimate === 'function' ? () => navigator.storage.estimate() : undefined,
     productEditor: new URL(location.href).searchParams.get('editor') === 'project',
     list: () => listValidationProjects(options, storage),
     open: (id, initial, mode, workspaceFile, reviewEdit) => openValidationHost({ ...options, run: id, initial, mode, workspaceFile, reviewEdit, openStorage: create => storage(id, create) }),

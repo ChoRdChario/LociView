@@ -45,6 +45,12 @@ The browser adapter `harness/projectScene/browserUiState.ts` owns its advisory k
 remembering it. The product header calls the same guarded Project selector.
 Project data and ordinary entry remain separate; todo owns the executed evidence.
 
+Fresh photo selection uses `projectFiles/photo.ts`'s negative HEIF guidance only
+at the three fresh entry points. The product workspace owns explicit cancellation
+of an unapplied media attempt; durable retry remains the Session/host's authority.
+Its help panel consumes an optional read-only storage estimate from the browser
+adapter through existing UI ports, without changing Project or pending state.
+
 The new practical-team workflow uses Project-wide Assets/Caption resources and
 Scene membership. New file services are partially connected in the limited
 validation route. Old Native acceptance remains valid only for its tested scope.

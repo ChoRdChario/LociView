@@ -43,6 +43,30 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     ['保存と共有', 'ブラウザ内の再開データは、端末のデータ削除で失われます。「ファイルに保存」でバックアップを作り、ファイル欄で保存先のファイルを選択して内容を確認してください。「相手に渡す」で作業一式を共有し、同じプロジェクトの変更分を受け取れます。'],
     ['困ったとき', '更新に失敗したら入力を保持したまま「更新を再試行」を選択します。競合は「状態を確認」から残す内容を選択します。3D表示だけに問題がある場合は「3D表示を再試行」を選択してください。'],
   ]) help.append(make('h3', title), make('p', text));
+  const storageHelp = make('details'), storageStatus = make('p'); let storageChecking = false, storageEpoch = 0;
+  storageHelp.setAttribute('aria-label', 'このサイトの保存容量'); storageStatus.setAttribute('role', 'status');
+  const storageCheck = button('保存容量を確認', () => { void queryStorage(); });
+  storageHelp.append(make('summary', 'このサイトの保存容量'),
+    make('p', 'このサイト全体の推定値です。プロジェクト単独の容量や端末の空き容量を示すものではありません。保存できるかは実際の保存結果で確認してください。'), storageCheck, storageStatus);
+  help.append(storageHelp);
+  async function queryStorage() {
+    if (disposed || storageChecking) return;
+    const epoch = ++storageEpoch; storageChecking = true; storageCheck.disabled = true; storageStatus.textContent = '保存容量を確認しています。';
+    try {
+      const estimate = await ports.storageEstimate?.(); if (disposed || epoch !== storageEpoch) return;
+      const finite = (n: unknown) => typeof n === 'number' && Number.isFinite(n) && n >= 0 ? n : null;
+      const usage = finite(estimate?.usage), quota = finite(estimate?.quota);
+      const bytes = (n: number | null) => {
+        if (n === null) return '不明';
+        const units = ['B', 'KB', 'MB', 'GB', 'TB']; let unit = 0;
+        while (n >= 1000 && unit < units.length - 1) { n /= 1000; unit++; }
+        return `${n.toLocaleString('ja-JP', { maximumFractionDigits: 1 })} ${units[unit]}`;
+      };
+      storageStatus.textContent = usage === null && quota === null ? 'この環境では保存容量の目安を確認できません。' :
+        `使用量の目安：${bytes(usage)}。保存上限の目安：${bytes(quota)}。`;
+    } catch { if (!disposed && epoch === storageEpoch) storageStatus.textContent = '保存容量を確認できませんでした。もう一度確認できます。'; }
+    finally { if (!disposed && epoch === storageEpoch) { storageChecking = false; storageCheck.disabled = false; } }
+  }
   header.append(projectTitle, resumeStatus, fileStatus, help);
   const resumeNotice = make('p'); resumeNotice.setAttribute('role', 'status');
   const otherProject = button('別のプロジェクトを開く', () => {
@@ -179,7 +203,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   deletionBox.append(deletionTitle, deletionEffects, deletionNote, confirmDelete, cancelDelete); deletionArea.append(beginDelete, deletionBox, referenceIssues);
   const media = make('section'), mediaLabel = make('label', 'メディアを追加'), mediaInput = make('input');
   media.setAttribute('aria-label', 'メディア'); mediaInput.type = 'file'; mediaInput.accept = 'image/png,image/jpeg,image/webp,image/gif'; mediaInput.setAttribute('aria-label', 'メディアを追加'); mediaLabel.append(mediaInput);
-  const cancelMedia = button('選択を取り消す', () => { if (!mutationBlock()) { pickerScope = null; mediaInput.value = ''; render(); } });
+  const cancelMedia = button('選択を取り消す', cancelMediaSelection);
   media.append(make('h2', 'メディア'), mediaLabel, cancelMedia);
   const conflicts = make('section');
   let sceneId = chooseStartupScene(ports.read().state).sceneId ?? '', disposed = false, busy = false, composing = false, feedback = '';
@@ -191,7 +215,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   const addColors = new Map<string, string>(), addColorValue = () => addColors.get(sceneId) ?? '#a08045';
   let parentKey = '', parentScope = '';
   let deletion: { token: string; sceneId: string; captionId: string; title: string; impact: ReturnType<ProjectWorkspacePorts['captionDeletion']> } | null = null;
-  let rawPosition = ['', '', ''], pending: { action: () => Promise<unknown>; complete: () => void } | null = null;
+  let rawPosition = ['', '', ''], pending: { action: () => Promise<unknown>; complete: () => void; owner?: 'media' } | null = null;
   let pickerScope: { token: string; sceneId: string; captionId: string } | null = null;
   let gesture: { pointerId: number; action: PinAction | null; token: string; sceneId: string; receipt: string; x: number; y: number; left: number; top: number; width: number; height: number; generation: number; shifted: boolean; color: string } | null = null;
   let gestureGeneration = 0, gestureContext = ''; const pressedPointers = new Set<number>();
@@ -428,8 +452,8 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     referenceIssues.replaceChildren(...[...new Set(issues.map(i => `${i.code === 'concurrent-delete-edit' ? '削除と編集が競合しています。内容は履歴に保持しています。' : i.code === 'atomic-field-conflict' ? '削除・復元の状態が競合しています。' : '参照先の確認が必要です。関係する内容は履歴に保持しています。'} ${i.path.join(' / ')}`))].map(text => make('p', text)));
   }
   function positionValid() { return rawPosition.every(v => /^[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?$/i.test(v.trim()) && Number.isFinite(Number(v))); }
-  async function perform(action: () => Promise<unknown>, complete: () => void) {
-    busy = true; feedback = '変更を適用しています。'; pending = { action, complete };
+  async function perform(action: () => Promise<unknown>, complete: () => void, owner?: 'media') {
+    busy = true; feedback = '変更を適用しています。'; pending = { action, complete, owner };
     try { render(); await action(); if (!disposed) { complete(); pending = null; } }
     catch (error) { if (!disposed) feedback = error instanceof Error ? error.message : '変更を適用できません。入力を保持しています。'; }
     finally { busy = false; if (!disposed) render(); }
@@ -442,7 +466,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   async function runRetry() {
     if (busy || !pending || ports.readOnly || ports.otherPending()) return;
     const work = pending;
-    await perform(() => ports.status().kind === 'failed' ? ports.retry() : work.action(), work.complete);
+    await perform(() => ports.status().kind === 'failed' ? ports.retry() : work.action(), work.complete, work.owner);
   }
   function sceneBlock() {
     return mutationBlock() || (hasCaptionDraft(draft) || draft?.composing || panelInput() || mediaManager?.hasChanges() || composing || includeMemory().composing || pin || !!numericTarget || choosing || deletion || pickerScope || recovery?.hasChanges() || viewport.read().dragging ? '現在の入力・操作を完了してください。' : null);
@@ -489,7 +513,14 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   mediaInput.addEventListener('click', () => {
     if (guardInput() && memory().selectedCaptionId) { pickerScope = { token: provider().token, sceneId, captionId: memory().selectedCaptionId! }; render(); }
   });
-  mediaInput.addEventListener('cancel', () => { if (!pending && !busy) { pickerScope = null; render(); } });
+  function canCancelMedia() {
+    if (disposed || busy || ports.readOnly || ports.status().kind !== 'idle' || ports.otherPending() || windowMoving || composingInput()) return false;
+    if (!pending) return true;
+    return pending.owner === 'media' && !hasCaptionDraft(draft) && !pin && !numericTarget && !choosing && !deletion && !sceneEdit &&
+      !panelInput() && !mediaManager?.hasChanges() && !recovery?.hasChanges() && !viewport.read().dragging;
+  }
+  function cancelMediaSelection() { if (canCancelMedia()) { if (pending?.owner === 'media') { pending = null; feedback = ''; } pickerScope = null; mediaInput.value = ''; render(); } }
+  mediaInput.addEventListener('cancel', cancelMediaSelection);
   mediaInput.addEventListener('change', () => {
     const file = mediaInput.files?.[0], scope = pickerScope;
     if (!file || !scope || mutationBlock()) return;
@@ -497,7 +528,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     const orders = projectAttachments(provider(), scope.captionId).map(a => a.order).sort();
     const input = { ...scope, attachmentId: id('att'), eventId: id('evt'), orderKey: (orders.at(-1) ?? '') + 'U',
       file: { name: file.name, size: file.size, arrayBuffer: file.arrayBuffer.bind(file) } };
-    void perform(() => ports.addMedia(scope.token, input), () => { pickerScope = null; mediaInput.value = ''; resetDraft(); feedback = 'メディアを追加しました。'; });
+    void perform(() => ports.addMedia(scope.token, input), () => { pickerScope = null; mediaInput.value = ''; resetDraft(); feedback = 'メディアを追加しました。'; }, 'media');
   });
   const modifiedPointer = (event: PointerEvent) => event.altKey || event.ctrlKey || event.metaKey;
   const invalidateGesture = () => { gesture = null; gestureGeneration++; };
@@ -603,7 +634,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       sceneNote.textContent = sceneEdit?.kind === 'create' ? 'このシーンのモデルを引き継ぎます。キャプションは追加されません。' : sceneEdit?.kind === 'default' ? '次にプロジェクトを開くときの開始シーンにします。' : ''; sceneNote.hidden = !sceneNote.textContent;
       sceneStatus.textContent = staleScene ? '内容が更新されています。入力は保持しています。取り消して選び直してください。' : start ? `開始シーン：${fieldValue(p.state.scenes[start]?.name) ?? '名称を確認'}` : '開始シーンの状態を確認してください。';
       mediaInput.disabled = !!blocked || !!sceneEdit || includeMemory().composing || !!deletion || panelInput() || !!mediaManager?.hasChanges() || hasCaptionDraft(draft) || !!pin || !!numericTarget || choosing || !!recovery?.hasChanges() || !selected;
-      cancelMedia.hidden = !pickerScope; cancelMedia.disabled = !!blocked;
+      cancelMedia.hidden = !pickerScope; cancelMedia.disabled = !canCancelMedia();
       mediaManager!.render();
       recovery!.render();
       body.setAttribute('aria-busy', String(busy)); body.inert = busy;
@@ -635,5 +666,5 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   mounted = true; render();
   return { root, render, session: interaction, inputPending: () => dirty() || busy,
     hasChanges: () => dirty() || busy || !!pending,
-    unmount() { if (disposed) return; disposed = true; gesture = null; gestureGeneration++; pressedPointers.clear(); viewport.reservePointer(false); recovery?.dispose(); windows.dispose(); mediaManager?.dispose(); mediaViewer.dispose(); viewport.dispose(); list.dispose(); inclusion.dispose(); detail.dispose(); for (const panel of panels.values()) panel.dispose(); root.remove(); } };
+    unmount() { if (disposed) return; disposed = true; storageEpoch++; gesture = null; gestureGeneration++; pressedPointers.clear(); viewport.reservePointer(false); recovery?.dispose(); windows.dispose(); mediaManager?.dispose(); mediaViewer.dispose(); viewport.dispose(); list.dispose(); inclusion.dispose(); detail.dispose(); for (const panel of panels.values()) panel.dispose(); root.remove(); } };
 }

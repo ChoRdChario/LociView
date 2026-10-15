@@ -73,6 +73,7 @@ export interface ProjectWorkspacePorts {
   projectStatus(): { readonly title: string | null; readonly resumable: boolean; readonly backup: 'verified' | 'unconfirmed' | 'unavailable' };
   openProject?(): void;
   resumedLastProject?(): boolean;
+  storageEstimate?(): Promise<Readonly<{ usage?: number; quota?: number }>>;
   readonly readOnly: boolean;
   status(): { kind: 'idle' | 'checking' | 'failed'; error?: string; retryable?: boolean };
   dispatch(token: string, command: MetadataEdit): Promise<unknown>;

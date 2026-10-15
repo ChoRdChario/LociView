@@ -1779,6 +1779,47 @@ is preserved and the limitation is visible. Browser execution budgets (64 MiB
 combined input, 4 MiB JSON, 100,000 structural items, 8,000,000 accessor values,
 16,777,216 image pixels) are caller refusal limits, not measured support promises.
 
+**Fresh media-selection and save recovery (2026-10-16).** This connects the
+already approved [PROD-16](00-product-contract.md) local
+HEIC/HEIF compatibility flow and contextual capacity help; it adds no decoder,
+format admission, storage permission or migration recipe. A small bounded
+content-only negative hint in projectFiles/photo may give fresh selection this
+guidance: `元の画像を残し、端末で別のJPEGを書き出して選び直してください。`
+Known PNG/JPEG/WebP/GIF magic keeps the existing strict checker and corrupt-input
+diagnostic first. Only unknown bytes use the bounded ftyp major/compatible-brand
+hint; it is not a BMFF validator or admission proof. Filename/MIME hints never
+override actual bytes. Connect it only to fresh image preparation, fresh initial
+media and the new-file classifier's unknown branch. Shared retained/received/
+conversion inspectors, old LociMyu reports, profiles, receipts and raw bytes remain
+unchanged. Rejection creates no Project/journal/CAS mutation.
+
+The typed product UI retains a media-only owner for a failed selection attempt,
+including through retry. When authority is idle and no write, other pending work,
+read-only or IME/input guard blocks it, the existing selection-cancel action may
+explicitly clear only that unapplied media attempt, file and picker scope. A new
+picker recaptures the current token/Scene/Caption. Never automatically discard all
+failures or cancel non-idle host/journal/publication/display recovery; those keep
+their exact input/IDs and retry. Other command owners keep their current meaning.
+
+Contextual help may query optional UI-only `storageEstimate(): Promise<Readonly<
+{usage?:number;quota?:number}>>`, passed through the existing validation workspace/
+product adapter into pure UI. Only the browser adapter calls the existing API.
+Per the [Storage Standard](https://storage.spec.whatwg.org/#usage-and-quota), show
+finite nonnegative usage/quota as estimates for this site's storage, with absent,
+failed and retry states. Do not describe these as Project size, device free disk,
+save success or offline readiness. Keep query state local, update only its own
+help nodes, disable only its query button, and ignore late results after disposal.
+Do not enter command perform/dirty/pending/changed, request persist, clean up or
+delete data, or use the estimate to accept/refuse a save.
+
+Acceptance reuses one real-service flow: disguised HEIF refusal without mutation
+→ explicit cancellation → bytes-first separate JPEG → one Caption attachment →
+named backup/cold exact bytes; while an actual durable failure retains its input,
+capacity help does not alter its draft/IDs/history and the existing retry succeeds.
+Use focused cases for magic/filename negatives, generic corrupt input, estimate
+known/unknown/failure/retry and late/disposed/IME completion. Keep existing outer
+budgets and browser/device/offline/adoption evidence separate.
+
 Validation-GLB placement connection reuses the already approved M07 semantics:
 Move/Rotate/positive uniform scale about the model origin, preview/confirm/cancel,
 same all-Scene Asset placement and unchanged Caption asset-local coordinates.

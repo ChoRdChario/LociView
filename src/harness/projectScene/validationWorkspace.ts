@@ -1,4 +1,4 @@
-import { isAdditionalPhoto, type PhotoDecoder } from '../../projectFiles/photo';
+import { isAdditionalPhoto, freshPhotoSelectionIssue, type PhotoDecoder } from '../../projectFiles/photo';
 import { projectResumeReference, type ProjectResumeReference } from '../../ui/resumeReference';
 import { newId } from '../../projectMetadata/persistence';
 import { prepareValidationProject, type ValidationFile } from '../../projectFiles/initialProject';
@@ -34,6 +34,7 @@ type Host = ReturnType<typeof createValidationModeHost>;
 export interface ValidationWorkspacePorts {
   fileLimits: FileValidationLimits; decode?: PngDecoder; jpeg?: JpegDecoder; photo?: PhotoDecoder;
   productEditor?: boolean;
+  storageEstimate?(): Promise<Readonly<{ usage?: number; quota?: number }>>;
   lastProject?: { read(): ProjectResumeReference | null; remember(reference: ProjectResumeReference): void };
   list(): Promise<ValidationProjectEntry[]>;
   open(run: string, initial?: ReturnType<typeof prepareValidationCreation>, mode?: LocalOpenMode, workspaceFile?: Blob, reviewEdit?: PreparedReviewEdit): Promise<Awaited<ReturnType<typeof openValidationHost>>>;
@@ -190,7 +191,8 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     const fileTools = receiveTools;
     try { workspace = ports.productEditor ? createProductWorkspace(document, target, next.factory, fileTools,
       ports.renderModelCandidate ? display => ports.renderModelCandidate!(target, display) : undefined,
-      { openProject: () => { void selectProject(); }, resumedLastProject: () => resumedLast, changed: () => { rememberCurrent(); controls(); } }) : createSavedWorkspace(document, target, next.factory,
+      { openProject: () => { void selectProject(); }, resumedLastProject: () => resumedLast, storageEstimate: ports.storageEstimate,
+        changed: () => { rememberCurrent(); controls(); } }) : createSavedWorkspace(document, target, next.factory,
       (session, changed) => {
         const root = document.createElement('section');
         const blockedReason = () => fileTools?.hasChanges() ? 'ファイルの操作を終えるか、取り消してから解消してください。' : null;
@@ -360,7 +362,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
       const item = { label: file.name, bytes };
       if (bytes.length >= 4 && new DataView(bytes.buffer).getUint32(0, true) === 0x46546c67) models.push(item);
       else if (isAdditionalPhoto(bytes) || isJpeg(bytes) || [137, 80, 78, 71, 13, 10, 26, 10].every((b, i) => bytes[i] === b)) media.push(item);
-      else throw Error('この検証では静的GLBとPNG/JPEG/WebP/GIF画像を選択してください。元のファイルは変更していません。');
+      else throw Error(freshPhotoSelectionIssue(bytes) ?? 'この検証では静的GLBとPNG/JPEG/WebP/GIF画像を選択してください。元のファイルは変更していません。');
     }
     const run = newId(), initial = prepareValidationCreation(await prepareValidationProject({ run, title: name, models, media }, ports.fileLimits, ports.decode, ports.jpeg, ports.photo), 'map2');
     if (disposed) return; await closeCurrent(); await openProject(run, initial);

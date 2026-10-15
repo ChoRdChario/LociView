@@ -11,6 +11,8 @@ selection wins and actual opening must succeed before the named resume notice.
 Frozen-v1 explicit starting Views and model placement use the approved additive
 07f/07g recipes, preserving original GLB and model-local pin coordinates; their
 exact tested scope and remaining conversion/adoption work remain in todo/inventory.
+Fresh-media cancellation and the optional site storage estimate belong to the UI;
+neither overrides durable recovery or validates a device's free disk/offline state.
 
 ## Resume safely
 

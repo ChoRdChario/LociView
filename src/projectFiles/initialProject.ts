@@ -1,4 +1,4 @@
-import { inspectProjectImage, type PhotoDecoder } from './photo';
+import { inspectProjectImage, freshPhotoSelectionIssue, type PhotoDecoder } from './photo';
 import { immutableDigest } from '../domain/projectGraphSupport';
 import { admitProjectRecords, projectRecordMaps } from '../domain/projectRecords';
 import { cloneCanonicalValue, type JsonObject, type JsonValue } from '../domain/values';
@@ -82,7 +82,8 @@ export async function prepareValidationProject(input: { run: string; title: stri
     add('sceneAssetMembershipsById', { id: fresh('sam'), sceneId, assetId: model.asset.id!, orderKey: `A${index.toString(36).padStart(8, '0')}`, lifecycle: active() });
   }
   for (const file of media) {
-    const name = label(file.label), bytes = file.bytes.slice(), mime = await inspectProjectImage(bytes, limits, decode, jpeg, photo);
+    const name = label(file.label), bytes = file.bytes.slice(), issue = freshPhotoSelectionIssue(bytes); if (issue) return fileError(issue);
+    const mime = await inspectProjectImage(bytes, limits, decode, jpeg, photo);
     const ref = await blob(bytes, mime);
     add('mediaResourcesById', await sealValidationRecord('media-resource', { id: fresh('med'), label: name, mediaKind: 'image', blob: ref as unknown as JsonObject }));
   }
