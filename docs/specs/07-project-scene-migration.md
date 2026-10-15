@@ -414,6 +414,16 @@ The next appearance extension is a separate
 [companion](07a-native-appearance-conversion-proposal.md), PO ratified 2026-10-15
 for bounded implementation. It does not change recipe-1's restrictions or identity.
 
+### 5.4 Frozen-v1 concrete companion — PROPOSED
+
+The [first frozen-v1 ProjectScene companion](07b-frozen-v1-conversion-proposal.md)
+defines a closed static-GLB/PNG input, exact source keys/identity vectors, faithful
+Scene/Caption/media/perspective-View mapping, private raw-source retention and
+exact initial-source recovery. It records the observed default-View/material-key/
+malformed-import discrepancies rather than changing the frozen contract. This is
+a reviewable compatibility proposal, not durable implementation authority or a
+passed migration/storage/profile gate. Broader initial conversion remains required.
+
 ## 6. Acceptance and historical evidence
 
 Reuse the existing source/file/session tests and grouped device acceptance:

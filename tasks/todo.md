@@ -104,6 +104,50 @@ destructive boundary. Ordinary entry and temporary iPhone HTTPS need their exist
 exact-build/route approvals. Main, Pages, Service Worker, version/license, release,
 dependency changes and private/public fixture distribution are outside this unit.
 
+### Current decision — first frozen-v1 ProjectScene recipe
+
+Outcome: self-contained frozen-v1 GLB/PNG Project ZIP → conversion preview → new
+Scenes/Caption/media/perspective Views → edit/first placement → named backup,
+Workspace/independent review and exact cold reopen. This required initial-converter
+scope is accepted; the new concrete recipe is not yet ratified. Keep durable
+conversion disabled until PO decides the [07b proposal](../docs/specs/07b-frozen-v1-conversion-proposal.md),
+as required by 05 §9 and 07 §5.2. No small user test is a development dependency.
+
+- [x] Inspect relevant frozen contracts, actual parser/reducer/source behavior and
+  existing golden boundaries without opening legacy repositories/private inputs.
+- [x] Define closed admission/mapping, every ID source key/preimage/collision rule,
+  seven identity vectors, exact Caption/inventory bytes/hash, private source
+  accounting and connected persistence/recovery acceptance. Independently review.
+- [ ] Receive PO's concrete recipe/subset decision; only then implement the one
+  connected file workflow through typed services and the existing validation UI.
+
+The proposal preserves standard identity-transform defaults, whole-input refusals,
+distinct equal-byte media, repeated attachments, source-authoritative v1 LWW and
+raw logs. Explicit default-View vs current-viewer behavior, legacy material-key
+addressing and transformed-pin semantics are recorded discrepancies, excluded
+from the first subset rather than silently resolved. The old writable importer
+and malformed-line preservation discrepancy is also recorded; this new reader
+does not modify or claim to repair it. Broad v1/Native/LociMyu conversion remains
+required, including excluded inputs and the anonymized-real-source acceptance.
+
+Two independent read-only reviews closed the model-label/identity-default,
+missing/tied ordering and null/absent anchor/default-View ambiguities. Seven ID
+vectors, the 222-byte Caption and 257-byte admitted-operation inventory were
+independently recomputed. No remaining P1/P2 or approval-blocking ambiguity.
+Document math is not renderer/runtime/real-input evidence. Local links/diff and
+retained contracts are checked; this successor is documentation-only, so it
+does not repeat the already passed Native source-tree checkpoint below.
+
+Milestone audit: preceding Native production/test tree is independently reviewed,
+fully checked and committed on g0-baseline; this successor changes only the
+proposed recipe, documentation routes and current plan. No obvious unconnected
+workflow remains within the currently approved converter recipes. Continue by
+closing this next required compatibility decision, rather than adding unrelated
+controls or retrying denied browser initialization. Managed browser observation,
+physical-device/storage/profile adoption, ordinary entry and release gates remain
+separate. Existing Projects/jobs/recipes/frozen readers and private-source export
+boundaries are unchanged; no durable v1 converter is implemented in this proposal.
+
 ### Completed implementation — Native appearance conversion/edit/file/reopen
 
 PO ratified 07a on 2026-10-15: implement its exact new recipe/profile and opaque,
