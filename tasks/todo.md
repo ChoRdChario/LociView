@@ -120,6 +120,42 @@ destructive boundary. Ordinary entry and temporary iPhone HTTPS need their exist
 exact-build/route approvals. Main, Pages, Service Worker, version/license, release,
 dependency changes and private/public fixture distribution are outside this unit.
 
+### Current implementation — first backup opening into an absent Project
+
+Outcome: named backup → content-inspected opening on an absent original Project
+→ explicit confirmation → exact full restore → edit/file handoff → selected-
+generation cold reopen. PO explicitly ratified the exact
+[06a companion](../docs/specs/06a-first-backup-open-proposal.md) on 2026-10-16.
+The prior unified-opening checkpoint is pushed at g0 f50a7fc; only the owned
+design draft remained. This approval/status/plan precedes implementation.
+
+- [x] Close the concrete P2/S2/snapshot, absence/cancellation/selection/lifetime
+  and import boundaries through independent review; empty canonical vector
+  agrees between Node and independent .NET. Record PO ratification before code.
+- [ ] Add closed first-only Prepared-2/Start-2 and phase-bound absence checks to
+  existing restore authority. Preserve ready Start-1 and all prior wire/seals.
+- [ ] Connect strict noncreating original-DB probe, recovery-only Host/catalog
+  before original opening, and unified backup confirmation/cancel/retry; no fake
+  Session/provider. Hand the same lease once to the verified selected Host.
+- [ ] Reuse service fault cases and one backup → first restore → typed edit/file
+  → selected cold flow, with terminal leftovers, unknown/probe/race/ack-loss and
+  old-ready contrasts. Record actual canonical P2/S2/successor vectors.
+- [ ] Focus/early sceneCore for new imports, independent meaningful final review,
+  frozen source/tests → one serial checkpoint/builds → HTTP identity/outgoing
+  audit → normal verified g0 commit/push.
+
+Ports: existing restoreControls/BackupRestoreJob/initializeBackup/generation
+scope and optional originalDatabasePresent/firstBackup; separate recovery-only
+open result at the selector/Host/catalog boundary, existing browser DB adapter.
+Raw database enumeration must preserve unknown/error for first-only refusal;
+do not strengthen unrelated old enumeration/readers. No UI storage writers,
+original DB/bootstrap, new Project identity/history, Workspace reinterpretation,
+new profiles/dependencies/renderer, deletion, ordinary activation or release.
+Stop only affected work for unprovable absence, unknown/partial/lost-ack evidence,
+changed lease/predecessor or a true need to weaken old-ready/Start-1 semantics.
+Existing budgets, warm-create/cold-noncreation, CAS no-repair and browser/device/
+offline/adoption exclusions remain; managed-browser denial is not retried.
+
 ### Completed implementation — one file-opening intent
 
 Outcome: select files once → inspect their actual content → either name/create a
