@@ -53,7 +53,10 @@ See inventory for individual connections and todo for executed checks and remain
 The same validation file entry connects bounded Native, frozen-v1 and LociMyu
 initial conversions. The approved frozen-v1 recipe-4 in `frozenV1Source.ts` /
 `frozenV1Mapping.ts` preserves explicit saved starting Views without changing old
-conversion domains or model profiles. `projectFiles/lociMyuSource.ts` owns raw workbook inspection,
+conversion domains or model profiles. The approved recipe-5 maps saved model
+scale/Y-or-Z-up/offset only into the binding, preserving original GLB and local
+pin coordinates; source inspection checks new5 display readiness before creation.
+`projectFiles/lociMyuSource.ts` owns raw workbook inspection,
 `lociMyuMapping.ts` verifies source identity and constructs typed records, and
 `lociMyuConversion.ts` retains the private source/receipt and validates recovery
 and explicit report export. Workspace UI exposes coarse workbook choice and the

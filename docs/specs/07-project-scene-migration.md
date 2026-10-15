@@ -424,8 +424,12 @@ malformed-import discrepancies rather than changing the frozen contract. This is
 PO-approved bounded implementation contract, not a passed migration/storage/profile
 gate. The [07f additive default-View companion](07f-frozen-v1-default-view-proposal.md)
 was ratified 2026-10-16: recipe-4 preserves frozen explicit priority and retained
-default history while keeping old domains and other exclusions fixed. Broader
-initial conversion remains required; todo owns executed evidence.
+default history while keeping old domains and other exclusions fixed. The
+[07g placement companion](07g-frozen-v1-placement-proposal.md), ratified the same
+day, adds recipe-5 for saved scale/Y-or-Z-up/offset with original GLB and model-local
+pins retained; offset applies as new Project-frame translation after scale/rotation.
+Old domains/profiles and orthographic/inline-camera/material exclusions stay fixed.
+Broader initial conversion remains required; todo owns executed evidence.
 
 ### 5.5 LociMyu concrete companion — approved bounded implementation
 

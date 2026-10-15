@@ -309,7 +309,9 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
       conversion = native ?? legacy; const n = conversion!.summary;
       conversionNote.textContent = `${native ? 'Native' : '旧LociView'}ファイル：モデル ${n.models}・シーン ${n.scenes}・キャプション ${n.captions}・メディア ${n.media}`;
       if (legacy) { const s = legacy.summary.sourceOnly;
-        conversionNote.textContent += `。元ファイルだけに保持：編集者情報 ${s.profiles}・削除済み記録 ${s.deletedRecords}・キャッシュ ${s.caches}・削除済み本体 ${s.deletedPayloads}・未使用本体 ${s.unlinkedPayloads}・面の法線 ${s.anchorNormals}`; }
+        conversionNote.textContent += `。元ファイルだけに保持：編集者情報 ${s.profiles}・削除済み記録 ${s.deletedRecords}・キャッシュ ${s.caches}・削除済み本体 ${s.deletedPayloads}・未使用本体 ${s.unlinkedPayloads}・面の法線 ${s.anchorNormals}`;
+        if ('appliedModelOffsets' in legacy.summary && legacy.summary.appliedModelOffsets > 0)
+          conversionNote.textContent += '。モデルの保存済み位置補正を適用します。旧画面では反映されていなかった配置です。'; }
       conversionPanel.hidden = false; status.textContent = ''; return;
     }
     if (lociPreview) {

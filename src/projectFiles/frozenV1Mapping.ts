@@ -2,7 +2,7 @@ import { admitProjectRecords, projectRecordMaps } from '../domain/projectRecords
 import { cloneCanonicalValue, type JsonObject, type JsonValue } from '../domain/values';
 import { digest, newId, technicalId } from '../projectMetadata/persistence';
 import { identityPlacement, sealValidationRecord, type PreparedValidationProject } from './initialProject';
-import { frozenV1Recipe, frozenV1JpegRecipe, frozenV1PhotoRecipe, frozenV1DefaultViewRecipe, type FrozenV1Recipe, sourceColor, codeOrder, type FrozenV1Plan } from './frozenV1Source';
+import { frozenV1Recipe, frozenV1JpegRecipe, frozenV1PhotoRecipe, frozenV1DefaultViewRecipe, frozenV1PlacementRecipe, frozenV1Placement, type FrozenV1Recipe, sourceColor, codeOrder, type FrozenV1Plan } from './frozenV1Source';
 import { fileError, validationGlbProfile, jpegGlbProfile, validationMetadataLimits as limits } from './validation';
 
 type Key = readonly (string | number | Key)[];
@@ -28,10 +28,10 @@ export function frozenV1ConversionIds(conversionId: string, sourceZipSha256: str
     if (!frozenV1SourceKey(prefix, key)) return fileError('変換時の識別情報が不正です。');
     const preimage = `lociview:${recipe}:id:jcs-v1\n` + JSON.stringify([conversionId, sourceZipSha256, prefix, key]);
     const sha256 = await digest(new TextEncoder().encode(preimage)), value = `${prefix}_${sha256.slice(0, 32)}`, old = entries.get(value);
-    if (old && (old.preimage !== preimage || old.sha256 !== sha256) || [frozenV1JpegRecipe, frozenV1PhotoRecipe, frozenV1DefaultViewRecipe].includes(recipe) && full.has(sha256) && full.get(sha256) !== preimage) return fileError('変換先の識別情報が衝突しました。');
+    if (old && (old.preimage !== preimage || old.sha256 !== sha256) || [frozenV1JpegRecipe, frozenV1PhotoRecipe, frozenV1DefaultViewRecipe, frozenV1PlacementRecipe].includes(recipe) && full.has(sha256) && full.get(sha256) !== preimage) return fileError('変換先の識別情報が衝突しました。');
     entries.set(value, { id: value, sha256, preimage }); full.set(sha256, preimage); return value;
   };
-  return { id, report: () => [frozenV1JpegRecipe, frozenV1PhotoRecipe, frozenV1DefaultViewRecipe].includes(recipe) ? [...entries.values()].sort((a, b) => codeOrder(a.id, b.id)) : [...entries.values()] };
+  return { id, report: () => [frozenV1JpegRecipe, frozenV1PhotoRecipe, frozenV1DefaultViewRecipe, frozenV1PlacementRecipe].includes(recipe) ? [...entries.values()].sort((a, b) => codeOrder(a.id, b.id)) : [...entries.values()] };
 }
 const rank = (n: number) => `A${n.toString(36).padStart(8, '0')}`;
 
@@ -68,7 +68,8 @@ export async function mapFrozenV1Project(plan: FrozenV1Plan, conversionId: strin
     add('assetRevisionsById', await sealValidationRecord('asset-revision', { id: revisionId, assetId, representationIds: [representationId],
       anchorCompatibilityClasses: [{ id: compatibilityId, targetVariantFamilyIds: [familyId] }],
       provenance: { origin: 'import', sourceMediaType: body.ref.mediaType, inputBlobDigests: [body.ref.digest] } }));
-    add('assetBindingsById', await sealValidationRecord('asset-binding-revision', { id: bindingId, assetId, assetRevisionId: revisionId, assetToProject: identityPlacement(), method: 'import' }));
+    add('assetBindingsById', await sealValidationRecord('asset-binding-revision', { id: bindingId, assetId, assetRevisionId: revisionId,
+      assetToProject: plan.recipe === frozenV1PlacementRecipe ? frozenV1Placement(body.record.fields.transform) : identityPlacement(), method: 'import' }));
     add('assetsById', { id: assetId, label: body.record.fields.originalName as string, assetFrameId, status: { kind: 'ready', activeBindingId: bindingId },
       ...(body.record.fields.pinScale === undefined ? {} : { pinScale: body.record.fields.pinScale as number }), lifecycle: await active('ast', ['asset', s]) });
     models.set(s, { assetId, assetFrameId, revisionId, compatibilityId });

@@ -10,7 +10,7 @@ import { checkContentFacts } from '../domain/projectContentChecks';
 import { readProjectScene } from '../scene/projectProvider';
 import { readValidationBody } from './content';
 import { readValidationInitialRecord, writeValidationInitial, validationInitialOrigin } from './creation';
-import { frozenV1Recipe, frozenV1JpegRecipe, frozenV1PhotoRecipe, frozenV1DefaultViewRecipe, type FrozenV1Recipe, inspectFrozenV1Source, byteProof, type FrozenV1Plan } from './frozenV1Source';
+import { frozenV1Recipe, frozenV1JpegRecipe, frozenV1PhotoRecipe, frozenV1DefaultViewRecipe, frozenV1PlacementRecipe, type FrozenV1Recipe, inspectFrozenV1Source, byteProof, type FrozenV1Plan } from './frozenV1Source';
 import { mapFrozenV1Project, frozenV1SourceKey, type FrozenV1MappingEntry } from './frozenV1Mapping';
 import type { PngDecoder } from './png';
 import type { JpegDecoder } from './jpeg';
@@ -26,7 +26,7 @@ interface ConversionReceipt {
 const receiptPath = (fs: ProjectWorkspaceFS) => metadataPath(fs, 'frozen-v1-conversion.json');
 const sourcePath = (fs: ProjectWorkspaceFS) => metadataPath(fs, 'frozen-v1-conversion-source.zip');
 export const hasFrozenV1Conversion = async (fs: ProjectWorkspaceFS, checkBoundInitial = true) => !!await fs.readStream(receiptPath(fs)) || !!await fs.readStream(sourcePath(fs)) ||
-  checkBoundInitial && [frozenV1Recipe, frozenV1JpegRecipe, frozenV1PhotoRecipe, frozenV1DefaultViewRecipe].includes(await validationInitialOrigin(fs) as FrozenV1Recipe);
+  checkBoundInitial && [frozenV1Recipe, frozenV1JpegRecipe, frozenV1PhotoRecipe, frozenV1DefaultViewRecipe, frozenV1PlacementRecipe].includes(await validationInitialOrigin(fs) as FrozenV1Recipe);
 const fail = () => fileError('旧形式の変換記録が不足しているか一致しません。保持した記録は上書きしていません。');
 
 async function checkReceipt(r: ConversionReceipt, projectId: string) {
@@ -34,7 +34,7 @@ async function checkReceipt(r: ConversionReceipt, projectId: string) {
   const proof = (p: unknown): boolean => keys(p, ['byteLength', 'digest']) && Number.isSafeInteger((p as ConversionReceipt['original']).byteLength) &&
     (p as ConversionReceipt['original']).byteLength > 0 && /^[0-9a-f]{64}$/.test((p as ConversionReceipt['original']).digest);
   if (!keys(r, ['recipe', 'conversionId', 'projectId', 'original', 'initial', 'fingerprints', 'inventory', 'mapping', 'report']) ||
-    ![frozenV1Recipe, frozenV1JpegRecipe, frozenV1PhotoRecipe, frozenV1DefaultViewRecipe].includes(r.recipe) || !/^[0-9a-f]{32}$/.test(r.conversionId) || r.projectId !== projectId || projectId !== `prj_${r.conversionId}` ||
+    ![frozenV1Recipe, frozenV1JpegRecipe, frozenV1PhotoRecipe, frozenV1DefaultViewRecipe, frozenV1PlacementRecipe].includes(r.recipe) || !/^[0-9a-f]{32}$/.test(r.conversionId) || r.projectId !== projectId || projectId !== `prj_${r.conversionId}` ||
     !proof(r.original) || !keys(r.initial, ['byteLength', 'digest', 'proof']) || !proof({ byteLength: r.initial.byteLength, digest: r.initial.digest }) ||
     !Array.isArray(r.mapping) || !r.mapping.length) return fail();
   const ids = new Set<string>();

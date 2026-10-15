@@ -18,7 +18,8 @@ export const frozenV1Recipe = 'v1-project-scene-migration-recipe-1';
 export const frozenV1JpegRecipe = 'v1-project-scene-migration-recipe-2';
 export const frozenV1PhotoRecipe = 'v1-project-scene-migration-recipe-3';
 export const frozenV1DefaultViewRecipe = 'v1-project-scene-migration-recipe-4';
-export type FrozenV1Recipe = typeof frozenV1DefaultViewRecipe | typeof frozenV1PhotoRecipe | typeof frozenV1Recipe | typeof frozenV1JpegRecipe;
+export const frozenV1PlacementRecipe = 'v1-project-scene-migration-recipe-5';
+export type FrozenV1Recipe = typeof frozenV1PlacementRecipe | typeof frozenV1DefaultViewRecipe | typeof frozenV1PhotoRecipe | typeof frozenV1Recipe | typeof frozenV1JpegRecipe;
 export const codeOrder = (a: string, b: string) => a < b ? -1 : a > b ? 1 : 0;
 export const byteProof = async (bytes: Uint8Array) => ({ byteLength: bytes.length, digest: await digest(bytes) });
 const fail = () => fileError('この旧形式ファイルの設定は、まだそのまま変換できません。');
@@ -29,6 +30,54 @@ export const sourceColor = (value: unknown) => {
 };
 const text = (value: unknown): string => typeof value === 'string' ? value : fail();
 const vector = (value: unknown) => fileVector(value, 3);
+
+/** Recipe-5's normative serialized constants: validate, never renormalize them. */
+export function frozenV1Placement(value: unknown) {
+  const t = value === undefined ? {} : closed(value, ['scale', 'upAxis', 'offset']);
+  const uniformScale = t.scale === undefined ? 1 : fileNumber(t.scale), axis = t.upAxis ?? 'Y';
+  if (uniformScale <= 0 || !['Y', 'Z'].includes(axis as string) || t.upAxis === null) return fail();
+  return { translation: t.offset === undefined ? [0, 0, 0] : vector(t.offset), uniformScale,
+    rotationXYZW: axis === 'Z' ? [-0.7071067811865475, 0, 0, 0.7071067811865475] : [0, 0, 0, 1] };
+}
+const nonidentity = (placement: ReturnType<typeof frozenV1Placement>) => placement.uniformScale !== 1 ||
+  placement.rotationXYZW[0] !== 0 || placement.translation.some(n => n !== 0);
+
+/** Mirror the display's Matrix4.compose / Vector3.applyMatrix4, including q residue. */
+function finiteProjectPoint(point: readonly number[], placement: ReturnType<typeof frozenV1Placement>) {
+  const [x, y, z, w] = placement.rotationXYZW as [number, number, number, number], s = placement.uniformScale;
+  const x2 = x + x, y2 = y + y, z2 = z + z, xx = x * x2, xy = x * y2, xz = x * z2,
+    yy = y * y2, yz = y * z2, zz = z * z2, wx = w * x2, wy = w * y2, wz = w * z2;
+  const [px, py, pz] = point as [number, number, number], t = placement.translation;
+  const projected = [
+    ((1 - (yy + zz)) * s) * px + ((xy - wz) * s) * py + ((xz + wy) * s) * pz + t[0]!,
+    ((xy + wz) * s) * px + ((1 - (xx + zz)) * s) * py + ((yz - wx) * s) * pz + t[1]!,
+    ((xz - wy) * s) * px + ((yz + wx) * s) * py + ((1 - (xx + yy)) * s) * pz + t[2]!,
+  ];
+  if (!projected.every(Number.isFinite)) fail();
+}
+/** New5 only: scalar readiness checks matching the current runtime camera guard. */
+function checkPlacementReadiness(models: readonly FrozenV1Body[], captions: readonly EntityRecord[], views: readonly EntityRecord[]) {
+  const placements = new Map(models.map(m => [m.record.id, frozenV1Placement(m.record.fields.transform)]));
+  for (const model of models) {
+    const b = model.model!.bounds, p = placements.get(model.record.id)!;
+    for (const x of [b.min[0]!, b.max[0]!]) for (const y of [b.min[1]!, b.max[1]!]) for (const z of [b.min[2]!, b.max[2]!]) finiteProjectPoint([x, y, z], p);
+  }
+  for (const caption of captions) {
+    const a = caption.fields.anchor;
+    if (a && Object.hasOwn(a as object, 'position')) {
+      const anchor = fileObject(a); finiteProjectPoint(vector(anchor.position), placements.get(text(anchor.modelAssetId))!);
+    }
+  }
+  for (const view of views) {
+    const c = fileObject(view.fields.cameraState), eye = vector(c.eye), target = vector(c.target), up = vector(c.up);
+    const direction = target.map((n, i) => n - eye[i]!), length = Math.hypot(...direction), norm = Math.hypot(...up);
+    if (!Number.isFinite(length) || !length || Math.abs(norm - 1) > 1e-12) fail();
+    const d = direction.map(n => n / length), cross = [up[1]! * d[2]! - up[2]! * d[1]!, up[2]! * d[0]! - up[0]! * d[2]!, up[0]! * d[1]! - up[1]! * d[0]!];
+    const fov = fileNumber(c.fov) * Math.PI / 180;
+    if (Math.hypot(...cross) <= 1e-12 || !Number.isFinite(fov) || fov <= 0 || fov >= Math.PI) fail();
+    sourceColor(view.fields.background);
+  }
+}
 
 function checkSourceFields(op: Op, limits: FileValidationLimits) {
   const fields: Record<string, string[]> = {
@@ -47,11 +96,7 @@ function checkSourceFields(op: Op, limits: FileValidationLimits) {
   }
   if (op.e === 'asset') {
     if (v.kind !== undefined && !['model', 'image'].includes(text(v.kind))) fail();
-    if (v.transform !== undefined) {
-      const t = closed(v.transform, ['scale', 'upAxis', 'offset']);
-      if (t.scale !== undefined && t.scale !== 1 || t.upAxis !== undefined && t.upAxis !== 'Y' ||
-        t.offset !== undefined && vector(t.offset).some(n => n !== 0)) fail();
-    }
+    if (v.transform !== undefined) frozenV1Placement(v.transform);
     if (v.pinScale !== undefined && (fileNumber(v.pinScale) < 0.001 || Number(v.pinScale) > 1000)) fail();
     if (v.size !== undefined && (!Number.isSafeInteger(v.size) || Number(v.size) < 0)) fail();
     if (v.sha256 !== undefined && !/^[0-9a-f]{64}$/.test(text(v.sha256))) fail();
@@ -81,15 +126,16 @@ function checkSourceFields(op: Op, limits: FileValidationLimits) {
 }
 
 export interface FrozenV1Body { record: EntityRecord; ref: StoredBlobRef; bytes: Uint8Array; model?: ValidatedGlb }
-export interface FrozenV1Plan {
-  recipe: FrozenV1Recipe;
+interface FrozenV1PlanBase {
   manifest: ProjectManifest; models: readonly FrozenV1Body[]; media: readonly FrozenV1Body[];
   scenes: readonly EntityRecord[]; captions: readonly EntityRecord[]; views: readonly EntityRecord[];
   fingerprints: readonly { path: string; role: string; byteLength: number; digest: string }[];
   inventory: { count: number; byteLength: number; digest: string };
-  report: { models: number; scenes: number; captions: number; media: number; originalExcludedFromExports: true;
-    sourceOnly: { profiles: number; deletedRecords: number; caches: number; deletedPayloads: number; unlinkedPayloads: number; anchorNormals: number } };
 }
+interface FrozenV1Report { models: number; scenes: number; captions: number; media: number; originalExcludedFromExports: true;
+  sourceOnly: { profiles: number; deletedRecords: number; caches: number; deletedPayloads: number; unlinkedPayloads: number; anchorNormals: number } }
+export type FrozenV1Plan = FrozenV1PlanBase & ({ recipe: typeof frozenV1PlacementRecipe; report: FrozenV1Report & { appliedModelOffsets: number } } |
+  { recipe: Exclude<FrozenV1Recipe, typeof frozenV1PlacementRecipe>; report: FrozenV1Report });
 
 /** Read only, owned bytes and complete raw accounting; never the legacy writable importer. */
 export async function inspectFrozenV1Source(input: Blob, limits: FileValidationLimits, decode?: PngDecoder, jpeg?: JpegDecoder, photo?: PhotoDecoder): Promise<{ plan: FrozenV1Plan; original: Uint8Array } | null> {
@@ -186,6 +232,13 @@ export async function inspectFrozenV1Source(input: Blob, limits: FileValidationL
   fingerprints.sort((a, b) => codeOrder(a.path, b.path));
   // A historical nonnull default binds the new domain even if it later loses or its Set is deleted.
   const explicitDefaultHistory = ops.some(op => op.e === 'set' && op.v && Object.hasOwn(op.v, 'defaultViewId') && op.v.defaultViewId !== null);
-  return { original, plan: { recipe: explicitDefaultHistory ? frozenV1DefaultViewRecipe : media.some(m => m.ref.mediaType === 'image/webp' || m.ref.mediaType === 'image/gif') ? frozenV1PhotoRecipe : models.some(m => m.model?.jpeg) || media.some(m => m.ref.mediaType === 'image/jpeg') ? frozenV1JpegRecipe : frozenV1Recipe, manifest, models, media, scenes, captions, views, fingerprints, inventory,
-    report: { models: models.length, scenes: scenes.length, captions: captions.length, media: media.length, sourceOnly, originalExcludedFromExports: true } } };
+  const placementHistory = ops.some(op => op.e === 'asset' && op.v?.transform !== undefined && nonidentity(frozenV1Placement(op.v.transform)));
+  const base = { manifest, models, media, scenes, captions, views, fingerprints, inventory },
+    report: FrozenV1Report = { models: models.length, scenes: scenes.length, captions: captions.length, media: media.length, sourceOnly, originalExcludedFromExports: true };
+  if (placementHistory) {
+    checkPlacementReadiness(models, captions, views);
+    const appliedModelOffsets = models.filter(m => frozenV1Placement(m.record.fields.transform).translation.some(n => n !== 0)).length;
+    return { original, plan: { ...base, recipe: frozenV1PlacementRecipe, report: { ...report, appliedModelOffsets } } };
+  }
+  return { original, plan: { ...base, recipe: explicitDefaultHistory ? frozenV1DefaultViewRecipe : media.some(m => m.ref.mediaType === 'image/webp' || m.ref.mediaType === 'image/gif') ? frozenV1PhotoRecipe : models.some(m => m.model?.jpeg) || media.some(m => m.ref.mediaType === 'image/jpeg') ? frozenV1JpegRecipe : frozenV1Recipe, report } };
 }

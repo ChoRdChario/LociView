@@ -29,6 +29,8 @@ The approved JPEG photo/embedded-texture extension now preserves original metada
 through direct creation/addition, conversion, file exchange and generation restore.
 Frozen-v1 explicit starting Views now survive conversion, file handoff and
 selected-generation restore/edit/cold reopen under the approved recipe-4.
+Its additive recipe-5 also preserves saved model placement and model-local pins,
+with explicit disclosure when applying the formerly ignored offset.
 The approved WebP/GIF companion connects the same photo workflow with original
 Blob animation behavior and four additive conversion domains; GLB profiles stay fixed.
 The named last-Project resume and guarded Project/file switching connection now
@@ -112,23 +114,61 @@ destructive boundary. Ordinary entry and temporary iPhone HTTPS need their exist
 exact-build/route approvals. Main, Pages, Service Worker, version/license, release,
 dependency changes and private/public fixture distribution are outside this unit.
 
-### Current decision — frozen-v1 model placement
+### Completed implementation — frozen-v1 model placement
 
-The next connected outcome is nonidentity model placement with its model-local
-pins → conversion → edit/file handoff → selected-generation restore/edit/cold.
-The exact [07g proposal](../docs/specs/07g-frozen-v1-placement-proposal.md) is
-**PROPOSED, unratified and not implemented**. Applying saved offset as Project-frame
-translation can move a model compared with the old viewer, which ignored offset;
-this is the explicit PO compatibility decision before source implementation.
-The proposal, fixed canonical quaternion, four independently calculated identity
-vectors and recovery/privacy boundaries have independent review without P1/P2.
-Documentation-only checks: four vectors agree with independent calculations;
-all 66 local links in the four-document change resolve, and tested runtime hashes
-are unchanged. No runtime verification is claimed for the proposed recipe.
-Next: obtain that one ratification; do not implement the new recipe before it.
-Old recipes/profiles, all-retained orthographic refusal, inline camera and
-material/renderer exclusions remain. No new numerical kernel or evidence-fence
-relaxation is proposed.
+PO ratified the exact [07g companion](../docs/specs/07g-frozen-v1-placement-proposal.md)
+on 2026-10-16. Outcome: nonidentity model placement with its model-local pins →
+inspect/confirm conversion → edit/file handoff → selected-generation restore/edit/
+cold reopen. Applying saved offset as Project-frame translation can move a model
+compared with the old viewer, which ignored offset; that compatibility decision
+is approved. Fixed canonical quaternion and four identity vectors have independent
+review and calculations; approval alone is not implementation evidence.
+
+- [x] Record ratification and the bounded plan before source implementation;
+  actual g0-baseline starts clean at pushed 8b70056.
+- [x] Add all-retained nonidentity dispatch, exact binding mapping and new5-only
+  derived finite/runtime-camera guards with captured receipt/origin recovery.
+- [x] Connect the conditional offset consequence/count and cancel/no-write;
+  reuse service faults and one scaled-Z/offset-pin edit/file/restore/edit/cold flow.
+- [x] Independently review, freeze source/tests, run the required final serial
+  checkpoint and HTTP identity, and audit the suitable g0 checkpoint.
+
+Ports: existing frozen source/plan/map, initial/origin receipts, conditional
+conversion preview and typed Session/content/file/generation services. No new
+module/import boundary is planned; private conversion scalar checks must mirror
+accepted runtime conditions without importing harness/UI. Preserve raw GLB and
+model-local pins, old recipes1–4/profiles/jobs, all-retained ortho and inline-camera
+refusal, material exclusions, exact captured-initial proof and warm retry fences.
+No dependency, renderer, numeric kernel, ordinary-entry/adoption/deploy or public
+fixture change. Stop affected work only for a real new authority/contract decision
+or managed permission; no known denied browser bootstrap retry or workaround.
+
+Focused evidence: 36 service/preview/fault cases passed (8.45s test time). The final
+related group passes 41 cases (32.81s), including the corrected pin-only overflow
+fixture, old camera/report baseline, all-retained/current/atomic placement, four
+goldens/collision/order, MIME/profile independence, fully rebound false binding,
+report-count/source mutation, independent-origin loss/downgrade and completed edits.
+The one added connected variant combines scale2/Z/offset, unchanged raw GLB/local
+pin, Project point approximately [10.5,20,29], all-Scene membership, perspective
+entry, named backup/Workspace/review and actual selected-generation restore/edit/
+cold. A test-only readonly review-model field assumption was corrected after
+typecheck; no product change was needed. Root and both read-only reviews have no
+remaining P1/P2. No new module/import boundary requires a new isolation allowlist.
+Final serial evidence: typecheck, all 116 test files (2,576 passed, 21 existing
+todo; 898.87s) and all three builds pass, exit 0 in
+`placement-checkpoint-2026-10-16.log`. All six source/test hashes still match
+`placement-tested-tree-2026-10-16.json`. The existing localhost:4182 helper verifies
+all seven validation files byte-for-byte; manifest SHA-256
+`5d09d957c7a4e1e030a973abca1d087e94a17c47f8750239350754bf00e42e2a`.
+This is HTTP identity only; Node/recorded DOM are not browser/GPU/device/offline or
+anonymized-real-source evidence. Git owns checkpoint and remote identity.
+
+Next: close the already approved input/save recovery workflow (PROD-16/F10/H02):
+fresh unsupported photo → preserve original and select a separate device-written
+JPEG → continue the same Caption; read-only site storage estimate → return to
+existing save/retry. Record its narrow UI/port acceptance before code. Retained
+converter reports/recipes/profiles, durable retry and pending adoption gates stay
+fixed; no new decoder, persistence permission, cleanup or storage authority.
 
 ### Completed implementation — frozen-v1 explicit default View
 
@@ -207,8 +247,8 @@ build files match HTTP on the existing localhost:4182 helper; manifest SHA-256
 `396da9e22b3e542f72883be23cf2a59ea02a2011ba5917e7afdbc61a758ebc07`.
 This is HTTP identity only; browser/GPU/device/offline evidence is unchanged.
 
-The next compatibility decision is recorded above. Its unratified proposal review
-found that orthographic
+The placement successor and its ratification are recorded above. Its earlier
+proposal review found that orthographic
 span/zoom is absent and JavaScript hypot/tan approximation cannot by itself bind
 portable exact rederived records. Keep ortho refusal and that numeric-policy
 question open; do not add a math kernel or weaken evidence fences. Inline camera

@@ -8,7 +8,8 @@ The bounded integrated UI is selected by `editor=project` in validation; follow
 todo for its tested scope and remaining ordinary-entry/browser/device boundaries.
 The last-Project hint is optional UI advice, not Project authority; explicit URL
 selection wins and actual opening must succeed before the named resume notice.
-Frozen-v1 explicit starting Views use only the approved additive 07f recipe; its
+Frozen-v1 explicit starting Views and model placement use the approved additive
+07f/07g recipes, preserving original GLB and model-local pin coordinates; their
 exact tested scope and remaining conversion/adoption work remain in todo/inventory.
 
 ## Resume safely

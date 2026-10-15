@@ -1,11 +1,13 @@
 # Frozen-v1 model placement conversion companion
 
-Status: **PROPOSED — unratified, not implemented or adopted.**
+Status: **PO ratified 2026-10-16 — approved for bounded implementation, not adoption.**
 This connected companion extends [07b](07b-frozen-v1-conversion-proposal.md),
 [07d](07d-jpeg-project-scene-proposal.md), [07e](07e-webp-gif-project-scene-proposal.md)
 and [07f](07f-frozen-v1-default-view-proposal.md) only as specified below.
-It requires exact PO ratification before implementation. [Todo](../../tasks/todo.md)
-owns current implementation/evidence; this proposal gives no release credit.
+The PO approved this exact companion after independent review. [Todo](../../tasks/todo.md)
+owns current implementation/evidence; ratification gives no release credit.
+The bounded nondefault validation route is implemented and checkpoint-tested;
+broader conversion and browser/device/adoption evidence remain open in todo.
 
 ## Outcome and the compatibility decision
 
@@ -19,7 +21,7 @@ agree with the source pin coordinates; transforming pins again would be wrong.
 Its setter does not apply the recorded offset. The source contract does not fix
 offset's frame or addition order.
 
-**Proposed decision:** apply saved offset as translation in the new Project frame,
+**Ratified decision:** apply saved offset as translation in the new Project frame,
 after rotation and scale. Models and their pins can therefore move compared with
 the old viewer. Disclose this effect before confirmation. Cancel preserves the
 input and writes no Project. Scale/Y-or-Z-up keep their existing geometric meaning;
@@ -86,7 +88,7 @@ These checks belong only to new recipe-5, never old recipe-1/2/3/4.
 
 ## One additive domain, conditional disclosure and exact IDs
 
-Propose exactly `v1-project-scene-migration-recipe-5`. Select it iff any retained
+Use exactly `v1-project-scene-migration-recipe-5`. Select it iff any retained
 model transform differs from the previously admitted identity subset 1/Y/[0,0,0].
 Historical overwritten/deleted values count for this immutable domain selection.
 Otherwise preserve recipe-4 explicit-default-history priority, then recipe-3/2/1
@@ -172,5 +174,6 @@ or anonymized-real-source acceptance.
 
 Independently review the meaningful diff and run one required final serial
 checkpoint plus HTTP build identity at the connected source/test boundary.
-Stop affected work for a real new authority/contract conflict. **Implementation
-of this proposal is prohibited until its exact PO ratification.**
+Stop affected work for a real new authority/contract conflict. The exact PO
+ratification authorizes this bounded implementation and its relevant checks and
+fixes without renewed approval; ordinary entry and adoption gates remain binding.

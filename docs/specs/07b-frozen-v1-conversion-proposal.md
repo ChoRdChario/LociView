@@ -240,10 +240,12 @@ defaults and inline defaultCameraState. The separately named
 [07f companion](07f-frozen-v1-default-view-proposal.md), PO ratified 2026-10-16,
 adds faithful explicit default mapping without reinterpreting those old domains.
 Inline camera meaning remains unresolved and refused.
-The material-key/address mapping and nonidentity transforms remain outside these
-recipes. Current scale/Y-or-Z-up applies to both models and model-local pins;
-the unresolved transform difference is offset (its frame/order is unspecified and
-the old viewer does not apply it). Orthographic saved zoom/span and inline camera
+Material-key/address mapping remains outside these recipes. Nonidentity placement
+stays outside recipes1–4; the [07g companion](07g-frozen-v1-placement-proposal.md),
+PO ratified 2026-10-16, adds recipe-5. Scale/Y-or-Z-up still applies to models and
+model-local pins; its explicit new decision applies offset as Project translation
+after scale/rotation, unlike the old viewer which ignored it. Original source
+fields and local coordinates stay unchanged. Orthographic saved zoom/span and inline camera
 meaning also need an explicit companion, not a silent frozen-contract rewrite.
 Orthographic reconstruction additionally needs a portable exact-record numerical
 policy; a runtime hypot/tan expression alone does not establish that policy.
