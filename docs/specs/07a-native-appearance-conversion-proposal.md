@@ -1,14 +1,20 @@
 # Native appearance conversion companion
 
-Status: **PROPOSED — requires PO ratification; not implemented or adopted.**
-Prepared 2026-10-15. This is the next bounded extension of
+Status: **PO ratified 2026-10-15 — approved for bounded implementation, not adoption.**
+PO authorized this exact recipe/profile/subset after independent review. Code and
+executed evidence are recorded in todo; approval alone is not implementation.
+The exact opaque/opacity-1/disabled-chroma path is now implemented in the isolated
+validation composition and exercised through product edit, file exchange/review
+and cold recovery with synthetic GLB/PNG, memory storage and recorded DOM. See
+todo for final checks; browser/GPU/device/offline adoption remains pending.
+This is the next bounded extension of
 [07 §5.3](07-project-scene-migration.md#53-concrete-first-native-companion--po-approved-2026-09-21),
 not a change to the approved recipe-1. Current work and evidence stay in
 [todo](../../tasks/todo.md).
 
 ## Decision and user outcome
 
-Ratify `native-project-scene-recipe-2` and the separate development profile below
+The approved boundary is `native-project-scene-recipe-2` and the separate development profile below
 for Native GLB/PNG backups containing representable material adjustments. The
 user can convert shading/sidedness adjustments and retain disabled chroma
 parameters, then edit, save, exchange and reopen the new Project. Source files,
@@ -19,7 +25,7 @@ The first subset deliberately excludes fractional opacity and active chroma.
 Those remain required later work: Native replaces material opacity whereas the
 target multiplies source coverage; even zero Native feather is soft chroma.
 They require another versioned admission/mapping companion and the applicable
-renderer evidence. This proposal does not change a gate or approve a numeric
+renderer evidence. This companion does not change a gate or approve a numeric
 rendering/performance guarantee, dependency, ordinary entry or deployment.
 
 ## Closed input subset
@@ -56,7 +62,7 @@ inspection/rendering behavior; this is not wider material-edit admission.
 
 ## Occurrence profile and addresses
 
-Candidate ID: `development-validation-glb-occurrence-1`. Its exact profile text
+Approved development ID: `development-validation-glb-occurrence-1`. Its exact profile text
 is the single ASCII line in the following block, UTF-8 without BOM or final LF:
 
 ```text
@@ -243,7 +249,7 @@ hex characters. Hashes include the full recipe prefix and LF.
 | `evt`, `['initial-event','ovr',['mesh-appearance',M]]` | 235 | `dc927f6982fca7244f5b5beffabf6bc55eda7ef68b834eea96517da8cabcebad` |
 | `tag`, `['tag','記録']` | 175 | `8f6b117eb0f5c1f6fe150fda62b2646a9c6ce3c8390697c8896edd706e8ebfe0` |
 
-## Connected implementation and acceptance after ratification
+## Connected implementation and acceptance
 
 Implement one Native-file → preview → confirmed conversion → Scene-specific
 material inspection/edit → named backup/Workspace → independent reopen workflow.

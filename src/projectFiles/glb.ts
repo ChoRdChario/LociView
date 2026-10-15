@@ -9,6 +9,7 @@ export interface ValidatedGlb {
   readonly bounds: { min: number[]; max: number[] };
   readonly materials: readonly JsonObject[];
   readonly surfaceRanges: readonly JsonObject[];
+  readonly occurrences?: readonly { nodeIndex: number; primitiveIndex: number; materialIndex: number | null; slotIndex: number }[];
 }
 /** Own container checks: legacy parseGlb accepts duplicate/truncated chunks and is not admission. */
 export function validationGlbParts(bytes: Uint8Array, limits: FileValidationLimits) {

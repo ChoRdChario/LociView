@@ -104,13 +104,74 @@ destructive boundary. Ordinary entry and temporary iPhone HTTPS need their exist
 exact-build/route approvals. Main, Pages, Service Worker, version/license, release,
 dependency changes and private/public fixture distribution are outside this unit.
 
-### Active unit — concrete Native appearance compatibility proposal
+### Completed implementation — Native appearance conversion/edit/file/reopen
+
+PO ratified 07a on 2026-10-15: implement its exact new recipe/profile and opaque,
+opacity-1, disabled-chroma subset, retaining recipe-1 and existing files/jobs.
+Outcome: Native material-adjusted GLB/PNG backup → conversion preview → Scene-local
+material editing → named backup/Workspace → independent reopen/cold recovery.
+
+- [x] Connect exact occurrence profile inspection/decoder and catalog facts through
+  content, display and standalone review, preserving old profile behavior.
+- [x] Connect recipe-2 material mapping and bounded private witness with exact
+  persist/cold/completed retry; preserve raw source outside ordinary outputs.
+- [x] Exercise representative product material/file flow and invariant/fault cases,
+  independently review, run final serial checks and push a suitable checkpoint.
+
+Ports/import boundary before implementation: `projectFiles/glbOccurrences.ts`
+consumes owned inspected GLB bytes and returns derived catalog, exact decoded
+root/provenance rows and a disposer. It may use Three/GLTFLoader and existing
+viewer resource disposal, but no UI, Session or storage. Native conversion owns
+receipt/mapping I/O; content derives ordinary receiver facts from profile+body.
+The harness renderer uses those checked locators, with per-occurrence clone
+ownership only on the new profile. Viewer code gains no package/storage imports.
+No directory-wide isolation allowlist, global bootstrap/profile change, old job
+reinterpretation, fractional-opacity/active-chroma admission, ordinary entry or
+deployment. Real-browser acceptance remains pending below; it does not block
+isolated authorized implementation. Stop for a real contract discrepancy or new
+compatibility/adoption authority, not each helper or missing manual observation.
+
+Focused evidence: eight Native appearance cases pass, including actual pinned-Three
+association/occurrence clones, numeric/profile/identity vectors, interrupted exact
+initialization, completed retry retaining edits, missing/wrong witness and recipe
+downgrade refusal, unsupported whole-input refusal, and product material editing
+across Scenes → named backup/independent Workspace/review → exact cold reopen.
+The broader focused Native/old-shared-slot run passed 14 cases before the final
+Scene/witness assertions. Independent production and workflow review is complete;
+the receipt-downgrade P2 was corrected and re-reviewed, with no remaining P1/P2.
+Final serial `npm run check:checkpoint` passed on the frozen 13 source/test paths:
+typecheck, 114 test files / 2,380 tests passed with 21 existing todo, and normal,
+harness and validation builds. Log: local ignored
+`.artifacts/traces/native-appearance-checkpoint-2026-10-15.log`; tree fingerprints:
+`.artifacts/traces/native-appearance-tested-tree-2026-10-15.json`. Earlier focused
+product/receipt/type errors are retained beside them as corrected failure evidence.
+Staging unchanged source/test and later documentation do not require another run.
+
+The local static validation server serves all seven newly built files with exact
+byte/length matches; candidate manifest SHA-256 is
+`d0489321834374949ac2924c8bbc5bd53750c3a69ce6f6cd675b3dc64e5ca5c8`.
+Validation output has no SW/webmanifest/samples. This is HTTP build identity only,
+not browser/GPU/input/offline evidence. The protected-runtime rejection below
+still blocks that observation; physical iOS and adoption/release remain pending.
+
+Milestone audit: g0-baseline at the preceding documentation checkpoint; only the
+approved Native appearance workflow, focused evidence and its status records are
+selected. No dependency, ordinary entry, deployment or public-fixture changes.
+Independent receipt/provenance/workflow reviews found no remaining P1/P2 after
+the correction. Existing approved converter subsets are now connected; the next
+required outcome is a concrete frozen-v1 initial-conversion recipe decision.
+Keep broader Native material/profile and LociMyu work required, and the browser
+denial confined to its evidence lane. Push this suitable development checkpoint
+under the existing authorization; Git owns its identity.
+
+### Completed decision — Native appearance compatibility companion
 
 Outcome: make the next required migration decision reviewable: exact new companion
 and occurrence-profile identities, faithful material-address/numeric mapping,
 whole-input refusals and connected implementation/acceptance. Existing Native
-recipe-1 and every retained Project/job stay unchanged. This is a PROPOSED contract,
-not ratification, implementation or renderer/profile adoption.
+recipe-1 and every retained Project/job stay unchanged. At its documentation
+checkpoint this was a PROPOSED contract; PO has since ratified the bounded
+implementation above. That checkpoint alone was not implementation or adoption.
 
 - [x] Verify current Native material behavior against the target contract; define
   the representable bounded source subset and remaining renderer evidence.
@@ -130,18 +191,17 @@ arithmetic/helper comparison is not rendering evidence. Local links/diff and old
 contract consistency are checked; product source/tests are unchanged, so no
 runtime suite/build is repeated for this documentation-only checkpoint.
 
-Next: PO ratification of this concrete new recipe/profile/subset, then one
-connected conversion/edit/backup/exchange/reopen implementation. Do not treat the
-earlier fresh-map2 approval as approval of this compatibility extension. The
+Decision received: PO explicitly ratified this concrete new recipe/profile/subset;
+its connected implementation is tracked above. The earlier fresh-map2 approval
+was not used as approval of this compatibility extension. The
 remaining browser block below requires an environment approval change, not another
 request for the user's already-granted Chrome permission.
 
-Milestone audit: clean product checkpoint already pushed; this turn changes only
-the proposal, documentation links and current task record. Browser acceptance remains
+Proposal-checkpoint audit: the preceding product checkpoint was already pushed;
+that checkpoint changed only the proposal, documentation links and task record. Browser acceptance remains
 blocked below, with no substitute claimed. Initial Native migration is already in
-scope; a new appearance mapping/profile requires explicit PO ratification under
-07 §5.2–5.3 and 05 §9. No new parser, renderer, storage, receipt or source rewrite
-will be implemented while that decision is pending.
+scope; the new appearance mapping/profile required explicit PO ratification under
+07 §5.2–5.3 and 05 §9, now received. No implementation preceded that decision.
 
 ### Pending acceptance — grouped Chrome verification of the integrated candidate
 

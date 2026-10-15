@@ -11,8 +11,9 @@ import type { MetadataMediaPort } from '../projectMetadata/session';
 import { digest, newId } from '../projectMetadata/persistence';
 import type { StoredBlobRef } from '../projectMetadata/blobStore';
 import { inspectValidationGlb, type ValidatedGlb } from './glb';
+import { inspectOccurrenceGlb } from './glbOccurrences';
 import { inspectValidationPng, type PngDecoder } from './png';
-import { fileError, fileObject, validationGlbProfile, validationMetadataLimits, type FileValidationLimits } from './validation';
+import { fileError, fileObject, validationGlbProfile, occurrenceGlbProfile, validationMetadataLimits, type FileValidationLimits } from './validation';
 import { identityPlacement, prepareValidationModel, sealValidationRecord, validationFileLabel, type ValidationFile } from './initialProject';
 
 export async function readValidationBody(file: WorkspaceReadableFile, maxBytes: number): Promise<Uint8Array> {
@@ -70,7 +71,7 @@ export class ValidationContent implements MetadataMediaPort {
     await this.store.put(new Blob([body.bytes.slice().buffer]).stream(), body.ref.mediaType, body.ref);
   }
   private async modelDeclaration(record: JsonObject): Promise<JsonObject> {
-    if (!same(record.formatProfile, await validationGlbProfile()) || record.contentKind !== 'mesh' || record.role !== 'meshPrimary' ||
+    if ((!same(record.formatProfile, await validationGlbProfile()) && !same(record.formatProfile, await occurrenceGlbProfile())) || record.contentKind !== 'mesh' || record.role !== 'meshPrimary' ||
       !same(record.representationToAsset, { ...identityPlacement(), reflection: 'none' }) ||
       !same(record.purposes, ['source', 'display']) && !same(record.purposes, ['display']) ||
       !same(record.derivedFrom, [])) return fileError('保存したモデルの形式を確認できません。');
@@ -81,7 +82,8 @@ export class ValidationContent implements MetadataMediaPort {
   async model(record: JsonObject, readOnly = false): Promise<ValidatedGlb> {
     await this.checkRead?.();
     const blob = await this.modelDeclaration(record);
-    const model = await inspectValidationGlb(await readValidationBody(await (readOnly ? this.store.openReadOnly(blob) : this.store.open(blob)), this.limits.maxFileBytes), this.limits, this.decode);
+    const inspect = same(record.formatProfile, await occurrenceGlbProfile()) ? inspectOccurrenceGlb : inspectValidationGlb;
+    const model = await inspect(await readValidationBody(await (readOnly ? this.store.openReadOnly(blob) : this.store.open(blob)), this.limits.maxFileBytes), this.limits, this.decode);
     await this.checkRead?.(); return model;
   }
   private imageDeclaration(record: JsonObject): JsonObject {
@@ -109,7 +111,8 @@ export class ValidationContent implements MetadataMediaPort {
     if (request.fact === 'media') {
       await inspectValidationPng(bytes, this.limits, this.decode); return this.execute(request, { image: bytes });
     }
-    return this.execute(request, { model: await inspectValidationGlb(bytes, this.limits, this.decode) });
+    const inspect = same(record.formatProfile, await occurrenceGlbProfile()) ? inspectOccurrenceGlb : inspectValidationGlb;
+    return this.execute(request, { model: await inspect(bytes, this.limits, this.decode) });
   }
   /** Fresh facts for a new record reusing an already verified body; no receipt creation here. */
   inspectStored(request: ContentRequest) { return this.execute(request, undefined, true); }

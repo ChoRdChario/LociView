@@ -43,6 +43,7 @@
 | project-scene memory／旧 `storage=saved` | 合成の2人チーム、更新・競合・独立copy・保存の限定ループ | 新metadata serviceまたは実ファイル製品wireの接続済み |
 | project-scene `storage=metadata` | 新source/repository/session/journalと従来25群＋C07/V04の合成UI接続、限定履歴受信・明示解消 | 任意モデル／任意画像／実ファイルのチーム受信／通常home／offlineの合格 |
 | project-scene `storage=validation` | 静的GLB/PNG Projectの作成・一覧・再開、実本体read/renderと編集、限定Workspace/Contributionの実file入出力・中断復旧、名前付きbackup出力と確認付き復元・復元後の編集／返送、独立コピー出力・入力・編集／再開、選択Sceneの閲覧用出力・内容由来のstandalone View、明示確認した編集コピー・中断復旧・編集／再開。実行結果はtodo参照 | 通常home、正式profile／任意形式、実描画／実入力／実機／offlineの受入れ、全purpose／移行の完成 |
+| 同じvalidationのNative初回変換 | GLB/PNG限定のrecipe-1に加え、承認済み07aのrecipe-2で不透明な元材質・不透明度1・クロマ無効の陰影／両面設定と無効中のパラメータを保持。面ごとの対応を検証し、Scene別の材質編集→名前付きbackup／独立Workspace／閲覧用file→cold再開を自動確認。元ZIP／私的対応表は通常出力に含めない。実行結果はtodo参照 | Native移行全体、半透明／有効クロマ、他profile／exchange、実GPU／実機／offlineの合格、正式profile採用 |
 | 同じvalidationの `editor=project` | Scene／Caption／ピン／PNGと、モデル・保存した視点・材質の4作業タブを接続。GLB追加／差替／配置、一時表示／所属／重複解消、視点・背景、Project／Scene材質、登録PNGの整理と共通viewerに加え、複数Caption比較窓の移動・サイズ変更・個別終了・接続線、確認付きCaption削除と明示的な親モデル変更を統合。新規作成は承認済みmap2を明示選択し、Scene別追加色・Shift／空欄からの数値配置・Captionからのowner再表示・Asset全Scene共通のピン倍率・保存状態とhelpも統合。既存Project／復旧中jobの形式は保持。保存・受渡し・受信・復元serviceを共有。対象ごとの自動検証・cold再開と未確認事項はtodo参照 | 全機能の移植、通常home、実描画・実入力・実機・offlineの合格。旧editorは保持し、分類件数は増やさない |
 
 ## 2. 全機能群

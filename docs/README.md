@@ -21,7 +21,7 @@ record executed evidence and connections; do not infer those from a document tit
 | Project/Scene team work and TEAM-FLOW-01 | [specification 05](specs/05-project-scene-team-workflow.md), especially §§7.5, 12.6, 13.2 |
 | Workspace, Contribution, backup, review, clean copy | [specification 06](specs/06-project-package-wire.md), especially §§8, 11–12 and section-local status |
 | One-time Native/v1/LociMyu conversion and cutover | [specification 07](specs/07-project-scene-migration.md); continued old-format updates were withdrawn by PO 2026-09-14; initial mapping/compatibility remains to be closed |
-| Next Native material conversion decision, not implemented | [PROPOSED appearance companion](specs/07a-native-appearance-conversion-proposal.md); new recipe/profile and bounded input subset require PO ratification |
+| Approved bounded Native material conversion | [Appearance companion](specs/07a-native-appearance-conversion-proposal.md); recipe-2/profile/subset approved 2026-10-15; implementation/evidence remain in todo |
 | UI intent, writing, visual tone and interaction | [UI product guidelines](ui-product-guidelines.md); [UI task mapping](../tasks/uiux-handoff.md) for historical audit evidence |
 | Ownership, license or sponsorship | [licensing](licensing-and-ownership.md), [sponsorship](sponsorship-policy.md); direction is not adoption or a license grant |
 

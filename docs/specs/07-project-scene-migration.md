@@ -411,8 +411,8 @@ case; final code checks/review run once at the connected outcome. Human checks
 stay grouped with the existing static build/adoption boundary.
 
 The next appearance extension is a separate
-[PROPOSED companion](07a-native-appearance-conversion-proposal.md), pending PO
-ratification. It does not change this approved recipe's restrictions or identity.
+[companion](07a-native-appearance-conversion-proposal.md), PO ratified 2026-10-15
+for bounded implementation. It does not change recipe-1's restrictions or identity.
 
 ## 6. Acceptance and historical evidence
 

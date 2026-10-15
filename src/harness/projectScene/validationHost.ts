@@ -164,7 +164,7 @@ export async function openValidationHost(options: ValidationHostOptions) {
       const before = await session.read(), entries = await new TransactionJournal(fs, limits).entries();
       if (before.state === 'empty' && !localInitial) throw Error('作業一式を選択するか、プロジェクト一覧へ戻ってください。');
       const initializing = before.state === 'empty' || entries.length === 1 && entries[0]!.start.purpose === 'initialize' && !entries[0]!.publication && before.state !== 'ready';
-      const result = await ready(initializing && await hasNativeConversion(fs) ? await resumeNativeConversion(fs, options.store, session, options.fileLimits, `prj_${run}`) :
+      const result = await ready(initializing && await hasNativeConversion(fs) ? await resumeNativeConversion(fs, options.store, session, options.fileLimits, `prj_${run}`, options.decode) :
         before.state === 'empty' && options.initial ? await options.initial.persist(fs, options.store, session) :
         initializing ? await resumeValidationCreation(fs, session, `prj_${run}`) : await session.retry());
       content.releasePreparedImages(); content.releasePreparedModels(); return result;

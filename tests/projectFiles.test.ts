@@ -10,8 +10,9 @@ import { OriginBlobStore } from '../src/projectMetadata/blobStore';
 import type { MetadataStorageFactory } from '../src/projectMetadata/repository';
 import { MetadataRepository } from '../src/projectMetadata/repository';
 import { digest, newId, json, underWriteLease } from '../src/projectMetadata/persistence';
-import { validationMetadataLimits as metadata, type FileValidationLimits } from '../src/projectFiles/validation';
+import { validationMetadataLimits as metadata, occurrenceGlbProfile, occurrenceGlbProfileText, type FileValidationLimits } from '../src/projectFiles/validation';
 import { inspectValidationGlb, validationGlbParts } from '../src/projectFiles/glb';
+import { inspectOccurrenceGlb, decodeOccurrenceGlb } from '../src/projectFiles/glbOccurrences';
 import { inspectValidationPng } from '../src/projectFiles/png';
 import { prepareValidationProject } from '../src/projectFiles/initialProject';
 import { prepareValidationCreation, resumeValidationCreation, validationProjectService } from '../src/projectFiles/creation';
@@ -100,7 +101,7 @@ import { ContributionReceiveJob } from '../src/projectPackage/contributionReceiv
 import { remoteEvidenceBytes } from '../src/projectMetadata/packageRemote';
 import { Uint8ArrayReader, Uint8ArrayWriter, ZipWriter } from '@zip.js/zip.js';
 import { prepareNativeConversion, resumeNativeConversion } from '../src/projectFiles/nativeConversion';
-import { nativeConversionIds } from '../src/projectFiles/nativeMapping';
+import { nativeConversionIds, nativeAppearanceRecipe } from '../src/projectFiles/nativeMapping';
 
 const budget: FileValidationLimits = { maxFileBytes: 1_000_000, maxJsonBytes: 100_000, maxItems: 10_000, maxValues: 100_000, maxPixels: 10_000 };
 const png = Uint8Array.from(atob(fixtureMedia[0]!.base64), c => c.charCodeAt(0));
@@ -143,9 +144,9 @@ function storageFactory() {
   return factory;
 }
 /** Native source bytes built here only; no private files or external sample distribution. */
-async function nativeConversionFile(change: (snapshot: any) => void = () => {}, badBody = false) {
+async function nativeConversionFile(change: (snapshot: any) => void = () => {}, badBody = false, modelBytes = glb()) {
   const id = (prefix: string, n: number) => `${prefix}_${n.toString().padStart(26, '0')}`;
-  const model = glb(), blob = { algorithm: 'sha256', digest: await digest(model), byteLength: model.length, mediaType: 'model/gltf-binary' };
+  const model = modelBytes.slice(), blob = { algorithm: 'sha256', digest: await digest(model), byteLength: model.length, mediaType: 'model/gltf-binary' };
   const imageBlob = { algorithm: 'sha256', digest: await digest(png), byteLength: png.length, mediaType: 'image/png' };
   const set = id('set', 0), second = id('set', 2);
   const snapshot: any = { format: 'lociview-native-project-snapshot', schemaVersion: 1, snapshotId: id('snp', 1), generation: 1,
@@ -183,6 +184,18 @@ async function nativeConversionFile(change: (snapshot: any) => void = () => {}, 
   for (const m of manifest.media) await add(m.entry, png);
   return new Blob([(await writer.close()).slice().buffer]);
 }
+async function nativeAppearanceFile(change: (snapshot: any) => void = () => {}, model = glb(j => {
+  j.nodes.push({ mesh: 0, translation: [-3, 0, 0] }); j.scenes[0].nodes.push(1);
+})) {
+  return nativeConversionFile(s => {
+    const asset = s.assets.find((a: any) => a.label === '建物'), rep = s.representations.find((r: any) => r.assetId === asset.id), revision = s.assetRevisions.find((r: any) => r.assetId === asset.id);
+    s.meshMaterialAppearances = s.displaySets.map((set: any, i: number) => ({ id: `mat_${String(i + 1).padStart(26, '0')}`,
+      displaySetId: set.id, assetId: asset.id, authoredAssetRevisionId: revision.id, representationId: rep.id, materialSlotKey: 'm/0/0',
+      opacity: 1, doubleSided: i === 0, unlit: i === 0,
+      chroma: { enabled: false, colorSrgb: [0.5 / 255, 1.5 / 255, 254.5 / 255], tolerance: 0.3, feather: 0 } }));
+    change(s);
+  }, false, model);
+}
 class TestFS extends MemoryFS {
   reject = (_: string) => false; reads = 0;
   override async writeText(path: string, text: string) { if (this.reject(path)) throw Error('injected quota'); return super.writeText(path, text); }
@@ -210,6 +223,79 @@ async function openFileCaption(modelBytes = glb()) {
 }
 
 describe('limited real-format validation (synthetic GLB bytes, injected PNG decoder, memory storage)', () => {
+  it('Native appearance conversion fixes the approved recipe-2 identity vectors and distinct occurrence locators', async () => {
+    expect(new TextEncoder().encode(occurrenceGlbProfileText)).toHaveLength(1198);
+    expect(await occurrenceGlbProfile()).toEqual({ id: 'development-validation-glb-occurrence-1', specificationSha256: '9bbf1243a3786d54a6439104614c46e502a3cdfa20dc9e9d610ee1da42cf059f' });
+    const ids = nativeConversionIds('0'.repeat(32), '1'.repeat(64), nativeAppearanceRecipe);
+    for (const [prefix, key, bytes, sha] of [
+      ['cap', ['caption', 'cap_00000000000000000000000001'], 203, '85c0e680cf0491cdcb521fec8af712ec2cac1c23f95dac35aae47505f20db4a8'],
+      ['slot', ['material-occurrence', 'rep_00000000000000000000000001', 0, 0], 220, 'dd4b486ecc4c8241a8addd75570baddc31c82c22b1e74892f6f49d1549397572'],
+      ['slot', ['material-occurrence', 'rep_00000000000000000000000001', 1, 0], 220, 'e0f336959c1452758cce2ad54045e8aec6c2ec30f4e30146b2ff2b953dfdf5cb'],
+      ['ovr', ['mesh-appearance', 'mat_00000000000000000000000001'], 211, '643aa03e4d714d507eb5d542a2efbee8b82d070689a52e6b2859ecd1ac2d8df5'],
+      ['evt', ['initial-event', 'ovr', ['mesh-appearance', 'mat_00000000000000000000000001']], 235, 'dc927f6982fca7244f5b5beffabf6bc55eda7ef68b834eea96517da8cabcebad'],
+      ['tag', ['tag', '記録'], 175, '8f6b117eb0f5c1f6fe150fda62b2646a9c6ce3c8390697c8896edd706e8ebfe0'],
+    ] as const) {
+      const id = await ids.id(prefix, key), row = ids.report().find(r => r.id === id)!;
+      expect(row.sha256).toBe(sha); expect(new TextEncoder().encode(row.preimage)).toHaveLength(bytes); expect(id).toBe(`${prefix}_${sha.slice(0, 32)}`);
+    }
+    const bytes = glb(j => { const p = j.meshes[0].primitives[0]; j.meshes[0].primitives.push({ attributes: { POSITION: 0 } }, { ...p });
+      j.nodes.push({ mesh: 0, translation: [-3, 0, 0] }); j.scenes[0].nodes.push(1); });
+    const source = await inspectOccurrenceGlb(bytes, budget, decode), decoded = await decodeOccurrenceGlb(source);
+    try {
+      expect(source.materials).toHaveLength(6); expect(decoded.occurrenceSlots.map(r => [r.nodeIndex, r.primitiveIndex, r.slotIndex])).toEqual([[0, 0, 0], [0, 1, 1], [0, 2, 2], [1, 0, 3], [1, 1, 4], [1, 2, 5]]);
+      expect(new Set(decoded.occurrenceSlots.map(r => r.node.material)).size).toBe(6);
+      expect(decoded.occurrenceSlots.map(r => r.childPath)).toEqual([[0, 0], [0, 1], [0, 2], [1, 0], [1, 1], [1, 2]]);
+      expect(source.bytes).toEqual(bytes); expect(decoded.materialLocators.size).toBe(6);
+    } finally { decoded.dispose(); }
+  });
+  it('Native appearance conversion retains exact witness and latent values through interrupted initialization, retry and later edits', async () => {
+    const file = await nativeAppearanceFile(), input = await file.arrayBuffer();
+    const prepared = await prepareNativeConversion(file, budget, decode), initial = await prepared!.create();
+    const fs = new TestFS(), locks = lockManager(), storage = storageFactory();
+    const store = new OriginBlobStore(fs, { maxBlobBytes: budget.maxFileBytes, maxChunkBytes: 1_000_000, maxChunks: 10000, metadata }, locks);
+    const own = validationProjectService(fs, storage, store, budget, decode), projectId = initial.source.proof.identity.projectId as string;
+    fs.reject = p => p.endsWith('/published.json'); await expect(initial.persist(fs, store, own.session)).rejects.toThrow('quota'); fs.reject = () => false;
+    const path = (await fs.list('')).find(p => p.endsWith('/native-conversion.json'))!, receiptBytes = await fs.readBytes(path), receipt = JSON.parse(new TextDecoder().decode(receiptBytes!));
+    expect(receipt.recipe).toBe(nativeAppearanceRecipe); expect(receipt.materialWitness).toHaveLength(4);
+    const oldIds = nativeConversionIds(receipt.conversionId, receipt.original.digest); await oldIds.id('cap', ['caption', 'cap_00000000000000000000000001']);
+    const downgraded = { ...receipt, recipe: 'native-project-scene-recipe-1', mapping: oldIds.report() }; delete downgraded.materialWitness;
+    const cold = validationProjectService(fs, storage, store, budget, decode);
+    await fs.writeBytes(path, new TextEncoder().encode(json(downgraded)));
+    await expect(resumeNativeConversion(fs, store, cold.session, budget, projectId, decode)).rejects.toThrow('材質変換の版');
+    expect(JSON.parse(new TextDecoder().decode((await fs.readBytes(path))!))).toEqual(downgraded);
+    await fs.writeBytes(path, receiptBytes!);
+    const ready = await resumeNativeConversion(fs, store, cold.session, budget, projectId, decode);
+    expect(ready.source!.originalChanges()).toEqual(initial.source.originalChanges()); expect(await fs.readBytes(path)).toEqual(receiptBytes);
+    const p = ready.provider!; if (p.kind !== 'scene-provider') throw Error('provider');
+    const appearances = Object.values(p.details.mutable.materialOverridesById).map(fields => fields.appearance);
+    expect(appearances).toHaveLength(2);
+    for (const a of appearances) expect(a).toMatchObject({ kind: 'value', value: { opacity: 1, chroma: { enabled: false, keyColorSrgb: [0, 1 / 255, 1], tolerance: 0.3 / Math.sqrt(3), softness: 0.0001 / Math.sqrt(3) } } });
+    const captionId = Object.keys(p.resources.captions)[0]!, edited = await cold.session.edit(ready.source!.token, { kind: 'editCaption', captionId, edits: { body: '材質変換後の編集' } });
+    expect((await initial.persist(fs, store, cold.session)).source!.originalChanges()).toEqual(edited.source!.originalChanges());
+    await fs.writeBytes(path, new TextEncoder().encode(json(downgraded)));
+    await expect(resumeNativeConversion(fs, store, cold.session, budget, projectId, decode)).rejects.toThrow('材質変換の版');
+    for (const change of [(r: typeof receipt) => { delete r.materialWitness[0].childPath; },
+      (r: typeof receipt) => { r.materialWitness[0].childPath = [1]; }]) {
+      const broken = structuredClone(receipt); change(broken);
+      await fs.writeBytes(path, new TextEncoder().encode(json(broken)));
+      await expect(resumeNativeConversion(fs, store, cold.session, budget, projectId, decode)).rejects.toThrow('対応表');
+      expect(JSON.parse(new TextDecoder().decode((await fs.readBytes(path))!))).toEqual(broken);
+      expect((await cold.session.read()).source!.token).toBe(edited.source!.token);
+    }
+    expect((await cold.session.read()).source!.token).toBe(edited.source!.token); expect(await file.arrayBuffer()).toEqual(input);
+  });
+  it.each(['opacity', 'chroma', 'slot', 'family', 'source-alpha'] as const)('Native appearance conversion refuses the whole unsupported %s input', async kind => {
+    const bytes = glb(j => { if (kind === 'source-alpha') j.materials[0].alphaMode = 'BLEND'; });
+    const file = await nativeAppearanceFile(s => {
+      const a = s.meshMaterialAppearances[1];
+      if (kind === 'opacity') a.opacity = 0.5;
+      if (kind === 'chroma') a.chroma.enabled = true;
+      if (kind === 'slot') a.materialSlotKey = 'm/99/0';
+      if (kind === 'family') { const r = s.representations.find((r: any) => r.id === a.representationId), id = `rep_${'3'.padStart(26, '0')}`;
+        s.representations.push({ ...r, id }); s.assetRevisions.find((r: any) => r.id === a.authoredAssetRevisionId).representationIds.push(id); }
+    }, bytes), before = await file.arrayBuffer();
+    await expect(prepareNativeConversion(file, budget, decode)).rejects.toThrow(); expect(await file.arrayBuffer()).toEqual(before);
+  });
   it('Native conversion fixes the four approved scoped identity vectors', async () => {
     const ids = nativeConversionIds('0'.repeat(32), '1'.repeat(64));
     for (const [prefix, key, length, sha] of [
@@ -1499,14 +1585,15 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       fileLimits: budget, decode, packageLocks: r.locks, openStorage: async () => ({ factory: r.factory, dispose: async () => {} }) };
     return { ...r, f, run, options };
   }
-  async function productWorkspaceFixture(includeInitial = false, duplicateModels = false, withTag = false, profile: 'map1' | 'map2' = 'map1') {
-    const r = firstWorkspaceRecipient(), run = newId(), captionId = `cap_${newId()}`;
+  async function productWorkspaceFixture(includeInitial = false, duplicateModels = false, withTag = false, profile: 'map1' | 'map2' = 'map1',
+    initial?: NonNullable<Parameters<typeof openValidationHost>[0]['initial']>) {
+    const r = firstWorkspaceRecipient(), run = initial ? (initial.source.proof.identity.projectId as string).slice(4) : newId(), captionId = `cap_${newId()}`;
     const options = { run, base: r.fs, coordinator: ProjectMutationCoordinator.browser(r.locks), store: r.store,
       fileLimits: budget, decode, packageLocks: r.locks, openStorage: async () => ({ factory: r.factory, dispose: async () => {} }) };
-    // Start this workflow from one real GLB, without unrelated prior receive/replacement histories.
-    const prepared = structuredClone(await prepareValidationProject({ run, title: '統合画面の検証', models: [{ label: 'モデル', bytes: glb() }],
+    // Use an admitted conversion or one fresh GLB, without unrelated receive/replacement histories.
+    const prepared = initial ? undefined : structuredClone(await prepareValidationProject({ run, title: '統合画面の検証', models: [{ label: 'モデル', bytes: glb() }],
       media: includeInitial ? [{ label: '受信画像', bytes: png }] : [] }, budget, decode));
-    if (includeInitial) {
+    if (includeInitial && prepared) {
       const project = prepared.records.project as JsonObject, sceneId = project.defaultSceneId!;
       const active = () => ({ state: 'active', eventId: `evt_${newId()}`, reason: 'initial' });
       (prepared.records.captionsById as Record<string, JsonObject>)[captionId] = { id: captionId, title: '最初の記録', body: '', colorSrgb: [1, 0, 0],
@@ -1520,9 +1607,9 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
         (prepared.records.captionTagMembershipsById as Record<string, JsonObject>)[edgeId] = { id: edgeId, captionId, tagId, lifecycle: active() };
       }
     }
-    if (duplicateModels) { const edges = prepared.records.sceneAssetMembershipsById as Record<string, JsonObject>, first = Object.values(edges)[0]!, id = `sam_${newId()}`;
+    if (duplicateModels && prepared) { const edges = prepared.records.sceneAssetMembershipsById as Record<string, JsonObject>, first = Object.values(edges)[0]!, id = `sam_${newId()}`;
       edges[id] = { ...first, id, orderKey: 'B' }; }
-    const host = await openValidationHost({ ...options, initial: prepareValidationCreation(prepared, profile) });
+    const host = await openValidationHost({ ...options, initial: initial ?? prepareValidationCreation(prepared!, profile) });
     const file = includeInitial ? await host.workspaceOutput.download(await host.workspaceOutput.generate(host.read().source!.token)) : undefined;
     const f = { ...r, run, options, f: { captionId, file } };
     const legacy = vi.spyOn(host.authority, 'write').mockImplementation(() => { throw Error('product UI must dispatch typed commands'); });
@@ -1576,6 +1663,66 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       proposePin: (...args: Parameters<NonNullable<Parameters<ViewportFactory>[2]>>) => proposePin?.(...args),
       proposeModel: (...args: Parameters<NonNullable<Parameters<ViewportFactory>[3]>>) => proposeModel?.(...args) };
   }
+  it('Native appearance conversion connects product editing, occurrence clones, named backup, independent Workspace/review and exact cold reopen', async () => {
+    const input = await nativeAppearanceFile(), inputBytes = await input.arrayBuffer();
+    const initial = await (await prepareNativeConversion(input, budget, decode))!.create();
+    const h = await productWorkspaceFixture(false, false, false, 'map2', initial), { host, editor, button, named, edited } = h;
+    const sceneId = h.display()!.sceneId, visible = h.display()!.models[0]!; if (visible.shape !== 'saved-glb') throw Error('saved model');
+    const model = host.authority.read().modelVersions!.find(v => v.assetId === visible.binding.assetId)!, c = model.closure;
+    if (c.shape !== 'saved-glb') throw Error('saved model');
+    const slots = validationMaterialSlots(c), slot = slots.find(s => s.locator.slotIndex === 0)!, other = slots.find(s => s.locator.slotIndex === 1)!;
+    const effects = () => h.display()!.savedMaterials![model.assetId]!;
+    expect(effects()[slot.target.logicalMaterialSlotId]).toMatchObject({ appearance: { lighting: 'unlit', doubleSided: true } });
+    expect(effects()[slot.target.logicalMaterialSlotId]).not.toHaveProperty('appearance.chroma');
+    expect(effects()[other.target.logicalMaterialSlotId]).toBeUndefined();
+    const residents = await prepareValidationResidents(host.authority.read().modelVersions!, host.content);
+    const surface = residents.create(c, effects()), plain = residents.create(c);
+    const materials = (root: THREE.Object3D) => { const result: THREE.Material[] = []; root.traverse(n => { if (n instanceof THREE.Mesh) result.push(n.material); }); return result; };
+    const changed = materials(surface.mesh), originals = materials(plain.mesh);
+    expect(changed[0]).toBeInstanceOf(THREE.MeshBasicMaterial); expect(changed[0]!.side).toBe(THREE.DoubleSide);
+    expect(changed[1]).toBeInstanceOf(THREE.MeshStandardMaterial); expect(changed[1]!.side).toBe(THREE.FrontSide);
+    expect(originals.every(m => m instanceof THREE.MeshStandardMaterial && m.side === THREE.FrontSide)).toBe(true);
+    expect(new Set([...changed, ...originals]).size).toBe(4); surface.dispose!(); plain.dispose!(); residents.dispose();
+
+    button('材質', editor).fire('click'); const panel = named('材質の作業', editor), target = named('モデル', panel);
+    target.value = model.assetId; target.fire('change'); const face = named('面', panel);
+    face.value = face.children.find(n => n.textContent === '面の材質 1')!.value; face.fire('change');
+    button('設定を編集', panel).fire('click'); expect(named('照明', panel).value).toBe('unlit'); expect(named('表示する面', panel).value).toBe('double');
+    named('照明', panel).value = 'lit'; named('照明', panel).fire('change');
+    named('表示する面', panel).value = 'front'; named('表示する面', panel).fire('change'); await edited(() => button('変更を適用', panel).fire('click'));
+    expect(effects()[slot.target.logicalMaterialSlotId]).toMatchObject({ appearance: { lighting: 'lit', doubleSided: false } });
+    expect(effects()[other.target.logicalMaterialSlotId]).toBeUndefined(); expect(h.legacy).not.toHaveBeenCalled();
+    button('全体', named('シーン', editor)).fire('click');
+    expect(h.display()!.sceneId).not.toBe(sceneId);
+    expect(effects()[slot.target.logicalMaterialSlotId]).toMatchObject({ appearance: { lighting: 'inherit', doubleSided: false } });
+    button('観察', named('シーン', editor)).fire('click'); expect(h.display()!.sceneId).toBe(sceneId);
+    expect(effects()[slot.target.logicalMaterialSlotId]).toMatchObject({ appearance: { lighting: 'lit', doubleSided: false } });
+    const provider = host.read().provider!; if (provider.kind !== 'scene-provider') throw Error('provider');
+    const raw = Object.values(provider.details.mutable.materialOverridesById).map(r => r.appearance);
+    expect(raw).toHaveLength(2); for (const a of raw) expect(a).toMatchObject({ kind: 'value', value: { chroma: { enabled: false,
+      keyColorSrgb: [0, 1 / 255, 1], tolerance: 0.3 / Math.sqrt(3), softness: 0.0001 / Math.sqrt(3) } } });
+    const source = host.read().source!, backupId = await host.workspaceOutput.generateBackup(source.token, '材質の保存');
+    const backup = await BackupArchive.inspect(await host.workspaceOutput.download(backupId), metadata);
+    expect(backup.source.originalChanges()).toEqual(source.originalChanges());
+    expect(host.workspaceOutput.jobs.find(j => j.id === backupId)!.label).toBe('材質の保存');
+    const workspace = await host.workspaceOutput.download(await host.workspaceOutput.generate(source.token)), peer = firstWorkspaceRecipient();
+    expect((await peer.receiver.importWorkspace(workspace)).state).toBe('ready');
+    expect((await peer.session.read()).source!.originalChanges()).toEqual(source.originalChanges());
+    expect((await peer.fs.list('')).some(p => p.includes('native-conversion'))).toBe(false);
+    const review = await prepareReviewView(await host.workspaceOutput.download(await host.workspaceOutput.generateReview(source.token, { sceneId })), budget, decode);
+    expect(review.models).toHaveLength(1); expect(review.models[0]!.representation.formatProfile).toEqual(await occurrenceGlbProfile());
+    const reviewedEffects = review.display(null, null).savedMaterials![review.models[0]!.assetId]!;
+    expect(Object.values(reviewedEffects)).toEqual(Object.values(effects()));
+    const readonly = await prepareReadonlyResidents(review.models, review.content), viewed = readonly.create(review.models[0]!, reviewedEffects);
+    expect(materials(viewed.mesh).every(m => m instanceof THREE.MeshStandardMaterial && m.side === THREE.FrontSide)).toBe(true);
+    viewed.dispose!(); readonly.dispose();
+    for (const archive of [backup.archive, (await WorkspaceArchive.inspect(workspace, metadata)).archive, review.inspection.archive])
+      expect(archive.control.entries.some(e => /native|conversion/.test(e.path))).toBe(false);
+    expect(await input.arrayBuffer()).toEqual(inputBytes); await h.ui.dispose();
+    const cold = await openValidationHost(h.f.options); expect(cold.read().source!.originalChanges()).toEqual(source.originalChanges());
+    expect(cold.authority.read().modelVersions!.map(v => v.closure.representation.formatProfile)).toEqual([await occurrenceGlbProfile(), await occurrenceGlbProfile()]);
+    await cold.dispose();
+  });
   it('connects colored Shift and numeric pins, local owner reveal, map2 scale retry and exact cold resume', async () => {
     const h = await productWorkspaceFixture(false, false, false, 'map2'), { host, editor, named, button, all, edited } = h;
     const canvas = named('3Dモデルの表示', editor), color = named('追加色', editor), before = host.read().source!.token;

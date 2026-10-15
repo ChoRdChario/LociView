@@ -1,24 +1,34 @@
 import { nativeCaptionDisplaySetIdV1, nativeCaptionOwnerAssetIdV1, nativeDisplaySetsV1, nativeSavedViewDisplaySetIdV1,
   NATIVE_DEFAULT_DISPLAY_SET_ID, type NativeProjectSnapshotV1 } from '../nativeGs/schema';
 import { nativeCaptionNeedsReviewV1, resolveNativeGsSliceV1 } from '../nativeGs/resolver';
+import { nativeMaterialSlotKey } from '../nativeGs/materialSlots';
 import { admitProjectRecords, projectRecordMaps } from '../domain/projectRecords';
 import { cloneCanonicalValue, type JsonObject, type JsonValue } from '../domain/values';
 import { digest, newId, technicalId } from '../projectMetadata/persistence';
 import { sealValidationRecord, type PreparedValidationProject } from './initialProject';
 import type { ValidatedGlb } from './glb';
-import { fileError, validationGlbProfile, validationMetadataLimits as limits } from './validation';
+import type { DecodedOccurrenceSlot } from './glbOccurrences';
+import { fileError, validationGlbProfile, occurrenceGlbProfile, validationMetadataLimits as limits } from './validation';
 
 export const nativeConversionRecipe = 'native-project-scene-recipe-1';
+export const nativeAppearanceRecipe = 'native-project-scene-recipe-2';
+export type NativeConversionRecipe = typeof nativeConversionRecipe | typeof nativeAppearanceRecipe;
+export interface NativeMaterialWitness {
+  nativeRepresentationId: string; sourceGlbSha256: string; childPath: readonly number[]; materialArraySlot: 0;
+  nodeIndex: number; primitiveIndex: number; sourceMaterialIndex: number | null; slotIndex: number;
+  targetRepresentationId: string; targetProfile: JsonObject; targetMaterialLayoutId: string; targetLogicalMaterialSlotId: string;
+}
+export type NativeOccurrence = Omit<DecodedOccurrenceSlot, 'node'>;
 type SourceKey = readonly (string | number | SourceKey)[];
 export interface NativeMappingEntry { id: string; sha256: string; preimage: string }
 /** One conversion's collision registry; original identity, not text similarity, owns each key. */
-export function nativeConversionIds(conversionId: string, sourceZipSha256: string) {
+export function nativeConversionIds(conversionId: string, sourceZipSha256: string, recipe: NativeConversionRecipe = nativeConversionRecipe) {
   technicalId(conversionId);
   if (!/^[0-9a-f]{64}$/.test(sourceZipSha256)) return fileError('変換元の識別情報が不正です。');
   const entries = new Map<string, NativeMappingEntry>();
   const byPreimage = new Map<string, string>();
   const id = async (prefix: string, key: SourceKey) => {
-    const preimage = `lociview:${nativeConversionRecipe}:id:jcs-v1\n` + JSON.stringify([conversionId, sourceZipSha256, prefix, key]);
+    const preimage = `lociview:${recipe}:id:jcs-v1\n` + JSON.stringify([conversionId, sourceZipSha256, prefix, key]);
     const existing = byPreimage.get(preimage); if (existing) return existing;
     const sha256 = await digest(new TextEncoder().encode(preimage)), value = `${prefix}_${sha256.slice(0, 32)}`, old = entries.get(value);
     if (old && (old.sha256 !== sha256 || old.preimage !== preimage)) return fileError('変換先の識別情報が衝突しました。');
@@ -28,10 +38,24 @@ export function nativeConversionIds(conversionId: string, sourceZipSha256: strin
 }
 const rank = (n: number) => `A${n.toString(36).padStart(8, '0')}`;
 const copy = (value: unknown) => cloneCanonicalValue(value, limits) as JsonObject;
+export function nativeAppearanceIntent(a: NonNullable<NativeProjectSnapshotV1['meshMaterialAppearances']>[number]) {
+  const quantize = (c: number) => {
+    const x = c < 0.04045 ? c * 0.0773993808 : Math.pow(c * 0.9478672986 + 0.0521327014, 2.4);
+    const y = x < 0.0031308 ? x * 12.92 : 1.055 * Math.pow(x, 0.41666) - 0.055;
+    return Math.round(255 * Math.min(1, Math.max(0, y))) / 255;
+  };
+  return { appearance: { opacity: a.opacity, doubleSided: a.doubleSided, lighting: a.unlit ? 'unlit' : 'inherit',
+    chroma: { enabled: a.chroma.enabled, keyColorSrgb: a.chroma.colorSrgb.map(quantize),
+      tolerance: a.chroma.tolerance / Math.sqrt(3), softness: Math.max(a.chroma.feather, 0.0001) / Math.sqrt(3) } },
+    compositing: { coverage: { policy: 'inherit' }, optics: 'inherit' } };
+}
 
 /** Exact §5.3 mapper; no filename matching, normalization, model selection or storage writes. */
-export async function mapNativeProject(snapshot: NativeProjectSnapshotV1, models: ReadonlyMap<string, ValidatedGlb>, conversionId: string, sourceSha256: string) {
-  const ids = nativeConversionIds(conversionId, sourceSha256), id = ids.id;
+export async function mapNativeProject(snapshot: NativeProjectSnapshotV1, models: ReadonlyMap<string, ValidatedGlb>, conversionId: string, sourceSha256: string,
+  sourceWitness?: ReadonlyMap<string, readonly NativeOccurrence[]>) {
+  const recipe: NativeConversionRecipe = snapshot.meshMaterialAppearances?.length ? nativeAppearanceRecipe : nativeConversionRecipe;
+  if (recipe === nativeAppearanceRecipe && !sourceWitness) return fileError('元の材質の対応記録が不足しています。');
+  const ids = nativeConversionIds(conversionId, sourceSha256, recipe), id = ids.id;
   const one = (prefix: string, name: string, source: string) => id(prefix, [name, source]);
   const asset = (s: string) => one('ast', 'asset', s), revision = (s: string) => one('rev', 'revision', s), binding = (s: string) => one('bnd', 'binding', s);
   const rep = (s: string) => one('rep', 'representation', s), frame = (s: string) => one('frm', 'frame', s), scene = (s: string) => one('scn', 'display-set', s);
@@ -44,23 +68,37 @@ export async function mapNativeProject(snapshot: NativeProjectSnapshotV1, models
   records.identity = { projectId: `prj_${conversionId}`, historyEpoch: `hep_${newId()}`, lineageSeed: newId() + newId() };
   records.project = { title: snapshot.project.title, frame: { ...copy(snapshot.project.frame), id: await frame(snapshot.project.frame.id) },
     defaultSceneId: await scene(snapshot.presentation.activeDisplaySetId ?? NATIVE_DEFAULT_DISPLAY_SET_ID) };
-  const profile = await validationGlbProfile();
+  const profile = await (recipe === nativeAppearanceRecipe ? occurrenceGlbProfile : validationGlbProfile)();
   const targetModels = new Map<string, { record: JsonObject; model: ValidatedGlb }>();
-  if (profile.specificationSha256 !== '077c5da2241deb7956026fe20376dee9301d70b29d10a436d673f37909e4186f') return fileError('変換レシピとモデル検証の版が一致しません。');
+  if (profile.specificationSha256 !== (recipe === nativeAppearanceRecipe ? '9bbf1243a3786d54a6439104614c46e502a3cdfa20dc9e9d610ee1da42cf059f' : '077c5da2241deb7956026fe20376dee9301d70b29d10a436d673f37909e4186f')) return fileError('変換レシピとモデル検証の版が一致しません。');
+  const materialWitness: NativeMaterialWitness[] = [];
   for (const r of snapshot.representations) {
     const model = models.get(r.id); if (!model) return fileError('モデルの検証結果が不足しています。');
-    const slots = await Promise.all(model.materials.map(async material => {
+    const occurrenceByRank = new Map(model.occurrences?.map(o => [o.slotIndex, o]) ?? []);
+    const slots = await Promise.all(model.materials.map(async (material): Promise<JsonObject & { logicalMaterialSlotId: string }> => {
       const locator = material.sourceLocator as JsonObject;
-      return { ...material, logicalMaterialSlotId: await id('slot', ['material-slot', r.id, locator.kind as string,
+      const occurrence = occurrenceByRank.get(locator.slotIndex as number);
+      if (recipe === nativeAppearanceRecipe && !occurrence) return fileError('材質の面の対応が不足しています。');
+      return { ...material, logicalMaterialSlotId: await id('slot', recipe === nativeAppearanceRecipe ?
+        ['material-occurrence', r.id, occurrence!.nodeIndex, occurrence!.primitiveIndex] : ['material-slot', r.id, locator.kind as string,
         locator.kind === 'gltfMaterial' ? locator.materialIndex as number : 0]) };
     }));
     slots.sort((a, b) => a.logicalMaterialSlotId.localeCompare(b.logicalMaterialSlotId));
+    const logicalByRank = new Map(slots.map(s => [(s.sourceLocator as JsonObject).slotIndex, s.logicalMaterialSlotId]));
     const record = await sealValidationRecord('representation', { id: await rep(r.id), assetId: await asset(r.assetId),
       representationFrameId: await frame(r.representationFrameId), contentKind: 'mesh', purposes: ['source', 'display'], role: 'meshPrimary',
       variantFamilyId: await family(r.assetId, r.variantFamilyId), formatProfile: profile, blob: copy(r.blob),
       representationToAsset: copy(r.representationToAsset), derivedFrom: [], logicalBoundsAsset: model.bounds,
       materialCatalog: { layoutId: await id('lay', ['material-layout', r.id]), slots } });
     add('representationsById', record); targetModels.set(record.id as string, { record, model });
+    if (recipe === nativeAppearanceRecipe) {
+      const rows = sourceWitness!.get(r.id); if (!rows || rows.length !== slots.length) return fileError('材質の対応表が不足しています。');
+      for (const row of rows) materialWitness.push({ nativeRepresentationId: r.id, sourceGlbSha256: r.blob.digest,
+        childPath: [...row.childPath], materialArraySlot: 0, nodeIndex: row.nodeIndex, primitiveIndex: row.primitiveIndex,
+        sourceMaterialIndex: row.materialIndex, slotIndex: row.slotIndex, targetRepresentationId: record.id as string,
+        targetProfile: { ...profile }, targetMaterialLayoutId: (record.materialCatalog as JsonObject).layoutId as string,
+        targetLogicalMaterialSlotId: logicalByRank.get(row.slotIndex)! });
+    }
   }
   for (const r of snapshot.assetRevisions) add('assetRevisionsById', await sealValidationRecord('asset-revision', {
     id: await revision(r.id), assetId: await asset(r.assetId), representationIds: (await Promise.all(r.representationIds.map(rep))).sort(),
@@ -118,7 +156,19 @@ export async function mapNativeProject(snapshot: NativeProjectSnapshotV1, models
       add('viewsById', { id: await view(v.id), sceneId, name: v.name, orderKey: rank(j), projectFrameId: await frame(v.projectFrameId),
         camera: copy(v.camera), background: copy(v.background), lifecycle: await active('view', ['view', v.id]) });
   }
+  const repById = new Map(snapshot.representations.map(r => [r.id, r]));
+  const witnessByTarget = new Map(materialWitness.map(w => [`${w.nativeRepresentationId}/${nativeMaterialSlotKey(w.childPath, w.materialArraySlot)}`, w]));
+  for (const a of snapshot.meshMaterialAppearances ?? []) {
+    const r = repById.get(a.representationId)!, witness = witnessByTarget.get(`${r.id}/${a.materialSlotKey}`);
+    if (!witness) return fileError('元の材質の面を特定できません。');
+    const key: SourceKey = ['mesh-appearance', a.id];
+    add('materialOverridesById', { id: await id('ovr', key), routing: { scope: { kind: 'scene', sceneId: await scene(a.displaySetId) },
+      target: { assetId: await asset(a.assetId), variantFamilyId: await family(r.assetId, r.variantFamilyId),
+        materialLayoutId: witness.targetMaterialLayoutId, logicalMaterialSlotId: witness.targetLogicalMaterialSlotId } },
+      ...nativeAppearanceIntent(a), lifecycle: await active('ovr', key) });
+  }
   const checked = admitProjectRecords(records, limits, 'map2');
   if (checked.kind !== 'valid-records' || checked.hasUnknownFields) return fileError('このファイルの値は、まだそのまま変換できません。');
-  return { records: cloneCanonicalValue(checked.records, limits) as PreparedValidationProject['records'], mapping: ids.report(), reviewStates, targetModels };
+  materialWitness.sort((a, b) => a.nativeRepresentationId.localeCompare(b.nativeRepresentationId) || a.nodeIndex - b.nodeIndex || a.primitiveIndex - b.primitiveIndex);
+  return { records: cloneCanonicalValue(checked.records, limits) as PreparedValidationProject['records'], recipe, materialWitness, mapping: ids.report(), reviewStates, targetModels };
 }

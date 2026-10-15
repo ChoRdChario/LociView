@@ -4,8 +4,9 @@ import type { JsonObject } from '../../domain/values';
 import { materialForDisplay, type MaterialIntent } from '../../domain/materialIntent';
 import { ReviewArchive } from '../../projectPackage/reviewArchive';
 import { inspectValidationGlb, type ValidatedGlb } from '../../projectFiles/glb';
+import { inspectOccurrenceGlb } from '../../projectFiles/glbOccurrences';
 import { inspectValidationPng, type PngDecoder } from '../../projectFiles/png';
-import { validationGlbProfile, validationMetadataLimits, type FileValidationLimits } from '../../projectFiles/validation';
+import { validationGlbProfile, occurrenceGlbProfile, validationMetadataLimits, type FileValidationLimits } from '../../projectFiles/validation';
 import { identityPlacement } from '../../projectFiles/initialProject';
 import { value } from '../../scene/types';
 import type { CaptionListItem, CaptionListSource } from '../../ui/projectScene/captionListState';
@@ -23,17 +24,17 @@ export async function prepareReviewView(file: Blob, limits: FileValidationLimits
   const snapshot = review.snapshot, scene = object(snapshot.scene), sceneId = string(scene.id), project = object(snapshot.project);
   if (review.closure.entries.reduce((n, b) => n + b.byteLength, 0) > limits.maxFileBytes)
     throw Error('この検証画面の容量上限を超えています。元のファイルは変更していません。');
-  const profile = await validationGlbProfile(), models: ReadonlyRenderModel[] = [], decoded = new Map<string, ValidatedGlb>(), images = new Map<string, Blob>();
+  const profile = await validationGlbProfile(), occurrence = await occurrenceGlbProfile(), models: ReadonlyRenderModel[] = [], decoded = new Map<string, ValidatedGlb>(), images = new Map<string, Blob>();
   const assets = table(snapshot, 'assetsById'), representations = table(snapshot, 'representationsById');
   for (const asset of Object.values(assets)) {
     if (asset.kind !== 'visual') continue;
     const ids = list(asset.representationIds); if (ids.length !== 1) throw Error('この検証画面では、1つの表示本体を持つモデルだけを開けます。');
     const record = representations[string(ids[0])]!, blob = object(record.blob);
-    if (!same(record.formatProfile, profile) || record.contentKind !== 'mesh' || record.role !== 'meshPrimary' || !same(record.purposes, ['display']) ||
+    if ((!same(record.formatProfile, profile) && !same(record.formatProfile, occurrence)) || record.contentKind !== 'mesh' || record.role !== 'meshPrimary' || !same(record.purposes, ['display']) ||
       !same(record.representationToAsset, { ...identityPlacement(), reflection: 'none' }) || blob.mediaType !== 'model/gltf-binary')
       throw Error('このモデルの表示形式は未対応です。元のファイルは変更していません。');
     const bytes = await inspection.archive.entryBytes(`blobs/sha256/${string(blob.digest)}`, limits.maxFileBytes);
-    const source = await inspectValidationGlb(bytes, limits, decode), catalog = object(record.materialCatalog), slots = list(catalog.slots).map(object);
+    const source = await (same(record.formatProfile, occurrence) ? inspectOccurrenceGlb : inspectValidationGlb)(bytes, limits, decode), catalog = object(record.materialCatalog), slots = list(catalog.slots).map(object);
     const actual = new Set(source.materials.map(canonical));
     if (!same(record.logicalBoundsAsset, source.bounds) || slots.length !== source.materials.length ||
       slots.some(s => !actual.delete(canonical({ sourceLocator: s.sourceLocator!, sourceSemantics: s.sourceSemantics! }))) || actual.size)
