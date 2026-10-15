@@ -7,6 +7,8 @@ import type { createValidationReceiveControls } from './validationReceiveControl
 import { productSources } from './productSources';
 import { readProjectCamera, readSolidBackground } from './viewHistory';
 import { createModelCandidatePreview, modelCandidateDisplay, type ModelCandidateRenderer } from './modelCandidatePreview';
+import { createMetadataStartupControls } from './metadataStartupControls';
+import { chooseStartupScene } from '../../scene/resolve';
 
 type Host = ReturnType<typeof createValidationModeHost>;
 type Tools = ReturnType<typeof createValidationReceiveControls>;
@@ -15,16 +17,25 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
   const root = document.createElement('section'), mode = document.createElement('button'), status = document.createElement('p');
   mode.type = 'button'; status.setAttribute('role', 'status');
   let disposed = false, switching = false, core: ReturnType<typeof createProjectWorkspace> | undefined;
-  let viewportScene = '', refreshPreview: (() => void) | undefined;
+  let viewportScene = '', refreshPreview: (() => void) | undefined, modeFeedback = '';
+  let startup: ReturnType<typeof createMetadataStartupControls> | undefined;
   const read = () => { const p = host.read().provider; if (p?.kind !== 'scene-provider') throw Error('プロジェクトの内容を確認してください。'); return p; };
   const external = () => switching || !!tools?.hasChanges();
   const changed = () => {
     if (disposed) return;
     tools?.render(); mode.textContent = host.mode!.current === 'view' ? '編集を開始する' : '閲覧に切り替える';
-    mode.disabled = switching || !!core?.inputPending() || !!tools?.hasChanges();
+    mode.disabled = switching || !!core?.inputPending() || !!startup?.hasChanges() || !!tools?.hasChanges();
     if (core) core.root.inert = switching || !!tools?.busy();
+    startup?.render();
+    retryStartup.hidden = !!core || !startup?.recoveryPending(); retryStartup.disabled = switching || !!host.authority.readOnly || !!tools?.hasChanges() || !!startup?.busy();
+    if (!core) status.textContent = modeFeedback || (host.hasPending() ? '更新が未完了です。元の変更から再試行してください。' : '開始シーンを確認してください。シーンと記録は保持しています。');
   };
-  core = createProjectWorkspace(document, {
+  const retryStartup = document.createElement('button'); retryStartup.type = 'button'; retryStartup.textContent = '更新を再試行';
+  retryStartup.addEventListener('click', () => { if (!retryStartup.disabled && !disposed) startup?.retry(); });
+  root.append(mode, status, retryStartup); if (tools) root.append(tools.root);
+  const mountCore = () => {
+    if (disposed || core || startup?.busy() || startup?.recoveryPending() || host.hasPending() || !chooseStartupScene(read().state).sceneId) return;
+    core = createProjectWorkspace(document, {
     ...productSources(host),
     createModelPreview: renderCandidate ? () => {
       let token = '', sceneId = '';
@@ -93,6 +104,14 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
               display = { ...display, preview: position, pinEdit: { target: next.pin.target, position, enabled: !next.readOnly } };
             }
           }
+          if (next.comparison?.token === next.token) {
+            const anchor = next.comparison.anchor;
+            if (anchor.kind === 'project' && anchor.projectFrameId === read().resources.projectFrameId) display = { ...display, preview: anchor.positionProject };
+            else if (anchor.kind === 'asset') {
+              const owner = !next.hiddenAssetIds?.includes(anchor.assetId) && display.models.find(m => m.binding.assetId === anchor.assetId && snapshot.modelVersions?.some(v => v.assetId === anchor.assetId && v.projection.bindingId === m.binding.id && v.projection.assetFrameId === anchor.assetFrameId));
+              if (owner) display = { ...display, preview: pointInProject(anchor.positionAsset, owner.binding.assetToProject) };
+            }
+          }
           rendered = next.readOnly ? { ...display, pinEdit: undefined } : display;
           runtime.update(rendered);
           runtime.setPinPointerActive?.(!!next.windowMoving || next.choosing && !next.readOnly); runtime.setActive(true);
@@ -120,20 +139,30 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
         dispose() { if (!closed) { closed = true; runtime.setActive(false); runtime.dispose(); } },
       };
     },
-  });
+    });
+    root.append(core.root);
+    startup?.dispose(); startup?.root.remove(); startup = undefined; status.textContent = '';
+  };
+  const render = () => { if (!disposed) { mountCore(); core?.render(); changed(); } };
+  if (!chooseStartupScene(read().state).sceneId) {
+    startup = createMetadataStartupControls(document, host, () => undefined, render, external); root.append(startup.root);
+  }
+  mountCore();
   mode.addEventListener('click', () => { void (async () => {
-    if (disposed || mode.disabled || core!.inputPending() || tools?.hasChanges()) return;
+    if (disposed || mode.disabled || core?.inputPending() || startup?.hasChanges() || tools?.hasChanges()) return;
     const recovery = host.mode!.current === 'view' && (host.read().state === 'pending' || host.mode!.recoveryAvailable);
     if (host.hasPending() && !recovery) { status.textContent = '更新を再試行してから切り替えてください。'; return; }
-    switching = true; changed();
-    try { await host.mode!.change(host.mode!.current === 'view' ? 'edit' : 'view', read().token, () => core!.render()); }
-    catch (error) { if (!disposed) status.textContent = (error as Error).message; }
-    finally { switching = false; if (!disposed) { core!.render(); changed(); } }
+    modeFeedback = ''; switching = true; changed();
+    try { await host.mode!.change(host.mode!.current === 'view' ? 'edit' : 'view', read().token, render); }
+    catch (error) { if (!disposed) { modeFeedback = (error as Error).message; status.textContent = modeFeedback; } }
+    finally { switching = false; render(); }
   })(); });
-  root.append(mode, status); if (tools) root.append(tools.root); root.append(core.root);
-  const unmount = () => { if (!disposed) { disposed = true; core!.unmount(); root.remove(); } };
+  const unmount = () => { if (!disposed) { disposed = true; startup?.dispose(); core?.unmount(); root.remove(); } };
   changed();
-  return { root, session: core.session, render() { if (!disposed) { core!.render(); changed(); } },
-    inputPending: () => switching || core!.inputPending(), hasChanges: () => host.hasPending() || core!.hasChanges() || !!tools?.hasChanges(), unmount,
+  const interaction = { get interactionPending() { return core?.session.interactionPending || !!startup?.hasChanges(); },
+    get acknowledgment() { return core?.session.acknowledgment ?? { state: startup?.busy() ? 'checking' as const : startup?.recoveryPending() ? 'failed' as const : 'idle' as const }; },
+    refreshHistory: render };
+  return { root, session: interaction, render,
+    inputPending: () => switching || !!core?.inputPending() || !!startup?.hasChanges(), hasChanges: () => host.hasPending() || !!core?.hasChanges() || !!startup?.hasChanges() || !!tools?.hasChanges(), unmount,
     async dispose() { unmount(); tools?.dispose(); await host.dispose(); } };
 }

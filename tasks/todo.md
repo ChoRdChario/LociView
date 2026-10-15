@@ -20,7 +20,8 @@ product composition's edit → save/two-round exchange → cold-reopen workflow 
 the nondefault validation route, now including the model, Saved View and material
 panels, attachment organization/shared viewing and Scene-local Caption comparison
 windows, confirmed Caption deletion, explicit pin parent changes, Scene names/
-next-open choice and existing Caption inclusion/exclusion. Existing
+next-open choice and existing Caption inclusion/exclusion, now with explicit
+Scene/Caption conflict choices, parent-only recovery and independent copies. Existing
 file/recovery work is retained.
 Ordinary entry, broader profiles/converters, browser performance, physical-iPhone
 and offline acceptance remain open. Full details and earlier failures are in the
@@ -100,6 +101,86 @@ major architecture/product decision, a required managed permission, or a release
 destructive boundary. Ordinary entry and temporary iPhone HTTPS need their existing
 exact-build/route approvals. Main, Pages, Service Worker, version/license, release,
 dependency changes and private/public fixture distribution are outside this unit.
+
+### Completed unit — recover conflicting Scene and Caption edits in the integrated editor
+
+PO authorized autonomous continuation on 2026-10-15 until a concrete new decision
+is needed. Outcome: inspect all relevant Scene/Caption candidates, explicitly
+resolve or recover the record, then continue editing/save/exchange/cold reopen.
+One writer; bounded read-only reviewers. Reuse accepted checked readers, typed
+commands and exact operation retry; no new schema/policy/format or release lane.
+
+- [x] Integrate checked Scene-name/manual and warm startup choices; cold startup
+  shows the existing explicit recovery controls before creating the Scene editor.
+- [x] Complete the adjacent Caption field/lifecycle/duplicate-membership recovery
+  flow in a whole-Project review area, preserving unapplied work and exact IDs.
+- [x] Run focused guards/fault and representative real-file/cold flows; obtain
+  independent review, then the serial final checkpoint and scoped g0-baseline push.
+
+Acceptance: show every original candidate without a guessed winner or filtered
+subset. Scene-name resolution preserves pending Caption text; startup resolution
+refuses other pending input, and cold editor mount waits for saved acknowledgement.
+Warm resolution does not navigate or recall a camera. Manual text, anchor/color
+whole candidates including absence, parent-only lifecycle recovery, and explicit
+keep-one/independent keep-both retain their accepted contracts. Scene/Caption
+identity, local drafts/windows, original history and existing resources survive.
+Unknown/malformed/stale/readonly/IME/in-flight states cannot authorize writes;
+failure retains exact selection/prepared change, cancel writes nothing. No generic
+orphan repair, arbitrary trash restore, Scene delete/reorder or conversion policy.
+Reuse existing command tests and the current validation adapter; browser EPERM
+remains a grouped acceptance gap. Stop only for a real specification/authority,
+compatibility/major architecture, dependency or release/destructive boundary.
+
+Initial audit: clean g0-baseline at the prior pushed checkpoint. Product startup
+currently creates an empty-Scene workspace on a conflicting default; warm review
+only offers selected Caption title/body candidates. Existing checked services
+already implement the missing decisions. Close this connected recovery boundary
+before extending converters; read-only mapping research may identify a later PO
+decision without blocking these approved UI connections.
+
+Implemented: a whole-Project review module backed by checked read descriptors,
+manual text/name validation, full anchor/color candidates (including absence),
+parent-only lifecycle recovery and explicit original-registration plus one/both
+choices. Copy command/IDs are sealed once through the existing operation owner.
+Cold startup reuses the existing startup controls without a synthetic Session;
+the Scene editor is created only after saved acknowledgement. Publication and
+subsequent first display-construction failure retain an explicit exact retry.
+Warm name resolution preserves unapplied Caption text; startup refuses it until
+explicit cancellation. Mode refusal retains its reason. Comparison previews
+exclude hidden owners and competing edit/placement ownership; no pin gizmo or
+camera recall is introduced. Independent reviews closed five P2s and their
+correction-only checks have no open P1/P2. Three new real-file/cold workflows and
+the existing conflict-display case pass in focused runs; exact import isolation
+passes (12 cases). Initial test-fixture/base/publication/equality failures and
+type corrections remain in ignored traces; contracts were not weakened.
+Final serial `npm run check:checkpoint` passed (exit 0): typecheck; **114 files /
+2,368 passed / 21 existing todo**; ordinary, harness and validation builds. Seven
+executable-file hashes match the frozen tested tree. Independent final scope/
+privacy review has no open P1/P2; the 11-path checkpoint contains only this
+connected implementation, its tests and relevant records. No dependency, public
+fixture, ordinary entry, storage/wire, SW or deployment configuration changed.
+The static validation manifest for seven files is
+`d0329147297484538a586a9e9c4f1fd6a2f56ab2d3db7e405054ab94e68be7f6`;
+all seven HTTP bodies match disk, with no SW/webmanifest/public samples. These
+results do not complete browser/device/offline/adoption acceptance. Git owns the
+actual authorized g0-baseline commit/push identity.
+Browser lane: an attempted Chrome-plugin bootstrap was rejected by managed
+auto-review as a retry of the known protected browser-client realpath EPERM
+without explicit Chrome-operation authorization. Stop that browser action;
+do not retry another plugin path or use indirect execution to bypass it. Node/
+recorded DOM/build/HTTP remain separate evidence. Continue unaffected approved
+implementation; request bounded explicit browser authorization only after the
+integrated candidate is concrete. The refusal is an environment constraint, not
+a product test failure or permission to waive rendered/device acceptance.
+
+Next connected unit: complete chosen-color/Shift/numeric pin addition, explicit
+owner display, map2 Asset pin-size editing and practical save/resume help. PO
+approved on 2026-10-15 the concrete extension of fresh direct GLB/PNG creation to
+map2 (schema 2.1/summary2): select the profile explicitly at that creation call,
+never by changing the global bootstrap default. Existing/received Projects and
+retained creation/output/recovery jobs keep their original proof/profile/bytes.
+Record this amendment in 07 before implementing it. No new wire, old-Project
+upgrade, model/material profile, ordinary entry or release is authorized.
 
 ### Completed unit — manage Scenes and Caption membership in the integrated editor
 

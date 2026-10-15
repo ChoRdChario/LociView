@@ -142,6 +142,18 @@
 | T03 | 同じ項目の競合を比較し、明示的に解消する | 部品未接続 | 限定GLB/PNG実ファイルUIでCaption title/body・anchor/color、Scene名・開始View、View名／順序／camera／backgroundを明示解消。任意値の不在・完全な座標／カメラを保持し、温存中のScene／カメラ不変更、起動Scene競合はcold明示選択後に画面を開く。親のみ復元・Scene再登録・独立copy、同一AssetのGLB更新比較（readonly、pin/gizmoなし）とstatus選択も接続。元履歴・他モデル・未適用入力を保持し、exact retry／通常編集／Contribution返送／no-op／cold再開を既存testsで確認。開始View不在の解消は有効な元履歴参照の同一変更set/deleteとし、不正nullを新規生成しない。既存不正履歴は書換えず拒否。他field／他lifecycle、通常経路・実機受入れは残る。 | [src/harness/projectScene/metadataConflictControls.ts](../src/harness/projectScene/metadataConflictControls.ts) / [src/harness/projectScene/metadataAssetStatusControls.ts](../src/harness/projectScene/metadataAssetStatusControls.ts) / [src/harness/projectScene/modelCandidatePreview.ts](../src/harness/projectScene/modelCandidatePreview.ts) / [src/harness/projectScene/validationWorkspace.ts](../src/harness/projectScene/validationWorkspace.ts) / [src/harness/projectScene/metadataCaptionLifecycleControls.ts](../src/harness/projectScene/metadataCaptionLifecycleControls.ts) / [src/projectMetadata/commands.ts](../src/projectMetadata/commands.ts) |
 | T04 | 重複所属で片方／両方を選び、独立項目として残す | 部品未接続 | 限定GLB/PNG実ファイルUIでCaptionとモデルのkeep-one／独立keep-bothを接続。元登録を明示選択し、Caption／添付はfresh IDで本文・添付説明を独立編集。モデルは全slotとeffective Scene→Project材質を完全rekeyし、既存本体を複製せずfresh factsを検証。3登録→2コピーの位置・材質・GLB更新→Contribution返送no-op／cold再開、元Asset／他Scene／Caption不変とexact retryを既存testsで確認。一般Point/GS/Proxy等のcopy closure、通常経路・実機受入れは残る。 | [src/projectMetadata/membership.ts](../src/projectMetadata/membership.ts) / [src/projectMetadata/modelMembership.ts](../src/projectMetadata/modelMembership.ts) / [src/harness/projectScene/metadataMembershipControls.ts](../src/harness/projectScene/metadataMembershipControls.ts) / [src/projectFiles/modelFacts.ts](../src/projectFiles/modelFacts.ts) / [tests/projectFiles.test.ts](../tests/projectFiles.test.ts) / [tests/ui/projectMetadataHost.test.ts](../tests/ui/projectMetadataHost.test.ts) |
 
+限定validationの `editor=project` にも、T03/T04の既存commandを使う
+全Projectの競合確認を接続。Scene名／開始Scene、Caption本文の手動入力、
+完全な位置／色候補（未設定を含む）、親Captionだけの削除・復元、
+元の登録とone/bothを明示する独立コピーを扱う。開始Scene未解決のcold起動は
+保存確認後だけeditorを作り、warm解消はScene・camera・未適用本文を保持する。
+hidden ownerや別の位置調整中には比較previewを表示しない。失敗時の元変更retry、
+実ファイル返送・cold再開の自動確認と残る実画面／実機受入れはtodo参照。
+一般orphan／全lifecycle／他profileの修復は含めず、分類件数は変更しない。
+[製品用の確認画面](../src/ui/projectScene/projectRecovery.ts) /
+[検査済みread adapter](../src/harness/projectScene/productSources.ts) /
+[接続テスト](../tests/projectFiles.test.ts)
+
 ### ファイル・移行
 
 | ID | 機能群／利用者の結果 | 状態 | 現在の境界・残り | コード／既存受入れ参照（行番号は監査時点） |

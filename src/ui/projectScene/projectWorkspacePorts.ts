@@ -10,6 +10,18 @@ import type { ViewFieldVersions } from './viewAuthoringState';
 
 export type WorkspaceProvider = Extract<ProjectProviderRead, { kind: 'scene-provider' }>;
 export type Point3 = readonly [number, number, number];
+export interface WorkspaceRecoveryGroup {
+  readonly key: string; readonly label: string; readonly ready: boolean;
+  readonly note?: string; readonly details?: readonly string[];
+  readonly choices: readonly { id: string; label: string; anchor?: Anchor }[];
+  readonly manual?: 'name' | 'title' | 'body';
+  readonly copyReady?: boolean;
+  readonly target: { kind: 'name'; sceneId: string } | { kind: 'startup' } |
+    { kind: 'text'; captionId: string; field: 'title' | 'body' } |
+    { kind: 'field'; captionId: string; field: 'anchor' | 'colorSrgb' } |
+    { kind: 'lifecycle'; captionId: string; operationIds: readonly string[] } |
+    { kind: 'membership'; sceneId: string; captionId: string; edgeIds: readonly string[] };
+}
 export interface WorkspaceFile { readonly name: string; readonly size: number; arrayBuffer(): Promise<ArrayBuffer> }
 export interface WorkspacePlacement { readonly translation: Point3; readonly rotationXYZW: readonly [number, number, number, number]; readonly uniformScale: number }
 export interface WorkspaceModelTarget { readonly kind: 'model'; readonly token: string; readonly sceneId: string; readonly assetId: string; readonly bindingId: string }
@@ -34,6 +46,7 @@ export interface WorkspaceViewportState {
   readonly available: boolean;
   readonly hiddenAssetIds?: readonly string[]; readonly model?: WorkspaceModelProposal | null;
   readonly windowMoving?: boolean;
+  readonly comparison?: { token: string; captionId: string; anchor: Anchor } | null;
 }
 export interface WorkspaceViewport {
   update(state: WorkspaceViewportState): void;
@@ -67,6 +80,8 @@ export interface ProjectWorkspacePorts {
   mediaDescription(text: string): string;
   captionDeletion(token: string, captionId: string): CaptionDeletionImpact;
   pinPositionInParent(token: string, captionId: string, assetId: string): Point3 | null;
+  recovery(): readonly WorkspaceRecoveryGroup[];
+  prepareCaptionMembership(token: string, sceneId: string, captionId: string, observedIds: readonly string[], keepId: string, choice: 'one' | 'both'): MetadataEdit;
   modelDetails(sceneId: string, assetId: string): WorkspaceModelDetails | null;
   modelPlacement(translation: readonly string[], rotation: readonly string[], scale: string): WorkspacePlacement;
   modelAngles(rotation: WorkspacePlacement['rotationXYZW']): readonly [string, string, string];

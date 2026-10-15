@@ -1569,6 +1569,18 @@ clear only the excluded Scene's editing selection after durable acknowledgement.
 Keep the shared draft/IME/gesture/file/readonly guards and existing conflict
 boundaries. No new schema, format, general recovery or adoption is implied.
 
+**Product conflict/recovery integration (2026-10-15):** connect the existing
+Scene-name/startup and Caption field/lifecycle/membership decisions in §8 to the
+same typed composition. Keep checked candidate preparation in the validation
+read adapter and one operation/retry owner in the product workspace. Use a whole
+Project review area so excluded/conflicting Captions remain reachable. Scene-name
+resolution may preserve unapplied Caption text; startup choices refuse other
+pending input. A cold unresolved default uses the existing explicit startup
+controls without constructing a Scene editor until saved acknowledgement; warm
+resolution retains navigation/camera/draft identity. Preserve full candidate
+validation, absence, parent-only recovery and independent-copy semantics. No new
+recovery policy, wire/storage authority, adoption or ordinary entry is introduced.
+
 Each production slice requires a short meta-audit, exact-tree tests/build, one
 independent read-only review and a reversible commit. Run focused checks during
 editing, then the required full matrix once on the final executable tree. Reuse

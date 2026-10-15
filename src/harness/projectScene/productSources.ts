@@ -4,12 +4,17 @@ import type { JsonObject } from '../../domain/values';
 import { materialFields } from '../../domain/materialIntent';
 import { materialResolutionContext } from '../../projectMetadata/materialResolution';
 import { assetStatusCandidates } from '../../projectMetadata/assetStatus';
-import { assetMembershipGroups, planAssetMembershipResolution } from '../../projectMetadata/membership';
+import { assetMembershipGroups, planAssetMembershipResolution, captionMembershipGroups, captionCopySource, planCaptionMembershipResolution } from '../../projectMetadata/membership';
+import { sceneNameCandidates } from '../../projectMetadata/sceneAuthoring';
+import { defaultSceneCandidates } from '../../projectMetadata/startupScene';
+import { captionFieldCandidates } from '../../projectMetadata/captionCandidates';
+import { captionLifecycleRecovery } from '../../projectMetadata/captionDeletion';
+import { planMetadataEdit } from '../../projectMetadata/commands';
 import { assetCopySource, prepareAssetMembershipCopy } from '../../projectMetadata/modelMembership';
 import { entryViewCandidates, viewFieldCandidates } from '../../projectMetadata/viewResolution';
 import { newId } from '../../projectMetadata/persistence';
 import type { MaterialRecordPort, MaterialSource } from '../../ui/projectScene/materialState';
-import type { ProjectWorkspacePorts, WorkspaceMaterialReview } from '../../ui/projectScene/projectWorkspacePorts';
+import type { ProjectWorkspacePorts, WorkspaceMaterialReview, WorkspaceRecoveryGroup } from '../../ui/projectScene/projectWorkspacePorts';
 import { fieldValue } from '../../ui/projectScene/projectRead';
 import { metadataViewData } from './metadataViews';
 import { entryKey, viewKey, orderBetween } from './viewHistory';
@@ -25,9 +30,78 @@ import type { createValidationModeHost } from './validationModeHost';
 
 /** Read adapters only: no Session exposure, synthetic editor or mutation authority. */
 export function productSources(host: ReturnType<typeof createValidationModeHost>): Pick<ProjectWorkspacePorts,
-  'modelDetails' | 'modelPlacement' | 'modelAngles' | 'modelReview' | 'modelDeletion' | 'prepareModelMembership' | 'views' | 'viewOrder' | 'viewReview' | 'materials' | 'mediaDescription' | 'captionDeletion' | 'pinPositionInParent'> {
+  'modelDetails' | 'modelPlacement' | 'modelAngles' | 'modelReview' | 'modelDeletion' | 'prepareModelMembership' | 'views' | 'viewOrder' | 'viewReview' | 'materials' | 'mediaDescription' | 'captionDeletion' | 'pinPositionInParent' | 'recovery' | 'prepareCaptionMembership'> {
   const provider = () => { const p = host.read().provider; if (p?.kind !== 'scene-provider') throw Error('プロジェクトの内容を確認してください。'); return p; };
   return {
+    recovery() {
+      const p = provider(), groups: WorkspaceRecoveryGroup[] = [];
+      const sceneLabel = (id: string) => fieldValue(p.state.scenes[id]?.name) ?? (p.state.scenes[id] ? `シーン ${Object.keys(p.state.scenes).sort().indexOf(id) + 1}（名称を確認）` : '参照先を確認');
+      const captionLabel = (id: string) => fieldValue(p.resources.captions[id]?.title) || `キャプション ${Object.keys(p.details.mutable.captionsById).sort().indexOf(id) + 1}`;
+      const fieldLabels: Record<string, string> = { title: 'タイトル', body: '本文', anchor: 'ピン位置', colorSrgb: 'ピンの色' };
+      const describe = (field: string, value: unknown): string => {
+        if (field === 'anchor' && value && typeof value === 'object') {
+          const a = value as import('../../scene/types').Anchor, owner = a.kind === 'asset' ? a.assetId : a.kind === 'unplaced' ? a.ownerAssetId : null;
+          const label = owner ? fieldValue(p.details.mutable.assetsById[owner]?.label) ?? 'モデル名を確認' : '';
+          return a.kind === 'asset' ? `${label}・位置 ${a.positionAsset.join(' / ')}` : a.kind === 'project' ? `プロジェクト内の位置 ${a.positionProject.join(' / ')}` : `未配置${label ? `・${label}` : ''}`;
+        }
+        if (field === 'colorSrgb') return value === undefined ? '未設定（標準色）' : Array.isArray(value) ? `#${value.map(n => Math.round(Number(n) * 255).toString(16).padStart(2, '0')).join('')}（${value.join(' / ')}）` : '確認が必要な値';
+        return typeof value === 'string' ? value || '空の内容' : '確認が必要な値';
+      };
+      for (const field of p.inspection.candidates.fields) {
+        const [map, recordId, name] = field.path;
+        if (field.path.length === 2 && map === 'project' && recordId === 'defaultSceneId' && field.candidates.length > 1) {
+          let ready = false; try { defaultSceneCandidates(p, host.limits); ready = true; } catch { /* Keep every original candidate visible. */ }
+          groups.push({ key: 'startup', label: '開始シーンの競合', ready, target: { kind: 'startup' },
+            note: '次に開くシーンを選びます。現在のシーンや記録は変わりません。', choices: field.candidates.map((c, i) => ({ id: c.operationId,
+              label: `候補 ${i + 1}：${c.value.kind === 'value' && typeof c.value.value === 'string' ? sceneLabel(c.value.value) : '参照先を確認'}` })) });
+        }
+        if (field.path.length !== 3 || field.candidates.length < 2) continue;
+        if (map === 'scenesById' && name === 'name') {
+          let ready = false; try { sceneNameCandidates(p, recordId!, host.limits); ready = true; } catch { /* No partial acceptance. */ }
+          groups.push({ key: `scene/${recordId}`, label: `シーン ${Object.keys(p.state.scenes).sort().indexOf(recordId!) + 1}の名前`, ready,
+            target: { kind: 'name', sceneId: recordId! }, manual: 'name', choices: field.candidates.map((c, i) => ({ id: c.operationId, label: `候補 ${i + 1}：${describe('name', c.value.kind === 'value' ? c.value.value : undefined)}` })) });
+        }
+        if (map !== 'captionsById' || !['title', 'body', 'anchor', 'colorSrgb'].includes(name!)) continue;
+        const captionId = recordId!, isText = name === 'title' || name === 'body'; let ready = false;
+        try { if (isText) planMetadataEdit(p, { kind: 'resolveCaptionText', captionId, field: name, choice: { kind: 'candidate', operationId: field.candidates[0]!.operationId } }, host.limits);
+          else captionFieldCandidates(p, captionId, name as 'anchor' | 'colorSrgb', host.limits); ready = true;
+        } catch { /* Display raw choices; never confirm an unchecked subset. */ }
+        groups.push({ key: `caption/${captionId}/${name}`, label: `${captionLabel(captionId)}：${({ title: 'タイトル', body: '本文', anchor: 'ピン位置', colorSrgb: 'ピンの色' })[name!]}`, ready,
+          target: isText ? { kind: 'text', captionId, field: name } : { kind: 'field', captionId, field: name as 'anchor' | 'colorSrgb' },
+          ...(isText ? { manual: name } : {}), ...(name === 'anchor' ? { note: '比較中の位置は未確定です。モデルが非表示、または座標の基準を確認できない場合は表示されません。' } : {}),
+          choices: field.candidates.map((c, i) => ({ id: c.operationId, label: `候補 ${i + 1}：${ready || isText ? describe(name!, c.value.kind === 'value' ? c.value.value : undefined) : '確認が必要な値'}`,
+            ...(ready && name === 'anchor' && c.value.kind === 'value' ? { anchor: c.value.value as unknown as import('../../scene/types').Anchor } : {}) })) });
+      }
+      for (const [captionId] of Object.entries(p.details.mutable.captionsById)) {
+        if (!p.issues.some(i => i.path.join('/') === `captionsById/${captionId}/lifecycle` && ['concurrent-delete-edit', 'atomic-field-conflict'].includes(i.code))) continue;
+        let source: ReturnType<typeof captionLifecycleRecovery> | undefined; try { source = captionLifecycleRecovery(p, captionId, host.limits); } catch { /* Not a general trash restore. */ }
+        groups.push({ key: `lifecycle/${captionId}`, label: `${captionLabel(captionId)}：削除と編集`, ready: !!source,
+          target: { kind: 'lifecycle', captionId, operationIds: source?.lifecycle.candidates.map(c => c.operationId) ?? [] },
+          note: 'キャプション本体だけを変更します。削除済みのシーン登録・添付・タグ登録は復元しません。',
+          choices: [{ id: 'deleted', label: '削除状態を維持' }, { id: 'active', label: 'キャプションを復元' }],
+          details: source ? [...source.fields.filter(f => ['title', 'body', 'anchor', 'colorSrgb'].includes(f.path[2]!)).flatMap(f => f.candidates.map((c, i) => `${fieldLabels[f.path[2]!]} 候補 ${i + 1}：${describe(f.path[2]!, c.value.kind === 'value' ? c.value.value : undefined)}`)),
+            ...source.children.map(c => `${c.kind === 'scene' ? `シーン登録：${sceneLabel(c.referenceId ?? '')}` : c.kind === 'attachment' ? '添付' : 'タグ登録'} — ${c.uncertain || c.state === 'unresolved' ? '状態を要確認' : c.state === 'deleted' ? '削除済み・復元しません' : '登録あり・親の復元後に再表示される場合があります'}`)] : [] });
+      }
+      for (const g of captionMembershipGroups(p, host.limits)) {
+        let ready = false, copyReady = false;
+        try { planCaptionMembershipResolution(p, { kind: 'resolveCaptionMembership', sceneId: g.sceneId, captionId: g.captionId, observedMembershipIds: g.edgeIds,
+          originalMembershipId: g.edgeIds[0]!, choice: 'one', copies: [], eventId: `evt_${'0'.repeat(32)}` }, host.limits); ready = true;
+          captionCopySource(p, g.captionId, host.limits); copyReady = true;
+        } catch { /* Keep-one can remain available when copy content is unresolved. */ }
+        groups.push({ key: `membership/${g.sceneId}/${g.captionId}`, label: `${sceneLabel(g.sceneId)}：${captionLabel(g.captionId)}の重複登録`, ready, copyReady,
+          target: { kind: 'membership', sceneId: g.sceneId, captionId: g.captionId, edgeIds: g.edgeIds },
+          choices: g.edgeIds.map((id, i) => ({ id, label: `元のキャプションとして残す登録 ${i + 1}` })),
+          note: copyReady ? '両方残す場合は、他方を本文・添付説明・タグを独立に編集できる記録にします。他のシーンは変わりません。' : '本文・添付などが未解決のため、両方残す操作はできません。一つにまとめる操作は内容を変更しません。' });
+      }
+      return groups;
+    },
+    prepareCaptionMembership(token, sceneId, captionId, observedIds, keepId, choice) {
+      const p = provider(); if (p.token !== token) throw Error('登録が更新されています。選択を保持しています。');
+      const source = choice === 'both' ? captionCopySource(p, captionId, host.limits) : undefined;
+      return { kind: 'resolveCaptionMembership', sceneId, captionId, observedMembershipIds: [...observedIds], originalMembershipId: keepId, choice, eventId: `evt_${newId()}`,
+        copies: choice === 'one' ? [] : observedIds.filter(id => id !== keepId).map(sourceMembershipId => ({ sourceMembershipId, captionId: `cap_${newId()}`, membershipId: `scm_${newId()}`,
+          attachments: source!.attachments.map(a => ({ sourceId: a.id as string, targetId: `att_${newId()}` })), tags: source!.tags.map(t => ({ sourceId: t.id as string, targetId: `tgm_${newId()}` })) })) };
+    },
     mediaDescription: normalizeAlt,
     captionDeletion: (token, captionId) => host.authority.captionDeletionImpact!(token, captionId),
     pinPositionInParent(token, captionId, assetId) {
