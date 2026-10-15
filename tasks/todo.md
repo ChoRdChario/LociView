@@ -104,7 +104,80 @@ destructive boundary. Ordinary entry and temporary iPhone HTTPS need their exist
 exact-build/route approvals. Main, Pages, Service Worker, version/license, release,
 dependency changes and private/public fixture distribution are outside this unit.
 
-### Active unit — finish everyday pin work and save/resume guidance
+### Active unit — concrete Native appearance compatibility proposal
+
+Outcome: make the next required migration decision reviewable: exact new companion
+and occurrence-profile identities, faithful material-address/numeric mapping,
+whole-input refusals and connected implementation/acceptance. Existing Native
+recipe-1 and every retained Project/job stay unchanged. This is a PROPOSED contract,
+not ratification, implementation or renderer/profile adoption.
+
+- [x] Verify current Native material behavior against the target contract; define
+  the representable bounded source subset and remaining renderer evidence.
+- [x] Prepare exact identity preimages/vectors and profile bytes and independently
+  review them. The single new compatibility decision is ready before implementation.
+
+[Proposal](../docs/specs/07a-native-appearance-conversion-proposal.md): recipe-2,
+separate occurrence profile for every retained Representation, exact source-slot
+association/witness and recovery bindings. The first subset covers opaque source
+slots with requested opacity 1 and disabled chroma, including unlit/sidedness and
+latent chroma values. Fractional opacity and active chroma stay required later
+work. Two read-only reviewers closed the missing correspondence/witness procedure;
+no remaining P1/P2. Six identity vectors, exact profile text (1198 bytes, SHA-256
+`9bbf1243a3786d54a6439104614c46e502a3cdfa20dc9e9d610ee1da42cf059f`)
+and effective-key boundary vectors were independently recomputed. Document
+arithmetic/helper comparison is not rendering evidence. Local links/diff and old
+contract consistency are checked; product source/tests are unchanged, so no
+runtime suite/build is repeated for this documentation-only checkpoint.
+
+Next: PO ratification of this concrete new recipe/profile/subset, then one
+connected conversion/edit/backup/exchange/reopen implementation. Do not treat the
+earlier fresh-map2 approval as approval of this compatibility extension. The
+remaining browser block below requires an environment approval change, not another
+request for the user's already-granted Chrome permission.
+
+Milestone audit: clean product checkpoint already pushed; this turn changes only
+the proposal, documentation links and current task record. Browser acceptance remains
+blocked below, with no substitute claimed. Initial Native migration is already in
+scope; a new appearance mapping/profile requires explicit PO ratification under
+07 §5.2–5.3 and 05 §9. No new parser, renderer, storage, receipt or source rewrite
+will be implemented while that decision is pending.
+
+### Pending acceptance — grouped Chrome verification of the integrated candidate
+
+PO explicitly authorized Chrome operation only on the local validation screen
+at `http://127.0.0.1:4182` on 2026-10-15. Baseline: clean g0-baseline at the
+automatically checked and pushed everyday-pin/help checkpoint; no source change
+is needed merely to start observation. The earlier managed rejection and runtime
+EPERM remain evidence, but the previously missing explicit authority is now given.
+
+Outcome: observe one integrated create/open → Scene/Caption/model/view/material
+work → backup verification/exchange → reload/resume flow, plus the accepted Native
+GLB/PNG input, using local synthetic fixtures and the exact served candidate.
+Record real-browser observations separately from Node/recorded-DOM checks.
+
+- [ ] Connect the authorized Chrome surface once and inspect the local screen.
+- [ ] Exercise the connected workflow and record build/route and observed results;
+  fix ordinary in-scope defects with focused checks and independent review.
+- [ ] Close the verification record and suitable checkpoint; retain physical-iOS,
+  storage-adoption, offline/PWA, migration/profile and ordinary-entry gates.
+
+Attempt result: despite that explicit authorization, automatic approval review
+rejected Chrome runtime initialization again: "Although the user explicitly
+authorized local Chrome operation, this repeats the previously rejected
+protected-runtime initialization and would violate the requirement not to retry
+or bypass a known denial." No browser connection, navigation, screenshot or
+workflow observation executed. User permission is no longer missing; the remaining
+block is managed approval of the protected runtime. Do not ask for the same user
+permission again or switch surfaces/indirect runtimes to bypass this rejection.
+
+Stop only affected work if managed approval still denies connection, the protected
+runtime remains inaccessible, or a real specification/compatibility decision is
+needed. Do not retry a new denial unchanged, switch browser surfaces, inspect a
+browser profile/store, or call HTTP/Node checks browser acceptance. No release,
+ordinary-entry activation, new dependency/profile/converter or real-user data loss.
+
+### Completed implementation — everyday pin work and save/resume guidance
 
 Outcome: create a new explicit-map2 GLB/PNG Project, add repeated colored pins by
 surface/Shift or explicit numeric alternative, reveal an owner from its Caption,
@@ -180,8 +253,9 @@ changes or deployment edits. The accepted GLB/PNG product candidate has no obvio
 remaining workflow that is merely an existing-control connection. Close the
 current verification/checkpoint before adding scope. Next outcome: grouped real
 Chrome open/edit/colored-pin/model/view/material/save/verify/exchange/reopen and
-Native-input observation on this exact nondefault candidate. Explicit Chrome
-operation authority is the affected managed-permission stop. Normal entry still
+Native-input observation on this exact nondefault candidate. Chrome operation
+authority has since been granted; protected-runtime managed approval remains the
+affected stop, as recorded above. Normal entry still
 requires 03 §10 and applicable storage/device/profile evidence. Native appearance
 needs a new versioned companion; frozen-v1/LociMyu durable conversion needs its
 ratified recipe/golden identities. Do not substitute tag authoring or other new
