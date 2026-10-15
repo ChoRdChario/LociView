@@ -20,6 +20,8 @@ todo for its tested scope and remaining ordinary-entry/browser/device boundaries
    new decision/authority boundary or the completed requested result.
    Complete useful integrated workflows before grouped PO/browser/device checks;
    do not make the user's availability a dependency for each small test.
+   Until the application is complete, each completion report includes the next
+   planned unit, alongside the outcome and remaining limits.
 
 ## Non-negotiable distinctions
 

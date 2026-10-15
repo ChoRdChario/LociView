@@ -43,12 +43,14 @@ export interface MetadataMediaPort {
   stage(record: JsonObject, token: string): Promise<void>;
   verify(blobs: readonly JsonObject[]): Promise<void>;
   inventory?(blobs: readonly JsonObject[]): Promise<void>;
+  /** Owned evidence/presence witness; never accepts an incoming verified bit. */
+  retained?(record: JsonObject): Promise<boolean>;
 }
 export interface MetadataModelFactPlan { readonly baseToken: string | null; readonly finalToken: string; readonly stagedBlobs?: readonly JsonObject[]; stage(): Promise<void> }
 export interface MetadataModelFactPort { plan(base: ProjectMetadataSource, next: ProjectMetadataSource): Promise<MetadataModelFactPlan | null>;
   planRestored?(next: ProjectMetadataSource, bodyFor: (ref: JsonObject) => Blob, refs: readonly JsonObject[]): Promise<MetadataModelFactPlan>;
-  planImported?(next: ProjectMetadataSource, bodyFor: (ref: JsonObject) => Blob): Promise<MetadataModelFactPlan>;
-  planReceived?(base: ProjectMetadataSource, next: ProjectMetadataSource, bodyFor: (ref: JsonObject) => Blob): Promise<MetadataModelFactPlan> }
+  planImported?(next: ProjectMetadataSource, bodyFor: (ref: JsonObject) => Blob, hasIncoming?: (ref: JsonObject) => boolean): Promise<MetadataModelFactPlan>;
+  planReceived?(base: ProjectMetadataSource, next: ProjectMetadataSource, bodyFor: (ref: JsonObject) => Blob, hasIncoming?: (ref: JsonObject) => boolean): Promise<MetadataModelFactPlan> }
 
 export type MetadataSessionRead = Readonly<{
   state: 'empty' | 'ready' | 'pending' | 'repair-required';
@@ -58,9 +60,7 @@ export type MetadataSessionRead = Readonly<{
   publication: string | null;
 }>;
 
-/** Readiness of the whole Project; inactive weak records retain their diagnostics. */
-export function metadataProviderReady(provider: ProjectProviderRead, limits: MetadataLimits): boolean {
-  if (provider.kind !== 'scene-provider' || provider.inspection.checks.some(c => c.outcome !== 'verified')) return false;
+function weakContent(provider: Extract<ProjectProviderRead, { kind: 'scene-provider' }>, limits: MetadataLimits) {
   const candidates = provider.inspection.candidates, active = new Set(candidates.knownActiveRoots), queue = [...active];
   const outgoing = new Map<string, string[]>(); let work = provider.inspection.workUsed;
   const charge = () => { if (++work > limits.maxWork) fail('provider-readiness-limit'); };
@@ -71,12 +71,35 @@ export function metadataProviderReady(provider: ProjectProviderRead, limits: Met
   for (let i = 0; i < queue.length; i++) for (const id of outgoing.get(queue[i]!) ?? []) {
     charge(); if (!active.has(id)) { active.add(id); queue.push(id); }
   }
+  const checkedMedia = new Set(provider.inspection.checks.filter(c => c.request.fact === 'media').flatMap(c => c.request.records.map(r => r.id as string)));
+  const media = new Set(provider.issues.filter(issue => {
+    charge(); return issue.kind === 'unverified' && issue.code === 'verified-media-bytes-required' && issue.path.length === 3 &&
+      issue.path[0] === 'mediaResourcesById' && issue.path[2] === 'blob' && !active.has(issue.path[1]!) && !checkedMedia.has(issue.path[1]!);
+  }).map(issue => issue.path[1]!));
+  return { active, media, charge };
+}
+/** Exact unrequested weak records; unavailable, never successful content checks. */
+export function unreceivedWeakMedia(provider: Extract<ProjectProviderRead, { kind: 'scene-provider' }>, limits: MetadataLimits): ReadonlySet<string> {
+  return weakContent(provider, limits).media;
+}
+/** Readiness of the whole Project; inactive weak records retain their diagnostics. */
+export function metadataProviderReady(provider: ProjectProviderRead, limits: MetadataLimits): boolean {
+  if (provider.kind !== 'scene-provider' || provider.inspection.checks.some(c => c.outcome !== 'verified')) return false;
+  const { active, media, charge } = weakContent(provider, limits);
   return !provider.issues.some(issue => {
     charge();
     if (issue.kind === 'unverified' && issue.code === 'verified-profile-content-bounds-catalog-required' && issue.path.length === 3 &&
       issue.path[0] === 'representationsById' && issue.path[2] === 'formatProfile' && !active.has(issue.path[1]!)) return false;
+    if (issue.kind === 'unverified' && issue.code === 'verified-media-bytes-required' && issue.path.length === 3 &&
+      issue.path[0] === 'mediaResourcesById' && issue.path[2] === 'blob' && media.has(issue.path[1]!)) return false;
     return ['invalid', 'unverified'].includes(issue.kind) || issue.code === 'opaque-data-protection-required';
   });
+}
+
+const blobKey = (ref: JsonObject) => `${ref.digest}:${ref.byteLength}`;
+function incomingBlobs(blobs: readonly { sha256: string; byteLength: number }[]) {
+  const available = new Set(blobs.map(b => `${b.sha256}:${b.byteLength}`));
+  return (ref: JsonObject) => ref.algorithm === 'sha256' && available.has(blobKey(ref));
 }
 
 /** New synthetic-workspace service; ordinary ProjectStore/UI and old saved runs do not import it. */
@@ -84,6 +107,9 @@ export class MetadataProjectSession {
   private readonly limits: MetadataLimits;
   private readonly repository: MetadataRepository;
   private readonly journal: TransactionJournal;
+  private acknowledgedMedia = new Set<string>();
+  private acknowledgedLocalChanges = new Set<string>();
+  private acknowledgmentsLoaded = false;
   private retained: { start: JournalStart; parts: Uint8Array[]; stagedBlobs?: JsonObject[];
     modelFacts?: { plan: MetadataModelFactPlan; next: ProjectMetadataSource };
     remote?: JournalRemoteInput;
@@ -106,11 +132,16 @@ export class MetadataProjectSession {
       const source = await this.repository.read(published.start.repositoryId, published.start.proof, published.publication!.heads);
       if (!source) fail('published-source-missing');
       const originals = new Map(source!.originalChanges().map(b => [A.decodeChange(b).hash, b]));
+      const acknowledged = new Set<string>(), localChanges = new Set<string>();
+      let witnessWork = 0;
+      const witness = () => { if (++witnessWork > this.limits.maxWork) fail('retained-media-limit'); };
       for (const entry of entries.filter(e => e.publication)) {
+        witness();
         for (const head of entry.publication!.heads) if (!originals.has(head)) fail('published-history-missing');
         for (const bytes of await this.journal.validateParts(entry.prepared!)) {
           const included = originals.get(A.decodeChange(bytes).hash);
           if (!included || !equalBytes(included, bytes)) fail('published-transaction-missing');
+          if (['initialize', 'localCommand', 'importClean'].includes(entry.start.purpose)) localChanges.add(A.decodeChange(bytes).hash);
         }
         if (entry.start.purpose === 'importWorkspace') await this.journal.validateImport(entry.prepared!);
         else if (entry.start.purpose === 'importClean') await (await CleanInputJob.open(this.fs, entry.start.transactionId, this.limits)).validateJournal(entry.prepared!);
@@ -120,8 +151,13 @@ export class MetadataProjectSession {
           if (!base) fail('remote-base-missing');
           await this.journal.validateRemote(entry.prepared!, base!);
         }
+        for (const ref of entry.prepared!.stagedBlobs ?? []) { witness(); acknowledged.add(blobKey(ref)); }
+        for (const ref of await this.journal.receivedBlobs(entry.prepared!)) { witness(); acknowledged.add(`${ref.sha256}:${ref.byteLength}`); }
       }
-      const provider = await readProjectScene(source!.read(), this.limits, this.verifier(false), { verifyRetainedMedia: !!this.media });
+      this.acknowledgedMedia = acknowledged;
+      this.acknowledgedLocalChanges = localChanges;
+      this.acknowledgmentsLoaded = true;
+      const provider = await readProjectScene(source!.read(), this.limits, this.verifier(false), { verifyRetainedMedia: this.retainedSelection(source!) });
       return this.last = Object.freeze({ state: pending ? 'pending' : this.providerReady(provider) ? 'ready' : 'repair-required',
         source: source!, provider, publication: published.start.transactionId });
     } catch {
@@ -131,9 +167,26 @@ export class MetadataProjectSession {
 
   /** Full current provider/content closure, never only a materialized Caption record. */
   private async checked(source: ProjectMetadataSource, allowNewEvidence: boolean): Promise<ProjectProviderRead> {
-    const provider = await readProjectScene(source.read(), this.limits, this.verifier(allowNewEvidence), { verifyRetainedMedia: !!this.media });
+    const provider = await readProjectScene(source.read(), this.limits, this.verifier(allowNewEvidence), {
+      verifyRetainedMedia: allowNewEvidence && !!this.media ? true : this.retainedSelection(source) });
     if (!this.providerReady(provider) || provider.kind !== 'scene-provider' || provider.token !== source.token) fail('provider-not-ready');
     return provider;
+  }
+  private retainedSelection(source: ProjectMetadataSource) {
+    const acknowledged = new Set(this.acknowledgedMedia); let work = 0;
+    for (const change of source.read().history.changes) {
+      if (++work > this.limits.maxWork) fail('retained-media-limit');
+      if (!this.acknowledgedLocalChanges.has(change.id)) continue;
+      for (const w of change.writes) {
+        if (++work > this.limits.maxWork) fail('retained-media-limit');
+        if (w.path[0] === 'mediaResourcesById' && w.path.length === 2 && w.value.kind === 'value') {
+          const record = w.value.value as JsonObject;
+          if (record && typeof record === 'object' && record.blob && typeof record.blob === 'object') acknowledged.add(blobKey(record.blob as JsonObject));
+        }
+      }
+    }
+    return async (record: JsonObject): Promise<boolean> => !!this.media &&
+      (acknowledged.has(blobKey(record.blob as JsonObject)) || (this.media.retained ? await this.media.retained(record) : true));
   }
   private providerReady(provider: ProjectProviderRead): boolean { return metadataProviderReady(provider, this.limits); }
 
@@ -478,7 +531,7 @@ export class MetadataProjectSession {
       }
       if (entries.some(e => e !== own)) return fail('clean-import-other-transaction');
       if (!own?.prepared) {
-        const facts = await this.modelFacts.planImported(source, ref => job.inspection.archive.entryBlob(`blobs/sha256/${ref.digest}`));
+        const facts = await this.modelFacts.planImported(source, ref => job.inspection.archive.entryBlob(`blobs/sha256/${ref.digest}`), incomingBlobs(job.inspection.archive.control.manifest.blobs));
         if (facts.baseToken !== null || facts.finalToken !== source.token) return fail('model-facts-token');
         const introduced = new Set((facts.stagedBlobs ?? []).map(b => b.digest));
         await this.media.inventory(inventory.filter(b => !introduced.has(b.digest)));
@@ -559,7 +612,7 @@ export class MetadataProjectSession {
       if (entries.some(e => e !== own)) return fail('import-other-transaction');
       if (!own?.prepared) {
         const parts = initialWorkspaceChanges(source, this.limits);
-        const facts = await this.modelFacts.planImported(source, ref => job.inspection.archive.entryBlob(`blobs/sha256/${ref.digest}`));
+        const facts = await this.modelFacts.planImported(source, ref => job.inspection.archive.entryBlob(`blobs/sha256/${ref.digest}`), incomingBlobs(job.inspection.archive.control.manifest.blobs));
         if (facts.baseToken !== null || facts.finalToken !== source.token) return fail('model-facts-token');
         const introduced = new Set((facts.stagedBlobs ?? []).map(b => b.digest));
         await this.media.inventory(inventory.filter(b => !introduced.has(b.digest)));
@@ -615,7 +668,7 @@ export class MetadataProjectSession {
       if (!parts.length) await this.media.inventory(inventory);
       if (own && (json(own.start.proof) !== json(base.proof) || json(own.start.baseHeads) !== json(base.heads))) return fail('receive-job-journal');
       if (!own?.prepared) {
-        const facts = await this.modelFacts.planReceived(base, final, ref => job.inspection.archive.entryBlob(`blobs/sha256/${ref.digest}`));
+        const facts = await this.modelFacts.planReceived(base, final, ref => job.inspection.archive.entryBlob(`blobs/sha256/${ref.digest}`), incomingBlobs(job.inspection.archive.control.manifest.blobs));
         const introduced = new Set((facts.stagedBlobs ?? []).map(b => b.digest));
         await this.media.inventory(inventory.filter(b => !introduced.has(b.digest)));
         if (!job.start) {
@@ -708,7 +761,7 @@ export class MetadataProjectSession {
       const { parts, final } = planRemoteChanges(base, job.inspection.target, this.limits), inventory = await job.inventory();
       if (own && (json(own.start.proof) !== json(base.proof) || json(own.start.baseHeads) !== json(base.heads))) fail('receive-job-journal');
       if (!own?.prepared) {
-        const facts = parts.length ? await this.modelFacts.planReceived(base, final, r => job.inspection.archive.entryBlob(`blobs/sha256/${r.digest}`)) : null;
+        const facts = parts.length ? await this.modelFacts.planReceived(base, final, r => job.inspection.archive.entryBlob(`blobs/sha256/${r.digest}`), incomingBlobs(job.inspection.archive.control.manifest.blobs)) : null;
         const introduced = new Set((facts?.stagedBlobs ?? []).map(b => b.digest));
         await this.media.inventory(inventory.filter(b => !introduced.has(b.digest)));
         if (!job.start) {
@@ -774,6 +827,10 @@ export class MetadataProjectSession {
 
   private async resume(receiveJob?: ReceiveJob, restoreJob?: BackupRestoreJob): Promise<MetadataSessionRead> {
     const entries = await this.journal.entries(), pending = entries.find(e => !e.publication);
+    if (!this.acknowledgmentsLoaded && entries.some(e => e.publication)) {
+      await this.read();
+      if (!this.acknowledgmentsLoaded) return fail('retained-media-witness');
+    }
     const transactionId = pending?.start.transactionId ?? this.retained?.start.transactionId;
     if ((pending?.start ?? this.retained?.start)?.purpose === 'restoreBackup') {
       if (!restoreJob || restoreJob.id !== transactionId || !this.media) return fail('restore-job-recovery-required');
@@ -864,8 +921,16 @@ export class MetadataProjectSession {
       }
       if (pending?.durable && (!stored || stored.token !== next.token)) fail('import-acknowledged-change-missing');
     } else next = stored ? stored.appendOriginal(parts) : ProjectMetadataSource.reopen(parts, start.proof, this.limits);
+    // Prepared recovery is verify-only too, including an initial weak PNG whose
+    // two local receipts disappeared before publication. The originals above are validated.
+    let witnessWork = 0;
+    const witness = () => { if (++witnessWork > this.limits.maxWork) fail('retained-media-limit'); };
+    for (const ref of prepared.stagedBlobs ?? []) { witness(); this.acknowledgedMedia.add(blobKey(ref)); }
+    for (const ref of await this.journal.receivedBlobs(prepared)) { witness(); this.acknowledgedMedia.add(`${ref.sha256}:${ref.byteLength}`); }
+    if (['initialize', 'localCommand', 'importClean'].includes(start.purpose))
+      for (const part of prepared.changes) { witness(); this.acknowledgedLocalChanges.add(part.expectedChangeHash); }
     // Exact pending changes can coexist with legitimate extra local heads; never rebase or choose a winner.
-    await this.checked(next, start.purpose === 'initialize');
+    await this.checked(next, false);
     if (receiveJob) await this.media!.inventory!(await receiveJob.inventory());
     if (restoreJob) await this.media!.verify(restoreJob.inventory());
     await this.repository.persist(start.repositoryId, next);

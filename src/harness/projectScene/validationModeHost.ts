@@ -9,6 +9,7 @@ export type ValidationDisplayHost = Pick<Host, 'authority' | 'setDisplayPreparat
 /** One stable editor/read facade; only the verified durable host/lease is replaced. */
 export function createValidationModeHost(initial: Host, open: (mode: LocalOpenMode) => Promise<Host>, changed: (mode: LocalOpenMode) => void) {
   let current = initial, closed = false, switching = false, operation: Promise<void> | undefined;
+  let imageOwner = current.content, imageEpoch = 0;
   let prepare: ((next: SyntheticProject) => Promise<void>) | undefined, detach: (() => void) | undefined;
   const admit = () => { if (closed || switching) throw Error('画面の切替が完了するまでお待ちください。'); };
   const run = async <T>(action: () => T | Promise<T>) => { admit(); return action(); };
@@ -71,7 +72,7 @@ export function createValidationModeHost(initial: Host, open: (mode: LocalOpenMo
       try { await work; } finally { switching = false; if (operation === work) operation = undefined; }
     },
   };
-  const host: SavedWorkspaceHost & ValidationDisplayHost & Pick<Host, 'workspaceFiles' | 'workspaceOutput' | 'backupRestore' | 'dispatch'> & { content: Pick<Host['content'], 'model' | 'image'> } = {
+  const host: SavedWorkspaceHost & ValidationDisplayHost & Pick<Host, 'workspaceFiles' | 'workspaceOutput' | 'backupRestore' | 'dispatch'> & { content: Pick<Host['content'], 'model' | 'image'>; imageScope(): string } = {
     authority, mode, limits: initial.limits, read: () => current.read(),
     hasPending: () => switching || current.hasPending(),
     refresh: () => run(() => current.refresh()), resolve: (...a) => run(() => current.resolve(...a)),
@@ -120,6 +121,7 @@ export function createValidationModeHost(initial: Host, open: (mode: LocalOpenMo
     },
     // The resident cache never retains a closed host's content service.
     content: { model: (record, readOnly) => current.content.model(record, readOnly), image: (record, readOnly) => current.content.image(record, readOnly) },
+    imageScope() { if (imageOwner !== current.content) { imageOwner = current.content; imageEpoch++; } return String(imageEpoch); },
     setDisplayPreparation(callback) {
       admit(); if (prepare) throw Error('モデル表示の接続を確認してください。');
       prepare = callback; detach = current.setDisplayPreparation(callback);

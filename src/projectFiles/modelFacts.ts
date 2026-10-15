@@ -12,9 +12,9 @@ import { fileObject } from './validation';
 
 /** Owned new GLB or fresh records reusing exact known bodies. Old evidence is never repaired. */
 export function validationModelFacts(content: ValidationContent): MetadataModelFactPort {
-  return { planReceived: (base, next, bodyFor) => validationReceivedFacts(content, base, next, bodyFor),
+  return { planReceived: (base, next, bodyFor, hasIncoming) => validationReceivedFacts(content, base, next, bodyFor, hasIncoming),
     planRestored: (next, bodyFor, refs) => restoredFacts(content, next, bodyFor, refs),
-    planImported: (next, bodyFor) => receivedFacts(content, null, next, bodyFor), async plan(base, next) {
+    planImported: (next, bodyFor, hasIncoming) => receivedFacts(content, null, next, bodyFor, hasIncoming), async plan(base, next) {
     const used = new Set<string>(), introduced = new Set<string>(); let work = 0;
     const charge = () => { if (++work > limits.maxWork) fileError('モデルの検証範囲を超えています。'); };
     for (const change of base.read().history.changes) for (const w of change.writes) {
@@ -48,7 +48,7 @@ export function validationModelFacts(content: ValidationContent): MetadataModelF
       if (introduced.size !== 1) return fileError('一つの3Dモデルを選択してください。');
       preparedRecord = r;
       return content.inspectPreparedModel(request);
-    } }, { verifyRetainedMedia: true });
+    } }, { verifyRetainedMedia: record => content.retained(record) });
     if (!metadataProviderReady(provider, limits) || provider.kind !== 'scene-provider')
       return fileError('追加するモデルの参照を確認できません。');
     if (!requests.length) return null; // Weak-only records require no new facts/body reads.
@@ -92,7 +92,7 @@ async function restoredFacts(content: ValidationContent, next: ProjectMetadataSo
     if (state === 'unverified') introduced.add(key);
     else if (state !== 'verified-present') return fileError('記録済みの本体に修復が必要です。');
   }
-  const facts = await receivedFacts(content, null, next, bodyFor), handled = new Set((facts.stagedBlobs ?? []).map(json));
+  const facts = await receivedFacts(content, null, next, bodyFor, ref => bodies.has(json(ref))), handled = new Set((facts.stagedBlobs ?? []).map(json));
   if ([...handled].some(key => !bodies.has(key))) return fileError('復元する本体の一覧が一致しません。');
   const completed = new Set<string>();
   return { baseToken: null, finalToken: next.token, stagedBlobs: [...introduced].sort().map(key => bodies.get(key)!.ref), async stage() {
@@ -107,12 +107,12 @@ async function restoredFacts(content: ValidationContent, next: ProjectMetadataSo
 
 /** Full original-record admission. The caller still owns receive-job/source retention and publication. */
 export async function validationReceivedFacts(content: ValidationContent, base: ProjectMetadataSource, next: ProjectMetadataSource,
-  bodyFor: (ref: JsonObject) => Blob): Promise<MetadataModelFactPlan> {
+  bodyFor: (ref: JsonObject) => Blob, hasIncoming?: (ref: JsonObject) => boolean): Promise<MetadataModelFactPlan> {
   if (json(base.proof) !== json(next.proof)) return fileError('受信先のプロジェクトが一致しません。');
-  return receivedFacts(content, base, next, bodyFor);
+  return receivedFacts(content, base, next, bodyFor, hasIncoming);
 }
 async function receivedFacts(content: ValidationContent, base: ProjectMetadataSource | null, next: ProjectMetadataSource,
-  bodyFor: (ref: JsonObject) => Blob): Promise<MetadataModelFactPlan> {
+  bodyFor: (ref: JsonObject) => Blob, hasIncoming?: (ref: JsonObject) => boolean): Promise<MetadataModelFactPlan> {
   const oldIds = new Set<string>(), oldDigests = new Map<string, number>(), sizes = new Map<string, number>();
   const inspectionBudget = { maxNodes: limits.maxNodes, maxWork: limits.maxWork };
   const before = base ? await base.inspectOriginal(inspectionBudget) : null, after = await next.inspectOriginal(inspectionBudget);
@@ -153,7 +153,7 @@ async function receivedFacts(content: ValidationContent, base: ProjectMetadataSo
       result = await content.inspectReceived(request, input.file); bodies.set(json(ref), input);
     }
     results.set(key, result); requests.set(key, request); return result;
-  } }, { verifyRetainedMedia: true });
+  } }, { verifyRetainedMedia: async record => !hasIncoming || hasIncoming(record.blob as JsonObject) || await content.retained(record) });
   if (!metadataProviderReady(provider, limits) || provider.kind !== 'scene-provider') return fileError('受信後の参照を確認できません。');
   const staged: { ref: JsonObject; file: Blob }[] = [], completedBodies = new Set<string>(), completedFacts = new Set<string>();
   for (const [key, body] of [...bodies].sort(([a], [b]) => a < b ? -1 : 1)) {

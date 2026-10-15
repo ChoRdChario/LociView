@@ -139,7 +139,11 @@ export class ValidationContent implements MetadataMediaPort {
   async inventory(blobs: readonly JsonObject[]): Promise<void> {
     for (const blob of blobs) if (await this.store.inspect(blob) !== 'verified-present') return fileError('受信ファイルの本体を確認できません。');
   }
-  verifier(allowNewEvidence: boolean): ProjectContentVerifier {
+  /** Project-owned fact witness. An unrelated origin's CAS body grants no media admission. */
+  async retained(record: JsonObject): Promise<boolean> {
+    return this.verifier(false).hasEvidence({ token: 'retained-media', fact: 'media', records: [record], context: {} });
+  }
+  verifier(allowNewEvidence: boolean): PersistentContentVerifier {
     const executor: ProjectContentVerifier = { scope: 'development-validation', verify: q => this.execute(q) };
     return new PersistentContentVerifier(this.fs, validationMetadataLimits, executor, 'validation-glb-png-executor-1',
       blobInventory(this.store, validationMetadataLimits), allowNewEvidence);

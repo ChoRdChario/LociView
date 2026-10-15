@@ -164,4 +164,27 @@ describe('same-host known PNG media connection; not decoder adoption, raster, IM
     const fresh = nodes(root).find(n => n.tag === 'img')!; expect(fresh).not.toBe(old); old.fire('error'); expect(button(root, '画像を再試行').hidden).toBe(true);
     expect((fresh as unknown as HTMLImageElement).loading).toBe('lazy'); grid.dispose(); viewer.dispose();
   });
+  it('loads verified async PNGs only for mounted thumbnails and discards late results after paging or disposal', async () => {
+    const document = new RecordedDocument(), viewer = createMediaViewer(document.asDocument()), create = vi.spyOn(URL, 'createObjectURL'), revoke = vi.spyOn(URL, 'revokeObjectURL');
+    const releases: ((blob: Blob) => void)[] = [], loads = Array.from({ length: 13 }, () => vi.fn(() => new Promise<Blob>(resolve => { releases.push(resolve); })));
+    const group: MediaPreviewGroup = { scope: 'async', label: '保存済み画像', items: loads.map((load, i) => ({ id: String(i), resourceId: String(i), label: String(i), description: '', image: { load } })) };
+    const thumbnails = createMediaThumbnails(document.asDocument(), () => group, viewer), root = record(thumbnails.root);
+    thumbnails.render(); await vi.waitFor(() => expect(releases).toHaveLength(12)); expect(loads[12]).not.toHaveBeenCalled();
+    button(root, '次の一覧').fire('click'); await vi.waitFor(() => expect(releases).toHaveLength(13));
+    releases.slice(0, 12).forEach(resolve => resolve(new Blob(['verified bytes'], { type: 'image/png' }))); await Promise.resolve(); await Promise.resolve();
+    expect(nodes(root).filter(n => n.tag === 'img')).toHaveLength(0); expect(create).not.toHaveBeenCalled();
+    releases[12]!(new Blob(['verified last'], { type: 'image/png' })); await vi.waitFor(() => expect(nodes(root).filter(n => n.tag === 'img')).toHaveLength(1));
+    thumbnails.dispose(); viewer.dispose(); expect(revoke).toHaveBeenCalledTimes(create.mock.calls.length); create.mockRestore(); revoke.mockRestore();
+  });
+  it('retries an async body read on the exact item and ignores resolution after resource retargeting', async () => {
+    const document = new RecordedDocument(), viewer = createMediaViewer(document.asDocument()), root = record(viewer.root);
+    let resolve!: (blob: Blob) => void; const load = vi.fn().mockRejectedValueOnce(Error('read failed')).mockImplementationOnce(() => new Promise<Blob>(r => { resolve = r; }));
+    let group: MediaPreviewGroup = { scope: 'exact', label: '記録', items: [{ id: 'att', resourceId: 'med', label: '画像', description: '', image: { load } }] };
+    viewer.open(() => group, 'att', document.createElement('button') as unknown as HTMLElement);
+    await vi.waitFor(() => expect(button(root, '画像を再試行').hidden).toBe(false)); expect(load).toHaveBeenCalledTimes(1);
+    button(root, '画像を再試行').fire('click'); await vi.waitFor(() => expect(load).toHaveBeenCalledTimes(2));
+    group = { ...group, items: [{ ...group.items[0]!, resourceId: 'other' }] }; viewer.render(); resolve(new Blob(['stale verified bytes'], { type: 'image/png' }));
+    await Promise.resolve(); await Promise.resolve(); expect(nodes(root).filter(n => n.tag === 'img')).toHaveLength(0);
+    expect(nodes(root).some(n => n.textContent.includes('選び直してください'))).toBe(true); viewer.dispose();
+  });
 });

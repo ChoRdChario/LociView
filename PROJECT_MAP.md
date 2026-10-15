@@ -23,7 +23,8 @@ owns feature coverage. Read [document authority](docs/README.md) for contracts.
 Within validation, `editor=project` selects the bounded typed product composition
 in `src/ui/projectScene/projectWorkspace.ts`; its viewport/file adapter is
 `src/harness/projectScene/productWorkspace.ts`. The existing editor remains available.
-The composition's model, Saved View and material panels reuse their pure controls;
+The composition's model, Saved View, material and attachment panels reuse their pure controls;
+`projectMedia.ts` connects attachment management to the common `mediaPreview.ts` viewer.
 `productSources.ts` supplies bounded read projections and command preparation.
 Inventory and todo own its exact feature and verification scope.
 

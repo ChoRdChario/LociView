@@ -209,6 +209,14 @@ not all historically mentioned blobs. Recompute the required closure against tha
 inventory; unknown minor fields retain the conservative inventory. No guessed
 inventory from hashes, current UI state or the receiver's later union is valid.
 
+Implementation clarification (2026-10-15): receiving a Workspace does not require
+the body of an omitted, weak-only historical PNG declaration. Preserve that
+declaration as unavailable; do not invent receipt or content evidence. Required
+closure and physically supplied bodies still undergo their existing validation.
+Previously acknowledged local bytes/evidence remain protected against silent loss
+or incoming repair. This clarifies the existing inventory boundary without
+changing package bytes, retention roots or the supported media profile.
+
 An available retained base protects its evidence and guaranteed inventory as local
 retention roots. This may retain models no longer active in current Scenes and is
 included in backup's protected inventory. Inventory verification uses the existing

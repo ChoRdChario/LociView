@@ -248,7 +248,7 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
       const validationFiles = /[\\/]projectFiles[\\/](validation|png|glb|glbMaterials|initialProject|content|creation|modelFacts|receiveWorkspace|sendWorkspace|nativeMapping|nativeConversion)\.ts$/.test(path);
       const validationDisplay = /[\\/]harness[\\/]projectScene[\\/](modelTypes|modelCandidatePreview|validationProjection|validationRender|validationMaterials|validationCoverage)\.ts$/.test(path);
       const validationHost = /[\\/]harness[\\/]projectScene[\\/](reviewView|reviewWorkspace|savedHost|validationHost|validationModeHost|validationCatalog|validationGeneration|validationWorkspace|validationReceiveControls|validationOutputControls|validationBrowser|browserMetadataStorage|productWorkspace|productSources|viewCandidateLabels)\.ts$/.test(path);
-      const productComposition = /[\\/]ui[\\/]projectScene[\\/](projectWorkspacePorts|projectWorkspace|projectRead|projectPanel|projectModels|projectViews|projectMaterials)\.ts$/.test(path);
+      const productComposition = /[\\/]ui[\\/]projectScene[\\/](projectWorkspacePorts|projectWorkspace|projectRead|projectPanel|projectModels|projectViews|projectMaterials|projectMedia)\.ts$/.test(path);
       if (!metadataFoundation && !metadataService && !metadataHost && !validationFiles && !validationDisplay && !validationHost && !packageMetadata && !productComposition) expect(source, path).not.toMatch(/(?:from\s+|import\s*\()['"][^'"]*\/projectMetadata\//);
       if (packageControl) {
         const imports = [...source.matchAll(/(?:from\s+|import\s*\()(['"])([^'"]+)\1/g)].map(m => m[2]);
@@ -347,7 +347,7 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
           validationOutputControls: ['./validationModeHost', '../../ui/projectScene/projectWorkspacePorts'],
           productWorkspace: ['../../ui/projectScene/projectWorkspace', '../../ui/projectScene/projectWorkspacePorts', '../../domain/values', './viewportModel', './viewportHost', './validationModeHost', './validationReceiveControls', './productSources', './viewHistory', './modelCandidatePreview'],
           viewCandidateLabels: ['../../scene/projectProvider'],
-          productSources: ['../../scene/types', '../../scene/resolve', '../../domain/values', '../../domain/materialIntent', '../../projectMetadata/materialResolution', '../../projectMetadata/assetStatus', '../../projectMetadata/membership', '../../projectMetadata/modelMembership', '../../projectMetadata/viewResolution', '../../projectMetadata/persistence', '../../ui/projectScene/materialState', '../../ui/projectScene/projectWorkspacePorts', '../../ui/projectScene/projectRead', './metadataViews', './viewHistory', './viewCandidateLabels', './modelTransform', './materialHistory', './validationMaterials', './materialReview', './modelClosure', './validationModeHost'],
+          productSources: ['../../scene/types', '../../scene/resolve', '../../domain/values', '../../domain/materialIntent', '../../projectMetadata/materialResolution', '../../projectMetadata/assetStatus', '../../projectMetadata/membership', '../../projectMetadata/modelMembership', '../../projectMetadata/viewResolution', '../../projectMetadata/persistence', '../../ui/projectScene/materialState', '../../ui/projectScene/projectWorkspacePorts', '../../ui/projectScene/projectRead', './metadataViews', './viewHistory', './viewCandidateLabels', './modelTransform', './materialHistory', './validationMaterials', './materialReview', './mediaHistory', './modelClosure', './validationModeHost'],
           validationBrowser: ['../../platform/opfs', '../../platform/projectLock', '../../projectMetadata/blobStore', '../../projectMetadata/generationScope', '../../projectFiles/validation',
             './browserMetadataStorage', './validationHost', './validationCatalog', './validationWorkspace', './validationRender', './viewport', './viewportModel', './fixture'],
           browserMetadataStorage: ['@automerge/automerge/slim', '@automerge/automerge/automerge.wasm?url', '@automerge/automerge-repo-storage-indexeddb'],
@@ -401,7 +401,7 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
           persistence: ['../core/json', '../domain/projectGraphSupport', '../domain/values', '../platform/fs', './format', './repository'],
           generationScope: ['../platform/fs', './format', './persistence', './repository'],
           repository: ['@automerge/automerge/slim', '@automerge/automerge-repo/slim', '../platform/fs', './format', './persistence', './source'],
-          journal: ['@automerge/automerge/slim', '../platform/fs', '../domain/values', '../domain/projectRecordFields', './format', './source', './persistence', './remote', './packageRemote', '../projectPackage/contributionEvidence'],
+          journal: ['@automerge/automerge/slim', '../platform/fs', '../domain/values', '../domain/projectRecordFields', './format', './source', './persistence', './remote', './packageRemote', '../projectPackage/contributionEvidence', '../projectPackage/manifest'],
           remote: ['@automerge/automerge/slim', '../domain/values', './format', './source', './persistence'],
           packageRemote: ['../domain/values', '../projectPackage/manifest', '../projectPackage/contract', './format', './source', './remote', './persistence', '../projectPackage/contributionEvidence', '../projectPackage/backupEvidence'],
           records: ['../domain/projectRecords', '../domain/projectRecordFields', '../domain/projectGraphSupport', '../scene/projectProvider', './format'],
@@ -481,6 +481,7 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
         // not the Native controller/schema runtime or a general Native dependency.
         const shared = ['../../scene/types', '../../domain/captionText', '../../domain/values', '../../domain/materialIntent', '../../nativeGs/backgroundColor'];
         if (productComposition) shared.push('../../projectMetadata/commands', '../../scene/projectProvider', '../../scene/resolve');
+        if (path.replaceAll('\\', '/').endsWith('/projectRead.ts')) shared.push('../../domain/projectGraphSupport');
         if (path.replaceAll('\\', '/').endsWith('/materialState.ts')) shared.push('../../domain/projectProfile');
         expect(imports.every(p => p?.startsWith('./') || shared.includes(p!)), path).toBe(true);
       } else if (/[\\/]harness[\\/]projectScene[\\/](fixture|session|workspace|entry|validationEntry|historyPort|historyProjection|teamWorkspace|modelFixture|modelClosure|modelHistory|developmentControls|membershipResolution|viewport|viewportHost|viewportModel|pinParent|viewHistory|viewSession|materialHistory|materialSession|materialReview|mediaHistory|mediaSession|mediaControls|mediaPresentation)\.ts$/.test(path)) {

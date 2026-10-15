@@ -41,6 +41,7 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
     replaceModel: async (token, input) => host.authority.replaceModelFile!(token, input),
     transformModel: async (token, input) => host.authority.transformModel!(token, input),
     image: async record => new Blob([(await host.content.image(record, true)).slice().buffer], { type: 'image/png' }),
+    imageScope: () => host.imageScope(),
     changed, otherPending: external,
     createViewport(canvas, update, propose, proposeModel): WorkspaceViewport {
       let state: WorkspaceViewportState | undefined, closed = false;

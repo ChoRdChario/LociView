@@ -43,7 +43,7 @@
 | project-scene memory／旧 `storage=saved` | 合成の2人チーム、更新・競合・独立copy・保存の限定ループ | 新metadata serviceまたは実ファイル製品wireの接続済み |
 | project-scene `storage=metadata` | 新source/repository/session/journalと従来25群＋C07/V04の合成UI接続、限定履歴受信・明示解消 | 任意モデル／任意画像／実ファイルのチーム受信／通常home／offlineの合格 |
 | project-scene `storage=validation` | 静的GLB/PNG Projectの作成・一覧・再開、実本体read/renderと編集、限定Workspace/Contributionの実file入出力・中断復旧、名前付きbackup出力と確認付き復元・復元後の編集／返送、独立コピー出力・入力・編集／再開、選択Sceneの閲覧用出力・内容由来のstandalone View、明示確認した編集コピー・中断復旧・編集／再開。実行結果はtodo参照 | 通常home、正式profile／任意形式、実描画／実入力／実機／offlineの受入れ、全purpose／移行の完成 |
-| 同じvalidationの `editor=project` | Scene／Caption／ピン／PNGと、モデル・保存した視点・材質の4作業タブを接続。GLB追加／差替／配置、一時表示／所属／重複解消、視点の記録／呼出／開始設定／背景、Project／Scene材質の編集／解除・競合候補を既存authorityへ接続。保存・受渡し・受信・復元serviceを共有。対象ごとの自動検証・二往復／cold再開と未確認事項はtodo参照 | 全機能の移植、通常home、実描画・実入力・実機・offlineの合格。旧editorは保持し、分類件数は増やさない |
+| 同じvalidationの `editor=project` | Scene／Caption／ピン／PNGと、モデル・保存した視点・材質の4作業タブを接続。GLB追加／差替／配置、一時表示／所属／重複解消、視点・背景、Project／Scene材質に加え、登録PNGの再利用・説明・順序・確認付き添付解除・共通画像viewerを既存authorityへ接続。保存・受渡し・受信・復元serviceを共有。対象ごとの自動検証・cold再開と未確認事項はtodo参照 | 全機能の移植、通常home、実描画・実入力・実機・offlineの合格。旧editorは保持し、分類件数は増やさない |
 
 ## 2. 全機能群
 
@@ -102,7 +102,7 @@
 
 | ID | 機能群／利用者の結果 | 状態 | 現在の境界・残り | コード／既存受入れ参照（行番号は監査時点） |
 |---|---|---|---|---|
-| I01 | Project内メディアを添付・再利用し、説明・順序・添付解除を編集する | 接続済み | 合成2枚とvalidation保存PNGの登録・再利用。確認付き添付削除で元bytesと他Captionを保持。実入力受入れは別。 | [src/harness/projectScene/mediaControls.ts](../src/harness/projectScene/mediaControls.ts) / [tests/ui/projectMetadataHost.test.ts](../tests/ui/projectMetadataHost.test.ts) |
+| I01 | Project内メディアを添付・再利用し、説明・順序・添付解除を編集する | 接続済み | 合成2枚とvalidation保存PNGに加え、限定product compositionの既存commandへ統合。確認付き解除で元bytesと他Captionを保持。最後の解除後のWorkspace受渡し・編集継続・cold再開、未受領画像の選択除外と所有済み証拠消失の停止を自動確認。実入力受入れは別。 | [src/ui/projectScene/projectMedia.ts](../src/ui/projectScene/projectMedia.ts) / [src/harness/projectScene/mediaControls.ts](../src/harness/projectScene/mediaControls.ts) / [tests/projectFiles.test.ts](../tests/projectFiles.test.ts) |
 | I02 | 実画像ファイルを添付する | 別経路のみ | validation hostのPNG後入れは同じcreateAttachment／journalへ限定接続。拒否・元bytes retry・cold復旧を確認。他のNative JPEG/WebP/GIF still-image範囲と実入力は残り、行全体は完了としない。 | [src/harness/projectScene/validationHost.ts](../src/harness/projectScene/validationHost.ts) / [tests/projectFiles.test.ts](../tests/projectFiles.test.ts) |
 | I03 | 添付画像を開いて拡大・失敗時に再試行する | 接続済み | 合成bytesとvalidation保存PNGから表示。欠損をfixture画像で置換しない。保存後のgallery準備失敗も隠さず同じ添付を再確認。 | [src/harness/projectScene/mediaControls.ts](../src/harness/projectScene/mediaControls.ts) / [tests/projectFiles.test.ts](../tests/projectFiles.test.ts) |
 | I04 | サムネイルで選び、共通viewerで画像を前後確認する | 接続済み | 既知PNGのページ付きサムネイル選択→明示添付、panel／複数Caption windowから同一viewerの前後・終了・同じ対象retryを接続。readonly reviewも共通操作。Caption／attachment／resource IDを固定し、重複resourceへの独立添付・draft保持、Scene変更時終了、旧load/error破棄。通常home・新媒体・実browser／実機は未受入れ。 | [src/harness/projectScene/mediaControls.ts](../src/harness/projectScene/mediaControls.ts) / [src/ui/projectScene/mediaPreview.ts](../src/ui/projectScene/mediaPreview.ts) / [tests/ui/projectSceneMedia.test.ts](../tests/ui/projectSceneMedia.test.ts) |

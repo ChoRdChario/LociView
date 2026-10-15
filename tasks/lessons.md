@@ -24,6 +24,9 @@ Read only the relevant topic, not every historical incident.
   human testing. Do not turn each small improvement or fixture into a PO test
   request. Pending human acceptance is recorded, not a dependency of continued
   implementation; actual adoption/release gates and autonomous checks remain.
+  Completion reports must state the delivered result and remaining limits; until
+  the application is complete, always include the concrete next planned unit
+  (PO instruction 2026-10-15). A verified slice is not application completion.
 - 2026-09-20: Runtime checks also have a UX cost. Measure the complete user
   action's I/O amplification before adding more validation. Reuse owned evidence
   within an explicitly bounded operation; retain input, write, publication and

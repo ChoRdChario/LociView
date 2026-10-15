@@ -1484,6 +1484,44 @@ pending input. Validate representative model/view/material edits through file
 output and independent reopen, plus existing focused invariant/fault tests. This
 adds no renderer, storage, compatibility, profile or ordinary-entry policy.
 
+**Product attachment integration clarification (2026-10-15):** extend the same
+composition with registered admitted PNG reuse, attachment description/order,
+confirmed detachment and the existing common thumbnail/viewer controls. Reads
+retain exact Caption/attachment/resource identities and distinguish uncertain
+relations from an empty list. Writes use existing typed attachment commands and
+the shared operation owner; original IDs/inputs remain fixed through retry.
+Detachment tombstones only the selected attachment, preserving media bytes and
+other Captions. Viewer navigation is local, preserves editing drafts and rejects
+late image events/results after identity, Scene or component lifetime changes.
+Retain verified immutable body identity across unrelated edits, bound mounted
+thumbnails with the existing pagination, and release object URLs on replacement
+or disposal. An opaque host image-lifetime read must follow the underlying current
+content service, rather than the stable mode facade, so host handoff invalidates
+old readers/promises without exposing that service. Confirm connected
+reuse/edit/detach → file exchange/cold reopen plus
+existing viewer fault coverage. This is a composition change within the current
+PNG lane, not additional media/profile or browser/device acceptance.
+
+**Detached PNG handoff correction (2026-10-15):** a Workspace may retain an
+immutable historical media declaration without its weak-only body, as already
+required by specification 06's guaranteed-inventory boundary. On fresh receipt,
+request all strong-closure media and physically supplied media; retain an omitted,
+never-received weak PNG as unavailable, with its original declaration and diagnostic.
+It is not an available catalog choice. Only the exact unrequested weak
+`verified-media-bytes-required` issue may coexist with whole-Project readiness;
+an executed failed/missing/stale/malformed check still blocks readiness.
+Locally acknowledged media remains subject to verification after detachment.
+Owned content-evidence receipts and prepared/published local/staged or original
+physical-manifest witnesses prevent loss from being reclassified as never received,
+including loss of both receipt types. A matching body in another Project's origin
+CAS alone does not admit omitted media or make it a catalog choice.
+Reuse of known records never repairs them
+from incoming bytes. No wire, schema, retention or general weak-record reactivation
+policy changes. Acceptance: last global detachment → fresh Workspace import →
+read/edit/export/cold reopen, unavailable-media disclosure, and acknowledged-media
+loss rejection with no repair writes. Backup protected-inventory verification and
+required/conflicted media checks remain unchanged.
+
 Each production slice requires a short meta-audit, exact-tree tests/build, one
 independent read-only review and a reversible commit. Run focused checks during
 editing, then the required full matrix once on the final executable tree. Reuse

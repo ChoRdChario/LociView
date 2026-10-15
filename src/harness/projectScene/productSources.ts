@@ -18,14 +18,16 @@ import { rotationDegrees, degreesRotation, finiteInput } from './modelTransform'
 import { materialBucket, materialLimits, sourceMaterialIntent } from './materialHistory';
 import { validationMaterialSlots, validationMaterialSourceIssue, validationMaterialIssue } from './validationMaterials';
 import { describeMaterialCandidate } from './materialReview';
+import { normalizeAlt } from './mediaHistory';
 import { canonicalFixture } from './modelClosure';
 import type { createValidationModeHost } from './validationModeHost';
 
 /** Read adapters only: no Session exposure, synthetic editor or mutation authority. */
 export function productSources(host: ReturnType<typeof createValidationModeHost>): Pick<ProjectWorkspacePorts,
-  'modelDetails' | 'modelPlacement' | 'modelAngles' | 'modelReview' | 'modelDeletion' | 'prepareModelMembership' | 'views' | 'viewOrder' | 'viewReview' | 'materials'> {
+  'modelDetails' | 'modelPlacement' | 'modelAngles' | 'modelReview' | 'modelDeletion' | 'prepareModelMembership' | 'views' | 'viewOrder' | 'viewReview' | 'materials' | 'mediaDescription'> {
   const provider = () => { const p = host.read().provider; if (p?.kind !== 'scene-provider') throw Error('プロジェクトの内容を確認してください。'); return p; };
   return {
+    mediaDescription: normalizeAlt,
     modelDetails(sceneId, assetId) {
       const p = provider(), snapshot = host.authority.read(); if (p.token !== snapshot.state.token) return null;
       const asset = p.resources.assets[assetId], projection = asset?.projection;

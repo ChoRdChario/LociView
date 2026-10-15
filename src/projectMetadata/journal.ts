@@ -10,6 +10,7 @@ import { captureJournalRemote, checkJournalRemote, isPackageRemote, isContributi
   remoteEvidenceBytes, remoteEvidenceDescriptors, remoteInputFromEvidence,
   type JournalRemoteProof, type JournalRemoteInput, type BackupRestoreInput } from './packageRemote';
 import { assertContributionBaseInReceiver, frozenBaseSource } from '../projectPackage/contributionEvidence';
+import { readManifestControl } from '../projectPackage/manifest';
 
 export interface JournalStart {
   transactionId: string;
@@ -236,6 +237,20 @@ export class TransactionJournal {
       originals.set(name, bytes);
     }
     return remoteInputFromEvidence(p.remote, originals);
+  }
+  /** Physical incoming inventory only, after the caller validates the published journal.
+   * Base guarantees are not evidence that a Contribution supplied those bodies. */
+  async receivedBlobs(p: PreparedJournal): Promise<readonly { sha256: string; byteLength: number }[]> {
+    if (!p.remote || !isPackageRemote(p.remote)) return [];
+    const read = async (name: string, ref: { sha256: string; byteLength: number }) => {
+      const path = this.path(p.start.transactionId, name), file = await this.fs.readStream(path);
+      if (!file || file.size !== ref.byteLength) return fail('remote-source-size');
+      const bytes = await this.fs.readBytes(path);
+      if (!bytes || bytes.length !== ref.byteLength || await digest(bytes) !== ref.sha256) return fail('remote-source-digest');
+      return bytes;
+    };
+    return readManifestControl(await read('source-manifest.json', p.remote.source.manifest),
+      await read('source-manifest.sha256', p.remote.source.checksum)).manifest.blobs;
   }
   private async readRemoteSource(p: PreparedJournal): Promise<ProjectMetadataSource> {
     return validateJournalRemote(await this.readRemoteInput(p), p.start.proof, this.limits);

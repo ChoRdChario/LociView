@@ -18,7 +18,7 @@ The latest verified implementation includes bounded Native GLB/PNG conversion �
 edit/first-place → named backup/Workspace → independent reopen, plus the typed
 product composition's edit → save/two-round exchange → cold-reopen workflow in
 the nondefault validation route, now including the model, Saved View and material
-panels. Existing file/recovery work is retained.
+panels and attachment organization/shared viewing. Existing file/recovery work is retained.
 Ordinary entry, broader profiles/converters, browser performance, physical-iPhone
 and offline acceptance remain open. Full details and earlier failures are in the
 [September checkpoint record](../docs/history/development-through-2026-09-21/tasks/todo.md).
@@ -97,6 +97,85 @@ major architecture/product decision, a required managed permission, or a release
 destructive boundary. Ordinary entry and temporary iPhone HTTPS need their existing
 exact-build/route approvals. Main, Pages, Service Worker, version/license, release,
 dependency changes and private/public fixture distribution are outside this unit.
+
+### Completed unit — organize and compare attachments in the integrated editor
+
+PO entrusted continuation on 2026-10-15 and requested the next planned unit in
+every completion report until application completion. Outcome: reuse a registered
+PNG on another Caption, edit descriptions/order, confirm detachment, compare
+thumbnails in the shared viewer, then save/exchange and cold-reopen these edits.
+Reuse existing verified PNG reads, pure thumbnails/viewer and typed attachment
+commands through the same operation/retry owner. No SyntheticMediaSession or
+string-map writes in product UI; no new format, dependency, schema, home activation
+or release. Keep source media and other Caption attachments when detaching.
+Relevant discrepancy recorded: the initial product count helper treated an
+alt-text conflict as an unknown count and skipped concurrent delete/edit after
+a deleted lifecycle. Existing media contracts/tests require a known count for
+description-only conflict and unknown for delete/edit; this unit corrects the
+product projection to those retained contracts, without redefining them.
+
+Connected-flow audit: last global detachment exposed a receiver defect: it asked
+for weak-only historical PNG bytes omitted correctly by Workspace's strong closure.
+Own cold reopen already preserved the image. The bounded 05/06 receiver/read and
+unavailable-media correction resolved this failure in focused and final checks
+below. Strict owned-loss/no-repair and strong-content
+checks remain. This closed a handoff blocker without a new package/retention
+policy or a separate workstream.
+
+- [x] Record the bounded composition clarification; connect attachment management
+  and common viewing with shared draft/IME/file/Scene guards.
+- [x] Verify reuse/order/description/detach, exact failure retry, stale-image
+  suppression and one connected file/exchange/cold-reopen flow with existing tests.
+- [x] Independently review, pass the required serial final checkpoint and verify
+  the staged scope for the authorized g0-baseline checkpoint; report the next unit.
+  Git owns the actual commit/push identity.
+
+Implemented: registered PNG selection/reuse, attachment descriptions/order,
+confirmation-based detachment and shared paged thumbnails/viewer in the same
+four-task composition. Description conflicts retain known counts; concurrent
+delete/edit keeps the count uncertain. Typed commands share the existing
+draft/IME/file/Scene/retry owner. Async verified reads preserve immutable identity
+across unrelated edits and invalidate on underlying image-service handoff.
+
+The connected recorded-DOM/actual-file flow now covers reuse twice, description
+publication failure/exact retry, reorder/viewer/draft preservation, Contribution
+receipt, last global detachment and cold reopen. Empty-origin and unrelated warm
+CAS recipients open the resulting Workspace with unavailable historical media
+excluded from choices; fresh-host editing, model addition, output and cold reopen
+continue. Compact service faults cover owned weak PNG body/CAS/fact/both-receipt
+loss, prepared initialization and cold unrelated-command retry, preowned incoming
+bytes with no staged body, and missing/corrupt strong PNG. No acknowledged loss is
+repaired from incoming bytes or silently downgraded to never received.
+
+Independent read-only UI and content/storage reviews found and closed service-
+lifetime, unavailable-catalog, unrelated warm-CAS and cold-witness P2s; no remaining
+P1/P2 in the reviewed scope. Focused checks and the final serial
+`npm run check:checkpoint` passed: typecheck; **114 files / 2,357 passed / 21
+existing todo**; ordinary, harness and validation builds (exit 0). Its first
+attempt stopped at a readonly-array type error in the new test fixture, corrected
+without changing source contracts/assertions. Failed attempts remain under ignored
+`.artifacts/traces` and do not count as passed evidence.
+
+Final static validation manifest (7 output files):
+`83351308bd8a27c846cb67766013bf23000f182c6b4a372aa2b993ae55f9f44f`.
+All seven served HTTP bodies matched disk at port 4182; SW, webmanifest and public
+samples remain absent. This is build/HTTP evidence, not browser/rendering,
+offline/PWA or physical-device acceptance. All 19 changed source/test hashes
+matched the tested tree and staged content. The 26-path checkpoint excludes
+private inputs/fixtures, dependency and deployment changes; g0-baseline runs CI,
+not the main-only Pages deployment. Remaining browser/GPU/iPhone evidence is
+unchanged and grouped at the candidate boundary.
+
+Stop only for a new specification/profile/policy/authority or release/destructive
+boundary. Existing browser EPERM is unchanged; do not retry it or wait on small PO
+tests. Browser/device/offline acceptance remains a grouped lane.
+
+Next planned unit: connect multiple Caption comparison windows to this same
+editor, including move/resize, individual close, connection lines and the shared
+image viewer, reusing existing local-state controls and draft/IME guards. Then
+connect the remaining Caption deletion/parent-model management, followed by the
+remaining initial conversions and gated ordinary entry. These are planned work,
+not completed functionality or a new browser/device acceptance claim.
 
 ### Completed unit — model, Saved View and material screen integration
 

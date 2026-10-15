@@ -61,6 +61,8 @@ export interface ProjectWorkspacePorts {
   addMedia(token: string, input: { sceneId: string; captionId: string; attachmentId: string; eventId: string; orderKey: string;
     file: { name: string; size: number; arrayBuffer(): Promise<ArrayBuffer> } }): Promise<unknown>;
   image(record: JsonObject): Promise<Blob>;
+  imageScope(): string;
+  mediaDescription(text: string): string;
   modelDetails(sceneId: string, assetId: string): WorkspaceModelDetails | null;
   modelPlacement(translation: readonly string[], rotation: readonly string[], scale: string): WorkspacePlacement;
   modelAngles(rotation: WorkspacePlacement['rotationXYZW']): readonly [string, string, string];

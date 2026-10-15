@@ -36,6 +36,7 @@ import { fixtureModelIds } from '../src/harness/projectScene/modelClosure';
 import { openValidationHost, validationArea } from '../src/harness/projectScene/validationHost';
 import { createValidationModeHost } from '../src/harness/projectScene/validationModeHost';
 import { productSources } from '../src/harness/projectScene/productSources';
+import { projectCaptions, projectMediaResources, projectMediaUncertain } from '../src/ui/projectScene/projectRead';
 import { listValidationProjects } from '../src/harness/projectScene/validationCatalog';
 import { createSavedWorkspace } from '../src/harness/projectScene/metadataWorkspace';
 import type { DisplayCapture } from '../src/harness/projectScene/viewSession';
@@ -1545,8 +1546,10 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
         read: () => ({ ready: !!display, token: String(cameraEpoch), pickToken: String(cameraEpoch), display, pins: display?.pins.map(p => ({ id: p.id, x: 30, y: 40, visible: true })) ?? [],
           issue, notice: '検証用の表示通知', dragging: false, projection: payload.camera.projection.kind, axis: null }) };
     };
+    let opened = false, liveHost = host; const imageReads = [vi.spyOn(host.content, 'image')];
     const ui = createValidationWorkspace(document, { productEditor: true, fileLimits: budget, decode, list: async () => [], selected() {},
-      open: async () => host, render: async () => ({ factory, dispose() {} }) }, f.run);
+      open: async (_run, _initial, mode) => { if (!opened) { opened = true; return host; } liveHost = await openValidationHost({ ...options, mode }); imageReads.push(vi.spyOn(liveHost.content, 'image')); return liveHost; },
+      render: async () => ({ factory, dispose() {} }) }, f.run);
     const root = record(ui.root), all = (n: RecordedNode): RecordedNode[] => [n, ...n.children.flatMap(all)];
     const named = (label: string, parent = root) => all(parent).find(n => n.attributes.get('aria-label') === label)!;
     const button = (text: string, parent = root) => all(parent).find(n => n.tag === 'button' && n.textContent === text)!;
@@ -1559,7 +1562,8 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     };
     return { f, host, ui, editor, root, all, named, button, edited, status, downloads, legacy, dispatch, pick,
       moveCamera: () => camera({ kind: 'fit' }), display: () => display, setIssue: (text: string) => { issue = text; }, retryViewport, camera, recall, background,
-      payload: () => structuredClone(payload), proposeModel: (...args: Parameters<NonNullable<Parameters<ViewportFactory>[3]>>) => proposeModel?.(...args) };
+      payload: () => structuredClone(payload), liveHost: () => liveHost, imageReads,
+      proposeModel: (...args: Parameters<NonNullable<Parameters<ViewportFactory>[3]>>) => proposeModel?.(...args) };
   }
   it('connects the product model panel through local visibility, placement retry, GLB add/replace and cold reopen (injected viewport)', async () => {
     const h = await productWorkspaceFixture(true), { host, button, named, editor, edited, all } = h;
@@ -1820,14 +1824,106 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     named('検索', editor).fire('input'); expect(h.all(area).find(n => n.tag === 'select')!.value).toBe(option.value);
     await edited(() => button('この内容を使う', area).fire('click'));
     expect(host.authority.read().resources.captions[captionId]!.body).toEqual({ kind: 'value', value: '相手からの内容' });
-    const media = named('メディア', editor), show = button('受信画像', media);
-    const images = () => h.all(media).filter(n => n.tag === 'img');
-    const previous = images()[0]!; show.fire('click'); await vi.waitFor(() => expect(images()[0]).not.toBe(previous));
-    const old = images()[0]!; show.fire('click'); await vi.waitFor(() => expect(images()[0]).not.toBe(old));
-    old.fire('error'); expect(h.status.textContent).not.toContain('画像を表示できません');
-    images()[0]!.fire('error'); expect(h.status.textContent).toContain('画像を表示できません');
-    const failed = images()[0]!; show.fire('click'); await vi.waitFor(() => expect(images()[0]).not.toBe(failed));
-    images()[0]!.fire('load'); expect(images()[0]!.hidden).toBe(false);
+    const media = named('メディア', editor), gallery = named('添付画像', media), viewer = named('画像ビューア', media);
+    button('画像を表示', gallery).fire('click'); expect(viewer.open).toBe(true);
+    const images = () => h.all(viewer).filter(n => n.tag === 'img'); await vi.waitFor(() => expect(images(), h.all(viewer).map(n => n.textContent).join(' ')).toHaveLength(1));
+    const old = images()[0]!; old.fire('error'); expect(h.all(viewer).some(n => n.textContent.includes('画像を表示できません'))).toBe(true);
+    named('検索', editor).fire('input'); expect(button('画像を再試行', viewer).hidden).toBe(false);
+    button('画像を再試行', viewer).fire('click'); await vi.waitFor(() => { expect(images()).toHaveLength(1); expect(images()[0]).not.toBe(old); });
+    old.fire('error'); expect(button('画像を再試行', viewer).hidden).toBe(true);
+    const failed = images()[0]!; failed.fire('error'); expect(button('画像を再試行', viewer).hidden).toBe(false);
+    button('画像を再試行', viewer).fire('click'); await vi.waitFor(() => { expect(images()).toHaveLength(1); expect(images()[0]).not.toBe(failed); });
+    failed.fire('load'); images()[0]!.fire('load'); expect(images()[0]!.hidden).toBe(false); expect(button('画像を再試行', viewer).hidden).toBe(true);
+    await h.ui.dispose();
+  });
+  it('organizes reused PNG attachments through product editing, exact retry, comparison, file exchange and last-detachment cold reopen', async () => {
+    const h = await productWorkspaceFixture(true), { host, editor, named, button, edited, all } = h, firstCaption = h.f.f.captionId;
+    const provider = host.read().provider!; if (provider.kind !== 'scene-provider') throw Error('provider');
+    const resources = Object.values(provider.details.immutable.mediaResourcesById);
+    if (resources[0]?.kind !== 'value') throw Error('media'); const mediaRecord = resources[0].value;
+    button('ピンを追加', editor).fire('click'); const canvas = named('3Dモデルの表示', editor), pointer = { pointerId: 8, isPrimary: true, button: 0, clientX: 70, clientY: 80 };
+    canvas.fire('pointerdown', pointer); canvas.fire('pointerup', pointer); await edited(() => button('位置を確定', editor).fire('click'));
+    const captionId = Object.keys(host.authority.read().resources.captions).find(id => id !== firstCaption)!;
+    const media = named('画像の整理', editor), stored = named('登録済みメディア', media); stored.open = true; stored.fire('toggle');
+    for (let i = 0; i < 2; i++) { button('受信画像', named('メディアを選択', media)).fire('click'); await edited(() => button('選択したメディアを添付', media).fire('click')); }
+    const rows = () => captionAttachments(host.authority.read().mediaData, captionId).ready;
+    const ids = rows().map(r => r.id); expect(new Set(ids).size).toBe(2); expect(rows().every(r => r.mediaResourceId.kind === 'value' && r.mediaResourceId.value === mediaRecord.id)).toBe(true);
+    expect(captionAttachments(host.authority.read().mediaData, firstCaption).ready).toHaveLength(1);
+    const reused = host.read().provider!; if (reused.kind !== 'scene-provider') throw Error('provider'); expect(Object.keys(reused.details.immutable.mediaResourcesById)).toHaveLength(1);
+    const editArea = named('添付の編集', media); button('説明を編集', editArea).fire('click'); const input = named('メディアの説明', media);
+    input.fire('compositionstart'); input.value = '位置を比較する画像'; input.fire('input');
+    expect(button('ファイルに保存', named('ファイル')).disabled).toBe(true); expect(button('モデル', editor).disabled).toBe(true);
+    named('キャプション一覧', editor).children[0]!.children[0]!.fire('click'); expect(input.value).toBe('位置を比較する画像');
+    expect(button('説明を適用', media).disabled).toBe(true);
+    input.fire('compositionend'); const before = host.read().source!.originalChanges().length;
+    h.f.fs.reject = path => path.endsWith('/published.json'); button('説明を適用', media).fire('click');
+    await vi.waitFor(() => expect(host.authority.status!().kind).toBe('failed'), { timeout: 10000 }); await vi.waitFor(() => expect(h.status.dataset.busy).toBe('false'));
+    expect(input.value).toBe('位置を比較する画像'); const paths = (await h.f.fs.list(`${validationArea}/${h.f.run}/`)).filter(p => p.endsWith('.amchange'));
+    const originals = await Promise.all(paths.map(p => h.f.fs.readBytes(p))); h.f.fs.reject = () => false;
+    await edited(() => button('更新を再試行', editor).fire('click')); expect(host.read().source!.originalChanges()).toHaveLength(before + 1);
+    expect(await Promise.all(paths.map(p => h.f.fs.readBytes(p)))).toEqual(originals); expect(rows()[0]!.altText).toEqual({ kind: 'value', value: '位置を比較する画像' });
+    await edited(() => button('後へ', editArea).fire('click')); expect(rows().map(r => r.id)).toEqual([ids[1], ids[0]]);
+    button('説明を編集', editArea).fire('click'); input.value = '未適用の説明'; input.fire('input'); button('画像を表示', named('添付画像', media)).fire('click');
+    const viewer = named('画像ビューア', media); expect(all(editor).filter(n => n.tag === 'dialog')).toHaveLength(1); expect(viewer.open).toBe(true);
+    viewer.fire('keydown', { key: 'ArrowRight', preventDefault() {}, stopPropagation() {} }); expect(all(viewer).some(n => n.textContent === '2 / 2')).toBe(true);
+    expect(input.value).toBe('未適用の説明'); named('閉じる', viewer).fire('click');
+    button('取り消す', named('説明の編集', media)).fire('click');
+    button('添付を解除', editArea).fire('click'); expect(rows()).toHaveLength(2); await edited(() => button('添付を解除する', media).fire('click'));
+    expect(rows().map(r => r.id)).toEqual([ids[0]]); expect(captionAttachments(host.authority.read().mediaData, firstCaption).ready).toHaveLength(1);
+    const peer = firstWorkspaceRecipient(), shared = await host.workspaceOutput.download(await host.workspaceOutput.generate(host.read().source!.token));
+    await peer.receiver.importWorkspace(shared); await peer.session.edit((await peer.session.read()).source!.token,
+      { kind: 'editAttachment', sceneId: Object.keys(host.authority.read().state.scenes)[0]!, captionId, attachmentId: ids[0]!, field: 'altText', value: '相手の画像説明' });
+    const receive = named('更新ファイルを選択'); Object.assign(receive, { files: [(await contributionFile(peer.session, peer.fs, peer.store)).file] }); receive.fire('change');
+    await edited(() => receive.parent!.parent!.fire('submit', { preventDefault() {} })); await vi.waitFor(() => expect(all(h.root).some(n => n.textContent === '更新を受け取りました。')).toBe(true), { timeout: 10000 });
+    Object.assign(receive, { files: [] }); receive.fire('change'); expect(all(editArea).some(n => n.textContent === '相手の画像説明')).toBe(true);
+    button('添付を解除', editArea).fire('click'); await edited(() => button('添付を解除する', media).fire('click')); expect(rows()).toHaveLength(0);
+    named('キャプション一覧', editor).children[0]!.children[0]!.fire('click'); expect(captionAttachments(host.authority.read().mediaData, firstCaption).ready).toHaveLength(1);
+    button('添付を解除', editArea).fire('click'); await edited(() => button('添付を解除する', media).fire('click'));
+    expect(captionAttachments(host.authority.read().mediaData, firstCaption).ready).toHaveLength(0); expect(h.imageReads[0]).toHaveBeenCalledTimes(1);
+    const final = host.read().source!, output = await host.workspaceOutput.download(await host.workspaceOutput.generate(final.token)); await h.ui.dispose();
+    const cold = await openValidationHost(h.f.options); expect(cold.read().source!.originalChanges()).toEqual(final.originalChanges());
+    expect(captionAttachments(cold.authority.read().mediaData, captionId).ready).toHaveLength(0); expect(captionAttachments(cold.authority.read().mediaData, firstCaption).ready).toHaveLength(0);
+    expect(await cold.content.image(mediaRecord, true)).toEqual(png);
+    const emptyOrigin = firstWorkspaceRecipient(), emptyRead = await emptyOrigin.receiver.importWorkspace(output); expect(emptyRead.state).toBe('ready');
+    const reopened = firstWorkspaceRecipient(); await reopened.store.put(new Blob([png.slice().buffer]).stream(), 'image/png', mediaRecord.blob as JsonObject);
+    const options = { ...h.f.options, base: reopened.fs, store: reopened.store, coordinator: ProjectMutationCoordinator.browser(reopened.locks),
+      packageLocks: reopened.locks, openStorage: async () => ({ factory: reopened.factory, dispose: async () => {} }) };
+    const recipient = await openValidationHost({ ...options, workspaceFile: output });
+    expect(recipient.read().state).toBe('ready'); expect(recipient.read().source!.originalChanges()).toEqual(final.originalChanges());
+    expect(recipient.authority.read().mediaChoices).toEqual([]);
+    const unavailableProvider = recipient.read().provider!; if (unavailableProvider.kind !== 'scene-provider') throw Error('provider');
+    expect(projectMediaResources(unavailableProvider)).toEqual([]);
+    expect(recipient.read().provider).toMatchObject({ issues: expect.arrayContaining([expect.objectContaining({ code: 'verified-media-bytes-required' })]) });
+    await recipient.dispatch(recipient.read().source!.token, { kind: 'editCaption', captionId, edits: { body: '受け取り先で編集を継続' } });
+    const model = glb(j => { j.nodes[0].translation = [2, 0, 0]; });
+    await recipient.authority.addModelFile!(recipient.read().source!.token, { sceneId: Object.keys(recipient.authority.read().state.scenes)[0]!,
+      assetId: `ast_${newId()}`, file: { name: '追加するモデル', size: model.length, arrayBuffer: async () => model.slice().buffer } });
+    await recipient.workspaceOutput.generate(recipient.read().source!.token); const continued = recipient.read().source!; await recipient.dispose();
+    const recipientCold = await openValidationHost(options); expect(recipientCold.read().state).toBe('ready');
+    expect(recipientCold.read().source!.originalChanges()).toEqual(continued.originalChanges()); await recipientCold.dispose();
+    expect(h.legacy).not.toHaveBeenCalled(); await cold.dispose();
+  });
+  it('reloads the exact PNG from the current image service after product view/edit handoff', async () => {
+    const h = await productWorkspaceFixture(true), { editor, named, button, all } = h;
+    named('キャプション一覧', editor).children[0]!.children[0]!.fire('click');
+    const gallery = named('添付画像', editor); await vi.waitFor(() => expect(all(gallery).filter(n => n.tag === 'img')).toHaveLength(1)); expect(h.imageReads[0]).toHaveBeenCalledTimes(1);
+    const initial = h.host, token = initial.read().source!.token; button('閲覧に切り替える').fire('click');
+    await vi.waitFor(() => expect(button('編集を開始する')?.disabled).toBe(false), { timeout: 10000 });
+    await vi.waitFor(() => expect(h.imageReads[1]).toHaveBeenCalledTimes(1)); expect(h.liveHost()).not.toBe(initial); expect(h.liveHost().read().source!.token).toBe(token);
+    expect(all(gallery).filter(n => n.tag === 'img')).toHaveLength(1); expect(button('説明を編集', named('画像の整理', editor)).disabled).toBe(true);
+    button('編集を開始する').fire('click'); await vi.waitFor(() => expect(button('閲覧に切り替える')?.disabled).toBe(false), { timeout: 10000 });
+    await vi.waitFor(() => expect(h.imageReads[2]).toHaveBeenCalledTimes(1)); expect(h.liveHost().read().source!.token).toBe(token); await h.ui.dispose();
+  });
+  it('keeps product attachment counts known for description conflicts and unknown for concurrent deletion/edit', async () => {
+    const h = await productWorkspaceFixture(true), source = h.host.read().source!, original = A.load<Record<string, any>>(source.encodeFullSource());
+    const attachmentId = Object.keys(original.captionAttachmentsById)[0]!, captionId = h.f.f.captionId, sceneId = Object.keys(h.host.authority.read().state.scenes)[0]!;
+    const branches = ['説明 A', '説明 B'].map(text => A.change(A.clone(original), d => { d.captionAttachmentsById[attachmentId].altText = new A.ImmutableString(canonicalFixture(text)); }));
+    const read = async (doc: typeof original) => readProjectScene(ProjectMetadataSource.fromFullSource(A.save(doc), source.proof, metadata).read(), metadata, h.host.content.verifier(false));
+    const alt = await read(A.merge(branches[0]!, branches[1]!)); if (alt.kind !== 'scene-provider') throw Error('provider');
+    expect(projectMediaUncertain(alt, captionId)).toBe(false); expect(projectCaptions(alt, sceneId).find(c => c.id === captionId)!.mediaCount).toEqual({ kind: 'value', value: 1 });
+    const deleted = A.change(A.clone(original), d => { d.captionAttachmentsById[attachmentId].lifecycle = new A.ImmutableString(canonicalFixture({ state: 'deleted', eventId: `evt_${newId()}`, reason: 'userDelete' })); });
+    const conflict = await read(A.merge(deleted, branches[0]!)); if (conflict.kind !== 'scene-provider') throw Error('provider');
+    expect(projectMediaUncertain(conflict, captionId)).toBe(true); expect(projectCaptions(conflict, sceneId).find(c => c.id === captionId)!.mediaCount.kind).toBe('unresolved');
     await h.ui.dispose();
   });
   async function restoredWorkspaceHostFixture() {
@@ -3059,6 +3155,79 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const put = vi.spyOn(f.store, 'put');
     await expect(validationReceivedFacts(f.receiver.content, f.local.source!, f.final, f.bodyFor)).rejects.toThrow();
     expect(put).not.toHaveBeenCalled(); expect(await f.fs.readBytes(object)).toBeNull();
+  });
+  it.each(['body', 'cas-receipt', 'fact', 'both-receipts'] as const)('rejects owned weak initial PNG %s loss after cold reopen without incoming repair', async missing => {
+    const r = firstWorkspaceRecipient(), service = validationProjectService(r.fs, r.factory, r.store, budget, decode);
+    const prepared = await prepareValidationProject({ run: newId(), title: '元画像を保持', models: [{ label: 'モデル', bytes: glb() }], media: [{ label: '画像', bytes: png }] }, budget, decode);
+    const before = await prepareValidationCreation(prepared).persist(r.fs, r.store, service.session);
+    const image = Object.values(prepared.records.mediaResourcesById as Record<string, JsonObject>)[0]!, ref = image.blob as JsonObject, hash = ref.digest as string;
+    const receipt = `v2/cas/sha256/${hash.slice(0, 2)}/${hash.slice(2)}.json`, object = `v2/cas/objects/${JSON.parse((await r.fs.readText(receipt))!).objectId}.bin`;
+    let fact: string | undefined;
+    for (const path of await r.fs.list('v2/metadata/evidence/')) if (JSON.parse((await r.fs.readText(path))!).key.fact === 'media') fact = path;
+    expect(fact).toBeTruthy();
+    const removed = missing === 'body' ? [object] : missing === 'cas-receipt' ? [receipt] : missing === 'fact' ? [fact!] : [receipt, fact!];
+    for (const path of removed) await r.fs.remove(path);
+    const remaining = await r.fs.list(''), writes = vi.spyOn(r.fs, 'writeText'), puts = vi.spyOn(r.store, 'put');
+    const cold = validationProjectService(r.fs, r.factory, r.store, budget, decode), read = await cold.session.read();
+    expect(read.state).toBe('repair-required'); expect(read.source!.originalChanges()).toEqual(before.source!.originalChanges());
+    await expect(validationReceivedFacts(cold.content, before.source!, before.source!, () => new Blob([png.slice().buffer]), () => true)).rejects.toThrow();
+    expect(writes).not.toHaveBeenCalled(); expect(puts).not.toHaveBeenCalled(); expect(await r.fs.list('')).toEqual(remaining);
+    for (const path of removed) expect(await r.fs.readBytes(path)).toBeNull();
+  });
+  it('does not recreate weak initial PNG evidence after prepared publication was interrupted', async () => {
+    const r = firstWorkspaceRecipient(), service = validationProjectService(r.fs, r.factory, r.store, budget, decode);
+    const prepared = await prepareValidationProject({ run: newId(), title: '中断した作成', models: [{ label: 'モデル', bytes: glb() }], media: [{ label: '画像', bytes: png }] }, budget, decode);
+    r.fs.reject = path => path.endsWith('/published.json');
+    await expect(prepareValidationCreation(prepared).persist(r.fs, r.store, service.session)).rejects.toThrow('quota'); r.fs.reject = () => false;
+    const entry = (await new TransactionJournal(r.fs, metadata).entries())[0]!; expect(entry.prepared).not.toBeNull(); expect(entry.publication).toBeNull();
+    const ref = Object.values(prepared.records.mediaResourcesById as Record<string, JsonObject>)[0]!.blob as JsonObject, hash = ref.digest as string;
+    await r.fs.remove(`v2/cas/sha256/${hash.slice(0, 2)}/${hash.slice(2)}.json`);
+    for (const path of await r.fs.list('v2/metadata/evidence/')) if (JSON.parse((await r.fs.readText(path))!).key.fact === 'media') await r.fs.remove(path);
+    const files = await r.fs.list(''), writes = vi.spyOn(r.fs, 'writeText');
+    await expect(validationProjectService(r.fs, r.factory, r.store, budget, decode).session.retry()).rejects.toThrow('provider-not-ready');
+    expect(writes).not.toHaveBeenCalled(); expect(await r.fs.list('')).toEqual(files);
+  });
+  it('loads earlier owned weak PNG witnesses before a cold prepared-command retry', async () => {
+    const f = await receivedFixture(), ref = { algorithm: 'sha256' as const, digest: await digest(png), byteLength: png.length, mediaType: 'image/png' };
+    const image = await sealValidationRecord('media-resource', { id: `med_${newId()}`, label: '保持する画像', mediaKind: 'image', blob: ref });
+    // This source is initialized locally, including its unattached PNG admission.
+    const r = firstWorkspaceRecipient(), own = validationProjectService(r.fs, r.factory, r.store, budget, decode);
+    const prepared = structuredClone(f.prepared); (prepared.records.mediaResourcesById as Record<string, JsonObject>)[image.id as string] = image;
+    const initial = await prepareValidationCreation({ ...prepared, blobs: [...prepared.blobs, { ref, bytes: png.slice() }] }).persist(r.fs, r.store, own.session);
+    r.fs.reject = path => path.endsWith('/published.json');
+    await expect(own.session.editCaption(initial.source!.token, f.captionId, 'body', '中断した編集')).rejects.toThrow('quota'); r.fs.reject = () => false;
+    const hash = (image.blob as JsonObject).digest as string; await r.fs.remove(`v2/cas/sha256/${hash.slice(0, 2)}/${hash.slice(2)}.json`);
+    for (const path of await r.fs.list('v2/metadata/evidence/')) if (JSON.parse((await r.fs.readText(path))!).key.fact === 'media') await r.fs.remove(path);
+    const files = await r.fs.list(''), writes = vi.spyOn(r.fs, 'writeText');
+    await expect(r.reopen().session.retry()).rejects.toThrow('provider-not-ready'); expect(writes).not.toHaveBeenCalled(); expect(await r.fs.list('')).toEqual(files);
+  });
+  it('retains a physical import witness for preowned PNG bytes when no body was staged', async () => {
+    const f = await workspaceFileFixture(), r = firstWorkspaceRecipient();
+    for (const ref of f.capture.bodyRefs) await r.store.put((await f.senderStore.openReadOnly(ref)).stream(), ref.mediaType, ref);
+    const imported = await r.receiver.importWorkspace(f.file), entry = (await new TransactionJournal(r.fs, metadata).entries())[0]!;
+    expect(entry.prepared!.stagedBlobs).toBeUndefined();
+    const sceneId = Object.keys((imported.provider as Extract<NonNullable<typeof imported.provider>, { kind: 'scene-provider' }>).state.scenes)[0]!;
+    const included = await r.session.edit(imported.source!.token, { kind: 'include', sceneId, resourceKind: 'caption', resourceId: f.captionId,
+      membershipId: `scm_${newId()}`, orderKey: 'A', eventId: `evt_${newId()}` });
+    const attachmentId = Object.keys((included.provider as Extract<NonNullable<typeof included.provider>, { kind: 'scene-provider' }>).details.attachments)[0]!;
+    const detached = await r.session.edit(included.source!.token, { kind: 'deleteAttachment', sceneId, captionId: f.captionId, attachmentId, eventId: `evt_${newId()}` });
+    const ref = f.image.blob as JsonObject, hash = ref.digest as string;
+    await r.fs.remove(`v2/cas/sha256/${hash.slice(0, 2)}/${hash.slice(2)}.json`);
+    for (const path of await r.fs.list('v2/metadata/evidence/')) if (JSON.parse((await r.fs.readText(path))!).key.fact === 'media') await r.fs.remove(path);
+    const files = await r.fs.list(''), writes = vi.spyOn(r.fs, 'writeText'), read = await r.reopen().session.read();
+    expect(read.state).toBe('repair-required'); expect(read.source!.originalChanges()).toEqual(detached.source!.originalChanges());
+    expect(writes).not.toHaveBeenCalled(); expect(await r.fs.list('')).toEqual(files);
+  });
+  it.each(['missing', 'corrupt'] as const)('requires strong PNG bytes even when weak selection declines a %s incoming body', async fault => {
+    const f = await workspaceFileFixture(), final = planRemoteChanges(f.local.source!, f.source, metadata).final, puts = vi.spyOn(f.store, 'put'), writes = vi.spyOn(f.fs, 'writeText');
+    const input = vi.fn((ref: JsonObject) => {
+      if (ref.digest !== (f.image.blob as JsonObject).digest) return f.bodyFor(ref);
+      if (fault === 'missing') throw Error('missing PNG');
+      const bytes = png.slice(); bytes[bytes.length - 1] = bytes[bytes.length - 1]! ^ 1; return new Blob([bytes.buffer]);
+    });
+    await expect(validationReceivedFacts(f.receiver.content, f.local.source!, final, input, () => false)).rejects.toThrow();
+    expect(input.mock.calls.some(([ref]) => ref.digest === (f.image.blob as JsonObject).digest)).toBe(true);
+    expect(puts).not.toHaveBeenCalled(); expect(writes).not.toHaveBeenCalled(); expect((await f.receiver.session.read()).source!.token).toBe(f.local.source!.token);
   });
   it('leaves storage untouched when readonly admission discovers corrupt reused bytes under a new record ID', async () => {
     const f = await receivedFixture(true), path = (await f.fs.list('v2/cas/objects/'))[0]!, bytes = (await f.fs.readBytes(path))!;

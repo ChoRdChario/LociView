@@ -4,7 +4,7 @@ import { technicalId, newId, metadataPath, json } from '../../projectMetadata/pe
 import { TransactionJournal } from '../../projectMetadata/journal';
 import type { MetadataStorageFactory } from '../../projectMetadata/repository';
 import type { OriginBlobStore } from '../../projectMetadata/blobStore';
-import type { MetadataSessionRead } from '../../projectMetadata/session';
+import { unreceivedWeakMedia, type MetadataSessionRead } from '../../projectMetadata/session';
 import type { MetadataEdit } from '../../projectMetadata/commands';
 import { captionDeletionImpact } from '../../projectMetadata/captionDeletion';
 import { assetDeletionImpact } from '../../projectMetadata/assetDeletion';
@@ -125,11 +125,14 @@ export async function openValidationHost(options: ValidationHostOptions) {
       if (read.source && read.source.proof.identity.projectId !== `prj_${run}`) throw Error('保存領域とプロジェクトが一致しません。');
       if (read.provider?.kind !== 'scene-provider') return;
       const versions = await validationModelVersions(read.provider);
+      const unavailable = unreceivedWeakMedia(read.provider, limits), available: Record<string, MediaImage> = {};
       for (const [id, field] of Object.entries(read.provider.details.immutable.mediaResourcesById)) {
+        if (unavailable.has(id)) continue;
         if (field.kind !== 'value') throw Error('保存した画像の情報を確認できません。');
         if (!cache[id]) cache[id] = { record: field.value as unknown as MediaImage['record'], base64: base64(await sourceContent.image(field.value)) };
+        available[id] = cache[id]!;
       }
-      return { ...metadataProjectView(read.provider, { ...cache }, versions), mediaChoices: Object.values(cache).map(i => i.record), validationFiles: true };
+      return { ...metadataProjectView(read.provider, available, versions), mediaChoices: Object.values(available).map(i => i.record), validationFiles: true };
     };
     const projectView = async (read: MetadataSessionRead) => {
       const next = await projectFrom(read); if (!next) return;

@@ -1,4 +1,5 @@
 import { resolveScene } from '../../scene/resolve';
+import { same } from '../../domain/projectGraphSupport';
 import { value, type Field } from '../../scene/types';
 import type { JsonValue, JsonObject } from '../../domain/values';
 import type { WorkspaceProvider } from './projectWorkspacePorts';
@@ -38,7 +39,7 @@ export function projectModels(provider: WorkspaceProvider, sceneId: string, proj
 export function projectAttachments(provider: WorkspaceProvider, captionId: string) {
   return Object.entries(provider.details.mutable.captionAttachmentsById).flatMap(([id, fields]) => {
     const target = fieldValue(provider.details.attachments[id]);
-    if (!target || target.captionId !== captionId || !activeRecord(fields)) return [];
+    if (!target || target.captionId !== captionId || !activeRecord(fields) || provider.issues.some(i => i.code === 'concurrent-delete-edit' && i.path[0] === 'captionAttachmentsById' && i.path[1] === id)) return [];
     const media = fieldValue(provider.details.immutable.mediaResourcesById[target.mediaResourceId]);
     return [{ id, media, fields, label: typeof media?.label === 'string' ? media.label : 'メディア',
       order: String(fieldValue(fields.orderKey) ?? ''), alt: String(fieldValue(fields.altText) ?? '') }];
@@ -48,11 +49,20 @@ export function projectAttachments(provider: WorkspaceProvider, captionId: strin
 export function projectMediaUncertain(provider: WorkspaceProvider, captionId: string): boolean {
   return Object.entries(provider.details.mutable.captionAttachmentsById).some(([id, fields]) => {
     const lifecycle = fieldValue(fields.lifecycle) as JsonObject | undefined;
-    if (lifecycle?.state === 'deleted') return false;
+    const deleteEdit = provider.issues.some(i => i.code === 'concurrent-delete-edit' && i.path[0] === 'captionAttachmentsById' && i.path[1] === id);
+    if (lifecycle?.state === 'deleted' && !deleteEdit) return false;
     const target = fieldValue(provider.details.attachments[id]);
     if (target && target.captionId !== captionId) return false;
-    return !target || lifecycle?.state !== 'active' || fields.orderKey?.kind !== 'value' || fields.altText?.kind !== 'value' ||
+    return deleteEdit || !target || lifecycle?.state !== 'active' || fields.orderKey?.kind !== 'value' ||
       provider.details.immutable.mediaResourcesById[target.mediaResourceId]?.kind !== 'value';
+  });
+}
+export function projectMediaResources(provider: WorkspaceProvider) {
+  return Object.entries(provider.details.immutable.mediaResourcesById).flatMap(([id, field]) => {
+    const record = fieldValue(field), blob = record?.blob as JsonObject | undefined;
+    const verified = record && provider.inspection.checks.some(c => c.outcome === 'verified' && c.request.token === provider.token &&
+      c.request.fact === 'media' && c.request.records.length === 1 && same(c.request.records[0]!, record));
+    return verified && record.id === id && record.mediaKind === 'image' && blob?.mediaType === 'image/png' && typeof record.label === 'string' ? [{ id, record, label: record.label }] : [];
   });
 }
 export function projectCaptionSceneCount(provider: WorkspaceProvider, captionId: string): Field<number> {

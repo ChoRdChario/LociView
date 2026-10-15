@@ -21,7 +21,7 @@ export class PersistentContentVerifier implements ProjectContentVerifier {
     if (!version || version.length > 128) fail('verifier-version');
   }
 
-  async verify(input: ContentRequest): Promise<unknown> {
+  private async receipt(input: ContentRequest) {
     const request = cloneCanonicalValue(input, this.limits) as unknown as ContentRequest;
     const key = cloneCanonicalValue({ version: this.version, scope: this.scope,
       fact: request.fact, records: request.records, context: request.context }, this.limits) as JsonObject;
@@ -29,6 +29,16 @@ export class PersistentContentVerifier implements ProjectContentVerifier {
     const receipt = await readReceipt<Evidence>(this.fs, path, this.limits);
     if (receipt && (Object.keys(receipt).sort().join(',') !== 'digest,facts,key' || json(receipt.key) !== json(key) ||
       receipt.digest !== await jsonDigest({ key, facts: receipt.facts }))) fail('content-evidence');
+    return { request, key, path, receipt };
+  }
+  /** Presence of an owned exact receipt, even if its acknowledged CAS receipt was lost. */
+  async hasEvidence(input: ContentRequest): Promise<boolean> {
+    const { request, receipt } = await this.receipt(input);
+    if (receipt) checkContentFacts(request, receipt.facts);
+    return !!receipt;
+  }
+  async verify(input: ContentRequest): Promise<unknown> {
+    const { request, key, path, receipt } = await this.receipt(input);
     const presence = await this.inventory.inspect(request);
     if (receipt && presence === 'verified-present') {
       checkContentFacts(request, receipt.facts);

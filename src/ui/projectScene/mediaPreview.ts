@@ -1,5 +1,5 @@
 /** Host-verified PNG bodies only. Imported labels/URLs are never image sources. */
-export type PreviewPng = { readonly base64: string } | { readonly blob: Blob };
+export type PreviewPng = { readonly base64: string } | { readonly blob: Blob } | { readonly load: () => Promise<Blob> };
 export interface MediaPreviewItem {
   readonly id: string; readonly resourceId: string; readonly label: string;
   readonly description: string; readonly image: PreviewPng | null;
@@ -9,17 +9,27 @@ export interface MediaPreviewGroup {
 }
 export type MediaPreviewReader = () => MediaPreviewGroup | null;
 const sameBody = (a: PreviewPng | null, b: PreviewPng | null) => a === b || !!a && !!b &&
-  ('base64' in a && 'base64' in b ? a.base64 === b.base64 : 'blob' in a && 'blob' in b && a.blob === b.blob);
+  ('base64' in a && 'base64' in b ? a.base64 === b.base64 : 'blob' in a && 'blob' in b ? a.blob === b.blob : 'load' in a && 'load' in b && a.load === b.load);
 
 /** A new image node per attempt keeps old load/error events out of a retry. */
 function createPngPreview(document: Document, read: () => MediaPreviewItem | null, lazy: boolean, imageHost: HTMLElement = document.createElement('div')) {
   const root = document.createElement('div'), error = document.createElement('p'), retry = document.createElement('button');
   root.className = 'lv-media-image'; error.setAttribute('role', 'status'); retry.type = 'button'; retry.textContent = '画像を再試行';
-  let body: PreviewPng | null = null, image: HTMLImageElement | null = null, release: (() => void) | null = null, disposed = false;
+  let body: PreviewPng | null = null, image: HTMLImageElement | null = null, release: (() => void) | null = null, disposed = false, epoch = 0;
   function clear() { image?.remove(); image = null; release?.(); release = null; }
   function load(item: MediaPreviewItem | null) {
-    clear(); body = item?.image ?? null;
+    const attempt = ++epoch; clear(); body = item?.image ?? null;
     if (!item || !body) { error.textContent = '画像を読み込めません。添付情報は変更していません。'; retry.hidden = false; return; }
+    const expected = body;
+    const current = () => { const next = read(); return !disposed && epoch === attempt && next?.id === item.id && next.resourceId === item.resourceId && sameBody(next.image, expected); };
+    if ('load' in expected) {
+      error.textContent = '画像を読み込んでいます。'; retry.hidden = true;
+      void Promise.resolve().then(() => expected.load()).then(blob => { if (current()) paint(read()!, { blob }); }, () => {
+        if (current()) { error.textContent = '画像を読み込めません。添付情報は変更していません。'; retry.hidden = false; }
+      });
+    } else paint(item, expected);
+  }
+  function paint(item: MediaPreviewItem, png: Exclude<PreviewPng, { readonly load: () => Promise<Blob> }>) {
     const current = document.createElement('img'); image = current; current.draggable = false;
     current.alt = item.description || item.label; current.loading = lazy ? 'lazy' : 'eager'; current.decoding = 'async';
     current.addEventListener('error', () => { if (disposed || image !== current) return;
@@ -28,8 +38,8 @@ function createPngPreview(document: Document, read: () => MediaPreviewItem | nul
       current.hidden = false; error.textContent = ''; retry.hidden = true; });
     error.textContent = ''; retry.hidden = true; imageHost.append(current);
     try {
-      if ('base64' in body) current.src = `data:image/png;base64,${body.base64}`;
-      else { const url = URL.createObjectURL(body.blob); release = () => URL.revokeObjectURL(url); current.src = url; }
+      if ('base64' in png) current.src = `data:image/png;base64,${png.base64}`;
+      else { const url = URL.createObjectURL(png.blob); release = () => URL.revokeObjectURL(url); current.src = url; }
     } catch { current.hidden = true; error.textContent = '画像を読み込めません。'; retry.hidden = false; }
   }
   retry.addEventListener('click', () => { if (!disposed) load(read()); }); root.append(imageHost, error, retry);

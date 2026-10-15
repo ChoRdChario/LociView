@@ -14,7 +14,7 @@ const repMap = 'representationsById', mediaMap = 'mediaResourcesById', revisionM
 
 /** Runs the candidate admission itself. A caller-supplied typed inspection is not authority. */
 export async function inspectProjectContent(input: unknown, limits: HistoryReadLimits, verifier: ProjectContentVerifier,
-  options: { verifyRetainedMedia?: boolean } = {}): Promise<ProjectContentInspection> {
+  options: { verifyRetainedMedia?: boolean | ((record: JsonObject) => Promise<boolean>) } = {}): Promise<ProjectContentInspection> {
   const candidates = await inspectProjectCandidates(input, limits); if (candidates.kind === 'rejected') return candidates;
   try {
     const scope = verifier.scope;
@@ -70,7 +70,10 @@ export async function inspectProjectContent(input: unknown, limits: HistoryReadL
       repEvidence.set(canonical(r), result);
     }
     const checkedMedia = new Set<string>();
-    for (const r of media.filter(r => options.verifyRetainedMedia || required.has(string(r.id)))) {
+    for (const r of media) {
+      charge();
+      if (!required.has(string(r.id)) && !(typeof options.verifyRetainedMedia === 'function' ?
+        await options.verifyRetainedMedia(r) : options.verifyRetainedMedia)) continue;
       checkedMedia.add(string(r.id)); await query('media', [r], {}, [mediaMap, string(r.id), 'blob']);
     }
     const families = new Map<string, JsonObject[]>();
