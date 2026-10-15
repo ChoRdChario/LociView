@@ -1,13 +1,13 @@
 import { admitProjectRecords, projectRecordMaps } from '../domain/projectRecords';
 import { cloneCanonicalValue, type JsonObject, type JsonValue } from '../domain/values';
-import { digest, newId, technicalId } from '../projectMetadata/persistence';
+import { digest, json, newId, technicalId } from '../projectMetadata/persistence';
 import { identityPlacement, sealValidationRecord, type PreparedValidationProject } from './initialProject';
-import { frozenV1Recipe, frozenV1JpegRecipe, frozenV1PhotoRecipe, frozenV1DefaultViewRecipe, frozenV1PlacementRecipe, frozenV1Placement, type FrozenV1Recipe, sourceColor, codeOrder, type FrozenV1Plan } from './frozenV1Source';
+import { frozenV1Recipe, frozenV1JpegRecipe, frozenV1PhotoRecipe, frozenV1DefaultViewRecipe, frozenV1PlacementRecipe, frozenV1MaterialRecipe, frozenV1Placement, type FrozenV1Recipe, sourceColor, codeOrder, type FrozenV1Plan } from './frozenV1Source';
 import { fileError, validationGlbProfile, jpegGlbProfile, validationMetadataLimits as limits } from './validation';
 
 type Key = readonly (string | number | Key)[];
 export interface FrozenV1MappingEntry { id: string; sha256: string; preimage: string }
-export function frozenV1SourceKey(prefix: unknown, key: unknown, nested = false): boolean {
+export function frozenV1SourceKey(prefix: unknown, key: unknown, nested = false, recipe: FrozenV1Recipe = frozenV1Recipe): boolean {
   if (typeof prefix !== 'string' || !Array.isArray(key)) return false;
   const simple: Record<string, string[]> = { frm: ['project-frame', 'asset-frame', 'representation-frame'], ast: ['asset'],
     rep: ['model-representation'], rev: ['model-revision'], bnd: ['model-binding'], fam: ['mesh-family'], cmp: ['anchor-class'],
@@ -19,19 +19,21 @@ export function frozenV1SourceKey(prefix: unknown, key: unknown, nested = false)
   if (prefix === 'slot') return key.length === 4 && key[0] === 'material-slot' && typeof key[1] === 'string' &&
     (key[2] === 'gltfMaterial' && index(key[3]) || key[2] === 'representationMaterial' && key[3] === 0);
   if (prefix === 'att') return key.length === 4 && key[0] === 'attachment' && typeof key[1] === 'string' && index(key[2]) && typeof key[3] === 'string';
-  return prefix === 'evt' && !nested && key.length === 3 && key[0] === 'initial-event' && ['ast', 'scn', 'sam', 'cap', 'scm', 'att', 'tag', 'tgm', 'view'].includes(key[1]) && frozenV1SourceKey(key[1], key[2], true);
+  if (prefix === 'ovr') return recipe === frozenV1MaterialRecipe && key.length === 2 && key[0] === 'material' && typeof key[1] === 'string' && /^mat_[0-7][0123456789ABCDEFGHJKMNPQRSTVWXYZ]{25}$/u.test(key[1]);
+  return prefix === 'evt' && !nested && key.length === 3 && key[0] === 'initial-event' &&
+    [...['ast', 'scn', 'sam', 'cap', 'scm', 'att', 'tag', 'tgm', 'view'], ...(recipe === frozenV1MaterialRecipe ? ['ovr'] : [])].includes(key[1]) && frozenV1SourceKey(key[1], key[2], true, recipe);
 }
 export function frozenV1ConversionIds(conversionId: string, sourceZipSha256: string, recipe: FrozenV1Recipe = frozenV1Recipe) {
   technicalId(conversionId); if (!/^[0-9a-f]{64}$/.test(sourceZipSha256)) return fileError('変換元の識別情報が不正です。');
   const entries = new Map<string, FrozenV1MappingEntry>(), full = new Map<string, string>();
   const id = async (prefix: string, key: Key) => {
-    if (!frozenV1SourceKey(prefix, key)) return fileError('変換時の識別情報が不正です。');
+    if (!frozenV1SourceKey(prefix, key, false, recipe)) return fileError('変換時の識別情報が不正です。');
     const preimage = `lociview:${recipe}:id:jcs-v1\n` + JSON.stringify([conversionId, sourceZipSha256, prefix, key]);
     const sha256 = await digest(new TextEncoder().encode(preimage)), value = `${prefix}_${sha256.slice(0, 32)}`, old = entries.get(value);
-    if (old && (old.preimage !== preimage || old.sha256 !== sha256) || [frozenV1JpegRecipe, frozenV1PhotoRecipe, frozenV1DefaultViewRecipe, frozenV1PlacementRecipe].includes(recipe) && full.has(sha256) && full.get(sha256) !== preimage) return fileError('変換先の識別情報が衝突しました。');
+    if (old && (old.preimage !== preimage || old.sha256 !== sha256) || recipe !== frozenV1Recipe && full.has(sha256) && full.get(sha256) !== preimage) return fileError('変換先の識別情報が衝突しました。');
     entries.set(value, { id: value, sha256, preimage }); full.set(sha256, preimage); return value;
   };
-  return { id, report: () => [frozenV1JpegRecipe, frozenV1PhotoRecipe, frozenV1DefaultViewRecipe, frozenV1PlacementRecipe].includes(recipe) ? [...entries.values()].sort((a, b) => codeOrder(a.id, b.id)) : [...entries.values()] };
+  return { id, report: () => recipe !== frozenV1Recipe ? [...entries.values()].sort((a, b) => codeOrder(a.id, b.id)) : [...entries.values()] };
 }
 const rank = (n: number) => `A${n.toString(36).padStart(8, '0')}`;
 
@@ -50,7 +52,8 @@ export async function mapFrozenV1Project(plan: FrozenV1Plan, conversionId: strin
   const projectFrameId = await one('frm', 'project-frame', plan.manifest.projectId);
   records.project = { title: plan.manifest.name, frame: { id: projectFrameId, handedness: 'right', upAxis: '+Y', unit: { kind: 'unknown' } },
     defaultSceneId: await scene(plan.scenes[0]!.id) };
-  const profile = await validationGlbProfile(), models = new Map<string, { assetId: string; assetFrameId: string; revisionId: string; compatibilityId: string }>();
+  const profile = await validationGlbProfile(), models = new Map<string, { assetId: string; assetFrameId: string; revisionId: string; compatibilityId: string;
+    representation: JsonObject; slots: Map<string, JsonObject> }>();
   if (profile.specificationSha256 !== '077c5da2241deb7956026fe20376dee9301d70b29d10a436d673f37909e4186f') return fileError('モデル検証の版が一致しません。');
   const targetModels = new Map<string, { record: JsonObject; model: NonNullable<FrozenV1Plan['models'][number]['model']> }>();
   for (const body of plan.models) {
@@ -58,7 +61,7 @@ export async function mapFrozenV1Project(plan: FrozenV1Plan, conversionId: strin
     const revisionId = await one('rev', 'model-revision', s), familyId = await one('fam', 'mesh-family', s), compatibilityId = await one('cmp', 'anchor-class', s);
     const representationId = await one('rep', 'model-representation', s), bindingId = await one('bnd', 'model-binding', s);
     const slots = await Promise.all(model.materials.map(async m => { const locator = m.sourceLocator as JsonObject;
-      return { ...m, logicalMaterialSlotId: await id('slot', ['material-slot', s, locator.kind as string, (locator.kind === 'gltfMaterial' ? locator.materialIndex : 0) as number]) }; }));
+      return { ...m, logicalMaterialSlotId: await id('slot', ['material-slot', s, locator.kind as string, (locator.kind === 'gltfMaterial' ? locator.materialIndex : 0) as number]) } as JsonObject & { logicalMaterialSlotId: string }; }));
     slots.sort((a, b) => codeOrder(a.logicalMaterialSlotId, b.logicalMaterialSlotId));
     const representation = await sealValidationRecord('representation', { id: representationId, assetId,
       representationFrameId: await one('frm', 'representation-frame', s), contentKind: 'mesh', purposes: ['source', 'display'], role: 'meshPrimary',
@@ -69,10 +72,10 @@ export async function mapFrozenV1Project(plan: FrozenV1Plan, conversionId: strin
       anchorCompatibilityClasses: [{ id: compatibilityId, targetVariantFamilyIds: [familyId] }],
       provenance: { origin: 'import', sourceMediaType: body.ref.mediaType, inputBlobDigests: [body.ref.digest] } }));
     add('assetBindingsById', await sealValidationRecord('asset-binding-revision', { id: bindingId, assetId, assetRevisionId: revisionId,
-      assetToProject: plan.recipe === frozenV1PlacementRecipe ? frozenV1Placement(body.record.fields.transform) : identityPlacement(), method: 'import' }));
+      assetToProject: plan.recipe === frozenV1PlacementRecipe || plan.recipe === frozenV1MaterialRecipe ? frozenV1Placement(body.record.fields.transform) : identityPlacement(), method: 'import' }));
     add('assetsById', { id: assetId, label: body.record.fields.originalName as string, assetFrameId, status: { kind: 'ready', activeBindingId: bindingId },
       ...(body.record.fields.pinScale === undefined ? {} : { pinScale: body.record.fields.pinScale as number }), lifecycle: await active('ast', ['asset', s]) });
-    models.set(s, { assetId, assetFrameId, revisionId, compatibilityId });
+    models.set(s, { assetId, assetFrameId, revisionId, compatibilityId, representation, slots: new Map(slots.map(slot => [json(slot.sourceLocator), slot])) });
   }
   for (const body of plan.media) add('mediaResourcesById', await sealValidationRecord('media-resource', { id: await media(body.record.id),
     label: body.record.fields.originalName as string, mediaKind: 'image', blob: { ...body.ref } }));
@@ -107,8 +110,25 @@ export async function mapFrozenV1Project(plan: FrozenV1Plan, conversionId: strin
         camera: { position: c.eye as number[], target: c.target as number[], up: c.up as number[], projection: { kind: 'perspective', verticalFovRadians: (c.fov as number) * Math.PI / 180 } },
         background: { kind: 'solid', colorSrgb: sourceColor(v.fields.background) } }); }
   }
+  const materialMappings: JsonObject[] = [], routes = new Set<string>();
+  if (plan.recipe === frozenV1MaterialRecipe) for (const material of plan.materials) {
+    const model = models.get(material.sourceAssetId), slot = model?.slots.get(json(material.sourceLocator));
+    if (!model || !slot) return fileError('材質の元モデル・面の対応を確認できません。');
+    const scn = await scene(material.sourceSetId), representation = model.representation, catalog = representation.materialCatalog as JsonObject;
+    const route = JSON.stringify([scn, model.assetId, catalog.layoutId, slot.logicalMaterialSlotId]);
+    if (routes.has(route) || !(records.scenesById as JsonObject)[scn]) return fileError('材質のシーン対応が重複しているか不足しています。'); routes.add(route);
+    const key: Key = ['material', material.sourceMaterialId], ovr = await id('ovr', key);
+    add('materialOverridesById', { id: ovr, routing: { scope: { kind: 'scene', sceneId: scn }, target: { assetId: model.assetId,
+      variantFamilyId: representation.variantFamilyId!, materialLayoutId: catalog.layoutId!, logicalMaterialSlotId: slot.logicalMaterialSlotId! } },
+      appearance: { opacity: 1, doubleSided: material.doubleSided, lighting: material.unlit ? 'unlit' : 'inherit' },
+      compositing: { coverage: { policy: 'inherit' }, optics: 'inherit' }, lifecycle: await active('ovr', key) });
+    const { doubleSided: _doubleSided, unlit: _unlit, ...proof } = material;
+    materialMappings.push({ ...proof, targetSceneId: scn, targetAssetId: model.assetId, targetRepresentationId: representation.id!,
+      targetProfile: representation.formatProfile!, targetMaterialLayoutId: catalog.layoutId!, targetLogicalMaterialSlotId: slot.logicalMaterialSlotId!, targetOverrideId: ovr });
+  }
+  materialMappings.sort((a, b) => codeOrder(a.targetOverrideId as string, b.targetOverrideId as string));
   const checked = admitProjectRecords(records, limits, 'map2');
   if (checked.kind !== 'valid-records' || checked.hasUnknownFields) return fileError('変換したプロジェクトの内容を確認できません。');
-  return { records: cloneCanonicalValue(checked.records, limits) as PreparedValidationProject['records'], mapping: ids.report(), targetModels,
+  return { records: cloneCanonicalValue(checked.records, limits) as PreparedValidationProject['records'], mapping: ids.report(), targetModels, materialMappings,
     blobs: [...plan.models, ...plan.media].map(b => ({ ref: { ...b.ref }, bytes: b.bytes })) };
 }

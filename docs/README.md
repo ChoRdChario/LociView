@@ -20,7 +20,7 @@ record executed evidence and connections; do not infer those from a document tit
 | LociMyu → Native conversion | [specification 04](specs/04-locimyu-conversion.md) |
 | Project/Scene team work and TEAM-FLOW-01 | [specification 05](specs/05-project-scene-team-workflow.md), especially §§7.5, 12.6, 13.2 |
 | Approved first backup opening when the original Project is absent | [First-backup companion](specs/06a-first-backup-open-proposal.md); exact absent predecessor/P2/S2 recovery implemented and Node-verified in bounded validation; not adopted |
-| Proposed frozen-v1 exact material-address conversion | [07i companion](specs/07i-frozen-v1-material-proposal.md); exact decoded address → unique base slot, disabled chroma values only in source/explanation, new recipe6/IDs; PROPOSED, unratified, not implemented |
+| Approved frozen-v1 exact material-address conversion | [07i companion](specs/07i-frozen-v1-material-proposal.md); exact decoded address → unique base slot, disabled chroma values only in source/explanation, recipe6/IDs ratified 2026-10-16; bounded implementation/checks in todo, not adopted |
 | Workspace, Contribution, backup, review, clean copy | [specification 06](specs/06-project-package-wire.md), especially §§8, 11–12 and section-local status |
 | One-time Native/v1/LociMyu conversion and cutover | [specification 07](specs/07-project-scene-migration.md); continued old-format updates were withdrawn by PO 2026-09-14; initial mapping/compatibility remains to be closed |
 | Approved bounded Native material conversion | [Appearance companion](specs/07a-native-appearance-conversion-proposal.md); recipe-2/profile/subset approved 2026-10-15; implementation/evidence remain in todo |

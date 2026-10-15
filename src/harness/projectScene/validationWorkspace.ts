@@ -73,7 +73,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   conversionTitleLabel.textContent = '変換後のプロジェクト名'; conversionTitle.setAttribute('aria-label', '変換後のプロジェクト名'); conversionTitleLabel.append(conversionTitle);
   relation.type = 'checkbox'; relation.setAttribute('aria-label', '表と視点・材質の関連付けを確認'); relationLabel.textContent = '表と視点・材質の関連付けを確認'; relationLabel.append(relation);
   previewAgain.type = saveReport.type = 'button'; previewAgain.textContent = '変換内容を確認'; saveReport.textContent = '変換の説明を保存';
-  lociChoices.append(workbookLabel, conversionTitleLabel, relationNote, relationLabel, previewAgain, saveReport); lociChoices.hidden = true; conversionPanel.replaceChildren(lociChoices, conversionNote, conversionHelp, convert, cancelConversion);
+  lociChoices.append(workbookLabel, conversionTitleLabel, relationNote, relationLabel, previewAgain); lociChoices.hidden = true; conversionPanel.replaceChildren(lociChoices, conversionNote, conversionHelp, saveReport, convert, cancelConversion);
   const coldReport = document.createElement('button'); coldReport.type = 'button'; coldReport.textContent = '変換の説明を保存'; coldReport.hidden = true; root.append(coldReport);
   const status = document.createElement('p'); status.setAttribute('role', 'status');
   const list = document.createElement('section'), refresh = document.createElement('button'), back = document.createElement('button');
@@ -110,7 +110,8 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     openFile.hidden = !form.hidden || !conversionPanel.hidden;
     create.textContent = creationAttempt ? '作成を再試行' : 'プロジェクトを作成';
     convert.disabled = busy || composing || !!lociPreview && (!lociCurrent() || lociEvaluation!.blocked);
-    saveReport.disabled = busy || composing || !lociCurrent(); previewAgain.disabled = busy || composing;
+    saveReport.hidden = !lociPreview && !(conversion && 'report' in conversion && conversion.report);
+    saveReport.disabled = busy || composing || (!!lociPreview ? !lociCurrent() : !conversion || !('report' in conversion) || !conversion.report); previewAgain.disabled = busy || composing;
     workbook.disabled = conversionTitle.disabled = relation.disabled = busy;
     coldReport.disabled = busy || composing || !!workspace?.hasChanges() || !!reviewWorkspace?.hasChanges() || !!receiveTools?.hasChanges(); back.disabled = busy;
     back.hidden = !host && !reviewWorkspace || !!workspace && 'hasProjectHeader' in workspace && workspace.hasProjectHeader(); };
@@ -377,7 +378,9 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   conversionTitle.addEventListener('input', invalidateLoci);
   relation.addEventListener('change', () => { invalidateLoci(); if (!busy) execute(evaluateLoci); });
   previewAgain.addEventListener('click', () => execute(evaluateLoci));
-  saveReport.addEventListener('click', () => { if (!disposed && !busy && !composing && lociCurrent()) exportReport(lociEvaluation!.report()); });
+  saveReport.addEventListener('click', () => { if (disposed || busy || composing) return;
+    if (lociPreview && lociCurrent()) exportReport(lociEvaluation!.report());
+    else if (conversion && 'report' in conversion && conversion.report) exportReport(conversion.report()); });
   coldReport.addEventListener('click', () => execute(async () => { if (composing || workspace?.hasChanges() || reviewWorkspace?.hasChanges() || receiveTools?.hasChanges()) throw Error('入力・操作を確定するか取り消してください。'); const target = host; if (!target) return;
     const report = await target.conversionReport(); if (disposed || host !== target) return; if (!report) { coldReport.hidden = true; return; } exportReport(report); }));
   workspaceInput.addEventListener('change', () => {
@@ -441,7 +444,12 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
       if (legacy) { const s = legacy.summary.sourceOnly;
         conversionNote.textContent += `。元ファイルだけに保持：編集者情報 ${s.profiles}・削除済み記録 ${s.deletedRecords}・キャッシュ ${s.caches}・削除済み本体 ${s.deletedPayloads}・未使用本体 ${s.unlinkedPayloads}・面の法線 ${s.anchorNormals}`;
         if ('appliedModelOffsets' in legacy.summary && legacy.summary.appliedModelOffsets > 0)
-          conversionNote.textContent += '。モデルの保存済み位置補正を適用します。旧画面では反映されていなかった配置です。'; }
+          conversionNote.textContent += '。モデルの保存済み位置補正を適用します。旧画面では反映されていなかった配置です。';
+        if ('materialEffects' in legacy.summary) {
+          const effects = legacy.summary.materialEffects;
+          conversionNote.textContent += `。陰影・両面表示を引き継ぐ材質：${effects.scenes}シーン・${effects.overrides}件`;
+          if (effects.sourceOnlyChromaRows > 0) conversionNote.textContent += '。色の透過が無効なときの色・許容範囲・ぼかしは、元のZIPと説明ファイルだけに残り、変換後の編集値には引き継ぎません。';
+        } }
       conversionPanel.hidden = false; status.textContent = ''; return;
     }
     if (lociPreview) {

@@ -11,7 +11,7 @@ import { captionDeletionImpact } from '../../projectMetadata/captionDeletion';
 import { assetDeletionImpact } from '../../projectMetadata/assetDeletion';
 import { prepareValidationCreation, resumeValidationCreation, validationProjectService } from '../../projectFiles/creation';
 import { hasNativeConversion, resumeNativeConversion } from '../../projectFiles/nativeConversion';
-import { hasFrozenV1Conversion, resumeFrozenV1Conversion } from '../../projectFiles/frozenV1Conversion';
+import { hasFrozenV1Conversion, resumeFrozenV1Conversion, hasFrozenV1MaterialReport, readFrozenV1MaterialReport } from '../../projectFiles/frozenV1Conversion';
 import { hasLociMyuConversion, resumeLociMyuConversion, readLociMyuConversionReport } from '../../projectFiles/lociMyuConversion';
 import { validationMetadataLimits as limits, type FileValidationLimits } from '../../projectFiles/validation';
 import type { PngDecoder } from '../../projectFiles/png';
@@ -621,8 +621,9 @@ async function openNormalValidationHost(options: ValidationHostOptions, inherite
       dispose: async () => { await dispose(); content.releasePreparedImages(); content.releasePreparedModels(); prepareDisplay = undefined; } };
     ownsLease = true;
     return { ...host, dispatch, get content() { return content; }, workspaceFiles, workspaceOutput, backupRestore, display: () => restoreRetired ? undefined : project,
-      conversionReportAvailable: () => hasLociMyuConversion(fs, false),
-      conversionReport: () => execute(async () => readLociMyuConversionReport(fs, options.fileLimits, `prj_${run}`, options.decode, options.jpeg, options.photo), true),
+      conversionReportAvailable: async () => await hasLociMyuConversion(fs, false) || await hasFrozenV1MaterialReport(fs),
+      conversionReport: () => execute(async () => await readLociMyuConversionReport(fs, options.fileLimits, `prj_${run}`, options.decode, options.jpeg, options.photo) ??
+        await readFrozenV1MaterialReport(fs, options.fileLimits, `prj_${run}`, options.decode, options.jpeg, options.photo), true),
       get accessDetail() { return options.mode === 'view' ? '閲覧専用です。' : lease.accessDetail; },
       setDisplayPreparation(callback: (next: SyntheticProject) => Promise<void>) {
       if (closed || prepareDisplay) throw Error('モデル表示の接続を確認してください。');

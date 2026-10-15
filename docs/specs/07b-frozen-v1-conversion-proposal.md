@@ -11,6 +11,10 @@ and cold recovery with synthetic GLB/PNG, memory storage and recorded DOM. The
 serial checks and HTTP build identity pass; browser/GPU/device/offline and
 anonymized-real-source acceptance remain pending. This is bounded implementation,
 not full v1 conversion or ordinary-entry/profile/storage adoption.
+The separately ratified [07i companion](07i-frozen-v1-material-proposal.md) adds
+recipe-6's exact decoded-address/unique-base-slot material subset. Its source-only
+disabled chroma explanation and Scene overrides do not reinterpret this recipe-1
+or other old prepared jobs. Current implementation/checks remain in todo.
 
 ## User outcome and decision
 

@@ -1,10 +1,15 @@
 # Frozen-v1 exact material-address conversion
 
-Status: **PROPOSED — not ratified, not implemented or adopted.**
-This additive companion to [07b](07b-frozen-v1-conversion-proposal.md) proposes
-one bounded conversion workflow. Approval of 06a or earlier migration recipes
-does not authorize its implementation. Existing recipes1–5 keep their literals,
+Status: **APPROVED — exact companion ratified by PO 2026-10-16; bounded validation implementation, not adopted.**
+This additive companion to [07b](07b-frozen-v1-conversion-proposal.md) defines
+one bounded conversion workflow. The PO explicitly approved this exact companion
+on 2026-10-16. Existing recipes1–5 keep their literals,
 source acceptance, reports, IDs, profiles and completed-retry timing.
+The exact source/map/receipt and typed confirmation/edit/file/selected-restore/cold
+path is implemented and exercised with synthetic models, injected image decode and
+recorded DOM. Final serial checks, all three builds and HTTP byte identity pass;
+the exact evidence is in [todo](../../tasks/todo.md). This does not claim
+browser/GPU/device/offline acceptance.
 
 ## Decision and user outcome
 
@@ -17,8 +22,8 @@ The new decision is a conservative address-to-slot mapping and new immutable
 recipe. It accepts neither the old viewer's display-name/suffix/raw-name fallback
 nor broadcast to a shared source material. Disabled chroma editing values remain
 only in the original ZIP and a field-named explanation, **not** editable target
-chroma settings. The PO is asked to ratify that limitation and the exact mapping
-below together. Existing 02's material tuple is already authoritative; this does
+chroma settings. The PO ratified that limitation and the exact mapping below
+together on 2026-10-16. Existing 02's material tuple is already authoritative; this does
 not ask to reapprove it or claim parity with every old viewer input.
 
 ## Observed source and the narrower proposed subset
@@ -286,4 +291,5 @@ new source/render semantics, a need to reinterpret old jobs/profiles, or a new
 storage/numeric/format policy. General opacity/chroma, fallback names, shared-source
 broadcast, orthographic numeric reconstruction, inline cameras, external legacy
 repos, ordinary activation, dependencies, cleanup/deletion and release/deploy are
-excluded. Implementation remains stopped until the PO ratifies this companion.
+excluded. PO ratification authorizes this bounded implementation; it does not
+claim implementation completion, browser/device acceptance or adoption.

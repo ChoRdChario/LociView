@@ -16,6 +16,10 @@ neither overrides durable recovery or validates a device's free disk/offline sta
 LociMyu's approved 07h subset maps opaque/disabled-chroma shading/sidedness to
 Scene material slots. Latent chroma editing values stay only in source/report;
 old recipes/profiles and private-evidence export boundaries remain fixed.
+Frozen-v1's approved 07i subset proves exact decoded material addresses against
+unique base slots; its Scene shading/sidedness and private explanation retain
+the same source-only latent-value boundary. It adds no fallback-name/shared-material
+mapping, occurrence profile or ordinary-entry/browser adoption.
 The validation file selector uses one content-inspected intent and conditional
 Project creation. Its cached initial/run and late-result guards are UI ownership,
 not a new package authority. The approved 06a first-backup branch uses a proven

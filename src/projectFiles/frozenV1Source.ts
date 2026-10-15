@@ -5,11 +5,12 @@ import { parseOpsJsonl, v1OperationLogActor } from '../core/jsonl';
 import { admitNonDivergentV1Operations, type LocatedV1Operation } from '../core/operationAdmission';
 import { reduce, sortOps, visibleEntities, isVisible, type EntityRecord } from '../core/reduce';
 import type { Op } from '../core/schema';
-import { cloneCanonicalValue, type JsonObject } from '../domain/values';
+import { cloneCanonicalValue, singleLineControls, type JsonObject, type JsonValue } from '../domain/values';
 import { digest, json } from '../projectMetadata/persistence';
 import type { StoredBlobRef } from '../projectMetadata/blobStore';
 import { readValidationBody } from './content';
 import { inspectFreshValidationGlb, type ValidatedGlb } from './glb';
+import { inspectOccurrenceGlb, inspectOccurrenceJpegGlb, decodeOccurrenceGlb } from './glbOccurrences';
 import type { PngDecoder } from './png';
 import type { JpegDecoder } from './jpeg';
 import { checkFileLimits, fileError, fileObject, fileList, fileNumber, fileVector, limitedJson, validationMetadataLimits, type FileValidationLimits } from './validation';
@@ -19,7 +20,8 @@ export const frozenV1JpegRecipe = 'v1-project-scene-migration-recipe-2';
 export const frozenV1PhotoRecipe = 'v1-project-scene-migration-recipe-3';
 export const frozenV1DefaultViewRecipe = 'v1-project-scene-migration-recipe-4';
 export const frozenV1PlacementRecipe = 'v1-project-scene-migration-recipe-5';
-export type FrozenV1Recipe = typeof frozenV1PlacementRecipe | typeof frozenV1DefaultViewRecipe | typeof frozenV1PhotoRecipe | typeof frozenV1Recipe | typeof frozenV1JpegRecipe;
+export const frozenV1MaterialRecipe = 'v1-project-scene-migration-recipe-6';
+export type FrozenV1Recipe = typeof frozenV1MaterialRecipe | typeof frozenV1PlacementRecipe | typeof frozenV1DefaultViewRecipe | typeof frozenV1PhotoRecipe | typeof frozenV1Recipe | typeof frozenV1JpegRecipe;
 export const codeOrder = (a: string, b: string) => a < b ? -1 : a > b ? 1 : 0;
 export const byteProof = async (bytes: Uint8Array) => ({ byteLength: bytes.length, digest: await digest(bytes) });
 const fail = () => fileError('この旧形式ファイルの設定は、まだそのまま変換できません。');
@@ -30,6 +32,27 @@ export const sourceColor = (value: unknown) => {
 };
 const text = (value: unknown): string => typeof value === 'string' ? value : fail();
 const vector = (value: unknown) => fileVector(value, 3);
+const materialFail = (id: string, field: string, reason: string): never => fileError(`材質 ${id}・${field}：${reason}`);
+function checkMaterialFields(id: string, value: unknown) {
+  const v = fileObject(value), bad = (field: string) => materialFail(id, field, '保存値の型または対応している設定を確認してください。');
+  const keys = ['setId', 'modelAssetId', 'materialKey', 'opacity', 'doubleSided', 'unlit', 'unlitLike', 'chroma', 'legacyKey'];
+  for (const field of Object.keys(v)) if (!keys.includes(field)) bad(field.slice(0, 64));
+  for (const [field, prefix] of [['setId', 'set'], ['modelAssetId', 'ast']] as const)
+    if (Object.hasOwn(v, field) && (typeof v[field] !== 'string' || !new RegExp(`^${prefix}_[0-7][0123456789ABCDEFGHJKMNPQRSTVWXYZ]{25}$`, 'u').test(v[field] as string))) bad(field);
+  if (Object.hasOwn(v, 'materialKey') && (typeof v.materialKey !== 'string' || !v.materialKey.length || singleLineControls.test(v.materialKey))) bad('materialKey');
+  const unit = (n: unknown, field: string) => { if (typeof n !== 'number' || !Number.isFinite(n) || n < 0 || n > 1) bad(field); };
+  if (Object.hasOwn(v, 'opacity')) unit(v.opacity, 'opacity');
+  for (const field of ['doubleSided', 'unlit', 'unlitLike', 'legacyKey']) if (Object.hasOwn(v, field) && typeof v[field] !== 'boolean') bad(field);
+  if (Object.hasOwn(v, 'unlit') && Object.hasOwn(v, 'unlitLike') && v.unlit !== v.unlitLike) bad('unlit/unlitLike');
+  if (Object.hasOwn(v, 'chroma')) {
+    if (!v.chroma || typeof v.chroma !== 'object' || Array.isArray(v.chroma)) bad('chroma');
+    const c = v.chroma as Record<string, unknown>;
+    if (Object.keys(c).some(k => !['enable', 'color', 'tol', 'tolerance', 'feather'].includes(k)) || typeof c.enable !== 'boolean') bad('chroma');
+    if (Object.hasOwn(c, 'color') && (typeof c.color !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(c.color))) bad('chroma.color');
+    for (const field of ['tol', 'tolerance', 'feather']) if (Object.hasOwn(c, field)) unit(c[field], `chroma.${field}`);
+  }
+  return v;
+}
 
 /** Recipe-5's normative serialized constants: validate, never renormalize them. */
 export function frozenV1Placement(value: unknown) {
@@ -85,10 +108,11 @@ function checkSourceFields(op: Op, limits: FileValidationLimits) {
     asset: ['kind', 'path', 'originalName', 'mime', 'size', 'sha256', 'transform', 'pinScale'],
     caption: ['setId', 'title', 'body', 'color', 'tags', 'attachments', 'anchor'],
     view: ['setId', 'name', 'cameraState', 'background'], profile: ['displayName', 'defaultPinColor'], meta: [],
+    material: ['setId', 'modelAssetId', 'materialKey', 'opacity', 'doubleSided', 'unlit', 'unlitLike', 'chroma', 'legacyKey'],
   };
   if (!Object.hasOwn(fields, op.e)) fail();
   if (!op.v) return;
-  const v = closed(op.v, fields[op.e]!);
+  const v = op.e === 'material' ? checkMaterialFields(op.id, op.v) : closed(op.v, fields[op.e]!);
   if (op.e === 'set') {
     if (Object.hasOwn(v, 'order')) fileNumber(v.order);
     if (Object.hasOwn(v, 'defaultCameraState') || Object.hasOwn(v, 'defaultViewId') && v.defaultViewId !== null &&
@@ -126,6 +150,15 @@ function checkSourceFields(op: Op, limits: FileValidationLimits) {
 }
 
 export interface FrozenV1Body { record: EntityRecord; ref: StoredBlobRef; bytes: Uint8Array; model?: ValidatedGlb }
+export interface FrozenV1Material {
+  sourceMaterialId: string; sourceSetId: string; sourceAssetId: string; sourceMaterialKey: string; sourceGlbSha256: string;
+  childPath: number[]; materialArraySlot: 0; nodeIndex: number; primitiveIndex: number; sourceMaterialIndex: number | null;
+  sourceLocator: JsonObject; sourceSemantics: JsonObject; selectedOccurrenceCount: 1; doubleSided: boolean; unlit: boolean;
+}
+export interface FrozenV1MaterialReport {
+  appliedModelOffsets: number; materialEffects: { scenes: number; overrides: number; sourceOnlyChromaRows: number };
+  sourceOnlyMaterialValues: { sourceMaterialId: string; field: string; value: JsonValue }[];
+}
 interface FrozenV1PlanBase {
   manifest: ProjectManifest; models: readonly FrozenV1Body[]; media: readonly FrozenV1Body[];
   scenes: readonly EntityRecord[]; captions: readonly EntityRecord[]; views: readonly EntityRecord[];
@@ -134,8 +167,60 @@ interface FrozenV1PlanBase {
 }
 interface FrozenV1Report { models: number; scenes: number; captions: number; media: number; originalExcludedFromExports: true;
   sourceOnly: { profiles: number; deletedRecords: number; caches: number; deletedPayloads: number; unlinkedPayloads: number; anchorNormals: number } }
-export type FrozenV1Plan = FrozenV1PlanBase & ({ recipe: typeof frozenV1PlacementRecipe; report: FrozenV1Report & { appliedModelOffsets: number } } |
-  { recipe: Exclude<FrozenV1Recipe, typeof frozenV1PlacementRecipe>; report: FrozenV1Report });
+export type FrozenV1Plan = FrozenV1PlanBase & ({ recipe: typeof frozenV1MaterialRecipe; materials: readonly FrozenV1Material[]; report: FrozenV1Report & FrozenV1MaterialReport } |
+  { recipe: typeof frozenV1PlacementRecipe; report: FrozenV1Report & { appliedModelOffsets: number } } |
+  { recipe: Exclude<FrozenV1Recipe, typeof frozenV1PlacementRecipe | typeof frozenV1MaterialRecipe>; report: FrozenV1Report });
+
+/** Temporary decoder provenance only; the caller retains each model's original base catalog. */
+async function materialProof(rows: readonly EntityRecord[], models: readonly FrozenV1Body[], sceneIds: ReadonlySet<string>, limits: FileValidationLimits, png?: PngDecoder, jpeg?: JpegDecoder) {
+  if (rows.length > Math.min(limits.maxItems, validationMetadataLimits.maxNodes)) return fail();
+  const materials: FrozenV1Material[] = [], values: FrozenV1MaterialReport['sourceOnlyMaterialValues'] = [], tuples = new Set<string>(), routes = new Set<string>();
+  const byModel = new Map<string, EntityRecord[]>(), modelIds = new Set(models.map(m => m.record.id)); let work = 0;
+  const charge = (n: number) => { work += n; if (!Number.isSafeInteger(work) || work > Math.min(limits.maxValues, validationMetadataLimits.maxWork)) fail(); };
+  for (const row of rows) {
+    charge(1); const v = checkMaterialFields(row.id, row.fields), bad = (field: string, reason: string) => materialFail(row.id, field, reason);
+    if (!sceneIds.has(v.setId as string)) bad('setId', '有効なシーンへの対応を確認できません。');
+    if (!modelIds.has(v.modelAssetId as string)) bad('modelAssetId', '有効なモデルへの対応を確認できません。');
+    if (typeof v.materialKey !== 'string' || !v.materialKey.length) bad('materialKey', '保存済みの正確な対応が必要です。');
+    if (v.opacity !== undefined && v.opacity !== 1) bad('opacity', '不透明な材質だけを変換できます。');
+    if (v.chroma !== undefined && (v.chroma as Record<string, unknown>).enable !== false) bad('chroma.enable', '色の透過が無効な材質だけを変換できます。');
+    const tuple = json([v.setId, v.modelAssetId, v.materialKey]); if (tuples.has(tuple)) bad('materialKey', '保存済みの対応が重複しています。'); tuples.add(tuple);
+    const own = byModel.get(v.modelAssetId as string) ?? []; own.push(row); byModel.set(v.modelAssetId as string, own);
+    if (Object.hasOwn(v, 'legacyKey')) values.push({ sourceMaterialId: row.id, field: 'legacyKey', value: v.legacyKey as boolean });
+    if (v.chroma) for (const field of ['color', 'tol', 'tolerance', 'feather']) if (Object.hasOwn(v.chroma, field))
+      values.push({ sourceMaterialId: row.id, field: `chroma.${field}`, value: (v.chroma as JsonObject)[field]! });
+  }
+  for (const model of models) {
+    const own = byModel.get(model.record.id); if (!own) continue;
+    const inspected = model.model!.jpeg ? await inspectOccurrenceJpegGlb(model.bytes, limits, png, jpeg) : await inspectOccurrenceGlb(model.bytes, limits, png);
+    const decoded = await decodeOccurrenceGlb(inspected);
+    try {
+      const keys = new Map<string, typeof decoded.occurrenceSlots[number][]>(), counts = new Map<number | null, number>();
+      for (const slot of decoded.occurrenceSlots) {
+        charge(1 + slot.childPath.length); const path: string[] = []; let node: NonNullable<typeof slot.node.parent> = slot.node;
+        while (node !== decoded.root) { charge(1); const parent = node.parent; if (!parent) return fail(); path.unshift(node.name !== '' ? node.name : '#' + parent.children.indexOf(node)); node = parent; }
+        const key = `m/${path.join('|')}/${slot.materialArraySlot}`, list = keys.get(key) ?? []; list.push(slot); keys.set(key, list);
+        counts.set(slot.materialIndex, (counts.get(slot.materialIndex) ?? 0) + 1);
+      }
+      const catalog = new Map(model.model!.materials.map(m => [json(m.sourceLocator), m]));
+      for (const row of own) {
+        charge(1); const f = row.fields, found = keys.get(f.materialKey as string), bad = (reason: string) => materialFail(row.id, 'materialKey', reason);
+        if (found?.length !== 1) bad('元モデルの正確な材質アドレスを一意に確認できません。');
+        const slot = found![0]!; if (counts.get(slot.materialIndex) !== 1) bad('共有された元材質には対応していません。');
+        const locator: JsonObject = slot.materialIndex === null ? { kind: 'representationMaterial', slotIndex: 0 } : { kind: 'gltfMaterial', materialIndex: slot.materialIndex };
+        const source = catalog.get(json(locator)), semantics = source?.sourceSemantics as JsonObject | undefined;
+        if (!semantics || json(semantics) !== json({ coverage: { kind: 'opaque' }, optics: 'surface', lighting: 'lit', doubleSided: false })) bad('不透明・陰影あり・表面のみの元材質だけを変換できます。');
+        const route = json([f.setId, model.record.id, locator]); if (routes.has(route)) bad('同じシーンの材質対応が重複しています。'); routes.add(route);
+        materials.push({ sourceMaterialId: row.id, sourceSetId: f.setId as string, sourceAssetId: model.record.id, sourceMaterialKey: f.materialKey as string,
+          sourceGlbSha256: model.ref.digest, childPath: [...slot.childPath], materialArraySlot: 0, nodeIndex: slot.nodeIndex, primitiveIndex: slot.primitiveIndex,
+          sourceMaterialIndex: slot.materialIndex, sourceLocator: locator, sourceSemantics: semantics!, selectedOccurrenceCount: 1,
+          doubleSided: f.doubleSided === true, unlit: f.unlit === true || f.unlitLike === true });
+      }
+    } finally { decoded.dispose(); }
+  }
+  materials.sort((a, b) => codeOrder(a.sourceMaterialId, b.sourceMaterialId)); values.sort((a, b) => codeOrder(a.sourceMaterialId, b.sourceMaterialId) || codeOrder(a.field, b.field));
+  return { materials, values };
+}
 
 /** Read only, owned bytes and complete raw accounting; never the legacy writable importer. */
 export async function inspectFrozenV1Source(input: Blob, limits: FileValidationLimits, decode?: PngDecoder, jpeg?: JpegDecoder, photo?: PhotoDecoder): Promise<{ plan: FrozenV1Plan; original: Uint8Array } | null> {
@@ -235,6 +320,14 @@ export async function inspectFrozenV1Source(input: Blob, limits: FileValidationL
   const placementHistory = ops.some(op => op.e === 'asset' && op.v?.transform !== undefined && nonidentity(frozenV1Placement(op.v.transform)));
   const base = { manifest, models, media, scenes, captions, views, fingerprints, inventory },
     report: FrozenV1Report = { models: models.length, scenes: scenes.length, captions: captions.length, media: media.length, sourceOnly, originalExcludedFromExports: true };
+  if (ops.some(op => op.e === 'material')) {
+    checkPlacementReadiness(models, captions, views);
+    const { materials, values } = await materialProof(visibleEntities(state, 'material').sort((a, b) => codeOrder(a.id, b.id)), models, sceneIds, limits, decode, jpeg);
+    return { original, plan: { ...base, recipe: frozenV1MaterialRecipe, materials, report: { ...report,
+      appliedModelOffsets: models.filter(m => frozenV1Placement(m.record.fields.transform).translation.some(n => n !== 0)).length,
+      materialEffects: { scenes: new Set(materials.map(m => m.sourceSetId)).size, overrides: materials.length,
+        sourceOnlyChromaRows: new Set(values.filter(v => v.field.startsWith('chroma.')).map(v => v.sourceMaterialId)).size }, sourceOnlyMaterialValues: values } } };
+  }
   if (placementHistory) {
     checkPlacementReadiness(models, captions, views);
     const appliedModelOffsets = models.filter(m => frozenV1Placement(m.record.fields.transform).translation.some(n => n !== 0)).length;

@@ -71,6 +71,10 @@ initial conversions. The approved frozen-v1 recipe-4 in `frozenV1Source.ts` /
 conversion domains or model profiles. The approved recipe-5 maps saved model
 scale/Y-or-Z-up/offset only into the binding, preserving original GLB and local
 pin coordinates; source inspection checks new5 display readiness before creation.
+The approved 07i recipe-6 uses temporary occurrence decode to prove exact saved
+material addresses, then persists the original base catalog/profile and Scene
+overrides. Source-only latent values and private captured witnesses follow the
+existing converter/report lifetime; typed editing and file/restore use existing ports.
 `projectFiles/lociMyuSource.ts` owns raw workbook inspection,
 `lociMyuMapping.ts` verifies source identity and constructs typed records, and
 `lociMyuConversion.ts` retains the private source/receipt and validates recovery

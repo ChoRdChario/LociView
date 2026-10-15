@@ -42,6 +42,9 @@ Fresh HEIF selection now explains separate local JPEG export and permits explici
 unapplied-media cancellation; site storage estimates preserve pending save retry.
 LociMyu Scene shading/sidedness now survives conversion and selected-generation
 restore under recipe-4; disabled chroma settings remain source/report only.
+Frozen-v1 recipe-6 now proves exact decoded material addresses against unique
+base slots, preserving Scene shading/sidedness through the same file/restore/cold
+workflow; disabled chroma editing values remain original/explanation only.
 The same file-opening intent now inspects models/photos and packages, reveals
 conditional creation, and preserves selection/retry ownership through failure.
 Ordinary entry, broader profiles/converters, browser performance, physical-iPhone
@@ -123,14 +126,16 @@ destructive boundary. Ordinary entry and temporary iPhone HTTPS need their exist
 exact-build/route approvals. Main, Pages, Service Worker, version/license, release,
 dependency changes and private/public fixture distribution are outside this unit.
 
-### Current decision — frozen-v1 exact material-address conversion
+### Completed implementation — frozen-v1 exact material-address conversion
 
 Outcome: exact saved material address → Scene/base-slot shading/sidedness → edit,
 file exchange and actual selected-generation restore/edit/cold, without changing
 old recipes/profiles or inventing fallback-name/shared-material semantics. The
-[07i proposal](../docs/specs/07i-frozen-v1-material-proposal.md) is **PROPOSED,
-unratified and not implemented**. This is the next genuine compatibility/ID
-decision after the completed 06a workflow, not authority for source changes.
+[07i companion](../docs/specs/07i-frozen-v1-material-proposal.md) was explicitly
+ratified by PO on 2026-10-16, authorizing its exact bounded implementation.
+Actual clean g0 HEAD/cache bc308b9 is the starting checkpoint. This approved
+status and connected plan precede source changes; implementation/adoption are
+not claimed by the approval.
 
 - [x] Bound the exact producer-key and association proof using existing occurrence
   decode helpers, keeping temporary catalogs out of the actual base profile.
@@ -138,13 +143,91 @@ decision after the completed 06a workflow, not authority for source changes.
   private witness/report phases, recipe6/IDs/recovery and one connected acceptance.
 - [x] Independent meaningful proposal reviews closed with no P1/P2. All six Node
   vectors agree with independent Python/.NET (no runtime/browser evidence).
-- [ ] PO ratifies the exact new mapping/domain and inactive editing-value limitation.
-  Until then implement no new6/material source path. Old1–5, orthographic/inline
-  refusals and all ordinary/browser/device/offline/adoption gates stay fixed.
+- [x] Record exact PO ratification, current outcome/ports/checks/stops before source.
+- [x] Connect retained-material dispatch and typed raw/current checks to temporary
+  occurrence proof; persist only actual base GLB/catalog/profile and local pins.
+- [x] Map unique exact source routes to Scene overrides, new6 IDs/witness and
+  captured source/initial/origin/report re-derivation. Keep old1–5 unchanged.
+- [x] Connect typed confirmation/explanation and one edit/save/exchange/actual
+  selected restore/same-service edit/cold flow. Reuse focused service fault cases.
+- [x] Early sceneCore at the exact new import, meaningful independent review,
+  final source/test freeze → required serial checkpoint/builds → HTTP identity.
+  Retain the exact reviewed/tested tree for normal verified g0 checkpoint/push;
+  Git owns actual commit and remote identity, not a duplicated document log.
 
-Keep the proposal checkpoint docs-only; no new fixture/math/renderer/decoder port,
-external legacy repository, dependency, ordinary activation or release. If approved,
-record ratification and a short connected plan before the source implementation.
+Ports: existing frozen source/map/conversion and source-only explanation, existing
+glbOccurrences inspection/decode (new6-only private proof), Session/provider/content,
+typed material editor, file/generation and validation confirmation/report ports.
+No temporary ordinal catalog under a base profile; no harness/UI/native converter
+dependency in projectFiles. Preserve exact key/unique base locator proof, boolean
+aliases and field-named latent values, whole-input refusal and warm/private-input
+lifetime. All old1–5/profiles/placement/readiness and ortho/inline refusals stay fixed.
+Use one writer and read-only core/UI reviewers; no control-by-control final checks.
+Stop only affected work for a genuine source/render contract conflict, unprovable
+address, changed old-job authority or a new storage/numeric/format policy. No public
+fixture distribution/new numeric policy/renderer/decoder port, external legacy repository, dependency,
+ordinary activation, release or browser-denial retry. Node is not actual
+browser/device/offline/adoption evidence.
+
+Editing evidence: early sceneCore 12 PASS. The new material service/fault/ID group
+plus the existing cross-domain collision case passed 44 cases; preview/cold/sidecar
+material variants passed 3; the connected product/file/selected-restore variant
+passed 1 (21.39s test); the final control-key negative passed 1. Typecheck 90738
+passed after the test-owned mutable clone casts and saved-GLB narrowing. The
+subsequent source delta uses existing singleLineControls for the approved single-
+line key; its new NUL contrast passed.
+
+Retained editing failures: sandbox Vitest realpath EPERM collected no tests;
+authorized local execution is separate from the denied browser bootstrap. One
+embedded-JPEG fixture lacked Node self and was corrected to the existing owned
+bitmap stub, including exactly-once close. An extra test parenthesis failed
+collection. Connected test corrections used the visible settled explanation
+button, preserved the existing inherit lighting value, and read the saved closure's
+binding.assetId; no production behavior, outcome assertion or timeout was relaxed.
+Independent core review closed the extra createdAt restriction against approved
+update-wins material visibility; a complete update-only positive now passes.
+All six legacy acknowledgment-owner corrections remain unchanged.
+The first final serial (6823) was intentionally stopped after typecheck passed
+and while the suite was running: the old blanket material-refusal case was the
+now-approved delete-only input. It produced no final suite/build result. Its log
+and freeze remain at `v1-material-checkpoint-interrupted-2026-10-16.log` and
+`v1-material-interrupted-tested-tree-2026-10-16.json` under `.artifacts/traces`.
+Preserve that exact old input as new6/zero-current-effects success; the negative
+now uses a valid update with an unsupported raw field. The refusal/source-byte
+assertions are retained. Relevant negative/deleted contrast passed 2 focused cases;
+the exact former input passed its own positive check. This relevant test correction
+justifies one new final freeze/serial, with all production source unchanged.
+
+Final result: session69136 `check:checkpoint` exit0; typecheck and 116 test files /
+2673 passed +21 existing todo, suite wall740.09s (aggregate case time908.93s), then
+normal/harness/validation builds3.30/3.02/5.71s. Log:
+`.artifacts/traces/v1-material-checkpoint-2026-10-16.log`.
+The final 8-runtime manifest `v1-material-final-tested-tree-2026-10-16.json` matches
+all current raw SHA/byte lengths/Git OIDs; the interrupted manifest is separate.
+Independent core/receipt and UI/connected/root reviews have no unresolved P1/P2.
+Final HTTP GET identity matches all7 validation build files, manifest
+`5d72317cefae746b44e1eacc27f2766e196383095b0585777285d9e3ce5519c4`, with no
+validation SW/manifest/samples. Sandbox localhost EACCES was an execution constraint;
+the separately authorized local GET check passed without browser use. No new server
+or browser attempt was made. Scope17 = runtime8 +docs9; no dependency/workflow/
+public fixture/ordinary entry or deploy change. Node/Three fixtures, injected
+bitmaps and recorded DOM are not actual browser/GPU/device/offline evidence.
+
+Next outcome after this verified checkpoint: observe the existing candidate's
+open → edit → save/backup → cold/interruption workflow in actual browser/OPFS/
+Web Locks before ordinary-entry/storage adoption. Reuse the existing static
+`http://127.0.0.1:4182/dev.html?editor=project` route and owned synthetic inputs;
+no new matrix, PoC, profile or recipe is justified by this milestone audit. This
+lane is not executed: protected browser-client realpath EPERM and the automatic
+approval review's rejection of retry remain known constraints. Do not retry that
+bootstrap, change browser/profile/tool to bypass it, or ask again for Chrome
+permission. Physical iPhone, offline and ordinary entry retain their gates.
+No currently evident approved UI wiring gap takes priority; remaining F06–08
+extensions require separate compatibility/profile/render decisions. Do not invent
+the next migration recipe while the candidate's external evidence lane is blocked.
+Read-only dependency triage attempted npm audit once; registry.npmjs.org DNS
+returned ENOTFOUND, so no fresh advisory result was obtained. Manifest, lockfile,
+installed dependencies and the current runtime tree remain unchanged.
 
 ### Completed implementation — first backup opening into an absent Project
 

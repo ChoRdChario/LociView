@@ -429,6 +429,12 @@ default history while keeping old domains and other exclusions fixed. The
 day, adds recipe-5 for saved scale/Y-or-Z-up/offset with original GLB and model-local
 pins retained; offset applies as new Project-frame translation after scale/rotation.
 Old domains/profiles and orthographic/inline-camera/material exclusions stay fixed.
+The separately ratified [07i material companion](07i-frozen-v1-material-proposal.md)
+adds recipe-6 only for retained material history, exact producer addresses and
+unique base slots. It maps opaque shading/sidedness to Scene overrides; disabled
+chroma editing values remain in the raw source/private explanation. Existing
+placement/default/photo semantics and old1–5 remain fixed; fallback/shared-source,
+general opacity/chroma and orthographic/inline-camera support are not added.
 Broader initial conversion remains required; todo owns executed evidence.
 
 ### 5.5 LociMyu concrete companion — approved bounded implementation
