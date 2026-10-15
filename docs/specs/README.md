@@ -52,6 +52,7 @@ The words **MUST**, **MUST NOT**, **SHOULD**, and **MAY** are normative. A metri
 | Document | Status / purpose |
 |---|---|
 | [`06-project-package-wire.md`](06-project-package-wire.md) | `PROPOSED / UNRATIFIED / NOT IMPLEMENTED`; five-purpose wire design under 05 §7.5, with explicit unresolved journal/base, budget and history-free-builder inputs; no format/version or production authorization |
+| [`07g-frozen-v1-placement-proposal.md`](07g-frozen-v1-placement-proposal.md) | `PROPOSED / UNRATIFIED / NOT IMPLEMENTED`; exact additive recipe-5 for nonidentity model placement, including explicit saved-offset compatibility; orthographic/inline-camera/material exclusions remain |
 
 ## Fixed versus conditional decisions
 

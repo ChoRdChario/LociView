@@ -112,6 +112,24 @@ destructive boundary. Ordinary entry and temporary iPhone HTTPS need their exist
 exact-build/route approvals. Main, Pages, Service Worker, version/license, release,
 dependency changes and private/public fixture distribution are outside this unit.
 
+### Current decision — frozen-v1 model placement
+
+The next connected outcome is nonidentity model placement with its model-local
+pins → conversion → edit/file handoff → selected-generation restore/edit/cold.
+The exact [07g proposal](../docs/specs/07g-frozen-v1-placement-proposal.md) is
+**PROPOSED, unratified and not implemented**. Applying saved offset as Project-frame
+translation can move a model compared with the old viewer, which ignored offset;
+this is the explicit PO compatibility decision before source implementation.
+The proposal, fixed canonical quaternion, four independently calculated identity
+vectors and recovery/privacy boundaries have independent review without P1/P2.
+Documentation-only checks: four vectors agree with independent calculations;
+all 66 local links in the four-document change resolve, and tested runtime hashes
+are unchanged. No runtime verification is claimed for the proposed recipe.
+Next: obtain that one ratification; do not implement the new recipe before it.
+Old recipes/profiles, all-retained orthographic refusal, inline camera and
+material/renderer exclusions remain. No new numerical kernel or evidence-fence
+relaxation is proposed.
+
 ### Completed implementation — frozen-v1 explicit default View
 
 PO ratified the exact [07f companion](../docs/specs/07f-frozen-v1-default-view-proposal.md)
@@ -189,8 +207,8 @@ build files match HTTP on the existing localhost:4182 helper; manifest SHA-256
 `396da9e22b3e542f72883be23cf2a59ea02a2011ba5917e7afdbc61a758ebc07`.
 This is HTTP identity only; browser/GPU/device/offline evidence is unchanged.
 
-Next: record nonidentity v1 model placement as one concrete, separately ratified
-companion. The unratified next-proposal review found that orthographic
+The next compatibility decision is recorded above. Its unratified proposal review
+found that orthographic
 span/zoom is absent and JavaScript hypot/tan approximation cannot by itself bind
 portable exact rederived records. Keep ortho refusal and that numeric-policy
 question open; do not add a math kernel or weaken evidence fences. Inline camera
