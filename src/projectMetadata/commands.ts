@@ -11,7 +11,7 @@ import { value, type Anchor, type Field, type Membership } from '../scene/types'
 import type { ProjectProviderRead } from '../scene/projectProvider';
 import { fail, type MetadataLimits } from './format';
 import { normalizeCaptionText } from '../domain/captionText';
-import { planCaptionMembershipResolution, planAssetMembershipResolution, type CaptionMembershipResolution, type AssetMembershipResolution } from './membership';
+import { candidateReader, planCaptionMembershipResolution, planAssetMembershipResolution, type CaptionMembershipResolution, type AssetMembershipResolution } from './membership';
 import { metadataImmutableReader } from './records';
 import { assetStatusCandidates } from './assetStatus';
 import { planAssetMembershipCopies } from './modelMembership';
@@ -40,6 +40,7 @@ export type MetadataEdit =
   | AssetMembershipResolution
   | { kind: 'resolveAssetStatus'; assetId: string; operationId: string }
   | { kind: 'resolveDefaultScene'; operationId: string }
+  | { kind: 'setAssetPinScale'; assetId: string; pinScale: number }
   | { kind: 'resolveCaptionField'; captionId: string; field: CaptionChoiceField; operationId: string }
   | { kind: 'activatePreparedRevision'; sceneId: string; assetId: string; expectedBindingId: string; revisionId: string; binding: JsonObject }
   | { kind: 'moveAsset'; sceneId: string; assetId: string; expectedBindingId: string; binding: JsonObject }
@@ -84,6 +85,14 @@ export function canonicalMetadataEdit(input: MetadataEdit, limits: MetadataLimit
 /** Plan only from the Session's fresh verified provider. Not a generic patch/import API. */
 export function planMetadataEdit(provider: Provider, input: MetadataEdit, limits: MetadataLimits): readonly MetadataWrite[] {
   const command = canonicalMetadataEdit(input, limits), raw = command as unknown as JsonObject;
+  if (command.kind === 'setAssetPinScale') {
+    shape(raw, ['kind', 'assetId', 'pinScale']);
+    if (provider.semanticProfile !== 'map2') fail('pin-scale-profile');
+    const reader = candidateReader(provider, limits), guard = new ProjectRecordFields(provider.semanticProfile);
+    guard.id(command.assetId, 'ast', []); reader.active('assetsById', command.assetId); reader.exact('assetsById', command.assetId, 'pinScale');
+    checkMutableField(guard, 'assetsById', 'pinScale', command.pinScale);
+    return [{ map: 'assetsById', id: command.assetId, create: false, fields: { pinScale: command.pinScale } }];
+  }
   if (command.kind === 'addAsset') return planAssetAddition(provider, command, limits);
   if (command.kind === 'replaceAssetModel') return planModelReplacement(provider, command, limits);
   if (command.kind === 'resolveSceneName') return planSceneNameResolution(provider, command, limits);

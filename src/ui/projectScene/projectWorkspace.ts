@@ -11,7 +11,7 @@ import { createCaptionWindowControls } from './captionWindowControls';
 import { captionWindowPlanIsCurrent, newCaptionWindowMemory, planCaptionWindow, type CaptionWindowMemory, type CaptionWindowPlan } from './captionWindowState';
 import { createMediaViewer } from './mediaPreview';
 import type { SceneUiMemory } from './navigationState';
-import { fieldValue, projectAttachments, projectCaptions, projectCaptionSceneCount, projectCaptionInventory } from './projectRead';
+import { fieldValue, projectAttachments, projectCaptions, projectCaptionSceneCount, projectCaptionInventory, projectModels, projectIdentity } from './projectRead';
 import { surfaceAnchor, type ProjectWorkspacePorts, type WorkspaceFileInteraction, type WorkspacePinProposal, type WorkspaceSurface, type Point3 } from './projectWorkspacePorts';
 import { createProjectModels } from './projectModels';
 import { createProjectViews } from './projectViews';
@@ -25,7 +25,7 @@ const id = (prefix: string) => `${prefix}_${crypto.randomUUID().replaceAll('-', 
 const emptyMemory = (): SceneUiMemory => ({ selectedCaptionId: null, search: '', listScrollTop: 0, pinColors: null, ownerFilter: { kind: 'all' } });
 const sameTarget = (a: WorkspaceSurface, b: WorkspaceSurface) => JSON.stringify(a) === JSON.stringify(b);
 const colorBytes = (hex: string) => hex.slice(1).match(/../g)!.map(n => parseInt(n, 16) / 255);
-type PinAction = { kind: 'add' | 'move' | 'reparent' | 'place'; token: string; sceneId: string; captionId: string | null; assetId?: string };
+type PinAction = { kind: 'add' | 'move' | 'reparent' | 'place'; token: string; sceneId: string; captionId: string | null; assetId?: string; color?: string };
 type SceneEdit = { kind: 'create' | 'rename' | 'default'; token: string; sceneId: string; name: string; composing: boolean };
 
 /** Product composition: provider reads and typed commands; owns no storage or fixture adapter. */
@@ -33,7 +33,17 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   const make = <K extends keyof HTMLElementTagNameMap>(tag: K, text = '') => { const node = document.createElement(tag); node.textContent = text; return node; };
   const button = (text: string, action: () => void) => { const b = make('button', text); b.type = 'button'; b.addEventListener('click', () => { if (!b.disabled && !disposed) action(); }); return b; };
   const root = make('main'); root.className = 'lv-project-workspace';
-  const header = make('header'), heading = make('h1', 'LociViewで3Dモデルと記録を編集します。');
+  const header = make('header'), heading = make('h1', 'LociViewは3Dモデルと記録を編集できるアプリです。');
+  const projectTitle = make('h2'), resumeStatus = make('p'), fileStatus = make('p'), help = make('details');
+  projectTitle.setAttribute('aria-label', 'プロジェクト名'); resumeStatus.setAttribute('aria-label', '再開データの状態'); fileStatus.setAttribute('aria-label', '保存ファイルの状態');
+  help.setAttribute('aria-label', 'ヘルプ'); help.append(make('summary', 'ヘルプ'));
+  for (const [title, text] of [
+    ['はじめる', 'プロジェクトを選び、変更するときは「編集を開始する」を選択します。シーンを切り替えても「開始シーン」は変わりません。'],
+    ['記録する', '「ピンを追加」でモデルの面を選択し、位置を確定します。Shiftを押しながら面を選択しても追加できます。「数値で配置」では追加先モデルとX・Y・Zを指定します。未配置のピンは、最初にモデルの面を選択してください。'],
+    ['保存と共有', 'ブラウザ内の再開データは、端末のデータ削除で失われます。「ファイルに保存」でバックアップを作り、ファイル欄で保存先のファイルを選択して内容を確認してください。「相手に渡す」で作業一式を共有し、同じプロジェクトの変更分を受け取れます。'],
+    ['困ったとき', '更新に失敗したら入力を保持したまま「更新を再試行」を選択します。競合は「状態を確認」から残す内容を選択します。3D表示だけに問題がある場合は「3D表示を再試行」を選択してください。'],
+  ]) help.append(make('h3', title), make('p', text));
+  header.append(projectTitle, resumeStatus, fileStatus, help);
   const status = make('p'); status.setAttribute('role', 'status'); status.className = 'lv-operation-status';
   const retry = button('更新を再試行', () => { void runRetry(); }); header.append(heading, status, retry);
   const revise = button('入力を修正する', () => { if (!busy && ports.status().kind === 'idle') { pending = null; feedback = ''; render(); } }); header.append(revise);
@@ -62,7 +72,24 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   sceneForm.append(sceneLabel, sceneNote, createScene, cancelScene); sceneArea.append(sceneStatus, sceneManagement, sceneForm);
   const pinArea = make('section'), pinStatus = make('p'), coords = make('div'); pinStatus.setAttribute('role', 'status');
   pinArea.setAttribute('aria-label', 'ピンの操作');
-  const addPin = button('ピンを追加', () => { if (guardInput()) { pinAction = { kind: 'add', token: provider().token, sceneId, captionId: null }; choosing = true; placingCaption = null; render(); } });
+  const addPin = button('ピンを追加', () => { if (guardInput()) { pinAction = { kind: 'add', token: provider().token, sceneId, captionId: null, color: addColorValue() }; choosing = true; placingCaption = null; render(); } });
+  const addColorLabel = make('label', '追加色'), addColor = make('input'); addColor.type = 'color'; addColor.setAttribute('aria-label', '追加色'); addColorLabel.append(addColor);
+  const numericAdd = make('details'), numericLabel = make('label', '追加先モデル'), numericModel = make('select'), beginNumeric = button('このモデルに追加', () => {
+    if (!guardInput() || numericScope !== numericKey) return;
+    const target = viewport.target(numericModel.value); if (!target) return;
+    pinAction = { kind: 'add', token: provider().token, sceneId, captionId: null, assetId: target.assetId, color: addColorValue() };
+    numericTarget = target; pin = null; rawPosition = ['', '', '']; choosing = false; placingCaption = null; render();
+  });
+  numericModel.setAttribute('aria-label', '追加先モデル'); numericLabel.append(numericModel); numericAdd.append(make('summary', '数値で配置'), numericLabel, beginNumeric);
+  const captureNumeric = () => { numericScope = numericKey; };
+  numericModel.addEventListener('focus', captureNumeric); numericModel.addEventListener('pointerdown', captureNumeric);
+  numericModel.addEventListener('change', () => { if (numericModel.disabled || numericScope !== numericKey) numericModel.value = ''; render(); });
+  const captureAddColor = () => { colorScope = { token: provider().token, sceneId }; };
+  addColor.addEventListener('focus', captureAddColor); addColor.addEventListener('pointerdown', captureAddColor);
+  addColor.addEventListener('input', () => {
+    if (mutationBlock() || dirty() || colorScope && (colorScope.token !== provider().token || colorScope.sceneId !== sceneId) || !/^#[0-9a-f]{6}$/i.test(addColor.value)) { addColor.value = addColorValue(); return; }
+    addColors.set(sceneId, addColor.value.toLowerCase()); gesture = null; gestureGeneration++; render();
+  });
   const movePin = button('位置を調整', () => {
     if (!guardInput()) return;
     const caption = provider().resources.captions[memory().selectedCaptionId ?? ''], anchor = fieldValue(caption?.anchor);
@@ -96,20 +123,24 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     const label = make('label', axis), input = make('input'); input.type = 'number'; input.step = 'any'; input.setAttribute('aria-label', `位置 ${axis}`);
     label.append(input); coords.append(label);
     input.addEventListener('input', () => {
-      if (!pin || mutationBlock() || !pinCurrent()) return;
+      const target = pin?.target ?? numericTarget; if (!target || mutationBlock() || !pinCurrent()) return;
       rawPosition[i] = input.value;
-      if (rawPosition.every(v => v.trim() !== '' && Number.isFinite(Number(v)))) pin = { ...pin, position: rawPosition.map(Number) as unknown as Point3 };
+      if (positionValid()) { pin = { target, captionId: placingCaption, position: rawPosition.map(Number) as unknown as Point3 }; numericTarget = null; }
       render();
     });
     input.addEventListener('compositionstart', () => { composing = true; render(); });
-    input.addEventListener('compositionend', () => { composing = false; render(); }); return input;
+    input.addEventListener('compositionend', () => {
+      rawPosition[i] = input.value; composing = false; const target = pin?.target ?? numericTarget;
+      if (target && !mutationBlock() && pinCurrent() && positionValid()) { pin = { target, captionId: placingCaption, position: rawPosition.map(Number) as unknown as Point3 }; numericTarget = null; }
+      render();
+    }); return input;
   });
   const finishPin = button('位置を確定', () => {
-    if (!pin || choosing || mutationBlock() || composingInput() || viewport.read().dragging || !positionValid() || !pinCurrent()) return;
+    if (!pin || !!numericTarget || choosing || mutationBlock() || composingInput() || viewport.read().dragging || !positionValid() || !pinCurrent()) return;
     const captured = pin, target = viewport.target(captured.target.assetId);
     if (!target || !sameTarget(target, captured.target)) { feedback = '表示が変わっています。面を選び直してください。'; render(); return; }
     const command: MetadataEdit = captured.captionId ? { kind: pinAction!.kind === 'move' ? 'movePin' : 'reparentPin', sceneId, captionId: captured.captionId, anchor: surfaceAnchor(captured) } :
-      { kind: 'addPin', sceneId, captionId: id('cap'), membershipId: id('scm'), eventId: id('evt'), anchor: surfaceAnchor(captured), colorSrgb: colorBytes('#a08045') };
+      { kind: 'addPin', sceneId, captionId: id('cap'), membershipId: id('scm'), eventId: id('evt'), anchor: surfaceAnchor(captured), colorSrgb: colorBytes(pinAction!.color!) };
     void run(command, () => {
       const captionId = command.kind === 'addPin' ? command.captionId : captured.captionId!;
       clearPin(); selectCaption(captionId); feedback = 'ピンの位置を確定しました。';
@@ -117,7 +148,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   });
   const cancelPin = button('取り消す', () => { if (!busy && !pending && ports.status().kind === 'idle' && !ports.otherPending() && !composingInput()) { clearPin(); render(); } });
   const repick = button('面で位置を指定', () => { if (pin && !mutationBlock() && !composingInput() && pinCurrent()) { gesture = null; choosing = true; placingCaption = pin.captionId; render(); } });
-  pinArea.append(addPin, movePin, parent, pinStatus, coords, repick, finishPin, cancelPin);
+  pinArea.append(addColorLabel, addPin, numericAdd, movePin, parent, pinStatus, coords, repick, finishPin, cancelPin);
   const deletionArea = make('section'), deletionBox = make('section'), deletionTitle = make('p'), deletionEffects = make('ul'), deletionNote = make('p'), referenceIssues = make('section');
   deletionArea.setAttribute('aria-label', 'キャプションの削除'); deletionBox.setAttribute('aria-label', '削除の確認'); deletionNote.setAttribute('role', 'status');
   referenceIssues.setAttribute('aria-label', '記録の状態');
@@ -150,11 +181,15 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   let draft: CaptionDraft | null = null, pin: WorkspacePinProposal | null = null, choosing = false, placingCaption: string | null = null;
   let sceneEdit: SceneEdit | null = null, sceneInputScope: { token: string; sceneId: string } | null = null;
   let pinAction: PinAction | null = null;
+  let numericTarget: WorkspaceSurface | null = null, numericKey = '', numericScope = '';
+  let colorScope: { token: string; sceneId: string } | null = null;
+  const addColors = new Map<string, string>(), addColorValue = () => addColors.get(sceneId) ?? '#a08045';
   let parentKey = '', parentScope = '';
   let deletion: { token: string; sceneId: string; captionId: string; title: string; impact: ReturnType<ProjectWorkspacePorts['captionDeletion']> } | null = null;
   let rawPosition = ['', '', ''], pending: { action: () => Promise<unknown>; complete: () => void } | null = null;
   let pickerScope: { token: string; sceneId: string; captionId: string } | null = null;
-  let gesture: { pointerId: number; action: PinAction | null; token: string; receipt: string; x: number; y: number; left: number; top: number; width: number; height: number } | null = null;
+  let gesture: { pointerId: number; action: PinAction | null; token: string; sceneId: string; receipt: string; x: number; y: number; left: number; top: number; width: number; height: number; generation: number; shifted: boolean; color: string } | null = null;
+  let gestureGeneration = 0, gestureContext = ''; const pressedPointers = new Set<number>();
   let rendering = false, renderAgain = false, windowMoving = false;
   let viewportFeedback = '';
   const memories = new Map<string, SceneUiMemory>();
@@ -166,19 +201,21 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   const windowMemory = () => { if (!windowMemories.has(sceneId)) windowMemories.set(sceneId, newCaptionWindowMemory(sceneId)); return windowMemories.get(sceneId)!; };
   const includeMemory = () => { if (!includeMemories.has(sceneId)) includeMemories.set(sceneId, newCaptionIncludeMemory(sceneId)); return includeMemories.get(sceneId)!; };
   const composingInput = () => composing || !!draft?.composing || !!sceneEdit?.composing || includeMemory().composing || !!recovery?.composing() || !!mediaManager?.composing() || [...panels.values()].some(p => p.composing());
-  const draftInput = () => hasCaptionDraft(draft) || !!draft?.composing || !!pin || choosing || !!deletion || composing || !!pickerScope || !!sceneEdit || includeMemory().composing;
+  const draftInput = () => hasCaptionDraft(draft) || !!draft?.composing || !!pin || !!numericTarget || choosing || !!deletion || composing || !!pickerScope || !!sceneEdit || includeMemory().composing;
   const panelInput = () => [...panels.values()].some(p => p.hasChanges());
   const dirty = () => draftInput() || !!recovery?.hasChanges() || !!pending || panelInput() || !!mediaManager?.hasChanges() || windowMoving || viewport.read().dragging;
   const mutationBlock = () => windowMoving ? 'ウィンドウの操作を完了してください。' : busy ? '変更を適用しています。' : ports.status().kind === 'failed' ? ports.status().error || '更新を再試行してください。' :
     ports.readOnly ? '閲覧中です。編集を開始してください。' : ports.otherPending() ? 'ファイルの操作を完了してください。' : pending ? '再試行するか、入力を修正してください。' : null;
   const listContext = (): CaptionListContext => ({ source: { kind: 'ready', token: provider().token, sceneId,
-    captions: projectCaptions(provider(), sceneId) }, memory: memory(), pending: dirty() ? 'text' : busy ? 'update' : null, mutationBlock: mutationBlock() });
+    captions: projectCaptions(provider(), sceneId, models?.hidden()) }, memory: memory(), pending: dirty() ? 'text' : busy ? 'update' : null,
+    showModelPending: composingInput() || pressedPointers.size || pin || numericTarget || choosing || deletion || pickerScope || sceneEdit || recovery?.hasChanges() || panelInput() || mediaManager?.hasChanges() || windowMoving || viewport.read().dragging ? 'text' : null,
+    mutationBlock: busy || pending || windowMoving || ports.status().kind !== 'idle' || ports.otherPending() ? '現在の操作を完了してください。' : null });
   const detailContext = (): DetailContext => {
-    const item = projectCaptions(provider(), sceneId).find(c => c.id === memory().selectedCaptionId);
+    const item = projectCaptions(provider(), sceneId, models?.hidden()).find(c => c.id === memory().selectedCaptionId);
     return { source: item ? { kind: 'ready', token: provider().token, sceneId, caption: item, sceneCount: projectCaptionSceneCount(provider(), item.id) } :
       { kind: 'unavailable', token: provider().token, sceneId, captionId: memory().selectedCaptionId,
         reason: memory().selectedCaptionId ? 'この記録は削除されたか、所属・更新の状態を確認する必要があります。未適用の入力は保持しています。' : '記録を選択してください。' },
-      draft, mutationBlock: mutationBlock() || (pin || choosing || deletion || sceneEdit || includeMemory().composing || pickerScope || recovery?.hasChanges() || panelInput() || mediaManager?.hasChanges() ? '現在の操作を完了してください。' : null), feedback: { kind: 'idle' } };
+      draft, mutationBlock: mutationBlock() || (pin || !!numericTarget || choosing || deletion || sceneEdit || includeMemory().composing || pickerScope || recovery?.hasChanges() || panelInput() || mediaManager?.hasChanges() ? '現在の操作を完了してください。' : null), feedback: { kind: 'idle' } };
   };
   const list = createCaptionListControls(document, plan => {
     if (disposed || busy || pending || windowMoving || ports.otherPending()) return;
@@ -188,6 +225,16 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     if (plan.kind === 'unchanged' && plan.explicitSelection) openWindow(plan.explicitSelection.captionId);
     if (plan.kind === 'effect' && plan.action === 'review') {
       selectCaption(plan.captionId); feedback = '記録の競合・配置先・メディアの状態を確認してください。';
+    }
+    if (plan.kind === 'effect' && plan.action === 'showModel') {
+      const p = provider(), anchor = fieldValue(p.resources.captions[plan.captionId]?.anchor), source = projectModels(p, sceneId, projectIdentity(p), models!.hidden(), viewport.read());
+      const asset = anchor?.kind === 'asset' && source.kind === 'ready' ? source.items.find(a => a.id === anchor.assetId) : undefined;
+      if (asset?.lifecycle.kind !== 'value' || asset.lifecycle.value !== 'active' || asset.membership.kind !== 'value' ||
+        p.resources.assets[asset.id]?.projection.kind !== 'value' || !projectCaptions(p, sceneId, models!.hidden()).some(c => c.id === plan.captionId && c.pin === 'ownerHidden')) { feedback = 'モデルの所属と状態を確認してください。'; render(); return; }
+      if (asset.membership.value.kind === 'included') { models!.show(asset.id); feedback = 'モデルを表示しました。'; }
+      else if (!mutationBlock()) { void run({ kind: 'include', sceneId, resourceKind: 'asset', resourceId: asset.id, membershipId: id('sam'), eventId: id('evt'), orderKey: ports.viewOrder(null, null) },
+        () => { models!.show(asset.id); feedback = 'このシーンにモデルを追加して表示しました。'; }); return; }
+      else feedback = mutationBlock()!;
     }
     render();
   }, active => { composing = active; render(); });
@@ -248,7 +295,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     if (owner !== 'captions' && mediaManager?.hasChanges()) return 'メディアの入力・操作を完了してください。';
     if (writes && hasCaptionDraft(draft)) return 'キャプションの変更を適用するか、取り消してください。';
     if (!allowDrag && viewport.read().dragging) return 'カメラ・配置の操作を終えてください。';
-    if (composing || draft?.composing || pin || choosing || deletion || pickerScope || recovery?.hasChanges() || sceneEdit || includeMemory().composing) return '現在の入力・操作を完了してください。';
+    if (composing || draft?.composing || pin || !!numericTarget || choosing || deletion || pickerScope || recovery?.hasChanges() || sceneEdit || includeMemory().composing) return '現在の入力・操作を完了してください。';
     if ([...panels].some(([key, panel]) => key !== owner && panel.hasChanges())) return 'ほかの作業の入力を完了するか、取り消してください。';
     return null;
   }
@@ -263,14 +310,14 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   mediaManager = createProjectMedia(document, panelHost, () => memory().selectedCaptionId, mediaViewer); media.append(mediaManager.root);
   function recoveryBlock(group?: WorkspaceRecoveryGroup): string | null {
     const global = mutationBlock(); if (global) return global;
-    if (composingInput() || pin || choosing || deletion || pickerScope || sceneEdit || panelInput() || mediaManager?.hasChanges() || viewport.read().dragging)
+    if (composingInput() || pin || !!numericTarget || choosing || deletion || pickerScope || sceneEdit || panelInput() || mediaManager?.hasChanges() || viewport.read().dragging)
       return '現在の入力・操作を完了してください。';
     if (group?.target.kind === 'startup' && hasCaptionDraft(draft)) return 'キャプションの変更を適用するか、取り消してください。';
     return null;
   }
   recovery = createProjectRecovery(document, { token: () => provider().token, groups: () => ports.recovery(), block: recoveryBlock,
     cancelBlock: () => busy || !!pending || windowMoving || ports.otherPending() || ports.status().kind !== 'idle',
-    selectBlock: () => busy || !!pending || windowMoving || ports.otherPending() || ports.status().kind !== 'idle' || !!pin || choosing || !!deletion || !!pickerScope || !!sceneEdit || panelInput() || !!mediaManager?.hasChanges() || viewport.read().dragging || composing || !!draft?.composing || includeMemory().composing,
+    selectBlock: () => busy || !!pending || windowMoving || ports.otherPending() || ports.status().kind !== 'idle' || !!pin || !!numericTarget || choosing || !!deletion || !!pickerScope || !!sceneEdit || panelInput() || !!mediaManager?.hasChanges() || viewport.read().dragging || composing || !!draft?.composing || includeMemory().composing,
     changed: render, membership: ports.prepareCaptionMembership,
     apply(token, command, complete) {
       if (recoveryBlock() || token !== provider().token) return;
@@ -321,14 +368,15 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   }
   function resetDraft() { draft = null; draft = beginCaptionDraft(detailContext().source); }
   function selectCaption(captionId: string) { memories.set(sceneId, { ...memory(), selectedCaptionId: captionId }); resetDraft(); openWindow(captionId); }
-  function setPin(next: WorkspacePinProposal) { pin = next; choosing = false; rawPosition = next.position.map(String); }
-  function clearPin() { gesture = null; pin = null; pinAction = null; choosing = false; placingCaption = null; rawPosition = ['', '', '']; }
+  function setPin(next: WorkspacePinProposal) { pin = next; numericTarget = null; choosing = false; rawPosition = next.position.map(String); }
+  function clearPin() { gesture = null; gestureGeneration++; pin = null; numericTarget = null; pinAction = null; choosing = false; placingCaption = null; rawPosition = ['', '', '']; }
   function pinCurrent() {
     if (!pinAction || pinAction.token !== provider().token || pinAction.sceneId !== sceneId || pinAction.captionId && pinAction.captionId !== memory().selectedCaptionId) return false;
     if (pinAction.captionId) { const caption = provider().resources.captions[pinAction.captionId];
       if (fieldValue(caption?.lifecycle)?.state !== 'active' || caption?.anchor.kind !== 'value' || projectCaptionSceneCount(provider(), pinAction.captionId).kind !== 'value') return false;
     }
-    return !pin || (!pinAction.assetId || pin.target.assetId === pinAction.assetId) && !!viewport.target(pin.target.assetId) && sameTarget(viewport.target(pin.target.assetId)!, pin.target);
+    const target = pin?.target ?? numericTarget;
+    return !target || (!pinAction.assetId || target.assetId === pinAction.assetId) && !!viewport.target(target.assetId) && sameTarget(viewport.target(target.assetId)!, target);
   }
   function parentIssue(assetId: string) {
     const p = provider(), selected = memory().selectedCaptionId, caption = selected ? p.resources.captions[selected] : undefined, anchor = fieldValue(caption?.anchor);
@@ -342,6 +390,12 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     const p = provider(), selected = memory().selectedCaptionId, caption = selected ? p.resources.captions[selected] : undefined, anchor = fieldValue(caption?.anchor), blocked = mutationBlock();
     const targets = Object.values(p.resources.assets).filter(a => fieldValue(a.lifecycle)?.state === 'active' && (anchor?.kind !== 'asset' || a.id !== anchor.assetId)).map(a => ({ id: a.id,
       label: fieldValue(p.details.mutable.assetsById[a.id]?.label) as string | undefined, target: viewport.target(a.id) }));
+    const numericTargets = Object.values(p.resources.assets).flatMap(a => { const target = viewport.target(a.id); return target ? [{ id: a.id, name: fieldValue(p.details.mutable.assetsById[a.id]?.label) as string | undefined, target }] : []; });
+    const nextNumericKey = JSON.stringify([p.token, sceneId, numericTargets]);
+    if (nextNumericKey !== numericKey) { numericKey = nextNumericKey; numericModel.replaceChildren(); const empty = make('option', '追加先モデルを選択'); empty.value = ''; numericModel.append(empty);
+      for (const t of numericTargets) { const option = make('option', t.name ?? '名称を確認'); option.value = t.id; numericModel.append(option); } numericModel.value = ''; }
+    numericModel.disabled = !!blocked || dirty(); beginNumeric.disabled = numericModel.disabled || !numericModel.value || numericScope !== numericKey;
+    addPin.disabled = addPin.disabled || !numericTargets.length; addColor.disabled = addPin.disabled; addColor.value = addColorValue();
     const key = JSON.stringify([p.token, sceneId, selected, targets]);
     if (key !== parentKey) { const empty = make('option', '変更先モデルを選択'); empty.value = ''; parentTarget.replaceChildren(empty); parentTarget.value = '';
       for (const item of targets) { const option = make('option', item.label || '名称を確認'); option.value = item.id; option.disabled = !item.target; parentTarget.append(option); } parentKey = key;
@@ -368,7 +422,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     referenceIssues.hidden = !issues.length;
     referenceIssues.replaceChildren(...[...new Set(issues.map(i => `${i.code === 'concurrent-delete-edit' ? '削除と編集が競合しています。内容は履歴に保持しています。' : i.code === 'atomic-field-conflict' ? '削除・復元の状態が競合しています。' : '参照先の確認が必要です。関係する内容は履歴に保持しています。'} ${i.path.join(' / ')}`))].map(text => make('p', text)));
   }
-  function positionValid() { return rawPosition.every(v => v.trim() !== '' && Number.isFinite(Number(v))); }
+  function positionValid() { return rawPosition.every(v => /^[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?$/i.test(v.trim()) && Number.isFinite(Number(v))); }
   async function perform(action: () => Promise<unknown>, complete: () => void) {
     busy = true; feedback = '変更を適用しています。'; pending = { action, complete };
     try { render(); await action(); if (!disposed) { complete(); pending = null; } }
@@ -386,7 +440,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     await perform(() => ports.status().kind === 'failed' ? ports.retry() : work.action(), work.complete);
   }
   function sceneBlock() {
-    return mutationBlock() || (hasCaptionDraft(draft) || draft?.composing || panelInput() || mediaManager?.hasChanges() || composing || includeMemory().composing || pin || choosing || deletion || pickerScope || recovery?.hasChanges() || viewport.read().dragging ? '現在の入力・操作を完了してください。' : null);
+    return mutationBlock() || (hasCaptionDraft(draft) || draft?.composing || panelInput() || mediaManager?.hasChanges() || composing || includeMemory().composing || pin || !!numericTarget || choosing || deletion || pickerScope || recovery?.hasChanges() || viewport.read().dragging ? '現在の入力・操作を完了してください。' : null);
   }
   function clearSceneEdit() { sceneEdit = null; sceneInputScope = null; sceneName.value = ''; }
   function beginSceneChange(kind: 'rename' | 'default') {
@@ -440,31 +494,52 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       file: { name: file.name, size: file.size, arrayBuffer: file.arrayBuffer.bind(file) } };
     void perform(() => ports.addMedia(scope.token, input), () => { pickerScope = null; mediaInput.value = ''; resetDraft(); feedback = 'メディアを追加しました。'; });
   });
+  const modifiedPointer = (event: PointerEvent) => event.altKey || event.ctrlKey || event.metaKey;
+  const invalidateGesture = () => { gesture = null; gestureGeneration++; };
   canvas.addEventListener('pointerdown', event => {
-    if (gesture || !event.isPrimary || event.button !== 0 || event.shiftKey || event.altKey || event.ctrlKey || event.metaKey || !choosing || mutationBlock() || composingInput()) { gesture = null; return; }
-    const read = viewport.read(), rect = canvas.getBoundingClientRect();
-    if (!read.ready || read.dragging || read.token !== provider().token || !read.pickToken || !pinCurrent()) return;
-    gesture = { pointerId: event.pointerId, action: pinAction, token: read.token, receipt: read.pickToken, x: event.clientX, y: event.clientY,
-      left: rect.left, top: rect.top, width: rect.width, height: rect.height };
-  });
-  canvas.addEventListener('pointercancel', () => { gesture = null; });
-  canvas.addEventListener('lostpointercapture', () => { gesture = null; });
-  canvas.addEventListener('pointermove', event => {
-    if (gesture && (gesture.pointerId !== event.pointerId || event.shiftKey || event.altKey || event.ctrlKey || event.metaKey ||
-      Math.hypot(event.clientX - gesture.x, event.clientY - gesture.y) > 4)) gesture = null;
-  });
+    if (disposed) return;
+    pressedPointers.add(event.pointerId); invalidateGesture();
+    const read = viewport.read(), direct = event.shiftKey && !pinAction && !dirty();
+    if (pressedPointers.size === 1 && event.isPrimary && event.button === 0 && (choosing || direct) && !read.dragging) {
+      viewport.reservePointer(true); canvas.setPointerCapture?.(event.pointerId);
+    }
+    if (pressedPointers.size !== 1 || !event.isPrimary || event.button !== 0 || modifiedPointer(event) || (!direct && !choosing) || mutationBlock() || composingInput()) return;
+    const rect = canvas.getBoundingClientRect();
+    if (!read.ready || read.dragging || read.token !== provider().token || !read.pickToken || !direct && !pinCurrent() ||
+      ![event.clientX, event.clientY, rect.left, rect.top, rect.width, rect.height].every(Number.isFinite) || rect.width <= 0 || rect.height <= 0) return;
+    gesture = { pointerId: event.pointerId, action: pinAction, token: read.token, sceneId, receipt: read.pickToken, x: event.clientX, y: event.clientY,
+      left: rect.left, top: rect.top, width: rect.width, height: rect.height, generation: gestureGeneration, shifted: Boolean(event.shiftKey), color: addColorValue() };
+  }, true);
+  const cancelPointer = (event: PointerEvent) => { if (disposed) return; pressedPointers.delete(event.pointerId); invalidateGesture(); if (!pressedPointers.size) viewport.reservePointer(false); };
+  canvas.addEventListener('pointercancel', cancelPointer, true);
+  canvas.addEventListener('lostpointercapture', event => { if (pressedPointers.has(event.pointerId)) cancelPointer(event); }, true);
+  const movePointer = (event: PointerEvent) => {
+    if (disposed) return;
+    if (gesture?.pointerId === event.pointerId && (Boolean(event.shiftKey) !== gesture.shifted || modifiedPointer(event) ||
+      !Number.isFinite(event.clientX) || !Number.isFinite(event.clientY) || Math.hypot(event.clientX - gesture.x, event.clientY - gesture.y) > 4)) invalidateGesture();
+  };
+  canvas.addEventListener('pointermove', movePointer, true);
   canvas.addEventListener('pointerup', event => {
-    const down = gesture; gesture = null; if (!down || down.action !== pinAction || !event.isPrimary || event.button !== 0 || down.pointerId !== event.pointerId || event.shiftKey || event.altKey || event.ctrlKey || event.metaKey || !choosing || mutationBlock() || composingInput()) return;
-    const read = viewport.read(), rect = canvas.getBoundingClientRect();
-    if (!read.ready || read.dragging || read.token !== down.token || read.pickToken !== down.receipt || provider().token !== down.token ||
-      rect.left !== down.left || rect.top !== down.top || rect.width !== down.width || rect.height !== down.height ||
-      Math.hypot(event.clientX - down.x, event.clientY - down.y) > 4) return;
-    if (!pinCurrent()) return;
-    const hit = viewport.pick(event.clientX - rect.left, event.clientY - rect.top, pinAction?.assetId); if (!hit) return;
-    if (pinAction?.assetId && hit.target.assetId !== pinAction.assetId) return;
-    if (hit.target.token !== provider().token || hit.target.sceneId !== sceneId || !hit.position.every(Number.isFinite)) return;
-    setPin({ ...hit, captionId: placingCaption }); render();
-  });
+    if (disposed) return;
+    const down = gesture; movePointer(event); pressedPointers.delete(event.pointerId);
+    if (!pressedPointers.size) viewport.reservePointer(false);
+    if (!down || down !== gesture || !event.isPrimary || event.button !== 0 || down.pointerId !== event.pointerId || pressedPointers.size || modifiedPointer(event)) { invalidateGesture(); return; }
+    gesture = null;
+    queueMicrotask(() => {
+      if (disposed || down.generation !== gestureGeneration || pressedPointers.size || down.action !== pinAction || down.sceneId !== sceneId || mutationBlock() || composingInput()) return;
+      const direct = down.shifted && !down.action;
+      if (direct ? dirty() || down.color !== addColorValue() : !choosing || !pinCurrent()) return;
+      const read = viewport.read(), rect = canvas.getBoundingClientRect();
+      if (!read.ready || read.dragging || read.token !== down.token || read.pickToken !== down.receipt || provider().token !== down.token ||
+        rect.left !== down.left || rect.top !== down.top || rect.width !== down.width || rect.height !== down.height) return;
+      try { const hit = viewport.pick(event.clientX - rect.left, event.clientY - rect.top, pinAction?.assetId, direct);
+        if (!hit) { feedback = '配置する面を特定できません。視点を変えて選び直してください。'; render(); return; }
+        if (pinAction?.assetId && hit.target.assetId !== pinAction.assetId || hit.target.token !== provider().token || hit.target.sceneId !== sceneId || !hit.position.every(Number.isFinite)) return;
+        if (direct) { pinAction = { kind: 'add', token: down.token, sceneId, captionId: null, color: down.color }; placingCaption = null; }
+        setPin({ ...hit, captionId: placingCaption }); render();
+      } catch (error) { feedback = (error as Error).message; render(); }
+    });
+  }, true);
   const cameraTools = make('div'); cameraTools.className = 'lv-project-camera';
   const cameraButtons = ([['fit', '全体表示'], ['front', '正面'], ['top', '上面']] as const).map(([action, label]) => button(label, () => viewAction(() => viewport.camera(action))));
   cameraTools.append(...cameraButtons); viewportTools.insertBefore(cameraTools, viewportStatus);
@@ -479,6 +554,13 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     if (disposed || rendering) return; rendering = true;
     try {
       const p = provider(), blocked = mutationBlock(), selected = memory().selectedCaptionId;
+      const summary = ports.projectStatus();
+      projectTitle.textContent = summary.title?.trim() || '名前を確認できないプロジェクト';
+      resumeStatus.textContent = busy || ports.status().kind === 'checking' ? '変更を確定しています。' : pending || ports.status().kind === 'failed' ? '更新が未完了です。入力を保持しています。再試行してください。' :
+        draftInput() || panelInput() || recovery?.hasChanges() || mediaManager?.hasChanges() ? '入力中の内容はまだ確定していません。' : summary.resumable ? 'このブラウザに再開用データがあります。' : '再開データの状態を確認してください。';
+      fileStatus.textContent = summary.backup === 'verified' ? '確定済みの内容は、選択した保存ファイルと一致しています。' : summary.backup === 'unavailable' ? 'ファイルの保存状態を確認できません。ファイル欄を確認してください。' : '現在の内容を保存したファイルは未確認です。';
+      const nextGestureContext = JSON.stringify([p.token, sceneId, ports.readOnly, ports.imageScope(), ports.otherPending(), models?.hidden(), memory().pinColors]);
+      if (gestureContext !== nextGestureContext) { gestureContext = nextGestureContext; gesture = null; gestureGeneration++; }
       status.dataset.busy = String(busy); status.textContent = ports.status().kind === 'failed' ? ports.status().error || feedback : feedback;
       retry.hidden = !pending; retry.disabled = busy || ports.readOnly || ports.otherPending() || ports.status().retryable === false;
       revise.hidden = !pending || busy || ports.status().kind !== 'idle';
@@ -494,12 +576,12 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       addPin.disabled = !!blocked || dirty() || !sceneId;
       movePin.disabled = !!blocked || dirty() || !selected;
       movePin.textContent = selected && fieldValue(p.resources.captions[selected]?.anchor)?.kind === 'unplaced' ? 'ピンを配置' : '位置を調整';
-      coords.hidden = !pin; finishPin.hidden = !pin; cancelPin.hidden = !pin && !choosing;
+      coords.hidden = !pin && !numericTarget; finishPin.hidden = !pin && !numericTarget; cancelPin.hidden = !pin && !numericTarget && !choosing;
       finishPin.textContent = pinAction?.kind === 'reparent' ? '親モデルと位置を確定' : '位置を確定';
       finishPin.disabled = !!blocked || composingInput() || choosing || viewport.read().dragging || !positionValid() || !pinCurrent(); cancelPin.disabled = busy || !!pending || ports.status().kind !== 'idle' || ports.otherPending() || composingInput();
       repick.hidden = !pin; repick.disabled = !!blocked || composingInput() || !pinCurrent();
       const count = selected ? projectCaptionSceneCount(p, selected) : undefined;
-      pinStatus.textContent = [pinAction && !pinCurrent() ? '対象が更新されています。取り消して選び直してください。' : choosing ? '配置先のモデルの面を選択してください。' : pin ? '位置を確認して確定してください。' : '',
+      pinStatus.textContent = [pinAction && !pinCurrent() ? '対象が更新されています。取り消して選び直してください。' : choosing ? '配置先のモデルの面を選択してください。' : pin ? '位置を確認して確定してください。' : numericTarget ? 'X・Y・Zを入力してください。' : '',
         pinAction?.kind === 'reparent' && count?.kind === 'value' ? `${count.value}シーンに反映されます。変更先モデルがないシーンでは一覧のみになります。` : ''].filter(Boolean).join(' ');
       coordinateInputs.forEach((input, i) => { input.disabled = !!blocked || !pinCurrent(); if (!composing) input.value = rawPosition[i]!; });
       const scene = p.state.scenes[sceneId], start = fieldValue(p.state.defaultSceneId), staleScene = !!sceneEdit && (sceneEdit.token !== p.token || sceneEdit.sceneId !== sceneId);
@@ -512,7 +594,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       cancelScene.hidden = !sceneEdit; cancelScene.disabled = busy || !!pending || ports.status().kind !== 'idle' || ports.otherPending() || !!sceneEdit?.composing;
       sceneNote.textContent = sceneEdit?.kind === 'create' ? 'このシーンのモデルを引き継ぎます。キャプションは追加されません。' : sceneEdit?.kind === 'default' ? '次にプロジェクトを開くときの開始シーンにします。' : ''; sceneNote.hidden = !sceneNote.textContent;
       sceneStatus.textContent = staleScene ? '内容が更新されています。入力は保持しています。取り消して選び直してください。' : start ? `開始シーン：${fieldValue(p.state.scenes[start]?.name) ?? '名称を確認'}` : '開始シーンの状態を確認してください。';
-      mediaInput.disabled = !!blocked || !!sceneEdit || includeMemory().composing || !!deletion || panelInput() || !!mediaManager?.hasChanges() || hasCaptionDraft(draft) || !!pin || choosing || !!recovery?.hasChanges() || !selected;
+      mediaInput.disabled = !!blocked || !!sceneEdit || includeMemory().composing || !!deletion || panelInput() || !!mediaManager?.hasChanges() || hasCaptionDraft(draft) || !!pin || !!numericTarget || choosing || !!recovery?.hasChanges() || !selected;
       cancelMedia.hidden = !pickerScope; cancelMedia.disabled = !!blocked;
       mediaManager!.render();
       recovery!.render();
@@ -536,6 +618,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
         const caption = p.resources.captions[projected.id]; if (!caption) continue;
         const marker = button(fieldValue(caption.title) || '名称なし', () => { if (!dirty() && !busy && !ports.otherPending()) { selectCaption(projected.id); render(); } });
         marker.className = 'lv-project-marker'; marker.style.left = `${projected.x}px`; marker.style.top = `${projected.y}px`;
+        marker.style.transform = `translate(-50%, -50%) scale(${projected.scale ?? 1})`; if (projected.color) marker.style.backgroundColor = projected.color;
         marker.setAttribute('aria-pressed', String(projected.id === selected)); markers.append(marker);
       }
       ports.changed();
@@ -544,5 +627,5 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   mounted = true; render();
   return { root, render, session: interaction, inputPending: () => dirty() || busy,
     hasChanges: () => dirty() || busy || !!pending,
-    unmount() { if (disposed) return; disposed = true; recovery?.dispose(); windows.dispose(); mediaManager?.dispose(); mediaViewer.dispose(); viewport.dispose(); list.dispose(); inclusion.dispose(); detail.dispose(); for (const panel of panels.values()) panel.dispose(); root.remove(); } };
+    unmount() { if (disposed) return; disposed = true; gesture = null; gestureGeneration++; pressedPointers.clear(); viewport.reservePointer(false); recovery?.dispose(); windows.dispose(); mediaManager?.dispose(); mediaViewer.dispose(); viewport.dispose(); list.dispose(); inclusion.dispose(); detail.dispose(); for (const panel of panels.values()) panel.dispose(); root.remove(); } };
 }

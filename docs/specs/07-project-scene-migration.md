@@ -148,7 +148,16 @@ services and host; [todo](../../tasks/todo.md) records its executed checks.
 This is not an implemented initial converter, ordinary entry, formal content
 profile or browser/device/offline adoption.
 
-Use the following exact additions for fresh converted Projects. They do not
+**PO-approved direct-creation extension (2026-10-15):** fresh static GLB/PNG
+Projects created in the existing nondefault validation entry also use map-2,
+schema 2.1 and summary-2. Select that profile explicitly at the admitted creation
+call; do not change the global bootstrap default. Existing/received Projects,
+prepared creation receipts and output/recovery jobs retain their original
+proof/profile/bytes, including map-1. No old Project upgrade, new model/material
+profile, ordinary-entry activation or deployment is authorized by this extension.
+
+Use the following exact additions for fresh converted and these fresh directly
+created Projects. They do not
 authorize migration, activation or renderer support before their applicable checks.
 
 | Data | Approved representation and behavior |
@@ -163,7 +172,7 @@ and hashing need no replacement format. Use these explicit semantic combinations
 | Input/output lane | Adapter / snapshot | Summary |
 |---|---|---|
 | Existing causal files/jobs | `lociview-automerge-atomic-map-1`, unchanged historical field interpretation | `lociview-project-summary-1` |
-| Fresh converted Project and its causal files | `lociview-automerge-atomic-map-2`, bootstrap schema `{ major: 2, minor: 1 }` | `lociview-project-summary-2` |
+| Fresh converted or explicitly admitted fresh direct GLB/PNG Project and its causal files | `lociview-automerge-atomic-map-2`, bootstrap schema `{ major: 2, minor: 1 }` | `lociview-project-summary-2` |
 | Existing review files/jobs | `lociview-project-scene-review` version `1` | `lociview-project-summary-1` |
 | New-profile review output | `lociview-project-scene-review` version `2` | `lociview-project-summary-2` |
 

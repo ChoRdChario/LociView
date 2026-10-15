@@ -32,6 +32,34 @@ function field(source: ProjectMetadataSource, name: string) {
 
 const originalBudget = { maxNodes: PACKAGE_LIMITS.inspectionNodes, maxWork: PACKAGE_LIMITS.inspectionWork };
 describe('explicit metadata semantic profiles', () => {
+  it('edits only a known active map2 Asset pin scale and refuses ambiguous, stale or unsupported writes', async () => {
+    const records = fixture(); records.schema.minor = 1; delete records.assetsById[id('ast')].pinScale;
+    const source = ProjectMetadataSource.bootstrap(records.schema, records.identity, limits, { semanticProfile: 'map2' }).initialize(records);
+    const rep = records.representationsById[id('rep')], before = source.originalChanges();
+    const provider = (s: ProjectMetadataSource) => readProjectScene(s.read(), limits, developmentContentVerifier([
+      { variantFamilyId: rep.variantFamilyId, representationId: rep.id, payloadDigest: rep.payloadDigest },
+    ]));
+    const p = await provider(source), edit = { kind: 'setAssetPinScale' as const, assetId: id('ast'), pinScale: 0.001 }, tx = 'a'.repeat(32);
+    for (const pinScale of [0.001, 1, 1000]) {
+      const result = source.prepareEdit(source.token, { ...edit, pinScale }, p, tx);
+      expect(result.read().history.changes.at(-1)!.writes.map(w => w.path)).toEqual([['assetsById', id('ast'), 'pinScale']]);
+      expect(source.originalChanges()).toEqual(before);
+    }
+    for (const pinScale of [0, -1, 0.0009, 1001, NaN, Infinity]) expect(() => source.prepareEdit(source.token, { ...edit, pinScale }, p, tx)).toThrow();
+    expect(() => source.prepareEdit('stale', edit, p, tx)).toThrow(/stale-token/);
+    const old = create(records).source, op = await provider(old); expect(() => old.prepareEdit(old.token, edit, op, tx)).toThrow(/pin-scale-profile/);
+    const left = ProjectMetadataSource.reopen(changed(source, d => { d.assetsById[id('ast')].pinScale = new A.ImmutableString('2'); }), source.proof, limits);
+    const conflict = left.appendOriginal(changed(source, d => { d.assetsById[id('ast')].pinScale = new A.ImmutableString('3'); }));
+    const cp = await provider(conflict); expect(() => conflict.prepareEdit(conflict.token, edit, cp, tx)).toThrow();
+    const deleted = ProjectMetadataSource.reopen(changed(source, d => { d.assetsById[id('ast')].lifecycle = new A.ImmutableString(canonical({ state: 'deleted', eventId: id('evt', 2), reason: 'userDelete' })); }), source.proof, limits);
+    const dp = await provider(deleted); expect(dp.kind).toBe('scene-provider'); if (dp.kind !== 'scene-provider') throw Error('provider');
+    expect(dp.resources.assets[id('ast')]!.lifecycle).toMatchObject({ kind: 'value', value: { state: 'deleted', reason: 'userDelete' } });
+    expect(() => deleted.prepareEdit(deleted.token, edit, dp, tx)).toThrow();
+    const deleteEdit = deleted.appendOriginal(left.originalChanges()), dep = await provider(deleteEdit);
+    expect(dep.kind).toBe('scene-provider'); if (dep.kind !== 'scene-provider') throw Error('provider');
+    expect(dep.issues.some(i => i.code === 'concurrent-delete-edit' && i.path[0] === 'assetsById' && i.path[1] === id('ast'))).toBe(true);
+    expect(() => deleteEdit.prepareEdit(deleteEdit.token, edit, dep, tx)).toThrow();
+  });
   it('binds map2 to its bootstrap and rejects envelope relabelling or later header changes', () => {
     const records = fixture(); records.schema.minor = 1;
     const old = create(records).source;

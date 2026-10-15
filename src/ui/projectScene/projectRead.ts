@@ -25,7 +25,10 @@ export function projectModels(provider: WorkspaceProvider, sceneId: string, proj
       if ((fieldValue(fields.lifecycle) as JsonObject | undefined)?.state === 'deleted') continue;
       const scene = fieldValue(fields.sceneId), owner = fieldValue(fields.assetId);
       if (typeof scene === 'string' && scene !== sceneId || typeof owner === 'string' && owner !== asset.id) continue;
-      if (scene !== sceneId || owner !== asset.id || !activeRecord(fields)) uncertain = true;
+      const edge = provider.state.assetMemberships[id];
+      if (scene !== sceneId || owner !== asset.id || !activeRecord(fields) || fieldValue(fields.id) !== id || fields.orderKey?.kind !== 'value' ||
+        !edge || edge.sceneId !== sceneId || edge.resourceId !== asset.id || fieldValue(edge.lifecycle)?.state !== 'active' ||
+        provider.issues.some(i => i.code === 'concurrent-delete-edit' && i.path[0] === 'sceneAssetMembershipsById' && i.path[1] === id)) uncertain = true;
       else edges.push({ id, order: fields.orderKey as Field<string> });
     }
     const membership: Field<ModelMembership> = uncertain || edges.length > 1 ? unknown() : edges[0] ?
@@ -79,11 +82,18 @@ export function projectCaptionSceneCount(provider: WorkspaceProvider, captionId:
   }
   return value(scenes.size);
 }
-export function projectCaptions(provider: WorkspaceProvider, sceneId: string): readonly CaptionListItem[] {
+export function projectCaptions(provider: WorkspaceProvider, sceneId: string, hiddenAssetIds: readonly string[] = []): readonly CaptionListItem[] {
   const scene = resolveScene(provider.state, provider.resources, sceneId);
   if (scene.kind !== 'ready') return [];
-  return scene.composition.captions.map(c => projectCaptionItem(provider, { ...c, id: c.captionId },
-    c.marker === 'visible' ? 'visible' : c.marker === 'unplaced' ? 'unplaced' : c.marker === 'needsReview' ? 'needsReview' : 'unavailable'));
+  const models = projectModels(provider, sceneId, projectIdentity(provider), hiddenAssetIds, { ready: false, issue: null });
+  return scene.composition.captions.map(c => { const anchor = fieldValue(c.anchor), item = anchor?.kind === 'asset' && models.kind === 'ready' ? models.items.find(a => a.id === anchor.assetId) : undefined;
+    const projection = anchor?.kind === 'asset' ? fieldValue(provider.resources.assets[anchor.assetId]?.projection) : undefined;
+    const ownerHidden = anchor?.kind === 'asset' && item?.lifecycle.kind === 'value' && item.lifecycle.value === 'active' && item.membership.kind === 'value' &&
+      projection?.assetFrameId === anchor.assetFrameId &&
+      !provider.issues.some(i => i.code === 'concurrent-delete-edit' && i.path[0] === 'assetsById' && i.path[1] === anchor.assetId) &&
+      (item.membership.value.kind === 'absent' || hiddenAssetIds.includes(anchor.assetId) && scene.composition.assets.some(a => a.assetId === anchor.assetId));
+    return { ...projectCaptionItem(provider, { ...c, id: c.captionId }, c.marker === 'unplaced' ? 'unplaced' : ownerHidden ? 'ownerHidden' : c.marker === 'visible' ? 'visible' : c.marker === 'needsReview' ? 'needsReview' : 'unavailable'),
+      needsReview: c.marker === 'needsReview' || anchor?.kind === 'asset' && !!projection && !projection.anchorCompatibilityIds.includes(anchor.authoredAnchorCompatibilityId) }; });
 }
 function projectCaptionItem(provider: WorkspaceProvider, c: Pick<Caption, 'id' | 'title' | 'body' | 'anchor'>, pin: CaptionListItem['pin']): CaptionListItem {
     const colorField = provider.details.mutable.captionsById[c.id]?.colorSrgb;

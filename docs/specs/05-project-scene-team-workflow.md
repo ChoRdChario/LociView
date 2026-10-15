@@ -1581,6 +1581,21 @@ resolution retains navigation/camera/draft identity. Preserve full candidate
 validation, absence, parent-only recovery and independent-copy semantics. No new
 recovery policy, wire/storage authority, adoption or ordinary entry is introduced.
 
+**Product everyday pin/save integration (2026-10-15):** reuse §11.3 captured
+Scene-local addition color and the existing surface/Shift/numeric alternatives.
+Keep the current typed command/gesture owner; reserve pointer input before Orbit,
+invalidate stale/multi-pointer/modified/drag/late sequences and never manufacture
+coordinates for a numeric or unplaced first-placement proposal. Existing owner
+display uses local reveal for included hidden Assets and exact typed include only
+for known absent membership. Add `setAssetPinScale` only for the accepted map2
+atomic Asset field (finite inclusive 0.001–1000); inspect active identity/lifecycle
+and the exact existing value, refusing uncertainty. This changes all owned pin
+sizes across Scenes, not coordinates/model/camera. Preserve old map1 semantics.
+Fresh direct map2 creation follows the PO-approved 07 §5.1 extension. Header/help
+reads distinguish browser resume data, draft/pending failure and current verified
+whole-Project backup; generation/download is never external-save acknowledgement.
+No new storage, profile/renderer adoption, ordinary entry or release is introduced.
+
 Each production slice requires a short meta-audit, exact-tree tests/build, one
 independent read-only review and a reversible commit. Run focused checks during
 editing, then the required full matrix once on the final executable tree. Reuse

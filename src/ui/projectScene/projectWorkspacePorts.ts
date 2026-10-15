@@ -50,9 +50,10 @@ export interface WorkspaceViewportState {
 }
 export interface WorkspaceViewport {
   update(state: WorkspaceViewportState): void;
-  pick(xCss: number, yCss: number, assetId?: string): { target: WorkspaceSurface; position: Point3 } | null;
+  pick(xCss: number, yCss: number, assetId?: string, directCreation?: boolean): { target: WorkspaceSurface; position: Point3 } | null;
+  reservePointer(active: boolean): void;
   read(): { token: string; sceneId: string; pickToken: string; ready: boolean; dragging: boolean; issue: string | null; notice: string | null;
-    pins: readonly { id: string; x: number; y: number; visible: boolean }[]; readonly assetIds?: readonly string[]; readonly view?: ViewRuntime };
+    pins: readonly { id: string; x: number; y: number; visible: boolean; scale?: number; color?: string }[]; readonly assetIds?: readonly string[]; readonly view?: ViewRuntime };
   target(assetId: string): WorkspaceSurface | null;
   camera(action: 'fit' | 'front' | 'back' | 'left' | 'right' | 'top' | 'bottom'): void;
   retry(): void;
@@ -69,6 +70,7 @@ export interface WorkspaceFileInteraction {
 }
 export interface ProjectWorkspacePorts {
   read(): WorkspaceProvider;
+  projectStatus(): { readonly title: string | null; readonly resumable: boolean; readonly backup: 'verified' | 'unconfirmed' | 'unavailable' };
   readonly readOnly: boolean;
   status(): { kind: 'idle' | 'checking' | 'failed'; error?: string; retryable?: boolean };
   dispatch(token: string, command: MetadataEdit): Promise<unknown>;

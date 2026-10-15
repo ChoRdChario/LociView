@@ -10,13 +10,15 @@ export function createProjectModels(document: Document, host: ProjectPanelHost):
   const memories = new Map<string, ModelListMemory>();
   const preview = host.ports.createModelPreview?.();
   let edit: WorkspaceModelProposal | null = null, raw: string[] = [], composing = false, disposed = false;
+  let pinSize: { token: string; sceneId: string; assetId: string; raw: string } | null = null;
+  let pinSizeScope: { token: string; sceneId: string; assetId: string } | null = null;
   let fileScope: { kind: 'add' | 'replace'; token: string; sceneId: string; assetId: string; expectedBindingId?: string; file?: WorkspaceFile } | null = null;
   let deletion: { token: string; assetId: string } | null = null;
   const choices = new Map<string, { token: string; value: string }>();
   const membershipDecisions = new Map<string, { token: string; sceneId: string; value: 'one' | 'both' }>();
   const memory = () => { const { provider, sceneId } = host.source(); if (!memories.has(sceneId)) memories.set(sceneId, newModelListMemory(projectIdentity(provider), sceneId)); return memories.get(sceneId)!; };
   const setMemory = (next: ModelListMemory) => memories.set(host.source().sceneId, next);
-  const ownInput = () => !!edit || !!fileScope || !!deletion || choices.size > 0 || membershipDecisions.size > 0;
+  const ownInput = () => !!edit || !!fileScope || !!deletion || !!pinSize || choices.size > 0 || membershipDecisions.size > 0;
   const context = (): ModelListContext => {
     const { provider, sceneId } = host.source(), m = memory(), block = host.block('models');
     return { source: projectModels(provider, sceneId, m.projectId, m.hiddenAssetIds, host.viewport().read()), memory: m,
@@ -99,6 +101,28 @@ export function createProjectModels(document: Document, host: ProjectPanelHost):
   const cancel = button('配置を取り消す', () => { if (!host.block('models', false) && !composing) { edit = null; host.changed(); } });
   const impact = make('p'); impact.setAttribute('role', 'status'); placement.append(begin, impact, fields, modes, confirm, cancel);
   function valid() { try { host.ports.modelPlacement(raw.slice(0, 3), raw.slice(3, 6), raw[6]!); return true; } catch { return false; } }
+  const pinSizeArea = make('section'), pinSizeLabel = make('label', 'ピンの表示倍率'), pinSizeInput = make('input'), pinSizeNote = make('p');
+  pinSizeInput.type = 'number'; pinSizeInput.min = '0.001'; pinSizeInput.max = '1000'; pinSizeInput.step = 'any'; pinSizeInput.setAttribute('aria-label', 'ピンの表示倍率'); pinSizeLabel.append(pinSizeInput);
+  const capturePinSize = () => { const { provider, sceneId } = host.source(), assetId = memory().assetId;
+    if (assetId && !pinSize) pinSizeScope = { token: provider.token, sceneId, assetId }; };
+  pinSizeInput.addEventListener('focus', capturePinSize); pinSizeInput.addEventListener('pointerdown', capturePinSize);
+  const validPinSize = () => !!pinSize && /^[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?$/i.test(pinSize.raw.trim()) && Number.isFinite(Number(pinSize.raw)) && Number(pinSize.raw) >= 0.001 && Number(pinSize.raw) <= 1000;
+  pinSizeInput.addEventListener('input', () => {
+    if (host.block('models') || edit || fileScope || deletion || choices.size || membershipDecisions.size || memory().composing) return;
+    if (!pinSizeScope) capturePinSize(); if (!pinSizeScope) return;
+    pinSize = { ...(pinSize ?? pinSizeScope), raw: pinSizeInput.value }; host.changed();
+  });
+  pinSizeInput.addEventListener('compositionstart', () => { composing = true; host.changed(); });
+  pinSizeInput.addEventListener('compositionend', () => { if (pinSize) pinSize = { ...pinSize, raw: pinSizeInput.value }; composing = false; host.changed(); });
+  const applyPinSize = button('倍率を適用', () => {
+    const captured = pinSize, { provider, sceneId } = host.source();
+    if (!captured || host.block('models') || composing || !validPinSize() || captured.token !== provider.token || captured.sceneId !== sceneId || captured.assetId !== memory().assetId) return;
+    const value = Number(captured.raw), previous = provider.details.mutable.assetsById[captured.assetId]?.pinScale;
+    if (previous?.kind === 'value' && (previous.value ?? 1) === value) { pinSize = null; pinSizeScope = null; host.changed(); return; }
+    host.dispatch('models', captured.token, { kind: 'setAssetPinScale', assetId: captured.assetId, pinScale: value }, () => { pinSize = null; pinSizeScope = null; host.message('ピンの表示倍率を変更しました。'); });
+  });
+  const cancelPinSize = button('倍率の変更を取り消す', () => { if (!host.block('models', false) && !composing) { pinSize = null; pinSizeScope = null; host.changed(); } });
+  pinSizeArea.append(pinSizeLabel, pinSizeNote, applyPinSize, cancelPinSize);
   const remove = button('プロジェクトから削除', () => {
     if (host.block('models') || ownInput() || memory().composing || composing || !memory().assetId) return;
     try { if (host.ports.modelDeletion(memory().assetId!).dependencies.length) return; deletion = { token: host.source().provider.token, assetId: memory().assetId! }; host.changed(); }
@@ -108,13 +132,23 @@ export function createProjectModels(document: Document, host: ProjectPanelHost):
   deletionBox.append(button('削除する', () => { const captured = deletion; if (!captured || host.block('models')) return;
     host.dispatch('models', captured.token, { kind: 'deleteAsset', assetId: captured.assetId, eventId: newProjectId('evt') }, () => { deletion = null; setMemory({ ...memory(), assetId: null }); host.message('モデルを削除しました。'); }); }),
     button('戻る', () => { if (!host.block('models', false)) { deletion = null; host.changed(); } }));
-  root.append(list.root, fileArea, placement, review, remove, deletionNote, deletionBox); if (preview) root.append(preview.root);
+  root.append(list.root, fileArea, placement, pinSizeArea, review, remove, deletionNote, deletionBox); if (preview) root.append(preview.root);
   function render() {
     if (disposed) return; list.render(context()); const block = host.block('models'), selected = memory().assetId, { provider, sceneId } = host.source();
     const details = selected ? host.ports.modelDetails(sceneId, selected) : null;
     const source = context().source, selectedItem = source.kind === 'ready' ? source.items.find(i => i.id === selected) : undefined;
     const included = selectedItem?.membership.kind === 'value' && selectedItem.membership.value.kind === 'included';
     const visible = selectedItem?.display.kind === 'value' && selectedItem.display.value === 'visible';
+    const scale = selected ? provider.details.mutable.assetsById[selected]?.pinScale : undefined;
+    const scaleReady = provider.semanticProfile === 'map2' && selectedItem?.lifecycle.kind === 'value' && selectedItem.lifecycle.value === 'active' && scale?.kind === 'value' &&
+      !provider.issues.some(i => i.code === 'concurrent-delete-edit' && i.path[0] === 'assetsById' && i.path[1] === selected);
+    pinSizeArea.hidden = !selected;
+    pinSizeInput.disabled = !!block || !scaleReady || !!edit || !!fileScope || !!deletion || choices.size > 0 || membershipDecisions.size > 0;
+    if (!composing) pinSizeInput.value = pinSize?.raw ?? String(scale?.kind === 'value' ? scale.value ?? 1 : '');
+    const staleScale = !!pinSize && (pinSize.token !== provider.token || pinSize.sceneId !== sceneId || pinSize.assetId !== selected);
+    applyPinSize.disabled = !!block || !scaleReady || !pinSize || composing || staleScale || !validPinSize();
+    cancelPinSize.hidden = !pinSize; cancelPinSize.disabled = !!host.block('models', false) || composing;
+    pinSizeNote.textContent = staleScale ? '内容が更新されています。入力を保持しています。取り消して選び直してください。' : !scaleReady ? 'このプロジェクトでは倍率を変更できません。モデルと設定の状態を確認してください。' : 'このモデルに属するピンの大きさを、すべてのシーンで変更します。';
     add.disabled = !!block || ownInput() || memory().composing || !sceneId;
     replace.disabled = !!block || ownInput() || memory().composing || !details || !included || details.sceneCount.kind !== 'value';
     confirmReplacement.hidden = fileScope?.kind !== 'replace' || !fileScope.file; confirmReplacement.disabled = !!block || fileScope?.token !== provider.token;
@@ -133,24 +167,24 @@ export function createProjectModels(document: Document, host: ProjectPanelHost):
     const choice = (key: string, label: string, values: readonly { id: string; label: string }[], apply: (value: string) => void) => {
       const owned = choices.get(key), row = make('label', label), select = make('select'), empty = make('option', '選択してください'); empty.value = ''; select.append(empty); select.setAttribute('aria-label', label);
       for (const item of values) { const option = make('option', item.label); option.value = item.id; select.append(option); }
-      select.value = owned?.value ?? ''; select.disabled = !!block || composing || memory().composing || !!edit || !!fileScope || !!owned && owned.token !== provider.token;
+      select.value = owned?.value ?? ''; select.disabled = !!block || composing || memory().composing || !!edit || !!fileScope || !!pinSize || !!owned && owned.token !== provider.token;
       select.addEventListener('change', () => { if (!select.disabled) { choices.set(key, { token: provider.token, value: select.value }); host.changed(); } }); row.append(select);
-      const save = button('選択を確定', () => { if (!host.block('models') && owned?.token === host.source().provider.token && owned.value) apply(owned.value); });
+      const save = button('選択を確定', () => { if (!host.block('models') && !pinSize && owned?.token === host.source().provider.token && owned.value) apply(owned.value); });
       save.disabled = select.disabled || !owned?.value;
       const clear = button('選択を取り消す', () => { if (!host.block('models', false)) { choices.delete(key); membershipDecisions.delete(key); host.changed(); } }); clear.hidden = !owned && !membershipDecisions.has(key); clear.disabled = !!host.block('models', false);
       review.append(row, save, clear);
     };
     for (const group of groups.statuses) { if (group.issue) review.append(make('p', group.issue));
       if (preview) for (const [index, item] of group.choices.entries()) { const show = button(`${group.label}：候補 ${index + 1} を表示`, () => {
-        if (host.block('models', false)) return; try { preview.show(provider.token, sceneId, group.assetId, item.operationId, `${group.label}：候補 ${index + 1}`); } catch (error) { host.message((error as Error).message); }
-      }); show.disabled = !!host.block('models', false); review.append(show); }
+        if (host.block('models', false) || pinSize) return; try { preview.show(provider.token, sceneId, group.assetId, item.operationId, `${group.label}：候補 ${index + 1}`); } catch (error) { host.message((error as Error).message); }
+      }); show.disabled = !!host.block('models', false) || !!pinSize; review.append(show); }
       choice(`status/${group.assetId}`, `${group.label}：残すモデルと配置`, group.choices.map(c => ({ id: c.operationId, label: c.label })), operationId => {
       host.dispatch('models', provider.token, { kind: 'resolveAssetStatus', assetId: group.assetId, operationId }, () => { choices.delete(`status/${group.assetId}`); host.message('モデルと配置を確定しました。'); });
     }); }
     for (const group of groups.memberships) {
       const key = `${sceneId}/membership/${group.assetId}`, selectedDecision = membershipDecisions.get(key), row = make('label', '重複するモデル'), decision = make('select'); decision.setAttribute('aria-label', '重複するモデル');
       for (const [value, label] of [['one', '一つにまとめる'], ['both', '別々のモデルとして両方残す']]) { const option = make('option', label); option.value = value!; decision.append(option); }
-      decision.value = selectedDecision?.value ?? 'one'; decision.disabled = !!block || !!edit || !!fileScope || composing || memory().composing || !!selectedDecision && selectedDecision.token !== provider.token;
+      decision.value = selectedDecision?.value ?? 'one'; decision.disabled = !!block || !!edit || !!fileScope || !!pinSize || composing || memory().composing || !!selectedDecision && selectedDecision.token !== provider.token;
       decision.addEventListener('change', () => { if (!decision.disabled) { membershipDecisions.set(key, { token: provider.token, sceneId, value: decision.value as 'one' | 'both' }); host.changed(); } }); row.append(decision); review.append(row);
       choice(key, '残すモデル登録', group.edgeIds.map((id, i) => ({ id, label: `登録 ${i + 1}` })), originalMembershipId => {
         let prepared: ReturnType<typeof host.ports.prepareModelMembership> | undefined;

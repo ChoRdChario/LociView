@@ -121,7 +121,7 @@ export function createCaptionListControls(document: Document, onPlan: (plan: Cap
     const showModel = item.pin === 'ownerHidden' && item.owner.kind === 'value' && item.owner.value.kind === 'asset';
     entry.effect = showModel ? 'showModel' : 'review'; entry.action.textContent = showModel ? 'モデルを表示' : '状態を確認';
     entry.action.hidden = !showModel && !needsReview;
-    entry.action.disabled = context!.pending !== null || (showModel && context!.mutationBlock !== null);
+    entry.action.disabled = (showModel && context!.showModelPending !== undefined ? context!.showModelPending : context!.pending) !== null || (showModel && context!.mutationBlock !== null);
     if (showModel && context!.mutationBlock) notes.push(context!.mutationBlock);
     entry.note.textContent = notes.join(' · ');
     return entry.node;

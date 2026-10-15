@@ -46,8 +46,10 @@ export function validationProjectService(fs: ProjectWorkspaceFS, storage: Metada
   return { content, session: new MetadataProjectSession(fs, storage, metadataLimits, allow => content.verifier(allow), content, validationModelFacts(content)) };
 }
 /** Capture once; repeated execution uses identical source/IDs/bytes after a failed attempt. */
-export function prepareValidationCreation(input: PreparedValidationProject) {
-  const source = ProjectMetadataSource.bootstrap(input.records.schema, input.records.identity, metadataLimits).initialize(input.records);
+export function prepareValidationCreation(input: PreparedValidationProject, semanticProfile: 'map1' | 'map2' = 'map1') {
+  if (semanticProfile === 'map2' && (input.records.schema.major !== 2 || input.records.schema.minor !== 0 && input.records.schema.minor !== 1)) return fileError('作成するプロジェクトの版を確認してください。');
+  const schema = semanticProfile === 'map2' ? { ...input.records.schema, minor: 1 } : input.records.schema;
+  const source = ProjectMetadataSource.bootstrap(schema, input.records.identity, metadataLimits, { semanticProfile }).initialize({ ...input.records, schema });
   const blobs = input.blobs.map(b => ({ ref: { ...b.ref }, bytes: b.bytes.slice() }));
   return { source, async persist(fs: ProjectWorkspaceFS, store: OriginBlobStore, session: MetadataProjectSession) {
     const before = await session.read();

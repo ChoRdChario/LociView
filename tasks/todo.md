@@ -22,7 +22,9 @@ panels, attachment organization/shared viewing and Scene-local Caption compariso
 windows, confirmed Caption deletion, explicit pin parent changes, Scene names/
 next-open choice and existing Caption inclusion/exclusion, now with explicit
 Scene/Caption conflict choices, parent-only recovery and independent copies. Existing
-file/recovery work is retained.
+file/recovery work is retained. The explicit-map2 fresh-creation extension,
+Scene-local add colors, guarded Shift/numeric placement, owner reveal, Asset-wide
+pin sizing and checked save/resume/help are also connected in this bounded route.
 Ordinary entry, broader profiles/converters, browser performance, physical-iPhone
 and offline acceptance remain open. Full details and earlier failures are in the
 [September checkpoint record](../docs/history/development-through-2026-09-21/tasks/todo.md).
@@ -101,6 +103,89 @@ major architecture/product decision, a required managed permission, or a release
 destructive boundary. Ordinary entry and temporary iPhone HTTPS need their existing
 exact-build/route approvals. Main, Pages, Service Worker, version/license, release,
 dependency changes and private/public fixture distribution are outside this unit.
+
+### Active unit — finish everyday pin work and save/resume guidance
+
+Outcome: create a new explicit-map2 GLB/PNG Project, add repeated colored pins by
+surface/Shift or explicit numeric alternative, reveal an owner from its Caption,
+adjust an Asset's pin display size, then save/verify/reopen with clear guidance.
+PO approved the direct-creation map2 extension on 2026-10-15; 07 §5.1 now records
+it. Existing/received Projects and prepared jobs retain their source proof/bytes.
+
+- [x] Connect explicit fresh map2 creation, map2-only Asset pinScale editing and
+  consistent marker scaling, without changing old bootstrap/profile defaults.
+- [x] Complete Scene-local captured add color, guarded Shift/numeric placement,
+  and owner reveal/include; preserve current command, gesture and retry owners.
+- [x] Add Project/resume/file status and contextual help using existing read state.
+  Verify connected file/cold and failure guards; independently review and run the
+  final serial checkpoint before the next suitable g0-baseline push.
+
+Acceptance: a new creation fixes its profile before staging; old creation/output
+jobs recover from their original profile. pinScale is Asset-wide/all-Scene,
+finite inclusive 0.001–1000, map2 only; absence renders as 1 and unknown/conflicting
+values are not overwritten. Coordinates/model/camera remain unchanged. Add color
+is Scene-local, captured at operation start and retained across exact retry;
+move/filter are independent. Numeric coordinates start empty and require an
+explicit eligible model; unplaced first placement still requires a surface.
+Shift placement owns pointer capture before Orbit and rejects modified/multitouch/
+drag/stale/late/disposed gestures. Caption owner reveal is local for hidden
+included owners and typed include only for known absent membership. Help/status
+cannot claim external saving from generation/download; only current non-stale
+verified whole-Project backup counts. Preserve drafts/IME/windows and failure
+recovery. No tag-authoring policy, arbitrary migration, renderer/profile expansion,
+ordinary entry, dependencies, release or deployment. Browser action remains
+blocked by the recorded managed rejection; continue independent implementation.
+
+Initial audit: clean g0-baseline at the reviewed Scene/Caption recovery checkpoint.
+C06 filters are already connected; C04 add color is still fixed, Shift/numeric
+entry and Caption owner reveal are missing. Existing map2/render scale is accepted
+but product markers and editing are not connected. Close these daily operations
+and honest save/resume guidance before further conversion/profile decisions.
+
+Implementation now includes the four-part help and a checked Project header.
+Only a whole-Project backup with file-verified state, exact current source token
+and `stale === false` is acknowledged; generation/download and verified teamwork
+files do not qualify. A Workspace-base change invalidates that acknowledgment
+even without a source-token change. Text drafts, failed writes and local resume
+have separate messages.
+
+Focused evidence: exact-module isolation 12 passed; command bounds/profile/
+absence/conflict/legal deletion/delete-edit cases passed; provider/list 32 passed;
+six connected creation/profile-recovery/product regressions passed. The daily
+operation flow also passes after final IME-only coordinate settlement, readonly
+reveal, known-absent typed include and late queued-color invalidation corrections.
+Independent read-only reviews closed the numeric-target, unavailable-owner,
+retained-text reveal and model-choice/pin-size draft findings. A legal deletion
+precondition replaced a malformed lifecycle test; no contract/assertion was relaxed.
+
+Final serial verification passed at the frozen 13-path source/test tree in
+`.artifacts/traces/pin-work-tested-tree-2026-10-15.json`: typecheck, 114 test files /
+2,372 passed / 21 existing todo, normal build and both isolated builds, exit 0.
+Full output: `.artifacts/traces/pin-work-checkpoint-2026-10-15.log`.
+Seven static validation outputs match HTTP bytes at port 4182; manifest
+`046c07bab15b9cd717106a91f44650e265fe8e4d71a1184c96c6dece1dbc13e2`.
+No SW, webmanifest or samples enter that output. This verifies build/HTTP identity,
+not real rendering, native input, browser persistence, offline or physical iPhone.
+Independent final diff reviews have no remaining P1/P2. Suitable checkpoint scope
+is this bounded source/test/specification and status update, for g0-baseline;
+Git owns its commit/publication identity. Earlier failed evidence
+is retained: a sandbox Vitest realpath EPERM ran no tests; authorized focused
+execution passed. The first checkpoint stopped at a test-only optional-style
+type error before tests/builds; the corrected final tree restarts the sequence.
+Neither failure is browser evidence. Browser connection remains subject to the
+recorded automatic approval rejection; do not retry without changed authority.
+
+Milestone audit: g0-baseline at the preceding checkpoint, no unrelated outgoing
+changes or deployment edits. The accepted GLB/PNG product candidate has no obvious
+remaining workflow that is merely an existing-control connection. Close the
+current verification/checkpoint before adding scope. Next outcome: grouped real
+Chrome open/edit/colored-pin/model/view/material/save/verify/exchange/reopen and
+Native-input observation on this exact nondefault candidate. Explicit Chrome
+operation authority is the affected managed-permission stop. Normal entry still
+requires 03 §10 and applicable storage/device/profile evidence. Native appearance
+needs a new versioned companion; frozen-v1/LociMyu durable conversion needs its
+ratified recipe/golden identities. Do not substitute tag authoring or other new
+features for these acceptance/compatibility boundaries.
 
 ### Completed unit — recover conflicting Scene and Caption edits in the integrated editor
 

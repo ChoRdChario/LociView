@@ -265,7 +265,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
       else if ([137, 80, 78, 71, 13, 10, 26, 10].every((b, i) => bytes[i] === b)) media.push(item);
       else throw Error('この検証では静的GLBとPNGを選択してください。元のファイルは変更していません。');
     }
-    const run = newId(), initial = prepareValidationCreation(await prepareValidationProject({ run, title: name, models, media }, ports.fileLimits, ports.decode));
+    const run = newId(), initial = prepareValidationCreation(await prepareValidationProject({ run, title: name, models, media }, ports.fileLimits, ports.decode), 'map2');
     if (disposed) return; await closeCurrent(); await openProject(run, initial);
     // Clear the selection only after creation is actually ready; the host retains exact retry input otherwise.
     if (host?.read().state === 'ready') files.value = '';

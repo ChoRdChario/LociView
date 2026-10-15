@@ -22,6 +22,8 @@ export interface CaptionListContext {
   readonly source: CaptionListSource;
   readonly memory: SceneUiMemory;
   readonly pending: PendingInteraction | null;
+  /** Local owner reveal may retain an ordinary text draft; other operations keep pending. */
+  readonly showModelPending?: PendingInteraction | null;
   /** Host's reason that shared edits are unavailable. Local finding still works. */
   readonly mutationBlock: string | null;
 }
@@ -130,7 +132,8 @@ export function planCaptionList(context: CaptionListContext, intent: CaptionList
       if (!item) return { kind: 'blocked', reason: 'キャプションの状態を確認してください。' };
       // Preserve explicit reselection for host viewing aids without changing editor selection.
       if (intent.kind === 'select' && item.id === memory.selectedCaptionId) return { kind: 'unchanged', explicitSelection: { ...base, captionId: item.id } };
-      if (context.pending) return { kind: 'blocked', reason: sceneSwitchReason(context.pending) };
+      const pending = intent.kind === 'showModel' && context.showModelPending !== undefined ? context.showModelPending : context.pending;
+      if (pending) return { kind: 'blocked', reason: sceneSwitchReason(pending) };
       if (intent.kind === 'select') return change({ selectedCaptionId: item.id });
       if (intent.kind === 'review') return { ...base, kind: 'effect', action: 'review', captionId: item.id };
       if (context.mutationBlock) return { kind: 'blocked', reason: context.mutationBlock };
@@ -149,6 +152,6 @@ export function captionListPlanIsCurrent(plan: CaptionListPlan, context: Caption
   }
   return !captionSourceIssue(context.source) && plan.token === context.source.token &&
     plan.sceneId === context.source.sceneId && plan.baseMemory === context.memory &&
-    (!(plan.kind === 'effect' || plan.intent === 'select') || context.pending === null) &&
+    (!(plan.kind === 'effect' || plan.intent === 'select') || (plan.kind === 'effect' && plan.action === 'showModel' && context.showModelPending !== undefined ? context.showModelPending : context.pending) === null) &&
     (!(plan.kind === 'effect' && plan.action === 'showModel') || context.mutationBlock === null);
 }

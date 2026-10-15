@@ -46,6 +46,15 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
           preview.show(label, modelCandidateDisplay(read(), scene, asset, operation, host.limits)); } };
     } : undefined,
     read, get readOnly() { return !!host.authority.readOnly; }, status: () => host.authority.status!(),
+    projectStatus() {
+      const current = host.read(), provider = read(), jobs = host.workspaceOutput.jobs;
+      const title = provider.inspection.candidates.fields.find(f => f.path.length === 2 && f.path[0] === 'project' && f.path[1] === 'title');
+      const candidate = title?.valid && title.candidates.length === 1 ? title.candidates[0]?.value : undefined;
+      return { title: candidate?.kind === 'value' && typeof candidate.value === 'string' ? candidate.value : null,
+        resumable: current.state === 'ready' && !!current.publication && current.source?.token === provider.token && !host.hasPending(),
+        backup: host.workspaceOutput.error || jobs.some(j => j.state === 'repair-required') ? 'unavailable' :
+          jobs.some(j => j.purpose === 'backup' && j.state === 'file-verified' && j.token === provider.token && j.stale === false) ? 'verified' : 'unconfirmed' };
+    },
     dispatch: (token, command) => host.dispatch(token, command), retry: async () => host.authority.retry!(),
     addMedia: async (token, input) => host.authority.addMediaFile!(token, input),
     addModel: async (token, input) => host.authority.addModelFile!(token, input),
@@ -55,7 +64,7 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
     imageScope: () => host.imageScope(),
     changed, otherPending: external,
     createViewport(canvas, update, propose, proposeModel): WorkspaceViewport {
-      let state: WorkspaceViewportState | undefined, closed = false, rendered: SyntheticDisplay | undefined;
+      let state: WorkspaceViewportState | undefined, closed = false, rendered: SyntheticDisplay | undefined, pointerHeld = false;
       const runtime = factory(canvas, update, (target, position) => {
         if (!state?.pin || state.readOnly || host.authority.readOnly || target.token !== read().token ||
           JSON.stringify(target) !== JSON.stringify(state.pin.target)) return false;
@@ -83,7 +92,9 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
         const available = current && seen.ready && !seen.issue;
         const pinIds = new Set(available ? rendered!.pins.map(p => p.id) : []);
         return { token: seen.display?.token ?? '', sceneId: seen.display?.sceneId ?? '', pickToken: available ? receipt : '', ready: available,
-          dragging: seen.dragging || !!seen.manipulating, pins: available ? seen.pins.filter(p => pinIds.has(p.id) && Number.isFinite(p.x) && Number.isFinite(p.y)) : [], issue: seen.issue, notice: seen.notice ?? null,
+          dragging: seen.dragging || !!seen.manipulating, pins: available ? seen.pins.filter(p => pinIds.has(p.id) && Number.isFinite(p.x) && Number.isFinite(p.y)).map(p => {
+            const source = rendered!.pins.find(pin => pin.id === p.id)!; return { ...p, scale: source.scale ?? 1, color: source.color };
+          }) : [], issue: seen.issue, notice: seen.notice ?? null,
           assetIds: available ? seen.display!.models.map(m => m.binding.assetId) : [],
           view: available && !seen.dragging && !seen.manipulating ? { kind: 'ready' as const, token: seen.token, sceneId: state!.sceneId, projectFrameId: read().resources.projectFrameId,
             projection: seen.projection, axis: seen.axis, bounds: { kind: 'value' as const, value: seen.display!.bounds ? 'available' as const : 'empty' as const } } :
@@ -114,11 +125,12 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
           }
           rendered = next.readOnly ? { ...display, pinEdit: undefined } : display;
           runtime.update(rendered);
-          runtime.setPinPointerActive?.(!!next.windowMoving || next.choosing && !next.readOnly); runtime.setActive(true);
+          runtime.setPinPointerActive?.(pointerHeld || !!next.windowMoving || next.choosing && !next.readOnly); runtime.setActive(true);
         },
         read: observation, target,
-        pick(x, y, assetId) {
-          if (closed || !state || state.readOnly || host.authority.readOnly || !state.choosing) return null;
+        reservePointer(active) { pointerHeld = active; if (!closed) runtime.setPinPointerActive?.(active || !!state?.windowMoving || !!state?.choosing && !state.readOnly); },
+        pick(x, y, assetId, directCreation = false) {
+          if (closed || !state || state.readOnly || host.authority.readOnly || !state.choosing && !directCreation) return null;
           const before = observation();
           if (!before.ready || before.dragging || !before.pickToken || before.token !== read().token) return null;
           const display = runtime.read().display;

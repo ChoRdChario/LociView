@@ -64,6 +64,7 @@ describe('scope-labelled same-token Scene provider; not current-app/source-adapt
     expect(scene(p).assets.map(a => a.assetId)).toEqual([id('ast', 2)]);
     expect(scene(p).captions[0]).toMatchObject({ title: { kind: 'value', value: '記録' }, marker: 'suppressed' });
     expect(p.resources.assets[id('ast')]!.lifecycle.kind).toBe('value'); expect(p.resources.assets[id('ast')]!.projection.kind).toBe('unresolved');
+    expect(projectCaptions(p, id('scn'), [id('ast')])[0]!.pin).not.toBe('ownerHidden');
     expect(p.details.attachments[id('att')]!.kind).toBe('value');
   });
   it('does not propagate Caption/attachment/material failures backward into model availability', async () => {
@@ -72,6 +73,16 @@ describe('scope-labelled same-token Scene provider; not current-app/source-adapt
     const p = await read(r, withTitle, verifier(r, async item => item.id === id('med') ? undefined : developmentContentBytes(item)));
     expect(scene(p).assets).toHaveLength(1); expect(scene(p).captions[0]!.title.kind).toBe('unresolved'); expect(scene(p).captions[0]!.marker).toBe('visible');
     expect(p.details.attachments[id('att')]!.kind).toBe('unresolved'); expect(p.resources.captions[id('cap')]!.body.kind).toBe('value');
+  });
+  it('reveals only a known hidden or absent model owner, keeping projection and membership conflicts reviewable', async () => {
+    const r = fixture(), source = candidateFixture(r);
+    expect(projectCaptions(await read(r, source), id('scn'), [id('ast')])[0]!.pin).toBe('ownerHidden');
+    const absent = fixture(); delete absent.sceneAssetMembershipsById[id('sam')];
+    expect(projectCaptions(await read(absent), id('scn'))[0]!.pin).toBe('ownerHidden');
+    for (const [path, value] of [
+      [['assetsById', id('ast'), 'status'], r.assetsById[id('ast')].status],
+      [['sceneAssetMembershipsById', id('sam'), 'assetId'], id('ast')],
+    ] as const) expect(projectCaptions(await read(r, conflicts(source, [...path], value, value)), id('scn'), [id('ast')])[0]!.pin).not.toBe('ownerHidden');
   });
   it('retains equal mutable candidates and optional absence without selecting or inventing a value', async () => {
     const r = fixture(); delete r.captionsById[id('cap')].colorSrgb; delete r.scenesById[id('scn')].defaultViewId;
