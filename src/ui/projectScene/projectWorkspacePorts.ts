@@ -1,4 +1,5 @@
 import type { MetadataEdit } from '../../projectMetadata/commands';
+import type { CaptionDeletionImpact } from '../../scene/commands';
 import type { ProjectProviderRead } from '../../scene/projectProvider';
 import type { Anchor } from '../../scene/types';
 import type { JsonObject } from '../../domain/values';
@@ -64,6 +65,8 @@ export interface ProjectWorkspacePorts {
   image(record: JsonObject): Promise<Blob>;
   imageScope(): string;
   mediaDescription(text: string): string;
+  captionDeletion(token: string, captionId: string): CaptionDeletionImpact;
+  pinPositionInParent(token: string, captionId: string, assetId: string): Point3 | null;
   modelDetails(sceneId: string, assetId: string): WorkspaceModelDetails | null;
   modelPlacement(translation: readonly string[], rotation: readonly string[], scale: string): WorkspacePlacement;
   modelAngles(rotation: WorkspacePlacement['rotationXYZW']): readonly [string, string, string];

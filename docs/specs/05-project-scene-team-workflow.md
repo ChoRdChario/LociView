@@ -1540,6 +1540,21 @@ failure/retry controls outside the floating overlap. Reuse existing interruption
 tests and verify the connected product workflow, readonly/local state and exact
 image-service invalidation. No new persistence or renderer/profile adoption.
 
+**Product Caption management integration (2026-10-15):** compose the accepted
+Project-wide deletion (§4.3) and explicit parent change (§4.4) in the same editor.
+Read the exact deletion impact through a typed read-only adapter and dispatch the
+existing command with all observed edge IDs after confirmation; preserve shared
+resource bodies and clear local selection/windows only after success. Incoming
+deletion keeps draft identity/text while explaining why apply is unavailable.
+Use the existing verified coordinate planner through a read adapter for parent
+preview; an explicit empty-first destination and separate reparent intent must
+never be inferred from an ordinary move. Require current source/Scene/target and
+known affected Scene count, reserve existing surface/gizmo input, disclose
+list-only effects and require a surface when the old position is unavailable.
+Retain proposals on failure and retry the exact original command. Keep the
+existing draft/IME/window/file/readonly guards, cancellation and metadata
+authority; this introduces no new persistence, compatibility or adoption claim.
+
 Each production slice requires a short meta-audit, exact-tree tests/build, one
 independent read-only review and a reversible commit. Run focused checks during
 editing, then the required full matrix once on the final executable tree. Reuse

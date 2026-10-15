@@ -19,7 +19,8 @@ edit/first-place → named backup/Workspace → independent reopen, plus the typ
 product composition's edit → save/two-round exchange → cold-reopen workflow in
 the nondefault validation route, now including the model, Saved View and material
 panels, attachment organization/shared viewing and Scene-local Caption comparison
-windows. Existing file/recovery work is retained.
+windows, confirmed Caption deletion and explicit pin parent changes. Existing
+file/recovery work is retained.
 Ordinary entry, broader profiles/converters, browser performance, physical-iPhone
 and offline acceptance remain open. Full details and earlier failures are in the
 [September checkpoint record](../docs/history/development-through-2026-09-21/tasks/todo.md).
@@ -99,6 +100,78 @@ destructive boundary. Ordinary entry and temporary iPhone HTTPS need their exist
 exact-build/route approvals. Main, Pages, Service Worker, version/license, release,
 dependency changes and private/public fixture distribution are outside this unit.
 
+### Completed unit — delete Captions and change their parent model in the integrated editor
+
+PO authorized continuation on 2026-10-15. Outcome: inspect every affected Scene,
+attachment and tag before deleting one Project-wide Caption; explicitly select a
+new parent model, preserve an authoritative Project-space position in its local
+preview, adjust by surface/gizmo and confirm/cancel without changing identity.
+Reuse accepted deletion/reparent commands, impact reader and coordinate planner,
+with the existing product operation/retry owner. No storage/schema/package,
+dependency, ordinary entry or release changes. One writer; read-only reviewers.
+
+- [x] Clarify the bounded read/action composition, connect confirmation and
+  parent preview to draft/IME/file/Scene/window guards and stale-source rejection.
+- [x] Reuse service fault/coordinate tests and verify representative connected
+  delete/reparent/file/cold-reopen workflows, preserving exact retry and history.
+- [x] Independently review, run the serial final checkpoint, verify outgoing
+  privacy/scope and prepare the authorized g0-baseline checkpoint. Git owns the
+  actual commit/push identity.
+
+Acceptance: deletion lists all affected dependencies, keeps media/tag/model
+resources and causal content, and clears only matching local selection/windows
+after success. Stale confirmation requires cancel/reinspection. Parent changes
+start with an empty explicit destination, use current eligible target evidence,
+preserve Caption content/memberships and show all-Scene/list-only consequences.
+Unavailable original position requires a new verified surface; no origin is
+invented. Failure retains the proposal and exact retry; cancel writes nothing.
+Readonly, conflicting anchor/lifecycle, stale bindings, drafts/IME and ongoing
+operations cannot authorize writes. Incoming deletion preserves unsaved text but
+disables its apply action and explains the current state.
+
+Initial audit: branch g0-baseline is clean at the previous verified checkpoint;
+the missing work is product composition, not new metadata authority. The product
+detail unavailable projection currently drops the selected ID, allowing its
+controls to retain stale editable props during a draft plus incoming deletion.
+Correct this connection to existing detail contracts in this unit. Browser runtime
+EPERM remains the grouped evidence gap; do not retry unchanged or wait on small
+PO tests. Stop for actual policy/compatibility/architecture or release boundaries.
+Implemented: explicit empty-first parent selection and pin intent, verified
+position-preserving preview, target-only surface/gizmo input, Scene-count/list-
+only consequences, cancellation and original-command retry. Project-wide deletion
+names all observed Scene/attachment/tag edges, retains shared resources/history
+and removes local selection/windows only after acknowledgement. Incoming deletion
+preserves draft identity/text with unavailable apply; late edit/reference issues
+remain visible. Focused checks passed: seven representative product cases and 40
+existing import/pin/coordinate/host cases. Independent read-only reviews closed
+camera-drag confirmation and IME/gizmo-input P2s. A subsequent same-token
+cancel/restart audit found a late surface gesture could enter the new intent;
+clear/capture the gesture's operation identity and verify old pointer-up cannot
+pick into the new proposal. Its focused regression and independent confirmation
+passed. The final serial `npm run check:checkpoint` passed: typecheck; **114 files /
+2,362 passed / 21 existing todo**; ordinary, harness and validation builds (exit 0).
+Earlier focused/type failures and the interrupted pre-fix root run remain under
+ignored `.artifacts/traces`; they do not count as passed evidence. The corrected
+gesture type uses an explicit alias. No contract/assertion weakening or test
+exclusion was used.
+
+Final static validation manifest (7 output files):
+`ee50566de0e0006157e847334ff669e6b81ca21201eb4a5fa631aa700b9880d2`.
+All seven served HTTP bodies matched disk at port 4182; SW, webmanifest and public
+samples remain absent. All six changed executable file hashes match the tested
+tree and staged bytes. The reviewed 10-path checkpoint excludes private inputs,
+fixtures, dependency and deployment changes; g0-baseline triggers verification CI,
+not the main-only Pages deployment. Node/recorded-DOM/build/HTTP results do not
+complete browser/rendering, offline/PWA or physical-device acceptance.
+
+Connected-milestone audit: the product editor still lacks accepted Scene rename/
+default and Caption membership controls. Close that direct editing gap next,
+before broadening conversion; further immutable conversion recipes require their
+existing concrete mapping/decision boundaries. Next: integrate Scene management
+and Caption inclusion/exclusion; then initial-conversion gaps, gated ordinary
+entry and grouped browser/device/offline acceptance. No new product decision is
+ratified by this sequencing change.
+
 ### Completed unit — compare Captions in the integrated editor
 
 PO authorized continuation on 2026-10-15. Outcome: select multiple Captions in the
@@ -154,8 +227,8 @@ evidence, not browser/rendering, offline/PWA or physical-device acceptance.
 
 Stop only at existing new-policy/architecture/compatibility/authority or release
 boundaries. Existing browser runtime EPERM remains a grouped candidate evidence
-gap, not a reason to wait for small PO tests. Next: integrate remaining Caption
-deletion/parent-model management, then initial-conversion gaps and gated entry.
+gap, not a reason to wait for small PO tests. The Caption-management unit above
+owns the current follow-up and next action; this completed record is evidence.
 
 ### Completed unit — organize and compare attachments in the integrated editor
 

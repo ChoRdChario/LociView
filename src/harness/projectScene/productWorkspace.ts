@@ -58,8 +58,8 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
       const target = (assetId: string): WorkspaceSurface | null => {
         if (!state || state.readOnly || state.token !== read().token) return null;
         const snapshot = host.authority.read(), version = snapshot.modelVersions?.find(v => v.assetId === assetId);
-        const display = runtime.read().display;
-        if (state.hiddenAssetIds?.includes(assetId) || snapshot.state.token !== state.token || !version || version.families.length !== 1 || !display || display.token !== state.token || display.sceneId !== state.sceneId || display.readOnly || !display.models.some(m => m.binding.assetId === assetId && m.binding.id === version.projection.bindingId)) return null;
+        const seen = runtime.read(), display = seen.display;
+        if (!state.available || !seen.ready || seen.issue || rendered !== display || state.hiddenAssetIds?.includes(assetId) || snapshot.state.token !== state.token || !version || version.families.length !== 1 || !display || display.token !== state.token || display.sceneId !== state.sceneId || display.readOnly || !display.models.some(m => m.binding.assetId === assetId && m.binding.id === version.projection.bindingId)) return null;
         const family = version.families[0]!;
         return { token: state.token, sceneId: state.sceneId, assetId, assetFrameId: version.projection.assetFrameId,
           bindingId: version.projection.bindingId, revisionId: version.projection.revisionId,
