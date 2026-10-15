@@ -1,7 +1,7 @@
 import type { ProjectProviderRead } from '../../scene/projectProvider';
 import { metadataImmutableReader } from '../../projectMetadata/records';
 import { same } from '../../domain/projectGraphSupport';
-import { validationGlbProfile, occurrenceGlbProfile, validationMetadataLimits } from '../../projectFiles/validation';
+import { validationGlbProfile, occurrenceGlbProfile, jpegGlbProfile, occurrenceJpegGlbProfile, validationMetadataLimits } from '../../projectFiles/validation';
 import { freezeSynthetic } from './fixture';
 import type { DisplayModelVersion, ValidationModelClosure } from './modelTypes';
 import type { MetadataLimits } from '../../projectMetadata/format';
@@ -23,6 +23,7 @@ export function validationDeclaredBodyBytes(provider: Extract<ProjectProviderRea
 export async function validationModelVersions(provider: ProjectProviderRead): Promise<readonly DisplayModelVersion[]> {
   if (provider.kind !== 'scene-provider') throw Error('保存したシーンを確認できません。');
   const read = metadataImmutableReader(provider, validationMetadataLimits), profile = await validationGlbProfile(), occurrence = await occurrenceGlbProfile();
+  const profiles = [profile, occurrence, await jpegGlbProfile(), await occurrenceJpegGlbProfile()];
   return freezeSynthetic(Object.values(provider.resources.assets).flatMap(asset => {
     if (asset.lifecycle.kind !== 'value' || asset.lifecycle.value.state !== 'active' || asset.projection.kind !== 'value') return [];
     const p = asset.projection.value;
@@ -31,7 +32,7 @@ export async function validationModelVersions(provider: ProjectProviderRead): Pr
     const representation = read('representationsById', p.representationIds[0]!);
     if (binding.assetId !== asset.id || binding.assetRevisionId !== revision.id || revision.assetId !== asset.id ||
       representation.assetId !== asset.id || !same(revision.representationIds, p.representationIds) ||
-      !same(representation.formatProfile, profile) && !same(representation.formatProfile, occurrence)) throw Error('保存したモデルと表示本体の対応を確認できません。');
+      !profiles.some(profile => same(representation.formatProfile, profile))) throw Error('保存したモデルと表示本体の対応を確認できません。');
     // These exact immutable values were validated by the provider, not by this UI assertion.
     const closure: ValidationModelClosure = { shape: 'saved-glb', assetFrame: { id: p.assetFrameId },
       representationFrame: { id: representation.representationFrameId as string },

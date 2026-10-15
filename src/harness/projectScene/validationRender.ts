@@ -124,7 +124,7 @@ export async function prepareReadonlyResidents(initial: readonly ReadonlyRenderM
     for (const slot of slots) {
       const effect = effects[slot.target.logicalMaterialSlotId];
       if (effect && !('issue' in effect)) {
-        const issue = validationMaterialIssue(slot, effect, (c.representation.formatProfile as JsonObject)?.id === 'development-validation-glb-occurrence-1' ? 'map2' : 'map1'); if (issue) throw Error(issue);
+        const issue = validationMaterialIssue(slot, effect, ['development-validation-glb-occurrence-1', 'development-validation-glb-occurrence-jpeg-1'].includes(String((c.representation.formatProfile as JsonObject)?.id)) ? 'map2' : 'map1'); if (issue) throw Error(issue);
         for (const [material, locator] of item.model.materialLocators) if (same(locator, slot.locator) && !(material instanceof THREE.MeshStandardMaterial))
           throw Error('元の材質の設定を確認してください。');
       }
@@ -156,7 +156,7 @@ export async function prepareReadonlyResidents(initial: readonly ReadonlyRenderM
             if (effect && 'issue' in effect) result.visible = false;
             else if (effect) {
               if (!(m instanceof THREE.MeshStandardMaterial)) throw Error('元の材質の設定を確認してください。');
-              const a = materialForDisplay(effect, (c.representation.formatProfile as JsonObject)?.id === 'development-validation-glb-occurrence-1' ? 'map2' : 'map1').appearance;
+              const a = materialForDisplay(effect, ['development-validation-glb-occurrence-1', 'development-validation-glb-occurrence-jpeg-1'].includes(String((c.representation.formatProfile as JsonObject)?.id)) ? 'map2' : 'map1').appearance;
               if (a.lighting === 'unlit') {
                 result.dispose(); result = new THREE.MeshBasicMaterial({ color: m.color.clone(), map: m.map,
                   vertexColors: m.vertexColors, side: m.side, opacity: m.opacity, alphaMap: m.alphaMap, alphaTest: m.alphaTest,

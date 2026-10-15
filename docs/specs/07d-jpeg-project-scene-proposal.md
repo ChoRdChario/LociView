@@ -1,7 +1,7 @@
 # JPEG photos and embedded textures companion
 
 Status: **PO ratified 2026-10-15 — bounded implementation authorized;
-not implemented, not adopted.**
+bounded implementation verified in the nondefault validation route, not adopted.**
 This is one connected extension of [05](05-project-scene-team-workflow.md),
 [07](07-project-scene-migration.md), [07a](07a-native-appearance-conversion-proposal.md),
 [07b](07b-frozen-v1-conversion-proposal.md) and

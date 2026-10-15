@@ -16,7 +16,8 @@ export const fixtureMedia = freezeSynthetic(images.map(([label, base64], index) 
   return { record: { ...record, payloadDigest: fixtureRecordDigest('media-resource', record) }, base64 };
 }));
 export const mediaSeed = () => Object.fromEntries(fixtureMedia.map(m => [`media/${m.record.id}`, canonicalFixture(m.record)]));
-export interface MediaImage { readonly record: typeof fixtureMedia[number]['record']; readonly base64: string }
+export interface MediaImage { readonly record: Omit<typeof fixtureMedia[number]['record'], 'label' | 'blob'> & { readonly label: string;
+  readonly blob: Omit<typeof fixtureMedia[number]['record']['blob'], 'mediaType'> & { readonly mediaType: 'image/png' | 'image/jpeg' } }; readonly base64: string }
 export interface MediaFileSelection { readonly name: string; readonly size: number; arrayBuffer(): Promise<ArrayBuffer> }
 export interface MediaFileAddition { readonly sceneId: string; readonly captionId: string; readonly attachmentId: string;
   readonly orderKey: string; readonly eventId: string; readonly file: MediaFileSelection }

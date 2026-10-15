@@ -1,5 +1,5 @@
-/** Host-verified PNG bodies only. Imported labels/URLs are never image sources. */
-export type PreviewPng = { readonly base64: string } | { readonly blob: Blob } | { readonly load: () => Promise<Blob> };
+/** Host-verified image bodies only. Imported labels/URLs are never image sources. */
+export type PreviewPng = { readonly base64: string; readonly mediaType?: 'image/png' | 'image/jpeg' } | { readonly blob: Blob } | { readonly load: () => Promise<Blob> };
 export interface MediaPreviewItem {
   readonly id: string; readonly resourceId: string; readonly label: string;
   readonly description: string; readonly image: PreviewPng | null;
@@ -9,7 +9,7 @@ export interface MediaPreviewGroup {
 }
 export type MediaPreviewReader = () => MediaPreviewGroup | null;
 const sameBody = (a: PreviewPng | null, b: PreviewPng | null) => a === b || !!a && !!b &&
-  ('base64' in a && 'base64' in b ? a.base64 === b.base64 : 'blob' in a && 'blob' in b ? a.blob === b.blob : 'load' in a && 'load' in b && a.load === b.load);
+  ('base64' in a && 'base64' in b ? a.base64 === b.base64 && (a.mediaType ?? 'image/png') === (b.mediaType ?? 'image/png') : 'blob' in a && 'blob' in b ? a.blob === b.blob : 'load' in a && 'load' in b && a.load === b.load);
 
 /** A new image node per attempt keeps old load/error events out of a retry. */
 function createPngPreview(document: Document, read: () => MediaPreviewItem | null, lazy: boolean, imageHost: HTMLElement = document.createElement('div')) {
@@ -38,7 +38,7 @@ function createPngPreview(document: Document, read: () => MediaPreviewItem | nul
       current.hidden = false; error.textContent = ''; retry.hidden = true; });
     error.textContent = ''; retry.hidden = true; imageHost.append(current);
     try {
-      if ('base64' in png) current.src = `data:image/png;base64,${png.base64}`;
+      if ('base64' in png) current.src = `data:${png.mediaType === 'image/jpeg' ? 'image/jpeg' : 'image/png'};base64,${png.base64}`;
       else { const url = URL.createObjectURL(png.blob); release = () => URL.revokeObjectURL(url); current.src = url; }
     } catch { current.hidden = true; error.textContent = '画像を読み込めません。'; retry.hidden = false; }
   }

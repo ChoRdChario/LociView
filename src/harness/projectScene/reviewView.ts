@@ -3,10 +3,11 @@ import { canonical, list, object, same, string } from '../../domain/projectGraph
 import type { JsonObject } from '../../domain/values';
 import { materialForDisplay, type MaterialIntent } from '../../domain/materialIntent';
 import { ReviewArchive } from '../../projectPackage/reviewArchive';
-import { inspectValidationGlb, type ValidatedGlb } from '../../projectFiles/glb';
-import { inspectOccurrenceGlb } from '../../projectFiles/glbOccurrences';
-import { inspectValidationPng, type PngDecoder } from '../../projectFiles/png';
-import { validationGlbProfile, occurrenceGlbProfile, validationMetadataLimits, type FileValidationLimits } from '../../projectFiles/validation';
+import { inspectValidationGlb, inspectValidationJpegGlb, type ValidatedGlb } from '../../projectFiles/glb';
+import { inspectOccurrenceGlb, inspectOccurrenceJpegGlb } from '../../projectFiles/glbOccurrences';
+import type { PngDecoder } from '../../projectFiles/png';
+import { inspectValidationImage, type JpegDecoder } from '../../projectFiles/jpeg';
+import { validationGlbProfile, occurrenceGlbProfile, jpegGlbProfile, occurrenceJpegGlbProfile, validationMetadataLimits, type FileValidationLimits } from '../../projectFiles/validation';
 import { identityPlacement } from '../../projectFiles/initialProject';
 import { value } from '../../scene/types';
 import type { CaptionListItem, CaptionListSource } from '../../ui/projectScene/captionListState';
@@ -19,22 +20,24 @@ const table = (r: JsonObject, name: string) => object(r[name]) as Record<string,
 const ordered = (rows: JsonObject[]) => rows.sort((a, b) => string(a.orderKey).localeCompare(string(b.orderKey)) || string(a.id).localeCompare(string(b.id)));
 
 /** Inspected read-only file content. No storage, history, synthetic Project or commands. */
-export async function prepareReviewView(file: Blob, limits: FileValidationLimits, decode?: PngDecoder) {
+export async function prepareReviewView(file: Blob, limits: FileValidationLimits, decode?: PngDecoder, jpeg?: JpegDecoder) {
   const original = file.slice(), inspection = await ReviewArchive.inspect(original, validationMetadataLimits), review = inspection.review;
   const snapshot = review.snapshot, scene = object(snapshot.scene), sceneId = string(scene.id), project = object(snapshot.project);
   if (review.closure.entries.reduce((n, b) => n + b.byteLength, 0) > limits.maxFileBytes)
     throw Error('この検証画面の容量上限を超えています。元のファイルは変更していません。');
   const profile = await validationGlbProfile(), occurrence = await occurrenceGlbProfile(), models: ReadonlyRenderModel[] = [], decoded = new Map<string, ValidatedGlb>(), images = new Map<string, Blob>();
+  const jpegProfile = await jpegGlbProfile(), jpegOccurrence = await occurrenceJpegGlbProfile();
   const assets = table(snapshot, 'assetsById'), representations = table(snapshot, 'representationsById');
   for (const asset of Object.values(assets)) {
     if (asset.kind !== 'visual') continue;
     const ids = list(asset.representationIds); if (ids.length !== 1) throw Error('この検証画面では、1つの表示本体を持つモデルだけを開けます。');
     const record = representations[string(ids[0])]!, blob = object(record.blob);
-    if ((!same(record.formatProfile, profile) && !same(record.formatProfile, occurrence)) || record.contentKind !== 'mesh' || record.role !== 'meshPrimary' || !same(record.purposes, ['display']) ||
+    if (![profile, occurrence, jpegProfile, jpegOccurrence].some(p => same(record.formatProfile, p)) || record.contentKind !== 'mesh' || record.role !== 'meshPrimary' || !same(record.purposes, ['display']) ||
       !same(record.representationToAsset, { ...identityPlacement(), reflection: 'none' }) || blob.mediaType !== 'model/gltf-binary')
       throw Error('このモデルの表示形式は未対応です。元のファイルは変更していません。');
     const bytes = await inspection.archive.entryBytes(`blobs/sha256/${string(blob.digest)}`, limits.maxFileBytes);
-    const source = await (same(record.formatProfile, occurrence) ? inspectOccurrenceGlb : inspectValidationGlb)(bytes, limits, decode), catalog = object(record.materialCatalog), slots = list(catalog.slots).map(object);
+    const inspect = same(record.formatProfile, jpegOccurrence) ? inspectOccurrenceJpegGlb : same(record.formatProfile, jpegProfile) ? inspectValidationJpegGlb : same(record.formatProfile, occurrence) ? inspectOccurrenceGlb : inspectValidationGlb;
+    const source = await inspect(bytes, limits, decode, jpeg), catalog = object(record.materialCatalog), slots = list(catalog.slots).map(object);
     const actual = new Set(source.materials.map(canonical));
     if (!same(record.logicalBoundsAsset, source.bounds) || slots.length !== source.materials.length ||
       slots.some(s => !actual.delete(canonical({ sourceLocator: s.sourceLocator!, sourceSemantics: s.sourceSemantics! }))) || actual.size)
@@ -44,9 +47,10 @@ export async function prepareReviewView(file: Blob, limits: FileValidationLimits
       assetToProject: asset.assetToProject as unknown as ReadonlyRenderModel['assetToProject'], representation: record as ReadonlyRenderModel['representation'] });
   }
   for (const record of Object.values(table(snapshot, 'mediaResourcesById'))) {
-    const blob = object(record.blob); if (record.mediaKind !== 'image' || blob.mediaType !== 'image/png') throw Error('このメディアの表示形式は未対応です。');
-    const bytes = await inspection.archive.entryBytes(`blobs/sha256/${string(blob.digest)}`, limits.maxFileBytes); await inspectValidationPng(bytes, limits, decode);
-    images.set(string(record.id), new Blob([bytes.slice().buffer], { type: 'image/png' }));
+    const blob = object(record.blob); if (record.mediaKind !== 'image' || blob.mediaType !== 'image/png' && blob.mediaType !== 'image/jpeg') throw Error('このメディアの表示形式は未対応です。');
+    const bytes = await inspection.archive.entryBytes(`blobs/sha256/${string(blob.digest)}`, limits.maxFileBytes);
+    if (await inspectValidationImage(bytes, limits, decode, jpeg) !== blob.mediaType) throw Error('メディアの本体形式が一致しません。');
+    images.set(string(record.id), new Blob([bytes.slice().buffer], { type: blob.mediaType }));
   }
   const savedMaterials: Record<string, ValidationMaterialEffects> = {};
   for (const model of models) {

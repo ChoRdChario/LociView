@@ -9,13 +9,14 @@ import { checkContentFacts } from '../domain/projectContentChecks';
 import { readProjectScene } from '../scene/projectProvider';
 import { readValidationBody } from './content';
 import { readValidationInitialRecord, writeValidationInitial, validationInitialOrigin } from './creation';
-import { lociMyuRecipe, lociMyuEvidence, openLociMyuSource, planLociMyuSource, lociMyuByteProof, LociMyuPreflightError, type LociMyuSourcePlan, type OpenedLociMyuSource } from './lociMyuSource';
+import { lociMyuRecipe, lociMyuJpegRecipe, type LociMyuRecipe, lociMyuEvidence, openLociMyuSource, planLociMyuSource, lociMyuByteProof, LociMyuPreflightError, type LociMyuSourcePlan, type OpenedLociMyuSource } from './lociMyuSource';
 import { mapLociMyuProject, lociMyuSourceKey, type LociMyuMappingEntry } from './lociMyuMapping';
 import type { PngDecoder } from './png';
+import type { JpegDecoder } from './jpeg';
 import { fileError, validationMetadataLimits as metadata, type FileValidationLimits } from './validation';
 
 interface ConversionReceipt {
-  recipe: typeof lociMyuRecipe; conversionId: string; projectId: string; original: { byteLength: number; digest: string };
+  recipe: LociMyuRecipe; conversionId: string; projectId: string; original: { byteLength: number; digest: string };
   initial: { byteLength: number; digest: string; proof: MetadataProof }; selection: number; workbook: LociMyuSourcePlan['workbook'];
   confirmation: LociMyuSourcePlan['confirmation']; title: string; fingerprints: LociMyuSourcePlan['fingerprints']; inventory: LociMyuSourcePlan['inventory'];
   sourceIdentities: JsonObject[]; mapping: LociMyuMappingEntry[]; report: JsonObject;
@@ -23,7 +24,7 @@ interface ConversionReceipt {
 const receiptPath = (fs: ProjectWorkspaceFS) => metadataPath(fs, 'locimyu-conversion.json');
 const sourcePath = (fs: ProjectWorkspaceFS) => metadataPath(fs, 'locimyu-conversion-source.zip');
 export const hasLociMyuConversion = async (fs: ProjectWorkspaceFS, checkBoundInitial = true) => !!await fs.readStream(receiptPath(fs)) || !!await fs.readStream(sourcePath(fs)) ||
-  checkBoundInitial && await validationInitialOrigin(fs) === lociMyuRecipe;
+  checkBoundInitial && [lociMyuRecipe, lociMyuJpegRecipe].includes(await validationInitialOrigin(fs) as LociMyuRecipe);
 const fail = () => fileError('LociMyuの変換記録が不足しているか一致しません。保持した記録は上書きしていません。');
 const reportBlob = (report: JsonObject) => new Blob([json(lociMyuEvidence(report))], { type: 'application/json' });
 const ascii = (value: unknown) => json(lociMyuEvidence(value)).replace(/[\u007f-\uffff]/g, c => `\\u${c.charCodeAt(0).toString(16).padStart(4, '0')}`);
@@ -46,13 +47,13 @@ async function checkReceipt(r: ConversionReceipt, projectId: string) {
   const proof = (p: unknown): boolean => keys(p, ['byteLength', 'digest']) && Number.isSafeInteger((p as ConversionReceipt['original']).byteLength) &&
     (p as ConversionReceipt['original']).byteLength > 0 && /^[0-9a-f]{64}$/.test((p as ConversionReceipt['original']).digest);
   if (!keys(r, ['recipe', 'conversionId', 'projectId', 'original', 'initial', 'selection', 'workbook', 'confirmation', 'title', 'fingerprints', 'inventory', 'sourceIdentities', 'mapping', 'report']) ||
-    r.recipe !== lociMyuRecipe || !/^[0-9a-f]{32}$/.test(r.conversionId) || r.projectId !== projectId || projectId !== `prj_${r.conversionId}` || !proof(r.original) ||
+    ![lociMyuRecipe, lociMyuJpegRecipe].includes(r.recipe) || !/^[0-9a-f]{32}$/.test(r.conversionId) || r.projectId !== projectId || projectId !== `prj_${r.conversionId}` || !proof(r.original) ||
     !keys(r.initial, ['byteLength', 'digest', 'proof']) || !proof({ byteLength: r.initial.byteLength, digest: r.initial.digest }) || !Number.isSafeInteger(r.selection) || r.selection < 0 ||
     !keys(r.workbook, ['path', 'byteLength', 'digest']) || typeof r.workbook.path !== 'string' || typeof r.title !== 'string' || !Array.isArray(r.mapping) || !r.mapping.length) return fail();
   const ids = new Set<string>(), hashes = new Map<string, string>();
   for (const entry of r.mapping) {
     if (!keys(entry, ['id', 'preimage', 'sha256']) || typeof entry.id !== 'string' || typeof entry.preimage !== 'string' || !/^[0-9a-f]{64}$/.test(entry.sha256) || ids.has(entry.id)) return fail();
-    const prefix = `lociview:${lociMyuRecipe}:id:jcs-v1\n`; let tuple: unknown;
+    const prefix = `lociview:${r.recipe}:id:jcs-v1\n`; let tuple: unknown;
     try { tuple = JSON.parse(entry.preimage.slice(prefix.length)); } catch { return fail(); }
     if (!Array.isArray(tuple) || tuple.length !== 5 || tuple[0] !== r.conversionId || tuple[1] !== r.original.digest || tuple[2] !== r.workbook.path || !lociMyuSourceKey(tuple[3], tuple[4]) ||
       entry.preimage !== prefix + JSON.stringify(tuple) || entry.id !== `${tuple[3]}_${entry.sha256.slice(0, 32)}` || await digest(new TextEncoder().encode(entry.preimage)) !== entry.sha256 ||
@@ -62,7 +63,7 @@ async function checkReceipt(r: ConversionReceipt, projectId: string) {
 }
 function makeReport(original: ConversionReceipt['original'], evaluated: Awaited<ReturnType<typeof planLociMyuSource>>, mapped?: Awaited<ReturnType<typeof mapLociMyuProject>>, source?: ProjectMetadataSource): JsonObject {
   const { base, plan, relation } = evaluated;
-  return lociMyuEvidence({ format: 'lociview-locimyu-to-project-scene-report', version: 1, recipe: lociMyuRecipe,
+  return lociMyuEvidence({ format: 'lociview-locimyu-to-project-scene-report', version: 1, recipe: plan?.recipe ?? lociMyuRecipe,
     original, workbook: base.workbook, confirmedTitle: base.title, confirmation: base.confirmation, relationBasis: relation,
     inventory: base.inventory, fingerprints: base.fingerprints, accounting: base.accounting, sourceEvidence: base.sourceEvidence,
     converted: { models: plan ? 1 : 0, scenes: plan?.scenes.length ?? 0, captions: plan?.scenes.reduce((n, s) => n + s.captions.length, 0) ?? 0, media: plan?.media.length ?? 0, views: plan?.views.length ?? 0 },
@@ -73,7 +74,7 @@ function makeReport(original: ConversionReceipt['original'], evaluated: Awaited<
 async function verifyRetained(r: ConversionReceipt, source: ProjectMetadataSource, opened: OpenedLociMyuSource) {
   if (source.semanticProfile !== 'map2') return fail(); await checkReceipt(r, source.proof.identity.projectId as string);
   const evaluated = await planLociMyuSource(opened, r.selection, r.title, r.confirmation !== null), plan = evaluated.plan;
-  if (!plan || json(source.proof) !== json(r.initial.proof) || json(plan.workbook) !== json(r.workbook) || json(plan.confirmation) !== json(r.confirmation) ||
+  if (!plan || plan.recipe !== r.recipe || json(source.proof) !== json(r.initial.proof) || json(plan.workbook) !== json(r.workbook) || json(plan.confirmation) !== json(r.confirmation) ||
     json(plan.fingerprints) !== json(r.fingerprints) || json(plan.inventory) !== json(r.inventory)) return fail();
   const expected = await mapLociMyuProject(plan, r.conversionId, r.original.digest, source.proof.identity);
   if (json(expected.mapping) !== json(r.mapping) || json(expected.sourceIdentities) !== json(r.sourceIdentities) || json(makeReport(r.original, evaluated, expected, source)) !== json(r.report)) return fail();
@@ -83,8 +84,8 @@ async function verifyRetained(r: ConversionReceipt, source: ProjectMetadataSourc
 }
 
 /** Preview owns the original ZIP. Each evaluation binds one exact workbook/title/relation decision. */
-export async function prepareLociMyuConversion(input: Blob, limits: FileValidationLimits, decode?: PngDecoder) {
-  const result = await openLociMyuSource(input, limits, decode); if (!result) return null;
+export async function prepareLociMyuConversion(input: Blob, limits: FileValidationLimits, decode?: PngDecoder, jpeg?: JpegDecoder) {
+  const result = await openLociMyuSource(input, limits, decode, jpeg); if (!result) return null;
   const opened = result;
   const originalProof = await lociMyuByteProof(opened.original);
   return {
@@ -113,7 +114,7 @@ export async function prepareLociMyuConversion(input: Blob, limits: FileValidati
           const response = (outcome: string, facts?: JsonObject) => ({ request, scope: 'development-validation', outcome, ...(facts ? { facts } : {}) });
           if (request.records.length !== 1) return response('unsupported');
           const record = request.records[0]!; let facts: JsonObject;
-          if (request.fact === 'media' && same(media[record.id as string], record)) facts = { mediaKind: 'image', mediaType: 'image/png' };
+          if (request.fact === 'media' && same(media[record.id as string], record)) facts = { mediaKind: 'image', mediaType: (record.blob as JsonObject).mediaType! };
           else {
             const known = mapped.targetModels.get(record.id as string); if (!known || !same(known.record, record)) return response('unsupported'); const model = known.model;
             if (request.fact === 'representation') facts = { contentKind: 'mesh', staticPose: true, contentBoundsAsset: model.bounds, materials: [...model.materials], surfaceRanges: [...model.surfaceRanges] };
@@ -124,23 +125,23 @@ export async function prepareLociMyuConversion(input: Blob, limits: FileValidati
           checkContentFacts(request, facts); return response('verified', facts);
         } }, { verifyRetainedMedia: true });
         if (provider.kind !== 'scene-provider' || !metadataProviderReady(provider, metadata)) return fileError('元のモデル・記録の関係をそのまま変換できません。');
-        const receipt: ConversionReceipt = { recipe: lociMyuRecipe, conversionId, projectId: `prj_${conversionId}`, original: originalProof,
+        const receipt: ConversionReceipt = { recipe: plan.recipe, conversionId, projectId: `prj_${conversionId}`, original: originalProof,
           initial: { ...await lociMyuByteProof(source.encodeFullSource()), proof: source.proof }, selection, workbook: plan.workbook, confirmation: plan.confirmation, title,
           fingerprints: plan.fingerprints, inventory: plan.inventory, sourceIdentities: mapped.sourceIdentities, mapping: mapped.mapping, report: makeReport(originalProof, evaluated, mapped, source) };
         await verifyRetained(receipt, source, opened);
         return { source, async persist(fs: ProjectWorkspaceFS, store: OriginBlobStore, session: MetadataProjectSession) {
           const before = await session.read(), existing = await readLociMyuReceipt(fs);
-          if (existing) { if (json(existing) !== json(receipt)) return fail(); return resumeLociMyuConversion(fs, store, session, limits, receipt.projectId, decode); }
+          if (existing) { if (json(existing) !== json(receipt)) return fail(); return resumeLociMyuConversion(fs, store, session, limits, receipt.projectId, decode, jpeg); }
           if (before.state !== 'empty') return fileError('作成先が空ではありません。既存の記録は変更していません。');
           await underWriteLease(fs, async () => {
             await writeLociMyuReceipt(fs, receipt);
             const old = await fs.readBytes(sourcePath(fs)); if (old && !equalBytes(old, opened.original)) return fail();
             if (!old) await fs.writeBytes(sourcePath(fs), opened.original);
             const saved = await fs.readBytes(sourcePath(fs)); if (!saved || !equalBytes(saved, opened.original)) return fail();
-            await writeValidationInitial(fs, source, lociMyuRecipe);
+            await writeValidationInitial(fs, source, receipt.recipe);
           });
           const saved = await readLociMyuReceipt(fs), initial = await readValidationInitialRecord(fs);
-          if (json(saved) !== json(receipt) || initial.receipt.digest !== receipt.initial.digest || initial.receipt.version !== 'validation-initial-2' || initial.receipt.originRecipe !== lociMyuRecipe) return fail();
+          if (json(saved) !== json(receipt) || initial.receipt.digest !== receipt.initial.digest || initial.receipt.version !== 'validation-initial-2' || initial.receipt.originRecipe !== receipt.recipe) return fail();
           await verifyRetained(receipt, initial.source, opened);
           for (const b of mapped.blobs) await store.put(new Blob([b.bytes.slice().buffer]).stream(), b.ref.mediaType, b.ref);
           return session.createFromSource(source);
@@ -151,17 +152,17 @@ export async function prepareLociMyuConversion(input: Blob, limits: FileValidati
     },
   };
 }
-async function retained(fs: ProjectWorkspaceFS, limits: FileValidationLimits, projectId: string, decode?: PngDecoder) {
+async function retained(fs: ProjectWorkspaceFS, limits: FileValidationLimits, projectId: string, decode?: PngDecoder, jpeg?: JpegDecoder) {
   const receipt = await readLociMyuReceipt(fs); if (!receipt) return fail(); await checkReceipt(receipt, projectId);
   const initial = await readValidationInitialRecord(fs);
-  if (initial.receipt.byteLength !== receipt.initial.byteLength || initial.receipt.digest !== receipt.initial.digest || initial.receipt.version !== 'validation-initial-2' || initial.receipt.originRecipe !== lociMyuRecipe) return fail();
+  if (initial.receipt.byteLength !== receipt.initial.byteLength || initial.receipt.digest !== receipt.initial.digest || initial.receipt.version !== 'validation-initial-2' || initial.receipt.originRecipe !== receipt.recipe) return fail();
   const raw = await fs.readStream(sourcePath(fs)); if (!raw || raw.size !== receipt.original.byteLength) return fail();
   const original = await readValidationBody(raw, limits.maxFileBytes); if (await digest(original) !== receipt.original.digest) return fail();
-  const opened = await openLociMyuSource(new Blob([original.slice().buffer]), limits, decode); if (!opened) return fail();
+  const opened = await openLociMyuSource(new Blob([original.slice().buffer]), limits, decode, jpeg); if (!opened) return fail();
   const mapped = await verifyRetained(receipt, initial.source, opened); return { receipt, initial, mapped };
 }
-export async function resumeLociMyuConversion(fs: ProjectWorkspaceFS, store: OriginBlobStore, session: MetadataProjectSession, limits: FileValidationLimits, projectId: string, decode?: PngDecoder) {
-  const { initial, mapped } = await retained(fs, limits, projectId, decode), before = await session.read();
+export async function resumeLociMyuConversion(fs: ProjectWorkspaceFS, store: OriginBlobStore, session: MetadataProjectSession, limits: FileValidationLimits, projectId: string, decode?: PngDecoder, jpeg?: JpegDecoder) {
+  const { initial, mapped } = await retained(fs, limits, projectId, decode, jpeg), before = await session.read();
   if (before.state === 'ready') { if (json(before.source!.proof) !== json(initial.source.proof)) return fail(); return before; }
   if (before.state !== 'pending' && before.state !== 'empty') return fail();
   for (const body of mapped.blobs) {
@@ -172,7 +173,7 @@ export async function resumeLociMyuConversion(fs: ProjectWorkspaceFS, store: Ori
   return before.state === 'pending' ? session.recoverInitialization(initial.source) : session.createFromSource(initial.source);
 }
 /** Explicit private report export only; never part of any package output purpose. */
-export async function readLociMyuConversionReport(fs: ProjectWorkspaceFS, limits: FileValidationLimits, projectId: string, decode?: PngDecoder): Promise<Blob | null> {
+export async function readLociMyuConversionReport(fs: ProjectWorkspaceFS, limits: FileValidationLimits, projectId: string, decode?: PngDecoder, jpeg?: JpegDecoder): Promise<Blob | null> {
   if (!await hasLociMyuConversion(fs)) return null;
-  return reportBlob((await retained(fs, limits, projectId, decode)).receipt.report);
+  return reportBlob((await retained(fs, limits, projectId, decode, jpeg)).receipt.report);
 }

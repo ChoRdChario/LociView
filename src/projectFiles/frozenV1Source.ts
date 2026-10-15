@@ -8,11 +8,14 @@ import { cloneCanonicalValue, type JsonObject } from '../domain/values';
 import { digest, json } from '../projectMetadata/persistence';
 import type { StoredBlobRef } from '../projectMetadata/blobStore';
 import { readValidationBody } from './content';
-import { inspectValidationGlb, type ValidatedGlb } from './glb';
-import { inspectValidationPng, type PngDecoder } from './png';
+import { inspectFreshValidationGlb, type ValidatedGlb } from './glb';
+import type { PngDecoder } from './png';
+import { inspectValidationImage, isJpeg, type JpegDecoder } from './jpeg';
 import { checkFileLimits, fileError, fileObject, fileList, fileNumber, fileVector, limitedJson, validationMetadataLimits, type FileValidationLimits } from './validation';
 
 export const frozenV1Recipe = 'v1-project-scene-migration-recipe-1';
+export const frozenV1JpegRecipe = 'v1-project-scene-migration-recipe-2';
+export type FrozenV1Recipe = typeof frozenV1Recipe | typeof frozenV1JpegRecipe;
 export const codeOrder = (a: string, b: string) => a < b ? -1 : a > b ? 1 : 0;
 export const byteProof = async (bytes: Uint8Array) => ({ byteLength: bytes.length, digest: await digest(bytes) });
 const fail = () => fileError('この旧形式ファイルの設定は、まだそのまま変換できません。');
@@ -75,6 +78,7 @@ function checkSourceFields(op: Op, limits: FileValidationLimits) {
 
 export interface FrozenV1Body { record: EntityRecord; ref: StoredBlobRef; bytes: Uint8Array; model?: ValidatedGlb }
 export interface FrozenV1Plan {
+  recipe: FrozenV1Recipe;
   manifest: ProjectManifest; models: readonly FrozenV1Body[]; media: readonly FrozenV1Body[];
   scenes: readonly EntityRecord[]; captions: readonly EntityRecord[]; views: readonly EntityRecord[];
   fingerprints: readonly { path: string; role: string; byteLength: number; digest: string }[];
@@ -84,7 +88,7 @@ export interface FrozenV1Plan {
 }
 
 /** Read only, owned bytes and complete raw accounting; never the legacy writable importer. */
-export async function inspectFrozenV1Source(input: Blob, limits: FileValidationLimits, decode?: PngDecoder): Promise<{ plan: FrozenV1Plan; original: Uint8Array } | null> {
+export async function inspectFrozenV1Source(input: Blob, limits: FileValidationLimits, decode?: PngDecoder, jpeg?: JpegDecoder): Promise<{ plan: FrozenV1Plan; original: Uint8Array } | null> {
   checkFileLimits(limits); const file = input.slice();
   if (file.size > limits.maxFileBytes) return fileError('ファイルが検査の上限を超えています。');
   if (await inspectZipContainerIdentity(file) !== 'v1') return null;
@@ -130,12 +134,12 @@ export async function inspectFrozenV1Source(input: Blob, limits: FileValidationL
       !(kind === 'model' ? path.startsWith('models/') : /^(media|thumbs)\//.test(path)) || !bytes) fail();
     if (kind === 'image' && (Object.hasOwn(f, 'transform') || Object.hasOwn(f, 'pinScale'))) fail();
     text(f.originalName);
-    const mediaType = kind === 'model' ? 'model/gltf-binary' : 'image/png';
+    const mediaType = kind === 'model' ? 'model/gltf-binary' : isJpeg(bytes!) ? 'image/jpeg' : 'image/png';
     const ref: StoredBlobRef = { algorithm: 'sha256', digest: await digest(bytes!), byteLength: bytes!.length, mediaType };
     if (f.mime !== undefined && f.mime !== '' && f.mime !== mediaType || f.size !== undefined && f.size !== ref.byteLength || f.sha256 !== undefined && f.sha256 !== ref.digest) fail();
     const body: FrozenV1Body = { record, ref, bytes: bytes! };
-    if (kind === 'model') { body.model = await inspectValidationGlb(bytes!, limits, decode); models.push(body); }
-    else { await inspectValidationPng(bytes!, limits, decode); media.push(body); }
+    if (kind === 'model') { body.model = await inspectFreshValidationGlb(bytes!, limits, decode, jpeg); models.push(body); }
+    else { await inspectValidationImage(bytes!, limits, decode, jpeg); media.push(body); }
     activePaths.add(path);
   }
   if (!models.length) fail(); models.sort((a, b) => codeOrder(a.record.id, b.record.id)); media.sort((a, b) => codeOrder(a.record.id, b.record.id));
@@ -175,6 +179,6 @@ export async function inspectFrozenV1Source(input: Blob, limits: FileValidationL
     fingerprints.push({ path: entry.path, role, ...await byteProof(entry.data) });
   }
   fingerprints.sort((a, b) => codeOrder(a.path, b.path));
-  return { original, plan: { manifest, models, media, scenes, captions, views, fingerprints, inventory,
+  return { original, plan: { recipe: models.some(m => m.model?.jpeg) || media.some(m => m.ref.mediaType === 'image/jpeg') ? frozenV1JpegRecipe : frozenV1Recipe, manifest, models, media, scenes, captions, views, fingerprints, inventory,
     report: { models: models.length, scenes: scenes.length, captions: captions.length, media: media.length, sourceOnly, originalExcludedFromExports: true } } };
 }

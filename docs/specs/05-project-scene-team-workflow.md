@@ -2859,6 +2859,17 @@ complete known immutable source blob declarations, counts each digest once and
 rejects inconsistent sizes/unknown records. It does not read or restore old bodies,
 make them display-authoritative, or change the existing validation capacity ceiling.
 
+#### Approved additive JPEG companion (2026-10-15)
+
+[07d](07d-jpeg-project-scene-proposal.md) extends the bounded validation/product
+route with JPEG photos and embedded GLB JPEG, using its exact two new profiles
+and four new conversion recipes. Existing PNG profiles/recipes and prepared jobs
+retain their meanings. The same Session/content/file/recovery ports carry checked
+MIME and per-Representation profiles; original JPEG metadata stays byte-exact and
+inherits §7.3 sharing disclosure. No sanitization purpose, renderer backend,
+ordinary entry or adoption credit is introduced. Todo owns actual implementation
+checks and pending browser/device/offline acceptance.
+
 ### 13.3 Approved scheduling exception — validators and UI components (2026-09-08)
 
 The PO explicitly approved advancing storage-neutral data validation and reusable

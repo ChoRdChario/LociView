@@ -1,10 +1,12 @@
 import * as THREE from 'three';
 import type { JsonObject } from '../domain/values';
 import { inspectValidationPng, type PngDecoder } from './png';
+import { inspectValidationJpeg, type JpegDecoder } from './jpeg';
 import { inspectGlbMaterials } from './glbMaterials';
 import { checkFileLimits, fileError, fileFields, fileInteger, fileList, fileNumber, fileObject, fileVector, limitedJson, type FileValidationLimits } from './validation';
 
 export interface ValidatedGlb {
+  readonly jpeg?: true;
   readonly bytes: Uint8Array;
   readonly bounds: { min: number[]; max: number[] };
   readonly materials: readonly JsonObject[];
@@ -28,6 +30,21 @@ export function validationGlbParts(bytes: Uint8Array, limits: FileValidationLimi
 
 /** Static core geometry/material facts from actual bytes; no file-name or fixture authority. */
 export async function inspectValidationGlb(input: Uint8Array, limits: FileValidationLimits, decodePng?: PngDecoder): Promise<ValidatedGlb> {
+  return inspectGlb(input, limits, decodePng);
+}
+/** Explicit additive profile; never an old-profile-refusal fallback. */
+export async function inspectValidationJpegGlb(input: Uint8Array, limits: FileValidationLimits, decodePng?: PngDecoder, decodeJpeg?: JpegDecoder): Promise<ValidatedGlb> {
+  if (!validationGlbUsesJpeg(input, limits)) return fileError('JPEGモデルの形式が一致しません。');
+  return { ...await inspectGlb(input, limits, decodePng, decodeJpeg, true), jpeg: true };
+}
+export function validationGlbUsesJpeg(input: Uint8Array, limits: FileValidationLimits): boolean {
+  const { json } = validationGlbParts(input, limits);
+  return fileList(json.images ?? [], limits.maxItems).some(raw => fileObject(raw).mimeType === 'image/jpeg');
+}
+export function inspectFreshValidationGlb(input: Uint8Array, limits: FileValidationLimits, png?: PngDecoder, jpeg?: JpegDecoder) {
+  return validationGlbUsesJpeg(input, limits) ? inspectValidationJpegGlb(input, limits, png, jpeg) : inspectValidationGlb(input, limits, png);
+}
+async function inspectGlb(input: Uint8Array, limits: FileValidationLimits, decodePng?: PngDecoder, decodeJpeg?: JpegDecoder, jpeg = false): Promise<ValidatedGlb> {
   checkFileLimits(limits);
   if (input.length > limits.maxFileBytes) return fileError('GLBがこの検証の上限を超えています。');
   const bytes = input.slice(), { json: j, bin } = validationGlbParts(bytes, limits), max = limits.maxItems;
@@ -81,8 +98,9 @@ export async function inspectValidationGlb(input: Uint8Array, limits: FileValida
   for (const raw of images) {
     const image = fileObject(raw); fileFields(image, ['bufferView', 'mimeType']);
     const view = views[fileInteger(image.bufferView)];
-    if (!view || view.stride || image.mimeType !== 'image/png') return fileError('内蔵画像はPNGのみ対応しています。');
-    const dimensions = await inspectValidationPng(bin.subarray(view.offset, view.offset + view.length), limits, decodePng);
+    if (!view || view.stride || image.mimeType !== 'image/png' && !(jpeg && image.mimeType === 'image/jpeg')) return fileError('内蔵画像の形式にはまだ対応していません。');
+    const body = bin.subarray(view.offset, view.offset + view.length);
+    const dimensions = image.mimeType === 'image/jpeg' ? await inspectValidationJpeg(body, limits, 'glb-texture', decodeJpeg) : await inspectValidationPng(body, limits, decodePng);
     charge(dimensions.width * dimensions.height);
   }
   let implicitMaterial = false;

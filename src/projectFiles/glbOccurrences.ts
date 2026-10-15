@@ -3,12 +3,19 @@ import { GLTFLoader, type GLTFParser } from 'three/addons/loaders/GLTFLoader.js'
 import type { JsonObject } from '../domain/values';
 import { canonical } from '../domain/projectGraphSupport';
 import { disposeModelResources, disposeMaterialResources } from '../viewer/loaders';
-import { inspectValidationGlb, validationGlbParts, type ValidatedGlb } from './glb';
+import { inspectValidationGlb, inspectValidationJpegGlb, validationGlbParts, type ValidatedGlb } from './glb';
 import type { PngDecoder } from './png';
+import type { JpegDecoder } from './jpeg';
 import { fileError, type FileValidationLimits } from './validation';
 
 export async function inspectOccurrenceGlb(bytes: Uint8Array, limits: FileValidationLimits, decode?: PngDecoder): Promise<ValidatedGlb> {
-  const base = await inspectValidationGlb(bytes, limits, decode), j = validationGlbParts(base.bytes, limits).json;
+  return occurrenceCatalog(await inspectValidationGlb(bytes, limits, decode), limits);
+}
+export async function inspectOccurrenceJpegGlb(bytes: Uint8Array, limits: FileValidationLimits, png?: PngDecoder, jpeg?: JpegDecoder): Promise<ValidatedGlb> {
+  return occurrenceCatalog(await inspectValidationJpegGlb(bytes, limits, png, jpeg), limits);
+}
+function occurrenceCatalog(base: ValidatedGlb, limits: FileValidationLimits): ValidatedGlb {
+  const j = validationGlbParts(base.bytes, limits).json;
   if (base.surfaceRanges.length > limits.maxItems) return fileError('材質の面の数が検査の上限を超えています。');
   const nodes = j.nodes as { mesh?: number }[], meshes = j.meshes as { primitives: { material?: number }[] }[];
   const occurrences = base.surfaceRanges.map(r => ({ nodeIndex: Number(r.nodeIndex), primitiveIndex: Number(r.primitiveIndex) }))

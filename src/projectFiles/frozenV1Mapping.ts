@@ -2,8 +2,8 @@ import { admitProjectRecords, projectRecordMaps } from '../domain/projectRecords
 import { cloneCanonicalValue, type JsonObject, type JsonValue } from '../domain/values';
 import { digest, newId, technicalId } from '../projectMetadata/persistence';
 import { identityPlacement, sealValidationRecord, type PreparedValidationProject } from './initialProject';
-import { frozenV1Recipe, sourceColor, codeOrder, type FrozenV1Plan } from './frozenV1Source';
-import { fileError, validationGlbProfile, validationMetadataLimits as limits } from './validation';
+import { frozenV1Recipe, frozenV1JpegRecipe, type FrozenV1Recipe, sourceColor, codeOrder, type FrozenV1Plan } from './frozenV1Source';
+import { fileError, validationGlbProfile, jpegGlbProfile, validationMetadataLimits as limits } from './validation';
 
 type Key = readonly (string | number | Key)[];
 export interface FrozenV1MappingEntry { id: string; sha256: string; preimage: string }
@@ -21,23 +21,23 @@ export function frozenV1SourceKey(prefix: unknown, key: unknown, nested = false)
   if (prefix === 'att') return key.length === 4 && key[0] === 'attachment' && typeof key[1] === 'string' && index(key[2]) && typeof key[3] === 'string';
   return prefix === 'evt' && !nested && key.length === 3 && key[0] === 'initial-event' && ['ast', 'scn', 'sam', 'cap', 'scm', 'att', 'tag', 'tgm', 'view'].includes(key[1]) && frozenV1SourceKey(key[1], key[2], true);
 }
-export function frozenV1ConversionIds(conversionId: string, sourceZipSha256: string) {
+export function frozenV1ConversionIds(conversionId: string, sourceZipSha256: string, recipe: FrozenV1Recipe = frozenV1Recipe) {
   technicalId(conversionId); if (!/^[0-9a-f]{64}$/.test(sourceZipSha256)) return fileError('変換元の識別情報が不正です。');
-  const entries = new Map<string, FrozenV1MappingEntry>();
+  const entries = new Map<string, FrozenV1MappingEntry>(), full = new Map<string, string>();
   const id = async (prefix: string, key: Key) => {
     if (!frozenV1SourceKey(prefix, key)) return fileError('変換時の識別情報が不正です。');
-    const preimage = `lociview:${frozenV1Recipe}:id:jcs-v1\n` + JSON.stringify([conversionId, sourceZipSha256, prefix, key]);
+    const preimage = `lociview:${recipe}:id:jcs-v1\n` + JSON.stringify([conversionId, sourceZipSha256, prefix, key]);
     const sha256 = await digest(new TextEncoder().encode(preimage)), value = `${prefix}_${sha256.slice(0, 32)}`, old = entries.get(value);
-    if (old && (old.preimage !== preimage || old.sha256 !== sha256)) return fileError('変換先の識別情報が衝突しました。');
-    entries.set(value, { id: value, sha256, preimage }); return value;
+    if (old && (old.preimage !== preimage || old.sha256 !== sha256) || recipe === frozenV1JpegRecipe && full.has(sha256) && full.get(sha256) !== preimage) return fileError('変換先の識別情報が衝突しました。');
+    entries.set(value, { id: value, sha256, preimage }); full.set(sha256, preimage); return value;
   };
-  return { id, report: () => [...entries.values()] };
+  return { id, report: () => recipe === frozenV1JpegRecipe ? [...entries.values()].sort((a, b) => codeOrder(a.id, b.id)) : [...entries.values()] };
 }
 const rank = (n: number) => `A${n.toString(36).padStart(8, '0')}`;
 
 /** Expected record construction may use a captured identity for validation, never recreate history. */
 export async function mapFrozenV1Project(plan: FrozenV1Plan, conversionId: string, sourceSha256: string, capturedIdentity?: JsonObject) {
-  const ids = frozenV1ConversionIds(conversionId, sourceSha256), id = ids.id;
+  const ids = frozenV1ConversionIds(conversionId, sourceSha256, plan.recipe), id = ids.id;
   const one = (prefix: string, name: string, source: string) => id(prefix, [name, source]);
   const asset = (s: string) => one('ast', 'asset', s), scene = (s: string) => one('scn', 'set', s), caption = (s: string) => one('cap', 'caption', s);
   const media = (s: string) => one('med', 'media', s), view = (s: string) => one('view', 'view', s);
@@ -62,7 +62,7 @@ export async function mapFrozenV1Project(plan: FrozenV1Plan, conversionId: strin
     slots.sort((a, b) => codeOrder(a.logicalMaterialSlotId, b.logicalMaterialSlotId));
     const representation = await sealValidationRecord('representation', { id: representationId, assetId,
       representationFrameId: await one('frm', 'representation-frame', s), contentKind: 'mesh', purposes: ['source', 'display'], role: 'meshPrimary',
-      variantFamilyId: familyId, formatProfile: profile, blob: { ...body.ref }, representationToAsset: { ...identityPlacement(), reflection: 'none' },
+      variantFamilyId: familyId, formatProfile: model.jpeg ? await jpegGlbProfile() : profile, blob: { ...body.ref }, representationToAsset: { ...identityPlacement(), reflection: 'none' },
       derivedFrom: [], logicalBoundsAsset: model.bounds, materialCatalog: { layoutId: await one('lay', 'material-layout', s), slots } });
     add('representationsById', representation); targetModels.set(representationId, { record: representation, model });
     add('assetRevisionsById', await sealValidationRecord('asset-revision', { id: revisionId, assetId, representationIds: [representationId],

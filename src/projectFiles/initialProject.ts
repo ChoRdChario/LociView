@@ -3,9 +3,10 @@ import { admitProjectRecords, projectRecordMaps } from '../domain/projectRecords
 import { cloneCanonicalValue, type JsonObject, type JsonValue } from '../domain/values';
 import { digest, newId, technicalId } from '../projectMetadata/persistence';
 import type { StoredBlobRef } from '../projectMetadata/blobStore';
-import { inspectValidationGlb } from './glb';
-import { inspectValidationPng, type PngDecoder } from './png';
-import { checkFileLimits, fileError, validationGlbProfile, validationMetadataLimits, type FileValidationLimits } from './validation';
+import { inspectFreshValidationGlb, validationGlbUsesJpeg } from './glb';
+import type { PngDecoder } from './png';
+import { inspectValidationImage, type JpegDecoder } from './jpeg';
+import { checkFileLimits, fileError, validationGlbProfile, jpegGlbProfile, validationMetadataLimits, type FileValidationLimits } from './validation';
 
 export interface ValidationFile { readonly label: string; readonly bytes: Uint8Array }
 export interface PreparedValidationProject {
@@ -24,10 +25,10 @@ const label = validationFileLabel;
 const fresh = (prefix: string) => `${prefix}_${newId()}`;
 export const identityPlacement = () => ({ translation: [0, 0, 0], rotationXYZW: [0, 0, 0, 1], uniformScale: 1 });
 
-export async function prepareValidationModel(input: ValidationFile, limits: FileValidationLimits, decode?: PngDecoder, assetId = fresh('ast')) {
+export async function prepareValidationModel(input: ValidationFile, limits: FileValidationLimits, decode?: PngDecoder, assetId = fresh('ast'), jpeg?: JpegDecoder) {
   checkFileLimits(limits);
   if (!/^ast_[0-9a-f]{32}$/.test(assetId)) return fileError('追加するモデルの識別情報を確認してください。');
-  const name = validationFileLabel(input.label), inspected = await inspectValidationGlb(input.bytes.slice(), limits, decode);
+  const name = validationFileLabel(input.label), inspected = await inspectFreshValidationGlb(input.bytes.slice(), limits, decode, jpeg);
   const ref: StoredBlobRef = { algorithm: 'sha256', digest: await digest(inspected.bytes), byteLength: inspected.bytes.length, mediaType: 'model/gltf-binary' };
   const revisionId = fresh('rev'), representationId = fresh('rep'), bindingId = fresh('bnd');
   const familyId = fresh('fam'), compatibilityId = fresh('cmp'), layoutId = fresh('lay');
@@ -35,7 +36,7 @@ export async function prepareValidationModel(input: ValidationFile, limits: File
     .sort((a, b) => a.logicalMaterialSlotId.localeCompare(b.logicalMaterialSlotId));
   const representation = await sealValidationRecord('representation', {
     id: representationId, assetId, representationFrameId: fresh('frm'), contentKind: 'mesh', purposes: ['source', 'display'], role: 'meshPrimary',
-    variantFamilyId: familyId, formatProfile: await validationGlbProfile(), blob: ref as unknown as JsonObject,
+    variantFamilyId: familyId, formatProfile: await (validationGlbUsesJpeg(inspected.bytes, limits) ? jpegGlbProfile() : validationGlbProfile()), blob: ref as unknown as JsonObject,
     representationToAsset: { ...identityPlacement(), reflection: 'none' }, logicalBoundsAsset: inspected.bounds,
     derivedFrom: [], materialCatalog: { layoutId, slots },
   });
@@ -51,7 +52,7 @@ export async function prepareValidationModel(input: ValidationFile, limits: File
 
 /** New local identities from inspected files, never inferred from filenames or another Project. */
 export async function prepareValidationProject(input: { run: string; title: string; models: readonly ValidationFile[]; media?: readonly ValidationFile[] },
-  limits: FileValidationLimits, decode?: PngDecoder): Promise<PreparedValidationProject> {
+  limits: FileValidationLimits, decode?: PngDecoder, jpeg?: JpegDecoder): Promise<PreparedValidationProject> {
   checkFileLimits(limits);
   const run = technicalId(input.run), title = label(input.title), sceneId = fresh('scn'), frameId = fresh('frm');
   if (!input.models.length || input.models.length + (input.media?.length ?? 0) > limits.maxItems) return fileError('3Dモデルを選択してください。');
@@ -74,14 +75,14 @@ export async function prepareValidationProject(input: { run: string; title: stri
   records.project = { title, defaultSceneId: sceneId, frame: { id: frameId, handedness: 'right', upAxis: '+Y', unit: { kind: 'meters', metersPerProjectUnit: 1 } } };
   add('scenesById', { id: sceneId, name: '全体', orderKey: 'A', lifecycle: active() });
   for (const [index, file] of models.entries()) {
-    const model = await prepareValidationModel(file, limits, decode); blobs.push(model.body);
+    const model = await prepareValidationModel(file, limits, decode, undefined, jpeg); blobs.push(model.body);
     add('representationsById', model.representation); add('assetRevisionsById', model.revision);
     add('assetBindingsById', model.binding); add('assetsById', model.asset);
     add('sceneAssetMembershipsById', { id: fresh('sam'), sceneId, assetId: model.asset.id!, orderKey: `A${index.toString(36).padStart(8, '0')}`, lifecycle: active() });
   }
   for (const file of media) {
-    const name = label(file.label), bytes = file.bytes.slice(); await inspectValidationPng(bytes, limits, decode);
-    const ref = await blob(bytes, 'image/png');
+    const name = label(file.label), bytes = file.bytes.slice(), mime = await inspectValidationImage(bytes, limits, decode, jpeg);
+    const ref = await blob(bytes, mime);
     add('mediaResourcesById', await sealValidationRecord('media-resource', { id: fresh('med'), label: name, mediaKind: 'image', blob: ref as unknown as JsonObject }));
   }
   const checked = admitProjectRecords(records, validationMetadataLimits);

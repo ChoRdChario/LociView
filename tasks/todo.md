@@ -14,7 +14,7 @@ Initial Native/frozen-v1/LociMyu conversion and new-format teamwork remain requi
 Project/Scene identity, explicit conflict resolution, source preservation and the
 frozen v1/map-1/map-2/immutable-recipe boundaries remain unchanged.
 
-The latest verified implementation includes bounded Native/frozen-v1/LociMyu GLB/PNG conversion →
+The latest verified implementation includes bounded Native/frozen-v1/LociMyu GLB/PNG/JPEG conversion →
 edit/first-place → named backup/Workspace → independent reopen, plus the typed
 product composition's edit → save/two-round exchange → cold-reopen workflow in
 the nondefault validation route, now including the model, Saved View and material
@@ -25,6 +25,8 @@ Scene/Caption conflict choices, parent-only recovery and independent copies. Exi
 file/recovery work is retained. The explicit-map2 fresh-creation extension,
 Scene-local add colors, guarded Shift/numeric placement, owner reveal, Asset-wide
 pin sizing and checked save/resume/help are also connected in this bounded route.
+The approved JPEG photo/embedded-texture extension now preserves original metadata
+through direct creation/addition, conversion, file exchange and generation restore.
 Ordinary entry, broader profiles/converters, browser performance, physical-iPhone
 and offline acceptance remain open. Full details and earlier failures are in the
 [September checkpoint record](../docs/history/development-through-2026-09-21/tasks/todo.md).
@@ -103,6 +105,69 @@ major architecture/product decision, a required managed permission, or a release
 destructive boundary. Ordinary entry and temporary iPhone HTTPS need their existing
 exact-build/route approvals. Main, Pages, Service Worker, version/license, release,
 dependency changes and private/public fixture distribution are outside this unit.
+
+### Current implementation — JPEG photos/textures/edit/file/reopen
+
+Outcome: the PO-ratified [07d companion](../docs/specs/07d-jpeg-project-scene-proposal.md)
+connects JPEG photos and embedded model textures through direct creation/addition,
+Native/v1/LociMyu conversion, editing/first placement, named backup/Workspace,
+independent review and cold recovery in the existing nondefault route.
+
+- [x] Implement bounded JPEG structure/primary-Exif inspection plus actual decoder
+  validation and the exact two additive GLB profiles; preserve PNG and old profiles.
+- [x] Connect inspected MIME/profile through current content/facts/provider/display
+  and photo ports, keeping original JPEG bytes and existing evidence lifetimes.
+- [x] Add only the four new immutable recipes for admitted target JPEG, with exact
+  inherited keys, new-only collision/evidence rules and independent origin recovery.
+- [x] Verify direct and converted connected file/recovery flows, old dispatch and
+  acknowledged-loss fences; obtain independent parser/compatibility/UI reviews.
+- [ ] Freeze the final source/test tree, run the final serial checkpoint and HTTP
+  identity checks, audit outgoing scope and push a suitable g0-baseline checkpoint.
+
+Use focused installed tests during implementation and early sceneCore exact import
+checks. No re-encoding, metadata stripping, dependency/public fixture distribution,
+ordinary-entry activation, release/deploy or new performance guarantee. Browser,
+physical-device/offline adoption remains separately pending; managed browser denial
+is not retried. Stop only affected work for a real contract/authority/scope conflict.
+One writer owns the tree; root and the two area reviewers remain read-only.
+
+Focused evidence: JPEG structure/Exif/scan/table/Adobe/decode/close tests passed
+24 cases; exact sceneCore isolation passed 12. The JPEG-filtered service/product
+group passed 40 cases, including old JPEG refusal boundaries. Final Native
+downgrade and expanded backup-restoration corrections passed three cases. Direct
+byte-classified creation with misleading file names/MIME → real host → cold bytes
+passed. Native4 embedded-JPEG occurrence/witness, photo addition/alt/viewer,
+body/first-placement, named backup/Workspace/independent review, restore to a new
+generation, subsequent editing and exact cold reopen are connected. Four recipe
+cases cover interrupted initialization and completed retry retaining later edits;
+photo-only Native4 retains old occurrence profiles. Source-only/deleted JPEG does
+not select a recipe; detached acknowledged JPEG body/fact loss remains repair,
+without offered-body repair or unrelated-CAS adoption. No fixture is private input.
+
+Independent source/profile/parser, compatibility/receipt and UI/file reviewers
+closed the concrete findings. Corrections preserve per-scan block accounting,
+all-8-bit quantization and baseline Huffman rules, bounded fill work, grayscale
+Adobe0 and primary-versus-thumbnail Exif authority. Old Native2 completed retry
+does not gain independent PNG decode. The new-only source recomputation uses
+captured identity and the same refusal subset, with exact report/records/mappings.
+
+Milestone meta-audit: g0-baseline starts at the pushed approved-JPEG docs
+checkpoint; this unit stays on the approved direct/conversion/edit/file/recovery
+path. Runtime changes are limited to JPEG admission, exact profiles/recipes and
+their existing ports. No separate PoC, dependency, ordinary-entry or deployment
+work is included. The final source/test freeze and one serial full checkpoint
+remain the completion boundary. Browser/device/offline and real-input evidence
+remain pending, without retrying the known managed browser denial.
+
+Final serial `check:checkpoint` exited 0 on the reviewed 34-path source/test tree:
+typecheck, all 115 test files (2468 passed, 21 existing todo; suite 569.77s),
+ordinary/harness/validation builds passed. All frozen hashes remain unchanged.
+The existing localhost endpoint serves all seven final validation files byte-exact;
+manifest SHA-256 `5caeabd9d7ef30d1bb4902f90fb8b57b9fc678f33404862d0a5e5e30836f262d`.
+The isolated output has no SW/manifest/samples. This is HTTP identity, not browser,
+GPU/device/offline or observed-product-latency evidence. Independent final reviews
+cover the 42 selected JPEG source/test/doc paths and exclude the separate next
+proposal. Git owns the ensuing normal g0-baseline checkpoint identity.
 
 ### Completed implementation — LociMyu conversion/edit/file/reopen
 
@@ -255,7 +320,7 @@ not browser/GPU/device/offline acceptance. Independent final scope/privacy/deplo
 review closed on the 18 selected feature paths. Git owns the ensuing normal
 g0-baseline checkpoint identity; the separate JPEG companion is excluded from it.
 
-Next connected unit, PO approved 2026-10-15: [JPEG companion](../docs/specs/07d-jpeg-project-scene-proposal.md), photos and embedded GLB JPEG →
+The following unit was PO approved 2026-10-15: [JPEG companion](../docs/specs/07d-jpeg-project-scene-proposal.md), photos and embedded GLB JPEG →
 edit/first placement → named backup/Workspace/independent review → cold reopen.
 Record the approved companion as a separate documentation checkpoint before
 source changes. Use its exact two additive profiles and four new conversion

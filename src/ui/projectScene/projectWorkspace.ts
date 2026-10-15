@@ -173,7 +173,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   const cancelDelete = button('取り消す', () => { if (!busy && !pending && ports.status().kind === 'idle' && !ports.otherPending() && !composing) { deletion = null; render(); } });
   deletionBox.append(deletionTitle, deletionEffects, deletionNote, confirmDelete, cancelDelete); deletionArea.append(beginDelete, deletionBox, referenceIssues);
   const media = make('section'), mediaLabel = make('label', 'メディアを追加'), mediaInput = make('input');
-  media.setAttribute('aria-label', 'メディア'); mediaInput.type = 'file'; mediaInput.accept = 'image/png'; mediaInput.setAttribute('aria-label', 'メディアを追加'); mediaLabel.append(mediaInput);
+  media.setAttribute('aria-label', 'メディア'); mediaInput.type = 'file'; mediaInput.accept = 'image/png,image/jpeg'; mediaInput.setAttribute('aria-label', 'メディアを追加'); mediaLabel.append(mediaInput);
   const cancelMedia = button('選択を取り消す', () => { if (!mutationBlock()) { pickerScope = null; mediaInput.value = ''; render(); } });
   media.append(make('h2', 'メディア'), mediaLabel, cancelMedia);
   const conflicts = make('section');

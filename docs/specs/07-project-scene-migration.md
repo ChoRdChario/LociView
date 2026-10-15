@@ -435,6 +435,17 @@ independently reviewed; PO ratified the exact recipe/subset on 2026-10-15 under
 claiming aggregate conversion, profile/storage/device or ordinary-entry acceptance.
 Broader formats/materials, ordinary entry and all adoption gates remain required.
 
+### 5.6 JPEG companion — approved additive profiles and recipes
+
+PO ratified [07d](07d-jpeg-project-scene-proposal.md) on 2026-10-15. It adds JPEG
+photo/embedded-texture admission through two exact development profiles and four
+new recipes while preserving all old profile/recipe/job meanings. Only admitted
+target JPEG selects a new recipe; each Representation keeps its actual profile.
+Photos retain primary orientation/browser color management, model textures keep
+standard orientation/color rules, and original metadata bytes remain intact.
+Bounded implementation and executed file/recovery evidence are recorded in todo;
+broader formats/materials, ordinary entry and adoption gates remain open.
+
 ## 6. Acceptance and historical evidence
 
 Reuse the existing source/file/session tests and grouped device acceptance:

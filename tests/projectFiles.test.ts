@@ -10,10 +10,12 @@ import { OriginBlobStore } from '../src/projectMetadata/blobStore';
 import type { MetadataStorageFactory } from '../src/projectMetadata/repository';
 import { MetadataRepository } from '../src/projectMetadata/repository';
 import { digest, newId, json, underWriteLease } from '../src/projectMetadata/persistence';
-import { validationMetadataLimits as metadata, occurrenceGlbProfile, occurrenceGlbProfileText, type FileValidationLimits } from '../src/projectFiles/validation';
-import { inspectValidationGlb, validationGlbParts } from '../src/projectFiles/glb';
+import { validationMetadataLimits as metadata, occurrenceGlbProfile, occurrenceGlbProfileText, jpegGlbProfile, occurrenceJpegGlbProfile, type FileValidationLimits } from '../src/projectFiles/validation';
+import { inspectValidationGlb, inspectValidationJpegGlb, validationGlbParts } from '../src/projectFiles/glb';
 import { inspectOccurrenceGlb, decodeOccurrenceGlb } from '../src/projectFiles/glbOccurrences';
 import { inspectValidationPng } from '../src/projectFiles/png';
+import { isJpeg, jpegStructure, type JpegDecoder } from '../src/projectFiles/jpeg';
+import { jpegBytes } from './helpers/jpegFixtures';
 import { prepareValidationProject } from '../src/projectFiles/initialProject';
 import { prepareValidationCreation, resumeValidationCreation, validationProjectService } from '../src/projectFiles/creation';
 import { fixtureMedia, captionAttachments } from '../src/harness/projectScene/mediaHistory';
@@ -119,6 +121,10 @@ const png = Uint8Array.from(atob(fixtureMedia[0]!.base64), c => c.charCodeAt(0))
 // Decoder injection observes calls/failure/disposal, NOT actual browser/raster acceptance.
 const decodeImplementation = async (_: Uint8Array) => ({ width: 64, height: 48, close: vi.fn() });
 const decode = vi.fn(decodeImplementation);
+const decodeJpeg: JpegDecoder = async (bytes, use) => {
+  const source = jpegStructure(bytes, budget, use), swap = use === 'photo' && source.orientation >= 5;
+  return { width: swap ? source.height : source.width, height: swap ? source.width : source.height, close() {} };
+};
 const caseDisposals: (() => void | Promise<void>)[] = [];
 function owned<T extends { dispose(): void | Promise<void> }>(resource: T): T {
   caseDisposals.push(() => resource.dispose()); return resource;
@@ -151,16 +157,16 @@ async function acknowledge(ack: WorkingAcknowledgment | readonly WorkingAcknowle
   } finally { for (const unsubscribe of unsubscribes) unsubscribe(); }
   for (const owner of owners) expect(owner.state).toBe(expected);
 }
-function glb(mutate: (json: any, bin: Uint8Array) => void = () => {}, textured = false) {
-  const bin = new Uint8Array(36 + (textured ? 24 + png.length : 0));
+function glb(mutate: (json: any, bin: Uint8Array) => void = () => {}, textured = false, imageBytes = png) {
+  const bin = new Uint8Array(36 + (textured ? 24 + imageBytes.length : 0));
   new Float32Array(bin.buffer, 0, 9).set([-1, 0, 0, 1, 0, 0, 0, 2, 0]);
   const json: any = { asset: { version: '2.0' }, scene: 0, scenes: [{ nodes: [0] }], nodes: [{ mesh: 0, translation: [3, 0, 0] }],
     meshes: [{ primitives: [{ attributes: { POSITION: 0 }, material: 0 }] }], buffers: [{ byteLength: bin.length }],
     bufferViews: [{ buffer: 0, byteLength: 36 }], accessors: [{ bufferView: 0, componentType: 5126, count: 3, type: 'VEC3', min: [-1, 0, 0], max: [1, 2, 0] }],
     materials: [{ pbrMetallicRoughness: { baseColorFactor: [0.2, 0.5, 0.8, 1], roughnessFactor: 0.7 } }] };
   if (textured) {
-    new Float32Array(bin.buffer, 36, 6).set([0, 0, 1, 0, 0.5, 1]); bin.set(png, 60);
-    json.bufferViews.push({ buffer: 0, byteOffset: 36, byteLength: 24 }, { buffer: 0, byteOffset: 60, byteLength: png.length });
+    new Float32Array(bin.buffer, 36, 6).set([0, 0, 1, 0, 0.5, 1]); bin.set(imageBytes, 60);
+    json.bufferViews.push({ buffer: 0, byteOffset: 36, byteLength: 24 }, { buffer: 0, byteOffset: 60, byteLength: imageBytes.length });
     json.accessors.push({ bufferView: 1, componentType: 5126, count: 3, type: 'VEC2' });
     json.meshes[0].primitives[0].attributes.TEXCOORD_0 = 1;
     json.images = [{ bufferView: 2, mimeType: 'image/png' }]; json.textures = [{ source: 0 }];
@@ -188,10 +194,10 @@ function storageFactory() {
   return factory;
 }
 /** Native source bytes built here only; no private files or external sample distribution. */
-async function nativeConversionFile(change: (snapshot: any) => void = () => {}, badBody = false, modelBytes = glb()) {
+async function nativeConversionFile(change: (snapshot: any) => void = () => {}, badBody = false, modelBytes = glb(), imageBytes = png) {
   const id = (prefix: string, n: number) => `${prefix}_${n.toString().padStart(26, '0')}`;
   const model = modelBytes.slice(), blob = { algorithm: 'sha256', digest: await digest(model), byteLength: model.length, mediaType: 'model/gltf-binary' };
-  const imageBlob = { algorithm: 'sha256', digest: await digest(png), byteLength: png.length, mediaType: 'image/png' };
+  const imageBlob = { algorithm: 'sha256', digest: await digest(imageBytes), byteLength: imageBytes.length, mediaType: isJpeg(imageBytes) ? 'image/jpeg' : 'image/png' };
   const set = id('set', 0), second = id('set', 2);
   const snapshot: any = { format: 'lociview-native-project-snapshot', schemaVersion: 1, snapshotId: id('snp', 1), generation: 1,
     project: { id: id('prj', 1), title: '変換する記録', frame: { id: id('frm', 1), handedness: 'right', upAxis: '+Y', unit: { kind: 'unknown' } } },
@@ -225,12 +231,12 @@ async function nativeConversionFile(change: (snapshot: any) => void = () => {}, 
   const add = (path: string, data: Uint8Array) => writer.add(path, new Uint8ArrayReader(data), { level: 0 });
   await add('native/package.json', new TextEncoder().encode(JSON.stringify(manifest))); await add('native/snapshot.json', bytes);
   for (const r of manifest.representations) { const b = model.slice(); if (badBody) b[0] = 0; await add(r.entry, b); }
-  for (const m of manifest.media) await add(m.entry, png);
+  for (const m of manifest.media) await add(m.entry, imageBytes);
   return new Blob([(await writer.close()).slice().buffer]);
 }
 async function nativeAppearanceFile(change: (snapshot: any) => void = () => {}, model = glb(j => {
   j.nodes.push({ mesh: 0, translation: [-3, 0, 0] }); j.scenes[0].nodes.push(1);
-})) {
+}), imageBytes = png) {
   return nativeConversionFile(s => {
     const asset = s.assets.find((a: any) => a.label === '建物'), rep = s.representations.find((r: any) => r.assetId === asset.id), revision = s.assetRevisions.find((r: any) => r.assetId === asset.id);
     s.meshMaterialAppearances = s.displaySets.map((set: any, i: number) => ({ id: `mat_${String(i + 1).padStart(26, '0')}`,
@@ -238,18 +244,18 @@ async function nativeAppearanceFile(change: (snapshot: any) => void = () => {}, 
       opacity: 1, doubleSided: i === 0, unlit: i === 0,
       chroma: { enabled: false, colorSrgb: [0.5 / 255, 1.5 / 255, 254.5 / 255], tolerance: 0.3, feather: 0 } }));
     change(s);
-  }, false, model);
+  }, false, model, imageBytes);
 }
-async function frozenV1File(change: (ops: any[]) => void = () => {}) {
+async function frozenV1File(change: (ops: any[]) => void = () => {}, imageBytes = png, model = glb()) {
   const id = (prefix: string, n: number) => `${prefix}_${String(n).padStart(26, '0')}`, actor = 'a_0000000000001', ops: any[] = [];
   const add = (e: string, n: number, v: Record<string, unknown>, t = 'create') => {
     const op = ops.length + 1; ops.push({ op, hlc: `2026-10-15T00:00:00.000Z-${op.toString(16).padStart(4, '0')}-${actor}`, actor, user: '', t, e,
       id: id(e === 'caption' ? 'cap' : e === 'asset' ? 'ast' : e === 'profile' ? 'usr' : e, n), ...(t === 'delete' ? {} : { v }) });
   };
-  const model = glb(), imageSha = await digest(png);
+  const imageSha = await digest(imageBytes);
   add('set', 1, { name: '観察', order: 1 }); add('set', 2, { name: '全体', order: 2 });
   add('asset', 1, { kind: 'model', path: 'models/model.glb', originalName: '模型.glb', mime: '', size: model.length, transform: { scale: 1, upAxis: 'Y' }, pinScale: 1.5 });
-  for (const n of [2, 3, 4]) add('asset', n, { kind: 'image', path: `media/image${n}.png`, originalName: `画像${n}.png`, mime: 'image/png', size: png.length, sha256: imageSha });
+  for (const n of [2, 3, 4]) add('asset', n, { kind: 'image', path: `media/image${n}.png`, originalName: `画像${n}.png`, mime: isJpeg(imageBytes) ? 'image/jpeg' : 'image/png', size: imageBytes.length, sha256: imageSha });
   add('caption', 1, { setId: id('set', 1), title: '配置済み', body: '元の本文', color: '#eab308', tags: ['記録', '観察'], attachments: [id('ast', 2), id('ast', 3), id('ast', 2)],
     anchor: { modelAssetId: id('ast', 1), position: [0.25, 0.5, 0], normal: [0, 0, 1] } });
   add('caption', 2, { setId: id('set', 1), title: '', body: '', color: '#123456' });
@@ -259,7 +265,7 @@ async function frozenV1File(change: (ops: any[]) => void = () => {}) {
   change(ops);
   const entries = [{ path: 'lociview.json', data: new TextEncoder().encode(JSON.stringify({ format: 'lociview-project', schemaVersion: 1, projectId: id('prj', 1), name: '旧形式の記録', createdAt: '2026-10-15T00:00:00.000Z', generator: 'synthetic-test' })) },
     { path: `ops/${actor}.jsonl`, data: new TextEncoder().encode('  ' + ops.map(op => JSON.stringify(op)).join('\r\n') + '\r\n' + JSON.stringify(ops[0]) + '\r\n') },
-    { path: 'models/model.glb', data: model }, ...[2, 3, 4].map(n => ({ path: `media/image${n}.png`, data: png })),
+    { path: 'models/model.glb', data: model }, ...[2, 3, 4].map(n => ({ path: `media/image${n}.png`, data: imageBytes })),
     { path: 'snapshot.json', data: new TextEncoder().encode('{"stale":true}') }, { path: 'captions.csv', data: new TextEncoder().encode('ignored cache') },
     { path: 'thumbs/unused.png', data: png }];
   return new Blob([(await writeZipEntries(entries)).slice().buffer]);
@@ -318,6 +324,165 @@ const lociMyuTestReceiptBytes = (receipt: unknown) => {
 };
 
 describe('limited real-format validation (synthetic GLB bytes, injected PNG decoder, memory storage)', () => {
+  it('JPEG companion keeps exact profiles, old readers and all eight approved recipe identity vectors', async () => {
+    expect(await jpegGlbProfile()).toEqual({ id: 'development-validation-glb-jpeg-1', specificationSha256: 'a08a1c90496df087b1cd454dd29177ff3da7fdc8b5ebfb07156189479a8f8db8' });
+    expect(await occurrenceJpegGlbProfile()).toEqual({ id: 'development-validation-glb-occurrence-jpeg-1', specificationSha256: '63c0b3828fbf76ab6f92807d412b5680146965c2c9be8d12c12fb30e3d681fdb' });
+    const zero = '0'.repeat(32), one = '1'.repeat(64), caption = ['cap_0TVSSJ69V3DJPVB0ZMWRGZ7J40', '1ade732327636cadb583f4e621f3c880e14d093ec00523b35cafee626bbc3309'] as const;
+    const native3 = nativeConversionIds(zero, one, 'native-project-scene-recipe-3'), native4 = nativeConversionIds(zero, one, 'native-project-scene-recipe-4');
+    const v1 = frozenV1ConversionIds(zero, one, 'v1-project-scene-migration-recipe-2'), loci = lociMyuConversionIds(zero, one, 'data.xlsx', 'locimyu-project-scene-migration-recipe-2');
+    for (const [ids, prefix, key, count, sha] of [
+      [native3, 'med', ['media', 'med_00000000000000000000000001'], 201, 'eed0d039ede87befc0368cc953593029db3f4e5d7743fec386edb14af6a0c99f'],
+      [native3, 'slot', ['material-slot', 'rep_00000000000000000000000001', 'gltfMaterial', 0], 227, 'f9c8b341c41b44848841e4c016181f808969102a3c14b1c414f2179c5bcf7a1c'],
+      [native4, 'slot', ['material-occurrence', 'rep_00000000000000000000000001', 0, 0], 220, '9ae5413dd3d4d961c8bd47bbc0c5cd7b13598924060a94e4fd7d646c22d1b1d5'],
+      [native4, 'evt', ['initial-event', 'ovr', ['mesh-appearance', 'mat_00000000000000000000000001']], 235, '298882c816fe1c49ab87335339295fe4b91b335430efbde5bce102239b606f43'],
+      [v1, 'rep', ['model-representation', 'ast_00000000000000000000000001'], 222, '7e6ad124bfcf254fe6eedf23b3abb22a050faf82cc2010951bac464dad0650f9'],
+      [v1, 'att', ['attachment', 'cap_00000000000000000000000001', 1, 'ast_00000000000000000000000002'], 247, '6765b874139010d9d3e485dfb6b923285c6dc4ff8edc8dbd749f413456080eee'],
+      [loci, 'cap', ['caption', caption], 295, 'd054863797cf33ee967162eae0979fb45cd0e63042b871cf947e2cc1ee55d2a4'],
+      [loci, 'att', ['attachment', caption, 0, 'media/写真.jpg'], 319, '40a267791106b0d85532d628f4d28b70716116a074ad543046b8e4179f394e95'],
+    ] as const) {
+      const id = await ids.id(prefix, key); expect(id).toBe(`${prefix}_${sha.slice(0, 32)}`);
+      const entry = ids.report().find(e => e.id === id)!; expect(entry.sha256).toBe(sha); expect(new TextEncoder().encode(entry.preimage)).toHaveLength(count);
+    }
+    const bytes = glb(j => { j.images[0].mimeType = 'image/jpeg'; }, true, jpegBytes('rgb-progressive'));
+    await expect(inspectValidationGlb(bytes, budget, decode)).rejects.toThrow();
+    expect((await inspectValidationJpegGlb(bytes, budget, decode, decodeJpeg)).jpeg).toBe(true);
+  });
+  it('JPEG companion preserves old Native recipe-2 completed retry without adding independent PNG decode', async () => {
+    const initial = await (await prepareNativeConversion(await nativeAppearanceFile(), budget, decode))!.create(), r = firstWorkspaceRecipient();
+    const service = validationProjectService(r.fs, r.factory, r.store, budget, decode);
+    await initial.persist(r.fs, r.store, service.session);
+    const noImageDecoder = vi.fn(async () => { throw Error('independent image decode must not be added to old completed retry'); });
+    const ready = await resumeNativeConversion(r.fs, r.store, service.session, budget, initial.source.proof.identity.projectId as string, noImageDecoder);
+    expect(ready.state).toBe('ready'); expect(noImageDecoder).not.toHaveBeenCalled();
+  });
+  it('JPEG companion applies full-hash collisions only to new Native/v1 domains and keeps ASCII mapping order', async () => {
+    const zero = '0'.repeat(32), one = '1'.repeat(64), factories = [
+      () => nativeConversionIds(zero, one, 'native-project-scene-recipe-3'), () => nativeConversionIds(zero, one, 'native-project-scene-recipe-4'),
+      () => frozenV1ConversionIds(zero, one, 'v1-project-scene-migration-recipe-2'), () => lociMyuConversionIds(zero, one, 'data.xlsx', 'locimyu-project-scene-migration-recipe-2'),
+    ];
+    const hash = vi.spyOn(crypto.subtle, 'digest').mockResolvedValue(new Uint8Array(32).buffer);
+    try {
+      for (const create of factories) { const ids = create(); await ids.id('med', ['media', 'synthetic-a']); await expect(ids.id('rep', ['model-representation', 'synthetic-b'])).rejects.toThrow('衝突'); }
+      for (const ids of [nativeConversionIds(zero, one), frozenV1ConversionIds(zero, one)]) {
+        await ids.id('med', ['media', 'synthetic-a']); await ids.id('rep', ['model-representation', 'synthetic-b']); expect(ids.report()).toHaveLength(2);
+      }
+      for (const create of factories) {
+        hash.mockResolvedValueOnce(new Uint8Array(32).buffer).mockResolvedValueOnce(Uint8Array.from({ length: 32 }, (_, i) => i === 31 ? 1 : 0).buffer);
+        const ids = create(); await ids.id('med', ['media', 'a']); await expect(ids.id('med', ['media', 'b'])).rejects.toThrow('衝突');
+      }
+    } finally { hash.mockRestore(); }
+    for (const create of factories) {
+      const ids = create(); await Promise.all([ids.id('rep', ['model-representation', 'b']), ids.id('med', ['media', 'a'])]);
+      expect(ids.report().map(e => e.id)).toEqual(ids.report().map(e => e.id).sort());
+    }
+  });
+  it('JPEG companion excludes unlinked/deleted JPEG payloads from fresh v1/LociMyu recipe dispatch', async () => {
+    const raw = new Uint8Array(await (await frozenV1File()).arrayBuffer()), entries = await readZipEntries(raw);
+    entries.find(e => e.path === 'media/image4.png')!.data = jpegBytes('rgb-exif-6');
+    entries.find(e => e.path === 'thumbs/unused.png')!.data = jpegBytes('rgb-exif-6');
+    const opened = await inspectFrozenV1Source(new Blob([(await writeZipEntries(entries)).slice().buffer]), budget, decode, decodeJpeg);
+    expect(opened!.plan.recipe).toBe(frozenV1Recipe);
+    const file = await lociMyuFile((_s, files) => { files.find(e => e.path === 'media/unlinked.png')!.data = jpegBytes('rgb-exif-6'); });
+    const initial = await (await (await prepareLociMyuConversion(file, budget, decode, decodeJpeg))!.evaluate(0, '未関連は保持')).create(), r = firstWorkspaceRecipient(decodeJpeg);
+    await initial.persist(r.fs, r.store, validationProjectService(r.fs, r.factory, r.store, budget, decode, undefined, decodeJpeg).session);
+    const receipt = readLociMyuTestReceipt((await r.fs.readBytes('v2/metadata/locimyu-conversion.json'))!);
+    expect(receipt.recipe).toBe(lociMyuRecipe); expect(receipt.report.converted.media).toBe(2);
+  });
+  it('JPEG companion Native3 independent origin blocks cold generic recovery after sidecar loss and initial-receipt downgrade', async () => {
+    const r = firstWorkspaceRecipient(decodeJpeg), initial = await (await prepareNativeConversion(await nativeConversionFile(() => {}, false, glb(), jpegBytes('rgb-exif-6')), budget, decode, decodeJpeg))!.create();
+    const run = (initial.source.proof.identity.projectId as string).slice(4), options = { run, base: r.fs, store: r.store, coordinator: ProjectMutationCoordinator.browser(r.locks),
+      fileLimits: budget, decode, jpeg: decodeJpeg, packageLocks: r.locks, openStorage: async () => ({ factory: r.factory, dispose: async () => {} }) };
+    r.fs.reject = p => p.endsWith('/published.json'); const first = await openValidationHost({ ...options, initial }); expect(first.read().state).toBe('pending'); await first.dispose(); r.fs.reject = () => false;
+    const prefix = `${validationArea}/${run}/v2/metadata/`;
+    for (const name of ['native-conversion.json', 'native-conversion-source.zip']) await r.fs.remove(prefix + name);
+    const path = prefix + 'validation-initial.json', before = JSON.parse((await r.fs.readText(path))!); delete before.originRecipe; before.version = 'validation-initial-1'; await r.fs.writeText(path, json(before));
+    const cold = owned(await openValidationHost(options)), files = await r.fs.list(''), originals = await Promise.all(files.map(p => r.fs.readBytes(p))), writes = vi.spyOn(r.fs, 'writeText');
+    expect(cold.read().state).toBe('pending'); await expect(cold.authority.retry!()).rejects.toThrow();
+    expect(writes).not.toHaveBeenCalled(); expect(await r.fs.list('')).toEqual(files); expect(await Promise.all(files.map(p => r.fs.readBytes(p)))).toEqual(originals);
+  });
+  it.each(['body', 'both-receipts'] as const)('JPEG companion retains acknowledged detached photo %s loss as cold repair without adopting unrelated bytes', async missing => {
+    const r = firstWorkspaceRecipient(decodeJpeg), service = validationProjectService(r.fs, r.factory, r.store, budget, decode, undefined, decodeJpeg), photo = jpegBytes('rgb-exif-6');
+    const prepared = await prepareValidationProject({ run: newId(), title: '元写真を保持', models: [{ label: 'モデル', bytes: glb() }], media: [{ label: '写真', bytes: photo }] }, budget, decode, decodeJpeg);
+    const initial = await prepareValidationCreation(prepared, 'map2').persist(r.fs, r.store, service.session), p = initial.provider!; if (p.kind !== 'scene-provider') throw Error('provider');
+    const sceneId = Object.keys(p.state.scenes)[0]!, captionId = `cap_${newId()}`, attachmentId = `att_${newId()}`, image = Object.values(prepared.records.mediaResourcesById as Record<string, JsonObject>)[0]!;
+    const asset = Object.values(p.resources.assets)[0]!; if (asset.projection.kind !== 'value') throw Error('model'); const model = asset.projection.value;
+    const pin = await service.session.edit(initial.source!.token, { kind: 'addPin', sceneId, captionId, membershipId: `scm_${newId()}`, eventId: `evt_${newId()}`,
+      anchor: { kind: 'asset', assetId: asset.id, assetFrameId: model.assetFrameId, positionAsset: [3, 0.5, 0], authoredAssetRevisionId: model.revisionId,
+        authoredAnchorCompatibilityId: model.anchorCompatibilityIds[0]!, hitEvidence: { method: 'manual' } } as Anchor });
+    const attached = await service.session.edit(pin.source!.token, { kind: 'createAttachment', sceneId, captionId, attachmentId, media: image, orderKey: 'A', altText: '', eventId: `evt_${newId()}` });
+    const detached = await service.session.edit(attached.source!.token, { kind: 'deleteAttachment', sceneId, captionId, attachmentId, eventId: `evt_${newId()}` });
+    const output = new WorkspaceSender(r.fs, service.session, r.store, metadata, r.locks), file = await output.download(await output.generate(detached.source!.token)), empty = firstWorkspaceRecipient(decodeJpeg);
+    expect((await empty.receiver.importWorkspace(file)).state).toBe('ready');
+    const hash = (image.blob as JsonObject).digest as string, receipt = `v2/cas/sha256/${hash.slice(0, 2)}/${hash.slice(2)}.json`, object = `v2/cas/objects/${JSON.parse((await r.fs.readText(receipt))!).objectId}.bin`;
+    if (missing === 'body') await r.fs.remove(object);
+    else { await r.fs.remove(receipt); for (const path of await r.fs.list('v2/metadata/evidence/')) if (JSON.parse((await r.fs.readText(path))!).key.fact === 'media') await r.fs.remove(path); }
+    const files = await r.fs.list(''), writes = vi.spyOn(r.fs, 'writeText'), puts = vi.spyOn(r.store, 'put'), cold = r.reopen();
+    expect((await cold.session.read()).state).toBe('repair-required');
+    await expect(validationReceivedFacts(validationProjectService(r.fs, r.factory, r.store, budget, decode, undefined, decodeJpeg).content, detached.source!, detached.source!, () => new Blob([photo.slice().buffer]), () => true)).rejects.toThrow();
+    expect(writes).not.toHaveBeenCalled(); expect(puts).not.toHaveBeenCalled(); expect(await r.fs.list('')).toEqual(files);
+  });
+  it('JPEG companion creates a real project from byte-classified GLB and oriented photo with misleading names and cold exact bytes', async () => {
+    const r = firstWorkspaceRecipient(decodeJpeg), factories = new Map<string, MetadataStorageFactory>(); let host: Awaited<ReturnType<typeof openValidationHost>> | undefined;
+    const options = { base: r.fs, coordinator: ProjectMutationCoordinator.browser(r.locks), store: r.store, fileLimits: budget, decode, jpeg: decodeJpeg, packageLocks: r.locks };
+    const openStorage = async (run: string, create: boolean) => { if (!factories.has(run)) { if (!create) throw Error('missing'); factories.set(run, storageFactory()); } return { factory: factories.get(run)!, dispose: async () => {} }; };
+    let display: Parameters<ReturnType<ViewportFactory>['update']>[0] | undefined;
+    const factory: ViewportFactory = () => ({ update(next) { display = next; }, setActive() {}, camera() {}, retry() {}, dispose() {},
+      read: () => ({ ready: !!display, display, token: '1', pickToken: '1', pins: [], issue: null, dragging: false, projection: 'perspective', axis: null }) });
+    const ui = owned(createValidationWorkspace(new RecordedDocument().asDocument(), { ...options, productEditor: true, list: async () => [], selected() {}, render: async () => ({ factory, dispose() {} }),
+      open: async (run, initial, mode) => host = await openValidationHost({ ...options, run, initial, mode, openStorage: create => openStorage(run, create) }) }));
+    const root = record(ui.root), all = (n: RecordedNode): RecordedNode[] => [n, ...n.children.flatMap(all)], input = all(root).find(n => n.attributes.get('aria-label') === '3Dモデルとメディアを選択')!;
+    await vi.waitFor(() => expect(all(root).find(n => n.tag === 'button' && n.textContent === 'プロジェクトを作成')!.disabled).toBe(false));
+    const model = glb(j => { j.images[0].mimeType = 'image/jpeg'; }, true, jpegBytes('rgb-progressive')), photo = jpegBytes('rgb-exif-6');
+    Object.assign(input, { files: [new File([model.slice().buffer], 'model.data', { type: 'text/plain' }), new File([photo.slice().buffer], 'photo.bin', { type: 'application/octet-stream' })] });
+    input.parent!.parent!.fire('submit', { preventDefault() {} });
+    await vi.waitFor(() => expect(host?.read().state).toBe('ready'), { timeout: 10000 });
+    await vi.waitFor(() => expect(all(root).some(n => n.className === 'lv-project-workspace'), all(root).filter(n => n.tag === 'p').map(n => n.textContent).join(' | ')).toBe(true));
+    const source = host!.read().source!, run = (source.proof.identity.projectId as string).slice(4), media = host!.authority.read().mediaChoices![0]!;
+    expect(media.blob.mediaType).toBe('image/jpeg'); expect(await host!.content.image(media as unknown as JsonObject, true)).toEqual(photo);
+    expect((host!.authority.read().modelVersions![0]!.closure.representation.formatProfile as JsonObject).id).toBe('development-validation-glb-jpeg-1');
+    await ui.dispose(); const cold = owned(await openValidationHost({ ...options, run, openStorage: create => openStorage(run, create) }));
+    expect(cold.read().source!.originalChanges()).toEqual(source.originalChanges()); expect(await cold.content.image(media as unknown as JsonObject, true)).toEqual(photo);
+  });
+  for (const kind of ['Native3', 'Native4', 'v1-2', 'LociMyu2'] as const) it(`JPEG companion ${kind} binds captured origin, exact cold recovery and completed later edits`, async () => {
+    const photo = jpegBytes('rgb-exif-6'), texture = glb(j => { j.images[0].mimeType = 'image/jpeg'; }, true, jpegBytes('rgb-progressive'));
+    const r = firstWorkspaceRecipient(decodeJpeg), service = validationProjectService(r.fs, r.factory, r.store, budget, decode, undefined, decodeJpeg);
+    const file = kind === 'Native3' ? await nativeConversionFile(() => {}, false, glb(), photo) : kind === 'Native4' ? await nativeAppearanceFile(() => {}, undefined, photo) :
+      kind === 'v1-2' ? await frozenV1File(() => {}, photo, texture) : await lociMyuFile((_s, entries) => { entries[0]!.data = texture; entries[1]!.data = photo; entries[2]!.data = photo; });
+    const prepared = kind.startsWith('Native') ? await prepareNativeConversion(file, budget, decode, decodeJpeg) : kind === 'v1-2' ? await prepareFrozenV1Conversion(file, budget, decode, decodeJpeg) : null;
+    const initial = prepared ? await prepared.create() : await (await (await prepareLociMyuConversion(file, budget, decode, decodeJpeg))!.evaluate(0, '写真の記録')).create();
+    const projectId = initial.source.proof.identity.projectId as string, expectedRecipe = kind === 'Native3' ? 'native-project-scene-recipe-3' : kind === 'Native4' ? 'native-project-scene-recipe-4' : kind === 'v1-2' ? 'v1-project-scene-migration-recipe-2' : 'locimyu-project-scene-migration-recipe-2';
+    const resume = (session: typeof service.session) => kind.startsWith('Native') ? resumeNativeConversion(r.fs, r.store, session, budget, projectId, decode, decodeJpeg) :
+      kind === 'v1-2' ? resumeFrozenV1Conversion(r.fs, r.store, session, budget, projectId, decode, decodeJpeg) : resumeLociMyuConversion(r.fs, r.store, session, budget, projectId, decode, decodeJpeg);
+    r.fs.reject = p => p.endsWith('/published.json'); await expect(initial.persist(r.fs, r.store, service.session)).rejects.toThrow(); r.fs.reject = () => false;
+    expect(JSON.parse((await r.fs.readText('v2/metadata/validation-origin.json'))!).originRecipe).toBe(expectedRecipe);
+    const cold = validationProjectService(r.fs, r.factory, r.store, budget, decode, undefined, decodeJpeg), ready = await resume(cold.session);
+    expect(ready.state).toBe('ready'); expect(ready.source!.originalChanges()).toEqual(initial.source.originalChanges());
+    const inspected = await initial.source.inspectOriginal({ maxNodes: metadata.maxNodes, maxWork: metadata.maxWork }), records = inspected.candidates.unambiguousRecords!;
+    const models = Object.values(records.representationsById as Record<string, JsonObject>), media = Object.values(records.mediaResourcesById as Record<string, JsonObject>);
+    expect(media).toHaveLength(2); expect(media.every(m => (m.blob as JsonObject).mediaType === 'image/jpeg')).toBe(true); expect(new Set(media.map(m => m.id)).size).toBe(2);
+    expect(models.every(m => (m.formatProfile as JsonObject).id === (kind === 'Native3' ? 'development-validation-glb-1' : kind === 'Native4' ? 'development-validation-glb-occurrence-1' : 'development-validation-glb-jpeg-1'))).toBe(true);
+    if (kind === 'Native4') expect(JSON.parse((await r.fs.readText('v2/metadata/native-conversion.json'))!).materialWitness.every((w: any) => w.targetProfile.id === 'development-validation-glb-occurrence-1')).toBe(true);
+    const edited = await cold.session.edit(ready.source!.token, { kind: 'editCaption', captionId: Object.keys(records.captionsById!)[0]!, edits: { body: '復旧後の追記' } });
+    expect((await resume(cold.session)).source!.originalChanges()).toEqual(edited.source!.originalChanges());
+    if (kind.startsWith('Native')) {
+      const path = 'v2/metadata/native-conversion.json', bytes = (await r.fs.readBytes(path))!, receipt = JSON.parse(new TextDecoder().decode(bytes));
+      try {
+        for (const recipe of kind === 'Native3' ? ['native-project-scene-recipe-1'] : ['native-project-scene-recipe-3', 'native-project-scene-recipe-2']) {
+          await r.fs.writeBytes(path, new TextEncoder().encode(json({ ...receipt, recipe })));
+          const files = await r.fs.list(''), saved = await Promise.all(files.map(p => r.fs.readBytes(p))), writes = vi.spyOn(r.fs, 'writeText');
+          try { await expect(resume(cold.session)).rejects.toThrow(); expect(writes).not.toHaveBeenCalled();
+            expect((await cold.session.read()).source!.originalChanges()).toEqual(edited.source!.originalChanges());
+            expect(await r.fs.list('')).toEqual(files); expect(await Promise.all(files.map(p => r.fs.readBytes(p)))).toEqual(saved);
+          } finally { writes.mockRestore(); }
+        }
+      } finally { await r.fs.writeBytes(path, bytes); }
+    }
+    const paths = await r.fs.list(''), before = await Promise.all(paths.map(async path => [path, await r.fs.readBytes(path)]));
+    const conversionPath = kind.startsWith('Native') ? 'v2/metadata/native-conversion.json' : kind === 'v1-2' ? 'v2/metadata/frozen-v1-conversion.json' : 'v2/metadata/locimyu-conversion.json';
+    await r.fs.remove(conversionPath); await expect(resume(cold.session)).rejects.toThrow();
+    expect((await cold.session.read()).source!.originalChanges()).toEqual(edited.source!.originalChanges());
+    expect((await r.fs.list('')).length).toBe(before.length - 1);
+  });
   it('LociMyu conversion fixes all approved source and target identity/Caption/inventory vectors', async () => {
     const source = await planLociMyuCaptionIdentity({ legacyId: 'c_SYNTH_A', occurrence: 0, sheetIdentity: { kind: 'legacyGid', value: '0' } });
     const full = [...source.fullDigest].map(b => b.toString(16).padStart(2, '0')).join('');
@@ -1015,11 +1180,11 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const receiver = new WorkspaceReceiver(f.fs, f.fs, f.receiver.session, metadata, f.locks);
     return { ...f, source, file, receiverService: receiver, reopen, capture, senderStore };
   }
-  function firstWorkspaceRecipient() {
+  function firstWorkspaceRecipient(jpeg?: JpegDecoder) {
     const fs = new TestFS(), factory = storageFactory(), locks = lockManager();
     const store = new OriginBlobStore(fs, { maxBlobBytes: budget.maxFileBytes, maxChunkBytes: 1_000_000, maxChunks: 10000, metadata }, locks);
     const reopen = () => {
-      const { session } = validationProjectService(fs, factory, store, budget, decode);
+      const { session } = validationProjectService(fs, factory, store, budget, decode, undefined, jpeg);
       return { session, receiver: new WorkspaceReceiver(fs, fs, session, metadata, locks) };
     };
     return { fs, factory, store, locks, reopen, ...reopen() };
@@ -2078,10 +2243,17 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
   }
   async function productWorkspaceFixture(includeInitial = false, duplicateModels = false, withTag = false, profile: 'map1' | 'map2' = 'map1',
     initial?: NonNullable<Parameters<typeof openValidationHost>[0]['initial']>,
-    setup: { initialWorkspace?: boolean; scenes?: readonly { id: string; name: string; orderKey: string }[] } = {}) {
-    const r = firstWorkspaceRecipient(), run = initial ? (initial.source.proof.identity.projectId as string).slice(4) : newId(), captionId = `cap_${newId()}`;
+    setup: { jpeg?: JpegDecoder; restoreGenerations?: boolean; initialWorkspace?: boolean; scenes?: readonly { id: string; name: string; orderKey: string }[] } = {}) {
+    const r = firstWorkspaceRecipient(setup.jpeg), run = initial ? (initial.source.proof.identity.projectId as string).slice(4) : newId(), captionId = `cap_${newId()}`;
+    const generationFactories = new Map<string, MetadataStorageFactory>(), databases: RestoreDatabasePorts = {
+      listGenerations: async () => [...generationFactories.keys()], open: async (id, create) => {
+        if (id === null) return { factory: r.factory, dispose: async () => {} };
+        if (!generationFactories.has(id) && create) generationFactories.set(id, storageFactory()); const factory = generationFactories.get(id);
+        if (!factory) throw Error('missing generation'); return { factory, dispose: async () => {} };
+      },
+    };
     const options = { run, base: r.fs, coordinator: ProjectMutationCoordinator.browser(r.locks), store: r.store,
-      fileLimits: budget, decode, packageLocks: r.locks, openStorage: async () => ({ factory: r.factory, dispose: async () => {} }) };
+      fileLimits: budget, decode, jpeg: setup.jpeg, generations: setup.restoreGenerations ? () => databases : undefined, packageLocks: r.locks, openStorage: async () => ({ factory: r.factory, dispose: async () => {} }) };
     // Use an admitted conversion or one fresh GLB, without unrelated receive/replacement histories.
     const prepared = initial ? undefined : structuredClone(await prepareValidationProject({ run, title: '統合画面の検証', models: [{ label: 'モデル', bytes: glb() }],
       media: includeInitial ? [{ label: '受信画像', bytes: png }] : [] }, budget, decode));
@@ -2141,7 +2313,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
           issue, notice: '検証用の表示通知', dragging: viewportDragging, projection: payload.camera.projection.kind, axis: null }) };
     };
     let opened = false, liveHost = host; const imageReads = [vi.spyOn(host.content, 'image')];
-    const ui = owned(createValidationWorkspace(document, { productEditor: true, fileLimits: budget, decode, list: async () => [], selected() {},
+    const ui = owned(createValidationWorkspace(document, { productEditor: true, fileLimits: budget, decode, jpeg: setup.jpeg, list: async () => [], selected() {},
       open: async (_run, _initial, mode) => { if (!opened) { opened = true; return host; } liveHost = await openValidationHost({ ...options, mode }); imageReads.push(vi.spyOn(liveHost.content, 'image')); return liveHost; },
       render: async () => ({ factory, dispose() {} }) }, f.run));
     const root = record(ui.root), all = (n: RecordedNode): RecordedNode[] => [n, ...n.children.flatMap(all)];
@@ -2193,6 +2365,63 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       proposePin: (...args: Parameters<NonNullable<Parameters<ViewportFactory>[2]>>) => proposePin?.(...args),
       proposeModel: (...args: Parameters<NonNullable<Parameters<ViewportFactory>[3]>>) => proposeModel?.(...args) };
   }
+  it('JPEG companion Native4 connects exact occurrence textures, oriented photo addition, product edits, backup/Workspace/review and cold reopen', async () => {
+    const bitmapCloses: ReturnType<typeof vi.fn>[] = [];
+    vi.stubGlobal('self', { URL });
+    vi.stubGlobal('createImageBitmap', vi.fn(async () => { const close = vi.fn(); bitmapCloses.push(close); return { width: 8, height: 4, close }; }));
+    let h: Awaited<ReturnType<typeof productWorkspaceFixture>> | undefined;
+    try {
+      const texture = glb(j => { j.images[0].mimeType = 'image/jpeg'; }, true, jpegBytes('rgb-progressive')), photo = jpegBytes('rgb-exif-6');
+      const file = await nativeAppearanceFile(() => {}, texture, photo), original = await file.arrayBuffer(), initial = await (await prepareNativeConversion(file, budget, decode, decodeJpeg))!.create();
+      expect(bitmapCloses.length).toBeGreaterThan(0); expect(bitmapCloses.every(close => close.mock.calls.length === 1)).toBe(true);
+      h = await productWorkspaceFixture(false, false, false, 'map2', initial, { jpeg: decodeJpeg, restoreGenerations: true });
+      const { host, editor, named, button, edited } = h, provider = host.read().provider!; if (provider.kind !== 'scene-provider') throw Error('provider');
+      const unplaced = Object.values(provider.resources.captions).find(c => c.title.kind === 'value' && c.title.value === '未配置の記録')!;
+      expect(host.authority.read().modelVersions!.every(v => (v.closure.representation.formatProfile as JsonObject).id === 'development-validation-glb-occurrence-jpeg-1')).toBe(true);
+      const receiptPath = (await h.f.fs.list('')).find(p => p.endsWith('/native-conversion.json'))!, receipt = JSON.parse((await h.f.fs.readText(receiptPath))!);
+      expect(receipt.recipe).toBe('native-project-scene-recipe-4'); expect(receipt.materialWitness.every((w: any) => w.targetProfile.id === 'development-validation-glb-occurrence-jpeg-1')).toBe(true);
+      named('キャプション一覧', editor).children[1]!.children[0]!.fire('click');
+      const body = named('本文', editor); body.value = '写真と模型の記録'; body.fire('input');
+      h.f.fs.reject = p => p.endsWith('/staging.json'); await h.failed(() => button('変更を適用', editor).fire('click')); h.f.fs.reject = () => false;
+      const read = h.f.fs.readStream.bind(h.f.fs), guard = vi.spyOn(h.f.fs, 'readStream').mockImplementation(async p => { if (p.endsWith('/native-conversion-source.zip')) throw Error('later edit cannot require private ZIP'); return read(p); });
+      await edited(() => button('更新を再試行', editor).fire('click')); guard.mockRestore();
+      button('ピンを配置', editor).fire('click'); const canvas = named('3Dモデルの表示', editor), pointer = { pointerId: 7, isPrimary: true, button: 0, clientX: 40, clientY: 50 };
+      canvas.fire('pointerdown', pointer); canvas.fire('pointerup', pointer); await Promise.resolve(); await edited(() => button('位置を確定', editor).fire('click'));
+      expect(host.authority.read().resources.captions[unplaced.id]!.anchor).toMatchObject({ kind: 'value', value: { kind: 'asset' } });
+      const mediaInput = named('メディアを追加', editor); mediaInput.fire('click'); Object.assign(mediaInput, { files: [new File([photo.slice().buffer], '追加写真.data', { type: 'text/plain' })] });
+      await edited(() => mediaInput.fire('change'));
+      const media = named('画像の整理', editor), edits = named('添付の編集', media); button('説明を編集', edits).fire('click');
+      const alt = named('メディアの説明', media); alt.value = '向きを保持した写真'; alt.fire('input'); await edited(() => button('説明を適用', media).fire('click'));
+      expect(captionAttachments(host.authority.read().mediaData, unplaced.id).ready[0]!.altText).toEqual({ kind: 'value', value: '向きを保持した写真' });
+      const originalUrl = URL.createObjectURL, imageTypes: string[] = [], urls = vi.spyOn(URL, 'createObjectURL').mockImplementation(blob => { if (blob instanceof Blob) imageTypes.push(blob.type); return originalUrl(blob); });
+      try { button('画像を表示', named('添付画像', media)).fire('click'); await vi.waitFor(() => expect(imageTypes).toContain('image/jpeg')); named('閉じる', named('画像ビューア', editor)).fire('click'); } finally { urls.mockRestore(); }
+      const output = named('ファイル'), label = named('名前（任意）', output); label.value = '写真を含む保存'; label.fire('input'); button('ファイルに保存', output).fire('click');
+      await vi.waitFor(() => expect(h!.downloads).toHaveBeenCalledOnce(), { timeout: 10000 }); const source = host.read().source!, job = host.workspaceOutput.jobs.find(j => j.purpose === 'backup')!;
+      const backupFile = await host.workspaceOutput.download(job.id), backup = await BackupArchive.inspect(backupFile, metadata); expect(job.label).toBe('写真を含む保存'); expect(backup.source.originalChanges()).toEqual(source.originalChanges());
+      const workspace = await host.workspaceOutput.download(await host.workspaceOutput.generate(source.token)), peer = firstWorkspaceRecipient(decodeJpeg);
+      expect((await peer.receiver.importWorkspace(workspace)).state).toBe('ready'); expect((await peer.session.read()).source!.originalChanges()).toEqual(source.originalChanges());
+      const review = await prepareReviewView(await host.workspaceOutput.download(await host.workspaceOutput.generateReview(source.token, { sceneId: h.display()!.sceneId })), budget, decode, decodeJpeg);
+      expect(review.images.size).toBe(3); expect([...review.images.values()].every(blob => blob.type === 'image/jpeg')).toBe(true); expect(review.attachments).toHaveLength(3);
+      expect(review.models.every(model => (model.representation.formatProfile as JsonObject).id === 'development-validation-glb-occurrence-jpeg-1')).toBe(true);
+      expect((await peer.fs.list('')).some(p => /conversion|validation-origin/.test(p))).toBe(false);
+      for (const archive of [backup.archive, (await WorkspaceArchive.inspect(workspace, metadata)).archive, review.inspection.archive]) expect(archive.control.entries.some(e => /conversion|source\.zip|^ops\//i.test(e.path))).toBe(false);
+      expect(await file.arrayBuffer()).toEqual(original); expect(host.authority.read().mediaChoices).toHaveLength(3);
+      await h.ui.dispose(); const cold = owned(await openValidationHost(h.f.options)); expect(cold.read().source!.originalChanges()).toEqual(source.originalChanges());
+      expect(cold.authority.read().resources.captions[unplaced.id]!.body).toEqual({ kind: 'value', value: '写真と模型の記録' });
+      for (const record of cold.authority.read().mediaChoices!) expect(await cold.content.image(record as unknown as JsonObject, true)).toEqual(photo);
+      await cold.dispatch(cold.read().source!.token, { kind: 'editCaption', captionId: unplaced.id, edits: { body: '復元前の作業' } });
+      await cold.backupRestore.prepare(backupFile);
+      await cold.backupRestore.confirm(async (next, content) => {
+        for (const version of next.modelVersions!) expect((await content.model(version.closure.representation)).bytes).toEqual(texture);
+        for (const record of next.mediaChoices!) expect(await content.image(record as unknown as JsonObject)).toEqual(photo);
+      });
+      cold.backupRestore.displayReady(cold.read().source!.token); expect(cold.read().source!.originalChanges()).toEqual(source.originalChanges());
+      await cold.dispatch(cold.read().source!.token, { kind: 'editCaption', captionId: unplaced.id, edits: { body: '写真の復元後の追記' } });
+      const final = cold.read().source!.originalChanges(); await cold.dispose(); const restored = owned(await openValidationHost(h.f.options));
+      expect(restored.read().source!.originalChanges()).toEqual(final); expect(restored.authority.read().resources.captions[unplaced.id]!.body).toEqual({ kind: 'value', value: '写真の復元後の追記' });
+      for (const record of restored.authority.read().mediaChoices!) expect(await restored.content.image(record as unknown as JsonObject, true)).toEqual(photo);
+    } finally { await h?.ui.dispose(); vi.unstubAllGlobals(); }
+  });
   it('LociMyu conversion connects product editing/first placement, named backup, independent Workspace/review, cold report and exact reopen', async () => {
     const file = await lociMyuFile(), input = await file.arrayBuffer(), initial = await (await (await prepareLociMyuConversion(file, budget, decode))!.evaluate(0, 'LociMyuからの記録')).create();
     const h = await productWorkspaceFixture(false, false, false, 'map2', initial), { host, editor, button, named, edited } = h;

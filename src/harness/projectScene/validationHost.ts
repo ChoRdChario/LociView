@@ -14,6 +14,7 @@ import { hasFrozenV1Conversion, resumeFrozenV1Conversion } from '../../projectFi
 import { hasLociMyuConversion, resumeLociMyuConversion, readLociMyuConversionReport } from '../../projectFiles/lociMyuConversion';
 import { validationMetadataLimits as limits, type FileValidationLimits } from '../../projectFiles/validation';
 import type { PngDecoder } from '../../projectFiles/png';
+import type { JpegDecoder } from '../../projectFiles/jpeg';
 import { sealValidationRecord } from '../../projectFiles/initialProject';
 import { cloneCanonicalValue, type JsonObject } from '../../domain/values';
 import { metadataProjectView } from './metadataFixture';
@@ -46,7 +47,7 @@ export const validationArea = 'lociview-development-validation-1';
 export interface ValidationHostOptions {
   mode?: LocalOpenMode;
   run: string; base: WorkspaceFS; coordinator: ProjectMutationCoordinator; store: OriginBlobStore;
-  fileLimits: FileValidationLimits; decode?: PngDecoder; initial?: ReturnType<typeof prepareValidationCreation>;
+  fileLimits: FileValidationLimits; decode?: PngDecoder; jpeg?: JpegDecoder; initial?: ReturnType<typeof prepareValidationCreation>;
   workspaceFile?: Blob;
   reviewEdit?: PreparedReviewEdit;
   packageLocks?: LockManager | null;
@@ -119,7 +120,7 @@ export async function openValidationHost(options: ValidationHostOptions) {
     if (incoming instanceof CleanArchive && last.source) throw Error('この独立コピーの再開用データがあります。ファイルを取り込まず、プロジェクト一覧から再開してください。');
     if (last.source && (last.source.proof.identity.projectId !== `prj_${run}` || incoming && json(last.source.proof) !== json(incoming.source.proof)))
       throw Error('ファイルと再開用データのプロジェクトが一致しません。既存データは変更していません。');
-    let localInitial = !!options.initial || await hasNativeConversion(fs) || await hasLociMyuConversion(fs, false) || await hasFrozenV1Conversion(fs, false) || !!await fs.readStream(metadataPath(fs, 'validation-initial.json')) ||
+    let localInitial = !!options.initial || await hasNativeConversion(fs, false) || await hasLociMyuConversion(fs, false) || await hasFrozenV1Conversion(fs, false) || !!await fs.readStream(metadataPath(fs, 'validation-initial.json')) ||
       (await new TransactionJournal(fs, limits).entries()).some(e => e.start.purpose === 'initialize');
     let prepareDisplay: ((next: SyntheticProject) => Promise<void>) | undefined;
     let images: Record<string, MediaImage> = {};
@@ -166,10 +167,10 @@ export async function openValidationHost(options: ValidationHostOptions) {
       const before = await session.read(), entries = await new TransactionJournal(fs, limits).entries();
       if (before.state === 'empty' && !localInitial) throw Error('作業一式を選択するか、プロジェクト一覧へ戻ってください。');
       const initializing = before.state === 'empty' || entries.length === 1 && entries[0]!.start.purpose === 'initialize' && !entries[0]!.publication && before.state !== 'ready';
-      const result = await ready(initializing && await hasNativeConversion(fs) ? await resumeNativeConversion(fs, options.store, session, options.fileLimits, `prj_${run}`, options.decode) :
+      const result = await ready(initializing && await hasNativeConversion(fs) ? await resumeNativeConversion(fs, options.store, session, options.fileLimits, `prj_${run}`, options.decode, options.jpeg) :
         before.state === 'empty' && options.initial ? await options.initial.persist(fs, options.store, session) :
-        initializing && await hasLociMyuConversion(fs) ? await resumeLociMyuConversion(fs, options.store, session, options.fileLimits, `prj_${run}`, options.decode) :
-        initializing && await hasFrozenV1Conversion(fs) ? await resumeFrozenV1Conversion(fs, options.store, session, options.fileLimits, `prj_${run}`, options.decode) :
+        initializing && await hasLociMyuConversion(fs) ? await resumeLociMyuConversion(fs, options.store, session, options.fileLimits, `prj_${run}`, options.decode, options.jpeg) :
+        initializing && await hasFrozenV1Conversion(fs) ? await resumeFrozenV1Conversion(fs, options.store, session, options.fileLimits, `prj_${run}`, options.decode, options.jpeg) :
         initializing ? await resumeValidationCreation(fs, session, `prj_${run}`) : await session.retry());
       content.releasePreparedImages(); content.releasePreparedModels(); return result;
     };
@@ -493,7 +494,7 @@ export async function openValidationHost(options: ValidationHostOptions) {
       dispose: async () => { await dispose(); content.releasePreparedImages(); content.releasePreparedModels(); prepareDisplay = undefined; } };
     return { ...host, dispatch, get content() { return content; }, workspaceFiles, workspaceOutput, backupRestore, display: () => restoreRetired ? undefined : project,
       conversionReportAvailable: () => hasLociMyuConversion(fs, false),
-      conversionReport: () => execute(async () => readLociMyuConversionReport(fs, options.fileLimits, `prj_${run}`, options.decode), true),
+      conversionReport: () => execute(async () => readLociMyuConversionReport(fs, options.fileLimits, `prj_${run}`, options.decode, options.jpeg), true),
       get accessDetail() { return options.mode === 'view' ? '閲覧専用です。' : lease.accessDetail; },
       setDisplayPreparation(callback: (next: SyntheticProject) => Promise<void>) {
       if (closed || prepareDisplay) throw Error('モデル表示の接続を確認してください。');

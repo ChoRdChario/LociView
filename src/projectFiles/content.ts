@@ -10,10 +10,11 @@ import type { OriginBlobStore } from '../projectMetadata/blobStore';
 import type { MetadataMediaPort } from '../projectMetadata/session';
 import { digest, newId } from '../projectMetadata/persistence';
 import type { StoredBlobRef } from '../projectMetadata/blobStore';
-import { inspectValidationGlb, type ValidatedGlb } from './glb';
-import { inspectOccurrenceGlb } from './glbOccurrences';
-import { inspectValidationPng, type PngDecoder } from './png';
-import { fileError, fileObject, validationGlbProfile, occurrenceGlbProfile, validationMetadataLimits, type FileValidationLimits } from './validation';
+import { inspectValidationGlb, inspectValidationJpegGlb, inspectFreshValidationGlb, type ValidatedGlb } from './glb';
+import { inspectOccurrenceGlb, inspectOccurrenceJpegGlb } from './glbOccurrences';
+import type { PngDecoder } from './png';
+import { inspectValidationImage, type JpegDecoder } from './jpeg';
+import { fileError, fileObject, validationGlbProfile, occurrenceGlbProfile, jpegGlbProfile, occurrenceJpegGlbProfile, validationMetadataLimits, type FileValidationLimits } from './validation';
 import { identityPlacement, prepareValidationModel, sealValidationRecord, validationFileLabel, type ValidationFile } from './initialProject';
 
 export async function readValidationBody(file: WorkspaceReadableFile, maxBytes: number): Promise<Uint8Array> {
@@ -35,14 +36,14 @@ export class ValidationContent implements MetadataMediaPort {
   private readonly preparedModels = new Map<string, Awaited<ReturnType<typeof prepareValidationModel>>>();
   constructor(private readonly fs: ProjectWorkspaceFS, readonly store: OriginBlobStore,
     readonly limits: FileValidationLimits, private readonly decode?: PngDecoder,
-    private readonly checkRead?: () => Promise<void>) {}
+    private readonly checkRead?: () => Promise<void>, private readonly jpeg?: JpegDecoder) {}
   /** Owned input only; no body or Project write until the existing journal stages it. */
   async prepareImage(input: ValidationFile): Promise<JsonObject> {
     this.fs.mutationAuthority.assertWorkspaceWriteAuthorized();
     const label = validationFileLabel(input.label);
     if (!input.bytes.length || input.bytes.length > this.limits.maxFileBytes) return fileError('画像がこの検証の上限を超えています。');
-    const bytes = input.bytes.slice(); await inspectValidationPng(bytes, this.limits, this.decode);
-    const ref: StoredBlobRef = { algorithm: 'sha256', digest: await digest(bytes), byteLength: bytes.length, mediaType: 'image/png' };
+    const bytes = input.bytes.slice(), mediaType = await inspectValidationImage(bytes, this.limits, this.decode, this.jpeg);
+    const ref: StoredBlobRef = { algorithm: 'sha256', digest: await digest(bytes), byteLength: bytes.length, mediaType };
     const record = await sealValidationRecord('media-resource', { id: `med_${newId()}`, label, mediaKind: 'image', blob: ref as unknown as JsonObject });
     this.preparedImages.set(record.id as string, { record, bytes, ref });
     return cloneCanonicalValue(record, validationMetadataLimits) as JsonObject;
@@ -51,7 +52,7 @@ export class ValidationContent implements MetadataMediaPort {
   releasePreparedModels(): void { this.preparedModels.clear(); }
   async prepareModel(input: ValidationFile, assetId: string) {
     this.fs.mutationAuthority.assertWorkspaceWriteAuthorized();
-    const prepared = await prepareValidationModel(input, this.limits, this.decode, assetId);
+    const prepared = await prepareValidationModel(input, this.limits, this.decode, assetId, this.jpeg);
     this.preparedModels.set(prepared.representation.id as string, prepared);
     const { body: _body, ...records } = prepared;
     return cloneCanonicalValue(records, validationMetadataLimits) as typeof records;
@@ -63,7 +64,7 @@ export class ValidationContent implements MetadataMediaPort {
     return p;
   }
   async inspectPreparedModel(request: ContentRequest) {
-    return this.execute(request, { model: await inspectValidationGlb(this.preparedModel(request.records[0]!).body.bytes.slice(), this.limits, this.decode) });
+    return this.execute(request, { model: await this.inspectModel(request.records[0]!, this.preparedModel(request.records[0]!).body.bytes.slice()) });
   }
   async stagePreparedModel(record: JsonObject): Promise<void> {
     this.fs.mutationAuthority.assertWorkspaceWriteAuthorized();
@@ -71,7 +72,7 @@ export class ValidationContent implements MetadataMediaPort {
     await this.store.put(new Blob([body.bytes.slice().buffer]).stream(), body.ref.mediaType, body.ref);
   }
   private async modelDeclaration(record: JsonObject): Promise<JsonObject> {
-    if ((!same(record.formatProfile, await validationGlbProfile()) && !same(record.formatProfile, await occurrenceGlbProfile())) || record.contentKind !== 'mesh' || record.role !== 'meshPrimary' ||
+    if (!(await Promise.all([validationGlbProfile(), occurrenceGlbProfile(), jpegGlbProfile(), occurrenceJpegGlbProfile()])).some(p => same(record.formatProfile, p)) || record.contentKind !== 'mesh' || record.role !== 'meshPrimary' ||
       !same(record.representationToAsset, { ...identityPlacement(), reflection: 'none' }) ||
       !same(record.purposes, ['source', 'display']) && !same(record.purposes, ['display']) ||
       !same(record.derivedFrom, [])) return fileError('保存したモデルの形式を確認できません。');
@@ -82,20 +83,28 @@ export class ValidationContent implements MetadataMediaPort {
   async model(record: JsonObject, readOnly = false): Promise<ValidatedGlb> {
     await this.checkRead?.();
     const blob = await this.modelDeclaration(record);
-    const inspect = same(record.formatProfile, await occurrenceGlbProfile()) ? inspectOccurrenceGlb : inspectValidationGlb;
-    const model = await inspect(await readValidationBody(await (readOnly ? this.store.openReadOnly(blob) : this.store.open(blob)), this.limits.maxFileBytes), this.limits, this.decode);
+    const model = await this.inspectModel(record, await readValidationBody(await (readOnly ? this.store.openReadOnly(blob) : this.store.open(blob)), this.limits.maxFileBytes));
     await this.checkRead?.(); return model;
   }
   private imageDeclaration(record: JsonObject): JsonObject {
     const blob = fileObject(record.blob) as JsonObject;
-    if (record.mediaKind !== 'image' || blob.mediaType !== 'image/png') return fileError('この検証版で扱える添付はPNGのみです。');
+    if (record.mediaKind !== 'image' || blob.mediaType !== 'image/png' && blob.mediaType !== 'image/jpeg') return fileError('この画像形式にはまだ対応していません。');
     return blob;
   }
   async image(record: JsonObject, readOnly = false): Promise<Uint8Array> {
     await this.checkRead?.();
     const blob = this.imageDeclaration(record);
     const bytes = await readValidationBody(await (readOnly ? this.store.openReadOnly(blob) : this.store.open(blob)), this.limits.maxFileBytes);
-    await inspectValidationPng(bytes, this.limits, this.decode); await this.checkRead?.(); return bytes;
+    await this.inspectImage(bytes, blob); await this.checkRead?.(); return bytes;
+  }
+  private async inspectImage(bytes: Uint8Array, blob: JsonObject) {
+    if (await inspectValidationImage(bytes, this.limits, this.decode, this.jpeg) !== blob.mediaType) return fileError('画像の本体形式が一致しません。');
+  }
+  private async inspectModel(record: JsonObject, bytes: Uint8Array) {
+    const inspect = same(record.formatProfile, await occurrenceJpegGlbProfile()) ? inspectOccurrenceJpegGlb :
+      same(record.formatProfile, await jpegGlbProfile()) ? inspectValidationJpegGlb :
+      same(record.formatProfile, await occurrenceGlbProfile()) ? inspectOccurrenceGlb : inspectValidationGlb;
+    return inspect(bytes, this.limits, this.decode, this.jpeg);
   }
   /** Original incoming record and immutable range, no ID allocation or storage/evidence writes. */
   async inspectReceived(input: ContentRequest, file: Blob) {
@@ -109,10 +118,9 @@ export class ValidationContent implements MetadataMediaPort {
     const bytes = await readValidationBody({ size: file.size, stream: () => file.stream() }, this.limits.maxFileBytes);
     if (await digest(bytes) !== ref.digest) return fileError('受信する本体が一致しません。');
     if (request.fact === 'media') {
-      await inspectValidationPng(bytes, this.limits, this.decode); return this.execute(request, { image: bytes });
+      await this.inspectImage(bytes, ref); return this.execute(request, { image: bytes });
     }
-    const inspect = same(record.formatProfile, await occurrenceGlbProfile()) ? inspectOccurrenceGlb : inspectValidationGlb;
-    return this.execute(request, { model: await inspect(bytes, this.limits, this.decode) });
+    return this.execute(request, { model: await this.inspectModel(record, bytes) });
   }
   /** Fresh facts for a new record reusing an already verified body; no receipt creation here. */
   inspectStored(request: ContentRequest) { return this.execute(request, undefined, true); }
@@ -134,8 +142,8 @@ export class ValidationContent implements MetadataMediaPort {
   async verify(blobs: readonly JsonObject[]): Promise<void> {
     for (const blob of blobs) {
       const bytes = await readValidationBody(await this.store.open(blob), this.limits.maxFileBytes);
-      if (blob.mediaType === 'image/png') await inspectValidationPng(bytes, this.limits, this.decode);
-      else if (blob.mediaType === 'model/gltf-binary') await inspectValidationGlb(bytes, this.limits, this.decode);
+      if (blob.mediaType === 'image/png' || blob.mediaType === 'image/jpeg') await this.inspectImage(bytes, blob);
+      else if (blob.mediaType === 'model/gltf-binary') await inspectFreshValidationGlb(bytes, this.limits, this.decode, this.jpeg);
       else return fileError('追加する本体形式が不正です。');
     }
   }
@@ -159,7 +167,7 @@ export class ValidationContent implements MetadataMediaPort {
     let facts: JsonObject;
     if (request.fact === 'media') {
       this.imageDeclaration(record); if (!prepared?.image) await this.image(record, readOnly);
-      facts = { mediaKind: 'image', mediaType: 'image/png' };
+      facts = { mediaKind: 'image', mediaType: this.imageDeclaration(record).mediaType! };
     } else if (request.fact === 'representation' || request.fact === 'family-envelope' || request.fact === 'family-contribution') {
       await this.modelDeclaration(record); // Prepared decoding never bypasses declared profile/role/transform checks.
       const decoded = prepared?.model ?? await this.model(record, readOnly);

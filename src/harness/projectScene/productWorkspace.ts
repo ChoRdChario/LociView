@@ -60,7 +60,7 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
     addModel: async (token, input) => host.authority.addModelFile!(token, input),
     replaceModel: async (token, input) => host.authority.replaceModelFile!(token, input),
     transformModel: async (token, input) => host.authority.transformModel!(token, input),
-    image: async record => new Blob([(await host.content.image(record, true)).slice().buffer], { type: 'image/png' }),
+    image: async record => new Blob([(await host.content.image(record, true)).slice().buffer], { type: (record.blob as { mediaType: string }).mediaType }),
     imageScope: () => host.imageScope(),
     changed, otherPending: external,
     createViewport(canvas, update, propose, proposeModel): WorkspaceViewport {
