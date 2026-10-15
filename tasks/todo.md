@@ -116,6 +116,30 @@ destructive boundary. Ordinary entry and temporary iPhone HTTPS need their exist
 exact-build/route approvals. Main, Pages, Service Worker, version/license, release,
 dependency changes and private/public fixture distribution are outside this unit.
 
+### Current decision — LociMyu Scene material conversion
+
+The next connected gap is source-authoritative Scene shading/sidedness → conversion
+→ edit/file/selected-generation restore/edit/cold, within one static GLB. The exact
+[07h proposal](../docs/specs/07h-locimyu-material-proposal.md) is PROPOSED, unratified
+and not implemented. Existing 04 exact-name fan-out stays normative; the new
+Scene/slot mapping, recipe-4/IDs and disabled-chroma source-only limit require one
+PO decision. Disabled color/threshold/feather would remain in original ZIP plus
+item-named private report instead of target editing values. Do not borrow Native
+numeric formulas or make unavailable producer/real-input parity claims.
+
+- [x] Prepare the concrete subset, selected-surface selector, Scene/slot mapping,
+  closed witness/report phases, origin/recovery/privacy and connected acceptance.
+- [x] Root and independent read-only reviews have no remaining P1/P2; all five ID
+  vectors agree between Node and independent Python calculations. Pre-create/
+  blocked report phase and new4-only duplicate-material-table wording are closed.
+- [ ] Obtain ratification of this exact companion before source implementation;
+  then record the short implementation/check/stop plan. Old1–3 jobs/zero-match/
+  reports/ready timing, actual GLB profiles and warm retry remain fixed.
+
+This documentation checkpoint adds no runtime evidence, capability or adoption
+credit. Active chroma/fractional opacity and broader material/rendering semantics
+remain excluded, as do ordinary activation, dependencies, release and browser retry.
+
 ### Completed implementation — recover photo input and save work
 
 Outcome: fresh HEIC/HEIF selection → actionable local JPEG guidance → explicitly
@@ -165,9 +189,8 @@ the separate unratified material proposal is excluded. Git owns checkpoint and
 remote identity. HTTP is identity only; synthetic HEIF is a negative hint fixture,
 and JPEG decode, DOM and StorageEstimate are injected, not browser/device proof.
 
-Next: concretize the source-authoritative LociMyu Scene-material target/identity
-companion for one PO decision. It is not permission to implement a new recipe;
-the broader browser/device/ordinary-entry gates remain open.
+Next: the exact LociMyu Scene-material proposal and PO decision are recorded above.
+The broader browser/device/ordinary-entry gates remain open.
 
 ### Completed implementation — frozen-v1 model placement
 

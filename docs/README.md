@@ -28,6 +28,7 @@ record executed evidence and connections; do not infer those from a document tit
 | Approved WebP/GIF photo extension | [WebP/GIF companion](specs/07e-webp-gif-project-scene-proposal.md); four additive recipes and existing raw-image display approved 2026-10-15; implementation/evidence in todo, not adopted |
 | Approved frozen-v1 explicit default-View extension | [Default-View companion](specs/07f-frozen-v1-default-view-proposal.md); exact recipe-4 approved 2026-10-16; bounded implementation/evidence in todo, not adopted |
 | Approved frozen-v1 model placement extension | [Placement companion](specs/07g-frozen-v1-placement-proposal.md); exact additive recipe-5 and saved-offset compatibility approved 2026-10-16; implementation/evidence in todo, not adopted |
+| Proposed LociMyu Scene material extension | [Material companion](specs/07h-locimyu-material-proposal.md); new recipe-4/Scene-slot identity and disabled-chroma source-only limit await PO ratification; not implemented |
 | UI intent, writing, visual tone and interaction | [UI product guidelines](ui-product-guidelines.md); [UI task mapping](../tasks/uiux-handoff.md) for historical audit evidence |
 | Ownership, license or sponsorship | [licensing](licensing-and-ownership.md), [sponsorship](sponsorship-policy.md); direction is not adoption or a license grant |
 
