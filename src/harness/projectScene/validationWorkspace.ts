@@ -279,6 +279,13 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     relationNote.textContent = evaluated.relation.kind === 'confirmation-required' ? evaluated.relation.relations.map(r => `${r.sheetGid} → ${r.sheetName}`).join(' / ') :
       evaluated.relation.kind === 'unavailable' ? '表との対応を確認できない視点・材質は有効にしません。' : '';
     const n = evaluated.summary; conversionNote.textContent = evaluated.blocked ? 'この内容は変換できません。説明ファイルで問題を確認してください。' : `LociMyuファイル：モデル ${n.models}・シーン ${n.scenes}・キャプション ${n.captions}・メディア ${n.media}・視点 ${n.views}`;
+    const effects = n.materialEffects as { scenes: number; overrides: number; sourceOnlyChromaRows: number } | null | undefined;
+    const materialIssue = n.materialIssue as { field: string; reason: string } | null | undefined;
+    if (evaluated.blocked && materialIssue) conversionNote.textContent += ` ${materialIssue.field}：${materialIssue.reason}`;
+    if (!evaluated.blocked && effects) {
+      conversionNote.textContent += `。材質の見え方：${effects.scenes}シーン・${effects.overrides}件`;
+      if (Number(effects.sourceOnlyChromaRows) > 0) conversionNote.textContent += '。色の透過が無効なときの色・許容範囲・ぼかしは、元のZIPと説明ファイルだけに残り、変換後の編集値には引き継ぎません。';
+    }
     conversionHelp.textContent = '元ZIPと変換の説明を別に保管してください。変換後のバックアップや共有ファイルには元データと説明は含まれません。'; controls();
   };
   workbook.addEventListener('change', () => { relation.checked = false; invalidateLoci(); if (!busy) execute(evaluateLoci); });

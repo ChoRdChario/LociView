@@ -3,7 +3,7 @@ import { cloneCanonicalValue, scalarLength, type JsonObject, type JsonValue } fr
 import { planLociMyuCaptionIdentity } from '../io/locimyu';
 import { digest, newId, technicalId } from '../projectMetadata/persistence';
 import { identityPlacement, sealValidationRecord, type PreparedValidationProject } from './initialProject';
-import { lociMyuRecipe, type LociMyuRecipe, LociMyuPreflightError, type LociMyuSourcePlan } from './lociMyuSource';
+import { lociMyuRecipe, lociMyuMaterialRecipe, type LociMyuRecipe, LociMyuPreflightError, type LociMyuSourcePlan } from './lociMyuSource';
 import { fileError, validationGlbProfile, jpegGlbProfile, validationMetadataLimits as limits } from './validation';
 
 export type LociMyuKey = readonly (string | number | LociMyuKey)[];
@@ -11,7 +11,7 @@ export interface LociMyuMappingEntry { id: string; sha256: string; preimage: str
 const path = (v: unknown) => typeof v === 'string' && v.length > 0;
 const sheet = (v: unknown) => Array.isArray(v) && v.length === 2 && ['legacyGid', 'sheetName'].includes(v[0]) && path(v[1]);
 const caption = (v: unknown) => Array.isArray(v) && v.length === 2 && typeof v[0] === 'string' && /^cap_[0-9A-HJKMNP-TV-Z]{26}$/.test(v[0]) && typeof v[1] === 'string' && /^[0-9a-f]{64}$/.test(v[1]);
-export function lociMyuSourceKey(prefix: unknown, key: unknown, nested = false): boolean {
+export function lociMyuSourceKey(prefix: unknown, key: unknown, nested = false, recipe: LociMyuRecipe = lociMyuRecipe): boolean {
   if (typeof prefix !== 'string' || !Array.isArray(key)) return false;
   if (prefix === 'frm') return key.length === 1 && key[0] === 'project-frame' || key.length === 2 && ['asset-frame', 'representation-frame'].includes(key[0]) && path(key[1]);
   const simple: Record<string, string> = { ast: 'model', rep: 'model-representation', rev: 'model-revision', bnd: 'model-binding', fam: 'mesh-family', cmp: 'anchor-class', lay: 'material-layout', med: 'media' };
@@ -23,13 +23,14 @@ export function lociMyuSourceKey(prefix: unknown, key: unknown, nested = false):
   if (prefix === 'att') return key.length === 4 && key[0] === 'attachment' && caption(key[1]) && key[2] === 0 && path(key[3]);
   if (prefix === 'view') return key.length === 3 && key[0] === 'view' && key[1] === '__LM_VIEWS' && Number.isSafeInteger(key[2]) && key[2] >= 2;
   if (prefix === 'slot') return key.length === 4 && key[0] === 'material-slot' && path(key[1]) && (key[2] === 'gltfMaterial' && Number.isSafeInteger(key[3]) && key[3] >= 0 || key[2] === 'representationMaterial' && key[3] === 0);
-  return prefix === 'evt' && !nested && key.length === 3 && key[0] === 'initial-event' && ['ast', 'scn', 'sam', 'cap', 'scm', 'att', 'view'].includes(key[1]) && lociMyuSourceKey(key[1], key[2], true);
+  if (prefix === 'ovr') return recipe === lociMyuMaterialRecipe && key.length === 7 && key[0] === 'material-row' && key[1] === '__LM_MATERIALS' && Number.isSafeInteger(key[2]) && key[2] >= 2 && sheet(key[3]) && path(key[4]) && key[5] === 'gltfMaterial' && Number.isSafeInteger(key[6]) && key[6] >= 0;
+  return prefix === 'evt' && !nested && key.length === 3 && key[0] === 'initial-event' && ['ast', 'scn', 'sam', 'cap', 'scm', 'att', 'view', ...(recipe === lociMyuMaterialRecipe ? ['ovr'] : [])].includes(key[1]) && lociMyuSourceKey(key[1], key[2], true, recipe);
 }
 export function lociMyuConversionIds(conversionId: string, sourceZipSha256: string, workbookPath: string, recipe: LociMyuRecipe = lociMyuRecipe) {
   technicalId(conversionId); if (!/^[0-9a-f]{64}$/.test(sourceZipSha256) || !path(workbookPath)) return fileError('変換元の識別情報が不正です。');
   const entries = new Map<string, LociMyuMappingEntry>(), full = new Map<string, string>();
   const id = async (prefix: string, key: LociMyuKey) => {
-    if (!lociMyuSourceKey(prefix, key)) return fileError('変換時の識別情報が不正です。');
+    if (!lociMyuSourceKey(prefix, key, false, recipe)) return fileError('変換時の識別情報が不正です。');
     scalarLength(JSON.stringify(key), limits.maxStringScalars, []);
     const preimage = `lociview:${recipe}:id:jcs-v1\n` + JSON.stringify([conversionId, sourceZipSha256, workbookPath, prefix, key]);
     const sha256 = await digest(new TextEncoder().encode(preimage)), value = `${prefix}_${sha256.slice(0, 32)}`, old = entries.get(value), oldFull = full.get(sha256);
@@ -60,7 +61,7 @@ export async function mapLociMyuProject(plan: LociMyuSourcePlan, conversionId: s
   if (profile.specificationSha256 !== '077c5da2241deb7956026fe20376dee9301d70b29d10a436d673f37909e4186f') return fileError('モデル検証の版が一致しません。');
   const assetId = await one('ast', 'model'), assetFrameId = await one('frm', 'asset-frame'), revisionId = await one('rev', 'model-revision');
   const familyId = await one('fam', 'mesh-family'), compatibilityId = await one('cmp', 'anchor-class'), representationId = await one('rep', 'model-representation'), bindingId = await one('bnd', 'model-binding');
-  const slots = await Promise.all(plan.model.model.materials.map(async m => { const locator = m.sourceLocator as JsonObject;
+  const slots: (JsonObject & { logicalMaterialSlotId: string })[] = await Promise.all(plan.model.model.materials.map(async m => { const locator = m.sourceLocator as JsonObject;
     return { ...m, logicalMaterialSlotId: await id('slot', ['material-slot', s, locator.kind as string, (locator.kind === 'gltfMaterial' ? locator.materialIndex : 0) as number]) }; }));
   slots.sort((a, b) => a.logicalMaterialSlotId < b.logicalMaterialSlotId ? -1 : a.logicalMaterialSlotId > b.logicalMaterialSlotId ? 1 : 0);
   const representation = await sealValidationRecord('representation', { id: representationId, assetId, representationFrameId: await one('frm', 'representation-frame'),
@@ -92,8 +93,31 @@ export async function mapLociMyuProject(plan: LociMyuSourcePlan, conversionId: s
     for (const [n, v] of ownViews.entries()) { const key: LociMyuKey = ['view', '__LM_VIEWS', v.row];
       add('viewsById', { id: await id('view', key), sceneId: scn, projectFrameId, name: v.name, orderKey: rank(n), lifecycle: await active('view', key), camera: v.camera, background: { kind: 'solid', colorSrgb: v.background } }); }
   }
+  const materialMappings: JsonObject[] = [], routes = new Set<string>();
+  if (plan.recipe === lociMyuMaterialRecipe) {
+    if (!plan.materialRows?.length) return fileError('変換元の材質対応が不足しています。');
+    const catalog = new Map(slots.filter(slot => (slot.sourceLocator as JsonObject).kind === 'gltfMaterial').map(slot => [(slot.sourceLocator as JsonObject).materialIndex, slot]));
+    for (const row of plan.materialRows) {
+      const S: LociMyuKey = [row.identity.kind, row.identity.value], scn = await id('scn', ['sheet', S]);
+      if (!(records.scenesById as JsonObject)[scn]) return fileError('材質のシーン対応が不足しています。');
+      for (const index of row.indices) {
+        const slot = catalog.get(index); if (!slot) return fileError('材質の面の対応が不足しています。');
+        const route = `${scn}/${slot.logicalMaterialSlotId}`; if (routes.has(route)) return fileError('材質の対応が重複しています。'); routes.add(route);
+        const key: LociMyuKey = ['material-row', '__LM_MATERIALS', row.row, S, s, 'gltfMaterial', index], ovr = await id('ovr', key);
+        add('materialOverridesById', { id: ovr, routing: { scope: { kind: 'scene', sceneId: scn }, target: { assetId, variantFamilyId: familyId,
+          materialLayoutId: (representation.materialCatalog as JsonObject).layoutId!, logicalMaterialSlotId: slot.logicalMaterialSlotId } },
+          appearance: { opacity: 1, doubleSided: row.doubleSided, lighting: row.unlit ? 'unlit' : 'inherit' },
+          compositing: { coverage: { policy: 'inherit' }, optics: 'inherit' }, lifecycle: await active('ovr', key) });
+        materialMappings.push({ sourceTable: '__LM_MATERIALS', sourceRow: row.row, sceneSource: S as JsonValue, modelPath: s,
+          modelBlob: { digest: plan.model.ref.digest, byteLength: plan.model.ref.byteLength, mediaType: plan.model.ref.mediaType }, formatProfile: representation.formatProfile!,
+          materialIndex: index, materialKey: row.key, targetSceneId: scn, targetRepresentationId: representationId,
+          targetMaterialLayoutId: (representation.materialCatalog as JsonObject).layoutId!, targetLogicalMaterialSlotId: slot.logicalMaterialSlotId, targetOverrideId: ovr });
+      }
+    }
+    materialMappings.sort((a, b) => (a.targetOverrideId as string) < (b.targetOverrideId as string) ? -1 : (a.targetOverrideId as string) > (b.targetOverrideId as string) ? 1 : 0);
+  }
   const checked = admitProjectRecords(records, limits, 'map2');
   if (checked.kind !== 'valid-records' || checked.hasUnknownFields) throw new LociMyuPreflightError('元データを省略・修正せずに変換先の項目として保存できません。');
-  return { records: cloneCanonicalValue(checked.records, limits) as PreparedValidationProject['records'], mapping: ids.report(), sourceIdentities,
+  return { records: cloneCanonicalValue(checked.records, limits) as PreparedValidationProject['records'], mapping: ids.report(), sourceIdentities, materialMappings,
     targetModels: new Map([[representationId, { record: representation, model: plan.model.model }]]), blobs: [plan.model, ...plan.media] };
 }

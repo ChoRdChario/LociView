@@ -8,6 +8,11 @@ source semantics in [04](04-locimyu-conversion.md) and the one-time cutover in
 receiver, `locimyu-caption-id-2`, v1 recipes, Projects or prepared jobs.
 Current work and evidence remain in [todo](../../tasks/todo.md).
 
+The additive [07h material companion](07h-locimyu-material-proposal.md), ratified
+2026-10-16, extends the otherwise-refused matched/current material rows through a
+separate recipe-4, without changing recipe1–3 or their zero-match/report behavior.
+It does not imply support for active chroma or fractional opacity.
+
 ## Decision and connected outcome
 
 Approved immutable recipe: `locimyu-project-scene-migration-recipe-1`.

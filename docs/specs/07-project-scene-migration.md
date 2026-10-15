@@ -440,6 +440,10 @@ connected edit/file/reopen acceptance. Its vectors and source mapping have been
 independently reviewed; PO ratified the exact recipe/subset on 2026-10-15 under
 05 §9.2. Implementation and executed evidence are recorded in todo, without
 claiming aggregate conversion, profile/storage/device or ordinary-entry acceptance.
+The separately ratified [07h material companion](07h-locimyu-material-proposal.md)
+adds recipe-4 for exact matched/current opaque/disabled-chroma Scene shading and
+sidedness. It uses existing GLB material-index slots, retains latent chroma values
+only in original ZIP/report and keeps old recipes, profiles and recovery fences.
 Broader formats/materials, ordinary entry and all adoption gates remain required.
 
 ### 5.6 JPEG companion — approved additive profiles and recipes

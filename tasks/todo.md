@@ -37,6 +37,8 @@ The named last-Project resume and guarded Project/file switching connection now
 uses only UI advisory run/mode, with explicit URL priority and actual-open checks.
 Fresh HEIF selection now explains separate local JPEG export and permits explicit
 unapplied-media cancellation; site storage estimates preserve pending save retry.
+LociMyu Scene shading/sidedness now survives conversion and selected-generation
+restore under recipe-4; disabled chroma settings remain source/report only.
 Ordinary entry, broader profiles/converters, browser performance, physical-iPhone
 and offline acceptance remain open. Full details and earlier failures are in the
 [September checkpoint record](../docs/history/development-through-2026-09-21/tasks/todo.md).
@@ -116,14 +118,15 @@ destructive boundary. Ordinary entry and temporary iPhone HTTPS need their exist
 exact-build/route approvals. Main, Pages, Service Worker, version/license, release,
 dependency changes and private/public fixture distribution are outside this unit.
 
-### Current decision — LociMyu Scene material conversion
+### Completed implementation — LociMyu Scene material conversion
 
 The next connected gap is source-authoritative Scene shading/sidedness → conversion
 → edit/file/selected-generation restore/edit/cold, within one static GLB. The exact
-[07h proposal](../docs/specs/07h-locimyu-material-proposal.md) is PROPOSED, unratified
-and not implemented. Existing 04 exact-name fan-out stays normative; the new
-Scene/slot mapping, recipe-4/IDs and disabled-chroma source-only limit require one
-PO decision. Disabled color/threshold/feather would remain in original ZIP plus
+[07h companion](../docs/specs/07h-locimyu-material-proposal.md) was explicitly
+ratified by PO 2026-10-16. Implementation starts from clean g0 d1aac0f.
+Existing 04 exact-name fan-out stays normative; the new Scene/slot mapping,
+recipe-4/IDs and disabled-chroma source-only limit are authorized. Disabled
+color/threshold/feather remain in original ZIP plus
 item-named private report instead of target editing values. Do not borrow Native
 numeric formulas or make unavailable producer/real-input parity claims.
 
@@ -132,13 +135,53 @@ numeric formulas or make unavailable producer/real-input parity claims.
 - [x] Root and independent read-only reviews have no remaining P1/P2; all five ID
   vectors agree between Node and independent Python calculations. Pre-create/
   blocked report phase and new4-only duplicate-material-table wording are closed.
-- [ ] Obtain ratification of this exact companion before source implementation;
-  then record the short implementation/check/stop plan. Old1–3 jobs/zero-match/
-  reports/ready timing, actual GLB profiles and warm retry remain fixed.
+- [x] Record exact PO ratification and this short plan before source changes.
+- [x] Extend the existing source/map/receipt/origin ports with matched-current
+  new4 selection, bounded subset/fan-out, ovr+evt keys and exact private witness.
+- [x] Connect intended-count/latent-value preview and report phases; reuse one
+  edit/file/actual selected-generation restore/edit/cold workflow and service faults.
+- [x] Pass focused checks, independent meaningful-final-diff review, freeze and
+  one final serial checkpoint/HTTP identity, then audit and normally push g0.
 
-This documentation checkpoint adds no runtime evidence, capability or adoption
-credit. Active chroma/fractional opacity and broader material/rendering semantics
-remain excluded, as do ordinary activation, dependencies, release and browser retry.
+Ports: existing lociMyuSource/Mapping/Conversion, closed creation origin and
+conditional validation preview; reuse typed Session/material/content/file/generation
+services. Old1–3 jobs/zero-match/reports/ready timing, actual GLB profiles/local
+pins and warm retry remain fixed. No new module/import boundary is planned.
+No active chroma/fractional opacity, math/renderer, producer claim, dependency,
+ordinary activation, release or browser-denial retry. Stop affected work only for
+an actual new authority/contract conflict or managed boundary. Node/injected/HTTP
+checks do not provide browser/device/offline or real-source acceptance.
+
+Focused evidence: the early selector/golden/old-refusal group passes 18 cases;
+the final related group passes 27 (29.56s, 25.40s test time), including all five
+MIME/profile variants, full/short collisions, preview/cancel, two-Scene material
+editing, four distinct Scene/slot mappings despite repeated geometry, source
+clones, independent Workspace/rekeyed review, actual selected-generation restore/
+same-host edit/cold, and warm retry without private ZIP reads. Typecheck passes.
+The dedicated fan-out refusal passes (1.16s test time). Its initial fixture hit
+the existing test's 100KB XLSX preflight instead; the diagnostic identified that
+mask, and using the existing host's 4MB XML/100k-item input budgets independently
+exercises the unchanged 100k metadata fan-out guard. No runtime/outer budget changed.
+Review confirms the corrected source row/field/reason and its blocked-preview
+projection, alongside empty pre-create witnesses without placeholder IDs.
+The final six source/test paths passed the serial checkpoint: typecheck,
+116 files / 2606 passed with 21 existing todo (689.84s), and normal, harness and
+validation builds. Root and both independent review lanes have no remaining
+P1/P2. The seven validation HTTP files exactly match their built bytes; manifest
+SHA-256 is `29e4ed648510795ea16445c5cde4691cc535c1ef8831ea64c1627baa035cf9a7`.
+Local evidence: `.artifacts/traces/loci-material-checkpoint-2026-10-16.log`,
+`loci-material-tested-tree-2026-10-16.json` and `loci-material-http-2026-10-16.json`
+in the same traces directory. Source/index identity and outgoing review precede
+the normal g0 checkpoint; Git owns its publication identity. This is Node,
+injected-decoder, recorded-DOM and HTTP evidence, with real-source/browser/device/
+offline/adoption gates still open.
+
+Short milestone audit: the next accepted visible gap is one content-inspected
+file-opening intent for raw models/photos and packages in the same nondefault
+route. Preserve all supported GLB cardinality/order and media selection; do not
+invent the unresolved frozen-v1 material matching or orthographic numeric policy.
+Record that next unit's ports/acceptance before implementation after this safe
+checkpoint. Ordinary entry and browser/device/adoption gates remain separate.
 
 ### Completed implementation — recover photo input and save work
 

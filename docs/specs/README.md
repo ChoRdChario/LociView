@@ -47,12 +47,12 @@ The words **MUST**, **MUST NOT**, **SHOULD**, and **MAY** are normative. A metri
 | [`07e-webp-gif-project-scene-proposal.md`](07e-webp-gif-project-scene-proposal.md) | WebP/GIF photos, four additive recipes and existing raw-image display approved 2026-10-15; bounded implementation/evidence in todo, not adopted |
 | [`07f-frozen-v1-default-view-proposal.md`](07f-frozen-v1-default-view-proposal.md) | Frozen-v1 explicit starting View through one additive recipe-4 approved 2026-10-16; old recipes/profiles remain fixed; bounded implementation/evidence in todo, not adopted |
 | [`07g-frozen-v1-placement-proposal.md`](07g-frozen-v1-placement-proposal.md) | Nonidentity frozen-v1 placement and explicit saved-offset compatibility through recipe-5 approved 2026-10-16; old recipes/profiles and orthographic/inline-camera/material exclusions remain; implementation/evidence in todo, not adopted |
+| [`07h-locimyu-material-proposal.md`](07h-locimyu-material-proposal.md) | Exact single-GLB Scene shading/sidedness and recipe-4/slot identity approved 2026-10-16, including disabled-chroma source-only limit; bounded implementation/evidence in todo, not adopted |
 
 ### Proposed companions — not covered by the approval above
 
 | Document | Status / purpose |
 |---|---|
-| [`07h-locimyu-material-proposal.md`](07h-locimyu-material-proposal.md) | `PROPOSED / UNRATIFIED / NOT IMPLEMENTED`; single-GLB opaque/disabled-chroma Scene shading/sidedness, new recipe-4/slot identity and explicit latent-chroma source-only limit; old1–3 remain fixed |
 | [`06-project-package-wire.md`](06-project-package-wire.md) | `PROPOSED / UNRATIFIED / NOT IMPLEMENTED`; five-purpose wire design under 05 §7.5, with explicit unresolved journal/base, budget and history-free-builder inputs; no format/version or production authorization |
 
 ## Fixed versus conditional decisions

@@ -1,6 +1,6 @@
 # LociMyu Scene material conversion companion
 
-Status: **PROPOSED — not ratified, not implemented or adopted.**
+Status: **APPROVED — exact companion ratified by PO 2026-10-16; bounded implementation verified in the nondefault validation route, not adopted.**
 This is an additive target/identity companion to [07c](07c-locimyu-project-scene-conversion-proposal.md),
 using the already accepted source ABI in [04 §4.1](04-locimyu-conversion.md#41-sheet-relationships).
 It does not reopen that source authority or claim original-producer/real-input
@@ -8,12 +8,12 @@ parity from synthetic receiver tests. [Todo](../../tasks/todo.md) owns active wo
 
 ## Decision and connected outcome
 
-Proposed immutable recipe: `locimyu-project-scene-migration-recipe-4`.
+Approved immutable recipe: `locimyu-project-scene-migration-recipe-4`.
 One selected LociMyu workbook plus its one static GLB → inspect the material
 consequence → convert the source Scene's shading/sidedness → edit → named backup/
 Workspace/review → actual selected-generation restore/edit/cold reopen.
 
-Ratification would approve the new Scene/slot mapping and identity domain below,
+PO ratification approves the new Scene/slot mapping and identity domain below,
 with this explicit limit: only opacity exactly 1 and disabled chroma are admitted.
 Disabled chroma color/tolerance/feather stay in the original ZIP and item-named
 private report; they do not become editable target chroma values. Switching color
@@ -220,7 +220,8 @@ Workspace/review and selected-generation restore → same-host edit → cold reo
 Normal outputs exclude private evidence. Node/injected renderer tests do not
 prove GPU pixels, original producer parity, real inputs, physical iPhone or offline.
 
-Stop affected implementation until this exact target/identity/subset is ratified.
+Proceed within this exact ratified target/identity/subset. Stop affected work for
+a genuine new source/target contract or authority conflict, not routine fixes.
 Later opacity/chroma, arbitrary source material semantics, multiple models,
 per-occurrence differences, ordinary activation/adoption/release remain excluded.
 Do not normalize latent numbers, add a math framework or silently reinterpret an

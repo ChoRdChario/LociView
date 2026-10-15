@@ -69,6 +69,10 @@ and explicit report export. Workspace UI exposes coarse workbook choice and the
 approved complete relation confirmation; ordinary package outputs exclude that
 private evidence. Exact subset, executed checks and pending gates belong to todo
 and inventory.
+The approved 07h material recipe expands exact source names to distinct selected
+GLB material indices, using the existing catalog and Scene-local overrides.
+The same source/map/receipt path keeps the private witness/report phases and
+disabled-chroma source-only values; no occurrence profile or renderer is added.
 
 The approved JPEG companion adds `projectFiles/jpeg.ts` for bounded photo/texture
 admission, two exact GLB profiles and four new converter domains. Existing typed

@@ -6,7 +6,7 @@ import { analyzeLociMyuSheets, isLociMyuCaptionSheet, lociMyuTrimV1 as trim, pro
   planLociMyuDisplaySetRelationConfirmation, LociMyuIdentityCollisionError, LociMyuSourceValidationError,
   type SheetTable, type LociMyuCaption, type LociMyuCaptionSheetIdentity } from '../io/locimyu';
 import { scalarLength, type JsonObject, type JsonValue } from '../domain/values';
-import { digest } from '../projectMetadata/persistence';
+import { digest, json } from '../projectMetadata/persistence';
 import type { StoredBlobRef } from '../projectMetadata/blobStore';
 import { readValidationBody } from './content';
 import { inspectFreshValidationGlb, validationGlbParts, type ValidatedGlb } from './glb';
@@ -17,13 +17,16 @@ import { checkFileLimits, validationMetadataLimits, type FileValidationLimits } 
 export const lociMyuRecipe = 'locimyu-project-scene-migration-recipe-1';
 export const lociMyuJpegRecipe = 'locimyu-project-scene-migration-recipe-2';
 export const lociMyuPhotoRecipe = 'locimyu-project-scene-migration-recipe-3';
-export type LociMyuRecipe = typeof lociMyuPhotoRecipe | typeof lociMyuRecipe | typeof lociMyuJpegRecipe;
+export const lociMyuMaterialRecipe = 'locimyu-project-scene-migration-recipe-4';
+export type LociMyuRecipe = typeof lociMyuMaterialRecipe | typeof lociMyuPhotoRecipe | typeof lociMyuRecipe | typeof lociMyuJpegRecipe;
 export const lociMyuByteProof = async (bytes: Uint8Array) => ({ byteLength: bytes.length, digest: await digest(bytes) });
 export interface LociMyuIssue { severity: 'info' | 'warning' | 'blocking'; sheet: string | null; row: number | null; sourceId: string | null;
   field: string; reason: string; impact: string; candidates: string[] }
 export interface LociMyuBody { path: string; label: string; bytes: Uint8Array; ref: StoredBlobRef }
 export interface LociMyuScene { name: string; identity: LociMyuCaptionSheetIdentity; captions: { value: LociMyuCaption; row: number; imagePath?: string }[] }
 export interface LociMyuView { row: number; scene: string; name: string; camera: JsonObject; background: number[] }
+export interface LociMyuMaterial { row: number; scene: string; identity: LociMyuCaptionSheetIdentity; key: string; indices: number[];
+  doubleSided: boolean; unlit: boolean; sourceOnlyChroma: boolean }
 export interface LociMyuSourcePlan {
   recipe: LociMyuRecipe;
   workbook: { path: string; byteLength: number; digest: string }; confirmation: readonly { sheetGid: string; sheetName: string }[] | null;
@@ -31,6 +34,7 @@ export interface LociMyuSourcePlan {
   fingerprints: { path: string; role: string; byteLength: number; digest: string }[];
   inventory: { count: number; byteLength: number; digest: string }; issues: LociMyuIssue[];
   sourceEvidence: JsonObject;
+  materialRows?: LociMyuMaterial[];
   accounting: { tables: number; rows: number; entries: number; sourceOnlyEntries: number; missingIds: number };
 }
 /** Private legacy evidence permits exact scalar sequences; target record admission remains NFC. */
@@ -147,7 +151,7 @@ export async function openLociMyuSource(input: Blob, limits: FileValidationLimit
 
 export async function planLociMyuSource(opened: OpenedLociMyuSource, selection: number, title: string, confirmRelations: boolean): Promise<{
   relation: ReturnType<typeof planLociMyuDisplaySetRelationConfirmation>;
-  base: Pick<LociMyuSourcePlan, 'workbook' | 'confirmation' | 'title' | 'inventory' | 'fingerprints' | 'issues' | 'accounting' | 'sourceEvidence'>;
+  base: Pick<LociMyuSourcePlan, 'workbook' | 'confirmation' | 'title' | 'inventory' | 'fingerprints' | 'issues' | 'accounting' | 'sourceEvidence'> & { materialSelected?: true };
   plan: LociMyuSourcePlan | null;
 }> {
   const { imported, entries, limits, decode, jpeg, photo } = opened, source = imported.sources[selection];
@@ -166,7 +170,7 @@ export async function planLociMyuSource(opened: OpenedLociMyuSource, selection: 
     diagnostics: s.validationFailure ?? null, admittedCaptions: s.captionCount, tables: s.tables.map(t => ({ name: t.name, headers: t.rows[0] ?? [], rows: t.rows.length })) }))),
     diagnostics: { selectedWorkbook: source.archivePath, candidateFailures: imported.sources.filter(s => s.validationFailure).map(s => ({ path: s.archivePath, failure: s.validationFailure! })) },
     rawAnalyzerDiagnostics: opened.rawAnalyzerDiagnostics, fileIdMapRows: imported.fileIdMapRows ?? [] }) as JsonObject;
-  const base: Pick<LociMyuSourcePlan, 'workbook' | 'confirmation' | 'title' | 'inventory' | 'fingerprints' | 'issues' | 'accounting' | 'sourceEvidence'> = { workbook, confirmation: null, title, inventory, fingerprints, issues, accounting, sourceEvidence };
+  const base: Pick<LociMyuSourcePlan, 'workbook' | 'confirmation' | 'title' | 'inventory' | 'fingerprints' | 'issues' | 'accounting' | 'sourceEvidence'> & { materialSelected?: true } = { workbook, confirmation: null, title, inventory, fingerprints, issues, accounting, sourceEvidence };
   try {
     if (opened.preflightFailures.has(source.archivePath)) refuse(opened.preflightFailures.get(source.archivePath)!);
     if (source.validationFailure && source.validationFailure.code !== 'missing-legacy-id') {
@@ -193,12 +197,15 @@ export async function planLociMyuSource(opened: OpenedLociMyuSource, selection: 
     const model = { path: candidate.path, label: candidate.path.split('/').at(-1)!, bytes: candidate.data, model: inspected,
       ref: { algorithm: 'sha256', ...await lociMyuByteProof(candidate.data), mediaType: 'model/gltf-binary' } as StoredBlobRef };
     const rawGlb = validationGlbParts(candidate.data, limits).json, rawMaterials = rawGlb.materials as { name?: string }[] | undefined;
-    const materialNames = new Set<string>();
+    const materialNames = new Set<string>(), materialIndices = new Map<string, Set<number>>();
     for (const surface of inspected.surfaceRanges) {
       const node = (rawGlb.nodes as { mesh?: number }[])[surface.nodeIndex as number]!, mesh = (rawGlb.meshes as { primitives: { material?: number }[] }[])[node.mesh!]!;
       const index = mesh.primitives[surface.primitiveIndex as number]!.material, name = index === undefined ? undefined : rawMaterials?.[index]?.name;
-      if (typeof name === 'string') materialNames.add(trim(name));
+      if (typeof name === 'string') { const key = trim(name); materialNames.add(key);
+        const values = materialIndices.get(key) ?? new Set<number>(); values.add(index!); materialIndices.set(key, values); }
     }
+    const materialSlots = new Map(inspected.materials.filter(m => (m.sourceLocator as JsonObject).kind === 'gltfMaterial').map(m => [(m.sourceLocator as JsonObject).materialIndex, m]));
+    const materialTableCount = tables.filter(t => trim(t.name) === '__LM_MATERIALS').length;
     const namesById = new Map<string, Set<string>>(), idsByName = new Map<string, Set<string>>(), taintedIds = new Set<string>(), taintedNames = new Set<string>();
     for (const r of imported.fileIdMapRows ?? []) {
       const id = trim(r.fileId), name = trim(r.fileName);
@@ -237,7 +244,7 @@ export async function planLociMyuSource(opened: OpenedLociMyuSource, selection: 
       }
       scenes.push(scene);
     }
-    const views: LociMyuView[] = [];
+    const views: LociMyuView[] = [], materialRows: LociMyuMaterial[] = []; let materialWork = 0;
     for (const table of tables) {
       const name = trim(table.name);
       const sourceOnlyColumns = identities.has(table) ? new Set([8, 9]) : name === '__LM_VIEWS' ? new Set([15, 16]) : name === '__LM_MATERIALS' ? new Set([8, 9, 10, 11, 12]) : null;
@@ -273,7 +280,27 @@ export async function planLociMyuSource(opened: OpenedLociMyuSource, selection: 
           const number = (c: number, fallback: number) => cell(r, c) === '' ? fallback : finite(cell(r, c));
           const opacity = number(1, 1), tolerance = number(6, 0), feather = number(7, 0);
           const valid = [opacity, tolerance, feather].every(v => v !== null && v >= 0 && v <= 1) && [2, 3, 4].every(c => bool(cell(r, c))) && (!cell(r, 5) || hex(cell(r, 5)));
-          if (key && activation.has(gid) && materialNames.has(key) && current && valid) refuse('有効な材質調整を含むため、この最初の対応範囲では変換できません。');
+          if (key && activation.has(gid) && materialNames.has(key) && current && valid) {
+            base.materialSelected = true;
+            const materialRefuse = (field: string, reason: string, candidates: string[] = []): never => { issue('blocking', name, i + 1, key, field, reason, 'プロジェクトは作成していません。', candidates); return refuse(reason); };
+            if (materialTableCount !== 1) materialRefuse('material table', '材質表が重複しているため対応を確定できません。');
+            const truth = (c: number) => ['true', '1', 'yes', 'on'].includes(cell(r, c).toLowerCase());
+            if (opacity !== 1) materialRefuse('opacity', 'この材質の不透明度はまだ変換できません。');
+            if (truth(4)) materialRefuse('chromaEnable', 'この材質の色の透過設定はまだ変換できません。');
+            const targets = materialIndices.get(key)!;
+            materialWork += targets.size;
+            if (materialWork > validationMetadataLimits.maxWork || materialWork > validationMetadataLimits.maxNodes) materialRefuse('material targets', '材質の対応件数が上限を超えています。');
+            const indices = [...targets].sort((a, b) => a - b);
+            for (const index of indices) {
+              const slot = materialSlots.get(index);
+              if (!slot || json(slot.sourceSemantics) !== json({ coverage: { kind: 'opaque' }, optics: 'surface', lighting: 'lit', doubleSided: false }))
+                materialRefuse('sourceSemantics', `材質 ${index + 1} の元の見え方はまだ変換できません。`, [`gltfMaterial:${index}`]);
+            }
+            const scene = scenes.find(s => s.name === activation.get(gid))!;
+            materialRows.push({ row: i + 1, scene: scene.name, identity: scene.identity, key, indices, doubleSided: truth(2), unlit: truth(3), sourceOnlyChroma: [5, 6, 7].some(c => !!cell(r, c)) });
+            for (const c of [5, 6, 7]) if (cell(r, c)) issue('info', name, i + 1, key, cell(table.rows[0] ?? [], c) || `column${c + 1}`, '色の透過が無効なときの編集値は変換先へ写さず、元のZIPと説明ファイルに保持します。');
+            continue;
+          }
           issue('warning', name, i + 1, key || null, 'material', '未解決・無効または過去の材質行は有効にしません。');
         }
       }
@@ -292,7 +319,9 @@ export async function planLociMyuSource(opened: OpenedLociMyuSource, selection: 
       if (role === 'unselected-workbook' || role === 'unlinked-media') { accounting.sourceOnlyEntries++; issue('info', entry.path, null, null, 'entry', 'この項目は元ファイルだけに保持します。'); }
       fingerprints.push({ path: entry.path, role, ...await lociMyuByteProof(entry.data) });
     }
-    const plan: LociMyuSourcePlan = { ...base, recipe: [...images.values()].some(m => m.ref.mediaType === 'image/webp' || m.ref.mediaType === 'image/gif') ? lociMyuPhotoRecipe : model.model.jpeg || [...images.values()].some(m => m.ref.mediaType === 'image/jpeg') ? lociMyuJpegRecipe : lociMyuRecipe, model, media: [...images.values()], scenes, views };
+    const plan: LociMyuSourcePlan = { ...base, recipe: base.materialSelected ? lociMyuMaterialRecipe : [...images.values()].some(m => m.ref.mediaType === 'image/webp' || m.ref.mediaType === 'image/gif') ? lociMyuPhotoRecipe : model.model.jpeg || [...images.values()].some(m => m.ref.mediaType === 'image/jpeg') ? lociMyuJpegRecipe : lociMyuRecipe, model, media: [...images.values()], scenes, views,
+      ...(base.materialSelected ? { materialRows } : {}) };
+    if (base.materialSelected) lociMyuEvidence(materialRows);
     lociMyuEvidence({ ...base, scenes: scenes.map(s => ({ name: s.name, identity: s.identity, captions: s.captions.map(c => ({ row: c.row, id: c.value.captionId })) })) });
     return { relation, base, plan };
   } catch (error) {
