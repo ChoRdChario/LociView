@@ -106,7 +106,23 @@ destructive boundary. Ordinary entry and temporary iPhone HTTPS need their exist
 exact-build/route approvals. Main, Pages, Service Worker, version/license, release,
 dependency changes and private/public fixture distribution are outside this unit.
 
-### Current implementation — JPEG photos/textures/edit/file/reopen
+### Next proposed unit — WebP/GIF photos/edit/file/reopen
+
+The [07e companion](../docs/specs/07e-webp-gif-project-scene-proposal.md) is independently
+reviewed, PROPOSED and not implemented. The concrete PO decision is four additive
+immutable recipes for admitted WebP/GIF photos, retaining existing raw-image
+display and original metadata. Do not implement before ratification.
+
+Proposed outcome: direct addition or Native/v1/LociMyu conversion → Caption/image
+editing and viewing → named backup/Workspace/review → restore/edit/cold reopen.
+Acceptance includes complete bounded container inspection, temporary decode/close,
+exact source/identity/origin and loss/retry fences, then independent review and the
+final serial checkpoint. Existing PNG/JPEG APIs, recipes and four GLB profiles stay
+fixed. GLB WebP/GIF, animation controls or playback guarantees, ordinary entry,
+dependencies and adoption/release are excluded. Stop affected work for a real new
+contract, authority or scope conflict; browser/device evidence remains separate.
+
+### Completed implementation — JPEG photos/textures/edit/file/reopen
 
 Outcome: the PO-ratified [07d companion](../docs/specs/07d-jpeg-project-scene-proposal.md)
 connects JPEG photos and embedded model textures through direct creation/addition,
@@ -121,7 +137,7 @@ independent review and cold recovery in the existing nondefault route.
   inherited keys, new-only collision/evidence rules and independent origin recovery.
 - [x] Verify direct and converted connected file/recovery flows, old dispatch and
   acknowledged-loss fences; obtain independent parser/compatibility/UI reviews.
-- [ ] Freeze the final source/test tree, run the final serial checkpoint and HTTP
+- [x] Freeze the final source/test tree, run the final serial checkpoint and HTTP
   identity checks, audit outgoing scope and push a suitable g0-baseline checkpoint.
 
 Use focused installed tests during implementation and early sceneCore exact import
@@ -155,8 +171,8 @@ Milestone meta-audit: g0-baseline starts at the pushed approved-JPEG docs
 checkpoint; this unit stays on the approved direct/conversion/edit/file/recovery
 path. Runtime changes are limited to JPEG admission, exact profiles/recipes and
 their existing ports. No separate PoC, dependency, ordinary-entry or deployment
-work is included. The final source/test freeze and one serial full checkpoint
-remain the completion boundary. Browser/device/offline and real-input evidence
+work is included. The final source/test freeze and serial full checkpoint are
+complete. Browser/device/offline and real-input evidence
 remain pending, without retrying the known managed browser denial.
 
 Final serial `check:checkpoint` exited 0 on the reviewed 34-path source/test tree:
@@ -167,7 +183,8 @@ manifest SHA-256 `5caeabd9d7ef30d1bb4902f90fb8b57b9fc678f33404862d0a5e5e30836f26
 The isolated output has no SW/manifest/samples. This is HTTP identity, not browser,
 GPU/device/offline or observed-product-latency evidence. Independent final reviews
 cover the 42 selected JPEG source/test/doc paths and exclude the separate next
-proposal. Git owns the ensuing normal g0-baseline checkpoint identity.
+proposal. The normal g0-baseline checkpoint is pushed; live origin matches local
+Git identity. The separate 07e proposal has documentation-only verification.
 
 ### Completed implementation — LociMyu conversion/edit/file/reopen
 
