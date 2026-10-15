@@ -123,7 +123,30 @@ destructive boundary. Ordinary entry and temporary iPhone HTTPS need their exist
 exact-build/route approvals. Main, Pages, Service Worker, version/license, release,
 dependency changes and private/public fixture distribution are outside this unit.
 
-### Current implementation — first backup opening into an absent Project
+### Current decision — frozen-v1 exact material-address conversion
+
+Outcome: exact saved material address → Scene/base-slot shading/sidedness → edit,
+file exchange and actual selected-generation restore/edit/cold, without changing
+old recipes/profiles or inventing fallback-name/shared-material semantics. The
+[07i proposal](../docs/specs/07i-frozen-v1-material-proposal.md) is **PROPOSED,
+unratified and not implemented**. This is the next genuine compatibility/ID
+decision after the completed 06a workflow, not authority for source changes.
+
+- [x] Bound the exact producer-key and association proof using existing occurrence
+  decode helpers, keeping temporary catalogs out of the actual base profile.
+- [x] Specify raw/current checks, unique routes, disabled-chroma source-only values,
+  private witness/report phases, recipe6/IDs/recovery and one connected acceptance.
+- [x] Independent meaningful proposal reviews closed with no P1/P2. All six Node
+  vectors agree with independent Python/.NET (no runtime/browser evidence).
+- [ ] PO ratifies the exact new mapping/domain and inactive editing-value limitation.
+  Until then implement no new6/material source path. Old1–5, orthographic/inline
+  refusals and all ordinary/browser/device/offline/adoption gates stay fixed.
+
+Keep the proposal checkpoint docs-only; no new fixture/math/renderer/decoder port,
+external legacy repository, dependency, ordinary activation or release. If approved,
+record ratification and a short connected plan before the source implementation.
+
+### Completed implementation — first backup opening into an absent Project
 
 Outcome: named backup → content-inspected opening on an absent original Project
 → explicit confirmation → exact full restore → edit/file handoff → selected-
@@ -143,7 +166,7 @@ design draft remained. This approval/status/plan precedes implementation.
 - [x] Reuse service fault cases and one backup → first restore → typed edit/file
   → selected cold flow, with terminal leftovers, unknown/probe/race/ack-loss and
   old-ready contrasts. Record actual canonical P2/S2/successor vectors.
-- [ ] Focus/early sceneCore for new imports, independent meaningful final review,
+- [x] Focus/early sceneCore for new imports, independent meaningful final review,
   frozen source/tests → one serial checkpoint/builds → HTTP identity/outgoing
   audit → normal verified g0 commit/push.
 
@@ -207,11 +230,12 @@ all7 final build files exactly (status, bytes, SHA), no SW/manifest/samples, man
 `59f27e834d8a029e541d246c43c000bd5fefd81f41b6d051298dd64043378c2c`.
 Report: `.artifacts/traces/first-backup-http-2026-10-16.json`. This is HTTP identity
 only, not browser/IndexedDB/device/offline evidence. Outgoing scope18=runtime10+
-docs8, local links290/0missing, credential scan0; exact stage/Git/push remains.
-Next after this
-checkpoint: evaluate the remaining frozen-v1 material address/recipe decision as
-a concrete proposal; do not implement an unratified mapping or retry denied
-browser/device gates.
+docs8, local links290/0missing, credential scan0. Exact18 stage and runtime10 index
+OIDs matched the tested freeze, then g0 c04180a was committed and normally pushed;
+HEAD/cached/live origin agreed. Only the owned next-proposal draft remained at that
+point; clean worktree is checked after its separate docs-only checkpoint. Existing
+main-only deployment and g0 CI triggers were unchanged. The next proposal above
+does not authorize implementation or retry of denied browser/device gates.
 
 ### Completed implementation — one file-opening intent
 
