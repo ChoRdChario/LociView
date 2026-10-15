@@ -4,6 +4,9 @@ import { createCaptionListControls } from './captionListControls';
 import { captionListPlanIsCurrent, type CaptionListContext } from './captionListState';
 import { createCaptionDetailControls } from './captionDetailControls';
 import { beginCaptionDraft, captionApplyIsCurrent, hasCaptionDraft, type CaptionDraft, type DetailContext } from './captionDetailState';
+import { createCaptionWindowControls } from './captionWindowControls';
+import { captionWindowPlanIsCurrent, newCaptionWindowMemory, planCaptionWindow, type CaptionWindowMemory, type CaptionWindowPlan } from './captionWindowState';
+import { createMediaViewer } from './mediaPreview';
 import type { SceneUiMemory } from './navigationState';
 import { fieldValue, projectAttachments, projectCaptions, projectCaptionSceneCount } from './projectRead';
 import { surfaceAnchor, type ProjectWorkspacePorts, type WorkspaceFileInteraction, type WorkspacePinProposal, type WorkspaceSurface, type Point3 } from './projectWorkspacePorts';
@@ -32,10 +35,13 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   stage.className = 'lv-project-stage'; canvas.setAttribute('aria-label', '3Dモデルの表示'); canvas.tabIndex = 0;
   const viewportStatus = make('p'); viewportStatus.setAttribute('role', 'status'); viewportStatus.className = 'lv-project-viewport-status';
   const retryViewport = button('3D表示を再試行', () => viewAction(() => viewport.retry()));
-  markers.className = 'lv-project-markers'; stage.append(canvas, markers, viewportStatus, retryViewport);
+  markers.className = 'lv-project-markers'; stage.append(canvas, markers);
+  const viewportTools = make('section'); viewportTools.className = 'lv-project-viewport-tools'; viewportTools.setAttribute('aria-label', '3D表示の操作');
+  viewportTools.append(viewportStatus, retryViewport);
+  const mediaViewer = createMediaViewer(document);
   const sidebar = make('aside'); sidebar.setAttribute('aria-label', '作業パネル');
   const taskTabs = make('div'), captionPanel = make('section'); taskTabs.setAttribute('role', 'tablist'); taskTabs.setAttribute('aria-label', '作業');
-  const panels = new Map<ProjectTask, ProjectPanel>(); let task: ProjectTask = 'captions', models: ProjectModelPanel | undefined, mediaManager: ProjectPanel | undefined;
+  const panels = new Map<ProjectTask, ProjectPanel>(); let task: ProjectTask = 'captions', models: ProjectModelPanel | undefined, mediaManager: ReturnType<typeof createProjectMedia> | undefined;
   const sceneArea = make('section'), scenes = make('div'); sceneArea.setAttribute('aria-label', 'シーン'); sceneArea.append(make('h2', 'シーン'), scenes);
   const sceneForm = make('form'), sceneLabel = make('label', 'シーン名'), sceneName = make('input');
   sceneName.setAttribute('aria-label', 'シーン名'); sceneLabel.append(sceneName);
@@ -87,16 +93,18 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   let rawPosition = ['', '', ''], pending: { action: () => Promise<unknown>; complete: () => void } | null = null;
   let pickerScope: { token: string; sceneId: string; captionId: string } | null = null;
   let gesture: { pointerId: number; token: string; receipt: string; x: number; y: number; left: number; top: number; width: number; height: number } | null = null;
-  let rendering = false;
+  let rendering = false, renderAgain = false, windowMoving = false;
   let viewportFeedback = '';
   const memories = new Map<string, SceneUiMemory>();
+  const windowMemories = new Map<string, CaptionWindowMemory>();
   const conflictChoices = new Map<string, { token: string; operationId: string }>();
   const provider = () => ports.read();
   const memory = () => { if (!memories.has(sceneId)) memories.set(sceneId, emptyMemory()); return memories.get(sceneId)!; };
+  const windowMemory = () => { if (!windowMemories.has(sceneId)) windowMemories.set(sceneId, newCaptionWindowMemory(sceneId)); return windowMemories.get(sceneId)!; };
   const draftInput = () => hasCaptionDraft(draft) || !!draft?.composing || !!pin || choosing || composing || !!pickerScope || sceneName.value.trim() !== '';
   const panelInput = () => [...panels.values()].some(p => p.hasChanges());
-  const dirty = () => draftInput() || conflictChoices.size > 0 || !!pending || panelInput() || !!mediaManager?.hasChanges() || viewport.read().dragging;
-  const mutationBlock = () => busy ? '変更を適用しています。' : ports.status().kind === 'failed' ? ports.status().error || '更新を再試行してください。' :
+  const dirty = () => draftInput() || conflictChoices.size > 0 || !!pending || panelInput() || !!mediaManager?.hasChanges() || windowMoving || viewport.read().dragging;
+  const mutationBlock = () => windowMoving ? 'ウィンドウの操作を完了してください。' : busy ? '変更を適用しています。' : ports.status().kind === 'failed' ? ports.status().error || '更新を再試行してください。' :
     ports.readOnly ? '閲覧中です。編集を開始してください。' : ports.otherPending() ? 'ファイルの操作を完了してください。' : pending ? '再試行するか、入力を修正してください。' : null;
   const listContext = (): CaptionListContext => ({ source: { kind: 'ready', token: provider().token, sceneId,
     captions: projectCaptions(provider(), sceneId) }, memory: memory(), pending: dirty() ? 'text' : busy ? 'update' : null, mutationBlock: mutationBlock() });
@@ -107,16 +115,22 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       draft, mutationBlock: mutationBlock() || (pin || choosing || pickerScope || conflictChoices.size || panelInput() || mediaManager?.hasChanges() ? '現在の操作を完了してください。' : null), feedback: { kind: 'idle' } };
   };
   const list = createCaptionListControls(document, plan => {
-    if (disposed || busy || pending || ports.otherPending()) return;
+    if (disposed || busy || pending || windowMoving || ports.otherPending()) return;
     if (plan.kind === 'blocked') { feedback = plan.reason; render(); return; }
     if (!captionListPlanIsCurrent(plan, listContext())) return;
-    if (plan.kind === 'change') { memories.set(sceneId, plan.memory); if (plan.intent === 'select') resetDraft(); }
+    if (plan.kind === 'change') { memories.set(sceneId, plan.memory); if (plan.intent === 'select') { resetDraft(); openWindow(memory().selectedCaptionId!); } }
+    if (plan.kind === 'unchanged' && plan.explicitSelection) openWindow(plan.explicitSelection.captionId);
     if (plan.kind === 'effect' && plan.action === 'review') {
       selectCaption(plan.captionId); feedback = '記録の競合・配置先・メディアの状態を確認してください。';
     }
     render();
   }, active => { composing = active; render(); });
   const detail = createCaptionDetailControls(document, event => {
+    if (event.kind === 'window') {
+      if (!disposed && !busy && !pending && !windowMoving && !ports.otherPending() && event.token === provider().token &&
+        event.sceneId === sceneId && event.captionId === memory().selectedCaptionId) { openWindow(event.captionId); render(); }
+      return;
+    }
     if (disposed || mutationBlock() || panelInput() || mediaManager?.hasChanges()) return;
     if (event.kind === 'draft' && event.baseDraft === draft) draft = event.draft;
     else if (event.kind === 'cancel' && event.draft === draft) resetDraft();
@@ -128,13 +142,14 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     } else if (event.kind === 'review') feedback = '下の競合欄で残す内容を選択してください。';
     render();
   });
-  captionPanel.append(list.root, pinArea, detail.root, conflicts, media); sidebar.append(sceneArea, taskTabs, captionPanel); body.append(stage, sidebar); root.append(header, body);
+  captionPanel.append(list.root, pinArea, detail.root, conflicts, media); sidebar.append(sceneArea, taskTabs, captionPanel); body.append(stage, sidebar); root.append(header, viewportTools, body, mediaViewer.root);
   let mounted = false;
   const viewport = ports.createViewport(canvas, () => { if (mounted && !rendering) render(); }, (target, position) => {
     if (!pin || mutationBlock() || !sameTarget(target, pin.target) || !position.every(Number.isFinite)) return false;
     setPin({ ...pin, position }); render(); return true;
   }, proposal => models?.propose(proposal) ?? false);
   function panelBlock(owner: ProjectTask, writes = true, allowDrag = false): string | null {
+    if (windowMoving) return 'ウィンドウの操作を完了してください。';
     const global = writes ? mutationBlock() : busy || pending || ports.status().kind !== 'idle' ? '現在の更新を完了してください。' : ports.otherPending() ? 'ファイルの操作を完了してください。' : null;
     if (global) return global;
     if (owner !== 'captions' && mediaManager?.hasChanges()) return 'メディアの入力・操作を完了してください。';
@@ -152,12 +167,29 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     },
     dispatch(owner, token, command, complete) { this.execute(owner, token, () => ports.dispatch(token, command), complete); },
   };
-  mediaManager = createProjectMedia(document, panelHost, () => memory().selectedCaptionId); media.append(mediaManager.root);
+  mediaManager = createProjectMedia(document, panelHost, () => memory().selectedCaptionId, mediaViewer); media.append(mediaManager.root);
+  const windowBlock = () => busy || pending || ports.otherPending() ? '現在の更新・ファイル操作を完了してください。' :
+    draftInput() || conflictChoices.size || panelInput() || mediaManager?.hasChanges() || viewport.read().dragging ? '入力・操作を確定するか、取り消してください。' : null;
+  function acceptWindow(plan: CaptionWindowPlan): boolean {
+    if (disposed || busy || pending || ports.otherPending() || plan.kind === 'blocked' ||
+      !captionWindowPlanIsCurrent(plan, listContext().source, windowMemory(), memory().selectedCaptionId)) return false;
+    if (plan.memory.placements !== windowMemory().placements && windowBlock()) return false;
+    windowMemories.set(sceneId, plan.memory); render(); return true;
+  }
+  function openWindow(captionId: string) {
+    const plan = planCaptionWindow(listContext().source, windowMemory(), memory().selectedCaptionId, { kind: 'open', captionId });
+    if (plan.kind !== 'change') return false;
+    windowMemories.set(sceneId, plan.memory); return true;
+  }
+  const windows = createCaptionWindowControls(document, acceptWindow, active => {
+    windowMoving = active; if (rendering) renderAgain = true; else render();
+  }, captionId => mediaManager!.gallery(captionId));
+  stage.append(windows.root); captionPanel.append(windows.tools);
   models = createProjectModels(document, panelHost); panels.set('models', models);
   panels.set('views', createProjectViews(document, panelHost)); panels.set('materials', createProjectMaterials(document, panelHost));
   const tabButtons = new Map<ProjectTask, HTMLButtonElement>();
   for (const [key, label] of [['captions', 'キャプション'], ['models', 'モデル'], ['views', '保存した視点'], ['materials', '材質']] as const) {
-    const tab = button(label, () => { if (!busy && !pending && !ports.otherPending() && !composing && !draft?.composing && !mediaManager?.composing() && ![...panels.values()].some(p => p.composing())) { task = key; render(); } });
+    const tab = button(label, () => { if (!busy && !pending && !windowMoving && !ports.otherPending() && !composing && !draft?.composing && !mediaManager?.composing() && ![...panels.values()].some(p => p.composing())) { task = key; render(); } });
     tab.setAttribute('role', 'tab'); tab.setAttribute('aria-controls', `lv-project-${key}`); tab.id = `lv-project-tab-${key}`; tabButtons.set(key, tab); taskTabs.append(tab);
     tab.addEventListener('keydown', event => {
       if (tab.disabled || !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
@@ -179,7 +211,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     return true;
   }
   function resetDraft() { draft = null; draft = beginCaptionDraft(detailContext().source); }
-  function selectCaption(captionId: string) { memories.set(sceneId, { ...memory(), selectedCaptionId: captionId }); resetDraft(); }
+  function selectCaption(captionId: string) { memories.set(sceneId, { ...memory(), selectedCaptionId: captionId }); resetDraft(); openWindow(captionId); }
   function setPin(next: WorkspacePinProposal) { pin = next; choosing = false; rawPosition = next.position.map(String); }
   function positionValid() { return rawPosition.every(v => v.trim() !== '' && Number.isFinite(Number(v))); }
   async function perform(action: () => Promise<unknown>, complete: () => void) {
@@ -247,9 +279,11 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     setPin({ ...hit, captionId: placingCaption }); render();
   });
   const cameraTools = make('div'); cameraTools.className = 'lv-project-camera';
-  for (const [action, label] of [['fit', '全体表示'], ['front', '正面'], ['top', '上面']] as const)
-    cameraTools.append(button(label, () => viewAction(() => viewport.camera(action)))); stage.append(cameraTools);
+  const cameraButtons = ([['fit', '全体表示'], ['front', '正面'], ['top', '上面']] as const).map(([action, label]) => button(label, () => viewAction(() => viewport.camera(action))));
+  cameraTools.append(...cameraButtons); viewportTools.insertBefore(cameraTools, viewportStatus);
+  const viewBlocked = () => busy || !!pending || windowMoving || ports.otherPending() || composing || !!draft?.composing || !!mediaManager?.composing() || [...panels.values()].some(p => p.composing());
   function viewAction(action: () => void) {
+    if (viewBlocked()) return;
     try { action(); viewportFeedback = ''; }
     catch (error) { viewportFeedback = error instanceof Error ? error.message : '3D表示を確認してください。'; }
     render();
@@ -268,7 +302,8 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
         choice.disabled = busy || dirty() || ports.otherPending(); choice.setAttribute('aria-pressed', String(scene.id === sceneId)); scenes.append(choice);
       }
       if (!draft) draft = beginCaptionDraft(detailContext().source);
-      list.render(listContext()); detail.render({ ...detailContext(), windowBlock: '追加の表示操作は既存の編集画面で利用できます。' });
+      list.render(listContext()); detail.render({ ...detailContext(), windowBlock: busy || pending || windowMoving || ports.otherPending() ? '現在の操作を完了してください。' : null });
+      windows.render({ source: listContext().source, memory: windowMemory(), selectedId: selected, moveBlock: windowBlock() });
       addPin.disabled = !!blocked || dirty() || !sceneId;
       movePin.disabled = !!blocked || dirty() || !selected;
       movePin.textContent = selected && fieldValue(p.resources.captions[selected]?.anchor)?.kind === 'unplaced' ? 'ピンを配置' : '位置を調整';
@@ -307,25 +342,29 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       body.setAttribute('aria-busy', String(busy)); body.inert = busy;
       const resolved = sceneId ? resolveScene(p.state, p.resources, sceneId) : null;
       viewport.update({ token: p.token, sceneId, selectedId: selected, pin, choosing,
-        pinColors: memory().pinColors, hiddenAssetIds: models!.hidden(), model: models!.proposal(), available: resolved?.kind === 'ready', readOnly: !!blocked || resolved?.kind !== 'ready' });
+        pinColors: memory().pinColors, hiddenAssetIds: models!.hidden(), model: models!.proposal(), windowMoving,
+        available: resolved?.kind === 'ready', readOnly: !!blocked || resolved?.kind !== 'ready' });
       for (const [key, tab] of tabButtons) { tab.setAttribute('aria-selected', String(task === key)); tab.tabIndex = task === key ? 0 : -1;
-        tab.disabled = busy || !!pending || ports.otherPending() || composing || !!draft?.composing || !!mediaManager?.composing() || [...panels.values()].some(p => p.composing()); }
+        tab.disabled = busy || !!pending || windowMoving || ports.otherPending() || composing || !!draft?.composing || !!mediaManager?.composing() || [...panels.values()].some(p => p.composing()); }
       captionPanel.hidden = task !== 'captions'; for (const [key, panel] of panels) { panel.root.hidden = key !== task; if (key === task) panel.render(); }
       const seen = viewport.read();
+      const extent = canvas.getBoundingClientRect?.() ?? { width: 0, height: 0 };
+      windows.project({ ready: seen.ready, sourceToken: seen.token, sceneId: seen.sceneId, width: extent.width, height: extent.height, pins: seen.pins });
       viewportStatus.textContent = [viewportFeedback, seen.issue, seen.notice, resolved?.kind !== 'ready' && 'シーンを選択し、表示状態を確認してください。'].filter(Boolean).join(' ');
-      retryViewport.hidden = !seen.issue && !viewportFeedback; retryViewport.disabled = busy || ports.otherPending();
+      viewportStatus.hidden = !viewportStatus.textContent;
+      retryViewport.hidden = !seen.issue && !viewportFeedback; retryViewport.disabled = viewBlocked(); cameraButtons.forEach(b => { b.disabled = viewBlocked(); });
       markers.replaceChildren();
-      for (const projected of seen.pins) if (projected.visible) {
+      for (const projected of seen.pins) if (seen.ready && seen.token === p.token && seen.sceneId === sceneId && projected.visible && Number.isFinite(projected.x) && Number.isFinite(projected.y)) {
         const caption = p.resources.captions[projected.id]; if (!caption) continue;
         const marker = button(fieldValue(caption.title) || '名称なし', () => { if (!dirty() && !busy && !ports.otherPending()) { selectCaption(projected.id); render(); } });
         marker.className = 'lv-project-marker'; marker.style.left = `${projected.x}px`; marker.style.top = `${projected.y}px`;
         marker.setAttribute('aria-pressed', String(projected.id === selected)); markers.append(marker);
       }
       ports.changed();
-    } finally { rendering = false; }
+    } finally { rendering = false; if (renderAgain) { renderAgain = false; render(); } }
   }
   mounted = true; render();
   return { root, render, session: interaction, inputPending: () => dirty() || busy,
     hasChanges: () => dirty() || busy || !!pending,
-    unmount() { if (disposed) return; disposed = true; mediaManager?.dispose(); viewport.dispose(); list.dispose(); detail.dispose(); for (const panel of panels.values()) panel.dispose(); root.remove(); } };
+    unmount() { if (disposed) return; disposed = true; windows.dispose(); mediaManager?.dispose(); mediaViewer.dispose(); viewport.dispose(); list.dispose(); detail.dispose(); for (const panel of panels.values()) panel.dispose(); root.remove(); } };
 }

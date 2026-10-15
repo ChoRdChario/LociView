@@ -32,11 +32,12 @@ export interface WorkspaceViewportState {
   readonly pinColors: readonly string[] | null;
   readonly available: boolean;
   readonly hiddenAssetIds?: readonly string[]; readonly model?: WorkspaceModelProposal | null;
+  readonly windowMoving?: boolean;
 }
 export interface WorkspaceViewport {
   update(state: WorkspaceViewportState): void;
   pick(xCss: number, yCss: number, assetId?: string): { target: WorkspaceSurface; position: Point3 } | null;
-  read(): { token: string; pickToken: string; ready: boolean; dragging: boolean; issue: string | null; notice: string | null;
+  read(): { token: string; sceneId: string; pickToken: string; ready: boolean; dragging: boolean; issue: string | null; notice: string | null;
     pins: readonly { id: string; x: number; y: number; visible: boolean }[]; readonly assetIds?: readonly string[]; readonly view?: ViewRuntime };
   target(assetId: string): WorkspaceSurface | null;
   camera(action: 'fit' | 'front' | 'back' | 'left' | 'right' | 'top' | 'bottom'): void;

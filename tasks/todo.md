@@ -18,7 +18,8 @@ The latest verified implementation includes bounded Native GLB/PNG conversion �
 edit/first-place → named backup/Workspace → independent reopen, plus the typed
 product composition's edit → save/two-round exchange → cold-reopen workflow in
 the nondefault validation route, now including the model, Saved View and material
-panels and attachment organization/shared viewing. Existing file/recovery work is retained.
+panels, attachment organization/shared viewing and Scene-local Caption comparison
+windows. Existing file/recovery work is retained.
 Ordinary entry, broader profiles/converters, browser performance, physical-iPhone
 and offline acceptance remain open. Full details and earlier failures are in the
 [September checkpoint record](../docs/history/development-through-2026-09-21/tasks/todo.md).
@@ -98,6 +99,64 @@ destructive boundary. Ordinary entry and temporary iPhone HTTPS need their exist
 exact-build/route approvals. Main, Pages, Service Worker, version/license, release,
 dependency changes and private/public fixture distribution are outside this unit.
 
+### Completed unit — compare Captions in the integrated editor
+
+PO authorized continuation on 2026-10-15. Outcome: select multiple Captions in the
+same editor, compare confirmed text/images in separate windows, move/resize/close
+them and return between Scenes without losing local layout or editing drafts.
+Reuse existing pure window state/controls, the common image viewer and the current
+viewport. No new storage/schema/package/profile, dependencies, ordinary entry or
+release. The implementation remains one writer with bounded read-only review.
+
+- [x] Clarify the narrow composition/receipt boundary and connect window memory,
+  selection/reopening, local gestures and shared viewing to existing guards.
+- [x] Reuse pure window/gesture tests; add one representative actual-product
+  workflow and focused same-token stale-projection/service tests.
+- [x] Independently review, pass the serial final checkpoint and verify source
+  and outgoing scope for the authorized g0-baseline checkpoint. Git owns the
+  actual commit/push identity.
+
+Acceptance: window front/close do not change editing selection or draft; geometry
+changes are guarded during drafts/IME, and active gestures block conflicting
+Scene/file/view/edit operations. Layout stays Scene-local and outside Project
+history. Confirmed text, DOM/scroll and immutable media identity survive local
+window operations. Lines require the exact rendered display receipt, current
+source/Scene and finite visible pin coordinates; authoritative needsReview pins
+remain eligible. Recovery controls stay outside floating-window overlap. Shared
+viewer remains usable from windows on every task tab and invalidates on
+Scene/content-service handoff. Readonly supports local comparison.
+
+Implemented in the existing product composition: one Scene-local window-memory
+map, consecutive selection and explicit reopen, independent front/close,
+move/resize/arrange and shared fixed-Caption image galleries. Recovery and camera
+controls are outside floating overlap. Current exact display identity, source,
+Scene, readiness, finite coordinates and pin membership gate lines and markers.
+Rendering-triggered gesture cancellation releases guards through one follow-up
+render. Window gestures reserve the existing Orbit input channel too.
+
+Focused checks passed: 25 existing state/control/isolation cases and product
+comparison/scene-layout/draft-IME/gesture/readonly/service-handoff cases, plus five
+representative existing product edit/model/conflict/file regressions. UI and
+viewport read-only reviews closed the camera-input reservation P2; outgoing/docs
+review found no additional issue or private/dependency/deployment scope. The final
+serial `npm run check:checkpoint` passed: typecheck; **114 files / 2,359 passed /
+21 existing todo**; ordinary, harness and validation builds (exit 0). Earlier
+focused fixture/setup failures remain under ignored `.artifacts/traces`; no
+contract/assertion weakening or test exclusion was used.
+
+Final static validation manifest (7 output files):
+`c422daaf72fc3a5565a0f54ed288a6b8b316fc02387ddeee02384c9274777550`.
+All seven served HTTP bodies matched disk at port 4182; SW, webmanifest and public
+samples remain absent. All six changed executable file hashes match the tested
+tree and staged content; the 10-path checkpoint contains no private input,
+fixture, dependency or deployment change. This is Node/recorded-DOM/build/HTTP
+evidence, not browser/rendering, offline/PWA or physical-device acceptance.
+
+Stop only at existing new-policy/architecture/compatibility/authority or release
+boundaries. Existing browser runtime EPERM remains a grouped candidate evidence
+gap, not a reason to wait for small PO tests. Next: integrate remaining Caption
+deletion/parent-model management, then initial-conversion gaps and gated entry.
+
 ### Completed unit — organize and compare attachments in the integrated editor
 
 PO entrusted continuation on 2026-10-15 and requested the next planned unit in
@@ -170,12 +229,9 @@ Stop only for a new specification/profile/policy/authority or release/destructiv
 boundary. Existing browser EPERM is unchanged; do not retry it or wait on small PO
 tests. Browser/device/offline acceptance remains a grouped lane.
 
-Next planned unit: connect multiple Caption comparison windows to this same
-editor, including move/resize, individual close, connection lines and the shared
-image viewer, reusing existing local-state controls and draft/IME guards. Then
-connect the remaining Caption deletion/parent-model management, followed by the
-remaining initial conversions and gated ordinary entry. These are planned work,
-not completed functionality or a new browser/device acceptance claim.
+The comparison-window follow-up is tracked in the current unit above. That unit
+owns the current next action; this completed attachment record is retained
+evidence, not a second task queue or a browser/device acceptance claim.
 
 ### Completed unit — model, Saved View and material screen integration
 

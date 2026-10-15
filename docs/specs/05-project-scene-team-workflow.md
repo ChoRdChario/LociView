@@ -1522,6 +1522,24 @@ read/edit/export/cold reopen, unavailable-media disclosure, and acknowledged-med
 loss rejection with no repair writes. Backup protected-inventory verification and
 required/conflicted media checks remain unchanged.
 
+**Product comparison-window integration (2026-10-15):** connect the existing
+Caption window state/controls to the same product composition. Consecutive
+explicit selections retain separate windows; reselecting the same row or using
+the detail action reopens a dismissed window without resetting its draft.
+Window front/close never selects another editing Caption or writes Project
+history. Move/resize/arrange are guarded against drafts/IME/other operations;
+an active gesture blocks conflicting Scene/file/camera/edit actions, including
+Orbit wheel/touch input through the existing viewport input reservation. Preserve
+Scene-local placement, confirmed content, stable DOM/scroll and non-drag controls.
+Share one workspace-level image viewer and the existing exact verified PNG cache
+between the editor and fixed-Caption window galleries, including other task tabs.
+Use the current exact rendered display object as the projection receipt, including
+same-token hide/filter updates, plus source/Scene/finite visible points for lines.
+The latest needsReview clarification in §2 remains authoritative. Keep rendering
+failure/retry controls outside the floating overlap. Reuse existing interruption
+tests and verify the connected product workflow, readonly/local state and exact
+image-service invalidation. No new persistence or renderer/profile adoption.
+
 Each production slice requires a short meta-audit, exact-tree tests/build, one
 independent read-only review and a reversible commit. Run focused checks during
 editing, then the required full matrix once on the final executable tree. Reuse

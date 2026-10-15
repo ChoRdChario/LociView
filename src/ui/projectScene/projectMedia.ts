@@ -1,14 +1,14 @@
 import type { JsonObject } from '../../domain/values';
-import { createMediaViewer, createMediaThumbnails, type MediaPreviewGroup, type PreviewPng } from './mediaPreview';
+import { createMediaThumbnails, type MediaViewer, type MediaPreviewGroup, type PreviewPng } from './mediaPreview';
 import { fieldValue, projectAttachments, projectIdentity, projectMediaResources, projectMediaUncertain } from './projectRead';
 import { newProjectId, panelNodes, sameProjectValue, type ProjectPanelHost, type ProjectPanel } from './projectPanel';
 
 /** Attachment commands and local viewing only; binary verification stays in the current host. */
-export function createProjectMedia(document: Document, host: ProjectPanelHost, caption: () => string | null): ProjectPanel {
+export function createProjectMedia(document: Document, host: ProjectPanelHost, caption: () => string | null, viewer: MediaViewer) {
   const { make, button } = panelNodes(document), root = make('section'), galleryHost = make('div'), stored = make('details'), list = make('section');
   root.setAttribute('aria-label', '画像の整理'); galleryHost.setAttribute('aria-label', '添付画像'); list.setAttribute('aria-label', '添付の編集');
   stored.setAttribute('aria-label', '登録済みメディア'); stored.append(make('summary', '登録済みメディア'));
-  const viewer = createMediaViewer(document), status = make('p'); status.setAttribute('role', 'status');
+  const status = make('p'); status.setAttribute('role', 'status');
   type Scope = { token: string; sceneId: string; captionId: string };
   type Choice = Scope & { id: string; record: JsonObject };
   type Draft = Scope & { attachmentId: string; raw: string; composing: boolean };
@@ -82,7 +82,7 @@ export function createProjectMedia(document: Document, host: ProjectPanelHost, c
     });
   });
   confirmation.append(question, detach, button('戻る', () => { if (!host.block('captions', false)) { removal = null; host.changed(); } }));
-  root.append(galleryHost, stored, list, form, confirmation, status, viewer.root);
+  root.append(galleryHost, stored, list, form, confirmation, status);
   function render() {
     if (disposed) return; const s = source(), block = host.block('captions'), local = host.block('captions', false), uncertain = uncertainty(), currentScope = scope();
     if (registeredScope !== currentScope) { registeredScope = currentScope; registeredReader = reader(null); picker.dispose(); picker = newPicker();
@@ -118,5 +118,10 @@ export function createProjectMedia(document: Document, host: ProjectPanelHost, c
     }
   }
   return { root, render, hasChanges: owned, composing: () => !!draft?.composing,
-    dispose() { disposed = true; gallery?.dispose(); picker.dispose(); viewer.dispose(); bodies.clear(); root.remove(); } };
+    gallery(captionId: string) {
+      let lifetime = scope(), read = reader(captionId);
+      const thumbs = createMediaThumbnails(document, () => read(), viewer); thumbs.root.setAttribute('aria-label', '添付画像');
+      return { root: thumbs.root, render() { if (lifetime !== scope()) { lifetime = scope(); read = reader(captionId); } thumbs.render(); }, dispose: thumbs.dispose };
+    },
+    dispose() { disposed = true; gallery?.dispose(); picker.dispose(); bodies.clear(); root.remove(); } } satisfies ProjectPanel & { gallery(captionId: string): { root: HTMLElement; render(): void; dispose(): void } };
 }

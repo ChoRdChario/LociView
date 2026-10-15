@@ -25,6 +25,8 @@ in `src/ui/projectScene/projectWorkspace.ts`; its viewport/file adapter is
 `src/harness/projectScene/productWorkspace.ts`. The existing editor remains available.
 The composition's model, Saved View, material and attachment panels reuse their pure controls;
 `projectMedia.ts` connects attachment management to the common `mediaPreview.ts` viewer.
+The composition reuses `captionWindowControls.ts` for Scene-local comparison
+windows and their galleries, sharing the workspace-level image viewer.
 `productSources.ts` supplies bounded read projections and command preparation.
 Inventory and todo own its exact feature and verification scope.
 
