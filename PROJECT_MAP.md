@@ -44,6 +44,15 @@ Scene membership. New file services are partially connected in the limited
 validation route. Old Native acceptance remains valid only for its tested scope.
 See inventory for individual connections and todo for executed checks and remaining adoption conditions.
 
+The same validation file entry connects bounded Native, frozen-v1 and LociMyu
+initial conversions. `projectFiles/lociMyuSource.ts` owns raw workbook inspection,
+`lociMyuMapping.ts` verifies source identity and constructs typed records, and
+`lociMyuConversion.ts` retains the private source/receipt and validates recovery
+and explicit report export. Workspace UI exposes coarse workbook choice and the
+approved complete relation confirmation; ordinary package outputs exclude that
+private evidence. Exact subset, executed checks and pending gates belong to todo
+and inventory.
+
 ## Current directories
 
 | Path | Responsibility / primary boundary |

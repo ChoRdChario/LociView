@@ -1,6 +1,6 @@
 # LociMyu initial ProjectScene conversion companion
 
-Status: **PROPOSED — no durable implementation or recipe approval.**
+Status: **APPROVED — exact recipe/subset ratified by PO 2026-10-15; bounded implementation verified in the nondefault validation route, not adopted.**
 This companion fixes the new target identity/admission boundary required by
 [05 §9.2](05-project-scene-team-workflow.md#92-locimyu). It preserves the accepted
 source semantics in [04](04-locimyu-conversion.md) and the one-time cutover in
@@ -10,7 +10,7 @@ Current work and evidence remain in [todo](../../tasks/todo.md).
 
 ## Decision and connected outcome
 
-Proposed immutable recipe: `locimyu-project-scene-migration-recipe-1`.
+Approved immutable recipe: `locimyu-project-scene-migration-recipe-1`.
 One LociMyu outer ZIP → content inspection/workbook selection → conversion
 effects and any existing all-or-nothing relation confirmation → new Project with
 Scenes, Caption/media and Saved Views → edit/first placement → named backup,
@@ -201,6 +201,18 @@ confirmation or absence, confirmed title, complete closed mappings/report,
 payload refs and exact initial source/proof/bytes. Revalidate these bindings
 before publication/cold recovery; do not regenerate IDs or Automerge history.
 Use existing OriginBlobStore, metadata initialization/journal and WorkspaceFS.
+Private receipt evidence uses the closed `{version:'locimyu-conversion-evidence-1',chunks:[...]}`
+ASCII-escaped canonical JSON envelope so
+source-only NFD strings remain exact without weakening target metadata's NFC
+admission. Decode and revalidate the complete captured evidence on every read;
+this private encoding never changes package wire or source identity preimages.
+Each nonfinal chunk is exactly 50,000 ASCII characters, the final chunk is 1–50,000,
+and the ordinary 8 MB receipt budget still applies. Inner decoding retains the
+independent node/depth/scalar budgets and requires exact canonical re-encoding;
+duplicate members, altered escapes/chunking, missing evidence and invalid versions
+are refusal states, never permission to repair captured evidence.
+The private mapping array is ordered by ASCII target ID, independent of digest
+completion order. This ordering does not change any ID preimage or source order.
 Capture an independent closed origin binding for this new recipe as well as its
 initial receipt so generic creation cannot bypass conversion verification after
 sidecar loss/downgrade. Add an exact recipe case; never reinterpret or loosen the
@@ -209,7 +221,8 @@ preserves subsequent target edits.
 
 Use `projectFiles/lociMyuSource.ts` → `lociMyuMapping.ts` → `lociMyuConversion.ts`
 for source inspection, pure mapping and prepared conversion respectively. The
-source module may import assets/zipio, assets/importWizard and io/locimyu plus
+source module may import assets/zipio, assets/importWizard, io/locimyu and the
+existing read-only io/csv parser for exact file-map header accounting, plus
 existing projectFiles validators/inspectors, domain values and metadata digest
 helpers. Mapping consumes that source plan, domain records, the current GLB
 profile and existing sealing helpers. Conversion consumes that plan/mapping and

@@ -23,7 +23,7 @@ record executed evidence and connections; do not infer those from a document tit
 | One-time Native/v1/LociMyu conversion and cutover | [specification 07](specs/07-project-scene-migration.md); continued old-format updates were withdrawn by PO 2026-09-14; initial mapping/compatibility remains to be closed |
 | Approved bounded Native material conversion | [Appearance companion](specs/07a-native-appearance-conversion-proposal.md); recipe-2/profile/subset approved 2026-10-15; implementation/evidence remain in todo |
 | Approved first frozen-v1 → ProjectScene conversion | [v1 companion](specs/07b-frozen-v1-conversion-proposal.md); exact bounded recipe/subset approved 2026-10-15; implementation/evidence remain in todo |
-| Next LociMyu → ProjectScene recipe decision | [LociMyu companion](specs/07c-locimyu-project-scene-conversion-proposal.md); PROPOSED, independently reviewed identity/admission mapping; no recipe approval or durable implementation |
+| Approved first LociMyu → ProjectScene conversion | [LociMyu companion](specs/07c-locimyu-project-scene-conversion-proposal.md); exact recipe/subset approved 2026-10-15; implementation/evidence remain in todo |
 | UI intent, writing, visual tone and interaction | [UI product guidelines](ui-product-guidelines.md); [UI task mapping](../tasks/uiux-handoff.md) for historical audit evidence |
 | Ownership, license or sponsorship | [licensing](licensing-and-ownership.md), [sponsorship](sponsorship-policy.md); direction is not adoption or a license grant |
 

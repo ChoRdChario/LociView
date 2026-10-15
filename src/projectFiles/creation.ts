@@ -10,16 +10,18 @@ import type { PreparedValidationProject } from './initialProject';
 import type { PngDecoder } from './png';
 import { fileError, validationMetadataLimits as metadataLimits, type FileValidationLimits } from './validation';
 
+type InitialOriginRecipe = 'v1-project-scene-migration-recipe-1' | 'locimyu-project-scene-migration-recipe-1';
+const originRecipeKnown = (value: unknown): value is InitialOriginRecipe => value === 'v1-project-scene-migration-recipe-1' || value === 'locimyu-project-scene-migration-recipe-1';
 type InitialReceipt = { proof: MetadataProof; byteLength: number; digest: string } & (
-  { version: 'validation-initial-1' } | { version: 'validation-initial-2'; originRecipe: 'v1-project-scene-migration-recipe-1' });
+  { version: 'validation-initial-1' } | { version: 'validation-initial-2'; originRecipe: InitialOriginRecipe });
 const initialPath = (fs: ProjectWorkspaceFS) => metadataPath(fs, 'validation-initial.am');
 const receiptPath = (fs: ProjectWorkspaceFS) => metadataPath(fs, 'validation-initial.json');
 const originPath = (fs: ProjectWorkspaceFS) => metadataPath(fs, 'validation-origin.json');
-type InitialOrigin = { version: 'validation-origin-1'; originRecipe: 'v1-project-scene-migration-recipe-1'; proof: MetadataProof; byteLength: number; digest: string };
+type InitialOrigin = { version: 'validation-origin-1'; originRecipe: InitialOriginRecipe; proof: MetadataProof; byteLength: number; digest: string };
 async function readInitialOrigin(fs: ProjectWorkspaceFS) {
   const r = await readReceipt<InitialOrigin>(fs, originPath(fs), metadataLimits);
   if (r && (Object.keys(r).sort().join(',') !== 'byteLength,digest,originRecipe,proof,version' || r.version !== 'validation-origin-1' ||
-    r.originRecipe !== 'v1-project-scene-migration-recipe-1' || !Number.isSafeInteger(r.byteLength) || r.byteLength <= 0 ||
+    !originRecipeKnown(r.originRecipe) || !Number.isSafeInteger(r.byteLength) || r.byteLength <= 0 ||
     r.byteLength > metadataLimits.maxTotalBytes || !/^[0-9a-f]{64}$/.test(r.digest))) return fileError('作成途中の変換種別を確認できません。');
   return r;
 }
@@ -31,7 +33,7 @@ export async function readValidationInitial(fs: ProjectWorkspaceFS): Promise<Pro
 async function readInitialReceipt(fs: ProjectWorkspaceFS) {
   const r = await readReceipt<InitialReceipt>(fs, receiptPath(fs), metadataLimits);
   if (!r) return null;
-  const bound = r.version === 'validation-initial-2' && r.originRecipe === 'v1-project-scene-migration-recipe-1';
+  const bound = r.version === 'validation-initial-2' && originRecipeKnown(r.originRecipe);
   if ((!bound && r.version !== 'validation-initial-1') || Object.keys(r).sort().join(',') !== (bound ? 'byteLength,digest,originRecipe,proof,version' : 'byteLength,digest,proof,version') ||
     !Number.isSafeInteger(r.byteLength) || r.byteLength <= 0 || r.byteLength > metadataLimits.maxTotalBytes ||
     typeof r.digest !== 'string') return fileError('作成途中の初期記録を確認できません。');
@@ -54,7 +56,7 @@ export async function readValidationInitialRecord(fs: ProjectWorkspaceFS) {
   if (source.originalChanges().length !== 2) return fileError('初期記録の履歴を確認できません。');
   return { source, receipt: r };
 }
-export async function writeValidationInitial(fs: ProjectWorkspaceFS, source: ProjectMetadataSource, originRecipe?: 'v1-project-scene-migration-recipe-1'): Promise<void> {
+export async function writeValidationInitial(fs: ProjectWorkspaceFS, source: ProjectMetadataSource, originRecipe?: InitialOriginRecipe): Promise<void> {
   const bytes = source.encodeFullSource();
   if (originRecipe) await writeReceipt(fs, originPath(fs), { version: 'validation-origin-1', originRecipe, proof: source.proof, byteLength: bytes.length, digest: await digest(bytes) }, metadataLimits);
   // Manifest first binds the exact intended source; partial bytes stay repair state.

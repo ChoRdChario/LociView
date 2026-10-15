@@ -14,7 +14,7 @@ Initial Native/frozen-v1/LociMyu conversion and new-format teamwork remain requi
 Project/Scene identity, explicit conflict resolution, source preservation and the
 frozen v1/map-1/map-2/immutable-recipe boundaries remain unchanged.
 
-The latest verified implementation includes bounded Native/frozen-v1 GLB/PNG conversion →
+The latest verified implementation includes bounded Native/frozen-v1/LociMyu GLB/PNG conversion →
 edit/first-place → named backup/Workspace → independent reopen, plus the typed
 product composition's edit → save/two-round exchange → cold-reopen workflow in
 the nondefault validation route, now including the model, Saved View and material
@@ -104,7 +104,7 @@ destructive boundary. Ordinary entry and temporary iPhone HTTPS need their exist
 exact-build/route approvals. Main, Pages, Service Worker, version/license, release,
 dependency changes and private/public fixture distribution are outside this unit.
 
-### Next connected unit — LociMyu conversion/edit/file/reopen, exact recipe decision
+### Completed implementation — LociMyu conversion/edit/file/reopen
 
 Outcome: required F08 outer ZIP → workbook/coarse relation choice → new Scenes,
 Caption/PNG/perspective and approved orthographic Views → edit/first placement →
@@ -120,29 +120,163 @@ unplaced preservation, exact media/GID authority or orthographic approximation.
   required ports and one connected acceptance workflow. Two independent reviews
   find no remaining P1/P2; independently recomputed vectors all match. Correct
   decoded row encounter order rather than relying on XLSX r attributes.
-- [ ] Receive the exact recipe/subset ratification required by 05 §9.2, then
-  implement/verify/review that connected workflow without per-control PO tests.
+- [x] PO ratified the exact 07c recipe/subset on 2026-10-15.
+- [x] Implement owned source inspection, closed identity/mapping and bound
+  initial-source/origin receipts with interrupted/completed cold recovery.
+- [x] Connect workbook choice, complete relation confirmation, explicit title
+  and separate report export to the existing file/product workflow, including
+  cold report export; preserve private source/report isolation from team files.
+- [x] Verify representative conversion → edit/first placement → backup/Workspace/
+  independent review → cold reopen, refusal/collision/recovery faults and exact
+  import isolation. Independently review source/mapping and persistence/UI.
+- [ ] Run one final serial check:checkpoint on the reviewed final source/test
+  tree, audit outgoing scope and push the suitable g0-baseline checkpoint.
 
-This proposal is not durable implementation. First subset: one static GLB and
+Final verification passed in the bounded nondefault route. First subset: one static GLB and
 exact-linked PNG; active material adjustments and exact-linked JPEG/WebP/GIF
 refuse the whole input, with original preservation. Already nonauthoritative/
 ambiguous relations and HEIC remain report-only under 04. Broader formats and
 material conversion stay required. No old Native DTO becomes the new source;
 no schema/profile/dependency/ordinary-entry/deploy change is proposed.
 
-Checks: document diff/local links, retained-contract consistency and independent
-source/identity/privacy review. Vectors in
+Checks: focused installed-Vitest cases and sceneCore import isolation during
+implementation; required final serial typecheck/full tests/three builds,
+independent final diff and privacy/deploy audit, then document links. Vectors in
 `.artifacts/traces/locimyu-project-scene-vectors-2026-10-15.json` are synthetic
-math evidence only. No runtime recheck for this documentation-only successor;
-the frozen-v1 eight-path tested tree and full checkpoint below remain unchanged.
+math evidence only. No browser/GPU/device/offline evidence is claimed. Known
+managed browser denial is not retried. One writer owns all files; independent
+agents are read-only. New modules use only the exact ports/imports in 07c.
+
+Focused evidence: 25 LociMyu cases passed together, followed by five additional
+acknowledged-loss/forgery/material-vocabulary cases and two relevant current-
+diagnostic/NFD reruns. The connected product/file/cold-report case passed;
+source/test inspection also covers compressed UI entry and exact captured retry.
+Early exact import-isolation check: 12 passed. A focused common-entry run passed
+21 cases including existing Native/v1 previews before the last bounded fixes.
+Typecheck passed before those final corrections; final serial check below owns
+the completion result. Sandbox Vitest initially failed before collection with
+dependency realpath EPERM; the managed escalation for installed tests succeeded.
+No browser retry was attempted.
+
+Independent source/mapping, conversion/recovery/codec and UI reviewers closed
+all P2 findings. Fixes preserve raw NFD source evidence in the specified bounded
+private encoding while target NFC remains strict; choose workbooks after the
+accepted missing-ID projection; separate historical/current diagnostics; name
+source-only fields; use selected Mesh slots for material authority; reject
+XLSX structures the existing decoder would silently omit; invalidate awaited
+preview results after late IME/input; and permit validated report export while
+initialization is incomplete. No ordinary-entry/profile/wire gate was weakened.
+
+The first full run was deliberately interrupted after review confirmed that
+parallel slot-ID digests could produce a nondeterministic receipt mapping order.
+Its log and source manifest remain as interrupted evidence, not completion.
+The new recipe now sorts mapping by ASCII ID; a regression forces both opposite
+digest completion orders through persistence and cold verification. Its first
+fault injection also held serial receipt checks and timed out; the injection
+now queues only concurrent batches, with the unchanged 30-second test limit.
+The corrected regression and the header-only file-map accounting case passed,
+along with the 12 exact-boundary cases. Existing reader decoding and unknown CSV
+source-only retention remain unchanged. The independent correction review is
+recorded before the final rerun.
+
+The second full run passed typecheck but failed three existing connected tests:
+two projectFiles default-1s waits observed unfinished save acknowledgments, and
+the Saved View both-absent case exceeded its unchanged 30s outer limit. All 32
+new LociMyu cases passed. The failed full log (2428 passed, 3 failed, 21 existing
+todo) and its nine-file manifest are retained; builds did not run after failure.
+This is not a verified checkpoint. Cross-test inspection found no persistent
+new crypto/URL spy, listener or host; it does not prove a CPU/GC cause.
+
+The two file cases now subscribe to actual save-owner completion before reading
+results/clicking onward, with actual dispatch and final idle/result/history
+assertions retained. Startup and editor each own a normal acknowledgment; the
+test observes both subscriptions, restores its capture spy in finally and
+unsubscribes each completion wait. No product port or runtime limit changed.
+The Saved View focused diagnostic completed in 2.92s (setup 1.84s, including two
+receives totaling 0.97s); no unfinished acknowledgment was observed. Its fixture
+now receives the exact union of both independently authored branch changes once
+before UI mount. Candidate/history, resolution, absence/no-null, ordinary edit,
+cold/fault assertions remain unchanged. This reduces repeated setup I/O and does
+not establish the full timeout's cause or a browser-performance guarantee.
+The three formerly failing cases passed focused checks; independent correction
+reviews found no remaining P1/P2. Final async-owner identity checking also rejects
+a stale captured owner before waiting; both file cases passed with that assertion.
+The final ten source/test paths are frozen in
+`.artifacts/traces/locimyu-tested-tree-2026-10-15.json` for the final serial
+checkpoint; all earlier interrupted/failed evidence remains. No runtime edits
+are planned while it runs.
+
+Verification meta-audit after that run: typecheck passed; 113/114 files and
+2429 tests passed, two different existing product recovery cases failed (Scene
+recovery outer 30s; Caption-copy fault default 1s wait). The earlier three and
+all 32 new LociMyu cases passed. Builds again did not run. Preserve this second
+failure log/manifest; do not classify it as a known pre-existing failure or
+blindly retry/extend budgets. Push and JPEG source work remain held.
+
+The bounded verification correction is now reviewed and focused-checked. The
+Scene stage diagnostic reached cold mount in 28.62s, then its default-1s fault
+poll failed while save was still checking; later recovery/file assertions were
+still pending. There was forward progress, not an observed deadlock. The same
+three-Scene/one-GLB/Caption/PNG setup now seeds initial Scenes/memberships instead
+of making two unrelated preparatory commands, preserving all later independent
+branches, two-round files, fault/cold and relative original-history assertions.
+Initial file generation is opt-in only for its three actual consumers; the
+initial Caption/PNG/tag records remain unchanged.
+
+The common product fixture observes existing final-render busy signals, requires
+an actual operation start and awaits completion before the existing token/status/
+result assertions. Product saves and file receipt keep distinct signals; host-
+idle admission rejection, failed publication, post-publication display failure
+and same-history retry retain their original distinctions. Cold startup uses its
+actual acknowledgment, including the legitimate synchronous display-only retry.
+No new timeout, worker change, product port or source/runtime change was made.
+
+File-local teardown now disposes registered UI/hosts in reverse ownership order,
+even after failure, before public mock restoration; the shared injected decoder
+implementation is retained. The unused DOM-creation spy became a plain local
+wrapper. Held IME evaluation is released before disposal on failure. Public
+restoration clears call/result/context graphs, but pinned registries may still
+retain target closures: neither complete heap reclamation nor timeout causation
+is claimed. Registry internals and whole-workspace runner configuration are
+untouched. The shared group passed 28/29, with one fixture variable-name mistake;
+that correction and the final release cleanup passed their two focused cases,
+closing all 29 distinct cases. Independent correction/outgoing reviews find no
+remaining P1/P2. A fresh ten-file freeze and final serial checkpoint follow;
+earlier interrupted/failed logs and manifests remain. No product latency or
+browser optimization is inferred from Node evidence.
+
+Final serial `check:checkpoint` exited 0: typecheck, all 114 test files
+(2431 passed, 21 existing todo; suite 819.07s), ordinary build, harness build and
+validation build passed. The ten frozen source/test paths are unchanged. The
+existing local HTTP endpoint serves all seven final validation files byte-exact;
+manifest SHA-256 `96d699197750f7ce0cb84580d9d1b45480482773b519cb3796181a3bf28158f2`.
+No SW/manifest/samples are in that isolated output. This is HTTP identity only,
+not browser/GPU/device/offline acceptance. Independent final scope/privacy/deploy
+review closed on the 18 selected feature paths. Git owns the ensuing normal
+g0-baseline checkpoint identity; the separate JPEG companion is excluded from it.
+
+Next connected unit, PO approved 2026-10-15: JPEG photos and embedded GLB JPEG →
+edit/first placement → named backup/Workspace/independent review → cold reopen.
+Record the approved companion as a separate documentation checkpoint before
+source changes. Use its exact two additive profiles and four new conversion
+recipes only for admitted target JPEG; retain old profiles/recipes/jobs and raw
+metadata bytes. Photos follow primary Exif orientation/browser color management;
+GLB textures admit standard orientation and ignore image color metadata.
+Reuse current budgets, decoder/content/facts/Session/file ports; independently
+review parser/profile dispatch and connected recovery, then run the final serial
+checks. No dependency, re-encoding/sanitization, ordinary-entry, deployment or
+numeric/device guarantee is included. Stop only affected work for a real
+contract/authority/scope conflict; grouped browser/device/offline and anonymized
+real-source acceptance remain separate. Broader formats/material recipes still
+require their concrete compatibility companions.
 
 Milestone audit: the approved Native and frozen-v1 bounded workflows are now
-reviewed, fully checked and pushed on g0-baseline. LociMyu still has no bounded
-new-route converter; fix its actual new identity/admission boundary before writes,
+reviewed, fully checked and pushed on g0-baseline. This unit connects LociMyu's
+approved bounded new-route converter; close its exact source/recovery workflow,
 without reopening accepted source policies or creating extra helper workstreams.
-Stop only this new recipe implementation pending the concrete PO decision; the
-managed Chrome block, device/offline/profile/storage adoption and ordinary-entry/
-release remain distinct. This is one compatibility decision, not a microtest.
+Continue under the approved exact recipe; stop only for a real new contract or
+scope decision, managed authority or release boundary. The managed Chrome block,
+device/offline/profile/storage adoption and ordinary-entry/release remain distinct.
 
 ### Completed implementation — frozen-v1 conversion/edit/file/reopen
 

@@ -157,8 +157,9 @@ describe('Saved View conflict resolution; saved memory ports and recorded DOM on
         ...jsonCapture(), eventId: `evt_${tx}` }, await read(seed), tx);
     }
     const one = branch(seed, field, first), two = branch(seed, field, second);
-    await host.receive(host.read().source!.token, fullSource(one, 1500));
-    await host.receive(host.read().source!.token, fullSource(two, 1501));
+    // Both independently authored branches are the fixture input. This test
+    // starts after receive and does not assert an intermediate package state.
+    await host.receive(host.read().source!.token, fullSource(one.appendOriginal(two.originalChanges()), 1500));
     const recalls: DisplayCapture[] = [], background = vi.fn();
     const mount = createMetadataWorkspace(new RecordedDocument().asDocument(), host, () => ({
       update() {}, setActive() {}, read: () => ({ token: 'camera', ready: true, issue: null, dragging: false,

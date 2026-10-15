@@ -40,6 +40,12 @@ Read only the relevant topic, not every historical incident.
   Repeated output discovery and harness conversion are hypotheses to investigate,
   not established browser bottlenecks. Preserve the accepted read-operation
   lifetime and all write/publication/recovery checks.
+  When different connected cases exceed waits in consecutive full runs, stop
+  individual poll fixes/full reruns and inspect their common operation completion
+  and resource lifetime. Await actual owner/UI confirmation, close fixture-owned
+  mocks/hosts even on failure and remove unused setup while retaining original
+  inputs, history/results and outer budgets. A retained mock graph is evidence
+  of a lifetime defect, not proof of a particular timeout or product latency.
 - Current work belongs in todo, coverage in inventory, contracts in specifications.
   Map/handoff/index should link rather than repeat changing counts and next steps.
 - An approved plan authorizes its ordinary implementation/fixes. Stop only at an

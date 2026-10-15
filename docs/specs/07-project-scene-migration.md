@@ -424,14 +424,15 @@ malformed-import discrepancies rather than changing the frozen contract. This is
 PO-approved bounded implementation contract, not a passed migration/storage/profile
 gate. Broader initial conversion remains required; todo owns executed evidence.
 
-### 5.5 LociMyu concrete companion — PROPOSED, not implemented
+### 5.5 LociMyu concrete companion — approved bounded implementation
 
 The [LociMyu ProjectScene companion](07c-locimyu-project-scene-conversion-proposal.md)
-retains 04's source identity/relationship/orthographic rules and proposes the new
+retains 04's source identity/relationship/orthographic rules and fixes the new
 exact target-ID recipe, GLB/PNG admission subset, private receipt/report and
 connected edit/file/reopen acceptance. Its vectors and source mapping have been
-independently reviewed; this is not PO ratification or durable implementation.
-05 §9.2 requires that exact companion decision before new conversion writes.
+independently reviewed; PO ratified the exact recipe/subset on 2026-10-15 under
+05 §9.2. Implementation and executed evidence are recorded in todo, without
+claiming aggregate conversion, profile/storage/device or ordinary-entry acceptance.
 Broader formats/materials, ordinary entry and all adoption gates remain required.
 
 ## 6. Acceptance and historical evidence

@@ -72,7 +72,7 @@ export function createValidationModeHost(initial: Host, open: (mode: LocalOpenMo
       try { await work; } finally { switching = false; if (operation === work) operation = undefined; }
     },
   };
-  const host: SavedWorkspaceHost & ValidationDisplayHost & Pick<Host, 'workspaceFiles' | 'workspaceOutput' | 'backupRestore' | 'dispatch'> & { content: Pick<Host['content'], 'model' | 'image'>; imageScope(): string } = {
+  const host: SavedWorkspaceHost & ValidationDisplayHost & Pick<Host, 'workspaceFiles' | 'workspaceOutput' | 'backupRestore' | 'dispatch' | 'conversionReport' | 'conversionReportAvailable'> & { content: Pick<Host['content'], 'model' | 'image'>; imageScope(): string } = {
     authority, mode, limits: initial.limits, read: () => current.read(),
     hasPending: () => switching || current.hasPending(),
     refresh: () => run(() => current.refresh()), resolve: (...a) => run(() => current.resolve(...a)),
@@ -108,6 +108,8 @@ export function createValidationModeHost(initial: Host, open: (mode: LocalOpenMo
       download: (...a) => run(() => current.workspaceOutput.download(...a)),
     },
     dispatch: (...args: Parameters<Host['dispatch']>) => run(() => current.dispatch(...args)),
+    conversionReport: () => run(() => current.conversionReport()),
+    conversionReportAvailable: () => run(() => current.conversionReportAvailable()),
     backupRestore: {
       get enabled() { return current.backupRestore.enabled; }, get error() { return current.backupRestore.error; },
       get pending() { return current.backupRestore.pending; }, get needsDisplay() { return current.backupRestore.needsDisplay; },

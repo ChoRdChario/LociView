@@ -42,13 +42,13 @@ The words **MUST**, **MUST NOT**, **SHOULD**, and **MAY** are normative. A metri
 | [`04-locimyu-conversion.md`](04-locimyu-conversion.md) | Canonical LociMyu Caption identity, source-authority rules and the direct-adapter conversion-report boundary |
 | [`05-project-scene-team-workflow.md`](05-project-scene-team-workflow.md) | ProjectScene composition, continuing new-format team history, Workspace/Contribution purposes, one-time migration and acceptance; supersedes identified general-v2 clauses without changing Native bytes |
 | [`07-project-scene-migration.md`](07-project-scene-migration.md) | PO-approved one-time cutover (2026-09-14); initial conversion is not complete. The former old-update bridge and §11 approval request are superseded; reduced source/target mapping still precedes implementation |
+| [`07c-locimyu-project-scene-conversion-proposal.md`](07c-locimyu-project-scene-conversion-proposal.md) | Exact first LociMyu → ProjectScene recipe/subset approved 2026-10-15, retaining 04 source semantics; bounded implementation/evidence are recorded in todo, broader conversion/adoption remain open |
 
 ### Proposed companions — not covered by the approval above
 
 | Document | Status / purpose |
 |---|---|
 | [`06-project-package-wire.md`](06-project-package-wire.md) | `PROPOSED / UNRATIFIED / NOT IMPLEMENTED`; five-purpose wire design under 05 §7.5, with explicit unresolved journal/base, budget and history-free-builder inputs; no format/version or production authorization |
-| [`07c-locimyu-project-scene-conversion-proposal.md`](07c-locimyu-project-scene-conversion-proposal.md) | `PROPOSED / NOT IMPLEMENTED`; next LociMyu → ProjectScene exact recipe/subset under 05 §9.2, retaining 04 source semantics; independent review and golden recomputation do not ratify it |
 
 ## Fixed versus conditional decisions
 
