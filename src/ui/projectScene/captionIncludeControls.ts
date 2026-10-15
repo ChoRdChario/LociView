@@ -30,7 +30,7 @@ export function createCaptionIncludeControls(document: Document, onPlan: (plan: 
   listen(review, 'click', () => { if (!review.disabled) request({ kind: 'review' }); });
   function render(next: CaptionIncludeContext): boolean {
     if (disposed) return false;
-    if (context && (context.memory.composing || context.feedback.kind === 'applying') && context.source.sceneId !== next.source.sceneId) {
+    if (context && (context.memory.composing || context.feedback.kind === 'applying' && next.feedback.kind === 'applying') && context.source.sceneId !== next.source.sceneId) {
       status.textContent = '入力または変更処理を完了してください。'; return false;
     }
     context = next;

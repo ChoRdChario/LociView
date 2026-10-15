@@ -36,7 +36,7 @@ import { fixtureModelIds } from '../src/harness/projectScene/modelClosure';
 import { openValidationHost, validationArea } from '../src/harness/projectScene/validationHost';
 import { createValidationModeHost } from '../src/harness/projectScene/validationModeHost';
 import { productSources } from '../src/harness/projectScene/productSources';
-import { projectCaptions, projectMediaResources, projectMediaUncertain } from '../src/ui/projectScene/projectRead';
+import { projectCaptions, projectMediaResources, projectMediaUncertain, projectCaptionInventory } from '../src/ui/projectScene/projectRead';
 import { listValidationProjects } from '../src/harness/projectScene/validationCatalog';
 import { createSavedWorkspace } from '../src/harness/projectScene/metadataWorkspace';
 import type { DisplayCapture } from '../src/harness/projectScene/viewSession';
@@ -1568,7 +1568,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     };
     return { f, host, ui, editor, root, all, named, button, edited, status, downloads, legacy, dispatch, pick,
       moveCamera: () => camera({ kind: 'fit' }), display: () => display, setIssue: (text: string) => { issue = text; }, retryViewport, camera, recall, background,
-      payload: () => structuredClone(payload), liveHost: () => liveHost, imageReads, reservePointer, refresh: () => notifyViewport(),
+      payload: () => structuredClone(payload), liveHost: () => liveHost, imageReads, reservePointer, refresh: () => notifyViewport(), viewportFactory: factory,
       holdFrame(value: boolean) { holdFrame = value; if (!value) { projected = display; notifyViewport(); } },
       pinPoint(value: typeof pinPoint) { pinPoint = value; notifyViewport(); },
       extent(value: typeof extent) { extent = value; notifyViewport(); },
@@ -1576,6 +1576,110 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       proposePin: (...args: Parameters<NonNullable<Parameters<ViewportFactory>[2]>>) => proposePin?.(...args),
       proposeModel: (...args: Parameters<NonNullable<Parameters<ViewportFactory>[3]>>) => proposeModel?.(...args) };
   }
+  it('manages product Scenes and shared Caption membership through exact retry, file exchange and cold startup', async () => {
+    const h = await productWorkspaceFixture(true), { host, editor, named, button, all, edited } = h, captionId = h.f.f.captionId;
+    const initial = host.authority.read(), firstScene = Object.keys(initial.state.scenes)[0]!, firstName = initial.state.scenes[firstScene]!.name;
+    if (firstName.kind !== 'value') throw Error('name');
+    named('キャプション一覧', editor).children[0]!.children[0]!.fire('click');
+    const parent = named('変更先モデル', editor); parent.fire('focus'); parent.value = initial.modelVersions![0]!.assetId; parent.fire('change'); button('位置を確認', editor).fire('click');
+    await edited(() => button('親モデルと位置を確定', editor).fire('click'));
+    const firstWindow = named('最初の記録', named('キャプションのウィンドウ', editor)); named('大きさを変更', firstWindow).fire('keydown', { key: 'ArrowRight', preventDefault() {} });
+    const form = named('シーンの変更', editor), name = named('シーン名', form); name.value = '現地'; name.fire('input');
+    expect(all(form).some(n => n.textContent.includes('キャプションは追加されません'))).toBe(true);
+    await edited(() => form.fire('submit', { preventDefault() {} }));
+    const created = h.dispatch.mock.lastCall![1]; if (created.kind !== 'createScene') throw Error('create'); const secondScene = created.sceneId;
+    expect(h.display()!.sceneId).toBe(secondScene); expect(host.authority.read().state.defaultSceneId).toEqual(initial.state.defaultSceneId);
+    expect(Object.values(host.authority.read().state.captionMemberships).some(e => e.sceneId === secondScene)).toBe(false);
+    expect(Object.values(host.authority.read().state.assetMemberships).filter(e => e.sceneId === secondScene)).toHaveLength(1);
+    button('名前を変更', editor).fire('click'); name.fire('compositionstart'); name.value = '現地の調査'; name.fire('input');
+    expect(button('モデル', editor).disabled).toBe(true); expect(button('ファイルに保存', named('ファイル')).disabled).toBe(true); name.fire('compositionend');
+    const beforeRename = host.read().source!; h.f.fs.reject = path => path.endsWith('/published.json'); form.fire('submit', { preventDefault() {} });
+    await vi.waitFor(() => expect(host.authority.status!().kind).toBe('failed'), { timeout: 10000 }); await vi.waitFor(() => expect(h.status.dataset.busy).toBe('false'));
+    expect(host.read().source!.token).toBe(beforeRename.token); expect(name.value).toBe('現地の調査'); expect(button('取り消す', form).disabled).toBe(true);
+    h.f.fs.reject = () => false; await edited(() => button('更新を再試行', editor).fire('click'));
+    expect(host.read().source!.originalChanges()).toHaveLength(beforeRename.originalChanges().length + 1); expect(h.display()!.sceneId).toBe(secondScene);
+    button('開始シーンにする', editor).fire('click'); expect(all(form).some(n => n.textContent.includes('次にプロジェクトを開くとき'))).toBe(true);
+    await edited(() => form.fire('submit', { preventDefault() {} })); expect(h.display()!.sceneId).toBe(secondScene);
+    button('モデル', editor).fire('click'); const models = named('モデルの作業', editor); named('プロジェクトのモデル一覧', models).children[0]!.children[0]!.fire('click');
+    const visible = named('このシーンに表示', models); visible.checked = false; await edited(() => visible.fire('change'));
+    button('キャプション', editor).fire('click'); expect(h.display()!.models).toHaveLength(0);
+    const picker = named('キャプションの追加・除外', editor), choices = named('キャプション', picker), query = named('検索', picker);
+    choices.value = captionId; choices.fire('change'); expect(all(picker).some(n => n.textContent.includes('モデルは非表示のまま'))).toBe(true);
+    const resources = host.authority.read().resources.captions;
+    await edited(() => button('このシーンに追加', picker).fire('click')); expect(h.display()!.models).toHaveLength(0); expect(h.display()!.selectedId).toBeNull();
+    named('キャプション一覧', editor).children[0]!.children[0]!.fire('click'); expect(h.display()!.selectedId).toBe(captionId);
+    query.fire('compositionstart'); query.value = '検索中'; query.fire('input'); expect(button('このシーンから外す', picker).disabled).toBe(true); expect(button('モデル', editor).disabled).toBe(true);
+    expect(button('ファイルに保存', named('ファイル')).disabled).toBe(true); query.fire('compositionend'); expect(choices.value).toBe(captionId);
+    const beforeExclude = host.read().source!, edge = Object.values(host.authority.read().state.captionMemberships).find(e => e.sceneId === secondScene && e.resourceId === captionId)!;
+    h.f.fs.reject = path => path.endsWith('/published.json'); button('このシーンから外す', picker).fire('click');
+    await vi.waitFor(() => expect(host.authority.status!().kind).toBe('failed'), { timeout: 10000 }); await vi.waitFor(() => expect(h.status.dataset.busy).toBe('false'));
+    expect(host.read().source!.token).toBe(beforeExclude.token); expect(h.display()!.selectedId).toBe(captionId); expect(named('最初の記録', named('キャプションのウィンドウ', editor))).toBeDefined();
+    const staged = (await h.f.fs.list('')).filter(path => path.endsWith('.amchange')), bytes = await Promise.all(staged.map(path => h.f.fs.readBytes(path)));
+    h.f.fs.reject = () => false; await edited(() => button('更新を再試行', editor).fire('click')); expect(await Promise.all(staged.map(path => h.f.fs.readBytes(path)))).toEqual(bytes);
+    expect(h.display()!.selectedId).toBeNull(); expect(host.authority.read().resources.captions).toEqual(resources); expect(choices.value).toBe(captionId); expect(query.value).toBe('検索中');
+    expect(host.authority.read().state.captionMemberships[edge.id]!.lifecycle).toMatchObject({ value: { state: 'deleted' } });
+    await edited(() => button('このシーンに追加', picker).fire('click'));
+    expect(Object.values(host.authority.read().state.captionMemberships).filter(e => e.sceneId === secondScene && e.lifecycle.kind === 'value' && e.lifecycle.value.state === 'active').map(e => e.id)).not.toContain(edge.id);
+    button(firstName.value, named('シーン', editor)).fire('click'); expect(h.display()!.sceneId).toBe(firstScene);
+    expect(named('最初の記録', named('キャプションのウィンドウ', editor)).style.width).toBe('300px');
+    const shared = await host.workspaceOutput.download(await host.workspaceOutput.generate(host.read().source!.token)), peer = firstWorkspaceRecipient(); await peer.receiver.importWorkspace(shared);
+    await peer.session.edit((await peer.session.read()).source!.token, { kind: 'renameScene', sceneId: secondScene, name: '共同作業で変更したシーン' });
+    const receive = named('更新ファイルを選択'); Object.assign(receive, { files: [(await contributionFile(peer.session, peer.fs, peer.store)).file] }); receive.fire('change');
+    await edited(() => receive.parent!.parent!.fire('submit', { preventDefault() {} })); await vi.waitFor(() => expect(all(h.root).some(n => n.textContent === '更新を受け取りました。')).toBe(true), { timeout: 10000 });
+    Object.assign(receive, { files: [] }); receive.fire('change'); expect(h.display()!.sceneId).toBe(firstScene);
+    const final = host.read().source!; await h.ui.dispose(); const cold = await openValidationHost(h.f.options); expect(cold.read().source!.originalChanges()).toEqual(final.originalChanges());
+    const coldUi = createValidationWorkspace(new RecordedDocument().asDocument(), { productEditor: true, fileLimits: budget, decode, list: async () => [], selected() {},
+      open: async () => cold, render: async () => ({ factory: h.viewportFactory, dispose() {} }) }, h.f.run);
+    await vi.waitFor(() => expect(h.display()!.sceneId).toBe(secondScene));
+    expect(cold.authority.read().state.scenes[secondScene]!.name).toEqual({ kind: 'value', value: '共同作業で変更したシーン' });
+    expect(cold.authority.read().state.defaultSceneId).toEqual({ kind: 'value', value: secondScene }); expect(h.legacy).not.toHaveBeenCalled(); await coldUi.dispose();
+  });
+  it('guards product Scene drafts against IME, camera gestures and stale source while keeping readonly inventory usable', async () => {
+    const h = await productWorkspaceFixture(true), { host, editor, named, button, all, edited } = h, captionId = h.f.f.captionId;
+    const form = named('シーンの変更', editor), name = named('シーン名', form); name.value = '作業中'; name.fire('input'); await edited(() => form.fire('submit', { preventDefault() {} }));
+    button('名前を変更', editor).fire('click'); name.fire('compositionstart'); name.value = '未確定の名称'; name.fire('input');
+    expect(button('名前を確定', form).disabled).toBe(true); expect(button('モデル', editor).disabled).toBe(true); name.fire('compositionend');
+    const calls = h.dispatch.mock.calls.length; h.dragging(true); expect(button('名前を確定', form).disabled).toBe(true); form.fire('submit', { preventDefault() {} }); expect(h.dispatch).toHaveBeenCalledTimes(calls); h.dragging(false);
+    await host.dispatch(host.read().source!.token, { kind: 'editCaption', captionId, edits: { body: '入力中に届いた更新' } }); h.refresh();
+    expect(name.value).toBe('未確定の名称'); expect(button('名前を確定', form).disabled).toBe(true); button('取り消す', form).fire('click');
+    const count = Object.keys(host.authority.read().state.scenes).length; name.fire('focus'); await host.dispatch(host.read().source!.token, { kind: 'editCaption', captionId, edits: { body: 'フォーカス後の更新' } }); h.refresh();
+    name.value = '古い対象への追加'; name.fire('input'); expect(button('シーンを追加', form).disabled).toBe(true); form.fire('submit', { preventDefault() {} }); expect(Object.keys(host.authority.read().state.scenes)).toHaveLength(count); button('取り消す', form).fire('click');
+    button('開始シーンにする', editor).fire('click'); await host.dispatch(host.read().source!.token, { kind: 'editCaption', captionId, edits: { body: '確認中に届いた更新' } }); h.refresh();
+    expect(button('開始シーンを設定', form).disabled).toBe(true); button('取り消す', form).fire('click');
+    button('閲覧に切り替える').fire('click'); await vi.waitFor(() => expect(button('編集を開始する')?.disabled).toBe(false), { timeout: 10000 });
+    expect(name.disabled).toBe(true); expect(button('名前を変更', editor).disabled).toBe(true); expect(button('開始シーンにする', editor).disabled).toBe(true);
+    const picker = named('キャプションの追加・除外', editor), choices = named('キャプション', picker), query = named('検索', picker); choices.value = captionId; choices.fire('change');
+    expect(button('このシーンに追加', picker).disabled).toBe(true); expect(query.readOnly).toBe(false);
+    query.fire('compositionstart'); query.value = '最初'; query.fire('input'); expect(button('編集を開始する').disabled).toBe(true);
+    const current = h.liveHost(), base = current.read(); if (base.provider?.kind !== 'scene-provider') throw Error('provider');
+    const updated = base.source!.prepareEdit(base.source!.token, { kind: 'editCaption', captionId, edits: { body: '再描画前の更新' } }, base.provider, newId());
+    const provider = await readProjectScene(updated.read(), metadata, current.content.verifier(false)); if (provider.kind !== 'scene-provider') throw Error('provider');
+    const unread = vi.spyOn(current, 'read').mockImplementation(() => ({ ...base, source: updated, provider }));
+    query.value = '最初の記録'; query.fire('compositionend'); expect(query.value).toBe('最初の記録'); expect(choices.value).toBe(captionId); expect(button('編集を開始する').disabled).toBe(false);
+    unread.mockRestore(); h.refresh(); expect(h.ui.hasChanges()).toBe(false); expect(all(named('キャプション一覧', editor)).some(n => n.className === 'lv-caption-select')).toBe(false); await h.ui.dispose();
+  });
+  it('keeps raw ambiguous product Caption membership uncertain without blocking independent text conflicts', async () => {
+    const h = await productWorkspaceFixture(true), source = h.host.read().source!, sceneId = Object.keys(h.host.authority.read().state.scenes)[0]!, captionId = h.f.f.captionId;
+    const original = A.load<Record<string, any>>(source.encodeFullSource()), edgeId = Object.keys(original.sceneCaptionMembershipsById)[0]!;
+    const scalar = (v: string | JsonObject) => new A.ImmutableString(canonicalFixture(v));
+    const read = async (doc: typeof original) => { const p = await readProjectScene(ProjectMetadataSource.fromFullSource(A.save(doc), source.proof, metadata).read(), metadata, h.host.content.verifier(false));
+      if (p.kind !== 'scene-provider') throw Error('provider'); const inventory = projectCaptionInventory(p, sceneId); if (inventory.kind !== 'ready') throw Error('inventory'); return inventory.items.find(i => i.caption.id === captionId)!; };
+    const deleted = A.change(A.clone(original), d => { d.sceneCaptionMembershipsById[edgeId].lifecycle = scalar({ state: 'deleted', eventId: `evt_${newId()}`, reason: 'userDelete' }); });
+    expect((await read(deleted)).membership).toEqual({ kind: 'value', value: 'absent' });
+    const unknownOwner = A.change(A.clone(original), d => { d.sceneCaptionMembershipsById[edgeId].captionId = scalar('not-an-id'); });
+    expect((await read(unknownOwner)).membership.kind).toBe('unresolved');
+    const duplicate = A.change(A.clone(original), d => { const id = `scm_${newId()}`; d.sceneCaptionMembershipsById[id] = { ...d.sceneCaptionMembershipsById[edgeId], id: scalar(id) }; });
+    expect((await read(duplicate)).membership.kind).toBe('unresolved');
+    const edgeEdit = A.change(A.clone(original), d => { d.sceneCaptionMembershipsById[edgeId].orderKey = scalar('B'); });
+    expect((await read(A.merge(deleted, edgeEdit))).membership.kind).toBe('unresolved');
+    const parallelOrder = A.change(A.clone(original), d => { d.sceneCaptionMembershipsById[edgeId].orderKey = scalar('C'); });
+    expect((await read(A.merge(edgeEdit, parallelOrder))).membership.kind).toBe('unresolved');
+    const unknownScene = A.change(A.clone(original), d => { d.sceneCaptionMembershipsById[edgeId].sceneId = scalar('not-a-scene'); d.sceneCaptionMembershipsById[edgeId].captionId = scalar(`cap_${newId()}`); });
+    expect((await read(unknownScene)).membership.kind).toBe('unresolved');
+    const titles = ['候補 A', '候補 B'].map(text => A.change(A.clone(original), d => { d.captionsById[captionId].title = scalar(text); }));
+    const textConflict = await read(A.merge(titles[0]!, titles[1]!)); expect(textConflict.caption.title.kind).toBe('unresolved'); expect(textConflict.lifecycle).toEqual({ kind: 'value', value: 'active' }); expect(textConflict.membership).toEqual({ kind: 'value', value: 'included' });
+    await h.ui.dispose();
+  });
   it('deletes one shared product Caption after exact dependency confirmation, retaining resources through retry, files and cold reopen', async () => {
     const h = await productWorkspaceFixture(true, false, true), { host, editor, named, button, edited, all } = h, captionId = h.f.f.captionId;
     const sceneId = Object.keys(host.authority.read().state.scenes)[0]!, secondScene = `scn_${newId()}`;

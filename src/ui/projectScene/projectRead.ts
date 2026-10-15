@@ -1,9 +1,10 @@
 import { resolveScene } from '../../scene/resolve';
 import { same } from '../../domain/projectGraphSupport';
-import { value, type Field } from '../../scene/types';
+import { value, type Field, type Caption } from '../../scene/types';
 import type { JsonValue, JsonObject } from '../../domain/values';
 import type { WorkspaceProvider } from './projectWorkspacePorts';
 import type { CaptionListItem } from './captionListState';
+import type { CaptionIncludeSource } from './captionIncludeState';
 import type { ModelListSource, ModelMembership } from './modelListState';
 
 export const fieldValue = <T>(f: Field<T> | undefined): T | undefined => f?.kind === 'value' ? f.value : undefined;
@@ -81,17 +82,44 @@ export function projectCaptionSceneCount(provider: WorkspaceProvider, captionId:
 export function projectCaptions(provider: WorkspaceProvider, sceneId: string): readonly CaptionListItem[] {
   const scene = resolveScene(provider.state, provider.resources, sceneId);
   if (scene.kind !== 'ready') return [];
-  return scene.composition.captions.map(c => {
-    const colorField = provider.details.mutable.captionsById[c.captionId]?.colorSrgb;
+  return scene.composition.captions.map(c => projectCaptionItem(provider, { ...c, id: c.captionId },
+    c.marker === 'visible' ? 'visible' : c.marker === 'unplaced' ? 'unplaced' : c.marker === 'needsReview' ? 'needsReview' : 'unavailable'));
+}
+function projectCaptionItem(provider: WorkspaceProvider, c: Pick<Caption, 'id' | 'title' | 'body' | 'anchor'>, pin: CaptionListItem['pin']): CaptionListItem {
+    const colorField = provider.details.mutable.captionsById[c.id]?.colorSrgb;
     const color = fieldValue(colorField);
     const hex = Array.isArray(color) && color.length === 3 && color.every(n => typeof n === 'number' && Number.isFinite(n) && n >= 0 && n <= 1)
       ? '#' + color.map(n => Math.round(Number(n) * 255).toString(16).padStart(2, '0')).join('') : colorField?.kind === 'value' && color === undefined ? '#a08045' : null;
     const anchor = fieldValue(c.anchor), assetId = anchor?.kind === 'asset' ? anchor.assetId : anchor?.kind === 'unplaced' ? anchor.ownerAssetId : null;
     const label = assetId ? provider.details.mutable.assetsById[assetId]?.label : undefined;
-    return { id: c.captionId, title: c.title, body: c.body, color: hex ? value(hex) : unknown<string>(),
+    return { id: c.id, title: c.title, body: c.body, color: hex ? value(hex) : unknown<string>(),
       owner: c.anchor.kind === 'unresolved' ? c.anchor : assetId ? value({ kind: 'asset' as const, assetId, name: label as Field<string> ?? unknown<string>() }) :
         anchor?.kind === 'project' ? value({ kind: 'project' as const }) : value({ kind: 'none' as const }),
-      mediaCount: projectMediaUncertain(provider, c.captionId) ? unknown<number>() : value(projectAttachments(provider, c.captionId).length),
-      pin: c.marker === 'visible' ? 'visible' : c.marker === 'unplaced' ? 'unplaced' : c.marker === 'needsReview' ? 'needsReview' : 'unavailable' };
-  });
+      mediaCount: projectMediaUncertain(provider, c.id) ? unknown<number>() : value(projectAttachments(provider, c.id).length), pin };
+}
+/** Whole Project inventory; unresolved raw endpoints must never become absence. */
+export function projectCaptionInventory(provider: WorkspaceProvider, sceneId: string, hiddenAssetIds: readonly string[] = []): CaptionIncludeSource {
+  const scene = resolveScene(provider.state, provider.resources, sceneId), scope = { token: provider.token, sceneId };
+  if (scene.kind !== 'ready') return { ...scope, kind: 'unavailable', reason: 'シーンの状態を確認してください。' };
+  const counts = new Map<string, number>(), uncertain = new Set<string>(); let uncertainAll = false;
+  const deleteEdits = new Set(provider.issues.filter(i => i.code === 'concurrent-delete-edit').map(i => `${i.path[0]}/${i.path[1]}`));
+  for (const [id, fields] of Object.entries(provider.details.mutable.sceneCaptionMembershipsById)) {
+    const lifecycle = fieldValue(fields.lifecycle) as JsonObject | undefined, deleteEdit = deleteEdits.has(`sceneCaptionMembershipsById/${id}`);
+    const owner = fieldValue(fields.captionId), target = fieldValue(fields.sceneId);
+    if (typeof target !== 'string') { uncertainAll = true; continue; }
+    if (target !== sceneId) continue;
+    const edge = provider.state.captionMemberships[id];
+    if (typeof owner !== 'string') uncertainAll = true;
+    else if (fieldValue(fields.id) !== id || fields.orderKey?.kind !== 'value' || !lifecycle || deleteEdit) uncertain.add(owner);
+    else if (lifecycle.state === 'deleted') continue;
+    else if (lifecycle.state !== 'active' || !edge || edge.resourceId !== owner || edge.sceneId !== sceneId || fieldValue(edge.lifecycle)?.state !== 'active') uncertain.add(owner);
+    else counts.set(owner, (counts.get(owner) ?? 0) + 1);
+  }
+  const visibleOwners = new Set(scene.composition.assets.map(a => a.assetId).filter(id => !hiddenAssetIds.includes(id)));
+  return { ...scope, kind: 'ready', items: Object.values(provider.resources.captions).map(caption => {
+    const anchor = fieldValue(caption.anchor), owner = anchor?.kind === 'asset' ? anchor.assetId : null, count = counts.get(caption.id) ?? 0;
+    return { caption: projectCaptionItem(provider, caption, anchor?.kind === 'unplaced' ? 'unplaced' : owner && !visibleOwners.has(owner) ? 'ownerHidden' : 'unavailable'),
+      lifecycle: caption.lifecycle.kind === 'value' && !deleteEdits.has(`captionsById/${caption.id}`) ? value(caption.lifecycle.value.state) : unknown(),
+      membership: uncertainAll || uncertain.has(caption.id) || count > 1 ? unknown() : value(count ? 'included' : 'absent') };
+  }) };
 }

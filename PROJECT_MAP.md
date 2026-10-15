@@ -29,6 +29,9 @@ The composition reuses `captionWindowControls.ts` for Scene-local comparison
 windows and their galleries, sharing the workspace-level image viewer.
 Caption deletion confirmation and explicit parent proposals use the same workspace
 guards and typed commands, with impact/coordinate reads adapted by `productSources.ts`.
+Scene names and the next-open Scene use the same captured draft/retry owner;
+`captionIncludeControls.ts` consumes `projectRead.ts`'s complete Caption inventory
+for membership-only changes without copying content or showing the owner.
 `productSources.ts` supplies bounded read projections and command preparation.
 Inventory and todo own its exact feature and verification scope.
 

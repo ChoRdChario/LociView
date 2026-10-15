@@ -1,14 +1,17 @@
 import type { MetadataEdit } from '../../projectMetadata/commands';
-import { chooseStartupScene, resolveScene } from '../../scene/resolve';
+import { chooseStartupScene, resolveScene, memberships } from '../../scene/resolve';
+import type { Issue } from '../../scene/types';
 import { createCaptionListControls } from './captionListControls';
 import { captionListPlanIsCurrent, type CaptionListContext } from './captionListState';
 import { createCaptionDetailControls } from './captionDetailControls';
+import { createCaptionIncludeControls } from './captionIncludeControls';
+import { captionIncludePlanIsCurrent, newCaptionIncludeMemory, type CaptionIncludeMemory, type CaptionIncludeContext } from './captionIncludeState';
 import { beginCaptionDraft, captionApplyIsCurrent, hasCaptionDraft, type CaptionDraft, type DetailContext } from './captionDetailState';
 import { createCaptionWindowControls } from './captionWindowControls';
 import { captionWindowPlanIsCurrent, newCaptionWindowMemory, planCaptionWindow, type CaptionWindowMemory, type CaptionWindowPlan } from './captionWindowState';
 import { createMediaViewer } from './mediaPreview';
 import type { SceneUiMemory } from './navigationState';
-import { fieldValue, projectAttachments, projectCaptions, projectCaptionSceneCount } from './projectRead';
+import { fieldValue, projectAttachments, projectCaptions, projectCaptionSceneCount, projectCaptionInventory } from './projectRead';
 import { surfaceAnchor, type ProjectWorkspacePorts, type WorkspaceFileInteraction, type WorkspacePinProposal, type WorkspaceSurface, type Point3 } from './projectWorkspacePorts';
 import { createProjectModels } from './projectModels';
 import { createProjectViews } from './projectViews';
@@ -21,6 +24,7 @@ const emptyMemory = (): SceneUiMemory => ({ selectedCaptionId: null, search: '',
 const sameTarget = (a: WorkspaceSurface, b: WorkspaceSurface) => JSON.stringify(a) === JSON.stringify(b);
 const colorBytes = (hex: string) => hex.slice(1).match(/../g)!.map(n => parseInt(n, 16) / 255);
 type PinAction = { kind: 'add' | 'move' | 'reparent' | 'place'; token: string; sceneId: string; captionId: string | null; assetId?: string };
+type SceneEdit = { kind: 'create' | 'rename' | 'default'; token: string; sceneId: string; name: string; composing: boolean };
 
 /** Product composition: provider reads and typed commands; owns no storage or fixture adapter. */
 export function createProjectWorkspace(document: Document, ports: ProjectWorkspacePorts) {
@@ -45,8 +49,15 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   const panels = new Map<ProjectTask, ProjectPanel>(); let task: ProjectTask = 'captions', models: ProjectModelPanel | undefined, mediaManager: ReturnType<typeof createProjectMedia> | undefined;
   const sceneArea = make('section'), scenes = make('div'); sceneArea.setAttribute('aria-label', 'シーン'); sceneArea.append(make('h2', 'シーン'), scenes);
   const sceneForm = make('form'), sceneLabel = make('label', 'シーン名'), sceneName = make('input');
+  sceneForm.setAttribute('aria-label', 'シーンの変更');
   sceneName.setAttribute('aria-label', 'シーン名'); sceneLabel.append(sceneName);
-  const createScene = button('シーンを追加', () => {}); createScene.type = 'submit'; sceneForm.append(sceneLabel, createScene); sceneArea.append(sceneForm);
+  const createScene = button('シーンを追加', () => {}); createScene.type = 'submit';
+  const sceneNote = make('p'), sceneStatus = make('p'), sceneManagement = make('details'), sceneActions = make('div');
+  sceneManagement.setAttribute('aria-label', 'シーンの管理'); sceneStatus.setAttribute('role', 'status');
+  const renameScene = button('名前を変更', () => beginSceneChange('rename')), defaultScene = button('開始シーンにする', () => beginSceneChange('default'));
+  const cancelScene = button('取り消す', () => { if (!busy && !pending && ports.status().kind === 'idle' && !ports.otherPending() && !sceneEdit?.composing) { clearSceneEdit(); render(); } });
+  sceneActions.append(renameScene, defaultScene); sceneManagement.append(make('summary', 'シーンを管理'), sceneActions);
+  sceneForm.append(sceneLabel, sceneNote, createScene, cancelScene); sceneArea.append(sceneStatus, sceneManagement, sceneForm);
   const pinArea = make('section'), pinStatus = make('p'), coords = make('div'); pinStatus.setAttribute('role', 'status');
   pinArea.setAttribute('aria-label', 'ピンの操作');
   const addPin = button('ピンを追加', () => { if (guardInput()) { pinAction = { kind: 'add', token: provider().token, sceneId, captionId: null }; choosing = true; placingCaption = null; render(); } });
@@ -92,7 +103,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     input.addEventListener('compositionend', () => { composing = false; render(); }); return input;
   });
   const finishPin = button('位置を確定', () => {
-    if (!pin || choosing || mutationBlock() || composing || viewport.read().dragging || !positionValid() || !pinCurrent()) return;
+    if (!pin || choosing || mutationBlock() || composingInput() || viewport.read().dragging || !positionValid() || !pinCurrent()) return;
     const captured = pin, target = viewport.target(captured.target.assetId);
     if (!target || !sameTarget(target, captured.target)) { feedback = '表示が変わっています。面を選び直してください。'; render(); return; }
     const command: MetadataEdit = captured.captionId ? { kind: pinAction!.kind === 'move' ? 'movePin' : 'reparentPin', sceneId, captionId: captured.captionId, anchor: surfaceAnchor(captured) } :
@@ -102,8 +113,8 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       clearPin(); selectCaption(captionId); feedback = 'ピンの位置を確定しました。';
     });
   });
-  const cancelPin = button('取り消す', () => { if (!busy && !pending && ports.status().kind === 'idle' && !ports.otherPending() && !composing) { clearPin(); render(); } });
-  const repick = button('面で位置を指定', () => { if (pin && !mutationBlock() && !composing && pinCurrent()) { gesture = null; choosing = true; placingCaption = pin.captionId; render(); } });
+  const cancelPin = button('取り消す', () => { if (!busy && !pending && ports.status().kind === 'idle' && !ports.otherPending() && !composingInput()) { clearPin(); render(); } });
+  const repick = button('面で位置を指定', () => { if (pin && !mutationBlock() && !composingInput() && pinCurrent()) { gesture = null; choosing = true; placingCaption = pin.captionId; render(); } });
   pinArea.append(addPin, movePin, parent, pinStatus, coords, repick, finishPin, cancelPin);
   const deletionArea = make('section'), deletionBox = make('section'), deletionTitle = make('p'), deletionEffects = make('ul'), deletionNote = make('p'), referenceIssues = make('section');
   deletionArea.setAttribute('aria-label', 'キャプションの削除'); deletionBox.setAttribute('aria-label', '削除の確認'); deletionNote.setAttribute('role', 'status');
@@ -115,7 +126,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     } catch (error) { feedback = (error as Error).message; render(); }
   });
   const confirmDelete = button('削除する', () => {
-    const captured = deletion; if (!captured || mutationBlock() || composing || viewport.read().dragging || captured.token !== provider().token || captured.sceneId !== sceneId || captured.captionId !== memory().selectedCaptionId) return;
+    const captured = deletion; if (!captured || mutationBlock() || composingInput() || viewport.read().dragging || captured.token !== provider().token || captured.sceneId !== sceneId || captured.captionId !== memory().selectedCaptionId) return;
     const { memberships, attachments, tags } = captured.impact;
     void run({ kind: 'deleteCaption', captionId: captured.captionId, eventId: id('evt'), observedMembershipIds: memberships.map(e => e.id),
       observedAttachmentIds: attachments.map(e => e.id), observedTagMembershipIds: tags.map(e => e.id) }, () => {
@@ -135,6 +146,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   const conflicts = make('section'); conflicts.setAttribute('aria-label', '記録の競合');
   let sceneId = chooseStartupScene(ports.read().state).sceneId ?? '', disposed = false, busy = false, composing = false, feedback = '';
   let draft: CaptionDraft | null = null, pin: WorkspacePinProposal | null = null, choosing = false, placingCaption: string | null = null;
+  let sceneEdit: SceneEdit | null = null, sceneInputScope: { token: string; sceneId: string } | null = null;
   let pinAction: PinAction | null = null;
   let parentKey = '', parentScope = '';
   let deletion: { token: string; sceneId: string; captionId: string; title: string; impact: ReturnType<ProjectWorkspacePorts['captionDeletion']> } | null = null;
@@ -145,11 +157,14 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   let viewportFeedback = '';
   const memories = new Map<string, SceneUiMemory>();
   const windowMemories = new Map<string, CaptionWindowMemory>();
+  const includeMemories = new Map<string, CaptionIncludeMemory>();
   const conflictChoices = new Map<string, { token: string; operationId: string }>();
   const provider = () => ports.read();
   const memory = () => { if (!memories.has(sceneId)) memories.set(sceneId, emptyMemory()); return memories.get(sceneId)!; };
   const windowMemory = () => { if (!windowMemories.has(sceneId)) windowMemories.set(sceneId, newCaptionWindowMemory(sceneId)); return windowMemories.get(sceneId)!; };
-  const draftInput = () => hasCaptionDraft(draft) || !!draft?.composing || !!pin || choosing || !!deletion || composing || !!pickerScope || sceneName.value.trim() !== '';
+  const includeMemory = () => { if (!includeMemories.has(sceneId)) includeMemories.set(sceneId, newCaptionIncludeMemory(sceneId)); return includeMemories.get(sceneId)!; };
+  const composingInput = () => composing || !!draft?.composing || !!sceneEdit?.composing || includeMemory().composing || !!mediaManager?.composing() || [...panels.values()].some(p => p.composing());
+  const draftInput = () => hasCaptionDraft(draft) || !!draft?.composing || !!pin || choosing || !!deletion || composing || !!pickerScope || !!sceneEdit || includeMemory().composing;
   const panelInput = () => [...panels.values()].some(p => p.hasChanges());
   const dirty = () => draftInput() || conflictChoices.size > 0 || !!pending || panelInput() || !!mediaManager?.hasChanges() || windowMoving || viewport.read().dragging;
   const mutationBlock = () => windowMoving ? 'ウィンドウの操作を完了してください。' : busy ? '変更を適用しています。' : ports.status().kind === 'failed' ? ports.status().error || '更新を再試行してください。' :
@@ -161,7 +176,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     return { source: item ? { kind: 'ready', token: provider().token, sceneId, caption: item, sceneCount: projectCaptionSceneCount(provider(), item.id) } :
       { kind: 'unavailable', token: provider().token, sceneId, captionId: memory().selectedCaptionId,
         reason: memory().selectedCaptionId ? 'この記録は削除されたか、所属・更新の状態を確認する必要があります。未適用の入力は保持しています。' : '記録を選択してください。' },
-      draft, mutationBlock: mutationBlock() || (pin || choosing || deletion || pickerScope || conflictChoices.size || panelInput() || mediaManager?.hasChanges() ? '現在の操作を完了してください。' : null), feedback: { kind: 'idle' } };
+      draft, mutationBlock: mutationBlock() || (pin || choosing || deletion || sceneEdit || includeMemory().composing || pickerScope || conflictChoices.size || panelInput() || mediaManager?.hasChanges() ? '現在の操作を完了してください。' : null), feedback: { kind: 'idle' } };
   };
   const list = createCaptionListControls(document, plan => {
     if (disposed || busy || pending || windowMoving || ports.otherPending()) return;
@@ -191,10 +206,37 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     } else if (event.kind === 'review') feedback = '下の競合欄で残す内容を選択してください。';
     render();
   });
-  captionPanel.append(list.root, pinArea, detail.root, conflicts, media, deletionArea); sidebar.append(sceneArea, taskTabs, captionPanel); body.append(stage, sidebar); root.append(header, viewportTools, body, mediaViewer.root);
+  const includeContext = (): CaptionIncludeContext => ({ source: projectCaptionInventory(provider(), sceneId, models?.hidden()), memory: includeMemory(),
+    pending: dirty() ? 'text' : null, mutationBlock: mutationBlock(), feedback: { kind: busy ? 'applying' : 'idle' } });
+  const inclusion = createCaptionIncludeControls(document, plan => {
+    if (disposed || plan.kind === 'blocked') return;
+    if (plan.kind === 'change') {
+      const current = includeMemory(), localText = plan.baseMemory === current && plan.sceneId === sceneId && plan.memory.sceneId === sceneId && plan.memory.captionId === current.captionId;
+      if (!captionIncludePlanIsCurrent(plan, includeContext()) && !localText) return;
+      if ((busy || pending || windowMoving || ports.otherPending()) && !localText) return;
+      includeMemories.set(sceneId, plan.memory); render(); return;
+    }
+    if (!captionIncludePlanIsCurrent(plan, includeContext())) return;
+    if (busy || pending || windowMoving || ports.otherPending() || dirty()) return;
+    if (plan.kind === 'review') { feedback = '記録の状態と所属・更新の競合を確認してください。'; render(); return; }
+    const edges = Object.values(provider().state.captionMemberships).filter(e => e.sceneId === sceneId && e.resourceId === plan.captionId && fieldValue(e.lifecycle)?.state === 'active');
+    if (mutationBlock() || plan.kind === 'exclude' && edges.length !== 1) return;
+    const command: MetadataEdit = plan.kind === 'include' ? { kind: 'include', sceneId, resourceKind: 'caption', resourceId: plan.captionId,
+      membershipId: id('scm'), orderKey: 'Z', eventId: id('evt') } : { kind: 'exclude', resourceKind: 'caption', membershipId: edges[0]!.id, eventId: id('evt') };
+    void run(command, () => {
+      if (plan.kind === 'exclude') {
+        if (memory().selectedCaptionId === plan.captionId) { memories.set(sceneId, { ...memory(), selectedCaptionId: null }); resetDraft(); }
+        const m = windowMemory(); windowMemories.set(sceneId, { ...m, retained: m.retained.filter(c => c !== plan.captionId), dismissed: m.dismissed.filter(c => c !== plan.captionId),
+          order: m.order.filter(c => c !== plan.captionId), placements: m.placements.filter(c => c.captionId !== plan.captionId) });
+      }
+      feedback = plan.kind === 'include' ? 'このシーンに追加しました。' : 'このシーンから外しました。キャプションは残っています。';
+    });
+  });
+  inclusion.root.setAttribute('aria-label', 'キャプションの追加・除外');
+  captionPanel.append(list.root, inclusion.root, pinArea, detail.root, conflicts, media, deletionArea); sidebar.append(sceneArea, taskTabs, captionPanel); body.append(stage, sidebar); root.append(header, viewportTools, body, mediaViewer.root);
   let mounted = false;
   const viewport = ports.createViewport(canvas, () => { if (mounted && !rendering) render(); }, (target, position) => {
-    if (!pin || mutationBlock() || composing || !pinCurrent() || !sameTarget(target, pin.target) || !position.every(Number.isFinite)) return false;
+    if (!pin || mutationBlock() || composingInput() || !pinCurrent() || !sameTarget(target, pin.target) || !position.every(Number.isFinite)) return false;
     setPin({ ...pin, position }); render(); return true;
   }, proposal => models?.propose(proposal) ?? false);
   function panelBlock(owner: ProjectTask, writes = true, allowDrag = false): string | null {
@@ -204,7 +246,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     if (owner !== 'captions' && mediaManager?.hasChanges()) return 'メディアの入力・操作を完了してください。';
     if (writes && hasCaptionDraft(draft)) return 'キャプションの変更を適用するか、取り消してください。';
     if (!allowDrag && viewport.read().dragging) return 'カメラ・配置の操作を終えてください。';
-    if (composing || draft?.composing || pin || choosing || deletion || pickerScope || conflictChoices.size || sceneName.value.trim() !== '') return '現在の入力・操作を完了してください。';
+    if (composing || draft?.composing || pin || choosing || deletion || pickerScope || conflictChoices.size || sceneEdit || includeMemory().composing) return '現在の入力・操作を完了してください。';
     if ([...panels].some(([key, panel]) => key !== owner && panel.hasChanges())) return 'ほかの作業の入力を完了するか、取り消してください。';
     return null;
   }
@@ -238,7 +280,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   panels.set('views', createProjectViews(document, panelHost)); panels.set('materials', createProjectMaterials(document, panelHost));
   const tabButtons = new Map<ProjectTask, HTMLButtonElement>();
   for (const [key, label] of [['captions', 'キャプション'], ['models', 'モデル'], ['views', '保存した視点'], ['materials', '材質']] as const) {
-    const tab = button(label, () => { if (!busy && !pending && !windowMoving && !ports.otherPending() && !composing && !draft?.composing && !mediaManager?.composing() && ![...panels.values()].some(p => p.composing())) { task = key; render(); } });
+    const tab = button(label, () => { if (!busy && !pending && !windowMoving && !ports.otherPending() && !composing && !sceneEdit?.composing && !includeMemory().composing && !draft?.composing && !mediaManager?.composing() && ![...panels.values()].some(p => p.composing())) { task = key; render(); } });
     tab.setAttribute('role', 'tab'); tab.setAttribute('aria-controls', `lv-project-${key}`); tab.id = `lv-project-tab-${key}`; tabButtons.set(key, tab); taskTabs.append(tab);
     tab.addEventListener('keydown', event => {
       if (tab.disabled || !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
@@ -292,7 +334,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     movePin.disabled = !!blocked || dirty() || !caption || fieldValue(caption.lifecycle)?.state !== 'active' || !anchor || anchor.kind === 'project' || projectCaptionSceneCount(p, caption.id).kind !== 'value';
     beginDelete.hidden = !!deletion; beginDelete.disabled = !!blocked || dirty() || !selected;
     deletionBox.hidden = !deletion;
-    confirmDelete.disabled = !!blocked || !deletion || composing || viewport.read().dragging || deletion.token !== p.token || deletion.sceneId !== sceneId || deletion.captionId !== selected;
+    confirmDelete.disabled = !!blocked || !deletion || composingInput() || viewport.read().dragging || deletion.token !== p.token || deletion.sceneId !== sceneId || deletion.captionId !== selected;
     cancelDelete.disabled = busy || !!pending || ports.status().kind !== 'idle' || ports.otherPending() || composing;
     if (deletion) {
       const { impact } = deletion; deletionTitle.textContent = `「${deletion.title}」をプロジェクト全体から削除しますか？`;
@@ -325,18 +367,48 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     const work = pending;
     await perform(() => ports.status().kind === 'failed' ? ports.retry() : work.action(), work.complete);
   }
+  function sceneBlock() {
+    return mutationBlock() || (hasCaptionDraft(draft) || draft?.composing || panelInput() || mediaManager?.hasChanges() || composing || includeMemory().composing || pin || choosing || deletion || pickerScope || conflictChoices.size || viewport.read().dragging ? '現在の入力・操作を完了してください。' : null);
+  }
+  function clearSceneEdit() { sceneEdit = null; sceneInputScope = null; sceneName.value = ''; }
+  function beginSceneChange(kind: 'rename' | 'default') {
+    if (!guardInput()) return;
+    const p = provider(), scene = p.state.scenes[sceneId];
+    if (!scene || fieldValue(scene.lifecycle)?.state !== 'active' || kind === 'rename' && scene.name.kind !== 'value' || kind === 'default' && p.state.defaultSceneId.kind !== 'value') return;
+    sceneEdit = { kind, token: p.token, sceneId, name: fieldValue(scene.name) ?? '', composing: false };
+    sceneInputScope = { token: p.token, sceneId }; render(); if (kind === 'rename') sceneName.focus();
+  }
+  const captureSceneInput = () => { if (!sceneEdit) sceneInputScope = { token: provider().token, sceneId }; };
+  sceneName.addEventListener('focus', captureSceneInput); sceneName.addEventListener('pointerdown', captureSceneInput);
+  function editSceneName(active = sceneEdit?.composing ?? false) {
+    const settling = !!sceneEdit?.composing && !active;
+    if ((sceneBlock() || sceneEdit?.kind === 'default') && !settling) return;
+    sceneEdit = { ...(sceneEdit ?? { kind: 'create', ...(sceneInputScope ?? { token: provider().token, sceneId }) }), name: sceneName.value, composing: active };
+    render();
+  }
+  sceneName.addEventListener('input', () => editSceneName());
+  sceneName.addEventListener('compositionstart', () => editSceneName(true));
+  sceneName.addEventListener('compositionend', () => editSceneName(false));
   sceneForm.addEventListener('submit', event => {
-    event.preventDefault(); if (mutationBlock() || panelInput() || mediaManager?.hasChanges() || composing || hasCaptionDraft(draft) || pin || choosing || deletion || pickerScope || conflictChoices.size || !sceneName.value.trim()) return;
-    const p = provider(), source = p.state.scenes[sceneId]; if (!source) return;
-    const edges = Object.values(p.state.assetMemberships).filter(e => e.sceneId === sceneId && fieldValue(e.lifecycle)?.state === 'active');
-    const nextScene = id('scn'), name = sceneName.value;
-    const orders = Object.values(p.state.scenes).map(s => fieldValue(s.orderKey)).filter((s): s is string => typeof s === 'string').sort();
-    void run({ kind: 'createScene', sceneId: nextScene, activeSceneId: sceneId, sourceSceneId: sceneId, name, orderKey: (orders.at(-1) ?? '') + 'U',
-      membershipIds: edges.map(() => id('sam')), eventId: id('evt') }, () => { sceneName.value = ''; sceneId = nextScene; draft = null; feedback = 'シーンを追加しました。'; });
+    event.preventDefault(); const captured = sceneEdit, p = provider();
+    if (!captured || sceneBlock() || captured.composing || captured.token !== p.token || captured.sceneId !== sceneId || captured.kind !== 'default' && !captured.name.trim()) return;
+    try {
+      let command: MetadataEdit;
+      if (captured.kind === 'create') {
+        const issues: Issue[] = [], edges = memberships(p.state, p.state.assetMemberships, sceneId, p.resources.assets, issues);
+        if (issues.length) throw Error('モデルの登録を確認してからシーンを作成してください。');
+        const orders = Object.values(p.state.scenes).filter(s => fieldValue(s.lifecycle)?.state !== 'deleted').map(s => {
+          if (s.orderKey.kind !== 'value') throw Error('シーンの順序を確認してください。'); return s.orderKey.value;
+        }).sort();
+        command = { kind: 'createScene', sceneId: id('scn'), activeSceneId: sceneId, sourceSceneId: sceneId, name: captured.name,
+          orderKey: ports.viewOrder(orders.at(-1) ?? null, null), membershipIds: edges.map(() => id('sam')), eventId: id('evt') };
+      } else command = captured.kind === 'rename' ? { kind: 'renameScene', sceneId, name: captured.name } : { kind: 'setDefaultScene', sceneId };
+      void run(command, () => {
+        clearSceneEdit(); if (command.kind === 'createScene') { sceneId = command.sceneId; draft = null; }
+        feedback = captured.kind === 'create' ? 'シーンを追加しました。' : captured.kind === 'rename' ? 'シーン名を変更しました。' : '開始シーンを設定しました。';
+      });
+    } catch (error) { feedback = (error as Error).message; render(); }
   });
-  sceneName.addEventListener('input', () => render());
-  sceneName.addEventListener('compositionstart', () => { composing = true; render(); });
-  sceneName.addEventListener('compositionend', () => { composing = false; render(); });
   mediaInput.addEventListener('click', () => {
     if (guardInput() && memory().selectedCaptionId) { pickerScope = { token: provider().token, sceneId, captionId: memory().selectedCaptionId! }; render(); }
   });
@@ -351,7 +423,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     void perform(() => ports.addMedia(scope.token, input), () => { pickerScope = null; mediaInput.value = ''; resetDraft(); feedback = 'メディアを追加しました。'; });
   });
   canvas.addEventListener('pointerdown', event => {
-    if (gesture || !event.isPrimary || event.button !== 0 || event.shiftKey || event.altKey || event.ctrlKey || event.metaKey || !choosing || mutationBlock() || composing) { gesture = null; return; }
+    if (gesture || !event.isPrimary || event.button !== 0 || event.shiftKey || event.altKey || event.ctrlKey || event.metaKey || !choosing || mutationBlock() || composingInput()) { gesture = null; return; }
     const read = viewport.read(), rect = canvas.getBoundingClientRect();
     if (!read.ready || read.dragging || read.token !== provider().token || !read.pickToken || !pinCurrent()) return;
     gesture = { pointerId: event.pointerId, action: pinAction, token: read.token, receipt: read.pickToken, x: event.clientX, y: event.clientY,
@@ -364,7 +436,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       Math.hypot(event.clientX - gesture.x, event.clientY - gesture.y) > 4)) gesture = null;
   });
   canvas.addEventListener('pointerup', event => {
-    const down = gesture; gesture = null; if (!down || down.action !== pinAction || !event.isPrimary || event.button !== 0 || down.pointerId !== event.pointerId || event.shiftKey || event.altKey || event.ctrlKey || event.metaKey || !choosing || mutationBlock() || composing) return;
+    const down = gesture; gesture = null; if (!down || down.action !== pinAction || !event.isPrimary || event.button !== 0 || down.pointerId !== event.pointerId || event.shiftKey || event.altKey || event.ctrlKey || event.metaKey || !choosing || mutationBlock() || composingInput()) return;
     const read = viewport.read(), rect = canvas.getBoundingClientRect();
     if (!read.ready || read.dragging || read.token !== down.token || read.pickToken !== down.receipt || provider().token !== down.token ||
       rect.left !== down.left || rect.top !== down.top || rect.width !== down.width || rect.height !== down.height ||
@@ -378,7 +450,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   const cameraTools = make('div'); cameraTools.className = 'lv-project-camera';
   const cameraButtons = ([['fit', '全体表示'], ['front', '正面'], ['top', '上面']] as const).map(([action, label]) => button(label, () => viewAction(() => viewport.camera(action))));
   cameraTools.append(...cameraButtons); viewportTools.insertBefore(cameraTools, viewportStatus);
-  const viewBlocked = () => busy || !!pending || windowMoving || ports.otherPending() || composing || !!draft?.composing || !!mediaManager?.composing() || [...panels.values()].some(p => p.composing());
+  const viewBlocked = () => busy || !!pending || windowMoving || ports.otherPending() || composingInput();
   function viewAction(action: () => void) {
     if (viewBlocked()) return;
     try { action(); viewportFeedback = ''; }
@@ -399,22 +471,30 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
         choice.disabled = busy || dirty() || ports.otherPending(); choice.setAttribute('aria-pressed', String(scene.id === sceneId)); scenes.append(choice);
       }
       if (!draft) draft = beginCaptionDraft(detailContext().source);
-      list.render(listContext()); detail.render({ ...detailContext(), windowBlock: busy || pending || windowMoving || ports.otherPending() ? '現在の操作を完了してください。' : null });
+      list.render(listContext()); inclusion.render(includeContext()); detail.render({ ...detailContext(), windowBlock: busy || pending || windowMoving || ports.otherPending() ? '現在の操作を完了してください。' : null });
       windows.render({ source: listContext().source, memory: windowMemory(), selectedId: selected, moveBlock: windowBlock() });
       addPin.disabled = !!blocked || dirty() || !sceneId;
       movePin.disabled = !!blocked || dirty() || !selected;
       movePin.textContent = selected && fieldValue(p.resources.captions[selected]?.anchor)?.kind === 'unplaced' ? 'ピンを配置' : '位置を調整';
       coords.hidden = !pin; finishPin.hidden = !pin; cancelPin.hidden = !pin && !choosing;
       finishPin.textContent = pinAction?.kind === 'reparent' ? '親モデルと位置を確定' : '位置を確定';
-      finishPin.disabled = !!blocked || composing || choosing || viewport.read().dragging || !positionValid() || !pinCurrent(); cancelPin.disabled = busy || !!pending || ports.status().kind !== 'idle' || ports.otherPending() || composing;
-      repick.hidden = !pin; repick.disabled = !!blocked || composing || !pinCurrent();
+      finishPin.disabled = !!blocked || composingInput() || choosing || viewport.read().dragging || !positionValid() || !pinCurrent(); cancelPin.disabled = busy || !!pending || ports.status().kind !== 'idle' || ports.otherPending() || composingInput();
+      repick.hidden = !pin; repick.disabled = !!blocked || composingInput() || !pinCurrent();
       const count = selected ? projectCaptionSceneCount(p, selected) : undefined;
       pinStatus.textContent = [pinAction && !pinCurrent() ? '対象が更新されています。取り消して選び直してください。' : choosing ? '配置先のモデルの面を選択してください。' : pin ? '位置を確認して確定してください。' : '',
         pinAction?.kind === 'reparent' && count?.kind === 'value' ? `${count.value}シーンに反映されます。変更先モデルがないシーンでは一覧のみになります。` : ''].filter(Boolean).join(' ');
       coordinateInputs.forEach((input, i) => { input.disabled = !!blocked || !pinCurrent(); if (!composing) input.value = rawPosition[i]!; });
-      sceneName.disabled = !!blocked || !!pin || choosing || !!deletion || hasCaptionDraft(draft) || !!pickerScope || conflictChoices.size > 0 || panelInput() || !!mediaManager?.hasChanges();
-      createScene.disabled = sceneName.disabled || composing || !sceneName.value.trim() || !sceneId;
-      mediaInput.disabled = !!blocked || !!deletion || panelInput() || !!mediaManager?.hasChanges() || hasCaptionDraft(draft) || !!pin || choosing || conflictChoices.size > 0 || !selected;
+      const scene = p.state.scenes[sceneId], start = fieldValue(p.state.defaultSceneId), staleScene = !!sceneEdit && (sceneEdit.token !== p.token || sceneEdit.sceneId !== sceneId);
+      sceneName.disabled = !!sceneBlock(); if (!sceneEdit?.composing && sceneName.value !== (sceneEdit?.name ?? '')) sceneName.value = sceneEdit?.name ?? '';
+      sceneActions.hidden = !!sceneEdit; renameScene.disabled = !!blocked || dirty() || scene?.name.kind !== 'value';
+      defaultScene.disabled = !!blocked || dirty() || p.state.defaultSceneId.kind !== 'value' || start === sceneId;
+      sceneLabel.hidden = sceneEdit?.kind === 'default';
+      createScene.textContent = sceneEdit?.kind === 'rename' ? '名前を確定' : sceneEdit?.kind === 'default' ? '開始シーンを設定' : 'シーンを追加';
+      createScene.disabled = !!sceneBlock() || !sceneEdit || sceneEdit.composing || staleScene || sceneEdit.kind !== 'default' && !sceneEdit.name.trim() || !sceneId;
+      cancelScene.hidden = !sceneEdit; cancelScene.disabled = busy || !!pending || ports.status().kind !== 'idle' || ports.otherPending() || !!sceneEdit?.composing;
+      sceneNote.textContent = sceneEdit?.kind === 'create' ? 'このシーンのモデルを引き継ぎます。キャプションは追加されません。' : sceneEdit?.kind === 'default' ? '次にプロジェクトを開くときの開始シーンにします。' : ''; sceneNote.hidden = !sceneNote.textContent;
+      sceneStatus.textContent = staleScene ? '内容が更新されています。入力は保持しています。取り消して選び直してください。' : start ? `開始シーン：${fieldValue(p.state.scenes[start]?.name) ?? '名称を確認'}` : '開始シーンの状態を確認してください。';
+      mediaInput.disabled = !!blocked || !!sceneEdit || includeMemory().composing || !!deletion || panelInput() || !!mediaManager?.hasChanges() || hasCaptionDraft(draft) || !!pin || choosing || conflictChoices.size > 0 || !selected;
       cancelMedia.hidden = !pickerScope; cancelMedia.disabled = !!blocked;
       mediaManager!.render();
       conflicts.replaceChildren();
@@ -447,7 +527,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
         available: resolved?.kind === 'ready', readOnly: !!blocked || resolved?.kind !== 'ready' });
       renderCaptionActions();
       for (const [key, tab] of tabButtons) { tab.setAttribute('aria-selected', String(task === key)); tab.tabIndex = task === key ? 0 : -1;
-        tab.disabled = busy || !!pending || windowMoving || ports.otherPending() || composing || !!draft?.composing || !!mediaManager?.composing() || [...panels.values()].some(p => p.composing()); }
+        tab.disabled = busy || !!pending || windowMoving || ports.otherPending() || composingInput(); }
       captionPanel.hidden = task !== 'captions'; for (const [key, panel] of panels) { panel.root.hidden = key !== task; if (key === task) panel.render(); }
       const seen = viewport.read();
       const extent = canvas.getBoundingClientRect?.() ?? { width: 0, height: 0 };
@@ -468,5 +548,5 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   mounted = true; render();
   return { root, render, session: interaction, inputPending: () => dirty() || busy,
     hasChanges: () => dirty() || busy || !!pending,
-    unmount() { if (disposed) return; disposed = true; windows.dispose(); mediaManager?.dispose(); mediaViewer.dispose(); viewport.dispose(); list.dispose(); detail.dispose(); for (const panel of panels.values()) panel.dispose(); root.remove(); } };
+    unmount() { if (disposed) return; disposed = true; windows.dispose(); mediaManager?.dispose(); mediaViewer.dispose(); viewport.dispose(); list.dispose(); inclusion.dispose(); detail.dispose(); for (const panel of panels.values()) panel.dispose(); root.remove(); } };
 }

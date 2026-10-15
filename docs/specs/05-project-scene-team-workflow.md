@@ -1555,6 +1555,20 @@ Retain proposals on failure and retry the exact original command. Keep the
 existing draft/IME/window/file/readonly guards, cancellation and metadata
 authority; this introduces no new persistence, compatibility or adoption claim.
 
+**Product Scene/membership integration (2026-10-15):** connect the accepted Scene
+name/default operations (§4.2) and existing Caption inclusion/exclusion in the
+same product composition. Capture source token and Scene when a create/rename/
+default draft begins; stale drafts keep input but cannot commit. Setting the
+default does not navigate the current editor. Preserve creation's model-only
+inheritance and exact IDs across retry. Reuse the pure membership picker with a
+complete Project inventory, Scene-local local state and no automatic editor/owner
+selection. Inspect original mutable membership endpoints/lifecycle, including
+unprojected, duplicate and delete/edit candidates, before claiming absent/included.
+Dispatch the existing membership-only commands with one exact edge/fresh IDs;
+clear only the excluded Scene's editing selection after durable acknowledgement.
+Keep the shared draft/IME/gesture/file/readonly guards and existing conflict
+boundaries. No new schema, format, general recovery or adoption is implied.
+
 Each production slice requires a short meta-audit, exact-tree tests/build, one
 independent read-only review and a reversible commit. Run focused checks during
 editing, then the required full matrix once on the final executable tree. Reuse

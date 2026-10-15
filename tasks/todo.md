@@ -19,7 +19,8 @@ edit/first-place → named backup/Workspace → independent reopen, plus the typ
 product composition's edit → save/two-round exchange → cold-reopen workflow in
 the nondefault validation route, now including the model, Saved View and material
 panels, attachment organization/shared viewing and Scene-local Caption comparison
-windows, confirmed Caption deletion and explicit pin parent changes. Existing
+windows, confirmed Caption deletion, explicit pin parent changes, Scene names/
+next-open choice and existing Caption inclusion/exclusion. Existing
 file/recovery work is retained.
 Ordinary entry, broader profiles/converters, browser performance, physical-iPhone
 and offline acceptance remain open. Full details and earlier failures are in the
@@ -100,6 +101,87 @@ destructive boundary. Ordinary entry and temporary iPhone HTTPS need their exist
 exact-build/route approvals. Main, Pages, Service Worker, version/license, release,
 dependency changes and private/public fixture distribution are outside this unit.
 
+### Completed unit — manage Scenes and Caption membership in the integrated editor
+
+PO explicitly authorized this connected unit on 2026-10-15 without small manual
+confirmation waits. Outcome: name a Scene, explicitly choose the next-open Scene,
+and include/exclude an existing Project Caption without copying its content or
+showing its owner. Reuse pure Caption inclusion controls and the existing typed
+Scene/membership commands through the shared operation/retry owner. One writer;
+bounded read-only review. No storage/schema/package/dependency, ordinary-entry,
+renderer or release change; browser EPERM remains a grouped evidence gap.
+
+- [x] Capture Scene create/rename/default drafts, confirmation/IME/stale guards;
+  connect a complete conflict-aware Project Caption inventory and Scene-local picker.
+- [x] Verify one connected Scene/membership/save/exchange/cold-start workflow,
+  focused ambiguous-input and interruption cases; reuse existing service tests.
+- [x] Independently review, pass the serial final checkpoint, verify exact outgoing
+  scope/privacy and prepare the authorized g0-baseline checkpoint.
+
+Acceptance: current Scene selection never silently sets the default; setting the
+default changes only the shared next-open setting. Create copies current active
+Asset memberships under fresh IDs, not Captions/materials/views; capture the
+source when input starts. Stale/name/default conflicts cannot be overwritten by
+ordinary controls. Cancel writes nothing, failure keeps drafts/selection and exact
+retry. Inclusion changes only the exact Scene edge, keeps Caption/media/history
+and other Scenes, and does not select the editor or show the owner automatically.
+Unknown endpoints/lifecycle, duplicate membership and concurrent delete/edit
+remain uncertain; never project them as absent. Exclusion clears only the affected
+Scene's editor selection after acknowledgement. Drafts/IME/gestures/readonly/file
+operations share the existing guards; readonly still permits local inventory use.
+
+Initial audit: clean g0-baseline at the previous verified checkpoint. The product
+create form currently captures the latest source only on submit; align it with
+the existing Scene draft contract. The current Scene-only Caption list is not a
+complete Project inventory. Reuse its field formatting but inspect raw membership
+fields so an unprojected reference cannot become an apparent absent edge. Stop
+only for an actual policy/architecture/compatibility/authority or release boundary.
+Implemented: captured create/rename/default drafts and explicit next-open
+confirmation; complete raw, conflict-aware Caption inventory with Scene-local
+query/choice and exact include/exclude commands. Ordinary selection does not
+set the default. Publication failure retains inputs/selection/windows; retry
+reuses the original change. Existing GLB owner membership can stay excluded;
+Caption inclusion does not show it. A connected real-package test covers shared
+Caption exclusion/re-add, another Scene's window placement, Workspace/Contribution
+exchange, warm current-Scene retention and the new default on cold startup.
+Focused checks pass (four cases including the pure control regression). Initial
+failed runs exposed RecordedDOM event assumptions and a real busy-state carryover
+after Scene creation; corrected events and settled cross-Scene rendering pass.
+Raw order/id/lifecycle uncertainty and local IME completion after a source change
+were corrected from independent review; correction-only review has no open P1/P2.
+Earlier failed logs remain under ignored `.artifacts/traces`.
+
+Final serial `npm run check:checkpoint` passed (exit 0): typecheck; **114 files /
+2,365 passed / 21 existing todo**; ordinary, harness and validation builds. The
+five changed executable files match their frozen tested hashes. Independent
+read-only final scope/privacy review found no open P1/P2; nine tracked paths,
+210 local documentation links valid, no dependency/deployment/private-fixture
+changes. The authorized g0-baseline push triggers verification CI, not the
+main-only Pages deployment. Git owns the actual commit/push identity.
+
+Static validation manifest (7 output files):
+`18fb712f58a6a471f24535cd6ea4604e86c6823b7e7c9b8b10a4c431ea695e2a`.
+All seven HTTP bodies matched disk at port 4182; SW, webmanifest and public
+samples remain absent. The first sandboxed HTTP attempt returned EACCES; the
+managed authorized run of the same verifier passed. This verifies build/serving,
+not browser rendering/native input, physical iPhone, offline/PWA or adoption.
+
+Connected-milestone audit: this unit closes the ordinary Scene/membership editing
+gap, but the product branch bypasses metadataWorkspace's startup recovery. A cold
+default conflict cannot yet enter the product editor through an explicit choice;
+Scene-name conflict also blocks rename without an integrated resolution action.
+Close that existing recovery boundary next, before adding conversion scope.
+Next unit: compare/resolve Scene-name candidates (or enter a new name), explicitly
+resolve a cold-start default conflict, then resume editing/save/exchange/cold open.
+Reuse accepted checked readers/typed commands and original-command retry; warm
+resolution keeps the current Scene, camera and pending draft. Verify stale, IME,
+readonly and interrupted-save guards. Exclude general orphan repair, arbitrary
+tombstone restore, Scene deletion/reordering and ordinary-entry adoption. Stop
+only for a real specification/authority conflict, not another small PO check.
+Caption field/lifecycle/duplicate-membership recovery follows within the same
+approved scope, then remaining initial conversions and gated ordinary entry with
+grouped browser/device/offline acceptance.
+
 ### Completed unit — delete Captions and change their parent model in the integrated editor
 
 PO authorized continuation on 2026-10-15. Outcome: inspect every affected Scene,
@@ -167,9 +249,8 @@ complete browser/rendering, offline/PWA or physical-device acceptance.
 Connected-milestone audit: the product editor still lacks accepted Scene rename/
 default and Caption membership controls. Close that direct editing gap next,
 before broadening conversion; further immutable conversion recipes require their
-existing concrete mapping/decision boundaries. Next: integrate Scene management
-and Caption inclusion/exclusion; then initial-conversion gaps, gated ordinary
-entry and grouped browser/device/offline acceptance. No new product decision is
+existing concrete mapping/decision boundaries. The unit above now owns this
+connection and the next connected-milestone choice. No new product decision is
 ratified by this sequencing change.
 
 ### Completed unit — compare Captions in the integrated editor

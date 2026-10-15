@@ -98,6 +98,11 @@ describe('disconnected existing-Project Caption inclusion', () => {
     expect(h.search).toBe(input); expect(h.search.value).toBe('調査'); expect(h.include.disabled).toBe(true);
     expect(h.controls.render({ ...h.context, source: { ...h.context.source, sceneId: 'other' } })).toBe(false);
     h.search.fire('compositionend'); expect(h.context.memory.composing).toBe(false); expect(h.context.memory.query).toBe('調査');
+    h.render({ ...h.context, feedback: { kind: 'applying' } });
+    const next = { ...h.context, source: { ...h.context.source, sceneId: 'other' }, memory: newCaptionIncludeMemory('other') };
+    expect(h.controls.render(next)).toBe(false);
+    h.render({ ...next, feedback: { kind: 'idle' } });
+    expect(h.context.source.sceneId).toBe('other'); expect(h.search.readOnly).toBe(false); expect(h.search.value).toBe('');
     const count = h.events.length; h.controls.dispose(); h.search.fire('input'); h.include.fire('click'); expect(h.events).toHaveLength(count);
   });
 
