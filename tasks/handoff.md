@@ -8,6 +8,10 @@ The bounded integrated UI is selected by `editor=project` in validation; follow
 todo for its tested scope and remaining ordinary-entry/browser/device boundaries.
 Attachment description/order candidates use the same checked Session recovery
 owner; selecting optional absence preserves absence and permits normal editing.
+Attachment lifecycle recovery uses exact causal findings/current states and a
+fresh event, preserving scalar candidates; it does not restore ordinary tombstones.
+An ambiguous parent with valid same-state lifecycle candidates can confirm only
+that state before child recovery; the existing Caption restore permission is unchanged.
 The last-Project hint is optional UI advice, not Project authority; explicit URL
 selection wins and actual opening must succeed before the named resume notice.
 Frozen-v1 explicit starting Views and model placement use the approved additive
@@ -29,6 +33,10 @@ absent predecessor and recovery-only entry before opening any original database.
 Prepared-2/Start-2 retain exact backup history/bases and select a dedicated generation;
 ready-Project Start-1 replacement and Contribution reception keep their old authority.
 Current todo owns the final executed evidence; this does not pass adoption gates.
+Next is grouped actual-browser OPFS/Web Locks and device/offline evidence, subject
+to the existing protected-browser denial and exact-build/device gates. Broader
+model/profile compatibility needs its concrete accepted contract; no further
+source feature is started at this handoff.
 
 ## Resume safely
 

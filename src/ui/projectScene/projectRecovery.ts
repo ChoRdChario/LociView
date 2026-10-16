@@ -39,7 +39,9 @@ export function createProjectRecovery(document: Document, host: RecoveryHost) {
       case 'text': return { kind: 'resolveCaptionText', captionId: target.captionId, field: target.field, choice };
       case 'field': return { kind: 'resolveCaptionField', captionId: target.captionId, field: target.field, operationId: f.select.value };
       case 'attachmentField': return { kind: 'resolveAttachmentField', captionId: target.captionId, attachmentId: target.attachmentId, field: target.field, operationId: f.select.value };
+      case 'attachmentLifecycle': return { kind: 'resolveAttachmentLifecycle', captionId: target.captionId, attachmentId: target.attachmentId, state: f.select.value as 'active' | 'deleted', observedOperationIds: [...target.operationIds], eventId: newProjectId('evt') };
       case 'lifecycle': return { kind: 'resolveCaptionLifecycle', captionId: target.captionId, state: f.select.value as 'active' | 'deleted', observedOperationIds: [...target.operationIds], eventId: newProjectId('evt') };
+      case 'captionLifecycleConfirm': return { kind: 'confirmCaptionLifecycle', captionId: target.captionId, state: f.select.value as 'active' | 'deleted', observedOperationIds: [...target.operationIds], eventId: newProjectId('evt') };
       case 'membership': return host.membership(f.token, target.sceneId, target.captionId, target.edgeIds, f.select.value, f.decision.value as 'one' | 'both');
     }
   }

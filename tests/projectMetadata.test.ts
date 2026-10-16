@@ -12,7 +12,8 @@ import { PACKAGE_LIMITS } from '../src/projectPackage/contract';
 import { planWorkspaceClosure } from '../src/projectPackage/closure';
 import { immutableDigest } from '../src/domain/projectGraphSupport';
 import { createFixtureModel } from '../src/harness/projectScene/modelClosure';
-import { attachmentFieldCandidates } from '../src/projectMetadata/captionCandidates';
+import { attachmentFieldCandidates, attachmentLifecycleRecovery } from '../src/projectMetadata/captionCandidates';
+import { captionLifecycleConfirmation, captionLifecycleRecovery } from '../src/projectMetadata/captionDeletion';
 
 const limits: MetadataLimits = { ...valueLimits, maxWork: 1_000_000, maxChanges: 100,
   maxChangeBytes: 1_000_000, maxTotalBytes: 4_000_000, maxOperations: 10_000 };
@@ -103,6 +104,94 @@ describe('attachment atomic candidate selection', () => {
       expect(() => conflicted.prepareEdit(conflicted.token,{kind:'resolveAttachmentField',field:'altText',captionId:id('cap'),attachmentId:id('att'),operationId:alt(conflicted).candidates[0]!.operationId},p,'a'.repeat(32))).toThrow();
       expect(conflicted.originalChanges()).toEqual(before);
     });
+});
+describe('attachment lifecycle decisions', () => {
+  const provider=async(source:ProjectMetadataSource)=>{const p=await readProjectScene(source.read(),limits,developmentContentVerifier([]));if(p.kind!=='scene-provider')throw Error('provider');return p;};
+  const life=(state:'active'|'deleted',event=4)=>({state,eventId:id('evt',event),reason:state==='deleted'?'userDelete':'restore'});
+  const concurrent=()=>{const {source}=create();const deleted=ProjectMetadataSource.reopen(changed(source,d=>{d.captionAttachmentsById[id('att')].lifecycle=new A.ImmutableString(canonical(life('deleted')));}),source.proof,limits);
+    const edits=['A','B'].map(text=>changed(source,d=>{const row=d.captionAttachmentsById[id('att')];row.altText=new A.ImmutableString(canonical(`説明 ${text}`));row.orderKey=new A.ImmutableString(canonical(text));}));return {source,deleted,edits};};
+  it.each([['active',false],['deleted',false],['active',true],['deleted',true]] as const)('causally chooses %s with reversed receive=%s without changing retained scalar atoms',async(state,reverse)=>{
+    const {deleted,edits}=concurrent(), input=reverse ? ProjectMetadataSource.reopen(edits[1]!,deleted.proof,limits).appendOriginal(edits[0]!).appendOriginal(deleted.originalChanges()) : deleted.appendOriginal(edits[0]!).appendOriginal(edits[1]!);
+    const p=await provider(input), candidate=attachmentLifecycleRecovery(p,id('cap'),id('att'),limits), before=input.originalChanges();expect(candidate.lifecycle.candidates).toHaveLength(1);expect(candidate.states).toEqual(['deleted','active']);
+    const edit={kind:'resolveAttachmentLifecycle' as const,captionId:id('cap'),attachmentId:id('att'),state,observedOperationIds:candidate.lifecycle.candidates.map(c=>c.operationId),eventId:id('evt',9)};
+    const resolved=input.prepareEdit(input.token,edit,p,'a'.repeat(32)), after=await provider(resolved);
+    expect(after.details.mutable.captionAttachmentsById[id('att')]!.lifecycle).toEqual({kind:'value',value:{state,eventId:id('evt',9),reason:state==='active'?'restore':'conflictResolution'}});
+    expect(resolved.read().history.changes.at(-1)!.writes.map(w=>w.path)).toEqual([['captionAttachmentsById',id('att'),'lifecycle']]);expect([...resolved.read().history.changes.at(-1)!.deps].sort()).toEqual([...input.heads].sort());
+    for(const name of ['id','captionId','mediaResourceId','altText','orderKey'])expect(after.details.mutable.captionAttachmentsById[id('att')]![name]).toEqual(p.details.mutable.captionAttachmentsById[id('att')]![name]);
+    expect(resolved.originalChanges().slice(0,before.length)).toEqual(before);expect(resolved.originalChanges()).toHaveLength(before.length+1);
+    expect(after.issues.some(i=>i.code==='concurrent-delete-edit' && i.path[1]===id('att'))).toBe(false);
+    expect(()=>attachmentLifecycleRecovery(after,id('cap'),id('att'),limits)).toThrow('attachment-lifecycle-not-conflicted');
+    expect(ProjectMetadataSource.fromFullSource(resolved.encodeFullSource(),resolved.proof,limits).originalChanges()).toEqual(resolved.originalChanges());
+    expect(()=>input.prepareEdit('stale',edit,p,'b'.repeat(32))).toThrow('stale-token');
+    for(const observedOperationIds of [[],['missing'],[...edit.observedOperationIds,...edit.observedOperationIds]])expect(()=>input.prepareEdit(input.token,{...edit,observedOperationIds},p,'b'.repeat(32))).toThrow('attachment-lifecycle-observed');
+    expect(()=>input.prepareEdit(input.token,{...edit,eventId:id('evt',4)},p,'b'.repeat(32))).toThrow('attachment-lifecycle-event-reused');expect(input.originalChanges()).toEqual(before);
+  });
+  it.each([['active','active'],['deleted','deleted'],['active','deleted']] as const)('reconciles returned %s/%s decisions using only actual states and another fresh event',async(left,right)=>{
+    const {deleted,edits}=concurrent(), input=deleted.appendOriginal(edits[0]!), p=await provider(input), observedOperationIds=attachmentLifecycleRecovery(p,id('cap'),id('att'),limits).lifecycle.candidates.map(c=>c.operationId);
+    const command={kind:'resolveAttachmentLifecycle' as const,captionId:id('cap'),attachmentId:id('att'),observedOperationIds};
+    const a=input.prepareEdit(input.token,{...command,state:left,eventId:id('evt',9)},p,'a'.repeat(32)), b=input.prepareEdit(input.token,{...command,state:right,eventId:id('evt',10)},p,'b'.repeat(32));
+    const returned=a.appendOriginal(b.originalChanges()), rp=await provider(returned), source=attachmentLifecycleRecovery(rp,id('cap'),id('att'),limits);
+    expect(source.lifecycle.candidates).toHaveLength(2);expect([...source.states].sort()).toEqual([...new Set([left,right])].sort());
+    const finalCommand={...command,state:left,eventId:id('evt',11),observedOperationIds:source.lifecycle.candidates.map(c=>c.operationId)};
+    if(left===right)expect(()=>returned.prepareEdit(returned.token,{...finalCommand,state:left==='active'?'deleted':'active'},rp,'c'.repeat(32))).toThrow('attachment-lifecycle-state');
+    const final=returned.prepareEdit(returned.token,finalCommand,rp,'c'.repeat(32)), fp=await provider(final);
+    expect(fp.details.mutable.captionAttachmentsById[id('att')]!.lifecycle).toEqual({kind:'value',value:{state:left,eventId:id('evt',11),reason:left==='active'?'restore':'conflictResolution'}});
+    expect([...final.read().history.changes.at(-1)!.deps].sort()).toEqual([...returned.heads].sort());expect(final.originalChanges().slice(0,returned.originalChanges().length)).toEqual(returned.originalChanges());
+    expect(fp.issues.filter(i=>i.path[1]===id('att') && (i.kind==='invalid'||i.kind==='unverified'))).toEqual([]);
+  });
+  it('allows explicit restoration after two deleted heads and an unobserved concurrent edit',async()=>{
+    const {source,deleted,edits}=concurrent(), second=changed(source,d=>{d.captionAttachmentsById[id('att')].lifecycle=new A.ImmutableString(canonical(life('deleted',5)));});
+    const input=deleted.appendOriginal(second).appendOriginal(edits[0]!), p=await provider(input), recovery=attachmentLifecycleRecovery(p,id('cap'),id('att'),limits);
+    expect(recovery.lifecycle.candidates).toHaveLength(2);expect(recovery.deleteEdit).toBe(true);expect(recovery.states).toEqual(['deleted','active']);
+    const resolved=input.prepareEdit(input.token,{kind:'resolveAttachmentLifecycle',captionId:id('cap'),attachmentId:id('att'),state:'active',observedOperationIds:recovery.lifecycle.candidates.map(c=>c.operationId),eventId:id('evt',9)},p,'a'.repeat(32));
+    expect((await provider(resolved)).details.mutable.captionAttachmentsById[id('att')]!.lifecycle).toEqual({kind:'value',value:{state:'active',reason:'restore',eventId:id('evt',9)}});
+    expect([...resolved.read().history.changes.at(-1)!.deps].sort()).toEqual([...input.heads].sort());expect(resolved.originalChanges().slice(0,input.originalChanges().length)).toEqual(input.originalChanges());
+  });
+  it.each(['ordinary-deleted','observed-delete','after-delete-edit','event-reused','unknown','order-absent','missing-media','deleted-parent'] as const)('refuses %s without repairing history or endpoints',async kind=>{
+    const {source,deleted,edits}=concurrent();let input=deleted.appendOriginal(edits[0]!);
+    if(kind==='ordinary-deleted')input=deleted;
+    else if(kind==='observed-delete')input=ProjectMetadataSource.reopen(changed(ProjectMetadataSource.reopen(edits[0]!,source.proof,limits),d=>{d.captionAttachmentsById[id('att')].lifecycle=new A.ImmutableString(canonical(life('deleted')));}),source.proof,limits);
+    else if(kind==='after-delete-edit')input=ProjectMetadataSource.reopen(changed(deleted,d=>{d.captionAttachmentsById[id('att')].altText=new A.ImmutableString(canonical('不正な削除後編集'));}),source.proof,limits);
+    else input=ProjectMetadataSource.reopen(changed(input,d=>{
+      const row=d.captionAttachmentsById[id('att')];if(kind==='event-reused')row.lifecycle=new A.ImmutableString(canonical({...life('active'),eventId:id('evt',4)}));
+      if(kind==='unknown')row.futureRecovery=new A.ImmutableString('true');if(kind==='order-absent')delete row.orderKey;
+      if(kind==='missing-media')row.mediaResourceId=new A.ImmutableString(canonical(id('med',999)));if(kind==='deleted-parent')d.captionsById[id('cap')].lifecycle=new A.ImmutableString(canonical(life('deleted',5)));
+    }),source.proof,limits);
+    const p=await provider(input), before=input.originalChanges();expect(()=>attachmentLifecycleRecovery(p,id('cap'),id('att'),limits)).toThrow();
+    expect(()=>input.prepareEdit(input.token,{kind:'resolveAttachmentLifecycle',captionId:id('cap'),attachmentId:id('att'),state:'active',observedOperationIds:[],eventId:id('evt',12)},p,'a'.repeat(32))).toThrow();expect(input.originalChanges()).toEqual(before);
+  });
+});
+describe('same-state Caption lifecycle confirmation',()=>{
+  const provider=async(source:ProjectMetadataSource)=>{const p=await readProjectScene(source.read(),limits,developmentContentVerifier([]));if(p.kind!=='scene-provider')throw Error('provider');return p;};
+  const concurrent=(left:'active'|'deleted',right=left)=>{const {source}=create(), branch=(state:'active'|'deleted',event:number)=>changed(source,d=>{d.captionsById[id('cap')].lifecycle=new A.ImmutableString(canonical({state,eventId:id('evt',event),reason:'conflictResolution'}));});
+    return ProjectMetadataSource.reopen(branch(left,4),source.proof,limits).appendOriginal(branch(right,5));};
+  it.each(['active','deleted'] as const)('confirms only %s with a new event while retaining every child and old restore refusal',async state=>{
+    const input=concurrent(state), p=await provider(input), read=captionLifecycleConfirmation(p,id('cap'),limits);expect(read.state).toBe(state);expect(read.lifecycle.candidates).toHaveLength(2);
+    const command={kind:'confirmCaptionLifecycle' as const,captionId:id('cap'),state,observedOperationIds:read.lifecycle.candidates.map(c=>c.operationId),eventId:id('evt',9)};
+    const final=input.prepareEdit(input.token,command,p,'a'.repeat(32)), fp=await provider(final);
+    expect(fp.details.mutable.captionsById[id('cap')]!.lifecycle).toEqual({kind:'value',value:{state,reason:'conflictResolution',eventId:id('evt',9)}});
+    expect(final.read().history.changes.at(-1)!.writes.map(w=>w.path)).toEqual([['captionsById',id('cap'),'lifecycle']]);expect([...final.read().history.changes.at(-1)!.deps].sort()).toEqual([...input.heads].sort());
+    const childAtoms=(s:ProjectMetadataSource)=>{const read=inspectAtomicHistory(s.read().history,limits);if(read.kind!=='atomic-history-inspection')throw Error('history');return read.fields.filter(f=>['captionAttachmentsById','sceneCaptionMembershipsById','captionTagMembershipsById'].includes(f.path[0]!));};
+    expect(childAtoms(final)).toEqual(childAtoms(input)); // Provider visibility can change when a parent becomes known.
+    for(const name of ['id','title','body','anchor','colorSrgb'])expect(fp.details.mutable.captionsById[id('cap')]![name]).toEqual(p.details.mutable.captionsById[id('cap')]![name]);
+    expect(final.originalChanges().slice(0,input.originalChanges().length)).toEqual(input.originalChanges());expect(ProjectMetadataSource.fromFullSource(final.encodeFullSource(),final.proof,limits).originalChanges()).toEqual(final.originalChanges());
+    expect(()=>captionLifecycleRecovery(p,id('cap'),limits)).toThrow('caption-lifecycle-not-conflicted');
+    expect(()=>input.prepareEdit(input.token,{...command,kind:'resolveCaptionLifecycle'},p,'b'.repeat(32))).toThrow('caption-lifecycle-not-conflicted');
+    expect(()=>input.prepareEdit(input.token,{...command,state:state==='active'?'deleted':'active'},p,'b'.repeat(32))).toThrow('caption-lifecycle-state');
+    expect(()=>input.prepareEdit('stale',command,p,'b'.repeat(32))).toThrow('stale-token');
+    for(const observedOperationIds of [[],['missing'],[...command.observedOperationIds,...command.observedOperationIds]])expect(()=>input.prepareEdit(input.token,{...command,observedOperationIds},p,'b'.repeat(32))).toThrow('caption-lifecycle-observed');
+    expect(()=>input.prepareEdit(input.token,{...command,eventId:id('evt',4)},p,'b'.repeat(32))).toThrow('caption-lifecycle-event-reused');
+  });
+  it.each(['single-active','single-deleted','mixed','unknown','invalid-history'] as const)('refuses %s without expanding ordinary restore',async kind=>{
+    let input=concurrent('active');if(kind==='mixed')input=concurrent('active','deleted');
+    if(kind==='single-active')input=create().source;
+    if(kind==='single-deleted') {const {source}=create();input=ProjectMetadataSource.reopen(changed(source,d=>{d.captionsById[id('cap')].lifecycle=new A.ImmutableString(canonical({state:'deleted',eventId:id('evt',4),reason:'userDelete'}));}),source.proof,limits);}
+    if(kind==='unknown'||kind==='invalid-history')input=ProjectMetadataSource.reopen(changed(input,d=>{if(kind==='unknown')d.captionsById[id('cap')].futureState=new A.ImmutableString('true');else d.captionsById[id('cap')].lifecycle=new A.ImmutableString(canonical({state:'active',eventId:id('evt',4),reason:'restore'}));}),input.proof,limits);
+    const p=await provider(input), before=input.originalChanges();expect(()=>captionLifecycleConfirmation(p,id('cap'),limits)).toThrow(kind==='invalid-history'?'caption-lifecycle-source':undefined);
+    expect(()=>input.prepareEdit(input.token,{kind:'confirmCaptionLifecycle',captionId:id('cap'),state:'active',observedOperationIds:[],eventId:id('evt',9)},p,'a'.repeat(32))).toThrow(kind==='invalid-history'?'caption-lifecycle-source':undefined);expect(input.originalChanges()).toEqual(before);
+    if(kind==='mixed'){const old=captionLifecycleRecovery(p,id('cap'),limits), resolved=input.prepareEdit(input.token,{kind:'resolveCaptionLifecycle',captionId:id('cap'),state:'active',observedOperationIds:old.lifecycle.candidates.map(c=>c.operationId),eventId:id('evt',9)},p,'a'.repeat(32));
+      expect((await provider(resolved)).details.mutable.captionsById[id('cap')]!.lifecycle).toEqual({kind:'value',value:{state:'active',reason:'restore',eventId:id('evt',9)}});}
+  });
 });
 describe('explicit metadata semantic profiles', () => {
   it('edits only a known active map2 Asset pin scale and refuses ambiguous, stale or unsupported writes', async () => {

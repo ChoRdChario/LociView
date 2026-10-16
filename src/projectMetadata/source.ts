@@ -144,7 +144,8 @@ export class ProjectMetadataSource {
       // SAME change. No intermediate absence is published or saved separately.
       if (command.kind === 'resolveCaptionText' || command.kind === 'resolveCaptionField') delete draft.captionsById[command.captionId][command.field];
       if (command.kind === 'resolveAttachmentField') delete draft.captionAttachmentsById[command.attachmentId][command.field];
-      if (command.kind === 'resolveCaptionLifecycle') delete draft.captionsById[command.captionId].lifecycle;
+      if (command.kind === 'resolveAttachmentLifecycle') delete draft.captionAttachmentsById[command.attachmentId].lifecycle;
+      if (command.kind === 'resolveCaptionLifecycle' || command.kind === 'confirmCaptionLifecycle') delete draft.captionsById[command.captionId].lifecycle;
       if (command.kind === 'resolveAssetStatus') delete draft.assetsById[command.assetId].status;
       if (command.kind === 'resolveDefaultScene') delete draft.project.defaultSceneId;
       if (command.kind === 'resolveSceneName') delete draft.scenesById[command.sceneId].name;

@@ -24,6 +24,10 @@ next-open choice and existing Caption inclusion/exclusion, now with explicit
 Scene/Caption conflict choices, parent-only recovery and independent copies. Attachment
 description/order candidates now use the same checked recovery owner, including
 true absent-description selection and normal edit/file/cold continuation. Existing
+causal attachment deletion/edit and lifecycle decisions now share that owner,
+with explicit current-state/fresh-event selection and retained scalar candidates.
+A separate same-state parent confirmation unblocks existing active children
+without extending Caption restore permissions or reviving child tombstones.
 file/recovery work is retained. The explicit-map2 fresh-creation extension,
 Scene-local add colors, guarded Shift/numeric placement, owner reveal, Asset-wide
 pin sizing and checked save/resume/help are also connected in this bounded route.
@@ -128,7 +132,106 @@ destructive boundary. Ordinary entry and temporary iPhone HTTPS need their exist
 exact-build/route approvals. Main, Pages, Service Worker, version/license, release,
 dependency changes and private/public fixture distribution are outside this unit.
 
-### Current implementation — resolve attachment candidates and continue work
+### Current handoff — grouped browser/storage/device evidence
+
+Next outcome: existing candidate open → edit → save/backup → cold/interruption
+with actual browser OPFS and Web Locks. Protected browser initialization remains
+blocked by the recorded realpath EPERM/automatic-review rejection; do not retry
+or bypass it. Physical iPhone storage and exact-build offline/PWA acceptance remain
+separate human/device gates. Broader model/renderer/profile compatibility requires
+its own concrete accepted contract before implementation; do not generate another
+recipe or feature by default. Keep dev-tool dependency findings separate. No further
+source workstream is started at this handoff. All local checks below are bounded
+Node/recorded-DOM/HTTP evidence, not completion of these adoption/release gates.
+
+### Completed implementation — parent and attachment lifecycle recovery
+
+Outcome: explicitly confirm a parent's valid same-state lifecycle conflict when
+it blocks recovery of that Caption's attachment → inspect a causal attachment
+deletion/edit or lifecycle conflict → retain
+deletion or explicitly restore the attachment with a fresh event → resolve any
+independent description/order candidates using the existing recovery controls →
+normal editing, same-Project file return and cold reopen. Approved 05's observed
+media boundary already requires this explicit assignment. Starting checkpoint
+e26dd21 is pushed, HEAD/cache/live agree, and its worktree was clean.
+
+- [x] Read checked original candidates/history for one attachment, exact active
+  parent Caption and immutable media. Reject unknown/invalid history, endpoint
+  ambiguity, event reuse and unsupported ordinary trash restoration; never repair
+  those by overwriting history. Keep explanation/order candidates visible.
+- [x] Add one narrow typed Session lifecycle decision with exact observed
+  operation IDs, fresh event and existing token/IME/read-only/retry guards. Write
+  only lifecycle causally after every observed head; preserve scalar candidates,
+  attachment/media IDs, unrelated records, bodies and losing operations.
+- Choices follow the existing assignment contract exactly: current candidate
+  states plus active restoration whenever exact concurrent-delete-edit is present,
+  without a candidate-count restriction. Multiple lifecycle candidates are also
+  explicitly selectable without delete/edit. Thus independent active/
+  active or deleted/deleted recovery events can be explicitly reconciled with a
+  fresh event after all heads, without introducing a new deletion or trash restore.
+- [x] Reuse existing causal/service faults (both receive orders, stale/unknown/
+  reused event, two deleted heads plus an unobserved edit, and explicit keep-deleted), plus one product restore → publication
+  fault/exact retry → scalar decisions/edit → Contribution/file/cold flow. Review
+  two independent active recoveries and their returned-file conflict; explicitly
+  resolve again with a fresh event. Caption's narrower accepted lifecycle subset
+  is unchanged. Add a separate closed parent confirmation for at least two valid
+  current lifecycle candidates that all have the same state: exact IDs/token,
+  fresh conflictResolution event, that same state only, one lifecycle cell after
+  all heads. Refuse mixed states/single tombstones/opposite state and preserve
+  every child state. Explain that already-active children may reappear once their
+  active parent is confirmed. Integrate this prerequisite into the same true flow.
+- [x] Focus changed boundaries and any new import edge early; obtain independent
+  meaningful review, freeze once, run one final serial checkpoint/builds/HTTP and
+  verify exact scope for a suitable normal authorized g0 checkpoint.
+
+Ports/import boundary: existing candidateReader, typed original source.history /
+projectHistoryReview causal findings, checkMutableField and immutable reader →
+narrow MetadataEdit planner → existing Source/Session/journal; checked recovery
+descriptors → existing projectRecovery/perform owner. No UI storage or synthetic
+string-map command adapter. Share attachment candidate validation where needed;
+Existing Caption restore permissions and verified scalar resolution stay intact.
+No new schema/package/profile/ID rule, general trash/orphan repair, retargeting,
+cascade/GC, renderer/dependency/ordinary-entry/release or browser-denial retry.
+Stop only an affected branch for a genuine contract conflict, unavailable causal
+evidence, new authority/policy or destructive/release boundary. Node/recorded DOM
+remains separate from real browser/device/offline acceptance.
+
+Executed editing checks: shared scalar/lifecycle metadata group31 PASS, then
+lifecycle16 PASS after adding the two-deleted-heads/concurrent-edit contrast;
+new connected lifecycle=true variant1 PASS (15.89s). The representative reuses the
+previous scalar file flow: current raw deletion/edit → retained descriptions/order
+→ View/IME/stale hold → actual publication failure → exact staged change/fresh
+event retry → lifecycle-only all-head write → scalar choices and ordinary editing
+→ two-way Contribution, named backup and cold exact history/image bytes. Existing
+scalar-only/unknown projection group2 PASS (15.64s), final typecheck58566 PASS.
+No new module/import edge; sceneCore's last exact import graph is intact.
+Core and UI/provider independent meaningful reviews are closed without P1/P2;
+root connected/spec meaningful review is also closed. Final evidence is below.
+The early plan's candidate-count restriction was corrected from the existing
+contract before final review: exact causal delete/edit permits active restoration
+even with multiple deleted candidates. This adds no new tombstone/endpoint policy.
+The same-state Caption prerequisite is an implementation clarification of existing
+§8, not a new PO ratification or general restore permission. Its service7 cases
+passed across the final6 + corrected1 executions, with the reused-event refusal
+asserting exact `caption-lifecycle-source`; the integrated parent→attachment→scalar
+file/cold variant passed1 (16.77s).
+Initial parent-test failures compared dependent provider visibility instead of
+unchanged raw child atoms; the assertion now compares original atomic fields.
+A same-value raw Automerge fixture assignment also hit physical absent-mismatch;
+using a distinct reason with the reused event reaches the intended invalid-history
+guard. Failure evidence is retained; no runtime admission, timeout or result was relaxed.
+Final serial session54110 exits0: typecheck, 116files/2714 PASS +21 existing todo
+(699.72s), normal/harness/validation builds3.17/2.96/5.62s. Evidence:
+`.artifacts/traces/attachment-lifecycle-checkpoint-2026-10-16.log` and runtime9
+`attachment-lifecycle-final-tested-tree-2026-10-16.json` in the same directory.
+HTTP7 exact, manifest
+`5c90184226751cd85b888ae00e62a2aa7914f4a6deafc71dbb0278c22fb4d541`, with no
+validation SW/manifest/public samples. Exact checkpoint scope is14paths, runtime9
+(source7/tests2) +docs5. Local links241 have no missing target; outgoing privacy
+patterns0, actual g0/ChoRdChario origin and main-only deployment are unchanged.
+Source/test content stays fixed; Git owns the normal checkpoint's exact identity.
+
+### Completed implementation — resolve attachment candidates and continue work
 
 Outcome: concurrent description and order cells of the same attached image → review
 all original candidates and explicitly retain one per cell → resume normal
@@ -149,7 +252,7 @@ Actual clean g0 HEAD b9ac8c4 is the starting checkpoint.
 - [x] Reuse service faults and one product conflict → choice → edit → same-Project
   file return → cold flow. Assert original candidate operations, bytes, endpoints,
   unrelated fields and exact retry; no per-field roundtrip matrix.
-- [ ] Focus changed boundaries, early sceneCore only for new import edges, obtain
+- [x] Focus changed boundaries, early sceneCore only for new import edges, obtain
   independent meaningful final review, freeze the exact runtime/test scope, run
   one serial checkpoint/builds/HTTP identity and normal verified g0 commit/push.
 
@@ -198,7 +301,8 @@ no validation SW/manifest/public samples. These are Node/recorded-DOM and HTTP
 facts, not browser/device/offline or ordinary-entry acceptance. The exact13-path
 checkpoint consists of source6/tests3/docs4; local links234 have no missing target,
 outgoing private-pattern scan0, actual g0/ChoRdChario remote and main-only deployment
-trigger remain unchanged. Normal verified g0 commit/push is the remaining step.
+trigger remain unchanged. Normal verified g0 commit/push completed at e26dd21,
+HEAD/cache/live exact and clean; its committed runtime9 matches the final freeze.
 After that checkpoint, the next approved connected unit is attachment lifecycle
 conflict recovery through its existing causal-history/new-event boundary; retain
 scalar candidates and reuse this unit rather than invent an endpoint/ownership

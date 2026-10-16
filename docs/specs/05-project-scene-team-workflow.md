@@ -2539,6 +2539,20 @@ conflicts to be resolved first. Invalid history (event reuse, initial after dele
 edit after delete without restore, identity mutation) is not repaired by appending
 another event.
 
+**Same-state Caption confirmation under §8 (2026-10-16, bounded connection):**
+when at least two valid current Caption lifecycle candidates all have the same
+state, a separate closed `confirmCaptionLifecycle` command may confirm only that
+state with a fresh `conflictResolution` event. Check every field/history value,
+exact token/Caption/observed-operation IDs and event freshness; write one lifecycle
+cell after all source heads and retain the command/event across failure. Reject
+single tombstones, mixed candidates and an opposite-state request. The existing
+`resolveCaptionLifecycle` permission and restore reasons above stay unchanged.
+Show retained scalar/anchor and child states without a default selection; no child
+tombstone is revived, while an already-active child may become usable after its
+active parent is confirmed. Acceptance includes confirming an active parent before
+attachment recovery, scalar choices, continued edit/file return and cold reopen;
+this adds no general restore, new deletion or relation repair authority.
+
 The metadata service's existing whole-source admission remains unchanged,
 including its unverified-evidence refusals. This command does not broaden weak
 surface-index evidence admission or adopt an additional input profile.

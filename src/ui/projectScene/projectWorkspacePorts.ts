@@ -20,7 +20,9 @@ export interface WorkspaceRecoveryGroup {
     { kind: 'text'; captionId: string; field: 'title' | 'body' } |
     { kind: 'field'; captionId: string; field: 'anchor' | 'colorSrgb' } |
     { kind: 'attachmentField'; captionId: string; attachmentId: string; field: 'altText' | 'orderKey' } |
+    { kind: 'attachmentLifecycle'; captionId: string; attachmentId: string; operationIds: readonly string[] } |
     { kind: 'lifecycle'; captionId: string; operationIds: readonly string[] } |
+    { kind: 'captionLifecycleConfirm'; captionId: string; operationIds: readonly string[] } |
     { kind: 'membership'; sceneId: string; captionId: string; edgeIds: readonly string[] };
 }
 export interface WorkspaceFile { readonly name: string; readonly size: number; arrayBuffer(): Promise<ArrayBuffer> }

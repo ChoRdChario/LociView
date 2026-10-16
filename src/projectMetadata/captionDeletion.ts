@@ -12,8 +12,20 @@ export interface CaptionLifecycleResolution {
   kind: 'resolveCaptionLifecycle'; captionId: string; state: 'active' | 'deleted';
   observedOperationIds: string[]; eventId: string;
 }
+export interface CaptionLifecycleConfirmation {
+  kind: 'confirmCaptionLifecycle'; captionId: string; state: 'active' | 'deleted';
+  observedOperationIds: string[]; eventId: string;
+}
 /** Parent recovery is not deletion/copying: retain every child and unrelated field. */
 export function captionLifecycleRecovery(provider: Provider, captionId: string, limits: MetadataLimits) {
+  return captionLifecycleSource(provider, captionId, limits, false);
+}
+/** Same-state confirmation cannot introduce a new active/deleted state. */
+export function captionLifecycleConfirmation(provider: Provider, captionId: string, limits: MetadataLimits) {
+  const source = captionLifecycleSource(provider, captionId, limits, true);
+  return { ...source, state: (source.lifecycle.candidates[0]!.value as { kind: 'value'; value: JsonObject }).value.state as 'active' | 'deleted' };
+}
+function captionLifecycleSource(provider: Provider, captionId: string, limits: MetadataLimits, sameState: boolean) {
   const guard = new ProjectRecordFields(provider.semanticProfile); guard.id(captionId, 'cap', []);
   const r = candidateReader(provider, limits), map = 'captionsById';
   if (r.exact(map, captionId, 'id') !== captionId || provider.issues.some(i => i.path[0] === map && i.path[1] === captionId &&
@@ -33,7 +45,8 @@ export function captionLifecycleRecovery(provider: Provider, captionId: string, 
   const lifecycle = fields.find(f => f.path[2] === 'lifecycle')!;
   const states = lifecycle.candidates.map(c => (c.value.kind === 'value' ? c.value.value as JsonObject : {}).state);
   const deleteEdit = provider.issues.some(i => i.code === 'concurrent-delete-edit' && i.path.join('/') === `${map}/${captionId}/lifecycle`);
-  if (!states.includes('deleted') || !deleteEdit && !states.includes('active')) fail('caption-lifecycle-not-conflicted');
+  if (sameState ? lifecycle.candidates.length < 2 || states.some(state=>state!==states[0]) : !states.includes('deleted') || !deleteEdit && !states.includes('active'))
+    fail('caption-lifecycle-not-conflicted');
   const children: { kind: 'scene' | 'attachment' | 'tag'; id: string; referenceId?: string;
     state: 'active' | 'deleted' | 'unresolved'; uncertain: boolean }[] = [];
   for (const [childMap, kind, endpoint] of [['sceneCaptionMembershipsById', 'scene', 'sceneId'],
@@ -59,6 +72,18 @@ export function planCaptionLifecycleResolution(provider: Provider, command: Capt
     fail('caption-lifecycle-shape');
   const guard = new ProjectRecordFields(); guard.id(command.eventId, 'evt', []);
   const source = captionLifecycleRecovery(provider, command.captionId, limits);
+  return captionLifecycleWrite(provider, command, source, command.state === 'active' ? 'restore' : 'conflictResolution', limits);
+}
+export function planCaptionLifecycleConfirmation(provider: Provider, command: CaptionLifecycleConfirmation, limits: MetadataLimits): MetadataRecordEdit[] {
+  if (Object.keys(command).sort().join(',') !== 'captionId,eventId,kind,observedOperationIds,state' || !['active','deleted'].includes(command.state))
+    fail('caption-lifecycle-shape');
+  const guard = new ProjectRecordFields(); guard.id(command.eventId, 'evt', []);
+  const source = captionLifecycleConfirmation(provider, command.captionId, limits);
+  if (command.state !== source.state) fail('caption-lifecycle-state');
+  return captionLifecycleWrite(provider, command, source, 'conflictResolution', limits);
+}
+function captionLifecycleWrite(provider: Provider, command: CaptionLifecycleResolution | CaptionLifecycleConfirmation,
+  source: ReturnType<typeof captionLifecycleRecovery>, reason: 'restore' | 'conflictResolution', limits: MetadataLimits): MetadataRecordEdit[] {
   const expected = new Set(source.lifecycle.candidates.map(c => c.operationId)), observed = command.observedOperationIds;
   if (!Array.isArray(observed) || observed.length !== expected.size || new Set(observed).size !== observed.length || !observed.every(id => expected.has(id)))
     fail('caption-lifecycle-observed');
@@ -69,7 +94,7 @@ export function planCaptionLifecycleResolution(provider: Provider, command: Capt
       (write.value.value as JsonObject).eventId === command.eventId) fail('caption-lifecycle-event-reused');
   }
   return [{ map: 'captionsById', id: command.captionId, create: false,
-    fields: { lifecycle: { state: command.state, reason: command.state === 'active' ? 'restore' : 'conflictResolution', eventId: command.eventId } } }];
+    fields: { lifecycle: { state: command.state, reason, eventId: command.eventId } } }];
 }
 
 /** Deletion is not copying: inspect identity/endpoints/lifecycle, preserve other candidates. */

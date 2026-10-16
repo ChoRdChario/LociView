@@ -7,8 +7,8 @@ import { assetStatusCandidates } from '../../projectMetadata/assetStatus';
 import { assetMembershipGroups, planAssetMembershipResolution, captionMembershipGroups, captionCopySource, planCaptionMembershipResolution } from '../../projectMetadata/membership';
 import { sceneNameCandidates } from '../../projectMetadata/sceneAuthoring';
 import { defaultSceneCandidates } from '../../projectMetadata/startupScene';
-import { captionFieldCandidates, attachmentFieldCandidates } from '../../projectMetadata/captionCandidates';
-import { captionLifecycleRecovery } from '../../projectMetadata/captionDeletion';
+import { captionFieldCandidates, attachmentFieldCandidates, attachmentLifecycleRecovery } from '../../projectMetadata/captionCandidates';
+import { captionLifecycleRecovery, captionLifecycleConfirmation } from '../../projectMetadata/captionDeletion';
 import { planMetadataEdit } from '../../projectMetadata/commands';
 import { assetCopySource, prepareAssetMembershipCopy } from '../../projectMetadata/modelMembership';
 import { entryViewCandidates, viewFieldCandidates } from '../../projectMetadata/viewResolution';
@@ -47,6 +47,19 @@ export function productSources(host: ReturnType<typeof createValidationModeHost>
         if (field === 'colorSrgb') return value === undefined ? '未設定（標準色）' : Array.isArray(value) ? `#${value.map(n => Math.round(Number(n) * 255).toString(16).padStart(2, '0')).join('')}（${value.join(' / ')}）` : '確認が必要な値';
         return typeof value === 'string' ? value || '空の内容' : '確認が必要な値';
       };
+      const attachmentOrder = (captionId: string, attachmentId: string) => {
+        const siblings = projectAttachments(p, captionId).filter(r => r.id !== attachmentId && r.fields.orderKey?.kind === 'value');
+        const known = new Set(siblings.map(r => r.id)), uncertain = Object.entries(p.details.mutable.captionAttachmentsById).some(([id, fields]) => {
+          const owner = fieldValue(fields.captionId);
+          return id !== attachmentId && (owner === undefined || owner === captionId) && !known.has(id) &&
+            ((fieldValue(fields.lifecycle) as JsonObject | undefined)?.state !== 'deleted' || p.issues.some(i=>i.code==='concurrent-delete-edit' && i.path[0]==='captionAttachmentsById' && i.path[1]===id));
+        });
+        return { uncertain, describe(key: string) {
+          const at = siblings.filter(r => r.order < key || r.order === key && r.id.localeCompare(attachmentId) < 0).length;
+          const next = siblings[at], previous = siblings[at - 1];
+          return `順序を確認できる画像の中で ${at + 1}/${siblings.length + 1} 番目${next ? `（「${next.label}」の前）` : previous ? `（「${previous.label}」の後）` : ''}`;
+        } };
+      };
       for (const field of p.inspection.candidates.fields) {
         const [map, recordId, name] = field.path;
         if (field.path.length === 2 && map === 'project' && recordId === 'defaultSceneId' && field.candidates.length > 1) {
@@ -61,23 +74,13 @@ export function productSources(host: ReturnType<typeof createValidationModeHost>
           const captionId = typeof owner === 'string' ? owner : ''; let ready = false;
           try { attachmentFieldCandidates(p, captionId, attachmentId, name, host.limits); ready = true; } catch { /* Never accept only valid-looking choices. */ }
           const mediaId = fieldValue(row?.mediaResourceId), media = typeof mediaId === 'string' ? fieldValue(p.details.immutable.mediaResourcesById[mediaId]) : undefined;
-          const siblings = projectAttachments(p, captionId).filter(r => r.id !== attachmentId && r.fields.orderKey?.kind === 'value');
-          const known = new Set(siblings.map(r => r.id)), uncertain = Object.entries(p.details.mutable.captionAttachmentsById).some(([id, fields]) => {
-            const owner = fieldValue(fields.captionId);
-            return id !== attachmentId && (owner === undefined || owner === captionId) &&
-              (fieldValue(fields.lifecycle) as JsonObject | undefined)?.state !== 'deleted' && !known.has(id);
-          });
-          const describeOrder = (key: string) => {
-            const at = siblings.filter(r => r.order < key || r.order === key && r.id.localeCompare(attachmentId) < 0).length;
-            const next = siblings[at], previous = siblings[at - 1];
-            return `順序を確認できる画像の中で ${at + 1}/${siblings.length + 1} 番目${next ? `（「${next.label}」の前）` : previous ? `（「${previous.label}」の後）` : ''}`;
-          };
+          const order = attachmentOrder(captionId, attachmentId);
           groups.push({ key: `attachment/${attachmentId}/${name}`, label: `${captionId ? captionLabel(captionId) : '添付先を確認'}：${typeof media?.label === 'string' ? media.label : '添付画像'}の${name === 'altText' ? '説明' : '順序'}`, ready,
             target: { kind: 'attachmentField', captionId, attachmentId, field: name },
             note: name === 'altText' ? 'この画像の説明だけを変更します。画像・添付先・順序は変わりません。' :
-              `この画像の順序だけを変更します。説明やほかの添付は変わりません。${uncertain ? '未解決のほかの添付は、この位置に含めていません。' : ''}`,
+              `この画像の順序だけを変更します。説明やほかの添付は変わりません。${order.uncertain ? '未解決のほかの添付は、この位置に含めていません。' : ''}`,
             choices: field.candidates.map((c, i) => ({ id: c.operationId, label: `候補 ${i + 1}：${name === 'altText' && c.value.kind === 'absent' ? '説明なし（未設定）' :
-              c.value.kind !== 'value' || typeof c.value.value !== 'string' ? '確認が必要な値' : name === 'altText' ? c.value.value || '空の説明' : describeOrder(c.value.value)}` })) });
+              c.value.kind !== 'value' || typeof c.value.value !== 'string' ? '確認が必要な値' : name === 'altText' ? c.value.value || '空の説明' : order.describe(c.value.value)}` })) });
         }
         if (map === 'scenesById' && name === 'name') {
           let ready = false; try { sceneNameCandidates(p, recordId!, host.limits); ready = true; } catch { /* No partial acceptance. */ }
@@ -95,13 +98,29 @@ export function productSources(host: ReturnType<typeof createValidationModeHost>
           choices: field.candidates.map((c, i) => ({ id: c.operationId, label: `候補 ${i + 1}：${ready || isText ? describe(name!, c.value.kind === 'value' ? c.value.value : undefined) : '確認が必要な値'}`,
             ...(ready && name === 'anchor' && c.value.kind === 'value' ? { anchor: c.value.value as unknown as import('../../scene/types').Anchor } : {}) })) });
       }
+      for (const [attachmentId, row] of Object.entries(p.details.mutable.captionAttachmentsById)) {
+        if (!p.issues.some(i=>i.path.join('/')===`captionAttachmentsById/${attachmentId}/lifecycle` && ['concurrent-delete-edit','atomic-field-conflict'].includes(i.code))) continue;
+        const owner = fieldValue(row.captionId), captionId = typeof owner === 'string' ? owner : '', mediaId = fieldValue(row.mediaResourceId);
+        const media = typeof mediaId === 'string' ? fieldValue(p.details.immutable.mediaResourcesById[mediaId]) : undefined;
+        let source: ReturnType<typeof attachmentLifecycleRecovery> | undefined;
+        try { source = attachmentLifecycleRecovery(p, captionId, attachmentId, host.limits); } catch { /* Invalid history/endpoints are not repaired by this choice. */ }
+        const order = attachmentOrder(captionId, attachmentId), retained = p.inspection.candidates.fields.filter(f=>f.path[0]==='captionAttachmentsById' && f.path[1]===attachmentId && ['altText','orderKey'].includes(f.path[2]!));
+        groups.push({ key:`attachment/${attachmentId}/lifecycle`, label:`${captionId ? captionLabel(captionId) : '添付先を確認'}：${typeof media?.label==='string' ? media.label : '添付画像'}の添付状態`, ready:!!source,
+          target:{kind:'attachmentLifecycle',captionId,attachmentId,operationIds:source?.lifecycle.candidates.map(c=>c.operationId) ?? []},
+          note:`添付状態だけを確定します。画像本体と説明・順序の候補は変更しません。${order.uncertain ? '未解決のほかの添付は、順序の位置に含めていません。' : ''}`,
+          choices:source?.states.map(state=>({id:state,label:state==='deleted' ? '添付を外した状態を維持' : source!.states.includes('deleted') ? '添付を復元' : '添付を残す'})) ?? [],
+          details:retained.flatMap(f=>f.candidates.map((c,i)=>`${f.path[2]==='altText' ? '説明' : '順序'} 候補 ${i+1}：${c.value.kind==='absent' ? '未設定' : typeof c.value.value!=='string' ? '確認が必要な値' : f.path[2]==='altText' ? c.value.value || '空の説明' : order.describe(c.value.value)}`)) });
+      }
       for (const [captionId] of Object.entries(p.details.mutable.captionsById)) {
         if (!p.issues.some(i => i.path.join('/') === `captionsById/${captionId}/lifecycle` && ['concurrent-delete-edit', 'atomic-field-conflict'].includes(i.code))) continue;
-        let source: ReturnType<typeof captionLifecycleRecovery> | undefined; try { source = captionLifecycleRecovery(p, captionId, host.limits); } catch { /* Not a general trash restore. */ }
-        groups.push({ key: `lifecycle/${captionId}`, label: `${captionLabel(captionId)}：削除と編集`, ready: !!source,
-          target: { kind: 'lifecycle', captionId, operationIds: source?.lifecycle.candidates.map(c => c.operationId) ?? [] },
-          note: 'キャプション本体だけを変更します。削除済みのシーン登録・添付・タグ登録は復元しません。',
-          choices: [{ id: 'deleted', label: '削除状態を維持' }, { id: 'active', label: 'キャプションを復元' }],
+        let source: ReturnType<typeof captionLifecycleRecovery> | undefined, confirmedState:'active'|'deleted'|undefined;
+        try { source = captionLifecycleRecovery(p, captionId, host.limits); } catch { try {
+          const confirmation=captionLifecycleConfirmation(p,captionId,host.limits);source=confirmation;confirmedState=confirmation.state;
+        } catch { /* Neither general trash restoration nor arbitrary state assignment. */ } }
+        groups.push({ key: `lifecycle/${captionId}`, label: `${captionLabel(captionId)}：${confirmedState ? '状態の競合' : '削除と編集'}`, ready: !!source,
+          target: { kind: confirmedState ? 'captionLifecycleConfirm' : 'lifecycle', captionId, operationIds: source?.lifecycle.candidates.map(c => c.operationId) ?? [] },
+          note: `キャプション本体だけを変更します。削除済みのシーン登録・添付・タグ登録は復元しません。${confirmedState==='active' ? '有効な登録・添付は再表示される場合があります。' : ''}`,
+          choices: confirmedState ? [{id:confirmedState,label:confirmedState==='active' ? '記録を残す' : '削除状態を維持'}] : [{ id: 'deleted', label: '削除状態を維持' }, { id: 'active', label: 'キャプションを復元' }],
           details: source ? [...source.fields.filter(f => ['title', 'body', 'anchor', 'colorSrgb'].includes(f.path[2]!)).flatMap(f => f.candidates.map((c, i) => `${fieldLabels[f.path[2]!]} 候補 ${i + 1}：${describe(f.path[2]!, c.value.kind === 'value' ? c.value.value : undefined)}`)),
             ...source.children.map(c => `${c.kind === 'scene' ? `シーン登録：${sceneLabel(c.referenceId ?? '')}` : c.kind === 'attachment' ? '添付' : 'タグ登録'} — ${c.uncertain || c.state === 'unresolved' ? '状態を要確認' : c.state === 'deleted' ? '削除済み・復元しません' : '登録あり・親の復元後に再表示される場合があります'}`)] : [] });
       }

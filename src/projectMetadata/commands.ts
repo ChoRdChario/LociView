@@ -15,9 +15,9 @@ import { candidateReader, planCaptionMembershipResolution, planAssetMembershipRe
 import { metadataImmutableReader } from './records';
 import { assetStatusCandidates } from './assetStatus';
 import { planAssetMembershipCopies } from './modelMembership';
-import { captionFieldCandidates, attachmentFieldCandidates, type CaptionChoiceField } from './captionCandidates';
+import { captionFieldCandidates, attachmentFieldCandidates, planAttachmentLifecycleResolution, type AttachmentLifecycleResolution, type CaptionChoiceField } from './captionCandidates';
 import { planSceneAuthoring, planSceneNameResolution, type SceneNameResolution } from './sceneAuthoring';
-import { planCaptionDeletion, planCaptionLifecycleResolution, type CaptionLifecycleResolution } from './captionDeletion';
+import { planCaptionDeletion, planCaptionLifecycleResolution, planCaptionLifecycleConfirmation, type CaptionLifecycleResolution, type CaptionLifecycleConfirmation } from './captionDeletion';
 import type { CaptionDeletionCommand, AssetDeletionCommand, PinParentCommand } from '../scene/commands';
 import { planAssetDeletion } from './assetDeletion';
 import { defaultSceneCandidates } from './startupScene';
@@ -31,6 +31,8 @@ export type MetadataEdit =
   | ReplaceAssetModelCommand
   | CaptionDeletionCommand
   | CaptionLifecycleResolution
+  | CaptionLifecycleConfirmation
+  | AttachmentLifecycleResolution
   | AssetDeletionCommand
   | SceneAuthoringCommand
   | SceneNameResolution
@@ -107,6 +109,8 @@ export function planMetadataEdit(provider: Provider, input: MetadataEdit, limits
   }
   if (command.kind === 'deleteCaption') return planCaptionDeletion(provider, command, limits);
   if (command.kind === 'resolveCaptionLifecycle') return planCaptionLifecycleResolution(provider, command, limits);
+  if (command.kind === 'confirmCaptionLifecycle') return planCaptionLifecycleConfirmation(provider, command, limits);
+  if (command.kind === 'resolveAttachmentLifecycle') return planAttachmentLifecycleResolution(provider, command, limits);
   if (command.kind === 'deleteAsset') return planAssetDeletion(provider, command, limits);
   if (command.kind === 'createScene' || command.kind === 'renameScene' || command.kind === 'setDefaultScene')
     return planSceneAuthoring(provider, command, limits);

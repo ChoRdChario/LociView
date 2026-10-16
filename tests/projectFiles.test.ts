@@ -4718,7 +4718,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     await vi.waitFor(() => expect(h.imageReads[2]).toHaveBeenCalledTimes(1)); expect(viewer.open).toBe(false); expect(card.style.width).toBe('300px');
     expect(h.liveHost().read().source!.token).toBe(token); await h.ui.dispose();
   });
-  it('resolves both attachment cells, retries the exact absence choice, and returns edited files before cold reopen', async () => {
+  it.each([false,true])('resolves both attachment cells, retries the exact decision, and returns files before cold reopen (lifecycle=%s)', async withLifecycle => {
     const h = await productWorkspaceFixture(true), { editor, named, button, all, edited } = h, captionId = h.f.f.captionId;
     const live = () => h.liveHost(), p = () => { const provider = live().read().provider!; if (provider.kind !== 'scene-provider') throw Error('provider'); return provider; };
     const first = Object.entries(p().details.mutable.captionAttachmentsById)[0]!, attachmentId = first[0], mediaId = fieldValue(first[1].mediaResourceId) as string;
@@ -4731,30 +4731,52 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const peer = firstWorkspaceRecipient(); await peer.receiver.importWorkspace(seed);
     await live().dispatch(shared.token,{kind:'editAttachment',sceneId,captionId,attachmentId,field:'altText',value:'手元の説明'});
     await live().dispatch(live().read().source!.token,{kind:'editAttachment',sceneId,captionId,attachmentId,field:'orderKey',value:'B'}); h.refresh();
-    const doc = A.change(A.load<Record<string,any>>(shared.encodeFullSource()),d=>{delete d.captionAttachmentsById[attachmentId].altText; d.captionAttachmentsById[attachmentId].orderKey=new A.ImmutableString(json('D'));});
-    const source = ProjectMetadataSource.fromFullSource(A.save(doc),shared.proof,metadata), provider = await underWriteLease(h.f.fs,()=>readProjectScene(source.read(),metadata,live().content.verifier(true)));
+    const doc = A.change(A.load<Record<string,any>>(shared.encodeFullSource()),d=>{delete d.captionAttachmentsById[attachmentId].altText; d.captionAttachmentsById[attachmentId].orderKey=new A.ImmutableString(json('D'));
+      if(withLifecycle)d.captionAttachmentsById[attachmentId].lifecycle=new A.ImmutableString(json({state:'deleted',reason:'userDelete',eventId:`evt_${newId()}`}));});
+    let incoming=doc;
+    if(withLifecycle){const parentDeleted=A.change(A.load<Record<string,any>>(shared.encodeFullSource()),d=>{d.captionsById[captionId].lifecycle=new A.ImmutableString(json({state:'deleted',reason:'userDelete',eventId:`evt_${newId()}`}));});
+      const parents=[0,1].map(()=>A.change(A.clone(parentDeleted),d=>{d.captionsById[captionId].lifecycle=new A.ImmutableString(json({state:'active',reason:'restore',eventId:`evt_${newId()}`}));}));incoming=A.merge(A.merge(A.clone(doc),parents[0]!),parents[1]!);}
+    const source = ProjectMetadataSource.fromFullSource(A.save(incoming),shared.proof,metadata), provider = await underWriteLease(h.f.fs,()=>readProjectScene(source.read(),metadata,live().content.verifier(true)));
     const publication=newId(), capture = await WorkspaceSourceCapture.prepare({read:async()=>({state:'ready',source,provider,publication})},source.token,h.f.store,metadata), chunks:BlobPart[]=[];
     await writeWorkspaceArchive(capture,h.f.store,new WritableStream({write:b=>{chunks.push(b.slice() as BlobPart);}}),{packageId:`pkg_${newId()}`,createdByVersion:'validation'});
     const receive = named('更新ファイルを選択'); Object.assign(receive,{files:[new Blob(chunks)]}); receive.fire('change'); await edited(()=>receive.parent!.parent!.fire('submit',{preventDefault(){}}));
     await vi.waitFor(()=>expect(all(h.root).some(n=>n.textContent==='更新を受け取りました。')).toBe(true)); Object.assign(receive,{files:[]}); receive.fire('change');
-    const form = (field:'説明'|'順序') => all(named('記録の競合',editor)).find(n=>n.tag==='li' && n.attributes.get('aria-label')?.endsWith(`受信画像の${field}`))!;
-    const select = (field:'説明'|'順序') => all(form(field)).find(n=>n.tag==='select')!;
+    const form = (field:'説明'|'順序'|'添付状態') => all(named('記録の競合',editor)).find(n=>n.tag==='li' && n.attributes.get('aria-label')?.endsWith(`受信画像の${field}`))!;
+    const select = (field:'説明'|'順序'|'添付状態') => all(form(field)).find(n=>n.tag==='select')!;
     const chooseAbsent = () => { const s=select('説明'); s.value=s.children.find(n=>n.textContent.includes('説明なし（未設定）'))!.value; s.fire('change'); return s.value; };
+    const decision=withLifecycle?'添付状態':'説明', chooseDecision=()=>{if(!withLifecycle)return chooseAbsent(); const s=select('添付状態');s.value='active';s.fire('change');return s.value;};
+    if(withLifecycle){const parent=all(named('記録の競合',editor)).find(n=>n.tag==='li' && n.attributes.get('aria-label')?.endsWith('：状態の競合'))!, choice=all(parent).find(n=>n.tag==='select')!;
+      expect(choice.children.map(n=>n.value)).toEqual(['','active']);expect(choice.value).toBe('');expect(all(parent).some(n=>n.textContent.includes('有効な登録・添付は再表示される場合があります'))).toBe(true);
+      expect(select('添付状態').disabled).toBe(true);const before=live().read().source!, retained=p().inspection.candidates.fields.filter(f=>f.path[0]==='captionAttachmentsById');
+      choice.value='active';choice.fire('change');await edited(()=>button('競合を解消',parent).fire('click'));const command=h.dispatch.mock.calls.at(-1)![1];if(command.kind!=='confirmCaptionLifecycle')throw Error('parent command');
+      expect(p().details.mutable.captionsById[captionId]!.lifecycle).toEqual({kind:'value',value:{state:'active',reason:'conflictResolution',eventId:command.eventId}});
+      expect(live().read().source!.read().history.changes.at(-1)!.writes.map(w=>w.path)).toEqual([['captionsById',captionId,'lifecycle']]);expect([...live().read().source!.read().history.changes.at(-1)!.deps].sort()).toEqual([...before.heads].sort());
+      expect(p().inspection.candidates.fields.filter(f=>f.path[0]==='captionAttachmentsById')).toEqual(retained);expect(live().read().source!.originalChanges().slice(0,before.originalChanges().length)).toEqual(before.originalChanges());
+      named('キャプション一覧',editor).children[0]!.children[0]!.fire('click');expect(select('添付状態').disabled).toBe(false);}
     expect(select('順序').children.map(n=>n.textContent)).toEqual(expect.arrayContaining([expect.stringContaining('1/3 番目'),expect.stringContaining('2/3 番目')]));
     const orderChoices = p().inspection.candidates.fields.find(f=>f.path.join('/')===`captionAttachmentsById/${attachmentId}/orderKey`)!.candidates;
+    const altChoices = p().inspection.candidates.fields.find(f=>f.path.join('/')===`captionAttachmentsById/${attachmentId}/altText`)!.candidates;
+    if(withLifecycle){expect(all(form('添付状態')).map(n=>n.textContent)).toEqual(expect.arrayContaining([expect.stringContaining('説明 候補'),expect.stringContaining('順序 候補')]));
+      expect(select('説明').disabled).toBe(true);expect(select('順序').disabled).toBe(true);expect(named('添付の編集',named('画像の整理',editor)).children).toHaveLength(2);}
     const stableSiblings = siblings.map(id=>p().details.mutable.captionAttachmentsById[id]);
     button('閲覧に切り替える').fire('click'); await vi.waitFor(()=>expect(button('編集を開始する')?.disabled).toBe(false),{timeout:10000});
-    chooseAbsent(); const readonlyToken=live().read().source!.token; expect(button('競合を解消',form('説明')).disabled).toBe(true); button('競合を解消',form('説明')).fire('click'); expect(live().read().source!.token).toBe(readonlyToken);
-    button('選択を取り消す',form('説明')).fire('click'); button('編集を開始する').fire('click'); await vi.waitFor(()=>expect(button('閲覧に切り替える')?.disabled).toBe(false),{timeout:10000});
-    const absentChoice=chooseAbsent(), search=named('検索',all(editor).find(n=>n.className==='lv-caption-browser')!), dispatch=vi.spyOn(live(),'dispatch');
-    search.fire('compositionstart'); const calls=dispatch.mock.calls.length; expect(button('競合を解消',form('説明')).disabled).toBe(true); button('競合を解消',form('説明')).fire('click'); expect(dispatch).toHaveBeenCalledTimes(calls); search.fire('compositionend');
+    chooseDecision(); const readonlyToken=live().read().source!.token; expect(button('競合を解消',form(decision)).disabled).toBe(true); button('競合を解消',form(decision)).fire('click'); expect(live().read().source!.token).toBe(readonlyToken);
+    button('選択を取り消す',form(decision)).fire('click'); button('編集を開始する').fire('click'); await vi.waitFor(()=>expect(button('閲覧に切り替える')?.disabled).toBe(false),{timeout:10000});
+    const decisionChoice=chooseDecision(), search=named('検索',all(editor).find(n=>n.className==='lv-caption-browser')!), dispatch=vi.spyOn(live(),'dispatch');
+    search.fire('compositionstart'); const calls=dispatch.mock.calls.length; expect(button('競合を解消',form(decision)).disabled).toBe(true); button('競合を解消',form(decision)).fire('click'); expect(dispatch).toHaveBeenCalledTimes(calls); search.fire('compositionend');
     await live().dispatch(live().read().source!.token,{kind:'editCaption',captionId,edits:{body:'選択中に届いた本文'}}); h.refresh();
-    expect(select('説明').value).toBe(absentChoice); expect(button('競合を解消',form('説明')).disabled).toBe(true); button('選択を取り消す',form('説明')).fire('click'); chooseAbsent();
-    const before=live().read().source!; h.f.fs.reject=path=>path.endsWith('/published.json'); await h.failed(()=>button('競合を解消',form('説明')).fire('click'));
-    expect(select('説明').value).toBe(absentChoice); const staged=(await h.f.fs.list('')).filter(path=>path.endsWith('.amchange')), bytes=await Promise.all(staged.map(path=>h.f.fs.readBytes(path)));
-    expect(button('選択を取り消す',form('説明')).disabled).toBe(true); h.f.fs.reject=()=>false; await edited(()=>button('更新を再試行',editor).fire('click'));
+    expect(select(decision).value).toBe(decisionChoice); expect(button('競合を解消',form(decision)).disabled).toBe(true); button('選択を取り消す',form(decision)).fire('click'); chooseDecision();
+    const before=live().read().source!; h.f.fs.reject=path=>path.endsWith('/published.json'); await h.failed(()=>button('競合を解消',form(decision)).fire('click'));
+    const exactCommand=dispatch.mock.calls.at(-1)![1];expect(exactCommand.kind).toBe(withLifecycle?'resolveAttachmentLifecycle':'resolveAttachmentField');
+    expect(select(decision).value).toBe(decisionChoice); const staged=(await h.f.fs.list('')).filter(path=>path.endsWith('.amchange')), bytes=await Promise.all(staged.map(path=>h.f.fs.readBytes(path)));
+    expect(button('選択を取り消す',form(decision)).disabled).toBe(true); h.f.fs.reject=()=>false; await edited(()=>button('更新を再試行',editor).fire('click'));
     expect(await Promise.all(staged.map(path=>h.f.fs.readBytes(path)))).toEqual(bytes); expect(live().read().source!.originalChanges().slice(0,before.originalChanges().length)).toEqual(before.originalChanges());
-    expect(live().read().source!.originalChanges()).toHaveLength(before.originalChanges().length+1); expect(p().details.mutable.captionAttachmentsById[attachmentId]!.altText).toEqual({kind:'value',value:undefined});
+    expect(live().read().source!.originalChanges()).toHaveLength(before.originalChanges().length+1);
+    if(withLifecycle){if(exactCommand.kind!=='resolveAttachmentLifecycle')throw Error('lifecycle command');expect(p().details.mutable.captionAttachmentsById[attachmentId]!.lifecycle).toEqual({kind:'value',value:{state:'active',reason:'restore',eventId:exactCommand.eventId}});
+      expect(live().read().source!.read().history.changes.at(-1)!.writes.map(w=>w.path)).toEqual([['captionAttachmentsById',attachmentId,'lifecycle']]);expect([...live().read().source!.read().history.changes.at(-1)!.deps].sort()).toEqual([...before.heads].sort());
+      expect(p().inspection.candidates.fields.find(f=>f.path.join('/')===`captionAttachmentsById/${attachmentId}/altText`)!.candidates).toEqual(altChoices);expect(p().inspection.candidates.fields.find(f=>f.path.join('/')===`captionAttachmentsById/${attachmentId}/orderKey`)!.candidates).toEqual(orderChoices);
+      chooseAbsent();await edited(()=>button('競合を解消',form('説明')).fire('click'));}
+    expect(p().details.mutable.captionAttachmentsById[attachmentId]!.altText).toEqual({kind:'value',value:undefined});
     expect(p().inspection.candidates.fields.find(f=>f.path.join('/')===`captionAttachmentsById/${attachmentId}/orderKey`)!.candidates).toEqual(orderChoices);
     const order=select('順序'); order.value=order.children.find(n=>n.textContent.includes('2/3 番目'))!.value; order.fire('change'); await edited(()=>button('競合を解消',form('順序')).fire('click'));
     expect(p().details.mutable.captionAttachmentsById[attachmentId]!.orderKey).toEqual({kind:'value',value:'D'}); expect(p().details.mutable.captionAttachmentsById[attachmentId]!.altText).toEqual({kind:'value',value:undefined});
