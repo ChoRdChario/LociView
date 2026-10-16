@@ -7,7 +7,7 @@ import { assetStatusCandidates } from '../../projectMetadata/assetStatus';
 import { assetMembershipGroups, planAssetMembershipResolution, captionMembershipGroups, captionCopySource, planCaptionMembershipResolution } from '../../projectMetadata/membership';
 import { sceneNameCandidates } from '../../projectMetadata/sceneAuthoring';
 import { defaultSceneCandidates } from '../../projectMetadata/startupScene';
-import { captionFieldCandidates } from '../../projectMetadata/captionCandidates';
+import { captionFieldCandidates, attachmentFieldCandidates } from '../../projectMetadata/captionCandidates';
 import { captionLifecycleRecovery } from '../../projectMetadata/captionDeletion';
 import { planMetadataEdit } from '../../projectMetadata/commands';
 import { assetCopySource, prepareAssetMembershipCopy } from '../../projectMetadata/modelMembership';
@@ -15,7 +15,7 @@ import { entryViewCandidates, viewFieldCandidates } from '../../projectMetadata/
 import { newId } from '../../projectMetadata/persistence';
 import type { MaterialRecordPort, MaterialSource } from '../../ui/projectScene/materialState';
 import type { ProjectWorkspacePorts, WorkspaceMaterialReview, WorkspaceRecoveryGroup } from '../../ui/projectScene/projectWorkspacePorts';
-import { fieldValue } from '../../ui/projectScene/projectRead';
+import { fieldValue, projectAttachments } from '../../ui/projectScene/projectRead';
 import { metadataViewData } from './metadataViews';
 import { entryKey, viewKey, orderBetween } from './viewHistory';
 import { viewLabel, viewDescription } from './viewCandidateLabels';
@@ -56,6 +56,29 @@ export function productSources(host: ReturnType<typeof createValidationModeHost>
               label: `候補 ${i + 1}：${c.value.kind === 'value' && typeof c.value.value === 'string' ? sceneLabel(c.value.value) : '参照先を確認'}` })) });
         }
         if (field.path.length !== 3 || field.candidates.length < 2) continue;
+        if (map === 'captionAttachmentsById' && (name === 'altText' || name === 'orderKey')) {
+          const attachmentId = recordId!, row = p.details.mutable.captionAttachmentsById[attachmentId], owner = fieldValue(row?.captionId);
+          const captionId = typeof owner === 'string' ? owner : ''; let ready = false;
+          try { attachmentFieldCandidates(p, captionId, attachmentId, name, host.limits); ready = true; } catch { /* Never accept only valid-looking choices. */ }
+          const mediaId = fieldValue(row?.mediaResourceId), media = typeof mediaId === 'string' ? fieldValue(p.details.immutable.mediaResourcesById[mediaId]) : undefined;
+          const siblings = projectAttachments(p, captionId).filter(r => r.id !== attachmentId && r.fields.orderKey?.kind === 'value');
+          const known = new Set(siblings.map(r => r.id)), uncertain = Object.entries(p.details.mutable.captionAttachmentsById).some(([id, fields]) => {
+            const owner = fieldValue(fields.captionId);
+            return id !== attachmentId && (owner === undefined || owner === captionId) &&
+              (fieldValue(fields.lifecycle) as JsonObject | undefined)?.state !== 'deleted' && !known.has(id);
+          });
+          const describeOrder = (key: string) => {
+            const at = siblings.filter(r => r.order < key || r.order === key && r.id.localeCompare(attachmentId) < 0).length;
+            const next = siblings[at], previous = siblings[at - 1];
+            return `順序を確認できる画像の中で ${at + 1}/${siblings.length + 1} 番目${next ? `（「${next.label}」の前）` : previous ? `（「${previous.label}」の後）` : ''}`;
+          };
+          groups.push({ key: `attachment/${attachmentId}/${name}`, label: `${captionId ? captionLabel(captionId) : '添付先を確認'}：${typeof media?.label === 'string' ? media.label : '添付画像'}の${name === 'altText' ? '説明' : '順序'}`, ready,
+            target: { kind: 'attachmentField', captionId, attachmentId, field: name },
+            note: name === 'altText' ? 'この画像の説明だけを変更します。画像・添付先・順序は変わりません。' :
+              `この画像の順序だけを変更します。説明やほかの添付は変わりません。${uncertain ? '未解決のほかの添付は、この位置に含めていません。' : ''}`,
+            choices: field.candidates.map((c, i) => ({ id: c.operationId, label: `候補 ${i + 1}：${name === 'altText' && c.value.kind === 'absent' ? '説明なし（未設定）' :
+              c.value.kind !== 'value' || typeof c.value.value !== 'string' ? '確認が必要な値' : name === 'altText' ? c.value.value || '空の説明' : describeOrder(c.value.value)}` })) });
+        }
         if (map === 'scenesById' && name === 'name') {
           let ready = false; try { sceneNameCandidates(p, recordId!, host.limits); ready = true; } catch { /* No partial acceptance. */ }
           groups.push({ key: `scene/${recordId}`, label: `シーン ${Object.keys(p.state.scenes).sort().indexOf(recordId!) + 1}の名前`, ready,

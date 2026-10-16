@@ -12,6 +12,7 @@ import { PACKAGE_LIMITS } from '../src/projectPackage/contract';
 import { planWorkspaceClosure } from '../src/projectPackage/closure';
 import { immutableDigest } from '../src/domain/projectGraphSupport';
 import { createFixtureModel } from '../src/harness/projectScene/modelClosure';
+import { attachmentFieldCandidates } from '../src/projectMetadata/captionCandidates';
 
 const limits: MetadataLimits = { ...valueLimits, maxWork: 1_000_000, maxChanges: 100,
   maxChangeBytes: 1_000_000, maxTotalBytes: 4_000_000, maxOperations: 10_000 };
@@ -31,6 +32,78 @@ function field(source: ProjectMetadataSource, name: string) {
 }
 
 const originalBudget = { maxNodes: PACKAGE_LIMITS.inspectionNodes, maxWork: PACKAGE_LIMITS.inspectionWork };
+describe('attachment atomic candidate selection', () => {
+  const provider = async (source: ProjectMetadataSource) => {
+    const p = await readProjectScene(source.read(), limits, developmentContentVerifier([]));
+    if (p.kind !== 'scene-provider') throw Error('provider'); return p;
+  };
+  const alt = (source: ProjectMetadataSource) => {
+    const read = inspectAtomicHistory(source.read().history, limits); if (read.kind !== 'atomic-history-inspection') throw Error('history');
+    return read.fields.find(f => canonical(f.path) === canonical(['captionAttachmentsById', id('att'), 'altText']))!;
+  };
+  it.each(['left','right','absent','absent-absent','empty','other-field'] as const)('selects the exact %s atom causally while retaining every original', async kind => {
+    const { source } = create();
+    const branch = (left: boolean) => changed(source, d => {
+      const row = d.captionAttachmentsById[id('att')];
+      if (kind === 'absent-absent' || kind === 'absent' && left || kind === 'empty' && !left) delete row.altText;
+      else row.altText = new A.ImmutableString(canonical(kind === 'empty' ? '' : left ? '説明 A' : '説明 B'));
+      if (kind === 'other-field') row.orderKey = new A.ImmutableString(canonical(left ? 'B' : 'C'));
+    });
+    const conflicted = ProjectMetadataSource.reopen(branch(true), source.proof, limits).appendOriginal(branch(false)), p = await provider(conflicted), before = conflicted.originalChanges();
+    const candidates = attachmentFieldCandidates(p, id('cap'), id('att'), 'altText', limits); expect(candidates).toHaveLength(2);
+    const choice = candidates.find(c => kind === 'absent' || kind === 'absent-absent' ? c.value.kind === 'absent' :
+      c.value.kind === 'value' && c.value.value === (kind === 'empty' ? '' : kind === 'right' ? '説明 B' : '説明 A'))!;
+    const edit = { kind: 'resolveAttachmentField' as const, field:'altText' as const, captionId: id('cap'), attachmentId: id('att'), operationId: choice.operationId };
+    const resolved = conflicted.prepareEdit(conflicted.token, edit, p, 'a'.repeat(32)), actual = alt(resolved);
+    expect(actual.candidates).toHaveLength(1); expect(actual.candidates[0]!.value).toEqual(choice.value); expect(actual.candidates[0]!.operationId).not.toBe(choice.operationId);
+    expect(resolved.originalChanges()).toHaveLength(before.length + 1); expect(resolved.originalChanges().slice(0,before.length)).toEqual(before);
+    const last = resolved.read().history.changes.at(-1)!; expect(last.writes.map(w=>w.path)).toEqual([['captionAttachmentsById',id('att'),'altText']]); expect([...last.deps].sort()).toEqual([...conflicted.heads].sort());
+    const after = await provider(resolved);
+    for (const field of ['id','captionId','mediaResourceId','orderKey','lifecycle']) expect(after.details.mutable.captionAttachmentsById[id('att')]![field]).toEqual(p.details.mutable.captionAttachmentsById[id('att')]![field]);
+    expect(ProjectMetadataSource.fromFullSource(resolved.encodeFullSource(), resolved.proof, limits).originalChanges()).toEqual(resolved.originalChanges());
+    expect(() => conflicted.prepareEdit('stale', edit, p, 'b'.repeat(32))).toThrow('stale-token');
+    expect(() => conflicted.prepareEdit(conflicted.token, {...edit, operationId:'missing'}, p, 'b'.repeat(32))).toThrow('attachment-resolution-choice');
+    expect(conflicted.originalChanges()).toEqual(before);
+  });
+  it.each(['B','C'])('chooses order %s without resolving sibling description or Caption title', async key => {
+    const { source } = create(), branch = (left: boolean) => changed(source, d => {
+      const row = d.captionAttachmentsById[id('att')]; row.orderKey = new A.ImmutableString(canonical(left ? 'B' : 'C'));
+      row.altText = new A.ImmutableString(canonical(left ? '説明 A' : '説明 B'));
+      d.captionsById[id('cap')].title = new A.ImmutableString(canonical(left ? 'タイトル A' : 'タイトル B'));
+    });
+    const conflicted = ProjectMetadataSource.reopen(branch(true), source.proof, limits).appendOriginal(branch(false)), p = await provider(conflicted), before = conflicted.originalChanges();
+    const candidates = attachmentFieldCandidates(p,id('cap'),id('att'),'orderKey',limits); expect(candidates).toHaveLength(2);
+    const choice = candidates.find(c => c.value.kind === 'value' && c.value.value === key)!;
+    const resolved = conflicted.prepareEdit(conflicted.token,{kind:'resolveAttachmentField',captionId:id('cap'),attachmentId:id('att'),field:'orderKey',operationId:choice.operationId},p,'a'.repeat(32)), after = await provider(resolved);
+    expect(after.details.mutable.captionAttachmentsById[id('att')]!.orderKey).toEqual({kind:'value',value:key});
+    expect(alt(resolved)).toEqual(alt(conflicted)); expect(after.details.mutable.captionsById[id('cap')]!.title).toEqual(p.details.mutable.captionsById[id('cap')]!.title);
+    expect(resolved.read().history.changes.at(-1)!.writes.map(w=>w.path)).toEqual([['captionAttachmentsById',id('att'),'orderKey']]);
+    expect(resolved.originalChanges().slice(0,before.length)).toEqual(before);
+    expect(ProjectMetadataSource.fromFullSource(resolved.encodeFullSource(),resolved.proof,limits).originalChanges()).toEqual(resolved.originalChanges());
+    expect(() => attachmentFieldCandidates(p,id('cap'),id('att'),'captionId' as 'orderKey',limits)).toThrow('attachment-resolution-field');
+  });
+  it.each(['invalid-alt','invalid-order','unknown-field','missing-order','wrong-caption','missing-media','delete-edit','deleted-caption'] as const)(
+    'refuses %s without selecting a valid-looking subset', async kind => {
+      const { source } = create();
+      const branch = (left: boolean) => changed(source, d => {
+        const row = d.captionAttachmentsById[id('att')]; row.altText = new A.ImmutableString(canonical(left ? '説明 A' : '説明 B'));
+        if (!left) {
+          if (kind === 'invalid-alt') row.altText = new A.ImmutableString('42');
+          if (kind === 'invalid-order') row.orderKey = new A.ImmutableString('42');
+          if (kind === 'unknown-field') row.futureDescription = new A.ImmutableString('true');
+          if (kind === 'missing-order') delete row.orderKey;
+          if (kind === 'wrong-caption') row.captionId = new A.ImmutableString(canonical(id('cap',2)));
+          if (kind === 'missing-media') row.mediaResourceId = new A.ImmutableString(canonical(id('med',999)));
+          if (kind === 'delete-edit') row.lifecycle = new A.ImmutableString(canonical({state:'deleted',reason:'userDelete',eventId:id('evt',4)}));
+          if (kind === 'deleted-caption') d.captionsById[id('cap')].lifecycle = new A.ImmutableString(canonical({state:'deleted',reason:'userDelete',eventId:id('evt',4)}));
+        }
+      });
+      const conflicted = ProjectMetadataSource.reopen(branch(true), source.proof, limits).appendOriginal(branch(false)), p = await provider(conflicted), before=conflicted.originalChanges();
+      expect(() => attachmentFieldCandidates(p,id('cap'),id('att'),'altText',limits)).toThrow();
+      expect(() => conflicted.prepareEdit(conflicted.token,{kind:'resolveAttachmentField',field:'altText',captionId:id('cap'),attachmentId:id('att'),operationId:alt(conflicted).candidates[0]!.operationId},p,'a'.repeat(32))).toThrow();
+      expect(conflicted.originalChanges()).toEqual(before);
+    });
+});
 describe('explicit metadata semantic profiles', () => {
   it('edits only a known active map2 Asset pin scale and refuses ambiguous, stale or unsupported writes', async () => {
     const records = fixture(); records.schema.minor = 1; delete records.assetsById[id('ast')].pinScale;

@@ -143,6 +143,7 @@ export class ProjectMetadataSource {
       // write: remove all observed values, then set the explicit choice in the
       // SAME change. No intermediate absence is published or saved separately.
       if (command.kind === 'resolveCaptionText' || command.kind === 'resolveCaptionField') delete draft.captionsById[command.captionId][command.field];
+      if (command.kind === 'resolveAttachmentField') delete draft.captionAttachmentsById[command.attachmentId][command.field];
       if (command.kind === 'resolveCaptionLifecycle') delete draft.captionsById[command.captionId].lifecycle;
       if (command.kind === 'resolveAssetStatus') delete draft.assetsById[command.assetId].status;
       if (command.kind === 'resolveDefaultScene') delete draft.project.defaultSceneId;
@@ -167,9 +168,11 @@ export class ProjectMetadataSource {
           // Concurrent absent/absent candidates have no materialized property.
           // A bare delete would emit no operation and leave their causal conflict
           // unresolved. Write then delete in this SAME change; the adapter keeps
-          // its final absent operation, never a displayed or separately saved color.
+          // its final absent operation, never an intermediate displayed/saved value.
           if (command.kind === 'resolveCaptionField' && field === 'colorSrgb')
             draft[edit.map][edit.id][field] = scalar([0, 0, 0], this.limits);
+          if (command.kind === 'resolveAttachmentField' && field === 'altText')
+            draft[edit.map][edit.id][field] = scalar('', this.limits);
           if (command.kind === 'resolveEntryView' && field === 'defaultViewId')
             draft[edit.map][edit.id][field] = scalar(entryWitness!, this.limits);
           delete draft[edit.map][edit.id][field];

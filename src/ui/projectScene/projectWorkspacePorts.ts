@@ -19,6 +19,7 @@ export interface WorkspaceRecoveryGroup {
   readonly target: { kind: 'name'; sceneId: string } | { kind: 'startup' } |
     { kind: 'text'; captionId: string; field: 'title' | 'body' } |
     { kind: 'field'; captionId: string; field: 'anchor' | 'colorSrgb' } |
+    { kind: 'attachmentField'; captionId: string; attachmentId: string; field: 'altText' | 'orderKey' } |
     { kind: 'lifecycle'; captionId: string; operationIds: readonly string[] } |
     { kind: 'membership'; sceneId: string; captionId: string; edgeIds: readonly string[] };
 }

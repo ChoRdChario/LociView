@@ -32,7 +32,7 @@ guards and typed commands, with impact/coordinate reads adapted by `productSourc
 Scene names and the next-open Scene use the same captured draft/retry owner;
 `captionIncludeControls.ts` consumes `projectRead.ts`'s complete Caption inventory
 for membership-only changes without copying content or showing the owner.
-`projectRecovery.ts` presents whole-Project Scene/Caption decisions from checked
+`projectRecovery.ts` presents whole-Project Scene/Caption and attachment-cell decisions from checked
 `productSources.ts` descriptors, using the workspace's existing typed retry owner.
 The validation adapter reuses startup recovery before creating a Scene editor
 when the persisted default is unresolved; warm resolution retains that editor.

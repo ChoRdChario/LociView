@@ -15,7 +15,7 @@ import { candidateReader, planCaptionMembershipResolution, planAssetMembershipRe
 import { metadataImmutableReader } from './records';
 import { assetStatusCandidates } from './assetStatus';
 import { planAssetMembershipCopies } from './modelMembership';
-import { captionFieldCandidates, type CaptionChoiceField } from './captionCandidates';
+import { captionFieldCandidates, attachmentFieldCandidates, type CaptionChoiceField } from './captionCandidates';
 import { planSceneAuthoring, planSceneNameResolution, type SceneNameResolution } from './sceneAuthoring';
 import { planCaptionDeletion, planCaptionLifecycleResolution, type CaptionLifecycleResolution } from './captionDeletion';
 import type { CaptionDeletionCommand, AssetDeletionCommand, PinParentCommand } from '../scene/commands';
@@ -42,6 +42,7 @@ export type MetadataEdit =
   | { kind: 'resolveDefaultScene'; operationId: string }
   | { kind: 'setAssetPinScale'; assetId: string; pinScale: number }
   | { kind: 'resolveCaptionField'; captionId: string; field: CaptionChoiceField; operationId: string }
+  | { kind: 'resolveAttachmentField'; captionId: string; attachmentId: string; field: 'altText' | 'orderKey'; operationId: string }
   | { kind: 'activatePreparedRevision'; sceneId: string; assetId: string; expectedBindingId: string; revisionId: string; binding: JsonObject }
   | { kind: 'moveAsset'; sceneId: string; assetId: string; expectedBindingId: string; binding: JsonObject }
   | { kind: 'transformAsset'; sceneId: string; assetId: string; expectedBindingId: string; binding: JsonObject }
@@ -64,7 +65,7 @@ export type MetadataEdit =
   | { kind: 'createAttachment'; sceneId: string; captionId: string; attachmentId: string; media: JsonObject; orderKey: string; altText: string; eventId: string }
   | { kind: 'editAttachment'; sceneId: string; captionId: string; attachmentId: string; field: 'altText' | 'orderKey'; value: string }
   | { kind: 'deleteAttachment'; sceneId: string; captionId: string; attachmentId: string; eventId: string };
-export interface MetadataRecordEdit { map: MutableRecordMap | 'mediaResourcesById' | 'assetBindingsById' | 'assetRevisionsById' | 'representationsById'; id: string; create: boolean; fields: JsonObject; remove?: readonly ('defaultViewId' | 'colorSrgb')[] }
+export interface MetadataRecordEdit { map: MutableRecordMap | 'mediaResourcesById' | 'assetBindingsById' | 'assetRevisionsById' | 'representationsById'; id: string; create: boolean; fields: JsonObject; remove?: readonly ('defaultViewId' | 'colorSrgb' | 'altText')[] }
 export type MetadataWrite = MetadataRecordEdit | { map: 'project'; id: 'defaultSceneId'; create: false; fields: { defaultSceneId: string } };
 type Provider = Extract<ProjectProviderRead, { kind: 'scene-provider' }>;
 const exact = <T>(field: Field<T> | undefined): T => field?.kind === 'value' ? field.value : fail('command-unresolved');
@@ -204,6 +205,14 @@ export function planMetadataEdit(provider: Provider, input: MetadataEdit, limits
       (intent.compositing.coverage.policy === 'inherit' && (intent.appearance.opacity ?? 1) < 1)) fail('material-unsupported');
   };
   switch (command.kind) {
+    case 'resolveAttachmentField': {
+      shape(raw, ['kind', 'captionId', 'attachmentId', 'field', 'operationId']);
+      const selected = attachmentFieldCandidates(provider, command.captionId, command.attachmentId, command.field, limits).find(c => c.operationId === command.operationId);
+      if (!selected) return fail('attachment-resolution-choice');
+      result.push({ map: 'captionAttachmentsById', id: command.attachmentId, create: false,
+        fields: selected.value.kind === 'value' ? { [command.field]: selected.value.value } : {},
+        ...(selected.value.kind === 'absent' ? { remove: ['altText'] as const } : {}) }); break;
+    }
     case 'resolveCaptionField': {
       shape(raw, ['kind', 'captionId', 'field', 'operationId']);
       const candidates = captionFieldCandidates(provider, command.captionId, command.field, limits);

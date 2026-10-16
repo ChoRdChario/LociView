@@ -21,7 +21,9 @@ the nondefault validation route, now including the model, Saved View and materia
 panels, attachment organization/shared viewing and Scene-local Caption comparison
 windows, confirmed Caption deletion, explicit pin parent changes, Scene names/
 next-open choice and existing Caption inclusion/exclusion, now with explicit
-Scene/Caption conflict choices, parent-only recovery and independent copies. Existing
+Scene/Caption conflict choices, parent-only recovery and independent copies. Attachment
+description/order candidates now use the same checked recovery owner, including
+true absent-description selection and normal edit/file/cold continuation. Existing
 file/recovery work is retained. The explicit-map2 fresh-creation extension,
 Scene-local add colors, guarded Shift/numeric placement, owner reveal, Asset-wide
 pin sizing and checked save/resume/help are also connected in this bounded route.
@@ -126,6 +128,91 @@ destructive boundary. Ordinary entry and temporary iPhone HTTPS need their exist
 exact-build/route approvals. Main, Pages, Service Worker, version/license, release,
 dependency changes and private/public fixture distribution are outside this unit.
 
+### Current implementation — resolve attachment candidates and continue work
+
+Outcome: concurrent description and order cells of the same attached image → review
+all original candidates and explicitly retain one per cell → resume normal
+attachment editing → same-Project file return and cold reopen, retaining image/
+attachment identity, the untouched sibling cell and every losing operation. Existing 05 §8 and
+its observed media boundary already require explicit atomic-cell resolution;
+this closes a missing typed product connection, not a new compatibility policy.
+Actual clean g0 HEAD b9ac8c4 is the starting checkpoint.
+
+- [x] Add a narrowly typed Session command/candidate reader for only attachment
+  altText/orderKey. Validate the complete candidate set and known active attachment/
+  Caption/media endpoints; choose an exact operation ID without requiring the
+  sibling cell to be resolved. Only optional altText admits absence/removal.
+- [x] Reuse whole-Project recovery groups/controls and current retry owner. Show
+  missing description separately from empty text; describe order choices relative
+  to confirmed sibling images and disclose unresolved siblings. Keep read-only/stale/IME and
+  failed-save exact retry, then restore ordinary attachment editing.
+- [x] Reuse service faults and one product conflict → choice → edit → same-Project
+  file return → cold flow. Assert original candidate operations, bytes, endpoints,
+  unrelated fields and exact retry; no per-field roundtrip matrix.
+- [ ] Focus changed boundaries, early sceneCore only for new import edges, obtain
+  independent meaningful final review, freeze the exact runtime/test scope, run
+  one serial checkpoint/builds/HTTP identity and normal verified g0 commit/push.
+
+Ports: existing projectMetadata candidateReader/checkMutableField/MetadataEdit/
+ProjectMetadataSource.prepareEdit and Session.edit; existing productSources.recovery
+→ WorkspaceRecoveryGroup → projectRecovery.command → workspace perform/retry.
+The optional altText registry already admits absence; preserve it with the same
+atomic write/remove pattern as other optional-field resolutions, never map absence
+to an empty string. No storage writes from UI, generic patch API, schema/package/
+recipe/profile/ID/renderer/dependency change or attachment endpoint/lifecycle
+repair is included. Order selection preserves the exact original key and uses
+existing ordering only for display; it does not infer a winner or reorder siblings.
+Stop only the affected work for a genuine ambiguity
+in accepted candidate/absence semantics, new source/storage authority or product
+policy. Known browser EPERM/automatic-review rejection is neither retried nor
+bypassed; Node/recorded DOM does not count as browser/device/offline acceptance.
+
+Executed focused evidence: metadata atomic-candidate16 PASS (exact file/-t),
+early sceneCore12 PASS for the added candidate-reader import, connected file/
+projection2 PASS (19.80s), and final typecheck90983 PASS. The representative case
+receives both conflicts, preserves readonly/IME/stale choices, faults real
+publication, retries the exact staged change, selects absence then order, resumes
+ordinary description editing, exchanges two-way Contribution, inspects a named
+backup and cold-reopens exact history/image bytes. Unknown candidates remain
+visible but disabled; uncertain sibling order is excluded with explicit help.
+Core/service, UI/provider and root connected meaningful reviews are closed without
+P1/P2. No relaxed UI/provider guard was needed.
+An early review concern about optional absence was withdrawn after checking the
+existing typed provider's value(undefined) projection and the passing connected
+assertion; projectMedia needed no relaxed guard.
+
+Preserved editing failures: typecheck69647 caught a missing test import and the
+wrong limits type in the new backup assertion (fixed without source changes).
+The first connected fixture used a changing publication ID; the next attempt
+exposed an incorrect Recorded-DOM search parent and reuse of a consumed Automerge
+document. Stable publication/correct node ownership/explicit clones fixed those
+fixture errors; no runtime policy, timeout or result assertion was weakened.
+Final checks run only after the reviewed source/test tree is frozen.
+Final serial session 43560 exits0: typecheck, 116 files/2690 PASS +21 existing todo
+(714.87s), normal/harness/validation builds3.60/3.73/7.95s. Log:
+`.artifacts/traces/attachment-recovery-checkpoint-2026-10-16.log`; runtime9 identity
+is fixed in `attachment-recovery-final-tested-tree-2026-10-16.json` under the same
+traces directory. HTTP7 matches exact build bytes, manifest
+`d3107432a683a96382df480d0c585f064f228ffec9ce75579eca81930e368e37`;
+no validation SW/manifest/public samples. These are Node/recorded-DOM and HTTP
+facts, not browser/device/offline or ordinary-entry acceptance. The exact13-path
+checkpoint consists of source6/tests3/docs4; local links234 have no missing target,
+outgoing private-pattern scan0, actual g0/ChoRdChario remote and main-only deployment
+trigger remain unchanged. Normal verified g0 commit/push is the remaining step.
+After that checkpoint, the next approved connected unit is attachment lifecycle
+conflict recovery through its existing causal-history/new-event boundary; retain
+scalar candidates and reuse this unit rather than invent an endpoint/ownership
+repair. Browser/OPFS/WebLocks evidence and E04 dependency debt remain separate.
+
+The separate fresh read-only dependency audit now succeeds (raw evidence:
+`.artifacts/traces/dependency-audit-2026-10-16.json`): 8 packages, moderate2/high4/
+critical2, with dev-tool reachability under independent triage. This supersedes
+the earlier DNS failure as fresh evidence, not as observed exploitation or product
+runtime impact. No dependency/install/lock change is bundled into this workflow.
+Bounded read-only triage found all9 lock nodes dev:true and no established P0/P1
+path in the current Node runner; this is not a general safety claim. The findings
+remain E04 debt and any major/toolchain update is a separate approved unit.
+
 ### Completed implementation — frozen-v1 exact material-address conversion
 
 Outcome: exact saved material address → Scene/base-slot shading/sidedness → edit,
@@ -213,7 +300,7 @@ or browser attempt was made. Scope17 = runtime8 +docs9; no dependency/workflow/
 public fixture/ordinary entry or deploy change. Node/Three fixtures, injected
 bitmaps and recorded DOM are not actual browser/GPU/device/offline evidence.
 
-Next outcome after this verified checkpoint: observe the existing candidate's
+The 07i milestone audit initially proposed observing the existing candidate's
 open → edit → save/backup → cold/interruption workflow in actual browser/OPFS/
 Web Locks before ordinary-entry/storage adoption. Reuse the existing static
 `http://127.0.0.1:4182/dev.html?editor=project` route and owned synthetic inputs;
@@ -222,7 +309,9 @@ lane is not executed: protected browser-client realpath EPERM and the automatic
 approval review's rejection of retry remain known constraints. Do not retry that
 bootstrap, change browser/profile/tool to bypass it, or ask again for Chrome
 permission. Physical iPhone, offline and ordinary entry retain their gates.
-No currently evident approved UI wiring gap takes priority; remaining F06–08
+The attachment-description recovery gap identified afterward is now the current
+implementation above; it supersedes that next-slice hypothesis while preserving
+the blocked browser/storage lane. Remaining F06–08
 extensions require separate compatibility/profile/render decisions. Do not invent
 the next migration recipe while the candidate's external evidence lane is blocked.
 Read-only dependency triage attempted npm audit once; registry.npmjs.org DNS

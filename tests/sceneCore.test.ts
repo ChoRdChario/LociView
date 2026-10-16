@@ -426,7 +426,7 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
             '../domain/values', '../scene/projectProvider', './membership', './commands', './format'],
           modelReplacement: ['../domain/projectRecords', '../domain/projectRecordFields', '../domain/projectGraphSupport',
             '../domain/values', '../scene/projectProvider', '../scene/resolve', './membership', './records', './commands', './format'],
-          captionCandidates: ['../scene/projectProvider', '../domain/projectMutableFields', '../domain/projectRecordFields', './membership', './format'],
+          captionCandidates: ['../scene/projectProvider', '../domain/projectMutableFields', '../domain/projectRecordFields', './membership', './format', './records'],
           captionDeletion: ['../scene/commands', '../scene/projectProvider', '../domain/projectRecordFields', './membership', './format', './commands', '../domain/projectMutableFields', '../domain/values'],
           assetDeletion: ['../scene/commands', '../scene/projectProvider', '../domain/projectCandidates', '../domain/projectRecordFields', '../domain/projectGraphSupport', './membership', './format', './commands'],
           sceneAuthoring: ['../scene/commands', '../scene/projectProvider', '../domain/projectRecordFields', '../domain/projectMutableFields',
