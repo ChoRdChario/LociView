@@ -14,7 +14,7 @@ export function triangleGlb() {
   }, bin));
 }
 
-export function smallPng() {
+export function smallPng(red = 40) {
   const chunk = (type: string, data: Buffer) => {
     const payload = Buffer.concat([Buffer.from(type), data]); let crc = 0xffffffff;
     for (const byte of payload) {
@@ -27,7 +27,7 @@ export function smallPng() {
   };
   const header = Buffer.alloc(13); header.writeUInt32BE(2, 0); header.writeUInt32BE(2, 4);
   header[8] = 8; header[9] = 6;
-  const row = Buffer.from([0, 40, 120, 200, 255, 220, 160, 60, 255]);
+  const row = Buffer.from([0, red, 120, 200, 255, 220, 160, 60, 255]);
   return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
     chunk('IHDR', header), chunk('IDAT', deflateSync(Buffer.concat([row, row]))), chunk('IEND', Buffer.alloc(0))]);
 }

@@ -35,7 +35,12 @@ ready-Project Start-1 replacement and Contribution reception keep their old auth
 Current todo owns the final executed evidence; this does not pass adoption gates.
 The approved repository-owned Chromium test lane is described in the
 [browser runbook](../docs/browser-testing.md); todo owns its executed outcomes,
-remaining performance work and exact next unit. The separate Chrome-plugin
+remaining performance work and exact next unit.
+The same lane also covers real two-party Workspace/Contribution rounds and cold
+reopen; todo records exact scope and the storage-enumeration readback correction.
+History preservation compares complete original hash/byte pairs, while wire and
+journal ordinals retain their own order. Normal E2E runs use light diagnostics;
+full traces are opt-in in the runbook. The separate Chrome-plugin
 bootstrap restriction remains unresolved. Physical-device/offline and ordinary-
 entry adoption retain their gates. Broader model/profile compatibility needs its
 concrete accepted contract; do not start another profile or recipe by default.

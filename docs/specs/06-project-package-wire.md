@@ -2817,6 +2817,40 @@ on strict ports. Budget inspection closes before the mutation it guards. Abort
 checks remain effective after the closing audit as well. Selection loss at a
 closing audit must reject before returning data or continuing a mutation.
 
+The same rule covers WorkspaceBaseStore's pure `read`, `readEvidence` and
+`payloads` operations. Capture scalar limits and an owned proof before the
+opening audit, and deeply own supplied evidence references/record arrays. An
+operation-local store uses the read facade for every nested journal, output-job,
+base receipt and original-evidence check; opened jobs stay on that exact owner
+and never escape. Return only owned base records, byte arrays or Blob descriptors.
+Each call repeats the existing complete validation, including generated/imported
+observations, source heads/closure, acknowledged-local evidence and restored
+evidence rules. No successful result is cached across calls or shared with a
+concurrent strict reader. Closing refusal must reject the entire read.
+`preflightRecord`, `recordGenerated`, imported-base recording, journal writes,
+output generation/publication and Selection remain on their existing strict
+ports; do not wrap their whole write workflow. Unregistered staging scopes still
+fall back to strict per-I/O reads. Acceptance compares the real restored store's
+strict and operation-scoped records/bytes/payloads, supplied-argument ownership,
+closing refusal and fresh refusal after acknowledged evidence loss, reusing
+existing mutation/recovery cases and the actual two-party browser file flow.
+
+Within that single read callback, `read` may acquire one owned, validated journal
+chain and use it for every imported-base observation and `readRestoredBases`.
+`payloads` may acquire one restored-history result at its first needed reference
+and reuse it for that callback's remaining manifest references. Keep these values
+in callback-local variables/private arguments only; distinguish a verified null
+result from an unacquired result. Preserve the empty `payloads([])` behavior.
+All source/binding/parts/digest/dependency validation still runs on the acquired
+history; every base's observation, local evidence, closure and budgets, and every
+reference's exact binding/local existence/readback still run. Public calls always
+start fresh, including after acknowledged local evidence loss. No global, Store-
+field or cross-operation Promise cache or cross-write reuse is introduced. Closing audits still
+refuse structural/Selection changes; reusing an acquired immutable result is not
+a new guarantee to detect arbitrary content changes at every later instruction
+within the same read. Acceptance retains strict-result equality, closing refusal,
+next-call source/local-loss tests and diagnostic one-chain/one-restore-read checks.
+
 Acceptance reuses existing storage/output recovery cases, adding bounded checks
 for concurrent strict readers, expired lazy handles, mutation denial, argument
 ownership and closing-audit refusal. Measure the existing host flow before broad

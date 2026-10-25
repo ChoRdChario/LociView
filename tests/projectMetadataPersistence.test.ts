@@ -1153,6 +1153,63 @@ describe('new-workspace metadata persistence service (memory ports, not device/a
     expect((await h.session().read()).source!.originalChanges()).toEqual(edited.source!.originalChanges());
   });
 
+  it.each([false, true])('retains exact concurrent originals through storage traversal reordering (right first: %s)', async rightFirst => {
+    const h = setup(), first = (await h.session().create(h.records)).source!;
+    const change = (source: ProjectMetadataSource, actor: string, field: string, value: string) => {
+      const doc = A.load<Record<string, any>>(source.encodeFullSource(), { actor });
+      const next = A.change(doc, { time: 0 }, draft => { draft.captionsById[id('cap')][field] = new A.ImmutableString(json(value)); });
+      return ProjectMetadataSource.reopen(A.getAllChanges(next), source.proof, limits);
+    };
+    const left = change(first, '11'.repeat(16), 'title', '一巡目の題名'), right = change(first, 'ee'.repeat(16), 'body', '一巡目の本文');
+    const joined = left.appendOriginal(right.originalChanges());
+    const nextLeft = change(joined, '22'.repeat(16), 'title', '二巡目の題名'), nextRight = change(joined, 'dd'.repeat(16), 'body', '二巡目の本文');
+    const local = rightFirst ? nextRight : nextLeft, remote = rightFirst ? nextLeft : nextRight;
+    const expected = local.appendOriginal(remote.originalChanges());
+    const storage: MetadataStorageFactory = () => {
+      const base = h.storage();
+      return { ...base, loadRange: async prefix => (await base.loadRange(prefix)).reverse() };
+    };
+    const repository = new MetadataRepository(h.fs, storage, limits);
+    const repositoryId = (await new TransactionJournal(h.fs, limits).entries())[0]!.start.repositoryId;
+    const originals = (source: ProjectMetadataSource) => source.originalChanges().map(bytes => [A.decodeChange(bytes).hash, [...bytes]]).sort(([a], [b]) => String(a).localeCompare(String(b)));
+    for (const target of [rightFirst ? right : left, joined, local, expected]) {
+      let failure: unknown;
+      try { await underWriteLease(h.fs, () => repository.persist(repositoryId, target)); } catch (error) { failure = error; }
+      const stored = (await new MetadataRepository(h.fs, storage, limits).read(repositoryId, first.proof))!;
+      expect(stored.token).toBe(target.token); expect(originals(stored)).toEqual(originals(target));
+      expect(failure).toBeUndefined();
+    }
+    const actual = (await new MetadataRepository(h.fs, storage, limits).read(repositoryId, first.proof))!;
+    expect(textCandidates(actual, 'title')).toEqual([{ kind: 'value', value: '二巡目の題名' }]);
+    expect(textCandidates(actual, 'body')).toEqual([{ kind: 'value', value: '二巡目の本文' }]);
+  });
+
+  it('receives two concurrent rounds with reordered storage chunks, cold reopens and continues without reauthoring or replay writes', async () => {
+    const h = setup();
+    const storage: MetadataStorageFactory = () => {
+      const base = h.storage(); return { ...base, loadRange: async prefix => (await base.loadRange(prefix)).reverse() };
+    };
+    const session = () => new MetadataProjectSession(h.fs, storage, limits, h.verifier), writer = session(), first = await writer.create(h.records);
+    const originals = (source: ProjectMetadataSource) => source.originalChanges().map(bytes => [A.decodeChange(bytes).hash, [...bytes]]).sort(([a], [b]) => String(a).localeCompare(String(b)));
+    const local1 = await writer.editCaption(first.source!.token, id('cap'), 'body', '手元の一巡目');
+    const remote1 = await first.source!.prepareCaptionText(first.source!.token, id('cap'), 'title', '相手の一巡目');
+    const merged1 = await writer.receiveFullSource(local1.source!.token, fullSource(remote1));
+    const local2 = await writer.editCaption(merged1.source!.token, id('cap'), 'body', '手元の二巡目');
+    const remote2 = await merged1.source!.prepareCaptionText(merged1.source!.token, id('cap'), 'title', '相手の二巡目');
+    const expected = local2.source!.appendOriginal(remote2.originalChanges()), done = await writer.receiveFullSource(local2.source!.token, fullSource(remote2));
+    expect(done.state).toBe('ready'); expect(originals(done.source!)).toEqual(originals(expected));
+    const cold = session(), reopened = await cold.read(), journal = new TransactionJournal(h.fs, limits), entries = await journal.entries();
+    expect(reopened.state).toBe('ready'); expect(reopened.source!.heads).toEqual(expected.heads); expect(originals(reopened.source!)).toEqual(originals(expected));
+    expect(textCandidates(reopened.source!, 'title')).toEqual([{ kind: 'value', value: '相手の二巡目' }]);
+    expect(textCandidates(reopened.source!, 'body')).toEqual([{ kind: 'value', value: '手元の二巡目' }]);
+    const writes = { metadata: h.fault.writes, files: h.fs.writes };
+    expect((await cold.receiveFullSource(reopened.source!.token, fullSource(remote2))).publication).toBe(done.publication);
+    expect(await journal.entries()).toEqual(entries); expect({ metadata: h.fault.writes, files: h.fs.writes }).toEqual(writes);
+    const continued = await cold.editCaption(reopened.source!.token, id('cap'), 'body', '再開後の追記');
+    expect(continued.state).toBe('ready'); expect(originals(continued.source!)).toEqual(expect.arrayContaining(originals(expected)));
+    expect(await journal.entries()).toHaveLength(entries.length + 1);
+  });
+
   it('valid additional local heads after metadata-durable/pre-publication interruption remain recoverable', async () => {
     const h = setup(), writer = h.session(), first = await writer.create(h.records);
     h.fs.reject = path => path.endsWith('/published.json');

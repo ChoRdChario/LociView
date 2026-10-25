@@ -1,9 +1,9 @@
 import * as A from '@automerge/automerge/slim';
 import type { ProjectWorkspaceFS } from '../platform/fs';
 import { fail, type MetadataLimits, type MetadataProof } from '../projectMetadata/format';
-import { digest, json, readReceipt, writeReceipt } from '../projectMetadata/persistence';
+import { digest, json, readReceipt, withMetadataRead, writeReceipt } from '../projectMetadata/persistence';
 import { checkRemoteHeads } from '../projectMetadata/remote';
-import { TransactionJournal } from '../projectMetadata/journal';
+import { TransactionJournal, type JournalEntry } from '../projectMetadata/journal';
 import { ProjectMetadataSource } from '../projectMetadata/source';
 import { PACKAGE_LIMITS as L, type EvidenceRef } from './contract';
 import { packageByteHash, readManifestControl } from './manifest';
@@ -70,6 +70,13 @@ export async function receiveJobIds(fs: ProjectWorkspaceFS): Promise<string[]> {
 export class WorkspaceBaseStore {
   constructor(private readonly fs: ProjectWorkspaceFS, private readonly limits: MetadataLimits, private readonly proof: MetadataProof) {}
   async read(): Promise<WorkspaceBaseRecord[]> {
+    const limits = { ...this.limits }, proof = structuredClone(this.proof);
+    return withMetadataRead(this.fs, undefined, ({ fs }) => new WorkspaceBaseStore(fs, limits, proof).readDirect());
+  }
+  private async readDirect(): Promise<WorkspaceBaseRecord[]> {
+    const journal = new TransactionJournal(this.fs, this.limits);
+    let entries: Promise<readonly JournalEntry[]> | undefined;
+    const readEntries = () => entries ??= journal.entries();
     const outputs: WorkspaceOutputJob[] = [];
     for (const id of await WorkspaceOutputJob.ids(this.fs)) if (await WorkspaceOutputJob.state(this.fs, id, this.limits) === 'started') {
       const job = await WorkspaceOutputJob.open(this.fs, id, this.limits); await job.validateCompletion(); outputs.push(job);
@@ -89,10 +96,10 @@ export class WorkspaceBaseStore {
       checkRemoteHeads(r.declaredHeads); if (r.completions[0]!.observation === 'imported') checkRemoteHeads(r.completions[0]!.publishedReceiverHeads);
       // Local receipts always require their own copies, even when a restore holds identical evidence.
       await this.readLocalEvidence(r.evidence.manifest); await this.readLocalEvidence(r.evidence.metadata);
-      await this.verifyBaseObservation(r, outputs); rows.push(r);
+      await this.verifyBaseObservation(r, outputs, readEntries); rows.push(r);
     }
     await this.requireLocalObservations(rows);
-    const restored = await new TransactionJournal(this.fs, this.limits).readRestoredBases();
+    const restored = await journal.readRestoredBases(await readEntries());
     const historical = restored ? readBackupBases(restored.input.exchangeBasesBytes, this.proof).table.records : [];
     const originals = new Map(restored?.input.proof.source.baseEvidence.map((e, i) => [e.sha256, restored.input.baseEvidenceBytes[i]!]) ?? []);
     rows.push(...historical);
@@ -142,10 +149,10 @@ export class WorkspaceBaseStore {
     }
   }
   /** A local imported base requires an actual prior observation, not plausible-looking heads. */
-  private async verifyBaseObservation(record: WorkspaceBaseRecord, outputs: readonly WorkspaceOutputJob[]): Promise<void> {
+  private async verifyBaseObservation(record: WorkspaceBaseRecord, outputs: readonly WorkspaceOutputJob[], readEntries: () => Promise<readonly JournalEntry[]>): Promise<void> {
     const completion = record.completions[0]!;
     if (completion.observation === 'generated') return verifyGeneratedBase(this.fs, this.limits, record, outputs);
-    const entries = await new TransactionJournal(this.fs, this.limits).entries(), heads = completion.publishedReceiverHeads;
+    const entries = await readEntries(), heads = completion.publishedReceiverHeads;
     const publication = entries.find(e => e.publication && json(e.publication.heads) === json(heads));
     if (!publication?.publication || json(publication.start.proof) !== json({ identity: record.identity, envelope: record.metadataEnvelope })) return fail('receive-base-observation');
     for (const id of await receiveJobIds(this.fs)) {
@@ -195,7 +202,14 @@ export class WorkspaceBaseStore {
   }
 
   async readEvidence(e: EvidenceRef): Promise<Uint8Array> {
+    const owned = structuredClone(e), limits = { ...this.limits }, proof = structuredClone(this.proof);
+    return withMetadataRead(this.fs, undefined, ({ fs }) => new WorkspaceBaseStore(fs, limits, proof).readEvidenceDirect(owned));
+  }
+  private async readEvidenceDirect(e: EvidenceRef): Promise<Uint8Array> {
     const restored = await new TransactionJournal(this.fs, this.limits).readRestoredBases();
+    return this.readObservedEvidence(e, restored);
+  }
+  private async readObservedEvidence(e: EvidenceRef, restored: Awaited<ReturnType<TransactionJournal['readRestoredBases']>>): Promise<Uint8Array> {
     if (restored && json(restored.entry.start.proof) !== json(this.proof)) return fail('receive-base-lineage');
     const index = restored?.input.proof.source.baseEvidence.findIndex(r => json(r) === json(e)) ?? -1;
     if (!restored || index < 0) return this.readLocalEvidence(e);
@@ -220,9 +234,15 @@ export class WorkspaceBaseStore {
     return foldBases(await this.read());
   }
   async payloads(records: readonly WorkspaceBaseRecord[]) {
+    const owned = structuredClone(records), limits = { ...this.limits }, proof = structuredClone(this.proof);
+    return withMetadataRead(this.fs, undefined, ({ fs }) => new WorkspaceBaseStore(fs, limits, proof).payloadsDirect(owned));
+  }
+  private async payloadsDirect(records: readonly WorkspaceBaseRecord[]) {
     const payloads = [];
+    let restored: ReturnType<TransactionJournal['readRestoredBases']> | undefined;
     for (const r of records) {
-      const m = readManifestControl(await this.readEvidence(r.evidence.manifest), new TextEncoder().encode(r.workspaceManifestSha256)).manifest;
+      const observation = await (restored ??= new TransactionJournal(this.fs, this.limits).readRestoredBases());
+      const m = readManifestControl(await this.readObservedEvidence(r.evidence.manifest, observation), new TextEncoder().encode(r.workspaceManifestSha256)).manifest;
       if (m.purpose !== 'teamWorkspace') return fail('output-base-purpose'); payloads.push(...m.blobs);
     }
     return payloads;

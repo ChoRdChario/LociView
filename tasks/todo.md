@@ -339,7 +339,207 @@ are unchanged. This unit closes one real browser workflow and its operation-
 blocking redraw defect. The next priority is the measured restored-Project delay,
 with separate iPhone/offline/adoption evidence still pending.
 
-### Current checkpoint unit — restored-Project save latency
+### Completed checkpoint — real two-party browser file workflow
+
+PO authorized this next connected workflow on2026-10-26. Start at clean pushed
+8ec392f on g0-baseline. Root is the only writer; bounded read-only agents map
+existing UI/service contracts and review the final diff/evidence.
+
+Outcome: dedicated independent A/B Chromium profiles use only the built product
+UI to distribute an actual Workspace, retain local Caption/media through an
+incoming update, exchange two rounds of real Contribution files, make explicit
+conflict choices and fully close/relaunch both browsers to resume. Use generated
+GLB/PNG data, the existing localhost-only browser lane and approved typed services.
+Inspect actual downloaded files with existing readers for identity, original
+bytes, causal history/base selection and accepted-file replay no-op. Include two
+Scenes/model revision/pin correction where the existing integrated UI permits;
+label the exact tested subset rather than claiming full TEAM-FLOW-01/adoption.
+
+Plan: extend existing E2E with one connected representative team workflow; use
+existing Node/service fault combinations rather than recreate every permutation.
+Fix observed defects at their existing UI/service boundary with focused relevant
+checks; record any specification discrepancy before changing that contract. Keep
+browser profiles/downloads/traces/failure evidence private under ignored artifacts.
+At final source/test tree run the serial checkpoint and all relevant E2E, obtain
+independent diff/evidence review, then commit/push a suitable g0 checkpoint.
+
+Exit: two-round user workflow passes on actual OPFS/IDB with both cold resumes,
+retained local media, explicit conflict resolution and exact file evidence.
+Stop only affected work for a real contract/product/authority decision. No new
+dependency, recipe/profile, ordinary-entry activation, write/recovery-fence change
+or release/deploy; physical iPhone/offline/PWA and broader acceptance remain open.
+
+First browser execution retained at `.artifacts/e2e/runs/1792958903988-61464/`:
+W0 distribution/real empty-B import, B's durable Caption edit and unique PNG, and
+A's next edit succeed; W1 generation/download stays busy at90s and fails the
+existing functional wait. Do not label it a deadlock or raise the deadline from
+that display alone: UI busy includes generation plus output/base refresh. The
+existing MemoryFS suite covers repeated Workspace generation but not its OPFS
+elapsed time. Add the existing optional timing spans to Workspace generation and
+capture per-profile lock/IO measures at failure before selecting an optimization.
+Independent test review also tightened raw Contribution-byte preservation, exact
+W1 declared heads and both-context failure cleanup; these are assertion/diagnostic
+corrections, not observed product defects.
+
+Measured repeat with timing at `.artifacts/e2e/runs/1792959322342-19328/` confirms
+W1 is still inside generation at90s, with no pending Web Lock and both project/
+package locks held by its own participant. Since the preceding edit/display,
+W1 performs1924 structural-list pairs (~44.6s aggregate),438 metadata handle/
+424 byte reads (~22.4s aggregate); its one ZIP write already returned (~1.9s).
+These overlapping counters diagnose repeated validation/I/O, not a product
+latency guarantee. Existing base reads re-open/check all prior output jobs and
+base originals repeatedly during preflight/recording. Specify the existing pure
+read-operation extension for WorkspaceBaseStore.read/readEvidence/payloads before
+code, with independent contract review, exact ownership/closing/fresh-read tests.
+Keep content/observation validation and all mutation/publication fences unchanged;
+do not raise the90s waiter to conceal the known failure.
+
+Bounded reader fix: strict-vs-scoped original records/bytes/payloads, deep input
+ownership, closing refusal and fresh-source loss checks PASS (5 focused cases),
+plus selected-generation acknowledged-local-loss despite restored twins and the
+existing strict-staging case PASS (2 cases). Independent code/spec review has no
+P1/P2. Repeated actual browser run retained at
+`.artifacts/e2e/runs/1792959817860-52268/`: W1's generation promise now settles at
+84.209s (the observer uses finally, so success versus rejection still needs the
+final UI/file result);
+package lock is released with no queued lock, but post-generation output refresh
+is still running when the90s download wait expires. Since the prior edit,
+933 structural-list pairs occur, versus1924 at the former90s failure. The later
+run has progressed farther and done more content validation; do not interpret
+these observations as a stable improvement percentage or latency PASS.
+
+PO steering: assess excessive realtime-era refresh frequency for the current
+file-based workflow. Bounded source review finds no Project/storage polling in
+the active host/browser composition; render reads cached state, and the rAF path
+notifies only changed state (same-input guard already implemented). The measured
+cost belongs to repeated validation inside one explicit command. A duplicate
+tools render exists but has no storage I/O and is not the proven W1 bottleneck.
+Do not turn this into a separate legacy/UI audit before closing the file flow.
+
+Brief meta-audit/replan: preserve all3 failures; the new team test borrowed90s
+from the simpler single-user diagnostic and has now observed a finite generation
+promise followed by pending output refresh. After independent contract review,
+adjust only this NEW multi-file workflow's download/refresh bound to180s and
+whole-test bound to900s. Keep existing single-user/config limits, retry0 and all
+content/history/base assertions unchanged. Attach normal-close timing/lock data
+and each step's elapsed time. This lets the integrated functional result be
+observed after the bounded reader fix; it does not pass latency acceptance or
+reclassify the failed runs. Do not automatically extend bounds again. Prioritize
+actual two-party completion over more helpers merely to fit an arbitrary timer.
+
+Actual continuation at `.artifacts/e2e/runs/1792960264517-17208/` passes W1's real
+download and B receive/local-media retention/explicit manual conflict resolution.
+W1 host generation54.230s, output refresh38.548s, download4.244s in this run.
+The first Contribution then exceeds180s while preparing its actual download;
+do not extend the limits again. At B's last display→failure, counts include1622
+metadata handle/1588 byte reads (~69.6s aggregate) and1727 structural-list pairs.
+The current base reader rescans the same journal separately for each imported
+base and restored-history lookup within one callback; payload manifests also
+repeat the same restored-history lookup. Independent contract review admits
+one validated journal/restored result per pure callback, with all per-base/ref
+checks retained and fresh validation at every new public call. Specify that exact
+lifetime before code, reuse existing strict/ownership/closing/local-loss tests,
+then re-execute the actual two-party flow. This follows the PO's frequency
+steering without introducing polling, a shared cache or relaxed write fences.
+
+P1 milestone audit: the no-trace run
+`.artifacts/e2e/runs/1792961841212-28628/` passes first round, creates all four
+actual Contributions, then B's final A2 receive fails `stored-original-bytes`.
+This is an actual storage-readback error, not a latency-only failure. Stop further
+UI/display-cache or trace-default work until original preservation is corrected.
+Independent source/contract review identifies Repository.persist's indexwise
+comparison as an extra condition: Source.reopen and remote stored verification
+already compare hash→exact bytes, while journal/wire ordinals remain canonical.
+A real pinned Repo regression with valid reversed storage enumeration and fixed
+sibling actors now reproduces both merge orientations: token and complete original
+hash→full-byte sets are equal, only array order differs, and the old predicate
+rejects both. Retain that red evidence; clarify specification05 before the minimal
+readback comparison fix. Keep missing/extra/duplicate/different-byte and final
+authority refusal, then test full Session two-round/cold/replay/edit recovery and
+the actual two-browser flow. Do not relax the byte or journal/wire order contracts.
+
+P1 correction: specification05's original-byte readback clarification precedes
+the minimal Repository.persist fix. It now checks unique native change hashes,
+same frontier/token, same count and a complete hash→exact-byte bijection; missing,
+extra, duplicate, different bytes and final authority loss remain refusals.
+Public source order, serialization and journal/wire ordinals are unchanged.
+Both reversed-enumeration real-Repo orientations now pass, plus full Session two
+concurrent rounds→cold read→no-write replay→continued ordinary edit and existing
+diamond/additional-head/lost-authority cases:6 focused PASS. Independent P1 diff/
+contract review has no P1/P2. Red evidence is retained in
+`.artifacts/e2e/repository-original-order-red.log`. The actual no-trace browser
+workflow is rerunning; do not mark the integrated unit complete before it passes.
+
+Post-fix actual no-trace run `.artifacts/e2e/runs/1792962910831-25276/` now passes
+all four real Contribution sends/receives, two-round final edits/media retention,
+complete original bytes/identity/history/base checks and duplicate replay no-op.
+It fails only at the new cold-start notice's inherited generic15s expectation;
+the saved Project is listed and the UI says it is checking resume data. Cold
+result remains unverified. Independent review permits aligning this separate new
+startup boundary to the existing90s file-open/recovery wait. Keep file180s,
+whole900s, all data assertions, existing single-user/config and retry0 unchanged;
+retain the failed run and observe actual cold body/images/history/bases before
+marking complete. No trace-default or additional UI cache policy is active yet.
+
+Actual full team workflow: PASS under
+`.artifacts/e2e/runs/1792963688076-3444/`, one test/10.6m including owned build,
+no retry, no uncaught browser errors, `--timings --no-trace`. All4 real
+Contributions, explicit original W0 choice, exact original GLB+shared/unique PNG,
+13 original changes and identity, explicit conflict resolution, same base proofs
+with participant-specific observations, A replay full source/records/table no-op,
+both complete browser shutdown/relaunch and fresh cold backup history/table checks
+pass. Step observations: distribution27.683s, local/update/conflict45.035s,
+round1 92.866s, round2+archive/no-op checks284.614s, cold checks166.071s. These
+inclusive steps are functional observations, not per-action latency guarantees.
+
+After that full no-trace pass and independent diagnostic-policy review, make
+normal runner execution light; full operation recording is opt-in through the
+unambiguous wrapper flag `--record-trace`. Preserve `--no-trace` compatibility,
+reject conflicting flags, retain screenshots/reports/timing/failure evidence and
+all existing assertions/limits/retry0. Previous rich-trace failures remain failed
+in their recorded conditions. No additional UI base-choice cache was implemented.
+Final frozen source/test checkpoint PASS: typecheck;116 Vitest files/2724 cases,
+21 existing todo (1022.86s); normal, harness and static-validation builds, exit0.
+Only existing build/chunk warnings remain. The normal runner then passes BOTH
+E2E specs under `.artifacts/e2e/runs/1792965775294-58784/`:2 PASS/15.7m including
+owned build, retry0, no skipped/flaky/unexpected results or browser exceptions.
+Both environment attachments confirm trace=false/timings=1, matching dedicated
+Chromium/Node versions and the exact six served assets. Team case722.332s;
+its five inclusive steps30.348/55.825/112.280/340.462/176.501s retain the same
+raw-original, identity, local-edit/media, explicit conflict, base, replay and both
+cold-backup assertions. These are functional observations, not latency acceptance.
+
+Current single-user restored save/file verify is75.182s, versus the earlier
+41.993s no-trace observation; initial restore52.133s and restored Apply20.838s.
+Keep both observations: the browser/Node/flags match, but JavaScript builds differ.
+The same save action's structural-list pairs fall800→770, restore-control handles
+10400→10010 and byte reads4800→4620; other principal I/O counts are unchanged.
+Repeated work decreased while elapsed time increased. These runs do not establish
+a code regression or machine-load cause; long and variable save/startup waits
+remain unresolved. Do not reuse an earlier faster observation as the current one.
+
+Independent read-only final diff, contract, content/evidence and outgoing-scope
+reviews have no actionable finding. The reviewer rehashed final original bytes,
+checked participant-specific base observations and both cold results; all eight
+source/test/runner blobs retain the reviewed and executed content. Six changed
+documents'239 local links have no missing target; final diff checks pass.
+Ignored checkpoint/browser logs and all failed-run artifacts remain local.
+
+Milestone audit: the actual g0-baseline branch/origin and live remote starting
+HEAD match the approved checkpoint. This14-path workflow closes real two-party
+file continuity and the observed original-order defect, without dependency,
+public-fixture, ordinary-entry, storage-schema or deployment changes. Use the
+standing development-checkpoint commit/push authorization; Git owns publication
+identity. No aggregate TEAM/adoption, device, offline or release gate passes here.
+
+Next planned connected unit: extend the same two-party browser lane through a
+shared model revision, affected-pin correction and duplicate membership keep-both
+with independent subsequent edits, then a representative interrupted input/retry.
+Reuse accepted services and existing failure tests; retain affected-action timing
+to address the remaining save/startup wait. Physical iPhone, exact-build offline/PWA, ordinary entry and
+aggregate adoption/release retain their separate gates.
+
+### Completed checkpoint — restored-Project save latency
 
 PO authorized investigation, improvement and autonomous verification on 2026-10-26.
 Starting at clean pushed47255d0 on g0-baseline; root is the only writer, with

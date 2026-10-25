@@ -140,6 +140,12 @@
 
 ### チーム
 
+独立した専用Chromium 2 profileでのWorkspace更新・4つの実Contributionによる
+2往復・本文競合の明示解消・手元画像保持・再受信no-op・両者cold再開を、限定
+validation経路で検証した。[team E2E](../tests/e2e/team-workflow.spec.ts)と
+[実行記録](todo.md)が範囲・条件を所有する。通常入口・モデル更新／pin補正・
+keep-both・中断・実機／offlineを含むTEAM-FLOW-01全完了や、行全体の採用ではない。
+
 | ID | 機能群／利用者の結果 | 状態 | 現在の境界・残り | コード／既存受入れ参照（行番号は監査時点） |
 |---|---|---|---|---|
 | T01 | 配布された更新を手元の記録を保って受け取る | 部品未接続 | 新serviceの完全source受信／remote journalと合成タイトル／登録のUI受信を接続。限定GLB/PNG hostには実Workspaceファイル受信・入力再選択・cold復旧・同じeditor更新を接続。実Workspace／Contribution受信→Caption title/body比較・明示解消→通常編集→二巡目受信・再受信no-op→cold再開を既存統合testsで接続。通常UI、他対応形式、他競合UIの完全接続・実機受入れは残る、F01/F02参照。 | [src/projectMetadata/session.ts](../src/projectMetadata/session.ts) / [src/harness/projectScene/validationReceiveControls.ts](../src/harness/projectScene/validationReceiveControls.ts) / [tests/projectFiles.test.ts](../tests/projectFiles.test.ts) |

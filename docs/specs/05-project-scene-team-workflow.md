@@ -2082,6 +2082,16 @@ or model/storage fallback. Its hidden `storageSubsystem.loadDoc/saveDoc` seam is
 version-local, fenced for the entire write/readback operation, and independently
 reopened to compare original bytes and heads. Read-only open never seeds storage.
 
+Storage readback compares a bijection of decoded change hashes to the exact
+original bytes, together with the same frontier/token/proof. The pinned adapter's
+chunk enumeration and `getAllChanges` array position are not a history-order
+contract: independent concurrent changes may be enumerated differently on reload.
+Missing, extra, duplicate and same-hash/different-byte originals must still refuse
+acknowledgment. Do not re-author/re-encode changes, sort the public source history,
+or alter the canonical dependency ordinals of journal/wire parts to satisfy this
+comparison. This clarifies the existing original-byte invariant; it changes no
+persisted field, publication fence or recovery authority.
+
 The private new-workspace creation receipt retains the empty bootstrap and later
 initialization changes, withheld from readiness together. It is not a package
 batch or an extension of the §8 one-change local-command union. Subsequent Caption

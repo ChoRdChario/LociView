@@ -2426,6 +2426,56 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const index = `${workspacePackageRoot(f.scope.fs)}backup-output-index/${id}.json`; await f.fs.remove(index);
     await expect(BackupOutputJob.state(f.scope.fs, id, metadata)).rejects.toThrow('output-state'); expect(await f.fs.exists(index)).toBe(false);
   }, 60_000);
+  it('keeps base records, evidence and payload reads exact and owned within separate closing audits', async () => {
+    const f = await auditedRestoredJournal(), proof = structuredClone(f.expected.source.proof), limits = { ...metadata };
+    const strict = owned(await openWorkspaceGeneration(f.fs, { generationId: f.selected.generationId, allowCreate: false,
+      auditReadOperations: false, assertSelected: () => f.selected.check() }, f.databases.open));
+    const baseline = new WorkspaceBaseStore(strict.fs, metadata, f.expected.source.proof), store = new WorkspaceBaseStore(f.scope.fs, limits, proof);
+    const expected = await baseline.read(); expect(expected.length).toBeGreaterThan(0);
+    const reference = { ...expected[0]!.evidence.manifest }, evidence = await baseline.readEvidence(reference), payloads = await baseline.payloads(expected);
+    const ownedRead = async <T>(start: () => Promise<T>, mutate: () => void) => {
+      let entered!: () => void, release!: () => void, pause = true;
+      const started = new Promise<void>(resolve => { entered = resolve; }), held = new Promise<void>(resolve => { release = resolve; });
+      caseDisposals.push(release); f.audit.count = 0;
+      f.audit.before = async () => { if (pause) { pause = false; entered(); await held; } };
+      const pending = start(); await started; mutate(); release();
+      const result = await pending; expect(f.audit.count).toBe(2); f.audit.before = async () => {}; return result;
+    };
+    expect(await ownedRead(() => store.read(), () => {
+      Object.assign(proof.identity, { projectId: `prj_${'0'.repeat(32)}` }); limits.maxTotalBytes = 0;
+    })).toEqual(expected);
+    Object.assign(proof.identity, f.expected.source.proof.identity); Object.assign(limits, metadata);
+    expect(await ownedRead(() => store.readEvidence(reference), () => { reference.sha256 = '0'.repeat(64); reference.byteLength = 1; })).toEqual(evidence);
+    const records = structuredClone(expected);
+    expect(await ownedRead(() => store.payloads(records), () => { Object.assign(records[0]!.evidence.manifest, { sha256: '0'.repeat(64) }); records.length = 0; })).toEqual(payloads);
+    for (const read of [() => store.read(), () => store.readEvidence(expected[0]!.evidence.manifest), () => store.payloads(expected)]) {
+      f.audit.count = 0; f.audit.before = async () => { if (f.audit.count === 2) throw Error('base closing audit'); };
+      await expect(read()).rejects.toThrow('base closing audit'); expect(f.audit.count).toBe(2);
+    }
+    f.audit.before = async () => {};
+    const lost = f.journal.path(f.job.id, 'source-exchange-bases.json'); await f.fs.remove(lost);
+    await expect(store.read()).rejects.toThrow(); await expect(store.readEvidence(expected[0]!.evidence.manifest)).rejects.toThrow();
+    expect(await f.fs.exists(lost)).toBe(false);
+  }, 60_000);
+  it('refuses lost acknowledged local base receipts in a selected read operation despite restored twins', async () => {
+    const f = await auditedRestoredJournal(), session = validationProjectService(f.selected.fs, f.selected.factory, f.store, budget, decode).session;
+    const receiver = new WorkspaceReceiver(f.fs, f.selected.fs, session, metadata, f.locks), current = await session.read();
+    await receiver.receive(current.source!.token, f.file);
+    const bases = new WorkspaceBaseStore(f.scope.fs, metadata, current.source!.proof), entries = vi.spyOn(TransactionJournal.prototype, 'entries');
+    const rows = await bases.read(); expect(entries).toHaveBeenCalledTimes(1);
+    expect(rows).toHaveLength(2); expect(rows[0]).toEqual(rows[1]);
+    const restored = vi.spyOn(TransactionJournal.prototype, 'readRestoredBases');
+    expect((await bases.payloads(rows)).length).toBeGreaterThan(0); expect(restored).toHaveBeenCalledTimes(1);
+    entries.mockClear(); restored.mockClear();
+    expect(await bases.payloads([])).toEqual([]); expect(entries).not.toHaveBeenCalled(); expect(restored).not.toHaveBeenCalled();
+    const prefix = workspacePackageRoot(f.scope.fs);
+    for (const path of [...await f.scope.fs.list(`${prefix}bases/`), ...await f.scope.fs.list(`${prefix}evidence/`)]) await f.fs.remove(path);
+    await expect(bases.read()).rejects.toThrow('receive-base-missing');
+    await expect(bases.readEvidence(rows[0]!.evidence.metadata)).rejects.toThrow('receive-base-missing');
+    await expect(bases.payloads(rows)).rejects.toThrow('receive-base-missing');
+    expect(await f.scope.fs.list(`${prefix}bases/`)).toEqual([]);
+    expect(await f.scope.fs.list(`${prefix}evidence/`)).toEqual([]);
+  }, 60_000);
   it('cold-recovers backup initialization only with its original job and rejects lost acknowledged source', async () => {
     const f = await restoreFileFixture(), job = await (await f.prepare()).persist(f.ports, f.databases), scope = await job.openStaging(f.databases);
     const service = validationProjectService(scope.fs, scope.factory, f.store, budget, decode);

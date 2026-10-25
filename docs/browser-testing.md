@@ -28,7 +28,7 @@ For latency diagnosis with the same functional assertions:
 
 ```powershell
 npm run test:e2e -- --timings
-npm run test:e2e -- --timings --no-trace
+npm run test:e2e -- project-workflow.spec.ts --timings --record-trace
 ```
 
 `--timings` opts the validation page into local Performance measures for host
@@ -39,11 +39,16 @@ for each action. Parent stages include their children; aggregate I/O durations m
 overlap. These measurements do not isolate every internal ZIP/validation/queue
 stage. No storage access or validation is skipped to collect them.
 
-`--no-trace` omits the Playwright operation traces to compare tracing overhead;
-functional assertions, generated inputs, dedicated profiles and reports remain.
+Normal runs omit continuous Playwright operation tracing. `--record-trace` opts
+into full traces; it is a wrapper boolean, not a Playwright trace-mode argument.
+Two independent browser processes with recording can substantially increase run
+time. Screenshots, reports, original-byte checks and failure diagnostics remain in
+normal runs. `--no-trace` remains an explicit compatibility alias for that mode;
+combining it with `--record-trace` is an error. All functional assertions,
+generated inputs, dedicated profiles, deadlines and retry policy are unchanged.
 Record the flags with any timing comparison. A single execution is an observation,
-not a stable latency guarantee. Ordinary runs retain tracing and omit detailed
-page instrumentation.
+not a stable latency guarantee. Older runs retain their recorded trace condition;
+their defaults preceded this change. Detailed page instrumentation is opt-in.
 
 ## Acceptance and artifacts
 
@@ -56,7 +61,21 @@ and restoration of that backup in a separate empty profile followed by editing
 and another verified backup. Original model/image bytes and Project identity must
 survive. Browser exceptions fail the test.
 
-Browser cache, profiles, downloads, screenshots, traces, environment/build identity
+The team regression uses two independent persistent Chromium profiles and two
+Scenes. A distributes a real Workspace; B opens it without a separate model
+import, edits text and adds a distinct image. A's update produces a body conflict
+that requires an explicit choice. Four actual Contribution files then complete
+two bidirectional rounds against the explicitly selected original Workspace.
+Final backups verify original model/images, every contributed change byte,
+identity and unchanged base proofs. Replaying an accepted file must leave source,
+records and that workspace's base table unchanged. Both browsers fully close and
+relaunch, then UI and fresh backups must retain the same state/history/table.
+Generated/imported base observations differ legitimately between participants.
+This is bounded file-workflow evidence, not all of TEAM-FLOW-01: model replacement,
+pin correction, keep-both, representative interruption, offline and device lanes
+retain their own remaining acceptance.
+
+Browser cache, profiles, downloads, screenshots, optional traces, environment/build identity
 and HTML/JSON reports stay under ignored `.artifacts/e2e/`. Each execution has a
 separate `runs/<identifier>/` directory, so a later run retains earlier failures.
 These artifacts contain synthetic test data only. Browser installation is reused.

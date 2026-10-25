@@ -123,10 +123,10 @@ export class MetadataRepository {
 
   /** Caller holds project lease and has already retained/verified the complete journal. */
   async persist(id: string, expected: ProjectMetadataSource): Promise<void> {
-    const parts = expected.originalChanges();
+    const parts = expected.originalChanges(), byHash = new Map(parts.map(b => [A.decodeChange(b).hash, b]));
+    if (byHash.size !== parts.length) fail('stored-original-bytes');
     await this.use(true, async storage => {
       const existing = await storage.loadDoc(this.documentId(id));
-      const byHash = new Map(parts.map(b => [A.decodeChange(b).hash, b]));
       if (existing) for (const b of A.getAllChanges(existing)) {
         const exact = byHash.get(A.decodeChange(b).hash);
         if (!exact || !equalBytes(exact, b)) fail('unobserved-stored-history');
@@ -137,8 +137,14 @@ export class MetadataRepository {
     });
     const fresh = await this.read(id, expected.proof);
     if (!fresh || fresh.token !== expected.token) fail('stored-heads');
-    const stored = fresh!.originalChanges();
-    if (stored.length !== parts.length || parts.some((b, i) => !equalBytes(b, stored[i]!))) fail('stored-original-bytes');
+    const stored = fresh!.originalChanges(), remaining = new Map(byHash);
+    if (stored.length !== parts.length) fail('stored-original-bytes');
+    for (const bytes of stored) {
+      const hash = A.decodeChange(bytes).hash, original = remaining.get(hash);
+      if (!original || !equalBytes(original, bytes)) fail('stored-original-bytes');
+      remaining.delete(hash);
+    }
+    if (remaining.size) fail('stored-original-bytes');
     this.fs.mutationAuthority.assertWorkspaceWriteAuthorized();
   }
 }
