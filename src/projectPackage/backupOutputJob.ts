@@ -1,7 +1,7 @@
 import type { ProjectWorkspaceFS } from '../platform/fs';
 import type { OriginBlobStore } from '../projectMetadata/blobStore';
 import { fail, type MetadataLimits } from '../projectMetadata/format';
-import { json, newId, readReceipt, technicalId, writeReceipt } from '../projectMetadata/persistence';
+import { json, newId, readReceipt, technicalId, withMetadataRead, writeReceipt } from '../projectMetadata/persistence';
 import { ProjectMetadataSource } from '../projectMetadata/source';
 import { PACKAGE_LIMITS as L, type EvidenceRef } from './contract';
 import { packageByteHash, readManifestControl, canonicalControl } from './manifest';
@@ -66,6 +66,9 @@ export class BackupOutputJob {
       description: capture.description }, label);
   }
   static async ids(fs: ProjectWorkspaceFS) {
+    return withMetadataRead(fs, undefined, ({ fs }) => this.idsDirect(fs));
+  }
+  private static async idsDirect(fs: ProjectWorkspaceFS) {
     const prefix = `${workspacePackageRoot(fs)}backup-output/`, ix = `${workspacePackageRoot(fs)}backup-output-index/`;
     const paths = [...await fs.list(prefix), ...await fs.list(ix)]; if (paths.length > L.entryCount) return fail('output-job-budget');
     const ids = new Set<string>(); let controls = 0;
@@ -81,6 +84,10 @@ export class BackupOutputJob {
     return [...ids];
   }
   static async state(fs: ProjectWorkspaceFS, id: string, limits: MetadataLimits) {
+    const ownedId = technicalId(id), ownedLimits = { ...limits };
+    return withMetadataRead(fs, undefined, ({ fs }) => this.stateDirect(fs, ownedId, ownedLimits));
+  }
+  private static async stateDirect(fs: ProjectWorkspaceFS, id: string, limits: MetadataLimits) {
     if (!(await this.ids(fs)).includes(technicalId(id))) return fail('output-missing');
     const path = root(fs, id), start = await fs.readStream(`${path}start.json`), abandoned = await fs.readStream(`${path}abandoned.json`);
     const ix = await readReceipt(fs, indexPath(fs, id), limits);
@@ -145,20 +152,27 @@ export class BackupOutputJob {
     return this;
   }
   private async space(additional: number) {
-    const paths = await this.fs.list(workspacePackageRoot(this.fs)); if (paths.length > L.entryCount) return fail('output-space-budget');
-    let total = additional + L.baseEvidenceBytes;
-    for (const path of paths) {
-      const f = await this.fs.readStream(path); if (!f || !Number.isSafeInteger(f.size) || f.size < 0) return fail('output-space-read');
-      total += f.size; if (total > 2_147_483_648 - 16_777_216) fail('output-space-budget');
-    }
+    const prefix = workspacePackageRoot(this.fs);
+    return withMetadataRead(this.fs, undefined, async ({ fs }) => {
+      const paths = await fs.list(prefix); if (paths.length > L.entryCount) return fail('output-space-budget');
+      let total = additional + L.baseEvidenceBytes;
+      for (const path of paths) {
+        const f = await fs.readStream(path); if (!f || !Number.isSafeInteger(f.size) || f.size < 0) return fail('output-space-read');
+        total += f.size; if (total > 2_147_483_648 - 16_777_216) fail('output-space-budget');
+      }
+    });
   }
   async steps(): Promise<Step[]> {
-    const paths = await this.fs.list(this.path('steps/')); if (paths.length > 2) return fail('output-step-budget');
-    const rows: Step[] = [], start = reference(this.records().start);
+    const path = this.path(''), id = this.id, start = reference(this.records().start), limits = { ...this.limits };
+    return withMetadataRead(this.fs, undefined, ({ fs }) => this.stepsDirect(fs, path, id, start, limits));
+  }
+  private async stepsDirect(fs: ProjectWorkspaceFS, prefix: string, id: string, start: EvidenceRef, limits: MetadataLimits): Promise<Step[]> {
+    const paths = await fs.list(`${prefix}steps/`); if (paths.length > 2) return fail('output-step-budget');
+    const rows: Step[] = [];
     for (const path of paths) {
-      const s = await readReceipt<Step>(this.fs, path, this.limits);
+      const s = await readReceipt<Step>(fs, path, limits);
       if (!s || Object.keys(s).sort().join(',') !== 'detail,jobId,previous,schema,start' || s.schema !== 'lociview-package-job-step-1' ||
-        s.jobId !== this.id || path !== this.path(`steps/${reference(s).sha256}.json`) || json(s.start) !== json(start)) return fail('output-step');
+        s.jobId !== id || path !== `${prefix}steps/${reference(s).sha256}.json` || json(s.start) !== json(start)) return fail('output-step');
       rows.push(s);
     }
     const ordered: Step[] = []; let previous: EvidenceRef | null = null;
@@ -206,16 +220,24 @@ export class BackupOutputJob {
   private async validateInputs(signal?: AbortSignal) {
     checkAbort(signal);
     // Sequential readback: the warm path must not hide loss behind its memory copy.
-    if (await BackupOutputJob.state(this.fs, this.id, this.limits) !== 'started') fail('output-unstarted');
-    for (const entry of [{ path: 'manifest.json', bytes: this.inputs.manifest }, ...this.inputs.originals]) {
+    const id = this.id, limits = { ...this.limits };
+    const originals = [{ path: 'manifest.json', bytes: this.inputs.manifest }, ...this.inputs.originals]
+      .map(entry => ({ path: this.path(entry.path), expected: ref(entry.bytes) }));
+    const records = Object.entries(this.records()).map(([name, value]) => ({ path: this.path(`${name}.json`), expected: json(value) }));
+    await withMetadataRead(this.fs, undefined, async ({ fs }) => {
+      if (await BackupOutputJob.state(fs, id, limits) !== 'started') fail('output-unstarted');
+      for (const entry of originals) {
+        checkAbort(signal);
+        const file = await fs.readStream(entry.path);
+        if (!file || file.size !== entry.expected.byteLength) fail('output-input-missing');
+        const stored = await fs.readBytes(entry.path);
+        if (!stored || json(ref(stored)) !== json(entry.expected)) fail('output-input-binding');
+      }
+      for (const record of records)
+        if (json(await readReceipt(fs, record.path, limits)) !== record.expected) fail('output-input-binding');
       checkAbort(signal);
-      const file = await this.fs.readStream(this.path(entry.path));
-      if (!file || file.size !== entry.bytes.length) fail('output-input-missing');
-      const stored = await this.fs.readBytes(this.path(entry.path));
-      if (!stored || json(ref(stored)) !== json(ref(entry.bytes))) fail('output-input-binding');
-    }
-    for (const [name, value] of Object.entries(this.records()))
-      if (json(await readReceipt(this.fs, this.path(`${name}.json`), this.limits)) !== json(value)) fail('output-input-binding');
+    });
+    // Cancellation during the closing structural audit also prevents publication.
     checkAbort(signal);
   }
   async generate(store: OriginBlobStore, signal?: AbortSignal) {

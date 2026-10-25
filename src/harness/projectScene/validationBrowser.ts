@@ -3,7 +3,7 @@ import { ProjectMutationCoordinator } from '../../platform/projectLock';
 import { OriginBlobStore } from '../../projectMetadata/blobStore';
 import { validationMetadataLimits, type FileValidationLimits } from '../../projectFiles/validation';
 import { initializeBrowserMetadata, openBrowserMetadataStorage, browserMetadataDatabaseNames, browserOriginalDatabasePresent } from './browserMetadataStorage';
-import { openValidationEntry, validationArea } from './validationHost';
+import { openValidationEntry, validationArea, measureValidation, type ValidationTiming } from './validationHost';
 import { listValidationProjects } from './validationCatalog';
 import { createValidationWorkspace } from './validationWorkspace';
 import { prepareValidationResidents, prepareReadonlyResidents } from './validationRender';
@@ -20,16 +20,43 @@ export async function createValidationBrowserWorkspace(document: Document, run?:
   if (!import.meta.env.DEV && import.meta.env.MODE !== 'project-scene-validation')
     throw Error('開発サーバーまたは専用の検証ビルドで開いてください。');
   await initializeBrowserMetadata();
-  const base = await OpfsFS.open(), locks = navigator.locks ?? null;
-  const options = { base, coordinator: ProjectMutationCoordinator.browser(locks), fileLimits: validationBrowserLimits, packageLocks: locks,
+  const metrics = new Map<string, { count: number; milliseconds: number }>(); let measures = 0;
+  const publish = (stage: string, milliseconds: number) => {
+    if (++measures > 2000) return;
+    performance.measure(`lociview.${stage}`, { start: performance.now() - milliseconds, duration: milliseconds,
+      detail: { io: Object.fromEntries([...metrics].map(([key, value]) => [key, { ...value }])) } });
+  };
+  const timing: ValidationTiming | undefined = new URL(location.href).searchParams.get('timings') === '1' ? (stage, milliseconds) => {
+    if (!stage.startsWith('io.')) { publish(stage, milliseconds); return; }
+    const previous = metrics.get(stage) ?? { count: 0, milliseconds: 0 };
+    metrics.set(stage, { count: previous.count + 1, milliseconds: previous.milliseconds + milliseconds });
+  } : undefined;
+  if (timing) document.addEventListener('lociview-timing-snapshot', () => publish('snapshot', 0));
+  const observed = <T extends object>(target: T, label: (method: string, args: unknown[]) => string): T => !timing ? target : new Proxy(target, {
+    get(object, key) {
+      const value: unknown = Reflect.get(object, key, object);
+      if (typeof key !== 'string' || typeof value !== 'function') return value;
+      return (...args: unknown[]) => measureValidation(timing, label(key, args), () => Reflect.apply(value, object, args));
+    },
+  });
+  const base = observed(await OpfsFS.open(), (method, args) => {
+    const path = typeof args[0] === 'string' ? args[0] : '';
+    const family = path.includes('/v2/local-restore/') ? 'restore-controls' : path.includes('/v2/packages/') ? 'packages' : path.includes('/v2/metadata/') ? 'metadata' : 'other';
+    return `io.opfs.${family}.${method}`;
+  }), locks = navigator.locks ?? null;
+  const openStorage = async (name: string, create: boolean) => {
+    const connection = await openBrowserMetadataStorage(name, create);
+    return { ...connection, factory: () => observed(connection.factory(), method => `io.idb.${method}`) };
+  };
+  const options = { base, timing, coordinator: ProjectMutationCoordinator.browser(locks), fileLimits: validationBrowserLimits, packageLocks: locks,
     generations: (id: string) => { const original = `${validationArea}-${id}`, prefix = `${original}-generation-`;
       return { listGenerations: async () => (await browserMetadataDatabaseNames()).filter(name => name.startsWith(prefix)).map(name => name.slice(prefix.length)),
         originalDatabasePresent: () => browserOriginalDatabasePresent(original),
-        open: (generation: string | null, create: boolean) => openBrowserMetadataStorage(generationDatabaseName(original, generation), create) };
+        open: (generation: string | null, create: boolean) => openStorage(generationDatabaseName(original, generation), create) };
     },
     store: new OriginBlobStore(base, { maxBlobBytes: validationBrowserLimits.maxFileBytes,
       maxChunkBytes: 16 * 1024 * 1024, maxChunks: 100_000, metadata: validationMetadataLimits }, locks) };
-  const storage = (id: string, create: boolean) => openBrowserMetadataStorage(`${validationArea}-${id}`, create);
+  const storage = (id: string, create: boolean) => openStorage(`${validationArea}-${id}`, create);
   const uiState = createValidationUiState();
   const workspace = createValidationWorkspace(document, { ...options, lastProject: uiState.lastProject,
     storageEstimate: typeof navigator.storage?.estimate === 'function' ? () => navigator.storage.estimate() : undefined,

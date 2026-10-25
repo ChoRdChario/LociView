@@ -339,16 +339,122 @@ are unchanged. This unit closes one real browser workflow and its operation-
 blocking redraw defect. The next priority is the measured restored-Project delay,
 with separate iPhone/offline/adoption evidence still pending.
 
-Next planned connected unit: make restored-Project editing → named backup →
-actual file verification practical by measuring the same synthetic workflow's
-generation/validation, storage/queue, output-list refresh, package generation,
-download and file-selection verification stages in the real browser. Separate
-inclusive/overlapping spans and tracing overhead; make no numeric guarantee from
-the current totals. Choose a bounded fix only after these measurements. Preserve
-the existing validation and recovery/publication/Selection fences; any change to
-their timing or verified-read lifetime needs the applicable specification review
-first. No new recipe/profile/dependency or ordinary-entry activation is planned.
-Then extend the existing browser lane to the accepted two-round team-file workflow.
+### Current checkpoint unit — restored-Project save latency
+
+PO authorized investigation, improvement and autonomous verification on 2026-10-26.
+Starting at clean pushed47255d0 on g0-baseline; root is the only writer, with
+bounded read-only contract/cause and final-diff reviewers. User outcome: restored
+Project editing → named backup → actual file verification retains exact content,
+history and recovery behavior while removing measured redundant work.
+
+First instrument the same synthetic browser workflow before selecting a fix.
+Diagnostic ports: an optional fixed-name timing observer in the validation host;
+the browser adapter supplies it only for `timings=1`, aggregates existing OPFS/IDB
+calls by fixed family without data/path logging, and emits bounded macro-stage
+Performance measures for E2E attachment. Host spans separate generation,
+output-job/base refresh, display preparation, download and selected-file verify.
+No extra storage reads, telemetry sink, dependency or user-visible diagnostic flow.
+Preserve callback results/errors and all existing audits/fences. Keep inclusive
+and overlapping stage/I/O times distinct; label uninstrumented internals.
+
+After measurements, document a bounded fix and acceptance before implementation;
+obtain independent contract review for read-lifetime or validation-boundary changes.
+Existing specification06's pure operation-owned read scope is a candidate, not a
+license to move staging/write/publication/Selection into that scope. Reuse existing
+storage/output fault tests plus the same real saved-file/cold-reopen E2E. At the
+final source/test tree run the approved serial checkpoint and independent review,
+then commit/push a verified g0 checkpoint. Stop only affected work for a genuine
+specification/authority decision, managed denial, or scope/deployment boundary.
+
+Measured pre-change baseline (timings+tracing, same Chromium/flags/generated
+workflow as optimized runs, pre-optimization build): functional PASS
+under `.artifacts/e2e/runs/1792956012457-42340/`. Restored save/file verify109.791s:
+generate72.823s, two output job/base refreshes19.451s, selected-file verify16.472s,
+download0.492s (top-level inclusive spans are not added again). During that action
+the underlying OPFS records18096 restore-control handle reads and8352 byte reads;
+their aggregate durations can overlap, so counts alone are not elapsed acceptance.
+Display preparation is negligible in this measured Apply; queue/internal ZIP and
+validation CPU are not individually instrumented. The observed control I/O and
+unbatched restored-history reads justify the next bounded fix.
+
+Fix acceptance/specification first: specification06's independently reviewed
+pure-reader clarification explicitly covers readRestoredBases. Deep-own its
+optional supplied entries before awaiting; use the existing operation-owned
+read-only facade and a Journal owned by that facade for the unchanged full read.
+Retain entry/closing audits, fresh validation per call and strict unregistered
+staging/write/restore/publication/Selection fences. No across-operation cache or
+shared active flag. Verify actual initialized restored history/binding equality,
+closing refusal, argument mutation and acknowledged-source loss using existing
+fixtures and generation tests, then remeasure the same browser flow with and
+without tracing. Independent contract review found no new PO decision needed.
+
+First bounded fix result: functional PASS with tracing/timings in
+`.artifacts/e2e/runs/1792956603247-23972/`; restored save89.314s, generation45.770s,
+selected-file verify25.839s and output refresh13.736s. This is partial progress,
+not the exit. Brief audit: retain the same user workflow and accepted pure-reader
+boundary; do not expand to ZIP buffering or write-fence changes. Independent
+review permits the next pure BackupOutputJob ID/state, steps, space and warm-input
+reader scopes. Snapshot only refs/scalars/JSON, keep the original job FS owner,
+and retain independent fresh input readbacks before and after ZIP generation.
+Add closing-audit and loss-during-generation regressions, reuse existing exact
+backup/cold-retry/cancel/source-loss cases, then remeasure before broader checks.
+
+Second bounded fix result: functional PASS with the same timing/tracing flags in
+`.artifacts/e2e/runs/1792957317731-38864/`, one connected test/2.8m, no retry.
+Restored save/file verify60.926s (109.791s measured baseline, about45% reduction):
+generate39.845s, selected-file verify8.600s, two output refreshes10.569s,
+download0.533s. Restore-control reads fall to10400 handles/4800 byte reads and
+800 structural-list pairs. Metadata content reads remain579 handles/579 byte
+reads: validation is retained, not replaced by cached success. Parent spans and
+aggregate I/O are not summed. This is one synthetic desktop observation, not a
+latency guarantee; the previous93.980s run lacked the detailed timing flag.
+Generation and strict structural audits still dominate the remaining wait.
+
+Independent final implementation review: no actionable P1/P2 for the pure-reader
+ownership/lifetime, ZIP-before/after input validation, cancellation, diagnostics
+and regressions. Read-only outgoing audit admits the10-path diff: no private
+source, runtime dependency, public fixture or deployment change.
+
+No-trace comparison: functional PASS, one connected test/2.2m, no retry, under
+`.artifacts/e2e/runs/1792957501652-29536/`; the same final validation build, generated
+GLB/PNG, dedicated fresh profiles and assertions, `--timings --no-trace`.
+Restored save/file verify41.993s: generate26.377s, selected-file verify6.772s,
+output refresh7.548s, download0.483s. Initial save6.116s, first restore34.481s,
+restored Apply10.165s. This supports keeping tracing conditions explicit; there
+is no measured pre-fix no-trace baseline or statistical tracing-cost estimate.
+Both final browser runs retain original bytes/identity/history, exact saved-file
+inspection/UI acknowledgment, full browser relaunch, fresh-profile restoration,
+edit/resave/reload and zero uncaught browser errors. Physical iPhone, offline,
+ordinary entry, representative large inputs and latency acceptance remain open.
+Final frozen source/test checkpoint: PASS, typecheck,116 Vitest files/2719 passed,
+21 existing todo retained, normal/harness/static-validation builds, exit0. The
+first attempt stopped before tests/builds on a new test's read-only-port/full-
+Session type mismatch; corrected by constructing the real Session from the same
+selected FS/factory, without a cast or relaxed assertion. The independent reviewer
+closed that one-line delta. Local logs retain both outcomes in
+`.artifacts/e2e/checkpoint-latency-{typecheck,final}.log`.
+Reviewed source/test blobs match the final tested files. Browser attachments were
+independently checked against the claims: both final runs use identical asset
+hashes; baseline and optimized builds differ as expected. No performance/device/
+offline/ordinary-entry adoption is claimed. The verified10-path checkpoint uses
+the standing g0-baseline commit/push authorization; Git owns publication identity.
+
+Next connected unit: independent A/B profiles in the same approved browser lane,
+actual Workspace distribution → retain local Caption/media while receiving an
+update → two rounds of Contribution return → explicit conflicts → cold reopen.
+Reuse existing TEAM-FLOW-01, service/fault and product-composition coverage; do not
+duplicate every fault permutation in the browser. Include exact bytes/identity/
+base history and received-file replay no-op assertions. This uses approved
+services/route and adds no dependency, recipe or ordinary-entry adoption. Keep
+physical iPhone and exact-build offline/PWA acceptance as their own evidence lanes.
+Do not expand this optimization into write fences or ZIP buffering by default.
+
+Checkpoint meta-audit: same authorized branch/accepted scope, one writer and
+bounded read-only reviews. Measured repeated restore-control I/O was reduced
+without content-read removal or write-fence changes. The requested investigation
+and bounded improvement close here; remaining latency is explicit. Next priority
+is the missing real two-party file workflow, rather than another reader/helper or
+format recipe. Ordinary entry, release/deploy and external evidence gates remain.
 
 ### Completed implementation — parent and attachment lifecycle recovery
 

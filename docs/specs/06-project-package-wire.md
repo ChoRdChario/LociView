@@ -2789,6 +2789,34 @@ No new persisted receipt, selector or package field is introduced.
 Initial consumers are journal discovery/parts, repository reads and pure output
 discovery/download. Job owner checks remain exact-object checks: a read job is
 opened and inspected with the same operation facade and does not escape it.
+
+2026-10-26 bounded consumer clarification: the published-history reader
+`TransactionJournal.readRestoredBases` may use the same pure bulk-read capability.
+Capture any supplied journal-entry array deeply before the opening audit, read
+the binding, retained original evidence and parts through one operation-owned
+Journal, and return only owned records/bytes and the immutable source. Repeat the
+full content validation on every call; do not cache a successful result, token or
+receipt. Closing-audit refusal must reject the read. This does not wrap or relax
+`validateRestore`, initialization, publication, staging, write or Selection fences;
+unregistered staging scopes retain their per-I/O checks. Acceptance covers exact
+restored bytes/bases, closing refusal, concurrent strict access, argument mutation
+after entry and repeated refusal after acknowledged evidence loss/corruption.
+This is an extension of the existing pure-reader contract, independently reviewed;
+it adds no persisted field, restoration authority or performance guarantee.
+
+The same pure-reader rule covers BackupOutputJob's ID/state discovery, step
+inspection, space-budget inspection and durable-input readback suboperations.
+Capture expected IDs, scalar limits, sizes/digests and canonical record JSON
+before awaiting. Keep the live job owned by its original FS; private helpers
+receive the temporary read facade explicitly and return only owned DTOs or void.
+Do not open/relabel a job on one owner and use it on another, or retain a second
+aggregate original-byte set. Each pre-generation and post-artifact input readback
+is a separate fresh operation; missing or changed originals still refuse output.
+All actual writes, stream/close/readback, publication and receipt appends remain
+on strict ports. Budget inspection closes before the mutation it guards. Abort
+checks remain effective after the closing audit as well. Selection loss at a
+closing audit must reject before returning data or continuing a mutation.
+
 Acceptance reuses existing storage/output recovery cases, adding bounded checks
 for concurrent strict readers, expired lazy handles, mutation denial, argument
 ownership and closing-audit refusal. Measure the existing host flow before broad

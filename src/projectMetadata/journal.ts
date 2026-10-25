@@ -303,6 +303,11 @@ export class TransactionJournal {
   }
   /** Historical authority comes from this published initialization, never from fabricated local receipts. */
   async readRestoredBases(entries?: readonly JournalEntry[]) {
+    const owned = entries === undefined ? undefined : structuredClone(entries);
+    return withMetadataRead(this.fs, undefined, ({ fs }) => new TransactionJournal(fs, this.limits).readRestoredBasesDirect(owned));
+  }
+
+  private async readRestoredBasesDirect(entries?: readonly JournalEntry[]) {
     const chain = entries ?? await this.entries(), entry = chain.find(e => e.start.purpose === 'restoreBackup');
     const binding = await readReceipt<RestoredBasesBinding>(this.fs, metadataPath(this.fs, 'restored-bases.json'), this.limits);
     if (!entry) { if (binding) fail('restore-base-orphan'); return null; }

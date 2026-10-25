@@ -8,9 +8,10 @@ import { inspectProjectCandidates } from '../../src/domain/projectCandidates';
 import { validationMetadataLimits } from '../../src/projectFiles/validation';
 import { smallPng, triangleGlb } from './fixtures';
 
-const entry = 'http://127.0.0.1:4182/dev.html?editor=project';
+const entry = `http://127.0.0.1:4182/dev.html?editor=project${process.env.LOCIVIEW_E2E_TIMINGS === '1' ? '&timings=1' : ''}`;
 const projectName = '自動検証のプロジェクト', captionName = '三角形の確認';
 const body = '自動検証の本文\n画像と位置を保存します。';
+const tracing = process.env.LOCIVIEW_E2E_TRACE !== '0';
 const sha256 = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex');
 
 async function selectCaption(page: Page) {
@@ -73,9 +74,23 @@ test('GLBと画像の編集を保存し、ブラウザ再起動と別端末相�
   const profile = await mkdtemp(join(root, 'workflow-'));
   const restoredProfile = await mkdtemp(join(root, 'restored-'));
   const glb = triangleGlb(), png = smallPng(), errors: string[] = [], timings: Record<string, number> = {};
+  let currentPage: Page | undefined;
+  const timingSnapshot = async () => currentPage?.evaluate(() => {
+    document.dispatchEvent(new Event('lociview-timing-snapshot'));
+    return performance.getEntriesByType('measure').filter(entry => entry.name.startsWith('lociview.')).map(entry => ({
+      stage: entry.name, milliseconds: entry.duration, start: entry.startTime, detail: (entry as PerformanceMeasure).detail,
+    }));
+  });
   const measure = async <T>(name: string, action: () => Promise<T>) => {
+    const before = await timingSnapshot().catch(() => undefined);
+    await currentPage?.evaluate(() => performance.clearMeasures()).catch(() => undefined);
     const started = performance.now();
-    try { return await action(); } finally { timings[name] = Math.round(performance.now() - started); console.info(`${name}: ${timings[name]}ms`); }
+    try { return await action(); } finally {
+      timings[name] = Math.round(performance.now() - started); console.info(`${name}: ${timings[name]}ms`);
+      // Diagnostics must not replace an action failure if its page has closed.
+      const after = await timingSnapshot().catch(() => undefined);
+      await testInfo.attach(`段階別計測 ${name}`, { body: JSON.stringify({ before: before?.at(-1), after }), contentType: 'application/json' }).catch(() => undefined);
+    }
   };
   let context: BrowserContext | undefined, phase = 0;
   const launch = async (userDataDir: string) => {
@@ -89,8 +104,9 @@ test('GLBと画像の編集を保存し、ブラウザ再起動と別端末相�
       return url.origin === new URL(entry).origin || ['blob:', 'data:'].includes(url.protocol)
         ? route.continue() : route.abort('blockedbyclient');
     });
-    await context.tracing.start({ screenshots: true, snapshots: true, sources: true });
+    if (tracing) await context.tracing.start({ screenshots: true, snapshots: true, sources: true });
     const page = context.pages()[0] ?? await context.newPage();
+    currentPage = page;
     page.on('pageerror', error => errors.push(error.message));
     return page;
   };
@@ -98,8 +114,10 @@ test('GLBと画像の編集を保存し、ブラウザ再起動と別端末相�
     const owned = context; context = undefined;
     if (!owned) return;
     try {
-      const path = testInfo.outputPath(`phase-${++phase}.zip`);
-      await owned.tracing.stop({ path }); await testInfo.attach(`操作記録 ${phase}`, { path, contentType: 'application/zip' });
+      if (tracing) {
+        const path = testInfo.outputPath(`phase-${++phase}.zip`);
+        await owned.tracing.stop({ path }); await testInfo.attach(`操作記録 ${phase}`, { path, contentType: 'application/zip' });
+      }
     } finally { await owned.close(); }
   };
   try {
@@ -108,7 +126,7 @@ test('GLBと画像の編集を保存し、ブラウザ再起動と別端末相�
     const html = await page.request.get('http://127.0.0.1:4182/dev.html');
     expect(sha256(await html.body())).toBe(sha256(await readFile('validation-dist/dev.html')));
     const assets = await readdir('validation-dist/assets');
-    await testInfo.attach('実行環境', { body: JSON.stringify({ browser: context!.browser()!.version(), headless: true,
+    await testInfo.attach('実行環境', { body: JSON.stringify({ browser: context!.browser()!.version(), headless: true, tracing,
       node: process.version, platform: process.platform, route: entry,
       assets: await Promise.all(assets.map(async name => ({ name, sha256: sha256(await readFile(join('validation-dist/assets', name))) }))) }, null, 2), contentType: 'application/json' });
     await page.getByLabel('ファイルを選択', { exact: true }).setInputFiles({ name: 'triangle.glb', mimeType: 'model/gltf-binary', buffer: glb });

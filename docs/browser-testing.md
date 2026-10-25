@@ -24,6 +24,27 @@ runner does not terminate or reuse an unknown server. Browser page requests are
 limited to this origin and generated Blob/data resources. Package/browser downloads
 and browser process execution remain subject to the host's managed permissions.
 
+For latency diagnosis with the same functional assertions:
+
+```powershell
+npm run test:e2e -- --timings
+npm run test:e2e -- --timings --no-trace
+```
+
+`--timings` opts the validation page into local Performance measures for host
+generation, output refresh, display, download and selected-file verification.
+Attachments include cumulative underlying OPFS/IndexedDB call counts and durations
+by fixed family, without paths or content. Subtract the before/after snapshots
+for each action. Parent stages include their children; aggregate I/O durations may
+overlap. These measurements do not isolate every internal ZIP/validation/queue
+stage. No storage access or validation is skipped to collect them.
+
+`--no-trace` omits the Playwright operation traces to compare tracing overhead;
+functional assertions, generated inputs, dedicated profiles and reports remain.
+Record the flags with any timing comparison. A single execution is an observation,
+not a stable latency guarantee. Ordinary runs retain tracing and omit detailed
+page instrumentation.
+
 ## Acceptance and artifacts
 
 The connected regression creates a Project, places a pin using numeric model-local

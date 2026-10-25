@@ -47,7 +47,15 @@ import { BackupArchive } from '../../projectPackage/backupArchive';
 import { openValidationGeneration, validationGenerationDatabases, validationGenerationService, inspectValidationFirstBackup } from './validationGeneration';
 
 export const validationArea = 'lociview-development-validation-1';
+export type ValidationTiming = (stage: string, milliseconds: number) => void;
+/** Optional local diagnostics; observers never change an operation's outcome. */
+export function measureValidation<T>(observer: ValidationTiming | undefined, stage: string, action: () => Promise<T>): Promise<T> {
+  if (!observer) return action();
+  const started = performance.now();
+  return action().finally(() => { try { observer(stage, performance.now() - started); } catch { /* Diagnostics have no authority. */ } });
+}
 export interface ValidationHostOptions {
+  timing?: ValidationTiming;
   mode?: LocalOpenMode;
   run: string; base: WorkspaceFS; coordinator: ProjectMutationCoordinator; store: OriginBlobStore;
   fileLimits: FileValidationLimits; decode?: PngDecoder; jpeg?: JpegDecoder; photo?: PhotoDecoder; initial?: ReturnType<typeof prepareValidationCreation>;
@@ -194,6 +202,7 @@ export async function openValidationHost(options: ValidationHostOptions) {
   return openNormalValidationHost(options);
 }
 async function openNormalValidationHost(options: ValidationHostOptions, inheritedLease?: ProjectMutationSession) {
+  const measure = <T>(stage: string, action: () => Promise<T>) => measureValidation(options.timing, stage, action);
   const run = technicalId(options.run), root = `${validationArea}/${run}`;
   if (options.mode === 'view' && options.initial) throw Error('閲覧ではプロジェクトを作成できません。');
   if (options.mode === 'view' && options.workspaceFile) throw Error('閲覧では作業一式を取り込めません。');
@@ -232,7 +241,7 @@ async function openNormalValidationHost(options: ValidationHostOptions, inherite
     let outputJobs: WorkspaceOutputState[] = [], outputFailure = '';
     let outputBases: ContributionBaseChoice[] = [], outputDiscoveryFailure = '';
     const reloadOutput = async () => {
-      try { outputJobs = await sender.jobs(); outputBases = await sender.availableBases(); outputDiscoveryFailure = ''; }
+      try { outputJobs = await measure('host.output.jobs', () => sender.jobs()); outputBases = await measure('host.output.bases', () => sender.availableBases()); outputDiscoveryFailure = ''; }
       catch (error) { outputBases = []; outputDiscoveryFailure = error instanceof Error ? error.message : '受け渡しの記録を確認できません。'; }
     };
     const unfinishedOutput = () => outputJobs.some(j => ['unstarted', 'incomplete', 'repair-required'].includes(j.state));
@@ -265,8 +274,8 @@ async function openNormalValidationHost(options: ValidationHostOptions, inherite
       return validationProjectFrom(read, sourceContent, cache);
     };
     const projectView = async (read: MetadataSessionRead) => {
-      const next = await projectFrom(read); if (!next) return;
-      await prepareDisplay?.(next);
+      const next = await measure('host.display.data', () => projectFrom(read)); if (!next) return;
+      await measure('host.display.prepare', async () => { await prepareDisplay?.(next); });
       if (closed) throw Error('画面を閉じました。保存内容は再度開いて確認してください。');
       project = next;
     };
@@ -382,16 +391,16 @@ async function openNormalValidationHost(options: ValidationHostOptions, inherite
       previewClean: (token: string) => outputAction(() => sender.previewClean(token)),
       previewReview: (token: string, selection: Parameters<typeof sender.previewReview>[1]) => outputAction(() => sender.previewReview(token, selection)),
       generateReview: (token: string, selection: Parameters<typeof sender.generateReview>[1]) => outputAction(() => sender.generateReview(token, selection)),
-      generateBackup: (token: string, label?: string) => outputAction(() => sender.generateBackup(token, label)),
+      generateBackup: (token: string, label?: string) => measure('host.backup.total', () => outputAction(() => measure('host.backup.generate', () => sender.generateBackup(token, label)))),
       generateContribution: (token: string, selection: ContributionBaseChoice['selection']) => outputAction(() => sender.generateContribution(token, selection)),
       retry: (id: string) => outputAction(() => sender.retry(id), true),
       cancel: (id: string) => outputAction(() => sender.cancel(id), true),
-      verifyFile: (id: string, file: Blob) => outputAction(() => sender.verifyFile(id, file), true),
-      download: (id: string) => execute(() => {
+      verifyFile: (id: string, file: Blob) => measure('host.file.verify.total', () => outputAction(() => measure('host.file.verify', () => sender.verifyFile(id, file)), true)),
+      download: (id: string) => measure('host.download', () => execute(() => {
         if (reviewPending()) throw Error('編集コピーの作成を完了してください。');
         if (connection?.restorePending || restoreRetired || restoreDisplayPending) throw Error('復元を完了してからファイルを渡してください。');
         return sender.download(id);
-      }, true),
+      }, true)),
     };
     type PrepareRestoreDisplay = (next: SyntheticProject, source: typeof content) => Promise<void>;
     const restorePorts = () => ({ fs, factory: connection!.factory, session, store: options.store });
@@ -522,7 +531,7 @@ async function openNormalValidationHost(options: ValidationHostOptions, inherite
           const issue = validationMaterialIssue(slot, intent, before.provider.semanticProfile); if (issue) throw Error(issue);
         }
       }
-      const display = await ready(await session.edit(token, command));
+      const display = await ready(await measure('host.edit', () => session.edit(token, command)));
       return { display, read: last };
     }, true);
     const dispatch = async (token: string, command: MetadataEdit) => (await commitCommand(token, command)).read;
