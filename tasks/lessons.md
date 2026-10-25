@@ -61,6 +61,14 @@ Read only the relevant topic, not every historical incident.
   an unchanged source review solely because the same files were staged.
 - An environment/tool failure is not product failure. Try a genuinely different,
   authorized path; do not retry the same denied operation or fabricate acceptance.
+  2026-10-26 refinement: verify local commands, component identity and reinstall
+  source before prescribing repair. Separate app/runtime, bundled operation plugin
+  and browser extension failures; do not repeat generic UI/restart advice against
+  an unchanged preconnection import error. A feedback submission does not establish
+  an individual reply channel; never make an unverified reply a development gate.
+  Before uninstalling a loaded plugin, check its helper usage and release that
+  exact helper through normal approved maintenance. A failed uninstall can leave
+  missing manifests while inventory still says installed; verify required files.
 
 ## User intent, saving and visible status
 

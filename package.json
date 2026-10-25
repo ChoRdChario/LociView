@@ -19,6 +19,8 @@
     "test": "vitest run",
     "test:focus": "vitest run --reporter=dot --silent=passed-only --maxWorkers=2 --testTimeout=30000",
     "test:related": "vitest related --run --reporter=dot --silent=passed-only --maxWorkers=2 --testTimeout=30000",
+    "test:e2e": "node scripts/run-e2e.mjs",
+    "test:e2e:install": "node scripts/run-e2e.mjs --install",
     "check:checkpoint": "npm run typecheck && npm run test:focus && npm run build && npm run build:harness && npm run build:validation",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
@@ -37,6 +39,7 @@
     }
   },
   "devDependencies": {
+    "@playwright/test": "1.64.1",
     "@types/node": "^26.1.1",
     "@types/three": "0.180.0",
     "ajv": "8.20.0",

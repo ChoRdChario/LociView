@@ -9,3 +9,4 @@ validation-dist/
 .artifacts/traces/
 /.artifacts/acquisition/
 /.artifacts/heic-decoder-poc/
+/.artifacts/e2e/

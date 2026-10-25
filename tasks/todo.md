@@ -1,6 +1,6 @@
 # LociView active work
 
-Updated 2026-10-16. This file owns the current plan, checks and next actions.
+Updated 2026-10-26. This file owns the current plan, checks and next actions.
 [Inventory](implementation-inventory.md) owns feature coverage;
 [docs/README.md](../docs/README.md) routes contracts. Git owns commit identity.
 
@@ -135,14 +135,220 @@ dependency changes and private/public fixture distribution are outside this unit
 ### Current handoff — grouped browser/storage/device evidence
 
 Next outcome: existing candidate open → edit → save/backup → cold/interruption
-with actual browser OPFS and Web Locks. Protected browser initialization remains
-blocked by the recorded realpath EPERM/automatic-review rejection; do not retry
-or bypass it. Physical iPhone storage and exact-build offline/PWA acceptance remain
+with actual browser OPFS and Web Locks. Chrome plugin placement has been restored
+through the official manager after a failed partial uninstall and a confirmed
+running helper. The supported bootstrap still stops at the runtime's forbidden
+`node:process` import, including after full app restart following reinstallation.
+PO also reports the same error from one official attempt in a fresh diagnostic
+chat, before connection; that is reported evidence, not an executed root check.
+The local post-restart attempt has no automatic-review rejection
+and does not reobserve the earlier realpath EPERM. Preserve both older failures;
+do not repeat the new failure unchanged, patch the client or bypass its runtime.
+Physical iPhone storage and exact-build offline/PWA acceptance remain
 separate human/device gates. Broader model/renderer/profile compatibility requires
 its own concrete accepted contract before implementation; do not generate another
-recipe or feature by default. Keep dev-tool dependency findings separate. No further
-source workstream is started at this handoff. All local checks below are bounded
-Node/recorded-DOM/HTTP evidence, not completion of these adoption/release gates.
+recipe or feature by default. Keep dev-tool dependency findings separate. The
+approved dedicated-Chromium unit below adds actual desktop browser evidence;
+older Node/recorded-DOM/HTTP checks retain their original limits. Neither lane
+completes the separate adoption/release gates.
+
+2026-10-26 connection preflight: after showing Chrome's installed-extension
+settings, PO requested a test. The existing browser runtime and Chrome binding
+were both absent; protected initialization was not retried against the retained
+managed rejection. No new browser error or rendered result is claimed. Default
+loopback inspection was permission-denied; approved HTTP inspection then found
+connection refused. The existing validation preview was started on 127.0.0.1:4182,
+and all seven served files match their local validation-dist bytes. The candidate
+is available at `http://127.0.0.1:4182/dev.html?editor=project`; Chrome interaction,
+OPFS/Web Locks and edit/save/reload remain unexecuted. Product source and its
+10-16 checkpoint evidence are unchanged; an environment-policy/runtime recovery
+is still needed before the known-denied browser initialization can proceed.
+
+Mode-change follow-up (2026-10-26): PO changed the approval mode and new execution
+instructions now route escalations to user approval. Plan one supported Chrome
+connection under that changed authority; use only the local validation route and
+nonprivate walkthrough inputs for create/edit/backup/reload. Record actual served
+build and browser observations separately. Stop the affected browser action on a
+new denial or inaccessible runtime; no alternate surface, indirect bootstrap,
+profile inspection, real-user data replacement or adoption/release claim.
+
+Executed result: the single documented Chrome bootstrap using plugin26.803.81509
+failed with `Importing module "node:process" is not allowed in node_repl`.
+The JS tool description explicitly lists node:process as unavailable. No user
+approval prompt or new automatic-review rejection occurred; setup, Chrome
+selection/documentation, navigation and UI/storage tests were not reached.
+Classify this as a client/runtime compatibility or capability limitation, not a
+new Chrome-site denial or current EPERM. Independent read-only diagnosis agrees.
+No product/client/runtime configuration was modified. Next: obtain a supported
+client/runtime combination or official repair before repeating the bootstrap.
+The exact diagnostic is retained locally in
+`.artifacts/traces/chrome-runtime-connection-2026-10-26.txt` for support; no exact
+official fix was established by the documentation search. App update/restart is
+generic troubleshooting only, not a verified fix for this error.
+
+Restart follow-up (2026-10-26): after PO reported restarting the app, one supported
+Chrome bootstrap returned the same forbidden `node:process` import error before
+connection. Restart did not resolve this observed failure. No further retry or
+permission change was attempted; the diagnostic above includes this reproduction.
+After PO also closed Chrome and requested another check, one supported bootstrap
+again returned the same import error before Chrome discovery/connection. Closing
+Chrome did not change this observed result; no further workaround was attempted.
+
+Read-only compatibility inventory: installed OpenAI.Codex26.1021.3705.0,
+Windows25H2/build26200.9711 x64, active Chrome plugin26.803.81509; the local
+latest alias has the same version, not proof of public latest/support. Official
+documentation did not establish an exact compatible pair or this error's fix.
+Guide: check the supported app updater, retest after a material supported update,
+otherwise submit the exact version/error reproduction to support. Chrome extension
+repair is a later connection-stage diagnostic, not a proven fix for this import.
+No application/plugin update, config edit or browser retry was performed here.
+
+Current self-service environment unit (2026-10-26): PO requested a concrete local
+repair guide rather than waiting for a feedback reply. Outcome: a supported,
+bounded Chrome-plugin re-registration trial and one post-change connection check.
+The request is a guide, not authorization to uninstall or rewrite the environment.
+Read-only local checks found CLI0.164.0-alpha.11.1 with documented plugin
+list/add/remove. `chrome@openai-bundled` is installed/enabled, AVAILABLE, at
+26.803.81509. Its local bundled catalog and separate source manifest/client exist
+outside installed cache at the same version. No Git marketplace upgrade applies.
+Doctor summary reports install/config/desktop initialization consistent; its
+generic warnings do not establish this browser-loader cause or pass browser tests.
+Guide: in ordinary PowerShell, remove only that exact plugin, add it again from
+the same registered bundled source after successful removal, then fully restart
+the app and refresh the supported skill/runtime before one Chrome check. Preserve
+Project/OPFS/profile/chat data and all other plugins/configuration; no client patch,
+new runtime permissions or raw cache deletion. Reinstallation can reset registration
+and placement but is not a proven fix for the static forbidden-module restriction.
+On any removal/install error stop that step. If the same import refusal survives
+actual re-registration, close this trial as ineffective and evaluate data-preserving
+app repair separately; do not loop or use an alternate execution path to bypass it.
+No plugin removal/addition, app repair or browser retry was performed for this guide.
+
+Executed repair follow-up: PO ran the guide; remove failed with Windows error5,
+so add did not run. Inspection found a partial cache (plugin.json missing) even
+though CLI still reported installed/enabled. Owner had FullControl; no Deny or
+Readonly evidence was found on inspected items. The remaining extension-host.exe
+was running from the exact target cache. One explicit user-reviewed escalation
+verified the physical Chrome root, its sole in-root latest junction and independent
+source, stopped only the confirmed helper, and completed official remove/add.
+Both commands exit0; installed/enabled/version and restored manifest/client/skill
+all match26.803.81509. No ACL, security policy, Chrome/profile or Project change.
+This repairs placement/registration, not the original forbidden-module restriction.
+After resetting only the failed JS execution bindings, one normal bootstrap still
+returned the same node:process error. PO then fully restarted the desktop app.
+Refreshed inventory still reports installed/enabled26.803.81509; the manifest,
+client and skill are present. One supported post-restart bootstrap returned the
+same forbidden import before connection. Close re-registration/restart as
+ineffective for this loader failure; actual browser acceptance remains unexecuted.
+PO then reports one official attempt in a fresh same-project diagnostic chat:
+the same forbidden import, before Chrome connection or localhost access, with no
+settings changes, reinstall, other URL or retry. This weakens the stale-chat
+hypothesis; it does not establish the exact integration defect or a compatible pair.
+Close the supported-plugin repair trial as blocked. No further bootstrap, restart,
+reinstallation, permission loosening or app/profile reset is planned on this evidence.
+Retain this development chat; browser/device acceptance remains pending.
+
+### Completed environment unit — dedicated browser regression workflow
+
+PO approved Playwright Test and dedicated Chromium on 2026-10-26, including
+installation, environment setup and autonomous connected verification. Root is
+the sole writer; bounded reviewers map UI/acceptance and review the final diff.
+
+Outcome: reproducibly create/open a synthetic GLB Project → place/edit Caption
+and add generated image → named backup download and explicit file verification →
+reload and cold-browser resume. Exercise first-backup reopening in a fresh isolated
+profile if the same flow permits it. Use the built nondefault validation route,
+real OPFS/Web Locks and local files, retaining traces/screenshots on failure.
+
+Executed plan/checks: exact-pin development-only `@playwright/test`, review the lockfile,
+run npm audit, install matching Chromium under ignored workspace artifacts, and
+add a serial `test:e2e` command/config plus synthetic-data tests. Keep existing
+Vitest checks. Own a local-only preview on 127.0.0.1:4182; fail on an occupied port
+rather than reuse an unverified server. Keep browser profiles/downloads/reports
+under ignored artifacts. Run the connected E2E while implementing, fix observed
+in-scope failures, then the serial required checkpoint and independent final review.
+
+Exit: installed runner/browser, one executed connected workflow with exact browser/
+build evidence and repeatable instructions. Record actual failures and remaining
+acceptance. No user Chrome/profile/extension/CDP, plugin retry, production runtime
+dependency, CI/deploy or ordinary-entry change. Dedicated Chromium results do not
+pass physical iPhone, offline/PWA, broader profiles or aggregate adoption gates.
+Managed download/launch approvals remain binding; stop affected work on a denial,
+specification conflict or genuinely new product/architecture decision.
+
+Observed connected defect and bounded fix acceptance: dedicated Chromium reaches
+GLB/pin/text/image editing, but normal pointer activation of Save retries detached
+buttons until timeout. A repeated same-input viewport update advances the renderer
+serial, notifies the product render again, and rebuilds file controls indefinitely.
+Before the fix: retain failed-run trace/screenshot. Fix the validation adapter's
+operation-local display update to be idempotent for identical typed viewport input,
+keeping the exact resident/display identity and all token/Scene/read-only/filter/
+proposal changes observable. No camera, coordinate, renderer profile or storage/
+save acknowledgment contract changes. Verify stable no-op notification, real input
+changes/receipts, and the original normal-pointer E2E save/restart/restore workflow;
+do not force clicks or relax assertions to bypass the defect.
+
+Subsequent browser evidence: fixed Save → verified downloaded backup → reload →
+full browser relaunch all complete. Fresh-profile first restore completes beyond
+the initial 15s E2E locator deadline, followed by a real in-progress edit at the
+next 15s deadline; these are not proven deadlocks. Record whole-action elapsed
+times and uninstrumented storage/validation stages, with generous bounded
+functional waits rather than claiming latency acceptance. First-restore controls
+also need the existing root busy owner: disable confirm/cancel while working and
+show accepted restore progress, restoring controls on completion/error. No storage
+checks, publication/recovery fences or package contracts are weakened.
+
+Executed functional E2E: PASS, one connected test, no retry/skipped/flaky case,
+205.8s including owned server build. Playwright1.64.1 / matching Chromium
+156.0.8078.4 revision1248, Windows headless, Node24.12.0, exact nondefault route.
+The test verifies served HTML against the built file and records local asset
+hashes; it does not fetch/hash every served asset. Actual original GLB/PNG bytes,
+Caption/anchor/attachment, Project identity and both real downloaded backups pass
+the existing archive reader and UI file acknowledgment. Reload, full browser
+restart, separate-empty-profile first restore, continued edit/resave/reload pass;
+uncaught browser errors are empty. Trace/report/screenshots and exact inputs stay
+local under `.artifacts/e2e/runs/1792953766890-7600/`.
+
+Observed whole-action times with tracing: first backup plus UI file verification
+8.904s; fresh-profile restore36.703s; restored body Apply16.340s; restored backup
+plus file verification93.980s. Internal storage, repeated validation, display,
+package generation and handoff stages remain undifferentiated. These are clear
+performance follow-ups, not a passed latency guarantee or device/offline evidence.
+Do not infer the cause from synthetic I/O counts or weaken generation/recovery
+fences. Next performance work starts by measuring these stages in the real browser.
+
+Dependency/independent review: exact lock delta adds only three dev nodes
+(@playwright/test → playwright → playwright-core), no existing dependency changes.
+npm audit reports10 inherited dev-tool findings (2critical/5high/2moderate/1low);
+all implicated lock nodes match HEAD byte-for-byte, none is Playwright. This is
+not audit PASS; retain `.artifacts/e2e/npm-audit.json` and separate the existing
+toolchain remediation from this unit. Independent final diff review has no P1/P2;
+focused display and first-backup busy regressions pass. The final serial checkpoint
+passes: typecheck,116 Vitest files/2715 tests (21 existing todo retained), normal
+build, harness build and static validation build, exit0. A first sandboxed run
+had153 failed tests/4 unhandled errors in7 files, including denied temporary Git
+config/hard-link/junction operations; the identical full script passed after
+explicit managed execution approval, without source/assertion/limit changes.
+Both results are retained locally in `.artifacts/e2e/checkpoint-*.log` (the first
+tool result was partly truncated). Reviewed source/test Git blobs match the tested
+working files; later result/handoff prose does not require another runtime rerun.
+
+Checkpoint meta-audit: g0-baseline remains the authorized development branch;
+ordinary entry, CI/deployment, runtime dependencies, release and public fixtures
+are unchanged. This unit closes one real browser workflow and its operation-
+blocking redraw defect. The next priority is the measured restored-Project delay,
+with separate iPhone/offline/adoption evidence still pending.
+
+Next planned connected unit: make restored-Project editing → named backup →
+actual file verification practical by measuring the same synthetic workflow's
+generation/validation, storage/queue, output-list refresh, package generation,
+download and file-selection verification stages in the real browser. Separate
+inclusive/overlapping spans and tracing overhead; make no numeric guarantee from
+the current totals. Choose a bounded fix only after these measurements. Preserve
+the existing validation and recovery/publication/Selection fences; any change to
+their timing or verified-read lifetime needs the applicable specification review
+first. No new recipe/profile/dependency or ordinary-entry activation is planned.
+Then extend the existing browser lane to the accepted two-round team-file workflow.
 
 ### Completed implementation — parent and attachment lifecycle recovery
 

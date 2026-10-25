@@ -83,6 +83,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   let host: Host | undefined, workspace: ReturnType<typeof createSavedWorkspace> | ReturnType<typeof createProductWorkspace> | undefined;
   let reviewWorkspace: ReturnType<typeof createReviewWorkspace> | undefined;
   let firstRecovery: FirstBackupRecovery | undefined;
+  const firstRecoveryButtons = new Set<HTMLButtonElement>();
   let receiveTools: ReturnType<typeof createValidationReceiveControls> | undefined;
   let resident: Awaited<ReturnType<ValidationWorkspacePorts['render']>> | undefined;
   let busy = false, disposed = false, composing = false, selected: string | null = null, operation: Promise<void> | undefined;
@@ -104,6 +105,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     const opened = await ports.open(...args); if ('kind' in opened) { await opened.dispose(); throw Error('バックアップの初回復元を一覧から再開してください。'); } return opened;
   };
   const controls = () => { navigation.inert = busy; openFile.disabled = create.disabled = cancelConversion.disabled = busy || composing;
+    for (const button of firstRecoveryButtons) button.disabled = busy;
     workspaceInput.disabled = title.disabled = busy || !!creationAttempt;
     cancelSelection.disabled = busy || composing || !!creationAttempt;
     cancelSelection.hidden = !selectionPending || !conversionPanel.hidden;
@@ -134,7 +136,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     reviewWorkspace?.dispose(); reviewWorkspace = undefined;
     if (oldWorkspace) await oldWorkspace.dispose(); else await oldHost?.dispose(); oldResident?.dispose(); content.replaceChildren();
     receiveTools?.dispose(); receiveTools = undefined;
-    const oldRecovery = firstRecovery; firstRecovery = undefined; await oldRecovery?.dispose();
+    const oldRecovery = firstRecovery; firstRecovery = undefined; firstRecoveryButtons.clear(); await oldRecovery?.dispose();
   };
   const ensureMaySwitch = () => {
     if (composing || changed()) throw Error('入力・更新を確定するか、取り消してからプロジェクトを切り替えてください。');
@@ -300,13 +302,14 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   };
   const renderFirstRecovery = () => {
     const target = firstRecovery; if (!target || disposed) return;
+    firstRecoveryButtons.clear();
     const state = target.state(), panel = document.createElement('section'), note = document.createElement('p'), commands = document.createElement('div');
     note.textContent = state.error || (state.phase === 'preview' ? state.replacing
       ? 'バックアップの時点に切り替えます。現在の作業と元ファイルは残ります。' : 'このプロジェクトの再開用データはありません。バックアップから元のプロジェクトを復元します。元ファイルは変更しません。'
       : state.phase === 'terminal' ? 'プロジェクトはまだありません。復元の記録は保持しています。ファイルを選択して開き直せます。' : 'バックアップの初回復元が未完了です。記録を使って再開するか、取りやめてください。');
     const summary = document.createElement('p'); summary.textContent = `${state.title}${state.fileName ? ` — ${state.fileName}` : ''}${state.memo ? ` — ${state.memo}` : ''}`;
     const button = (label: string, action: () => Promise<void>) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = label;
-      b.addEventListener('click', () => execute(action)); commands.append(b); };
+      firstRecoveryButtons.add(b); b.addEventListener('click', () => { if (!b.disabled) execute(action); }); commands.append(b); };
     const leave = async (cancel: boolean) => { if (cancel) await (state.phase === 'beforeStart' ? target.abandon() : target.cancel());
       await closeCurrent(); clearSelection(); selected = null; ports.selected(null); navigation.hidden = false; await updateList(); status.textContent = ''; };
     if (target.readOnly) button('編集を開始する', async () => {
@@ -316,6 +319,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
       } catch (error) { renderFirstRecovery(); throw error; }
     });
     else if (state.phase === 'preview' || state.phase === 'pending' && state.retryable) button(state.phase === 'preview' ? 'バックアップから復元' : '復元を再開', async () => {
+      status.textContent = 'バックアップから復元しています。';
       let staged: Awaited<ReturnType<ValidationWorkspacePorts['render']>> | undefined,
         preparation: Parameters<ValidationDisplayHost['setDisplayPreparation']>[0] | undefined, sourceContent: ValidationNormalHost['content'] | undefined;
       try {

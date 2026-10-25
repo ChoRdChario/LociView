@@ -11,6 +11,7 @@ record executed evidence and connections; do not infer those from a document tit
 | How to work, verify and push | [AGENTS.md](../AGENTS.md) |
 | Where code lives | [PROJECT_MAP.md](../PROJECT_MAP.md) |
 | What currently works / remains | [todo](../tasks/todo.md), [inventory](../tasks/implementation-inventory.md), then code/tests |
+| Dedicated Chromium regression setup and evidence scope | [Browser tests](browser-testing.md) |
 | Frozen legacy-v1 wire compatibility | [02-data-format.md](02-data-format.md) and golden fixtures |
 | Accepted architecture / reconsideration | [ADR-0001](adr/0001-v2-foundation.md), [ADR-0002](adr/0002-project-scenes-and-continuing-team-history.md) |
 | Product, privacy and media boundaries | [specification 00](specs/00-product-contract.md) |

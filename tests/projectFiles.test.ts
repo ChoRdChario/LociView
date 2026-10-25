@@ -2173,11 +2173,13 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       button = (label: string) => all(root).filter(n => n.tag === 'button' && n.textContent === label).at(-1)!;
     await vi.waitFor(() => expect(button('ファイルを開く').disabled).toBe(false));
     const choose = () => { Object.assign(input, { files: [new File([f.backupFile], '現地の保存.backup')] }); input.fire('change'); input.parent!.parent!.fire('submit', { preventDefault() {} }); };
-    choose(); await vi.waitFor(() => expect(button('バックアップから復元')).toBeTruthy()); expect(await r.base.list('')).toEqual([]);
+    choose(); await vi.waitFor(() => expect(button('バックアップから復元')?.disabled).toBe(false)); expect(await r.base.list('')).toEqual([]);
     const original = await r.inspection.source.inspectOriginal(metadata), project = original.candidates.unambiguousRecords.project as JsonObject;
     expect(all(root).some(n => n.textContent === `${project.title} — 現地の保存.backup`)).toBe(true);
     button('キャンセル').fire('click'); await vi.waitFor(() => expect(ui.hasChanges()).toBe(false)); expect(await r.base.list('')).toEqual([]);
     choose(); await vi.waitFor(() => expect(button('バックアップから復元')?.disabled).toBe(false)); button('バックアップから復元').fire('click');
+    expect(button('バックアップから復元').disabled).toBe(true); expect(button('キャンセル').disabled).toBe(true);
+    expect(all(root).some(n => n.textContent === 'バックアップから復元しています。')).toBe(true);
     await vi.waitFor(() => expect(all(root).some(n => n.className === 'lv-project-workspace')).toBe(true), { timeout: 20000 });
     expect(current!.read().source!.originalChanges()).toEqual(r.inspection.source.originalChanges());
     await current!.dispatch(current!.read().source!.token, { kind: 'editCaption', captionId: f.captionId, edits: { body: '復元した端末での記録' } });
@@ -3450,6 +3452,23 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       proposePin: (...args: Parameters<NonNullable<Parameters<ViewportFactory>[2]>>) => proposePin?.(...args),
       proposeModel: (...args: Parameters<NonNullable<Parameters<ViewportFactory>[3]>>) => proposeModel?.(...args) };
   }
+  it('retains exact display through same-input viewport notifications without losing camera and pin updates', async () => {
+    const h = await productWorkspaceFixture(), initial = h.display();
+    h.refresh(); h.refresh();
+    expect(h.display()).toBe(initial);
+    const pose = h.payload(); h.button('正面', h.editor).fire('click'); h.refresh();
+    expect(h.payload()).not.toEqual(pose); expect(h.display()).toBe(initial);
+    const numeric = h.named('追加先モデル', h.editor); numeric.fire('focus');
+    numeric.value = numeric.children[1]!.value; numeric.fire('change'); h.button('このモデルに追加', h.editor).fire('click');
+    for (const [axis, value] of [['X', '0.2'], ['Y', '0.2'], ['Z', '0']]) {
+      const input = h.named(`位置 ${axis}`, h.editor); input.value = value!; input.fire('input');
+    }
+    const proposal = h.display(); expect(proposal).not.toBe(initial); expect(proposal!.preview).toBeDefined();
+    h.refresh(); expect(h.display()).toBe(proposal);
+    await h.edited(() => h.button('位置を確定', h.editor).fire('click'));
+    expect(h.display()).not.toBe(proposal); expect(h.display()!.pins).toHaveLength(1);
+    expect(h.display()!.preview).toBeUndefined(); await h.ui.dispose();
+  });
   it.each(['jpeg', 'webp', 'gif'] as const)('photo companion %s Native appearance connects occurrence textures, addition, product edits, file and selected-generation cold restore', async format => {
     const bitmapCloses: ReturnType<typeof vi.fn>[] = [];
     vi.stubGlobal('self', { URL });

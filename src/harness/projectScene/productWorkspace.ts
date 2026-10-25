@@ -67,6 +67,7 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
     changed, otherPending: external,
     createViewport(canvas, update, propose, proposeModel): WorkspaceViewport {
       let state: WorkspaceViewportState | undefined, closed = false, rendered: SyntheticDisplay | undefined, pointerHeld = false;
+      let renderedInput = '';
       const runtime = factory(canvas, update, (target, position) => {
         if (!state?.pin || state.readOnly || host.authority.readOnly || target.token !== read().token ||
           JSON.stringify(target) !== JSON.stringify(state.pin.target)) return false;
@@ -106,7 +107,14 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
         update(next) {
           if (closed) return; state = next; viewportScene = next.sceneId; refreshPreview?.();
           const snapshot = host.authority.read();
-          if (!next.available || snapshot.state.token !== next.token) { runtime.setPinPointerActive?.(false); runtime.setActive(false); return; }
+          if (!next.available || snapshot.state.token !== next.token) { renderedInput = ''; runtime.setPinPointerActive?.(false); runtime.setActive(false); return; }
+          // A renderer observation can request another UI render. Identical typed
+          // input must retain the exact display and must not start a new renderer
+          // revision/notification cycle (which would repeatedly replace controls).
+          const input = JSON.stringify(next);
+          if (input === renderedInput) {
+            runtime.setPinPointerActive?.(pointerHeld || !!next.windowMoving || next.choosing && !next.readOnly); runtime.setActive(true); return;
+          }
           const modelEdit = next.model && next.model.target.token === next.token ? { target: next.model.target, position: next.model.placement.translation,
             enabled: !next.readOnly, manipulation: { mode: next.model.mode, rotationXYZW: next.model.placement.rotationXYZW, uniformScale: next.model.placement.uniformScale } } : undefined;
           let display = syntheticDisplay(snapshot, next.sceneId, next.pinColors, next.selectedId, modelEdit, next.hiddenAssetIds ?? []);
@@ -127,6 +135,7 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
           }
           rendered = next.readOnly ? { ...display, pinEdit: undefined } : display;
           runtime.update(rendered);
+          renderedInput = input;
           runtime.setPinPointerActive?.(pointerHeld || !!next.windowMoving || next.choosing && !next.readOnly); runtime.setActive(true);
         },
         read: observation, target,

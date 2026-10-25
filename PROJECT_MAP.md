@@ -27,6 +27,11 @@ The composition's model, Saved View, material and attachment panels reuse their 
 `projectMedia.ts` connects attachment management to the common `mediaPreview.ts` viewer.
 The composition reuses `captionWindowControls.ts` for Scene-local comparison
 windows and their galleries, sharing the workspace-level image viewer.
+
+`playwright.config.ts`, `scripts/run-e2e.mjs` and `tests/e2e/*.spec.ts` own the
+dedicated Chromium regression lane for the built validation entry. See the
+[browser runbook](docs/browser-testing.md) for setup/ownership and todo for evidence.
+
 Caption deletion confirmation and explicit parent proposals use the same workspace
 guards and typed commands, with impact/coordinate reads adapted by `productSources.ts`.
 Scene names and the next-open Scene use the same captured draft/retry owner;

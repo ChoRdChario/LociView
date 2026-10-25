@@ -33,10 +33,12 @@ absent predecessor and recovery-only entry before opening any original database.
 Prepared-2/Start-2 retain exact backup history/bases and select a dedicated generation;
 ready-Project Start-1 replacement and Contribution reception keep their old authority.
 Current todo owns the final executed evidence; this does not pass adoption gates.
-Next is grouped actual-browser OPFS/Web Locks and device/offline evidence, subject
-to the existing protected-browser denial and exact-build/device gates. Broader
-model/profile compatibility needs its concrete accepted contract; no further
-source feature is started at this handoff.
+The approved repository-owned Chromium test lane is described in the
+[browser runbook](../docs/browser-testing.md); todo owns its executed outcomes,
+remaining performance work and exact next unit. The separate Chrome-plugin
+bootstrap restriction remains unresolved. Physical-device/offline and ordinary-
+entry adoption retain their gates. Broader model/profile compatibility needs its
+concrete accepted contract; do not start another profile or recipe by default.
 
 ## Resume safely
 
