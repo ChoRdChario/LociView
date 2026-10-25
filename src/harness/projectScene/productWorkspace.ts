@@ -96,7 +96,7 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
         const pinIds = new Set(available ? rendered!.pins.map(p => p.id) : []);
         return { token: seen.display?.token ?? '', sceneId: seen.display?.sceneId ?? '', pickToken: available ? receipt : '', ready: available,
           dragging: seen.dragging || !!seen.manipulating, pins: available ? seen.pins.filter(p => pinIds.has(p.id) && Number.isFinite(p.x) && Number.isFinite(p.y)).map(p => {
-            const source = rendered!.pins.find(pin => pin.id === p.id)!; return { ...p, scale: source.scale ?? 1, color: source.color };
+            const source = rendered!.pins.find(pin => pin.id === p.id)!; return { ...p, scale: source.scale ?? 1, color: source.color, status: source.status, notice: source.notice };
           }) : [], issue: seen.issue, notice: seen.notice ?? null,
           assetIds: available ? seen.display!.models.map(m => m.binding.assetId) : [],
           view: available && !seen.dragging && !seen.manipulating ? { kind: 'ready' as const, token: seen.token, sceneId: state!.sceneId, projectFrameId: read().resources.projectFrameId,

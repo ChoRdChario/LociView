@@ -128,6 +128,9 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     const target = viewport.target(anchor.assetId);
     if (!target) { feedback = '配置先モデルを確認してください。'; render(); return; }
     pinAction = { kind: 'move', token: provider().token, sceneId, captionId: caption.id, assetId: anchor.assetId };
+    if (projectCaptions(provider(), sceneId).find(item => item.id === caption.id)?.needsReview) {
+      pin = null; choosing = true; placingCaption = caption.id; rawPosition = ['', '', '']; render(); return;
+    }
     setPin({ target, position: anchor.positionAsset, captionId: caption.id }); render();
   });
   const parent = make('details'), parentTitle = make('summary', '親モデルを変更'), parentLabel = make('label', '変更先モデル'), parentTarget = make('select'), parentNote = make('p');
@@ -658,6 +661,10 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
         const marker = button(fieldValue(caption.title) || '名称なし', () => { if (!dirty() && !busy && !ports.otherPending()) { selectCaption(projected.id); render(); } });
         marker.className = 'lv-project-marker'; marker.style.left = `${projected.x}px`; marker.style.top = `${projected.y}px`;
         marker.style.transform = `translate(-50%, -50%) scale(${projected.scale ?? 1})`; if (projected.color) marker.style.backgroundColor = projected.color;
+        marker.setAttribute('data-review', String(projected.status === 'needsReview'));
+        if (projected.status === 'needsReview') {
+          marker.setAttribute('aria-description', projected.notice ?? '要確認'); marker.title = `${marker.textContent}（${projected.notice ?? '要確認'}）`;
+        }
         marker.setAttribute('aria-pressed', String(projected.id === selected)); markers.append(marker);
       }
       ports.changed();

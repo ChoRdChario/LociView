@@ -47,6 +47,7 @@ import { browserMetadataDatabaseNames, browserOriginalDatabasePresent } from '..
 import { createValidationModeHost } from '../src/harness/projectScene/validationModeHost';
 import { productSources } from '../src/harness/projectScene/productSources';
 import { fieldValue, projectCaptions, projectMediaResources, projectMediaUncertain, projectCaptionInventory } from '../src/ui/projectScene/projectRead';
+import type { WorkspaceProvider } from '../src/ui/projectScene/projectWorkspacePorts';
 import { listValidationProjects } from '../src/harness/projectScene/validationCatalog';
 import { createSavedWorkspace } from '../src/harness/projectScene/metadataWorkspace';
 import type { DisplayCapture } from '../src/harness/projectScene/viewSession';
@@ -4459,6 +4460,43 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect(cold.read().source!.originalChanges()).toEqual(source.originalChanges()); expect(cold.authority.read().modelVersions).toHaveLength(2);
     const peer = firstWorkspaceRecipient(); await peer.receiver.importWorkspace(workspace); expect((await peer.session.read()).source!.token).toBe(source.token);
     await cold.dispose();
+  });
+  it('requires a current surface after product replacement before a review pin can be corrected', async () => {
+    const h = await productWorkspaceFixture(false), { host, button, named, editor, edited, all } = h;
+    const target = named('追加先モデル', editor); target.fire('focus'); target.value = target.children[1]!.value; target.fire('change');
+    button('このモデルに追加', editor).fire('click');
+    for (const [axis, value] of [['X', '0.2'], ['Y', '0.2'], ['Z', '0']]) { const input = named(`位置 ${axis}`, editor); input.value = value!; input.fire('input'); }
+    await edited(() => button('位置を確定', editor).fire('click'));
+    const added = h.dispatch.mock.lastCall![1]; if (added.kind !== 'addPin') throw Error('pin');
+    const old = host.authority.read().resources.captions[added.captionId]!, oldColor = h.display()!.pins[0]!.color;
+    button('モデル', editor).fire('click'); const panel = named('モデルの作業', editor);
+    named('プロジェクトのモデル一覧', panel).children[0]!.children[0]!.fire('click');
+    button('モデルを差し替える', panel).fire('click');
+    const replacement = named('モデルを差し替える', panel);
+    Object.assign(replacement, { files: [Object.assign(new Blob([glb().slice().buffer]), { name: 'replacement.glb' })] }); replacement.fire('change');
+    await edited(() => button('差し替えを確定', panel).fire('click'));
+    button('キャプション', editor).fire('click');
+    expect(projectCaptions(host.read().provider as WorkspaceProvider, h.display()!.sceneId)[0]!.needsReview).toBe(true);
+    button('位置を調整', editor).fire('click');
+    expect(button('位置を確定', editor).disabled).toBe(true);
+    const before = host.read().source!.token, calls = h.dispatch.mock.calls.length;
+    const current = host.authority.read().modelVersions![0]!, canvas = named('3Dモデルの表示', editor);
+    expect(h.display()!.pinEdit).toBeUndefined();
+    for (const axis of ['X', 'Y', 'Z']) { const input = named(`位置 ${axis}`, editor); input.value = '9'; input.fire('input'); }
+    button('位置を確定', editor).fire('click');
+    expect(host.read().source!.token).toBe(before); expect(h.dispatch).toHaveBeenCalledTimes(calls);
+    const marker = all(editor).find(n => n.className === 'lv-project-marker')!;
+    expect(marker.attributes.get('data-review')).toBe('true'); expect(marker.attributes.get('aria-description')).toContain('要確認');
+    expect(marker.style.backgroundColor).toBe(oldColor); expect(h.display()!.pins[0]!.position).toEqual([0.2, 0.2, 0]);
+    const pointer = { pointerId: 51, button: 0, isPrimary: true, clientX: 80, clientY: 90 };
+    canvas.fire('pointerdown', pointer); canvas.fire('pointerup', pointer); await Promise.resolve();
+    expect(button('位置を確定', editor).disabled).toBe(false);
+    await edited(() => button('位置を確定', editor).fire('click'));
+    const corrected = host.authority.read().resources.captions[added.captionId]!;
+    expect(corrected.anchor).toMatchObject({ value: { positionAsset: [0.25, 0.5, 0], authoredAssetRevisionId: current.projection.revisionId } });
+    expect(corrected.title).toEqual(old.title); expect(corrected.body).toEqual(old.body);
+    expect(projectCaptions(host.read().provider as WorkspaceProvider, h.display()!.sceneId)[0]!.needsReview).toBe(false);
+    expect(all(editor).find(n => n.className === 'lv-project-marker')!.attributes.get('data-review')).toBe('false');
   });
   it('preserves Caption drafts and model search IME, and resolves duplicate models as independent copies through product commands', async () => {
     const h = await productWorkspaceFixture(true, true, false, 'map2'), { button, named, editor, host, all, edited } = h;

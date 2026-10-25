@@ -26,6 +26,8 @@
 .lv-project-stage canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; touch-action: none; }
 .lv-project-markers { position: absolute; inset: 0; pointer-events: none; }
 .lv-project-workspace .lv-project-marker { position: absolute; pointer-events: auto; transform: translate(-50%, -50%); max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border-radius: 20px; }
+.lv-project-workspace .lv-project-marker[data-review="true"] { padding-right: 32px; }
+.lv-project-workspace .lv-project-marker[data-review="true"]::after { content: "!"; position: absolute; right: 6px; top: 50%; transform: translateY(-50%); width: 16px; height: 16px; border: 1px solid #413d39; border-radius: 50%; background: #faf9f8; color: #413d39; font-size: 12px; font-weight: 700; line-height: 16px; text-align: center; }
 .lv-project-camera { display: flex; flex-wrap: wrap; gap: 8px; }
 .lv-project-viewport-tools { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; padding: 8px 12px; }
 .lv-project-viewport-status { flex: 1 1 160px; margin: 0; }

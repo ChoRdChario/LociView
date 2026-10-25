@@ -71,9 +71,28 @@ identity and unchanged base proofs. Replaying an accepted file must leave source
 records and that workspace's base table unchanged. Both browsers fully close and
 relaunch, then UI and fresh backups must retain the same state/history/table.
 Generated/imported base observations differ legitimately between participants.
-This is bounded file-workflow evidence, not all of TEAM-FLOW-01: model replacement,
-pin correction, keep-both, representative interruption, offline and device lanes
-retain their own remaining acceptance.
+This is bounded file-workflow evidence, not all of TEAM-FLOW-01. Keep-both,
+broader model/fault coverage, offline and device lanes retain their acceptance.
+
+The model regression shares one placed model across two Scenes and retains a
+peer's local text and distinct image while receiving a replacement. It checks the
+replacement confirmation/cancel, preserved placement and original model bytes,
+visible colored review pins and a separate badge. A review pin must first select
+the current model surface before numeric adjustment and confirmation; an actual
+canvas intersection is checked against the new model's geometry. Contribution
+return/replay and both full browser restarts retain the visible corrected pin,
+body and images. A's fresh post-restart backup must exactly match B's pre-close
+records/history and all four original model/image blobs.
+
+One test-only native OPFS failure rejects publication-marker creation before the
+file exists, after metadata persistence. The existing incomplete-Project list →
+`編集で開く` → `更新を再試行` route must publish the same transaction, prepared
+receipt and original change bytes after complete browser shutdown. This adds no
+product fault controls or storage bypass. It is an injected publication failure,
+not OS crash, power-loss, physical-device durability or all interruption phases.
+Actual downloads are inspected with existing package readers. The single-user
+case separately covers selecting a downloaded backup for the UI's verified-save
+acknowledgment; do not transfer that UI acknowledgment to every model/team output.
 
 Browser cache, profiles, downloads, screenshots, optional traces, environment/build identity
 and HTML/JSON reports stay under ignored `.artifacts/e2e/`. Each execution has a

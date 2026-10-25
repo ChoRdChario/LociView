@@ -339,6 +339,125 @@ are unchanged. This unit closes one real browser workflow and its operation-
 blocking redraw defect. The next priority is the measured restored-Project delay,
 with separate iPhone/offline/adoption evidence still pending.
 
+### Completed checkpoint — model replacement, pin correction and interrupted recovery
+
+PO authorized this connected workflow on2026-10-26, with explicit emphasis on
+friendly daily use and avoiding excessive complexity. Start at clean pushed
+07fc61a on g0-baseline. Root is the only writer; bounded read-only reviewers map
+the accepted model/pin/recovery contracts and assess rendered usability.
+
+Outcome: use the built `editor=project` screen and dedicated Chromium to replace
+a real generated GLB, preserve shared model placement and Caption/media, make
+affected pins visibly require review, explicitly correct/confirm a pin, then pass
+actual same-Project files and cold resume with exact original model/history bytes.
+Include one deterministic browser interruption at an existing durable boundary
+and prove the existing retry/reopen path completes once without lost local work.
+Use existing Node fault cases for other phase combinations; do not create a
+generic fault framework or add diagnostic controls to the product.
+
+Plan: map existing UI/service and acceptance first; add one connected browser
+regression with synthetic distinct models and representative interruption; inspect
+rendered confirmation/review/recovery states and fix observed defects using the
+existing command/file authorities. Keep ordinary actions short and recognizable,
+showing extra decisions only when replacement or recovery requires them. Before
+any storage/architecture/package change, specify its exact acceptance and obtain
+the required independent review; stop only that affected lane for a genuine new
+PO/contract/managed-authority decision. Do not wait for small human tests.
+
+Exit: actual replacement→pin correction→interrupted retry/cold continuation and
+downloaded-file evidence pass, with independent diff/evidence/UX review. Run
+focused checks while editing; once at the final source/test tree run the serial
+checkpoint and relevant normal E2Es, then commit/push the suitable g0 checkpoint.
+No dependency, new format/profile, ordinary-entry activation, inferred pin mapping,
+write/recovery-fence change, device/offline adoption or release/deploy is implied.
+Keep existing failed artifacts, bounded waits and current save-delay observations.
+Duplicate-membership keep-both remains a later connected browser extension.
+
+Contract discrepancy recorded before correction: the product pin-move path uses
+the old coordinates with the current model identity, so numeric-only confirmation
+can clear needsReview, contrary to05's accepted current-surface requirement.
+Its overlay also drops the exact rendered pin status/notice and lacks the required
+separate review badge. Independent mapping confirms both. Restore the accepted
+behavior with the existing surface-selection action and display status port;
+preserve compatible numeric moves, pin color, position, drafts and retry ownership.
+The browser interruption will one-shot reject native OPFS publication-marker
+creation before the file exists, then close/reopen and use the existing retry UI.
+Read-only fault evidence will retain the durable marker and raw changes. This is
+an injected publication interruption, not power-loss/device durability evidence.
+
+Focused RED reproduces the numeric-only review bypass; after the minimal UI/port/
+badge correction, four relevant real-file product cases PASS (new review guard,
+compatible numeric/Shift pins, parent changes and model panel). Typecheck PASS.
+The first browser run1792967629972-51176 fails at media setup: a test-only direct
+setInputFiles did not perform the existing picker ownership capture. Correct the
+new helper to use the same real filechooser action as the already passing lane;
+keep product guards, assertions and all deadlines. Failure artifacts are retained.
+The second run1792967863706-37476 reaches the model tab but its new test locator
+asks for a region instead of the existing tabpanel named by the visible tab.
+Correct that role locator from source and the actual failure screen; no product
+behavior or timing change. The same regression now checks the exact active new
+model digest and same-transaction prepared/durable/raw-part publication recovery.
+Run1792968076894-43480 completes shared-model distribution and B local edits;
+its new failure waiter observes the retry control during busy processing, before
+the intended publication fault. Wait for that same control to be enabled and its
+owned product status to settle before reading the fault evidence. Preserve this
+failed run, existing time bounds and native injection point. Brief meta-audit:
+the missing evidence is the actual connected workflow, so correct only the test's
+ownership/final-state observations; add no framework, product step or extra audit.
+Run1792968177218-3560 reaches the intended fault and validates durable/prepared
+receipts plus the exact original part before complete A shutdown. Cold startup
+correctly refuses a successful last-Project auto-resume of incomplete data and
+shows that Project's existing `更新が未完了` catalog row. The test incorrectly
+expected immediate retry UI. Follow the existing `編集で開く`→`更新を再試行`
+recovery path; retain incomplete-resume guards and failed artifacts unchanged.
+
+Actual connected model workflow PASS in run1792968402654-23712: one test/5.7m
+including owned build, retry0, normal trace=false/timings=1. Four inclusive steps
+42.430/38.019/156.287/77.381s cover two-Scene shared placement, confirmation/cancel,
+real OPFS publication failure, full browser shutdown, explicit incomplete-Project
+open/retry, same transaction/prepared/durable/raw-byte publication, exact active
+new model bytes, peer local text/two original PNGs, visible colored review pins,
+surface-required correction via actual new-geometry intersection, Contribution
+return/replay, both cold UI resumes and final actual-backup records/history/bytes.
+No uncaught browser errors. Timings are observations, not performance acceptance.
+Independent rendered review closes confirmation, interrupted retry, incomplete
+selector, visible review badge and both final cold screens. No new
+wizard, setting or recovery policy was introduced.
+Final frozen source/test checkpoint PASS: typecheck;116 Vitest files/2725 cases,
+21 existing todo (985.53s); normal, harness and static-validation builds, exit0.
+Only existing build/chunk warnings remain.
+
+Final normal browser regression PASS under run1792969884215-34516: all3 cases,
+12.7m including owned build, retry0, no skipped/flaky/unexpected results or browser
+exceptions. Model case193.933s, single-user128.151s and team430.211s. Model steps
+27.362/21.630/94.281/43.700s preserve the same actual-surface, exact journal/raw
+original, active-model, local text/media, Contribution/replay and cold UI checks.
+Its exact post-cold archive comparison is A-cold versus B-final before shutdown;
+B-cold separately verifies UI/body/images/pin. The team case retains its stronger
+both-cold-backup history/table checks. Do not transfer acceptance between cases.
+
+Latest single-user restored save/file verify42.926s; keep the preceding75.182s
+and41.993s observations in their own recorded builds/conditions. Long and variable
+save waits remain open; this UI correction does not establish a performance cause
+or numeric guarantee. Physical iPhone, offline/PWA, ordinary entry, broader format/
+fault combinations, keep-both and aggregate adoption/release are still pending.
+
+Independent contract, final diff/evidence, rendered UX and11-path outgoing reviews
+have no actionable finding. All seven source/test blobs retain the independently
+reviewed and executed content. Four changed documents'230 local links have no
+missing target; diff checks pass. Ignored logs and every failed browser run remain.
+Milestone audit: actual g0 branch/origin/live starting HEAD match; this closes the
+requested connected model/recovery workflow without new product controls, schema,
+dependencies, public inputs or deployment changes. The verified checkpoint uses
+standing g0-baseline commit/push authorization; Git owns publication identity.
+
+Next connected unit after this boundary: duplicate model/Caption memberships'
+explicit keep-both → independent subsequent edits → same-Project return/reopen,
+using the existing controls and services. Preserve simple normal actions and
+show recovery choices only when needed; no separate revision manager or automatic
+model matching. Long/variable save waits and the ordinary-entry/device/offline
+adoption conditions remain open.
+
 ### Completed checkpoint — real two-party browser file workflow
 
 PO authorized this next connected workflow on2026-10-26. Start at clean pushed

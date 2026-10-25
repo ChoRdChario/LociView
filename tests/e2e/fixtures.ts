@@ -2,14 +2,14 @@ import { deflateSync } from 'node:zlib';
 import { serializeGlb } from '../../src/assets/glbOptimize';
 
 /** Owned synthetic inputs; no user data or externally downloaded sample. */
-export function triangleGlb() {
+export function triangleGlb(z = 0) {
   const bin = new Uint8Array(36);
-  new Float32Array(bin.buffer).set([-1, 0, 0, 1, 0, 0, 0, 2, 0]);
+  new Float32Array(bin.buffer).set([-1, 0, z, 1, 0, z, 0, 2, z]);
   return Buffer.from(serializeGlb({ asset: { version: '2.0' }, scene: 0,
     scenes: [{ nodes: [0] }], nodes: [{ mesh: 0 }],
     meshes: [{ primitives: [{ attributes: { POSITION: 0 }, material: 0 }] }],
     buffers: [{ byteLength: bin.length }], bufferViews: [{ buffer: 0, byteLength: 36 }],
-    accessors: [{ bufferView: 0, componentType: 5126, count: 3, type: 'VEC3', min: [-1, 0, 0], max: [1, 2, 0] }],
+    accessors: [{ bufferView: 0, componentType: 5126, count: 3, type: 'VEC3', min: [-1, 0, z], max: [1, 2, z] }],
     materials: [{ pbrMetallicRoughness: { baseColorFactor: [0.2, 0.5, 0.8, 1], roughnessFactor: 0.7 } }],
   }, bin));
 }

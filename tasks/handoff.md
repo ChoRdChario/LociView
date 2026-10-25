@@ -38,6 +38,11 @@ The approved repository-owned Chromium test lane is described in the
 remaining performance work and exact next unit.
 The same lane also covers real two-party Workspace/Contribution rounds and cold
 reopen; todo records exact scope and the storage-enumeration readback correction.
+Its bounded model workflow also covers same-Asset GLB replacement, current-surface
+pin correction and injected publication failure followed by explicit cold retry.
+Keep incompatible pin correction behind a real surface selection and carry review
+status from the exact rendered display; ordinary compatible numeric moves remain.
+The test's injected failure is not power-loss or general storage adoption evidence.
 History preservation compares complete original hash/byte pairs, while wire and
 journal ordinals retain their own order. Normal E2E runs use light diagnostics;
 full traces are opt-in in the runbook. The separate Chrome-plugin

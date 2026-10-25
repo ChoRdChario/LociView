@@ -86,6 +86,11 @@
 | M13 | 位置合わせの基準固定・bounds fit・reset／undo・redo | 新規実装 | 完全alignmentは新hostも限定Nativeも未達。M06/M07と別の残り。alignment固有のundo/redoで、一般Caption Undoの新設を含めない。 | [docs/specs/01-domain-rendering.md:769](../docs/specs/01-domain-rendering.md) / [docs/specs/01-domain-rendering.md:786](../docs/specs/01-domain-rendering.md) |
 | M14 | 既存モデルへ補修Meshを追加・配置し、任意hard exclusionと一体で保存する | 新規実装 | 承認済みvisual repair pairの利用者flowは未実装。別Asset追加ではない。repair-local gizmo、patch/mask一体preview/cancel、revision/bindingの原子的commit、対応pin class保持が必要。renderer/profile・hard-mask gateに依存し、直近チームsliceでは実装しない。 | [docs/specs/00-product-contract.md:116](../docs/specs/00-product-contract.md) / [docs/specs/00-product-contract.md:275](../docs/specs/00-product-contract.md) |
 
+M08の限定product経路は、要確認ピンの補正で現在のモデル面を明示選択し、元の色と独立した要確認表示を保つ。
+専用Chromiumの [モデル差し替え・復旧テスト](../tests/e2e/model-recovery.spec.ts) が、2シーン共有の配置保持、
+相手の本文・画像保持、公開中断後の同一変更での再開、面指定での補正・返送を接続する。
+実行結果はtodoに集約し、一般形式・全中断段階・実機・offline・正式採用の合格には広げない。
+
 ### Caption
 
 | ID | 機能群／利用者の結果 | 状態 | 現在の境界・残り | コード／既存受入れ参照（行番号は監査時点） |
