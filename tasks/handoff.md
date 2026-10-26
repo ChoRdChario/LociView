@@ -43,6 +43,13 @@ pin correction and injected publication failure followed by explicit cold retry.
 Keep incompatible pin correction behind a real surface selection and carry review
 status from the exact rendered display; ordinary compatible numeric moves remain.
 The test's injected failure is not power-loss or general storage adoption evidence.
+The same dedicated lane creates genuine duplicate Scene registrations and confirms
+independent model/Caption copies through actual return/replay and both cold UIs.
+Keep original versus copy and other-Scene consequences in the existing forms;
+existing numeric/IME pin edits retain the captured action's Caption ID, including
+compatible moves. Caption copies retain their original model parent unless the
+user explicitly changes it. Exact package evidence and remaining acceptance live
+in todo; do not generalize this bounded copy case to all formats or offline.
 History preservation compares complete original hash/byte pairs, while wire and
 journal ordinals retain their own order. Normal E2E runs use light diagnostics;
 full traces are opt-in in the runbook. The separate Chrome-plugin

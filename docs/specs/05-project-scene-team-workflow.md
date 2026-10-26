@@ -820,6 +820,19 @@ values by exposing an unimplemented keep-both action. The command depends on
 every observed candidate. An unseen concurrent edge remains detectable and
 reopens the conflict; no automatic winner or automatic duplicate is introduced.
 
+Bounded product presentation acceptance: keep the existing typed commands and
+confirmation forms. Caption recovery uses its existing read-only `details`;
+model-membership display adds named group context, consequences, checked
+other-Scene references and copy-availability to the existing `modelReview` port.
+These are provider-derived display values, not new persisted fields or UI write
+authority. Incomplete reference information is labelled as uncertain, never
+reported as no other references. Show the affected Scene/resource, continuing
+original versus independent copy, copy's Scene-only scope and unchanged model
+ownership of existing Captions before confirmation. Ordinals may supplement this
+context; they never select an original. Missing choices use a choice instruction,
+not a text-format error. Reuse normal Scene inclusion to create browser conflicts
+and the existing file/retry services; no wizard or automatic copy-name policy.
+
 ## 9. Migration
 
 **PO-approved one-time cutover (2026-09-14; supersedes later-old-input clauses):**

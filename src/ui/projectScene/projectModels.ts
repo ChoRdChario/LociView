@@ -22,7 +22,7 @@ export function createProjectModels(document: Document, host: ProjectPanelHost):
   const context = (): ModelListContext => {
     const { provider, sceneId } = host.source(), m = memory(), block = host.block('models');
     return { source: projectModels(provider, sceneId, m.projectId, m.hiddenAssetIds, host.viewport().read()), memory: m,
-      pending: ownInput() || composing || m.composing ? 'modelTransform' : host.block('models', false) ? 'update' : null, mutationBlock: block, feedback: { kind: 'idle' } };
+      pending: composing || m.composing ? 'composition' : edit ? 'modelTransform' : ownInput() ? 'text' : host.block('models', false) ? 'update' : null, mutationBlock: block, feedback: { kind: 'idle' } };
   };
   const list = createModelListControls(document, plan => {
     if (disposed || host.block('models', false) || !modelListPlanIsCurrent(plan, context())) return;
@@ -164,7 +164,7 @@ export function createProjectModels(document: Document, host: ProjectPanelHost):
     catch (error) { remove.disabled = true; deletionNote.textContent = selected ? (error as Error).message : ''; }
     review.replaceChildren();
     const groups = host.ports.modelReview(sceneId);
-    const choice = (key: string, label: string, values: readonly { id: string; label: string }[], apply: (value: string) => void) => {
+    const choice = (key: string, label: string, values: readonly { id: string; label: string }[], apply: (value: string) => void, area: HTMLElement = review) => {
       const owned = choices.get(key), row = make('label', label), select = make('select'), empty = make('option', '選択してください'); empty.value = ''; select.append(empty); select.setAttribute('aria-label', label);
       for (const item of values) { const option = make('option', item.label); option.value = item.id; select.append(option); }
       select.value = owned?.value ?? ''; select.disabled = !!block || composing || memory().composing || !!edit || !!fileScope || !!pinSize || !!owned && owned.token !== provider.token;
@@ -172,7 +172,7 @@ export function createProjectModels(document: Document, host: ProjectPanelHost):
       const save = button('選択を確定', () => { if (!host.block('models') && !pinSize && owned?.token === host.source().provider.token && owned.value) apply(owned.value); });
       save.disabled = select.disabled || !owned?.value;
       const clear = button('選択を取り消す', () => { if (!host.block('models', false)) { choices.delete(key); membershipDecisions.delete(key); host.changed(); } }); clear.hidden = !owned && !membershipDecisions.has(key); clear.disabled = !!host.block('models', false);
-      review.append(row, save, clear);
+      area.append(row, save, clear);
     };
     for (const group of groups.statuses) { if (group.issue) review.append(make('p', group.issue));
       if (preview) for (const [index, item] of group.choices.entries()) { const show = button(`${group.label}：候補 ${index + 1} を表示`, () => {
@@ -182,17 +182,22 @@ export function createProjectModels(document: Document, host: ProjectPanelHost):
       host.dispatch('models', provider.token, { kind: 'resolveAssetStatus', assetId: group.assetId, operationId }, () => { choices.delete(`status/${group.assetId}`); host.message('モデルと配置を確定しました。'); });
     }); }
     for (const group of groups.memberships) {
+      const area = make('section'); area.setAttribute('aria-label', group.label ?? 'モデル登録の重複');
+      area.append(make('h3', group.label ?? 'モデル登録の重複'));
+      if (group.note) area.append(make('p', group.note));
+      if (group.details?.length) { const details = make('ul'); for (const text of group.details) details.append(make('li', text)); area.append(details); }
+      review.append(area);
       const key = `${sceneId}/membership/${group.assetId}`, selectedDecision = membershipDecisions.get(key), row = make('label', '重複するモデル'), decision = make('select'); decision.setAttribute('aria-label', '重複するモデル');
-      for (const [value, label] of [['one', '一つにまとめる'], ['both', '別々のモデルとして両方残す']]) { const option = make('option', label); option.value = value!; decision.append(option); }
+      for (const [value, label] of [['one', '一つにまとめる'], ['both', '別々のモデルとして両方残す']]) { const option = make('option', label); option.value = value!; option.disabled = value === 'both' && group.copyReady === false; decision.append(option); }
       decision.value = selectedDecision?.value ?? 'one'; decision.disabled = !!block || !!edit || !!fileScope || !!pinSize || composing || memory().composing || !!selectedDecision && selectedDecision.token !== provider.token;
-      decision.addEventListener('change', () => { if (!decision.disabled) { membershipDecisions.set(key, { token: provider.token, sceneId, value: decision.value as 'one' | 'both' }); host.changed(); } }); row.append(decision); review.append(row);
+      decision.addEventListener('change', () => { if (!decision.disabled) { membershipDecisions.set(key, { token: provider.token, sceneId, value: decision.value as 'one' | 'both' }); host.changed(); } }); row.append(decision); area.append(row);
       choice(key, '残すモデル登録', group.edgeIds.map((id, i) => ({ id, label: `登録 ${i + 1}` })), originalMembershipId => {
         let prepared: ReturnType<typeof host.ports.prepareModelMembership> | undefined;
         const capturedDecision = membershipDecisions.get(key); if (capturedDecision && (capturedDecision.token !== provider.token || capturedDecision.sceneId !== sceneId)) return;
         const mode = capturedDecision?.value ?? 'one';
         host.execute('models', provider.token, () => { prepared ??= host.ports.prepareModelMembership(provider.token, sceneId, group.assetId, group.edgeIds, originalMembershipId, mode);
           return prepared.then(command => host.ports.dispatch(provider.token, command)); }, () => { choices.delete(key); membershipDecisions.delete(key); host.message('モデルの登録を整理しました。'); });
-      });
+      }, area);
     }
     preview?.render(sceneId);
   }

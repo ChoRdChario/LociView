@@ -56,7 +56,7 @@ export function createProjectRecovery(document: Document, host: RecoveryHost) {
         text.setAttribute('aria-label', `${group.label}の入力`); decision.setAttribute('aria-label', `${group.label}の重複の扱い`);
         message.setAttribute('role', 'status');
         const option = (node: HTMLSelectElement, id: string, label: string) => { const o = make('option', label); o.value = id; node.append(o); };
-        option(select, '', '選択してください');
+        option(select, '', group.target.kind === 'membership' ? '元として残す登録を選択' : '選択してください');
         for (const c of group.choices) { const li = make('li', c.label); li.style.whiteSpace = 'pre-wrap'; values.append(li); option(select, c.id, c.label); }
         if (group.manual) option(select, 'manual', group.manual === 'name' ? '名前を入力' : '文言を入力');
         option(decision, '', '重複の扱いを選択'); option(decision, 'one', '一つにまとめる'); option(decision, 'both', '別々の記録として両方残す'); decision.value = '';
@@ -89,7 +89,8 @@ export function createProjectRecovery(document: Document, host: RecoveryHost) {
       f.apply.disabled = !f.group.ready || !f.select.value || !!block || composing() || stale || !valid(f);
       f.cancel.hidden = !dirty(f); f.cancel.disabled = host.cancelBlock() || composing();
       f.message.textContent = stale ? '内容が更新されています。入力は保持しています。取り消して選び直してください。' : !f.group.ready ? '候補を確認できないため解消できません。元の内容は保持しています。' :
-        !valid(f) ? '入力の長さ・改行・空白を確認してください。' : block ?? '';
+        !valid(f) ? f.group.target.kind === 'membership' ? f.decision.value === 'both' && !f.group.copyReady ?
+          '両方残すには、未解決の内容を先に確認してください。' : '重複の扱いを選択してください。' : '入力の長さ・改行・空白を確認してください。' : block ?? '';
     }
     for (const node of [...list.children]) if (!nodes.includes(node as HTMLLIElement)) node.remove();
     nodes.forEach((node, i) => { if (list.children[i] !== node) list.insertBefore(node, list.children[i] ?? null); });

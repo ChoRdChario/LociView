@@ -94,7 +94,8 @@ export interface ProjectWorkspacePorts {
   modelPlacement(translation: readonly string[], rotation: readonly string[], scale: string): WorkspacePlacement;
   modelAngles(rotation: WorkspacePlacement['rotationXYZW']): readonly [string, string, string];
   modelReview(sceneId: string): { statuses: readonly { assetId: string; label: string; issue?: string; choices: readonly { operationId: string; label: string }[] }[];
-    memberships: readonly { sceneId: string; assetId: string; edgeIds: readonly string[] }[] };
+    memberships: readonly { sceneId: string; assetId: string; edgeIds: readonly string[];
+      label?: string; note?: string; details?: readonly string[]; copyReady?: boolean }[] };
   addModel(token: string, input: { sceneId: string; assetId: string; file: WorkspaceFile }): Promise<unknown>;
   replaceModel(token: string, input: { sceneId: string; assetId: string; expectedBindingId: string; file: WorkspaceFile }): Promise<unknown>;
   transformModel(token: string, input: { sceneId: string; assetId: string; expectedBindingId: string; bindingId: string; placement: WorkspacePlacement }): Promise<unknown>;

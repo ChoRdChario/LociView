@@ -32,6 +32,25 @@ import type { createValidationModeHost } from './validationModeHost';
 export function productSources(host: ReturnType<typeof createValidationModeHost>): Pick<ProjectWorkspacePorts,
   'modelDetails' | 'modelPlacement' | 'modelAngles' | 'modelReview' | 'modelDeletion' | 'prepareModelMembership' | 'views' | 'viewOrder' | 'viewReview' | 'materials' | 'mediaDescription' | 'captionDeletion' | 'pinPositionInParent' | 'recovery' | 'prepareCaptionMembership'> {
   const provider = () => { const p = host.read().provider; if (p?.kind !== 'scene-provider') throw Error('プロジェクトの内容を確認してください。'); return p; };
+  const otherSceneReferences = (p: ReturnType<typeof provider>, kind: 'asset' | 'caption', id: string, sceneId: string) => {
+    const map = kind === 'asset' ? 'sceneAssetMembershipsById' : 'sceneCaptionMembershipsById', field = kind === 'asset' ? 'assetId' : 'captionId';
+    const names = new Map<string, string>(), deleteEdits = new Set(p.issues.filter(issue => issue.code === 'concurrent-delete-edit' && issue.path[0] === map).map(issue => issue.path[1])); let uncertain = false;
+    for (const [edgeId, fields] of Object.entries(p.details.mutable[map])) {
+      const owner = fieldValue(fields[field]); if (typeof owner === 'string' && owner !== id) continue;
+      const life = fieldValue(fields.lifecycle) as JsonObject | undefined;
+      if (deleteEdits.has(edgeId)) uncertain = true;
+      if (life?.state === 'deleted') continue;
+      const scene = fieldValue(fields.sceneId);
+      if (owner !== id || typeof scene !== 'string' || life?.state !== 'active') { uncertain = true; continue; }
+      if (scene === sceneId) continue;
+      const name = fieldValue(p.state.scenes[scene]?.name), active = fieldValue(p.state.scenes[scene]?.lifecycle)?.state === 'active';
+      if (!name || !active) uncertain = true;
+      names.set(scene, name || '名称を確認するシーン');
+    }
+    const noun = kind === 'asset' ? 'モデル' : 'キャプション';
+    return [`元の${noun}を参照するほかのシーン：${names.size ? [...names.values()].join('、') : uncertain ? '確認が必要です' : 'ありません'}。`,
+      ...(uncertain && names.size ? ['ほかにも未解決の参照があります。元の参照先は変更しません。'] : [])];
+  };
   return {
     recovery() {
       const p = provider(), groups: WorkspaceRecoveryGroup[] = [];
@@ -132,8 +151,9 @@ export function productSources(host: ReturnType<typeof createValidationModeHost>
         } catch { /* Keep-one can remain available when copy content is unresolved. */ }
         groups.push({ key: `membership/${g.sceneId}/${g.captionId}`, label: `${sceneLabel(g.sceneId)}：${captionLabel(g.captionId)}の重複登録`, ready, copyReady,
           target: { kind: 'membership', sceneId: g.sceneId, captionId: g.captionId, edgeIds: g.edgeIds },
-          choices: g.edgeIds.map((id, i) => ({ id, label: `元のキャプションとして残す登録 ${i + 1}` })),
-          note: copyReady ? '両方残す場合は、他方を本文・添付説明・タグを独立に編集できる記録にします。他のシーンは変わりません。' : '本文・添付などが未解決のため、両方残す操作はできません。一つにまとめる操作は内容を変更しません。' });
+          choices: g.edgeIds.map((id, i) => ({ id, label: `${captionLabel(g.captionId)}：登録 ${i + 1}` })),
+          details: otherSceneReferences(p, 'caption', g.captionId, g.sceneId),
+          note: copyReady ? `同じキャプションへの登録が${g.edgeIds.length}件あります。選んだ登録が元の記録を引き継ぎます。「両方残す」では、他方をこのシーンだけの独立した記録にします。本文・ピン位置・画像の説明を別々に編集でき、ピンの親モデルと画像本体は引き継ぎます。` : '本文・添付などが未解決のため、両方残す操作はできません。一つにまとめる操作は内容を変更しません。' });
       }
       return groups;
     },
@@ -183,7 +203,16 @@ export function productSources(host: ReturnType<typeof createValidationModeHost>
           return { operationId: c.operationId, label: `候補 ${i + 1}：位置 ${placement.translation.join(' / ')}、回転 ${rotationDegrees(placement.rotationXYZW).join(' / ')}°、倍率 ${placement.uniformScale}` };
         }) }); } catch { statuses.push({ assetId: id, label: String(fieldValue(fields.label) ?? 'モデル'), choices: [], issue: 'モデルまたは配置を確認できないため、候補を確定できません。保存した内容は保持しています。' }); }
       }
-      return { statuses, memberships: assetMembershipGroups(p, host.limits).filter(g => g.sceneId === sceneId) };
+      return { statuses, memberships: assetMembershipGroups(p, host.limits).filter(g => g.sceneId === sceneId).map(group => {
+        const name = String(fieldValue(p.details.mutable.assetsById[group.assetId]?.label) ?? '名称を確認するモデル');
+        const scene = fieldValue(p.state.scenes[sceneId]?.name) ?? '名称を確認するシーン';
+        let copyReady = false; try { assetCopySource(p, sceneId, group.assetId, host.limits); copyReady = true; } catch { /* Keep-one does not require a complete copy. */ }
+        return { ...group, label: `${scene}：${name}の重複登録`, copyReady,
+          note: `同じモデルへの登録が${group.edgeIds.length}件あります。選んだ登録が元のモデルを引き継ぎます。` + (copyReady ?
+            '「両方残す」では、他方をこのシーンだけの独立したモデルにします。現在の配置・材質を引き継ぎ、別々に変更できます。既存のキャプションは元のモデルに残ります。' :
+            'モデル・材質に未解決の内容があるため、両方残す操作はできません。一つにまとめる操作はモデル本体を変更しません。'),
+          details: otherSceneReferences(p, 'asset', group.assetId, sceneId) };
+      }) };
     },
     modelDeletion: assetId => host.authority.assetDeletionImpact!(provider().token, assetId),
     async prepareModelMembership(token, sceneId, assetId, observedIds, keepId, choice) {

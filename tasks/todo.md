@@ -339,6 +339,85 @@ are unchanged. This unit closes one real browser workflow and its operation-
 blocking redraw defect. The next priority is the measured restored-Project delay,
 with separate iPhone/offline/adoption evidence still pending.
 
+### Completed checkpoint — independent keep-both editing, return and resume
+
+PO authorized this connected workflow on2026-10-26 with simple friendly daily use,
+starting clean at pushed b1d92c4 on g0-baseline. Root is the only writer; independent
+read-only agents review contracts, final source deltas, actual packages and UX.
+
+Outcome/exit: two dedicated Chromium profiles independently include the same model
+and Caption in a second Scene, receive actual files to create genuine duplicate
+memberships, explicitly keep both with a named continuing original, edit each
+independently, return/replay files and fully restart both browsers. Exact saved
+records/history, original bytes and other-Scene references must survive. Run focused
+checks during fixes, then relevant normal E2Es and the serial checkpoint at the
+final tree, independent review and the authorized g0 development push. Stop only
+affected work for a genuine new specification/product/managed-authority need.
+No new dependency/profile/schema/storage fence, ordinary entry, device/offline
+adoption, release or deployment. No injected duplicate metadata or copy wizard.
+
+Before code, §8 presentation acceptance records the existing Caption `details`
+and optional provider-derived modelReview label/note/details/copyReady display
+fields. Existing forms now name Scene/resource, explain original versus Scene-only
+independent copy, unchanged Caption model ownership and other-Scene references;
+incomplete references remain uncertain. Original selection is explicit. No name
+suffix policy, command/write authority or automatic winner is introduced.
+
+Observed defects and bounded fixes:
+- Duplicate decisions displayed a text-format error or model-placement instruction.
+  Use the actual choice/input/composition context in the same existing controls.
+- Compatible numeric movement lost the action's Caption ID and attempted addition
+  (`colorBytes(undefined)` before dispatch). RED reproduces it; both ordinary-input
+  and IME handlers now retain guarded `pinAction.captionId`, preserving add/place/
+  reparent/current-surface/stale rules. Copy movement leaves the original unchanged.
+- Inherited dark control backgrounds made selected values unreadable. One scoped
+  light-background rule preserves existing palette, focus and interaction structure.
+
+Executed evidence:
+- Five focused real-file product cases PASS/29.28s, covering numeric/Shift placement,
+  reviewed correction, reparenting and independent Caption/model controls. A prior
+  focused result lost to tool truncation was resolved by this recorded execution.
+- Final run1792976102374-52692:2browser cases PASS/14.9m, retry0, no page exceptions;
+  keep-both9.2m and affected model-recovery5.5m. Dedicated Chromium156.0.8078.4,
+  Node24.12.0, win32/headless, two independent profiles, traceoff and timing capture.
+  Existing unchanged single-user/two-round cases keep their earlier-build evidence.
+- Actual seven ZIPs validate. A-post-cold metadata.am equals B-pre-close byte-for-byte
+  (5,777bytes), with20original changes, records and heads equal. W0/W1 and contributed
+  original bytes survive. Each has exactly one496byte GLB and one77byte PNG, shared
+  media and fresh copy-owned IDs. Original Scene edges remain unchanged; UI-selected
+  original edges stay active and other observed candidates are tombstoned. Model X
+  is-2/3.5 with scale1.25; original/copy pin positions are[.2,.2,0]/[.4,.3,.1], both
+  retain the original model owner; attachment IDs/descriptions are independent.
+- Both cold UIs and readable confirmation values pass independent actual screenshot
+  review. Exact transforms/alt/history are DOM/package evidence, not visual claims.
+  B has no new post-cold archive comparison. Base evidence matches, while legitimate
+  generated/imported observations differ; whole ZIP/base-table equality is not claimed.
+- Independent final source/contract/package/outgoing-scope and result-doc reviews
+  find no remaining issue. Runtime/source-test content is frozen at8files (6src+2tests);
+  final index must match their tested/reviewed Git blobs. All13paths remain in scope.
+
+Failure evidence is retained under ignored `.artifacts/e2e/runs/`: initial
+run1792974411064-13292 PASS lacked scrolled confirmation captures; run1792975510913-55480 fails numeric copy movement and retains the cause/low-contrast screenshots.
+Final run closes both. Whole-action times are observations, not latency acceptance.
+Full serial checkpoint PASS: typecheck;116files/2,725PASS/21existing TODO; normal,
+harness and validation builds. Vitest duration1,045.57s; builds5.31/4.33/8.52s.
+Existing bundle-size warnings remain diagnostic output, not new acceptance.
+Raw output: `.artifacts/e2e/checkpoint-keep-both-final.log`; final browser output:
+`.artifacts/e2e/keep-both-final-browser.log`. The8staged source/test blobs match the
+frozen tested/reviewed tree. Later result-only prose/staging does not repeat runtime
+checks. This is the authorized verified g0-baseline development checkpoint; Git
+owns commit/push identity. Artifacts/private inputs/dependencies/release paths are
+outside the13-file staged scope; final branch/remote/index/clean checks close it.
+
+Milestone meta-audit: this closes the accepted independent-copy workflow without
+auxiliary infrastructure or aggregate adoption credit. Next connected outcome:
+interrupt receipt of a real Workspace UPDATE before input.zip creation, fully
+restart, reselect the exact original file and use `受信を再開`, retaining local work
+and the same job. Reuse receive-job archive proofs and existing Node fault cases;
+do not substitute local-model publication retry or add a generic fault framework.
+Integrated ordinary-entry TEAM-FLOW-01, physical phone/offline and performance
+acceptance remain separate open boundaries.
+
 ### Completed checkpoint — model replacement, pin correction and interrupted recovery
 
 PO authorized this connected workflow on2026-10-26, with explicit emphasis on

@@ -148,8 +148,15 @@ M08の限定product経路は、要確認ピンの補正で現在のモデル面�
 独立した専用Chromium 2 profileでのWorkspace更新・4つの実Contributionによる
 2往復・本文競合の明示解消・手元画像保持・再受信no-op・両者cold再開を、限定
 validation経路で検証した。[team E2E](../tests/e2e/team-workflow.spec.ts)と
-[実行記録](todo.md)が範囲・条件を所有する。通常入口・モデル更新／pin補正・
-keep-both・中断・実機／offlineを含むTEAM-FLOW-01全完了や、行全体の採用ではない。
+[実行記録](todo.md)が範囲・条件を所有する。別のモデル／独立コピーの代表例を
+含めても、通常入口からの統合TEAM-FLOW-01、実機／offline全完了や行全体の採用ではない。
+
+[keep-both E2E](../tests/e2e/keep-both-workflow.spec.ts)では、同じモデルとCaptionを
+別々にSceneへ追加して実ファイル受信で重複を作り、明示した元と独立コピーを両方残す。
+既存フォームに対象・他Scene・独立範囲を表示し、本文・画像説明・ピン位置・モデル配置の
+別々の変更→返送／再受信→両者cold UI再開と、A再開後backup対B終了前backupの完全な
+履歴／record一致を確認する。元の他Scene登録、fresh所有ID、同じモデル／画像bytesを
+保持し、Captionコピーのpinは元モデルを参照する。分類件数・一般形式の採用は変更しない。
 
 | ID | 機能群／利用者の結果 | 状態 | 現在の境界・残り | コード／既存受入れ参照（行番号は監査時点） |
 |---|---|---|---|---|

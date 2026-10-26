@@ -157,13 +157,13 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     input.addEventListener('input', () => {
       const target = pin?.target ?? numericTarget; if (!target || mutationBlock() || !pinCurrent()) return;
       rawPosition[i] = input.value;
-      if (positionValid()) { pin = { target, captionId: placingCaption, position: rawPosition.map(Number) as unknown as Point3 }; numericTarget = null; }
+      if (positionValid()) { pin = { target, captionId: pinAction!.captionId, position: rawPosition.map(Number) as unknown as Point3 }; numericTarget = null; }
       render();
     });
     input.addEventListener('compositionstart', () => { composing = true; render(); });
     input.addEventListener('compositionend', () => {
       rawPosition[i] = input.value; composing = false; const target = pin?.target ?? numericTarget;
-      if (target && !mutationBlock() && pinCurrent() && positionValid()) { pin = { target, captionId: placingCaption, position: rawPosition.map(Number) as unknown as Point3 }; numericTarget = null; }
+      if (target && !mutationBlock() && pinCurrent() && positionValid()) { pin = { target, captionId: pinAction!.captionId, position: rawPosition.map(Number) as unknown as Point3 }; numericTarget = null; }
       render();
     }); return input;
   });

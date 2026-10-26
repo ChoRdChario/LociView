@@ -4156,6 +4156,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     await peer.session.edit((await peer.session.read()).source!.token, { kind: 'include', sceneId, resourceKind: 'caption', resourceId: captionId, membershipId: `scm_${newId()}`, orderKey: 'B', eventId: `evt_${newId()}` }); await receive();
     expect(projectCaptions(p(), sceneId)).toHaveLength(0);
     const duplicate = all(named('記録の競合', editor)).find(n => n.tag === 'li' && n.attributes.get('aria-label')?.endsWith('の重複登録'))!;
+    expect(all(duplicate).some(n => n.textContent.includes('入力の長さ・改行・空白'))).toBe(false);
     const selects = all(duplicate).filter(n => n.tag === 'select'), original = selects[0]!, decision = selects[1]!;
     expect(original.value).toBe(''); expect(decision.value).toBe(''); original.value = original.children[1]!.value; original.fire('change'); expect(button('競合を解消', duplicate).disabled).toBe(true);
     decision.value = 'both'; decision.fire('change'); const originalCaption = host.authority.read().resources.captions[captionId];
@@ -4497,6 +4498,13 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect(corrected.title).toEqual(old.title); expect(corrected.body).toEqual(old.body);
     expect(projectCaptions(host.read().provider as WorkspaceProvider, h.display()!.sceneId)[0]!.needsReview).toBe(false);
     expect(all(editor).find(n => n.className === 'lv-project-marker')!.attributes.get('data-review')).toBe('false');
+    button('位置を調整', editor).fire('click');
+    const x = named('位置 X', editor); x.value = '0.9'; x.fire('input');
+    const y = named('位置 Y', editor); y.fire('compositionstart'); y.value = '0.8'; y.fire('compositionend');
+    await edited(() => button('位置を確定', editor).fire('click'));
+    expect(h.dispatch.mock.lastCall![1]).toMatchObject({ kind: 'movePin', captionId: added.captionId });
+    expect(Object.keys(host.authority.read().resources.captions)).toEqual([added.captionId]);
+    expect(host.authority.read().resources.captions[added.captionId]!.anchor).toMatchObject({ value: { positionAsset: [0.9, 0.8, 0] } });
   });
   it('preserves Caption drafts and model search IME, and resolves duplicate models as independent copies through product commands', async () => {
     const h = await productWorkspaceFixture(true, true, false, 'map2'), { button, named, editor, host, all, edited } = h;
@@ -4506,12 +4514,14 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     button('キャプション', editor).fire('click'); expect(body.value).toBe('未適用の記録'); await edited(() => button('変更を適用', editor).fire('click'));
     button('モデル', editor).fire('click');
     named('プロジェクトのモデル一覧', panel).children[0]!.children[0]!.fire('click');
+    expect(all(named('モデルの更新候補', panel)).some(n => n.textContent.includes('既存のキャプションは元のモデルに残ります'))).toBe(true);
     const size = named('ピンの表示倍率', panel); size.fire('focus'); size.value = '2'; size.fire('input');
     const beforeSize = host.read().source!.token, calls = h.dispatch.mock.calls.length;
     expect(named('重複するモデル', panel).disabled).toBe(true); expect(named('残すモデル登録', panel).disabled).toBe(true);
     button('選択を確定', panel).fire('click'); expect(h.dispatch).toHaveBeenCalledTimes(calls); expect(host.read().source!.token).toBe(beforeSize); expect(size.value).toBe('2');
     button('倍率の変更を取り消す', panel).fire('click');
     let decision = named('重複するモデル', panel); decision.value = 'both'; decision.fire('change');
+    expect(all(panel).some(n => n.textContent.includes('モデルの配置を確定するか'))).toBe(false);
     expect(button('ファイルに保存', named('ファイル')).disabled).toBe(true);
     button('選択を取り消す', named('モデルの更新候補', panel)).fire('click');
     expect(named('重複するモデル', panel).value).toBe('one'); expect(button('ファイルに保存', named('ファイル')).disabled).toBe(false);

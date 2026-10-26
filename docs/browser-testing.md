@@ -71,8 +71,9 @@ identity and unchanged base proofs. Replaying an accepted file must leave source
 records and that workspace's base table unchanged. Both browsers fully close and
 relaunch, then UI and fresh backups must retain the same state/history/table.
 Generated/imported base observations differ legitimately between participants.
-This is bounded file-workflow evidence, not all of TEAM-FLOW-01. Keep-both,
-broader model/fault coverage, offline and device lanes retain their acceptance.
+This is bounded file-workflow evidence, not all of TEAM-FLOW-01. The separate
+model/copy cases below do not close the integrated ordinary-entry, broader fault,
+offline or physical-device acceptance.
 
 The model regression shares one placed model across two Scenes and retains a
 peer's local text and distinct image while receiving a replacement. It checks the
@@ -93,6 +94,25 @@ not OS crash, power-loss, physical-device durability or all interruption phases.
 Actual downloads are inspected with existing package readers. The single-user
 case separately covers selecting a downloaded backup for the UI's verified-save
 acknowledgment; do not transfer that UI acknowledgment to every model/team output.
+
+The keep-both regression creates real duplicate model and Caption memberships
+through independent Scene inclusion in two profiles and actual Contribution
+reception. Existing confirmation forms name the affected Scene/resource, continuing
+original, Scene-only independent copy and other-Scene references. They require an
+explicit original; no generated copy name or extra wizard is introduced. Rendered
+captures and computed styles check readable current choices.
+
+A real Workspace then carries the split to the peer. Subsequent edits separately
+change original/copy model placement, Caption text and attachment descriptions;
+the copied Caption's numeric pin move retains its original model owner and leaves
+the original pin unchanged. The existing model-recovery case separately protects
+the required surface selection for incompatible pins. Downloaded packages check
+fresh owned model/Caption/attachment IDs, original Scene references, shared exact
+model/image bytes and complete original/contributed change bytes. Replay must
+leave two independent records, without another copy. Both full browser restarts
+check UI/text/images and model placement; A's post-restart backup exactly matches
+B's pre-close records/history. This does not claim a fresh post-restart archive
+from B, every copy-compatible format, offline startup or aggregate team adoption.
 
 Browser cache, profiles, downloads, screenshots, optional traces, environment/build identity
 and HTML/JSON reports stay under ignored `.artifacts/e2e/`. Each execution has a
