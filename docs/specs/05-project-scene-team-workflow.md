@@ -1076,6 +1076,18 @@ must not descend into unrelated directory branches for a scoped query. Each call
 still observes current entries and propagates errors from the relevant subtree;
 this optimization neither caches directory contents nor changes stored paths.
 
+Bounded file-recovery presentation: the product composition's file-interaction
+acknowledgment represents its own in-flight or retained editor command. A global
+receive-job failure does not become a failed editor command that blocks the same
+job's reselection/retry. Existing dirty/composition/readonly checks and the Host,
+Session, exact-input and journal authorities remain binding. Report a rejected
+original-file reselection in plain language with the next action; retain the job
+and selected input until the user reselects or clears it. A narrow read-only import
+of the existing typed metadata error may classify that message; it creates no new
+storage or recovery authority. While a receive job is unresolved, hide completed
+receive-history retry controls; retain the unresolved job's existing recovery and
+cancel actions. Completed display-retry behavior without an unresolved job remains.
+
 ## 11. UI contract
 
 The Desktop workspace retains four tabs: `キャプション`, `モデル`,

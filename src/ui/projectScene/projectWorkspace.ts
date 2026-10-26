@@ -390,7 +390,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   }
   const interaction: WorkspaceFileInteraction = {
     get interactionPending() { return dirty(); },
-    get acknowledgment(): WorkspaceFileInteraction['acknowledgment'] { return { state: busy ? 'checking' : ports.status().kind === 'failed' ? 'failed' : 'idle' }; },
+    get acknowledgment(): WorkspaceFileInteraction['acknowledgment'] { return { state: busy ? 'checking' : pending ? 'failed' : 'idle' }; },
     refreshHistory() { if (!hasCaptionDraft(draft) && !draft?.composing) draft = null; render(); },
   };
   function guardInput(): boolean {

@@ -339,6 +339,118 @@ are unchanged. This unit closes one real browser workflow and its operation-
 blocking redraw defect. The next priority is the measured restored-Project delay,
 with separate iPhone/offline/adoption evidence still pending.
 
+### Completed checkpoint — receive recovery and continued initial-file workflows
+
+PO authorized this on 2026-10-26 from clean pushed 385c10c/g0-baseline, including
+self-evident next steps without micro-confirmation. Root is the only writer;
+bounded read-only agents review contracts, source, real packages and rendered UX.
+
+Outcome/plan: extend the existing two-profile model workflow with a real W1 receive
+interruption before native input.zip creation, wrong-file refusal, full shutdown,
+exact original-file reselection and the same job's completion without lost local
+text/images. Continue actual pin correction, second exchange, explicit concurrent
+body resolution, independent Scene inclusion/Caption keep-both, separate edits,
+return/replay and both cold UIs. Use the accepted next entry workflows for owned
+Native portable-v2, frozen-v1 GLB/PNG and LociMyu CSV through content confirmation,
+conversion/editing, actual checked save and full cold continuation. Reuse existing
+commands, fixtures/readers and UI; no new fault/test framework or input injection.
+
+Authority: 05 §§10–12.6, existing receive journals and accepted initial-conversion
+07/07b/07c subsets. No new schema/profile/recipe/dependency, ordinary-home activation,
+SW/PWA/offline/device/adoption or release/deploy. Keep source ZIPs/private explanations
+out of ordinary output. Before production changes, the bounded file-interaction
+owner/presentation contract was recorded in 05; existing typed error import is an
+exact sceneCore allowlist addition. Genuine new policy/spec/managed authority stops
+only affected work. This closes connected validation paths, not full TEAM/S3.
+
+Observed fixes (3 production files):
+- File-interaction ack mirrored global receive failure and blocked its own warm
+  reselection. Scope ack to the editor's busy/retained command; preserve dirty/IME,
+  read-only, global mutation/output, Host/Session/exact-input/journal protection.
+- Wrong original-file selection exposed an internal metadata code. Classify only
+  existing Workspace/Contribution reselection errors into actionable Japanese;
+  retain selected input/job so the user can choose the right file.
+- Completed W0 history added another resume control beside pending W1. Hide
+  completed-history retry while a receive is unresolved; retain current recovery,
+  cancellation and completed-only display retry. Require one current resume action.
+- Validation label/form display:grid overrode UA hidden, exposing unneeded relation
+  and creation controls. One validation-host-only hidden rule restores the existing
+  conditional UI; converter logic/permissions and ordinary roots are unchanged.
+
+Executed focused evidence: new mounted-product test RED at warm reselect after
+correcting an initial fixture Caption-selection mistake; then17selected cases PASS.
+Exact sceneCore12PASS, editor retained-failure/IME2PASS, warm+existing display-retry
+2PASS. Typechecks pass. Independent final source/test/format/scope reviews find no
+remaining issue; review corrected two pre-run test assumptions (journal staging.json,
+Native unplaced/cancel behavior) before execution. No relaxed waits/assertions/retries.
+
+Final browser run1792982586942-48844:4PASS/8.7m, retry0, no page exceptions.
+Dedicated Chromium156.0.8078.4/Node24.12.0/win32/headless, traceoff+timings. Three
+initial entries PASS/25.0,24.5,23.0s; model/receive chain PASS/7.3m. Build/environment
+hashes and exact selected-file UI acknowledgments remain attached in ignored report.
+Original single-user/two-round/model-copy cases retain their earlier-build scope.
+
+Independent actual evidence:
+- W1 receive binding matches the9,306byte archive and resumed full input bytes;
+  one job retains exact prepared/input receipts, then start/staging/publication
+  and workspacePublished/baseRecorded references. Warm wrong-file and cold receipt
+  comparisons are executed assertions; saved JSON has pending/resumed snapshots.
+- Same-Project concurrent body branches have one common predecessor and explicit
+  manual causal resolution. Selected original membership stays active, other
+  observed membership is tombstoned, original Scene edges unchanged, copy only in
+  Scene2. Subsequent original/copy bodies/attachments remain independent.
+- A-post-cold and B-pre-close decoded records/identity/heads and20raw original
+  changes match, with original4model/image blobs. Their metadata.am containers
+  legitimately differ (5,618/5,616bytes); each manifest binds its own correct hash.
+  Do not claim whole metadata containers/ZIP/base tables equal or B-post-cold archive.
+- Initial entry backups retain exact converted records/raw changes/heads/identity
+  after cold, and only original GLB/PNG blobs. Native retains2Assets/2Scenes/2Caption/
+  2media identities/2attachments; frozen retains1Asset/2Scenes/3Caption/2media/
+  3attachments including duplicate resource attachment and owner-aware unplaced;
+  Loci CSV retains1Asset/1Scene/2Caption/1media/2attachments and unplaced owner.
+  Input ZIPs/private explanations are absent from ordinary output. Cancellation
+  here is UI evidence; no-write is the existing Node evidence, not a browser claim.
+- Actual screenshots close readable source/recovery choices, hidden conditions,
+  independent record names/body and decoded images. Exact owners/coordinates/raw
+  bytes come from DOM/archive assertions. Offline/phone/all formats/Native appearance
+  recipes/Loci XLSX and auxiliary tables are outside these three browser subsets.
+
+Retained failed browser runs:1792980755518-39156 shows duplicate resume controls;
+1792982321104-60828 has Native/frozen PASS and Loci hidden-CSS failure. Earlier
+1792981326741-50908 integrated chain PASS precedes the final shared CSS, and
+1792981953433-23696 first Native PASS precedes shared-case generalization. All
+artifacts remain under ignored .artifacts/e2e/runs. Changes/tests were grouped at
+this file-entry milestone before the final serial checkpoint, not per helper.
+
+First full checkpoint fails one existing material integration assertion:
+115files/2,725PASS/1FAIL/21TODO. Its provider lifecycle wait can finish after
+publication but before the existing UI acknowledgment refreshes displayed material.
+The case already captures mountedWork and awaits it for preceding commands; use
+the same owner for duplicate resolution too, retaining lifecycle and exact-material
+assertions. No production material change, retry, timeout increase or relaxed check.
+Retain the first failed log. The focused material case PASS/12.61s; independent
+source review confirms provider publication precedes asynchronous Project/UI update,
+and the failing fallback is the preceding display. Awaiting existing mountedWork
+strengthens the completion boundary. Update only that tested source/test Git blob;
+application code and the four passed browser paths are unchanged. Final serial rerun PASS: typecheck;116files/2,726PASS/21existing TODO; normal,
+harness and validation builds. Vitest716.15s; builds3.27/3.23/5.78s. Output at
+.artifacts/e2e/checkpoint-receive-initial-rerun.log. Existing bundle-size warnings
+remain diagnostic output, not an adoption or capacity result.
+First raw output:
+.artifacts/e2e/checkpoint-receive-initial-final.log. Source/test tree is frozen at
+8files (3production+5test); all8staged Git blobs match the tested/reviewed content.
+Independent source/test/package/rendered/doc/outgoing-scope reviews are closed.
+The13-file authorized g0 development checkpoint excludes private artifacts, public
+samples, dependencies and release paths; Git owns commit/push identity. Finish
+branch/remote/index/clean checks without repeating runtime tests for result prose.
+
+Next engineering outcome after this checkpoint: assess the remaining ordinary-entry
+integration and grouped device/offline acceptance against accepted gates, using
+these complete Desktop file workflows. No automatic adoption, activation or new
+compatibility recipe follows from browser passes. Source format/profile extensions
+need their exact accepted contracts; preserve the practical-team scope and friendly
+intent-based controls rather than expanding another fixture/fault matrix.
+
 ### Completed checkpoint — independent keep-both editing, return and resume
 
 PO authorized this connected workflow on2026-10-26 with simple friendly daily use,

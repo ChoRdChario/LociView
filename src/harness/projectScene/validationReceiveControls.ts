@@ -1,3 +1,4 @@
+import { MetadataSourceError } from '../../projectMetadata/format';
 import type { createValidationModeHost } from './validationModeHost';
 import type { WorkspaceFileInteraction } from '../../ui/projectScene/projectWorkspacePorts';
 import { createValidationOutputControls } from './validationOutputControls';
@@ -41,7 +42,10 @@ export function createValidationReceiveControls(document: Document, host: Return
         await action(); if (disposed) return;
         session()?.refreshHistory(); await recovered();
         input.value = ''; selectedJob = null; selectedCopy = null; cancel = null; feedback = completed;
-      } catch (error) { if (!disposed) feedback = error instanceof Error ? error.message : '受信できません。元のデータは保持しています。'; }
+      } catch (error) { if (!disposed) feedback = error instanceof MetadataSourceError &&
+        ['receive-reselected-file', 'contribution-reselected-file'].includes(error.code) ?
+        '中断前と異なるファイルです。読み込みを始めた元のファイルを選び直してください。' :
+        error instanceof Error ? error.message : '受信できません。元のデータは保持しています。'; }
       finally { busy = false; if (!disposed) { render(); changed(); } }
     })();
   };
@@ -90,8 +94,9 @@ export function createValidationReceiveControls(document: Document, host: Return
       });
       if (['input-required', 'unbound-input'].includes(copy.state)) button(row, 'コピー作成を取りやめる', () => { cancel = { id: copy.id, stale: false, review: true }; render(); changed(); });
     }
+    const pendingReceive = host.workspaceFiles.jobs.some(job => !['abandoned', 'cancelled', 'completed'].includes(job.state));
     for (const job of host.workspaceFiles.jobs) {
-      if (['abandoned', 'cancelled'].includes(job.state) || job.state === 'completed' && !host.workspaceFiles.error) continue;
+      if (['abandoned', 'cancelled'].includes(job.state) || job.state === 'completed' && (!host.workspaceFiles.error || pendingReceive)) continue;
       const row = document.createElement('section'), note = document.createElement('p');
       note.textContent = job.state === 'input-required' ? 'ファイルの読み込みが中断しました。元のファイルを選び直してください。' :
         job.state === 'unbound-input' ? '元のファイルを確認できません。この受信を取りやめ、新しく選択してください。' :

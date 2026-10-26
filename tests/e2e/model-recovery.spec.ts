@@ -13,6 +13,8 @@ import { triangleGlb, smallPng } from './fixtures';
 
 const entry = `http://127.0.0.1:4182/dev.html?editor=project${process.env.LOCIVIEW_E2E_TIMINGS === '1' ? '&timings=1' : ''}`;
 const title = 'モデルを引き継ぐプロジェクト', captionTitle = '位置を見直す記録', localBody = 'Bの現地で追記した本文';
+const mergedBody = `${localBody}。Aの復旧後の追記。Bの二巡目の追記`, finalBody = `${mergedBody}。元の記録に追記`;
+const originalTitle = '位置を見直した元の記録', copyTitle = '別々に残した記録', copyBody = 'Bが独立した記録に追記した本文', copyAlt = '独立した記録の画像説明';
 const fileTimeout = 180_000, actionTimeout = 90_000;
 const sha = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex');
 const blob = async (path: string) => new Blob([new Uint8Array(await readFile(path)).buffer]);
@@ -22,9 +24,9 @@ const models = (page: Page) => page.getByRole('tabpanel', { name: 'モデル', e
 const pinArea = (page: Page) => page.getByRole('region', { name: 'ピンの操作', exact: true });
 const marker = (page: Page) => page.locator('.lv-project-marker');
 
-async function chooseCaption(page: Page) {
+async function chooseCaption(page: Page, name = captionTitle) {
   await page.getByRole('tab', { name: 'キャプション', exact: true }).click();
-  await page.getByRole('list', { name: 'キャプション一覧', exact: true }).locator('.lv-caption-select').filter({ hasText: captionTitle }).click();
+  await page.getByRole('list', { name: 'キャプション一覧', exact: true }).locator('.lv-caption-select').filter({ hasText: name }).click();
 }
 async function edit(page: Page, body: string) {
   await detail(page).getByLabel('本文', { exact: true }).fill(body);
@@ -71,7 +73,7 @@ async function inspect(path: string) {
   return { backup, records: inspected.unambiguousRecords as Record<string, any>, history: originals(backup.source) };
 }
 
-test('差し替え公開の中断を復旧し、相手の記録と要確認ピンを保持して面を選び直せる', async ({}, info) => {
+test('差し替えと受信の中断を元のファイルから復旧し、手元の記録・ピンを保って二巡目も返せる', async ({}, info) => {
   test.setTimeout(900_000); Automerge.getHeads(Automerge.init());
   const root = info.outputPath('profiles'); await mkdir(root, { recursive: true });
   const profiles = { A: await mkdtemp(join(root, 'model-A-')), B: await mkdtemp(join(root, 'model-B-')) };
@@ -111,6 +113,7 @@ test('差し替え公開の中断を復旧し、相手の記録と要確認ピ�
     await info.attach('実行環境', { body: JSON.stringify({ browser: contexts.get('A')!.browser()!.version(), node: process.version,
       platform: process.platform, tracing, headless: true, route: entry, independentProfiles: profiles.A !== profiles.B,
       assets: await Promise.all((await readdir('validation-dist/assets')).map(async name => ({ name, sha256: sha(await readFile(join('validation-dist/assets', name))) }))) }), contentType: 'application/json' });
+    let initialWorkspacePath = '', primaryScene = '';
     let base!: Awaited<ReturnType<typeof WorkspaceArchive.inspect>>, initialRecords!: Record<string, any>, originalColor = '';
     await step('配置済みモデルを二つのシーンで共有し、Bが作業一式を開く', async () => {
       await a.getByLabel('ファイルを選択', { exact: true }).setInputFiles({ name: 'original.glb', mimeType: 'model/gltf-binary', buffer: oldGlb });
@@ -127,10 +130,10 @@ test('差し替え公開の中断を復旧し、相手の記録と要確認ピ�
       await models(a).getByLabel('モデル位置 X', { exact: true }).fill('1.25'); await models(a).getByLabel('モデル倍率', { exact: true }).fill('1.5');
       await models(a).getByRole('button', { name: '配置を確定', exact: true }).click(); await expect(a.getByText('モデルの配置を確定しました。', { exact: true })).toBeVisible({ timeout: actionTimeout });
       await a.getByRole('tab', { name: 'キャプション', exact: true }).click();
-      const scenes = a.getByRole('region', { name: 'シーン', exact: true }), first = (await scenes.locator('button[aria-pressed="true"]').textContent())!;
+      const scenes = a.getByRole('region', { name: 'シーン', exact: true }), first = (await scenes.locator('button[aria-pressed="true"]').textContent())!; primaryScene = first;
       await a.getByLabel('シーン名', { exact: true }).fill('共有した別シーン'); await a.getByRole('button', { name: 'シーンを追加', exact: true }).click();
       await expect(a.getByText('シーンを追加しました。', { exact: true })).toBeVisible({ timeout: actionTimeout }); await scenes.getByRole('button', { name: first, exact: true }).click(); await chooseCaption(a);
-      const path = await download(a, info, 'W0-差し替え前', 'teamWorkspace'); base = await WorkspaceArchive.inspect(await blob(path), validationMetadataLimits);
+      const path = await download(a, info, 'W0-差し替え前', 'teamWorkspace'); initialWorkspacePath = path; base = await WorkspaceArchive.inspect(await blob(path), validationMetadataLimits);
       const inspected = await inspectProjectCandidates(base.source.read(), validationMetadataLimits); if (inspected.kind !== 'project-candidate-inspection') throw Error('initial metadata'); initialRecords = inspected.unambiguousRecords;
       await b.getByLabel('ファイルを選択', { exact: true }).setInputFiles(path); await b.getByRole('button', { name: 'ファイルを開く', exact: true }).click();
       await expect(b.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText(title, { timeout: actionTimeout }); await chooseCaption(b); await edit(b, localBody); await image(b, 'Bの追加画像.png', localPng);
@@ -215,9 +218,93 @@ test('差し替え公開の中断を復旧し、相手の記録と要確認ピ�
       expect(recovered.records.representationsById[revision.representationIds[0]].blob.digest).toBe(sha(newGlb));
       expect(Object.keys(recovered.records.scenesById)).toHaveLength(2);
     });
+    const contributionBytes: string[][] = [];
+    const checkContribution = async (path: string) => {
+      const archive = await PackageArchive.inspect(await blob(path)), manifest = archive.control.manifest;
+      if (manifest.purpose !== 'contribution') throw Error('reply purpose');
+      expect(manifest.identity).toEqual(base.source.proof.identity); expect(manifest.base.heads).toEqual(base.source.heads);
+      expect(manifest.base.workspacePackageId).toBe(base.archive.control.manifest.packageId);
+      for (const part of manifest.changes) { const bytes = await archive.entryBytes(`changes/${String(part.ordinal).padStart(8, '0')}.amchange`, part.byteLength);
+        expect(sha(bytes)).toBe(part.bytesSha256); contributionBytes.push([sha(bytes), Buffer.from(bytes).toString('hex')]); }
+      return manifest;
+    };
+    let beforeReceive!: Awaited<ReturnType<typeof inspect>>;
+    await step('受信中断を元ファイルの再選択で復旧し、手元の本文と画像を保つ', async () => {
+      const update = await download(a, info, 'W1-差し替え済み', 'teamWorkspace'), updateBytes = await readFile(update);
+      const workspace = await WorkspaceArchive.inspect(await blob(update), validationMetadataLimits);
+      beforeReceive = await inspect(await download(b, info, 'B-受信前の手元作業', 'backup'));
+      // Test-only BEFORE native creation: retain closed input binding, with no input/start/journal.
+      await b.evaluate(() => {
+        const state = { armed: true, hits: 0, dir: null as FileSystemDirectoryHandle | null }; (window as any).__receiveInputFault = state;
+        const get = FileSystemDirectoryHandle.prototype.getFileHandle;
+        FileSystemDirectoryHandle.prototype.getFileHandle = async function(name, options) {
+          if (state.armed && name === 'input.zip' && options?.create === true) {
+            state.armed = false; state.hits++; state.dir = this; throw new DOMException('検証用の受信中断', 'AbortError');
+          }
+          return get.call(this, name, options);
+        };
+      });
+      let area = b.getByRole('region', { name: '更新ファイル', exact: true });
+      await area.getByLabel('更新ファイルを選択', { exact: true }).setInputFiles(update);
+      await area.getByRole('button', { name: '更新を受け取る', exact: true }).click();
+      await expect(area.getByRole('button', { name: '元のファイルを選び直す', exact: true })).toBeEnabled({ timeout: actionTimeout });
+      await expect(area.getByText('更新を受け取りました。', { exact: true })).toBeHidden();
+      await expect(detail(b).getByLabel('本文', { exact: true })).toHaveValue(localBody); await checkImages(b, 2);
+      const fault = await b.evaluate(async () => {
+        const state = (window as any).__receiveInputFault, path = await (await navigator.storage.getDirectory()).resolve(state.dir);
+        if (!path) throw Error('receive directory outside OPFS'); return { path, hits: state.hits };
+      });
+      expect(fault.hits).toBe(1); expect(fault.path.slice(-4, -1)).toEqual(['v2', 'packages', 'receive']);
+      const jobId = fault.path.at(-1)!;
+      const snapshot = (page: Page) => page.evaluate(async path => {
+        const root = await navigator.storage.getDirectory();
+        const directory = async (parts: string[]) => { let dir = root; try { for (const part of parts) dir = await dir.getDirectoryHandle(part); return dir; }
+          catch (error) { if ((error as DOMException).name === 'NotFoundError') return null; throw error; } };
+        const dir = (await directory(path))!;
+        const file = async (parent: FileSystemDirectoryHandle | null, name: string) => { if (!parent) return null; try { return await (await parent.getFileHandle(name)).getFile(); }
+          catch (error) { if ((error as DOMException).name === 'NotFoundError') return null; throw error; } };
+        const text = async (parent: FileSystemDirectoryHandle | null, name: string) => (await file(parent, name))?.text() ?? null;
+        const entries = async (parent: FileSystemDirectoryHandle | null) => { const result: string[] = []; if (parent) for await (const [name] of (parent as any).entries()) result.push(name); return result.sort(); };
+        const journal = await directory([...path.slice(0, -4), 'v2', 'metadata', 'journal', path.at(-1)!]), input = await file(dir, 'input.zip');
+        const stepDir = await directory([...path, 'steps']), steps = [];
+        for (const name of await entries(stepDir)) steps.push(JSON.parse((await text(stepDir, name))!));
+        return { prepared: await text(dir, 'prepared.json'), binding: await text(dir, 'input.json'), start: await text(dir, 'start.json'),
+          inputHex: input ? Array.from(new Uint8Array(await input.arrayBuffer()), n => n.toString(16).padStart(2, '0')).join('') : null,
+          steps, journalStart: await text(journal, 'staging.json'), publication: await text(journal, 'published.json'),
+          jobIds: await entries(await directory(path.slice(0, -1))) };
+      }, fault.path);
+      const pending = await snapshot(b), prepared = JSON.parse(pending.prepared!), binding = JSON.parse(pending.binding!);
+      expect(prepared.packageId).toBe(workspace.archive.control.manifest.packageId);
+      expect(binding).toMatchObject({ jobId, archive: { sha256: sha(updateBytes), byteLength: updateBytes.length } });
+      expect(pending).toMatchObject({ start: null, inputHex: null, steps: [], journalStart: null, publication: null });
+      // Warm refusal must reach exact-input validation, not be blocked by its own receive failure.
+      const picker = b.waitForEvent('filechooser'); await area.getByRole('button', { name: '元のファイルを選び直す', exact: true }).click();
+      await (await picker).setFiles(initialWorkspacePath); await expect(area.getByRole('button', { name: '受信を再開', exact: true })).toHaveCount(1); await area.locator('form').getByRole('button', { name: '受信を再開', exact: true }).click();
+      await expect(area.getByText('中断前と異なるファイルです。読み込みを始めた元のファイルを選び直してください。', { exact: true })).toBeVisible({ timeout: actionTimeout });
+      await expect(area.getByRole('button', { name: '受信を再開', exact: true })).toBeEnabled(); expect(await snapshot(b)).toEqual(pending);
+      await area.scrollIntoViewIfNeeded(); await b.screenshot({ path: info.outputPath('別のファイルを拒否して受信を保持.png'), fullPage: true });
+      await close('B'); b = await launch('B');
+      const incomplete = b.locator('p').filter({ hasText: title }).filter({ hasText: '更新が未完了' }); await expect(incomplete).toBeVisible({ timeout: actionTimeout });
+      await incomplete.getByRole('button', { name: '編集で開く', exact: true }).click(); area = b.getByRole('region', { name: '更新ファイル', exact: true });
+      await expect(area.getByRole('button', { name: '元のファイルを選び直す', exact: true })).toBeEnabled({ timeout: actionTimeout });
+      await expect(b.getByRole('button', { name: '更新を再試行', exact: true })).toBeHidden(); expect(await snapshot(b)).toEqual(pending);
+      await area.scrollIntoViewIfNeeded(); await b.screenshot({ path: info.outputPath('再起動後に元ファイルで受信を再開.png'), fullPage: true });
+      const correct = b.waitForEvent('filechooser'); await area.getByRole('button', { name: '元のファイルを選び直す', exact: true }).click();
+      await (await correct).setFiles(update); await expect(area.getByRole('button', { name: '受信を再開', exact: true })).toHaveCount(1); await area.locator('form').getByRole('button', { name: '受信を再開', exact: true }).click();
+      await expect(area.getByText('更新を受け取りました。', { exact: true })).toBeVisible({ timeout: actionTimeout });
+      const resumed = await snapshot(b); expect(resumed.prepared).toBe(pending.prepared); expect(resumed.binding).toBe(pending.binding);
+      expect(resumed.jobIds).toEqual(pending.jobIds); expect(Buffer.from(resumed.inputHex!, 'hex')).toEqual(updateBytes);
+      expect(JSON.parse(resumed.start!)).toMatchObject({ jobId, operation: 'receiveWorkspace' });
+      expect(JSON.parse(resumed.journalStart!)).toMatchObject({ transactionId: jobId, purpose: 'remotePackageMerge', baseHeads: beforeReceive.backup.source.heads });
+      expect(JSON.parse(resumed.publication!)).toMatchObject({ transactionId: jobId });
+      expect(resumed.steps.map(step => step.detail.kind).sort()).toEqual(['baseRecorded', 'workspacePublished']);
+      evidence.receiveInterruption = { fault, pending, resumed };
+      await chooseCaption(b); await expect(detail(b).getByLabel('本文', { exact: true })).toHaveValue(localBody); await checkImages(b, 2);
+      await expect(marker(b)).toHaveAttribute('data-review', 'true');
+    });
     let final!: Awaited<ReturnType<typeof inspect>>;
     await step('Bの本文と画像を保ち、要確認を面選択で補正してAに返す', async () => {
-      const update = await download(a, info, 'W1-差し替え済み', 'teamWorkspace'); await receive(b, update); await chooseCaption(b);
+      await chooseCaption(b);
       await expect(detail(b).getByLabel('本文', { exact: true })).toHaveValue(localBody); await checkImages(b, 2);
       await expect(marker(b)).toHaveAttribute('data-review', 'true'); await expect(marker(b)).toHaveAttribute('aria-description', '要確認');
       expect(await marker(b).evaluate(node => getComputedStyle(node).backgroundColor)).toBe(originalColor);
@@ -238,9 +325,7 @@ test('差し替え公開の中断を復旧し、相手の記録と要確認ピ�
       await pinArea(b).getByRole('button', { name: '位置を確定', exact: true }).click(); await expect(b.getByText('ピンの位置を確定しました。', { exact: true })).toBeVisible({ timeout: actionTimeout });
       await expect(marker(b)).toHaveAttribute('data-review', 'false'); await checkImages(b, 2);
       const reply = await download(b, info, 'B-ピンを補正した変更分', 'contribution', base.archive.control.manifest.packageId);
-      const returned = await PackageArchive.inspect(await blob(reply)), manifest = returned.control.manifest; if (manifest.purpose !== 'contribution') throw Error('reply purpose');
-      expect(manifest.identity).toEqual(base.source.proof.identity); expect(manifest.base.heads).toEqual(base.source.heads);
-      expect(manifest.base.workspacePackageId).toBe(base.archive.control.manifest.packageId);
+      await checkContribution(reply);
       await receive(a, reply); await receive(a, reply); await chooseCaption(a); await expect(marker(a)).toHaveAttribute('data-review', 'false');
       await expect(detail(a).getByLabel('本文', { exact: true })).toHaveValue(localBody); await checkImages(a, 2);
       final = await inspect(await download(b, info, 'B-補正完了', 'backup'));
@@ -249,14 +334,66 @@ test('差し替え公開の中断を復旧し、相手の記録と要確認ピ�
       const asset = Object.values(final.records.assetsById)[0] as any, binding = final.records.assetBindingsById[asset.status.activeBindingId];
       expect(caption.anchor.authoredAssetRevisionId).toBe(binding.assetRevisionId); expect(caption.body).toBe(localBody);
       expect(final.history).toEqual(expect.arrayContaining(recovered.history));
+      expect(final.history).toEqual(expect.arrayContaining(beforeReceive.history));
       for (const input of [oldGlb, newGlb, png, localPng]) expect(Buffer.from(await final.backup.archive.entryBytes(`blobs/sha256/${sha(input)}`, input.length))).toEqual(input);
       evidence.final = { records: final.records, history: final.history, heads: final.backup.source.heads };
+    });
+    await step('同じProjectの本文競合を解消し、両方残した独立記録を編集して二巡目を返す', async () => {
+      const previous = final, originalId = Object.keys(previous.records.captionsById)[0]!;
+      const secondScene = '共有した別シーン', aBody = `${localBody}。Aの復旧後の追記`, bBody = `${localBody}。Bの二巡目の追記`;
+      await chooseCaption(a); await edit(a, aBody); await chooseCaption(b); await edit(b, bBody);
+      for (const page of [a, b]) {
+        const scenes = page.getByRole('region', { name: 'シーン', exact: true }); await scenes.getByRole('button', { name: secondScene, exact: true }).click();
+        const include = page.locator('details.lv-caption-include'); await include.getByText('キャプションの追加・除外', { exact: true }).click();
+        await include.getByLabel('キャプション', { exact: true }).selectOption(originalId); await include.getByRole('button', { name: 'このシーンに追加', exact: true }).click();
+        await expect(page.getByText('このシーンに追加しました。', { exact: true })).toBeVisible({ timeout: actionTimeout });
+        await scenes.getByRole('button', { name: primaryScene, exact: true }).click();
+      }
+      const outward = await download(a, info, 'A-二巡目の変更分', 'contribution', base.archive.control.manifest.packageId); await checkContribution(outward); await receive(b, outward);
+      const recovery = b.getByRole('region', { name: '記録の競合', exact: true });
+      const body = recovery.getByRole('listitem', { name: `${captionTitle}：本文`, exact: true });
+      await expect(body).toContainText(aBody); await expect(body).toContainText(bBody); await expect(body.getByRole('combobox')).toHaveValue('');
+      await body.getByRole('combobox').selectOption('manual'); await body.getByRole('textbox').fill(mergedBody);
+      await body.getByRole('button', { name: '競合を解消', exact: true }).click(); await expect(body).toBeHidden({ timeout: actionTimeout });
+      const duplicate = recovery.getByRole('listitem', { name: `${secondScene}：${captionTitle}の重複登録`, exact: true });
+      await expect(duplicate).toContainText(primaryScene); await expect(duplicate.getByRole('combobox').first()).toHaveValue('');
+      const choices = await duplicate.getByRole('combobox').first().locator('option').evaluateAll(nodes => nodes.map(n => (n as HTMLOptionElement).value).filter(Boolean)); expect(choices).toHaveLength(2);
+      await duplicate.getByRole('combobox').first().selectOption(choices[0]!); await duplicate.getByRole('combobox').nth(1).selectOption('both');
+      await duplicate.scrollIntoViewIfNeeded(); await b.screenshot({ path: info.outputPath('復旧後も同じProjectで両方残す.png'), fullPage: true });
+      await duplicate.getByRole('button', { name: '競合を解消', exact: true }).click(); await expect(duplicate).toBeHidden({ timeout: actionTimeout });
+      // Original is unambiguous in its first Scene; its new name then distinguishes the copy.
+      await chooseCaption(b); await detail(b).getByLabel('タイトル', { exact: true }).fill(originalTitle); await edit(b, finalBody);
+      await b.getByRole('region', { name: 'シーン', exact: true }).getByRole('button', { name: secondScene, exact: true }).click();
+      await chooseCaption(b); await detail(b).getByLabel('タイトル', { exact: true }).fill(copyTitle); await edit(b, copyBody); await checkImages(b, 2);
+      const gallery = b.getByRole('region', { name: '画像の整理', exact: true }); await gallery.getByRole('button', { name: '説明を編集', exact: true }).first().click();
+      await gallery.getByLabel('メディアの説明', { exact: true }).fill(copyAlt); await gallery.getByRole('button', { name: '説明を適用', exact: true }).click();
+      await expect(b.getByText('メディアの説明を適用しました。', { exact: true })).toBeVisible({ timeout: actionTimeout });
+      const reply = await download(b, info, 'B-二巡目の返送', 'contribution', base.archive.control.manifest.packageId); await checkContribution(reply);
+      await receive(a, reply); await receive(a, reply); await chooseCaption(a, originalTitle); await expect(detail(a).getByLabel('本文', { exact: true })).toHaveValue(finalBody);
+      final = await inspect(await download(b, info, 'B-二巡目完了', 'backup'));
+      expect(Object.keys(final.records.captionsById)).toHaveLength(2); const copyId = Object.keys(final.records.captionsById).find(id => id !== originalId)!;
+      expect(final.records.captionsById[originalId]).toEqual({ ...previous.records.captionsById[originalId], title: originalTitle, body: finalBody });
+      expect(final.records.captionsById[copyId]).toMatchObject({ title: copyTitle, body: copyBody, anchor: previous.records.captionsById[originalId].anchor, lifecycle: { state: 'active' } });
+      for (const map of ['assetsById', 'assetBindingsById', 'assetRevisionsById', 'representationsById', 'mediaResourcesById', 'sceneAssetMembershipsById']) expect(final.records[map]).toEqual(previous.records[map]);
+      for (const [id, attachment] of Object.entries(previous.records.captionAttachmentsById)) expect(final.records.captionAttachmentsById[id]).toEqual(attachment);
+      const copies = (Object.values(final.records.captionAttachmentsById) as any[]).filter(row => row.captionId === copyId); expect(copies).toHaveLength(2); expect(copies.some(row => row.altText === copyAlt)).toBe(true);
+      for (const row of copies) expect(Object.values(previous.records.captionAttachmentsById).some((original: any) => original.id !== row.id && original.mediaResourceId === row.mediaResourceId)).toBe(true);
+      const firstId = Object.keys(previous.records.scenesById).find(id => previous.records.scenesById[id].name === primaryScene)!;
+      for (const [id, edge] of Object.entries(previous.records.sceneCaptionMembershipsById) as [string, any][]) if (edge.sceneId === firstId) expect(final.records.sceneCaptionMembershipsById[id]).toEqual(edge);
+      expect(final.history).toEqual(expect.arrayContaining(previous.history)); expect(final.history).toEqual(expect.arrayContaining(contributionBytes));
+      evidence.secondRound = { records: final.records, history: final.history, heads: final.backup.source.heads, contributionBytes, copyId, originalId, choices, continuingOriginal: choices[0] };
     });
     await step('両ブラウザの再開と実バックアップが補正済みモデルと記録を保持する', async () => {
       await close('A'); await close('B'); a = await launch('A'); b = await launch('B');
       for (const [who, page] of [['A', a], ['B', b]] as const) {
-        await expect(page.getByText(`最後のプロジェクトを再開しました：${title}`, { exact: true })).toBeVisible({ timeout: actionTimeout }); await chooseCaption(page);
-        await expect(marker(page)).toHaveAttribute('data-review', 'false'); await expect(detail(page).getByLabel('本文', { exact: true })).toHaveValue(localBody); await checkImages(page, 2);
+        await expect(page.getByText(`最後のプロジェクトを再開しました：${title}`, { exact: true })).toBeVisible({ timeout: actionTimeout }); await chooseCaption(page, originalTitle);
+        await expect(marker(page)).toHaveAttribute('data-review', 'false'); await expect(detail(page).getByLabel('本文', { exact: true })).toHaveValue(finalBody); await checkImages(page, 2);
+        await page.getByRole('region', { name: 'シーン', exact: true }).getByRole('button', { name: '共有した別シーン', exact: true }).click();
+        await expect(page.getByRole('list', { name: 'キャプション一覧', exact: true }).locator('.lv-caption-select')).toHaveCount(2); await chooseCaption(page, copyTitle);
+        await expect(detail(page).getByLabel('本文', { exact: true })).toHaveValue(copyBody); await checkImages(page, 2);
+        await expect(page.getByRole('region', { name: '画像の整理', exact: true })).toContainText(copyAlt);
+        await expect(marker(page)).toHaveCount(2); for (const pin of await marker(page).all()) await expect(pin).toHaveAttribute('data-review', 'false');
+        await expect(page.getByRole('region', { name: '記録の競合', exact: true })).toBeHidden();
         await expect(page.locator('.lv-project-viewport-status')).toBeEmpty(); await page.screenshot({ path: info.outputPath(`${who}-補正後の再開.png`), fullPage: true });
       }
       const cold = await inspect(await download(a, info, 'A-再起動後の保存', 'backup'));

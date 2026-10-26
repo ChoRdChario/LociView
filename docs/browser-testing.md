@@ -95,6 +95,25 @@ Actual downloads are inspected with existing package readers. The single-user
 case separately covers selecting a downloaded backup for the UI's verified-save
 acknowledgment; do not transfer that UI acknowledgment to every model/team output.
 
+The same model chain also interrupts an actual received Workspace update before
+native creation of input.zip, after its closed input binding is durable. A wrong
+valid Workspace is rejected in the mounted editor without changing those receipts.
+After full shutdown, the catalog/edit entry exposes exact original-file reselection
+and receive resumption, with the same job/input bytes and the eventual journal
+publication. Existing local text and two images must survive. This is a received
+file interruption, separate from the local replacement-publication fault above;
+it is not OS-crash/power-loss evidence or every import interruption phase.
+
+Continue that same Project into a second exchange: independent body edits create
+a real field conflict, independent Scene inclusion creates duplicate Caption
+membership, and both require explicit choices. Preserve the original and a Scene-
+only copy; edit their names/bodies and the copy's attachment description separately,
+return actual Contribution bytes and replay them. Both cold UIs verify both Scenes,
+independent records/media and corrected pins. A's post-cold backup is compared with
+B's final pre-close records/history and original four model/image blobs. This
+connects bounded Desktop team operations in one chain; ordinary-entry, offline,
+physical-iPhone and aggregate TEAM-FLOW-01/S3 acceptance remain separate.
+
 The keep-both regression creates real duplicate model and Caption memberships
 through independent Scene inclusion in two profiles and actual Contribution
 reception. Existing confirmation forms name the affected Scene/resource, continuing
@@ -113,6 +132,25 @@ leave two independent records, without another copy. Both full browser restarts
 check UI/text/images and model placement; A's post-restart backup exactly matches
 B's pre-close records/history. This does not claim a fresh post-restart archive
 from B, every copy-compatible format, offline startup or aggregate team adoption.
+
+The shared initial-conversion case uses owned generated Native portable-v2,
+frozen-v1 JSONL and LociMyu CSV ZIPs, each with admitted static GLB/PNG bytes.
+It exercises content detection and confirmation/cancellation, then editing an
+existing Caption, actual image decode, named download, selected-file verification,
+full browser close/relaunch and a fresh backup. Format-specific Scene/resource/
+attachment counts, placed and unplaced model owners, original geometry/photo bytes
+and exact converted records/raw changes/heads/identity survive. Frozen duplicate image
+attachments remain separate, and LociMyu requires an explicit title/re-evaluation
+without an unrelated View/material relation decision. Scoped hidden semantics keep
+unneeded creation/confirmation controls out of the current decision.
+
+This is the recorded recipe/subset only, not every Native/v1/LociMyu format, later
+appearance recipe or LociMyu XLSX/auxiliary-table path. Original input ZIPs and
+private explanations are excluded from ordinary output; generated model/image
+bytes remain. Cancellation is observed UI behavior here; its no-write invariant
+has separate Node coverage. First output gets the actual UI verified-file
+acknowledgment; the post-cold output is archive-inspected. It is not offline/PWA,
+physical-device, ordinary-home or adoption evidence.
 
 Browser cache, profiles, downloads, screenshots, optional traces, environment/build identity
 and HTML/JSON reports stay under ignored `.artifacts/e2e/`. Each execution has a

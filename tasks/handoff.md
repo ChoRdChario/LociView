@@ -43,6 +43,14 @@ pin correction and injected publication failure followed by explicit cold retry.
 Keep incompatible pin correction behind a real surface selection and carry review
 status from the exact rendered display; ordinary compatible numeric moves remain.
 The test's injected failure is not power-loss or general storage adoption evidence.
+Its connected received-file lane retains exact input/job proof through warm wrong-
+file refusal, complete shutdown, original-file reselection and continued exchange.
+File-interaction acknowledgment belongs to the editor's own busy/retained command;
+keep global Host/Session/dirty/readonly protections, while allowing the receive
+owner to recover itself. Pending receive jobs hide completed-history retry controls
+so the current recovery stays clear; completed-only display recovery is retained.
+The same Project continues through real body conflict, Caption keep-both,
+independent later edits and second-round return. Exact outcomes remain in todo.
 The same dedicated lane creates genuine duplicate Scene registrations and confirms
 independent model/Caption copies through actual return/replay and both cold UIs.
 Keep original versus copy and other-Scene consequences in the existing forms;
@@ -52,7 +60,13 @@ user explicitly changes it. Exact package evidence and remaining acceptance live
 in todo; do not generalize this bounded copy case to all formats or offline.
 History preservation compares complete original hash/byte pairs, while wire and
 journal ordinals retain their own order. Normal E2E runs use light diagnostics;
-full traces are opt-in in the runbook. The separate Chrome-plugin
+full traces are opt-in in the runbook.
+The initial-conversion browser lane covers bounded Native portable-v2, frozen-v1
+GLB/PNG and LociMyu CSV into existing Caption edits, actual checked-save selection
+and cold continuation. Retain source-only private data and format-specific Scene,
+owner and attachment identities; do not generalize to every recipe or XLSX path.
+Validation-host hidden attributes override layout display rules so unrelated
+creation/relationship decisions stay hidden. The runbook and todo own exact scope. The separate Chrome-plugin
 bootstrap restriction remains unresolved. Physical-device/offline and ordinary-
 entry adoption retain their gates. Broader model/profile compatibility needs its
 concrete accepted contract; do not start another profile or recipe by default.

@@ -3588,6 +3588,32 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       proposePin: (...args: Parameters<NonNullable<Parameters<ViewportFactory>[2]>>) => proposePin?.(...args),
       proposeModel: (...args: Parameters<NonNullable<Parameters<ViewportFactory>[3]>>) => proposeModel?.(...args) };
   }
+  it('reselects the exact interrupted update from the mounted product without losing local work', async () => {
+    const h = await productWorkspaceFixture(true, false, false, 'map2', undefined, { initialWorkspace: true });
+    const { host, editor, root, all, button, named } = h, incoming = h.f.f.file!;
+    all(editor).find(n => n.className === 'lv-caption-select')!.fire('click');
+    const body = named('本文', editor); body.value = '手元だけの追記'; body.fire('input');
+    await h.edited(() => button('変更を適用', editor).fire('click'));
+    const before = host.read().source!, wrong = await host.workspaceOutput.download(await host.workspaceOutput.generate(before.token));
+    const input = named('更新ファイルを選択'); Object.assign(input, { files: [incoming], click: vi.fn() }); input.fire('change');
+    h.f.fs.reject = path => path.endsWith('/input.zip');
+    await h.failed(() => button('更新を受け取る').parent!.fire('submit', { preventDefault() {} }));
+    h.f.fs.reject = () => false;
+    const job = host.workspaceFiles.jobs.find(j => j.state === 'input-required')!;
+    expect(host.read().source!.token).toBe(before.token); expect(body.value).toBe('手元だけの追記');
+    button('元のファイルを選び直す').fire('click'); Object.assign(input, { files: [wrong] }); input.fire('change');
+    await h.completed(() => button('受信を再開').parent!.fire('submit', { preventDefault() {} }));
+    expect(all(root).some(n => n.textContent === '中断前と異なるファイルです。読み込みを始めた元のファイルを選び直してください。')).toBe(true);
+    expect(host.read().source!.token).toBe(before.token); expect(host.workspaceFiles.jobs.find(j => j.id === job.id)!.state).toBe('input-required');
+    expect((input as unknown as HTMLInputElement).files![0]).toBe(wrong);
+    Object.assign(input, { files: [incoming] }); input.fire('change');
+    await h.completed(() => button('受信を再開').parent!.fire('submit', { preventDefault() {} }));
+    expect(host.workspaceFiles.jobs.find(j => j.id === job.id)!.state).toBe('completed');
+    expect(host.read().source!.token).toBe(before.token);
+    expect(named('本文', editor).value).toBe('手元だけの追記'); expect(host.hasPending()).toBe(false);
+    expect(all(root).some(n => n.textContent === '更新を受け取りました。')).toBe(true);
+    await h.ui.dispose();
+  });
   it('retains exact display through same-input viewport notifications without losing camera and pin updates', async () => {
     const h = await productWorkspaceFixture(), initial = h.display();
     h.refresh(); h.refresh();
@@ -7137,7 +7163,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     // Duplicate still withholds the Scene override; Project fallback is not merged into it.
     expect(display!.savedMaterials![closure.binding.assetId]![slot.target.logicalMaterialSlotId]).toMatchObject({ appearance: { doubleSided: true } });
     const dupForm = tools.children.find(n => n.attributes.get('aria-label')?.endsWith('設定の重複'))!;
-    choose(named('残す設定', dupForm), id); button('選んだ設定を残す', dupForm).fire('click');
+    choose(named('残す設定', dupForm), id); await mountedWork.run(() => button('選んだ設定を残す', dupForm).fire('click'));
     await vi.waitFor(() => expect(p().details.mutable.materialOverridesById[duplicate]!.lifecycle).toMatchObject({ kind: 'value', value: { state: 'deleted', reason: 'conflictResolution' } }));
     expect(display!.savedMaterials![closure.binding.assetId]![slot.target.logicalMaterialSlotId]).toEqual({ appearance: chosenAppearance, compositing: inherit });
     expect(factory).toHaveBeenCalledOnce(); expect(recall).not.toHaveBeenCalled(); expect(display!.sceneId).toBe(sceneId);

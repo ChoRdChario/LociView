@@ -143,7 +143,20 @@ M08の限定product経路は、要確認ピンの補正で現在のモデル面�
 | S03 | 別タブから確認し、編集権を安全に扱う | 接続済み | readonly／refresh／lease handoffの限定接続。同時多人数編集・実機保証とは別。 | [src/harness/projectScene/metadataHost.ts](../src/harness/projectScene/metadataHost.ts) / [src/projectMetadata/persistence.ts](../src/projectMetadata/persistence.ts) |
 | S04 | オフラインで起動・作業・終了後に再開する | 別経路のみ | 旧Nativeの合格経路は新hostへ流用不可。普通の製品導線／offline保存基盤の接続と新実測が必要。SW変更は現在非対象。 | [tasks/uiux-handoff.md](../tasks/uiux-handoff.md) / [docs/specs/05-project-scene-team-workflow.md:1064](../docs/specs/05-project-scene-team-workflow.md) |
 
+[初回変換E2E](../tests/e2e/initial-conversion.spec.ts)は承認済みのNative portable-v2、
+frozen-v1 GLB/PNG、LociMyu CSVの限定入力を、内容確認／取消→変換→既存記録編集→
+実保存ファイルの照合→cold再開へ接続する。Scene・親あり／なし未配置・独立／重複添付と
+元GLB／PNG、変換後のrecord／履歴を保持。元ZIPや私的説明を通常出力へ含めず、
+Native全profile／後続材質recipe／XLSXや補助表全経路／実機／offlineの採用は含めない。
+実行結果はtodoが所有し、分類件数は変更しない。
+
 ### チーム
+
+既存[model-recovery E2E](../tests/e2e/model-recovery.spec.ts)は同じ2SceneのProjectで、
+モデル更新・pin補正に、受信入力の中断→誤ファイル拒否→cold後の正確な元ファイル再選択、
+本文競合の明示解消とCaption所属のkeep-both、原／コピーの独立編集・返送・二巡目再開を
+接続する。手元の本文／画像、同じjobと元bytes、Scene外参照を保持する限定Desktop経路。
+実行結果はtodoが所有し、ordinary entry／offline／実機／全TEAMの採用や分類件数は変えない。
 
 独立した専用Chromium 2 profileでのWorkspace更新・4つの実Contributionによる
 2往復・本文競合の明示解消・手元画像保持・再受信no-op・両者cold再開を、限定

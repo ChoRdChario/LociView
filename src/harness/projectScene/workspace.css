@@ -165,6 +165,7 @@
   .lv-media-viewer { width: calc(100vw - 12px); padding: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left)); }
 }
 .lv-validation-host { color: #312f2d; font: 14px/1.5 system-ui, sans-serif; }
+.lv-validation-host [hidden] { display: none !important; }
 .lv-validation-home { max-width: 948px; margin: 0 auto; padding: 24px; }
 .lv-validation-home h1 { font-size: 22px; font-weight: 500; }
 .lv-validation-home h2 { margin-top: 28px; font-size: 17px; font-weight: 500; }
