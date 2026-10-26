@@ -68,6 +68,12 @@ The words **MUST**, **MUST NOT**, **SHOULD**, and **MAY** are normative. A metri
 |---|---|
 | [`01b-gs-proxy-project-scene-proposal.md`](01b-gs-proxy-project-scene-proposal.md) | PROPOSED REQUIREMENTS / APPROVED LIMITED QUALIFICATION / NO PRODUCTION GS / NOT ADOPTED. GSL1.4.3/Three0.186 evaluation approved 2026-10-27; measured scope, context recreation and immutable0.180 profile stop in §7. The former CPU/SH3 draft is archived; 01a stays immutable. |
 
+### Proposed display compatibility companion
+
+| Document | Status / purpose |
+|---|---|
+| [`07j-three-186-compatibility-proposal.md`](07j-three-186-compatibility-proposal.md) | PROPOSED, not approved/implemented/adopted: exact0.180 proof/math/cleanup retained, neutral witness and sequentially checked0.186 display. One existing appearance conversion/edit/file/cold workflow; unchanged profiles/recipes/history. No new GS source or GS production permission. |
+
 ## Fixed versus conditional decisions
 
 Fixed unless a later accepted ADR supersedes the applicable part of ADR-0001 or

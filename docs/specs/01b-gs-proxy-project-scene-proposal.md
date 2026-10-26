@@ -194,3 +194,33 @@ camera-to-mean方向の一次式で独立確認して修正し、失敗を保持
 評価と既存製品を分け、影響する更新だけを止める。次はこの互換境界と、SH4/source・
 display derivativeの正確なprofile、context再作成を含むtyped adapter案を確定し、
 必要な互換性・production権限を独立レビューのうえ判断する。
+
+## 8. 次の実装順とGS接続の残り
+
+最初の接続単位は[07j互換性companion](07j-three-186-compatibility-proposal.md)の
+既存材質workflow。0.180の実検査・proofを保つ閉じた境界を作り、0.186表示で同じ
+変換・編集・file・cold再開を通す。07jは提案であり、今回のcontinuationだけで新依存や
+production互換adapterが承認されたとは扱わない。GSの未確定仕様をこの判断へ混ぜない。
+
+その境界の後に、GSを同じSession／provider／file ownerへ接続する。
+
+- sourceは完全なSH0〜4と有限support boundsの正確なprofile／goldenを確定する。
+  GSLの量子化・色・footprintは表示側の独立したqualified policyとし、sourceへ逆流させない。
+  archiveの未承認SH3 JSONやCPU presentation IDを流用・承認済みにしない。
+- owned検査／content factsとprepared sourceをprojectFiles側に置き、viewerは形式・ZIP・
+  storageを読まない。typed display descriptorがcanonical frame/boundsと現在の世代を渡し、
+  residentはGS資源のload/cancel/dispose/context再作成を所有する。
+- GSと明示同一AssetのProxyを別Representationとして扱う。新しい位置は通常gizmoで
+  調整・確定し、manual AssetFrame座標を保存する。source／draw／LOD indexをピンへ入れない。
+- Proxy attach/change/removeでは、GS classを保持するための正確なsurface-equivalence
+  factsも計画する。新Representationがないremoveでもfact-only planが必要となる。
+  現行modelFactsのintroduced.sizeだけで早期returnする実装をそのまま流用せず、既存receiptを
+  修理して通すこともない。provider tokenと同じ未変更GS identity/targetに閉じて検証する。
+- Workspace／Contribution／backup／review／cleanのclosure・受信・復旧・再開を一度の
+  connected file flowで確かめる。原本・係数・履歴と、表示用のLODは別に保持する。
+- 現行64MiB全体読込経路は、必要なら非既定の小型file接続checkpointに限定する。
+  大規模GSの完成とは呼ばず、stream/stage/増分hash・backpressure・CPU/GPU/targetの
+  各予算を実用経路として残す。SH4とpaged LODの両立も未解決のまま保持する。
+
+この順序は受入scopeの縮小ではなく、前回32件の不適合が示した互換性依存を先に閉じるため。
+新しいGSのexact profile／品質fallback／production接続は、証拠と具体案を揃えて別途判断する。

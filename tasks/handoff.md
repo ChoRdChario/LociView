@@ -22,6 +22,11 @@ measured scope and failures are in01b §7/todo. The existing occurrence GLB/JPEG
 profiles explicitly pin0.180.0, so product migration is held rather than silently
 reinterpreting immutable profiles. SH4 and paged-LOD paths remain separate.
 New profiles, production GS and adoption still need their actual authority/gates.
+The next concrete decision is [07j](../docs/specs/07j-three-186-compatibility-proposal.md):
+retain actual180 source math/proof/legacy keys and closed cleanup, then independently
+check186 display using neutral values after old resources are released. It is
+proposed, not implemented or dependency-authorized. Its unit is existing material
+conversion/open/edit/file/cold continuation; GS profile decisions stay subsequent.
 The superseded proposal/JSON remain in linked history, not an approval queue.
 
 Dedicated Chromium verifies only its recorded localhost/headless workflows. It
