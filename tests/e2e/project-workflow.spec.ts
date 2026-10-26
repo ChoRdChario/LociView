@@ -14,7 +14,11 @@ const body = '自動検証の本文\n画像と位置を保存します。';
 const tracing = process.env.LOCIVIEW_E2E_TRACE !== '0';
 const sha256 = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex');
 
+async function projectReady(page: Page) {
+  await expect(page.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText(projectName, { timeout: 90_000 });
+}
 async function selectCaption(page: Page) {
+  await projectReady(page);
   await page.getByRole('list', { name: 'キャプション一覧', exact: true })
     .locator('.lv-caption-select').filter({ hasText: captionName }).click();
 }
@@ -155,12 +159,16 @@ test('GLBと画像の編集を保存し、ブラウザ再起動と別端末相�
     await checkCaption(page);
     const backup = testInfo.outputPath('first-backup.zip'); await measure('最初の保存と実ファイル確認', () => saveBackup(page, backup, '最初の保存'));
     const first = await inspectBackup(backup, glb, png, body);
-    await page.reload(); await selectCaption(page); await checkCaption(page);
+    await measure('通常の再読込から編集画面の準備', async () => { await page.reload(); await projectReady(page); });
+    await selectCaption(page); await checkCaption(page);
     await expect(page.getByLabel('保存ファイルの状態', { exact: true })).toContainText('一致しています');
     await close();
 
-    page = await launch(profile); await page.goto(entry);
-    await expect(page.getByText(`最後のプロジェクトを再開しました：${projectName}`, { exact: true })).toBeVisible();
+    page = await measure('完全終了後の起動と再開', async () => {
+      const resumed = await launch(profile); await resumed.goto(entry);
+      await expect(resumed.getByText(`最後のプロジェクトを再開しました：${projectName}`, { exact: true })).toBeVisible({ timeout: 90_000 });
+      return resumed;
+    });
     await selectCaption(page); await checkCaption(page);
     await page.screenshot({ path: testInfo.outputPath('cold-resume.png'), fullPage: true });
     await close();
@@ -185,7 +193,8 @@ test('GLBと画像の編集を保存し、ブラウザ再起動と別端末相�
     const secondPath = testInfo.outputPath('restored-backup.zip'); await measure('復元後の保存と実ファイル確認', () => saveBackup(page, secondPath, '復元後の保存'));
     const second = await inspectBackup(secondPath, glb, png, continued);
     expect(second.identity).toEqual(first.identity);
-    await page.reload(); await selectCaption(page); await checkCaption(page, continued);
+    await measure('復元後の再読込から編集画面の準備', async () => { await page.reload(); await projectReady(page); });
+    await selectCaption(page); await checkCaption(page, continued);
     await page.screenshot({ path: testInfo.outputPath('restored-edit.png'), fullPage: true });
     await testInfo.attach('保存ファイル検査', { body: JSON.stringify({ first, second }, null, 2), contentType: 'application/json' });
     expect(errors, 'uncaught browser errors').toEqual([]);

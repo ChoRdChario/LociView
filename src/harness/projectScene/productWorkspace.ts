@@ -16,6 +16,7 @@ type Tools = ReturnType<typeof createValidationReceiveControls>;
 export function createProductWorkspace(document: Document, host: Host, factory: ViewportFactory, tools?: Tools, renderCandidate?: ModelCandidateRenderer,
   navigation?: { openProject(): void; resumedLastProject(): boolean; changed(): void; storageEstimate?(): Promise<Readonly<{ usage?: number; quota?: number }>> }) {
   const root = document.createElement('section'), mode = document.createElement('button'), status = document.createElement('p');
+  root.className = 'lv-project-shell';
   mode.type = 'button'; status.setAttribute('role', 'status');
   let disposed = false, switching = false, core: ReturnType<typeof createProjectWorkspace> | undefined;
   let viewportScene = '', refreshPreview: (() => void) | undefined, modeFeedback = '';

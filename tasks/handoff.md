@@ -71,6 +71,15 @@ bootstrap restriction remains unresolved. Physical-device/offline and ordinary-
 entry adoption retain their gates. Broader model/profile compatibility needs its
 concrete accepted contract; do not start another profile or recipe by default.
 
+
+The same lane now connects a 100-record, long-Japanese 320px/touch-emulation
+workflow through keyboard navigation, text/image description editing, pin
+cancellation, checked save and full cold continuation. Reuse the runbook's grouped
+device handoff and todo's exact candidate artifacts; real IME/200% browser zoom,
+physical iPhone and offline remain pending. Specification 05 records the proposed
+ordinary composition ports/import boundaries; this does not activate home,
+select a new storage namespace or authorize HTTPS/SW/PWA exposure.
+
 ## Resume safely
 
 1. Read AGENTS.md and the short current records above. Check actual branch, HEAD,

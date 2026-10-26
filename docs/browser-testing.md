@@ -152,6 +152,62 @@ has separate Node coverage. First output gets the actual UI verified-file
 acknowledgment; the post-cold output is archive-inspected. It is not offline/PWA,
 physical-device, ordinary-home or adoption evidence.
 
+The narrow-screen regression uses the same admitted Native input generator with
+100 owned Caption records, long Japanese titles and generated GLB/PNG bytes. At
+100 records the existing ordinary DOM tab order applies; virtualization begins
+above that boundary. It uses a 320×720 CSS-pixel viewport with DPR2 and no-hover
+touch emulation, then 568×320 while a simulated composition/draft is retained.
+Keyboard task navigation and list Tab navigation, visible focus, numeric-pin
+cancellation, attachment description editing, image decode/modal/focus return,
+actual selected-file save verification and full close/relaunch are connected.
+Both backups compare decoded records, original change bytes, heads and identity;
+original model/image bytes and the cancelled pin position must survive. Save/send
+targets meet the existing 44 CSS-pixel criterion, and recorded phases check page
+width. This is neither a 100-record capacity promise nor physical touch/native IME,
+actual browser zoom, software-keyboard, offline/PWA or ordinary-route acceptance.
+
+## One grouped device handoff
+
+Run the existing candidate workflow and retain its artifacts:
+
+```powershell
+npm run test:e2e -- responsive-workflow.spec.ts --timings
+```
+
+Use that execution's report, `実行環境` attachment and local files together;
+[todo](../tasks/todo.md) identifies the current reviewed run. Its result directory
+contains `100-caption-native.zip`, the two actual saved ZIPs and rendered captures.
+Record the source commit, build mode/entry, served asset SHA256 values and each
+transferred file's exact path, byte length and SHA256. The input has the project
+name `Nativeから引き継ぐ記録`, Scenes `観察`/`全体`, 100 records in `観察`, two model
+resources (one hidden) and two image resources. The long final title starts `100：`.
+Do not silently rebuild and call it the same tested candidate. Keep existing site
+storage; never delete other projects, change namespaces or clear the user's profile
+to obtain a passing result.
+
+For a grouped session, record the actual device model, OS/browser version,
+tab versus installed PWA, viewport/DPR, browser zoom, input/keyboard/IME,
+site usage/quota, power/thermal conditions and unknown values. On the exact
+candidate: open the input → reach long records by keyboard/touch → edit Japanese
+text with the actual keyboard and edit/view an image → enter and cancel a numeric
+pin move → save a named backup and select its actual saved file for verification
+→ fully close and reopen → confirm the edits/images/pin and inspect a fresh backup.
+Save screenshots, raw output files and hashes beside that session's receipt;
+record actual browser 200% zoom separately from viewport resizing/DPR. Reuse the
+existing two-profile team/file artifacts for the subsequent five-purpose and
+interruption/recovery acceptance; this small input alone does not close those gates.
+
+The current validation build has no Service Worker or PWA manifest. Its loopback
+HTTP route is desktop-only; physical iPhone use needs a separately approved exact
+build and trusted HTTPS route under specification 05. No external server, tunnel
+or publication is authorized by this runbook. Offline startup remains pending for
+an approved offline-capable candidate: establish its recorded cache/install state,
+disconnect the network, then repeat initial/cold opening, edits, file output and
+recovery with original-byte inspection. A dev-server visit or an already-open page
+is not offline/PWA acceptance. Ordinary home activation retains the applicable
+storage/device/adoption gates. Keep these unexecuted fields pending and continue
+other authorized development without requesting per-control PO testing.
+
 Browser cache, profiles, downloads, screenshots, optional traces, environment/build identity
 and HTML/JSON reports stay under ignored `.artifacts/e2e/`. Each execution has a
 separate `runs/<identifier>/` directory, so a later run retains earlier failures.

@@ -1466,6 +1466,42 @@ gates. Extract only the required composition when that workflow is implemented;
 this direction does not promote the validation host or its storage namespace,
 change formats/dependencies, or authorize activation before gate completion.
 
+**PROPOSED ordinary-connection composition (2026-10-26; design, not activation):**
+The production composition receives capabilities chosen by its caller: an already
+leased ProjectWorkspaceFS, metadata storage factory/selected generation, existing
+origin CAS/content reader, package locks and a MetadataProjectSession. This plan
+assigns no production directory, IDB name, migration cohort or UI-hint key. Never
+search/fallback into another route's storage or copy origin-wide CAS by assumption.
+
+Required boundary and imports, to review before implementation:
+- Application snapshot: one immutable source/provider/publication tuple from the
+  same Session read. Typed dispatch/retry and existing model/media services retain
+  the source token and verified-read lifetime; no UI string-map writes.
+- Product display adapter: provider plus complete immutable records and checked
+  content/facts yield models, materials, pins and view state. Preserve exact Scene,
+  binding/revision/representation/family/class and camera/coverage pick receipts.
+  Viewer receives render/runtime data only, never package/storage/UI authority.
+- File adapter: existing Sender/Receiver/restore jobs own preparation, exact input,
+  publication, retry and save verification. UI observes owned busy/error/draft
+  state, and never writes receipts or treats download start as a verified save.
+- Application composition owns the injected Session/platform/services; product
+  UI imports narrow typed UI ports and pure domain only. Product UI never receives
+  raw Session/FS/package writers. Production adapters never import src/harness,
+  SyntheticProject/SyntheticAuthority, fixture fallback or synthetic string-map
+  View/material adapters. Existing v1 AppContext/ProjectStore remains route-specific;
+  current local UI state is supplied through an explicit UI port.
+- Nondefault composition may exercise these production ports with the existing
+  leased candidate drivers. Keep all currently connected panels/commands working;
+  do not promote a PoC, change namespace or remove conveniences to make it pass.
+
+Connection exit: actual Workspace open → Caption/image editing → checked backup
+save → full cold reopen, preserving original history/bytes, current job ownership
+and pending/failed states; then reuse the same continuing-team chain and all five
+package preflights. Ordinary home/default activation still requires applicable
+G1-A/C/S1–S3/device evidence and a separate decision. A responsive Desktop result
+is not physical iPhone, actual browser zoom, offline/PWA or aggregate adoption.
+
+
 **Bounded product composition implementation boundary (2026-10-15):** implement
 the connected open → Scene/Caption/pin/media edit → file save/send/receive →
 independent reopen workflow in `src/ui/projectScene`, selectable with

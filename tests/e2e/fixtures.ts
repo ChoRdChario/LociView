@@ -35,7 +35,7 @@ export function smallPng(red = 40) {
 }
 
 /** Existing admitted Native recipe-1 shape, synthesized locally for real browser entry. */
-export async function nativeConversionBackup(model: Buffer, image: Buffer) {
+export async function nativeConversionBackup(model: Buffer, image: Buffer, captionCount = 2) {
   const id = (prefix: string, n: number) => `${prefix}_${String(n).padStart(26, '0')}`;
   const hash = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex');
   const placement = () => ({ translation: [0, 0, 0], rotationXYZW: [0, 0, 0, 1], uniformScale: 1 });
@@ -56,6 +56,10 @@ export async function nativeConversionBackup(model: Buffer, image: Buffer) {
       anchor: { kind: 'asset', assetId: id('ast', 1), assetFrameId: id('frm', 2), positionAsset: [3, 0.5, 0], authoredAssetRevisionId: id('rev', 1), authoredAnchorCompatibilityId: id('cls', 1), hitEvidence: { method: 'manual' } } },
       { id: id('cap', 2), title: '未配置の記録', body: '', displaySetId: id('set', 2), tags: ['記録'], color: '#123456', anchor: null }],
     mediaResources: [1, 2].map(n => ({ id: id('med', n), label: `画像 ${n}`, kind: 'image', blob: imageBlob })) };
+  const placed = snapshot.captions[0]! as Extract<(typeof snapshot.captions)[number], { anchor: object }>;
+  for (let n = 3; n <= captionCount; n++) snapshot.captions.push({ ...placed, id: id('cap', n),
+    title: `${String(n).padStart(3, '0')}：長い日本語の記録名を狭い画面でも省略せず確認するための現地観察記録`,
+    body: `現地観察の記録 ${n}`, tags: [], attachmentMediaIds: [] });
   const bytes = Buffer.from(JSON.stringify(snapshot));
   const manifest = { format: 'lociview-native-portable-backup', packageVersion: 2,
     nativeSnapshot: { schemaVersion: 1, projectId: snapshot.project.id, snapshotId: snapshot.snapshotId, generation: snapshot.generation, entry: 'native/snapshot.json', byteLength: bytes.length, algorithm: 'sha256', digest: hash(bytes) },

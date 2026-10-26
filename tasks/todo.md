@@ -4,6 +4,8 @@ Updated 2026-10-26. This file owns the current plan, checks and next actions.
 [Inventory](implementation-inventory.md) owns feature coverage;
 [docs/README.md](../docs/README.md) routes contracts. Git owns commit identity.
 
+Current checkpoint plan, results and next gate: [narrow/touch candidate and ordinary-connection design](#current-checkpoint-unit--ordinary-connection-design-and-narrowtouch-candidate-acceptance).
+
 ## Current boundary — deliver the practical-team workflow
 
 Outcome: ordinary home → real Project/Scene/Caption/media work → file handoff and
@@ -338,6 +340,110 @@ ordinary entry, CI/deployment, runtime dependencies, release and public fixtures
 are unchanged. This unit closes one real browser workflow and its operation-
 blocking redraw defect. The next priority is the measured restored-Project delay,
 with separate iPhone/offline/adoption evidence still pending.
+
+### Current checkpoint unit — ordinary-connection design and narrow/touch candidate acceptance
+
+PO requested the next integration/device/offline preparation on 2026-10-26, from
+clean pushed df523f4/g0-baseline. One root writer; read-only reviewers map gates,
+production boundaries and rendered interaction. Outcome: specify the exact ordinary
+Session/provider/content/display/file ports without choosing a new persistent root
+or promoting SyntheticProject/validation storage; prepare a reproducible device
+handoff from the same build and actual saved input/output bytes. Before any new
+production host, obtain independent review of these exact ports/import boundaries.
+
+Close the immediately executable SCN-UI-04 gap in the existing candidate: real
+Chromium at320CSSpx/short height,100owned Native Caption records, long Japanese,
+keyboard list navigation/focus, no-hover touch, numeric-pin cancellation and text/
+image editing through actual checked-save and complete cold reopen. First measure
+layout,44px targets and control reachability; fix only observed problems using
+existing controls. Reuse the pinned runner/fixture/package readers. CSS zoom/DPR
+or viewport emulation does not prove actual200% browser zoom, physical phone,
+software keyboard or offline/PWA. Keep those explicit in the grouped device steps.
+
+Preserve all current command, draft/IME, Session/file/recovery and viewer boundaries.
+No ordinary-home activation, namespace/IDB migration, new profile/recipe/dependency,
+Service Worker/PWA, external HTTPS exposure, main/Pages/release or numeric capacity
+guarantee. CAS remains existing origin-wide v2/cas; namespace isolation applies to
+metadata/UI advice, not a claim that CAS is Project-private. Stop only affected work
+for a genuine architecture/policy/compatibility/managed-authority decision. Focused
+checks while fixing, final serial checkpoint and executed browser/independent
+review, then suitable authorized g0 commit/push.
+
+
+Executed scope at the current final tree:
+- First320px characterization retained run1793000007961-47236: outer Save was33px
+  high although the editor reflowed. Add one validation-only shell class and reuse
+  scoped44px file/control styles, wrapping and focus. Preserve hidden priority and
+  exclude checkbox/radio from the new input rule. Independent rendered review
+  found base CSS specificity overriding selected/primary/readonly styles; lower
+  all new base selectors to(0,1,1), retain existing state rules and add real-browser
+  checks for four distinct selected/primary fills and readonly's dashed border.
+  No command/storage/namespace/renderer/ordinary entry changes.
+- Correct test setup to the existing100-row ordinary DOM boundary (>100 is virtual),
+  then use actual99Tab presses to reach the last long title. Fixture defaults stay2;
+  no product threshold/contract changes. Exact HTMLImageElement guard resolves the
+  new callback's TypeScript inference without relaxing decode verification.
+- Final responsive case PASS/77.976s in run1793004040481-21036: retry0/traceoff,
+  dedicated Chromium156.0.8078.4/Node24.12.0/Win32/headless.320×720 and568×320 phases,
+  including the open decoded-image modal, have scrollWidth equal to viewport and
+  zero reported element overflows.100 records,99Tab focus, simulated composition/
+  draft retention, body/attachment-description edits,4.25 pin cancellation (saved
+  position remains3), image focus return, actual first-output file verification and
+  fresh backup after full cold reopen preserve decoded records/raw original changes/
+  heads/identity and original GLB/PNG. ZIP-container equality is not asserted.
+- Preserve that exact7-file build, input/two actual saved outputs, sizes/SHA256 and
+  screenshots in run1793004040481-21036's local `device-handoff.json` and
+  `candidate-build/`. Runbook supplies one grouped device procedure; physical
+  device/HTTPS/actual200%zoom/nativeIME/offline remain unexecuted, current build noSW.
+- Same run's separate Desktop workflow preserves checked first/restored backups,
+  but final reload fails15s row selection while the app is still checking resume
+  data. Keep the failure/image/log; do not claim that case PASS. Independent review
+  confirms page.reload is not asynchronous Project readiness. Wait for the exact
+  mounted Project heading using the existing90s functional startup bound, preserving
+  input15s/case360s/retry0 and all content/actual-file/identity assertions. Record
+  normal reload, cold startup and restored reload with existing measure. No further
+  extension if readiness fails90s. The focused corrected Desktop case is complete.
+  Corrected run1793004521212-28776 passes/3.8m, retry0/traceoff, on identical built
+  assets. Normal reload→ready2.771s, full cold startup5.656s, restored reload→ready
+  14.272s. Latest restored save/file verify97.041s; variable long waits remain unresolved,
+  not an optimization/capacity acceptance or a proven CSS/storage regression.
+- Source/contract and final narrow rendered reviews close with no remaining issue.
+  Ordinary composition remains independently reviewed PROPOSED ports. Outgoing9-path
+  review is clean; independent review closes the extra10thpath readiness/measure fix.
+  First full checkpoint stops at new image-callback type inference before tests/
+  builds; next is intentionally interrupted on CSS review, not a test PASS. Keep
+  checkpoint-responsive.log/checkpoint-responsive-final.log. Final serial checkpoint
+  PASS at the frozen tree: typecheck,116 Vitest files/2726passed/21existing todo,
+  normal/harness/static-validation builds, exit0
+  (checkpoint-responsive-reviewed.log). Reviewed/tested source/test Git blobs
+  match the working tree; final documentation-only results need no runtime rerun.
+  This is a verified g0-baseline development checkpoint; Git branch/upstream owns
+  commit/publication identity. Public fixtures, CI/deployment, dependencies,
+  ordinary home and SW sources remain unchanged.
+
+
+Remaining latency, existing diagnostic evidence only: the latest97.041s action
+has generation54.188s, selected-file verify19.651s, two output-refresh spans21.031s
+and download1.201s. Compared with the same-built-assets89.501s run, I/O counts are
+unchanged (restore-control10010handles/4620reads,770structural-list pairs; metadata
+579handles/reads; package257handles/96reads/one stream). Nested/overlapping I/O
+aggregates are not elapsed-time totals or proof of disk/IDB/CPU cause. Next bounded
+investigation uses existing opt-in timing around BackupOutputJob.generate's
+stream/close, artifact inspection and final durable-input/receipt fences. No
+validation reduction, cross-write cache or backend replacement follows from this
+observation. Keep current publication/recovery/verified-read lifetimes.
+
+Checkpoint meta-audit: continue the accepted candidate/device gate path. Do not
+add another profile/recipe/fixture framework or activate ordinary home to evade
+missing storage/physical/offline evidence. Ordinary composition ports are a reviewed
+PROPOSED design, not adoption/activation. Exact-candidate real iOS storage/recovery
+and grouped UI acceptance remain the next adoption evidence, while repeated
+~90–97s restored save waits make measured generation/validation latency the next
+autonomous engineering priority; diagnose with existing stage/I/O snapshots and
+retain publication/recovery/verification fences. Do not wait for per-control PO
+testing or substitute another fixture count for this user-visible wait. Trusted
+HTTPS and any future offline-capable artifact retain their separate approval. Other in-scope work need
+not wait for per-control PO feedback.
 
 ### Completed checkpoint — receive recovery and continued initial-file workflows
 

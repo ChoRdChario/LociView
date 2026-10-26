@@ -284,6 +284,14 @@ LociMyuからのタブ構成、Sceneに相当する記録切替、直接色選�
 | E04 | 規模・安全性・アクセシビリティ | 最終rootテスト、限定hostのfocus／失敗／古いtoken防御、既存runtime audit | **実装確認＋証拠**。10k Caption/50k changes、規定多tab workload、10k UI virtualizationとopen/edit budget達成、メモリ・CSP・不正入力、200%/狭幅/IME/keyboard/contrast/44pxの総合確認。未測定を性能FAILにしない。開発用依存の監査残件は未解消（最新結果はtodo）、runtimeの狭いhold解消とは別 |
 | E05 | Desktop／physical iPhone／offline | 旧Native受入れ、旧saved限定4群、修正後journalのPO再確認 | **新経路の証拠待ち**。新metadata hostの8群は一般的好評のみで全件PASSではない。新保存・描画に必要な実機は該当境界で実施し、全てを無条件に最終日へ先送りしない。最後は通常UIでTEAM-FLOW-01。dev serverはoffline/PWA証拠ではない |
 
+限定validationの狭幅経路は、100件の長い日本語一覧の通常Tab移動、模擬touch／composition、
+本文・画像説明の編集、ピン移動取消、実保存ファイル照合と完全終了後の再開まで接続した。
+外側の保存／更新操作にも既存44px基準と折返しを適用する。
+[responsive browser case](../tests/e2e/responsive-workflow.spec.ts)と
+[一括実機引き継ぎ](../docs/browser-testing.md#one-grouped-device-handoff)を再利用し、
+実行結果はtodoに一本化する。100件は既存DOM表示境界内で、virtualization、実IME、
+200% browser zoom、実機iPhone、offline/PWAや通常入口の採用を確認したものではない。
+
 根拠:
 [03 gates](../docs/specs/03-gates-and-delivery.md)、
 [02 journal §8](../docs/specs/02-storage-package-migration.md)、
