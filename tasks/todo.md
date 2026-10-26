@@ -4,7 +4,7 @@ Updated 2026-10-26. This file owns the current plan, checks and next actions.
 [Inventory](implementation-inventory.md) owns feature coverage;
 [docs/README.md](../docs/README.md) routes contracts. Git owns commit identity.
 
-Current checkpoint plan, results and next gate: [narrow/touch candidate and ordinary-connection design](#current-checkpoint-unit--ordinary-connection-design-and-narrowtouch-candidate-acceptance).
+Current checkpoint plan, results and next action: [restored save latency reduction](#current-checkpoint-unit--restored-save-latency-reduction).
 
 ## Current boundary — deliver the practical-team workflow
 
@@ -341,7 +341,85 @@ are unchanged. This unit closes one real browser workflow and its operation-
 blocking redraw defect. The next priority is the measured restored-Project delay,
 with separate iPhone/offline/adoption evidence still pending.
 
-### Current checkpoint unit — ordinary-connection design and narrow/touch candidate acceptance
+### Current checkpoint unit — restored save latency reduction
+
+PO authorized improvement on2026-10-26 from clean pushed23a5c42/g0-baseline.
+Outcome: shorten the actual restored-Project named backup → download → selected-file
+verification workflow while retaining original bytes/history and cold continuation.
+One root writer; bounded read-only cause/contract reviewers. Existing opt-in browser
+stages show97.041s (generation54.188s); first split generation's strict stream/close,
+artifact inspection and durable-input/receipt work, then optimize demonstrated
+bounded stream I/O or repeated pure reads within the accepted operation lifetime. Reuse current
+Playwright case/inputs, package/fault tests and timing attachments; no new framework.
+
+Acceptance: real-browser before/after with matching flags and unchanged functional
+assertions; focused fault/read-lifetime regressions and early import-boundary check,
+then one final serial checkpoint and independent final diff/evidence review. Preserve
+validation, byte readback, write/publication/recovery/cancellation fences and exact
+selected-file acknowledgment. No schema/profile/dependency/namespace/renderer,
+ordinary-home/SW/PWA/HTTPS/release change or numeric performance promise. Stop only
+affected work for an actual contract/fence/policy or managed-authority decision.
+Verified checkpoints may use the existing authorized normal g0 commit/push.
+
+
+Measured implementation and evidence:
+- Opt-in diagnostics pass fixed content-free timings through existing Sender →
+  Session → backup job imports. Undefined/throwing observers have no authority;
+  capture/persist/finish/job and inputs/space/stream-close/inspection/receipt stages
+  preserve execution order and all checks. Focused4backup original-loss/cancel/
+  exact-output cases pass, including observer exceptions on success and failure.
+- Instrumented before run1793013279835-47436 PASS/3.3m: restored save/file verify
+ 78.476s, outer generation48.895s includes capture6.919/persist7.491/finish22.794.
+  Job15.919s includes stream-close12.945s; pre/post input checks0.292/0.254s and
+  artifact inspection0.382s. The outer generation span is not the ZIP writer alone.
+- Choose the measured stream boundary: shared OpfsFS now copies each whole input
+  before any awaited flush, groups small owned chunks in one fixed64KiB buffer,
+  writes large chunks directly with original ownership, and flushes the exact tail
+  before the same successful close. All writes remain serial; reader cancellation,
+  native abort, original errors and lock release are preserved. Existing per-input
+  generation guards and raw chunk/size/hash accounting remain; no whole-file buffer.
+  This shared sink affects all callers, not only the validation backup.
+- OPFS/sceneCore focused35PASS.9new sink regressions cover small/empty/boundary/
+  large chunks, pending-write backpressure and source mutation, and source/write/
+  tail/close failures despite cleanup errors. A200tiny-chunk controlled native sink
+  now receives1write; this is unit-call evidence, not observed browser-native counts.
+- After run1793013966268-12348 PASS/2.5m: same dedicated Chromium156.0.8078.4,
+  Node24.12.0/Win32/headless/timings1/traceoff/retry0 and functional assertions.
+  Restored save/file verify53.346s; generation30.398s (capture4.286/persist5.006/
+  finish13.883, job9.900), stream-close7.637s, selected-file verify11.066s.
+  The same case retains actual model/image bytes, first/restored named backup
+  inspection and selected-file acknowledgment, editing and cold continuation.
+  Capture/persist/refresh also became faster: this single before/after does not
+  isolate the whole25.130s difference to coalescing or promise stable latency.
+  Nested stage/I/O durations are not added. Long waits remain unresolved.
+- Source/contract review closes without actionable findings. A TypeScript check
+  found pending buffer's generic ArrayBufferLike too broad for native write;
+  declare its actual owned ArrayBuffer type (erased at runtime).
+- Final serial check: typecheckPASS; whole root run has114suites/2682testsPASS and
+  21existing todo, but2fixture suites cannot initialize because reviewed02 is a
+  registry provenance source and its new worktree bytes differ from the index.
+  Normalize that document to repository LF and stage its reviewed text; preserve
+  the failed checkpoint-backup-stream-coalescing.log. No verifier/assertion changes.
+  Focused2suites/53PASS after matching indexed bytes and managed execution approval;
+  the first focused attempt's temporary-Git permission refusal is retained in tool
+  evidence. The runtime source/test tree remains the frozen7Gitblobs, so existing
+  policy does not repeat114passing suites merely for the corrected index. All2735
+  test cases now pass;21todo remain. Normal/harness/static-validation builds then
+  PASS serially (builds-backup-stream-coalescing.log). The initial combined command
+  itself is not relabelled PASS. Independent code/contract/outgoing review closes.
+  Local backup-stream-comparison.json owns observations and7source/test Git blobs.
+  Public fixtures, dependencies, namespace, ordinary entry and SW sources unchanged.
+  This is a verified g0 development checkpoint; Git owns commit/publication identity.
+
+Milestone audit: this closes the bounded shared stream-write improvement with
+actual backup evidence, not general capacity/device/adoption. Next engineering
+priority is remaining root-control/read-only amplification in the measured capture,
+output readiness/protection and file-state refresh. Use the existing operation-owned
+read lifetime for a demonstrated pure-read duplication; retain strict lazy-write,
+close/readback/publication/recovery fences and prepare a concrete reviewed proposal
+before any change to their timing. Real iPhone/offline/ordinary-entry gates remain.
+
+### Completed checkpoint — narrow/touch candidate and ordinary-connection design
 
 PO requested the next integration/device/offline preparation on 2026-10-26, from
 clean pushed df523f4/g0-baseline. One root writer; read-only reviewers map gates,

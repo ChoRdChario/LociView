@@ -36,7 +36,12 @@ generation, output refresh, display, download and selected-file verification.
 Attachments include cumulative underlying OPFS/IndexedDB call counts and durations
 by fixed family, without paths or content. Subtract the before/after snapshots
 for each action. Parent stages include their children; aggregate I/O durations may
-overlap. These measurements do not isolate every internal ZIP/validation/queue
+overlap. Backup diagnostics additionally separate capture/persist/finish/job and the
+job's input/space/stream-close/artifact-inspection/final-input/receipt phases.
+The outer generation span includes the complete Session workflow. Stream-close
+includes producer/backpressure and generation guards, not just native disk time.
+Native write counts from controlled sink unit tests are distinct from this browser
+telemetry. These measurements do not isolate every internal ZIP/validation/queue
 stage. No storage access or validation is skipped to collect them.
 
 Normal runs omit continuous Playwright operation tracing. `--record-trace` opts

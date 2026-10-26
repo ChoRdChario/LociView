@@ -20,7 +20,7 @@ import { packageByteHash } from '../projectPackage/manifest';
 import type { OriginBlobStore } from './blobStore';
 import { WorkspaceOutputJob } from '../projectPackage/outputJob';
 import { ContributionOutputJob } from '../projectPackage/contributionOutputJob';
-import { BackupOutputJob, checkedBackupLabel } from '../projectPackage/backupOutputJob';
+import { BackupOutputJob, checkedBackupLabel, measureBackupOutput, type BackupOutputTiming } from '../projectPackage/backupOutputJob';
 import { BackupSourceCapture } from '../projectPackage/backupSource';
 import { CleanOutputJob } from '../projectPackage/cleanOutputJob';
 import { CleanInputJob } from '../projectPackage/cleanInputJob';
@@ -384,28 +384,28 @@ export class MetadataProjectSession {
     });
   }
 
-  private async finishBackupOutput(job: BackupOutputJob, store: OriginBlobStore, signal?: AbortSignal) {
+  private async finishBackupOutput(job: BackupOutputJob, store: OriginBlobStore, signal?: AbortSignal, timing?: BackupOutputTiming) {
     job.assertOwner(this.fs); const current = await this.outputReady();
     if (json(current.source!.proof) !== json(job.source.proof)) return fail('output-lineage');
     await this.assertOutputSlot(job.id); await validateOutputProtection(this.fs, job, store, this.limits);
-    await job.generate(store, signal); return job.id;
+    await measureBackupOutput(timing, 'job', () => job.generate(store, signal, timing)); return job.id;
   }
-  async createManualCheckpoint(expectedToken: string, label: string | undefined, store: OriginBlobStore, version: string, signal?: AbortSignal) {
+  async createManualCheckpoint(expectedToken: string, label: string | undefined, store: OriginBlobStore, version: string, signal?: AbortSignal, timing?: BackupOutputTiming) {
     checkedBackupLabel(label);
     return underWriteLease(this.fs, async () => {
       const read = await this.outputReady(); if (read.source!.token !== expectedToken) return fail('output-stale');
       await this.assertOutputSlot();
       const bases = new WorkspaceBaseStore(this.fs, this.limits, read.source!.proof);
-      const capture = await BackupSourceCapture.prepare(this, expectedToken, bases, store, this.limits, signal);
+      const capture = await measureBackupOutput(timing, 'capture', () => BackupSourceCapture.prepare(this, expectedToken, bases, store, this.limits, signal));
       const job = BackupOutputJob.prepare(this.fs, capture, this.limits, version, label);
       await validateOutputProtection(this.fs, job, store, this.limits);
       const current = await this.outputReady();
       if (current.source!.token !== expectedToken || current.publication !== capture.publication || json(await bases.snapshot()) !== json(job.frozenBases())) return fail('output-stale');
-      await job.persist(); return this.finishBackupOutput(job, store, signal);
+      await measureBackupOutput(timing, 'persist', () => job.persist()); return measureBackupOutput(timing, 'finish', () => this.finishBackupOutput(job, store, signal, timing));
     });
   }
-  async resumeBackupOutput(id: string, store: OriginBlobStore, signal?: AbortSignal) {
-    return underWriteLease(this.fs, async () => this.finishBackupOutput(await BackupOutputJob.open(this.fs, id, this.limits), store, signal));
+  async resumeBackupOutput(id: string, store: OriginBlobStore, signal?: AbortSignal, timing?: BackupOutputTiming) {
+    return underWriteLease(this.fs, async () => this.finishBackupOutput(await BackupOutputJob.open(this.fs, id, this.limits), store, signal, timing));
   }
   async verifyBackupOutput(id: string, file: Blob, store: OriginBlobStore) {
     return underWriteLease(this.fs, async () => {

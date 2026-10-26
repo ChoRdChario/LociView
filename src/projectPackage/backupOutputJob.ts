@@ -29,6 +29,14 @@ const checkRef = (r: EvidenceRef) => {
     !Number.isSafeInteger(r.byteLength) || r.byteLength <= 0 || r.byteLength > L.archiveBytes) fail('output-reference');
 };
 
+export type BackupOutputTiming = (stage: 'capture' | 'persist' | 'finish' | 'job' | 'inputs-before' | 'space' | 'stream-close' | 'artifact-inspect' | 'inputs-after' | 'receipt', milliseconds: number) => void;
+/** Optional local observations have no authority over output or recovery. */
+export function measureBackupOutput<T>(observer: BackupOutputTiming | undefined, stage: Parameters<BackupOutputTiming>[0], action: () => Promise<T>): Promise<T> {
+  if (!observer) return action();
+  const started = performance.now();
+  return action().finally(() => { try { observer(stage, performance.now() - started); } catch { /* Diagnostics have no authority. */ } });
+}
+
 /** Frozen manual backup. No base advancement, automatic promotion or restore authority. */
 export class BackupOutputJob {
   readonly source: ProjectMetadataSource;
@@ -240,29 +248,34 @@ export class BackupOutputJob {
     // Cancellation during the closing structural audit also prevents publication.
     checkAbort(signal);
   }
-  async generate(store: OriginBlobStore, signal?: AbortSignal) {
-    await this.validateInputs(signal);
+  async generate(store: OriginBlobStore, signal?: AbortSignal, timing?: BackupOutputTiming) {
+    const measure = <T>(stage: Parameters<BackupOutputTiming>[0], action: () => Promise<T>) => measureBackupOutput(timing, stage, action);
+    await measure('inputs-before', () => this.validateInputs(signal));
     if ((await this.steps()).some(s => s.detail.kind === 'artifactVerified')) { await this.artifact(); return; }
     if ((await this.steps()).length) return fail('output-cancelled');
     const m = this.manifest(), options = { packageId: m.packageId, createdByVersion: m.createdByVersion };
     const controls = { manifest: this.inputs.manifest, checksum: new TextEncoder().encode(packageByteHash(this.inputs.manifest)) };
-    await this.space(readManifestControl(controls.manifest, controls.checksum).archiveByteLength);
+    await measure('space', () => this.space(readManifestControl(controls.manifest, controls.checksum).archiveByteLength));
     const sinkId = newId(), path = this.path(`artifacts/${sinkId}.zip`); if (await this.fs.exists(path)) return fail('output-sink-exists');
     const bridge = new TransformStream<Uint8Array, Uint8Array>(), cancel = new AbortController(), abort = () => cancel.abort(signal?.reason);
     signal?.addEventListener('abort', abort, { once: true }); if (signal?.aborted) abort();
-    const writing = this.fs.writeStream(path, bridge.readable); void writing.catch(e => cancel.abort(e));
-    const originals = this.inputs.originals.map(e => ({ path: e.path, ...ref(e.bytes), read: () => e.bytes.slice() }));
-    const generating = writeCausalArchive({ blobs: m.blobs, bodyRefs: this.inputs.description.bodyRefs }, controls, originals, store, bridge.writable, { ...options, signal: cancel.signal });
-    let generated: Awaited<typeof generating>;
-    try { [, generated] = await Promise.all([writing, generating]); }
-    catch (error) { cancel.abort(error); await Promise.allSettled([writing, generating]); throw error; }
-    finally { signal?.removeEventListener('abort', abort); }
-    const file = await this.fs.readStream(path); if (!file?.blob || file.size !== generated.byteLength) return fail('output-close-unverified');
-    const inspected = await BackupArchive.inspect(await file.blob(), this.limits, signal);
+    const generated = await measure('stream-close', async () => {
+      const writing = this.fs.writeStream(path, bridge.readable); void writing.catch(e => cancel.abort(e));
+      const originals = this.inputs.originals.map(e => ({ path: e.path, ...ref(e.bytes), read: () => e.bytes.slice() }));
+      const generating = writeCausalArchive({ blobs: m.blobs, bodyRefs: this.inputs.description.bodyRefs }, controls, originals, store, bridge.writable, { ...options, signal: cancel.signal });
+      try { const [, result] = await Promise.all([writing, generating]); return result; }
+      catch (error) { cancel.abort(error); await Promise.allSettled([writing, generating]); throw error; }
+      finally { signal?.removeEventListener('abort', abort); }
+    });
+    const inspected = await measure('artifact-inspect', async () => {
+      const file = await this.fs.readStream(path); if (!file?.blob || file.size !== generated.byteLength) return fail('output-close-unverified');
+      return BackupArchive.inspect(await file.blob(), this.limits, signal);
+    });
     if (inspected.archive.sha256 !== generated.sha256 || inspected.archive.byteLength !== generated.byteLength || json(inspected.archive.control.manifest) !== json(m)) return fail('output-readback');
-    await this.validateInputs(signal);
-    await this.append({ kind: 'artifactVerified', archive: { sha256: generated.sha256, byteLength: generated.byteLength }, location: 'opfsArtifact', sinkId });
+    await measure('inputs-after', () => this.validateInputs(signal));
+    await measure('receipt', () => this.append({ kind: 'artifactVerified', archive: { sha256: generated.sha256, byteLength: generated.byteLength }, location: 'opfsArtifact', sinkId }));
   }
+
   async verifySelected(file: Blob) {
     const { step } = await this.artifact(), observed = await BackupArchive.inspect(file.slice(), this.limits), expected = (step.detail as Artifact).archive;
     if (observed.archive.sha256 !== expected.sha256 || observed.archive.byteLength !== expected.byteLength) return fail('output-selected-mismatch');

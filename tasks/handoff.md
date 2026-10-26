@@ -4,6 +4,12 @@ Read [current todo](todo.md) first. It owns the next action, worktree state, che
 results and approval boundaries; this handoff deliberately does not duplicate them.
 Use [inventory](implementation-inventory.md) for coverage, [map](../PROJECT_MAP.md)
 for code locations and [document index](../docs/README.md) for applicable contracts.
+For restored-backup latency, the shared OPFS sink groups native writes inside
+its existing generation guards; keep those lazy-input and close/readback fences.
+The optional backup phase observer carries only fixed names/durations and has no
+operation authority. Current measurements and next work remain in todo; the
+[browser runbook](../docs/browser-testing.md) distinguishes observed whole actions
+from native sink unit counts and device/adoption evidence.
 The bounded integrated UI is selected by `editor=project` in validation; follow
 todo for its tested scope and remaining ordinary-entry/browser/device boundaries.
 Attachment description/order candidates use the same checked Session recovery

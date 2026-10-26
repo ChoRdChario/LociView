@@ -845,6 +845,13 @@ BlobStore requirements:
 
 - accept `ReadableStream<Uint8Array>` or an equivalent bounded source;
 - write bounded chunks with backpressure;
+- The shared OPFS stream sink may coalesce small owned chunks in one fixed
+  64 KiB buffer, charged within the existing application I/O budget. Copy each
+  incoming chunk before any awaited flush; retain large-chunk ownership and bounds.
+  Await native writes sequentially, flush the exact tail before the same close,
+  and preserve upstream cancellation/native abort/original-error propagation.
+  This changes neither chunk admission nor write/close/readback/publication fences;
+  an in-flight stream does not promise per-input-chunk durability.
 - calculate incremental SHA-256 and byte count during staging;
 - compare expected digest/size when supplied;
 - publish immutable content only after verification;

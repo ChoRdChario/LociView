@@ -132,12 +132,25 @@ export class OpfsFS implements WorkspaceFS {
     if (!h) throw new Error(`opfs: cannot open ${path}`);
     const writable = await h.createWritable();
     const reader = stream.getReader();
+    let pending: Uint8Array<ArrayBuffer> | undefined, used = 0;
+    const flush = async () => {
+      if (used) { await writable.write(pending!.subarray(0, used)); used = 0; }
+    };
     try {
       while (true) {
         const result = await reader.read();
         if (result.done) break;
-        await writable.write(new Uint8Array(result.value));
+        // Own the complete chunk before a pending write can suspend this loop.
+        const bytes = new Uint8Array(result.value);
+        if (bytes.length >= 65_536) { await flush(); await writable.write(bytes); }
+        else if (bytes.length) {
+          pending ??= new Uint8Array(65_536);
+          if (bytes.length > pending.length - used) await flush();
+          pending.set(bytes, used); used += bytes.length;
+          if (used === pending.length) await flush();
+        }
       }
+      await flush();
       await writable.close();
     } catch (error) {
       try {

@@ -5,7 +5,7 @@ import type { MetadataLimits } from '../projectMetadata/format';
 import { json, withMetadataRead } from '../projectMetadata/persistence';
 import { WorkspaceOutputJob } from '../projectPackage/outputJob';
 import { ContributionOutputJob } from '../projectPackage/contributionOutputJob';
-import { BackupOutputJob } from '../projectPackage/backupOutputJob';
+import { BackupOutputJob, type BackupOutputTiming } from '../projectPackage/backupOutputJob';
 import { CleanOutputJob } from '../projectPackage/cleanOutputJob';
 import { ReviewOutputJob } from '../projectPackage/reviewOutputJob';
 import type { ReviewSelectionOptions } from '../projectPackage/reviewSelection';
@@ -22,14 +22,14 @@ export interface ContributionBaseChoice { selection: ContributionBaseSelection; 
 /** Explicit same-Project output commands. Download handoff has no completion receipt. */
 export class WorkspaceSender {
   constructor(private readonly fs: ProjectWorkspaceFS, private readonly session: MetadataProjectSession,
-    private readonly store: OriginBlobStore, private readonly limits: MetadataLimits, private readonly locks: LockManager | null) {}
+    private readonly store: OriginBlobStore, private readonly limits: MetadataLimits, private readonly locks: LockManager | null, private readonly backupTiming?: BackupOutputTiming) {}
   generate(token: string, signal?: AbortSignal) { return workspaceFileOperation(this.locks, () => this.session.createWorkspaceOutput(token, this.store, '0.0.1', signal)); }
   generateClean(token: string, signal?: AbortSignal) { return workspaceFileOperation(this.locks, () => this.session.createCleanOutput(token, this.store, '0.0.1', signal)); }
   previewClean(token: string) { return this.session.previewCleanOutput(token); }
   generateReview(token: string, selection: ReviewSelectionOptions, signal?: AbortSignal) { return workspaceFileOperation(this.locks, () => this.session.createReviewOutput(token, selection, this.store, '0.0.1', signal)); }
   previewReview(token: string, selection: ReviewSelectionOptions) { return this.session.previewReviewOutput(token, selection); }
   generateBackup(token: string, label?: string, signal?: AbortSignal) {
-    return workspaceFileOperation(this.locks, () => this.session.createManualCheckpoint(token, label, this.store, '0.0.1', signal));
+    return workspaceFileOperation(this.locks, () => this.session.createManualCheckpoint(token, label, this.store, '0.0.1', signal, this.backupTiming));
   }
   generateContribution(token: string, selection: ContributionBaseSelection, signal?: AbortSignal) {
     const owned = structuredClone(selection);
@@ -43,7 +43,7 @@ export class WorkspaceSender {
     const key = await this.key(id); return key.kind === 'workspace' ? this.session.resumeWorkspaceOutput(id, this.store, signal) :
       key.kind === 'clean' ? this.session.resumeCleanOutput(id, this.store, signal) :
       key.kind === 'review' ? this.session.resumeReviewOutput(id, this.store, signal) :
-      key.kind === 'backup' ? this.session.resumeBackupOutput(id, this.store, signal) : this.session.resumeContributionOutput(id, this.store, signal);
+      key.kind === 'backup' ? this.session.resumeBackupOutput(id, this.store, signal, this.backupTiming) : this.session.resumeContributionOutput(id, this.store, signal);
   }); }
   cancel(id: string) { return workspaceFileOperation(this.locks, async () => {
     const key = await this.key(id); return key.kind === 'workspace' ? this.session.cancelWorkspaceOutput(id) :

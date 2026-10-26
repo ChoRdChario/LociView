@@ -229,7 +229,7 @@ async function openNormalValidationHost(options: ValidationHostOptions, inherite
     connection = await openValidationGeneration(lease.workspace, options, fresh && !!(options.initial || incoming || options.reviewEdit) && lease.holdsWriteLock);
     let { fs, content, session } = connection.service;
     let receiver = new WorkspaceReceiver(options.base, fs, session, limits, options.packageLocks ?? null);
-    let sender = new WorkspaceSender(fs, session, options.store, limits, options.packageLocks ?? null);
+    let sender = new WorkspaceSender(fs, session, options.store, limits, options.packageLocks ?? null, options.timing ? (stage, ms) => options.timing!(`host.backup.${stage}`, ms) : undefined);
     const databases = validationGenerationDatabases(options), rootFs = lease.workspace;
     let restoreControls = await readRestoreControls(rootFs, limits), restoreFailure = '', restoreRetired = false,
       restoreDisplayPending = false, restoreEpoch = 0, preparedRestore: BackupRestoreJob | undefined;
@@ -410,7 +410,7 @@ async function openNormalValidationHost(options: ValidationHostOptions, inherite
       const previous = connection!, next = await openValidationGeneration(rootFs, options);
       connection = next; ({ fs, content, session } = next.service);
       receiver = new WorkspaceReceiver(options.base, fs, session, limits, options.packageLocks ?? null);
-      sender = new WorkspaceSender(fs, session, options.store, limits, options.packageLocks ?? null);
+      sender = new WorkspaceSender(fs, session, options.store, limits, options.packageLocks ?? null, options.timing ? (stage, ms) => options.timing!(`host.backup.${stage}`, ms) : undefined);
       project = undefined; images = {}; localInitial = false;
       try {
         last = await session.read(); project = await projectFrom(last);

@@ -2835,10 +2835,15 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     await expect(cold.generateClean(f.local.source!.token)).rejects.toThrow();
   }, 60000);
   it('generates separate named backups with exact originals and no base advancement or save claim', async () => {
-    const { f, sent } = await contributionTeam(), sender = new WorkspaceSender(f.fs, f.receiver.session, f.store, metadata, f.locks);
+    const { f, sent } = await contributionTeam(), timings: { stage: string; milliseconds: number }[] = [];
+    const sender = new WorkspaceSender(f.fs, f.receiver.session, f.store, metadata, f.locks, (stage, milliseconds) => {
+      timings.push({ stage, milliseconds }); throw Error('observer has no authority');
+    });
     const before = await f.receiver.session.read(), token = before.source!.token, label = '現地調査前';
     const id = await sender.generateBackup(token, label), file = await sender.download(id), job = await BackupOutputJob.open(f.fs, id, metadata);
     const inspected = await BackupArchive.inspect(file, metadata);
+    expect([...new Set(timings.map(t => t.stage))].sort()).toEqual(['capture', 'persist', 'finish', 'job', 'inputs-before', 'space', 'stream-close', 'artifact-inspect', 'inputs-after', 'receipt'].sort());
+    expect(timings.every(t => Number.isFinite(t.milliseconds) && t.milliseconds >= 0)).toBe(true);
     expect(inspected.source.encodeFullSource()).toEqual(before.source!.encodeFullSource());
     expect(inspected.description.table).toEqual(sent.snapshot);
     expect(inspected.archive.control.manifest).toMatchObject({ purpose: 'backup', targetHeads: before.source!.heads });
@@ -2903,7 +2908,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect(writes).not.toHaveBeenCalled(); expect(writeBytes).not.toHaveBeenCalled(); expect(await f.fs.list('')).toEqual(before);
   }, 15000);
   it('rejects acknowledged backup original loss after Start even on the initial warm generation', async () => {
-    const { f, sent } = await contributionTeam(), sender = new WorkspaceSender(f.fs, f.receiver.session, f.store, metadata, f.locks);
+    const { f, sent } = await contributionTeam(), sender = new WorkspaceSender(f.fs, f.receiver.session, f.store, metadata, f.locks, () => { throw Error('observer has no authority'); });
     const write = f.fs.writeText.bind(f.fs);
     vi.spyOn(f.fs, 'writeText').mockImplementation(async (path, text) => {
       await write(path, text);

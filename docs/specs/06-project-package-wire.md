@@ -2835,6 +2835,29 @@ strict and operation-scoped records/bytes/payloads, supplied-argument ownership,
 closing refusal and fresh refusal after acknowledged evidence loss, reusing
 existing mutation/recovery cases and the actual two-party browser file flow.
 
+**Shared OPFS sink refinement (2026-10-26):** coalesce small incoming chunks
+using one fixed 64 KiB owned buffer within the existing I/O accounting, never a
+whole-archive buffer. Preserve the original whole-input-chunk copy before any
+await, large-input bounds/backpressure, byte order, exact tail, sequential native
+writes, cancellation, abort, original errors and successful close before readback.
+All routes using the shared sink retain their original-byte and recovery contracts;
+no bytes/receipt are acknowledged sooner and no write/publication fence is removed.
+Acceptance exercises boundary/large/empty chunks, mutation while a write is pending,
+backpressure and read/write/close/cancel/abort failures, then the same actual restored
+backup/edit/checked-save/cold workflow and complete existing regression suite.
+
+**Restored-backup timing refinement (2026-10-26; diagnostics only):** the
+existing opt-in validation observer may pass through Sender/Session to the backup
+job as an optional callback. Record fixed, content-free capture/persist/finish and
+job input/space/stream-close/artifact-inspection/final-input/receipt stages. The
+outer Sender span includes capture, strict lease fences and job generation; do not
+attribute it entirely to the ZIP writer. Undefined observers execute the existing
+action directly; observer failure cannot change the operation's outcome. Preserve
+all execution order, exact input ownership, abort checks, readback, write/close,
+publication and recovery fences. No result cache or new validation/write lifetime
+is introduced by timing. Compare the same real-file workflow/flags and original
+bytes/history before choosing an optimization; nested I/O totals are not wall time.
+
 Within that single read callback, `read` may acquire one owned, validated journal
 chain and use it for every imported-base observation and `readRestoredBases`.
 `payloads` may acquire one restored-history result at its first needed reference

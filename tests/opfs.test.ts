@@ -56,3 +56,59 @@ describe('OPFS scoped fresh listing', () => {
     await expect(f.fs.list('')).rejects.toBe(error);
   });
 });
+
+// Native sink doubles verify exact bytes and failure ownership, not disk latency.
+async function streamSink() {
+  const bytes: Uint8Array[] = [];
+  const sink = { write: vi.fn(async (chunk: Uint8Array) => { bytes.push(chunk.slice()); }),
+    close: vi.fn(async () => {}), abort: vi.fn(async (_error: unknown) => {}) };
+  vi.stubGlobal('navigator', { storage: { getDirectory: async () => ({ getFileHandle: async () => ({ createWritable: async () => sink }) }) } });
+  return { fs: await OpfsFS.open(), sink, bytes };
+}
+function sourceChunks(chunks: Uint8Array[]) {
+  let at = 0;
+  const reader = { read: vi.fn(async () => at < chunks.length ? { done: false, value: chunks[at++]! } : { done: true, value: undefined }),
+    cancel: vi.fn(async (_error: unknown) => {}), releaseLock: vi.fn() };
+  return { reader, input: { getReader: () => reader } as unknown as ReadableStream<Uint8Array> };
+}
+const joinBytes = (chunks: Uint8Array[]) => {
+  const result = new Uint8Array(chunks.reduce((n, b) => n + b.length, 0)); let at = 0;
+  for (const chunk of chunks) { result.set(chunk, at); at += chunk.length; } return result;
+};
+describe('OPFS bounded stream writes', () => {
+  it.each([0, 1, 200])('coalesces %i tiny chunks, flushes the exact tail before close and releases the reader', async count => {
+    const f = await streamSink(), chunks = Array.from({ length: count }, (_, i) => new Uint8Array(37).fill(i % 256));
+    const source = sourceChunks([new Uint8Array(0), ...chunks, new Uint8Array(0)]);
+    f.sink.close.mockImplementation(async () => { expect(joinBytes(f.bytes)).toEqual(joinBytes(chunks)); });
+    await f.fs.writeStream('artifact.zip', source.input);
+    expect(f.sink.write).toHaveBeenCalledTimes(count ? 1 : 0); expect(f.sink.close).toHaveBeenCalledOnce();
+    expect(f.sink.abort).not.toHaveBeenCalled(); expect(source.reader.releaseLock).toHaveBeenCalledOnce();
+  });
+  it('preserves order across buffer boundaries and existing large input chunks', async () => {
+    const f = await streamSink(), chunks = [30_000, 30_000, 10_000, 65_536, 131_075, 3].map((n, i) => new Uint8Array(n).fill(i + 1));
+    await f.fs.writeStream('artifact.zip', sourceChunks(chunks).input);
+    expect(joinBytes(f.bytes)).toEqual(joinBytes(chunks));
+    expect(f.bytes.map(b => b.length)).toEqual([60_000, 10_000, 65_536, 131_075, 3]);
+  });
+  it('owns the entire next chunk before a delayed flush and preserves backpressure', async () => {
+    const f = await streamSink(), next = new Uint8Array(3).fill(2), source = sourceChunks([new Uint8Array(65_535).fill(1), next, new Uint8Array([3])]);
+    let entered!: () => void, release!: () => void;
+    const started = new Promise<void>(r => { entered = r; }), held = new Promise<void>(r => { release = r; });
+    f.sink.write.mockImplementationOnce(async chunk => { entered(); await held; f.bytes.push(chunk.slice()); });
+    const pending = f.fs.writeStream('artifact.zip', source.input);
+    await started; expect(source.reader.read).toHaveBeenCalledTimes(2); expect(f.sink.write).toHaveBeenCalledOnce();
+    next.fill(9); release(); await pending;
+    expect(f.bytes[0]).toEqual(new Uint8Array(65_535).fill(1)); expect(f.bytes[1]).toEqual(new Uint8Array([2, 2, 2, 3]));
+  });
+  it.each(['source', 'midflush', 'tail', 'close'] as const)('preserves the original %s failure despite cancel/abort failures', async phase => {
+    const f = await streamSink(), source = sourceChunks(phase === 'midflush' ? [new Uint8Array(65_536)] : [new Uint8Array([1, 2, 3])]);
+    const failure = Error(`original ${phase}`);
+    if (phase === 'source') source.reader.read.mockRejectedValueOnce(failure);
+    else if (phase === 'close') f.sink.close.mockRejectedValueOnce(failure);
+    else f.sink.write.mockRejectedValueOnce(failure);
+    source.reader.cancel.mockRejectedValueOnce(Error('secondary cancel')); f.sink.abort.mockRejectedValueOnce(Error('secondary abort'));
+    await expect(f.fs.writeStream('artifact.zip', source.input)).rejects.toBe(failure);
+    expect(source.reader.cancel).toHaveBeenCalledWith(failure); expect(f.sink.abort).toHaveBeenCalledWith(failure);
+    expect(source.reader.releaseLock).toHaveBeenCalledOnce(); expect(f.sink.close).toHaveBeenCalledTimes(phase === 'close' ? 1 : 0);
+  });
+});
