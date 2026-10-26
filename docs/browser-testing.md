@@ -44,6 +44,22 @@ Native write counts from controlled sink unit tests are distinct from this brows
 telemetry. These measurements do not isolate every internal ZIP/validation/queue
 stage. No storage access or validation is skipped to collect them.
 
+The existing single-user workflow also records two user-facing boundaries:
+final Save action → download event, and selected-file confirmation → matching
+acknowledgment. Driver overhead is included; human picker/decision time and OS
+save completion are separate. The broader save/file-check span remains available.
+A test-only Event Timing observer requests a16ms reporting threshold, records at
+most512 numeric/event-name samples per document and marks support/truncation.
+Attachments are cumulative per document; deduplicate by document time origin,
+interaction ID, event name and start time, rather than adding snapshots. Several
+events can belong to one gesture. Empty/unsupported data is not zero latency.
+The [Event Timing API working draft](https://www.w3.org/TR/event-timing/) describes
+this event grouping and duration reporting; the pinned browser is the executed
+evidence. These are local next-paint event observations, not field INP, p75/p95, asynchronous
+completion or physical-device acceptance. Use the development targets in the
+[UI guidelines](ui-product-guidelines.md#22-快適さの開発目標と報告po方針-2026-10-26)
+to prioritize work; functional assertions and existing deadlines remain unchanged.
+
 Normal runs omit continuous Playwright operation tracing. `--record-trace` opts
 into full traces; it is a wrapper boolean, not a Playwright trace-mode argument.
 Two independent browser processes with recording can substantially increase run

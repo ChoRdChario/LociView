@@ -4,7 +4,7 @@ Updated 2026-10-26. This file owns the current plan, checks and next actions.
 [Inventory](implementation-inventory.md) owns feature coverage;
 [docs/README.md](../docs/README.md) routes contracts. Git owns commit identity.
 
-Current checkpoint plan, results and next action: [restored save latency reduction](#current-checkpoint-unit--restored-save-latency-reduction).
+Current checkpoint plan, results and next action: [comfortable file work and fresh output state](#current-checkpoint-unit--comfortable-file-work-and-fresh-output-state).
 
 ## Current boundary — deliver the practical-team workflow
 
@@ -341,7 +341,97 @@ are unchanged. This unit closes one real browser workflow and its operation-
 blocking redraw defect. The next priority is the measured restored-Project delay,
 with separate iPhone/offline/adoption evidence still pending.
 
-### Current checkpoint unit — restored save latency reduction
+### Current checkpoint unit — comfortable file work and fresh output state
+
+PO authorized continuation and comfort-led UI/UX targets/reporting on2026-10-26,
+from clean pusheda11ed6e/g0-baseline. Outcome: everyday open → record → save/send →
+resume stays understandable, responsive and recoverable; shorten the existing
+file-state refresh without another user decision or control. Root only writer;
+read-only reviewers check accepted read lifetimes and whole-workflow UX.
+
+Record source-backed development targets in the existing UI guidelines, distinguishing
+first feedback, simple local completion and data-dependent durable/file work from
+formal03 device/adoption guarantees. Report delivered user work, remaining friction,
+measured whole waits and next outcome; verification counts are supporting evidence.
+No invented progress/remaining time, early saved claim or new healthy-state checks.
+
+Connected implementation: jobs() already owns one pure withMetadataRead callback.
+Reuse one successful current-source/base/inventory comparison snapshot inside that
+call across backup rows. Keep every job's own original/state/step/artifact/protection
+checks, failure isolation and the outer closing audit; next calls always start fresh.
+No new read API/global/Store cache, write/publication/recovery fence, schema/profile,
+dependency, ordinary home/SW/HTTPS/release change. Set no numeric delivery guarantee.
+Focused strict/scoped/fresh-loss and per-job/catch/closing tests plus the existing
+actual restored file workflow judge the result. Add bounded interaction observations
+to that same lane if useful; do not turn local event samples into field INP/p95.
+At the final source/test tree run required serial checks once, with independently
+reviewed evidence and suitable authorized normal g0 commit/push. Preserve failures.
+
+
+Verified development checkpoint (2026-10-26; publication identity is in Git):
+- UI guidelines §2.2 now owns source-backed comfort targets and the4-point user
+  workflow report. NN/g response/heuristic references, web.dev INP and W3C status/
+  target-size guidance inform development priorities; existing03 gates remain.
+  First feedback100ms, simple local views1s, small-fixture output and optional file
+  verification each10s are development budgets, not arbitrary-model/device promises.
+  Normal save does not require healthy-state file reselection; automated verification
+  deliberately exercises that stronger separate assurance path.
+- Protection now returns its owned snapshot and entry-captured proof alongside the
+  existing base-store capability. Mutation callers retain the same strict store and
+  order. One jobs callback reuses the matching-proof snapshot for stale display and
+  one fully successful current projection across backup rows. Proof mismatch takes
+  the old current-proof snapshot route; failed/partial projections are never cached.
+  All own-job protections/artifact checks and closing audits still run.
+- Focused7cases+sceneCore12+typecheckPASS. Two-backup regression verifies2protection
+  snapshots and1current read, exact row states, mismatched-proof refusal/fallback,
+  transient failure isolation and fresh next-call recovery. Owner/closing tests and
+  acknowledged metadata/base/artifact/index/job-loss cases remain exact.
+- Before1793017203117-51128 PASS54.617s; firstpost1793017591881-23048 PASS57.608s;
+  final1793018116100-66084 PASS54.293s for the restored save+file-check action.
+  Same Chromium156.0.8078.4/Node24.12.0/Win32/headless/timings1/traceoff/retry0;
+  runtime JS identical between the2post runs. Model/image bytes, named backup
+  inspection and selected-file acknowledgment, editing and cold continuation pass.
+  Whole-action speed improvement is NOT demonstrated. Restored-action metadata
+  readStream579→541 and readBytes579→541 (38each APIcounter; not76physical files)
+  are diagnostic work reductions; root-control770list/10010handles/4620reads remain.
+- Final user-action boundaries (automation-inclusive, human picker wait excluded):
+  initial Save→download4.528s / selection→matching ack2.558s; restored39.375s /
+  14.552s. The initial small-fixture samples meet each10s goal; restored samples
+  remain above it. Do not compare a summed2-action wait with either separate budget.
+- Local Event Timing requests16ms threshold and retains at most512numeric/event-name
+  entries per document. Deduplicate cumulative snapshots by document origin/id/
+  event/start; several events can describe one gesture. Final5documents/66reported
+  events max136ms,3events above100,noneabove200,supported/nontruncated. This is a
+  sampled local next-paint observation, not field INP, percentile/mobile acceptance
+  or a universal100ms pass. Simple-view1s target remains unmeasured here.
+- Independent source/goal/metric/outgoing reviews close without remaining findings
+  after correcting INP wording to input→next paint. Final check:checkpoint exits0:
+  typecheck,116Vitest suites/2735PASS/21todo, normal/harness/validation builds PASS.
+  Existing large-chunk build warnings remain. The ignored
+  comfort-output-state-evidence.json retains all3runs and5source/test Git blobs;
+  checkpoint-comfort-output-state.log retains the complete serial output. Changed
+  registry provenance sources: none. Stage must match those tested source/test blobs;
+  later result/handoff-only prose does not require another runtime run.
+
+Milestone audit: retain the simple daily workflow and explicit saved/recovery state.
+The development targets make the restored path's long wait a visible priority,
+not a passed capacity/SLA gate. Next connected outcome: shorten restored save →
+download and optional selected-file confirmation, judged at the same user-action
+boundaries. First split each outputReady call into review readiness, the original
+live Session.read and receive readiness, using the existing optional observer and
+visited-job counts. Then, only if a measured stage warrants it, group its pure
+reads within separate review/receive read callbacks in the same order. Preserve
+actual Session ownership/retained state, fresh entry/closing audits and media/CAS
+checks; do not use a Session facade or reuse a result across readiness calls.
+Acceptance: existing fault/refusal/loss tests, exact archive/identity and cold
+continuation, same browser action timings; no new UI choice or test framework.
+Small measured readiness cost means stop this helper optimization and reprioritize.
+Each write/publication/staging/recovery fence stays fixed. If reducing those strict
+fences is necessary, stop only that change and prepare a concrete independently
+reviewed proposal for PO rather than silently changing timing. Physical iPhone,
+realIME/200%zoom, offline and ordinary-home activation retain their acceptance.
+
+### Completed checkpoint — restored save latency reduction
 
 PO authorized improvement on2026-10-26 from clean pushed23a5c42/g0-baseline.
 Outcome: shorten the actual restored-Project named backup → download → selected-file

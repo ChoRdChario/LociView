@@ -52,14 +52,16 @@ async function inspectBackup(path: string, glb: Buffer, png: Buffer, expectedBod
   }
   return { identity: manifest.identity, sha256: sha256(bytes), bytes: bytes.length };
 }
-async function saveBackup(page: Page, path: string, name: string) {
+async function saveBackup(page: Page, path: string, name: string, boundaries?: Record<string, number>) {
   const files = page.getByRole('region', { name: 'ファイル', exact: true });
   await files.getByRole('button', { name: '保存', exact: true }).click();
   await files.getByLabel('名前（任意）', { exact: true }).fill(name);
+  const saveStarted = performance.now();
   const [download] = await Promise.all([
     page.waitForEvent('download', { timeout: 90_000 }),
     files.getByRole('button', { name: 'ファイルに保存', exact: true }).click(),
   ]);
+  if (boundaries) boundaries[`${name}.save-to-download-ms`] = performance.now() - saveStarted;
   await download.saveAs(path); expect(await download.failure()).toBeNull();
   const history = files.locator('details').filter({ has: page.locator('summary', { hasText: /^作成したファイル$/ }) });
   await history.locator('summary').first().click();
@@ -67,17 +69,18 @@ async function saveBackup(page: Page, path: string, name: string) {
   await row.getByText('保存先のファイルを確認', { exact: true }).click();
   const choosing = page.waitForEvent('filechooser');
   await row.getByRole('button', { name: 'ファイルを選択', exact: true }).click();
-  await (await choosing).setFiles(path);
+  const chooser = await choosing, verifyStarted = performance.now(); await chooser.setFiles(path);
   await expect(files.getByText('選択したファイルの内容を確認しました。', { exact: true })).toBeVisible({ timeout: 90_000 });
   await expect(page.getByLabel('保存ファイルの状態', { exact: true }))
     .toHaveText('確定済みの内容は、選択した保存ファイルと一致しています。');
+  if (boundaries) boundaries[`${name}.selected-file-to-ack-ms`] = performance.now() - verifyStarted;
 }
 
 test('GLBと画像の編集を保存し、ブラウザ再起動と別端末相当の復元から続けられる', async ({}, testInfo) => {
   const root = testInfo.outputPath('profiles'); await mkdir(root, { recursive: true });
   const profile = await mkdtemp(join(root, 'workflow-'));
   const restoredProfile = await mkdtemp(join(root, 'restored-'));
-  const glb = triangleGlb(), png = smallPng(), errors: string[] = [], timings: Record<string, number> = {};
+  const glb = triangleGlb(), png = smallPng(), errors: string[] = [], timings: Record<string, number> = {}, boundaries: Record<string, number> = {};
   let currentPage: Page | undefined;
   const timingSnapshot = async () => currentPage?.evaluate(() => {
     document.dispatchEvent(new Event('lociview-timing-snapshot'));
@@ -85,6 +88,8 @@ test('GLBと画像の編集を保存し、ブラウザ再起動と別端末相�
       stage: entry.name, milliseconds: entry.duration, start: entry.startTime, detail: (entry as PerformanceMeasure).detail,
     }));
   });
+  const interactionSnapshot = async () => currentPage?.evaluate(() =>
+    (window as unknown as { __lociE2EEventTiming?: unknown }).__lociE2EEventTiming);
   const measure = async <T>(name: string, action: () => Promise<T>) => {
     const before = await timingSnapshot().catch(() => undefined);
     await currentPage?.evaluate(() => performance.clearMeasures()).catch(() => undefined);
@@ -94,13 +99,32 @@ test('GLBと画像の編集を保存し、ブラウザ再起動と別端末相�
       // Diagnostics must not replace an action failure if its page has closed.
       const after = await timingSnapshot().catch(() => undefined);
       await testInfo.attach(`段階別計測 ${name}`, { body: JSON.stringify({ before: before?.at(-1), after }), contentType: 'application/json' }).catch(() => undefined);
+      await testInfo.attach(`操作応答の観測 ${name}`, { body: JSON.stringify(await interactionSnapshot().catch(() => undefined)), contentType: 'application/json' }).catch(() => undefined);
     }
   };
-  let context: BrowserContext | undefined, phase = 0;
+  let context: BrowserContext | undefined, phase = 0, interactionPhase = 0;
   const launch = async (userDataDir: string) => {
     context = await chromium.launchPersistentContext(userDataDir, {
       channel: 'chromium', headless: true, viewport: { width: 1440, height: 1000 },
       acceptDownloads: true, serviceWorkers: 'block',
+    });
+    // Local browser observations only: no field INP, percentiles or product telemetry.
+    await context.addInitScript(() => {
+      const probe = { kind: 'local-event-timing', fieldINP: false, thresholdMs: 16, documentTimeOrigin: performance.timeOrigin,
+        supported: typeof PerformanceObserver !== 'undefined' && PerformanceObserver.supportedEntryTypes.includes('event'),
+        truncated: false, entries: [] as { event: string; duration: number; start: number; interactionId: number }[] };
+      (window as unknown as { __lociE2EEventTiming: typeof probe }).__lociE2EEventTiming = probe;
+      if (!probe.supported) return;
+      try {
+        new PerformanceObserver(list => {
+          for (const entry of list.getEntries()) {
+            const interactionId = (entry as PerformanceEntry & { interactionId?: number }).interactionId;
+            if (!interactionId) continue;
+            if (probe.entries.length >= 512) { probe.truncated = true; continue; }
+            probe.entries.push({ event: entry.name, duration: entry.duration, start: entry.startTime, interactionId });
+          }
+        }).observe({ type: 'event', buffered: true, durationThreshold: 16 } as PerformanceObserverInit & { durationThreshold: number });
+      } catch { probe.supported = false; }
     });
     context.setDefaultTimeout(15_000); context.setDefaultNavigationTimeout(15_000);
     await context.route('**/*', route => {
@@ -118,6 +142,7 @@ test('GLBと画像の編集を保存し、ブラウザ再起動と別端末相�
     const owned = context; context = undefined;
     if (!owned) return;
     try {
+      await testInfo.attach(`終了前の操作応答 ${++interactionPhase}`, { body: JSON.stringify(await interactionSnapshot().catch(() => undefined)), contentType: 'application/json' }).catch(() => undefined);
       if (tracing) {
         const path = testInfo.outputPath(`phase-${++phase}.zip`);
         await owned.tracing.stop({ path }); await testInfo.attach(`操作記録 ${phase}`, { path, contentType: 'application/zip' });
@@ -157,7 +182,7 @@ test('GLBと画像の編集を保存し、ブラウザ再起動と別端末相�
     await (await choosing).setFiles({ name: 'evidence.png', mimeType: 'image/png', buffer: png });
     await expect(page.getByText('メディアを追加しました。', { exact: true })).toBeVisible();
     await checkCaption(page);
-    const backup = testInfo.outputPath('first-backup.zip'); await measure('最初の保存と実ファイル確認', () => saveBackup(page, backup, '最初の保存'));
+    const backup = testInfo.outputPath('first-backup.zip'); await measure('最初の保存と実ファイル確認', () => saveBackup(page, backup, '最初の保存', boundaries));
     const first = await inspectBackup(backup, glb, png, body);
     await measure('通常の再読込から編集画面の準備', async () => { await page.reload(); await projectReady(page); });
     await selectCaption(page); await checkCaption(page);
@@ -190,7 +215,7 @@ test('GLBと画像の編集を保存し、ブラウザ再起動と別端末相�
       await restoredDetail.getByRole('button', { name: '変更を適用', exact: true }).click();
       await expect(page.getByText('変更を適用しました。', { exact: true })).toBeVisible({ timeout: 90_000 });
     });
-    const secondPath = testInfo.outputPath('restored-backup.zip'); await measure('復元後の保存と実ファイル確認', () => saveBackup(page, secondPath, '復元後の保存'));
+    const secondPath = testInfo.outputPath('restored-backup.zip'); await measure('復元後の保存と実ファイル確認', () => saveBackup(page, secondPath, '復元後の保存', boundaries));
     const second = await inspectBackup(secondPath, glb, png, continued);
     expect(second.identity).toEqual(first.identity);
     await measure('復元後の再読込から編集画面の準備', async () => { await page.reload(); await projectReady(page); });
@@ -211,5 +236,6 @@ test('GLBと画像の編集を保存し、ブラウザ再起動と別端末相�
     await close();
     await testInfo.attach('ブラウザ例外', { body: JSON.stringify(errors), contentType: 'application/json' });
     await testInfo.attach('操作全体の実時間（内訳未分離・性能受入れではない）', { body: JSON.stringify(timings, null, 2), contentType: 'application/json' });
+    await testInfo.attach('開発目標の操作境界', { body: JSON.stringify({ kind: 'automation-inclusive-lab', excludesHumanPickerWait: true, boundaries }), contentType: 'application/json' });
   }
 });

@@ -32,7 +32,8 @@ export async function outputTerminal(job: OutputJob) {
 /** Later observations may be added; none of the capture's protected evidence may disappear. */
 export async function validateOutputProtection(fs: ProjectWorkspaceFS, job: OutputJob, store: Pick<OriginBlobStore, 'inspect'>, limits: MetadataLimits) {
   job.assertOwner(fs);
-  const bases = new WorkspaceBaseStore(fs, limits, job.source.proof), snapshot = await bases.snapshot(), frozen = job.frozenBases();
+  const proof = structuredClone(job.source.proof);
+  const bases = new WorkspaceBaseStore(fs, limits, proof), snapshot = await bases.snapshot(), frozen = job.frozenBases();
   for (const r of frozen.records) {
     const found = snapshot.records.find(b => b.workspacePackageId === r.workspacePackageId);
     if (!found || json({ ...found, completions: [] }) !== json({ ...r, completions: [] }) ||
@@ -43,5 +44,5 @@ export async function validateOutputProtection(fs: ProjectWorkspaceFS, job: Outp
     protectedWorkspaceInventory((await job.source.inspectOriginal({ maxWork: L.inspectionWork, maxNodes: L.inspectionNodes })).candidates, payloads);
   if (json(inventory) !== json(job.frozenInventory())) return fail('output-frozen-inventory');
   for (const b of inventory.blobs) if (await store.inspect({ algorithm: 'sha256', digest: b.sha256, byteLength: b.byteLength, mediaType: 'application/octet-stream' }) !== 'verified-present') return fail('output-protected-body-missing');
-  return bases;
+  return { bases, snapshot, proof };
 }

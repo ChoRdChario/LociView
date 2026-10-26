@@ -96,6 +96,16 @@ export class WorkspaceSender {
   private async jobsDirect(): Promise<WorkspaceOutputState[]> {
     const result: WorkspaceOutputState[] = [];
     let bases: ReturnType<WorkspaceBaseStore['read']> | undefined;
+    const readCurrentBackup = async (protection: Awaited<ReturnType<typeof validateOutputProtection>>) => {
+      const current = await this.session.read(); if (!current.source) throw Error('output-source-missing');
+      const proof = structuredClone(current.source.proof), currentBases = new WorkspaceBaseStore(this.fs, this.limits, proof);
+      const snapshot = json(proof) === json(protection.proof) ? protection.snapshot : await currentBases.snapshot();
+      const inspection = await current.source.inspectOriginal({ maxNodes: L.inspectionNodes, maxWork: L.inspectionWork });
+      const inventory = protectedWorkspaceInventory(inspection.candidates, await currentBases.payloads(snapshot.records));
+      return { token: current.source.token, snapshot: json(snapshot), inventory: json(inventory) };
+    };
+    // Only a complete successful projection lives inside this one read callback.
+    let currentBackup: Awaited<ReturnType<typeof readCurrentBackup>> | undefined;
     for (const key of await outputJobKeys(this.fs)) {
       const { id } = key, purpose = key.kind === 'workspace' ? 'teamWorkspace' as const : key.kind;
       try {
@@ -110,12 +120,9 @@ export class WorkspaceSender {
         }
         let extra: { label?: string; stale?: boolean } = {};
         if (job instanceof BackupOutputJob) {
-          await validateOutputProtection(this.fs, job, this.store, this.limits);
-          const current = await this.session.read(); if (!current.source) throw Error('output-source-missing');
-          const currentBases = new WorkspaceBaseStore(this.fs, this.limits, current.source.proof), snapshot = await currentBases.snapshot();
-          const inspection = await current.source.inspectOriginal({ maxNodes: L.inspectionNodes, maxWork: L.inspectionWork });
-          const inventory = protectedWorkspaceInventory(inspection.candidates, await currentBases.payloads(snapshot.records));
-          extra = { label: job.label, stale: current.source.token !== job.source.token || json(snapshot) !== json(job.frozenBases()) || json(inventory) !== json(job.frozenInventory()) };
+          const protection = await validateOutputProtection(this.fs, job, this.store, this.limits);
+          const current = currentBackup ??= await readCurrentBackup(protection);
+          extra = { label: job.label, stale: current.token !== job.source.token || current.snapshot !== json(job.frozenBases()) || current.inventory !== json(job.frozenInventory()) };
         }
         result.push({ id, purpose, ...extra, token: job.source.token, cancellable: kinds.length === 0, state: kinds.includes('cancelled') ? 'cancelled' : kinds.includes('externalFileVerified') ? 'file-verified' :
           kinds.includes(key.kind === 'workspace' ? 'baseRecorded' : 'artifactVerified') ? 'generated' : 'incomplete' });

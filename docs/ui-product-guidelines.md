@@ -9,6 +9,8 @@
 > current worktree has passed rendered Desktop or physical-iPhone acceptance.
 > Presentation amendment approved 2026-09-14: ordinary-workflow simplicity
 > (§§2.1, 4.4–4.5, 6.1, 9.2). This approval is not implementation evidence.
+> Comfort goals/reporting delegated 2026-10-26 (§2.2); development targets do not
+> replace device/adoption gates or claim implemented performance.
 
 ## 1. Authority and scope
 
@@ -78,6 +80,58 @@ an instrument whose target and state are always clear**.
 
 この方針は表示と導線の改善であり、自動的な競合解消、対応関係の推測、参照の一括削除、
 保存・ファイル形式の保証変更を承認するものではない。
+
+### 2.2 快適さの開発目標と報告（PO方針 2026-10-26）
+
+**分類：開発の優先順位を決める目標。実装済み・性能保証・採用済みを意味しない。**
+POは、快適に使えることを全体の軸にし、定番のUI/UX指針を参考に目標値と報告方法を定める方針を委任した。
+既存の仕様03の端末・データ別受入れ、保存・復旧・互換性の契約は維持する。
+
+全体の判断には[NN/gのusability heuristics](https://www.nngroup.com/articles/ten-usability-heuristics/)の
+状態の可視性、一貫性、記憶に頼らない認識、ミスからの回復、必要な情報に絞る考え方を用いる。
+新たな設定や確認を増やす前に、対象と結果が分かるか、同じ概念に同じ語を使うか、
+不要な判断や再入力がないか、既存の安全な取消・復旧へ戻れるかを確認する。
+
+[NN/gの応答時間の目安](https://www.nngroup.com/articles/response-times-3-important-limits/)では、
+約0.1秒は直接操作の感覚、約1秒は思考の流れ、約10秒は注意を維持できる範囲に関係する。
+これを参考にした次の値はLociViewの開発判断であり、任意の3Dデータの処理時間を保証する値ではない。
+[web.devのINP](https://web.dev/articles/inp)は入力から次の描画までの応答性を扱い、200ms以下を良好の目安とする。
+処理全体の完了時間とは別に評価する。正式なfield判定は端末別page-viewのp75であり、少数の自動操作からINP合格やp95を作らない。
+
+| 体験 | 開発目標・確認方法 |
+|---|---|
+| 選択・入力に反応する | 受付・選択・押下など最初の見える反応は100ms以内を目指す。入力を失わず、選択・focus・処理中を区別する。 |
+| 普段の作業が途切れない | タブ切替・検索・絞込みなど単純な表示操作は1秒以内を目指す。永続化の完了とローカル入力の反応を混同しない。 |
+| 保存を待ち続けない | 所有する小規模の標準回帰入力では、通常のファイル生成と追加の保存ファイル照合を各10秒以内へ近づける。超過は未達としてtodoに記録する。大容量・別履歴・別端末へ値を一般化しない。 |
+| 長い処理でも状況が分かる | 1秒級から処理状態を示す。10秒級は性能残件として扱い、実際に分かる段階や量を伝える。未計測の残時間・進捗率を作らず、取消は安全に実装済みの範囲だけで示す。 |
+| 迷わず、安心して続ける | 「開く→記録→保存／渡す→再開」を内部形式・job一覧の理解なしで完了する。正常時の点検、同じ情報の再入力、意味のない選択を要求しない。未反映・外部保存未確認・失敗と安全な次操作は明示する。 |
+| 入力方法を選べる | 既存の44 CSS px目標、keyboard/focus、320 CSS px、200% zoom、長い日本語／実IME、動きを減らす設定を維持する。 |
+
+[W3Cのstatus message指針](https://www.w3.org/WAI/WCAG22/Understanding/status-messages.html)に沿い、
+処理状態と結果は作業のfocusを奪わず伝えられるようにする。
+44pxは既存のLociView方針で、[WCAGの拡張target size](https://www.w3.org/WAI/WCAG22/Understanding/target-size-enhanced.html)にも対応する。
+これをAA適合や実機受入れの完了宣言にはしない。各操作の安全性・復旧可能性は速さと独立に確認する。
+
+10秒目標の境界は、通常保存が最終「ファイルに保存」選択からdownload開始まで（同期の状態再表示も含む）、
+任意照合がファイル選択確定から一致の通知までとする。OSでの保存完了や、人間のpicker／判断待ちは別に扱う。
+内部の生成だけが速くなっても、再表示・受渡しを待たせていれば通常保存の達成にはしない。
+
+計測は既存の実ファイルworkflowを使う。入力のbytes・履歴・出力件数、端末／browser、build、
+trace／計測条件、回数nを添え、通常生成・任意の再選択照合・人間の判断待ちを区別する。
+単回は観測値として残す。複数回なら生値とmin/median/maxを添え、少数値から保証や百分位を主張しない。
+field INP、local Event Timing、描画待ちの代用測定、操作全体の時間を混同しない。
+見える反応の改善だけで、長い完了待ちを解消した扱いにはしない。
+
+報告の主語は利用者が終えられる作業にする。短い報告は次の4点に揃える。
+
+1. 今回つながった／改善した利用者の作業。
+2. 目標に対する同条件の実測と、未測定・未達の残件。
+3. 残る使いづらさ・復旧上の制限・未受入れの端末／offline／通常入口。
+4. 次に完了させる作業。
+
+テスト・build・reviewは検証欄にまとめ、件数や部品数を完成度に置き換えない。
+通常保存のたびにファイル再選択を要求する方針ではない。自動検証の再選択は正確な保存内容を確認するためで、
+画面は引き続きdownload開始・端末への保存完了・内容照合をそれぞれ正しく区別する。
 
 ## 3. User-visible mental model and terminology
 

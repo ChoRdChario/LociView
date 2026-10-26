@@ -2835,6 +2835,27 @@ strict and operation-scoped records/bytes/payloads, supplied-argument ownership,
 closing refusal and fresh refusal after acknowledged evidence loss, reusing
 existing mutation/recovery cases and the actual two-party browser file flow.
 
+**Output-state projection refinement (2026-10-26):** within one pure
+WorkspaceSender.jobs read callback, each backup still runs its complete original,
+state/steps/artifact/completion/protection validation. Protection captures the source
+proof before awaiting, uses that exact proof for its base store/snapshot, and may
+return that owned snapshot/proof alongside its existing base-store capability.
+Mutation callers continue using the same strict store and fresh checks; the result
+is not a caller-supplied validated bit or a cross-operation authority.
+
+The backup stale-display projection may reuse the successful protection snapshot
+only when its proof equals the actual current source proof. Otherwise read the
+current-proof snapshot as before. Within that one jobs callback, lazily reuse one
+fully successful current token/base/inventory projection across rows; no rejected
+Promise, partial value, Store/global cache, new read API or cross-call reuse. Keep
+job-specific protected bytes, completion inclusion, frozen inventory and artifact
+checks on every row. Do not use display reuse for generate/download/verify or move
+a temporary base-store capability outside its owner read lifetime. Per-job failure
+isolation, the closing audit outside catches and fresh next calls remain mandatory.
+Acceptance checks one-row duplicate-snapshot removal, multiple backups' exact states,
+proof mismatch fallback, failed-projection retry, acknowledged evidence loss and
+closing refusal using existing service and actual restored-file workflows.
+
 **Shared OPFS sink refinement (2026-10-26):** coalesce small incoming chunks
 using one fixed 64 KiB owned buffer within the existing I/O accounting, never a
 whole-archive buffer. Preserve the original whole-input-chunk copy before any

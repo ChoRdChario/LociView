@@ -10,6 +10,11 @@ The optional backup phase observer carries only fixed names/durations and has no
 operation authority. Current measurements and next work remain in todo; the
 [browser runbook](../docs/browser-testing.md) distinguishes observed whole actions
 from native sink unit counts and device/adoption evidence.
+Comfort targets and the outcome/goal/friction/next-step report belong to
+[UI guidelines §2.2](../docs/ui-product-guidelines.md). Output-state projection
+reuse is confined to one matching-proof read callback; keep all per-job protections
+and closing audits. Todo records the still-unmet restored-save target and next
+readiness-stage investigation; local Event Timing is not field INP acceptance.
 The bounded integrated UI is selected by `editor=project` in validation; follow
 todo for its tested scope and remaining ordinary-entry/browser/device boundaries.
 Attachment description/order candidates use the same checked Session recovery

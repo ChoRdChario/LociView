@@ -2416,7 +2416,8 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     job.assertOwner(f.scope.fs);
     await withMetadataRead(f.scope.fs, undefined, async ({ fs }) => { expect(() => job.assertOwner(fs)).toThrow('output-owner'); });
     const paths = await f.fs.list(''), writes = vi.spyOn(f.fs, 'writeText');
-    for (const read of [() => BackupOutputJob.ids(f.scope.fs), () => BackupOutputJob.state(f.scope.fs, id, metadata), () => job.steps()]) {
+    for (const read of [() => BackupOutputJob.ids(f.scope.fs), () => BackupOutputJob.state(f.scope.fs, id, metadata), () => job.steps(),
+      () => new WorkspaceSender(f.scope.fs, session, f.store, metadata, f.locks).jobs()]) {
       f.audit.count = 0; f.audit.before = async () => { if (f.audit.count === 2) throw Error('backup closing audit'); };
       await expect(read()).rejects.toThrow('backup closing audit'); expect(f.audit.count).toBe(2);
       job.assertOwner(f.scope.fs);
@@ -2856,6 +2857,26 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect(f.fs.reads).toBe(reads); // Listing checks facts/receipts, not model streams.
     const second = await sender.generateBackup(token, label), other = await sender.download(second);
     expect(second).not.toBe(id); expect((await BackupOutputJob.open(f.fs, second, metadata)).manifest().packageId).not.toBe(job.manifest().packageId);
+    const currentRead = f.receiver.session.read.bind(f.receiver.session), readSpy = vi.spyOn(f.receiver.session, 'read'),
+      snapshotSpy = vi.spyOn(WorkspaceBaseStore.prototype, 'snapshot');
+    const rows = (await sender.jobs()).filter(row => row.purpose === 'backup');
+    expect(rows).toHaveLength(2); expect(rows.every(row => row.state === 'generated' && row.stale === false)).toBe(true);
+    expect(readSpy).toHaveBeenCalledTimes(1); expect(snapshotSpy).toHaveBeenCalledTimes(2); // Each protection still runs; display does not reread it.
+    readSpy.mockRestore(); snapshotSpy.mockRestore();
+    const actual = await currentRead(), foreignProof = structuredClone(actual.source!.proof);
+    Object.assign(foreignProof.identity, { projectId: `prj_${'f'.repeat(32)}` });
+    const foreignSource = new Proxy(actual.source!, { get(target, key) {
+      if (key === 'proof') return foreignProof;
+      const value: unknown = Reflect.get(target, key, target); return typeof value === 'function' ? value.bind(target) : value;
+    } });
+    const mismatched = vi.spyOn(f.receiver.session, 'read').mockResolvedValue({ ...actual, source: foreignSource });
+    expect((await sender.jobs()).filter(row => row.purpose === 'backup').map(row => row.state)).toEqual(['repair-required', 'repair-required']);
+    expect(mismatched).toHaveBeenCalledTimes(2); // A failed projection is not cached.
+    mismatched.mockRestore();
+    const transient = vi.spyOn(f.receiver.session, 'read').mockImplementation(currentRead).mockRejectedValueOnce(Error('temporary current read'));
+    expect((await sender.jobs()).filter(row => row.purpose === 'backup').map(row => row.state).sort()).toEqual(['generated', 'repair-required']);
+    expect(transient).toHaveBeenCalledTimes(2); transient.mockRestore();
+    expect((await sender.jobs()).filter(row => row.purpose === 'backup').every(row => row.state === 'generated' && row.stale === false)).toBe(true);
     await expect(sender.verifyFile(id, other)).rejects.toThrow('output-selected-mismatch');
     await sender.verifyFile(id, file); const writes = vi.spyOn(f.fs, 'writeText');
     await sender.verifyFile(id, file); expect(writes).not.toHaveBeenCalled(); writes.mockRestore();

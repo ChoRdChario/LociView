@@ -300,7 +300,7 @@ export class MetadataProjectSession {
     job.assertOwner(this.fs); const current = await this.outputReady();
     if (json(current.source!.proof) !== json(job.source.proof)) return fail('output-lineage');
     await this.assertOutputSlot(job.id);
-    const bases = await validateOutputProtection(this.fs, job, store, this.limits);
+    const { bases } = await validateOutputProtection(this.fs, job, store, this.limits);
     await bases.preflightRecord(job.baseRecord(), job.originalEvidence()); await job.generate(store, signal);
     await job.baseRecorded(await bases.recordGenerated(job)); return job.id;
   }
