@@ -41,11 +41,11 @@ export function createProjectModels(document: Document, host: ProjectPanelHost):
     host.changed();
   });
   const input = (label: string) => { const node = make('input'); node.type = 'file'; node.accept = '.glb,model/gltf-binary'; node.hidden = true; node.setAttribute('aria-label', label); fileArea.append(node); return node; };
-  const addInput = input('3Dモデルを追加'), replaceInput = input('モデルを差し替える');
+  const addInput = input('3Dモデルを追加'), replaceInput = input('モデルを差し替える'); addInput.accept += ',.ply,application/ply';
   const beginFile = (kind: 'add' | 'replace') => {
     if (host.block('models') || ownInput() || memory().composing) return;
     const { provider, sceneId } = host.source(), details = memory().assetId ? host.ports.modelDetails(sceneId, memory().assetId!) : null;
-    if (kind === 'replace' && (!details || details.sceneCount.kind !== 'value')) return;
+    if (kind === 'replace' && (!details || details.replacementAvailable === false || details.sceneCount.kind !== 'value')) return;
     fileScope = { kind, token: provider.token, sceneId, assetId: kind === 'add' ? newProjectId('ast') : details!.target.assetId,
       expectedBindingId: kind === 'replace' ? details!.target.bindingId : undefined };
     const selected = kind === 'add' ? addInput : replaceInput; selected.value = ''; host.changed(); selected.click();
@@ -132,11 +132,15 @@ export function createProjectModels(document: Document, host: ProjectPanelHost):
   deletionBox.append(button('削除する', () => { const captured = deletion; if (!captured || host.block('models')) return;
     host.dispatch('models', captured.token, { kind: 'deleteAsset', assetId: captured.assetId, eventId: newProjectId('evt') }, () => { deletion = null; setMemory({ ...memory(), assetId: null }); host.message('モデルを削除しました。'); }); }),
     button('戻る', () => { if (!host.block('models', false)) { deletion = null; host.changed(); } }));
-  root.append(list.root, fileArea, placement, pinSizeArea, review, remove, deletionNote, deletionBox); if (preview) root.append(preview.root);
+  const pointSizeArea = make('section'), pointSizeLabel = make('label', '点の大きさ（px）'), pointSizeInput = make('input');
+  pointSizeInput.type = 'range'; pointSizeInput.min = '1'; pointSizeInput.max = '20'; pointSizeInput.step = '1'; pointSizeInput.setAttribute('aria-label', '点の大きさ（px）'); pointSizeLabel.append(pointSizeInput); pointSizeArea.append(pointSizeLabel);
+  pointSizeInput.addEventListener('input', () => { const assetId = memory().assetId; if (assetId && !pointSizeInput.disabled) { host.viewport().setPointDiameter?.(assetId, Number(pointSizeInput.value)); host.changed(); } });
+  root.append(list.root, fileArea, placement, pinSizeArea, pointSizeArea, review, remove, deletionNote, deletionBox); if (preview) root.append(preview.root);
   function render() {
     if (disposed) return; list.render(context()); const block = host.block('models'), selected = memory().assetId, { provider, sceneId } = host.source();
     const details = selected ? host.ports.modelDetails(sceneId, selected) : null;
     const source = context().source, selectedItem = source.kind === 'ready' ? source.items.find(i => i.id === selected) : undefined;
+    pointSizeArea.hidden = !details?.pointCloud; pointSizeInput.disabled = !!block || !!edit || !!fileScope; if (selected) pointSizeInput.value = String(host.viewport().pointDiameter?.(selected) ?? 3);
     const included = selectedItem?.membership.kind === 'value' && selectedItem.membership.value.kind === 'included';
     const visible = selectedItem?.display.kind === 'value' && selectedItem.display.value === 'visible';
     const scale = selected ? provider.details.mutable.assetsById[selected]?.pinScale : undefined;
@@ -150,10 +154,10 @@ export function createProjectModels(document: Document, host: ProjectPanelHost):
     cancelPinSize.hidden = !pinSize; cancelPinSize.disabled = !!host.block('models', false) || composing;
     pinSizeNote.textContent = staleScale ? '内容が更新されています。入力を保持しています。取り消して選び直してください。' : !scaleReady ? 'このプロジェクトでは倍率を変更できません。モデルと設定の状態を確認してください。' : 'このモデルに属するピンの大きさを、すべてのシーンで変更します。';
     add.disabled = !!block || ownInput() || memory().composing || !sceneId;
-    replace.disabled = !!block || ownInput() || memory().composing || !details || !included || details.sceneCount.kind !== 'value';
+    replace.disabled = !!block || ownInput() || memory().composing || !details || details.replacementAvailable === false || !included || details.sceneCount.kind !== 'value';
     confirmReplacement.hidden = fileScope?.kind !== 'replace' || !fileScope.file; confirmReplacement.disabled = !!block || fileScope?.token !== provider.token;
     cancelFile.hidden = !fileScope; cancelFile.disabled = !!host.block('models', false);
-    fileNote.textContent = fileScope?.kind === 'replace' ? `${fileScope.file?.name ?? 'ファイルを選択してください。'} ${details?.sceneCount.kind === 'value' ? `${details.sceneCount.value}シーンのモデルを差し替えます。` : ''} 配置と記録は保持され、ピンは要確認になります。材質の調整は引き継ぎません。` : fileScope ? '追加する静的GLBを選択してください。' : '';
+    fileNote.textContent = fileScope?.kind === 'replace' ? `${fileScope.file?.name ?? 'ファイルを選択してください。'} ${details?.sceneCount.kind === 'value' ? `${details.sceneCount.value}シーンのモデルを差し替えます。` : ''} 配置と記録は保持され、ピンは要確認になります。材質の調整は引き継ぎません。` : fileScope ? '追加するGLBまたは点群のPLYを選択してください。' : '';
     begin.disabled = !!block || ownInput() || !details || !visible || details.sceneCount.kind !== 'value';
     fields.hidden = modes.hidden = confirm.hidden = cancel.hidden = !edit; confirm.disabled = !!block || composing || !valid(); cancel.disabled = !!host.block('models', false) || composing;
     inputs.forEach((node, index) => { node.disabled = !!block; if (!composing) node.value = raw[index] ?? ''; });
@@ -202,7 +206,7 @@ export function createProjectModels(document: Document, host: ProjectPanelHost):
     preview?.render(sceneId);
   }
   return { root, render, hasChanges: () => ownInput() || memory().composing || composing, composing: () => composing || memory().composing,
-    hidden: () => memory().hiddenAssetIds, proposal: () => edit,
+    selectedPoint: () => { const assetId=memory().assetId; return assetId && host.ports.modelDetails(host.source().sceneId,assetId)?.pointCloud === true ? assetId : null; }, hidden: () => memory().hiddenAssetIds, proposal: () => edit,
     show(assetId) { setMemory({ ...memory(), hiddenAssetIds: memory().hiddenAssetIds.filter(id => id !== assetId) }); },
     propose(next) { if (!edit || composing || memory().composing || next.mode !== edit.mode || host.block('models', true, true) || !sameProjectValue(next.target, edit.target)) return false;
       if (!next.placement.translation.every(Number.isFinite) || !Number.isFinite(next.placement.uniformScale) || next.placement.uniformScale <= 0) return false;

@@ -19,6 +19,14 @@ field INP acceptance. Explicit binary cutout connects the existing opaque GLB sl
 through UI, sparse material commands, identical display/pick predicates and file/cold
 continuation. Inventory/todo retain its precise scope and the remaining model/
 material/profile/device requirements; do not treat it as all-feature completion.
+The approved [01a](../docs/specs/01a-point-project-scene-proposal.md) ordinary-point
+path preserves exact XYZ/RGB ASCII PLY bytes and uses owned source centres for
+point-cloud anchors; explicit adjustments become manual. Source/three profile
+JSON bytes stay immutable. Projection samples are shared by display and pick;
+GPU Boolean visibility handles mixed Mesh occlusion without GPU IDs/depth
+reconstruction. Point capability failures stay local. Review binary decoders use
+the existing archive Blob port/consumer limits; control/source limits stay fixed.
+Todo/inventory own the exact tested scope, checkpoint and remaining work.
 The bounded integrated UI is selected by `editor=project` in validation; follow
 todo for its tested scope and remaining ordinary-entry/browser/device boundaries.
 Attachment description/order candidates use the same checked Session recovery

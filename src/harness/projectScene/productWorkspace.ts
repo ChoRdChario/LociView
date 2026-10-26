@@ -69,10 +69,10 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
     createViewport(canvas, update, propose, proposeModel): WorkspaceViewport {
       let state: WorkspaceViewportState | undefined, closed = false, rendered: SyntheticDisplay | undefined, pointerHeld = false;
       let renderedInput = '';
-      const runtime = factory(canvas, update, (target, position) => {
+      const runtime = factory(canvas, update, (target, position, phase) => {
         if (!state?.pin || state.readOnly || host.authority.readOnly || target.token !== read().token ||
           JSON.stringify(target) !== JSON.stringify(state.pin.target)) return false;
-        return propose(target, position);
+        return propose(target, position, phase);
       }, (target, position, manipulation) => {
         if (!state?.model || state.readOnly || host.authority.readOnly || JSON.stringify(state.model.target) !== JSON.stringify(target) || target.token !== read().token) return false;
         return !!proposeModel?.({ target, mode: manipulation?.mode ?? state.model.mode,
@@ -139,7 +139,7 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
           renderedInput = input;
           runtime.setPinPointerActive?.(pointerHeld || !!next.windowMoving || next.choosing && !next.readOnly); runtime.setActive(true);
         },
-        read: observation, target,
+        read: observation, target, setPointDiameter: (assetId, diameter) => runtime.setPointDiameter?.(assetId, diameter), pointDiameter: assetId => runtime.pointDiameter?.(assetId) ?? 3,
         reservePointer(active) { pointerHeld = active; if (!closed) runtime.setPinPointerActive?.(active || !!state?.windowMoving || !!state?.choosing && !state.readOnly); },
         pick(x, y, assetId, directCreation = false) {
           if (closed || !state || state.readOnly || host.authority.readOnly || !state.choosing && !directCreation) return null;

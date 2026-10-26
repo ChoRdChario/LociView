@@ -369,7 +369,7 @@ checkpoint/builds and meaningful independent review at the connected workflow.
 Keep one current plan here, route-specific coverage in inventory and next outcome
 in every milestone report. Next selection and delivered result are recorded below.
 
-Selected connected operation: A03's already specified binary material cutout,
+Completed connected operation: A03's already specified binary material cutout,
 not a new paste convenience (I02 file attachment is already connected). Existing
 opaque editable GLB slots gain an explicit mask choice and cutoff; opacity and
 soft chroma affect binary coverage under01 §4.2, never silently smooth blending.
@@ -455,6 +455,107 @@ and tested tree; final browser assets match the last validation build. Exact26pa
 scope contains no dependency/public fixture/CI/home/SW/release change. Later result
 prose/index changes do not require rerunning the passed runtime checks. Preserve
 the first whole-check FAIL, subsequent final root PASS and all browser observations.
+
+### Completed connected operation — ordinary-point files and continued records
+
+PO renewed continuation2026-10-27 from clean pushed0fcf393/g0-baseline and explicitly
+approved [01a](../docs/specs/01a-point-project-scene-proposal.md), including its six
+immutable source/presentation/golden JSON companions. Outcome: open/add the exact
+XYZ/RGB ASCII PLY → local diameter/placement/visibility → source-centre Caption and
+media → actual saved/team/review files → receive/restore/cold continuation. Feature
+completion remains ahead of performance. Root is the only writer; independent
+read-only reviewers cover data/authority, rendering/picking and the connected UI.
+
+Accepted boundary: original XYZ at1unit=1Assetmetre;3px default/1..20px disc;
+exact three-profile registry, binary-only candidate backend;6CSSpx fallback after
+covered fragment/depth proof; point-only source-unlit exception; current source
+identity plus owned canonical centre before the existing Session publication.
+Explicit adjustments become source-less manual; unchanged move/cancel retains
+point evidence. Dither/smooth, GS/Proxy, point replacement/conversion and other
+Mesh formats keep their actual gates. No package/schema/dependency/network,
+ordinary-home/SW/release change, weakened recovery fence or changed old profile.
+
+Implementation uses an owned shared Float32 screen/depth projection for display
+and picking (including large-coordinate cancellation), prepared before Three's
+attribute upload. Mixed-Mesh occlusion uses actual GPU Boolean coverage/depth,
+without reading IDs or reconstructing depth. Unknown coverage/depth remains an
+ambiguous placement. Point capability failures remain local; saved Caption/media
+and other Mesh display remain available. Opening a point Project selects the typed
+product editor within validation; a point added to the older synthetic harness
+cannot silently create manual provenance and instead asks to reopen that Project.
+
+- [x] Ratify/review exact source and three presentation definitions; verify approved
+  JSON bytes/hashes and retain old GLB/Native/converter semantics.
+- [x] Connect strict source inspection to fresh/add, content facts, receivers and
+  restore; original bytes/order/Float32 centres and RGB remain owned.
+- [x] Connect local diameter, placement/visibility, direct/fallback point selection,
+  checked point-cloud commands and explicit manual adjustment/cancel handling.
+- [x] Focused parser/registry/pixel/pick/fault/isolation and existing viewport
+  regressions:42PASS. Typecheck passed before final small rejection/test fixes;
+  the final serial checkpoint below remains required.
+- [x] Independent final data/authority and renderer reviews: findings closed,
+  including bare trailing CR, large coordinate projection, upload timing, exact
+  source centre, ambiguous depth, Mesh ties and GPU-probe resource/tile ownership.
+- [x] Dedicated Chromium: real-file/cold workflowPASS in run1793042542621-48668
+  (4.1min); transformed Mesh-occlusion casePASS in run1793040449635-58376
+  (19s, that earlier aggregate run was not a PASS). Exact source/assets/scope and
+  retained failure lanes: `.artifacts/e2e/point-evidence.json`.
+- [x] Final source/test check:checkpointPASS: typecheck,117files/2749testsPASS
+  (21existingTODO), normal build, harness build and validation build, serially.
+- [x] Verify exact reviewed/tested scope, privacy and deployment trigger; prepare
+  the suitable g0-baseline checkpoint for normal commit/push. Git owns its actual
+  publication identity; no main/Pages/SW/release/deployment change.
+
+Browser evidence now covers source recording/media, local diameter/visibility and
+Move/Rotate/scale, exact named-backup file selection, independent Workspace/return,
+standalone Review, unsupported-DPR point-only isolation, cold restart and absent-
+workspace restore followed by continued edits/backup with exact original history.
+The mixed-Mesh case proves GPU occlusion at a Float32 cancellation edge and source-
+centre placement after hiding that Mesh. Earlier test-target/phase-wait failures
+remain preserved. It also exposed a real existing Review binary-read bug: the
+browser64MiB body ceiling was passed to an8MB control/source buffer API. Using the
+existing native Blob decoder port fixes GLB/point/image Review while keeping ZIP,
+control/source and consumer limits. The existing Native GLB/PNG Review regression
+with browser ceiling passes; data-boundary re-review has no findings.
+
+The first completed full checkpoint reported2747PASS/2FAIL/21TODO: two resident
+read-count spies still watched the GLB-only compatibility wrapper after generic
+model reads moved to modelContent. Geometry/disposal assertions passed. Moved the
+two count spies and three no-extra-read spies to the actual modelContent port,
+retaining every count/assertion; the old fixture-owned model port remains intact.
+All six affected GLB/media/visibility regressions pass; independent review is
+closed. A separate GLB-selection regression preserves ordinary Mesh Add/Shift
+behavior while only a selected Point narrows point targeting. The final full
+checkpoint passed serially (root798.94s). Earlier sandbox-only temporary-Git write failures
+remain recorded; approved escalation is used for the unchanged Git tests. No
+physical-device, offline, performance, aggregate G0/G1 or adoption acceptance is
+claimed. Final-build dedicated Chromium Review alsoPASS: one local DPR3 notice,
+Mesh/Caption/image remain usable, no page errors; screenshot inspected. All43final
+source/test hashes match the tested tree; final7asset hashes are retained separately
+from the earlier browser assets. Normative6JSON bytes/hashes and8doc links pass.
+
+Short meta-audit: branch/HEAD and accepted scope remain unchanged; production work
+closes one connected M02/M12 boundary rather than accumulating helpers. Existing
+whole-workflow tests are reused. Genuine stop conditions are a new unresolved
+contract/product/architecture decision, unapproved dependency, or release/destructive
+boundary. Manual/device lanes stay pending without blocking in-scope implementation.
+Next: prepare the exact GS source-profile and GS/Proxy continuation proposal for
+M03/M10, using the existing candidate and recorded characterization. Source support
+bounds, covariance/SH semantics and immutable goldens require a concrete reviewed
+proposal before PO ratification; the older Native inspector/renderer is not that
+authority. Then connect selected GS to its same-Asset invisible Proxy, explicit
+manual pin confirmation and the existing file/cold workflow. Do not return to
+latency-first work, redo G0 preparation, or count all point/GS/model and material
+coverage as complete from this bounded implementation.
+
+Read-only GS preflight: the existing eight-splat source/generator/transport
+diagnostics remain reusable candidate evidence, but lack independently authored
+support-bound/transformed-SH goldens and immutable upstream/license provenance.
+The current64MiB validation body ceiling also cannot admit the baseG1-B500k SH3
+payload (124,000,000bytes before its header). Do not silently increase that ceiling
+or promote the Native header inspector/means-only bounds. Exact semantic profile,
+bounded admission and production integration need their own reviewed decision;
+tiny-file integration must not receive large-source/paging/device gate credit.
 
 ### Completed checkpoint — comfortable file work and fresh output state
 

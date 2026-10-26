@@ -1,0 +1,33 @@
+{
+  "id": "lociview-point-smooth-1",
+  "version": 1,
+  "defaultDiameterCssPixels": 3,
+  "minimumDiameterCssPixels": 1,
+  "maximumDiameterCssPixels": 20,
+  "shape": "disc",
+  "edgeCoverage": "smoothBlend",
+  "pickCoverageAlphaThreshold": 0.5,
+  "radialCoverage": {
+    "rule": "g = 1 when hypot(sampleCenterCss - projectedCenterCss) <= diameterCssPixels / 2; otherwise g = 0",
+    "antiAliasing": "no fractional geometric edge in version 1"
+  },
+  "sampling": {
+    "origin": "top-left",
+    "renderSize": "max(1, floor(cssExtent * devicePixelRatio * renderScale + 0.5)) per axis",
+    "sampleCenterCss": "((i+0.5)*cssWidth/width, (j+0.5)*cssHeight/height)",
+    "pointerSample": "(floor(xCss*width/cssWidth), floor(yCss*height/cssHeight)) for pointer inside viewport",
+    "depth": "source point projected-center depth",
+    "distanceAttenuation": false,
+    "sizeClamp": "use an equivalent quad or report unsupported; never hidden native clamp"
+  },
+  "materialComposition": "01-domain-rendering section 4.2; geometry and material evaluated separately; unsupported edge/material policies never silently fallback",
+  "goldens": {
+    "file": "point-presentation-1.goldens.json",
+    "sha256": "9b098247c67c1006c6bf08a3656503781be3da5bc535eb2a1d41cc49ef4ff742"
+  },
+  "ditherSeedDomains": {
+    "geometry": "lociview-point-geometry-coverage-1",
+    "material": "lociview-material-coverage-1"
+  },
+  "ditherRuleBinding": "A separately ratified immutable G0 dither rule must bind matrix, seed derivation and top-left sample coordinates to the two distinct domains. A dither request is unsupported until that exact rule ID/digest and required capability are available; no engine defaults."
+}

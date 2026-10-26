@@ -17,12 +17,17 @@ owns feature coverage. Read [document authority](docs/README.md) for contracts.
 |---|---|---|
 | `index.html` → `src/main.ts` → `src/ui/app.ts` | Ordinary home and legacy v1 route, with Native entry | New ProjectScene adoption |
 | `src/nativeGs/app.ts` | Bounded Native Mesh/Point/GS, DisplaySets, media and package exchange | New continuing-history team workflow or general format support |
-| `dev.html` → `src/dev-entry.ts` → `src/harness/projectScene/entry.ts` | Nondefault ProjectScene development host; memory, old saved, metadata and limited static GLB plus PNG/JPEG/WebP/GIF photo validation routes | Ordinary-home, device, offline or release acceptance |
-| `project-scene-validation` build → `dev.html` → `validationEntry.ts` | Same limited GLB and photo validation screen, static-only entry; separate `validation-dist`, no public assets or Service Worker | Ordinary-home activation, offline/PWA, profile/device or release acceptance |
+| `dev.html` → `src/dev-entry.ts` → `src/harness/projectScene/entry.ts` | Nondefault ProjectScene development host; memory, old saved, metadata and limited static GLB/approved XYZ-RGB ASCII PLY plus PNG/JPEG/WebP/GIF photo validation routes | Ordinary-home, device, offline or release acceptance |
+| `project-scene-validation` build → `dev.html` → `validationEntry.ts` | Same limited GLB/point and photo validation screen, static-only entry; separate `validation-dist`, no public assets or Service Worker | Ordinary-home activation, offline/PWA, profile/device or release acceptance |
 
 Within validation, `editor=project` selects the bounded typed product composition
 in `src/ui/projectScene/projectWorkspace.ts`; its viewport/file adapter is
 `src/harness/projectScene/productWorkspace.ts`. The existing editor remains available.
+The approved [01a point companion](docs/specs/01a-point-project-scene-proposal.md)
+connects `projectFiles/pointPly.ts`/`content.ts`, the checked Session point-anchor port,
+`viewer/pointSurface.ts` and the validation point visibility/pick adapters. Point
+Projects use the typed composition inside validation; exact evidence/status stays
+in todo. This adds no ordinary-home, GS, smooth/dither or device/adoption credit.
 The composition's model, Saved View, material and attachment panels reuse their pure controls;
 `projectMedia.ts` connects attachment management to the common `mediaPreview.ts` viewer.
 The composition reuses `captionWindowControls.ts` for Scene-local comparison

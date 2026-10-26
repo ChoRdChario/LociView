@@ -1,6 +1,6 @@
 # 実装・接続の全体棚卸し
 
-> 更新: 2026-10-15（限定product composition・承認済み初回変換の経路を追加。全体分類は2026-09-21時点）。本書は機能対応の正本。
+> 更新: 2026-10-27（01aの限定Point経路を追記。全体分類は2026-09-21時点）。本書は機能対応の正本。
 > 実装順・現在の作業tree・実行結果は [todo](todo.md) を参照し、ここへ重複記載しない。
 > 限定接続と製品受入れを区別し、通常画面・実機の新たな合格は主張しない。
 > [以前の棚卸しと監査記録](../docs/history/development-through-2026-09-14/tasks/implementation-inventory.md) は履歴。
@@ -72,7 +72,7 @@
 | ID | 機能群／利用者の結果 | 状態 | 現在の境界・残り | コード／既存受入れ参照（行番号は監査時点） |
 |---|---|---|---|---|
 | M01 | Meshを追加・表示する | 別経路のみ | validation静的GLBの新規作成／開いたProjectへの独立追加／元材質表示は限定接続。追加は現在Sceneのみ、exact保存・表示retryで重複させない。NativeのglTF/OBJ/STL/Mesh PLY等は新経路へ未接続。部分接続を行全体の完了としない。 | [src/harness/projectScene/validationHost.ts](../src/harness/projectScene/validationHost.ts) / [src/harness/projectScene/validationRender.ts](../src/harness/projectScene/validationRender.ts) / [tests/projectFiles.test.ts](../tests/projectFiles.test.ts) |
-| M02 | 通常Pointを追加・表示・pickする | 別経路のみ | Nativeもexact ASCII float XYZ＋uchar RGB PLY限定。新hostへ未接続。一般点群対応とは呼ばない。 | [src/nativeGs/plyProfile.ts:351](../src/nativeGs/plyProfile.ts) / [tests/nativeGs/pointPresentation.test.ts:9](../tests/nativeGs/pointPresentation.test.ts) |
+| M02 | 通常Pointを追加・表示・pickする | 別経路のみ | 承認済み01aのexact XYZ/RGB ASCII PLYを限定validationへ追加し、原本・点順序・Float32中心を保持して追加／表示／選択／Caption・画像／backup・Workspace・返送・閲覧／復元・coldへ接続。binary discのみ、代表DPR1/2描画とDPR3局所Unsupportedを専用Chromiumで確認。一般PLY／Point全体、dither・smooth、Point差替・変換・copyの一般対応や実機／offline／採用は残る。最終チェックと実行範囲はtodo参照。 | [src/projectFiles/pointPly.ts](../src/projectFiles/pointPly.ts) / [01a](../docs/specs/01a-point-project-scene-proposal.md) / [tests/e2e/point-workflow.spec.ts](../tests/e2e/point-workflow.spec.ts) |
 | M03 | GSを追加・表示する | 別経路のみ | Nativeのexact Graphdeco SH2/SH3 profileを新hostに未接続。実body・resource lifecycleの検証が必要。 | [src/nativeGs/plyProfile.ts:305](../src/nativeGs/plyProfile.ts) / [src/harness/projectScene/viewport.ts:91](../src/harness/projectScene/viewport.ts) |
 | M04 | モデル選択・検索とScene所属を管理する | 接続済み | 既知モデルのinclude/exclude。Assetそのものは残る。 | [src/ui/projectScene/modelListState.ts:15](../src/ui/projectScene/modelListState.ts) / [tests/ui/projectMetadataHost.test.ts:535](../tests/ui/projectMetadataHost.test.ts) |
 | M05 | モデルを一時的に隠す／単独表示する | 接続済み | モデルタブのhide/show/isolate/全表示とCaptionからの復帰をlocal接続。Scene所属・履歴・Saved Viewは不変更。resident・カメラ・本文・windowを保持し、所有pin/hit/gizmoを抑制。readonly、Scene別保持、新規追加・cold解除は既存tests、実描画／実機は未受入れ。 | [src/ui/projectScene/modelListState.ts](../src/ui/projectScene/modelListState.ts) / [src/harness/projectScene/viewportHost.ts](../src/harness/projectScene/viewportHost.ts) / [tests/projectFiles.test.ts](../tests/projectFiles.test.ts) |
@@ -82,7 +82,7 @@
 | M09 | Projectからモデルを削除する | 接続済み | 全Scene所属・Caption anchor・material routingの原候補を検査し、参照ゼロのAssetだけ確認付きtombstone。未知／曖昧な参照は拒否。保存前の選択、本体／原履歴、後着参照と相手の未適用入力を保持。exact retry／cold reopen／再受信を限定hostで確認。cascade・物理消去・一般参照修復なし。 | [src/projectMetadata/assetDeletion.ts](../src/projectMetadata/assetDeletion.ts) / [src/harness/projectScene/assetDeletionControls.ts](../src/harness/projectScene/assetDeletionControls.ts) / [tests/ui/projectMetadataHost.test.ts](../tests/ui/projectMetadataHost.test.ts) |
 | M10 | GSの配置補助モデルと配置可否を確認する | 別経路のみ | Nativeの明示same-Asset Proxyだけのpickを未継承。Proxyなしでは既存Caption保持、新配置拒否。 | [src/nativeGs/app.ts:380](../src/nativeGs/app.ts) / [tests/nativeGs/schemaResolver.test.ts:869](../tests/nativeGs/schemaResolver.test.ts) |
 | M11 | ピンの表示サイズを調整する | 別経路のみ | 限定validationでは取込pinScaleを保持し、ピン描画へ反映済み。限定product compositionでは明示map2のAsset倍率編集・全Sceneのmarker反映・失敗時exact retry・backup/cold再開まで接続。map1は不変更。通常入口／実描画・実機受入れは未完で主分類は維持。 | [src/harness/projectScene/viewportModel.ts](../src/harness/projectScene/viewportModel.ts) / [src/harness/projectScene/viewportHost.ts](../src/harness/projectScene/viewportHost.ts) / [src/nativeGs/app.ts:1841](../src/nativeGs/app.ts) |
-| M12 | 点群の表示径を調整する | 別経路のみ | 新Point経路がない。Nativeの一時表示設定をPoint接続時に継承。 | [src/nativeGs/viewer.ts:430](../src/nativeGs/viewer.ts) / [src/nativeGs/app.ts:1854](../src/nativeGs/app.ts) |
+| M12 | 点群の表示径を調整する | 別経路のみ | 01aの限定Point経路に既定3px・1〜20pxの一時表示径を接続。Assetごと・viewport内の設定で、Metadata／保存視点／fileへ混ぜず、現在のgesture receiptを更新する。exact3profile registryとbinary-only capabilityを分け、dither/smoothへfallbackしない。Native既存経路は不変更。Point全体／実機／採用の分類へ広げず、実行範囲はtodo参照。 | [src/domain/pointPresentation.ts](../src/domain/pointPresentation.ts) / [src/ui/projectScene/projectModels.ts](../src/ui/projectScene/projectModels.ts) |
 | M13 | 位置合わせの基準固定・bounds fit・reset／undo・redo | 新規実装 | 完全alignmentは新hostも限定Nativeも未達。M06/M07と別の残り。alignment固有のundo/redoで、一般Caption Undoの新設を含めない。 | [docs/specs/01-domain-rendering.md:769](../docs/specs/01-domain-rendering.md) / [docs/specs/01-domain-rendering.md:786](../docs/specs/01-domain-rendering.md) |
 | M14 | 既存モデルへ補修Meshを追加・配置し、任意hard exclusionと一体で保存する | 新規実装 | 承認済みvisual repair pairの利用者flowは未実装。別Asset追加ではない。repair-local gizmo、patch/mask一体preview/cancel、revision/bindingの原子的commit、対応pin class保持が必要。renderer/profile・hard-mask gateに依存し、直近チームsliceでは実装しない。 | [docs/specs/00-product-contract.md:116](../docs/specs/00-product-contract.md) / [docs/specs/00-product-contract.md:275](../docs/specs/00-product-contract.md) |
 

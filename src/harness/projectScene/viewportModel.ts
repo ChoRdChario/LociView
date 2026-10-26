@@ -1,3 +1,4 @@
+import { isSavedModel } from './modelTypes';
 import * as THREE from 'three';
 import { resolveScene } from '../../scene/resolve';
 import { captionColorKey } from '../../ui/projectScene/captionListState';
@@ -70,20 +71,20 @@ export function syntheticDisplay(project: SyntheticProject, sceneId: string, pin
   const models = resolved.composition.assets.slice().sort((a, b) => a.assetId.localeCompare(b.assetId)).map(asset => {
     const version = modelVersion(asset.assetId, asset.projection.bindingId, project.modelVersions ?? syntheticVersions);
     if (!version) throw new Error('表示するモデルを確認してください。');
-    return version.closure.shape === 'saved-glb' ? version.closure : readFixtureModel(canonicalFixture(version.closure));
+    return isSavedModel(version.closure) ? version.closure : readFixtureModel(canonicalFixture(version.closure));
   });
-  const materials = Object.fromEntries(models.filter(c => c.shape !== 'saved-glb').map(c => {
+  const materials = Object.fromEntries(models.filter(c => !isSavedModel(c)).map(c => {
     const target = materialTarget(c), intent = resolved.composition.materials.find(m => targetKey(m.target) === targetKey(target))?.intent as MaterialIntent | undefined;
     try { return [c.binding.assetId, resolveFixtureMaterial(intent && materialForDisplay(intent, project.semanticProfile))]; }
     catch (e) { return [c.binding.assetId, { issue: e instanceof Error ? e.message : '見え方を確認してください。' }]; }
   }));
-  const savedMaterials = Object.fromEntries(models.filter(c => c.shape === 'saved-glb').map(model => [model.binding.assetId,
+  const savedMaterials = Object.fromEntries(models.filter(c => isSavedModel(c)).map(model => [model.binding.assetId,
     Object.fromEntries(validationMaterialSlots(model).flatMap(slot => {
       const intent = resolved.composition.materials.find(m => targetKey(m.target) === targetKey(slot.target))?.intent as MaterialIntent | undefined;
       if (!intent) return []; const issue = validationMaterialIssue(slot, intent, project.semanticProfile);
       return [[slot.target.logicalMaterialSlotId, issue ? { issue } : materialForDisplay(intent, project.semanticProfile)]];
     }))]));
-  const activeTargets = new Set(models.flatMap(m => m.shape === 'saved-glb' ? validationMaterialSlots(m).map(s => targetKey(s.target)) : [targetKey(materialTarget(m))]));
+  const activeTargets = new Set(models.flatMap(m => isSavedModel(m) ? validationMaterialSlots(m).map(s => targetKey(s.target)) : [targetKey(materialTarget(m))]));
   const materialNotices = Object.values(project.materialData?.records ?? {}).flatMap(r => {
     if (r.lifecycle.kind === 'value' && r.lifecycle.value.state === 'deleted') return [];
     if (r.routing.kind !== 'value') return ['見え方の適用先に競合があります。'];

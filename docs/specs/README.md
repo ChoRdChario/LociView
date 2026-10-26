@@ -37,6 +37,7 @@ The words **MUST**, **MUST NOT**, **SHOULD**, and **MAY** are normative. A metri
 |---|---|
 | [`00-product-contract.md`](00-product-contract.md) | User outcomes, support levels, MVP boundary, security and operational constraints |
 | [`01-domain-rendering.md`](01-domain-rendering.md) | Frames, asset revisions, renderer-neutral scene, per-Asset visibility, composition support, picking, alignment and GS/iOS lifecycle |
+| [`01a-point-project-scene-proposal.md`](01a-point-project-scene-proposal.md) | APPROVED 2026-10-27: exact ordinary-point PLY source, three presentation companions, local diameter and point-hit workflow; implementation/evidence in todo, ordinary/device/adoption gates remain |
 | [`02-storage-package-migration.md`](02-storage-package-migration.md) | Metadata, CAS, transaction recovery, package classes, merge semantics, v1 conversion |
 | [`03-gates-and-delivery.md`](03-gates-and-delivery.md) | G0, blocking G0-S, PoC gates, evidence, feature flags, rollback and development sequence |
 | [`04-locimyu-conversion.md`](04-locimyu-conversion.md) | Canonical LociMyu Caption identity, source-authority rules and the direct-adapter conversion-report boundary |

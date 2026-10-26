@@ -418,6 +418,12 @@ Material override `routing.target` names `{ assetId, variantFamilyId, materialLa
 
 Every `meshPrimary`, `pointPrimary` and `visualPatch` candidate has a complete MaterialCatalog. When a validated source has no material object, its FormatProfile still emits one synthetic logical slot, but derives that slot's `SourceMaterialSemantics` from any vertex/point/face color-alpha or format attributes. Only a profile-proven `sourceAlpha === 1` with no authored optical/lighting/sidedness signal receives `{ coverage:{kind:'opaque'}, optics:'surface', lighting:'lit', doubleSided:false }`; alpha below one or alpha that cannot be proven constant uses the profile's explicit non-opaque classification. A synthetic slot supplies identity/routing, not permission to erase source alpha. `interactionProxy`, `splatExclusion` and `gsPrimary` do not acquire a guessed mesh material catalog.
 
+PO-approved point-source exception2026-10-27: the exact
+`development-validation-point-ply-rgb-1` ID/digest in [01a](01a-point-project-scene-proposal.md)
+uses one opaque/surface/unlit/front synthetic slot with white factor and original
+linearized vertex RGB, without normals. This narrow exception does not change any
+existing Mesh/Native profile or the generic no-authored-lighting default above.
+
 Persistent material data separates:
 
 ```text
@@ -604,6 +610,11 @@ No deletion performs an implicit cascade. A compound UI action expands into expl
 A child addition concurrent with parent deletion is retained as an orphan review item. SceneResolver excludes it from authoritative output; collaboration export preserves it and all conflict-required bytes, review export may omit the affected presentation item with disclosure, and clean export blocks until it is reassigned or tombstoned. Restoring the parent can resolve the orphan explicitly. Media blobs remain strong only through active/conflicting attachments and package/journal retention roots.
 
 ## 5. Derived SceneDocument
+
+> PO amendment2026-10-27: [approved point companion01a](01a-point-project-scene-proposal.md)
+> fixes the exact three profile bytes/default and6CSSpx fallback for the bounded
+> candidate, plus its source/point-hit rules. Implementation and device/adoption
+> evidence remain separate; dither/smooth support is not enabled by this approval.
 
 Ordinary points use one renderer-neutral transient presentation contract:
 

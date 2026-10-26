@@ -1,0 +1,85 @@
+{
+  "id": "development-validation-point-ply-rgb-1",
+  "version": 1,
+  "container": "self-contained PLY ASCII 1.0",
+  "header": {
+    "maxBytes": 65536,
+    "encoding": "ASCII",
+    "lineEndings": [
+      "LF",
+      "CRLF"
+    ],
+    "magic": "ply",
+    "format": "format ascii 1.0",
+    "elements": "exactly one positive safe-integer vertex count; no other element even at count zero",
+    "properties": [
+      "float x",
+      "float y",
+      "float z",
+      "uchar red",
+      "uchar green",
+      "uchar blue"
+    ],
+    "ignored": "empty header lines and printable ASCII comment / obj_info lines; never interpret a URL",
+    "terminator": "standalone end_header line, anchored to a line boundary",
+    "directives": "format exactly once; vertex element exactly once; properties after that element in listed order; only blank/comment/obj_info lines otherwise; no other directive"
+  },
+  "payload": {
+    "maxRowBytesIncludingCRExcludingLF": 1024,
+    "lineEndings": [
+      "LF",
+      "CRLF"
+    ],
+    "finalNewline": "optional; no trailing empty row",
+    "fields": "exactly six space/tab separated decimal tokens per declared row; no GS/face/normal/alpha/list data",
+    "positions": "finite decimal Number -> IEEE754 Float32 round-to-nearest ties-to-even -> require finite -> normalize negative zero",
+    "rgb": "unsigned decimal integer 0..255 -> channel/255 sRGB -> linear channel by 01 section4.2 -> IEEE754 Float32",
+    "budgets": "original byteLength <= existing maxFileBytes, pointCount <= maxItems, 6*pointCount <= maxValues; reject before unbounded allocation"
+  },
+  "frame": {
+    "axis": "preserve original XYZ as right-handed Y-up AssetFrame coordinates",
+    "unit": "one source coordinate unit is one Asset metre; no inferred units or recentering",
+    "representationToAsset": "canonical identity",
+    "normal": "absent; never infer"
+  },
+  "bounds": "exact component-wise min/max of all post-Float32 positions, canonical positive zeros; point-centre geometric support, screen glyph footprint remains transient",
+  "records": {
+    "contentKind": "pointCloud",
+    "role": "pointPrimary",
+    "purposes": [
+      "source",
+      "display"
+    ],
+    "occurrence": {
+      "nodeIndex": 0,
+      "primitiveIndex": 0,
+      "pointIndex": "original zero-based row ordinal; retain duplicates; no LOD/reorder"
+    },
+    "sourceLocator": {
+      "kind": "representationMaterial",
+      "slotIndex": 0
+    },
+    "sourceSemantics": {
+      "coverage": {
+        "kind": "opaque"
+      },
+      "optics": "surface",
+      "lighting": "unlit",
+      "doubleSided": false
+    },
+    "baseFactor": [
+      1,
+      1,
+      1,
+      1
+    ],
+    "sourceAlpha": 1,
+    "materialCatalog": "one synthetic slot; vertex RGB contribution preserved",
+    "familyEnvelopeAuthority": "this verified original source"
+  },
+  "decodeVerification": "pinned loader output count=N, no triangles, exact ordinal positions and linear colors, finite arrays, exact bounds/catalog; mismatch fails rather than rewriting metadata",
+  "goldens": {
+    "file": "point-ply-rgb-1.goldens.json",
+    "sha256": "d13429e70f3b688c5d0c0518610e32e37e117137cc4bdac6e21525f66caa8541"
+  }
+}

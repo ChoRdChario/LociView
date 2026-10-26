@@ -24,7 +24,7 @@ vi.mock('three', async importOriginal => {
   return { ...actual, WebGLRenderer: class {
     disposed = false; scene: any; camera: any; frames = 0;
     constructor() { if (tracker.fail) throw new Error('synthetic WebGL refusal'); tracker.renderers.push(this); }
-    setPixelRatio() {} setSize() {}
+    setPixelRatio() {} setSize() {} setDrawingBufferSize() {}
     render(scene: any, camera: any) { this.scene = scene; this.camera = camera; scene.updateMatrixWorld(true); this.frames++; }
     dispose() { this.disposed = true; }
   } };

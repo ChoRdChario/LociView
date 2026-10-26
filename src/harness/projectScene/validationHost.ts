@@ -594,6 +594,7 @@ async function openNormalValidationHost(options: ValidationHostOptions, inherite
             throw Error('モデルを含む合計がこの検証の上限を超えています。');
           const bytes = new Uint8Array(await file.arrayBuffer());
           if (bytes.length !== file.size) throw Error('選択したモデルの大きさが一致しません。');
+          if (bytes.length < 4 || new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).getUint32(0, true) !== 0x46546c67) throw Error('差し替えにはGLBを選択してください。点群の差し替えはまだ利用できません。');
           const prepared = await content.prepareModel({ label: file.name, bytes }, target.assetId);
           try {
             const binding = await sealValidationRecord('asset-binding-revision', { id: prepared.binding.id!, assetId: target.assetId,
@@ -612,7 +613,7 @@ async function openNormalValidationHost(options: ValidationHostOptions, inherite
             throw Error('モデルが更新されています。配置の入力を保持しています。');
           const versions = await validationModelVersions(before.provider);
           const source = versions.find(v => v.assetId === captured.assetId && v.projection.bindingId === captured.expectedBindingId)?.closure;
-          if (!source || source.shape !== 'saved-glb') throw Error('配置するモデルを確認してください。');
+          if (!source || !['saved-glb', 'saved-point'].includes(source.shape)) throw Error('配置するモデルを確認してください。');
           const binding = await sealValidationRecord('asset-binding-revision', { id: captured.bindingId, assetId: captured.assetId,
             assetRevisionId: source.revision.id, parentBindingId: source.binding.id, method: 'manual',
             assetToProject: captured.placement as unknown as JsonObject });

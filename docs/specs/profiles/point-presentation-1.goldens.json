@@ -1,0 +1,159 @@
+{
+  "version": 1,
+  "scope": "normative scalar/selection vectors; not raster, performance or device acceptance",
+  "diameter": [
+    {
+      "requested": 0,
+      "resolved": 1
+    },
+    {
+      "requested": 3,
+      "resolved": 3
+    },
+    {
+      "requested": 21,
+      "resolved": 20
+    },
+    {
+      "requested": "nonfinite",
+      "resolved": 3,
+      "diagnostic": true
+    }
+  ],
+  "radialCoverage": [
+    {
+      "diameter": 1,
+      "radius": 0,
+      "g": 1,
+      "binaryAccepted": true
+    },
+    {
+      "diameter": 1,
+      "radius": 0.5,
+      "g": 1,
+      "binaryAccepted": true
+    },
+    {
+      "diameter": 1,
+      "radius": 0.500001,
+      "g": 0,
+      "binaryAccepted": false
+    },
+    {
+      "diameter": 3,
+      "radius": 1.5,
+      "g": 1,
+      "binaryAccepted": true
+    },
+    {
+      "diameter": 3,
+      "radius": 1.500001,
+      "g": 0,
+      "binaryAccepted": false
+    },
+    {
+      "diameter": 20,
+      "radius": 10,
+      "g": 1,
+      "binaryAccepted": true
+    },
+    {
+      "diameter": 20,
+      "radius": 10.000001,
+      "g": 0,
+      "binaryAccepted": false
+    }
+  ],
+  "viewport": {
+    "cssWidth": 640.5,
+    "cssHeight": 480.25,
+    "devicePixelRatio": 1.25,
+    "renderScale": 1,
+    "width": 801,
+    "height": 600,
+    "pointer": [
+      321.25,
+      100.5
+    ],
+    "sampleTopLeft": [
+      401,
+      125
+    ],
+    "sampleCenterCss": [
+      321.0496254681648,
+      100.45229166666667
+    ]
+  },
+  "selection": [
+    {
+      "name": "direct-depth-before-center-distance",
+      "diameter": 20,
+      "candidates": [
+        {
+          "id": "rep_a",
+          "coversClick": true,
+          "visible": true,
+          "distanceCss": 4,
+          "depth": 0.2
+        },
+        {
+          "id": "rep_b",
+          "coversClick": true,
+          "visible": true,
+          "distanceCss": 0,
+          "depth": 0.8
+        }
+      ],
+      "selected": "rep_a"
+    },
+    {
+      "name": "fallback-after-empty-click",
+      "diameter": 3,
+      "meshSourceCoversClick": false,
+      "candidates": [
+        {
+          "id": "rep_a",
+          "coversClick": false,
+          "visible": true,
+          "distanceCss": 4,
+          "depth": 0.2
+        },
+        {
+          "id": "rep_b",
+          "coversClick": false,
+          "visible": true,
+          "distanceCss": 2,
+          "depth": 0.8
+        }
+      ],
+      "selected": "rep_b"
+    },
+    {
+      "name": "mesh-source-covers-click-no-point-fallback",
+      "meshSourceCoversClick": true,
+      "pointCoversClick": false,
+      "fallbackPointDistanceCss": 2,
+      "selectedPoint": null
+    },
+    {
+      "name": "complete-occurrence-tie",
+      "sameRepresentation": true,
+      "samePosition": [
+        0,
+        2,
+        0
+      ],
+      "sameDistanceAndDepth": true,
+      "pointIndices": [
+        3,
+        2
+      ],
+      "selectedPointIndex": 2
+    },
+    {
+      "name": "unknown-visible-depth",
+      "proofComplete": false,
+      "result": "ambiguity; no pin commit"
+    }
+  ]
+}

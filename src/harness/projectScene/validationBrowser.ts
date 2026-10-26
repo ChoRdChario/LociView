@@ -11,6 +11,7 @@ import { sceneViewportFactory } from './viewport';
 import { syntheticDisplay } from './viewportModel';
 import type { SyntheticProject } from './fixture';
 import { generationDatabaseName } from '../../projectMetadata/generationScope';
+import { isSavedModel } from './modelTypes';
 import { createValidationUiState } from './browserUiState';
 
 // Conservative execution budgets for this development lane, not measured product capacity.
@@ -64,7 +65,7 @@ export async function createValidationBrowserWorkspace(document: Document, run?:
     list: () => listValidationProjects(options, storage),
     open: (id, initial, mode, workspaceFile, reviewEdit, firstBackup) => openValidationEntry({ ...options, run: id, initial, mode, workspaceFile, reviewEdit, firstBackup, openStorage: create => storage(id, create) }),
     renderModelCandidate: async (host, display) => {
-      const resident = await prepareReadonlyResidents(display.models, { model: record => host.content.model(record, true) });
+      const resident = await prepareReadonlyResidents(display.models, { modelContent: record => host.content.modelContent(record, true) });
       return { factory: sceneViewportFactory(resident), dispose: () => resident.dispose() };
     },
     renderReview: async view => {
@@ -83,7 +84,7 @@ export async function createValidationBrowserWorkspace(document: Document, run?:
           for (const scene of Object.values(next.state.scenes)) {
             if (scene.lifecycle.kind !== 'value' || scene.lifecycle.value.state !== 'active') continue;
             const display = syntheticDisplay(next, scene.id, null, null);
-            for (const model of display.models) if (model.shape === 'saved-glb') resident.validate(model, display.savedMaterials?.[model.binding.assetId]);
+            for (const model of display.models) if (isSavedModel(model)) resident.validate(model, display.savedMaterials?.[model.binding.assetId]);
           }
         };
         await prepare(host.authority.read());

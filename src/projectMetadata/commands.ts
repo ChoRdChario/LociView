@@ -87,7 +87,7 @@ export function canonicalMetadataEdit(input: MetadataEdit, limits: MetadataLimit
 }
 
 /** Plan only from the Session's fresh verified provider. Not a generic patch/import API. */
-export function planMetadataEdit(provider: Provider, input: MetadataEdit, limits: MetadataLimits): readonly MetadataWrite[] {
+export function planMetadataEdit(provider: Provider, input: MetadataEdit, limits: MetadataLimits, checkedPointAnchor = false): readonly MetadataWrite[] {
   const command = canonicalMetadataEdit(input, limits), raw = command as unknown as JsonObject;
   if (command.kind === 'setAssetPinScale') {
     shape(raw, ['kind', 'assetId', 'pinScale']);
@@ -149,10 +149,10 @@ export function planMetadataEdit(provider: Provider, input: MetadataEdit, limits
     add(map, e.id, create ? { id: e.id, sceneId: e.sceneId, [kind === 'asset' ? 'assetId' : 'captionId']: e.resourceId,
       orderKey: exact(e.orderKey), lifecycle: json(exact(e.lifecycle)) } : { lifecycle: json(exact(e.lifecycle)) }, create);
   };
-  const pin = (sceneId: string, anchor: Anchor) => {
+  const pin = (sceneId: string, anchor: Anchor, allowPoint = false) => {
     c.id(sceneId, 'scn', []); c.anchor(json(anchor), []);
     const evidence = object(json(anchor)).hitEvidence;
-    if (anchor.kind !== 'asset' || !evidence || object(evidence).method !== 'manual' || c.unknown) return fail('pin-manual-only');
+    if (anchor.kind !== 'asset' || !evidence || !(object(evidence).method === 'manual' || allowPoint && checkedPointAnchor && object(evidence).method === 'point-cloud') || c.unknown) return fail('pin-manual-only');
     row('scenesById', sceneId); row('assetsById', anchor.assetId);
     memberships('asset', sceneId, anchor.assetId);
     const resolved = resolveScene(provider.state, provider.resources, sceneId);
@@ -374,7 +374,7 @@ export function planMetadataEdit(provider: Provider, input: MetadataEdit, limits
       const oldCheck = new ProjectRecordFields(provider.semanticProfile); oldCheck.anchor(json(before), []);
       if (oldCheck.unknown) fail('pin-unknown-anchor');
       memberships('caption', command.sceneId, command.captionId);
-      if (!pin(command.sceneId, after).captions.some(c => c.captionId === command.captionId)) fail('pin-not-in-scene');
+      if (!pin(command.sceneId, after, true).captions.some(c => c.captionId === command.captionId)) fail('pin-not-in-scene');
       const merged = { ...object(json(before)), ...object(json(after)) };
       // Manual placement explicitly replaces known hit evidence and normal. Do
       // not silently erase unknown anchor/evidence subtrees from an old source.
@@ -385,7 +385,7 @@ export function planMetadataEdit(provider: Provider, input: MetadataEdit, limits
     }
     case 'addPin': {
       shape(raw, ['kind', 'sceneId', 'captionId', 'membershipId', 'eventId', 'anchor', ...('colorSrgb' in raw ? ['colorSrgb'] : [])]);
-      pin(command.sceneId, command.anchor); c.id(command.eventId, 'evt', []);
+      pin(command.sceneId, command.anchor, true); c.id(command.eventId, 'evt', []);
       const lifecycle = { state: 'active' as const, eventId: command.eventId, reason: 'initial' as const };
       add('captionsById', command.captionId, { id: command.captionId, title: '', body: '', colorSrgb: 'colorSrgb' in raw ? raw.colorSrgb! : [160 / 255, 128 / 255, 69 / 255],
         lifecycle, anchor: json(command.anchor) }, true);

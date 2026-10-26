@@ -30,7 +30,7 @@ export interface WorkspacePlacement { readonly translation: Point3; readonly rot
 export interface WorkspaceModelTarget { readonly kind: 'model'; readonly token: string; readonly sceneId: string; readonly assetId: string; readonly bindingId: string }
 export interface WorkspaceModelProposal { readonly target: WorkspaceModelTarget; readonly placement: WorkspacePlacement; readonly mode: 'translate' | 'rotate' | 'scale' }
 export interface WorkspaceModelDetails { readonly target: WorkspaceModelTarget; readonly placement: WorkspacePlacement;
-  readonly rotationDegrees: readonly [string, string, string]; readonly sceneCount: Field<number> }
+  readonly replacementAvailable?: boolean; readonly pointCloud?: boolean; readonly rotationDegrees: readonly [string, string, string]; readonly sceneCount: Field<number> }
 export interface WorkspaceViewPayload { readonly camera: JsonObject; readonly background: { readonly kind: 'solid'; readonly colorSrgb: Point3 } }
 export interface WorkspaceMaterialReview { readonly key: string; readonly token: string; readonly sceneId: string; readonly overrideId: string;
   readonly label: string; readonly appearance: readonly { operationId: string; label: string }[];
@@ -41,7 +41,7 @@ export interface WorkspaceSurface {
   readonly bindingId: string; readonly revisionId: string; readonly representationId: string;
   readonly familyId: string; readonly compatibilityId: string;
 }
-export interface WorkspacePinProposal { readonly target: WorkspaceSurface; readonly position: Point3; readonly captionId: string | null }
+export interface WorkspacePinProposal { readonly target: WorkspaceSurface; readonly position: Point3; readonly captionId: string | null; readonly point?: { readonly pointIndex: number } }
 export interface WorkspaceViewportState {
   readonly token: string; readonly sceneId: string; readonly selectedId: string | null;
   readonly pin: WorkspacePinProposal | null; readonly choosing: boolean; readonly readOnly: boolean;
@@ -53,7 +53,9 @@ export interface WorkspaceViewportState {
 }
 export interface WorkspaceViewport {
   update(state: WorkspaceViewportState): void;
-  pick(xCss: number, yCss: number, assetId?: string, directCreation?: boolean): { target: WorkspaceSurface; position: Point3 } | null;
+  pick(xCss: number, yCss: number, assetId?: string, directCreation?: boolean): { target: WorkspaceSurface; position: Point3; point?: { readonly pointIndex: number } } | null;
+  setPointDiameter?(assetId: string, diameter: number): void;
+  pointDiameter?(assetId: string): number;
   reservePointer(active: boolean): void;
   read(): { token: string; sceneId: string; pickToken: string; ready: boolean; dragging: boolean; issue: string | null; notice: string | null;
     pins: readonly { id: string; x: number; y: number; visible: boolean; scale?: number; color?: string; status?: 'normal' | 'needsReview'; notice?: string }[]; readonly assetIds?: readonly string[]; readonly view?: ViewRuntime };
@@ -109,12 +111,12 @@ export interface ProjectWorkspacePorts {
   materials(sceneId: string): { source: MaterialSource; review: readonly WorkspaceMaterialReview[] };
   createModelPreview?(): { root: HTMLElement; show(token: string, sceneId: string, assetId: string, operationId: string, label: string): void; render(sceneId: string): void; dispose(): void };
   createViewport(canvas: HTMLCanvasElement, changed: () => void,
-    propose: (target: WorkspaceSurface, position: Point3) => boolean,
+    propose: (target: WorkspaceSurface, position: Point3, phase?: 'begin' | 'adjust' | 'restore') => boolean,
     proposeModel?: (proposal: WorkspaceModelProposal) => boolean): WorkspaceViewport;
   changed(): void;
   otherPending(): boolean;
 }
-export const surfaceAnchor = (proposal: WorkspacePinProposal): Anchor & { hitEvidence: { method: 'manual' } } => ({ kind: 'asset',
+export const surfaceAnchor = (proposal: WorkspacePinProposal): Anchor => ({ kind: 'asset',
   assetId: proposal.target.assetId, assetFrameId: proposal.target.assetFrameId, positionAsset: proposal.position,
   authoredAnchorCompatibilityId: proposal.target.compatibilityId, authoredAssetRevisionId: proposal.target.revisionId,
-  hitEvidence: { method: 'manual' } });
+  hitEvidence: proposal.point ? { method: 'point-cloud', source: { representationId: proposal.target.representationId, surfaceRef: { kind: 'pointSample', nodeIndex: 0, primitiveIndex: 0, pointIndex: proposal.point.pointIndex } } } : { method: 'manual' } });

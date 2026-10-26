@@ -6,6 +6,7 @@ import { inspectGlbMaterials } from './glbMaterials';
 import { checkFileLimits, fileError, fileFields, fileInteger, fileList, fileNumber, fileObject, fileVector, limitedJson, type FileValidationLimits } from './validation';
 
 export interface ValidatedGlb {
+  readonly kind?: 'glb';
   readonly jpeg?: true;
   readonly bytes: Uint8Array;
   readonly bounds: { min: number[]; max: number[] };

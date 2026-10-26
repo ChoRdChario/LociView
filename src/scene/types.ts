@@ -36,7 +36,7 @@ export interface AssetProjection {
 export interface Asset extends Entity { readonly projection: Field<AssetProjection>; readonly pinScale?: Field<number | undefined> }
 export type Anchor = Readonly<{ kind: 'asset'; assetId: string; assetFrameId: string;
   positionAsset: readonly [number, number, number]; authoredAnchorCompatibilityId: string;
-  authoredAssetRevisionId?: string }> |
+  authoredAssetRevisionId?: string; hitEvidence?: { readonly method: string; readonly source?: { readonly representationId: string; readonly surfaceRef: { readonly kind: 'pointSample'; readonly nodeIndex: number; readonly primitiveIndex: number; readonly pointIndex: number } } } }> |
   Readonly<{ kind: 'project'; projectFrameId: string; positionProject: readonly [number, number, number] }> |
   Readonly<{ kind: 'unplaced'; ownerAssetId?: string }>;
 export interface Caption extends Entity {

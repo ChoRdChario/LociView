@@ -12,7 +12,7 @@ export interface ModelPlacementTarget {
 
 /** Transient ProjectFrame marker; model-only rotation/uniform scale, never a history write. */
 export function createPinGizmo<T = PinSurfaceTarget>(canvas: HTMLCanvasElement, scene: THREE.Scene, camera: THREE.Camera,
-  propose: (target: T, position: V3, manipulation?: ModelManipulation) => boolean, activity: (dragging: boolean) => void) {
+  propose: (target: T, position: V3, manipulation?: ModelManipulation, phase?: 'begin' | 'adjust' | 'restore') => boolean, activity: (dragging: boolean) => void) {
   const marker = new THREE.Object3D(), control = new TransformControls(camera, canvas), helper = control.getHelper();
   control.setMode('translate'); control.setSpace('world'); control.setSize(1);
   scene.add(marker, helper);
@@ -41,14 +41,14 @@ export function createPinGizmo<T = PinSurfaceTarget>(canvas: HTMLCanvasElement, 
     syncing = true;
     if (restore && current && beforeProposal) {
       copy(marker, before);
-      if (propose(beforeProposal.target, beforeProposal.position, beforeProposal.manipulation)) copy(accepted, before); else copy(marker, accepted);
+      if (propose(beforeProposal.target, beforeProposal.position, beforeProposal.manipulation, 'restore')) copy(accepted, before); else copy(marker, accepted);
     }
     control.dragging = false; control.axis = null; syncing = false;
     activity(false);
   };
   control.addEventListener('dragging-changed', event => {
     if (disposed || syncing) return;
-    if (event.value) { copy(before, marker); copy(accepted, marker); beforeProposal = current; }
+    if (event.value) { copy(before, marker); copy(accepted, marker); beforeProposal = current; if (current && !current.manipulation) propose(current.target, current.position, undefined, 'begin'); }
     activity(Boolean(event.value));
   });
   control.addEventListener('objectChange', () => {

@@ -4,8 +4,8 @@ export function createModelAdditionControls(document: Document, session: Synthet
   const root = document.createElement('section'), add = document.createElement('button'), input = document.createElement('input');
   const cancel = document.createElement('button'), note = document.createElement('p');
   add.type = cancel.type = 'button'; add.textContent = '3Dモデルを追加'; cancel.textContent = '選択を取り消す';
-  input.type = 'file'; input.accept = '.glb,model/gltf-binary'; input.hidden = true; input.setAttribute('aria-label', '3Dモデルを追加');
-  note.textContent = '静的GLBのみ。別のモデルとして、このシーンに追加します。';
+  input.type = 'file'; input.accept = '.glb,.ply,model/gltf-binary,application/ply'; input.hidden = true; input.setAttribute('aria-label', '3Dモデルを追加');
+  note.textContent = 'GLBまたは点群のPLYのみ。別のモデルとして、このシーンに追加します。';
   root.append(add, input, cancel, note);
   let disposed = false, target: { token: string; sceneId: string } | undefined;
   add.addEventListener('click', () => { if (disposed || add.disabled) return;

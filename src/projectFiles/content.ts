@@ -13,6 +13,7 @@ import { digest, newId } from '../projectMetadata/persistence';
 import type { StoredBlobRef } from '../projectMetadata/blobStore';
 import { inspectValidationGlb, inspectValidationJpegGlb, inspectFreshValidationGlb, type ValidatedGlb } from './glb';
 import { inspectOccurrenceGlb, inspectOccurrenceJpegGlb } from './glbOccurrences';
+import { inspectPointPly, isPointModel, pointSourceProfile, pointSourceMediaType, type ValidatedModel } from './pointPly';
 import type { PngDecoder } from './png';
 import type { JpegDecoder } from './jpeg';
 import { fileError, fileObject, validationGlbProfile, occurrenceGlbProfile, jpegGlbProfile, occurrenceJpegGlbProfile, validationMetadataLimits, type FileValidationLimits } from './validation';
@@ -73,18 +74,13 @@ export class ValidationContent implements MetadataMediaPort {
     const { body } = this.preparedModel(record);
     await this.store.put(new Blob([body.bytes.slice().buffer]).stream(), body.ref.mediaType, body.ref);
   }
-  private async modelDeclaration(record: JsonObject): Promise<JsonObject> {
-    if (!(await Promise.all([validationGlbProfile(), occurrenceGlbProfile(), jpegGlbProfile(), occurrenceJpegGlbProfile()])).some(p => same(record.formatProfile, p)) || record.contentKind !== 'mesh' || record.role !== 'meshPrimary' ||
-      !same(record.representationToAsset, { ...identityPlacement(), reflection: 'none' }) ||
-      !same(record.purposes, ['source', 'display']) && !same(record.purposes, ['display']) ||
-      !same(record.derivedFrom, [])) return fileError('保存したモデルの形式を確認できません。');
-    const blob = fileObject(record.blob) as JsonObject;
-    if (blob.mediaType !== 'model/gltf-binary') return fileError('保存したモデルの本体形式が一致しません。');
-    return blob;
-  }
+  private modelDeclaration(record: JsonObject) { return validationModelDeclaration(record); }
+  /** Kept GLB-specific for existing converter/decoder clients. */
   async model(record: JsonObject, readOnly = false): Promise<ValidatedGlb> {
-    await this.checkRead?.();
-    const blob = await this.modelDeclaration(record);
+    const result = await this.modelContent(record, readOnly); if (isPointModel(result)) return fileError('この経路ではGLBモデルを選択してください。'); return result;
+  }
+  async modelContent(record: JsonObject, readOnly = false): Promise<ValidatedModel> {
+    await this.checkRead?.(); const blob = await this.modelDeclaration(record);
     const model = await this.inspectModel(record, await readValidationBody(await (readOnly ? this.store.openReadOnly(blob) : this.store.open(blob)), this.limits.maxFileBytes));
     await this.checkRead?.(); return model;
   }
@@ -102,11 +98,8 @@ export class ValidationContent implements MetadataMediaPort {
   private async inspectImage(bytes: Uint8Array, blob: JsonObject) {
     if (await inspectProjectImage(bytes, this.limits, this.decode, this.jpeg, this.photo) !== blob.mediaType) return fileError('画像の本体形式が一致しません。');
   }
-  private async inspectModel(record: JsonObject, bytes: Uint8Array) {
-    const inspect = same(record.formatProfile, await occurrenceJpegGlbProfile()) ? inspectOccurrenceJpegGlb :
-      same(record.formatProfile, await jpegGlbProfile()) ? inspectValidationJpegGlb :
-      same(record.formatProfile, await occurrenceGlbProfile()) ? inspectOccurrenceGlb : inspectValidationGlb;
-    return inspect(bytes, this.limits, this.decode, this.jpeg);
+  private inspectModel(record: JsonObject, bytes: Uint8Array) {
+    return inspectDeclaredValidationModel(record, bytes, this.limits, this.decode, this.jpeg);
   }
   /** Original incoming record and immutable range, no ID allocation or storage/evidence writes. */
   async inspectReceived(input: ContentRequest, file: Blob) {
@@ -146,6 +139,7 @@ export class ValidationContent implements MetadataMediaPort {
       const bytes = await readValidationBody(await this.store.open(blob), this.limits.maxFileBytes);
       if (projectImageMime(blob.mediaType)) await this.inspectImage(bytes, blob);
       else if (blob.mediaType === 'model/gltf-binary') await inspectFreshValidationGlb(bytes, this.limits, this.decode, this.jpeg);
+      else if (blob.mediaType === pointSourceMediaType) await inspectPointPly(bytes, this.limits);
       else return fileError('追加する本体形式が不正です。');
     }
   }
@@ -161,7 +155,7 @@ export class ValidationContent implements MetadataMediaPort {
     return new PersistentContentVerifier(this.fs, validationMetadataLimits, executor, 'validation-glb-png-executor-1',
       blobInventory(this.store, validationMetadataLimits), allowNewEvidence);
   }
-  private async execute(input: ContentRequest, prepared?: { model?: ValidatedGlb; image?: Uint8Array }, readOnly = false) {
+  private async execute(input: ContentRequest, prepared?: { model?: ValidatedModel; image?: Uint8Array }, readOnly = false) {
     const request = cloneCanonicalValue(input, validationMetadataLimits) as unknown as ContentRequest;
     const response = (outcome: string, facts?: JsonObject) => ({ request, scope: 'development-validation', outcome, ...(facts ? { facts } : {}) });
     if (request.records.length !== 1) return response('unsupported'); // No inferred equivalence or multi-output proof.
@@ -172,18 +166,40 @@ export class ValidationContent implements MetadataMediaPort {
       facts = { mediaKind: 'image', mediaType: this.imageDeclaration(record).mediaType! };
     } else if (request.fact === 'representation' || request.fact === 'family-envelope' || request.fact === 'family-contribution') {
       await this.modelDeclaration(record); // Prepared decoding never bypasses declared profile/role/transform checks.
-      const decoded = prepared?.model ?? await this.model(record, readOnly);
+      const decoded = prepared?.model ?? await this.modelContent(record, readOnly);
       if (!same(record.logicalBoundsAsset, decoded.bounds)) return response('failed');
       const rawCatalog = fileObject(record.materialCatalog), slots = rawCatalog.slots;
       if (!Array.isArray(slots) || slots.length !== decoded.materials.length) return response('failed');
       const actual = new Set(decoded.materials.map(canonical));
       for (const slot of slots) { const s = fileObject(slot); if (!actual.delete(canonical({ sourceLocator: s.sourceLocator, sourceSemantics: s.sourceSemantics } as JsonObject))) return response('failed'); }
       if (actual.size) return response('failed');
-      facts = request.fact === 'representation' ? { contentKind: 'mesh', staticPose: true, contentBoundsAsset: decoded.bounds,
+      facts = request.fact === 'representation' ? { contentKind: isPointModel(decoded) ? 'pointCloud' : 'mesh', staticPose: true, contentBoundsAsset: decoded.bounds,
         materials: [...decoded.materials], surfaceRanges: [...decoded.surfaceRanges] } : request.fact === 'family-envelope' ?
         { logicalBoundsAsset: decoded.bounds, authority: { kind: same(record.purposes, ['display']) ? 'first-verified-output' : 'source', representationId: record.id!, payloadDigest: record.payloadDigest! } } :
         { verifiedMembers: [{ id: record.id!, payloadDigest: record.payloadDigest! }] };
     } else return response('unsupported');
     checkContentFacts(request, facts); return response('verified', facts);
   }
+}
+
+/** Exact input tuple shared by saved content and history-free viewing. No MIME/profile fallback. */
+export async function validationModelDeclaration(record: JsonObject, use: 'saved' | 'review' = 'saved'): Promise<JsonObject> {
+  const point = same(record.formatProfile, await pointSourceProfile());
+  const glb = (await Promise.all([validationGlbProfile(), occurrenceGlbProfile(), jpegGlbProfile(), occurrenceJpegGlbProfile()])).some(p => same(record.formatProfile, p));
+  if ((!point && !glb) || record.contentKind !== (point ? 'pointCloud' : 'mesh') || record.role !== (point ? 'pointPrimary' : 'meshPrimary') ||
+    !same(record.representationToAsset, { ...identityPlacement(), reflection: 'none' }) ||
+    (use === 'review' ? !same(record.purposes, ['display']) : !same(record.purposes, ['source', 'display']) && !same(record.purposes, ['display'])) ||
+    use === 'saved' && !same(record.derivedFrom, [])) return fileError('保存したモデルの形式を確認できません。');
+  const blob = fileObject(record.blob) as JsonObject;
+  if (blob.mediaType !== (point ? pointSourceMediaType : 'model/gltf-binary')) return fileError('保存したモデルの本体形式が一致しません。');
+  return blob;
+}
+export async function inspectDeclaredValidationModel(record: JsonObject, bytes: Uint8Array, limits: FileValidationLimits,
+  png?: PngDecoder, jpeg?: JpegDecoder, use: 'saved' | 'review' = 'saved'): Promise<ValidatedModel> {
+  await validationModelDeclaration(record, use);
+  if (same(record.formatProfile, await pointSourceProfile())) return inspectPointPly(bytes, limits);
+  const inspect = same(record.formatProfile, await occurrenceJpegGlbProfile()) ? inspectOccurrenceJpegGlb :
+    same(record.formatProfile, await jpegGlbProfile()) ? inspectValidationJpegGlb :
+    same(record.formatProfile, await occurrenceGlbProfile()) ? inspectOccurrenceGlb : inspectValidationGlb;
+  return inspect(bytes, limits, png, jpeg);
 }

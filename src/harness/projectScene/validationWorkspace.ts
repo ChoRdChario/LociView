@@ -1,3 +1,4 @@
+import { isPointPly } from '../../projectFiles/pointPly';
 import { isAdditionalPhoto, freshPhotoSelectionIssue, type PhotoDecoder } from '../../projectFiles/photo';
 import { projectResumeReference, type ProjectResumeReference } from '../../ui/resumeReference';
 import { newId } from '../../projectMetadata/persistence';
@@ -216,7 +217,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     if (disposed || host !== target) { next.dispose(); return; }
     resident = next;
     const fileTools = receiveTools;
-    try { workspace = ports.productEditor ? createProductWorkspace(document, target, next.factory, fileTools,
+    try { workspace = ports.productEditor || target.authority.read().modelVersions?.some(v => v.closure.shape === 'saved-point') ? createProductWorkspace(document, target, next.factory, fileTools,
       ports.renderModelCandidate ? display => ports.renderModelCandidate!(target, display) : undefined,
       { openProject: () => { void selectProject(); }, resumedLastProject: () => resumedLast, storageEstimate: ports.storageEstimate,
         changed: () => { rememberCurrent(); controls(); } }) : createSavedWorkspace(document, target, next.factory,
@@ -252,7 +253,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
       await target.backupRestore[retry ? 'retry' : 'confirm'](async (next, sourceContent) => {
         readContent = sourceContent;
         staged = await ports.render({ authority: { ...target.authority, read: () => next },
-          content: { model: record => readContent!.model(record) },
+          content: { model: record => readContent!.model(record), modelContent: record => readContent!.modelContent(record) },
           setDisplayPreparation(callback) { stagedPrepare = callback; return () => { if (stagedPrepare === callback) stagedPrepare = undefined; }; } });
       });
       if (disposed || host !== target) throw Error('画面を閉じました。復元先は再度開いて確認してください。');
@@ -326,7 +327,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
         const opened = await target[state.phase === 'preview' ? 'confirm' : 'retry'](async (next, content) => {
           if (disposed || firstRecovery !== target) throw Error('画面を閉じました。復元記録は保持しています。');
           sourceContent = content; staged = await ports.render({ authority: { readOnly: true, read: () => next, write: () => { throw Error('復元先の確認中です。'); } },
-            content: { model: record => sourceContent!.model(record) },
+            content: { model: record => sourceContent!.model(record), modelContent: record => sourceContent!.modelContent(record) },
             setDisplayPreparation(callback) { preparation = callback; return () => { if (preparation === callback) preparation = undefined; }; } });
           if (disposed || firstRecovery !== target) throw Error('画面を閉じました。復元記録は保持しています。');
         });
@@ -422,7 +423,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
       actualTotal += bytes.byteLength;
       if (!Number.isSafeInteger(actualTotal) || actualTotal > ports.fileLimits.maxFileBytes) throw Error('選択したファイルがこの検証の上限を超えています。');
       const file = { label: item.label, bytes };
-      if (bytes.length >= 4 && new DataView(bytes.buffer).getUint32(0, true) === 0x46546c67) models.push(file);
+      if (isPointPly(bytes) || bytes.length >= 4 && new DataView(bytes.buffer).getUint32(0, true) === 0x46546c67) models.push(file);
       else if (isAdditionalPhoto(bytes) || isJpeg(bytes) || [137,80,78,71,13,10,26,10].every((b,i) => bytes[i] === b)) media.push(file);
       else {
         const issue = freshPhotoSelectionIssue(bytes); if (issue) throw Error(issue);

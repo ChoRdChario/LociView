@@ -7,6 +7,7 @@ import type { ProjectProviderRead } from '../scene/projectProvider';
 import { candidateReader } from './membership';
 import type { MetadataRecordEdit } from './commands';
 import { fail, type MetadataLimits } from './format';
+import { pointSourceDeclaration } from '../domain/pointSource';
 
 export interface AddAssetCommand { readonly kind: 'addAsset'; readonly sceneId: string;
   readonly asset: JsonObject; readonly revision: JsonObject; readonly representation: JsonObject;
@@ -39,10 +40,11 @@ export function planAssetAddition(provider: Extract<ProjectProviderRead, { kind:
     membership.sceneId !== command.sceneId || !same(asset.status, { kind: 'ready', activeBindingId: binding.id! }) ||
     binding.assetRevisionId !== revision.id || !same(revision.representationIds, [rep.id!]) || binding.method !== 'import' ||
     !same(binding.assetToProject, identity) || !same(rep.representationToAsset, { ...identity, reflection: 'none' }) ||
-    rep.contentKind !== 'mesh' || rep.role !== 'meshPrimary' || !same(rep.purposes, ['source', 'display']) || !same(rep.derivedFrom, []) ||
+    !(rep.contentKind === 'mesh' && rep.role === 'meshPrimary' || rep.contentKind === 'pointCloud' && rep.role === 'pointPrimary') || !same(rep.purposes, ['source', 'display']) || !same(rep.derivedFrom, []) ||
     classes.length !== 1 || !same(object(classes[0]).targetVariantFamilyIds, [rep.variantFamilyId!]) || !slots.length)
     fail('model-add-closure');
   const blob = object(rep.blob);
+  if (rep.contentKind === 'pointCloud' && (!same(rep.formatProfile, pointSourceDeclaration) || blob.mediaType !== 'application/ply')) fail('point-add-profile');
   if (!same(revision.provenance, { origin: 'import', sourceMediaType: blob.mediaType!, inputBlobDigests: [blob.digest!] })) fail('model-add-provenance');
   for (const lifecycle of [object(asset.lifecycle), object(membership.lifecycle)])
     if (!same(lifecycle, { state: 'active', reason: 'initial', eventId: lifecycle.eventId! })) fail('model-add-lifecycle');

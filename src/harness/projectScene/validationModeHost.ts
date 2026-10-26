@@ -4,7 +4,7 @@ import type { SyntheticAuthority } from './historyProjection';
 import type { SyntheticProject } from './fixture';
 
 type Host = Awaited<ReturnType<typeof openValidationHost>>;
-export type ValidationDisplayHost = Pick<Host, 'authority' | 'setDisplayPreparation'> & { content: Pick<Host['content'], 'model'> };
+export type ValidationDisplayHost = Pick<Host, 'authority' | 'setDisplayPreparation'> & { content: Pick<Host['content'], 'model' | 'modelContent'> };
 
 /** One stable editor/read facade; only the verified durable host/lease is replaced. */
 export function createValidationModeHost(initial: Host, open: (mode: LocalOpenMode) => Promise<Host>, changed: (mode: LocalOpenMode) => void) {
@@ -72,7 +72,7 @@ export function createValidationModeHost(initial: Host, open: (mode: LocalOpenMo
       try { await work; } finally { switching = false; if (operation === work) operation = undefined; }
     },
   };
-  const host: SavedWorkspaceHost & ValidationDisplayHost & Pick<Host, 'workspaceFiles' | 'workspaceOutput' | 'backupRestore' | 'dispatch' | 'conversionReport' | 'conversionReportAvailable'> & { content: Pick<Host['content'], 'model' | 'image'>; imageScope(): string } = {
+  const host: SavedWorkspaceHost & ValidationDisplayHost & Pick<Host, 'workspaceFiles' | 'workspaceOutput' | 'backupRestore' | 'dispatch' | 'conversionReport' | 'conversionReportAvailable'> & { content: Pick<Host['content'], 'model' | 'modelContent' | 'image'>; imageScope(): string } = {
     authority, mode, limits: initial.limits, read: () => current.read(),
     hasPending: () => switching || current.hasPending(),
     refresh: () => run(() => current.refresh()), resolve: (...a) => run(() => current.resolve(...a)),
@@ -122,7 +122,7 @@ export function createValidationModeHost(initial: Host, open: (mode: LocalOpenMo
       displayReady: (...a) => { admit(); current.backupRestore.displayReady(...a); },
     },
     // The resident cache never retains a closed host's content service.
-    content: { model: (record, readOnly) => current.content.model(record, readOnly), image: (record, readOnly) => current.content.image(record, readOnly) },
+    content: { modelContent: (record, readOnly) => current.content.modelContent(record, readOnly), model: (record, readOnly) => current.content.model(record, readOnly), image: (record, readOnly) => current.content.image(record, readOnly) },
     imageScope() { if (imageOwner !== current.content) { imageOwner = current.content; imageEpoch++; } return String(imageEpoch); },
     setDisplayPreparation(callback) {
       admit(); if (prepare) throw Error('モデル表示の接続を確認してください。');

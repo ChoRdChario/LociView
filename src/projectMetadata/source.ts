@@ -1,3 +1,4 @@
+import { usePointAnchorProof, type PointAnchorProof } from './pointAnchorProof';
 import * as A from '@automerge/automerge/slim';
 import { inspectProjectCandidates } from '../domain/projectCandidates';
 import { admitProjectRecords, checkProjectHeader, projectRecordMaps } from '../domain/projectRecords';
@@ -127,10 +128,10 @@ export class ProjectMetadataSource {
   }
 
   /** Internal typed command preparation; the Session supplies its own verified read. */
-  prepareEdit(expectedToken: string, command: MetadataEdit, provider: ProjectProviderRead, transactionId: string): ProjectMetadataSource {
+  prepareEdit(expectedToken: string, command: MetadataEdit, provider: ProjectProviderRead, transactionId: string, pointProof?: PointAnchorProof): ProjectMetadataSource {
     if (expectedToken !== this.token || provider.kind !== 'scene-provider' || provider.token !== this.token) return fail('stale-token');
     if (!/^[0-9a-f]{32}$/.test(transactionId)) return fail('transaction-id');
-    const edits = planMetadataEdit(provider, command, this.limits), creating = new Set<string>();
+    const edits = planMetadataEdit(provider, command, this.limits, usePointAnchorProof(pointProof, this, command, transactionId)), creating = new Set<string>();
     const entryWitness = command.kind === 'resolveEntryView' && edits.some(edit => edit.map !== 'project' && edit.remove?.includes('defaultViewId'))
       ? originalEntryWitness(this.doc, this.proof, this.limits, command.sceneId) : undefined;
     for (const edit of edits) if (edit.create) {

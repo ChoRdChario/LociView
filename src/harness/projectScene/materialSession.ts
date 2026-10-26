@@ -1,3 +1,4 @@
+import { isSavedModel } from './modelTypes';
 import { materialFields, materialForDisplay, type MaterialIntent } from '../../domain/materialIntent';
 import { value, type Field } from '../../scene/types';
 import { acceptMaterialApply, materialPlanIsCurrent, newMaterialSelection, type MaterialContext, type MaterialDraft, type MaterialEffect,
@@ -34,7 +35,7 @@ export class SyntheticMaterialSession {
         const version = asset.projection.kind === 'value' ? (p.modelVersions ?? syntheticVersions).find(v => v.projection.bindingId === (asset.projection as { value: { bindingId: string } }).value.bindingId) : null;
         const name = value(p.modelNames[asset.id] ?? 'モデル');
         if (!version) return { assetId: asset.id, name, surfaces: { kind: 'unresolved' as const, reason: 'conflict' as const }, reason: 'モデルの更新候補を確認してください。' };
-        if (version.closure.shape === 'saved-glb') return { assetId: asset.id, name, reason: null,
+        if (isSavedModel(version.closure)) return { assetId: asset.id, name, reason: null,
           surfaces: value(validationMaterialSlots(version.closure).map(slot => ({ target: slot.target, name: value(slot.name),
             project: record({ scope: { kind: 'project' }, target: slot.target }), scene: record({ scope: { kind: 'scene', sceneId }, target: slot.target }),
             sourceIntent: value(sourceMaterialIntent),

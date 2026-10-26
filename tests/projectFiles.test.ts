@@ -3968,7 +3968,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect((await peer.receiver.importWorkspace(workspace)).state).toBe('ready');
     expect((await peer.session.read()).source!.originalChanges()).toEqual(source.originalChanges());
     expect((await peer.fs.list('')).some(p => p.includes('native-conversion'))).toBe(false);
-    const review = await prepareReviewView(await host.workspaceOutput.download(await host.workspaceOutput.generateReview(source.token, { sceneId })), budget, decode);
+    const review = await prepareReviewView(await host.workspaceOutput.download(await host.workspaceOutput.generateReview(source.token, { sceneId })), { ...budget, maxFileBytes: 64 * 1024 * 1024 }, decode);
     expect(review.models).toHaveLength(1); expect(review.models[0]!.representation.formatProfile).toEqual(await occurrenceGlbProfile());
     const reviewedEffects = review.display(null, null).savedMaterials![review.models[0]!.assetId]!;
     expect(Object.values(reviewedEffects)).toEqual(Object.values(effects()));
@@ -3981,6 +3981,17 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const cold = await openValidationHost(h.f.options); expect(cold.read().source!.originalChanges()).toEqual(source.originalChanges());
     expect(cold.authority.read().modelVersions!.map(v => v.closure.representation.formatProfile)).toEqual([await occurrenceGlbProfile(), await occurrenceGlbProfile()]);
     await cold.dispose();
+  });
+  it('keeps visible Mesh creation independent of the GLB selected in the model panel', async () => {
+    const h=await productWorkspaceFixture(), {host,editor,named,button,all}=h;
+    const secondId=`ast_${newId()}`, input=glb(); await host.authority.addModelFile!(host.read().source!.token,{sceneId:Object.keys(host.authority.read().state.scenes)[0]!,assetId:secondId,file:{name:'別のGLB',size:input.length,arrayBuffer:async()=>input.slice().buffer}}); h.refresh();
+    button('モデル',editor).fire('click'); const rows=named('プロジェクトのモデル一覧',editor); rows.children.find(row=>row.children[0]?.textContent==='モデル')!.children[0]!.fire('click'); button('キャプション',editor).fire('click');
+    h.pick.mockImplementation(targets=>{const target=targets.find(t=>t.assetId===secondId);return target?{target,position:[.25,.5,0] as const}:null;});
+    const canvas=named('3Dモデルの表示',editor),pointer={pointerId:83,button:0,isPrimary:true,clientX:80,clientY:90};
+    button('ピンを追加',editor).fire('click'); canvas.fire('pointerdown',pointer);canvas.fire('pointerup',pointer);await Promise.resolve();
+    expect(h.pick.mock.lastCall![0]).toHaveLength(2);expect(h.display()!.pinEdit!.target.assetId).toBe(secondId);button('取り消す',named('ピンの操作',editor)).fire('click');
+    const shifted={...pointer,shiftKey:true};canvas.fire('pointerdown',shifted);canvas.fire('pointerup',shifted);await Promise.resolve();expect(h.pick.mock.lastCall![0]).toHaveLength(2);expect(h.display()!.pinEdit!.target.assetId).toBe(secondId);
+    button('取り消す',named('ピンの操作',editor)).fire('click');expect(h.legacy).not.toHaveBeenCalled();await h.ui.dispose();
   });
   it('connects colored Shift and numeric pins, local owner reveal, map2 scale retry and exact cold resume', async () => {
     const h = await productWorkspaceFixture(false, false, false, 'map2'), { host, editor, named, button, all, edited } = h;
@@ -7314,7 +7325,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect(host.hasPending()).toBe(false); expect(host.read().source!.token).toBe(base); expect(workspace.hasChanges()).toBe(true);
     controls.render(); const cancel = root.children.find(n => n.textContent === '選択を取り消す')!;
     expect(cancel.hidden).toBe(false); cancel.fire('click'); expect(workspace.hasChanges()).toBe(false);
-    const sceneId = s.sceneId, readModel = vi.spyOn(host.content, 'model'), file = { name: '3Dモデル', size: glb().length, arrayBuffer: vi.fn(async () => glb().buffer as ArrayBuffer) };
+    const sceneId = s.sceneId, readModel = vi.spyOn(host.content, 'modelContent'), file = { name: '3Dモデル', size: glb().length, arrayBuffer: vi.fn(async () => glb().buffer as ArrayBuffer) };
     s.setViewportState(true, [initial.assetId], null);
     expect(s.acceptModel(planModelList(s.modelContext(), { kind: 'visibility', action: 'hide', assetId: initial.assetId }))).toBe(true);
     for (let i = 0; i < 2; i++) {
@@ -7351,7 +7362,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const all = (n: RecordedNode): RecordedNode[] => [n, ...n.children.flatMap(all)];
     const button = (text: string) => all(root).find(n => n.tag === 'button' && n.textContent === text)!;
     const model = s.snapshot.modelVersions![0]!, original = s.snapshot, parts = readOnly.read().source!.originalChanges();
-    const readBody = vi.spyOn(readOnly.content, 'model'), write = vi.spyOn(readOnly.authority, 'write');
+    const readBody = vi.spyOn(readOnly.content, 'modelContent'), write = vi.spyOn(readOnly.authority, 'write');
     expect(s.acceptList(planCaptionList(s.captionContext(), { kind: 'select', captionId }))).toBe(true);
     const window = s.windowMemory;
     button('モデル').fire('click');
@@ -7470,7 +7481,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       if (fail && releases.length === 2) throw Error('second new decode');
       const model = await decodeValidationModel(source), dispose = vi.fn(model.dispose); releases.push(dispose); return { ...model, dispose };
     });
-    const reads = vi.spyOn(host.content, 'model'), cache = await prepareValidationResidents([versions[0]!], host.content, decoder);
+    const reads = vi.spyOn(host.content, 'modelContent'), cache = await prepareValidationResidents([versions[0]!], host.content, decoder);
     const old = cache.create(versions[0]!.closure as any); fail = true;
     await expect(cache.prepare(versions)).rejects.toThrow('second new decode'); expect(releases[0]).not.toHaveBeenCalled(); expect(releases[1]).toHaveBeenCalledOnce();
     expect(old.asset.children).toHaveLength(1); expect(() => cache.create(versions[1]!.closure as any)).toThrow();
@@ -7507,7 +7518,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect(saved.assetFrame).toEqual(source.assetFrame); expect(saved.representationFrame).toEqual(source.representationFrame);
     expect(s.snapshot.resources.captions).toEqual(old.resources.captions); expect(s.snapshot.state.assetMemberships).toEqual(old.state.assetMemberships);
     expect(fs.reads).toBe(reads); expect(host.read().source!.originalChanges()).toHaveLength(parts.length + 1);
-    const residentReads = vi.spyOn(host.content, 'model'), residents = await prepareValidationResidents(old.modelVersions!, host.content);
+    const residentReads = vi.spyOn(host.content, 'modelContent'), residents = await prepareValidationResidents(old.modelVersions!, host.content);
     if (source.shape !== 'saved-glb' || saved.shape !== 'saved-glb') throw Error('expected saved model');
     const originalResident = residents.create(source), movedResident = residents.create(saved);
     expect(new THREE.Box3().setFromObject(originalResident.mesh).min.x).toBe(2);
@@ -7556,7 +7567,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
   }, 15_000);
   it('adds a selected PNG through the existing media editor, retains invalid input and reopens the exact attachment', async () => {
     const { host, workspace, s, options, captionId } = await openFileCaption();
-    const modelRead = vi.spyOn(host.content, 'model');
+    const modelRead = vi.spyOn(host.content, 'modelContent');
     const controls = createMediaControls(new RecordedDocument().asDocument(), s.media, () => controls.render()), root = record(controls.root);
     const all = (n: RecordedNode): RecordedNode[] => [n, ...n.children.flatMap(all)];
     const button = (label: string) => all(root).find(n => n.tag === 'button' && n.textContent === label)!;

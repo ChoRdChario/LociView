@@ -1,3 +1,5 @@
+import { issuePointAnchorProof } from './pointAnchorProof';
+import type { Anchor } from '../scene/types';
 import * as A from '@automerge/automerge/slim';
 import type { ProjectWorkspaceFS } from '../platform/fs';
 import { cloneCanonicalValue, type JsonObject } from '../domain/values';
@@ -47,7 +49,8 @@ export interface MetadataMediaPort {
   retained?(record: JsonObject): Promise<boolean>;
 }
 export interface MetadataModelFactPlan { readonly baseToken: string | null; readonly finalToken: string; readonly stagedBlobs?: readonly JsonObject[]; stage(): Promise<void> }
-export interface MetadataModelFactPort { plan(base: ProjectMetadataSource, next: ProjectMetadataSource): Promise<MetadataModelFactPlan | null>;
+export interface MetadataModelFactPort { preparePointAnchor?(source: ProjectMetadataSource, provider: Extract<ProjectProviderRead, { kind: 'scene-provider' }>, command: Extract<MetadataEdit, { kind: 'addPin' | 'movePin' }>): Promise<Anchor>;
+  plan(base: ProjectMetadataSource, next: ProjectMetadataSource): Promise<MetadataModelFactPlan | null>;
   planRestored?(next: ProjectMetadataSource, bodyFor: (ref: JsonObject) => Blob, refs: readonly JsonObject[]): Promise<MetadataModelFactPlan>;
   planImported?(next: ProjectMetadataSource, bodyFor: (ref: JsonObject) => Blob, hasIncoming?: (ref: JsonObject) => boolean): Promise<MetadataModelFactPlan>;
   planReceived?(base: ProjectMetadataSource, next: ProjectMetadataSource, bodyFor: (ref: JsonObject) => Blob, hasIncoming?: (ref: JsonObject) => boolean): Promise<MetadataModelFactPlan> }
@@ -239,7 +242,14 @@ export class MetadataProjectSession {
           stagedBlobs: [command.media.blob as JsonObject], introduction: { source: durable, command } };
         return this.resume();
       }
-      const prepared = durable.prepareEdit(expectedToken, command, provider, transactionId);
+      let pointProof;
+      if ((command.kind === 'addPin' || command.kind === 'movePin') && command.anchor.kind === 'asset' && command.anchor.hitEvidence?.method === 'point-cloud') {
+        if (!this.modelFacts?.preparePointAnchor || provider.kind !== 'scene-provider') fail('point-anchor-unconnected');
+        const owned = await this.modelFacts!.preparePointAnchor!(durable, provider as Extract<ProjectProviderRead, { kind: 'scene-provider' }>, command);
+        if (json(owned) !== json(command.anchor)) fail('point-anchor-position');
+        pointProof = issuePointAnchorProof(durable, command, transactionId);
+      }
+      const prepared = durable.prepareEdit(expectedToken, command, provider, transactionId, pointProof);
       const known = new Set(durable.originalChanges().map(b => A.decodeChange(b).hash));
       const parts = prepared.originalChanges().filter(b => !known.has(A.decodeChange(b).hash));
       if (!parts.length) return read; // An unchanged value has no storage transaction.

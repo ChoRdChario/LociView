@@ -1,8 +1,10 @@
+import { pointVisibility } from './validationPointCoverage';
+import { pickPointAwareCreation } from './viewportPointPicking';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { fixtureModelBytes } from './modelClosure';
 import { defaultPose, fittedPose, placementMatrix, projectBounds, switchProjection, type CameraPose, type RenderDisplay } from './viewportModel';
-import { renderOwner, renderPlacement } from './modelTypes';
+import { renderOwner, renderPlacement, isReadonlyModel, isSavedModel } from './modelTypes';
 import type { ViewportFactory, ViewportObservation } from './viewportHost';
 import { PROJECT_SCENE_STANDARD_BACKGROUND_HEX, readProjectCamera, readSolidBackground, type SolidBackground } from './viewHistory';
 import type { DisplayCapture } from './viewSession';
@@ -11,6 +13,7 @@ import { createPinGizmo, type ModelPlacementTarget } from './pinGizmo';
 import { proposedPlacement } from './modelTransform';
 import type { SavedModelResidentPort } from './validationRender';
 import { hasBinaryCoverage } from '../../viewer/hardChroma';
+import { resolvePointPresentation, pointRegistrySnapshot, defaultPointProfile } from '../../domain/pointPresentation';
 import { createValidationCoverage, coveragePixel } from './validationCoverage';
 
 /** The saved resident port is explicit; the default still accepts only exact synthetic fixtures. */
@@ -27,7 +30,7 @@ export const sceneViewportFactory = (saved?: SavedModelResidentPort): ViewportFa
   let entryPending = false, notice: string | null = null;
   let pose = defaultPose(), display: RenderDisplay | null = null, modelKey = '', active = false, disposed = false, applying = false;
   let issue: string | null = null, contextLost = false, dragging = false, axis: ViewportObservation['axis'] = null, serial = 0, raf = 0, lastObservation = '';
-  let width = 1, height = 1;
+  let width = 1, height = 1, rawPixelRatio = 0; let pointDiameterNotice: string | null = null; const pointDiameters = new Map<string, number>();
   let pickEpoch = 0;
   let coverageProbe: ReturnType<typeof createValidationCoverage> | null = null, coverageIssue: string | null = null;
   let gizmo: ReturnType<typeof createPinGizmo<PinSurfaceTarget | ModelPlacementTarget>> | null = null;
@@ -89,14 +92,14 @@ export const sceneViewportFactory = (saved?: SavedModelResidentPort): ViewportFa
   function fail(e: unknown) { issue = `3D表示を停止しました。${errorText(e)} 編集内容は保持しています。`; release(); serial++; changed(); }
   function buildModels() {
     if (!display || !renderer) return;
-    const key = JSON.stringify([display.models.map(m => m.shape === 'render-glb' ? m.key : m.binding.id), display.materials, display.savedMaterials]); if (key === modelKey) return;
+    const key = JSON.stringify([display.models.map(m => isReadonlyModel(m) ? m.key : m.binding.id), display.materials, display.savedMaterials]); if (key === modelKey) return;
     pickEpoch++;
     clearModels();
     try {
       for (const model of display.models) {
         const assetId = renderOwner(model), appearance = display.materials?.[assetId];
         if (appearance && 'issue' in appearance) continue; // Diagnosed unsupported effect; no source-looking replacement.
-        if (model.shape === 'saved-glb' || model.shape === 'render-glb') {
+        if (isReadonlyModel(model) || isSavedModel(model)) {
           if (!saved) throw Error('実モデルの表示本体が未接続です。');
           const surface = saved.create(model, display.savedMaterials?.[assetId]); models.add(surface.asset); resident.set(assetId, surface); continue;
         }
@@ -115,6 +118,11 @@ export const sceneViewportFactory = (saved?: SavedModelResidentPort): ViewportFa
       modelKey = key;
     } catch (e) { clearModels(); throw e; }
   }
+  function configurePoints() {
+    const rawDpr = globalThis.devicePixelRatio || 1;
+    const view = { cssWidth: width, cssHeight: height, devicePixelRatio: rawDpr, renderScale: 1 };
+    for (const [assetId, surface] of resident) surface.points?.configure(view, pointDiameters.get(assetId) ?? 3);
+  }
   function previewModels() {
     if (!display) return;
     for (const model of display.models) {
@@ -125,7 +133,7 @@ export const sceneViewportFactory = (saved?: SavedModelResidentPort): ViewportFa
         ? proposedPlacement(renderPlacement(model), edit) : renderPlacement(model);
       surface.asset.matrix.copy(placementMatrix(placement)); surface.asset.updateMatrixWorld(true);
     }
-    updateClipping();
+    configurePoints(); updateClipping();
   }
   function installPose() {
     if (!renderer) return;
@@ -144,14 +152,14 @@ export const sceneViewportFactory = (saved?: SavedModelResidentPort): ViewportFa
       if (![...camera.projectionMatrix.elements, ...camera.matrixWorld.elements].every(Number.isFinite)) throw new Error('表示範囲を確認してください。');
       // Register TransformControls before OrbitControls: handle-down disables orbit
       // before its listener sees that same event (including touch).
-      gizmo = !display?.readOnly && (proposePin || proposeModel) ? createPinGizmo<PinSurfaceTarget | ModelPlacementTarget>(canvas, scene, camera, (target, world, manipulation) => {
+      gizmo = !display?.readOnly && (proposePin || proposeModel) ? createPinGizmo<PinSurfaceTarget | ModelPlacementTarget>(canvas, scene, camera, (target, world, manipulation, phase) => {
         if ('kind' in target) return !!proposeModel && !!display?.modelEdit?.enabled &&
           JSON.stringify(target) === JSON.stringify(display.modelEdit.target) && proposeModel(target, world, manipulation);
         const surface = resident.get(target.assetId);
         if (!proposePin || !surface || JSON.stringify(target) !== JSON.stringify(display?.pinEdit?.target) || !display?.pinEdit?.enabled) return false;
         surface.asset.updateMatrixWorld(true);
         const p = surface.asset.worldToLocal(new THREE.Vector3(...world));
-        return [p.x, p.y, p.z].every(Number.isFinite) && proposePin(target, [p.x || 0, p.y || 0, p.z || 0]);
+        return [p.x, p.y, p.z].every(Number.isFinite) && proposePin(target, [p.x || 0, p.y || 0, p.z || 0], phase);
       }, busy => { syncOrbit(busy); serial++; if (!applying) changed(); }) : null;
       controls = new OrbitControls(camera, canvas); controls.enableDamping = false; controls.target.copy(target);
       controls.mouseButtons = { MIDDLE: THREE.MOUSE.ROTATE };
@@ -188,12 +196,19 @@ export const sceneViewportFactory = (saved?: SavedModelResidentPort): ViewportFa
     camera.near = camera instanceof THREE.PerspectiveCamera ? Math.max(1e-6, (distance - radius) / 1000) : -far;
     camera.far = far; camera.updateProjectionMatrix();
   }
+  function renderFrame() {
+    if (!renderer || !camera) return;
+    // Upload new projected attributes before Three traverses/uploads geometry, never in onBeforeRender.
+    for (const surface of resident.values()) if (surface.points) { const gl=renderer.getContext(); surface.points.project(camera,gl.getParameter(gl.DEPTH_BITS) as number); }
+    renderer.render(scene,camera);
+  }
   function draw() {
     if (!active || disposed || !renderer || !camera) return;
     try {
       // Reserve before notification: ready -> host render -> ensure may reenter synchronously.
       raf = requestAnimationFrame(draw);
-      renderer.render(scene, camera);
+      if (rawPixelRatio !== (globalThis.devicePixelRatio || 1)) ensure();
+      renderFrame();
       const fingerprint = JSON.stringify([serial, width, height, display?.token, display?.pins, display?.preview, pose, background]);
       if (fingerprint !== lastObservation) { lastObservation = fingerprint; changed(); }
     } catch (e) { fail(e); }
@@ -201,7 +216,7 @@ export const sceneViewportFactory = (saved?: SavedModelResidentPort): ViewportFa
   function ensure() {
     if (!active || disposed || issue || !display) return;
     const rect = canvas.getBoundingClientRect(); if (rect.width <= 0 || rect.height <= 0) return;
-    const resized = width !== rect.width || height !== rect.height; width = rect.width; height = rect.height;
+    const resized = width !== rect.width || height !== rect.height || rawPixelRatio !== (globalThis.devicePixelRatio || 1); width = rect.width; height = rect.height; rawPixelRatio = globalThis.devicePixelRatio || 1;
     if (resized) pickEpoch++;
     try {
       if (!renderer) {
@@ -212,7 +227,9 @@ export const sceneViewportFactory = (saved?: SavedModelResidentPort): ViewportFa
         installPose(); buildModels(); previewModels();
       }
       if (resized || !raf) {
-        renderer.setSize(width, height, false);
+        const ratio = Math.min(globalThis.devicePixelRatio || 1, 2);
+        renderer.setDrawingBufferSize(Math.max(1, Math.floor(width * ratio + .5)), Math.max(1, Math.floor(height * ratio + .5)), 1);
+        configurePoints();
         if (camera instanceof THREE.PerspectiveCamera) camera.aspect = width / height;
         else if (camera) { const half = (camera.top - camera.bottom) / 2; camera.left = -half * width / height; camera.right = half * width / height; }
         camera?.updateProjectionMatrix(); serial++;
@@ -236,6 +253,18 @@ export const sceneViewportFactory = (saved?: SavedModelResidentPort): ViewportFa
     coverageProbe ??= createValidationCoverage(renderer); coverageIssue = null;
     return { ndc: pixel.ndc, coverage: coverageProbe.begin(camera, pixel, error => { coverageIssue = errorText(error); }) };
   }
+  function pointPick(targets: readonly PinSurfaceTarget[], x: number, y: number) {
+    if (!renderer || !camera || !display || display.readOnly) return null;
+    const drawing = renderer.getDrawingBufferSize(new THREE.Vector2()), dpr = globalThis.devicePixelRatio || 1;
+    const view = { cssWidth: width, cssHeight: height, devicePixelRatio: dpr, renderScale: Math.min(dpr, 2) / dpr };
+    coverageIssue = null; renderFrame();
+    const visible=pointVisibility(renderer,camera,resident,width,height,error=>{coverageIssue=errorText(error);});
+    try { return pickPointAwareCreation(display, targets, resident, camera, view, x, y, ndc => {
+      const pixel = coveragePixel((ndc.x+1)*width/2, (1-ndc.y)*height/2, width, height, drawing); if (!pixel) throw Error('点の表示位置を確認できません。');
+      coverageProbe ??= createValidationCoverage(renderer!);
+      return coverageProbe.begin(camera!, pixel, error => { coverageIssue = errorText(error); });
+    }, renderer.getContext().getParameter(renderer.getContext().DEPTH_BITS) as number,visible); } finally { visible.dispose(); }
+  }
   function reportPickIssue() { if (coverageIssue) { serial++; changed(); } }
   canvas.addEventListener('webglcontextlost', lost);
   canvas.addEventListener('webglcontextrestored', restored);
@@ -250,17 +279,23 @@ export const sceneViewportFactory = (saved?: SavedModelResidentPort): ViewportFa
       else if (boundsChanged) { observePose(); installPose(); }
       buildModels(); previewModels(); gizmo?.update(next.modelEdit ?? next.pinEdit); serial++;
     },
+    pointDiameter(assetId) { return pointDiameters.get(assetId) ?? 3; },
+    setPointDiameter(assetId, input) { const resolved = resolvePointPresentation(pointRegistrySnapshot, defaultPointProfile, input), diameter = resolved.diameterCssPixels; pointDiameterNotice = resolved.diagnosedDefault ? '点の大きさを既定の3pxに戻しました。' : null;
+      if (diameter === (pointDiameters.get(assetId) ?? 3)) return;
+      pointDiameters.set(assetId, diameter); configurePoints(); pickEpoch++; serial++; changed(); },
     setActive(next) { if (!next && active) release(); active = next; ensure(); },
     setPinPointerActive(next) { pinPointerActive = next; syncOrbit(); },
     pick(target, x, y) {
       if (!active || disposed || !renderer || !camera || issue || contextLost || dragging || gizmo?.dragging || !display || display.readOnly) return null;
-      try { const sample = pickSample(x, y); if (!sample) return null;
+      try { if ([...resident.values()].some(s => s.points)) { const hit = pointPick([target], x, y); reportPickIssue(); return coverageIssue ? null : hit?.position ?? null; }
+        const sample = pickSample(x, y); if (!sample) return null;
         const result = pickResidentSurface(display, target, resident, camera, sample.ndc, sample.coverage); reportPickIssue(); return coverageIssue ? null : result;
       } catch (error) { coverageIssue = errorText(error); reportPickIssue(); return null; }
     },
     pickCreation(targets, x, y) {
       if (!active || disposed || !renderer || !camera || issue || contextLost || dragging || gizmo?.dragging || !display || display.readOnly) return null;
-      try { const sample = pickSample(x, y); if (!sample) return null;
+      try { if ([...resident.values()].some(s => s.points)) { const hit = pointPick(targets, x, y); reportPickIssue(); return coverageIssue ? null : hit; }
+        const sample = pickSample(x, y); if (!sample) return null;
         const result = pickResidentCreation(display, targets, resident, camera, sample.ndc, sample.coverage); reportPickIssue(); return coverageIssue ? null : result;
       } catch (error) { coverageIssue = errorText(error); reportPickIssue(); return null; }
     },
@@ -280,7 +315,7 @@ export const sceneViewportFactory = (saved?: SavedModelResidentPort): ViewportFa
         display: display ?? undefined,
         pickToken: String(pickEpoch),
         ready: Boolean(active && renderer && camera && !issue), issue,
-        notice: [notice, coverageIssue, alphaPicking && !display?.readOnly ? '半透明・切り抜きの面へのピン配置は未接続です。原本の見た目は保持しています。' : null,
+        notice: [notice, coverageIssue, pointDiameterNotice, ...new Set([...resident.values()].flatMap(s => s.points?.issue ? [s.points.issue] : [])), alphaPicking && !display?.readOnly ? '半透明・切り抜きの面へのピン配置は未接続です。原本の見た目は保持しています。' : null,
           ...new Set(display?.pins.flatMap(p => p.notice ? [p.notice] : []) ?? []),
           ...(display?.materialNotices ?? []), ...Object.values(display?.materials ?? {}).flatMap(m => 'issue' in m ? [m.issue] : []),
           ...Object.values(display?.savedMaterials ?? {}).flatMap(rows => Object.values(rows).flatMap(m => 'issue' in m ? [m.issue] : []))].filter(Boolean).join(' ') || null,
@@ -306,13 +341,13 @@ export const sceneViewportFactory = (saved?: SavedModelResidentPort): ViewportFa
       // No camera/Orbit/gizmo replacement, fitting, model I/O or rounded readback.
       scene.background = new THREE.Color().setRGB(...next.colorSrgb, THREE.SRGBColorSpace);
       try {
-        renderer.render(scene, camera);
+        renderFrame();
         background = next; // Readable for verification, not yet published to Scene memory/listeners.
         verify?.();
       }
       catch (e) {
         background = previousValue; scene.background = previous;
-        try { renderer.render(scene, camera); } catch (rollbackError) { fail(rollbackError); }
+        try { renderFrame(); } catch (rollbackError) { fail(rollbackError); }
         throw e;
       }
       backgrounds.set(display.sceneId, next); serial++; changed();

@@ -29,6 +29,7 @@ export interface ViewportObservation {
   readonly preview?: { readonly x: number; readonly y: number; readonly visible: boolean };
 }
 export interface SyntheticViewport {
+  setPointDiameter?(assetId: string, diameter: number): void; pointDiameter?(assetId: string): number;
   update(display: RenderDisplay): void; setActive(active: boolean): void;
   /** Reserve placement input before Orbit receives pointerdown; independent of gizmo activity. */
   setPinPointerActive?(active: boolean): void;
@@ -37,10 +38,10 @@ export interface SyntheticViewport {
   /** Includes exact readback verification; thrown verification must roll back before publication. */
   setBackground?(background: SolidBackground, verify?: () => void): void;
   pick?(target: PinSurfaceTarget, xCss: number, yCss: number): V3 | null;
-  pickCreation?(targets: readonly PinSurfaceTarget[], xCss: number, yCss: number): { target: PinSurfaceTarget; position: V3 } | null;
+  pickCreation?(targets: readonly PinSurfaceTarget[], xCss: number, yCss: number): { target: PinSurfaceTarget; position: V3; point?: { readonly pointIndex: number } } | null;
 }
 export type ViewportFactory = (canvas: HTMLCanvasElement, changed: () => void,
-  proposePin?: (target: PinSurfaceTarget, positionAsset: V3) => boolean,
+  proposePin?: (target: PinSurfaceTarget, positionAsset: V3, phase?: 'begin' | 'adjust' | 'restore') => boolean,
   proposeModel?: (target: ModelPlacementTarget, positionProject: V3, manipulation?: ModelManipulation) => boolean) => SyntheticViewport;
 
 /** DOM/read-port adapter, not a second camera implementation or durable service. */
@@ -49,7 +50,7 @@ export function createViewportHost(document: Document, session: SyntheticSession
   const root = document.createElement('section'); root.className = 'lv-development-viewport'; root.setAttribute('aria-label', '3D表示');
   const mediaViewer = sharedViewer ?? createMediaViewer(document); if (!sharedViewer) root.append(mediaViewer.root);
   const canvas = document.createElement('canvas'); canvas.tabIndex = 0;
-  canvas.setAttribute('aria-label', session.snapshot.modelVersions?.some(v => v.closure.shape === 'saved-glb') ? '3Dモデルの表示' : '合成モデルの3D表示');
+  canvas.setAttribute('aria-label', session.snapshot.modelVersions?.some(v => ['saved-glb','saved-point'].includes(v.closure.shape)) ? '3Dモデルの表示' : '合成モデルの3D表示');
   const overlay = document.createElement('div'); overlay.className = 'lv-development-pin-layer';
   const preview = document.createElement('div'); preview.className = 'lv-development-pin-preview'; preview.textContent = '仮の位置'; preview.hidden = true;
   const status = document.createElement('p'); status.setAttribute('role', 'status');
@@ -156,7 +157,8 @@ export function createViewportHost(document: Document, session: SyntheticSession
     if (ghost) { preview.style.left = `${ghost.x}px`; preview.style.top = `${ghost.y}px`; }
     if ((dragChanged || stateChanged) && hasRendered && !rendering) changed();
   }
-  const proposePin = (target: PinSurfaceTarget, position: V3) => {
+  const proposePin = (target: PinSurfaceTarget, position: V3, phase?: 'begin' | 'adjust' | 'restore') => {
+    if (phase === 'begin') return true;
     const accepted = session.acceptPinSurface(target, position, true); changed(); return accepted;
   };
   const proposeModel = (target: ModelPlacementTarget, position: V3, manipulation?: ModelManipulation) => {
@@ -214,6 +216,9 @@ export function createViewportHost(document: Document, session: SyntheticSession
         JSON.stringify(start.targets) !== JSON.stringify(start.creating ? session.pinCreationTargets() : [session.pinSurfaceTarget()])) return;
       const rect = canvas.getBoundingClientRect();
       try {
+        if (session.snapshot.modelVersions?.some(v => v.closure.shape === 'saved-point' && start.targets.some(t => t.assetId === v.assetId))) {
+          session.message = '点群のピン配置は統合編集画面で利用できます。プロジェクトを開き直してください。'; changed(); return;
+        }
         const x = e.clientX - rect.left, y = e.clientY - rect.top;
         const hit = start.creating ? runtime?.pickCreation?.(start.targets, x, y) : (() => {
           const position = runtime?.pick?.(start.targets[0]!, x, y); return position ? { target: start.targets[0]!, position } : null;

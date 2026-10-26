@@ -16,6 +16,7 @@ record executed evidence and connections; do not infer those from a document tit
 | Accepted architecture / reconsideration | [ADR-0001](adr/0001-v2-foundation.md), [ADR-0002](adr/0002-project-scenes-and-continuing-team-history.md) |
 | Product, privacy and media boundaries | [specification 00](specs/00-product-contract.md) |
 | Frames, revisions, picking and rendering | [specification 01](specs/01-domain-rendering.md) |
+| Approved ordinary-point file workflow | [01a companion](specs/01a-point-project-scene-proposal.md); exact source/presentation package approved 2026-10-27; implementation/evidence in todo, not adopted |
 | Storage, journal, Native package and migration boundaries | [specification 02](specs/02-storage-package-migration.md) |
 | Adoption, device/performance and release gates | [specification 03](specs/03-gates-and-delivery.md), [G0 coverage](g0/g0-coverage-map.md) |
 | LociMyu → Native conversion | [specification 04](specs/04-locimyu-conversion.md) |

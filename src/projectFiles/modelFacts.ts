@@ -1,3 +1,6 @@
+import { resolveScene } from '../scene/resolve';
+import { pointSourceDeclaration } from '../domain/pointSource';
+import type { Anchor } from '../scene/types';
 import { readProjectScene } from '../scene/projectProvider';
 import { metadataProviderReady, type MetadataModelFactPort, type MetadataModelFactPlan } from '../projectMetadata/session';
 import type { ProjectMetadataSource } from '../projectMetadata/source';
@@ -6,13 +9,33 @@ import type { ContentRequest } from '../domain/projectContentChecks';
 import { cloneCanonicalValue, type JsonObject } from '../domain/values';
 import { validationMetadataLimits as limits, fileError } from './validation';
 import type { ValidationContent } from './content';
+import { pointSourceMediaType } from './pointPly';
 import { ProjectRecordFields } from '../domain/projectRecordFields';
 import { checkProjectRecord } from '../domain/projectRecords';
 import { fileObject } from './validation';
 
 /** Owned new GLB or fresh records reusing exact known bodies. Old evidence is never repaired. */
 export function validationModelFacts(content: ValidationContent): MetadataModelFactPort {
-  return { planReceived: (base, next, bodyFor, hasIncoming) => validationReceivedFacts(content, base, next, bodyFor, hasIncoming),
+  return { async preparePointAnchor(source, provider, command): Promise<Anchor> {
+    if (source.token !== provider.token || command.anchor.kind !== 'asset') return fileError('点の記録対象が更新されています。');
+    const anchor = command.anchor, evidence = anchor.hitEvidence, reference = evidence?.source, index = reference?.surfaceRef;
+    const scene = resolveScene(provider.state, provider.resources, command.sceneId);
+    const projection = scene.kind === 'ready' ? scene.composition.assets.find(a => a.assetId === anchor.assetId)?.projection : undefined;
+    const field = reference && provider.details.immutable.representationsById[reference.representationId];
+    const record = field?.kind === 'value' ? field.value : undefined;
+    if (!projection || !record || !reference || evidence?.method !== 'point-cloud' || !index || index.kind !== 'pointSample' || index.nodeIndex !== 0 || index.primitiveIndex !== 0 || !Number.isSafeInteger(index.pointIndex) || index.pointIndex < 0 ||
+      projection.assetFrameId !== anchor.assetFrameId || projection.revisionId !== anchor.authoredAssetRevisionId || !projection.anchorCompatibilityIds.includes(anchor.authoredAnchorCompatibilityId) || !projection.representationIds.includes(reference.representationId) ||
+      record.assetId !== anchor.assetId || record.contentKind !== 'pointCloud' || record.role !== 'pointPrimary' || json(record.formatProfile) !== json(pointSourceDeclaration)) return fileError('元の点と記録対象を確認できません。');
+    const revision = provider.details.immutable.assetRevisionsById[projection.revisionId];
+    if (revision?.kind !== 'value' || !(revision.value.anchorCompatibilityClasses as JsonObject[]).some(c => c.id === anchor.authoredAnchorCompatibilityId && (c.targetVariantFamilyIds as string[]).includes(record.variantFamilyId as string))) return fileError('点の互換性を確認できません。');
+    const decoded = await content.modelContent(record, true);
+    if (decoded.kind !== 'point' || index.pointIndex >= decoded.positions.length / 3) return fileError('元の点を確認できません。');
+    const position = Array.from(decoded.positions.subarray(index.pointIndex * 3, index.pointIndex * 3 + 3)) as [number, number, number];
+    // This exact source profile requires identity representationToAsset; its inspector checks it.
+    return { kind: 'asset', assetId: anchor.assetId, assetFrameId: projection.assetFrameId, positionAsset: position,
+      authoredAssetRevisionId: projection.revisionId, authoredAnchorCompatibilityId: anchor.authoredAnchorCompatibilityId,
+      hitEvidence: { method: 'point-cloud', source: { representationId: record.id as string, surfaceRef: { kind: 'pointSample', nodeIndex: 0, primitiveIndex: 0, pointIndex: index.pointIndex } } } };
+  }, planReceived: (base, next, bodyFor, hasIncoming) => validationReceivedFacts(content, base, next, bodyFor, hasIncoming),
     planRestored: (next, bodyFor, refs) => restoredFacts(content, next, bodyFor, refs),
     planImported: (next, bodyFor, hasIncoming) => receivedFacts(content, null, next, bodyFor, hasIncoming), async plan(base, next) {
     const used = new Set<string>(), introduced = new Set<string>(); let work = 0;
@@ -78,7 +101,7 @@ async function restoredFacts(content: ValidationContent, next: ProjectMetadataSo
   let total = 0;
   for (const ref of refs) {
     const check = new ProjectRecordFields(); check.blob(ref, []);
-    if (check.unknown || !['model/gltf-binary', 'image/png', 'image/jpeg', 'image/webp', 'image/gif'].includes(ref.mediaType as string)) return fileError('復元する本体形式を確認してください。');
+    if (check.unknown || !['model/gltf-binary', pointSourceMediaType, 'image/png', 'image/jpeg', 'image/webp', 'image/gif'].includes(ref.mediaType as string)) return fileError('復元する本体形式を確認してください。');
     const key = json(ref), size = ref.byteLength as number, previous = sizes.get(ref.digest as string);
     if (previous !== undefined && previous !== size) return fileError('復元する本体の大きさが一致しません。');
     if (previous === undefined) { total += size; sizes.set(ref.digest as string, size); }

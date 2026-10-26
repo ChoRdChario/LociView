@@ -1,0 +1,141 @@
+{
+  "version": 1,
+  "scope": "normative data expectations; not executed renderer or device acceptance",
+  "accepted": [
+    {
+      "name": "four-points-with-duplicate",
+      "utf8": "ply\nformat ascii 1.0\nelement vertex 4\nproperty float x\nproperty float y\nproperty float z\nproperty uchar red\nproperty uchar green\nproperty uchar blue\nend_header\n-1 0 -0 255 0 0\n1 0 0 0 255 0\n0 2 0 128 64 255\n0 2 0 128 64 255\n",
+      "sha256": "641ea30efd1801d2f1665d86e4f16b65c4e11e7220018d134bd54a838413fa44",
+      "pointCount": 4,
+      "positionsFloat32": [
+        [
+          -1,
+          0,
+          0
+        ],
+        [
+          1,
+          0,
+          0
+        ],
+        [
+          0,
+          2,
+          0
+        ],
+        [
+          0,
+          2,
+          0
+        ]
+      ],
+      "colorsLinearFloat32": [
+        [
+          1,
+          0,
+          0
+        ],
+        [
+          0,
+          1,
+          0
+        ],
+        [
+          0.2158605009317398,
+          0.05126945674419403,
+          1
+        ],
+        [
+          0.2158605009317398,
+          0.05126945674419403,
+          1
+        ]
+      ],
+      "bounds": {
+        "min": [
+          -1,
+          0,
+          0
+        ],
+        "max": [
+          1,
+          2,
+          0
+        ]
+      },
+      "occurrences": {
+        "nodeIndex": 0,
+        "primitiveIndex": 0,
+        "pointIndex": "unchanged zero-based input row ordinal"
+      }
+    },
+    {
+      "name": "CRLF-no-final-newline",
+      "utf8": "ply\r\nformat ascii 1.0\r\nelement vertex 4\r\nproperty float x\r\nproperty float y\r\nproperty float z\r\nproperty uchar red\r\nproperty uchar green\r\nproperty uchar blue\r\nend_header\r\n-1 0 -0 255 0 0\r\n1 0 0 0 255 0\r\n0 2 0 128 64 255\r\n0 2 0 128 64 255",
+      "sameDecodedAs": "four-points-with-duplicate"
+    },
+    {
+      "name": "float32-rounding",
+      "utf8": "ply\nformat ascii 1.0\nelement vertex 1\nproperty float x\nproperty float y\nproperty float z\nproperty uchar red\nproperty uchar green\nproperty uchar blue\nend_header\n0.1 -0 1.00000006 0 128 255\n",
+      "pointCount": 1,
+      "positionsFloat32": [
+        [
+          0.10000000149011612,
+          0,
+          1.0000001192092896
+        ]
+      ],
+      "bounds": {
+        "min": [
+          0.10000000149011612,
+          0,
+          1.0000001192092896
+        ],
+        "max": [
+          0.10000000149011612,
+          0,
+          1.0000001192092896
+        ]
+      }
+    },
+    {
+      "name": "inert-comment-containing-terminator-text",
+      "utf8": "ply\nformat ascii 1.0\ncomment ignored end_header\nobj_info https://example.invalid/a\nelement vertex 4\nproperty float x\nproperty float y\nproperty float z\nproperty uchar red\nproperty uchar green\nproperty uchar blue\nend_header\n-1 0 -0 255 0 0\n1 0 0 0 255 0\n0 2 0 128 64 255\n0 2 0 128 64 255\n",
+      "sameDecodedAs": "four-points-with-duplicate"
+    }
+  ],
+  "rejected": [
+    {
+      "mutation": "replace first x with 1e39",
+      "reason": "finite Number but nonfinite Float32"
+    },
+    {
+      "mutation": "replace first x with NaN or Infinity",
+      "reason": "invalid/nonfinite decimal"
+    },
+    {
+      "mutation": "replace first red with 256, -1, or 1.5",
+      "reason": "not uchar decimal"
+    },
+    {
+      "mutation": "declare 3 vertices but retain 4 rows",
+      "reason": "row count mismatch"
+    },
+    {
+      "mutation": "append one empty payload line",
+      "reason": "trailing empty row"
+    },
+    {
+      "mutation": "append element face 0 in header",
+      "reason": "nonvertex element"
+    },
+    {
+      "mutation": "add property float nx or f_dc_0",
+      "reason": "not the closed XYZ/RGB signature"
+    },
+    {
+      "mutation": "header exceeds 65536 bytes or row exceeds 1024 bytes including CR excluding LF",
+      "reason": "bounded parse limit"
+    }
+  ]
+}

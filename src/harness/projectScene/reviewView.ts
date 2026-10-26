@@ -1,15 +1,14 @@
+import { inspectDeclaredValidationModel, readValidationBody } from '../../projectFiles/content';
+import { isPointModel, type ValidatedModel } from '../../projectFiles/pointPly';
 import { inspectProjectImage, projectImageMime, type PhotoDecoder } from '../../projectFiles/photo';
 import * as THREE from 'three';
 import { canonical, list, object, same, string } from '../../domain/projectGraphSupport';
 import type { JsonObject } from '../../domain/values';
 import { materialForDisplay, type MaterialIntent } from '../../domain/materialIntent';
 import { ReviewArchive } from '../../projectPackage/reviewArchive';
-import { inspectValidationGlb, inspectValidationJpegGlb, type ValidatedGlb } from '../../projectFiles/glb';
-import { inspectOccurrenceGlb, inspectOccurrenceJpegGlb } from '../../projectFiles/glbOccurrences';
 import type { PngDecoder } from '../../projectFiles/png';
 import type { JpegDecoder } from '../../projectFiles/jpeg';
-import { validationGlbProfile, occurrenceGlbProfile, jpegGlbProfile, occurrenceJpegGlbProfile, validationMetadataLimits, type FileValidationLimits } from '../../projectFiles/validation';
-import { identityPlacement } from '../../projectFiles/initialProject';
+import { validationMetadataLimits, type FileValidationLimits } from '../../projectFiles/validation';
 import { value } from '../../scene/types';
 import type { CaptionListItem, CaptionListSource } from '../../ui/projectScene/captionListState';
 import type { ReadonlyRenderModel } from './modelTypes';
@@ -26,30 +25,25 @@ export async function prepareReviewView(file: Blob, limits: FileValidationLimits
   const snapshot = review.snapshot, scene = object(snapshot.scene), sceneId = string(scene.id), project = object(snapshot.project);
   if (review.closure.entries.reduce((n, b) => n + b.byteLength, 0) > limits.maxFileBytes)
     throw Error('この検証画面の容量上限を超えています。元のファイルは変更していません。');
-  const profile = await validationGlbProfile(), occurrence = await occurrenceGlbProfile(), models: ReadonlyRenderModel[] = [], decoded = new Map<string, ValidatedGlb>(), images = new Map<string, Blob>();
-  const jpegProfile = await jpegGlbProfile(), jpegOccurrence = await occurrenceJpegGlbProfile();
+  const models: ReadonlyRenderModel[] = [], decoded = new Map<string, ValidatedModel>(), images = new Map<string, Blob>();
   const assets = table(snapshot, 'assetsById'), representations = table(snapshot, 'representationsById');
   for (const asset of Object.values(assets)) {
     if (asset.kind !== 'visual') continue;
     const ids = list(asset.representationIds); if (ids.length !== 1) throw Error('この検証画面では、1つの表示本体を持つモデルだけを開けます。');
     const record = representations[string(ids[0])]!, blob = object(record.blob);
-    if (![profile, occurrence, jpegProfile, jpegOccurrence].some(p => same(record.formatProfile, p)) || record.contentKind !== 'mesh' || record.role !== 'meshPrimary' || !same(record.purposes, ['display']) ||
-      !same(record.representationToAsset, { ...identityPlacement(), reflection: 'none' }) || blob.mediaType !== 'model/gltf-binary')
-      throw Error('このモデルの表示形式は未対応です。元のファイルは変更していません。');
-    const bytes = await inspection.archive.entryBytes(`blobs/sha256/${string(blob.digest)}`, limits.maxFileBytes);
-    const inspect = same(record.formatProfile, jpegOccurrence) ? inspectOccurrenceJpegGlb : same(record.formatProfile, jpegProfile) ? inspectValidationJpegGlb : same(record.formatProfile, occurrence) ? inspectOccurrenceGlb : inspectValidationGlb;
-    const source = await inspect(bytes, limits, decode, jpeg), catalog = object(record.materialCatalog), slots = list(catalog.slots).map(object);
+    const bytes = await readValidationBody(inspection.archive.entryBlob(`blobs/sha256/${string(blob.digest)}`), limits.maxFileBytes);
+    const source = await inspectDeclaredValidationModel(record, bytes, limits, decode, jpeg, 'review'), catalog = object(record.materialCatalog), slots = list(catalog.slots).map(object);
     const actual = new Set(source.materials.map(canonical));
     if (!same(record.logicalBoundsAsset, source.bounds) || slots.length !== source.materials.length ||
       slots.some(s => !actual.delete(canonical({ sourceLocator: s.sourceLocator!, sourceSemantics: s.sourceSemantics! }))) || actual.size)
       throw Error('モデルの形状・材質と表示情報が一致しません。');
     decoded.set(string(record.id), source);
-    models.push({ shape: 'render-glb', key: `${review.token}/${record.id}`, assetId: string(asset.id),
+    models.push({ shape: isPointModel(source) ? 'render-point' : 'render-glb', key: `${review.token}/${record.id}`, assetId: string(asset.id),
       assetToProject: asset.assetToProject as unknown as ReadonlyRenderModel['assetToProject'], representation: record as ReadonlyRenderModel['representation'] });
   }
   for (const record of Object.values(table(snapshot, 'mediaResourcesById'))) {
     const blob = object(record.blob); if (record.mediaKind !== 'image' || !projectImageMime(blob.mediaType)) throw Error('このメディアの表示形式は未対応です。');
-    const bytes = await inspection.archive.entryBytes(`blobs/sha256/${string(blob.digest)}`, limits.maxFileBytes);
+    const bytes = await readValidationBody(inspection.archive.entryBlob(`blobs/sha256/${string(blob.digest)}`), limits.maxFileBytes);
     if (await inspectProjectImage(bytes, limits, decode, jpeg, photo) !== blob.mediaType) throw Error('メディアの本体形式が一致しません。');
     images.set(string(record.id), new Blob([bytes.slice().buffer], { type: blob.mediaType }));
   }
@@ -63,7 +57,7 @@ export async function prepareReviewView(file: Blob, limits: FileValidationLimits
       const selected = local[0] ?? global[0]; if (!selected) continue;
       const intent: MaterialIntent = { appearance: selected.appearance as unknown as MaterialIntent['appearance'],
         compositing: selected.compositing as unknown as MaterialIntent['compositing'] }, issue = validationMaterialIssue(slot, intent, review.semanticProfile);
-      if (issue) throw Error(issue); effects[slot.target.logicalMaterialSlotId] = materialForDisplay(intent, review.semanticProfile);
+      if (issue && model.shape !== 'render-point') throw Error(issue); effects[slot.target.logicalMaterialSlotId] = issue ? { issue } : materialForDisplay(intent, review.semanticProfile);
     }
     savedMaterials[model.assetId] = effects;
   }
@@ -103,7 +97,7 @@ export async function prepareReviewView(file: Blob, limits: FileValidationLimits
     entry: scene.defaultViewId ? { kind: 'ready', payload: capture(string(scene.defaultViewId)) } : { kind: 'none' } });
   return { original, inspection, source, models, images, attachments, views, capture, display,
     title: string(project.title), sceneName: string(scene.name),
-    content: { async model(record: JsonObject) { const expected = representations[string(record.id)], body = decoded.get(string(record.id));
+    content: { async modelContent(record: JsonObject) { const expected = representations[string(record.id)], body = decoded.get(string(record.id));
       if (!expected || !same(expected, record) || !body) throw Error('モデルの表示本体を確認してください。'); return body; } } };
 }
 export type ReviewView = Awaited<ReturnType<typeof prepareReviewView>>;

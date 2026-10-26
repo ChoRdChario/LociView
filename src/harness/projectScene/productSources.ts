@@ -1,3 +1,4 @@
+import { isSavedModel } from './modelTypes';
 import { value, type Field } from '../../scene/types';
 import { resolveScene } from '../../scene/resolve';
 import type { JsonObject } from '../../domain/values';
@@ -169,14 +170,14 @@ export function productSources(host: ReturnType<typeof createValidationModeHost>
     pinPositionInParent(token, captionId, assetId) {
       const p = provider(), snapshot = host.authority.read();
       if (p.token !== token || snapshot.state.token !== token) throw Error('対象が更新されています。取り消して選び直してください。');
-      if (!snapshot.modelVersions?.length || !snapshot.modelVersions.some(v => v.assetId === assetId && v.closure.shape === 'saved-glb')) return null;
+      if (!snapshot.modelVersions?.length || !snapshot.modelVersions.some(v => v.assetId === assetId && isSavedModel(v.closure))) return null;
       return pinPositionInParent(snapshot, captionId, assetId);
     },
     modelDetails(sceneId, assetId) {
       const p = provider(), snapshot = host.authority.read(); if (p.token !== snapshot.state.token) return null;
       const asset = p.resources.assets[assetId], projection = asset?.projection;
       const version = projection?.kind === 'value' ? snapshot.modelVersions?.find(v => v.assetId === assetId && v.projection.bindingId === projection.value.bindingId) : undefined;
-      if (!version || version.closure.shape !== 'saved-glb') return null;
+      if (!version || !isSavedModel(version.closure)) return null;
       const ids = new Set<string>(); let uncertain = false;
       for (const fields of Object.values(p.details.mutable.sceneAssetMembershipsById)) {
         if ((fieldValue(fields.lifecycle) as JsonObject | undefined)?.state === 'deleted') continue;
@@ -186,7 +187,7 @@ export function productSources(host: ReturnType<typeof createValidationModeHost>
         else ids.add(scene);
       }
       return { target: { kind: 'model', token: p.token, sceneId, assetId, bindingId: version.projection.bindingId },
-        placement: version.closure.binding.assetToProject, rotationDegrees: rotationDegrees(version.closure.binding.assetToProject.rotationXYZW),
+        replacementAvailable: version.closure.shape === 'saved-glb', pointCloud: version.closure.shape === 'saved-point', placement: version.closure.binding.assetToProject, rotationDegrees: rotationDegrees(version.closure.binding.assetToProject.rotationXYZW),
         sceneCount: uncertain ? { kind: 'unresolved', reason: 'conflict' } : value(ids.size) };
     },
     modelPlacement(translation, rotation, scale) {
@@ -262,7 +263,7 @@ export function productSources(host: ReturnType<typeof createValidationModeHost>
           const projection = asset.projection;
           const version = projection.kind === 'value' ? snapshot.modelVersions?.find(v => v.assetId === asset.id && v.projection.bindingId === projection.value.bindingId) : undefined;
           const name = p.details.mutable.assetsById[asset.id]!.label as Field<string>;
-          if (!version || version.closure.shape !== 'saved-glb') return { assetId: asset.id, name, surfaces: { kind: 'unresolved', reason: 'conflict' }, reason: 'モデルの状態を確認してください。' };
+          if (!version || !isSavedModel(version.closure)) return { assetId: asset.id, name, surfaces: { kind: 'unresolved', reason: 'conflict' }, reason: 'モデルの状態を確認してください。' };
           return { assetId: asset.id, name, reason: null, surfaces: value(validationMaterialSlots(version.closure).map(slot => ({
             target: slot.target, name: value(slot.name), project: record(slot.target, 'project'), scene: record(slot.target, 'scene'), sourceIntent: value(sourceMaterialIntent),
             fieldIssues: Object.fromEntries(materialFields.map(f => [f, validationMaterialSourceIssue(slot) ??
@@ -281,7 +282,7 @@ export function productSources(host: ReturnType<typeof createValidationModeHost>
           if (appearance.length < 2 && compositing.length < 2 && (!duplicate || context.ids.length < 2)) continue;
           const describe = (field: 'appearance' | 'compositing', value: JsonObject) => describeMaterialCandidate(field, canonicalFixture(value), snapshot);
           const target = context.routing.target as JsonObject, version = snapshot.modelVersions?.find(v => v.assetId === target.assetId);
-          const slot = version?.closure.shape === 'saved-glb' ? validationMaterialSlots(version.closure).find(s => canonicalFixture(s.target) === canonicalFixture(target))?.name : undefined;
+          const slot = version && isSavedModel(version.closure) ? validationMaterialSlots(version.closure).find(s => canonicalFixture(s.target) === canonicalFixture(target))?.name : undefined;
           review.push({ key: `${bucket}/${id}`, token: p.token, sceneId, overrideId: id, label: `${snapshot.modelNames[target.assetId as string] ?? 'モデル'}／${slot ?? '面を確認してください'}／${(context.routing.scope as JsonObject).kind === 'scene' ? 'このシーンだけ' : 'プロジェクト共通'}`,
             appearance: appearance.map(a => ({ operationId: a.operationId, label: describe('appearance', a.value) })),
             compositing: compositing.map(a => ({ operationId: a.operationId, label: describe('compositing', a.value) })),

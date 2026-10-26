@@ -9,7 +9,7 @@ export interface ModelReplacementTarget { readonly token: string; readonly scene
 
 /** Saved read projection only. Complete immutable records remain attached, not reconstructed as fixtures. */
 export interface ValidationModelClosure {
-  readonly shape: 'saved-glb';
+  readonly shape: 'saved-glb' | 'saved-point';
   readonly assetFrame: { readonly id: string };
   readonly representationFrame: { readonly id: string };
   readonly binding: JsonObject & { readonly id: string; readonly payloadDigest: string; readonly assetId: string; readonly assetRevisionId: string;
@@ -25,16 +25,16 @@ export interface ValidationModelClosure {
 export type DisplayModelClosure = FixtureModelClosure | ValidationModelClosure;
 /** Read-only rendering facts, not a Binding, Revision or metadata source. */
 export interface ReadonlyRenderModel {
-  readonly shape: 'render-glb'; readonly key: string; readonly assetId: string; readonly assetToProject: FixturePlacement;
+  readonly shape: 'render-glb' | 'render-point'; readonly key: string; readonly assetId: string; readonly assetToProject: FixturePlacement;
   readonly representation: JsonObject & { readonly id: string; readonly assetId: string; readonly variantFamilyId: string;
     readonly representationToAsset: FixturePlacement;
     readonly logicalBoundsAsset: ValidationModelClosure['representation']['logicalBoundsAsset'];
     readonly materialCatalog: ValidationModelClosure['representation']['materialCatalog'] };
 }
-export const renderModel = (model: ValidationModelClosure | ReadonlyRenderModel): ReadonlyRenderModel => model.shape === 'render-glb' ? model :
-  ({ shape: 'render-glb', key: model.binding.id, assetId: model.binding.assetId, assetToProject: model.binding.assetToProject, representation: model.representation });
-export const renderOwner = (model: DisplayModelClosure | ReadonlyRenderModel) => model.shape === 'render-glb' ? model.assetId : model.binding.assetId;
-export const renderPlacement = (model: DisplayModelClosure | ReadonlyRenderModel) => model.shape === 'render-glb' ? model.assetToProject : model.binding.assetToProject;
+export const renderModel = (model: ValidationModelClosure | ReadonlyRenderModel): ReadonlyRenderModel => isReadonlyModel(model) ? model :
+  ({ shape: model.shape === 'saved-point' ? 'render-point' : 'render-glb', key: model.binding.id, assetId: model.binding.assetId, assetToProject: model.binding.assetToProject, representation: model.representation });
+export const renderOwner = (model: DisplayModelClosure | ReadonlyRenderModel) => isReadonlyModel(model) ? model.assetId : model.binding.assetId;
+export const renderPlacement = (model: DisplayModelClosure | ReadonlyRenderModel) => isReadonlyModel(model) ? model.assetToProject : model.binding.assetToProject;
 /** Explicit placement edit; no model-content introduction or fixture reconstruction. */
 export interface ModelPlacementCommand {
   readonly sceneId: string; readonly assetId: string; readonly expectedBindingId: string;
@@ -45,3 +45,6 @@ export interface DisplayModelVersion {
   readonly families: readonly { readonly id: string; readonly name: string; readonly compatibilityId: string }[];
   readonly closure: DisplayModelClosure;
 }
+
+export const isSavedModel = (model: DisplayModelClosure): model is ValidationModelClosure => model.shape === 'saved-glb' || model.shape === 'saved-point';
+export function isReadonlyModel(model: DisplayModelClosure | ReadonlyRenderModel): model is ReadonlyRenderModel { return model.shape === 'render-glb' || model.shape === 'render-point'; }

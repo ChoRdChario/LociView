@@ -101,7 +101,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   sceneForm.append(sceneLabel, sceneNote, createScene, cancelScene); sceneArea.append(sceneStatus, sceneManagement, sceneForm);
   const pinArea = make('section'), pinStatus = make('p'), coords = make('div'); pinStatus.setAttribute('role', 'status');
   pinArea.setAttribute('aria-label', 'ピンの操作');
-  const addPin = button('ピンを追加', () => { if (guardInput()) { pinAction = { kind: 'add', token: provider().token, sceneId, captionId: null, color: addColorValue() }; choosing = true; placingCaption = null; render(); } });
+  const addPin = button('ピンを追加', () => { if (guardInput()) { pinAction = { kind: 'add', token: provider().token, sceneId, captionId: null, assetId: models?.selectedPoint() ?? undefined, color: addColorValue() }; choosing = true; placingCaption = null; render(); } });
   const addColorLabel = make('label', '追加色'), addColor = make('input'); addColor.type = 'color'; addColor.setAttribute('aria-label', '追加色'); addColorLabel.append(addColor);
   const numericAdd = make('details'), numericLabel = make('label', '追加先モデル'), numericModel = make('select'), beginNumeric = button('このモデルに追加', () => {
     if (!guardInput() || numericScope !== numericKey) return;
@@ -131,7 +131,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     if (projectCaptions(provider(), sceneId).find(item => item.id === caption.id)?.needsReview) {
       pin = null; choosing = true; placingCaption = caption.id; rawPosition = ['', '', '']; render(); return;
     }
-    setPin({ target, position: anchor.positionAsset, captionId: caption.id }); render();
+    setPin({ target, position: anchor.positionAsset, captionId: caption.id, ...(anchor.hitEvidence?.method === 'point-cloud' && anchor.hitEvidence.source?.representationId === target.representationId ? { point: {pointIndex:anchor.hitEvidence.source.surfaceRef.pointIndex} } : {}) }); render();
   });
   const parent = make('details'), parentTitle = make('summary', '親モデルを変更'), parentLabel = make('label', '変更先モデル'), parentTarget = make('select'), parentNote = make('p');
   parentTarget.setAttribute('aria-label', '変更先モデル'); parentLabel.append(parentTarget);
@@ -316,9 +316,12 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   inclusion.root.setAttribute('aria-label', 'キャプションの追加・除外');
   captionPanel.append(list.root, inclusion.root, pinArea, detail.root, conflicts, media, deletionArea); sidebar.append(sceneArea, taskTabs, captionPanel); body.append(stage, sidebar); root.append(header, viewportTools, body, mediaViewer.root);
   let mounted = false;
-  const viewport = ports.createViewport(canvas, () => { if (mounted && !rendering) render(); }, (target, position) => {
+  let beforePinDrag: WorkspacePinProposal | null = null;
+  const viewport = ports.createViewport(canvas, () => { if (mounted && !rendering) render(); }, (target, position, phase) => {
     if (!pin || mutationBlock() || composingInput() || !pinCurrent() || !sameTarget(target, pin.target) || !position.every(Number.isFinite)) return false;
-    setPin({ ...pin, position }); render(); return true;
+    if (phase === 'begin') { beforePinDrag = pin; return true; }
+    if (phase === 'restore' && beforePinDrag && sameTarget(target, beforePinDrag.target)) setPin(beforePinDrag);
+    else setPin({ ...pin, position, point: undefined }); render(); return true;
   }, proposal => models?.propose(proposal) ?? false);
   function panelBlock(owner: ProjectTask, writes = true, allowDrag = false): string | null {
     if (windowMoving) return 'ウィンドウの操作を完了してください。';
@@ -571,11 +574,11 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       const read = viewport.read(), rect = canvas.getBoundingClientRect();
       if (!read.ready || read.dragging || read.token !== down.token || read.pickToken !== down.receipt || provider().token !== down.token ||
         rect.left !== down.left || rect.top !== down.top || rect.width !== down.width || rect.height !== down.height) return;
-      try { const hit = viewport.pick(event.clientX - rect.left, event.clientY - rect.top, pinAction?.assetId, direct);
+      try { const hit = viewport.pick(event.clientX - rect.left, event.clientY - rect.top, pinAction?.assetId ?? models?.selectedPoint() ?? undefined, direct);
         if (!hit) { feedback = '配置する面を特定できません。視点を変えて選び直してください。'; render(); return; }
         if (pinAction?.assetId && hit.target.assetId !== pinAction.assetId || hit.target.token !== provider().token || hit.target.sceneId !== sceneId || !hit.position.every(Number.isFinite)) return;
         if (direct) { pinAction = { kind: 'add', token: down.token, sceneId, captionId: null, color: down.color }; placingCaption = null; }
-        setPin({ ...hit, captionId: placingCaption }); render();
+        setPin({ ...hit, point: pinAction?.kind === 'reparent' ? undefined : hit.point, captionId: placingCaption }); render();
       } catch (error) { feedback = (error as Error).message; render(); }
     });
   }, true);
