@@ -14,8 +14,13 @@ in parallel. Continue ordinary approved work without small PO testing waits.
 01a's bounded point workflow is implemented; exact six JSON companions are immutable.
 Native, synthetic hosts, typed validation and ordinary home have separate authority
 and evidence. Source point centres and explicit manual positions are distinct;
-renderer/proxy output never rewrites canonical saved positions. Next GS/Proxy work
-needs the concrete source/ports/golden proposal recorded in todo before activation.
+renderer/proxy output never rewrites canonical saved positions. The PO requested
+Point/GS requirement reassessment after checking SH4. The [revised 01b](../docs/specs/01b-gs-proxy-project-scene-proposal.md)
+withdraws the SH3-only CPU/screen recommendation and compares fixed released
+renderers. GSL1.4.3 is the first evaluation candidate, not adopted; its SH4 and
+paged-LOD paths do not yet establish combined SH4+paging. New dependencies/Three
+update and a change to the03 evaluation scope need approval before that work.
+The superseded proposal/JSON remain in linked history, not an approval queue.
 
 Dedicated Chromium verifies only its recorded localhost/headless workflows. It
 does not fix the separate Chrome-plugin bootstrap failure or pass physical iPhone,

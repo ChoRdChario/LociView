@@ -28,91 +28,71 @@ in nondefault validation; code and executed tests determine its observed behavio
 01a adds approved XYZ/RGB ASCII PLY alongside admitted GLB and photos. This is not
 ordinary-entry activation, arbitrary-format support or general v2 adoption.
 
-## Current unit — documentation alignment and GS/Proxy proposal
+## Current boundary — Point/GS requirements reassessed
 
-PO authorized continuation from clean pushed7d4dbb1, explicitly requesting a
-documentation check before proceeding. Outcome: accurate short startup records,
-then one concrete independently reviewed proposal for M03/M10's next workflow:
-GS source → explicit same-Asset invisible Proxy → approximate hit → ordinary
-gizmo/explicit confirmation → source-less manual AssetFrame Caption → media/edit/
-save/team/review/backup/cold continuation. Preserve usable independent Mesh/Point
-work and existing Captions when one display/interaction path is unavailable.
+PO requested reassessment on2026-10-27 after identifying released SH4 support.
+This supersedes the pending approval request for35c0a4d's SH3-only/CPU-screen01b.
+Do not implement that draft or treat this review request as dependency/adoption
+approval. Root remains the sole writer; bounded read-only reviews cover current
+released renderers, product/UX and source/storage/format boundaries.
 
-Root is the sole writer. Read-only reviews cover documentation, exact GS source
-semantics and Session/package/Proxy boundaries. No new PoC or parallel framework.
+- [x] Compare fixed released Gaussian-Splat-Lite, current Spark and PlayCanvas
+  against existing accepted Point/GS, SH4, capacity, offline and lifecycle needs.
+- [x] Revise01b as a requirements/choice proposal: source preservation, SH0..4,
+  scalable display and budgets, comfortable camera/quality behavior, stable pins.
+  Preserve01a's six approved JSON and existing wire/recovery/compatibility gates.
+- [x] Retain the superseded unapproved draft/evidence, update current indexes and
+  handoff, and independently review the revised requirements and next-step choice.
+- [x] Verify docs/links/byte-bound evidence and prepare the suitable checkpoint.
+  Ask only at a concrete new dependency/architecture/profile authority boundary;
+  do not silently ratify numeric guarantees or begin runtime implementation.
 
-- [x] Reconcile startup/index/inventory/runbook with published code and actual
-  point/browser evidence. Preserve full prior records;11docs/339local links,
-  two retained-text comparisons and6immutable JSON checksPASS. Independent review
-  confirms no contract/acceptance change or history loss.
-- [x] Prepare one exact GS source-profile/semantic-golden proposal from the existing
-  eight-splat candidate and pinned primary sources. Fix source coordinate, support,
-  covariance, quaternion, SH/color/transform and immutable ID/digest rules.
-- [x] Specify bounded admission and typed read/display/fact/interaction ports for
-  one GS visual plus optional same-Asset Proxy. Distinguish untrusted new-package
-  rejection from runtime-local unavailable display/interaction, while retaining
-  publication, receive/export, hash, closure, recovery and evidence fences.
-- [x] Independently review source/authority/render/UX semantics. Close the GS range
-  shape mismatch, missing off-diagonal/reflection oracle, unspecified renderer
-  precision/pixels and Point-fallback GS coverage cases. No runtime was activated.
-- [x] Exact-byte/table/golden bindings and74local links in8proposal paths pass;
-  four candidate JSON files are valid and the six approved01a JSON files unchanged.
-  Existing GS fixture/registry regressions:2suites/28PASS. The appropriate checks
-  cover documents/numeric oracles, not a new runtime implementation.
-- [ ] PO ratification of the exact01b source/presentation/adapter and availability
-  clarification decisions. The concrete reviewed proposal is ready; preserve its
-  candidate state until that reply is recorded. Git owns the suitable development
-  checkpoint's publication identity.
+Final docs checksPASS:7changed Markdown documents/94local links, retained draft
+body except rebased links,4exact archived JSON,6immutable01a JSON, unchanged
+registered G0 SHA and5numeric capacity rows. Diff whitespacePASS. Three independent
+read-only reviews (product/render requirements, storage/source contracts, fixed
+upstream claims) report no unresolved findings. Evidence is retained in ignored
+`.artifacts/e2e/rendering-reassessment-evidence.json`. No product code, package,
+lockfile or runtime changed; runtime suites were not rerun for this docs-only unit.
+Publish only this reviewed checkpoint on g0-baseline under standing authorization;
+Git records publication identity. Pages deploy remains main-only, not this push.
 
-### Current findings and actual stop conditions
+## Reassessment findings and next authority boundary
 
-The [GS preflight](../docs/g0/gs-source-profile-candidate.md) and
-[tiny source](../fixtures/gs/source.v1.json)/generator/transport diagnostics remain
-candidate evidence. The [01b proposal](../docs/specs/01b-gs-proxy-project-scene-proposal.md)
-now supplies separately authored analytic/raw-bit oracles and fixed primary-source/
-license hashes for independent review; none is ratified or runtime-registered.
-Generated fixture expectations are not their own independent proof. Native's
-header-only inspector and means-only renderer box
-cannot become new-route source authority. Pinned Spark's defaults/quantization/color
-are not promoted into the new route. The proposal chooses a separately authored
-bounded Three CPU/screen pass, exact presentation and actual-view capability
-predicate; this architecture/source choice still needs PO approval. The underlying
-Spark/PlayCanvas adoption and large/paging gates remain separate.
+[Revised01b](../docs/specs/01b-gs-proxy-project-scene-proposal.md) withdraws the
+SH3-only full-source CPU/screen recommendation. Existing accepted progressive
+loading, separate budgets and the500k renderer fixture make a100k/64MiB product
+ceiling unsuitable. SH4 also exceeds8M attributes at100k points; do not merely
+raise admission limits. NormalPoint01a semantics/six JSON stay immutable.
 
-Proposal checks alreadyPASS:10fixed raw-bit cases,64independently evaluated SH
-scalars,3covariance/3transform vectors, six perspective/ortho×DPR capability
-predicates, rotated-anisotropic pixel expectations, opposite-view full-SH color
-expectations and the analytic falloff-LUT bound. These are numeric/document
-checks, not executed GPU, product-code or browser acceptance. Fixed primary
-source/license hashes are verified; no upstream implementation is redistributed.
+Static fixed-release comparison: GSL1.4.3 handles PLY/SPZ SH0..4 but RAD/SOG only
+SH3; current Spark2.4.0 and PlayCanvas2.23.3 remain SH3. GSL is the first proposed
+evaluation candidate, not adopted. SH4 plus scalable paging remains an explicit
+evidence gap. Source/canonical coordinates, qualified display derivatives,
+transient RenderPlan and output-purpose closures are distinct; no silent SH
+truncation or display-index pin authority. Preserve the explicit Proxy/manual flow.
 
-The registered G0 preflight document is also a byte-bound evidence input. A
-navigation-only amendment caused indexed-blob and then registered-SHA failures in
-the existing fixture checks. Restore the exact original preflight, keeping new
-answers/navigation in01b and the indexes; the same2suites then pass28tests.
-The registry, source fixture, checks and assertions were not relaxed. These earlier
-failures remain in ignored proposal evidence; they are not runtime GS evidence.
+The [superseded draft](../docs/history/gs-proxy-draft-2026-10-27/README.md) retains
+the original body with local links rebased and four exact candidate JSON bytes.
+Its numeric/document checks are not practical GPU evidence. The original byte-bound
+G0 preflight and fixtures stay unchanged; its earlier index/SHA failures remain
+in local evidence. Previous document alignment/history is retained in the linked
+October record and Git. The former pending approval question is superseded.
 
-Short meta-audit: actual g0-baseline has the verified documentation checkpoint;
-the latest production code remains the tested01a point path. This unit prepares
-one genuinely new GS source/render/Proxy contract, without a new PoC, dependency,
-production code or blanket gate credit. The next stop is PO ratification of that
-exact proposal; ordinary in-contract implementation/tests do not need repeated
-approval. Upon approval, complete the whole specified GS/Proxy/file/cold workflow
-and its mandatory existing file actions, not another helper-only slice.
+Next proposed connected unit: qualify gaussian-splat-lite exact1.4.3 plus
+three/@types exact0.186.0, with license/notice, published-artifact identity,
+lockfile/audit, existing route compatibility and isolated rendering/lifecycle
+checks. npm registry identity remains unverified after DNS failure. New dependency,
+Three migration and03 candidate/evaluation scope require a concrete PO decision;
+this request authorizes reassessment only. No new profile, runtime integration,
+normal home, publication or adoption is activated. Keep existing gates and safety
+limits until an approved, measured replacement exists.
 
-Current validation limits are64MiB/file and fresh selection aggregate,100,000items,
-8,000,000values; they are bounded
-admission, not performance/capacity guarantees. BaseG1-B500k SH3 requires124,000,000
-payload bytes before the header and exceeds this route. Do not silently raise
-limits or count tiny-file integration as large/paging/device acceptance.
-
-No production GS activation, new profile ratification, dependency, schema/wire,
-ordinary home/SW/HTTPS/publication, public fixture distribution, destructive action
-or release/deployment is authorized by preparatory work. Stop only affected work
-for an unresolved contract or genuinely new policy/architecture/authority decision.
-Existing implementation approval covers ordinary sequencing/tests/fixes; no
-per-control PO tests or repeated permission requests.
+Short meta-audit: g0-baseline's last production change remains the verified01a
+workflow. This docs-only unit corrects the proposed critical path rather than
+adding another helper/PoC. Ordinary approved work/tests/fixes do not require
+repeated approval; only the new dependency/evaluation authority boundary stops
+that next unit. Physical-device evidence remains a separate lane.
 
 ## Last verified connected checkpoint — ordinary-point workflow
 

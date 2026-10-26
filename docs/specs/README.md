@@ -66,7 +66,7 @@ The words **MUST**, **MUST NOT**, **SHOULD**, and **MAY** are normative. A metri
 
 | Document | Status / purpose |
 |---|---|
-| [`01b-gs-proxy-project-scene-proposal.md`](01b-gs-proxy-project-scene-proposal.md) | PROPOSED, not approved/implemented/adopted: exact SH3 GS/interaction-GLB profiles, independent semantic goldens and exact screen-presentation/probes, typed GS/Proxy continuation and bounded Three CPU/screen adapter. Four JSON candidates are not runtime registry entries; 01a stays immutable. |
+| [`01b-gs-proxy-project-scene-proposal.md`](01b-gs-proxy-project-scene-proposal.md) | REVISED PROPOSAL, not approved/implemented/adopted: SH0–4, GPU/progressive rendering, comfortable interaction and source/pin preservation; fixed GSL1.4.3/Spark2.4.0/PlayCanvas comparison. GSL evaluation/dependencies need approval. The former CPU/SH3 draft and four JSON candidates are archived; 01a stays immutable. |
 
 ## Fixed versus conditional decisions
 

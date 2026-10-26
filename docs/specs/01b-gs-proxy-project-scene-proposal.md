@@ -1,364 +1,157 @@
-# 01b: GS files, explicit interaction surfaces and continued records
+# 01b: Point / GS rendering requirements reassessment
 
-> Status: **PROPOSED / NOT PO APPROVED / NOT IMPLEMENTED / NOT ADOPTED**
-> Prepared: 2026-10-27. Exact candidate companions are review inputs, not active profiles.
-> This proposal closes the next bounded M03/M10 workflow; it does not complete all model, migration or adoption work.
+> Status: **REVISED PROPOSAL / NOT PO APPROVED / NOT IMPLEMENTED / NOT ADOPTED**
+> Reassessed: 2026-10-27, at the PO's request after checking SH4 support.
+> This replaces the unapproved SH3-only CPU/screen proposal at35c0a4d.
+> [Superseded draft and exact candidate JSON](../history/gs-proxy-draft-2026-10-27/README.md)
+> remain evidence, not active profiles or an outstanding request to approve that draft.
 
-## 1. 利用者の結果と今回の判断
+## 1. 利用者の結果と見直しの結論
 
-GSを開く／追加する → 必要なら同じ座標で作成した位置指定用の面を設定する →
-GSを選んで記録位置を指定する → 通常の位置調整・確定 → 本文・画像を編集する →
-保存・受け渡し・復元・再開、を現在の検証画面へ接続する。
-位置指定用の面は描画せず、選んだGSにだけ対応付ける。面がなくてもGSの表示と
-保存済み記録の利用はでき、新しい位置指定だけを止める。
+点群またはGSを開く → 形と色を確認しながら視点を動かす → 記録位置を指定・調整する
+→ 本文・画像を編集する → 保存・受け渡し・復元・再開、を一つの流れとして完成させる。
+利用者に描画エンジン、SH次数、内部ファイルの役割を選ばせない。
 
-今回の新しい判断は、次の具体的な仕様をまとめたものとなる。
+前案の「SH3限定・10万点・毎視点更新で全点をCPU計算する専用描画」は推奨を撤回する。
+小さな入力で計算を定義できても、既存の段階読込・50万点検証へつながらず、通常の
+視点移動でモデル全体が表示不可になる設計だった。数式検証は実用性の証明ではない。
 
-- 最初のGS入力は、62個のFloat32属性を持つbinary little-endian SH3 PLY。
-  原本・点の順序・元の値を保持し、他のPLYを拡張子だけでGS扱いしない。
-- XYZの軸と単位は01aと同じ座標規約（右手Y-up、1単位=1Asset m）を指定する。
-  ファイルから実測の縮尺や向きを推測する意味ではなく、必要な配置変更は明示操作とする。
-- 陰影係数をすべて評価してから色を0〜1に収め、sRGBから線形色へ変換する。
-  有限の広がりは下記のcutoff／covariance規則で決める。これは上流実装の完全再現を
-  名乗るものではなく、この新profileの表示解釈である。
-- 位置指定用の面は既存の限定GLB検査を通した原本から、両面の三角形だけを使用する。
-  同じGSの座標・単位で作成済みであることを明示確認し、自動位置合わせはしない。
-- 近似の位置は通常のgizmoで調整または明示確定し、保存する位置はGSのAssetFrameの
-  manual座標とする。面を後で交換・解除しても、保存済み記録を動かさない。
-- 新しいtyped GS／Proxy接続と、§7の局所的な表示・操作可否を実装する。
-  保存済み本体や検証証拠の喪失時は、現在の復旧・書込み停止を維持する。
-- 最初の限定描画は既存Three.js上に、元データからCPU計算した画面上の形状・色を
-  渡す専用passとして実装する。§8の正確な描画設定と現在視点ごとの可否判定を通して
-  非既定validationへ接続する。Sparkの圧縮・既定色変換は新経路へ流用しない。
-- Mesh／Pointへの位置指定でGSが重なる場合は、同じ画素でGSの寄与がないことを
-  確認できたときだけ確定候補にし、不能時は既存のモデル単独表示を案内する。
-  GSの近似面による位置指定は、これと別の明示ターゲット操作とする。
+見直し案は次のとおり。
 
-承認を求める対象はこの具体案と正確なJSON bytesである。新依存、通常home、公開、
-実機／offline、G1-B合格や正式なrenderer採用はこの承認に含めない。
+- 通常点群とGSを区別する。GSはSH0〜4の完全な元データを扱う要件で評価し、
+  通常点群の点描画やDC色だけの表示でGS対応を代用しない。
+- GSの実用描画はGPUでの投影・SH評価と、GPUまたは非同期workerでの整列を基本候補とする。
+  段階読込・表示量の調整・資源解放を機能要件に戻す。独自の全点CPU描画は参照計算に留める。
+- 原本と保存座標は保持する。表示専用の量子化・LOD・画質調整は別に管理し、
+  表示用の番号や近似位置を保存済みピンの根拠にしない。
+- 画面の描画倍率や負荷へ適応し、通常の視点移動で全体を消さない。
+  読込・低画質表示・失敗・再試行を必要な場面で伝え、設定項目を増やして回避させない。
+- 最初の再評価候補はGaussian-Splat-Lite正式1.4.3。Spark正式2.4.0とPlayCanvasも比較する。
+  SH4だけで採用せず、既存Threeとの互換性、座標・色・混在描画、offline、資源寿命を検証する。
 
-## 2. Authority and immutable candidate companions
+これは要件と次の評価方針の提案であり、新しい数値保証、FormatProfile、変換規則、依存追加、
+renderer採用、通常homeへの接続を承認する文書ではない。
 
-[01 §§2.2,3.2,4.1,8](01-domain-rendering.md) fixes frame/covariance/SH semantics,
-explicit same-Asset interaction routing and confirmed manual anchors.
-[03 §5](03-gates-and-delivery.md#5-g1-b--renderer-bakeoff) currently permits the
-disposable Spark harness and stops before production integration. **If approved,
-01b adds one exact exception to that stop: production implementation and qualified
-activation in the nondefault ProjectScene validation path described here.** It
-does not adopt Spark, pass G1-B, promote PoC code, or activate ordinary home.
-[05](05-project-scene-team-workflow.md) and [06 §11](06-project-package-wire.md)
-retain their existing Session, privacy, package and isolated-implementation authority.
+## 2. 維持する契約と今回の変更範囲
 
-Candidate JSON is UTF-8, LF, no BOM, one final LF. SHA-256 covers exact bytes; no
-file contains its own digest. A profile points to its golden-manifest digest.
-The golden names profile IDs, not profile digests, avoiding a hash cycle.
-After PO approval, changing semantics requires a new ID/digest, never editing these bytes.
+[00](00-product-contract.md)、[01 §§2–4,8,10–12](01-domain-rendering.md)、
+[03 §5](03-gates-and-delivery.md#5-g1-b--renderer-bakeoff)、
+[ADR-0001](../adr/0001-v2-foundation.md)の原本保持、frame、段階読込、混在描画、
+同一Assetの明示Proxy、端末・offline・採用ゲートは維持する。
+[05](05-project-scene-team-workflow.md)のtyped Session commandと
+[06](06-project-package-wire.md)の目的別closure・検証・復旧・公開境界も変えない。
 
-| ID / input | Exact companion | Candidate SHA-256 |
+実装済み[01a](01a-point-project-scene-proposal.md)の6個の承認済みJSONは変更しない。
+そのASCII XYZ/RGB、source順序、Float32中心、照明なしのRGB、CSS点径、可視性に基づく
+選択・6CSSpx近傍、source-centreとmanual座標の区別は保持する。現行DPR1/2の限定実装は
+そのまま有効であり、今回の文書だけで任意DPR・大規模点群対応にはならない。
+
+GSLは現行03のSpark/Three対PlayCanvas比較に追加する**未承認の評価候補**。
+03が指定する停止条件、旧Spark2.1.0のPoC範囲、依存・Three更新の権限は自動では広がらない。
+正式比較候補の変更と新しいisolated qualificationの範囲は、次の承認対象として切り分ける。
+旧01bの「非既定production接続の例外」を今回引き継がない。
+
+## 3. 点群描画に求める結果
+
+| 項目 | 見直し後の要求案 | 実装・受入で確認すること |
 |---|---|---|
-| `development-validation-gs-ply-sh3-1` | [GS profile](profiles/gs-ply-sh3-1.profile.json) | `746cc3fda107a52fdc14efe079b6ddda0297cc084b11205c3b5e3cd1b20a4970` |
-| `development-validation-proxy-glb-1` | [interaction profile](profiles/proxy-glb-1.profile.json) | `383e4352199eedbd99b89550d9a899a8182d50f005c8e9a1ff9daa2b2402f7ff` |
-| independent semantic vectors | [goldens](profiles/gs-ply-sh3-1.goldens.json) | `d3c7fc4782006faa66628848192af585d56d9fb5d31da36d9202cf10ca223e85` |
-| `lociview-gs-screen-1` | [screen presentation/probes](profiles/gs-screen-1.presentation.json) | `51ac8c27546c0b7e197a6431919610bd1ac45676bfd201d8fc1e0a301dac7f98` |
+| 通常点群 | 01aの見た目・選択・座標を維持し、将来のGPU/段階表示へ接続できる境界にする | 点径と選択が同じRenderPlan・有効描画倍率を使用。表示順/LOD番号をsource ordinalへ転用しない |
+| GS入力 | Graphdeco型PLYのSH0〜4を評価対象にする。次数を完全な属性集合・型・係数数から判定する | 正常な低次数と壊れた高次数を区別。不足した係数をゼロ補完したり拡張子だけで認定しない。正確な許可schema/ID/goldenは実装前に確定 |
+| GS表示 | 異方性、opacity、view-dependent SHと元の座標規約を保つ | 既知producer/参照画像に対する方向別の色、covariance、透明度、画面footprint。独自の上限clampやgammaを無検証で標準化しない |
+| 表示精度 | 原本の正確さと、表示専用の量子化誤差を分ける | source順序・全係数は保持。display derivativeのprofile、変換元、誤差・goldenを記録。毎フレームの全計算をFloat64に固定しない |
+| 座標・視点 | 正の一様scale、回転、平行移動、規定の反転を扱い、保存したframeと視点を維持 | centresだけでなく形状とSH方向も変換。遠方原点は必要ならcamera-relative計算。物理単位不明をメートルと推測しない |
+| 操作感 | 視点操作をブロックせず、最新視点へ追随する。負荷時も支持できる表示を残す | 有効render scale、LOD、描画点数を予算内で調整。古いsort/decode結果を世代で破棄。通常panだけでwhole-Asset Unsupportedへ遷移させない |
+| 中断と再開 | 読込の進捗・取消・再試行、失敗時の理由と回復手段を提供する | quota、decode失敗、context loss、切替・再読込で部分資源を残さない。独立するMesh/点群/Caption/画像を使い続けられる |
+| 位置指定 | GSには同じAssetの明示的な非表示Proxyを使用し、通常gizmoで調整・確定する | 保存するのはGSのAssetFrameのsource-less manual座標。Proxy交換/不在やLOD変更で既存ピンを動かさない |
+| 混在 | 選んだ可視Assetだけを位置指定対象にする。opaque MeshとGSの既定混在を保つ | 無関係なMeshをProxy代用にしない。Proxyを色・depth・fitへ入れない。隠れた点への誤配置を防ぐ。高度な透明交差は後続ゲート |
+| 保存・受渡し | 元データと目的別closureを保存し、再開後も同じ編集結果を再現する | Workspace/backup/cleanの必要な完全sourceを現在のGPUページから作らない。Reviewの省略・表示用データは既存目的契約で判断する |
 
-The separate [GS screen-presentation candidate](profiles/gs-screen-1.presentation.json)
-binds the exact projection/reconstruction/composition, current-view numeric predicate
-and fixed camera/pixel probes. It is transient renderer capability, not a saved
-source bound or user setting. Source and presentation ID/digest are qualified together.
+SH4は25基底/75色係数、SH3は16基底/48色係数。`SPZ v4`というファイル版番号は
+SH4対応を意味しない。PLY/SPZ/SOG/RADが同じ次数・精度・段階読込を持つとも限らない。
+特定形式の対応は新しい明示profileと証拠が揃った範囲でだけ名乗る。
+直接GSへのraycastやProxy生成は最初の要件に追加しない。ライブラリのhit indexは
+現在の表示ページの番号である可能性があり、永続source IDの根拠にはならない。
 
-These source IDs are not registered in runtime or allowed in newly written Project data
-until approval and implementation. The unratified preflight handle is not reused.
-The existing six01a companions, old GLB/Native profiles and conversion recipes stay immutable.
+## 4. 容量と段階読込を再設計する理由
 
-The older G0 preflight text is itself SHA-bound by the fixture registry and stays
-byte-for-byte unchanged. New answers and fixed primary references live here, not
-as an in-place rewrite of that evidence. Approving01b does not relabel the old
-preflight handle, source digest or registry as ratified.
+現行validationの64MiBは初回選択時の合計にも適用され、選択bodyは全体を読み込む。
+追加時にも既存bodyとの合計や消費側の上限があり、packageの大きいwire上限だけでは
+入力・decode容量は広がらない。100,000itemsと8,000,000属性scalarsも別の制約である。
+これらは現行限定経路の安全上限として維持し、製品容量の要求にはしない。
 
-## 3. Source meaning and admission
+Graphdeco型で3個のnormalも含むFloat32 PLY payloadを仮定すると、基底数K=(L+1)^2、
+属性数=3K+14、stride=4(3K+14)bytesとなる。headerやdecode中のコピーは別途必要。
 
-The GS JSON completely fixes the62-property order/248-byte stride, LF-only bounded
-ASCII header, full finite payload, source ordinal, ignored finite normals and
-reject cases. Preserve the original byte stream. Budget preflight uses the existing
-FileValidationLimits: file body≤maxFileBytes, count≤maxItems,62×count≤maxValues;
-fresh multi-file selection also retains its existing aggregate byte ceiling.
-Current browser values are64MiB,100,000items and8,000,000values. These are bounded
-admission, not decoded CPU/GPU or performance/capacity guarantees. Add/receive/export
-retain their own existing total/closure limits; none is raised by this proposal.
+| 次数L | SH rest属性数 | 全属性数 | bytes/点 | 50万点payload |
+|---|---:|---:|---:|---:|
+| 0 | 0 | 17 | 68 | 34,000,000 |
+| 1 | 9 | 26 | 104 | 52,000,000 |
+| 2 | 24 | 41 | 164 | 82,000,000 |
+| 3 | 45 | 62 | 248 | 124,000,000 |
+| 4 | 72 | 89 | 356 | 178,000,000 |
 
-Decode source Float32 values before binary64 semantic calculations. Normalize a
-finite nonzero wxyz quaternion; q and−q give the same covariance. Use exp(logScale),
-stable sigmoid(opacityLogit) and `Sigma=R diag(s²) Rᵀ`. Reject nonfinite/zero scale
-or scale-square, nonfinite covariance/bounds, or an input with no nonempty support.
-Negative zero normalizes in semantic values, never by rewriting the original file.
+SH4では8M属性制約だけでも89,887点までとなる。現行上限を単に引き上げる方法では、
+既存03の50万点検証へ安全に進めない。50万点は既存の暫定端末試験条件であり、新たな
+動作保証ではない。単一ファイルの小型接続だけでGS workflow完成とも数えない。
 
-The proposed finite source cutoff is **τ=1/510, K²=8**. For a≥τ,
-ρ²=min(8,2ln(a/τ)); for a<τ support is empty. Equality includes the centre.
-Halfwidth on axis i isρ×hypot(row_i(R diag(s))). The profile fixes conservative
-binary64 outward padding/nextDown/nextUp and componentwise union. This defines
-logical source support; a screen reconstruction/AA kernel is a separate backend
-presentation effect and cannot silently replace those bounds or source facts.
+GSの実用経路では、既存01 §10に従い、stream/stage/増分hash/decode/uploadへbackpressureを
+かける。encoded staging、decode作業、CPU常駐、GPU常駐、描画targetを別予算とし、
+可視GS全体のLODを管理する。新しい容量・画質・時間の閾値は実測後に承認する。
+大規模原本のLOD作成はdesktop/local toolingを評価し、iOSに全体変換を要求しない。
 
-For complete frame L,t: means use Lμ+t, covariance uses LΣLᵀ, opacity is unchanged.
-Evaluate SH using camera-to-mean direction returned by inverse(L), including
-reflection. Individual Gaussian orientation never rotates the SH basis. Sum all
-16terms in declared order, then bias+0.5, final[0,1] clamp and IEC sRGB decode.
-The full-precision constants and nonzero mixed-direction/channel/clamp goldens are
-explicit. Camera-at-mean has no defined direction: omit that transient fragment,
-not the saved source, instead of inventing a direction.
+原本、provenance付き表示derivative、一時的なRenderPlan、出力目的のclosureを区別する。
+原本の全SHを保持していても、表示がSH3ならSH4再現とは呼ばない。
+特にGSL1.4.3のRAD/SOGはSH3までであり、**SH4完全表示と大規模paged表示を同時に
+満たす経路は未確認**。元SH4を保ってSH3 previewを許す製品判断、SH4用の別paged形式、
+ライブラリの追加対応のいずれかを、証拠と新profileなしに暗黙採用しない。
 
-The selected coordinate convention, finite cutoff, upper color clamp and IEC
-transfer are **new LociView rules**, not facts proved by Graphdeco's code. Graphdeco's
-rasterizer instead uses a0.99 alpha cap,1/255 pixel cutoff,3σ image radius and only
-a lower color clamp. Spark's defaults also do not define this source contract.
-Original bytes are retained so another later profile/explicit conversion remains possible.
+## 5. 正式公開版での再比較
 
-## 4. Explicit GS and interaction records
+以下は2026-10-27に固定commitの一次資料を確認した静的比較。
+インストール、性能測定、offline/PWA、実機、LociViewへの統合を実施した結果ではない。
+ライブラリの機能が存在しても、LociViewの対応・採用済みを意味しない。
 
-Use existing schema fields, not a new package/schema version. A GS visual record is
-gaussianSplat/gsPrimary/source+display, one visual family and singleton anchor class,
-no MaterialCatalog, and complete splatSample source ranges. Its original PLY uses
-application/ply coupled to the exact GS profile; Point PLY remains a distinct tuple.
+| 候補と固定版 | 確認した対応 | LociViewで残る判断・検証 |
+|---|---|---|
+| Gaussian-Splat-Lite1.4.3 / `d8703f7` | PLY/SPZ SH0〜4。RAD/SOGはSH3。WebGPUで投影・cull・sort、WebGL2 fallbackはGPU評価＋非同期WASM worker sort。paged RAD/SOG、ローカルbytes/resolver | Three>=0.186.0のため現行0.180.0からの更新が必要。SH4×LODの未充足、量子化・色・反転、mixed depth、WebGL2実機・資源寿命・local WASM/worker配布を検証。Apache-2.0と第三者noticeを審査 |
+| Spark2.4.0 / `ffe210d` | Three>=0.180.0。PLY/SPZ/SOG/RADほか、paged LoD。GPU評価＋worker sort。新しいSPZ版を読めてもSH上限は3 | 現行2.1.0より新しい修正を含むため再比較価値あり。ただしSH4全係数の描画要求には未到達。MIT。旧2.1.0の結果だけで新版を棄却しない |
+| PlayCanvas Engine2.23.3 / `b7655d8` | PLY/SOG、paged SOG、SPZ v4 parser。WebGPU GPU sort/WebGL2 worker sort。SH上限3、SPZのdegree4追加bandは無視 | Three差替えだけでは済まず別engine adapterが必要。SH4のままの再現は未充足。SPZ用ZSTD WASM等のローカル配布も必要。MIT |
 
-A proxy record is mesh/interactionProxy with purposes:['interaction'], its own
-same-Asset family/frame, no MaterialCatalog/class, an explicit
-proxyForGsVariantFamilyId and complete original triangle ranges. The target GS
-family must occur in that same AssetRevision. Retain imported GLB bytes and inherited
-GLB1 admission, including embedded PNG validation. Authored material alpha/chroma/
-sidedness do not filter interaction geometry: this profile is geometry-only and
-two-sided. It changes no old visual-GLB interpretation.
+GSLの**正式1.4.3 tag**を比較単位にする。同じpackage版を表示していても、mainの
+Unreleased API変更を混ぜない。正式版の`maxSh`制限を、未公開版のdecode/storage動作と
+混同しない。各候補の圧縮・Float16等は表示精度の評価対象であり、原本保持の代替ではない。
 
-Proxy geometry is owned by InteractionIndex resources, never added to a visual
-scene, depth, shadow, screenshot, material panel or fit bounds. No proxy generation,
-automatic registration, cross-Asset Mesh substitution or guessed family relation.
-Only the selected visible, supported GS family can admit its unique valid proxy.
+GSLのGitHub正式releaseは確認済みだが、npm registry照会はDNS解決に失敗したため、
+公開tarballの`gitHead`・`dist.integrity`・内容一致は未確認。導入時の停止条件とする。
+Node要件は`^20.19.0 || >=22.12.0`。source上はWASM/workerを同梱する構成だが、
+実際のnpm artifact、LociViewのbundle/CSP、cold offline動作は別途検証する。
 
-After confirming same coordinates/unit, attach/change creates a fresh immutable
-revision/binding while reusing the exact GS representation/family/class, original
-AssetFrame and assetToProject. Reuse that class only through owned verified content
-equivalence of the unchanged GS, never a UI flag. Retain old revisions/bodies/history.
-Remove creates the corresponding GS-only revision. Replace/remove cannot move,
-reparent, invalidate or rewrite existing compatible Captions merely because the
-interaction resource changed. Imported multiple valid same-target proxies are
-interaction ambiguity, not an arbitrary first winner; explicit replacement can
-produce one new proxy without deleting old history.
+一次資料（固定commit）：
 
-## 5. UI and command boundary
+- GSL: [formats / SH / streaming](https://github.com/WilliamLiu-1997/Gaussian-Splat-Lite/blob/d8703f7aed0e966e808a3fd3a2e1def3179d90dc/docs/SplatFileType.md)、[Three peer](https://github.com/WilliamLiu-1997/Gaussian-Splat-Lite/blob/d8703f7aed0e966e808a3fd3a2e1def3179d90dc/package.json#L89)、[renderer](https://github.com/WilliamLiu-1997/Gaussian-Splat-Lite/blob/d8703f7aed0e966e808a3fd3a2e1def3179d90dc/src/rendering/GaussianSplatRenderer.js)、[RAD budgets](https://github.com/WilliamLiu-1997/Gaussian-Splat-Lite/blob/d8703f7aed0e966e808a3fd3a2e1def3179d90dc/docs/RadStreamScheduler.md)、[license](https://github.com/WilliamLiu-1997/Gaussian-Splat-Lite/blob/d8703f7aed0e966e808a3fd3a2e1def3179d90dc/LICENSE)。
+- Spark: [2.4.0 release](https://github.com/sparkjsdev/spark/releases/tag/v2.4.0)、[SH cap](https://github.com/sparkjsdev/spark/blob/ffe210dc0a45d0515a06c9235878108112827d61/src/PackedSplats.ts#L127)、[package](https://github.com/sparkjsdev/spark/blob/ffe210dc0a45d0515a06c9235878108112827d61/package.json)。
+- PlayCanvas: [package](https://github.com/playcanvas/engine/blob/b7655d8fccc1284678af8f098b26b0725e20dd3a/package.json)、[SPZ SH cap](https://github.com/playcanvas/engine/blob/b7655d8fccc1284678af8f098b26b0725e20dd3a/scripts/esm/parsers/spz-parser.mjs#L268)、[sort/LOD parameters](https://github.com/playcanvas/engine/blob/b7655d8fccc1284678af8f098b26b0725e20dd3a/src/scene/gsplat-unified/gsplat-params.js)。
 
-Use existing file/model panels, pending-input owner and ordinary Caption gizmo.
-When a GS is selected, reveal one contextual action `記録する面を指定`; when one
-already exists use `記録する面を変更`, with `記録する面を外す` in contextual details.
-The validated file preview states the same-coordinate/unit prerequisite before
-`この面を使う`. Unknown registration refuses, while cancel preserves the current
-GS/proxy. Do not ask the user to choose a backend/profile or expose IDs and manifests.
+## 6. 次工程と承認境界
 
-New placement explicitly targets that visible GS and raycasts only its admitted
-interaction geometry. This first proxy path precedes01's general visible-fragment
-selection: a coarse proxy hit is not proof of a visible GS sample or surface depth.
-The normal adjustment/explicit `位置を確定` commits a complete manual anchor with
-current GS AssetFrame/revision/class, no proxy/splat locator, source, confidence or
-normal. Keep this consequence in the placement help, not as a permanent badge.
-Unchanged confirmation is allowed; source-point evidence from01a is never relabelled.
+推奨する次の単位は、**GSL正式1.4.3とThree/@types0.186.0の互換性・描画要件評価**。
+これは恒久renderer採用やGS production統合ではなく、具体的な不足を判定する限定作業とする。
+新依存とThree更新、03の評価候補・作業範囲の変更が必要なため、次の内容をまとめてPOへ
+提示し、承認後に実施する。現時点でpackage/lock、runtime、source registryは変更していない。
 
-Hidden/unsupported GS or absent/ambiguous/unusable proxy cannot start a new GS hit.
-Existing saved records use canonical positions; valid current binding/class permits
-ordinary manual correction without reraycasting the proxy. Preserve Caption IDs,
-Scene membership, text/media, drafts and other model visibility. A stale generation,
-Scene/binding/class change, IME, drag or pending recovery refuses/cancels the captured
-action through existing guards. Never fall back to an unrelated Mesh, ordinary
-point or direct-GS pick. Preserve legacy Mesh Add/Shift behavior outside the
-explicit GS route; retain existing Point target/source-centre rules.
+1. 新依存を固定し、license/第三者notice・lockfile・npm auditを確認する。Three更新は
+   GS feature実装と分離し、既存Mesh/Point/Native/旧harnessの互換性・entry隔離を検証する。
+   問題があれば元の動作経路を保持して評価を止め、範囲を広げて修復し続けない。
+2. 既存isolated検証設備で、SH0/3/4の方向別色、異方性、Sim(3)/反転、Mesh depth、
+   Proxy→調整→manual座標の不変性、取消・解放・context restore、外部要求なしを確認する。
+   必要な一時評価コードをproductionへそのまま昇格しない。公配布fixtureは追加しない。
+3. SH4通常読込とpaged SH3を別々に測定し、入力/作業/CPU/GPU/targetの上限と劣化を記録する。
+   SH4×pagingが未充足ならそれを明示し、SH3への無言変換、上限の無検証拡大、別方式の
+   追加実装で通したことにしない。新しい画質fallbackやsource/derivative profileは別途確定する。
+4. 既存受入項目へ証拠を対応付けて独立レビューし、採用候補として継続/棄却/再試行を報告する。
+   その後、正確なprofile/golden・typed portsと必要な限定production権限を確定し、
+   GS/Proxy追加から編集・五目的file・復元・cold再開まで一つの実装単位で完成させる。
 
-Specify these typed ports before source implementation:
-
-| Boundary | Bounded addition / ownership |
-|---|---|
-| model/content union | owned inspected GS source and geometry-only proxy facts; old GLB/Point branches unchanged |
-| read projection | saved-gs/render-gs plus explicit absent/ready/ambiguous/unavailable proxy state; representationToAsset is the full CanonicalTransform including reflection, mutable assetToProject is Sim3; one GS visual per Asset revision in this bounded path; no general untyped array adapter |
-| GS attach/change/remove | Session commands with captured token/Scene/Asset/current binding/GS family, owned selected input and explicit registration confirmation; fresh prepared IDs once |
-| model facts | materials:[] for GS/proxy, exact original ranges/bounds/profile; interaction family first-verified-output envelope authority; unchanged-GS equivalence proof for class reuse |
-| backend/resources | viewer consumes only renderer-neutral owned attributes/profile/frame; coordinator owns shared render state and per-Asset availability; InteractionIndex owns invisible proxy resources |
-| UI/display | provider-derived GS capability and interaction state; typed explicit GS target, not a synthetic string-map or storage read |
-
-Keep core/domain/scene free of UI, viewer free of package/storage and runtime
-external URLs. Extend exact sceneCore import allowlists and verify them early.
-Prepare one introduced proxy body per attach through existing owned staging; a
-GS+proxy pair is not a second unrelated visual model or an unbounded prepared set.
-
-## 6. File continuation and lifecycle
-
-Every ingress uses the same exact inspector: fresh/add, Workspace/Clean import,
-Contribution receive, backup restore, cold open and standalone Review. Existing
-operation-owned reads, CAS/journal/acknowledged-content lifetime, IDs and marker-last
-publication remain. Retry uses the same prepared bytes/IDs; missing acknowledged
-evidence is not reconstructed. Retained source/metadata exceptions are not flattened.
-
-Workspace/Contribution/backup preserve current source/proxy relations and original
-history/bytes. Review/Clean/edit-copy/independent keep-both use existing typed re-key
-builders, updating GS/proxy/family/class references while preserving intended Asset
-ownership. Proxies never become visible models or pin owners. Manual current
-anchors do not add weak old proxy provenance to a history-free closure. Use the
-existing archive Blob decoder port and all original control/consumer/closure limits.
-
-All five-purpose output/input, Review edit-copy and independent keep-both are
-required before this connected unit is complete. An unsupported refusal is safe
-failure behavior, not completion credit; retain that item as unfinished. Never
-silently drop a proxy, GS source, unknown record or protected body to produce a
-successful-looking file. No old Native/v1/LociMyu GS conversion recipe
-or model-replacement policy is implied. Those remain later explicit mappings;
-GLB replacement and prior conversion recipes retain their exact behavior.
-
-## 7. Availability and security clarification for approval
-
-| Situation | Required result |
-|---|---|
-| new input invalid/unknown profile, malformed source, cross-Asset/outside-revision target, missing required body | reject the input as a whole before mutation; preserve original/current Project |
-| valid GS, no proxy record | GS display and existing records remain; new GS placement disabled |
-| multiple valid same-target proxies | GS display remains; new GS placement disabled with an actionable ambiguity; no first-match |
-| verified valid bytes/facts, but decoder/GPU/interaction capability unavailable | per-Asset display/interaction diagnostic; unrelated assets and permitted existing-record work remain usable |
-| acknowledged CAS body, fact receipt or original history missing/corrupt | retain current Project repair/publication/receive/export fences; do not grant writes or synthesize evidence to obtain local degradation |
-| stale/context-lost/disposed display gesture | cancel/refuse the gesture, release owned resources and retain pending user data |
-
-**Normative clarification requested with this proposal:**01's missing/broken-proxy
-degradation describes absent relationships or runtime capability failure with valid
-verified source/facts. It does not override02/05/06's corruption/lost-evidence
-publication fence. Existing read-only published content may remain visible during
-repair, but this proposal does not promise write/gizmo continuation after physical
-content loss. This distinction is part of the PO decision, not an implementation
-shortcut to weaken checked()/metadataProviderReady().
-
-## 8. Exact bounded presentation and connected acceptance
-
-The initial adapter is an **independently authored bounded Three screen-GS pass**,
-using the same owned CPU projection direction as01a. CPU binary64 evaluates full
-source covariance/SH/IEC color and current-view projected moments; the renderer
-receives owned Float32 screen attributes. Reuse Three0.180.0 and existing coordinator/
-resource ports; no new dependency, raw-loader authority, promoted Native/PoC code,
-Spark packer or runtime CDN. This new bounded adapter choice is part of the PO
-architecture decision here, not an adopted general renderer or large-GS solution.
-
-Spark2.1.0 remains the existing Native/harness candidate. Its packed means/scales/
-quaternion/SH, pre-SH8bit DC clamp and gamma2.2 are known mismatches for this source
-profile. The bounded CPU/screen pass avoids those dependencies. Later Spark/PlayCanvas
-bakeoff and paging remain separate gates; no new technology-adoption claim follows.
-Source bounds always come from the independent inspector, never a renderer box.
-
-The exact screen companion fixes perspective and orthographic Jacobians,
-`SigmaCss=J*SigmaCamera*Jᵀ+0.3I`, no FOV/J clamp or opacity compensation, centre
-near/far clipping, camera-at-mean, full drawing-buffer sample coordinates, Q/alpha
-cutoff and a4096-interval owned Float32 falloff LUT. The256×17 R32F layout uses two
-texelFetch reads and manual interpolation; no4097-wide texture or float-linear
-extension is assumed. No screen kernel is persisted as source covariance/bounds.
-
-The companion also fixes executable **current-view capability**, not merely a label
-that eight goldens passed. Device precision and functional texture/linear-target/
-blend/output probes must pass. For every nonempty in-view primitive, compare actual
-uploaded centre/conic/color/alpha with CPU canonical values. Check SPD/finite data,
-rounded-covariance recovery, bounded operands and the explicit per-rectangle Q-error
-bound `etaQ<=2^-12`. Bound alpha and contour errors, including Float32 cutoff and LUT
-error. Require the declared contour displacement<=0.25CSSpx. Re-evaluate on source,
-frame, camera, viewport or DPR change before publishing a display receipt. A failed
-primitive makes only that GS visual Unsupported; never silently omit it, weaken the
-source profile or enlarge the predicate to fit an engine. Preserve existing Mesh/
-Point display and records, and cancel stale gestures during view preparation.
-
-Qualification distinguishes quantities and discontinuous boundaries:
-
-- Source/unassociated linear RGB error<=1/1024 and2D covariance max-entry error
-  <=max(1e-12,1e-5×reference max-entry norm); source3D scalars retain their separate
-  absolute/relative1e-12 oracle. Actual Float32 upload errors obey the tighter
-  current-view predicate, not a general packed-color allowance.
-- Mean/contour displacement<=0.25CSSpx; interior alpha error<=1/1024.
-- In the analytically defined contour guard only, radius-cutoff alpha/premul error
-  <=1/50 and alpha-threshold error<=1/255. A guard is derived from the fixed contour
-  and displacement bound, never an arbitrary mask hiding failed pixels.
-- Fixed camera/probe linear-premultiplied RGBA, away from those guards, must match
-  within1/1024 before final IEC conversion. Read actual linear/half-float values;
-  do not divide by near-zero alpha or compare encoded canvas values as linear.
-  These probe tolerances are not a universal all-scene pixel/performance promise.
-
-The companion contains concrete33×33CSS perspective/orthographic cameras,
-DPR1/1.25/2, rounded buffers, background/exposure,2D covariance/conics, pixel-centre
-Q/alpha/linear results, opaque Mesh/Point depth cases and two-GS order/ties. It also
-contains positive/negative capability boundaries. Reuse a small existing test/probe
-port; no new PoC or generic measurement framework. Execute independent scalar/raw-bit
-checks and actual browser probes before enabling this exact bounded pass.
-
-Composition is linear-premultiplied source-over in a functionally verified RGBA16F
-FBO, followed by one IEC output conversion; blending directly in an encoded-sRGB
-canvas or RGBA8-linear substitute is not equivalent. Opaque/binary Mesh **and opaque
-Point** write the first color/depth pass. GS tests strict Less against that depth,
-never writes depth, and sorts far-to-near across admitted GS by mean depth with the
-companion's content/ordinal/numeric-transform tie rule. Proxy geometry contributes
-to none of these passes. If the linear-target capability is unavailable, retain the
-existing Mesh/Point path and diagnose only GS. Advanced shared-view material classes
-keep their actual gates and local diagnostics; no alternate blend policy is inferred.
-
-For explicit Mesh/Point placement, a same-frame Boolean coverage query must prove
-no admitted GS contribution at a direct hit's canonical sample. For Point-radius
-fallback, apply it to each actual covered visibility-proof sample used by01a and
-prove at least one Point-covered sample with no GS contribution after opaque depth.
-A click-only or centre-only test cannot prove a hidden/partly covered glyph visible.
-Keep01a's no-Mesh-fragment and ranked-ambiguity rules. Otherwise refuse that placement
-and offer the existing isolation control.
-This is an occlusion-safety query only: no GS ID, depth reconstruction or position
-is returned. The explicitly selected-GS/proxy approximation remains01's separate
-first-path exception; it does not claim visible-splat surface precision. Add mixed
-regressions proving no hidden Point/Mesh commit and no unrelated fallback target.
-
-The mathematical presentation and error limits are normative. Direct-conic screen
-attributes and the supplied etaQ formula are one sufficient executable proof path.
-A mathematically equivalent factor/whitener or tighter conservative bound remains
-ordinary implementation when independently derived for its actual uploaded values/
-arithmetic, passes the same current-view limits/goldens and is independently reviewed
-before activation. That does not change source/presentation policy or require another
-PO decision. A label, an unmodified bound for different parameters, or a weakened
-threshold is not such proof.
-
-Complete one connected real-file workflow, reusing existing services/tests:
-fresh/add GS → same-coordinate proxy attach → explicit GS/Mesh target isolation →
-approximate hit → adjust/confirm → text/image → checked backup → Workspace/return →
-Review/Clean/edit-copy/keep-both → proxy replace/remove → restore/cold continuation
-with exact source/history and unchanged saved positions. Every listed file action
-is required for unit completion; a safe unsupported refusal remains unfinished.
-Include invalid/cross-Asset/multiple/missing proxy, renderer-local failure versus
-acknowledged loss, cancel/stale/read-only, exact retry/interruption, context loss,
-and owned20load/unload cycles. Service tests cover fault combinations; do not clone
-the entire browser roundtrip for every field. Run required final serial checks,
-isolation and independent review. Preserve failures and label per-case/aggregate results.
-
-500k SH3 is124,000,000payload bytes and exceeds current admission. Full renderer
-bakeoff, derivatives/paging, physical iPhone, actual IME/zoom, offline/PWA, ordinary
-entry and release retain their real gates. No direct-GS pick, generated proxy,
-large-source guarantee or formal renderer adoption is earned here.
-
-## 9. Fixed primary provenance and clean implementation
-
-Read through the GitHub connector on2026-10-27; base64 bytes were decoded and each
-Git blob SHA-1 recomputed before SHA-256. Full reference texts stay in ignored
-`.artifacts/e2e/gs-primary/`; no upstream training/renderer implementation is added
-to LociView. The input layout and mathematical conventions were checked; specification
-text, analytic vectors and implementation are independently authored.
-
-| Fixed source / license | SHA-256 |
-|---|---|
-| [Graphdeco model54c035f](https://github.com/graphdeco-inria/gaussian-splatting/blob/54c035f7834b564019656c3e3fcc3646292f727d/scene/gaussian_model.py) | `546ba41528a879af4d83bd280a3ef3cbcca9a5e9132204185aaa8f8ee9ffa310` |
-| [SH reference54c035f](https://github.com/graphdeco-inria/gaussian-splatting/blob/54c035f7834b564019656c3e3fcc3646292f727d/utils/sh_utils.py) | `7d1ff267546390635e6d1f68c4f88c4a8b052482d5c9be1d32f06bc69e9a96e7` |
-| [Graphdeco license54c035f](https://github.com/graphdeco-inria/gaussian-splatting/blob/54c035f7834b564019656c3e3fcc3646292f727d/LICENSE.md) | `c5ba70a2194af2aefe85dfe3da68608dcb3abd21a3aa53b55aa297c2f0b60eb3` |
-| [Raster reference59f5f77](https://github.com/graphdeco-inria/diff-gaussian-rasterization/blob/59f5f77e3ddbac3ed9db93ec2cfe99ed6c5d121d/cuda_rasterizer/forward.cu) | `83c182561b9f75e93b7b72a24aaf1fce507388a0198aa4a56137d25deabcd6c8` |
-| [Raster license59f5f77](https://github.com/graphdeco-inria/diff-gaussian-rasterization/blob/59f5f77e3ddbac3ed9db93ec2cfe99ed6c5d121d/LICENSE.md) | `cd5c95b3cfff3acc1bd412420c770f88809331c3db6872df11a970147aa8e81f` |
-
-Model/raster files carry Inria2023 notices and research/noncommercial/evaluation
-conditions. SH source carries a distinct PlenOctree Authors2021 permissive two-clause
-notice. Treat them file by file, not as one blanket license. This factual preflight
-grants no commercial/redistribution or top-level LociView license authority.
-Project synthetic fixture registry remains NOASSERTION/unreviewed; no public app
-sample or upstream source redistribution is authorized.
-
-Pinned local Spark source map SHA-256 is
-`7bb4e32e97dde9352981651d8e5aee41780546ee04cb96abcf7d8fa8d9fc75b4`;
-its local MIT LICENSE SHA-256 is
-`51829693e5dccd9ca1daa093991faac3aaa93238eb8fd5f5cb4130af85791d64`.
-Lockfile already binds the2.1.0 tarball/integrity. No tarball re-download or Rust
-stream-decoder equivalence is claimed. A JS source-map observation is not proof
-that another WASM decoder follows it.
+Physical iPhone、HTTPS/offline/PWA、通常home、S1/S2/TEAM-FLOW-01、一般renderer採用と
+releaseの未充足は残す。ローカルChromiumの結果でそれらを合格扱いしない。
+細かな操作ごとのPO確認や、POのテスト待ちを通常の開発依存に戻さない。
