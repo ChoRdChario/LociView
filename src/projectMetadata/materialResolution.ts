@@ -77,7 +77,7 @@ export function materialResolutionContext(p: Provider, sceneId: string, override
 export function checkedResolutionIntent(appearance: JsonObject, compositing: JsonObject, limits: MetadataLimits, profile: ProjectSemanticProfile = 'map1'): MaterialIntent {
   const intent = validateMaterialIntent({ appearance, compositing }, limits, profile);
   if (intent.compositing.optics === 'transmission' || ['smoothBlend', 'ditherCoverage'].includes(intent.compositing.coverage.policy) ||
-    (profile !== 'map2' || intent.appearance.chroma?.enabled !== false) && (intent.appearance.chroma?.softness ?? 0) > 0 ||
+    intent.compositing.coverage.policy !== 'mask' && (profile !== 'map2' || intent.appearance.chroma?.enabled !== false) && (intent.appearance.chroma?.softness ?? 0) > 0 ||
     (intent.compositing.coverage.policy === 'inherit' && (intent.appearance.opacity ?? 1) < 1)) fail('material-unsupported');
   return intent;
 }

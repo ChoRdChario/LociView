@@ -62,7 +62,8 @@ export type MetadataEdit =
   | { kind: 'deleteView'; sceneId: string; viewId: string; eventId: string }
   | { kind: 'setEntryView'; sceneId: string; viewId: string | null }
   | { kind: 'createMaterial'; sceneId: string; overrideId: string; routing: JsonObject; appearance: JsonObject; compositing: JsonObject; eventId: string }
-  | { kind: 'editMaterial'; sceneId: string; overrideId: string; appearance: JsonObject }
+  | ({ kind: 'editMaterial'; sceneId: string; overrideId: string } &
+      ({ appearance: JsonObject; compositing?: JsonObject } | { appearance?: JsonObject; compositing: JsonObject }))
   | { kind: 'resetMaterial'; sceneId: string; overrideId: string; eventId: string }
   | { kind: 'createAttachment'; sceneId: string; captionId: string; attachmentId: string; media: JsonObject; orderKey: string; altText: string; eventId: string }
   | { kind: 'editAttachment'; sceneId: string; captionId: string; attachmentId: string; field: 'altText' | 'orderKey'; value: string }
@@ -205,7 +206,7 @@ export function planMetadataEdit(provider: Provider, input: MetadataEdit, limits
     const intent = validateMaterialIntent({ appearance, compositing }, limits, provider.semanticProfile);
     if (c.unknown || intent.compositing.optics === 'transmission' ||
       ['smoothBlend', 'ditherCoverage'].includes(intent.compositing.coverage.policy) ||
-      (provider.semanticProfile !== 'map2' || intent.appearance.chroma?.enabled !== false) && (intent.appearance.chroma?.softness ?? 0) > 0 ||
+      intent.compositing.coverage.policy !== 'mask' && (provider.semanticProfile !== 'map2' || intent.appearance.chroma?.enabled !== false) && (intent.appearance.chroma?.softness ?? 0) > 0 ||
       (intent.compositing.coverage.policy === 'inherit' && (intent.appearance.opacity ?? 1) < 1)) fail('material-unsupported');
   };
   switch (command.kind) {
@@ -447,14 +448,22 @@ export function planMetadataEdit(provider: Provider, input: MetadataEdit, limits
         lifecycle: { state: 'active', eventId: command.eventId, reason: 'initial' } }, true); break;
     }
     case 'editMaterial': case 'resetMaterial': {
-      shape(raw, ['kind', 'sceneId', 'overrideId', command.kind === 'editMaterial' ? 'appearance' : 'eventId']);
+      shape(raw, ['kind', 'sceneId', 'overrideId', ...(command.kind === 'editMaterial' ?
+        ['appearance', 'compositing'].filter(k => Object.hasOwn(raw, k)) : ['eventId'])]);
+      if (command.kind === 'editMaterial' && !Object.hasOwn(raw, 'appearance') && !Object.hasOwn(raw, 'compositing')) fail('material-empty');
       const r = row('materialOverridesById', command.overrideId);
       checkMutableField(c, 'materialOverridesById', 'lifecycle', exact(r.lifecycle));
       const routing = exact(r.routing) as JsonObject, appearance = exact(r.appearance) as JsonObject, compositing = exact(r.compositing) as JsonObject;
       exact(provider.resources.materials[command.overrideId]?.intent);
       material(command.sceneId, routing, command.overrideId); materialIntent(appearance, compositing);
       if (command.kind === 'editMaterial') {
-        materialIntent(command.appearance, compositing); add('materialOverridesById', command.overrideId, { appearance: command.appearance });
+        const nextAppearance = Object.hasOwn(raw, 'appearance') ? command.appearance! : appearance;
+        const nextCompositing = Object.hasOwn(raw, 'compositing') ? command.compositing! : compositing;
+        materialIntent(nextAppearance, nextCompositing);
+        const fields: Record<string, JsonValue> = {};
+        if (!same(nextAppearance, appearance)) fields.appearance = nextAppearance;
+        if (!same(nextCompositing, compositing)) fields.compositing = nextCompositing;
+        if (Object.keys(fields).length) add('materialOverridesById', command.overrideId, fields);
       } else add('materialOverridesById', command.overrideId, { lifecycle: { state: 'deleted', eventId: command.eventId, reason: 'userDelete' } });
       break;
     }

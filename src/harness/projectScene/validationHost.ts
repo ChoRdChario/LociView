@@ -512,11 +512,11 @@ async function openNormalValidationHost(options: ValidationHostOptions, inherite
       if (command.kind === 'createMaterial' || command.kind === 'editMaterial') {
         const current = command.kind === 'editMaterial' ? project?.materialData?.records[command.overrideId] : undefined;
         const routing = command.kind === 'createMaterial' ? command.routing : current?.routing.kind === 'value' ? current.routing.value : null;
-        const compositing = command.kind === 'createMaterial' ? command.compositing : current?.compositing.kind === 'value' ? current.compositing.value : null;
+        const compositing = command.compositing ?? (current?.compositing.kind === 'value' ? current.compositing.value : null);
         const slots = project?.modelVersions?.flatMap(v => v.closure.shape === 'saved-glb' ? validationMaterialSlots(v.closure) : []) ?? [];
         const slot = slots.find(s => same(s.target as unknown as JsonObject, routing?.target as JsonObject | undefined));
         if (!slot || !compositing) throw Error('設定するモデルと材質を確認してください。');
-        const issue = validationMaterialIssue(slot, { appearance: command.appearance, compositing } as MaterialIntent, project?.semanticProfile);
+        const issue = validationMaterialIssue(slot, { appearance: command.appearance ?? (current?.appearance.kind === 'value' ? current.appearance.value : undefined), compositing } as MaterialIntent, project?.semanticProfile);
         if (issue) throw Error(issue);
       }
       if (command.kind === 'resolveMaterialIntent' || command.kind === 'resolveMaterialDuplicates') {

@@ -13,8 +13,12 @@ from native sink unit counts and device/adoption evidence.
 Comfort targets and the outcome/goal/friction/next-step report belong to
 [UI guidelines §2.2](../docs/ui-product-guidelines.md). Output-state projection
 reuse is confined to one matching-proof read callback; keep all per-job protections
-and closing audits. Todo records the still-unmet restored-save target and next
-readiness-stage investigation; local Event Timing is not field INP acceptance.
+and closing audits. Todo records the still-unmet restored-save target as backlog; feature completion
+now takes priority over readiness-stage optimization. Local Event Timing is not
+field INP acceptance. Explicit binary cutout connects the existing opaque GLB slots
+through UI, sparse material commands, identical display/pick predicates and file/cold
+continuation. Inventory/todo retain its precise scope and the remaining model/
+material/profile/device requirements; do not treat it as all-feature completion.
 The bounded integrated UI is selected by `editor=project` in validation; follow
 todo for its tested scope and remaining ordinary-entry/browser/device boundaries.
 Attachment description/order candidates use the same checked Session recovery

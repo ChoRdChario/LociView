@@ -24,11 +24,13 @@ export function validationMaterialIssue(slot: ValidationMaterialSlot, input: Mat
   const source = validationMaterialSourceIssue(slot); if (source) return source;
   try {
     const intent = materialForDisplay(validateMaterialIntent(input, { maxNodes: 4096, maxDepth: 16, maxStringScalars: 65536 }, profile), profile), a = intent.appearance, c = intent.compositing;
+    if (c.coverage.policy === 'inherit' && ((a.opacity ?? 1) < 1 || (a.chroma?.softness ?? 0) > 0))
+      return '不透明度と境界のぼかしを使うには「切り抜き」を選択してください。滑らかな半透明は未対応です。';
     if (Object.keys(intent).sort().join(',') !== 'appearance,compositing' ||
-      Object.keys(a).some(k => !['lighting', 'doubleSided', 'baseColorSrgb', 'opacity', 'chroma'].includes(k)) || (a.opacity !== undefined && a.opacity !== 1) ||
-      a.chroma && (a.chroma.softness !== 0 || Object.keys(a.chroma).sort().join(',') !== 'keyColorSrgb,softness,tolerance') ||
-      !same(c, { coverage: { policy: c.coverage.policy }, optics: c.optics }) ||
-      !['inherit', 'opaque'].includes(c.coverage.policy) || !['inherit', 'surface'].includes(c.optics))
+      Object.keys(a).some(k => !['lighting', 'doubleSided', 'baseColorSrgb', 'opacity', 'chroma'].includes(k)) || (c.coverage.policy !== 'mask' && a.opacity !== undefined && a.opacity !== 1) ||
+      a.chroma && (c.coverage.policy !== 'mask' && a.chroma.softness !== 0 || Object.keys(a.chroma).sort().join(',') !== 'keyColorSrgb,softness,tolerance') ||
+      !same(c, { coverage: c.coverage.policy === 'mask' ? { policy: 'mask', alphaCutoff: c.coverage.alphaCutoff! } : { policy: c.coverage.policy }, optics: c.optics }) ||
+      !['inherit', 'opaque', 'mask'].includes(c.coverage.policy) || !['inherit', 'surface'].includes(c.optics))
       return 'この見え方は実モデルへ未接続です。';
     return null;
   } catch { return '材質の設定を確認してください。'; }

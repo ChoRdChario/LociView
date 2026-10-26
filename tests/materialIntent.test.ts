@@ -1,9 +1,26 @@
 import { describe, expect, it } from 'vitest';
-import { editMaterialAppearance, materialInput, materialForDisplay, validateMaterialIntent } from '../src/domain/materialIntent';
+import { editMaterialIntent, editMaterialAppearance, materialInput, materialForDisplay, validateMaterialIntent } from '../src/domain/materialIntent';
 
 const limits = { maxNodes: 1000, maxDepth: 12, maxStringScalars: 1000 };
 const intent = (appearance: unknown = {}, coverage: unknown = { policy: 'inherit' }, optics = 'inherit') => ({ appearance, compositing: { coverage, optics } });
 describe('decoded atomic material intent (not Project/source semantics/backend admission)', () => {
+  it('edits explicit cutout without rebuilding untouched appearance or unknown compositing values', () => {
+    const base = validateMaterialIntent(intent({ lighting: 'unlit', chroma: { enabled: false,
+      keyColorSrgb: [0.2, 0.4, 0.6], tolerance: 0.2, softness: 0.3 } }), limits, 'map2');
+    const mask = editMaterialIntent(base, { coverage: 'mask', cutoff: '0' }, 'map2');
+    expect(mask.appearance).toEqual(base.appearance);
+    expect(mask.compositing).toEqual({ coverage: { policy: 'mask', alphaCutoff: 0 }, optics: 'inherit' });
+    expect(materialInput(mask.appearance, 'coverage', 'map2', mask.compositing)).toBe('mask');
+    const soft = editMaterialIntent(mask, { opacity: '40', chroma: 'on', softness: '0.6', cutoff: '1' }, 'map2');
+    expect(validateMaterialIntent(soft, limits, 'map2').appearance).toMatchObject({ opacity: 0.4, chroma: { enabled: true, softness: 0.6 } });
+    expect(soft.compositing.coverage.alphaCutoff).toBe(1);
+    const extra = { ...mask, compositing: { ...mask.compositing, future: { retained: true } } };
+    expect(editMaterialIntent(extra, { cutoff: '0.5' }, 'map2').compositing.future).toEqual({ retained: true });
+    expect(editMaterialIntent(base, { coverage: 'opaque' }, 'map2').appearance.chroma).toEqual(base.appearance.chroma);
+    for (const cutoff of ['', ' ', '-1', '1.01', 'Infinity']) expect(() => editMaterialIntent(mask, { cutoff })).toThrow();
+    expect(() => editMaterialIntent(base, { cutoff: '0.5' })).toThrow();
+    expect(() => editMaterialIntent(base, { coverage: 'ditherCoverage' })).toThrow();
+  });
   it('retains map2 inactive chroma parameters, but leaves map1 enabled semantics unchanged', () => {
     const chroma = { keyColorSrgb: [0.123456, 0.2, 0.3], tolerance: 0.2, softness: 0.3, enabled: false };
     const raw = intent({ chroma }, { policy: 'opaque' });

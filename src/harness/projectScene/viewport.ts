@@ -10,7 +10,7 @@ import { pickResidentCreation, pickResidentSurface, type PinSurfaceTarget, type 
 import { createPinGizmo, type ModelPlacementTarget } from './pinGizmo';
 import { proposedPlacement } from './modelTransform';
 import type { SavedModelResidentPort } from './validationRender';
-import { hardChroma } from '../../viewer/hardChroma';
+import { hasBinaryCoverage } from '../../viewer/hardChroma';
 import { createValidationCoverage, coveragePixel } from './validationCoverage';
 
 /** The saved resident port is explicit; the default still accepts only exact synthetic fixtures. */
@@ -227,7 +227,7 @@ export const sceneViewportFactory = (saved?: SavedModelResidentPort): ViewportFa
     const ndc = new THREE.Vector2(x * 2 / width - 1, 1 - y * 2 / height);
     let needed = false;
     for (const surface of resident.values()) surface.mesh.traverse(node => {
-      if (node instanceof THREE.Mesh && (Array.isArray(node.material) ? node.material : [node.material]).some(m => hardChroma(m))) needed = true;
+      if (node instanceof THREE.Mesh && (Array.isArray(node.material) ? node.material : [node.material]).some(m => hasBinaryCoverage(m))) needed = true;
     });
     if (!needed) return { ndc, coverage: undefined };
     if (!renderer || !camera) throw Error('3D表示を確認してください。');

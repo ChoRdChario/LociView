@@ -39,11 +39,11 @@ export class SyntheticMaterialSession {
             project: record({ scope: { kind: 'project' }, target: slot.target }), scene: record({ scope: { kind: 'scene', sceneId }, target: slot.target }),
             sourceIntent: value(sourceMaterialIntent),
             fieldIssues: Object.fromEntries(materialFields.map(f => [f, validationMaterialSourceIssue(slot) ??
-              (['lighting', 'doubleSided', 'chroma', 'keyColor', 'tolerance'].includes(f) ? null : 'この設定は実モデルへ未接続です。')])) as Record<typeof materialFields[number], string | null>,
+              null])) as Record<typeof materialFields[number], string | null>,
             admit: (intent: MaterialIntent) => validationMaterialIssue(slot, intent, p.semanticProfile) }))) };
         const target = materialTarget(version.closure), project = record({ scope: { kind: 'project' }, target }), scene = record({ scope: { kind: 'scene', sceneId }, target });
         return { assetId: asset.id, name, surfaces: value([{ target, name: value('表面'), project, scene, sourceIntent: value(sourceMaterialIntent),
-          fieldIssues: Object.fromEntries(materialFields.map(f => [f, f === 'opacity' || f === 'softness' ? '半透明の表示は未接続です。' : null])) as Record<typeof materialFields[number], string | null>,
+          fieldIssues: Object.fromEntries(materialFields.map(f => [f, f === 'opacity' || f === 'softness' || f === 'coverage' || f === 'cutoff' ? 'この見え方は実モデルへ未接続です。' : null])) as Record<typeof materialFields[number], string | null>,
           admit: (intent: MaterialIntent) => materialCapability(materialForDisplay(intent, p.semanticProfile)) }]), reason: null };
       }) }, selection: this.selections.get(sceneId)!, draft: this.drafts.get(sceneId) ?? null, pending: otherPending,
       mutationBlock: this.block() ?? this.mutationBlock(), feedback: this.feedback.get(sceneId) ?? { kind: 'idle' } };
@@ -73,7 +73,11 @@ export class SyntheticMaterialSession {
               changes[materialKey(id, 'compositing')] = canonicalFixture(plan.intent.compositing);
               changes[materialKey(id, 'lifecycle')] = canonicalFixture({ state: 'active', eventId: fresh('evt'), reason: 'initial' });
             }
-            changes[materialKey(id, 'appearance')] = canonicalFixture(plan.intent.appearance);
+            const current = this.read().materialData?.records[id]?.intent;
+            if (!plan.recordId || current?.kind !== 'value' || canonicalFixture(current.value.appearance) !== canonicalFixture(plan.intent.appearance))
+              changes[materialKey(id, 'appearance')] = canonicalFixture(plan.intent.appearance);
+            if (plan.recordId && current?.kind === 'value' && canonicalFixture(current.value.compositing) !== canonicalFixture(plan.intent.compositing))
+              changes[materialKey(id, 'compositing')] = canonicalFixture(plan.intent.compositing);
           }
           prepared = this.prepared = { plan, id, changes: Object.freeze(changes) };
         }

@@ -23,7 +23,7 @@ export function createProjectMaterials(document: Document, host: ProjectPanelHos
     else if (plan.kind === 'apply' || plan.kind === 'remove') {
       const recordId = plan.recordId ?? newProjectId('ovr');
       const command: MetadataEdit = plan.kind === 'remove' ? { kind: 'resetMaterial', sceneId: plan.sceneId, overrideId: recordId, eventId: newProjectId('evt') } :
-        plan.recordId ? { kind: 'editMaterial', sceneId: plan.sceneId, overrideId: recordId, appearance: plan.intent.appearance } :
+        plan.recordId ? { kind: 'editMaterial', sceneId: plan.sceneId, overrideId: recordId, appearance: plan.intent.appearance, compositing: plan.intent.compositing } :
           { kind: 'createMaterial', sceneId: plan.sceneId, overrideId: recordId,
             routing: { target: { ...plan.selection.target! }, scope: plan.selection.scope === 'scene' ? { kind: 'scene', sceneId: plan.sceneId } : { kind: 'project' } },
             appearance: plan.intent.appearance, compositing: plan.intent.compositing, eventId: newProjectId('evt') };

@@ -4586,6 +4586,47 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect(command).toMatchObject({ choice: 'both', copies: [expect.anything()] });
     const ids = host.authority.read().modelVersions!.map(v => v.assetId); expect(new Set(ids).size).toBe(2); expect(h.legacy).not.toHaveBeenCalled(); await h.ui.dispose();
   });
+  it('connects explicit GLB cutout controls, scoped reset, exact failed retry and real file/cold continuation', async () => {
+    const h = await productWorkspaceFixture(true,false,false,'map2'), {host,button,named,editor,edited,failed} = h;
+    button('材質',editor).fire('click'); const panel = named('材質の作業',editor);
+    const model = named('モデル',panel); model.value = host.authority.read().modelVersions![0]!.assetId; model.fire('change');
+    const surface = named('面',panel); surface.value = surface.children.find(n => n.value !== '')!.value; surface.fire('change');
+    const set = (label:string,value:string,event='input') => { const n = named(label,panel); n.value=value; n.fire(event); };
+    set('適用範囲','project','change'); button('設定を編集',panel).fire('click');
+    set('透過の表示方法','mask','change'); set('切り抜きのしきい値','0'); set('不透明度（%）','0');
+    set('指定した色を透過','on','change'); set('境界のぼかし','0.4'); set('照明','unlit','change');
+    expect(button('変更を適用',panel).disabled).toBe(false); await edited(() => button('変更を適用',panel).fire('click'));
+    const made = h.dispatch.mock.calls.map(c=>c[1]).find(c=>c.kind==='createMaterial')!; if(made.kind!=='createMaterial') throw Error('material');
+    expect(made.appearance.chroma).toMatchObject({enabled:true,softness:0.4});
+    const target = made.routing.target as JsonObject, effect = () => h.display()!.savedMaterials![target.assetId as string]![target.logicalMaterialSlotId as string];
+    expect(effect()).toMatchObject({appearance:{opacity:0,chroma:{softness:0.4}},compositing:{coverage:{policy:'mask',alphaCutoff:0}}});
+    set('適用範囲','scene','change'); button('設定を編集',panel).fire('click'); set('切り抜きのしきい値','1');
+    await edited(() => button('変更を適用',panel).fire('click')); expect(effect()).toMatchObject({compositing:{coverage:{alphaCutoff:1}}});
+    button('設定を編集',panel).fire('click'); set('切り抜きのしきい値','0.5'); h.f.fs.reject=p=>p.endsWith('/published.json');
+    await failed(() => button('変更を適用',panel).fire('click')); expect(named('切り抜きのしきい値',panel).value).toBe('0.5');
+    const retained=(await h.f.fs.list('')).filter(p=>p.endsWith('.amchange')), bytes=await Promise.all(retained.map(p=>h.f.fs.readBytes(p)));
+    h.f.fs.reject=()=>false; await edited(() => button('更新を再試行',editor).fire('click'));
+    expect(await Promise.all(retained.map(p=>h.f.fs.readBytes(p)))).toEqual(bytes);
+    expect(effect()).toMatchObject({compositing:{coverage:{alphaCutoff:0.5}}});
+    button('この範囲の設定を解除',panel).fire('click'); await edited(() => button('設定を解除する',panel).fire('click'));
+    expect(effect()).toMatchObject({compositing:{coverage:{alphaCutoff:0}}});
+    const before=host.read().source!, sceneId=host.authority.read().state.defaultSceneId; if(sceneId.kind!=='value') throw Error('scene');
+    await expect(host.dispatch(before.token,{kind:'editMaterial',sceneId:sceneId.value,overrideId:made.overrideId,
+      compositing:{coverage:{policy:'smoothBlend'},optics:'inherit'}})).rejects.toThrow();
+    expect(host.read().source!.token).toBe(before.token);
+    const sender=host.workspaceOutput, workspace=await sender.download(await sender.generate(before.token)), peer=firstWorkspaceRecipient();
+    await peer.receiver.importWorkspace(workspace);
+    const peerRead=await peer.session.read(); expect(peerRead.source!.originalChanges()).toEqual(before.originalChanges());
+    if(peerRead.provider?.kind!=='scene-provider') throw Error('provider');
+    expect(peerRead.provider!.resources.materials[made.overrideId]!.intent).toMatchObject({kind:'value',value:{appearance:made.appearance,compositing:made.compositing}});
+    // The product records the same intent; the fixture's model bytes remain original.
+    const archive=await WorkspaceArchive.inspect(workspace,metadata);
+    expect(archive.archive.control.manifest.blobs.length).toBeGreaterThan(0);
+    await h.ui.dispose(); const cold=owned(await openValidationHost(h.f.options));
+    expect(cold.read().source!.originalChanges()).toEqual(before.originalChanges());
+    expect(cold.authority.read().materialData!.records[made.overrideId]!.intent).toMatchObject({kind:'value',value:{appearance:made.appearance,compositing:made.compositing}});
+    await cold.dispose(); expect(h.legacy).not.toHaveBeenCalled();
+  });
   it('connects product Saved Views and material scope to exact capture, typed writes and file reopen (injected viewport)', async () => {
     const h = await productWorkspaceFixture(true), { host, button, named, editor, edited, all } = h;
     button('保存した視点', editor).fire('click'); const views = named('視点の作業', editor), author = named('視点の作成と管理', views), background = named('3D背景', views);
@@ -7059,6 +7100,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     vi.stubGlobal('createImageBitmap', vi.fn(async () => bitmap));
     try {
       const bytes = glb(j => {
+        j.materials[0].pbrMetallicRoughness.baseColorFactor[3] = 0.25; // OPAQUE still ignores source alpha.
         j.materials.push({ pbrMetallicRoughness: { baseColorFactor: [0.7, 0.4, 0.1, 1] } }, {}); // Includes an unused declared slot.
         const p = j.meshes[0].primitives[0];
         j.meshes[0].primitives = [{ ...p, material: 1 }, p, { attributes: { POSITION: 0 } }, { ...p }];
@@ -7091,6 +7133,8 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
         expect(hardChroma(edited[i]!)).toBeUndefined();
       }
       expect(edited[1]).toBe(edited[3]); expect(mats(untouched.mesh)[1]).not.toBe(edited[1]);
+      const opaque = residents.create(c, { [slot.target.logicalMaterialSlotId]: { appearance: { opacity: 1 }, compositing: { coverage: { policy: 'inherit' }, optics: 'inherit' } } });
+      expect(mats(opaque.mesh)[1]!.opacity).toBe(1); expect(originals[1]!.opacity).toBe(0.25); opaque.dispose!();
       changed.dispose!(); const reset = residents.create(c), restored = mats(reset.mesh)[1] as THREE.MeshStandardMaterial;
       expect(restored).toBeInstanceOf(THREE.MeshStandardMaterial); expect(restored.roughness).toBe(0.7); expect(restored.color.r).toBe(0.2);
       expect(restored.map).toBe(originals[1]!.map); expect(restored.side).toBe(THREE.FrontSide); expect(bitmap.close).not.toHaveBeenCalled();
@@ -7121,7 +7165,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
         .map(([k, v]) => [k, new A.ImmutableString(json(v))]));
     });
     const a = branch({ lighting: 'unlit' }, { coverage: { policy: 'opaque' }, optics: 'surface' }, true),
-      b = branch(chosenAppearance, inherit), c = branch({ lighting: 'lit' }, { coverage: { policy: 'mask', alphaCutoff: 0.5 }, optics: 'surface' });
+      b = branch(chosenAppearance, inherit), c = branch({ lighting: 'lit' }, { coverage: { policy: 'ditherCoverage', alphaCutoff: 0.5 }, optics: 'surface' });
     const merged = A.merge(A.merge(A.clone(a), A.clone(b)), A.clone(c));
     const remote = ProjectMetadataSource.fromFullSource(A.save(merged), seed.proof, metadata), contentFS = new TestFS(), content = new ValidationContent(contentFS, f.store, budget, decode);
     const provider = await underWriteLease(contentFS, () => readProjectScene(remote.read(), metadata, content.verifier(true))), publication = newId();
@@ -7158,12 +7202,12 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const writes = vi.spyOn(f.fs, 'writeBytes'); writes.mockClear(); confirm.fire('click');
     await vi.waitFor(() => expect(form.children.some(n => n.attributes.get('role') === 'status' && !!n.textContent)).toBe(true));
     await vi.waitFor(() => expect(host.hasPending()).toBe(false)); expect(host.read().source!.token).toBe(before.token); expect(writes).not.toHaveBeenCalled();
-    // Unsupported real-GLB mask is structurally legal, but cannot bypass host capability checks.
-    choose(appearance, operation('appearance', { lighting: 'lit' })); choose(compositing, operation('compositing', { coverage: { policy: 'mask', alphaCutoff: 0.5 }, optics: 'surface' }));
+    // Unratified dither remains structurally legal, but is refused by the metadata policy before writes.
+    choose(appearance, operation('appearance', { lighting: 'lit' })); choose(compositing, operation('compositing', { coverage: { policy: 'ditherCoverage', alphaCutoff: 0.5 }, optics: 'surface' }));
     await expect(host.resolve(before.token, { kind: 'resolveMaterialIntent', sceneId, overrideId: id,
-      appearanceOperationId: appearance.value, compositingOperationId: compositing.value })).rejects.toThrow('未接続');
+      appearanceOperationId: appearance.value, compositingOperationId: compositing.value })).rejects.toThrow('material-unsupported');
     expect(host.read().source!.token).toBe(before.token); expect(writes).not.toHaveBeenCalled();
-    confirm.fire('click'); expect(all(form).filter(n => n.attributes.get('role') === 'status').map(n => n.textContent).join(' ')).toContain('未接続');
+    confirm.fire('click'); expect(all(form).filter(n => n.attributes.get('role') === 'status').map(n => n.textContent).join(' ')).toContain('material-unsupported');
     expect(host.read().source!.token).toBe(before.token); expect(writes).not.toHaveBeenCalled();
     choose(appearance, operation('appearance', chosenAppearance)); choose(compositing, operation('compositing', inherit));
     const unchangedToken = host.read().source!.token;
@@ -7223,7 +7267,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     request({ kind: 'model', assetId: c.binding.assetId });
     const context = s.materialContext(); if (context.source.kind !== 'ready') throw Error('ready');
     const surfaces = context.source.models[0]!.surfaces; if (surfaces.kind !== 'value') throw Error('surfaces');
-    expect(surfaces.value).toHaveLength(2); expect(surfaces.value.every(v => v.fieldIssues.chroma === null && v.fieldIssues.softness)).toBe(true);
+    expect(surfaces.value).toHaveLength(2); expect(surfaces.value.every(v => v.fieldIssues.chroma === null && v.fieldIssues.softness === null)).toBe(true);
     const slot = validationMaterialSlots(c).find(v => v.locator.materialIndex === 0)!;
     request({ kind: 'surface', key: materialTargetKey(slot.target) }); request({ kind: 'scope', scope: 'project' });
     const reads = fs.reads, before = s.snapshot;
@@ -7253,7 +7297,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const changes = Object.fromEntries(Object.entries({ routing: { scope: { kind: 'project' }, target: slot.target },
       appearance: { chroma: { keyColorSrgb: [1, 0, 0], tolerance: 0, softness: 0.1 } }, compositing: intent.compositing,
       lifecycle: { state: 'active', eventId: `evt_${newId()}`, reason: 'initial' } }).map(([k, v]) => [materialKey(id, k), canonicalFixture(v)]));
-    const paths = await fs.list(''); await expect(host.authority.write(token, changes, { sceneId: s.sceneId })).rejects.toThrow('未接続');
+    const paths = await fs.list(''); await expect(host.authority.write(token, changes, { sceneId: s.sceneId })).rejects.toThrow('切り抜き');
     expect(host.read().source!.token).toBe(token); expect(host.hasPending()).toBe(false); expect(await fs.list('')).toEqual(paths);
     await workspace.dispose();
   });

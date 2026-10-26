@@ -27,6 +27,12 @@ Read only the relevant topic, not every historical incident.
   Completion reports must state the delivered result and remaining limits; until
   the application is complete, always include the concrete next planned unit
   (PO instruction 2026-10-15). A verified slice is not application completion.
+  2026-10-27 priority correction: keep the missing accepted features on the
+  critical path until the complete set is integrated and coherent. Do not let
+  measured latency, helper optimization or repeated verification displace feature
+  completion. Refactor as needed for integration; fix blocking/data-loss defects
+  promptly and keep ordinary performance polish in backlog. Reports distinguish
+  missing implementation, integration, acceptance and performance explicitly.
 - 2026-09-20: Runtime checks also have a UX cost. Measure the complete user
   action's I/O amplification before adding more validation. Reuse owned evidence
   within an explicitly bounded operation; retain input, write, publication and

@@ -1,5 +1,5 @@
 import type { Field, MaterialTarget } from '../../scene/types';
-import { editMaterialAppearance, materialInput, validateMaterialIntent, type MaterialEditField, type MaterialEdits, type MaterialIntent } from '../../domain/materialIntent';
+import { editMaterialIntent, materialInput, validateMaterialIntent, type MaterialEditField, type MaterialEdits, type MaterialIntent } from '../../domain/materialIntent';
 import type { ValueLimits } from '../../domain/values';
 import type { ProjectSemanticProfile } from '../../domain/projectProfile';
 import { sceneSwitchReason, type PendingInteraction } from './navigationState';
@@ -93,7 +93,8 @@ function writeIssue(context: MaterialContext): string | null {
 }
 export function editMaterialDraft(draft: MaterialDraft, field: MaterialEditField, text: string, composing = draft.composing): MaterialDraft {
   const edits = { ...draft.edits };
-  if (text === materialInput(draft.base.appearance, field, draft.semanticProfile)) delete edits[field]; else edits[field] = text;
+  if (field === 'coverage' && text !== 'mask') delete edits.cutoff;
+  if (text === materialInput(draft.base.appearance, field, draft.semanticProfile, draft.base.compositing)) delete edits[field]; else edits[field] = text;
   return Object.freeze({ ...draft, edits: Object.freeze(edits), composing });
 }
 export function materialApplyIssue(context: MaterialContext): string | null {
@@ -110,7 +111,7 @@ export function materialApplyIssue(context: MaterialContext): string | null {
   }
   let intent: MaterialIntent;
   try {
-    intent = validateMaterialIntent({ ...draft.base, appearance: editMaterialAppearance(draft.base.appearance, draft.edits, source.semanticProfile) }, source.limits, source.semanticProfile);
+    intent = validateMaterialIntent(editMaterialIntent(draft.base, draft.edits, source.semanticProfile), source.limits, source.semanticProfile);
   } catch (error) { return error instanceof Error && error.name !== 'DomainValidationError' && error.message ? error.message : 'この見え方の組み合わせは適用できません。状態を確認してください。'; }
   try {
     const issue = view.surface!.admit(intent); return issue === null ? null : issue || 'この設定には対応していません。';
@@ -144,7 +145,7 @@ export function planMaterial(context: MaterialContext, request: MaterialIntentRe
   if (request.kind === 'apply') {
     const issue = materialApplyIssue(context); if (issue || !draft) return blocked(issue || '設定を確認してください。');
     return Object.freeze({ kind: 'apply', token: source.token, projectId: source.projectId, sceneId: source.sceneId, selection,
-      recordId: draft.recordId, draft, intent: validateMaterialIntent({ ...draft.base, appearance: editMaterialAppearance(draft.base.appearance, draft.edits, source.semanticProfile) }, source.limits, source.semanticProfile) });
+      recordId: draft.recordId, draft, intent: validateMaterialIntent(editMaterialIntent(draft.base, draft.edits, source.semanticProfile), source.limits, source.semanticProfile) });
   }
   if (draft || !view.record) return blocked(draft ? '入力を適用するか取り消してください。' : 'この範囲に解除する設定はありません。');
   return Object.freeze({ kind: 'remove', token: source.token, projectId: source.projectId, sceneId: source.sceneId, selection, recordId: view.record.id });

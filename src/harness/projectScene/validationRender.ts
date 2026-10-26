@@ -9,7 +9,7 @@ import { placementMatrix } from './viewportModel';
 import { canonical, same } from '../../domain/projectGraphSupport';
 import type { JsonObject } from '../../domain/values';
 import { validationMaterialSlots, validationMaterialIssue, type ValidationMaterialEffects } from './validationMaterials';
-import { patchHardChroma } from '../../viewer/hardChroma';
+import { patchHardChroma, patchBinaryMask } from '../../viewer/hardChroma';
 import { decodeOccurrenceGlb, type DecodedOccurrenceSlot } from '../../projectFiles/glbOccurrences';
 import { materialForDisplay } from '../../domain/materialIntent';
 
@@ -156,7 +156,8 @@ export async function prepareReadonlyResidents(initial: readonly ReadonlyRenderM
             if (effect && 'issue' in effect) result.visible = false;
             else if (effect) {
               if (!(m instanceof THREE.MeshStandardMaterial)) throw Error('元の材質の設定を確認してください。');
-              const a = materialForDisplay(effect, ['development-validation-glb-occurrence-1', 'development-validation-glb-occurrence-jpeg-1'].includes(String((c.representation.formatProfile as JsonObject)?.id)) ? 'map2' : 'map1').appearance;
+              const displayed = materialForDisplay(effect, ['development-validation-glb-occurrence-1', 'development-validation-glb-occurrence-jpeg-1'].includes(String((c.representation.formatProfile as JsonObject)?.id)) ? 'map2' : 'map1');
+              const a = displayed.appearance;
               if (a.lighting === 'unlit') {
                 result.dispose(); result = new THREE.MeshBasicMaterial({ color: m.color.clone(), map: m.map,
                   vertexColors: m.vertexColors, side: m.side, opacity: m.opacity, alphaMap: m.alphaMap, alphaTest: m.alphaTest,
@@ -166,7 +167,9 @@ export async function prepareReadonlyResidents(initial: readonly ReadonlyRenderM
               if (a.baseColorSrgb) (result as THREE.MeshStandardMaterial | THREE.MeshBasicMaterial).color.setRGB(...a.baseColorSrgb as [number, number, number], THREE.SRGBColorSpace);
               if (a.doubleSided !== undefined) result.side = a.doubleSided ? THREE.DoubleSide : THREE.FrontSide;
               if (a.opacity !== undefined) result.opacity = a.opacity;
-              if (a.chroma) patchHardChroma(result as THREE.MeshStandardMaterial | THREE.MeshBasicMaterial, a.chroma);
+              if (displayed.compositing.coverage.policy === 'mask') patchBinaryMask(result as THREE.MeshStandardMaterial | THREE.MeshBasicMaterial,
+                { opacity: a.opacity ?? 1, cutoff: displayed.compositing.coverage.alphaCutoff!, ...(a.chroma ? { chroma: a.chroma } : {}) });
+              else if (a.chroma) patchHardChroma(result as THREE.MeshStandardMaterial | THREE.MeshBasicMaterial, a.chroma);
             }
             return result;
           };

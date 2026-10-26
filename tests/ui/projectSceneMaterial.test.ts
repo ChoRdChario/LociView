@@ -55,6 +55,24 @@ function host(initial = fixture()) {
 }
 
 describe('disconnected material controls (not rendering, browser or save acceptance)', () => {
+  it('drops the cutout-only threshold draft when explicitly returning to inherited coverage', () => {
+    let context=editing(); context=edit(context,'coverage','mask'); context=edit(context,'cutoff','0.4');
+    context=edit(context,'coverage','inherit'); expect(context.draft!.edits.cutoff).toBeUndefined();
+    expect(context.draft!.edits.coverage).toBeUndefined();
+    expect(materialApplyIssue(context)).toBe('変更はありません。');
+  });
+  it('makes cutout explicit, reveals its threshold and retains the appearance atom for coverage-only edits', () => {
+    const h = host(); h.begin.fire('click'); const before = h.context.draft!.base.appearance;
+    const coverage = h.fields.get('coverage')!, cutoff = h.fields.get('cutoff')!;
+    expect(cutoff.parent!.hidden).toBe(true); coverage.value='mask'; coverage.fire('change');
+    expect(cutoff.parent!.hidden).toBe(false); cutoff.value='0'; cutoff.fire('input');
+    expect(h.apply.disabled).toBe(false); h.apply.fire('click');
+    const plan=h.plans.at(-1)!; if(plan.kind!=='apply') throw Error('apply');
+    expect(plan.intent.appearance).toEqual(before); expect(plan.intent.compositing.coverage).toEqual({policy:'mask',alphaCutoff:0});
+    expect(coverage.parent!.children.at(-1)!.textContent).toContain('滑らかな半透明にはなりません');
+    const stale={...h.context,source:{...h.context.source,token:'new'}}; h.render(stale); expect(h.apply.disabled).toBe(true);
+    expect(cutoff.value).toBe('0'); h.controls.dispose();
+  });
   it('retains map2 disabled chroma parameters across editing and toggles without applying them implicitly', () => {
     const appearance = { chroma: { enabled: false, keyColorSrgb: [0.123456, 0.2, 0.3], tolerance: 0.2, softness: 0.4 } };
     const current = validateMaterialIntent({ appearance, compositing: { coverage: { policy: 'smoothBlend' }, optics: 'inherit' } }, limits, 'map2');

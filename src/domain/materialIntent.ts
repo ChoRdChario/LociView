@@ -64,13 +64,16 @@ export function materialForDisplay(intent: MaterialIntent, profile: ProjectSeman
   return { ...intent, appearance };
 }
 
-export const materialFields = ['opacity', 'lighting', 'doubleSided', 'chroma', 'keyColor', 'tolerance', 'softness'] as const;
+export const materialFields = ['opacity', 'lighting', 'doubleSided', 'chroma', 'keyColor', 'tolerance', 'softness', 'coverage', 'cutoff'] as const;
 export type MaterialEditField = typeof materialFields[number];
 export type MaterialEdits = Readonly<Partial<Record<MaterialEditField, string>>>;
 export const materialFieldLabels: Readonly<Record<MaterialEditField, string>> = Object.freeze({ opacity: '不透明度（%）', lighting: '照明',
-  doubleSided: '表示する面', chroma: '指定した色を透過', keyColor: '透過する色', tolerance: '色の許容範囲', softness: '境界のぼかし' });
-export function materialInput(a: MaterialAppearance, field: MaterialEditField, profile: ProjectSemanticProfile = 'map1'): string {
+  doubleSided: '表示する面', chroma: '指定した色を透過', keyColor: '透過する色', tolerance: '色の許容範囲', softness: '境界のぼかし',
+  coverage: '透過の表示方法', cutoff: '切り抜きのしきい値' });
+export function materialInput(a: MaterialAppearance, field: MaterialEditField, profile: ProjectSemanticProfile = 'map1', compositing?: MaterialCompositing): string {
   switch (field) {
+    case 'coverage': return compositing?.coverage.policy ?? 'inherit';
+    case 'cutoff': return String(compositing?.coverage.alphaCutoff ?? 0.5);
     case 'opacity': return String((a.opacity ?? 1) * 100);
     case 'lighting': return a.lighting ?? 'inherit';
     case 'doubleSided': return a.doubleSided === undefined ? 'inherit' : a.doubleSided ? 'double' : 'front';
@@ -79,6 +82,28 @@ export function materialInput(a: MaterialAppearance, field: MaterialEditField, p
     case 'tolerance': return String(a.chroma?.tolerance ?? 0.1);
     case 'softness': return String(a.chroma?.softness ?? 0);
   }
+}
+
+/** Explicit compositing edits preserve the other atom and unknown source fields. */
+export function editMaterialIntent(base: MaterialIntent, edits: MaterialEdits, profile: ProjectSemanticProfile = 'map1'): MaterialIntent {
+  let compositing = base.compositing;
+  if (edits.coverage !== undefined || edits.cutoff !== undefined) {
+    const coverage = { ...compositing.coverage };
+    if (edits.coverage !== undefined) {
+      if (!['inherit', 'opaque', 'mask'].includes(edits.coverage)) throw Error('透過の表示方法を選び直してください。');
+      coverage.policy = edits.coverage as 'inherit' | 'opaque' | 'mask';
+      if (coverage.policy === 'mask') coverage.alphaCutoff ??= 0.5;
+      else delete coverage.alphaCutoff;
+    }
+    if (edits.cutoff !== undefined) {
+      const n = Number(edits.cutoff);
+      if (coverage.policy !== 'mask' || !edits.cutoff.trim() || !Number.isFinite(n) || n < 0 || n > 1)
+        throw Error('切り抜きのしきい値は0〜1で入力してください。');
+      coverage.alphaCutoff = n;
+    }
+    compositing = { ...compositing, coverage };
+  }
+  return { ...base, appearance: editMaterialAppearance(base.appearance, edits, profile), compositing };
 }
 /** Local explicit edits only. Base is a validated immutable value; unknown data is never rebuilt from controls. */
 export function editMaterialAppearance(base: MaterialAppearance, edits: MaterialEdits, profile: ProjectSemanticProfile = 'map1'): MaterialAppearance {

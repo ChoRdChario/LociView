@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import * as THREE from 'three';
-import { patchHardChroma, hardChroma, hardChromaCoverageMaterial } from '../../src/viewer/hardChroma';
+import { patchBinaryMask, binaryMask, hasBinaryCoverage, patchHardChroma, hardChroma, hardChromaCoverageMaterial } from '../../src/viewer/hardChroma';
 import { coveragePixel, coverageTriangle, createValidationCoverage } from '../../src/harness/projectScene/validationCoverage';
 
 const settings = { keyColorSrgb: [0.2, 0.4, 0.6], tolerance: 0.1 };
@@ -57,6 +57,26 @@ describe('hard-chroma shader and coverage protocol (no GPU/device acceptance)', 
       expect(clonedShader.fragmentShader).toContain('gl_FragColor = vec4(1.0, 0.0, 1.0, 1.0)');
       expect(query.customProgramCacheKey()).not.toBe(material.customProgramCacheKey()); expect(hardChroma(query)).toEqual(settings);
       query.dispose(); material.dispose(); original.dispose(); original.map.dispose();
+    }
+  });
+  it('shares the composed mask predicate with its owned GPU probe and preserves cutoff zero', () => {
+    for (const material of [new THREE.MeshStandardMaterial(), new THREE.MeshBasicMaterial()]) {
+      const source = material.clone(), input = { opacity: 0, cutoff: 0, chroma: { ...settings, softness: 0.3 } };
+      patchBinaryMask(material, input);
+      const shader = { uniforms: {}, fragmentShader: (material instanceof THREE.MeshStandardMaterial ? THREE.ShaderLib.standard : THREE.ShaderLib.basic).fragmentShader };
+      material.onBeforeCompile(shader as any, {} as THREE.WebGLRenderer);
+      expect(shader.fragmentShader).toContain('clamp(lvMaskOpacity * lvChromaCoverage, 0.0, 1.0) < lvMaskCutoff');
+      expect(shader.fragmentShader).toContain('diffuseColor.a = 1.0;');
+      expect(shader.fragmentShader.indexOf('float lvChromaCoverage')).toBeLessThan(shader.fragmentShader.indexOf('#include <alphatest_fragment>'));
+      const query = hardChromaCoverageMaterial(material), probe = { uniforms: {}, fragmentShader: (material instanceof THREE.MeshStandardMaterial ? THREE.ShaderLib.standard : THREE.ShaderLib.basic).fragmentShader };
+      query.onBeforeCompile(probe as any, {} as THREE.WebGLRenderer);
+      expect(probe.uniforms).toEqual(shader.uniforms); expect(binaryMask(query)).toEqual(input);
+      expect(hasBinaryCoverage(query)).toBe(true); expect(hasBinaryCoverage(source)).toBe(false);
+      expect(probe.fragmentShader).toContain('gl_FragColor = vec4(1.0, 0.0, 1.0, 1.0)');
+      expect(material.opacity).toBe(1); expect(material.transparent).toBe(false); expect(material.depthWrite).toBe(true);
+      expect(binaryMask(material)).not.toBe(input); expect(binaryMask(material)!.chroma!.keyColorSrgb).not.toBe(input.chroma.keyColorSrgb);
+      expect(() => patchBinaryMask(material, input)).toThrow();
+      query.dispose(); material.dispose(); source.dispose();
     }
   });
   it('uses exact drawing-buffer centers and owns just the addressed triangle with normalized UV1/color attributes', () => {

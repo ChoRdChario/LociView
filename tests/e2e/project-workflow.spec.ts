@@ -43,6 +43,8 @@ async function inspectBackup(path: string, glb: Buffer, png: Buffer, expectedBod
   expect(Object.values(records.captionsById)).toEqual([expect.objectContaining({ title: captionName, body: expectedBody,
     anchor: expect.objectContaining({ kind: 'asset', positionAsset: [0.2, 0.2, 0] }) })]);
   expect(Object.keys(records.captionAttachmentsById)).toHaveLength(1);
+  expect(Object.values(records.materialOverridesById)).toEqual([expect.objectContaining({ appearance: expect.objectContaining({ opacity: 0 }),
+    compositing: { coverage: { policy: 'mask', alphaCutoff: 0 }, optics: 'inherit' } })]);
   const manifest = archive.archive.control.manifest;
   if (manifest.purpose !== 'backup') throw Error('expected backup manifest');
   for (const input of [glb, png]) {
@@ -182,6 +184,51 @@ test('GLBと画像の編集を保存し、ブラウザ再起動と別端末相�
     await (await choosing).setFiles({ name: 'evidence.png', mimeType: 'image/png', buffer: png });
     await expect(page.getByText('メディアを追加しました。', { exact: true })).toBeVisible();
     await checkCaption(page);
+    await measure('切り抜きの描画とピン配置の一致', async () => {
+      await page.getByRole('tab', { name: '材質', exact: true }).click();
+      const panel = page.getByRole('tabpanel', { name: '材質', exact: true }); await expect(panel).toBeVisible();
+      const model = panel.getByLabel('モデル', { exact: true }), surface = panel.getByLabel('面', { exact: true });
+      const modelIds = await model.locator('option').evaluateAll(nodes => nodes.map(n => (n as HTMLOptionElement).value).filter(Boolean));
+      expect(modelIds).toHaveLength(1); await model.selectOption(modelIds[0]!);
+      const slots = await surface.locator('option').evaluateAll(nodes => nodes.map(n => (n as HTMLOptionElement).value).filter(Boolean));
+      expect(slots).toHaveLength(1); await surface.selectOption(slots[0]!);
+      await panel.getByRole('button', { name: '設定を編集', exact: true }).click();
+      await panel.getByLabel('透過の表示方法', { exact: true }).selectOption('mask');
+      await panel.getByLabel('切り抜きのしきい値', { exact: true }).fill('0.4');
+      await panel.getByLabel('透過の表示方法', { exact: true }).selectOption('inherit');
+      await expect(panel.getByLabel('切り抜きのしきい値', { exact: true })).toBeHidden();
+      await panel.getByLabel('透過の表示方法', { exact: true }).selectOption('mask');
+      await panel.getByLabel('不透明度（%）', { exact: true }).fill('0');
+      await panel.getByLabel('指定した色を透過', { exact: true }).selectOption('on');
+      await panel.getByLabel('透過する色', { exact: true }).fill('#3380cc');
+      await panel.getByLabel('境界のぼかし', { exact: true }).fill('0.4');
+      await panel.getByLabel('照明', { exact: true }).selectOption('unlit');
+      await panel.getByLabel('切り抜きのしきい値', { exact: true }).fill('1');
+      await panel.getByRole('button', { name: '変更を適用', exact: true }).click();
+      await expect(page.getByText('材質の設定を適用しました。', { exact: true })).toBeVisible();
+      const pinArea = page.getByRole('region', { name: 'ピンの操作', exact: true }), canvas = page.getByLabel('3Dモデルの表示', { exact: true });
+      const pick = async () => {
+        await page.getByRole('tab', { name: 'キャプション', exact: true }).click();
+        await page.getByRole('button', { name: '正面', exact: true }).click();
+        await page.getByRole('button', { name: '全体表示', exact: true }).click();
+        await pinArea.getByRole('button', { name: 'ピンを追加', exact: true }).click();
+        const box = await canvas.boundingBox(); expect(box).toBeTruthy();
+        await canvas.click({ position: { x: box!.width / 2, y: box!.height / 2 } });
+      };
+      await pick(); await expect(page.getByText('配置する面を特定できません。視点を変えて選び直してください。', { exact: true })).toBeVisible();
+      await expect(pinArea.getByRole('button', { name: '位置を確定', exact: true })).toBeHidden();
+      await pinArea.getByRole('button', { name: '取り消す', exact: true }).click();
+      await page.getByRole('tab', { name: '材質', exact: true }).click();
+      await panel.getByRole('button', { name: '設定を編集', exact: true }).click();
+      await panel.getByLabel('切り抜きのしきい値', { exact: true }).fill('0');
+      await panel.getByRole('button', { name: '変更を適用', exact: true }).click();
+      await expect(page.getByText('材質の設定を適用しました。', { exact: true })).toBeVisible();
+      await pick(); await expect(pinArea.getByRole('button', { name: '位置を確定', exact: true })).toBeVisible();
+      expect(Number(await pinArea.getByLabel('位置 Z', { exact: true }).inputValue())).toBeCloseTo(0, 5);
+      await page.screenshot({ path: testInfo.outputPath('mask-zero-covered-pin.png'), fullPage: true });
+      await pinArea.getByRole('button', { name: '取り消す', exact: true }).click();
+      await expect(page.locator('.lv-project-viewport-status')).toBeEmpty(); await checkCaption(page);
+    });
     const backup = testInfo.outputPath('first-backup.zip'); await measure('最初の保存と実ファイル確認', () => saveBackup(page, backup, '最初の保存', boundaries));
     const first = await inspectBackup(backup, glb, png, body);
     await measure('通常の再読込から編集画面の準備', async () => { await page.reload(); await projectReady(page); });

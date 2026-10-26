@@ -2512,6 +2512,15 @@ describe('new synthetic saved host (memory ports and recorded DOM, not real brow
       appearance: { baseColorSrgb: exactColor } }, provider, tx);
     const coloredView = metadataProjectView(await read(colored));
     expect(coloredView.materialData!.records[id]!.appearance).toEqual({ kind: 'value', value: { baseColorSrgb: exactColor } });
+    const masked = made.prepareEdit(made.token, { kind: 'editMaterial', sceneId: f.overview, overrideId: id,
+      appearance: { lighting: 'unlit' }, compositing: { coverage: { policy: 'mask', alphaCutoff: 0 }, optics: 'inherit' } }, provider, 'd'.repeat(32));
+    const merged = metadataProjectView(await read(masked.appendOriginal(colored.originalChanges())));
+    expect(merged.materialData!.records[id]!.appearance).toEqual({ kind: 'value', value: { baseColorSrgb: exactColor } });
+    expect(merged.materialData!.records[id]!.compositing).toEqual({ kind: 'value', value: { coverage: { policy: 'mask', alphaCutoff: 0 }, optics: 'inherit' } });
+    const soft = masked.prepareEdit(masked.token, { kind: 'editMaterial', sceneId: f.overview, overrideId: id,
+      appearance: { opacity: 0, chroma: { keyColorSrgb: [0, 0, 0], tolerance: 0, softness: 0.5 } } }, await read(masked), tx);
+    expect(metadataProjectView(await read(soft)).materialData!.records[id]!.intent.kind).toBe('value');
+    expect(() => made.prepareEdit(made.token, { kind: 'editMaterial', sceneId: f.overview, overrideId: id } as MetadataEdit, provider, tx)).toThrow(/empty/);
     const unchanged = metadataProjectView(provider).materialData!.cells;
     for (const field of ['routing', 'compositing', 'lifecycle'])
       expect(coloredView.materialData!.cells[materialKey(id, field)]).toEqual(unchanged[materialKey(id, field)]);

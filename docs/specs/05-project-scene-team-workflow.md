@@ -1926,6 +1926,44 @@ Use focused cases for magic/filename negatives, generic corrupt input, estimate
 known/unknown/failure/retry and late/disposed/IME completion. Keep existing outer
 budgets and browser/device/offline/adoption evidence separate.
 
+**Explicit binary material cutout connection (2026-10-27).** This implements
+01 §4.2's already accepted mask semantics on the existing editable opaque/lit/
+front-sided GLB source slots. It does not change their byte/profile admission.
+The product material form may explicitly choose inherited, opaque or mask coverage
+and, for mask, a cutoff in[0,1] (initial explicit cutoff0.5). Label mask as
+`切り抜き`, not smooth transparency. Appearance opacity and chroma softness become
+editable for mask; inherit fractional opacity/positive softness remains unavailable
+until its smoothBlend gate. Opaque still refuses chroma/nonunit opacity. Keep the
+whole exact source intent and unknown fields when no explicit field changes them.
+
+The existing captured material draft owns both appearance and compositing edits.
+`editMaterial` accepts appearance and/or compositing, with at least one present;
+omitted or unchanged atoms retain their old exact value and are not reassigned.
+Validate the complete candidate pair before one Session transaction assigns only
+the changed atoms; simultaneous edits publish together. Routing/identity/lifecycle and duplicate/conflict rules
+stay unchanged. Existing old callers remain appearance-only. The ordinary and
+synthetic adapters preserve an explicitly edited compositing atom in the same way.
+Reset still confirms removal of the exact scoped record and restores Project/source
+fallback; no automatic winner, scope change or history rewrite follows.
+
+On a profile-proven opaque source, source coverage is1; compute chroma in linear
+pre-lighting RGB with01's normalized distance and zero/positive-softness branches.
+Use clamp(opacity * chromaCoverage,0,1) >= cutoff, including cutoff0; surviving
+samples output alpha1, rejected samples discard. Preserve original texture/vertex/
+base-factor RGB, lighting and sidedness. Display and the existing owned Boolean GPU
+probe use the identical shader predicate, texture derivatives and cutoff. Failed
+coverage remains unknown and cannot create a pin; hidden/discarded front faces may
+reveal the next proven covered target, while unrelated covered or unknown foreground surfaces still occlude.
+Owned clones/queries release resources and never patch source templates.
+
+Acceptance covers cutoff0/1 and equality, hard/soft chroma and opacity, retained
+unknown/disabled-map2 values, exact appearance-only compatibility, conflict/stale/
+readonly refusal, scope/reset, failed-save exact retry, original-byte preservation,
+real package receive and cold continuation. Reuse existing unit/service/browser
+lanes; a rendered single-backend case is not general renderer/device adoption.
+Unratified dither, Experimental smoothBlend, source MASK/BLEND edits, migration
+recipes, new profiles and ordinary/offline/release activation retain their gates.
+
 Validation-GLB placement connection reuses the already approved M07 semantics:
 Move/Rotate/positive uniform scale about the model origin, preview/confirm/cancel,
 same all-Scene Asset placement and unchanged Caption asset-local coordinates.

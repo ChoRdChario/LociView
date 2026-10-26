@@ -1,10 +1,10 @@
 # LociView active work
 
-Updated 2026-10-26. This file owns the current plan, checks and next actions.
+Updated 2026-10-27. This file owns the current plan, checks and next actions.
 [Inventory](implementation-inventory.md) owns feature coverage;
 [docs/README.md](../docs/README.md) routes contracts. Git owns commit identity.
 
-Current checkpoint plan, results and next action: [comfortable file work and fresh output state](#current-checkpoint-unit--comfortable-file-work-and-fresh-output-state).
+Current plan and next action: [complete the accepted feature set](#current-checkpoint-unit--complete-the-accepted-feature-set).
 
 ## Current boundary — deliver the practical-team workflow
 
@@ -341,7 +341,122 @@ are unchanged. This unit closes one real browser workflow and its operation-
 blocking redraw defect. The next priority is the measured restored-Project delay,
 with separate iPhone/offline/adoption evidence still pending.
 
-### Current checkpoint unit — comfortable file work and fresh output state
+### Current checkpoint unit — complete the accepted feature set
+
+PO priority correction2026-10-27: implement and integrate the remaining accepted
+features before further performance optimization. Aim for the whole feature set
+to coexist coherently across open → model/Scene/Caption/media work → file exchange
+→ saved/cold/recovery continuation. Refactor only where necessary to connect those
+operations simply. The restored-save readiness investigation below is deferred;
+known timings and comfort targets remain honest backlog, not the active workstream.
+Performance defects still warrant immediate repair if they prevent use or lose data.
+This preserves the accepted61-group scope, deferredM13/M14, withdrawnF09 and actual
+architecture/profile/migration/device/release gates; it does not introduce features.
+
+One root writer; bounded read-only mappings check the remaining model/point/GS,
+material/conversion and existing-profile UI connections in parallel. Select a
+connected missing operation from actual code/contracts, not the stale summary
+classification counts. Record its required ports/admission before implementation;
+reuse existing typed commands/storage/file services and relevant tests. Complete
+editing, save/handoff and cold continuation where that operation needs them.
+No new settings/diagnostic ceremony or per-control PO testing. Exact new semantic
+profile/recipe or substantial product/architecture decisions require one concrete
+independently reviewed proposal at the actual boundary; continue independent
+in-scope implementation while such decisions are pending.
+
+Checks: focused changed-boundary regressions during editing; final serial required
+checkpoint/builds and meaningful independent review at the connected workflow.
+Keep one current plan here, route-specific coverage in inventory and next outcome
+in every milestone report. Next selection and delivered result are recorded below.
+
+Selected connected operation: A03's already specified binary material cutout,
+not a new paste convenience (I02 file attachment is already connected). Existing
+opaque editable GLB slots gain an explicit mask choice and cutoff; opacity and
+soft chroma affect binary coverage under01 §4.2, never silently smooth blending.
+Use the existing typed material Session port, same source slot/captured draft,
+instance-owned renderer patch and identical Boolean GPU coverage query. Extend
+ordinary material editing to retain/update the complete appearance/compositing
+pair in one command without reassigning unchanged atoms. Preserve old appearance-only
+calls, unknown fields, scope
+precedence, conflicts, exact retry, originals and archive/cold continuation.
+No source MASK/BLEND admission, dither, smoothBlend, new model profile/recipe,
+ordinary entry/SW/release or performance work. Read-only design/diff review is
+required; stop only for an actual contract conflict or unresolved new policy.
+Check pure material/command/renderer/pick boundaries plus one connected real-file
+cutout/edit/reset/cold workflow and recorded dedicated-browser rendering evidence.
+Point/GS mappings remain read-only prerequisites for the next missing workflow;
+provisional point diameter/pick rules require a concrete companion decision before
+activation, not another optional helper project.
+
+Verified development checkpoint (2026-10-27; publication identity is in Git):
+- Product material form explicitly selects inherited/opaque/cutout; cutoff is
+  contextual, retained unsupported policies remain visible, and cutout help states
+  it is binary rather than smooth transparency. Returning from a drafted cutoff
+  to non-mask clears that inactive threshold input instead of trapping Apply.
+- Existing opaque GLB slot admission permits specified opacity/soft chroma only
+  under explicitmask. No source profile/byte admission or recipe changed. Candidate
+  pairs are checked before existing Session writes, and only changed atoms are
+  assigned; independent coverage and appearance work does not create false conflict.
+  Legacy appearance-only calls and explicit opacity1 on an OPAQUE alpha<1 source
+  keep their old effect. Scope/reset, original source and whole-intent fallback stay.
+- Owned display clones and Boolean GPU probes use the same mask predicate after
+  linear prelighting color: opacity×chromaCoverage, strictalpha<cutoff discard and
+  alpha1 for survivors. Cutoff0 includes alpha0, unlike legacy hard-chroma early
+  discard. Geometry/texture/source templates stay immutable and owners dispose.
+- Focused pure/UI/renderer/isolation4files39PASS; metadata independent-atoms case
+  PASS; real-file saved-material4casesPASS including product cutout controls,
+  scope/reset, actual save-failure exact retry, Workspace receiver and cold history.
+- Browser run1793030452134-64660 PASS on final build, dedicated Chromium/no trace/
+  timings0/retry0: mask→threshold→inherit→mask, cutoff1 discarded face refuses a
+  pin and cutoff0 permits the real Boolean GPU pick, then unchanged model/image
+  bytes and exact mask in named ZIP → reload → full shutdown/cold → independent
+  initial restore → body edit → checked backup → reload/cold continuation. Source
+  hashes and all6built asset hashes are frozen in ignored material-cutout-evidence.json.
+  The opacity0 test proves threshold/pick integration, not broad soft-chroma GPU
+  color/image reproduction, all device profiles or renderer adoption. No elapsed-
+  time comparison or performance acceptance is made in this feature unit.
+- Preserve failures: first new E2E1793030039315-35960 used a region locator for the
+  actual tabpanel; correcting that assertion led to PASS1793030144530-33804, before
+  final mode-switch/opacity fixes and the final PASS above. Earlier typecheck
+  local readonly-map/test-provider errors were corrected. A new test initially
+  expected the raw map2 enabled marker on a display-normalized copy; raw command
+  assertion is retained and display expectation follows its existing contract.
+  Independent review found/fixed the inactive cutoff draft and legacy opacity
+  regressions; relevant regression coverage remains. Do not erase these failures.
+- Initial final check:checkpoint exits1 after typecheckPASS and root2738PASS/
+  2FAIL+21todo (115suitesPASS/1FAIL). Both failures were old mask-unsupported and
+  generic refusal-copy expectations, not remaining production failures. Change
+  the negative candidate to still-unratified dither and assert its metadata policy
+  rejection; keep every no-write/IME/readonly/exact-retry/file-return assertion.
+  The other negative still refuses inherited soft chroma with the specific cutout
+  guidance. Independent review confirms no contract weakening. Corrected2cases
+  PASS; do not relabel that first whole command PASS. Final typecheck and all3builds
+  PASS, and all6validation asset hashes equal the final browser run. Final root
+  npm test PASS on the final tree:116suites/2740PASS/21todo (1064.73s), exit0.
+  Its log is retained as material-cutout-final-root-tests.log. Source/test20blob hashes and initial/final
+  check receipts are in ignored material-cutout-evidence.json.
+
+Milestone direction: the next missing user workflow is ordinary points (M02/M12)
+followed by GS/Proxy and remaining Mesh/material/conversion connections, then
+ordinary home/offline integration under their actual gates. Reuse Native's exact
+ASCII XYZ/RGB PLY inspector/loader where appropriate, verify post-Float32 finite
+positions/count/bounds, and carry the new model through Caption work and real
+file/cold continuation. Before activation, produce one concrete reviewed point
+companion for the genuinely unratified diameter/coverage/pick registry in01/03;
+Native's existing numeric defaults are evidence, not automatic new-route approval.
+Do not spend this prerequisite on unrelated cleanup, new paste convenience,
+performance work or a substitute PoC. DeferredM13/M14 and withdrawnF09 remain out.
+
+Checkpoint meta-audit: actual g0-baseline remains the authorized nondeploying branch.
+This closes one accepted missing material workflow and restores feature-first
+sequencing; it does not completeA03/all61groups or waive their device/profile/
+ordinary-entry/offline gates. Final source/test20blob hashes match the reviewed
+and tested tree; final browser assets match the last validation build. Exact26path
+scope contains no dependency/public fixture/CI/home/SW/release change. Later result
+prose/index changes do not require rerunning the passed runtime checks. Preserve
+the first whole-check FAIL, subsequent final root PASS and all browser observations.
+
+### Completed checkpoint — comfortable file work and fresh output state
 
 PO authorized continuation and comfort-led UI/UX targets/reporting on2026-10-26,
 from clean pusheda11ed6e/g0-baseline. Outcome: everyday open → record → save/send →

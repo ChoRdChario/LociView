@@ -39,6 +39,7 @@ export function createMaterialControls(document: Document, onPlan: (plan: Materi
   const enums: Partial<Record<MaterialEditField, readonly (readonly [string, string])[]>> = {
     lighting: [['inherit', '元の設定'], ['lit', '照明あり'], ['unlit', '照明なし']],
     doubleSided: [['inherit', '元の設定'], ['front', '片面'], ['double', '両面']], chroma: [['off', '無効'], ['on', '有効']],
+    coverage: [['inherit', '元の設定'], ['opaque', '不透明'], ['mask', '切り抜き']],
   };
   function updateDraft(field: MaterialEditField, input: HTMLInputElement | HTMLSelectElement) {
     if (!context?.draft || disposed || input.disabled || ('readOnly' in input && input.readOnly)) return;
@@ -111,16 +112,20 @@ export function createMaterialControls(document: Document, onPlan: (plan: Materi
     impact.textContent = !view.surface ? '' : next.selection.scope === 'scene' ? 'このシーンだけに適用します。'
       : '同じモデル・面を使うシーンで共通になります。シーン専用の設定がある場合は、そちらが優先されます。';
     const beginPlan = planMaterial(next, { kind: 'begin' }); begin.hidden = Boolean(d); begin.disabled = beginPlan.kind === 'blocked';
-    const base = d?.base ?? view.base, raw = (field: MaterialEditField) => d?.edits[field] ?? (base ? materialInput(base.appearance, field, next.source.semanticProfile) : '');
+    const base = d?.base ?? view.base, raw = (field: MaterialEditField) => d?.edits[field] ?? (base ? materialInput(base.appearance, field, next.source.semanticProfile, base.compositing) : '');
     editor.hidden = !base;
     for (const [field, control] of controls) {
-      const value = raw(field); if (composing !== field && d?.composing !== field && control.input.value !== value) control.input.value = value;
+      const value = raw(field);
+      if (field === 'coverage') options(control.input as HTMLSelectElement, enums.coverage!.some(([key]) => key === value) ? enums.coverage! :
+        [...enums.coverage!, [value, value === 'smoothBlend' ? '半透明（この環境では未対応）' : '現在の設定（この環境では未対応）']], value);
+      if (composing !== field && d?.composing !== field && control.input.value !== value) control.input.value = value;
       const reason = view.surface?.fieldIssues[field], enabled = d && reason === null && !inFlight && next.mutationBlock === null && !next.pending && !view.editIssue;
       control.input.disabled = enums[field] ? !enabled : false;
       if (!enums[field]) (control.input as HTMLInputElement).readOnly = composing !== field && !enabled;
       // Keep all fields with retained input visible even after capability loss or disabling chroma.
       control.group.hidden = ['keyColor', 'tolerance', 'softness'].includes(field) && raw('chroma') !== 'on' && d?.edits[field] === undefined && composing !== field;
-      control.note.textContent = reason ?? ''; control.note.hidden = !control.note.textContent;
+      if (field === 'cutoff') control.group.hidden = raw('coverage') !== 'mask' && d?.edits.cutoff === undefined;
+      control.note.textContent = reason ?? (field === 'coverage' && raw('coverage') === 'mask' ? 'しきい値を下回る部分を非表示にします。滑らかな半透明にはなりません。' : ''); control.note.hidden = !control.note.textContent;
     }
     const applyIssue = materialApplyIssue(next); apply.disabled = applyIssue !== null; apply.hidden = !d;
     cancel.hidden = !d; cancel.disabled = !d || Boolean(composing || d.composing) || inFlight;

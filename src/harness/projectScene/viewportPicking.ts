@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { SyntheticDisplay, V3 } from './viewportModel';
-import { hardChroma } from '../../viewer/hardChroma';
+import { hasBinaryCoverage } from '../../viewer/hardChroma';
 
 /** Ephemeral exact resident target; never saved source provenance or an inferred relation. */
 export interface PinSurfaceTarget {
@@ -40,7 +40,7 @@ export function pickResidentSurface(display: SyntheticDisplay, target: PinSurfac
       if (!material?.visible) continue;
       const p = result.point.clone().project(camera);
       if (![p.x, p.y, p.z].every(Number.isFinite) || p.z < -1 || p.z > 1) continue;
-      const decision = hardChroma(material) ? coverage?.(result, material) ?? 'unknown' :
+      const decision = hasBinaryCoverage(material) ? coverage?.(result, material) ?? 'unknown' :
         material.transparent || material.alphaTest > 0 || material.opacity < 1 ? 'unknown' : 'covered';
       if (decision !== 'discarded') return { result, decision };
     }

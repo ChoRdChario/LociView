@@ -266,7 +266,7 @@ export function productSources(host: ReturnType<typeof createValidationModeHost>
           return { assetId: asset.id, name, reason: null, surfaces: value(validationMaterialSlots(version.closure).map(slot => ({
             target: slot.target, name: value(slot.name), project: record(slot.target, 'project'), scene: record(slot.target, 'scene'), sourceIntent: value(sourceMaterialIntent),
             fieldIssues: Object.fromEntries(materialFields.map(f => [f, validationMaterialSourceIssue(slot) ??
-              (['lighting', 'doubleSided', 'chroma', 'keyColor', 'tolerance'].includes(f) ? null : 'この設定は実モデルへ未接続です。')])) as Record<typeof materialFields[number], string | null>,
+              null])) as Record<typeof materialFields[number], string | null>,
             admit: intent => validationMaterialIssue(slot, intent, p.semanticProfile) }))) };
         }) };
       const review: WorkspaceMaterialReview[] = [], seen = new Set<string>();
