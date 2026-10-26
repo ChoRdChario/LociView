@@ -84,14 +84,17 @@ npm test
 npm run dev
 ```
 
-`index.html` is the product entry point. `dev.html` is a manual viewer harness.
+`index.html` is the ordinary product entry. `dev.html` is the nondefault ProjectScene
+development entry. The typed composition and isolated static validation route are
+described in the [project map](PROJECT_MAP.md); the dedicated Chromium lane is in
+the [browser runbook](docs/browser-testing.md).
 
 ## Read in this order
 
 1. [AGENTS.md](AGENTS.md) — project working rules and exclusions
-2. [PROJECT_MAP.md](PROJECT_MAP.md) — current code entry points and responsibilities
-3. [docs/README.md](docs/README.md) — authority/status of every document
-4. [tasks/todo.md](tasks/todo.md) — active work only
+2. [tasks/todo.md](tasks/todo.md) — current boundary, plan, checks and next action
+3. [PROJECT_MAP.md](PROJECT_MAP.md) — current code entry points and responsibilities
+4. [docs/README.md](docs/README.md) — document authority and section-specific status
 
 Read [docs/v2/00-approved-direction.md](docs/v2/00-approved-direction.md) only for G0+, renderer, storage, migration, GS, or v2 specification work. It is approved direction, not current implementation.
 

@@ -1,8 +1,8 @@
 # LociView v2 implementation specifications
 
-> Status: `PRODUCT-OWNER APPROVED IMPLEMENTATION CONTRACT / NOT IMPLEMENTED`
+> Status: `APPROVED CONTRACTS / SECTION-SPECIFIC BOUNDED IMPLEMENTATION / GENERAL ADOPTION PENDING`
 > Baseline implementation: normalized v1 commit `fc7054f`; this specification revision is identified by its own Git commit
-> Approved: 2026-08-19; Product Owner amendments recorded through 2026-09-14
+> Base approval: 2026-08-19; later approvals/amendments are recorded in each specification and companion.
 
 These documents turn accepted ADRs 0001 and 0002 and the approved v2 direction
 into testable implementation contracts. They intentionally separate fixed
@@ -11,9 +11,10 @@ gate.
 
 Specification 05 §13.4 records the PO-approved thin whole-workflow sequencing:
 one connected synthetic development host may precede subsystem polish and gated
-production integration. The first synthetic in-memory loop exists; general v2
-and its full acceptance do not. Existing data, adoption, wire/migration and
-device requirements are unchanged. Current bounded evidence is in `tasks/todo.md`.
+production integration. Bounded metadata, typed UI and real-file validation paths
+now exist; general v2 and full acceptance remain open. Existing data, adoption,
+wire/migration and device requirements are unchanged. Current bounded evidence
+is in [todo](../../tasks/todo.md); a section's status must not be inferred from this index.
 
 ## Authority
 
@@ -27,7 +28,10 @@ The authority order for v2 work is:
 
 `docs/v2/00-approved-direction.md` is a non-normative navigation summary of the ADR and, after approval, these specifications. It cannot override either. Its MVP and gate summaries MUST be updated in the same change when a normative source changes.
 
-The product owner approved this package on 2026-08-19 and authorized work to proceed through its gates in order. Approval authorizes G0 now; it does not bypass G0-S/G1 evidence or mean that GS, multiple models, Automerge, CAS, or renderer backends already exist.
+The product owner approved the base contracts on 2026-08-19 and authorized work
+through their gates. Later bounded implementation approvals remain section-specific.
+Neither approval nor existing code bypasses G0-S/G1 evidence or establishes general
+GS, multiple-model, Automerge, CAS or renderer adoption.
 
 The words **MUST**, **MUST NOT**, **SHOULD**, and **MAY** are normative. A metric marked **provisional** is a gate input to be confirmed in G0, not a released product guarantee.
 
@@ -52,11 +56,11 @@ The words **MUST**, **MUST NOT**, **SHOULD**, and **MAY** are normative. A metri
 | [`07g-frozen-v1-placement-proposal.md`](07g-frozen-v1-placement-proposal.md) | Nonidentity frozen-v1 placement and explicit saved-offset compatibility through recipe-5 approved 2026-10-16; old recipes/profiles and orthographic/inline-camera/material exclusions remain; implementation/evidence in todo, not adopted |
 | [`07h-locimyu-material-proposal.md`](07h-locimyu-material-proposal.md) | Exact single-GLB Scene shading/sidedness and recipe-4/slot identity approved 2026-10-16, including disabled-chroma source-only limit; bounded implementation/evidence in todo, not adopted |
 
-### Proposed companions — not covered by the approval above
+### Proposed wire with separately approved isolated implementation
 
 | Document | Status / purpose |
 |---|---|
-| [`06-project-package-wire.md`](06-project-package-wire.md) | `PROPOSED / UNRATIFIED / NOT IMPLEMENTED`; five-purpose wire design under 05 §7.5, with explicit unresolved journal/base, budget and history-free-builder inputs; no format/version or production authorization |
+| [`06-project-package-wire.md`](06-project-package-wire.md) | `PROPOSED WIRE / APPROVED ISOLATED IMPLEMENTATION (§11) / NO ORDINARY ADOPTION`; bounded five-purpose implementation/evidence is section-specific and recorded in todo. General wire/version/budget ratification, S2 and ordinary adoption remain open. |
 
 ## Fixed versus conditional decisions
 

@@ -44,8 +44,9 @@ may be retained intentionally: read their status amendments before inferring a w
 
 ## Current implementation distinction
 
-- Ordinary legacy v1, bounded Native, synthetic Scene hosts and limited real GLB/PNG
-  validation are different evidence lanes. Do not transfer acceptance between them.
+- Ordinary legacy v1, bounded Native, synthetic Scene hosts and bounded validation
+  of admitted GLB, 01a XYZ/RGB ASCII PLY and photos are different evidence lanes.
+  Do not transfer acceptance between them.
 - Specification 02 contains implemented bounded Native sections alongside general
   v2 boundaries. Specification 04 has bounded Native conversion acceptance.
 - Specification 05 has bounded core/metadata/UI and real-file validation connections.
@@ -70,8 +71,9 @@ are legacy baselines/runbooks, not new team-workflow guarantees.
 `03-architecture.md` contains implementation drift; `07-roadmap.md` is superseded.
 Use [specification index](specs/README.md) for contracts and local section status.
 
-Per-checkpoint status and the prior detailed classification are retained in the
-[historical records](history/development-through-2026-09-14/README.md).
+Completed checkpoint details are retained in the
+[October records](history/development-through-2026-10-27/README.md), which link to
+earlier history. Current status and next work remain in todo.
 Open only the record needed for a concrete compatibility or evidence question.
 
 The 2026-09-14 working-guidance cleanup follows OpenAI's

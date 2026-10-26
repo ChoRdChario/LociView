@@ -6,7 +6,7 @@ owns feature coverage. Read [document authority](docs/README.md) for contracts.
 
 ## Start here
 
-- Fresh session: [handoff](tasks/handoff.md), current todo, then relevant contracts.
+- Fresh session: [current todo](tasks/todo.md), this map, document authority, then relevant contracts. [Handoff](tasks/handoff.md) is the short resume guide.
 - Existing bounded task: target source, its tests and direct imports.
 - UI work: [approved UI/UX principles](docs/ui-product-guidelines.md).
 - Historical claims: [preserved records](docs/history/development-through-2026-09-14/README.md), only when needed. Do not reconstruct current scope from them.

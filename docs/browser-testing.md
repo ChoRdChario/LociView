@@ -1,8 +1,9 @@
 # Dedicated browser tests
 
 The repository owns a Playwright Test lane for the nondefault ProjectScene
-validation build. It launches matching downloaded Chromium with generated GLB/PNG
-inputs and dedicated profiles. It does not connect to the user's browser.
+validation build. It launches matching downloaded Chromium with generated GLB,
+approved synthetic XYZ/RGB ASCII PLY and image inputs in dedicated profiles.
+It does not connect to the user's browser.
 
 ## Run
 
@@ -72,6 +73,17 @@ not a stable latency guarantee. Older runs retain their recorded trace condition
 their defaults preceded this change. Detailed page instrumentation is opt-in.
 
 ## Acceptance and artifacts
+
+The [point workflow](../tests/e2e/point-workflow.spec.ts) covers 01a's admitted
+ASCII PLY, RGB/disc pixels at DPR1/2, local diameter/placement/visibility,
+source-centre recording and explicit manual adjustment, Caption/image edits,
+actual backup/Workspace/Contribution/Review files, full cold restart and
+absent-Project restore followed by editing and checked save. A separate case uses
+a transformed large-coordinate GLB to prove GPU occlusion, then source-centre
+selection after hiding that Mesh. Unsupported DPR3 is local to point display;
+existing Mesh/Caption/media stay usable. Individual run results and final-build
+identity remain in todo; a passing case never relabels a failed aggregate run.
+This is not arbitrary PLY/GS, physical-device, offline or adoption acceptance.
 
 The connected regression creates a Project, places a pin using numeric model-local
 coordinates, edits Caption text and adds a generated image. It downloads a named
