@@ -1,0 +1,60 @@
+{
+  "id": "development-validation-gs-ply-sh3-1",
+  "version": 1,
+  "container": "self-contained PLY binary_little_endian 1.0",
+  "mediaType": "application/ply",
+  "header": {
+    "maxBytes": 65536,
+    "encoding": "printable ASCII plus LF; no CR or NUL",
+    "firstLines": ["ply", "format binary_little_endian 1.0"],
+    "elements": "exactly one positive safe-integer vertex count; no other element even count zero",
+    "properties": ["float x", "float y", "float z", "float nx", "float ny", "float nz", "float f_dc_0", "float f_dc_1", "float f_dc_2", "float f_rest_0", "float f_rest_1", "float f_rest_2", "float f_rest_3", "float f_rest_4", "float f_rest_5", "float f_rest_6", "float f_rest_7", "float f_rest_8", "float f_rest_9", "float f_rest_10", "float f_rest_11", "float f_rest_12", "float f_rest_13", "float f_rest_14", "float f_rest_15", "float f_rest_16", "float f_rest_17", "float f_rest_18", "float f_rest_19", "float f_rest_20", "float f_rest_21", "float f_rest_22", "float f_rest_23", "float f_rest_24", "float f_rest_25", "float f_rest_26", "float f_rest_27", "float f_rest_28", "float f_rest_29", "float f_rest_30", "float f_rest_31", "float f_rest_32", "float f_rest_33", "float f_rest_34", "float f_rest_35", "float f_rest_36", "float f_rest_37", "float f_rest_38", "float f_rest_39", "float f_rest_40", "float f_rest_41", "float f_rest_42", "float f_rest_43", "float f_rest_44", "float opacity", "float scale_0", "float scale_1", "float scale_2", "float rot_0", "float rot_1", "float rot_2", "float rot_3"],
+    "ignored": "printable ASCII comment and obj_info lines, including empty payload; never resolve metadata URLs",
+    "terminator": "standalone end_header followed by LF; exactly one format/vertex table; no unknown directives or blank lines"
+  },
+  "payload": {
+    "recordBytes": 248,
+    "fields": "62 IEEE754 little-endian Float32 scalars per source splat; exactly count*248 bytes; no trailing bytes",
+    "finite": "all scalars finite, including ignored normal; canonicalize decoded negative zero without rewriting original bytes",
+    "ordering": "retain every source ordinal and duplicate; no sort, merge, LOD, decimation or flattened draw index",
+    "normal": "finite ignored placeholders; never a surface normal",
+    "budgets": "byteLength<=existing maxFileBytes; count<=maxItems; 62*count<=maxValues; all safe integer arithmetic and full payload preflight before allocation/activation"
+  },
+  "frame": {
+    "axis": "preserve XYZ as right-handed Y-up AssetFrame coordinates",
+    "unit": "one source coordinate unit is prescribed as one Asset metre; no physical-unit detection, recentering or automatic registration",
+    "representationToAsset": "canonical identity at fresh import; later validated normalization follows specification01",
+    "physicalAccuracy": "coordinate convention only; not measured scale or survey accuracy"
+  },
+  "gaussian": {
+    "precision": "decode Float32 source to Number; binary64 semantic calculations; original Float32 bytes remain source authority",
+    "scale": "s_i=exp(scale_i); each s_i and s_i*s_i must be finite and strictly positive; reject overflow/underflow",
+    "opacity": "a=1/(1+exp(-o)) when o>=0, otherwise exp(o)/(1+exp(o)); finite sigmoid result in[0,1], without a0.99 cap",
+    "rotation": "rot_0..3 are wxyz; finite nonzero quaternion, normalize by hypot, canonical positive w or first nonzero xyz; q and -q give identical covariance",
+    "covariance": "column-vector active R(q); Sigma=R diag(s_i*s_i) transpose(R); never rotate SH by this individual Gaussian quaternion",
+    "support": {
+      "alphaCutoff": { "numerator": 1, "denominator": 510 },
+      "maxMahalanobisRadiusSquared": 8,
+      "empty": "a<cutoff; equality has centre-only support",
+      "rhoSquared": "min(8,2*ln(a/cutoff)) for nonempty splats",
+      "region": "mean+R diag(s) u with dot(u,u)<=rhoSquared; validate every scalar even for empty support"
+    },
+    "bounds": {
+      "analytic": "nonempty splat halfwidth_i=rho*hypot(R_i0*s_0,R_i1*s_1,R_i2*s_2); union mean_i+-halfwidth_i",
+      "outward": "each primitive axis lower=nextDown(mean_i-halfwidth_i-epsilon_i), upper=nextUp(mean_i+halfwidth_i+epsilon_i); epsilon_i=64*2^-52*max(1,abs(mean_i),halfwidth_i); binary64 nextDown/nextUp; then exact componentwise union and canonical positive zero",
+      "reject": "nonfinite/intermediate bounds, nonfinite covariance, or no nonempty support; centre-only renderer boxes are not source bounds"
+    }
+  },
+  "sh": {
+    "degree": 3,
+    "layout": "DC R,G,B; f_rest_0..14 are R coefficients1..15,15..29 G,30..44 B",
+    "direction": "camera-to-mean; dRepresentation=normalize(inverse(L)*(meanProject-cameraProject)); L is complete Representation-to-Project linear transform; camera-at-mean has undefined direction and no transient fragment",
+    "constants": { "C0": 0.28209479177387814, "C1": 0.4886025119029199, "C2": [1.0925484305920792, -1.0925484305920792, 0.31539156525252005, -1.0925484305920792, 0.5462742152960396], "C3": [-0.5900435899266435, 2.890611442640554, -0.4570457994644658, 0.3731763325901154, -0.4570457994644658, 1.445305721320277, -0.5900435899266435] },
+    "basis0to15": ["C0", "-C1*y", "C1*z", "-C1*x", "C2[0]*x*y", "C2[1]*y*z", "C2[2]*(2*z*z-x*x-y*y)", "C2[3]*x*z", "C2[4]*(x*x-y*y)", "C3[0]*y*(3*x*x-y*y)", "C3[1]*x*y*z", "C3[2]*y*(4*z*z-x*x-y*y)", "C3[3]*z*(2*z*z-3*x*x-3*y*y)", "C3[4]*x*(4*z*z-x*x-y*y)", "C3[5]*z*(x*x-y*y)", "C3[6]*x*(x*x-3*y*y)"],
+    "color": "for each channel sum basis_k*c_k in ascending k=0..15, then add0.5, clamp the full sum to[0,1] as encoded sRGB, then use specification01 IEC sRGB-to-linear transfer; no preclamp, per-degree clamp, gamma2.2 substitute or pre-SH transfer",
+    "numerics": "binary64 oracle absolute/relative tolerance1e-12; this is not permission for unqualified packed/half/8bit renderer approximation"
+  },
+  "transform": "mean'=L*mean+t, Sigma'=L*Sigma*transpose(L), opacity unchanged, source-direction SH as specified; positive mutable Sim3 and explicit immutable x-reflection only; compute conservative support bounds after transform, not transformed means alone",
+  "records": { "contentKind": "gaussianSplat", "role": "gsPrimary", "purposes": ["source", "display"], "materialCatalog": "absent", "surfaceRange": "{kind:splatSample,count:N}, no nodeIndex or primitiveIndex; global sourceSplatIndex retains every original row ordinal", "anchorClass": "one singleton visual-family class; first proxy path commits manual anchors, never splatSample evidence" },
+  "goldenManifest": { "file": "gs-ply-sh3-1.goldens.json", "sha256": "d3c7fc4782006faa66628848192af585d56d9fb5d31da36d9202cf10ca223e85" }
+}

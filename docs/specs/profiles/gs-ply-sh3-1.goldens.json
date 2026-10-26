@@ -1,0 +1,137 @@
+{
+  "oracleVersion": 1,
+  "profileId": "development-validation-gs-ply-sh3-1",
+  "authorship": "Independently selected analytic vectors and fixed raw-bit checks; not copied from the PLY fixture generator's expected.v1.json. Formula results are rounded for comparison, not production decoder output.",
+  "comparison": { "absoluteTolerance": 1e-12, "relativeTolerance": 1e-12 },
+  "sourceFixture": {
+    "path": "fixtures/gs/profile-golden-sh3-v1.ply",
+    "sha256": "d62becb6b21de9e2f7b24e51f05e2327ae261439b0b4af3c90bc4e75acf3cf5f",
+    "byteLength": 3573,
+    "headerByteLength": 1589,
+    "recordBytes": 248,
+    "count": 8,
+    "rawBits": [
+      { "index": 0, "field": "scale_0", "hex32": "c0000000" },
+      { "index": 0, "field": "opacity", "hex32": "00000000" },
+      { "index": 1, "field": "x", "hex32": "3f800000" },
+      { "index": 1, "field": "f_rest_0", "hex32": "3e800000" },
+      { "index": 1, "field": "f_rest_3", "hex32": "be000000" },
+      { "index": 1, "field": "f_rest_8", "hex32": "3d800000" },
+      { "index": 4, "field": "rot_0", "hex32": "bf800000" },
+      { "index": 6, "field": "rot_0", "hex32": "40000000" },
+      { "index": 6, "field": "f_rest_43", "hex32": "be000000" },
+      { "index": 7, "field": "ny", "hex32": "3f800000" }
+    ],
+    "independentFacts": [
+      { "index": 0, "mean": [0, 0, 0], "alpha": 0.5, "covarianceDiagonal": [0.01831563888873418, 0.01831563888873418, 0.01831563888873418] },
+      { "index": 4, "normalizedRotationWxyz": [1, 0, 0, 0] },
+      { "index": 6, "normalizedRotationWxyz": [1, 0, 0, 0] },
+      { "index": 7, "mean": [0.25, -0.5, 0.75], "normal": "absent despite finite source ny=1" }
+    ]
+  },
+  "analyticCovariance": [
+    {
+      "name": "axis-aligned-anisotropic",
+      "mean": [1, 2, 3], "logScale": [0, -1, -2], "rotationWxyz": [1, 0, 0, 0], "opacityLogit": 0,
+      "normalizedRotationWxyz": [1, 0, 0, 0],
+      "covarianceRows": [[1, 0, 0], [0, 0.1353352832366127, 0], [0, 0, 0.01831563888873418]],
+      "rho": 2.8284271247461903,
+      "analyticHalfwidth": [2.8284271247461903, 1.0405201900457778, 0.3827859860416437]
+    },
+    {
+      "name": "oblique-anisotropic-offdiagonal",
+      "mean": [1, 2, 3], "logScale": [0, -1, -2], "rotationWxyz": [2, 0, 0, 1], "opacityLogit": 0,
+      "covarianceRows": [[0.4466145812714321, 0.41503906404642593, 0], [0.41503906404642593, 0.6887207019651805, 0], [0, 0, 0.01831563888873418]],
+      "analyticHalfwidth": [1.8902160326723125, 2.3472889928002996, 0.3827859860416437]
+    },
+    {
+      "name": "normalized-nonunit-quarter-turn",
+      "mean": [1, 2, 3], "logScale": [0, -1, -2], "rotationWxyz": [2, 0, 0, 2], "opacityLogit": 0,
+      "normalizedRotationWxyz": [0.7071067811865476, 0, 0, 0.7071067811865476],
+      "covarianceRows": [[0.1353352832366127, 0, 0], [0, 1, 0], [0, 0, 0.01831563888873418]],
+      "analyticHalfwidth": [1.0405201900457778, 2.8284271247461903, 0.3827859860416437]
+    }
+  ],
+  "support": [
+    { "opacityLogit": 0, "alpha": 0.5, "empty": false, "rho": 2.8284271247461903 },
+    { "opacityLogit": -6, "alpha": 0.0024726231566347743, "empty": false, "rho": 0.6810800842494824 },
+    { "opacityLogit": -7, "empty": true },
+    { "opacityLogit": 1000, "alpha": 1, "empty": false, "rho": 2.8284271247461903 },
+    { "opacityLogit": -1000, "alpha": 0, "empty": true },
+    { "decodedAlphaEqualsCutoff": true, "empty": false, "rho": 0, "meaning": "centre-only support" }
+  ],
+  "transforms": [
+    {
+      "name": "oblique-covariance-x-reflection-sign",
+      "sourceAnalyticCovariance": "oblique-anisotropic-offdiagonal",
+      "translation": [0, 0, 0], "rotationXYZW": [0, 0, 0, 1], "uniformScale": 1, "reflection": "x",
+      "meanProject": [-1, 2, 3],
+      "covarianceProjectRows": [[0.4466145812714321, -0.41503906404642593, 0], [-0.41503906404642593, 0.6887207019651805, 0], [0, 0, 0.01831563888873418]],
+      "analyticHalfwidthProject": [1.8902160326723125, 2.3472889928002996, 0.3827859860416437]
+    },
+    {
+      "name": "positive-scale-quarter-turn-reflection",
+      "sourceAnalyticCovariance": "axis-aligned-anisotropic",
+      "translation": [4, 5, 6], "rotationXYZW": [0, 0, 0.7071067811865476, 0.7071067811865476], "uniformScale": 2, "reflection": "x",
+      "meanProject": [0, 3, 12],
+      "covarianceProjectRows": [[0.5413411329464508, 0, 0], [0, 4, 0], [0, 0, 0.07326255555493672]],
+      "analyticHalfwidthProject": [2.0810403800915556, 5.656854249492381, 0.7655719720832874],
+      "dProject": [0, -1, 0], "dRepresentation": [1, 0, 0],
+      "unchanged": ["alpha", "source bytes", "source ordinal", "SH coefficients"]
+    },
+    {
+      "name": "positive-scale-quarter-turn-without-reflection",
+      "translation": [4, 5, 6], "rotationXYZW": [0, 0, 0.7071067811865476, 0.7071067811865476], "uniformScale": 2, "reflection": "none",
+      "meanSource": [1, 2, 3], "meanProject": [0, 7, 12],
+      "dProject": [0, 1, 0], "dRepresentation": [1, 0, 0]
+    }
+  ],
+  "shBasisPositiveAxes": [
+    { "direction": [1, 0, 0], "basis0to15": [0.28209479177387814, 0, 0, -0.4886025119029199, 0, 0, -0.31539156525252005, 0, 0.5462742152960396, 0, 0, 0, 0, 0.4570457994644658, 0, -0.5900435899266435] },
+    { "direction": [0, 1, 0], "basis0to15": [0.28209479177387814, -0.4886025119029199, 0, 0, 0, 0, -0.31539156525252005, 0, -0.5462742152960396, 0.5900435899266435, 0, 0.4570457994644658, 0, 0, 0, 0] },
+    { "direction": [0, 0, 1], "basis0to15": [0.28209479177387814, 0, 0.4886025119029199, 0, 0, 0, 0.6307831305050401, 0, 0, 0, 0, 0, 0.7463526651802308, 0, 0, 0] }
+  ],
+  "shParity": { "negativeDirectionMultiplierByDegree": [1, -1, 1, -1], "degrees0to15": [0, 1, 1, 1, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3] },
+  "shBasisMixedDirection": {
+    "directionBeforeNormalization": [1, 2, 3],
+    "direction": [0.2672612419124244, 0.5345224838248488, 0.8017837257372732],
+    "basis0to15": [0.28209479177387814, -0.261169028265409, 0.3917535423981135, -0.1305845141327045, 0.15607834722743988, -0.46823504168231966, 0.29286359630591147, -0.23411752084115983, -0.11705876042057992, 0.02252796894660857, 0.3310921731627339, -0.5409527810353757, 0.06411572363594453, -0.27047639051768785, -0.24831912987205043, 0.12390382920634714]
+  },
+  "shAndColor": [
+    {
+      "name": "mixed-direction-independent-RGB-channel-major-coefficients",
+      "dcRgb": [0, 0, 0], "restSparse": { "0": 0.25, "24": -0.5, "43": 0.75 },
+      "dRepresentation": [0.2672612419124244, 0.5345224838248488, 0.8017837257372732],
+      "encodedSrgbAfterFullShBiasClamp": [0.4347077429336478, 0.33445391341863306, 0.3137606525959622],
+      "linearRgb": [0.1585049490632852, 0.09147210431656007, 0.08023818135391238]
+    },
+    {
+      "name": "negative-and-above-one-DC-must-not-be-clamped-before-SH",
+      "dcRgb": [-4, 4, 0], "restSparse": { "2": -2, "17": 2 }, "dRepresentation": [1, 0, 0],
+      "encodedSrgbAfterFullShBiasClamp": [0.34882585671032724, 0.6511741432896728, 0.5],
+      "linearRgb": [0.09978378930254349, 0.3815772247802742, 0.21404114048223244]
+    },
+    { "name": "final-LDR-clamp", "dcRgb": [100, -100, 0], "restSparse": {}, "dRepresentation": [0, 0, 1], "encodedSrgbAfterFullShBiasClamp": [1, 0, 0.5], "linearRgb": [1, 0, 0.21404114048223244] },
+    { "name": "camera-at-mean", "cameraEqualsMean": true, "expect": "undefined direction; omit this transient fragment rather than invent a SH direction or mutate the source" }
+  ],
+  "individualGaussianRotationDoesNotRotateSh": {
+    "colorVector": "mixed-direction-independent-RGB-channel-major-coefficients",
+    "rotationsWxyz": [[1, 0, 0, 0], [2, 0, 0, 1]],
+    "sameEncodedSrgb": [0.4347077429336478, 0.33445391341863306, 0.3137606525959622]
+  },
+  "negativeSourceCases": [
+    "ordinary RGB ASCII PLY is not GS", "partial GS property table is Unsupported, never ordinary-point fallback",
+    "SH2 or non-62-property dialect", "extra face element even count zero", "CRLF header", "duplicate or reordered property",
+    "truncated or trailing payload", "nonfinite scalar including ignored normal", "zero quaternion",
+    "scale exp overflow or underflow to zero", "scale-square nonfinite or zero", "all splats have empty support",
+    "unsafe count/stride arithmetic", "header/file/item/value budget exceeded"
+  ],
+  "proxyContractCases": [
+    "source geometry/triangle order inherited from the exact GLB1 profile; no proxy catalog or rendered color/depth/shadow/fit contribution",
+    "absent or multiple valid same-target proxies disable new GS placement only",
+    "foreign Asset, wrong role or outside-revision GS target rejects untrusted input as a whole",
+    "confirmed proxy candidate commits source-less, normal-less, confidence-less manual anchor in the GS AssetFrame",
+    "replace/remove proxy preserves existing Caption position, identity, text and media",
+    "valid bytes plus unsupported decoder is local unavailability; lost acknowledged bytes/evidence retain Project repair/publication fences"
+  ]
+}

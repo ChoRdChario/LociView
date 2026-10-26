@@ -45,29 +45,64 @@ semantics and Session/package/Proxy boundaries. No new PoC or parallel framework
   point/browser evidence. Preserve full prior records;11docs/339local links,
   two retained-text comparisons and6immutable JSON checksPASS. Independent review
   confirms no contract/acceptance change or history loss.
-- [ ] Prepare one exact GS source-profile/semantic-golden proposal from the existing
+- [x] Prepare one exact GS source-profile/semantic-golden proposal from the existing
   eight-splat candidate and pinned primary sources. Fix source coordinate, support,
   covariance, quaternion, SH/color/transform and immutable ID/digest rules.
-- [ ] Specify bounded admission and typed read/display/fact/interaction ports for
+- [x] Specify bounded admission and typed read/display/fact/interaction ports for
   one GS visual plus optional same-Asset Proxy. Distinguish untrusted new-package
   rejection from runtime-local unavailable display/interaction, while retaining
   publication, receive/export, hash, closure, recovery and evidence fences.
-- [ ] Independently review the concrete proposal and final documentation diff;
-  execute relevant document/profile/golden checks and publish suitable verified
-  g0-baseline checkpoints. Ask PO for genuinely new semantic/architecture choices
-  only after the exact reviewable proposal is ready.
+- [x] Independently review source/authority/render/UX semantics. Close the GS range
+  shape mismatch, missing off-diagonal/reflection oracle, unspecified renderer
+  precision/pixels and Point-fallback GS coverage cases. No runtime was activated.
+- [x] Exact-byte/table/golden bindings and74local links in8proposal paths pass;
+  four candidate JSON files are valid and the six approved01a JSON files unchanged.
+  Existing GS fixture/registry regressions:2suites/28PASS. The appropriate checks
+  cover documents/numeric oracles, not a new runtime implementation.
+- [ ] PO ratification of the exact01b source/presentation/adapter and availability
+  clarification decisions. The concrete reviewed proposal is ready; preserve its
+  candidate state until that reply is recorded. Git owns the suitable development
+  checkpoint's publication identity.
 
 ### Current findings and actual stop conditions
 
 The [GS preflight](../docs/g0/gs-source-profile-candidate.md) and
-[tiny source](../fixtures/gs/source.v1.json)/generator/transport diagnostics are
-candidate evidence. They lack independently authored support/transformed-SH oracles
-and immutable upstream/license provenance; generated expected values are not their
-own independent proof. Native's header-only inspector and means-only renderer box
+[tiny source](../fixtures/gs/source.v1.json)/generator/transport diagnostics remain
+candidate evidence. The [01b proposal](../docs/specs/01b-gs-proxy-project-scene-proposal.md)
+now supplies separately authored analytic/raw-bit oracles and fixed primary-source/
+license hashes for independent review; none is ratified or runtime-registered.
+Generated fixture expectations are not their own independent proof. Native's
+header-only inspector and means-only renderer box
 cannot become new-route source authority. Pinned Spark's defaults/quantization/color
-also require backend qualification, not automatic promotion from the old route.
+are not promoted into the new route. The proposal chooses a separately authored
+bounded Three CPU/screen pass, exact presentation and actual-view capability
+predicate; this architecture/source choice still needs PO approval. The underlying
+Spark/PlayCanvas adoption and large/paging gates remain separate.
 
-Current validation limits are64MiB/file,100,000items,8,000,000values; they are bounded
+Proposal checks alreadyPASS:10fixed raw-bit cases,64independently evaluated SH
+scalars,3covariance/3transform vectors, six perspective/ortho×DPR capability
+predicates, rotated-anisotropic pixel expectations, opposite-view full-SH color
+expectations and the analytic falloff-LUT bound. These are numeric/document
+checks, not executed GPU, product-code or browser acceptance. Fixed primary
+source/license hashes are verified; no upstream implementation is redistributed.
+
+The registered G0 preflight document is also a byte-bound evidence input. A
+navigation-only amendment caused indexed-blob and then registered-SHA failures in
+the existing fixture checks. Restore the exact original preflight, keeping new
+answers/navigation in01b and the indexes; the same2suites then pass28tests.
+The registry, source fixture, checks and assertions were not relaxed. These earlier
+failures remain in ignored proposal evidence; they are not runtime GS evidence.
+
+Short meta-audit: actual g0-baseline has the verified documentation checkpoint;
+the latest production code remains the tested01a point path. This unit prepares
+one genuinely new GS source/render/Proxy contract, without a new PoC, dependency,
+production code or blanket gate credit. The next stop is PO ratification of that
+exact proposal; ordinary in-contract implementation/tests do not need repeated
+approval. Upon approval, complete the whole specified GS/Proxy/file/cold workflow
+and its mandatory existing file actions, not another helper-only slice.
+
+Current validation limits are64MiB/file and fresh selection aggregate,100,000items,
+8,000,000values; they are bounded
 admission, not performance/capacity guarantees. BaseG1-B500k SH3 requires124,000,000
 payload bytes before the header and exceeds this route. Do not silently raise
 limits or count tiny-file integration as large/paging/device acceptance.

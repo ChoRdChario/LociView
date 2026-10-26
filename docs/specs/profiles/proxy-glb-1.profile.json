@@ -1,0 +1,16 @@
+{
+  "id": "development-validation-proxy-glb-1",
+  "version": 1,
+  "mediaType": "model/gltf-binary",
+  "sourceInputProfile": { "id": "development-validation-glb-1", "specificationSha256": "077c5da2241deb7956026fe20376dee9301d70b29d10a436d673f37909e4186f" },
+  "admission": "Inherit that exact GLB1 byte/JSON/accessor/static-pose/selected-scene/PNG integrity and consumer budget validation unchanged; no JPEG/other extensions or external resources. New role-specific identity does not widen old profile admission.",
+  "geometry": "Use all validated static triangle primitive occurrences in original(nodeIndex,primitiveIndex,triangleIndex) order, transformed by their source node matrices. No flattening ambiguity, decimation, generated proxy or name-based association.",
+  "contentFacts": "Empty materials array, complete original meshTriangle ranges and inherited geometry bounds. Interaction-only family uses first-verified-output envelope authority. Imported proxy has derivedFrom empty and no invented derivation tool; source bytes/relation are explicit, not inferred provenance.",
+  "appearance": "Authored GLB materials/textures remain original validated bytes but have no interaction coverage/sidedness authority. Interaction triangles are two-sided geometry; do not apply alpha/chroma, create a MaterialCatalog or include source appearance in a visual pass.",
+  "frame": "The user explicitly confirms that this file is prepared in the selected GS Asset's coordinate system and unit. Initial representationToAsset is canonical identity; unknown registration is refused, never inferred by bounds, filename, overlap or an independent Mesh.",
+  "bounds": "Inherited exact static geometry AABB after the explicit representationToAsset transform; retained for validation/interaction acceleration only, never visual fit bounds",
+  "records": { "contentKind": "mesh", "role": "interactionProxy", "purposes": ["interaction"], "materialCatalog": "absent", "surfaceRange": "meshTriangle with complete original occurrence", "variantFamily": "separate same-Asset interaction family", "proxyForGsVariantFamilyId": "explicit visual GS family in the same AssetRevision", "anchorClass": "none" },
+  "visibility": "Never contributes to color, depth, shadow, screenshot, material controls, model list membership, visual fit or measurement. Only the explicitly selected visible GS family can admit its unique verified same-Asset proxy.",
+  "anchor": "Transient approximate hit transforms to GS AssetFrame; ordinary gizmo adjustment or explicit confirmation writes a source-less, normal-less, confidence-less manual anchor with active GS class/revision. Save/reopen never raycasts this proxy.",
+  "goldenManifest": { "file": "gs-ply-sh3-1.goldens.json", "sha256": "d3c7fc4782006faa66628848192af585d56d9fb5d31da36d9202cf10ca223e85" }
+}

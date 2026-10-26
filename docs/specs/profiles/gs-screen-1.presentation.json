@@ -1,0 +1,137 @@
+{
+  "id": "lociview-gs-screen-1",
+  "version": 1,
+  "scope": "Transient bounded validation presentation/qualification, not persisted source bounds, general renderer adoption or a performance guarantee",
+  "implementationProof": {
+    "normative": "The mathematical projection/kernel/coverage/composition, device/view scope, numeric error limits and probes are normative. Owned full-source CPU evaluation and a conservative current-view error certificate remain mandatory.",
+    "baseline": "Direct-conic attributes/evaluation and etaQ below form one executable sufficient proof path, not a requirement to keep an inefficient arithmetic representation forever.",
+    "equivalentImplementation": "A mathematically equivalent evaluation such as a covariance factor/whitener is ordinary implementation only when a conservative bound is independently derived for its actual uploaded values and shader arithmetic, satisfies these same per-view limits and probes, and passes independent review before activation. Do not merely reuse the direct-conic formula for different parameters or change source/presentation policy. No renewed PO decision is required for such an in-contract numerical improvement."
+  },
+  "coordinates": {
+    "cssViewport": "finite width/height32..4096; DPR1..2; renderScale1; drawing width/height round(cssExtent*DPR), positive and<=8192",
+    "sample": "full drawing-buffer pixel centre(x+0.5,y+0.5), top-left origin; tiled probe must restore the full-buffer origin",
+    "bufferTransform": "D=diag(drawingWidth/cssWidth,drawingHeight/cssHeight); centrePx=D*centreCss; covariancePx=D*covarianceCss*transpose(D)"
+  },
+  "projection": {
+    "mean": "CPU binary64 complete source-to-camera transform, never GPU mean-only transform or packed coordinates",
+    "cameraCovariance": "SigmaCamera=linearView*SigmaProject*transpose(linearView)",
+    "perspective": "camera looks along-z; fx=cssWidth/(2*tan(horizontalFov/2)),fy=cssHeight/(2*tan(verticalFov/2)); centreCss=[cssWidth/2-fx*x/z,cssHeight/2+fy*y/z]; J=[[-fx/z,0,fx*x/(z*z)],[0,fy/z,-fy*y/(z*z)]]",
+    "orthographic": "centre follows the admitted ProjectCamera extents; J=[[cssWidth/(right-left),0,0],[0,-cssHeight/(top-bottom),0]]",
+    "covarianceCss": "J*SigmaCamera*transpose(J)+0.3*I;0.3 is fixed CSS-pixel-squared reconstruction variance; no FOV/J clamp, opacity-energy compensation or source covariance rewrite",
+    "clip": "centre depth -z must lie in the closed admitted near/far interval; outside centres produce no fragment. Camera-at-mean produces no fragment. Invalid/uncertain finite projection fails local GS capability, not source validation. Do not guess a near-plane intersection surface."
+  },
+  "ownedUpload": {
+    "inputs": "CPU evaluates full source SH/IEC color, alpha, projected centre/covariance and depth for the current source/frame/view; upload owned screen attributes only",
+    "round": "qf(v)=Float32(v), with abs(qf(v))<2^-40 canonicalized to0 in transient buffers only; never alter source data",
+    "attributes": "Baseline: centrePx, inverse covariancePx symmetric entries, unassociated linear RGB, alpha and centre depth; actual rounded values are the capability predicate's inputs. Equivalent certified parameters follow implementationProof.",
+    "identity": "one current source/frame/view generation; stale completion or a changed view invalidates draw/pick preparation"
+  },
+  "fragment": {
+    "quadratic": "Mathematical Q=d^T*inverse(covariancePx)*d. Baseline GPU evaluates max(0,A00*dx*dx+2*A01*dx*dy+A11*dy*dy),d=full-buffer sample-uploaded centre; all highp; discard Q>8. Equivalent certified evaluation follows implementationProof.",
+    "falloff": "a32*lookupExpMinusHalf(Q); no0.99 cap, no per-source color transfer after CPU evaluation, no opacity compensation",
+    "cutoff": "discard computed alpha<qf(1/510); equality survives",
+    "output": "premultiplied linear RGB*alpha and alpha; GS centre depth is constant across its footprint",
+    "quad": "conservative axis-aligned ellipse rectangle plus one physical pixel padding, clipped to viewport; no clipping of an admitted fragment by a tight quad"
+  },
+  "falloffLookup": {
+    "intervals": 4096,
+    "samples": "qf(exp(-4*k/4096)), k=0..4096; deterministic CPU-owned values, checked against the analytic oracle",
+    "texture": "R32F256x17, nearest/no mipmaps; index k maps to(k mod256,floor(k/256)); unused texels are0",
+    "evaluation": "k=min(4095,floor(512*clamp(Q,0,8)));t=512*Q-k; two texelFetch reads and explicit highp linear interpolation; no float-linear capability assumption",
+    "absoluteErrorBound": 0.0000019073486328125
+  },
+  "capability": {
+    "device": "WebGL2 highp precision>=23 and exponent range>=127; actual R32F fetch, linear RGBA16F render/blend and final IEC output probes pass; no GL/shader/readback/context error. Missing capability leaves Mesh/Point on their existing path and GS Unsupported.",
+    "perVisiblePrimitive": "For each nonempty source splat whose conservative quad intersects the viewport, all source/current-view/rounded values must be finite; reference and uploaded covariance inverse must be SPD; nonzero uploaded conic entries lie in[2^-40,2^20] by absolute value; uploaded centre and max sample offsets D0,D1 have magnitude<=8192. Any failure makes that GS visual unavailable, never silently drops one in-view splat.",
+    "covarianceCheck": "C=inverse(covariancePx),A=qf(C); maxEntryAbs(inverse(A)-covariancePx)<=max(1e-12,1e-5*maxEntryAbs(covariancePx))",
+    "centreCheck": "maxEntryAbs(inverse(D)*(qf(centrePx)-centrePx))<=0.25CSSpx",
+    "colorCheck": "CPU canonical linear RGB and alpha versus uploaded qf values differ by<=2^-20 per channel; source a<1/510 is skipped before rounding",
+    "etaQ": "u=2^-23,gamma32=32*u/(1-32*u),delta=qf(centrePx)-centrePx; Di=max abs(sample_i-qf(centrePx)_i) on the padded quad intersected with viewport; B=abs(A00-C00)*D0^2+2*abs(A01-C01)*D0*D1+abs(A11-C11)*D1^2+2*(abs((C*delta)0)*D0+abs((C*delta)1)*D1)+abs(transpose(delta)*C*delta); S=abs(A00)*D0^2+2*abs(A01)*D0*D1+abs(A11)*D1^2; etaQ=B+gamma32*(S+1); require etaQ<=2^-12. The unit term covers subnormal/flush error under the explicit bounded operands; overflow is refused.",
+    "alphaCheck": "epsilonL=2^-19,gamma4=4*u/(1-4*u); etaAlpha=abs(a-a32)+a32*(expm1(etaQ/2)+epsilonL)+gamma4*(a32+1); require etaAlpha+2^-11<=1/1024",
+    "contourCheck": "k=min(8,2*ln(a/(1/510)));rL=epsilonL*exp(4);zeta=abs(ln(a32/a))+abs(ln(qf(1/510)/(1/510)))-ln(1-rL)-ln(1-u);E=etaQ+2*zeta;deltaRadius=max(sqrt(k+E)-sqrt(k),sqrt(k)-sqrt(max(0,k-E)));sqrt(largestEigenvalue(covarianceCss))*deltaRadius<=0.25CSSpx",
+    "outcome": "This exact current-view predicate must pass before publishing its GS display receipt. Failure is local Unsupported with a useful view/scale diagnostic; it is not an input rewrite, source rejection, silently omitted primitive, new saved setting or successful renderer claim. Re-evaluate on source/frame/camera/viewport/DPR change."
+  },
+  "composition": {
+    "target": "linear RGBA16F with functional render/blend verification; no tone mapping, exposure1; final IEC linear-to-sRGB conversion exactly once",
+    "opaqueFirst": "existing opaque/binary Mesh and opaque Point color/depth pass; preserve their source/display/pick rules",
+    "gs": "depthTest against opaque fragment-depth buffer using strict Less; GS uses constant centre depth, depthWrite false; premultiplied source-over with ONE,ONE_MINUS_SRC_ALPHA; far-to-near by camera mean depth across admitted GS assets",
+    "equalDepth": "ascending stable tuple(source Blob SHA256 as lowercase hex, original source ordinal as integer, complete source-to-project4x4 numerical matrix as16column-major entries compared numerically/lexicographically with negative zero normalized); identical tuple/render values commute; no random renderer IDs or draw/LOD indices",
+    "overlapPicking": "GS target uses its explicit proxy exception. Direct Mesh/Point hits require no admitted GS contribution at their canonical hit sample in the same frame. Point-radius fallback applies the identical GS query to each actual covered visibility-proof sample used by01a, requiring at least one Point-covered sample with no GS contribution after opaque depth; neither click-only nor centre-only checks prove that. Preserve01a's no-Mesh-fragment and ranked-ambiguity rules. Unknown proof refuses placement and offers existing model isolation. No direct-splat ID/depth/position is returned."
+  },
+  "qualification": {
+    "sourceLinearRgbAbsoluteError": 0.0009765625,
+    "meanCssError": 0.25,
+    "covariance": "compare 2D buffer covariance before rasterization, same max-entry formula as capability; source 3D covariance has its separate1e-12 oracle",
+    "interiorAlphaAbsoluteError": 0.0009765625,
+    "contourCssDisplacement": 0.25,
+    "radiusBoundaryAlphaPremulError": 0.02,
+    "alphaCutoffBoundaryAlphaPremulError": 0.00392156862745098,
+    "fixedProbeLinearPremulRgbaErrorAwayFromBoundaryGuards": 0.0009765625,
+    "measurement": "read linear premultiplied RGBA before final IEC output; decode half values when that is the actual read format. Source RGB comparison is unassociated CPU/GPU attribute color, never divided by near-zero alpha. Boundary guards are derived from the analytic contours and the0.25CSS bound, not arbitrary ignored pixels. Fixed-probe composite tolerance is not a universal all-scene image guarantee."
+  },
+  "probeProtocol": {
+    "cssViewport": [33, 33], "dprs": [1, 1.25, 2], "renderScale": 1,
+    "backgroundLinearRgba": [0, 0, 1, 1], "isolatedClearRgba": [0, 0, 0, 0], "exposure": 1, "toneMapping": "none",
+    "source": { "mean": [0, 0, 0], "logScale": [0, 0, 0], "rotationWxyz": [1, 0, 0, 0], "opacityLogit": 0, "dcRgb": [100, -100, -100], "restSparse": {}, "expectedLinearRgb": [1, 0, 0], "expectedAlpha": 0.5 },
+    "perspective": { "position": [0, 0, 5], "target": [0, 0, 0], "up": [0, 1, 0], "verticalFovRadians": 1.5707963267948966, "near": 0.1, "far": 100, "centreCss": [16.5, 16.5], "covarianceCssRows": [[11.19, 0], [0, 11.19]], "inverseCssRows": [[0.08936550491510277, 0], [0, 0.08936550491510277]] },
+    "orthographic": { "position": [0, 0, 5], "target": [0, 0, 0], "up": [0, 1, 0], "left": -16.5, "right": 16.5, "bottom": -16.5, "top": 16.5, "near": 0.1, "far": 100, "centreCss": [16.5, 16.5], "covarianceCssRows": [[1.3, 0], [0, 1.3]], "inverseCssRows": [[0.7692307692307693, 0], [0, 0.7692307692307693]] },
+    "perspectiveSamples": [
+      { "dpr": 1, "pixel": [16, 16], "Q": 0, "alpha": 0.5, "isolatedLinearRgba": [0.5, 0, 0, 0.5], "overBlueLinearRgba": [0.5, 0, 0.5, 1] },
+      { "dpr": 1, "pixel": [17, 16], "Q": 0.08936550491510277, "alpha": 0.47815040889927457 },
+      { "dpr": 1, "pixel": [25, 16], "Q": 7.238605898123325, "alpha": 0.013400675945257104 },
+      { "dpr": 1, "pixel": [26, 16], "accepted": false },
+      { "dpr": 1.25, "drawingSize": [41, 41], "pixel": [20, 20], "Q": 0, "alpha": 0.5 },
+      { "dpr": 2, "drawingSize": [66, 66], "pixel": [32, 32], "Q": 0.011170688114387846, "alpha": 0.4972151124886501 }
+    ],
+    "orthographicSamples": [
+      { "dpr": 1, "pixel": [16, 16], "Q": 0, "alpha": 0.5 },
+      { "dpr": 1, "pixel": [17, 16], "Q": 0.7692307692307693, "alpha": 0.3403561991616927 },
+      { "dpr": 1, "pixel": [19, 16], "Q": 6.923076923076923, "alpha": 0.015690722857128536 },
+      { "dpr": 1, "pixel": [20, 16], "accepted": false },
+      { "dpr": 2, "pixel": [32, 32], "Q": 0.09615384615384616, "alpha": 0.4765302359568668 }
+    ],
+    "rotatedAnisotropic": {
+      "camera": "orthographic above, DPR1",
+      "sourceOverride": { "logScale": [0, -1, -2], "rotationWxyz": [2, 0, 0, 1] },
+      "covarianceCssRows": [[0.7466145812714321, -0.41503906404642593], [-0.41503906404642593, 0.9887207019651806]],
+      "inverseCssRows": [[1.7470543174734743, 0.7333676611820288], [0.7333676611820288, 1.3192565151172908]],
+      "samples": [
+        { "pixel": [17, 17], "Q": 4.533046154954823, "alpha": 0.05183600686161535 },
+        { "pixel": [17, 15], "Q": 1.5995755102267075, "alpha": 0.22471217100682744 }
+      ],
+      "xReflection": "Apply complete source-to-project x reflection: screen off-diagonal covariance and conic signs reverse, and the two sample Q/alpha results swap."
+    },
+    "fullShColorUpload": {
+      "camera": "same perspective settings, position[-1.3363062095621219,-2.6726124191242437,-4.008918628686366], target origin, up[0,1,0], DPR1, centre pixel[16,16]",
+      "sourceOverride": { "dcRgb": [0, 0, 0], "restSparse": { "0": 0.25, "24": -0.5, "43": 0.75 } },
+      "dRepresentation": [0.2672612419124244, 0.5345224838248488, 0.8017837257372732],
+      "linearRgb": [0.1585049490632852, 0.09147210431656007, 0.08023818135391238],
+      "isolatedLinearRgba": [0.0792524745316426, 0.045736052158280035, 0.04011909067695619, 0.5],
+      "overBlueLinearRgba": [0.0792524745316426, 0.045736052158280035, 0.5401190906769562, 1],
+      "oppositeCamera": {
+        "position": [1.3363062095621219, 2.6726124191242437, 4.008918628686366],
+        "linearRgb": [0.27952802816009115, 0.40048138109358655, 0.42864169433311927],
+        "isolatedLinearRgba": [0.13976401408004557, 0.20024069054679328, 0.21432084716655964, 0.5]
+      }
+    },
+    "opaqueDepthSamples": [
+      { "opaqueKind": "Mesh", "linearRgb": [0, 1, 0], "cameraDepth": 4, "gsDepth": 5, "centreLinearRgba": [0, 1, 0, 1] },
+      { "opaqueKind": "Point", "linearRgb": [0, 1, 0], "cameraDepth": 4, "gsDepth": 5, "centreLinearRgba": [0, 1, 0, 1] },
+      { "opaqueKind": "Mesh", "linearRgb": [0, 1, 0], "cameraDepth": 5, "gsDepth": 5, "centreLinearRgba": [0, 1, 0, 1] },
+      { "opaqueKind": "Mesh", "linearRgb": [0, 1, 0], "cameraDepth": 6, "gsDepth": 5, "centreLinearRgba": [0.5, 0.5, 0, 1] }
+    ],
+    "twoGsCentre": { "far": { "cameraDepth": 6, "linearRgb": [0, 1, 0], "alpha": 0.5 }, "near": { "cameraDepth": 4, "linearRgb": [1, 0, 0], "alpha": 0.5 }, "backgroundLinearRgb": [0, 0, 1], "linearRgba": [0.5, 0.25, 0.25, 1], "encodedSrgb": [0.7353569830524495, 0.5370987304831942, 0.5370987304831942] },
+    "equalDepthOrder": "at common centre depth5, green stable source key00...00 draws before red keyff...ff, source ordinal0 and identity transform; expect the same[0.5,0.25,0.25,1] result",
+    "clipCases": ["centre beyond near/far produces no fragment", "camera-at-mean produces no fragment", "invalid or uncertain depth/projection is Unsupported, not guessed"],
+    "capabilityCases": [
+      { "name": "ordinary centred ortho primitive at DPR1 and2", "protocolSource": true, "expect": "pass" },
+      { "name": "fractional DPR1.25 rounded41 buffer", "protocolSource": true, "expect": "pass" },
+      { "name": "DPR just above2", "dpr": 2.0001, "expect": "Unsupported" },
+      { "name": "etaQ inclusive limit", "etaQ": 0.000244140625, "expect": "this subcheck passes" },
+      { "name": "etaQ above limit", "etaQ": 0.000244140626, "expect": "Unsupported" },
+      { "name": "giant near-cutoff contour", "decodedAlpha": 0.00196078431372549, "covarianceCssRows": [[1000000, 0], [0, 1000000]], "expect": "Unsupported by contour displacement" },
+      { "name": "same view with unavailable half-float blend or failed probe", "expect": "GS Unsupported; existing Mesh/Point path retained" },
+      { "name": "non-SPD uploaded conic, nonfinite projection, stale view generation", "expect": "Unsupported/no gesture commit" }
+    ]
+  }
+}

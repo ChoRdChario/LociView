@@ -62,6 +62,12 @@ The words **MUST**, **MUST NOT**, **SHOULD**, and **MAY** are normative. A metri
 |---|---|
 | [`06-project-package-wire.md`](06-project-package-wire.md) | `PROPOSED WIRE / APPROVED ISOLATED IMPLEMENTATION (§11) / NO ORDINARY ADOPTION`; bounded five-purpose implementation/evidence is section-specific and recorded in todo. General wire/version/budget ratification, S2 and ordinary adoption remain open. |
 
+### Unapproved model companion
+
+| Document | Status / purpose |
+|---|---|
+| [`01b-gs-proxy-project-scene-proposal.md`](01b-gs-proxy-project-scene-proposal.md) | PROPOSED, not approved/implemented/adopted: exact SH3 GS/interaction-GLB profiles, independent semantic goldens and exact screen-presentation/probes, typed GS/Proxy continuation and bounded Three CPU/screen adapter. Four JSON candidates are not runtime registry entries; 01a stays immutable. |
+
 ## Fixed versus conditional decisions
 
 Fixed unless a later accepted ADR supersedes the applicable part of ADR-0001 or
