@@ -344,6 +344,15 @@ Failure stops CAS production work and triggers a format/sink/desktop-packer ADR 
 
 ## 5. G1-B — renderer bakeoff
 
+PO amendment2026-10-27: [01b §6](01b-gs-proxy-project-scene-proposal.md#6-次工程と承認境界)
+authorizes limited evaluation of exact gaussian-splat-lite1.4.3 with exact
+Three.js/@types0.186.0, including compatibility, SH4, paging and lifecycle checks.
+This additional candidate is not adopted and does not pass or remove the paired
+bakeoff/device gates below. Evaluation code stays disposable/isolated, with no
+ordinary-entry or production GS activation. Profile ratification and production
+integration remain separate decisions; the former Spark-only harness approval
+below is retained as historical scope, not a ban on this newly approved evaluation.
+
 Before the full bakeoff or any production adoption, the Product Owner authorizes
 one bounded Spark/Three technical harness. It is candidate evidence only and does
 not satisfy G1-B, adopt Spark, implement the production renderer boundary or earn

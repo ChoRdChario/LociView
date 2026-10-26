@@ -1,7 +1,9 @@
 # 01b: Point / GS rendering requirements reassessment
 
-> Status: **REVISED PROPOSAL / NOT PO APPROVED / NOT IMPLEMENTED / NOT ADOPTED**
+> Status: **PROPOSED REQUIREMENTS / APPROVED LIMITED QUALIFICATION / NO PRODUCTION GS / NOT ADOPTED**
 > Reassessed: 2026-10-27, at the PO's request after checking SH4 support.
+> PO approved **only §6 limited GSL1.4.3 / Three0.186.0 qualification** on2026-10-27.
+> Other new source/presentation requirements remain proposals; this is not adoption.
 > This replaces the unapproved SH3-only CPU/screen proposal at35c0a4d.
 > [Superseded draft and exact candidate JSON](../history/gs-proxy-draft-2026-10-27/README.md)
 > remain evidence, not active profiles or an outstanding request to approve that draft.
@@ -29,8 +31,8 @@
 - 最初の再評価候補はGaussian-Splat-Lite正式1.4.3。Spark正式2.4.0とPlayCanvasも比較する。
   SH4だけで採用せず、既存Threeとの互換性、座標・色・混在描画、offline、資源寿命を検証する。
 
-これは要件と次の評価方針の提案であり、新しい数値保証、FormatProfile、変換規則、依存追加、
-renderer採用、通常homeへの接続を承認する文書ではない。
+§6で承認済みの限定評価を除き、これは要件と評価方針の提案である。新しい数値保証、
+FormatProfile、変換規則、追加の依存、renderer採用、通常homeへの接続は承認していない。
 
 ## 2. 維持する契約と今回の変更範囲
 
@@ -46,10 +48,10 @@ renderer採用、通常homeへの接続を承認する文書ではない。
 選択・6CSSpx近傍、source-centreとmanual座標の区別は保持する。現行DPR1/2の限定実装は
 そのまま有効であり、今回の文書だけで任意DPR・大規模点群対応にはならない。
 
-GSLは現行03のSpark/Three対PlayCanvas比較に追加する**未承認の評価候補**。
-03が指定する停止条件、旧Spark2.1.0のPoC範囲、依存・Three更新の権限は自動では広がらない。
-正式比較候補の変更と新しいisolated qualificationの範囲は、次の承認対象として切り分ける。
-旧01bの「非既定production接続の例外」を今回引き継がない。
+GSLは03のSpark/Three対PlayCanvasの正式採用比較に対し、**§6の限定評価だけを承認された
+追加候補**。03の2026-10-27 amendmentがその範囲を記録する。既存の停止条件、
+profile・production権限は自動では広がらず、旧01bの「非既定production接続の例外」も
+引き継がない。正式採用比較と限定資格評価を区別する。
 
 ## 3. 点群描画に求める結果
 
@@ -121,8 +123,9 @@ GSLの**正式1.4.3 tag**を比較単位にする。同じpackage版を表示し
 Unreleased API変更を混ぜない。正式版の`maxSh`制限を、未公開版のdecode/storage動作と
 混同しない。各候補の圧縮・Float16等は表示精度の評価対象であり、原本保持の代替ではない。
 
-GSLのGitHub正式releaseは確認済みだが、npm registry照会はDNS解決に失敗したため、
-公開tarballの`gitHead`・`dist.integrity`・内容一致は未確認。導入時の停止条件とする。
+再評価時のnpm registry照会はDNS解決に失敗したが、承認後の許可された照会・取得で解消。
+正式tarballの`gitHead`は固定commitと一致し、registryのSHA-512 integrityとも照合済み。
+これは配布物の照合であり、再現buildや全コードのsecurity監査を意味しない。
 Node要件は`^20.19.0 || >=22.12.0`。source上はWASM/workerを同梱する構成だが、
 実際のnpm artifact、LociViewのbundle/CSP、cold offline動作は別途検証する。
 
@@ -136,8 +139,9 @@ Node要件は`^20.19.0 || >=22.12.0`。source上はWASM/workerを同梱する構
 
 推奨する次の単位は、**GSL正式1.4.3とThree/@types0.186.0の互換性・描画要件評価**。
 これは恒久renderer採用やGS production統合ではなく、具体的な不足を判定する限定作業とする。
-新依存とThree更新、03の評価候補・作業範囲の変更が必要なため、次の内容をまとめてPOへ
-提示し、承認後に実施する。現時点でpackage/lock、runtime、source registryは変更していない。
+新依存とThree更新、03の評価候補・作業範囲の変更を含む以下の限定評価は、
+2026-10-27にPO承認済み。実施状況・配布物の照合・結果はtasks/todoを正とする。
+承認は正確なprofileやproduction実装へ拡張しない。
 
 1. 新依存を固定し、license/第三者notice・lockfile・npm auditを確認する。Three更新は
    GS feature実装と分離し、既存Mesh/Point/Native/旧harnessの互換性・entry隔離を検証する。
@@ -155,3 +159,38 @@ Node要件は`^20.19.0 || >=22.12.0`。source上はWASM/workerを同梱する構
 Physical iPhone、HTTPS/offline/PWA、通常home、S1/S2/TEAM-FLOW-01、一般renderer採用と
 releaseの未充足は残す。ローカルChromiumの結果でそれらを合格扱いしない。
 細かな操作ごとのPO確認や、POのテスト待ちを通常の開発依存に戻さない。
+
+## 7. 限定評価の観測と残る境界（2026-10-27）
+
+判定は**候補として継続、production接続と製品側Three更新は保留**。
+評価用に導入した正式GSL1.4.3とThree/types0.186.0を、既存Vite・専用Chromiumで
+隔離評価した。通常homeやProjectScene Sessionへは接続していない。
+自作入力・評価コード・全失敗・実行build・結果はignored local artifactsに保持する。
+新しい公開fixtureやsource profile、既存profileの解釈変更はない。
+
+| 評価 | 実行して確認した範囲 | 残る制約 |
+|---|---|---|
+| 配布物・license・audit | 公式tarball4,612,987bytesのSHA-512とgitHeadを照合。Apache-2.0、NOTICE、MIT/zlib等の第三者通知を確認。audit追加前後とも10件（low1/moderate2/high5/critical2）、新しい指摘なし | auditの既存指摘は解消していない。正式配布・採用のlicense/security gate合格ではない |
+| Three互換性 | 0.186で型検査後、117suiteの既存テストを実行。115suite/2,717件PASS、2suite/32件FAIL、21既存TODO。28件は材質変換の0.180固定guard、4件はGPUをmockした視点操作テスト | 型検査には評価時だけtexture imageのunknownを絞るテスト修正が必要だった。全体評価は未合格、後続の3buildは未実行。guardや承認済みprofileを緩和しない |
+| SH0/3/4 | 独立したY30/Y40の符号と一致する実pixel。SH3緑55→26、SH4赤55→103、斜め方向の赤46。xに奇なY41を持つ別入力では反転で赤32→62 | `encodeLinear:true`のcanvas 8bit readPixels値。全producer・全色域・画質profileの認定ではない |
+| 形状・配置・遮蔽 | 異方性の向き、反転、opaque Meshの前後depth。平行移動後の重心、1.4倍時の面積比1.9413（期待1.96）、回転差0.29890rad（期待0.3）を確認 | 小さいowned入力、WebGL2、固定の視点・変換での観測。一般transform誤差保証ではない |
+| Proxy/manual | 明示Proxy hitをAssetFrameへ戻し、調整後manual座標の行列往復を確認 | 評価用Three上の計算であり、Session・実際のgizmo・file保存・再開の新GS統合証拠ではない |
+| 取消・解放 | RAD初期化取消はAbortError、再読込・表示・除去が成立。20回unload後のThree texture数は5,7,7,…でウォーム後安定、geometry数は2 | 全worker/CPU/GPUメモリや過渡peakの無漏洩保証ではない |
+| context復旧 | 旧資源をlossイベント中に破棄し、restore後にGS renderer/modelを再作成すれば表示が戻りGLerror0 | 同じ資源の自動復帰はlit0/GLerror1282で失敗。restore後に旧資源を破棄する手順も失敗。将来adapterは正しい世代管理と再作成を実装する必要がある |
+| 段階読込SH3 | 50万点のowned原本124,001,531bytesから15chunkのRADを作成。視点移動で要求5→8、常駐chunk5、描画14,107→17,768。観測時のCPU cache41,821,460bytes/GPU cache31,637,520bytesは設定64/32MiB内 | 原本50万点を同時描画した証拠ではない。別報告のWASM peakは71,237,632bytes。cache予算は総CPU上限ではなく、2snapshotから総メモリや過渡予算を保証しない。固定待機込みの経過時間を初回preview latencyへ流用しない |
+
+SH4とpaged LODは依然別の経路。WebGPU、物理iPhone、cold offline/PWA、フルGS編集・
+五目的file・復旧、G1-Bは未検証または未実装であり、今回のPASSを移さない。
+ブラウザのaggregateにはraw context復旧の失敗が残り、その後のfocusedな復旧・変換・
+multi-page PASSをaggregate全合格へ付け替えない。初回SH3 probeの符号誤りは
+camera-to-mean方向の一次式で独立確認して修正し、失敗を保持した。
+
+製品へのThree一括更新には、[07a](07a-native-appearance-conversion-proposal.md)と
+[07d](07d-jpeg-project-scene-proposal.md)が固定する0.180.0 GLTFLoader association proofとの
+契約不一致がある。既存ID/digestやprofile文言を0.186へ書き換えて解決してはいけない。
+製品のpackage/lock・build設定・一時テスト修正を元のbytesに戻し、npm ciで実依存も
+0.180.0へ復元済み。復元後の型検査と、候補で失敗した32件はすべてPASSした。
+これは復元のfocused確認であり、0.186全体評価の成功や全0.180 suite再実行ではない。
+評価と既存製品を分け、影響する更新だけを止める。次はこの互換境界と、SH4/source・
+display derivativeの正確なprofile、context再作成を含むtyped adapter案を確定し、
+必要な互換性・production権限を独立レビューのうえ判断する。

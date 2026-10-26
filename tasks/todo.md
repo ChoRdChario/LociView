@@ -28,71 +28,75 @@ in nondefault validation; code and executed tests determine its observed behavio
 01a adds approved XYZ/RGB ASCII PLY alongside admitted GLB and photos. This is not
 ordinary-entry activation, arbitrary-format support or general v2 adoption.
 
-## Current boundary — Point/GS requirements reassessed
+## Current boundary — limited qualification complete; product migration held
 
-PO requested reassessment on2026-10-27 after identifying released SH4 support.
-This supersedes the pending approval request for35c0a4d's SH3-only/CPU-screen01b.
-Do not implement that draft or treat this review request as dependency/adoption
-approval. Root remains the sole writer; bounded read-only reviews cover current
-released renderers, product/UX and source/storage/format boundaries.
+PO approved revised01b §6 on2026-10-27: gaussian-splat-lite exact1.4.3 with
+three/@types exact0.186.0 qualification. This permits the limited dependency/API/
+compatibility/rendering/paging/lifecycle evaluation, not production GS, source
+profile ratification, ordinary entry, adoption or publication. Root is sole writer;
+independent reviewers are read-only.
 
-- [x] Compare fixed released Gaussian-Splat-Lite, current Spark and PlayCanvas
-  against existing accepted Point/GS, SH4, capacity, offline and lifecycle needs.
-- [x] Revise01b as a requirements/choice proposal: source preservation, SH0..4,
-  scalable display and budgets, comfortable camera/quality behavior, stable pins.
-  Preserve01a's six approved JSON and existing wire/recovery/compatibility gates.
-- [x] Retain the superseded unapproved draft/evidence, update current indexes and
-  handoff, and independently review the revised requirements and next-step choice.
-- [x] Verify docs/links/byte-bound evidence and prepare the suitable checkpoint.
-  Ask only at a concrete new dependency/architecture/profile authority boundary;
-  do not silently ratify numeric guarantees or begin runtime implementation.
+- [x] Official registry gitHead matches fixed release d8703f7; downloaded tarball
+  SHA-512 integrity, package/license/NOTICE/third-party notices verified. Baseline
+  and candidate npm audit both10 findings, including2critical/5high; no additions.
+  No audit fix or unrelated upgrade. Existing findings remain a readiness concern.
+- [x] Evaluate Three0.186 compatibility without weakening immutable0.180 guards.
+  Typecheck after a temporary unknown-image test narrowing; full117suite attempt:
+  115suite/2717PASS,2suite/32FAIL,21existingTODO.28material/conversion cases refuse
+  the pinned decoder mismatch;4mock-viewport navigation cases fail. Subsequent
+  root builds were not run because the checkpoint stops on failure.
+- [x] Isolated Vite/dedicated Chromium: SH0/3/4 directional pixels, anisotropic
+  reflection, rendered translation/rotation/scale and x-odd SH4 reflection PASS.
+  Explicit Proxy/manual matrix calculation is not Session/gizmo/file evidence.
+  Twenty unload cycles show warm texture plateau only. RAD cancellation/reload
+  and20k-source/one-chunk display PASS. Owned500k-source/15chunk SH3 shows view-led
+  page requests and sampled resident caches within64/32MiB; not500k simultaneously
+  drawn or a total CPU-memory guarantee. Exact observations/limits in01b §7.
+- [x] Preserve raw context restore FAIL and failed after-restore disposal. The
+  correct adapter sequence—dispose during loss, recreate after restore—PASS.
+  Aggregate failures remain failures; focused passes are not substituted.
+- [x] Finish restored-environment targeted checks, final docs/immutable evidence
+  verification and independent review; publish only suitable g0-baseline checkpoint.
 
-Final docs checksPASS:7changed Markdown documents/94local links, retained draft
-body except rebased links,4exact archived JSON,6immutable01a JSON, unchanged
-registered G0 SHA and5numeric capacity rows. Diff whitespacePASS. Three independent
-read-only reviews (product/render requirements, storage/source contracts, fixed
-upstream claims) report no unresolved findings. Evidence is retained in ignored
-`.artifacts/e2e/rendering-reassessment-evidence.json`. No product code, package,
-lockfile or runtime changed; runtime suites were not rerun for this docs-only unit.
-Publish only this reviewed checkpoint on g0-baseline under standing authorization;
-Git records publication identity. Pages deploy remains main-only, not this push.
+The evaluation found a real stop condition: 07a/07d and runtime occurrence decode
+explicitly pin Three0.180.0. Do not remove that guard, reinterpret old profile IDs,
+change their digests or turn a candidate renderer into production to pass tests.
+Product package.json/package-lock.json/vite.config.ts/projectFiles.test.ts are
+restored byte-for-byte to published HEAD, and npm ci restored actual Three/types
+0.180.0. Candidate manifests, tarball, fixtures, builds, tests and failed/passing
+reports are retained under ignored `.artifacts/e2e/gsl-qualification/`.
+Restored typecheckPASS and all32candidate-failed casesPASS in2focused files
+(449other cases unselected). This verifies that restoration, not the whole0.180
+suite afresh, and does not relabel the0.186 full attempt as a pass.
 
-## Reassessment findings and next authority boundary
+Final documentation checks:6Markdown files/84local links,6immutable01a JSON and
+unchanged G0/registry/07a/07d/source-profile contractsPASS. Product temporary files
+and installed Three/types are restored. Read-only contract/render/evidence reviews
+have no unresolved findings; report wording corrections are applied. Full logs,
+candidate manifests/builds, source inputs, original failures and focused results
+are retained in `.artifacts/e2e/gsl-qualification/qualification-evidence.json` and
+the files it binds. Only documents are outgoing; no candidate code/dependency,
+public fixture, runtime profile or release is included. Git owns publication ID.
 
-[Revised01b](../docs/specs/01b-gs-proxy-project-scene-proposal.md) withdraws the
-SH3-only full-source CPU/screen recommendation. Existing accepted progressive
-loading, separate budgets and the500k renderer fixture make a100k/64MiB product
-ceiling unsuitable. SH4 also exceeds8M attributes at100k points; do not merely
-raise admission limits. NormalPoint01a semantics/six JSON stay immutable.
+Current decision: continue GSL as a candidate, hold product migration. SH4/paged
+LOD remain separate; WebGPU, physical device, cold offline/PWA, ordinary-home and
+full GS Session/file/restore integration are unverified/unimplemented. Approval
+and result are in [01b §§6–7](../docs/specs/01b-gs-proxy-project-scene-proposal.md)
+and the explicit [03 amendment](../docs/specs/03-gates-and-delivery.md#5-g1-b--renderer-bakeoff).
 
-Static fixed-release comparison: GSL1.4.3 handles PLY/SPZ SH0..4 but RAD/SOG only
-SH3; current Spark2.4.0 and PlayCanvas2.23.3 remain SH3. GSL is the first proposed
-evaluation candidate, not adopted. SH4 plus scalable paging remains an explicit
-evidence gap. Source/canonical coordinates, qualified display derivatives,
-transient RenderPlan and output-purpose closures are distinct; no silent SH
-truncation or display-index pin authority. Preserve the explicit Proxy/manual flow.
+Next connected unit: specify a compatible decoder/renderer transition preserving
+old occurrence profiles and histories, precise SH4/source/display profiles and
+context-recreation ports. Independently review the concrete contract/production
+proposal before asking for genuinely new compatibility authority; no small PO
+fixture/control checks. Do not add another PoC or silently widen the current grant.
 
-The [superseded draft](../docs/history/gs-proxy-draft-2026-10-27/README.md) retains
-the original body with local links rebased and four exact candidate JSON bytes.
-Its numeric/document checks are not practical GPU evidence. The original byte-bound
-G0 preflight and fixtures stay unchanged; its earlier index/SHA failures remain
-in local evidence. Previous document alignment/history is retained in the linked
-October record and Git. The former pending approval question is superseded.
-
-Next proposed connected unit: qualify gaussian-splat-lite exact1.4.3 plus
-three/@types exact0.186.0, with license/notice, published-artifact identity,
-lockfile/audit, existing route compatibility and isolated rendering/lifecycle
-checks. npm registry identity remains unverified after DNS failure. New dependency,
-Three migration and03 candidate/evaluation scope require a concrete PO decision;
-this request authorizes reassessment only. No new profile, runtime integration,
-normal home, publication or adoption is activated. Keep existing gates and safety
-limits until an approved, measured replacement exists.
-
-Short meta-audit: g0-baseline's last production change remains the verified01a
-workflow. This docs-only unit corrects the proposed critical path rather than
-adding another helper/PoC. Ordinary approved work/tests/fixes do not require
-repeated approval; only the new dependency/evaluation authority boundary stops
-that next unit. Physical-device evidence remains a separate lane.
+Short meta-audit: latest production remains verified01a; the candidate has real
+bounded browser evidence, but its root Three migration fails accepted fences.
+Preserving the old route and closing that compatibility boundary is the critical
+path. Source registry, approved Point JSON, wire/recovery fences and current safe
+limits stay unchanged. Reassessment's old CPU/SH3 draft is superseded and retained
+in [history](../docs/history/gs-proxy-draft-2026-10-27/README.md); prior docs-only
+checkpoint details stay in Git rather than a second current plan.
 
 ## Last verified connected checkpoint — ordinary-point workflow
 

@@ -17,9 +17,11 @@ and evidence. Source point centres and explicit manual positions are distinct;
 renderer/proxy output never rewrites canonical saved positions. The PO requested
 Point/GS requirement reassessment after checking SH4. The [revised 01b](../docs/specs/01b-gs-proxy-project-scene-proposal.md)
 withdraws the SH3-only CPU/screen recommendation and compares fixed released
-renderers. GSL1.4.3 is the first evaluation candidate, not adopted; its SH4 and
-paged-LOD paths do not yet establish combined SH4+paging. New dependencies/Three
-update and a change to the03 evaluation scope need approval before that work.
+renderers. GSL1.4.3/Three0.186 limited qualification was approved2026-10-27;
+measured scope and failures are in01b §7/todo. The existing occurrence GLB/JPEG
+profiles explicitly pin0.180.0, so product migration is held rather than silently
+reinterpreting immutable profiles. SH4 and paged-LOD paths remain separate.
+New profiles, production GS and adoption still need their actual authority/gates.
 The superseded proposal/JSON remain in linked history, not an approval queue.
 
 Dedicated Chromium verifies only its recorded localhost/headless workflows. It

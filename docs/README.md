@@ -17,7 +17,7 @@ record executed evidence and connections; do not infer those from a document tit
 | Product, privacy and media boundaries | [specification 00](specs/00-product-contract.md) |
 | Frames, revisions, picking and rendering | [specification 01](specs/01-domain-rendering.md) |
 | Approved ordinary-point file workflow | [01a companion](specs/01a-point-project-scene-proposal.md); exact source/presentation package approved 2026-10-27; implementation/evidence in todo, not adopted |
-| Point/GS requirements and next renderer evaluation | [Revised 01b proposal](specs/01b-gs-proxy-project-scene-proposal.md); SH0–4, GPU/progressive display and source/pin preservation; GSL1.4.3 is an unapproved evaluation candidate. The former SH3-only CPU draft is superseded; no new runtime or profile is approved |
+| Point/GS requirements and renderer evaluation | [Revised 01b](specs/01b-gs-proxy-project-scene-proposal.md); GSL1.4.3/Three0.186 limited qualification approved 2026-10-27; bounded observations and the old-profile0.180 compatibility stop in §7. New source profiles, production connection and adoption remain unapproved |
 | Storage, journal, Native package and migration boundaries | [specification 02](specs/02-storage-package-migration.md) |
 | Adoption, device/performance and release gates | [specification 03](specs/03-gates-and-delivery.md), [G0 coverage](g0/g0-coverage-map.md) |
 | LociMyu → Native conversion | [specification 04](specs/04-locimyu-conversion.md) |

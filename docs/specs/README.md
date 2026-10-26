@@ -62,11 +62,11 @@ The words **MUST**, **MUST NOT**, **SHOULD**, and **MAY** are normative. A metri
 |---|---|
 | [`06-project-package-wire.md`](06-project-package-wire.md) | `PROPOSED WIRE / APPROVED ISOLATED IMPLEMENTATION (§11) / NO ORDINARY ADOPTION`; bounded five-purpose implementation/evidence is section-specific and recorded in todo. General wire/version/budget ratification, S2 and ordinary adoption remain open. |
 
-### Unapproved model companion
+### Model requirements with approved limited evaluation
 
 | Document | Status / purpose |
 |---|---|
-| [`01b-gs-proxy-project-scene-proposal.md`](01b-gs-proxy-project-scene-proposal.md) | REVISED PROPOSAL, not approved/implemented/adopted: SH0–4, GPU/progressive rendering, comfortable interaction and source/pin preservation; fixed GSL1.4.3/Spark2.4.0/PlayCanvas comparison. GSL evaluation/dependencies need approval. The former CPU/SH3 draft and four JSON candidates are archived; 01a stays immutable. |
+| [`01b-gs-proxy-project-scene-proposal.md`](01b-gs-proxy-project-scene-proposal.md) | PROPOSED REQUIREMENTS / APPROVED LIMITED QUALIFICATION / NO PRODUCTION GS / NOT ADOPTED. GSL1.4.3/Three0.186 evaluation approved 2026-10-27; measured scope, context recreation and immutable0.180 profile stop in §7. The former CPU/SH3 draft is archived; 01a stays immutable. |
 
 ## Fixed versus conditional decisions
 
