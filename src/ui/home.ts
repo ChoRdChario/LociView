@@ -18,6 +18,8 @@ import { serializeConventionalSourceReport } from './conventionalSourceReport';
 import type { NativeHomeUi } from '../nativeGs/homeUi';
 
 export interface HomeDeps {
+  pwa?:boolean;
+  onNewProject?(files:readonly File[]):Promise<void>;
   nativeHome?: NativeHomeUi;
   fs: WorkspaceFS;
   identity: Identity;
@@ -85,7 +87,7 @@ async function listProjects(fs: WorkspaceFS): Promise<ProjectListItem[]> {
   return out.sort((left, right) => right.createdAt.localeCompare(left.createdAt));
 }
 
-export function mountHome(root: HTMLElement, deps: HomeDeps): void {
+export function mountHome(root: HTMLElement, deps: HomeDeps) {
   const listEl = el('div', { class: 'lv-home-list' });
   const conventionalSection = el('details', { class: 'ng-card', hidden: 'true' },
     el('summary', {}, 'この端末に残っている旧プロジェクト'),
@@ -146,7 +148,7 @@ export function mountHome(root: HTMLElement, deps: HomeDeps): void {
   });
 
   const installBar = el('div', { class: 'lv-install' });
-  if (!isStandalone()) {
+  if (deps.pwa!==false && !isStandalone()) {
     onInstallAvailability((available) => {
       clear(installBar);
       if (!available) return;
@@ -173,7 +175,7 @@ export function mountHome(root: HTMLElement, deps: HomeDeps): void {
       dropZone,
       fileStatus,
       deps.nativeHome?.transfer ?? null,
-      deps.nativeHome?.creation ?? null,
+      deps.onNewProject ? null : deps.nativeHome?.creation ?? null,
       nativeProjectsSection,
       conventionalSection,
       fileInput,
@@ -199,9 +201,11 @@ export function mountHome(root: HTMLElement, deps: HomeDeps): void {
       try {
         identity = await inspectZipContainerIdentity(file);
       } catch (error) {
-        if (hasZipSignature || deps.nativeHome === undefined) throw error;
+        if (hasZipSignature) throw error;
         release?.();
-        await deps.nativeHome.acceptModelFile(file);
+        if(deps.onNewProject)await deps.onNewProject([file]);
+        else if(deps.nativeHome)await deps.nativeHome.acceptModelFile(file);
+        else throw error;
         fileStatus.textContent = '';
         return;
       }
@@ -379,4 +383,5 @@ export function mountHome(root: HTMLElement, deps: HomeDeps): void {
 
   if (deps.nativeHome === undefined) void renderNativeList();
   void renderList();
+  return {openFile:handleFile};
 }

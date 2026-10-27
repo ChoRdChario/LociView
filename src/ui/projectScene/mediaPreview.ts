@@ -14,18 +14,19 @@ const sameBody = (a: PreviewPng | null, b: PreviewPng | null) => a === b || !!a 
 /** A new image node per attempt keeps old load/error events out of a retry. */
 function createPngPreview(document: Document, read: () => MediaPreviewItem | null, lazy: boolean, imageHost: HTMLElement = document.createElement('div')) {
   const root = document.createElement('div'), error = document.createElement('p'), retry = document.createElement('button');
-  root.className = 'lv-media-image'; error.setAttribute('role', 'status'); retry.type = 'button'; retry.textContent = '画像を再試行';
+  root.className = 'lv-media-image'; error.className='lv-operation-status';error.setAttribute('role', 'status'); retry.type = 'button'; retry.textContent = '画像を再試行';
+  const loading=(value:boolean)=>{error.dataset.busy=String(value);root.setAttribute('aria-busy',String(value));};
   let body: PreviewPng | null = null, image: HTMLImageElement | null = null, release: (() => void) | null = null, disposed = false, epoch = 0;
   function clear() { image?.remove(); image = null; release?.(); release = null; }
   function load(item: MediaPreviewItem | null) {
-    const attempt = ++epoch; clear(); body = item?.image ?? null;
+    const attempt = ++epoch; clear();loading(false); body = item?.image ?? null;
     if (!item || !body) { error.textContent = '画像を読み込めません。添付情報は変更していません。'; retry.hidden = false; return; }
     const expected = body;
     const current = () => { const next = read(); return !disposed && epoch === attempt && next?.id === item.id && next.resourceId === item.resourceId && sameBody(next.image, expected); };
     if ('load' in expected) {
-      error.textContent = '画像を読み込んでいます。'; retry.hidden = true;
+      loading(true);error.textContent = '画像を読み込んでいます。'; retry.hidden = true;
       void Promise.resolve().then(() => expected.load()).then(blob => { if (current()) paint(read()!, { blob }); }, () => {
-        if (current()) { error.textContent = '画像を読み込めません。添付情報は変更していません。'; retry.hidden = false; }
+        if (current()) { loading(false);error.textContent = '画像を読み込めません。添付情報は変更していません。'; retry.hidden = false; }
       });
     } else paint(item, expected);
   }
@@ -33,14 +34,14 @@ function createPngPreview(document: Document, read: () => MediaPreviewItem | nul
     const current = document.createElement('img'); image = current; current.draggable = false;
     current.alt = item.description || item.label; current.loading = lazy ? 'lazy' : 'eager'; current.decoding = 'async';
     current.addEventListener('error', () => { if (disposed || image !== current) return;
-      current.hidden = true; error.textContent = '画像を表示できません。添付情報は変更していません。'; retry.hidden = false; });
+      loading(false);current.hidden = true; error.textContent = '画像を表示できません。添付情報は変更していません。'; retry.hidden = false; });
     current.addEventListener('load', () => { if (disposed || image !== current) return;
-      current.hidden = false; error.textContent = ''; retry.hidden = true; });
-    error.textContent = ''; retry.hidden = true; imageHost.append(current);
+      loading(false);current.hidden = false; error.textContent = ''; retry.hidden = true; });
+    loading(true);error.textContent = '画像を読み込んでいます。'; retry.hidden = true; imageHost.append(current);
     try {
       if ('base64' in png) current.src = `data:${png.mediaType ?? 'image/png'};base64,${png.base64}`;
       else { const url = URL.createObjectURL(png.blob); release = () => URL.revokeObjectURL(url); current.src = url; }
-    } catch { current.hidden = true; error.textContent = '画像を読み込めません。'; retry.hidden = false; }
+    } catch { loading(false);current.hidden = true; error.textContent = '画像を読み込めません。'; retry.hidden = false; }
   }
   retry.addEventListener('click', () => { if (!disposed) load(read()); }); root.append(imageHost, error, retry);
   return { root, render() { if (disposed) return; const item = read();

@@ -11,6 +11,7 @@ import { CleanArchive } from './cleanArchive';
 import { workspacePackageRoot } from './workspaceBases';
 
 export interface ReviewEditBinding { jobId: string; prepared: EvidenceRef }
+export interface CompletedReviewChild { readonly childId: string; readonly binding: Readonly<ReviewEditBinding> }
 export type ReviewEditDescriptor = ReturnType<PreparedReviewEdit['descriptor']>;
 export interface ReviewEditState { id: string; childId?: string; state: 'incomplete' | 'input-required' | 'unbound-input' | 'repair-required' | 'completed' | 'abandoned' }
 export const reviewEditRoot = (fs: ProjectWorkspaceFS, id: string) => `${workspacePackageRoot(fs)}review-edit/${technicalId(id)}/`;
@@ -115,7 +116,8 @@ export async function reviewEditPublication(fs: ProjectWorkspaceFS, parent: Awai
   return { schema: 'lociview-review-edit-published-1', jobId: d.jobId, prepared: reference(d), childId: d.childId, publication: reference(publication) };
 }
 
-export async function reviewEditStates(fs: ProjectWorkspaceFS, limits: MetadataLimits): Promise<ReviewEditState[]> {
+export async function reviewEditStates(fs: ProjectWorkspaceFS, limits: MetadataLimits,
+  completedChild?: (observation: CompletedReviewChild) => void): Promise<ReviewEditState[]> {
   const result: ReviewEditState[] = [];
   const children = await reviewEditChildren(fs, limits);
   for (const id of await reviewEditIds(fs, limits)) {
@@ -150,6 +152,7 @@ export async function reviewEditStates(fs: ProjectWorkspaceFS, limits: MetadataL
         if (copy.archive.sha256 !== parent.descriptor.copy.sha256) fail('review-edit-child-evidence');
       }
       if (receipt && json(receipt) !== json(await reviewEditPublication(fs, parent, limits))) fail('review-edit-completion');
+      if (receipt) completedChild?.({ childId: parent.descriptor.childId, binding: structuredClone(parent.binding) });
       result.push({ id, childId, state: receipt ? 'completed' : 'incomplete' });
     } catch { result.push({ id, childId, state: 'repair-required' }); }
   }
@@ -184,7 +187,7 @@ export async function persistReviewEdit(fs: ProjectWorkspaceFS, prepared: Prepar
   for (const p of paths) { const f = await fs.readStream(p); if (!f || !Number.isSafeInteger(f.size) || f.size < 0) return fail('review-edit-size'); bytes += f.size; }
   const bodies = prepared.clean.description.closure.entries.reduce((n, e) => n + e.byteLength, 0);
   const journalBytes = prepared.clean.source.originalChanges().reduce((n, part) => n + part.byteLength, 0);
-  if (bytes + prepared.original.size + 2 * prepared.copy.size + bodies + d.metadata.byteLength + 4 * journalBytes + 12 * L.controlBytes > 2_147_483_648 - 16_777_216) fail('review-edit-budget');
+  if (bytes + prepared.original.size + prepared.scratchByteLength + 2 * prepared.copy.size + bodies + d.metadata.byteLength + 4 * journalBytes + 12 * L.controlBytes > 2_147_483_648 - 16_777_216) fail('review-edit-budget');
   await writeReceipt(fs, `${path}prepared.json`, d, limits);
   await writeReceipt(fs, index(fs, id), reviewEditMarker('index', id, ref), limits);
   await writeReceipt(fs, `${path}recipe.json`, prepared.reconstruction, limits);
@@ -196,4 +199,5 @@ export async function persistReviewEdit(fs: ProjectWorkspaceFS, prepared: Prepar
   await write('copy.zip', prepared.copy); await write('original.zip', prepared.original);
   await readReviewEdit(fs, id, limits);
   await writeReceipt(fs, `${path}start.json`, reviewEditMarker('start', id, ref), limits);
+  await prepared.releaseScratch();
 }

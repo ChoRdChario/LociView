@@ -1,7 +1,7 @@
 import type { ProjectWorkspaceFS } from '../platform/fs';
-import type { MetadataProjectSession } from '../projectMetadata/session';
+import type { MetadataProjectSession, MetadataSessionRead } from '../projectMetadata/session';
 import type { OriginBlobStore } from '../projectMetadata/blobStore';
-import type { MetadataLimits } from '../projectMetadata/format';
+import type { MetadataLimits, MetadataProof } from '../projectMetadata/format';
 import { json, withMetadataRead } from '../projectMetadata/persistence';
 import { WorkspaceOutputJob } from '../projectPackage/outputJob';
 import { ContributionOutputJob } from '../projectPackage/contributionOutputJob';
@@ -57,13 +57,16 @@ export class WorkspaceSender {
       key.kind === 'review' ? this.session.verifyReviewOutput(id, file, this.store) :
       key.kind === 'backup' ? this.session.verifyBackupOutput(id, file, this.store) : this.session.verifyContributionOutput(id, file, this.store);
   }); }
-  async availableBases(): Promise<ContributionBaseChoice[]> {
+  async availableBases(current?: MetadataSessionRead): Promise<ContributionBaseChoice[]> {
+    // One successful command's display projection only; commands never use it.
+    const proof = current?.state === 'ready' && current.source ? structuredClone(current.source.proof) : undefined;
     return withMetadataRead(this.fs, undefined, ({ fs }) =>
-      new WorkspaceSender(fs, this.session, this.store, this.limits, this.locks).availableBasesDirect());
+      new WorkspaceSender(fs, this.session, this.store, this.limits, this.locks).availableBasesDirect(proof));
   }
-  private async availableBasesDirect(): Promise<ContributionBaseChoice[]> {
-    const read = await this.session.read(); if (read.state !== 'ready' || !read.source) return [];
-    const bases = new WorkspaceBaseStore(this.fs, this.limits, read.source.proof), rows = await bases.read();
+  private async availableBasesDirect(observed?: MetadataProof): Promise<ContributionBaseChoice[]> {
+    let proof = observed;
+    if (!proof) { const read = await this.session.read(); if (read.state !== 'ready' || !read.source) return []; proof = read.source.proof; }
+    const bases = new WorkspaceBaseStore(this.fs, this.limits, proof), rows = await bases.read();
     const choices: ContributionBaseChoice[] = [];
     for (const [i, r] of rows.entries()) {
       const selection = { workspacePackageId: r.workspacePackageId, workspaceManifestSha256: r.workspaceManifestSha256, heads: [...r.declaredHeads] };

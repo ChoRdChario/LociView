@@ -9,7 +9,8 @@ import { inspectPointPly, isPointPly, pointSourceProfile, pointSourceMediaType }
 import { hasGsPlySignature, inspectGsPly, gsSourceProfile, inspectGsPlyFile, captureGsBlob } from './gsPly';
 import type { PngDecoder } from './png';
 import type { JpegDecoder } from './jpeg';
-import { checkFileLimits, fileError, validationGlbProfile, jpegGlbProfile, validationMetadataLimits, type FileValidationLimits } from './validation';
+import { PACKAGE_LIMITS } from '../projectPackage/contract';
+import { checkFileLimits, fileError, validationGlbProfile, jpegGlbProfile, validationMetadataLimits, projectFilePolicy, type ProjectFilePolicyInput } from './validation';
 
 export interface ValidationFile { readonly label: string; readonly bytes: Uint8Array; readonly file?: never }
 export interface ValidationBlobFile { readonly label: string; readonly file: Blob; readonly bytes?: never }
@@ -38,27 +39,34 @@ const fresh = (prefix: string) => `${prefix}_${newId()}`;
 export const identityPlacement = () => ({ translation: [0, 0, 0], rotationXYZW: [0, 0, 0, 1], uniformScale: 1 });
 
 /** Own native input before awaits; GS and opted-in packages retain native views. */
-export function validationModelFile(input: {label:string;file:Blob}, limits: FileValidationLimits): Promise<ValidationModelFile>;
-export function validationModelFile(input: {label:string;file:Blob}, limits: FileValidationLimits, keepPackage: true): Promise<ValidationModelFile | ValidationPackageFile>;
-export async function validationModelFile(input: {label:string;file:Blob}, limits: FileValidationLimits, keepPackage=false): Promise<ValidationModelFile | ValidationPackageFile> {
+export function validationModelFile(input: {label:string;file:Blob}, budget: ProjectFilePolicyInput): Promise<ValidationModelFile>;
+export function validationModelFile(input: {label:string;file:Blob}, budget: ProjectFilePolicyInput, keepPackage: true, maxBufferedBytes?:number): Promise<ValidationModelFile | ValidationPackageFile>;
+export async function validationModelFile(input: {label:string;file:Blob}, budget: ProjectFilePolicyInput, keepPackage=false, maxBufferedBytes?:number): Promise<ValidationModelFile | ValidationPackageFile> {
+  const policy=projectFilePolicy(budget), limits=policy.nonGs;
   const name=input.label,file=captureGsBlob(input.file);
-  if(!Number.isSafeInteger(file.size)||file.size<=0||file.size>limits.maxFileBytes)return fileError('選択したファイルがこの検証の上限を超えています。');
+  if(!Number.isSafeInteger(file.size)||file.size<=0||file.size>Math.max(policy.gs.maxFileBytes, keepPackage && policy.projectBodyBytes>limits.maxFileBytes ? PACKAGE_LIMITS.archiveBytes : limits.maxFileBytes))return fileError('選択したファイルがこの検証の上限を超えています。');
   const prefix=new Uint8Array(await file.slice(0,65536).arrayBuffer());
-  if(isPointPly(prefix)&&hasGsPlySignature(prefix))return {label:name,file};
+  if(isPointPly(prefix)&&hasGsPlySignature(prefix)){
+    if(file.size>policy.gs.maxFileBytes)return fileError('GSが容量の上限を超えています。');
+    return {label:name,file};
+  }
   // Dispatch hint only: existing archive/conversion inspectors still admit all bytes.
   if(keepPackage&&prefix[0]===0x50&&prefix[1]===0x4b&&
     (prefix[2]===3&&prefix[3]===4||prefix[2]===5&&prefix[3]===6||prefix[2]===7&&prefix[3]===8))return {label:name,package:file};
+  if(file.size>Math.min(limits.maxFileBytes,maxBufferedBytes ?? limits.maxFileBytes))return fileError('選択したファイルが容量の上限を超えています。');
   return {label:name,bytes:new Uint8Array(await file.arrayBuffer())};
 }
 
-export function prepareValidationModel(input: ValidationFile, limits: FileValidationLimits, decode?: PngDecoder, assetId?: string, jpeg?: JpegDecoder): Promise<PreparedValidationModel>;
-export function prepareValidationModel(input: ValidationModelFile, limits: FileValidationLimits, decode?: PngDecoder, assetId?: string, jpeg?: JpegDecoder): Promise<PreparedValidationModel<ValidationBody>>;
-export async function prepareValidationModel(input: ValidationModelFile, limits: FileValidationLimits, decode?: PngDecoder, assetId = fresh('ast'), jpeg?: JpegDecoder): Promise<PreparedValidationModel<ValidationBody>> {
+export function prepareValidationModel(input: ValidationFile, budget: ProjectFilePolicyInput, decode?: PngDecoder, assetId?: string, jpeg?: JpegDecoder): Promise<PreparedValidationModel>;
+export function prepareValidationModel(input: ValidationModelFile, budget: ProjectFilePolicyInput, decode?: PngDecoder, assetId?: string, jpeg?: JpegDecoder): Promise<PreparedValidationModel<ValidationBody>>;
+export async function prepareValidationModel(input: ValidationModelFile, budget: ProjectFilePolicyInput, decode?: PngDecoder, assetId = fresh('ast'), jpeg?: JpegDecoder): Promise<PreparedValidationModel<ValidationBody>> {
+  const policy=projectFilePolicy(budget), limits=policy.nonGs;
   checkFileLimits(limits);
   if (!/^ast_[0-9a-f]{32}$/.test(assetId)) return fileError('追加するモデルの識別情報を確認してください。');
   const name = validationFileLabel(input.label), file = input.file && captureGsBlob(input.file);
+  if(!file&&input.bytes!.length>limits.maxFileBytes)return fileError('大きなGSは元ファイルから選択してください。');
   const ply = !!file || isPointPly(input.bytes!), gs = !!file || ply && hasGsPlySignature(input.bytes!), point = ply && !gs;
-  const inspected = file ? await inspectGsPlyFile(file, limits) : gs ? await inspectGsPly(input.bytes!, limits) : point ? await inspectPointPly(input.bytes!, limits) : await inspectFreshValidationGlb(input.bytes!.slice(), limits, decode, jpeg);
+  const inspected = file ? await inspectGsPlyFile(file, policy.gs) : gs ? await inspectGsPly(input.bytes!, policy.gs) : point ? await inspectPointPly(input.bytes!, limits) : await inspectFreshValidationGlb(input.bytes!.slice(), limits, decode, jpeg);
   const ref: StoredBlobRef = { algorithm: 'sha256', digest: inspected.kind==='gs' ? inspected.digest : await digest(inspected.bytes), byteLength: inspected.kind==='gs' ? inspected.byteLength : inspected.bytes.length, mediaType: ply ? pointSourceMediaType : 'model/gltf-binary' };
   const body: ValidationBody = inspected.kind==='gs' && inspected.file ? {ref,file:inspected.file} : {ref,bytes:inspected.bytes!};
   const revisionId = fresh('rev'), representationId = fresh('rep'), bindingId = fresh('bnd');
@@ -83,15 +91,19 @@ export async function prepareValidationModel(input: ValidationModelFile, limits:
 
 /** New local identities from inspected files, never inferred from filenames or another Project. */
 type ValidationProjectInput<F = ValidationFile> = { run: string; title: string; models: readonly F[]; media?: readonly ValidationFile[] };
-export function prepareValidationProject(input: ValidationProjectInput, limits: FileValidationLimits, decode?: PngDecoder, jpeg?: JpegDecoder, photo?: PhotoDecoder): Promise<PreparedValidationProject>;
-export function prepareValidationProject(input: ValidationProjectInput<ValidationModelFile>, limits: FileValidationLimits, decode?: PngDecoder, jpeg?: JpegDecoder, photo?: PhotoDecoder): Promise<PreparedValidationProject<ValidationBody>>;
+export function prepareValidationProject(input: ValidationProjectInput, budget: ProjectFilePolicyInput, decode?: PngDecoder, jpeg?: JpegDecoder, photo?: PhotoDecoder): Promise<PreparedValidationProject>;
+export function prepareValidationProject(input: ValidationProjectInput<ValidationModelFile>, budget: ProjectFilePolicyInput, decode?: PngDecoder, jpeg?: JpegDecoder, photo?: PhotoDecoder): Promise<PreparedValidationProject<ValidationBody>>;
 export async function prepareValidationProject(input: ValidationProjectInput<ValidationModelFile>,
-  limits: FileValidationLimits, decode?: PngDecoder, jpeg?: JpegDecoder, photo?: PhotoDecoder): Promise<PreparedValidationProject<ValidationBody>> {
+  budget: ProjectFilePolicyInput, decode?: PngDecoder, jpeg?: JpegDecoder, photo?: PhotoDecoder): Promise<PreparedValidationProject<ValidationBody>> {
+  const policy=projectFilePolicy(budget), limits=policy.nonGs;
   checkFileLimits(limits);
   const run = technicalId(input.run), title = label(input.title), sceneId = fresh('scn'), frameId = fresh('frm');
   if (!input.models.length || input.models.length + (input.media?.length ?? 0) > limits.maxItems) return fileError('3Dモデルを選択してください。');
   const total = [...input.models, ...input.media ?? []].reduce((sum, file) => sum + (file.file ? file.file.size : file.bytes.byteLength), 0);
-  if (!Number.isSafeInteger(total) || total > limits.maxFileBytes) return fileError('選択したファイルの合計がこの検証の上限を超えています。');
+  if (!Number.isSafeInteger(total)) return fileError('選択したファイルの合計を確認してください。');
+  // Native selections do not materialize the aggregate. Bound owned byte preparation separately.
+  const ownedBytes=[...input.models,...input.media ?? []].reduce((n,f)=>n+(f.file ? 0 : f.bytes.byteLength),0);
+  if(ownedBytes>limits.maxFileBytes)return fileError('選択したファイルの合計が容量の上限を超えています。');
   // Own the complete selection before decoding awaits; later caller edits cannot swap a file.
   const models: ValidationModelFile[] = input.models.map(file => file.file ? {label:label(file.label),file:captureGsBlob(file.file)} : {label:label(file.label),bytes:file.bytes.slice()});
   const media = (input.media ?? []).map(file => ({ label: label(file.label), bytes: file.bytes.slice() }));
@@ -109,7 +121,7 @@ export async function prepareValidationProject(input: ValidationProjectInput<Val
   records.project = { title, defaultSceneId: sceneId, frame: { id: frameId, handedness: 'right', upAxis: '+Y', unit: { kind: 'meters', metersPerProjectUnit: 1 } } };
   add('scenesById', { id: sceneId, name: '全体', orderKey: 'A', lifecycle: active() });
   for (const [index, file] of models.entries()) {
-    const model = await prepareValidationModel(file, limits, decode, undefined, jpeg); blobs.push(model.body);
+    const model = await prepareValidationModel(file, policy, decode, undefined, jpeg); blobs.push(model.body);
     if (model.representation.contentKind === 'gaussianSplat') records.project = { ...(records.project as JsonObject), frame: { id: frameId, handedness: 'right', upAxis: '+Y', unit: { kind: 'unknown' } } };
     add('representationsById', model.representation); add('assetRevisionsById', model.revision);
     add('assetBindingsById', model.binding); add('assetsById', model.asset);
@@ -121,6 +133,9 @@ export async function prepareValidationProject(input: ValidationProjectInput<Val
     const ref = await blob(bytes, mime);
     add('mediaResourcesById', await sealValidationRecord('media-resource', { id: fresh('med'), label: name, mediaKind: 'image', blob: ref as unknown as JsonObject }));
   }
+  const sizes=new Map<string,number>();
+  for(const body of blobs){const prior=sizes.get(body.ref.digest);if(prior!==undefined&&prior!==body.ref.byteLength)return fileError('本体の大きさが一致しません。');sizes.set(body.ref.digest,body.ref.byteLength);}
+  if([...sizes.values()].reduce((n,size)=>n+size,0)>policy.projectBodyBytes)return fileError('モデルと画像の合計が容量の上限を超えています。');
   const checked = admitProjectRecords(records, validationMetadataLimits);
   if (checked.kind !== 'valid-records' || checked.hasUnknownFields) return fileError('初期プロジェクトの内容を確認できません。');
   return { records: cloneCanonicalValue(checked.records, validationMetadataLimits) as PreparedValidationProject['records'], blobs };

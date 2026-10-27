@@ -5,6 +5,31 @@ validation build. It launches matching downloaded Chromium with generated GLB,
 approved synthetic XYZ/RGB ASCII PLY and image inputs in dedicated profiles.
 It does not connect to the user's browser.
 
+The approved01e PC candidate has a separate `playwright.desktop.config.ts` lane.
+It builds `desktop-dist` and opens the actual `index.html` root, with Service Workers
+blocked, local-only requests and matching dedicated Chromium. It neither activates
+the normal PWA nor connects to a personal Chrome profile. Normal/validation and
+Desktop evidence are separate. All previews use4182 exclusively; run them serially.
+
+```powershell
+npm run test:e2e -- --config playwright.desktop.config.ts desktop-entry.spec.ts
+npm run test:e2e -- --config playwright.desktop.config.ts gs-workflow.spec.ts --grep 'SH4と面'
+npm run test:e2e -- --config playwright.desktop.config.ts desktop-large-gs.spec.ts
+```
+
+The large test generates/verifies a fixed owned178MB SH4 grid when absent; no user
+file or distributed binary fixture is required. It exercises all five purposes,
+return, Review edit-copy, absent-original restore and cold restart across dedicated
+profiles, verifying original digest/history/records and forbidding whole-GS
+`Blob.arrayBuffer()` in application code. Its native source/full-resident SDK path
+is not progressive paging or a total-RAM/device guarantee. The download deadline
+remains300s; the longer overall deadline only accommodates the connected actions.
+Artifacts and interrupted/failing profiles remain under ignored `.artifacts/e2e`.
+For a local candidate preview, use `npm run build:desktop` then
+`npm run preview:desktop`; it creates no SW/install assets. Continuing existing
+validation data requires the same origin/profile; a different output directory
+alone does not transfer data. Do not deploy this candidate over a normal PWA root.
+
 The separate `playwright.normal.config.ts` builds/previews the ordinary `index.html`
 entry for07j's existing Native/v1 compatibility smoke. Run it with
 `npm run test:e2e -- --config playwright.normal.config.ts`. Its dedicated profiles
@@ -259,6 +284,13 @@ and HTML/JSON reports stay under ignored `.artifacts/e2e/`. Each execution has a
 separate `runs/<identifier>/` directory, so a later run retains earlier failures.
 These artifacts contain synthetic test data only. Browser installation is reused.
 
+The Desktop candidate's `desktop-loading.spec.ts` cold-reopens an owned Point +
+textured-GLB Project with image decode deliberately held. It checks early Caption
+search/reading, actual ready-Point pixels/camera, fenced changes/files, local spinner
+and reduced motion, retained search/selection and identical backup history after
+release. This is a presentation/fence check with an artificial delay, not a loading
+speed benchmark. Run it through `playwright.desktop.config.ts`; todo owns results.
+
 `tests/e2e/*.spec.ts` is separate from the Node Vitest `*.test.ts` suite. Continue
 running the existing required checkpoint checks; passing E2E does not replace them.
 Functional storage waits have generous bounded deadlines. Recorded whole-action
@@ -267,7 +299,7 @@ diagnostic observations, not performance acceptance or a product capacity promis
 
 This is desktop dedicated-Chromium evidence for the recorded validation build and
 headless execution. It does not verify the broken Chrome plugin, physical iPhone,
-offline/PWA, ordinary-entry activation, broader format support or aggregate adoption.
+offline/PWA, general ordinary-release activation, broader format support or aggregate adoption.
 Current execution outcomes and next work belong in [todo](../tasks/todo.md).
 
 Playwright references: [installation](https://playwright.dev/docs/intro),

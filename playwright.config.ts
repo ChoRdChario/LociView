@@ -5,7 +5,7 @@ if (!/^\d+-\d+$/.test(run)) throw Error('Invalid E2E run identifier');
 const artifacts = `.artifacts/e2e/runs/${run}`;
 export default defineConfig({
   testDir: './tests/e2e', testMatch: '**/*.spec.ts',
-  testIgnore: '**/normal-three-compat.spec.ts',
+  testIgnore: ['**/normal-three-compat.spec.ts','**/desktop-*.spec.ts'],
   fullyParallel: false, workers: 1, retries: 0,
   // Functional diagnostics only; these deadlines are not latency acceptance.
   timeout: 360_000, expect: { timeout: 15_000 },

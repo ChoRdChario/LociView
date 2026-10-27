@@ -32,9 +32,14 @@ export async function writeReviewArchive(capture: ReviewSourceCapture, store: Pi
 /** History-free standalone inspection; this does not initialize metadata or acknowledge storage. */
 export class ReviewArchive {
   readonly kind = 'review-archive-inspection';
-  private constructor(readonly archive: PackageArchive, readonly review: ReviewSnapshot) {}
+  private constructor(readonly archive: PackageArchive, readonly review: ReviewSnapshot) { Object.freeze(this); }
   static async inspect(file: Blob, limits: MetadataLimits, signal?: AbortSignal) {
-    const archive = await PackageArchive.inspect(file, signal), manifest = archive.control.manifest;
+    return this.fromArchive(await PackageArchive.inspect(file, signal), limits, signal);
+  }
+  /** Only the currently live input owner may reuse its immutable native capture. */
+  async reopen(limits: MetadataLimits) { return ReviewArchive.fromArchive(await this.archive.reopenCapturedControl(), limits); }
+  private static async fromArchive(archive: PackageArchive, limits: MetadataLimits, signal?: AbortSignal) {
+    const manifest = archive.control.manifest;
     if (manifest.purpose !== 'review') return fail('purpose');
     const review = await readReviewSnapshot(await archive.entryBytes('review.json', L.snapshotBytes, signal), limits); checkAbort(signal);
     if (review.snapshot.snapshotId !== manifest.snapshotId || !same(review.closure.entries as unknown as JsonValue, manifest.blobs as unknown as JsonValue) ||

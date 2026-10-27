@@ -126,19 +126,27 @@ export async function readRestoreControls(fs: ProjectWorkspaceFS, limits: Metada
   if (paths.length > L.entryCount || new Set(paths).size !== paths.length) fail('restore-control-budget');
   const byJob = new Map<string, Map<string, string>>(), selectionPaths: string[] = [], sizes = new Map<string, number>();
   let controlBytes = 0, nodes = 0, work = 0;
-  for (const path of paths) {
-    if (!path.startsWith(prefix)) fail('restore-control-path');
-    const local = path.slice(prefix.length), job = /^jobs\/([0-9a-f]{32})\/(input\.zip|prepared\.json|start\.json|db-opened\.json|result\.json|abandoned\.json)$/.exec(local),
-      index = /^index\/([0-9a-f]{32})\.json$/.exec(local);
-    if (job || index) {
-      const id = (job ?? index)![1]!, files = byJob.get(id) ?? new Map<string, string>();
-      files.set(job ? job[2]! : 'index', path); byJob.set(id, files);
-    } else if (/^selections\/[0-9a-f]{64}\.json$/.test(local)) selectionPaths.push(path);
-    else fail('restore-control-path');
-    const file = await fs.readStream(path);
-    if (!file || !Number.isSafeInteger(file.size) || file.size < 0 || file.size > (job?.[2] === 'input.zip' ? L.archiveBytes : readLimits.maxTotalBytes)) return fail('restore-control-size');
-    sizes.set(path, file.size);
-    if (job?.[2] !== 'input.zip') { controlBytes += file.size; if (controlBytes > L.controlsBytes) fail('restore-control-budget'); }
+  // Overlap size-only native opens within this audit; receipt bytes below are
+  // still freshly reopened, parsed and checked in the original order.
+  for (let at = 0; at < paths.length; at += 4) {
+    const opened = await Promise.allSettled(paths.slice(at, at + 4).map(async path => {
+      if (!path.startsWith(prefix)) return fail('restore-control-path');
+      const local = path.slice(prefix.length), job = /^jobs\/([0-9a-f]{32})\/(input\.zip|prepared\.json|start\.json|db-opened\.json|result\.json|abandoned\.json)$/.exec(local),
+        index = /^index\/([0-9a-f]{32})\.json$/.exec(local);
+      if (!job && !index && !/^selections\/[0-9a-f]{64}\.json$/.test(local)) return fail('restore-control-path');
+      return { path, job, index, file: await fs.readStream(path) };
+    }));
+    for (const result of opened) {
+      if (result.status === 'rejected') throw result.reason;
+      const { path, job, index, file } = result.value;
+      if (job || index) {
+        const id = (job ?? index)![1]!, files = byJob.get(id) ?? new Map<string, string>();
+        files.set(job ? job[2]! : 'index', path); byJob.set(id, files);
+      } else selectionPaths.push(path); // Namespace was checked before the open.
+      if (!file || !Number.isSafeInteger(file.size) || file.size < 0 || file.size > (job?.[2] === 'input.zip' ? L.archiveBytes : readLimits.maxTotalBytes)) return fail('restore-control-size');
+      sizes.set(path, file.size);
+      if (job?.[2] !== 'input.zip') { controlBytes += file.size; if (controlBytes > L.controlsBytes) fail('restore-control-budget'); }
+    }
   }
   const read = async <T>(path: string): Promise<T> => {
     const value = await readReceipt<T>(fs, path, readLimits); if (!value) return fail('restore-control-missing');

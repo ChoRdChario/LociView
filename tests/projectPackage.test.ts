@@ -103,6 +103,21 @@ async function unpackFixture(file: Blob) {
   return entries;
 }
 
+async function blockScanFixture() {
+  const h = await workspaceFixture(), entries = await unpackFixture(h.file), old = entries.at(-1)!;
+  const body = Uint8Array.from({ length: 2 * 1_048_576 + 65_539 }, (_, i) => (i * 37 + 11) % 251);
+  const digest = packageByteHash(body), path = `blobs/sha256/${digest}`;
+  const manifest = JSON.parse(new TextDecoder().decode(entries[0]!.bytes));
+  manifest.blobs = manifest.blobs.map((e: Entry) => e.path === old.path ? { path, byteLength: body.length, sha256: digest } : e)
+    .sort((a: Entry, b: Entry) => a.path < b.path ? -1 : 1);
+  recount(manifest);
+  const bodies = new Map(entries.slice(3).map(e => [e.path, e.bytes])); bodies.delete(old.path); bodies.set(path, body);
+  const file = fixedZip([{ path: 'manifest.json', bytes: encode(canonical(manifest)) },
+    { path: 'manifest.sha256', bytes: encode(packageByteHash(encode(canonical(manifest)))) }, entries[2]!,
+    ...manifest.blobs.map((e: Entry) => ({ path: e.path, bytes: bodies.get(e.path)! }))]);
+  return { file, body, path };
+}
+
 describe('selected-Scene review snapshot (not View activation or external saving)', () => {
   const make = (records: Record<string, any>) => ProjectMetadataSource.bootstrap(records.schema, records.identity, metadataLimits).initialize(records);
   const change = (source: ProjectMetadataSource, fn: (d: Record<string, any>) => void) =>
@@ -813,6 +828,49 @@ describe('connected Workspace ZIP generation and integrity (not admission or ext
       for (let i = 0; i < L.streamChunks; i++) expect((await empty.read()).value).toHaveLength(0);
       await expect(empty.read()).rejects.toThrow(/zip-stream-budget/); expect(zeros).toBe(L.streamChunks);
     } finally { empty.releaseLock(); }
+  });
+
+  it('scans bounded native blocks with exact hashes and keeps buffered entry reads at64KiB', async () => {
+    const f = await blockScanFixture(), expected = packageByteHash(new Uint8Array(await f.file.arrayBuffer())), reads: number[] = [];
+    const original = Blob.prototype.arrayBuffer, spy = vi.spyOn(Blob.prototype, 'arrayBuffer').mockImplementation(function(this: Blob) {
+      reads.push(this.size); return original.call(this);
+    });
+    try {
+      const archive = await PackageArchive.inspect(f.file);
+      expect(archive.sha256).toBe(expected); expect(reads.filter(n => n === 1_048_576)).toHaveLength(2);
+      expect(Math.max(...reads)).toBe(1_048_576); reads.length = 0;
+      expect(await archive.entryBytes(f.path, L.sourceBytes)).toEqual(f.body); expect(Math.max(...reads)).toBe(65_536);
+      const crc = new ZipCrc32(); for (let at = 0; at < f.body.length; at += 31_337) crc.update(f.body.subarray(at, at + 31_337));
+      expect(crc.digest()).toBe(fixtureCrc(f.body));
+    } finally { spy.mockRestore(); }
+  });
+
+  it('rejects native block short reads and observes cancellation before another block', async () => {
+    const f = await blockScanFixture(), original = Blob.prototype.arrayBuffer;
+    for (const mode of ['short', 'abort', 'between'] as const) {
+      const cancel = new AbortController(); let blocks = 0;
+      const spy = vi.spyOn(Blob.prototype, 'arrayBuffer').mockImplementation(async function(this: Blob) {
+        const bytes = await original.call(this);
+        if (this.size === 1_048_576) {
+          blocks++; if (mode === 'abort') cancel.abort(); else if (mode === 'between') setTimeout(() => cancel.abort(), 0); else return bytes.slice(0, -1);
+        }
+        return bytes;
+      });
+      try {
+        await expect(PackageArchive.inspect(f.file, cancel.signal)).rejects.toThrow(mode === 'short' ? /zip-short-read/ : /abort/i);
+        expect(blocks).toBe(1);
+      } finally { spy.mockRestore(); }
+    }
+  });
+
+  it('checks corruption on both sides of native and logical block boundaries', async () => {
+    const f = await blockScanFixture(), entries = await unpackFixture(f.file), bodyIndex = entries.findIndex(e => e.path === f.path);
+    const payloadAt = entries.slice(0, bodyIndex).reduce((n, e) => n + 30 + e.path.length + e.bytes.length + 16, 0) + 30 + f.path.length;
+    const bytes = new Uint8Array(await f.file.arrayBuffer());
+    for (const offset of [65_535, 65_536, 1_048_575, 1_048_576, f.body.length - 1]) {
+      const changed = bytes.slice(); changed[payloadAt + offset] = changed[payloadAt + offset]! ^ 1;
+      await expect(PackageArchive.inspect(new Blob([changed]))).rejects.toThrow(/zip-crc/);
+    }
   });
 
   it('matches an independently encoded ZIP, reads with zip.js, and retains complete original metadata', async () => {

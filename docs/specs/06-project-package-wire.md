@@ -1724,8 +1724,14 @@ extent independently of the writer library. Entries begin at zero, are contiguou
 and correspond one-to-one in the manifest's order; central ends at EOCD and no
 prefix, gaps, suffix, extra/comment, alias, ZIP64 or alternative descriptor passes.
 Headers share the metadata budget; raw ranges, control copies and body streams
-share finite reads/buffers. Read payloads in at most 64 KiB ranges; do not buffer a
-whole archive. Controls are decoded only after their declared bounds pass.
+share finite reads/buffers. Payload validation uses64KiB logical pieces. The
+2026-10-28 internal refinement in[01e§2.3](01e-desktop-large-gs-workflow.md) permits
+only the full payload scan to capture one native range of at most1MiB and process
+its non-copying64KiB pieces in order, preserving logical range/stream charging,
+CRC/both SHA/abort checks and fresh inspection lifetimes. Headers, controls and
+buffered entry reads retain64KiB physical ranges. No parallel prefetch, retained
+cross-entry block or whole archive buffering is allowed; count transient native
+blocks within the existing64MiB I/O envelope. Controls are decoded only after their declared bounds pass.
 Buffered entry reads require a finite safe-integer maximum no greater than the
 source bound and only one may run per archive at a time. Each range observes both
 the archive and the current read's cancellation signal; a rejected/cancelled read

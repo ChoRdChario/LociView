@@ -1,3 +1,5 @@
+import { validationDeclaredBodyBytes } from './bodyBudget';
+import type { ProjectProviderRead } from '../scene/projectProvider';
 import { inspectProjectImage, projectImageMime, freshPhotoSelectionIssue, type PhotoDecoder } from './photo';
 import type { ProjectWorkspaceFS, WorkspaceReadableFile } from '../platform/fs';
 import type { ContentRequest, ProjectContentVerifier } from '../domain/projectContentChecks';
@@ -17,7 +19,7 @@ import { inspectPointPly, isPointModel, isGsModel, isGlbModel, pointSourceProfil
 import { gsSourceProfile, inspectGsPly, inspectGsPlyFile, captureGsBlob, gsBlobStream, hasGsPlySignature } from './gsPly';
 import type { PngDecoder } from './png';
 import type { JpegDecoder } from './jpeg';
-import { fileError, fileObject, validationGlbProfile, occurrenceGlbProfile, jpegGlbProfile, occurrenceJpegGlbProfile, validationMetadataLimits, type FileValidationLimits } from './validation';
+import { fileError, fileObject, validationGlbProfile, occurrenceGlbProfile, jpegGlbProfile, occurrenceJpegGlbProfile, validationMetadataLimits, projectFilePolicy, type FileValidationLimits, type ProjectFilePolicy, type ProjectFilePolicyInput } from './validation';
 import { identityPlacement, prepareValidationModel, sealValidationRecord, validationFileLabel, type ValidationFile, type ValidationModelFile } from './initialProject';
 
 export async function readValidationBody(file: WorkspaceReadableFile, maxBytes: number): Promise<Uint8Array> {
@@ -37,9 +39,18 @@ export async function readValidationBody(file: WorkspaceReadableFile, maxBytes: 
 export class ValidationContent implements MetadataMediaPort {
   private readonly preparedImages = new Map<string, { record: JsonObject; bytes: Uint8Array; ref: StoredBlobRef }>();
   private readonly preparedModels = new Map<string, Awaited<ReturnType<typeof prepareValidationModel>>>();
+  readonly limits: FileValidationLimits;
+  readonly policy: ProjectFilePolicy;
   constructor(private readonly fs: ProjectWorkspaceFS, readonly store: OriginBlobStore,
-    readonly limits: FileValidationLimits, private readonly decode?: PngDecoder,
-    private readonly checkRead?: () => Promise<void>, private readonly jpeg?: JpegDecoder, private readonly photo?: PhotoDecoder) {}
+    budget: ProjectFilePolicyInput, private readonly decode?: PngDecoder,
+    private readonly checkRead?: () => Promise<void>, private readonly jpeg?: JpegDecoder, private readonly photo?: PhotoDecoder) { this.policy=projectFilePolicy(budget); this.limits=this.policy.nonGs; }
+  assertIntroduction(provider:Extract<ProjectProviderRead,{kind:'scene-provider'}>,record:JsonObject):void {
+    validationDeclaredBodyBytes(provider,this.policy,record);
+  }
+  async assertBodySize(ref:JsonObject,file:Blob):Promise<void> {
+    const gs=ref.mediaType===pointSourceMediaType&&hasGsPlySignature(new Uint8Array(await file.slice(0,65536).arrayBuffer()));
+    if(file.size>(gs?this.policy.gs:this.limits).maxFileBytes)return fileError('本体が容量の上限を超えています。');
+  }
   /** Owned input only; no body or Project write until the existing journal stages it. */
   async prepareImage(input: ValidationFile): Promise<JsonObject> {
     this.fs.mutationAuthority.assertWorkspaceWriteAuthorized();
@@ -57,7 +68,7 @@ export class ValidationContent implements MetadataMediaPort {
   releasePreparedModel(id:string):void { this.preparedModels.delete(id); }
   async prepareModel(input: ValidationModelFile, assetId: string) {
     this.fs.mutationAuthority.assertWorkspaceWriteAuthorized();
-    const prepared = await prepareValidationModel(input, this.limits, this.decode, assetId, this.jpeg);
+    const prepared = await prepareValidationModel(input, this.policy, this.decode, assetId, this.jpeg);
     this.preparedModels.set(prepared.representation.id as string, prepared);
     const { body: _body, ...records } = prepared;
     return cloneCanonicalValue(records, validationMetadataLimits) as typeof records;
@@ -78,7 +89,7 @@ export class ValidationContent implements MetadataMediaPort {
   }
   async inspectPreparedModel(request: ContentRequest) {
     const body=this.preparedModel(request.records[0]!).body;
-    return this.execute(request, { model: body.file ? await inspectDeclaredValidationBlob(request.records[0]!,body.file,this.limits) : await this.inspectModel(request.records[0]!,body.bytes.slice()) });
+    return this.execute(request, { model: body.file ? await inspectDeclaredValidationBlob(request.records[0]!,body.file,this.policy) : await this.inspectModel(request.records[0]!,body.bytes.slice()) });
   }
   async stagePreparedModel(record: JsonObject): Promise<void> {
     this.fs.mutationAuthority.assertWorkspaceWriteAuthorized();
@@ -93,7 +104,7 @@ export class ValidationContent implements MetadataMediaPort {
   async modelContent(record: JsonObject, readOnly = false): Promise<ValidatedModel> {
     await this.checkRead?.(); const blob = await this.modelDeclaration(record);
     const file=await (readOnly ? this.store.openReadOnly(blob) : this.store.open(blob));
-    const model = record.contentKind==='gaussianSplat' && file.blob ? await inspectDeclaredValidationBlob(record,await file.blob(),this.limits) :
+    const model = record.contentKind==='gaussianSplat' && file.blob ? await inspectDeclaredValidationBlob(record,await file.blob(),this.policy) :
       await this.inspectModel(record, await readValidationBody(file,this.limits.maxFileBytes));
     await this.checkRead?.(); return model;
   }
@@ -112,7 +123,7 @@ export class ValidationContent implements MetadataMediaPort {
     if (await inspectProjectImage(bytes, this.limits, this.decode, this.jpeg, this.photo) !== blob.mediaType) return fileError('画像の本体形式が一致しません。');
   }
   private inspectModel(record: JsonObject, bytes: Uint8Array) {
-    return inspectDeclaredValidationModel(record, bytes, this.limits, this.decode, this.jpeg);
+    return inspectDeclaredValidationModel(record, bytes, this.policy, this.decode, this.jpeg);
   }
   /** Original incoming record and immutable range, no ID allocation or storage/evidence writes. */
   async inspectReceived(input: ContentRequest, file: Blob) {
@@ -121,9 +132,9 @@ export class ValidationContent implements MetadataMediaPort {
     const record = request.records[0]!, check = new ProjectRecordFields(); check.blob(record.blob!, []);
     if (check.unknown) return fileError('受信する本体の情報が不正です。');
     const ref = record.blob as JsonObject;
-    if (file.size !== ref.byteLength || file.size <= 0 || file.size > this.limits.maxFileBytes) return fileError('受信する本体の大きさが不正です。');
+    if (file.size !== ref.byteLength || file.size <= 0 || file.size > (record.contentKind==='gaussianSplat'?this.policy.gs:this.limits).maxFileBytes) return fileError('受信する本体の大きさが不正です。');
     if (request.fact === 'media') this.imageDeclaration(record); else await this.modelDeclaration(record);
-    if(request.fact!=='media'&&record.contentKind==='gaussianSplat')return this.execute(request,{model:await inspectDeclaredValidationBlob(record,file,this.limits)});
+    if(request.fact!=='media'&&record.contentKind==='gaussianSplat')return this.execute(request,{model:await inspectDeclaredValidationBlob(record,file,this.policy)});
     const bytes = await readValidationBody({ size: file.size, stream: () => file.stream() }, this.limits.maxFileBytes);
     if (await digest(bytes) !== ref.digest) return fileError('受信する本体が一致しません。');
     if (request.fact === 'media') {
@@ -136,8 +147,8 @@ export class ValidationContent implements MetadataMediaPort {
   async inspectReceivedEquivalence(request: ContentRequest, file: Blob) {
     const gs=validationGsEquivalenceSource(request); if(!gs) return fileError('GSの同一表面を確認できません。');
     const ref=await this.modelDeclaration(gs);
-    if(file.size!==ref.byteLength || file.size>this.limits.maxFileBytes) return fileError('GSの原本の大きさが一致しません。');
-    return this.execute(request,{model:await inspectDeclaredValidationBlob(gs,file,this.limits)});
+    if(file.size!==ref.byteLength || file.size>this.policy.gs.maxFileBytes) return fileError('GSの原本の大きさが一致しません。');
+    return this.execute(request,{model:await inspectDeclaredValidationBlob(gs,file,this.policy)});
   }
   async stageReceived(file: Blob, ref: JsonObject): Promise<void> {
     this.fs.mutationAuthority.assertWorkspaceWriteAuthorized();
@@ -159,12 +170,12 @@ export class ValidationContent implements MetadataMediaPort {
       const file=await this.store.open(blob);
       if(blob.mediaType===pointSourceMediaType&&file.blob){
         const snapshot=await file.blob(),prefix=new Uint8Array(await snapshot.slice(0,65536).arrayBuffer());
-        if(hasGsPlySignature(prefix)){const gs=await inspectGsPlyFile(snapshot,this.limits);if(gs.digest!==blob.digest||gs.byteLength!==blob.byteLength)return fileError('GSの原本が一致しません。');continue;}
+        if(hasGsPlySignature(prefix)){const gs=await inspectGsPlyFile(snapshot,this.policy.gs);if(gs.digest!==blob.digest||gs.byteLength!==blob.byteLength)return fileError('GSの原本が一致しません。');continue;}
       }
       const bytes = await readValidationBody(file, this.limits.maxFileBytes);
       if (projectImageMime(blob.mediaType)) await this.inspectImage(bytes, blob);
       else if (blob.mediaType === 'model/gltf-binary') await inspectFreshValidationGlb(bytes, this.limits, this.decode, this.jpeg);
-      else if (blob.mediaType === pointSourceMediaType) await (hasGsPlySignature(bytes) ? inspectGsPly(bytes, this.limits) : inspectPointPly(bytes, this.limits));
+      else if (blob.mediaType === pointSourceMediaType) await (hasGsPlySignature(bytes) ? inspectGsPly(bytes, this.policy.gs) : inspectPointPly(bytes, this.limits));
       else return fileError('追加する本体形式が不正です。');
     }
   }
@@ -238,11 +249,13 @@ export async function validationModelDeclaration(record: JsonObject, use: 'saved
   if (blob.mediaType !== (point || gs ? pointSourceMediaType : 'model/gltf-binary')) return fileError('保存したモデルの本体形式が一致しません。');
   return blob;
 }
-export async function inspectDeclaredValidationModel(record: JsonObject, bytes: Uint8Array, limits: FileValidationLimits,
+export async function inspectDeclaredValidationModel(record: JsonObject, bytes: Uint8Array, budget: ProjectFilePolicyInput,
   png?: PngDecoder, jpeg?: JpegDecoder, use: 'saved' | 'review' = 'saved'): Promise<ValidatedModel> {
+  const policy=projectFilePolicy(budget), limits=policy.nonGs;
+  if(bytes.length>limits.maxFileBytes)return fileError('大きなGSは元ファイルから選択してください。');
   await validationModelDeclaration(record, use);
   if (same(record.formatProfile, await pointSourceProfile())) return inspectPointPly(bytes, limits);
-  if (same(record.formatProfile, await gsSourceProfile())) return inspectGsPly(bytes, limits, { representationToAsset: record.representationToAsset as JsonObject, logicalBoundsAsset: record.logicalBoundsAsset as JsonObject });
+  if (same(record.formatProfile, await gsSourceProfile())) return inspectGsPly(bytes, policy.gs, { representationToAsset: record.representationToAsset as JsonObject, logicalBoundsAsset: record.logicalBoundsAsset as JsonObject });
   const inspect = same(record.formatProfile, await occurrenceJpegGlbProfile()) ? inspectOccurrenceJpegGlb :
     same(record.formatProfile, await jpegGlbProfile()) ? inspectValidationJpegGlb :
     same(record.formatProfile, await occurrenceGlbProfile()) ? inspectOccurrenceGlb : inspectValidationGlb;
@@ -250,12 +263,13 @@ export async function inspectDeclaredValidationModel(record: JsonObject, bytes: 
 }
 
 /** Exact checked immutable snapshot for GS; other formats retain their byte path. */
-export async function inspectDeclaredValidationBlob(input: JsonObject, inputFile: Blob, limits: FileValidationLimits,
+export async function inspectDeclaredValidationBlob(input: JsonObject, inputFile: Blob, budget: ProjectFilePolicyInput,
   png?: PngDecoder, jpeg?: JpegDecoder, use: 'saved' | 'review' = 'saved'): Promise<ValidatedModel> {
+  const policy=projectFilePolicy(budget), limits=policy.nonGs;
   const record=cloneCanonicalValue(input,validationMetadataLimits) as JsonObject,file=captureGsBlob(inputFile);
   const ref=await validationModelDeclaration(record,use);
   if(record.contentKind!=='gaussianSplat')return inspectDeclaredValidationModel(record,await readValidationBody(file,limits.maxFileBytes),limits,png,jpeg,use);
-  const model=await inspectGsPlyFile(file,limits,{representationToAsset:record.representationToAsset as JsonObject,logicalBoundsAsset:record.logicalBoundsAsset as JsonObject});
+  const model=await inspectGsPlyFile(file,policy.gs,{representationToAsset:record.representationToAsset as JsonObject,logicalBoundsAsset:record.logicalBoundsAsset as JsonObject});
   if(model.digest!==ref.digest||model.byteLength!==ref.byteLength)return fileError('GSの原本が一致しません。');
   return model;
 }

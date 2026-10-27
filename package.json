@@ -7,6 +7,8 @@
     "dev": "vite",
     "build": "vite build",
     "build:harness": "vite build --mode spark-harness",
+    "build:desktop": "vite build --mode project-scene-desktop",
+    "preview:desktop": "vite preview --mode project-scene-desktop --outDir desktop-dist --host 127.0.0.1 --port 4182 --strictPort",
     "build:validation": "vite build --mode project-scene-validation",
     "preview": "vite preview",
     "preview:harness": "vite preview --outDir dev-dist --port 4181 --strictPort",
@@ -21,7 +23,7 @@
     "test:related": "vitest related --run --reporter=dot --silent=passed-only --maxWorkers=2 --testTimeout=30000",
     "test:e2e": "node scripts/run-e2e.mjs",
     "test:e2e:install": "node scripts/run-e2e.mjs --install",
-    "check:checkpoint": "npm run typecheck && npm run test:focus && npm run build && npm run build:harness && npm run build:validation",
+    "check:checkpoint": "npm run typecheck && npm run test:focus && npm run build && npm run build:harness && npm run build:validation && npm run build:desktop",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
   },

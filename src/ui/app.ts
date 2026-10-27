@@ -33,13 +33,15 @@ import type { LociMyuDisplaySetRelationConfirmation } from '../io/locimyu';
 /** これを超えるモデルは開いた時点で自動読み込みせず、手動表示に委ねる（iOSメモリ対策） */
 const AUTO_LOAD_LIMIT = 25 * 1024 * 1024;
 
-export async function bootApp(root: HTMLElement): Promise<void> {
+export interface LegacyAppController {openFile(file:File):Promise<void>;close():Promise<boolean>}
+export interface LegacyAppOptions {pwa?:boolean;initialFile?:File;onNewProject?(files:readonly File[]):Promise<void>;onReady?(controller:LegacyAppController):void}
+export async function bootApp(root: HTMLElement, options:LegacyAppOptions={}): Promise<void> {
   // ---- PWA（オフライン起動・インストール・ファイル関連付け）------------------------
-  initFileHandlers();
+  if(options.pwa!==false){initFileHandlers();
   initInstallPrompt();
   void registerPwa({
     onUpdate: (applyUpdate) => showToast('新しいバージョンがあります', '更新', applyUpdate),
-  });
+  });}
 
   // ---- ワークスペース ----------------------------------------------------------
   let fs: WorkspaceFS;
@@ -83,7 +85,7 @@ export async function bootApp(root: HTMLElement): Promise<void> {
   let v1ConversionInProgress = false;
   let lociMyuConversionInProgress = false;
   let activeHomeUi: NativeHomeUi | null = null;
-  let homeEpoch = 0;
+  let homeEpoch = 0;let homeFiles:ReturnType<typeof mountHome>|undefined,closed=false;
 
   // ---- 保存状態（書き出し済みop数をプロジェクトごとに記録） -----------------------------
   const exportedKey = (dir: string): string => `lv-package-covered:${dir}`;
@@ -583,6 +585,7 @@ export async function bootApp(root: HTMLElement): Promise<void> {
     clear(root);
     root.className = '';
     const deps = {
+      pwa:options.pwa,onNewProject:options.onNewProject,
       fs,
       identity,
       openProject,
@@ -595,7 +598,7 @@ export async function bootApp(root: HTMLElement): Promise<void> {
       convertLociMyuZipToNative,
     };
     if (!persistentWorkspace) {
-      mountHome(root, deps);
+      homeFiles=mountHome(root, deps);
       return;
     }
     try {
@@ -606,18 +609,18 @@ export async function bootApp(root: HTMLElement): Promise<void> {
         mount: (container, nativeHome) => {
           if (epoch !== homeEpoch) return;
           activeHomeUi = nativeHome;
-          mountHome(container, { ...deps, nativeHome });
+          homeFiles=mountHome(container, { ...deps, nativeHome });
         },
         openProject: openNativeProjects,
-      });
+      },{pwa:options.pwa});
     } catch (error) {
       if (epoch !== homeEpoch) return;
       clear(root);
-      mountHome(root, { ...deps, storageWarning: `プロジェクトの準備に失敗しました：${error instanceof Error ? error.message : String(error)}` });
+      homeFiles=mountHome(root, { ...deps, storageWarning: `プロジェクトの準備に失敗しました：${error instanceof Error ? error.message : String(error)}` });
     }
   }
 
-  async function closeProjectAndShowHome(): Promise<boolean> {
+  async function closeProjectAndShowHome(showHome=true): Promise<boolean> {
     if (activeHomeUi?.busy) {
       await infoDialog('ファイル処理中', '先に処理と、書き出したファイルの保存確認を完了してください。受け取るファイルは、その後にもう一度開いてください。');
       return false;
@@ -651,7 +654,7 @@ export async function bootApp(root: HTMLElement): Promise<void> {
     }
     projectAccess = null;
     disposeViewer();
-    await renderHome();
+    if(showHome)await renderHome();
     return true;
   }
 
@@ -798,7 +801,8 @@ export async function bootApp(root: HTMLElement): Promise<void> {
   }
 
   // ---- キーボード ---------------------------------------------------------------
-  document.addEventListener('keydown', (ev) => {
+  const onKeydown=(ev:KeyboardEvent) => {
+    if(closed)return;
     if (ctx === null) return;
     if (v1ConversionInProgress) return;
     const editing = (ev.target as HTMLElement).tagName === 'INPUT' || (ev.target as HTMLElement).tagName === 'TEXTAREA';
@@ -811,20 +815,23 @@ export async function bootApp(root: HTMLElement): Promise<void> {
       ev.preventDefault();
       ctx.undo.redo();
     }
-  });
+  };
+  document.addEventListener('keydown',onKeydown);
 
   // ---- OSから開かれたファイル（関連付け・共有シート） -------------------------------
   await renderHome();
-  onExternalFileOpen(async (file) => {
-    // ビューアを開いている場合はホームへ戻してから投入する（ホームが受け口の一貫ルール）
-    if (!(await closeProjectAndShowHome())) return;
-    await new Promise((r) => setTimeout(r, 0));
-    const dropTarget = root.querySelector('.lv-drop');
-    if (dropTarget === null) return;
-    const dt = new DataTransfer();
-    dt.items.add(file);
-    dropTarget.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: dt }));
-  });
+  const controller:LegacyAppController={async openFile(file){if(closed)throw Error('画面を閉じました。');
+    if(ctx!==null && !(await closeProjectAndShowHome()))return;
+    if(!homeFiles)throw Error('ファイルを開く画面の準備が未完了です。');await homeFiles.openFile(file);
+  },async close(){if(closed)return true;
+    if(projectOpening||v1ConversionInProgress||lociMyuConversionInProgress||packageExportStatus.phase==='generating')return false;
+    if(!(await closeProjectAndShowHome(false)))return false;
+    closed=true;homeEpoch++;activeHomeUi=null;homeFiles=undefined;document.removeEventListener('keydown',onKeydown);return true;
+  }};
+  options.onReady?.(controller);
+  if(options.pwa!==false)onExternalFileOpen(file=>controller.openFile(file));
+  if(options.initialFile)await controller.openFile(options.initialFile);
+
 
 }
 

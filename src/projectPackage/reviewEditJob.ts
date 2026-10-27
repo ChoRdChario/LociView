@@ -4,13 +4,13 @@ import { underWriteLease, writeReceipt } from '../projectMetadata/persistence';
 import type { MetadataProjectSession } from '../projectMetadata/session';
 import { CleanInputJob } from './cleanInputJob';
 import { PreparedReviewEdit } from './reviewEdit';
-import { abandonReviewEdit, persistReviewEdit, readReviewEdit, reviewEditRoot, reviewEditPublication, reviewEditStates } from './reviewEditControls';
+import { abandonReviewEdit, persistReviewEdit, readReviewEdit, reviewEditRoot, reviewEditPublication, reviewEditStates, type CompletedReviewChild } from './reviewEditControls';
 
 /** Parent persistence and clean initialization take successive, never nested, write leases.
  * The existing file service owns one outer package-operation lock. */
 export class ReviewEditJob {
   constructor(private readonly fs: ProjectWorkspaceFS, private readonly session: MetadataProjectSession, private readonly limits: MetadataLimits) {}
-  states() { return reviewEditStates(this.fs, this.limits); }
+  states(completedChild?: (observation: CompletedReviewChild) => void) { return reviewEditStates(this.fs, this.limits, completedChild); }
   async start(prepared: PreparedReviewEdit) {
     await underWriteLease(this.fs, () => persistReviewEdit(this.fs, prepared, this.limits));
     return this.retry(prepared.id);

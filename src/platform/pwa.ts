@@ -65,6 +65,7 @@ export async function registerPwa(callbacks: {
   onOfflineReady?: () => void;
   onUpdate?: (applyUpdate: () => void) => void;
 }): Promise<ServiceWorkerRegistration | null> {
+  if(import.meta.env.MODE==='project-scene-desktop')return null;
   if (!('serviceWorker' in navigator)) return null;
   if (import.meta.env.DEV) return null; // devサーバーではSWを使わない
 

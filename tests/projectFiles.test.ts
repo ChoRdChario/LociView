@@ -46,6 +46,8 @@ import { openValidationHost, openValidationEntry, validationArea } from '../src/
 import { browserMetadataDatabaseNames, browserOriginalDatabasePresent } from '../src/harness/projectScene/browserMetadataStorage';
 import { createValidationModeHost } from '../src/harness/projectScene/validationModeHost';
 import { productSources } from '../src/harness/projectScene/productSources';
+import { createProductWorkspace } from '../src/projectScene/productWorkspace';
+import type { ValidationModelClosure } from '../src/projectScene/modelTypes';
 import { fieldValue, projectCaptions, projectMediaResources, projectMediaUncertain, projectCaptionInventory } from '../src/ui/projectScene/projectRead';
 import type { WorkspaceProvider } from '../src/ui/projectScene/projectWorkspacePorts';
 import { listValidationProjects } from '../src/harness/projectScene/validationCatalog';
@@ -87,9 +89,9 @@ import { CleanInputJob } from '../src/projectPackage/cleanInputJob';
 import { CleanArchive } from '../src/projectPackage/cleanArchive';
 import { ReviewArchive } from '../src/projectPackage/reviewArchive';
 import { ReviewOutputJob } from '../src/projectPackage/reviewOutputJob';
-import { PreparedReviewEdit } from '../src/projectPackage/reviewEdit';
+import { PreparedReviewEdit, createReviewEditScratch } from '../src/projectPackage/reviewEdit';
 import { ReviewEditJob } from '../src/projectPackage/reviewEditJob';
-import { reviewEditRoot } from '../src/projectPackage/reviewEditControls';
+import { reviewEditRoot, type ReviewEditBinding } from '../src/projectPackage/reviewEditControls';
 import { prepareReviewView } from '../src/harness/projectScene/reviewView';
 import { inspectReviewSnapshot, prepareReviewEdit } from '../src/projectPackage/reviewSnapshot';
 import { BackupArchive, writeBackupArchive } from '../src/projectPackage/backupArchive';
@@ -622,7 +624,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       await vi.waitFor(()=>expect(all(page).find(n=>n.tag==='button'&&n.textContent==='ファイルを開く')!.disabled).toBe(false));
       // First-backup confirmation remains read-only until the user explicitly accepts it.
       Object.assign(input2,{files:[backup]});input2.fire('change');input2.parent!.parent!.fire('submit',{preventDefault(){}});
-      await vi.waitFor(()=>expect(all(page).some(n=>n.textContent.includes('再開用データはありません'))).toBe(true));
+      await vi.waitFor(()=>expect(all(page).some(n=>n.textContent.startsWith('このプロジェクトの再開用データはありません。バックアップから'))).toBe(true));
       expect(opening).toHaveBeenCalledOnce();expect(await peer.fs.list('')).toEqual([]);expect(databases.size).toBe(0);
       all(page).filter(n=>n.tag==='button'&&n.textContent==='キャンセル').at(-1)!.fire('click');await vi.waitFor(()=>expect(next.hasChanges()).toBe(false));
       Object.assign(input2,{files:[handoff]});input2.fire('change');input2.parent!.parent!.fire('submit',{preventDefault(){}});
@@ -2049,7 +2051,8 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect(h.button('ファイルを開く').disabled).toBe(false);
     expect(await f.fs.list('')).toEqual(files); expect(await Promise.all(files.map(p=>f.fs.readBytes(p)))).toEqual(bytes);
   });
-  it.each(['pending','blank-title','renderer','lease','stale'] as const)('named resume returns a catalog-ready/actual-%s race to the file/list exit without a success hint', async kind => {
+  it.each((['pending','blank-title','renderer','lease','stale'] as const).flatMap(kind =>
+    (kind === 'renderer' ? [false] : [false,true]).map(progressive => ({kind,progressive}))))('named resume returns a catalog-ready/actual-$kind race (progressive=$progressive) to the file/list exit without a success hint', async ({kind,progressive}) => {
     const f = resumeWorkspaceFixture(), a = await f.seed(kind === 'blank-title' ? '  ' : '元の記録'); f.reference({run:a.run,mode:'edit'});
     let first = true; const list = async () => {
       const entries = await f.ports.list();
@@ -2060,7 +2063,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       }
       return entries;
     };
-    const h = f.mount(undefined,{list,render:async target=>{
+    const h = f.mount(undefined,{list,progressivePresentation:progressive,render:async target=>{
       if (kind === 'renderer') throw Error('display failed'); const prepared = await f.ports.render(target);
       if (kind === 'stale') await f.host().dispatch(f.host().read().source!.token,{kind:'editCaption',captionId:a.captionId,edits:{body:'表示準備中の更新'}});
       return prepared;
@@ -2068,6 +2071,14 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect(f.remember).not.toHaveBeenCalled(); expect(h.ui.selected).toBeNull(); expect(h.navigation.hidden).toBe(false); expect(h.button('ファイルを開く').disabled).toBe(false);
     expect(h.all(h.root).some(n=>n.textContent.startsWith('最後のプロジェクトを再開しました'))).toBe(false);
     expect(h.all(h.root).some(n=>n.textContent.includes('一覧またはファイルから開いてください'))).toBe(true);
+  });
+  it('named resume retains valid verified metadata after progressive display failure without acknowledging a completed opening',async()=>{
+    const f=resumeWorkspaceFixture(),a=await f.seed('読み込める記録');f.reference({run:a.run,mode:'edit'});
+    const h=f.mount(undefined,{progressivePresentation:true,render:async()=>{throw Error('モデルの表示に失敗');}});await h.idle();
+    expect(h.ui.selected).toBe(a.run);expect(h.named('プロジェクト名',h.editor()).textContent).toBe('読み込める記録');
+    expect(h.named('検索',h.editor()).disabled).toBe(false);expect(h.button('保存').disabled).toBe(true);
+    expect(h.button('モデルを再読み込み').hidden).toBe(false);expect(f.remember).not.toHaveBeenCalled();
+    expect(h.all(h.root).some(n=>n.textContent.startsWith('最後のプロジェクトを再開しました'))).toBe(false);
   });
   it.each(['open-rejection','render-success'] as const)('named resume ignores a late %s after disposal and releases acquired display ownership', async kind => {
     const f = resumeWorkspaceFixture(), a = await f.seed('元の記録'); f.reference({run:a.run,mode:'edit'});
@@ -2186,9 +2197,11 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
   }, 60_000);
   it('confirms and cancels first backup opening from the unified picker, then edits, saves and cold-reopens the selected Project', async () => {
     const f = await restoreFileFixture(), r = await firstBackupHostFixture(f.backupFile); let current: Awaited<ReturnType<typeof openValidationHost>> | undefined;
+    let release!:()=>void;const ready=new Promise<void>(resolve=>{release=resolve;});
     const factory: ViewportFactory = () => ({ update() {}, setActive() {}, camera() {}, retry() {}, dispose() {}, read: () => ({ ready: true, display: undefined, token: '1', pickToken: '1', pins: [], issue: null, dragging: false, projection: 'perspective', axis: null }) });
+    const render=vi.fn(async()=>({factory,ready,dispose(){}}));
     const ui = owned(createValidationWorkspace(new RecordedDocument().asDocument(), { ...r.options, productEditor: true,
-      list: () => listValidationProjects(r.options, r.openStorage), selected() {}, render: async () => ({ factory, dispose() {} }),
+      list: () => listValidationProjects(r.options, r.openStorage), selected() {}, render,
       open: async (run, initial, mode, workspaceFile, reviewEdit, firstBackup) => { const opened = await openValidationEntry({ ...r.options, run, initial, mode, workspaceFile, reviewEdit, firstBackup });
         if (!('kind' in opened)) current = opened; else { const confirm = opened.confirm.bind(opened); opened.confirm = async prepare => current = await confirm(prepare); } return opened; } }));
     const root = record(ui.root), all = (n: RecordedNode): RecordedNode[] => [n, ...n.children.flatMap(all)], input = all(root).find(n => n.attributes.get('aria-label') === 'ファイルを選択')!,
@@ -2202,6 +2215,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     choose(); await vi.waitFor(() => expect(button('バックアップから復元')?.disabled).toBe(false)); button('バックアップから復元').fire('click');
     expect(button('バックアップから復元').disabled).toBe(true); expect(button('キャンセル').disabled).toBe(true);
     expect(all(root).some(n => n.textContent === 'バックアップから復元しています。')).toBe(true);
+    try{await vi.waitFor(()=>expect(render).toHaveBeenCalledOnce(),{timeout:20000});expect(current).toBeUndefined();expect(all(root).some(n=>n.className==='lv-project-workspace')).toBe(false);}finally{release();}
     await vi.waitFor(() => expect(all(root).some(n => n.className === 'lv-project-workspace')).toBe(true), { timeout: 20000 });
     expect(current!.read().source!.originalChanges()).toEqual(r.inspection.source.originalChanges());
     await current!.dispatch(current!.read().source!.token, { kind: 'editCaption', captionId: f.captionId, edits: { body: '復元した端末での記録' } });
@@ -2616,6 +2630,30 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     await expect(writeRestoreControl(fs, `v2/local-restore/jobs/${newId()}/abandoned.json`, { retained: 'no room for terminal record' }, metadata)).rejects.toThrow('restore-space-budget');
     expect(await fs.list('v2/local-restore/')).toEqual([]); opened.mockRestore();
   });
+  it('bounds restore size opens, drains failures in path order and freshly reopens receipts without reading stat bodies',async()=>{
+    for(const mode of ['success','failure','size'] as const){
+      const fs=new TestFS();for(let i=0;i<5;i++){const id=newId();await fs.writeText(`v2/local-restore/jobs/${id}/abandoned.json`,json({schema:'lociview-local-restore-abandoned-1',jobId:id,stage:'beforeStart'}));}
+      const paths=await fs.list('v2/local-restore/'),first=new Set<string>(),gates:{resolve():void;reject(error:Error):void}[]=[],stream=vi.fn(()=>{throw Error('stat must not consume a body');});
+      const read=fs.readStream.bind(fs);let active=0,peak=0,finished=false;
+      const opens=vi.spyOn(fs,'readStream').mockImplementation(async path=>{
+        const file=await read(path);if(!first.has(path)){first.add(path);active++;peak=Math.max(peak,active);
+          try{await new Promise<void>((resolve,reject)=>{gates.push({resolve,reject});});}finally{active--;}}
+        return file&&{...file,size:mode==='size'&&path===paths[0]?PACKAGE_LIMITS.controlBytes+1:file.size,stream};
+      }),bytes=vi.spyOn(fs,'readBytes');
+      const done=readRestoreControls(fs,metadata).then(value=>({value,error:null}),error=>({value:null,error})).finally(()=>{finished=true;});
+      await vi.waitFor(()=>expect(gates).toHaveLength(4));expect(peak).toBe(4);expect(bytes).not.toHaveBeenCalled();
+      if(mode==='failure'){
+        gates[2]!.reject(Error('later open failed'));gates[0]!.reject(Error('first open failed'));gates[1]!.resolve();
+        await new Promise(resolve=>setTimeout(resolve,0));expect(finished).toBe(false);gates[3]!.resolve();
+      }else{for(const gate of gates.slice().reverse())gate.resolve();if(mode==='success'){await vi.waitFor(()=>expect(gates).toHaveLength(5));gates[4]!.resolve();}}
+      const result=await done;expect(active).toBe(0);expect(peak).toBe(4);expect(stream).not.toHaveBeenCalled();
+      if(mode==='success'){
+        expect(result.error).toBeNull();expect(result.value!.jobs.map(j=>j.id)).toEqual(paths.map(path=>path.split('/')[3]));
+        expect(opens).toHaveBeenCalledTimes(10);expect(bytes).toHaveBeenCalledTimes(5);
+      }else{expect(result.error).toBeInstanceOf(Error);expect(result.error.message).toContain(mode==='failure'?'first open failed':'restore-control-size');expect(opens).toHaveBeenCalledTimes(4);expect(bytes).not.toHaveBeenCalled();}
+      opens.mockRestore();bytes.mockRestore();
+    }
+  });
   it('rejects lookalike restore control filenames and unknown generation namespaces', async () => {
     const fs = new TestFS(), id = newId(), path = `v2/local-restore/jobs/${id}/preparedXjson`;
     await fs.writeText(path, '{}'); await expect(readRestoreControls(fs, metadata)).rejects.toThrow('restore-control-path');
@@ -3015,6 +3053,25 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     await expect(sender.jobs()).rejects.toThrow('output-job-kind-collision');
     await expect(sender.generateBackup(token)).rejects.toThrow('output-job-kind-collision');
   }, 15000);
+  it('uses a captured command proof only for base display, retaining fresh defaults, evidence and command checks', async () => {
+    const { f, sent } = await contributionTeam(), session = f.receiver.session;
+    const sender = new WorkspaceSender(f.fs, session, f.store, metadata, f.locks), current = await session.read(), expected = await sender.availableBases();
+    const reads = vi.spyOn(session, 'read');
+    try {
+      expect(await sender.availableBases(current)).toEqual(expected); expect(reads).not.toHaveBeenCalled();
+      await sender.availableBases(); expect(reads).toHaveBeenCalled(); reads.mockClear();
+      await sender.availableBases({ ...current, state: 'repair-required' }); expect(reads).toHaveBeenCalled(); reads.mockClear();
+      const proof = structuredClone(current.source!.proof), displaySource = Object.create(current.source!);
+      Object.defineProperty(displaySource, 'proof', { value: proof });
+      const pending = sender.availableBases({ ...current, source: displaySource });
+      (proof.identity as { projectId: string }).projectId = `prj_${newId()}`;
+      expect(await pending).toEqual(expected); expect(reads).not.toHaveBeenCalled();
+      await session.editCaption(sent.current.source!.token, f.captionId, 'body', '次の編集'); reads.mockClear();
+      await expect(sender.generateContribution(sent.current.source!.token, expected[0]!.selection)).rejects.toThrow(); expect(reads).toHaveBeenCalled();
+      for (const path of await f.fs.list('v2/packages/evidence/')) await f.fs.remove(path);
+      await expect(sender.availableBases(current)).rejects.toThrow();
+    } finally { reads.mockRestore(); }
+  }, 20000);
   it('generates durable Contribution files for two actual rounds without advancing either base or reading old model bodies', async () => {
     const { f, r, sent } = await contributionTeam(), sender = new WorkspaceSender(f.fs, f.receiver.session, f.store, metadata, f.locks);
     const choices = await sender.availableBases(), beforeReads = f.fs.reads;
@@ -4709,7 +4766,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const source = ProjectMetadataSource.fromFullSource(A.save(A.merge(branches[0]!, branches[1]!)), seed.proof, metadata);
     const provider = await readProjectScene(source.read(), metadata, h.host.content.verifier(false));
     const projected = metadataProjectView(provider, {}, snapshot.modelVersions);
-    const facade = createValidationModeHost({ ...h.host, read: () => ({ ...h.host.read(), provider, source }), authority: { ...h.host.authority, read: () => projected } }, async () => { throw Error('read only fixture'); }, () => {});
+    const facade = createValidationModeHost(Object.assign(Object.create(h.host), { read: () => ({ ...h.host.read(), provider, source }), authority: Object.assign(Object.create(h.host.authority), { read: () => projected }) }), async () => { throw Error('read only fixture'); }, () => {});
     const ports = productSources(facade), groups = ports.materials(sceneId).review;
     expect(groups.some(g => g.overrideId === ids[1] && g.appearance.length === 2)).toBe(true);
     expect(groups.filter(g => g.owners.length === 2)).toHaveLength(1);
@@ -5135,13 +5192,13 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const baseline=A.change(A.clone(original),d=>{for(const [id,key] of [[fixed,'C'],[unresolved,'E']]) d.captionAttachmentsById[id!]={...d.captionAttachmentsById[attachmentId],id:scalar(id),orderKey:scalar(key)};});
     const orders=['B','D'].map((key,i)=>A.change(A.clone(baseline),d=>{d.captionAttachmentsById[attachmentId].orderKey=scalar(key); d.captionAttachmentsById[unresolved].orderKey=scalar(i?'F':'G');}));
     const orderSource=ProjectMetadataSource.fromFullSource(A.save(A.merge(orders[0]!,orders[1]!)),source.proof,metadata), orderProvider=await readProjectScene(orderSource.read(),metadata,h.host.content.verifier(false));
-    const facade=createValidationModeHost({...h.host,read:()=>({...h.host.read(),provider:orderProvider,source:orderSource})},async()=>{throw Error('read-only projection');},()=>{});
+    const facade=createValidationModeHost(Object.assign(Object.create(h.host),{read:()=>({...h.host.read(),provider:orderProvider,source:orderSource})}),async()=>{throw Error('read-only projection');},()=>{});
     const orderGroups=productSources(facade).recovery().filter(g=>g.target.kind==='attachmentField' && g.target.attachmentId===attachmentId);
     expect(orderGroups).toHaveLength(1); expect(orderGroups[0]!.ready).toBe(true); expect(orderGroups[0]!.note).toContain('未解決のほかの添付は、この位置に含めていません');
     expect(orderGroups[0]!.choices.map(c=>c.label)).toEqual(expect.arrayContaining([expect.stringContaining('1/2 番目'),expect.stringContaining('2/2 番目')]));
     const malformed=A.change(A.clone(A.merge(A.clone(branches[0]!),A.clone(branches[1]!))),d=>{d.captionAttachmentsById[attachmentId].futureField=scalar(true);});
     const badSource=ProjectMetadataSource.fromFullSource(A.save(malformed),source.proof,metadata), badProvider=await readProjectScene(badSource.read(),metadata,h.host.content.verifier(false));
-    const badFacade=createValidationModeHost({...h.host,read:()=>({...h.host.read(),provider:badProvider,source:badSource})},async()=>{throw Error('read-only projection');},()=>{});
+    const badFacade=createValidationModeHost(Object.assign(Object.create(h.host),{read:()=>({...h.host.read(),provider:badProvider,source:badSource})}),async()=>{throw Error('read-only projection');},()=>{});
     const refused=productSources(badFacade).recovery().filter(g=>g.target.kind==='attachmentField'); expect(refused).toHaveLength(1); expect(refused[0]!.ready).toBe(false); expect(refused[0]!.choices).toHaveLength(2);
     const deleted = A.change(A.clone(original), d => { d.captionAttachmentsById[attachmentId].lifecycle = new A.ImmutableString(canonicalFixture({ state: 'deleted', eventId: `evt_${newId()}`, reason: 'userDelete' })); });
     const conflict = await read(A.merge(deleted, branches[0]!)); if (conflict.kind !== 'scene-provider') throw Error('provider');
@@ -5328,7 +5385,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     // Inject an independently admitted optional-field omission at the pure View projection boundary.
     const noColor = structuredClone(prepared.inspection.review.snapshot), firstCaption = Object.values(noColor.captionsById as JsonObject)[0] as Record<string, JsonObject[string]>;
     delete firstCaption.colorSrgb;
-    const omitted = await inspectReviewSnapshot(noColor, metadata), inspect = vi.spyOn(ReviewArchive, 'inspect').mockResolvedValueOnce({ ...prepared.inspection, review: omitted });
+    const omitted = await inspectReviewSnapshot(noColor, metadata), inspect = vi.spyOn(ReviewArchive, 'inspect').mockResolvedValueOnce({ ...prepared.inspection, review: omitted, reopen: () => prepared.inspection.reopen(metadata) });
     try { const noColorView = await prepareReviewView(file, budget, decode);
       expect(noColorView.source.captions.find(c => c.id === firstCaption.id)!.color).toEqual({ kind: 'value', value: '#a08045' });
       expect(noColorView.inspection.review.snapshot.captionsById).toEqual(noColor.captionsById);
@@ -5382,6 +5439,17 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect(open.mock.calls[1]![4]).toBe(attempt); expect(u.selected).toBe(attempt.run);
     expect(copied!.workspaceFiles.reviewCopies[0]!.state).toBe('completed'); expect(copied!.workspaceFiles.jobs).toEqual([]);
     expect(copied!.read().source!.proof).not.toEqual(host.read().source!.proof); expect(copied!.workspaceOutput.bases).toEqual([]);
+    const discovery = vi.spyOn(ReviewEditJob.prototype, 'states').mockImplementationOnce(async observe => {
+      observe?.({ childId: attempt.childId, binding: { jobId: attempt.id, prepared: { sha256: '0'.repeat(64), byteLength: 1 } } });
+      throw Error('injected current discovery failure');
+    }), jobs = vi.spyOn(WorkspaceReceiver.prototype, 'jobs'), baseChoices = vi.spyOn(WorkspaceSender.prototype, 'availableBases');
+    try {
+      await copied!.workspaceFiles.refresh();
+      expect(jobs.mock.calls.at(-1)![0]!.completedReviewChildren!.size).toBe(0);
+      expect(baseChoices.mock.calls.at(-1)).toEqual([]);
+      expect(copied!.hasPending()).toBe(true);
+    } finally { discovery.mockRestore(); jobs.mockRestore(); baseChoices.mockRestore(); }
+    await copied!.workspaceFiles.refresh(); expect(copied!.hasPending()).toBe(false);
     const sceneId = Object.keys(copied!.authority.read().state.scenes)[0]!;
     await copied!.authority.authorScene!(copied!.read().source!.token, { kind: 'renameScene', sceneId, name: '閲覧コピーでの作業' });
     const updated = copied!.read().source!.token;
@@ -5391,6 +5459,56 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect(cold.authority.read().modelVersions).toHaveLength(1); expect(cold.workspaceOutput.bases).toEqual([]);
     expect(host.read().source!.token).toBe(token); expect(await digest(new Uint8Array(await file.arrayBuffer()))).toBe(attempt.descriptor().original.sha256);
     await cold.dispose(); tools.dispose(); await workspace.dispose();
+  }, 60000);
+  it('prepares a warm Review copy only from its frozen capture, rejecting DTO mutation and rechecking current limits', async () => {
+    const source = await openFileCaption(), id = await source.host.workspaceOutput.generateReview(source.host.read().source!.token, { sceneId: source.s.sceneId });
+    const file = await source.host.workspaceOutput.download(id), review = await ReviewArchive.inspect(file, metadata), expected = structuredClone(review.review.snapshot);
+    const other = await PackageArchive.inspect(await source.host.workspaceOutput.download(await source.host.workspaceOutput.generateBackup(source.host.read().source!.token)));
+    expect(() => Object.assign(review, { archive: other })).toThrow(); expect(review.archive.control.manifest.purpose).toBe('review');
+    const manifest = review.archive.control.manifest as unknown as Record<string, unknown>; // Deliberately mutate the public DTO through an untyped alias.
+    expect(() => { manifest.purpose = 'backup'; }).toThrow(); expect(() => { manifest.snapshotId = 'mutated-public-dto'; }).toThrow();
+    expect(() => { manifest.summary = {}; }).toThrow();
+    const fs = new TestFS(), scratch = createReviewEditScratch(fs), write = vi.spyOn(scratch, 'write'), inspect = vi.spyOn(PackageArchive, 'inspect');
+    try {
+      await expect(PreparedReviewEdit.fromInspectedReview(review, { ...metadata, maxWork: 1 }, scratch)).rejects.toThrow();
+      expect(write).not.toHaveBeenCalled(); expect(inspect).not.toHaveBeenCalled(); expect(await fs.list('')).toEqual([]);
+      const abort = new AbortController(), cancelled = await ReviewArchive.inspect(file, metadata, abort.signal); abort.abort(); inspect.mockClear();
+      await expect(PreparedReviewEdit.fromInspectedReview(cancelled, metadata, scratch)).rejects.toThrow();
+      expect(write).not.toHaveBeenCalled(); expect(inspect).not.toHaveBeenCalled();
+      const prepared = await PreparedReviewEdit.fromInspectedReview(review, metadata, scratch);
+      expect(prepared.review).not.toBe(review); expect(prepared.review.review.snapshot).toEqual(expected);
+      expect(prepared.review.archive.control.manifest.purpose).toBe('review');
+      expect(prepared.review.archive.sha256).toBe(review.archive.sha256);
+      expect(new Uint8Array(await prepared.original.arrayBuffer())).toEqual(new Uint8Array(await file.arrayBuffer()));
+      expect(inspect).toHaveBeenCalledOnce(); expect(inspect.mock.calls[0]![0]).toBe(prepared.copy); // The new output still gets a full scan.
+      await prepared.releaseScratch(); expect(await fs.list('')).toEqual([]);
+      inspect.mockClear();
+      await PreparedReviewEdit.prepare(file, metadata);
+      expect(inspect).toHaveBeenCalledTimes(2); expect(inspect.mock.calls[0]![0].size).toBe(file.size); // Default input inspection stays fresh.
+    } finally { inspect.mockRestore(); await scratch.dispose(); await source.workspace.dispose(); }
+  }, 60000);
+  it('omits only the same-read completed private Review child and retains strict discovery by default', async () => {
+    const source = await openFileCaption(), id = await source.host.workspaceOutput.generateReview(source.host.read().source!.token, { sceneId: source.s.sceneId });
+    const prepared = await PreparedReviewEdit.prepare(await source.host.workspaceOutput.download(id), metadata), r = firstWorkspaceRecipient();
+    const job = new ReviewEditJob(r.fs, r.session, metadata), observed = new Map<string, Readonly<ReviewEditBinding>>();
+    await job.start(prepared); expect(await job.states(c => observed.set(c.childId, c.binding))).toEqual([
+      { id: prepared.id, childId: prepared.childId, state: 'completed' }]);
+    const binding = structuredClone(observed.get(prepared.childId)!), openChild = vi.spyOn(CleanInputJob, 'open');
+    try {
+      const pending = r.receiver.jobs({ completedReviewChildren: observed });
+      (observed.get(prepared.childId)!.prepared as { sha256: string }).sha256 = 'f'.repeat(64); observed.clear();
+      expect(await pending).toEqual([]); expect(openChild).not.toHaveBeenCalled();
+      expect(await r.receiver.jobs()).toEqual([{ id: prepared.childId, state: 'completed' }]); expect(openChild).toHaveBeenCalled();
+      openChild.mockClear();
+      const wrong = { ...binding, prepared: { ...binding.prepared, sha256: 'f'.repeat(64) } };
+      expect(await r.receiver.jobs({ completedReviewChildren: new Map([[prepared.childId, wrong]]) })).toEqual([{ id: prepared.childId, state: 'completed' }]);
+      expect(openChild).toHaveBeenCalled();
+      const conflict = `v2/packages/receive/${prepared.childId}/prepared.json`;
+      await r.fs.writeText(conflict, '{}');
+      await expect(r.receiver.jobs({ completedReviewChildren: new Map([[prepared.childId, binding]]) })).rejects.toThrow(/collision/);
+      await r.fs.remove(conflict); await r.fs.remove(`${reviewEditRoot(r.fs, prepared.id)}published.json`);
+      const complete = vi.fn(); expect((await job.states(complete))[0]!.state).toBe('incomplete'); expect(complete).not.toHaveBeenCalled();
+    } finally { openChild.mockRestore(); await source.workspace.dispose(); }
   }, 60000);
   it.each(['original', 'child', 'completion'] as const)('cold resumes a review edit-copy stopped at %s through one parent recovery row', async stage => {
     const source = await openFileCaption(), id = await source.host.workspaceOutput.generateReview(source.host.read().source!.token, { sceneId: source.s.sceneId });
@@ -6124,15 +6242,16 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect(acknowledgments.size).toBeGreaterThan(0); const ack = [...acknowledgments];
     const clickWrite = async (control: RecordedNode) => {
       expect(control.disabled).toBe(false);
-      const write = vi.spyOn(host.authority, 'write');
+      // The harness translates strings before the real Session command boundary.
+      const command = vi.spyOn(host, 'dispatch');
       try {
         await acknowledge(ack, () => {
           control.fire('click');
-          expect(write).toHaveBeenCalledTimes(1);
-          expect(write.mock.results[0]!.type).toBe('return');
+          expect(command).toHaveBeenCalledTimes(1);
+          expect(command.mock.results[0]!.type).toBe('return');
         });
-        await write.mock.results[0]!.value;
-      } finally { write.mockRestore(); }
+        await command.mock.results[0]!.value;
+      } finally { command.mockRestore(); }
     };
     const fileInput = named('更新ファイルを選択'), receive = fileInput.parent!.parent!;
     const receiveFile = async (file: Blob) => {
@@ -6267,6 +6386,86 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     await vi.waitFor(() => expect(all(root).some(n => n.textContent.startsWith('検証用プロジェクト。'))).toBe(true));
     await workspace.dispose();
   });
+  it('keeps Caption search/selection and camera usable during presentation loading, fencing edits/files until the same preparation completes', async () => {
+    const f=await openFileCaption(), document=new RecordedDocument().asDocument();
+    let finish!:(value:Awaited<ReturnType<ValidationWorkspacePorts['render']>>)=>void, ready!:()=>void;
+    const complete=new Promise<void>(resolve=>{ready=resolve;}),render=vi.fn<ValidationWorkspacePorts['render']>(()=>new Promise(resolve=>{finish=resolve;}));
+    const dispatch=vi.spyOn(f.host,'dispatch'),remember=vi.fn(),camera=vi.fn();let display:Parameters<ReturnType<ViewportFactory>['update']>[0]|undefined;
+    const factory:ViewportFactory=()=>({update(next){display=next;},setActive(){},camera,retry(){},dispose(){},read:()=>({ready:true,display,token:'loading-camera',issue:null,dragging:false,pins:[],projection:'perspective',axis:null})});
+    const ui=createValidationWorkspace(document,{productEditor:true,progressivePresentation:true,fileLimits:budget,decode,selected(){},list:async()=>[],
+      lastProject:{read:()=>null,remember},open:async()=>f.host,render},f.options.run);
+    const root=record(ui.root),all=(n:RecordedNode):RecordedNode[]=>[n,...n.children.flatMap(all)];
+    const button=(text:string)=>all(root).find(n=>n.tag==='button'&&n.textContent===text)!;
+    try{
+      await vi.waitFor(()=>expect(render).toHaveBeenCalledOnce());
+      const search=all(root).find(n=>n.attributes.get('aria-label')==='検索')!,rows=()=>all(root).filter(n=>n.className==='lv-caption-select');
+      const initial=rows().length;expect(initial).toBeGreaterThan(0);search.value='見つからない検索語';search.fire('input');expect(rows()).toHaveLength(0);
+      search.value='';search.fire('input');rows()[0]!.fire('click');
+      expect(button('ピンを追加').disabled).toBe(true);expect(button('保存').disabled).toBe(true);expect(remember).not.toHaveBeenCalled();
+      button('ピンを追加').fire('click');expect(dispatch).not.toHaveBeenCalled();
+      finish({factory,ready:complete,dispose(){}});await vi.waitFor(()=>expect(display).toBeDefined());
+      button('正面').fire('click');expect(camera).toHaveBeenCalledOnce();
+      const status=all(root).find(n=>n.className==='lv-project-viewport-status')!;expect(status.dataset.busy).toBe('true');expect(button('保存').disabled).toBe(true);
+      ready();await ui.ready;expect(status.dataset.busy).toBe('false');expect(rows()).toHaveLength(initial);expect(search.value).toBe('');
+      expect(button('保存').disabled).toBe(false);expect(remember).toHaveBeenCalled();expect(dispatch).not.toHaveBeenCalled();
+    }finally{ready();await ui.dispose();await f.workspace.dispose();}
+  },30000);
+  it('keeps verified Captions on display failure/retry and disposes a late preparation after closing without waiting for it',async()=>{
+    const f=await receivedHostFixture(),document=new RecordedDocument().asDocument();let finish!:(value:Awaited<ReturnType<ValidationWorkspacePorts['render']>>)=>void;
+    const factory:ViewportFactory=()=>({update(){},setActive(){},camera(){},retry(){},dispose(){},read:()=>({ready:true,token:'test',issue:null,dragging:false,pins:[],projection:'perspective',axis:null})});
+    const render=vi.fn<ValidationWorkspacePorts['render']>().mockImplementationOnce(async host=>{const detach=host.setDisplayPreparation(async()=>{}),ready=Promise.reject(Error('model unavailable'));void ready.catch(()=>{});return{factory,ready,detachPreparation:detach,dispose:detach};})
+      .mockImplementationOnce(host=>{const detach=host.setDisplayPreparation(async()=>{});return new Promise(resolve=>{finish=value=>resolve({...value,dispose(){detach();value.dispose();}});});});
+    const ui=createValidationWorkspace(document,{productEditor:true,progressivePresentation:true,fileLimits:budget,decode,selected(){},list:async()=>[],open:async()=>f.host,render},f.options.run);
+    const root=record(ui.root),all=(n:RecordedNode):RecordedNode[]=>[n,...n.children.flatMap(all)];
+    await ui.ready;expect(all(root).some(n=>n.textContent==='model unavailable')).toBe(true);
+    const search=all(root).find(n=>n.attributes.get('aria-label')==='検索')!;expect(search.disabled).toBe(false);
+    all(root).find(n=>n.tag==='button'&&n.textContent==='モデルを再読み込み')!.fire('click');await vi.waitFor(()=>expect(render).toHaveBeenCalledTimes(2));
+    await ui.dispose();const dispose=vi.fn(),lateFactory=vi.fn();finish({factory:lateFactory,dispose});await vi.waitFor(()=>expect(dispose).toHaveBeenCalledOnce());expect(lateFactory).not.toHaveBeenCalled();
+  },30000);
+  it('keeps backup recovery available after terminal presentation failure and clears the failed gate only after validated restore',async()=>{
+    const f=await receivedHostFixture(),backup=await f.host.workspaceOutput.download(await f.host.workspaceOutput.generateBackup(f.host.read().source!.token));await f.host.dispose();
+    const generations=new Map<string,MetadataStorageFactory>(),databases:RestoreDatabasePorts={listGenerations:async()=>[...generations.keys()],originalDatabasePresent:async()=>true,
+      open:async(id,create)=>{if(id===null)return f.options.openStorage();if(!generations.has(id)&&create)generations.set(id,storageFactory());const factory=generations.get(id);if(!factory)throw Error('missing generation');return{factory,dispose:async()=>{}};}};
+    const host=await openValidationHost({...f.options,generations:()=>databases}),document=new RecordedDocument().asDocument();let display:Parameters<ReturnType<ViewportFactory>['update']>[0]|undefined;
+    const factory:ViewportFactory=()=>({update(next){display=next;},setActive(){},camera(){},retry(){},dispose(){},read:()=>({ready:true,display,token:'restored-camera',issue:null,dragging:false,pins:[],projection:'perspective',axis:null})});
+    const render=vi.fn<ValidationWorkspacePorts['render']>().mockRejectedValueOnce(Error('display refused')).mockResolvedValue({factory,dispose(){}});
+    const ui=createValidationWorkspace(document,{productEditor:true,progressivePresentation:true,fileLimits:budget,decode,selected(){},list:async()=>[],open:async()=>host,render},f.options.run);
+    const root=record(ui.root),all=(n:RecordedNode):RecordedNode[]=>[n,...n.children.flatMap(all)],button=(text:string,parent=root)=>all(parent).find(n=>n.tag==='button'&&n.textContent===text)!;
+    try{await ui.ready;expect(button('保存').disabled).toBe(true);
+      const area=all(root).find(n=>n.tag==='details'&&n.children.some(c=>c.tag==='summary'&&c.textContent==='バックアップから復元'))!,input=all(area).find(n=>n.attributes.get('aria-label')==='バックアップを選択')!;
+      Object.assign(input,{files:[backup]});input.fire('change');button('内容を確認',area).fire('click');
+      await vi.waitFor(()=>expect(button('このバックアップから復元',area)?.disabled).toBe(false),{timeout:10000});button('このバックアップから復元',area).fire('click');
+      Object.assign(input,{files:[]}); // Native input.value='' clears FileList; the recorded DOM has no native picker.
+      await vi.waitFor(()=>{expect(host.backupRestore.needsDisplay).toBe(false);expect(button('保存')?.disabled).toBe(false);},{timeout:10000});
+      expect(render).toHaveBeenCalledTimes(2);expect(all(root).some(n=>n.textContent==='display refused')).toBe(false);
+    }finally{await ui.dispose();}
+  },60000);
+  it('opens compact file controls for a cold interrupted output and keeps completed history collapsed', async () => {
+    const f = await receivedHostFixture(), writeStream = f.fs.writeStream.bind(f.fs);
+    const interrupted = vi.spyOn(f.fs, 'writeStream').mockImplementation(async (path, stream) => {
+      if (path.includes('/artifacts/')) { await stream.cancel(); throw Error('output interrupted'); }
+      return writeStream(path, stream);
+    });
+    await expect(f.host.workspaceOutput.generate(f.host.read().source!.token)).rejects.toThrow();
+    expect(f.host.hasPending()).toBe(false); await f.host.dispose(); interrupted.mockRestore();
+    const cold = await openValidationHost(f.options), mode = createValidationModeHost(cold, async () => { throw Error('unexpected switch'); }, () => {});
+    const document = new RecordedDocument().asDocument(); let ui: ReturnType<typeof createProductWorkspace> | undefined;
+    const tools = createValidationReceiveControls(document, mode, () => ui?.session, () => ui?.render(), async () => {});
+    let display: Parameters<ReturnType<ViewportFactory>['update']>[0] | undefined;
+    const factory: ViewportFactory = () => ({ update(next) { display = next; }, setActive() {}, camera() {}, retry() {}, dispose() {},
+      read: () => ({ ready: !!display, display, token: 'recorded-file-recovery', issue: null, dragging: false, pins: [], projection: 'perspective', axis: null }) });
+    ui = createProductWorkspace(document, mode, factory, tools, undefined,
+      { compactFiles: true, openProject() {}, resumedLastProject: () => false, changed() {} });
+    const root = record(ui.root), all = (n: RecordedNode): RecordedNode[] => [n, ...n.children.flatMap(all)], menu = all(root).find(n => n.className === 'lv-project-files')!;
+    try {
+      expect(cold.hasPending()).toBe(false); expect(cold.workspaceOutput.jobs.some(j => j.state === 'incomplete')).toBe(true);
+      expect(menu.open).toBe(true); const retry = all(menu).find(n => n.tag === 'button' && n.textContent === '生成を再開')!;
+      expect(retry.disabled).toBe(false); retry.fire('click');
+      await vi.waitFor(() => expect(cold.workspaceOutput.jobs.every(j => j.state === 'generated')).toBe(true), { timeout: 10000 });
+      await vi.waitFor(() => expect(tools.busy()).toBe(false));
+      menu.open = false; ui.render(); expect(menu.open).toBe(false);
+    } finally { await ui.dispose(); await mode.dispose(); }
+  }, 30000);
   it('keeps cold output recovery available when the model renderer fails (recorded DOM)', async () => {
     const f = await receivedHostFixture(), writeStream = f.fs.writeStream.bind(f.fs);
     const interrupted = vi.spyOn(f.fs, 'writeStream').mockImplementation(async (path, stream) => {
@@ -7098,7 +7297,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     fail = 'late'; const pending = host.mode!.change('edit', token, () => { throw Error('must never publish'); });
     const rejected = expect(pending).rejects.toThrow('閉じました');
     await vi.waitFor(() => expect(finish).toBeTypeOf('function'));
-    await expect(host.authority.write(token, {})).rejects.toThrow('切替');
+    await expect(host.dispatch(token, { kind: 'editCaption', captionId: Object.keys(project.resources.captions)[0]!, edits: { title: '切替中は適用しない' } })).rejects.toThrow('切替');
     await expect(host.refresh()).rejects.toThrow('切替'); await expect(host.resolve(token, {} as never)).rejects.toThrow('切替');
     const closing = host.dispose(); finish(); await rejected; await closing; expect(released).toHaveBeenCalledTimes(3);
     const probe = await openValidationHost(options); expect(probe.authority.readOnly).toBe(false); await probe.dispose();
@@ -7493,6 +7692,15 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     await expect(validationModelFacts(host.content).plan(source, source.prepareEdit(token, { ...other, representation: corrupt }, provider, newId()))).rejects.toThrow();
     expect(host.hasPending()).toBe(false); expect(host.read().source!.token).toBe(token); await workspace.dispose();
   }, 15_000);
+  it('returns a typed lazy-image projection without eager image reads and retains exact media choices and source',async()=>{
+    const f=await openFileCaption();f.s.media.addFile(f.s.mediaContext(),{name:'画像',size:png.length,arrayBuffer:async()=>png.slice().buffer});
+    await vi.waitFor(()=>expect(f.s.acknowledgment.state).toBe('idle'));const token=f.host.read().source!.token;await f.workspace.dispose();
+    const image=vi.spyOn(ValidationContent.prototype,'image');let cold:Awaited<ReturnType<typeof openValidationHost>>|undefined;
+    try{cold=await openValidationHost({...f.options,lazyImages:true});expect(cold.read().source!.token).toBe(token);expect(image).not.toHaveBeenCalled();
+      const choices=cold.authority.read().mediaChoices!;expect(choices.length).toBeGreaterThan(0);
+      await cold.content.image(choices[0] as unknown as JsonObject,true);expect(image).toHaveBeenCalledOnce();
+    }finally{image.mockRestore();await cold?.dispose();}
+  });
   it('prepares added residents atomically, retains old geometry after partial decode failure and disposes late completion', async () => {
     const prepared = await prepareValidationProject({ run: newId(), title: '表示準備', models: [0, 1, 2].map(i => ({ label: `${i}`, bytes: glb() })) }, budget, decode);
     const initial = prepareValidationCreation(prepared), fs = new TestFS(), locks = lockManager();
@@ -7514,6 +7722,13 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     let finish!: (value: any) => void; const delayed = await prepareValidationResidents([], host.content, () => new Promise(resolve => { finish = resolve; }));
     const pending = delayed.prepare([versions[0]!]); await vi.waitFor(() => expect(finish).toBeTypeOf('function'));
     delayed.dispose(); const release = vi.fn(); finish({ root: new THREE.Group(), dispose: release }); await expect(pending).rejects.toThrow('閉じ'); expect(release).toHaveBeenCalledOnce();
+    let unblock!:()=>void;const held=new Promise<void>(resolve=>{unblock=resolve;});let attempts=0;
+    const progressive=await prepareValidationResidents(versions,host.content,async source=>{if(++attempts===2){await held;throw Error('one model refused');}return decodeValidationModel(source);},true);
+    await vi.waitFor(()=>expect(progressive.state!(versions[0]!.closure as ValidationModelClosure).phase).toBe('ready'));
+    const partial=progressive.create(versions[0]!.closure as ValidationModelClosure);expect(progressive.state!(versions[1]!.closure as ValidationModelClosure).phase).toBe('loading');
+    unblock();await expect(progressive.ready).rejects.toThrow('一部のモデル');expect(partial.asset.children).toHaveLength(1);
+    expect(progressive.state!(versions[1]!.closure as ValidationModelClosure)).toEqual({phase:'failed',issue:'one model refused'});
+    expect(progressive.state!(versions[2]!.closure as ValidationModelClosure).phase).toBe('ready');partial.dispose!();progressive.dispose();
     await host.dispose();
   }, 15_000);
   it('previews/cancels and saves GLB placement only, preserving nested geometry, pin coordinates and body evidence on reopen', async () => {

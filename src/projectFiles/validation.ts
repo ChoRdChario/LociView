@@ -8,6 +8,19 @@ export interface FileValidationLimits {
   readonly maxFileBytes: number; readonly maxJsonBytes: number; readonly maxItems: number;
   readonly maxValues: number; readonly maxPixels: number;
 }
+/** Execution policy supplied by a composition root; never a source/profile declaration. */
+export interface ProjectFilePolicy {
+  readonly nonGs: FileValidationLimits;
+  readonly gs: FileValidationLimits;
+  readonly projectBodyBytes: number;
+}
+export type ProjectFilePolicyInput = FileValidationLimits | ProjectFilePolicy;
+export function projectFilePolicy(input: ProjectFilePolicyInput): ProjectFilePolicy {
+  const p = 'nonGs' in input ? input : { nonGs: input, gs: input, projectBodyBytes: input.maxFileBytes };
+  checkFileLimits(p.nonGs); checkFileLimits(p.gs);
+  if (!Number.isSafeInteger(p.projectBodyBytes) || p.projectBodyBytes <= 0) fileError('検査の上限を確認してください。');
+  return Object.freeze({ nonGs: Object.freeze({ ...p.nonGs }), gs: Object.freeze({ ...p.gs }), projectBodyBytes: p.projectBodyBytes });
+}
 export const fileError = (detail: string): never => { throw Error(`読み込めません。${detail} 元のファイルは変更していません。`); };
 export function checkFileLimits(limits: FileValidationLimits): void {
   for (const n of Object.values(limits)) if (!Number.isSafeInteger(n) || n <= 0) fileError('検査の上限を確認してください。');

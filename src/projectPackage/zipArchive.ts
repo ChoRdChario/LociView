@@ -25,6 +25,25 @@ class Ranges {
     if (bytes.length !== count) return fail('zip-short-read');
     return bytes;
   }
+  /** Native I/O blocks only; every original logical piece is still inspected. */
+  async payload(entry: ZipEntry, consume: (bytes: Uint8Array, first: boolean) => void): Promise<void> {
+    const nativeBlockBytes = entry.path === 'manifest.json' || entry.path === 'manifest.sha256' ? chunkBytes : 1_048_576;
+    let reads = 0;
+    for (let at = 0; at < entry.byteLength; at += nativeBlockBytes) {
+      checkAbort(this.signal);
+      const count = Math.min(nativeBlockBytes, entry.byteLength - at), logicalReads = Math.ceil(count / chunkBytes);
+      if (reads + logicalReads > L.streamChunks) return fail('zip-stream-budget');
+      if (this.reads + logicalReads > L.packageChunks) return fail('zip-read-budget');
+      if (entry.offset + at > this.file.size - count) return fail('zip-range');
+      reads += logicalReads; this.reads += logicalReads;
+      const block = new Uint8Array(await this.file.slice(entry.offset + at, entry.offset + at + count).arrayBuffer());
+      checkAbort(this.signal); if (block.length !== count) return fail('zip-short-read');
+      for (let offset = 0; offset < count; offset += chunkBytes) {
+        checkAbort(this.signal); consume(block.subarray(offset, Math.min(offset + chunkBytes, count)), at === 0 && offset === 0);
+      }
+      if (at + count < entry.byteLength) await new Promise<void>(resolve => setTimeout(resolve, 0));
+    }
+  }
   async bytes(entry: ZipEntry, max: number, signal?: AbortSignal): Promise<Uint8Array> {
     if (!Number.isSafeInteger(max) || max < 0 || entry.byteLength > max || max > L.sourceBytes) return fail('zip-buffer-budget');
     checkAbort(this.signal); checkAbort(signal);
@@ -52,6 +71,18 @@ export class PackageArchive {
   entryBlob(path: string): Blob {
     const entry = this.entries.find(e => e.path === path); if (!entry) return fail('zip-entry-missing');
     return this.ranges.file.slice(entry.offset, entry.offset + entry.byteLength);
+  }
+  /** The same immutable native input whose whole-container proof this owns. */
+  sourceSnapshot(): Blob {
+    checkAbort(this.ranges.signal);
+    return Blob.prototype.slice.call(this.ranges.file, 0, this.byteLength);
+  }
+  /** Reparse captured controls; reuse only this captured input's payload proof. */
+  async reopenCapturedControl(): Promise<PackageArchive> {
+    const control = readManifestControl(await this.entryBytes('manifest.json', L.controlBytes), await this.entryBytes('manifest.sha256', 64));
+    if (control.archiveByteLength !== this.byteLength || control.entries.length !== this.entries.length ||
+      this.entries.some((entry, i) => entry.path !== control.entries[i]!.path || entry.byteLength !== control.entries[i]!.byteLength)) return fail('entry-table');
+    return new PackageArchive(this.ranges, this.entries, control, this.byteLength, this.sha256);
   }
   async entryBytes(path: string, max: number, signal?: AbortSignal): Promise<Uint8Array> {
     const entry = this.entries.find(e => e.path === path); if (!entry) return fail('zip-entry-missing');
@@ -103,14 +134,12 @@ export class PackageArchive {
     }
     const observed: Entry[] = [], archiveHash = new NativeSha256();
     for (const entry of entries) {
-      const crc = new ZipCrc32(), hash = new NativeSha256(); let reads = 0;
+      const crc = new ZipCrc32(), hash = new NativeSha256();
       archiveHash.update(await ranges.read(entry.offset - 30 - entry.path.length, 30 + entry.path.length, true));
-      for (let offset = 0; offset < entry.byteLength; offset += chunkBytes) {
-        if (++reads > L.streamChunks) return fail('zip-stream-budget');
-        const bytes = await ranges.read(entry.offset + offset, Math.min(chunkBytes, entry.byteLength - offset));
-        if (offset === 0 && entry.path.startsWith('blobs/')) rejectNestedZip(bytes);
+      await ranges.payload(entry, (bytes, first) => {
+        if (first && entry.path.startsWith('blobs/')) rejectNestedZip(bytes);
         crc.update(bytes); hash.update(bytes); archiveHash.update(bytes);
-      }
+      });
       if (crc.digest() !== entry.crc32) return fail('zip-crc');
       archiveHash.update(await ranges.read(entry.offset + entry.byteLength, 16, true));
       observed.push({ path: entry.path, byteLength: entry.byteLength, sha256: hash.digestHex() });

@@ -57,7 +57,7 @@ export interface WorkspaceViewport {
   setPointDiameter?(assetId: string, diameter: number): void;
   pointDiameter?(assetId: string): number;
   reservePointer(active: boolean): void;
-  read(): { token: string; sceneId: string; pickToken: string; ready: boolean; dragging: boolean; issue: string | null; notice: string | null;readonly retryAvailable?:boolean;
+  read(): { token: string; sceneId: string; pickToken: string; ready: boolean; dragging: boolean; issue: string | null; notice: string | null;readonly loading?:boolean;readonly retryAvailable?:boolean;
     pins: readonly { id: string; x: number; y: number; visible: boolean; scale?: number; color?: string; status?: 'normal' | 'needsReview'; notice?: string }[]; readonly assetIds?: readonly string[]; readonly view?: ViewRuntime };
   target(assetId: string): WorkspaceSurface | null;
   camera(action: 'fit' | 'front' | 'back' | 'left' | 'right' | 'top' | 'bottom'): void;
@@ -80,6 +80,7 @@ export interface ProjectWorkspacePorts {
   resumedLastProject?(): boolean;
   storageEstimate?(): Promise<Readonly<{ usage?: number; quota?: number }>>;
   readonly readOnly: boolean;
+  presentation?(): { readonly busy: boolean; readonly reason: string } | null;
   status(): { kind: 'idle' | 'checking' | 'failed'; error?: string; retryable?: boolean };
   dispatch(token: string, command: MetadataEdit): Promise<unknown>;
   retry(): Promise<unknown>;

@@ -1,3 +1,5 @@
+import {createModelCandidatePreview} from '../../src/harness/projectScene/modelCandidatePreview';
+import { createGsResidency } from '../../src/viewer/gsDecodeQueue';
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import * as THREE from 'three';
 import { createSyntheticProject, fixtureIds as f } from '../../src/harness/projectScene/fixture';
@@ -125,6 +127,37 @@ describe('synthetic Scene display; GPU mocked, not rendered/browser acceptance',
     tick(); expect(renderer.frames).toBe(8); v.dispose(); expect(tracker.raf.size).toBe(0);
   });
 
+  it('does not emit repeated close notifications for an unopened/stale candidate preview',()=>{
+    const document=new RecordedDocument(),visibility=vi.fn(),prepare=vi.fn();
+    const preview=createModelCandidatePreview(document as unknown as Document,prepare,()=>false,visibility);
+    preview.render();preview.render();preview.dispose();expect(visibility).not.toHaveBeenCalled();expect(prepare).not.toHaveBeenCalled();
+  });
+  it('holds whole target intents across lazy decoder start and reuses them for caption-only changes',async()=>{
+    const base=syntheticDisplay(createSyntheticProject(),f.overview,null,null),pool=createGsResidency(5,445),admit=vi.spyOn(pool,'admit'),source=base.models[0]!;
+    const model=(key:string):ReadonlyRenderModel=>({shape:'render-gs',key,assetId:source.binding.assetId,assetToProject:source.binding.assetToProject,representation:{...source.representation,contentKind:'gaussianSplat'} as ReadonlyRenderModel['representation']});
+    const display=(key:string)=>({...base,token:key,models:[model(key)],readOnly:true as const,pinEdit:undefined,modelEdit:undefined,preview:undefined});
+    const make=()=>{const canvas=fakeCanvas(),create=vi.fn(()=>{const asset=new THREE.Group(),mesh=new THREE.Mesh(new THREE.PlaneGeometry(),new THREE.MeshStandardMaterial());asset.add(mesh);return{asset,mesh,dispose(){}};});
+      const runtime=sceneViewportFactory({create,gsDemand:m=>({count:'key' in m&&m.key.endsWith('4')?4:1,degree:4}),dispose(){}},pool)(canvas.canvas as unknown as HTMLCanvasElement,()=>{});return{canvas,create,runtime};};
+    const a=make(),b=make(),a1=display('a1'),b1=display('b1'),a4=display('a4'),b4=display('b4');
+    a.runtime.update(a1);a.runtime.setActive(true);a.canvas.show();b.runtime.update(b1);b.runtime.setActive(true);b.canvas.show();
+    a.runtime.update(a4);expect(admit).toHaveBeenCalledTimes(3);a.runtime.update({...a4,token:'caption-only'});expect(admit).toHaveBeenCalledTimes(3);
+    b.runtime.update(b4);expect(b.runtime.read().display).toBe(b1);expect(b.create).toHaveBeenCalledOnce();
+    a.runtime.setActive(false);await Promise.resolve();expect(b.runtime.read().display).toBe(b4);expect(b.create).toHaveBeenCalledTimes(2);
+    a.runtime.dispose();b.runtime.dispose();const neverActive=make();neverActive.runtime.update(a4);neverActive.runtime.setActive(false);
+    expect(()=>pool.admit([{count:5,degree:4}])).not.toThrow();neverActive.runtime.dispose();
+  });
+  it('retains the old correspondence on whole-view capacity refusal and starts an initially refused view after retry',()=>{
+    const base=syntheticDisplay(createSyntheticProject(),f.overview,null,null),canvas=fakeCanvas(),pool=createGsResidency(6,534),external=pool.reserve({}, {count:4,degree:4});
+    const source=base.models[0]!,model:ReadonlyRenderModel={shape:'render-gs',key:source.binding.id,assetId:source.binding.assetId,assetToProject:source.binding.assetToProject,representation:{...source.representation,contentKind:'gaussianSplat'} as ReadonlyRenderModel['representation']};
+    const create=vi.fn(()=>{const asset=new THREE.Group(),mesh=new THREE.Mesh(new THREE.PlaneGeometry(),new THREE.MeshStandardMaterial());asset.add(mesh);return{asset,mesh,dispose(){}};});
+    const v=sceneViewportFactory({create,gsDemand:()=>({count:4,degree:4}),dispose(){}},pool)(canvas.canvas as unknown as HTMLCanvasElement,()=>{});
+    const first={...base,models:[model],readOnly:true as const,pinEdit:undefined,modelEdit:undefined,preview:undefined};
+    v.update(first);v.setActive(true);canvas.show();expect(v.read().ready).toBe(false);expect(create).not.toHaveBeenCalled();expect(v.read().retryAvailable).toBe(true);
+    external.release();v.retry();canvas.show();expect(v.read().ready).toBe(true);expect(v.read().display).toBe(first);expect(create).toHaveBeenCalledOnce();
+    const next={...first,token:'new-target',models:[model,{...model,key:'second',assetId:'second'}]};v.update(next);
+    expect(v.read().display).toBe(first);expect(v.read().notice).toContain('前の表示');expect(create).toHaveBeenCalledOnce();
+    v.update({...first,token:'current-again'});expect(v.read().notice ?? '').not.toContain('前の表示');v.dispose();
+  });
   it('renders a read-only DTO with camera controls but no edit gizmo or placement picking', () => {
     const base = syntheticDisplay(createSyntheticProject(), f.overview, null, null), canvas = fakeCanvas(), propose = vi.fn();
     const models: ReadonlyRenderModel[] = base.models.map(m => ({ shape: 'render-glb', key: m.binding.id,
@@ -601,6 +634,37 @@ describe('synthetic Scene display; GPU mocked, not rendered/browser acceptance',
     expect(changed.resources.captions).toBe(p.resources.captions);
   });
 
+  it('adds a late ready model without replacing existing residents or refitting the camera; pending geometry cannot issue pick readiness',()=>{
+    const base=syntheticDisplay(createSyntheticProject(),f.overview,null,null),rows=base.models.slice(0,2).map(m=>({...m,shape:'saved-glb' as const})) as ValidationModelClosure[];
+    let loaded=false,notify!:()=>void;const releases:ReturnType<typeof vi.fn>[]=[],surfaces:THREE.Group[]=[];
+    const canvas=fakeCanvas(),create=vi.fn(()=>{const asset=new THREE.Group(),mesh=new THREE.Mesh(new THREE.BoxGeometry(),new THREE.MeshStandardMaterial());asset.add(mesh);surfaces.push(asset);
+      const dispose=vi.fn(()=>{asset.removeFromParent();mesh.geometry.dispose();mesh.material.dispose();});releases.push(dispose);return{asset,mesh,dispose};});
+    const v=sceneViewportFactory({create,dispose(){},gsDemand(){throw Error('A Mesh is not a GS demand');},state:m=>({phase:m.representation.id===rows[0]!.representation.id||loaded?'ready':'loading'}),subscribe(changed){notify=changed;return()=>{};}},createGsResidency(500,44500))(canvas.canvas as unknown as HTMLCanvasElement,()=>{});
+    v.update({...base,models:rows});v.setActive(true);canvas.show();expect(create).toHaveBeenCalledOnce();expect(v.read()).toMatchObject({ready:false,loading:true});
+    v.camera({kind:'axis',axis:'+x'});const pose=v.capture!(),control=tracker.controls.at(-1);
+    loaded=true;notify();expect(create).toHaveBeenCalledTimes(2);expect(releases[0]).not.toHaveBeenCalled();expect(v.capture!()).toEqual(pose);expect(tracker.controls.at(-1)).toBe(control);expect(v.read().ready).toBe(true);
+    expect((tracker.renderers[0].scene.children[0] as THREE.Group).children).toEqual(surfaces);v.dispose();expect(releases.every(release=>release.mock.calls.length===1)).toBe(true);
+  });
+  it('shows a ready mesh while GS sources are pending and admits the full exact GS demand before creating any GS resident',()=>{
+    const base=syntheticDisplay(createSyntheticProject(),f.overview,null,null),model=base.models[0]!;
+    const mesh={...model,shape:'saved-glb' as const} as ValidationModelClosure,gs={...base.models[1]!,shape:'saved-gs' as const,representation:{...base.models[1]!.representation,contentKind:'gaussianSplat'}} as ValidationModelClosure;
+    let pending=true,notify!:()=>void;const pool=createGsResidency(500,44500),admit=vi.spyOn(pool,'admit'),create=vi.fn(()=>{const asset=new THREE.Group(),surface=new THREE.Mesh(new THREE.BoxGeometry(),new THREE.MeshBasicMaterial());asset.add(surface);return{asset,mesh:surface,dispose(){asset.removeFromParent();surface.geometry.dispose();surface.material.dispose();}};});
+    const canvas=fakeCanvas(),v=sceneViewportFactory({create,dispose(){},state:m=>({phase:m.representation.contentKind==='gaussianSplat'&&pending?'loading':'ready'}),gsPending:()=>pending,
+      gsDemand:m=>m.representation.contentKind==='gaussianSplat'?{count:501,degree:4}:null,subscribe(changed){notify=changed;return()=>{};}},pool)(canvas.canvas as unknown as HTMLCanvasElement,()=>{});
+    v.update({...base,models:[mesh,gs]});v.setActive(true);canvas.show();expect(create).toHaveBeenCalledOnce();expect(admit).not.toHaveBeenCalled();
+    pending=false;notify();expect(admit).toHaveBeenCalled();expect(create).toHaveBeenCalledOnce();expect(v.read().ready).toBe(false);expect(v.read().retryAvailable).toBe(true);v.dispose();
+  });
+  it('retains an admitted GS view while the next complete target is unknown and never reacquires on an inactive cache notification',()=>{
+    const base=syntheticDisplay(createSyntheticProject(),f.overview,null,null),source=base.models[0]!;
+    const model=(key:string):ReadonlyRenderModel=>({shape:'render-gs',key,assetId:key,assetToProject:source.binding.assetToProject,representation:{...source.representation,contentKind:'gaussianSplat'} as ReadonlyRenderModel['representation']});
+    const a=model('A'),b=model('B'),first={...base,models:[a],readOnly:true as const,pinEdit:undefined,modelEdit:undefined,preview:undefined},next={...first,sceneId:'next',models:[a,b]};
+    let pending=true,notify!:()=>void;const pool=createGsResidency(500,44500),admit=vi.spyOn(pool,'admit'),canvas=fakeCanvas(),create=vi.fn();
+    const v=sceneViewportFactory({create,dispose(){},state:m=>({phase:'key'in m&&m.key==='B'&&pending?'loading':'ready'}),gsPending:models=>pending&&models.some(m=>'key'in m&&m.key==='B'),
+      gsDemand:m=>({count:'key'in m&&m.key==='A'?200:400,degree:4}),subscribe(changed){notify=changed;return()=>{};}},pool)(canvas.canvas as unknown as HTMLCanvasElement,()=>{});
+    v.update(first);const intent=admit.mock.results[0]!.value;v.update(next);expect(v.read().display).toBe(first);expect(intent.active).toBe(true);expect(create).not.toHaveBeenCalled();
+    v.setActive(false);const calls=admit.mock.calls.length;pending=false;notify();expect(admit).toHaveBeenCalledTimes(calls);const available=pool.admit([{count:500,degree:4}]);available.cancel();
+    v.setActive(true);expect(admit.mock.calls.at(-1)![0]).toEqual([{count:200,degree:4},{count:400,degree:4}]);expect(v.read().display).toBe(first);expect(v.read().ready).toBe(false);v.dispose();
+  });
   it('initializes after measurable attachment, uses both transforms, retains pose through updates/Scenes and releases on hide', () => {
     let reentered = false;
     const canvas = fakeCanvas(), viewport = createSyntheticViewport(canvas.canvas as unknown as HTMLCanvasElement, () => {

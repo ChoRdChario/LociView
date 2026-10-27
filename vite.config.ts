@@ -10,17 +10,19 @@ const base = process.env.BASE_PATH ?? '/';
 export default defineConfig(({ mode }) => {
   const isSparkHarness = mode === 'spark-harness';
   const isProjectSceneValidation = mode === 'project-scene-validation';
+  const isProjectSceneDesktop = mode === 'project-scene-desktop';
+  const isStaticScene = isProjectSceneValidation || isProjectSceneDesktop;
   const input: Record<string, string> = isSparkHarness || isProjectSceneValidation ? { dev: 'dev.html' } : { main: 'index.html' };
 
   return {
     base,
-    publicDir: isProjectSceneValidation ? false : undefined,
+    publicDir: isStaticScene ? false : undefined,
     build: {
       target: 'es2022',
       sourcemap: true,
-      outDir: isProjectSceneValidation ? 'validation-dist' : isSparkHarness ? 'dev-dist' : 'dist',
+      outDir: isProjectSceneDesktop ? 'desktop-dist' : isProjectSceneValidation ? 'validation-dist' : isSparkHarness ? 'dev-dist' : 'dist',
       // Keep the candidate GS bytes inspectable and independently cacheable.
-      assetsInlineLimit: isSparkHarness || isProjectSceneValidation ? 0 : undefined,
+      assetsInlineLimit: isSparkHarness || isStaticScene ? 0 : undefined,
       rollupOptions: {
         // The product PWA and disposable renderer harness are separate build graphs.
         // Otherwise Workbox would precache Spark merely because its lazy chunk exists.
@@ -41,7 +43,7 @@ export default defineConfig(({ mode }) => {
             },
       },
     },
-    plugins: isProjectSceneValidation ? [{
+    plugins: isStaticScene ? [{
       name: 'lociview-static-validation-shell',
       generateBundle() {
         // Exact approved validation-only dependency notices travel with that build.
@@ -53,6 +55,9 @@ export default defineConfig(({ mode }) => {
       transformIndexHtml: {
         order: 'pre',
         handler(html) {
+          if(isProjectSceneDesktop)return html.replace(/<link\b[^>]*rel="(?:icon|apple-touch-icon)"[^>]*>/g,'')
+            .replace(/<meta\b[^>]*name="apple-mobile-web-app[^"]*"[^>]*>/g,'')
+            .replace(/<meta\b[^>]*name="description"[^>]*>/g,'<meta name="description" content="LociViewは、3Dモデルに記録を付け、ファイルで作業を受け渡すアプリです。" />');
           // Reuse this page, without flashing the unrelated harness or fetching public assets.
           return html.replace(/<link\b[^>]*rel="icon"[^>]*>/g, '')
             .replace(/<title>[^<]*<\/title>/, '<title>LociView — ファイル検証</title>')

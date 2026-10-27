@@ -1,3 +1,4 @@
+import {projectSceneApplicationImports} from './helpers/projectSceneApplicationImports';
 import { describe, expect, it } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -235,6 +236,8 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
     for (const path of walk('src').filter(p => /\.(ts|tsx|js)$/.test(p))) {
       const source = readFileSync(path, 'utf8');
       const normalizedPath=path.replaceAll('\\','/');
+      const applicationImports=projectSceneApplicationImports[normalizedPath];
+      if(normalizedPath.startsWith('src/projectScene/'))expect(applicationImports,path).toBeDefined();
       if(source.includes("from 'three-compat-180"))expect(['src/projectFiles/glb.ts','src/projectFiles/legacy180Occurrences.ts','src/viewer/compat180/modelRuntime.ts','src/viewer/compat180/addons.d.ts'],path).toContain(normalizedPath);
       if(/from ['"][^'"]*compat180\/modelRuntime['"]|from ['"]\.\/modelRuntime['"]/.test(source))expect(['src/viewer/compat180/proof.ts'],path).toContain(normalizedPath);
       if(/from ['"][^'"]*modelLoader['"]/.test(source))expect(['src/viewer/loaders.ts','src/viewer/compat180/proof.ts'],path).toContain(normalizedPath);
@@ -244,21 +247,28 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
       const reviewEditPackage = /[\\/]projectPackage[\\/](reviewEdit|reviewEditControls|reviewEditJob|cleanInputDescriptor)\.ts$/.test(path);
       const packageControl = reviewEditPackage || /[\\/]projectPackage[\\/](reviewSnapshot|reviewSelection|reviewSource|reviewArchive|reviewOutputJob|cleanRecords|cleanSource|cleanArchive|cleanOutputJob|cleanInputJob|contract|manifest|historySummary|closure|protectedInventory|workspaceSource|contributionSource|contributionArchive|contributionEvidence|contributionReceiveJob|contributionOutputJob|outputJobs|receiveJobs|zipChecks|zipArchive|workspaceArchive|receiveJob|workspaceBases|outputJob|backupEvidence|backupSource|backupArchive|backupOutputJob|backupRestoreJob|restoreControls)\.ts$/.test(path);
       const packageMetadata = reviewEditPackage || /[\\/]projectPackage[\\/](reviewSnapshot|reviewSelection|reviewSource|reviewArchive|reviewOutputJob|cleanRecords|cleanSource|cleanArchive|cleanOutputJob|cleanInputJob|historySummary|closure|protectedInventory|workspaceSource|workspaceArchive|contributionSource|contributionArchive|contributionEvidence|contributionReceiveJob|contributionOutputJob|outputJobs|receiveJobs|receiveJob|workspaceBases|outputJob|backupEvidence|backupSource|backupArchive|backupOutputJob|backupRestoreJob|restoreControls)\.ts$/.test(path);
-      const packageJournal = /[\\/]projectMetadata[\\/](packageRemote|session|journal)\.ts$/.test(path) || /[\\/]projectFiles[\\/](receiveWorkspace|sendWorkspace)\.ts$/.test(path) ||
+      const packageJournal = /[\\/]projectFiles[\\/]initialProject\.ts$/.test(path) || /[\\/]projectMetadata[\\/](packageRemote|session|journal)\.ts$/.test(path) || /[\\/]projectFiles[\\/](receiveWorkspace|sendWorkspace)\.ts$/.test(path) ||
         /[\\/]harness[\\/]projectScene[\\/](reviewView|validationHost|validationWorkspace|validationCatalog|validationGeneration)\.ts$/.test(path);
       // 06 §11/§12.3 permit these exact disconnected primitives, not an app importer.
-      if (!packageControl && !packageJournal) expect(source, path).not.toMatch(/(?:from\s+|import\s*\()['"][^'"]*\/projectPackage\//);
+      if (!applicationImports && !packageControl && !packageJournal) expect(source, path).not.toMatch(/(?:from\s+|import\s*\()['"][^'"]*\/projectPackage\//);
       const metadataFoundation = /[\\/]projectMetadata[\\/](format|source)\.ts$/.test(path);
       const metadataService = /[\\/]projectMetadata[\\/](pointAnchorProof|persistence|generationScope|repository|journal|contentEvidence|blobStream|blobStore|blobInventory|session|commands|remote|packageRemote|membership|records|assetStatus|modelMembership|modelAddition|modelReplacement|gsProxy|captionCandidates|sceneAuthoring|viewResolution|materialResolution|captionDeletion|assetDeletion|startupScene)\.ts$/.test(path);
       // 05 §13.2 permits this exact new synthetic host, never ordinary/old saved activation.
       const metadataHost = /[\\/]harness[\\/]projectScene[\\/]metadata(Fixture|Storage|Host|Intent|MembershipControls|Models|ModelFacts|AssetStatusControls|ConflictControls|MaterialControls|CaptionLifecycleControls|StartupControls)\.ts$/.test(path);
-      const validationFiles = /[\\/]projectFiles[\\/](validation|png|jpeg|photo|glb|glbMaterials|glbOccurrences|legacy180Occurrences|pointPly|gsPly|initialProject|content|creation|modelFacts|receiveWorkspace|sendWorkspace|nativeMapping|nativeConversion|frozenV1Source|frozenV1Mapping|frozenV1Conversion|lociMyuSource|lociMyuMapping|lociMyuConversion)\.ts$/.test(path);
+      const validationFiles = /[\\/]projectFiles[\\/](bodyBudget|validation|png|jpeg|photo|glb|glbMaterials|glbOccurrences|legacy180Occurrences|pointPly|gsPly|initialProject|content|creation|modelFacts|receiveWorkspace|sendWorkspace|nativeMapping|nativeConversion|frozenV1Source|frozenV1Mapping|frozenV1Conversion|lociMyuSource|lociMyuMapping|lociMyuConversion)\.ts$/.test(path);
       const validationDisplay = /[\\/]harness[\\/]projectScene[\\/](modelTypes|modelCandidatePreview|validationProjection|validationRender|validationMaterials|validationCoverage|validationPointCoverage)\.ts$/.test(path);
       const validationHost = /[\\/]harness[\\/]projectScene[\\/](reviewView|reviewWorkspace|savedHost|validationHost|validationModeHost|validationCatalog|validationGeneration|validationWorkspace|validationReceiveControls|validationOutputControls|validationBrowser|gsProxyWorkflow|browserMetadataStorage|browserUiState|productWorkspace|productSources|viewCandidateLabels)\.ts$/.test(path);
       const productComposition = /[\\/]ui[\\/]projectScene[\\/](projectWorkspacePorts|projectWorkspace|projectRead|projectPanel|projectModels|projectViews|projectMaterials|projectMedia|projectRecovery)\.ts$/.test(path);
-      if (!metadataFoundation && !metadataService && !metadataHost && !validationFiles && !validationDisplay && !validationHost && !packageMetadata && !productComposition) expect(source, path).not.toMatch(/(?:from\s+|import\s*\()['"][^'"]*\/projectMetadata\//);
-      if (packageControl) {
-        const imports = [...source.matchAll(/(?:from\s+|import\s*\()(['"])([^'"]+)\1/g)].map(m => m[2]);
+      if (!applicationImports && !metadataFoundation && !metadataService && !metadataHost && !validationFiles && !validationDisplay && !validationHost && !packageMetadata && !productComposition) expect(source, path).not.toMatch(/(?:from\s+|import\s*\()['"][^'"]*\/projectMetadata\//);
+      if(applicationImports){
+        const imports=[...source.matchAll(/(?:from\s+|import\s*\(\s*|import\s+)(['"])([^'"]+)\1/g)].map(m=>m[2]!);
+        expect(imports.every(p=>applicationImports.includes(p)),path).toBe(true);
+        if(normalizedPath.startsWith('src/projectScene/')){
+          expect(imports.every(p=>!/(harness|fixtures|poc)/.test(p)),path).toBe(true);
+          expect(source,path).not.toMatch(/\b(createSyntheticProject|fixtureModelBytes|metadataIntent|SyntheticSession)\b/);
+        }
+      } else if (packageControl) {
+        const imports = [...source.matchAll(/(?:from\s+|import\s*\(\s*|import\s+)(['"])([^'"]+)\1/g)].map(m => m[2]);
         const byFile: Record<string, string[]> = {
           reviewSnapshot: ['../core/json', '../domain/projectGraph', '../domain/projectGraphSupport', '../domain/projectMutableFields', '../domain/projectProfile', '../domain/projectRecordFields', '../domain/projectRecords', '../domain/values', '../projectMetadata/blobStore', '../projectMetadata/source', './cleanRecords', './contract', './manifest'],
           reviewSelection: ['../domain/projectCandidates', '../domain/projectGraphSupport', '../domain/projectMutableFields', '../domain/projectRecords', '../domain/values', '../projectMetadata/source', '../projectMetadata/persistence', './cleanRecords', './contract', './manifest', './reviewSnapshot'],
@@ -270,7 +280,7 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
           cleanArchive: ['../projectMetadata/blobStore', '../domain/projectGraphSupport', '../domain/values', '../projectMetadata/source', './contract', './cleanSource', './contributionEvidence', './manifest', './zipArchive', './workspaceArchive', './zipChecks'],
           cleanInputJob: ['../platform/fs', '../projectMetadata/persistence', '../projectMetadata/format', '../projectMetadata/journal', './cleanArchive', './contract', './cleanInputDescriptor', './reviewEditControls', './workspaceBases'],
           cleanInputDescriptor: ['../projectMetadata/format', '../projectMetadata/persistence', './cleanArchive', './manifest'],
-          reviewEdit: ['../domain/projectGraphSupport', '../projectMetadata/format', '../projectMetadata/source', '../projectMetadata/persistence', './cleanArchive', './cleanInputDescriptor', './cleanRecords', './cleanSource', './contributionEvidence', './contract', './manifest', './reviewArchive', './reviewSnapshot'],
+          reviewEdit: ['../platform/fs', '../domain/projectGraphSupport', '../projectMetadata/format', '../projectMetadata/source', '../projectMetadata/persistence', './cleanArchive', './cleanInputDescriptor', './cleanRecords', './cleanSource', './contributionEvidence', './contract', './manifest', './reviewArchive', './reviewSnapshot'],
           reviewEditControls: ['../platform/fs', '../projectMetadata/format', '../projectMetadata/persistence', '../projectMetadata/journal', './contract', './cleanInputDescriptor', './manifest', './reviewEdit', './cleanArchive', './workspaceBases'],
           reviewEditJob: ['../platform/fs', '../projectMetadata/format', '../projectMetadata/persistence', '../projectMetadata/session', './cleanInputJob', './reviewEdit', './reviewEditControls'],
           cleanOutputJob: ['../platform/fs', '../projectMetadata/blobStore', '../domain/projectContentChecks', '../projectMetadata/format', '../projectMetadata/source', '../projectMetadata/persistence', './contract', './manifest', './cleanSource', './cleanRecords', './cleanArchive', './workspaceArchive', './contributionEvidence', './workspaceBases', './protectedInventory', './zipChecks'],
@@ -328,7 +338,7 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
         expect(imports.every(p => byFile[name]!.includes(p!)), path).toBe(true);
         expect(source, path).not.toMatch(/\b(fetch|indexedDB|localStorage|sessionStorage|serviceWorker)\b/);
       } else if (/[\\/](scene|domain)[\\/]/.test(path)) {
-        const imports = [...source.matchAll(/(?:from\s+|import\s*\()(['"])([^'"]+)\1/g)].map(m => m[2]);
+        const imports = [...source.matchAll(/(?:from\s+|import\s*\(\s*|import\s+)(['"])([^'"]+)\1/g)].map(m => m[2]);
         const providerImports = path.replaceAll('\\', '/').endsWith('/scene/projectProvider.ts') ? [
           '../domain/projectContent', '../domain/projectGraphSupport', '../domain/projectMutableFields', '../domain/projectCandidates',
           '../domain/atomicHistory', '../domain/projectContentChecks', '../domain/projectProfile',
@@ -351,7 +361,7 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
             '../../projectPackage/restoreControls', '../../projectFiles/creation', '../../projectFiles/validation', './validationHost'],
           gsProxyWorkflow: ['../../projectMetadata/gsProxy','../../projectMetadata/persistence','../../domain/values','../../scene/projectProvider','../../projectFiles/content','../../projectFiles/initialProject','../../projectFiles/validation','./validationProjection','./mediaHistory'],
           validationCatalog: ['./validationHost', './validationGeneration', '../../projectFiles/receiveWorkspace', '../../projectFiles/sendWorkspace', '../../projectFiles/validation', '../../projectPackage/reviewEditControls'],
-          validationWorkspace: ['../../projectFiles/pointPly', './productWorkspace', './metadataMaterialControls', '../../projectMetadata/persistence', '../../projectFiles/initialProject', '../../projectFiles/creation', '../../projectFiles/nativeConversion', '../../projectFiles/frozenV1Conversion', '../../projectFiles/lociMyuConversion',
+          validationWorkspace: ['../../assets/zipio', '../../projectPackage/contract', '../../projectFiles/pointPly', './productWorkspace', './metadataMaterialControls', '../../projectMetadata/persistence', '../../projectFiles/initialProject', '../../projectFiles/creation', '../../projectFiles/nativeConversion', '../../projectFiles/frozenV1Conversion', '../../projectFiles/lociMyuConversion',
             '../../projectFiles/validation', '../../projectPackage/workspaceArchive', '../../projectPackage/cleanArchive', '../../projectPackage/zipArchive', '../../projectPackage/backupArchive', '../../projectPackage/reviewEdit', '../../projectFiles/png', './validationHost', './validationModeHost', './savedHost', './validationCatalog', './metadataWorkspace', './metadataConflictControls', './metadataCaptionLifecycleControls', './metadataMembershipControls', './metadataAssetStatusControls', './modelCandidatePreview', './viewportHost', './validationReceiveControls', './reviewView', './reviewWorkspace', '../../projectFiles/jpeg', '../../projectFiles/photo', '../../ui/resumeReference'],
           validationReceiveControls: ['../../projectMetadata/format', './validationModeHost', '../../ui/projectScene/projectWorkspacePorts', './validationOutputControls'],
           validationOutputControls: ['./validationModeHost', '../../ui/projectScene/projectWorkspacePorts'],
@@ -363,7 +373,7 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
           browserUiState: ['../../ui/context', '../../ui/resumeReference'],
           browserMetadataStorage: ['@automerge/automerge/slim', '@automerge/automerge/automerge.wasm?url', '@automerge/automerge-repo-storage-indexeddb'],
         };
-        const imports = [...source.matchAll(/(?:from\s+|import\s*\()(['"])([^'"]+)\1/g)].map(m => m[2]);
+        const imports = [...source.matchAll(/(?:from\s+|import\s*\(\s*|import\s+)(['"])([^'"]+)\1/g)].map(m => m[2]);
         const name = path.split(/[\\/]/).at(-1)!.replace(/\.ts$/, '');
         expect(imports.every(p => byFile[name]!.includes(p!)), path).toBe(true);
         if (name === 'browserUiState') expect(source, path).not.toMatch(/\b(fetch|indexedDB|sessionStorage|serviceWorker|OpfsFS|OriginBlobStore|MetadataProjectSession)\b/);
@@ -372,13 +382,13 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
         const byFile: Record<string, string[]> = {
           modelTypes: ['../../domain/values', '../../scene/types', './modelClosure', './mediaHistory'],
           modelCandidatePreview: ['../../scene/projectProvider', '../../projectMetadata/assetStatus', '../../projectMetadata/records', '../../projectMetadata/format', './modelTypes', './viewportModel', './viewportHost'],
-          validationProjection: ['../../projectFiles/gsPly', '../../projectFiles/pointPly', '../../scene/projectProvider', '../../projectMetadata/records', '../../projectMetadata/format', '../../domain/projectGraphSupport', '../../projectFiles/validation', './fixture', './modelTypes'],
-          validationRender: ['../../projectFiles/gsPly', '../../viewer/compat180/proof', '../../viewer/compat180/sceneProof', '../../domain/pointPresentation', '../../viewer/pointSurface', '../../projectFiles/pointPly', 'three', 'three/addons/loaders/GLTFLoader.js', '../../viewer/loaders', '../../viewer/hardChroma', '../../projectFiles/glb', '../../projectFiles/content', '../../projectFiles/glbOccurrences', '../../domain/materialIntent', './modelTypes', './viewportPicking', './viewportModel', '../../domain/projectGraphSupport', '../../domain/values', './validationMaterials'],
+          validationProjection: ['../../projectFiles/modelFacts', '../../projectFiles/gsPly', '../../projectFiles/pointPly', '../../scene/projectProvider', '../../projectMetadata/records', '../../projectMetadata/format', '../../domain/projectGraphSupport', '../../projectFiles/validation', './fixture', './modelTypes'],
+          validationRender: ['../../viewer/gsDecodeQueue', '../../projectFiles/gsPly', '../../viewer/compat180/proof', '../../viewer/compat180/sceneProof', '../../domain/pointPresentation', '../../viewer/pointSurface', '../../projectFiles/pointPly', 'three', 'three/addons/loaders/GLTFLoader.js', '../../viewer/loaders', '../../viewer/hardChroma', '../../projectFiles/glb', '../../projectFiles/content', '../../projectFiles/glbOccurrences', '../../domain/materialIntent', './modelTypes', './viewportPicking', './viewportModel', '../../domain/projectGraphSupport', '../../domain/values', './validationMaterials'],
           validationMaterials: ['../../domain/projectGraphSupport', '../../domain/materialIntent', '../../domain/projectProfile', '../../domain/values', '../../scene/types', './modelTypes'],
           validationPointCoverage: ['three', '../../viewer/hardChroma', './validationCoverage', './viewportPicking'],
           validationCoverage: ['three', '../../viewer/hardChroma', './viewportPicking'],
         };
-        const imports = [...source.matchAll(/(?:from\s+|import\s*\()(['"])([^'"]+)\1/g)].map(m => m[2]);
+        const imports = [...source.matchAll(/(?:from\s+|import\s*\(\s*|import\s+)(['"])([^'"]+)\1/g)].map(m => m[2]);
         expect(imports.every(p => byFile[path.split(/[\\/]/).at(-1)!.replace(/\.ts$/, '')]!.includes(p!)), path).toBe(true);
         expect(source, path).not.toMatch(/\b(fetch|indexedDB|localStorage|sessionStorage|serviceWorker)\b/);
       } else if (validationFiles) {
@@ -393,8 +403,8 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
           pointPly: ['./gsPly', '../../docs/specs/profiles/point-ply-rgb-1.profile.json?raw', '../domain/values', './validation', './glb', '../domain/pointPresentation'],
           glbOccurrences: ['./legacy180Occurrences', '../viewer/compat180/sceneProof', 'three', 'three/addons/loaders/GLTFLoader.js', '../domain/values', '../domain/projectGraphSupport', '../viewer/loaders', './glb', './png', './validation', './jpeg'],
           legacy180Occurrences: ['../nativeGs/sha256', '../viewer/compat180/sceneProof', 'three-compat-180', 'three-compat-180/addons/loaders/GLTFLoader.js', '../domain/values', '../domain/projectGraphSupport', '../viewer/compat180/resources', './glb', './png', './validation', './jpeg'],
-          initialProject: ['./gsPly', './pointPly', '../domain/projectGraphSupport', '../domain/projectRecords', '../domain/values', '../projectMetadata/persistence', '../projectMetadata/blobStore', './glb', './png', './validation', './jpeg', './photo'],
-          content: ['./gsPly', './pointPly', '../platform/fs', '../domain/projectContentChecks', '../domain/projectGraphSupport', '../domain/values', '../domain/projectRecordFields', '../projectMetadata/contentEvidence', '../projectMetadata/blobInventory', '../projectMetadata/blobStore', '../projectMetadata/session', '../projectMetadata/persistence', './glb', './glbOccurrences', './png', './validation', './initialProject', './jpeg', './photo'],
+          initialProject: ['../projectPackage/contract', './gsPly', './pointPly', '../domain/projectGraphSupport', '../domain/projectRecords', '../domain/values', '../projectMetadata/persistence', '../projectMetadata/blobStore', './glb', './png', './validation', './jpeg', './photo'],
+          content: ['./bodyBudget', '../scene/projectProvider', './gsPly', './pointPly', '../platform/fs', '../domain/projectContentChecks', '../domain/projectGraphSupport', '../domain/values', '../domain/projectRecordFields', '../projectMetadata/contentEvidence', '../projectMetadata/blobInventory', '../projectMetadata/blobStore', '../projectMetadata/session', '../projectMetadata/persistence', './glb', './glbOccurrences', './png', './validation', './initialProject', './jpeg', './photo'],
           creation: ['./gsPly', '../platform/fs', '../projectMetadata/blobStore', '../projectMetadata/source', '../projectMetadata/session', '../projectMetadata/repository', '../projectMetadata/persistence', './content', './initialProject', './png', './validation', './modelFacts', './jpeg', './photo'],
           nativeMapping: ['../nativeGs/materialSlots', './glbOccurrences', '../nativeGs/schema', '../nativeGs/resolver', '../domain/projectRecords', '../domain/values', '../projectMetadata/persistence', './initialProject', './glb', './validation'],
           nativeConversion: ['../nativeGs/materialSlots', './glbOccurrences', '../nativeGs/portablePackage', '../nativeGs/schema', '../platform/fs', '../projectMetadata/blobStore', '../projectMetadata/source', '../projectMetadata/session', '../projectMetadata/persistence', '../scene/projectProvider', '../domain/projectContentChecks', '../domain/projectGraphSupport', '../domain/values', './nativeMapping', './glb', './png', './initialProject', './content', './creation', './validation', './jpeg', './photo'],
@@ -404,23 +414,24 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
           lociMyuSource: ['../assets/zipio', '../assets/importWizard', '../io/csv', '../io/locimyu', '../domain/values', '../projectMetadata/persistence', '../projectMetadata/blobStore', './content', './glb', './png', './validation', './jpeg', './photo'],
           lociMyuMapping: ['../domain/projectRecords', '../domain/values', '../io/locimyu', '../projectMetadata/persistence', './initialProject', './lociMyuSource', './validation'],
           lociMyuConversion: ['../platform/fs', '../projectMetadata/blobStore', '../projectMetadata/source', '../projectMetadata/session', '../projectMetadata/persistence', '../domain/projectGraphSupport', '../domain/values', '../domain/projectContentChecks', '../scene/projectProvider', './content', './creation', './lociMyuSource', './lociMyuMapping', './png', './validation', './jpeg', './photo'],
-          modelFacts: ['./pointPly', '../domain/pointSource', '../scene/types', '../scene/resolve', '../scene/projectProvider', '../projectMetadata/session', '../projectMetadata/source', '../projectMetadata/persistence', '../domain/projectContentChecks', '../domain/projectRecordFields', '../domain/projectRecords', '../domain/values', './validation', './content'],
-          receiveWorkspace: ['../platform/fs', '../platform/projectLock', '../projectMetadata/session', '../projectMetadata/format', '../projectPackage/receiveJob', '../projectPackage/cleanInputJob', './validation', '../projectMetadata/journal', '../projectMetadata/persistence', '../projectMetadata/blobStore', '../projectPackage/contract', '../projectPackage/zipArchive', '../projectPackage/contributionReceiveJob', '../projectPackage/receiveJobs', '../projectPackage/manifest'],
+          bodyBudget: ['../scene/projectProvider','../domain/values','../projectMetadata/records','./validation'],
+          modelFacts: ['./bodyBudget', './pointPly', '../domain/pointSource', '../scene/types', '../scene/resolve', '../scene/projectProvider', '../projectMetadata/session', '../projectMetadata/source', '../projectMetadata/persistence', '../domain/projectContentChecks', '../domain/projectRecordFields', '../domain/projectRecords', '../domain/values', './validation', './content'],
+          receiveWorkspace: ['../platform/fs', '../platform/projectLock', '../projectMetadata/session', '../projectMetadata/format', '../projectPackage/receiveJob', '../projectPackage/cleanInputJob', './validation', '../projectMetadata/journal', '../projectMetadata/persistence', '../projectMetadata/blobStore', '../projectPackage/contract', '../projectPackage/zipArchive', '../projectPackage/contributionReceiveJob', '../projectPackage/receiveJobs', '../projectPackage/manifest', '../projectPackage/reviewEditControls'],
           sendWorkspace: ['../platform/fs', '../projectMetadata/session', '../projectMetadata/blobStore', '../projectMetadata/format', '../projectMetadata/persistence',
             '../projectPackage/outputJob', '../projectPackage/contributionOutputJob', '../projectPackage/backupOutputJob', '../projectPackage/cleanOutputJob', '../projectPackage/reviewOutputJob', '../projectPackage/reviewSelection', '../projectPackage/protectedInventory', '../projectPackage/contract', '../projectPackage/outputJobs', '../projectPackage/contributionSource', '../projectPackage/workspaceBases', './receiveWorkspace', './validation'],
         };
-        const imports = [...source.matchAll(/(?:from\s+|import\s*\()(['"])([^'"]+)\1/g)].map(m => m[2]);
+        const imports = [...source.matchAll(/(?:from\s+|import\s*\(\s*|import\s+)(['"])([^'"]+)\1/g)].map(m => m[2]);
         expect(imports.every(p => byFile[path.split(/[\\/]/).at(-1)!.replace(/\.ts$/, '')]!.includes(p!)), path).toBe(true);
         expect(source, path).not.toMatch(/\b(fetch|indexedDB|localStorage|sessionStorage|serviceWorker)\b/);
       } else if (metadataFoundation) {
-        const imports = [...source.matchAll(/(?:from\s+|import\s*\()(['"])([^'"]+)\1/g)].map(m => m[2]);
+        const imports = [...source.matchAll(/(?:from\s+|import\s*\(\s*|import\s+)(['"])([^'"]+)\1/g)].map(m => m[2]);
         const permitted = ['@automerge/automerge/slim', '../core/json', '../domain/atomicHistory',
           '../domain/projectGraphSupport', '../domain/projectRecords', '../domain/projectRecordFields',
           './pointAnchorProof', '../domain/values', '../domain/projectCandidates', '../domain/projectMutableFields', '../domain/projectProfile', '../scene/projectProvider', './commands', './format'];
         expect(imports.every(p => permitted.includes(p!)), path).toBe(true);
         expect(source, path).not.toMatch(/\b(fetch|indexedDB|localStorage|sessionStorage|serviceWorker)\b/);
       } else if (metadataService) {
-        const imports = [...source.matchAll(/(?:from\s+|import\s*\()(['"])([^'"]+)\1/g)].map(m => m[2]);
+        const imports = [...source.matchAll(/(?:from\s+|import\s*\(\s*|import\s+)(['"])([^'"]+)\1/g)].map(m => m[2]);
         const byFile: Record<string, string[]> = {
           // Repository type only: binds the read callback's FS/factory pair; no runtime Repo dependency.
           pointAnchorProof: ['./source', './commands', './persistence', './format'],
@@ -466,7 +477,7 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
         expect(imports.every(p => byFile[name]!.includes(p!)), path).toBe(true);
         expect(source, path).not.toMatch(/\b(fetch|indexedDB|localStorage|sessionStorage|serviceWorker)\b/);
       } else if (/[\\/]harness[\\/]projectScene[\\/]metadata(Fixture|Storage|Host|Browser|Intent|Views|Materials|Media|Models|ModelFacts|ModelRecords|ReceiveControls|ConflictControls|MaterialControls|CaptionLifecycleControls|MembershipControls|AssetStatusControls|Workspace|StartupControls)\.ts$/.test(path)) {
-        const imports = [...source.matchAll(/(?:from\s+|import\s*\()(['"])([^'"]+)\1/g)].map(m => m[2]);
+        const imports = [...source.matchAll(/(?:from\s+|import\s*\(\s*|import\s+)(['"])([^'"]+)\1/g)].map(m => m[2]);
         const byFile: Record<string, string[]> = {
           metadataFixture: ['./fixture', './modelFixture', './modelClosure', '../../domain/values', '../../scene/projectProvider',
             '../../scene/types', '../../projectMetadata/source', '../../projectMetadata/persistence', './metadataViews', './metadataMaterials', './metadataMedia', './mediaHistory', './metadataModels', './modelTypes'],
@@ -503,7 +514,7 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
         expect(imports.every(p => byFile[name]!.includes(p!)), path).toBe(true);
         if (name !== 'metadataBrowser') expect(source, path).not.toMatch(/\b(fetch|indexedDB|localStorage|sessionStorage|serviceWorker)\b/);
       } else if (/[\\/]ui[\\/]projectScene[\\/]/.test(path)) {
-        const imports = [...source.matchAll(/(?:from\s+|import\s*\()(['"])([^'"]+)\1/g)].map(m => m[2]);
+        const imports = [...source.matchAll(/(?:from\s+|import\s*\(\s*|import\s+)(['"])([^'"]+)\1/g)].map(m => m[2]);
         // 05 §13.3 permits the existing side-effect-free presentation helper,
         // not the Native controller/schema runtime or a general Native dependency.
         const shared = ['../../scene/types', '../../domain/captionText', '../../domain/values', '../../domain/materialIntent', '../../nativeGs/backgroundColor'];
@@ -513,7 +524,7 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
         if (path.replaceAll('\\', '/').endsWith('/materialState.ts')) shared.push('../../domain/projectProfile');
         expect(imports.every(p => p?.startsWith('./') || shared.includes(p!)), path).toBe(true);
       } else if (/[\\/]harness[\\/]projectScene[\\/](fixture|session|workspace|entry|validationEntry|historyPort|historyProjection|teamWorkspace|modelFixture|modelClosure|modelHistory|developmentControls|membershipResolution|viewportPointPicking|viewportPicking|viewport|viewportHost|viewportModel|pinParent|viewHistory|viewSession|materialHistory|materialSession|materialReview|mediaHistory|mediaSession|mediaControls|mediaPresentation)\.ts$/.test(path)) {
-        const imports = [...source.matchAll(/(?:from\s+|import\s*\()(['"])([^'"]+)\1/g)].map(m => m[2]);
+        const imports = [...source.matchAll(/(?:from\s+|import\s*\(\s*|import\s+)(['"])([^'"]+)\1/g)].map(m => m[2]);
         const permitted = ['../../scene/types', '../../scene/commands', '../../scene/resolve',
           '../../ui/projectScene/navigationState', '../../ui/projectScene/navigationControls',
           '../../ui/projectScene/captionListState', '../../ui/projectScene/captionListControls',
@@ -523,6 +534,7 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
           '../../ui/projectScene/pinModeState', '../../ui/projectScene/pinModeControls',
           '../../ui/projectScene/modelListState', '../../ui/projectScene/modelListControls'];
         if (/[\\/](viewport(?:Model|PointPicking|Picking)?|pinParent)\.ts$/.test(path)) permitted.push('three');
+        if (/[\\/](entry|validationEntry)\.ts$/.test(path)) permitted.push(...['captionList','captionDetail','modelList','captionActions','viewControls','materialControls','projectWorkspace'].map(name=>'../../ui/projectScene/'+name+'.css'));
         if (/[\\/](viewport|viewportPicking)\.ts$/.test(path)) permitted.push('../../viewer/hardChroma');
         if (path.replaceAll('\\', '/').endsWith('/viewport.ts')) permitted.push('three/addons/controls/OrbitControls.js');
         if (/[\\/](viewportHost|viewSession)\.ts$/.test(path)) permitted.push('../../ui/projectScene/viewControls', '../../ui/projectScene/viewState',
@@ -559,11 +571,12 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
           expect(source).toContain("if (import.meta.env.MODE !== 'project-scene-validation') throw");
           expect(source).not.toMatch(/(?:metadataBrowser|development-browser|createDevelopmentWorkspace|createTeamWorkspace|searchParams\.get\(['"](?:mode|storage)['"]\))/);
         }
-        if (/[\\/](viewport|viewportPicking)\.ts$/.test(path)) permitted.push('../../viewer/gsRender');
+        if (/[\\/](entry|validationEntry)\.ts$/.test(path)) permitted.push(...['captionList','captionDetail','modelList','captionActions','viewControls','materialControls','projectWorkspace'].map(name=>'../../ui/projectScene/'+name+'.css'));
+        if (/[\\/](viewport|viewportPicking)\.ts$/.test(path)) permitted.push('../../viewer/gsRender', '../../viewer/gsDecodeQueue');
         expect(imports.every(p => p?.startsWith('./') || permitted.includes(p!)), path).toBe(true);
         expect(source, path).not.toMatch(/\b(fetch|indexedDB|localStorage|sessionStorage|serviceWorker)\b/);
       } else if (path.replaceAll('\\', '/') === 'src/viewer/gsRender.ts') {
-        const imports=[...source.matchAll(/(?:from\s+|import\s*\()(['"])([^'"]+)\1/g)].map(m=>m[2]);
+        const imports=[...source.matchAll(/(?:from\s+|import\s*\(\s*|import\s+)(['"])([^'"]+)\1/g)].map(m=>m[2]);
         expect(imports.sort()).toEqual(['three','gaussian-splat-lite','../../docs/specs/profiles/gs-gsl-webgl2-packed-linear-1.profile.json?raw','../../docs/specs/profiles/gs-gsl-webgl2-packed-linear-1.goldens.json?raw','./gsDecodeQueue','../domain/gsSource'].sort());
         expect(source).not.toMatch(/\b(fetch|indexedDB|localStorage|sessionStorage|serviceWorker)\b/);
       } else if (path.replaceAll('\\', '/') === 'src/viewer/pointSurface.ts') {
@@ -574,6 +587,10 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
         expect(source.replaceAll('\r\n', '\n')).toContain("} else if (mode === 'project-scene') {\n    await import('./harness/projectScene/entry');");
         expect([...source.matchAll(/(?:from\s+|import\s*\()['"]([^'"]*\/(?:scene|domain|projectScene)\/[^'"]+)['"]/g)].map(m => m[1]))
           .toEqual(['./harness/projectScene/validationEntry', './harness/projectScene/entry']);
+      } else if(normalizedPath==='src/main.ts'){
+        expect(source).toContain("if(import.meta.env.MODE==='project-scene-desktop'){");
+        expect([...source.matchAll(/(?:from\s+|import\s*\(\s*|import\s+)(['"])([^'"]+)\1/g)].map(m=>m[2]))
+          .toEqual(['./ui/style.css','./projectScene/desktopEntry','./nativeGs/app','./ui/app']);
       } else expect(source).not.toMatch(/(?:from\s+|import\s*\()['"][^'"]*\/(scene|domain|projectScene)\//);
     }
     const backgroundHelper = readFileSync('src/nativeGs/backgroundColor.ts', 'utf8');

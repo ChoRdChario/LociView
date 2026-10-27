@@ -98,7 +98,7 @@ function drop(root: HomeNode, file: File): void {
   picker.dispatchEvent(event);
 }
 
-function setup(options: { existingConventional?: boolean } = {}) {
+function setup(options: { existingConventional?: boolean;onNewProject?:HomeDeps['onNewProject'];pwa?:boolean } = {}) {
   const root = new HomeNode();
   const release = vi.fn();
   let notifyCreationPending: (pending: boolean) => void = () => undefined;
@@ -126,6 +126,7 @@ function setup(options: { existingConventional?: boolean } = {}) {
   const registerConventionalPackage = vi.fn(async () => 'projects/registered');
   const openProject = vi.fn(async () => undefined);
   const deps: HomeDeps = {
+    onNewProject:options.onNewProject,pwa:options.pwa,
     nativeHome,
     fs: { list } as unknown as WorkspaceFS,
     identity: {
@@ -210,6 +211,12 @@ describe('ordinary home file intake', () => {
     expect(picker.focusCount).toBe(1);
   });
 
+  it('releases Native intake and routes fresh model creation through the candidate hook',async()=>{
+    vi.mocked(inspectZipContainerIdentity).mockRejectedValueOnce(Error('not a ZIP container'));let mounted:ReturnType<typeof setup>;
+    const onNewProject=vi.fn(async()=>{expect(mounted.release).toHaveBeenCalledOnce();});mounted=setup({pwa:false,onNewProject});
+    const file=new File([new Uint8Array([0x67,0x6c,0x54,0x46])],'new.glb');drop(mounted.root,file);
+    await vi.waitFor(()=>expect(onNewProject).toHaveBeenCalledWith([file]));expect(mounted.acceptModelFile).not.toHaveBeenCalled();
+  });
   it('routes by inspected content even when package and model filenames are misleading', async () => {
     vi.mocked(inspectZipContainerIdentity).mockResolvedValueOnce('native-portable');
     const packageHome = setup();

@@ -35,7 +35,9 @@ describe('approved static validation build', () => {
     expect(html).toContain('<p role="status">ファイル検証画面を準備しています。</p>');
     expect(html).toContain('src="/src/dev-entry.ts"');
     expect(html).not.toMatch(/rel="icon"|id="file-model"|id="btn-import"|data-sample=/);
-    const browser = readFileSync('src/harness/projectScene/validationBrowser.ts', 'utf8');
-    expect(browser).toContain("if (!import.meta.env.DEV && import.meta.env.MODE !== 'project-scene-validation')");
+    const harness = readFileSync('src/harness/projectScene/validationBrowser.ts', 'utf8');
+    expect(harness).toContain("from '../../projectScene/validationBrowser'");
+    const browser = readFileSync('src/projectScene/validationBrowser.ts', 'utf8');
+    expect(browser).toContain("if (!import.meta.env.DEV && import.meta.env.MODE !== 'project-scene-validation' && import.meta.env.MODE !== 'project-scene-desktop')");
   });
 });

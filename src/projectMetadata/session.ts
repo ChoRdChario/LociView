@@ -42,6 +42,8 @@ import type { BackupRestoreJob } from '../projectPackage/backupRestoreJob';
 
 /** Owned finite content boundary. Stage may introduce bytes; recovery may only verify saved bytes. */
 export interface MetadataMediaPort {
+  /** Route admission before retaining/staging a new media command; no writes. */
+  assertIntroduction?(provider: Extract<ProjectProviderRead,{kind:'scene-provider'}>,record:JsonObject):void;
   stage(record: JsonObject, token: string): Promise<void>;
   verify(blobs: readonly JsonObject[]): Promise<void>;
   inventory?(blobs: readonly JsonObject[]): Promise<void>;
@@ -242,6 +244,7 @@ export class MetadataProjectSession {
       if (command.kind === 'createAttachment') {
         if (!this.media || provider.kind !== 'scene-provider') fail('media-unconnected');
         planMetadataEdit(provider as Extract<ProjectProviderRead, { kind: 'scene-provider' }>, command, this.limits);
+        this.media!.assertIntroduction?.(provider as Extract<ProjectProviderRead,{kind:'scene-provider'}>,command.media);
         const [doc] = A.applyChanges(A.init(), durable.originalChanges());
         this.retained = { start: { transactionId, repositoryId: prior.start.repositoryId, predecessor: prior.start.transactionId,
           purpose: 'localCommand', proof: durable.proof, baseHeads: A.getHeads(doc).sort() }, parts: [],

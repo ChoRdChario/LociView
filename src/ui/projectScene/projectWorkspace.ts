@@ -238,7 +238,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   const panelInput = () => [...panels.values()].some(p => p.hasChanges());
   const dirty = () => draftInput() || !!recovery?.hasChanges() || !!pending || panelInput() || !!mediaManager?.hasChanges() || windowMoving || viewport.read().dragging;
   const mutationBlock = () => windowMoving ? 'ウィンドウの操作を完了してください。' : busy ? '変更を適用しています。' : ports.status().kind === 'failed' ? ports.status().error || '更新を再試行してください。' :
-    ports.readOnly ? '閲覧中です。編集を開始してください。' : ports.otherPending() ? 'ファイルの操作を完了してください。' : pending ? '再試行するか、入力を修正してください。' : null;
+    ports.presentation?.()?.reason ?? (ports.readOnly ? '閲覧中です。編集を開始してください。' : ports.otherPending() ? 'ファイルの操作を完了してください。' : pending ? '再試行するか、入力を修正してください。' : null);
   const listContext = (): CaptionListContext => ({ source: { kind: 'ready', token: provider().token, sceneId,
     captions: projectCaptions(provider(), sceneId, models?.hidden()) }, memory: memory(), pending: dirty() ? 'text' : busy ? 'update' : null,
     showModelPending: composingInput() || pressedPointers.size || pin || numericTarget || choosing || deletion || pickerScope || sceneEdit || recovery?.hasChanges() || panelInput() || mediaManager?.hasChanges() || windowMoving || viewport.read().dragging ? 'text' : null,
@@ -601,7 +601,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       projectTitle.textContent = summary.title?.trim() || '名前を確認できないプロジェクト';
       resumeNotice.textContent = ports.resumedLastProject?.() && summary.resumable && summary.title ? `最後のプロジェクトを再開しました：${summary.title}` : '';
       resumeNotice.hidden = !resumeNotice.textContent; otherProject.hidden = !ports.openProject;
-      otherProject.disabled = busy || dirty() || ports.otherPending();
+      otherProject.disabled = busy || dirty() || ports.otherPending() || !!ports.presentation?.();
       resumeStatus.textContent = busy || ports.status().kind === 'checking' ? '変更を確定しています。' : pending || ports.status().kind === 'failed' ? '更新が未完了です。入力を保持しています。再試行してください。' :
         draftInput() || panelInput() || recovery?.hasChanges() || mediaManager?.hasChanges() ? '入力中の内容はまだ確定していません。' : summary.resumable ? 'このブラウザに再開用データがあります。' : '再開データの状態を確認してください。';
       fileStatus.textContent = summary.backup === 'verified' ? '確定済みの内容は、選択した保存ファイルと一致しています。' : summary.backup === 'unavailable' ? 'ファイルの保存状態を確認できません。ファイル欄を確認してください。' : '現在の内容を保存したファイルは未確認です。';
@@ -658,7 +658,9 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       const seen = viewport.read();
       const extent = canvas.getBoundingClientRect?.() ?? { width: 0, height: 0 };
       windows.project({ ready: seen.ready, sourceToken: seen.token, sceneId: seen.sceneId, width: extent.width, height: extent.height, pins: seen.pins });
-      viewportStatus.textContent = [viewportFeedback, seen.issue, seen.notice, resolved?.kind !== 'ready' && 'シーンを選択し、表示状態を確認してください。'].filter(Boolean).join(' ');
+      viewportStatus.dataset.busy = String(!!ports.presentation?.()?.busy || !!seen.loading);
+      canvas.setAttribute('aria-busy', viewportStatus.dataset.busy);
+      viewportStatus.textContent = [ports.presentation?.()?.reason, viewportFeedback, seen.issue, seen.notice, resolved?.kind !== 'ready' && 'シーンを選択し、表示状態を確認してください。'].filter(Boolean).join(' ');
       viewportStatus.hidden = !viewportStatus.textContent;
       retryViewport.hidden = !seen.issue && !viewportFeedback&&!seen.retryAvailable; retryViewport.disabled = viewBlocked(); cameraButtons.forEach(b => { b.disabled = viewBlocked(); });
       markers.replaceChildren();

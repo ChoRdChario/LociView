@@ -11,6 +11,14 @@ work. Keep existing comfortable-UI guidance, original bytes/history, atomic Sess
 commands, file/recovery/evidence fences and one writer. Read-only reviews may run
 in parallel. Continue ordinary approved work without small PO testing waits.
 
+PO2026-10-28 authorized the usable-loading workflow in [01e§9](../docs/specs/01e-desktop-large-gs-workflow.md).
+The same typed screen opens after verified metadata, before model/image preparation;
+pending models report local loading/error while ready geometry and Caption reading
+remain usable. Canonical source/template/material checks protect edits/files; GPU
+status keeps existing per-target/overlap interaction rules. Both restore paths still
+await staged preparation. Todo records the verified loading checkpoint and
+the separate known500k Review command-latency failure; do not conflate those lanes.
+
 01a's bounded point workflow is implemented; exact six JSON companions are immutable.
 Native, synthetic hosts, typed validation and ordinary home have separate authority
 and evidence. Source point centres and explicit manual positions are distinct;
@@ -33,10 +41,11 @@ includes route-owned active-shape checks before planning/read/cold publication;
 separate-Asset models and weak history retain their existing rules. Verification
 includes actual GS pixels in Review and GPU fault recovery; exact latest results
 and outstanding checks remain in todo. The GS dynamic import is compile-time
-limited to development-server/static-validation use, preserving normal/harness
+limited to development-server/static-validation and the explicitly approved01e
+Desktop candidate, preserving normal/harness
 build and precache isolation. Large-source work must address the whole-body
-import/inspection/decode chain and full SH4 paging without changing the current
-limits or substituting SH3 implicitly.
+import/inspection/decode chain and full SH4 paging without changing normal/validation limits or substituting SH3 implicitly. Only
+the explicit01e Desktop composition supplies its larger approved policy.
 The [01d internal refinement](../docs/specs/01d-gs-file-backed-source.md) preserves
 that authority and the current64MiB limit while replacing repeated GS source
 arrays with captured File/Blob input, shared streamed inspection/hash and checked

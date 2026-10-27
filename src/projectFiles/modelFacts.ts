@@ -14,6 +14,9 @@ import { ProjectRecordFields } from '../domain/projectRecordFields';
 import { checkProjectRecord } from '../domain/projectRecords';
 import { fileObject } from './validation';
 
+export { validationDeclaredBodyBytes } from './bodyBudget';
+import { validationDeclaredBodyBytes } from './bodyBudget';
+
 /** Route capability, not a Core schema rule. Weak history and separate-Asset
  * models remain independent of this active, exact projection check. */
 export function assertValidationModelClosures(provider:Extract<ProjectProviderRead,{kind:'scene-provider'}>):void{
@@ -32,7 +35,7 @@ export function assertValidationModelClosures(provider:Extract<ProjectProviderRe
 
 /** Owned new GLB or fresh records reusing exact known bodies. Old evidence is never repaired. */
 export function validationModelFacts(content: ValidationContent): MetadataModelFactPort {
-  return { assertProvider:assertValidationModelClosures, async preparePointAnchor(source, provider, command): Promise<Anchor> {
+  return { assertProvider:provider=>{assertValidationModelClosures(provider);validationDeclaredBodyBytes(provider,content.policy);}, async preparePointAnchor(source, provider, command): Promise<Anchor> {
     if (source.token !== provider.token || command.anchor.kind !== 'asset') return fileError('点の記録対象が更新されています。');
     const anchor = command.anchor, evidence = anchor.hitEvidence, reference = evidence?.source, index = reference?.surfaceRef;
     const scene = resolveScene(provider.state, provider.resources, command.sceneId);
@@ -97,7 +100,7 @@ export function validationModelFacts(content: ValidationContent): MetadataModelF
     } }, { verifyRetainedMedia: record => content.retained(record) });
     if (!metadataProviderReady(provider, limits) || provider.kind !== 'scene-provider')
       return fileError('追加するモデルの参照を確認できません。');
-    assertValidationModelClosures(provider);
+    assertValidationModelClosures(provider);validationDeclaredBodyBytes(provider,content.policy);
     if (!requests.length) return null; // Weak-only records require no new facts/body reads.
     const record = preparedRecord, ref = record ? content.preparedModelRef(record) : undefined;
     const completed = new Set<string>(); let bodySaved = false;
@@ -129,8 +132,9 @@ async function restoredFacts(content: ValidationContent, next: ProjectMetadataSo
     const key = json(ref), size = ref.byteLength as number, previous = sizes.get(ref.digest as string);
     if (previous !== undefined && previous !== size) return fileError('復元する本体の大きさが一致しません。');
     if (previous === undefined) { total += size; sizes.set(ref.digest as string, size); }
-    if (total > content.limits.maxFileBytes || bodies.has(key)) return fileError('復元する本体が検証の範囲を超えています。');
+    if (total > content.policy.projectBodyBytes || bodies.has(key)) return fileError('復元する本体が検証の範囲を超えています。');
     const file = bodyFor(ref); if (!(file instanceof Blob) || file.size !== size) return fileError('復元する本体が不足しています。');
+    await content.assertBodySize(ref,file);
     bodies.set(key, { ref, file });
   }
   const introduced = new Set<string>();
@@ -176,7 +180,7 @@ async function receivedFacts(content: ValidationContent, base: ProjectMetadataSo
     const ref = record.blob as JsonObject, hash = ref.digest as string, size = ref.byteLength as number, previous = sizes.get(hash);
     if (previous !== undefined && previous !== size) return fileError('同じ本体の大きさが一致しません。');
     if (previous === undefined) { total += size; sizes.set(hash, size); }
-    if (total > content.limits.maxFileBytes) return fileError('モデルと画像の合計がこの検証の上限を超えています。');
+    if (total > content.policy.projectBodyBytes) return fileError('モデルと画像の合計がこの検証の上限を超えています。');
     if (old) oldDigests.set(hash, size);
   }
   const requests = new Map<string, ContentRequest>(), bodies = new Map<string, { ref: JsonObject; file: Blob }>();
@@ -213,7 +217,7 @@ async function receivedFacts(content: ValidationContent, base: ProjectMetadataSo
     results.set(key, result); requests.set(key, request); return result;
   } }, { verifyRetainedMedia: async record => !hasIncoming || hasIncoming(record.blob as JsonObject) || await content.retained(record) });
   if (!metadataProviderReady(provider, limits) || provider.kind !== 'scene-provider') return fileError('受信後の参照を確認できません。');
-  assertValidationModelClosures(provider);
+  assertValidationModelClosures(provider);validationDeclaredBodyBytes(provider,content.policy);
   const staged: { ref: JsonObject; file: Blob }[] = [], completedBodies = new Set<string>(), completedFacts = new Set<string>();
   for (const [key, body] of [...bodies].sort(([a], [b]) => a < b ? -1 : 1)) {
     const presence = await content.store.inspect(body.ref);

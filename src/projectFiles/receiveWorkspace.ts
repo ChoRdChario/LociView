@@ -12,6 +12,7 @@ import { PackageControlError } from '../projectPackage/manifest';
 import { ContributionReceiveJob } from '../projectPackage/contributionReceiveJob';
 import { CleanInputJob } from '../projectPackage/cleanInputJob';
 import { receiveJobKeys, receiveInputState, openReceiveJob, receiveTerminal, type ReceiveJob } from '../projectPackage/receiveJobs';
+import { reviewEditChildBinding, type ReviewEditBinding } from '../projectPackage/reviewEditControls';
 
 export interface WorkspaceReceiveState { id: string; state: 'incomplete' | 'completed' | 'cancelled' | 'repair-required' | 'input-required' | 'unbound-input' | 'abandoned' | 'stale' }
 
@@ -100,13 +101,21 @@ export class WorkspaceReceiver {
     return this.operation(async () => { const key = await this.key(id); return key.kind === 'clean' ? this.session.abandonCleanInput(id) :
       key.kind === 'contribution' ? this.session.abandonContributionInput(id) : this.session.abandonWorkspaceInput(id); });
   }
-  async jobs() {
+  async jobs(options: { completedReviewChildren?: ReadonlyMap<string, Readonly<ReviewEditBinding>> } = {}) {
+    if ((options.completedReviewChildren?.size ?? 0) > L.entryCount) return fileError('受信記録が検査の上限を超えています。');
+    // One display reload only. No command or recovery consumes this observation.
+    const completed = new Map([...options.completedReviewChildren ?? []].map(([id, binding]) => [id, structuredClone(binding)]));
     const result: WorkspaceReceiveState[] = [];
     const entries = await new TransactionJournal(this.fs, this.limits).entries();
     // The journal is also an authority: a deleted input directory must not hide its import.
     for (const key of await receiveJobKeys(this.fs, this.limits)) {
       const { id } = key;
       try {
+        const observed = key.kind === 'clean' ? completed.get(id) : undefined;
+        if (observed) {
+          const binding = await reviewEditChildBinding(this.fs, id, this.limits).catch(() => undefined);
+          if (binding && json(binding) === json(observed)) continue;
+        }
         const state = await receiveInputState(this.fs, key, this.limits);
         if (state !== 'started') { result.push({ id, state }); continue; }
         const job = await openReceiveJob(this.fs, key, this.store, this.limits), steps = await job.steps();

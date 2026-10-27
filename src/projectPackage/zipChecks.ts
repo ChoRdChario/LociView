@@ -8,7 +8,11 @@ const table = Uint32Array.from({ length: 256 }, (_, i) => {
 /** ZIP's CRC-32/ISO-HDLC; integrity only, never author authentication. */
 export class ZipCrc32 {
   private value = 0xffffffff;
-  update(bytes: Uint8Array): void { for (const byte of bytes) this.value = table[(this.value ^ byte) & 255]! ^ (this.value >>> 8); }
+  update(bytes: Uint8Array): void {
+    let value = this.value;
+    for (let i = 0; i < bytes.length; i++) value = table[(value ^ bytes[i]!) & 255]! ^ (value >>> 8);
+    this.value = value;
+  }
   digest(): number { return (this.value ^ 0xffffffff) >>> 0; }
 }
 export function rejectNestedZip(prefix: Uint8Array): void {

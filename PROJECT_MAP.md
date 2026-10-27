@@ -19,10 +19,23 @@ owns feature coverage. Read [document authority](docs/README.md) for contracts.
 | `src/nativeGs/app.ts` | Bounded Native Mesh/Point/GS, DisplaySets, media and package exchange | New continuing-history team workflow or general format support |
 | `dev.html` → `src/dev-entry.ts` → `src/harness/projectScene/entry.ts` | Nondefault ProjectScene development host; memory, old saved, metadata and limited static GLB/approved XYZ-RGB ASCII PLY/01c binary SH0–4 GS plus PNG/JPEG/WebP/GIF photo validation routes | Ordinary-home, device, offline or release acceptance |
 | `project-scene-validation` build → `dev.html` → `validationEntry.ts` | Same limited GLB/point/01c GS and photo validation screen, static-only entry; separate `validation-dist`, no public assets or Service Worker | Ordinary-home activation, offline/PWA, profile/device or release acceptance |
+| `project-scene-desktop` build → `index.html` → `src/projectScene/desktopEntry.ts` | Approved01e static PC candidate: new ProjectScene default, continued historical namespace, SH0–4 up to500k rows and512MiB Project bodies, typed edit/file/recovery workflow | General adoption, paged SH4, device/offline/PWA or release acceptance |
+
+Production application ports and composition live in `src/projectScene`; the ordinary
+Desktop graph imports no harness authority or fixtures. The same inspected file
+services receive split host policies, a shared whole-view/instance GS ledger and
+owned native Review-copy output. Source/schema/receipts are unchanged; todo owns
+executed evidence. Existing harness paths retain the old editor adapters.
+The typed loading path mounts verified Caption UI before binary display preparation.
+`deferredViewport.ts` retains the canvas/camera handoff; `validationRender.ts` reports
+per-model preparation to `viewport.ts` without dropping full GS admission. The
+presentation gate protects edits/files until canonical preparation succeeds;
+image/GPU loading and failure remain local. [01e§9](docs/specs/01e-desktop-large-gs-workflow.md#9-usable-loading-presentation-po-authorized2026-10-28)
+owns the loading contract; todo owns rendered and final-check evidence.
 
 Within validation, `editor=project` selects the bounded typed product composition
 in `src/ui/projectScene/projectWorkspace.ts`; its viewport/file adapter is
-`src/harness/projectScene/productWorkspace.ts`. The existing editor remains available.
+`src/projectScene/productWorkspace.ts` (the harness path is a compatibility re-export). The existing editor remains available.
 The approved [01a point companion](docs/specs/01a-point-project-scene-proposal.md)
 connects `projectFiles/pointPly.ts`/`content.ts`, the checked Session point-anchor port,
 `viewer/pointSurface.ts` and the validation point visibility/pick adapters. Point
@@ -31,7 +44,7 @@ in todo. This adds no ordinary-home, smooth/dither or device/adoption credit.
 The approved [01c companion](docs/specs/01c-gs-sh4-proxy-workflow-proposal.md) connects
 `projectFiles/gsPly.ts`, closed GS/Proxy Session commands and `gsProxyWorkflow.ts`,
 with optional interaction geometry in `validationRender.ts`. `viewer/gsRender.ts`
-is lazy and validation-only; its linear target and global decode ownership queue
+is lazy and limited to the explicit validation/Desktop builds; its linear target and global decode ownership queue
 never own Project/storage/package access. Todo owns exact executed acceptance;
 large sources/SH4 paging and renderer adoption remain separate.
 The [01d internal refinement](docs/specs/01d-gs-file-backed-source.md) keeps GS

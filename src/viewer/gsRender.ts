@@ -2,14 +2,14 @@ import * as THREE from 'three';
 import { GaussianSplatRenderer, SplatMesh, SplatFileType } from 'gaussian-splat-lite';
 import displayText from '../../docs/specs/profiles/gs-gsl-webgl2-packed-linear-1.profile.json?raw';
 import goldenText from '../../docs/specs/profiles/gs-gsl-webgl2-packed-linear-1.goldens.json?raw';
-import { queueGsDecode } from './gsDecodeQueue';
+import { queueGsDecode, type GsResidency, type GsViewIntent } from './gsDecodeQueue';
 import { gsLinear } from '../domain/gsSource';
 
 /** Neutral checked source. No Project, format records, filesystem or package access. */
 export type GsDisplaySource = {readonly count:number;readonly degree:number;readonly displayIssue:string|null} &
   ({readonly file:Blob;readonly bytes?:never}|{readonly bytes:Uint8Array;readonly file?:never});
 export interface GsDisplayResident {readonly source:GsDisplaySource;readonly object:THREE.Group;issue:string|null;ready:boolean}
-export interface GsRenderPort {render(scene:THREE.Scene,camera:THREE.Camera,before:()=>void):void;dispose():void;readonly depthBits:number}
+export interface GsRenderPort {render(scene:THREE.Scene,camera:THREE.Camera,before:()=>void):void;dispose():void;readonly depthBits:number;readonly healthyOwner?:object}
 let policy:Promise<void>|undefined;
 async function verifyPolicy(){return policy??=(async()=>{
   const hash=async(s:string)=>[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s)))].map(n=>n.toString(16).padStart(2,'0')).join('');
@@ -51,7 +51,7 @@ function probeLinearTarget(renderer:THREE.WebGLRenderer,target:THREE.WebGLRender
   }finally{renderer.setRenderTarget(previous);g.dispose();base.dispose();blend.dispose();}
 }
 /** One viewport coordinator. Source changes dispose it; camera-only sorts retain the last order. */
-export async function createGsRender(renderer:THREE.WebGLRenderer,residents:readonly GsDisplayResident[],changed:()=>void,signal?:AbortSignal):Promise<GsRenderPort>{
+export async function createGsRender(renderer:THREE.WebGLRenderer,residents:readonly GsDisplayResident[],changed:()=>void,signal?:AbortSignal,residency?:GsResidency,intent?:GsViewIntent):Promise<GsRenderPort>{
   signal?.throwIfAborted();await verifyPolicy();signal?.throwIfAborted();
   const target=new THREE.WebGLRenderTarget(1,1,{type:THREE.HalfFloatType,format:THREE.RGBAFormat,depthBuffer:true,samples:0});target.texture.colorSpace=THREE.LinearSRGBColorSpace;
   let depthBits:number;try{depthBits=probeLinearTarget(renderer,target);}catch(e){target.dispose();throw e;}
@@ -59,18 +59,20 @@ export async function createGsRender(renderer:THREE.WebGLRenderer,residents:read
   try{output=outputPass(target);coordinator=new GaussianSplatRenderer({renderer,autoUpdate:false,encodeLinear:true,premultipliedAlpha:true,transparent:true,depthTest:true,depthWrite:false,
     maxStdDev:Math.sqrt(8),minPixelRadius:0,minAlpha:.5/255,preBlurAmount:.3,blurAmount:0,clipXY:4,focalAdjustment:2,sortRadial:false,fastSort:true,minSortIntervalMs:0,stochastic:false,onDirty:changed});}
   catch(e){output?.dispose();target.dispose();throw e;}
+  const owner=intent?.owner??{};let slotIndex=0,coordinatorDisposed=false;
   let closed=false,sorting=false,lastSort='',attached:THREE.Scene|undefined,fatal:unknown;const decoded=new Set<GsDisplayResident>(),pendingDisplay=new Set<GsDisplayResident>();
   const leases=residents.map(resident=>{
     resident.ready=false;resident.issue='GSの表示を準備しています。';
+    if(resident.source.displayIssue){resident.issue=resident.source.displayIssue;return {cancel(){}};}
+    const slot=slotIndex++;
     const lease=queueGsDecode(resident,()=>{
-      if(resident.source.displayIssue)throw Error(resident.source.displayIssue);
       const mesh=new SplatMesh({...resident.source.file?{file:resident.source.file}:{fileBytes:resident.source.bytes.slice()},fileType:SplatFileType.PLY,fileName:'source.ply',editable:false,raycastable:false});mesh.maxSh=resident.source.degree;mesh.frustumCulled=false;
-      return {initialized:mesh.initialized,value:mesh,dispose:()=>{mesh.removeFromParent();mesh.dispose();}};
-    });
+      return {initialized:mesh.initialized,value:mesh,dispose:()=>{mesh.removeFromParent();mesh.dispose();if(closed&&!coordinatorDisposed)throw Error('GSの描画資源の解放を確認できません。');}};
+    },intent?()=>intent.reserve(slot,resident.source):residency?()=>residency.reserve(owner,resident.source):undefined);
     void lease.promise.then(mesh=>{if(closed){lease.cancel();return;}try{checkPacked(mesh,resident.source);resident.object.add(mesh);decoded.add(resident);lastSort='';changed();}catch(e){lease.cancel();resident.issue=(e as Error).message;changed();}},e=>{if(!closed){resident.issue=e instanceof Error?e.message:'GSを表示できません。';changed();}});
     return lease;
   });
-  return {depthBits,render(scene,camera,before){
+  return {depthBits,get healthyOwner(){return !closed&&!fatal?owner:undefined;},render(scene,camera,before){
     if(closed)return;if(fatal)throw fatal;if(attached!==scene){coordinator.removeFromParent();scene.add(coordinator);attached=scene;}
     scene.updateMatrixWorld(true);camera.updateMatrixWorld(true);
     const finiteGpu=(values:readonly number[])=>values.every(v=>Number.isFinite(v)&&Number.isFinite(Math.fround(v)));
@@ -87,6 +89,6 @@ export async function createGsRender(renderer:THREE.WebGLRenderer,residents:read
       before();renderer.clear();renderer.render(scene,camera);renderer.setRenderTarget(old);renderer.render(output!.scene,output!.camera);
       for(const r of pendingDisplay){becameReady||=!r.ready;r.ready=true;r.issue=null;}pendingDisplay.clear();
     }finally{renderer.setRenderTarget(old);}if(becameReady)changed();
-  },dispose(){if(closed)return;closed=true;const errors:unknown[]=[];for(const lease of leases)try{lease.cancel();}catch(e){errors.push(e);}for(const r of residents)r.ready=false;
-    coordinator.removeFromParent();try{coordinator.dispose();}catch(e){errors.push(e);}finally{target.dispose();output!.dispose();}if(errors.length)throw new AggregateError(errors,'GSの表示資源を解放できません。');}};
+  },dispose(){if(closed)return;closed=true;intent?.cancel();const errors:unknown[]=[];coordinator.removeFromParent();try{coordinator.dispose();coordinatorDisposed=true;}catch(e){errors.push(e);}for(const lease of leases)try{lease.cancel();}catch(e){errors.push(e);}for(const r of residents)r.ready=false;
+    try{target.dispose();}catch(e){errors.push(e);}try{output!.dispose();}catch(e){errors.push(e);}if(errors.length)throw new AggregateError(errors,'GSの表示資源を解放できません。');}};
 }

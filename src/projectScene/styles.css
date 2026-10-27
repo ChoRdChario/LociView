@@ -1,0 +1,8 @@
+@import '../ui/projectScene/captionList.css';
+@import '../ui/projectScene/captionDetail.css';
+@import '../ui/projectScene/modelList.css';
+@import '../ui/projectScene/captionActions.css';
+@import '../ui/projectScene/viewControls.css';
+@import '../ui/projectScene/materialControls.css';
+@import '../ui/projectScene/projectWorkspace.css';
+@import './workspace.css';

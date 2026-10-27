@@ -543,7 +543,7 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-export async function bootNativeGsApp(root: HTMLElement, homeHost?: NativeHomeHost): Promise<void> {
+export async function bootNativeGsApp(root: HTMLElement, homeHost?: NativeHomeHost,options:{pwa?:boolean}={}): Promise<void> {
   if (homeHost !== undefined && !homeHost.isCurrent()) return;
   clear(root);
   root.className = 'ng-app';
@@ -561,8 +561,9 @@ export async function bootNativeGsApp(root: HTMLElement, homeHost?: NativeHomeHo
     // Best effort. Publication still remains marker-last and fail closed.
   }
   const coordinator = ProjectMutationCoordinator.browser(navigator.locks ?? null);
-  const pwaRegistration = registerPwa({ onUpdate: () => undefined });
+  const pwaRegistration = options.pwa===false ? Promise.resolve(null) : registerPwa({ onUpdate: () => undefined });
   const createGsOfflinePreparation = () => {
+    if(options.pwa===false)return {element:el('span',{hidden:true}),show(){},hide(){}};
     const status = el('p', { class: 'ng-note', role: 'status' }, 'GSをオフラインで表示できるか確認しています…');
     const detail = el('p', { class: 'ng-note' });
     const prepare = el('button', { class: 'primary' }, 'GSのオフライン表示を準備');
@@ -3046,7 +3047,7 @@ export async function bootNativeGsApp(root: HTMLElement, homeHost?: NativeHomeHo
     fitQuick.addEventListener('click', () => fitView.click());
     stage.append(el('div', { class: 'ng-camera-tools' }, cameraQuick, fitQuick), positionMode);
 
-    const offlineReady = import.meta.env.DEV || await isNativeGsOfflineReady(await pwaRegistration);
+    const offlineReady = options.pwa===false || import.meta.env.DEV || await isNativeGsOfflineReady(await pwaRegistration);
     const gltfTextureMaxEdge = nativeRuntimeGltfTextureMaxEdge({
       userAgent: navigator.userAgent,
       platform: navigator.platform,

@@ -183,8 +183,12 @@ describe('same-host known PNG media connection; not decoder adoption, raster, IM
     viewer.open(() => group, 'att', document.createElement('button') as unknown as HTMLElement);
     await vi.waitFor(() => expect(button(root, '画像を再試行').hidden).toBe(false)); expect(load).toHaveBeenCalledTimes(1);
     button(root, '画像を再試行').fire('click'); await vi.waitFor(() => expect(load).toHaveBeenCalledTimes(2));
+    expect(nodes(root).find(n=>n.className==='lv-media-image')!.attributes.get('aria-busy')).toBe('true');
+    expect(nodes(root).find(n=>n.className==='lv-operation-status')!.dataset.busy).toBe('true');
     group = { ...group, items: [{ ...group.items[0]!, resourceId: 'other' }] }; viewer.render(); resolve(new Blob(['stale verified bytes'], { type: 'image/png' }));
     await Promise.resolve(); await Promise.resolve(); expect(nodes(root).filter(n => n.tag === 'img')).toHaveLength(0);
+    expect(nodes(root).some(n=>n.className==='lv-media-image')).toBe(false);
+    expect(nodes(root).some(n=>n.className==='lv-operation-status'&&n.dataset.busy==='true')).toBe(false);
     expect(nodes(root).some(n => n.textContent.includes('選び直してください'))).toBe(true); viewer.dispose();
   });
 });

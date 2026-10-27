@@ -12,7 +12,7 @@ import { WorkspaceArchive } from '../../src/projectPackage/workspaceArchive';
 import { inspectProjectCandidates } from '../../src/domain/projectCandidates';
 import { validationMetadataLimits } from '../../src/projectFiles/validation';
 import { presentedCanvas } from './presentedCanvas';
-const entry='http://127.0.0.1:4182/dev.html?editor=project';
+const entry=process.env.LOCIVIEW_E2E_ENTRY??'http://127.0.0.1:4182/dev.html?editor=project';
 const hash=(bytes:Uint8Array)=>createHash('sha256').update(bytes).digest('hex');
 const files=(p:Page)=>p.getByRole('region',{name:'ファイル',exact:true});
 const modelPanel=(p:Page)=>p.getByRole('tabpanel',{name:'モデル',exact:true});
@@ -25,14 +25,34 @@ async function guardWholeGsReads(context:BrowserContext){
       const originalDraw=WebGL2RenderingContext.prototype[name];
       (WebGL2RenderingContext.prototype as any)[name]=function(...args:any[]){(window as any).gsDrawCalls++;return (originalDraw as Function).apply(this,args);};
     }
-    const original=Blob.prototype.arrayBuffer;(window as any).wholeGsReads=0;
+    const original=Blob.prototype.arrayBuffer,slice=Blob.prototype.slice,parents=new WeakMap<Blob,Blob>(),zipPrefixes=new WeakMap<Blob,Promise<boolean>>();
+    (window as any).wholeGsReads=0;(window as any).zipGsRangeReads=0;
+    Blob.prototype.slice=function(start?:number,end?:number,type?:string){const child=slice.call(this,start,end,type);parents.set(child,this);return child;};
+    const zipPrefix=(file:Blob)=>{let known=zipPrefixes.get(file);if(!known){known=original.call(slice.call(file,0,4)).then(bytes=>{
+      const b=new Uint8Array(bytes);return b[0]===0x50&&b[1]===0x4b&&b[2]===3&&b[3]===4;});zipPrefixes.set(file,known);}return known;};
     Blob.prototype.arrayBuffer=async function(){
-      if(this.size>65536){const prefix=new Uint8Array(await original.call(Blob.prototype.slice.call(this,0,32)));
-        if(new TextDecoder().decode(prefix).startsWith('ply\nformat binary_little_endian')){(window as any).wholeGsReads++;throw Error('Whole GS arrayBuffer forbidden');}}
+      if(this.size>65536){const prefix=new Uint8Array(await original.call(slice.call(this,0,32)));
+        if(new TextDecoder().decode(prefix).startsWith('ply\nformat binary_little_endian')){
+          // 01e§2.3 permits bounded native ZIP payload reads. Raw sources and
+          // slices of a GS body still retain the original64KiB guard.
+          const parent=parents.get(this);
+          if(this.size<=1_048_576&&parent&&await zipPrefix(parent)){(window as any).zipGsRangeReads++;return original.call(this);}
+          (window as any).wholeGsReads++;throw Error('Whole GS arrayBuffer forbidden');}}
       return original.call(this);
     };
   });
 }
+test('GS読込ガードは小さい原本とその複製を拒否し、ZIP由来の範囲だけ1MiBまで許可する',async({page,context})=>{
+  await guardWholeGsReads(context);await page.goto(entry);
+  const result=await page.evaluate(async data=>{
+    const raw=new Blob([new Uint8Array(data)]),refused=async(file:Blob)=>{try{await file.arrayBuffer();return false;}catch(error){if((error as Error).message!=='Whole GS arrayBuffer forbidden')throw error;return true;}};
+    const rawRefused=await refused(raw),copyRefused=await refused(raw.slice(0));
+    const zipPrefix=new Uint8Array([0x50,0x4b,3,4]),zip=new Blob([zipPrefix,raw]),allowed=new Uint8Array(await zip.slice(4).arrayBuffer());
+    const oversized=new Blob([zipPrefix,raw,new Uint8Array(1_048_577-raw.size)]),oversizedRefused=await refused(oversized.slice(4));
+    return {rawRefused,copyRefused,oversizedRefused,exact:allowed.every((b,i)=>b===data[i]),size:allowed.length,refusals:(window as any).wholeGsReads,ranges:(window as any).zipGsRangeReads};
+  },Array.from(source));
+  expect(result).toEqual({rawRefused:true,copyRefused:true,oversizedRefused:true,exact:true,size:source.length,refusals:3,ranges:1});
+});
 async function ready(p:Page){await expect(p.getByRole('heading',{name:'プロジェクト名',exact:true})).toHaveText('GSの作業',{timeout:90_000});}
 async function gsReady(p:Page){await expect(p.locator('.lv-project-viewport-status')).toBeEmpty({timeout:90_000});}
 async function addProxy(p:Page,name='面.glb',z=0){
@@ -42,6 +62,7 @@ async function addProxy(p:Page,name='面.glb',z=0){
   const confirm=area.getByRole('button',{name:/^(?:このモデルに面を追加|面の変更を確定)$/,exact:true});await expect(confirm).toBeVisible();await confirm.click();await expect(p.getByText('位置指定用の面を登録しました。',{exact:true})).toBeVisible();await gsReady(p);
 }
 async function download(p:Page,info:TestInfo,name:string,purpose:'backup'|'teamWorkspace'|'contribution'|'review'|'clean',base?:string){
+ const menu=p.locator('details.lv-project-files');if(await menu.count()&&!await menu.evaluate(n=>(n as HTMLDetailsElement).open))await menu.locator(':scope > summary').click();
   const area=files(p);
   if(purpose==='review'||purpose==='clean'){const more=area.locator('summary').filter({hasText:/^その他$/});if(!await more.evaluate(n=>(n.parentElement as HTMLDetailsElement).open))await more.click();await area.getByRole('button',{name:purpose==='review'?'シーンを共有':'独立コピーを作る',exact:true}).click();}
   else await area.getByRole('button',{name:purpose==='backup'?'保存':'相手に渡す',exact:true}).click();
@@ -130,14 +151,19 @@ test('混在画面で前面の面を選び、GSと重なる点は保留して非
 test('GSの表示失敗を隔離し、点の選択とGPU復旧を同じ画面で継続する',async({},info)=>{
   test.setTimeout(180_000);await mkdir('.artifacts/e2e/profiles',{recursive:true});const profile=await mkdtemp('.artifacts/e2e/profiles/gs-fault-');
   const context=await chromium.launchPersistentContext(profile,{channel:'chromium',headless:true,viewport:{width:1440,height:1000},acceptDownloads:true,serviceWorkers:'block'}),errors:string[]=[];
-  await context.addInitScript(()=>{const original=WebGL2RenderingContext.prototype.checkFramebufferStatus;WebGL2RenderingContext.prototype.checkFramebufferStatus=function(target){
+  await context.addInitScript(()=>{(window as any).gsProbeFault=true;const read=WebGL2RenderingContext.prototype.readPixels;
+    WebGL2RenderingContext.prototype.readPixels=function(...args:any[]){if((window as any).gsProbeFault&&args[2]===1&&args[3]===1&&args[5]===this.FLOAT)throw Error('initial GS probe failure');return Reflect.apply(read,this,args);};
+    const original=WebGL2RenderingContext.prototype.checkFramebufferStatus;WebGL2RenderingContext.prototype.checkFramebufferStatus=function(target){
     if((window as any).gsTargetFault&&this.getParameter(this.FRAMEBUFFER_BINDING)&&this.getParameter(this.VIEWPORT)[2]>8)return this.FRAMEBUFFER_UNSUPPORTED;
     return original.call(this,target);
   };});
   const page=context.pages()[0]??await context.newPage();page.on('pageerror',e=>errors.push(e.message));await context.tracing.start({screenshots:true,snapshots:true,sources:true});
   const point=Buffer.from('ply\nformat ascii 1.0\nelement vertex 1\nproperty float x\nproperty float y\nproperty float z\nproperty uchar red\nproperty uchar green\nproperty uchar blue\nend_header\n0 0 0 255 0 0\n');
   try{
-    await page.goto(entry);await page.getByLabel('ファイルを選択',{exact:true}).setInputFiles([{name:'全係数.ply',mimeType:'application/ply',buffer:source},{name:'点.ply',mimeType:'application/ply',buffer:point}]);await page.getByRole('button',{name:'ファイルを開く',exact:true}).click();await page.getByRole('textbox',{name:'プロジェクト名',exact:true}).fill('GSの作業');await page.getByRole('button',{name:'プロジェクトを作成',exact:true}).click();await ready(page);await gsReady(page);
+    await page.goto(entry);await page.getByLabel('ファイルを選択',{exact:true}).setInputFiles([{name:'全係数.ply',mimeType:'application/ply',buffer:source},{name:'点.ply',mimeType:'application/ply',buffer:point}]);await page.getByRole('button',{name:'ファイルを開く',exact:true}).click();await page.getByRole('textbox',{name:'プロジェクト名',exact:true}).fill('GSの作業');await page.getByRole('button',{name:'プロジェクトを作成',exact:true}).click();await ready(page);
+    await expect(page.locator('.lv-project-viewport-status')).toContainText('initial GS probe failure');await expect(page.locator('.lv-project-viewport-status')).toHaveAttribute('data-busy','false');await expect(page.getByLabel('3Dモデルの表示',{exact:true})).toHaveAttribute('aria-busy','false');
+    await page.getByRole('button',{name:'正面',exact:true}).click();expect((await pixels(page)).slice(0,3)).toEqual([255,0,0]);
+    await page.evaluate(()=>{(window as any).gsProbeFault=false;});await page.getByRole('button',{name:'3D表示を再試行',exact:true}).click();await gsReady(page);
     await page.getByRole('tab',{name:'モデル',exact:true}).click();await modelPanel(page).locator('.lv-model-select').filter({hasText:'全係数.ply'}).click();await page.getByRole('tab',{name:'キャプション',exact:true}).click();await page.getByRole('button',{name:'ピンを追加',exact:true}).click();await page.getByRole('region',{name:'ピンの操作',exact:true}).getByRole('button',{name:'位置指定用の面を追加',exact:true}).click();await expect(modelPanel(page).getByRole('button',{name:'位置指定用の面を追加',exact:true})).toBeVisible();
     await page.evaluate(()=>{(window as any).gsTargetFault=true;});await page.setViewportSize({width:1450,height:1000});await expect(page.locator('.lv-project-viewport-status')).toContainText('GSの表示領域を準備できません。');
     await page.getByRole('button',{name:'正面',exact:true}).click();expect((await pixels(page)).slice(0,3)).toEqual([255,0,0]);

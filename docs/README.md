@@ -39,7 +39,14 @@ record executed evidence and connections; do not infer those from a document tit
 | Ownership, license or sponsorship | [licensing](licensing-and-ownership.md), [sponsorship](sponsorship-policy.md); direction is not adoption or a license grant |
 
 The [approved01e Desktop candidate](specs/01e-desktop-large-gs-workflow.md) groups
-large-SH4 capacity/residency/ordinary-root integration; implementation/evidence is in todo.
+large-SH4 capacity/residency/ordinary-root integration. `src/projectScene` owns the
+production composition; `project-scene-desktop` selects the static candidate at
+build time. Historical validation storage continues in place; default normal
+builds and their PWA retain their own route. Actual implementation/evidence is in todo.
+Its PO-approved§9 connects early verified Caption reading/search, progressive model
+presentation and local loading/retry UI. Canonical preparation and existing
+Session/file/restore fences remain separate from GPU readiness; no provisional
+ZIP preview or partial-SH loading is introduced.
 
 An accepted ADR constrains implementation immediately. A proposal is not approval;
 approved direction is not technology adoption; code is not device/offline acceptance.
