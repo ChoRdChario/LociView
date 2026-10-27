@@ -1,4 +1,4 @@
-import { inspectDeclaredValidationModel, readValidationBody } from '../../projectFiles/content';
+import { inspectDeclaredValidationModel, inspectDeclaredValidationBlob, readValidationBody } from '../../projectFiles/content';
 import { isPointModel, isGsModel, type ValidatedModel } from '../../projectFiles/pointPly';
 import { inspectProjectImage, projectImageMime, type PhotoDecoder } from '../../projectFiles/photo';
 import * as THREE from 'three';
@@ -32,8 +32,10 @@ export async function prepareReviewView(file: Blob, limits: FileValidationLimits
     const ids = list(asset.representationIds), reps=ids.map(id=>representations[string(id)]!),visuals=reps.filter(r=>r.role!=='interactionProxy'),proxies=reps.filter(r=>r.role==='interactionProxy');
     if(visuals.length!==1||proxies.length>1||proxies.length&&(visuals[0]!.role!=='gsPrimary'||proxies[0]!.proxyForGsVariantFamilyId!==visuals[0]!.variantFamilyId))throw Error('モデルと位置指定用の面の対応を確認できません。');
     for(const record of reps){const blob = object(record.blob);
-    const bytes = await readValidationBody(inspection.archive.entryBlob(`blobs/sha256/${string(blob.digest)}`), limits.maxFileBytes);
-    const source = await inspectDeclaredValidationModel(record, bytes, limits, decode, jpeg, 'review'), slots = isGsModel(source)&&record.materialCatalog===undefined?[]:list(object(record.materialCatalog).slots).map(object);
+    const file=inspection.archive.entryBlob(`blobs/sha256/${string(blob.digest)}`);
+    const source = record.contentKind==='gaussianSplat' ? await inspectDeclaredValidationBlob(record,file,limits,decode,jpeg,'review') :
+      await inspectDeclaredValidationModel(record,await readValidationBody(file,limits.maxFileBytes),limits,decode,jpeg,'review');
+    const slots = isGsModel(source)&&record.materialCatalog===undefined?[]:list(object(record.materialCatalog).slots).map(object);
     const actual = new Set(source.materials.map(canonical));
     if (!same(record.logicalBoundsAsset, source.bounds) || slots.length !== source.materials.length ||
       slots.some(s => !actual.delete(canonical({ sourceLocator: s.sourceLocator!, sourceSemantics: s.sourceSemantics! }))) || actual.size)

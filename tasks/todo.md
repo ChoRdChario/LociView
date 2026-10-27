@@ -28,6 +28,85 @@ in nondefault validation; code and executed tests determine its observed behavio
 01a adds approved XYZ/RGB ASCII PLY alongside admitted GLB and photos. This is not
 ordinary-entry activation, arbitrary-format support or general v2 adoption.
 
+## Next connected unit — full-SH4 tile qualification
+
+The remaining concrete evidence gap is bounded decoded/resident ownership and
+full-SH4 paging. Current fixed GSL1.4.3 supports SH4 raw PLY/SPZ but its RAD/SOG
+paging remains SH3; a dependency upgrade alone is not an established solution.
+Use the existing qualification facilities to compare full SH4 with raw-PLY tile
+residents under one renderer: complete-source/coordinate/coefficients and all-page
+pixels, one pending decode, global/retiring resource ownership, camera changes,
+cancel/context recovery and release. This is a disposable evaluation hypothesis,
+not a new persistent profile, product budget, index or source replacement.
+Keep production64MiB and exact01c/01d behavior. Before choosing a persistent
+tile/index/LOD format, a larger product budget, or how an incomplete region is
+presented, prepare the concrete independent review/PO decision. Do not substitute
+SH3 or mix unreleased main-branch API changes into fixed1.4.3 evidence.
+Primary capability references: [fixed format table](https://github.com/WilliamLiu-1997/Gaussian-Splat-Lite/blob/d8703f7aed0e966e808a3fd3a2e1def3179d90dc/docs/SplatFileType.md)
+and [fixed renderer API](https://github.com/WilliamLiu-1997/Gaussian-Splat-Lite/blob/d8703f7aed0e966e808a3fd3a2e1def3179d90dc/docs/GaussianSplatRenderer.md).
+
+## Verified unit — file-backed GS / streaming workflow (01d)
+
+Follow01c§8/§9(5) and G1-A after the verified/pushed01c checkpoint: a large source must
+stream→stage→incremental hash→inspect→bounded decode/upload→publish, then save and
+cold resume with the complete original intact. Start with the existing CAS/I/O
+boundaries and the concrete SH4 paging gap; reuse current facilities and evidence.
+Read-only preparation confirms WorkspaceFS/OPFS streams, incremental
+`blobStream` hashing and verified `OriginBlobStore.put()` publication already
+exist. The remaining whole-body chain is file selection/initialProject → content
+read/GS inspector → received/cold verification → SplatMesh decode. First specify
+file-backed source ownership and streaming inspection through save/cold reopen;
+that increment alone does not solve full SH4 paging or large-GS resident rendering.
+Specify encoded, scratch, resident and output budgets before implementation. Keep
+the current64MiB path and immutable profiles unchanged until a replacement is
+approved; no silent SH3 preview. A changed budget, format/derivative, renderer or
+storage/publication contract needs its concrete independent review/PO decision.
+Ordinary entry, device/offline, adoption and release remain separate gates.
+
+The direct boundary mapping and three independent design reviews are done.
+[01d](../docs/specs/01d-gs-file-backed-source.md) specifies the internal source
+refinement with existing authority/timing/limits. Implement the connected
+File/Blob GS selection/inspection/stage/display/save/cold workflow, preserve the
+five-purpose/Proxy behavior, then run relevant faults, final checks and independent
+diff review. No further PO wait is required within that reviewed scope.
+Check exact profile/fact/recovery preservation and current limits before choosing
+a slice. No new dependency, format, budget, renderer adoption or public release/
+deployment is authorized by this preparation.
+
+Meta-audit2026-10-27: clean g0-baseline at593bd9a; preceding production workflow
+and its final checks/reviews are complete. The next critical gap is whole-source
+ownership/inspection plus unresolved full-SH4 paging, rather than another renderer
+PoC or a higher numeric limit. Root is sole writer; three bounded read-only
+reviews cover storage, GS inspection/renderer and acceptance authority.
+
+Implementation is connected: shared bounded GS header/row inspection with
+incremental hash; byte compatibility; captured native input/body; exact checked
+CAS Blob views; stored/received/equivalence/Review verification; fixed public
+GSL Blob input. Preserve the intrinsic captured snapshot, readonly nonmutation
+and original I/O/abort/verification errors. Early review findings are fixed.
+Focused GS/import checks, source-partition/cancel faults, readonly snapshot
+ceilings/corruption and prepared cold addition pass. `file-add-browser.log` passes
+native GS addition→Proxy→backup→closed-browser cold reopen in dedicated Chromium,
+including a >64KiB source and a whole-GS arrayBuffer rejection guard.
+`connected-browser.log` passes all three remaining cases (9.1min): native SH4
+create/manual record/independent Mesh, all five file purposes, separate recipient
+edit/return, Review pixels, backup restore/cold, mixed selection and actual GPU
+loss/retry. The guard remains active across fresh, receiver, Review, Clean and
+restore environments. `selection-focus.log` preserves seven existing unified
+opening/product-model-panel cases; `snapshot-focus-fixed.log` passes four readonly
+snapshot/corruption/diagnostic cases; `durable-focus.log` passes13GS source/fault/
+prepared-cold cases. Meaningful final source/diff reviews have no open findings.
+Final source/test fingerprints and six browser-qualified JS/WASM/CSS hashes are
+retained. `checkpoint-final.log` passes typecheck,125files/2,800tests with21existing
+TODO, normal/harness/validation builds. `final-static-check.json` passes the four
+immutable companions,314local links, all17changed runtime/test files, zero GSL/
+adapter modules in normal/harness, validation-only exact notices, both SWs and
+the preserved Native Spark filename. Rebuilt validation runtime bytes exactly
+match the browser-qualified output. HEIC public-path isolation also passes.
+This is a reviewed/tested development checkpoint; Git owns actual commit/push
+identity and state. No larger capacity, SH4 paging, device/offline or adoption
+result is claimed. Logs and owned outputs stay in ignored `.artifacts/e2e/gs-01d/`.
+
 ## Verified unit — approved01c limited GS / Proxy workflow
 
 PO approved the independently reviewed [01c](../docs/specs/01c-gs-sh4-proxy-workflow-proposal.md)
@@ -121,24 +200,6 @@ No device/offline, ordinary-entry, aggregate adoption or release gate is passed.
 
 The proposal qualification evidence stays in `.artifacts/e2e/gs-spec-01c/` and Git;
 it is not implementation acceptance. Exact approved companions are never rewritten.
-
-## Next connected unit — large-source workflow design
-
-After the verified01c checkpoint, follow01c§8/§9(5) and G1-A: a large source must
-stream→stage→incremental hash→inspect→bounded decode/upload→publish, then save and
-cold resume with the complete original intact. Start with the existing CAS/I/O
-boundaries and the concrete SH4 paging gap; reuse current facilities and evidence.
-Read-only preparation confirms WorkspaceFS/OPFS streams, incremental
-`blobStream` hashing and verified `OriginBlobStore.put()` publication already
-exist. The remaining whole-body chain is file selection/initialProject → content
-read/GS inspector → received/cold verification → SplatMesh decode. First specify
-file-backed source ownership and streaming inspection through save/cold reopen;
-that increment alone does not solve full SH4 paging or large-GS resident rendering.
-Specify encoded, scratch, resident and output budgets before implementation. Keep
-the current64MiB path and immutable profiles unchanged until a replacement is
-approved; no silent SH3 preview. A changed budget, format/derivative, renderer or
-storage/publication contract needs its concrete independent review/PO decision.
-Ordinary entry, device/offline, adoption and release remain separate gates.
 
 ## Previous verified unit — approved07j implementation
 

@@ -17,7 +17,7 @@ import { hasLociMyuConversion, resumeLociMyuConversion, readLociMyuConversionRep
 import { validationMetadataLimits as limits, type FileValidationLimits } from '../../projectFiles/validation';
 import type { PngDecoder } from '../../projectFiles/png';
 import type { JpegDecoder } from '../../projectFiles/jpeg';
-import { sealValidationRecord } from '../../projectFiles/initialProject';
+import { sealValidationRecord, validationModelFile } from '../../projectFiles/initialProject';
 import { cloneCanonicalValue, type JsonObject } from '../../domain/values';
 import { metadataProjectView } from './metadataFixture';
 import { validationModelVersions, validationDeclaredBodyBytes } from './validationProjection';
@@ -557,7 +557,7 @@ async function openNormalValidationHost(options: ValidationHostOptions, inherite
       addMediaFile,
       addModelFile: (token, input: ModelFileAddition) => {
         const target = { sceneId: input.sceneId, assetId: input.assetId }, selected = input.file;
-        const file = { name: selected.name, size: selected.size, arrayBuffer: selected.arrayBuffer.bind(selected) };
+        const file = { name: selected.name, size: selected.size, blob: selected.blob?.slice(), arrayBuffer: selected.arrayBuffer.bind(selected) };
         return execute(async () => {
           editable(); const before = await session.read();
           if (before.state !== 'ready' || before.source?.token !== token || before.provider?.kind !== 'scene-provider')
@@ -571,9 +571,9 @@ async function openNormalValidationHost(options: ValidationHostOptions, inherite
           const orderKey = orderBetween(orders.at(-1) ?? null, null);
           if (!Number.isSafeInteger(file.size) || file.size <= 0 || validationDeclaredBodyBytes(before.provider, limits) + file.size > options.fileLimits.maxFileBytes)
             throw Error('モデルを含む合計がこの検証の上限を超えています。');
-          const bytes = new Uint8Array(await file.arrayBuffer());
-          if (bytes.length !== file.size) throw Error('選択したモデルの大きさが一致しません。');
-          const records = await content.prepareModel({ label: file.name, bytes }, target.assetId);
+          const input = file.blob ? await validationModelFile({label:file.name,file:file.blob},options.fileLimits) : {label:file.name,bytes:new Uint8Array(await file.arrayBuffer())};
+          if ((input.file ? input.file.size : input.bytes.length) !== file.size) throw Error('選択したモデルの大きさが一致しません。');
+          const records = await content.prepareModel(input, target.assetId);
           try {
             const result = await ready(await session.edit(token, { kind: records.representation.role==='gsPrimary' ? 'addGsAsset' : 'addAsset', sceneId: target.sceneId, ...records,
               membership: { id: `sam_${newId()}`, sceneId: target.sceneId, assetId: target.assetId, orderKey,

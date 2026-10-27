@@ -118,6 +118,31 @@ export class OriginBlobStore {
     return { ref, file };
   }
   /** Verified stream without diagnostic writes or lock acquisition, including on corruption. */
+  private blobView(file: WorkspaceReadableFile, ref: StoredBlobRef,
+    checked: (input: ReadableStream<Uint8Array>, complete: () => void) => ReadableStream<Uint8Array>,
+    failed?: (error: unknown) => Promise<void>): Pick<WorkspaceReadableFile, 'blob'> {
+    if (!file.blob) return {};
+    return { blob: async () => {
+      // Verify the captured snapshot itself, never a different stream or later open.
+      const provided = await file.blob!();
+      const blob = provided instanceof Blob ? Blob.prototype.slice.call(provided) : undefined;
+      if (!blob || blob.size !== ref.byteLength) {
+        const error = new BlobStoreError('mismatch');
+        try { await failed?.(error); } catch { /* Original mismatch remains authoritative. */ }
+        throw error;
+      }
+      let complete = false;
+      const reader = checked(blob.stream(), () => { complete = true; }).getReader();
+      try {
+        while (!(await reader.read()).done) { /* bounded verification */ }
+        if (!complete) throw new BlobStoreError('incomplete');
+        return blob;
+      } finally {
+        try { await reader.cancel(); } catch { /* Preserve original verification failure. */ }
+        reader.releaseLock();
+      }
+    } };
+  }
   async openReadOnly(input: JsonObject | StoredBlobRef, ceiling: BlobStreamLimits = this.limits): Promise<WorkspaceReadableFile> {
     for (const n of [ceiling.maxBlobBytes, ceiling.maxChunkBytes, ceiling.maxChunks])
       if (!Number.isSafeInteger(n) || n <= 0) throw new BlobStoreError('invalid');
@@ -125,17 +150,20 @@ export class OriginBlobStore {
       maxChunkBytes: Math.min(ceiling.maxChunkBytes, this.limits.maxChunkBytes), maxChunks: Math.min(ceiling.maxChunks, this.limits.maxChunks) };
     const { ref, file } = await this.readStored(input);
     if (file.size > limits.maxBlobBytes) throw new BlobStoreError('limit');
-    return { size: file.size, stream: () => checkedBlobStream(file.stream(), limits, () => {}, ref) };
+    const checked = (input: ReadableStream<Uint8Array>, complete: () => void) => checkedBlobStream(input, limits, complete, ref);
+    return { size: file.size, stream: () => checked(file.stream(), () => {}), ...this.blobView(file, ref, checked) };
   }
   async open(input: JsonObject | StoredBlobRef): Promise<WorkspaceReadableFile> {
     const { ref, file } = await this.readStored(input);
-    return { size: file.size, stream: () => storedBlobStream(file.stream(), this.limits, ref, () => {}, undefined, async error => {
+    const failed = async (error: unknown) => {
       if (error instanceof BlobStoreError && error.code === 'mismatch') {
         this.suspect.add(ref.digest);
         // Readers never gain a per-Project CAS writer. Busy/quota still rejects the original read.
         await this.writer(fs => writeReceipt(fs, suspectPath(ref.digest), { version: 'cas-suspect-1' }, this.limits.metadata));
       }
-    }) };
+    };
+    const checked = (input: ReadableStream<Uint8Array>, complete: () => void) => storedBlobStream(input, this.limits, ref, complete, undefined, failed);
+    return { size: file.size, stream: () => checked(file.stream(), () => {}), ...this.blobView(file, ref, checked, failed) };
   }
   /** Export/suspected corruption requires a complete byte verification, unlike metadata-only inspection. */
   async verify(input: JsonObject | StoredBlobRef, signal?: AbortSignal): Promise<void> {

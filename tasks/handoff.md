@@ -37,6 +37,13 @@ limited to development-server/static-validation use, preserving normal/harness
 build and precache isolation. Large-source work must address the whole-body
 import/inspection/decode chain and full SH4 paging without changing the current
 limits or substituting SH3 implicitly.
+The [01d internal refinement](../docs/specs/01d-gs-file-backed-source.md) preserves
+that authority and the current64MiB limit while replacing repeated GS source
+arrays with captured File/Blob input, shared streamed inspection/hash and checked
+CAS Blob views. Three independent reviews found no new PO decision within that
+exact scope. The bounded native File/Blob workflow is verified; todo owns its
+checkpoint and next full-SH4 tile qualification. Full decoded residency and SH4
+paging remain open.
 The PO approved [07j](../docs/specs/07j-three-186-compatibility-proposal.md) implementation
 and fixed dependencies on2026-10-27. Its bounded implementation retains:
 retain actual180 source math/proof/legacy keys and closed cleanup, then independently

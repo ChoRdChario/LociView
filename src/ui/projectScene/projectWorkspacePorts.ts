@@ -25,7 +25,7 @@ export interface WorkspaceRecoveryGroup {
     { kind: 'captionLifecycleConfirm'; captionId: string; operationIds: readonly string[] } |
     { kind: 'membership'; sceneId: string; captionId: string; edgeIds: readonly string[] };
 }
-export interface WorkspaceFile { readonly name: string; readonly size: number; arrayBuffer(): Promise<ArrayBuffer> }
+export interface WorkspaceFile { readonly name: string; readonly size: number; readonly blob?: Blob; arrayBuffer(): Promise<ArrayBuffer> }
 export interface WorkspacePlacement { readonly translation: Point3; readonly rotationXYZW: readonly [number, number, number, number]; readonly uniformScale: number }
 export interface WorkspaceModelTarget { readonly kind: 'model'; readonly token: string; readonly sceneId: string; readonly assetId: string; readonly bindingId: string }
 export interface WorkspaceModelProposal { readonly target: WorkspaceModelTarget; readonly placement: WorkspacePlacement; readonly mode: 'translate' | 'rotate' | 'scale' }

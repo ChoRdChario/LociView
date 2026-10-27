@@ -25,9 +25,9 @@ function memoryStorage():MetadataStorageFactory{
   return ()=>({load:async k=>rows.get(JSON.stringify(k))?.slice(),save:async(k,b)=>{rows.set(JSON.stringify(k),b.slice());},remove:async k=>{rows.delete(JSON.stringify(k));},loadRange:async p=>[...rows].filter(([k])=>matches(k,p)).map(([k,data])=>({key:JSON.parse(k),data:data.slice()})),removeRange:async p=>{for(const k of rows.keys())if(matches(k,p))rows.delete(k);}});
 }
 class FaultFS extends MemoryFS{rejectPublication=false;override async writeText(path:string,text:string){if(this.rejectPublication&&path.endsWith('/published.json'))throw Error('gs-publication-fault');return super.writeText(path,text);}}
-async function setup(){
+async function setup(fileBacked=false){
   A.getHeads(A.init());const fs=new FaultFS(),storage=memoryStorage(),store=new OriginBlobStore(fs,{maxBlobBytes:limits.maxFileBytes,maxChunkBytes:100_000,maxChunks:1000,metadata},{async request(name,_opts,callback){return callback({name,mode:'exclusive'});}} as LockManager);
-  const service=validationProjectService(fs,storage,store,limits),initial=prepareValidationCreation(await prepareValidationProject({run:newId(),title:'GS',models:[{label:'SH4',bytes:gsFixture()}]},limits),'map2');
+  const service=validationProjectService(fs,storage,store,limits),model=fileBacked?{label:'SH4',file:new Blob([gsFixture().slice().buffer])}:{label:'SH4',bytes:gsFixture()},initial=prepareValidationCreation(await prepareValidationProject({run:newId(),title:'GS',models:[model]},limits),'map2');
   expect((await initial.persist(fs,store,service.session)).state).toBe('ready');
   const read=async()=>{const r=await service.session.read();if(r.state!=='ready'||r.provider?.kind!=='scene-provider')throw Error('GS provider');return r.provider;};
   const target=async()=>{const p=await read(),v=(await validationModelVersions(p))[0]!,c=v.closure;if(c.shape!=='saved-gs')throw Error('GS closure');
@@ -35,6 +35,20 @@ async function setup(){
   const workflow=createGsProxyWorkflow(service.content,read,(token,command)=>service.session.edit(token,command));return {...service,fs,storage,store,read,target,workflow};
 }
 describe('01c same-GS Proxy commands and durable facts',()=>{
+  it('keeps native source snapshots through creation, stored inspection, verification and cold reopen',async()=>{
+    const r=await setup(true),first=await r.target(),p=await r.read(),record=p.details.immutable.representationsById[first.gsRepresentationId];if(record?.kind!=='value')throw Error('GS');
+    const original=r.fs.readStream.bind(r.fs),spy=vi.spyOn(r.fs,'readStream').mockImplementation(async path=>{const f=await original(path);return f&&path.startsWith('v2/cas/objects/')?{...f,stream(){throw Error('content must inspect checked Blob snapshot');}}:f;});
+    try{const source=await r.content.modelContent(record.value,true);expect(source.kind).toBe('gs');if(source.kind!=='gs')throw Error('GS');expect(source.file).toBeInstanceOf(Blob);expect(source.bytes).toBeUndefined();expect(source.digest).toBe((record.value.blob as any).digest);await r.content.verify([record.value.blob as any]);}finally{spy.mockRestore();}
+    const cold=validationProjectService(r.fs,r.storage,r.store,limits),ready=await cold.session.read();expect(ready.state).toBe('ready');expect(ready.source?.token).toBe((await r.session.read()).source?.token);const source=await cold.content.modelContent(record.value,true);expect(source.kind==='gs'&&source.file).toBeInstanceOf(Blob);
+  });
+  it('rejects an invalid File without writes and recovers prepared GS addition without its ephemeral source',async()=>{
+    const r=await setup(true),target=await r.target(),assetId=`ast_${newId()}`,writes=[vi.spyOn(r.fs,'writeText'),vi.spyOn(r.fs,'writeBytes'),vi.spyOn(r.fs,'writeStream'),vi.spyOn(r.fs,'appendText'),vi.spyOn(r.fs,'appendBytes'),vi.spyOn(r.fs,'remove')];
+    await expect(r.content.prepareModel({label:'bad.ply',file:new Blob([gsFixture().slice(0,-1).buffer])},assetId)).rejects.toThrow();for(const w of writes)expect(w).not.toHaveBeenCalled();
+    const input={label:'new GS',file:new Blob([gsFixture(0).slice().buffer])},preparing=r.content.prepareModel(input,assetId);input.file=new Blob([new Uint8Array([0])]);const records=await preparing;for(const w of writes)expect(w).not.toHaveBeenCalled();
+    r.fs.rejectPublication=true;await expect(r.session.edit(target.token,{kind:'addGsAsset',sceneId:target.sceneId,...records,membership:{id:`sam_${newId()}`,sceneId:target.sceneId,assetId,orderKey:'B',lifecycle:{state:'active',reason:'initial',eventId:`evt_${newId()}`}}})).rejects.toThrow('gs-publication-fault');
+    r.content.releasePreparedModels();r.fs.rejectPublication=false;const cold=validationProjectService(r.fs,r.storage,r.store,limits),ready=await cold.session.retry();expect(ready.state).toBe('ready');if(ready.provider?.kind!=='scene-provider')throw Error('cold GS');expect((await validationModelVersions(ready.provider)).map(m=>m.assetId)).toContain(assetId);
+    const source=await cold.content.modelContent(records.representation,true);expect(source.kind==='gs'&&source.file).toBeInstanceOf(Blob);if(source.kind!=='gs')throw Error('GS');expect(source.degree).toBe(0);expect(source.digest).toBe((records.representation.blob as any).digest);
+  });
   it('adds another complete GS through its dedicated command and keeps the existing Project frame',async()=>{
     const r=await setup(),before=await r.session.read(),p=await r.read(),target=await r.target(),assetId=`ast_${newId()}`,records=await r.content.prepareModel({label:'SH0',bytes:gsFixture(0)},assetId);
     const fields={sceneId:target.sceneId,...records,membership:{id:`sam_${newId()}`,sceneId:target.sceneId,assetId,orderKey:'B',lifecycle:{state:'active',reason:'initial',eventId:`evt_${newId()}`}}};

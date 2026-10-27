@@ -7,7 +7,8 @@ import type { MetadataStorageFactory } from '../projectMetadata/repository';
 import { digest, equalBytes, json, metadataPath, readReceipt, underWriteLease, writeReceipt } from '../projectMetadata/persistence';
 import { ValidationContent, readValidationBody } from './content';
 import { validationModelFacts } from './modelFacts';
-import type { PreparedValidationProject } from './initialProject';
+import { captureGsBlob, gsBlobStream } from './gsPly';
+import type { ValidationBody, PreparedValidationProject } from './initialProject';
 import type { PngDecoder } from './png';
 import type { JpegDecoder } from './jpeg';
 import { fileError, validationMetadataLimits as metadataLimits, type FileValidationLimits } from './validation';
@@ -83,15 +84,15 @@ export function validationProjectService(fs: ProjectWorkspaceFS, storage: Metada
   return { content, session: new MetadataProjectSession(fs, storage, metadataLimits, allow => content.verifier(allow), content, validationModelFacts(content)) };
 }
 /** Capture once; repeated execution uses identical source/IDs/bytes after a failed attempt. */
-export function prepareValidationCreation(input: PreparedValidationProject, semanticProfile: 'map1' | 'map2' = 'map1') {
+export function prepareValidationCreation(input: PreparedValidationProject<ValidationBody>, semanticProfile: 'map1' | 'map2' = 'map1') {
   if (semanticProfile === 'map2' && (input.records.schema.major !== 2 || input.records.schema.minor !== 0 && input.records.schema.minor !== 1)) return fileError('作成するプロジェクトの版を確認してください。');
   const schema = semanticProfile === 'map2' ? { ...input.records.schema, minor: 1 } : input.records.schema;
   const source = ProjectMetadataSource.bootstrap(schema, input.records.identity, metadataLimits, { semanticProfile }).initialize({ ...input.records, schema });
-  const blobs = input.blobs.map(b => ({ ref: { ...b.ref }, bytes: b.bytes.slice() }));
+  const blobs: ValidationBody[] = input.blobs.map(b => b.file ? {ref:{...b.ref},file:captureGsBlob(b.file)} : {ref:{...b.ref},bytes:b.bytes.slice()});
   return { source, async persist(fs: ProjectWorkspaceFS, store: OriginBlobStore, session: MetadataProjectSession) {
     const before = await session.read();
     if (before.state !== 'empty') return fileError('作成先が空ではありません。保存済みProjectは変更していません。');
-    for (const b of blobs) await store.put(new Blob([b.bytes.slice().buffer]).stream(), b.ref.mediaType, b.ref);
+    for (const b of blobs) await store.put(b.file ? gsBlobStream(b.file) : new Blob([b.bytes.slice().buffer]).stream(), b.ref.mediaType, b.ref);
     await underWriteLease(fs, () => writeValidationInitial(fs, source));
     return session.createFromSource(source);
   } };

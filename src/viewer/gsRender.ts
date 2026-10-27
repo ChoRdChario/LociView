@@ -6,7 +6,8 @@ import { queueGsDecode } from './gsDecodeQueue';
 import { gsLinear } from '../domain/gsSource';
 
 /** Neutral checked source. No Project, format records, filesystem or package access. */
-export interface GsDisplaySource {readonly bytes:Uint8Array;readonly count:number;readonly degree:number;readonly displayIssue:string|null}
+export type GsDisplaySource = {readonly count:number;readonly degree:number;readonly displayIssue:string|null} &
+  ({readonly file:Blob;readonly bytes?:never}|{readonly bytes:Uint8Array;readonly file?:never});
 export interface GsDisplayResident {readonly source:GsDisplaySource;readonly object:THREE.Group;issue:string|null;ready:boolean}
 export interface GsRenderPort {render(scene:THREE.Scene,camera:THREE.Camera,before:()=>void):void;dispose():void;readonly depthBits:number}
 let policy:Promise<void>|undefined;
@@ -63,7 +64,7 @@ export async function createGsRender(renderer:THREE.WebGLRenderer,residents:read
     resident.ready=false;resident.issue='GSの表示を準備しています。';
     const lease=queueGsDecode(resident,()=>{
       if(resident.source.displayIssue)throw Error(resident.source.displayIssue);
-      const mesh=new SplatMesh({fileBytes:resident.source.bytes.slice(),fileType:SplatFileType.PLY,fileName:'source.ply',editable:false,raycastable:false});mesh.maxSh=resident.source.degree;mesh.frustumCulled=false;
+      const mesh=new SplatMesh({...resident.source.file?{file:resident.source.file}:{fileBytes:resident.source.bytes.slice()},fileType:SplatFileType.PLY,fileName:'source.ply',editable:false,raycastable:false});mesh.maxSh=resident.source.degree;mesh.frustumCulled=false;
       return {initialized:mesh.initialized,value:mesh,dispose:()=>{mesh.removeFromParent();mesh.dispose();}};
     });
     void lease.promise.then(mesh=>{if(closed){lease.cancel();return;}try{checkPacked(mesh,resident.source);resident.object.add(mesh);decoded.add(resident);lastSort='';changed();}catch(e){lease.cancel();resident.issue=(e as Error).message;changed();}},e=>{if(!closed){resident.issue=e instanceof Error?e.message:'GSを表示できません。';changed();}});

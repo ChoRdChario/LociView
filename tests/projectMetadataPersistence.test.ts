@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import * as A from '@automerge/automerge'; // Node-only local Wasm initialization.
 import { MemoryFS, type ProjectMutationAuthority } from '../src/platform/fs';
 import { MetadataProjectSession, type MetadataSessionRead } from '../src/projectMetadata/session';
@@ -516,6 +516,42 @@ describe('streamed bodies connected to metadata creation (memory FS/fake origin 
     expect(fs.writes).toBe(afterCorruption); expect(afterCorruption).toBe(writes + 1);
     expect(lock.names).toHaveLength(leases); expect(await fs.list('v2/cas/suspect/')).toEqual([]);
     expect(await readerStore.inspect(ref)).toBe('verified-present'); // No diagnostic marker; not a digest claim.
+  });
+
+  it('verifies the same captured native Blob, not another stream or a second snapshot, without read-only mutation', async () => {
+    class Views extends MemoryFS {
+      bad=false; calls=0;
+      override async readStream(path:string){
+        const file=await super.readStream(path);if(!file||!path.startsWith('v2/cas/objects/'))return file;
+        return {...file,blob:async()=>{this.calls++;return new Blob([new Uint8Array(this.bad||this.calls>1?[1,2,9]:[1,2,3])]);}};
+      }
+    }
+    const fs=new Views(),lock=locks(),store=new OriginBlobStore(fs,budget,lock.manager),ref=await store.put(chunks(new Uint8Array([1,2,3])),'application/octet-stream');
+    const view=await new OriginBlobStore(fs,budget,null).openReadOnly(ref),writes=vi.spyOn(fs,'writeText'),leases=lock.names.length;
+    const captured=await view.blob!();expect([...new Uint8Array(await captured.arrayBuffer())]).toEqual([1,2,3]);expect(fs.calls).toBe(1);
+    fs.calls=0;await expect((await store.openReadOnly(ref,{...budget,maxChunkBytes:2})).blob!()).rejects.toMatchObject({code:'limit'});
+    fs.bad=true;fs.calls=0;await expect((await store.openReadOnly(ref)).blob!()).rejects.toMatchObject({code:'mismatch'});expect(writes).not.toHaveBeenCalled();expect(lock.names).toHaveLength(leases);expect(await store.inspect(ref)).toBe('verified-present');
+    await expect((await store.open(ref)).blob!()).rejects.toMatchObject({code:'mismatch'});expect(await store.inspect(ref)).toBe('suspect');
+  });
+
+  it('checks Blob native bytes even when its methods or the separate stream disagree',async()=>{
+    class Views extends MemoryFS {
+      override async readStream(path:string){const file=await super.readStream(path);if(!file||!path.startsWith('v2/cas/objects/'))return file;
+        return {...file,blob:async()=>{const blob=new Blob([new Uint8Array([1,2,9])]);blob.stream=()=>new Blob([new Uint8Array([1,2,3])]).stream();return blob;}};}
+    }
+    const fs=new Views(),store=new OriginBlobStore(fs,budget,locks().manager),ref=await store.put(chunks(new Uint8Array([1,2,3])),'application/octet-stream');
+    await expect((await store.openReadOnly(ref)).blob!()).rejects.toMatchObject({code:'mismatch'});
+    expect(await fs.list('v2/cas/suspect/')).toEqual([]);
+  });
+
+  it('preserves a snapshot-size mismatch when its diagnostic write also fails',async()=>{
+    class Views extends MemoryFS {
+      override async readStream(path:string){const file=await super.readStream(path);return file&&path.startsWith('v2/cas/objects/')?{...file,blob:async()=>new Blob([new Uint8Array([1])])}:file;}
+      override async writeText(path:string,text:string){if(path.startsWith('v2/cas/suspect/'))throw Error('diagnostic-quota');return super.writeText(path,text);}
+    }
+    const fs=new Views(),store=new OriginBlobStore(fs,budget,locks().manager),ref=await store.put(chunks(new Uint8Array([1,2,3])),'application/octet-stream');
+    await expect((await store.open(ref)).blob!()).rejects.toMatchObject({code:'mismatch'});
+    expect(await store.inspect(ref)).toBe('suspect');
   });
 
   it('captures exact history plus deduplicated strong bodies, excluding a distinct weak historical model', async () => {

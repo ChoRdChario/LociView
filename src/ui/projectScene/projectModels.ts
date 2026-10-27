@@ -66,7 +66,7 @@ export function createProjectModels(document: Document, host: ProjectPanelHost):
     node.addEventListener('cancel', () => { if (!host.block('models', false)) { fileScope = null; host.changed(); } });
     node.addEventListener('change', () => {
       const selected = node.files?.[0]; if (!selected || !fileScope || host.block('models')) return;
-      fileScope = { ...fileScope, file: { name: selected.name, size: selected.size, arrayBuffer: selected.arrayBuffer.bind(selected) } };
+      fileScope = { ...fileScope, file: { name: selected.name, size: selected.size, blob: selected.slice(), arrayBuffer: selected.arrayBuffer.bind(selected) } };
       if (fileScope.token !== host.source().provider.token) host.message('対象が更新されています。元のモデルを選び直してください。');
       else if (fileScope.kind === 'add') applyFile(); host.changed();
     });

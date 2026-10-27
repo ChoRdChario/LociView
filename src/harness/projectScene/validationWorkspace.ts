@@ -2,7 +2,7 @@ import { isPointPly } from '../../projectFiles/pointPly';
 import { isAdditionalPhoto, freshPhotoSelectionIssue, type PhotoDecoder } from '../../projectFiles/photo';
 import { projectResumeReference, type ProjectResumeReference } from '../../ui/resumeReference';
 import { newId } from '../../projectMetadata/persistence';
-import { prepareValidationProject, type ValidationFile } from '../../projectFiles/initialProject';
+import { prepareValidationProject, validationModelFile, type ValidationModelFile, type ValidationFile } from '../../projectFiles/initialProject';
 import { prepareValidationCreation } from '../../projectFiles/creation';
 import { prepareNativeConversion } from '../../projectFiles/nativeConversion';
 import { prepareFrozenV1Conversion } from '../../projectFiles/frozenV1Conversion';
@@ -93,7 +93,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   let lociEvaluation: Awaited<ReturnType<NonNullable<Awaited<ReturnType<typeof prepareLociMyuConversion>>>['evaluate']>> | null = null;
   let lociDraft = 0, lociDecision: string | undefined;
   let selectionGeneration = 0, creationDraft = 0, selectionPending = false;
-  let rawSelection: { models: ValidationFile[]; media: ValidationFile[] } | undefined;
+  let rawSelection: { models: ValidationModelFile[]; media: ValidationFile[] } | undefined;
   let creationAttempt: { run: string; initial: ReturnType<typeof prepareValidationCreation>; opened?: true; candidate?: ValidationNormalHost } | undefined;
   let selectionHost: Host | undefined;
   const lociTuple = () => JSON.stringify([workbook.value, conversionTitle.value, relation.checked]);
@@ -408,7 +408,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   }));
   workspaceForm.addEventListener('submit', event => { event.preventDefault(); execute(async () => {
     ensureMaySwitch(); if (creationAttempt) throw Error('作成を再試行してください。');
-    const selection = Array.from(workspaceInput.files ?? []).map(file => ({ file, label: file.name }));
+    const selection = Array.from(workspaceInput.files ?? []).map(file => ({ file: file instanceof Blob ? file.slice() : file, label: file.name }));
     if (!selection.length) throw Error('ファイルを選択してください。');
     const total = selection.reduce((n, item) => n + item.file.size, 0);
     if (selection.length > ports.fileLimits.maxItems || !Number.isSafeInteger(total) || total > ports.fileLimits.maxFileBytes ||
@@ -416,19 +416,21 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     const generation = ++selectionGeneration, draft = creationDraft, context = selectionContext(); selectionPending = true;
     status.textContent = 'ファイルを確認しています。';
     clearConversion(); rawSelection = undefined; form.hidden = true;
-    const models: ValidationFile[] = [], media: ValidationFile[] = [], packages: Blob[] = []; let actualTotal = 0;
+    const models: ValidationModelFile[] = [], media: ValidationFile[] = [], packages: Blob[] = []; let actualTotal = 0;
     for (const item of selection) {
-      const bytes = new Uint8Array(await item.file.arrayBuffer());
+      const selectedFile:{readonly size:number;arrayBuffer():Promise<ArrayBuffer>}=item.file;
+      const file:ValidationModelFile = selectedFile instanceof Blob ? await validationModelFile({label:item.label,file:selectedFile},ports.fileLimits) : {label:item.label,bytes:new Uint8Array(await selectedFile.arrayBuffer())};
       if (!guardSelection(generation, context) || draft !== creationDraft) return;
-      actualTotal += bytes.byteLength;
+      actualTotal += file.file ? file.file.size : file.bytes.byteLength;
       if (!Number.isSafeInteger(actualTotal) || actualTotal > ports.fileLimits.maxFileBytes) throw Error('選択したファイルがこの検証の上限を超えています。');
-      const file = { label: item.label, bytes };
+      if(file.file){models.push(file);continue;}
+      const bytes=file.bytes;
       if (isPointPly(bytes) || bytes.length >= 4 && new DataView(bytes.buffer).getUint32(0, true) === 0x46546c67) models.push(file);
       else if (isAdditionalPhoto(bytes) || isJpeg(bytes) || [137,80,78,71,13,10,26,10].every((b,i) => bytes[i] === b)) media.push(file);
       else {
         const issue = freshPhotoSelectionIssue(bytes); if (issue) throw Error(issue);
         // Existing package readers own container admission, including legacy ZIP forms.
-        packages.push(new File([bytes.buffer], item.label ?? 'LociMyu'));
+        packages.push(new File([bytes.slice().buffer], item.label ?? 'LociMyu'));
       }
     }
     if (!packages.length) {

@@ -34,6 +34,10 @@ with optional interaction geometry in `validationRender.ts`. `viewer/gsRender.ts
 is lazy and validation-only; its linear target and global decode ownership queue
 never own Project/storage/package access. Todo owns exact executed acceptance;
 large sources/SH4 paging and renderer adoption remain separate.
+The [01d internal refinement](docs/specs/01d-gs-file-backed-source.md) keeps GS
+originals as native File/Blob snapshots through shared streamed inspection/hash,
+checked CAS views and the fixed public decoder input. Stream-only backends retain
+their bounded byte fallback; current limits and Project/package authority remain.
 The composition's model, Saved View, material and attachment panels reuse their pure controls;
 `projectMedia.ts` connects attachment management to the common `mediaPreview.ts` viewer.
 The composition reuses `captionWindowControls.ts` for Scene-local comparison

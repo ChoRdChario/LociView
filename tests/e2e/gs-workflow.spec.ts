@@ -16,7 +16,17 @@ const hash=(bytes:Uint8Array)=>createHash('sha256').update(bytes).digest('hex');
 const files=(p:Page)=>p.getByRole('region',{name:'ファイル',exact:true});
 const modelPanel=(p:Page)=>p.getByRole('tabpanel',{name:'モデル',exact:true});
 const sh4Row=Array(89).fill(0);sh4Row[28]=.5;sh4Row[82]=sh4Row[83]=sh4Row[84]=Math.log(.3);sh4Row[85]=1;
-const source=Buffer.from(gsFixture(4,[sh4Row])),proxy=triangleGlb();
+const source=Buffer.from(gsFixture(4,Array.from({length:256},()=>sh4Row))),proxy=triangleGlb();
+async function guardWholeGsReads(context:BrowserContext){
+  await context.addInitScript(()=>{
+    const original=Blob.prototype.arrayBuffer;(window as any).wholeGsReads=0;
+    Blob.prototype.arrayBuffer=async function(){
+      if(this.size>65536){const prefix=new Uint8Array(await original.call(Blob.prototype.slice.call(this,0,32)));
+        if(new TextDecoder().decode(prefix).startsWith('ply\nformat binary_little_endian')){(window as any).wholeGsReads++;throw Error('Whole GS arrayBuffer forbidden');}}
+      return original.call(this);
+    };
+  });
+}
 async function ready(p:Page){await expect(p.getByRole('heading',{name:'プロジェクト名',exact:true})).toHaveText('GSの作業',{timeout:90_000});}
 async function gsReady(p:Page){await expect(p.locator('.lv-project-viewport-status')).toBeEmpty({timeout:90_000});}
 async function addProxy(p:Page,name='面.glb',z=0){
@@ -42,9 +52,10 @@ async function gsPainted(p:Page){await expect.poll(()=>p.getByLabel('3Dモデル
 test('SH4と面の登録・記録・ファイル受渡し・復元・cold再開を接続する',async({},info)=>{
   test.setTimeout(900_000);A.getHeads(A.init());const dir='.artifacts/e2e/profiles';await mkdir(dir,{recursive:true});const profiles=await Promise.all(['a','b','r','v','c'].map(n=>mkdtemp(join(dir,`gs-${n}-`)))),contexts=new Set<BrowserContext>(),errors:string[]=[];
   const launch=async(index:number)=>{const context=await chromium.launchPersistentContext(profiles[index]!,{channel:'chromium',headless:true,viewport:{width:1440,height:1000},acceptDownloads:true,serviceWorkers:'block'});contexts.add(context);context.setDefaultTimeout(15_000);await context.tracing.start({screenshots:true,snapshots:true,sources:true});
+    await guardWholeGsReads(context);
     await context.route('**/*',route=>{const u=new URL(route.request().url());return u.origin===new URL(entry).origin||['blob:','data:'].includes(u.protocol)?route.continue():route.abort('blockedbyclient');});
     const page=context.pages()[0]??await context.newPage();page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});await page.goto(entry);return {page,context};};
-  const close=async(c:BrowserContext,name:string)=>{await c.tracing.stop({path:info.outputPath(`${name}-trace.zip`)});await c.close();contexts.delete(c);};
+  const close=async(c:BrowserContext,name:string)=>{expect(await c.pages()[0]!.evaluate(()=>(window as any).wholeGsReads)).toBe(0);await c.tracing.stop({path:info.outputPath(`${name}-trace.zip`)});await c.close();contexts.delete(c);};
   try{
     let a=await launch(0),p=a.page;
     await p.getByLabel('ファイルを選択',{exact:true}).setInputFiles({name:'全係数.ply',mimeType:'application/ply',buffer:source});await p.getByRole('button',{name:'ファイルを開く',exact:true}).click();await p.getByRole('textbox',{name:'プロジェクト名',exact:true}).fill('GSの作業');await p.getByRole('button',{name:'プロジェクトを作成',exact:true}).click();await ready(p);await gsReady(p);
@@ -76,6 +87,21 @@ test('SH4と面の登録・記録・ファイル受渡し・復元・cold再開�
     const restored=await launch(2);await restored.page.getByLabel('ファイルを選択',{exact:true}).setInputFiles(receivedPath);await restored.page.getByRole('button',{name:'ファイルを開く',exact:true}).click();await restored.page.getByRole('button',{name:'バックアップから復元',exact:true}).click();await ready(restored.page);await gsReady(restored.page);const restoredSaved=await inspectBackup(await download(restored.page,info,'gs-restored','backup'));expect(restoredSaved.backup.source.proof.identity).toEqual(received.backup.source.proof.identity);expect(restoredSaved.records.captionsById[caption.id].anchor).toEqual(caption.anchor);await close(restored.context,'restored');
     expect(errors).toEqual([]);
   }finally{for(const c of contexts){await c.pages()[0]?.screenshot({path:info.outputPath(`failure-${contexts.size}.png`),fullPage:true}).catch(()=>{});await c.tracing.stop({path:info.outputPath(`failure-${contexts.size}.zip`)}).catch(()=>{});await c.close();}await info.attach('browser-errors',{body:JSON.stringify(errors),contentType:'application/json'});}
+});
+
+test('既存のモデルへファイルとしてGSを追加し、面と保存を保ってcold再開する',async({},info)=>{
+  await mkdir('.artifacts/e2e/profiles',{recursive:true});const profile=await mkdtemp('.artifacts/e2e/profiles/gs-file-');
+  const launch=async()=>{const c=await chromium.launchPersistentContext(profile,{channel:'chromium',headless:true,viewport:{width:1440,height:1000},acceptDownloads:true,serviceWorkers:'block'});await guardWholeGsReads(c);return c;};
+  let context=await launch();
+  try{
+    let p=context.pages()[0]??await context.newPage();await p.goto(entry);
+    await p.getByLabel('ファイルを選択',{exact:true}).setInputFiles({name:'最初.glb',mimeType:'model/gltf-binary',buffer:triangleGlb()});await p.getByRole('button',{name:'ファイルを開く',exact:true}).click();await p.getByRole('textbox',{name:'プロジェクト名',exact:true}).fill('GSの作業');await p.getByRole('button',{name:'プロジェクトを作成',exact:true}).click();await ready(p);
+    await p.getByRole('tab',{name:'モデル',exact:true}).click();const chooser=p.waitForEvent('filechooser');await modelPanel(p).getByRole('button',{name:'3Dモデルを追加',exact:true}).click();await(await chooser).setFiles({name:'全係数.ply',mimeType:'application/ply',buffer:source});await expect(p.getByText('モデルを追加しました。',{exact:true})).toBeVisible();await gsReady(p);await addProxy(p);
+    const first=await inspectBackup(await download(p,info,'file-backed-add','backup'));const gs=Object.values(first.records.representationsById).find((r:any)=>r.role==='gsPrimary') as any;expect(gs.blob.digest).toBe(hash(source));expect(await p.evaluate(()=>(window as any).wholeGsReads)).toBe(0);
+    await context.close();context=await launch();p=context.pages()[0]??await context.newPage();await p.goto(entry);await ready(p);await gsReady(p);
+    await p.getByRole('tab',{name:'モデル',exact:true}).click();await modelPanel(p).locator('.lv-model-select').filter({hasText:'全係数.ply'}).click();await modelPanel(p).getByRole('button',{name:'このモデルだけ表示',exact:true}).click();await p.getByRole('button',{name:'正面',exact:true}).click();await gsPainted(p);
+    const after=await inspectBackup(await download(p,info,'file-backed-cold','backup'));expect(after.records.representationsById[gs.id]).toEqual(gs);expect(await p.evaluate(()=>(window as any).wholeGsReads)).toBe(0);await p.screenshot({path:info.outputPath('file-backed-gs.png'),fullPage:true});
+  }finally{await context.close();}
 });
 
 test('混在画面で前面の面を選び、GSと重なる点は保留して非表示後に選ぶ',async({},info)=>{

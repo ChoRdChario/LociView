@@ -14,11 +14,11 @@ import type { StoredBlobRef } from '../projectMetadata/blobStore';
 import { inspectValidationGlb, inspectValidationJpegGlb, inspectFreshValidationGlb, type ValidatedGlb } from './glb';
 import { inspectOccurrenceGlb, inspectOccurrenceJpegGlb } from './glbOccurrences';
 import { inspectPointPly, isPointModel, isGsModel, isGlbModel, pointSourceProfile, pointSourceMediaType, type ValidatedModel } from './pointPly';
-import { gsSourceProfile, inspectGsPly, hasGsPlySignature } from './gsPly';
+import { gsSourceProfile, inspectGsPly, inspectGsPlyFile, captureGsBlob, gsBlobStream, hasGsPlySignature } from './gsPly';
 import type { PngDecoder } from './png';
 import type { JpegDecoder } from './jpeg';
 import { fileError, fileObject, validationGlbProfile, occurrenceGlbProfile, jpegGlbProfile, occurrenceJpegGlbProfile, validationMetadataLimits, type FileValidationLimits } from './validation';
-import { identityPlacement, prepareValidationModel, sealValidationRecord, validationFileLabel, type ValidationFile } from './initialProject';
+import { identityPlacement, prepareValidationModel, sealValidationRecord, validationFileLabel, type ValidationFile, type ValidationModelFile } from './initialProject';
 
 export async function readValidationBody(file: WorkspaceReadableFile, maxBytes: number): Promise<Uint8Array> {
   if (!Number.isSafeInteger(file.size) || file.size <= 0 || file.size > maxBytes) return fileError('保存した本体が検査の上限を超えています。');
@@ -55,7 +55,7 @@ export class ValidationContent implements MetadataMediaPort {
   releasePreparedImages(): void { this.preparedImages.clear(); }
   releasePreparedModels(): void { this.preparedModels.clear(); }
   releasePreparedModel(id:string):void { this.preparedModels.delete(id); }
-  async prepareModel(input: ValidationFile, assetId: string) {
+  async prepareModel(input: ValidationModelFile, assetId: string) {
     this.fs.mutationAuthority.assertWorkspaceWriteAuthorized();
     const prepared = await prepareValidationModel(input, this.limits, this.decode, assetId, this.jpeg);
     this.preparedModels.set(prepared.representation.id as string, prepared);
@@ -77,12 +77,13 @@ export class ValidationContent implements MetadataMediaPort {
     return p;
   }
   async inspectPreparedModel(request: ContentRequest) {
-    return this.execute(request, { model: await this.inspectModel(request.records[0]!, this.preparedModel(request.records[0]!).body.bytes.slice()) });
+    const body=this.preparedModel(request.records[0]!).body;
+    return this.execute(request, { model: body.file ? await inspectDeclaredValidationBlob(request.records[0]!,body.file,this.limits) : await this.inspectModel(request.records[0]!,body.bytes.slice()) });
   }
   async stagePreparedModel(record: JsonObject): Promise<void> {
     this.fs.mutationAuthority.assertWorkspaceWriteAuthorized();
     const { body } = this.preparedModel(record);
-    await this.store.put(new Blob([body.bytes.slice().buffer]).stream(), body.ref.mediaType, body.ref);
+    await this.store.put(body.file ? gsBlobStream(body.file) : new Blob([body.bytes.slice().buffer]).stream(), body.ref.mediaType, body.ref);
   }
   private modelDeclaration(record: JsonObject) { return validationModelDeclaration(record); }
   /** Kept GLB-specific for existing converter/decoder clients. */
@@ -91,7 +92,9 @@ export class ValidationContent implements MetadataMediaPort {
   }
   async modelContent(record: JsonObject, readOnly = false): Promise<ValidatedModel> {
     await this.checkRead?.(); const blob = await this.modelDeclaration(record);
-    const model = await this.inspectModel(record, await readValidationBody(await (readOnly ? this.store.openReadOnly(blob) : this.store.open(blob)), this.limits.maxFileBytes));
+    const file=await (readOnly ? this.store.openReadOnly(blob) : this.store.open(blob));
+    const model = record.contentKind==='gaussianSplat' && file.blob ? await inspectDeclaredValidationBlob(record,await file.blob(),this.limits) :
+      await this.inspectModel(record, await readValidationBody(file,this.limits.maxFileBytes));
     await this.checkRead?.(); return model;
   }
   private imageDeclaration(record: JsonObject): JsonObject {
@@ -120,6 +123,7 @@ export class ValidationContent implements MetadataMediaPort {
     const ref = record.blob as JsonObject;
     if (file.size !== ref.byteLength || file.size <= 0 || file.size > this.limits.maxFileBytes) return fileError('受信する本体の大きさが不正です。');
     if (request.fact === 'media') this.imageDeclaration(record); else await this.modelDeclaration(record);
+    if(request.fact!=='media'&&record.contentKind==='gaussianSplat')return this.execute(request,{model:await inspectDeclaredValidationBlob(record,file,this.limits)});
     const bytes = await readValidationBody({ size: file.size, stream: () => file.stream() }, this.limits.maxFileBytes);
     if (await digest(bytes) !== ref.digest) return fileError('受信する本体が一致しません。');
     if (request.fact === 'media') {
@@ -133,9 +137,7 @@ export class ValidationContent implements MetadataMediaPort {
     const gs=validationGsEquivalenceSource(request); if(!gs) return fileError('GSの同一表面を確認できません。');
     const ref=await this.modelDeclaration(gs);
     if(file.size!==ref.byteLength || file.size>this.limits.maxFileBytes) return fileError('GSの原本の大きさが一致しません。');
-    const bytes=await readValidationBody(file,this.limits.maxFileBytes);
-    if(await digest(bytes)!==ref.digest)return fileError('GSの原本が一致しません。');
-    return this.execute(request,{model:await this.inspectModel(gs,bytes)});
+    return this.execute(request,{model:await inspectDeclaredValidationBlob(gs,file,this.limits)});
   }
   async stageReceived(file: Blob, ref: JsonObject): Promise<void> {
     this.fs.mutationAuthority.assertWorkspaceWriteAuthorized();
@@ -154,7 +156,12 @@ export class ValidationContent implements MetadataMediaPort {
   }
   async verify(blobs: readonly JsonObject[]): Promise<void> {
     for (const blob of blobs) {
-      const bytes = await readValidationBody(await this.store.open(blob), this.limits.maxFileBytes);
+      const file=await this.store.open(blob);
+      if(blob.mediaType===pointSourceMediaType&&file.blob){
+        const snapshot=await file.blob(),prefix=new Uint8Array(await snapshot.slice(0,65536).arrayBuffer());
+        if(hasGsPlySignature(prefix)){const gs=await inspectGsPlyFile(snapshot,this.limits);if(gs.digest!==blob.digest||gs.byteLength!==blob.byteLength)return fileError('GSの原本が一致しません。');continue;}
+      }
+      const bytes = await readValidationBody(file, this.limits.maxFileBytes);
       if (projectImageMime(blob.mediaType)) await this.inspectImage(bytes, blob);
       else if (blob.mediaType === 'model/gltf-binary') await inspectFreshValidationGlb(bytes, this.limits, this.decode, this.jpeg);
       else if (blob.mediaType === pointSourceMediaType) await (hasGsPlySignature(bytes) ? inspectGsPly(bytes, this.limits) : inspectPointPly(bytes, this.limits));
@@ -240,4 +247,15 @@ export async function inspectDeclaredValidationModel(record: JsonObject, bytes: 
     same(record.formatProfile, await jpegGlbProfile()) ? inspectValidationJpegGlb :
     same(record.formatProfile, await occurrenceGlbProfile()) ? inspectOccurrenceGlb : inspectValidationGlb;
   return inspect(bytes, limits, png, jpeg);
+}
+
+/** Exact checked immutable snapshot for GS; other formats retain their byte path. */
+export async function inspectDeclaredValidationBlob(input: JsonObject, inputFile: Blob, limits: FileValidationLimits,
+  png?: PngDecoder, jpeg?: JpegDecoder, use: 'saved' | 'review' = 'saved'): Promise<ValidatedModel> {
+  const record=cloneCanonicalValue(input,validationMetadataLimits) as JsonObject,file=captureGsBlob(inputFile);
+  const ref=await validationModelDeclaration(record,use);
+  if(record.contentKind!=='gaussianSplat')return inspectDeclaredValidationModel(record,await readValidationBody(file,limits.maxFileBytes),limits,png,jpeg,use);
+  const model=await inspectGsPlyFile(file,limits,{representationToAsset:record.representationToAsset as JsonObject,logicalBoundsAsset:record.logicalBoundsAsset as JsonObject});
+  if(model.digest!==ref.digest||model.byteLength!==ref.byteLength)return fileError('GSの原本が一致しません。');
+  return model;
 }
