@@ -21,13 +21,16 @@ import { planCaptionDeletion, planCaptionLifecycleResolution, planCaptionLifecyc
 import type { CaptionDeletionCommand, AssetDeletionCommand, PinParentCommand } from '../scene/commands';
 import { planAssetDeletion } from './assetDeletion';
 import { defaultSceneCandidates } from './startupScene';
-import { planAssetAddition, type AddAssetCommand } from './modelAddition';
+import { planAssetAddition, type AddAssetCommand, type AddGsAssetCommand } from './modelAddition';
+import { planGsProxy, type GsProxyCommand } from './gsProxy';
 import { planModelReplacement, type ReplaceAssetModelCommand } from './modelReplacement';
 import { planViewResolution, type ViewResolution } from './viewResolution';
 import { planMaterialResolution, type MaterialResolution } from './materialResolution';
 
 export type MetadataEdit =
   | AddAssetCommand
+  | AddGsAssetCommand
+  | GsProxyCommand
   | ReplaceAssetModelCommand
   | CaptionDeletionCommand
   | CaptionLifecycleResolution
@@ -97,7 +100,8 @@ export function planMetadataEdit(provider: Provider, input: MetadataEdit, limits
     checkMutableField(guard, 'assetsById', 'pinScale', command.pinScale);
     return [{ map: 'assetsById', id: command.assetId, create: false, fields: { pinScale: command.pinScale } }];
   }
-  if (command.kind === 'addAsset') return planAssetAddition(provider, command, limits);
+  if (command.kind === 'addAsset' || command.kind === 'addGsAsset') return planAssetAddition(provider, command, limits);
+  if (command.kind === 'attachGsProxy' || command.kind === 'changeGsProxy' || command.kind === 'removeGsProxy') return planGsProxy(provider,command,limits);
   if (command.kind === 'replaceAssetModel') return planModelReplacement(provider, command, limits);
   if (command.kind === 'resolveSceneName') return planSceneNameResolution(provider, command, limits);
   if (command.kind === 'resolveViewField' || command.kind === 'resolveEntryView') return planViewResolution(provider, command, limits);

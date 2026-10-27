@@ -3,6 +3,7 @@ import type { JsonObject } from '../domain/values';
 import { checkFileLimits, fileError, type FileValidationLimits } from './validation';
 import type { ValidatedGlb } from './glb';
 import { verifyPointProfileTexts } from '../domain/pointPresentation';
+import type { ValidatedGs } from './gsPly';
 
 export const pointSourceProfileId = 'development-validation-point-ply-rgb-1';
 export const pointSourceProfileSha256 = 'c93909de6da2c44558d960c2620f967f8cd702b6171ae7df9e86df789ba35dd5';
@@ -21,9 +22,11 @@ export interface ValidatedPoint {
   readonly bounds: { min: number[]; max: number[] }; readonly materials: readonly JsonObject[]; readonly surfaceRanges: readonly JsonObject[];
   readonly jpeg?: never; readonly occurrences?: never;
 }
-export type ValidatedModel = ValidatedGlb | ValidatedPoint;
+export type ValidatedModel = ValidatedGlb | ValidatedPoint | ValidatedGs;
 export const isPointPly = (b: Uint8Array) => b.length >= 4 && b[0] === 112 && b[1] === 108 && b[2] === 121 && (b[3] === 10 || b[3] === 13 && b[4] === 10);
 export const isPointModel = (m: ValidatedModel): m is ValidatedPoint => 'kind' in m && m.kind === 'point';
+export const isGsModel = (m: ValidatedModel): m is ValidatedGs => 'kind' in m && m.kind === 'gs';
+export const isGlbModel = (m: ValidatedModel): m is ValidatedGlb => !('kind' in m) || m.kind === 'glb';
 const fail = () => fileError('XYZとRGBを持つASCII PLY点群を確認してください。');
 const decimal = /^[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?$/;
 const signature = ['float x', 'float y', 'float z', 'uchar red', 'uchar green', 'uchar blue'];

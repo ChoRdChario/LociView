@@ -20,7 +20,7 @@ export interface ProjectPanel {
   dispose(): void;
 }
 export interface ProjectModelPanel extends ProjectPanel {
-  selectedPoint(): string | null;
+  selectedSurface(): string | null;
   hidden(): readonly string[];
   proposal(): WorkspaceModelProposal | null;
   propose(next: WorkspaceModelProposal): boolean;

@@ -161,6 +161,9 @@ export interface SyntheticAuthority {
   assetDeletionImpact?(token: string, assetId: string): AssetDeletionImpact;
   deleteAsset?(token: string, command: AssetDeletionCommand): WorkingResult<SyntheticProject>;
   addMediaFile?(token: string, command: MediaFileAddition): WorkingResult<SyntheticProject>;
+  prepareGsProxy?: ReturnType<typeof import('./gsProxyWorkflow').createGsProxyWorkflow>['prepare'];
+  commitGsProxy?: ReturnType<typeof import('./gsProxyWorkflow').createGsProxyWorkflow>['commit'];
+  cancelGsProxy?: ()=>void;
   addModelFile?(token: string, command: ModelFileAddition): WorkingResult<SyntheticProject>;
   replaceModelFile?(token: string, command: ModelFileReplacement): WorkingResult<SyntheticProject>;
   transformModel?(token: string, command: ModelPlacementCommand): WorkingResult<SyntheticProject>;

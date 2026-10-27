@@ -1,8 +1,10 @@
 # 01b: Point / GS rendering requirements reassessment
 
-> Status: **PROPOSED REQUIREMENTS / APPROVED LIMITED QUALIFICATION / NO PRODUCTION GS / NOT ADOPTED**
+> Status: **BROAD REQUIREMENTS PROPOSED / LIMITED QUALIFICATION AND 01c IMPLEMENTATION APPROVED / NOT ADOPTED**
 > Reassessed: 2026-10-27, at the PO's request after checking SH4 support.
-> PO approved **only §6 limited GSL1.4.3 / Three0.186.0 qualification** on2026-10-27.
+> PO first approved **§6 limited GSL1.4.3 / Three0.186.0 qualification** on2026-10-27.
+> The later exact [01c](01c-gs-sh4-proxy-workflow-proposal.md) package is now approved
+> for bounded nondefault implementation; this does not adopt the broader requirements.
 > Other new source/presentation requirements remain proposals; this is not adoption.
 > This replaces the unapproved SH3-only CPU/screen proposal at35c0a4d.
 > [Superseded draft and exact candidate JSON](../history/gs-proxy-draft-2026-10-27/README.md)
@@ -165,7 +167,7 @@ releaseの未充足は残す。ローカルChromiumの結果でそれらを合�
 本節は限定評価時点の結果を保持する記録。その後、[07j](07j-three-186-compatibility-proposal.md)で
 実180 proofを保持するchecked186表示を実装・検証した。依存を180へ戻した下記の記述は
 評価当時の復元操作であり、現在のpackage状態ではない。GSの新しいsource/表示/Proxy接続は
-[01c具体案](01c-gs-sh4-proxy-workflow-proposal.md)に分離し、未承認・未実装のままである。
+[01c具体案](01c-gs-sh4-proxy-workflow-proposal.md)に分離した。その後、POは01cの正確な限定実装を承認した。現在の実装・検証はtodoを参照する。
 
 判定は**候補として継続、production接続と製品側Three更新は保留**。
 評価用に導入した正式GSL1.4.3とThree/types0.186.0を、既存Vite・専用Chromiumで

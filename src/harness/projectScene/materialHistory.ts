@@ -20,8 +20,11 @@ export interface MaterialData { readonly cells: Readonly<Record<string, HistoryC
 export const materialKey = (id: string, field: string) => `material/${id}/${field}`;
 export const targetKey = (t: MaterialTarget) => canonicalFixture(t);
 export const routingKey = (r: MaterialRouting) => canonicalFixture(r);
-export const materialTarget = (c: DisplayModelClosure): MaterialTarget => ({ assetId: c.binding.assetId, variantFamilyId: c.representation.variantFamilyId,
-  materialLayoutId: c.representation.materialCatalog.layoutId, logicalMaterialSlotId: c.representation.materialCatalog.slots[0]!.logicalMaterialSlotId });
+export const materialTarget = (c: DisplayModelClosure): MaterialTarget => {
+  const catalog=c.representation.materialCatalog;if(!catalog)throw Error('このモデルには材質の設定がありません。');
+  return { assetId: c.binding.assetId, variantFamilyId: c.representation.variantFamilyId,
+    materialLayoutId: catalog.layoutId, logicalMaterialSlotId: catalog.slots[0]!.logicalMaterialSlotId };
+};
 const unresolved = <T>(): Field<T> => ({ kind: 'unresolved', reason: 'conflict' });
 const texts = (c: HistoryCell) => c.kind === 'value' ? [c.value] : c.candidates.map(v => v.value);
 const initial = createSyntheticProject();

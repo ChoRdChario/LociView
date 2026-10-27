@@ -6,6 +6,7 @@ import { digest, newId, technicalId } from '../projectMetadata/persistence';
 import type { StoredBlobRef } from '../projectMetadata/blobStore';
 import { inspectFreshValidationGlb, validationGlbUsesJpeg } from './glb';
 import { inspectPointPly, isPointPly, pointSourceProfile, pointSourceMediaType } from './pointPly';
+import { hasGsPlySignature, inspectGsPly, gsSourceProfile } from './gsPly';
 import type { PngDecoder } from './png';
 import type { JpegDecoder } from './jpeg';
 import { checkFileLimits, fileError, validationGlbProfile, jpegGlbProfile, validationMetadataLimits, type FileValidationLimits } from './validation';
@@ -30,18 +31,18 @@ export const identityPlacement = () => ({ translation: [0, 0, 0], rotationXYZW: 
 export async function prepareValidationModel(input: ValidationFile, limits: FileValidationLimits, decode?: PngDecoder, assetId = fresh('ast'), jpeg?: JpegDecoder) {
   checkFileLimits(limits);
   if (!/^ast_[0-9a-f]{32}$/.test(assetId)) return fileError('追加するモデルの識別情報を確認してください。');
-  const name = validationFileLabel(input.label), point = isPointPly(input.bytes);
-  const inspected = point ? await inspectPointPly(input.bytes, limits) : await inspectFreshValidationGlb(input.bytes.slice(), limits, decode, jpeg);
-  const ref: StoredBlobRef = { algorithm: 'sha256', digest: await digest(inspected.bytes), byteLength: inspected.bytes.length, mediaType: point ? pointSourceMediaType : 'model/gltf-binary' };
+  const name = validationFileLabel(input.label), ply = isPointPly(input.bytes), gs = ply && hasGsPlySignature(input.bytes), point = ply && !gs;
+  const inspected = gs ? await inspectGsPly(input.bytes, limits) : point ? await inspectPointPly(input.bytes, limits) : await inspectFreshValidationGlb(input.bytes.slice(), limits, decode, jpeg);
+  const ref: StoredBlobRef = { algorithm: 'sha256', digest: await digest(inspected.bytes), byteLength: inspected.bytes.length, mediaType: ply ? pointSourceMediaType : 'model/gltf-binary' };
   const revisionId = fresh('rev'), representationId = fresh('rep'), bindingId = fresh('bnd');
   const familyId = fresh('fam'), compatibilityId = fresh('cmp'), layoutId = fresh('lay');
   const slots = inspected.materials.map(material => ({ ...material, logicalMaterialSlotId: fresh('slot') }))
     .sort((a, b) => a.logicalMaterialSlotId.localeCompare(b.logicalMaterialSlotId));
   const representation = await sealValidationRecord('representation', {
-    id: representationId, assetId, representationFrameId: fresh('frm'), contentKind: point ? 'pointCloud' : 'mesh', purposes: ['source', 'display'], role: point ? 'pointPrimary' : 'meshPrimary',
-    variantFamilyId: familyId, formatProfile: await (point ? pointSourceProfile() : validationGlbUsesJpeg(inspected.bytes, limits) ? jpegGlbProfile() : validationGlbProfile()), blob: ref as unknown as JsonObject,
+    id: representationId, assetId, representationFrameId: fresh('frm'), contentKind: gs ? 'gaussianSplat' : point ? 'pointCloud' : 'mesh', purposes: ['source', 'display'], role: gs ? 'gsPrimary' : point ? 'pointPrimary' : 'meshPrimary',
+    variantFamilyId: familyId, formatProfile: await (gs ? gsSourceProfile() : point ? pointSourceProfile() : validationGlbUsesJpeg(inspected.bytes, limits) ? jpegGlbProfile() : validationGlbProfile()), blob: ref as unknown as JsonObject,
     representationToAsset: { ...identityPlacement(), reflection: 'none' }, logicalBoundsAsset: inspected.bounds,
-    derivedFrom: [], materialCatalog: { layoutId, slots },
+    derivedFrom: [], ...(!gs ? { materialCatalog: { layoutId, slots } } : {}),
   });
   const revision = await sealValidationRecord('asset-revision', { id: revisionId, assetId, representationIds: [representationId],
     anchorCompatibilityClasses: [{ id: compatibilityId, targetVariantFamilyIds: [familyId] }],
@@ -79,6 +80,7 @@ export async function prepareValidationProject(input: { run: string; title: stri
   add('scenesById', { id: sceneId, name: '全体', orderKey: 'A', lifecycle: active() });
   for (const [index, file] of models.entries()) {
     const model = await prepareValidationModel(file, limits, decode, undefined, jpeg); blobs.push(model.body);
+    if (model.representation.contentKind === 'gaussianSplat') records.project = { ...(records.project as JsonObject), frame: { id: frameId, handedness: 'right', upAxis: '+Y', unit: { kind: 'unknown' } } };
     add('representationsById', model.representation); add('assetRevisionsById', model.revision);
     add('assetBindingsById', model.binding); add('assetsById', model.asset);
     add('sceneAssetMembershipsById', { id: fresh('sam'), sceneId, assetId: model.asset.id!, orderKey: `A${index.toString(36).padStart(8, '0')}`, lifecycle: active() });

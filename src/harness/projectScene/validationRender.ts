@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { disposeModelResources } from '../../viewer/loaders';
-import { isPointModel, type ValidatedModel, type ValidatedPoint } from '../../projectFiles/pointPly';
+import { isPointModel, isGsModel, type ValidatedModel, type ValidatedPoint } from '../../projectFiles/pointPly';
+import type { ValidatedGs } from '../../projectFiles/gsPly';
 import { createPointSurface } from '../../viewer/pointSurface';
 import type { ValidatedGlb } from '../../projectFiles/glb';
 import type { ValidationContent } from '../../projectFiles/content';
@@ -20,7 +21,7 @@ import { trackGltfImages, snapshotTargets, assertTargetTables } from '../../view
 export interface SavedModelResidentPort { create(model: ValidationModelClosure | ReadonlyRenderModel, effects?: ValidationMaterialEffects): ResidentSurface; dispose(): void }
 export interface ValidationResidentCache extends SavedModelResidentPort { prepare(versions: readonly DisplayModelVersion[]): Promise<void>;
   validate(c: ValidationModelClosure, effects?: ValidationMaterialEffects): void }
-export interface DecodedValidationModel { point?: ValidatedPoint; root: THREE.Object3D; materialLocators: ReadonlyMap<THREE.Material, JsonObject>; occurrenceSlots?: readonly DecodedOccurrenceSlot[]; dispose(): void }
+export interface DecodedValidationModel { point?: ValidatedPoint; gs?: ValidatedGs; proxy?:DecodedValidationModel; proxyIssue?:string; root: THREE.Object3D; materialLocators: ReadonlyMap<THREE.Material, JsonObject>; occurrenceSlots?: readonly DecodedOccurrenceSlot[]; dispose(): void }
 
 /** No arbitrary URL/path input. The caller supplies already inspected, owned GLB bytes. */
 export async function decodeValidationModel(source: ValidatedGlb, signal?: AbortSignal): Promise<DecodedValidationModel> {
@@ -110,27 +111,37 @@ export async function prepareReadonlyResidents(initial: readonly ReadonlyRenderM
   decode: (source: ValidatedGlb, signal?: AbortSignal) => Promise<DecodedValidationModel> = decodeValidationModel) {
   const lifetime = new AbortController();
   const templates = new Map<string, { record: string; model: DecodedValidationModel }>();
+  const uses=new Map<string,number>();let wanted=new Set<string>();
+  const collect=()=>{if(closed)return;for(const [key,item]of templates)if(!wanted.has(key)&&!uses.get(key)){item.model.dispose();templates.delete(key);}};
   const live = new Set<() => void>(); let closed = false, preparing = false;
+  const keyFor=(c:ValidationModelClosure|ReadonlyRenderModel)=>`${c.representation.id}/${c.proxy?.id??''}`;
   const dispose = () => { if (closed) return; closed = true; lifetime.abort(); for (const release of [...live]) release();
     for (const item of templates.values()) item.model.dispose(); templates.clear(); };
   const prepare = async (next: readonly ReadonlyRenderModel[]) => {
     if (closed || preparing) throw Error('モデルの表示準備を完了してください。');
     preparing = true; const staged = new Map<string, { record: string; model: DecodedValidationModel }>();
     try { for (const c of next) {
-      const key = c.representation.id, record = canonical(c.representation);
+      const key = keyFor(c), record = canonical(c.representation);
       const previous = templates.get(key) ?? staged.get(key);
       if (previous) { if (previous.record !== record) throw Error('モデルの本体が一致しません。'); continue; }
       const source = content.modelContent ? await content.modelContent(c.representation) : await content.model!(c.representation);
       if (!same(source.bounds, c.representation.logicalBoundsAsset)) throw Error('保存したモデルの範囲が一致しません。');
-      staged.set(key, { record, model: isPointModel(source) ? { point: source, root: new THREE.Group(), materialLocators: new Map(), dispose() {} } : await decode(source, lifetime.signal) });
+      let decoded:DecodedValidationModel;
+      if(isGsModel(source)){
+        decoded={gs:source,root:new THREE.Group(),materialLocators:new Map(),dispose(){this.proxy?.dispose();}};
+        if(c.proxy){try{const proxy=content.modelContent?await content.modelContent(c.proxy):await content.model!(c.proxy);if(isPointModel(proxy)||isGsModel(proxy))throw Error('位置指定用の面を確認してください。');
+          decoded.proxy=await decode(proxy,lifetime.signal);}catch(e){decoded.proxyIssue=(e as Error).message;}}
+      }else decoded=isPointModel(source)?{point:source,root:new THREE.Group(),materialLocators:new Map(),dispose(){}}:await decode(source,lifetime.signal);
+      staged.set(key, { record, model:decoded });
       if (closed) throw Error('画面を閉じました。');
     }
       for (const [key, item] of staged) templates.set(key, item);
+      wanted=new Set(next.map(keyFor));collect();
     } catch (error) { for (const item of staged.values()) item.model.dispose(); throw error; }
     finally { preparing = false; }
   };
   const validate = (c: ValidationModelClosure | ReadonlyRenderModel, effects: ValidationMaterialEffects = {}) => {
-    const item = templates.get(c.representation.id), slots = validationMaterialSlots(c);
+    const item = templates.get(keyFor(c)), slots = validationMaterialSlots(c);
     if (closed || !item || item.record !== canonical(c.representation)) throw Error('保存したモデルの表示本体を再確認してください。');
     if (Object.keys(effects).some(id => !slots.some(s => s.target.logicalMaterialSlotId === id))) throw Error('材質の適用先がありません。');
     if (item.model.point) return; // Unsupported point effects are diagnosed locally by the resident.
@@ -148,14 +159,25 @@ export async function prepareReadonlyResidents(initial: readonly ReadonlyRenderM
     return { dispose, prepare, validate, create(input: ValidationModelClosure | ReadonlyRenderModel, effects: ValidationMaterialEffects = {}) {
       const c = renderModel(input);
       validate(c, effects);
-      const item = templates.get(c.representation.id);
+      const item = templates.get(keyFor(c));
       if (closed || !item || item.record !== canonical(c.representation)) throw Error('保存したモデルの表示本体を再確認してください。');
+      const retain=()=>uses.set(keyFor(c),(uses.get(keyFor(c))??0)+1),drop=()=>{const key=keyFor(c),count=(uses.get(key)??0)-1;if(count>0)uses.set(key,count);else uses.delete(key);collect();};
+      if(item.model.gs){
+        const asset=new THREE.Group(),object=new THREE.Group();object.matrix.copy(placementMatrix(c.representation.representationToAsset));object.matrixAutoUpdate=false;
+        asset.matrix.copy(placementMatrix(c.assetToProject));asset.matrixAutoUpdate=false;asset.add(object);
+        const proxy=item.model.proxy?.root.clone(true),geometries:THREE.BufferGeometry[]=[],materials:THREE.Material[]=[];
+        if(proxy){proxy.traverse(node=>{if(node instanceof THREE.Mesh){node.geometry=node.geometry.clone();geometries.push(node.geometry);const material=new THREE.MeshBasicMaterial({side:THREE.DoubleSide});materials.push(material);node.material=material;node.layers.set(31);}});asset.add(proxy);}
+        asset.updateMatrixWorld(true);
+        const release=()=>{if(!live.delete(release))return;asset.removeFromParent();for(const g of geometries)g.dispose();for(const m of materials)m.dispose();drop();};retain();live.add(release);
+        return {mesh:object,asset,gs:{source:item.model.gs,object,issue:null,ready:false},...(proxy?{interaction:proxy}:{}),interactionIssue:item.model.proxyIssue??(!c.proxy?'位置指定用の面を追加してください。':null),dispose:release};
+      }
       if (item.model.point) {
         const source = item.model.point, point = createPointSurface(source.positions, source.colors), asset = new THREE.Group(), representation = new THREE.Group();
         representation.matrix.copy(placementMatrix(c.representation.representationToAsset)); representation.matrixAutoUpdate = false;
         representation.add(point.mesh); asset.add(representation); asset.matrix.copy(placementMatrix(c.assetToProject)); asset.matrixAutoUpdate = false; asset.updateMatrixWorld(true);
         const issue = Object.keys(effects).length ? 'この点群の材質調整は表示できません。点群のデータと記録は保持しています。' : null;
-        const release = () => { if (!live.delete(release)) return; asset.removeFromParent(); point.dispose(); };
+        const release = () => { if (!live.delete(release)) return; asset.removeFromParent(); point.dispose();drop(); };
+        retain();
         live.add(release);
         return { mesh: point.mesh, asset, points: { positions: source.positions, representationId: c.representation.id, object: point.mesh,
           project: point.project, diameter: 3, issue, configure(view: import('../../domain/pointPresentation').PointViewport, diameter: number) { const localIssue = point.configure(view, diameter); this.diameter = point.diameter; if (issue) point.mesh.visible = false; this.issue = issue ?? localIssue; return this.issue; } }, dispose: release };
@@ -164,8 +186,8 @@ export async function prepareReadonlyResidents(initial: readonly ReadonlyRenderM
       const slots = validationMaterialSlots(c), byLocator = new Map(slots.map(s => [canonical(s.locator), s]));
       const geometries = new Map<THREE.BufferGeometry, THREE.BufferGeometry>(), materials = new Map<THREE.Material, THREE.Material>();
       let released = false;
-      const release = () => { if (released) return; released = true; live.delete(release); asset.removeFromParent();
-        for (const g of geometries.values()) g.dispose(); for (const m of materials.values()) m.dispose(); };
+      const release = () => { if (released) return; released = true; const retained=live.delete(release); asset.removeFromParent();
+        for (const g of geometries.values()) g.dispose(); for (const m of materials.values()) m.dispose(); if(retained)drop(); };
       try {
         root.traverse(node => { if (node instanceof THREE.Mesh) {
           if (!geometries.has(node.geometry)) geometries.set(node.geometry, node.geometry.clone());
@@ -201,7 +223,7 @@ export async function prepareReadonlyResidents(initial: readonly ReadonlyRenderM
         const representation = new THREE.Group(); representation.matrix.copy(placementMatrix(c.representation.representationToAsset)); representation.matrixAutoUpdate = false;
         representation.add(root); asset.add(representation);
         asset.matrix.copy(placementMatrix(c.assetToProject)); asset.matrixAutoUpdate = false; asset.updateMatrixWorld(true);
-        live.add(release); return { mesh: root, asset, dispose: release };
+        retain();live.add(release); return { mesh: root, asset, dispose: release };
       } catch (error) { release(); throw error; }
     } };
   } catch (error) { dispose(); throw error; }

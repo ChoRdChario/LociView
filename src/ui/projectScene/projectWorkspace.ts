@@ -101,7 +101,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   sceneForm.append(sceneLabel, sceneNote, createScene, cancelScene); sceneArea.append(sceneStatus, sceneManagement, sceneForm);
   const pinArea = make('section'), pinStatus = make('p'), coords = make('div'); pinStatus.setAttribute('role', 'status');
   pinArea.setAttribute('aria-label', 'ピンの操作');
-  const addPin = button('ピンを追加', () => { if (guardInput()) { pinAction = { kind: 'add', token: provider().token, sceneId, captionId: null, assetId: models?.selectedPoint() ?? undefined, color: addColorValue() }; choosing = true; placingCaption = null; render(); } });
+  const addPin = button('ピンを追加', () => { if (guardInput()) { pinAction = { kind: 'add', token: provider().token, sceneId, captionId: null, assetId: models?.selectedSurface() ?? undefined, color: addColorValue() }; choosing = true; placingCaption = null; render(); } });
   const addColorLabel = make('label', '追加色'), addColor = make('input'); addColor.type = 'color'; addColor.setAttribute('aria-label', '追加色'); addColorLabel.append(addColor);
   const numericAdd = make('details'), numericLabel = make('label', '追加先モデル'), numericModel = make('select'), beginNumeric = button('このモデルに追加', () => {
     if (!guardInput() || numericScope !== numericKey) return;
@@ -180,7 +180,8 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   });
   const cancelPin = button('取り消す', () => { if (!busy && !pending && ports.status().kind === 'idle' && !ports.otherPending() && !composingInput()) { clearPin(); render(); } });
   const repick = button('面で位置を指定', () => { if (pin && !mutationBlock() && !composingInput() && pinCurrent()) { gesture = null; choosing = true; placingCaption = pin.captionId; render(); } });
-  pinArea.append(addColorLabel, addPin, numericAdd, movePin, parent, pinStatus, coords, repick, finishPin, cancelPin);
+  const addSurface=button('位置指定用の面を追加',()=>{if(!busy&&!pending){choosing=false;pinAction=null;placingCaption=null;task='models';render();}});
+  pinArea.append(addSurface,addColorLabel, addPin, numericAdd, movePin, parent, pinStatus, coords, repick, finishPin, cancelPin);
   const deletionArea = make('section'), deletionBox = make('section'), deletionTitle = make('p'), deletionEffects = make('ul'), deletionNote = make('p'), referenceIssues = make('section');
   deletionArea.setAttribute('aria-label', 'キャプションの削除'); deletionBox.setAttribute('aria-label', '削除の確認'); deletionNote.setAttribute('role', 'status');
   referenceIssues.setAttribute('aria-label', '記録の状態');
@@ -574,7 +575,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       const read = viewport.read(), rect = canvas.getBoundingClientRect();
       if (!read.ready || read.dragging || read.token !== down.token || read.pickToken !== down.receipt || provider().token !== down.token ||
         rect.left !== down.left || rect.top !== down.top || rect.width !== down.width || rect.height !== down.height) return;
-      try { const hit = viewport.pick(event.clientX - rect.left, event.clientY - rect.top, pinAction?.assetId ?? models?.selectedPoint() ?? undefined, direct);
+      try { const hit = viewport.pick(event.clientX - rect.left, event.clientY - rect.top, pinAction?.assetId ?? models?.selectedSurface() ?? undefined, direct);
         if (!hit) { feedback = '配置する面を特定できません。視点を変えて選び直してください。'; render(); return; }
         if (pinAction?.assetId && hit.target.assetId !== pinAction.assetId || hit.target.token !== provider().token || hit.target.sceneId !== sceneId || !hit.position.every(Number.isFinite)) return;
         if (direct) { pinAction = { kind: 'add', token: down.token, sceneId, captionId: null, color: down.color }; placingCaption = null; }
@@ -626,7 +627,9 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       finishPin.disabled = !!blocked || composingInput() || choosing || viewport.read().dragging || !positionValid() || !pinCurrent(); cancelPin.disabled = busy || !!pending || ports.status().kind !== 'idle' || ports.otherPending() || composingInput();
       repick.hidden = !pin; repick.disabled = !!blocked || composingInput() || !pinCurrent();
       const count = selected ? projectCaptionSceneCount(p, selected) : undefined;
-      pinStatus.textContent = [pinAction && !pinCurrent() ? '対象が更新されています。取り消して選び直してください。' : choosing ? '配置先のモデルの面を選択してください。' : pin ? '位置を確認して確定してください。' : numericTarget ? 'X・Y・Zを入力してください。' : '',
+      const selectedSurface=models?.selectedSurface(), gsTarget=selectedSurface?ports.modelDetails(sceneId,selectedSurface)?.gsProxyTarget:undefined;
+      addSurface.hidden=!choosing||!gsTarget||gsTarget.expectedProxyId!==null;addSurface.disabled=busy||!!pending;
+      pinStatus.textContent = [pinAction && !pinCurrent() ? '対象が更新されています。取り消して選び直してください。' : choosing ? gsTarget&&gsTarget.expectedProxyId===null?'このモデルの位置指定用の面を追加してください。本文や画像は面がなくても編集できます。':'配置先のモデルの面を選択してください。' : pin ? '位置を確認して確定してください。' : numericTarget ? 'X・Y・Zを入力してください。' : '',
         pinAction?.kind === 'reparent' && count?.kind === 'value' ? `${count.value}シーンに反映されます。変更先モデルがないシーンでは一覧のみになります。` : ''].filter(Boolean).join(' ');
       coordinateInputs.forEach((input, i) => { input.disabled = !!blocked || !pinCurrent(); if (!composing) input.value = rawPosition[i]!; });
       const scene = p.state.scenes[sceneId], start = fieldValue(p.state.defaultSceneId), staleScene = !!sceneEdit && (sceneEdit.token !== p.token || sceneEdit.sceneId !== sceneId);
@@ -657,7 +660,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       windows.project({ ready: seen.ready, sourceToken: seen.token, sceneId: seen.sceneId, width: extent.width, height: extent.height, pins: seen.pins });
       viewportStatus.textContent = [viewportFeedback, seen.issue, seen.notice, resolved?.kind !== 'ready' && 'シーンを選択し、表示状態を確認してください。'].filter(Boolean).join(' ');
       viewportStatus.hidden = !viewportStatus.textContent;
-      retryViewport.hidden = !seen.issue && !viewportFeedback; retryViewport.disabled = viewBlocked(); cameraButtons.forEach(b => { b.disabled = viewBlocked(); });
+      retryViewport.hidden = !seen.issue && !viewportFeedback&&!seen.retryAvailable; retryViewport.disabled = viewBlocked(); cameraButtons.forEach(b => { b.disabled = viewBlocked(); });
       markers.replaceChildren();
       for (const projected of seen.pins) if (seen.ready && seen.token === p.token && seen.sceneId === sceneId && projected.visible && Number.isFinite(projected.x) && Number.isFinite(projected.y)) {
         const caption = p.resources.captions[projected.id]; if (!caption) continue;

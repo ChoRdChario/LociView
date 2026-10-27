@@ -30,7 +30,7 @@ export interface WorkspacePlacement { readonly translation: Point3; readonly rot
 export interface WorkspaceModelTarget { readonly kind: 'model'; readonly token: string; readonly sceneId: string; readonly assetId: string; readonly bindingId: string }
 export interface WorkspaceModelProposal { readonly target: WorkspaceModelTarget; readonly placement: WorkspacePlacement; readonly mode: 'translate' | 'rotate' | 'scale' }
 export interface WorkspaceModelDetails { readonly target: WorkspaceModelTarget; readonly placement: WorkspacePlacement;
-  readonly replacementAvailable?: boolean; readonly pointCloud?: boolean; readonly rotationDegrees: readonly [string, string, string]; readonly sceneCount: Field<number> }
+  readonly gsProxyTarget?: {readonly sceneId:string;readonly assetId:string;readonly expectedBindingId:string;readonly gsRepresentationId:string;readonly gsPayloadDigest:string;readonly gsFamilyId:string;readonly expectedProxyId:string|null}; readonly replacementAvailable?: boolean; readonly pointCloud?: boolean; readonly rotationDegrees: readonly [string, string, string]; readonly sceneCount: Field<number> }
 export interface WorkspaceViewPayload { readonly camera: JsonObject; readonly background: { readonly kind: 'solid'; readonly colorSrgb: Point3 } }
 export interface WorkspaceMaterialReview { readonly key: string; readonly token: string; readonly sceneId: string; readonly overrideId: string;
   readonly label: string; readonly appearance: readonly { operationId: string; label: string }[];
@@ -57,7 +57,7 @@ export interface WorkspaceViewport {
   setPointDiameter?(assetId: string, diameter: number): void;
   pointDiameter?(assetId: string): number;
   reservePointer(active: boolean): void;
-  read(): { token: string; sceneId: string; pickToken: string; ready: boolean; dragging: boolean; issue: string | null; notice: string | null;
+  read(): { token: string; sceneId: string; pickToken: string; ready: boolean; dragging: boolean; issue: string | null; notice: string | null;readonly retryAvailable?:boolean;
     pins: readonly { id: string; x: number; y: number; visible: boolean; scale?: number; color?: string; status?: 'normal' | 'needsReview'; notice?: string }[]; readonly assetIds?: readonly string[]; readonly view?: ViewRuntime };
   target(assetId: string): WorkspaceSurface | null;
   camera(action: 'fit' | 'front' | 'back' | 'left' | 'right' | 'top' | 'bottom'): void;
@@ -98,6 +98,9 @@ export interface ProjectWorkspacePorts {
   modelReview(sceneId: string): { statuses: readonly { assetId: string; label: string; issue?: string; choices: readonly { operationId: string; label: string }[] }[];
     memberships: readonly { sceneId: string; assetId: string; edgeIds: readonly string[];
       label?: string; note?: string; details?: readonly string[]; copyReady?: boolean }[] };
+  prepareGsProxy?(token:string,target:NonNullable<WorkspaceModelDetails['gsProxyTarget']>,file?:WorkspaceFile):Promise<{id:string;label:string}>;
+  commitGsProxy?(token:string,id:string):Promise<unknown>;
+  cancelGsProxy?():void;
   addModel(token: string, input: { sceneId: string; assetId: string; file: WorkspaceFile }): Promise<unknown>;
   replaceModel(token: string, input: { sceneId: string; assetId: string; expectedBindingId: string; file: WorkspaceFile }): Promise<unknown>;
   transformModel(token: string, input: { sceneId: string; assetId: string; expectedBindingId: string; bindingId: string; placement: WorkspacePlacement }): Promise<unknown>;

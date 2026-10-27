@@ -50,6 +50,8 @@ export interface MetadataMediaPort {
 }
 export interface MetadataModelFactPlan { readonly baseToken: string | null; readonly finalToken: string; readonly stagedBlobs?: readonly JsonObject[]; stage(): Promise<void> }
 export interface MetadataModelFactPort { preparePointAnchor?(source: ProjectMetadataSource, provider: Extract<ProjectProviderRead, { kind: 'scene-provider' }>, command: Extract<MetadataEdit, { kind: 'addPin' | 'movePin' }>): Promise<Anchor>;
+  /** Route-owned read-only admission at existing planning/read/recovery fences. */
+  assertProvider?(provider: Extract<ProjectProviderRead, {kind:'scene-provider'}>): void;
   plan(base: ProjectMetadataSource, next: ProjectMetadataSource): Promise<MetadataModelFactPlan | null>;
   planRestored?(next: ProjectMetadataSource, bodyFor: (ref: JsonObject) => Blob, refs: readonly JsonObject[]): Promise<MetadataModelFactPlan>;
   planImported?(next: ProjectMetadataSource, bodyFor: (ref: JsonObject) => Blob, hasIncoming?: (ref: JsonObject) => boolean): Promise<MetadataModelFactPlan>;
@@ -191,7 +193,11 @@ export class MetadataProjectSession {
     return async (record: JsonObject): Promise<boolean> => !!this.media &&
       (acknowledged.has(blobKey(record.blob as JsonObject)) || (this.media.retained ? await this.media.retained(record) : true));
   }
-  private providerReady(provider: ProjectProviderRead): boolean { return metadataProviderReady(provider, this.limits); }
+  private providerReady(provider: ProjectProviderRead): boolean {
+    if(!metadataProviderReady(provider,this.limits))return false;
+    if(provider.kind==='scene-provider')this.modelFacts?.assertProvider?.(provider);
+    return true;
+  }
 
   async create(records: { schema: JsonObject; identity: JsonObject } & JsonObject): Promise<MetadataSessionRead> {
     return this.createFromSource(ProjectMetadataSource.bootstrap(records.schema, records.identity, this.limits).initialize(records));

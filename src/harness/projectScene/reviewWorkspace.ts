@@ -98,7 +98,7 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
   sidebar.append(views, windows.tools);
   function paint() {
     if (disposed) return; const observation = runtime?.read(), ready = !!observation?.ready && observation.display === display;
-    status.textContent = rendererFailure || failure || observation?.issue || observation?.notice || ''; retry.hidden = !!runtime && !observation?.issue;
+    status.textContent = rendererFailure || failure || observation?.issue || observation?.notice || ''; retry.hidden = !!runtime && !observation?.issue&&!observation?.retryAvailable;
     const wanted = new Set(display.pins.map(p => p.id));
     for (const [id, pin] of pins) if (!wanted.has(id)) { pin.remove(); pins.delete(id); }
     for (const pin of display.pins) {

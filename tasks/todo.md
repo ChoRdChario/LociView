@@ -28,69 +28,117 @@ in nondefault validation; code and executed tests determine its observed behavio
 01a adds approved XYZ/RGB ASCII PLY alongside admitted GLB and photos. This is not
 ordinary-entry activation, arbitrary-format support or general v2 adoption.
 
-## Current unit — SH4 GS / Proxy connected-workflow specification
+## Verified unit — approved01c limited GS / Proxy workflow
 
-PO requested2026-10-27: finalize GS input/rendering including SH4 and explicit
-same-Asset Proxy interaction, keeping the user flow simple. Continue investigation,
-specification and independent review without control-by-control PO waits; present
-one concrete proposal when a new product/format/renderer authority is required.
+PO approved the independently reviewed [01c](../docs/specs/01c-gs-sh4-proxy-workflow-proposal.md)
+package on2026-10-27: exact four immutable companions, GSL1.4.3 dependency,
+SH0–4 source/display and explicit same-Asset Proxy/manual position through edit,
+five-purpose files, recovery and cold resume. Root is sole writer; read-only
+reviewers cover source/facts, renderer/lifetime and Session/provider/file/UI.
 
-Outcome: one reviewable specification for content-inspected GS import → view →
-explicit Proxy-assisted position → normal gizmo confirmation → edit → five-purpose
-file exchange/restore/cold-resume. Root is sole writer; bounded read-only reviewers
-cover source semantics, renderer qualification, Session/provider/file/Proxy facts.
+Outcome: content-inspected GS → view → optional prepared interaction surface →
+existing position adjustment/confirmation → edit/save/send/restore/cold resume,
+with familiar controls and original full coefficients retained.
 
-- [x] Reconcile01b§8, the immutable source candidate, actual qualification and
-  current typed ports. Separate observed behavior, proposed semantics and missing
-  SH4/paged/device acceptance; preserve the approved01a and07j contracts.
-- [x] Specify exact input/source facts, display policy/lifetime, Proxy attach /
-  change/remove and canonical manual positions, simple UI decisions and connected
-  acceptance. Keep large-source/paging in the full scope, without numeric promises
-  or silently substituting SH3 preview for SH4 rendering.
-- [x] Independently review the complete proposal and resolve findings. Check
-  documentation links, retained history, immutable bytes and contract consistency.
-- [x] Prepare the reviewed documentation checkpoint and grouped decision package
-  with the concrete implementation sequence and remaining gates. Git owns actual
-  commit/push identity; PO owns approval of the exact proposed package.
+- [x] Record grouped approval and exact nondefault exception in03§5.
+- [x] Source inspector/goldens and closed fresh/saved/received/restored/review tuples;
+  preserve retained bounds, original bytes and existing profile semantics.
+- [x] Typed GS addition and captured Proxy add/change/remove; fact-only removal,
+  stable GS identity/class, existing atomic stage/publication and manual anchors.
+- [x] New linear renderer adapter, exact dependency/license/lock/audit, capability
+  and cancellation/resource checks, current-generation Proxy/point interaction.
+- [x] Representative dedicated Chromium connected file/recovery/cold workflow;
+  focused fault tests, full serial checkpoint and independent meaningful diff review.
+- [x] Update coverage/handoff; prepare the reviewed/tested g0-baseline checkpoint.
+  Git owns actual commit/push identity and state; standing authorization applies.
 
-This unit authorizes specification work, not new exact profile ratification,
-GSL production dependency/renderer adoption, ordinary-entry activation or release.
-No product/source/test/dependency edits precede the required concrete decision.
-Stop only the affected part for a genuine contract conflict or authority gap;
-research and review continue autonomously. The07j checkpoint is already pushed;
-its prior results below are evidence, not the current work queue.
+Acceptance and exclusions are01c§§3–10. Keep64MiB aggregate and existing inspector
+item/scalar limits; no SH4→SH3 fallback. Large streaming/SH4 paging, physical device,
+offline, ordinary entry, formal adoption and release remain open. Stop only the
+affected part for a contract conflict, new authority or a failed connection gate;
+ordinary implementation, relevant fixes and verification need no further PO wait.
+Meta-audit2026-10-27: g0-baseline/HEAD/worktree and exact01c authority checked;
+root remained sole writer. The connected GS/Proxy/Mesh workflow is implemented.
+A final P1 audit found Core-valid unsupported multi-output Assets could reach
+publication before UI rejection. The independently reviewed01c§7 readonly route
+assertion now refuses them during planning and existing Session read/recovery/
+publication checks, including previously prepared originals, without schema,
+receipt repair or Core capability changes. Both unsupported shapes and all FS
+mutation methods are covered by the negative test. No further code findings remain.
+The first completed aggregate then caught an M05 visibility regression: hiding a
+model recreated non-GS residents. GS-only invalidation now preserves the existing
+Mesh/Point residents, pose and fit behavior. Its independent follow-up review,
+37 focused tests and both mixed/fault browser cases pass on the corrected tree.
 
-Concrete proposal: [01c](../docs/specs/01c-gs-sh4-proxy-workflow-proposal.md) and4new
-exact JSON companions (source/display plus separate goldens). GS source bounds are
-independent of packed/LOD data; verified retained bounds stay literal in facts.
-Fixed GLB base profiles, captured Proxy operation target, class-preserving fact-only
-remove, source-less manual positions and purpose closure reuse the accepted owners.
-Initial per-body SH4 limit89,887 and aggregate64MiB remain a development restriction,
-not a reduced large-GS requirement. SH4 paging and silent SH3 fallback are not approved.
+Executed evidence (local headless Chromium/WebGL2 only):
+- Exact source degree0–4, independent mathematical/byte goldens, retained bounds,
+  input/context ownership, dedicated addition, Proxy/fact-only cold recovery,
+  cancellation, closed copy and old-fact nonrepair pass focused tests.
+- `connected-mesh-final.log`: GS+Proxy+independent Mesh, manual Caption/photo,
+  backup/cold, Workspace/Contribution return, Review actual SH4 pixels/local FBO
+  failure/retry, Clean rekey/import and first-backup restore PASS8.0min.
+- `closure-browser-final.log`: final route-guard tree passes Mesh-front/Point-hidden,
+  fragment+6px GS ambiguity→selected GS Proxy→hidden GS Point selection, plus
+  GS-local FBO fault→Point pin→actual GPU loss/restore/retry,2PASS40.8s.
+- `visibility-browser-final.log`: both cases above pass again after the M05
+  resident-preservation fix,2PASS39.8s; `visibility-fix.log` has37focused passes.
+- `runtime-probe-1.log`: production adapter held-sort transform x63→95 and
+  repeated load/cancel ownership,2PASS. Six cycles stay at the bounded shared
+  baseline1geometry/4textures. Eight89,887-row cancellations (32,001,977bytes)
+  peak at2workers; last idle decoder closes around183s. No immediate-zero-worker,
+  arbitrary-coordinate error, total-heap or general device-capacity claim.
+- `color-probe.log`: production negativeDC+SH4/HDR83/109/238, retained HDR179
+  (reference178), opaque56/111/162, edge147, Point-front255/0/0/back205/92/92,
+  oblique anisotropic Sim3/odd-SH reflection46/91/91→136/91/91, PASS8.4s.
+- Exact lock SRI and3upstream notice bytes match the qualified artifact. Audit
+  remains10existing findings (1low/2moderate/5high/2critical), same affected package
+  names, no clean-audit/release credit. Notices ship only in validation output.
+- Four approved companion hashes/framing, old GS candidate, untouched prior
+  profile/GLB proof files and340local link paths pass static checks.
 
-Added bounded qualification within existing01b§6 authority using the same official
-tarball and owned tiny data, entirely ignored/isolated. LinearRGBA16F shareddepth
-and finalIEC passed gray127vs128; negativeDC+SH4/HDR[83,109,238]; retained intermediate
-HDR after dark foreground[178,178,178]; opaque foreground[56,111,162], matching the
-independent references. Default center clip1.25 dropped a visible edge (RGB0),
-conservative clip4 kept it (RGB181), supporting the fixed screen-space policy.
-One shared decoder remained after owned sort resources closed, then retired at
-181.3s; this single small idle observation is not total-budget/repeated-cancel proof.
-Source mathematical vectors were independently recalculated; current code, tests,
-package/lock and immutable approved profiles have not changed. No full product
-suite/build is required for this documentation-only tree, and its old/runtime
-acceptance is not relabelled. Artifacts: `.artifacts/e2e/gs-spec-01c/`.
-Final source/numerical, renderer and Session/file/UI reviews have no unresolved
-findings. Final color/culling probePASS8.4s in `runs/1793087764801-39112/result.json`;
-shared idle worker probePASS3.1m in `runs/1793085616573-55180/result.json`.
-The4exact companions and their digest links,106local links,6approved01a JSON and
-unchanged old GS candidate passed static checks. Runtime source/tests/package/lock
-remain exactly the07j checkpoint. Current stop: grouped PO ratification/limited
-connection authority underAGENTS/03§5/01c. This is a real profile/dependency/renderer
-decision, not another small control or human-test wait. After approval, implement
-source/content→GS/Proxy typed commands→linear renderer→connected five-purpose
-file/recovery/cold flow with focused tests and final checkpoint review. Large
-stream/stage and SH4 paging, ordinary entry, device/offline/adoption/release remain open.
+`checkpoint-isolated-final.log` passes the final source/test tree: typecheck,
+124files/2,791tests with21existing TODO, normal/harness/validation builds.
+`final-static-check.json` confirms zero GSL/adapter sources in normal/harness,
+validation-only notices with exact upstream bytes, neither SW carrying the new
+GS adapter, and preserved Native Spark filename. The six validation JS/WASM/CSS
+files match the browser-qualified bytes exactly. `heic-isolation-final.log` also
+passes. All46changed runtime/test/dependency/build files match the retained hashes.
+The direct compile-time guard and meaningful final diff have independent review;
+no unresolved findings remain. No harness/offline acceptance is inferred.
+
+Retained failure evidence: `checkpoint-verified.log` had passed tests/builds before
+the post-build graph found GSL in the synthetic harness/precache. The final guard
+fixes that isolation defect while retaining development-server/static validation
+use;34focused tests and the rebuilt graphs pass.
+The first aggregate was intentionally interrupted for final review fixes and is
+not counted as a pass. `checkpoint-final.log` retains the completed aggregate's
+single M05 failure (2,790 passes,1failure,21existing TODO); it is not a pass either.
+Runtime/source/test fingerprints match the reviewed and tested content and are
+checked against staged content before the development checkpoint. Remaining work
+is the next large-source design below. All detailed logs, failure traces and
+owned fixture outputs stay in ignored `.artifacts/e2e/gs-01c/` or its linked runs.
+No device/offline, ordinary-entry, aggregate adoption or release gate is passed.
+
+The proposal qualification evidence stays in `.artifacts/e2e/gs-spec-01c/` and Git;
+it is not implementation acceptance. Exact approved companions are never rewritten.
+
+## Next connected unit — large-source workflow design
+
+After the verified01c checkpoint, follow01c§8/§9(5) and G1-A: a large source must
+stream→stage→incremental hash→inspect→bounded decode/upload→publish, then save and
+cold resume with the complete original intact. Start with the existing CAS/I/O
+boundaries and the concrete SH4 paging gap; reuse current facilities and evidence.
+Read-only preparation confirms WorkspaceFS/OPFS streams, incremental
+`blobStream` hashing and verified `OriginBlobStore.put()` publication already
+exist. The remaining whole-body chain is file selection/initialProject → content
+read/GS inspector → received/cold verification → SplatMesh decode. First specify
+file-backed source ownership and streaming inspection through save/cold reopen;
+that increment alone does not solve full SH4 paging or large-GS resident rendering.
+Specify encoded, scratch, resident and output budgets before implementation. Keep
+the current64MiB path and immutable profiles unchanged until a replacement is
+approved; no silent SH3 preview. A changed budget, format/derivative, renderer or
+storage/publication contract needs its concrete independent review/PO decision.
+Ordinary entry, device/offline, adoption and release remain separate gates.
 
 ## Previous verified unit — approved07j implementation
 

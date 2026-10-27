@@ -1,22 +1,38 @@
 import { resolveScene } from '../scene/resolve';
 import { pointSourceDeclaration } from '../domain/pointSource';
 import type { Anchor } from '../scene/types';
-import { readProjectScene } from '../scene/projectProvider';
+import { readProjectScene, type ProjectProviderRead } from '../scene/projectProvider';
 import { metadataProviderReady, type MetadataModelFactPort, type MetadataModelFactPlan } from '../projectMetadata/session';
 import type { ProjectMetadataSource } from '../projectMetadata/source';
 import { json } from '../projectMetadata/persistence';
 import type { ContentRequest } from '../domain/projectContentChecks';
 import { cloneCanonicalValue, type JsonObject } from '../domain/values';
 import { validationMetadataLimits as limits, fileError } from './validation';
-import type { ValidationContent } from './content';
+import { validationGsEquivalenceSource, type ValidationContent } from './content';
 import { pointSourceMediaType } from './pointPly';
 import { ProjectRecordFields } from '../domain/projectRecordFields';
 import { checkProjectRecord } from '../domain/projectRecords';
 import { fileObject } from './validation';
 
+/** Route capability, not a Core schema rule. Weak history and separate-Asset
+ * models remain independent of this active, exact projection check. */
+export function assertValidationModelClosures(provider:Extract<ProjectProviderRead,{kind:'scene-provider'}>):void{
+  let work=provider.inspection.workUsed;
+  const charge=()=>{if(++work>limits.maxWork)fileError('モデルの対応検査が上限を超えています。');};
+  for(const asset of Object.values(provider.resources.assets)){
+    charge();if(asset.lifecycle.kind!=='value'||asset.lifecycle.value.state!=='active'||asset.projection.kind!=='value')continue;
+    const records=asset.projection.value.representationIds.map(id=>{charge();const field=provider.details.immutable.representationsById[id];
+      if(field?.kind!=='value')return fileError('モデルの表示本体を確認できません。');return fileObject(field.value) as JsonObject;});
+    const visual=records.filter(r=>r.role!=='interactionProxy'),proxy=records.filter(r=>r.role==='interactionProxy'),primary=visual[0];
+    if(visual.length!==1||!primary||!['meshPrimary','pointPrimary','gsPrimary'].includes(primary.role as string)||records.some(r=>r.assetId!==asset.id)||
+      (primary.role==='gsPrimary'?proxy.length>1||proxy.some(r=>r.proxyForGsVariantFamilyId!==primary.variantFamilyId):proxy.length!==0))
+      return fileError('このモデルの表示本体の組み合わせには対応していません。');
+  }
+}
+
 /** Owned new GLB or fresh records reusing exact known bodies. Old evidence is never repaired. */
 export function validationModelFacts(content: ValidationContent): MetadataModelFactPort {
-  return { async preparePointAnchor(source, provider, command): Promise<Anchor> {
+  return { assertProvider:assertValidationModelClosures, async preparePointAnchor(source, provider, command): Promise<Anchor> {
     if (source.token !== provider.token || command.anchor.kind !== 'asset') return fileError('点の記録対象が更新されています。');
     const anchor = command.anchor, evidence = anchor.hitEvidence, reference = evidence?.source, index = reference?.surfaceRef;
     const scene = resolveScene(provider.state, provider.resources, command.sceneId);
@@ -38,15 +54,17 @@ export function validationModelFacts(content: ValidationContent): MetadataModelF
   }, planReceived: (base, next, bodyFor, hasIncoming) => validationReceivedFacts(content, base, next, bodyFor, hasIncoming),
     planRestored: (next, bodyFor, refs) => restoredFacts(content, next, bodyFor, refs),
     planImported: (next, bodyFor, hasIncoming) => receivedFacts(content, null, next, bodyFor, hasIncoming), async plan(base, next) {
-    const used = new Set<string>(), introduced = new Set<string>(); let work = 0;
+    const used = new Set<string>(), introduced = new Set<string>(), revisions=new Set<string>(), newRevisions=new Set<string>(); let work = 0;
     const charge = () => { if (++work > limits.maxWork) fileError('モデルの検証範囲を超えています。'); };
     for (const change of base.read().history.changes) for (const w of change.writes) {
       charge(); if (w.path[0] === 'representationsById') used.add(w.path[1]!);
+      if(w.path[0]==='assetRevisionsById')revisions.add(w.path[1]!);
     }
     for (const change of next.read().history.changes) for (const w of change.writes) {
       charge(); if (w.path[0] === 'representationsById' && !used.has(w.path[1]!)) introduced.add(w.path[1]!);
+      if(w.path[0]==='assetRevisionsById'&&!revisions.has(w.path[1]!))newRevisions.add(w.path[1]!);
     }
-    if (!introduced.size) return null;
+    if(!introduced.size&&!newRevisions.size)return null;
     const knownRefs = new Set<string>(), inspection = await base.inspectOriginal({ maxNodes: limits.maxNodes, maxWork: limits.maxWork });
     work += inspection.workUsed; charge();
     for (const scalar of inspection.scalars) {
@@ -57,6 +75,11 @@ export function validationModelFacts(content: ValidationContent): MetadataModelF
     const requests: ContentRequest[] = [], keys = new Set<string>(), ordinary = content.verifier(false);
     let preparedRecord: JsonObject | undefined;
     const provider = await readProjectScene(next.read(), limits, { scope: 'development-validation', verify: async request => {
+      if(request.fact==='surface-equivalence') {
+        if(!request.records.some(r=>newRevisions.has(r.id as string)))return ordinary.verify(request);
+        const gs=validationGsEquivalenceSource(request);if(!gs || !used.has(gs.id as string))return fileError('GSの同一表面を確認できません。');
+        const result=await content.inspectStored(request), key=json(request);if(!keys.has(key)){keys.add(key);requests.push(request);}return result;
+      }
       if (request.fact === 'media' || request.records.every(r => used.has(r.id as string))) return ordinary.verify(request);
       const r = request.records[0];
       if (request.records.length !== 1 || !r || !introduced.has(r.id as string) ||
@@ -74,6 +97,7 @@ export function validationModelFacts(content: ValidationContent): MetadataModelF
     } }, { verifyRetainedMedia: record => content.retained(record) });
     if (!metadataProviderReady(provider, limits) || provider.kind !== 'scene-provider')
       return fileError('追加するモデルの参照を確認できません。');
+    assertValidationModelClosures(provider);
     if (!requests.length) return null; // Weak-only records require no new facts/body reads.
     const record = preparedRecord, ref = record ? content.preparedModelRef(record) : undefined;
     const completed = new Set<string>(); let bodySaved = false;
@@ -83,7 +107,7 @@ export function validationModelFacts(content: ValidationContent): MetadataModelF
         else await content.store.open(ref); // Never refill an acknowledged body after loss.
       }
       for (const request of requests) {
-        const body = request.records[0]!.blob as JsonObject;
+        const body = (validationGsEquivalenceSource(request) ?? request.records[0]!).blob as JsonObject;
         if (knownRefs.has(json(body)) && await content.store.inspect(body) !== 'verified-present') return fileError('既存のモデル本体を確認できません。');
         const key = json(request), result = await content.verifier(!completed.has(key)).verify(request) as { outcome?: string };
         if (result.outcome !== 'verified') return fileError('追加するモデルの検証情報を保存できません。');
@@ -143,6 +167,7 @@ async function receivedFacts(content: ValidationContent, base: ProjectMetadataSo
   let work = (before?.workUsed ?? 0) + after.workUsed, total = 0;
   for (const [inspection, old] of [[before, true], [after, false]] as const) for (const scalar of inspection?.scalars ?? []) {
     if (++work > limits.maxWork) return fileError('受信内容が検証の上限を超えています。');
+    if(scalar.path[0]==='assetRevisionsById'){if(old)oldIds.add(scalar.path[1]!);continue;}
     if (!['representationsById', 'mediaResourcesById'].includes(scalar.path[0]!)) continue;
     if (old) oldIds.add(scalar.path[1]!);
     if (scalar.value.kind !== 'value') continue;
@@ -158,6 +183,16 @@ async function receivedFacts(content: ValidationContent, base: ProjectMetadataSo
   const results = new Map<string, unknown>(), ordinary = content.verifier(false);
   const provider = await readProjectScene(next.read(), limits, { scope: 'development-validation', verify: async request => {
     if (++work > limits.maxWork) return fileError('受信内容が検証の上限を超えています。');
+    if(request.records.every(r=>oldIds.has(r.id as string)))return ordinary.verify(request);
+    if(request.fact==='surface-equivalence') {
+      const gs=validationGsEquivalenceSource(request);if(!gs)return fileError('受信したGSの同一表面を確認できません。');
+      const ref=gs.blob as JsonObject,key=json(ref);
+      if(!oldDigests.has(ref.digest as string) && !bodies.has(key)) {
+        const file=bodyFor(ref);if(!(file instanceof Blob)||file.size!==ref.byteLength)return fileError('GSの原本が不足しています。'); bodies.set(key,{ref,file});
+      }
+      const result=oldDigests.has(ref.digest as string)?await content.inspectStored(request):await content.inspectReceivedEquivalence(request,bodies.get(key)!.file);
+      requests.set(json(request),request);return result;
+    }
     if (request.records.every(r => oldIds.has(r.id as string))) return ordinary.verify(request);
     const record = request.records[0];
     if (request.records.length !== 1 || !record || oldIds.has(record.id as string) ||
@@ -178,6 +213,7 @@ async function receivedFacts(content: ValidationContent, base: ProjectMetadataSo
     results.set(key, result); requests.set(key, request); return result;
   } }, { verifyRetainedMedia: async record => !hasIncoming || hasIncoming(record.blob as JsonObject) || await content.retained(record) });
   if (!metadataProviderReady(provider, limits) || provider.kind !== 'scene-provider') return fileError('受信後の参照を確認できません。');
+  assertValidationModelClosures(provider);
   const staged: { ref: JsonObject; file: Blob }[] = [], completedBodies = new Set<string>(), completedFacts = new Set<string>();
   for (const [key, body] of [...bodies].sort(([a], [b]) => a < b ? -1 : 1)) {
     const presence = await content.store.inspect(body.ref);
@@ -192,8 +228,9 @@ async function receivedFacts(content: ValidationContent, base: ProjectMetadataSo
     }
     for (const [key, request] of requests) {
       // Reused old bodies and old records must never be repaired from incoming bytes.
-      if (oldDigests.has((request.records[0]!.blob as JsonObject).digest as string) &&
-        await content.store.inspect(request.records[0]!.blob as JsonObject) !== 'verified-present') return fileError('既存の本体を確認できません。');
+      const record=validationGsEquivalenceSource(request) ?? request.records[0]!;
+      if (oldDigests.has((record.blob as JsonObject).digest as string) &&
+        await content.store.inspect(record.blob as JsonObject) !== 'verified-present') return fileError('既存の本体を確認できません。');
       const result = await content.verifier(!completedFacts.has(key)).verify(request) as { outcome?: string };
       if (result.outcome !== 'verified') return fileError('受信した本体の検証情報を記録できません。');
       completedFacts.add(key);

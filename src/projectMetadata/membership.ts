@@ -20,7 +20,8 @@ export interface AssetMembershipResolution {
   observedMembershipIds: string[]; originalMembershipId: string; choice: 'one' | 'both'; eventId: string;
   copies?: { sourceMembershipId: string; ids: Record<'asset' | 'assetFrame' | 'representationFrame' | 'binding' | 'revision' | 'representation' |
     'family' | 'compatibility' | 'layout' | 'membership', string>; slots: (IdCopy & { materialId: string | null })[];
-    binding: JsonObject; revision: JsonObject; representation: JsonObject }[];
+    binding: JsonObject; revision: JsonObject; representation: JsonObject;
+    proxy?:{ids:Record<'representation'|'frame'|'family'|'layout',string>;slots:IdCopy[];representation:JsonObject} }[];
 }
 const edgeMap = 'sceneCaptionMembershipsById';
 const shape = (o: object, keys: string[]) => {

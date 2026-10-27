@@ -60,6 +60,9 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
     },
     dispatch: (token, command) => host.dispatch(token, command), retry: async () => host.authority.retry!(),
     addMedia: async (token, input) => host.authority.addMediaFile!(token, input),
+    prepareGsProxy: async(...a)=>host.authority.prepareGsProxy!(...a),
+    commitGsProxy: async(...a)=>host.authority.commitGsProxy!(...a),
+    cancelGsProxy: ()=>host.authority.cancelGsProxy?.(),
     addModel: async (token, input) => host.authority.addModelFile!(token, input),
     replaceModel: async (token, input) => host.authority.replaceModelFile!(token, input),
     transformModel: async (token, input) => host.authority.transformModel!(token, input),
@@ -96,7 +99,7 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
         const available = current && seen.ready && !seen.issue;
         const pinIds = new Set(available ? rendered!.pins.map(p => p.id) : []);
         return { token: seen.display?.token ?? '', sceneId: seen.display?.sceneId ?? '', pickToken: available ? receipt : '', ready: available,
-          dragging: seen.dragging || !!seen.manipulating, pins: available ? seen.pins.filter(p => pinIds.has(p.id) && Number.isFinite(p.x) && Number.isFinite(p.y)).map(p => {
+          dragging: seen.dragging || !!seen.manipulating,retryAvailable:seen.retryAvailable, pins: available ? seen.pins.filter(p => pinIds.has(p.id) && Number.isFinite(p.x) && Number.isFinite(p.y)).map(p => {
             const source = rendered!.pins.find(pin => pin.id === p.id)!; return { ...p, scale: source.scale ?? 1, color: source.color, status: source.status, notice: source.notice };
           }) : [], issue: seen.issue, notice: seen.notice ?? null,
           assetIds: available ? seen.display!.models.map(m => m.binding.assetId) : [],
@@ -148,7 +151,7 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
           const display = runtime.read().display;
           if (!display || display.readOnly) return null;
           const targets = display.models.flatMap(m => {
-            const t = target(m.binding.assetId); return t && (!assetId || t.assetId === assetId) ? [t] : [];
+            const t = target(m.binding.assetId); if(m.shape==='saved-gs'&&!assetId)return []; return t && (!assetId || t.assetId === assetId) ? [t] : [];
           });
           const hit = runtime.pickCreation?.(targets, x, y), after = observation();
           return hit && before.pickToken === after.pickToken && before.token === after.token && read().token === before.token ? hit : null;

@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
+import { readFileSync } from 'node:fs';
 
 // PWA (docs/06 §5): アプリシェルを全precacheし、初回ロード後は完全オフラインで動作する。
 // プロジェクトデータはOPFSが担当するためSWのキャッシュ対象にしない（責務分離）。
@@ -42,6 +43,13 @@ export default defineConfig(({ mode }) => {
     },
     plugins: isProjectSceneValidation ? [{
       name: 'lociview-static-validation-shell',
+      generateBundle() {
+        // Exact approved validation-only dependency notices travel with that build.
+        for (const name of ['LICENSE', 'NOTICE', 'THIRD_PARTY_LICENSES.md']) this.emitFile({
+          type: 'asset', fileName: `third-party/gaussian-splat-lite-1.4.3/${name}`,
+          source: readFileSync(new URL(`./node_modules/gaussian-splat-lite/${name}`, import.meta.url), 'utf8'),
+        });
+      },
       transformIndexHtml: {
         order: 'pre',
         handler(html) {

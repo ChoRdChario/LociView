@@ -21,13 +21,22 @@ renderers. GSL1.4.3/Three0.186 limited qualification was approved2026-10-27;
 measured scope and failures are in01b §7/todo. The existing occurrence GLB/JPEG
 profiles explicitly pin0.180.0; the approved bridge below retains that real proof
 instead of reinterpreting immutable profiles. SH4 and paged-LOD paths remain separate.
-New profiles, production GS and adoption still need their actual authority/gates.
+01c now authorizes the exact limited GS implementation; general adoption retains its gates.
 The PO next requested the exact GS/Proxy specification. [01c](../docs/specs/01c-gs-sh4-proxy-workflow-proposal.md)
-now holds the proposed SH0–4 source and packed-linear display companions, explicit
-Proxy/manual workflow, typed ports, fixed dependency and limited-connection request.
+now holds the approved SH0–4 source and packed-linear display companions, explicit
+Proxy/manual workflow, typed ports, fixed dependency and limited nondefault connection.
 It preserves full source, class/facts/file authority and refuses silent SH3 fallback.
-Read todo for review/decision state. Do not implement/register these profiles or
-add GSL production dependencies before the grouped concrete approval.
+PO granted the grouped exact approval2026-10-27. Todo owns the current checkpoint
+and next large-source workflow design; do not repeat small approval/testing waits.
+The bounded implementation now
+includes route-owned active-shape checks before planning/read/cold publication;
+separate-Asset models and weak history retain their existing rules. Verification
+includes actual GS pixels in Review and GPU fault recovery; exact latest results
+and outstanding checks remain in todo. The GS dynamic import is compile-time
+limited to development-server/static-validation use, preserving normal/harness
+build and precache isolation. Large-source work must address the whole-body
+import/inspection/decode chain and full SH4 paging without changing the current
+limits or substituting SH3 implicitly.
 The PO approved [07j](../docs/specs/07j-three-186-compatibility-proposal.md) implementation
 and fixed dependencies on2026-10-27. Its bounded implementation retains:
 retain actual180 source math/proof/legacy keys and closed cleanup, then independently

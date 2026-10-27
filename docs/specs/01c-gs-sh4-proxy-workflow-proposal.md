@@ -1,6 +1,9 @@
 # 01c: SH0–4 GS input, linear display and explicit Proxy workflow
 
-> Status: **PROPOSED / INDEPENDENTLY REVIEWED / NOT IMPLEMENTED / NOT ADOPTED**
+> Status: **APPROVED LIMITED IMPLEMENTATION / INDEPENDENTLY REVIEWED / NOT ADOPTED**
+> PO approved the exact four companions, fixed GSL1.4.3 dependency and bounded
+> nondefault connection on2026-10-27. Implementation/evidence remain in
+> [todo](../../tasks/todo.md); this approval passes no aggregate adoption/release gate.
 > Prepared2026-10-27 at the PO's request. This is the next connected unit after
 > [07j](07j-three-186-compatibility-proposal.md), not approval inferred from its implementation.
 
@@ -21,8 +24,8 @@ SH次数、描画エンジン、内部のRepresentationや履歴を日常操作�
 - SH4を黙ってSH3へ下げない。まず現行安全上限の中で編集・五目的ファイル・復旧を完成
   させ、その後の大容量streamingとSH4 pagingを残す。小型接続をGS全体の完成としない。
 
-今回求めるのは、正確なsource/presentation companion、固定依存、typed接続と限定的な
-非既定実装の許可。正式renderer採用、通常入口の切替、容量保証、公開は含めない。
+今回の承認範囲は、正確なsource/presentation companion、固定依存、typed接続と限定的な
+非既定実装である。正式renderer採用、通常入口の切替、容量保証、公開は含めない。
 依存の再更新、独自fork、runtime CDN、直接GS選択、Proxy自動生成は含めない。
 
 ## 2. 権限・不変の契約
@@ -34,16 +37,16 @@ SH次数、描画エンジン、内部のRepresentationや履歴を日常操作�
 
 01aの6 JSON、07a/07d/07i等の既存profile/recipe/ID、07jの実180 proofと186表示は不変。
 [旧GS preflight](../g0/gs-source-profile-candidate.md)と旧01bの未批准SH3 JSONも変更・流用しない。
-本案の新IDは承認までは候補であり、保存データやcapabilityに登録しない。
+本案の新IDと正確なbytesは2026-10-27のPO一括承認で批准された。一般形式の採用とは区別する。
 
-承認時に[03 §5](03-gates-and-delivery.md#5-g1-b--renderer-bakeoff)へ追加する例外は、
+承認済みの[03 §5](03-gates-and-delivery.md#5-g1-b--renderer-bakeoff)に記録した例外は、
 本案の厳密profileを使う非既定ProjectScene実装とその検証だけである。G1-Bのpaired比較、
 physical iPhone、device/offline、G1-Aの大容量I/Oや一般採用を通過したことにはしない。
 GSL評価用コードは使い捨てであり、productionは以下の境界から新しく実装する。
 
 ## 3. 正確なsource profileとgoldens
 
-候補IDは`development-validation-gs-ply-f32le-sh0-4-1`。
+批准済みIDは`development-validation-gs-ply-f32le-sh0-4-1`。
 正確なJSONとgoldenのbytes/digestは本節のcompanion表で固定する。承認後の修正は新IDにする。
 
 | SH次数 | rest係数数 | Float32属性数 | record bytes |
@@ -98,7 +101,7 @@ Blob SHA-256と既存opaque ID、payload digest、source-envelope authorityを�
 
 ## 4. 表示policyとrenderer境界
 
-候補policyは`lociview-gs-gsl-webgl2-packed-linear-1`。GSL正式1.4.3、commit
+批准済みpolicyは`lociview-gs-gsl-webgl2-packed-linear-1`。GSL正式1.4.3、commit
 `d8703f7aed0e966e808a3fd3a2e1def3179d90dc`、Three0.186.0を固定する。
 依存追加時は既存tarball SRI、Apache-2.0/NOTICE/第三者通知、lockfileとauditを再照合する。
 既存Native Spark2.1.0、cache namespaceと明示準備は変更しない。
@@ -227,10 +230,17 @@ Captionの`位置を指定`では、対象GS → 面上の近似位置 → 既�
   stage→検証→prepared→publicationとdraft/retry ownerを使う。
 - `modelFacts`/`ValidationContent`: introduced bodyがなくても必要なclass factを作る。
   複数recordは閉じたGS surface-equivalenceだけを許し、既存一般拒否を取り除かない。
+  activeな投影は、Mesh/Point一つ、またはGS一つ＋任意のsame-GS Proxy一つに閉じる。
+  別Assetの複数モデルやweak履歴にはこの制限を広げない。route-ownedの読み取り専用
+  `MetadataModelFactPort.assertProvider`をplanningと既存Session.checkedへ接続し、
+  初回受信・復元・prepared/cold retryの既存検査時点で同じ可否を確認する。
+  汎用Core schema、journal/receipt、検査の書込権限は変更せず、port未指定経路は従来どおり。
 - provider→UI/viewer: 単一Representation前提を、既存Mesh/PointとGS＋任意Proxyの閉じた
   typed descriptorにする。完全なsource boundsとcurrent generationを渡し、synthetic mapを製品portへ持ち込まない。
 - viewer: 提供済みのsource/interaction資源だけをdecode/投影/raycastする。GS coordinatorと
   targetはviewport所有、body/recipe/receipt/FSは既存のcontent/Session所有。
+  GSの動的読込は開発サーバーまたは`project-scene-validation`のcompile-time分岐内に閉じる。
+  通常版・Spark harnessのbuild graphとService Worker precacheへ新adapter/GSLを含めない。
 
 descriptorのGS branchに必要な値は`assetId/assetFrameId/bindingId/revisionId`、
 `assetToProject`、GSの`representationId/payloadDigest/familyId/compatibilityId`、
@@ -267,7 +277,7 @@ SH3 paged評価を、大規模SH4の完成・要件撤回と扱わない。
 
 ## 9. 検証と実装の順序
 
-承認後は次の順で一つのconnected workflowを完成し、helperごとのPO承認待ちを挟まない。
+承認済みの範囲で次の順に一つのconnected workflowを完成し、helperごとのPO承認待ちを挟まない。
 
 1. 新source/profile/goldenを検査器・content factsへ接続。既存profile/source receipts/IDsは不変。
 2. GS追加とProxy追加/変更/解除、同じGS class、manual位置、provider/Reviewのtyped接続。
@@ -297,7 +307,7 @@ GS前方/Point後方、その逆、hidden GSを同じ混在fixtureで確認し�
 - [GSL正式版formats](https://github.com/WilliamLiu-1997/Gaussian-Splat-Lite/blob/d8703f7aed0e966e808a3fd3a2e1def3179d90dc/docs/SplatFileType.md)、
   [renderer options/色](https://github.com/WilliamLiu-1997/Gaussian-Splat-Lite/blob/d8703f7aed0e966e808a3fd3a2e1def3179d90dc/docs/GaussianSplatRenderer.md)、
   [loaded bboxの制約](https://github.com/WilliamLiu-1997/Gaussian-Splat-Lite/blob/d8703f7aed0e966e808a3fd3a2e1def3179d90dc/docs/SplatMesh.md#bounding-box)。
-- 追加の限定評価は既存の検証設備と同じtarballを用い、製品/dependencyを変更せず実施。
+- 承認前の追加限定評価は既存の検証設備と同じtarballを用い、製品/dependencyを変更せず実施。
   自作SH4入力でlinear RGBA16F＋一回IEC出力はgray127（参照128）、negative/HDR二層は
   `[83,109,238]`（独立参照と一致）、opaque前面は`[56,111,162]`（参照と一致）。
   encoded RGB2/alpha0.9の後景を黒/alpha0.9の前景で減衰すると`[178,178,178]`で参照と一致し、
@@ -315,10 +325,11 @@ GS前方/Point後方、その逆、hidden GSを同じ混在fixtureで確認し�
 
 CompanionはUTF-8/LF/no BOM/最終LF一つ。SHA-256は自己digestを含まない正確なbytesを対象とする。
 sourceとdisplayは別ID・別goldenで結び、既存候補のID/hashを再解釈しない。
-本案の数値・goldenは承認対象であり、実装済みや端末認定の宣言ではない。
-source/numerical、renderer/lifetime、typed Session/Proxy/UI/fileの独立したread-onlyレビューを
-完了した。数値再検算と具体的な指摘の修正を含め、未解決の所見はない。これはPO承認や
-production/device受入の代替ではない。現時点の停止境界は以下の新しい契約・実装権限である。
+POは2026-10-27に以下の数値・goldenと限定依存／接続を承認した。これらのJSON内の
+proposal時点のscope説明も含めてbytesは保持し、実機認定や一般adoptionへ読み替えない。
+提案のsource/numerical、renderer/lifetime、typed Session/Proxy/UI/fileは独立read-only
+レビュー済み。実装のコード・実行証拠・最終diff reviewは[todo](../../tasks/todo.md)が管理する。
+依存と通知配布は[固定依存記録](../dependencies/gaussian-splat-lite-1.4.3.md)を参照する。
 
 | ID / 役割 | 正確なcompanion | SHA-256 |
 |---|---|---|

@@ -9,8 +9,9 @@ export interface ValidationMaterialSlot { readonly target: MaterialTarget; reado
   readonly locator: JsonObject; readonly semantics: JsonObject }
 export type ValidationMaterialEffects = Readonly<Record<string, MaterialIntent | { readonly issue: string }>>;
 export function validationMaterialSlots(c: ValidationModelClosure | ReadonlyRenderModel): readonly ValidationMaterialSlot[] {
-  return c.representation.materialCatalog.slots.map(slot => ({ target: { assetId: renderOwner(c),
-    variantFamilyId: c.representation.variantFamilyId, materialLayoutId: c.representation.materialCatalog.layoutId,
+  const catalog=c.representation.materialCatalog; if(!catalog)return [];
+  return catalog.slots.map(slot => ({ target: { assetId: renderOwner(c),
+    variantFamilyId: c.representation.variantFamilyId, materialLayoutId: catalog.layoutId,
     logicalMaterialSlotId: slot.logicalMaterialSlotId }, locator: slot.sourceLocator, semantics: slot.sourceSemantics,
     name: slot.sourceLocator.kind === 'gltfMaterial' ? `材質 ${Number(slot.sourceLocator.materialIndex) + 1}` :
       ['development-validation-glb-occurrence-1', 'development-validation-glb-occurrence-jpeg-1'].includes(String((c.representation.formatProfile as JsonObject)?.id)) ? `面の材質 ${Number(slot.sourceLocator.slotIndex) + 1}` : '既定の材質' }));

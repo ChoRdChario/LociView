@@ -8,6 +8,7 @@ import { candidateReader, planAssetMembershipResolution, type AssetMembershipRes
 import type { MetadataRecordEdit } from './commands';
 import { fail, type MetadataLimits } from './format';
 import { metadataImmutableReader } from './records';
+import { gsSourceDeclaration } from '../domain/gsSource';
 
 type Provider = Extract<ProjectProviderRead, { kind: 'scene-provider' }>;
 const shape = (o: object, keys: string[]) => { if (Object.keys(o).sort().join(',') !== keys.sort().join(',')) fail('model-copy-shape'); };
@@ -20,7 +21,15 @@ export function assetCopySource(provider: Provider, sceneId: string, assetId: st
   const read = metadataImmutableReader(provider, limits);
   const binding = read('assetBindingsById', status.activeBindingId as string);
   const revision = read('assetRevisionsById', binding.assetRevisionId as string);
-  if (list(revision.representationIds).length !== 1) return fail('model-copy-closure');
+  const reps=list(revision.representationIds).map(id=>read('representationsById',id as string)),gs=reps.filter(r=>r.role==='gsPrimary');
+  if(gs.length){
+    const representation=gs[0]!,proxies=reps.filter(r=>r.role==='interactionProxy'),proxy=proxies[0];
+    if(gs.length!==1||proxies.length>1||reps.length!==1+proxies.length||!same(representation.formatProfile,gsSourceDeclaration)||representation.materialCatalog!==undefined||!same(representation.derivedFrom,[])||!same(representation.purposes,['source','display'])&&!same(representation.purposes,['display'])||proxy&&(proxy.proxyForGsVariantFamilyId!==representation.variantFamilyId||!same(proxy.purposes,['interaction'])))return fail('gs-copy-closure');
+    for(const [map,record]of [['assetBindingsById',binding],['assetRevisionsById',revision],...reps.map(r=>['representationsById',r] as const)] as const){const c=new ProjectRecordFields();checkProjectRecord(c,map,record);if(c.unknown||record.assetId!==assetId||!same(record,exact(provider.details.immutable[map][record.id as string])))fail('gs-copy-closure');}
+    const classes=list(revision.anchorCompatibilityClasses);if(classes.length!==1||!same(object(classes[0]).targetVariantFamilyIds,[representation.variantFamilyId!]))fail('gs-copy-class');
+    return {gs:true,asset,binding,revision,representation,proxy,materials:[] as {sourceId:string;material:JsonObject|null}[]};
+  }
+  if (reps.length !== 1) return fail('model-copy-closure');
   const representation = read('representationsById', list(revision.representationIds)[0] as string);
   for (const [map, record] of [['assetBindingsById', binding], ['assetRevisionsById', revision], ['representationsById', representation]] as const) {
     const c = new ProjectRecordFields(); checkProjectRecord(c, map, record);
@@ -61,13 +70,21 @@ export function assetCopySource(provider: Provider, sceneId: string, assetId: st
     }
     return { sourceId: target.logicalMaterialSlotId as string, material };
   });
-  return { asset, binding, revision, representation, materials };
+  return { gs:false,asset, binding, revision, representation, proxy:undefined,materials };
 }
 
 type Copy = NonNullable<AssetMembershipResolution['copies']>[number];
 const prefixes = { asset: 'ast', assetFrame: 'frm', representationFrame: 'frm', binding: 'bnd',
   revision: 'rev', representation: 'rep', family: 'fam', compatibility: 'cmp', layout: 'lay', membership: 'sam' };
-function copiedRecords(source: ReturnType<typeof assetCopySource>, ids: Copy['ids'], slots: Copy['slots']) {
+function copiedRecords(source: ReturnType<typeof assetCopySource>, ids: Copy['ids'], slots: Copy['slots'],proxy?:Copy['proxy']) {
+  if(source.gs){
+    const rep={...source.representation,id:ids.representation,assetId:ids.asset,representationFrameId:ids.representationFrame,variantFamilyId:ids.family};
+    const {parentRevisionId:_parent,...root}=source.revision;
+    const revision={...root,id:ids.revision,assetId:ids.asset,representationIds:[ids.representation,...(source.proxy&&proxy?[proxy.ids.representation]:[])],anchorCompatibilityClasses:[{id:ids.compatibility,targetVariantFamilyIds:[ids.family]}]};
+    const {parentBindingId:_bindingParent,...rootBinding}=source.binding;
+    const binding={...rootBinding,id:ids.binding,assetId:ids.asset,assetRevisionId:ids.revision};
+    return {representation:rep,revision,binding};
+  }
   const rep = source.representation, catalog = object(rep.materialCatalog), targets = new Map(slots.map(s => [s.sourceId, s.targetId]));
   const representation = { ...rep, id: ids.representation, assetId: ids.asset, representationFrameId: ids.representationFrame,
     variantFamilyId: ids.family, materialCatalog: { ...catalog, layoutId: ids.layout,
@@ -79,15 +96,22 @@ function copiedRecords(source: ReturnType<typeof assetCopySource>, ids: Copy['id
   const binding = { ...rootBinding, id: ids.binding, assetId: ids.asset, assetRevisionId: ids.revision };
   return { representation, revision, binding };
 }
+function copiedProxy(source:NonNullable<ReturnType<typeof assetCopySource>['proxy']>,copy:NonNullable<Copy['proxy']>,ids:Copy['ids']):JsonObject{
+  const catalog=object(source.materialCatalog),slots=new Map(copy.slots.map(s=>[s.sourceId,s.targetId]));
+  return {...source,id:copy.ids.representation,assetId:ids.asset,representationFrameId:copy.ids.frame,variantFamilyId:copy.ids.family,proxyForGsVariantFamilyId:ids.family,
+    materialCatalog:{...catalog,layoutId:copy.ids.layout,slots:list(catalog.slots).map(s=>({...object(s),logicalMaterialSlotId:slots.get(object(s).logicalMaterialSlotId as string)!})).sort((a,b)=>a.logicalMaterialSlotId.localeCompare(b.logicalMaterialSlotId))}};
+}
 /** Construct once from complete source records. The command planner independently verifies every remap. */
 export async function prepareAssetMembershipCopy(source: ReturnType<typeof assetCopySource>, sourceMembershipId: string,
   fresh: (prefix: string) => string): Promise<Copy> {
   const ids = Object.fromEntries(Object.entries(prefixes).map(([key, prefix]) => [key, fresh(prefix)])) as Copy['ids'];
   const slots = source.materials.map(s => ({ sourceId: s.sourceId, targetId: fresh('slot'), materialId: s.material ? fresh('ovr') : null }));
-  const records = copiedRecords(source, ids, slots);
   const seal = async (kind: string, record: JsonObject) => ({ ...record, payloadDigest: await immutableDigest(kind, record) });
+  let proxy:Copy['proxy'];
+  if(source.proxy){proxy={ids:{representation:fresh('rep'),frame:fresh('frm'),family:fresh('fam'),layout:fresh('lay')},slots:list(object(source.proxy.materialCatalog).slots).map(s=>({sourceId:object(s).logicalMaterialSlotId as string,targetId:fresh('slot')})),representation:{}};proxy.representation=await seal('representation',copiedProxy(source.proxy,proxy,ids));}
+  const records = copiedRecords(source, ids, slots,proxy);
   return { sourceMembershipId, ids, slots, representation: await seal('representation', records.representation),
-    revision: await seal('asset-revision', records.revision), binding: await seal('asset-binding-revision', records.binding) };
+    revision: await seal('asset-revision', records.revision), binding: await seal('asset-binding-revision', records.binding),...(proxy?{proxy}:{}) };
 }
 
 /** Independent current-model roots only; preserve original history and Caption ownership. */
@@ -110,7 +134,7 @@ export function planAssetMembershipCopies(provider: Provider, command: AssetMemb
   const fresh = (id: string, prefix: string) => { guard.id(id, prefix, []); if (reserved.has(id)) fail('model-copy-id'); reserved.add(id); };
   const lifecycle = { state: 'active', reason: 'initial', eventId: command.eventId };
   for (const copy of copies!) {
-    shape(copy, ['sourceMembershipId', 'ids', 'slots', 'binding', 'revision', 'representation']); shape(copy.ids, Object.keys(prefixes));
+    shape(copy, ['sourceMembershipId', 'ids', 'slots', 'binding', 'revision', 'representation',...(source.proxy?['proxy']:[])]); shape(copy.ids, Object.keys(prefixes));
     for (const [key, prefix] of Object.entries(prefixes)) fresh(copy.ids[key as keyof typeof prefixes], prefix);
     if (!Array.isArray(copy.slots) || copy.slots.length !== source.materials.length || new Set(copy.slots.map(s => s.sourceId)).size !== source.materials.length)
       fail('model-copy-slots');
@@ -122,7 +146,17 @@ export function planAssetMembershipCopies(provider: Provider, command: AssetMemb
       if (materials.get(slot.sourceId)) { if (!slot.materialId) fail('model-copy-material-id'); fresh(slot.materialId!, 'ovr'); }
       else if (slot.materialId !== null) fail('model-copy-material-id');
     }
-    const ids = copy.ids, expected = copiedRecords(source, ids, copy.slots);
+    if(source.proxy){
+      const proxy=copy.proxy;if(!proxy) return fail('gs-copy-proxy');shape(proxy,['ids','slots','representation']);shape(proxy.ids,['representation','frame','family','layout']);
+      for(const [key,prefix]of [['representation','rep'],['frame','frm'],['family','fam'],['layout','lay']] as const)fresh(proxy.ids[key],prefix);
+      const sourceSlots=list(object(source.proxy.materialCatalog).slots).map(s=>object(s).logicalMaterialSlotId as string);
+      if(proxy.slots.length!==sourceSlots.length||new Set(proxy.slots.map(s=>s.sourceId)).size!==sourceSlots.length||proxy.slots.some(s=>!sourceSlots.includes(s.sourceId)))fail('gs-copy-proxy-slots');
+      for(const slot of proxy.slots){shape(slot,['sourceId','targetId']);fresh(slot.targetId,'slot');}
+      const expected=copiedProxy(source.proxy,proxy,copy.ids);checkProjectRecord(guard,'representationsById',proxy.representation);
+      if(guard.unknown||!same({...expected,payloadDigest:''},{...proxy.representation,payloadDigest:''}))fail('gs-copy-proxy-remap');
+      edits.push({map:'representationsById',id:proxy.representation.id as string,fields:proxy.representation,create:true});
+    }
+    const ids = copy.ids, expected = copiedRecords(source, ids, copy.slots,copy.proxy);
     const { representation: expectedRepresentation, revision: expectedRevision, binding: expectedBinding } = expected;
     for (const [map, actual, expected] of [['representationsById', copy.representation, expectedRepresentation],
       ['assetRevisionsById', copy.revision, expectedRevision], ['assetBindingsById', copy.binding, expectedBinding]] as const) {

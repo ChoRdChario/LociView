@@ -1,5 +1,5 @@
 import { inspectDeclaredValidationModel, readValidationBody } from '../../projectFiles/content';
-import { isPointModel, type ValidatedModel } from '../../projectFiles/pointPly';
+import { isPointModel, isGsModel, type ValidatedModel } from '../../projectFiles/pointPly';
 import { inspectProjectImage, projectImageMime, type PhotoDecoder } from '../../projectFiles/photo';
 import * as THREE from 'three';
 import { canonical, list, object, same, string } from '../../domain/projectGraphSupport';
@@ -29,17 +29,19 @@ export async function prepareReviewView(file: Blob, limits: FileValidationLimits
   const assets = table(snapshot, 'assetsById'), representations = table(snapshot, 'representationsById');
   for (const asset of Object.values(assets)) {
     if (asset.kind !== 'visual') continue;
-    const ids = list(asset.representationIds); if (ids.length !== 1) throw Error('この検証画面では、1つの表示本体を持つモデルだけを開けます。');
-    const record = representations[string(ids[0])]!, blob = object(record.blob);
+    const ids = list(asset.representationIds), reps=ids.map(id=>representations[string(id)]!),visuals=reps.filter(r=>r.role!=='interactionProxy'),proxies=reps.filter(r=>r.role==='interactionProxy');
+    if(visuals.length!==1||proxies.length>1||proxies.length&&(visuals[0]!.role!=='gsPrimary'||proxies[0]!.proxyForGsVariantFamilyId!==visuals[0]!.variantFamilyId))throw Error('モデルと位置指定用の面の対応を確認できません。');
+    for(const record of reps){const blob = object(record.blob);
     const bytes = await readValidationBody(inspection.archive.entryBlob(`blobs/sha256/${string(blob.digest)}`), limits.maxFileBytes);
-    const source = await inspectDeclaredValidationModel(record, bytes, limits, decode, jpeg, 'review'), catalog = object(record.materialCatalog), slots = list(catalog.slots).map(object);
+    const source = await inspectDeclaredValidationModel(record, bytes, limits, decode, jpeg, 'review'), slots = isGsModel(source)&&record.materialCatalog===undefined?[]:list(object(record.materialCatalog).slots).map(object);
     const actual = new Set(source.materials.map(canonical));
     if (!same(record.logicalBoundsAsset, source.bounds) || slots.length !== source.materials.length ||
       slots.some(s => !actual.delete(canonical({ sourceLocator: s.sourceLocator!, sourceSemantics: s.sourceSemantics! }))) || actual.size)
       throw Error('モデルの形状・材質と表示情報が一致しません。');
     decoded.set(string(record.id), source);
-    models.push({ shape: isPointModel(source) ? 'render-point' : 'render-glb', key: `${review.token}/${record.id}`, assetId: string(asset.id),
-      assetToProject: asset.assetToProject as unknown as ReadonlyRenderModel['assetToProject'], representation: record as ReadonlyRenderModel['representation'] });
+    if(record===visuals[0])models.push({ shape: isGsModel(source) ? 'render-gs' : isPointModel(source) ? 'render-point' : 'render-glb', key: `${review.token}/${record.id}`, assetId: string(asset.id),
+      assetToProject: asset.assetToProject as unknown as ReadonlyRenderModel['assetToProject'], representation: record as ReadonlyRenderModel['representation'],...(proxies[0]?{proxy:proxies[0] as NonNullable<ReadonlyRenderModel['proxy']>}: {}) });
+    }
   }
   for (const record of Object.values(table(snapshot, 'mediaResourcesById'))) {
     const blob = object(record.blob); if (record.mediaKind !== 'image' || !projectImageMime(blob.mediaType)) throw Error('このメディアの表示形式は未対応です。');

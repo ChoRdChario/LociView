@@ -217,7 +217,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     if (disposed || host !== target) { next.dispose(); return; }
     resident = next;
     const fileTools = receiveTools;
-    try { workspace = ports.productEditor || target.authority.read().modelVersions?.some(v => v.closure.shape === 'saved-point') ? createProductWorkspace(document, target, next.factory, fileTools,
+    try { workspace = ports.productEditor || target.authority.read().modelVersions?.some(v => ['saved-point','saved-gs'].includes(v.closure.shape)) ? createProductWorkspace(document, target, next.factory, fileTools,
       ports.renderModelCandidate ? display => ports.renderModelCandidate!(target, display) : undefined,
       { openProject: () => { void selectProject(); }, resumedLastProject: () => resumedLast, storageEstimate: ports.storageEstimate,
         changed: () => { rememberCurrent(); controls(); } }) : createSavedWorkspace(document, target, next.factory,

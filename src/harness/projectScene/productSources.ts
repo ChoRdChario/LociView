@@ -187,6 +187,7 @@ export function productSources(host: ReturnType<typeof createValidationModeHost>
         else ids.add(scene);
       }
       return { target: { kind: 'model', token: p.token, sceneId, assetId, bindingId: version.projection.bindingId },
+        ...(version.closure.shape==='saved-gs'?{gsProxyTarget:{sceneId,assetId,expectedBindingId:version.closure.binding.id,gsRepresentationId:version.closure.representation.id,gsPayloadDigest:version.closure.representation.payloadDigest,gsFamilyId:version.closure.representation.variantFamilyId,expectedProxyId:version.closure.proxy?.id??null}}:{}),
         replacementAvailable: version.closure.shape === 'saved-glb', pointCloud: version.closure.shape === 'saved-point', placement: version.closure.binding.assetToProject, rotationDegrees: rotationDegrees(version.closure.binding.assetToProject.rotationXYZW),
         sceneCount: uncertain ? { kind: 'unresolved', reason: 'conflict' } : value(ids.size) };
     },

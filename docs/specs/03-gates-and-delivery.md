@@ -344,6 +344,14 @@ Failure stops CAS production work and triggers a format/sink/desktop-packer ADR 
 
 ## 5. G1-B — renderer bakeoff
 
+PO amendment2026-10-27: the reviewed [01c](01c-gs-sh4-proxy-workflow-proposal.md)
+exact source/display companions, GSL1.4.3 fixed dependency and connected GS/Proxy
+workflow are approved for limited implementation in nondefault ProjectScene
+validation. This adds no ordinary-entry, large-source/SH4 paging, paired bakeoff,
+device/offline, renderer adoption or release credit. Existing01a/07j profiles and
+Native Spark remain unchanged. The following earlier evaluation boundary is
+retained as history; it does not veto this newly approved limited connection.
+
 PO amendment2026-10-27: [01b §6](01b-gs-proxy-project-scene-proposal.md#6-次工程と承認境界)
 authorizes limited evaluation of exact gaussian-splat-lite1.4.3 with exact
 Three.js/@types0.186.0, including compatibility, SH4, paging and lifecycle checks.

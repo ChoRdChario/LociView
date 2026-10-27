@@ -78,11 +78,11 @@ export function createFixtureModel(ids: FixtureModelIds, shape: 'original' | 'up
 }
 export type FixtureModelClosure = ReturnType<typeof createFixtureModel>;
 export function fixtureModelIds(c: DisplayModelClosure): FixtureModelIds {
-  if (c.shape === 'saved-glb') throw Error('実モデルのコピー・更新はこの検証画面では未接続です。');
+  if (c.shape === 'saved-glb' || c.shape === 'saved-point' || c.shape === 'saved-gs') throw Error('実モデルのコピー・更新はこの検証画面では未接続です。');
   return { asset: c.binding.assetId, assetFrame: c.assetFrame.id, representationFrame: c.representationFrame.id,
     binding: c.binding.id, revision: c.revision.id, representation: c.representation.id,
     family: c.representation.variantFamilyId, compatibility: c.revision.anchorCompatibilityClasses[0]!.id,
-    layout: c.representation.materialCatalog.layoutId, slot: c.representation.materialCatalog.slots[0]!.logicalMaterialSlotId };
+    layout: c.representation.materialCatalog!.layoutId, slot: c.representation.materialCatalog!.slots[0]!.logicalMaterialSlotId };
 }
 export function readFixtureModel(text: string): FixtureModelClosure {
   if (text.length > 65_536) throw new Error('合成モデルが大きすぎます。');

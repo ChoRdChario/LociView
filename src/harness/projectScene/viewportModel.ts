@@ -52,8 +52,8 @@ const tuple = (v: THREE.Vector3): V3 => {
   if (![v.x, v.y, v.z].every(Number.isFinite)) throw new Error('表示座標が扱える範囲を超えています。');
   return [v.x || 0, v.y || 0, v.z || 0];
 };
-export function placementMatrix(t: FixturePlacement): THREE.Matrix4 {
-  return new THREE.Matrix4().compose(new THREE.Vector3(...t.translation), new THREE.Quaternion(...t.rotationXYZW), new THREE.Vector3().setScalar(t.uniformScale));
+export function placementMatrix(t: FixturePlacement & {readonly reflection?:'none'|'x'}): THREE.Matrix4 {
+  return new THREE.Matrix4().compose(new THREE.Vector3(...t.translation), new THREE.Quaternion(...t.rotationXYZW), new THREE.Vector3(t.reflection==='x'?-t.uniformScale:t.uniformScale,t.uniformScale,t.uniformScale));
 }
 export function pointInProject(point: V3, placement: FixturePlacement): V3 {
   return tuple(new THREE.Vector3(...point).applyMatrix4(placementMatrix(placement)));

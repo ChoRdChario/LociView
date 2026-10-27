@@ -15,6 +15,7 @@ import type { SavedModelResidentPort } from './validationRender';
 import { hasBinaryCoverage } from '../../viewer/hardChroma';
 import { resolvePointPresentation, pointRegistrySnapshot, defaultPointProfile } from '../../domain/pointPresentation';
 import { createValidationCoverage, coveragePixel } from './validationCoverage';
+import type { GsRenderPort } from '../../viewer/gsRender';
 
 /** The saved resident port is explicit; the default still accepts only exact synthetic fixtures. */
 export const sceneViewportFactory = (saved?: SavedModelResidentPort): ViewportFactory => (canvas, changed, proposePin, proposeModel) => {
@@ -33,6 +34,7 @@ export const sceneViewportFactory = (saved?: SavedModelResidentPort): ViewportFa
   let width = 1, height = 1, rawPixelRatio = 0; let pointDiameterNotice: string | null = null; const pointDiameters = new Map<string, number>();
   let pickEpoch = 0;
   let coverageProbe: ReturnType<typeof createValidationCoverage> | null = null, coverageIssue: string | null = null;
+  let gsRender:GsRenderPort|null=null,gsGeneration=0,gsPreparing=false,gsIssue:string|null=null,gsPreparationAbort:AbortController|null=null;
   let gizmo: ReturnType<typeof createPinGizmo<PinSurfaceTarget | ModelPlacementTarget>> | null = null;
   let pinPointerActive = false;
   function syncOrbit(manipulating = Boolean(gizmo?.dragging)) {
@@ -73,7 +75,13 @@ export const sceneViewportFactory = (saved?: SavedModelResidentPort): ViewportFa
     }
     poses.set(display.sceneId, pose); backgrounds.set(display.sceneId, background); entryPending = false; axis = null;
   }
+  function clearGs() {
+    coverageIssue=null;
+    gsGeneration++;gsPreparationAbort?.abort();gsPreparationAbort=null;gsRender?.dispose();gsRender=null;gsPreparing=false;gsIssue=null;
+    for(const surface of resident.values())if(surface.gs){surface.gs.ready=false;surface.gs.issue=null;}
+  }
   function clearModels() {
+    clearGs();
     coverageProbe?.dispose(); coverageProbe = null; coverageIssue = null;
     for (const surface of resident.values()) surface.dispose?.();
     resident.clear();
@@ -198,9 +206,16 @@ export const sceneViewportFactory = (saved?: SavedModelResidentPort): ViewportFa
   }
   function renderFrame() {
     if (!renderer || !camera) return;
+    const sources=[...resident.values()].filter(s=>s.gs&&s.asset.visible).map(s=>s.gs!);
+    if((import.meta.env.DEV||import.meta.env.MODE==='project-scene-validation')&&sources.length&&!gsRender&&!gsPreparing&&!gsIssue){gsPreparing=true;const generation=gsGeneration,currentRenderer=renderer,abort=new AbortController();gsPreparationAbort=abort;
+      void import('../../viewer/gsRender').then(m=>{abort.signal.throwIfAborted();if(generation!==gsGeneration||renderer!==currentRenderer)throw new DOMException('表示準備を取り消しました。','AbortError');
+        return m.createGsRender(currentRenderer,sources,()=>{if(abort.signal.aborted||generation!==gsGeneration)return;pickEpoch++;serial++;changed();},abort.signal);}).then(port=>{
+        if(generation!==gsGeneration||renderer!==currentRenderer){port.dispose();return;}gsRender=port;gsPreparing=false;serial++;changed();
+      },e=>{if(generation===gsGeneration){gsIssue=errorText(e);gsPreparing=false;serial++;changed();}});}
     // Upload new projected attributes before Three traverses/uploads geometry, never in onBeforeRender.
-    for (const surface of resident.values()) if (surface.points) { const gl=renderer.getContext(); surface.points.project(camera,gl.getParameter(gl.DEPTH_BITS) as number); }
-    renderer.render(scene,camera);
+    const before=()=>{for (const surface of resident.values()) if (surface.points) { const gl=renderer!.getContext(); surface.points.project(camera!,gsRender?.depthBits??gl.getParameter(gl.DEPTH_BITS) as number); }};
+    if(gsRender){try{gsRender.render(scene,camera,before);}catch(e){gsIssue=errorText(e);const failed=gsRender;gsRender=null;try{failed.dispose();}catch(cleanup){gsIssue+=` ${errorText(cleanup)}`;}for(const s of sources){s.ready=false;s.issue=gsIssue;}pickEpoch++;serial++;changed();before();renderer.render(scene,camera);}}
+    else{before();renderer.render(scene,camera);}
   }
   function draw() {
     if (!active || disposed || !renderer || !camera) return;
@@ -220,7 +235,7 @@ export const sceneViewportFactory = (saved?: SavedModelResidentPort): ViewportFa
     if (resized) pickEpoch++;
     try {
       if (!renderer) {
-        renderer = new THREE.WebGLRenderer({ canvas, antialias: true }); renderer.outputColorSpace = THREE.SRGBColorSpace;
+        renderer = new THREE.WebGLRenderer({ canvas, antialias: true }); renderer.outputColorSpace = THREE.SRGBColorSpace;renderer.toneMapping=THREE.NoToneMapping;
         renderer.setPixelRatio(Math.min(globalThis.devicePixelRatio || 1, 2));
         if (entryPending) enterScene();
         else { pose = poses.get(display.sceneId) ?? pose; background = backgrounds.get(display.sceneId) ?? background; }
@@ -255,15 +270,24 @@ export const sceneViewportFactory = (saved?: SavedModelResidentPort): ViewportFa
   }
   function pointPick(targets: readonly PinSurfaceTarget[], x: number, y: number) {
     if (!renderer || !camera || !display || display.readOnly) return null;
+    coverageIssue=null;
+    const gs=targets.length===1?resident.get(targets[0]!.assetId):undefined;
+    if(gs?.gs){const position=pickResidentSurface(display,targets[0]!,resident,camera,new THREE.Vector2(x*2/width-1,1-y*2/height));if(!position)coverageIssue=gs.interactionIssue??gs.gs.issue;return position?{target:targets[0]!,position}:null;}
     const drawing = renderer.getDrawingBufferSize(new THREE.Vector2()), dpr = globalThis.devicePixelRatio || 1;
     const view = { cssWidth: width, cssHeight: height, devicePixelRatio: dpr, renderScale: Math.min(dpr, 2) / dpr };
     coverageIssue = null; renderFrame();
     const visible=pointVisibility(renderer,camera,resident,width,height,error=>{coverageIssue=errorText(error);});
+    const gsOverlap=[...resident.values()].some(s=>s.gs?.ready&&s.asset.visible);
+    const checkedVisibility={...visible,point(surface:ResidentSurface,index:number,ndc:THREE.Vector2){
+      const proof=visible.point(surface,index,ndc);
+      if(gsOverlap&&proof==='visible'){coverageIssue='GSと点の前後関係を確認できません。GSを非表示にして点を選択してください。';return 'unknown' as const;}
+      return proof;
+    }};
     try { return pickPointAwareCreation(display, targets, resident, camera, view, x, y, ndc => {
       const pixel = coveragePixel((ndc.x+1)*width/2, (1-ndc.y)*height/2, width, height, drawing); if (!pixel) throw Error('点の表示位置を確認できません。');
       coverageProbe ??= createValidationCoverage(renderer!);
       return coverageProbe.begin(camera!, pixel, error => { coverageIssue = errorText(error); });
-    }, renderer.getContext().getParameter(renderer.getContext().DEPTH_BITS) as number,visible); } finally { visible.dispose(); }
+    }, gsRender?.depthBits??renderer.getContext().getParameter(renderer.getContext().DEPTH_BITS) as number,checkedVisibility); } finally { visible.dispose(); }
   }
   function reportPickIssue() { if (coverageIssue) { serial++; changed(); } }
   canvas.addEventListener('webglcontextlost', lost);
@@ -273,7 +297,7 @@ export const sceneViewportFactory = (saved?: SavedModelResidentPort): ViewportFa
       const sceneChanged = display?.sceneId !== next.sceneId;
       const boundsChanged = JSON.stringify(display?.bounds) !== JSON.stringify(next.bounds);
       const visibilityChanged = JSON.stringify(display?.hiddenAssetIds) !== JSON.stringify(next.hiddenAssetIds);
-      if (visibilityChanged) pickEpoch++;
+      if (visibilityChanged) {pickEpoch++;if([...resident.values()].some(s=>s.gs))clearGs();}
       if (sceneChanged) observePose(); display = next;
       if (sceneChanged) { entryPending = true; if (renderer) { enterScene(); installPose(); } }
       else if (boundsChanged) { observePose(); installPose(); }
@@ -287,14 +311,14 @@ export const sceneViewportFactory = (saved?: SavedModelResidentPort): ViewportFa
     setPinPointerActive(next) { pinPointerActive = next; syncOrbit(); },
     pick(target, x, y) {
       if (!active || disposed || !renderer || !camera || issue || contextLost || dragging || gizmo?.dragging || !display || display.readOnly) return null;
-      try { if ([...resident.values()].some(s => s.points)) { const hit = pointPick([target], x, y); reportPickIssue(); return coverageIssue ? null : hit?.position ?? null; }
+      try { if ([...resident.values()].some(s => s.points&&s.asset.visible&&s.points.object.visible)) { const hit = pointPick([target], x, y); reportPickIssue(); return coverageIssue ? null : hit?.position ?? null; }
         const sample = pickSample(x, y); if (!sample) return null;
         const result = pickResidentSurface(display, target, resident, camera, sample.ndc, sample.coverage); reportPickIssue(); return coverageIssue ? null : result;
       } catch (error) { coverageIssue = errorText(error); reportPickIssue(); return null; }
     },
     pickCreation(targets, x, y) {
       if (!active || disposed || !renderer || !camera || issue || contextLost || dragging || gizmo?.dragging || !display || display.readOnly) return null;
-      try { if ([...resident.values()].some(s => s.points)) { const hit = pointPick(targets, x, y); reportPickIssue(); return coverageIssue ? null : hit; }
+      try { if ([...resident.values()].some(s => s.points&&s.asset.visible&&s.points.object.visible)) { const hit = pointPick(targets, x, y); reportPickIssue(); return coverageIssue ? null : hit; }
         const sample = pickSample(x, y); if (!sample) return null;
         const result = pickResidentCreation(display, targets, resident, camera, sample.ndc, sample.coverage); reportPickIssue(); return coverageIssue ? null : result;
       } catch (error) { coverageIssue = errorText(error); reportPickIssue(); return null; }
@@ -314,8 +338,8 @@ export const sceneViewportFactory = (saved?: SavedModelResidentPort): ViewportFa
       return { token: JSON.stringify([serial, display?.sceneId, display?.projectFrameId, display?.bounds, width, height, pose, background]),
         display: display ?? undefined,
         pickToken: String(pickEpoch),
-        ready: Boolean(active && renderer && camera && !issue), issue,
-        notice: [notice, coverageIssue, pointDiameterNotice, ...new Set([...resident.values()].flatMap(s => s.points?.issue ? [s.points.issue] : [])), alphaPicking && !display?.readOnly ? '半透明・切り抜きの面へのピン配置は未接続です。原本の見た目は保持しています。' : null,
+        ready: Boolean(active && renderer && camera && !issue), issue,retryAvailable:!!gsIssue||[...resident.values()].some(s=>s.gs?.issue!==null&&s.gs?.issue!==undefined&&s.gs.issue!=='GSの表示を準備しています。'),
+        notice: [notice, coverageIssue, gsIssue, pointDiameterNotice, ...new Set([...resident.values()].flatMap(s => [s.points?.issue,s.gs?.issue].filter(Boolean))), alphaPicking && !display?.readOnly ? '半透明・切り抜きの面へのピン配置は未接続です。原本の見た目は保持しています。' : null,
           ...new Set(display?.pins.flatMap(p => p.notice ? [p.notice] : []) ?? []),
           ...(display?.materialNotices ?? []), ...Object.values(display?.materials ?? {}).flatMap(m => 'issue' in m ? [m.issue] : []),
           ...Object.values(display?.savedMaterials ?? {}).flatMap(rows => Object.values(rows).flatMap(m => 'issue' in m ? [m.issue] : []))].filter(Boolean).join(' ') || null,

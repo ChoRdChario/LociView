@@ -24,6 +24,7 @@ export interface ViewportObservation {
   readonly pickToken?: string;
   readonly manipulating?: boolean;
   readonly notice?: string | null;
+  readonly retryAvailable?: boolean;
   readonly projection: 'perspective' | 'orthographic'; readonly axis: ViewAxis | null;
   readonly pins: readonly { id: string; x: number; y: number; visible: boolean }[];
   readonly preview?: { readonly x: number; readonly y: number; readonly visible: boolean };
@@ -50,7 +51,7 @@ export function createViewportHost(document: Document, session: SyntheticSession
   const root = document.createElement('section'); root.className = 'lv-development-viewport'; root.setAttribute('aria-label', '3D表示');
   const mediaViewer = sharedViewer ?? createMediaViewer(document); if (!sharedViewer) root.append(mediaViewer.root);
   const canvas = document.createElement('canvas'); canvas.tabIndex = 0;
-  canvas.setAttribute('aria-label', session.snapshot.modelVersions?.some(v => ['saved-glb','saved-point'].includes(v.closure.shape)) ? '3Dモデルの表示' : '合成モデルの3D表示');
+  canvas.setAttribute('aria-label', session.snapshot.modelVersions?.some(v => ['saved-glb','saved-point','saved-gs'].includes(v.closure.shape)) ? '3Dモデルの表示' : '合成モデルの3D表示');
   const overlay = document.createElement('div'); overlay.className = 'lv-development-pin-layer';
   const preview = document.createElement('div'); preview.className = 'lv-development-pin-preview'; preview.textContent = '仮の位置'; preview.hidden = true;
   const status = document.createElement('p'); status.setAttribute('role', 'status');
@@ -145,7 +146,7 @@ export function createViewportHost(document: Document, session: SyntheticSession
     const dragChanged = session.setViewportDragging(observed?.dragging ?? false);
     const stateChanged = session.setViewportState(Boolean(observed?.ready && !error), display?.models.filter(m => !('issue' in (display?.materials?.[m.binding.assetId] ?? {}))).map(m => m.binding.assetId) ?? [], error ?? observed?.issue ?? observed?.notice ?? null);
     status.textContent = error ?? observed?.issue ?? observed?.notice ?? (observed?.ready ? '' : '3D表示は未接続です。'); status.hidden = !status.textContent;
-    retry.hidden = !factory || (!error && !observed?.issue);
+    retry.hidden = !factory || (!error && !observed?.issue&&!observed?.retryAvailable);
     // Preserve measurable layout while initialization waits for attachment/resize.
     canvas.style.visibility = error || !observed?.ready ? 'hidden' : 'visible';
     for (const [id, pin] of pins) {

@@ -6599,7 +6599,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     for (const change of [(c: any) => { c.expectedBindingId = `bnd_${newId()}`; },
       (c: any) => { c.binding.assetToProject.uniformScale = 3; }, (c: any) => { c.representation.extra = true; },
       (c: any) => { c.revision.anchorCompatibilityClasses[0].id = old.projection.anchorCompatibilityIds[0]; },
-      (c: any) => { c.representation.materialCatalog.slots[0].logicalMaterialSlotId = old.closure.representation.materialCatalog.slots[0]!.logicalMaterialSlotId; }]) {
+      (c: any) => { c.representation.materialCatalog.slots[0].logicalMaterialSlotId = old.closure.representation.materialCatalog!.slots[0]!.logicalMaterialSlotId; }]) {
       const copy = structuredClone(command); change(copy); expect(() => planMetadataEdit(provider, copy, metadata)).toThrow();
     }
     const file = { name: '不正', size: 3, arrayBuffer: vi.fn(async () => new Uint8Array(3).buffer) };
@@ -7464,7 +7464,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect(planMetadataEdit(provider, edit, metadata)).toHaveLength(5);
     const old = s.snapshot.modelVersions![0]!.closure;
     for (const change of [() => { edit.asset = { ...edit.asset, assetFrameId: old.assetFrame.id }; }, () => { edit.asset = { ...edit.asset, id: old.binding.assetId }; },
-      () => { (edit.representation.materialCatalog as any).slots[0].logicalMaterialSlotId = old.representation.materialCatalog.slots[0]!.logicalMaterialSlotId; }]) {
+      () => { (edit.representation.materialCatalog as any).slots[0].logicalMaterialSlotId = old.representation.materialCatalog!.slots[0]!.logicalMaterialSlotId; }]) {
       const saved = structuredClone(edit); change(); expect(() => planMetadataEdit(provider, edit, metadata)).toThrow(); Object.assign(edit, saved);
     }
     const prepared = await host.content.prepareModel({ label: '所有する入力', bytes: glb() }, `ast_${newId()}`);

@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import type { SyntheticDisplay, V3 } from './viewportModel';
 import type { PointViewport } from '../../domain/pointPresentation';
 import { hasBinaryCoverage } from '../../viewer/hardChroma';
+import type { GsDisplayResident } from '../../viewer/gsRender';
 
 /** Ephemeral exact resident target; never saved source provenance or an inferred relation. */
 export interface PinSurfaceTarget {
@@ -10,7 +11,7 @@ export interface PinSurfaceTarget {
   readonly familyId: string; readonly compatibilityId: string;
 }
 export interface ResidentPoints { readonly positions: Float32Array; readonly representationId: string; readonly object: THREE.Object3D; project(camera: THREE.Camera, depthBits: number): { readonly centersCss: Float32Array; readonly depths: Float32Array; readonly eligible: Uint8Array; readonly depthBits: number }; diameter: number; issue: string | null; configure(view: PointViewport, diameter: number): string | null }
-export interface ResidentSurface { readonly points?: ResidentPoints; readonly mesh: THREE.Object3D; readonly asset: THREE.Group; dispose?(): void }
+export interface ResidentSurface { readonly gs?: GsDisplayResident; readonly interaction?:THREE.Object3D;readonly interactionIssue?:string|null;readonly points?: ResidentPoints; readonly mesh: THREE.Object3D; readonly asset: THREE.Group; dispose?(): void }
 export type PickCoverage = (hit: THREE.Intersection<THREE.Object3D>, material: THREE.Material) => 'covered' | 'discarded' | 'unknown';
 
 /** Other resident models can occlude, never become the requested target. */
@@ -24,6 +25,14 @@ export function pickResidentSurface(display: SyntheticDisplay, target: PinSurfac
     model.representation.variantFamilyId !== target.familyId || !model.revision.anchorCompatibilityClasses.some(c =>
       c.id === target.compatibilityId && c.targetVariantFamilyIds.includes(target.familyId))) return null;
   camera.updateMatrixWorld(true);
+  if(selected.gs){
+    if(!selected.asset.visible || !selected.gs.ready || !selected.interaction)return null;
+    const ray=new THREE.Raycaster();ray.layers.set(31);ray.setFromCamera(ndc,camera);
+    if(camera instanceof THREE.OrthographicCamera)ray.ray.origin.set(ndc.x,ndc.y,-1).unproject(camera);
+    selected.asset.updateMatrixWorld(true);
+    const hit=ray.intersectObject(selected.interaction,true).find(h=>{const p=h.point.clone().project(camera);return [p.x,p.y,p.z].every(Number.isFinite)&&p.z>=-1&&p.z<=1;});
+    if(!hit)return null;const p=selected.asset.worldToLocal(hit.point.clone());return p.toArray().every(Number.isFinite)?p.toArray().map(n=>n||0) as unknown as V3:null;
+  }
   const hit = (surface: ResidentSurface) => residentMeshFragment(surface, camera, ndc, coverage);
   const chosen = hit(selected); if (!chosen) return null;
   if (chosen.decision !== 'covered') return null;

@@ -1,3 +1,4 @@
+import { createGsProxyWorkflow } from './gsProxyWorkflow';
 import type { PhotoDecoder } from '../../projectFiles/photo';
 import type { WorkspaceFS } from '../../platform/fs';
 import { ProjectMutationCoordinator, type ProjectMutationSession } from '../../platform/projectLock';
@@ -295,6 +296,7 @@ async function openNormalValidationHost(options: ValidationHostOptions, inherite
         failure = error instanceof Error ? error.message : '保存できません。入力は保持しています。'; throw error; }
       finally { busy = false; if (operation === work) operation = undefined; }
     };
+    let gsProxy:ReturnType<typeof createGsProxyWorkflow>|undefined;
     const resume = async () => {
       if (unfinishedReceive()) throw Error('「更新ファイル」の中断した受信を確認してください。');
       if (receiveDisplayPending && last.state === 'ready') {
@@ -308,7 +310,7 @@ async function openNormalValidationHost(options: ValidationHostOptions, inherite
         initializing && await hasLociMyuConversion(fs) ? await resumeLociMyuConversion(fs, options.store, session, options.fileLimits, `prj_${run}`, options.decode, options.jpeg, options.photo) :
         initializing && await hasFrozenV1Conversion(fs) ? await resumeFrozenV1Conversion(fs, options.store, session, options.fileLimits, `prj_${run}`, options.decode, options.jpeg, options.photo) :
         initializing ? await resumeValidationCreation(fs, session, `prj_${run}`) : await session.retry());
-      content.releasePreparedImages(); content.releasePreparedModels(); return result;
+      gsProxy?.completed();content.releasePreparedImages(); content.releasePreparedModels(); return result;
     };
     if (fresh && options.initial) { try { await execute(resume); } catch { /* Keep exact creation input for retry. */ } }
     const editable = (recovery = false) => {
@@ -535,7 +537,9 @@ async function openNormalValidationHost(options: ValidationHostOptions, inherite
       return { display, read: last };
     }, true);
     const dispatch = async (token: string, command: MetadataEdit) => (await commitCommand(token, command)).read;
+    gsProxy=createGsProxyWorkflow(content,async()=>{editable();const r=await session.read();if(r.state!=='ready'||!r.provider)throw Error('更新を完了してください。');return r.provider;},(token,command)=>execute(async()=>{editable();return ready(await session.edit(token,command));},true));
     const authority: SyntheticAuthority = {
+      prepareGsProxy: gsProxy.prepare, commitGsProxy: gsProxy.commit, cancelGsProxy: gsProxy.cancel,
       storage: 'saved-development', writeScope: 'caption-text',
       capabilities: { pins: true, membership: true, color: true, views: true, media: true, materials: true, sceneAuthoring: true, placement: true, transform: true },
       get readOnly() { return closed || fs.mutationAuthority.accessState !== 'editable'; },
@@ -571,7 +575,7 @@ async function openNormalValidationHost(options: ValidationHostOptions, inherite
           if (bytes.length !== file.size) throw Error('選択したモデルの大きさが一致しません。');
           const records = await content.prepareModel({ label: file.name, bytes }, target.assetId);
           try {
-            const result = await ready(await session.edit(token, { kind: 'addAsset', sceneId: target.sceneId, ...records,
+            const result = await ready(await session.edit(token, { kind: records.representation.role==='gsPrimary' ? 'addGsAsset' : 'addAsset', sceneId: target.sceneId, ...records,
               membership: { id: `sam_${newId()}`, sceneId: target.sceneId, assetId: target.assetId, orderKey,
                 lifecycle: { state: 'active', reason: 'initial', eventId: `evt_${newId()}` } } }));
             content.releasePreparedModels(); return result;
@@ -613,7 +617,7 @@ async function openNormalValidationHost(options: ValidationHostOptions, inherite
             throw Error('モデルが更新されています。配置の入力を保持しています。');
           const versions = await validationModelVersions(before.provider);
           const source = versions.find(v => v.assetId === captured.assetId && v.projection.bindingId === captured.expectedBindingId)?.closure;
-          if (!source || !['saved-glb', 'saved-point'].includes(source.shape)) throw Error('配置するモデルを確認してください。');
+          if (!source || !['saved-glb', 'saved-point', 'saved-gs'].includes(source.shape)) throw Error('配置するモデルを確認してください。');
           const binding = await sealValidationRecord('asset-binding-revision', { id: captured.bindingId, assetId: captured.assetId,
             assetRevisionId: source.revision.id, parentBindingId: source.binding.id, method: 'manual',
             assetToProject: captured.placement as unknown as JsonObject });
