@@ -38,6 +38,8 @@ The [01d internal refinement](docs/specs/01d-gs-file-backed-source.md) keeps GS
 originals as native File/Blob snapshots through shared streamed inspection/hash,
 checked CAS views and the fixed public decoder input. Stream-only backends retain
 their bounded byte fallback; current limits and Project/package authority remain.
+[01e](docs/specs/01e-desktop-large-gs-workflow.md) records the approved integrated
+Desktop large-SH4/ordinary-root candidate; actual implementation/evidence is in todo.
 The composition's model, Saved View, material and attachment panels reuse their pure controls;
 `projectMedia.ts` connects attachment management to the common `mediaPreview.ts` viewer.
 The composition reuses `captionWindowControls.ts` for Scene-local comparison

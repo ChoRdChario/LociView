@@ -12,11 +12,14 @@ export interface ModelPlacementTarget {
 
 /** Transient ProjectFrame marker; model-only rotation/uniform scale, never a history write. */
 export function createPinGizmo<T = PinSurfaceTarget>(canvas: HTMLCanvasElement, scene: THREE.Scene, camera: THREE.Camera,
-  propose: (target: T, position: V3, manipulation?: ModelManipulation, phase?: 'begin' | 'adjust' | 'restore') => boolean, activity: (dragging: boolean) => void) {
+  propose: (target: T, position: V3, manipulation?: ModelManipulation, phase?: 'begin' | 'adjust' | 'restore') => boolean, activity: (dragging: boolean) => void,
+  invalidate?: () => void) {
   const marker = new THREE.Object3D(), control = new TransformControls(camera, canvas), helper = control.getHelper();
   control.setMode('translate'); control.setSpace('world'); control.setSize(1);
   scene.add(marker, helper);
   let current: GizmoProposal<T> | undefined, beforeProposal: GizmoProposal<T> | undefined, disposed = false, syncing = false;
+  const changed = () => { if (!disposed) invalidate?.(); };
+  control.addEventListener('change', changed);
   const pointers = new Set<number>(); let owner: number | null = null, blocked = false, releasing: number | null = null;
   const before = new THREE.Object3D(), accepted = new THREE.Object3D();
   const copy = (to: THREE.Object3D, from: THREE.Object3D) => { to.position.copy(from.position); to.quaternion.copy(from.quaternion); to.scale.copy(from.scale); };
@@ -96,7 +99,7 @@ export function createPinGizmo<T = PinSurfaceTarget>(canvas: HTMLCanvasElement, 
       marker.updateMatrixWorld(true); control.attach(marker); enable();
     },
     dispose() {
-      disposed = true; control.detach(); control.dispose(); marker.removeFromParent(); helper.removeFromParent();
+      disposed = true; control.removeEventListener('change', changed); control.detach(); control.dispose(); marker.removeFromParent(); helper.removeFromParent();
       canvas.removeEventListener('pointerdown', down, true); canvas.removeEventListener('pointermove', move, true);
       canvas.removeEventListener('pointerup', up, true); canvas.removeEventListener('pointercancel', cancel, true);
       canvas.removeEventListener('lostpointercapture', lost, true); canvas.removeEventListener('keydown', key);

@@ -33,6 +33,12 @@ Read only the relevant topic, not every historical incident.
   completion. Refactor as needed for integration; fix blocking/data-loss defects
   promptly and keep ordinary performance polish in backlog. Reports distinguish
   missing implementation, integration, acceptance and performance explicitly.
+  Further PO correction: repeated limited evaluations/internal improvements must
+  lead to a larger usable workflow. Use large SH4 open→position→save→cold resume
+  and ordinary-entry integration as the completion unit; qualify alternatives
+  only to resolve a concrete blocker, then implement or present the real grouped
+  policy/architecture decision. Do not keep requiring another "continue" for
+  routine authorized sequencing.
 - 2026-09-20: Runtime checks also have a UX cost. Measure the complete user
   action's I/O amplification before adding more validation. Reuse owned evidence
   within an explicitly bounded operation; retain input, write, publication and

@@ -14,6 +14,7 @@ import { checkFileLimits, fileError, validationGlbProfile, jpegGlbProfile, valid
 export interface ValidationFile { readonly label: string; readonly bytes: Uint8Array; readonly file?: never }
 export interface ValidationBlobFile { readonly label: string; readonly file: Blob; readonly bytes?: never }
 export type ValidationModelFile = ValidationFile | ValidationBlobFile;
+export interface ValidationPackageFile { readonly label: string; readonly package: Blob }
 export type ValidationByteBody = { readonly ref: StoredBlobRef; readonly bytes: Uint8Array; readonly file?: never };
 export type ValidationBlobBody = { readonly ref: StoredBlobRef; readonly file: Blob; readonly bytes?: never };
 export type ValidationBody = ValidationByteBody | ValidationBlobBody;
@@ -36,12 +37,17 @@ const label = validationFileLabel;
 const fresh = (prefix: string) => `${prefix}_${newId()}`;
 export const identityPlacement = () => ({ translation: [0, 0, 0], rotationXYZW: [0, 0, 0, 1], uniformScale: 1 });
 
-/** Own native input before awaits; only GS keeps a file-backed source. */
-export async function validationModelFile(input: {label:string;file:Blob}, limits: FileValidationLimits): Promise<ValidationModelFile> {
+/** Own native input before awaits; GS and opted-in packages retain native views. */
+export function validationModelFile(input: {label:string;file:Blob}, limits: FileValidationLimits): Promise<ValidationModelFile>;
+export function validationModelFile(input: {label:string;file:Blob}, limits: FileValidationLimits, keepPackage: true): Promise<ValidationModelFile | ValidationPackageFile>;
+export async function validationModelFile(input: {label:string;file:Blob}, limits: FileValidationLimits, keepPackage=false): Promise<ValidationModelFile | ValidationPackageFile> {
   const name=input.label,file=captureGsBlob(input.file);
   if(!Number.isSafeInteger(file.size)||file.size<=0||file.size>limits.maxFileBytes)return fileError('選択したファイルがこの検証の上限を超えています。');
   const prefix=new Uint8Array(await file.slice(0,65536).arrayBuffer());
   if(isPointPly(prefix)&&hasGsPlySignature(prefix))return {label:name,file};
+  // Dispatch hint only: existing archive/conversion inspectors still admit all bytes.
+  if(keepPackage&&prefix[0]===0x50&&prefix[1]===0x4b&&
+    (prefix[2]===3&&prefix[3]===4||prefix[2]===5&&prefix[3]===6||prefix[2]===7&&prefix[3]===8))return {label:name,package:file};
   return {label:name,bytes:new Uint8Array(await file.arrayBuffer())};
 }
 

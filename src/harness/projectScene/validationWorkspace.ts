@@ -419,8 +419,14 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     const models: ValidationModelFile[] = [], media: ValidationFile[] = [], packages: Blob[] = []; let actualTotal = 0;
     for (const item of selection) {
       const selectedFile:{readonly size:number;arrayBuffer():Promise<ArrayBuffer>}=item.file;
-      const file:ValidationModelFile = selectedFile instanceof Blob ? await validationModelFile({label:item.label,file:selectedFile},ports.fileLimits) : {label:item.label,bytes:new Uint8Array(await selectedFile.arrayBuffer())};
+      const selected = selectedFile instanceof Blob ? await validationModelFile({label:item.label,file:selectedFile},ports.fileLimits,true) : {label:item.label,bytes:new Uint8Array(await selectedFile.arrayBuffer())};
       if (!guardSelection(generation, context) || draft !== creationDraft) return;
+      if('package' in selected){
+        actualTotal+=selected.package.size;
+        if(!Number.isSafeInteger(actualTotal)||actualTotal>ports.fileLimits.maxFileBytes)throw Error('選択したファイルがこの検証の上限を超えています。');
+        packages.push(new File([selected.package],selected.label));continue;
+      }
+      const file:ValidationModelFile=selected;
       actualTotal += file.file ? file.file.size : file.bytes.byteLength;
       if (!Number.isSafeInteger(actualTotal) || actualTotal > ports.fileLimits.maxFileBytes) throw Error('選択したファイルがこの検証の上限を超えています。');
       if(file.file){models.push(file);continue;}

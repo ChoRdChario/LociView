@@ -28,7 +28,75 @@ in nondefault validation; code and executed tests determine its observed behavio
 01a adds approved XYZ/RGB ASCII PLY alongside admitted GLB and photos. This is not
 ordinary-entry activation, arbitrary-format support or general v2 adoption.
 
-## Next connected unit — full-SH4 tile qualification
+## Current unit — usable large-SH4 workflow and ordinary-entry integration
+
+PO renewed the outcome priority: advance substantially through an integrated
+large SH4 open→Proxy/manual position→edit/media→save→cold-resume workflow, with
+ordinary-entry composition included in the plan. Root is sole writer; bounded
+read-only agents map capacity/file limits, renderer and production entry.
+
+Plan: resolve the actual renderer/residency gap using the fixed public APIs and
+existing qualification facilities; test the existing provisional500k-row desktop
+case and lossless raw-page equivalence. In parallel, specify GS-specific capacity
+and native package re-entry so a large Project still accepts media, backups and
+returns. Reuse the existing typed product UI and extract its production adapters;
+never import harness authority into the ordinary UI. Complete all ordinary
+in-scope work; bring only a concrete grouped capacity/entry/format decision to PO.
+
+Meta-audit: clean g0-baseline/071190d at start, preceding workflow and checks are
+verified/pushed. Small internal checkpoints did not increase usable capacity;
+do not repeat that as the outcome. The evidence gap is full decoded memory/SH4
+paging and the real ordinary-entry contracts. Current production profiles,
+64MiB guard, namespaces, receipts and entry remain until the relevant decision.
+
+Qualification below is a subordinate decision check, not this unit's completion.
+
+Qualification now connects owned178MB/500k SH4 → actual typed UI → same-coordinate
+Proxy/manual pin/note/photo → backup → cold-open → independent absent-original
+restore → restored cold-open → interrupted generation recovery → new backup →
+final closed-browser resume. Full source token, all records and GS digest/length
+match; whole-GS arrayBuffer guard remains zero. `large-restored-save-batched.log`
+passes the final8min sequence with the original300s download deadline unchanged.
+The evaluated direct1440×900 renderer inspected/displayed in16.39s; six small
+lossless all-page comparisons match, but create no paging/LOD or device evidence.
+
+Retained failures identified idle full-GS drawing and restored output's tiny
+write/fence overhead. Internal01e§2 refinements now keep native ZIP views, draw
+only changed frames (including hover/async sort), show real GS preparation and
+aggregate already-checked ZIP output before unchanged generation/write/readback/
+receipt fences. Existing limits/profiles remain; extra I/O slots stay within64MiB.
+Focused scheduler/package/source/output-fault checks and independent meaningful
+source/test reviews pass. Meta-audit: preserve those safety boundaries, finish the
+existing bounded GS/five-purpose/Point/GPU regression and one serial final
+checkpoint; then present01e's grouped capacity/residency/ordinary-root candidate
+decision. Production64MiB, ordinary entry, paging and device/release gates remain.
+Artifacts/failures remain under ignored `.artifacts/e2e/gs-large-workflow/`.
+The three-case bounded GS/five-purpose/Point/GPU regression passes. A final
+read-only audit found LociMyu's foreign/no-table classifier still capturing the
+whole ZIP; metadata-only spreadsheet absence now avoids it without changing
+positive conversion/diagnostics or manifest precedence. Focused conversion/ZIP/
+module-boundary checks and independent diff review pass. Final browser previews
+of118KB/178MB backups forbid whole-ZIP stream/arrayBuffer capture, create no IDB,
+and pass. That focused changed-input proof follows the unchanged three-case
+regression; no all-purpose500k or ordinary-entry credit is implied.
+The frozen final source/test tree passes typecheck,125files/2,805tests with21existing
+TODO and serial normal/harness/validation builds. Static checks retain four exact
+GS companions,114local link paths, all15runtime/test fingerprints, normal/harness
+GS isolation, exact notices/SWs/Native Spark identity and byte-identical browser-
+qualified validation output. HEIC public-path isolation passes. Independent source/
+test reviews have no open findings. Prepare/push this suitable verified checkpoint;
+Git owns actual commit identity/state, not duplicated logs.
+
+PO approved the complete01e PC candidate package2026-10-27. Next connected outcome:
+ordinary root→new/continued ProjectScene→large GS/Proxy/edit/media→five-purpose
+handoff/receive/restore/cold, with split limits, shared resident ownership and the
+same historical namespace. Root remains sole writer; read-only agents map policy,
+composition ports/import boundaries and renderer lifetime. Record those concrete
+ports/acceptance before production extraction; then implement the complete flow,
+fault/browser checks, independent review and final serial checks. No more helper
+approvals; stop only the affected part for a genuinely new policy/dependency/wire/
+authority conflict or release/destructive boundary. The dedicated Desktop candidate
+has no SW/install activation; current normal/validation/Native/v1 lanes stay intact.
 
 The remaining concrete evidence gap is bounded decoded/resident ownership and
 full-SH4 paging. Current fixed GSL1.4.3 supports SH4 raw PLY/SPZ but its RAD/SOG

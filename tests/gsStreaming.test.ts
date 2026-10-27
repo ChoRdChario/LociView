@@ -29,6 +29,16 @@ describe('01d identical GS inspection over bounded source partitions',()=>{
       const selected=await validationModelFile({label:'original.ply',file},limits);expect(selected.file).toBeInstanceOf(Blob);expect(reads.length).toBeGreaterThan(1);expect(Math.max(...reads)).toBeLessThanOrEqual(65536);
     }finally{spy.mockRestore();}
   });
+  it('passes a captured native ZIP to existing inspectors without whole-body arrayBuffer or filename normalization',async()=>{
+    const bytes=new Uint8Array(100000);bytes.set([0x50,0x4b,3,4]);for(let i=4;i<bytes.length;i++)bytes[i]=i%251;
+    const expected=bytes.slice(),file=new Blob([bytes.slice().buffer]),original=Blob.prototype.arrayBuffer,reads:number[]=[];
+    const spy=vi.spyOn(Blob.prototype,'arrayBuffer').mockImplementation(function(this:Blob){reads.push(this.size);if(this.size>65536)throw Error('whole package forbidden');return original.call(this);});
+    try{
+      const input={label:'  元の名前.zip  ',file},pending=validationModelFile(input,limits,true);input.file=new Blob([new Uint8Array([0])]);bytes.fill(0);const selected=await pending;
+      expect('package' in selected).toBe(true);if(!('package' in selected))throw Error('package');expect(selected.label).toBe('  元の名前.zip  ');expect(new Uint8Array(await original.call(selected.package))).toEqual(expected);expect(reads).toEqual([65536]);
+      await expect(validationModelFile({label:'too large',file}, {...limits,maxFileBytes:file.size-1},true)).rejects.toThrow('上限');
+    }finally{spy.mockRestore();}
+  });
   it('rejects wrong declared/observed length, trailing/truncated data, nonfinite rows and malformed headers',async()=>{
     const bytes=gsFixture(),source=await inspectGsPly(bytes,limits);
     const nan=bytes.slice();new DataView(nan.buffer).setFloat32(source.headerBytes+3*4,NaN,true);

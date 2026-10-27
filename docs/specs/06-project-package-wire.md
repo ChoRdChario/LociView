@@ -1704,10 +1704,19 @@ ones) as well as divided chunks and output to the shared package counter. Do not
 feed a 16 MiB chunk into the codec's eager slice queue. With a streaming destination,
 the live input/raw-check clone pair is at most 32 MiB, owned metadata plus its output
 copy at most 16,000,000 bytes, manifest at most 1 MiB, all container headers below
-4 MiB, and the finite codec/bridge stages carry only 64 KiB chunks. This leaves
+4 MiB, and the finite codec stages carry only 64 KiB chunks. This leaves
 more than 10 MiB below the 64 MiB I/O ceiling for those small stages. A caller that
 accumulates the entire output is not an eligible streaming sink; sink/job admission
 and actual device/scale measurement remain separate. This is not a Wasm/heap bound.
+
+The2026-10-27 internal output refinement in[01e§2.2](01e-desktop-large-gs-workflow.md)
+groups already-counted/hashed small ZIP output into owned1MiB sink blocks, after
+the codec and before generation-scoped WorkspaceFS writes. Original per-input
+chunk/read charging,16MiB admission, source64KiB checks and every write/close/
+publication/readback fence remain unchanged. A large internal vendor chunk is
+passed through after flushing the partial, without another whole-chunk copy or
+a slice queue. Include at most6MiB additional assembly/output/job-bridge/fenced/OPFS copies
+in the existing shared64MiB accounting; this is not a larger product capacity.
 
 The read-only inspector starts at the exact final 22-byte EOCD. Bound ranges before
 allocation, check every fixed central/local field, signed descriptor, CRC and byte

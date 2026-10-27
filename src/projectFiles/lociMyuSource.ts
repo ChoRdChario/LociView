@@ -1,5 +1,5 @@
 import { inspectProjectImage, type PhotoDecoder } from './photo';
-import { inspectZipContainerIdentity, readZipEntries, sanitizeZipPath, type ZipEntryData } from '../assets/zipio';
+import { inspectZipContainerMetadata, readZipEntries, sanitizeZipPath, type ZipEntryData } from '../assets/zipio';
 import { buildImportPlan, sniffImageExt, type ImportPlan } from '../assets/importWizard';
 import { parseCsv } from '../io/csv';
 import { analyzeLociMyuSheets, isLociMyuCaptionSheet, lociMyuTrimV1 as trim, projectLociMyuCaptionSheetIdentities,
@@ -116,7 +116,8 @@ export interface OpenedLociMyuSource { original: Uint8Array; imported: ImportPla
 export async function openLociMyuSource(input: Blob, limits: FileValidationLimits, decode?: PngDecoder, jpeg?: JpegDecoder, photo?: PhotoDecoder): Promise<OpenedLociMyuSource | null> {
   checkFileLimits(limits); const file = input.slice();
   if (file.size > limits.maxFileBytes) refuse('ファイルが検査の上限を超えています。');
-  if (await inspectZipContainerIdentity(file) !== 'foreign') return null;
+  const container = await inspectZipContainerMetadata(file);
+  if (container.identity !== 'foreign' || !container.hasSpreadsheetEntry) return null;
   const original = await readValidationBody({ size: file.size, stream: () => file.stream() }, limits.maxFileBytes);
   const entries = await readZipEntries(original, zipLimits(limits)), preflightFailures = new Map<string, string>();
   for (const e of entries) if (/\.xlsx$/i.test(e.path)) {

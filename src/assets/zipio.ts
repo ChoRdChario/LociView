@@ -158,6 +158,7 @@ export interface ZipEntryData {
 }
 
 export type ZipContainerIdentity = 'v1' | 'native-portable' | 'foreign';
+export interface ZipContainerMetadata { readonly identity: ZipContainerIdentity; readonly hasSpreadsheetEntry: boolean }
 
 /**
  * Classifies a selected archive from bounded random-access metadata only. The
@@ -168,6 +169,14 @@ export async function inspectZipContainerIdentity(
   blob: Blob,
   limits: ZipLimits = DEFAULT_ZIP_LIMITS,
 ): Promise<ZipContainerIdentity> {
+  return (await inspectZipContainerMetadata(blob, limits)).identity;
+}
+
+/** Negative routing hint only; all format-specific payload checks remain required. */
+export async function inspectZipContainerMetadata(
+  blob: Blob,
+  limits: ZipLimits = DEFAULT_ZIP_LIMITS,
+): Promise<ZipContainerMetadata> {
   if (!Number.isSafeInteger(blob.size) || blob.size < 1) {
     throw new Error('ZIP identity: file is empty or too large');
   }
@@ -210,9 +219,8 @@ export async function inspectZipContainerIdentity(
     const files = new Set(normalizedEntries.filter((entry) => !entry.directory).map((entry) => entry.path));
     // Frozen v1 says the exact root manifest is authoritative. Preserve that
     // precedence even when forward-compatible/unknown extra entries exist.
-    if (files.has(V1_MANIFEST_ENTRY)) return 'v1';
-    if (files.has(NATIVE_PORTABLE_MANIFEST_ENTRY)) return 'native-portable';
-    return 'foreign';
+    const identity = files.has(V1_MANIFEST_ENTRY) ? 'v1' : files.has(NATIVE_PORTABLE_MANIFEST_ENTRY) ? 'native-portable' : 'foreign';
+    return Object.freeze({ identity, hasSpreadsheetEntry: [...files].some(path => /\.(xlsx|csv)$/i.test(path)) });
   } finally {
     await reader.close().catch(() => {});
   }

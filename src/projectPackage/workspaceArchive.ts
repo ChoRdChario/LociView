@@ -105,11 +105,29 @@ export async function writePackageArchive(capture: Pick<WorkspaceSourceCapture, 
     if (!same(control.entries.slice(2), [...source.map(({ path, sha256, byteLength }) => ({ path, sha256, byteLength })), ...capture.blobs])) fail('zip-source-table');
     const bridge = new TransformStream<Uint8Array, Uint8Array>();
     const hash = new NativeSha256(); let byteLength = 0, chunks = 0, bodyReads = 0, finished = false;
+    const sinkBlockBytes = 1_048_576;
+    let pendingOutput: Uint8Array | undefined, pendingBytes = 0;
+    const flushOutput = (controller: TransformStreamDefaultController<Uint8Array>) => {
+      if (pendingBytes) controller.enqueue(pendingOutput!.subarray(0, pendingBytes));
+      pendingOutput = undefined; pendingBytes = 0;
+    };
     const output = new TransformStream<Uint8Array, Uint8Array>({ transform(bytes, controller) {
       checkAbort(cancel.signal);
       if (!(bytes instanceof Uint8Array) || bytes.length > L.chunkBytes || ++chunks + bodyReads > L.packageChunks || bytes.length > control.archiveByteLength - byteLength) fail('zip-output-budget');
-      hash.update(bytes); byteLength += bytes.length; controller.enqueue(bytes);
-    }, flush() { checkAbort(cancel.signal); if (byteLength !== control.archiveByteLength) fail('zip-output-size'); finished = true; } });
+      hash.update(bytes); byteLength += bytes.length;
+      // Retain the existing vendor-owned large-chunk path; own only small pieces
+      // assembled across writes. Never add another whole 16MiB remainder copy.
+      if (bytes.length >= sinkBlockBytes) { flushOutput(controller); controller.enqueue(bytes); return; }
+      if (!bytes.length) return;
+      pendingOutput ??= new Uint8Array(sinkBlockBytes);
+      const first = Math.min(bytes.length, sinkBlockBytes - pendingBytes);
+      pendingOutput.set(bytes.subarray(0, first), pendingBytes); pendingBytes += first;
+      if (pendingBytes === sinkBlockBytes) flushOutput(controller);
+      if (first < bytes.length) {
+        pendingOutput = new Uint8Array(sinkBlockBytes);
+        pendingOutput.set(bytes.subarray(first)); pendingBytes = bytes.length - first;
+      }
+    }, flush(controller) { checkAbort(cancel.signal); if (byteLength !== control.archiveByteLength) fail('zip-output-size'); flushOutput(controller); finished = true; } });
     pipeline = bridge.readable.pipeThrough(output).pipeTo(destination, { signal: cancel.signal });
     void pipeline.catch(error => { cancel.abort(error); });
     const writer = new ZipWriter(bridge.writable, zipOptions(cancel.signal));

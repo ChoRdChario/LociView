@@ -11,6 +11,7 @@ import { BackupArchive } from '../../src/projectPackage/backupArchive';
 import { WorkspaceArchive } from '../../src/projectPackage/workspaceArchive';
 import { inspectProjectCandidates } from '../../src/domain/projectCandidates';
 import { validationMetadataLimits } from '../../src/projectFiles/validation';
+import { presentedCanvas } from './presentedCanvas';
 const entry='http://127.0.0.1:4182/dev.html?editor=project';
 const hash=(bytes:Uint8Array)=>createHash('sha256').update(bytes).digest('hex');
 const files=(p:Page)=>p.getByRole('region',{name:'ファイル',exact:true});
@@ -19,6 +20,11 @@ const sh4Row=Array(89).fill(0);sh4Row[28]=.5;sh4Row[82]=sh4Row[83]=sh4Row[84]=Ma
 const source=Buffer.from(gsFixture(4,Array.from({length:256},()=>sh4Row))),proxy=triangleGlb();
 async function guardWholeGsReads(context:BrowserContext){
   await context.addInitScript(()=>{
+    (window as any).gsDrawCalls=0;
+    for(const name of ['drawArrays','drawElements','drawArraysInstanced','drawElementsInstanced'] as const){
+      const originalDraw=WebGL2RenderingContext.prototype[name];
+      (WebGL2RenderingContext.prototype as any)[name]=function(...args:any[]){(window as any).gsDrawCalls++;return (originalDraw as Function).apply(this,args);};
+    }
     const original=Blob.prototype.arrayBuffer;(window as any).wholeGsReads=0;
     Blob.prototype.arrayBuffer=async function(){
       if(this.size>65536){const prefix=new Uint8Array(await original.call(Blob.prototype.slice.call(this,0,32)));
@@ -47,8 +53,8 @@ async function download(p:Page,info:TestInfo,name:string,purpose:'backup'|'teamW
 }
 async function inspectBackup(path:string){const backup=await BackupArchive.inspect(new Blob([Uint8Array.from(await readFile(path)).buffer]),validationMetadataLimits),c=await inspectProjectCandidates(backup.source.read(),validationMetadataLimits);if(c.kind!=='project-candidate-inspection')throw Error('GS backup');
   expect(Buffer.from(await backup.archive.entryBytes(`blobs/sha256/${hash(source)}`,source.length))).toEqual(source);return {backup,records:c.unambiguousRecords as Record<string,any>};}
-async function pixels(p:Page){return p.getByLabel('3Dモデルの表示',{exact:true}).evaluate((canvas:HTMLCanvasElement)=>new Promise<number[]>(resolve=>requestAnimationFrame(()=>{const gl=canvas.getContext('webgl2')!,out=new Uint8Array(4);gl.readPixels(Math.floor(canvas.width/2),Math.floor(canvas.height/2),1,1,gl.RGBA,gl.UNSIGNED_BYTE,out);resolve([...out]);})));}
-async function gsPainted(p:Page){await expect.poll(()=>p.getByLabel('3Dモデルの表示',{exact:true}).evaluate((canvas:HTMLCanvasElement)=>new Promise<number>(resolve=>requestAnimationFrame(()=>{const gl=canvas.getContext('webgl2')!,b=new Uint8Array(canvas.width*canvas.height*4);gl.readPixels(0,0,canvas.width,canvas.height,gl.RGBA,gl.UNSIGNED_BYTE,b);let colored=0;for(let i=0;i<b.length;i+=4)if(b[i]!>b[i+1]!+10&&Math.abs(b[i+1]!-b[i+2]!)<10)colored++;resolve(colored);}))),{timeout:90_000}).toBeGreaterThan(20);}
+async function pixels(p:Page){return (await presentedCanvas(p.getByLabel('3Dモデルの表示',{exact:true}))).sample;}
+async function gsPainted(p:Page){await expect.poll(async()=>(await presentedCanvas(p.getByLabel('3Dモデルの表示',{exact:true}))).red,{timeout:90_000}).toBeGreaterThan(20);}
 test('SH4と面の登録・記録・ファイル受渡し・復元・cold再開を接続する',async({},info)=>{
   test.setTimeout(900_000);A.getHeads(A.init());const dir='.artifacts/e2e/profiles';await mkdir(dir,{recursive:true});const profiles=await Promise.all(['a','b','r','v','c'].map(n=>mkdtemp(join(dir,`gs-${n}-`)))),contexts=new Set<BrowserContext>(),errors:string[]=[];
   const launch=async(index:number)=>{const context=await chromium.launchPersistentContext(profiles[index]!,{channel:'chromium',headless:true,viewport:{width:1440,height:1000},acceptDownloads:true,serviceWorkers:'block'});contexts.add(context);context.setDefaultTimeout(15_000);await context.tracing.start({screenshots:true,snapshots:true,sources:true});
@@ -59,6 +65,7 @@ test('SH4と面の登録・記録・ファイル受渡し・復元・cold再開�
   try{
     let a=await launch(0),p=a.page;
     await p.getByLabel('ファイルを選択',{exact:true}).setInputFiles({name:'全係数.ply',mimeType:'application/ply',buffer:source});await p.getByRole('button',{name:'ファイルを開く',exact:true}).click();await p.getByRole('textbox',{name:'プロジェクト名',exact:true}).fill('GSの作業');await p.getByRole('button',{name:'プロジェクトを作成',exact:true}).click();await ready(p);await gsReady(p);
+    await expect.poll(async()=>{const before=await p.evaluate(()=>(window as any).gsDrawCalls);expect(before).toBeGreaterThan(0);await p.waitForTimeout(250);return await p.evaluate(()=>(window as any).gsDrawCalls)-before;}).toBe(0);
     await p.getByRole('button',{name:'正面',exact:true}).click();const before=await pixels(p);expect(before[0]!).toBeGreaterThan(before[1]!+10);await addProxy(p);
     await p.getByRole('tab',{name:'モデル',exact:true}).click();const meshChooser=p.waitForEvent('filechooser');await modelPanel(p).getByRole('button',{name:'3Dモデルを追加',exact:true}).click();await(await meshChooser).setFiles({name:'独立モデル.glb',mimeType:'model/gltf-binary',buffer:triangleGlb()});await expect(p.getByText('モデルを追加しました。',{exact:true})).toBeVisible();
     await modelPanel(p).locator('.lv-model-select').filter({hasText:'独立モデル.glb'}).click();await modelPanel(p).getByRole('button',{name:'配置を調整',exact:true}).click();await modelPanel(p).getByLabel('モデル位置 X',{exact:true}).fill('3');await modelPanel(p).getByRole('button',{name:'配置を確定',exact:true}).click();await expect(p.getByText('モデルの配置を確定しました。',{exact:true})).toBeVisible();await modelPanel(p).locator('.lv-model-select').filter({hasText:'全係数.ply'}).click();

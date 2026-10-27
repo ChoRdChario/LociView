@@ -344,6 +344,17 @@ Failure stops CAS production work and triggers a format/sink/desktop-packer ADR 
 
 ## 5. G1-B — renderer bakeoff
 
+PO amendment2026-10-27: [01e](01e-desktop-large-gs-workflow.md) authorizes the
+reviewed Desktop candidate package: split GS/non-GS capacity, shared resident work
+guard, full-resident first Desktop stage, existing typed services and an ordinary
+root in the dedicated `project-scene-desktop` static build. Continue existing
+ProjectScene data in place; retain current normal/validation/Native/v1 policies,
+fixed dependencies/profiles, and no candidate SW/install activation. This explicit
+candidate connection needs no repeated helper approval. It passes no aggregate
+G1, iPhone, paging, offline, technology adoption or main/Pages/release gate.
+The full-resident staged exception is recorded in01§10; actual code/evidence
+remains in todo. Earlier narrower approvals below do not veto this approved scope.
+
 PO amendment2026-10-27: the reviewed [01c](01c-gs-sh4-proxy-workflow-proposal.md)
 exact source/display companions, GSL1.4.3 fixed dependency and connected GS/Proxy
 workflow are approved for limited implementation in nondefault ProjectScene

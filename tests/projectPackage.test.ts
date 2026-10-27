@@ -6,13 +6,13 @@ import { PACKAGE_LIMITS as L, SUMMARY_FIELDS, type Entry, type PackageManifest, 
 import { checkPackageEntryTable, packageByteHash, PackageControlError, readManifestControl } from '../src/projectPackage/manifest';
 import '@automerge/automerge'; // Node-only Wasm initialization.
 import * as A from '@automerge/automerge/slim';
-import { ZipReader, BlobReader, Uint8ArrayWriter } from '@zip.js/zip.js';
+import { ZipReader, BlobReader, Uint8ArrayWriter, configure } from '@zip.js/zip.js';
 import { fixture, limits as valueLimits } from './helpers/projectRecordsFixture';
 import { ProjectMetadataSource, type MetadataLimits } from '../src/projectMetadata/source';
 import { readProjectScene } from '../src/scene/projectProvider';
 import { developmentContentVerifier, developmentContentBytes } from '../poc/scene-history/content-verifier';
 import { WorkspaceSourceCapture } from '../src/projectPackage/workspaceSource';
-import { WorkspaceArchive, writeWorkspaceArchive, workspaceInputChunks, prepareWorkspaceManifest } from '../src/projectPackage/workspaceArchive';
+import { WorkspaceArchive, writeWorkspaceArchive, workspaceInputChunks, prepareWorkspaceManifest, writeCausalArchive } from '../src/projectPackage/workspaceArchive';
 import { VerifiedContributionBase, ContributionSourceCapture, ContributionArchive } from '../src/projectPackage/contributionSource';
 import { prepareContributionManifest, writeContributionArchive } from '../src/projectPackage/contributionArchive';
 import { planRemoteChanges } from '../src/projectMetadata/remote';
@@ -714,6 +714,51 @@ describe('complete backup originals and ZIP (not durable checkpoint or restore)'
 });
 
 describe('connected Workspace ZIP generation and integrity (not admission or external saving)', () => {
+  it('groups checked sink writes with exact ZIP bytes, full blocks and owned tails under backpressure', async () => {
+    const f = await workspaceFixture(), block = 1_048_576;
+    const template = (await PackageArchive.inspect(f.file)).control.manifest;
+    for (const exact of [true, false]) {
+      const make = (length: number) => {
+        const bytes = Uint8Array.from({ length }, (_, i) => i % 251), sha256 = packageByteHash(bytes);
+        const entry = { path: `blobs/sha256/${sha256}`, sha256, byteLength: length };
+        const blobs = [...f.capture.blobs, entry].sort((a, b) => a.path < b.path ? -1 : 1);
+        const m = structuredClone(template) as Mutable<PackageManifest>; m.blobs = blobs; recount(m);
+        const manifest = encode(canonical(m as unknown as JsonValue)), checksum = encode(packageByteHash(manifest));
+        return { bytes, entry, blobs, manifest, checksum, control: readManifestControl(manifest, checksum) };
+      };
+      let data = make(2 * block + 37);
+      if (exact) data = make(data.bytes.length + Math.ceil(data.control.archiveByteLength / block) * block - data.control.archiveByteLength);
+      const capture = { blobs: data.blobs, bodyRefs: [...f.capture.bodyRefs,
+        { ...f.capture.bodyRefs[0]!, digest: data.entry.sha256, byteLength: data.entry.byteLength }] };
+      const expected = new Uint8Array(await fixedZip([
+        { path: 'manifest.json', bytes: data.manifest }, { path: 'manifest.sha256', bytes: data.checksum },
+        { path: 'metadata.am', bytes: f.capture.metadataBytes() },
+        ...data.blobs.map(e => ({ path: e.path, bytes: e.sha256 === data.entry.sha256 ? data.bytes : f.bodies.get(e.sha256)! })),
+      ]).arrayBuffer());
+      try {
+        for (const chunkSize of [65_536, 2 * block]) {
+          configure({ chunkSize });
+          const parts: Uint8Array[] = [];
+          const result = await writeCausalArchive(capture, data, [{ path: 'metadata.am', bytes: f.capture.metadataBytes() }], {
+            openReadOnly: async (ref, limits) => ref.digest === data.entry.sha256
+              ? { size: data.bytes.length, stream: () => new Blob([data.bytes]).stream() }
+              : f.store.openReadOnly(ref, limits),
+          }, new WritableStream({ async write(bytes) {
+            // Retain actual sink blocks across later writes: reuse would corrupt them.
+            parts.push(bytes); await new Promise(resolve => setTimeout(resolve, 0));
+          } }), f.options);
+          const actual = Buffer.concat(parts);
+          expect(Buffer.compare(actual, Buffer.from(expected))).toBe(0); expect(result.sha256).toBe(packageByteHash(expected));
+          expect((await PackageArchive.inspect(new Blob(parts as BlobPart[]))).byteLength).toBe(expected.length);
+          if (chunkSize === 65_536) {
+            expect(parts).toHaveLength(Math.ceil(expected.length / block));
+            expect(parts.slice(0, -1).every(p => p.length === block)).toBe(true);
+            expect(parts.at(-1)!.length).toBe(exact ? block : expected.length % block);
+          } else { expect(parts.some(p => p.length >= block)).toBe(true); expect(parts.every(p => p.length <= L.chunkBytes)).toBe(true); }
+        }
+      } finally { configure({ chunkSize: 65_536 }); }
+    }
+  });
   it.each(['map1', 'map2'] as const)('rejects %s causal summary-profile relabelling after container checksums are recomputed', async profile => {
     const f = await workspaceFixture(profile), entries = await unpackFixture(f.file);
     const manifest = JSON.parse(new TextDecoder().decode(entries[0]!.bytes));

@@ -11,6 +11,7 @@ import { WorkspaceArchive } from '../../src/projectPackage/workspaceArchive';
 import { inspectProjectCandidates } from '../../src/domain/projectCandidates';
 import { validationMetadataLimits } from '../../src/projectFiles/validation';
 import { smallPng, triangleGlb } from './fixtures';
+import { presentedCanvas } from './presentedCanvas';
 
 const entry = 'http://127.0.0.1:4182/dev.html?editor=project';
 const tracing = process.env.LOCIVIEW_E2E_TRACE !== '0';
@@ -52,10 +53,7 @@ async function backupRecords(path: string) {
   return { backup, records: inspection.unambiguousRecords as Record<string, any> };
 }
 async function sample(page: Page, dx = 0, dy = 0) {
-  return page.getByLabel('3Dモデルの表示', { exact: true }).evaluate((canvas: HTMLCanvasElement, offset) => new Promise<number[]>(resolve => requestAnimationFrame(() => {
-    const gl = canvas.getContext('webgl2')!; const out = new Uint8Array(4), rect = canvas.getBoundingClientRect();
-    gl.readPixels(Math.floor((rect.width / 2 + offset[0]!) * canvas.width / rect.width), canvas.height - 1 - Math.floor((rect.height / 2 + offset[1]!) * canvas.height / rect.height), 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, out); resolve([...out]);
-  })), [dx,dy]);
+  return (await presentedCanvas(page.getByLabel('3Dモデルの表示', { exact: true }), dx, dy)).sample;
 }
 
 test('点群の元座標で記録し、画像・調整・受け渡し・閲覧・復元・cold再開までつながる', async ({}, info) => {

@@ -852,6 +852,13 @@ suppressed whenever its owning Asset is hidden.
 
 ## 10. Large GS and iOS lifecycle
 
+PO amendment2026-10-27: the approved[01e Desktop candidate](01e-desktop-large-gs-workflow.md)
+may first use bounded full-resident SH0–4 display and recovery with complete
+coefficients, explicit loading/cancellation and the approved shared work guard.
+This is a staged Desktop exception to progressive first preview/restore, not a
+withdrawal of the general requirements below or iPhone/G1/LOD/adoption credit.
+Originals stay file-backed/streamed; silent SH4→SH3 fallback remains forbidden.
+
 The resource state machine is:
 
 ```text

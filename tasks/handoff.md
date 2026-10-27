@@ -42,8 +42,12 @@ that authority and the current64MiB limit while replacing repeated GS source
 arrays with captured File/Blob input, shared streamed inspection/hash and checked
 CAS Blob views. Three independent reviews found no new PO decision within that
 exact scope. The bounded native File/Blob workflow is verified; todo owns its
-checkpoint and next full-SH4 tile qualification. Full decoded residency and SH4
-paging remain open.
+checkpoint. The current integrated large-SH4/ordinary-entry unit and actual
+failures/checks are in todo; [01e](../docs/specs/01e-desktop-large-gs-workflow.md)
+holds the grouped Desktop capacity/residency/ordinary-root candidate approved by
+PO2026-10-27. Continue its integrated implementation without helper approval waits;
+full SH4 paging, general ordinary activation, device/offline and release retain
+their actual gates. Todo owns verified checkpoints and remaining implementation.
 The PO approved [07j](../docs/specs/07j-three-186-compatibility-proposal.md) implementation
 and fixed dependencies on2026-10-27. Its bounded implementation retains:
 retain actual180 source math/proof/legacy keys and closed cleanup, then independently

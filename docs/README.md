@@ -38,6 +38,9 @@ record executed evidence and connections; do not infer those from a document tit
 | UI intent, writing, visual tone and interaction | [UI product guidelines](ui-product-guidelines.md); [UI task mapping](../tasks/uiux-handoff.md) for historical audit evidence |
 | Ownership, license or sponsorship | [licensing](licensing-and-ownership.md), [sponsorship](sponsorship-policy.md); direction is not adoption or a license grant |
 
+The [approved01e Desktop candidate](specs/01e-desktop-large-gs-workflow.md) groups
+large-SH4 capacity/residency/ordinary-root integration; implementation/evidence is in todo.
+
 An accepted ADR constrains implementation immediately. A proposal is not approval;
 approved direction is not technology adoption; code is not device/offline acceptance.
 If code/tests and an applicable contract conflict, record the discrepancy rather

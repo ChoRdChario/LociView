@@ -117,7 +117,7 @@ import { frozenV1ConversionIds, frozenV1SourceKey } from '../src/projectFiles/fr
 import { frozenV1Recipe, frozenV1DefaultViewRecipe, frozenV1PlacementRecipe, frozenV1MaterialRecipe, inspectFrozenV1Source } from '../src/projectFiles/frozenV1Source';
 import { prepareLociMyuConversion, resumeLociMyuConversion, readLociMyuConversionReport } from '../src/projectFiles/lociMyuConversion';
 import { lociMyuConversionIds, lociMyuSourceKey } from '../src/projectFiles/lociMyuMapping';
-import { lociMyuRecipe, lociMyuMaterialRecipe } from '../src/projectFiles/lociMyuSource';
+import { lociMyuRecipe, lociMyuMaterialRecipe, openLociMyuSource } from '../src/projectFiles/lociMyuSource';
 import { makeXlsx, type XlsxSheetSpec } from './helpers/makeXlsx';
 import { LOCIMYU_CAPTION_HEADER, planLociMyuCaptionIdentity } from '../src/io/locimyu';
 import { readZipEntries } from '../src/assets/zipio';
@@ -403,6 +403,26 @@ const lociMyuTestReceiptBytes = (receipt: unknown) => {
 };
 
 describe('limited real-format validation (synthetic GLB bytes, injected PNG decoder, memory storage)', () => {
+  it('declines a foreign package without spreadsheets using metadata only, while retaining spreadsheet diagnostics', async () => {
+    const writer = new ZipWriter(new Uint8ArrayWriter());
+    await writer.add('manifest.json', new Uint8ArrayReader(new TextEncoder().encode('{}')), { level: 0 });
+    await writer.add('blobs/sha256/body', new Uint8ArrayReader(new Uint8Array(1_048_576)), { level: 0 });
+    const file = new Blob([(await writer.close()).slice().buffer]), stream = Blob.prototype.stream, arrayBuffer = Blob.prototype.arrayBuffer;
+    const streamSpy = vi.spyOn(Blob.prototype, 'stream').mockImplementation(function(this:Blob) {
+      if (this.size === file.size) throw Error('whole archive capture forbidden'); return stream.call(this);
+    });
+    const arraySpy = vi.spyOn(Blob.prototype, 'arrayBuffer').mockImplementation(function(this:Blob) {
+      if (this.size === file.size) throw Error('whole archive arrayBuffer forbidden'); return arrayBuffer.call(this);
+    });
+    try { await expect(openLociMyuSource(file, { ...budget, maxFileBytes: 2_000_000 })).resolves.toBeNull(); }
+    finally { streamSpy.mockRestore(); arraySpy.mockRestore(); }
+    for (const path of ['.hidden.XLSX', 'folder/~$locked.xlsx']) {
+      const malformed = new Blob([(await writeZipEntries([{ path, data: new Uint8Array([1, 2, 3]) }])).slice().buffer]);
+      const opened = await openLociMyuSource(malformed, budget); expect(opened).not.toBeNull();
+      expect(opened!.preflightFailures.has(path)).toBe(true);
+    }
+  });
+
   it('photo companion fixes all eight 07e immutable identity vectors', async () => {
     const zero = '0'.repeat(32), one = '1'.repeat(64), caption = ['cap_0TVSSJ69V3DJPVB0ZMWRGZ7J40','1ade732327636cadb583f4e621f3c880e14d093ec00523b35cafee626bbc3309'] as const;
     const a = nativeConversionIds(zero,one,'native-project-scene-recipe-5'), b = nativeConversionIds(zero,one,'native-project-scene-recipe-6');

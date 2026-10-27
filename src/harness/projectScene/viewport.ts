@@ -31,6 +31,7 @@ export const sceneViewportFactory = (saved?: SavedModelResidentPort): ViewportFa
   let entryPending = false, notice: string | null = null;
   let pose = defaultPose(), display: RenderDisplay | null = null, modelKey = '', active = false, disposed = false, applying = false;
   let issue: string | null = null, contextLost = false, dragging = false, axis: ViewportObservation['axis'] = null, serial = 0, raf = 0, lastObservation = '';
+  let lastDrawSerial = -1, visualDirty = true;
   let width = 1, height = 1, rawPixelRatio = 0; let pointDiameterNotice: string | null = null; const pointDiameters = new Map<string, number>();
   let pickEpoch = 0;
   let coverageProbe: ReturnType<typeof createValidationCoverage> | null = null, coverageIssue: string | null = null;
@@ -168,7 +169,7 @@ export const sceneViewportFactory = (saved?: SavedModelResidentPort): ViewportFa
         surface.asset.updateMatrixWorld(true);
         const p = surface.asset.worldToLocal(new THREE.Vector3(...world));
         return [p.x, p.y, p.z].every(Number.isFinite) && proposePin(target, [p.x || 0, p.y || 0, p.z || 0], phase);
-      }, busy => { syncOrbit(busy); serial++; if (!applying) changed(); }) : null;
+      }, busy => { syncOrbit(busy); serial++; if (!applying) changed(); }, () => { visualDirty = true; }) : null;
       controls = new OrbitControls(camera, canvas); controls.enableDamping = false; controls.target.copy(target);
       controls.mouseButtons = { MIDDLE: THREE.MOUSE.ROTATE };
       controls.addEventListener('start', () => { dragging = true; serial++; changed(); });
@@ -223,7 +224,11 @@ export const sceneViewportFactory = (saved?: SavedModelResidentPort): ViewportFa
       // Reserve before notification: ready -> host render -> ensure may reenter synchronously.
       raf = requestAnimationFrame(draw);
       if (rawPixelRatio !== (globalThis.devicePixelRatio || 1)) ensure();
-      renderFrame();
+      if (visualDirty || lastDrawSerial !== serial) {
+        // Clear before drawing: decoder/sort callbacks may invalidate this frame.
+        visualDirty = false; lastDrawSerial = serial;
+        renderFrame();
+      }
       const fingerprint = JSON.stringify([serial, width, height, display?.token, display?.pins, display?.preview, pose, background]);
       if (fingerprint !== lastObservation) { lastObservation = fingerprint; changed(); }
     } catch (e) { fail(e); }
@@ -339,7 +344,7 @@ export const sceneViewportFactory = (saved?: SavedModelResidentPort): ViewportFa
         display: display ?? undefined,
         pickToken: String(pickEpoch),
         ready: Boolean(active && renderer && camera && !issue), issue,retryAvailable:!!gsIssue||[...resident.values()].some(s=>s.gs?.issue!==null&&s.gs?.issue!==undefined&&s.gs.issue!=='GSの表示を準備しています。'),
-        notice: [notice, coverageIssue, gsIssue, pointDiameterNotice, ...new Set([...resident.values()].flatMap(s => [s.points?.issue,s.gs?.issue].filter(Boolean))), alphaPicking && !display?.readOnly ? '半透明・切り抜きの面へのピン配置は未接続です。原本の見た目は保持しています。' : null,
+        notice: [notice, coverageIssue, gsIssue, pointDiameterNotice, ...new Set([...resident.values()].flatMap(s => [s.points?.issue,s.asset.visible && s.gs ? s.gs.issue ?? (!s.gs.ready && !gsIssue ? 'GSの表示を準備しています。' : null) : null].filter(Boolean))), alphaPicking && !display?.readOnly ? '半透明・切り抜きの面へのピン配置は未接続です。原本の見た目は保持しています。' : null,
           ...new Set(display?.pins.flatMap(p => p.notice ? [p.notice] : []) ?? []),
           ...(display?.materialNotices ?? []), ...Object.values(display?.materials ?? {}).flatMap(m => 'issue' in m ? [m.issue] : []),
           ...Object.values(display?.savedMaterials ?? {}).flatMap(rows => Object.values(rows).flatMap(m => 'issue' in m ? [m.issue] : []))].filter(Boolean).join(' ') || null,

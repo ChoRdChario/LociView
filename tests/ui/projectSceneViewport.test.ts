@@ -101,6 +101,30 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('synthetic Scene display; GPU mocked, not rendered/browser acceptance', () => {
+  it('draws after changes, keeps idle frames quiet, and retains hover/reentrant invalidation without UI edits', () => {
+    const canvas = fakeCanvas(), changed = vi.fn();
+    const v = createSyntheticViewport(canvas.canvas as unknown as HTMLCanvasElement, changed, () => true);
+    const display = syntheticDisplay(createSyntheticProject(), f.overview, null, null);
+    const tick = () => { const [id, frame] = [...tracker.raf][0]!; tracker.raf.delete(id); frame(); };
+    v.update(display); v.setActive(true); canvas.show();
+    const renderer = tracker.renderers[0]; expect(renderer.frames).toBe(1);
+    tick(); tick(); expect(renderer.frames).toBe(1);
+    const token = v.read().token, notifications = changed.mock.calls.length;
+    tracker.gizmos.at(-1).dispatchEvent({ type: 'change' }); tick();
+    expect(renderer.frames).toBe(2); expect(v.read().token).toBe(token); expect(changed).toHaveBeenCalledTimes(notifications);
+    tick(); expect(renderer.frames).toBe(2);
+    tracker.controls.at(-1).dispatchEvent({ type: 'change' }); tick(); expect(renderer.frames).toBe(3);
+    v.update({ ...display, token: 'updated' }); tick(); expect(renderer.frames).toBe(4);
+    canvas.show(900, 600); tick(); expect(renderer.frames).toBe(5);
+    vi.stubGlobal('devicePixelRatio', 2); tick(); expect(renderer.frames).toBe(6);
+    const draw = renderer.render.bind(renderer);
+    vi.spyOn(renderer, 'render').mockImplementationOnce((scene, camera) => {
+      draw(scene, camera); tracker.gizmos.at(-1).dispatchEvent({ type: 'change' });
+    });
+    v.update(display); tick(); tick(); expect(renderer.frames).toBe(8);
+    tick(); expect(renderer.frames).toBe(8); v.dispose(); expect(tracker.raf.size).toBe(0);
+  });
+
   it('renders a read-only DTO with camera controls but no edit gizmo or placement picking', () => {
     const base = syntheticDisplay(createSyntheticProject(), f.overview, null, null), canvas = fakeCanvas(), propose = vi.fn();
     const models: ReadonlyRenderModel[] = base.models.map(m => ({ shape: 'render-glb', key: m.binding.id,

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   inspectZipContainerIdentity,
+  inspectZipContainerMetadata,
   ZipGuardError,
 } from '../../src/assets/zipio';
 import { writeDirectZip } from '../helpers/maliciousZip';
@@ -22,6 +23,14 @@ class RootArrayBufferForbiddenBlob extends Blob {
 }
 
 describe('ordinary-entry ZIP container identity', () => {
+  it('reports spreadsheet candidates without changing identity or excluding hidden/lock names', async () => {
+    for (const path of ['data.CsV', '.hidden.xlsx', 'folder/~$locked.XLSX'])
+      await expect(inspectZipContainerMetadata(blob(await archive([path])))).resolves.toEqual({ identity: 'foreign', hasSpreadsheetEntry: true });
+    await expect(inspectZipContainerMetadata(blob(await archive(['manifest.json', 'blobs/sha256/body']))))
+      .resolves.toEqual({ identity: 'foreign', hasSpreadsheetEntry: false });
+    await expect(inspectZipContainerMetadata(blob(await archive(['lociview.json', 'native/package.json', 'data.csv']))))
+      .resolves.toEqual({ identity: 'v1', hasSpreadsheetEntry: true });
+  });
   it('keeps the frozen root v1 marker authoritative without reading the selected Blob wholesale', async () => {
     const bytes = await archive(['lociview.json', 'native/package.json', 'assets/model.bin']);
     const selected = new RootArrayBufferForbiddenBlob([new Uint8Array(bytes)], { type: 'application/zip' });
