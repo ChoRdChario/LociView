@@ -33,6 +33,7 @@ export function createValidationModeHost(initial: Host, open: (mode: LocalOpenMo
     replaceModelFile: (...a) => run(() => current.authority.replaceModelFile!(...a)),
     transformModel: (...a) => run(() => current.authority.transformModel!(...a)),
     retry: () => run(() => current.authority.retry!()),
+    get nativeConversionRecovery() {return current.authority.nativeConversionRecovery;},
   };
   const mode: SavedWorkspaceMode = {
     get current() { return current.authority.readOnly ? 'view' : 'edit'; },

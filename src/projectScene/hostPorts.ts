@@ -27,6 +27,7 @@ export interface ProjectAuthority {
   transformModel?(token: string, command: ModelPlacementCommand): WorkingResult<ProjectDisplay>;
   status?(): Readonly<{ kind: 'idle' | 'checking' | 'failed'; error?: string; retryable?: boolean }>;
   retry?(): WorkingResult<ProjectDisplay>;
+  readonly nativeConversionRecovery?: {sourceRequired(): Promise<boolean>; reselect(file: Blob): WorkingResult<ProjectDisplay>};
 }
 export type LocalOpenMode = 'view' | 'edit';
 export interface SavedWorkspaceMode {

@@ -19,6 +19,20 @@ status keeps existing per-target/overlap interaction rules. Both restore paths s
 await staged preparation. Todo records the verified loading checkpoint and
 the separate known500k Review command-latency failure; do not conflate those lanes.
 
+PO2026-10-28 approved the complete [07k Native Point/GS/Proxy conversion](../docs/specs/07k-native-point-gs-proxy-conversion-proposal.md).
+It preserves unknown units, exact source/coordinates and GS/Proxy relations using
+two additive profiles and recipe7. Desktop alone has the bounded512MiB Native
+original exception. Todo owns implementation/browser/fault/final-check status and
+the next missing format group; do not repeat helper or per-control PO approvals.
+Old recipes, private-source lifetime and adoption/release boundaries remain fixed.
+
+The next [07l Mesh/Proxy companion](../docs/specs/07l-mesh-import-conversion-proposal.md)
+was also approved as one complete group2026-10-28: four exact STL/Mesh PLY/OBJ/
+self-contained glTF profiles, recipe8, unknown fresh unitless frames, canonical PLY
+geometry and preserved OBJ Phong effects. Root is sole writer. Todo owns the
+connected implementation/check sequence; no per-format/helper approval. Exact
+profile/golden bytes are fixed and renderer/adoption/release gates remain separate.
+
 01a's bounded point workflow is implemented; exact six JSON companions are immutable.
 Native, synthetic hosts, typed validation and ordinary home have separate authority
 and evidence. Source point centres and explicit manual positions are distinct;

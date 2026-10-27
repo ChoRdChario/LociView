@@ -134,6 +134,24 @@ class BoundedBlobReader extends BlobReader {
   }
 }
 
+/** zip.js payload producer hook; direct local/central metadata reads keep their own budget. */
+class NativeConversionBlobReader extends BoundedBlobReader {
+  constructor(private readonly originalFile: Blob) {super(originalFile);}
+  createReadable(options: {offset?: number; size?: number; diskNumberStart?: number; chunkSize?: number} = {}): ReadableStream<Uint8Array> {
+    let offset = options.offset ?? 0, remaining = options.size ?? this.originalFile.size - offset, cancelled = false;
+    if (!Number.isSafeInteger(offset) || !Number.isSafeInteger(remaining) || offset < 0 || remaining < 0 || offset + remaining > this.originalFile.size ||
+      options.diskNumberStart !== undefined && options.diskNumberStart !== 0) throw Error('native conversion: invalid payload range');
+    const source = this;
+    return new ReadableStream<Uint8Array>({async pull(c) {
+      if (!remaining) {c.close(); return;}
+      const count = Math.min(65536, remaining), bytes = await source.readUint8Array(offset, count);
+      if (cancelled) return;
+      if (bytes.length !== count) throw Error('native conversion: payload short read');
+      offset += count; remaining -= count; c.enqueue(bytes);
+    }, cancel() {cancelled = true;}}, {highWaterMark: 0});
+  }
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -443,9 +461,10 @@ function crossCheckManifestAndSnapshot(
   return { representationByteLength, mediaByteLength };
 }
 
-async function openPortablePackage(blob: Blob, signal?: AbortSignal, conversionLimits?: { maxFileBytes: number; maxJsonBytes: number; maxItems: number }): Promise<OpenPortablePackage> {
+async function openPortablePackage(blob: Blob, signal?: AbortSignal, conversionLimits?: { maxFileBytes: number; maxJsonBytes: number; maxItems: number }, streamedConversion = false): Promise<OpenPortablePackage> {
   if (!Number.isSafeInteger(blob.size) || blob.size < 1) throw new Error('native portable package: file is empty or too large');
-  const reader = new ZipReader(new BoundedBlobReader(blob), { strictness: 'strict' });
+  const boundedReader = streamedConversion ? new NativeConversionBlobReader(blob) : new BoundedBlobReader(blob);
+  const reader = new ZipReader(boundedReader, { strictness: 'strict' });
   try {
     const files = inspectEntryNamespace(await reader.getEntries({ strictness: 'strict', checkAmbiguity: true }));
     const manifestEntry = files.get(NATIVE_PORTABLE_MANIFEST_ENTRY);
@@ -495,10 +514,10 @@ export async function inspectNativePortablePackageV1(
 }
 
 /** Read-only conversion adapter. Null means no Native manifest, never failed Native admission. */
-export async function readNativePortableConversionV1(blob: Blob, limits: { maxFileBytes: number; maxJsonBytes: number; maxItems: number }) {
+export async function readNativePortableConversionV1(blob: Blob, limits: { maxFileBytes: number; maxJsonBytes: number; maxItems: number }, signal?: AbortSignal) {
   if (!(blob instanceof Blob) || blob.size <= 0) throw new Error('変換するファイルを選択してください。');
   let opened: OpenPortablePackage;
-  try { opened = await openPortablePackage(blob, undefined, limits); }
+  try { opened = await openPortablePackage(blob, signal, limits); }
   catch (error) { if (error instanceof NativePortableManifestAbsent) return null; throw error; }
   try {
     if (opened.files.size > limits.maxItems || opened.manifestBytes.length > limits.maxJsonBytes || opened.snapshotBytes.length > limits.maxJsonBytes ||
@@ -507,6 +526,7 @@ export async function readNativePortableConversionV1(blob: Blob, limits: { maxFi
     const bodies = new Map<string, Uint8Array>();
     for (const item of [...opened.inspection.manifest.representations, ...opened.inspection.manifest.media ?? []]) {
       const bytes = await opened.files.get(item.entry)!.getData(new Uint8ArrayWriter(), {
+        signal,
         checkSignature: true, checkAmbiguity: true, checkOverlappingEntry: true, strictness: 'strict',
       });
       if (bytes.length !== item.byteLength) throw new Error('変換する本体の大きさが一致しません。');
@@ -514,6 +534,60 @@ export async function readNativePortableConversionV1(blob: Blob, limits: { maxFi
     }
     return { ...opened.inspection, manifestBytes: opened.manifestBytes, snapshotBytes: opened.snapshotBytes, bodies };
   } finally { await opened.reader.close(); }
+}
+
+/**07k operation-owned archive. Sources restart while open; never retain decoded bodies. */
+export async function openNativePortableConversionStreamsV1(blob: Blob,
+  limits: {maxFileBytes: number; maxJsonBytes: number; maxItems: number}, signal?: AbortSignal) {
+  let opened: OpenPortablePackage;
+  try { opened = await openPortablePackage(blob, signal, limits, true); }
+  catch (error) { if (error instanceof NativePortableManifestAbsent) return null; throw error; }
+  const operation = new AbortController();
+  const abort = () => operation.abort(signal?.reason);
+  signal?.addEventListener('abort', abort, {once: true});
+  if (signal?.aborted) abort();
+  let closed = false, active: {cancel(reason?: unknown): Promise<void>} | undefined;
+  const pending = new Set<Promise<unknown>>();
+  const original: NativeBinarySource = {size: blob.size, mediaType: 'application/zip', stream() {
+    let offset = 0, cancelled = false;
+    return new ReadableStream<Uint8Array>({async pull(c) {
+      operation.signal.throwIfAborted(); if (closed) throw Error('native conversion: archive closed');
+      if (offset === blob.size) { c.close(); return; }
+      const end = Math.min(blob.size, offset + 65536), bytes = new Uint8Array(await Blob.prototype.slice.call(blob, offset, end).arrayBuffer());
+      operation.signal.throwIfAborted(); if (cancelled) return;
+      if (bytes.length !== end - offset) throw Error('native conversion: original short read');
+      offset = end; c.enqueue(bytes);
+    }, cancel() {cancelled = true;}}, {highWaterMark: 0});
+  }};
+  const bodies = new Map<string, NativeBinarySource>();
+  for (const item of [...opened.inspection.manifest.representations, ...opened.inspection.manifest.media ?? []]) {
+    bodies.set(item.entry, {size: item.byteLength, mediaType: item.mediaType, stream() {
+      operation.signal.throwIfAborted();
+      if (closed || active) throw Error('native conversion: overlapping body read');
+      const extraction = new AbortController(), relay = () => extraction.abort(operation.signal.reason);
+      operation.signal.addEventListener('abort', relay, {once: true});
+      const bridge = new TransformStream<Uint8Array, Uint8Array>(), reader = bridge.readable.getReader();
+      const task = opened.files.get(item.entry)!.getData(bridge.writable, {signal: extraction.signal,
+        checkSignature: true, checkAmbiguity: true, checkOverlappingEntry: true, strictness: 'strict'});
+      pending.add(task); void task.finally(() => pending.delete(task)).catch(() => {});
+      void task.catch(error => bridge.writable.abort(error).catch(() => {}));
+      let observed = 0, ended = false;
+      const release = () => { if (ended) return; ended = true; operation.signal.removeEventListener('abort', relay); active = undefined; reader.releaseLock(); };
+      const cancel = async (reason?: unknown) => { extraction.abort(reason); try { await reader.cancel(reason); await task.catch(() => {}); } finally { release(); } };
+      active = {cancel};
+      return new ReadableStream<Uint8Array>({async pull(c) {
+        try {
+          const next = await reader.read(); operation.signal.throwIfAborted();
+          if (next.done) { await task; if (observed !== item.byteLength) throw Error('native conversion: body short read'); release(); c.close(); return; }
+          if (!(next.value instanceof Uint8Array) || next.value.length > 65536 || next.value.length > item.byteLength - observed) throw Error('native conversion: invalid body chunk');
+          observed += next.value.length; c.enqueue(next.value);
+        } catch (error) { await cancel(error); throw error; }
+      }, cancel}, {highWaterMark: 0});
+    }});
+  }
+  return {...opened.inspection, manifestBytes: opened.manifestBytes, snapshotBytes: opened.snapshotBytes, bodies, original,
+    async close() {if (closed) return; closed = true; operation.abort(); signal?.removeEventListener('abort', abort);
+      await active?.cancel().catch(() => {}); await Promise.allSettled([...pending]); await opened.reader.close();}};
 }
 
 function currentHeapBytes(): number | null {

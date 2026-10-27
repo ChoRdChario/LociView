@@ -1,4 +1,6 @@
 import type { PointVisibility } from './validationPointCoverage';
+import { nativeSpatialTransform } from '../domain/nativeSpatialSource';
+import type { JsonObject } from '../domain/values';
 import * as THREE from 'three';
 import { pointViewportSample, type PointViewport } from '../domain/pointPresentation';
 import { residentMeshFragment, type PinSurfaceTarget, type ResidentSurface, type PickCoverage } from './viewportPicking';
@@ -50,7 +52,8 @@ export function pickPointAwareCreation(display: EditableDisplay, targets: readon
   function pointHit(p: Point) {
     const target = targets.length === 1 ? exactTarget(p.owner) : null; if (!target) return null;
     if (current.points.some(other => other.owner !== p.owner && Math.abs(other.depth - p.depth) <= depthTolerance)) return null;
-    const position = Array.from(p.surface.points!.positions.subarray(p.index*3,p.index*3+3)) as unknown as V3; // Exact source profile has identity representationToAsset.
+    const representation = display.models.find(m => m.binding.assetId === p.owner)!.representation;
+    const position = nativeSpatialTransform(representation.representationToAsset as unknown as JsonObject)(Array.from(p.surface.points!.positions.subarray(p.index*3,p.index*3+3))) as unknown as V3;
     return { target, position, point: { pointIndex: p.index } };
   }
   if (candidate && current.points.some(other => other !== candidate && Math.abs(other.depth-candidate.depth) <= depthTolerance && other.depth !== candidate.depth)) return null;

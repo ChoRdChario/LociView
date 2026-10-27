@@ -46,10 +46,15 @@ and existing file retention from bridge-only requirements.
 Apply [05 §9](05-project-scene-team-workflow.md) and the frozen input contracts.
 A new conversion recipe must not reinterpret the frozen old recipe or old IDs.
 
-The [07k Native Point/GS/Proxy proposal](07k-native-point-gs-proxy-conversion-proposal.md)
+The [approved07k Native Point/GS/Proxy companion](07k-native-point-gs-proxy-conversion-proposal.md)
 specifies the next additive source/frame/recipe and bounded-original decision.
-It is not approved or implemented; [todo](../../tasks/todo.md) owns its current
-review/decision state. Existing recipe1–6 and their jobs remain unchanged.
+PO approved this exact contract2026-10-28; [todo](../../tasks/todo.md) owns its current
+implementation/check state. Existing recipe1–6 and their jobs remain unchanged.
+
+The approved [07l Mesh/Proxy companion](07l-mesh-import-conversion-proposal.md) groups
+fresh import/addition with one-time Native conversion for STL/Mesh PLY/OBJ and
+self-contained glTF. PO approved its four exact profiles/recipe8/unit/display
+decisions2026-10-28; todo owns actual implementation/checks and remaining work.
 
 | Source content | One-time conversion requirement |
 |---|---|

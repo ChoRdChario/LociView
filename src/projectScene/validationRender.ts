@@ -136,7 +136,7 @@ export async function prepareReadonlyResidents(initial: readonly ReadonlyRenderM
       const previous = templates.get(key) ?? staged.get(key);
       if (previous) { if (previous.record !== record) throw Error('モデルの本体が一致しません。'); continue; }
       const source = content.modelContent ? await content.modelContent(c.representation) : await content.model!(c.representation);
-      if (!same(source.bounds, c.representation.logicalBoundsAsset)) throw Error('保存したモデルの範囲が一致しません。');
+      if (!same(nativeSpatialModelBounds(c.representation, source), c.representation.logicalBoundsAsset)) throw Error('保存したモデルの範囲が一致しません。');
       let decoded:DecodedValidationModel;
       if(isGsModel(source)){
         decoded={gs:source,root:new THREE.Group(),materialLocators:new Map(),dispose(){this.proxy?.dispose();}};
@@ -189,7 +189,7 @@ export async function prepareReadonlyResidents(initial: readonly ReadonlyRenderM
         const asset=new THREE.Group(),object=new THREE.Group();object.matrix.copy(placementMatrix(c.representation.representationToAsset));object.matrixAutoUpdate=false;
         asset.matrix.copy(placementMatrix(c.assetToProject));asset.matrixAutoUpdate=false;asset.add(object);
         const proxy=item.model.proxy?.root.clone(true),geometries:THREE.BufferGeometry[]=[],materials:THREE.Material[]=[];
-        if(proxy){proxy.traverse(node=>{if(node instanceof THREE.Mesh){node.geometry=node.geometry.clone();geometries.push(node.geometry);const material=new THREE.MeshBasicMaterial({side:THREE.DoubleSide});materials.push(material);node.material=material;node.layers.set(31);}});asset.add(proxy);}
+        if(proxy){proxy.traverse(node=>{if(node instanceof THREE.Mesh){node.geometry=node.geometry.clone();geometries.push(node.geometry);const material=new THREE.MeshBasicMaterial({side:THREE.DoubleSide,colorWrite:false,depthWrite:false});materials.push(material);node.material=material;node.layers.set(31);}});const placement=new THREE.Group();placement.matrix.copy(placementMatrix(c.proxy!.representationToAsset));placement.matrixAutoUpdate=false;placement.add(proxy);asset.add(placement);}
         asset.updateMatrixWorld(true);
         const release=()=>{if(!live.delete(release))return;asset.removeFromParent();for(const g of geometries)g.dispose();for(const m of materials)m.dispose();drop();};retain();live.add(release);
         return {mesh:object,asset,gs:{source:item.model.gs,object,issue:null,ready:false},...(proxy?{interaction:proxy}:{}),interactionIssue:item.model.proxyIssue??(!c.proxy?'位置指定用の面を追加してください。':null),dispose:release};
@@ -251,3 +251,4 @@ export async function prepareReadonlyResidents(initial: readonly ReadonlyRenderM
     } };
   } catch (error) { dispose(); throw error; }
 }
+import { nativeSpatialModelBounds } from '../projectFiles/nativeSpatial';

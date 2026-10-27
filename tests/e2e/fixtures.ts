@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { ZipWriter, Uint8ArrayReader, Uint8ArrayWriter } from '@zip.js/zip.js';
 import { deflateSync } from 'node:zlib';
 import { serializeGlb } from '../../src/assets/glbOptimize';
+import { gsFixture } from '../helpers/gsFixture';
 
 /** Owned synthetic inputs; no user data or externally downloaded sample. */
 export function triangleGlb(z = 0) {
@@ -48,7 +49,8 @@ export function texturedTriangleGlb() {
 }
 
 /** Existing admitted Native recipe-1 shape, synthesized locally for real browser entry. */
-export async function nativeConversionBackup(model: Buffer, image: Buffer, captionCount = 2, appearance = false) {
+export async function nativeConversionBackup(model: Buffer, image: Buffer, captionCount = 2, appearance = false,
+  extension?: {update(snapshot: any): void; bodies: ReadonlyMap<string, Buffer>}) {
   const id = (prefix: string, n: number) => `${prefix}_${String(n).padStart(26, '0')}`;
   const hash = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex');
   const placement = () => ({ translation: [0, 0, 0], rotationXYZW: [0, 0, 0, 1], uniformScale: 1 });
@@ -76,6 +78,7 @@ export async function nativeConversionBackup(model: Buffer, image: Buffer, capti
   if (appearance) Object.assign(snapshot,{meshMaterialAppearances:snapshot.displaySets.map((set,i)=>({id:id('mat',i+1),
     displaySetId:set.id,assetId:id('ast',1),authoredAssetRevisionId:id('rev',1),representationId:id('rep',1),materialSlotKey:'m/0/0',
     opacity:1,doubleSided:true,unlit:true,chroma:{enabled:false,colorSrgb:[0,1,0],tolerance:.2,feather:0}}))});
+  extension?.update(snapshot);
   const bytes = Buffer.from(JSON.stringify(snapshot));
   const manifest = { format: 'lociview-native-portable-backup', packageVersion: 2,
     nativeSnapshot: { schemaVersion: 1, projectId: snapshot.project.id, snapshotId: snapshot.snapshotId, generation: snapshot.generation, entry: 'native/snapshot.json', byteLength: bytes.length, algorithm: 'sha256', digest: hash(bytes) },
@@ -84,9 +87,53 @@ export async function nativeConversionBackup(model: Buffer, image: Buffer, capti
   const writer = new ZipWriter(new Uint8ArrayWriter());
   const add = (path: string, content: Uint8Array) => writer.add(path, new Uint8ArrayReader(content), { level: 0 });
   await add('native/package.json', Buffer.from(JSON.stringify(manifest))); await add('native/snapshot.json', bytes);
-  for (const row of manifest.representations) await add(row.entry, model);
+  for (const row of manifest.representations) await add(row.entry, extension?.bodies.get(row.representationId) ?? model);
   for (const row of manifest.media) await add(row.entry, image);
   return Buffer.from(await writer.close());
+}
+
+/** Owned Node fixture only; browser source ownership/streaming is verified separately. */
+export async function nativeSpatialBackup(rows = 256) {
+  const id=(p:string,n:number)=>`${p}_${String(n).padStart(26,'0')}`, sample=gsFixture(3);
+  const header=Buffer.from(new TextDecoder().decode(sample.subarray(0,sample.length-248)).replace('element vertex 1',`element vertex ${rows}`));
+  const gs=Buffer.alloc(header.length+rows*248);header.copy(gs);const width=Math.ceil(Math.sqrt(rows));
+  for(let i=0;i<rows;i++){
+    const offset=header.length+i*248;gs.writeFloatLE((i%width-width/2)/(width/2),offset);gs.writeFloatLE((Math.floor(i/width)-width/2)/(width/2),offset+4);
+    gs.writeFloatLE(.4,offset+24);
+    for(const k of [55,56,57])gs.writeFloatLE(Math.log(rows>10000?.003:.045),offset+k*4);gs.writeFloatLE(1,offset+58*4);
+  }
+  const pointHeader='ply\nformat ascii 1.0\nelement vertex 2\nproperty float x\nproperty float y\nproperty float z\nproperty uchar red\nproperty uchar green\nproperty uchar blue\nend_header\n';
+  const point=Buffer.from(pointHeader+'-1 0 0 255 0 0\n1 1 0 0 255 0\n'),proxy=triangleGlb(),hash=(b:Uint8Array)=>createHash('sha256').update(b).digest('hex');
+  const ref=(b:Buffer,mediaType:string)=>({algorithm:'sha256',digest:hash(b),byteLength:b.length,mediaType});
+  const bodies=new Map([[id('rep',1),point],[id('rep',2),gs],[id('rep',3),proxy]]);
+  const file=await nativeConversionBackup(proxy,smallPng(),2,false,{bodies,update(s){
+    const p=s.representations[0],g=s.representations[1],mesh=structuredClone(p);
+    s.project.title='Native点群とGS';s.presentation.displayMode='mixed';s.presentation.hiddenAssetIds=[id('ast',3)];
+    s.assets.find((a:any)=>a.id===id('ast',1)).label='点群';s.assets.find((a:any)=>a.id===id('ast',2)).label='GS';
+    s.assetBindingRevisions[0].assetToProject.translation=[0,0,0];s.assetBindingRevisions[1].assetToProject.translation=[-1.5,0,0];
+    Object.assign(p,{role:'pointPrimary',contentKind:'pointCloud',formatProfile:{id:'lociview-native-point-ply-ascii-xyz-rgb-v1'},blob:ref(point,'application/octet-stream'),
+      pointPly:{pointCount:2,headerByteLength:Buffer.byteLength(pointHeader),encoding:'ascii'},representationToAsset:{translation:[1,0,0],rotationXYZW:[0,1,0,0],uniformScale:.5,reflection:'x'}});
+    Object.assign(g,{role:'gsPrimary',contentKind:'gaussianSplat',formatProfile:{id:'lociview-native-graphdeco-ply-le-sh2-sh3-v1'},blob:ref(gs,'application/octet-stream'),
+      gsPly:{shDegree:3,splatCount:rows,headerByteLength:header.length,recordStrideBytes:248,payloadByteLength:rows*248}});
+    s.representations.push({...mesh,id:id('rep',3),assetId:g.assetId,representationFrameId:id('frm',8),role:'interactionProxy',purposes:['interaction'],variantFamilyId:id('fam',3),
+      derivedFrom:[g.id],proxyForGsVariantFamilyId:g.variantFamilyId,representationToAsset:{translation:[.1,-.1,.05],rotationXYZW:[0,1,0,0],uniformScale:.8,reflection:'none'}});
+    s.assetRevisions[1].representationIds.push(id('rep',3));
+    s.representations.push({...mesh,id:id('rep',4),assetId:id('ast',3),representationFrameId:id('frm',10),variantFamilyId:id('fam',4)});
+    s.assets.push({id:id('ast',3),label:'非表示の面モデル',assetFrameId:id('frm',9),status:{kind:'ready',activeBindingId:id('bnd',3)}});
+    s.assetRevisions.push({id:id('rev',3),assetId:id('ast',3),representationIds:[id('rep',4)],anchorCompatibilityClasses:[{id:id('cls',3),targetVariantFamilyIds:[id('fam',4)]}]});
+    s.assetBindingRevisions.push({...structuredClone(s.assetBindingRevisions[0]),id:id('bnd',3),assetId:id('ast',3),assetRevisionId:id('rev',3)});
+    s.captions[0].anchor.positionAsset=[1,.5,0];
+  }});
+  const eocd=file.lastIndexOf(Buffer.from([80,75,5,6])),bodyRanges:{start:number;end:number}[]=[];
+  let central=file.readUInt32LE(eocd+16);
+  for(let i=0;i<file.readUInt16LE(eocd+10);i++){
+    if(file.readUInt32LE(central)!==0x02014b50)throw Error('Owned Native fixture central directory');
+    const nameLength=file.readUInt16LE(central+28),extraLength=file.readUInt16LE(central+30),commentLength=file.readUInt16LE(central+32),local=file.readUInt32LE(central+42);
+    const name=file.toString('utf8',central+46,central+46+nameLength),start=local+30+file.readUInt16LE(local+26)+file.readUInt16LE(local+28);
+    if(name.startsWith('native/representations/')||name.startsWith('native/media/'))bodyRanges.push({start,end:start+file.readUInt32LE(central+20)});
+    central+=46+nameLength+extraLength+commentLength;
+  }
+  return {file,bodyRanges,gsDigest:hash(gs),gsBytes:gs.length,pointDigest:hash(point),proxyDigest:hash(proxy),originalDigest:hash(file),rows};
 }
 
 /** Frozen-v1 GLB/PNG subset from the existing owned operation-log fixture. */

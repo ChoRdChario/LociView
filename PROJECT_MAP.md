@@ -103,7 +103,13 @@ validation route. Old Native acceptance remains valid only for its tested scope.
 See inventory for individual connections and todo for executed checks and remaining adoption conditions.
 
 The same validation file entry connects bounded Native, frozen-v1 and LociMyu
-initial conversions. The approved frozen-v1 recipe-4 in `frozenV1Source.ts` /
+initial conversions. The approved [07k companion](docs/specs/07k-native-point-gs-proxy-conversion-proposal.md)
+connects Native Point/GS/GLB Proxy through `projectFiles/nativeSpatialConversion.ts`
+and the bounded `nativeGs/portablePackage.ts` adapter. `domain/nativeSpatialSource.ts`
+and `projectFiles/nativeSpatial.ts` share checked Asset coordinates/profile facts
+with picking/content/rendering. Exact recipe7/private-original recovery and
+executed scope belong to07k/todo; older recipes keep their identities.
+The approved frozen-v1 recipe-4 in `frozenV1Source.ts` /
 `frozenV1Mapping.ts` preserves explicit saved starting Views without changing old
 conversion domains or model profiles. The approved recipe-5 maps saved model
 scale/Y-or-Z-up/offset only into the binding, preserving original GLB and local

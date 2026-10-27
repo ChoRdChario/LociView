@@ -7,6 +7,8 @@ import { cloneCanonicalValue, type JsonObject, type JsonValue } from '../domain/
 import { digest, newId, technicalId } from '../projectMetadata/persistence';
 import { sealValidationRecord, type PreparedValidationProject } from './initialProject';
 import type { ValidatedGlb } from './glb';
+import { nativePointSourceProfile, nativeProxySourceProfile } from './nativeSpatial';
+import { gsSourceProfile } from './gsPly';
 import { fileError, validationGlbProfile, occurrenceGlbProfile, jpegGlbProfile, occurrenceJpegGlbProfile, validationMetadataLimits as limits } from './validation';
 
 export const nativeConversionRecipe = 'native-project-scene-recipe-1';
@@ -15,11 +17,14 @@ export const nativeJpegRecipe = 'native-project-scene-recipe-3';
 export const nativeAppearanceJpegRecipe = 'native-project-scene-recipe-4';
 export const nativePhotoRecipe = 'native-project-scene-recipe-5';
 export const nativeAppearancePhotoRecipe = 'native-project-scene-recipe-6';
-export type NativeConversionRecipe = typeof nativePhotoRecipe | typeof nativeAppearancePhotoRecipe | typeof nativeConversionRecipe | typeof nativeAppearanceRecipe | typeof nativeJpegRecipe | typeof nativeAppearanceJpegRecipe;
+export const nativeSpatialRecipe = 'native-project-scene-recipe-7';
+export type NativeConversionRecipe = typeof nativeSpatialRecipe | typeof nativePhotoRecipe | typeof nativeAppearancePhotoRecipe | typeof nativeConversionRecipe | typeof nativeAppearanceRecipe | typeof nativeJpegRecipe | typeof nativeAppearanceJpegRecipe;
 export const nativeRecipeHasAppearance = (recipe: NativeConversionRecipe) => recipe === nativeAppearanceRecipe || recipe === nativeAppearanceJpegRecipe || recipe === nativeAppearancePhotoRecipe;
 export const nativeRecipeHasJpeg = (recipe: NativeConversionRecipe) => recipe === nativeJpegRecipe || recipe === nativeAppearanceJpegRecipe;
 export const nativeRecipeHasPhoto = (recipe: NativeConversionRecipe) => recipe === nativePhotoRecipe || recipe === nativeAppearancePhotoRecipe;
-export const nativeRecipeHasOrigin = (recipe: NativeConversionRecipe) => nativeRecipeHasJpeg(recipe) || nativeRecipeHasPhoto(recipe);
+export const nativeRecipeHasOrigin = (recipe: NativeConversionRecipe) => recipe === nativeSpatialRecipe || nativeRecipeHasJpeg(recipe) || nativeRecipeHasPhoto(recipe);
+/** Compact inspected facts; conversion does not retain every source body/decoded array. */
+export type NativeModelFacts = Pick<ValidatedGlb, 'bounds' | 'materials' | 'surfaceRanges' | 'jpeg' | 'occurrences'>;
 export interface NativeMaterialWitness {
   nativeRepresentationId: string; sourceGlbSha256: string; childPath: readonly number[]; materialArraySlot: 0;
   nodeIndex: number; primitiveIndex: number; sourceMaterialIndex: number | null; slotIndex: number;
@@ -45,6 +50,13 @@ export function nativeConversionIds(conversionId: string, sourceZipSha256: strin
 }
 const rank = (n: number) => `A${n.toString(36).padStart(8, '0')}`;
 const copy = (value: unknown) => cloneCanonicalValue(value, limits) as JsonObject;
+function nativeRevisionProvenance(snapshot: NativeProjectSnapshotV1, representationIds: readonly string[], spatial: boolean): JsonObject {
+  const reps = representationIds.map(id => snapshot.representations.find(r => r.id === id)!);
+  const result: Record<string, JsonValue> = {origin: 'import', inputBlobDigests: [...new Set(reps.map(r => r.blob.digest))].sort()};
+  const types = [...new Set(reps.map(r => r.blob.mediaType))];
+  if (!spatial || types.length === 1) result.sourceMediaType = spatial ? types[0]! : 'model/gltf-binary';
+  return result;
+}
 export function nativeAppearanceIntent(a: NonNullable<NativeProjectSnapshotV1['meshMaterialAppearances']>[number]) {
   const quantize = (c: number) => {
     const x = c < 0.04045 ? c * 0.0773993808 : Math.pow(c * 0.9478672986 + 0.0521327014, 2.4);
@@ -58,12 +70,13 @@ export function nativeAppearanceIntent(a: NonNullable<NativeProjectSnapshotV1['m
 }
 
 /** Exact §5.3 mapper; no filename matching, normalization, model selection or storage writes. */
-export async function mapNativeProject(snapshot: NativeProjectSnapshotV1, models: ReadonlyMap<string, ValidatedGlb>, conversionId: string, sourceSha256: string,
+export async function mapNativeProject(snapshot: NativeProjectSnapshotV1, models: ReadonlyMap<string, NativeModelFacts>, conversionId: string, sourceSha256: string,
   sourceWitness?: ReadonlyMap<string, readonly NativeOccurrence[]>, capturedIdentity?: JsonObject) {
   const appearance = !!snapshot.meshMaterialAppearances?.length, jpeg = [...models.values()].some(m => m.jpeg) || snapshot.mediaResources?.some(m => m.blob.mediaType === 'image/jpeg');
   const photo = snapshot.mediaResources?.some(m => m.blob.mediaType === 'image/webp' || m.blob.mediaType === 'image/gif');
-  const recipe: NativeConversionRecipe = photo ? appearance ? nativeAppearancePhotoRecipe : nativePhotoRecipe : appearance ? jpeg ? nativeAppearanceJpegRecipe : nativeAppearanceRecipe : jpeg ? nativeJpegRecipe : nativeConversionRecipe;
-  if (nativeRecipeHasAppearance(recipe) && !sourceWitness) return fileError('元の材質の対応記録が不足しています。');
+  const spatial = snapshot.representations.some(r => r.role !== 'meshPrimary');
+  const recipe: NativeConversionRecipe = spatial ? nativeSpatialRecipe : photo ? appearance ? nativeAppearancePhotoRecipe : nativePhotoRecipe : appearance ? jpeg ? nativeAppearanceJpegRecipe : nativeAppearanceRecipe : jpeg ? nativeJpegRecipe : nativeConversionRecipe;
+  if ((spatial || nativeRecipeHasAppearance(recipe)) && !sourceWitness) return fileError('元の材質の対応記録が不足しています。');
   const ids = nativeConversionIds(conversionId, sourceSha256, recipe), id = ids.id;
   const one = (prefix: string, name: string, source: string) => id(prefix, [name, source]);
   const asset = (s: string) => one('ast', 'asset', s), revision = (s: string) => one('rev', 'revision', s), binding = (s: string) => one('bnd', 'binding', s);
@@ -78,31 +91,34 @@ export async function mapNativeProject(snapshot: NativeProjectSnapshotV1, models
   if ((records.identity as JsonObject).projectId !== `prj_${conversionId}`) return fileError('変換先の識別情報が一致しません。');
   records.project = { title: snapshot.project.title, frame: { ...copy(snapshot.project.frame), id: await frame(snapshot.project.frame.id) },
     defaultSceneId: await scene(snapshot.presentation.activeDisplaySetId ?? NATIVE_DEFAULT_DISPLAY_SET_ID) };
-  const baseProfile = await (appearance ? occurrenceGlbProfile : validationGlbProfile)();
-  const targetModels = new Map<string, { record: JsonObject; model: ValidatedGlb }>();
-  if (baseProfile.specificationSha256 !== (nativeRecipeHasAppearance(recipe) ? '9bbf1243a3786d54a6439104614c46e502a3cdfa20dc9e9d610ee1da42cf059f' : '077c5da2241deb7956026fe20376dee9301d70b29d10a436d673f37909e4186f')) return fileError('変換レシピとモデル検証の版が一致しません。');
+  const baseProfile = await (appearance || spatial ? occurrenceGlbProfile : validationGlbProfile)();
+  const targetModels = new Map<string, { record: JsonObject; model: NativeModelFacts }>();
+  if (baseProfile.specificationSha256 !== (spatial || nativeRecipeHasAppearance(recipe) ? '9bbf1243a3786d54a6439104614c46e502a3cdfa20dc9e9d610ee1da42cf059f' : '077c5da2241deb7956026fe20376dee9301d70b29d10a436d673f37909e4186f')) return fileError('変換レシピとモデル検証の版が一致しません。');
   const materialWitness: NativeMaterialWitness[] = [];
   for (const r of snapshot.representations) {
     const model = models.get(r.id); if (!model) return fileError('モデルの検証結果が不足しています。');
-    const profile = model.jpeg ? await (appearance ? occurrenceJpegGlbProfile() : jpegGlbProfile()) : baseProfile;
+    const occurrenceCatalog = r.role === 'meshPrimary' && (spatial || appearance);
+    const profile = r.role === 'pointPrimary' ? await nativePointSourceProfile() : r.role === 'gsPrimary' ? await gsSourceProfile() :
+      r.role === 'interactionProxy' ? await nativeProxySourceProfile() : model.jpeg ? await (occurrenceCatalog ? occurrenceJpegGlbProfile() : jpegGlbProfile()) : baseProfile;
     const occurrenceByRank = new Map(model.occurrences?.map(o => [o.slotIndex, o]) ?? []);
     const slots = await Promise.all(model.materials.map(async (material): Promise<JsonObject & { logicalMaterialSlotId: string }> => {
       const locator = material.sourceLocator as JsonObject;
       const occurrence = occurrenceByRank.get(locator.slotIndex as number);
-      if (nativeRecipeHasAppearance(recipe) && !occurrence) return fileError('材質の面の対応が不足しています。');
-      return { ...material, logicalMaterialSlotId: await id('slot', nativeRecipeHasAppearance(recipe) ?
+      if (occurrenceCatalog && !occurrence) return fileError('材質の面の対応が不足しています。');
+      return { ...material, logicalMaterialSlotId: await id('slot', occurrenceCatalog ?
         ['material-occurrence', r.id, occurrence!.nodeIndex, occurrence!.primitiveIndex] : ['material-slot', r.id, locator.kind as string,
         locator.kind === 'gltfMaterial' ? locator.materialIndex as number : 0]) };
     }));
     slots.sort((a, b) => a.logicalMaterialSlotId.localeCompare(b.logicalMaterialSlotId));
     const logicalByRank = new Map(slots.map(s => [(s.sourceLocator as JsonObject).slotIndex, s.logicalMaterialSlotId]));
     const record = await sealValidationRecord('representation', { id: await rep(r.id), assetId: await asset(r.assetId),
-      representationFrameId: await frame(r.representationFrameId), contentKind: 'mesh', purposes: ['source', 'display'], role: 'meshPrimary',
-      variantFamilyId: await family(r.assetId, r.variantFamilyId), formatProfile: profile, blob: copy(r.blob),
-      representationToAsset: copy(r.representationToAsset), derivedFrom: [], logicalBoundsAsset: model.bounds,
-      materialCatalog: { layoutId: await id('lay', ['material-layout', r.id]), slots } });
+      representationFrameId: await frame(r.representationFrameId), contentKind: r.contentKind, purposes: [...r.purposes], role: r.role,
+      variantFamilyId: await family(r.assetId, r.variantFamilyId), formatProfile: profile, blob: {...copy(r.blob), ...(r.role === 'pointPrimary' || r.role === 'gsPrimary' ? {mediaType: 'application/ply'} : {})},
+      representationToAsset: copy(r.representationToAsset), derivedFrom: spatial ? (await Promise.all(r.derivedFrom.map(rep))).sort() : [], logicalBoundsAsset: model.bounds,
+      ...(r.proxyForGsVariantFamilyId ? {proxyForGsVariantFamilyId: await family(r.assetId, r.proxyForGsVariantFamilyId)} : {}),
+      ...(r.role === 'gsPrimary' ? {} : {materialCatalog: { layoutId: await id('lay', ['material-layout', r.id]), slots }}) });
     add('representationsById', record); targetModels.set(record.id as string, { record, model });
-    if (nativeRecipeHasAppearance(recipe)) {
+    if (occurrenceCatalog) {
       const rows = sourceWitness!.get(r.id); if (!rows || rows.length !== slots.length) return fileError('材質の対応表が不足しています。');
       for (const row of rows) materialWitness.push({ nativeRepresentationId: r.id, sourceGlbSha256: r.blob.digest,
         childPath: [...row.childPath], materialArraySlot: 0, nodeIndex: row.nodeIndex, primitiveIndex: row.primitiveIndex,
@@ -115,7 +131,7 @@ export async function mapNativeProject(snapshot: NativeProjectSnapshotV1, models
     id: await revision(r.id), assetId: await asset(r.assetId), representationIds: (await Promise.all(r.representationIds.map(rep))).sort(),
     anchorCompatibilityClasses: (await Promise.all(r.anchorCompatibilityClasses.map(async c => ({ id: await compatibility(r.assetId, c.id),
       targetVariantFamilyIds: (await Promise.all(c.targetVariantFamilyIds.map(f => family(r.assetId, f)))).sort() })))).sort((a, b) => a.id.localeCompare(b.id)),
-    provenance: { origin: 'import', sourceMediaType: 'model/gltf-binary', inputBlobDigests: [...new Set(r.representationIds.map(s => snapshot.representations.find(p => p.id === s)!.blob.digest))].sort() },
+    provenance: nativeRevisionProvenance(snapshot, r.representationIds, spatial),
   }));
   for (const b of snapshot.assetBindingRevisions) add('assetBindingsById', await sealValidationRecord('asset-binding-revision', {
     id: await binding(b.id), assetId: await asset(b.assetId), assetRevisionId: await revision(b.assetRevisionId), assetToProject: copy(b.assetToProject), method: b.method,

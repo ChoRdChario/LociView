@@ -1,15 +1,16 @@
 # Native Point / GS / Proxy → ProjectScene
 
-> **PROPOSED — 2026-10-28. NOT APPROVED OR IMPLEMENTED.**
+> **PO-APPROVED — 2026-10-28. BOUNDED IMPLEMENTATION VERIFIED.**
 > This is the concrete additive decision for [07](07-project-scene-migration.md)
 > and [05 §9](05-project-scene-team-workflow.md#9-migration). Companion JSON is
-> proposed specification data only; no profile registration or product change.
+> immutable approved specification data; executed implementation/checks belong
+> in [todo](../../tasks/todo.md). No aggregate adoption or release approval.
 
 ## 1. Grouped decision and user outcome
 
 既存の「ファイルを開く → 新しいプロジェクトに変換」を使い、Nativeの点群・GSと
 位置指定用の面を、記録・シーン・画像・視点と一緒に引き継ぐ。形式や単位を選ぶ
-画面は増やさない。次の規則を一括で承認する案とする。
+画面は増やさない。次の規則は2026-10-28に一括承認された。
 
 - 単位が不明な点群は不明のまま、元の座標・倍率・反転を保持する。専用の点群と
   Proxyのprofileを追加し、既存profileの意味を変えない。
@@ -60,7 +61,7 @@ This does not claim coverage of every schema-valid Native snapshot.
 ## 3. Exact additive profiles, frames and picking
 
 These companions are UTF-8 without BOM, LF, one final LF. Their full-file SHA-256
-is the proposed `specificationSha256`; they are not runtime registrations.
+is the approved `specificationSha256`; runtime registration still requires code.
 
 | Profile | Exact companion | SHA-256 |
 |---|---|---|
@@ -160,6 +161,22 @@ resources and fitting/picking differences. Original ZIP/raw documents/private
 witnesses never enter Workspace, Contribution, backup, Review or clean outputs.
 Ordinary public facts are rederived from admitted bytes without requiring a
 recipient to possess the private conversion receipt.
+
+Implementation binding: recipe7's local receipt has exactly recipe, conversionId,
+projectId, original, originalRef, manifest, snapshot, initial, mapping,
+materialWitness, spatialWitness and report. Original/manifest/snapshot are
+byteLength/digest pairs; initial adds proof. Each spatialWitness row has exactly
+nativeRepresentationId, sourceBlob, sourceProfile, sourceRepresentationFrameId,
+targetRepresentationFrameId, targetRepresentationId, targetBlob, targetProfile,
+representationToAsset, logicalBoundsAsset, derivedFrom,
+proxyForGsVariantFamilyId (null if absent) and nativePlyFacts (null for GLB).
+Sort rows by Native Representation ID. Cold proof rederives and compares the
+complete closed arrays and initial records; it never repairs a witnessed value.
+Report contains exactly models/scenes/captions/media, originalExcludedFromExports
+and effects. Effects records nativePointUnitsPreserved:true, existingPinsPreserved:true,
+gsDisplayMayDiffer (any retained GS) and proxySelectionDoubleSided (any retained Proxy).
+The preview shows only applicable fitting/picking differences; these private
+effects do not become Project metadata or public package content.
 
 ## 5. Desktop Native capacity and bounded original handling
 

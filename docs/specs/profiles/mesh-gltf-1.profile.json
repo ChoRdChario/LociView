@@ -1,0 +1,56 @@
+{
+  "id": "development-validation-mesh-gltf-1",
+  "version": 1,
+  "status": "Development source profile; not generally adopted",
+  "records": {
+    "contentKind": "mesh",
+    "primary": {
+      "role": "meshPrimary",
+      "purposes": [
+        "source",
+        "display"
+      ],
+      "derivedFrom": [],
+      "reviewAndSavedEditCopy": {
+        "purposes": [
+          "display"
+        ],
+        "savedDerivedFrom": [],
+        "wire": "Review omits derivedFrom; saved independent edit-copy explicitly carries[]. Ordinary fresh/native authoring retains source+display."
+      }
+    },
+    "proxy": {
+      "role": "interactionProxy",
+      "purposes": [
+        "interaction"
+      ],
+      "family": "Own family distinct from exact same-Asset GS family named by proxyForGsVariantFamilyId.",
+      "derivedFrom": "Native recipe8 exactly one mapped same-Asset GS parent; fresh Proxy and saved Review edit-copy []; retained nonempty edges preserved/remapped by current-format exchange and Clean.",
+      "reviewWire": "Review omits derivedFrom; saved edit-copy explicitly carries[]."
+    }
+  },
+  "coordinates": {
+    "unit": "No physical-unit assertion by source profile. Preserve existing Project frame exactly. Proposed07l fresh unitless-Project rule chooses unknown; never rescale a source to fit a declared unit.",
+    "representationToAsset": "Canonical existing positive Sim3 and reflection none/x; no normalization. Identity for fresh import, exact retained transform for Native.",
+    "arithmetic": "Use development-native-point-ply-rgb-1@8fa283ea34207e0604f66204d3d6f7f8275071a99fb79bc940e23aa0905a0994 checked binary64 matrix/dot/translation order, with signed-zero canonical facts.",
+    "bounds": "Retain raw decoded bounds separately. Asset AABB transforms all eight raw-AABB corners. Authored node poses precede the wrapper; AssetBinding applies once later."
+  },
+  "budgets": "Reuse host non-GS file/JSON/item/scalar/pixel guards, with expanded geometry/work charged before allocation. No new cap or guarantee. Validate retained/unused declarations; reject partial/trailing/unsupported content without repair.",
+  "numeric": "Finite parsed Number and finite post-Float32 positions/normals required. Canonical positive zero for facts and new-format neutral comparison. Retain source order, duplicate vertices and winding; no welding/simplification.",
+  "display": "186 display is built from inspected owned neutral source geometry/material facts under the format rules. Actual180 proof and resource release precede display. Independent transformed root Group retains authored poses. No network.",
+  "proxyDisplay": "Invisible/no color or depth writes, excluded from fit. Existing DoubleSide approximate surface picking and manual confirmation; never reraycast saved pins.",
+  "goldens": {
+    "file": "mesh-conversion-8.goldens.json",
+    "sha256": "6fb753973ff29b782ae4f7d15b8b37ea6ec7c5ecd5fcf82e508a94db562697eb"
+  },
+  "format": {
+    "mediaType": "model/gltf+json",
+    "encoding": "Duplicate-key rejecting bounded JSON2.0; complete source JSON including base64 is subject to current maxJsonBytes. One optional leading UTF-8 BOM follows inherited decoder behavior.",
+    "staticFeatures": "Inherit unchanged closed geometry/material/static scene/PNG/JPEG rules from development-validation-glb-1@077c5da2241deb7956026fe20376dee9301d70b29d10a436d673f37909e4186f and development-validation-glb-jpeg-1@a08a1c90496df087b1cd454dd29177ff3da7fdc8b5ebfb07156189479a8f8db8, replacing only GLB container/resource admission. No animation,skin,morph,unsupported extensions or ambiguous scene.",
+    "buffers": "Exactly one canonical base64 data:application/octet-stream;base64, or data:application/gltf-buffer;base64, buffer. RFC4648 exact padding/roundtrip/no whitespace; decoded length equals declaration. Bound expanded totals before allocation.",
+    "images": "Admitted PNG/JPEG bufferView or canonical data:image/png;base64, / data:image/jpeg;base64, URI, never both. Unchanged integrity/decode/Exif orientation/color-role/pixel rules.",
+    "externalResources": "Reject external,relative,blob URIs before decode; no placeholders or network. Keep JSON and inline resources in one original body; no synthesized Caption media.",
+    "sourceCatalog": "Selected-scene occurrences ascending(actual nodeIndex,primitiveIndex), one cloned slot per occurrence including missing material, representationMaterial(slotIndex). Inherit actual180 association proof and separately checked186 neutral facts; no name fallback.",
+    "sourceSurfaces": "Original glTF nodeIndex/primitiveIndex and primitive triangle order; retain authored node poses."
+  }
+}

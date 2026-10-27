@@ -1,5 +1,6 @@
 import { inspectDeclaredValidationModel, inspectDeclaredValidationBlob, readValidationBody } from '../projectFiles/content';
 import { isPointModel, isGsModel, type ValidatedModel } from '../projectFiles/pointPly';
+import { nativeSpatialModelBounds } from '../projectFiles/nativeSpatial';
 import { inspectProjectImage, projectImageMime, type PhotoDecoder } from '../projectFiles/photo';
 import * as THREE from 'three';
 import { canonical, list, object, same, string } from '../domain/projectGraphSupport';
@@ -38,7 +39,7 @@ export async function prepareReviewView(file: Blob, budget: ProjectFilePolicyInp
       await inspectDeclaredValidationModel(record,await readValidationBody(file,limits.maxFileBytes),limits,decode,jpeg,'review');
     const slots = isGsModel(source)&&record.materialCatalog===undefined?[]:list(object(record.materialCatalog).slots).map(object);
     const actual = new Set(source.materials.map(canonical));
-    if (!same(record.logicalBoundsAsset, source.bounds) || slots.length !== source.materials.length ||
+    if (!same(record.logicalBoundsAsset, nativeSpatialModelBounds(record, source)) || slots.length !== source.materials.length ||
       slots.some(s => !actual.delete(canonical({ sourceLocator: s.sourceLocator!, sourceSemantics: s.sourceSemantics! }))) || actual.size)
       throw Error('モデルの形状・材質と表示情報が一致しません。');
     decoded.set(string(record.id), source);

@@ -1,0 +1,83 @@
+{
+  "id": "development-validation-mesh-obj-1",
+  "version": 1,
+  "status": "Development source profile; not generally adopted",
+  "records": {
+    "contentKind": "mesh",
+    "primary": {
+      "role": "meshPrimary",
+      "purposes": [
+        "source",
+        "display"
+      ],
+      "derivedFrom": [],
+      "reviewAndSavedEditCopy": {
+        "purposes": [
+          "display"
+        ],
+        "savedDerivedFrom": [],
+        "wire": "Review omits derivedFrom; saved independent edit-copy explicitly carries[]. Ordinary fresh/native authoring retains source+display."
+      }
+    },
+    "proxy": {
+      "role": "interactionProxy",
+      "purposes": [
+        "interaction"
+      ],
+      "family": "Own family distinct from exact same-Asset GS family named by proxyForGsVariantFamilyId.",
+      "derivedFrom": "Native recipe8 exactly one mapped same-Asset GS parent; fresh Proxy and saved Review edit-copy []; retained nonempty edges preserved/remapped by current-format exchange and Clean.",
+      "reviewWire": "Review omits derivedFrom; saved edit-copy explicitly carries[]."
+    }
+  },
+  "coordinates": {
+    "unit": "No physical-unit assertion by source profile. Preserve existing Project frame exactly. Proposed07l fresh unitless-Project rule chooses unknown; never rescale a source to fit a declared unit.",
+    "representationToAsset": "Canonical existing positive Sim3 and reflection none/x; no normalization. Identity for fresh import, exact retained transform for Native.",
+    "arithmetic": "Use development-native-point-ply-rgb-1@8fa283ea34207e0604f66204d3d6f7f8275071a99fb79bc940e23aa0905a0994 checked binary64 matrix/dot/translation order, with signed-zero canonical facts.",
+    "bounds": "Retain raw decoded bounds separately. Asset AABB transforms all eight raw-AABB corners. Authored node poses precede the wrapper; AssetBinding applies once later."
+  },
+  "budgets": "Reuse host non-GS file/JSON/item/scalar/pixel guards, with expanded geometry/work charged before allocation. No new cap or guarantee. Validate retained/unused declarations; reject partial/trailing/unsupported content without repair.",
+  "numeric": "Finite parsed Number and finite post-Float32 positions/normals required. Canonical positive zero for facts and new-format neutral comparison. Retain source order, duplicate vertices and winding; no welding/simplification.",
+  "display": "186 display is built from inspected owned neutral source geometry/material facts under the format rules. Actual180 proof and resource release precede display. Independent transformed root Group retains authored poses. No network.",
+  "proxyDisplay": "Invisible/no color or depth writes, excluded from fit. Existing DoubleSide approximate surface picking and manual confirmation; never reraycast saved pins.",
+  "goldens": {
+    "file": "mesh-conversion-8.goldens.json",
+    "sha256": "6fb753973ff29b782ae4f7d15b8b37ea6ec7c5ecd5fcf82e508a94db562697eb"
+  },
+  "format": {
+    "mediaType": "text/plain",
+    "encoding": "Strict UTF-8, one optional initial BOM; LF or CRLF. Reject bare CR/NUL/backslash continuation. Allowed only comments,v,vn,vt,f,o,g,s,usemtl,mtllib.",
+    "vertices": "v exactly XYZ or XYZRGB; referenced RGB complete or absent, finite0..1. vt exactly UV, vn exactly XYZ. No homogeneous-W forms.",
+    "faces": "Consistent UV/normal presence per polygon; positive/negative nonzero indices resolved against declarations available at face. At least3 corners. Pin fan(0,i,i+1), no ear-clipping/welding. Bounds cover emitted face vertices.",
+    "normals": "Authored normals retained. Missing normals derive from original parsed Number coordinates before final Float32 storage, matching180.",
+    "smoothing": "s off/0/on/1 only; retain pinned180 run finalization and flatShading behavior.",
+    "externalMaterials": "Never fetch or infer MTL/textures. mtllib retained as unavailable dependency; usemtl retains run identity only. Contextual explanation before fresh creation/conversion if present. No OBJ+MTL bundle support.",
+    "material": "Preserve MeshPhongMaterial white/specular#111111/shininess30 and source vertexColors/smoothing, opaque/lit/front. Never silently Standard-normalize. Native appearance subset remains opacity1/chroma-disabled with exact proof.",
+    "sourceCatalog": "Both o/g start objects under pinned180 rules. Empty initial placeholder, empty/consecutive declarations and objects with no emitted faces consume no ordinal. Number nonempty emitted source objects from0 in source order. Finalize/remove zero-length/trailing inherited runs before numbering retained materialRunOrdinal from0 per object. Global slotIndex ascending source object ordinal then materialArraySlot; representationMaterial(slotIndex). Names never key slots. A nonempty implicit initial object is objectOrdinal0; first o/g may adopt it under180 rules without splitting/reordering earlier faces.",
+    "sourceProof": "Bijection source objectOrdinal/materialRunOrdinal -> actual180 childPath/materialArraySlot ->186 neutral slot facts. No glTF nodeIndex/primitiveIndex fiction in private witness/ID keys.",
+    "sourceSurfaces": "Public generic meshTriangle nodeIndex=source object ordinal, primitiveIndex0, triangleIndex=fan output ordinal within that object.",
+    "effects": {
+      "allowedAppearance": [
+        "lighting",
+        "doubleSided",
+        "baseColorSrgb",
+        "opacity",
+        "chroma"
+      ],
+      "coverage": [
+        "inherit",
+        "opaque",
+        "mask"
+      ],
+      "optics": [
+        "inherit",
+        "surface"
+      ],
+      "lighting": "inherit/lit retain source Phong specular/shininess/smoothing; unlit uses owned Basic preserving diffuse/vertex colors/source UV/alpha inputs. Base-color override changes diffuse only.",
+      "side": "inherit restores source FrontSide; explicit false/true select FrontSide/DoubleSide.",
+      "reset": "Reconstruct immutable source before remaining resolved effects; never mutate source.",
+      "alpha": "Opacity defaults1; fractional opacity only under existing binary-mask/cutoff. Existing hard chroma at softness0; nonzero softness requires existing mask. Explicitly extend same checked shader patches to Phong; retain numeric/color/cutoff rules. Disabled map2 chroma removed only from display copy.",
+      "refuse": "smoothBlend,ditherCoverage,transmission,unknown keys and unsupported combinations refuse in command and render preparation. No smooth transparency, new specular/shininess editor or Native alpha conversion."
+    },
+    "color": "Complete referenced source RGB0..1 uses pinned180 sRGB-to-linear then Float32 before per-corner expansion. No linear reinterpretation or Uint8 quantization."
+  }
+}

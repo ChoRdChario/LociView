@@ -9,6 +9,8 @@ import type { MetadataRecordEdit } from './commands';
 import { fail, type MetadataLimits } from './format';
 import { metadataImmutableReader } from './records';
 import { gsSourceDeclaration } from '../domain/gsSource';
+import { pointSourceDeclaration } from '../domain/pointSource';
+import { nativePointSourceDeclaration } from '../domain/nativeSpatialSource';
 
 type Provider = Extract<ProjectProviderRead, { kind: 'scene-provider' }>;
 const shape = (o: object, keys: string[]) => { if (Object.keys(o).sort().join(',') !== keys.sort().join(',')) fail('model-copy-shape'); };
@@ -25,6 +27,7 @@ export function assetCopySource(provider: Provider, sceneId: string, assetId: st
   if(gs.length){
     const representation=gs[0]!,proxies=reps.filter(r=>r.role==='interactionProxy'),proxy=proxies[0];
     if(gs.length!==1||proxies.length>1||reps.length!==1+proxies.length||!same(representation.formatProfile,gsSourceDeclaration)||representation.materialCatalog!==undefined||!same(representation.derivedFrom,[])||!same(representation.purposes,['source','display'])&&!same(representation.purposes,['display'])||proxy&&(proxy.proxyForGsVariantFamilyId!==representation.variantFamilyId||!same(proxy.purposes,['interaction'])))return fail('gs-copy-closure');
+    if (proxy && !same(proxy.derivedFrom, []) && !same(proxy.derivedFrom, [representation.id!])) return fail('gs-copy-derivation');
     for(const [map,record]of [['assetBindingsById',binding],['assetRevisionsById',revision],...reps.map(r=>['representationsById',r] as const)] as const){const c=new ProjectRecordFields();checkProjectRecord(c,map,record);if(c.unknown||record.assetId!==assetId||!same(record,exact(provider.details.immutable[map][record.id as string])))fail('gs-copy-closure');}
     const classes=list(revision.anchorCompatibilityClasses);if(classes.length!==1||!same(object(classes[0]).targetVariantFamilyIds,[representation.variantFamilyId!]))fail('gs-copy-class');
     return {gs:true,asset,binding,revision,representation,proxy,materials:[] as {sourceId:string;material:JsonObject|null}[]};
@@ -40,7 +43,7 @@ export function assetCopySource(provider: Provider, sceneId: string, assetId: st
   shape(representation, ['id', 'assetId', 'representationFrameId', 'contentKind', 'purposes', 'role', 'variantFamilyId', 'formatProfile',
     'blob', 'representationToAsset', 'logicalBoundsAsset', 'derivedFrom', 'materialCatalog', 'payloadDigest']);
   const catalog = object(representation.materialCatalog), slots = list(catalog.slots), classes = list(revision.anchorCompatibilityClasses);
-  if (representation.contentKind !== 'mesh' || representation.role !== 'meshPrimary' || list(representation.derivedFrom).length ||
+  if (!(representation.contentKind === 'mesh' && representation.role === 'meshPrimary' || representation.contentKind === 'pointCloud' && representation.role === 'pointPrimary' && [pointSourceDeclaration, nativePointSourceDeclaration].some(p => same(representation.formatProfile, p))) || list(representation.derivedFrom).length ||
     !slots.length || classes.length !== 1 || !same(object(classes[0]).targetVariantFamilyIds, [representation.variantFamilyId!])) fail('model-copy-closure');
   const materials = slots.map(slot => {
     r.charge();
@@ -99,6 +102,7 @@ function copiedRecords(source: ReturnType<typeof assetCopySource>, ids: Copy['id
 function copiedProxy(source:NonNullable<ReturnType<typeof assetCopySource>['proxy']>,copy:NonNullable<Copy['proxy']>,ids:Copy['ids']):JsonObject{
   const catalog=object(source.materialCatalog),slots=new Map(copy.slots.map(s=>[s.sourceId,s.targetId]));
   return {...source,id:copy.ids.representation,assetId:ids.asset,representationFrameId:copy.ids.frame,variantFamilyId:copy.ids.family,proxyForGsVariantFamilyId:ids.family,
+    derivedFrom: list(source.derivedFrom).length ? [ids.representation] : [],
     materialCatalog:{...catalog,layoutId:copy.ids.layout,slots:list(catalog.slots).map(s=>({...object(s),logicalMaterialSlotId:slots.get(object(s).logicalMaterialSlotId as string)!})).sort((a,b)=>a.logicalMaterialSlotId.localeCompare(b.logicalMaterialSlotId))}};
 }
 /** Construct once from complete source records. The command planner independently verifies every remap. */

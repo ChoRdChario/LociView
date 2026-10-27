@@ -22,51 +22,76 @@ Fix latency when it prevents use or risks data. Keep the existing
 Root is sole writer; bounded independent reviewers are read-only. No small manual
 test or helper approvals. Continue in-scope work while device evidence is pending.
 
-## Current connected unit — Native Point/GS/Proxy conversion
+## Current connected unit — approved07l Mesh import / Native conversion
 
-PO2026-10-28 requests existing Point/GS/Proxy → new Project conversion, then normal
-editing/file exchange/restore/cold resume, without small manual-test waits. Root is
-sole writer. Plan: inspect actual Native admission and target profiles → specify
-exact byte/frame/unit/bounds/Proxy/Scene/pin mappings and acceptance → independent
-read-only contract review → implement all already authorized compatible work and
-relevant automated verification. Use the existing file-open/conversion flow and
-journal; add no dependency, separate conversion UI or storage framework.
-Stop only affected implementation for a genuinely new unit/profile/recipe/ID or
-compatibility decision requiring PO approval under05§9; first prepare a concrete
-reviewed proposal and next steps. No silent metre relabeling, repicking, SH loss,
-source overwrite, historical-recipe change, capacity/adoption or release claim.
-Meta-audit: g0-baseline/8dd75a1 starts clean; loading checkpoint below is verified.
-Missing initial conversion is the next feature priority;500k Review latency stays
-tracked separately. Reuse service fault tests and one connected file/browser flow.
+PO2026-10-28 approved [07l](../docs/specs/07l-mesh-import-conversion-proposal.md)
+in one group: STL/Mesh PLY/OBJ/self-contained glTF fresh creation/addition and Native
+Mesh/Proxy conversion → editing/position/material → all five outputs → two-way
+exchange with local edits → Review editable copy/Clean → restore/cold resume.
+Root is sole writer; three bounded reviewers are read-only. No per-format/helper
+PO approval or small manual-test wait. No new dependency/schema/package version.
 
-Investigation complete. Existing Native conversion explicitly admits only static
-GLB and retains legacy64MiB input. Native Point may declare unit unknown, while01a
-asserts metres/identity; Proxy carries its own transform/family and exact GS
-derivedFrom that the current saved-model subset rejects. Removing guards alone
-would change meaning. Native GS header inspection also does not prove payload.
+Meta-audit:07k final tree below is verified on g0-baseline; checkpoint/push it before
+editing runtime source for07l. Four exact approved profile companions, recipe8 ID/
+source goldens, unknown fresh unitless-Project policy, canonical PLY geometry,
+Phong-preserving OBJ effects and private receipt contract are already reviewed.
+Static hashes/lengths/eight IDs/seven source vectors/Float32 colors/old companion
+byte identity and local links pass. This is not07l runtime/adoption evidence.
 
-Concrete decision: [07k](../docs/specs/07k-native-point-gs-proxy-conversion-proposal.md)
-groups two additive exact profiles, immutable recipe7/ID vectors, preserved unit
-objects/transforms/manual pins and strict GS inspection, plus a Desktop-only512MiB
-Native original exception. Reuse file-backed strict STORE sources, private original
-CAS and existing durable initialize-start acknowledgement; old recipes1–6/jobs and
-all general release/adoption gates stay unchanged. No product implementation yet.
+Plan: new kind:'mesh-source' and domain neutral data/source-address types → strict
+STL/PLY then OBJ/glTF inspectors and actual180→186 proof → exact content/profile/
+MIME/facts/copy/Review/render/picking integration → recipe8 using07k archive/CAS/
+journal fences → same typed file/model/Proxy/material UI → focused faults and one
+representative connected mixed-format browser/file flow → final serial checkpoint
+and independent final diff review. Record exact imports and run sceneCore early.
+Reuse existing GLB parsed-core checks without changing old wrappers/profile bytes.
 
-Read-only independent mapping, target-profile and streaming/recovery reviews found
-no remaining blocker after correcting Native unit wire kind to meters and Review
-wire omission versus saved edit-copy derivedFrom:[]. Root also clarified actual
-durable staging versus in-memory pending and64KiB adapter versus16MiB CAS boundaries.
-Static Node check passes proposed JSON hashes/UTF-8 lengths, seven ID vectors,
-Point/Proxy transform arithmetic, unchanged frozen Point/GS hashes and local links.
-No runtime/browser check is claimed for this documentation-only checkpoint.
+Acceptance is07l§6. Keep originals, unit objects, raw/Asset bounds, slot/surface
+ordinals, existing pins/history and every write/readback/publication/recovery fence.
+OBJ MTL is never fetched; disclose its unavailable materials before creation.
+Stop only affected work for a real specification conflict, new product/numeric/
+architecture/migration policy, unsupported dependency or release/destructive gate.
+Other accepted implementation/tests continue. No silently normalized source,
+forgotten dormant representation, material-object slot collapse or GLB relabeling.
 
-Await one genuine grouped PO decision under AGENTS architecture/change rules and
-05§9 to ratify the new frame/profile/recipe/capacity/recovery contract. Next after
-approval: implement archive/recipe7 and public profile/picking/render connections,
-then all-purpose file exchange, restore/cold/interruption and >64MiB dedicated
-Chromium acceptance; run required final serial checks and independent final diff
-review. Do not insert per-helper/manual-test waits. Other Native formats/materials
-and the existing500k Review latency failure remain visible, not silently completed.
+## Verified checkpoint —07k Native Point/GS/Proxy conversion
+
+[07k](../docs/specs/07k-native-point-gs-proxy-conversion-proposal.md) is implemented
+in bounded shared validation/Desktop services: exact Point/GLB Proxy profiles,
+recipe7, unknown/metres preservation, checked transforms/point anchors and complete
+Native SH2/3 GS inspection. Strict serial STORE sources keep original/GS bodies
+file-backed, with private original CAS and actual durable-initialize acknowledgement.
+Exact-source reselect, later-edit-preserving retry, invisible transformed Proxy,
+copy/remap and read-only preflight cancel/status use existing ports/fences.
+
+Final frozen source/test tree passes typecheck,128 Vitest files/2852 tests (21
+existing todos), normal/harness/validation/Desktop builds. Twelve new service cases
+cover IDs/body reads/cancel, mixed appearance/dormant history/closures, source and
+receipt faults, pre/post-start recovery, authoritative anchors and five-purpose
+exchange/copies/cold. Independent final reviews have no outstanding findings.
+HEIC isolation, all four current-source maps, GS build/import separation, Desktop
+notices/distribution and ordinary/Desktop Native Spark chunk identity pass.
+Logs: `native07k-final-checks-authorized.log`, `native07k-final-artifacts.log`, and
+source/test hashes under ignored `.artifacts/e2e/desktop-integration-tools/`.
+
+Desktop run1793138997956-36676 passes13.5min: actual GS pixels, transformed point
+selection and backface Proxy selection; two independent browser profiles/two return
+rounds with local edits; all five outputs, Review edit-copy/Clean, restore/cold.
+Run1793140754710-64892 passes8.1min: owned74,414,267-byte Native ZIP/300000 SH3 rows,
+conversion/edit/save, original cold reopen/save, separate-profile restore/save and
+restored cold resume. It verifies preview cancel/no database, spinner/reduced motion,
+Native body max65536 bytes, metadata65557 bytes and no whole-original/GS read or page
+error. The rendered small model screenshot was inspected. Private original/witnesses
+are absent from public output. These are headless Chromium/local-HTTP observations,
+not physical-iOS/offline/PWA, arbitrary-format, RAM/latency, aggregate adoption or
+release acceptance. Restored large backup generation86.4s remains diagnostic timing.
+
+[Detailed preserved working/failure record](../docs/history/development-through-2026-10-28/tasks/native-spatial-conversion.md)
+retains initial setup, monitor, injected-Node-bitmap and typecheck failures. Default
+sandbox filesystem tests reproduce hard-link EPERM/FileHandle warnings; that whole
+run was interrupted, not passed. The same required sequence succeeds with approved
+filesystem authority; no tests/limits/exclusions weakened. Old recipe1–6/profile
+bytes remain unchanged. The unrelated500k SH4 Review240s failure below remains open.
 
 ## Verified checkpoint — usable loading
 
@@ -246,11 +271,14 @@ Logs, generated owned inputs, traces, failures and snapshots remain under ignore
 
 Next, prioritize real missing initial-conversion workflows over GS tuning;
 the500k Review failure remains tracked.
-Native Point/GS(+Proxy) currently cannot convert to ProjectScene although fresh
-target creation works. Mesh formats beyond GLB, special base-material editing and
-frozen-v1 orthographic camera mapping also remain. Prepare a concrete reviewed
-mapping/profile/ID proposal before implementing a new conversion contract; stale
-inventory classifications are hypotheses, not a renewed implementation queue.
+The approved07l four-format Mesh/Proxy workflow is the current connected unit.
+Special base-material editing, further external-resource/format subsets and frozen-v1
+orthographic mapping also remain; choose the next group from actual completed
+coverage. New exact policies/recipes require reviewed contract data before runtime
+implementation. Do not turn stale inventory classifications into a renewed queue.
+Keep existing-project units, original bytes/pins and the same five-purpose/return/
+restore/reopen workflow.07l approval covers its four internal tracks and routine
+fixes/tests; no repeated format/helper approval is required.
 Showing new-file metadata before complete ZIP integrity needs its own explicitly
 non-authoritative preview contract. Do not remove existing write/recovery inert
 guards or mix a retained old snapshot with new mutation authority.

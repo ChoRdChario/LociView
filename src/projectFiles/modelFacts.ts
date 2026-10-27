@@ -1,5 +1,7 @@
 import { resolveScene } from '../scene/resolve';
 import { pointSourceDeclaration } from '../domain/pointSource';
+import { nativePointSourceDeclaration, nativeProxySourceDeclaration, nativeSpatialTransform } from '../domain/nativeSpatialSource';
+import { same } from '../domain/projectGraphSupport';
 import type { Anchor } from '../scene/types';
 import { readProjectScene, type ProjectProviderRead } from '../scene/projectProvider';
 import { metadataProviderReady, type MetadataModelFactPort, type MetadataModelFactPlan } from '../projectMetadata/session';
@@ -22,6 +24,19 @@ import { validationDeclaredBodyBytes } from './bodyBudget';
 export function assertValidationModelClosures(provider:Extract<ProjectProviderRead,{kind:'scene-provider'}>):void{
   let work=provider.inspection.workUsed;
   const charge=()=>{if(++work>limits.maxWork)fileError('モデルの対応検査が上限を超えています。');};
+  for (const field of Object.values(provider.details.immutable.representationsById)) {
+    charge(); if (field.kind !== 'value') continue;
+    const r = field.value;
+    if (!same(r.formatProfile, nativeProxySourceDeclaration)) continue;
+    if (r.variantFamilyId === r.proxyForGsVariantFamilyId) return fileError('位置指定用の面とGSの識別情報が一致しません。');
+    const edges = r.derivedFrom;
+    if (!Array.isArray(edges) || edges.length > 1) return fileError('位置指定用の面の元モデルを確認できません。');
+    if (edges.length) {
+      const source = provider.details.immutable.representationsById[edges[0] as string];
+      if (source?.kind !== 'value' || source.value.role !== 'gsPrimary' || source.value.assetId !== r.assetId ||
+        source.value.variantFamilyId !== r.proxyForGsVariantFamilyId) return fileError('位置指定用の面とGSの対応が一致しません。');
+    }
+  }
   for(const asset of Object.values(provider.resources.assets)){
     charge();if(asset.lifecycle.kind!=='value'||asset.lifecycle.value.state!=='active'||asset.projection.kind!=='value')continue;
     const records=asset.projection.value.representationIds.map(id=>{charge();const field=provider.details.immutable.representationsById[id];
@@ -44,13 +59,12 @@ export function validationModelFacts(content: ValidationContent): MetadataModelF
     const record = field?.kind === 'value' ? field.value : undefined;
     if (!projection || !record || !reference || evidence?.method !== 'point-cloud' || !index || index.kind !== 'pointSample' || index.nodeIndex !== 0 || index.primitiveIndex !== 0 || !Number.isSafeInteger(index.pointIndex) || index.pointIndex < 0 ||
       projection.assetFrameId !== anchor.assetFrameId || projection.revisionId !== anchor.authoredAssetRevisionId || !projection.anchorCompatibilityIds.includes(anchor.authoredAnchorCompatibilityId) || !projection.representationIds.includes(reference.representationId) ||
-      record.assetId !== anchor.assetId || record.contentKind !== 'pointCloud' || record.role !== 'pointPrimary' || json(record.formatProfile) !== json(pointSourceDeclaration)) return fileError('元の点と記録対象を確認できません。');
+      record.assetId !== anchor.assetId || record.contentKind !== 'pointCloud' || record.role !== 'pointPrimary' || ![pointSourceDeclaration, nativePointSourceDeclaration].some(p => json(record.formatProfile) === json(p))) return fileError('元の点と記録対象を確認できません。');
     const revision = provider.details.immutable.assetRevisionsById[projection.revisionId];
     if (revision?.kind !== 'value' || !(revision.value.anchorCompatibilityClasses as JsonObject[]).some(c => c.id === anchor.authoredAnchorCompatibilityId && (c.targetVariantFamilyIds as string[]).includes(record.variantFamilyId as string))) return fileError('点の互換性を確認できません。');
     const decoded = await content.modelContent(record, true);
     if (decoded.kind !== 'point' || index.pointIndex >= decoded.positions.length / 3) return fileError('元の点を確認できません。');
-    const position = Array.from(decoded.positions.subarray(index.pointIndex * 3, index.pointIndex * 3 + 3)) as [number, number, number];
-    // This exact source profile requires identity representationToAsset; its inspector checks it.
+    const position = nativeSpatialTransform(record.representationToAsset as JsonObject)(Array.from(decoded.positions.subarray(index.pointIndex * 3, index.pointIndex * 3 + 3)));
     return { kind: 'asset', assetId: anchor.assetId, assetFrameId: projection.assetFrameId, positionAsset: position,
       authoredAssetRevisionId: projection.revisionId, authoredAnchorCompatibilityId: anchor.authoredAnchorCompatibilityId,
       hitEvidence: { method: 'point-cloud', source: { representationId: record.id as string, surfaceRef: { kind: 'pointSample', nodeIndex: 0, primitiveIndex: 0, pointIndex: index.pointIndex } } } };

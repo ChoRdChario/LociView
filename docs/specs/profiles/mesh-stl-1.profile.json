@@ -1,0 +1,58 @@
+{
+  "id": "development-validation-mesh-stl-1",
+  "version": 1,
+  "status": "Development source profile; not generally adopted",
+  "records": {
+    "contentKind": "mesh",
+    "primary": {
+      "role": "meshPrimary",
+      "purposes": [
+        "source",
+        "display"
+      ],
+      "derivedFrom": [],
+      "reviewAndSavedEditCopy": {
+        "purposes": [
+          "display"
+        ],
+        "savedDerivedFrom": [],
+        "wire": "Review omits derivedFrom; saved independent edit-copy explicitly carries[]. Ordinary fresh/native authoring retains source+display."
+      }
+    },
+    "proxy": {
+      "role": "interactionProxy",
+      "purposes": [
+        "interaction"
+      ],
+      "family": "Own family distinct from exact same-Asset GS family named by proxyForGsVariantFamilyId.",
+      "derivedFrom": "Native recipe8 exactly one mapped same-Asset GS parent; fresh Proxy and saved Review edit-copy []; retained nonempty edges preserved/remapped by current-format exchange and Clean.",
+      "reviewWire": "Review omits derivedFrom; saved edit-copy explicitly carries[]."
+    }
+  },
+  "coordinates": {
+    "unit": "No physical-unit assertion by source profile. Preserve existing Project frame exactly. Proposed07l fresh unitless-Project rule chooses unknown; never rescale a source to fit a declared unit.",
+    "representationToAsset": "Canonical existing positive Sim3 and reflection none/x; no normalization. Identity for fresh import, exact retained transform for Native.",
+    "arithmetic": "Use development-native-point-ply-rgb-1@8fa283ea34207e0604f66204d3d6f7f8275071a99fb79bc940e23aa0905a0994 checked binary64 matrix/dot/translation order, with signed-zero canonical facts.",
+    "bounds": "Retain raw decoded bounds separately. Asset AABB transforms all eight raw-AABB corners. Authored node poses precede the wrapper; AssetBinding applies once later."
+  },
+  "budgets": "Reuse host non-GS file/JSON/item/scalar/pixel guards, with expanded geometry/work charged before allocation. No new cap or guarantee. Validate retained/unused declarations; reject partial/trailing/unsupported content without repair.",
+  "numeric": "Finite parsed Number and finite post-Float32 positions/normals required. Canonical positive zero for facts and new-format neutral comparison. Retain source order, duplicate vertices and winding; no welding/simplification.",
+  "display": "186 display is built from inspected owned neutral source geometry/material facts under the format rules. Actual180 proof and resource release precede display. Independent transformed root Group retains authored poses. No network.",
+  "proxyDisplay": "Invisible/no color or depth writes, excluded from fit. Existing DoubleSide approximate surface picking and manual confirmation; never reraycast saved pins.",
+  "goldens": {
+    "file": "mesh-conversion-8.goldens.json",
+    "sha256": "6fb753973ff29b782ae4f7d15b8b37ea6ec7c5ecd5fcf82e508a94db562697eb"
+  },
+  "format": {
+    "mediaType": "model/stl",
+    "encoding": [
+      "Complete ASCII facet grammar, optional whitespace, multiple complete solids; one normal/three vertices per facet; N>0.",
+      "Binary exact84+50*N bytes, N>0; little-endian Float32 normal/vertices and uint16 attribute."
+    ],
+    "color": "Uncolored: no COLOR= marker and all attributes0. Colored: exactly one Magics COLOR=RGBA at a position recognized by pinned180 header scan, A255; no ignored/extra marker. Attribute bit15=0: low/mid/high5-bit RGB/31; bit15=1: header RGB/255. Pinned180 sRGB-to-linear then Float32 repeated per corner. Reject other alpha/attribute interpretations.",
+    "normals": "Preserve each finite facet normal, including zero; do not regenerate.",
+    "material": "One MeshStandardMaterial; #9aa4af uncolored or white colored, metalness0.1, roughness0.8, opaque/lit/front.",
+    "sourceCatalog": "Exactly representationMaterial(slotIndex0).",
+    "sourceSurfaces": "nodeIndex0, primitiveIndex0, triangleIndex=source facet ordinal."
+  }
+}

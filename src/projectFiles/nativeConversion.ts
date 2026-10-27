@@ -1,5 +1,8 @@
 import { inspectProjectImage, projectImageMime, type PhotoDecoder } from './photo';
 import { readNativePortableConversionV1 } from '../nativeGs/portablePackage';
+import { prepareNativeSpatialConversion, resumeNativeSpatialConversion } from './nativeSpatialConversion';
+import { nativeSpatialRecipe } from './nativeMapping';
+import { projectFilePolicy, type ProjectFilePolicyInput } from './validation';
 import { nativeDisplaySetsV1, type NativeProjectSnapshotV1 } from '../nativeGs/schema';
 import { nativeMaterialSlotKey } from '../nativeGs/materialSlots';
 import type { ProjectWorkspaceFS } from '../platform/fs';
@@ -22,6 +25,12 @@ import { readValidationInitialRecord, writeValidationInitial, validationInitialO
 import { checkFileLimits, fileError, occurrenceGlbProfile, occurrenceJpegGlbProfile, validationMetadataLimits as metadata, type FileValidationLimits } from './validation';
 
 interface ByteProof { byteLength: number; digest: string }
+/** File-open display data; no archive, storage or private witness authority. */
+export interface NativeConversionSummary {
+  readonly models: number; readonly scenes: number; readonly captions: number; readonly media: number;
+  readonly originalExcludedFromExports: true;
+  readonly nativeSpatial?: Readonly<{points: number; gs: number; proxies: number}>;
+}
 interface ConversionReceipt {
   recipe: NativeConversionRecipe; conversionId: string; projectId: string;
   original: ByteProof; manifest: ByteProof; snapshot: ByteProof;
@@ -33,7 +42,7 @@ const receiptPath = (fs: ProjectWorkspaceFS) => metadataPath(fs, 'native-convers
 const sourcePath = (fs: ProjectWorkspaceFS) => metadataPath(fs, 'native-conversion-source.zip');
 const proof = async (bytes: Uint8Array): Promise<ByteProof> => ({ byteLength: bytes.length, digest: await digest(bytes) });
 export const hasNativeConversion = async (fs: ProjectWorkspaceFS, checkBoundInitial = true) => !!await fs.readStream(receiptPath(fs)) || !!await fs.readStream(sourcePath(fs)) ||
-  checkBoundInitial && [nativeJpegRecipe, nativeAppearanceJpegRecipe, nativePhotoRecipe, nativeAppearancePhotoRecipe].includes(await validationInitialOrigin(fs) as NativeConversionRecipe);
+  checkBoundInitial && [nativeSpatialRecipe, nativeJpegRecipe, nativeAppearanceJpegRecipe, nativePhotoRecipe, nativeAppearancePhotoRecipe].includes(await validationInitialOrigin(fs) as NativeConversionRecipe);
 async function inspectNativeModel(bytes: Uint8Array, appearance: boolean, limits: FileValidationLimits, png?: PngDecoder, jpeg?: JpegDecoder) {
   const hasJpeg = validationGlbUsesJpeg(bytes, limits);
   const inspect = appearance ? hasJpeg ? inspectOccurrenceJpegGlb : inspectOccurrenceGlb : hasJpeg ? inspectValidationJpegGlb : inspectValidationGlb;
@@ -183,9 +192,12 @@ async function verifyAdditiveMapping(receipt: ConversionReceipt, source: Project
 }
 
 /** No IDs or persistent state are allocated until the user confirms create(). */
-export async function prepareNativeConversion(input: Blob, limits: FileValidationLimits, decode?: PngDecoder, jpeg?: JpegDecoder, photo?: PhotoDecoder) {
+export async function prepareNativeConversion(input: Blob, budget: ProjectFilePolicyInput, decode?: PngDecoder, jpeg?: JpegDecoder, photo?: PhotoDecoder, signal?: AbortSignal) {
+  const spatial = await prepareNativeSpatialConversion(input, budget, decode, jpeg, photo,signal);
+  if (spatial) {const summary: NativeConversionSummary = spatial.summary; return {...spatial,summary};}
+  const limits = projectFilePolicy(budget).nonGs;
   checkFileLimits(limits);
-  const file = input.slice(0, input.size), native = await readNativePortableConversionV1(file, limits);
+  const file = input.slice(0, input.size), native = await readNativePortableConversionV1(file, limits,signal);
   if (!native) return null;
   const { snapshot } = native;
   if (snapshot.collaborationBaseline) return fileError('この共同作業用のNativeファイルは、まだ変換できません。');
@@ -193,6 +205,7 @@ export async function prepareNativeConversion(input: Blob, limits: FileValidatio
   const sourceWitness = new Map<string, readonly NativeOccurrence[]>(); let occurrenceCount = 0;
   const models = new Map<string, ValidatedGlb>(), blobs: { ref: StoredBlobRef; bytes: Uint8Array }[] = [];
   for (const r of snapshot.representations) {
+    signal?.throwIfAborted();
     if (r.role !== 'meshPrimary' || r.contentKind !== 'mesh' || r.formatProfile.id !== 'lociview-native-model-glb-v1' ||
       !same(r.purposes, ['source', 'display']) || !same({ ...r.representationToAsset }, { ...identityPlacement(), reflection: 'none' }) ||
       r.derivedFrom.length || r.proxyForGsVariantFamilyId !== undefined || r.gsPly !== undefined || r.pointPly !== undefined || r.blob.mediaType !== 'model/gltf-binary')
@@ -202,7 +215,7 @@ export async function prepareNativeConversion(input: Blob, limits: FileValidatio
     const model = await inspectNativeModel(bytes, appearance, limits, decode, jpeg);
     models.set(r.id, model); blobs.push({ ref: { ...r.blob }, bytes });
     if (appearance) { occurrenceCount += model.occurrences!.length; if (occurrenceCount > limits.maxItems) return fileError('材質の面の数が検査の上限を超えています。');
-      const decoded = await captureLegacyOccurrenceProof(model);
+      const decoded = await captureLegacyOccurrenceProof(model,signal);
       sourceWitness.set(r.id, decoded.rows.map(row => ({ childPath:[...row.childPath], materialArraySlot:row.materialArraySlot, nodeIndex:row.nodeIndex, primitiveIndex:row.primitiveIndex, materialIndex:row.materialIndex, slotIndex:row.slotIndex }))); }
   }
   for (const m of snapshot.mediaResources ?? []) {
@@ -216,6 +229,7 @@ export async function prepareNativeConversion(input: Blob, limits: FileValidatio
   const original = await proof(originalBytes), manifest = await proof(native.manifestBytes), snapshotProof = await proof(native.snapshotBytes);
   const report = { models: snapshot.assets.length, scenes: nativeDisplaySetsV1(snapshot).length, captions: snapshot.captions.length,
     media: snapshot.mediaResources?.length ?? 0, originalExcludedFromExports: true as const };
+  signal?.throwIfAborted();
   let attempt: Promise<Awaited<ReturnType<typeof create>>> | undefined;
   async function create() {
     const conversionId = newId(), mapped = await mapNativeProject(snapshot, models, conversionId, original.digest, appearance ? sourceWitness : undefined);
@@ -284,14 +298,17 @@ export async function prepareNativeConversion(input: Blob, limits: FileValidatio
       return session.createFromSource(source);
     } };
   }
-  return { summary: Object.freeze({ ...report }), create: () => attempt ??= create() };
+  const summary: NativeConversionSummary = Object.freeze({...report});
+  return { summary, create: () => attempt ??= create() };
 }
 
 /** Cold recovery checks retained input; it never regenerates IDs or initial Automerge changes. */
 export async function resumeNativeConversion(fs: ProjectWorkspaceFS, store: OriginBlobStore, session: MetadataProjectSession,
-  limits: FileValidationLimits, projectId: string, decode?: PngDecoder, jpeg?: JpegDecoder, photo?: PhotoDecoder) {
+  budget: ProjectFilePolicyInput, projectId: string, decode?: PngDecoder, jpeg?: JpegDecoder, photo?: PhotoDecoder, reselected?: Blob) {
   const receipt = await readReceipt<ConversionReceipt>(fs, receiptPath(fs), metadata);
   if (!receipt) return fileError('変換元の記録を確認できません。');
+  if (receipt.recipe === nativeSpatialRecipe) return resumeNativeSpatialConversion(fs, store, session, budget, projectId, decode, jpeg, photo, reselected);
+  const limits = projectFilePolicy(budget).nonGs;
   await checkConversionReceipt(receipt, projectId);
   const { source, receipt: initial } = await readValidationInitialRecord(fs);
   if ((nativeRecipeHasOrigin(receipt.recipe) ? initial.version !== 'validation-initial-2' || initial.originRecipe !== receipt.recipe : initial.version !== 'validation-initial-1') || source.proof.identity.projectId !== projectId || json(source.proof) !== json(receipt.initial.proof) || initial.byteLength !== receipt.initial.byteLength ||

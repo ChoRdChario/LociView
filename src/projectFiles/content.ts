@@ -15,6 +15,8 @@ import { digest, newId } from '../projectMetadata/persistence';
 import type { StoredBlobRef } from '../projectMetadata/blobStore';
 import { inspectValidationGlb, inspectValidationJpegGlb, inspectFreshValidationGlb, type ValidatedGlb } from './glb';
 import { inspectOccurrenceGlb, inspectOccurrenceJpegGlb } from './glbOccurrences';
+import { nativePointSourceProfile, nativeProxySourceProfile, nativeSpatialModelBounds } from './nativeSpatial';
+import { validationGlbUsesJpeg } from './glb';
 import { inspectPointPly, isPointModel, isGsModel, isGlbModel, pointSourceProfile, pointSourceMediaType, type ValidatedModel } from './pointPly';
 import { gsSourceProfile, inspectGsPly, inspectGsPlyFile, captureGsBlob, gsBlobStream, hasGsPlySignature } from './gsPly';
 import type { PngDecoder } from './png';
@@ -208,15 +210,16 @@ export class ValidationContent implements MetadataMediaPort {
     } else if (request.fact === 'representation' || request.fact === 'family-envelope' || request.fact === 'family-contribution') {
       await this.modelDeclaration(record); // Prepared decoding never bypasses declared profile/role/transform checks.
       const decoded = prepared?.model ?? await this.modelContent(record, readOnly);
-      if (!same(record.logicalBoundsAsset, decoded.bounds)) return response('failed');
+      const bounds = nativeSpatialModelBounds(record, decoded);
+      if (!same(record.logicalBoundsAsset, bounds)) return response('failed');
       const slots = isGsModel(decoded) && record.materialCatalog === undefined ? [] : fileObject(record.materialCatalog).slots;
       if (!Array.isArray(slots) || slots.length !== decoded.materials.length) return response('failed');
       const actual = new Set(decoded.materials.map(canonical));
       for (const slot of slots) { const s = fileObject(slot); if (!actual.delete(canonical({ sourceLocator: s.sourceLocator, sourceSemantics: s.sourceSemantics } as JsonObject))) return response('failed'); }
       if (actual.size) return response('failed');
-      facts = request.fact === 'representation' ? { contentKind: isGsModel(decoded) ? 'gaussianSplat' : isPointModel(decoded) ? 'pointCloud' : 'mesh', staticPose: true, contentBoundsAsset: decoded.bounds,
+      facts = request.fact === 'representation' ? { contentKind: isGsModel(decoded) ? 'gaussianSplat' : isPointModel(decoded) ? 'pointCloud' : 'mesh', staticPose: true, contentBoundsAsset: bounds,
         materials: [...decoded.materials], surfaceRanges: [...decoded.surfaceRanges] } : request.fact === 'family-envelope' ?
-        { logicalBoundsAsset: decoded.bounds, authority: { kind: same(record.purposes, ['display']) || record.role === 'interactionProxy' ? 'first-verified-output' : 'source', representationId: record.id!, payloadDigest: record.payloadDigest! } } :
+        { logicalBoundsAsset: bounds, authority: { kind: same(record.purposes, ['display']) || record.role === 'interactionProxy' ? 'first-verified-output' : 'source', representationId: record.id!, payloadDigest: record.payloadDigest! } } :
         { verifiedMembers: [{ id: record.id!, payloadDigest: record.payloadDigest! }] };
     } else return response('unsupported');
     checkContentFacts(request, facts); return response('verified', facts);
@@ -237,14 +240,18 @@ export function validationGsEquivalenceSource(request: ContentRequest): JsonObje
 
 /** Exact input tuple shared by saved content and history-free viewing. No MIME/profile fallback. */
 export async function validationModelDeclaration(record: JsonObject, use: 'saved' | 'review' = 'saved'): Promise<JsonObject> {
-  const point = same(record.formatProfile, await pointSourceProfile());
+  const nativePoint = same(record.formatProfile, await nativePointSourceProfile());
+  const nativeProxy = same(record.formatProfile, await nativeProxySourceProfile());
+  const point = nativePoint || same(record.formatProfile, await pointSourceProfile());
   const gs = same(record.formatProfile, await gsSourceProfile());
-  const proxy = record.role === 'interactionProxy' && (await Promise.all([validationGlbProfile(), jpegGlbProfile()])).some(p => same(record.formatProfile,p));
-  const glb = (await Promise.all([validationGlbProfile(), occurrenceGlbProfile(), jpegGlbProfile(), occurrenceJpegGlbProfile()])).some(p => same(record.formatProfile, p));
+  const proxy = record.role === 'interactionProxy' && (nativeProxy || (await Promise.all([validationGlbProfile(), jpegGlbProfile()])).some(p => same(record.formatProfile,p)));
+  const glb = nativeProxy || (await Promise.all([validationGlbProfile(), occurrenceGlbProfile(), jpegGlbProfile(), occurrenceJpegGlbProfile()])).some(p => same(record.formatProfile, p));
+  if (nativeProxy && !proxy) return fileError('位置指定用の面の役割が一致しません。');
+  if (nativePoint || nativeProxy) { const check = new ProjectRecordFields(); check.transform(record.representationToAsset!, [], true); if (check.unknown) return fileError('モデルの座標変換を確認できません。'); }
   if ((!point && !glb && !gs) || record.contentKind !== (gs ? 'gaussianSplat' : point ? 'pointCloud' : 'mesh') || record.role !== (proxy ? 'interactionProxy' : gs ? 'gsPrimary' : point ? 'pointPrimary' : 'meshPrimary') ||
-    !gs && !same(record.representationToAsset, { ...identityPlacement(), reflection: 'none' }) ||
+    !gs && !nativePoint && !nativeProxy && !same(record.representationToAsset, { ...identityPlacement(), reflection: 'none' }) ||
     (proxy ? !same(record.purposes,['interaction']) : use === 'review' ? !same(record.purposes, ['display']) : !same(record.purposes, ['source', 'display']) && !same(record.purposes, ['display'])) ||
-    use === 'saved' && !same(record.derivedFrom, [])) return fileError('保存したモデルの形式を確認できません。');
+    use === 'saved' && !(nativeProxy ? Array.isArray(record.derivedFrom) && record.derivedFrom.length <= 1 : same(record.derivedFrom, []))) return fileError('保存したモデルの形式を確認できません。');
   const blob = fileObject(record.blob) as JsonObject;
   if (blob.mediaType !== (point || gs ? pointSourceMediaType : 'model/gltf-binary')) return fileError('保存したモデルの本体形式が一致しません。');
   return blob;
@@ -254,8 +261,9 @@ export async function inspectDeclaredValidationModel(record: JsonObject, bytes: 
   const policy=projectFilePolicy(budget), limits=policy.nonGs;
   if(bytes.length>limits.maxFileBytes)return fileError('大きなGSは元ファイルから選択してください。');
   await validationModelDeclaration(record, use);
-  if (same(record.formatProfile, await pointSourceProfile())) return inspectPointPly(bytes, limits);
+  if (same(record.formatProfile, await pointSourceProfile()) || same(record.formatProfile, await nativePointSourceProfile())) return inspectPointPly(bytes, limits);
   if (same(record.formatProfile, await gsSourceProfile())) return inspectGsPly(bytes, policy.gs, { representationToAsset: record.representationToAsset as JsonObject, logicalBoundsAsset: record.logicalBoundsAsset as JsonObject });
+  if (same(record.formatProfile, await nativeProxySourceProfile())) return (validationGlbUsesJpeg(bytes, limits) ? inspectValidationJpegGlb : inspectValidationGlb)(bytes, limits, png, jpeg);
   const inspect = same(record.formatProfile, await occurrenceJpegGlbProfile()) ? inspectOccurrenceJpegGlb :
     same(record.formatProfile, await jpegGlbProfile()) ? inspectValidationJpegGlb :
     same(record.formatProfile, await occurrenceGlbProfile()) ? inspectOccurrenceGlb : inspectValidationGlb;

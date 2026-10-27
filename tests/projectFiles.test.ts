@@ -14,7 +14,7 @@ import { OriginBlobStore } from '../src/projectMetadata/blobStore';
 import type { MetadataStorageFactory } from '../src/projectMetadata/repository';
 import { MetadataRepository } from '../src/projectMetadata/repository';
 import { openWorkspaceGeneration } from '../src/projectMetadata/generationScope';
-import { digest, newId, json, underWriteLease, withMetadataRead } from '../src/projectMetadata/persistence';
+import { digest, newId, json, readReceipt, underWriteLease, withMetadataRead } from '../src/projectMetadata/persistence';
 import { validationMetadataLimits as metadata, validationGlbProfile, occurrenceGlbProfile, occurrenceGlbProfileText, jpegGlbProfile, occurrenceJpegGlbProfile, type FileValidationLimits } from '../src/projectFiles/validation';
 import { inspectValidationGlb, inspectValidationJpegGlb, validationGlbParts } from '../src/projectFiles/glb';
 import { inspectOccurrenceGlb, decodeOccurrenceGlb } from '../src/projectFiles/glbOccurrences';
@@ -50,6 +50,7 @@ import { createProductWorkspace } from '../src/projectScene/productWorkspace';
 import type { ValidationModelClosure } from '../src/projectScene/modelTypes';
 import { fieldValue, projectCaptions, projectMediaResources, projectMediaUncertain, projectCaptionInventory } from '../src/ui/projectScene/projectRead';
 import type { WorkspaceProvider } from '../src/ui/projectScene/projectWorkspacePorts';
+import { surfaceAnchor } from '../src/ui/projectScene/projectWorkspacePorts';
 import { listValidationProjects } from '../src/harness/projectScene/validationCatalog';
 import { createSavedWorkspace } from '../src/harness/projectScene/metadataWorkspace';
 import type { DisplayCapture } from '../src/harness/projectScene/viewSession';
@@ -114,6 +115,11 @@ import { remoteEvidenceBytes } from '../src/projectMetadata/packageRemote';
 import { Uint8ArrayReader, Uint8ArrayWriter, ZipWriter } from '@zip.js/zip.js';
 import { prepareNativeConversion, resumeNativeConversion } from '../src/projectFiles/nativeConversion';
 import { nativeConversionIds, nativeAppearanceRecipe } from '../src/projectFiles/nativeMapping';
+import { nativeSpatialRecipe } from '../src/projectFiles/nativeMapping';
+import { nativePointSourceProfile, nativeProxySourceProfile, nativeSpatialModelBounds } from '../src/projectFiles/nativeSpatial';
+import { gsFixture } from './helpers/gsFixture';
+import { inspectNativeGsPlyV1 } from '../src/nativeGs/plyProfile';
+import { openNativePortableConversionStreamsV1 } from '../src/nativeGs/portablePackage';
 import { prepareFrozenV1Conversion, resumeFrozenV1Conversion, readFrozenV1MaterialReport } from '../src/projectFiles/frozenV1Conversion';
 import { frozenV1ConversionIds, frozenV1SourceKey } from '../src/projectFiles/frozenV1Mapping';
 import { frozenV1Recipe, frozenV1DefaultViewRecipe, frozenV1PlacementRecipe, frozenV1MaterialRecipe, inspectFrozenV1Source } from '../src/projectFiles/frozenV1Source';
@@ -232,7 +238,7 @@ function storageFactory() {
   return factory;
 }
 /** Native source bytes built here only; no private files or external sample distribution. */
-async function nativeConversionFile(change: (snapshot: any) => void = () => {}, badBody = false, modelBytes = glb(), imageBytes = png) {
+async function nativeConversionFile(change: (snapshot: any) => void = () => {}, badBody = false, modelBytes = glb(), imageBytes = png, bodies?: ReadonlyMap<string, Uint8Array>) {
   const id = (prefix: string, n: number) => `${prefix}_${n.toString().padStart(26, '0')}`;
   const model = modelBytes.slice(), blob = { algorithm: 'sha256', digest: await digest(model), byteLength: model.length, mediaType: 'model/gltf-binary' };
   const imageBlob = { algorithm: 'sha256', digest: await digest(imageBytes), byteLength: imageBytes.length, mediaType: photoMime(imageBytes) };
@@ -268,9 +274,39 @@ async function nativeConversionFile(change: (snapshot: any) => void = () => {}, 
   const writer = new ZipWriter(new Uint8ArrayWriter());
   const add = (path: string, data: Uint8Array) => writer.add(path, new Uint8ArrayReader(data), { level: 0 });
   await add('native/package.json', new TextEncoder().encode(JSON.stringify(manifest))); await add('native/snapshot.json', bytes);
-  for (const r of manifest.representations) { const b = model.slice(); if (badBody) b[0] = 0; await add(r.entry, b); }
+  for (const r of manifest.representations) { const b = (bodies?.get(r.representationId) ?? model).slice(); if (badBody) b[0] = 0; await add(r.entry, b); }
   for (const m of manifest.media) await add(m.entry, imageBytes);
   return new Blob([(await writer.close()).slice().buffer]);
+}
+/** Owned small synthetic mixed Native archive; file-backed browser evidence is separate. */
+async function nativeSpatialFile(change: (snapshot: any) => void = () => {}, degree: 2 | 3 = 2, gsRows = 1, extraBodies: ReadonlyMap<string, Uint8Array> = new Map()) {
+  const golden = JSON.parse(readFileSync('docs/specs/profiles/native-spatial-conversion-7.goldens.json','utf8'));
+  const row=[0,0,0,0,0,0,0,0,0,...Array(3*((degree+1)**2-1)).fill(0),0,0,0,0,1,0,0,0];
+  const point = new TextEncoder().encode(golden.point.utf8Source), gs = gsFixture(degree,Array.from({length:gsRows},()=>row)), proxy = glb();
+  const gsPly = await inspectNativeGsPlyV1({size:gs.length,stream:()=>new Blob([gs.slice().buffer]).stream()});
+  if (gsPly.kind !== 'supported-gs') throw Error('fixture GS profile');
+  const pointBlob = {algorithm:'sha256',digest:await digest(point),byteLength:point.length,mediaType:'application/octet-stream'};
+  const gsBlob = {algorithm:'sha256',digest:await digest(gs),byteLength:gs.length,mediaType:'application/octet-stream'};
+  const proxyBlob = {algorithm:'sha256',digest:await digest(proxy),byteLength:proxy.length,mediaType:'model/gltf-binary'};
+  const id = (prefix:string,n:number)=>`${prefix}_${String(n).padStart(26,'0')}`;
+  const bodies = new Map([[id('rep',1),point],[id('rep',2),gs],[id('rep',3),proxy]]);
+  for (const [key, bytes] of extraBodies) bodies.set(key, bytes);
+  return nativeConversionFile(s => {
+    const p=s.representations[0],g=s.representations[1];
+    Object.assign(p,{contentKind:'pointCloud',role:'pointPrimary',formatProfile:{id:'lociview-native-point-ply-ascii-xyz-rgb-v1'},blob:pointBlob,
+      pointPly:{pointCount:2,headerByteLength:golden.point.utf8Source.indexOf('end_header\n')+'end_header\n'.length,encoding:'ascii'},representationToAsset:golden.point.representationToAsset});
+    Object.assign(g,{contentKind:'gaussianSplat',role:'gsPrimary',formatProfile:{id:'lociview-native-graphdeco-ply-le-sh2-sh3-v1'},blob:gsBlob,gsPly:gsPly.facts});
+    s.representations.push({...g,id:id('rep',3),representationFrameId:id('frm',8),contentKind:'mesh',role:'interactionProxy',purposes:['interaction'],variantFamilyId:id('fam',3),
+      formatProfile:{id:'lociview-native-model-glb-v1'},blob:proxyBlob,representationToAsset:golden.proxy.representationToAsset,derivedFrom:[g.id],proxyForGsVariantFamilyId:g.variantFamilyId,gsPly:undefined});
+    s.assetRevisions[1].representationIds.push(id('rep',3)); s.assets[0].label='GS';s.assets[1].label='点群';
+    s.presentation.displayMode='mixed';s.presentation.hiddenAssetIds=[];change(s);
+  },false,glb(),png,bodies);
+}
+
+function nativeBlobViews(fs: TestFS) {
+  const read=fs.readStream.bind(fs);
+  fs.readStream=async path=>{const file=await read(path);if(!file)return file;const bytes=(await fs.readBytes(path))!.slice();
+    return {...file,blob:async()=>new Blob([bytes.buffer])};};
 }
 async function nativeAppearanceFile(change: (snapshot: any) => void = () => {}, model = glb(j => {
   j.nodes.push({ mesh: 0, translation: [-3, 0, 0] }); j.scenes[0].nodes.push(1);
@@ -1741,6 +1777,211 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect(implicit!.summary.scenes).toBe(1);
     expect((await implicit!.create()).source.originalChanges()).toHaveLength(2);
   });
+  it('Native07k binds exact ID goldens and bounded restartable Native body reads with cancellation',async()=>{
+    const golden=JSON.parse(readFileSync('docs/specs/profiles/native-spatial-conversion-7.goldens.json','utf8')),ids=nativeConversionIds(golden.conversionId,golden.sourceZipSha256,nativeSpatialRecipe);
+    for(const row of golden.ids)expect(await ids.id(row.outputPrefix,row.sourceKey)).toBe(row.id);
+    expect(ids.report()).toEqual(golden.ids.map((row:any)=>({id:row.id,preimage:row.preimage,sha256:row.sha256})).sort((a:any,b:any)=>a.id.localeCompare(b.id)));
+    const file=await nativeSpatialFile(()=>{},3,3000),opened=await openNativePortableConversionStreamsV1(file,budget);if(!opened)throw Error('archive');
+    const source=opened.bodies.get(opened.manifest.representations.find(r=>r.representationId.endsWith('2'))!.entry)!;
+    const arrayBuffer=Blob.prototype.arrayBuffer, sizes:number[]=[],spy=vi.spyOn(Blob.prototype,'arrayBuffer').mockImplementation(function(this:Blob){sizes.push(this.size);return arrayBuffer.call(this);});
+    try{
+      const reader=source.stream().getReader();expect(()=>source.stream()).toThrow('overlapping');
+      const first=await reader.read();expect(first.value!.length).toBeLessThanOrEqual(65536);await reader.cancel();reader.releaseLock();
+      let length=0,max=0;const restarted=source.stream().getReader();try{for(;;){const part=await restarted.read();if(part.done)break;length+=part.value.length;max=Math.max(max,part.value.length);}}finally{await restarted.cancel();restarted.releaseLock();}
+      expect(length).toBe(source.size);expect(max).toBe(65536);expect(Math.max(...sizes)).toBeLessThanOrEqual(65536);
+    }finally{spy.mockRestore();await opened.close();}
+    expect(()=>source.stream()).toThrow();
+  });
+  it('Native07k converts mixed Point/GS/Proxy, preserves authoritative coordinates, edits and cold resumes without resetting later work', async () => {
+    const file=await nativeSpatialFile(), original=await file.arrayBuffer(), prepared=await prepareNativeConversion(file,budget,decode);
+    const initial=await prepared!.create(), r=firstWorkspaceRecipient(); nativeBlobViews(r.fs);
+    const service=validationProjectService(r.fs,r.factory,r.store,budget,decode), ready=await initial.persist(r.fs,r.store,service.session);
+    expect(ready.state).toBe('ready'); if(ready.provider?.kind!=='scene-provider')throw Error('provider');
+    const provider=ready.provider, versions=await validationModelVersions(provider), point=versions.find(v=>v.closure.shape==='saved-point')!, gs=versions.find(v=>v.closure.shape==='saved-gs')!;
+    expect(point).toBeTruthy();expect(gs).toBeTruthy();expect(((await initial.source.inspectOriginal({maxNodes:metadata.maxNodes,maxWork:metadata.maxWork})).candidates.unambiguousRecords.project as any).frame.unit).toEqual({kind:'unknown'});
+    const pointRecord=(point.closure as ValidationModelClosure).representation, gsClosure=gs.closure as ValidationModelClosure;
+    expect(pointRecord.formatProfile).toEqual(await nativePointSourceProfile());expect(pointRecord.logicalBoundsAsset).toEqual({min:[6,20,24],max:[12,24,32]});
+    expect(gsClosure.proxy!.formatProfile).toEqual(await nativeProxySourceProfile());expect(gsClosure.proxy!.derivedFrom).toEqual([gsClosure.representation.id]);
+    expect(gsClosure.proxy!.variantFamilyId).not.toBe(gsClosure.representation.variantFamilyId);
+    expect(gsClosure.proxy!.logicalBoundsAsset).toEqual({min:[14,20,30],max:[18,24,30]});
+    const caption=Object.values(provider.resources.captions).find(c=>c.title.kind==='value'&&c.title.value==='既存のピン')!;
+    expect(caption.anchor).toMatchObject({kind:'value',value:{positionAsset:[3,0.5,0],hitEvidence:{method:'manual'}}});
+    const edited=await service.session.editCaption(ready.source!.token,caption.id,'body','変換後の編集');
+    const resumed=await resumeNativeConversion(r.fs,r.store,r.reopen().session,budget,initial.source.proof.identity.projectId as string,decode);
+    expect(resumed.state).toBe('ready');expect(resumed.source!.token).toBe(edited.source!.token);
+    expect(await file.arrayBuffer()).toEqual(original);expect((await r.fs.list('')).some(p=>p.endsWith('native-conversion-source.zip'))).toBe(false);
+    const receipt=await readReceipt<any>(r.fs,'v2/metadata/native-conversion.json',metadata);expect(receipt.recipe).toBe(nativeSpatialRecipe);expect(receipt.originalRef.mediaType).toBe('application/zip');
+    expect(receipt.spatialWitness.every((w:any)=>w.sourceProfile&&w.sourceRepresentationFrameId&&w.targetRepresentationFrameId)).toBe(true);
+  });
+  it('Native07k cancels a live GS inspection before a conversion identity or write destination exists',async()=>{
+    const file=await nativeSpatialFile(()=>{},3,3000),controller=new AbortController(),read=Blob.prototype.arrayBuffer;
+    const spy=vi.spyOn(Blob.prototype,'arrayBuffer').mockImplementation(async function(this:Blob){const bytes=await read.call(this);
+      if(this.size===65536&&new TextDecoder().decode(bytes.slice(0,32)).startsWith('ply\nformat binary_little_endian'))controller.abort();return bytes;});
+    try{await expect(prepareNativeConversion(file,{...budget,maxValues:1000000},decode,undefined,undefined,controller.signal)).rejects.toMatchObject({name:'AbortError'});expect(controller.signal.aborted).toBe(true);}
+    finally{spy.mockRestore();}
+  });
+  it('Native07k retains mixed textured Mesh appearances and dormant Point revisions and anchor classes',async()=>{
+    const closes:ReturnType<typeof vi.fn>[]=[];vi.stubGlobal('self',{URL});vi.stubGlobal('createImageBitmap',async()=>{const close=vi.fn();closes.push(close);return {width:8,height:4,close};});
+    try{
+    const id=(prefix:string,n:number)=>`${prefix}_${String(n).padStart(26,'0')}`,mesh=glb(()=>{},true);
+    const meshBlob={algorithm:'sha256',digest:await digest(mesh),byteLength:mesh.length,mediaType:'model/gltf-binary'};
+    const golden=JSON.parse(readFileSync('docs/specs/profiles/native-spatial-conversion-7.goldens.json','utf8'));
+    const point=new TextEncoder().encode(golden.point.utf8Source),file=await nativeSpatialFile(s=>{
+      const p=s.representations[0],revision=s.assetRevisions[0],binding=s.assetBindingRevisions[0];
+      s.representations.push({...p,id:id('rep',4),assetId:id('ast',3),representationFrameId:id('frm',9),variantFamilyId:id('fam',4),
+        contentKind:'mesh',role:'meshPrimary',formatProfile:{id:'lociview-native-model-glb-v1'},blob:meshBlob,pointPly:undefined,representationToAsset:{...identityPlacement(),reflection:'none'}});
+      s.assets.push({id:id('ast',3),label:'材質を持つMesh',assetFrameId:id('frm',10),status:{kind:'ready',activeBindingId:id('bnd',3)}});
+      s.assetRevisions.push({id:id('rev',3),assetId:id('ast',3),representationIds:[id('rep',4)],anchorCompatibilityClasses:[{id:id('cls',3),targetVariantFamilyIds:[id('fam',4)]}]});
+      s.assetBindingRevisions.push({...binding,id:id('bnd',3),assetId:id('ast',3),assetRevisionId:id('rev',3)});
+      s.representations.push({...p,id:id('rep',5),representationFrameId:id('frm',11),variantFamilyId:id('fam',5)});
+      s.assetRevisions.push({...revision,id:id('rev',4),representationIds:[id('rep',5)],anchorCompatibilityClasses:[{id:id('cls',4),targetVariantFamilyIds:[id('fam',5)]}]});
+      s.assetBindingRevisions.push({...binding,id:id('bnd',4),assetRevisionId:id('rev',4)});
+      Object.assign(s.captions[0].anchor,{authoredAssetRevisionId:id('rev',4),authoredAnchorCompatibilityId:id('cls',4)});
+      s.meshMaterialAppearances=s.displaySets.map((set:any,i:number)=>({id:id('mat',i+1),displaySetId:set.id,assetId:id('ast',3),authoredAssetRevisionId:id('rev',3),
+        representationId:id('rep',4),materialSlotKey:'m/0/0',opacity:1,doubleSided:i===0,unlit:i===0,chroma:{enabled:false,colorSrgb:[.1,.2,.3],tolerance:.3,feather:0}}));
+    },2,1,new Map([[id('rep',4),mesh],[id('rep',5),point]]));
+    const initial=await(await prepareNativeConversion(file,budget,decode))!.create(),r=firstWorkspaceRecipient();nativeBlobViews(r.fs);
+    const own=validationProjectService(r.fs,r.factory,r.store,budget,decode),ready=await initial.persist(r.fs,r.store,own.session);
+    expect(ready.state).toBe('ready');if(ready.provider?.kind!=='scene-provider')throw Error('provider');
+    const records=(await ready.source!.inspectOriginal({maxNodes:metadata.maxNodes,maxWork:metadata.maxWork})).candidates.unambiguousRecords as any;
+    expect(Object.keys(records.representationsById)).toHaveLength(5);expect(Object.keys(records.assetRevisionsById)).toHaveLength(4);expect(Object.keys(records.assetBindingsById)).toHaveLength(4);
+    const mappedMesh=Object.values(records.representationsById).find((v:any)=>v.role==='meshPrimary') as any;
+    expect(mappedMesh.formatProfile).toEqual(await occurrenceGlbProfile());expect(mappedMesh.blob).toEqual(meshBlob);
+    const overrides=Object.values(records.materialOverridesById) as any[];expect(overrides).toHaveLength(2);
+    expect(overrides.map(v=>v.appearance.lighting).sort()).toEqual(['inherit','unlit']);expect(overrides.map(v=>v.appearance.doubleSided).sort()).toEqual([false,true]);
+    expect(overrides.every(v=>v.routing.target.variantFamilyId===mappedMesh.variantFamilyId&&v.routing.target.logicalMaterialSlotId===mappedMesh.materialCatalog.slots[0].logicalMaterialSlotId)).toBe(true);
+    const receipt=await readReceipt<any>(r.fs,'v2/metadata/native-conversion.json',metadata),ids=nativeConversionIds(receipt.conversionId,receipt.original.digest,nativeSpatialRecipe);
+    const oldRevision=await ids.id('rev',['revision',id('rev',4)]),oldClass=await ids.id('cmp',['anchor-class',id('ast',1),id('cls',4)]);
+    const caption=Object.values(records.captionsById).find((c:any)=>c.title==='既存のピン') as any;
+    expect(caption.anchor).toMatchObject({positionAsset:[3,.5,0],authoredAssetRevisionId:oldRevision,authoredAnchorCompatibilityId:oldClass});
+    expect(records.assetRevisionsById[oldRevision].anchorCompatibilityClasses[0].id).toBe(oldClass);
+    expect(receipt.materialWitness).toHaveLength(1);expect(receipt.materialWitness[0].targetRepresentationId).toBe(mappedMesh.id);
+    expect((await resumeNativeConversion(r.fs,r.store,r.reopen().session,budget,initial.source.proof.identity.projectId as string,decode)).source!.token).toBe(ready.source!.token);
+    expect(closes.length).toBeGreaterThan(0);expect(closes.every(close=>close.mock.calls.length===1)).toBe(true);
+    }finally{vi.unstubAllGlobals();}
+  });
+  it('Native07k refuses a schema-valid dormant same-Asset multimodal revision instead of dropping a primary',async()=>{
+    const id=(prefix:string,n:number)=>`${prefix}_${String(n).padStart(26,'0')}`,file=await nativeSpatialFile(s=>{
+      const p=s.representations[0];s.representations.push({...p,id:id('rep',4),representationFrameId:id('frm',9),variantFamilyId:id('fam',4),
+        contentKind:'mesh',role:'meshPrimary',formatProfile:{id:'lociview-native-model-glb-v1'},blob:s.representations[2].blob,pointPly:undefined,representationToAsset:{...identityPlacement(),reflection:'none'}});
+      s.assetRevisions.push({id:id('rev',3),assetId:p.assetId,representationIds:[p.id,id('rep',4)],anchorCompatibilityClasses:[{id:id('cls',3),targetVariantFamilyIds:[p.variantFamilyId,id('fam',4)]}]});
+    });
+    const archive=await openNativePortableConversionStreamsV1(file,budget);expect(archive?.snapshot.assetRevisions).toHaveLength(3);await archive!.close();
+    const before=await file.arrayBuffer();await expect(prepareNativeConversion(file,budget,decode)).rejects.toThrow('モデル履歴の組み合わせ');expect(await file.arrayBuffer()).toEqual(before);
+  });
+  it('Native07k seals transformed point-index anchors and retains authored Proxy node pose beneath its independent transform', async()=>{
+    const initial=await(await prepareNativeConversion(await nativeSpatialFile(),budget,decode))!.create(),r=firstWorkspaceRecipient();nativeBlobViews(r.fs);
+    const service=validationProjectService(r.fs,r.factory,r.store,budget,decode),ready=await initial.persist(r.fs,r.store,service.session);
+    if(ready.provider?.kind!=='scene-provider')throw Error('provider');const p=ready.provider,versions=await validationModelVersions(p),point=versions.find(v=>v.closure.shape==='saved-point')!,gs=versions.find(v=>v.closure.shape==='saved-gs')!;
+    const sceneId=p.state.defaultSceneId.kind==='value'?p.state.defaultSceneId.value:'',closure=point.closure as ValidationModelClosure;
+    const target={token:p.token,sceneId,assetId:point.assetId,assetFrameId:point.projection.assetFrameId,bindingId:point.projection.bindingId,revisionId:point.projection.revisionId,representationId:closure.representation.id,familyId:closure.representation.variantFamilyId,compatibilityId:point.projection.anchorCompatibilityIds[0]!};
+    const command={kind:'addPin' as const,sceneId,captionId:`cap_${newId()}`,membershipId:`scm_${newId()}`,eventId:`evt_${newId()}`,colorSrgb:[1,0,0] as [number,number,number],anchor:surfaceAnchor({target,captionId:null,position:[12,24,32],point:{pointIndex:0}})};
+    await expect(service.session.edit(p.token,{...command,anchor:{...command.anchor,positionAsset:[1,2,-1]}} as typeof command)).rejects.toThrow();
+    const next=await service.session.edit(p.token,command);expect(next.provider?.kind==='scene-provider'&&next.provider.resources.captions[command.captionId]!.anchor).toMatchObject({kind:'value',value:{positionAsset:[12,24,32]}});
+    for(const model of [point,gs]){
+      const source=assetCopySource(p,sceneId,model.assetId,metadata),copy=await prepareAssetMembershipCopy(source,`sam_${newId()}`,prefix=>`${prefix}_${newId()}`);
+      expect(copy.representation.representationToAsset).toEqual((model.closure as ValidationModelClosure).representation.representationToAsset);
+      if(copy.proxy)expect(copy.proxy.representation.derivedFrom).toEqual([copy.ids.representation]);
+    }
+    const cache=await prepareValidationResidents(versions,service.content),resident=cache.create(gs.closure as ValidationModelClosure);
+    const world=new THREE.Vector3(-1,0,0);resident.interaction!.traverse(node=>{if(node instanceof THREE.Mesh)world.applyMatrix4(node.matrixWorld);});
+    expect(world.toArray()).toEqual([16,20,30]);resident.dispose?.();cache.dispose();
+  });
+  it('Native07k reselects only the exact original before initialization and preserves fixed IDs and initial bytes',async()=>{
+    const file=await nativeSpatialFile(),initial=await(await prepareNativeConversion(file,budget,decode))!.create(),r=firstWorkspaceRecipient();nativeBlobViews(r.fs);
+    const service=validationProjectService(r.fs,r.factory,r.store,budget,decode);r.fs.reject=p=>p.startsWith('v2/cas/objects/');
+    await expect(initial.persist(r.fs,r.store,service.session)).rejects.toThrow('quota');r.fs.reject=()=>false;
+    const bytes=await r.fs.readBytes('v2/metadata/validation-initial.am'),before=await r.fs.readBytes('v2/metadata/native-conversion.json'),cold=r.reopen().session,id=initial.source.proof.identity.projectId as string;
+    await expect(resumeNativeConversion(r.fs,r.store,cold,budget,id,decode)).rejects.toThrow('選び直し');
+    await expect(resumeNativeConversion(r.fs,r.store,cold,budget,id,decode,undefined,undefined,new Blob([new Uint8Array(file.size)]))).rejects.toThrow('一致しません');
+    expect((await resumeNativeConversion(r.fs,r.store,cold,budget,id,decode,undefined,undefined,file)).state).toBe('ready');
+    expect(await r.fs.readBytes('v2/metadata/validation-initial.am')).toEqual(bytes);expect(await r.fs.readBytes('v2/metadata/native-conversion.json')).toEqual(before);
+  });
+  it('Native07k recovers cold initialization before prepared marker and refuses lost original acknowledgement afterward',async()=>{
+    const file=await nativeSpatialFile(),initial=await(await prepareNativeConversion(file,budget,decode))!.create(),r=firstWorkspaceRecipient();nativeBlobViews(r.fs);
+    const service=validationProjectService(r.fs,r.factory,r.store,budget,decode);r.fs.reject=p=>p.includes('/changes/')&&p.endsWith('.amchange');
+    await expect(initial.persist(r.fs,r.store,service.session)).rejects.toThrow('quota');r.fs.reject=()=>false;
+    const id=initial.source.proof.identity.projectId as string;
+    expect((await resumeNativeConversion(r.fs,r.store,r.reopen().session,budget,id,decode)).state).toBe('ready');
+    const receipt=await readReceipt<any>(r.fs,'v2/metadata/native-conversion.json',metadata),hash=receipt.originalRef.digest;
+    await r.fs.remove(`v2/cas/sha256/${hash.slice(0,2)}/${hash.slice(2)}.json`);const put=vi.spyOn(r.store,'put');
+    await expect(resumeNativeConversion(r.fs,r.store,r.reopen().session,budget,id,decode,undefined,undefined,file)).rejects.toThrow('修復');expect(put).not.toHaveBeenCalled();
+  });
+  it('Native07k resumes after original publication before initialize and refuses missing or suspect originals without restaging',async()=>{
+    const file=await nativeSpatialFile(),initial=await(await prepareNativeConversion(file,budget,decode))!.create(),id=initial.source.proof.identity.projectId as string;
+    for(const fault of ['intact','missing','short','corrupt'] as const){
+      const r=firstWorkspaceRecipient();nativeBlobViews(r.fs);const own=validationProjectService(r.fs,r.factory,r.store,budget,decode),put=r.store.put.bind(r.store);
+      const interrupted=vi.spyOn(r.store,'put').mockImplementation(async(input,type,expected,signal)=>{if(type!=='application/zip'){await input.cancel();throw Error('injected public staging quota');}return put(input,type,expected,signal);});
+      await expect(initial.persist(r.fs,r.store,own.session)).rejects.toThrow('public staging quota');interrupted.mockRestore();
+      const receipt=await readReceipt<any>(r.fs,'v2/metadata/native-conversion.json',metadata),control=(await r.fs.readBytes('v2/metadata/native-conversion.json'))!,initialBytes=await r.fs.readBytes('v2/metadata/validation-initial.am');
+      expect(await r.store.inspect(receipt.originalRef)).toBe('verified-present');expect(await new TransactionJournal(r.fs,metadata).entries()).toEqual([]);
+      const hash=receipt.originalRef.digest,cas=await readReceipt<any>(r.fs,`v2/cas/sha256/${hash.slice(0,2)}/${hash.slice(2)}.json`,metadata),path=`v2/cas/objects/${cas.objectId}.bin`,bytes=(await r.fs.readBytes(path))!;
+      if(fault==='missing')await r.fs.remove(path);
+      if(fault==='short')await r.fs.writeBytes(path,bytes.slice(1));
+      if(fault==='corrupt'){bytes[0]=bytes[0]!^1;await r.fs.writeBytes(path,bytes);}
+      const resumedPut=vi.spyOn(r.store,'put');
+      if(fault==='intact'){
+        expect((await resumeNativeConversion(r.fs,r.store,r.reopen().session,budget,id,decode)).state).toBe('ready');
+        expect(resumedPut.mock.calls.some(call=>call[1]==='application/zip')).toBe(false);
+      }else{
+        await expect(resumeNativeConversion(r.fs,r.store,r.reopen().session,budget,id,decode,undefined,undefined,file)).rejects.toThrow();
+        expect(resumedPut).not.toHaveBeenCalled();expect(await new TransactionJournal(r.fs,metadata).entries()).toEqual([]);
+      }
+      expect(await r.fs.readBytes('v2/metadata/native-conversion.json')).toEqual(control);expect(await r.fs.readBytes('v2/metadata/validation-initial.am')).toEqual(initialBytes);resumedPut.mockRestore();
+    }
+  });
+  it('Native07k refuses mismatched PLY facts, unsupported retained revisions and broken Proxy relations as whole inputs',async()=>{
+    const metres=await(await prepareNativeConversion(await nativeSpatialFile(s=>{s.project.frame.unit={kind:'meters',metersPerProjectUnit:1};}),budget,decode))!.create();
+    expect(((await metres.source.inspectOriginal({maxNodes:metadata.maxNodes,maxWork:metadata.maxWork})).candidates.unambiguousRecords.project as any).frame.unit).toEqual({kind:'meters',metersPerProjectUnit:1});
+    for(const change of [(s:any)=>s.representations[0].pointPly.pointCount++,(s:any)=>s.representations[1].gsPly.splatCount++,
+      (s:any)=>s.representations[2].derivedFrom=[s.representations[0].id],(s:any)=>s.assetRevisions[0].representationIds.push(s.representations[1].id)]){
+      const file=await nativeSpatialFile(change),kept=await file.arrayBuffer();await expect(prepareNativeConversion(file,budget,decode)).rejects.toThrow();expect(await file.arrayBuffer()).toEqual(kept);
+    }
+    const bytes=new Uint8Array(await(await nativeSpatialFile()).arrayBuffer()),at=Buffer.from(bytes).indexOf('1 2 -1 255 0 128');expect(at).toBeGreaterThan(0);bytes[at]=48;
+    await expect(prepareNativeConversion(new Blob([bytes.slice().buffer]),budget,decode)).rejects.toThrow();
+  });
+  it('Native07k rejects an open nested receipt and retries later warm edits through their own journal purpose',async()=>{
+    const initial=await(await prepareNativeConversion(await nativeSpatialFile(),budget,decode))!.create(),r=firstWorkspaceRecipient();nativeBlobViews(r.fs);
+    const service=validationProjectService(r.fs,r.factory,r.store,budget,decode),ready=await initial.persist(r.fs,r.store,service.session),id=initial.source.proof.identity.projectId as string;
+    const path='v2/metadata/native-conversion.json',bytes=(await r.fs.readBytes(path))!,receipt=await readReceipt<any>(r.fs,path,metadata);
+    await r.fs.writeText(path,json({...receipt,initial:{...receipt.initial,extra:true}}));
+    await expect(resumeNativeConversion(r.fs,r.store,service.session,budget,id,decode)).rejects.toThrow('記録を確認');await r.fs.writeBytes(path,bytes);
+    if(ready.provider?.kind!=='scene-provider')throw Error('provider');const caption=Object.values(ready.provider.resources.captions)[0]!;
+    r.fs.reject=p=>p.includes('/changes/')&&p.endsWith('.amchange');await expect(service.session.editCaption(ready.source!.token,caption.id,'body','後続編集の再試行')).rejects.toThrow('quota');r.fs.reject=()=>false;
+    const resumed=await resumeNativeConversion(r.fs,r.store,service.session,budget,id,decode);expect(resumed.state).toBe('ready');
+    expect(resumed.provider?.kind==='scene-provider'&&resumed.provider.resources.captions[caption.id]!.body).toEqual({kind:'value',value:'後続編集の再試行'});
+  });
+  it('Native07k exchanges all five file purposes, keeps local edits, and reopens independent Review/Clean copies without private conversion evidence',async()=>{
+    const original=await nativeSpatialFile(),initial=await(await prepareNativeConversion(original,budget,decode))!.create(),r=firstWorkspaceRecipient();nativeBlobViews(r.fs);
+    const service=validationProjectService(r.fs,r.factory,r.store,budget,decode),ready=await initial.persist(r.fs,r.store,service.session);
+    if(ready.provider?.kind!=='scene-provider')throw Error('provider');const caption=Object.values(ready.provider.resources.captions).find(c=>c.title.kind==='value'&&c.title.value==='既存のピン')!;
+    const sender=new WorkspaceSender(r.fs,service.session,r.store,metadata,r.locks),workspace=await sender.download(await sender.generate(ready.source!.token));
+    const peer=firstWorkspaceRecipient(),received=await peer.receiver.importWorkspace(workspace);expect(received.state).toBe('ready');
+    await service.session.editCaption(ready.source!.token,caption.id,'title','手元の編集を保持');
+    const remote=await peer.session.editCaption(received.source!.token,caption.id,'body','相手からの返送'),other=new WorkspaceSender(peer.fs,peer.session,peer.store,metadata,peer.locks);
+    const base=(await other.availableBases())[0]!.selection,contribution=await other.download(await other.generateContribution(remote.source!.token,base));
+    const merged=await new WorkspaceReceiver(r.fs,r.fs,service.session,metadata,r.locks).receive((await service.session.read()).source!.token,contribution);
+    expect(merged.provider?.kind==='scene-provider'&&merged.provider.resources.captions[caption.id]).toMatchObject({title:{kind:'value',value:'手元の編集を保持'},body:{kind:'value',value:'相手からの返送'}});
+    const token=merged.source!.token,backup=await sender.download(await sender.generateBackup(token,'変換後'));
+    const sceneId=merged.provider?.kind==='scene-provider'&&merged.provider.state.defaultSceneId.kind==='value'?merged.provider.state.defaultSceneId.value:'';
+    const review=await sender.download(await sender.generateReview(token,{sceneId})),clean=await sender.download(await sender.generateClean(token));
+    const cleanArchive=await CleanArchive.inspect(clean,metadata),cleanReps=Object.values(cleanArchive.description.records.representationsById as Record<string,any>),cleanGs=cleanReps.find(r=>r.role==='gsPrimary')!;
+    expect(cleanReps.find(r=>r.role==='interactionProxy')!.derivedFrom).toEqual([cleanGs.id]);
+    const reviewView=await prepareReviewView(review,budget,decode);expect(reviewView).toBeTruthy();
+    const edit=await PreparedReviewEdit.prepare(review,metadata),copy=firstWorkspaceRecipient(),copied=await copy.receiver.importWorkspace(edit.copy);expect(copied.state).toBe('ready');
+    const editable=(await edit.clean.source.inspectOriginal({maxNodes:metadata.maxNodes,maxWork:metadata.maxWork})).candidates.unambiguousRecords;
+    expect(Object.values(editable.representationsById as Record<string,any>).find(r=>r.role==='interactionProxy')!.derivedFrom).toEqual([]);
+    const independentCaption=Object.keys(editable.captionsById as JsonObject)[0]!,edited=await copy.session.editCaption(copied.source!.token,independentCaption,'body','独立コピーの編集');
+    expect((await copy.reopen().session.read()).source!.token).toBe(edited.source!.token);
+    expect((await BackupArchive.inspect(backup,metadata)).source.token).toBe(token);
+    const originalHash=await digest(new Uint8Array(await original.arrayBuffer()));
+    for(const file of [workspace,contribution,backup,review,clean]){
+      const entries=await readZipEntries(new Uint8Array(await file.arrayBuffer()));
+      expect(entries.some(e=>e.path.includes('native-conversion')||e.path.startsWith('native/'))).toBe(false);
+      expect(entries.some(e=>new TextDecoder().decode(e.data).includes(originalHash))).toBe(false);
+    }
+    await edit.releaseScratch();
+  },60000);
   it('Native conversion connects file preview to editing, first placement, named backup, Workspace and independent reopen (recorded DOM)', async () => {
     const fs = new TestFS(), locks = lockManager(), coordinator = ProjectMutationCoordinator.browser(locks);
     const store = new OriginBlobStore(fs, { maxBlobBytes: budget.maxFileBytes, maxChunkBytes: 1_000_000, maxChunks: 10000, metadata }, locks);

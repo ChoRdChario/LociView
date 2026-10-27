@@ -13,6 +13,7 @@ import { captionDeletionImpact } from '../projectMetadata/captionDeletion';
 import { assetDeletionImpact } from '../projectMetadata/assetDeletion';
 import { prepareValidationCreation, resumeValidationCreation, validationProjectService } from '../projectFiles/creation';
 import { hasNativeConversion, resumeNativeConversion } from '../projectFiles/nativeConversion';
+import { nativeSpatialConversionSourceRequired } from '../projectFiles/nativeSpatialConversion';
 import { hasFrozenV1Conversion, resumeFrozenV1Conversion, hasFrozenV1MaterialReport, readFrozenV1MaterialReport } from '../projectFiles/frozenV1Conversion';
 import { hasLociMyuConversion, resumeLociMyuConversion, readLociMyuConversionReport } from '../projectFiles/lociMyuConversion';
 import { validationMetadataLimits as limits, type FileValidationLimits, type ProjectFilePolicy } from '../projectFiles/validation';
@@ -302,7 +303,7 @@ async function openNormalValidationHost(options: ValidationHostOptions, inherite
       finally { busy = false; if (operation === work) operation = undefined; }
     };
     let gsProxy:ReturnType<typeof createGsProxyWorkflow>|undefined;
-    const resume = async () => {
+    const resume = async (reselected?: Blob) => {
       if (unfinishedReceive()) throw Error('「更新ファイル」の中断した受信を確認してください。');
       if (receiveDisplayPending && last.state === 'ready') {
         const result = await ready(await session.read()); receiveFailure = ''; receiveDisplayPending = false; return result;
@@ -310,7 +311,7 @@ async function openNormalValidationHost(options: ValidationHostOptions, inherite
       const before = await session.read(), entries = await new TransactionJournal(fs, limits).entries();
       if (before.state === 'empty' && !localInitial) throw Error('作業一式を選択するか、プロジェクト一覧へ戻ってください。');
       const initializing = before.state === 'empty' || entries.length === 1 && entries[0]!.start.purpose === 'initialize' && !entries[0]!.publication && before.state !== 'ready';
-      const result = await ready(initializing && await hasNativeConversion(fs) ? await resumeNativeConversion(fs, options.store, session, options.fileLimits, `prj_${run}`, options.decode, options.jpeg, options.photo) :
+      const result = await ready(initializing && await hasNativeConversion(fs) ? await resumeNativeConversion(fs, options.store, session, options.filePolicy ?? options.fileLimits, `prj_${run}`, options.decode, options.jpeg, options.photo, reselected) :
         before.state === 'empty' && options.initial ? await options.initial.persist(fs, options.store, session) :
         initializing && await hasLociMyuConversion(fs) ? await resumeLociMyuConversion(fs, options.store, session, options.fileLimits, `prj_${run}`, options.decode, options.jpeg, options.photo) :
         initializing && await hasFrozenV1Conversion(fs) ? await resumeFrozenV1Conversion(fs, options.store, session, options.fileLimits, `prj_${run}`, options.decode, options.jpeg, options.photo) :
@@ -633,6 +634,8 @@ async function openNormalValidationHost(options: ValidationHostOptions, inherite
         }, true);
       },
       retry: () => execute(async () => { editable(true); return resume(); }),
+      nativeConversionRecovery: {sourceRequired: () => nativeSpatialConversionSourceRequired(fs,options.store),
+        reselect: file => execute(async () => {editable(true); return resume(file);})},
     };
     const emptyImport = () => !localInitial && last.state === 'empty' && !outputDiscoveryFailure && !unfinishedReceive() && !unfinishedOutput();
     const host: SavedWorkspaceHost = { authority, limits, read: () => last, hasPending: () => busy || !!connection?.restorePending || restoreRetired || restoreDisplayPending || receiveDisplayPending || unfinishedReceive() ||

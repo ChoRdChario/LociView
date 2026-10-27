@@ -297,6 +297,7 @@ export const projectSceneApplicationImports:Readonly<Record<string,readonly stri
     "./modelTypes"
   ],
   "src/projectScene/reviewView.ts": [
+    "../projectFiles/nativeSpatial",
     "../domain/materialIntent",
     "../domain/projectGraphSupport",
     "../domain/values",
@@ -374,6 +375,7 @@ export const projectSceneApplicationImports:Readonly<Record<string,readonly stri
     "./validationHost"
   ],
   "src/projectScene/validationHost.ts": [
+    "../projectFiles/nativeSpatialConversion",
     "../projectFiles/bodyBudget",
     "../domain/materialIntent",
     "../domain/projectGraphSupport",
@@ -446,6 +448,7 @@ export const projectSceneApplicationImports:Readonly<Record<string,readonly stri
     "three"
   ],
   "src/projectScene/validationProjection.ts": [
+    "../projectFiles/nativeSpatial",
     "../domain/projectGraphSupport",
     "../projectFiles/gsPly",
     "../projectFiles/modelFacts",
@@ -463,6 +466,7 @@ export const projectSceneApplicationImports:Readonly<Record<string,readonly stri
     "./validationOutputControls"
   ],
   "src/projectScene/validationRender.ts": [
+    "../projectFiles/nativeSpatial",
     "../domain/materialIntent",
     "../domain/pointPresentation",
     "../domain/projectGraphSupport",
@@ -569,6 +573,8 @@ export const projectSceneApplicationImports:Readonly<Record<string,readonly stri
     "three"
   ],
   "src/projectScene/viewportPointPicking.ts": [
+    "../domain/nativeSpatialSource",
+    "../domain/values",
     "../domain/pointPresentation",
     "./validationPointCoverage",
     "./viewportModel",
