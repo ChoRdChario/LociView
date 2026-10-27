@@ -22,6 +22,52 @@ Fix latency when it prevents use or risks data. Keep the existing
 Root is sole writer; bounded independent reviewers are read-only. No small manual
 test or helper approvals. Continue in-scope work while device evidence is pending.
 
+## Current connected unit — Native Point/GS/Proxy conversion
+
+PO2026-10-28 requests existing Point/GS/Proxy → new Project conversion, then normal
+editing/file exchange/restore/cold resume, without small manual-test waits. Root is
+sole writer. Plan: inspect actual Native admission and target profiles → specify
+exact byte/frame/unit/bounds/Proxy/Scene/pin mappings and acceptance → independent
+read-only contract review → implement all already authorized compatible work and
+relevant automated verification. Use the existing file-open/conversion flow and
+journal; add no dependency, separate conversion UI or storage framework.
+Stop only affected implementation for a genuinely new unit/profile/recipe/ID or
+compatibility decision requiring PO approval under05§9; first prepare a concrete
+reviewed proposal and next steps. No silent metre relabeling, repicking, SH loss,
+source overwrite, historical-recipe change, capacity/adoption or release claim.
+Meta-audit: g0-baseline/8dd75a1 starts clean; loading checkpoint below is verified.
+Missing initial conversion is the next feature priority;500k Review latency stays
+tracked separately. Reuse service fault tests and one connected file/browser flow.
+
+Investigation complete. Existing Native conversion explicitly admits only static
+GLB and retains legacy64MiB input. Native Point may declare unit unknown, while01a
+asserts metres/identity; Proxy carries its own transform/family and exact GS
+derivedFrom that the current saved-model subset rejects. Removing guards alone
+would change meaning. Native GS header inspection also does not prove payload.
+
+Concrete decision: [07k](../docs/specs/07k-native-point-gs-proxy-conversion-proposal.md)
+groups two additive exact profiles, immutable recipe7/ID vectors, preserved unit
+objects/transforms/manual pins and strict GS inspection, plus a Desktop-only512MiB
+Native original exception. Reuse file-backed strict STORE sources, private original
+CAS and existing durable initialize-start acknowledgement; old recipes1–6/jobs and
+all general release/adoption gates stay unchanged. No product implementation yet.
+
+Read-only independent mapping, target-profile and streaming/recovery reviews found
+no remaining blocker after correcting Native unit wire kind to meters and Review
+wire omission versus saved edit-copy derivedFrom:[]. Root also clarified actual
+durable staging versus in-memory pending and64KiB adapter versus16MiB CAS boundaries.
+Static Node check passes proposed JSON hashes/UTF-8 lengths, seven ID vectors,
+Point/Proxy transform arithmetic, unchanged frozen Point/GS hashes and local links.
+No runtime/browser check is claimed for this documentation-only checkpoint.
+
+Await one genuine grouped PO decision under AGENTS architecture/change rules and
+05§9 to ratify the new frame/profile/recipe/capacity/recovery contract. Next after
+approval: implement archive/recipe7 and public profile/picking/render connections,
+then all-purpose file exchange, restore/cold/interruption and >64MiB dedicated
+Chromium acceptance; run required final serial checks and independent final diff
+review. Do not insert per-helper/manual-test waits. Other Native formats/materials
+and the existing500k Review latency failure remain visible, not silently completed.
+
 ## Verified checkpoint — usable loading
 
 PO2026-10-28 authorized Caption-first read/search, ready-model camera operation and

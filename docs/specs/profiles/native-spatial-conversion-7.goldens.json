@@ -1,0 +1,251 @@
+{
+  "status": "Reference arithmetic and identity vectors, not decoder/browser/device evidence",
+  "recipe": "native-project-scene-recipe-7",
+  "conversionId": "00000000000000000000000000000000",
+  "sourceZipSha256": "1111111111111111111111111111111111111111111111111111111111111111",
+  "sourceDigestNote": "Synthetic fixed digest for identity vectors; not the digest of a distributed Native ZIP.",
+  "ids": [
+    {
+      "outputPrefix": "cap",
+      "sourceKey": [
+        "caption",
+        "cap_11111111111111111111111111"
+      ],
+      "preimage": "lociview:native-project-scene-recipe-7:id:jcs-v1\n[\"00000000000000000000000000000000\",\"1111111111111111111111111111111111111111111111111111111111111111\",\"cap\",[\"caption\",\"cap_11111111111111111111111111\"]]",
+      "utf8ByteLength": 203,
+      "sha256": "e43274928f577bc564b95d8d6714a9dbcf901ca598a7969cce68cfb7515d063f",
+      "id": "cap_e43274928f577bc564b95d8d6714a9db"
+    },
+    {
+      "outputPrefix": "rep",
+      "sourceKey": [
+        "representation",
+        "rep_22222222222222222222222222"
+      ],
+      "preimage": "lociview:native-project-scene-recipe-7:id:jcs-v1\n[\"00000000000000000000000000000000\",\"1111111111111111111111111111111111111111111111111111111111111111\",\"rep\",[\"representation\",\"rep_22222222222222222222222222\"]]",
+      "utf8ByteLength": 210,
+      "sha256": "dfd53195fe54f962bb9d279987aefa2fa5942775a57f1f65349c47fdcfa9956b",
+      "id": "rep_dfd53195fe54f962bb9d279987aefa2f"
+    },
+    {
+      "outputPrefix": "rep",
+      "sourceKey": [
+        "representation",
+        "rep_33333333333333333333333333"
+      ],
+      "preimage": "lociview:native-project-scene-recipe-7:id:jcs-v1\n[\"00000000000000000000000000000000\",\"1111111111111111111111111111111111111111111111111111111111111111\",\"rep\",[\"representation\",\"rep_33333333333333333333333333\"]]",
+      "utf8ByteLength": 210,
+      "sha256": "bb209f0a99a5f671d54c30ca03ea09d9c39b9bf296385f935d41b04e58b61b2c",
+      "id": "rep_bb209f0a99a5f671d54c30ca03ea09d9"
+    },
+    {
+      "outputPrefix": "fam",
+      "sourceKey": [
+        "family",
+        "ast_11111111111111111111111111",
+        "fam_22222222222222222222222222"
+      ],
+      "preimage": "lociview:native-project-scene-recipe-7:id:jcs-v1\n[\"00000000000000000000000000000000\",\"1111111111111111111111111111111111111111111111111111111111111111\",\"fam\",[\"family\",\"ast_11111111111111111111111111\",\"fam_22222222222222222222222222\"]]",
+      "utf8ByteLength": 235,
+      "sha256": "777e32b9b82c77ad0513498eaa20fb1556fdffcc51207811464a365fa4128b26",
+      "id": "fam_777e32b9b82c77ad0513498eaa20fb15"
+    },
+    {
+      "outputPrefix": "slot",
+      "sourceKey": [
+        "material-slot",
+        "rep_22222222222222222222222222",
+        "representationMaterial",
+        0
+      ],
+      "preimage": "lociview:native-project-scene-recipe-7:id:jcs-v1\n[\"00000000000000000000000000000000\",\"1111111111111111111111111111111111111111111111111111111111111111\",\"slot\",[\"material-slot\",\"rep_22222222222222222222222222\",\"representationMaterial\",0]]",
+      "utf8ByteLength": 237,
+      "sha256": "504ed840230675c9bf44c98a2da42dd4159d5666d150f9caca089405cd745def",
+      "id": "slot_504ed840230675c9bf44c98a2da42dd4"
+    },
+    {
+      "outputPrefix": "slot",
+      "sourceKey": [
+        "material-occurrence",
+        "rep_44444444444444444444444444",
+        0,
+        0
+      ],
+      "preimage": "lociview:native-project-scene-recipe-7:id:jcs-v1\n[\"00000000000000000000000000000000\",\"1111111111111111111111111111111111111111111111111111111111111111\",\"slot\",[\"material-occurrence\",\"rep_44444444444444444444444444\",0,0]]",
+      "utf8ByteLength": 220,
+      "sha256": "1762bd45d28097ab8e28e27a6e6c15c68368a5dc04b9d48b019ab729c08b6430",
+      "id": "slot_1762bd45d28097ab8e28e27a6e6c15c6"
+    },
+    {
+      "outputPrefix": "tag",
+      "sourceKey": [
+        "tag",
+        "記録"
+      ],
+      "preimage": "lociview:native-project-scene-recipe-7:id:jcs-v1\n[\"00000000000000000000000000000000\",\"1111111111111111111111111111111111111111111111111111111111111111\",\"tag\",[\"tag\",\"記録\"]]",
+      "utf8ByteLength": 175,
+      "sha256": "41de7211d99f4a1a58face1c1cdd02ecf2cf89f386787962f8145d7d661d5d3e",
+      "id": "tag_41de7211d99f4a1a58face1c1cdd02ec"
+    }
+  ],
+  "point": {
+    "utf8Source": "ply\nformat ascii 1.0\nelement vertex 2\nproperty float x\nproperty float y\nproperty float z\nproperty uchar red\nproperty uchar green\nproperty uchar blue\nend_header\n1 2 -1 255 0 128\n-2 0 3 0 255 0\n",
+    "byteLength": 192,
+    "sha256": "f6f2b51ba4b0dc5c69abd24d1bbe9a0aa4621d84270d666ed80c8fb6d976568a",
+    "positionsFloat32": [
+      [
+        1,
+        2,
+        -1
+      ],
+      [
+        -2,
+        0,
+        3
+      ]
+    ],
+    "colorsLinearFloat32": [
+      [
+        1,
+        0,
+        0.2158605009317398
+      ],
+      [
+        0,
+        1,
+        0
+      ]
+    ],
+    "boundsRepresentation": {
+      "min": [
+        -2,
+        0,
+        -1
+      ],
+      "max": [
+        1,
+        2,
+        3
+      ]
+    },
+    "representationToAsset": {
+      "translation": [
+        10,
+        20,
+        30
+      ],
+      "rotationXYZW": [
+        0,
+        1,
+        0,
+        0
+      ],
+      "uniformScale": 2,
+      "reflection": "x"
+    },
+    "positionsAsset": [
+      [
+        12,
+        24,
+        32
+      ],
+      [
+        6,
+        20,
+        24
+      ]
+    ],
+    "boundsAsset": {
+      "min": [
+        6,
+        20,
+        24
+      ],
+      "max": [
+        12,
+        24,
+        32
+      ]
+    },
+    "preservedProjectUnits": [
+      {
+        "kind": "unknown"
+      },
+      {
+        "kind": "meters",
+        "metersPerProjectUnit": 1
+      }
+    ],
+    "existingManualCaptionPositionAsset": [
+      4,
+      5,
+      6
+    ],
+    "expectedExistingManualCaptionPositionAsset": [
+      4,
+      5,
+      6
+    ]
+  },
+  "proxy": {
+    "vectorKind": "Transform arithmetic, not an encoded GLB fixture",
+    "sourceLocalPoint": [
+      -1,
+      0,
+      0
+    ],
+    "authoredNodeTranslation": [
+      3,
+      0,
+      0
+    ],
+    "boundsRepresentation": {
+      "min": [
+        2,
+        0,
+        0
+      ],
+      "max": [
+        4,
+        2,
+        0
+      ]
+    },
+    "representationToAsset": {
+      "translation": [
+        10,
+        20,
+        30
+      ],
+      "rotationXYZW": [
+        0,
+        1,
+        0,
+        0
+      ],
+      "uniformScale": 2,
+      "reflection": "x"
+    },
+    "expectedAssetPoint": [
+      14,
+      20,
+      30
+    ],
+    "boundsAsset": {
+      "min": [
+        14,
+        20,
+        30
+      ],
+      "max": [
+        18,
+        24,
+        30
+      ]
+    },
+    "colorWrite": false,
+    "depthWrite": false,
+    "includedInFit": false,
+    "newPickSide": "DoubleSide"
+  }
+}

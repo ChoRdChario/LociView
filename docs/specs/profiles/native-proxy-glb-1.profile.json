@@ -1,0 +1,34 @@
+{
+  "id": "development-native-proxy-glb-1",
+  "version": 1,
+  "status": "Development conversion profile; not generally adopted",
+  "encodingUnion": [
+    {
+      "id": "development-validation-glb-1",
+      "specificationSha256": "077c5da2241deb7956026fe20376dee9301d70b29d10a436d673f37909e4186f"
+    },
+    {
+      "id": "development-validation-glb-jpeg-1",
+      "specificationSha256": "a08a1c90496df087b1cd454dd29177ff3da7fdc8b5ebfb07156189479a8f8db8"
+    }
+  ],
+  "admission": "Select the unchanged PNG-only inspector when no embedded JPEG exists, otherwise the unchanged JPEG inspector. Keep every closed static-GLB/PNG/JPEG feature and resource guard; no relabelling old profiles, no external resources or new encoding.",
+  "records": {
+    "contentKind": "mesh",
+    "role": "interactionProxy",
+    "purposes": [
+      "interaction"
+    ],
+    "variantFamilyId": "Mapped distinct Native Proxy family; preserve its identity, never substitute the GS family.",
+    "proxyForGsVariantFamilyId": "Exact mapped Native GS family in the same Asset.",
+    "derivedFrom": "Recipe-7 import emits exactly [mapped Native GS Representation ID]. Saved records permit [] or exactly one same-Asset GS Representation ID in the proxyForGsVariantFamilyId family. Review wire omits this field; its saved edit-copy explicitly carries []. Empty arrays require no private ancestry proof and imply no Native provenance. Clean/continuing-history outputs preserve/remap retained nonempty arrays."
+  },
+  "representationToAsset": "Existing target canonical positive Sim3 plus reflection none/x, preserved exactly; use the checked binary64 transform of development-native-point-ply-rgb-1. No normalization.",
+  "bounds": "Asset-frame conservative AABB from all eight corners of the verified raw GLB AABB, including its authored node poses. Retain raw GLB bounds separately for the pinned loader proof; never overwrite them with Asset bounds.",
+  "materialCatalog": "Existing gltfMaterial(index) or implicit representationMaterial(0) locators, unchanged source semantics. No Native appearance override may target a Proxy; no new Proxy material editing.",
+  "display": "Wrap the cloned decoded root in a separate representationToAsset Group; retain all authored node transforms. No color/depth writes, excluded from fit. New interaction is DoubleSide as in existing target 01c, which differs from Native FrontSide. Never reraycast or move saved pins.",
+  "goldens": {
+    "file": "native-spatial-conversion-7.goldens.json",
+    "sha256": "077f16922fcd7dac503ebdc42c0497882a3618cc55e4f22a2f899c53747397ac"
+  }
+}

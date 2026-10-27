@@ -1,0 +1,42 @@
+{
+  "id": "development-native-point-ply-rgb-1",
+  "version": 1,
+  "status": "Development conversion profile; not generally adopted",
+  "inheritsEncoding": {
+    "id": "development-validation-point-ply-rgb-1",
+    "specificationSha256": "c93909de6da2c44558d960c2620f967f8cd702b6171ae7df9e86df789ba35dd5"
+  },
+  "inheritance": "Keep all header/payload/Float32/RGB/ordinal/material/work-budget rules. Replace only frame, representationToAsset admission, Asset bounds and point-anchor coordinate mapping as specified below.",
+  "frame": {
+    "axis": "Retain source RepresentationFrame and explicit mapping to the AssetFrame; no recentering or axis inference.",
+    "unit": "Make no physical-unit assertion. Preserve the exact ProjectFrame.unit object: {kind:unknown} or {kind:meters,metersPerProjectUnit:1}; no calibration or inferred scale.",
+    "representationToAsset": "Existing target canonical positive Sim3 plus reflection none/x; preserve values exactly. Reject noncanonical or nonfinite inputs; never normalize."
+  },
+  "transform": {
+    "linear": "L = uniformScale * R(rotationXYZW) * diag(reflection == x ? -1 : 1, 1, 1); R is the standard quaternion matrix used by gsRotation, with XYZW reordered to WXYZ at that API.",
+    "point": "out[i] = ((L[i][0]*p[0] + L[i][1]*p[1]) + L[i][2]*p[2]) + translation[i]; IEEE754 binary64, finite output required, negative zero becomes positive zero.",
+    "binding": "AssetBinding is applied once later for display/Project coordinates; never include it in logicalBoundsAsset."
+  },
+  "bounds": "Exact component-wise min/max of every transformed post-Float32 source position. Retain separately the raw RepresentationFrame bounds for decoder verification.",
+  "records": {
+    "contentKind": "pointCloud",
+    "role": "pointPrimary",
+    "purposes": [
+      "source",
+      "display"
+    ],
+    "derivedFrom": [],
+    "sourceLocator": {
+      "kind": "representationMaterial",
+      "slotIndex": 0
+    },
+    "pointSample": "nodeIndex 0, primitiveIndex 0, original zero-based pointIndex; retain duplicates and row order.",
+    "sourceSemantics": "Inherited opaque/surface/unlit/front, baseFactor [1,1,1,1], sourceAlpha 1, one synthetic RGB slot."
+  },
+  "anchors": "New direct pointSample anchors use the same checked transform into Asset coordinates. Existing Native manual Caption coordinates are already authoritative Asset/Project coordinates: do not transform or repick them.",
+  "presentation": "Existing point-binary/dither/smooth profiles and controls remain unchanged; allow this exact new source profile in the existing unlit point capability rule.",
+  "goldens": {
+    "file": "native-spatial-conversion-7.goldens.json",
+    "sha256": "077f16922fcd7dac503ebdc42c0497882a3618cc55e4f22a2f899c53747397ac"
+  }
+}

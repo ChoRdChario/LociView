@@ -46,6 +46,11 @@ and existing file retention from bridge-only requirements.
 Apply [05 §9](05-project-scene-team-workflow.md) and the frozen input contracts.
 A new conversion recipe must not reinterpret the frozen old recipe or old IDs.
 
+The [07k Native Point/GS/Proxy proposal](07k-native-point-gs-proxy-conversion-proposal.md)
+specifies the next additive source/frame/recipe and bounded-original decision.
+It is not approved or implemented; [todo](../../tasks/todo.md) owns its current
+review/decision state. Existing recipe1–6 and their jobs remain unchanged.
+
 | Source content | One-time conversion requirement |
 |---|---|
 | Project and frames | Preserve title, units, handedness/up-axis and exact relationships; create a new Project/history identity, not an in-place old-source upgrade |
