@@ -72,7 +72,7 @@ The words **MUST**, **MUST NOT**, **SHOULD**, and **MAY** are normative. A metri
 
 | Document | Status / purpose |
 |---|---|
-| [`07j-three-186-compatibility-proposal.md`](07j-three-186-compatibility-proposal.md) | PO APPROVED2026-10-27 / IMPLEMENTATION IN PROGRESS / NOT ADOPTED. Exact0.180 proof/math/cleanup, neutral witness and checked0.186 display; unchanged profiles/recipes/history. Current checks and managed ordinary-viewer recovery hold are in todo. No new GS source or GS production permission. |
+| [`07j-three-186-compatibility-proposal.md`](07j-three-186-compatibility-proposal.md) | PO APPROVED2026-10-27 / IMPLEMENTATION IN PROGRESS / NOT ADOPTED. Exact0.180 proof/math/cleanup, neutral witness and checked0.186 display; unchanged profiles/recipes/history. Ordinary-v1 recovery§7.1 is explicitly approved; current checks and remaining acceptance are in todo. No new GS source or GS production permission. |
 
 ## Fixed versus conditional decisions
 

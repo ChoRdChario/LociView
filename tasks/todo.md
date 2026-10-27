@@ -43,12 +43,13 @@ agents map loader/import, proof/call sites and existing browser acceptance.
   Connect186 checked display and existing converters with no engine-object leak.
 - [x] Focused import/fault/ownership/compatibility checks; convertedNative material/
   file/team/cold workflow, directNative and existingNativeSpark real-browser smoke.
-- [ ] Ordinaryv1 rendered/context recovery acceptance in§7.1: managed scope
-  confirmation is pending; preserve its current read-only policy.
-- [x] Mandatory final checks, independent meaningful diff review and later-fix
-  review; record remaining gates without claiming product186 adoption.
-- [x] Prepare the suitable verified g0-baseline **development** checkpoint;
-  normal push follows the staged-scope check. Git owns publication identity/state.
+- [x] Ordinaryv1 rendered/context recovery acceptance in§7.1: PO explicitly
+  authorized the exact recovery connection on2026-10-27 after the managed scope
+  rejection. Preserve its current read-only policy.
+- [x] Final recovery-tree checkpoint checks and independent meaningful diff /
+  later-fix review; record remaining gates without claiming product186 adoption.
+- [x] Prepare reviewed/tested recovery changes for a suitable **development**
+  checkpoint on g0-baseline. Git owns actual commit/push identity and state.
 
 Stop only affected work for a real contract conflict or inability to preserve an
 existing valid route; do not relax old proof, profile, bounds, image, recovery or
@@ -105,16 +106,67 @@ Final static browser evidence (all dedicated local headless Chromium):
 
 Meta-audit: the accepted dependency prerequisite remains the criticalpath; closed
 real constructor, lifetime, publication-race and stale-SDK-cache defects. Suitable
-development checkpoint only:07j stays IN PROGRESS/NOT ADOPTED and not a valid
-productThree186 checkpoint while ordinaryv1 recovery authority/evidence is pending.
-Next: finish§7.1 after explicit managed-scope confirmation, then return to01b§8's
+development checkpoints only:07j stays IN PROGRESS/NOT ADOPTED. The ordinaryv1
+recovery authority hold is resolved by the PO's explicit§7.1 permission. Final
+recovery-tree checks, browser flows and independent review passed; publication
+follows staged-scope/identity checks. Device/offline/entry/adoption gates remain open.
+Next: return to01b§8's
 preciseGS source/Proxy/typed display proposal; no newGS profiles or production
 permission is inferred. No additional PO control-by-control tests are requested.
 Artifacts and retained failures: `.artifacts/e2e/three-compat-07j/`; canonical run
-results remain under `.artifacts/e2e/runs`. Current whole-check is checkpoint-8;
+results remain under `.artifacts/e2e/runs`. The preceding bridge aggregate is checkpoint-8;
 previous typecheck failures/interrupted pre-final-tree checks are not passes.
 
-Managed approval constraint: two attempts to extend ordinary `ViewerCore` context
+### Current connected slice — ordinaryv1 display recovery
+
+Outcome: an already displayed legacy model returns after GPU connection recovery,
+with its exact temporary view, pins and material settings; source files and logs
+remain unchanged. Root is sole writer; bounded reviewers are read-only.
+Implement Core resource/input suspension and exact camera retention, then app-owned
+reload guarded by Project/access/navigation/model-load and recovery generations.
+Check stale reads/decodes, repeated loss, cancelled gizmo and manual retry with
+focused tests; verify a textured v1 readonly-open flow using real Chromium GPU loss.
+At the final source tree run required serial checkpoint checks and independent
+diff review, then commit/push the suitable development checkpoint. No new format,
+editable legacy entry, GS adoption or release is included. Stop only for an actual
+contract conflict or inability to preserve source/view/ownership boundaries.
+
+Implemented Core suspension/resource release and renderer reconstruction through
+the app-owned loader. The temporary full camera, point diameter and same-Asset
+retry target survive read/decode/allocation failure; intentional different-model
+selection keeps normal fitting. AppContext/access/navigation/model/recovery
+generations and abort fence each await and reject/dispose late candidates.
+Viewer disposal also releases the recovery target's Project reference.
+The existing read-only material chooser rebuilt enabled-looking edit fields;
+those rebuilt controls now preserve the read-only state without changing authority.
+
+Focused recovery/ownership tests:16PASS; scene import boundary and existing v1
+read-only/source preservation tests passed earlier in this slice. Read-only final
+review and its fixes have no unresolved findings. Dedicated Chromium actual GPU
+loss/restore preserves the complete framebuffer hash (texture/material/pin/ortho
+zoom). A second GPU loss with this test's synthetic model temporarily missing
+shows the read failure; restoring its exact bytes and choosing existing「表示」
+returns the same frame. Full OPFS file inventory/digests are unchanged afterward.
+`legacy-browser-5.log` records9.2s for that connected flow. Final post-reset build
+smoke also passed:3 ordinary-v1/Native/NativeSpark flows in33.3s, recorded in
+`legacy-browser-final.log` / `final-normal-1793080947278-44072/result.json`.
+Earlier failures (readonly field, test locator assumptions),
+the sandbox socket restriction and interrupted pre-final whole-check are retained,
+not relabelled as passes. The default-sandbox `legacy-checkpoint-final.log`
+completed115files/2625PASS,153FAIL in7existing scripts files,21TODO and4errors.
+135 failures directly deny Temp Git config creation,6 deny hardlinks and4 deny
+junction/symlinks;8 further receipt assertions/timeouts share the link failure
+(the4 unhandled errors also name EPERM). The viewer/UI tests passed; this is not
+an aggregatePASS. No product/test/assertion changes were made in response.
+The same final tree passed through approved environment escalation as
+`legacy-checkpoint-permitted.log`: typecheck,122files/2778PASS/21existingTODO,
+normal/harness/validation builds, serially. No failed test, exclusion, assertion or
+runtime limit was changed. Final whole-test duration952.03s is test-suite elapsed,
+not an app-action performance claim. The9 reviewed source/test blobs still match
+the tested final tree. Updated documentation links83/83 and diff checks passed.
+
+Historical managed rejection — resolved by the explicit PO approval above:
+two attempts to extend ordinary `ViewerCore` context
 recovery were rejected and neither patch was applied. The revised, independently
 reviewed whole-path proposal connected loss cleanup → fresh renderer → the existing
 AppContext/WorkspaceFS model loader → transform/material/pin sync, preserving the
@@ -122,10 +174,11 @@ full temporary camera and retaining Model-tab `表示` on failure. Auto-review's
 reason: "Although this is materially safer than the rejected legacy change, it
 expands07j into the ordinary legacy viewer and the user has only requested re-review
 of the proposal, not authorized implementation of this exact patch."
-This conflicts with the recorded07j implementation approval but does not authorize
-bypassing the managed decision. Stop that affected change; request explicit scope
-confirmation with the concrete proposal after unaffected verification. Legacy§6/
-§7.5 recovery remains pending; Native/ProjectScene evidence does not close it.
+The affected change was stopped, and the concrete§7.1 proposal was presented for
+explicit confirmation. PO then explicitly authorized that exact implementation.
+This retained rejection is historical evidence, not a current stop instruction.
+Legacy§6/§7.5 recovery evidence is now recorded in its own lane above;
+Native/ProjectScene results are not substituted for ordinary-v1 evidence.
 
 ## Previous preparation — compatibility proposal
 

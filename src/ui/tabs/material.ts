@@ -249,6 +249,10 @@ export function mountMaterialTab(container: HTMLElement, ctx: AppContext): () =>
       el('label', { class: 'lv-row' }, chromaCheck, ' クロマキー（指定色を透明にする）'),
       chromaBody,
     );
+    // Selecting a material rebuilds these controls without a screen refresh.
+    for (const control of controls.querySelectorAll<HTMLInputElement | HTMLButtonElement>('[data-project-mutation]')) {
+      control.disabled = !ctx.store.canMutate;
+    }
   }
 
   render();

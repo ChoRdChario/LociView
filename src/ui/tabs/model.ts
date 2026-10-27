@@ -115,7 +115,7 @@ export function mountModelTab(container: HTMLElement, ctx: AppContext, deps: Mod
     );
     if (s.points > 0) {
       const pointScale = el('input', {
-        type: 'range', min: '0.2', max: '5', step: '0.1', value: '1',
+        type: 'range', min: '0.2', max: '5', step: '0.1', value: String(ctx.viewer.getPointScale()),
         oninput: (ev) => ctx.viewer.setPointScale(Number((ev.target as HTMLInputElement).value)),
       });
       detailEl.append(el('div', { class: 'lv-hint' }, '点サイズ'), pointScale);

@@ -26,9 +26,10 @@ The PO approved [07j](../docs/specs/07j-three-186-compatibility-proposal.md) imp
 and fixed dependencies on2026-10-27. Its bounded implementation retains:
 retain actual180 source math/proof/legacy keys and closed cleanup, then independently
 checked186 display using neutral values after old resources are released. The
-unit is existing material conversion/open/edit/file/cold continuation. Todo owns
-executed checks and remaining ordinary-viewer recovery managed-approval constraint;
-do not retry the denied patch or mark07j complete. GS profile decisions stay subsequent.
+unit is existing material conversion/open/edit/file/cold continuation. PO explicitly
+approved the exact ordinary-v1 recovery in§7.1 after the managed scope rejection;
+that authority hold is resolved. Todo owns its executed checks and remaining
+acceptance. Preserve the existing read-only v1 entry and keep GS profile decisions subsequent.
 The superseded proposal/JSON remain in linked history, not an approval queue.
 
 Dedicated Chromium verifies only its recorded localhost/headless workflows. It

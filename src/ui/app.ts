@@ -15,9 +15,9 @@ import {
   onExternalFileOpen,
   registerPwa,
 } from '../platform/pwa';
-import { detectFormat, loadModel } from '../viewer/loaders';
 import { ViewerCore } from '../viewer/viewer';
 import { AppContext } from './context';
+import { createModelDisplayLoader } from './modelDisplay';
 import { el, clear, downloadBlob, fmtBytes } from './dom';
 import { infoDialog, promptDialog } from './dialogs';
 import { fNum, fStr } from './fields';
@@ -130,47 +130,13 @@ export async function bootApp(root: HTMLElement): Promise<void> {
   }
 
   // ---- モデル読込 ---------------------------------------------------------------
-  async function loadModelAsset(assetId: string): Promise<void> {
-    if (ctx === null) return;
-    const asset = ctx.asset(assetId);
-    if (asset === null) return;
-    // 軽量版があればそれを表示に使う（原本は書き出し用に保持）。iOSメモリ対策
-    const optPath = fStr(asset, 'optimizedPath');
-    const displayPath = optPath !== '' ? optPath : fStr(asset, 'path');
-    let bytes = await ctx.fs.readBytes(`${ctx.dir}/${displayPath}`);
-    if (bytes === null && optPath !== '') {
-      bytes = await ctx.fs.readBytes(`${ctx.dir}/${fStr(asset, 'path')}`); // 軽量版が無ければ原本
-    }
-    if (bytes === null) {
-      await infoDialog('モデル読込', `ファイルが見つかりません（差分ZIPで受け取った場合はフルZIPの取込が必要です）`);
-      return;
-    }
-    const fmt = detectFormat(displayPath, bytes);
-    if (fmt === null) {
-      await infoDialog('モデル読込', '対応していない形式です');
-      return;
-    }
-    try {
-      const model = await loadModel(fmt, bytes);
-      ctx.viewer.setModel(model);
-      ctx.ui.activeModelAssetId = assetId;
-      ctx.ui.loadedModelAssetId = assetId; // 実際に描画された（「表示中」判定の根拠）
-      // transformの適用
-      const t = asset.fields.transform;
-      if (typeof t === 'object' && t !== null && !Array.isArray(t)) {
-        const o = t as Record<string, unknown>;
-        ctx.viewer.setModelTransform({
-          scale: typeof o.scale === 'number' ? o.scale : 1,
-          upAxis: o.upAxis === 'Z' ? 'Z' : 'Y',
-        });
-      }
-      ctx.syncPins();
-      ctx.syncMaterials();
-      ctx.notify();
-    } catch (e) {
-      await infoDialog('モデル読込失敗', e instanceof Error ? e.message : String(e));
-    }
-  }
+  const modelDisplay = createModelDisplayLoader(
+    () => ctx !== null && projectAccess !== null
+      ? { context: ctx, access: projectAccess, navigation: projectNavigationEpoch } : null,
+    infoDialog,
+    () => showToast('3D表示を復旧しました。'),
+  );
+  const loadModelAsset = modelDisplay.load;
 
   // ---- project session / 画面遷移 ----------------------------------------------
   async function readProjectManifest(dir: string) {
@@ -222,6 +188,7 @@ export async function bootApp(root: HTMLElement): Promise<void> {
   }
 
   function disposeViewer(): void {
+    modelDisplay.reset();
     if (unmountViewer !== null) {
       unmountViewer();
       unmountViewer = null;
@@ -656,6 +623,7 @@ export async function bootApp(root: HTMLElement): Promise<void> {
       return false;
     }
     projectNavigationEpoch += 1;
+    modelDisplay.cancel();
     const activeCtx = ctx;
     const access = projectAccess;
     if (activeCtx !== null && access !== null) {
@@ -753,22 +721,40 @@ export async function bootApp(root: HTMLElement): Promise<void> {
     activeHomeUi = null;
     const viewer = new ViewerCore();
     ctx = new AppContext(access.workspace, dir, store, viewer, identity);
-    // メモリ不足でGLが落ちたら、白画面のままにせず状況を伝える
-    let contextLostShown = false;
+    const owner = ctx;
+    // A failed close retains this same live context/access. Each load separately
+    // captures the current navigation epoch, rather than the original mount epoch.
+    const isCurrentViewer = (): boolean => ctx === owner && projectAccess === access;
+    let displayedBeforeLoss: string | null = null;
+    let recoveryRead: number | null = null;
     viewer.onContextLost(() => {
-      // 描画は失われたので「表示中」を解除し、再表示できる状態に戻す
-      if (ctx !== null) {
-        ctx.ui.loadedModelAssetId = null;
-        ctx.notify();
+      if (!isCurrentViewer()) return;
+      displayedBeforeLoss = owner.ui.loadedModelAssetId ?? (recoveryRead !== null ? displayedBeforeLoss : null);
+      recoveryRead = viewer.displayRecovery;
+      modelDisplay.cancel();
+      owner.ui.loadedModelAssetId = null;
+      owner.notify();
+      showToast('3D表示の接続が切れました。接続の回復後に表示を復旧します。');
+    });
+    viewer.onContextRestored((recovery) => {
+      if (!isCurrentViewer()) return;
+      const assetId = displayedBeforeLoss;
+      if (assetId === null) {
+        try {
+          if (viewer.prepareDisplay() === 'failed') throw new Error('renderer unavailable');
+          viewer.finishDisplayRecovery(recovery);
+        } catch {
+          showToast('3D表示を再開できませんでした。Modelタブの「表示」で再試行してください。');
+        }
+        recoveryRead = null;
+        return;
       }
-      if (contextLostShown) return;
-      contextLostShown = true;
-      void infoDialog(
-        '表示を停止しました',
-        '端末のメモリが不足したため、3D表示を停止しました。' +
-          'より軽いモデルでお試しいただくか、他のアプリを閉じてから開き直してください。' +
-          '（キャプションや記録は失われていません）',
-      );
+      recoveryRead = recovery;
+      void loadModelAsset(assetId, recovery).finally(() => {
+        if (recoveryRead !== recovery) return;
+        recoveryRead = null;
+        displayedBeforeLoss = null;
+      });
     });
     unmountViewer = mountViewerScreen(root, ctx, {
       goHome: () => void closeProjectAndShowHome(),

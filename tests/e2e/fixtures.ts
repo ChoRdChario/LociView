@@ -90,11 +90,11 @@ export async function nativeConversionBackup(model: Buffer, image: Buffer, capti
 }
 
 /** Frozen-v1 GLB/PNG subset from the existing owned operation-log fixture. */
-export async function frozenV1ConversionBackup(model: Buffer, image: Buffer) {
+export async function frozenV1ConversionBackup(model: Buffer, image: Buffer, appearance = false) {
   const id = (prefix: string, n: number) => `${prefix}_${String(n).padStart(26, '0')}`, actor = 'a_0000000000001', ops: Record<string, unknown>[] = [];
   const add = (e: string, n: number, v: Record<string, unknown>, t = 'create') => { const op = ops.length + 1;
     ops.push({ op, hlc: `2026-10-15T00:00:00.000Z-${op.toString(16).padStart(4, '0')}-${actor}`, actor, user: '', t, e,
-      id: id(e === 'caption' ? 'cap' : e === 'asset' ? 'ast' : e === 'profile' ? 'usr' : e, n), ...(t === 'delete' ? {} : { v }) }); };
+      id: id(e === 'caption' ? 'cap' : e === 'asset' ? 'ast' : e === 'profile' ? 'usr' : e === 'material' ? 'mat' : e, n), ...(t === 'delete' ? {} : { v }) }); };
   add('set', 1, { name: '観察', order: 1 }); add('set', 2, { name: '全体', order: 2 });
   add('asset', 1, { kind: 'model', path: 'models/model.glb', originalName: '模型.glb', mime: '', size: model.length, transform: { scale: 1, upAxis: 'Y' }, pinScale: 1.5 });
   const digest = createHash('sha256').update(image).digest('hex');
@@ -104,6 +104,7 @@ export async function frozenV1ConversionBackup(model: Buffer, image: Buffer) {
   add('caption', 3, { setId: id('set', 2), title: '親だけの記録', body: '', color: '#ff8000', anchor: { modelAssetId: id('ast', 1) } });
   add('view', 1, { setId: id('set', 1), name: '透視図', cameraState: { eye: [1, 2, 5], target: [0, 0, 0], up: [0, 1, 0], fov: 60, ortho: false }, background: '#123456' });
   add('profile', 1, { displayName: '過去の編集者', defaultPinColor: '#eab308' }); add('asset', 4, {}, 'delete');
+  if (appearance) add('material', 1, { setId: id('set', 1), modelAssetId: id('ast', 1), materialKey: 'm/Panel/0', opacity: 1, doubleSided: true, unlit: true });
   const entries: [string, Uint8Array][] = [
     ['lociview.json', Buffer.from(JSON.stringify({ format: 'lociview-project', schemaVersion: 1, projectId: id('prj', 1), name: '旧形式の記録', createdAt: '2026-10-15T00:00:00.000Z', generator: 'synthetic-test' }))],
     [`ops/${actor}.jsonl`, Buffer.from('  ' + ops.map(op => JSON.stringify(op)).join('\r\n') + '\r\n' + JSON.stringify(ops[0]) + '\r\n')],

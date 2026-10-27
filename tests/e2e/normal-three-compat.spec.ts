@@ -1,5 +1,5 @@
 import {test,expect,chromium,type Page} from '@playwright/test';
-import {nativeConversionBackup,texturedTriangleGlb,smallPng} from './fixtures';
+import {frozenV1ConversionBackup,nativeConversionBackup,texturedTriangleGlb,smallPng} from './fixtures';
 import {makeNativeDraft,snapshotFromDraft} from '../nativeGs/nativeTestProject';
 import {ZipWriter,Uint8ArrayReader,Uint8ArrayWriter} from '@zip.js/zip.js';
 import {createHash} from 'node:crypto';
@@ -16,6 +16,84 @@ async function sample(page:Page) {
     const gl=canvas.getContext('webgl2')!,out=new Uint8Array(4);gl.readPixels(Math.floor(canvas.width/2),Math.floor(canvas.height/2),1,1,gl.RGBA,gl.UNSIGNED_BYTE,out);done([...out]);
   })));
 }
+
+async function legacyFrame(page:Page) {
+  return page.locator('canvas.lv-gl').evaluate((canvas:HTMLCanvasElement)=>new Promise<string>(done=>requestAnimationFrame(async()=>{
+    const gl=canvas.getContext('webgl2')!,pixels=new Uint8Array(canvas.width*canvas.height*4);
+    gl.readPixels(0,0,canvas.width,canvas.height,gl.RGBA,gl.UNSIGNED_BYTE,pixels);
+    done([...new Uint8Array(await crypto.subtle.digest('SHA-256',pixels))].map(b=>b.toString(16).padStart(2,'0')).join(''));
+  })));
+}
+async function legacySourceFiles(page:Page) {
+  return page.evaluate(async()=>{
+    const rows:{path:string;digest:string}[]=[];
+    async function walk(dir:FileSystemDirectoryHandle,path:string) {
+      for await(const [name,entry] of (dir as any).entries()) {
+        const key=path?`${path}/${name}`:name;
+        if(entry.kind==='directory')await walk(entry,key);
+        else {const data=await (await entry.getFile()).arrayBuffer();rows.push({path:key,digest:[...new Uint8Array(await crypto.subtle.digest('SHA-256',data))].map(b=>b.toString(16).padStart(2,'0')).join('')});}
+      }
+    }
+    await walk(await navigator.storage.getDirectory(),'');return rows.sort((a,b)=>a.path.localeCompare(b.path));
+  });
+}
+
+test('通常の従来形式はtexture・材質・ピン・平行投影zoomをGPU復旧後も保ち、原本とlogを書き換えない',async({},info)=>{
+  const context=await chromium.launchPersistentContext(await shortProfile('v1'),{channel:'chromium',headless:true,viewport:{width:1440,height:1000},acceptDownloads:true,serviceWorkers:'block'});
+  context.setDefaultTimeout(15_000);const page=context.pages()[0]??await context.newPage(),errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
+  try {
+    await page.goto('/');const choosing=page.waitForEvent('filechooser');await page.getByRole('button',{name:'ファイルを開く',exact:true}).click();
+    await (await choosing).setFiles({name:'legacy-texture.zip',mimeType:'application/zip',buffer:await frozenV1ConversionBackup(texturedTriangleGlb(),smallPng(),true)});
+    await page.getByRole('button',{name:'保存して閲覧専用で開く',exact:true}).click();
+    const canvas=page.locator('canvas.lv-gl');await expect(canvas).toBeVisible();
+    await page.getByRole('tab',{name:'Model',exact:true}).click();await expect(page.getByText('表示中',{exact:true})).toBeVisible();
+    await page.getByRole('tab',{name:'Material',exact:true}).click();await page.locator('.lv-panel select').last().selectOption('m/Panel/0');
+    await expect(page.getByLabel('両面表示（Double-sided）',{exact:true})).toBeChecked();await expect(page.getByLabel('Unlit（陰影なしで素の色を表示）',{exact:true})).toBeChecked();
+    await expect(page.getByLabel('両面表示（Double-sided）',{exact:true})).toBeDisabled();
+    await page.getByRole('tab',{name:'Caption',exact:true}).click();await page.getByText('配置済み',{exact:true}).click();await expect(page.getByRole('note')).toContainText('元の本文');
+    await page.getByRole('tab',{name:'Views',exact:true}).click();await page.getByRole('button',{name:'+Z',exact:true}).click();
+    await page.getByLabel('平行投影（Orthographic）',{exact:true}).check();
+    const bounds=(await canvas.boundingBox())!;await page.mouse.move(bounds.x+bounds.width*.5,bounds.y+bounds.height*.7);await page.mouse.wheel(0,-160);
+    let previous='',stable=0;await expect.poll(async()=>{const next=await legacyFrame(page);stable=next===previous?stable+1:0;previous=next;return stable;}).toBeGreaterThanOrEqual(2);
+    const before=await legacyFrame(page),files=await legacySourceFiles(page);
+    const center=await canvas.evaluate((node:HTMLCanvasElement)=>new Promise<number[]>(done=>requestAnimationFrame(()=>{
+      const gl=node.getContext('webgl2')!,rgba=new Uint8Array(4);gl.readPixels(Math.floor(node.width/2),Math.floor(node.height/2),1,1,gl.RGBA,gl.UNSIGNED_BYTE,rgba);done([...rgba]);
+    })));
+    expect(center[0]).toBeGreaterThan(100);expect(center[1]).toBeGreaterThan(100);expect(center[3]).toBe(255);
+    expect(files.some(row=>row.path.endsWith('models/model.glb'))).toBe(true);expect(files.some(row=>row.path.endsWith('.jsonl'))).toBe(true);
+    await canvas.evaluate((node:HTMLCanvasElement)=>{const ext=node.getContext('webgl2')!.getExtension('WEBGL_lose_context')!;
+      (globalThis as any).__restoreV1=()=>ext.restoreContext();ext.loseContext();});
+    await expect(page.getByRole('status').filter({hasText:'3D表示の接続が切れました。接続の回復後に表示を復旧します。'})).toBeVisible();
+    await page.getByRole('tab',{name:'Model',exact:true}).click();await expect(page.getByRole('button',{name:'表示',exact:true})).toBeVisible();
+    await page.evaluate(()=>(globalThis as any).__restoreV1());await expect(page.getByRole('status').filter({hasText:'3D表示を復旧しました。'})).toBeVisible();
+    await expect(page.getByText('表示中',{exact:true})).toBeVisible();await expect.poll(()=>legacyFrame(page)).toBe(before);
+    await expect(page.getByRole('note')).toContainText('元の本文');
+    await page.getByRole('tab',{name:'Material',exact:true}).click();await page.locator('.lv-panel select').last().selectOption('m/Panel/0');
+    await expect(page.getByLabel('両面表示（Double-sided）',{exact:true})).toBeChecked();await expect(page.getByLabel('Unlit（陰影なしで素の色を表示）',{exact:true})).toBeChecked();
+    // Fault only this test's synthetic model. Restore its exact bytes before the
+    // user's existing 「表示」 retry, then compare the original complete frame.
+    await page.evaluate(async(path)=>{
+      const parts=path.split('/'),name=parts.pop()!;let dir=await navigator.storage.getDirectory();
+      for(const part of parts)dir=await dir.getDirectoryHandle(part);
+      const bytes=await (await (await dir.getFileHandle(name)).getFile()).arrayBuffer();
+      (globalThis as any).__missingV1={dir,name,bytes};await dir.removeEntry(name);
+    },files.find(row=>row.path.endsWith('models/model.glb'))!.path);
+    await page.getByRole('tab',{name:'Model',exact:true}).click();
+    await canvas.evaluate((node:HTMLCanvasElement)=>{const ext=node.getContext('webgl2')!.getExtension('WEBGL_lose_context')!;
+      (globalThis as any).__restoreV1=()=>ext.restoreContext();ext.loseContext();});
+    await expect(page.getByRole('button',{name:'表示',exact:true})).toBeVisible();
+    await page.evaluate(()=>(globalThis as any).__restoreV1());await expect(page.getByRole('dialog').getByText('モデル読込失敗',{exact:true})).toBeVisible();
+    await page.evaluate(async()=>{const {dir,name,bytes}=(globalThis as any).__missingV1;
+      const writer=await (await dir.getFileHandle(name,{create:true})).createWritable();await writer.write(bytes);await writer.close();delete (globalThis as any).__missingV1;});
+    await page.getByRole('dialog').getByRole('button',{name:'OK',exact:true}).click();
+    await page.getByRole('button',{name:'表示',exact:true}).click();await expect(page.getByText('表示中',{exact:true})).toBeVisible();
+    await expect.poll(()=>legacyFrame(page)).toBe(before);
+    expect(await legacySourceFiles(page)).toEqual(files);expect(errors).toEqual([]);
+    await info.attach('exact GPU frame and unchanged source digests',{body:JSON.stringify({frame:before,files}),contentType:'application/json'});
+    await page.screenshot({path:info.outputPath('legacy-recovered.png'),fullPage:true});
+  } catch(error) {await info.attach('failure page',{body:await page.locator('body').innerText(),contentType:'text/plain'});await page.screenshot({path:info.outputPath('failure.png'),fullPage:true});throw error;}
+  finally {await context.close();}
+});
 test('Native材質付きバックアップを直接編集し、実context復旧と保存後の再開で対象キーを保持する',async({},info)=>{
   const context=await chromium.launchPersistentContext(info.outputPath('native-profile'),{channel:'chromium',headless:true,viewport:{width:1440,height:1000},acceptDownloads:true,serviceWorkers:'block'});
   context.setDefaultTimeout(15_000);

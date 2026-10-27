@@ -6,7 +6,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
-import type { LoadedModel, MaterialEntry } from './loaders';
+import { disposeModelResources, type LoadedModel, type MaterialEntry } from './loaders';
 import { getChroma, getUnlit, patchMaterial, setChroma, setUnlit, type ChromaSettings } from './shaderPatch';
 
 export interface PickHit {
@@ -60,6 +60,16 @@ export class ViewerCore {
   private tapMissHandlers = new Set<() => void>();
   private tickHandlers = new Set<() => void>();
   private contextLostHandlers = new Set<() => void>();
+  private contextRestoredHandlers = new Set<(recovery: number) => void>();
+  private contextLost = false;
+  private rendererReady = false;
+  private recoveryGeneration = 0;
+  private recoveryView: {
+    camera: THREE.PerspectiveCamera | THREE.OrthographicCamera;
+    target: THREE.Vector3;
+    baseFov: number;
+    pointScale: number;
+  } | null = null;
   private pinScale = 1;
 
   // ピン移動ギズモ（3軸ドラッグ。ピン選択中に表示）
@@ -81,18 +91,12 @@ export class ViewerCore {
     { opacity: number; transparent: boolean; side: THREE.Side; depthWrite: boolean }
   >();
   private basePointSize = 1;
+  private pointScale = 1;
   private backgroundHex: string | null = null;
 
   init(canvas: HTMLCanvasElement): void {
     this.canvas = canvas;
-    this.renderer = new THREE.WebGLRenderer({
-      canvas,
-      antialias: true,
-      alpha: false,
-      powerPreference: 'high-performance',
-    });
-    this.renderer.outputColorSpace = THREE.SRGBColorSpace;
-    this.renderer.setPixelRatio(Math.min(globalThis.devicePixelRatio || 1, 2));
+    this.createRenderer();
 
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(DEFAULT_BG);
@@ -118,6 +122,7 @@ export class ViewerCore {
     this.gizmo.setMode('translate');
     this.gizmo.setSize(0.8);
     this.gizmo.addEventListener('dragging-changed', (ev) => {
+      if (!this.canInteract()) return;
       const dragging = (ev as unknown as { value: boolean }).value;
       this.controls.enabled = !dragging; // ドラッグ中はカメラ回転を止める
       if (!dragging && this.gizmoPinId !== null) {
@@ -149,7 +154,7 @@ export class ViewerCore {
     canvas.addEventListener('contextmenu', (e) => e.preventDefault());
     canvas.style.touchAction = 'none';
     canvas.addEventListener('webglcontextlost', this.handleContextLost, false);
-    canvas.addEventListener('webglcontextrestored', this.onContextRestored, false);
+    canvas.addEventListener('webglcontextrestored', this.handleContextRestored, false);
     globalThis.addEventListener('resize', this.onResize);
 
     this.startLoop();
@@ -167,9 +172,10 @@ export class ViewerCore {
     const diag = box.getSize(new THREE.Vector3()).length();
     this.pinRadius = Math.max(diag * 0.006, 1e-6);
     this.basePointSize = diag * 0.002;
+    this.pointScale = this.recoveryView?.pointScale ?? 1;
     model.root.traverse((o) => {
       if (o instanceof THREE.Points) {
-        (o.material as THREE.PointsMaterial).size = this.basePointSize;
+        (o.material as THREE.PointsMaterial).size = this.basePointSize * this.pointScale;
       }
     });
     // 既定値を記録（リセット・表示セット切替に使用）＋ unlit/クロマキー拡張を注入
@@ -191,9 +197,10 @@ export class ViewerCore {
   clearModel(): void {
     if (this.currentModel !== null) {
       this.modelRoot.remove(this.currentModel.root);
-      disposeObject(this.currentModel.root);
+      disposeModelResources(this.currentModel.root);
       this.currentModel = null;
     }
+    this.matDefaults.clear();
     this.clearPins();
   }
 
@@ -202,7 +209,7 @@ export class ViewerCore {
   }
 
   fitCamera(): void {
-    if (this.currentModel === null) return;
+    if (this.currentModel === null || !this.canInteract()) return;
     const box = new THREE.Box3().setFromObject(this.currentModel.root);
     if (box.isEmpty()) return;
     const center = box.getCenter(new THREE.Vector3());
@@ -230,7 +237,7 @@ export class ViewerCore {
 
   /** 1フレームだけ即時描画する（RAF外からの状態変更直後の反映用） */
   renderOnce(): void {
-    if (this.disposed) return;
+    if (!this.isDisplayAvailable()) return;
     const { width, height } = this.canvasSize();
     this.renderer.setSize(width, height, false);
     this.updateProjection();
@@ -295,7 +302,7 @@ export class ViewerCore {
 
   /** 選択ピンに3軸移動ギズモを表示する。nullで解除 */
   showPinGizmo(pinId: string | null): void {
-    if (this.gizmo === null) return;
+    if (this.gizmo === null || !this.canInteract()) return;
     const mesh = pinId !== null ? this.pins.get(pinId) : undefined;
     if (mesh === undefined) {
       if (this.gizmoPinId !== null) {
@@ -355,6 +362,7 @@ export class ViewerCore {
 
   /** 点群の点サイズ倍率（Modelタブ） */
   setPointScale(mult: number): void {
+    this.pointScale = mult;
     if (this.currentModel === null) return;
     this.currentModel.root.traverse((o) => {
       if (o instanceof THREE.Points) {
@@ -362,6 +370,10 @@ export class ViewerCore {
       }
     });
     this.renderOnce();
+  }
+
+  getPointScale(): number {
+    return this.pointScale;
   }
 
   /** アセットtransformの適用（docs/04 §3。原本は無改変、表示レイヤーのみ） */
@@ -375,7 +387,7 @@ export class ViewerCore {
 
   /** ±XYZ軸ビュー（LociMyu Views継承） */
   viewAxis(axis: '+x' | '-x' | '+y' | '-y' | '+z' | '-z'): void {
-    if (this.currentModel === null) return;
+    if (this.currentModel === null || !this.canInteract()) return;
     const box = new THREE.Box3().setFromObject(this.currentModel.root);
     if (box.isEmpty()) return;
     const center = box.getCenter(new THREE.Vector3());
@@ -519,6 +531,7 @@ export class ViewerCore {
   }
 
   setCameraState(s: CameraState): void {
+    if (!this.canInteract()) return;
     // 壊れた保存値（0や欠損）でカメラを潰さない
     this.baseFov = Number.isFinite(s.fov) && s.fov > 1 && s.fov < 179 ? s.fov : 45;
     this.setOrthographic(s.ortho);
@@ -538,6 +551,7 @@ export class ViewerCore {
 
   /** 透視投影 ⇄ 平行投影の切替（位置・注視点・見かけの大きさを保つ） */
   setOrthographic(on: boolean): void {
+    if (!this.canInteract()) return;
     if (on === this.isOrtho()) return;
     const prev = this.camera;
     const target = this.controls.target.clone();
@@ -597,6 +611,9 @@ export class ViewerCore {
 
   dispose(): void {
     this.disposed = true;
+    this.recoveryView = null;
+    this.contextLostHandlers.clear();
+    this.contextRestoredHandlers.clear();
     cancelAnimationFrame(this.rafId);
     this.clearLongPress();
     this.canvas.removeEventListener('pointerdown', this.onPointerDown);
@@ -604,7 +621,7 @@ export class ViewerCore {
     this.canvas.removeEventListener('pointerup', this.onPointerUp);
     this.canvas.removeEventListener('pointercancel', this.onPointerUp);
     this.canvas.removeEventListener("webglcontextlost", this.handleContextLost);
-    this.canvas.removeEventListener('webglcontextrestored', this.onContextRestored);
+    this.canvas.removeEventListener('webglcontextrestored', this.handleContextRestored);
     globalThis.removeEventListener('resize', this.onResize);
     this.clearModel();
     if (this.gizmo !== null) {
@@ -614,9 +631,78 @@ export class ViewerCore {
     }
     this.controls.dispose();
     this.renderer.dispose();
+    this.rendererReady = false;
   }
 
   // ---- 内部 -----------------------------------------------------------------
+
+  private createRenderer(): void {
+    const candidate = new THREE.WebGLRenderer({
+      canvas: this.canvas, antialias: true, alpha: false, powerPreference: 'high-performance',
+    });
+    try {
+      candidate.outputColorSpace = THREE.SRGBColorSpace;
+      candidate.setPixelRatio(Math.min(globalThis.devicePixelRatio || 1, 2));
+    } catch (error) {
+      candidate.dispose();
+      throw error;
+    }
+    this.renderer = candidate;
+    this.rendererReady = true;
+  }
+
+  isDisplayAvailable(): boolean {
+    return !this.disposed && !this.contextLost && this.rendererReady;
+  }
+
+  /** The existing app load/retry entry also retries renderer allocation. */
+  prepareDisplay(): 'ready' | 'waiting' | 'failed' {
+    if (this.disposed || this.contextLost) return 'waiting';
+    if (this.rendererReady) return 'ready';
+    try {
+      this.createRenderer();
+      this.startLoop();
+      return 'ready';
+    } catch {
+      cancelAnimationFrame(this.rafId);
+      this.renderer.dispose();
+      this.rendererReady = false;
+      return 'failed';
+    }
+  }
+
+  /** Temporary recovery identity; never a saved camera/schema value. */
+  get displayRecovery(): number | null {
+    return this.recoveryView === null ? null : this.recoveryGeneration;
+  }
+
+  private canInteract(): boolean {
+    return this.isDisplayAvailable() && this.recoveryView === null;
+  }
+
+  /** Called by the owning app after model/transform/pin/material synchronization. */
+  finishDisplayRecovery(recovery: number): void {
+    if (!this.isDisplayAvailable() || this.displayRecovery !== recovery) return;
+    const saved = this.recoveryView!;
+    if (this.camera instanceof THREE.OrthographicCamera && saved.camera instanceof THREE.OrthographicCamera) {
+      this.camera.copy(saved.camera);
+    } else if (this.camera instanceof THREE.PerspectiveCamera && saved.camera instanceof THREE.PerspectiveCamera) {
+      this.camera.copy(saved.camera);
+    }
+    this.baseFov = saved.baseFov;
+    // Recreate controls to discard the interrupted gesture and residual damping.
+    this.controls.dispose();
+    this.controls = new OrbitControls(this.camera, this.canvas);
+    this.controls.enableDamping = true;
+    this.controls.enabled = false;
+    this.controls.target.copy(saved.target);
+    this.controls.update();
+    this.camera.updateMatrixWorld(true);
+    this.renderOnce();
+    this.recoveryView = null;
+    this.controls.enabled = true;
+    if (this.gizmo !== null) this.gizmo.enabled = true;
+  }
 
   private canvasSize(): { width: number; height: number } {
     const rect = this.canvas.getBoundingClientRect();
@@ -625,7 +711,7 @@ export class ViewerCore {
 
   private startLoop(): void {
     const loop = (): void => {
-      if (this.disposed) return;
+      if (!this.isDisplayAvailable()) return;
       this.rafId = requestAnimationFrame(loop);
       const { width, height } = this.canvasSize();
       const pr = this.renderer.getPixelRatio();
@@ -635,7 +721,7 @@ export class ViewerCore {
         this.renderer.setSize(width, height, false);
         this.updateProjection();
       }
-      this.controls.update();
+      if (this.recoveryView === null) this.controls.update();
       this.renderer.render(this.scene, this.camera);
       for (const fn of this.tickHandlers) fn();
     };
@@ -648,6 +734,25 @@ export class ViewerCore {
 
   private readonly handleContextLost = (ev: Event): void => {
     ev.preventDefault(); // restoredを待つ（スマホで頻発。docs/04 §7）
+    if (this.disposed || this.contextLost) return;
+    this.recoveryView ??= {
+      camera: this.camera.clone(), target: this.controls.target.clone(), baseFov: this.baseFov, pointScale: this.pointScale,
+    };
+    this.recoveryGeneration += 1;
+    this.contextLost = true;
+    cancelAnimationFrame(this.rafId);
+    this.clearLongPress();
+    this.controls.enabled = false;
+    this.controls.dispose();
+    if (this.gizmo !== null) {
+      this.gizmo.enabled = false;
+      this.gizmo.dragging = false;
+      this.gizmo.axis = null;
+      this.gizmo.detach();
+    }
+    this.clearModel();
+    this.renderer.dispose();
+    this.rendererReady = false;
     for (const fn of this.contextLostHandlers) fn();
   };
 
@@ -657,12 +762,21 @@ export class ViewerCore {
     return () => this.contextLostHandlers.delete(fn);
   }
 
-  private readonly onContextRestored = (): void => {
-    // three r150+ は自動で再アップロードする
+  onContextRestored(fn: (recovery: number) => void): () => void {
+    this.contextRestoredHandlers.add(fn);
+    return () => this.contextRestoredHandlers.delete(fn);
+  }
+
+  private readonly handleContextRestored = (): void => {
+    if (this.disposed || !this.contextLost) return;
+    this.contextLost = false;
+    // The owning app prepares the renderer before rereading its displayed asset.
+    // A failed allocation is then retryable through the same 「表示」 action.
+    for (const fn of this.contextRestoredHandlers) fn(this.recoveryGeneration);
   };
 
   private readonly onPointerDown = (ev: PointerEvent): void => {
-    if (ev.button !== 0) return;
+    if (!this.canInteract() || ev.button !== 0) return;
     // ギズモ操作中・ギズモの軸に触れている間は選択/追加ロジックを動かさない
     if (this.gizmo !== null && (this.gizmo.dragging || this.gizmo.axis !== null)) return;
     const rect = this.canvas.getBoundingClientRect();
@@ -690,9 +804,9 @@ export class ViewerCore {
 
     // 2) タッチは長押しでピン追加（指が動いたらキャンセル=回転優先）
     if (ev.pointerType === 'touch') {
+      this.clearLongPress();
       this.longPressStart = { x: ev.clientX, y: ev.clientY };
       const ndc = this.ndc.clone();
-      this.clearLongPress();
       this.longPressTimer = setTimeout(() => {
         this.longPressTimer = null;
         this.performPinAdd(ndc);
@@ -719,7 +833,7 @@ export class ViewerCore {
     // 長押し発火前の離し = タッチの素早いタップ（ピンにも当たっていない）→ 選択解除通知
     const wasPendingTap = this.longPressTimer !== null;
     this.clearLongPress();
-    if (wasPendingTap) {
+    if (wasPendingTap && this.canInteract()) {
       for (const fn of this.tapMissHandlers) fn();
     }
   };
@@ -729,10 +843,11 @@ export class ViewerCore {
       clearTimeout(this.longPressTimer);
       this.longPressTimer = null;
     }
+    this.longPressStart = null;
   }
 
   private performPinAdd(ndc: THREE.Vector2): void {
-    if (this.currentModel === null) return;
+    if (this.currentModel === null || !this.canInteract()) return;
     this.camera.updateMatrixWorld(true);
     this.modelRoot.updateWorldMatrix(true, true);
     this.raycaster.setFromCamera(ndc, this.camera);
