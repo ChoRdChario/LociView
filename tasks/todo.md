@@ -28,7 +28,71 @@ in nondefault validation; code and executed tests determine its observed behavio
 01a adds approved XYZ/RGB ASCII PLY alongside admitted GLB and photos. This is not
 ordinary-entry activation, arbitrary-format support or general v2 adoption.
 
-## Current unit — approved07j implementation
+## Current unit — SH4 GS / Proxy connected-workflow specification
+
+PO requested2026-10-27: finalize GS input/rendering including SH4 and explicit
+same-Asset Proxy interaction, keeping the user flow simple. Continue investigation,
+specification and independent review without control-by-control PO waits; present
+one concrete proposal when a new product/format/renderer authority is required.
+
+Outcome: one reviewable specification for content-inspected GS import → view →
+explicit Proxy-assisted position → normal gizmo confirmation → edit → five-purpose
+file exchange/restore/cold-resume. Root is sole writer; bounded read-only reviewers
+cover source semantics, renderer qualification, Session/provider/file/Proxy facts.
+
+- [x] Reconcile01b§8, the immutable source candidate, actual qualification and
+  current typed ports. Separate observed behavior, proposed semantics and missing
+  SH4/paged/device acceptance; preserve the approved01a and07j contracts.
+- [x] Specify exact input/source facts, display policy/lifetime, Proxy attach /
+  change/remove and canonical manual positions, simple UI decisions and connected
+  acceptance. Keep large-source/paging in the full scope, without numeric promises
+  or silently substituting SH3 preview for SH4 rendering.
+- [x] Independently review the complete proposal and resolve findings. Check
+  documentation links, retained history, immutable bytes and contract consistency.
+- [x] Prepare the reviewed documentation checkpoint and grouped decision package
+  with the concrete implementation sequence and remaining gates. Git owns actual
+  commit/push identity; PO owns approval of the exact proposed package.
+
+This unit authorizes specification work, not new exact profile ratification,
+GSL production dependency/renderer adoption, ordinary-entry activation or release.
+No product/source/test/dependency edits precede the required concrete decision.
+Stop only the affected part for a genuine contract conflict or authority gap;
+research and review continue autonomously. The07j checkpoint is already pushed;
+its prior results below are evidence, not the current work queue.
+
+Concrete proposal: [01c](../docs/specs/01c-gs-sh4-proxy-workflow-proposal.md) and4new
+exact JSON companions (source/display plus separate goldens). GS source bounds are
+independent of packed/LOD data; verified retained bounds stay literal in facts.
+Fixed GLB base profiles, captured Proxy operation target, class-preserving fact-only
+remove, source-less manual positions and purpose closure reuse the accepted owners.
+Initial per-body SH4 limit89,887 and aggregate64MiB remain a development restriction,
+not a reduced large-GS requirement. SH4 paging and silent SH3 fallback are not approved.
+
+Added bounded qualification within existing01b§6 authority using the same official
+tarball and owned tiny data, entirely ignored/isolated. LinearRGBA16F shareddepth
+and finalIEC passed gray127vs128; negativeDC+SH4/HDR[83,109,238]; retained intermediate
+HDR after dark foreground[178,178,178]; opaque foreground[56,111,162], matching the
+independent references. Default center clip1.25 dropped a visible edge (RGB0),
+conservative clip4 kept it (RGB181), supporting the fixed screen-space policy.
+One shared decoder remained after owned sort resources closed, then retired at
+181.3s; this single small idle observation is not total-budget/repeated-cancel proof.
+Source mathematical vectors were independently recalculated; current code, tests,
+package/lock and immutable approved profiles have not changed. No full product
+suite/build is required for this documentation-only tree, and its old/runtime
+acceptance is not relabelled. Artifacts: `.artifacts/e2e/gs-spec-01c/`.
+Final source/numerical, renderer and Session/file/UI reviews have no unresolved
+findings. Final color/culling probePASS8.4s in `runs/1793087764801-39112/result.json`;
+shared idle worker probePASS3.1m in `runs/1793085616573-55180/result.json`.
+The4exact companions and their digest links,106local links,6approved01a JSON and
+unchanged old GS candidate passed static checks. Runtime source/tests/package/lock
+remain exactly the07j checkpoint. Current stop: grouped PO ratification/limited
+connection authority underAGENTS/03§5/01c. This is a real profile/dependency/renderer
+decision, not another small control or human-test wait. After approval, implement
+source/content→GS/Proxy typed commands→linear renderer→connected five-purpose
+file/recovery/cold flow with focused tests and final checkpoint review. Large
+stream/stage and SH4 paging, ordinary entry, device/offline/adoption/release remain open.
+
+## Previous verified unit — approved07j implementation
 
 PO approved [07j](../docs/specs/07j-three-186-compatibility-proposal.md) on2026-10-27:
 fixed180 inspection/proof/cleanup and neutral legacy-key authority, sequentially

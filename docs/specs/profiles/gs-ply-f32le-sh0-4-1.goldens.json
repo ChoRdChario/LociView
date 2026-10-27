@@ -1,0 +1,511 @@
+{
+  "format": "lociview-gs-source-golden-vectors",
+  "version": 1,
+  "scope": "Project-owned mathematical/byte recipes; proposed normative inputs, not executed device or renderer evidence.",
+  "defaults": {
+    "geometryDegree": 0,
+    "encodedLogitF32": 0,
+    "normalF32": [
+      0,
+      0,
+      0
+    ],
+    "unspecifiedCoefficient": 0,
+    "colorVectorMeanF32": [
+      0,
+      0,
+      0
+    ],
+    "colorVectorLogScaleF32": [
+      0,
+      0,
+      0
+    ],
+    "colorVectorQuaternionWxyzF32": [
+      1,
+      0,
+      0,
+      0
+    ],
+    "colorVectorDegree": "smallest complete degree containing the largest stated basis index; G/B coefficients default0",
+    "representationToAsset": "canonical identity unless a frame vector explicitly supplies it"
+  },
+  "comparisons": {
+    "schemaCountsPropertyNamesRawBits": "exact",
+    "derivedZeroSign": "positive zero",
+    "smallMathVectors": {
+      "fields": [
+        "normalizedQuaternion",
+        "covariance",
+        "opacity",
+        "nonlinearColor",
+        "linearColor"
+      ],
+      "absoluteTolerance": 1e-12,
+      "relativeTolerance": 1e-12,
+      "predicate": "abs(actual-expected)<=max(absTolerance,relTolerance*abs(expected))"
+    },
+    "bounds": "use source profile raw-containment and padded-union comparison; no generic approximate equality",
+    "scope": "these small reference vectors only, not arbitrary-input error or renderer precision guarantees"
+  },
+  "canonicalByteRecipe": {
+    "appliesTo": [
+      "schemaVectors",
+      "geometryVectors",
+      "colorVectors"
+    ],
+    "excludes": "frameVectors are independent post-activation mean/covariance transform oracles, not Float32 PLY recipes; opacityVectors are scalar activation oracles, not assertions of whole-file admission",
+    "header": "ply LF; format binary_little_endian 1.0 LF; element vertex N LF; exact ordered property float NAME LF lines from selected schema; end_header LF; no metadata",
+    "payload": "one full scalar row per eligible vector in exact schema order, each value rounded to IEEE754 binary32 and little-endian encoded, no trailing bytes"
+  },
+  "schemaVectors": [
+    {
+      "degree": 0,
+      "basisCount": 1,
+      "restCount": 0,
+      "float32Scalars": 17,
+      "recordBytes": 68
+    },
+    {
+      "degree": 1,
+      "basisCount": 4,
+      "restCount": 9,
+      "float32Scalars": 26,
+      "recordBytes": 104
+    },
+    {
+      "degree": 2,
+      "basisCount": 9,
+      "restCount": 24,
+      "float32Scalars": 41,
+      "recordBytes": 164
+    },
+    {
+      "degree": 3,
+      "basisCount": 16,
+      "restCount": 45,
+      "float32Scalars": 62,
+      "recordBytes": 248
+    },
+    {
+      "degree": 4,
+      "basisCount": 25,
+      "restCount": 72,
+      "float32Scalars": 89,
+      "recordBytes": 356
+    }
+  ],
+  "geometryVectors": [
+    {
+      "name": "unit covariance has valid zero offdiagonals",
+      "meanF32": [
+        0.0,
+        -0.0,
+        0.0
+      ],
+      "encodedLogScaleF32": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "encodedQuaternionWxyzF32": [
+        1.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "expectedNormalizedQuaternionWxyz": [
+        1.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "expectedCovariance": [
+        [
+          1.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          1.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "expectedPaddedBounds": {
+        "min": [
+          -4.000000000000058,
+          -4.000000000000058,
+          -4.000000000000058
+        ],
+        "max": [
+          4.000000000000058,
+          4.000000000000058,
+          4.000000000000058
+        ]
+      },
+      "inspectionComparisons": "profile-defined containment plus 16-epsilon recomputation tolerance; never rewrite retained bounds"
+    },
+    {
+      "name": "oblique anisotropic covariance",
+      "meanF32": [
+        1.0,
+        2.0,
+        3.0
+      ],
+      "encodedLogScaleF32": [
+        0.0,
+        0.6931471824645996,
+        1.0986123085021973
+      ],
+      "encodedQuaternionWxyzF32": [
+        0.9238795042037964,
+        0.0,
+        0.0,
+        0.3826834261417389
+      ],
+      "expectedNormalizedQuaternionWxyz": [
+        0.9238795305660376,
+        0.0,
+        0.0,
+        0.3826834370613369
+      ],
+      "expectedCovariance": [
+        [
+          2.5000000381177054,
+          -1.5000000076186173,
+          0.0
+        ],
+        [
+          -1.5000000076186173,
+          2.4999999771195296,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          9.000000357013583
+        ]
+      ],
+      "expectedPaddedBounds": {
+        "min": [
+          -5.324555368552357,
+          -4.324555291395089,
+          -9.000000238009225
+        ],
+        "max": [
+          7.324555368552357,
+          8.32455529139509,
+          15.000000238009225
+        ]
+      },
+      "inspectionComparisons": "profile-defined containment plus 16-epsilon recomputation tolerance; never rewrite retained bounds"
+    },
+    {
+      "name": "negative quaternion same canonical geometry",
+      "meanF32": [
+        1.0,
+        2.0,
+        3.0
+      ],
+      "encodedLogScaleF32": [
+        0.0,
+        0.6931471824645996,
+        1.0986123085021973
+      ],
+      "encodedQuaternionWxyzF32": [
+        -0.9238795042037964,
+        0.0,
+        0.0,
+        -0.3826834261417389
+      ],
+      "expectedNormalizedQuaternionWxyz": [
+        0.9238795305660376,
+        0.0,
+        0.0,
+        0.3826834370613369
+      ],
+      "expectedCovariance": [
+        [
+          2.5000000381177054,
+          -1.5000000076186173,
+          0.0
+        ],
+        [
+          -1.5000000076186173,
+          2.4999999771195296,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          9.000000357013583
+        ]
+      ],
+      "expectedPaddedBounds": {
+        "min": [
+          -5.324555368552357,
+          -4.324555291395089,
+          -9.000000238009225
+        ],
+        "max": [
+          7.324555368552357,
+          8.32455529139509,
+          15.000000238009225
+        ]
+      },
+      "inspectionComparisons": "profile-defined containment plus 16-epsilon recomputation tolerance; never rewrite retained bounds"
+    }
+  ],
+  "colorVectors": [
+    {
+      "name": "degree1 camera-to-mean negative Z",
+      "unitDirectionRepresentation": [
+        0,
+        0,
+        -1
+      ],
+      "rCoefficientsByBasis": {
+        "2": 1.0
+      },
+      "expectedRNonlinear": 0.011397488097080077,
+      "expectedRLinear": 0.0008821585214458265,
+      "absoluteTolerance": 1e-12
+    },
+    {
+      "name": "degree1 positive Z",
+      "unitDirectionRepresentation": [
+        0,
+        0,
+        1
+      ],
+      "rCoefficientsByBasis": {
+        "2": 1.0
+      },
+      "expectedRNonlinear": 0.9886025119029199,
+      "expectedRLinear": 0.9742678572941115,
+      "absoluteTolerance": 1e-12
+    },
+    {
+      "name": "degree4 Y40 positive pole",
+      "unitDirectionRepresentation": [
+        0,
+        0,
+        1
+      ],
+      "rCoefficientsByBasis": {
+        "20": 0.5
+      },
+      "expectedRNonlinear": 0.9231421876608172,
+      "expectedRLinear": 0.8339862190440328,
+      "absoluteTolerance": 1e-12
+    },
+    {
+      "name": "degree4 Y40 negative pole",
+      "unitDirectionRepresentation": [
+        0,
+        0,
+        -1
+      ],
+      "rCoefficientsByBasis": {
+        "20": 0.5
+      },
+      "expectedRNonlinear": 0.9231421876608172,
+      "expectedRLinear": 0.8339862190440328,
+      "absoluteTolerance": 1e-12
+    },
+    {
+      "name": "degree4 Y41 oblique",
+      "unitDirectionRepresentation": [
+        0.6,
+        0,
+        0.8
+      ],
+      "rCoefficientsByBasis": {
+        "21": 0.5
+      },
+      "expectedRNonlinear": 0.26235466772845084,
+      "expectedRLinear": 0.05596310904717159,
+      "absoluteTolerance": 1e-12
+    },
+    {
+      "name": "degree4 Y41 reflected X",
+      "unitDirectionRepresentation": [
+        -0.6,
+        0,
+        0.8
+      ],
+      "rCoefficientsByBasis": {
+        "21": 0.5
+      },
+      "expectedRNonlinear": 0.7376453322715492,
+      "expectedRLinear": 0.5034814479070457,
+      "absoluteTolerance": 1e-12
+    },
+    {
+      "name": "negative DC then positive SH40",
+      "unitDirectionRepresentation": [
+        0,
+        0,
+        -1
+      ],
+      "rCoefficientsByBasis": {
+        "0": -2.1269445419311523,
+        "20": 0.5
+      },
+      "expectedRNonlinear": 0.3231422099901622,
+      "expectedRLinear": 0.0852248952609968,
+      "absoluteTolerance": 1e-12
+    },
+    {
+      "name": "negative final color lower clamp",
+      "unitDirectionRepresentation": [
+        0,
+        0,
+        -1
+      ],
+      "rCoefficientsByBasis": {
+        "0": -2.4814352989196777
+      },
+      "expectedRNonlinear": 0.0,
+      "expectedRLinear": 0.0,
+      "absoluteTolerance": 1e-12
+    },
+    {
+      "name": "HDR2 no upper clamp",
+      "unitDirectionRepresentation": [
+        0,
+        0,
+        -1
+      ],
+      "rCoefficientsByBasis": {
+        "0": 5.317361354827881
+      },
+      "expectedRNonlinear": 1.9999999441766376,
+      "expectedRLinear": 4.953845428625244,
+      "absoluteTolerance": 1e-12
+    }
+  ],
+  "opacityVectors": [
+    {
+      "encodedLogitF32": 0,
+      "expectedAlpha": 0.5,
+      "support": "nonempty"
+    },
+    {
+      "encodedLogitF32": -7,
+      "expectedAlpha": 0.0009110511944006454,
+      "support": "empty, preserve ordinal/count"
+    },
+    {
+      "encodedLogitF32": 100,
+      "expectedAlpha": 1,
+      "support": "nonempty"
+    }
+  ],
+  "rawBitsVectors": [
+    {
+      "description": "negative zero and duplicate rows remain in original source",
+      "negativeZeroFloat32LittleEndianHex": "00000080",
+      "decodedSummaryZero": 0,
+      "duplicateRows": "two occurrences, never deduplicate"
+    }
+  ],
+  "rejectMutations": [
+    "missing or extra SH band coefficient",
+    "duplicate or noncontiguous property",
+    "unknown/list/face/extra element",
+    "zero or over-uint32 vertex count",
+    "truncated or trailing payload",
+    "nonfinite scalar including ignored normal",
+    "all-zero quaternion",
+    "nonfinite or zero scale/axis variance",
+    "nonfinite covariance/bounds",
+    "all rows below support peak threshold",
+    "mixed header line endings",
+    "header over 65536 bytes"
+  ],
+  "basisDirectionRule": "Individual Gaussian quaternion affects covariance only. Complete Representation-to-Project Sim(3)/reflection inversely transforms the camera-to-mean direction; a coincident-camera primitive has no directional sample and is near-clipped, not a whole-Asset error.",
+  "frameVectors": [
+    {
+      "name": "canonical normalization includes reflection, rotation, positive scale and translation",
+      "meanRepresentation": [
+        1,
+        2,
+        3
+      ],
+      "covarianceRepresentation": [
+        [
+          1,
+          0,
+          0
+        ],
+        [
+          0,
+          4,
+          0
+        ],
+        [
+          0,
+          0,
+          9
+        ]
+      ],
+      "representationToAsset": {
+        "translation": [
+          10,
+          -3,
+          1
+        ],
+        "rotationXYZW": [
+          0,
+          0,
+          0.7071067811865476,
+          0.7071067811865476
+        ],
+        "uniformScale": 2,
+        "reflection": "x"
+      },
+      "expectedMeanAsset": [
+        6,
+        -5,
+        7
+      ],
+      "expectedCovarianceAsset": [
+        [
+          16,
+          0,
+          0
+        ],
+        [
+          0,
+          4,
+          0
+        ],
+        [
+          0,
+          0,
+          36
+        ]
+      ],
+      "expectedRawBoundsAsset": {
+        "min": [
+          -10,
+          -13,
+          -17
+        ],
+        "max": [
+          22,
+          3,
+          31
+        ]
+      },
+      "comparison": "smallMathVectors tolerance; stored padded envelope additionally obeys the profile bounds comparison"
+    }
+  ]
+}

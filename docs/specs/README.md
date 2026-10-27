@@ -73,6 +73,7 @@ The words **MUST**, **MUST NOT**, **SHOULD**, and **MAY** are normative. A metri
 | Document | Status / purpose |
 |---|---|
 | [`07j-three-186-compatibility-proposal.md`](07j-three-186-compatibility-proposal.md) | PO APPROVED2026-10-27 / IMPLEMENTATION IN PROGRESS / NOT ADOPTED. Exact0.180 proof/math/cleanup, neutral witness and checked0.186 display; unchanged profiles/recipes/history. Ordinary-v1 recovery§7.1 is explicitly approved; current checks and remaining acceptance are in todo. No new GS source or GS production permission. |
+| [`01c-gs-sh4-proxy-workflow-proposal.md`](01c-gs-sh4-proxy-workflow-proposal.md) | PROPOSED / NOT IMPLEMENTED / NOT ADOPTED. Exact SH0–4 source/goldens, GSL1.4.3 packed linear display, explicit same-Asset Proxy/manual position and five-purpose file/recovery workflow. Dedicated color/HDR/depth/culling and idle-worker observations only; profile/dependency/limited production authority pending. |
 
 ## Fixed versus conditional decisions
 

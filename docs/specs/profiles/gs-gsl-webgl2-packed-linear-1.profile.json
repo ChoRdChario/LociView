@@ -1,0 +1,78 @@
+{
+  "format": "lociview-gs-presentation-policy",
+  "id": "lociview-gs-gsl-webgl2-packed-linear-1",
+  "version": 1,
+  "sourceProfile": {
+    "id": "development-validation-gs-ply-f32le-sh0-4-1",
+    "specificationSha256": "e298cbb7b7202229ddfe4c834328854fc610109ccf38dbeb6a3f8d9d50954bee"
+  },
+  "goldens": {
+    "file": "gs-gsl-webgl2-packed-linear-1.goldens.json",
+    "sha256": "4c72c058724af1330c3fb4e2b90f3dcffabd4ffdb21af3af6d81b04a8ba093cf"
+  },
+  "dependency": {
+    "package": "gaussian-splat-lite",
+    "version": "1.4.3",
+    "commit": "d8703f7aed0e966e808a3fd3a2e1def3179d90dc",
+    "tarballSri": "sha512-nEaZztRZbuz2T23gWp0HvuBo1BHv2cl9brGQTxhNJEj8gBsBJP6jXRWe74paGIvq8vqdlUTrsxjs6jiwsuooWA==",
+    "three": "0.186.0"
+  },
+  "scope": "Nondefault ProjectScene validation only; no renderer adoption, general GS/SH4-paging, ordinary-entry or release claim",
+  "quality": {
+    "maxSh": "exact complete source degree, never automatically lower",
+    "maxStdDev": 2.8284271247461903,
+    "minPixelRadius": 0,
+    "minAlpha": 0.00196078431372549,
+    "preBlurAmount": 0.3,
+    "blurAmount": 0,
+    "clipXY": 4,
+    "focalAdjustment": 2,
+    "sortRadial": false,
+    "fastSort": true,
+    "minSortIntervalMs": 0,
+    "transparent": true,
+    "stochastic": false,
+    "autoUpdate": false,
+    "premultipliedAlpha": true,
+    "encodeLinear": true,
+    "depthTest": true,
+    "depthWrite": false
+  },
+  "colorTarget": {
+    "format": "RGBA16F",
+    "space": "linear sRGB",
+    "sharedOpaqueDepth": true,
+    "msaa": false,
+    "toneMapping": "none",
+    "passes": [
+      "opaque Mesh/Point into linear target and depth",
+      "premultiplied sorted GS into same target, depthTest on, depthWrite off",
+      "one IEC conversion to final canvas"
+    ],
+    "capability": "test actual float render/blend/depth support; extension name alone insufficient",
+    "failure": "diagnose GS display only; preserve source and unrelated valid Mesh/Point/Caption/media"
+  },
+  "precision": {
+    "original": "all source binary32/SH/ordinal preserved unchanged",
+    "runtime": "exact pinned GSL native packing: half RGB/logscale/alpha, packed quaternion, shared-exponent SH",
+    "sourceAuthority": "never packed/LOD/culling data or getBoundingBox; no current draw index in saved anchor",
+    "runtimeAdmission": [
+      "decoded count and degree equal exact source inspection",
+      "all decoded/packed mean/scale/quaternion/alpha/SH finite; scales positive",
+      "no representable-range saturation; per channel B=0.5+sum(abs(c_lm)*sqrt((2*l+1)/(4*pi))) over all basis indices includingDC; IECDecode(B) <=65504 for the linear half target",
+      "valid composed transform/camera projection and declared viewport/target budget",
+      "closed goldens/transform rules pass before capability is enabled"
+    ],
+    "errorClaim": "fixed golden tolerances only, no general per-pixel or geometric-error promise"
+  },
+  "picking": "explicit selected Asset only; GS uses bound same-Asset Proxy for transient manual proposal; 01a Point requires composed visibility proof or ambiguity",
+  "sortGeneration": "Discard content-generation-stale results. With unchanged source, the last sort order may remain visible while a new-camera sort is pending, as the fixed WebGL2 backend supports; never roll back source, transforms or camera and never hide the whole Asset just because sorting is pending.",
+  "lifetime": {
+    "coordinator": "one per viewport owns GSL renderer and linear target; resident owns SplatMesh",
+    "decodeConcurrency": "one global slot; mark cancelled candidates unadoptable immediately, await the original initialized resolve/reject before disposal and starting the latest queued replacement; do not early-reject that ownership wait",
+    "loss": "dispose adopted GPU/target/sort worker during loss; pending decode stays private until natural settlement then is disposed; discard stale results and rebuild from same live source generation; no immediate vendor-computation abort claim",
+    "sharedDecoderPool": "public GSL API retains idle decoder/WASM pool; exact version schedules retirement after3s..180s depending heap size, not a wall-clock deadline under suspension/throttling; include resources until actual closure in aggregate budgets, never count them as immediately freed",
+    "gate": "repeated cancellation/switch/load/unload must demonstrate bounded workers/heap and retirement before enabling the new connection; failure stops renderer activation without relaxing accepted general resource gates"
+  },
+  "paging": "no automatic SH3 fallback; raw SH4 and paged SH3 are different paths; future SH4 paging requires its own evidence/profile decision"
+}

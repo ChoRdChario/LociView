@@ -22,6 +22,12 @@ measured scope and failures are in01b §7/todo. The existing occurrence GLB/JPEG
 profiles explicitly pin0.180.0; the approved bridge below retains that real proof
 instead of reinterpreting immutable profiles. SH4 and paged-LOD paths remain separate.
 New profiles, production GS and adoption still need their actual authority/gates.
+The PO next requested the exact GS/Proxy specification. [01c](../docs/specs/01c-gs-sh4-proxy-workflow-proposal.md)
+now holds the proposed SH0–4 source and packed-linear display companions, explicit
+Proxy/manual workflow, typed ports, fixed dependency and limited-connection request.
+It preserves full source, class/facts/file authority and refuses silent SH3 fallback.
+Read todo for review/decision state. Do not implement/register these profiles or
+add GSL production dependencies before the grouped concrete approval.
 The PO approved [07j](../docs/specs/07j-three-186-compatibility-proposal.md) implementation
 and fixed dependencies on2026-10-27. Its bounded implementation retains:
 retain actual180 source math/proof/legacy keys and closed cleanup, then independently

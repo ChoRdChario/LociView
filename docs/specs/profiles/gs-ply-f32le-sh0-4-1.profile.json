@@ -1,0 +1,301 @@
+{
+  "format": "lociview-gs-source-profile",
+  "id": "development-validation-gs-ply-f32le-sh0-4-1",
+  "version": 1,
+  "goldens": {
+    "file": "gs-ply-f32le-sh0-4-1.goldens.json",
+    "sha256": "7f975a183d3092b8c52069e5d2d440839a498369f30b85a0e3e7c9417cb5ebd5"
+  },
+  "admission": {
+    "container": "PLY 1.0 binary_little_endian",
+    "headerEncoding": "ASCII, no BOM",
+    "headerMaxBytes": 65536,
+    "headerLineEndings": [
+      "LF",
+      "uniform CRLF"
+    ],
+    "directiveSpacing": "one ASCII space between grammar tokens; metadata text may contain printable ASCII/TAB; no trailing directive whitespace",
+    "ignoredMetadata": [
+      "comment",
+      "obj_info"
+    ],
+    "metadataPosition": "any header position after format and before end_header",
+    "elements": "one positive uint32 vertex, no other element",
+    "propertyType": "float, IEEE754 binary32 little-endian; no aliases/lists",
+    "orderedNames": [
+      "x",
+      "y",
+      "z",
+      "nx",
+      "ny",
+      "nz",
+      "f_dc_0",
+      "f_dc_1",
+      "f_dc_2",
+      "f_rest_0..3*((degree+1)^2-1)-1",
+      "opacity",
+      "scale_0",
+      "scale_1",
+      "scale_2",
+      "rot_0",
+      "rot_1",
+      "rot_2",
+      "rot_3"
+    ],
+    "schemas": [
+      {
+        "degree": 0,
+        "basisCount": 1,
+        "restCount": 0,
+        "float32Scalars": 17,
+        "recordBytes": 68
+      },
+      {
+        "degree": 1,
+        "basisCount": 4,
+        "restCount": 9,
+        "float32Scalars": 26,
+        "recordBytes": 104
+      },
+      {
+        "degree": 2,
+        "basisCount": 9,
+        "restCount": 24,
+        "float32Scalars": 41,
+        "recordBytes": 164
+      },
+      {
+        "degree": 3,
+        "basisCount": 16,
+        "restCount": 45,
+        "float32Scalars": 62,
+        "recordBytes": 248
+      },
+      {
+        "degree": 4,
+        "basisCount": 25,
+        "restCount": 72,
+        "float32Scalars": 89,
+        "recordBytes": 356
+      }
+    ],
+    "payloadLength": "vertexCount * recordBytes, exact; overflow checked before allocation",
+    "allScalarsFinite": true,
+    "normals": "finite ignored placeholders, never surface-normal evidence",
+    "classification": "any GS-specific opacity/scale_/rot_/f_dc_/f_rest_ signature with incomplete schema is unsupported; never ordinary-point fallback",
+    "budget": "caller maxFileBytes, maxItems, maxValues and operation work limits apply before allocation; not intrinsic large-file support"
+  },
+  "preservation": {
+    "originalBytes": "exact",
+    "rowOrdinal": "unchanged, duplicates retained",
+    "negativeZero": "original bits retained; summary/derived values normalize to +0",
+    "physicalUnit": "unknown; no automatic meter or axis/origin conversion",
+    "representationToAsset": "fresh import uses identity; received explicit canonical Sim(3)/reflection is verified and applied without changing source bytes; numeric placement is not physical registration"
+  },
+  "activation": {
+    "opacity": "x>=0: 1/(1+exp(-x)); x<0: exp(x)/(1+exp(x))",
+    "scale": "exp(s), finite and strictly positive",
+    "axisVariance": "exp(2*s), not exp(s)^2; finite and strictly positive; 2*s is binary64 after exact f32 decode",
+    "quaternion": "wxyz; n=sqrt(((w*w+x*x)+y*y)+z*z); reject n==0; divide by n; canonical sign first nonzero w,x,y,z positive",
+    "rotationRows": [
+      [
+        "1-2*(y*y+z*z)",
+        "2*(x*y-z*w)",
+        "2*(x*z+y*w)"
+      ],
+      [
+        "2*(x*y+z*w)",
+        "1-2*(x*x+z*z)",
+        "2*(y*z-x*w)"
+      ],
+      [
+        "2*(x*z-y*w)",
+        "2*(y*z+x*w)",
+        "1-2*(x*x+y*y)"
+      ]
+    ],
+    "covariance": "For i<=j, p[k]=(R[i,k]*axisVariance[k])*R[j,k] for k=0,1,2; Sigma[i,j]=(p[0]+p[1])+p[2]; copy Sigma[j,i]. Nonfinite rejected, valid zero offdiagonals allowed."
+  },
+  "assetFrameContext": {
+    "require": "exact recorded canonical representationToAsset validated under specification01; source schema does not infer it",
+    "linear": "L[i,k]=(uniformScale*Rplacement[i,k])*F[k,k]; F=diag(-1,1,1) for reflection x, identity otherwise",
+    "meanAsset": "((L[i,0]*mean[0]+L[i,1]*mean[1])+L[i,2]*mean[2])+translation[i]",
+    "covarianceAsset": "T[i,k]=(L[i,0]*Sigma[0,k]+L[i,1]*Sigma[1,k])+L[i,2]*Sigma[2,k]; for i<=j, A[i,j]=(T[i,0]*L[j,0]+T[i,1]*L[j,1])+T[i,2]*L[j,2]; copy A[j,i]",
+    "finite": "require finite transformed mean/covariance and positive diagonals; offdiagonal zero allowed; bounds use meanAsset/covarianceAsset"
+  },
+  "sourceSupport": {
+    "peakAlphaThreshold": 0.00196078431372549,
+    "emptyRule": "alpha < threshold; preserve row/count but omit from source bounds",
+    "mahalanobisRadius": 4,
+    "rawComponentRadius": "4*sqrt(covarianceAsset[i,i]); finite; every subsequent mean denotes meanAsset",
+    "rawUnion": "componentwise min(mean-radius), max(mean+radius) over every nonempty row, before padding",
+    "scale": "per axis max(1, max(abs(mean[i])), max(rawComponentRadius[i])) over all nonempty rows",
+    "pad": "64*2^-52*scale[i]",
+    "writerMin": "nextDown(rawUnion.min[i]-pad[i])",
+    "writerMax": "nextUp(rawUnion.max[i]+pad[i])",
+    "nextDownUp": "adjacent IEEE754 binary64 toward -/+infinity; finite output required; no output negative zero",
+    "union": "pad the complete raw union once; all-empty input unsupported",
+    "retainedBoundsVerification": {
+      "scale": "the same all-nonempty-row per-axis scale used by writer",
+      "tolerance": "16*2^-52*scale[i]",
+      "require": "Each stored min <= recomputed raw union min and each stored max >= recomputed raw union max; each stored component differs from the padded writer union component by no more than tolerance. No inward raw bound, widening on mismatch, or immutable record/digest rewrite.",
+      "scope": "only this new GS profile; existing profile exact comparisons unchanged"
+    },
+    "verifiedFactsOutput": "After complete original-byte/profile/context inspection and retainedBoundsVerification, return the exact verified retained logicalBoundsAsset as representation content bounds and GS source family envelope. Fresh creation uses the writer bounds. Never return a different recomputed padded union against an accepted retained record; do not relax generic facts containment.",
+    "viewFilter": "screen blur/AA/viewport caps are view-only and separately bounded for culling, never source bounds; packed/LOD library bbox is not source authority"
+  },
+  "sphericalHarmonics": {
+    "degree": "exact complete schema 0..4",
+    "coefficientOrder": "DC RGB; remaining basis1..K-1 contiguous R, then G, then B",
+    "direction": "normalize(inverse(full Representation-to-Project linear Sim(3)/reflection) * (meanProject-cameraProject)); never individual Gaussian q",
+    "coincidentCamera": "no directional sample for that primitive (near-clipped); no whole-Asset unsupported",
+    "basis": [
+      {
+        "index": 0,
+        "factor": 0.28209479177387814,
+        "polynomial": "1"
+      },
+      {
+        "index": 1,
+        "factor": -0.4886025119029199,
+        "polynomial": "y"
+      },
+      {
+        "index": 2,
+        "factor": 0.4886025119029199,
+        "polynomial": "z"
+      },
+      {
+        "index": 3,
+        "factor": -0.4886025119029199,
+        "polynomial": "x"
+      },
+      {
+        "index": 4,
+        "factor": 1.0925484305920792,
+        "polynomial": "x*y"
+      },
+      {
+        "index": 5,
+        "factor": -1.0925484305920792,
+        "polynomial": "y*z"
+      },
+      {
+        "index": 6,
+        "factor": 0.31539156525252005,
+        "polynomial": "2*z*z-x*x-y*y"
+      },
+      {
+        "index": 7,
+        "factor": -1.0925484305920792,
+        "polynomial": "x*z"
+      },
+      {
+        "index": 8,
+        "factor": 0.5462742152960396,
+        "polynomial": "x*x-y*y"
+      },
+      {
+        "index": 9,
+        "factor": -0.5900435899266435,
+        "polynomial": "y*(3*x*x-y*y)"
+      },
+      {
+        "index": 10,
+        "factor": 2.890611442640554,
+        "polynomial": "x*y*z"
+      },
+      {
+        "index": 11,
+        "factor": -0.4570457994644658,
+        "polynomial": "y*(4*z*z-x*x-y*y)"
+      },
+      {
+        "index": 12,
+        "factor": 0.3731763325901154,
+        "polynomial": "z*(2*z*z-3*x*x-3*y*y)"
+      },
+      {
+        "index": 13,
+        "factor": -0.4570457994644658,
+        "polynomial": "x*(4*z*z-x*x-y*y)"
+      },
+      {
+        "index": 14,
+        "factor": 1.445305721320277,
+        "polynomial": "z*(x*x-y*y)"
+      },
+      {
+        "index": 15,
+        "factor": -0.5900435899266435,
+        "polynomial": "x*(x*x-3*y*y)"
+      },
+      {
+        "index": 16,
+        "factor": 2.5033429417967046,
+        "polynomial": "x*y*(x*x-y*y)"
+      },
+      {
+        "index": 17,
+        "factor": -1.7701307697799304,
+        "polynomial": "y*z*(3*x*x-y*y)"
+      },
+      {
+        "index": 18,
+        "factor": 0.9461746957575601,
+        "polynomial": "x*y*(7*z*z-1)"
+      },
+      {
+        "index": 19,
+        "factor": -0.6690465435572892,
+        "polynomial": "y*z*(7*z*z-3)"
+      },
+      {
+        "index": 20,
+        "factor": 0.10578554691520431,
+        "polynomial": "z*z*(35*z*z-30)+3"
+      },
+      {
+        "index": 21,
+        "factor": -0.6690465435572892,
+        "polynomial": "x*z*(7*z*z-3)"
+      },
+      {
+        "index": 22,
+        "factor": 0.47308734787878004,
+        "polynomial": "(x*x-y*y)*(7*z*z-1)"
+      },
+      {
+        "index": 23,
+        "factor": -1.7701307697799304,
+        "polynomial": "x*z*(x*x-3*y*y)"
+      },
+      {
+        "index": 24,
+        "factor": 0.6258357354491761,
+        "polynomial": "x*x*(x*x-3*y*y)-y*y*(3*x*x-y*y)"
+      }
+    ],
+    "evaluation": "per channel, ascending basis index, accumulate factor*polynomial*coefficient in binary64, then +0.5, then max(value,0); no upper clamp",
+    "linearTransfer": "c<=0.04045: c/12.92; otherwise ((c+0.055)/1.055)^2.4, including c>1",
+    "presentation": "renderer quantization/filtering are a separate qualified policy, never source facts"
+  },
+  "facts": {
+    "contentKind": "gaussianSplat",
+    "role": "gsPrimary",
+    "purposes": [
+      "source",
+      "display"
+    ],
+    "mediaType": "application/ply",
+    "materialCatalog": "absent",
+    "materials": [],
+    "surfaceRange": {
+      "kind": "splatSample",
+      "count": "original vertexCount including empty support"
+    },
+    "staticPose": true,
+    "envelopeAuthority": "source",
+    "family": "one source GS family and one GS class; Proxy has no class"
+  }
+}

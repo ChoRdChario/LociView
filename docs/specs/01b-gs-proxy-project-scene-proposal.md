@@ -162,6 +162,11 @@ releaseの未充足は残す。ローカルChromiumの結果でそれらを合�
 
 ## 7. 限定評価の観測と残る境界（2026-10-27）
 
+本節は限定評価時点の結果を保持する記録。その後、[07j](07j-three-186-compatibility-proposal.md)で
+実180 proofを保持するchecked186表示を実装・検証した。依存を180へ戻した下記の記述は
+評価当時の復元操作であり、現在のpackage状態ではない。GSの新しいsource/表示/Proxy接続は
+[01c具体案](01c-gs-sh4-proxy-workflow-proposal.md)に分離し、未承認・未実装のままである。
+
 判定は**候補として継続、production接続と製品側Three更新は保留**。
 評価用に導入した正式GSL1.4.3とThree/types0.186.0を、既存Vite・専用Chromiumで
 隔離評価した。通常homeやProjectScene Sessionへは接続していない。
@@ -204,6 +209,7 @@ display derivativeの正確なprofile、context再作成を含むtyped adapter�
 GSの未確定仕様やproduction接続・adoptionはこの承認に含まれない。
 
 その境界の後に、GSを同じSession／provider／file ownerへ接続する。
+この具体的な承認案と正確なcompanionは[01c](01c-gs-sh4-proxy-workflow-proposal.md)。
 
 - sourceは完全なSH0〜4と有限support boundsの正確なprofile／goldenを確定する。
   GSLの量子化・色・footprintは表示側の独立したqualified policyとし、sourceへ逆流させない。
