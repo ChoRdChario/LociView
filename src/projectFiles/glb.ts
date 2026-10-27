@@ -1,4 +1,4 @@
-import * as THREE from 'three';
+import * as THREE from 'three-compat-180';
 import type { JsonObject } from '../domain/values';
 import { inspectValidationPng, type PngDecoder } from './png';
 import { inspectValidationJpeg, type JpegDecoder } from './jpeg';

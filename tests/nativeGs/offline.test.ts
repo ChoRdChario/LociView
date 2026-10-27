@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { waitForNativeGsServiceWorker } from '../../src/nativeGs/offline';
+import { waitForNativeGsServiceWorker, isNativeGsOfflineReady } from '../../src/nativeGs/offline';
 
 class FakeWorker extends EventTarget {
   state: ServiceWorkerState;
@@ -26,7 +26,7 @@ function asRegistration(value: FakeRegistration): ServiceWorkerRegistration {
 }
 
 describe('native GS Service Worker activation', () => {
-  afterEach(() => vi.useRealTimers());
+  afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
 
   it('accepts an already active worker', async () => {
     const registration = new FakeRegistration();
@@ -51,5 +51,15 @@ describe('native GS Service Worker activation', () => {
     const assertion = expect(result).rejects.toThrow('準備が完了しませんでした');
     await vi.advanceTimersByTimeAsync(25);
     await assertion;
+  });
+  it('keeps the old180 SDK cache entry but requires the new186 compiled graph',async()=>{
+    vi.stubEnv('DEV',false);vi.stubGlobal('location',{origin:'https://example.test'});
+    const old='https://example.test/assets/native-gs-spark-2.1.0.js',current='https://example.test/assets/native-gs-spark-2.1.0-three-0.186.0.js';
+    const entries=new Map([[old,new Response('old180 imports')]]),match=vi.fn(async(url:string)=>entries.get(url));
+    vi.stubGlobal('caches',{open:vi.fn(async()=>({match}))});
+    const registration=new FakeRegistration();registration.active=new FakeWorker('activated');
+    await expect(isNativeGsOfflineReady(asRegistration(registration))).resolves.toBe(false);expect(match).toHaveBeenCalledWith(current,{ignoreVary:true});
+    entries.set(current,new Response('new186 imports'));
+    await expect(isNativeGsOfflineReady(asRegistration(registration))).resolves.toBe(true);expect(entries.has(old)).toBe(true);
   });
 });

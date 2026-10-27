@@ -28,8 +28,8 @@ export default defineConfig(({ mode }) => {
           ? undefined
           : {
               chunkFileNames(chunk) {
-                if (chunk.name === 'native-gs-spark') return 'assets/native-gs-spark-2.1.0.js';
-                if (chunk.name === 'three-vendor') return 'assets/three-vendor-0.180.0.js';
+                if (chunk.name === 'native-gs-spark') return 'assets/native-gs-spark-2.1.0-three-0.186.0.js';
+                if (chunk.name === 'three-vendor') return 'assets/three-vendor-0.186.0.js';
                 return 'assets/[name]-[hash].js';
               },
               manualChunks(id) {
@@ -75,10 +75,10 @@ export default defineConfig(({ mode }) => {
               globPatterns: ['**/*.{js,css,html,woff2,wasm}'],
               // The GS runtime is cached only after the user explicitly prepares
               // the native GS path; ordinary v1 PWA installation must not fetch it.
-              globIgnores: ['**/native-gs-spark-2.1.0.js'],
+              globIgnores: ['**/native-gs-spark-2.1.0-three-0.186.0.js'],
               runtimeCaching: [
                 {
-                  urlPattern: /\/assets\/native-gs-spark-2\.1\.0\.js$/,
+                  urlPattern: /\/assets\/native-gs-spark-2\.1\.0-three-0\.186\.0\.js$/,
                   handler: 'CacheFirst',
                   options: {
                     cacheName: 'lociview-native-gs-runtime-v1',

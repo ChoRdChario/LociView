@@ -22,9 +22,9 @@ import {
   type LociMyuDisplaySetRelationConfirmation,
   type SheetTable,
 } from '../io/locimyu';
-import { detectFormat, disposeModelResources, loadModel, type ModelFormat } from '../viewer/loaders';
+import { detectFormat, type ModelFormat } from '../viewer/loaders';
 import type { ProjectWorkspaceFS } from '../platform/fs';
-import { nativeMaterialSlotKey } from './materialSlots';
+import { readLegacyModelTargets } from '../viewer/compat180/proof';
 import { inspectNativeGsPlyV1, inspectNativePointPlyV1 } from './plyProfile';
 import {
   NATIVE_GS_PROFILE_ID,
@@ -451,7 +451,7 @@ async function inspectModel(
 
 async function inspectMaterialTargets(model: ConvertedModel): Promise<Map<string, MaterialTarget[]>> {
   if (model.representation.contentKind !== 'mesh') return new Map();
-  const loaded = await loadModel(model.format, model.source.data, { gltfTextures: { kind: 'skip' } });
+  const rows = await readLegacyModelTargets(model.format, model.source.data, { gltfTextures: { kind: 'skip' } });
   const result = new Map<string, MaterialTarget[]>();
   const add = (key: string, target: MaterialTarget): void => {
     if (key === '') return;
@@ -459,28 +459,9 @@ async function inspectMaterialTargets(model: ConvertedModel): Promise<Map<string
     if (!values.some((entry) => entry.nativeKey === target.nativeKey)) values.push(target);
     result.set(key, values);
   };
-  const visit = (object: THREE.Object3D, path: readonly number[]): void => {
-    if (object instanceof THREE.Mesh) {
-      const materials = Array.isArray(object.material) ? object.material : [object.material];
-      materials.forEach((material, slot) => {
-        const target = {
-          nativeKey: nativeMaterialSlotKey(path, slot),
-        };
-        // LociMyu's durable materialKey is the trimmed material name. Its
-        // renderer broadcasts one row to every exact same-name material
-        // instance; repeated slots are therefore valid targets, not an
-        // ambiguity from which a winner must be guessed.
-        add(lociMyuTrimV1(material.name), target);
-      });
-    }
-    object.children.forEach((child, index) => visit(child, [...path, index]));
-  };
-  try {
-    visit(loaded.root, []);
-    return result;
-  } finally {
-    disposeModelResources(loaded.root);
-  }
+  // Existing exact-name broadcast and per-nativeKey deduplication are unchanged.
+  for (const row of rows) if (row.kind === 'mesh') add(lociMyuTrimV1(row.materialName), { nativeKey:row.nativeKey });
+  return result;
 }
 
 function mediaAuthority(

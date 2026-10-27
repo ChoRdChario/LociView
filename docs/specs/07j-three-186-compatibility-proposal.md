@@ -1,6 +1,6 @@
 # 07j: Preserve legacy material proofs while moving display to Three 0.186
 
-> Status: **PROPOSED / NOT PO APPROVED / NOT IMPLEMENTED / NOT ADOPTED**
+> Status: **PO APPROVED 2026-10-27 / IMPLEMENTATION IN PROGRESS / NOT ADOPTED**
 > Prepared 2026-10-27 after the [01b §7 qualification](01b-gs-proxy-project-scene-proposal.md#7-限定評価の観測と残る境界2026-10-27).
 > This is one compatibility decision. It does not approve GS profiles or GS production integration.
 
@@ -17,7 +17,7 @@
 承認対象は、この閉じた互換adapter、固定依存の追加・更新、必要な通常／Native／検証
 経路のThree移行、および下記の既存workflow検証。新GS入力、色・LODの品質方針、
 source profile、GSL production、通常ProjectScene入口、公開・releaseは含めない。
-この準備文書だけで実装や依存変更を開始しない。
+2026-10-27にPOがこの範囲の実装を承認済み。実施・検証の現在値はtasks/todoを正とする。
 
 ## 2. 維持する契約と新しい境界
 
@@ -212,9 +212,38 @@ helperごとにPOテストや追加承認を要求しない。
    明示準備cacheは別契約のまま。GSL chunks／workers／WASMがordinary／validationへ入らず、
    alias閉包が正しく分離されていることを実buildで確認する。lock/license/auditも検証する。
 
-今は実装・新依存・新browser確認を実行していない。既存0.180経路のcheckpointを保持し、
+同じSpark SDK2.1.0でも、依存Threeの変更でcompiled bytes／import graphは変わる。
+compiled chunk URLは`native-gs-spark-2.1.0-three-0.186.0.js`とし、Workboxの非precache／
+runtime routeと明示準備の期待URLを一致させる。既存cacheNameと準備actionを維持し、
+旧180用entryは削除しない。新アプリは旧entryだけをreadyと判定しない。旧entryだけを持つ
+更新fixtureと新URLのブラウザ準備を検証する。これは本依存更新のbundle identity修正で、
+保存schema、新GS profile、自動準備、一般offline/PWAの受入追加ではない。独立レビュー済み。
+
+POは2026-10-27に本仕様の実装と固定依存を承認した。現在は実装・検証中であり、
+正確な実行結果と残件は[todo](../../tasks/todo.md)に記録する。
 受入が揃うまで0.186を有効な製品checkpointとして扱わない。実機iPhone、HTTPS/offline/PWA、
 ProjectScene通常入口、S1/S2/G1-B／adoption／公開は個別の未充足のままとする。
+
+### 7.1 通常旧形式ビューアの復旧接続案（managed再確認待ち）
+
+§6の復旧を通常の`ViewerCore`と`AppContext`にも接続する具体案。保存・編集権限や
+保存形式は増やさず、現在の閲覧専用入口を保持する。
+
+- loss前に**表示済み**の`loadedModelAssetId`だけを捕捉する。未表示／大型モデルの
+  選択だけを根拠に自動読込せず、既存の容量確認を迂回しない。
+- loss中はRAF・pointer・長押し・gizmoの確定通知を停止し、表示資源／rendererを破棄。
+  カメラ全体（平行投影のzoom／frustum／clippingを含む）とtargetはCore内の一時値で保持。
+- restore後に同じ設定でrendererを再作成し、appが既存`loadModelAsset`とWorkspaceFSから
+  同じ生存Projectの元ファイルを再準備する。`setModel`・transform・pin・材質同期後に
+  元の視点へ戻す。途中のfitは一時的に抑え、原本／記録／操作ログを変更しない。
+- AppContext、access、navigation、model-load世代と取消を各await後と採用前に照合。
+  別画面／別モデル／再loss後の候補を採用せず解放する。取消をピン編集確定にしない。
+- lossで「表示中」を解除し、復旧待ちを伝える。読込失敗では自動再試行を繰り返さず、
+  既存Modelタブの「表示」を残す。表示・pin・材質・視点・原本／log不変と世代切替を検証。
+
+この完全案は独立レビュー済み。部分案の再表示経路不足は解消したが、managed approvalは
+「通常旧形式ビューアへの拡張にはこの正確な差分の明示的な実装許可が必要」として
+再度拒否した。どちらも未適用。§6／§7.5の当該受入だけを保留し、他の検証を継続する。
 
 ## 8. 代案と停止条件
 

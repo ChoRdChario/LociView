@@ -5,6 +5,19 @@ validation build. It launches matching downloaded Chromium with generated GLB,
 approved synthetic XYZ/RGB ASCII PLY and image inputs in dedicated profiles.
 It does not connect to the user's browser.
 
+The separate `playwright.normal.config.ts` builds/previews the ordinary `index.html`
+entry for07j's existing Native/v1 compatibility smoke. Run it with
+`npm run test:e2e -- --config playwright.normal.config.ts`. Its dedicated profiles
+are distinct from validation. The Native GS case explicitly prepares the existing
+Spark2.1 cache and allows its Service Worker; other cases block workers. Local
+normal-entry evidence is not physical-device/offline/PWA acceptance or new GS support.
+The GS and initial-conversion/team cases use short unique ASCII profiles under `.artifacts/e2e/profiles`.
+The longer test-title-derived Windows profile produced an actual CacheStorage
+`Unexpected internal error` during Service Worker installation; the short profile
+passed preparation. This is test-environment evidence, not a product PWA fix.
+The material/team lane also failed to open its recipient with the longer nested
+profile and passed with the short profile; it retains separate failed/final records.
+
 ## Run
 
 From the repository root, after `npm ci`:

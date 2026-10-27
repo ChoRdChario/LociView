@@ -67,27 +67,30 @@ function fakeCanvas() {
 }
 /** Actual Orbit handlers on an authored capture/bubble target, not native browser input. */
 function controlEventTarget(canvas: HTMLCanvasElement) {
-  const listeners = new Map<string, { handler: EventListener; capture: boolean }[]>();
+  const make = () => {
+    const listeners = new Map<string, { handler: EventListener; capture: boolean }[]>();
+    return {
+      addEventListener(type:string,handler:EventListener,options?:boolean|AddEventListenerOptions) {
+        const capture=typeof options==='boolean'?options:Boolean(options?.capture), group=listeners.get(type)??[];
+        if(!group.some(l=>l.handler===handler&&l.capture===capture))group.push({handler,capture});listeners.set(type,group);
+      },
+      removeEventListener(type:string,handler:EventListener,options?:boolean|EventListenerOptions) {
+        const capture=typeof options==='boolean'?options:Boolean(options?.capture);listeners.set(type,(listeners.get(type)??[]).filter(l=>l.handler!==handler||l.capture!==capture));
+      },
+      emit(type:string,event:Event,capture:boolean) {
+        for(const l of [...(listeners.get(type)??[])])if(l.capture===capture&&listeners.get(type)?.includes(l))l.handler(event);
+      },
+    };
+  };
+  const document=make(), target=make();
   Object.assign(canvas, {
-    getBoundingClientRect: () => ({ left: 0, top: 0, width: 800, height: 600 }), clientWidth: 800, clientHeight: 600,
-    getRootNode: () => ({ addEventListener() {}, removeEventListener() {} }),
-    setPointerCapture() {}, releasePointerCapture() {},
-    addEventListener(type: string, handler: EventListener, options?: boolean | AddEventListenerOptions) {
-      const capture = typeof options === 'boolean' ? options : Boolean(options?.capture), group = listeners.get(type) ?? [];
-      if (!group.some(l => l.handler === handler && l.capture === capture)) group.push({ handler, capture });
-      listeners.set(type, group);
-    },
-    removeEventListener(type: string, handler: EventListener, options?: boolean | EventListenerOptions) {
-      const capture = typeof options === 'boolean' ? options : Boolean(options?.capture);
-      listeners.set(type, (listeners.get(type) ?? []).filter(l => l.handler !== handler || l.capture !== capture));
-    },
-    fire(type: string, event: Event) {
-      for (const capture of [true, false]) for (const l of [...(listeners.get(type) ?? [])]) {
-        if (l.capture === capture && listeners.get(type)?.includes(l)) l.handler(event);
-      }
-    },
+    getBoundingClientRect:()=>({left:0,top:0,width:800,height:600}),clientWidth:800,clientHeight:600,
+    ownerDocument:document,getRootNode:()=>document,setPointerCapture(){},releasePointerCapture(){},
+    addEventListener:target.addEventListener,removeEventListener:target.removeEventListener,
+    fire(type:string,event:Event){document.emit(type,event,true);target.emit(type,event,true);target.emit(type,event,false);document.emit(type,event,false);},
   });
 }
+
 beforeEach(() => {
   tracker.renderers.length = tracker.controls.length = tracker.resize.length = tracker.gizmos.length = 0; tracker.raf.clear(); tracker.fail = false;
   tracker.realOrbit = false;

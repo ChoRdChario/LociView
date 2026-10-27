@@ -3,8 +3,8 @@ import { visibleEntities, type EntityRecord, type ProjectState } from '../core/r
 import { replacePortableSingleLineControls } from '../core/schema';
 import type { ProjectStore } from '../core/store';
 import type { ProjectWorkspaceFS, WorkspaceReadableFile } from '../platform/fs';
-import { detectFormat, disposeModelResources, loadModel, type ModelFormat } from '../viewer/loaders';
-import { legacyV1MaterialSlotKey, nativeMaterialSlotKey } from './materialSlots';
+import { detectFormat, type ModelFormat } from '../viewer/loaders';
+import { readLegacyModelTargets } from '../viewer/compat180/proof';
 import { inspectNativeGsPlyV1, inspectNativePointPlyV1 } from './plyProfile';
 import {
   NATIVE_CAPTION_PIN_SCALE_MAX,
@@ -374,34 +374,18 @@ async function materialTargets(asset: ConvertedAsset): Promise<Map<string, Mater
     await readPrefix(asset.sourceFile),
   );
   if (format === null || asset.representation.contentKind !== 'mesh') return new Map();
-  const loaded = await loadModel(format, await collectBytes(asset.sourceFile), { gltfTextures: { kind: 'skip' } });
+  const rows = await readLegacyModelTargets(format, await collectBytes(asset.sourceFile), { gltfTextures: { kind: 'skip' } });
   const result = new Map<string, MaterialSlotTarget[]>();
   const add = (key: string, target: MaterialSlotTarget): void => {
     const current = result.get(key) ?? [];
     current.push(target);
     result.set(key, current);
   };
-  const visit = (object: THREE.Object3D, path: readonly number[]): void => {
-    if (object instanceof THREE.Mesh) {
-      const materials = Array.isArray(object.material) ? object.material : [object.material];
-      materials.forEach((material, slot) => {
-        const target = {
-          nativeKey: nativeMaterialSlotKey(path, slot),
-          opacity: material.opacity,
-          doubleSided: material.side === THREE.DoubleSide,
-        };
-        add(legacyV1MaterialSlotKey(object, loaded.root, slot), target);
-        add(target.nativeKey, target);
-      });
-    }
-    object.children.forEach((child, index) => visit(child, [...path, index]));
-  };
-  try {
-    visit(loaded.root, []);
-    return result;
-  } finally {
-    disposeModelResources(loaded.root);
+  for (const row of rows) if (row.kind === 'mesh') {
+    const target = { nativeKey:row.nativeKey, opacity:row.opacity, doubleSided:row.side === THREE.DoubleSide };
+    add(row.v1Key, target); add(target.nativeKey, target);
   }
+  return result;
 }
 
 function parseMaterialAppearance(

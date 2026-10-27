@@ -36,6 +36,8 @@ windows and their galleries, sharing the workspace-level image viewer.
 `playwright.config.ts`, `scripts/run-e2e.mjs` and `tests/e2e/*.spec.ts` own the
 dedicated Chromium regression lane for the built validation entry. See the
 [browser runbook](docs/browser-testing.md) for setup/ownership and todo for evidence.
+`playwright.normal.config.ts` selects the separate normal-entry compatibility
+smoke for existing Native/v1 routes; it grants no ProjectScene adoption credit.
 
 Caption deletion confirmation and explicit parent proposals use the same workspace
 guards and typed commands, with impact/coordinate reads adapted by `productSources.ts`.

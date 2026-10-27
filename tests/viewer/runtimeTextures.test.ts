@@ -139,21 +139,21 @@ describe('bounded runtime texture decode', () => {
     }
   });
 
-  it('uses the bounded loader for an embedded GLB texture', async () => {
-    const decoded = bitmap(4096, 2048);
-    const decode = vi.fn(async (_blob: Blob, _options?: ImageBitmapOptions) => decoded);
-    vi.stubGlobal('self', globalThis);
-    vi.stubGlobal('createImageBitmap', decode);
-    const source = texturedGlb(pngHeader(8192, 4096));
-    const before = source.slice();
+  it('releases bounded180 images before independently decoding the186 display', async () => {
+    const old = bitmap(4096, 2048), current = bitmap(4096, 2048);
+    const decode = vi.fn(async (_blob: Blob, _options?: ImageBitmapOptions) => current)
+      .mockImplementationOnce(async () => old).mockImplementationOnce(async () => {
+        expect(old.close).toHaveBeenCalledTimes(1); return current;
+      });
+    vi.stubGlobal('self', globalThis); vi.stubGlobal('createImageBitmap', decode);
+    const source = texturedGlb(pngHeader(8192, 4096)), before = source.slice();
     const loaded = await loadModel('glb', source, { gltfTextures: { kind: 'max-edge', maxEdge: 4096 } });
     try {
-      expect(decode).toHaveBeenCalledTimes(1);
-      expect(decode.mock.calls[0]?.[1]).toEqual(expect.objectContaining({ resizeWidth: 4096, resizeHeight: 2048 }));
-      expect(source).toEqual(before);
-    } finally {
-      disposeModelResources(loaded.root);
-    }
+      expect(decode).toHaveBeenCalledTimes(2);
+      for (const call of decode.mock.calls) expect(call[1]).toEqual(expect.objectContaining({ resizeWidth: 4096, resizeHeight: 2048 }));
+      expect(old.close).toHaveBeenCalledTimes(1); expect(current.close).not.toHaveBeenCalled(); expect(source).toEqual(before);
+    } finally { disposeModelResources(loaded.root); }
+    expect(old.close).toHaveBeenCalledTimes(1); expect(current.close).toHaveBeenCalledTimes(1);
   });
 
   it('turns a swallowed embedded-texture failure into a GLB activation failure', async () => {

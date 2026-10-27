@@ -34,8 +34,21 @@ export function smallPng(red = 40) {
     chunk('IHDR', header), chunk('IDAT', deflateSync(Buffer.concat([row, row]))), chunk('IEND', Buffer.alloc(0))]);
 }
 
+/** Embedded owned texture plus UVs; exercises bitmap lifetime on GPU recovery. */
+export function texturedTriangleGlb() {
+  const image=smallPng(), bin=new Uint8Array(60+image.length);
+  new Float32Array(bin.buffer,0,9).set([-1,0,0,1,0,0,0,2,0]);
+  new Float32Array(bin.buffer,36,6).set([0,0,1,0,.5,1]);bin.set(image,60);
+  return Buffer.from(serializeGlb({asset:{version:'2.0'},scene:0,scenes:[{nodes:[0]}],nodes:[{name:'Panel',mesh:0}],
+    meshes:[{primitives:[{attributes:{POSITION:0,TEXCOORD_0:1},material:0}]}],buffers:[{byteLength:bin.length}],
+    bufferViews:[{buffer:0,byteOffset:0,byteLength:36},{buffer:0,byteOffset:36,byteLength:24},{buffer:0,byteOffset:60,byteLength:image.length}],
+    accessors:[{bufferView:0,componentType:5126,count:3,type:'VEC3',min:[-1,0,0],max:[1,2,0]}, {bufferView:1,componentType:5126,count:3,type:'VEC2'}],
+    materials:[{name:'Panel paint',pbrMetallicRoughness:{baseColorTexture:{index:0},metallicFactor:0,roughnessFactor:.7}}],
+    textures:[{source:0}],images:[{bufferView:2,mimeType:'image/png'}]},bin));
+}
+
 /** Existing admitted Native recipe-1 shape, synthesized locally for real browser entry. */
-export async function nativeConversionBackup(model: Buffer, image: Buffer, captionCount = 2) {
+export async function nativeConversionBackup(model: Buffer, image: Buffer, captionCount = 2, appearance = false) {
   const id = (prefix: string, n: number) => `${prefix}_${String(n).padStart(26, '0')}`;
   const hash = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex');
   const placement = () => ({ translation: [0, 0, 0], rotationXYZW: [0, 0, 0, 1], uniformScale: 1 });
@@ -60,6 +73,9 @@ export async function nativeConversionBackup(model: Buffer, image: Buffer, capti
   for (let n = 3; n <= captionCount; n++) snapshot.captions.push({ ...placed, id: id('cap', n),
     title: `${String(n).padStart(3, '0')}：長い日本語の記録名を狭い画面でも省略せず確認するための現地観察記録`,
     body: `現地観察の記録 ${n}`, tags: [], attachmentMediaIds: [] });
+  if (appearance) Object.assign(snapshot,{meshMaterialAppearances:snapshot.displaySets.map((set,i)=>({id:id('mat',i+1),
+    displaySetId:set.id,assetId:id('ast',1),authoredAssetRevisionId:id('rev',1),representationId:id('rep',1),materialSlotKey:'m/0/0',
+    opacity:1,doubleSided:true,unlit:true,chroma:{enabled:false,colorSrgb:[0,1,0],tolerance:.2,feather:0}}))});
   const bytes = Buffer.from(JSON.stringify(snapshot));
   const manifest = { format: 'lociview-native-portable-backup', packageVersion: 2,
     nativeSnapshot: { schemaVersion: 1, projectId: snapshot.project.id, snapshotId: snapshot.snapshotId, generation: snapshot.generation, entry: 'native/snapshot.json', byteLength: bytes.length, algorithm: 'sha256', digest: hash(bytes) },

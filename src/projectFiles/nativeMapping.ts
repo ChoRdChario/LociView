@@ -7,7 +7,6 @@ import { cloneCanonicalValue, type JsonObject, type JsonValue } from '../domain/
 import { digest, newId, technicalId } from '../projectMetadata/persistence';
 import { sealValidationRecord, type PreparedValidationProject } from './initialProject';
 import type { ValidatedGlb } from './glb';
-import type { DecodedOccurrenceSlot } from './glbOccurrences';
 import { fileError, validationGlbProfile, occurrenceGlbProfile, jpegGlbProfile, occurrenceJpegGlbProfile, validationMetadataLimits as limits } from './validation';
 
 export const nativeConversionRecipe = 'native-project-scene-recipe-1';
@@ -26,7 +25,7 @@ export interface NativeMaterialWitness {
   nodeIndex: number; primitiveIndex: number; sourceMaterialIndex: number | null; slotIndex: number;
   targetRepresentationId: string; targetProfile: JsonObject; targetMaterialLayoutId: string; targetLogicalMaterialSlotId: string;
 }
-export type NativeOccurrence = Omit<DecodedOccurrenceSlot, 'node'>;
+export interface NativeOccurrence { readonly childPath: readonly number[]; readonly materialArraySlot: 0; readonly nodeIndex:number; readonly primitiveIndex:number; readonly materialIndex:number|null; readonly slotIndex:number }
 type SourceKey = readonly (string | number | SourceKey)[];
 export interface NativeMappingEntry { id: string; sha256: string; preimage: string }
 /** One conversion's collision registry; original identity, not text similarity, owns each key. */

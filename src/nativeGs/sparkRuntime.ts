@@ -94,10 +94,12 @@ export class NativeSparkRuntime {
       enableLod: false,
       onProgress: onProgress === undefined ? undefined : (event) => onProgress(event.loaded),
     });
+    let released = false;
     try {
       await candidate.initialized;
       if (this.disposed || generation !== this.loadGenerations.get(representationId)) {
         candidate.removeFromParent();
+        released = true;
         candidate.dispose();
         throw new Error('Spark load became obsolete before activation');
       }
@@ -115,8 +117,10 @@ export class NativeSparkRuntime {
       this.splatMeshes.set(representationId, candidate);
       return { object: candidate, splatCount, bounds };
     } catch (error) {
-      candidate.removeFromParent();
-      candidate.dispose();
+      if (!released) {
+        candidate.removeFromParent();
+        candidate.dispose();
+      }
       throw error;
     }
   }

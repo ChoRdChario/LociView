@@ -19,14 +19,16 @@ Point/GS requirement reassessment after checking SH4. The [revised 01b](../docs/
 withdraws the SH3-only CPU/screen recommendation and compares fixed released
 renderers. GSL1.4.3/Three0.186 limited qualification was approved2026-10-27;
 measured scope and failures are in01b §7/todo. The existing occurrence GLB/JPEG
-profiles explicitly pin0.180.0, so product migration is held rather than silently
-reinterpreting immutable profiles. SH4 and paged-LOD paths remain separate.
+profiles explicitly pin0.180.0; the approved bridge below retains that real proof
+instead of reinterpreting immutable profiles. SH4 and paged-LOD paths remain separate.
 New profiles, production GS and adoption still need their actual authority/gates.
-The next concrete decision is [07j](../docs/specs/07j-three-186-compatibility-proposal.md):
+The PO approved [07j](../docs/specs/07j-three-186-compatibility-proposal.md) implementation
+and fixed dependencies on2026-10-27. Its bounded implementation retains:
 retain actual180 source math/proof/legacy keys and closed cleanup, then independently
-check186 display using neutral values after old resources are released. It is
-proposed, not implemented or dependency-authorized. Its unit is existing material
-conversion/open/edit/file/cold continuation; GS profile decisions stay subsequent.
+checked186 display using neutral values after old resources are released. The
+unit is existing material conversion/open/edit/file/cold continuation. Todo owns
+executed checks and remaining ordinary-viewer recovery managed-approval constraint;
+do not retry the denied patch or mark07j complete. GS profile decisions stay subsequent.
 The superseded proposal/JSON remain in linked history, not an approval queue.
 
 Dedicated Chromium verifies only its recorded localhost/headless workflows. It

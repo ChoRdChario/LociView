@@ -7107,8 +7107,10 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
   });
   it('maps all GLB slots by explicit primitive association and edits instance clones without changing PNG/PBR originals', async () => {
     vi.stubGlobal('self', globalThis);
-    const bitmap = { width: 64, height: 48, close: vi.fn() };
-    vi.stubGlobal('createImageBitmap', vi.fn(async () => bitmap));
+    const bitmaps: { width: number; height: number; close: ReturnType<typeof vi.fn> }[] = [];
+    vi.stubGlobal('createImageBitmap', vi.fn(async () => {
+      const bitmap = { width: 64, height: 48, close: vi.fn() }; bitmaps.push(bitmap); return bitmap;
+    }));
     try {
       const bytes = glb(j => {
         j.materials[0].pbrMetallicRoughness.baseColorFactor[3] = 0.25; // OPAQUE still ignores source alpha.
@@ -7125,6 +7127,8 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       const originals: THREE.MeshStandardMaterial[] = [];
       decoded.root.traverse(n => { if (n instanceof THREE.Mesh) originals.push(n.material as THREE.MeshStandardMaterial); });
       expect(originals).toHaveLength(8);
+      const bitmap = originals[1]!.map!.source.data as (typeof bitmaps)[number];
+      expect(bitmaps).toHaveLength(2); expect(bitmap).toBe(bitmaps[1]); expect(bitmaps[0]!.close).toHaveBeenCalledOnce();
       expect(originals.map(m => decoded.materialLocators.get(m))).toEqual([1, 0, null, 0, 1, 0, null, 0].map(i => i === null ?
         { kind: 'representationMaterial', slotIndex: 0 } : { kind: 'gltfMaterial', materialIndex: i }));
       const residents = await prepareValidationResidents(s.snapshot.modelVersions!, host.content, async () => decoded);
@@ -7151,7 +7155,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       expect(restored.map).toBe(originals[1]!.map); expect(restored.side).toBe(THREE.FrontSide); expect(bitmap.close).not.toHaveBeenCalled();
       expect(hardChroma(restored)).toBeUndefined(); expect(hardChroma(originals[1]!)).toBeUndefined();
       expect(inspected.bytes).toEqual(bytes); expect(originals[1]!.color.r).toBe(0.2);
-      reset.dispose!(); untouched.dispose!(); residents.dispose(); expect(bitmap.close).toHaveBeenCalledOnce(); await workspace.dispose();
+      reset.dispose!(); untouched.dispose!(); residents.dispose(); expect(bitmap.close).toHaveBeenCalledOnce(); expect(bitmaps[0]!.close).toHaveBeenCalledOnce(); await workspace.dispose();
     } finally { vi.unstubAllGlobals(); }
   });
   it('resolves received real-file material pairs and duplicate owners, edits/resets and returns exact history (recorded DOM)', async () => {
@@ -7937,7 +7941,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       const meshes: THREE.Mesh[] = []; result.root.traverse(n => { if (n instanceof THREE.Mesh) meshes.push(n); });
       expect(meshes).toHaveLength(4);
       const materials = meshes.map(n => n.material as THREE.MeshStandardMaterial | THREE.MeshBasicMaterial);
-      expect(materials.every(m => !!m.map && m.map.image.width === 64)).toBe(true);
+      expect(materials.every(m => { const image: unknown = m.map?.image; return typeof image === 'object' && image !== null && 'width' in image && image.width === 64; })).toBe(true);
       expect(materials.filter(m => m instanceof THREE.MeshStandardMaterial).every(m => m.roughness === 0.7 && m.color.r === 0.2)).toBe(true);
       expect(materials.filter(m => m instanceof THREE.MeshBasicMaterial).every(m => m.alphaTest === 0.4 && m.side === THREE.DoubleSide)).toBe(true);
       expect(bitmaps.length).toBeGreaterThan(0); result.dispose(); result.dispose();

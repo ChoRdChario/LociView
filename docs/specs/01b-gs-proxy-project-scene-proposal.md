@@ -199,8 +199,9 @@ display derivativeの正確なprofile、context再作成を含むtyped adapter�
 
 最初の接続単位は[07j互換性companion](07j-three-186-compatibility-proposal.md)の
 既存材質workflow。0.180の実検査・proofを保つ閉じた境界を作り、0.186表示で同じ
-変換・編集・file・cold再開を通す。07jは提案であり、今回のcontinuationだけで新依存や
-production互換adapterが承認されたとは扱わない。GSの未確定仕様をこの判断へ混ぜない。
+変換・編集・file・cold再開を通す。POは2026-10-27に07jの固定依存と互換adapter実装を
+承認した。現在は実装・検証中で、[todo](../../tasks/todo.md)が証拠と残件を管理する。
+GSの未確定仕様やproduction接続・adoptionはこの承認に含まれない。
 
 その境界の後に、GSを同じSession／provider／file ownerへ接続する。
 

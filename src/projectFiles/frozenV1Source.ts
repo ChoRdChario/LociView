@@ -10,7 +10,7 @@ import { digest, json } from '../projectMetadata/persistence';
 import type { StoredBlobRef } from '../projectMetadata/blobStore';
 import { readValidationBody } from './content';
 import { inspectFreshValidationGlb, type ValidatedGlb } from './glb';
-import { inspectOccurrenceGlb, inspectOccurrenceJpegGlb, decodeOccurrenceGlb } from './glbOccurrences';
+import { inspectOccurrenceGlb, inspectOccurrenceJpegGlb, captureLegacyOccurrenceProof } from './glbOccurrences';
 import type { PngDecoder } from './png';
 import type { JpegDecoder } from './jpeg';
 import { checkFileLimits, fileError, fileObject, fileList, fileNumber, fileVector, limitedJson, validationMetadataLimits, type FileValidationLimits } from './validation';
@@ -193,13 +193,12 @@ async function materialProof(rows: readonly EntityRecord[], models: readonly Fro
   for (const model of models) {
     const own = byModel.get(model.record.id); if (!own) continue;
     const inspected = model.model!.jpeg ? await inspectOccurrenceJpegGlb(model.bytes, limits, png, jpeg) : await inspectOccurrenceGlb(model.bytes, limits, png);
-    const decoded = await decodeOccurrenceGlb(inspected);
-    try {
-      const keys = new Map<string, typeof decoded.occurrenceSlots[number][]>(), counts = new Map<number | null, number>();
-      for (const slot of decoded.occurrenceSlots) {
-        charge(1 + slot.childPath.length); const path: string[] = []; let node: NonNullable<typeof slot.node.parent> = slot.node;
-        while (node !== decoded.root) { charge(1); const parent = node.parent; if (!parent) return fail(); path.unshift(node.name !== '' ? node.name : '#' + parent.children.indexOf(node)); node = parent; }
-        const key = `m/${path.join('|')}/${slot.materialArraySlot}`, list = keys.get(key) ?? []; list.push(slot); keys.set(key, list);
+    const decoded = await captureLegacyOccurrenceProof(inspected);
+    {
+      const keys = new Map<string, typeof decoded.rows[number][]>(), counts = new Map<number | null, number>();
+      for (const slot of decoded.rows) {
+        charge(1 + 2 * slot.childPath.length);
+        const key = slot.v1Key, list = keys.get(key) ?? []; list.push(slot); keys.set(key, list);
         counts.set(slot.materialIndex, (counts.get(slot.materialIndex) ?? 0) + 1);
       }
       const catalog = new Map(model.model!.materials.map(m => [json(m.sourceLocator), m]));
@@ -216,7 +215,7 @@ async function materialProof(rows: readonly EntityRecord[], models: readonly Fro
           sourceMaterialIndex: slot.materialIndex, sourceLocator: locator, sourceSemantics: semantics!, selectedOccurrenceCount: 1,
           doubleSided: f.doubleSided === true, unlit: f.unlit === true || f.unlitLike === true });
       }
-    } finally { decoded.dispose(); }
+    }
   }
   materials.sort((a, b) => codeOrder(a.sourceMaterialId, b.sourceMaterialId)); values.sort((a, b) => codeOrder(a.sourceMaterialId, b.sourceMaterialId) || codeOrder(a.field, b.field));
   return { materials, values };

@@ -13,7 +13,7 @@ import { same } from '../domain/projectGraphSupport';
 import { cloneCanonicalValue, type JsonObject, type JsonValue } from '../domain/values';
 import { mapNativeProject, nativeConversionRecipe, nativeAppearanceRecipe, nativeJpegRecipe, nativeAppearanceJpegRecipe, nativeRecipeHasAppearance, nativePhotoRecipe, nativeAppearancePhotoRecipe, nativeRecipeHasPhoto, nativeRecipeHasOrigin, nativeAppearanceIntent, type NativeConversionRecipe, type NativeMappingEntry, type NativeMaterialWitness, type NativeOccurrence } from './nativeMapping';
 import { inspectValidationGlb, inspectValidationJpegGlb, validationGlbUsesJpeg, type ValidatedGlb } from './glb';
-import { inspectOccurrenceGlb, inspectOccurrenceJpegGlb, decodeOccurrenceGlb } from './glbOccurrences';
+import { inspectOccurrenceGlb, inspectOccurrenceJpegGlb, captureLegacyOccurrenceProof } from './glbOccurrences';
 import type { PngDecoder } from './png';
 import type { JpegDecoder } from './jpeg';
 import { identityPlacement } from './initialProject';
@@ -202,8 +202,8 @@ export async function prepareNativeConversion(input: Blob, limits: FileValidatio
     const model = await inspectNativeModel(bytes, appearance, limits, decode, jpeg);
     models.set(r.id, model); blobs.push({ ref: { ...r.blob }, bytes });
     if (appearance) { occurrenceCount += model.occurrences!.length; if (occurrenceCount > limits.maxItems) return fileError('材質の面の数が検査の上限を超えています。');
-      const decoded = await decodeOccurrenceGlb(model);
-      try { sourceWitness.set(r.id, decoded.occurrenceSlots.map(({ node: _node, ...row }) => row)); } finally { decoded.dispose(); } }
+      const decoded = await captureLegacyOccurrenceProof(model);
+      sourceWitness.set(r.id, decoded.rows.map(row => ({ childPath:[...row.childPath], materialArraySlot:row.materialArraySlot, nodeIndex:row.nodeIndex, primitiveIndex:row.primitiveIndex, materialIndex:row.materialIndex, slotIndex:row.slotIndex }))); }
   }
   for (const m of snapshot.mediaResources ?? []) {
     if (!projectImageMime(m.blob.mediaType)) return fileError('この画像形式はまだ変換できません。');
@@ -316,8 +316,8 @@ export async function resumeNativeConversion(fs: ProjectWorkspaceFS, store: Orig
       const model = await inspectNativeModel(body, nativeRecipeHasAppearance(receipt.recipe), limits, decode, jpeg); models.set(r.id, model);
       if (nativeRecipeHasAppearance(receipt.recipe)) {
         occurrenceCount += model.occurrences!.length; if (occurrenceCount > limits.maxItems) return fileError('材質の面の数が検査の上限を超えています。');
-        const decoded = await decodeOccurrenceGlb(model);
-        try { rows.set(r.id, decoded.occurrenceSlots.map(({ node: _node, ...row }) => row)); } finally { decoded.dispose(); }
+        const decoded = await captureLegacyOccurrenceProof(model);
+        rows.set(r.id, decoded.rows.map(row => ({ childPath:[...row.childPath], materialArraySlot:row.materialArraySlot, nodeIndex:row.nodeIndex, primitiveIndex:row.primitiveIndex, materialIndex:row.materialIndex, slotIndex:row.slotIndex })));
       }
     }
     if (nativeRecipeHasOrigin(receipt.recipe)) {

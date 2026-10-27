@@ -5,7 +5,7 @@ const SERVICE_WORKER_ACTIVATION_TIMEOUT_MS = 60_000;
 
 function expectedSparkChunkUrl(): string {
   const base = new URL(import.meta.env.BASE_URL, location.origin);
-  return new URL('assets/native-gs-spark-2.1.0.js', base).href;
+  return new URL('assets/native-gs-spark-2.1.0-three-0.186.0.js', base).href;
 }
 
 async function cachedSparkChunkCount(): Promise<number> {

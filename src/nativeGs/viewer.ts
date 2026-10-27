@@ -64,6 +64,7 @@ export interface NativeGsViewerCallbacks {
   onIssuesChanged(issues: readonly string[]): void;
   onProgress(message: string): void;
   onRuntimeError(message: string): void;
+  onDisplayRecovery?(state: 'recovering' | 'restored'): void;
 }
 
 export type NativeAssetGizmoMode = 'translate' | 'rotate' | 'scale';
@@ -253,7 +254,7 @@ export class NativeGsViewer {
   private readonly scene = new THREE.Scene();
   private readonly perspectiveCamera = new THREE.PerspectiveCamera(48, 1, 0.01, 100_000);
   private camera: THREE.PerspectiveCamera | THREE.OrthographicCamera = this.perspectiveCamera;
-  private readonly renderer: THREE.WebGLRenderer;
+  private renderer: THREE.WebGLRenderer;
   private controls: OrbitControls;
   private readonly gizmo: TransformControls;
   private readonly gizmoRoot: THREE.Object3D;
@@ -284,6 +285,10 @@ export class NativeGsViewer {
   private editingEnabled = false;
   private gizmoDragging = false;
   private contextLost = false;
+  private recovering = false;
+  private loadGeneration = 0;
+  private loadAbort = new AbortController();
+  private loadSource: { open: (id: string) => Promise<WorkspaceReadableFile | null>; offlineReady: boolean } | null = null;
   private disposed = false;
   private animationFrame = 0;
   private resolution: NativeSliceResolutionV1;
@@ -326,11 +331,13 @@ export class NativeGsViewer {
     this.gizmoRoot.visible = false;
     this.scene.add(this.gizmoRoot);
     this.gizmo.addEventListener('mouseDown', () => {
+      if (this.disposed || this.contextLost || this.recovering) return;
       if (this.gizmoTarget?.kind !== 'asset') return;
       const group = this.assetGroups.get(this.gizmoTarget.assetId);
       if (group !== undefined) this.assetScaleDragStart = group.scale.x;
     });
     this.gizmo.addEventListener('dragging-changed', (event) => {
+      if (this.disposed || this.contextLost || this.recovering) return;
       this.gizmoDragging = (event as unknown as { value: boolean }).value;
       this.controls.enabled = !this.gizmoDragging;
       if (this.gizmoDragging) return;
@@ -338,6 +345,7 @@ export class NativeGsViewer {
       else if (this.gizmoTarget?.kind === 'asset') this.commitAssetTransformFromGroup();
     });
     this.gizmo.addEventListener('objectChange', () => {
+      if (this.disposed || this.contextLost || this.recovering) return;
       if (this.gizmoTarget?.kind === 'caption') this.syncCaptionFromMarker();
       else if (this.gizmoTarget?.kind === 'asset') this.enforceUniformAssetScale();
     });
@@ -346,6 +354,7 @@ export class NativeGsViewer {
     this.canvas.addEventListener('pointerup', this.onPointerUp);
     this.canvas.addEventListener('pointercancel', this.onPointerCancel);
     this.canvas.addEventListener('webglcontextlost', this.onContextLost);
+    this.canvas.addEventListener('webglcontextrestored', this.onContextRestored);
     this.resizeObserver = new ResizeObserver(() => this.resize());
     this.resizeObserver.observe(canvas);
     this.resize();
@@ -357,6 +366,18 @@ export class NativeGsViewer {
     offlineReady: boolean,
   ): Promise<void> {
     if (this.disposed) throw new Error('native viewer is disposed');
+    this.loadSource = { open: openRepresentation, offlineReady };
+    await this.loadRepresentations(false);
+  }
+
+  private async loadRepresentations(preserveView: boolean): Promise<void> {
+    const sourceAccess = this.loadSource;
+    if (sourceAccess === null || this.contextLost || this.disposed) return;
+    const generation = ++this.loadGeneration;
+    this.loadAbort.abort();
+    this.loadAbort = new AbortController();
+    const signal = this.loadAbort.signal;
+    this.clearRepresentations();
     for (const asset of this.snapshot.assets) {
       const group = new THREE.Group();
       group.name = asset.id;
@@ -373,15 +394,12 @@ export class NativeGsViewer {
       return rank(left.role) - rank(right.role) || left.id.localeCompare(right.id);
     });
     for (const representation of ordered) {
-      if (this.contextLost) {
-        this.resourceStates.set(representation.id, { availability: 'failed', registration: 'known' });
-        continue;
-      }
-      const source = await openRepresentation(representation.id);
-      if (this.contextLost) {
-        this.resourceStates.set(representation.id, { availability: 'failed', registration: 'known' });
-        continue;
-      }
+      if (!this.isCurrentLoad(generation)) return;
+      if (!this.assetGroups.has(representation.assetId)) continue;
+      try {
+      const source = await sourceAccess.open(representation.id);
+      if (!this.isCurrentLoad(generation)) return;
+      if (!this.assetGroups.has(representation.assetId)) continue;
       if (source === null) {
         this.resourceStates.set(representation.id, { availability: 'missing', registration: 'known' });
         continue;
@@ -390,22 +408,20 @@ export class NativeGsViewer {
         this.resourceStates.set(representation.id, { availability: 'failed', registration: 'known' });
         continue;
       }
-      try {
         if (representation.role === 'gsPrimary') {
-          if (!offlineReady) throw new Error('GS runtime is not offline-ready on this device');
-          await this.loadGs(representation, source);
+          if (!sourceAccess.offlineReady) throw new Error('GS runtime is not offline-ready on this device');
+          await this.loadGs(representation, source, generation);
         } else if (representation.role === 'pointPrimary') {
-          await this.loadPoint(representation, source);
+          await this.loadPoint(representation, source, generation, signal);
         } else {
-          await this.loadMeshLike(representation, source);
+          await this.loadMeshLike(representation, source, generation, signal);
         }
-        if (this.contextLost) {
-          this.releaseRepresentation(representation.id);
-          this.resourceStates.set(representation.id, { availability: 'failed', registration: 'known' });
-          continue;
-        }
+        if (!this.isCurrentLoad(generation)) return;
+        if (!this.assetGroups.has(representation.assetId)) { this.releaseRepresentation(representation.id); continue; }
         this.resourceStates.set(representation.id, { availability: 'ready', registration: 'known' });
       } catch (error) {
+        if (!this.isCurrentLoad(generation)) return;
+        if (!this.assetGroups.has(representation.assetId)) continue;
         this.resourceStates.set(representation.id, { availability: 'failed', registration: 'known' });
         this.recordRuntimeIssue(
           `${representation.role} activation failed: ${errorMessage(error)}`,
@@ -413,9 +429,34 @@ export class NativeGsViewer {
         );
       }
     }
-    this.currentCaption = this.snapshot.captions[0] ?? null;
+    if (!this.isCurrentLoad(generation)) return;
+    if (!preserveView) this.currentCaption = this.snapshot.captions[0] ?? null;
     this.updateResolution();
-    this.fitCamera();
+    if (!preserveView) this.fitCamera();
+  }
+
+  private isCurrentLoad(generation: number): boolean {
+    return !this.disposed && !this.contextLost && generation === this.loadGeneration;
+  }
+
+  private requireCurrentLoad(generation: number): void {
+    if (!this.isCurrentLoad(generation)) throw new DOMException('Display preparation cancelled', 'AbortError');
+  }
+
+  private clearRepresentations(): void {
+    this.sparkRuntime?.dispose();
+    this.sparkRuntime = null;
+    for (const object of this.representationObjects.values()) {
+      if (object.userData.nativeSpark === true) object.removeFromParent();
+      else disposeObject(object);
+    }
+    for (const group of this.assetGroups.values()) group.removeFromParent();
+    this.representationObjects.clear();
+    this.representationBounds.clear();
+    this.meshMaterialSlots.clear();
+    this.resourceStates.clear();
+    this.assetGroups.clear();
+    this.materialIssues = [];
   }
 
   getResourceStates(): ReadonlyMap<string, NativeResourceStateV1> {
@@ -774,6 +815,8 @@ export class NativeGsViewer {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    ++this.loadGeneration;
+    this.loadAbort.abort();
     cancelAnimationFrame(this.animationFrame);
     this.emptyTapStart = null;
     this.clearLongPress();
@@ -783,19 +826,11 @@ export class NativeGsViewer {
     this.canvas.removeEventListener('pointerup', this.onPointerUp);
     this.canvas.removeEventListener('pointercancel', this.onPointerCancel);
     this.canvas.removeEventListener('webglcontextlost', this.onContextLost);
+    this.canvas.removeEventListener('webglcontextrestored', this.onContextRestored);
     this.gizmo.detach();
     this.gizmo.dispose();
     this.controls.dispose();
-    this.sparkRuntime?.dispose();
-    this.sparkRuntime = null;
-    for (const object of this.representationObjects.values()) {
-      if (object.userData.nativeSpark === true) object.removeFromParent();
-      else disposeObject(object);
-    }
-    this.representationObjects.clear();
-    this.representationBounds.clear();
-    this.meshMaterialSlots.clear();
-    this.assetGroups.clear();
+    this.clearRepresentations();
     for (const marker of this.captionMarkers.values()) {
       marker.removeFromParent();
       marker.geometry.dispose();
@@ -805,7 +840,7 @@ export class NativeGsViewer {
     this.renderer.dispose();
   }
 
-  private async loadMeshLike(representation: NativeRepresentationV1, source: WorkspaceReadableFile): Promise<void> {
+  private async loadMeshLike(representation: NativeRepresentationV1, source: WorkspaceReadableFile, generation: number, signal: AbortSignal): Promise<void> {
     const format = nativeModelFormat(representation.formatProfile.id);
     if (format === null) throw new Error(`unsupported model profile ${representation.formatProfile.id}`);
     const gltfTextures = format !== 'glb' && format !== 'gltf'
@@ -815,8 +850,11 @@ export class NativeGsViewer {
         : this.options.gltfTextureMaxEdge === undefined
           ? undefined
           : { kind: 'max-edge' as const, maxEdge: this.options.gltfTextureMaxEdge };
-    const loaded = await loadModel(format, await collectStream(source), { gltfTextures });
+    const bytes = await collectStream(source);
+    this.requireCurrentLoad(generation);
+    const loaded = await loadModel(format, bytes, { gltfTextures, signal });
     try {
+      this.requireCurrentLoad(generation);
       let slots: NativeMeshMaterialSlot[] | null = null;
       if (representation.role === 'interactionProxy') {
         if (loaded.stats.triangles < 1) throw new Error('Interaction Proxy must contain triangles');
@@ -835,8 +873,10 @@ export class NativeGsViewer {
       if (slots !== null) this.meshMaterialSlots.set(representation.id, slots);
       this.applyActiveMeshMaterialAppearances();
     } catch (error) {
-      this.representationObjects.delete(representation.id);
-      this.meshMaterialSlots.delete(representation.id);
+      if (this.representationObjects.get(representation.id) === loaded.root) {
+        this.representationObjects.delete(representation.id);
+        this.meshMaterialSlots.delete(representation.id);
+      }
       disposeModelResources(loaded.root);
       throw error;
     }
@@ -886,9 +926,10 @@ export class NativeGsViewer {
       : null;
   }
 
-  private async loadPoint(representation: NativeRepresentationV1, source: WorkspaceReadableFile): Promise<void> {
+  private async loadPoint(representation: NativeRepresentationV1, source: WorkspaceReadableFile, generation: number, signal: AbortSignal): Promise<void> {
     if (representation.pointPly === undefined) throw new Error('ordinary-point PLY facts are absent');
     const inspection = await inspectNativePointPlyV1(source);
+    this.requireCurrentLoad(generation);
     if (
       inspection.kind !== 'supported-point' ||
       inspection.facts.pointCount !== representation.pointPly.pointCount ||
@@ -897,7 +938,11 @@ export class NativeGsViewer {
     ) {
       throw new Error('ordinary-point PLY no longer matches its admitted profile facts');
     }
-    const loaded = await loadModel('ply', await collectStream(source));
+    const bytes = await collectStream(source);
+    this.requireCurrentLoad(generation);
+    const loaded = await loadModel('ply', bytes, { signal });
+    try {
+    this.requireCurrentLoad(generation);
     if (loaded.kind !== 'points' || loaded.stats.points !== representation.pointPly.pointCount || loaded.stats.triangles !== 0) {
       throw new Error('ordinary-point decoder output does not match the admitted point-only profile');
     }
@@ -910,11 +955,13 @@ export class NativeGsViewer {
     if (group === undefined) throw new Error('Point Asset group is unavailable');
     group.add(loaded.root);
     this.representationObjects.set(representation.id, loaded.root);
+    } catch (error) { disposeModelResources(loaded.root); throw error; }
   }
 
-  private async loadGs(representation: NativeRepresentationV1, source: WorkspaceReadableFile): Promise<void> {
+  private async loadGs(representation: NativeRepresentationV1, source: WorkspaceReadableFile, generation: number): Promise<void> {
     if (representation.gsPly === undefined) throw new Error('GS PLY facts are absent');
     const inspection = await inspectNativeGsPlyV1(source);
+    this.requireCurrentLoad(generation);
     if (
       inspection.kind !== 'supported-gs' ||
       inspection.facts.shDegree !== representation.gsPly.shDegree ||
@@ -925,20 +972,29 @@ export class NativeGsViewer {
     ) {
       throw new Error('GS PLY no longer matches its admitted header facts');
     }
-    this.sparkRuntime ??= await NativeSparkRuntime.create(this.renderer, this.scene);
-    const loaded = await this.sparkRuntime.load(source, representation.id, representation.gsPly.splatCount, (bytes) => {
+    if (this.sparkRuntime === null) {
+      const runtime = await NativeSparkRuntime.create(this.renderer, this.scene);
+      if (!this.isCurrentLoad(generation)) { runtime.dispose(); this.requireCurrentLoad(generation); }
+      this.sparkRuntime = runtime;
+    }
+    const runtime = this.sparkRuntime;
+    const loaded = await runtime.load(source, representation.id, representation.gsPly.splatCount, (bytes) => {
+      if (!this.isCurrentLoad(generation)) return;
       this.callbacks.onProgress(`GS load: ${bytes.toLocaleString()} / ${source.size.toLocaleString()} bytes`);
     });
+    try {
+    if (!this.isCurrentLoad(generation)) { runtime.disposeSplat(representation.id); this.requireCurrentLoad(generation); }
     loaded.object.name = representation.id;
     loaded.object.userData.representationId = representation.id;
     loaded.object.userData.nativeSpark = true;
     applyCanonicalTransform(loaded.object, representation.representationToAsset);
     const group = this.assetGroups.get(representation.assetId);
-    if (group === undefined) throw new Error('GS Asset group is unavailable');
+    if (group === undefined) throw new DOMException('Published display membership changed', 'AbortError');
     group.add(loaded.object);
     this.representationObjects.set(representation.id, loaded.object);
     this.representationBounds.set(representation.id, loaded.bounds.clone());
     this.callbacks.onProgress(`GS ready: ${loaded.splatCount.toLocaleString()} splats`);
+    } catch (error) { loaded.object.removeFromParent(); runtime.disposeSplat(representation.id); throw error; }
   }
 
   private updateResolution(): void {
@@ -998,7 +1054,7 @@ export class NativeGsViewer {
   private refreshGizmoAttachment(): void {
     this.gizmo.detach();
     this.gizmoRoot.visible = false;
-    if (!this.editingEnabled) return;
+    if (!this.editingEnabled || this.contextLost || this.recovering || this.disposed) return;
     if (this.gizmoTarget?.kind === 'caption') {
       const marker = this.currentCaption === null ? undefined : this.captionMarkers.get(this.currentCaption.id);
       if (marker === undefined || !marker.visible) return;
@@ -1151,7 +1207,7 @@ export class NativeGsViewer {
 
   private placeCaptionAt(pointer: THREE.Vector2): void {
     const interaction = this.resolution.interaction;
-    if (!this.editingEnabled) return;
+    if (!this.editingEnabled || this.contextLost || this.recovering || this.disposed) return;
     if (!interaction.enabled) {
       this.callbacks.onIssuesChanged([...this.resolution.issues, interaction.reason]);
       return;
@@ -1233,6 +1289,7 @@ export class NativeGsViewer {
   }
 
   private readonly onPointerDown = (event: PointerEvent): void => {
+    if (this.disposed || this.contextLost || this.recovering) return;
     if (event.button !== 0 || this.gizmoDragging || this.gizmo.axis !== null) return;
     const pointer = this.pointerAt(event.clientX, event.clientY);
     if (this.selectCaptionAt(pointer)) return;
@@ -1259,6 +1316,7 @@ export class NativeGsViewer {
   };
 
   private readonly onPointerMove = (event: PointerEvent): void => {
+    if (this.disposed || this.contextLost || this.recovering) return;
     if (this.emptyTapStart?.pointerId === event.pointerId) {
       const dx = event.clientX - this.emptyTapStart.x;
       const dy = event.clientY - this.emptyTapStart.y;
@@ -1272,6 +1330,7 @@ export class NativeGsViewer {
   };
 
   private readonly onPointerUp = (event: PointerEvent): void => {
+    if (this.disposed || this.contextLost || this.recovering) return;
     if (this.emptyTapStart?.pointerId === event.pointerId) this.clearCaptionSelection();
     this.emptyTapStart = null;
     this.clearLongPress();
@@ -1457,16 +1516,53 @@ export class NativeGsViewer {
 
   private readonly onContextLost = (event: Event): void => {
     event.preventDefault();
+    if (this.disposed || this.contextLost) return;
     this.contextLost = true;
+    this.recovering = false;
+    ++this.loadGeneration;
+    this.loadAbort.abort();
     cancelAnimationFrame(this.animationFrame);
-    for (const [representationId, state] of this.resourceStates) {
-      if (state.availability === 'ready') {
-        this.resourceStates.set(representationId, { availability: 'failed', registration: state.registration });
-      }
-    }
-    const message = 'WebGL context was lost. Model display is unavailable until the project is reopened.';
-    if (!this.runtimeIssues.includes(message)) this.runtimeIssues.push(message);
+    this.clearLongPress();
+    this.emptyTapStart = null;
+    this.gizmoDragging = false;
+    this.controls.enabled = false;
+    this.gizmo.enabled = false;
+    this.gizmo.dragging = false;
+    this.gizmo.detach();
+    this.gizmoRoot.visible = false;
+    this.clearRepresentations();
+    this.renderer.dispose();
     this.updateResolution();
-    this.callbacks.onRuntimeError(message);
+    this.callbacks.onDisplayRecovery?.('recovering');
+  };
+
+  private readonly onContextRestored = (): void => {
+    if (this.disposed || !this.contextLost) return;
+    void this.restoreDisplay();
+  };
+
+  private async restoreDisplay(): Promise<void> {
+    this.contextLost = false;
+    this.recovering = true;
+    let generation = this.loadGeneration;
+    try {
+      this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: false, alpha: false });
+      this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+      this.renderer.setPixelRatio(Math.min(globalThis.devicePixelRatio, 2));
+      this.resize();
+      const pending = this.loadRepresentations(true); generation = this.loadGeneration;
+      await pending;
+      if (!this.isCurrentLoad(generation)) return;
+      this.recovering = false;
+      this.controls.enabled = true;
+      this.gizmo.enabled = true;
+      this.updateResolution();
+      this.callbacks.onDisplayRecovery?.('restored');
+      this.animate();
+    } catch (error) {
+      if (!this.isCurrentLoad(generation)) return;
+      this.recovering = false;
+      this.recordRuntimeIssue(`Display recovery failed: ${errorMessage(error)}`);
+    }
   };
 }

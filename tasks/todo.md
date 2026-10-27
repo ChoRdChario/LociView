@@ -28,7 +28,106 @@ in nondefault validation; code and executed tests determine its observed behavio
 01a adds approved XYZ/RGB ASCII PLY alongside admitted GLB and photos. This is not
 ordinary-entry activation, arbitrary-format support or general v2 adoption.
 
-## Current boundary — Three compatibility proposal ready
+## Current unit — approved07j implementation
+
+PO approved [07j](../docs/specs/07j-three-186-compatibility-proposal.md) on2026-10-27:
+fixed180 inspection/proof/cleanup and neutral legacy-key authority, sequentially
+checked186 display, required alias dependencies and complete existing conversion/
+material/edit/file/cold workflow verification. Root is sole writer; read-only
+agents map loader/import, proof/call sites and existing browser acceptance.
+
+- [x] Record approval; add exact runtime/type aliases and186 dependencies, verify
+  artifact/license/lock/audit and actual180 loader/helper constructor closure.
+- [x] Implement private180 model/proof ownership and canonical neutral target/
+  occurrence snapshots; preserve180 GLB math, all old IDs/recipes/receipts/keys.
+  Connect186 checked display and existing converters with no engine-object leak.
+- [x] Focused import/fault/ownership/compatibility checks; convertedNative material/
+  file/team/cold workflow, directNative and existingNativeSpark real-browser smoke.
+- [ ] Ordinaryv1 rendered/context recovery acceptance in§7.1: managed scope
+  confirmation is pending; preserve its current read-only policy.
+- [x] Mandatory final checks, independent meaningful diff review and later-fix
+  review; record remaining gates without claiming product186 adoption.
+- [x] Prepare the suitable verified g0-baseline **development** checkpoint;
+  normal push follows the staged-scope check. Git owns publication identity/state.
+
+Stop only affected work for a real contract conflict or inability to preserve an
+existing valid route; do not relax old proof, profile, bounds, image, recovery or
+key rules. Ordinary implementation/tests/fixes in07j do not need more PO approval.
+
+Implementation evidence so far (not whole07j acceptance): exact180/runtime+type
+aliases and186 renderer are installed; oldGLB math/profiles/IDs/recipes/receipts
+are unchanged. Engine-free target/source-pair proofs own a synchronous input copy;
+180 resources are completely released before checked186 display. MTL unused images,
+late cancellation and cleanup exceptions are covered. Native recovery preserves
+snapshot/camera/UI; stale decode and published deletion release late GS without
+resetting unrelated models. An actual double-dispose fault was reproduced then
+fixed while retaining explicit obsolete-candidate cleanup.
+
+Dependency/lock/license review: exact186 plus original180 SRI/alias, MIT on all four
+runtime/type packages, no GSL production dependency. npm audit before/after reports
+the same10 findings (1low/2moderate/5high/2critical), no new affected package names;
+these pre-existing findings are not a clean audit or release credit. Compiled
+Spark SDK2.1 URL now includesThree186 so old180 cache entries cannot claimready;
+cacheName, explicit preparation and old entries are retained. Independent review
+closed the cache P1 and Native generation/deletion/cleanup findings.
+
+Executed focused service/boundary checks and54 representative material/file/cold
+cases passed. Dedicated Chromium: converted texturedNative → caption edit → actual
+GPU loss/restore/retry → named save/file-match → full browser shutdown/reopen PASS;
+directNative material edit → bitmap-redecode context recovery → completed save/
+reopen PASS; existing NativeSpark2.1 actualpixel/visibility/Proxy placement/pin
+selection/save/unload/reopen PASS. The latter needed a short ASCII test profile:
+CDP recorded CacheStorage internal errors and failed SW installs with the longer
+profile, beforeSpark/Wasm began. No Chrome-plugin/device/GS-new-format/offline
+acceptance is borrowed.
+
+Final verification: `checkpoint-8.log` typecheck;120Vitest files/2762PASS/21existing
+TODO; normal, harness and validation builds, serially. Later E2E-only edits passed
+`typecheck-final.log`. The preceding aggregate's sole failure reused one bitmap
+for bothdecodes; the corrected fixture binds the actual186 image, asserts180
+close-before-display and retains current-image-alive/close-once assertions.
+Pages-base `/LociView/` build and HEIC public isolation alsoPASS. Build source maps
+show separate180/186 cores and sixoldaddons in allthreegraphs, zeroGSL modules;
+validation has zeroSpark modules and normal SW precache excludes the explicit SDK.
+
+Final static browser evidence (all dedicated local headless Chromium):
+- `final-validation-1793060404115-50788/result.json`: converted texturedNative,
+  actualGPU loss/retry, edit照明lit on建物's explicitface, Workspace to independent
+  browserB, change表示する面front, Contribution backtoA, retain all original base/
+  delta changebytes, namedbackup/file match and complete browser shutdown/reopen.
+  Whole75s; material/team step30.4s, save/check15.5s, cold/save19.3s. These single
+  whole-action observations are not decoder-stage/peak-memory or capacity guarantees.
+- `final-normal-1793060518131-39328/result.json`:2PASS/17.3s. DirectNative actual
+  Orbit/material/GPU recovery/save/reopen and existingSpark pixel/toggle/Proxy
+  position/gizmo completion/pin reselect/save/unload/reopen; cached runtime URL
+  includesThree186. Earlier long-profile failures and preliminary build results
+  remain separate and are not the final acceptance evidence.
+
+Meta-audit: the accepted dependency prerequisite remains the criticalpath; closed
+real constructor, lifetime, publication-race and stale-SDK-cache defects. Suitable
+development checkpoint only:07j stays IN PROGRESS/NOT ADOPTED and not a valid
+productThree186 checkpoint while ordinaryv1 recovery authority/evidence is pending.
+Next: finish§7.1 after explicit managed-scope confirmation, then return to01b§8's
+preciseGS source/Proxy/typed display proposal; no newGS profiles or production
+permission is inferred. No additional PO control-by-control tests are requested.
+Artifacts and retained failures: `.artifacts/e2e/three-compat-07j/`; canonical run
+results remain under `.artifacts/e2e/runs`. Current whole-check is checkpoint-8;
+previous typecheck failures/interrupted pre-final-tree checks are not passes.
+
+Managed approval constraint: two attempts to extend ordinary `ViewerCore` context
+recovery were rejected and neither patch was applied. The revised, independently
+reviewed whole-path proposal connected loss cleanup → fresh renderer → the existing
+AppContext/WorkspaceFS model loader → transform/material/pin sync, preserving the
+full temporary camera and retaining Model-tab `表示` on failure. Auto-review's final
+reason: "Although this is materially safer than the rejected legacy change, it
+expands07j into the ordinary legacy viewer and the user has only requested re-review
+of the proposal, not authorized implementation of this exact patch."
+This conflicts with the recorded07j implementation approval but does not authorize
+bypassing the managed decision. Stop that affected change; request explicit scope
+confirmation with the concrete proposal after unaffected verification. Legacy§6/
+§7.5 recovery remains pending; Native/ProjectScene evidence does not close it.
+
+## Previous preparation — compatibility proposal
 
 PO requested continuation after the limited qualification. Prepare one concrete
 reviewable compatibility proposal for existing appearance conversion/open/edit/
@@ -50,7 +149,7 @@ bounded independent reviewers cover compatibility, Session/file and render/UX.
   only for the genuinely new compatibility/profile/production authority once
   the proposal is concrete; do not implement an unapproved architecture.
 
-Stop only affected new profile/compatibility/production implementation. The §6
+Historical preparation stop (superseded for07j by the approval above): the §6
 limited evaluation grant does not itself approve that expansion. Reuse existing
 equipment and results; no new PoC, framework, dependency or small PO test waits.
 
@@ -62,19 +161,17 @@ serialize all materials into a second renderer or rewrite old IDs. Final GS
 quantization/color/paging profiles need their own evidence after this boundary.
 
 The concrete [07j companion](../docs/specs/07j-three-186-compatibility-proposal.md)
-is PROPOSED, not implemented or dependency-authorized. It retains actual180 math/
+was independently reviewed before approval. It retains actual180 math/
 proof/cleanup and old live Native/v1 material-key authority, then independently
 checks186 display after old resources are released. All old IDs, receipts and
 history remain. Three read-only reviewers closed the initial missing direct
 Native/v1 key checks and existing NativeSpark2.1 render-smoke acceptance; no
-unresolved specification findings remain. Implementation fitness is untested.
+unresolved specification findings remained at that preparation checkpoint. That
+review was not implementation evidence; current executed checks belong above.
 
-Current stop is one PO compatibility/dependency decision for07j, beyond the
-earlier limited evaluation grant. GS exact profiles/production permission are
-separate. No code, installed dependency, immutable profile or wire changed in
-this unit; checks are document links/anchors, unchanged exact-byte contracts and
-independent review. Suitable g0-baseline docs publication uses standing authority;
-Git owns its identity. Do not rerun old runtime suites merely for these documents.
+PO has now granted that07j compatibility/dependency decision. GS exact profiles/
+production permission remain separate. Prior preparation changed documents only;
+its link/immutable-binding checks and reviews do not verify this implementation.
 
 ## Previous qualification evidence
 
@@ -130,7 +227,7 @@ environment diagnostic. Dedicated Playwright/Chromium was separately authorized;
 its passing workflows neither repair nor verify that plugin. Do not retry a known
 denied action unchanged or revive old Chrome repair plans from the history.
 
-Verification for this documentation/proposal unit: diff, retained-history fidelity,
+Historical verification for the prior documentation/proposal unit: diff, retained-history fidelity,
 local links, approved-profile hashes and independent specification review. No product
 runtime changed; prior runtime evidence is not rerun or relabelled. New production
 implementation follows its approved proposal and AGENTS final-check requirements.

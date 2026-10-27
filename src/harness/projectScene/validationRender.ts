@@ -14,6 +14,8 @@ import { validationMaterialSlots, validationMaterialIssue, type ValidationMateri
 import { patchHardChroma, patchBinaryMask } from '../../viewer/hardChroma';
 import { decodeOccurrenceGlb, type DecodedOccurrenceSlot } from '../../projectFiles/glbOccurrences';
 import { materialForDisplay } from '../../domain/materialIntent';
+import { readLegacyModelProof } from '../../viewer/compat180/proof';
+import { trackGltfImages, snapshotTargets, assertTargetTables } from '../../viewer/compat180/sceneProof';
 
 export interface SavedModelResidentPort { create(model: ValidationModelClosure | ReadonlyRenderModel, effects?: ValidationMaterialEffects): ResidentSurface; dispose(): void }
 export interface ValidationResidentCache extends SavedModelResidentPort { prepare(versions: readonly DisplayModelVersion[]): Promise<void>;
@@ -21,8 +23,13 @@ export interface ValidationResidentCache extends SavedModelResidentPort { prepar
 export interface DecodedValidationModel { point?: ValidatedPoint; root: THREE.Object3D; materialLocators: ReadonlyMap<THREE.Material, JsonObject>; occurrenceSlots?: readonly DecodedOccurrenceSlot[]; dispose(): void }
 
 /** No arbitrary URL/path input. The caller supplies already inspected, owned GLB bytes. */
-export async function decodeValidationModel(source: ValidatedGlb): Promise<DecodedValidationModel> {
-  if (source.occurrences) return decodeOccurrenceGlb(source);
+export async function decodeValidationModel(source: ValidatedGlb, signal?: AbortSignal): Promise<DecodedValidationModel> {
+  signal?.throwIfAborted();
+  if (source.occurrences) return decodeOccurrenceGlb(source, signal);
+  const { bytes, ...metadata } = source;
+  source = { ...structuredClone(metadata), bytes: bytes.slice() };
+  const legacy = await readLegacyModelProof('glb', source.bytes, { signal });
+  signal?.throwIfAborted();
   const manager = new THREE.LoadingManager(), owned = new Set<ImageBitmap>();
   const materialLocators = new Map<THREE.Material, JsonObject>();
   const sourceLocators = new Set(source.materials.map(s => canonical(s.sourceLocator!)));
@@ -47,7 +54,7 @@ export async function decodeValidationModel(source: ValidatedGlb): Promise<Decod
   }
   try {
     const loader = new GLTFLoader(manager);
-    loader.register(parser => ({ name: 'LOCIVIEW_validation_saved_png', beforeRoot: async () => {
+    loader.register(parser => { trackGltfImages(parser); return { name: 'LOCIVIEW_validation_saved_png', beforeRoot: async () => {
       parser.textureLoader = new TrackedImages(manager).setOptions({ premultiplyAlpha: 'none', colorSpaceConversion: 'none' });
     }, loadMesh: async index => {
       const mesh = await parser.loadMesh(index);
@@ -69,9 +76,11 @@ export async function decodeValidationModel(source: ValidatedGlb): Promise<Decod
         materialLocators.set(node.material, locator);
       });
       return mesh;
-    } }));
+    } }; });
     const gltf = await loader.parseAsync(source.bytes.slice().buffer as ArrayBuffer, '');
     all.add(...gltf.scenes); const root = gltf.scene;
+    signal?.throwIfAborted();
+    assertTargetTables(legacy.table, snapshotTargets(root, legacy.table.rows));
     if (failed || !root) throw Error('モデルのテクスチャを表示できません。');
     let triangles = 0;
     root.updateMatrixWorld(true);
@@ -90,7 +99,7 @@ export async function decodeValidationModel(source: ValidatedGlb): Promise<Decod
 
 /** Reusable resident cache, scoped to one opened validation Project; never shared metadata. */
 export async function prepareValidationResidents(versions: readonly DisplayModelVersion[], content: { modelContent?(record: JsonObject): Promise<ValidatedModel>; model?(record: JsonObject): Promise<ValidatedGlb> },
-  decode: (source: ValidatedGlb) => Promise<DecodedValidationModel> = decodeValidationModel): Promise<ValidationResidentCache> {
+  decode: (source: ValidatedGlb, signal?: AbortSignal) => Promise<DecodedValidationModel> = decodeValidationModel): Promise<ValidationResidentCache> {
   const models = (rows: readonly DisplayModelVersion[]) => rows.map(v => {
     if (!isSavedModel(v.closure)) throw Error('実モデルの保存本体を選択してください。'); return renderModel(v.closure);
   });
@@ -98,10 +107,11 @@ export async function prepareValidationResidents(versions: readonly DisplayModel
   return { ...core, prepare: next => core.prepare(models(next)) };
 }
 export async function prepareReadonlyResidents(initial: readonly ReadonlyRenderModel[], content: { modelContent?(record: JsonObject): Promise<ValidatedModel>; model?(record: JsonObject): Promise<ValidatedGlb> },
-  decode: (source: ValidatedGlb) => Promise<DecodedValidationModel> = decodeValidationModel) {
+  decode: (source: ValidatedGlb, signal?: AbortSignal) => Promise<DecodedValidationModel> = decodeValidationModel) {
+  const lifetime = new AbortController();
   const templates = new Map<string, { record: string; model: DecodedValidationModel }>();
   const live = new Set<() => void>(); let closed = false, preparing = false;
-  const dispose = () => { if (closed) return; closed = true; for (const release of [...live]) release();
+  const dispose = () => { if (closed) return; closed = true; lifetime.abort(); for (const release of [...live]) release();
     for (const item of templates.values()) item.model.dispose(); templates.clear(); };
   const prepare = async (next: readonly ReadonlyRenderModel[]) => {
     if (closed || preparing) throw Error('モデルの表示準備を完了してください。');
@@ -112,7 +122,7 @@ export async function prepareReadonlyResidents(initial: readonly ReadonlyRenderM
       if (previous) { if (previous.record !== record) throw Error('モデルの本体が一致しません。'); continue; }
       const source = content.modelContent ? await content.modelContent(c.representation) : await content.model!(c.representation);
       if (!same(source.bounds, c.representation.logicalBoundsAsset)) throw Error('保存したモデルの範囲が一致しません。');
-      staged.set(key, { record, model: isPointModel(source) ? { point: source, root: new THREE.Group(), materialLocators: new Map(), dispose() {} } : await decode(source) });
+      staged.set(key, { record, model: isPointModel(source) ? { point: source, root: new THREE.Group(), materialLocators: new Map(), dispose() {} } : await decode(source, lifetime.signal) });
       if (closed) throw Error('画面を閉じました。');
     }
       for (const [key, item] of staged) templates.set(key, item);

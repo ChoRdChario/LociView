@@ -234,6 +234,12 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
     });
     for (const path of walk('src').filter(p => /\.(ts|tsx|js)$/.test(p))) {
       const source = readFileSync(path, 'utf8');
+      const normalizedPath=path.replaceAll('\\','/');
+      if(source.includes("from 'three-compat-180"))expect(['src/projectFiles/glb.ts','src/projectFiles/legacy180Occurrences.ts','src/viewer/compat180/modelRuntime.ts','src/viewer/compat180/addons.d.ts'],path).toContain(normalizedPath);
+      if(/from ['"][^'"]*compat180\/modelRuntime['"]|from ['"]\.\/modelRuntime['"]/.test(source))expect(['src/viewer/compat180/proof.ts'],path).toContain(normalizedPath);
+      if(/from ['"][^'"]*modelLoader['"]/.test(source))expect(['src/viewer/loaders.ts','src/viewer/compat180/proof.ts'],path).toContain(normalizedPath);
+      if(source.includes('captureOwnedOccurrenceProof')&&!normalizedPath.endsWith('/legacy180Occurrences.ts'))expect(['src/projectFiles/glbOccurrences.ts'],path).toContain(normalizedPath);
+
       if (source.includes("from './pointAnchorProof'")) expect(['session.ts', 'source.ts']).toContain(path.split(/[\\/]/).at(-1));
       const reviewEditPackage = /[\\/]projectPackage[\\/](reviewEdit|reviewEditControls|reviewEditJob|cleanInputDescriptor)\.ts$/.test(path);
       const packageControl = reviewEditPackage || /[\\/]projectPackage[\\/](reviewSnapshot|reviewSelection|reviewSource|reviewArchive|reviewOutputJob|cleanRecords|cleanSource|cleanArchive|cleanOutputJob|cleanInputJob|contract|manifest|historySummary|closure|protectedInventory|workspaceSource|contributionSource|contributionArchive|contributionEvidence|contributionReceiveJob|contributionOutputJob|outputJobs|receiveJobs|zipChecks|zipArchive|workspaceArchive|receiveJob|workspaceBases|outputJob|backupEvidence|backupSource|backupArchive|backupOutputJob|backupRestoreJob|restoreControls)\.ts$/.test(path);
@@ -246,7 +252,7 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
       const metadataService = /[\\/]projectMetadata[\\/](pointAnchorProof|persistence|generationScope|repository|journal|contentEvidence|blobStream|blobStore|blobInventory|session|commands|remote|packageRemote|membership|records|assetStatus|modelMembership|modelAddition|modelReplacement|captionCandidates|sceneAuthoring|viewResolution|materialResolution|captionDeletion|assetDeletion|startupScene)\.ts$/.test(path);
       // 05 §13.2 permits this exact new synthetic host, never ordinary/old saved activation.
       const metadataHost = /[\\/]harness[\\/]projectScene[\\/]metadata(Fixture|Storage|Host|Intent|MembershipControls|Models|ModelFacts|AssetStatusControls|ConflictControls|MaterialControls|CaptionLifecycleControls|StartupControls)\.ts$/.test(path);
-      const validationFiles = /[\\/]projectFiles[\\/](validation|png|jpeg|photo|glb|glbMaterials|glbOccurrences|pointPly|initialProject|content|creation|modelFacts|receiveWorkspace|sendWorkspace|nativeMapping|nativeConversion|frozenV1Source|frozenV1Mapping|frozenV1Conversion|lociMyuSource|lociMyuMapping|lociMyuConversion)\.ts$/.test(path);
+      const validationFiles = /[\\/]projectFiles[\\/](validation|png|jpeg|photo|glb|glbMaterials|glbOccurrences|legacy180Occurrences|pointPly|initialProject|content|creation|modelFacts|receiveWorkspace|sendWorkspace|nativeMapping|nativeConversion|frozenV1Source|frozenV1Mapping|frozenV1Conversion|lociMyuSource|lociMyuMapping|lociMyuConversion)\.ts$/.test(path);
       const validationDisplay = /[\\/]harness[\\/]projectScene[\\/](modelTypes|modelCandidatePreview|validationProjection|validationRender|validationMaterials|validationCoverage|validationPointCoverage)\.ts$/.test(path);
       const validationHost = /[\\/]harness[\\/]projectScene[\\/](reviewView|reviewWorkspace|savedHost|validationHost|validationModeHost|validationCatalog|validationGeneration|validationWorkspace|validationReceiveControls|validationOutputControls|validationBrowser|browserMetadataStorage|browserUiState|productWorkspace|productSources|viewCandidateLabels)\.ts$/.test(path);
       const productComposition = /[\\/]ui[\\/]projectScene[\\/](projectWorkspacePorts|projectWorkspace|projectRead|projectPanel|projectModels|projectViews|projectMaterials|projectMedia|projectRecovery)\.ts$/.test(path);
@@ -366,7 +372,7 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
           modelTypes: ['../../domain/values', '../../scene/types', './modelClosure', './mediaHistory'],
           modelCandidatePreview: ['../../scene/projectProvider', '../../projectMetadata/assetStatus', '../../projectMetadata/records', '../../projectMetadata/format', './modelTypes', './viewportModel', './viewportHost'],
           validationProjection: ['../../projectFiles/pointPly', '../../scene/projectProvider', '../../projectMetadata/records', '../../projectMetadata/format', '../../domain/projectGraphSupport', '../../projectFiles/validation', './fixture', './modelTypes'],
-          validationRender: ['../../domain/pointPresentation', '../../viewer/pointSurface', '../../projectFiles/pointPly', 'three', 'three/addons/loaders/GLTFLoader.js', '../../viewer/loaders', '../../viewer/hardChroma', '../../projectFiles/glb', '../../projectFiles/content', '../../projectFiles/glbOccurrences', '../../domain/materialIntent', './modelTypes', './viewportPicking', './viewportModel', '../../domain/projectGraphSupport', '../../domain/values', './validationMaterials'],
+          validationRender: ['../../viewer/compat180/proof', '../../viewer/compat180/sceneProof', '../../domain/pointPresentation', '../../viewer/pointSurface', '../../projectFiles/pointPly', 'three', 'three/addons/loaders/GLTFLoader.js', '../../viewer/loaders', '../../viewer/hardChroma', '../../projectFiles/glb', '../../projectFiles/content', '../../projectFiles/glbOccurrences', '../../domain/materialIntent', './modelTypes', './viewportPicking', './viewportModel', '../../domain/projectGraphSupport', '../../domain/values', './validationMaterials'],
           validationMaterials: ['../../domain/projectGraphSupport', '../../domain/materialIntent', '../../domain/projectProfile', '../../domain/values', '../../scene/types', './modelTypes'],
           validationPointCoverage: ['three', '../../viewer/hardChroma', './validationCoverage', './viewportPicking'],
           validationCoverage: ['three', '../../viewer/hardChroma', './viewportPicking'],
@@ -380,10 +386,11 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
           png: ['../viewer/rasterDimensions', './validation'],
           jpeg: ['./validation', './png'],
           photo: ['./jpeg', './png', './validation'],
-          glb: ['three', '../domain/values', './png', './glbMaterials', './validation', './jpeg'],
+          glb: ['three-compat-180', '../domain/values', './png', './glbMaterials', './validation', './jpeg'],
           glbMaterials: ['../domain/values', './validation'],
           pointPly: ['../../docs/specs/profiles/point-ply-rgb-1.profile.json?raw', '../domain/values', './validation', './glb', '../domain/pointPresentation'],
-          glbOccurrences: ['three', 'three/addons/loaders/GLTFLoader.js', '../domain/values', '../domain/projectGraphSupport', '../viewer/loaders', './glb', './png', './validation', './jpeg'],
+          glbOccurrences: ['./legacy180Occurrences', '../viewer/compat180/sceneProof', 'three', 'three/addons/loaders/GLTFLoader.js', '../domain/values', '../domain/projectGraphSupport', '../viewer/loaders', './glb', './png', './validation', './jpeg'],
+          legacy180Occurrences: ['../nativeGs/sha256', '../viewer/compat180/sceneProof', 'three-compat-180', 'three-compat-180/addons/loaders/GLTFLoader.js', '../domain/values', '../domain/projectGraphSupport', '../viewer/compat180/resources', './glb', './png', './validation', './jpeg'],
           initialProject: ['./pointPly', '../domain/projectGraphSupport', '../domain/projectRecords', '../domain/values', '../projectMetadata/persistence', '../projectMetadata/blobStore', './glb', './png', './validation', './jpeg', './photo'],
           content: ['./pointPly', '../platform/fs', '../domain/projectContentChecks', '../domain/projectGraphSupport', '../domain/values', '../domain/projectRecordFields', '../projectMetadata/contentEvidence', '../projectMetadata/blobInventory', '../projectMetadata/blobStore', '../projectMetadata/session', '../projectMetadata/persistence', './glb', './glbOccurrences', './png', './validation', './initialProject', './jpeg', './photo'],
           creation: ['../platform/fs', '../projectMetadata/blobStore', '../projectMetadata/source', '../projectMetadata/session', '../projectMetadata/repository', '../projectMetadata/persistence', './content', './initialProject', './png', './validation', './modelFacts', './jpeg', './photo'],

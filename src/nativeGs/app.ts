@@ -1779,7 +1779,7 @@ export async function bootNativeGsApp(root: HTMLElement, homeHost?: NativeHomeHo
     const runtimeStatus = el('p', { class: 'ng-status' }, 'モデルを読み込んでいます…');
     const diagnostics = el('ul', { class: 'ng-diagnostics' });
     const runtimeErrors: string[] = [];
-    const display = el('select');
+    const display = el('select', { 'aria-label': '一括表示' });
     display.append(el('option', { value: '' }, '一括表示を選択'));
     for (const [value, label] of [['mixed', 'すべてのモデル'], ['gs-only', 'Gaussian Splattingのみ'], ['mesh-only', '3Dモデル／通常点群のみ']] as const) {
       display.append(el('option', { value }, label));
@@ -3135,6 +3135,17 @@ export async function bootNativeGsApp(root: HTMLElement, homeHost?: NativeHomeHo
         markDirty();
       },
       onIssuesChanged(issues) { setDiagnostics([...new Set([...issues, ...runtimeErrors])]); },
+      onDisplayRecovery(state) {
+        if (state === 'recovering') {
+          runtimeStatus.className = 'ng-status';
+          runtimeStatus.textContent = '3D表示の接続が切れました。接続の回復後に表示を復旧します。';
+        } else {
+          runtimeErrorBadge.hidden = runtimeErrors.length === 0;
+          runtimeStatus.className = runtimeErrors.length === 0 ? 'ng-status' : 'ng-error';
+          runtimeStatus.textContent = runtimeErrors.length === 0 ? '3D表示を復旧しました。' : `モデルを表示できません：${runtimeErrors[0]}`;
+        }
+        syncVisibilityControls();
+      },
       onProgress(message) { runtimeStatus.textContent = message; },
       onRuntimeError(message) {
         if (!runtimeErrors.includes(message)) runtimeErrors.push(message);

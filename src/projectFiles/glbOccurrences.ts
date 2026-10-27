@@ -1,3 +1,4 @@
+import { snapshotTargets, assertTargetRows, trackGltfImages } from '../viewer/compat180/sceneProof';
 import * as THREE from 'three';
 import { GLTFLoader, type GLTFParser } from 'three/addons/loaders/GLTFLoader.js';
 import type { JsonObject } from '../domain/values';
@@ -7,6 +8,29 @@ import { inspectValidationGlb, inspectValidationJpegGlb, validationGlbParts, typ
 import type { PngDecoder } from './png';
 import type { JpegDecoder } from './jpeg';
 import { fileError, type FileValidationLimits } from './validation';
+import { captureOwnedOccurrenceProof, occurrenceInputKey } from './legacy180Occurrences';
+export { captureLegacyOccurrenceProof } from './legacy180Occurrences';
+
+/** Actual180 proof and release precede a separately verified186 display. */
+export async function decodeOccurrenceGlb(source: ValidatedGlb, signal?: AbortSignal) {
+  const {bytes,...metadata}=source;
+  const owned:ValidatedGlb={...structuredClone(metadata),bytes:bytes.slice()};
+  const proof=await captureOwnedOccurrenceProof(owned,signal);
+  signal?.throwIfAborted();
+  const display = await decodeOccurrenceDisplay(owned);
+  try {
+    signal?.throwIfAborted();
+    if(proof.inputKey!==occurrenceInputKey(owned))throw Error('元のモデル入力が変更されました。');
+    if (proof.rows.length !== display.occurrenceSlots.length) throw Error('旧材質の面の数が一致しません。');
+    for (const [index, slot] of display.occurrenceSlots.entries()) {
+      const old = proof.rows[index]!;
+      if (old.nodeIndex !== slot.nodeIndex || old.primitiveIndex !== slot.primitiveIndex || old.slotIndex !== slot.slotIndex || old.materialIndex !== slot.materialIndex)
+        throw Error('旧材質の対応が一致しません。');
+      assertTargetRows([old.target], snapshotTargets(slot.node, [old.target], false).rows, false);
+    }
+    return display;
+  } catch(error) { display.dispose(); throw error; }
+}
 
 export async function inspectOccurrenceGlb(bytes: Uint8Array, limits: FileValidationLimits, decode?: PngDecoder): Promise<ValidatedGlb> {
   return occurrenceCatalog(await inspectValidationGlb(bytes, limits, decode), limits);
@@ -34,8 +58,8 @@ export interface DecodedOccurrenceSlot {
   readonly nodeIndex: number; readonly primitiveIndex: number; readonly materialIndex: number | null; readonly slotIndex: number;
 }
 /** Owned inspected input only. No source URLs, metadata, storage or UI authority. */
-export async function decodeOccurrenceGlb(source: ValidatedGlb) {
-  if (!source.occurrences || THREE.REVISION !== '180' || !THREE.ColorManagement.enabled || THREE.ColorManagement.workingColorSpace !== THREE.LinearSRGBColorSpace)
+async function decodeOccurrenceDisplay(source: ValidatedGlb) {
+  if (!source.occurrences || THREE.REVISION !== '186' || !THREE.ColorManagement.enabled || THREE.ColorManagement.workingColorSpace !== THREE.LinearSRGBColorSpace)
     throw Error('モデルと材質の対応を確認できません。');
   const manager = new THREE.LoadingManager(), owned = new Set<ImageBitmap>(), roots = new Set<THREE.Object3D>(), originals = new Set<THREE.Material>();
   const materialLocators = new Map<THREE.Material, JsonObject>(), occurrenceSlots: DecodedOccurrenceSlot[] = [];
@@ -68,6 +92,7 @@ export async function decodeOccurrenceGlb(source: ValidatedGlb) {
     loader.register(p => { parser = p; return { name: 'LOCIVIEW_occurrence_png', beforeRoot: async () => {
       p.textureLoader = new Images(manager).setOptions({ premultiplyAlpha: 'none', colorSpaceConversion: 'none' });
     } }; });
+    loader.register(p => { trackGltfImages(p); return { name:'LOCIVIEW_occurrence_texture_origin' }; });
     const gltf = await loader.parseAsync(source.bytes.slice().buffer as ArrayBuffer, '');
     for (const root of gltf.scenes) roots.add(root);
     const root = gltf.scene, p = gltf.parser, seen = new Set<number>(); let triangles = 0;
