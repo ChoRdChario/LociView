@@ -1,3 +1,4 @@
+import { opaqueMaterialSource } from '../domain/meshMaterialSource';
 import { inspectProjectImage, type PhotoDecoder } from './photo';
 import { inspectZipContainerMetadata, readZipEntries, sanitizeZipPath, type ZipEntryData } from '../assets/zipio';
 import { buildImportPlan, sniffImageExt, type ImportPlan } from '../assets/importWizard';
@@ -18,7 +19,8 @@ export const lociMyuRecipe = 'locimyu-project-scene-migration-recipe-1';
 export const lociMyuJpegRecipe = 'locimyu-project-scene-migration-recipe-2';
 export const lociMyuPhotoRecipe = 'locimyu-project-scene-migration-recipe-3';
 export const lociMyuMaterialRecipe = 'locimyu-project-scene-migration-recipe-4';
-export type LociMyuRecipe = typeof lociMyuMaterialRecipe | typeof lociMyuPhotoRecipe | typeof lociMyuRecipe | typeof lociMyuJpegRecipe;
+export const lociMyuOpaqueMaterialRecipe = 'locimyu-project-scene-migration-recipe-5';
+export type LociMyuRecipe = typeof lociMyuOpaqueMaterialRecipe | typeof lociMyuMaterialRecipe | typeof lociMyuPhotoRecipe | typeof lociMyuRecipe | typeof lociMyuJpegRecipe;
 export const lociMyuByteProof = async (bytes: Uint8Array) => ({ byteLength: bytes.length, digest: await digest(bytes) });
 export interface LociMyuIssue { severity: 'info' | 'warning' | 'blocking'; sheet: string | null; row: number | null; sourceId: string | null;
   field: string; reason: string; impact: string; candidates: string[] }
@@ -152,7 +154,7 @@ export async function openLociMyuSource(input: Blob, limits: FileValidationLimit
 
 export async function planLociMyuSource(opened: OpenedLociMyuSource, selection: number, title: string, confirmRelations: boolean): Promise<{
   relation: ReturnType<typeof planLociMyuDisplaySetRelationConfirmation>;
-  base: Pick<LociMyuSourcePlan, 'workbook' | 'confirmation' | 'title' | 'inventory' | 'fingerprints' | 'issues' | 'accounting' | 'sourceEvidence'> & { materialSelected?: true };
+  base: Pick<LociMyuSourcePlan, 'workbook' | 'confirmation' | 'title' | 'inventory' | 'fingerprints' | 'issues' | 'accounting' | 'sourceEvidence'> & { materialSelected?: true; materialRecipe?:typeof lociMyuMaterialRecipe|typeof lociMyuOpaqueMaterialRecipe };
   plan: LociMyuSourcePlan | null;
 }> {
   const { imported, entries, limits, decode, jpeg, photo } = opened, source = imported.sources[selection];
@@ -171,7 +173,7 @@ export async function planLociMyuSource(opened: OpenedLociMyuSource, selection: 
     diagnostics: s.validationFailure ?? null, admittedCaptions: s.captionCount, tables: s.tables.map(t => ({ name: t.name, headers: t.rows[0] ?? [], rows: t.rows.length })) }))),
     diagnostics: { selectedWorkbook: source.archivePath, candidateFailures: imported.sources.filter(s => s.validationFailure).map(s => ({ path: s.archivePath, failure: s.validationFailure! })) },
     rawAnalyzerDiagnostics: opened.rawAnalyzerDiagnostics, fileIdMapRows: imported.fileIdMapRows ?? [] }) as JsonObject;
-  const base: Pick<LociMyuSourcePlan, 'workbook' | 'confirmation' | 'title' | 'inventory' | 'fingerprints' | 'issues' | 'accounting' | 'sourceEvidence'> & { materialSelected?: true } = { workbook, confirmation: null, title, inventory, fingerprints, issues, accounting, sourceEvidence };
+  const base: Pick<LociMyuSourcePlan, 'workbook' | 'confirmation' | 'title' | 'inventory' | 'fingerprints' | 'issues' | 'accounting' | 'sourceEvidence'> & { materialSelected?: true; materialRecipe?:typeof lociMyuMaterialRecipe|typeof lociMyuOpaqueMaterialRecipe } = { workbook, confirmation: null, title, inventory, fingerprints, issues, accounting, sourceEvidence };
   try {
     if (opened.preflightFailures.has(source.archivePath)) refuse(opened.preflightFailures.get(source.archivePath)!);
     if (source.validationFailure && source.validationFailure.code !== 'missing-legacy-id') {
@@ -294,8 +296,10 @@ export async function planLociMyuSource(opened: OpenedLociMyuSource, selection: 
             const indices = [...targets].sort((a, b) => a - b);
             for (const index of indices) {
               const slot = materialSlots.get(index);
-              if (!slot || json(slot.sourceSemantics) !== json({ coverage: { kind: 'opaque' }, optics: 'surface', lighting: 'lit', doubleSided: false }))
+              const source=slot&&opaqueMaterialSource(slot.sourceSemantics);
+              if (!source)
                 materialRefuse('sourceSemantics', `材質 ${index + 1} の元の見え方はまだ変換できません。`, [`gltfMaterial:${index}`]);
+              if(source!.lighting==='unlit'||source!.doubleSided)base.materialRecipe=lociMyuOpaqueMaterialRecipe;
             }
             const scene = scenes.find(s => s.name === activation.get(gid))!;
             materialRows.push({ row: i + 1, scene: scene.name, identity: scene.identity, key, indices, doubleSided: truth(2), unlit: truth(3), sourceOnlyChroma: [5, 6, 7].some(c => !!cell(r, c)) });
@@ -320,7 +324,7 @@ export async function planLociMyuSource(opened: OpenedLociMyuSource, selection: 
       if (role === 'unselected-workbook' || role === 'unlinked-media') { accounting.sourceOnlyEntries++; issue('info', entry.path, null, null, 'entry', 'この項目は元ファイルだけに保持します。'); }
       fingerprints.push({ path: entry.path, role, ...await lociMyuByteProof(entry.data) });
     }
-    const plan: LociMyuSourcePlan = { ...base, recipe: base.materialSelected ? lociMyuMaterialRecipe : [...images.values()].some(m => m.ref.mediaType === 'image/webp' || m.ref.mediaType === 'image/gif') ? lociMyuPhotoRecipe : model.model.jpeg || [...images.values()].some(m => m.ref.mediaType === 'image/jpeg') ? lociMyuJpegRecipe : lociMyuRecipe, model, media: [...images.values()], scenes, views,
+    const plan: LociMyuSourcePlan = { ...base, recipe: base.materialSelected ? base.materialRecipe??lociMyuMaterialRecipe : [...images.values()].some(m => m.ref.mediaType === 'image/webp' || m.ref.mediaType === 'image/gif') ? lociMyuPhotoRecipe : model.model.jpeg || [...images.values()].some(m => m.ref.mediaType === 'image/jpeg') ? lociMyuJpegRecipe : lociMyuRecipe, model, media: [...images.values()], scenes, views,
       ...(base.materialSelected ? { materialRows } : {}) };
     if (base.materialSelected) lociMyuEvidence(materialRows);
     lociMyuEvidence({ ...base, scenes: scenes.map(s => ({ name: s.name, identity: s.identity, captions: s.captions.map(c => ({ row: c.row, id: c.value.captionId })) })) });

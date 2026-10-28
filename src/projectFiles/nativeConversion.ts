@@ -1,7 +1,8 @@
+import { opaqueMaterialSource } from '../domain/meshMaterialSource';
 import { inspectProjectImage, projectImageMime, type PhotoDecoder } from './photo';
 import { readNativePortableConversionV1 } from '../nativeGs/portablePackage';
-import { prepareNativeSpatialConversion, resumeNativeSpatialConversion } from './nativeSpatialConversion';
-import { nativeSpatialRecipe, nativeMeshRecipe } from './nativeMapping';
+import { prepareNativeSpatialConversion, resumeNativeSpatialConversion, nativeOpaqueConversionSourceLane,nativeSourceIsSpatial } from './nativeSpatialConversion';
+import { nativeSpatialRecipe, nativeMeshRecipe, nativeOpaqueMaterialRecipe,nativeUsesExpandedMaterialSource } from './nativeMapping';
 import { projectFilePolicy, type ProjectFilePolicyInput } from './validation';
 import { nativeDisplaySetsV1, type NativeProjectSnapshotV1 } from '../nativeGs/schema';
 import { nativeMaterialSlotKey } from '../nativeGs/materialSlots';
@@ -43,7 +44,7 @@ const receiptPath = (fs: ProjectWorkspaceFS) => metadataPath(fs, 'native-convers
 const sourcePath = (fs: ProjectWorkspaceFS) => metadataPath(fs, 'native-conversion-source.zip');
 const proof = async (bytes: Uint8Array): Promise<ByteProof> => ({ byteLength: bytes.length, digest: await digest(bytes) });
 export const hasNativeConversion = async (fs: ProjectWorkspaceFS, checkBoundInitial = true) => !!await fs.readStream(receiptPath(fs)) || !!await fs.readStream(sourcePath(fs)) ||
-  checkBoundInitial && [nativeMeshRecipe, nativeSpatialRecipe, nativeJpegRecipe, nativeAppearanceJpegRecipe, nativePhotoRecipe, nativeAppearancePhotoRecipe].includes(await validationInitialOrigin(fs) as NativeConversionRecipe);
+  checkBoundInitial && [nativeOpaqueMaterialRecipe, nativeMeshRecipe, nativeSpatialRecipe, nativeJpegRecipe, nativeAppearanceJpegRecipe, nativePhotoRecipe, nativeAppearancePhotoRecipe].includes(await validationInitialOrigin(fs) as NativeConversionRecipe);
 async function inspectNativeModel(bytes: Uint8Array, appearance: boolean, limits: FileValidationLimits, png?: PngDecoder, jpeg?: JpegDecoder) {
   const hasJpeg = validationGlbUsesJpeg(bytes, limits);
   const inspect = appearance ? hasJpeg ? inspectOccurrenceJpegGlb : inspectOccurrenceGlb : hasJpeg ? inspectValidationJpegGlb : inspectValidationGlb;
@@ -68,7 +69,7 @@ async function checkConversionReceipt(r: ConversionReceipt, projectId: string) {
     Object.keys(v).sort().join(',') === names.sort().join(',');
   const byteProof = (p: ByteProof) => keys(p, ['byteLength', 'digest']) && Number.isSafeInteger(p.byteLength) && p.byteLength > 0 && /^[0-9a-f]{64}$/.test(p.digest);
   if (!keys(r, ['recipe', 'conversionId', 'projectId', 'original', 'manifest', 'snapshot', 'initial', 'mapping', 'report', ...(nativeRecipeHasAppearance(r.recipe) ? ['materialWitness'] : [])]) ||
-    ![nativeConversionRecipe, nativeAppearanceRecipe, nativeJpegRecipe, nativeAppearanceJpegRecipe, nativePhotoRecipe, nativeAppearancePhotoRecipe].includes(r.recipe) || r.projectId !== projectId || r.projectId !== `prj_${r.conversionId}` || !/^[0-9a-f]{32}$/.test(r.conversionId) ||
+    ![nativeConversionRecipe, nativeAppearanceRecipe, nativeJpegRecipe, nativeAppearanceJpegRecipe, nativePhotoRecipe, nativeAppearancePhotoRecipe, nativeOpaqueMaterialRecipe].includes(r.recipe) || r.projectId !== projectId || r.projectId !== `prj_${r.conversionId}` || !/^[0-9a-f]{32}$/.test(r.conversionId) ||
     !byteProof(r.original) || !byteProof(r.manifest) || !byteProof(r.snapshot) || !keys(r.initial, ['byteLength', 'digest', 'proof']) ||
     !byteProof({ byteLength: r.initial.byteLength, digest: r.initial.digest }) || !Array.isArray(r.mapping) || !r.mapping.length ||
     !keys(r.report, ['models', 'scenes', 'captions', 'media', 'originalExcludedFromExports']) || r.report.originalExcludedFromExports !== true ||
@@ -114,7 +115,7 @@ function checkAppearanceSubset(snapshot: NativeProjectSnapshotV1, models: Readon
   for (const a of snapshot.meshMaterialAppearances) {
     const r = byRep.get(a.representationId)!, target = targets.get(`${r.id}/${a.materialSlotKey}`);
     if (a.opacity !== 1 || a.chroma.enabled || !target || families.get(`${r.assetId}/${r.variantFamilyId}`) !== 1 ||
-      !same(target.semantics, { coverage: { kind: 'opaque' }, optics: 'surface', lighting: 'lit', doubleSided: false }))
+      !opaqueMaterialSource(target.semantics))
       return fileError('この材質設定は、まだそのまま変換できません。不透明度1・透過色が無効の、不透明な元材質が対象です。');
   }
 }
@@ -308,7 +309,10 @@ export async function resumeNativeConversion(fs: ProjectWorkspaceFS, store: Orig
   budget: ProjectFilePolicyInput, projectId: string, decode?: PngDecoder, jpeg?: JpegDecoder, photo?: PhotoDecoder, reselected?: Blob) {
   const receipt = await readReceipt<ConversionReceipt>(fs, receiptPath(fs), metadata);
   if (!receipt) return fileError('変換元の記録を確認できません。');
-  if ((receipt.recipe === nativeSpatialRecipe || receipt.recipe === nativeMeshRecipe)) return resumeNativeSpatialConversion(fs, store, session, budget, projectId, decode, jpeg, photo, reselected);
+  if (receipt.recipe === nativeSpatialRecipe || receipt.recipe === nativeMeshRecipe) return resumeNativeSpatialConversion(fs, store, session, budget, projectId, decode, jpeg, photo, reselected);
+  // Shape chooses only a candidate location. Raw GLB9 checks its lane against the
+  // same original byte capture used below, avoiding another full fallback read.
+  if(receipt.recipe===nativeOpaqueMaterialRecipe&&Object.hasOwn(receipt,'originalRef')){const lane=await nativeOpaqueConversionSourceLane(fs,store,budget,receipt,reselected);if(lane.spatial)return resumeNativeSpatialConversion(fs,store,session,budget,projectId,decode,jpeg,photo,reselected,lane);}
   const limits = projectFilePolicy(budget).nonGs;
   await checkConversionReceipt(receipt, projectId);
   const { source, receipt: initial } = await readValidationInitialRecord(fs);
@@ -327,6 +331,7 @@ export async function resumeNativeConversion(fs: ProjectWorkspaceFS, store: Orig
   if (nativeRecipeHasAppearance(receipt.recipe) || nativeRecipeHasOrigin(receipt.recipe)) {
     checkedNative = await readNativePortableConversionV1(new Blob([original.slice().buffer]), limits) ?? undefined;
     if (!checkedNative || json(await proof(checkedNative.manifestBytes)) !== json(receipt.manifest) || json(await proof(checkedNative.snapshotBytes)) !== json(receipt.snapshot)) return fileError('変換元の内容が記録と一致しません。');
+    if(receipt.recipe===nativeOpaqueMaterialRecipe&&nativeSourceIsSpatial(checkedNative.snapshot))return fileError('変換元と復旧記録の経路が一致しません。');
     const models = new Map<string, ValidatedGlb>(), rows = new Map<string, readonly NativeOccurrence[]>(); let occurrenceCount = 0;
     for (const r of checkedNative.snapshot.representations) {
       const body = checkedNative.bodies.get(checkedNative.manifest.representations.find(m => m.representationId === r.id)!.entry)!;
@@ -345,11 +350,12 @@ export async function resumeNativeConversion(fs: ProjectWorkspaceFS, store: Orig
         if (await inspectProjectImage(body, limits, decode, jpeg, photo) !== m.blob.mediaType) return fileError('元の画像形式が一致しません。');
         hasJpeg ||= m.blob.mediaType === 'image/jpeg'; hasPhoto ||= m.blob.mediaType === 'image/webp' || m.blob.mediaType === 'image/gif';
       }
-      if ((nativeRecipeHasPhoto(receipt.recipe) ? !hasPhoto : hasPhoto || !hasJpeg) || !!checkedNative.snapshot.meshMaterialAppearances?.length !== nativeRecipeHasAppearance(receipt.recipe))
+      if (receipt.recipe!==nativeOpaqueMaterialRecipe&&(nativeRecipeHasPhoto(receipt.recipe) ? !hasPhoto : hasPhoto || !hasJpeg) || !!checkedNative.snapshot.meshMaterialAppearances?.length !== nativeRecipeHasAppearance(receipt.recipe))
         return fileError('変換の版と変換元が一致しません。');
     }
     if (nativeRecipeHasAppearance(receipt.recipe)) {
       checkAppearanceSubset(checkedNative.snapshot, models, rows, limits);
+      if(nativeUsesExpandedMaterialSource(checkedNative.snapshot,models,rows)!==(receipt.recipe===nativeOpaqueMaterialRecipe))return fileError('変換の版と元の材質が一致しません。');
       await verifyMaterialWitness(receipt, source, checkedNative.snapshot, models, rows, limits);
     }
     await verifyAdditiveMapping(receipt, source, checkedNative.snapshot, models, rows);

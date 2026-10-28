@@ -21,7 +21,7 @@ async function ready(p:Page,expected=title){await expect(p.getByRole('heading',{
 async function open(p:Page,path:string){await p.getByLabel('ファイルを選択',{exact:true}).setInputFiles(path);await p.getByRole('button',{name:'ファイルを開く',exact:true}).click();}
 async function selectCaption(p:Page,label?:string){await p.getByRole('tab',{name:'キャプション',exact:true}).click();const rows=p.getByRole('list',{name:'キャプション一覧',exact:true}).locator('.lv-caption-select');await(label?rows.filter({hasText:label}):rows.first()).click();}
 async function edit(p:Page,field:'タイトル'|'本文',text:string){await detail(p).getByLabel(field,{exact:true}).fill(text);await detail(p).getByRole('button',{name:'変更を適用',exact:true}).click();await expect(p.getByText('変更を適用しました。',{exact:true})).toBeVisible({timeout:180000});}
-async function output(p:Page,info:TestInfo,name:string,purpose:'backup'|'teamWorkspace'|'contribution'|'review'|'clean',base?:string){
+async function output(p:Page,info:TestInfo,name:string,purpose:'backup'|'teamWorkspace'|'contribution'|'review'|'clean',base?:string,reviewScene?:string){
   const menu=p.locator('details.lv-project-files');if(await menu.count()&&!await menu.evaluate(n=>(n as HTMLDetailsElement).open))await menu.locator(':scope > summary').click();
   const area=files(p);
   if(purpose==='review'||purpose==='clean'){
@@ -30,7 +30,7 @@ async function output(p:Page,info:TestInfo,name:string,purpose:'backup'|'teamWor
   }else await area.getByRole('button',{name:purpose==='backup'?'保存':'相手に渡す',exact:true}).click();
   if(purpose==='backup')await area.getByLabel('名前（任意）',{exact:true}).fill(name);
   else if(purpose!=='review'&&purpose!=='clean'){await area.getByLabel('渡す内容',{exact:true}).selectOption(purpose);if(base)await area.getByLabel('元にする作業一式',{exact:true}).selectOption(base);}
-  if(purpose==='review'){const scenes=area.getByLabel('渡すシーン',{exact:true});await scenes.selectOption((await scenes.locator('option').evaluateAll(ns=>ns.map(n=>(n as HTMLOptionElement).value).filter(Boolean)))[0]!);}
+  if(purpose==='review'){const scenes=area.getByLabel('渡すシーン',{exact:true});await scenes.selectOption(reviewScene?{label:reviewScene}:(await scenes.locator('option').evaluateAll(ns=>ns.map(n=>(n as HTMLOptionElement).value).filter(Boolean)))[0]!);}
   if(purpose==='review'||purpose==='clean')await area.getByRole('button',{name:'内容を確認',exact:true}).click();
   const primary=area.locator('button.lv-file-primary');await expect(primary).toBeEnabled({timeout:300000});
   const [download]=await Promise.all([p.waitForEvent('download',{timeout:300000}),primary.click()]);const path=info.outputPath(name+'.zip');await download.saveAs(path);expect(await download.failure()).toBeNull();
@@ -86,15 +86,28 @@ function verifyModels(records:Record<string,any>,fixture:Awaited<ReturnType<type
   expect(proxy.formatProfile.id).toBe('development-validation-mesh-obj-1');expect(proxy.materialCatalog.slots).toHaveLength(2);
   const caption=(Object.values(records.captionsById) as any[]).find(c=>c.anchor.kind==='asset'&&c.anchor.assetId===point.assetId&&c.anchor.hitEvidence.method==='manual');expect(caption.anchor.positionAsset).toEqual([1,.5,0]);
 }
+function materialMeaning(records:Record<string,any>){
+  const reps=Object.values(records.representationsById) as any[];
+  return(Object.values(records.materialOverridesById) as any[]).filter(o=>o.lifecycle.state==='active').map(o=>{
+    const rep=reps.find(r=>r.assetId===o.routing.target.assetId&&r.materialCatalog?.layoutId===o.routing.target.materialLayoutId),slot=rep?.materialCatalog.slots.find((s:any)=>s.logicalMaterialSlotId===o.routing.target.logicalMaterialSlotId);if(!slot)throw Error('Unbound material');
+    return{blob:rep.blob.digest,source:slot.sourceLocator,semantics:slot.sourceSemantics,appearance:o.appearance,compositing:o.compositing,scope:o.routing.scope.kind};
+  }).sort((a,b)=>JSON.stringify(a).localeCompare(JSON.stringify(b)));
+}
 
-test('Native07lの4形式と点群GSと面を変換し共有返送Review編集コピー独立コピー復元とcold再開を完走する',async({},info)=>{
-  test.setTimeout(1800000);const fixture=await nativeMeshBackup(),input=info.outputPath('native-small.zip');await writeFile(input,fixture.file);const run=await setup(info,fixture.bodyRanges);
+for(const opaqueMaterials of [false,true])test(opaqueMaterials?'07m Native9の元材質を引き継ぎ編集解除2往復5用途復元coldを完走する':'Native07lの4形式と点群GSと面を変換し共有返送Review編集コピー独立コピー復元とcold再開を完走する',async({},info)=>{
+  test.setTimeout(1800000);const fixture=await nativeMeshBackup(opaqueMaterials),input=info.outputPath('native-small.zip');await writeFile(input,fixture.file);const run=await setup(info,fixture.bodyRanges);
   try{
     let a=await run.launch(0);await open(a.p,input);await expect(a.p.getByRole('button',{name:'新しいプロジェクトに変換',exact:true})).toBeVisible({timeout:180000});await expect(a.p.getByText(/OBJの外部材質・画像は読み込まず/)).toBeVisible();await a.p.getByRole('button',{name:'新しいプロジェクトに変換',exact:true}).click();await ready(a.p);await run.mark('converted',a.p);
     await a.p.getByRole('tab',{name:'モデル',exact:true}).click();const firstPanel=a.p.getByRole('tabpanel',{name:'モデル',exact:true});await firstPanel.locator('.lv-model-select').filter({hasText:'GS'}).click();await firstPanel.getByRole('button',{name:'このモデルだけ表示',exact:true}).click();await a.p.getByRole('button',{name:'正面',exact:true}).click();await a.p.screenshot({path:info.outputPath('converted-models.png'),fullPage:true});
     await expect.poll(async()=>(await presentedCanvas(a.p.getByLabel('3Dモデルの表示',{exact:true}))).red,{timeout:90000}).toBeGreaterThan(20);
+    if(opaqueMaterials){
+      await a.p.getByRole('tab',{name:'材質',exact:true}).click();const m=a.p.getByRole('region',{name:'マテリアル',exact:true});await m.getByLabel('モデル',{exact:true}).selectOption({label:'gltf'});const surface=m.getByLabel('面',{exact:true});await surface.selectOption((await surface.locator('option').evaluateAll(ns=>ns.map(n=>(n as HTMLOptionElement).value).filter(Boolean)))[0]!);await m.getByLabel('適用範囲',{exact:true}).selectOption('scene');
+      await m.getByRole('button',{name:'設定を編集',exact:true}).click();await m.getByLabel('表示する面',{exact:true}).selectOption('front');await m.getByRole('button',{name:'変更を適用',exact:true}).click();await expect(a.p.getByText('材質の設定を適用しました。',{exact:true})).toBeVisible({timeout:180000});await ready(a.p);
+      await m.getByRole('button',{name:'この範囲の設定を解除',exact:true}).click();await m.getByRole('button',{name:'設定を解除する',exact:true}).click();await expect(a.p.getByText('材質の設定を解除しました。',{exact:true})).toBeVisible({timeout:180000});await ready(a.p);
+      await m.getByRole('button',{name:'設定を編集',exact:true}).click();await m.getByLabel('照明',{exact:true}).selectOption('unlit');await m.getByLabel('表示する面',{exact:true}).selectOption('double');await m.getByRole('button',{name:'変更を適用',exact:true}).click();await expect(a.p.getByText('材質の設定を適用しました。',{exact:true})).toBeVisible({timeout:180000});await ready(a.p);await run.mark('source-material-edit-reset',a.p);
+    }
     await selectCaption(a.p);await expect(detail(a.p).getByLabel('本文',{exact:true})).toHaveValue('本文を保持');await edit(a.p,'本文','変換後の編集');
-    const first=await backup(await output(a.p,info,'first','backup'));verifyModels(first.records,fixture);const originalCaptionId=(Object.values(first.records.captionsById) as any[]).find(c=>c.title==='既存のピン').id;
+    const first=await backup(await output(a.p,info,'first','backup'));verifyModels(first.records,fixture);if(opaqueMaterials){expect(materialMeaning(first.records)).toHaveLength(2);expect(materialMeaning(first.records).some(m=>m.semantics.lighting==='unlit')).toBe(true);}const originalCaptionId=(Object.values(first.records.captionsById) as any[]).find(c=>c.title==='既存のピン').id;
     const canvas=a.p.getByLabel('3Dモデルの表示',{exact:true});
     const sourceGs=(Object.values(first.records.representationsById) as any[]).find(r=>r.role==='gsPrimary');
     const hit=async(kind:string,position:readonly number[])=>{
@@ -120,17 +133,18 @@ test('Native07lの4形式と点群GSと面を変換し共有返送Review編集�
       const previousTitle=round===1?'既存のピン':`返送前${round-1}`;await selectCaption(a.p,previousTitle);await edit(a.p,'本文',`手元の本文${round}`);await selectCaption(b.p,previousTitle);await edit(b.p,'タイトル',`返送前${round}`);
       const returned=await output(b.p,info,'return-'+round,'contribution',wire.archive.control.manifest.packageId),receive=a.p.getByRole('region',{name:'更新ファイル',exact:true});
       await receive.getByLabel('更新ファイルを選択',{exact:true}).setInputFiles(returned);await receive.getByRole('button',{name:'更新を受け取る',exact:true}).click();await expect(receive.getByText('更新を受け取りました。',{exact:true})).toBeVisible({timeout:180000});await ready(a.p);
-      const state=await backup(await output(a.p,info,'round-'+round,'backup'));verifyModels(state.records,fixture);
+      const state=await backup(await output(a.p,info,'round-'+round,'backup'));verifyModels(state.records,fixture);if(opaqueMaterials)expect(materialMeaning(state.records)).toEqual(materialMeaning(first.records));
       expect(state.records.captionsById[originalCaptionId]).toMatchObject({title:`返送前${round}`,body:`手元の本文${round}`});
       if(round===1){workspace=await output(a.p,info,'workspace-2','teamWorkspace');wire=await WorkspaceArchive.inspect(await openAsBlob(workspace),limits);const incoming=b.p.getByRole('region',{name:'更新ファイル',exact:true});await incoming.getByLabel('更新ファイルを選択',{exact:true}).setInputFiles(workspace);await incoming.getByRole('button',{name:'更新を受け取る',exact:true}).click();await expect(incoming.getByText('更新を受け取りました。',{exact:true})).toBeVisible({timeout:180000});await ready(b.p);}
     }
     await run.close(b.context);await run.mark('two-rounds',a.p);
-    const finalPath=await output(a.p,info,'final','backup'),final=await backup(finalPath),reviewPath=await output(a.p,info,'review','review'),cleanPath=await output(a.p,info,'clean','clean');
+    const finalPath=await output(a.p,info,'final','backup'),final=await backup(finalPath),reviewPath=await output(a.p,info,'review','review',undefined,opaqueMaterials?'観察':undefined),cleanPath=await output(a.p,info,'clean','clean');
+    if(opaqueMaterials)expect(materialMeaning(final.records)).toEqual(materialMeaning(first.records));
     for(const path of [workspace,finalPath,reviewPath,cleanPath]){const archive=await PackageArchive.inspect(await openAsBlob(path));expect(archive.control.manifest.blobs.some(b=>b.sha256===fixture.originalDigest)).toBe(false);}
     await run.close(a.context);a=await run.launch(0);await ready(a.p);expect((await backup(await output(a.p,info,'cold','backup'))).archive.source.token).toBe(final.archive.source.token);await run.close(a.context);
     const review=await run.launch(2);await open(review.p,reviewPath);await expect(review.p.getByText('閲覧用シーンを開きました。編集プロジェクトは作成していません。',{exact:true})).toBeVisible({timeout:180000});await review.p.getByRole('button',{name:'編集コピーを作る',exact:true}).click();await review.p.getByRole('button',{name:'コピーを作成',exact:true}).click();await ready(review.p);
-    const editable=await backup(await output(review.p,info,'review-edit','backup'));expect(editable.archive.source.proof.identity.projectId).not.toBe(final.archive.source.proof.identity.projectId);expect((Object.values(editable.records.representationsById) as any[]).find(r=>r.role==='interactionProxy').derivedFrom).toEqual([]);await run.close(review.context);
-    const clean=await run.launch(3);await open(clean.p,cleanPath);await ready(clean.p);const standalone=await backup(await output(clean.p,info,'clean-edit','backup')),reps=Object.values(standalone.records.representationsById) as any[];expect(reps.find(r=>r.role==='interactionProxy').derivedFrom).toEqual([reps.find(r=>r.role==='gsPrimary').id]);expect((await CleanArchive.inspect(await openAsBlob(cleanPath),limits)).source.proof.identity).toEqual(standalone.archive.source.proof.identity);await run.close(clean.context);
+    const editable=await backup(await output(review.p,info,'review-edit','backup'));expect(editable.archive.source.proof.identity.projectId).not.toBe(final.archive.source.proof.identity.projectId);expect((Object.values(editable.records.representationsById) as any[]).find(r=>r.role==='interactionProxy').derivedFrom).toEqual([]);if(opaqueMaterials)expect(materialMeaning(editable.records)).toEqual(materialMeaning(final.records));await run.close(review.context);
+    const clean=await run.launch(3);await open(clean.p,cleanPath);await ready(clean.p);const standalone=await backup(await output(clean.p,info,'clean-edit','backup')),reps=Object.values(standalone.records.representationsById) as any[];expect(reps.find(r=>r.role==='interactionProxy').derivedFrom).toEqual([reps.find(r=>r.role==='gsPrimary').id]);expect((await CleanArchive.inspect(await openAsBlob(cleanPath),limits)).source.proof.identity).toEqual(standalone.archive.source.proof.identity);if(opaqueMaterials)expect(materialMeaning(standalone.records)).toEqual(materialMeaning(final.records));await run.close(clean.context);
     const restored=await run.launch(4);await open(restored.p,finalPath);await restored.p.getByRole('button',{name:'バックアップから復元',exact:true}).click();await ready(restored.p);expect((await backup(await output(restored.p,info,'restored','backup'))).records).toEqual(final.records);await run.close(restored.context);
     const cold=await run.launch(4);await ready(cold.p);await run.mark('restored-cold',cold.p);await run.close(cold.context);expect(run.errors).toEqual([]);
   }finally{await run.finish();}

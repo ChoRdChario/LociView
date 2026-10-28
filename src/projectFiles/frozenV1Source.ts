@@ -1,3 +1,4 @@
+import { opaqueMaterialSource } from '../domain/meshMaterialSource';
 import { inspectProjectImage, type PhotoDecoder } from './photo';
 import { inspectZipContainerIdentity, readZipEntries, sanitizeZipPath } from '../assets/zipio';
 import { parseCandidateV1ManifestBytes, type ProjectManifest } from '../core/manifest';
@@ -21,7 +22,8 @@ export const frozenV1PhotoRecipe = 'v1-project-scene-migration-recipe-3';
 export const frozenV1DefaultViewRecipe = 'v1-project-scene-migration-recipe-4';
 export const frozenV1PlacementRecipe = 'v1-project-scene-migration-recipe-5';
 export const frozenV1MaterialRecipe = 'v1-project-scene-migration-recipe-6';
-export type FrozenV1Recipe = typeof frozenV1MaterialRecipe | typeof frozenV1PlacementRecipe | typeof frozenV1DefaultViewRecipe | typeof frozenV1PhotoRecipe | typeof frozenV1Recipe | typeof frozenV1JpegRecipe;
+export const frozenV1OpaqueMaterialRecipe = 'v1-project-scene-migration-recipe-7';
+export type FrozenV1Recipe = typeof frozenV1OpaqueMaterialRecipe | typeof frozenV1MaterialRecipe | typeof frozenV1PlacementRecipe | typeof frozenV1DefaultViewRecipe | typeof frozenV1PhotoRecipe | typeof frozenV1Recipe | typeof frozenV1JpegRecipe;
 export const codeOrder = (a: string, b: string) => a < b ? -1 : a > b ? 1 : 0;
 export const byteProof = async (bytes: Uint8Array) => ({ byteLength: bytes.length, digest: await digest(bytes) });
 const fail = () => fileError('この旧形式ファイルの設定は、まだそのまま変換できません。');
@@ -153,7 +155,7 @@ export interface FrozenV1Body { record: EntityRecord; ref: StoredBlobRef; bytes:
 export interface FrozenV1Material {
   sourceMaterialId: string; sourceSetId: string; sourceAssetId: string; sourceMaterialKey: string; sourceGlbSha256: string;
   childPath: number[]; materialArraySlot: 0; nodeIndex: number; primitiveIndex: number; sourceMaterialIndex: number | null;
-  sourceLocator: JsonObject; sourceSemantics: JsonObject; selectedOccurrenceCount: 1; doubleSided: boolean; unlit: boolean;
+  sourceLocator: JsonObject; sourceSemantics: JsonObject; selectedOccurrenceCount: 1; doubleSided?: boolean; unlit: boolean;
 }
 export interface FrozenV1MaterialReport {
   appliedModelOffsets: number; materialEffects: { scenes: number; overrides: number; sourceOnlyChromaRows: number };
@@ -167,9 +169,9 @@ interface FrozenV1PlanBase {
 }
 interface FrozenV1Report { models: number; scenes: number; captions: number; media: number; originalExcludedFromExports: true;
   sourceOnly: { profiles: number; deletedRecords: number; caches: number; deletedPayloads: number; unlinkedPayloads: number; anchorNormals: number } }
-export type FrozenV1Plan = FrozenV1PlanBase & ({ recipe: typeof frozenV1MaterialRecipe; materials: readonly FrozenV1Material[]; report: FrozenV1Report & FrozenV1MaterialReport } |
+export type FrozenV1Plan = FrozenV1PlanBase & ({ recipe: typeof frozenV1MaterialRecipe | typeof frozenV1OpaqueMaterialRecipe; materials: readonly FrozenV1Material[]; report: FrozenV1Report & FrozenV1MaterialReport } |
   { recipe: typeof frozenV1PlacementRecipe; report: FrozenV1Report & { appliedModelOffsets: number } } |
-  { recipe: Exclude<FrozenV1Recipe, typeof frozenV1PlacementRecipe | typeof frozenV1MaterialRecipe>; report: FrozenV1Report });
+  { recipe: Exclude<FrozenV1Recipe, typeof frozenV1PlacementRecipe | typeof frozenV1MaterialRecipe | typeof frozenV1OpaqueMaterialRecipe>; report: FrozenV1Report });
 
 /** Temporary decoder provenance only; the caller retains each model's original base catalog. */
 async function materialProof(rows: readonly EntityRecord[], models: readonly FrozenV1Body[], sceneIds: ReadonlySet<string>, limits: FileValidationLimits, png?: PngDecoder, jpeg?: JpegDecoder) {
@@ -208,12 +210,12 @@ async function materialProof(rows: readonly EntityRecord[], models: readonly Fro
         const slot = found![0]!; if (counts.get(slot.materialIndex) !== 1) bad('共有された元材質には対応していません。');
         const locator: JsonObject = slot.materialIndex === null ? { kind: 'representationMaterial', slotIndex: 0 } : { kind: 'gltfMaterial', materialIndex: slot.materialIndex };
         const source = catalog.get(json(locator)), semantics = source?.sourceSemantics as JsonObject | undefined;
-        if (!semantics || json(semantics) !== json({ coverage: { kind: 'opaque' }, optics: 'surface', lighting: 'lit', doubleSided: false })) bad('不透明・陰影あり・表面のみの元材質だけを変換できます。');
+        if (!opaqueMaterialSource(semantics)) bad('不透明な元材質だけを変換できます。');
         const route = json([f.setId, model.record.id, locator]); if (routes.has(route)) bad('同じシーンの材質対応が重複しています。'); routes.add(route);
         materials.push({ sourceMaterialId: row.id, sourceSetId: f.setId as string, sourceAssetId: model.record.id, sourceMaterialKey: f.materialKey as string,
           sourceGlbSha256: model.ref.digest, childPath: [...slot.childPath], materialArraySlot: 0, nodeIndex: slot.nodeIndex, primitiveIndex: slot.primitiveIndex,
           sourceMaterialIndex: slot.materialIndex, sourceLocator: locator, sourceSemantics: semantics!, selectedOccurrenceCount: 1,
-          doubleSided: f.doubleSided === true, unlit: f.unlit === true || f.unlitLike === true });
+          ...(Object.hasOwn(f,'doubleSided')?{doubleSided:f.doubleSided===true}:{}), unlit: f.unlit === true || f.unlitLike === true });
       }
     }
   }
@@ -322,7 +324,8 @@ export async function inspectFrozenV1Source(input: Blob, limits: FileValidationL
   if (ops.some(op => op.e === 'material')) {
     checkPlacementReadiness(models, captions, views);
     const { materials, values } = await materialProof(visibleEntities(state, 'material').sort((a, b) => codeOrder(a.id, b.id)), models, sceneIds, limits, decode, jpeg);
-    return { original, plan: { ...base, recipe: frozenV1MaterialRecipe, materials, report: { ...report,
+    const expanded=materials.some(m=>{const source=opaqueMaterialSource(m.sourceSemantics)!;return source.lighting==='unlit'||source.doubleSided;});
+    return { original, plan: { ...base, recipe: expanded?frozenV1OpaqueMaterialRecipe:frozenV1MaterialRecipe, materials:expanded?materials:materials.map(m=>({...m,doubleSided:m.doubleSided??false})), report: { ...report,
       appliedModelOffsets: models.filter(m => frozenV1Placement(m.record.fields.transform).translation.some(n => n !== 0)).length,
       materialEffects: { scenes: new Set(materials.map(m => m.sourceSetId)).size, overrides: materials.length,
         sourceOnlyChromaRows: new Set(values.filter(v => v.field.startsWith('chroma.')).map(v => v.sourceMaterialId)).size }, sourceOnlyMaterialValues: values } } };

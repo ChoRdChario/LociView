@@ -1,3 +1,4 @@
+import { opaqueMaterialSource } from '../domain/meshMaterialSource';
 import { openNativePortableConversionStreamsV1 } from '../nativeGs/portablePackage';
 import { digestNativeStream } from '../nativeGs/sha256';
 import { NATIVE_GS_PROFILE_ID, NATIVE_POINT_PROFILE_ID, nativeDisplaySetsV1, type NativeProjectSnapshotV1 } from '../nativeGs/schema';
@@ -11,7 +12,7 @@ import { digest, json, metadataPath, newId, readReceipt, underWriteLease, writeR
 import { checkContentFacts } from '../domain/projectContentChecks';
 import { cloneCanonicalValue, type JsonObject } from '../domain/values';
 import { readProjectScene } from '../scene/projectProvider';
-import { mapNativeProject, nativeSpatialRecipe, nativeMeshRecipe, type NativeModelFacts, type NativeConversionMaterialWitness, type NativeMappingEntry, type NativeSourceOccurrence } from './nativeMapping';
+import { mapNativeProject, nativeSpatialRecipe, nativeMeshRecipe, nativeOpaqueMaterialRecipe, type NativeModelFacts, type NativeConversionMaterialWitness, type NativeMappingEntry, type NativeSourceOccurrence } from './nativeMapping';
 import { nativePointSourceProfile, nativeProxySourceProfile, nativeSpatialModelBounds } from './nativeSpatial';
 import { inspectPointPly } from './pointPly';
 import { nativeMeshSourceFormat, inspectMeshSource, meshSourceProfile } from './meshSource';
@@ -33,7 +34,7 @@ type Archive = NonNullable<Awaited<ReturnType<typeof openNativePortableConversio
 type ByteProof = {byteLength: number; digest: string};
 type Mapped = Awaited<ReturnType<typeof mapNativeProject>>;
 interface Receipt {
-  recipe: typeof nativeSpatialRecipe | typeof nativeMeshRecipe; conversionId: string; projectId: string;
+  recipe: typeof nativeSpatialRecipe | typeof nativeMeshRecipe | typeof nativeOpaqueMaterialRecipe; conversionId: string; projectId: string;
   original: ByteProof; originalRef: StoredBlobRef; manifest: ByteProof; snapshot: ByteProof;
   initial: ByteProof & {proof: MetadataProof}; mapping: NativeMappingEntry[];
   materialWitness: NativeConversionMaterialWitness[]; spatialWitness: JsonObject[];
@@ -46,7 +47,10 @@ const proof = async (bytes: Uint8Array): Promise<ByteProof> => ({byteLength: byt
 const originalProof = async (source: Archive['original'], signal?: AbortSignal): Promise<ByteProof> => {const p = await digestNativeStream(source.stream(),signal); return {byteLength: p.byteLength, digest: p.sha256};};
 const newMesh=(s:NativeProjectSnapshotV1)=>s.representations.some(r=>nativeMeshSourceFormat(r.formatProfile));
 const spatial = (s: NativeProjectSnapshotV1) => newMesh(s)||s.representations.some(r => r.role !== 'meshPrimary');
-const recipeFor=(s:NativeProjectSnapshotV1)=>newMesh(s)?nativeMeshRecipe:nativeSpatialRecipe;
+export const nativeSourceIsSpatial=spatial;
+interface OpaqueSourceLane {readonly spatial:boolean}
+// One-use capability for this recovery invocation's already verified immutable CAS view.
+const retainedOpaqueSources=new WeakMap<OpaqueSourceLane,{fs:ProjectWorkspaceFS;store:OriginBlobStore;ref:StoredBlobRef;file:Blob}>();
 function reportFor(snapshot: NativeProjectSnapshotV1, models:ReadonlyMap<string,NativeModelFacts>): Receipt['report'] {
   return {models: snapshot.assets.length, scenes: nativeDisplaySetsV1(snapshot).length, captions: snapshot.captions.length, media: snapshot.mediaResources?.length ?? 0,
     originalExcludedFromExports: true, effects: {...(newMesh(snapshot)?{unitsPreserved:true as const,objExternalMaterialsUnavailable:[...models.values()].some(m=>m.newMesh?.externalMaterialsUnavailable)}:{nativePointUnitsPreserved:true as const}), existingPinsPreserved: true,
@@ -129,7 +133,7 @@ async function inspect(archive: Archive, budget: ProjectFilePolicyInput, png?: P
     const material = row && models.get(r.id)!.materials.find(m => (m.sourceLocator as JsonObject).slotIndex === row.slotIndex);
     if (r.role !== 'meshPrimary' || !row || !material || a.opacity !== 1 || a.chroma.enabled ||
       snapshot.representations.filter(s => s.assetId === r.assetId && s.variantFamilyId === r.variantFamilyId).length !== 1 ||
-      !same(material.sourceSemantics, {coverage: {kind: 'opaque'}, optics: 'surface', lighting: 'lit', doubleSided: false})) return fileError('この材質設定はまだそのまま変換できません。');
+      !opaqueMaterialSource(material.sourceSemantics)) return fileError('この材質設定はまだそのまま変換できません。');
   }
   for (const m of snapshot.mediaResources ?? []) {
     signal?.throwIfAborted();
@@ -178,7 +182,7 @@ function checkReceipt(r: Receipt, projectId: string) {
   cloneCanonicalValue(r, metadata);
   const keys = (value: unknown, names: string[]) => !!value && typeof value === 'object' && !Array.isArray(value) && Object.keys(value).sort().join(',') === names.sort().join(',');
   if (!r || Object.keys(r).sort().join(',') !== ['recipe','conversionId','projectId','original','originalRef','manifest','snapshot','initial','mapping','materialWitness','spatialWitness','report'].sort().join(',') ||
-    !([nativeSpatialRecipe,nativeMeshRecipe] as readonly string[]).includes(r.recipe) || !/^[0-9a-f]{32}$/.test(r.conversionId) || r.projectId !== projectId || projectId !== `prj_${r.conversionId}` ||
+    !([nativeSpatialRecipe,nativeMeshRecipe,nativeOpaqueMaterialRecipe] as readonly string[]).includes(r.recipe) || !/^[0-9a-f]{32}$/.test(r.conversionId) || r.projectId !== projectId || projectId !== `prj_${r.conversionId}` ||
     ![r.original,r.manifest,r.snapshot].every(p => keys(p,['byteLength','digest'])) || !keys(r.initial,['byteLength','digest','proof']) ||
     !same(r.originalRef, {algorithm: 'sha256', digest: r.original.digest, byteLength: r.original.byteLength, mediaType: 'application/zip'}) ||
     ![r.original,r.manifest,r.snapshot,r.initial].every(p => p && Number.isSafeInteger(p.byteLength) && p.byteLength > 0 && /^[0-9a-f]{64}$/.test(p.digest)) ||
@@ -194,7 +198,8 @@ async function started(fs: ProjectWorkspaceFS, expected: MetadataProof): Promise
 /** Contextual recovery affordance; never offers re-creation after acknowledgement. */
 export async function nativeSpatialConversionSourceRequired(fs: ProjectWorkspaceFS, store: OriginBlobStore): Promise<boolean> {
   const receipt = await readReceipt<Receipt>(fs,path(fs),metadata);
-  if (!receipt || !([nativeSpatialRecipe,nativeMeshRecipe] as readonly string[]).includes(receipt.recipe)) return false;
+  if (!receipt || !([nativeSpatialRecipe,nativeMeshRecipe,nativeOpaqueMaterialRecipe] as readonly string[]).includes(receipt.recipe)) return false;
+  if(receipt.recipe===nativeOpaqueMaterialRecipe&&!Object.hasOwn(receipt,'originalRef'))return false; // Plain GLB keeps raw-source repair semantics.
   checkReceipt(receipt,receipt.projectId);
   const initial = await readValidationInitialRecord(fs);
   return !await started(fs,initial.source.proof) && await store.inspect(receipt.originalRef) === 'unverified';
@@ -218,7 +223,7 @@ export async function prepareNativeSpatialConversion(input: Blob, budget: Projec
     const conversionId = newId(), mapped = await mapNativeProject(snapshot, inspected.models, conversionId, original.digest, inspected.rows);
     const source = ProjectMetadataSource.bootstrap(mapped.records.schema, mapped.records.identity, metadata, {semanticProfile: 'map2'}).initialize(mapped.records);
     await admit(source, mapped, policy);
-    const receipt: Receipt = {recipe: recipeFor(snapshot), conversionId, projectId: `prj_${conversionId}`, original, originalRef: {algorithm: 'sha256', ...original, mediaType: 'application/zip'},
+    const receipt: Receipt = {recipe: mapped.recipe as Receipt['recipe'], conversionId, projectId: `prj_${conversionId}`, original, originalRef: {algorithm: 'sha256', ...original, mediaType: 'application/zip'},
       manifest, snapshot: snapshotProof, initial: {...await proof(source.encodeFullSource()), proof: source.proof}, mapping: mapped.mapping, materialWitness: mapped.materialWitness, spatialWitness: witnesses(snapshot,mapped,conversionId,original.digest), report};
     return {source, async persist(fs: ProjectWorkspaceFS, store: OriginBlobStore, session: MetadataProjectSession) {
       const old = await readReceipt<Receipt>(fs, path(fs), metadata);
@@ -234,9 +239,33 @@ export async function prepareNativeSpatialConversion(input: Blob, budget: Projec
     gs: snapshot.representations.filter(r => r.role === 'gsPrimary').length, proxies: snapshot.representations.filter(r => r.role === 'interactionProxy').length})}), create: () => attempt ??= create()};
 }
 
+/** The receipt chooses a candidate storage location only. Typed source metadata chooses the lane;
+ * the selected closed reader still verifies original hash, initial bytes and every witness before publication. */
+export async function nativeOpaqueConversionSourceLane(fs:ProjectWorkspaceFS,store:OriginBlobStore,budget:ProjectFilePolicyInput,
+  receipt:{original:ByteProof;originalRef?:StoredBlobRef},reselected?:Blob):Promise<OpaqueSourceLane>{
+  const policy=projectFilePolicy(budget);let file:Blob,retained:StoredBlobRef|undefined;
+  if(!receipt.original||Object.keys(receipt.original).sort().join(',')!=='byteLength,digest'||!Number.isSafeInteger(receipt.original.byteLength)||receipt.original.byteLength<=0||!/^[0-9a-f]{64}$/.test(receipt.original.digest))return fileError('変換元の記録を確認できません。');
+  if(receipt.originalRef){
+    const ref=receipt.originalRef;
+    if(!same(ref,{algorithm:'sha256',digest:receipt.original.digest,byteLength:receipt.original.byteLength,mediaType:'application/zip'})||
+      !Number.isSafeInteger(ref.byteLength)||ref.byteLength<=0||ref.byteLength>Math.min(536870912,policy.gs.maxFileBytes)||!/^[0-9a-f]{64}$/.test(ref.digest))return fileError('変換元の参照を確認できません。');
+    const state=await store.inspect(ref);
+    if(state==='verified-present'){const source=await store.openReadOnly(ref);if(!source.blob)return fileError('原本をファイルのまま確認できません。');file=await source.blob();retained={...ref};}
+    else if(state==='unverified'&&reselected)file=Blob.prototype.slice.call(reselected) as Blob;
+    else return fileError(state==='unverified'?'変換元のファイルを選び直して再開してください。':'保持した変換元の本体に修復が必要です。');
+  }else return fileError('変換元の参照を確認できません。');
+  if(file.size!==receipt.original.byteLength)return fileError('変換元ファイルの大きさが一致しません。');
+  const archive=await openNativePortableConversionStreamsV1(file,{...policy.nonGs,maxFileBytes:receipt.originalRef?Math.min(536870912,policy.gs.maxFileBytes):policy.nonGs.maxFileBytes}).catch(error=>{
+    if(receipt.originalRef&&!retained&&reselected)return fileError('選択したファイルは変換元と一致しません。');throw error;
+  });
+  if(!archive)return fileError('保持した変換元の形式が一致しません。');
+  try{const spatialLane=spatial(archive.snapshot);if(spatialLane!==!!receipt.originalRef)return fileError('変換元と復旧記録の経路が一致しません。');const lane=Object.freeze({spatial:spatialLane});if(retained)retainedOpaqueSources.set(lane,{fs,store,ref:retained,file});return lane;}finally{await archive.close();}
+}
+
 /** Fixed identity/initial bytes, original-CAS acknowledgement and complete source proof on every retry. */
 export async function resumeNativeSpatialConversion(fs: ProjectWorkspaceFS, store: OriginBlobStore, session: MetadataProjectSession,
-  budget: ProjectFilePolicyInput, projectId: string, png?: PngDecoder, jpeg?: JpegDecoder, photo?: PhotoDecoder, reselected?: Blob) {
+  budget: ProjectFilePolicyInput, projectId: string, png?: PngDecoder, jpeg?: JpegDecoder, photo?: PhotoDecoder, reselected?: Blob, sourceLane?:OpaqueSourceLane) {
+  const retained=sourceLane&&retainedOpaqueSources.get(sourceLane);if(sourceLane)retainedOpaqueSources.delete(sourceLane);
   const receipt = await readReceipt<Receipt>(fs,path(fs),metadata); if (!receipt) return fileError('変換元の記録がありません。'); checkReceipt(receipt, projectId);
   const policy = projectFilePolicy(budget), initial = await readValidationInitialRecord(fs), source = initial.source;
   if (initial.receipt.version !== 'validation-initial-2' || initial.receipt.originRecipe !== receipt.recipe || !same(initial.receipt.proof, receipt.initial.proof) ||
@@ -248,9 +277,11 @@ export async function resumeNativeSpatialConversion(fs: ProjectWorkspaceFS, stor
     if (p.sha256 !== receipt.original.digest || p.byteLength !== receipt.original.byteLength) return fileError('選択したファイルは変換元と一致しません。');
     await store.put(gsBlobStream(blob), 'application/zip', receipt.originalRef);
   } else if (state !== 'verified-present') return fileError('保持した変換元の本体に修復が必要です。');
-  const stored = await store.openReadOnly(receipt.originalRef);
-  if (!stored.blob) return fileError('この環境では変換元をファイルのまま再開できません。原本と再開用の記録は保持しています。');
-  const file = await stored.blob();
+  let file:Blob;
+  if(state==='verified-present'&&retained?.fs===fs&&retained.store===store&&same(retained.ref,receipt.originalRef))file=retained.file;
+  else {const stored = await store.openReadOnly(receipt.originalRef);
+    if (!stored.blob) return fileError('この環境では変換元をファイルのまま再開できません。原本と再開用の記録は保持しています。');
+    file=await stored.blob();}
   const archive = await openNativePortableConversionStreamsV1(file, {...policy.nonGs, maxFileBytes: Math.min(536870912,policy.gs.maxFileBytes)});
   if (!archive) return fileError('保持した変換元の形式が一致しません。');
   try {

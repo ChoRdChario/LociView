@@ -1,5 +1,5 @@
 {
-  "status": "PROPOSED - not approved or implemented",
+  "status": "APPROVED - PO 2026-10-28; exact identity vectors, not a FormatProfile",
   "vectors": [
     {
       "recipe": "native-project-scene-recipe-9",

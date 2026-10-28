@@ -39,9 +39,13 @@ source matrix: visual Mesh opaque/MASK, authored lit/unlit and front/double. Tod
 owns its actual checks and next action. Explicit Basic→lit, BLEND and new migration
 semantics remain behind real decisions; source capability never unlocks Point/GS/
 Proxy editing. Keep original bytes and identical display/Boolean-pick coverage.
-The next07m opaque-source conversion companion is PROPOSED, independently reviewed
-and awaiting grouped PO approval. It adds new recipe/ID meanings for Native/v1/
-LociMyu; do not implement it from the proposal alone or change older recipes.
+The07m opaque-source conversion companion was PO-approved2026-10-28 as one
+three-family unit and is verified in todo. It adds recipe/ID meanings for
+Native/v1/LociMyu and inherits an absent v1 side override from the source. Preserve
+older recipes and source-derived Native receipt lanes. The next missing material
+workflow is alpha/chroma; todo records concrete old/new semantic differences and
+the grouped policy/specification work needed before implementation. Do not infer
+approval of those meanings or repeat helper approvals for the completed07m scope.
 
 01a's bounded point workflow is implemented; exact six JSON companions are immutable.
 Native, synthetic hosts, typed validation and ordinary home have separate authority

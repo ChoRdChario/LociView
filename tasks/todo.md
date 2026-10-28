@@ -22,12 +22,61 @@ Fix latency when it prevents use or risks data. Keep the existing
 Root is sole writer; bounded independent reviewers are read-only. No small manual
 test or helper approvals. Continue in-scope work while device evidence is pending.
 
-## Current boundary —07m grouped decision pending
+## Verified checkpoint —07m opaque source-material conversion
 
-The existing Mesh source-material workflow below is verified. The next connected
-unit is the independently reviewed07m proposal; its new migration/ID meanings need
-PO approval. The grouped question is pending. Do not infer approval from elapsed
-time or implement its recipes before an answer. No small manual test is required.
+PO2026-10-28 approved [07m](../docs/specs/07m-opaque-source-material-conversion-proposal.md)
+as one group: Native/v1/LociMyu opaque sources originally unlit/double → exact scoped
+adjustments/edit/reset → five-purpose files, two returns with local edits,
+Review/Clean and selected restore/cold. At unit start, g0 HEAD994623f was pushed/clean;
+the source-material unit below is verified. Root is sole writer; bounded Native,
+v1/Loci and test/contract reviewers are read-only. This closes missing conversion
+workflows before GS tuning, without renewed helper or small manual-test approvals.
+
+Delivered: ratified exact contract/vectors → shared closed opaque source check → additive
+Native9 with source-derived GLB/spatial/Mesh receipt lanes and exact old retries →
+v1-7 absent-side inheritance/Loci5 exact mappings → focused source/ID/receipt/fault
+cases and representative connected Chromium/file flow → independent final diff
+review, serial full checkpoint/artifact isolation and suitable g0 push.
+Stop only affected work for a genuine new source/alpha/ownership/capacity policy or
+contract conflict. No MASK/BLEND/active chroma/fractional opacity, new dependency/
+profile/wire/schema, guessed mapping, ordinary activation, release or deployment.
+Preserve all old recipes/bytes/retries, raw originals, coordinates and every
+publication/readback/recovery fence. Approval covers the complete three-family unit.
+
+Implementation/focused cases and independent source reviews are complete. Native9
+plain/spatial/Mesh fresh/cold/ID tamper, fully consistent old2-domain rebind refusal,
+JPEG+WebP, unused-source old2 selection and per-invocation original-CAS read counts
+pass. Both CAS lanes keep exact-source reselect; raw GLB9 publication interruption
+keeps initial/source/receipt bytes, later edits and acknowledged-source-loss repair.
+v1-7 absent-side/offset/report and Loci5 exact name/index mapping pass through typed
+product edits, backup/Workspace/Review, separate two-return/Clean service flow and
+actual selected-generation restore/cold. Deleted v1 material history remains6.
+The final frozen15-file source/test tree passes typecheck,130 Vitest files/2916
+tests (21 existing todos), normal/harness/validation/Desktop builds and HEIC
+isolation. All four source maps match current sources; GS build/import separation,
+Desktop distribution/notices and ordinary/Desktop Native Spark identity pass.
+Independent final reviews have no outstanding findings; the raw-GLB9 pending
+publication/stream-read regression closes the last test gap. All15 staged
+source/test files match `.artifacts/e2e/desktop-integration-tools/opaque07m-tested-tree.json`.
+This is the verified g0 development checkpoint; Git owns its identity and actual
+remote state. Suitable checkpoint/push remains covered by standing authority.
+
+Desktop run1793151963340-64464 passes11.1min: mixed old GLB + Point/GS + all four
+Mesh/Proxy formats, advanced opaque source material edit/reset, two profiles/two
+returns with local edits, all five outputs, Review editable copy/Clean with exact
+source/semantics/effective-intent comparison, restore and cold. The earlier run
+1793151344171-68564 selected the unrelated 全体 Scene with no overrides; its
+comparison failed correctly. Final run explicitly selects 観察. An intermediate
+startup was stopped after a patch-command quoting error; it is not a passed run.
+Node fixture setup failures (frozen parsed JSON, helper scope, exact image keys)
+were corrected without changing product guards or test deadlines. Native review
+found old2 source-admission and duplicate original-read gaps; both are fixed with
+focused regressions and independent resolution review. Logs/hashes remain under
+ignored `.artifacts/e2e/desktop-integration-tools/opaque07m-*` and e2e/runs.
+The interrupted earlier full check is preserved separately; the final checkpoint
+and artifact logs are `opaque07m-final-checkpoint.log` and
+`opaque07m-final-artifacts.log`. Headless Chromium/local HTTP is not physical-iOS,
+offline/PWA, aggregate renderer/storage adoption or release evidence.
 
 ## Verified checkpoint — existing Mesh source-material editing/reset
 
@@ -69,15 +118,11 @@ Evidence is under ignored `.artifacts/e2e/desktop-integration-tools/`:
 The browser screenshot was inspected. Headless Chromium/local HTTP evidence does
 not pass physical-iOS, offline/PWA, aggregate renderer/storage adoption or release.
 
-Next decision is the grouped [07m opaque-source conversion proposal](../docs/specs/07m-opaque-source-material-conversion-proposal.md)
-(PROPOSED, not implemented): Native/v1/LociMyu exact old mappings with originally
-unlit/double opaque sources, additive recipes9/7/5. Full source MASK/BLEND and active
-chroma/fractional opacity have different legacy alpha meanings and stay separate.
-Independent proposal reviews are complete; witness-shape and v1 absent-side
-findings are resolved. Nine proposed identity vectors match independent Python/
-Node/reviewer calculations. Grouped PO approval is requested and pending; do not
-implement new recipes before an answer. Suitable g0 checkpoint/push remains covered
-by standing authorization after reviewed/tested staged-content equality.
+The [07m opaque-source conversion companion](../docs/specs/07m-opaque-source-material-conversion-proposal.md)
+is verified above. It preserves exact old mappings with additive recipes9/7/5;
+nine approved identity vectors retain independently checked Python/Node/reviewer
+preimages and hashes. Full source MASK/BLEND and active chroma/fractional opacity
+have different legacy alpha meanings and remain a separate grouped decision.
 
 ## Verified checkpoint —07l Mesh import / Native conversion
 
@@ -367,12 +412,31 @@ Logs, generated owned inputs, traces, failures and snapshots remain under ignore
 
 Next, prioritize missing connected user workflows over GS tuning;
 the500k Review failure remains tracked.
-  Approved07l and the source-material unit are verified above.
-  The next exact decision is07m's originally-unlit/double opaque source conversion
-  for Native/v1/LociMyu. Its new recipes preserve old job meanings and its new v1
-  recipe omits an absent side override to preserve the source side. It is PROPOSED,
-  not authorized/implemented. Obtain grouped approval only after concrete contract,
-  vectors and independent review; no per-family/helper approvals afterward.
+  Approved07l, source-material editing and07m conversion are verified above.
+  Next design the remaining alpha/chroma conversion as one connected unit.
+  Read-only source/01§4.2 comparison finds that map2 alone cannot reproduce old
+  factor-replacement order: MASK factor.4/cutoff.5 and texture alpha.25/.75 both
+  become sourceCoverage0, while old opacity1 yields discarded/covered. OPAQUE with
+  old opacity.5 makes texture alpha visible (.125/.375), whereas map2 coverage1
+  yields.5/.5. These are derived counterexamples, not new GPU measurements. A
+  concrete versioned compatibility policy (or explicitly approved visual change),
+  blend/depth/picking/GS scope and ignored Basic-chroma handling need one reviewed
+  decision before implementation. Read-only comparison recommends explicit
+  conversion to standard map2: one editing meaning after migration, originals and
+  old recipes unchanged, affected materials/consequences shown before conversion.
+  This may change the old appearance; it is a proposal, not an accepted policy.
+  Exact old-renderer reproduction instead needs a versioned persistent evaluator
+  covering the different Native/v1/Basic alpha orders, not a transient UI flag.
+  The next grouped proposal must fix all three families' exact value/default and
+  ignored-effect mappings, smooth blending/depth/GS interaction and picking, then
+  require edit/reset, five outputs, two returns and recovery/cold as one result.
+  No new map2 meaning/profile is assumed approved by this investigation.
+  Exact migration planning must also resolve v1 `tol` versus runtime `tolerance`,
+  LociMyu blank/default and truthy parsing differences, old feather0's nonzero
+  smoothing, and Native Basic chroma's depth/order flags despite no color patch.
+  Disabling that ignored color effect alone does not reproduce its old rendering.
+  Avoid another series of tiny source subsets; do not silently binarize
+  semi-transparency or activate previously ignored effects.
   Further external-resource/format subsets, frozen-v1 orthographic mapping and
   multi-model LociMyu also remain. Old orthographic span is not fully recorded;
   multi-model LociMyu has no reliable Caption owner/frame mapping. Native active

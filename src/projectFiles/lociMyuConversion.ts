@@ -10,7 +10,7 @@ import { checkContentFacts } from '../domain/projectContentChecks';
 import { readProjectScene } from '../scene/projectProvider';
 import { readValidationBody } from './content';
 import { readValidationInitialRecord, writeValidationInitial, validationInitialOrigin } from './creation';
-import { lociMyuRecipe, lociMyuJpegRecipe, lociMyuPhotoRecipe, lociMyuMaterialRecipe, type LociMyuRecipe, lociMyuEvidence, openLociMyuSource, planLociMyuSource, lociMyuByteProof, LociMyuPreflightError, type LociMyuSourcePlan, type OpenedLociMyuSource } from './lociMyuSource';
+import { lociMyuRecipe, lociMyuJpegRecipe, lociMyuPhotoRecipe, lociMyuMaterialRecipe, lociMyuOpaqueMaterialRecipe, type LociMyuRecipe, lociMyuEvidence, openLociMyuSource, planLociMyuSource, lociMyuByteProof, LociMyuPreflightError, type LociMyuSourcePlan, type OpenedLociMyuSource } from './lociMyuSource';
 import { mapLociMyuProject, lociMyuSourceKey, type LociMyuMappingEntry } from './lociMyuMapping';
 import type { PngDecoder } from './png';
 import type { JpegDecoder } from './jpeg';
@@ -25,7 +25,7 @@ interface ConversionReceipt {
 const receiptPath = (fs: ProjectWorkspaceFS) => metadataPath(fs, 'locimyu-conversion.json');
 const sourcePath = (fs: ProjectWorkspaceFS) => metadataPath(fs, 'locimyu-conversion-source.zip');
 export const hasLociMyuConversion = async (fs: ProjectWorkspaceFS, checkBoundInitial = true) => !!await fs.readStream(receiptPath(fs)) || !!await fs.readStream(sourcePath(fs)) ||
-  checkBoundInitial && [lociMyuRecipe, lociMyuJpegRecipe, lociMyuPhotoRecipe, lociMyuMaterialRecipe].includes(await validationInitialOrigin(fs) as LociMyuRecipe);
+  checkBoundInitial && [lociMyuRecipe, lociMyuJpegRecipe, lociMyuPhotoRecipe, lociMyuMaterialRecipe, lociMyuOpaqueMaterialRecipe].includes(await validationInitialOrigin(fs) as LociMyuRecipe);
 const fail = () => fileError('LociMyuの変換記録が不足しているか一致しません。保持した記録は上書きしていません。');
 const reportBlob = (report: JsonObject) => new Blob([json(lociMyuEvidence(report))], { type: 'application/json' });
 const ascii = (value: unknown) => json(lociMyuEvidence(value)).replace(/[\u007f-\uffff]/g, c => `\\u${c.charCodeAt(0).toString(16).padStart(4, '0')}`);
@@ -48,7 +48,7 @@ async function checkReceipt(r: ConversionReceipt, projectId: string) {
   const proof = (p: unknown): boolean => keys(p, ['byteLength', 'digest']) && Number.isSafeInteger((p as ConversionReceipt['original']).byteLength) &&
     (p as ConversionReceipt['original']).byteLength > 0 && /^[0-9a-f]{64}$/.test((p as ConversionReceipt['original']).digest);
   if (!keys(r, ['recipe', 'conversionId', 'projectId', 'original', 'initial', 'selection', 'workbook', 'confirmation', 'title', 'fingerprints', 'inventory', 'sourceIdentities', 'mapping', 'report']) ||
-    ![lociMyuRecipe, lociMyuJpegRecipe, lociMyuPhotoRecipe, lociMyuMaterialRecipe].includes(r.recipe) || !/^[0-9a-f]{32}$/.test(r.conversionId) || r.projectId !== projectId || projectId !== `prj_${r.conversionId}` || !proof(r.original) ||
+    ![lociMyuRecipe, lociMyuJpegRecipe, lociMyuPhotoRecipe, lociMyuMaterialRecipe, lociMyuOpaqueMaterialRecipe].includes(r.recipe) || !/^[0-9a-f]{32}$/.test(r.conversionId) || r.projectId !== projectId || projectId !== `prj_${r.conversionId}` || !proof(r.original) ||
     !keys(r.initial, ['byteLength', 'digest', 'proof']) || !proof({ byteLength: r.initial.byteLength, digest: r.initial.digest }) || !Number.isSafeInteger(r.selection) || r.selection < 0 ||
     !keys(r.workbook, ['path', 'byteLength', 'digest']) || typeof r.workbook.path !== 'string' || typeof r.title !== 'string' || !Array.isArray(r.mapping) || !r.mapping.length) return fail();
   const ids = new Set<string>(), hashes = new Map<string, string>();
@@ -67,7 +67,7 @@ function makeReport(original: ConversionReceipt['original'], evaluated: Awaited<
   const material = base.materialSelected === true;
   const materialEffects = material && plan && mapped ? { scenes: new Set(plan.materialRows!.map(row => row.scene)).size,
     overrides: mapped.materialMappings.length, sourceOnlyChromaRows: plan.materialRows!.filter(row => row.sourceOnlyChroma).length } : null;
-  return lociMyuEvidence({ format: 'lociview-locimyu-to-project-scene-report', version: 1, recipe: material ? lociMyuMaterialRecipe : plan?.recipe ?? lociMyuRecipe,
+  return lociMyuEvidence({ format: 'lociview-locimyu-to-project-scene-report', version: 1, recipe: plan?.recipe ?? base.materialRecipe ?? (material ? lociMyuMaterialRecipe : lociMyuRecipe),
     original, workbook: base.workbook, confirmedTitle: base.title, confirmation: base.confirmation, relationBasis: relation,
     inventory: base.inventory, fingerprints: base.fingerprints, accounting: base.accounting, sourceEvidence: base.sourceEvidence,
     converted: { models: plan ? 1 : 0, scenes: plan?.scenes.length ?? 0, captions: plan?.scenes.reduce((n, s) => n + s.captions.length, 0) ?? 0, media: plan?.media.length ?? 0, views: plan?.views.length ?? 0 },

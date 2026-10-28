@@ -1,9 +1,15 @@
 # Existing opaque source-material conversion companion
 
-Status: **PROPOSED — not approved or implemented.**
-This is the next connected migration decision after05's existing Mesh source-edit
+Status: **APPROVED — grouped implementation ratified by PO 2026-10-28; bounded three-family workflow implemented and verified, not adopted.**
+The PO approved the complete three-family workflow, new recipes/IDs and v1 absent-side
+inheritance in one group. No per-family/helper approval is needed. This is the connected migration decision after05's existing Mesh source-edit
 connection. It adds no renderer, dependency, public profile or general alpha policy.
 [Todo](../../tasks/todo.md) owns current implementation/checks and sequencing.
+Executed evidence covers the exact source/recipe subset below, typed editing,
+five-purpose files/two returns, selected restore and cold reopen. Native has a
+connected Desktop Chromium run; v1/LociMyu have representative product/service-file
+continuations. Physical iOS, offline/PWA, aggregate gates and release are not passed
+by this checkpoint. Todo owns the check results and retained failure evidence.
 
 ## User outcome and decision
 
@@ -13,7 +19,7 @@ Mesh → inspect consequences → edit/reset the exact Scene/slot → five-purpo
 files/two-way exchange → Review editable copy/Clean/restore/cold resume.
 
 The new decision admits the four source combinations opaque/surface × lit/unlit
-× front/double for addressed **visual Mesh** slots. Current converters accept only
+× front/double for addressed **visual Mesh** slots. Before this companion, converters accepted only
 opaque/surface/lit/front. Saved opacity remains exactly1 and chroma remains disabled.
 Keep the accepted original-source, exact-address and all-or-nothing rules. New
 immutable recipes are required; changing the meaning of old recipes is prohibited.
@@ -95,14 +101,27 @@ Determine the existing inspection/receipt lane from the verified original snapsh
 and inspected source kinds at prepare and exact-source recovery: newMesh→07l lane,
 otherwise non-Mesh/Proxy→07k lane, otherwise appearance GLB lane. Use that lane's
 full body/ref/witness shape, source key grammar, origin storage and expected-record
-checks. Recipe9 independently selects the new ID/acceptance domain. Update prepare,
-receipt allowlists, origin/appearance/JPEG/photo classification, startup/resume and
+checks. Recipe9 independently selects the new ID/acceptance domain.
+All new9 initial records use the existing validation-initial-2/originRecipe9 marker
+so a missing/mutated conversion receipt cannot downgrade to ordinary creation.
+Update prepare, receipt allowlists, origin/appearance/JPEG/photo classification, startup/resume and
 complete expected-record verification together. Never call the Mesh receipt reader
 on a plain GLB receipt just because its recipe is9. Do not infer a lane from a
 filename or unverified receipt-only hint. No new persisted discriminator is needed:
 the exact verified original source already supplies the lane. Old1–8 jobs retain
 their old dispatch and retry behavior. Preserve each lane's existing original/body/
 Project capacity;9 alone grants no larger allocation or Desktop exception.
+Receipt shape may select a candidate location and undergo provisional structural
+checks before source inspection; it is never lane/publication authority. Raw GLB9
+uses its existing whole-original capture once, then requires a verified plain-GLB
+source lane before model/witness/publication work. CAS lanes inspect source metadata
+through the verified Blob below. Do not add a preliminary whole-buffer read.
+The source-lane check may hand its already verified immutable CAS Blob to the
+same recovery invocation through a private one-use capability bound to FS/store/
+exact ref. This only avoids the newly introduced duplicate CAS acquisition. Keep
+the normal state/ack checks, original hash, witnesses and publication fences;
+reselected user bytes still require CAS write and verified readback. No general
+cache, cross-operation reuse or supplied verified flag is allowed.
 
 Keep every existing source-key grammar and output prefix. Only the recipe domain
 changes. In particular, Native override key is `['mesh-appearance',appearance.id]`,
@@ -120,10 +139,10 @@ The UTF-8 preimage has no BOM, final LF or normalization:
 LociMyu retains `workbookPath` between sourceZipSha256 and prefix. The escape is
 one LF. Output ID is `prefix+'_'+sha256.slice(0,32)`; retain full digest/preimage,
 reject shortened-ID/full-digest/entity collisions and sort mapping rows by target
-ID. The [proposed nine identity vectors](profiles/opaque-source-material-conversion.proposed-goldens.json)
+ID. The [approved nine identity vectors](profiles/opaque-source-material-conversion.goldens.json)
 fix two distinct overrides and one initial event per family, including literal
 preimages, UTF-8 lengths and full SHA-256/shortened IDs. Independently review them
-before implementation and keep all older goldens byte-identical. These proposed
+before implementation and keep all older goldens byte-identical. These identity
 vectors are not a registered FormatProfile; no profile hash is regenerated.
 
 ## Confirmation, persistence and recovery
@@ -162,7 +181,9 @@ Use existing parser/service/file/browser tests rather than another harness:
   v1/LociMyu service-file continuation using their existing exact-address fixtures:
   edit/scope/reset, independent-profile two returns with local edits, all five
   outputs, Review/Clean, actual selected-generation restore and cold reopen.
-- Native9 plain/spatial/Mesh fresh and interrupted-source-reselect recovery;
+- Native9 fresh/cold in all three lanes; interrupted plain GLB uses its retained
+  raw original (missing/tampered raw source requires repair), while spatial/Mesh
+  keep their existing pre-ack exact-source-reselect recovery;
   receipt/witness tampering, incompatible lane and original mismatch; old retries
   unchanged and no whole-original/GS reads newly introduced.
 - Required serial typecheck/full Vitest/four builds, artifact/source-map isolation,
@@ -171,6 +192,6 @@ Use existing parser/service/file/browser tests rather than another harness:
 Stop only the affected work for an actual contract conflict, new source/alpha/
 ownership/capacity interpretation or separately gated adoption/release action.
 Physical iOS, offline/PWA, general renderer/storage adoption and publication remain
-separate. Approval of this companion would cover the complete three-family unit,
+separate. PO approval of this companion covers the complete three-family unit,
 ordinary implementation/testing/fixes and its suitable g0 development checkpoint;
-it would not require per-format/helper or small manual-test confirmation.
+it does not require per-format/helper or small manual-test confirmation.

@@ -163,8 +163,9 @@ export function meshSources(){
   const goldens=JSON.parse(readFileSync('docs/specs/profiles/mesh-conversion-8.goldens.json','utf8'));
   return (['stl','ply','obj','gltf'] as const).map((format,i)=>{const g=goldens.sources[['stl-magics-red','ply-quad','obj-slots','gltf-json'][i]!];return{format,bytes:format==='obj'?Buffer.from('mtllib unavailable.mtl\n'+g.utf8):g.utf8?Buffer.from(g.utf8):Buffer.from(g.base64,'base64')};});
 }
-export async function nativeMeshBackup(){
+export async function nativeMeshBackup(opaqueMaterials=false){
   const id=(p:string,n:number)=>`${p}_${String(n).padStart(26,'0')}`,hash=(b:Buffer)=>createHash('sha256').update(b).digest('hex'),sources=meshSources();
+  if(opaqueMaterials){const source=sources.find(s=>s.format==='gltf')!,j=JSON.parse(source.bytes.toString('utf8'));j.materials[0].doubleSided=true;j.materials[0].extensions={KHR_materials_unlit:{}};j.extensionsUsed=['KHR_materials_unlit'];source.bytes=Buffer.from(JSON.stringify(j));}
   const proxy=Buffer.from('mtllib unavailable.mtl\no Surface\nv -1 0 0\nv 1 0 0\nv 0 2 0\nv -1 1 0\ns off\nusemtl First\nf 1 2 3\nusemtl Second\nf 1 3 4\n'),bodies=new Map([[id('rep',3),proxy],...sources.map((s,i)=>[id('rep',100+i),s.bytes] as const)]);
   return nativeSpatialBackup(256,{bodies,update(s){
     const placement=()=>({translation:[0,0,0],rotationXYZW:[0,0,0,1],uniformScale:1});
@@ -176,6 +177,7 @@ export async function nativeMeshBackup(){
       s.assetRevisions.push({id:revision,assetId:asset,representationIds:[rep],anchorCompatibilityClasses:[{id:id('cls',n),targetVariantFamilyIds:[family]}]});
       s.representations.push({id:rep,assetId:asset,representationFrameId:id('frm',400+n),contentKind:'mesh',purposes:['source','display'],role:'meshPrimary',variantFamilyId:family,formatProfile:{id:`lociview-native-model-${source.format}-v1`},blob:blob(source.bytes,source.format==='stl'?'model/stl':source.format==='obj'?'text/plain':source.format==='gltf'?'model/gltf+json':'application/octet-stream'),representationToAsset:{...placement(),translation:[1,2,3],uniformScale:2,reflection:'x'},derivedFrom:[]});
     }
+    if(opaqueMaterials)s.meshMaterialAppearances=[102,103].map((n,i)=>({id:id('mat',n),displaySetId:s.displaySets[0].id,assetId:id('ast',n),authoredAssetRevisionId:id('rev',n),representationId:id('rep',n),materialSlotKey:'m/0/0',opacity:1,doubleSided:true,unlit:i===0,chroma:{enabled:false,colorSrgb:[0,1,0],tolerance:.3,feather:0}}));
   }});
 }
 
