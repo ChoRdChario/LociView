@@ -1961,8 +1961,66 @@ unknown/disabled-map2 values, exact appearance-only compatibility, conflict/stal
 readonly refusal, scope/reset, failed-save exact retry, original-byte preservation,
 real package receive and cold continuation. Reuse existing unit/service/browser
 lanes; a rendered single-backend case is not general renderer/device adoption.
-Unratified dither, Experimental smoothBlend, source MASK/BLEND edits, migration
+Unratified dither, Experimental smoothBlend, source edits beyond the next bounded
+connection (including BLEND), migration
 recipes, new profiles and ordinary/offline/release activation retain their gates.
+
+**Existing Mesh source-material edit/reset connection (2026-10-28).** This
+bounded connection completes01§4.2 for provider-verified visual Mesh source
+slots already admitted by the existing profiles. This supersedes only the earlier
+opaque/lit/front source-edit restriction: surface opaque/MASK, authored lit/unlit,
+front/double sources may use the current scoped controls. Source profiles/bytes,
+catalogs, recipes and Native migration subsets remain exact. Provider/content
+admission owns profile registration; do not create a second format registry in
+the material adapter. A pure domain capability checks the verified Representation
+`contentKind:'mesh'`, `role:'meshPrimary'` and closed source semantics. Point, GS,
+interactionProxy, BLEND, transmission and unknown semantics remain non-editable.
+UI slots carry this capability; both ordinary and resolution Session commands
+enforce it before writing. The same capability is checked before clone rendering.
+
+| Authored source | Existing controls in this connection |
+|---|---|
+| opaque/MASK + lit + front/double | inherit/lit/unlit, explicit/inherited side, existing RGB factor, hard chroma and explicit mask controls |
+| opaque/MASK + unlit + front/double | inherit/unlit and the same side/color/chroma/mask controls; explicit lit is refused before write/display |
+| other semantics or nonvisual/non-Mesh role | existing unsupported state, no material mutation |
+
+Standard and approved OBJ Phong retain authored lighting parameters; source Basic
+stays Basic for inherit/unlit. Do not invent or recover latent PBR values to enable
+Basic→lit here. Absent side inherits the original side. Every display starts from
+an owned clone; reset reconstructs source fallback and retains history/originals.
+Routing, lifecycle, stale/conflict/readonly and unknown-field checks remain. A reset
+may tombstone a fully known/resolved Basic+lit override after the existing generic
+intent checks; source-specific lighting rejection must not prevent that cleanup.
+It does not bypass unknown intent/routing or permit unsupported source classes.
+
+Capture source factor alpha and source cutoff before appearance is applied. Source
+MASK evaluates factor × texture alpha × COLOR_0 alpha after all source alpha inputs,
+then produces binary sourceCoverage using its original cutoff. Source opaque
+coverage is1 regardless of authored alpha inputs. Apply01§4.2 opacity/chroma and
+requested coverage afterward: inherit mask cutoff0.5; explicit mask uses its saved
+cutoff, including0; requested opaque outputs alpha1 and ignores source coverage.
+Never source-discard early: explicit mask cutoff0 accepts appearanceAlpha0.
+Surviving binary output is alpha1. Preserve source RGB/UV/texture inputs and the
+existing numeric chroma rule; set backend alpha-test/opacity only on owned clones
+to avoid a second source cutoff. Display and the owned Boolean probe use identical
+source/final predicates. No-override/reset MASK and opaque-with-source-alpha also
+have a provable pick evaluator; raw backend flags do not redefine source semantics.
+
+Ports/imports: domain owns the pure Mesh/source capability; viewer/hardChroma owns
+an optional owned source-alpha/cutoff input on its binary evaluator (default keeps
+existing opaque behavior), retained by probe cloning. projectScene connects decoded
+classes/slots to it; UI has no storage/shader authority. Different shader bodies
+must have different program keys. Keep exact module/import allowlists and early
+sceneCore verification. No new storage or parallel renderer framework.
+
+Acceptance: Standard/Basic/Phong, both sides, scope and reset; MASK factor/texture/
+RGBA and source/final cutoff equality/0/1; opaque ignoring source alpha; hard/soft
+mask chroma; actual pixels and matching covered/discarded/backface picks; Basic→lit
+and Point/GS/Proxy/unknown-source refusal before writes; exact failed-save retry,
+local-edit-preserving returns, all five outputs, Review/Clean and restore/cold.
+Reuse one representative connected file/browser flow plus focused invariant cases.
+Required final checks and independent review precede a development checkpoint;
+device/offline/adoption/release and new alpha/migration policies remain separate.
 
 Validation-GLB placement connection reuses the already approved M07 semantics:
 Move/Rotate/positive uniform scale about the model origin, preview/confirm/cancel,

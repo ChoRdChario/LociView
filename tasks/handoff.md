@@ -33,9 +33,15 @@ geometry and preserved OBJ Phong effects. Root is sole writer. Todo owns the
 connected implementation/check sequence; no per-format/helper approval. Exact
 profile/golden bytes are fixed and renderer/adoption/release gates remain separate.
 The bounded workflow now has executed source/command/file/recovery and Desktop
-browser evidence, required full checks and independent review in todo. The next
-accepted connection is existing Mesh source-material editing/reset; keep new
-lighting/alpha interpretations and legacy migration policies behind real decisions.
+browser evidence, required full checks and independent review in todo. The existing
+Mesh source-material connection is verified under05's
+source matrix: visual Mesh opaque/MASK, authored lit/unlit and front/double. Todo
+owns its actual checks and next action. Explicit Basic→lit, BLEND and new migration
+semantics remain behind real decisions; source capability never unlocks Point/GS/
+Proxy editing. Keep original bytes and identical display/Boolean-pick coverage.
+The next07m opaque-source conversion companion is PROPOSED, independently reviewed
+and awaiting grouped PO approval. It adds new recipe/ID meanings for Native/v1/
+LociMyu; do not implement it from the proposal alone or change older recipes.
 
 01a's bounded point workflow is implemented; exact six JSON companions are immutable.
 Native, synthetic hosts, typed validation and ordinary home have separate authority

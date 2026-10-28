@@ -533,12 +533,16 @@ async function openNormalValidationHost(options: ValidationHostOptions, inherite
       if (command.kind === 'resolveMaterialIntent' || command.kind === 'resolveMaterialDuplicates') {
         const before = await session.read();
         if (before.state !== 'ready' || before.provider?.kind !== 'scene-provider' || before.source?.token !== token) throw Error('材質が更新されています。選び直してください。');
-        const selected = selectedMaterialResolution(before.provider, command, limits);
+        const selected = (()=>{try{return selectedMaterialResolution(before.provider, command, limits);}catch(error){
+          if(error instanceof Error&&'code' in error&&error.code==='material-unsupported')throw Error('選択した見え方は、このモデルでは使用できません。別の設定を選択してください。');
+          throw error;
+        }})();
         const versions = await validationModelVersions(before.provider);
         const slots = versions.flatMap(v => isSavedMesh(v.closure) ? validationMaterialSlots(v.closure) : []);
         const slot = slots.find(s => same(s.target as unknown as JsonObject, selected.routing.target));
         if (!slot) throw Error('設定するモデルと材質を確認してください。');
-        for (const intent of selected.intents.values()) {
+        for (const [id,intent] of selected.intents) {
+          if(command.kind==='resolveMaterialDuplicates'&&id!==command.overrideId)continue;
           const issue = validationMaterialIssue(slot, intent, before.provider.semanticProfile); if (issue) throw Error(issue);
         }
       }

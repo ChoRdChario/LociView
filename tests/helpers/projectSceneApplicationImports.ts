@@ -427,6 +427,7 @@ export const projectSceneApplicationImports:Readonly<Record<string,readonly stri
     "./viewDisplay"
   ],
   "src/projectScene/validationMaterials.ts": [
+    "../domain/meshMaterialSource",
     "../domain/meshSource",
     "../domain/materialIntent",
     "../domain/projectGraphSupport",
@@ -471,6 +472,7 @@ export const projectSceneApplicationImports:Readonly<Record<string,readonly stri
     "./validationOutputControls"
   ],
   "src/projectScene/validationRender.ts": [
+    "../domain/meshMaterialSource",
     "../domain/meshSource",
     "../projectFiles/meshDecode",
     "../projectFiles/nativeSpatial",

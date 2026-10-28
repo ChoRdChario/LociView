@@ -1,3 +1,4 @@
+import {meshMaterialSource,meshLightingIssue,type MeshMaterialSource} from '../domain/meshMaterialSource';
 import { cloneCanonicalValue, normalizeSceneName, type JsonObject, type JsonValue } from '../domain/values';
 import { checkMutableField, checkMutableRecord, type MutableRecordMap } from '../domain/projectMutableFields';
 import { ProjectRecordFields } from '../domain/projectRecordFields';
@@ -184,13 +185,13 @@ export function planMetadataEdit(provider: Provider, input: MetadataEdit, limits
     if (scope.kind === 'scene' && scope.sceneId !== sceneId) fail('material-scene');
     const assetId = target.assetId as string; row('assetsById', assetId);
     const projection = exact(provider.resources.assets[assetId]?.projection);
-    let found = false;
+    let found = false,source:MeshMaterialSource|undefined;
     for (const repId of projection.representationIds) {
       const rep = exact(provider.details.immutable.representationsById[repId]);
       if (rep.assetId !== assetId || rep.variantFamilyId !== target.variantFamilyId || !rep.materialCatalog) continue;
       const catalog = object(rep.materialCatalog); if (catalog.layoutId !== target.materialLayoutId) continue;
       for (const slot of list(catalog.slots).map(object)) if (slot.logicalMaterialSlotId === target.logicalMaterialSlotId) {
-        if (!same(slot.sourceSemantics, { coverage: { kind: 'opaque' }, optics: 'surface', lighting: 'lit', doubleSided: false })) fail('material-source');
+        const capability=meshMaterialSource(rep,slot.sourceSemantics);if(!capability)fail('material-source');source=capability!;
         found = true;
       }
     }
@@ -203,11 +204,13 @@ export function planMetadataEdit(provider: Provider, input: MetadataEdit, limits
       if (id !== owner || r.routing?.kind !== 'value' || r.lifecycle?.kind !== 'value' || reservations.hasUnknownFields)
         fail('material-reserved');
     }
+    return source!;
   };
-  const materialIntent = (appearance: JsonObject, compositing: JsonObject) => {
+  const materialIntent = (appearance: JsonObject, compositing: JsonObject,source?:MeshMaterialSource) => {
     checkMutableField(c, 'materialOverridesById', 'appearance', appearance);
     checkMutableField(c, 'materialOverridesById', 'compositing', compositing);
     const intent = validateMaterialIntent({ appearance, compositing }, limits, provider.semanticProfile);
+    if(source&&meshLightingIssue(source,intent.appearance))fail('material-unsupported');
     if (c.unknown || intent.compositing.optics === 'transmission' ||
       ['smoothBlend', 'ditherCoverage'].includes(intent.compositing.coverage.policy) ||
       intent.compositing.coverage.policy !== 'mask' && (provider.semanticProfile !== 'map2' || intent.appearance.chroma?.enabled !== false) && (intent.appearance.chroma?.softness ?? 0) > 0 ||
@@ -446,7 +449,7 @@ export function planMetadataEdit(provider: Provider, input: MetadataEdit, limits
     }
     case 'createMaterial': {
       shape(raw, ['kind', 'sceneId', 'overrideId', 'routing', 'appearance', 'compositing', 'eventId']);
-      material(command.sceneId, command.routing); materialIntent(command.appearance, command.compositing);
+      const source=material(command.sceneId, command.routing); materialIntent(command.appearance, command.compositing,source);
       add('materialOverridesById', command.overrideId, { id: command.overrideId, routing: command.routing,
         appearance: command.appearance, compositing: command.compositing,
         lifecycle: { state: 'active', eventId: command.eventId, reason: 'initial' } }, true); break;
@@ -459,11 +462,11 @@ export function planMetadataEdit(provider: Provider, input: MetadataEdit, limits
       checkMutableField(c, 'materialOverridesById', 'lifecycle', exact(r.lifecycle));
       const routing = exact(r.routing) as JsonObject, appearance = exact(r.appearance) as JsonObject, compositing = exact(r.compositing) as JsonObject;
       exact(provider.resources.materials[command.overrideId]?.intent);
-      material(command.sceneId, routing, command.overrideId); materialIntent(appearance, compositing);
+      const source=material(command.sceneId, routing, command.overrideId); materialIntent(appearance, compositing);
       if (command.kind === 'editMaterial') {
         const nextAppearance = Object.hasOwn(raw, 'appearance') ? command.appearance! : appearance;
         const nextCompositing = Object.hasOwn(raw, 'compositing') ? command.compositing! : compositing;
-        materialIntent(nextAppearance, nextCompositing);
+        materialIntent(nextAppearance, nextCompositing,source);
         const fields: Record<string, JsonValue> = {};
         if (!same(nextAppearance, appearance)) fields.appearance = nextAppearance;
         if (!same(nextCompositing, compositing)) fields.compositing = nextCompositing;

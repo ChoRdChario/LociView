@@ -38,6 +38,21 @@ async function setup(fileBacked=false,budget:ProjectFilePolicyInput=limits){
   const workflow=createGsProxyWorkflow(service.content,read,(token,command)=>service.session.edit(token,command));return {...service,fs,storage,store,read,target,workflow};
 }
 describe('01c same-GS Proxy commands and durable facts',()=>{
+  it('refuses material commands on GS, Point and an opaque Mesh Proxy before storage mutation',async()=>{
+    const r=await setup(),{token,...target}=await r.target(),bytes=triangleGlb();
+    const prepared=await r.workflow.prepare(token,target,{name:'surface.glb',size:bytes.length,arrayBuffer:async()=>Uint8Array.from(bytes).buffer});await r.workflow.commit(token,prepared.id);r.workflow.completed();
+    const golden=JSON.parse(readFileSync('docs/specs/profiles/native-spatial-conversion-7.goldens.json','utf8')),assetId=`ast_${newId()}`,point=await r.content.prepareModel({label:'Point',bytes:new TextEncoder().encode(golden.point.utf8Source)},assetId),beforePoint=await r.read();
+    await r.session.edit(beforePoint.token,{kind:'addAsset',sceneId:target.sceneId,...point,membership:{id:`sam_${newId()}`,sceneId:target.sceneId,assetId,orderKey:'B',lifecycle:{state:'active',reason:'initial',eventId:`evt_${newId()}`}}});
+    const p=await r.read(),versions=await validationModelVersions(p),gs=versions.find(v=>v.closure.shape==='saved-gs')!.closure,cloud=versions.find(v=>v.closure.shape==='saved-point')!.closure;
+    if(gs.shape!=='saved-gs'||cloud.shape!=='saved-point')throw Error('sources');
+    const paths=await r.fs.list(''),writes=vi.spyOn(r.fs,'writeBytes'),text=vi.spyOn(r.fs,'writeText');
+    for(const rep of [gs.representation,gs.proxy!,cloud.representation]){
+      const catalog=rep.materialCatalog,slot=catalog?.slots[0];
+      const command={kind:'createMaterial' as const,sceneId:target.sceneId,overrideId:`ovr_${newId()}`,routing:{scope:{kind:'project'},target:{assetId:rep.assetId,variantFamilyId:rep.variantFamilyId,materialLayoutId:catalog?.layoutId??`lay_${newId()}`,logicalMaterialSlotId:slot?.logicalMaterialSlotId??`slot_${newId()}`}},appearance:{lighting:'unlit'},compositing:{coverage:{policy:'inherit'},optics:'inherit'},eventId:`evt_${newId()}`};
+      await expect(r.session.edit(p.token,command)).rejects.toThrow(catalog?'material-source':'material-target');expect((await r.session.read()).source!.token).toBe(p.token);expect(await r.fs.list('')).toEqual(paths);expect(writes).not.toHaveBeenCalled();expect(text).not.toHaveBeenCalled();
+    }
+    expect((await validationProjectService(r.fs,r.storage,r.store,limits).session.read()).state).toBe('ready');
+  });
   it.each([['stl','stl-ascii'],['ply','ply-quad'],['obj','obj-slots'],['gltf','gltf-json']] as const)('Mesh07l attaches/changes %s through the actual Proxy command and keeps originals and current frame',async(format,name)=>{
     vi.stubGlobal('ProgressEvent',class extends Event{constructor(type:string,init:ProgressEventInit={}){super(type);Object.assign(this,{lengthComputable:false,loaded:0,total:0},init);}});vi.stubGlobal('createImageBitmap',async()=>{throw Error('Unexpected image');});
     try{const g=JSON.parse(readFileSync('docs/specs/profiles/mesh-conversion-8.goldens.json','utf8')).sources[name],bytes=new TextEncoder().encode(g.utf8),r=await setup(),{token,...target}=await r.target();

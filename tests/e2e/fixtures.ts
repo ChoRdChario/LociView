@@ -18,7 +18,7 @@ export function triangleGlb(z = 0) {
   }, bin));
 }
 
-export function smallPng(red = 40) {
+export function smallPng(red = 40,splitAlpha=false) {
   const chunk = (type: string, data: Buffer) => {
     const payload = Buffer.concat([Buffer.from(type), data]); let crc = 0xffffffff;
     for (const byte of payload) {
@@ -29,11 +29,30 @@ export function smallPng(red = 40) {
     head.writeUInt32BE(data.length); tail.writeUInt32BE((crc ^ 0xffffffff) >>> 0);
     return Buffer.concat([head, payload, tail]);
   };
-  const header = Buffer.alloc(13); header.writeUInt32BE(2, 0); header.writeUInt32BE(2, 4);
+  const width=splitAlpha?64:2,height=splitAlpha?48:2;
+  const header = Buffer.alloc(13); header.writeUInt32BE(width, 0); header.writeUInt32BE(height, 4);
   header[8] = 8; header[9] = 6;
-  const row = Buffer.from([0, red, 120, 200, 255, 220, 160, 60, 255]);
+  const row = splitAlpha?Buffer.alloc(1+width*4):Buffer.from([0, red, 120, 200, 255, 220, 160, 60, 255]);
+  if(splitAlpha)for(let x=0;x<width;x++)row.set([red,120,200,x<width/2?0:255],1+x*4);
   return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
-    chunk('IHDR', header), chunk('IDAT', deflateSync(Buffer.concat([row, row]))), chunk('IEND', Buffer.alloc(0))]);
+    chunk('IHDR', header), chunk('IDAT', deflateSync(Buffer.concat(Array.from({length:height},()=>row)))), chunk('IEND', Buffer.alloc(0))]);
+}
+
+/** Nonoverlapping owned sources: lit/double, opaque/unlit alpha.25, source MASK .8×.8×texture. */
+export function sourceMaterialPanelsGlb(change?:(json:any)=>void){
+  const parts:Buffer[]=[],views:any[]=[],accessors:any[]=[],primitives:any[]=[];let offset=0;
+  const floats=(values:number[],type:string,extra:object={})=>{const bytes=Buffer.alloc(values.length*4);values.forEach((n,i)=>bytes.writeFloatLE(n,i*4));const view=views.length;views.push({buffer:0,byteOffset:offset,byteLength:bytes.length});parts.push(bytes);offset+=bytes.length;const index=accessors.length;accessors.push({bufferView:view,componentType:5126,count:values.length/Number(type.slice(-1)),type,...extra});return index;};
+  for(const [i,x]of[-3,0,3].entries()){
+    const position=floats([x-1,-1,0,x+1,-1,0,x+1,1,0,x-1,-1,0,x+1,1,0,x-1,1,0],'VEC3',{min:[x-1,-1,0],max:[x+1,1,0]}),uv=floats([0,0,1,0,1,1,0,0,1,1,0,1],'VEC2'),attributes:any={POSITION:position,TEXCOORD_0:uv};
+    if(i===2)attributes.COLOR_0=floats(Array.from({length:6},()=>[1,1,1,.8]).flat(),'VEC4');primitives.push({attributes,material:i});
+  }
+  const image=smallPng(40,true),imageView=views.length;views.push({buffer:0,byteOffset:offset,byteLength:image.length});parts.push(image);offset+=image.length;
+  const j:any={asset:{version:'2.0'},extensionsUsed:['KHR_materials_unlit'],scene:0,scenes:[{nodes:[0]}],nodes:[{mesh:0}],meshes:[{primitives}],buffers:[{byteLength:offset}],bufferViews:views,accessors,
+    materials:[{doubleSided:true,pbrMetallicRoughness:{baseColorFactor:[.4,.8,.2,1],metallicFactor:0,roughnessFactor:.7}},
+      {extensions:{KHR_materials_unlit:{}},pbrMetallicRoughness:{baseColorFactor:[.3,.6,.9,.25]}},
+      {alphaMode:'MASK',alphaCutoff:.5,pbrMetallicRoughness:{baseColorFactor:[1,1,1,.8],baseColorTexture:{index:0},metallicFactor:0,roughnessFactor:.7}}],
+    samplers:[{magFilter:9728,minFilter:9728,wrapS:33071,wrapT:33071}],textures:[{source:0,sampler:0}],images:[{bufferView:imageView,mimeType:'image/png'}]};
+  change?.(j);return Buffer.from(serializeGlb(j,Buffer.concat(parts)));
 }
 
 /** Embedded owned texture plus UVs; exercises bitmap lifetime on GPU recovery. */

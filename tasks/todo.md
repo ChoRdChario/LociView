@@ -22,7 +22,64 @@ Fix latency when it prevents use or risks data. Keep the existing
 Root is sole writer; bounded independent reviewers are read-only. No small manual
 test or helper approvals. Continue in-scope work while device evidence is pending.
 
-## Current boundary — verified07l Mesh import / Native conversion
+## Current boundary —07m grouped decision pending
+
+The existing Mesh source-material workflow below is verified. The next connected
+unit is the independently reviewed07m proposal; its new migration/ID meanings need
+PO approval. The grouped question is pending. Do not infer approval from elapsed
+time or implement its recipes before an answer. No small manual test is required.
+
+## Verified checkpoint — existing Mesh source-material editing/reset
+
+Outcome: edit existing opaque/MASK Mesh sources with authored lit/unlit and front/
+double sides → exact scope/reset → matching display/pick → five-purpose files,
+two-way local-edit-preserving exchange, Review/Clean, restore/cold. Use accepted01§4.2
+and the explicit05 connection amendment. Root is sole writer; bounded reviewers
+are read-only. At unit start, g0-baseline HEAD5d05902 was pushed/clean;07l is verified
+below. This closes a visible missing workflow before performance tuning.
+
+Delivered: record/review source/effect acceptance → one pure provider-verified Mesh
+capability shared by UI/commands/resolution → owned source-aware clone and Boolean
+coverage/probe preserving source alpha before final mask → existing controls and
+typed Session/file/recovery flow → focused source/role/fault cases and one connected
+Chromium file workflow → independent final diff review and serial full checkpoint.
+Run sceneCore early for exact new imports. No dependency/profile/recipe/schema/wire,
+ordinary activation or release changes. No Point/GS/Proxy/BLEND/transmission/dither/
+smooth expansion. Preserve inherit, source bytes/templates, dormant/unknown intent,
+atomic writes and all recovery fences. Explicit lit on authored unlit stays blocked
+until a real authored-PBR/fallback decision; no new material meaning is invented.
+
+Implementation/focused checks and independent final diff reviews are complete.
+Desktop browser1793149173143-63292 passes5.7min: actual opaque-alpha.25 selection,
+source MASK covered/hole picks, explicit cutoff0, reset pixels and Basic-lit refusal;
+two independent profiles/two returns with local work, all five outputs, Review edit
+copy/Clean and restore/cold. Generated copy/restore/cold metadata also retains exact
+source-slot semantics and effective scoped material values. Final frozen17-file
+source/test tree passes typecheck,130 Vitest files/2901 tests (21 existing todos),
+normal/harness/validation/Desktop builds, HEIC isolation, all four current-source
+maps, GS build/import separation, Desktop notices/distribution and ordinary/Desktop
+Native Spark chunk identity. No outstanding independent final diff findings. The
+first browser run's ambiguous cancel locator was corrected without changing product
+requirements/deadlines. Source originals and all old profile/recipe bytes remain.
+Source-aware shader/probe, role and source refusal, exact command/resolution cleanup,
+backface Raycaster and original/failure/retry cases reuse focused/existing suites.
+Evidence is under ignored `.artifacts/e2e/desktop-integration-tools/`:
+`source-material-final-checkpoint.log`, `source-material-final-artifacts.log`,
+`source-material-output-inspection.log` and `source-material-tested-tree.json`.
+The browser screenshot was inspected. Headless Chromium/local HTTP evidence does
+not pass physical-iOS, offline/PWA, aggregate renderer/storage adoption or release.
+
+Next decision is the grouped [07m opaque-source conversion proposal](../docs/specs/07m-opaque-source-material-conversion-proposal.md)
+(PROPOSED, not implemented): Native/v1/LociMyu exact old mappings with originally
+unlit/double opaque sources, additive recipes9/7/5. Full source MASK/BLEND and active
+chroma/fractional opacity have different legacy alpha meanings and stay separate.
+Independent proposal reviews are complete; witness-shape and v1 absent-side
+findings are resolved. Nine proposed identity vectors match independent Python/
+Node/reviewer calculations. Grouped PO approval is requested and pending; do not
+implement new recipes before an answer. Suitable g0 checkpoint/push remains covered
+by standing authorization after reviewed/tested staged-content equality.
+
+## Verified checkpoint —07l Mesh import / Native conversion
 
 PO2026-10-28 approved [07l](../docs/specs/07l-mesh-import-conversion-proposal.md)
 in one group: STL/Mesh PLY/OBJ/self-contained glTF fresh creation/addition and Native
@@ -310,14 +367,12 @@ Logs, generated owned inputs, traces, failures and snapshots remain under ignore
 
 Next, prioritize missing connected user workflows over GS tuning;
 the500k Review failure remains tracked.
-  The approved07l four-format Mesh/Proxy workflow is the current connected unit.
-  Next, complete editing/reset for already admitted Mesh source materials: first
-  opaque unlit/double-sided sources, then source MASK. Use01§4.2's existing meanings,
-  exact Mesh/profile capabilities and a reviewed source/effect acceptance table;
-  do not accidentally unlock Point/GS material controls. Preserve inherit, side,
-  source-alpha and same-surface picking through file exchange/cold reopen. Existing
-  product approval covers normal sequencing and compatible implementation. A new
-  unlit→lit fallback/material meaning would need an explicit decision instead.
+  Approved07l and the source-material unit are verified above.
+  The next exact decision is07m's originally-unlit/double opaque source conversion
+  for Native/v1/LociMyu. Its new recipes preserve old job meanings and its new v1
+  recipe omits an absent side override to preserve the source side. It is PROPOSED,
+  not authorized/implemented. Obtain grouped approval only after concrete contract,
+  vectors and independent review; no per-family/helper approvals afterward.
   Further external-resource/format subsets, frozen-v1 orthographic mapping and
   multi-model LociMyu also remain. Old orthographic span is not fully recorded;
   multi-model LociMyu has no reliable Caption owner/frame mapping. Native active

@@ -365,7 +365,7 @@ export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: 
       let alphaPicking = false;
       for (const surface of resident.values()) if (surface.dispose) surface.mesh.traverse(node => {
         if (node instanceof THREE.Mesh && (Array.isArray(node.material) ? node.material : [node.material])
-          .some(m => m.transparent || m.alphaTest > 0 || m.opacity < 1)) alphaPicking = true;
+          .some(m => !hasBinaryCoverage(m)&&(m.transparent || m.alphaTest > 0 || m.opacity < 1))) alphaPicking = true;
       });
       const pending=display?.models.flatMap((model,i)=>{const state=loadState(model),label=(isReadonlyModel(model)||isSavedModel(model))?saved.label?.(model):undefined;return state&&state.phase!=='ready'?[`${label??`モデル ${i+1}`}: ${state.issue??'読み込み中'}`]:[];})??[];
       const loading=Boolean(pendingGsTarget&&!blockedNext?.models.some(m=>loadState(m)?.phase==='failed')||!issue&&(!renderer||!camera)||pending.length&&display?.models.some(model=>loadState(model)?.phase==='loading')||gsPreparing||[...resident.values()].some(s=>s.asset.visible&&s.gs&&!s.gs.ready&&(!s.gs.issue||s.gs.issue==='GSの表示を準備しています。')));

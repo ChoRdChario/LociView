@@ -91,6 +91,30 @@ describe('hard-chroma shader and coverage protocol (no GPU/device acceptance)', 
     expect(own.getAttribute('color').array).not.toBe(geometry.getAttribute('color').array);
     own.dispose(); expect(geometry.getAttribute('position').count).toBe(4); geometry.dispose();
   });
+  it('composes authored MASK after texture/vertex/alpha-map contributions and reapplies captured source opacity to the probe', () => {
+    for (const original of [new THREE.MeshStandardMaterial(),new THREE.MeshBasicMaterial(),new THREE.MeshPhongMaterial()]) {
+      original.opacity=.8;original.alphaTest=.5;
+      const material=original.clone(),input={opacity:.7,cutoff:0,sourceMask:{opacity:original.opacity,cutoff:original.alphaTest}};
+      patchBinaryMask(material,input);input.sourceMask.opacity=.1;
+      const source=original instanceof THREE.MeshStandardMaterial?THREE.ShaderLib.standard:original instanceof THREE.MeshPhongMaterial?THREE.ShaderLib.phong:THREE.ShaderLib.basic;
+      const compile=(m:THREE.Material)=>{const shader={uniforms:{},fragmentShader:source.fragmentShader};m.onBeforeCompile(shader as any,{} as THREE.WebGLRenderer);return shader;};
+      const shader=compile(material),query=hardChromaCoverageMaterial(material),probe=compile(query);
+      const predicate='float lvSourceCoverage = diffuseColor.a >= lvSourceCutoff ? 1.0 : 0.0;';
+      expect(shader.fragmentShader).toContain('#include <alphamap_fragment>\n'+predicate);
+      expect(shader.fragmentShader).toContain('clamp(lvSourceCoverage * lvMaskOpacity * lvChromaCoverage, 0.0, 1.0) < lvMaskCutoff');
+      expect(shader.fragmentShader.indexOf('discard;')).toBeGreaterThan(shader.fragmentShader.indexOf(predicate));
+      expect((shader.uniforms as any).lvMaskCutoff.value).toBe(0);expect((shader.uniforms as any).lvSourceCutoff.value).toBe(.5);
+      expect(probe.uniforms).toEqual(shader.uniforms);expect(binaryMask(query)).toEqual(binaryMask(material));
+      expect(material.opacity).toBe(.8);expect(query.opacity).toBe(.8);expect(material.alphaTest).toBe(0);expect(query.alphaTest).toBe(0);
+      expect(original.alphaTest).toBe(.5);expect(original.opacity).toBe(.8);expect(hasBinaryCoverage(original)).toBe(false);
+      const opaque=original.clone();patchBinaryMask(opaque,{opacity:1,cutoff:0});expect(opaque.customProgramCacheKey()).not.toBe(material.customProgramCacheKey());
+      expect(Object.isFrozen(binaryMask(material)!.sourceMask)).toBe(true);
+      query.dispose();opaque.dispose();material.dispose();original.dispose();
+    }
+    for(const sourceMask of [{opacity:NaN,cutoff:.5},{opacity:.8,cutoff:-1},{opacity:2,cutoff:.5}]){
+      const m=new THREE.MeshBasicMaterial();expect(()=>patchBinaryMask(m,{opacity:1,cutoff:.5,sourceMask})).toThrow('切り抜き');expect(hasBinaryCoverage(m)).toBe(false);m.dispose();
+    }
+  });
   it('queries only the addressed face with an even-origin translated viewport and restores/disposes its own state', () => {
     const renderer = new CoverageRenderer(), before = { target: renderer.target, clear: renderer.clearColor.clone(), onError: renderer.debug.onShaderError };
     const { hit, material, geometry } = candidate(); patchHardChroma(material, settings);

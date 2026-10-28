@@ -470,7 +470,7 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
             '../domain/projectRecords', '../domain/values', './membership', './commands', './format'],
           viewResolution: ['../scene/projectProvider', '../domain/projectRecordFields', '../domain/projectMutableFields',
             '../domain/values', './membership', './commands', './format'],
-          materialResolution: ['../domain/projectRecordFields', '../domain/projectMutableFields', '../domain/projectGraphSupport', '../domain/projectProfile', '../domain/materialIntent',
+          materialResolution: ['../domain/meshMaterialSource','../domain/projectRecordFields', '../domain/projectMutableFields', '../domain/projectGraphSupport', '../domain/projectProfile', '../domain/materialIntent',
             '../domain/values', '../scene/projectProvider', '../scene/projectMaterialRoutes', './membership', './records', './format', './commands'],
           contentEvidence: ['../domain/projectContentChecks', '../domain/values', '../platform/fs', './format', './persistence'],
           blobStream: ['../nativeGs/sha256'],
@@ -480,7 +480,7 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
             './format', './source', './repository', './journal', './persistence', './commands', './remote', './packageRemote', '../projectPackage/receiveJob', '../projectPackage/manifest', '../projectPackage/reviewEditControls',
             './blobStore', '../projectPackage/outputJob', '../projectPackage/contributionOutputJob', '../projectPackage/backupOutputJob', '../projectPackage/backupSource', '../projectPackage/cleanOutputJob', '../projectPackage/reviewOutputJob', '../projectPackage/reviewSource', '../projectPackage/reviewSelection', '../projectPackage/cleanInputJob', '../projectPackage/cleanSource', '../projectPackage/cleanRecords', '../projectPackage/contributionSource', '../projectPackage/outputJobs', '../projectPackage/workspaceBases', '../projectPackage/workspaceSource', '../projectPackage/protectedInventory', '../projectPackage/contract', '../projectPackage/contributionReceiveJob', '../projectPackage/contributionEvidence', '../projectPackage/receiveJobs', '../projectPackage/backupRestoreJob'],
           startupScene: ['../scene/projectProvider', '../domain/projectRecords', '../domain/projectRecordFields', './membership', './format'],
-          commands: ['./gsProxy', './materialResolution', '../domain/values', '../domain/projectMutableFields', '../domain/projectRecordFields', '../domain/projectRecords', '../domain/projectGraphSupport',
+          commands: ['../domain/meshMaterialSource','./gsProxy', './materialResolution', '../domain/values', '../domain/projectMutableFields', '../domain/projectRecordFields', '../domain/projectRecords', '../domain/projectGraphSupport',
             '../domain/materialIntent', '../domain/captionText', '../scene/projectMaterialRoutes', '../scene/commands', '../scene/resolve', '../scene/types', '../scene/projectProvider', './format', './membership', './records', './assetStatus', './modelMembership', './captionCandidates', './sceneAuthoring', './viewResolution', './captionDeletion', './assetDeletion', './startupScene', './modelAddition', './modelReplacement'],
         };
         const name = path.split(/[\\/]/).at(-1)!.replace(/\.ts$/, '');

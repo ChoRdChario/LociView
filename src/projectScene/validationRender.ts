@@ -14,6 +14,7 @@ import type { ResidentSurface } from './viewportPicking';
 import { placementMatrix } from './viewportModel';
 import { canonical, same } from '../domain/projectGraphSupport';
 import type { JsonObject } from '../domain/values';
+import type { MeshMaterialSource } from '../domain/meshMaterialSource';
 import { validationMaterialSlots, validationMaterialIssue, validationMaterialMap2, type ValidationMaterialEffects } from './validationMaterials';
 import { patchHardChroma, patchBinaryMask, type CoverageMaterial } from '../viewer/hardChroma';
 import { decodeOccurrenceGlb, type DecodedOccurrenceSlot } from '../projectFiles/glbOccurrences';
@@ -156,6 +157,9 @@ export async function prepareReadonlyResidents(initial: readonly ReadonlyRenderM
     } catch (error) { for (const item of staged.values()) item.model.dispose(); throw error; }
     finally { preparing = false; }
   };
+  const supportedClass=(material:THREE.Material,source:MeshMaterialSource|undefined|null,c:ValidationModelClosure|ReadonlyRenderModel)=>
+    source?.lighting==='unlit'?material instanceof THREE.MeshBasicMaterial:
+      material instanceof THREE.MeshStandardMaterial||meshSourceFormat(c.representation.formatProfile)==='obj'&&material instanceof THREE.MeshPhongMaterial;
   const validate = (c: ValidationModelClosure | ReadonlyRenderModel, effects: ValidationMaterialEffects = {}) => {
     const item = templates.get(keyFor(c)), slots = validationMaterialSlots(c);
     if (closed || !item || item.record !== canonical(c.representation)) throw Error('保存したモデルの表示本体を再確認してください。');
@@ -165,7 +169,7 @@ export async function prepareReadonlyResidents(initial: readonly ReadonlyRenderM
       const effect = effects[slot.target.logicalMaterialSlotId];
       if (effect && !('issue' in effect)) {
         const issue = validationMaterialIssue(slot, effect, validationMaterialMap2(c.representation.formatProfile) ? 'map2' : 'map1'); if (issue) throw Error(issue);
-        for (const [material, locator] of item.model.materialLocators) if (same(locator, slot.locator) && !(material instanceof THREE.MeshStandardMaterial) && !(meshSourceFormat(c.representation.formatProfile)==='obj'&&material instanceof THREE.MeshPhongMaterial))
+        for (const [material, locator] of item.model.materialLocators) if (same(locator, slot.locator) && !supportedClass(material,slot.source,c))
           throw Error('元の材質の設定を確認してください。');
       }
     }
@@ -225,21 +229,30 @@ export async function prepareReadonlyResidents(initial: readonly ReadonlyRenderM
             let result = m.clone(); materials.set(m, result);
             if (effect && 'issue' in effect) result.visible = false;
             else if (effect) {
-              if (!(m instanceof THREE.MeshStandardMaterial) && !(meshSourceFormat(c.representation.formatProfile)==='obj'&&m instanceof THREE.MeshPhongMaterial)) throw Error('元の材質の設定を確認してください。');
+              if (!supportedClass(m,slot.source,c)) throw Error('元の材質の設定を確認してください。');
+              const original=m as CoverageMaterial;
               const displayed = materialForDisplay(effect, validationMaterialMap2(c.representation.formatProfile) ? 'map2' : 'map1');
               const a = displayed.appearance;
-              if (a.lighting === 'unlit') {
-                result.dispose(); result = new THREE.MeshBasicMaterial({ color: m.color.clone(), map: m.map,
-                  vertexColors: m.vertexColors, side: m.side, opacity: m.opacity, alphaMap: m.alphaMap, alphaTest: m.alphaTest,
+              if (a.lighting === 'unlit'&&!(m instanceof THREE.MeshBasicMaterial)) {
+                result.dispose(); result = new THREE.MeshBasicMaterial({ color: original.color.clone(), map: original.map,
+                  vertexColors: original.vertexColors, side: m.side, opacity: m.opacity, alphaMap: original.alphaMap, alphaTest: m.alphaTest,
                   transparent: m.transparent, toneMapped: m.toneMapped, depthTest: m.depthTest, depthWrite: m.depthWrite, visible: m.visible });
                 materials.set(m, result);
               }
               if (a.baseColorSrgb) (result as CoverageMaterial).color.setRGB(...a.baseColorSrgb as [number, number, number], THREE.SRGBColorSpace);
               if (a.doubleSided !== undefined) result.side = a.doubleSided ? THREE.DoubleSide : THREE.FrontSide;
-              if (a.opacity !== undefined) result.opacity = a.opacity;
-              if (displayed.compositing.coverage.policy === 'mask') patchBinaryMask(result as CoverageMaterial,
-                { opacity: a.opacity ?? 1, cutoff: displayed.compositing.coverage.alphaCutoff!, ...(a.chroma ? { chroma: a.chroma } : {}) });
-              else if (a.chroma) patchHardChroma(result as CoverageMaterial, a.chroma);
+              const coverage=displayed.compositing.coverage;
+              if(coverage.policy==='opaque') {result.opacity=1;result.alphaTest=0;result.transparent=false;}
+              else if(coverage.policy==='mask'||slot.source?.coverage.kind==='mask')patchBinaryMask(result as CoverageMaterial,
+                {opacity:a.opacity??1,cutoff:coverage.policy==='mask'?coverage.alphaCutoff!:.5,...(a.chroma?{chroma:a.chroma}:{}),
+                  ...(slot.source?.coverage.kind==='mask'?{sourceMask:{opacity:original.opacity,cutoff:slot.source.coverage.alphaCutoff}}:{})});
+              else if(a.chroma)patchHardChroma(result as CoverageMaterial,a.chroma);
+              else if(slot.source?.coverage.kind==='opaque'){result.opacity=1;result.alphaTest=0;result.transparent=false;}
+
+            }else if(slot.source){
+              if(!supportedClass(m,slot.source,c))throw Error('元の材質の設定を確認してください。');
+              if(slot.source.coverage.kind==='mask')patchBinaryMask(result as CoverageMaterial,{opacity:1,cutoff:.5,sourceMask:{opacity:m.opacity,cutoff:slot.source.coverage.alphaCutoff}});
+              else {result.opacity=1;result.alphaTest=0;result.transparent=false;}
             }
             return result;
           };

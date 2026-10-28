@@ -4,22 +4,23 @@ import type { ProjectSemanticProfile } from '../domain/projectProfile';
 import type { JsonObject } from '../domain/values';
 import type { MaterialTarget } from '../scene/types';
 import { meshSourceFormat } from '../domain/meshSource';
+import { meshMaterialSource,meshLightingIssue,type MeshMaterialSource } from '../domain/meshMaterialSource';
 import { renderOwner, type ValidationModelClosure, type ReadonlyRenderModel } from './modelTypes';
 
 export interface ValidationMaterialSlot { readonly target: MaterialTarget; readonly name: string;
-  readonly locator: JsonObject; readonly semantics: JsonObject }
+  readonly locator: JsonObject; readonly semantics: JsonObject;readonly source?:MeshMaterialSource|null }
 export type ValidationMaterialEffects = Readonly<Record<string, MaterialIntent | { readonly issue: string }>>;
 export const validationMaterialMap2=(profile:unknown)=>!!meshSourceFormat(profile)||!!profile&&typeof profile==='object'&&!Array.isArray(profile)&&['development-validation-glb-occurrence-1','development-validation-glb-occurrence-jpeg-1'].includes(String((profile as JsonObject).id));
 export function validationMaterialSlots(c: ValidationModelClosure | ReadonlyRenderModel): readonly ValidationMaterialSlot[] {
   const catalog=c.representation.materialCatalog; if(!catalog)return [];
   return catalog.slots.map(slot => ({ target: { assetId: renderOwner(c),
     variantFamilyId: c.representation.variantFamilyId, materialLayoutId: catalog.layoutId,
-    logicalMaterialSlotId: slot.logicalMaterialSlotId }, locator: slot.sourceLocator, semantics: slot.sourceSemantics,
+    logicalMaterialSlotId: slot.logicalMaterialSlotId }, locator: slot.sourceLocator, semantics: slot.sourceSemantics,source:meshMaterialSource(c.representation,slot.sourceSemantics),
     name: slot.sourceLocator.kind === 'gltfMaterial' ? `材質 ${Number(slot.sourceLocator.materialIndex) + 1}` :
       validationMaterialMap2(c.representation.formatProfile) ? `面の材質 ${Number(slot.sourceLocator.slotIndex) + 1}` : '既定の材質' }));
 }
 export function validationMaterialSourceIssue(slot: ValidationMaterialSlot): string | null {
-  return same(slot.semantics, { coverage: { kind: 'opaque' }, optics: 'surface', lighting: 'lit', doubleSided: false }) ? null :
+  return slot.source || slot.source===undefined&&same(slot.semantics, { coverage: { kind: 'opaque' }, optics: 'surface', lighting: 'lit', doubleSided: false }) ? null :
     'この元材質の編集は未接続です。原本の設定を保持しています。';
 }
 /** One capability boundary for edit admission and slot-clone rendering. */
@@ -27,6 +28,7 @@ export function validationMaterialIssue(slot: ValidationMaterialSlot, input: Mat
   const source = validationMaterialSourceIssue(slot); if (source) return source;
   try {
     const intent = materialForDisplay(validateMaterialIntent(input, { maxNodes: 4096, maxDepth: 16, maxStringScalars: 65536 }, profile), profile), a = intent.appearance, c = intent.compositing;
+    const lighting=slot.source&&meshLightingIssue(slot.source,a);if(lighting)return lighting;
     if (c.coverage.policy === 'inherit' && ((a.opacity ?? 1) < 1 || (a.chroma?.softness ?? 0) > 0))
       return '不透明度と境界のぼかしを使うには「切り抜き」を選択してください。滑らかな半透明は未対応です。';
     if (Object.keys(intent).sort().join(',') !== 'appearance,compositing' ||

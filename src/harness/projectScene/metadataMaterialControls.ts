@@ -89,10 +89,14 @@ export function createMetadataMaterialControls(document: Document, host: Pick<Sa
               captured = current.command ?? command();
               const checked = selectedMaterialResolution(p, captured, host.limits);
               if (!slot) throw Error('設定するモデルと材質を確認してください。');
-              for (const intent of checked.intents.values()) { const issue = validationMaterialIssue(slot, intent, p.semanticProfile); if (issue) throw Error(issue); }
+              for (const [owner,intent] of checked.intents) {
+                if(captured.kind==='resolveMaterialDuplicates'&&owner!==captured.overrideId)continue;
+                const issue = validationMaterialIssue(slot, intent, p.semanticProfile); if (issue) throw Error(issue);
+              }
               current.command = captured;
             } catch (error) {
-              message.textContent = error instanceof Error ? error.message : '選択した組み合わせを確認してください。'; render(); changed(); return;
+              message.textContent = error instanceof Error&&'code' in error&&error.code==='material-unsupported'?
+                '選択した見え方は、このモデルでは使用できません。別の設定を選択してください。':error instanceof Error ? error.message : '選択した組み合わせを確認してください。'; render(); changed(); return;
             }
             session.applyWorking(() => host.resolve(current.token, captured), () => {
               if (disposed) return; forms.delete(key); session.refreshHistory(); render(); changed();

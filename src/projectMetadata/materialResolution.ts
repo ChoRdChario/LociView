@@ -1,3 +1,4 @@
+import {meshMaterialSource,meshLightingIssue,type MeshMaterialSource} from '../domain/meshMaterialSource';
 import { ProjectRecordFields } from '../domain/projectRecordFields';
 import type { ProjectSemanticProfile } from '../domain/projectProfile';
 import { checkMutableField, mutableRecordFields } from '../domain/projectMutableFields';
@@ -34,14 +35,14 @@ export function materialResolutionContext(p: Provider, sceneId: string, override
   r.active('assetsById', assetId);
   const projection = p.resources.assets[assetId]?.projection;
   if (projection?.kind !== 'value') return fail('material-target');
-  const immutable = metadataImmutableReader(p, limits); let found = false;
+  const immutable = metadataImmutableReader(p, limits); let found = false,source:MeshMaterialSource|undefined;
   for (const id of projection.value.representationIds) {
     r.charge(); const rep = immutable('representationsById', id);
     if (rep.assetId !== assetId || rep.variantFamilyId !== target.variantFamilyId || !rep.materialCatalog) continue;
     const catalog = object(rep.materialCatalog); if (catalog.layoutId !== target.materialLayoutId) continue;
     for (const slot of list(catalog.slots).map(object)) {
       r.charge(); if (slot.logicalMaterialSlotId !== target.logicalMaterialSlotId) continue;
-      if (!same(slot.sourceSemantics, { coverage: { kind: 'opaque' }, optics: 'surface', lighting: 'lit', doubleSided: false })) fail('material-source');
+      const capability=meshMaterialSource(rep,slot.sourceSemantics);if(!capability)fail('material-source');source=capability!;
       found = true;
     }
   }
@@ -72,10 +73,11 @@ export function materialResolutionContext(p: Provider, sceneId: string, override
       return { operationId: atom.operationId, value: object(atom.value.value) };
     });
   };
-  return { routing, ids: ids.sort(), atoms };
+  return { routing, ids: ids.sort(), atoms,source:source! };
 }
-export function checkedResolutionIntent(appearance: JsonObject, compositing: JsonObject, limits: MetadataLimits, profile: ProjectSemanticProfile = 'map1'): MaterialIntent {
+export function checkedResolutionIntent(appearance: JsonObject, compositing: JsonObject, limits: MetadataLimits, profile: ProjectSemanticProfile = 'map1',source?:MeshMaterialSource): MaterialIntent {
   const intent = validateMaterialIntent({ appearance, compositing }, limits, profile);
+  if(source&&meshLightingIssue(source,intent.appearance))fail('material-unsupported');
   if (intent.compositing.optics === 'transmission' || ['smoothBlend', 'ditherCoverage'].includes(intent.compositing.coverage.policy) ||
     intent.compositing.coverage.policy !== 'mask' && (profile !== 'map2' || intent.appearance.chroma?.enabled !== false) && (intent.appearance.chroma?.softness ?? 0) > 0 ||
     (intent.compositing.coverage.policy === 'inherit' && (intent.appearance.opacity ?? 1) < 1)) fail('material-unsupported');
@@ -91,7 +93,7 @@ export function selectedMaterialResolution(p: Provider, command: MaterialResolut
     if (a.length < 2 && c.length < 2) fail('material-resolution-not-conflicted');
     const appearance = a.find(v => v.operationId === command.appearanceOperationId), compositing = c.find(v => v.operationId === command.compositingOperationId);
     if (!appearance || !compositing) return fail('material-resolution-choice');
-    intents.set(command.overrideId, checkedResolutionIntent(appearance.value, compositing.value, limits, p.semanticProfile));
+    intents.set(command.overrideId, checkedResolutionIntent(appearance.value, compositing.value, limits, p.semanticProfile,context.source));
   } else {
     shape(command, 'eventId,kind,observedOverrideIds,overrideId,sceneId');
     new ProjectRecordFields().id(command.eventId, 'evt', []);
@@ -101,7 +103,7 @@ export function selectedMaterialResolution(p: Provider, command: MaterialResolut
     for (const id of ids) {
       const a = context.atoms(id, 'appearance'), c = context.atoms(id, 'compositing');
       if (a.length !== 1 || c.length !== 1) fail('material-resolution-unresolved');
-      intents.set(id, checkedResolutionIntent(a[0]!.value, c[0]!.value, limits, p.semanticProfile));
+      intents.set(id, checkedResolutionIntent(a[0]!.value, c[0]!.value, limits, p.semanticProfile,id===command.overrideId?context.source:undefined));
     }
   }
   return { ...context, intents };
