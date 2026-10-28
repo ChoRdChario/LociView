@@ -32,6 +32,7 @@ import { WorkingAcknowledgment } from '../src/harness/projectScene/acknowledgmen
 import { readProjectScene } from '../src/scene/projectProvider';
 import { resolveScene } from '../src/scene/resolve';
 import type { JsonObject } from '../src/domain/values';
+import type { ContentRequest } from '../src/domain/projectContentChecks';
 import type { Anchor } from '../src/scene/types';
 import * as THREE from 'three';
 import { validationModelVersions } from '../src/harness/projectScene/validationProjection';
@@ -2942,7 +2943,8 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     await withMetadataRead(f.scope.fs, undefined, async ({ fs }) => { expect(() => job.assertOwner(fs)).toThrow('output-owner'); });
     const paths = await f.fs.list(''), writes = vi.spyOn(f.fs, 'writeText');
     for (const read of [() => BackupOutputJob.ids(f.scope.fs), () => BackupOutputJob.state(f.scope.fs, id, metadata), () => job.steps(),
-      () => new WorkspaceSender(f.scope.fs, session, f.store, metadata, f.locks).jobs()]) {
+      () => new WorkspaceSender(f.scope.fs, session, f.store, metadata, f.locks).jobs(),
+      () => new WorkspaceSender(f.scope.fs, session, f.store, metadata, f.locks).outputOverview()]) {
       f.audit.count = 0; f.audit.before = async () => { if (f.audit.count === 2) throw Error('backup closing audit'); };
       await expect(read()).rejects.toThrow('backup closing audit'); expect(f.audit.count).toBe(2);
       job.assertOwner(f.scope.fs);
@@ -3544,12 +3546,37 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     await expect(sender.jobs()).rejects.toThrow('output-job-kind-collision');
     await expect(sender.generateBackup(token)).rejects.toThrow('output-job-kind-collision');
   }, 15000);
+  it('shares a fresh ready backup proof only inside a complete output overview and rereads after pending or late repair', async () => {
+    const { f, sent } = await contributionTeam(), session = f.receiver.session;
+    const sender = new WorkspaceSender(f.fs, session, f.store, metadata, f.locks);
+    await sender.generateBackup(sent.current.source!.token);
+    const expectedJobs = await sender.jobs(), expectedBases = await sender.availableBases(), current = await session.read();
+    const originalRead = session.read.bind(session), reads = vi.spyOn(session, 'read');
+    try {
+      expect(await sender.outputOverview()).toEqual({ jobs: expectedJobs, bases: expectedBases }); expect(reads).toHaveBeenCalledTimes(1);
+      await sender.outputOverview(); expect(reads).toHaveBeenCalledTimes(2);
+      reads.mockClear(); await sender.jobs(); await sender.availableBases(); expect(reads).toHaveBeenCalledTimes(2);
+      reads.mockClear(); reads.mockResolvedValueOnce({ ...current, state: 'pending' });
+      expect((await sender.outputOverview(current)).bases).toEqual(expectedBases); expect(reads).toHaveBeenCalledTimes(2);
+      // A later invalid row must discard an earlier successful backup observation.
+      const broken = 'f'.repeat(32), path = `v2/packages/backup-output-index/${broken}.json`;
+      await f.fs.writeText(path, '{}'); reads.mockClear();
+      const repair = await sender.outputOverview(current);
+      expect(repair.jobs).toContainEqual({ id: broken, purpose: 'backup', state: 'repair-required' });
+      expect(reads).toHaveBeenCalledTimes(2); expect(repair.bases).toEqual(expectedBases);
+      await f.fs.remove(path); reads.mockClear(); await sender.outputOverview(); expect(reads).toHaveBeenCalledTimes(1);
+      for (const evidence of await f.fs.list('v2/packages/evidence/')) await f.fs.remove(evidence);
+      await expect(sender.outputOverview()).rejects.toThrow();
+      reads.mockImplementation(originalRead);
+    } finally { reads.mockRestore(); }
+  }, 20000);
   it('uses a captured command proof only for base display, retaining fresh defaults, evidence and command checks', async () => {
     const { f, sent } = await contributionTeam(), session = f.receiver.session;
     const sender = new WorkspaceSender(f.fs, session, f.store, metadata, f.locks), current = await session.read(), expected = await sender.availableBases();
     const reads = vi.spyOn(session, 'read');
     try {
       expect(await sender.availableBases(current)).toEqual(expected); expect(reads).not.toHaveBeenCalled();
+      expect((await sender.outputOverview(current)).bases).toEqual(expected); expect(reads).not.toHaveBeenCalled();
       await sender.availableBases(); expect(reads).toHaveBeenCalled(); reads.mockClear();
       await sender.availableBases({ ...current, state: 'repair-required' }); expect(reads).toHaveBeenCalled(); reads.mockClear();
       const proof = structuredClone(current.source!.proof), displaySource = Object.create(current.source!);
@@ -3557,6 +3584,10 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       const pending = sender.availableBases({ ...current, source: displaySource });
       (proof.identity as { projectId: string }).projectId = `prj_${newId()}`;
       expect(await pending).toEqual(expected); expect(reads).not.toHaveBeenCalled();
+      (proof.identity as { projectId: string }).projectId = current.source!.proof.identity.projectId as string;
+      const overview = sender.outputOverview({ ...current, source: displaySource });
+      (proof.identity as { projectId: string }).projectId = `prj_${newId()}`;
+      expect((await overview).bases).toEqual(expected); expect(reads).not.toHaveBeenCalled();
       await session.editCaption(sent.current.source!.token, f.captionId, 'body', '次の編集'); reads.mockClear();
       await expect(sender.generateContribution(sent.current.source!.token, expected[0]!.selection)).rejects.toThrow(); expect(reads).toHaveBeenCalled();
       for (const path of await f.fs.list('v2/packages/evidence/')) await f.fs.remove(path);
@@ -6396,7 +6427,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect(archive.control.manifest).toMatchObject({ purpose: 'contribution', base: selectedBase });
     expect(host.workspaceOutput.bases).toHaveLength(2); expect(host.read().source!.token).toBe(before);
     expect(workspace.session).toBe(s); expect(s.memory).toBe(memory); expect(s.windowMemory).toBe(windows);
-    const unavailable = vi.spyOn(WorkspaceSender.prototype, 'availableBases').mockRejectedValueOnce(Error('基準データを確認できません。'));
+    const unavailable = vi.spyOn(WorkspaceSender.prototype, 'outputOverview').mockRejectedValueOnce(Error('基準データを確認できません。'));
     await host.refresh(); tools.render();
     const outputStatus = () => all(root).find(n => n.attributes.get('aria-label') === 'ファイル')!.children.find(n => n.attributes.get('role') === 'status')!;
     expect(outputStatus().textContent).toBe('基準データを確認できません。'); expect(host.workspaceOutput.bases).toEqual([]);
@@ -6509,7 +6540,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect(host.workspaceOutput.jobs.find(j => j.id === id)!.state).toBe('repair-required');
     expect((await listValidationProjects(options, options.openStorage))[0]!.state).toBe('unavailable');
     await ui.dispose();
-    const discovery = vi.spyOn(WorkspaceSender.prototype, 'jobs').mockRejectedValueOnce(Error('出力一覧を確認できません。'));
+    const discovery = vi.spyOn(WorkspaceSender.prototype, 'outputOverview').mockRejectedValueOnce(Error('出力一覧を確認できません。'));
     const cold = await openValidationHost(options); discovery.mockRestore();
     expect(cold.read().state).toBe('ready'); expect(cold.workspaceOutput.error).toBe('出力一覧を確認できません。');
     expect(cold.workspaceOutput.bases).toEqual([]);
@@ -7145,6 +7176,71 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const writes = vi.spyOn(f.fs, 'writeText');
     await expect(f.receiverService.receive(changed.source!.token, new Blob([corrupted.buffer]))).rejects.toThrow(); expect(writes).not.toHaveBeenCalled();
     expect((await f.receiverService.receive(changed.source!.token, f.file)).state).toBe('ready');
+  });
+  it.each([1, 2])('inspects each of %i exact imported GS records once per planning invocation without writes', async count => {
+    const bytes = gsFixture(4), file = new Blob([bytes.slice().buffer]);
+    const prepared = await prepareValidationProject({ run: newId(), title: 'GS planning',
+      models: Array.from({ length: count }, (_, i) => ({ label: `SH4 ${i}`, file })) }, budget, decode);
+    const source = prepareValidationCreation(prepared, 'map2').source, r = firstWorkspaceRecipient();
+    const content = validationProjectService(r.fs, r.factory, r.store, budget, decode).content;
+    const port = validationModelFacts(content), bodyFor = vi.fn(() => file), originalRead = Blob.prototype.arrayBuffer;
+    let sourceReads = 0;
+    const read = vi.spyOn(Blob.prototype, 'arrayBuffer').mockImplementation(function (this: Blob) {
+      if (this.size === file.size) sourceReads++;
+      return originalRead.call(this);
+    });
+    try {
+      const plan = await port.planImported!(source, bodyFor, () => true);
+      expect(plan.stagedBlobs).toHaveLength(1); expect(sourceReads).toBe(count);
+      expect(bodyFor).toHaveBeenCalledOnce(); expect(await r.fs.list('')).toEqual([]);
+      await port.planImported!(source, bodyFor, () => true);
+      expect(sourceReads).toBe(count * 2); expect(bodyFor).toHaveBeenCalledTimes(2);
+      expect(await r.fs.list('')).toEqual([]);
+      const corrupt = bytes.slice(); corrupt[corrupt.length - 1] = corrupt[corrupt.length - 1]! ^ 1;
+      await expect(port.planImported!(source, () => new Blob([corrupt.buffer]), () => true)).rejects.toThrow();
+      expect(await r.fs.list('')).toEqual([]);
+      const persistent = vi.spyOn(content, 'modelContent');
+      await underWriteLease(r.fs, () => plan.stage());
+      expect(persistent).toHaveBeenCalled(); // Staging obtains fresh stored-body facts.
+    } finally { read.mockRestore(); }
+  });
+  it('binds imported GS reuse to the exact record and Blob, owns returned facts and invalidates escaped inspectors', async () => {
+    const bytes = gsFixture(4), file = new Blob([bytes.slice().buffer]);
+    const prepared = await prepareValidationProject({ run: newId(), title: 'GS scope', models: [{ label: 'SH4', file }] }, budget, decode);
+    const record = Object.values(prepared.records.representationsById as Record<string, JsonObject>)[0]!;
+    const r = firstWorkspaceRecipient(), content = validationProjectService(r.fs, r.factory, r.store, budget, decode).content;
+    const request: ContentRequest = { token: 'planning', fact: 'representation', records: [record], context: {} };
+    const originalRead = Blob.prototype.arrayBuffer; let sourceReads = 0;
+    const read = vi.spyOn(Blob.prototype, 'arrayBuffer').mockImplementation(function (this: Blob) {
+      if (this.size === file.size) sourceReads++; return originalRead.call(this);
+    });
+    let escaped: ((request: ContentRequest, file: Blob) => Promise<unknown>) | undefined;
+    try {
+      await content.withImportedGsInspection(async inspect => {
+        escaped = inspect;
+        const first = await inspect(request, file) as any;
+        expect(() => { first.facts.surfaceRanges[0].count = 0; }).toThrow(TypeError);
+        expect(await inspect(request, file)).toMatchObject({ outcome: 'verified', facts: { surfaceRanges: [{ count: 1 }] } });
+        expect(sourceReads).toBe(1);
+        await inspect(request, file.slice()); expect(sourceReads).toBe(2); // Equal bytes are not Blob identity.
+        const bounds = structuredClone(record); (bounds.logicalBoundsAsset as any).min[0]--;
+        await expect(inspect({ ...request, records: [bounds] }, file)).rejects.toThrow();
+        const invalid = structuredClone(record); (invalid.formatProfile as any).id = 'unapproved';
+        await expect(inspect({ ...request, records: [invalid] }, file)).rejects.toThrow();
+        const corrupt = bytes.slice(); corrupt[corrupt.length - 1] = corrupt[corrupt.length - 1]! ^ 1;
+        await expect(inspect(request, new Blob([corrupt.buffer]))).rejects.toThrow();
+      });
+      await expect(escaped!(request, file)).rejects.toThrow('終了');
+      expect(await r.fs.list('')).toEqual([]);
+      // Even an already-started inspection cannot publish facts after scope disposal.
+      let release!: () => void, started!: () => void, pending!: Promise<unknown>;
+      const blocked = new Promise<void>(resolve => { release = resolve; }), reading = new Promise<void>(resolve => { started = resolve; });
+      read.mockImplementation(async function (this: Blob) {
+        if (this.size === file.size) { started(); await blocked; } return originalRead.call(this);
+      });
+      await content.withImportedGsInspection(async inspect => { pending = inspect(request, file); void pending.catch(() => {}); await reading; });
+      release(); await expect(pending).rejects.toThrow('終了'); expect(await r.fs.list('')).toEqual([]);
+    } finally { read.mockRestore(); }
   });
   it('admits original received GLB/PNG records without allocating IDs or writes, stages facts and keeps local Caption history', async () => {
     const f = await receivedFixture(), originals = f.final.originalChanges(), files = await f.fs.list('');

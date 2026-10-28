@@ -434,6 +434,45 @@ fresh default/durable checks and stale/disposed selection.
 Acceptance reuses completed-Review display discovery plus existing parent/child
 tamper/interruption tests, and repeats the240s/300s browser workflow unchanged.
 
+The500k Review edit-copy refinement (PO-authorized2026-10-29) may share only the
+complete GS source inspection within one fresh `planImported` provider-planning
+invocation. Bind reuse to the complete canonical Representation record and the
+exact owned immutable input Blob, under the captured current file policy. Neither
+digest/size nor record ID alone is sufficient. Each fact/request/context still
+passes its ordinary declaration, bounds, material and fact checks; no ContentResponse
+or persisted evidence is substituted. Returned JSON must not alias the retained
+decoded model. Do not retain whole-source arrays or introduce a global/content-instance
+cache. Release and invalidate the inspector before the plan returns, including on
+failure; its later stage cannot use it. `planReceived`, `planRestored` and default
+content inspection remain unchanged and fresh. Parent/child preparation, slot
+discovery, body staging/readback, fact persistence, publication, retry and cold
+recovery keep all existing fresh checks. This is bounded duplicate computation
+removal, not a changed write, validation or recovery fence.
+
+Acceptance measures the same-drive persistent-profile copy after origin-lock
+refusal/retry before and after, preserving240s editor readiness/300s downloads.
+A small SH4 test proves reuse across planning facts only, fresh subsequent calls,
+different-record/Blob non-reuse, no planning writes and unchanged stage/loss refusal.
+Then run the connected500k file flow, including actual editing of the independent
+copy, backup and same-profile cold reopen with original GS digest/records intact.
+
+The same workflow's read-only output overview may combine job and Contribution-base
+display discovery inside one existing metadata-read audit callback. Current backup
+status already obtains a fresh Session read. Only when that read is ready and the
+complete job discovery has no repair/pending/failure may its owned proof feed the
+immediately following base display. Base-table, evidence and verified CAS selection
+still run freshly. With no successful backup read, use the ordinary fresh base
+read unless the earlier successful-Review-command display hint is supplied under
+its unchanged guards; neither hint applies after repair/pending/discovery failure.
+Clear any observation on failure. Do not use retained Host state or a result
+from before output writes. Default `jobs()`/`availableBases()` and all output,
+download, verification, mutation and recovery commands retain their current checks.
+The observation expires with this one overview; it grants no command authority.
+Acceptance covers a single fresh read for the healthy joined display, fresh later
+calls and repair/pending/discovery/audit failures, plus post-copy save/cold browser
+evidence. Preserve existing private-parent/archive checks in ordinary edits and
+Session reads; removing those would require a separate storage-validation decision.
+
 The Desktop keeps the model/records visible first. Save, send, receive and recovery
 share one “保存・受け渡し” disclosure; pending recovery opens it automatically.
 Visibility does not discard input or change command/file authority.

@@ -65,6 +65,10 @@ Read only the relevant topic, not every historical incident.
   requirement. Preserve history and conditional data-safety rules separately.
 - An approved plan authorizes its ordinary implementation/fixes. Stop only at an
   actual new decision/authority boundary; a prior historical wait is not a new one.
+- Managed Windows Temp can reject hardlinks with EPERM in filesystem suites even
+  when focused memory tests pass. Confirm with an owned disposable probe and keep
+  the failure log; run unchanged final checks through approved escalation rather
+  than changing assertions or retrying in the same restricted environment.
 
 ## 長期プロジェクトと長期Codexセッションを分離する
 

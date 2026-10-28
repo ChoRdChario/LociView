@@ -249,7 +249,16 @@ async function openNormalValidationHost(options: ValidationHostOptions, inherite
     let outputJobs: WorkspaceOutputState[] = [], outputFailure = '';
     let outputBases: ContributionBaseChoice[] = [], outputDiscoveryFailure = '';
     const reloadOutput = async (current?: MetadataSessionRead) => {
-      try { outputJobs = await measure('host.output.jobs', () => sender.jobs()); outputBases = await measure('host.output.bases', () => current ? sender.availableBases(current) : sender.availableBases()); outputDiscoveryFailure = ''; }
+      try {
+        if (unfinishedReceive()) {
+          outputJobs = await measure('host.output.jobs', () => sender.jobs());
+          outputBases = await measure('host.output.bases', () => sender.availableBases());
+        } else {
+          const overview = await measure('host.output.overview', () => current ? sender.outputOverview(current) : sender.outputOverview());
+          outputJobs = overview.jobs; outputBases = overview.bases;
+        }
+        outputDiscoveryFailure = '';
+      }
       catch (error) { outputBases = []; outputDiscoveryFailure = error instanceof Error ? error.message : '受け渡しの記録を確認できません。'; }
     };
     const unfinishedOutput = () => outputJobs.some(j => ['unstarted', 'incomplete', 'repair-required'].includes(j.state));

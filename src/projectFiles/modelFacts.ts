@@ -71,7 +71,8 @@ export function validationModelFacts(content: ValidationContent): MetadataModelF
       hitEvidence: { method: 'point-cloud', source: { representationId: record.id as string, surfaceRef: { kind: 'pointSample', nodeIndex: 0, primitiveIndex: 0, pointIndex: index.pointIndex } } } };
   }, planReceived: (base, next, bodyFor, hasIncoming) => validationReceivedFacts(content, base, next, bodyFor, hasIncoming),
     planRestored: (next, bodyFor, refs) => restoredFacts(content, next, bodyFor, refs),
-    planImported: (next, bodyFor, hasIncoming) => receivedFacts(content, null, next, bodyFor, hasIncoming), async plan(base, next) {
+    planImported: (next, bodyFor, hasIncoming) => content.withImportedGsInspection(inspect =>
+      receivedFacts(content, null, next, bodyFor, hasIncoming, inspect)), async plan(base, next) {
     const used = new Set<string>(), introduced = new Set<string>(), revisions=new Set<string>(), newRevisions=new Set<string>(); let work = 0;
     const charge = () => { if (++work > limits.maxWork) fileError('モデルの検証範囲を超えています。'); };
     for (const change of base.read().history.changes) for (const w of change.writes) {
@@ -178,7 +179,8 @@ export async function validationReceivedFacts(content: ValidationContent, base: 
   return receivedFacts(content, base, next, bodyFor, hasIncoming);
 }
 async function receivedFacts(content: ValidationContent, base: ProjectMetadataSource | null, next: ProjectMetadataSource,
-  bodyFor: (ref: JsonObject) => Blob, hasIncoming?: (ref: JsonObject) => boolean): Promise<MetadataModelFactPlan> {
+  bodyFor: (ref: JsonObject) => Blob, hasIncoming?: (ref: JsonObject) => boolean,
+  inspectImported?: (request: ContentRequest, file: Blob) => Promise<unknown>): Promise<MetadataModelFactPlan> {
   const oldIds = new Set<string>(), oldDigests = new Map<string, number>(), sizes = new Map<string, number>();
   const inspectionBudget = { maxNodes: limits.maxNodes, maxWork: limits.maxWork };
   const before = base ? await base.inspectOriginal(inspectionBudget) : null, after = await next.inspectOriginal(inspectionBudget);
@@ -209,7 +211,8 @@ async function receivedFacts(content: ValidationContent, base: ProjectMetadataSo
       if(!oldDigests.has(ref.digest as string) && !bodies.has(key)) {
         const file=bodyFor(ref);if(!(file instanceof Blob)||file.size!==ref.byteLength)return fileError('GSの原本が不足しています。'); bodies.set(key,{ref,file});
       }
-      const result=oldDigests.has(ref.digest as string)?await content.inspectStored(request):await content.inspectReceivedEquivalence(request,bodies.get(key)!.file);
+      const result=oldDigests.has(ref.digest as string)?await content.inspectStored(request):
+        inspectImported ? await inspectImported(request,bodies.get(key)!.file) : await content.inspectReceivedEquivalence(request,bodies.get(key)!.file);
       requests.set(json(request),request);return result;
     }
     if (request.records.every(r => oldIds.has(r.id as string))) return ordinary.verify(request);
@@ -227,7 +230,7 @@ async function receivedFacts(content: ValidationContent, base: ProjectMetadataSo
     } else {
       const input = bodies.get(json(ref)) ?? { ref, file: bodyFor(ref) };
       if (!(input.file instanceof Blob) || input.file.size !== ref.byteLength) return fileError('受信する本体が不足しています。');
-      result = await content.inspectReceived(request, input.file); bodies.set(json(ref), input);
+      result = await (inspectImported ? inspectImported(request, input.file) : content.inspectReceived(request, input.file)); bodies.set(json(ref), input);
     }
     results.set(key, result); requests.set(key, request); return result;
   } }, { verifyRetainedMedia: async record => !hasIncoming || hasIncoming(record.blob as JsonObject) || await content.retained(record) });

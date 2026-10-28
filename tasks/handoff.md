@@ -11,13 +11,23 @@ work. Keep existing comfortable-UI guidance, original bytes/history, atomic Sess
 commands, file/recovery/evidence fences and one writer. Read-only reviews may run
 in parallel. Continue ordinary approved work without small PO testing waits.
 
+For the500k Review→edit-copy workflow, [01e§8](../docs/specs/01e-desktop-large-gs-workflow.md)
+bounds the import-planning-only GS inspection reuse. Do not extend it to receive,
+restore, persisted stage or recovery checks. Todo owns the measured results,
+connected edit/save/cold acceptance and remaining work; historical latency failures
+remain evidence rather than a new approval queue.
+Cross-command reuse of completed private import verification remains unapproved:
+[01h](../docs/specs/01h-completed-import-validation-lifetime-proposal.md) is a held
+proposal pending recovery design, not the implemented operation-local refinement.
+
 PO2026-10-28 authorized the usable-loading workflow in [01e§9](../docs/specs/01e-desktop-large-gs-workflow.md).
 The same typed screen opens after verified metadata, before model/image preparation;
 pending models report local loading/error while ready geometry and Caption reading
 remain usable. Canonical source/template/material checks protect edits/files; GPU
 status keeps existing per-target/overlap interaction rules. Both restore paths still
 await staged preparation. Todo records the verified loading checkpoint and
-the separate known500k Review command-latency failure; do not conflate those lanes.
+the retained historical500k Review command-latency failures and the now-verified
+but still slow workflow; do not treat those earlier failures as an active blocker.
 
 PO2026-10-28 approved the complete [07k Native Point/GS/Proxy conversion](../docs/specs/07k-native-point-gs-proxy-conversion-proposal.md).
 It preserves unknown units, exact source/coordinates and GS/Proxy relations using

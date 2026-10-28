@@ -159,6 +159,37 @@ export class ValidationContent implements MetadataMediaPort {
     }
     return this.execute(request, { model: await this.inspectModel(record, bytes) });
   }
+  /** One import-planning lifetime only. Persisted-body and recovery checks stay fresh. */
+  async withImportedGsInspection<T>(action: (inspect: (request: ContentRequest, file: Blob) => Promise<unknown>) => Promise<T>): Promise<T> {
+    const models = new Map<Blob, Map<string, Promise<ValidatedModel>>>(), policy = this.policy;
+    let active = true;
+    const assertActive = () => { if (!active) fileError('モデルの検証処理は終了しています。'); };
+    const inspect = async (input: ContentRequest, file: Blob) => {
+      assertActive();
+      const request = cloneCanonicalValue(input, validationMetadataLimits) as unknown as ContentRequest;
+      const record = validationGsEquivalenceSource(request) ?? (request.records.length === 1 ? request.records[0] : undefined);
+      if (!record || record.contentKind !== 'gaussianSplat') {
+        const result = await this.inspectReceived(request, file); assertActive(); return result;
+      }
+      if (!(file instanceof Blob)) return fileError('受信する本体を確認できません。');
+      const check = new ProjectRecordFields(); check.blob(record.blob!, []);
+      if (check.unknown) return fileError('受信する本体の情報が不正です。');
+      const ref = await this.modelDeclaration(record); assertActive();
+      if (file.size !== ref.byteLength || file.size <= 0 || file.size > policy.gs.maxFileBytes)
+        return fileError('受信する本体の大きさが不正です。');
+      let records = models.get(file);
+      if (!records) { records = new Map(); models.set(file, records); }
+      const key = canonical(record);
+      let decoded = records.get(key);
+      if (!decoded) { decoded = inspectDeclaredValidationBlob(record, file, policy); records.set(key, decoded); }
+      const model = await decoded; assertActive();
+      const result = await this.execute(request, { model }); assertActive();
+      // Facts leave this scope; their arrays must not mutate the retained model.
+      return cloneCanonicalValue(result, validationMetadataLimits);
+    };
+    try { return await action(inspect); }
+    finally { active = false; models.clear(); }
+  }
   /** Fresh facts for a new record reusing an already verified body; no receipt creation here. */
   inspectStored(request: ContentRequest) { return this.execute(request, undefined, true); }
   async inspectReceivedEquivalence(request: ContentRequest, file: Blob) {

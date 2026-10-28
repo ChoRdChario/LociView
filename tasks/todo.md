@@ -23,6 +23,26 @@ Fix latency when it prevents use or risks data. Keep the existing
 Root is sole writer; bounded independent reviewers are read-only. No small manual
 test or helper approvals. Continue in-scope work while device evidence is pending.
 
+## Next connected outcome —integrated Caption scale qualification
+
+The500k Review→independent edit→backup→cold workflow below is verified. Resume the
+PO's feature/integration-first priority with accepted E04/03 G1-C:10k Captions and
+50k changes, open→browse/search/select→edit→verified save→cold reopen. List
+virtualization/full-list search already exist; this is a connected scale outcome,
+not a new list feature or a claim that device evidence alone is missing. Current
+route limits include1,000changes/20,000operations/100,000nodes. Qualify with existing
+fixtures/services and prepare a concrete scoped PC metadata-policy specification
+before widening production admission; review/obtain any genuinely new numeric or
+architecture authority. Do not silently widen global limits or create another matrix.
+
+The500k workflow is still slow (about202s to editor,47s edit,232s backup observed).
+Further fresh-inspection/calculation tuning stays pending behind accepted missing
+integration unless it blocks use/data safety. Keep current corruption detection,
+write/publication/recovery fences and originals.01h cross-command reuse is held for
+recovery design, unapproved/unimplemented; current same-profile repair cannot rescue
+that private-ZIP failure. No new dependency/worker architecture, guarantee, optional
+M14, ordinary activation or release is inferred from this next-step record.
+
 ## Scope correction —optional visual repair
 
 PO2026-10-29 clarified that manual pin adjustment removes the need for a repair
@@ -36,7 +56,38 @@ No source/runtime, stored data, profile, Proxy relation or initial-placement
 policy change; no runtime acceptance credit. The next implementation unit below
 is unchanged. Stop only for an actual conflict outside this scope clarification.
 
-## Next connected outcome —500k Review edit-copy
+## Verified checkpoint —500k Review edit-copy
+
+Completed2026-10-29: operation-local GS decode reuse plus one read-only output
+overview; unchanged writers, original data, profiles and command/recovery fences.
+Final source/test tree has six matching hashes. Typecheck,133suites/2,968tests
+passed with21existing TODOs, and normal/harness/validation/Desktop builds all pass.
+Final Desktop large Review→lock refusal/retry→independent copy→actual text edit→
+backup→complete browser close→same-profile cold reopen→backup passes(15.2min),
+with full record/token equality, originalGS digest, manual pin/Proxy/photo and
+zero whole-GS application arrayBuffer reads/errors. Final smallSH4 all-five-purpose/
+return/restore/cold case also passes(4.9min). The earlier full500k all-five-purpose
+case passes on the pre-overview cut below; it is not mislabelled as final-tree
+whole-prefix evidence. The final changed display boundary is rerun at both scales.
+
+Matched diagnostic planning15,563.9→7,941.7ms removes one duplicate source decode.
+Final copy editor202,148ms/display212,527ms; actual edit47,034ms; save/file-check
+245,057ms; cold readiness137,126ms. Final backup observer231,636.1ms includes
+generation213,271.7ms and output overview18,364ms. Old-cut postgeneration jobs+
+bases41,724.8ms becomes one observed overview18,364ms; default services stay fresh.
+Old full case records manual tracing; final narrow case does not. These single
+observations and Node read counts establish the bounded change, not attribution
+of every wall-time difference, hardware/device guarantees or general adoption.
+
+Independent specification/source/final-extension reviews have no findings.
+The initial restricted checkpoint was stopped after an owned hardlink EPERM probe;
+unchanged approved execution supplies the passing full checks. A final narrow
+test first failed before opening Chrome because its Node Automerge bootstrap was
+missing; adding the existing canonical bootstrap fixes the harness, not admission.
+All failed logs/profiles remain under ignored artifacts. No validation/deadline
+relaxation, cross-command archive cache, iOS/offline/PWA/adoption or release credit.
+The following investigation entries retain their earlier pending/failure states
+as history; this completion and the Next outcome above own current status.
 
 The bounded01g Desktop checkpoint is verified below and pushed; Git owns its
 identity. Next close the accepted01e500k SH4 Review→explicit independent editing copy→edit/
@@ -50,6 +101,59 @@ completion stages; separate hash/CRC, Blob read and cooperative-yield wait. Dura
 parent/readback/publication/cold fences in01e§8 stay fresh. A candidate ordinary
 repair is exact record+ownedBlob inspection reuse only inside one pre-staging
 planImported invocation, never a digest-only or cross-fence cache. Measure first.
+PO2026-10-29 explicitly requested this complete improvement through automated
+verification. Plan: measure the retained Review with the same-drive persistent
+profile and lock-refusal/retry sequence; document/review the exact local lifetime
+before implementing measured duplicate elimination; focused invariant/failure
+checks; unchanged240s/300s target, then connected five-purpose/edit/save/cold
+browser acceptance; final serial checkpoint checks and independent review/push.
+Diagnostic instruments are ignored, separate from production evidence. Do not
+repeat the full expensive flow until its narrowed readiness case passes.
+
+Measured same-drive persistent-profile Review target with origin-lock refusal/
+retry: ignored instrumented baseline editor229,988ms/display242,940ms; after the
+scoped refinement225,525ms/239,054ms. Command-local model planning falls15,563.9ms
+to7,941.7ms; one duplicate GS inspection is removed. These are single matched
+diagnostic observations, not broad performance guarantees. SHA/Blob/timer probes
+are document-cumulative and overlapping; CRC CPU and isolated cooperative-yield
+wait are not separately established. The list-only diagnostic reporter did not
+persist its attached CPU profile; retain stdout and comparison JSON, not a sampled
+CPU claim. The initial restricted run could not connect to loopback and was stopped;
+authorized dedicated-Chromium runs supply these local measurements.
+
+Implemented only exact full-record+ownedBlob GS inspection reuse during
+`planImported`; received/restored/default inspectors and every durable fence stay
+fresh. Scoped results own frozen JSON and escaped/pending inspectors fail after
+disposal. Independent source/spec review has no findings. Five focused ownership/
+freshness/loss/declaration cases and typecheck pass. The first new alias test
+incorrectly tried to mutate already-frozen JSON; the corrected assertion verifies
+mutation refusal. Strict test-only typing fixes preserve the same runtime checks.
+The canonical500k Desktop case now actually edits the independent copy before
+backup and compares complete records after cold reopen. Connected browser and
+final serial checkpoint checks remain pending; earlier failures above/below are
+retained and are not yet superseded by whole-workflow acceptance.
+
+Same-workflow meta-audit: canonical copy readiness passes219,242ms and display
+233,535ms, but actual child edit+backup remains slow. `reloadOutput` reads the
+current backup Session in jobs and then again for base display. Close this ordinary
+read-only duplicate as part of the same accepted workflow: document/review a joined
+one-audit observation, retain fresh jobs/base/CAS checks and default services, test
+healthy/failure/lifetime, then verify final-tree post-copy edit/save/cold. Do not
+repeat unaffected creation/return steps merely for another count. The initial
+four-file frozen tree describes the first full browser run only; capture the final
+source/test tree after this extension. No fresh private-parent/Session/write/
+recovery scan may be skipped. Any such larger policy needs its own concrete decision.
+
+First-cut full Desktop run1793208592687-40884 passes the actual500k all-five-purpose/
+return/Review-copy edit+backup/cold/Clean/absent-original restore/final-cold flow
+(38.1min). The later overview extension is independently reviewed and nine focused
+cases pass; final six source/test hashes are captured separately. Its final-tree
+large Review/edit/save/cold and small all-purpose browser checks remain pending.
+The ordinary final suite was interrupted after reproducing managed-Temp hardlink
+EPERM; unchanged checkpoint checks are running through approved escalation.
+[01h](../docs/specs/01h-completed-import-validation-lifetime-proposal.md) is only a
+held proposal: current same-profile repair cannot rescue this private-ZIP failure,
+so no cross-command verification cache or delayed detection is enabled.
 Stop affected work for an actual validation-lifetime/write/recovery/capacity/new
 contract decision. Broader formats, physicaliOS/offline, adoption and release remain
 separate; the application is not declared complete.

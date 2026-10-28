@@ -19,6 +19,8 @@ import { fileError } from './validation';
 
 export interface WorkspaceOutputState { id: string; purpose: 'teamWorkspace' | 'contribution' | 'backup' | 'clean' | 'review'; label?: string; stale?: boolean; token?: string; cancellable?: boolean; state: 'unstarted' | 'incomplete' | 'generated' | 'file-verified' | 'abandoned' | 'cancelled' | 'repair-required' }
 export interface ContributionBaseChoice { selection: ContributionBaseSelection; label: string }
+const settledOutputDisplay = (rows: readonly WorkspaceOutputState[]) =>
+  rows.every(row => ['generated', 'file-verified', 'abandoned', 'cancelled'].includes(row.state));
 /** Explicit same-Project output commands. Download handoff has no completion receipt. */
 export class WorkspaceSender {
   constructor(private readonly fs: ProjectWorkspaceFS, private readonly session: MetadataProjectSession,
@@ -63,6 +65,17 @@ export class WorkspaceSender {
     return withMetadataRead(this.fs, undefined, ({ fs }) =>
       new WorkspaceSender(fs, this.session, this.store, this.limits, this.locks).availableBasesDirect(proof));
   }
+  /** One read-only display observation; never supplies output-command authority. */
+  async outputOverview(current?: MetadataSessionRead): Promise<{ jobs: WorkspaceOutputState[]; bases: ContributionBaseChoice[] }> {
+    const commandProof = current?.state === 'ready' && current.source ? structuredClone(current.source.proof) : undefined;
+    return withMetadataRead(this.fs, undefined, async ({ fs }) => {
+      const sender = new WorkspaceSender(fs, this.session, this.store, this.limits, this.locks);
+      let observed: MetadataProof | null | undefined;
+      const jobs = await sender.jobsDirect(proof => { observed = proof; });
+      const bases = await sender.availableBasesDirect(settledOutputDisplay(jobs) && observed !== null ? observed ?? commandProof : undefined);
+      return { jobs, bases };
+    });
+  }
   private async availableBasesDirect(observed?: MetadataProof): Promise<ContributionBaseChoice[]> {
     let proof = observed;
     if (!proof) { const read = await this.session.read(); if (read.state !== 'ready' || !read.source) return []; proof = read.source.proof; }
@@ -96,7 +109,7 @@ export class WorkspaceSender {
     return withMetadataRead(this.fs, undefined, ({ fs }) =>
       new WorkspaceSender(fs, this.session, this.store, this.limits, this.locks).jobsDirect());
   }
-  private async jobsDirect(): Promise<WorkspaceOutputState[]> {
+  private async jobsDirect(observe?: (proof: MetadataProof | null) => void): Promise<WorkspaceOutputState[]> {
     const result: WorkspaceOutputState[] = [];
     let bases: ReturnType<WorkspaceBaseStore['read']> | undefined;
     const readCurrentBackup = async (protection: Awaited<ReturnType<typeof validateOutputProtection>>) => {
@@ -105,7 +118,8 @@ export class WorkspaceSender {
       const snapshot = json(proof) === json(protection.proof) ? protection.snapshot : await currentBases.snapshot();
       const inspection = await current.source.inspectOriginal({ maxNodes: L.inspectionNodes, maxWork: L.inspectionWork });
       const inventory = protectedWorkspaceInventory(inspection.candidates, await currentBases.payloads(snapshot.records));
-      return { token: current.source.token, snapshot: json(snapshot), inventory: json(inventory) };
+      return { token: current.source.token, snapshot: json(snapshot), inventory: json(inventory),
+        proof: current.state === 'ready' ? proof : undefined };
     };
     // Only a complete successful projection lives inside this one read callback.
     let currentBackup: Awaited<ReturnType<typeof readCurrentBackup>> | undefined;
@@ -131,6 +145,7 @@ export class WorkspaceSender {
           kinds.includes(key.kind === 'workspace' ? 'baseRecorded' : 'artifactVerified') ? 'generated' : 'incomplete' });
       } catch { result.push({ id, purpose, state: 'repair-required' }); }
     }
+    if (currentBackup && settledOutputDisplay(result)) observe?.(currentBackup.proof ? structuredClone(currentBackup.proof) : null);
     return result;
   }
 }
