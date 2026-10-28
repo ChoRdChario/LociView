@@ -1,4 +1,4 @@
-import { materialFields, materialFieldLabels, materialInput, type MaterialEditField } from '../../domain/materialIntent';
+import { materialFields, materialFieldLabels, materialInput,editMaterialIntent, type MaterialEditField } from '../../domain/materialIntent';
 import { editMaterialDraft, materialApplyIssue, materialPlanIsCurrent, materialScopeLabel, materialSelectionKey, materialTargetKey,
   materialView, planMaterial, type MaterialContext, type MaterialDraft, type MaterialEffect, type MaterialIntentRequest, type MaterialPlan, type MaterialSelection } from './materialState';
 
@@ -113,11 +113,12 @@ export function createMaterialControls(document: Document, onPlan: (plan: Materi
       : '同じモデル・面を使うシーンで共通になります。シーン専用の設定がある場合は、そちらが優先されます。';
     const beginPlan = planMaterial(next, { kind: 'begin' }); begin.hidden = Boolean(d); begin.disabled = beginPlan.kind === 'blocked';
     const base = d?.base ?? view.base, raw = (field: MaterialEditField) => d?.edits[field] ?? (base ? materialInput(base.appearance, field, next.source.semanticProfile, base.compositing) : '');
+    const coverageChoices=next.source.semanticProfile==='map2'?[...enums.coverage!,['smoothBlend','半透明']as const]:enums.coverage!;
     editor.hidden = !base;
     for (const [field, control] of controls) {
       const value = raw(field);
-      if (field === 'coverage') options(control.input as HTMLSelectElement, enums.coverage!.some(([key]) => key === value) ? enums.coverage! :
-        [...enums.coverage!, [value, value === 'smoothBlend' ? '半透明（この環境では未対応）' : '現在の設定（この環境では未対応）']], value);
+      if (field === 'coverage') options(control.input as HTMLSelectElement, coverageChoices.some(([key]) => key === value) ? coverageChoices :
+        [...coverageChoices, [value, value === 'smoothBlend' ? '半透明（この環境では未対応）' : '現在の設定（この環境では未対応）']], value);
       if (composing !== field && d?.composing !== field && control.input.value !== value) control.input.value = value;
       const reason = view.surface?.fieldIssues[field], enabled = d && reason === null && !inFlight && next.mutationBlock === null && !next.pending && !view.editIssue;
       control.input.disabled = enums[field] ? !enabled : false;
@@ -131,7 +132,8 @@ export function createMaterialControls(document: Document, onPlan: (plan: Materi
     cancel.hidden = !d; cancel.disabled = !d || Boolean(composing || d.composing) || inFlight;
     remove.disabled = planMaterial(next, { kind: 'remove' }).kind !== 'remove'; remove.hidden = !view.record && !d;
     retry.hidden = next.feedback.kind !== 'failed'; retry.disabled = next.feedback.kind !== 'failed' || !materialPlanIsCurrent(next.feedback.plan, next);
-    status.textContent = [view.targetIssue, ...view.issues, next.mutationBlock, next.pending && 'ほかの操作を完了するか取り消してください。',
+    let displayNotice:string|null=null;try{if(base)displayNotice=view.surface?.displayNotice?.(d?editMaterialIntent(base,d.edits,next.source.semanticProfile):base)??null;}catch{/* Invalid draft retains its normal field/apply error. */}
+    status.textContent = [view.targetIssue, ...view.issues, displayNotice, next.mutationBlock, next.pending && 'ほかの操作を完了するか取り消してください。',
       inFlight && '設定を適用中です。', d && !inFlight && (applyIssue || '未適用の入力があります。'),
       next.feedback.kind === 'failed' && `${describe(next.feedback.plan.selection, view)}：${next.feedback.plan.kind === 'remove' ? '設定を解除' : '変更を適用'}できませんでした。${next.feedback.message} 入力と操作対象を保持しています。`].filter(Boolean).join(' ');
     status.hidden = !status.textContent; return true;

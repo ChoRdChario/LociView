@@ -115,6 +115,21 @@ describe('hard-chroma shader and coverage protocol (no GPU/device acceptance)', 
       const m=new THREE.MeshBasicMaterial();expect(()=>patchBinaryMask(m,{opacity:1,cutoff:.5,sourceMask})).toThrow('切り抜き');expect(hasBinaryCoverage(m)).toBe(false);m.dispose();
     }
   });
+  it('uses captured BLEND factor including zero and preserves fractional source alpha in the final binary predicate',()=>{
+    for(const factor of [0,.4,1])for(const material of [new THREE.MeshStandardMaterial(),new THREE.MeshBasicMaterial(),new THREE.MeshPhongMaterial()]){
+      material.opacity=factor;material.alphaTest=.8;
+      patchBinaryMask(material,{opacity:.5,cutoff:0,sourceBlendOpacity:factor});
+      const source=material instanceof THREE.MeshStandardMaterial?THREE.ShaderLib.standard:material instanceof THREE.MeshPhongMaterial?THREE.ShaderLib.phong:THREE.ShaderLib.basic;
+      const shader={uniforms:{},fragmentShader:source.fragmentShader};material.onBeforeCompile(shader as any,{} as THREE.WebGLRenderer);
+      expect(shader.fragmentShader).toContain('#include <alphamap_fragment>\nfloat lvSourceCoverage = diffuseColor.a;');
+      expect(shader.fragmentShader).toContain('clamp(lvSourceCoverage * lvMaskOpacity * lvChromaCoverage, 0.0, 1.0) < lvMaskCutoff');
+      expect(material.opacity).toBe(factor);expect(material.alphaTest).toBe(0);expect(material.transparent).toBe(false);
+      const probe=hardChromaCoverageMaterial(material);expect(binaryMask(probe)!.sourceBlendOpacity).toBe(factor);
+      expect(probe.opacity).toBe(factor);expect(material.customProgramCacheKey()).toContain('source-blend-1');
+      probe.dispose();material.dispose();
+    }
+    const m=new THREE.MeshBasicMaterial();expect(()=>patchBinaryMask(m,{opacity:1,cutoff:0,sourceBlendOpacity:0,sourceMask:{opacity:0,cutoff:0}})).toThrow();expect(hasBinaryCoverage(m)).toBe(false);m.dispose();
+  });
   it('queries only the addressed face with an even-origin translated viewport and restores/disposes its own state', () => {
     const renderer = new CoverageRenderer(), before = { target: renderer.target, clear: renderer.clearColor.clone(), onError: renderer.debug.onShaderError };
     const { hit, material, geometry } = candidate(); patchHardChroma(material, settings);

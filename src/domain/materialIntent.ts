@@ -90,8 +90,8 @@ export function editMaterialIntent(base: MaterialIntent, edits: MaterialEdits, p
   if (edits.coverage !== undefined || edits.cutoff !== undefined) {
     const coverage = { ...compositing.coverage };
     if (edits.coverage !== undefined) {
-      if (!['inherit', 'opaque', 'mask'].includes(edits.coverage)) throw Error('透過の表示方法を選び直してください。');
-      coverage.policy = edits.coverage as 'inherit' | 'opaque' | 'mask';
+      if (!['inherit', 'opaque', 'mask',...(profile==='map2'?['smoothBlend']:[])].includes(edits.coverage)) throw Error('透過の表示方法を選び直してください。');
+      coverage.policy = edits.coverage as 'inherit' | 'opaque' | 'mask' | 'smoothBlend';
       if (coverage.policy === 'mask') coverage.alphaCutoff ??= 0.5;
       else delete coverage.alphaCutoff;
     }

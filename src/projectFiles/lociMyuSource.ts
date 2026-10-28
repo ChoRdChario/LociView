@@ -1,4 +1,6 @@
-import { opaqueMaterialSource } from '../domain/meshMaterialSource';
+import { meshMaterialSemantics } from '../domain/meshMaterialSource';
+import type {MaterialIntent} from '../domain/materialIntent';
+import {standardMaterialNeeded,normalizedLegacyChroma,materialConversionNotice,sourceBlendNotice,type MaterialConversionNotice} from './materialNormalization';
 import { inspectProjectImage, type PhotoDecoder } from './photo';
 import { inspectZipContainerMetadata, readZipEntries, sanitizeZipPath, type ZipEntryData } from '../assets/zipio';
 import { buildImportPlan, sniffImageExt, type ImportPlan } from '../assets/importWizard';
@@ -20,7 +22,8 @@ export const lociMyuJpegRecipe = 'locimyu-project-scene-migration-recipe-2';
 export const lociMyuPhotoRecipe = 'locimyu-project-scene-migration-recipe-3';
 export const lociMyuMaterialRecipe = 'locimyu-project-scene-migration-recipe-4';
 export const lociMyuOpaqueMaterialRecipe = 'locimyu-project-scene-migration-recipe-5';
-export type LociMyuRecipe = typeof lociMyuOpaqueMaterialRecipe | typeof lociMyuMaterialRecipe | typeof lociMyuPhotoRecipe | typeof lociMyuRecipe | typeof lociMyuJpegRecipe;
+export const lociMyuStandardMaterialRecipe = 'locimyu-project-scene-migration-recipe-6';
+export type LociMyuRecipe = typeof lociMyuStandardMaterialRecipe | typeof lociMyuOpaqueMaterialRecipe | typeof lociMyuMaterialRecipe | typeof lociMyuPhotoRecipe | typeof lociMyuRecipe | typeof lociMyuJpegRecipe;
 export const lociMyuByteProof = async (bytes: Uint8Array) => ({ byteLength: bytes.length, digest: await digest(bytes) });
 export interface LociMyuIssue { severity: 'info' | 'warning' | 'blocking'; sheet: string | null; row: number | null; sourceId: string | null;
   field: string; reason: string; impact: string; candidates: string[] }
@@ -28,7 +31,7 @@ export interface LociMyuBody { path: string; label: string; bytes: Uint8Array; r
 export interface LociMyuScene { name: string; identity: LociMyuCaptionSheetIdentity; captions: { value: LociMyuCaption; row: number; imagePath?: string }[] }
 export interface LociMyuView { row: number; scene: string; name: string; camera: JsonObject; background: number[] }
 export interface LociMyuMaterial { row: number; scene: string; identity: LociMyuCaptionSheetIdentity; key: string; indices: number[];
-  doubleSided: boolean; unlit: boolean; sourceOnlyChroma: boolean }
+  doubleSided: boolean; unlit: boolean; sourceOnlyChroma: boolean;standardIntent?:MaterialIntent }
 export interface LociMyuSourcePlan {
   recipe: LociMyuRecipe;
   workbook: { path: string; byteLength: number; digest: string }; confirmation: readonly { sheetGid: string; sheetName: string }[] | null;
@@ -37,6 +40,7 @@ export interface LociMyuSourcePlan {
   inventory: { count: number; byteLength: number; digest: string }; issues: LociMyuIssue[];
   sourceEvidence: JsonObject;
   materialRows?: LociMyuMaterial[];
+  materialNotices?:readonly MaterialConversionNotice[];
   accounting: { tables: number; rows: number; entries: number; sourceOnlyEntries: number; missingIds: number };
 }
 /** Private legacy evidence permits exact scalar sequences; target record admission remains NFC. */
@@ -154,7 +158,7 @@ export async function openLociMyuSource(input: Blob, limits: FileValidationLimit
 
 export async function planLociMyuSource(opened: OpenedLociMyuSource, selection: number, title: string, confirmRelations: boolean): Promise<{
   relation: ReturnType<typeof planLociMyuDisplaySetRelationConfirmation>;
-  base: Pick<LociMyuSourcePlan, 'workbook' | 'confirmation' | 'title' | 'inventory' | 'fingerprints' | 'issues' | 'accounting' | 'sourceEvidence'> & { materialSelected?: true; materialRecipe?:typeof lociMyuMaterialRecipe|typeof lociMyuOpaqueMaterialRecipe };
+  base: Pick<LociMyuSourcePlan, 'workbook' | 'confirmation' | 'title' | 'inventory' | 'fingerprints' | 'issues' | 'accounting' | 'sourceEvidence'> & { materialSelected?: true; materialRecipe?:typeof lociMyuMaterialRecipe|typeof lociMyuOpaqueMaterialRecipe|typeof lociMyuStandardMaterialRecipe };
   plan: LociMyuSourcePlan | null;
 }> {
   const { imported, entries, limits, decode, jpeg, photo } = opened, source = imported.sources[selection];
@@ -173,7 +177,7 @@ export async function planLociMyuSource(opened: OpenedLociMyuSource, selection: 
     diagnostics: s.validationFailure ?? null, admittedCaptions: s.captionCount, tables: s.tables.map(t => ({ name: t.name, headers: t.rows[0] ?? [], rows: t.rows.length })) }))),
     diagnostics: { selectedWorkbook: source.archivePath, candidateFailures: imported.sources.filter(s => s.validationFailure).map(s => ({ path: s.archivePath, failure: s.validationFailure! })) },
     rawAnalyzerDiagnostics: opened.rawAnalyzerDiagnostics, fileIdMapRows: imported.fileIdMapRows ?? [] }) as JsonObject;
-  const base: Pick<LociMyuSourcePlan, 'workbook' | 'confirmation' | 'title' | 'inventory' | 'fingerprints' | 'issues' | 'accounting' | 'sourceEvidence'> & { materialSelected?: true; materialRecipe?:typeof lociMyuMaterialRecipe|typeof lociMyuOpaqueMaterialRecipe } = { workbook, confirmation: null, title, inventory, fingerprints, issues, accounting, sourceEvidence };
+  const base: Pick<LociMyuSourcePlan, 'workbook' | 'confirmation' | 'title' | 'inventory' | 'fingerprints' | 'issues' | 'accounting' | 'sourceEvidence'> & { materialSelected?: true; materialRecipe?:typeof lociMyuMaterialRecipe|typeof lociMyuOpaqueMaterialRecipe|typeof lociMyuStandardMaterialRecipe } = { workbook, confirmation: null, title, inventory, fingerprints, issues, accounting, sourceEvidence };
   try {
     if (opened.preflightFailures.has(source.archivePath)) refuse(opened.preflightFailures.get(source.archivePath)!);
     if (source.validationFailure && source.validationFailure.code !== 'missing-legacy-id') {
@@ -247,7 +251,7 @@ export async function planLociMyuSource(opened: OpenedLociMyuSource, selection: 
       }
       scenes.push(scene);
     }
-    const views: LociMyuView[] = [], materialRows: LociMyuMaterial[] = []; let materialWork = 0;
+    const views: LociMyuView[] = [], materialRows: LociMyuMaterial[] = [],standardIntents=new Map<number,MaterialIntent>(); let materialWork = 0;
     for (const table of tables) {
       const name = trim(table.name);
       const sourceOnlyColumns = identities.has(table) ? new Set([8, 9]) : name === '__LM_VIEWS' ? new Set([15, 16]) : name === '__LM_MATERIALS' ? new Set([8, 9, 10, 11, 12]) : null;
@@ -288,22 +292,23 @@ export async function planLociMyuSource(opened: OpenedLociMyuSource, selection: 
             const materialRefuse = (field: string, reason: string, candidates: string[] = []): never => { issue('blocking', name, i + 1, key, field, reason, 'プロジェクトは作成していません。', candidates); return refuse(reason); };
             if (materialTableCount !== 1) materialRefuse('material table', '材質表が重複しているため対応を確定できません。');
             const truth = (c: number) => ['true', '1', 'yes', 'on'].includes(cell(r, c).toLowerCase());
-            if (opacity !== 1) materialRefuse('opacity', 'この材質の不透明度はまだ変換できません。');
-            if (truth(4)) materialRefuse('chromaEnable', 'この材質の色の透過設定はまだ変換できません。');
             const targets = materialIndices.get(key)!;
             materialWork += targets.size;
             if (materialWork > validationMetadataLimits.maxWork || materialWork > validationMetadataLimits.maxNodes) materialRefuse('material targets', '材質の対応件数が上限を超えています。');
             const indices = [...targets].sort((a, b) => a - b);
             for (const index of indices) {
               const slot = materialSlots.get(index);
-              const source=slot&&opaqueMaterialSource(slot.sourceSemantics);
+              const source=slot&&meshMaterialSemantics(slot.sourceSemantics);
               if (!source)
                 materialRefuse('sourceSemantics', `材質 ${index + 1} の元の見え方はまだ変換できません。`, [`gltfMaterial:${index}`]);
-              if(source!.lighting==='unlit'||source!.doubleSided)base.materialRecipe=lociMyuOpaqueMaterialRecipe;
+              if(standardMaterialNeeded(source!,opacity as number,truth(4)))base.materialRecipe=lociMyuStandardMaterialRecipe;
+              else if(base.materialRecipe!==lociMyuStandardMaterialRecipe&&(source!.lighting==='unlit'||source!.doubleSided))base.materialRecipe=lociMyuOpaqueMaterialRecipe;
             }
             const scene = scenes.find(s => s.name === activation.get(gid))!;
-            materialRows.push({ row: i + 1, scene: scene.name, identity: scene.identity, key, indices, doubleSided: truth(2), unlit: truth(3), sourceOnlyChroma: [5, 6, 7].some(c => !!cell(r, c)) });
-            for (const c of [5, 6, 7]) if (cell(r, c)) issue('info', name, i + 1, key, cell(table.rows[0] ?? [], c) || `column${c + 1}`, '色の透過が無効なときの編集値は変換先へ写さず、元のZIPと説明ファイルに保持します。');
+            materialRows.push({ row: i + 1, scene: scene.name, identity: scene.identity, key, indices, doubleSided: truth(2), unlit: truth(3), sourceOnlyChroma: !truth(4)&&[5, 6, 7].some(c => !!cell(r, c)) });
+            standardIntents.set(i+1,{appearance:{opacity:opacity as number,doubleSided:truth(2),lighting:truth(3)?'unlit':'inherit',
+              ...(truth(4)?{chroma:normalizedLegacyChroma(hex(cell(r,5))??[0,0,0],cell(r,6)===''?.1:tolerance as number,feather as number)}:{})},compositing:{coverage:{policy:'inherit'},optics:'inherit'}});
+            for (const c of [5, 6, 7]) if (!truth(4)&&cell(r, c)) issue('info', name, i + 1, key, cell(table.rows[0] ?? [], c) || `column${c + 1}`, '色の透過が無効なときの編集値は変換先へ写さず、元のZIPと説明ファイルに保持します。');
             continue;
           }
           issue('warning', name, i + 1, key || null, 'material', '未解決・無効または過去の材質行は有効にしません。');
@@ -324,7 +329,12 @@ export async function planLociMyuSource(opened: OpenedLociMyuSource, selection: 
       if (role === 'unselected-workbook' || role === 'unlinked-media') { accounting.sourceOnlyEntries++; issue('info', entry.path, null, null, 'entry', 'この項目は元ファイルだけに保持します。'); }
       fingerprints.push({ path: entry.path, role, ...await lociMyuByteProof(entry.data) });
     }
-    const plan: LociMyuSourcePlan = { ...base, recipe: base.materialSelected ? base.materialRecipe??lociMyuMaterialRecipe : [...images.values()].some(m => m.ref.mediaType === 'image/webp' || m.ref.mediaType === 'image/gif') ? lociMyuPhotoRecipe : model.model.jpeg || [...images.values()].some(m => m.ref.mediaType === 'image/jpeg') ? lociMyuJpegRecipe : lociMyuRecipe, model, media: [...images.values()], scenes, views,
+    if(base.materialRecipe===lociMyuStandardMaterialRecipe)for(const row of materialRows)row.standardIntent=standardIntents.get(row.row)!;
+    const materialNotices:MaterialConversionNotice[]=[];
+    for(const row of materialRows)if(row.standardIntent)for(const index of row.indices){const slot=materialSlots.get(index)!,source=meshMaterialSemantics(slot.sourceSemantics)!,notice=materialConversionNotice({scene:row.scene,model:model.label,material:`${row.key}（材質 ${index+1}）`},source,row.standardIntent,row.standardIntent.appearance.chroma?.softness===0);if(notice)materialNotices.push(notice);}
+    for(const slot of model.model.materials){const source=meshMaterialSemantics(slot.sourceSemantics),index=Number((slot.sourceLocator as JsonObject).materialIndex);if(!source||source.coverage.kind!=='blend')continue;
+      const addressed=new Set(materialRows.filter(r=>r.indices.includes(index)).map(r=>r.scene));for(const scene of scenes)if(!addressed.has(scene.name)){const notice=sourceBlendNotice({scene:scene.name,model:model.label,material:`材質 ${index+1}`},source);if(notice)materialNotices.push(notice);}}
+    const plan: LociMyuSourcePlan = { ...base, recipe: base.materialSelected ? base.materialRecipe??lociMyuMaterialRecipe : [...images.values()].some(m => m.ref.mediaType === 'image/webp' || m.ref.mediaType === 'image/gif') ? lociMyuPhotoRecipe : model.model.jpeg || [...images.values()].some(m => m.ref.mediaType === 'image/jpeg') ? lociMyuJpegRecipe : lociMyuRecipe, model, media: [...images.values()], scenes, views,...(materialNotices.length?{materialNotices}:{}),
       ...(base.materialSelected ? { materialRows } : {}) };
     if (base.materialSelected) lociMyuEvidence(materialRows);
     lociMyuEvidence({ ...base, scenes: scenes.map(s => ({ name: s.name, identity: s.identity, captions: s.captions.map(c => ({ row: c.row, id: c.value.captionId })) })) });

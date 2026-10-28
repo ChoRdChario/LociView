@@ -10,7 +10,7 @@ import { checkContentFacts } from '../domain/projectContentChecks';
 import { readProjectScene } from '../scene/projectProvider';
 import { readValidationBody } from './content';
 import { readValidationInitialRecord, writeValidationInitial, validationInitialOrigin } from './creation';
-import { lociMyuRecipe, lociMyuJpegRecipe, lociMyuPhotoRecipe, lociMyuMaterialRecipe, lociMyuOpaqueMaterialRecipe, type LociMyuRecipe, lociMyuEvidence, openLociMyuSource, planLociMyuSource, lociMyuByteProof, LociMyuPreflightError, type LociMyuSourcePlan, type OpenedLociMyuSource } from './lociMyuSource';
+import { lociMyuRecipe, lociMyuJpegRecipe, lociMyuPhotoRecipe, lociMyuMaterialRecipe, lociMyuOpaqueMaterialRecipe,lociMyuStandardMaterialRecipe, type LociMyuRecipe, lociMyuEvidence, openLociMyuSource, planLociMyuSource, lociMyuByteProof, LociMyuPreflightError, type LociMyuSourcePlan, type OpenedLociMyuSource } from './lociMyuSource';
 import { mapLociMyuProject, lociMyuSourceKey, type LociMyuMappingEntry } from './lociMyuMapping';
 import type { PngDecoder } from './png';
 import type { JpegDecoder } from './jpeg';
@@ -25,7 +25,7 @@ interface ConversionReceipt {
 const receiptPath = (fs: ProjectWorkspaceFS) => metadataPath(fs, 'locimyu-conversion.json');
 const sourcePath = (fs: ProjectWorkspaceFS) => metadataPath(fs, 'locimyu-conversion-source.zip');
 export const hasLociMyuConversion = async (fs: ProjectWorkspaceFS, checkBoundInitial = true) => !!await fs.readStream(receiptPath(fs)) || !!await fs.readStream(sourcePath(fs)) ||
-  checkBoundInitial && [lociMyuRecipe, lociMyuJpegRecipe, lociMyuPhotoRecipe, lociMyuMaterialRecipe, lociMyuOpaqueMaterialRecipe].includes(await validationInitialOrigin(fs) as LociMyuRecipe);
+  checkBoundInitial && [lociMyuRecipe, lociMyuJpegRecipe, lociMyuPhotoRecipe, lociMyuMaterialRecipe, lociMyuOpaqueMaterialRecipe,lociMyuStandardMaterialRecipe].includes(await validationInitialOrigin(fs) as LociMyuRecipe);
 const fail = () => fileError('LociMyuの変換記録が不足しているか一致しません。保持した記録は上書きしていません。');
 const reportBlob = (report: JsonObject) => new Blob([json(lociMyuEvidence(report))], { type: 'application/json' });
 const ascii = (value: unknown) => json(lociMyuEvidence(value)).replace(/[\u007f-\uffff]/g, c => `\\u${c.charCodeAt(0).toString(16).padStart(4, '0')}`);
@@ -48,7 +48,7 @@ async function checkReceipt(r: ConversionReceipt, projectId: string) {
   const proof = (p: unknown): boolean => keys(p, ['byteLength', 'digest']) && Number.isSafeInteger((p as ConversionReceipt['original']).byteLength) &&
     (p as ConversionReceipt['original']).byteLength > 0 && /^[0-9a-f]{64}$/.test((p as ConversionReceipt['original']).digest);
   if (!keys(r, ['recipe', 'conversionId', 'projectId', 'original', 'initial', 'selection', 'workbook', 'confirmation', 'title', 'fingerprints', 'inventory', 'sourceIdentities', 'mapping', 'report']) ||
-    ![lociMyuRecipe, lociMyuJpegRecipe, lociMyuPhotoRecipe, lociMyuMaterialRecipe, lociMyuOpaqueMaterialRecipe].includes(r.recipe) || !/^[0-9a-f]{32}$/.test(r.conversionId) || r.projectId !== projectId || projectId !== `prj_${r.conversionId}` || !proof(r.original) ||
+    ![lociMyuRecipe, lociMyuJpegRecipe, lociMyuPhotoRecipe, lociMyuMaterialRecipe, lociMyuOpaqueMaterialRecipe,lociMyuStandardMaterialRecipe].includes(r.recipe) || !/^[0-9a-f]{32}$/.test(r.conversionId) || r.projectId !== projectId || projectId !== `prj_${r.conversionId}` || !proof(r.original) ||
     !keys(r.initial, ['byteLength', 'digest', 'proof']) || !proof({ byteLength: r.initial.byteLength, digest: r.initial.digest }) || !Number.isSafeInteger(r.selection) || r.selection < 0 ||
     !keys(r.workbook, ['path', 'byteLength', 'digest']) || typeof r.workbook.path !== 'string' || typeof r.title !== 'string' || !Array.isArray(r.mapping) || !r.mapping.length) return fail();
   const ids = new Set<string>(), hashes = new Map<string, string>();
@@ -74,7 +74,8 @@ function makeReport(original: ConversionReceipt['original'], evaluated: Awaited<
     issues: base.issues, sourceIdentities: mapped?.sourceIdentities ?? [], mapping: source ? mapped?.mapping ?? [] : [],
     targetIdentity: source?.proof.identity ?? null, initialProof: source?.proof ?? null, capturedBeforePublication: true,
     originalExcludedFromExports: true, sourceAndReportMustBeSavedSeparately: true,
-    ...(material ? { materialEffects, materialMappings: source ? mapped!.materialMappings : [] } : {}) }) as JsonObject;
+    ...(material ? { materialEffects, materialMappings: source ? mapped!.materialMappings : [] } : {}),
+    ...(plan?.recipe===lociMyuStandardMaterialRecipe?{materialNormalization:plan.materialNotices??[]}: {}) }) as JsonObject;
 }
 async function verifyRetained(r: ConversionReceipt, source: ProjectMetadataSource, opened: OpenedLociMyuSource) {
   if (source.semanticProfile !== 'map2') return fail(); await checkReceipt(r, source.proof.identity.projectId as string);
@@ -153,7 +154,7 @@ export async function prepareLociMyuConversion(input: Blob, limits: FileValidati
         } };
       }
       const materialIssue = evaluated.base.issues.find(issue => issue.severity === 'blocking');
-      return { relation: evaluated.relation, summary: { ...report.converted as JsonObject,
+      return { relation: evaluated.relation, summary: { ...report.converted as JsonObject,...(evaluated.plan?.materialNotices?.length?{materialNotices:evaluated.plan.materialNotices}:{}),
         ...(evaluated.base.materialSelected ? { materialEffects: report.materialEffects!, materialIssue: materialIssue ? { field: materialIssue.field, reason: materialIssue.reason } : null } : {}) } as JsonObject, blocked: !evaluated.plan,
         report: () => reportBlob(report), create: () => attempt ??= create() };
     },

@@ -1,4 +1,4 @@
-import { opaqueMaterialSource } from '../domain/meshMaterialSource';
+import { meshMaterialSemantics } from '../domain/meshMaterialSource';
 import { openNativePortableConversionStreamsV1 } from '../nativeGs/portablePackage';
 import { digestNativeStream } from '../nativeGs/sha256';
 import { NATIVE_GS_PROFILE_ID, NATIVE_POINT_PROFILE_ID, nativeDisplaySetsV1, type NativeProjectSnapshotV1 } from '../nativeGs/schema';
@@ -12,7 +12,7 @@ import { digest, json, metadataPath, newId, readReceipt, underWriteLease, writeR
 import { checkContentFacts } from '../domain/projectContentChecks';
 import { cloneCanonicalValue, type JsonObject } from '../domain/values';
 import { readProjectScene } from '../scene/projectProvider';
-import { mapNativeProject, nativeSpatialRecipe, nativeMeshRecipe, nativeOpaqueMaterialRecipe, type NativeModelFacts, type NativeConversionMaterialWitness, type NativeMappingEntry, type NativeSourceOccurrence } from './nativeMapping';
+import { mapNativeProject, nativeSpatialRecipe, nativeMeshRecipe, nativeOpaqueMaterialRecipe,nativeStandardMaterialRecipe,nativeMaterialConversionNotices, type NativeModelFacts, type NativeConversionMaterialWitness, type NativeMappingEntry, type NativeSourceOccurrence } from './nativeMapping';
 import { nativePointSourceProfile, nativeProxySourceProfile, nativeSpatialModelBounds } from './nativeSpatial';
 import { inspectPointPly } from './pointPly';
 import { nativeMeshSourceFormat, inspectMeshSource, meshSourceProfile } from './meshSource';
@@ -34,7 +34,7 @@ type Archive = NonNullable<Awaited<ReturnType<typeof openNativePortableConversio
 type ByteProof = {byteLength: number; digest: string};
 type Mapped = Awaited<ReturnType<typeof mapNativeProject>>;
 interface Receipt {
-  recipe: typeof nativeSpatialRecipe | typeof nativeMeshRecipe | typeof nativeOpaqueMaterialRecipe; conversionId: string; projectId: string;
+  recipe: typeof nativeSpatialRecipe | typeof nativeMeshRecipe | typeof nativeOpaqueMaterialRecipe | typeof nativeStandardMaterialRecipe; conversionId: string; projectId: string;
   original: ByteProof; originalRef: StoredBlobRef; manifest: ByteProof; snapshot: ByteProof;
   initial: ByteProof & {proof: MetadataProof}; mapping: NativeMappingEntry[];
   materialWitness: NativeConversionMaterialWitness[]; spatialWitness: JsonObject[];
@@ -131,9 +131,9 @@ async function inspect(archive: Archive, budget: ProjectFilePolicyInput, png?: P
   for (const a of snapshot.meshMaterialAppearances ?? []) {
     const r = snapshot.representations.find(r => r.id === a.representationId)!, row = rows.get(r.id)?.find(row => nativeMaterialSlotKey(row.childPath, row.materialArraySlot) === a.materialSlotKey);
     const material = row && models.get(r.id)!.materials.find(m => (m.sourceLocator as JsonObject).slotIndex === row.slotIndex);
-    if (r.role !== 'meshPrimary' || !row || !material || a.opacity !== 1 || a.chroma.enabled ||
+    if (r.role !== 'meshPrimary' || !row || !material ||
       snapshot.representations.filter(s => s.assetId === r.assetId && s.variantFamilyId === r.variantFamilyId).length !== 1 ||
-      !opaqueMaterialSource(material.sourceSemantics)) return fileError('この材質設定はまだそのまま変換できません。');
+      !meshMaterialSemantics(material.sourceSemantics)) return fileError('この材質設定はまだそのまま変換できません。');
   }
   for (const m of snapshot.mediaResources ?? []) {
     signal?.throwIfAborted();
@@ -182,7 +182,7 @@ function checkReceipt(r: Receipt, projectId: string) {
   cloneCanonicalValue(r, metadata);
   const keys = (value: unknown, names: string[]) => !!value && typeof value === 'object' && !Array.isArray(value) && Object.keys(value).sort().join(',') === names.sort().join(',');
   if (!r || Object.keys(r).sort().join(',') !== ['recipe','conversionId','projectId','original','originalRef','manifest','snapshot','initial','mapping','materialWitness','spatialWitness','report'].sort().join(',') ||
-    !([nativeSpatialRecipe,nativeMeshRecipe,nativeOpaqueMaterialRecipe] as readonly string[]).includes(r.recipe) || !/^[0-9a-f]{32}$/.test(r.conversionId) || r.projectId !== projectId || projectId !== `prj_${r.conversionId}` ||
+    !([nativeSpatialRecipe,nativeMeshRecipe,nativeOpaqueMaterialRecipe,nativeStandardMaterialRecipe] as readonly string[]).includes(r.recipe) || !/^[0-9a-f]{32}$/.test(r.conversionId) || r.projectId !== projectId || projectId !== `prj_${r.conversionId}` ||
     ![r.original,r.manifest,r.snapshot].every(p => keys(p,['byteLength','digest'])) || !keys(r.initial,['byteLength','digest','proof']) ||
     !same(r.originalRef, {algorithm: 'sha256', digest: r.original.digest, byteLength: r.original.byteLength, mediaType: 'application/zip'}) ||
     ![r.original,r.manifest,r.snapshot,r.initial].every(p => p && Number.isSafeInteger(p.byteLength) && p.byteLength > 0 && /^[0-9a-f]{64}$/.test(p.digest)) ||
@@ -198,8 +198,8 @@ async function started(fs: ProjectWorkspaceFS, expected: MetadataProof): Promise
 /** Contextual recovery affordance; never offers re-creation after acknowledgement. */
 export async function nativeSpatialConversionSourceRequired(fs: ProjectWorkspaceFS, store: OriginBlobStore): Promise<boolean> {
   const receipt = await readReceipt<Receipt>(fs,path(fs),metadata);
-  if (!receipt || !([nativeSpatialRecipe,nativeMeshRecipe,nativeOpaqueMaterialRecipe] as readonly string[]).includes(receipt.recipe)) return false;
-  if(receipt.recipe===nativeOpaqueMaterialRecipe&&!Object.hasOwn(receipt,'originalRef'))return false; // Plain GLB keeps raw-source repair semantics.
+  if (!receipt || !([nativeSpatialRecipe,nativeMeshRecipe,nativeOpaqueMaterialRecipe,nativeStandardMaterialRecipe] as readonly string[]).includes(receipt.recipe)) return false;
+  if((receipt.recipe===nativeOpaqueMaterialRecipe||receipt.recipe===nativeStandardMaterialRecipe)&&!Object.hasOwn(receipt,'originalRef'))return false; // Plain GLB keeps raw-source repair semantics.
   checkReceipt(receipt,receipt.projectId);
   const initial = await readValidationInitialRecord(fs);
   return !await started(fs,initial.source.proof) && await store.inspect(receipt.originalRef) === 'unverified';
@@ -235,7 +235,8 @@ export async function prepareNativeSpatialConversion(input: Blob, budget: Projec
       return resumeNativeSpatialConversion(fs, store, session, policy, receipt.projectId, png, jpeg, photo, file);
     }};
   }
-  return {summary: Object.freeze({...report, objExternalMaterialsUnavailable:[...inspected.models.values()].some(m=>m.newMesh?.externalMaterialsUnavailable), effects: Object.freeze({...report.effects}), nativeSpatial: Object.freeze({points: snapshot.representations.filter(r => r.role === 'pointPrimary').length,
+  const materialNotices=nativeMaterialConversionNotices(snapshot,inspected.models,inspected.rows);
+  return {summary: Object.freeze({...report,...(materialNotices.length?{materialNotices}:{}), objExternalMaterialsUnavailable:[...inspected.models.values()].some(m=>m.newMesh?.externalMaterialsUnavailable), effects: Object.freeze({...report.effects}), nativeSpatial: Object.freeze({points: snapshot.representations.filter(r => r.role === 'pointPrimary').length,
     gs: snapshot.representations.filter(r => r.role === 'gsPrimary').length, proxies: snapshot.representations.filter(r => r.role === 'interactionProxy').length})}), create: () => attempt ??= create()};
 }
 

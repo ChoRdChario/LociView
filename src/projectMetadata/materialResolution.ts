@@ -42,7 +42,7 @@ export function materialResolutionContext(p: Provider, sceneId: string, override
     const catalog = object(rep.materialCatalog); if (catalog.layoutId !== target.materialLayoutId) continue;
     for (const slot of list(catalog.slots).map(object)) {
       r.charge(); if (slot.logicalMaterialSlotId !== target.logicalMaterialSlotId) continue;
-      const capability=meshMaterialSource(rep,slot.sourceSemantics);if(!capability)fail('material-source');source=capability!;
+      const capability=meshMaterialSource(rep,slot.sourceSemantics);if(!capability||p.semanticProfile!=='map2'&&capability.coverage.kind==='blend')fail('material-source');source=capability!;
       found = true;
     }
   }
@@ -78,9 +78,9 @@ export function materialResolutionContext(p: Provider, sceneId: string, override
 export function checkedResolutionIntent(appearance: JsonObject, compositing: JsonObject, limits: MetadataLimits, profile: ProjectSemanticProfile = 'map1',source?:MeshMaterialSource): MaterialIntent {
   const intent = validateMaterialIntent({ appearance, compositing }, limits, profile);
   if(source&&meshLightingIssue(source,intent.appearance))fail('material-unsupported');
-  if (intent.compositing.optics === 'transmission' || ['smoothBlend', 'ditherCoverage'].includes(intent.compositing.coverage.policy) ||
-    intent.compositing.coverage.policy !== 'mask' && (profile !== 'map2' || intent.appearance.chroma?.enabled !== false) && (intent.appearance.chroma?.softness ?? 0) > 0 ||
-    (intent.compositing.coverage.policy === 'inherit' && (intent.appearance.opacity ?? 1) < 1)) fail('material-unsupported');
+  if (intent.compositing.optics === 'transmission' || intent.compositing.coverage.policy==='ditherCoverage' || profile!=='map2'&&(
+    intent.compositing.coverage.policy==='smoothBlend'||intent.compositing.coverage.policy !== 'mask' && (intent.appearance.chroma?.softness ?? 0) > 0 ||
+    intent.compositing.coverage.policy === 'inherit' && (intent.appearance.opacity ?? 1) < 1)) fail('material-unsupported');
   return intent;
 }
 /** Used by the real-file host too, before journaling, for exact-slot capability admission. */

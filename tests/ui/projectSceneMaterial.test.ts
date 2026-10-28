@@ -4,6 +4,7 @@ import { materialFields, materialInput, validateMaterialIntent, type MaterialInt
 import { acceptMaterialApply, editMaterialDraft, materialApplyIssue, materialPlanIsCurrent, materialTargetKey, materialView,
   newMaterialSelection, planMaterial, type MaterialContext, type MaterialEffect, type MaterialPlan, type MaterialSurfacePort } from '../../src/ui/projectScene/materialState';
 import { createMaterialControls } from '../../src/ui/projectScene/materialControls';
+import {createMaterialConversionNotice} from '../../src/ui/projectScene/conversionNotice';
 import { RecordedDocument, record } from './domRecorder';
 
 const id = (prefix: string, n: number) => `${prefix}_${n.toString(16).padStart(32, '0')}`;
@@ -55,6 +56,20 @@ function host(initial = fixture()) {
 }
 
 describe('disconnected material controls (not rendering, browser or save acceptance)', () => {
+  it('keeps a map2 smooth edit applicable while explaining its display consequence',()=>{
+    const base=fixture(true,{...surface(),displayNotice:i=>i.compositing.coverage.policy==='smoothBlend'?'この材質の面は非表示になります。設定は保持します。':null});
+    const h=host(editing({...base,source:{...base.source,semanticProfile:'map2'}})),coverage=h.fields.get('coverage')!;
+    expect(coverage.children.find(n=>n.value==='smoothBlend')?.textContent).toBe('半透明');coverage.value='smoothBlend';coverage.fire('change');
+    expect(h.apply.disabled).toBe(false);expect(h.status.textContent).toContain('設定は保持します');h.apply.fire('click');
+    const p=h.plans.at(-1)!;if(p.kind!=='apply')throw Error('apply');expect(p.intent.compositing.coverage).toEqual({policy:'smoothBlend'});expect(p.intent.appearance).toEqual(h.context.draft!.base.appearance);
+    h.controls.dispose();
+  });
+  it('shows exact conversion targets as text and clears stale explanations without adding a decision',()=>{
+    const view=createMaterialConversionNotice(new RecordedDocument().asDocument()),root=record(view.root),details=root.children[1]!,list=details.children[1]!;
+    view.render([{scene:'観察',model:'<img src=x onerror=alert(1)>',material:'面1',reasons:['alpha-order','smooth-display']}]);
+    expect(root.hidden).toBe(false);expect(details.open).toBe(false);expect(root.children[0]!.textContent).toContain('一部の材質の面は非表示になります');expect(list.children[0]!.textContent).toContain('<img src=x onerror=alert(1)>');expect(list.children[0]!.children).toHaveLength(0);expect(list.children[0]!.textContent).toContain('非表示になります');expect(root.children.filter(n=>n.tag==='button')).toHaveLength(0);
+    view.render();expect(root.hidden).toBe(true);expect(list.children).toHaveLength(0);
+  });
   it('drops the cutout-only threshold draft when explicitly returning to inherited coverage', () => {
     let context=editing(); context=edit(context,'coverage','mask'); context=edit(context,'cutoff','0.4');
     context=edit(context,'coverage','inherit'); expect(context.draft!.edits.cutoff).toBeUndefined();

@@ -36,16 +36,26 @@ The bounded workflow now has executed source/command/file/recovery and Desktop
 browser evidence, required full checks and independent review in todo. The existing
 Mesh source-material connection is verified under05's
 source matrix: visual Mesh opaque/MASK, authored lit/unlit and front/double. Todo
-owns its actual checks and next action. Explicit Basic→lit, BLEND and new migration
-semantics remain behind real decisions; source capability never unlocks Point/GS/
+owns its actual checks and next action. Explicit Basic→lit and smooth drawing
+remain behind real decisions; the approved07n below owns BLEND intent/migration; source capability never unlocks Point/GS/
 Proxy editing. Keep original bytes and identical display/Boolean-pick coverage.
 The07m opaque-source conversion companion was PO-approved2026-10-28 as one
 three-family unit and is verified in todo. It adds recipe/ID meanings for
 Native/v1/LociMyu and inherits an absent v1 side override from the source. Preserve
-older recipes and source-derived Native receipt lanes. The next missing material
-workflow is alpha/chroma; todo records concrete old/new semantic differences and
-the grouped policy/specification work needed before implementation. Do not infer
-approval of those meanings or repeat helper approvals for the completed07m scope.
+older recipes and source-derived Native receipt lanes. PO explicitly approved
+the[07n standard alpha/chroma workflow](../docs/specs/07n-standard-alpha-chroma-conversion.md)
+2026-10-28: normalized new-format operations, preserved originals/existing data,
+affected-target/reason explanations and implementation/automatic verification as
+one group. The bounded workflow and final automatic checks are verified; todo
+owns exact evidence, retained failures and the measured save/output waits.
+Do not repeat normalization/helper approval. Smooth intent may
+be edited/saved while its material contribution is locally hidden with an
+explanation; actual smooth composition remains behind G1-D, even for Mesh-only.
+The independently reviewed[01f proposal](../docs/specs/01f-desktop-smooth-composition-evaluation.md)
+is PROPOSED/unstarted. It asks only whether a read-only PC WBOIT evaluation may
+precede the base-renderer prerequisite, preserving actual qualification/product
+activation gates. PO has not approved that sequencing exception. Do not start
+it or turn the07n checkpoint into adoption/normal activation/release credit.
 
 01a's bounded point workflow is implemented; exact six JSON companions are immutable.
 Native, synthetic hosts, typed validation and ordinary home have separate authority

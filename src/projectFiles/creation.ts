@@ -13,9 +13,10 @@ import type { PngDecoder } from './png';
 import type { JpegDecoder } from './jpeg';
 import { fileError, validationMetadataLimits as metadataLimits, type ProjectFilePolicyInput } from './validation';
 
-type InitialOriginRecipe = 'native-project-scene-recipe-9' | 'v1-project-scene-migration-recipe-7' | 'locimyu-project-scene-migration-recipe-5' | 'native-project-scene-recipe-8' | 'native-project-scene-recipe-7' | 'v1-project-scene-migration-recipe-6' | 'locimyu-project-scene-migration-recipe-4' | 'v1-project-scene-migration-recipe-5' | 'v1-project-scene-migration-recipe-4' | 'native-project-scene-recipe-5' | 'native-project-scene-recipe-6' | 'v1-project-scene-migration-recipe-3' | 'locimyu-project-scene-migration-recipe-3' | 'v1-project-scene-migration-recipe-1' | 'locimyu-project-scene-migration-recipe-1' |
+type InitialOriginRecipe = 'native-project-scene-recipe-10' | 'v1-project-scene-migration-recipe-8' | 'locimyu-project-scene-migration-recipe-6' | 'native-project-scene-recipe-9' | 'v1-project-scene-migration-recipe-7' | 'locimyu-project-scene-migration-recipe-5' | 'native-project-scene-recipe-8' | 'native-project-scene-recipe-7' | 'v1-project-scene-migration-recipe-6' | 'locimyu-project-scene-migration-recipe-4' | 'v1-project-scene-migration-recipe-5' | 'v1-project-scene-migration-recipe-4' | 'native-project-scene-recipe-5' | 'native-project-scene-recipe-6' | 'v1-project-scene-migration-recipe-3' | 'locimyu-project-scene-migration-recipe-3' | 'v1-project-scene-migration-recipe-1' | 'locimyu-project-scene-migration-recipe-1' |
   'v1-project-scene-migration-recipe-2' | 'locimyu-project-scene-migration-recipe-2' | 'native-project-scene-recipe-3' | 'native-project-scene-recipe-4';
 const originRecipeKnown = (value: unknown): value is InitialOriginRecipe => typeof value === 'string' && [
+  'native-project-scene-recipe-10', 'v1-project-scene-migration-recipe-8', 'locimyu-project-scene-migration-recipe-6',
   'native-project-scene-recipe-9', 'v1-project-scene-migration-recipe-7', 'locimyu-project-scene-migration-recipe-5',
   'native-project-scene-recipe-8', 'native-project-scene-recipe-7',
   'v1-project-scene-migration-recipe-1', 'v1-project-scene-migration-recipe-4', 'v1-project-scene-migration-recipe-5', 'locimyu-project-scene-migration-recipe-1',

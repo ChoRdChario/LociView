@@ -10,6 +10,7 @@ import { newId } from '../projectMetadata/persistence';
 import { prepareValidationProject, validationModelFile, type ValidationModelFile, type ValidationFile } from '../projectFiles/initialProject';
 import { prepareValidationCreation } from '../projectFiles/creation';
 import { prepareNativeConversion } from '../projectFiles/nativeConversion';
+import {createMaterialConversionNotice} from '../ui/projectScene/conversionNotice';
 import { prepareFrozenV1Conversion } from '../projectFiles/frozenV1Conversion';
 import { prepareLociMyuConversion } from '../projectFiles/lociMyuConversion';
 import { validationMetadataLimits, projectFilePolicy, type FileValidationLimits, type ProjectFilePolicy } from '../projectFiles/validation';
@@ -76,6 +77,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   workspaceLabel.textContent = 'ファイルを選択'; workspaceInput.type = 'file'; workspaceInput.multiple = true; workspaceInput.setAttribute('aria-label', 'ファイルを選択'); workspaceLabel.append(workspaceInput);
   openFile.type = 'submit'; openFile.textContent = 'ファイルを開く'; workspaceForm.append(workspaceLabel, openFile,fallback);
   const conversionPanel = document.createElement('section'), conversionNote = document.createElement('p'), conversionHelp = document.createElement('p');
+  const materialNotice=createMaterialConversionNotice(document);
   const convert = document.createElement('button'), cancelConversion = document.createElement('button');
   convert.type = cancelConversion.type = 'button'; convert.textContent = '新しいプロジェクトに変換'; cancelConversion.textContent = 'キャンセル';
   conversionHelp.textContent = '元ファイルは変更しません。チームでは変換後のファイルを使ってください。元ファイルは書き出しに含まれないため、別に保管してください。';
@@ -87,7 +89,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   conversionTitleLabel.textContent = '変換後のプロジェクト名'; conversionTitle.setAttribute('aria-label', '変換後のプロジェクト名'); conversionTitleLabel.append(conversionTitle);
   relation.type = 'checkbox'; relation.setAttribute('aria-label', '表と視点・材質の関連付けを確認'); relationLabel.textContent = '表と視点・材質の関連付けを確認'; relationLabel.append(relation);
   previewAgain.type = saveReport.type = 'button'; previewAgain.textContent = '変換内容を確認'; saveReport.textContent = '変換の説明を保存';
-  lociChoices.append(workbookLabel, conversionTitleLabel, relationNote, relationLabel, previewAgain); lociChoices.hidden = true; conversionPanel.replaceChildren(lociChoices, conversionNote, conversionHelp, saveReport, convert, cancelConversion);
+  lociChoices.append(workbookLabel, conversionTitleLabel, relationNote, relationLabel, previewAgain); lociChoices.hidden = true; conversionPanel.replaceChildren(lociChoices, conversionNote, materialNotice.root,conversionHelp, saveReport, convert, cancelConversion);
   const coldReport = document.createElement('button'); coldReport.type = 'button'; coldReport.textContent = '変換の説明を保存'; coldReport.hidden = true; root.append(coldReport);
   const status = document.createElement('p'); status.setAttribute('role', 'status'); status.className = 'lv-operation-status lv-validation-status';
   const list = document.createElement('section'), refresh = document.createElement('button'), back = document.createElement('button');
@@ -397,8 +399,8 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     if (state.phase === 'terminal') button('一覧に戻る', () => leave(false));
     panel.append(summary, note, commands); content.replaceChildren(panel); controls();
   };
-  const invalidateLoci = () => { lociDraft++; lociEvaluation = null; lociDecision = undefined; conversion = null; controls(); };
-  const clearConversion = () => { legacyFile=undefined;fallback.hidden=true; lociDraft++; lociDecision = undefined; conversion = null; lociPreview = null; lociEvaluation = null; lociChoices.hidden = true; conversionPanel.hidden = true; };
+  const invalidateLoci = () => { lociDraft++; lociEvaluation = null; lociDecision = undefined; conversion = null;materialNotice.render(); controls(); };
+  const clearConversion = () => { legacyFile=undefined;fallback.hidden=true; lociDraft++; lociDecision = undefined; conversion = null; lociPreview = null; lociEvaluation = null; lociChoices.hidden = true; conversionPanel.hidden = true;materialNotice.render(); };
   const clearSelection = () => {
     selectionAbort?.abort(); selectionAbort = undefined; nativeSelectionChecking = false;
     selectionGeneration++; creationDraft++; selectionPending = false; rawSelection = undefined; creationAttempt = undefined; selectionHost = undefined;
@@ -428,6 +430,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     relationNote.textContent = evaluated.relation.kind === 'confirmation-required' ? evaluated.relation.relations.map(r => `${r.sheetGid} → ${r.sheetName}`).join(' / ') :
       evaluated.relation.kind === 'unavailable' ? '表との対応を確認できない視点・材質は有効にしません。' : '';
     const n = evaluated.summary; conversionNote.textContent = evaluated.blocked ? 'この内容は変換できません。説明ファイルで問題を確認してください。' : `LociMyuファイル：モデル ${n.models}・シーン ${n.scenes}・キャプション ${n.captions}・メディア ${n.media}・視点 ${n.views}`;
+    materialNotice.render(n.materialNotices as Parameters<typeof materialNotice.render>[0]);
     const effects = n.materialEffects as { scenes: number; overrides: number; sourceOnlyChromaRows: number } | null | undefined;
     const materialIssue = n.materialIssue as { field: string; reason: string } | null | undefined;
     if (evaluated.blocked && materialIssue) conversionNote.textContent += ` ${materialIssue.field}：${materialIssue.reason}`;
@@ -536,6 +539,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     if (native || legacy) {
       conversion = native ?? legacy; const n = conversion!.summary;
       conversionNote.textContent = `${native ? 'Native' : '旧LociView'}ファイル：モデル ${n.models}・シーン ${n.scenes}・キャプション ${n.captions}・メディア ${n.media}`;
+      materialNotice.render(n.materialNotices);
       if (native?.summary.nativeSpatial) {
         conversionNote.textContent += '。元の単位・座標・記録を引き継ぎます。';
         if (native.summary.nativeSpatial.gs) conversionNote.textContent += 'GSの見え方や全体を収める範囲は変わる場合があります。';

@@ -15,6 +15,8 @@ export interface MaterialSurfacePort {
   readonly fieldIssues: Readonly<Record<MaterialEditField, string | null>>;
   /** Pure candidate capability/source-semantics admission, covered by source token; never renderer fallback. */
   readonly admit: (intent: MaterialIntent) => string | null;
+  /** Display-only consequence; never blocks a valid semantic edit or changes its intent. */
+  readonly displayNotice?: (intent:MaterialIntent)=>string|null;
 }
 export interface MaterialModelPort { readonly assetId: string; readonly name: Field<string>; readonly surfaces: Field<readonly MaterialSurfacePort[]>; readonly reason: string | null }
 export type MaterialSource = Readonly<{ token: string; projectId: string; sceneId: string; limits: ValueLimits; semanticProfile?: ProjectSemanticProfile }> &

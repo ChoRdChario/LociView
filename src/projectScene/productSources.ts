@@ -22,7 +22,7 @@ import { entryKey, viewKey, orderBetween } from './viewDisplay';
 import { viewLabel, viewDescription } from './viewCandidateLabels';
 import { rotationDegrees, degreesRotation, finiteInput } from './modelTransform';
 import { materialBucket, materialLimits, sourceMaterialIntent } from './materialDisplay';
-import { validationMaterialSlots, validationMaterialSourceIssue, validationMaterialIssue } from './validationMaterials';
+import { validationMaterialSlots, validationMaterialSourceIssue, validationMaterialIssue,validationMaterialDisplayNotice } from './validationMaterials';
 import { describeMaterialCandidate } from './materialLabels';
 import { normalizeAlt } from './mediaDisplay';
 import { canonicalDisplay } from './displaySupport';
@@ -267,9 +267,9 @@ export function productSources(host: ReturnType<typeof createValidationModeHost>
           if (!version || !isSavedModel(version.closure)) return { assetId: asset.id, name, surfaces: { kind: 'unresolved', reason: 'conflict' }, reason: 'モデルの状態を確認してください。' };
           return { assetId: asset.id, name, reason: null, surfaces: value(validationMaterialSlots(version.closure).map(slot => ({
             target: slot.target, name: value(slot.name), project: record(slot.target, 'project'), scene: record(slot.target, 'scene'), sourceIntent: value(sourceMaterialIntent),
-            fieldIssues: Object.fromEntries(materialFields.map(f => [f, validationMaterialSourceIssue(slot) ??
+            fieldIssues: Object.fromEntries(materialFields.map(f => [f, validationMaterialSourceIssue(slot,p.semanticProfile) ??
               null])) as Record<typeof materialFields[number], string | null>,
-            admit: intent => validationMaterialIssue(slot, intent, p.semanticProfile) }))) };
+            admit: intent => validationMaterialIssue(slot, intent, p.semanticProfile),displayNotice:intent=>validationMaterialDisplayNotice(slot,intent,p.semanticProfile) }))) };
         }) };
       const review: WorkspaceMaterialReview[] = [], seen = new Set<string>();
       for (const [id, fields] of Object.entries(p.details.mutable.materialOverridesById)) {

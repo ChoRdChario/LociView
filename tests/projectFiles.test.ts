@@ -78,7 +78,7 @@ import { ProjectMetadataSource } from '../src/projectMetadata/source';
 import { planRemoteChanges } from '../src/projectMetadata/remote';
 import { planNavigation } from '../src/ui/projectScene/navigationState';
 import { planMaterial, materialTargetKey, editMaterialDraft, type MaterialIntentRequest } from '../src/ui/projectScene/materialState';
-import { validationMaterialSlots, validationMaterialIssue } from '../src/harness/projectScene/validationMaterials';
+import { validationMaterialSlots, validationMaterialIssue,validationMaterialDisplayNotice } from '../src/harness/projectScene/validationMaterials';
 import { materialKey } from '../src/harness/projectScene/materialHistory';
 import { canonicalFixture } from '../src/harness/projectScene/modelClosure';
 import type { MaterialIntent } from '../src/domain/materialIntent';
@@ -119,17 +119,17 @@ import { remoteEvidenceBytes } from '../src/projectMetadata/packageRemote';
 import { Uint8ArrayReader, Uint8ArrayWriter, ZipWriter } from '@zip.js/zip.js';
 import { prepareNativeConversion, resumeNativeConversion } from '../src/projectFiles/nativeConversion';
 import { nativeConversionIds, nativeAppearanceRecipe } from '../src/projectFiles/nativeMapping';
-import { nativeSpatialRecipe,nativeOpaqueMaterialRecipe } from '../src/projectFiles/nativeMapping';
+import { nativeConversionRecipe,nativeSpatialRecipe,nativeOpaqueMaterialRecipe,nativeStandardMaterialRecipe } from '../src/projectFiles/nativeMapping';
 import { nativePointSourceProfile, nativeProxySourceProfile, nativeSpatialModelBounds } from '../src/projectFiles/nativeSpatial';
 import { gsFixture } from './helpers/gsFixture';
 import { inspectNativeGsPlyV1 } from '../src/nativeGs/plyProfile';
 import { openNativePortableConversionStreamsV1 } from '../src/nativeGs/portablePackage';
 import { prepareFrozenV1Conversion, resumeFrozenV1Conversion, readFrozenV1MaterialReport } from '../src/projectFiles/frozenV1Conversion';
 import { frozenV1ConversionIds, frozenV1SourceKey } from '../src/projectFiles/frozenV1Mapping';
-import { frozenV1Recipe, frozenV1DefaultViewRecipe, frozenV1PlacementRecipe, frozenV1MaterialRecipe,frozenV1OpaqueMaterialRecipe, inspectFrozenV1Source } from '../src/projectFiles/frozenV1Source';
+import { frozenV1Recipe, frozenV1DefaultViewRecipe, frozenV1PlacementRecipe, frozenV1MaterialRecipe,frozenV1OpaqueMaterialRecipe,frozenV1StandardMaterialRecipe, inspectFrozenV1Source } from '../src/projectFiles/frozenV1Source';
 import { prepareLociMyuConversion, resumeLociMyuConversion, readLociMyuConversionReport } from '../src/projectFiles/lociMyuConversion';
 import { lociMyuConversionIds, lociMyuSourceKey } from '../src/projectFiles/lociMyuMapping';
-import { lociMyuRecipe, lociMyuMaterialRecipe,lociMyuOpaqueMaterialRecipe, openLociMyuSource } from '../src/projectFiles/lociMyuSource';
+import { lociMyuRecipe, lociMyuMaterialRecipe,lociMyuOpaqueMaterialRecipe,lociMyuStandardMaterialRecipe, openLociMyuSource } from '../src/projectFiles/lociMyuSource';
 import { makeXlsx, type XlsxSheetSpec } from './helpers/makeXlsx';
 import { LOCIMYU_CAPTION_HEADER, planLociMyuCaptionIdentity } from '../src/io/locimyu';
 import { readZipEntries } from '../src/assets/zipio';
@@ -415,22 +415,36 @@ function expandedOpaqueMaterials(j:any){
   const unlit=j.materials[1]??j.materials[0];unlit.extensions={KHR_materials_unlit:{}};
   j.extensionsUsed=[...new Set([...(j.extensionsUsed??[]),'KHR_materials_unlit'])];
 }
-function opaqueV1File(){return frozenV1File(ops=>{exactV1Materials(ops);for(const m of ops.filter(o=>o.e==='material').slice(0,2))delete m.v.doubleSided;},png,exactV1MaterialModel(expandedOpaqueMaterials));}
+function opaqueV1File(materialTeamOnly=false){return frozenV1File(ops=>{
+  exactV1Materials(ops);for(const m of ops.filter(o=>o.e==='material').slice(0,2))delete m.v.doubleSided;
+  if(materialTeamOnly){
+    // Keep both Scenes, all four material rows, placement and Views. Media and
+    // extra Caption combinations are covered by the full product/restore case.
+    const caption=ops.find(o=>o.e==='caption');caption.v.attachments=[];
+    ops.splice(0,ops.length,...ops.filter(o=>o.e==='asset'?o.id==='ast_00000000000000000000000001':o.e==='caption'?o.id===caption.id:true));
+  }
+},png,exactV1MaterialModel(expandedOpaqueMaterials));}
 function opaqueLociMaterials(s:XlsxSheetSpec[],e:{path:string;data:Uint8Array}[]){
   lociMyuMaterials(s,e);const body=e.find(x=>x.path==='models/model.glb')!,parts=validationGlbParts(body.data,budget);const j=structuredClone(parts.json);expandedOpaqueMaterials(j);body.data=serializeGlb(j,parts.bin);
 }
-async function nativeOpaqueFile(lane:'plain'|'spatial'|'mesh'){
+async function nativeOpaqueFile(lane:'plain'|'spatial'|'mesh',change?:(s:any)=>void,changeModel?:(j:any)=>void){
   const id=(p:string,n:number)=>`${p}_${String(n).padStart(26,'0')}`;
-  if(lane==='plain')return nativeAppearanceFile(()=>{},glb(j=>{j.materials[0].doubleSided=true;j.materials[0].pbrMetallicRoughness.baseColorFactor[3]=.25;}));
+  if(lane==='plain')return nativeAppearanceFile(s=>change?.(s),glb(j=>{j.materials[0].doubleSided=true;j.materials[0].pbrMetallicRoughness.baseColorFactor[3]=.25;changeModel?.(j);}));
   if(lane==='mesh'){
-    const model=JSON.parse(new TextDecoder().decode(meshFixture('gltf-json')));expandedOpaqueMaterials(model);const bytes=new TextEncoder().encode(JSON.stringify(model));
-    return nativeMeshFile(s=>{const rep=s.representations.find((r:any)=>r.id===id('rep',103));s.meshMaterialAppearances.push({...structuredClone(s.meshMaterialAppearances[0]),id:id('mat',2),assetId:rep.assetId,representationId:rep.id,authoredAssetRevisionId:id('rev',103)});},['obj','obj-slots'],new Map([['gltf',bytes]]));
+    const model=JSON.parse(new TextDecoder().decode(meshFixture('gltf-json')));expandedOpaqueMaterials(model);changeModel?.(model);const bytes=new TextEncoder().encode(JSON.stringify(model));
+    return nativeMeshFile(s=>{const rep=s.representations.find((r:any)=>r.id===id('rep',103));s.meshMaterialAppearances.push({...structuredClone(s.meshMaterialAppearances[0]),id:id('mat',2),assetId:rep.assetId,representationId:rep.id,authoredAssetRevisionId:id('rev',103)});change?.(s);},['obj','obj-slots'],new Map([['gltf',bytes]]));
   }
-  const bytes=glb(j=>{j.materials[0].doubleSided=true;}),blob={algorithm:'sha256',digest:await digest(bytes),byteLength:bytes.length,mediaType:'model/gltf-binary'};
+  const bytes=glb(j=>{j.materials[0].doubleSided=true;changeModel?.(j);}),blob={algorithm:'sha256',digest:await digest(bytes),byteLength:bytes.length,mediaType:'model/gltf-binary'};
   return nativeSpatialFile(s=>{const rep=s.representations.find((r:any)=>r.id===id('rep',1));Object.assign(rep,{contentKind:'mesh',role:'meshPrimary',formatProfile:{id:'lociview-native-model-glb-v1'},blob,representationToAsset:{...identityPlacement(),reflection:'none'}});delete rep.pointPly;
     const revision=s.assetRevisions.find((r:any)=>r.representationIds.includes(rep.id));s.meshMaterialAppearances=s.displaySets.map((set:any,i:number)=>({id:id('mat',20+i),displaySetId:set.id,assetId:rep.assetId,authoredAssetRevisionId:revision.id,representationId:rep.id,materialSlotKey:'m/0/0',opacity:1,doubleSided:i===0,unlit:i===0,chroma:{enabled:false,colorSrgb:[0,1,0],tolerance:.3,feather:0}}));
+    change?.(s);
   },2,1,new Map([[id('rep',1),bytes]]));
 }
+function standardNativeFile(lane:'plain'|'spatial'|'mesh'){
+  return nativeOpaqueFile(lane,s=>s.meshMaterialAppearances.forEach((a:any,i:number)=>{a.opacity=i===0?.5:1;a.chroma.enabled=true;a.chroma.feather=i===0?0:.2;}),j=>{j.materials[0].alphaMode='BLEND';});
+}
+function standardV1File(){return frozenV1File(ops=>{exactV1Materials(ops);const rows=ops.filter(o=>o.e==='material');rows[0].v.opacity=.5;delete rows[0].v.doubleSided;rows[1].v.chroma={enable:true,tol:.9};delete rows[2].v.opacity;rows[3].v.chroma.enable=true;},png,exactV1MaterialModel(j=>{expandedOpaqueMaterials(j);j.materials[0].alphaMode='MASK';j.materials[1].alphaMode='BLEND';}));}
+function standardLociMaterials(s:XlsxSheetSpec[],e:{path:string;data:Uint8Array}[]){opaqueLociMaterials(s,e);const rows=s.find(t=>t.name==='__LM_MATERIALS')!.rows;rows[1]![1]='0.5';rows[1]![4]='true';rows[1]![6]='';rows[1]![7]='0';rows[2]![4]='true';const body=e.find(x=>x.path==='models/model.glb')!,parts=validationGlbParts(body.data,budget),j:any=structuredClone(parts.json);j.materials[0].alphaMode='MASK';j.materials[1].alphaMode='BLEND';body.data=serializeGlb(j,parts.bin);}
 class TestFS extends MemoryFS {
   reject = (_: string) => false; reads = 0;
   override async writeText(path: string, text: string) { if (this.reject(path)) throw Error('injected quota'); return super.writeText(path, text); }
@@ -442,13 +456,13 @@ class TestFS extends MemoryFS {
     return { size: file.size, stream: () => { this.reads++; return file.stream(); } }; }
 }
 
-async function openFileCaption(modelBytes = glb()) {
+async function openFileCaption(modelBytes = glb(),profile:'map1'|'map2'='map1') {
   const fs = new TestFS(), locks = lockManager(), run = newId(), factory = storageFactory();
   const coordinator = ProjectMutationCoordinator.browser(locks);
   const store = new OriginBlobStore(fs, { maxBlobBytes: budget.maxFileBytes, maxChunkBytes: 1_000_000, maxChunks: 10000, metadata }, locks);
   const options = { base: fs, coordinator, store, fileLimits: budget, decode, run, packageLocks: locks,
     openStorage: async () => ({ factory, dispose: async () => {} }) };
-  const initial = prepareValidationCreation(await prepareValidationProject({ run, title: '追加の検証', models: [{ label: '3Dモデル', bytes: modelBytes }] }, budget, decode));
+  const initial = prepareValidationCreation(await prepareValidationProject({ run, title: '追加の検証', models: [{ label: '3Dモデル', bytes: modelBytes }] }, budget, decode),profile);
   const host = await openValidationHost({ ...options, initial }), workspace = createSavedWorkspace(new RecordedDocument().asDocument(), host);
   const s = workspace.session!, model = s.snapshot.modelVersions![0]!;
   s.setViewportState(true, [model.assetId], null); s.acceptPinCreation(s.pinCreationTargets()[0]!, [3, 0.5, 0]);
@@ -885,16 +899,16 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       if(kind==='implicit')e.find(x=>x.path==='models/model.glb')!.data=glb(j=>{j.materials[0].name='SourceMaterial';delete j.meshes[0].primitives[0].material;});
     });
     const preview=(await prepareLociMyuConversion(file,budget,decode))!, choice=await preview.evaluate(0,kind==='target-title'?'a\nb':'材質の記録'), report=JSON.parse(await choice.report().text());
-    const blocked=['duplicate','opacity','chroma','target-title'].includes(kind), inactive=['invalid','zero','implicit'].includes(kind);
-    expect(choice.blocked).toBe(blocked);expect(report.recipe).toBe(inactive?lociMyuRecipe:kind==='source-double'?lociMyuOpaqueMaterialRecipe:lociMyuMaterialRecipe);
+    const standard=kind==='opacity'||kind==='chroma',blocked=['duplicate','target-title'].includes(kind), inactive=['invalid','zero','implicit'].includes(kind);
+    expect(choice.blocked).toBe(blocked);expect(report.recipe).toBe(inactive?lociMyuRecipe:standard?lociMyuStandardMaterialRecipe:kind==='source-double'?lociMyuOpaqueMaterialRecipe:lociMyuMaterialRecipe);
     expect(report.targetIdentity).toBeNull();expect(report.initialProof).toBeNull();
     if(inactive){expect(report).not.toHaveProperty('materialMappings');expect(report).not.toHaveProperty('materialEffects');}
-    else {expect(report.materialMappings).toEqual([]);expect(report.materialEffects).toEqual(blocked?null:{scenes:kind==='noop'?1:2,overrides:kind==='noop'||kind==='source-double'?2:4,sourceOnlyChromaRows:kind==='noop'?0:kind==='superseded'?1:2});}
+    else {expect(report.materialMappings).toEqual([]);expect(report.materialEffects).toEqual(blocked?null:{scenes:kind==='noop'?1:2,overrides:kind==='noop'||kind==='source-double'?2:4,sourceOnlyChromaRows:kind==='noop'?0:kind==='superseded'||kind==='chroma'?1:2});}
     if(blocked){await expect(choice.create()).rejects.toThrow();return;}
     const initial=await choice.create(), records=(await initial.source.inspectOriginal(metadata)).candidates.unambiguousRecords;
     const overrides=Object.values(records.materialOverridesById as Record<string,JsonObject>);
     expect(overrides).toHaveLength(inactive?0:kind==='noop'||kind==='source-double'?2:4);
-    for(const row of overrides){expect(row.appearance).not.toHaveProperty('chroma');expect(row.appearance).toMatchObject({opacity:1,doubleSided:expect.any(Boolean)});expect(row.compositing).toEqual({coverage:{policy:'inherit'},optics:'inherit'});}
+    for(const row of overrides){const a=row.appearance as JsonObject;if(kind==='chroma'&&a.doubleSided===false)expect(a.chroma).toMatchObject({enabled:true,tolerance:.25/Math.sqrt(3),softness:.5/Math.sqrt(3)});else expect(a).not.toHaveProperty('chroma');expect(a).toMatchObject({opacity:kind==='opacity'&&a.doubleSided===false?.5:1,doubleSided:expect.any(Boolean)});expect(row.compositing).toEqual({coverage:{policy:'inherit'},optics:'inherit'});}
     if(kind==='superseded'||kind==='noop')expect(overrides.every(r=>(r.appearance as JsonObject).lighting==='inherit')).toBe(true);
     if(kind==='normal')for(const field of ['chromaColor','chromaTolerance','chromaFeather'])expect(report.issues.some((i:any)=>i.field===field)).toBe(true);
     const rep=Object.values(records.representationsById as Record<string,JsonObject>)[0]!;expect(rep.formatProfile).toEqual(await validationGlbProfile());
@@ -1004,10 +1018,11 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       if (kind === 'ambiguous-png') entries.find(e => e.path === 'file_ids.csv')!.data = new TextEncoder().encode('fileId,filename\nimage1,a.png\nimage1,b.png\nimage2,b.png\n');
     });
     const preview = (await prepareLociMyuConversion(file, budget, decode))!, choice = await preview.evaluate(preview.selectedSourceIndex, kind === 'invalid-title' ? 'a\nb' : '確認');
-    expect(choice.blocked).toBe(kind !== 'ambiguous-png'); const report = JSON.parse(await choice.report().text());
+    const standard=kind==='unsupported-material-opacity'||kind==='unsupported-material-chroma';
+    expect(choice.blocked).toBe(kind !== 'ambiguous-png'&&!standard); const report = JSON.parse(await choice.report().text());
     expect(report.fingerprints).toHaveLength((await readZipEntries(new Uint8Array(await file.arrayBuffer()))).length);
     if (choice.blocked) { expect(report.issues.some((i: any) => i.severity === 'blocking')).toBe(true); await expect(choice.create()).rejects.toThrow(); }
-    else { const initial = await choice.create(); expect(Object.keys((await initial.source.inspectOriginal(metadata)).candidates.unambiguousRecords.captionAttachmentsById as JsonObject)).toHaveLength(0); }
+    else { const initial = await choice.create(),records=(await initial.source.inspectOriginal(metadata)).candidates.unambiguousRecords;if(standard){expect(report.recipe).toBe(lociMyuStandardMaterialRecipe);expect(report.materialNormalization.length).toBeGreaterThan(0);expect(Object.keys(records.materialOverridesById as JsonObject).length).toBeGreaterThan(0);}else expect(Object.keys(records.captionAttachmentsById as JsonObject)).toHaveLength(0); }
   });
   it('LociMyu conversion binds a coarse workbook choice and complete activation confirmation without changing Caption source identity', async () => {
     const preview = (await prepareLociMyuConversion(await lociMyuFile((_s, entries) => { entries.push({ path: 'backup.csv', data: new TextEncoder().encode(LOCIMYU_CAPTION_HEADER.join(',') + '\nc_csv,CSV記録,,,,,,,,\n') }); }, true), budget, decode))!;
@@ -1069,14 +1084,14 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     }), budget, decode))!;
     const choice = await preview.evaluate(0, '名前'); expect(choice.blocked).toBe(false); expect(JSON.parse(await choice.report().text()).issues.some((i: any) => i.field === 'material')).toBe(true);
   });
-  it.each([false,true,'opaque'] as const)('LociMyu conversion material=%s retains captured initialization/source/report through interrupted publication, cold recovery and completed retry', async material => {
-    const file = await lociMyuFile(material==='opaque'?opaqueLociMaterials:material?lociMyuMaterials:undefined), original = await file.arrayBuffer(), preview = (await prepareLociMyuConversion(file, budget, decode))!, initial = await (await preview.evaluate(0, '確認した名前')).create();
+  it.each([false,true,'opaque','standard'] as const)('LociMyu conversion material=%s retains captured initialization/source/report through interrupted publication, cold recovery and completed retry', async material => {
+    const file = await lociMyuFile(material==='standard'?standardLociMaterials:material==='opaque'?opaqueLociMaterials:material?lociMyuMaterials:undefined), original = await file.arrayBuffer(), preview = (await prepareLociMyuConversion(file, budget, decode))!, initial = await (await preview.evaluate(0, '確認した名前')).create();
     const fs = new TestFS(), storage = storageFactory(), store = new OriginBlobStore(fs, { maxBlobBytes: budget.maxFileBytes, maxChunkBytes: 1_000_000, maxChunks: 10000, metadata }, lockManager());
     const service = validationProjectService(fs, storage, store, budget, decode), projectId = initial.source.proof.identity.projectId as string;
     fs.reject = p => p.endsWith('/published.json'); await expect(initial.persist(fs, store, service.session)).rejects.toThrow('quota'); fs.reject = () => false;
     const path = (await fs.list('')).find(p => p.endsWith('/locimyu-conversion.json'))!, receiptBytes = (await fs.readBytes(path))!, receipt = readLociMyuTestReceipt(receiptBytes);
-    expect(receipt.recipe).toBe(material==='opaque'?lociMyuOpaqueMaterialRecipe:material?lociMyuMaterialRecipe:lociMyuRecipe); expect(receipt.report.sourceIdentities).toHaveLength(3);
-    if(material){expect(receipt.report.materialMappings).toHaveLength(4);expect(receipt.report.materialEffects).toEqual({scenes:2,overrides:4,sourceOnlyChromaRows:2});}
+    expect(receipt.recipe).toBe(material==='standard'?lociMyuStandardMaterialRecipe:material==='opaque'?lociMyuOpaqueMaterialRecipe:material?lociMyuMaterialRecipe:lociMyuRecipe); expect(receipt.report.sourceIdentities).toHaveLength(3);
+    if(material){expect(receipt.report.materialMappings).toHaveLength(4);expect(receipt.report.materialEffects).toEqual({scenes:2,overrides:4,sourceOnlyChromaRows:material==='standard'?0:2});}
     const cold = validationProjectService(fs, storage, store, budget, decode), ready = await resumeLociMyuConversion(fs, store, cold.session, budget, projectId, decode);
     expect(ready.source!.originalChanges()).toEqual(initial.source.originalChanges()); expect(await fs.readBytes(path)).toEqual(receiptBytes);
     const captionId = Object.keys(ready.provider!.kind === 'scene-provider' ? ready.provider!.resources.captions : {})[0]!;
@@ -1159,16 +1174,16 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const open=vi.fn<ValidationWorkspacePorts['open']>(async()=>{throw Error('must not open');});
     const ui=owned(createValidationWorkspace(new RecordedDocument().asDocument(),{fileLimits:budget,decode,selected(){},list:async()=>[],open,render:async()=>{throw Error('must not render');}}));
     const root=record(ui.root), all=(n:RecordedNode):RecordedNode[]=>[n,...n.children.flatMap(all)], named=(name:string)=>all(root).find(n=>n.attributes.get('aria-label')===name)!,button=(name:string)=>all(root).find(n=>n.tag==='button'&&n.textContent===name&&!n.hidden)!;
-    const file=await lociMyuFile((s,e)=>{lociMyuMaterials(s,e);if(blocked)s.find(t=>t.name==='__LM_MATERIALS')!.rows[2]![1]='0.5';}), exact=await file.arrayBuffer();
+    const file=await lociMyuFile((s,e)=>{lociMyuMaterials(s,e);if(blocked)s.push({...structuredClone(s.find(t=>t.name==='__LM_MATERIALS')!),name:'__LM_MATERIALS '});}), exact=await file.arrayBuffer();
     await vi.waitFor(()=>expect(button('ファイルを開く').disabled).toBe(false));Object.assign(named('ファイルを選択'),{files:[file]});named('ファイルを選択').parent!.parent!.fire('submit',{preventDefault(){}});
-    await vi.waitFor(()=>expect(all(root).some(n=>n.tag==='p'&&n.textContent.includes(blocked?'opacity':'材質の見え方：2シーン・4件'))).toBe(true));
+    await vi.waitFor(()=>expect(all(root).some(n=>n.tag==='p'&&n.textContent.includes(blocked?'材質表が重複':'材質の見え方：2シーン・4件'))).toBe(true));
     expect(button('新しいプロジェクトに変換').disabled).toBe(blocked);
     if(!blocked)expect(all(root).some(n=>n.textContent.includes('変換後の編集値には引き継ぎません'))).toBe(true);
     const download=vi.spyOn(URL,'createObjectURL').mockReturnValue('blob:material-report'),revoke=vi.spyOn(URL,'revokeObjectURL').mockImplementation(()=>{});
     try {button('変換の説明を保存').fire('click');const report=JSON.parse(await (download.mock.calls[0]![0] as Blob).text());
       expect(report.recipe).toBe(lociMyuMaterialRecipe);expect(report.materialMappings).toEqual([]);expect(report.targetIdentity).toBeNull();expect(report.initialProof).toBeNull();
       expect(report.materialEffects).toEqual(blocked?null:{scenes:2,overrides:4,sourceOnlyChromaRows:2});
-      if(blocked)expect(report.issues.some((i:any)=>i.sheet==='__LM_MATERIALS'&&i.row===3&&i.sourceId==='SourceMaterial'&&i.field==='opacity')).toBe(true);
+      if(blocked)expect(report.issues.some((i:any)=>i.sheet==='__LM_MATERIALS'&&i.row===2&&i.sourceId==='SourceMaterial'&&i.field==='material table')).toBe(true);
       button('キャンセル').fire('click');expect(button('ファイルを開く').disabled).toBe(false);expect(open).not.toHaveBeenCalled();expect(await file.arrayBuffer()).toEqual(exact);
     }finally{await ui.dispose();download.mockRestore();revoke.mockRestore();}
   });
@@ -1289,7 +1304,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect(Object.values(records.materialOverridesById as JsonObject)).toHaveLength(kind==='deleted'?0:4);
   });
   it.each(['unknown','historical-unknown','set-id','asset-id','empty-key','multiline-key','control-key','opacity-type','bool-type','alias','split-alias','chroma-null','chroma-missing-enable','chroma-unknown','chroma-color','chroma-number','active-opacity','active-chroma','dangling-set','deleted-model','duplicate-source','missing-key','name-fallback','shared','source-mask','source-blend','camera'] as const)(
-    'frozen v1 material refuses %s without creating or changing source',async kind=>{
+    'frozen v1 material validates supported and refused %s without changing source',async kind=>{
       const model=exactV1MaterialModel(j=>{
         if(kind==='shared')j.meshes[0].primitives[1].material=0;
         if(kind==='source-mask')j.materials[0].alphaMode='MASK';
@@ -1314,7 +1329,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
         if(kind==='missing-key')material.v.materialKey='m/missing/0';if(kind==='name-fallback')material.v.materialKey='Surfaces';
         if(kind==='camera')ops.find(o=>o.e==='view').v.cameraState={eye:[0,0,0],target:[1,0,0],up:[1,1e-13,0],fov:60,ortho:false};
       },png,model),raw=await file.arrayBuffer();
-      await expect(prepareFrozenV1Conversion(file,budget,decode)).rejects.toThrow();expect(await file.arrayBuffer()).toEqual(raw);
+      if(['active-opacity','active-chroma','source-mask','source-blend'].includes(kind)){const prepared=(await prepareFrozenV1Conversion(file,budget,decode))!,initial=await prepared.create();expect(JSON.parse(await prepared.report!().text()).recipe).toBe(frozenV1StandardMaterialRecipe);expect(prepared.summary.materialNotices!.length).toBeGreaterThan(0);expect(Object.keys((await initial.source.inspectOriginal(metadata)).candidates.unambiguousRecords.materialOverridesById as JsonObject)).toHaveLength(4);}else await expect(prepareFrozenV1Conversion(file,budget,decode)).rejects.toThrow();expect(await file.arrayBuffer()).toEqual(raw);
     });
   it('frozen v1 material admits one exact implicit base locator per selected scene',async()=>{
     const model=glb(j=>{j.nodes[0].name='Only';delete j.meshes[0].primitives[0].material;delete j.materials;});
@@ -1602,14 +1617,14 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       }), bytes = await file.arrayBuffer();
       await expect(prepareFrozenV1Conversion(file, budget, decode)).rejects.toThrow(); expect(await file.arrayBuffer()).toEqual(bytes);
     });
-  it.each([false, true, 'placement', 'material', 'opaque'] as const)('frozen v1 conversion explicit=%s retains exact source and mappings through interrupted publication, cold recovery and completed retry', async variant => {
-    const explicit = variant !== false, material = variant === 'material'||variant==='opaque', placement = variant === 'placement' || material;
-    const file = variant==='opaque'?await opaqueV1File():await frozenV1File(material ? exactV1Materials : placement ? placedV1Model : explicit ? explicitV1Default : undefined,png,material?exactV1MaterialModel():glb()), bytes = await file.arrayBuffer(), initial = await (await prepareFrozenV1Conversion(file, budget, decode))!.create();
+  it.each([false, true, 'placement', 'material', 'opaque','standard'] as const)('frozen v1 conversion explicit=%s retains exact source and mappings through interrupted publication, cold recovery and completed retry', async variant => {
+    const explicit = variant !== false, material = variant === 'material'||variant==='opaque'||variant==='standard', placement = variant === 'placement' || material;
+    const file = variant==='standard'?await standardV1File():variant==='opaque'?await opaqueV1File():await frozenV1File(material ? exactV1Materials : placement ? placedV1Model : explicit ? explicitV1Default : undefined,png,material?exactV1MaterialModel():glb()), bytes = await file.arrayBuffer(), initial = await (await prepareFrozenV1Conversion(file, budget, decode))!.create();
     const fs = new TestFS(), locks = lockManager(), storage = storageFactory(), store = new OriginBlobStore(fs, { maxBlobBytes: budget.maxFileBytes, maxChunkBytes: 1_000_000, maxChunks: 10000, metadata }, locks);
     const service = validationProjectService(fs, storage, store, budget, decode), projectId = initial.source.proof.identity.projectId as string;
     fs.reject = p => p.endsWith('/published.json'); await expect(initial.persist(fs, store, service.session)).rejects.toThrow('quota'); fs.reject = () => false;
     const path = (await fs.list('')).find(p => p.endsWith('/frozen-v1-conversion.json'))!, receiptBytes = (await fs.readBytes(path))!, receipt = JSON.parse(new TextDecoder().decode(receiptBytes));
-    expect(receipt.recipe).toBe(variant==='opaque'?frozenV1OpaqueMaterialRecipe:material ? frozenV1MaterialRecipe : placement ? frozenV1PlacementRecipe : explicit ? frozenV1DefaultViewRecipe : frozenV1Recipe);
+    expect(receipt.recipe).toBe(variant==='standard'?frozenV1StandardMaterialRecipe:variant==='opaque'?frozenV1OpaqueMaterialRecipe:material ? frozenV1MaterialRecipe : placement ? frozenV1PlacementRecipe : explicit ? frozenV1DefaultViewRecipe : frozenV1Recipe);
     const cold = validationProjectService(fs, storage, store, budget, decode), ready = await resumeFrozenV1Conversion(fs, store, cold.session, budget, projectId, decode);
     expect(ready.source!.originalChanges()).toEqual(initial.source.originalChanges()); expect(await fs.readBytes(path)).toEqual(receiptBytes);
     const p = ready.provider!; if (p.kind !== 'scene-provider') throw Error('provider'); const captionId = Object.keys(p.resources.captions)[0]!;
@@ -1786,7 +1801,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     }
     expect((await cold.session.read()).source!.token).toBe(edited.source!.token); expect(await file.arrayBuffer()).toEqual(input);
   });
-  it.each(['opacity', 'chroma', 'slot', 'family', 'source-alpha'] as const)('Native appearance conversion refuses the whole unsupported %s input', async kind => {
+  it.each(['opacity', 'chroma', 'slot', 'family', 'source-alpha'] as const)('Native appearance conversion validates the whole scoped %s input', async kind => {
     const bytes = glb(j => { if (kind === 'source-alpha') j.materials[0].alphaMode = 'BLEND'; });
     const file = await nativeAppearanceFile(s => {
       const a = s.meshMaterialAppearances[1];
@@ -1796,7 +1811,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       if (kind === 'family') { const r = s.representations.find((r: any) => r.id === a.representationId), id = `rep_${'3'.padStart(26, '0')}`;
         s.representations.push({ ...r, id }); s.assetRevisions.find((r: any) => r.id === a.authoredAssetRevisionId).representationIds.push(id); }
     }, bytes), before = await file.arrayBuffer();
-    await expect(prepareNativeConversion(file, budget, decode)).rejects.toThrow(); expect(await file.arrayBuffer()).toEqual(before);
+    if(['opacity','chroma','source-alpha'].includes(kind)){const prepared=(await prepareNativeConversion(file,budget,decode))!,initial=await prepared.create();expect(prepared.summary.materialNotices!.length).toBeGreaterThan(0);const r=firstWorkspaceRecipient();await initial.persist(r.fs,r.store,r.session);expect((await readReceipt<any>(r.fs,'v2/metadata/native-conversion.json',metadata)).recipe).toBe(nativeStandardMaterialRecipe);}else await expect(prepareNativeConversion(file, budget, decode)).rejects.toThrow(); expect(await file.arrayBuffer()).toEqual(before);
   });
   it('Native conversion fixes the four approved scoped identity vectors', async () => {
     const ids = nativeConversionIds('0'.repeat(32), '1'.repeat(64));
@@ -1849,6 +1864,61 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     for(const g of goldens.vectors){const ids=g.recipe===nativeOpaqueMaterialRecipe?nativeConversionIds(g.conversionId,g.sourceZipSha256,nativeOpaqueMaterialRecipe):g.recipe===frozenV1OpaqueMaterialRecipe?frozenV1ConversionIds(g.conversionId,g.sourceZipSha256,frozenV1OpaqueMaterialRecipe):lociMyuConversionIds(g.conversionId,g.sourceZipSha256,g.workbookPath,lociMyuOpaqueMaterialRecipe);
       expect(await ids.id(g.prefix,g.sourceKey)).toBe(g.id);expect(ids.report()).toContainEqual({id:g.id,preimage:g.preimage,sha256:g.sha256});expect(new TextEncoder().encode(g.preimage)).toHaveLength(g.utf8Bytes);}
   });
+  it.each(['native','v1','locimyu']as const)('07n %s preview, cancel and reselect explain actual targets without Project, DB, CAS or journal writes',async family=>{
+    const fs=new TestFS(),locks=lockManager(),store=new OriginBlobStore(fs,{maxBlobBytes:budget.maxFileBytes,maxChunkBytes:1_000_000,maxChunks:10000,metadata},locks),factory=storageFactory(),save=vi.fn();
+    const openStorage=vi.fn(async()=>({factory:()=>({...factory(),save}),dispose:async()=>{}}));
+    const open=vi.fn<ValidationWorkspacePorts['open']>(async(run,initial)=>openValidationHost({run,initial,base:fs,coordinator:ProjectMutationCoordinator.browser(locks),store,fileLimits:budget,decode,packageLocks:locks,openStorage}));
+    const writes=[vi.spyOn(MemoryFS.prototype,'writeText'),vi.spyOn(MemoryFS.prototype,'writeBytes'),vi.spyOn(MemoryFS.prototype,'writeStream'),vi.spyOn(OriginBlobStore.prototype,'put'),vi.spyOn(TransactionJournal.prototype,'begin')];
+    const ui=owned(createValidationWorkspace(new RecordedDocument().asDocument(),{fileLimits:budget,decode,selected(){},list:async()=>[],open,render:async()=>{throw Error('preview only');}}));
+    const root=record(ui.root),all=(n:RecordedNode):RecordedNode[]=>[n,...n.children.flatMap(all)],button=(name:string)=>all(root).find(n=>n.tag==='button'&&n.textContent===name&&!n.hidden)!,input=all(root).find(n=>n.attributes.get('aria-label')==='ファイルを選択')!;
+    const raw=family==='native'?await standardNativeFile('plain'):family==='v1'?await standardV1File():await lociMyuFile(standardLociMaterials),file=new File([await raw.arrayBuffer()],`${family}.zip`),original=await file.arrayBuffer();
+    try{
+      await vi.waitFor(()=>expect(button('ファイルを開く').disabled).toBe(false));
+      for(let pass=0;pass<2;pass++){
+        Object.assign(input,{files:[file]});input.parent!.parent!.fire('submit',{preventDefault(){}});
+        await vi.waitFor(()=>expect(button('新しいプロジェクトに変換')?.disabled).toBe(false));
+        const notice=all(root).find(n=>n.attributes.get('aria-label')==='材質の変換による変更'&&!n.hidden)!;expect(notice).toBeTruthy();
+        const targets=all(notice).filter(n=>n.tag==='li').map(n=>n.textContent);expect(targets.length).toBeGreaterThan(0);expect(targets.some(t=>t.includes('観察 /'))).toBe(true);expect(targets.some(t=>t.includes('非表示になります'))).toBe(true);
+        button('キャンセル').fire('click');expect(notice.hidden).toBe(true);expect(button('ファイルを開く').disabled).toBe(false);
+      }
+      expect(open).not.toHaveBeenCalled();expect(openStorage).not.toHaveBeenCalled();expect(save).not.toHaveBeenCalled();for(const spy of writes)expect(spy).not.toHaveBeenCalled();expect(await fs.list('')).toEqual([]);expect(await file.arrayBuffer()).toEqual(original);
+    }finally{await ui.dispose();for(const spy of writes)spy.mockRestore();}
+  });
+  it.each(['native','v1','locimyu']as const)('07n %s explains every unaddressed source BLEND Scene without switching the old recipe',async family=>{
+    const change=(j:any)=>{j.materials[0].alphaMode='BLEND';};
+    const file=family==='native'?await nativeAppearanceFile(s=>{delete s.meshMaterialAppearances;},glb(change)):family==='v1'?await frozenV1File(undefined,png,glb(change)):await lociMyuFile((_s,e)=>{const body=e.find(b=>b.path==='models/model.glb')!,p=validationGlbParts(body.data,budget),j=structuredClone(p.json);change(j);body.data=serializeGlb(j,p.bin);});
+    const prepared=family==='native'?(await prepareNativeConversion(file,budget,decode))!:family==='v1'?(await prepareFrozenV1Conversion(file,budget,decode))!:await(await prepareLociMyuConversion(file,budget,decode))!.evaluate(0,'元材質の説明');
+    const notices=prepared.summary.materialNotices as readonly {scene:string;reasons:readonly string[]}[];expect(notices.length).toBeGreaterThan(0);expect(notices.every(n=>n.reasons.includes('smooth-display')&&n.scene!=='個別設定がないシーン')).toBe(true);expect(new Set(notices.map(n=>n.scene)).size).toBe(prepared.summary.scenes);
+    const initial=await prepared.create(),r=firstWorkspaceRecipient();await initial.persist(r.fs,r.store,r.session);
+    const recipe=family==='native'?(await readReceipt<any>(r.fs,'v2/metadata/native-conversion.json',metadata)).recipe:family==='v1'?(await readReceipt<any>(r.fs,'v2/metadata/frozen-v1-conversion.json',metadata)).recipe:JSON.parse(await('report'in prepared&&prepared.report?prepared.report().text():Promise.reject(Error('report')))).recipe;
+    expect(recipe).toBe(family==='native'?nativeConversionRecipe:family==='v1'?frozenV1Recipe:lociMyuRecipe);
+  });
+  it('07n fixes new identity vectors while leaving all earlier goldens intact',async()=>{
+    const goldens=JSON.parse(readFileSync('docs/specs/profiles/standard-alpha-chroma-conversion.goldens.json','utf8'));
+    for(const g of goldens.vectors){const ids=g.recipe===nativeStandardMaterialRecipe?nativeConversionIds(g.conversionId,g.sourceZipSha256,nativeStandardMaterialRecipe):g.recipe===frozenV1StandardMaterialRecipe?frozenV1ConversionIds(g.conversionId,g.sourceZipSha256,frozenV1StandardMaterialRecipe):lociMyuConversionIds(g.conversionId,g.sourceZipSha256,g.workbookPath,lociMyuStandardMaterialRecipe);
+      expect(await ids.id(g.prefix,g.sourceKey)).toBe(g.id);const actual=ids.report().find(e=>e.id===g.id)!;expect(actual.preimage).toBe(g.preimage);expect(actual.sha256).toBe(g.sha256);expect(new TextEncoder().encode(actual.preimage)).toHaveLength(g.utf8Bytes);}
+  });
+  it.each(['plain','spatial','mesh']as const)('07n Native10 %s normalizes active alpha/chroma with explained source and exact cold recovery',async lane=>{
+    const file=await standardNativeFile(lane),original=await file.arrayBuffer(),prepared=(await prepareNativeConversion(file,budget,decode))!;
+    expect(prepared.summary.materialNotices?.some(n=>n.reasons.includes('alpha-order'))).toBe(true);expect(prepared.summary.materialNotices?.some(n=>n.reasons.includes('smooth-display'))).toBe(true);
+    const initial=await prepared.create(),r=firstWorkspaceRecipient();nativeBlobViews(r.fs);const ready=await initial.persist(r.fs,r.store,r.session);expect(ready.state).toBe('ready');
+    const receipt=await readReceipt<any>(r.fs,'v2/metadata/native-conversion.json',metadata);expect(receipt.recipe).toBe(nativeStandardMaterialRecipe);expect(Object.hasOwn(receipt,'originalRef')).toBe(lane!=='plain');expect(Object.hasOwn(receipt.report,'materialNotices')).toBe(false);
+    const records=(await initial.source.inspectOriginal(metadata)).candidates.unambiguousRecords,overrides=Object.values(records.materialOverridesById as Record<string,any>);expect(overrides.some(o=>o.appearance.opacity===.5&&o.appearance.chroma.softness===0)).toBe(true);expect(overrides.every(o=>o.compositing.coverage.policy==='inherit')).toBe(true);
+    const cold=r.reopen();expect((await resumeNativeConversion(r.fs,r.store,cold.session,budget,initial.source.proof.identity.projectId as string,decode)).state).toBe('ready');expect(await file.arrayBuffer()).toEqual(original);
+  },30000);
+  it('07n v1-8 normalizes saved/default alpha and active Basic chroma with accurate source-only explanation',async()=>{
+    const file=await standardV1File(),original=await file.arrayBuffer(),prepared=(await prepareFrozenV1Conversion(file,budget,decode))!,initial=await prepared.create(),report=JSON.parse(await prepared.report!().text());
+    expect(report.recipe).toBe(frozenV1StandardMaterialRecipe);expect(report.materialEffects.sourceOnlyChromaRows).toBe(2);expect(report.sourceOnlyMaterialValues.some((v:any)=>v.sourceMaterialId.endsWith('2')&&v.field==='chroma.tol')).toBe(true);expect(report.materialNormalization.some((n:any)=>n.reasons.includes('basic-chroma'))).toBe(true);
+    const records=(await initial.source.inspectOriginal(metadata)).candidates.unambiguousRecords,overrides=Object.values(records.materialOverridesById as Record<string,any>),hard=overrides.find(o=>o.appearance.chroma?.keyColorSrgb.every((n:number)=>n===0))!;
+    expect(hard.appearance.chroma.tolerance).toBeCloseTo(.1/Math.sqrt(3));expect(hard.appearance.chroma.softness).toBe(0);expect(overrides.some(o=>o.appearance.opacity===.5&&!Object.hasOwn(o.appearance,'doubleSided'))).toBe(true);
+    const r=firstWorkspaceRecipient();expect((await initial.persist(r.fs,r.store,r.session)).state).toBe('ready');const cold=r.reopen();expect((await resumeFrozenV1Conversion(r.fs,r.store,cold.session,budget,initial.source.proof.identity.projectId as string,decode)).state).toBe('ready');expect(await file.arrayBuffer()).toEqual(original);
+  });
+  it('07n LociMyu6 maps blank chroma defaults and effective target rows through exact recovery',async()=>{
+    const file=await lociMyuFile(standardLociMaterials),original=await file.arrayBuffer(),preview=(await prepareLociMyuConversion(file,budget,decode))!,choice=await preview.evaluate(0,'標準材質への変換');expect(choice.blocked).toBe(false);expect(Array.isArray(choice.summary.materialNotices)).toBe(true);
+    const initial=await choice.create(),records=(await initial.source.inspectOriginal(metadata)).candidates.unambiguousRecords,overrides=Object.values(records.materialOverridesById as Record<string,any>),hard=overrides.filter(o=>o.appearance.opacity===.5);expect(hard).toHaveLength(2);expect(hard.every(o=>o.appearance.chroma.softness===0&&o.appearance.chroma.tolerance===.1/Math.sqrt(3))).toBe(true);
+    const report=JSON.parse(await choice.report().text());expect(report.recipe).toBe(lociMyuStandardMaterialRecipe);expect(report.materialEffects.sourceOnlyChromaRows).toBe(0);expect(report.materialNormalization.some((n:any)=>n.reasons.includes('smooth-display'))).toBe(true);
+    const r=firstWorkspaceRecipient();expect((await initial.persist(r.fs,r.store,r.session)).state).toBe('ready');const cold=r.reopen();expect((await resumeLociMyuConversion(r.fs,r.store,cold.session,budget,initial.source.proof.identity.projectId as string,decode)).state).toBe('ready');expect(await file.arrayBuffer()).toEqual(original);
+  });
   it.each(['plain','spatial','mesh'] as const)('07m Native9 %s keeps the source-derived receipt lane and exact cold continuation',async lane=>{
     const file=await nativeOpaqueFile(lane),initial=await(await prepareNativeConversion(file,budget,decode))!.create(),r=firstWorkspaceRecipient();nativeBlobViews(r.fs);
     const service=validationProjectService(r.fs,r.factory,r.store,budget,decode),ready=await initial.persist(r.fs,r.store,service.session);expect(ready.state).toBe('ready');
@@ -1883,8 +1953,8 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const initial=await(await prepareNativeConversion(await nativeAppearanceFile(()=>{},model),budget,decode))!.create(),r=firstWorkspaceRecipient();await initial.persist(r.fs,r.store,r.session);
     const receipt=await readReceipt<any>(r.fs,'v2/metadata/native-conversion.json',metadata);expect(receipt.recipe).toBe(nativeAppearanceRecipe);expect((await resumeNativeConversion(r.fs,r.store,r.reopen().session,budget,receipt.projectId,decode)).source!.originalChanges()).toEqual(initial.source.originalChanges());
   });
-  it('07m plain Native9 resumes interrupted publication from retained raw source and refuses raw loss after acknowledgement',async()=>{
-    const file=await nativeOpaqueFile('plain'),initial=await(await prepareNativeConversion(file,budget,decode))!.create(),r=firstWorkspaceRecipient();
+  it.each([false,true])('07m/07n plain Native material standard=%s resumes interrupted publication from retained raw source and refuses raw loss after acknowledgement',async standard=>{
+    const file=standard?await standardNativeFile('plain'):await nativeOpaqueFile('plain'),initial=await(await prepareNativeConversion(file,budget,decode))!.create(),r=firstWorkspaceRecipient();
     r.fs.reject=p=>p.endsWith('/published.json');await expect(initial.persist(r.fs,r.store,r.session)).rejects.toThrow('quota');r.fs.reject=()=>false;
     const path='v2/metadata/native-conversion.json',initialPath='v2/metadata/validation-initial.am',receipt=await r.fs.readBytes(path),bytes=await r.fs.readBytes(initialPath),cold=r.reopen().session,id=initial.source.proof.identity.projectId as string;
     const read=r.fs.readStream.bind(r.fs);let originalReads=0;
@@ -1894,16 +1964,17 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect((await resumeNativeConversion(r.fs,r.store,cold,budget,id,decode)).source!.token).toBe(edited.source!.token);
     await r.fs.remove('v2/metadata/native-conversion-source.zip');const paths=await r.fs.list(''),saved=await Promise.all(paths.map(p=>r.fs.readBytes(p)));await expect(resumeNativeConversion(r.fs,r.store,cold,budget,id,decode,undefined,undefined,file)).rejects.toThrow('記録が不足');expect((await cold.read()).source!.token).toBe(edited.source!.token);expect(await r.fs.list('')).toEqual(paths);expect(await Promise.all(paths.map(p=>r.fs.readBytes(p)))).toEqual(saved);
   });
-  it('07m refuses expanded opaque sources rebound into a fully consistent old Native2 domain before writes',async()=>{
-    const file=await nativeOpaqueFile('plain'),initial=await(await prepareNativeConversion(file,budget,decode))!.create(),r=firstWorkspaceRecipient();nativeBlobViews(r.fs);
-    await initial.persist(r.fs,r.store,r.session);const receipt=await readReceipt<any>(r.fs,'v2/metadata/native-conversion.json',metadata),old=nativeConversionIds(receipt.conversionId,receipt.original.digest,nativeAppearanceRecipe),ids=new Map<string,string>();
+  it.each([false,true])('07m/07n refuses material standard=%s sources rebound into a fully consistent old Native domain before writes',async standard=>{
+    const file=standard?await standardNativeFile('plain'):await nativeOpaqueFile('plain'),initial=await(await prepareNativeConversion(file,budget,decode))!.create(),r=firstWorkspaceRecipient();nativeBlobViews(r.fs);
+    const oldRecipe=standard?nativeOpaqueMaterialRecipe:nativeAppearanceRecipe;
+    await initial.persist(r.fs,r.store,r.session);const receipt=await readReceipt<any>(r.fs,'v2/metadata/native-conversion.json',metadata),old=nativeConversionIds(receipt.conversionId,receipt.original.digest,oldRecipe),ids=new Map<string,string>();
     for(const row of receipt.mapping){const tuple=JSON.parse(row.preimage.slice(row.preimage.indexOf('\n')+1));ids.set(row.id,await old.id(tuple[2],tuple[3]));}
     const rekey=(value:any):any=>typeof value==='string'?ids.get(value)??value:Array.isArray(value)?value.map(rekey):value&&typeof value==='object'?Object.fromEntries(Object.entries(value).map(([key,v])=>[ids.get(key)??key,rekey(v)])):value;
     const records=rekey((await initial.source.inspectOriginal(metadata)).candidates.unambiguousRecords);
     for(const [map,kind]of[['representationsById','representation'],['assetRevisionsById','asset-revision'],['assetBindingsById','asset-binding-revision']] as const)for(const [id,value]of Object.entries(records[map])){const row={...(value as JsonObject)};delete row.payloadDigest;records[map][id]=await sealValidationRecord(kind,row);}
     const source=ProjectMetadataSource.bootstrap(records.schema,records.identity,metadata,{semanticProfile:'map2'}).initialize(records),bytes=source.encodeFullSource();
-    const forged={...receipt,recipe:nativeAppearanceRecipe,mapping:old.report(),materialWitness:rekey(receipt.materialWitness),initial:{byteLength:bytes.length,digest:await digest(bytes),proof:source.proof}},target=firstWorkspaceRecipient();
-    await underWriteLease(target.fs,async()=>{await writeValidationInitial(target.fs,source);await target.fs.writeBytes('v2/metadata/native-conversion.json',new TextEncoder().encode(json(forged)));await target.fs.writeBytes('v2/metadata/native-conversion-source.zip',new Uint8Array(await file.arrayBuffer()));});
+    const forged={...receipt,recipe:oldRecipe,mapping:old.report(),materialWitness:rekey(receipt.materialWitness),initial:{byteLength:bytes.length,digest:await digest(bytes),proof:source.proof}},target=firstWorkspaceRecipient();
+    await underWriteLease(target.fs,async()=>{await writeValidationInitial(target.fs,source,standard?nativeOpaqueMaterialRecipe:undefined);await target.fs.writeBytes('v2/metadata/native-conversion.json',new TextEncoder().encode(json(forged)));await target.fs.writeBytes('v2/metadata/native-conversion-source.zip',new Uint8Array(await file.arrayBuffer()));});
     const paths=await target.fs.list(''),saved=await Promise.all(paths.map(p=>target.fs.readBytes(p)));
     await expect(resumeNativeConversion(target.fs,target.store,target.session,budget,receipt.projectId,decode)).rejects.toThrow('変換の版と元の材質');
     expect((await target.session.read()).state).toBe('empty');expect(await target.fs.list('')).toEqual(paths);expect(await Promise.all(paths.map(p=>target.fs.readBytes(p)))).toEqual(saved);
@@ -2046,7 +2117,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const world=new THREE.Vector3(-1,0,0);resident.interaction!.traverse(node=>{if(node instanceof THREE.Mesh)world.applyMatrix4(node.matrixWorld);});
     expect(world.toArray()).toEqual([16,20,30]);resident.dispose?.();cache.dispose();
   });
-  it.each([['Native07k',nativeSpatialFile],['Native07l',nativeMeshFile],['07m-spatial',()=>nativeOpaqueFile('spatial')],['07m-mesh',()=>nativeOpaqueFile('mesh')]] as const)('%s reselects only the exact original before initialization and preserves fixed IDs and initial bytes',async(_name,fixture)=>{
+  it.each([['Native07k',nativeSpatialFile],['Native07l',nativeMeshFile],['07m-spatial',()=>nativeOpaqueFile('spatial')],['07m-mesh',()=>nativeOpaqueFile('mesh')],['07n-spatial',()=>standardNativeFile('spatial')],['07n-mesh',()=>standardNativeFile('mesh')]] as const)('%s reselects only the exact original before initialization and preserves fixed IDs and initial bytes',async(_name,fixture)=>{
     const file=await fixture(),initial=await(await prepareNativeConversion(file,budget,decode))!.create(),r=firstWorkspaceRecipient();nativeBlobViews(r.fs);
     const service=validationProjectService(r.fs,r.factory,r.store,budget,decode);r.fs.reject=p=>p.startsWith('v2/cas/objects/');
     await expect(initial.persist(r.fs,r.store,service.session)).rejects.toThrow('quota');r.fs.reject=()=>false;
@@ -2337,8 +2408,8 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const receiver = new WorkspaceReceiver(f.fs, f.fs, f.receiver.session, metadata, f.locks);
     return { ...f, source, file, receiverService: receiver, reopen, capture, senderStore };
   }
-  async function exerciseOpaqueFileReturns(workspace:Blob){
-    const a=firstWorkspaceRecipient(),b=firstWorkspaceRecipient();await a.receiver.importWorkspace(workspace);await b.receiver.importWorkspace(workspace);
+  async function exerciseOpaqueFileReturns(workspace:Blob,existingOrigin?:ReturnType<typeof firstWorkspaceRecipient>){
+    const a=existingOrigin??firstWorkspaceRecipient(),b=firstWorkspaceRecipient();if(!existingOrigin)await a.receiver.importWorkspace(workspace);await b.receiver.importWorkspace(workspace);
     const senderA=new WorkspaceSender(a.fs,a.session,a.store,metadata,a.locks),senderB=new WorkspaceSender(b.fs,b.session,b.store,metadata,b.locks);
     const first=await a.session.read();if(first.provider?.kind!=='scene-provider')throw Error('provider');const caption=Object.keys(first.provider.resources.captions)[0]!,originalMaterials=first.provider.inspection.candidates.unambiguousRecords.materialOverridesById;
     for(let round=1;round<=2;round++){
@@ -4211,7 +4282,58 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       for (const record of restored.authority.read().mediaChoices!) expect(await restored.content.image(record as unknown as JsonObject, true)).toEqual(photo);
     } finally { await h?.ui.dispose(); vi.unstubAllGlobals(); }
   });
+  it.each(['v1','locimyu']as const)('07n %s standard material product editing/reset, five-purpose returns and selected restore/cold retain semantic intent',async family=>{
+    // Node bitmap dimensions only. Actual texture pixels/coverage are a separate Chromium lane.
+    vi.stubGlobal('self',{URL});vi.stubGlobal('createImageBitmap',async(blob:Blob)=>{const data=await blob.arrayBuffer(),view=new DataView(data);return{width:view.getUint32(16),height:view.getUint32(20),close(){}};});
+    try{
+    const file=family==='v1'?await standardV1File():await lociMyuFile(standardLociMaterials),original=await file.arrayBuffer();
+    const prepared=family==='v1'?(await prepareFrozenV1Conversion(file,budget,decode))!:await(await prepareLociMyuConversion(file,budget,decode))!.evaluate(0,'標準材質の検証'),initial=await prepared.create();
+    const h=await productWorkspaceFixture(false,false,false,'map2',initial,{restoreGenerations:true}),{host,editor,button,named,edited}=h;
+    const records=(await initial.source.inspectOriginal(metadata)).candidates.unambiguousRecords,alpha=Object.values(records.materialOverridesById as Record<string,any>).find(o=>o.appearance.opacity===.5)!,selectedScene=(records.scenesById as Record<string,any>)[alpha.routing.scope.sceneId];button(selectedScene.name,named('シーン',editor)).fire('click');
+    await vi.waitFor(()=>expect(h.display()!.sceneId).toBe(selectedScene.id));
+    const sceneId=h.display()!.sceneId,version=host.authority.read().modelVersions![0]!,closure=version.closure;if(closure.shape!=='saved-glb')throw Error('model');
+    expect(closure.representation.formatProfile).toEqual(await validationGlbProfile());
+    const checkDisplay=async(project:Parameters<typeof syntheticDisplay>[0],content:ValidationContent,mixed:boolean)=>{
+      const display=syntheticDisplay(project,sceneId,null,null),cache=await prepareValidationResidents(project.modelVersions!,content),surface=cache.create(closure,display.savedMaterials![version.assetId]!);
+      const list:THREE.Material[]=[];surface.mesh.traverse(n=>{if(n instanceof THREE.Mesh)list.push(...(Array.isArray(n.material)?n.material:[n.material]));});
+      const hidden=mixed?(family==='v1'?1:2):(family==='v1'?2:4);
+      expect(list).toHaveLength(family==='v1'?3:4);expect(surface.materialNotices!.length).toBeGreaterThan(0);expect(list.filter(m=>!m.visible)).toHaveLength(hidden);expect(list.filter(m=>m.visible)).toHaveLength(list.length-hidden);expect(surface.asset.visible).toBe(true);surface.dispose!();cache.dispose();
+    };
+    await checkDisplay(host.authority.read(),host.content,false);
+    button('材質',editor).fire('click');const panel=named('材質の作業',editor),model=named('モデル',panel);model.value=version.assetId;model.fire('change');
+    const face=named('面',panel);face.value=face.children.find(n=>n.textContent==='材質 1')!.value;face.fire('change');expect(panel.children.some(n=>n.textContent.includes('滑らかな透過表示'))||panel.children.flatMap(n=>n.children).some(n=>n.textContent.includes('滑らかな透過表示'))).toBe(true);
+    button('設定を編集',panel).fire('click');named('透過の表示方法',panel).value='smoothBlend';named('透過の表示方法',panel).fire('change');await edited(()=>button('変更を適用',panel).fire('click'));
+    const mask=async()=>{button('設定を編集',panel).fire('click');named('透過の表示方法',panel).value='mask';named('透過の表示方法',panel).fire('change');named('切り抜きのしきい値',panel).value='0.2';named('切り抜きのしきい値',panel).fire('input');named('不透明度（%）',panel).value='40';named('不透明度（%）',panel).fire('input');await edited(()=>button('変更を適用',panel).fire('click'));};
+    await mask();await checkDisplay(host.authority.read(),host.content,true);
+    button('この範囲の設定を解除',panel).fire('click');await edited(()=>button('設定を解除する',panel).fire('click'));await checkDisplay(host.authority.read(),host.content,true);await mask();
+    const output=named('ファイル'),label=named('名前（任意）',output);label.value='材質変更後';label.fire('input');button('ファイルに保存',output).fire('click');await vi.waitFor(()=>expect(h.downloads).toHaveBeenCalledOnce(),{timeout:10000});
+    const source=host.read().source!,backup=await host.workspaceOutput.download(host.workspaceOutput.jobs.find(j=>j.purpose==='backup')!.id),workspace=await host.workspaceOutput.download(await host.workspaceOutput.generate(source.token));
+    await exerciseOpaqueFileReturns(workspace);
+    const review=await prepareReviewView(await host.workspaceOutput.download(await host.workspaceOutput.generateReview(source.token,{sceneId})),budget,decode);
+    expect(Object.values(review.display(null,null).savedMaterials![review.models[0]!.assetId]!).some(e=>!('issue'in e)&&e.compositing.coverage.policy==='mask')).toBe(true);
+    for(const archive of [(await BackupArchive.inspect(backup,metadata)).archive,(await WorkspaceArchive.inspect(workspace,metadata)).archive,review.inspection.archive])expect(archive.control.entries.some(e=>/conversion|source\.zip|^ops\//.test(e.path))).toBe(false);
+    await h.ui.dispose();const cold=owned(await openValidationHost(h.f.options));expect(cold.read().source!.originalChanges()).toEqual(source.originalChanges());const caption=Object.keys(cold.authority.read().resources.captions)[0]!;
+    await cold.dispatch(cold.read().source!.token,{kind:'editCaption',captionId:caption,edits:{body:'復元前の作業'}});await cold.backupRestore.prepare(backup);let checked=false;
+    await cold.backupRestore.confirm(async(next,content)=>{await checkDisplay(next,content,true);checked=true;});expect(checked).toBe(true);cold.backupRestore.displayReady(cold.read().source!.token);expect(cold.read().source!.originalChanges()).toEqual(source.originalChanges());
+    await cold.dispatch(cold.read().source!.token,{kind:'editCaption',captionId:caption,edits:{body:'復元後の追記'}});const final=cold.read().source!.originalChanges();await cold.dispose();const reopened=owned(await openValidationHost(h.f.options));expect(reopened.read().source!.originalChanges()).toEqual(final);expect(reopened.authority.read().resources.captions[caption]!.body).toEqual({kind:'value',value:'復元後の追記'});expect(await file.arrayBuffer()).toEqual(original);await reopened.dispose();
+    }finally{vi.unstubAllGlobals();}
+  },60000);
+  it.each(['v1','locimyu']as const)('07m %s opaque materials survive independent typed editing, two returns, Clean and cold',async family=>{
+    meshNodeResources();try{
+      const initial=family==='v1'?await(await prepareFrozenV1Conversion(await opaqueV1File(true),budget,decode))!.create():await(await(await prepareLociMyuConversion(await lociMyuFile(opaqueLociMaterials),budget,decode))!.evaluate(0,'不透明材質の受け渡し')).create();
+      const r=firstWorkspaceRecipient();await initial.persist(r.fs,r.store,r.session);let read=await r.session.read();if(read.provider?.kind!=='scene-provider')throw Error('provider');
+      const scene=read.provider.state.defaultSceneId;if(scene.kind!=='value')throw Error('scene');
+      const records=(await initial.source.inspectOriginal(metadata)).candidates.unambiguousRecords,rows=Object.values(records.materialOverridesById as Record<string,any>).filter(o=>o.routing.scope.sceneId===scene.value);
+      expect(rows).toHaveLength(2);
+      if(family==='v1'){expect(Object.keys(records.materialOverridesById as JsonObject)).toHaveLength(4);expect(Object.keys(records.scenesById as JsonObject)).toHaveLength(2);expect(Object.keys(records.captionsById as JsonObject)).toHaveLength(1);expect(Object.keys(records.mediaResourcesById as JsonObject)).toHaveLength(0);}
+      const sourceIndex=(row:any)=>{const rep=Object.values(records.representationsById as Record<string,any>).find(r=>r.materialCatalog?.layoutId===row.routing.target.materialLayoutId)!;return rep.materialCatalog.slots.find((s:any)=>s.logicalMaterialSlotId===row.routing.target.logicalMaterialSlotId).sourceLocator.materialIndex as number;};rows.sort((a,b)=>sourceIndex(a)-sourceIndex(b));
+      for(const [i,row]of rows.entries())read=await r.session.edit(read.source!.token,{kind:'editMaterial',sceneId:scene.value,overrideId:row.id,appearance:{...row.appearance,lighting:i===0?'lit':'unlit',doubleSided:i!==0}});
+      const sender=new WorkspaceSender(r.fs,r.session,r.store,metadata,r.locks),workspace=await sender.download(await sender.generate(read.source!.token));
+      await exerciseOpaqueFileReturns(workspace,r);
+    }finally{vi.unstubAllGlobals();}
+  });
   it.each([false,true,'opaque'] as const)('LociMyu conversion material=%s connects product editing/first placement, named backup, independent Workspace/review, cold report and exact reopen', async material => {
+    if(material)meshNodeResources();try{
     const file = await lociMyuFile(material==='opaque'?opaqueLociMaterials:material?lociMyuMaterials:undefined), input = await file.arrayBuffer(), initial = await (await (await prepareLociMyuConversion(file, budget, decode))!.evaluate(0, 'LociMyuからの記録')).create();
     const h = await productWorkspaceFixture(false, false, false, 'map2', initial,{restoreGenerations:!!material}), { host, editor, button, named, edited } = h;
     const provider = host.read().provider!; if (provider.kind !== 'scene-provider') throw Error('provider');
@@ -4265,7 +4387,6 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     if(material){const read=await peer.session.read();if(read.provider?.kind!=='scene-provider')throw Error('provider');
       checkMaterials(metadataProjectView(read.provider,{},await validationModelVersions(read.provider)));}
     expect((await peer.fs.list('')).some(p => /locimyu-conversion|validation-origin/.test(p))).toBe(false);
-    if(material==='opaque')await exerciseOpaqueFileReturns(workspace);
     const review = await prepareReviewView(await host.workspaceOutput.download(await host.workspaceOutput.generateReview(source.token, { sceneId: h.display()!.sceneId })), budget, decode);
     expect(review.images.size).toBe(2); expect(review.attachments).toHaveLength(2);
     if(material){const e=review.display(null,null).savedMaterials![review.models[0]!.assetId]!, slots=validationMaterialSlots(review.models[0]!);
@@ -4293,9 +4414,11 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       await restored.dispatch(restored.read().source!.token,{kind:'editCaption',captionId:placed.id,edits:{body:'材質を保った復元後の追記'}});const final=restored.read().source!.originalChanges();await restored.dispose();
       const reopened=owned(await openValidationHost(h.f.options));expect(reopened.read().source!.originalChanges()).toEqual(final);expect(reopened.authority.read().resources.captions[placed.id]!.body).toEqual({kind:'value',value:'材質を保った復元後の追記'});checkMaterials(reopened.authority.read());await reopened.dispose();
     }
+    }finally{if(material)vi.unstubAllGlobals();}
   });
   it.each([false, true, 'placement', 'material', 'opaque'] as const)('frozen v1 conversion explicit=%s connects product editing/first placement to named backup, independent Workspace/review and exact cold reopen', async variant => {
     const explicit = variant !== false, material=variant==='material'||variant==='opaque',placement = variant === 'placement'||material,expectedModel=material?exactV1MaterialModel(variant==='opaque'?expandedOpaqueMaterials:undefined):glb();
+    if(material)meshNodeResources();try{
     const file = await frozenV1File(material?exactV1Materials:placement ? placedV1Model : explicit ? explicitV1Default : undefined,png,expectedModel), bytes = await file.arrayBuffer(), prepared=(await prepareFrozenV1Conversion(file,budget,decode))!,initial = await prepared.create();
     const h = await productWorkspaceFixture(false, false, false, 'map2', initial, { restoreGenerations: explicit }), { host, editor, named, button, edited } = h;
     const original = host.read().provider!; if (original.kind !== 'scene-provider') throw Error('provider');
@@ -4378,7 +4501,6 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect((await peer.receiver.importWorkspace(workspace)).state).toBe('ready'); expect((await peer.session.read()).source!.originalChanges()).toEqual(source.originalChanges());
     if(material){const read=await peer.session.read();if(read.provider?.kind!=='scene-provider')throw Error('provider');checkMaterials(metadataProjectView(read.provider,{},await validationModelVersions(read.provider)));}
     expect((await peer.fs.list('')).some(p => p.includes('frozen-v1-conversion'))).toBe(false);
-    if(variant==='opaque')await exerciseOpaqueFileReturns(workspace);
     const review = await prepareReviewView(await host.workspaceOutput.download(await host.workspaceOutput.generateReview(source.token, { sceneId: h.display()!.sceneId })), budget, decode);
     expect(review.images.size).toBe(2); expect(review.attachments).toHaveLength(3); expect(review.display(null,null).entry).toEqual(entry);
     if (placement) {
@@ -4420,6 +4542,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       if(material){checkMaterials(reopened.authority.read());expect(await reopened.conversionReportAvailable()).toBe(false);}
     }
     await cold.dispose();
+    }finally{if(material)vi.unstubAllGlobals();}
   });
   it('Native appearance conversion connects product editing, occurrence clones, named backup, independent Workspace/review and exact cold reopen', async () => {
     const input = await nativeAppearanceFile(), inputBytes = await input.arrayBuffer();
@@ -5131,7 +5254,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect(effect()).toMatchObject({compositing:{coverage:{alphaCutoff:0}}});
     const before=host.read().source!, sceneId=host.authority.read().state.defaultSceneId; if(sceneId.kind!=='value') throw Error('scene');
     await expect(host.dispatch(before.token,{kind:'editMaterial',sceneId:sceneId.value,overrideId:made.overrideId,
-      compositing:{coverage:{policy:'smoothBlend'},optics:'inherit'}})).rejects.toThrow();
+      compositing:{coverage:{policy:'ditherCoverage',alphaCutoff:.5},optics:'inherit'}})).rejects.toThrow();
     expect(host.read().source!.token).toBe(before.token);
     const sender=host.workspaceOutput, workspace=await sender.download(await sender.generate(before.token)), peer=firstWorkspaceRecipient();
     await peer.receiver.importWorkspace(workspace);
@@ -7791,7 +7914,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       for (const i of [1, 3, 5, 7]) {
         expect(edited[i]).toBeInstanceOf(THREE.MeshBasicMaterial); expect(edited[i]!.side).toBe(THREE.DoubleSide);
         expect(edited[i]!.color).toEqual(expectedColor); expect(edited[i]!.map).toBe(originals[i]!.map);
-        expect(hardChroma(edited[i]!)).toEqual({ keyColorSrgb: [0.1, 0.2, 0.3], tolerance: 0.2 });
+        expect(binaryMask(edited[i]!)).toEqual({opacity:1,cutoff:.5,chroma:{keyColorSrgb:[0.1,0.2,0.3],tolerance:.2,softness:0}});expect(hasBinaryCoverage(edited[i]!)).toBe(true);expect(edited[i]!.visible).toBe(true);expect(edited[i]!.depthWrite).toBe(true);
       }
       for (const i of [0, 2, 4, 6]) {
         expect(edited[i]).toBeInstanceOf(THREE.MeshStandardMaterial); expect(edited[i]!.color).toEqual(originals[i]!.color);
@@ -7803,7 +7926,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       changed.dispose!(); const reset = residents.create(c), restored = mats(reset.mesh)[1] as THREE.MeshStandardMaterial;
       expect(restored).toBeInstanceOf(THREE.MeshStandardMaterial); expect(restored.roughness).toBe(0.7); expect(restored.color.r).toBe(0.2);
       expect(restored.map).toBe(originals[1]!.map); expect(restored.side).toBe(THREE.FrontSide); expect(bitmap.close).not.toHaveBeenCalled();
-      expect(hardChroma(restored)).toBeUndefined(); expect(hardChroma(originals[1]!)).toBeUndefined();
+      expect(hasBinaryCoverage(restored)).toBe(false); expect(hasBinaryCoverage(originals[1]!)).toBe(false);
       expect(inspected.bytes).toEqual(bytes); expect(originals[1]!.color.r).toBe(0.2);
       reset.dispose!(); untouched.dispose!(); residents.dispose(); expect(bitmap.close).toHaveBeenCalledOnce(); expect(bitmaps[0]!.close).toHaveBeenCalledOnce(); await workspace.dispose();
     } finally { vi.unstubAllGlobals(); }
@@ -8012,17 +8135,23 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect(syntheticDisplay(cold.authority.read(), sceneId, null, null).savedMaterials![c.binding.assetId]![slot.target.logicalMaterialSlotId]).toMatchObject({ appearance: { lighting: 'unlit', chroma: { keyColorSrgb: [1, 0, 0], tolerance: 0.1, softness: 0 } } });
     await cold.dispose();
   }, 20_000);
-  it('admits MASK/double source edits but rejects BLEND and unsupported effects before journal mutation', async () => {
-    const { host, workspace, s, fs } = await openFileCaption(glb(j => { j.materials.push({ alphaMode: 'MASK', doubleSided: true },{alphaMode:'BLEND'}); }));
+  it('admits map2 BLEND with display redirect, retains map1 refusal and rejects unsupported effects before journal mutation', async () => {
+    const { host, workspace, s, fs } = await openFileCaption(glb(j => { j.materials.push({ alphaMode: 'MASK', doubleSided: true },{alphaMode:'BLEND'}); }),'map2');
     const c = s.snapshot.modelVersions![0]!.closure; if (c.shape !== 'saved-glb') throw Error('saved model');
     const slots = validationMaterialSlots(c), intent: MaterialIntent = { appearance: { lighting: 'unlit' }, compositing: { coverage: { policy: 'inherit' }, optics: 'inherit' } };
     expect(validationMaterialIssue(slots.find(v => v.locator.materialIndex === 1)!, intent)).toBeNull();
     expect(validationMaterialIssue(slots.find(v => v.locator.materialIndex === 2)!, intent)).toContain('未接続');
-    const slot = slots.find(v => v.locator.materialIndex === 0)!, id = `ovr_${newId()}`, token = s.snapshot.state.token;
+    expect(validationMaterialIssue(slots.find(v=>v.locator.materialIndex===2)!,intent,'map2')).toBeNull();expect(validationMaterialDisplayNotice(slots.find(v=>v.locator.materialIndex===2)!,intent,'map2')).toContain('非表示');
+    const p=host.read().provider;if(p?.kind!=='scene-provider')throw Error('provider');
+    const blendId=`ovr_${newId()}`,command:Parameters<typeof planMetadataEdit>[1]={kind:'createMaterial',sceneId:s.sceneId,overrideId:blendId,routing:{scope:{kind:'project'},target:{...slots.find(v=>v.locator.materialIndex===2)!.target}},appearance:intent.appearance,compositing:intent.compositing,eventId:`evt_${newId()}`};
+    expect(()=>planMetadataEdit({...p,semanticProfile:'map1'},command,metadata)).toThrow('material-source');expect(planMetadataEdit(p,command,metadata).length).toBeGreaterThan(0);
+    const admitted=await host.dispatch(host.read().source!.token,command),admittedProvider=admitted.provider;if(admittedProvider?.kind!=='scene-provider')throw Error('provider');
+    expect(materialResolutionContext(admittedProvider,s.sceneId,blendId,metadata).source.coverage.kind).toBe('blend');expect(()=>materialResolutionContext({...admittedProvider,semanticProfile:'map1'},s.sceneId,blendId,metadata)).toThrow('material-source');
+    const slot = slots.find(v => v.locator.materialIndex === 0)!, id = `ovr_${newId()}`, token = host.read().source!.token;
     const changes = Object.fromEntries(Object.entries({ routing: { scope: { kind: 'project' }, target: slot.target },
-      appearance: { chroma: { keyColorSrgb: [1, 0, 0], tolerance: 0, softness: 0.1 } }, compositing: intent.compositing,
+      appearance: { chroma: { keyColorSrgb: [1, 0, 0], tolerance: 0, softness: 0.1 } }, compositing: {coverage:{policy:'ditherCoverage',alphaCutoff:.5},optics:'inherit'},
       lifecycle: { state: 'active', eventId: `evt_${newId()}`, reason: 'initial' } }).map(([k, v]) => [materialKey(id, k), canonicalFixture(v)]));
-    const paths = await fs.list(''); await expect(host.authority.write(token, changes, { sceneId: s.sceneId })).rejects.toThrow('切り抜き');
+    const paths = await fs.list(''); await expect(host.authority.write(token, changes, { sceneId: s.sceneId })).rejects.toThrow();
     expect(host.read().source!.token).toBe(token); expect(host.hasPending()).toBe(false); expect(await fs.list('')).toEqual(paths);
     await workspace.dispose();
   });

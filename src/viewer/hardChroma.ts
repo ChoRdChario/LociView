@@ -5,7 +5,7 @@ const settings = new WeakMap<THREE.Material, HardChroma>();
 export const hardChroma = (material: THREE.Material) => settings.get(material);
 export interface BinaryMask { readonly opacity: number; readonly cutoff: number;
   readonly chroma?: HardChroma & { readonly softness: number };
-  readonly sourceMask?:{readonly opacity:number;readonly cutoff:number} }
+  readonly sourceMask?:{readonly opacity:number;readonly cutoff:number};readonly sourceBlendOpacity?:number }
 const masks = new WeakMap<THREE.Material, BinaryMask>();
 export const binaryMask = (material: THREE.Material) => masks.get(material);
 export const hasBinaryCoverage = (material: THREE.Material) => settings.has(material) || masks.has(material);
@@ -56,19 +56,20 @@ export function hardChromaCoverageMaterial(material: THREE.Material) {
 
 /** Binary mask on an admitted source clone. Compose all coverage before discarding, including cutoff zero. */
 export function patchBinaryMask(material: CoverageMaterial, input: BinaryMask, coverageOnly = false) {
-  if (hasBinaryCoverage(material) || ![input.opacity, input.cutoff,...(input.sourceMask?[input.sourceMask.opacity,input.sourceMask.cutoff]:[]), ...(input.chroma ?
+  if (hasBinaryCoverage(material) || input.sourceMask&&input.sourceBlendOpacity!==undefined || ![input.opacity, input.cutoff,...(input.sourceMask?[input.sourceMask.opacity,input.sourceMask.cutoff]:[]),...(input.sourceBlendOpacity!==undefined?[input.sourceBlendOpacity]:[]), ...(input.chroma ?
     [...input.chroma.keyColorSrgb, input.chroma.tolerance, input.chroma.softness] : [])].every(n => Number.isFinite(n) && n >= 0 && n <= 1) ||
     input.chroma && input.chroma.keyColorSrgb.length !== 3) throw Error('切り抜きの設定を確認してください。');
-  const owned: BinaryMask = Object.freeze({ opacity: input.opacity, cutoff: input.cutoff,...(input.sourceMask?{sourceMask:Object.freeze({...input.sourceMask})}:{}), ...(input.chroma ? {
+  const owned: BinaryMask = Object.freeze({ opacity: input.opacity, cutoff: input.cutoff,...(input.sourceMask?{sourceMask:Object.freeze({...input.sourceMask})}:{}),...(input.sourceBlendOpacity!==undefined?{sourceBlendOpacity:input.sourceBlendOpacity}:{}), ...(input.chroma ? {
     chroma: Object.freeze({ ...input.chroma, keyColorSrgb: Object.freeze([...input.chroma.keyColorSrgb]) }) } : {}) });
-  const token=owned.sourceMask?'#include <alphamap_fragment>':colorToken;
+  const sourceAlpha=!!owned.sourceMask||owned.sourceBlendOpacity!==undefined;
+  const token=sourceAlpha?'#include <alphamap_fragment>':colorToken;
   const check = (text: string) => {
     if (text.split(token).length !== 2 || text.split(endToken).length !== 2) throw Error('切り抜きを描画できません。');
   };
   check(coverageSource(material).fragmentShader);
   const key = new THREE.Color().setRGB(...(owned.chroma?.keyColorSrgb ?? [0, 0, 0]) as [number, number, number], THREE.SRGBColorSpace);
-  masks.set(material, owned); material.transparent = false; material.depthWrite = true; material.opacity = owned.sourceMask?.opacity??1;
-  if(owned.sourceMask)material.alphaTest=0;
+  masks.set(material, owned); material.transparent = false; material.depthWrite = true; material.opacity = owned.sourceMask?.opacity??owned.sourceBlendOpacity??1;
+  if(sourceAlpha)material.alphaTest=0;
   material.onBeforeCompile = shader => {
     check(shader.fragmentShader);
     Object.assign(shader.uniforms, { lvMaskOpacity: { value: owned.opacity }, lvMaskCutoff: { value: owned.cutoff },
@@ -88,11 +89,11 @@ if (lvMaskChroma > 0.5) {
 if (clamp(lvMaskOpacity * lvChromaCoverage, 0.0, 1.0) < lvMaskCutoff) discard;
 diffuseColor.a = 1.0;
 `;
-    const composed=owned.sourceMask?'\nfloat lvSourceCoverage = diffuseColor.a >= lvSourceCutoff ? 1.0 : 0.0;\n'+predicate.replace('lvMaskOpacity * lvChromaCoverage','lvSourceCoverage * lvMaskOpacity * lvChromaCoverage'):predicate;
+    const composed=sourceAlpha?'\nfloat lvSourceCoverage = '+(owned.sourceMask?'diffuseColor.a >= lvSourceCutoff ? 1.0 : 0.0':'diffuseColor.a')+';\n'+predicate.replace('lvMaskOpacity * lvChromaCoverage','lvSourceCoverage * lvMaskOpacity * lvChromaCoverage'):predicate;
     shader.fragmentShader = 'uniform float lvMaskOpacity, lvMaskCutoff, lvMaskChroma, lvMaskTolerance, lvMaskSoftness;\nuniform vec3 lvMaskKey;\n'+(owned.sourceMask?'uniform float lvSourceCutoff;\n':'') +
       shader.fragmentShader.replace(token, token + composed);
     if (coverageOnly) shader.fragmentShader = shader.fragmentShader.replace(endToken, endToken + '\ngl_FragColor = vec4(1.0, 0.0, 1.0, 1.0);\n');
   };
-  material.customProgramCacheKey = () => `lociview-binary-mask${owned.sourceMask?'-source-1':'-1'}:${coverageOnly ? 'coverage' : 'color'}`;
+  material.customProgramCacheKey = () => `lociview-binary-mask${owned.sourceMask?'-source-1':owned.sourceBlendOpacity!==undefined?'-source-blend-1':'-1'}:${coverageOnly ? 'coverage' : 'color'}`;
   material.needsUpdate = true;
 }

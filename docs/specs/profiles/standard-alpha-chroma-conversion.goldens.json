@@ -1,0 +1,170 @@
+{
+  "status": "APPROVED DIRECTION - PO 2026-10-28; exact identity vectors for independent review, not a FormatProfile",
+  "vectors": [
+    {
+      "recipe": "native-project-scene-recipe-10",
+      "conversionId": "00000000000000000000000000000000",
+      "sourceZipSha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "prefix": "ovr",
+      "sourceKey": [
+        "mesh-appearance",
+        "mat_00000000000000000000000000000000"
+      ],
+      "preimage": "lociview:native-project-scene-recipe-10:id:jcs-v1\n[\"00000000000000000000000000000000\",\"1111111111111111111111111111111111111111111111111111111111111111\",\"ovr\",[\"mesh-appearance\",\"mat_00000000000000000000000000000000\"]]",
+      "utf8Bytes": 218,
+      "sha256": "f2cf07967c21d6fbcbeccd5f04da5647e4e254aa78660978896d1828ee02d549",
+      "id": "ovr_f2cf07967c21d6fbcbeccd5f04da5647"
+    },
+    {
+      "recipe": "native-project-scene-recipe-10",
+      "conversionId": "00000000000000000000000000000000",
+      "sourceZipSha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "prefix": "ovr",
+      "sourceKey": [
+        "mesh-appearance",
+        "mat_00000000000000000000000000000001"
+      ],
+      "preimage": "lociview:native-project-scene-recipe-10:id:jcs-v1\n[\"00000000000000000000000000000000\",\"1111111111111111111111111111111111111111111111111111111111111111\",\"ovr\",[\"mesh-appearance\",\"mat_00000000000000000000000000000001\"]]",
+      "utf8Bytes": 218,
+      "sha256": "30535b9897a31e460413671527c5827dcbc888124370b64a02ab5e681c7282bb",
+      "id": "ovr_30535b9897a31e460413671527c5827d"
+    },
+    {
+      "recipe": "native-project-scene-recipe-10",
+      "conversionId": "00000000000000000000000000000000",
+      "sourceZipSha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "prefix": "evt",
+      "sourceKey": [
+        "initial-event",
+        "ovr",
+        [
+          "mesh-appearance",
+          "mat_00000000000000000000000000000000"
+        ]
+      ],
+      "preimage": "lociview:native-project-scene-recipe-10:id:jcs-v1\n[\"00000000000000000000000000000000\",\"1111111111111111111111111111111111111111111111111111111111111111\",\"evt\",[\"initial-event\",\"ovr\",[\"mesh-appearance\",\"mat_00000000000000000000000000000000\"]]]",
+      "utf8Bytes": 242,
+      "sha256": "5b646692be8c6471a6d0da7571d3cb0bc1097603f1efd9d67b8f38eebca48931",
+      "id": "evt_5b646692be8c6471a6d0da7571d3cb0b"
+    },
+    {
+      "recipe": "v1-project-scene-migration-recipe-8",
+      "conversionId": "00000000000000000000000000000000",
+      "sourceZipSha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "prefix": "ovr",
+      "sourceKey": [
+        "material",
+        "mat_00000000000000000000000000"
+      ],
+      "preimage": "lociview:v1-project-scene-migration-recipe-8:id:jcs-v1\n[\"00000000000000000000000000000000\",\"1111111111111111111111111111111111111111111111111111111111111111\",\"ovr\",[\"material\",\"mat_00000000000000000000000000\"]]",
+      "utf8Bytes": 210,
+      "sha256": "b9abf470c964350cf948e0cc710da2278e6f851c742f77a8e72952c5ecdc5ef3",
+      "id": "ovr_b9abf470c964350cf948e0cc710da227"
+    },
+    {
+      "recipe": "v1-project-scene-migration-recipe-8",
+      "conversionId": "00000000000000000000000000000000",
+      "sourceZipSha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "prefix": "ovr",
+      "sourceKey": [
+        "material",
+        "mat_00000000000000000000000001"
+      ],
+      "preimage": "lociview:v1-project-scene-migration-recipe-8:id:jcs-v1\n[\"00000000000000000000000000000000\",\"1111111111111111111111111111111111111111111111111111111111111111\",\"ovr\",[\"material\",\"mat_00000000000000000000000001\"]]",
+      "utf8Bytes": 210,
+      "sha256": "00a298712c47d75ce991146b951f451778e92a41e7524609be3fecee2e15c7ed",
+      "id": "ovr_00a298712c47d75ce991146b951f4517"
+    },
+    {
+      "recipe": "v1-project-scene-migration-recipe-8",
+      "conversionId": "00000000000000000000000000000000",
+      "sourceZipSha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "prefix": "evt",
+      "sourceKey": [
+        "initial-event",
+        "ovr",
+        [
+          "material",
+          "mat_00000000000000000000000000"
+        ]
+      ],
+      "preimage": "lociview:v1-project-scene-migration-recipe-8:id:jcs-v1\n[\"00000000000000000000000000000000\",\"1111111111111111111111111111111111111111111111111111111111111111\",\"evt\",[\"initial-event\",\"ovr\",[\"material\",\"mat_00000000000000000000000000\"]]]",
+      "utf8Bytes": 234,
+      "sha256": "3bd8e76e01671fb76d66ef21a5392d438d19a9090c033c78ddea6c707bf038c0",
+      "id": "evt_3bd8e76e01671fb76d66ef21a5392d43"
+    },
+    {
+      "recipe": "locimyu-project-scene-migration-recipe-6",
+      "conversionId": "00000000000000000000000000000000",
+      "sourceZipSha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "workbookPath": "data.xlsx",
+      "prefix": "ovr",
+      "sourceKey": [
+        "material-row",
+        "__LM_MATERIALS",
+        2,
+        [
+          "legacyGid",
+          "0"
+        ],
+        "models/model.glb",
+        "gltfMaterial",
+        0
+      ],
+      "preimage": "lociview:locimyu-project-scene-migration-recipe-6:id:jcs-v1\n[\"00000000000000000000000000000000\",\"1111111111111111111111111111111111111111111111111111111111111111\",\"data.xlsx\",\"ovr\",[\"material-row\",\"__LM_MATERIALS\",2,[\"legacyGid\",\"0\"],\"models/model.glb\",\"gltfMaterial\",0]]",
+      "utf8Bytes": 271,
+      "sha256": "2a2e918904661e83c33be0e4370877b3e92c985a75380b20d2ddd1ed9d91eae6",
+      "id": "ovr_2a2e918904661e83c33be0e4370877b3"
+    },
+    {
+      "recipe": "locimyu-project-scene-migration-recipe-6",
+      "conversionId": "00000000000000000000000000000000",
+      "sourceZipSha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "workbookPath": "data.xlsx",
+      "prefix": "ovr",
+      "sourceKey": [
+        "material-row",
+        "__LM_MATERIALS",
+        2,
+        [
+          "legacyGid",
+          "0"
+        ],
+        "models/model.glb",
+        "gltfMaterial",
+        1
+      ],
+      "preimage": "lociview:locimyu-project-scene-migration-recipe-6:id:jcs-v1\n[\"00000000000000000000000000000000\",\"1111111111111111111111111111111111111111111111111111111111111111\",\"data.xlsx\",\"ovr\",[\"material-row\",\"__LM_MATERIALS\",2,[\"legacyGid\",\"0\"],\"models/model.glb\",\"gltfMaterial\",1]]",
+      "utf8Bytes": 271,
+      "sha256": "2d274ae1fafd202488cb8a831cfd18063b695636915739d334bfd1f05a016a47",
+      "id": "ovr_2d274ae1fafd202488cb8a831cfd1806"
+    },
+    {
+      "recipe": "locimyu-project-scene-migration-recipe-6",
+      "conversionId": "00000000000000000000000000000000",
+      "sourceZipSha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "workbookPath": "data.xlsx",
+      "prefix": "evt",
+      "sourceKey": [
+        "initial-event",
+        "ovr",
+        [
+          "material-row",
+          "__LM_MATERIALS",
+          2,
+          [
+            "legacyGid",
+            "0"
+          ],
+          "models/model.glb",
+          "gltfMaterial",
+          0
+        ]
+      ],
+      "preimage": "lociview:locimyu-project-scene-migration-recipe-6:id:jcs-v1\n[\"00000000000000000000000000000000\",\"1111111111111111111111111111111111111111111111111111111111111111\",\"data.xlsx\",\"evt\",[\"initial-event\",\"ovr\",[\"material-row\",\"__LM_MATERIALS\",2,[\"legacyGid\",\"0\"],\"models/model.glb\",\"gltfMaterial\",0]]]",
+      "utf8Bytes": 295,
+      "sha256": "de601363fa2974fad0a42aa42a099bacf2dd494f7cb9ea71fe8465d198ebc6b9",
+      "id": "evt_de601363fa2974fad0a42aa42a099bac"
+    }
+  ]
+}

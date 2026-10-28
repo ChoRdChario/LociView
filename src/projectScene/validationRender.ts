@@ -15,8 +15,8 @@ import { placementMatrix } from './viewportModel';
 import { canonical, same } from '../domain/projectGraphSupport';
 import type { JsonObject } from '../domain/values';
 import type { MeshMaterialSource } from '../domain/meshMaterialSource';
-import { validationMaterialSlots, validationMaterialIssue, validationMaterialMap2, type ValidationMaterialEffects } from './validationMaterials';
-import { patchHardChroma, patchBinaryMask, type CoverageMaterial } from '../viewer/hardChroma';
+import { validationMaterialSlots, validationMaterialIssue,validationMaterialCoverage,smoothMaterialDisplayNotice, type ValidationMaterialEffects } from './validationMaterials';
+import { patchBinaryMask, type CoverageMaterial } from '../viewer/hardChroma';
 import { decodeOccurrenceGlb, type DecodedOccurrenceSlot } from '../projectFiles/glbOccurrences';
 import { materialForDisplay } from '../domain/materialIntent';
 import { readLegacyModelProof } from '../viewer/compat180/proof';
@@ -168,7 +168,9 @@ export async function prepareReadonlyResidents(initial: readonly ReadonlyRenderM
     for (const slot of slots) {
       const effect = effects[slot.target.logicalMaterialSlotId];
       if (effect && !('issue' in effect)) {
-        const issue = validationMaterialIssue(slot, effect, validationMaterialMap2(c.representation.formatProfile) ? 'map2' : 'map1'); if (issue) throw Error(issue);
+        // The owning Project already projects semanticProfile into display intent.
+        // A source FormatProfile never determines editable metadata semantics.
+        const issue = validationMaterialIssue(slot, effect, 'map2'); if (issue) throw Error(issue);
         for (const [material, locator] of item.model.materialLocators) if (same(locator, slot.locator) && !supportedClass(material,slot.source,c))
           throw Error('元の材質の設定を確認してください。');
       }
@@ -214,6 +216,7 @@ export async function prepareReadonlyResidents(initial: readonly ReadonlyRenderM
       const root = item.model.root.clone(true), asset = new THREE.Group();
       const slots = validationMaterialSlots(c), byLocator = new Map(slots.map(s => [canonical(s.locator), s]));
       const geometries = new Map<THREE.BufferGeometry, THREE.BufferGeometry>(), materials = new Map<THREE.Material, THREE.Material>();
+      const materialNotices:string[]=[];
       let released = false;
       const release = () => { if (released) return; released = true; const retained=live.delete(release); asset.removeFromParent();
         for (const g of geometries.values()) g.dispose(); for (const m of materials.values()) m.dispose(); if(retained)drop(); };
@@ -231,7 +234,7 @@ export async function prepareReadonlyResidents(initial: readonly ReadonlyRenderM
             else if (effect) {
               if (!supportedClass(m,slot.source,c)) throw Error('元の材質の設定を確認してください。');
               const original=m as CoverageMaterial;
-              const displayed = materialForDisplay(effect, validationMaterialMap2(c.representation.formatProfile) ? 'map2' : 'map1');
+              const displayed = materialForDisplay(effect, 'map2');
               const a = displayed.appearance;
               if (a.lighting === 'unlit'&&!(m instanceof THREE.MeshBasicMaterial)) {
                 result.dispose(); result = new THREE.MeshBasicMaterial({ color: original.color.clone(), map: original.map,
@@ -241,18 +244,19 @@ export async function prepareReadonlyResidents(initial: readonly ReadonlyRenderM
               }
               if (a.baseColorSrgb) (result as CoverageMaterial).color.setRGB(...a.baseColorSrgb as [number, number, number], THREE.SRGBColorSpace);
               if (a.doubleSided !== undefined) result.side = a.doubleSided ? THREE.DoubleSide : THREE.FrontSide;
-              const coverage=displayed.compositing.coverage;
-              if(coverage.policy==='opaque') {result.opacity=1;result.alphaTest=0;result.transparent=false;}
-              else if(coverage.policy==='mask'||slot.source?.coverage.kind==='mask')patchBinaryMask(result as CoverageMaterial,
-                {opacity:a.opacity??1,cutoff:coverage.policy==='mask'?coverage.alphaCutoff!:.5,...(a.chroma?{chroma:a.chroma}:{}),
-                  ...(slot.source?.coverage.kind==='mask'?{sourceMask:{opacity:original.opacity,cutoff:slot.source.coverage.alphaCutoff}}:{})});
-              else if(a.chroma)patchHardChroma(result as CoverageMaterial,a.chroma);
-              else if(slot.source?.coverage.kind==='opaque'){result.opacity=1;result.alphaTest=0;result.transparent=false;}
+              const coverage=validationMaterialCoverage(slot,displayed,'map2');
+              if(coverage?.kind==='smoothBlend'){result.visible=false;materialNotices.push(`${slot.name}：${smoothMaterialDisplayNotice}`);}
+              else if(coverage?.kind==='opaque') {result.opacity=1;result.alphaTest=0;result.transparent=false;result.depthWrite=true;}
+              else if(coverage?.kind==='mask')patchBinaryMask(result as CoverageMaterial,
+                {opacity:coverage.opacity,cutoff:coverage.cutoff!,...(coverage.chroma?{chroma:coverage.chroma}:{}),
+                  ...(slot.source?.coverage.kind==='mask'?{sourceMask:{opacity:original.opacity,cutoff:slot.source.coverage.alphaCutoff}}:{}),
+                  ...(slot.source?.coverage.kind==='blend'?{sourceBlendOpacity:original.opacity}:{})});
 
             }else if(slot.source){
               if(!supportedClass(m,slot.source,c))throw Error('元の材質の設定を確認してください。');
-              if(slot.source.coverage.kind==='mask')patchBinaryMask(result as CoverageMaterial,{opacity:1,cutoff:.5,sourceMask:{opacity:m.opacity,cutoff:slot.source.coverage.alphaCutoff}});
-              else {result.opacity=1;result.alphaTest=0;result.transparent=false;}
+              if(slot.source.coverage.kind==='blend'){result.visible=false;materialNotices.push(`${slot.name}：${smoothMaterialDisplayNotice}`);}
+              else if(slot.source.coverage.kind==='mask')patchBinaryMask(result as CoverageMaterial,{opacity:1,cutoff:.5,sourceMask:{opacity:m.opacity,cutoff:slot.source.coverage.alphaCutoff}});
+              else {result.opacity=1;result.alphaTest=0;result.transparent=false;result.depthWrite=true;}
             }
             return result;
           };
@@ -261,7 +265,7 @@ export async function prepareReadonlyResidents(initial: readonly ReadonlyRenderM
         const representation = new THREE.Group(); representation.matrix.copy(placementMatrix(c.representation.representationToAsset)); representation.matrixAutoUpdate = false;
         representation.add(root); asset.add(representation);
         asset.matrix.copy(placementMatrix(c.assetToProject)); asset.matrixAutoUpdate = false; asset.updateMatrixWorld(true);
-        retain();live.add(release); return { mesh: root, asset, dispose: release };
+        retain();live.add(release); return { mesh: root, asset,materialNotices, dispose: release };
       } catch (error) { release(); throw error; }
     } };
   } catch (error) { dispose(); throw error; }

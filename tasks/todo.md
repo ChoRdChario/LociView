@@ -22,6 +22,125 @@ Fix latency when it prevents use or risks data. Keep the existing
 Root is sole writer; bounded independent reviewers are read-only. No small manual
 test or helper approvals. Continue in-scope work while device evidence is pending.
 
+## Verified checkpoint —07n standard alpha/chroma material workflow
+
+PO2026-10-28 explicitly approved standard new-format material operations for new
+Native/v1/LociMyu conversions, keeping originals and existing data and explaining
+affected targets/reasons before conversion. Complete specification, implementation
+and automated verification without per-field/family/manual-test waits. This ratifies
+the migration direction below; it does not mean exact old-renderer reproduction.
+
+At unit start g0-baseline HEAD47fb8cc is pushed/clean. Root is sole writer; three
+bounded read-only reviewers cover renderer/gates, source mappings/preview and
+acceptance. Meta-audit: this closes missing material workflows before GS tuning;
+03 G1-D is still unpassed and its actual compositor/activation boundary must be
+resolved against the new scope, never silently treated as passed.
+
+Plan: record exact value/default/ignored-effect mappings and display/pick authority
+in the[approved07n companion](../docs/specs/07n-standard-alpha-chroma-conversion.md) → independently review contracts/import ports → shared closed
+source capability/evaluator and owned display/coverage probe → typed material
+commands/controls/resolution → additive recipes and target-specific conversion
+explanations with exact recovery → focused invariants plus one connected browser/
+five-output/two-return/restore/cold flow → serial final checkpoint, independent
+final diff review and suitable g0 commit/push. Keep original profiles/recipes,
+schema/wire, source bytes/templates, atomic publication and recovery fences.
+Stop only affected work for a real contract conflict/new compositor authority,
+unsupported source ownership/format policy, dependency, ordinary activation or
+release. Do not obtain approval again for the already approved normalization.
+
+Standard source/coverage, slot-local smooth redirect, binary BLEND, typed map2
+edit/resolution, controls and target/reason preview are connected. Native10's
+three source-derived receipt lanes, v1-8/Loci6 exact defaults/reports and cold
+recovery pass. Focused cases confirm three-family preview/cancel/reselect has
+zero Project-FS/DB/CAS/journal writes, each new interrupted publication keeps
+initial/source/receipt bytes and later edits, both CAS lanes reselect only exact
+originals, and a fully ID/proof/origin-rebound Native9 downgrade refuses before
+writes. v1/Loci product workflows pass edit/reset→five purposes/two returns with
+local work→Review/Clean→actual selected restore/post-restore edit/cold.
+
+Dedicated Desktop Chromium GPU run1793177707771-24152 passes38.4s: source BLEND
+is locally hidden, unaffected panels stay, rear red points show, and source
+factor/texture/RGBA × appearance opacity/chroma with cutoffs0/.25/.5 matches
+actual pixels, pin hits and point occlusion. Unknown coverage is rejected.
+Run1793177402020-67600 failed because the test still targeted the selected Point
+when requesting a Mesh hit; the final test explicitly selects its intended model.
+Native10 Desktop run1793177988948-69416 passes25.7min: preview/cancel/reselect
+with zero OPFS/DB writes, all existing formats/Point/GS/Proxy, edit/reset,
+five purposes/two returns with local work, source exclusion, Review editing copy,
+Clean identity/relations, exact selected restore and closed-browser cold resume.
+This elapsed test duration is not an individual action-latency acceptance.
+The browser measures do expose a remaining practical wait: the fourth backup
+is75.21s versus31.43s in the earlier07m run, second Workspace output60.01s
+versus22.47s, and maximum edit12.60s versus3.79s. Display preparation remains
+3.2ms or less; final/source ZIP growth is only166/22bytes. A cause is not proved
+by two runs/environment comparisons. Repeated history/output verification through
+`validationHost.reloadOutput()`/`WorkspaceSender.jobs()`/`availableBases()` is the
+first measured-path investigation candidate. Nested measures confirm that the
+75.21s backup comprises generation49.50s + `jobs()`16.82s + bases8.89s; the
+60.01s Workspace comprises generation37.55s + jobs12.95s + bases9.52s. Thus
+post-generation UI-list revalidation alone costs25.71/22.46s. Download2.93/2.10s
+is separate. Backup capture9.90s, write/readback2.28s and finish15.01s include a
+1.97s actual job (ZIP write completion.27s/inspection.61s); remaining generation
+validation intervals lack their own measures. This is a concrete next diagnostic,
+not permission to skip verification or extend verified-read lifetimes.
+No whole-screen freeze/data-loss
+evidence or comfortable-latency acceptance is claimed. Keep this actual browser
+finding alongside the existing500k Review latency lane; do not relax readback,
+write/publication or recovery fences, or substitute synthetic I/O counts for time.
+After that build, the only product change makes the smooth-hide consequence
+visible outside collapsed preview details. Its focused DOM case and Desktop
+preview-only run1793179566956-27956 pass; screenshot is visually checked.
+The initial serial checkpoint passes typecheck and130 suites but finds5 failures:
+two old opaque UI/file tests exceed their existing30s, two old rejection tests
+still treat newly approved smooth/BLEND as unsupported, and one checks the former
+hardChroma hook rather than the unified binary coverage contract. Its full log is
+retained as `standard07n-final-checkpoint.log`; it is not a passed checkpoint.
+Corrected checks use real unsupported dither for no-journal refusal and verify
+actual binary chroma/mask/visibility/depth. The compatibility review also restores
+map1's prior BLEND-source edit refusal across typed commands, resolution and UI;
+map2 rendering/editing is unchanged. The companion explicitly retains this boundary.
+
+The new07n bitmap stubs now restore in finally. Old material cases own their
+texture-free stubs too. Their independent two-environment return/Clean/cold
+helper is moved into separate fresh-origin typed service cases, preserving all
+assertions and deadlines; A is the real converted origin and B imports its actual
+Workspace. Outer UI/edit/retry/placement/Backup/Review/restore/cold checks stay.
+The previously failing UI/material cases and both new service cases pass focused
+checks without retries, skips or deadline changes. The second root run passes
+2943 tests/130 suites; only the v1 team-service case still exceeds30s. That
+dedicated fixture now retains both Scenes/all4 material rows/Views/placement/GLB
+and one Caption, omitting unrelated extra Captions/media metadata while retaining
+unused PNGs in the original ZIP. Full product/restore cases keep the complete
+fixture and every assertion. Its actual conversion/typed edits/two-environment
+returns/Clean/cold passes18.02s with the same30s deadline. This test-only change
+has independent review and no outstanding findings.
+
+The common viewport warning now states hide/retention without promising edit
+actions to existing map1 Projects. New Native1 conversions already use map2;
+never infer Project semantics from a recipe number. Final Desktop GPU/preview
+run1793183858775-66588 passes both cases(1.4/31.2s), including current profile
+guards/copy, pixels/pin/point coverage. No full Native flow replay is needed for
+the preview copy/map1-only guard changes. Required serial checkpoint
+passes as `standard07n-checkpoint.log`: typecheck,131 suites/2944 tests with21
+existing todos and normal/harness/validation/Desktop builds. Artifact log
+`standard07n-checkpoint-artifacts.log` passes HEIC isolation, current-source maps
+in all4 builds, GS import/build separation, Desktop distribution/notices and
+ordinary/Desktop Native Spark identity. Earlier failing full
+logs/snapshots remain retained, including `standard07n-verified-checkpoint.log`.
+
+Independent final Native, v1/Loci and renderer/command/UI reviews have no
+outstanding findings; exact IDs also have Python/Node vector agreement. Resolved
+findings were renderer-profile inference, premature source alpha clamp and actual
+Scene-target notice indexing. Intermediate fixture/import failures and the
+wrong-origin forged-test setup are retained in ignored standard07n logs; no
+product guards, assertions or existing timeouts were relaxed.38 changed source/
+test files are frozen in `.artifacts/e2e/desktop-integration-tools/standard07n-checkpoint-tested-tree.json`.
+The earlier pre-visible-warning and pre-correction snapshots remain retained.
+The final source/test tree is verified for this bounded g0 development checkpoint.
+Git owns actual commit/remote identity; suitable commit/push remains covered by
+standing authority.07n does not pass G1-D or enable smooth. Physical-iOS,
+offline/PWA, general adoption and release acceptance remain separate and unclaimed.
+
 ## Verified checkpoint —07m opaque source-material conversion
 
 PO2026-10-28 approved [07m](../docs/specs/07m-opaque-source-material-conversion-proposal.md)
@@ -410,43 +529,26 @@ Logs, generated owned inputs, traces, failures and snapshots remain under ignore
 
 ## Next outcome and remaining acceptance
 
-Next, prioritize missing connected user workflows over GS tuning;
-the500k Review failure remains tracked.
-  Approved07l, source-material editing and07m conversion are verified above.
-  Next design the remaining alpha/chroma conversion as one connected unit.
-  Read-only source/01§4.2 comparison finds that map2 alone cannot reproduce old
-  factor-replacement order: MASK factor.4/cutoff.5 and texture alpha.25/.75 both
-  become sourceCoverage0, while old opacity1 yields discarded/covered. OPAQUE with
-  old opacity.5 makes texture alpha visible (.125/.375), whereas map2 coverage1
-  yields.5/.5. These are derived counterexamples, not new GPU measurements. A
-  concrete versioned compatibility policy (or explicitly approved visual change),
-  blend/depth/picking/GS scope and ignored Basic-chroma handling need one reviewed
-  decision before implementation. Read-only comparison recommends explicit
-  conversion to standard map2: one editing meaning after migration, originals and
-  old recipes unchanged, affected materials/consequences shown before conversion.
-  This may change the old appearance; it is a proposal, not an accepted policy.
-  Exact old-renderer reproduction instead needs a versioned persistent evaluator
-  covering the different Native/v1/Basic alpha orders, not a transient UI flag.
-  The next grouped proposal must fix all three families' exact value/default and
-  ignored-effect mappings, smooth blending/depth/GS interaction and picking, then
-  require edit/reset, five outputs, two returns and recovery/cold as one result.
-  No new map2 meaning/profile is assumed approved by this investigation.
-  Exact migration planning must also resolve v1 `tol` versus runtime `tolerance`,
-  LociMyu blank/default and truthy parsing differences, old feather0's nonzero
-  smoothing, and Native Basic chroma's depth/order flags despite no color patch.
-  Disabling that ignored color effect alone does not reproduce its old rendering.
-  Avoid another series of tiny source subsets; do not silently binarize
-  semi-transparency or activate previously ignored effects.
-  Further external-resource/format subsets, frozen-v1 orthographic mapping and
-  multi-model LociMyu also remain. Old orthographic span is not fully recorded;
-  multi-model LociMyu has no reliable Caption owner/frame mapping. Native active
-  chroma/opacity uses different smooth-alpha semantics from the current binary
-  mask, so none of those policies may be guessed. New exact policies/recipes need
-  reviewed concrete contracts and genuine grouped approval before runtime work.
-  Do not turn stale inventory classifications into a renewed queue.
-Keep existing-project units, original bytes/pins and the same five-purpose/return/
-restore/reopen workflow.07l approval covers its four internal tracks and routine
-fixes/tests; no repeated format/helper approval is required.
+Prioritize missing connected user workflows over GS tuning; the500k Review
+failure remains tracked.07n above owns the completed normalization direction,
+its current checks and the smooth-display limit. Do not repeat its approval or
+reopen old mapping decisions from superseded planning prose.
+
+The next user-visible material gap is actual smooth composition.03 G1-D still
+requires its base-renderer prerequisite and independent qualification/adoption;
+07n does not waive it, including for Mesh-only. The independently reviewed
+[01f proposal](../docs/specs/01f-desktop-smooth-composition-evaluation.md) makes a
+concrete read-only/fixed-dependency PC evaluation start-condition exception.
+It is PROPOSED/unstarted; ask PO once about that real sequencing decision after
+the current authorized07n workflow is verified. Do not start it or label G1-D
+passed without the required authority/evidence.
+Existing07n editing/outputs/recovery remain usable and exact in the meantime.
+Further external-resource/format subsets, frozen-v1 orthographic mapping and
+multi-model LociMyu remain separate. Old orthographic span is not fully recorded;
+multi-model LociMyu has no reliable Caption owner/frame mapping. Do not guess
+new compatibility policies or silently assign owners. Preserve existing-project
+units, original bytes/pins and the five-purpose/return/restore/reopen workflow.
+
 Showing new-file metadata before complete ZIP integrity needs its own explicitly
 non-authoritative preview contract. Do not remove existing write/recovery inert
 guards or mix a retained old snapshot with new mutation authority.

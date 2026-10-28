@@ -1,4 +1,6 @@
-import { opaqueMaterialSource } from '../domain/meshMaterialSource';
+import { opaqueMaterialSource,meshMaterialSemantics } from '../domain/meshMaterialSource';
+import type {MaterialIntent} from '../domain/materialIntent';
+import {standardMaterialNeeded,normalizedLegacyChroma,materialConversionNotice,sourceBlendNotice,type MaterialConversionNotice} from './materialNormalization';
 import { inspectProjectImage, type PhotoDecoder } from './photo';
 import { inspectZipContainerIdentity, readZipEntries, sanitizeZipPath } from '../assets/zipio';
 import { parseCandidateV1ManifestBytes, type ProjectManifest } from '../core/manifest';
@@ -23,7 +25,8 @@ export const frozenV1DefaultViewRecipe = 'v1-project-scene-migration-recipe-4';
 export const frozenV1PlacementRecipe = 'v1-project-scene-migration-recipe-5';
 export const frozenV1MaterialRecipe = 'v1-project-scene-migration-recipe-6';
 export const frozenV1OpaqueMaterialRecipe = 'v1-project-scene-migration-recipe-7';
-export type FrozenV1Recipe = typeof frozenV1OpaqueMaterialRecipe | typeof frozenV1MaterialRecipe | typeof frozenV1PlacementRecipe | typeof frozenV1DefaultViewRecipe | typeof frozenV1PhotoRecipe | typeof frozenV1Recipe | typeof frozenV1JpegRecipe;
+export const frozenV1StandardMaterialRecipe = 'v1-project-scene-migration-recipe-8';
+export type FrozenV1Recipe = typeof frozenV1StandardMaterialRecipe | typeof frozenV1OpaqueMaterialRecipe | typeof frozenV1MaterialRecipe | typeof frozenV1PlacementRecipe | typeof frozenV1DefaultViewRecipe | typeof frozenV1PhotoRecipe | typeof frozenV1Recipe | typeof frozenV1JpegRecipe;
 export const codeOrder = (a: string, b: string) => a < b ? -1 : a > b ? 1 : 0;
 export const byteProof = async (bytes: Uint8Array) => ({ byteLength: bytes.length, digest: await digest(bytes) });
 const fail = () => fileError('この旧形式ファイルの設定は、まだそのまま変換できません。');
@@ -156,36 +159,38 @@ export interface FrozenV1Material {
   sourceMaterialId: string; sourceSetId: string; sourceAssetId: string; sourceMaterialKey: string; sourceGlbSha256: string;
   childPath: number[]; materialArraySlot: 0; nodeIndex: number; primitiveIndex: number; sourceMaterialIndex: number | null;
   sourceLocator: JsonObject; sourceSemantics: JsonObject; selectedOccurrenceCount: 1; doubleSided?: boolean; unlit: boolean;
+  standardIntent?:MaterialIntent;
 }
 export interface FrozenV1MaterialReport {
   appliedModelOffsets: number; materialEffects: { scenes: number; overrides: number; sourceOnlyChromaRows: number };
   sourceOnlyMaterialValues: { sourceMaterialId: string; field: string; value: JsonValue }[];
+  materialNormalization?:{scene:string;model:string;material:string;reasons:string[]}[];
 }
 interface FrozenV1PlanBase {
   manifest: ProjectManifest; models: readonly FrozenV1Body[]; media: readonly FrozenV1Body[];
   scenes: readonly EntityRecord[]; captions: readonly EntityRecord[]; views: readonly EntityRecord[];
   fingerprints: readonly { path: string; role: string; byteLength: number; digest: string }[];
   inventory: { count: number; byteLength: number; digest: string };
+  materialNotices?:readonly MaterialConversionNotice[];
 }
 interface FrozenV1Report { models: number; scenes: number; captions: number; media: number; originalExcludedFromExports: true;
   sourceOnly: { profiles: number; deletedRecords: number; caches: number; deletedPayloads: number; unlinkedPayloads: number; anchorNormals: number } }
-export type FrozenV1Plan = FrozenV1PlanBase & ({ recipe: typeof frozenV1MaterialRecipe | typeof frozenV1OpaqueMaterialRecipe; materials: readonly FrozenV1Material[]; report: FrozenV1Report & FrozenV1MaterialReport } |
+export type FrozenV1Plan = FrozenV1PlanBase & ({ recipe: typeof frozenV1MaterialRecipe | typeof frozenV1OpaqueMaterialRecipe | typeof frozenV1StandardMaterialRecipe; materials: readonly FrozenV1Material[]; report: FrozenV1Report & FrozenV1MaterialReport } |
   { recipe: typeof frozenV1PlacementRecipe; report: FrozenV1Report & { appliedModelOffsets: number } } |
-  { recipe: Exclude<FrozenV1Recipe, typeof frozenV1PlacementRecipe | typeof frozenV1MaterialRecipe | typeof frozenV1OpaqueMaterialRecipe>; report: FrozenV1Report });
+  { recipe: Exclude<FrozenV1Recipe, typeof frozenV1PlacementRecipe | typeof frozenV1MaterialRecipe | typeof frozenV1OpaqueMaterialRecipe | typeof frozenV1StandardMaterialRecipe>; report: FrozenV1Report });
 
 /** Temporary decoder provenance only; the caller retains each model's original base catalog. */
 async function materialProof(rows: readonly EntityRecord[], models: readonly FrozenV1Body[], sceneIds: ReadonlySet<string>, limits: FileValidationLimits, png?: PngDecoder, jpeg?: JpegDecoder) {
   if (rows.length > Math.min(limits.maxItems, validationMetadataLimits.maxNodes)) return fail();
   const materials: FrozenV1Material[] = [], values: FrozenV1MaterialReport['sourceOnlyMaterialValues'] = [], tuples = new Set<string>(), routes = new Set<string>();
-  const byModel = new Map<string, EntityRecord[]>(), modelIds = new Set(models.map(m => m.record.id)); let work = 0;
+  const byModel = new Map<string, EntityRecord[]>(), modelIds = new Set(models.map(m => m.record.id)); let work = 0,standard=false;
+  const intents=new Map<string,MaterialIntent>(),activeChroma=new Set<string>();
   const charge = (n: number) => { work += n; if (!Number.isSafeInteger(work) || work > Math.min(limits.maxValues, validationMetadataLimits.maxWork)) fail(); };
   for (const row of rows) {
     charge(1); const v = checkMaterialFields(row.id, row.fields), bad = (field: string, reason: string) => materialFail(row.id, field, reason);
     if (!sceneIds.has(v.setId as string)) bad('setId', '有効なシーンへの対応を確認できません。');
     if (!modelIds.has(v.modelAssetId as string)) bad('modelAssetId', '有効なモデルへの対応を確認できません。');
     if (typeof v.materialKey !== 'string' || !v.materialKey.length) bad('materialKey', '保存済みの正確な対応が必要です。');
-    if (v.opacity !== undefined && v.opacity !== 1) bad('opacity', '不透明な材質だけを変換できます。');
-    if (v.chroma !== undefined && (v.chroma as Record<string, unknown>).enable !== false) bad('chroma.enable', '色の透過が無効な材質だけを変換できます。');
     const tuple = json([v.setId, v.modelAssetId, v.materialKey]); if (tuples.has(tuple)) bad('materialKey', '保存済みの対応が重複しています。'); tuples.add(tuple);
     const own = byModel.get(v.modelAssetId as string) ?? []; own.push(row); byModel.set(v.modelAssetId as string, own);
     if (Object.hasOwn(v, 'legacyKey')) values.push({ sourceMaterialId: row.id, field: 'legacyKey', value: v.legacyKey as boolean });
@@ -210,17 +215,37 @@ async function materialProof(rows: readonly EntityRecord[], models: readonly Fro
         const slot = found![0]!; if (counts.get(slot.materialIndex) !== 1) bad('共有された元材質には対応していません。');
         const locator: JsonObject = slot.materialIndex === null ? { kind: 'representationMaterial', slotIndex: 0 } : { kind: 'gltfMaterial', materialIndex: slot.materialIndex };
         const source = catalog.get(json(locator)), semantics = source?.sourceSemantics as JsonObject | undefined;
-        if (!opaqueMaterialSource(semantics)) bad('不透明な元材質だけを変換できます。');
+        const capability=meshMaterialSemantics(semantics);if (!capability) bad('元材質の表示方法に対応していません。');
         const route = json([f.setId, model.record.id, locator]); if (routes.has(route)) bad('同じシーンの材質対応が重複しています。'); routes.add(route);
         materials.push({ sourceMaterialId: row.id, sourceSetId: f.setId as string, sourceAssetId: model.record.id, sourceMaterialKey: f.materialKey as string,
           sourceGlbSha256: model.ref.digest, childPath: [...slot.childPath], materialArraySlot: 0, nodeIndex: slot.nodeIndex, primitiveIndex: slot.primitiveIndex,
           sourceMaterialIndex: slot.materialIndex, sourceLocator: locator, sourceSemantics: semantics!, selectedOccurrenceCount: 1,
           ...(Object.hasOwn(f,'doubleSided')?{doubleSided:f.doubleSided===true}:{}), unlit: f.unlit === true || f.unlitLike === true });
+        const chroma=f.chroma as JsonObject|undefined,enabled=chroma?.enable===true,opacity=(f.opacity??1)as number;
+        if(enabled)activeChroma.add(row.id);
+        standard=standardMaterialNeeded(capability!,opacity,enabled)||standard;
+        intents.set(row.id,{appearance:{opacity,...(Object.hasOwn(f,'doubleSided')?{doubleSided:f.doubleSided===true}:{}),lighting:f.unlit===true||f.unlitLike===true?'unlit':'inherit',
+          ...(enabled?{chroma:normalizedLegacyChroma(sourceColor(chroma!.color??'#000000'),(chroma!.tolerance??.1)as number,(chroma!.feather??0)as number)}:{})},
+          compositing:{coverage:{policy:'inherit'},optics:'inherit'}});
       }
     }
   }
   materials.sort((a, b) => codeOrder(a.sourceMaterialId, b.sourceMaterialId)); values.sort((a, b) => codeOrder(a.sourceMaterialId, b.sourceMaterialId) || codeOrder(a.field, b.field));
-  return { materials, values };
+  return { materials:standard?materials.map(m=>({...m,standardIntent:intents.get(m.sourceMaterialId)!})):materials,
+    values:standard?values.filter(v=>!activeChroma.has(v.sourceMaterialId)||!['chroma.color','chroma.tolerance','chroma.feather'].includes(v.field)):values,
+    standard,activeChroma };
+}
+
+function frozenV1MaterialNotices(models:readonly FrozenV1Body[],scenes:readonly EntityRecord[],materials:readonly FrozenV1Material[]):readonly MaterialConversionNotice[]{
+  const notices:MaterialConversionNotice[]=[];
+  for(const model of models){
+    const name=(model.record.fields.originalName??model.record.fields.path??model.record.id)as string,own=materials.filter(m=>m.sourceAssetId===model.record.id);
+    for(const m of own)if(m.standardIntent){const source=meshMaterialSemantics(m.sourceSemantics)!,notice=materialConversionNotice({scene:scenes.find(s=>s.id===m.sourceSetId)!.fields.name as string,model:name,material:m.sourceMaterialKey},source,m.standardIntent,m.standardIntent.appearance.chroma?.softness===0);if(notice)notices.push(notice);}
+    for(const slot of model.model?.materials??[]){const source=meshMaterialSemantics(slot.sourceSemantics);if(!source||source.coverage.kind!=='blend')continue;
+      const addressed=new Set(own.filter(m=>json(m.sourceLocator)===json(slot.sourceLocator)).map(m=>m.sourceSetId)),locator=slot.sourceLocator as JsonObject;
+      for(const scene of scenes)if(!addressed.has(scene.id)){const notice=sourceBlendNotice({scene:scene.fields.name as string,model:name,material:`材質 ${Number(locator.materialIndex??locator.slotIndex??0)+1}`},source);if(notice)notices.push(notice);}
+    }
+  }return notices;
 }
 
 /** Read only, owned bytes and complete raw accounting; never the legacy writable importer. */
@@ -319,16 +344,19 @@ export async function inspectFrozenV1Source(input: Blob, limits: FileValidationL
   // A historical nonnull default binds the new domain even if it later loses or its Set is deleted.
   const explicitDefaultHistory = ops.some(op => op.e === 'set' && op.v && Object.hasOwn(op.v, 'defaultViewId') && op.v.defaultViewId !== null);
   const placementHistory = ops.some(op => op.e === 'asset' && op.v?.transform !== undefined && nonidentity(frozenV1Placement(op.v.transform)));
-  const base = { manifest, models, media, scenes, captions, views, fingerprints, inventory },
+  const sourceNotices=frozenV1MaterialNotices(models,scenes,[]);
+  const base = { manifest, models, media, scenes, captions, views, fingerprints, inventory,...(sourceNotices.length?{materialNotices:sourceNotices}:{}) },
     report: FrozenV1Report = { models: models.length, scenes: scenes.length, captions: captions.length, media: media.length, sourceOnly, originalExcludedFromExports: true };
   if (ops.some(op => op.e === 'material')) {
     checkPlacementReadiness(models, captions, views);
-    const { materials, values } = await materialProof(visibleEntities(state, 'material').sort((a, b) => codeOrder(a.id, b.id)), models, sceneIds, limits, decode, jpeg);
-    const expanded=materials.some(m=>{const source=opaqueMaterialSource(m.sourceSemantics)!;return source.lighting==='unlit'||source.doubleSided;});
-    return { original, plan: { ...base, recipe: expanded?frozenV1OpaqueMaterialRecipe:frozenV1MaterialRecipe, materials:expanded?materials:materials.map(m=>({...m,doubleSided:m.doubleSided??false})), report: { ...report,
+    const { materials, values,standard,activeChroma } = await materialProof(visibleEntities(state, 'material').sort((a, b) => codeOrder(a.id, b.id)), models, sceneIds, limits, decode, jpeg);
+    const expanded=!standard&&materials.some(m=>{const source=opaqueMaterialSource(m.sourceSemantics)!;return source.lighting==='unlit'||source.doubleSided;});
+    const materialNotices=frozenV1MaterialNotices(models,scenes,materials);
+    return { original, plan: { ...base,...(materialNotices.length?{materialNotices}:{}),recipe:standard?frozenV1StandardMaterialRecipe:expanded?frozenV1OpaqueMaterialRecipe:frozenV1MaterialRecipe, materials:standard||expanded?materials:materials.map(m=>({...m,doubleSided:m.doubleSided??false})), report: { ...report,
       appliedModelOffsets: models.filter(m => frozenV1Placement(m.record.fields.transform).translation.some(n => n !== 0)).length,
       materialEffects: { scenes: new Set(materials.map(m => m.sourceSetId)).size, overrides: materials.length,
-        sourceOnlyChromaRows: new Set(values.filter(v => v.field.startsWith('chroma.')).map(v => v.sourceMaterialId)).size }, sourceOnlyMaterialValues: values } } };
+        sourceOnlyChromaRows: new Set(values.filter(v => v.field.startsWith('chroma.')&&(!standard||!activeChroma.has(v.sourceMaterialId))).map(v => v.sourceMaterialId)).size }, sourceOnlyMaterialValues: values,
+      ...(standard?{materialNormalization:materialNotices.map(n=>({...n,reasons:[...n.reasons]}))}:{}) } } };
   }
   if (placementHistory) {
     checkPlacementReadiness(models, captions, views);

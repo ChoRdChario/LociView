@@ -1,7 +1,7 @@
 import type { JsonObject } from './values';
 
 export interface MeshMaterialSource {
-  readonly coverage: {readonly kind:'opaque'} | {readonly kind:'mask';readonly alphaCutoff:number};
+  readonly coverage: {readonly kind:'opaque'|'blend'} | {readonly kind:'mask';readonly alphaCutoff:number};
   readonly lighting:'lit'|'unlit';readonly doubleSided:boolean;
 }
 const object=(v:unknown):v is Record<string,unknown>=>!!v&&typeof v==='object'&&!Array.isArray(v);
@@ -15,7 +15,7 @@ export function meshMaterialSemantics(semantics:unknown):MeshMaterialSource|null
     Object.keys(semantics).sort().join(',')!=='coverage,doubleSided,lighting,optics'||semantics.optics!=='surface'||
     (semantics.lighting!=='lit'&&semantics.lighting!=='unlit')||typeof semantics.doubleSided!=='boolean'||!object(semantics.coverage))return null;
   const c=semantics.coverage;
-  if(c.kind==='opaque'&&Object.keys(c).join(',')==='kind')return{coverage:{kind:'opaque'},lighting:semantics.lighting as 'lit'|'unlit',doubleSided:semantics.doubleSided};
+  if((c.kind==='opaque'||c.kind==='blend')&&Object.keys(c).join(',')==='kind')return{coverage:{kind:c.kind},lighting:semantics.lighting as 'lit'|'unlit',doubleSided:semantics.doubleSided};
   if(c.kind==='mask'&&Object.keys(c).sort().join(',')==='alphaCutoff,kind'&&typeof c.alphaCutoff==='number'&&Number.isFinite(c.alphaCutoff)&&c.alphaCutoff>=0&&c.alphaCutoff<=1)
     return{coverage:{kind:'mask',alphaCutoff:c.alphaCutoff},lighting:semantics.lighting as 'lit'|'unlit',doubleSided:semantics.doubleSided};
   return null;

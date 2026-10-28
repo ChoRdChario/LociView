@@ -365,15 +365,17 @@ export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: 
       let alphaPicking = false;
       for (const surface of resident.values()) if (surface.dispose) surface.mesh.traverse(node => {
         if (node instanceof THREE.Mesh && (Array.isArray(node.material) ? node.material : [node.material])
-          .some(m => !hasBinaryCoverage(m)&&(m.transparent || m.alphaTest > 0 || m.opacity < 1))) alphaPicking = true;
+          .some(m => m.visible&&!hasBinaryCoverage(m)&&(m.transparent || m.alphaTest > 0 || m.opacity < 1))) alphaPicking = true;
       });
       const pending=display?.models.flatMap((model,i)=>{const state=loadState(model),label=(isReadonlyModel(model)||isSavedModel(model))?saved.label?.(model):undefined;return state&&state.phase!=='ready'?[`${label??`モデル ${i+1}`}: ${state.issue??'読み込み中'}`]:[];})??[];
+      const materialNotices=[...resident.entries()].flatMap(([id,s])=>{if(!s.asset.visible)return[];const model=display?.models.find(m=>renderOwner(m)===id),label=model&&(isReadonlyModel(model)||isSavedModel(model))?saved.label?.(model):undefined;return(s.materialNotices??[]).map(n=>`${label??'モデル'} / ${n}`);});
       const loading=Boolean(pendingGsTarget&&!blockedNext?.models.some(m=>loadState(m)?.phase==='failed')||!issue&&(!renderer||!camera)||pending.length&&display?.models.some(model=>loadState(model)?.phase==='loading')||gsPreparing||[...resident.values()].some(s=>s.asset.visible&&s.gs&&!s.gs.ready&&(!s.gs.issue||s.gs.issue==='GSの表示を準備しています。')));
       return { token: JSON.stringify([serial, display?.sceneId, display?.projectFrameId, display?.bounds, width, height, pose, background]),
         display: display ?? undefined,
         pickToken: String(pickEpoch),
         ready: Boolean(active && renderer && camera && !issue&&!capacityIssue&&!pendingGsTarget&&!pending.length), loading, issue,retryAvailable:!!capacityIssue||!!gsIssue||[...resident.values()].some(s=>s.gs?.issue!==null&&s.gs?.issue!==undefined&&s.gs.issue!=='GSの表示を準備しています。'),
         notice: [pendingGsTarget&&'次のシーンのモデルを確認しています。前の表示を保持しています。',pending.join(' / '),capacityIssue, notice, coverageIssue, gsIssue, pointDiameterNotice, ...new Set([...resident.values()].flatMap(s => [s.points?.issue,s.asset.visible && s.gs ? s.gs.issue ?? (!s.gs.ready && !gsIssue ? 'GSの表示を準備しています。' : null) : null].filter(Boolean))), alphaPicking && !display?.readOnly ? '半透明・切り抜きの面へのピン配置は未接続です。原本の見た目は保持しています。' : null,
+          ...new Set(materialNotices),
           ...new Set(display?.pins.flatMap(p => p.notice ? [p.notice] : []) ?? []),
           ...(display?.materialNotices ?? []), ...Object.values(display?.materials ?? {}).flatMap(m => 'issue' in m ? [m.issue] : []),
           ...Object.values(display?.savedMaterials ?? {}).flatMap(rows => Object.values(rows).flatMap(m => 'issue' in m ? [m.issue] : []))].filter(Boolean).join(' ') || null,

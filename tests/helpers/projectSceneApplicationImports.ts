@@ -427,6 +427,7 @@ export const projectSceneApplicationImports:Readonly<Record<string,readonly stri
     "./viewDisplay"
   ],
   "src/projectScene/validationMaterials.ts": [
+    "../domain/materialCoverage",
     "../domain/meshMaterialSource",
     "../domain/meshSource",
     "../domain/materialIntent",
@@ -499,6 +500,7 @@ export const projectSceneApplicationImports:Readonly<Record<string,readonly stri
     "three/addons/loaders/GLTFLoader.js"
   ],
   "src/projectScene/validationWorkspace.ts": [
+    "../ui/projectScene/conversionNotice",
     "../projectFiles/meshSource",
     "./deferredViewport",
     "../assets/zipio",

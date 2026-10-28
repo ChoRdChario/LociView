@@ -9,7 +9,7 @@ import { syntheticVersions } from './modelFixture';
 import { canonicalFixture } from './modelClosure';
 import { materialBucket, materialCapability, materialKey, materialLimits, materialTarget, sourceMaterialIntent, type MaterialRouting } from './materialHistory';
 import type { WorkingWrite } from './acknowledgment';
-import { validationMaterialSlots, validationMaterialSourceIssue, validationMaterialIssue } from './validationMaterials';
+import { validationMaterialSlots, validationMaterialSourceIssue, validationMaterialIssue,validationMaterialDisplayNotice } from './validationMaterials';
 
 const fresh = (prefix: string) => `${prefix}_${crypto.randomUUID().replaceAll('-', '')}`;
 export class SyntheticMaterialSession {
@@ -39,9 +39,9 @@ export class SyntheticMaterialSession {
           surfaces: value(validationMaterialSlots(version.closure).map(slot => ({ target: slot.target, name: value(slot.name),
             project: record({ scope: { kind: 'project' }, target: slot.target }), scene: record({ scope: { kind: 'scene', sceneId }, target: slot.target }),
             sourceIntent: value(sourceMaterialIntent),
-            fieldIssues: Object.fromEntries(materialFields.map(f => [f, validationMaterialSourceIssue(slot) ??
+            fieldIssues: Object.fromEntries(materialFields.map(f => [f, validationMaterialSourceIssue(slot,p.semanticProfile) ??
               null])) as Record<typeof materialFields[number], string | null>,
-            admit: (intent: MaterialIntent) => validationMaterialIssue(slot, intent, p.semanticProfile) }))) };
+            admit: (intent: MaterialIntent) => validationMaterialIssue(slot, intent, p.semanticProfile),displayNotice:(intent:MaterialIntent)=>validationMaterialDisplayNotice(slot,intent,p.semanticProfile) }))) };
         const target = materialTarget(version.closure), project = record({ scope: { kind: 'project' }, target }), scene = record({ scope: { kind: 'scene', sceneId }, target });
         return { assetId: asset.id, name, surfaces: value([{ target, name: value('表面'), project, scene, sourceIntent: value(sourceMaterialIntent),
           fieldIssues: Object.fromEntries(materialFields.map(f => [f, f === 'opacity' || f === 'softness' || f === 'coverage' || f === 'cutoff' ? 'この見え方は実モデルへ未接続です。' : null])) as Record<typeof materialFields[number], string | null>,

@@ -13,6 +13,7 @@ describe('provider-verified Mesh material source capability',()=>{
   it('rejects nonvisual roles, unknown/partial semantics and coercible values',()=>{
     const roles:JsonObject[]=[{contentKind:'pointCloud',role:'pointPrimary'},{contentKind:'gaussianSplat',role:'gsPrimary'},{contentKind:'mesh',role:'interactionProxy'},{contentKind:'mesh'}];
     for(const r of roles)expect(meshMaterialSource(r,semantics())).toBeNull();
-    for(const s of [{...semantics(),lighting:['unlit']},{...semantics(),lighting:{toString:()=> 'unlit'}},{...semantics(),extra:true},{...semantics(),doubleSided:1},{...semantics(),coverage:{kind:'blend'}},{...semantics(),coverage:{kind:'mask'}},{...semantics(),coverage:{kind:'mask',alphaCutoff:NaN}},{...semantics(),coverage:{kind:'mask',alphaCutoff:2}},{...semantics(),optics:'transmission'}])expect(meshMaterialSource(rep,s)).toBeNull();
+    expect(meshMaterialSource(rep,{...semantics(),coverage:{kind:'blend'}})).toEqual({coverage:{kind:'blend'},lighting:'lit',doubleSided:false});
+    for(const s of [{...semantics(),lighting:['unlit']},{...semantics(),lighting:{toString:()=> 'unlit'}},{...semantics(),extra:true},{...semantics(),doubleSided:1},{...semantics(),coverage:{kind:'blend',alphaCutoff:.5}},{...semantics(),coverage:{kind:'mask'}},{...semantics(),coverage:{kind:'mask',alphaCutoff:NaN}},{...semantics(),coverage:{kind:'mask',alphaCutoff:2}},{...semantics(),optics:'transmission'}])expect(meshMaterialSource(rep,s)).toBeNull();
   });
 });

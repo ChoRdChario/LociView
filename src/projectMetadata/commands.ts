@@ -191,7 +191,7 @@ export function planMetadataEdit(provider: Provider, input: MetadataEdit, limits
       if (rep.assetId !== assetId || rep.variantFamilyId !== target.variantFamilyId || !rep.materialCatalog) continue;
       const catalog = object(rep.materialCatalog); if (catalog.layoutId !== target.materialLayoutId) continue;
       for (const slot of list(catalog.slots).map(object)) if (slot.logicalMaterialSlotId === target.logicalMaterialSlotId) {
-        const capability=meshMaterialSource(rep,slot.sourceSemantics);if(!capability)fail('material-source');source=capability!;
+        const capability=meshMaterialSource(rep,slot.sourceSemantics);if(!capability||provider.semanticProfile!=='map2'&&capability.coverage.kind==='blend')fail('material-source');source=capability!;
         found = true;
       }
     }
@@ -212,9 +212,9 @@ export function planMetadataEdit(provider: Provider, input: MetadataEdit, limits
     const intent = validateMaterialIntent({ appearance, compositing }, limits, provider.semanticProfile);
     if(source&&meshLightingIssue(source,intent.appearance))fail('material-unsupported');
     if (c.unknown || intent.compositing.optics === 'transmission' ||
-      ['smoothBlend', 'ditherCoverage'].includes(intent.compositing.coverage.policy) ||
-      intent.compositing.coverage.policy !== 'mask' && (provider.semanticProfile !== 'map2' || intent.appearance.chroma?.enabled !== false) && (intent.appearance.chroma?.softness ?? 0) > 0 ||
-      (intent.compositing.coverage.policy === 'inherit' && (intent.appearance.opacity ?? 1) < 1)) fail('material-unsupported');
+      intent.compositing.coverage.policy==='ditherCoverage' || provider.semanticProfile!=='map2'&&(
+      intent.compositing.coverage.policy==='smoothBlend'||intent.compositing.coverage.policy !== 'mask' && (intent.appearance.chroma?.softness ?? 0) > 0 ||
+      intent.compositing.coverage.policy === 'inherit' && (intent.appearance.opacity ?? 1) < 1)) fail('material-unsupported');
   };
   switch (command.kind) {
     case 'resolveAttachmentField': {

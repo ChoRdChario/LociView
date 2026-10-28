@@ -1,4 +1,6 @@
-import { opaqueMaterialSource } from '../domain/meshMaterialSource';
+import { opaqueMaterialSource,meshMaterialSemantics,type MeshMaterialSource } from '../domain/meshMaterialSource';
+import type {MaterialIntent} from '../domain/materialIntent';
+import {standardMaterialNeeded,materialConversionNotice,sourceBlendNotice,type MaterialConversionNotice} from './materialNormalization';
 import { nativeCaptionDisplaySetIdV1, nativeCaptionOwnerAssetIdV1, nativeDisplaySetsV1, nativeSavedViewDisplaySetIdV1,
   NATIVE_DEFAULT_DISPLAY_SET_ID, type NativeProjectSnapshotV1 } from '../nativeGs/schema';
 import { nativeCaptionNeedsReviewV1, resolveNativeGsSliceV1 } from '../nativeGs/resolver';
@@ -23,11 +25,12 @@ export const nativeAppearancePhotoRecipe = 'native-project-scene-recipe-6';
 export const nativeSpatialRecipe = 'native-project-scene-recipe-7';
 export const nativeMeshRecipe = 'native-project-scene-recipe-8';
 export const nativeOpaqueMaterialRecipe = 'native-project-scene-recipe-9';
-export type NativeConversionRecipe = typeof nativeOpaqueMaterialRecipe | typeof nativeMeshRecipe | typeof nativeSpatialRecipe | typeof nativePhotoRecipe | typeof nativeAppearancePhotoRecipe | typeof nativeConversionRecipe | typeof nativeAppearanceRecipe | typeof nativeJpegRecipe | typeof nativeAppearanceJpegRecipe;
-export const nativeRecipeHasAppearance = (recipe: NativeConversionRecipe) => recipe === nativeOpaqueMaterialRecipe || recipe === nativeAppearanceRecipe || recipe === nativeAppearanceJpegRecipe || recipe === nativeAppearancePhotoRecipe;
+export const nativeStandardMaterialRecipe = 'native-project-scene-recipe-10';
+export type NativeConversionRecipe = typeof nativeStandardMaterialRecipe | typeof nativeOpaqueMaterialRecipe | typeof nativeMeshRecipe | typeof nativeSpatialRecipe | typeof nativePhotoRecipe | typeof nativeAppearancePhotoRecipe | typeof nativeConversionRecipe | typeof nativeAppearanceRecipe | typeof nativeJpegRecipe | typeof nativeAppearanceJpegRecipe;
+export const nativeRecipeHasAppearance = (recipe: NativeConversionRecipe) => recipe === nativeStandardMaterialRecipe || recipe === nativeOpaqueMaterialRecipe || recipe === nativeAppearanceRecipe || recipe === nativeAppearanceJpegRecipe || recipe === nativeAppearancePhotoRecipe;
 export const nativeRecipeHasJpeg = (recipe: NativeConversionRecipe) => recipe === nativeJpegRecipe || recipe === nativeAppearanceJpegRecipe;
 export const nativeRecipeHasPhoto = (recipe: NativeConversionRecipe) => recipe === nativePhotoRecipe || recipe === nativeAppearancePhotoRecipe;
-export const nativeRecipeHasOrigin = (recipe: NativeConversionRecipe) => recipe === nativeOpaqueMaterialRecipe || recipe === nativeMeshRecipe || recipe === nativeSpatialRecipe || nativeRecipeHasJpeg(recipe) || nativeRecipeHasPhoto(recipe);
+export const nativeRecipeHasOrigin = (recipe: NativeConversionRecipe) => recipe === nativeStandardMaterialRecipe || recipe === nativeOpaqueMaterialRecipe || recipe === nativeMeshRecipe || recipe === nativeSpatialRecipe || nativeRecipeHasJpeg(recipe) || nativeRecipeHasPhoto(recipe);
 /** Compact inspected facts; conversion does not retain every source body/decoded array. */
 export type NativeModelFacts = Pick<ValidatedGlb, 'bounds' | 'materials' | 'surfaceRanges' | 'jpeg' | 'occurrences'> & {newMesh?:{format:MeshSourceFormat;externalMaterialsUnavailable:boolean}};
 export interface NativeMaterialWitness {
@@ -43,6 +46,39 @@ export interface NativeMeshMaterialWitness {
 }
 export type NativeSourceOccurrence=NativeOccurrence|NativeMeshOccurrence;
 export type NativeConversionMaterialWitness=NativeMaterialWitness|NativeMeshMaterialWitness;
+function nativeAppearanceSource(representationId:string,materialSlotKey:string,models:ReadonlyMap<string,NativeModelFacts>,rows:ReadonlyMap<string,readonly NativeSourceOccurrence[]>):MeshMaterialSource{
+  const row=rows.get(representationId)?.find(r=>nativeMaterialSlotKey(r.childPath,r.materialArraySlot)===materialSlotKey);
+  const material=row&&models.get(representationId)?.materials.find(m=>(m.sourceLocator as JsonObject).slotIndex===row.slotIndex);
+  return material&&meshMaterialSemantics(material.sourceSemantics)||fileError('元の材質の対応を確認できません。');
+}
+export function nativeUsesStandardMaterial(snapshot:NativeProjectSnapshotV1,models:ReadonlyMap<string,NativeModelFacts>,rows:ReadonlyMap<string,readonly NativeSourceOccurrence[]>):boolean{
+  let needed=false;for(const a of snapshot.meshMaterialAppearances??[]){const source=nativeAppearanceSource(a.representationId,a.materialSlotKey,models,rows);needed=standardMaterialNeeded(source,a.opacity,a.chroma.enabled)||needed;}return needed;
+}
+export function nativeMaterialConversionNotices(snapshot:NativeProjectSnapshotV1,models:ReadonlyMap<string,NativeModelFacts>,rows:ReadonlyMap<string,readonly NativeSourceOccurrence[]>):readonly MaterialConversionNotice[]{
+  const notices:MaterialConversionNotice[]=[],sets=nativeDisplaySetsV1(snapshot),standard=nativeUsesStandardMaterial(snapshot,models,rows);
+  const byRepresentation=new Map<string,NonNullable<NativeProjectSnapshotV1['meshMaterialAppearances']>[number][]>();
+  for(const a of snapshot.meshMaterialAppearances??[]){const group=byRepresentation.get(a.representationId)??[];group.push(a);byRepresentation.set(a.representationId,group);}
+  for(const r of snapshot.representations){
+    if(r.role!=='meshPrimary')continue;
+    const model=snapshot.assets.find(a=>a.id===r.assetId)!.label;
+    const rowRanks=new Map(rows.get(r.id)?.map(row=>[nativeMaterialSlotKey(row.childPath,row.materialArraySlot),row.slotIndex]));
+    const byRank=new Map<number,NonNullable<NativeProjectSnapshotV1['meshMaterialAppearances']>[number][]>();
+    for(const a of byRepresentation.get(r.id)??[]){const rank=rowRanks.get(a.materialSlotKey);if(rank===undefined)return fileError('元の材質の対応を確認できません。');const group=byRank.get(rank)??[];group.push(a);byRank.set(rank,group);}
+    for(const slot of models.get(r.id)?.materials??[]){
+      const source=meshMaterialSemantics(slot.sourceSemantics);if(!source)continue;
+      const rank=(slot.sourceLocator as JsonObject).slotIndex??(slot.sourceLocator as JsonObject).materialIndex??0;
+      const material=`材質 ${Number(rank)+1}`;
+      const appearances=byRank.get(Number(rank))??[];
+      for(const a of standard?appearances:[]){
+        const labels={scene:sets.find(scene=>scene.id===a.displaySetId)!.name,model,material};
+        const notice=materialConversionNotice(labels,source,nativeAppearanceIntent(a,nativeStandardMaterialRecipe),a.chroma.enabled&&a.chroma.feather===0);
+        if(notice)notices.push(notice);
+      }
+      if(source.coverage.kind==='blend'){const addressed=new Set(appearances.map(a=>a.displaySetId));for(const scene of sets)if(!addressed.has(scene.id)){const notice=sourceBlendNotice({scene:scene.name,model,material},source);if(notice)notices.push(notice);}}
+    }
+  }
+  return notices;
+}
 /** Complete inspected occurrence proof, including hidden Scenes and retained revisions. */
 export function nativeUsesExpandedMaterialSource(snapshot:NativeProjectSnapshotV1,models:ReadonlyMap<string,NativeModelFacts>,rows:ReadonlyMap<string,readonly NativeSourceOccurrence[]>):boolean{
   let expanded=false;
@@ -81,7 +117,7 @@ function nativeRevisionProvenance(snapshot: NativeProjectSnapshotV1, representat
   if (!spatial || types.length === 1) result.sourceMediaType = spatial ? types[0]! : 'model/gltf-binary';
   return result;
 }
-export function nativeAppearanceIntent(a: NonNullable<NativeProjectSnapshotV1['meshMaterialAppearances']>[number]) {
+export function nativeAppearanceIntent(a: NonNullable<NativeProjectSnapshotV1['meshMaterialAppearances']>[number],recipe:NativeConversionRecipe=nativeAppearanceRecipe):MaterialIntent {
   const quantize = (c: number) => {
     const x = c < 0.04045 ? c * 0.0773993808 : Math.pow(c * 0.9478672986 + 0.0521327014, 2.4);
     const y = x < 0.0031308 ? x * 12.92 : 1.055 * Math.pow(x, 0.41666) - 0.055;
@@ -89,7 +125,7 @@ export function nativeAppearanceIntent(a: NonNullable<NativeProjectSnapshotV1['m
   };
   return { appearance: { opacity: a.opacity, doubleSided: a.doubleSided, lighting: a.unlit ? 'unlit' : 'inherit',
     chroma: { enabled: a.chroma.enabled, keyColorSrgb: a.chroma.colorSrgb.map(quantize),
-      tolerance: a.chroma.tolerance / Math.sqrt(3), softness: Math.max(a.chroma.feather, 0.0001) / Math.sqrt(3) } },
+      tolerance: a.chroma.tolerance / Math.sqrt(3), softness: (recipe===nativeStandardMaterialRecipe&&a.chroma.enabled?a.chroma.feather:Math.max(a.chroma.feather, 0.0001)) / Math.sqrt(3) } },
     compositing: { coverage: { policy: 'inherit' }, optics: 'inherit' } };
 }
 
@@ -100,8 +136,9 @@ export async function mapNativeProject(snapshot: NativeProjectSnapshotV1, models
   const photo = snapshot.mediaResources?.some(m => m.blob.mediaType === 'image/webp' || m.blob.mediaType === 'image/gif');
   const spatial = snapshot.representations.some(r => r.role !== 'meshPrimary');
   const mesh=[...models.values()].some(m=>m.newMesh), bounded=spatial||mesh;
-  const expanded=appearance&&sourceWitness&&nativeUsesExpandedMaterialSource(snapshot,models,sourceWitness);
-  const recipe: NativeConversionRecipe = expanded ? nativeOpaqueMaterialRecipe : mesh ? nativeMeshRecipe : spatial ? nativeSpatialRecipe : photo ? appearance ? nativeAppearancePhotoRecipe : nativePhotoRecipe : appearance ? jpeg ? nativeAppearanceJpegRecipe : nativeAppearanceRecipe : jpeg ? nativeJpegRecipe : nativeConversionRecipe;
+  const standard=appearance&&sourceWitness&&nativeUsesStandardMaterial(snapshot,models,sourceWitness);
+  const expanded=!standard&&appearance&&sourceWitness&&nativeUsesExpandedMaterialSource(snapshot,models,sourceWitness);
+  const recipe: NativeConversionRecipe = standard ? nativeStandardMaterialRecipe : expanded ? nativeOpaqueMaterialRecipe : mesh ? nativeMeshRecipe : spatial ? nativeSpatialRecipe : photo ? appearance ? nativeAppearancePhotoRecipe : nativePhotoRecipe : appearance ? jpeg ? nativeAppearanceJpegRecipe : nativeAppearanceRecipe : jpeg ? nativeJpegRecipe : nativeConversionRecipe;
   if ((bounded || nativeRecipeHasAppearance(recipe)) && !sourceWitness) return fileError('元の材質の対応記録が不足しています。');
   const ids = nativeConversionIds(conversionId, sourceSha256, recipe), id = ids.id;
   const one = (prefix: string, name: string, source: string) => id(prefix, [name, source]);
@@ -225,7 +262,7 @@ export async function mapNativeProject(snapshot: NativeProjectSnapshotV1, models
     add('materialOverridesById', { id: await id('ovr', key), routing: { scope: { kind: 'scene', sceneId: await scene(a.displaySetId) },
       target: { assetId: await asset(a.assetId), variantFamilyId: await family(r.assetId, r.variantFamilyId),
         materialLayoutId: witness.targetMaterialLayoutId, logicalMaterialSlotId: witness.targetLogicalMaterialSlotId } },
-      ...nativeAppearanceIntent(a), lifecycle: await active('ovr', key) });
+      ...nativeAppearanceIntent(a,recipe), lifecycle: await active('ovr', key) });
   }
   const checked = admitProjectRecords(records, limits, 'map2');
   if (checked.kind !== 'valid-records' || checked.hasUnknownFields) return fileError('このファイルの値は、まだそのまま変換できません。');
