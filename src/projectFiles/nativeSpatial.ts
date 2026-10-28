@@ -6,6 +6,7 @@ import { same } from '../domain/projectGraphSupport';
 import type { JsonObject } from '../domain/values';
 import { digest } from '../projectMetadata/persistence';
 import { isPointModel, type ValidatedModel } from './pointPly';
+import { meshSourceFormat } from '../domain/meshSource';
 
 let verified: Promise<void> | undefined;
 async function verifyProfiles() {
@@ -23,7 +24,7 @@ export async function nativeProxySourceProfile(): Promise<JsonObject> { await ve
 /** Raw decoded facts remain in RepresentationFrame; only these public facts are Asset-frame. */
 export function nativeSpatialModelBounds(record: JsonObject, model: ValidatedModel): {min: number[]; max: number[]} {
   const point = same(record.formatProfile, nativePointSourceDeclaration), proxy = same(record.formatProfile, nativeProxySourceDeclaration);
-  if (!point && !proxy) return model.bounds;
+  if (!point && !proxy && !meshSourceFormat(record.formatProfile)) return model.bounds;
   const transform = nativeSpatialTransform(record.representationToAsset as JsonObject), min = [Infinity, Infinity, Infinity], max = [-Infinity, -Infinity, -Infinity];
   const add = (p: readonly number[]) => transform(p).forEach((n, i) => { min[i] = Math.min(min[i]!, n); max[i] = Math.max(max[i]!, n); });
   if (point) {

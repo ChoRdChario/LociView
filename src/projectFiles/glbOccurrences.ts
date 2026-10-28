@@ -58,13 +58,13 @@ export interface DecodedOccurrenceSlot {
   readonly nodeIndex: number; readonly primitiveIndex: number; readonly materialIndex: number | null; readonly slotIndex: number;
 }
 /** Owned inspected input only. No source URLs, metadata, storage or UI authority. */
-async function decodeOccurrenceDisplay(source: ValidatedGlb) {
+export async function decodeOccurrenceDisplay(source: Pick<ValidatedGlb,'bytes'|'bounds'|'materials'|'surfaceRanges'|'occurrences'>,inlineResources=false) {
   if (!source.occurrences || THREE.REVISION !== '186' || !THREE.ColorManagement.enabled || THREE.ColorManagement.workingColorSpace !== THREE.LinearSRGBColorSpace)
     throw Error('モデルと材質の対応を確認できません。');
   const manager = new THREE.LoadingManager(), owned = new Set<ImageBitmap>(), roots = new Set<THREE.Object3D>(), originals = new Set<THREE.Material>();
   const materialLocators = new Map<THREE.Material, JsonObject>(), occurrenceSlots: DecodedOccurrenceSlot[] = [];
   let parser: GLTFParser | undefined, closed = false, failed = false;
-  manager.setURLModifier(url => { if (!url.startsWith('blob:')) throw Error('外部参照のあるモデルは表示できません。'); return url; });
+  manager.setURLModifier(url => { if (!url.startsWith('blob:')&&!(inlineResources&&/^data:(?:application\/(?:octet-stream|gltf-buffer)|image\/(?:png|jpeg));base64,/.test(url))) throw Error('外部参照のあるモデルは表示できません。'); return url; });
   manager.onError = () => { failed = true; };
   const dispose = () => {
     if (closed) return; closed = true;

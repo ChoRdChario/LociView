@@ -8,15 +8,17 @@ export interface BinaryMask { readonly opacity: number; readonly cutoff: number;
 const masks = new WeakMap<THREE.Material, BinaryMask>();
 export const binaryMask = (material: THREE.Material) => masks.get(material);
 export const hasBinaryCoverage = (material: THREE.Material) => settings.has(material) || masks.has(material);
+export type CoverageMaterial=THREE.MeshStandardMaterial|THREE.MeshBasicMaterial|THREE.MeshPhongMaterial;
+const coverageSource=(material:CoverageMaterial)=>material instanceof THREE.MeshStandardMaterial?THREE.ShaderLib.standard:material instanceof THREE.MeshPhongMaterial?THREE.ShaderLib.phong:THREE.ShaderLib.basic;
 const colorToken = '#include <color_fragment>', endToken = '#include <dithering_fragment>';
 const declarations = 'uniform vec3 lvHardKey;\nuniform float lvHardTolerance;\n';
 const coverage = '\nif (distance(diffuseColor.rgb, lvHardKey) / sqrt(3.0) <= lvHardTolerance) discard;\n';
 
 /** Exact binary pre-lighting coverage; only call on an owned, opaque source clone. */
-export function patchHardChroma(material: THREE.MeshStandardMaterial | THREE.MeshBasicMaterial, input: HardChroma, coverageOnly = false) {
+export function patchHardChroma(material: CoverageMaterial, input: HardChroma, coverageOnly = false) {
   if (hasBinaryCoverage(material) || input.keyColorSrgb.length !== 3 ||
     ![...input.keyColorSrgb, input.tolerance].every(v => Number.isFinite(v) && v >= 0 && v <= 1)) throw Error('色の透過設定を確認してください。');
-  const source = material instanceof THREE.MeshStandardMaterial ? THREE.ShaderLib.standard : THREE.ShaderLib.basic;
+  const source = coverageSource(material);
   const check = (text: string) => {
     if (text.split(colorToken).length !== 2 || text.split(endToken).length !== 2) throw Error('色の透過を描画できません。');
   };
@@ -38,13 +40,13 @@ export function patchHardChroma(material: THREE.MeshStandardMaterial | THREE.Mes
 /** Clone() deliberately does not copy shader hooks. Reapply the identical predicate. */
 export function hardChromaCoverageMaterial(material: THREE.Material) {
   const mask = binaryMask(material);
-  if (mask && (material instanceof THREE.MeshStandardMaterial || material instanceof THREE.MeshBasicMaterial)) {
+  if (mask && (material instanceof THREE.MeshStandardMaterial || material instanceof THREE.MeshBasicMaterial || material instanceof THREE.MeshPhongMaterial)) {
     const clone = material.clone(); patchBinaryMask(clone, mask, true);
     clone.blending = THREE.NoBlending; clone.depthTest = false; clone.depthWrite = false;
     return clone;
   }
   const setting = hardChroma(material);
-  if (!setting || !(material instanceof THREE.MeshStandardMaterial || material instanceof THREE.MeshBasicMaterial))
+  if (!setting || !(material instanceof THREE.MeshStandardMaterial || material instanceof THREE.MeshBasicMaterial || material instanceof THREE.MeshPhongMaterial))
     throw Error('この面の色の透過を確認できません。');
   const clone = material.clone(); patchHardChroma(clone, setting, true);
   clone.blending = THREE.NoBlending; clone.depthTest = false; clone.depthWrite = false;
@@ -52,7 +54,7 @@ export function hardChromaCoverageMaterial(material: THREE.Material) {
 }
 
 /** Explicit mask on a proven opaque source. Compose before discarding, including cutoff zero. */
-export function patchBinaryMask(material: THREE.MeshStandardMaterial | THREE.MeshBasicMaterial, input: BinaryMask, coverageOnly = false) {
+export function patchBinaryMask(material: CoverageMaterial, input: BinaryMask, coverageOnly = false) {
   if (hasBinaryCoverage(material) || ![input.opacity, input.cutoff, ...(input.chroma ?
     [...input.chroma.keyColorSrgb, input.chroma.tolerance, input.chroma.softness] : [])].every(n => Number.isFinite(n) && n >= 0 && n <= 1) ||
     input.chroma && input.chroma.keyColorSrgb.length !== 3) throw Error('切り抜きの設定を確認してください。');
@@ -61,7 +63,7 @@ export function patchBinaryMask(material: THREE.MeshStandardMaterial | THREE.Mes
   const check = (text: string) => {
     if (text.split(colorToken).length !== 2 || text.split(endToken).length !== 2) throw Error('切り抜きを描画できません。');
   };
-  check((material instanceof THREE.MeshStandardMaterial ? THREE.ShaderLib.standard : THREE.ShaderLib.basic).fragmentShader);
+  check(coverageSource(material).fragmentShader);
   const key = new THREE.Color().setRGB(...(owned.chroma?.keyColorSrgb ?? [0, 0, 0]) as [number, number, number], THREE.SRGBColorSpace);
   masks.set(material, owned); material.transparent = false; material.depthWrite = true; material.opacity = 1;
   material.onBeforeCompile = shader => {

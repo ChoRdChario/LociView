@@ -1,6 +1,8 @@
 import { gsSourceProfile } from '../projectFiles/gsPly';
 import { pointSourceProfile } from '../projectFiles/pointPly';
 import { nativePointSourceProfile } from '../projectFiles/nativeSpatial';
+import { meshSourceDeclarations, meshSourceFormat, type MeshSourceFormat } from '../domain/meshSource';
+import { meshSourceProfile } from '../projectFiles/meshSource';
 import type { ProjectProviderRead } from '../scene/projectProvider';
 import { metadataImmutableReader } from '../projectMetadata/records';
 import { same } from '../domain/projectGraphSupport';
@@ -14,7 +16,7 @@ export { validationDeclaredBodyBytes } from '../projectFiles/modelFacts';
 export async function validationModelVersions(provider: ProjectProviderRead): Promise<readonly DisplayModelVersion[]> {
   if (provider.kind !== 'scene-provider') throw Error('保存したシーンを確認できません。');
   const read = metadataImmutableReader(provider, validationMetadataLimits), profile = await validationGlbProfile(), occurrence = await occurrenceGlbProfile();
-  const gs = await gsSourceProfile(), point = await pointSourceProfile(), nativePoint = await nativePointSourceProfile(), profiles = [profile, occurrence, await jpegGlbProfile(), await occurrenceJpegGlbProfile(), point, nativePoint, gs];
+  const gs = await gsSourceProfile(), point = await pointSourceProfile(), nativePoint = await nativePointSourceProfile(), profiles = [profile, occurrence, await jpegGlbProfile(), await occurrenceJpegGlbProfile(), point, nativePoint, gs,...await Promise.all((Object.keys(meshSourceDeclarations) as MeshSourceFormat[]).map(meshSourceProfile))];
   return freezeDisplay(Object.values(provider.resources.assets).flatMap(asset => {
     if (asset.lifecycle.kind !== 'value' || asset.lifecycle.value.state !== 'active' || asset.projection.kind !== 'value') return [];
     const p = asset.projection.value;
@@ -27,7 +29,7 @@ export async function validationModelVersions(provider: ProjectProviderRead): Pr
       representation.assetId !== asset.id || !same(revision.representationIds, p.representationIds) ||
       !profiles.some(profile => same(representation.formatProfile, profile))) throw Error('保存したモデルと表示本体の対応を確認できません。');
     // These exact immutable values were validated by the provider, not by this UI assertion.
-    const closure: ValidationModelClosure = { shape: same(representation.formatProfile, gs) ? 'saved-gs' : same(representation.formatProfile, point) || same(representation.formatProfile, nativePoint) ? 'saved-point' : 'saved-glb', assetFrame: { id: p.assetFrameId },
+    const closure: ValidationModelClosure = { shape: same(representation.formatProfile, gs) ? 'saved-gs' : same(representation.formatProfile, point) || same(representation.formatProfile, nativePoint) ? 'saved-point' : meshSourceFormat(representation.formatProfile)?'saved-mesh':'saved-glb', assetFrame: { id: p.assetFrameId },
       representationFrame: { id: representation.representationFrameId as string },
       binding: binding as ValidationModelClosure['binding'], revision: revision as ValidationModelClosure['revision'],
       representation: representation as ValidationModelClosure['representation'], ...(proxy ? {proxy:proxy as ValidationModelClosure['representation']} : {}) };

@@ -99,10 +99,11 @@ export interface ProjectWorkspacePorts {
   modelReview(sceneId: string): { statuses: readonly { assetId: string; label: string; issue?: string; choices: readonly { operationId: string; label: string }[] }[];
     memberships: readonly { sceneId: string; assetId: string; edgeIds: readonly string[];
       label?: string; note?: string; details?: readonly string[]; copyReady?: boolean }[] };
-  prepareGsProxy?(token:string,target:NonNullable<WorkspaceModelDetails['gsProxyTarget']>,file?:WorkspaceFile):Promise<{id:string;label:string}>;
+  prepareGsProxy?(token:string,target:NonNullable<WorkspaceModelDetails['gsProxyTarget']>,file?:WorkspaceFile):Promise<{id:string;label:string;externalMaterialsUnavailable?:boolean}>;
   commitGsProxy?(token:string,id:string):Promise<unknown>;
   cancelGsProxy?():void;
   addModel(token: string, input: { sceneId: string; assetId: string; file: WorkspaceFile }): Promise<unknown>;
+  modelSelectionNotice?(file:WorkspaceFile):Promise<{externalMaterialsUnavailable:boolean}>;
   replaceModel(token: string, input: { sceneId: string; assetId: string; expectedBindingId: string; file: WorkspaceFile }): Promise<unknown>;
   transformModel(token: string, input: { sceneId: string; assetId: string; expectedBindingId: string; bindingId: string; placement: WorkspacePlacement }): Promise<unknown>;
   modelDeletion(assetId: string): { readonly dependencies: readonly { kind: string; id: string; uncertain: boolean }[] };

@@ -28,6 +28,8 @@ import type { ProjectAuthority } from './hostPorts';
 import type { SavedWorkspaceHost, LocalOpenMode } from './hostPorts';
 import type { MediaImage, MediaFileAddition } from './mediaDisplay';
 import type { ModelPlacementCommand, ModelFileAddition, ModelFileReplacement } from './modelTypes';
+import { isSavedModel, isSavedMesh } from './modelTypes';
+import { classifyMeshSource } from '../projectFiles/meshSource';
 import { orderBetween } from './viewDisplay';
 import { resolveScene } from '../scene/resolve';
 import { validationMaterialSlots, validationMaterialIssue } from './validationMaterials';
@@ -522,7 +524,7 @@ async function openNormalValidationHost(options: ValidationHostOptions, inherite
         const current = command.kind === 'editMaterial' ? project?.materialData?.records[command.overrideId] : undefined;
         const routing = command.kind === 'createMaterial' ? command.routing : current?.routing.kind === 'value' ? current.routing.value : null;
         const compositing = command.compositing ?? (current?.compositing.kind === 'value' ? current.compositing.value : null);
-        const slots = project?.modelVersions?.flatMap(v => v.closure.shape === 'saved-glb' ? validationMaterialSlots(v.closure) : []) ?? [];
+        const slots = project?.modelVersions?.flatMap(v => isSavedMesh(v.closure) ? validationMaterialSlots(v.closure) : []) ?? [];
         const slot = slots.find(s => same(s.target as unknown as JsonObject, routing?.target as JsonObject | undefined));
         if (!slot || !compositing) throw Error('設定するモデルと材質を確認してください。');
         const issue = validationMaterialIssue(slot, { appearance: command.appearance ?? (current?.appearance.kind === 'value' ? current.appearance.value : undefined), compositing } as MaterialIntent, project?.semanticProfile);
@@ -533,7 +535,7 @@ async function openNormalValidationHost(options: ValidationHostOptions, inherite
         if (before.state !== 'ready' || before.provider?.kind !== 'scene-provider' || before.source?.token !== token) throw Error('材質が更新されています。選び直してください。');
         const selected = selectedMaterialResolution(before.provider, command, limits);
         const versions = await validationModelVersions(before.provider);
-        const slots = versions.flatMap(v => v.closure.shape === 'saved-glb' ? validationMaterialSlots(v.closure) : []);
+        const slots = versions.flatMap(v => isSavedMesh(v.closure) ? validationMaterialSlots(v.closure) : []);
         const slot = slots.find(s => same(s.target as unknown as JsonObject, selected.routing.target));
         if (!slot) throw Error('設定するモデルと材質を確認してください。');
         for (const intent of selected.intents.values()) {
@@ -599,16 +601,17 @@ async function openNormalValidationHost(options: ValidationHostOptions, inherite
           const versions = await validationModelVersions(before.provider);
           const source = versions.find(v => v.assetId === target.assetId && v.projection.bindingId === target.expectedBindingId)?.closure;
           const view = authority.read(), scene = resolveScene(view.state, view.resources, target.sceneId);
-          if (!source || source.shape !== 'saved-glb' || scene.kind !== 'ready' || !scene.composition.assets.some(a => a.assetId === target.assetId))
+          if (!source || !isSavedMesh(source) || scene.kind !== 'ready' || !scene.composition.assets.some(a => a.assetId === target.assetId))
             throw Error('差し替えるモデルを確認してください。');
           if (!Number.isSafeInteger(file.size) || file.size <= 0 || file.size > content.limits.maxFileBytes)
             throw Error('モデルを含む合計がこの検証の上限を超えています。');
           assertValidationBodyAllocation(before.provider,content.policy,file.size);
           const bytes = new Uint8Array(await file.arrayBuffer());
           if (bytes.length !== file.size) throw Error('選択したモデルの大きさが一致しません。');
-          if (bytes.length < 4 || new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).getUint32(0, true) !== 0x46546c67) throw Error('差し替えにはGLBを選択してください。点群の差し替えはまだ利用できません。');
+          if (!(bytes.length>=4&&new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength).getUint32(0,true)===0x46546c67)&&!classifyMeshSource(bytes)) throw Error('差し替えには面を持つ3Dモデルを選択してください。点群の差し替えはまだ利用できません。');
           const prepared = await content.prepareModel({ label: file.name, bytes }, target.assetId);
           try {
+            if(prepared.representation.role!=='meshPrimary')throw Error('差し替えには面を持つ3Dモデルを選択してください。');
             const binding = await sealValidationRecord('asset-binding-revision', { id: prepared.binding.id!, assetId: target.assetId,
               assetRevisionId: prepared.revision.id!, parentBindingId: source.binding.id, method: 'manual', assetToProject: source.binding.assetToProject as unknown as JsonObject });
             const result = await ready(await session.edit(token, { kind: 'replaceAssetModel', ...target,
@@ -625,7 +628,7 @@ async function openNormalValidationHost(options: ValidationHostOptions, inherite
             throw Error('モデルが更新されています。配置の入力を保持しています。');
           const versions = await validationModelVersions(before.provider);
           const source = versions.find(v => v.assetId === captured.assetId && v.projection.bindingId === captured.expectedBindingId)?.closure;
-          if (!source || !['saved-glb', 'saved-point', 'saved-gs'].includes(source.shape)) throw Error('配置するモデルを確認してください。');
+          if (!source || !isSavedModel(source)) throw Error('配置するモデルを確認してください。');
           const binding = await sealValidationRecord('asset-binding-revision', { id: captured.bindingId, assetId: captured.assetId,
             assetRevisionId: source.revision.id, parentBindingId: source.binding.id, method: 'manual',
             assetToProject: captured.placement as unknown as JsonObject });

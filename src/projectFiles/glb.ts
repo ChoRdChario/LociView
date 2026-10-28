@@ -48,7 +48,12 @@ export function inspectFreshValidationGlb(input: Uint8Array, limits: FileValidat
 async function inspectGlb(input: Uint8Array, limits: FileValidationLimits, decodePng?: PngDecoder, decodeJpeg?: JpegDecoder, jpeg = false): Promise<ValidatedGlb> {
   checkFileLimits(limits);
   if (input.length > limits.maxFileBytes) return fileError('GLBがこの検証の上限を超えています。');
-  const bytes = input.slice(), { json: j, bin } = validationGlbParts(bytes, limits), max = limits.maxItems;
+  const bytes = input.slice(), { json: j, bin } = validationGlbParts(bytes, limits);
+  return {bytes,...await inspectStaticMeshDocument(j,bin,limits,decodePng,decodeJpeg,jpeg)};
+}
+/** Shared static facts only. Container/resource adapters must validate their own original input. */
+export async function inspectStaticMeshDocument(j:Record<string,unknown>,bin:Uint8Array,limits:FileValidationLimits,decodePng?:PngDecoder,decodeJpeg?:JpegDecoder,jpeg=false):Promise<Omit<ValidatedGlb,'bytes'>> {
+  const max=limits.maxItems;
   fileFields(j, ['asset', 'scene', 'scenes', 'nodes', 'meshes', 'buffers', 'bufferViews', 'accessors', 'materials', 'textures', 'images', 'samplers', 'extensionsUsed', 'extensionsRequired']);
   const asset = fileObject(j.asset); fileFields(asset, ['version', 'minVersion', 'generator', 'copyright']);
   if (asset.version !== '2.0' || asset.minVersion !== undefined && asset.minVersion !== '2.0') return fileError('GLBのバージョンが未対応です。');
@@ -190,5 +195,5 @@ async function inspectGlb(input: Uint8Array, limits: FileValidationLimits, decod
   if (!surfaceRanges.length || box.isEmpty()) return fileError('開始シーンに表示できる面がありません。');
   if (implicitMaterial) materials.push({ sourceLocator: { kind: 'representationMaterial', slotIndex: 0 },
     sourceSemantics: { coverage: { kind: 'opaque' }, optics: 'surface', lighting: 'lit', doubleSided: false } });
-  return { bytes, bounds: { min: box.min.toArray().map(n => n || 0), max: box.max.toArray().map(n => n || 0) }, materials, surfaceRanges };
+  return { bounds: { min: box.min.toArray().map(n => n || 0), max: box.max.toArray().map(n => n || 0) }, materials, surfaceRanges };
 }

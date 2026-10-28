@@ -43,7 +43,7 @@ export async function prepareReviewView(file: Blob, budget: ProjectFilePolicyInp
       slots.some(s => !actual.delete(canonical({ sourceLocator: s.sourceLocator!, sourceSemantics: s.sourceSemantics! }))) || actual.size)
       throw Error('モデルの形状・材質と表示情報が一致しません。');
     decoded.set(string(record.id), source);
-    if(record===visuals[0])models.push({ shape: isGsModel(source) ? 'render-gs' : isPointModel(source) ? 'render-point' : 'render-glb', key: `${review.token}/${record.id}`, assetId: string(asset.id),
+    if(record===visuals[0])models.push({ shape: isGsModel(source) ? 'render-gs' : isPointModel(source) ? 'render-point' : source.kind==='mesh-source'?'render-mesh':'render-glb', key: `${review.token}/${record.id}`, assetId: string(asset.id),
       assetToProject: asset.assetToProject as unknown as ReadonlyRenderModel['assetToProject'], representation: record as ReadonlyRenderModel['representation'],...(proxies[0]?{proxy:proxies[0] as NonNullable<ReadonlyRenderModel['proxy']>}: {}) });
     }
   }

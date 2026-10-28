@@ -3,6 +3,7 @@ import { assetStatusCandidates } from '../projectMetadata/assetStatus';
 import { metadataImmutableReader } from '../projectMetadata/records';
 import type { MetadataLimits } from '../projectMetadata/format';
 import type { ReadonlyRenderModel } from './modelTypes';
+import { meshSourceFormat } from '../domain/meshSource';
 import { projectBounds, type ReadonlyDisplay } from './viewportModel';
 import type { ViewportFactory, ProjectViewport } from './viewportPorts';
 
@@ -15,7 +16,7 @@ export function modelCandidateDisplay(provider: Extract<ProjectProviderRead, { k
   if (!candidate || !Array.isArray(candidate.revision.representationIds) || candidate.revision.representationIds.length !== 1)
     throw Error('この候補の表示本体を確認できません。');
   const rep = metadataImmutableReader(provider, limits)('representationsById', candidate.revision.representationIds[0] as string);
-  const model: ReadonlyRenderModel = { shape: 'render-glb', key: candidate.binding.id as string, assetId,
+  const model: ReadonlyRenderModel = { shape: meshSourceFormat(rep.formatProfile)?'render-mesh':'render-glb', key: candidate.binding.id as string, assetId,
     assetToProject: candidate.binding.assetToProject as unknown as ReadonlyRenderModel['assetToProject'],
     representation: rep as ReadonlyRenderModel['representation'] };
   return { readOnly: true, token: provider.token, sceneId, projectFrameId: provider.resources.projectFrameId,

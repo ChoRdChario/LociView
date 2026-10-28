@@ -1,6 +1,7 @@
 import { resolveScene } from '../scene/resolve';
 import { pointSourceDeclaration } from '../domain/pointSource';
 import { nativePointSourceDeclaration, nativeProxySourceDeclaration, nativeSpatialTransform } from '../domain/nativeSpatialSource';
+import { meshSourceFormat } from '../domain/meshSource';
 import { same } from '../domain/projectGraphSupport';
 import type { Anchor } from '../scene/types';
 import { readProjectScene, type ProjectProviderRead } from '../scene/projectProvider';
@@ -27,7 +28,7 @@ export function assertValidationModelClosures(provider:Extract<ProjectProviderRe
   for (const field of Object.values(provider.details.immutable.representationsById)) {
     charge(); if (field.kind !== 'value') continue;
     const r = field.value;
-    if (!same(r.formatProfile, nativeProxySourceDeclaration)) continue;
+    if (!same(r.formatProfile, nativeProxySourceDeclaration) && !(r.role==='interactionProxy'&&meshSourceFormat(r.formatProfile))) continue;
     if (r.variantFamilyId === r.proxyForGsVariantFamilyId) return fileError('位置指定用の面とGSの識別情報が一致しません。');
     const edges = r.derivedFrom;
     if (!Array.isArray(edges) || edges.length > 1) return fileError('位置指定用の面の元モデルを確認できません。');
@@ -142,7 +143,7 @@ async function restoredFacts(content: ValidationContent, next: ProjectMetadataSo
   let total = 0;
   for (const ref of refs) {
     const check = new ProjectRecordFields(); check.blob(ref, []);
-    if (check.unknown || !['model/gltf-binary', pointSourceMediaType, 'image/png', 'image/jpeg', 'image/webp', 'image/gif'].includes(ref.mediaType as string)) return fileError('復元する本体形式を確認してください。');
+    if (check.unknown || !['model/gltf-binary','model/stl','text/plain','model/gltf+json', pointSourceMediaType, 'image/png', 'image/jpeg', 'image/webp', 'image/gif'].includes(ref.mediaType as string)) return fileError('復元する本体形式を確認してください。');
     const key = json(ref), size = ref.byteLength as number, previous = sizes.get(ref.digest as string);
     if (previous !== undefined && previous !== size) return fileError('復元する本体の大きさが一致しません。');
     if (previous === undefined) { total += size; sizes.set(ref.digest as string, size); }

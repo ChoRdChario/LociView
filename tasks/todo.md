@@ -22,7 +22,7 @@ Fix latency when it prevents use or risks data. Keep the existing
 Root is sole writer; bounded independent reviewers are read-only. No small manual
 test or helper approvals. Continue in-scope work while device evidence is pending.
 
-## Current connected unit — approved07l Mesh import / Native conversion
+## Current boundary — verified07l Mesh import / Native conversion
 
 PO2026-10-28 approved [07l](../docs/specs/07l-mesh-import-conversion-proposal.md)
 in one group: STL/Mesh PLY/OBJ/self-contained glTF fresh creation/addition and Native
@@ -31,20 +31,59 @@ exchange with local edits → Review editable copy/Clean → restore/cold resume
 Root is sole writer; three bounded reviewers are read-only. No per-format/helper
 PO approval or small manual-test wait. No new dependency/schema/package version.
 
-Meta-audit:07k final tree below is verified on g0-baseline; checkpoint/push it before
-editing runtime source for07l. Four exact approved profile companions, recipe8 ID/
+Meta-audit:07k final tree below is verified, committed and pushed on g0-baseline;
+worktree was clean before07l source edits. Four exact approved profile companions, recipe8 ID/
 source goldens, unknown fresh unitless-Project policy, canonical PLY geometry,
 Phong-preserving OBJ effects and private receipt contract are already reviewed.
 Static hashes/lengths/eight IDs/seven source vectors/Float32 colors/old companion
 byte identity and local links pass. This is not07l runtime/adoption evidence.
 
-Plan: new kind:'mesh-source' and domain neutral data/source-address types → strict
+Delivered: new kind:'mesh-source' and domain neutral data/source-address types → strict
 STL/PLY then OBJ/glTF inspectors and actual180→186 proof → exact content/profile/
 MIME/facts/copy/Review/render/picking integration → recipe8 using07k archive/CAS/
 journal fences → same typed file/model/Proxy/material UI → focused faults and one
 representative connected mixed-format browser/file flow → final serial checkpoint
 and independent final diff review. Record exact imports and run sceneCore early.
 Reuse existing GLB parsed-core checks without changing old wrappers/profile bytes.
+
+Implementation is connected through exact source inspectors/neutral180→186 proof,
+typed selection/add/replace/Proxy/material commands, recipe8's existing archive/CAS/
+journal engine and normal copy/Review/restore readers. OBJ unavailable declarations
+pause only affected additions; replacement/Proxy reuse existing confirmations.
+Notice is read-only and late/disposed/unverified results cannot publish a command.
+Independent review findings (command allowlists, source-slot bijection, bounded
+token expansion and notice failure/disposal) are fixed with focused regressions.
+Focused input/import/Proxy checks and17 changed service/product/recovery cases pass.
+Final frozen source/test tree passes typecheck,129 Vitest files/2896 tests (21
+existing todos), and normal/harness/validation/Desktop builds. HEIC public-path
+isolation, all four current-source maps, GS build/import separation, Desktop
+distribution/notices and ordinary/Desktop Native Spark chunk identity pass.
+Staged47 source/test files match the independently reviewed/tested hashes.
+Logs: `mesh07l-final-checkpoint.log`, `mesh07l-final-artifacts.log` and
+`mesh07l-tested-tree.json` under ignored e2e/integration-tools.
+Browser run1793145790592-24288 passes two cases14.5min (Native case13.2min):
+two independent profiles/two returns with local work, all five purposes, old GLB +
+Point/GS + all four new formats/non-GLB Proxy, Review edit-copy/Clean, restore/cold.
+Browser1793146810299-59808 passes the focused fresh workflow1.2min: textured inline
+PNG glTF, actual Phong lit mask/chroma discard and matching covered/discarded picks,
+reset-to-source pixel equivalence, unlit, four-format addition, new Proxy attachment,
+replacement, backup/cold. Rendered PLY/glTF and mask screenshots were inspected.
+These are dedicated headless Chromium/local-HTTP observations, not iOS/offline/PWA
+or aggregate adoption/release. Logs/owned sources/profiles remain under ignored
+`.artifacts/e2e/`; helper scripts are in its ignored integration-tools subtree.
+
+Preserved failures:1793145356841-64928 passed fresh four-format rendering/file/cold
+but its mixed exchange assertion selected an arbitrary added Caption. Use explicit
+title selection plus the source Caption ID for saved-record comparison. Focused
+1793146673655-55712 used a disabled assertion for a coordinate field that is hidden
+while awaiting a surface; it now checks the actual refusal, hidden confirmation and
+no GPU error, matching the existing acceptance. No timeout or requirement relaxed.
+An initial full checkpoint was interrupted after identifying stale busy copy after
+the read-only file notice. The final callback clears that transient copy; its exact
+failure/reselect/confirm DOM regression passes. Keep the interrupted log separate
+from final evidence. Earlier Node-only ProgressEvent setup, wrong test constructor,
+frozen fault-fixture mutation and extra-token test target were corrected; no product
+guard was loosened. Review findings are resolved.
 
 Acceptance is07l§6. Keep originals, unit objects, raw/Asset bounds, slot/surface
 ordinals, existing pins/history and every write/readback/publication/recovery fence.
@@ -269,13 +308,23 @@ Logs, generated owned inputs, traces, failures and snapshots remain under ignore
 
 ## Next outcome and remaining acceptance
 
-Next, prioritize real missing initial-conversion workflows over GS tuning;
+Next, prioritize missing connected user workflows over GS tuning;
 the500k Review failure remains tracked.
-The approved07l four-format Mesh/Proxy workflow is the current connected unit.
-Special base-material editing, further external-resource/format subsets and frozen-v1
-orthographic mapping also remain; choose the next group from actual completed
-coverage. New exact policies/recipes require reviewed contract data before runtime
-implementation. Do not turn stale inventory classifications into a renewed queue.
+  The approved07l four-format Mesh/Proxy workflow is the current connected unit.
+  Next, complete editing/reset for already admitted Mesh source materials: first
+  opaque unlit/double-sided sources, then source MASK. Use01§4.2's existing meanings,
+  exact Mesh/profile capabilities and a reviewed source/effect acceptance table;
+  do not accidentally unlock Point/GS material controls. Preserve inherit, side,
+  source-alpha and same-surface picking through file exchange/cold reopen. Existing
+  product approval covers normal sequencing and compatible implementation. A new
+  unlit→lit fallback/material meaning would need an explicit decision instead.
+  Further external-resource/format subsets, frozen-v1 orthographic mapping and
+  multi-model LociMyu also remain. Old orthographic span is not fully recorded;
+  multi-model LociMyu has no reliable Caption owner/frame mapping. Native active
+  chroma/opacity uses different smooth-alpha semantics from the current binary
+  mask, so none of those policies may be guessed. New exact policies/recipes need
+  reviewed concrete contracts and genuine grouped approval before runtime work.
+  Do not turn stale inventory classifications into a renewed queue.
 Keep existing-project units, original bytes/pins and the same five-purpose/return/
 restore/reopen workflow.07l approval covers its four internal tracks and routine
 fixes/tests; no repeated format/helper approval is required.

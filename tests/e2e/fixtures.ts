@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { ZipWriter, Uint8ArrayReader, Uint8ArrayWriter } from '@zip.js/zip.js';
 import { deflateSync } from 'node:zlib';
 import { serializeGlb } from '../../src/assets/glbOptimize';
@@ -93,7 +94,7 @@ export async function nativeConversionBackup(model: Buffer, image: Buffer, capti
 }
 
 /** Owned Node fixture only; browser source ownership/streaming is verified separately. */
-export async function nativeSpatialBackup(rows = 256) {
+export async function nativeSpatialBackup(rows = 256,extension?:{bodies:ReadonlyMap<string,Buffer>;update(snapshot:any):void}) {
   const id=(p:string,n:number)=>`${p}_${String(n).padStart(26,'0')}`, sample=gsFixture(3);
   const header=Buffer.from(new TextDecoder().decode(sample.subarray(0,sample.length-248)).replace('element vertex 1',`element vertex ${rows}`));
   const gs=Buffer.alloc(header.length+rows*248);header.copy(gs);const width=Math.ceil(Math.sqrt(rows));
@@ -105,7 +106,8 @@ export async function nativeSpatialBackup(rows = 256) {
   const pointHeader='ply\nformat ascii 1.0\nelement vertex 2\nproperty float x\nproperty float y\nproperty float z\nproperty uchar red\nproperty uchar green\nproperty uchar blue\nend_header\n';
   const point=Buffer.from(pointHeader+'-1 0 0 255 0 0\n1 1 0 0 255 0\n'),proxy=triangleGlb(),hash=(b:Uint8Array)=>createHash('sha256').update(b).digest('hex');
   const ref=(b:Buffer,mediaType:string)=>({algorithm:'sha256',digest:hash(b),byteLength:b.length,mediaType});
-  const bodies=new Map([[id('rep',1),point],[id('rep',2),gs],[id('rep',3),proxy]]);
+  const bodies=new Map<string,Buffer>([[id('rep',1),point],[id('rep',2),gs],[id('rep',3),proxy]]);
+  for(const [id,body] of extension?.bodies??[])bodies.set(id,body);
   const file=await nativeConversionBackup(proxy,smallPng(),2,false,{bodies,update(s){
     const p=s.representations[0],g=s.representations[1],mesh=structuredClone(p);
     s.project.title='Native点群とGS';s.presentation.displayMode='mixed';s.presentation.hiddenAssetIds=[id('ast',3)];
@@ -123,6 +125,7 @@ export async function nativeSpatialBackup(rows = 256) {
     s.assetRevisions.push({id:id('rev',3),assetId:id('ast',3),representationIds:[id('rep',4)],anchorCompatibilityClasses:[{id:id('cls',3),targetVariantFamilyIds:[id('fam',4)]}]});
     s.assetBindingRevisions.push({...structuredClone(s.assetBindingRevisions[0]),id:id('bnd',3),assetId:id('ast',3),assetRevisionId:id('rev',3)});
     s.captions[0].anchor.positionAsset=[1,.5,0];
+    extension?.update(s);
   }});
   const eocd=file.lastIndexOf(Buffer.from([80,75,5,6])),bodyRanges:{start:number;end:number}[]=[];
   let central=file.readUInt32LE(eocd+16);
@@ -133,7 +136,28 @@ export async function nativeSpatialBackup(rows = 256) {
     if(name.startsWith('native/representations/')||name.startsWith('native/media/'))bodyRanges.push({start,end:start+file.readUInt32LE(central+20)});
     central+=46+nameLength+extraLength+commentLength;
   }
-  return {file,bodyRanges,gsDigest:hash(gs),gsBytes:gs.length,pointDigest:hash(point),proxyDigest:hash(proxy),originalDigest:hash(file),rows};
+  return {file,bodyRanges,gsDigest:hash(gs),gsBytes:gs.length,pointDigest:hash(point),proxyDigest:hash(bodies.get(id('rep',3))!),originalDigest:hash(file),rows};
+}
+
+/** Owned07l source vectors, never user files or public fixtures. */
+export function meshSources(){
+  const goldens=JSON.parse(readFileSync('docs/specs/profiles/mesh-conversion-8.goldens.json','utf8'));
+  return (['stl','ply','obj','gltf'] as const).map((format,i)=>{const g=goldens.sources[['stl-magics-red','ply-quad','obj-slots','gltf-json'][i]!];return{format,bytes:format==='obj'?Buffer.from('mtllib unavailable.mtl\n'+g.utf8):g.utf8?Buffer.from(g.utf8):Buffer.from(g.base64,'base64')};});
+}
+export async function nativeMeshBackup(){
+  const id=(p:string,n:number)=>`${p}_${String(n).padStart(26,'0')}`,hash=(b:Buffer)=>createHash('sha256').update(b).digest('hex'),sources=meshSources();
+  const proxy=Buffer.from('mtllib unavailable.mtl\no Surface\nv -1 0 0\nv 1 0 0\nv 0 2 0\nv -1 1 0\ns off\nusemtl First\nf 1 2 3\nusemtl Second\nf 1 3 4\n'),bodies=new Map([[id('rep',3),proxy],...sources.map((s,i)=>[id('rep',100+i),s.bytes] as const)]);
+  return nativeSpatialBackup(256,{bodies,update(s){
+    const placement=()=>({translation:[0,0,0],rotationXYZW:[0,0,0,1],uniformScale:1});
+    const blob=(b:Buffer,mediaType:string)=>({algorithm:'sha256',digest:hash(b),byteLength:b.length,mediaType});
+    Object.assign(s.representations.find((r:any)=>r.id===id('rep',3)),{formatProfile:{id:'lociview-native-model-obj-v1'},blob:blob(proxy,'text/plain')});
+    for(const [i,source] of sources.entries()){const n=100+i,asset=id('ast',n),rep=id('rep',n),family=id('fam',n),revision=id('rev',n);
+      s.assets.push({id:asset,label:source.format,assetFrameId:id('frm',200+n),status:{kind:'ready',activeBindingId:id('bnd',n)}});
+      s.assetBindingRevisions.push({id:id('bnd',n),assetId:asset,assetRevisionId:revision,assetToProject:{...placement(),translation:[i*3+6,0,0]},method:'manual'});
+      s.assetRevisions.push({id:revision,assetId:asset,representationIds:[rep],anchorCompatibilityClasses:[{id:id('cls',n),targetVariantFamilyIds:[family]}]});
+      s.representations.push({id:rep,assetId:asset,representationFrameId:id('frm',400+n),contentKind:'mesh',purposes:['source','display'],role:'meshPrimary',variantFamilyId:family,formatProfile:{id:`lociview-native-model-${source.format}-v1`},blob:blob(source.bytes,source.format==='stl'?'model/stl':source.format==='obj'?'text/plain':source.format==='gltf'?'model/gltf+json':'application/octet-stream'),representationToAsset:{...placement(),translation:[1,2,3],uniformScale:2,reflection:'x'},derivedFrom:[]});
+    }
+  }});
 }
 
 /** Frozen-v1 GLB/PNG subset from the existing owned operation-log fixture. */

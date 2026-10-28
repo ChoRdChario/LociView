@@ -10,6 +10,8 @@ import type { PngDecoder } from './png';
 import type { JpegDecoder } from './jpeg';
 import { fileError, occurrenceGlbProfileText, occurrenceJpegGlbProfileText, type FileValidationLimits } from './validation';
 import { digestNativeBytes } from '../nativeGs/sha256';
+import type { MeshSourceData } from '../domain/meshSource';
+import { meshSourceInputKey } from './meshSourceBinding';
 
 export function occurrenceInputKey(source:ValidatedGlb):string {
   const sha256=digestNativeBytes(source.bytes).sha256;
@@ -53,18 +55,28 @@ export async function captureOwnedOccurrenceProof(source:ValidatedGlb,signal?:Ab
   } finally { decoded.dispose(); }
 }
 
+/** New JSON-glTF binding; old GLB profile/input keys and URI policy stay closed. */
+export async function captureGltfMeshOccurrenceProof(input:MeshSourceData,signal?:AbortSignal):Promise<LegacyOccurrenceProof>{
+  if(input.kind!=='mesh-source'||input.format!=='gltf')throw Error('glTFの入力形式を確認してください。');
+  const source=structuredClone(input),inputKey=meshSourceInputKey(source);signal?.throwIfAborted();const decoded=await decodeOccurrenceGlb(source,true);
+  try{signal?.throwIfAborted();const rows=decoded.occurrenceSlots.map(slot=>{const target=snapshotTargets(slot.node,undefined,false).rows[0];if(!target)throw Error('元の材質を確認できません。');
+      return Object.freeze({childPath:Object.freeze([...slot.childPath]),materialArraySlot:slot.materialArraySlot,nodeIndex:slot.nodeIndex,primitiveIndex:slot.primitiveIndex,materialIndex:slot.materialIndex,slotIndex:slot.slotIndex,v1Key:'',target});});
+    if(inputKey!==meshSourceInputKey(source))throw Error('元のモデル入力が変更されました。');return Object.freeze({inputKey,rows:Object.freeze(rows)});
+  }finally{decoded.dispose();}
+}
+
 interface DecodedOccurrenceSlot {
   readonly node: THREE.Mesh; readonly childPath: readonly number[]; readonly materialArraySlot: 0;
   readonly nodeIndex: number; readonly primitiveIndex: number; readonly materialIndex: number | null; readonly slotIndex: number;
 }
 /** Owned inspected input only. No source URLs, metadata, storage or UI authority. */
-async function decodeOccurrenceGlb(source: ValidatedGlb) {
+async function decodeOccurrenceGlb(source: Pick<ValidatedGlb,'bytes'|'bounds'|'materials'|'surfaceRanges'|'occurrences'>,inlineResources=false) {
   if (!source.occurrences || THREE.REVISION !== '180' || !THREE.ColorManagement.enabled || THREE.ColorManagement.workingColorSpace !== THREE.LinearSRGBColorSpace)
     throw Error('モデルと材質の対応を確認できません。');
   const manager = new THREE.LoadingManager(), owned = new Set<ImageBitmap>(), roots = new Set<THREE.Object3D>(), originals = new Set<THREE.Material>();
   const materialLocators = new Map<THREE.Material, JsonObject>(), occurrenceSlots: DecodedOccurrenceSlot[] = [];
   let parser: GLTFParser | undefined, closed = false, failed = false;
-  manager.setURLModifier(url => { if (!url.startsWith('blob:')) throw Error('外部参照のあるモデルは表示できません。'); return url; });
+  manager.setURLModifier(url => { if (!url.startsWith('blob:')&&!(inlineResources&&/^data:(?:application\/(?:octet-stream|gltf-buffer)|image\/(?:png|jpeg));base64,/.test(url))) throw Error('外部参照のあるモデルは表示できません。'); return url; });
   manager.onError = () => { failed = true; };
   const dispose = () => {
     if (closed) return; closed = true;

@@ -75,7 +75,7 @@ export function createValidationModeHost(initial: Host, open: (mode: LocalOpenMo
       try { await work; } finally { switching = false; if (operation === work) operation = undefined; }
     },
   };
-  const host: SavedWorkspaceHost & ValidationDisplayHost & Pick<Host, 'workspaceFiles' | 'workspaceOutput' | 'backupRestore' | 'dispatch' | 'conversionReport' | 'conversionReportAvailable'> & { content: Pick<Host['content'], 'model' | 'modelContent' | 'image'>; imageScope(): string } = {
+  const host: SavedWorkspaceHost & ValidationDisplayHost & Pick<Host, 'workspaceFiles' | 'workspaceOutput' | 'backupRestore' | 'dispatch' | 'conversionReport' | 'conversionReportAvailable'> & { content: Pick<Host['content'], 'model' | 'modelContent' | 'image' | 'modelSelectionNotice'>; imageScope(): string } = {
     authority, mode, limits: initial.limits, read: () => current.read(),
     hasPending: () => switching || current.hasPending(),
     refresh: () => run(() => current.refresh()), resolve: (...a) => run(() => current.resolve(...a)),
@@ -125,7 +125,7 @@ export function createValidationModeHost(initial: Host, open: (mode: LocalOpenMo
       displayReady: (...a) => { admit(); current.backupRestore.displayReady(...a); },
     },
     // The resident cache never retains a closed host's content service.
-    content: { modelContent: (record, readOnly) => current.content.modelContent(record, readOnly), model: (record, readOnly) => current.content.model(record, readOnly), image: (record, readOnly) => current.content.image(record, readOnly) },
+    content: { modelSelectionNotice:file=>run(()=>current.content.modelSelectionNotice(file)), modelContent: (record, readOnly) => current.content.modelContent(record, readOnly), model: (record, readOnly) => current.content.model(record, readOnly), image: (record, readOnly) => current.content.image(record, readOnly) },
     imageScope() { if (imageOwner !== current.content) { imageOwner = current.content; imageEpoch++; } return String(imageEpoch); },
     setDisplayPreparation(callback) {
       admit(); if (prepare) throw Error('モデル表示の接続を確認してください。');

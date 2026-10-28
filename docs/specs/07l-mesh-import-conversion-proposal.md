@@ -1,7 +1,7 @@
 # Mesh files and Native Mesh / Proxy → ProjectScene
 
-> **PO-APPROVED — 2026-10-28. IMPLEMENTATION PLANNED.**
-> This is the next grouped M01/F06 decision after [07k](07k-native-point-gs-proxy-conversion-proposal.md).
+> **PO-APPROVED — 2026-10-28. BOUNDED IMPLEMENTATION VERIFIED.**
+> This is the grouped M01/F06 companion after [07k](07k-native-point-gs-proxy-conversion-proposal.md).
 > PO approved the exact grouped contract/companions below. It does not itself
 > register profiles, provide executed runtime evidence or pass adoption/release.
 > [Todo](../../tasks/todo.md) owns current work and executed evidence.
@@ -23,8 +23,9 @@ Old profiles/recipes1–7 and their prepared jobs retain their exact meanings.
 
 ## 2. Exact source companions and common admission
 
-The four proposed UTF-8/LF JSON companions below and their shared golden file are
-specification data. Runtime registration still requires the implementation/checks.
+The four approved UTF-8/LF JSON companions below and their shared golden file are
+specification data. Exact registration is in projectFiles/meshSource and content;
+todo records shared-service and dedicated Desktop browser evidence and its limits.
 
 | Proposed source | Companion / bytes | SHA-256 / published MIME |
 |---|---|---|
@@ -221,6 +222,15 @@ unsupported dormant combinations refuse the whole source, not discard history.
 Nonidentity GLB-primary remains outside the old GLB profiles and this proposal.
 
 ## 5. Recipe8, private proof and recovery
+
+Implementation port refinement: the model panel may request a typed read-only
+`modelSelectionNotice(file)` with `externalMaterialsUnavailable:boolean`. This
+inspect-only result grants no edit/content evidence; the eventual Session command
+revalidates its captured file. Only an OBJ with an unavailable declaration pauses
+automatic addition for its contextual confirmation. Replacement and Proxy reuse
+their existing confirmation. Scope/token checks discard late notices; cancel
+does not publish a model or write storage. The Proxy preparation result carries
+the same display-only consequence, separate from its captured command identity.
 
 Choose native-project-scene-recipe-8 iff at least one newly admitted format occurs
 in any retained Native Representation, including a Proxy. Otherwise choose the

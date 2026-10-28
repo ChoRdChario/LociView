@@ -12,8 +12,8 @@ export function createProjectModels(document: Document, host: ProjectPanelHost):
   let edit: WorkspaceModelProposal | null = null, raw: string[] = [], composing = false, disposed = false;
   let pinSize: { token: string; sceneId: string; assetId: string; raw: string } | null = null;
   let pinSizeScope: { token: string; sceneId: string; assetId: string } | null = null;
-  let proxyScope: {token:string;target:NonNullable<ReturnType<typeof host.ports.modelDetails>>['gsProxyTarget'];removing:boolean;prepared?:{id:string;label:string}} | null=null;
-  let fileScope: { kind: 'add' | 'replace'; token: string; sceneId: string; assetId: string; expectedBindingId?: string; file?: WorkspaceFile } | null = null;
+  let proxyScope: {token:string;target:NonNullable<ReturnType<typeof host.ports.modelDetails>>['gsProxyTarget'];removing:boolean;prepared?:{id:string;label:string;externalMaterialsUnavailable?:boolean}} | null=null;
+  let fileScope: { kind: 'add' | 'replace'; token: string; sceneId: string; assetId: string; expectedBindingId?: string; file?: WorkspaceFile; externalMaterialsUnavailable?:boolean } | null = null;
   let deletion: { token: string; assetId: string } | null = null;
   const choices = new Map<string, { token: string; value: string }>();
   const membershipDecisions = new Map<string, { token: string; sceneId: string; value: 'one' | 'both' }>();
@@ -41,8 +41,8 @@ export function createProjectModels(document: Document, host: ProjectPanelHost):
     } catch (error) { host.message((error as Error).message); }
     host.changed();
   });
-  const input = (label: string) => { const node = make('input'); node.type = 'file'; node.accept = '.glb,model/gltf-binary'; node.hidden = true; node.setAttribute('aria-label', label); fileArea.append(node); return node; };
-  const addInput = input('3Dモデルを追加'), replaceInput = input('モデルを差し替える'); addInput.accept += ',.ply,application/ply';
+  const input = (label: string) => { const node = make('input'); node.type = 'file'; node.accept = '.glb,.gltf,.obj,.stl,.ply,model/gltf-binary,model/gltf+json,model/stl,application/ply,text/plain'; node.hidden = true; node.setAttribute('aria-label', label); fileArea.append(node); return node; };
+  const addInput = input('3Dモデルを追加'), replaceInput = input('モデルを差し替える');
   const beginFile = (kind: 'add' | 'replace') => {
     if (host.block('models') || ownInput() || memory().composing) return;
     const { provider, sceneId } = host.source(), details = memory().assetId ? host.ports.modelDetails(sceneId, memory().assetId!) : null;
@@ -53,10 +53,11 @@ export function createProjectModels(document: Document, host: ProjectPanelHost):
   };
   const add = button('3Dモデルを追加', () => beginFile('add')), replace = button('モデルを差し替える', () => beginFile('replace'));
   const cancelFile = button('選択を取り消す', () => { if (!host.block('models', false) && !composing) { fileScope = null; addInput.value = replaceInput.value = ''; host.changed(); } });
+  const confirmAddition=button('このモデルを追加',()=>applyFile());
   const confirmReplacement = button('差し替えを確定', () => applyFile()), fileNote = make('p'); fileNote.setAttribute('role', 'status');
-  fileArea.append(add, replace, cancelFile, fileNote, confirmReplacement);
+  fileArea.append(add, replace, cancelFile, fileNote, confirmReplacement,confirmAddition);
   function applyFile() {
-    const captured = fileScope; if (!captured?.file || host.block('models') || captured.token !== host.source().provider.token) return;
+    const captured = fileScope; if (!captured?.file || host.ports.modelSelectionNotice&&captured.externalMaterialsUnavailable===undefined || host.block('models') || captured.token !== host.source().provider.token) return;
     const action = captured.kind === 'add' ? () => host.ports.addModel(captured.token, { sceneId: captured.sceneId, assetId: captured.assetId, file: captured.file! }) :
       () => host.ports.replaceModel(captured.token, { sceneId: captured.sceneId, assetId: captured.assetId, expectedBindingId: captured.expectedBindingId!, file: captured.file! });
     host.execute('models', captured.token, action, () => { fileScope = null; addInput.value = replaceInput.value = ''; setMemory({ ...memory(), assetId: captured.assetId });
@@ -66,9 +67,17 @@ export function createProjectModels(document: Document, host: ProjectPanelHost):
     node.addEventListener('cancel', () => { if (!host.block('models', false)) { fileScope = null; host.changed(); } });
     node.addEventListener('change', () => {
       const selected = node.files?.[0]; if (!selected || !fileScope || host.block('models')) return;
-      fileScope = { ...fileScope, file: { name: selected.name, size: selected.size, blob: selected.slice(), arrayBuffer: selected.arrayBuffer.bind(selected) } };
+      fileScope = { ...fileScope, externalMaterialsUnavailable:undefined, file: { name: selected.name, size: selected.size, blob: selected.slice(), arrayBuffer: selected.arrayBuffer.bind(selected) } };
       if (fileScope.token !== host.source().provider.token) host.message('対象が更新されています。元のモデルを選び直してください。');
-      else if (fileScope.kind === 'add') applyFile(); host.changed();
+      else if(host.ports.modelSelectionNotice){
+        const captured=fileScope;let applied=false;
+        host.execute('models',captured.token,async()=>{
+          const notice=await host.ports.modelSelectionNotice!(captured.file!);
+          if(disposed||fileScope!==captured||captured.token!==host.source().provider.token)throw Error('対象が更新されています。選び直してください。');
+          if(captured.kind==='add'&&!notice.externalMaterialsUnavailable){await host.ports.addModel(captured.token,{sceneId:captured.sceneId,assetId:captured.assetId,file:captured.file!});applied=true;}
+          else fileScope={...captured,externalMaterialsUnavailable:notice.externalMaterialsUnavailable};
+        },()=>{if(applied){fileScope=null;addInput.value='';setMemory({...memory(),assetId:captured.assetId});host.message('モデルを追加しました。');}else host.message('');});
+      }else if (fileScope.kind === 'add') applyFile(); host.changed();
     });
   }
   const proxyArea=make('section'),proxyNote=make('p'),proxyInput=input('位置指定用の面を選択');proxyArea.setAttribute('aria-label','位置指定用の面');proxyNote.setAttribute('role','status');
@@ -81,6 +90,7 @@ export function createProjectModels(document: Document, host: ProjectPanelHost):
   const proxyAdd=button('位置指定用の面を追加',()=>beginProxy(false)),proxyRemove=button('位置指定用の面を外す',()=>beginProxy(true));
   function prepareProxy(file?:WorkspaceFile){
     const captured=proxyScope;if(!captured?.target||host.block('models')||!host.ports.prepareGsProxy)return;
+    captured.prepared=undefined;
     host.execute('models',captured.token,async()=>{const result=await host.ports.prepareGsProxy!(captured.token,captured.target!,file);if(proxyScope===captured)captured.prepared=result;},()=>host.changed());
   }
   proxyInput.addEventListener('change',()=>{const file=proxyInput.files?.[0];if(file&&proxyScope)prepareProxy({name:file.name,size:file.size,arrayBuffer:file.arrayBuffer.bind(file)});});
@@ -167,6 +177,7 @@ export function createProjectModels(document: Document, host: ProjectPanelHost):
     proxyConfirm.textContent=proxyScope?.removing?'面を外す':proxyScope?.target?.expectedProxyId?'面の変更を確定':'このモデルに面を追加';
     proxyConfirm.disabled=!!block||!proxyScope?.prepared||proxyScope.token!==provider.token;proxyCancel.disabled=!!host.block('models',false);
     proxyNote.textContent=proxyScope?.token&&proxyScope.token!==provider.token?'モデルが更新されています。入力は保持しています。取り消して選び直してください。':proxyScope?.removing?'新しく位置を選ぶには面の追加が必要です。保存済みの記録位置は変わりません。':proxyScope?.prepared?`${proxyScope.prepared.label} を選択中のモデルに関連付けます。同じ原点・向き・倍率で用意した面であることを確認してください。面は通常表示されず、保存済みの記録位置は変わりません。`:'このモデルと同じ座標で用意した面のデータを選択してください。';
+    if(proxyScope?.prepared?.externalMaterialsUnavailable)proxyNote.textContent+=' OBJの外部材質・画像は読み込まず、既定の材質で表示します。';
     const source = context().source, selectedItem = source.kind === 'ready' ? source.items.find(i => i.id === selected) : undefined;
     pointSizeArea.hidden = !details?.pointCloud; pointSizeInput.disabled = !!block || !!edit || !!fileScope; if (selected) pointSizeInput.value = String(host.viewport().pointDiameter?.(selected) ?? 3);
     const included = selectedItem?.membership.kind === 'value' && selectedItem.membership.value.kind === 'included';
@@ -183,9 +194,11 @@ export function createProjectModels(document: Document, host: ProjectPanelHost):
     pinSizeNote.textContent = staleScale ? '内容が更新されています。入力を保持しています。取り消して選び直してください。' : !scaleReady ? 'このプロジェクトでは倍率を変更できません。モデルと設定の状態を確認してください。' : 'このモデルに属するピンの大きさを、すべてのシーンで変更します。';
     add.disabled = !!block || ownInput() || memory().composing || !sceneId;
     replace.disabled = !!block || ownInput() || memory().composing || !details || details.replacementAvailable === false || !included || details.sceneCount.kind !== 'value';
-    confirmReplacement.hidden = fileScope?.kind !== 'replace' || !fileScope.file; confirmReplacement.disabled = !!block || fileScope?.token !== provider.token;
+    confirmAddition.hidden=fileScope?.kind!=='add'||!fileScope.file||!fileScope.externalMaterialsUnavailable;confirmAddition.disabled=!!block||fileScope?.token!==provider.token;
+    confirmReplacement.hidden = fileScope?.kind !== 'replace' || !fileScope.file; confirmReplacement.disabled = !!block || fileScope?.token !== provider.token || !!host.ports.modelSelectionNotice&&fileScope?.externalMaterialsUnavailable===undefined;
     cancelFile.hidden = !fileScope; cancelFile.disabled = !!host.block('models', false);
-    fileNote.textContent = fileScope?.kind === 'replace' ? `${fileScope.file?.name ?? 'ファイルを選択してください。'} ${details?.sceneCount.kind === 'value' ? `${details.sceneCount.value}シーンのモデルを差し替えます。` : ''} 配置と記録は保持され、ピンは要確認になります。材質の調整は引き継ぎません。` : fileScope ? '追加するGLBまたは点群のPLYを選択してください。' : '';
+    fileNote.textContent = fileScope?.kind === 'replace' ? `${fileScope.file?.name ?? 'ファイルを選択してください。'} ${details?.sceneCount.kind === 'value' ? `${details.sceneCount.value}シーンのモデルを差し替えます。` : ''} 配置と記録は保持され、ピンは要確認になります。材質の調整は引き継ぎません。` : fileScope ? '追加するモデルを選択してください。' : '';
+    if(fileScope?.externalMaterialsUnavailable)fileNote.textContent+=' OBJの外部材質・画像は読み込まず、既定の材質で表示します。';
     begin.disabled = !!block || ownInput() || !details || !visible || details.sceneCount.kind !== 'value';
     fields.hidden = modes.hidden = confirm.hidden = cancel.hidden = !edit; confirm.disabled = !!block || composing || !valid(); cancel.disabled = !!host.block('models', false) || composing;
     inputs.forEach((node, index) => { node.disabled = !!block; if (!composing) node.value = raw[index] ?? ''; });
@@ -239,5 +252,5 @@ export function createProjectModels(document: Document, host: ProjectPanelHost):
     propose(next) { if (!edit || composing || memory().composing || next.mode !== edit.mode || host.block('models', true, true) || !sameProjectValue(next.target, edit.target)) return false;
       if (!next.placement.translation.every(Number.isFinite) || !Number.isFinite(next.placement.uniformScale) || next.placement.uniformScale <= 0) return false;
       edit = next; raw = [...next.placement.translation.map(String), ...host.ports.modelAngles(next.placement.rotationXYZW), String(next.placement.uniformScale)]; host.changed(); return true; },
-    dispose() { disposed = true; preview?.dispose(); list.dispose(); root.remove(); } };
+    dispose() { disposed = true; fileScope=null; preview?.dispose(); list.dispose(); root.remove(); } };
 }

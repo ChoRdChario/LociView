@@ -3,18 +3,20 @@ import { materialForDisplay, validateMaterialIntent, type MaterialIntent } from 
 import type { ProjectSemanticProfile } from '../domain/projectProfile';
 import type { JsonObject } from '../domain/values';
 import type { MaterialTarget } from '../scene/types';
+import { meshSourceFormat } from '../domain/meshSource';
 import { renderOwner, type ValidationModelClosure, type ReadonlyRenderModel } from './modelTypes';
 
 export interface ValidationMaterialSlot { readonly target: MaterialTarget; readonly name: string;
   readonly locator: JsonObject; readonly semantics: JsonObject }
 export type ValidationMaterialEffects = Readonly<Record<string, MaterialIntent | { readonly issue: string }>>;
+export const validationMaterialMap2=(profile:unknown)=>!!meshSourceFormat(profile)||!!profile&&typeof profile==='object'&&!Array.isArray(profile)&&['development-validation-glb-occurrence-1','development-validation-glb-occurrence-jpeg-1'].includes(String((profile as JsonObject).id));
 export function validationMaterialSlots(c: ValidationModelClosure | ReadonlyRenderModel): readonly ValidationMaterialSlot[] {
   const catalog=c.representation.materialCatalog; if(!catalog)return [];
   return catalog.slots.map(slot => ({ target: { assetId: renderOwner(c),
     variantFamilyId: c.representation.variantFamilyId, materialLayoutId: catalog.layoutId,
     logicalMaterialSlotId: slot.logicalMaterialSlotId }, locator: slot.sourceLocator, semantics: slot.sourceSemantics,
     name: slot.sourceLocator.kind === 'gltfMaterial' ? `材質 ${Number(slot.sourceLocator.materialIndex) + 1}` :
-      ['development-validation-glb-occurrence-1', 'development-validation-glb-occurrence-jpeg-1'].includes(String((c.representation.formatProfile as JsonObject)?.id)) ? `面の材質 ${Number(slot.sourceLocator.slotIndex) + 1}` : '既定の材質' }));
+      validationMaterialMap2(c.representation.formatProfile) ? `面の材質 ${Number(slot.sourceLocator.slotIndex) + 1}` : '既定の材質' }));
 }
 export function validationMaterialSourceIssue(slot: ValidationMaterialSlot): string | null {
   return same(slot.semantics, { coverage: { kind: 'opaque' }, optics: 'surface', lighting: 'lit', doubleSided: false }) ? null :

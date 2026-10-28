@@ -3,6 +3,7 @@ import { PACKAGE_LIMITS } from '../projectPackage/contract';
 import type {WorkspaceFileInteraction} from '../ui/projectScene/projectWorkspacePorts';
 import type {createProductWorkspace} from './productWorkspace';
 import { isPointPly } from '../projectFiles/pointPly';
+import { classifyMeshSource, inspectMeshSource } from '../projectFiles/meshSource';
 import { isAdditionalPhoto, freshPhotoSelectionIssue, type PhotoDecoder } from '../projectFiles/photo';
 import { projectResumeReference, type ProjectResumeReference } from '../ui/resumeReference';
 import { newId } from '../projectMetadata/persistence';
@@ -474,6 +475,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     status.textContent = 'ファイルを確認しています。';
     clearConversion(); rawSelection = undefined; form.hidden = true;
     const models: ValidationModelFile[] = [], media: ValidationFile[] = [], packages: File[] = []; let actualTotal = 0, bufferedBytes=0;
+    let unitlessMesh=false, unavailableObjMaterials=false;
     for (const item of selection) {
       const selectedFile:{readonly size:number;arrayBuffer():Promise<ArrayBuffer>}=item.file;
       if(!(selectedFile instanceof Blob)&&selectedFile.size>ports.fileLimits.maxFileBytes-bufferedBytes)throw Error('一度に選択するファイルの合計を減らしてください。');
@@ -489,7 +491,18 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
       if (!Number.isSafeInteger(actualTotal)) throw Error('選択したファイルがこの検証の上限を超えています。');
       if(file.file){models.push(file);continue;}
       const bytes=file.bytes;bufferedBytes+=bytes.byteLength;
-      if (isPointPly(bytes) || bytes.length >= 4 && new DataView(bytes.buffer).getUint32(0, true) === 0x46546c67) models.push(file);
+      const meshFormat=classifyMeshSource(bytes);
+      if(meshFormat){
+        const controller=new AbortController();selectionAbort=controller;nativeSelectionChecking=true;controls();
+        try{
+          const checked=await inspectMeshSource(meshFormat,bytes,policy.nonGs,ports.decode,ports.jpeg,controller.signal);
+          if(!guardSelection(generation,context)||draft!==creationDraft)return;
+          unitlessMesh ||= meshFormat!=='gltf';unavailableObjMaterials ||= checked.externalMaterialsUnavailable;
+          models.push(file);
+        }catch(error){if(controller.signal.aborted&&!selectionCurrent(generation,context))return;throw error;}
+        finally{if(selectionAbort===controller){selectionAbort=undefined;nativeSelectionChecking=false;controls();}}
+      }
+      else if (isPointPly(bytes) || bytes.length >= 4 && new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength).getUint32(0, true) === 0x46546c67) models.push(file);
       else if (isAdditionalPhoto(bytes) || isJpeg(bytes) || [137,80,78,71,13,10,26,10].every((b,i) => bytes[i] === b)) media.push(file);
       else {
         const issue = freshPhotoSelectionIssue(bytes); if (issue) throw Error(issue);
@@ -501,6 +514,8 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
       if (!models.length) throw Error('3Dモデルを選択してください。画像はモデルと一緒に選択できます。');
       rawSelection = { models, media }; form.hidden = false;
       creationNote.textContent = `3Dモデル ${models.length}・メディア ${media.length}。元のファイルは変更しません。`;
+      if(unitlessMesh)creationNote.textContent+=' このプロジェクトの単位は不明として扱います。';
+      if(unavailableObjMaterials)creationNote.textContent+=' OBJの外部材質・画像は読み込まず、既定の材質で表示します。';
       status.textContent = ''; return;
     }
     if (packages.length !== 1 || models.length || media.length) throw Error('作業ファイルは1つずつ開いてください。モデルや画像と一緒には開けません。');
@@ -526,6 +541,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
         if (native.summary.nativeSpatial.gs) conversionNote.textContent += 'GSの見え方や全体を収める範囲は変わる場合があります。';
         if (native.summary.nativeSpatial.proxies) conversionNote.textContent += '位置指定用の面は両面から選択できます。';
       }
+      if(native?.summary.objExternalMaterialsUnavailable)conversionNote.textContent+='。OBJの外部材質・画像は読み込まず、既定の材質で表示します。';
       if (legacy) { const s = legacy.summary.sourceOnly;
         conversionNote.textContent += `。元ファイルだけに保持：編集者情報 ${s.profiles}・削除済み記録 ${s.deletedRecords}・キャッシュ ${s.caches}・削除済み本体 ${s.deletedPayloads}・未使用本体 ${s.unlinkedPayloads}・面の法線 ${s.anchorNormals}`;
         if ('appliedModelOffsets' in legacy.summary && legacy.summary.appliedModelOffsets > 0)

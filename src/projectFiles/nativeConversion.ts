@@ -1,7 +1,7 @@
 import { inspectProjectImage, projectImageMime, type PhotoDecoder } from './photo';
 import { readNativePortableConversionV1 } from '../nativeGs/portablePackage';
 import { prepareNativeSpatialConversion, resumeNativeSpatialConversion } from './nativeSpatialConversion';
-import { nativeSpatialRecipe } from './nativeMapping';
+import { nativeSpatialRecipe, nativeMeshRecipe } from './nativeMapping';
 import { projectFilePolicy, type ProjectFilePolicyInput } from './validation';
 import { nativeDisplaySetsV1, type NativeProjectSnapshotV1 } from '../nativeGs/schema';
 import { nativeMaterialSlotKey } from '../nativeGs/materialSlots';
@@ -30,6 +30,7 @@ export interface NativeConversionSummary {
   readonly models: number; readonly scenes: number; readonly captions: number; readonly media: number;
   readonly originalExcludedFromExports: true;
   readonly nativeSpatial?: Readonly<{points: number; gs: number; proxies: number}>;
+  readonly objExternalMaterialsUnavailable?: boolean;
 }
 interface ConversionReceipt {
   recipe: NativeConversionRecipe; conversionId: string; projectId: string;
@@ -42,7 +43,7 @@ const receiptPath = (fs: ProjectWorkspaceFS) => metadataPath(fs, 'native-convers
 const sourcePath = (fs: ProjectWorkspaceFS) => metadataPath(fs, 'native-conversion-source.zip');
 const proof = async (bytes: Uint8Array): Promise<ByteProof> => ({ byteLength: bytes.length, digest: await digest(bytes) });
 export const hasNativeConversion = async (fs: ProjectWorkspaceFS, checkBoundInitial = true) => !!await fs.readStream(receiptPath(fs)) || !!await fs.readStream(sourcePath(fs)) ||
-  checkBoundInitial && [nativeSpatialRecipe, nativeJpegRecipe, nativeAppearanceJpegRecipe, nativePhotoRecipe, nativeAppearancePhotoRecipe].includes(await validationInitialOrigin(fs) as NativeConversionRecipe);
+  checkBoundInitial && [nativeMeshRecipe, nativeSpatialRecipe, nativeJpegRecipe, nativeAppearanceJpegRecipe, nativePhotoRecipe, nativeAppearancePhotoRecipe].includes(await validationInitialOrigin(fs) as NativeConversionRecipe);
 async function inspectNativeModel(bytes: Uint8Array, appearance: boolean, limits: FileValidationLimits, png?: PngDecoder, jpeg?: JpegDecoder) {
   const hasJpeg = validationGlbUsesJpeg(bytes, limits);
   const inspect = appearance ? hasJpeg ? inspectOccurrenceJpegGlb : inspectOccurrenceGlb : hasJpeg ? inspectValidationJpegGlb : inspectValidationGlb;
@@ -268,7 +269,7 @@ export async function prepareNativeConversion(input: Blob, budget: ProjectFilePo
     const bytes = source.encodeFullSource();
     const receipt: ConversionReceipt = { recipe: mapped.recipe, conversionId, projectId: `prj_${conversionId}`,
       original, manifest, snapshot: snapshotProof, initial: { ...await proof(bytes), proof: source.proof }, mapping: mapped.mapping, report,
-      ...(appearance ? { materialWitness: mapped.materialWitness } : {}) };
+      ...(appearance ? { materialWitness: mapped.materialWitness.map(w=>{if('sourceAddress' in w)return fileError('変換レシピと材質の対応が一致しません。');return w;}) } : {}) };
     if (appearance) await verifyMaterialWitness(receipt, source, snapshot, models, sourceWitness, limits);
     await verifyAdditiveMapping(receipt, source, snapshot, models, sourceWitness);
     return { source, async persist(fs: ProjectWorkspaceFS, store: OriginBlobStore, session: MetadataProjectSession) {
@@ -307,7 +308,7 @@ export async function resumeNativeConversion(fs: ProjectWorkspaceFS, store: Orig
   budget: ProjectFilePolicyInput, projectId: string, decode?: PngDecoder, jpeg?: JpegDecoder, photo?: PhotoDecoder, reselected?: Blob) {
   const receipt = await readReceipt<ConversionReceipt>(fs, receiptPath(fs), metadata);
   if (!receipt) return fileError('変換元の記録を確認できません。');
-  if (receipt.recipe === nativeSpatialRecipe) return resumeNativeSpatialConversion(fs, store, session, budget, projectId, decode, jpeg, photo, reselected);
+  if ((receipt.recipe === nativeSpatialRecipe || receipt.recipe === nativeMeshRecipe)) return resumeNativeSpatialConversion(fs, store, session, budget, projectId, decode, jpeg, photo, reselected);
   const limits = projectFilePolicy(budget).nonGs;
   await checkConversionReceipt(receipt, projectId);
   const { source, receipt: initial } = await readValidationInitialRecord(fs);

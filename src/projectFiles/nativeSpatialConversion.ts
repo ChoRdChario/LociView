@@ -11,9 +11,12 @@ import { digest, json, metadataPath, newId, readReceipt, underWriteLease, writeR
 import { checkContentFacts } from '../domain/projectContentChecks';
 import { cloneCanonicalValue, type JsonObject } from '../domain/values';
 import { readProjectScene } from '../scene/projectProvider';
-import { mapNativeProject, nativeSpatialRecipe, type NativeModelFacts, type NativeMaterialWitness, type NativeMappingEntry, type NativeOccurrence } from './nativeMapping';
+import { mapNativeProject, nativeSpatialRecipe, nativeMeshRecipe, type NativeModelFacts, type NativeConversionMaterialWitness, type NativeMappingEntry, type NativeSourceOccurrence } from './nativeMapping';
 import { nativePointSourceProfile, nativeProxySourceProfile, nativeSpatialModelBounds } from './nativeSpatial';
 import { inspectPointPly } from './pointPly';
+import { nativeMeshSourceFormat, inspectMeshSource, meshSourceProfile } from './meshSource';
+import { captureMeshOccurrenceProof } from './meshDecode';
+import { meshSourceDeclarations } from '../domain/meshSource';
 import { inspectGsPlyStream, gsSourceProfile, gsBlobStream } from './gsPly';
 import { inspectValidationGlb, inspectValidationJpegGlb, validationGlbUsesJpeg } from './glb';
 import { inspectOccurrenceGlb, inspectOccurrenceJpegGlb, captureLegacyOccurrenceProof } from './glbOccurrences';
@@ -30,21 +33,23 @@ type Archive = NonNullable<Awaited<ReturnType<typeof openNativePortableConversio
 type ByteProof = {byteLength: number; digest: string};
 type Mapped = Awaited<ReturnType<typeof mapNativeProject>>;
 interface Receipt {
-  recipe: typeof nativeSpatialRecipe; conversionId: string; projectId: string;
+  recipe: typeof nativeSpatialRecipe | typeof nativeMeshRecipe; conversionId: string; projectId: string;
   original: ByteProof; originalRef: StoredBlobRef; manifest: ByteProof; snapshot: ByteProof;
   initial: ByteProof & {proof: MetadataProof}; mapping: NativeMappingEntry[];
-  materialWitness: NativeMaterialWitness[]; spatialWitness: JsonObject[];
+  materialWitness: NativeConversionMaterialWitness[]; spatialWitness: JsonObject[];
   report: {models: number; scenes: number; captions: number; media: number; originalExcludedFromExports: true;
-    effects: {nativePointUnitsPreserved: true; existingPinsPreserved: true; gsDisplayMayDiffer: boolean; proxySelectionDoubleSided: boolean}};
+    effects: {nativePointUnitsPreserved?: true; unitsPreserved?:true; objExternalMaterialsUnavailable?:boolean; existingPinsPreserved: true; gsDisplayMayDiffer: boolean; proxySelectionDoubleSided: boolean}};
 }
 const path = (fs: ProjectWorkspaceFS) => metadataPath(fs, 'native-conversion.json');
 const same = (a: unknown, b: unknown) => a === undefined || b === undefined ? a === b : json(a) === json(b);
 const proof = async (bytes: Uint8Array): Promise<ByteProof> => ({byteLength: bytes.length, digest: await digest(bytes)});
 const originalProof = async (source: Archive['original'], signal?: AbortSignal): Promise<ByteProof> => {const p = await digestNativeStream(source.stream(),signal); return {byteLength: p.byteLength, digest: p.sha256};};
-const spatial = (s: NativeProjectSnapshotV1) => s.representations.some(r => r.role !== 'meshPrimary');
-function reportFor(snapshot: NativeProjectSnapshotV1): Receipt['report'] {
+const newMesh=(s:NativeProjectSnapshotV1)=>s.representations.some(r=>nativeMeshSourceFormat(r.formatProfile));
+const spatial = (s: NativeProjectSnapshotV1) => newMesh(s)||s.representations.some(r => r.role !== 'meshPrimary');
+const recipeFor=(s:NativeProjectSnapshotV1)=>newMesh(s)?nativeMeshRecipe:nativeSpatialRecipe;
+function reportFor(snapshot: NativeProjectSnapshotV1, models:ReadonlyMap<string,NativeModelFacts>): Receipt['report'] {
   return {models: snapshot.assets.length, scenes: nativeDisplaySetsV1(snapshot).length, captions: snapshot.captions.length, media: snapshot.mediaResources?.length ?? 0,
-    originalExcludedFromExports: true, effects: {nativePointUnitsPreserved: true, existingPinsPreserved: true,
+    originalExcludedFromExports: true, effects: {...(newMesh(snapshot)?{unitsPreserved:true as const,objExternalMaterialsUnavailable:[...models.values()].some(m=>m.newMesh?.externalMaterialsUnavailable)}:{nativePointUnitsPreserved:true as const}), existingPinsPreserved: true,
       gsDisplayMayDiffer: snapshot.representations.some(r => r.role === 'gsPrimary'), proxySelectionDoubleSided: snapshot.representations.some(r => r.role === 'interactionProxy')}};
 }
 
@@ -52,7 +57,7 @@ function reportFor(snapshot: NativeProjectSnapshotV1): Receipt['report'] {
 async function inspect(archive: Archive, budget: ProjectFilePolicyInput, png?: PngDecoder, jpeg?: JpegDecoder, photo?: PhotoDecoder, signal?: AbortSignal) {
   const policy = projectFilePolicy(budget), limits = policy.nonGs, snapshot = archive.snapshot;
   if (!spatial(snapshot) || snapshot.collaborationBaseline) return fileError('このNativeファイルはこの変換経路の対象ではありません。');
-  const models = new Map<string, NativeModelFacts>(), rows = new Map<string, readonly NativeOccurrence[]>();
+  const models = new Map<string, NativeModelFacts>(), rows = new Map<string, readonly NativeSourceOccurrence[]>();
   const publicBodies: {entry: string; ref: StoredBlobRef}[] = [], sizes = new Map<string, number>(); let total = 0, occurrenceCount = 0;
   const add = (entry: string, ref: StoredBlobRef) => {
     const old = sizes.get(ref.digest);
@@ -87,8 +92,19 @@ async function inspect(archive: Archive, budget: ProjectFilePolicyInput, png?: P
       models.set(r.id, {bounds: nativeSpatialModelBounds(record, model), materials: model.materials, surfaceRanges: model.surfaceRanges});
       continue;
     }
+    const format=nativeMeshSourceFormat(r.formatProfile);
+    if(format){
+      if(r.contentKind!=='mesh'||r.blob.mediaType!==(format==='ply'?'application/octet-stream':meshSourceDeclarations[format].mediaType)||r.gsPly||r.pointPly)return fileError('モデルの元の形式を確認できません。');
+      if(proxy){const parent=snapshot.representations.find(s=>s.id===r.derivedFrom[0]);if(r.derivedFrom.length!==1||!parent||parent.role!=='gsPrimary'||parent.assetId!==r.assetId||parent.variantFamilyId!==r.proxyForGsVariantFamilyId||r.variantFamilyId===parent.variantFamilyId)return fileError('位置指定用の面とGSの対応が不正です。');}
+      const model=await inspectMeshSource(format,bytes,limits,png,jpeg,signal),captured=await captureMeshOccurrenceProof(model,signal);
+      occurrenceCount+=captured.rows.length;if(occurrenceCount>limits.maxItems)return fileError('材質の面の数が上限を超えています。');
+      rows.set(r.id,captured.rows.map(row=>({childPath:[...row.childPath],materialArraySlot:row.materialArraySlot,sourceAddress:row.sourceAddress,slotIndex:row.slotIndex})));
+      models.set(r.id,{bounds:nativeSpatialModelBounds({formatProfile:await meshSourceProfile(format),representationToAsset:{...r.representationToAsset}},model),materials:model.materials,surfaceRanges:model.surfaceRanges,...(model.jpeg?{jpeg:true as const}:{}),...(model.occurrences?{occurrences:model.occurrences}:{}),newMesh:{format,externalMaterialsUnavailable:model.externalMaterialsUnavailable}});
+      if(format==='ply'){const body=publicBodies[publicBodies.length-1]!;body.ref={...body.ref,mediaType:'application/ply'};}
+      continue;
+    }
     if (r.contentKind !== 'mesh' || r.formatProfile.id !== 'lociview-native-model-glb-v1' || r.blob.mediaType !== 'model/gltf-binary' || r.gsPly || r.pointPly ||
-      !proxy && !same(r.representationToAsset, {...identityPlacement(), reflection: 'none'})) return fileError('このモデル形式はまだ変換できません。GLBが対象です。');
+      !proxy && !same(r.representationToAsset, {...identityPlacement(), reflection: 'none'})) return fileError('このモデルの形式または配置は、まだそのまま変換できません。');
     if (proxy) {
       const parent = snapshot.representations.find(s => s.id === r.derivedFrom[0]);
       if (r.derivedFrom.length !== 1 || !parent || parent.role !== 'gsPrimary' || parent.assetId !== r.assetId ||
@@ -129,7 +145,7 @@ async function inspect(archive: Archive, budget: ProjectFilePolicyInput, png?: P
 function witnesses(snapshot: NativeProjectSnapshotV1, mapped: Mapped, conversionId: string, sourceDigest: string): JsonObject[] {
   const entries = new Map(mapped.mapping.map(m => [m.preimage, m.id]));
   return snapshot.representations.map(r => {
-    const id = entries.get(`lociview:${nativeSpatialRecipe}:id:jcs-v1\n` + JSON.stringify([conversionId, sourceDigest, 'rep', ['representation',r.id]]))!;
+    const id = entries.get(`lociview:${mapped.recipe}:id:jcs-v1\n` + JSON.stringify([conversionId, sourceDigest, 'rep', ['representation',r.id]]))!;
     const target = mapped.targetModels.get(id)!.record;
     return {nativeRepresentationId: r.id, sourceBlob: {...r.blob}, sourceProfile: {...r.formatProfile}, sourceRepresentationFrameId: r.representationFrameId, targetRepresentationFrameId: target.representationFrameId!, targetRepresentationId: id, targetBlob: target.blob!, targetProfile: target.formatProfile!, representationToAsset: target.representationToAsset!,
       logicalBoundsAsset: target.logicalBoundsAsset!, derivedFrom: target.derivedFrom!, proxyForGsVariantFamilyId: target.proxyForGsVariantFamilyId ?? null, nativePlyFacts: r.gsPly ? {...r.gsPly} : r.pointPly ? {...r.pointPly} : null};
@@ -162,7 +178,7 @@ function checkReceipt(r: Receipt, projectId: string) {
   cloneCanonicalValue(r, metadata);
   const keys = (value: unknown, names: string[]) => !!value && typeof value === 'object' && !Array.isArray(value) && Object.keys(value).sort().join(',') === names.sort().join(',');
   if (!r || Object.keys(r).sort().join(',') !== ['recipe','conversionId','projectId','original','originalRef','manifest','snapshot','initial','mapping','materialWitness','spatialWitness','report'].sort().join(',') ||
-    r.recipe !== nativeSpatialRecipe || !/^[0-9a-f]{32}$/.test(r.conversionId) || r.projectId !== projectId || projectId !== `prj_${r.conversionId}` ||
+    !([nativeSpatialRecipe,nativeMeshRecipe] as readonly string[]).includes(r.recipe) || !/^[0-9a-f]{32}$/.test(r.conversionId) || r.projectId !== projectId || projectId !== `prj_${r.conversionId}` ||
     ![r.original,r.manifest,r.snapshot].every(p => keys(p,['byteLength','digest'])) || !keys(r.initial,['byteLength','digest','proof']) ||
     !same(r.originalRef, {algorithm: 'sha256', digest: r.original.digest, byteLength: r.original.byteLength, mediaType: 'application/zip'}) ||
     ![r.original,r.manifest,r.snapshot,r.initial].every(p => p && Number.isSafeInteger(p.byteLength) && p.byteLength > 0 && /^[0-9a-f]{64}$/.test(p.digest)) ||
@@ -178,7 +194,7 @@ async function started(fs: ProjectWorkspaceFS, expected: MetadataProof): Promise
 /** Contextual recovery affordance; never offers re-creation after acknowledgement. */
 export async function nativeSpatialConversionSourceRequired(fs: ProjectWorkspaceFS, store: OriginBlobStore): Promise<boolean> {
   const receipt = await readReceipt<Receipt>(fs,path(fs),metadata);
-  if (!receipt || receipt.recipe !== nativeSpatialRecipe) return false;
+  if (!receipt || !([nativeSpatialRecipe,nativeMeshRecipe] as readonly string[]).includes(receipt.recipe)) return false;
   checkReceipt(receipt,receipt.projectId);
   const initial = await readValidationInitialRecord(fs);
   return !await started(fs,initial.source.proof) && await store.inspect(receipt.originalRef) === 'unverified';
@@ -196,25 +212,25 @@ export async function prepareNativeSpatialConversion(input: Blob, budget: Projec
     manifest = await proof(archive.manifestBytes); snapshotProof = await proof(archive.snapshotBytes);
   } finally {await archive.close();}
   signal?.throwIfAborted();
-  const snapshot = archive.snapshot, report = reportFor(snapshot);
+  const snapshot = archive.snapshot, report = reportFor(snapshot,inspected.models);
   let attempt: Promise<Awaited<ReturnType<typeof create>>> | undefined;
   async function create() {
     const conversionId = newId(), mapped = await mapNativeProject(snapshot, inspected.models, conversionId, original.digest, inspected.rows);
     const source = ProjectMetadataSource.bootstrap(mapped.records.schema, mapped.records.identity, metadata, {semanticProfile: 'map2'}).initialize(mapped.records);
     await admit(source, mapped, policy);
-    const receipt: Receipt = {recipe: nativeSpatialRecipe, conversionId, projectId: `prj_${conversionId}`, original, originalRef: {algorithm: 'sha256', ...original, mediaType: 'application/zip'},
+    const receipt: Receipt = {recipe: recipeFor(snapshot), conversionId, projectId: `prj_${conversionId}`, original, originalRef: {algorithm: 'sha256', ...original, mediaType: 'application/zip'},
       manifest, snapshot: snapshotProof, initial: {...await proof(source.encodeFullSource()), proof: source.proof}, mapping: mapped.mapping, materialWitness: mapped.materialWitness, spatialWitness: witnesses(snapshot,mapped,conversionId,original.digest), report};
     return {source, async persist(fs: ProjectWorkspaceFS, store: OriginBlobStore, session: MetadataProjectSession) {
       const old = await readReceipt<Receipt>(fs, path(fs), metadata);
       if (old && !same(old,receipt)) return fileError('作成先は別の変換処理です。');
       if (!old) {
         if ((await session.read()).state !== 'empty') return fileError('作成先が空ではありません。');
-        await underWriteLease(fs, async () => {await writeValidationInitial(fs, source, nativeSpatialRecipe); await writeReceipt(fs, path(fs), receipt, metadata);});
+        await underWriteLease(fs, async () => {await writeValidationInitial(fs, source, receipt.recipe); await writeReceipt(fs, path(fs), receipt, metadata);});
       }
       return resumeNativeSpatialConversion(fs, store, session, policy, receipt.projectId, png, jpeg, photo, file);
     }};
   }
-  return {summary: Object.freeze({...report, effects: Object.freeze({...report.effects}), nativeSpatial: Object.freeze({points: snapshot.representations.filter(r => r.role === 'pointPrimary').length,
+  return {summary: Object.freeze({...report, objExternalMaterialsUnavailable:[...inspected.models.values()].some(m=>m.newMesh?.externalMaterialsUnavailable), effects: Object.freeze({...report.effects}), nativeSpatial: Object.freeze({points: snapshot.representations.filter(r => r.role === 'pointPrimary').length,
     gs: snapshot.representations.filter(r => r.role === 'gsPrimary').length, proxies: snapshot.representations.filter(r => r.role === 'interactionProxy').length})}), create: () => attempt ??= create()};
 }
 
@@ -223,7 +239,7 @@ export async function resumeNativeSpatialConversion(fs: ProjectWorkspaceFS, stor
   budget: ProjectFilePolicyInput, projectId: string, png?: PngDecoder, jpeg?: JpegDecoder, photo?: PhotoDecoder, reselected?: Blob) {
   const receipt = await readReceipt<Receipt>(fs,path(fs),metadata); if (!receipt) return fileError('変換元の記録がありません。'); checkReceipt(receipt, projectId);
   const policy = projectFilePolicy(budget), initial = await readValidationInitialRecord(fs), source = initial.source;
-  if (initial.receipt.version !== 'validation-initial-2' || initial.receipt.originRecipe !== nativeSpatialRecipe || !same(initial.receipt.proof, receipt.initial.proof) ||
+  if (initial.receipt.version !== 'validation-initial-2' || initial.receipt.originRecipe !== receipt.recipe || !same(initial.receipt.proof, receipt.initial.proof) ||
     initial.receipt.digest !== receipt.initial.digest || initial.receipt.byteLength !== receipt.initial.byteLength) return fileError('変換時の初期記録が一致しません。');
   const acknowledged = await started(fs, source.proof), state = await store.inspect(receipt.originalRef);
   if (state === 'unverified' && !acknowledged) {
@@ -241,9 +257,9 @@ export async function resumeNativeSpatialConversion(fs: ProjectWorkspaceFS, stor
     if (!same(await originalProof(archive.original), receipt.original) || !same(await proof(archive.manifestBytes), receipt.manifest) || !same(await proof(archive.snapshotBytes), receipt.snapshot)) return fileError('保持した変換元の内容が一致しません。');
     const inspected = await inspect(archive,policy,png,jpeg,photo), mapped = await mapNativeProject(archive.snapshot,inspected.models,receipt.conversionId,receipt.original.digest,inspected.rows,source.proof.identity);
     const original = await source.inspectOriginal({maxNodes:metadata.maxNodes,maxWork:metadata.maxWork});
-    if (mapped.recipe !== nativeSpatialRecipe || original.candidates.hasUnknownFields || !same(original.candidates.unambiguousRecords,mapped.records) || !same(mapped.mapping,receipt.mapping) ||
+    if (mapped.recipe !== receipt.recipe || original.candidates.hasUnknownFields || !same(original.candidates.unambiguousRecords,mapped.records) || !same(mapped.mapping,receipt.mapping) ||
       !same(mapped.materialWitness,receipt.materialWitness) || !same(witnesses(archive.snapshot,mapped,receipt.conversionId,receipt.original.digest),receipt.spatialWitness) ||
-      !same(receipt.report, reportFor(archive.snapshot))) return fileError('変換元と初期記録の対応が一致しません。補修していません。');
+      !same(receipt.report, reportFor(archive.snapshot,inspected.models))) return fileError('変換元と初期記録の対応が一致しません。補修していません。');
     await admit(source,mapped,policy);
     for (const body of inspected.publicBodies) {
       const presence = await store.inspect(body.ref);

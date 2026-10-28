@@ -1,3 +1,5 @@
+import {readFileSync} from 'node:fs';
+import {meshSourceProfile} from '../src/projectFiles/meshSource';
 import { describe,it,expect,vi } from 'vitest';
 import * as A from '@automerge/automerge';
 import { MemoryFS } from '../src/platform/fs';
@@ -36,6 +38,14 @@ async function setup(fileBacked=false,budget:ProjectFilePolicyInput=limits){
   const workflow=createGsProxyWorkflow(service.content,read,(token,command)=>service.session.edit(token,command));return {...service,fs,storage,store,read,target,workflow};
 }
 describe('01c same-GS Proxy commands and durable facts',()=>{
+  it.each([['stl','stl-ascii'],['ply','ply-quad'],['obj','obj-slots'],['gltf','gltf-json']] as const)('Mesh07l attaches/changes %s through the actual Proxy command and keeps originals and current frame',async(format,name)=>{
+    vi.stubGlobal('ProgressEvent',class extends Event{constructor(type:string,init:ProgressEventInit={}){super(type);Object.assign(this,{lengthComputable:false,loaded:0,total:0},init);}});vi.stubGlobal('createImageBitmap',async()=>{throw Error('Unexpected image');});
+    try{const g=JSON.parse(readFileSync('docs/specs/profiles/mesh-conversion-8.goldens.json','utf8')).sources[name],bytes=new TextEncoder().encode(g.utf8),r=await setup(),{token,...target}=await r.target();
+      const first=await r.workflow.prepare(token,target,{name:format,size:bytes.length,arrayBuffer:async()=>bytes.slice().buffer});expect((await r.session.read()).source!.token).toBe(token);await r.workflow.commit(token,first.id);r.workflow.completed();
+      const {token:currentToken,...current}=await r.target(),p=await r.read(),again=await r.workflow.prepare(p.token,current,{name:format,size:bytes.length,arrayBuffer:async()=>bytes.slice().buffer});await r.workflow.commit(p.token,again.id);r.workflow.completed();
+      const final=await r.read(),rep=(await validationModelVersions(final))[0]!.closure;if(rep.shape!=='saved-gs')throw Error('saved');expect(rep.proxy!.formatProfile).toEqual(await meshSourceProfile(format));expect((await validationProjectService(r.fs,r.storage,r.store,limits).session.read()).state).toBe('ready');
+    }finally{vi.unstubAllGlobals();}
+  });
   it('splits native GS admission from nonGS and rejects new unique bodies before a pending save while retaining duplicates',async()=>{
     const bytes=gsFixture(),proxy=triangleGlb(),nonGs={...limits,maxFileBytes:proxy.length},policy={nonGs,gs:limits,projectBodyBytes:bytes.length+proxy.length};
     expect(bytes.length).toBeGreaterThan(nonGs.maxFileBytes);

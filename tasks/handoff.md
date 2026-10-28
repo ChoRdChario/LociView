@@ -26,12 +26,16 @@ original exception. Todo owns implementation/browser/fault/final-check status an
 the next missing format group; do not repeat helper or per-control PO approvals.
 Old recipes, private-source lifetime and adoption/release boundaries remain fixed.
 
-The next [07l Mesh/Proxy companion](../docs/specs/07l-mesh-import-conversion-proposal.md)
+The [07l Mesh/Proxy companion](../docs/specs/07l-mesh-import-conversion-proposal.md)
 was also approved as one complete group2026-10-28: four exact STL/Mesh PLY/OBJ/
 self-contained glTF profiles, recipe8, unknown fresh unitless frames, canonical PLY
 geometry and preserved OBJ Phong effects. Root is sole writer. Todo owns the
 connected implementation/check sequence; no per-format/helper approval. Exact
 profile/golden bytes are fixed and renderer/adoption/release gates remain separate.
+The bounded workflow now has executed source/command/file/recovery and Desktop
+browser evidence, required full checks and independent review in todo. The next
+accepted connection is existing Mesh source-material editing/reset; keep new
+lighting/alpha interpretations and legacy migration policies behind real decisions.
 
 01a's bounded point workflow is implemented; exact six JSON companions are immutable.
 Native, synthetic hosts, typed validation and ordinary home have separate authority

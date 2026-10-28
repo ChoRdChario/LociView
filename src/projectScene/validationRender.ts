@@ -2,7 +2,9 @@ import type { GsDemand } from '../viewer/gsDecodeQueue';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { disposeModelResources } from '../viewer/loaders';
-import { isPointModel, isGsModel, type ValidatedModel, type ValidatedPoint } from '../projectFiles/pointPly';
+import { isPointModel, isGsModel, isMeshSourceModel, type ValidatedModel, type ValidatedPoint } from '../projectFiles/pointPly';
+import { decodeMeshSource } from '../projectFiles/meshDecode';
+import { meshSourceFormat } from '../domain/meshSource';
 import type { ValidatedGs } from '../projectFiles/gsPly';
 import { createPointSurface } from '../viewer/pointSurface';
 import type { ValidatedGlb } from '../projectFiles/glb';
@@ -12,8 +14,8 @@ import type { ResidentSurface } from './viewportPicking';
 import { placementMatrix } from './viewportModel';
 import { canonical, same } from '../domain/projectGraphSupport';
 import type { JsonObject } from '../domain/values';
-import { validationMaterialSlots, validationMaterialIssue, type ValidationMaterialEffects } from './validationMaterials';
-import { patchHardChroma, patchBinaryMask } from '../viewer/hardChroma';
+import { validationMaterialSlots, validationMaterialIssue, validationMaterialMap2, type ValidationMaterialEffects } from './validationMaterials';
+import { patchHardChroma, patchBinaryMask, type CoverageMaterial } from '../viewer/hardChroma';
 import { decodeOccurrenceGlb, type DecodedOccurrenceSlot } from '../projectFiles/glbOccurrences';
 import { materialForDisplay } from '../domain/materialIntent';
 import { readLegacyModelProof } from '../viewer/compat180/proof';
@@ -141,8 +143,8 @@ export async function prepareReadonlyResidents(initial: readonly ReadonlyRenderM
       if(isGsModel(source)){
         decoded={gs:source,root:new THREE.Group(),materialLocators:new Map(),dispose(){this.proxy?.dispose();}};
         if(c.proxy){try{const proxy=content.modelContent?await content.modelContent(c.proxy):await content.model!(c.proxy);if(isPointModel(proxy)||isGsModel(proxy))throw Error('位置指定用の面を確認してください。');
-          decoded.proxy=await decode(proxy,lifetime.signal);}catch(e){decoded.proxyIssue=(e as Error).message;}}
-      }else decoded=isPointModel(source)?{point:source,root:new THREE.Group(),materialLocators:new Map(),dispose(){}}:await decode(source,lifetime.signal);
+          decoded.proxy=isMeshSourceModel(proxy)?await decodeMeshSource(proxy,lifetime.signal):await decode(proxy,lifetime.signal);}catch(e){decoded.proxyIssue=(e as Error).message;}}
+      }else decoded=isPointModel(source)?{point:source,root:new THREE.Group(),materialLocators:new Map(),dispose(){}}:isMeshSourceModel(source)?await decodeMeshSource(source,lifetime.signal):await decode(source,lifetime.signal);
       staged.set(key, { record, model:decoded });
       if (closed) throw Error('画面を閉じました。');
       if(publish){templates.set(key,staged.get(key)!);staged.delete(key);failures.delete(key);notify();}
@@ -162,8 +164,8 @@ export async function prepareReadonlyResidents(initial: readonly ReadonlyRenderM
     for (const slot of slots) {
       const effect = effects[slot.target.logicalMaterialSlotId];
       if (effect && !('issue' in effect)) {
-        const issue = validationMaterialIssue(slot, effect, ['development-validation-glb-occurrence-1', 'development-validation-glb-occurrence-jpeg-1'].includes(String((c.representation.formatProfile as JsonObject)?.id)) ? 'map2' : 'map1'); if (issue) throw Error(issue);
-        for (const [material, locator] of item.model.materialLocators) if (same(locator, slot.locator) && !(material instanceof THREE.MeshStandardMaterial))
+        const issue = validationMaterialIssue(slot, effect, validationMaterialMap2(c.representation.formatProfile) ? 'map2' : 'map1'); if (issue) throw Error(issue);
+        for (const [material, locator] of item.model.materialLocators) if (same(locator, slot.locator) && !(material instanceof THREE.MeshStandardMaterial) && !(meshSourceFormat(c.representation.formatProfile)==='obj'&&material instanceof THREE.MeshPhongMaterial))
           throw Error('元の材質の設定を確認してください。');
       }
     }
@@ -223,8 +225,8 @@ export async function prepareReadonlyResidents(initial: readonly ReadonlyRenderM
             let result = m.clone(); materials.set(m, result);
             if (effect && 'issue' in effect) result.visible = false;
             else if (effect) {
-              if (!(m instanceof THREE.MeshStandardMaterial)) throw Error('元の材質の設定を確認してください。');
-              const displayed = materialForDisplay(effect, ['development-validation-glb-occurrence-1', 'development-validation-glb-occurrence-jpeg-1'].includes(String((c.representation.formatProfile as JsonObject)?.id)) ? 'map2' : 'map1');
+              if (!(m instanceof THREE.MeshStandardMaterial) && !(meshSourceFormat(c.representation.formatProfile)==='obj'&&m instanceof THREE.MeshPhongMaterial)) throw Error('元の材質の設定を確認してください。');
+              const displayed = materialForDisplay(effect, validationMaterialMap2(c.representation.formatProfile) ? 'map2' : 'map1');
               const a = displayed.appearance;
               if (a.lighting === 'unlit') {
                 result.dispose(); result = new THREE.MeshBasicMaterial({ color: m.color.clone(), map: m.map,
@@ -232,12 +234,12 @@ export async function prepareReadonlyResidents(initial: readonly ReadonlyRenderM
                   transparent: m.transparent, toneMapped: m.toneMapped, depthTest: m.depthTest, depthWrite: m.depthWrite, visible: m.visible });
                 materials.set(m, result);
               }
-              if (a.baseColorSrgb) (result as THREE.MeshStandardMaterial | THREE.MeshBasicMaterial).color.setRGB(...a.baseColorSrgb as [number, number, number], THREE.SRGBColorSpace);
+              if (a.baseColorSrgb) (result as CoverageMaterial).color.setRGB(...a.baseColorSrgb as [number, number, number], THREE.SRGBColorSpace);
               if (a.doubleSided !== undefined) result.side = a.doubleSided ? THREE.DoubleSide : THREE.FrontSide;
               if (a.opacity !== undefined) result.opacity = a.opacity;
-              if (displayed.compositing.coverage.policy === 'mask') patchBinaryMask(result as THREE.MeshStandardMaterial | THREE.MeshBasicMaterial,
+              if (displayed.compositing.coverage.policy === 'mask') patchBinaryMask(result as CoverageMaterial,
                 { opacity: a.opacity ?? 1, cutoff: displayed.compositing.coverage.alphaCutoff!, ...(a.chroma ? { chroma: a.chroma } : {}) });
-              else if (a.chroma) patchHardChroma(result as THREE.MeshStandardMaterial | THREE.MeshBasicMaterial, a.chroma);
+              else if (a.chroma) patchHardChroma(result as CoverageMaterial, a.chroma);
             }
             return result;
           };

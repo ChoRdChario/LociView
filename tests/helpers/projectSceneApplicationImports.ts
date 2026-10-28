@@ -210,6 +210,7 @@ export const projectSceneApplicationImports:Readonly<Record<string,readonly stri
     "./viewDisplay"
   ],
   "src/projectScene/modelCandidatePreview.ts": [
+    "../domain/meshSource",
     "../projectMetadata/assetStatus",
     "../projectMetadata/format",
     "../projectMetadata/records",
@@ -375,6 +376,7 @@ export const projectSceneApplicationImports:Readonly<Record<string,readonly stri
     "./validationHost"
   ],
   "src/projectScene/validationHost.ts": [
+    "../projectFiles/meshSource",
     "../projectFiles/nativeSpatialConversion",
     "../projectFiles/bodyBudget",
     "../domain/materialIntent",
@@ -425,6 +427,7 @@ export const projectSceneApplicationImports:Readonly<Record<string,readonly stri
     "./viewDisplay"
   ],
   "src/projectScene/validationMaterials.ts": [
+    "../domain/meshSource",
     "../domain/materialIntent",
     "../domain/projectGraphSupport",
     "../domain/projectProfile",
@@ -448,6 +451,8 @@ export const projectSceneApplicationImports:Readonly<Record<string,readonly stri
     "three"
   ],
   "src/projectScene/validationProjection.ts": [
+    "../domain/meshSource",
+    "../projectFiles/meshSource",
     "../projectFiles/nativeSpatial",
     "../domain/projectGraphSupport",
     "../projectFiles/gsPly",
@@ -466,6 +471,8 @@ export const projectSceneApplicationImports:Readonly<Record<string,readonly stri
     "./validationOutputControls"
   ],
   "src/projectScene/validationRender.ts": [
+    "../domain/meshSource",
+    "../projectFiles/meshDecode",
     "../projectFiles/nativeSpatial",
     "../domain/materialIntent",
     "../domain/pointPresentation",
@@ -490,6 +497,7 @@ export const projectSceneApplicationImports:Readonly<Record<string,readonly stri
     "three/addons/loaders/GLTFLoader.js"
   ],
   "src/projectScene/validationWorkspace.ts": [
+    "../projectFiles/meshSource",
     "./deferredViewport",
     "../assets/zipio",
     "../projectFiles/creation",

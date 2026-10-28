@@ -34,7 +34,8 @@ export function createGsProxyWorkflow(content: ValidationContent, current: ()=>P
         if(bytes.length!==selected.size)throw Error('選択した面の大きさが一致しません。');
         proxy=await content.prepareGsProxy({label:selected.name,bytes},target.assetId,target.gsFamilyId);live();await check(token,target);live();
       }else if(target.expectedProxyId===null)throw Error('外す面を確認してください。');
-      const id=newId();prepared={id,token,target,...(proxy?{proxy}:{})};adopted=true;return {id,label:selected?.name??''};
+      const notice=proxy?await content.preparedModelNotice(proxy):{externalMaterialsUnavailable:false};live();await check(token,target);live();
+      const id=newId();prepared={id,token,target,...(proxy?{proxy}:{})};adopted=true;return {id,label:selected?.name??'',...notice};
       } finally {if(!adopted&&proxy)content.releasePreparedModel(proxy.id as string);}
     },
     async commit(token:string,id:string){

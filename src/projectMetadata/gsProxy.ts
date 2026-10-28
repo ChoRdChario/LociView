@@ -1,6 +1,7 @@
 import { checkProjectRecord, projectRecordMaps } from '../domain/projectRecords';
 import { ProjectRecordFields } from '../domain/projectRecordFields';
 import { gsSourceDeclaration } from '../domain/gsSource';
+import { meshSourceFormat, meshSourceDeclarations } from '../domain/meshSource';
 import { object, list, same } from '../domain/projectGraphSupport';
 import type { JsonObject } from '../domain/values';
 import type { ProjectProviderRead } from '../scene/projectProvider';
@@ -47,9 +48,10 @@ export function planGsProxy(provider: Extract<ProjectProviderRead,{kind:'scene-p
   if(proxy) {
     exactKeys(proxy,['id','assetId','representationFrameId','contentKind','purposes','role','variantFamilyId','formatProfile','blob','representationToAsset','logicalBoundsAsset','derivedFrom','materialCatalog','proxyForGsVariantFamilyId','payloadDigest']);
     const p=object(proxy.formatProfile);
+    const mesh=meshSourceFormat(p);
     if(proxy.assetId!==command.assetId || proxy.contentKind!=='mesh' || proxy.role!=='interactionProxy' || !same(proxy.purposes,['interaction']) || proxy.proxyForGsVariantFamilyId!==gs.variantFamilyId || !same(proxy.derivedFrom,[]) ||
       !same(proxy.representationToAsset,{translation:[0,0,0],rotationXYZW:[0,0,0,1],uniformScale:1,reflection:'none'}) ||
-      !(p.id==='development-validation-glb-1' && p.specificationSha256==='077c5da2241deb7956026fe20376dee9301d70b29d10a436d673f37909e4186f' || p.id==='development-validation-glb-jpeg-1' && p.specificationSha256==='a08a1c90496df087b1cd454dd29177ff3da7fdc8b5ebfb07156189479a8f8db8')) return fail('gs-proxy-profile');
+      !(mesh&&object(proxy.blob).mediaType===meshSourceDeclarations[mesh].mediaType || p.id==='development-validation-glb-1' && p.specificationSha256==='077c5da2241deb7956026fe20376dee9301d70b29d10a436d673f37909e4186f' || p.id==='development-validation-glb-jpeg-1' && p.specificationSha256==='a08a1c90496df087b1cd454dd29177ff3da7fdc8b5ebfb07156189479a8f8db8')) return fail('gs-proxy-profile');
   }
   const reserved=new Set<string>(), reader=candidateReader(provider,limits);
   const reserve=(v:unknown):void=>{reader.charge();if(typeof v==='string')reserved.add(v);else if(Array.isArray(v))v.forEach(reserve);else if(v&&typeof v==='object')Object.values(v).forEach(reserve);};

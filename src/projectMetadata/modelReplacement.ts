@@ -1,5 +1,6 @@
 import { checkProjectRecord, projectRecordMaps } from '../domain/projectRecords';
 import { ProjectRecordFields } from '../domain/projectRecordFields';
+import { meshSourceFormat, meshSourceDeclarations } from '../domain/meshSource';
 import { object, list, same } from '../domain/projectGraphSupport';
 import type { JsonObject, JsonValue } from '../domain/values';
 import type { ProjectProviderRead } from '../scene/projectProvider';
@@ -46,7 +47,8 @@ export function planModelReplacement(provider: Extract<ProjectProviderRead, { ki
     classes.length !== 1 || !same(object(classes[0]).targetVariantFamilyIds, [rep.variantFamilyId!]) || !slots.length)
     fail('model-replace-closure');
   const blob = object(rep.blob);
-  if (blob.mediaType !== 'model/gltf-binary' ||
+  const mesh=meshSourceFormat(rep.formatProfile);
+  if (blob.mediaType !== (mesh?meshSourceDeclarations[mesh].mediaType:'model/gltf-binary') ||
     !same(revision.provenance, { origin: 'import', sourceMediaType: blob.mediaType!, inputBlobDigests: [blob.digest!] })) fail('model-replace-provenance');
   const reserved = new Set<string>();
   const reserve = (v: unknown): void => { reader.charge(); if (typeof v === 'string') reserved.add(v);

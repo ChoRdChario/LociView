@@ -16,6 +16,8 @@ import type { StoredBlobRef } from '../projectMetadata/blobStore';
 import { inspectValidationGlb, inspectValidationJpegGlb, inspectFreshValidationGlb, type ValidatedGlb } from './glb';
 import { inspectOccurrenceGlb, inspectOccurrenceJpegGlb } from './glbOccurrences';
 import { nativePointSourceProfile, nativeProxySourceProfile, nativeSpatialModelBounds } from './nativeSpatial';
+import { meshSourceDeclarations, meshSourceFormat, type MeshSourceFormat } from '../domain/meshSource';
+import { classifyMeshSource, inspectMeshSource, meshSourceProfile } from './meshSource';
 import { validationGlbUsesJpeg } from './glb';
 import { inspectPointPly, isPointModel, isGsModel, isGlbModel, pointSourceProfile, pointSourceMediaType, type ValidatedModel } from './pointPly';
 import { gsSourceProfile, inspectGsPly, inspectGsPlyFile, captureGsBlob, gsBlobStream, hasGsPlySignature } from './gsPly';
@@ -78,7 +80,7 @@ export class ValidationContent implements MetadataMediaPort {
   async prepareGsProxy(input: ValidationFile, assetId: string, familyId: string): Promise<JsonObject> {
     this.fs.mutationAuthority.assertWorkspaceWriteAuthorized();
     const p=await prepareValidationModel(input,this.limits,this.decode,assetId,this.jpeg);
-    if(p.representation.role!=='meshPrimary') return fileError('位置指定用の面にはGLBを選択してください。');
+    if(p.representation.role!=='meshPrimary') return fileError('位置指定用の面には、面を持つ3Dモデルを選択してください。');
     const {payloadDigest:_old,...raw}=p.representation;
     const representation=await sealValidationRecord('representation',{...raw,role:'interactionProxy',purposes:['interaction'],proxyForGsVariantFamilyId:familyId});
     this.preparedModels.set(representation.id as string,{...p,representation});return cloneCanonicalValue(representation,validationMetadataLimits) as JsonObject;
@@ -102,6 +104,19 @@ export class ValidationContent implements MetadataMediaPort {
   /** Kept GLB-specific for existing converter/decoder clients. */
   async model(record: JsonObject, readOnly = false): Promise<ValidatedGlb> {
     const result = await this.modelContent(record, readOnly); if (!isGlbModel(result)) return fileError('この経路ではGLBモデルを選択してください。'); return result;
+  }
+  /** Inspect-only display consequence; never stages bytes or grants command evidence. */
+  async modelSelectionNotice(file:Readonly<{size:number;arrayBuffer():Promise<ArrayBuffer>}>):Promise<{externalMaterialsUnavailable:boolean}>{
+    await this.checkRead?.();
+    if(!Number.isSafeInteger(file.size)||file.size<=0)return fileError('モデルを選択してください。');
+    if(file.size>this.limits.maxFileBytes)return{externalMaterialsUnavailable:false};
+    const bytes=new Uint8Array(await file.arrayBuffer());if(bytes.length!==file.size)return fileError('選択したモデルの大きさが一致しません。');
+    const model=classifyMeshSource(bytes)==='obj'?await inspectMeshSource('obj',bytes,this.limits):undefined;
+    await this.checkRead?.();return{externalMaterialsUnavailable:model?.externalMaterialsUnavailable??false};
+  }
+  async preparedModelNotice(record:JsonObject){
+    const body=this.preparedModel(record).body;
+    return body.file?{externalMaterialsUnavailable:false}:this.modelSelectionNotice({size:body.bytes.length,arrayBuffer:async()=>body.bytes.slice().buffer});
   }
   async modelContent(record: JsonObject, readOnly = false): Promise<ValidatedModel> {
     await this.checkRead?.(); const blob = await this.modelDeclaration(record);
@@ -177,7 +192,8 @@ export class ValidationContent implements MetadataMediaPort {
       const bytes = await readValidationBody(file, this.limits.maxFileBytes);
       if (projectImageMime(blob.mediaType)) await this.inspectImage(bytes, blob);
       else if (blob.mediaType === 'model/gltf-binary') await inspectFreshValidationGlb(bytes, this.limits, this.decode, this.jpeg);
-      else if (blob.mediaType === pointSourceMediaType) await (hasGsPlySignature(bytes) ? inspectGsPly(bytes, this.policy.gs) : inspectPointPly(bytes, this.limits));
+      else if (blob.mediaType === pointSourceMediaType) await (hasGsPlySignature(bytes) ? inspectGsPly(bytes, this.policy.gs) : classifyMeshSource(bytes)==='ply'?inspectMeshSource('ply',bytes,this.limits,this.decode,this.jpeg):inspectPointPly(bytes, this.limits));
+      else if(['model/stl','text/plain','model/gltf+json'].includes(blob.mediaType as string)){const format=(Object.keys(meshSourceDeclarations) as MeshSourceFormat[]).find(f=>meshSourceDeclarations[f].mediaType===blob.mediaType)!;await inspectMeshSource(format,bytes,this.limits,this.decode,this.jpeg);}
       else return fileError('追加する本体形式が不正です。');
     }
   }
@@ -240,20 +256,21 @@ export function validationGsEquivalenceSource(request: ContentRequest): JsonObje
 
 /** Exact input tuple shared by saved content and history-free viewing. No MIME/profile fallback. */
 export async function validationModelDeclaration(record: JsonObject, use: 'saved' | 'review' = 'saved'): Promise<JsonObject> {
+  const mesh=meshSourceFormat(record.formatProfile);if(mesh)await meshSourceProfile(mesh);
   const nativePoint = same(record.formatProfile, await nativePointSourceProfile());
   const nativeProxy = same(record.formatProfile, await nativeProxySourceProfile());
   const point = nativePoint || same(record.formatProfile, await pointSourceProfile());
   const gs = same(record.formatProfile, await gsSourceProfile());
-  const proxy = record.role === 'interactionProxy' && (nativeProxy || (await Promise.all([validationGlbProfile(), jpegGlbProfile()])).some(p => same(record.formatProfile,p)));
+  const proxy = record.role === 'interactionProxy' && (!!mesh || nativeProxy || (await Promise.all([validationGlbProfile(), jpegGlbProfile()])).some(p => same(record.formatProfile,p)));
   const glb = nativeProxy || (await Promise.all([validationGlbProfile(), occurrenceGlbProfile(), jpegGlbProfile(), occurrenceJpegGlbProfile()])).some(p => same(record.formatProfile, p));
   if (nativeProxy && !proxy) return fileError('位置指定用の面の役割が一致しません。');
-  if (nativePoint || nativeProxy) { const check = new ProjectRecordFields(); check.transform(record.representationToAsset!, [], true); if (check.unknown) return fileError('モデルの座標変換を確認できません。'); }
-  if ((!point && !glb && !gs) || record.contentKind !== (gs ? 'gaussianSplat' : point ? 'pointCloud' : 'mesh') || record.role !== (proxy ? 'interactionProxy' : gs ? 'gsPrimary' : point ? 'pointPrimary' : 'meshPrimary') ||
-    !gs && !nativePoint && !nativeProxy && !same(record.representationToAsset, { ...identityPlacement(), reflection: 'none' }) ||
+  if (nativePoint || nativeProxy || mesh) { const check = new ProjectRecordFields(); check.transform(record.representationToAsset!, [], true); if (check.unknown) return fileError('モデルの座標変換を確認できません。'); }
+  if ((!point && !glb && !gs && !mesh) || record.contentKind !== (gs ? 'gaussianSplat' : point ? 'pointCloud' : 'mesh') || record.role !== (proxy ? 'interactionProxy' : gs ? 'gsPrimary' : point ? 'pointPrimary' : 'meshPrimary') ||
+    !gs && !nativePoint && !nativeProxy && !mesh && !same(record.representationToAsset, { ...identityPlacement(), reflection: 'none' }) ||
     (proxy ? !same(record.purposes,['interaction']) : use === 'review' ? !same(record.purposes, ['display']) : !same(record.purposes, ['source', 'display']) && !same(record.purposes, ['display'])) ||
-    use === 'saved' && !(nativeProxy ? Array.isArray(record.derivedFrom) && record.derivedFrom.length <= 1 : same(record.derivedFrom, []))) return fileError('保存したモデルの形式を確認できません。');
+    use === 'saved' && !(nativeProxy || mesh&&proxy ? Array.isArray(record.derivedFrom) && record.derivedFrom.length <= 1 : same(record.derivedFrom, []))) return fileError('保存したモデルの形式を確認できません。');
   const blob = fileObject(record.blob) as JsonObject;
-  if (blob.mediaType !== (point || gs ? pointSourceMediaType : 'model/gltf-binary')) return fileError('保存したモデルの本体形式が一致しません。');
+  if (blob.mediaType !== (mesh?meshSourceDeclarations[mesh].mediaType:point || gs ? pointSourceMediaType : 'model/gltf-binary')) return fileError('保存したモデルの本体形式が一致しません。');
   return blob;
 }
 export async function inspectDeclaredValidationModel(record: JsonObject, bytes: Uint8Array, budget: ProjectFilePolicyInput,
@@ -261,6 +278,7 @@ export async function inspectDeclaredValidationModel(record: JsonObject, bytes: 
   const policy=projectFilePolicy(budget), limits=policy.nonGs;
   if(bytes.length>limits.maxFileBytes)return fileError('大きなGSは元ファイルから選択してください。');
   await validationModelDeclaration(record, use);
+  const mesh=meshSourceFormat(record.formatProfile);if(mesh)return inspectMeshSource(mesh,bytes,limits,png,jpeg);
   if (same(record.formatProfile, await pointSourceProfile()) || same(record.formatProfile, await nativePointSourceProfile())) return inspectPointPly(bytes, limits);
   if (same(record.formatProfile, await gsSourceProfile())) return inspectGsPly(bytes, policy.gs, { representationToAsset: record.representationToAsset as JsonObject, logicalBoundsAsset: record.logicalBoundsAsset as JsonObject });
   if (same(record.formatProfile, await nativeProxySourceProfile())) return (validationGlbUsesJpeg(bytes, limits) ? inspectValidationJpegGlb : inspectValidationGlb)(bytes, limits, png, jpeg);
