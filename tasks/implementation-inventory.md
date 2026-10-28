@@ -1,6 +1,6 @@
 # 実装・接続の全体棚卸し
 
-> 更新: 2026-10-28（限定Point/01c GS・Proxy、07k／07l Native・Meshと07n標準材質変換の接続を反映。全体分類は2026-09-21時点）。本書は機能対応の正本。
+> 更新: 2026-10-29（限定Point/GS・Proxy、Native・Mesh／標準材質変換と01gのPC候補表示を反映。全体分類は2026-09-21時点）。本書は機能対応の正本。
 > 実装順・現在の作業tree・実行結果は [todo](todo.md) を参照し、ここへ重複記載しない。
 > 限定接続と製品受入れを区別し、通常画面・実機の新たな合格は主張しない。
 > [以前の棚卸しと監査記録](../docs/history/development-through-2026-09-14/tasks/implementation-inventory.md) は履歴。
@@ -17,10 +17,13 @@ GS専用上限と全既知本体の合計、画面全体の表示予定・実イ
 局所表示と既存の対象別pick条件で扱う。初回／通常復元の選択前検証は維持する。
 これは既存の操作群の接続改善で、機能数やadoption合格を加算しない。
 
-[01f](../docs/specs/01f-desktop-smooth-composition-evaluation.md)の隔離PC評価は、
-以下の製品経路の接続範囲を増やさない。内部解像度・追加表示policy・PC候補接続の
-[01g](../docs/specs/01g-desktop-smooth-display-proposal.md)はPROPOSED。
-製品のsmooth非表示と、保存済み意図・既存profile／pick規則の保持は継続する。
+[01f](../docs/specs/01f-desktop-smooth-composition-evaluation.md)の隔離PC評価と、
+承認済み[01g](../docs/specs/01g-desktop-smooth-display-proposal.md)の製品実装は別の証拠経路。
+01e PC候補だけにMesh／GSの近似透過表示、内部解像度の自動調整、document共通の
+64MiB未満の追加target予算を接続する。通常／validationの局所smooth非表示は保持する。
+保存済み意図・原本／全SH・既存profile／pick規則とファイル契約は不変。
+以下の07n変換行の局所非表示はvalidation側の記述で、Desktop側は01gの条件付き表示を使う。
+実行結果・未実行条件はtodoを参照し、一般採用や群全体の完成に加算しない。
 
 ## 1. 結論と数え方
 
@@ -149,7 +152,7 @@ M08の限定product経路は、要確認ピンの補正で現在のモデル面�
 |---|---|---|---|---|
 | A01 | 対象／Scene・Project範囲を選び、照明・表裏・hard chromaを編集／解除する | 接続済み | admitted Mesh全slotの照明／表裏／hard chroma／解除を接続。受信原候補の明示確定、scope優先順位と重複keep-one後の編集／返送を保持。既知Basic+litの解除やloser整理は可能だが、新たなlit選択・未知値・不適合effectは拒否。07nではmap2の半透明意図もtyped編集・解消・保存でき、描画未対応を設定消去や編集拒否へ転用しない。実行済み範囲はtodo、実機は別受入れ。 | [src/harness/projectScene/materialSession.ts](../src/harness/projectScene/materialSession.ts) / [src/harness/projectScene/metadataMaterialControls.ts](../src/harness/projectScene/metadataMaterialControls.ts) / [src/projectMetadata/materialResolution.ts](../src/projectMetadata/materialResolution.ts) / [tests/projectFiles.test.ts](../tests/projectFiles.test.ts) |
 | A02 | 実Meshのmaterial／textureと複数slotを扱う | 別経路のみ | GLBと07l四形式のadmitted source locatorを実decoded材質へ厳密対応。opaque/MASK/BLEND×lit/unlit×front/doubleのowned clone編集／解除で原本・texture・RGB/alpha・PBR/Phong設定を保持。07nでBLENDの明示mask化とresetも接続。滑らかな表示、元からunlitの明示lit化、他形式・Representation選択は残る。Point/GS/Proxyの材質は解放しない。実行済み描画／file／復旧範囲はtodo、一般採用・実機は別。 | [src/domain/meshMaterialSource.ts](../src/domain/meshMaterialSource.ts) / [src/projectScene/validationRender.ts](../src/projectScene/validationRender.ts) / [src/projectScene/validationMaterials.ts](../src/projectScene/validationMaterials.ts) / [tests/projectFiles.test.ts](../tests/projectFiles.test.ts) |
-| A03 | 不透明度・soft chromaを安全な対応範囲で使う | 別経路のみ | opaqueとsource MASK／BLENDのexplicit binary maskを既存product画面・typed Session・clone描画・同一GPU pick・解除・五用途file／復元へ接続。source factor×texture×RGBAを元cutoffで二値化してからopacity/chromaと最終cutoffを合成し、cutoff0を先行discardしない。opaqueは元alphaを無視する。07nではinherit半透明／soft chroma／smoothBlend意図と新移行を編集・共有・復旧・再開できる。実際のsmooth描画はG1-D未達のため該当材質の面だけ非表示にして説明し、他の面を保持。dither等は残る。実行結果はtodo。G1-D等の採用・実機受入れや滑らかな半透明の一般保証は主張せず、群全体の完了にはしない。 | [src/viewer/hardChroma.ts](../src/viewer/hardChroma.ts) / [docs/specs/05-project-scene-team-workflow.md](../docs/specs/05-project-scene-team-workflow.md) |
+| A03 | 不透明度・soft chromaを安全な対応範囲で使う | 別経路のみ | opaqueとsource MASK／BLENDのexplicit binary maskを既存product画面・typed Session・clone描画・同一GPU pick・解除・五用途file／復元へ接続。source factor×texture×RGBAを元cutoffで二値化してからopacity/chromaと最終cutoffを合成し、cutoff0を先行discardしない。opaqueは元alphaを無視する。07nではinherit半透明／soft chroma／smoothBlend意図と新移行を編集・共有・復旧・再開できる。validationでは該当材質のsmooth面だけ非表示にして説明し、他の面を保持。01g承認済みPC候補では、document共通予算と内部解像度の自動調整でMesh／GSの近似透過表示を接続し、非対応時の局所非表示・設定保持と既存pick拒否を保つ。dither等は残る。実行結果はtodo。G1-D等の採用・実機受入れや滑らかな半透明の一般保証は主張せず、群全体の完了にはしない。 | [src/viewer/hardChroma.ts](../src/viewer/hardChroma.ts) / [docs/specs/05-project-scene-team-workflow.md](../docs/specs/05-project-scene-team-workflow.md) |
 
 ### 保存
 

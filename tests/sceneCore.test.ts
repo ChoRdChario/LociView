@@ -587,9 +587,18 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
         if (/[\\/](viewport|viewportPicking)\.ts$/.test(path)) permitted.push('../../viewer/gsRender', '../../viewer/gsDecodeQueue');
         expect(imports.every(p => p?.startsWith('./') || permitted.includes(p!)), path).toBe(true);
         expect(source, path).not.toMatch(/\b(fetch|indexedDB|localStorage|sessionStorage|serviceWorker)\b/);
+      } else if (['compositionPolicy','targetBudget','smoothMaterial','smoothComposite'].some(name=>normalizedPath===`src/viewer/${name}.ts`)) {
+        const byFile:Record<string,readonly string[]>={
+          compositionPolicy:['../../docs/specs/profiles/desktop-smooth-mrt-1.policy.json?raw','../../docs/specs/profiles/desktop-smooth-mrt-1.goldens.json?raw'],
+          targetBudget:['./compositionPolicy'],smoothMaterial:['three','./hardChroma','./compositionPolicy'],
+          smoothComposite:['three','./gsRender','./compositionPolicy','./smoothMaterial','./hardChroma','./targetBudget']};
+        const name=normalizedPath.split('/').at(-1)!.replace('.ts','');
+        const imports=[...source.matchAll(/(?:from\s+|import\s*\(\s*|import\s+)(['"])([^'"]+)\1/g)].map(m=>m[2]);
+        expect(imports.sort()).toEqual([...byFile[name]!].sort());
+        expect(source).not.toMatch(/\b(fetch|indexedDB|localStorage|sessionStorage|serviceWorker)\b/);
       } else if (path.replaceAll('\\', '/') === 'src/viewer/gsRender.ts') {
         const imports=[...source.matchAll(/(?:from\s+|import\s*\(\s*|import\s+)(['"])([^'"]+)\1/g)].map(m=>m[2]);
-        expect(imports.sort()).toEqual(['three','gaussian-splat-lite','../../docs/specs/profiles/gs-gsl-webgl2-packed-linear-1.profile.json?raw','../../docs/specs/profiles/gs-gsl-webgl2-packed-linear-1.goldens.json?raw','./gsDecodeQueue','../domain/gsSource'].sort());
+        expect(imports.sort()).toEqual(['three','gaussian-splat-lite','../../docs/specs/profiles/gs-gsl-webgl2-packed-linear-1.profile.json?raw','../../docs/specs/profiles/gs-gsl-webgl2-packed-linear-1.goldens.json?raw','./gsDecodeQueue','../domain/gsSource','./targetBudget'].sort());
         expect(source).not.toMatch(/\b(fetch|indexedDB|localStorage|sessionStorage|serviceWorker)\b/);
       } else if (normalizedPath === 'src/viewer/meshSurface.ts') {
         const imports=[...source.matchAll(/from\s+['"]([^'"]+)['"]/g)].map(m=>m[1]);

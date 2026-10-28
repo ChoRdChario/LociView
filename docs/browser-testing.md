@@ -15,7 +15,22 @@ Desktop evidence are separate. All previews use4182 exclusively; run them serial
 npm run test:e2e -- --config playwright.desktop.config.ts desktop-entry.spec.ts
 npm run test:e2e -- --config playwright.desktop.config.ts gs-workflow.spec.ts --grep 'SH4と面'
 npm run test:e2e -- --config playwright.desktop.config.ts desktop-large-gs.spec.ts
+npm run test:e2e -- --config playwright.desktop.config.ts desktop-smooth.spec.ts desktop-smooth-team.spec.ts
+npm run test:e2e -- --config playwright.desktop.config.ts desktop-smooth-capacity.spec.ts
 ```
+
+The01g smooth lane uses actual Desktop source-alpha/chroma pixels, fallback and
+edit/Workspace/Review/restore/cold continuation. Its separate capacity case uses
+the fixed500k SH4 source and prepares an exact5e5bb9e comparison Desktop build via
+`scripts/prepare-smooth-baseline.mjs`, reusing installed dependencies inside ignored
+artifacts. It does not checkout files, install dependencies or change the product
+entry. Matched actual buffer dimensions and120-second middle-button camera traces
+separate rAF scheduling intervals, rendered callback CPU, valid sampled GPU queries
+and `sortCenters32` public Worker RPC roundtrips. These are different measurements;
+rAF is not proof every frame was presented, and Worker roundtrip is not pure sort.
+Resize-cycle GL object counts establish counter stability, not totalGPU/RAM proof.
+Run this case serially without another build/root suite or GPU workload beside it.
+Todo records the actual GPU/environment/results and any unexecuted acceptance.
 
 The large test generates/verifies a fixed owned178MB SH4 grid when absent; no user
 file or distributed binary fixture is required. It exercises all five purposes,

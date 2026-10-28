@@ -1,7 +1,12 @@
 /** Reviewed composition/import boundary. Entries are exact files, never a directory exemption. */
 export const projectSceneApplicationImports:Readonly<Record<string,readonly string[]>> = {
-  "src/harness/projectScene/acknowledgment.ts": ["../../projectScene/acknowledgment"],
-  "src/projectScene/deferredViewport.ts": ["./viewportModel", "./viewportPorts"],
+  "src/harness/projectScene/acknowledgment.ts": [
+    "../../projectScene/acknowledgment"
+  ],
+  "src/projectScene/deferredViewport.ts": [
+    "./viewportModel",
+    "./viewportPorts"
+  ],
   "src/harness/projectScene/browserMetadataStorage.ts": [
     "../../projectScene/browserMetadataStorage"
   ],
@@ -124,6 +129,8 @@ export const projectSceneApplicationImports:Readonly<Record<string,readonly stri
     "../projectFiles/validation",
     "../ui/app",
     "../viewer/gsDecodeQueue",
+    "../viewer/smoothComposite",
+    "../viewer/targetBudget",
     "./productWorkspace",
     "./styles.css",
     "./validationBrowser"
@@ -342,6 +349,7 @@ export const projectSceneApplicationImports:Readonly<Record<string,readonly stri
     "../projectMetadata/generationScope",
     "../projectPackage/reviewEdit",
     "../viewer/gsDecodeQueue",
+    "../viewer/smoothComposite",
     "./browserMetadataStorage",
     "./browserUiState",
     "./displayTypes",
@@ -448,6 +456,7 @@ export const projectSceneApplicationImports:Readonly<Record<string,readonly stri
   ],
   "src/projectScene/validationPointCoverage.ts": [
     "../viewer/hardChroma",
+    "../viewer/smoothMaterial",
     "./validationCoverage",
     "./viewportPicking",
     "three"
@@ -473,11 +482,9 @@ export const projectSceneApplicationImports:Readonly<Record<string,readonly stri
     "./validationOutputControls"
   ],
   "src/projectScene/validationRender.ts": [
+    "../domain/materialIntent",
     "../domain/meshMaterialSource",
     "../domain/meshSource",
-    "../projectFiles/meshDecode",
-    "../projectFiles/nativeSpatial",
-    "../domain/materialIntent",
     "../domain/pointPresentation",
     "../domain/projectGraphSupport",
     "../domain/values",
@@ -485,6 +492,8 @@ export const projectSceneApplicationImports:Readonly<Record<string,readonly stri
     "../projectFiles/glb",
     "../projectFiles/glbOccurrences",
     "../projectFiles/gsPly",
+    "../projectFiles/meshDecode",
+    "../projectFiles/nativeSpatial",
     "../projectFiles/pointPly",
     "../viewer/compat180/proof",
     "../viewer/compat180/sceneProof",
@@ -492,6 +501,7 @@ export const projectSceneApplicationImports:Readonly<Record<string,readonly stri
     "../viewer/hardChroma",
     "../viewer/loaders",
     "../viewer/pointSurface",
+    "../viewer/smoothMaterial",
     "./modelTypes",
     "./validationMaterials",
     "./viewportModel",
@@ -547,6 +557,9 @@ export const projectSceneApplicationImports:Readonly<Record<string,readonly stri
     "../viewer/gsDecodeQueue",
     "../viewer/gsRender",
     "../viewer/hardChroma",
+    "../viewer/smoothComposite",
+    "../viewer/smoothMaterial",
+    "../viewer/targetBudget",
     "./displayCapture",
     "./modelTransform",
     "./modelTypes",

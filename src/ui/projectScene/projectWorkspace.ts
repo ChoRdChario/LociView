@@ -316,9 +316,22 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   });
   inclusion.root.setAttribute('aria-label', 'キャプションの追加・除外');
   captionPanel.append(list.root, inclusion.root, pinArea, detail.root, conflicts, media, deletionArea); sidebar.append(sceneArea, taskTabs, captionPanel); body.append(stage, sidebar); root.append(header, viewportTools, body, mediaViewer.root);
-  let mounted = false;
+  let mounted = false, observationFrame:number|null=null, observationEpoch=0;
+  function cancelObservation(){
+    const frame=observationFrame;observationFrame=null;observationEpoch++;
+    if(frame!==null&&typeof globalThis.cancelAnimationFrame==='function')globalThis.cancelAnimationFrame(frame);
+  }
+  function viewportChanged(){
+    if(!mounted||disposed||rendering||observationFrame!==null)return;
+    if(typeof globalThis.requestAnimationFrame!=='function'){render();return;}
+    const epoch=observationEpoch;
+    observationFrame=globalThis.requestAnimationFrame(()=>{
+      if(disposed||epoch!==observationEpoch)return;
+      observationFrame=null;render(); // Read current state; never retain an authority snapshot.
+    });
+  }
   let beforePinDrag: WorkspacePinProposal | null = null;
-  const viewport = ports.createViewport(canvas, () => { if (mounted && !rendering) render(); }, (target, position, phase) => {
+  const viewport = ports.createViewport(canvas, viewportChanged, (target, position, phase) => {
     if (!pin || mutationBlock() || composingInput() || !pinCurrent() || !sameTarget(target, pin.target) || !position.every(Number.isFinite)) return false;
     if (phase === 'begin') { beforePinDrag = pin; return true; }
     if (phase === 'restore' && beforePinDrag && sameTarget(target, beforePinDrag.target)) setPin(beforePinDrag);
@@ -594,7 +607,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     render();
   }
   function render() {
-    if (disposed || rendering) return; rendering = true;
+    if (disposed || rendering) return;cancelObservation();rendering = true;
     try {
       const p = provider(), blocked = mutationBlock(), selected = memory().selectedCaptionId;
       const summary = ports.projectStatus();
@@ -681,5 +694,5 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   mounted = true; render();
   return { root, render, session: interaction, inputPending: () => dirty() || busy,
     hasChanges: () => dirty() || busy || !!pending,
-    unmount() { if (disposed) return; disposed = true; storageEpoch++; gesture = null; gestureGeneration++; pressedPointers.clear(); viewport.reservePointer(false); recovery?.dispose(); windows.dispose(); mediaManager?.dispose(); mediaViewer.dispose(); viewport.dispose(); list.dispose(); inclusion.dispose(); detail.dispose(); for (const panel of panels.values()) panel.dispose(); root.remove(); } };
+    unmount() { if (disposed) return; disposed = true;cancelObservation();storageEpoch++; gesture = null; gestureGeneration++; pressedPointers.clear(); viewport.reservePointer(false); recovery?.dispose(); windows.dispose(); mediaManager?.dispose(); mediaViewer.dispose(); viewport.dispose(); list.dispose(); inclusion.dispose(); detail.dispose(); for (const panel of panels.values()) panel.dispose(); root.remove(); } };
 }

@@ -43,6 +43,7 @@ export interface ValidationWorkspacePorts {
   fileLimits: FileValidationLimits; filePolicy?: ProjectFilePolicy; decode?: PngDecoder; jpeg?: JpegDecoder; photo?: PhotoDecoder;
   mountEditor:MountedEditorFactory;
   progressivePresentation?:boolean;
+  smoothDisplay?:boolean;
   introduction?:string;
   initialFiles?:readonly File[];
   openLegacy?(file?:File):Promise<void>;
@@ -77,7 +78,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   workspaceLabel.textContent = 'ファイルを選択'; workspaceInput.type = 'file'; workspaceInput.multiple = true; workspaceInput.setAttribute('aria-label', 'ファイルを選択'); workspaceLabel.append(workspaceInput);
   openFile.type = 'submit'; openFile.textContent = 'ファイルを開く'; workspaceForm.append(workspaceLabel, openFile,fallback);
   const conversionPanel = document.createElement('section'), conversionNote = document.createElement('p'), conversionHelp = document.createElement('p');
-  const materialNotice=createMaterialConversionNotice(document);
+  const materialNotice=createMaterialConversionNotice(document,ports.smoothDisplay);
   const convert = document.createElement('button'), cancelConversion = document.createElement('button');
   convert.type = cancelConversion.type = 'button'; convert.textContent = '新しいプロジェクトに変換'; cancelConversion.textContent = 'キャンセル';
   conversionHelp.textContent = '元ファイルは変更しません。チームでは変換後のファイルを使ってください。元ファイルは書き出しに含まれないため、別に保管してください。';
@@ -256,7 +257,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
       const refresh=()=>{if(!current())return;mounted=checked&&!state();if(mounted&&selectionHost===target&&!target.hasPending())clearSelection();rememberCurrent();controls();};
       presentation={busy:true,reason:'モデルを読み込んでいます。記録は閲覧・検索できます。'};
       workspace=ports.mountEditor(target,bridge.factory,receiveTools,ports.renderModelCandidate?display=>ports.renderModelCandidate!(target,display):undefined,
-        {presentation:state,openProject:()=>{void selectProject();},resumedLastProject:()=>resumedLast,storageEstimate:ports.storageEstimate,changed:refresh});
+        {smoothDisplay:ports.smoothDisplay,presentation:state,openProject:()=>{void selectProject();},resumedLastProject:()=>resumedLast,storageEstimate:ports.storageEstimate,changed:refresh});
       content.replaceChildren(workspace.root,retry);workspace.render();
       const load=async()=>{
         checked=false;mounted=false;presentation={busy:true,reason:'モデルを読み込んでいます。記録は閲覧・検索できます。'};retry.hidden=true;resident?.detachPreparation?.();workspace?.render();
@@ -282,7 +283,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     const fileTools = receiveTools;
     try { workspace=ports.mountEditor(target,next.factory,fileTools,
       ports.renderModelCandidate ? display=>ports.renderModelCandidate!(target,display) : undefined,
-      {openProject:()=>{void selectProject();},resumedLastProject:()=>resumedLast,storageEstimate:ports.storageEstimate,
+      {smoothDisplay:ports.smoothDisplay,openProject:()=>{void selectProject();},resumedLastProject:()=>resumedLast,storageEstimate:ports.storageEstimate,
         changed:()=>{rememberCurrent();controls();}});
       content.replaceChildren(workspace.root); workspace.render();
       if (target.backupRestore.needsDisplay) { target.backupRestore.displayReady(target.read().source!.token); workspace.render(); } }

@@ -85,6 +85,7 @@ export function createPinGizmo<T = PinSurfaceTarget>(canvas: HTMLCanvasElement, 
   canvas.addEventListener('pointerup', up, true); canvas.addEventListener('pointercancel', cancel, true);
   canvas.addEventListener('lostpointercapture', lost, true); canvas.addEventListener('keydown', key);
   return {
+    helper,
     get dragging() { return control.dragging; },
     update(next?: GizmoProposal<T>) {
       const same = JSON.stringify(current?.target) === JSON.stringify(next?.target);

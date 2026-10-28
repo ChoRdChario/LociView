@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { hasBinaryCoverage, hardChromaCoverageMaterial } from '../viewer/hardChroma';
+import {smoothCoverage} from '../viewer/smoothMaterial';
 import { coveragePixel } from './validationCoverage';
 import type { ResidentSurface } from './viewportPicking';
 
@@ -11,7 +12,7 @@ export interface PointVisibility {
 export function pointVisibility(renderer: THREE.WebGLRenderer, camera: THREE.Camera, residents: ReadonlyMap<string, ResidentSurface>,
   cssWidth: number, cssHeight: number, failed: (error: unknown) => void): PointVisibility & { dispose(): void } {
   const target = new THREE.WebGLRenderTarget(2,2,{depthBuffer:true,stencilBuffer:false,minFilter:THREE.NearestFilter,magFilter:THREE.NearestFilter,generateMipmaps:false});
-  const scene = new THREE.Scene(), pointScene = new THREE.Scene(), materials = new Map<THREE.Material,THREE.Material>();
+  const scene = new THREE.Scene(), pointScene = new THREE.Scene(), materials = new Map<THREE.Material,THREE.Material>(),unknownSmooth:THREE.Mesh[]=[];
   let candidate: THREE.Mesh | undefined, candidateGeometry: THREE.InstancedBufferGeometry | undefined, candidateMaterial: THREE.ShaderMaterial | undefined, invalid = false;
   const dispose = () => { target.dispose(); for (const m of materials.values()) m.dispose(); materials.clear(); candidateGeometry?.dispose(); candidateMaterial?.dispose(); };
   try {
@@ -21,9 +22,11 @@ export function pointVisibility(renderer: THREE.WebGLRenderer, camera: THREE.Cam
       surface.mesh.traverse(object => {
         if (!(object instanceof THREE.Mesh)) return;
         for (let node: THREE.Object3D | null=object; node; node=node.parent) if (!node.visible) return;
+        if((Array.isArray(object.material)?object.material:[object.material]).some(m=>m.visible&&smoothCoverage(m)))unknownSmooth.push(object);
         const own = (source: THREE.Material) => {
           if (!source.visible) { const invisible=source.clone(); materials.set(invisible,invisible); return invisible; }
           const previous=materials.get(source); if(previous)return previous;
+          if(smoothCoverage(source)){const hidden=source.clone();hidden.visible=false;materials.set(source,hidden);return hidden;}
           if (!hasBinaryCoverage(source) && (source.transparent || source.alphaTest>0 || source.opacity<1)) throw Error('この面の透過を確認できません。視点を変えて再試行してください。');
           const material=hasBinaryCoverage(source) ? hardChromaCoverageMaterial(source) : source.clone();
           material.depthTest=true; material.depthWrite=true; material.transparent=false; material.blending=THREE.NoBlending; materials.set(source,material); return material;
@@ -37,6 +40,14 @@ export function pointVisibility(renderer: THREE.WebGLRenderer, camera: THREE.Cam
     if (invalid) return 'unknown';
     const size=renderer.getDrawingBufferSize(new THREE.Vector2()), pixel=coveragePixel((ndc.x+1)*cssWidth/2,(1-ndc.y)*cssHeight/2,cssWidth,cssHeight,size);
     if(!pixel)return 'unknown';
+    if(unknownSmooth.length){const ray=new THREE.Raycaster();ray.setFromCamera(pixel.ndc,camera);
+      if(camera instanceof THREE.OrthographicCamera)ray.ray.origin.set(pixel.ndc.x,pixel.ndc.y,-1).unproject(camera);
+      for(const mesh of unknownSmooth)for(const hit of ray.intersectObject(mesh,false)){
+        const material=Array.isArray(mesh.material)?mesh.material[hit.face?.materialIndex??0]:mesh.material;
+        if(!material?.visible||!smoothCoverage(material))continue;const clip=hit.point.clone().project(camera);
+        if([clip.x,clip.y,clip.z].every(Number.isFinite)&&clip.z>=-1&&clip.z<=1){failed(Error('滑らかな透過の面と重なる位置は確認できません。視点を変えるか、そのモデルを非表示にしてください。'));return 'unknown';}
+      }
+    }
     const prior=renderer.getRenderTarget(), cube=renderer.getActiveCubeFace(), mip=renderer.getActiveMipmapLevel(), color=renderer.getClearColor(new THREE.Color()).clone(), alpha=renderer.getClearAlpha();
     const auto=renderer.autoClear, xr=renderer.xr.enabled, shadow=renderer.shadowMap.autoUpdate, check=renderer.debug.checkShaderErrors, onError=renderer.debug.onShaderError; let shaderError=false;
     try {

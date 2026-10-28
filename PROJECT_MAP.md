@@ -66,7 +66,13 @@ smoke for existing Native/v1 routes; it grants no ProjectScene adoption credit.
 
 `scripts/smooth-composition-evaluation` is the isolated read-only01f public-API
 GS/Mesh transparency experiment. No product entry imports it. Its README explains
-reproduction; todo owns results and the proposed01g display-policy decision.
+reproduction; todo owns its results. The approved[01g companion](docs/specs/01g-desktop-smooth-display-proposal.md)
+connects the independently implemented `viewer/smoothComposite.ts`,
+`smoothMaterial.ts`, `compositionPolicy.ts` and shared `targetBudget.ts` only through
+the Desktop entry's neutral presentation port. `gsRender.ts` retains GS decode/sort
+ownership and lends its checked base frame; viewport owns rounded layout/picks and
+truthful local fallback. Immutable source/display profiles and ordinary route
+activation remain separate; todo owns exact production evidence and pending gates.
 
 Caption deletion confirmation and explicit parent proposals use the same workspace
 guards and typed commands, with impact/coordinate reads adapted by `productSources.ts`.

@@ -1,5 +1,6 @@
 import {workspaceFileOperation} from '../projectFiles/receiveWorkspace';
 import type { GsResidency } from '../viewer/gsDecodeQueue';
+import type {SmoothPresentation} from '../viewer/smoothComposite';
 import { createReviewEditScratch } from '../projectPackage/reviewEdit';
 import { OpfsFS } from '../platform/opfs';
 import { ProjectMutationCoordinator } from '../platform/projectLock';
@@ -20,8 +21,9 @@ import { createValidationUiState } from './browserUiState';
 // Conservative execution budgets for this development lane, not measured product capacity.
 export const validationBrowserLimits: FileValidationLimits = { maxFileBytes: 64 * 1024 * 1024,
   maxJsonBytes: 4 * 1024 * 1024, maxItems: 100_000, maxValues: 8_000_000, maxPixels: 16_777_216 };
-export interface BrowserWorkspaceComposition { readonly mountEditor:MountedEditorFactory;readonly progressivePresentation?:boolean;readonly filePolicy?:ProjectFilePolicy;readonly residency?:GsResidency;readonly introduction?:string;readonly initialFiles?:readonly File[];openLegacy?(file?:File):Promise<void> }
+export interface BrowserWorkspaceComposition { readonly mountEditor:MountedEditorFactory;readonly smoothDisplay?:SmoothPresentation;readonly progressivePresentation?:boolean;readonly filePolicy?:ProjectFilePolicy;readonly residency?:GsResidency;readonly introduction?:string;readonly initialFiles?:readonly File[];openLegacy?(file?:File):Promise<void> }
 export async function createValidationBrowserWorkspace(document: Document, composition:BrowserWorkspaceComposition, run?: string) {
+  if(composition.smoothDisplay&&import.meta.env.MODE!=='project-scene-desktop')throw Error('専用のPC候補ビルドで開いてください。');
   if (!import.meta.env.DEV && import.meta.env.MODE !== 'project-scene-validation' && import.meta.env.MODE !== 'project-scene-desktop')
     throw Error('開発サーバーまたは専用の検証ビルドで開いてください。');
   const policy=projectFilePolicy(composition.filePolicy ?? validationBrowserLimits);
@@ -65,20 +67,20 @@ export async function createValidationBrowserWorkspace(document: Document, compo
   const storage = (id: string, create: boolean) => openStorage(`${validationArea}-${id}`, create);
   const uiState = createValidationUiState();
   const scratch=createReviewEditScratch(base);
-  const workspace = createValidationWorkspace(document, { ...options,progressivePresentation:composition.progressivePresentation,reviewEditArchive:{write:produce=>workspaceFileOperation(locks,()=>scratch.write(produce))},initialFiles:composition.initialFiles,openLegacy:composition.openLegacy,mountEditor:composition.mountEditor,introduction:composition.introduction,lastProject: uiState.lastProject,
+  const workspace = createValidationWorkspace(document, { ...options,smoothDisplay:!!composition.smoothDisplay,progressivePresentation:composition.progressivePresentation,reviewEditArchive:{write:produce=>workspaceFileOperation(locks,()=>scratch.write(produce))},initialFiles:composition.initialFiles,openLegacy:composition.openLegacy,mountEditor:composition.mountEditor,introduction:composition.introduction,lastProject: uiState.lastProject,
     storageEstimate: typeof navigator.storage?.estimate === 'function' ? () => navigator.storage.estimate() : undefined,
     list: () => listValidationProjects(options, storage),
     open: (id, initial, mode, workspaceFile, reviewEdit, firstBackup) => openValidationEntry({ ...options, run: id, initial, mode, workspaceFile, reviewEdit, firstBackup, openStorage: create => storage(id, create) }),
     renderModelCandidate: async (host, display) => {
       const resident = await prepareReadonlyResidents(display.models, { modelContent: record => host.content.modelContent(record, true) });
-      return { factory: sceneViewportFactory(resident,composition.residency), dispose: () => resident.dispose() };
+      return { factory: sceneViewportFactory(resident,composition.residency,undefined,composition.smoothDisplay), dispose: () => resident.dispose() };
     },
     renderReview: async view => {
       const resident = await prepareReadonlyResidents(view.models, view.content);
       try {
         const display = view.display(null, null);
         for (const model of view.models) resident.validate(model, display.savedMaterials?.[model.assetId]);
-        return { factory: sceneViewportFactory(resident,composition.residency), dispose: () => resident.dispose() };
+        return { factory: sceneViewportFactory(resident,composition.residency,undefined,composition.smoothDisplay), dispose: () => resident.dispose() };
       } catch (error) { resident.dispose(); throw error; }
     },
     render: async host => {
@@ -99,7 +101,7 @@ export async function createValidationBrowserWorkspace(document: Document, compo
         }});void ready.catch(()=>{});
         if(!composition.progressivePresentation)await ready;
         const detach = host.setDisplayPreparation(prepare);
-        return { factory: sceneViewportFactory(resident,composition.residency), ready, detachPreparation:detach, dispose: () => { detach(); resident.dispose(); } };
+        return { factory: sceneViewportFactory(resident,composition.residency,undefined,composition.smoothDisplay), ready, detachPreparation:detach, dispose: () => { detach(); resident.dispose(); } };
       } catch (error) { resident.dispose(); throw error; }
     },
     selected: (id, mode) => {

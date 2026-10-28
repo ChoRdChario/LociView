@@ -17,6 +17,7 @@ import type { JsonObject } from '../domain/values';
 import type { MeshMaterialSource } from '../domain/meshMaterialSource';
 import { validationMaterialSlots, validationMaterialIssue,validationMaterialCoverage,smoothMaterialDisplayNotice, type ValidationMaterialEffects } from './validationMaterials';
 import { patchBinaryMask, type CoverageMaterial } from '../viewer/hardChroma';
+import {patchSmoothCoverage} from '../viewer/smoothMaterial';
 import { decodeOccurrenceGlb, type DecodedOccurrenceSlot } from '../projectFiles/glbOccurrences';
 import { materialForDisplay } from '../domain/materialIntent';
 import { readLegacyModelProof } from '../viewer/compat180/proof';
@@ -27,7 +28,7 @@ export interface SavedModelResidentPort {
   label?(model:ValidationModelClosure|ReadonlyRenderModel):string;
   subscribe?(changed:()=>void):()=>void;
   gsPending?(models:readonly (ValidationModelClosure|ReadonlyRenderModel)[]):boolean;
-  gsDemand?(model: ValidationModelClosure | ReadonlyRenderModel): GsDemand | null; create(model: ValidationModelClosure | ReadonlyRenderModel, effects?: ValidationMaterialEffects): ResidentSurface; dispose(): void }
+  gsDemand?(model: ValidationModelClosure | ReadonlyRenderModel): GsDemand | null; create(model: ValidationModelClosure | ReadonlyRenderModel, effects?: ValidationMaterialEffects,smoothDisplay?:boolean): ResidentSurface; dispose(): void }
 export interface ValidationResidentCache extends SavedModelResidentPort { prepare(versions: readonly DisplayModelVersion[]): Promise<void>;
   readonly ready:Promise<void>;
   validate(c: ValidationModelClosure, effects?: ValidationMaterialEffects): void }
@@ -187,7 +188,7 @@ export async function prepareReadonlyResidents(initial: readonly ReadonlyRenderM
       gsPending(models:readonly (ValidationModelClosure|ReadonlyRenderModel)[]){return models.some(c=>c.representation.contentKind==='gaussianSplat'&&!templates.has(keyFor(c)));},
       gsDemand(input:ValidationModelClosure|ReadonlyRenderModel){const c=renderModel(input),item=templates.get(keyFor(c));
       if(closed||!item||item.record!==canonical(c.representation))throw Error('保存したモデルの表示本体を再確認してください。');
-      return item.model.gs&&!item.model.gs.displayIssue?{count:item.model.gs.count,degree:item.model.gs.degree}:null;}, create(input: ValidationModelClosure | ReadonlyRenderModel, effects: ValidationMaterialEffects = {}) {
+      return item.model.gs&&!item.model.gs.displayIssue?{count:item.model.gs.count,degree:item.model.gs.degree}:null;}, create(input: ValidationModelClosure | ReadonlyRenderModel, effects: ValidationMaterialEffects = {},smoothDisplay=false) {
       const c = renderModel(input);
       validate(c, effects);
       const item = templates.get(keyFor(c));
@@ -245,7 +246,10 @@ export async function prepareReadonlyResidents(initial: readonly ReadonlyRenderM
               if (a.baseColorSrgb) (result as CoverageMaterial).color.setRGB(...a.baseColorSrgb as [number, number, number], THREE.SRGBColorSpace);
               if (a.doubleSided !== undefined) result.side = a.doubleSided ? THREE.DoubleSide : THREE.FrontSide;
               const coverage=validationMaterialCoverage(slot,displayed,'map2');
-              if(coverage?.kind==='smoothBlend'){result.visible=false;materialNotices.push(`${slot.name}：${smoothMaterialDisplayNotice}`);}
+              if(coverage?.kind==='smoothBlend'){
+                if(smoothDisplay)patchSmoothCoverage(result as CoverageMaterial,{opacity:coverage.opacity,...(coverage.chroma?{chroma:coverage.chroma}:{}),
+                  ...(slot.source?.coverage.kind==='mask'?{sourceMask:{opacity:original.opacity,cutoff:slot.source.coverage.alphaCutoff}}:{}),...(slot.source?.coverage.kind==='blend'?{sourceBlendOpacity:original.opacity}:{})});
+                else{result.visible=false;materialNotices.push(`${slot.name}：${smoothMaterialDisplayNotice}`);}}
               else if(coverage?.kind==='opaque') {result.opacity=1;result.alphaTest=0;result.transparent=false;result.depthWrite=true;}
               else if(coverage?.kind==='mask')patchBinaryMask(result as CoverageMaterial,
                 {opacity:coverage.opacity,cutoff:coverage.cutoff!,...(coverage.chroma?{chroma:coverage.chroma}:{}),
@@ -254,7 +258,7 @@ export async function prepareReadonlyResidents(initial: readonly ReadonlyRenderM
 
             }else if(slot.source){
               if(!supportedClass(m,slot.source,c))throw Error('元の材質の設定を確認してください。');
-              if(slot.source.coverage.kind==='blend'){result.visible=false;materialNotices.push(`${slot.name}：${smoothMaterialDisplayNotice}`);}
+              if(slot.source.coverage.kind==='blend'){if(smoothDisplay)patchSmoothCoverage(result as CoverageMaterial,{opacity:1,sourceBlendOpacity:m.opacity});else{result.visible=false;materialNotices.push(`${slot.name}：${smoothMaterialDisplayNotice}`);}}
               else if(slot.source.coverage.kind==='mask')patchBinaryMask(result as CoverageMaterial,{opacity:1,cutoff:.5,sourceMask:{opacity:m.opacity,cutoff:slot.source.coverage.alphaCutoff}});
               else {result.opacity=1;result.alphaTest=0;result.transparent=false;result.depthWrite=true;}
             }

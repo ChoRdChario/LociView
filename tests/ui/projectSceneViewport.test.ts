@@ -103,6 +103,13 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('synthetic Scene display; GPU mocked, not rendered/browser acceptance', () => {
+  it('retains a healthy active view without forced measurement while resize, DPR and reopen still prepare',()=>{
+    const canvas=fakeCanvas(),v=createSyntheticViewport(canvas.canvas as unknown as HTMLCanvasElement,()=>{},()=>true),display=syntheticDisplay(createSyntheticProject(),f.overview,null,null);
+    v.update(display);v.setActive(true);canvas.show();const measure=vi.spyOn(canvas.canvas as unknown as HTMLCanvasElement,'getBoundingClientRect'),renderer=tracker.renderers[0],pose=v.read().token;
+    for(let i=0;i<20;i++)v.setActive(true);expect(measure).not.toHaveBeenCalled();expect(tracker.renderers).toHaveLength(1);expect(v.read().token).toBe(pose);
+    canvas.show(900,650);expect(measure).toHaveBeenCalledOnce();expect(v.read().ready).toBe(true);measure.mockClear();vi.stubGlobal('devicePixelRatio',2);const[id,tick]=[...tracker.raf][0]!;tracker.raf.delete(id);tick();expect(measure).toHaveBeenCalled();
+    v.setActive(false);expect(renderer.disposed).toBe(true);measure.mockClear();v.setActive(true);expect(measure).toHaveBeenCalled();expect(tracker.renderers).toHaveLength(2);expect(v.read().ready).toBe(true);v.dispose();
+  });
   it('draws after changes, keeps idle frames quiet, and retains hover/reentrant invalidation without UI edits', () => {
     const canvas = fakeCanvas(), changed = vi.fn();
     const v = createSyntheticViewport(canvas.canvas as unknown as HTMLCanvasElement, changed, () => true);

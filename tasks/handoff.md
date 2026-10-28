@@ -36,8 +36,8 @@ The bounded workflow now has executed source/command/file/recovery and Desktop
 browser evidence, required full checks and independent review in todo. The existing
 Mesh source-material connection is verified under05's
 source matrix: visual Mesh opaque/MASK, authored lit/unlit and front/double. Todo
-owns its actual checks and next action. Explicit Basic→lit and smooth drawing
-remain behind real decisions; the approved07n below owns BLEND intent/migration; source capability never unlocks Point/GS/
+owns its actual checks and next action. Explicit Basic→lit remains unsupported;
+approved01g below owns Desktop-only smooth display. The approved07n owns BLEND intent/migration; source capability never unlocks Point/GS/
 Proxy editing. Keep original bytes and identical display/Boolean-pick coverage.
 The07m opaque-source conversion companion was PO-approved2026-10-28 as one
 three-family unit and is verified in todo. It adds recipe/ID meanings for
@@ -50,7 +50,8 @@ one group. The bounded workflow and final automatic checks are verified; todo
 owns exact evidence, retained failures and the measured save/output waits.
 Do not repeat normalization/helper approval. Smooth intent may
 be edited/saved while its material contribution is locally hidden with an
-explanation; actual smooth composition remains behind G1-D, even for Mesh-only.
+explanation outside the approved01g Desktop candidate. General smooth adoption
+remains behind G1-D, even for Mesh-only.
 The independently reviewed[01f companion](../docs/specs/01f-desktop-smooth-composition-evaluation.md)
 was PO-approved2026-10-28 for the early read-only PC WBOIT evaluation and continued
 implementation if no technical problems remain. Todo owns its current evidence
@@ -58,10 +59,14 @@ and stop conditions. Actual qualification/product activation gates remain;
 do not turn a PC experiment into G1-D/iOS/adoption/normal activation/release credit.
 The experiment demonstrates bounded1080p composition, but unrestricted full
 resolution exceeds the64MiB extra-target budget and GPU cost increases.
-[01g](../docs/specs/01g-desktop-smooth-display-proposal.md) is the PROPOSED automatic
-internal-resolution/viewport-policy/PC-candidate connection decision. Preserve07n
-until that decision; todo owns exact measurements and final-check status.
-Conditional continuation did not ratify this newly discovered quality/activation tradeoff.
+[01g](../docs/specs/01g-desktop-smooth-display-proposal.md) was explicitly approved
+by PO2026-10-28: automatic internal-resolution/viewport policy and01e PC-candidate
+connection before the outstanding core/iOS conditions. The owned production
+compositor is connected only by the Desktop entry. Preserve old profiles, source
+bytes/SH, map1 guards, CSS point diameter/6px/rawDPR limits and file/recovery fences.
+Todo owns exact measurements, final-check status and next work; continue authorized
+implementation without another helper approval. General adoption, physical iOS,
+offline/PWA, ordinary activation and release retain their actual gates.
 
 01a's bounded point workflow is implemented; exact six JSON companions are immutable.
 Native, synthetic hosts, typed validation and ordinary home have separate authority

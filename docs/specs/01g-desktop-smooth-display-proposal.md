@@ -1,6 +1,6 @@
 # PC候補の透過表示と描画解像度
 
-Status: **PROPOSED — 判断待ち。製品への実装・接続・有効化は未承認。**
+Status: **APPROVED — PO2026-10-28「進めてください」により本案の一括実装を承認。PC候補限定。一般採用・公開は含まない。**
 
 ## 利用者が得る結果と今回の判断
 
@@ -24,7 +24,8 @@ SH4・50万点／1080pの描画・回転・順序変更・GPU復旧が動作し�
 のcore／実機条件を満たす前に**01e静的PC候補だけ**へ実装・接続する例外を求める。
 実装は新たな独立production reviewと下記検証を経る。通常PWA・公開・deployment、
 G1-D採用、iOS合格を含めない。01fの評価開始の例外だけでは、この接続は許可されない。
-二点を含むこの一つの方針をPOが承認するまでは、製品の07n表示を維持する。
+POはこの二点と追加表示policyを含む方針を承認した。通常の実装・検証・修正は
+再承認を挟まず進める。実装・検証状態はtodoが管理する。
 
 ## 実装境界
 
@@ -57,6 +58,15 @@ G1-D採用、iOS合格を含めない。01fの評価開始の例外だけでは�
   「非表示」から「対応済み」へ説明だけを先に変えない。
 - 表示には近似であることと、内部解像度調整が起きた場合の結果を短く伝える。
   内部エンジンや透過方式を選ぶカード、通常時の手動解像度設定は増やさない。
+- カメラ／sortの通知で既に有効な健全rendererを再度有効にするときは、その保持だけで
+  寸法を再取得しない。実寸法の変更はResizeObserver、DPR変更は既存の描画ループで
+  検出し、初回・無効状態からの復帰・未生成renderer・明示再試行は従来どおり準備する。
+  inactive時のGS予定の取消、操作／視点のguard、一覧・状態通知やSession契約は変えない。
+- viewportの描画・sort通知によるUI再描画は、次のanimation frameで一度にまとめ、
+  その時点のprovider／viewportを読み直す。UI操作・command・ピン／モデル提案の
+  直接renderは即時のままとし、待機中の通知を取り消す。unmountは予約と遅延callbackを
+  無効にする。RAFのない記録用DOMでは従来の同期通知を保つ。表示の投影・状態・
+  View capture／pickの鮮度、操作時guard、保存／復旧のfenceを省略する仕組みにしない。
 - metadata／既存profile／recipe／wire、source保存、Session command、保存・共有・復旧の
   fenceを変更しない。評価のGPU計測とProjectの保存性能を混同しない。
 
@@ -78,9 +88,41 @@ count>0ならrevealage0、それ以外は`exp(-sumTau)`。
 合成色は重み付き平均RGB×(1-revealage)＋opaqueRGB×revealage。
 alpha0でaccumが0の場合は平均RGBを0とする。原色／HDRをclampしない。
 
-policyの正確なJSON／digestとalpha端点・HDR・順序のgoldensは、承認後かつ製品実装前に
+policyの正確なJSON／digestとalpha端点・HDR・順序のgoldensは、製品実装前に
 この数式と一致する形で固定し、独立レビューする。未知policyや公開shaderの形状不一致は
 明示的に拒否する。評価コードをそのまま登録・有効化しない。
+
+## 接続portと資源所有
+
+- `desktopEntry`だけがdocument内の共有target予算を作り、`BrowserWorkspaceComposition`
+  の任意の表示portを通じて編集・Review・モデル候補のviewportへ渡す。DEV／URLでは有効化しない。
+- `validationRender`は既存semantic profileで解釈済みの効果から、所有Mesh材質へ
+  source coverage→appearance→final alphaのhookを適用する。viewerには確認済み数値と
+  THREE資源だけを渡す。map1の入力／編集権限を変えない。
+- `gsRender`はdecode／sort／ready／取消・解放を一元所有し、任意の中立的な描画callbackに
+  準備済みGS object／元ShaderMaterial／既存linear base targetを渡す。材質交換は
+  try/finallyで戻し、合成完了後にreadyを進める。従来呼出しの01c経路は維持する。
+- `smoothComposite`はMeshの派生材質とMRT／resolve資源を所有する。GS baseは借用し、
+  Mesh-only時はbaseとdepthも所有する。保守的な予算では両経路ともbase8＋depth4＋
+  accumulation16＋optical depth8の**36bytes/pixel**を計上する。1080p相当は最大値であり、
+  この実費・同時view・device上限によってさらに縮小してよい。既存01c予算を借りて
+  新しいMesh-only baseを無料扱いしない。
+  GS借用時はGS ownerが12bytes/pixel、compositorが24bytes/pixelを個別に保有し、
+  既存baseの世代・寸法を確認してclaimしてからMRTを確保する。compositorだけを閉じても
+  baseの計上を戻さず、その実targetの破棄／resize完了時にGS ownerが解放する。
+- viewportは共通scaleから丸めたRenderPlanを確定し、canvasのCSS寸法を保ってdrawing
+  bufferだけを変更する。同じsnapshotを点とcoverage/pointerへ渡し、変更時にpick世代を進める。
+  resizeは旧targetを解放してから新しい確保を行い、解放前に予算を戻さない。
+  予約不可なら既存の有効表示を保持し、確保失敗なら説明付きの既存base fallbackに戻る。
+- sceneの全transparent材質を推測分類しない。実モデルのsmooth descriptorを列挙して
+  GSと合成する。操作helperはその対象に含めず、既存の操作表示を維持する。
+- 位置確認では、確認済みsmooth markerと交差する各canonical probe rayを、alphaや
+  前後の閾値で受理せず`unknown`にする。クリック画素と近傍6pxの各候補画素へ同じ
+  規則を適用し、材質slot・clip範囲・平行投影を保持する。交差しないrayは既存の
+  Boolean判定を使う。旧来の未分類透明材質の全体拒否は変更しない。
+  準備中・fallbackで実際に非表示のsmooth面は、その表示世代のpickからも除く。
+- conversion noticeと材質panelへ同じtrusted表示能力を渡す。PC候補の事前説明は
+  近似表示と条件付き非表示を伝え、viewportはprobe／描画後の実際の状態を伝える。
 
 ## 一つの完了条件
 

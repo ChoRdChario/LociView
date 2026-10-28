@@ -30,7 +30,7 @@ import { pinPositionInParent } from './pinParent';
 import type { createValidationModeHost } from './validationModeHost';
 
 /** Read adapters only: no Session exposure, synthetic editor or mutation authority. */
-export function productSources(host: ReturnType<typeof createValidationModeHost>): Pick<ProjectWorkspacePorts,
+export function productSources(host: ReturnType<typeof createValidationModeHost>,smoothDisplay=false): Pick<ProjectWorkspacePorts,
   'modelDetails' | 'modelPlacement' | 'modelAngles' | 'modelReview' | 'modelDeletion' | 'prepareModelMembership' | 'views' | 'viewOrder' | 'viewReview' | 'materials' | 'mediaDescription' | 'captionDeletion' | 'pinPositionInParent' | 'recovery' | 'prepareCaptionMembership'> {
   const provider = () => { const p = host.read().provider; if (p?.kind !== 'scene-provider') throw Error('プロジェクトの内容を確認してください。'); return p; };
   const otherSceneReferences = (p: ReturnType<typeof provider>, kind: 'asset' | 'caption', id: string, sceneId: string) => {
@@ -269,7 +269,7 @@ export function productSources(host: ReturnType<typeof createValidationModeHost>
             target: slot.target, name: value(slot.name), project: record(slot.target, 'project'), scene: record(slot.target, 'scene'), sourceIntent: value(sourceMaterialIntent),
             fieldIssues: Object.fromEntries(materialFields.map(f => [f, validationMaterialSourceIssue(slot,p.semanticProfile) ??
               null])) as Record<typeof materialFields[number], string | null>,
-            admit: intent => validationMaterialIssue(slot, intent, p.semanticProfile),displayNotice:intent=>validationMaterialDisplayNotice(slot,intent,p.semanticProfile) }))) };
+            admit: intent => validationMaterialIssue(slot, intent, p.semanticProfile),displayNotice:intent=>validationMaterialDisplayNotice(slot,intent,p.semanticProfile,smoothDisplay) }))) };
         }) };
       const review: WorkspaceMaterialReview[] = [], seen = new Set<string>();
       for (const [id, fields] of Object.entries(p.details.mutable.materialOverridesById)) {

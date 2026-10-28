@@ -35,6 +35,13 @@ cutout or opaque coverage using the same material editor. Never change persisten
 intent to obtain a display fallback. Mesh-only does not bypass this gate. Dither
 and experimental smooth production connection are not enabled by this companion.
 
+The separately approved[01g companion](01g-desktop-smooth-display-proposal.md)
+subsequently authorizes conditional approximate display only in the01e static
+PC candidate, including sourceMASK-before-appearance and BLEND final-alpha math.
+Its owned viewport policy does not change this migration/editor contract, map1,
+persisted intent or old recipes. The local-hide behavior above remains in other
+routes and as the candidate's explicit unsupported-display fallback.
+
 ## Standard evaluation and editor
 
 Use the existing map2 atoms and existing source profiles, not a new interpretation:

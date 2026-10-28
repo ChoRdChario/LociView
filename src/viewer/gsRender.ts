@@ -4,12 +4,15 @@ import displayText from '../../docs/specs/profiles/gs-gsl-webgl2-packed-linear-1
 import goldenText from '../../docs/specs/profiles/gs-gsl-webgl2-packed-linear-1.goldens.json?raw';
 import { queueGsDecode, type GsResidency, type GsViewIntent } from './gsDecodeQueue';
 import { gsLinear } from '../domain/gsSource';
+import type {TargetBudget,TargetLease} from './targetBudget';
 
 /** Neutral checked source. No Project, format records, filesystem or package access. */
 export type GsDisplaySource = {readonly count:number;readonly degree:number;readonly displayIssue:string|null} &
   ({readonly file:Blob;readonly bytes?:never}|{readonly bytes:Uint8Array;readonly file?:never});
 export interface GsDisplayResident {readonly source:GsDisplaySource;readonly object:THREE.Group;issue:string|null;ready:boolean}
-export interface GsRenderPort {render(scene:THREE.Scene,camera:THREE.Camera,before:()=>void):void;dispose():void;readonly depthBits:number;readonly healthyOwner?:object}
+export interface GsFrame {readonly object:THREE.Mesh;readonly sourceMaterial:THREE.ShaderMaterial;readonly baseTarget:THREE.WebGLRenderTarget;
+  readonly baseBytes:number;claimBase():void;withMaterial(material:THREE.ShaderMaterial,draw:()=>void):void;renderBase():void}
+export interface GsRenderPort {render(scene:THREE.Scene,camera:THREE.Camera,before:()=>void,present?:(frame:GsFrame)=>void):void;dispose():void;readonly depthBits:number;readonly healthyOwner?:object;readonly targetBytes?:number}
 let policy:Promise<void>|undefined;
 async function verifyPolicy(){return policy??=(async()=>{
   const hash=async(s:string)=>[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s)))].map(n=>n.toString(16).padStart(2,'0')).join('');
@@ -51,15 +54,16 @@ function probeLinearTarget(renderer:THREE.WebGLRenderer,target:THREE.WebGLRender
   }finally{renderer.setRenderTarget(previous);g.dispose();base.dispose();blend.dispose();}
 }
 /** One viewport coordinator. Source changes dispose it; camera-only sorts retain the last order. */
-export async function createGsRender(renderer:THREE.WebGLRenderer,residents:readonly GsDisplayResident[],changed:()=>void,signal?:AbortSignal,residency?:GsResidency,intent?:GsViewIntent):Promise<GsRenderPort>{
+export async function createGsRender(renderer:THREE.WebGLRenderer,residents:readonly GsDisplayResident[],changed:()=>void,signal?:AbortSignal,residency?:GsResidency,intent?:GsViewIntent,targetBudget?:TargetBudget):Promise<GsRenderPort>{
   signal?.throwIfAborted();await verifyPolicy();signal?.throwIfAborted();
   const target=new THREE.WebGLRenderTarget(1,1,{type:THREE.HalfFloatType,format:THREE.RGBAFormat,depthBuffer:true,samples:0});target.texture.colorSpace=THREE.LinearSRGBColorSpace;
+  if(targetBudget)target.depthTexture=new THREE.DepthTexture(1,1,THREE.UnsignedIntType);
   let depthBits:number;try{depthBits=probeLinearTarget(renderer,target);}catch(e){target.dispose();throw e;}
   let output:ReturnType<typeof outputPass>|undefined,coordinator:GaussianSplatRenderer;
   try{output=outputPass(target);coordinator=new GaussianSplatRenderer({renderer,autoUpdate:false,encodeLinear:true,premultipliedAlpha:true,transparent:true,depthTest:true,depthWrite:false,
     maxStdDev:Math.sqrt(8),minPixelRadius:0,minAlpha:.5/255,preBlurAmount:.3,blurAmount:0,clipXY:4,focalAdjustment:2,sortRadial:false,fastSort:true,minSortIntervalMs:0,stochastic:false,onDirty:changed});}
   catch(e){output?.dispose();target.dispose();throw e;}
-  const owner=intent?.owner??{};let slotIndex=0,coordinatorDisposed=false;
+  const owner=intent?.owner??{};let slotIndex=0,coordinatorDisposed=false,targetGeneration=0,baseLease:TargetLease|undefined;
   let closed=false,sorting=false,lastSort='',attached:THREE.Scene|undefined,fatal:unknown;const decoded=new Set<GsDisplayResident>(),pendingDisplay=new Set<GsDisplayResident>();
   const leases=residents.map(resident=>{
     resident.ready=false;resident.issue='GSの表示を準備しています。';
@@ -72,23 +76,32 @@ export async function createGsRender(renderer:THREE.WebGLRenderer,residents:read
     void lease.promise.then(mesh=>{if(closed){lease.cancel();return;}try{checkPacked(mesh,resident.source);resident.object.add(mesh);decoded.add(resident);lastSort='';changed();}catch(e){lease.cancel();resident.issue=(e as Error).message;changed();}},e=>{if(!closed){resident.issue=e instanceof Error?e.message:'GSを表示できません。';changed();}});
     return lease;
   });
-  return {depthBits,get healthyOwner(){return !closed&&!fatal?owner:undefined;},render(scene,camera,before){
+  return {depthBits,get targetBytes(){return baseLease?.bytes??0;},get healthyOwner(){return !closed&&!fatal?owner:undefined;},render(scene,camera,before,present){
     if(closed)return;if(fatal)throw fatal;if(attached!==scene){coordinator.removeFromParent();scene.add(coordinator);attached=scene;}
     scene.updateMatrixWorld(true);camera.updateMatrixWorld(true);
     const finiteGpu=(values:readonly number[])=>values.every(v=>Number.isFinite(v)&&Number.isFinite(Math.fround(v)));
     if(!finiteGpu(camera.matrixWorld.elements)||!finiteGpu(camera.projectionMatrix.elements)||residents.some(r=>!finiteGpu(r.object.matrixWorld.elements)))throw Error('この配置・視点ではGSを表示できません。');
     const size=renderer.getDrawingBufferSize(new THREE.Vector2()),gl=renderer.getContext(),max=Math.min(renderer.capabilities.maxTextureSize,gl.getParameter(gl.MAX_RENDERBUFFER_SIZE) as number);
     if(!Number.isSafeInteger(size.x)||!Number.isSafeInteger(size.y)||size.x<=0||size.y<=0||size.x>max||size.y>max||!Number.isSafeInteger(size.x*size.y*12))throw Error('GSの表示領域が扱える範囲を超えています。');
-    if(target.width!==size.x||target.height!==size.y)target.setSize(size.x,size.y);
+    if(target.width!==size.x||target.height!==size.y||baseLease&&!present){
+      if(baseLease){target.dispose();baseLease.release();baseLease=undefined;}
+      target.setSize(size.x,size.y);targetGeneration++;
+    }
     const key=JSON.stringify([camera.matrixWorld.elements,camera.projectionMatrix.elements,residents.map(r=>[decoded.has(r),r.object.matrixWorld.elements,r.object.visible])]);
     if(!sorting&&key!==lastSort){sorting=true;lastSort=key;scene.updateMatrixWorld(true);const readySet=[...decoded];void coordinator.update({scene,camera}).then(()=>{if(!closed){for(const r of readySet)pendingDisplay.add(r);changed();}},e=>{if(!closed){fatal=e;changed();}}).finally(()=>{sorting=false;});}
     // Public pinned API refreshes geometry in unchanged ranges while a sort is in flight.
     scene.updateMatrixWorld(true);coordinator.display.refreshTransforms(renderer);
-    let becameReady=false;const old=renderer.getRenderTarget();try{renderer.setRenderTarget(target);
-      const gl=renderer.getContext();if(gl.checkFramebufferStatus(gl.FRAMEBUFFER)!==gl.FRAMEBUFFER_COMPLETE)throw Error('GSの表示領域を準備できません。');
-      before();renderer.clear();renderer.render(scene,camera);renderer.setRenderTarget(old);renderer.render(output!.scene,output!.camera);
+    let becameReady=false;const old=renderer.getRenderTarget();try{
+      const generation=targetGeneration,assertFrame=()=>{if(closed||generation!==targetGeneration)throw Error('GSの表示世代が一致しません。');};
+      const renderBase=()=>{assertFrame();renderer.setRenderTarget(target);
+        const gl=renderer.getContext();if(gl.checkFramebufferStatus(gl.FRAMEBUFFER)!==gl.FRAMEBUFFER_COMPLETE)throw Error('GSの表示領域を準備できません。');
+        before();renderer.clear();renderer.render(scene,camera);renderer.setRenderTarget(old);renderer.render(output!.scene,output!.camera);};
+      if(present){if(!(coordinator.material instanceof THREE.ShaderMaterial))throw Error('GSの表示材質を確認できません。');
+        const sourceMaterial=coordinator.material;
+        present({object:coordinator,sourceMaterial,baseTarget:target,get baseBytes(){assertFrame();return baseLease?.bytes??0;},claimBase(){assertFrame();if(!targetBudget)throw Error('GSの透過表示は未接続です。');baseLease??=targetBudget.reserve(target.width*target.height*12);},renderBase,withMaterial(material,draw){assertFrame();const previous=coordinator.material;try{coordinator.material=material;draw();}finally{coordinator.material=previous;}}});
+      }else renderBase();
       for(const r of pendingDisplay){becameReady||=!r.ready;r.ready=true;r.issue=null;}pendingDisplay.clear();
     }finally{renderer.setRenderTarget(old);}if(becameReady)changed();
   },dispose(){if(closed)return;closed=true;intent?.cancel();const errors:unknown[]=[];coordinator.removeFromParent();try{coordinator.dispose();coordinatorDisposed=true;}catch(e){errors.push(e);}for(const lease of leases)try{lease.cancel();}catch(e){errors.push(e);}for(const r of residents)r.ready=false;
-    try{target.dispose();}catch(e){errors.push(e);}try{output!.dispose();}catch(e){errors.push(e);}if(errors.length)throw new AggregateError(errors,'GSの表示資源を解放できません。');}};
+    try{target.dispose();baseLease?.release();baseLease=undefined;}catch(e){errors.push(e);}try{output!.dispose();}catch(e){errors.push(e);}if(errors.length)throw new AggregateError(errors,'GSの表示資源を解放できません。');}};
 }

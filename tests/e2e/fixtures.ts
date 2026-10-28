@@ -39,12 +39,12 @@ export function smallPng(red = 40,splitAlpha=false) {
 }
 
 /** Nonoverlapping owned sources: lit/double, opaque/unlit alpha.25, source MASK .8×.8×texture. */
-export function sourceMaterialPanelsGlb(change?:(json:any)=>void){
+export function sourceMaterialPanelsGlb(change?:(json:any)=>void,vertexAlpha=.8){
   const parts:Buffer[]=[],views:any[]=[],accessors:any[]=[],primitives:any[]=[];let offset=0;
   const floats=(values:number[],type:string,extra:object={})=>{const bytes=Buffer.alloc(values.length*4);values.forEach((n,i)=>bytes.writeFloatLE(n,i*4));const view=views.length;views.push({buffer:0,byteOffset:offset,byteLength:bytes.length});parts.push(bytes);offset+=bytes.length;const index=accessors.length;accessors.push({bufferView:view,componentType:5126,count:values.length/Number(type.slice(-1)),type,...extra});return index;};
   for(const [i,x]of[-3,0,3].entries()){
     const position=floats([x-1,-1,0,x+1,-1,0,x+1,1,0,x-1,-1,0,x+1,1,0,x-1,1,0],'VEC3',{min:[x-1,-1,0],max:[x+1,1,0]}),uv=floats([0,0,1,0,1,1,0,0,1,1,0,1],'VEC2'),attributes:any={POSITION:position,TEXCOORD_0:uv};
-    if(i===2)attributes.COLOR_0=floats(Array.from({length:6},()=>[1,1,1,.8]).flat(),'VEC4');primitives.push({attributes,material:i});
+    if(i===2)attributes.COLOR_0=floats(Array.from({length:6},()=>[1,1,1,vertexAlpha]).flat(),'VEC4');primitives.push({attributes,material:i});
   }
   const image=smallPng(40,true),imageView=views.length;views.push({buffer:0,byteOffset:offset,byteLength:image.length});parts.push(image);offset+=image.length;
   const j:any={asset:{version:'2.0'},extensionsUsed:['KHR_materials_unlit'],scene:0,scenes:[{nodes:[0]}],nodes:[{mesh:0}],meshes:[{primitives}],buffers:[{byteLength:offset}],bufferViews:views,accessors,

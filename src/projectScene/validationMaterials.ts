@@ -29,8 +29,8 @@ export function validationMaterialCoverage(slot:ValidationMaterialSlot,input:Mat
   return source?resolveMaterialCoverage(source,materialForDisplay(input,profile)):null;
 }
 export const smoothMaterialDisplayNotice='滑らかな透過表示は未対応のため、この材質の面を非表示にしています。設定は保持しています。';
-export function validationMaterialDisplayNotice(slot:ValidationMaterialSlot,input:MaterialIntent,profile:ProjectSemanticProfile='map1'):string|null{
-  return validationMaterialCoverage(slot,input,profile)?.kind==='smoothBlend'?smoothMaterialDisplayNotice:null;
+export function validationMaterialDisplayNotice(slot:ValidationMaterialSlot,input:MaterialIntent,profile:ProjectSemanticProfile='map1',smoothDisplay=false):string|null{
+  return validationMaterialCoverage(slot,input,profile)?.kind==='smoothBlend'?smoothDisplay?'透過表示は近似です。対応できない場合は面を非表示にし、設定を保持します。':smoothMaterialDisplayNotice:null;
 }
 /** One capability boundary for edit admission and slot-clone rendering. */
 export function validationMaterialIssue(slot: ValidationMaterialSlot, input: MaterialIntent, profile: ProjectSemanticProfile = 'map1'): string | null {

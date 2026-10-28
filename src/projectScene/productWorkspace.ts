@@ -14,7 +14,7 @@ type Host = ReturnType<typeof createValidationModeHost>;
 type Tools = ReturnType<typeof createValidationReceiveControls>;
 /** Validation-only adapter. No synthetic Session or string-map writes enter product UI. */
 export function createProductWorkspace(document: Document, host: Host, factory: ViewportFactory, tools?: Tools, renderCandidate?: ModelCandidateRenderer,
-  navigation?: { compactFiles?:boolean;presentation?():{busy:boolean;reason:string}|null;openProject(): void; resumedLastProject(): boolean; changed(): void; storageEstimate?(): Promise<Readonly<{ usage?: number; quota?: number }>> }) {
+  navigation?: { compactFiles?:boolean;smoothDisplay?:boolean;presentation?():{busy:boolean;reason:string}|null;openProject(): void; resumedLastProject(): boolean; changed(): void; storageEstimate?(): Promise<Readonly<{ usage?: number; quota?: number }>> }) {
   const root = document.createElement('section'), mode = document.createElement('button'), status = document.createElement('p');
   root.className = 'lv-project-shell';
   mode.type = 'button'; status.setAttribute('role', 'status');
@@ -43,7 +43,7 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
   const mountCore = () => {
     if (disposed || core || startup?.busy() || startup?.recoveryPending() || host.hasPending() || !chooseStartupScene(read().state).sceneId) return;
     core = createProjectWorkspace(document, {
-    ...productSources(host),
+    ...productSources(host,navigation?.smoothDisplay),
     openProject: navigation?.openProject, resumedLastProject: navigation?.resumedLastProject, storageEstimate: navigation?.storageEstimate,
     createModelPreview: renderCandidate ? () => {
       let token = '', sceneId = '';

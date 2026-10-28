@@ -1,0 +1,18 @@
+{
+  "id": "lociview-desktop-smooth-mrt-1",
+  "version": 1,
+  "scope": "01e-typed-desktop-viewport-only",
+  "renderer": { "three": "0.186.0", "gaussianSplatLite": "1.4.3", "api": "public-webgl2" },
+  "source": "unchanged-07n-final-alpha-and-01c-packed-linear-gs",
+  "targets": { "base": "RGBA16F", "depth": "DEPTH_COMPONENT24-UNSIGNED_INT", "accumulation": "RGBA32F", "opticalDepth": "RG32F", "samples": 0 },
+  "budget": { "documentBytesExclusive": 67108864, "chargedBytesPerPixel": 36, "maximumPixelsPerView": 2073600, "countAllocatingAndRetiring": true },
+  "layout": { "uniformScaleMaximum": 1, "round": "floor(css*rawDpr*scale+0.5)", "preserveRawDprAndCssPointRules": true },
+  "coverage": { "sourceMaskBeforeAppearance": true, "clamp": "final-only", "smoothPicking": "existing-refusal", "chroma": "07n-prelighting-linear" },
+  "weight": { "alphaMultiplier": 10, "offset": 0.01, "power": 3, "gain": 1000, "depthMultiplier": 0.9, "minimum": 0.01, "maximum": 30 },
+  "accumulation": "sum(premultipliedLinearRGB*weight,clamp(finalAlpha,0,1)*weight)",
+  "opticalDepth": { "saturatedAlpha": 1, "saturatedOutput": [0, 1], "otherwise": "(-log(1-alpha),0)", "smallAlphaBelow": 0.001, "smallAlpha": "alpha+alpha^2/2+alpha^3/3" },
+  "resolve": "reveal=count>0?0:exp(-sumTau);average=sumWeightAlpha>0?sumRGB/sumWeightAlpha:0;linear=average*(1-reveal)+opaque*reveal",
+  "output": "one-final-srgb-conversion",
+  "failure": "retain-intent-hide-smooth-use-existing-base-no-sorted-alpha-fallback",
+  "persistentChanges": false
+}

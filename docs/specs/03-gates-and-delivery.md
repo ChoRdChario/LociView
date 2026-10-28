@@ -586,6 +586,15 @@ This starts only after a base renderer passes and is time-boxed to ten focused w
 
 The feasibility spike may run immediately after G1-B (before or alongside G1-C) so it can inform scope without changing the base product. Passing evidence records only `ADOPT`/`REJECT` for later use; productionization and any default/feature-flag change wait until the core MVP has passed iOS, migration, corruption, privacy and security hardening plus a separate production review.
 
+PO-approved[01f](01f-desktop-smooth-composition-evaluation.md) permits the separately
+recorded early PC evaluation. PO-approved[01g](01g-desktop-smooth-display-proposal.md)
+permits independently reviewed production implementation and connection only in
+the01e static PC candidate before those outstanding conditions, with automatic
+internal-resolution limits and an additive viewport policy. This exception does
+not pass G1-D, physical-iOS/core hardening, ordinary PWA activation or release;
+the candidate criteria below and original profiles remain unchanged. Todo owns
+executed production evidence rather than transferring the evaluation's results.
+
 Fixtures include the closed aircraft, six-plus layers on a ray, intersecting mesh/GS, a 360-degree camera sweep, draw-order permutations and physical-iOS context restore.
 
 Candidate pass:

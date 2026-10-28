@@ -4182,6 +4182,19 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       proposePin: (...args: Parameters<NonNullable<Parameters<ViewportFactory>[2]>>) => proposePin?.(...args),
       proposeModel: (...args: Parameters<NonNullable<Parameters<ViewportFactory>[3]>>) => proposeModel?.(...args) };
   }
+  it('batches renderer observations without delaying typed intents or accepting stale view captures',async()=>{
+    const h=await productWorkspaceFixture(true),frames=new Map<number,FrameRequestCallback>();let next=0;
+    vi.stubGlobal('requestAnimationFrame',(fn:FrameRequestCallback)=>{const id=++next;frames.set(id,fn);return id;});vi.stubGlobal('cancelAnimationFrame',(id:number)=>frames.delete(id));
+    const flush=()=>{for(const[id,fn]of [...frames]){frames.delete(id);fn(0);}},scene=h.named('シーン',h.editor).children.find(n=>n.tag==='div')!,rebuild=vi.spyOn(scene,'replaceChildren'),markers=h.all(h.editor).find(n=>n.className==='lv-project-markers')!,before=h.host.read().source!.token;
+    try{
+      for(let i=0;i<20;i++)h.pinPoint({x:30+i,y:40+i});expect(frames.size).toBe(1);expect(rebuild).not.toHaveBeenCalled();expect(markers.children[0]!.style.left).toBe('30px');flush();expect(rebuild).toHaveBeenCalledOnce();expect(markers.children[0]!.style.left).toBe('49px');expect(markers.children[0]!.style.top).toBe('59px');expect(h.host.read().source!.token).toBe(before);expect(h.dispatch).not.toHaveBeenCalled();
+      h.setIssue('最初の表示エラー');h.refresh();h.setIssue('最新の表示エラー');h.refresh();expect(frames.size).toBe(1);flush();expect(h.all(h.editor).find(n=>n.className==='lv-project-viewport-status')!.textContent).toContain('最新の表示エラー');
+      h.setIssue('');h.refresh();const cancelled=[...frames.values()][0]!;const count=rebuild.mock.calls.length;h.button('モデル',h.editor).fire('click');expect(frames.size).toBe(0);expect(rebuild).toHaveBeenCalledTimes(count+1);cancelled(0);expect(rebuild).toHaveBeenCalledTimes(count+1);
+      h.button('キャプション',h.editor).fire('click');expect(h.button('ピンを追加',h.editor).disabled).toBe(false);h.dragging(true);expect(frames.size).toBe(1);h.button('ピンを追加',h.editor).fire('click');expect(h.pick).not.toHaveBeenCalled();expect(h.dispatch).not.toHaveBeenCalled();expect(frames.size).toBe(0);h.dragging(false);flush();
+      h.button('保存した視点',h.editor).fire('click');const author=h.named('視点の作成と管理',h.editor);h.moveCamera();h.refresh();h.button('視点を作る',author).fire('click');flush();h.button('視点を作る',author).fire('click');const name=h.named('視点の名称',author);name.value='最新の表示';name.fire('input');const captured=h.payload();await h.edited(()=>h.button('視点を追加',author).fire('click'));const command=h.dispatch.mock.calls.map(c=>c[1]).find(c=>c.kind==='createView')!;expect(command).toMatchObject({kind:'createView',camera:captured.camera,background:captured.background});
+      h.refresh();const late=[...frames.values()][0]!;await h.ui.dispose();expect(frames.size).toBe(0);const stopped=rebuild.mock.calls.length;late(0);h.refresh();expect(rebuild).toHaveBeenCalledTimes(stopped);expect(frames.size).toBe(0);
+    }finally{await h.ui.dispose();vi.unstubAllGlobals();}
+  });
   it('reselects the exact interrupted update from the mounted product without losing local work', async () => {
     const h = await productWorkspaceFixture(true, false, false, 'map2', undefined, { initialWorkspace: true });
     const { host, editor, root, all, button, named } = h, incoming = h.f.f.file!;

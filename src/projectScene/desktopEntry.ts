@@ -3,6 +3,8 @@ import {createValidationBrowserWorkspace,validationBrowserLimits} from './valida
 import {createProductWorkspace} from './productWorkspace';
 import {projectFilePolicy} from '../projectFiles/validation';
 import {createGsResidency} from '../viewer/gsDecodeQueue';
+import {createTargetBudget,targetLayout} from '../viewer/targetBudget';
+import {createSmoothComposite} from '../viewer/smoothComposite';
 import type {LegacyAppController} from '../ui/app';
 
 /** Explicit static PC candidate, never selected by URL or a persisted preference. */
@@ -11,6 +13,7 @@ export async function bootDesktopApp(root:HTMLElement){
   const policy=projectFilePolicy({nonGs:validationBrowserLimits,
     gs:{...validationBrowserLimits,maxFileBytes:512*1024*1024,maxItems:500_000,maxValues:44_500_000},projectBodyBytes:512*1024*1024});
   const residency=createGsResidency(500_000,44_500_000);
+  const smoothDisplay={budget:createTargetBudget(),plan:targetLayout,create:createSmoothComposite};
   let workspace:Awaited<ReturnType<typeof createValidationBrowserWorkspace>>|undefined,legacy:LegacyAppController|undefined,busy=false;
   const message=(error:unknown)=>{const status=document.createElement('p');status.setAttribute('role','status');status.textContent=error instanceof Error?error.message:'画面を開けません。';root.append(status);};
   const projects=async(files?:readonly File[])=>{
@@ -18,7 +21,7 @@ export async function bootDesktopApp(root:HTMLElement){
     try{
       if(legacy&&!(await legacy.close()))return;legacy=undefined;
       await workspace?.dispose();workspace=undefined;document.documentElement.classList.add('lv-project-page');root.replaceChildren();
-      workspace=await createValidationBrowserWorkspace(document,{progressivePresentation:true,filePolicy:policy,residency,initialFiles:files,openLegacy,
+      workspace=await createValidationBrowserWorkspace(document,{smoothDisplay,progressivePresentation:true,filePolicy:policy,residency,initialFiles:files,openLegacy,
         mountEditor:(host,factory,tools,renderCandidate,navigation)=>createProductWorkspace(document,host,factory,tools,renderCandidate,{...navigation,compactFiles:true})},new URL(location.href).searchParams.get('run')??undefined);
       root.append(workspace.root);await workspace.ready;
     }catch(error){message(error);const retry=document.createElement('button');retry.textContent='以前のプロジェクトを開く';retry.addEventListener('click',()=>{void openLegacy();});root.append(retry);}

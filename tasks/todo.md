@@ -1,6 +1,6 @@
 # LociView active work
 
-Updated2026-10-28. This is the single current plan and check record.
+Updated2026-10-29. This is the single current plan and check record.
 [Inventory](implementation-inventory.md) owns route-specific coverage;
 [map](../PROJECT_MAP.md) and [document index](../docs/README.md) route contracts/code.
 Git owns checkpoint identity. [Prior working records](../docs/history/development-through-2026-10-28/tasks/todo-before-desktop.md)
@@ -22,7 +22,154 @@ Fix latency when it prevents use or risks data. Keep the existing
 Root is sole writer; bounded independent reviewers are read-only. No small manual
 test or helper approvals. Continue in-scope work while device evidence is pending.
 
-## Current boundary —01f evaluated;01g display policy needs PO decision
+## Next connected outcome —500k Review edit-copy
+
+The bounded01g Desktop implementation is automatically verified below; Git owns
+checkpoint identity. Complete the suitableg0 commit/push under standing authority,
+then close the accepted01e500k SH4 Review→explicit independent editing copy→edit/
+save→cold reopen. Keep the persistent-profile/origin-lock refusal+retry sequence
+and unchanged240s readiness/300s download acceptance. This known blocked workflow
+precedes comfort-only output tuning; no fresh helper/PO-test permission is needed.
+
+Read-only cause mapping found repeated178MB body inspection, not coefficients in
+CRDT. Measure parent/child prepare, initializeClean slot/model plan/persist and
+completion stages; separate hash/CRC, Blob read and cooperative-yield wait. Durable
+parent/readback/publication/cold fences in01e§8 stay fresh. A candidate ordinary
+repair is exact record+ownedBlob inspection reuse only inside one pre-staging
+planImported invocation, never a digest-only or cross-fence cache. Measure first.
+Stop affected work for an actual validation-lifetime/write/recovery/capacity/new
+contract decision. Broader formats, physicaliOS/offline, adoption and release remain
+separate; the application is not declared complete.
+
+## Verified checkpoint —01g PC smooth display
+
+PO2026-10-28 approved01g via「進めてください」: automatic internal-resolution
+limits, additive compositor policy and typed01e PC-candidate connection before
+the outstanding core/iOS activation conditions. Start clean/pushed5e5bb9e.
+Root is sole writer; bounded read-only reviewers cover publicGS/frame ports,
+policy/resource/pick contracts and connected browser acceptance. Meta-audit:
+close actual material display; no new dependency, source/wire/recipe migration,
+ordinary legacy/Native/PWA activation, general adoption or release.
+
+Plan: fix exact policy/goldens/import ports and independent review → neutral
+owned material/compositor and shared target budget → Desktop-only resident,
+viewport/layout/pick and truthful notices → focused numeric/fault/lifetime
+checks plus connected Desktop edit/file/restore/cold browser evidence → serial
+final checks, independent final diff/evidence review and suitable g0 checkpoint.
+Keep rawDPR/pointCSS/6px limits, map1 guards, old profiles and Session fences.
+Stop affected work only for a new actual contract/policy/dependency/release
+decision. No repeated helper/field/PO testing waits.01f evidence below remains
+the evaluated baseline.01g's final whole-tree checks/review remain pending below.
+
+Production implementation: exact hashed additive MRT policy/goldens, owned
+Basic/Phong/Standard final-alpha hooks, shared36bytes/pixel target planning,
+separate borrowedGS base/MRT leases and generation-safe resize/cancellation.
+Only Desktop supplies the typed presentation port; ordinary/validation behavior,
+source/schema/wire/recipes, map1 and save/recovery fences are unchanged.
+Presented smooth rays stay conservatively unpickable; actual local fallback
+excludes hidden smooth from coverage. CSS point diameter/6px/rawDPR limits remain.
+BoundedP2 limitation: an unknown smooth ray in6px neighbor search may retain a
+refusal even when a later neighboring point is visible. This is conservative,
+not an accepted new transparency threshold or evidence of a false pin placement.
+
+Focused policy/import/layout/material/lifetime checks pass; actual Desktop run
+1793199986216-34336 passes4 cases(2.5min): Mesh-only4K/fault/retry with retained
+opaque contribution, same-opacity Phong lit/unlit, deferred-policy resize/rawFLOAT
+alpha2, mixedGS/Proxy/Point edit→Workspace→cold→absent-backup restore with original
+bytes/material/Caption/Representation/binding identity and the same smooth texel.
+Earlier wrong-Phong-face and missing Node Automerge initialization failures remain
+in ignored logs; product assertions and existing deadlines were not relaxed.
+Run1793200753134-7244 passes all6 browser cases(9.0min), additionally covering
+sourceMASK→smooth pixels and readonlyReview/DPR2 display. Its production500k
+matched120s baseline/candidate has frame p9512.2/12.2ms, rendered callbacks
+16470/14041, CPU5.1/5.8ms, GPU.586560/.668544ms and sort RPC10.2/11.2ms.
+These are old-product(hidden smooth) versus new-feature costs, not equal rendered
+fragments or general hardware guarantees. All20 actual layouts alternate
+2001×931/1840×975 with67,065,516/64,584,000bytes, below64MiB; textures27/FBO7
+stay stable, not total memory proof. The later failing run below takes precedence
+for performance qualification.
+The isolated5e5bb9e comparison build uses existing dependencies under ignored
+artifacts. Its first setup missed CSS layout settling(1006vs1008); it is not a
+performance result. No01f PoC timing is transferred to the product.
+
+Actual final-source capacity run1793201343728-61232 passes exact baseline preparation,
+both120s traces, latest CSS/scale/parity and20 resource cycles, but **FAILS** the
+existing+30% frame criterion: baseline12.3ms→candidate18.1ms(+47.15%). Root checkpoint
+was correctly not started. Keep the earlier6-pass evidence without calling this
+performance boundary passed. CPUmean3.889→4.251ms/GPU p95.490→.555ms are much smaller
+changes; both frame medians12.1ms and the fraction>16ms crosses4.75%→6.07%, so
+scheduling quantization matters. Shared drift is observed, not an environment-only
+cause. No blind retry, timeout/assertion relaxation or policy change.
+
+Updated plan: one bounded public-WebGL/CDP CPU cause profile on the actual camera
+action → remove measured redundant display work within owned generation/UI
+observation boundaries → focused regression and actual same120s acceptance →
+serial checkpoint, independent substantive-fix review and suitable g0 push.
+The bounded15s cause profile1793201956898-34660 identifies shared full-UI work
+(~58% inclusive CPU samples), repeated forced layout (~1.25s) and blocking FBO
+queries. Owned-FBO caching was tried with generation/format guards, then removed:
+profile1793202664793-63572 shows its wait moved to getError and rectangle cost to
+the full render's later extent read; no speedup is proved. The exact pre-cache
+compositor is restored by frozen LF hash; experiment/source/profile evidence stays
+ignored. Do not claim FBO-only causation or transfer these diagnostic timings to
+acceptance. Repeated healthy activation now retains the viewport without ensure;
+actual RO/DPR/reopen paths remain. Renderer observation UI callbacks alone coalesce
+once perRAF, with fresh reads, immediate command/UI/proposal renders and cancelled/
+epoch-invalidated queued callbacks at direct render/unmount. This removes duplicate
+draw/sort-start/sort-complete full-panel work without a semantic UI cache.
+The actual product focused case proves20→1/latest projection+error, live drag guard,
+direct cancellation, latest typedView capture and late-unmount refusal; typecheck
+passes. Targeted independent fix reviews have no outstanding finding.
+Final32-file source/test/policy/helper LF hashes are in
+`.artifacts/e2e/desktop-integration-tools/smooth01g-final-source-tree.json`;
+prior failed-gate hashes/sources are retained separately. Final browser
+run1793203501224-66324 passes all6 cases(9.8min), including the retained latest
+CSS/parity/resource assertions, mixed-file/Review/DPR2/cold/restore and sourceMASK.
+Independent artifact review confirms exact sources, blob bytes and mapping/pixels.
+At matched1792×1008/DPR1/RTX5080, the120s old-product/candidate frame p95 is
+18.1/18.3ms(+1.10%, current+30% criterion passes). GPU p95 is.506912/.596224ms;
+rendered-callback CPU6.0/9.3ms and all instrumented RAF callbacks summed by frame
+timestamp6.0/14.0ms. The latter includes the newly scheduled UI callback but not
+all async browser work. This does **not** establish a CPU/overall speedup; substantial
+headroom cost and prior variability remain. There are11176/10729 rendered callbacks,
+373/358 valid GPU queries,10206/10705 successful sort RPC samples and no disjoint/
+incomplete/query/sort errors.20 layout cycles retain the same strict bytes/counts.
+The original47.15% failure remains evidence, not retroactively passed. Earlier
+standard-material browser evidence still owns soft chroma/source-factor/RGBA and
+scaled5px-hit/8px-refusal; the current6 cases add scheduler/lifecycle coverage.
+Required serial `smooth01g-checkpoint.log` passes: typecheck,133 suites/2964
+tests with21 existing todos(1448.15s), normal/harness/validation/Desktop builds.
+The32 frozen source/test/policy/helper files still match exactly. Post-build
+`smooth01g-artifacts.log` passes HEIC isolation, all4 current source maps, GS build
+separation, Desktop distribution/notices and ordinary/Desktop Native Spark identity.
+Final current-tree GPU/pick run(`smooth01g-final-point-material.log`) passes46.2s:
+soft chroma/source factor×texture×RGBA×appearance,4K5px point hit/8px refusal,
+preserved opaque/MASK/cutoff0 and conservative smooth refusal. Earlier preview
+case and full file cases remain separately identified; no test/guard/deadline was
+relaxed. Read-only implementation/contract/evidence reviews have no unresolved
+P0/P1; scheduling-only pass does not establish overall CPU improvement/adoption.
+Storage validation/publication/recovery fences stay fixed. PhysicaliOS/offline/
+weakPC/general adoption remain unclaimed. This is a suitable verified development
+checkpoint on existingg0; Git owns actual commit/remote state, with no release or
+ordinary PWA activation. Retain all diagnostic/failing runs and discarded experiment.
+
+Source-audit follow-up, not a reproduced newP1: pick entries predate01g and can
+retain cached CSS/rawDPR before the firstRO/RAF after an environment change.
+Existing receipt checks alone do not prove this interval closed. Record a focused
+no-tick input regression before broader device qualification; do not infer DPR>2
+support from automatic rendering scale or currentDPR1/2 browser evidence.
+Next connected unit after01g: close the accepted01e500k SH4 Review→explicit
+independent edit-copy→edit/save→cold reopen. Its existing240s timeout blocks a
+user workflow, so this precedes comfort-only07n output tuning. Preserve persistent
+profiles, origin-lock refusal/retry and unchanged readiness/download deadlines;
+measure ReviewEditJob/readReviewEdit/CleanInput.prepareReview/session publication
+stages before choosing a fix. Stop affected work if validation-lifetime, write/
+readback/recovery fences, capacity or another actual contract need a new decision.
+No full five-purpose replay before the narrowed acceptance passes. PhysicaliOS,
+offline/PWA, broader conversion/profile/gate and release work remain separate;
+this development checkpoint is not application completion.
+
+## Prior evaluated boundary —01f
 
 PO2026-10-28 approved the01f early read-only PC evaluation and continued
 implementation if the technical evaluation finds no problems. Start at clean,
@@ -89,20 +236,15 @@ dependencies and build configurations still equal7887072. Required serial
 heavy browser work beside them. Read-only API/math, contract and independent
 artifact-evidence reviews have no unresolved finding. Frozen evaluation source
 matches the staged LF content. Suitable g0 checkpoint/push is covered by standing
-authority; Git owns its identity.01g remains a proposal awaiting the grouped PO decision.
+authority; Git owns its identity. At this prior checkpoint01g awaited the grouped PO decision.
 Post-build HEIC isolation, current source maps in all4 builds, GS build separation,
 Desktop notices/distribution and ordinary/Desktop Native Spark identity pass.
 
-Next: [PROPOSED01g](../docs/specs/01g-desktop-smooth-display-proposal.md) groups the
-new decision: automatic3D internal-resolution limits within tested1080p-equivalent/
-64MiB, an additive viewport compositor policy, and independently reviewed01e typed
-PC-candidate connection before the unpassed03 core/iOS prerequisites. Preserve
-source/SH/coordinates/native UI, old policies/semantic profiles/map1 guards,
-CSS point sizes/6px and current DPR limits. Alternative: full resolution with07n's
-unsupported redirect. Do not silently ratify that visible-quality/activation
-tradeoff from the successful1080p experiment. Normal PWA, physical iOS, offline,
-adoption/release remain separate. Full07n texture/chroma/lighting renderer
-compatibility and production integration are still unimplemented in this proposal.
+At the01f checkpoint,01g still required a decision about automatic3D resolution,
+the new viewport policy and PC-only connection before core/iOS prerequisites.
+PO subsequently approved that group; the current authority/status above supersedes
+this historical boundary. Normal PWA, physicaliOS, offline and adoption/release
+remain separate. Do not use this prior checkpoint as a renewed approval hold.
 
 ## Verified checkpoint —07n standard alpha/chroma material workflow
 

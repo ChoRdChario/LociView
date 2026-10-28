@@ -15,10 +15,13 @@ import type { SavedModelResidentPort } from './validationRender';
 import { hasBinaryCoverage } from '../viewer/hardChroma';
 import { resolvePointPresentation, pointRegistrySnapshot, defaultPointProfile } from '../domain/pointPresentation';
 import { createValidationCoverage, coveragePixel } from './validationCoverage';
-import type { GsRenderPort } from '../viewer/gsRender';
+import type { GsRenderPort,GsFrame } from '../viewer/gsRender';
+import type {SmoothComposite,SmoothPresentation,SmoothMesh} from '../viewer/smoothComposite';
+import type {TargetLayout} from '../viewer/targetBudget';
+import {smoothCoverage} from '../viewer/smoothMaterial';
 
 /** Application viewport. Actual saved residents are required; geometry adapters own any non-file preview. */
-export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: GsResidency, geometry?: (model:RenderDisplay['models'][number],appearance:NonNullable<EditableDisplay['materials']>[string]|undefined)=>ResidentSurface): ViewportFactory => (canvas, changed, proposePin, proposeModel) => {
+export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: GsResidency, geometry?: (model:RenderDisplay['models'][number],appearance:NonNullable<EditableDisplay['materials']>[string]|undefined)=>ResidentSurface,presentation?:SmoothPresentation): ViewportFactory => (canvas, changed, proposePin, proposeModel) => {
   let renderer: THREE.WebGLRenderer | null = null, controls: OrbitControls | null = null;
   let camera: THREE.PerspectiveCamera | THREE.OrthographicCamera | null = null;
   const scene = new THREE.Scene(), models = new THREE.Group(); scene.add(models); scene.background = new THREE.Color(PROJECT_SCENE_STANDARD_BACKGROUND_HEX);
@@ -42,6 +45,8 @@ export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: 
   let gsRender:GsRenderPort|null=null,gsGeneration=0,gsPreparing=false,gsIssue:string|null=null,gsPreparationAbort:AbortController|null=null;
   let gizmo: ReturnType<typeof createPinGizmo<PinSurfaceTarget | ModelPlacementTarget>> | null = null;
   let pinPointerActive = false;
+  let composite:SmoothComposite|null=null,smoothLayout:TargetLayout|null=null,smoothGeneration=0,smoothPending=false,smoothIssue:string|null=null,smoothPresented=false,waitingBudget=false,refusedAvailable=0,smoothAbort:AbortController|null=null;
+  const overlayScene=new THREE.Scene();
   function syncOrbit(manipulating = Boolean(gizmo?.dragging)) {
     if (controls) controls.enabled = !pinPointerActive && !manipulating;
   }
@@ -80,7 +85,9 @@ export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: 
     }
     poses.set(display.sceneId, pose); backgrounds.set(display.sceneId, background); entryPending = false; axis = null;
   }
+  function clearSmooth(){if(!presentation)return;smoothGeneration++;smoothAbort?.abort();smoothAbort=null;composite?.dispose();composite=null;smoothPending=false;smoothLayout=null;smoothIssue=null;smoothPresented=false;waitingBudget=false;delete canvas.dataset.compositionBytes;delete canvas.dataset.renderScale;}
   function clearGs(preserve?:GsViewIntent|null) {
+    clearSmooth();
     if(gsIntent!==preserve)gsIntent?.cancel();gsIntent=preserve??null;if(!preserve)gsIntentKey='';
     coverageIssue=null;
     gsGeneration++;gsPreparationAbort?.abort();gsPreparationAbort=null;gsRender?.dispose();gsRender=null;gsPreparing=false;gsIssue=null;
@@ -107,7 +114,7 @@ export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: 
   function buildModels() {
     if (!display || !renderer) return;
     const key = JSON.stringify([display.models.map(m => [isReadonlyModel(m) ? m.key : m.binding.id,loadState(m)]), display.materials, display.savedMaterials]); if (key === modelKey) return;
-    pickEpoch++;
+    clearSmooth();pickEpoch++;
     coverageProbe?.dispose();coverageProbe=null;coverageIssue=null;
     const target=new Map<string,string>();
     const pendingGs=saved.gsPending?.(fileModels(display.models))??false;
@@ -127,7 +134,7 @@ export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: 
         if (!target.has(assetId)||resident.has(assetId)) continue;
         const surface = !isReadonlyModel(model)&&!isSavedModel(model)
           ? geometry ? geometry(model,appearance) : (()=>{throw Error('保存したモデルの表示本体を確認してください。');})()
-          : saved.create(model, display.savedMaterials?.[assetId]);
+          : saved.create(model, display.savedMaterials?.[assetId],!!presentation);
         models.add(surface.asset);resident.set(assetId,surface);residentKeys.set(assetId,target.get(assetId)!);
       }
       for(const model of display.models){const surface=resident.get(renderOwner(model));if(surface)models.add(surface.asset);}
@@ -136,7 +143,7 @@ export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: 
   }
   function configurePoints() {
     const rawDpr = globalThis.devicePixelRatio || 1;
-    const view = { cssWidth: width, cssHeight: height, devicePixelRatio: rawDpr, renderScale: 1 };
+    const view = smoothLayout??{ cssWidth: width, cssHeight: height, devicePixelRatio: rawDpr, renderScale: Math.min(rawDpr,2)/rawDpr };
     for (const [assetId, surface] of resident) surface.points?.configure(view, pointDiameters.get(assetId) ?? 3);
   }
   function previewModels() {
@@ -212,18 +219,59 @@ export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: 
     camera.near = camera instanceof THREE.PerspectiveCamera ? Math.max(1e-6, (distance - radius) / 1000) : -far;
     camera.far = far; camera.updateProjectionMatrix();
   }
+  function smoothMeshes():SmoothMesh[]{
+    const result:SmoothMesh[]=[];
+    for(const surface of resident.values())if(surface.asset.visible)surface.mesh.traverse(object=>{
+      if(!(object instanceof THREE.Mesh))return;for(let node:THREE.Object3D|null=object;node;node=node.parent)if(!node.visible)return;
+      if((Array.isArray(object.material)?object.material:[object.material]).some(m=>m.visible&&smoothCoverage(m)))result.push({object});
+    });return result;
+  }
+  function hideSmooth<T>(meshes:readonly SmoothMesh[],draw:()=>T):T{
+    const previous=new Map<THREE.Material,boolean>();for(const {object}of meshes)for(const m of Array.isArray(object.material)?object.material:[object.material])if(smoothCoverage(m)&&!previous.has(m)){previous.set(m,m.visible);m.visible=false;}
+    try{return draw();}finally{for(const [m,visible]of previous)m.visible=visible;}
+  }
+  function syncSmoothLayout(meshes:readonly SmoothMesh[]){
+    if(!renderer||!presentation)return;
+    if(!meshes.length||smoothIssue){const hadLayout=!!smoothLayout;smoothPresented=false;if(!meshes.length)clearSmooth();else{composite?.dispose();composite=null;smoothLayout=null;delete canvas.dataset.compositionBytes;delete canvas.dataset.renderScale;}
+      if(hadLayout){const ratio=Math.min(rawPixelRatio||1,2);renderer.setDrawingBufferSize(Math.max(1,Math.floor(width*ratio+.5)),Math.max(1,Math.floor(height*ratio+.5)),1);configurePoints();pickEpoch++;}return;}
+    if(smoothLayout&&smoothLayout.cssWidth===width&&smoothLayout.cssHeight===height&&smoothLayout.devicePixelRatio===rawPixelRatio)return;
+    try{const gl=renderer.getContext(),available=presentation.budget.available+(composite?.leaseBytes??0)+(gsRender?.targetBytes??0);
+      const next=presentation.plan(width,height,rawPixelRatio,available,Math.min(renderer.capabilities.maxTextureSize,gl.getParameter(gl.MAX_RENDERBUFFER_SIZE) as number));
+      if(smoothLayout&&(smoothLayout.width!==next.width||smoothLayout.height!==next.height))clearSmooth();
+      smoothLayout=next;renderer.setDrawingBufferSize(next.width,next.height,1);configurePoints();coverageProbe?.dispose();coverageProbe=null;pickEpoch++;serial++;
+    }catch(error){smoothIssue=errorText(error);waitingBudget=true;refusedAvailable=presentation.budget.available;serial++;changed();}
+  }
+  function drawSmooth(meshes:readonly SmoothMesh[],before:()=>void,frame?:GsFrame){
+    if(!renderer||!camera||!presentation)return;
+    const fallback=()=>hideSmooth(meshes,()=>{if(frame)frame.renderBase();else{before();renderer!.render(scene,camera!);}});
+    if(!smoothLayout||smoothIssue){smoothPresented=false;fallback();return;}
+    if(!composite&&!smoothPending){smoothPending=true;smoothAbort=new AbortController();const generation=smoothGeneration,current=renderer,layout=smoothLayout;
+      void presentation.create(current,presentation.budget,layout,frame,smoothAbort.signal).then(created=>{
+        if(disposed||renderer!==current||generation!==smoothGeneration){created.dispose();return;}composite=created;smoothPending=false;smoothAbort=null;serial++;changed();
+      },error=>{if(generation!==smoothGeneration||disposed)return;smoothIssue=errorText(error);waitingBudget=smoothIssue.includes('空き容量');refusedAvailable=presentation.budget.available;smoothPending=false;serial++;changed();});
+    }
+    if(!composite){fallback();return;}
+    const helper=gizmo?.helper,wasVisible=helper?.visible;
+    try{if(helper)helper.visible=false;before();composite.render(scene,camera,meshes,frame);smoothPresented=true;
+      canvas.dataset.compositionBytes=String(composite.layout.bytes);canvas.dataset.renderScale=String(smoothLayout.renderScale);
+    }catch(error){smoothIssue=errorText(error);const failed=composite;composite=null;failed.dispose();delete canvas.dataset.compositionBytes;delete canvas.dataset.renderScale;smoothPresented=false;fallback();serial++;changed();}
+    finally{if(helper)helper.visible=wasVisible!;}
+    if(smoothPresented&&helper&&wasVisible){const parent=helper.parent,auto=renderer.autoClear;try{overlayScene.add(helper);renderer.autoClear=false;renderer.clearDepth();renderer.render(overlayScene,camera);}finally{helper.removeFromParent();parent?.add(helper);renderer.autoClear=auto;}}
+  }
   function renderFrame() {
     if (!renderer || !camera) return;
+    const smooth=presentation?smoothMeshes():[];syncSmoothLayout(smooth);
     const sources=[...resident.values()].filter(s=>s.gs&&s.asset.visible).map(s=>s.gs!);
     if((import.meta.env.DEV||import.meta.env.MODE==='project-scene-validation'||import.meta.env.MODE==='project-scene-desktop')&&sources.length&&!gsRender&&!gsPreparing&&!gsIssue){gsPreparing=true;const generation=gsGeneration,currentRenderer=renderer,intent=gsIntent,abort=new AbortController();gsPreparationAbort=abort;
       void import('../viewer/gsRender').then(m=>{abort.signal.throwIfAborted();if(generation!==gsGeneration||renderer!==currentRenderer)throw new DOMException('表示準備を取り消しました。','AbortError');
-        return m.createGsRender(currentRenderer,sources,()=>{if(abort.signal.aborted||generation!==gsGeneration)return;pickEpoch++;serial++;changed();},abort.signal,residency,intent??undefined);}).then(port=>{
-        if(generation!==gsGeneration||renderer!==currentRenderer){port.dispose();return;}gsRender=port;gsPreparing=false;serial++;changed();
+        return m.createGsRender(currentRenderer,sources,()=>{if(abort.signal.aborted||generation!==gsGeneration)return;pickEpoch++;serial++;changed();},abort.signal,residency,intent??undefined,presentation?.budget);}).then(port=>{
+        if(generation!==gsGeneration||renderer!==currentRenderer){port.dispose();return;}clearSmooth();gsRender=port;gsPreparing=false;serial++;changed();
       },e=>{if(generation===gsGeneration){gsIssue=errorText(e);gsPreparing=false;for(const source of sources){source.ready=false;source.issue=gsIssue;}serial++;changed();}});}
     // Upload new projected attributes before Three traverses/uploads geometry, never in onBeforeRender.
     const before=()=>{for (const surface of resident.values()) if (surface.points) { const gl=renderer!.getContext(); surface.points.project(camera!,gsRender?.depthBits??gl.getParameter(gl.DEPTH_BITS) as number); }};
-    if(gsRender){try{gsRender.render(scene,camera,before);}catch(e){gsIssue=errorText(e);const failed=gsRender;gsRender=null;try{failed.dispose();}catch(cleanup){gsIssue+=` ${errorText(cleanup)}`;}for(const s of sources){s.ready=false;s.issue=gsIssue;}pickEpoch++;serial++;changed();before();renderer.render(scene,camera);}}
-    else{before();renderer.render(scene,camera);}
+    if(gsRender){try{if(presentation&&smooth.length&&smoothLayout&&!smoothIssue)gsRender.render(scene,camera,before,frame=>drawSmooth(smooth,before,frame));else hideSmooth(smooth,()=>gsRender!.render(scene,camera!,before));}catch(e){gsIssue=errorText(e);clearSmooth();const failed=gsRender;gsRender=null;try{failed.dispose();}catch(cleanup){gsIssue+=` ${errorText(cleanup)}`;}for(const s of sources){s.ready=false;s.issue=gsIssue;}pickEpoch++;serial++;changed();hideSmooth(smooth,()=>{before();renderer!.render(scene,camera!);});}}
+    else if(presentation&&smooth.length)drawSmooth(smooth,before);else{before();renderer.render(scene,camera);}
+    if(presentation)canvas.dataset.compositionDocumentBytes=String(presentation.budget.used);
   }
   function draw() {
     if (!active || disposed || !renderer || !camera) return;
@@ -272,7 +320,8 @@ export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: 
       }
       if (resized || !raf) {
         const ratio = Math.min(globalThis.devicePixelRatio || 1, 2);
-        renderer.setDrawingBufferSize(Math.max(1, Math.floor(width * ratio + .5)), Math.max(1, Math.floor(height * ratio + .5)), 1);
+        if(presentation)syncSmoothLayout(smoothMeshes());
+        if(!smoothLayout)renderer.setDrawingBufferSize(Math.max(1, Math.floor(width * ratio + .5)), Math.max(1, Math.floor(height * ratio + .5)), 1);
         configurePoints();
         if (camera instanceof THREE.PerspectiveCamera) camera.aspect = width / height;
         else if (camera) { const half = (camera.top - camera.bottom) / 2; camera.left = -half * width / height; camera.right = half * width / height; }
@@ -285,6 +334,7 @@ export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: 
   const lost = (event: Event) => { event.preventDefault(); contextLost = true; fail(new Error('描画環境の復旧を待って再試行してください。')); };
   const restored = () => { contextLost = false; issue = '描画環境が復旧しました。3D表示を再試行してください。'; serial++; changed(); };
   function pickSample(x: number, y: number) {
+    if(presentation)renderFrame();
     const ndc = new THREE.Vector2(x * 2 / width - 1, 1 - y * 2 / height);
     let needed = false;
     for (const surface of resident.values()) surface.mesh.traverse(node => {
@@ -302,25 +352,29 @@ export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: 
     coverageIssue=null;
     const gs=targets.length===1?resident.get(targets[0]!.assetId):undefined;
     if(gs?.gs){const position=pickResidentSurface(display,targets[0]!,resident,camera,new THREE.Vector2(x*2/width-1,1-y*2/height));if(!position)coverageIssue=gs.interactionIssue??gs.gs.issue;return position?{target:targets[0]!,position}:null;}
-    const drawing = renderer.getDrawingBufferSize(new THREE.Vector2()), dpr = globalThis.devicePixelRatio || 1;
-    const view = { cssWidth: width, cssHeight: height, devicePixelRatio: dpr, renderScale: Math.min(dpr, 2) / dpr };
-    coverageIssue = null; renderFrame();
-    const visible=pointVisibility(renderer,camera,resident,width,height,error=>{coverageIssue=errorText(error);});
+    renderFrame();if(!renderer||!camera||!display||display.readOnly)return null;const currentRenderer=renderer,currentCamera=camera,currentDisplay=display;
+    return presentedPick(()=>{const drawing = currentRenderer.getDrawingBufferSize(new THREE.Vector2()), dpr = globalThis.devicePixelRatio || 1;
+    const view = smoothLayout??{ cssWidth: width, cssHeight: height, devicePixelRatio: dpr, renderScale: Math.min(dpr, 2) / dpr };
+    coverageIssue = null;
+    const visible=pointVisibility(currentRenderer,currentCamera,resident,width,height,error=>{coverageIssue=errorText(error);});
     const gsOverlap=[...resident.values()].some(s=>s.gs?.ready&&s.asset.visible);
     const checkedVisibility={...visible,point(surface:ResidentSurface,index:number,ndc:THREE.Vector2){
       const proof=visible.point(surface,index,ndc);
       if(gsOverlap&&proof==='visible'){coverageIssue='GSと点の前後関係を確認できません。GSを非表示にして点を選択してください。';return 'unknown' as const;}
       return proof;
     }};
-    try { return pickPointAwareCreation(display, targets, resident, camera, view, x, y, ndc => {
+    try { return pickPointAwareCreation(currentDisplay, targets, resident, currentCamera, view, x, y, ndc => {
       const pixel = coveragePixel((ndc.x+1)*width/2, (1-ndc.y)*height/2, width, height, drawing); if (!pixel) throw Error('点の表示位置を確認できません。');
       coverageProbe ??= createValidationCoverage(renderer!);
       return coverageProbe.begin(camera!, pixel, error => { coverageIssue = errorText(error); });
-    }, gsRender?.depthBits??renderer.getContext().getParameter(renderer.getContext().DEPTH_BITS) as number,checkedVisibility); } finally { visible.dispose(); }
+    }, gsRender?.depthBits??currentRenderer.getContext().getParameter(currentRenderer.getContext().DEPTH_BITS) as number,checkedVisibility); } finally { visible.dispose(); }
+    });
   }
   function reportPickIssue() { if (coverageIssue) { serial++; changed(); } }
+  function presentedPick<T>(action:()=>T):T{return presentation&&!smoothPresented?hideSmooth(smoothMeshes(),action):action();}
   canvas.addEventListener('webglcontextlost', lost);
   canvas.addEventListener('webglcontextrestored', restored);
+  const unsubscribeTargets=presentation?.budget.subscribe(()=>{if(!waitingBudget||disposed||!active||presentation.budget.available<=refusedAvailable)return;waitingBudget=false;smoothIssue=null;smoothLayout=null;serial++;changed();});
   const unsubscribeAdmission=residency?.subscribe(()=>{if(!blockedNext||disposed||!active||retryScheduled)return;retryScheduled=true;
     queueMicrotask(()=>{retryScheduled=false;if(blockedNext&&!disposed&&active){viewport.update(blockedNext);ensure();}});});
   const viewport:ReturnType<ViewportFactory>={
@@ -339,20 +393,27 @@ export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: 
     setPointDiameter(assetId, input) { const resolved = resolvePointPresentation(pointRegistrySnapshot, defaultPointProfile, input), diameter = resolved.diameterCssPixels; pointDiameterNotice = resolved.diagnosedDefault ? '点の大きさを既定の3pxに戻しました。' : null;
       if (diameter === (pointDiameters.get(assetId) ?? 3)) return;
       pointDiameters.set(assetId, diameter); configurePoints(); pickEpoch++; serial++; changed(); },
-    setActive(next) { const activating=next&&!active;if (!next && (active||gsIntent)) release(); active = next;if(activating&&blockedNext)viewport.update(blockedNext); ensure(); },
+    setActive(next) {
+      const activating=next&&!active,retained=Boolean(next&&active&&renderer&&camera&&!issue);
+      if (!next && (active||gsIntent)) release(); active = next;
+      if(activating&&blockedNext)viewport.update(blockedNext);
+      // Unchanged active state is common after camera/sort observations. Actual
+      // size/DPR changes still enter ensure through ResizeObserver/the draw loop.
+      if(!retained)ensure();
+    },
     setPinPointerActive(next) { pinPointerActive = next; syncOrbit(); },
     pick(target, x, y) {
       if (!active || disposed || !renderer || !camera || issue || contextLost || dragging || gizmo?.dragging || !display || display.readOnly) return null;
       try { if ([...resident.values()].some(s => s.points&&s.asset.visible&&s.points.object.visible)) { const hit = pointPick([target], x, y); reportPickIssue(); return coverageIssue ? null : hit?.position ?? null; }
         const sample = pickSample(x, y); if (!sample) return null;
-        const result = pickResidentSurface(display, target, resident, camera, sample.ndc, sample.coverage); reportPickIssue(); return coverageIssue ? null : result;
+        const current=display,currentCamera=camera;const result = presentedPick(()=>pickResidentSurface(current, target, resident, currentCamera, sample.ndc, sample.coverage)); reportPickIssue(); return coverageIssue ? null : result;
       } catch (error) { coverageIssue = errorText(error); reportPickIssue(); return null; }
     },
     pickCreation(targets, x, y) {
       if (!active || disposed || !renderer || !camera || issue || contextLost || dragging || gizmo?.dragging || !display || display.readOnly) return null;
       try { if ([...resident.values()].some(s => s.points&&s.asset.visible&&s.points.object.visible)) { const hit = pointPick(targets, x, y); reportPickIssue(); return coverageIssue ? null : hit; }
         const sample = pickSample(x, y); if (!sample) return null;
-        const result = pickResidentCreation(display, targets, resident, camera, sample.ndc, sample.coverage); reportPickIssue(); return coverageIssue ? null : result;
+        const current=display,currentCamera=camera;const result = presentedPick(()=>pickResidentCreation(current, targets, resident, currentCamera, sample.ndc, sample.coverage)); reportPickIssue(); return coverageIssue ? null : result;
       } catch (error) { coverageIssue = errorText(error); reportPickIssue(); return null; }
     },
     read() {
@@ -369,12 +430,12 @@ export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: 
       });
       const pending=display?.models.flatMap((model,i)=>{const state=loadState(model),label=(isReadonlyModel(model)||isSavedModel(model))?saved.label?.(model):undefined;return state&&state.phase!=='ready'?[`${label??`モデル ${i+1}`}: ${state.issue??'読み込み中'}`]:[];})??[];
       const materialNotices=[...resident.entries()].flatMap(([id,s])=>{if(!s.asset.visible)return[];const model=display?.models.find(m=>renderOwner(m)===id),label=model&&(isReadonlyModel(model)||isSavedModel(model))?saved.label?.(model):undefined;return(s.materialNotices??[]).map(n=>`${label??'モデル'} / ${n}`);});
-      const loading=Boolean(pendingGsTarget&&!blockedNext?.models.some(m=>loadState(m)?.phase==='failed')||!issue&&(!renderer||!camera)||pending.length&&display?.models.some(model=>loadState(model)?.phase==='loading')||gsPreparing||[...resident.values()].some(s=>s.asset.visible&&s.gs&&!s.gs.ready&&(!s.gs.issue||s.gs.issue==='GSの表示を準備しています。')));
+      const loading=Boolean(smoothPending||pendingGsTarget&&!blockedNext?.models.some(m=>loadState(m)?.phase==='failed')||!issue&&(!renderer||!camera)||pending.length&&display?.models.some(model=>loadState(model)?.phase==='loading')||gsPreparing||[...resident.values()].some(s=>s.asset.visible&&s.gs&&!s.gs.ready&&(!s.gs.issue||s.gs.issue==='GSの表示を準備しています。')));
       return { token: JSON.stringify([serial, display?.sceneId, display?.projectFrameId, display?.bounds, width, height, pose, background]),
         display: display ?? undefined,
         pickToken: String(pickEpoch),
-        ready: Boolean(active && renderer && camera && !issue&&!capacityIssue&&!pendingGsTarget&&!pending.length), loading, issue,retryAvailable:!!capacityIssue||!!gsIssue||[...resident.values()].some(s=>s.gs?.issue!==null&&s.gs?.issue!==undefined&&s.gs.issue!=='GSの表示を準備しています。'),
-        notice: [pendingGsTarget&&'次のシーンのモデルを確認しています。前の表示を保持しています。',pending.join(' / '),capacityIssue, notice, coverageIssue, gsIssue, pointDiameterNotice, ...new Set([...resident.values()].flatMap(s => [s.points?.issue,s.asset.visible && s.gs ? s.gs.issue ?? (!s.gs.ready && !gsIssue ? 'GSの表示を準備しています。' : null) : null].filter(Boolean))), alphaPicking && !display?.readOnly ? '半透明・切り抜きの面へのピン配置は未接続です。原本の見た目は保持しています。' : null,
+        ready: Boolean(active && renderer && camera && !issue&&!capacityIssue&&!pendingGsTarget&&!pending.length), loading, issue,retryAvailable:!!capacityIssue||!!gsIssue||!!smoothIssue||[...resident.values()].some(s=>s.gs?.issue!==null&&s.gs?.issue!==undefined&&s.gs.issue!=='GSの表示を準備しています。'),
+        notice: [smoothPresented?'透過表示は近似です。':null,smoothPending?'透過表示を準備しています。':null,smoothIssue?`${smoothIssue} 透過の面は非表示です。設定と記録は保持しています。`:null,smoothLayout&&smoothLayout.renderScale<Math.min(1,2/(rawPixelRatio||1))?'3D表示の細かさを自動調整しています。元データと記録は変わりません。':null,pendingGsTarget&&'次のシーンのモデルを確認しています。前の表示を保持しています。',pending.join(' / '),capacityIssue, notice, coverageIssue, gsIssue, pointDiameterNotice, ...new Set([...resident.values()].flatMap(s => [s.points?.issue,s.asset.visible && s.gs ? s.gs.issue ?? (!s.gs.ready && !gsIssue ? 'GSの表示を準備しています。' : null) : null].filter(Boolean))), alphaPicking && !display?.readOnly ? presentation?'滑らかな透過の面は位置指定に使えません。位置の手動調整は利用できます。':'半透明・切り抜きの面へのピン配置は未接続です。原本の見た目は保持しています。' : null,
           ...new Set(materialNotices),
           ...new Set(display?.pins.flatMap(p => p.notice ? [p.notice] : []) ?? []),
           ...(display?.materialNotices ?? []), ...Object.values(display?.materials ?? {}).flatMap(m => 'issue' in m ? [m.issue] : []),
@@ -420,7 +481,7 @@ export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: 
       poses.set(display.sceneId, pose); backgrounds.set(display.sceneId, background); notice = null; serial++; changed();
     },
     retry() { if(blockedNext){this.update(blockedNext);ensure();return;} if (contextLost) throw new Error('描画環境の復旧を待って再試行してください。'); release(); issue = null; ensure(); },
-    dispose() { disposed = true;unsubscribeResidents?.();unsubscribeAdmission?.(); release(); resize.disconnect(); canvas.removeEventListener('pointerdown', mouseNavigation, true);
+    dispose() { disposed = true;unsubscribeTargets?.();unsubscribeResidents?.();unsubscribeAdmission?.(); release(); resize.disconnect(); canvas.removeEventListener('pointerdown', mouseNavigation, true);
       canvas.removeEventListener('webglcontextlost', lost); canvas.removeEventListener('webglcontextrestored', restored); },
   };
   const unsubscribeResidents=saved.subscribe?.(()=>{if(disposed||!display&&!blockedNext)return;
