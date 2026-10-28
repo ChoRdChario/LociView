@@ -1,6 +1,6 @@
 # 実装・接続の全体棚卸し
 
-> 更新: 2026-10-29（限定Point/GS・Proxy、Native・Mesh／標準材質変換と01gのPC候補表示を反映。全体分類は2026-09-21時点）。本書は機能対応の正本。
+> 更新: 2026-10-29（限定Point/GS・Proxy、Native・Mesh／標準材質変換と01gのPC候補表示を反映。接続分類は2026-09-21時点、M14の任意化のみ本日のPO確認を反映）。本書は機能対応の正本。
 > 実装順・現在の作業tree・実行結果は [todo](todo.md) を参照し、ここへ重複記載しない。
 > 限定接続と製品受入れを区別し、通常画面・実機の新たな合格は主張しない。
 > [以前の棚卸しと監査記録](../docs/history/development-through-2026-09-14/tasks/implementation-inventory.md) は履歴。
@@ -28,9 +28,10 @@ GS専用上限と全既知本体の合計、画面全体の表示予定・実イ
 ## 1. 結論と数え方
 
 元の棚卸しは **64機能群**。2026-09-14のPO判断でF09（移行後の旧形式更新受信）を撤回し、
-現在の要件は63群。限定接続済みの分類は **34群**、他分類は **29群**。
-今回の実用チーム版はM13/M14を後続へ分けた **61群** が対象。F09の除外は完成ではない。
-以下は最後に確認した接続分類であり、環境整理だけで件数を増やさない。
+2026-10-29のPO確認でM14（補修Mesh）を任意・完成条件外として整理した。必須要件は **62群**、
+今回の実用チーム版は後続M13を除く **61群** が対象。除外・任意化は完成ではない。
+2026-09-21の接続分類は限定接続済み **34群**、他分類 **29群** だった。
+以下はその接続分類を保ち、M14だけを新規実装から任意へ移したもの。現在の実装数の再集計ではない。
 「34/64完成」といった完成率・工数には換算しない。小さい部品接続と
 移行／チーム受信では仕事量が大きく違い、接続済みも下記の限定経路だからである。
 
@@ -39,7 +40,8 @@ GS専用上限と全既知本体の合計、画面全体の表示予定・実イ
 | 接続済み | 34 | 新metadata hostで操作・必要な記録まで接続。従来25群は既知三角形／2 PNG起点、P01/P02は限定validation、C04/C07/C09/C11/V04/M05/I04は両hostへ接続。実機受入れは別 |
 | 部品未接続 | 4 | 新系統のUI部品・pure planner等はあるが、対象群全体の画面・実データ・typed command／保存のいずれかが未接続。T01〜T04は限定接続まで進んだ |
 | 別経路のみ | 17 | Nativeまたはmemory／旧savedの相当操作はある。新source／サービス／rendererへの移植・接続が必要。配線だけとは限らない |
-| 新規実装 | 8 | 新契約の機能群全体が未完了。限定的な実装・UI接続を含む行もあり、コード不在を意味しない |
+| 新規実装 | 7 | M14任意化後の分類。新契約の機能群全体が未完了。限定的な実装・UI接続を含む行もあり、コード不在を意味しない |
+| 任意・完成条件外 | 1 | M14。手動ピン調整に補修Meshは不要。必須残件・自動的な後続予定には数えず、利用者の必要が生じた場合に再判断する |
 | 要件撤回 | 1 | F09。移行した後は新形式で続ける運用に確定。完了・deferred・PASSには数えない |
 
 - 一つの行は、共有する前提・保存境界を持つ「利用者の作業群」。同一ViewのCRUD等は一群。
@@ -47,9 +49,9 @@ GS専用上限と全既知本体の合計、画面全体の表示予定・実イ
 - 同一行を複数分類へ加算しない。UI部品と保存commandの両方がない場合も一群のまま。
 - Desktop／iPhone、単体／統合テスト、retryの各faultを機能数へ重複加算しない。
 - §4の基盤・検証残件、§6の明示deferred／未決事項は、この64群とは別に管理する。
-- 元の64群の識別子を保持した棚卸しであり、要件撤回と後続機能を区別する。全行を現在の合成接続sliceや最初の
-  candidate必須gateへ追加しない。完全alignmentやM14等の別gate能力は、その前提が
-  揃った段階で扱う。閉じた旧Native受入れをこの件数で再オープンしない。
+- 元の64群の識別子を保持し、要件撤回・任意機能・後続要件を区別する。全行を現在の合成接続sliceや最初の
+  candidate必須gateへ追加しない。完全alignmentは後続要件、M14は必要が生じた場合に再判断する任意機能。
+  閉じた旧Native受入れをこの件数で再オープンしない。
 - 「新規実装」はコードが全くないという意味ではない。F08は旧Native変換とは別の
   新Scene変換であり、旧経路だけでは新経路の完成と数えない。
 - 本書はソース・既存テスト・承認済み仕様の照合。新しい実ブラウザ操作／性能測定ではない。
@@ -104,7 +106,7 @@ GS専用上限と全既知本体の合計、画面全体の表示予定・実イ
 | M11 | ピンの表示サイズを調整する | 別経路のみ | 限定validationでは取込pinScaleを保持し、ピン描画へ反映済み。限定product compositionでは明示map2のAsset倍率編集・全Sceneのmarker反映・失敗時exact retry・backup/cold再開まで接続。map1は不変更。通常入口／実描画・実機受入れは未完で主分類は維持。 | [src/harness/projectScene/viewportModel.ts](../src/harness/projectScene/viewportModel.ts) / [src/harness/projectScene/viewportHost.ts](../src/harness/projectScene/viewportHost.ts) / [src/nativeGs/app.ts:1841](../src/nativeGs/app.ts) |
 | M12 | 点群の表示径を調整する | 別経路のみ | 01aの限定Point経路に既定3px・1〜20pxの一時表示径を接続。Assetごと・viewport内の設定で、Metadata／保存視点／fileへ混ぜず、現在のgesture receiptを更新する。exact3profile registryとbinary-only capabilityを分け、dither/smoothへfallbackしない。Native既存経路は不変更。Point全体／実機／採用の分類へ広げず、実行範囲はtodo参照。 | [src/domain/pointPresentation.ts](../src/domain/pointPresentation.ts) / [src/ui/projectScene/projectModels.ts](../src/ui/projectScene/projectModels.ts) |
 | M13 | 位置合わせの基準固定・bounds fit・reset／undo・redo | 新規実装 | 完全alignmentは新hostも限定Nativeも未達。M06/M07と別の残り。alignment固有のundo/redoで、一般Caption Undoの新設を含めない。 | [docs/specs/01-domain-rendering.md:769](../docs/specs/01-domain-rendering.md) / [docs/specs/01-domain-rendering.md:786](../docs/specs/01-domain-rendering.md) |
-| M14 | 既存モデルへ補修Meshを追加・配置し、任意hard exclusionと一体で保存する | 新規実装 | 承認済みvisual repair pairの利用者flowは未実装。別Asset追加ではない。repair-local gizmo、patch/mask一体preview/cancel、revision/bindingの原子的commit、対応pin class保持が必要。renderer/profile・hard-mask gateに依存し、直近チームsliceでは実装しない。 | [docs/specs/00-product-contract.md:116](../docs/specs/00-product-contract.md) / [docs/specs/00-product-contract.md:275](../docs/specs/00-product-contract.md) |
+| M14 | 既存モデルへ補修Meshを追加・配置し、任意hard exclusionと一体で保存する | 任意・完成条件外 | PO2026-10-29確認。手動ピン調整に必須ではなく、必須残件・自動的な後続予定から除外。利用者flowは未実装。将来必要になり実装する場合は、原本保持・repair-local配置・patch/maskの原子的commit・対応pin class保護と該当gateを満たす。位置指定用Proxyの既存動作は変更しない。 | [仕様00 §4.4／§10](../docs/specs/00-product-contract.md) |
 
 M08の限定product経路は、要確認ピンの補正で現在のモデル面を明示選択し、元の色と独立した要確認表示を保つ。
 専用Chromiumの [モデル差し替え・復旧テスト](../tests/e2e/model-recovery.spec.ts) が、2シーン共有の配置保持、
@@ -299,7 +301,7 @@ LociMyuからのタブ構成、Sceneに相当する記録切替、直接色選�
 | ID | 境界 | 再利用できるもの | 残りの種類・具体的な不足 |
 |---|---|---|---|
 | E01 | 保存／CAS／GC／大容量I/O | 新original-byte journal、metadata-only cold evidence、非活性OriginBlobStoreのbounded stream／保存後検証／不変receipt／実inventory→metadata作成・再開、隔離CAS・retentionと500 MiB保存本体のPO readback | **実装＋証拠**。新storeの実OPFS・Web Locks・iOS証拠とhost接続、全Project/conflict/opaque/未完了journal等のroot producer、origin-wide GC、bounded browser/iOS出力、実中断。MemoryFSの一般bytes試験をプラットフォーム採用証拠にせず、過去の500 MiB最初の完了ログ不明をFAIL扱いして同じreadbackを繰り返さない |
-| E02 | 実モデル・Representation／renderer | 旧Nativeの限定Mesh/Point/GS/Proxy、各loader、known triangle content verifier | **実装＋採用**。実body admission、Frame/catalog/texture/family証拠、Representation選択と対応外の局所的fallback、資源解放。shared-view合成・hard mask・dither等の各gateを確認。M01–M03/A02と補修操作M14の技術前提で、同じ作業をここで重複加算しない |
+| E02 | 実モデル・Representation／renderer | 旧Nativeの限定Mesh/Point/GS/Proxy、各loader、known triangle content verifier | **実装＋採用**。実body admission、Frame/catalog/texture/family証拠、Representation選択と対応外の局所的fallback、資源解放。shared-view合成・dither等の該当gateを確認。M01–M03/A02の技術前提で、同じ作業をここで重複加算しない。任意M14のhard mask等はその機能を採用する場合だけ別途確認する |
 | E03 | 新wire・移行recipe | 5-purposeの意味的closure PoC、原履歴／prepared migrationの隔離証拠 | **孤立実装＋採用／初回移行の残件**。06 §11の実装先行と§12.6のreview/edit-copy方針は承認済み。実装は各F行・todoを参照。一般profile／容量保証／採用、07の初回source mappingと必要target差分は残る。late bridgeは撤回済みで、そのPoCを再実行・採用条件化しない。 |
 | E04 | 規模・安全性・アクセシビリティ | 最終rootテスト、限定hostのfocus／失敗／古いtoken防御、既存runtime audit | **実装確認＋証拠**。10k Caption/50k changes、規定多tab workload、10k UI virtualizationとopen/edit budget達成、メモリ・CSP・不正入力、200%/狭幅/IME/keyboard/contrast/44pxの総合確認。未測定を性能FAILにしない。開発用依存の監査残件は未解消（最新結果はtodo）、runtimeの狭いhold解消とは別 |
 | E05 | Desktop／physical iPhone／offline | 旧Native受入れ、旧saved限定4群、修正後journalのPO再確認 | **新経路の証拠待ち**。新metadata hostの8群は一般的好評のみで全件PASSではない。新保存・描画に必要な実機は該当境界で実施し、全てを無条件に最終日へ先送りしない。最後は通常UIでTEAM-FLOW-01。dev serverはoffline/PWA証拠ではない |
@@ -325,7 +327,7 @@ LociMyuからのタブ構成、Sceneに相当する記録切替、直接色選�
 
 実行順は [todoの現在境界](todo.md) に一本化する。承認済みの実用チーム版を
 全体先行でつなぎ、各行の実装・UI接続・実機受入れを混同しない。
-内部部品の完了を新しい利用者操作の完成として数えず、M13/M14と撤回F09は今回の61群に含めない。
+内部部品の完了を新しい利用者操作の完成として数えず、後続M13・任意M14・撤回F09は今回の61群に含めない。
 
 ## 6. 明示deferred／判断未確定（64群へ加算しない）
 

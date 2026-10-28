@@ -449,8 +449,11 @@ base adoption or the first paired slice:
   tie fixtures; this acceptance remains required before MVP ordinary-point
   display/picking support is claimed;
 - `integratedOpaque`: complete source-material/opacity/chroma/final-alpha matrix,
-  opaque/mask/dither intersections, visual patch/exclusion, external repair,
-  compatibility/rebind negatives, target switching and excluded proxy picks;
+  opaque/mask/dither intersections and applicable compatibility/rebind negatives.
+  Visual patch/exclusion, external repair, repair-target switching and excluded
+  proxy picks are conditional acceptance only if that optional capability is
+  enabled; M14 does not block completion or base/material adoption under the
+  [2026-10-29 product decision](00-product-contract.md);
 - `integratedTransparencyExperimental`: the closed translucent aircraft and its
   G1-D evidence.
 
@@ -709,7 +712,9 @@ below.
    generation, ordinary points and advanced composition do not block this slice.
 10. ordinary-point display/picking acceptance, multiple Assets including same-kind Assets,
     per-Asset visibility and alignment.
-11. required opaque/mask/dither shared-view composition and patch/exclusion.
+11. required opaque/mask/dither shared-view composition. M14 visual repair and
+    patch/exclusion are optional, outside completion requirements; apply their
+    gates only before enabling that capability.
 12. iOS, migration, corruption, privacy and security hardening.
 13. after core iOS/migration/corruption/privacy/security hardening, productionize a previously adopted G1-D result only through production review; if the feasibility spike was deferred, it may instead run now. Exact-renderer research remains a separate later gate.
 

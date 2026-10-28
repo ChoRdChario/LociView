@@ -11,7 +11,8 @@ headings are not an active queue or renewed approval requirements.
 
 Complete open → Project/Scene/model/Caption/media work → save/send → receive/resolve
 → edit/restore/cold-resume. The practical-team scope remains61 of the original64
-inventory groups: M13/M14 are later; F09 continuing old-format updates was withdrawn.
+inventory groups: M13 remains later; M14 visual repair is optional and outside
+completion requirements per PO2026-10-29; F09 continuing old-format updates was withdrawn.
 Initial Native/frozen-v1/LociMyu conversion and new-format teamwork remain required.
 The inventory classification counts are dated observations, not completion rates.
 
@@ -22,11 +23,23 @@ Fix latency when it prevents use or risks data. Keep the existing
 Root is sole writer; bounded independent reviewers are read-only. No small manual
 test or helper approvals. Continue in-scope work while device evidence is pending.
 
+## Scope correction —optional visual repair
+
+PO2026-10-29 clarified that manual pin adjustment removes the need for a repair
+mesh to obtain an exact hit. M14 is optional, not a required later feature.
+Aligned inventory and governing product/domain/gate/team clauses, retaining
+original IDs, historical decisions and conditional repair-data invariants.
+Verified documentation-only diff, local links and classification arithmetic;
+independent read-only contract review passed. Runtime checks are not required for
+this documentation-only correction.
+No source/runtime, stored data, profile, Proxy relation or initial-placement
+policy change; no runtime acceptance credit. The next implementation unit below
+is unchanged. Stop only for an actual conflict outside this scope clarification.
+
 ## Next connected outcome —500k Review edit-copy
 
-The bounded01g Desktop implementation is automatically verified below; Git owns
-checkpoint identity. Complete the suitableg0 commit/push under standing authority,
-then close the accepted01e500k SH4 Review→explicit independent editing copy→edit/
+The bounded01g Desktop checkpoint is verified below and pushed; Git owns its
+identity. Next close the accepted01e500k SH4 Review→explicit independent editing copy→edit/
 save→cold reopen. Keep the persistent-profile/origin-lock refusal+retry sequence
 and unchanged240s readiness/300s download acceptance. This known blocked workflow
 precedes comfort-only output tuning; no fresh helper/PO-test permission is needed.

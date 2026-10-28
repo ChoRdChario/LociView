@@ -2628,8 +2628,11 @@ replay and cold reopen. No new PoC, wire, dependency, Native or adoption credit.
 **PO-approved practical-team completion and full-source receive (2026-09-12):**
 the first completion target is a usable team candidate under TEAM-FLOW-01, with
 real files, ordinary Project/Scene/editing flows, five-purpose exchange and
-Desktop/physical-iPhone/offline acceptance. Inventory M13 full alignment and M14
-visual repair stay required later capabilities, not first-candidate blockers.
+Desktop/physical-iPhone/offline acceptance. Inventory M13 full alignment stays a
+required later capability, not a first-candidate blocker. The PO2026-10-29
+[scope clarification](00-product-contract.md) makes M14 visual repair optional,
+outside completion requirements; it supersedes the earlier required-later wording
+for M14 without changing manual pin adjustment or existing Proxy eligibility.
 The original target was the other 62 inventory groups. The PO's 2026-09-14
 one-time cutover withdraws F09, leaving 61 in the practical-team target; this is
 a scope reduction, not a completion claim. Initial conversion, real-data,

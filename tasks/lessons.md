@@ -60,6 +60,9 @@ Read only the relevant topic, not every historical incident.
   of a lifetime defect, not proof of a particular timeout or product latency.
 - Current work belongs in todo, coverage in inventory, contracts in specifications.
   Map/handoff/index should link rather than repeat changing counts and next steps.
+  Apply current PO scope corrections to those governing records; a retained schema
+  or historical later-feature plan does not make an optional feature a completion
+  requirement. Preserve history and conditional data-safety rules separately.
 - An approved plan authorizes its ordinary implementation/fixes. Stop only at an
   actual new decision/authority boundary; a prior historical wait is not a new one.
 

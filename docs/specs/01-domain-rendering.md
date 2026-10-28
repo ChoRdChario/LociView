@@ -790,6 +790,10 @@ The MVP alignment tool MUST provide:
 - residual and method metadata when a fitted method is used;
 - per-Asset visibility changes without losing the pending transform.
 
+Visual-repair authoring is optional and outside completion requirements under
+[the 2026-10-29 product decision](00-product-contract.md). If that workflow is
+implemented, the following repair-alignment rules apply.
+
 Repair alignment is representation-local, not a second Asset alignment. “Add visual repair” preserves the imported source, lets the user place its RepresentationFrame into the selected target AssetFrame with the same translation/quaternion/positive-uniform-scale controls, then freezes that `representationToAsset` in the new `visualPatch`. An optional hard exclusion is generated/imported already in the target AssetFrame with identity `representationToAsset`. Accepting the preview stages both resources and atomically creates one new AssetRevision/AssetBindingRevision that copies the prior `assetToProject`; cancellation changes no active revision. The new patch family receives its own singleton anchor-compatibility class, while byte- and surface-unchanged base-family classes retain their IDs. A surface-equivalent candidate added inside the same patch family may retain its class; a surface-changing patch replacement creates a new patch VariantFamily and singleton class but replaces only the old patch class within the revision partition. Deleting the patch removes only that class, so base-family pins remain compatible while affected patch-authored pins become `needsReview`. The workflow cannot group a separately aligned Asset, reuse an interaction proxy as color geometry, or commit a mask without its patch.
 
 Three non-collinear point pairs are the mathematical minimum for correspondence fitting; production UI SHOULD accept 4–8 pairs and report residuals. PCA and ICP are later assistants only because symmetry, missing GS regions and floaters can produce plausible but wrong alignment.
@@ -925,8 +929,11 @@ These IDs remain normative, but their activation follows
 `03-gates-and-delivery.md`: base G1-B closes only the Mesh, GS, simple opaque
 mixed, shared-proxy, transform/bounds and resource-lifecycle clauses exercised by
 its base pack. Ordinary-point, multiple-Asset visibility, complete material/shared-view composition,
-patch/exclusion/repair and transparency clauses are retained as later feature
-acceptance and do not block the first paired slice.
+patch/exclusion/repair and transparency clauses are retained as feature
+acceptance and do not block the first paired slice. Per the 2026-10-29 product
+decision, M14 repair authoring is optional, not a required later feature; its
+acceptance applies before enabling that capability, not to application completion
+without it. Existing Representation validation remains unchanged.
 
 ### Domain and resolver
 

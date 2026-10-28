@@ -216,6 +216,12 @@ The user selects a reference asset and adjusts another asset non-destructively. 
 
 ### 4.4 Add a visual repair pair
 
+Optional workflow, outside completion requirements per the 2026-10-29 PO
+clarification in §10. Manual pin adjustment does not require a repair mesh or an
+exact surface hit. This is not an automatic later delivery commitment. If the
+visual-repair workflow is implemented, the following preservation and commit
+rules apply:
+
 1. Select the existing logical asset and target GS families.
 2. Import a human-authored repair mesh while preserving its source bytes.
 3. Align its RepresentationFrame into the target AssetFrame with a temporary Sim(3) repair gizmo; this does not create a second logical asset or change the asset's ProjectFrame alignment.
@@ -550,6 +556,19 @@ the implemented Native contract unchanged:
 
 The normative detail and acceptance are in
 `05-project-scene-team-workflow.md` and ADR-0002.
+
+Recorded on 2026-10-29, clarifying visual-repair scope:
+
+- M14 visual repair is optional and outside application-completion requirements;
+  it is not a required later capability or a completion/adoption blocker merely
+  because its Representation roles and conditional contracts exist;
+- manual pin adjustment supplies the final saved position without requiring a
+  repair mesh or a precise surface hit. A future visual-repair workflow needs a
+  concrete user need and a new scope decision before implementation;
+- this clarification supersedes earlier required-later/MVP-authoring wording for
+  M14 only. Original bytes, existing data and patch/exclusion validation and
+  atomicity rules are retained. Existing interactionProxy relationships, GS
+  initial-placement eligibility and saved manual-position authority are unchanged.
 
 Still required later:
 
