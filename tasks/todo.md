@@ -22,6 +22,88 @@ Fix latency when it prevents use or risks data. Keep the existing
 Root is sole writer; bounded independent reviewers are read-only. No small manual
 test or helper approvals. Continue in-scope work while device evidence is pending.
 
+## Current boundary —01f evaluated;01g display policy needs PO decision
+
+PO2026-10-28 approved the01f early read-only PC evaluation and continued
+implementation if the technical evaluation finds no problems. Start at clean,
+pushed g0-baseline7887072. Root is sole writer; bounded read-only reviewers own
+public API feasibility and contract/acceptance review. Meta-audit: actual smooth
+display closes the next material gap; no new dependency/data/wire policy and no
+claim that the outstanding base/iOS/production gates have passed.
+
+Plan: fixed public Three/GSL hooks proof → isolated read-only shared-context
+accumulation/revealage/depth experiment → actual browser layers/intersections/
+camera/order, p95/target bytes/lifecycle/context checks → independent evidence
+review. If feasible, specify/review the production connection and continue the
+authorized implementation within its actual gate boundary. Keep ordinary and
+Desktop product behavior unchanged during evaluation. Stop affected work for
+required private/deep/fork/new dependency, failed visual/performance/resource
+criteria, unsupported policy or an unmet nonwaived activation gate. Reuse07n
+data-flow evidence instead of another five-output matrix. No per-control asks.
+
+Outcome: **PC EVALUATION: NOT FEASIBLE for unrestricted full-resolution PC under
+the current64MiB extra-target budget.** Bounded1080p public-only composition and
+camera fluidity are demonstrated on dedicated Chromium/ANGLE NVIDIA RTX5080/D3D11;
+this does not reject the mechanism or change a product route. The isolated owned
+experiment is `scripts/smooth-composition-evaluation`; its README owns reproduction
+and limits. No new dependency/private API/deep import/fork or Project/storage/
+package/source mutation. The fixed01c sorted/RGBA16F policy stays immutable;
+WBOIT is not a pass of that different policy.
+
+Run1793191287310-61848 passes3 cases(4.6min): actual500k SH4 source178,002,206bytes,
+1,004,416 accumulated triangles (public128-splat geometry batches), actual GS/Mesh
+contribution, shared opaque/MASK depth, eight layers, closed owned aircraft,
+36 camera views and opposed draw orders. Six oblique reference views are visually
+inspected; family contribution is not a complete component-disappearance oracle.
+Each visible120-second nonblocking camera/sort trace records19,788 rAF callbacks.
+Base/MRT rAF p95 is6.4/6.3ms: scheduling/presentation proxies, not proof every
+submitted frame was displayed. Static CPU submission/flush p95 is.9/1.0ms, while
+valid non-disjoint GPU query p95 is.856224/4.762944ms. Retain that substantial
+headroom cost despite roughly165 rAF callbacks/s. Chromium implements WebGL finish as Flush;
+CPU spans are not GPU fences (primary source linked in the experiment README).
+Do not infer weaker-PC/iOS/general rendering performance from this GPU.
+
+The initial canonical two-pass comparison exceeded the static CPU diagnostic
+(1.1→1.6ms) and used.836→4.525ms GPU in retained run1793190875023-49632.
+Additive MRT uses a separate alpha1 count and float32 optical depth. Final focused
+run1793191624570-58236 passes2 cases(28s): dual/MRT pixels differ by at most one8bit
+code; alpha0/next-float32-below1/1/2^-30 auxiliary readback covers all branches;
+bright accumulation70,505.30 is finite above the half-float ceiling. Live loss→
+release→restore→recreate retains both contributions.20 unload cycles stabilize
+renderer counters at2 geometries/6 textures, not total-memory/worker-release proof.
+Extra RGBA32F+RG32F targets use49,766,400bytes(47.46MiB) at1920×1080, but actual
+2560×1440 allocation uses88,473,600bytes(84.38MiB), above64MiB. That diagnostic
+records a failure boundary, not high-resolution acceptance. Missing float blending
+is explicitly unsupported; final typed/local-only case passes in
+`smooth01f-final-local-route.log`. Earlier incomplete/failed logs remain: LDR-only
+proof, stale GL objects disposed after restore, too-dim HDR fixture, pre-pooled
+timing and mistaken one-splat-per-instance assertion. No product assertion,
+existing timeout, gate, source color or SH coefficient was relaxed.
+
+The4 evaluation source files are frozen (LF SHA256) in
+`.artifacts/e2e/desktop-integration-tools/smooth01f-tested-script-tree.json`.
+Standalone strict TypeScript and JavaScript syntax checks pass. Product src/tests,
+dependencies and build configurations still equal7887072. Required serial
+`npm run check:checkpoint` passes as `smooth01f-checkpoint.log`: typecheck,
+131 suites/2944 tests with21 existing todos (788.20s) and normal/harness/validation/Desktop builds, run serially without
+heavy browser work beside them. Read-only API/math, contract and independent
+artifact-evidence reviews have no unresolved finding. Frozen evaluation source
+matches the staged LF content. Suitable g0 checkpoint/push is covered by standing
+authority; Git owns its identity.01g remains a proposal awaiting the grouped PO decision.
+Post-build HEIC isolation, current source maps in all4 builds, GS build separation,
+Desktop notices/distribution and ordinary/Desktop Native Spark identity pass.
+
+Next: [PROPOSED01g](../docs/specs/01g-desktop-smooth-display-proposal.md) groups the
+new decision: automatic3D internal-resolution limits within tested1080p-equivalent/
+64MiB, an additive viewport compositor policy, and independently reviewed01e typed
+PC-candidate connection before the unpassed03 core/iOS prerequisites. Preserve
+source/SH/coordinates/native UI, old policies/semantic profiles/map1 guards,
+CSS point sizes/6px and current DPR limits. Alternative: full resolution with07n's
+unsupported redirect. Do not silently ratify that visible-quality/activation
+tradeoff from the successful1080p experiment. Normal PWA, physical iOS, offline,
+adoption/release remain separate. Full07n texture/chroma/lighting renderer
+compatibility and production integration are still unimplemented in this proposal.
+
 ## Verified checkpoint —07n standard alpha/chroma material workflow
 
 PO2026-10-28 explicitly approved standard new-format material operations for new
@@ -539,9 +621,9 @@ requires its base-renderer prerequisite and independent qualification/adoption;
 07n does not waive it, including for Mesh-only. The independently reviewed
 [01f proposal](../docs/specs/01f-desktop-smooth-composition-evaluation.md) makes a
 concrete read-only/fixed-dependency PC evaluation start-condition exception.
-It is PROPOSED/unstarted; ask PO once about that real sequencing decision after
-the current authorized07n workflow is verified. Do not start it or label G1-D
-passed without the required authority/evidence.
+PO approved its start-order exception and conditional continuation2026-10-28;
+the current unit above owns execution and its concrete01g decision. Do not label
+G1-D passed without its required authority/evidence.
 Existing07n editing/outputs/recovery remain usable and exact in the meantime.
 Further external-resource/format subsets, frozen-v1 orthographic mapping and
 multi-model LociMyu remain separate. Old orthographic span is not fully recorded;

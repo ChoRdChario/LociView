@@ -64,6 +64,10 @@ dedicated Chromium regression lane for the built validation entry. See the
 `playwright.normal.config.ts` selects the separate normal-entry compatibility
 smoke for existing Native/v1 routes; it grants no ProjectScene adoption credit.
 
+`scripts/smooth-composition-evaluation` is the isolated read-only01f public-API
+GS/Mesh transparency experiment. No product entry imports it. Its README explains
+reproduction; todo owns results and the proposed01g display-policy decision.
+
 Caption deletion confirmation and explicit parent proposals use the same workspace
 guards and typed commands, with impact/coordinate reads adapted by `productSources.ts`.
 Scene names and the next-open Scene use the same captured draft/retry owner;

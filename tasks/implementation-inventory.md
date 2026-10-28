@@ -17,6 +17,11 @@ GS専用上限と全既知本体の合計、画面全体の表示予定・実イ
 局所表示と既存の対象別pick条件で扱う。初回／通常復元の選択前検証は維持する。
 これは既存の操作群の接続改善で、機能数やadoption合格を加算しない。
 
+[01f](../docs/specs/01f-desktop-smooth-composition-evaluation.md)の隔離PC評価は、
+以下の製品経路の接続範囲を増やさない。内部解像度・追加表示policy・PC候補接続の
+[01g](../docs/specs/01g-desktop-smooth-display-proposal.md)はPROPOSED。
+製品のsmooth非表示と、保存済み意図・既存profile／pick規則の保持は継続する。
+
 ## 1. 結論と数え方
 
 元の棚卸しは **64機能群**。2026-09-14のPO判断でF09（移行後の旧形式更新受信）を撤回し、

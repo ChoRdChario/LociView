@@ -51,11 +51,17 @@ owns exact evidence, retained failures and the measured save/output waits.
 Do not repeat normalization/helper approval. Smooth intent may
 be edited/saved while its material contribution is locally hidden with an
 explanation; actual smooth composition remains behind G1-D, even for Mesh-only.
-The independently reviewed[01f proposal](../docs/specs/01f-desktop-smooth-composition-evaluation.md)
-is PROPOSED/unstarted. It asks only whether a read-only PC WBOIT evaluation may
-precede the base-renderer prerequisite, preserving actual qualification/product
-activation gates. PO has not approved that sequencing exception. Do not start
-it or turn the07n checkpoint into adoption/normal activation/release credit.
+The independently reviewed[01f companion](../docs/specs/01f-desktop-smooth-composition-evaluation.md)
+was PO-approved2026-10-28 for the early read-only PC WBOIT evaluation and continued
+implementation if no technical problems remain. Todo owns its current evidence
+and stop conditions. Actual qualification/product activation gates remain;
+do not turn a PC experiment into G1-D/iOS/adoption/normal activation/release credit.
+The experiment demonstrates bounded1080p composition, but unrestricted full
+resolution exceeds the64MiB extra-target budget and GPU cost increases.
+[01g](../docs/specs/01g-desktop-smooth-display-proposal.md) is the PROPOSED automatic
+internal-resolution/viewport-policy/PC-candidate connection decision. Preserve07n
+until that decision; todo owns exact measurements and final-check status.
+Conditional continuation did not ratify this newly discovered quality/activation tradeoff.
 
 01a's bounded point workflow is implemented; exact six JSON companions are immutable.
 Native, synthetic hosts, typed validation and ordinary home have separate authority
