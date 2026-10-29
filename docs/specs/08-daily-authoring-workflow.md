@@ -72,6 +72,11 @@ candidate reads and command preparation. No UI storage writes or generic patch A
 - Local display name is an advisory browser preference, not an authentication
   identity or retroactive author attribution. Keep it outside Project history.
 
+[08b](08b-shared-editor-name-policy-proposal.md) records the PO-approved future
+opt-in sharing policy and its proposed technical design. This existing private
+preference is not automatically shared. Named-change storage and old-reader
+compatibility are not implemented or ratified by this08 clause.
+
 ## Authorized continuation —Caption action Undo,2026-10-29
 
 PO authorized the next usability workflow after the bounded checkpoint above.

@@ -56,13 +56,52 @@ unchanged-feature-classification checks pass; independent review has no findings
 No runtime change or new capacity guarantee; no runtime suite is needed for this
 documentation checkpoint.
 
-## Current boundary —GS workflow verified; editor-name policy pending
+## Current boundary —08b editor-name design
+
+PO2026-10-29 approved the [08b product policy](../docs/specs/08b-shared-editor-name-policy-proposal.md)
+and authorized concretizing its design. Explicit Project-local opt-in records a
+self-declared name only on future confirmed edits; Workspace/Contribution/Backup
+retain it and Review/Clean exclude it. This is design authority, not approval of
+an unsettled storage/profile/migration change or product implementation.
+
+Outcome/plan: specify the smallest exact original-change linkage, Session capture
+and retry behavior, provider/UI ports, five-purpose disclosure/projection and
+old-reader compatibility; independently review the complete proposal. Preserve
+actor generation, old original bytes, unknown data and publication/recovery fences.
+Root alone writes docs; three bounded source/UX/package reviewers are read-only.
+Checks are documentation diff, local links and contract/authority consistency;
+no runtime check is warranted without source/test changes. Present any genuine
+compatibility/implementation decision as one concrete reviewed next step.
+
+Start-of-unit meta-audit: g0-baseline HEAD90b0e82 is pushed; source/test diff is
+empty (modelFacts has a stat-only marker). The prior GS unit below is complete.
+This unit closes the newly approved daily-use design gap without expanding into
+identity verification, a generic history screen, a new dependency or release.
+
+Concrete proposal: canonical v2 change-message name declaration joined only by
+the enclosing change hash; pre-await host capture and retained Session context;
+closed requiredCapabilities field on new journal starts and history-bearing
+manifests. Keep map1/map2, root/proof, old bytes and exchange-base equality exact.
+Capability comes from complete retained history/base evidence; disclosure comes
+from actual output bytes (Contribution delta is distinct from its named base).
+The genuine next decision is rejecting named histories in the current old reader,
+including same-browser cold reopen, and authorizing the connected implementation.
+This technical design remains PROPOSED until that grouped decision; product policy
+is already approved and is not asked again. Independent final design review PASS:
+non-NFC header parsing is isolated from domain validation, and local protection
+requirements are distinguished from each file's actual payload/activation scope.
+Package/privacy review PASS. Seven-doc local-file-target check PASS (340 targets,
+none missing); diff/authority/retained-history checks PASS. No runtime source/test
+change or new runtime evidence; no runtime suite/build was run for this doc-only
+checkpoint. Next is the single concrete compatibility/implementation judgment in08b.
+
+## Previous verified boundary —GS workflow
 
 The bounded08a Desktop workflow and required final checks are complete. Source,
 fault/file/browser evidence and independent final review are recorded below.
 The suitable g0-baseline development checkpoint retains device/offline/adoption/
-release limits. Next08b is a product-policy proposal awaiting PO judgment, not an
-authorized implementation. Current source/test bytes remain frozen through Git
+release limits. At that checkpoint08b awaited PO judgment; the current design
+authority is recorded above. Current source/test bytes remain frozen through Git
 preflight and checkpoint publication; Git owns the checkpoint identity.
 
 PO approved08a2026-10-29 with no assigned Proxy in the new revision. Complete
@@ -378,14 +417,12 @@ boundary from the earlier08 continuation. Former Proxy carry/rekey remains outsi
 PO's selected unassigned-surface policy. No new dependency/profile/capacity promise
 or general adoption follows from the owned500k source/renderer/file lane.
 
-Next product decision: [08b editor-name sharing policy](../docs/specs/08b-shared-editor-name-policy-proposal.md)
-is PROPOSED, unapproved/unimplemented. Independent product-policy review PASS;
-PO response is pending. Optional self-declared names would apply only to future
-confirmed edits after explicit Project opt-in, retained in Workspace/Contribution/
-Backup and omitted from Review/Clean. Existing08 browser-local names must not be
-silently shared. Exact storage/profile/compatibility design remains unsettled;
-this policy proposal does not approve a substantial migration or schema decision.
-Current GS verification/Push does not depend on that response.
+Current [08b](../docs/specs/08b-shared-editor-name-policy-proposal.md) product policy
+is PO-approved2026-10-29; exact message, local opt-in/capture/retry, required-reader
+capability, purpose-specific disclosure and acceptance are now proposed in08b.
+Technical/compatibility implementation is not yet approved or implemented. Next
+judgment is the grouped old-reader refusal plus implementation described above,
+not the already approved sharing policy. Current08 browser-local names stay private.
 
 Local Undo covers the named confirmed Caption actions in this editor, not every
 Project action or historical rollback. Native Point/different-profile replacement

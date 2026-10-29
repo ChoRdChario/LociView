@@ -25,9 +25,14 @@ was PO-approved2026-10-29: GS-body replacement starts without an assigned Proxy
 and retains old bodies/history.08 is verified/pushed;08a is connected through
 file/correction/restore/cold; its final checks PASS in todo. The06a
 control reader preserves every audit and streams each fresh receipt snapshot;
-there is no cross-audit reuse. Next[08b](../docs/specs/08b-shared-editor-name-policy-proposal.md)
-is only a PROPOSED editor-name sharing policy, awaiting PO judgment; storage/profile
-design is not ratified. Existing browser-local names remain private.
+there is no cross-audit reuse. PO approved the[08b](../docs/specs/08b-shared-editor-name-policy-proposal.md)
+editor-name product policy2026-10-29 and authorized design concretization.08b now
+proposes exact change-message attribution, pre-await capture/retry, five-purpose
+privacy and a closed journal/manifest required-capability field. The latter stops
+old readers from opening named histories without disclosure, while retaining
+schema/map1/map2/root/proof/base evidence. That compatibility decision and product
+implementation remain PROPOSED; todo owns review/checks and the concrete next step.
+Existing browser-local names remain private; no product code was changed by design.
 General Windows HEIC and device/adoption/release gates remain separate.
 Keep existing comfortable-UI guidance, original bytes/history, atomic Session
 commands, file/recovery/evidence fences and one writer. Read-only reviews may run
