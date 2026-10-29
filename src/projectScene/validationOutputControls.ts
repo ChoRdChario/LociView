@@ -114,7 +114,7 @@ export function createValidationOutputControls(document: Document, host: ReturnT
     if (purpose === 'review') {
       const provider = host.read().provider, sceneRecords = provider?.kind === 'scene-provider' ? provider.state.scenes : {};
       const label = document.createElement('label'), scenes = document.createElement('select'), empty = document.createElement('option');
-      label.textContent = 'シーン'; scenes.setAttribute('aria-label', '渡すシーン'); empty.value = ''; empty.textContent = '選択してください'; scenes.append(empty);
+      label.textContent = '渡すシーン'; scenes.setAttribute('aria-label', '渡すシーン'); empty.value = ''; empty.textContent = '選択してください'; scenes.append(empty);
       for (const scene of Object.values(sceneRecords)) {
         if (scene.lifecycle.kind !== 'value' || scene.lifecycle.value.state !== 'active' || scene.name.kind !== 'value') continue;
         const option = document.createElement('option'); option.value = scene.id; option.textContent = scene.name.value; scenes.append(option);
@@ -210,10 +210,17 @@ export function createValidationOutputControls(document: Document, host: ReturnT
         () => { if (cancellation === id) cancellation = null; }));
       button(list, '戻る', () => { cancellation = null; render(); changed(); });
     }
-    if (selected) button(list, 'ファイル確認を取り消す', () => { selected = null; select.value = ''; render(); changed(); });
+    if (selected) button(list, 'ファイル確認を取り消す', cancelFileSelection);
   };
+  function cancelFileSelection() {
+    if (disposed || busy || !selected) return;
+    selected = null; select.value = ''; render(); changed();
+  }
+  select.addEventListener('cancel', cancelFileSelection);
   select.addEventListener('change', () => {
-    const id = selected, file = select.files?.[0]; if (id && file) perform(() => host.workspaceOutput.verifyFile(id, file), '選択したファイルの内容を確認しました。', true, false,
+    const id = selected, file = select.files?.[0];
+    if (!file) { cancelFileSelection(); return; }
+    if (id) perform(() => host.workspaceOutput.verifyFile(id, file), '選択したファイルの内容を確認しました。', true, false,
       () => { if (selected === id) { selected = null; select.value = ''; } });
   });
   // Keep this input mounted across refreshes, including native IME composition.

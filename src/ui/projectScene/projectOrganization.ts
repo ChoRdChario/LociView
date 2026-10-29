@@ -117,9 +117,9 @@ export function createProjectOrganization(document: Document, host: Organization
   }
   const tagList = make('div'), tagForm = make('div'), tagNameLabel = make('label', 'タグ名'), tagName = make('input'), tagColor = make('input');
   tagName.setAttribute('aria-label', 'タグ名'); tagColor.type = 'color'; tagColor.value = '#57758b'; tagColor.setAttribute('aria-label', 'タグの色'); tagNameLabel.append(tagName);
-  const startTag = () => { if (!captured) captured = { token: host.source().provider.token, tagId: form?.kind === 'tagEdit' ? form.id : null }; };
+  const startTag = () => { if (!captured) captured = { token: form?.kind === 'tagEdit' ? form.token : host.source().provider.token, tagId: form?.kind === 'tagEdit' ? form.id : null }; };
   for (const node of [tagName, tagColor]) {
-    node.addEventListener('focus', startTag); node.addEventListener('input', () => { startTag(); host.changed(); });
+    node.addEventListener('input', () => { startTag(); host.changed(); });
     node.addEventListener('compositionstart', () => { startTag(); composing = true; host.changed(); }); node.addEventListener('compositionend', () => { composing = false; host.changed(); });
   }
   const saveTag = button('タグを追加', () => {

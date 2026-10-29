@@ -15,15 +15,17 @@ export function createValidationReceiveControls(document: Document, host: Return
   const clear = document.createElement('button'); clear.type = 'button'; clear.textContent = '選択を取り消す';
   const help = document.createElement('p'); help.textContent = '同じプロジェクトの作業一式・変更分を統合します。元ファイルは変更しません。';
   const status = document.createElement('p'), jobs = document.createElement('section'); status.setAttribute('role', 'status');
+  status.className = 'lv-operation-status';
   form.append(label, submit, clear); root.append(heading, help, form, status, jobs);
   let busy = false, disposed = false, feedback = '', selectedJob: string | null = null, selectedCopy: string | null = null,
     cancel: { id: string; stale: boolean; review?: boolean } | null = null;
+  let activeOperation: 'receive' | 'restore' | null = null;
   const restoreArea = document.createElement('details'), restoreSummary = document.createElement('summary'), restoreLabel = document.createElement('label'),
     restoreInput = document.createElement('input'), restoreCommands = document.createElement('div'), restoreStatus = document.createElement('p');
   restoreSummary.textContent = 'バックアップから復元'; restoreLabel.textContent = 'バックアップを選択';
   restoreInput.type = 'file'; restoreInput.setAttribute('aria-label', 'バックアップを選択'); restoreLabel.append(restoreInput);
-  restoreStatus.setAttribute('role', 'status'); restoreArea.append(restoreSummary, restoreLabel, restoreStatus, restoreCommands);
-  let restorePrepared = false, restoreCancel = false;
+  restoreStatus.setAttribute('role', 'status'); restoreStatus.className = 'lv-operation-status'; restoreArea.append(restoreSummary, restoreLabel, restoreStatus, restoreCommands);
+  let restorePrepared = false, restoreCancel = false, restoreFeedback = '';
   const restoreChanges = () => !!restoreInput.files?.length || restorePrepared || restoreCancel;
   const output = createValidationOutputControls(document, host, session, changed, () => otherInput() || busy || !!input.files?.length || !!selectedJob || !!cancel || restoreChanges());
   root.append(restoreArea, output.root);
@@ -36,7 +38,7 @@ export function createValidationReceiveControls(document: Document, host: Return
   const perform = (action: () => Promise<unknown>, recovery: boolean, completed: string) => {
     if (busy || output.hasChanges() || restoreChanges() || disposed) return;
     try { guard(recovery); } catch (error) { feedback = (error as Error).message; render(); return; }
-    busy = true; feedback = '更新を確認しています。'; render(); changed();
+    busy = true; activeOperation = 'receive'; restoreFeedback = ''; feedback = '更新を確認しています。'; render(); changed();
     void (async () => {
       try {
         await action(); if (disposed) return;
@@ -46,7 +48,7 @@ export function createValidationReceiveControls(document: Document, host: Return
         ['receive-reselected-file', 'contribution-reselected-file'].includes(error.code) ?
         '中断前と異なるファイルです。読み込みを始めた元のファイルを選び直してください。' :
         error instanceof Error ? error.message : '受信できません。元のデータは保持しています。'; }
-      finally { busy = false; if (!disposed) { render(); changed(); } }
+      finally { busy = false; activeOperation = null; if (!disposed) { render(); changed(); } }
     })();
   };
   const button = (parent: HTMLElement, text: string, action: () => void) => {
@@ -55,15 +57,16 @@ export function createValidationReceiveControls(document: Document, host: Return
   };
   const performRestore = (action: () => Promise<void>, recovery: boolean, completed: string, consume = true) => {
     if (busy || disposed || output.hasChanges() || input.files?.length || selectedJob || cancel) return;
-    try { guard(recovery,true); } catch (error) { feedback = (error as Error).message; render(); return; }
-    busy = true; feedback = '復元を確認しています。'; render(); changed();
+    feedback = '';
+    try { guard(recovery,true); } catch (error) { restoreFeedback = (error as Error).message; render(); return; }
+    busy = true; activeOperation = 'restore'; restoreFeedback = '復元を確認しています。'; render(); changed();
     void (async () => {
       try {
         await action(); if (disposed) return;
         if (consume) { restoreInput.value = ''; restorePrepared = false; restoreCancel = false; }
-        await recovered(); feedback = completed;
-      } catch (error) { if (!disposed) feedback = error instanceof Error ? error.message : '復元を完了できません。元のデータは保持しています。'; }
-      finally { busy = false; if (!disposed) { render(); changed(); } }
+        await recovered(); restoreFeedback = completed;
+      } catch (error) { if (!disposed) restoreFeedback = error instanceof Error ? error.message : '復元を完了できません。元のデータは保持しています。'; }
+      finally { busy = false; activeOperation = null; if (!disposed) { render(); changed(); } }
     })();
   };
   const render = () => {
@@ -79,7 +82,8 @@ export function createValidationReceiveControls(document: Document, host: Return
     labelText.textContent = selectedCopy ? '元の閲覧用ファイルを選び直す' : selectedJob ? '元のファイルを選び直す' : host.workspaceFiles.initialImport ? 'ファイルを選択' : '更新ファイルを選択';
     input.setAttribute('aria-label', labelText.textContent);
     submit.textContent = selectedCopy ? 'コピー作成を再開' : selectedJob ? '受信を再開' : host.workspaceFiles.initialImport ? 'ファイルを開く' : '更新を受け取る';
-    status.textContent = feedback || host.workspaceFiles.reviewCopyError || host.workspaceFiles.error || (host.authority.readOnly ? '閲覧中。受信するには編集を開始してください。' : '');
+    status.dataset.busy = String(activeOperation === 'receive');
+    status.textContent = activeOperation === 'restore' ? '' : feedback || host.workspaceFiles.reviewCopyError || host.workspaceFiles.error || (host.authority.readOnly ? '閲覧中。受信するには編集を開始してください。' : '');
     jobs.replaceChildren();
     for (const copy of copies) {
       if (['completed', 'abandoned'].includes(copy.state)) continue;
@@ -122,7 +126,8 @@ export function createValidationReceiveControls(document: Document, host: Return
     restoreArea.hidden = !host.backupRestore.enabled;
     if (host.backupRestore.pending || host.backupRestore.needsDisplay) restoreArea.open = true;
     restoreInput.disabled = busy || otherInput(true) || output.hasChanges() || host.authority.readOnly || host.backupRestore.pending;
-    restoreStatus.textContent = host.backupRestore.error || (host.backupRestore.pending ? '復元が未完了です。' :
+    restoreStatus.dataset.busy = String(activeOperation === 'restore');
+    restoreStatus.textContent = restoreFeedback || host.backupRestore.error || (host.backupRestore.pending ? '復元が未完了です。' :
       host.backupRestore.needsDisplay ? '復元先の表示を再開してください。' : '統合ではなく、バックアップの状態に切り替えます。元の作業とファイルは残ります。');
     restoreCommands.replaceChildren();
     if (host.backupRestore.retryable) button(restoreCommands, '復元を再開', () => performRestore(async () => {
@@ -144,12 +149,12 @@ export function createValidationReceiveControls(document: Document, host: Return
         await host.backupRestore.prepare(file); restorePrepared = true;
       }, false, '復元内容を確認してください。', false));
       if (restoreChanges()) button(restoreCommands, '復元の選択を取り消す', () => {
-        host.backupRestore.clearPreparation(); restoreInput.value = ''; restorePrepared = false; feedback = ''; render(); changed();
+        host.backupRestore.clearPreparation(); restoreInput.value = ''; restorePrepared = false; restoreFeedback = ''; render(); changed();
       });
     }
   };
   restoreInput.addEventListener('change', () => {
-    if (busy) return; host.backupRestore.clearPreparation(); restorePrepared = false; feedback = ''; render(); changed();
+    if (busy) return; host.backupRestore.clearPreparation(); restorePrepared = false; restoreFeedback = ''; render(); changed();
   });
   input.addEventListener('change', () => { feedback = ''; render(); changed(); });
   clear.addEventListener('click', () => { if (busy) return; input.value = ''; selectedJob = null; selectedCopy = null; feedback = ''; render(); changed(); });

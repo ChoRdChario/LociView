@@ -5602,6 +5602,48 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     let checked=false;await cold.backupRestore.confirm(async(next,content)=>{for(const record of next.mediaChoices!){const expected=files.find(f=>f.name===record.label);expect(await content.image(record as unknown as JsonObject)).toEqual(expected?.bytes??png);}checked=true;});expect(checked).toBe(true);cold.backupRestore.displayReady(cold.read().source!.token);expect(cold.read().source!.originalChanges()).toEqual(original);
     await cold.dispose();const resumed=await openValidationHost(h.f.options);expect(resumed.read().source!.token).toBe(token);await resumed.dispose();
   },30000);
+  it('PC everyday editing keeps focus-only tag fields free while protecting IME and stale tag edits',async()=>{
+    const h=await productWorkspaceFixture(true,false,true,'map2'),{host,named,button,editor}=h,token=host.read().source!.token;
+    const name=named('タグ名',editor),color=named('タグの色',editor),output=named('ファイル');
+    for(const node of[name,color]){node.fire('focus');node.fire('blur');}h.refresh();
+    expect(h.ui.hasChanges()).toBe(false);expect(button('別のプロジェクトを開く',editor).disabled).toBe(false);expect(button('保存',output).disabled).toBe(false);expect(h.dispatch).not.toHaveBeenCalled();
+    name.fire('compositionstart');name.value='入力中';name.fire('input');expect(h.ui.hasChanges()).toBe(true);
+    expect(button('タグを追加',editor).disabled).toBe(true);expect(button('タグの入力を取り消す',editor).disabled).toBe(true);expect(button('保存',output).disabled).toBe(true);
+    name.fire('compositionend');expect(button('タグを追加',editor).disabled).toBe(false);button('タグの入力を取り消す',editor).fire('click');
+    expect(h.ui.hasChanges()).toBe(false);expect(host.read().source!.token).toBe(token);
+    button('タグを編集',editor).fire('click');name.value='残すタグの入力';name.fire('input');
+    const captionId=Object.keys(host.authority.read().resources.captions)[0]!;await host.dispatch(token,{kind:'editCaption',captionId,edits:{body:'別の更新'}});h.refresh();
+    const calls=h.dispatch.mock.calls.length;expect(name.value).toBe('残すタグの入力');expect(button('タグを更新',editor).disabled).toBe(true);button('タグを更新',editor).fire('click');expect(h.dispatch).toHaveBeenCalledTimes(calls);
+    button('タグの入力を取り消す',editor).fire('click');expect(h.ui.hasChanges()).toBe(false);expect(button('保存',output).disabled).toBe(false);await h.ui.dispose();
+  });
+  it('PC optional saved-file cancellation releases only its picker and never an active verification',async()=>{
+    const h=await productWorkspaceFixture(true),{host,button,named}=h,output=named('ファイル');
+    button('ファイルに保存',output).fire('click');await vi.waitFor(()=>expect(h.downloads).toHaveBeenCalledOnce(),{timeout:10000});
+    const status=output.children.find(n=>n.attributes.get('role')==='status')!;await vi.waitFor(()=>expect(status.dataset.busy).toBe('false'));
+    const source=host.read().source!,jobs=structuredClone(host.workspaceOutput.jobs),input=named('保存先のファイルを選択');
+    button('ファイルを選択',output).fire('click');expect(h.ui.hasChanges()).toBe(true);input.fire('cancel');expect(h.ui.hasChanges()).toBe(false);expect(host.workspaceOutput.jobs).toEqual(jobs);expect(host.read().source!.token).toBe(source.token);
+    button('ファイルを選択',output).fire('click');Object.assign(input,{files:[]});input.fire('change');expect(h.ui.hasChanges()).toBe(false);
+    let release!:()=>void;const gate=new Promise<void>(resolve=>{release=resolve;});caseDisposals.push(release);
+    const verify=vi.spyOn(host.workspaceOutput,'verifyFile').mockImplementation(async()=>{await gate;throw Error('照合の検証失敗');});
+    button('ファイルを選択',output).fire('click');Object.assign(input,{files:[new Blob(['selected'])]});input.fire('change');expect(status.dataset.busy).toBe('true');input.fire('cancel');expect(h.ui.hasChanges()).toBe(true);expect(status.dataset.busy).toBe('true');
+    release();await vi.waitFor(()=>expect(status.dataset.busy).toBe('false'));expect(status.textContent).toBe('照合の検証失敗');expect(h.ui.hasChanges()).toBe(true);
+    input.fire('cancel');expect(h.ui.hasChanges()).toBe(false);expect(host.read().source!.token).toBe(source.token);expect(host.workspaceOutput.jobs).toEqual(jobs);verify.mockRestore();await h.ui.dispose();
+  });
+  it.each(['receive','restore'] as const)('PC %s feedback stays at its operation and clears busy state on failure without losing the input',async operation=>{
+    const h=await productWorkspaceFixture(true,false,false,'map2',undefined,{restoreGenerations:true}),{host,named,button,all}=h,root=named('更新ファイル');
+    const common=root.children.find(n=>n.attributes.get('role')==='status')!,restoreInput=named('バックアップを選択'),restoreArea=restoreInput.parent!.parent!,restoreStatus=restoreArea.children.find(n=>n.attributes.get('role')==='status')!;
+    expect(common.className).toBe('lv-operation-status');expect(restoreStatus.className).toBe('lv-operation-status');expect(common.dataset.busy).toBe('false');expect(restoreStatus.dataset.busy).toBe('false');
+    let release!:()=>void;const gate=new Promise<void>(resolve=>{release=resolve;});caseDisposals.push(release);const source=host.read().source!,file=new Blob(['kept input']);
+    const action=operation==='receive'?vi.spyOn(host.workspaceFiles,'receive').mockImplementation(async()=>{await gate;throw Error('受信の検証失敗');}):vi.spyOn(host.backupRestore,'prepare').mockImplementation(async()=>{await gate;throw Error('復元の検証失敗');});
+    const input=operation==='receive'?named('更新ファイルを選択'):restoreInput;Object.assign(input,{files:[file]});input.fire('change');
+    if(operation==='receive')button('更新を受け取る',root).parent!.fire('submit',{preventDefault(){}});else button('内容を確認',restoreArea).fire('click');
+    const active=operation==='receive'?common:restoreStatus,inactive=operation==='receive'?restoreStatus:common;
+    expect(active.dataset.busy).toBe('true');expect(inactive.dataset.busy).toBe('false');expect(active.textContent).toBe(operation==='receive'?'更新を確認しています。':'復元を確認しています。');
+    if(operation==='restore')expect(common.textContent).toBe('');expect(button('保存',named('ファイル')).disabled).toBe(true);expect(h.ui.hasChanges()).toBe(true);
+    release();await vi.waitFor(()=>expect(active.dataset.busy).toBe('false'));expect(active.textContent).toBe(operation==='receive'?'受信の検証失敗':'復元の検証失敗');
+    expect((input as unknown as HTMLInputElement).files?.[0]).toBe(file);expect(host.read().source!.token).toBe(source.token);expect(h.ui.hasChanges()).toBe(true);action.mockRestore();
+    Object.assign(input,{files:[]});input.fire('change');if(operation==='receive')button('選択を取り消す',root).fire('click');expect(h.ui.hasChanges()).toBe(false);await h.ui.dispose();
+  });
   it('daily authoring cancellation remains available after losing edit access without writing records', async () => {
     const h = await productWorkspaceFixture(true), source = h.host.read().source!, access = vi.spyOn(h.host.authority, 'readOnly', 'get');
     h.button('シーンを複製', h.editor).fire('click'); access.mockReturnValue(true); h.refresh();

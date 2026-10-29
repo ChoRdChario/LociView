@@ -56,7 +56,82 @@ unchanged-feature-classification checks pass; independent review has no findings
 No runtime change or new capacity guarantee; no runtime suite is needed for this
 documentation checkpoint.
 
-## Current boundary —verified local HEIC original and portable display
+## Current boundary —PC everyday workflow and usable workspace
+
+PO2026-10-30 authorizes continuing the consolidated PC completion/usability work
+without small manual-test waits. Outcome: create/open → select Scene → record,
+edit and compare Captions/media → save/share → reopen, with the subject and current
+action clear at normal PC sizes. Root is the sole writer; bounded read-only agents
+review entry/files, Caption/organization and model/view/material navigation.
+
+Plan: observe the current Desktop candidate and existing connected tests; select
+one coherent user-visible problem from actual rendered/code evidence; fix through
+existing typed commands and UI/display ports; reuse focused tests plus a real
+browser workflow at the affected sizes; independently review the meaningful final
+diff, then run required serial checkpoint checks and push suitable g0 work.
+Acceptance comes from the approved UI guidelines, especially §§4–7/9–11; preserve
+input, selection, failure/retry, original/history and file-completion distinctions.
+No storage/package/renderer change, new dependency, numeric guarantee, automatic
+conflict policy, device/offline adoption or release is granted. Stop only affected
+work for a genuine new policy/architecture/authority decision. Pending Safari and
+offline-shell lanes do not block ordinary PC implementation.
+
+Audit start: g0-baseline HEAD6386708, clean worktree, prior08c checkpoint pushed.
+Current risk is integrated usability, not more format expansion or10k qualification.
+Code/render findings determine the slice; historical classifications are not a new
+feature queue. Previous checks are baseline evidence only.
+
+Chosen connected slice: Caption/tag editing → save/optional saved-file check →
+continue/receive/restore. Confirmed code issues: empty tag focus creates a draft;
+file-picker cancel leaves optional verification selected; receive/restore miss the
+existing operation-status ring and restore may show stale pending text while busy;
+help implies optional file verification is compulsory, and Review Scene label and
+accessible name differ. Fix local UI ownership/status only, preserving genuine tag
+input/IME/stale edits, file generation/verification/recovery and save-success fences.
+Verify focus-only freedom, IME + stale tag protection, native cancel/empty selection
+and cancel-during-verify safety, operation-scoped busy/failure clearing, and one
+real Chromium save/receive/restore/continue workflow. No layout redesign or tie-key
+rebalance in this slice: specification05 permits exact-neighbor refusal without
+collection rewrite; a broader tie-repair command remains separate.
+
+Implementation and focused4 state/IME/cancellation checks PASS; relevant legacy
+file/recovery8 and additional existing guard/cold selections pass. Typecheck PASS.
+Two-context dedicated Chromium run1793303586874-36768 PASS (1280×800 and1440×900):
+tag keyboard traversal→real backup→optional-picker cancel→Project reopen→disjoint
+return merge preserving local body→restore original backup→save/reload. Receive
+and restore real operations were held at one digest solely to inspect progress;
+all original validation resumes afterward. The browser cancel event is injected
+into an intercepted headless chooser, then the chooser is retired; Node also checks
+empty choice and cancel-during-active-verify. Actual OS-dialog behavior is not a
+separate claim. Screenshots verify the existing ring and static reduced-motion
+presentation. Independent tag/help and file-state diff reviews PASS. One test-only
+RecordedNode.files typing error was corrected; no assertion/timeout relaxation.
+Final serial `npm run check:checkpoint` PASS at the frozen6 source/test files:
+typecheck,136 root files/3071 passed/21 unchanged TODO and all4 builds. Root suite
+1053.03s; log `.artifacts/e2e/pc-continuation/checkpoint.log`. Four-artifact HEIC
+isolation PASS. Frozen-source hashes match; staged content must retain this
+tested/reviewed tree. Documentation diff/local links and independent review PASS.
+Independent executed-evidence review also PASS: real downloaded archives, disjoint
+merge, exact restored history and page reload are evidenced. This is not actual
+OS-dialog, full browser restart, device or offline-shell acceptance.
+
+Remaining rendered finding for the next PC layout unit: full-page screenshots at
+1280×800 exceed the window, and expanded file tools push the3D stage down. Preserve
+all current input/file safety and explicit comparison windows while assessing the
+accepted stage+task-pane simultaneous layout (§4.2/10). This is not a current
+package/renderer change, new capacity guarantee or device acceptance.
+Bounded next plan: compact Desktop active core only gets an available-height chain
+from its host/content; file tools remain outside the inert core and scroll within
+their expanded body. Preserve canvas/comparison-window DOM and existing resize/
+gesture cancellation; narrow/short/zoomed screens retain document scrolling.
+Startup/recovery/home/Review/legacy must not inherit the constrained active layout.
+Use the same connected PC workflow plus geometry/scroll/window assertions, with
+rendered normal/expanded/long-Japanese/narrow/short observations; no new layout
+framework, package/command change or automatic collapse of current input.
+
+
+
+## Previous boundary —verified local HEIC original and portable display
 
 PO2026-10-30 approves the readable-browser/local-generation direction in
 [08c](../docs/specs/08c-portable-heic-display.md). Root was the sole writer;
