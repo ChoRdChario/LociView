@@ -53,13 +53,26 @@ export function createValidationOutputControls(document: Document, host: ReturnT
     b.disabled = busy || composing || otherBusy() || writes && !!host.authority.readOnly;
     b.addEventListener('click', () => { if (!b.disabled) action(); }); parent.append(b); return b;
   };
-  const generateAndDownload = (generate: () => Promise<string>) => perform(async () => {
-    const id = await generate();
+  const privacyNotice = (value: { includesDeclaredEditorNames?: boolean; requiresEditorAttributionReader?: boolean }) => value.includesDeclaredEditorNames ?
+    '記録された編集者名を含みます。対応版のLociViewで開いてください。' : value.requiresEditorAttributionReader ?
+    'この変更分を開くには編集者名の表示に対応したLociViewが必要です。今回の変更分に編集者名は含みません。' : '';
+  const currentDisclosure = () => {
+    const current = host.workspaceOutput.privacy, base = host.workspaceOutput.bases.find(b => b.selection.workspacePackageId === baseId);
+    const requires = purpose === 'backup' ? current.backupIncludesNames : purpose === 'contribution' ? current.sourceIncludesNames || !!base?.includesDeclaredEditorNames : purpose === 'teamWorkspace' ? current.sourceIncludesNames : false;
+    return { includesDeclaredEditorNames: purpose === 'contribution' ? !!base?.deltaIncludesDeclaredEditorNames : requires, requiresEditorAttributionReader: requires };
+  };
+  const generateAndDownload = (generate: () => Promise<string>) => {
+    const expected = currentDisclosure(); let needsDisclosure = false;
+    return perform(async () => {
+    const id = await generate(), job = host.workspaceOutput.jobs.find(j => j.id === id);
     // Generation is already durable even if the browser handoff then fails.
     // Keep that exact result available; retry must not silently create another job.
     resetChoice();
+    if (job && (!!job.includesDeclaredEditorNames !== !!expected.includesDeclaredEditorNames || !!job.requiresEditorAttributionReader !== !!expected.requiresEditorAttributionReader)) {
+      needsDisclosure = true; history.open = true; return;
+    }
     await handoff(id);
-  }, handoffMessage, true, false, undefined, 'ファイルを作成しています。');
+  }, handoffMessage, true, false, () => { if (needsDisclosure) feedback = '作成したファイルの内容を確認し、ダウンロードしてください。'; }, 'ファイルを作成しています。'); };
   const handoff = async (id: string) => {
     feedback = 'ダウンロードを準備しています。'; render();
     try { await download(id); }
@@ -93,6 +106,8 @@ export function createValidationOutputControls(document: Document, host: ReturnT
       choosePurpose(kind.value as 'teamWorkspace' | 'contribution');
     });
     const chosen = host.workspaceOutput.bases.find(b => b.selection.workspacePackageId === baseId);
+    const disclosure = privacyNotice(currentDisclosure());
+    if (disclosure) { const privacy = document.createElement('p'); privacy.textContent = disclosure; actions.append(privacy); }
     const cleanConfirmed = !!cleanPreview && cleanPreview.token === host.read().source?.token;
     const reviewConfirmed = !!reviewPreview && reviewPreview.token === host.read().source?.token && reviewPreview.sceneId === sceneId && reviewPreview.omittedEntryView === omitEntry;
     if (purpose === 'review') {
@@ -172,6 +187,8 @@ export function createValidationOutputControls(document: Document, host: ReturnT
       text.textContent = `${name} ${job.label || i + 1} — ${job.state === 'file-verified' ? '選択したファイルの内容を確認済み' : complete ? '生成済み・ファイルへの保存は未確認' :
         job.state === 'repair-required' ? '生成データを確認できません。元データは保持しています。' : 'ファイル生成が未完了です。'}`;
       row.append(text); (complete ? completedFiles : list).append(row);
+      const disclosure = privacyNotice(job);
+      if (disclosure) { const privacy = document.createElement('p'); privacy.textContent = disclosure; row.append(privacy); }
       if (job.stale || job.token && job.token !== host.read().source?.token) {
         const older = document.createElement('p'); older.textContent = '作成後の変更はこのファイルに含まれません。'; row.append(older);
       }

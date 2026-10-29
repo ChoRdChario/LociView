@@ -1,4 +1,5 @@
 import type { ProjectWorkspaceFS } from '../platform/fs';
+import { hasEditorCapability } from '../projectMetadata/editorAttribution';
 import type { MetadataProjectSession, MetadataSessionRead } from '../projectMetadata/session';
 import type { OriginBlobStore } from '../projectMetadata/blobStore';
 import type { MetadataLimits, MetadataProof } from '../projectMetadata/format';
@@ -17,8 +18,8 @@ import { WorkspaceBaseStore } from '../projectPackage/workspaceBases';
 import { workspaceFileOperation } from './receiveWorkspace';
 import { fileError } from './validation';
 
-export interface WorkspaceOutputState { id: string; purpose: 'teamWorkspace' | 'contribution' | 'backup' | 'clean' | 'review'; label?: string; stale?: boolean; token?: string; cancellable?: boolean; state: 'unstarted' | 'incomplete' | 'generated' | 'file-verified' | 'abandoned' | 'cancelled' | 'repair-required' }
-export interface ContributionBaseChoice { selection: ContributionBaseSelection; label: string }
+export interface WorkspaceOutputState { id: string; purpose: 'teamWorkspace' | 'contribution' | 'backup' | 'clean' | 'review'; includesDeclaredEditorNames?: boolean; requiresEditorAttributionReader?: boolean; label?: string; stale?: boolean; token?: string; cancellable?: boolean; state: 'unstarted' | 'incomplete' | 'generated' | 'file-verified' | 'abandoned' | 'cancelled' | 'repair-required' }
+export interface ContributionBaseChoice { selection: ContributionBaseSelection; label: string; includesDeclaredEditorNames?: boolean; deltaIncludesDeclaredEditorNames?: boolean }
 const settledOutputDisplay = (rows: readonly WorkspaceOutputState[]) =>
   rows.every(row => ['generated', 'file-verified', 'abandoned', 'cancelled'].includes(row.state));
 /** Explicit same-Project output commands. Download handoff has no completion receipt. */
@@ -63,7 +64,7 @@ export class WorkspaceSender {
     // One successful command's display projection only; commands never use it.
     const proof = current?.state === 'ready' && current.source ? structuredClone(current.source.proof) : undefined;
     return withMetadataRead(this.fs, undefined, ({ fs }) =>
-      new WorkspaceSender(fs, this.session, this.store, this.limits, this.locks).availableBasesDirect(proof));
+      new WorkspaceSender(fs, this.session, this.store, this.limits, this.locks).availableBasesDirect(proof, current?.source ?? undefined));
   }
   /** One read-only display observation; never supplies output-command authority. */
   async outputOverview(current?: MetadataSessionRead): Promise<{ jobs: WorkspaceOutputState[]; bases: ContributionBaseChoice[] }> {
@@ -72,19 +73,22 @@ export class WorkspaceSender {
       const sender = new WorkspaceSender(fs, this.session, this.store, this.limits, this.locks);
       let observed: MetadataProof | null | undefined;
       const jobs = await sender.jobsDirect(proof => { observed = proof; });
-      const bases = await sender.availableBasesDirect(settledOutputDisplay(jobs) && observed !== null ? observed ?? commandProof : undefined);
+      const bases = await sender.availableBasesDirect(settledOutputDisplay(jobs) && observed !== null ? observed ?? commandProof : undefined, current?.source ?? undefined);
       return { jobs, bases };
     });
   }
-  private async availableBasesDirect(observed?: MetadataProof): Promise<ContributionBaseChoice[]> {
+  private async availableBasesDirect(observed?: MetadataProof, currentSource?: NonNullable<MetadataSessionRead['source']>): Promise<ContributionBaseChoice[]> {
     let proof = observed;
-    if (!proof) { const read = await this.session.read(); if (read.state !== 'ready' || !read.source) return []; proof = read.source.proof; }
+    if (!proof) { const read = await this.session.read(); if (read.state !== 'ready' || !read.source) return []; proof = read.source.proof; currentSource = read.source; }
     const bases = new WorkspaceBaseStore(this.fs, this.limits, proof), rows = await bases.read();
     const choices: ContributionBaseChoice[] = [];
     for (const [i, r] of rows.entries()) {
       const selection = { workspacePackageId: r.workspacePackageId, workspaceManifestSha256: r.workspaceManifestSha256, heads: [...r.declaredHeads] };
       const base = await VerifiedContributionBase.select(bases, selection, this.store, this.limits);
-      choices.push({ selection, label: `作業一式 ${i + 1}（${r.completions.some(c => c.observation === 'imported') ? '受信' : '作成'}・変更 ${base.source.originalChanges().length} 件）` });
+      const baseHashes = new Set(base.source.read().history.changes.map(c => c.id));
+      choices.push({ selection, label: `作業一式 ${i + 1}（${r.completions.some(c => c.observation === 'imported') ? '受信' : '作成'}・変更 ${base.source.originalChanges().length} 件）`,
+        ...(base.source.includesDeclaredEditorNames ? { includesDeclaredEditorNames: true } : {}),
+        ...(currentSource && json(currentSource.proof) === json(proof) && currentSource.editorDeclarations().some(d => !baseHashes.has(d.changeId)) ? { deltaIncludesDeclaredEditorNames: true } : {}) });
     }
     return choices;
   }
@@ -141,7 +145,11 @@ export class WorkspaceSender {
           const current = currentBackup ??= await readCurrentBackup(protection);
           extra = { label: job.label, stale: current.token !== job.source.token || current.snapshot !== json(job.frozenBases()) || current.inventory !== json(job.frozenInventory()) };
         }
-        result.push({ id, purpose, ...extra, token: job.source.token, cancellable: kinds.length === 0, state: kinds.includes('cancelled') ? 'cancelled' : kinds.includes('externalFileVerified') ? 'file-verified' :
+        const manifest = job.manifest(), requiresEditor = hasEditorCapability(manifest.requiredCapabilities);
+        const includesNames = requiresEditor && (manifest.purpose !== 'contribution' ||
+          job.source.editorDeclarations().some(d => manifest.changes.some(c => c.expectedChangeHash === d.changeId)));
+        result.push({ id, purpose, ...extra, ...(requiresEditor ? { requiresEditorAttributionReader: true } : {}),
+          ...(includesNames ? { includesDeclaredEditorNames: true } : {}), token: job.source.token, cancellable: kinds.length === 0, state: kinds.includes('cancelled') ? 'cancelled' : kinds.includes('externalFileVerified') ? 'file-verified' :
           kinds.includes(key.kind === 'workspace' ? 'baseRecorded' : 'artifactVerified') ? 'generated' : 'incomplete' });
       } catch { result.push({ id, purpose, state: 'repair-required' }); }
     }

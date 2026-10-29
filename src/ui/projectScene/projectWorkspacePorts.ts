@@ -25,7 +25,7 @@ export type Point3 = readonly [number, number, number];
 export interface WorkspaceRecoveryGroup {
   readonly key: string; readonly label: string; readonly ready: boolean;
   readonly note?: string; readonly details?: readonly string[];
-  readonly choices: readonly { id: string; label: string; anchor?: Anchor }[];
+  readonly choices: readonly { id: string; label: string; anchor?: Anchor; editorName?: string | null }[];
   readonly manual?: 'name' | 'title' | 'body';
   readonly copyReady?: boolean;
   readonly target: { kind: 'name'; sceneId: string } | { kind: 'startup' } |
@@ -103,6 +103,8 @@ export interface ProjectWorkspacePorts {
   resumedLastProject?(): boolean;
   storageEstimate?(): Promise<Readonly<{ usage?: number; quota?: number }>>;
   localSettings?: { read(): string; save(displayName: string): boolean };
+  editorSettings?: { read(): Readonly<{ enabled: boolean; name: string }>; save(value: Readonly<{ enabled: boolean; name: string }>): boolean };
+  captionEditors?(captionId: string): readonly { label: string; names: readonly (string | null)[] }[];
   readonly readOnly: boolean;
   presentation?(): { readonly busy: boolean; readonly reason: string } | null;
   status(): { kind: 'idle' | 'checking' | 'failed'; error?: string; retryable?: boolean };

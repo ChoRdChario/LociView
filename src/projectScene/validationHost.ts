@@ -1,4 +1,5 @@
 import { createGsProxyWorkflow } from './gsProxyWorkflow';
+import { captureEditor } from '../projectMetadata/editorAttribution';
 import { assertValidationBodyAllocation } from '../projectFiles/bodyBudget';
 import type { PhotoDecoder } from '../projectFiles/photo';
 import type { MediaDecoders } from '../projectFiles/media';
@@ -61,6 +62,10 @@ export function measureValidation<T>(observer: ValidationTiming | undefined, sta
   return action().finally(() => { try { observer(stage, performance.now() - started); } catch { /* Diagnostics have no authority. */ } });
 }
 export interface ValidationHostOptions {
+  editorSettings?: {
+    read(proof: import('../projectMetadata/source').MetadataProof): Readonly<{ enabled: boolean; name: string }>;
+    save(proof: import('../projectMetadata/source').MetadataProof, value: Readonly<{ enabled: boolean; name: string }>): boolean;
+  };
   timing?: ValidationTiming;
   /** Typed UI reads images through its scoped per-resource port. Legacy projection stays eager. */
   lazyImages?: boolean;
@@ -409,6 +414,8 @@ async function openNormalValidationHost(options: ValidationHostOptions, inherite
       finally { await reloadOutput(); }
     }, true);
     const workspaceOutput = {
+      get privacy() { const sourceIncludesNames = last.source?.includesDeclaredEditorNames ?? false;
+        return { sourceIncludesNames, backupIncludesNames: sourceIncludesNames || outputBases.some(b => b.includesDeclaredEditorNames) }; },
       get jobs() { return outputJobs; }, get error() { return outputFailure || outputDiscoveryFailure; },
       get bases() { return outputBases; },
       generate: (token: string) => measure('host.workspace.total', () => outputAction(() => measure('host.workspace.generate', () => sender.generate(token)))),
@@ -510,12 +517,21 @@ async function openNormalValidationHost(options: ValidationHostOptions, inherite
         restoreDisplayPending = false; restoreFailure = ''; failure = '';
       },
     };
+    const editorSettings = options.editorSettings ? {
+      read: () => { if (!last.source) throw Error('プロジェクトを確認してください。'); return options.editorSettings!.read(last.source.proof); },
+      save: (value: Readonly<{ enabled: boolean; name: string }>) => {
+        if (closed || busy || restoreRetired || !last.source) return false;
+        try { return options.editorSettings!.save(last.source.proof, value); } catch { return false; }
+      },
+    } : undefined;
+    const captureLocalEditor = () => { const preference = editorSettings?.read();
+      return captureEditor(preference?.enabled ? { kind: 'self-declared', name: preference.name } : { kind: 'none' }); };
     const addMediaFile = (token: string, input: MediaFileAddition) => {
       const selected = input.file, target = { sceneId: input.sceneId, captionId: input.captionId, attachmentId: input.attachmentId,
         orderKey: input.orderKey, eventId: input.eventId };
       const file = { name: selected.name, size: selected.size, arrayBuffer: selected.arrayBuffer.bind(selected) };
       return execute(async () => {
-      editable();
+      editable(); const editor = captureLocalEditor();
       const before = await session.read();
       if (before.state !== 'ready' || before.provider?.kind !== 'scene-provider' || before.source?.token !== token)
         throw Error('対象が更新されています。キャプションを選び直してください。');
@@ -526,14 +542,14 @@ async function openNormalValidationHost(options: ValidationHostOptions, inherite
       const bytes = new Uint8Array(await file.arrayBuffer());
       if (bytes.length !== file.size) throw Error('選択したメディアの大きさが一致しません。');
       const media = await content.prepareImage({ label: file.name, bytes });
-      try { const result = await ready(await session.edit(token, { kind: 'createAttachment', ...target, media, altText: '' }));
+      try { const result = await ready(await session.edit(token, { kind: 'createAttachment', ...target, media, altText: '' }, editor));
         content.releasePreparedImages(); return result;
       } catch (error) { if ((await session.read()).state === 'ready') content.releasePreparedImages(); throw error; }
       }, true);
     };
     // Both UI compositions share the same command, profile and publication boundary.
     const commitCommand = (token: string, input: MetadataEdit | (() => MetadataEdit)) => execute(async () => {
-      editable();
+      editable(); const editor = captureLocalEditor();
       const command = typeof input === 'function' ? input() : input;
       if (command.kind === 'createMaterial' || command.kind === 'editMaterial') {
         const current = command.kind === 'editMaterial' ? project?.materialData?.records[command.overrideId] : undefined;
@@ -561,11 +577,11 @@ async function openNormalValidationHost(options: ValidationHostOptions, inherite
           const issue = validationMaterialIssue(slot, intent, before.provider.semanticProfile); if (issue) throw Error(issue);
         }
       }
-      const display = await ready(await measure('host.edit', () => session.edit(token, command)));
+      const display = await ready(await measure('host.edit', () => session.edit(token, command, editor)));
       return { display, read: last };
     }, true);
     const dispatch = async (token: string, command: MetadataEdit) => (await commitCommand(token, command)).read;
-    gsProxy=createGsProxyWorkflow(content,async()=>{editable();const r=await session.read();if(r.state!=='ready'||!r.provider)throw Error('更新を完了してください。');return r.provider;},(token,command)=>execute(async()=>{editable();return ready(await session.edit(token,command));},true));
+    gsProxy=createGsProxyWorkflow(content,async()=>{editable();const r=await session.read();if(r.state!=='ready'||!r.provider)throw Error('更新を完了してください。');return r.provider;},(token,command,editor)=>execute(async()=>{editable();return ready(await session.edit(token,command,editor));},true),captureLocalEditor);
     const authority: ProjectAuthority = {
       prepareGsProxy: gsProxy.prepare, commitGsProxy: gsProxy.commit, cancelGsProxy: gsProxy.cancel,
       storage: 'saved-development', writeScope: 'caption-text',
@@ -575,18 +591,18 @@ async function openNormalValidationHost(options: ValidationHostOptions, inherite
       status: () => ({ kind: busy ? 'checking' : failure || connection?.restorePending || restoreRetired || restoreDisplayPending || receiveDisplayPending || unfinishedReceive() || last.state !== 'ready' ? 'failed' : 'idle',
         retryable: !(connection?.restorePending || restoreRetired || restoreDisplayPending),
         error: restoreFailure || failure || (connection?.restorePending || restoreRetired || restoreDisplayPending ? 'バックアップの復元が未完了です。' : '') || (receiveDisplayPending ? receiveFailure : '') || (unfinishedReceive() ? '「更新ファイル」の中断した受信を確認してください。' : '更新が未完了です。') }),
-      authorScene: (token, command) => execute(async () => { editable(); return ready(await session.edit(token, command)); }, true),
-      reparentPin: (token, command) => execute(async () => { editable(); return ready(await session.edit(token, command)); }, true),
+      authorScene: (token, command) => execute(async () => { editable(); const editor = captureLocalEditor(); return ready(await session.edit(token, command, editor)); }, true),
+      reparentPin: (token, command) => execute(async () => { editable(); const editor = captureLocalEditor(); return ready(await session.edit(token, command, editor)); }, true),
       captionDeletionImpact: (token, id) => { if (last.provider?.kind !== 'scene-provider' || token !== last.provider.token) throw Error('内容が更新されています。'); return captionDeletionImpact(last.provider, id, limits); },
-      deleteCaption: (token, command) => execute(async () => { editable(); return ready(await session.edit(token, command)); }, true),
+      deleteCaption: (token, command) => execute(async () => { editable(); const editor = captureLocalEditor(); return ready(await session.edit(token, command, editor)); }, true),
       assetDeletionImpact: (token, id) => { if (last.provider?.kind !== 'scene-provider' || token !== last.provider.token) throw Error('内容が更新されています。'); return assetDeletionImpact(last.provider, id, limits); },
-      deleteAsset: (token, command) => execute(async () => { editable(); return ready(await session.edit(token, command)); }, true),
+      deleteAsset: (token, command) => execute(async () => { editable(); const editor = captureLocalEditor(); return ready(await session.edit(token, command, editor)); }, true),
       addMediaFile,
       addModelFile: (token, input: ModelFileAddition) => {
         const target = { sceneId: input.sceneId, assetId: input.assetId }, selected = input.file;
         const file = { name: selected.name, size: selected.size, blob: selected.blob?.slice(), arrayBuffer: selected.arrayBuffer.bind(selected) };
         return execute(async () => {
-          editable(); const before = await session.read();
+          editable(); const editor = captureLocalEditor(); const before = await session.read();
           if (before.state !== 'ready' || before.source?.token !== token || before.provider?.kind !== 'scene-provider')
             throw Error('対象が更新されています。シーンを選び直してください。');
           const view = authority.read(), scene = resolveScene(view.state, view.resources, target.sceneId);
@@ -605,7 +621,7 @@ async function openNormalValidationHost(options: ValidationHostOptions, inherite
           try {
             const result = await ready(await session.edit(token, { kind: records.representation.role==='gsPrimary' ? 'addGsAsset' : 'addAsset', sceneId: target.sceneId, ...records,
               membership: { id: `sam_${newId()}`, sceneId: target.sceneId, assetId: target.assetId, orderKey,
-                lifecycle: { state: 'active', reason: 'initial', eventId: `evt_${newId()}` } } }));
+                lifecycle: { state: 'active', reason: 'initial', eventId: `evt_${newId()}` } } }, editor));
             content.releasePreparedModels(); return result;
           } catch (error) { if ((await session.read()).state === 'ready') content.releasePreparedModels(); throw error; }
         }, true);
@@ -614,7 +630,7 @@ async function openNormalValidationHost(options: ValidationHostOptions, inherite
         const target = { sceneId: input.sceneId, assetId: input.assetId, expectedBindingId: input.expectedBindingId }, selected = input.file;
         const file = { name: selected.name, size: selected.size, blob: selected.blob && captureGsBlob(selected.blob), arrayBuffer: selected.arrayBuffer.bind(selected) };
         return execute(async () => {
-          editable(); const before = await session.read();
+          editable(); const editor = captureLocalEditor(); const before = await session.read();
           if (before.state !== 'ready' || before.source?.token !== token || before.provider?.kind !== 'scene-provider')
             throw Error('対象が更新されています。差し替えるモデルを確認してください。');
           const versions = await validationModelVersions(before.provider);
@@ -637,7 +653,7 @@ async function openNormalValidationHost(options: ValidationHostOptions, inherite
             const binding = await sealValidationRecord('asset-binding-revision', { id: prepared.binding.id!, assetId: target.assetId,
               assetRevisionId: prepared.revision.id!, parentBindingId: source.binding.id, method: 'manual', assetToProject: source.binding.assetToProject as unknown as JsonObject });
             const result = await ready(await session.edit(token, { kind: 'replaceAssetModel', ...target,
-              revision: prepared.revision, representation: prepared.representation, binding }));
+              revision: prepared.revision, representation: prepared.representation, binding }, editor));
             content.releasePreparedModels(); return result;
           } catch (error) { if ((await session.read()).state === 'ready') content.releasePreparedModels(); throw error; }
         }, true);
@@ -645,7 +661,7 @@ async function openNormalValidationHost(options: ValidationHostOptions, inherite
       transformModel: (token, input: ModelPlacementCommand) => {
         const captured = cloneCanonicalValue(input as unknown as JsonObject, limits) as unknown as ModelPlacementCommand;
         return execute(async () => {
-          editable(); const before = await session.read();
+          editable(); const editor = captureLocalEditor(); const before = await session.read();
           if (before.state !== 'ready' || before.source?.token !== token || before.provider?.kind !== 'scene-provider')
             throw Error('モデルが更新されています。配置の入力を保持しています。');
           const versions = await validationModelVersions(before.provider);
@@ -656,7 +672,7 @@ async function openNormalValidationHost(options: ValidationHostOptions, inherite
             assetToProject: captured.placement as unknown as JsonObject });
           return ready(await session.edit(token, captured.fitReference ? { kind: 'fitAssetBounds', sceneId: captured.sceneId, assetId: captured.assetId,
             expectedBindingId: captured.expectedBindingId, binding, referenceAssetId: captured.fitReference.assetId, expectedReferenceBindingId: captured.fitReference.bindingId } :
-            { kind: 'transformAsset', sceneId: captured.sceneId, assetId: captured.assetId, expectedBindingId: captured.expectedBindingId, binding }));
+            { kind: 'transformAsset', sceneId: captured.sceneId, assetId: captured.assetId, expectedBindingId: captured.expectedBindingId, binding }, editor));
         }, true);
       },
       retry: () => execute(async () => { editable(true); return resume(); }),
@@ -670,7 +686,7 @@ async function openNormalValidationHost(options: ValidationHostOptions, inherite
       resolve: async (token, command) => (await commitCommand(token, command)).display,
       dispose: async () => { await dispose(); content.releasePreparedImages(); content.releasePreparedModels(); prepareDisplay = undefined; } };
     ownsLease = true;
-    return { ...host, dispatch, get content() { return content; }, workspaceFiles, workspaceOutput, backupRestore, display: () => restoreRetired ? undefined : project,
+    return { ...host, dispatch, editorSettings, get content() { return content; }, workspaceFiles, workspaceOutput, backupRestore, display: () => restoreRetired ? undefined : project,
       conversionReportAvailable: async () => await hasLociMyuConversion(fs, false) || await hasFrozenV1MaterialReport(fs),
       conversionReport: () => execute(async () => await readLociMyuConversionReport(fs, options.fileLimits, `prj_${run}`, options.decode, options.jpeg, options.photo) ??
         await readFrozenV1MaterialReport(fs, options.fileLimits, `prj_${run}`, options.decode, options.jpeg, options.photo), true),

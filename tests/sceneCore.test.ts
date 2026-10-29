@@ -246,13 +246,13 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
       if (source.includes("from './pointAnchorProof'")) expect(['session.ts', 'source.ts']).toContain(path.split(/[\\/]/).at(-1));
       const reviewEditPackage = /[\\/]projectPackage[\\/](reviewEdit|reviewEditControls|reviewEditJob|cleanInputDescriptor)\.ts$/.test(path);
       const packageControl = reviewEditPackage || /[\\/]projectPackage[\\/](reviewSnapshot|reviewSelection|reviewSource|reviewArchive|reviewOutputJob|cleanRecords|cleanSource|cleanArchive|cleanOutputJob|cleanInputJob|contract|manifest|historySummary|closure|protectedInventory|workspaceSource|contributionSource|contributionArchive|contributionEvidence|contributionReceiveJob|contributionOutputJob|outputJobs|receiveJobs|zipChecks|zipArchive|workspaceArchive|receiveJob|workspaceBases|outputJob|backupEvidence|backupSource|backupArchive|backupOutputJob|backupRestoreJob|restoreControls)\.ts$/.test(path);
-      const packageMetadata = reviewEditPackage || /[\\/]projectPackage[\\/](reviewSnapshot|reviewSelection|reviewSource|reviewArchive|reviewOutputJob|cleanRecords|cleanSource|cleanArchive|cleanOutputJob|cleanInputJob|historySummary|closure|protectedInventory|workspaceSource|workspaceArchive|contributionSource|contributionArchive|contributionEvidence|contributionReceiveJob|contributionOutputJob|outputJobs|receiveJobs|receiveJob|workspaceBases|outputJob|backupEvidence|backupSource|backupArchive|backupOutputJob|backupRestoreJob|restoreControls)\.ts$/.test(path);
+      const packageMetadata = reviewEditPackage || /[\\/]projectPackage[\\/](contract|manifest|reviewSnapshot|reviewSelection|reviewSource|reviewArchive|reviewOutputJob|cleanRecords|cleanSource|cleanArchive|cleanOutputJob|cleanInputJob|historySummary|closure|protectedInventory|workspaceSource|workspaceArchive|contributionSource|contributionArchive|contributionEvidence|contributionReceiveJob|contributionOutputJob|outputJobs|receiveJobs|receiveJob|workspaceBases|outputJob|backupEvidence|backupSource|backupArchive|backupOutputJob|backupRestoreJob|restoreControls)\.ts$/.test(path);
       const packageJournal = /[\\/]projectFiles[\\/]initialProject\.ts$/.test(path) || /[\\/]projectMetadata[\\/](packageRemote|session|journal)\.ts$/.test(path) || /[\\/]projectFiles[\\/](receiveWorkspace|sendWorkspace)\.ts$/.test(path) ||
         /[\\/]harness[\\/]projectScene[\\/](reviewView|validationHost|validationWorkspace|validationCatalog|validationGeneration)\.ts$/.test(path);
       // 06 §11/§12.3 permit these exact disconnected primitives, not an app importer.
       if (!applicationImports && !packageControl && !packageJournal) expect(source, path).not.toMatch(/(?:from\s+|import\s*\()['"][^'"]*\/projectPackage\//);
       const metadataFoundation = /[\\/]projectMetadata[\\/](format|source)\.ts$/.test(path);
-      const metadataService = /[\\/]projectMetadata[\\/](pointAnchorProof|persistence|generationScope|repository|journal|contentEvidence|blobStream|blobStore|blobInventory|session|commands|remote|packageRemote|membership|records|assetStatus|modelMembership|modelAddition|modelReplacement|gsProxy|captionCandidates|sceneAuthoring|viewResolution|materialResolution|captionDeletion|assetDeletion|startupScene|captionAuthoring|captionUndo|captionReactivation|sceneOrganization)\.ts$/.test(path);
+      const metadataService = /[\\/]projectMetadata[\\/](editorAttribution|pointAnchorProof|persistence|generationScope|repository|journal|contentEvidence|blobStream|blobStore|blobInventory|session|commands|remote|packageRemote|membership|records|assetStatus|modelMembership|modelAddition|modelReplacement|gsProxy|captionCandidates|sceneAuthoring|viewResolution|materialResolution|captionDeletion|assetDeletion|startupScene|captionAuthoring|captionUndo|captionReactivation|sceneOrganization)\.ts$/.test(path);
       // 05 §13.2 permits this exact new synthetic host, never ordinary/old saved activation.
       const metadataHost = /[\\/]harness[\\/]projectScene[\\/]metadata(Fixture|Storage|Host|Intent|MembershipControls|Models|ModelFacts|AssetStatusControls|ConflictControls|MaterialControls|CaptionLifecycleControls|StartupControls)\.ts$/.test(path);
       const validationFiles = /[\\/]projectFiles[\\/](materialNormalization|meshSource|meshSourceSupport|meshSourceBinding|meshDecode|meshStl|meshPly|meshObj|meshGltf|nativeSpatialConversion|nativeSpatial|bodyBudget|validation|png|jpeg|photo|media|mediaContainer|avcMedia|hevcMedia|heic|glb|glbMaterials|glbOccurrences|legacy180Occurrences|pointPly|gsPly|initialProject|content|creation|modelFacts|receiveWorkspace|sendWorkspace|nativeMapping|nativeConversion|frozenV1Source|frozenV1Mapping|frozenV1Conversion|lociMyuSource|lociMyuMapping|lociMyuConversion)\.ts$/.test(path);
@@ -288,47 +288,47 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
           backupRestoreJob: ['../platform/fs', '../domain/values', '../projectMetadata/blobStore', '../projectMetadata/format', '../projectMetadata/generationScope',
             '../projectMetadata/persistence', '../projectMetadata/session', '../projectMetadata/journal', './backupArchive', './contract', './workspaceBases',
             './receiveJobs', './outputJobs', './zipChecks', './restoreControls', '../projectMetadata/repository', '../projectMetadata/packageRemote', './manifest'],
-          contract: ['../domain/projectProfile'], manifest: ['../core/json', '../domain/values', '../domain/projectGraphSupport',
+          contract: ['../projectMetadata/editorAttribution', '../domain/projectProfile'], manifest: ['../projectMetadata/editorAttribution', '../core/json', '../domain/values', '../domain/projectGraphSupport',
             '../domain/projectRecordFields', '../domain/projectRecords', '../nativeGs/sha256', './contract'],
           backupEvidence: ['@automerge/automerge/slim', '../domain/projectGraphSupport', '../domain/projectRecordFields', '../domain/values',
             '../projectMetadata/source', '../projectMetadata/blobStore', './workspaceBases', './contract', './manifest',
             './contributionEvidence', './historySummary', './closure', './protectedInventory', './zipChecks'],
           backupSource: ['../projectMetadata/session', '../projectMetadata/source', '../projectMetadata/blobStore', '../projectMetadata/blobStream',
             './workspaceBases', './contract', './manifest', './contributionEvidence', './backupEvidence', './workspaceArchive', './zipChecks'],
-          backupArchive: ['../projectMetadata/blobStore', '../projectMetadata/source', '../domain/projectGraphSupport', '../domain/values',
+          backupArchive: ['../projectMetadata/editorAttribution', '../projectMetadata/blobStore', '../projectMetadata/source', '../domain/projectGraphSupport', '../domain/values',
             './contract', './manifest', './backupSource', './backupEvidence', './contributionEvidence', './workspaceArchive', './zipArchive', './zipChecks'],
           historySummary: ['../projectMetadata/source', '../domain/projectRecordFields', '../domain/projectRecords',
             '../domain/projectMutableFields', '../domain/projectProfile', '../domain/projectGraphSupport', '../domain/values', './contract', './manifest'],
           closure: ['../domain/projectCandidates', '../domain/projectRecordFields', '../domain/projectGraphSupport', '../domain/values',
             '../projectMetadata/blobStore', './contract', './manifest'],
           protectedInventory: ['../domain/projectCandidates', '../domain/projectGraphSupport', '../domain/values', './contract', './manifest', './closure'],
-          workspaceBases: ['@automerge/automerge/slim', '../platform/fs', '../projectMetadata/format', '../projectMetadata/persistence', '../projectMetadata/remote', '../projectMetadata/journal',
+          workspaceBases: ['../projectMetadata/editorAttribution', '@automerge/automerge/slim', '../platform/fs', '../projectMetadata/format', '../projectMetadata/persistence', '../projectMetadata/remote', '../projectMetadata/journal',
             '../projectMetadata/source', './contract', './manifest', './closure', './historySummary', './outputJob', './backupEvidence'],
-          outputJob: ['../platform/fs', '../projectMetadata/blobStore', '../projectMetadata/format', '../projectMetadata/persistence', '../projectMetadata/source',
+          outputJob: ['../projectMetadata/editorAttribution', '../platform/fs', '../projectMetadata/blobStore', '../projectMetadata/format', '../projectMetadata/persistence', '../projectMetadata/source',
             './contract', './manifest', './workspaceSource', './workspaceArchive', './workspaceBases', './protectedInventory'],
-          contributionOutputJob: ['../platform/fs', '../projectMetadata/blobStore', '../projectMetadata/format', '../projectMetadata/persistence', '../projectMetadata/source',
+          contributionOutputJob: ['../projectMetadata/editorAttribution', '../platform/fs', '../projectMetadata/blobStore', '../projectMetadata/format', '../projectMetadata/persistence', '../projectMetadata/source',
             './contract', './manifest', './contributionSource', './contributionEvidence', './contributionArchive', './workspaceBases', './protectedInventory'],
-          backupOutputJob: ['../platform/fs', '../projectMetadata/blobStore', '../projectMetadata/format', '../projectMetadata/persistence', '../projectMetadata/source',
+          backupOutputJob: ['../projectMetadata/editorAttribution', '../platform/fs', '../projectMetadata/blobStore', '../projectMetadata/format', '../projectMetadata/persistence', '../projectMetadata/source',
             './contract', './manifest', './backupArchive', './backupSource', './backupEvidence', './contributionEvidence', './workspaceArchive', '../domain/projectRecordFields', './workspaceBases', './zipChecks'],
           outputJobs: ['../platform/fs', '../projectMetadata/format', './outputJob', './contributionOutputJob', './backupOutputJob', './cleanOutputJob', './reviewOutputJob', './cleanSource', '../projectMetadata/blobStore',
             '../projectMetadata/persistence', './workspaceBases', './protectedInventory', './contract'],
           workspaceSource: ['../projectMetadata/session', '../projectMetadata/source', '../projectMetadata/blobStore', '../projectMetadata/blobStream',
             './contract', './manifest', './historySummary', './closure', './contributionEvidence'],
           // 06 §8.5/8.6: exact file/source/receive boundaries, not ordinary activation.
-          contributionSource: ['@automerge/automerge/slim', '../domain/projectGraphSupport', '../domain/values', '../projectMetadata/blobStore',
+          contributionSource: ['../projectMetadata/editorAttribution', '@automerge/automerge/slim', '../domain/projectGraphSupport', '../domain/values', '../projectMetadata/blobStore',
             '../projectMetadata/blobStream', '../projectMetadata/session', '../projectMetadata/source', './contract', './manifest',
             './historySummary', './closure', './workspaceSource', './workspaceBases', './zipChecks', './zipArchive', './contributionEvidence'],
-          contributionEvidence: ['@automerge/automerge/slim', '../domain/projectGraphSupport', '../domain/values', '../projectMetadata/source',
+          contributionEvidence: ['../projectMetadata/editorAttribution', '@automerge/automerge/slim', '../domain/projectGraphSupport', '../domain/values', '../projectMetadata/source',
             './contract', './manifest', './historySummary', './closure'],
           contributionReceiveJob: ['../platform/fs', '../projectMetadata/blobStore', '../projectMetadata/format', '../projectMetadata/persistence',
             '../projectMetadata/remote', '../projectMetadata/journal', '../projectMetadata/packageRemote', './contract', './workspaceBases',
             './contributionSource', './contributionEvidence', './zipArchive', './closure'],
           receiveJobs: ['../platform/fs', '../projectMetadata/blobStore', '../projectMetadata/format', '../projectMetadata/journal',
             '../projectMetadata/packageRemote', './receiveJob', './contributionReceiveJob', './cleanInputJob'],
-          contributionArchive: ['../projectMetadata/blobStore', '../domain/projectGraphSupport', '../domain/values', './contract', './manifest',
+          contributionArchive: ['../projectMetadata/editorAttribution', '../projectMetadata/blobStore', '../domain/projectGraphSupport', '../domain/values', './contract', './manifest',
             './contributionSource', './workspaceArchive', './zipChecks'],
           zipChecks: ['./manifest'], zipArchive: ['../nativeGs/sha256', './contract', './manifest', './zipChecks'],
-          workspaceArchive: ['@zip.js/zip.js', '../domain/projectGraphSupport', '../domain/values', '../projectMetadata/blobStore',
+          workspaceArchive: ['../projectMetadata/editorAttribution', '@zip.js/zip.js', '../domain/projectGraphSupport', '../domain/values', '../projectMetadata/blobStore',
             '../projectMetadata/blobStream', '../projectMetadata/source', '../nativeGs/sha256', './contract', './manifest',
             './workspaceSource', './historySummary', './closure', './zipChecks', './zipArchive'],
           receiveJob: ['../platform/fs', '../projectMetadata/format', '../projectMetadata/persistence', '../projectMetadata/remote',
@@ -433,7 +433,7 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
           bodyBudget: ['../scene/projectProvider','../domain/values','../projectMetadata/records','./validation'],
           modelFacts: ['../domain/meshSource', '../domain/nativeSpatialSource', '../domain/projectGraphSupport', './bodyBudget', './pointPly', '../domain/pointSource', '../scene/types', '../scene/resolve', '../scene/projectProvider', '../projectMetadata/session', '../projectMetadata/source', '../projectMetadata/persistence', '../domain/projectContentChecks', '../domain/projectRecordFields', '../domain/projectRecords', '../domain/values', './validation', './content'],
           receiveWorkspace: ['../platform/fs', '../platform/projectLock', '../projectMetadata/session', '../projectMetadata/format', '../projectPackage/receiveJob', '../projectPackage/cleanInputJob', './validation', '../projectMetadata/journal', '../projectMetadata/persistence', '../projectMetadata/blobStore', '../projectPackage/contract', '../projectPackage/zipArchive', '../projectPackage/contributionReceiveJob', '../projectPackage/receiveJobs', '../projectPackage/manifest', '../projectPackage/reviewEditControls'],
-          sendWorkspace: ['../platform/fs', '../projectMetadata/session', '../projectMetadata/blobStore', '../projectMetadata/format', '../projectMetadata/persistence',
+          sendWorkspace: ['../projectMetadata/editorAttribution', '../platform/fs', '../projectMetadata/session', '../projectMetadata/blobStore', '../projectMetadata/format', '../projectMetadata/persistence',
             '../projectPackage/outputJob', '../projectPackage/contributionOutputJob', '../projectPackage/backupOutputJob', '../projectPackage/cleanOutputJob', '../projectPackage/reviewOutputJob', '../projectPackage/reviewSelection', '../projectPackage/protectedInventory', '../projectPackage/contract', '../projectPackage/outputJobs', '../projectPackage/contributionSource', '../projectPackage/workspaceBases', './receiveWorkspace', './validation'],
         };
         const imports = [...source.matchAll(/(?:from\s+|import\s*\(\s*|import\s+)(['"])([^'"]+)\1/g)].map(m => m[2]);
@@ -441,7 +441,7 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
         expect(source, path).not.toMatch(/\b(fetch|indexedDB|localStorage|sessionStorage|serviceWorker)\b/);
       } else if (metadataFoundation) {
         const imports = [...source.matchAll(/(?:from\s+|import\s*\(\s*|import\s+)(['"])([^'"]+)\1/g)].map(m => m[2]);
-        const permitted = ['@automerge/automerge/slim', '../core/json', '../domain/atomicHistory',
+        const permitted = ['./editorAttribution', '@automerge/automerge/slim', '../core/json', '../domain/atomicHistory',
           '../domain/projectGraphSupport', '../domain/projectRecords', '../domain/projectRecordFields',
           './pointAnchorProof', '../domain/values', '../domain/projectCandidates', '../domain/projectMutableFields', '../domain/projectProfile', '../scene/projectProvider', './commands', './format'];
         expect(imports.every(p => permitted.includes(p!)), path).toBe(true);
@@ -450,6 +450,7 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
         const imports = [...source.matchAll(/(?:from\s+|import\s*\(\s*|import\s+)(['"])([^'"]+)\1/g)].map(m => m[2]);
         const byFile: Record<string, string[]> = {
           // Repository type only: binds the read callback's FS/factory pair; no runtime Repo dependency.
+          editorAttribution: ['../core/json', '../domain/projectGraphSupport', '../domain/values'],
           pointAnchorProof: ['./source', './commands', './persistence', './format'],
           captionReactivation: ['../domain/values', '../domain/projectGraphSupport', '../domain/projectCandidates', './source', './format', './persistence'],
           captionUndo: ['./records', '../domain/values', '../domain/projectGraphSupport', '../domain/projectMutableFields', '../domain/projectRecordFields', '../scene/projectProvider', './membership', './captionAuthoring', './format', './commands'],
@@ -458,9 +459,9 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
           persistence: ['../core/json', '../domain/projectGraphSupport', '../domain/values', '../platform/fs', './format', './repository'],
           generationScope: ['../platform/fs', './format', './persistence', './repository'],
           repository: ['@automerge/automerge/slim', '@automerge/automerge-repo/slim', '../platform/fs', './format', './persistence', './source'],
-          journal: ['@automerge/automerge/slim', '../platform/fs', '../domain/values', '../domain/projectRecordFields', './format', './source', './persistence', './remote', './packageRemote', '../projectPackage/contributionEvidence', '../projectPackage/manifest'],
+          journal: ['./editorAttribution', '@automerge/automerge/slim', '../platform/fs', '../domain/values', '../domain/projectRecordFields', './format', './source', './persistence', './remote', './packageRemote', '../projectPackage/contributionEvidence', '../projectPackage/manifest'],
           remote: ['@automerge/automerge/slim', '../domain/values', './format', './source', './persistence'],
-          packageRemote: ['../domain/values', '../projectPackage/manifest', '../projectPackage/contract', './format', './source', './remote', './persistence', '../projectPackage/contributionEvidence', '../projectPackage/backupEvidence'],
+          packageRemote: ['./editorAttribution', '../domain/values', '../projectPackage/manifest', '../projectPackage/contract', './format', './source', './remote', './persistence', '../projectPackage/contributionEvidence', '../projectPackage/backupEvidence'],
           records: ['../domain/projectRecords', '../domain/projectRecordFields', '../domain/projectGraphSupport', '../scene/projectProvider', './format'],
           assetStatus: ['../domain/projectMutableFields', '../domain/projectRecords', '../domain/projectRecordFields', '../domain/projectGraphSupport',
             '../domain/values', '../scene/types', '../scene/projectProvider', './format'],
@@ -486,7 +487,7 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
           blobStream: ['../nativeGs/sha256'],
           blobStore: ['../platform/fs', '../platform/projectLock', '../domain/projectRecordFields', '../domain/values', './format', './persistence', './blobStream'],
           blobInventory: ['../domain/projectContentChecks', '../domain/values', './contentEvidence', './format', './blobStore'],
-          session: ['./captionReactivation', '../scene/types', './pointAnchorProof', '@automerge/automerge/slim', '../platform/fs', '../domain/values', '../domain/projectContentChecks', '../domain/captionText', '../scene/projectProvider',
+          session: ['./editorAttribution', './captionReactivation', '../scene/types', './pointAnchorProof', '@automerge/automerge/slim', '../platform/fs', '../domain/values', '../domain/projectContentChecks', '../domain/captionText', '../scene/projectProvider',
             './format', './source', './repository', './journal', './persistence', './commands', './remote', './packageRemote', '../projectPackage/receiveJob', '../projectPackage/manifest', '../projectPackage/reviewEditControls',
             './blobStore', '../projectPackage/outputJob', '../projectPackage/contributionOutputJob', '../projectPackage/backupOutputJob', '../projectPackage/backupSource', '../projectPackage/cleanOutputJob', '../projectPackage/reviewOutputJob', '../projectPackage/reviewSource', '../projectPackage/reviewSelection', '../projectPackage/cleanInputJob', '../projectPackage/cleanSource', '../projectPackage/cleanRecords', '../projectPackage/contributionSource', '../projectPackage/outputJobs', '../projectPackage/workspaceBases', '../projectPackage/workspaceSource', '../projectPackage/protectedInventory', '../projectPackage/contract', '../projectPackage/contributionReceiveJob', '../projectPackage/contributionEvidence', '../projectPackage/receiveJobs', '../projectPackage/backupRestoreJob'],
           startupScene: ['../scene/projectProvider', '../domain/projectRecords', '../domain/projectRecordFields', './membership', './format'],

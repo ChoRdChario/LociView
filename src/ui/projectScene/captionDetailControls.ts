@@ -9,6 +9,7 @@ export type CaptionDetailEvent = CaptionApplyPlan |
   Readonly<{ kind: 'review'; captionId: string; field: CaptionEditField; token: string }> |
   Readonly<{ kind: 'window'; captionId: string; sceneId: string; token: string; action: 'open' | 'retain' | 'release' }>;
 export interface CaptionDetailProps extends DetailContext {
+  readonly editorFields?: readonly { label: string; names: readonly (string | null)[] }[];
   /** Host capability boundary, not a failed command or a change to the Caption. */
   readonly windowBlock?: string | null;
 }
@@ -27,6 +28,7 @@ export function createCaptionDetailControls(document: Document, onEvent: (event:
   let props: CaptionDetailProps | undefined, disposed = false, cancelFor: CaptionDraft | null = null;
   const listen = (node: HTMLElement, name: string, handler: () => void) => { node.addEventListener(name, handler); cleanups.push(() => node.removeEventListener(name, handler)); };
   root.append(status, impact);
+  const editors = make('details'), editorRows = make('ul'); editors.append(make('summary', '編集者情報'), editorRows);
   for (const field of ['title', 'body', 'color'] as const) {
     const group = make('div'), label = make('label', captionFieldLabels[field]);
     const input = field === 'body' ? make('textarea') : make('input');
@@ -103,6 +105,7 @@ export function createCaptionDetailControls(document: Document, onEvent: (event:
       sceneId: props.source.sceneId, token: props.source.token, action });
   };
   listen(showWindow, 'click', () => windowEvent('open'));
+  root.append(editors);
 
   function render(next: CaptionDetailProps): boolean {
     if (disposed) return false;
@@ -113,6 +116,12 @@ export function createCaptionDetailControls(document: Document, onEvent: (event:
     props = next;
     if (cancelFor !== next.draft) { cancelFor = null; confirmation.hidden = true; }
     const source = next.source, owned = next.draft?.captionId === nextId ? next.draft : null;
+    editors.hidden = source.kind !== 'ready' || !next.editorFields;
+    editorRows.replaceChildren();
+    for (const field of next.editorFields ?? []) for (const [i, name] of field.names.entries()) {
+      const row = make('li', field.label + (field.names.length > 1 ? `・候補 ${i + 1}：` : '：'));
+      row.append(make('bdi', name === null ? '編集者情報なし' : `編集者名：${name}`)); editorRows.append(row);
+    }
     const inFlight = next.feedback.kind === 'applying';
     for (const [field, control] of fields) {
       const current = source.kind === 'ready' ? source.caption[field] : null;

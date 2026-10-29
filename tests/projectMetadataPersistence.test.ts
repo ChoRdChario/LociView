@@ -78,6 +78,30 @@ const fullSource = (source: ProjectMetadataSource): FullMetadataSource => ({
   packageId: id('pkg'), metadataBytes: source.encodeFullSource(), proof: source.proof, remoteHeads: source.heads,
 });
 
+describe('08b editor declaration transaction continuity', () => {
+  it('keeps confirmed names and original bytes through cold retry, opt-out, and stripped requirement refusal', async () => {
+    const h = setup(), writer = h.session(), initial = await writer.create(h.records);
+    h.fault.save = true;
+    const editor = { kind: 'self-declared' as const, name: '担当A' };
+    await expect(writer.edit(initial.source!.token, { kind: 'editCaption', captionId: id('cap'), edits: { title: '名前付き変更' } }, editor)).rejects.toThrow();
+    editor.name = '担当B';
+    const journal = new TransactionJournal(h.fs, limits), pending = (await journal.entries()).at(-1)!;
+    expect(pending.start.requiredCapabilities).toEqual(['editor-attribution-v1']);
+    const exact = await journal.validateParts(pending.prepared!);
+    h.fault.save = false; const cold = h.session(), recovered = await cold.retry();
+    expect(recovered.source!.editorDeclarations()[0]!.declaration.editor.name).toBe('担当A');
+    for (const b of exact) expect(recovered.source!.originalChanges()).toContainEqual(b);
+    const later = await cold.edit(recovered.source!.token, { kind: 'editCaption', captionId: id('cap'), edits: { body: '無記名の追記' } });
+    expect((await journal.entries()).at(-1)!.start.requiredCapabilities).toEqual(['editor-attribution-v1']);
+    expect(later.source!.editorDeclarations()).toEqual(recovered.source!.editorDeclarations());
+    const tail = (await journal.entries()).at(-1)!;
+    const path = journal.path(tail.start.transactionId, 'staging.json');
+    const receipt = JSON.parse((await h.fs.readText(path))!); delete receipt.requiredCapabilities;
+    await h.fs.writeText(path, json(receipt));
+    expect((await h.session().read()).state).toBe('repair-required');
+  });
+});
+
 describe('local generation capabilities (ports only, not backup restore/selection acceptance)', () => {
   const nextId = 'd'.repeat(32);
   function local() {
@@ -1262,6 +1286,21 @@ describe('new-workspace metadata persistence service (memory ports, not device/a
     expect(textCandidates(done.source!, 'title')).toEqual([{ kind: 'value', value: '追加の変更' }]);
   });
 
+  it('08b refuses an immutable anonymous recovery start when extra durable heads introduce a named change', async () => {
+    const h = setup(), writer = h.session(), first = await writer.create(h.records);
+    h.fs.reject = path => path.endsWith('/published.json');
+    await expect(writer.editCaption(first.source!.token, id('cap'), 'body', '元の変更')).rejects.toThrow();
+    const journal = new TransactionJournal(h.fs, limits), entries = await journal.entries(), start = entries[0]!.start;
+    const repository = new MetadataRepository(h.fs, h.storage, limits), stored = (await repository.read(start.repositoryId, start.proof))!;
+    const named = first.source!.prepareEdit(first.source!.token, { kind: 'editCaption', captionId: id('cap'), edits: { title: '追加の名前付き変更' } }, first.provider!, 'c'.repeat(32), undefined, { kind: 'self-declared', name: '別の編集者' });
+    await underWriteLease(h.fs, () => repository.persist(start.repositoryId, stored.appendOriginal(named.originalChanges())));
+    h.fs.reject = () => false;
+    await expect(h.session().retry()).rejects.toThrow();
+    const after = await journal.entries(); expect(after.at(-1)!.publication).toBeNull();
+    expect(after.at(-1)!.start).toEqual(entries.at(-1)!.start);
+    expect((await repository.read(start.repositoryId, start.proof))!.includesDeclaredEditorNames).toBe(true);
+    expect((await h.session().read()).state).toBe('pending');
+  });
   it('fails closed on lost authority after an adapter write; the next retry may use the already stored exact changes', async () => {
     const h = setup(), writer = h.session(), first = await writer.create(h.records);
     let lost = false, active = 0;

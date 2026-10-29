@@ -57,7 +57,10 @@ export function createProjectRecovery(document: Document, host: RecoveryHost) {
         message.setAttribute('role', 'status');
         const option = (node: HTMLSelectElement, id: string, label: string) => { const o = make('option', label); o.value = id; node.append(o); };
         option(select, '', group.target.kind === 'membership' ? '元として残す登録を選択' : '選択してください');
-        for (const c of group.choices) { const li = make('li', c.label); li.style.whiteSpace = 'pre-wrap'; values.append(li); option(select, c.id, c.label); }
+        for (const c of group.choices) { const li = make('li', c.label); li.style.whiteSpace = 'pre-wrap';
+          const attribution = c.editorName === undefined ? '' : c.editorName === null ? '編集者情報なし' : `編集者名：${c.editorName}`;
+          if (attribution) { const note = make('bdi', attribution); li.append(make('br'), note); }
+          values.append(li); option(select, c.id, c.label + (attribution ? `（\u2068${attribution}\u2069）` : '')); }
         if (group.manual) option(select, 'manual', group.manual === 'name' ? '名前を入力' : '文言を入力');
         option(decision, '', '重複の扱いを選択'); option(decision, 'one', '一つにまとめる'); option(decision, 'both', '別々の記録として両方残す'); decision.value = '';
         decision.hidden = group.target.kind !== 'membership';

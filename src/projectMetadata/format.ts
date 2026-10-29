@@ -1,5 +1,6 @@
 import * as A from '@automerge/automerge/slim';
 import { parseJsonWithoutDuplicateMembers } from '../core/json';
+import { inspectEditorMessage } from './editorAttribution';
 import { inspectAtomicHistory, type AtomicChange, type AtomicWrite, type HistoryReadLimits } from '../domain/atomicHistory';
 import { canonical, immutableKinds, same } from '../domain/projectGraphSupport';
 import { projectRecordMaps, checkProjectHeader } from '../domain/projectRecords';
@@ -107,6 +108,7 @@ function inspectPhysicalDetail(doc: PhysicalDoc, inputProof: MetadataProof, limi
   const bytes = checkedChanges(A.getAllChanges(doc), limits);
   if (!bytes.length) fail('empty-history');
   const decoded = bytes.map(b => A.decodeChange(b));
+  for (const change of decoded) inspectEditorMessage(change.message, limits);
   const byHash = new Map(decoded.map(c => [c.hash, c]));
   if (byHash.size !== decoded.length) fail('duplicate-change');
   const roots = decoded.filter(c => !c.deps.length);

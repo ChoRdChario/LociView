@@ -19,6 +19,7 @@ export function createProjectOrganization(document: Document, host: Organization
   let disposed = false, composing = false, form: { kind: 'sceneCopy' | 'sceneDelete' | 'tagEdit' | 'tagDelete'; token: string; id: string } | null = null;
   let captured: { token: string; tagId: string | null } | null = null;
   let settingsDraft: { before: string; value: string } | null = null;
+  let editorDraft: { before: string; value: { enabled: boolean; name: string } } | null = null;
   const settingsRoot = make('details'), displayNameLabel = make('label', 'このブラウザの表示名'), displayName = make('input'), settingsStatus = make('p');
   const displayNameBadge = make('span'); displayNameBadge.setAttribute('aria-label', 'このブラウザの利用者');
   settingsRoot.setAttribute('aria-label', '設定'); displayName.setAttribute('aria-label', 'このブラウザの表示名'); displayName.maxLength = 256; displayNameLabel.append(displayName);
@@ -35,6 +36,27 @@ export function createProjectOrganization(document: Document, host: Organization
   });
   const cancelSettings = button('表示名の入力を取り消す', () => { if (!composing && !host.localBlocked()) { settingsDraft = null; settingsStatus.textContent = ''; host.changed(); } });
   settingsRoot.append(settingsSummary, displayNameLabel, make('p', 'このブラウザだけの設定です。共有ファイルや過去の編集者名は変わりません。'), applySettings, cancelSettings, settingsStatus);
+  const editorForm = make('div'), editorLabel = make('label', '編集者名'), editorInput = make('input'), editorToggleLabel = make('label'), editorToggle = make('input'), editorStatus = settingsStatus;
+  editorInput.maxLength = 256; editorLabel.append(editorInput); editorToggle.type = 'checkbox';
+  editorToggleLabel.append(editorToggle, make('span', 'このプロジェクトの今後の編集にこの名前を残す')); editorStatus.setAttribute('role', 'status');
+  const readEditor = () => { try { return host.ports.editorSettings?.read() ?? { enabled: false, name: '' }; }
+    catch { editorStatus.textContent = '編集者名の設定を確認して保存してください。'; return { enabled: false, name: '' }; } };
+  const beginEditor = () => { if (!editorDraft) editorDraft = { before: JSON.stringify(readEditor()), value: { enabled: editorToggle.checked, name: editorInput.value } }; };
+  const changeEditor = () => { beginEditor(); editorDraft!.value = { enabled: editorToggle.checked, name: editorInput.value }; host.changed(); };
+  editorInput.addEventListener('input', changeEditor); editorToggle.addEventListener('change', changeEditor);
+  editorInput.addEventListener('compositionstart', () => { beginEditor(); composing = true; host.changed(); });
+  editorInput.addEventListener('compositionend', () => { composing = false; changeEditor(); });
+  const applyEditor = button('編集者名を設定', () => {
+    if (!editorDraft || composing || host.localBlocked() || !host.ports.editorSettings) return;
+    if (editorDraft.before !== JSON.stringify(readEditor())) { editorStatus.textContent = '別の画面で設定が変わっています。入力を取り消して確認してください。'; return; }
+    if (host.ports.editorSettings.save(editorDraft.value)) { editorDraft = null; editorStatus.textContent = '編集者名の設定を保存しました。'; host.changed(); }
+    else editorStatus.textContent = '設定できませんでした。名前を確認してください。入力は保持しています。';
+  });
+  const cancelEditor = button('編集者名の入力を取り消す', () => { if (!composing && !host.localBlocked()) { editorDraft = null; editorStatus.textContent = ''; host.changed(); } });
+  editorForm.append(editorLabel, editorToggleLabel,
+    make('p', '自己申告の名前です。作業一式・変更分・バックアップに含まれます。停止しても過去の記録は残ります。'),
+    make('p', '名前を残した編集を含むプロジェクトや共有ファイルは、対応版のLociViewで開く必要があります。'), applyEditor, cancelEditor);
+  settingsRoot.append(editorForm, settingsStatus);
   const actionHistory: { past: CaptionUndoReceipt[]; future: CaptionUndoReceipt[] } = { past: [], future: [] };
   const recorded = new WeakSet<CaptionUndoCapture>();
   let undoWarning = '';
@@ -111,13 +133,18 @@ export function createProjectOrganization(document: Document, host: Organization
   const tagConfirm = button('タグを削除する', () => { const f = form; if (f?.kind === 'tagDelete' && f.token === host.source().provider.token) perform({ kind: 'deleteTag', tagId: f.id }, () => { form = null; host.message('タグを削除しました。記録は残っています。'); }); });
   const tagNote = make('p'); tagForm.append(tagNameLabel, tagColor, saveTag, tagCancel, tagNote, tagConfirm); tagsRoot.append(tagList, tagForm);
   function render() {
-    if (disposed) return; const s = host.source(), enabled = !!host.ports.authoring, blocked = !!host.blocked(), owned = !!form || !!captured || !!settingsDraft;
-    settingsRoot.hidden = !host.ports.localSettings;
+    if (disposed) return; const s = host.source(), enabled = !!host.ports.authoring, blocked = !!host.blocked(), owned = !!form || !!captured || !!settingsDraft || !!editorDraft;
+    settingsRoot.hidden = !host.ports.localSettings && !host.ports.editorSettings;
     const savedName = host.ports.localSettings?.read() ?? ''; displayNameBadge.textContent = savedName; displayNameBadge.hidden = !savedName;
     if (!composing && displayName.value !== (settingsDraft?.value ?? host.ports.localSettings?.read() ?? '')) displayName.value = settingsDraft?.value ?? host.ports.localSettings?.read() ?? '';
     const localBlocked = host.localBlocked() || !!form || !!captured;
     displayName.disabled = localBlocked; applySettings.disabled = localBlocked || composing || !settingsDraft;
     cancelSettings.hidden = !settingsDraft; cancelSettings.disabled = localBlocked || composing;
+    editorForm.hidden = !host.ports.editorSettings;
+    const currentEditor = editorDraft?.value ?? readEditor();
+    if (!composing) editorInput.value = currentEditor.name; editorToggle.checked = currentEditor.enabled;
+    editorInput.disabled = editorToggle.disabled = localBlocked; applyEditor.disabled = localBlocked || composing || !editorDraft;
+    cancelEditor.hidden = !editorDraft; cancelEditor.disabled = localBlocked || composing;
     sceneRoot.hidden = captionRoot.hidden = tagsRoot.hidden = !enabled;
     const choices = sceneChoices(s.provider.state), index = choices.findIndex(c => c.id === s.sceneId);
     copyScene.disabled = blocked || owned; removeScene.disabled = blocked || owned || choices.length < 2 || fieldValue(s.provider.state.defaultSceneId) === s.sceneId;
@@ -176,7 +203,7 @@ export function createProjectOrganization(document: Document, host: Organization
       tagList.append(row);
     }
   }
-  return { sceneRoot, captionRoot, tagsRoot, settingsRoot, displayNameBadge, render, hasChanges: () => !!form || !!captured || !!settingsDraft, composing: () => composing,
+  return { sceneRoot, captionRoot, tagsRoot, settingsRoot, displayNameBadge, render, hasChanges: () => !!form || !!captured || !!settingsDraft || !!editorDraft, composing: () => composing,
     beginAction(command: CaptionUndoInput) { const s = host.source(); return host.ports.authoring?.beginUndo(s.provider.token, command) ?? null; },
     recordAction(capture: CaptionUndoCapture | null) {
       if (!capture || recorded.has(capture)) return;

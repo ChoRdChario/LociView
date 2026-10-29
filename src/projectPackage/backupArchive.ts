@@ -1,4 +1,5 @@
 import type { OriginBlobStore } from '../projectMetadata/blobStore';
+import { editorCapabilities, checkEditorCapability } from '../projectMetadata/editorAttribution';
 import { ProjectMetadataSource, type MetadataLimits } from '../projectMetadata/source';
 import { canonical } from '../domain/projectGraphSupport';
 import type { JsonValue } from '../domain/values';
@@ -20,7 +21,7 @@ export function prepareBackupManifest(capture: BackupSourceCapture, options: Wor
     packageId: options.packageId, createdByVersion: options.createdByVersion, ...(options.memo !== undefined ? { memo: options.memo } : {}),
     identity: capture.proof.identity, metadataEnvelope: capture.proof.envelope, targetHeads: capture.targetHeads,
     metadata: descriptors[0], protectedInventory: descriptors[1], exchangeBases: descriptors[2], baseEvidence: capture.description.baseEvidence,
-    blobs: capture.blobs, summary: capture.summary, payloadTotals: { entryCount: payloads.length,
+    blobs: capture.blobs, summary: capture.summary, ...editorCapabilities(capture.description.includesDeclaredEditorNames), payloadTotals: { entryCount: payloads.length,
       uncompressedBytes: payloads.reduce((n, e) => n + e.byteLength, 0), largestEntryBytes: Math.max(0, ...payloads.map(e => e.byteLength)) } });
   if (manifest.length + 64 + descriptors[1]!.byteLength + descriptors[2]!.byteLength + capture.description.baseControlBytes > L.controlsBytes) fail('backup-control-budget');
   const checksum = new TextEncoder().encode(packageByteHash(manifest));
@@ -52,6 +53,7 @@ export class BackupArchive {
     if (archive.control.entries[0]!.byteLength + 64 + m.exchangeBases.byteLength + m.protectedInventory.byteLength + declared.baseControlBytes > L.controlsBytes) fail('backup-control-budget');
     for (const reference of m.baseEvidence) evidence.push({ reference, bytes: await archive.entryBytes(`base-evidence/sha256/${reference.sha256}`, L.sourceBytes, signal) });
     const description = await inspectBackupOriginals(source, table, evidence, limits, signal);
+    checkEditorCapability(m.requiredCapabilities, description.includesDeclaredEditorNames);
     if (archive.control.entries[0]!.byteLength + 64 + m.exchangeBases.byteLength + m.protectedInventory.byteLength + description.baseControlBytes > L.controlsBytes) fail('backup-control-budget');
     const inventory = canonicalControl(await archive.entryBytes('protected-inventory.json', L.controlBytes, signal));
     if (!same(inventory, description.inventory) || !same(m.blobs, description.blobs)) fail('backup-protected-inventory');

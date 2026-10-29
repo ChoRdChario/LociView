@@ -1,9 +1,9 @@
 # 08b: 共有する変更に任意の編集者名を残す
 
-Status: **製品方針はPO承認済み2026-10-29。以下の技術設計はPROPOSED・未実装**。
-POは方針の具体化を承認した。旧版での読込を止める互換性境界とその実装は、
-この具体案の独立レビュー後にまとめて判断する。保存設計の承認・runtime検証・
-adoptionや公開を示す文書ではない。現在の実装・検証は[todo](../../tasks/todo.md)が正本。
+Status: **PO承認済み2026-10-29。ProjectSceneの限定経路で実装・自動検証済み2026-10-30**。
+POは独立レビュー済みの旧版読込制限を含め、記録・表示・共有・復旧・再開まで承認した。
+これは実機・offline・adoptionや公開の合格を示さない。実装範囲・検証結果は
+[todo](../../tasks/todo.md)が正本。以下は仕様02/06の該当境界に対する承認済み追加契約である。
 
 ## 1. 承認済みの利用者向け方針
 
@@ -23,16 +23,16 @@ adoptionや公開を示す文書ではない。現在の実装・検証は[todo]
 - 文章へ手入力された氏名や素材内の情報を匿名化する機能ではない。停止や独立コピーで、
   既に相手へ渡した情報を削除したとは説明しない。
 
-製品方針の独立レビュー2026-10-29はPASS。以下は、その承認を保存設計の承認へ
-読み替えずに具体化した技術案である。
+製品方針の独立レビュー2026-10-29はPASS。その後、具体化した以下の技術設計も
+独立レビューを経てPO承認を受けた。実行済みの受入れはtodoに記録する。
 
 ## 2. 現在の境界と最小構成
 
 現在の[仕様08](08-daily-authoring-workflow.md)の表示名はブラウザ内のUI設定であり、
-Project履歴へ含まれない。既存実装は変更していない。
+Project履歴へ含まれない。この非公開設定を自動で共有することはない。
 [仕様02 §8・§9.4](02-storage-package-migration.md)と
-[仕様06 §6](06-project-package-wire.md)に対する将来の追加を以下に定義する。
-現行のv1 message完全一致・閉じたjournal/manifest契約は、実装承認までは現行のまま。
+[仕様06 §6](06-project-package-wire.md)に対する承認済み追加を以下に定義する。
+v1 message完全一致・閉じたjournal/manifest契約を、以下の限定追加へ拡張する。
 
 保存するのは**名前付きの元changeのmessage**と、旧版を止める**必須機能の宣言**だけとする。
 新しい人物ID、contributor表、root map、actor固定化、ライブラリ依存を追加しない。
@@ -104,6 +104,7 @@ type LocalEditorContext =
 **最初のawaitより前**に検証済み設定を値としてコピーする。
 メディアdecode、モデル検査、材質preflight、lease取得の後で名前を読み直さない。
 dispatch、Scene操作、削除、ピン移動、GS/Proxy確定、モデル・メディア操作を同じ規則へ接続する。
+GSの面の確定はworkflow内部の検査・sealより前に捕捉し、host callback到着時に読み直さない。
 
 Sessionのretained commandと、media staging後にprepareEditする`introduction`にも
 同じcontextを保持する。元changeができた後は既存のexact partsを再利用し、retry/cold復旧で
@@ -122,7 +123,7 @@ Sessionのretained commandと、media staging後にprepareEditする`introductio
 
 失敗した編集から名前だけを公開せず、既存のwrite/readback/publication fenceと同じ結果にする。
 
-## 5. 互換性境界 —追加の判断対象
+## 5. 承認済みの互換性境界
 
 名前付きmessageは現行readerでも不透明なheaderとして残る。そのまま受理させると、
 旧版が名前を表示・開示せずに再共有する。これを避けるため、次の**閉じた任意field**を
@@ -164,7 +165,7 @@ Sessionのretained commandと、media staging後にprepareEditする`introductio
 | ファイル | 保持／除外と必須機能の判定 |
 |---|---|
 | 作業一式（Workspace） | 全元履歴の名前を保持。完全sourceから要件と開示を導出 |
-| 変更分（Contribution） | 元delta bytesを保持。要件はbaseから再構築したtarget全体、名前を実際に含むかはdeltaから別に導出 |
+| 変更分（Contribution） | 元delta bytesを保持。要件は検証済みbaseと再構築targetの和、名前を実際に含むかはdeltaから別に導出。復元した古いtargetがbaseの後続変更を含まない場合も同じ |
 | バックアップ | current sourceと全exchange-base evidenceの名前を保持。その和から要件と開示を導出。埋込済み旧manifestやdigestは変更しない |
 | 閲覧用シーン（Review） | 専用snapshotと必要なblobだけ。元message・名前投影・要件・設定を含めない |
 | 独立コピー（Clean） | 現在の編集可能状態からfresh genesisを作る。元message・名前投影・要件・設定を引き継がない |
@@ -204,7 +205,7 @@ UIは元changeやpackageをparseせずstorageへ直接書かない。viewerはPr
 
 ## 8. 実装時の受入れと一括工程
 
-以下は実行済み検証ではなく、実装承認後の受入れ。既存service testsへ不変条件とfaultを追加し、
+以下は承認済み実装の受入れ条件であり、実行結果の正本はtodoとする。既存service testsへ不変条件とfaultを追加し、
 代表する接続flowでファイル・画面・coldまで通す。名前ごとに全roundtripを複製しない。
 
 1. 初期無効、明示有効、名前変更・停止・取消、別Project/端末/Cleanの分離、設定失敗。
@@ -230,10 +231,10 @@ UIは元changeやpackageをparseせずstorageへ直接書かない。viewerはPr
 新しいimport境界はsceneCoreを早期確認する。独立diff reviewと最終checkpoint checks、
 専用Chromiumの接続flowまでまとめる。既存の実機・offline・公開gateは別途維持する。
 
-次の判断は、**この必須機能宣言により名前付き履歴を旧版で開けなくする互換性変更を含め、
-本案の編集・受渡し・復旧・再開まで一括実装してよいか**。承認済みの共有方針自体は尋ね直さない。
-承認後は通常の実装・関連修正・検証ごとの確認待ちを挟まない。
+POは必須機能宣言により名前付き履歴を旧版で開けなくする互換性変更を含め、本案の
+編集・受渡し・復旧・再開まで一括実装することを承認した。通常の実装・関連修正・検証ごとの
+確認待ちを挟まず進める。新しい製品方針・互換性拡張・公開判断はこの承認に含めない。
 
 技術設計の独立レビュー2026-10-29はPASS。非NFC headerの限定検査と、ローカル保護要件／
 ファイル別要件の区別を修正して確認済み。package/privacyの独立レビューもPASS。
-読み取り設計レビューであり、実装承認・旧readerを実行した証拠・runtime受入れの合格ではない。
+読み取り設計レビューであり、旧readerを実行した証拠・runtime受入れの合格ではない。

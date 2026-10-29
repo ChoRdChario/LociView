@@ -1,4 +1,5 @@
 import type { ProjectSemanticProfile } from '../domain/projectProfile';
+import type { EditorCapabilities } from '../projectMetadata/editorAttribution';
 /** Isolated validation contract, specification 06 §§3/7/11–12. Not published wire adoption. */
 export const PACKAGE_FORMAT = 'lociview-project-package';
 export const PACKAGE_WIRE_VERSION = '1';
@@ -49,6 +50,7 @@ export interface AutomaticSummary {
   readonly blobEntryCount: number; readonly blobBytes: number;
 }
 interface Common {
+  readonly requiredCapabilities?: EditorCapabilities;
   readonly format: typeof PACKAGE_FORMAT; readonly wireVersion: typeof PACKAGE_WIRE_VERSION;
   readonly packageId: string; readonly createdByVersion: string; readonly memo?: string;
   readonly summary: AutomaticSummary; readonly blobs: readonly Entry[];

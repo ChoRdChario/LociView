@@ -48,12 +48,18 @@ function map2Records() {
   records.materialOverridesById[id('ovr')].appearance = { chroma: { enabled: false, keyColorSrgb: [0, 1, 0], tolerance: 0.2, softness: 0.5 } };
   return records;
 }
-async function workspaceFixture(semanticProfile: 'map1' | 'map2' = 'map1', records = semanticProfile === 'map2' ? map2Records() : fixture()) {
-  const source = ProjectMetadataSource.bootstrap(records.schema, records.identity, metadataLimits, { semanticProfile }).initialize(records);
+async function workspaceFixture(semanticProfile: 'map1' | 'map2' = 'map1', records = semanticProfile === 'map2' ? map2Records() : fixture(), editorName?: string) {
+  let source = ProjectMetadataSource.bootstrap(records.schema, records.identity, metadataLimits, { semanticProfile }).initialize(records);
   const rep = records.representationsById[id('rep')];
-  const provider = await readProjectScene(source.read(), metadataLimits, developmentContentVerifier([
+  let provider = await readProjectScene(source.read(), metadataLimits, developmentContentVerifier([
     { variantFamilyId: rep.variantFamilyId, representationId: rep.id, payloadDigest: rep.payloadDigest },
   ]));
+  if (editorName) {
+    source = source.prepareEdit(source.token, { kind: 'editCaption', captionId: id('cap'), edits: { title: 'Attributed title' } }, provider, 'a'.repeat(32), undefined, { kind: 'self-declared', name: editorName });
+    provider = await readProjectScene(source.read(), metadataLimits, developmentContentVerifier([
+      { variantFamilyId: rep.variantFamilyId, representationId: rep.id, payloadDigest: rep.payloadDigest },
+    ]));
+  }
   const bodies = new Map<string, Uint8Array>();
   for (const record of [rep, ...Object.values(records.mediaResourcesById)] as JsonObject[])
     bodies.set((record.blob as JsonObject).digest as string, (await developmentContentBytes(record))!);
@@ -119,6 +125,31 @@ async function blockScanFixture() {
 }
 
 describe('selected-Scene review snapshot (not View activation or external saving)', () => {
+  it('08b excludes only history declarations from Review/Clean while retaining literal caption names', async () => {
+    const sentinel = 'PRIVATE_EDITOR_SENTINEL', f = await workspaceFixture('map1', undefined, sentinel);
+    const rep = fixture().representationsById[id('rep')], provider = await readProjectScene(f.source.read(), metadataLimits, developmentContentVerifier([
+      { variantFamilyId: rep.variantFamilyId, representationId: rep.id, payloadDigest: rep.payloadDigest },
+    ]));
+    const source = f.source.prepareEdit(f.source.token, { kind: 'editCaption', captionId: id('cap'), edits: { body: sentinel } }, provider, 'b'.repeat(32));
+    const p = await readProjectScene(source.read(), metadataLimits, developmentContentVerifier([
+      { variantFamilyId: rep.variantFamilyId, representationId: rep.id, payloadDigest: rep.payloadDigest },
+    ]));
+    const host = { read: async () => ({ state: 'ready' as const, source, provider: p, publication: 'privacy' }) };
+    const clean = await CleanSourceCapture.prepare(host, source.token, f.store, metadataLimits);
+    expect(clean.output.editorDeclarations()).toEqual([]); clean.output.assertFreshInitialization();
+    expect(clean.output.read().history.changes).toHaveLength(2);
+    const review = await ReviewSourceCapture.prepare(host, source.token, { sceneId: id('scn') }, f.store, metadataLimits);
+    const parts: BlobPart[] = [];
+    await writeReviewArchive(review, f.store, new WritableStream({ write(b) { parts.push(b.slice() as BlobPart); } }), f.options);
+    const archive = await PackageArchive.inspect(new Blob(parts));
+    expect(archive.control.manifest.requiredCapabilities).toBeUndefined();
+    const snapshot = new TextDecoder().decode(await archive.entryBytes('review.json', L.snapshotBytes));
+    expect(snapshot).toContain(sentinel); // Authored text is intentionally not anonymized.
+    expect(snapshot).not.toContain('self-declared'); expect(snapshot).not.toContain('transaction:v2');
+    const chunks: BlobPart[] = [];
+    await writeCleanArchive(clean, f.store, new WritableStream({ write(b) { chunks.push(b.slice() as BlobPart); } }), f.options);
+    expect((await PackageArchive.inspect(new Blob(chunks))).control.manifest.requiredCapabilities).toBeUndefined();
+  });
   const make = (records: Record<string, any>) => ProjectMetadataSource.bootstrap(records.schema, records.identity, metadataLimits).initialize(records);
   const change = (source: ProjectMetadataSource, fn: (d: Record<string, any>) => void) =>
     ProjectMetadataSource.fromFullSource(A.save(A.change(A.load<Record<string, any>>(source.encodeFullSource()), fn)), source.proof, metadataLimits);
@@ -424,6 +455,33 @@ describe('Contribution originals and actual ZIP (injected base/CAS ports, no dur
     return fixedZip(entries);
   }
 
+  it.each(['map1', 'map2'] as const)('08b retains %s named originals and distinguishes anonymous delta from its named base', async profile => {
+    const name = 'PRIVATE_EDITOR_SENTINEL', f = await workspaceFixture(profile, undefined, name), b = await baseFor(f.source, f.store);
+    const workspace = await WorkspaceArchive.inspect(f.file, metadataLimits);
+    expect(workspace.source.editorDeclarations()).toEqual(f.source.editorDeclarations());
+    expect(workspace.archive.control.manifest.requiredCapabilities).toEqual(['editor-attribution-v1']);
+    await expect(WorkspaceArchive.inspect(await rewrite(f.file, m => { delete m.requiredCapabilities; }), metadataLimits)).rejects.toThrow();
+    const target = body(f.source, 'Anonymous delta'), capture = await ContributionSourceCapture.prepare(await session(target), target.token, b.base, b.bodies, metadataLimits);
+    const built = await output(capture, b.bodies), inspected = await ContributionArchive.inspect(built.file, b.base, b.bodies, metadataLimits);
+    expect(inspected.target.editorDeclarations()).toEqual(f.source.editorDeclarations());
+    expect(inspected.archive.control.manifest.requiredCapabilities).toEqual(['editor-attribution-v1']);
+    for (const bytes of (await unpackFixture(built.file)).filter(e => e.path.startsWith('changes/')).map(e => e.bytes))
+      expect(A.decodeChange(bytes).message ?? '').not.toContain('transaction:v2');
+    for (const capabilities of [undefined, [], ['unsupported']]) await expect(ContributionArchive.inspect(await rewrite(built.file, m => {
+      if (capabilities === undefined) delete m.requiredCapabilities; else m.requiredCapabilities = capabilities;
+    }), b.base, b.bodies, metadataLimits)).rejects.toThrow();
+    const namedHashes = new Set(f.source.editorDeclarations().map(d => d.changeId));
+    const older = ProjectMetadataSource.reopen(f.source.originalChanges().filter(bytes => !namedHashes.has(A.decodeChange(bytes).hash)), f.source.proof, metadataLimits);
+    const olderTarget = body(older, 'Anonymous restored branch');
+    const olderCapture = await ContributionSourceCapture.prepare(await session(olderTarget), olderTarget.token, b.base, b.bodies, metadataLimits);
+    const olderFile = await output(olderCapture, b.bodies), olderRead = await ContributionArchive.inspect(olderFile.file, b.base, b.bodies, metadataLimits);
+    expect(olderRead.target.includesDeclaredEditorNames).toBe(false);
+    expect(olderRead.base.source.includesDeclaredEditorNames).toBe(true);
+    expect(olderRead.archive.control.manifest.requiredCapabilities).toEqual(['editor-attribution-v1']);
+    await expect(ContributionArchive.inspect(await rewrite(olderFile.file, m => { delete m.requiredCapabilities; }), b.base, b.bodies, metadataLimits)).rejects.toThrow();
+    const anonymous = await workspaceFixture(profile);
+    await expect(WorkspaceArchive.inspect(await rewrite(anonymous.file, m => { m.requiredCapabilities = ['editor-attribution-v1']; }), metadataLimits)).rejects.toThrow();
+  });
   it.each(['map1', 'map2'] as const)('retains %s exact edit/revert originals and delta-only counts, with zero unchanged body reads', async profile => {
     const f = await workspaceFixture(profile), b = await baseFor(f.source, f.store), target = body(body(f.source, 'Temporary'), fixture().captionsById[id('cap')].body);
     const capture = await ContributionSourceCapture.prepare(await session(target), target.token, b.base, b.bodies, metadataLimits);
@@ -623,6 +681,25 @@ describe('complete backup originals and ZIP (not durable checkpoint or restore)'
     return fixedZip([{ path: 'manifest.json', bytes: manifest }, { path: 'manifest.sha256', bytes: encode(packageByteHash(manifest)) },
       ...payloads(m).map(e => ({ path: e.path, bytes: values.get(e.path)! }))]);
   }
+  it('08b requires a compatible reader when names survive only in retained backup base evidence', async () => {
+    const f = await backupFixture(), rep = fixture().representationsById[id('rep')];
+    const provider = await readProjectScene(f.source.read(), metadataLimits, developmentContentVerifier([
+      { variantFamilyId: rep.variantFamilyId, representationId: rep.id, payloadDigest: rep.payloadDigest },
+    ]));
+    const named = f.source.prepareEdit(f.source.token, { kind: 'editCaption', captionId: id('cap'), edits: { title: 'Historical named base' } }, provider, 'c'.repeat(32), undefined, { kind: 'self-declared', name: 'PRIVATE_BASE_EDITOR' });
+    const capture = await WorkspaceSourceCapture.prepare(await session(named), named.token, f.store, metadataLimits);
+    const controls = prepareWorkspaceManifest(capture, { ...f.options, packageId: id('pkg', 1) }), metadata = capture.metadataBytes();
+    const reference = (bytes: Uint8Array) => ({ sha256: packageByteHash(bytes), byteLength: bytes.length });
+    f.evidence.set(packageByteHash(metadata), metadata); f.evidence.set(packageByteHash(controls.manifest), controls.manifest);
+    f.rows[0] = { ...f.rows[0]!, workspaceManifestSha256: packageByteHash(controls.manifest), declaredHeads: named.heads,
+      evidence: { manifest: reference(controls.manifest), metadata: reference(metadata) }, completions: [{ observation: 'generated' }] };
+    const backup = await BackupSourceCapture.prepare(await session(f.source), f.source.token, f.bases, f.store, metadataLimits);
+    expect(backup.source.includesDeclaredEditorNames).toBe(false); expect(backup.description.includesDeclaredEditorNames).toBe(true);
+    const built = await output(backup, f.store), reopened = await BackupArchive.inspect(built.file, metadataLimits);
+    expect(reopened.source.includesDeclaredEditorNames).toBe(false);
+    expect(reopened.archive.control.manifest.requiredCapabilities).toEqual(['editor-attribution-v1']);
+    await expect(BackupArchive.inspect(await rewrite(built.file, m => { delete m.requiredCapabilities; }), metadataLimits)).rejects.toThrow();
+  });
   it.each(['map1', 'map2'] as const)('keeps %s full original history, multiple historical observations and deduplicated evidence/bodies', async profile => {
     const f = await backupFixture(false, profile), originalRows = JSON.stringify(f.rows), host = await session(f.source);
     const capture = await BackupSourceCapture.prepare(host, f.source.token, f.bases, f.store, metadataLimits);

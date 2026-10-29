@@ -122,7 +122,9 @@ export const projectSceneApplicationImports:Readonly<Record<string,readonly stri
   ],
   "src/projectScene/browserUiState.ts": [
     "../ui/context",
-    "../ui/resumeReference"
+    "../ui/resumeReference",
+    "../projectMetadata/editorAttribution",
+    "../projectMetadata/source"
   ],
   "src/projectScene/desktopEntry.ts": [
     "../nativeGs/app",
@@ -162,7 +164,8 @@ export const projectSceneApplicationImports:Readonly<Record<string,readonly stri
     "../projectMetadata/gsProxy",
     "../projectMetadata/persistence",
     "../scene/projectProvider",
-    "./mediaDisplay"
+    "./mediaDisplay",
+    "../projectMetadata/editorAttribution"
   ],
   "src/projectScene/hostPorts.ts": [
     "../projectMetadata/commands",
@@ -443,7 +446,9 @@ export const projectSceneApplicationImports:Readonly<Record<string,readonly stri
     "./validationGeneration",
     "./validationMaterials",
     "./validationProjection",
-    "./viewDisplay"
+    "./viewDisplay",
+    "../projectMetadata/editorAttribution",
+    "../projectMetadata/source"
   ],
   "src/projectScene/validationMaterials.ts": [
     "../domain/materialCoverage",

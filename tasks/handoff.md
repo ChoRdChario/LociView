@@ -18,21 +18,23 @@ todo owns current checks and checkpoint. PO also approved bounded MP4 AVC/AAC,
 M4A/AAC, MP3 and native-browser single-still HEIC in08, without a new dependency.
 The grouped08 workflow and subsequent Caption-action Undo/ordinary Point replacement
 are verified through final checks; todo owns exact evidence and the next unit.
-Local Undo remains distinct from history rollback; durable author-name mapping
-and different-profile replacement are separate remaining boundaries.
+Local Undo remains distinct from history rollback; optional future-change names
+are covered by08b below. Historical identity inference and different-profile
+replacement are not granted by these workflows.
 The independently reviewed[08a companion](../docs/specs/08a-gs-body-replacement-proposal.md)
 was PO-approved2026-10-29: GS-body replacement starts without an assigned Proxy
 and retains old bodies/history.08 is verified/pushed;08a is connected through
 file/correction/restore/cold; its final checks PASS in todo. The06a
 control reader preserves every audit and streams each fresh receipt snapshot;
 there is no cross-audit reuse. PO approved the[08b](../docs/specs/08b-shared-editor-name-policy-proposal.md)
-editor-name product policy2026-10-29 and authorized design concretization.08b now
-proposes exact change-message attribution, pre-await capture/retry, five-purpose
+editor-name product policy and its concrete technical implementation2026-10-29.
+08b defines exact change-message attribution, pre-await capture/retry, five-purpose
 privacy and a closed journal/manifest required-capability field. The latter stops
 old readers from opening named histories without disclosure, while retaining
-schema/map1/map2/root/proof/base evidence. That compatibility decision and product
-implementation remain PROPOSED; todo owns review/checks and the concrete next step.
-Existing browser-local names remain private; no product code was changed by design.
+schema/map1/map2/root/proof/base evidence. The compatibility change and integrated
+implementation are connected in the bounded ProjectScene path; todo owns executed
+review/checks, remaining gates and the next decision.
+Existing browser-local names remain private unless separately selected for sharing.
 General Windows HEIC and device/adoption/release gates remain separate.
 Keep existing comfortable-UI guidance, original bytes/history, atomic Session
 commands, file/recovery/evidence fences and one writer. Read-only reviews may run

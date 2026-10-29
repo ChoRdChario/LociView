@@ -18,7 +18,20 @@ npm run test:e2e -- --config playwright.desktop.config.ts desktop-large-gs.spec.
 npm run test:e2e -- --config playwright.desktop.config.ts desktop-gs-replacement.spec.ts
 npm run test:e2e -- --config playwright.desktop.config.ts desktop-smooth.spec.ts desktop-smooth-team.spec.ts
 npm run test:e2e -- --config playwright.desktop.config.ts desktop-smooth-capacity.spec.ts
+npm run test:e2e -- --config playwright.desktop.config.ts desktop-editor-attribution.spec.ts
 ```
+
+The08b editor-name lane connects two dedicated profiles through named edits,
+conflict resolution, anonymous delta against a named base, all five file purposes,
+first-backup restore and cold continuation. It also opens the named Project and
+Workspace with an actual fixed prefeature reader at the same local origin.
+`scripts/prepare-editor-attribution-old-reader.mjs` builds Git checkpoint6c3788e
+inside ignored artifacts, verifies the unchanged dependency lock, reuses installed
+dependencies and hashes its runtime files. No checkout, network, install or personal
+browser is used. That Git object must be available locally; a shallow checkout must
+obtain the fixed source before this lane can run. The old reader refusing input is
+separate evidence from the current reader's corruption checks. It is not a guarantee
+about arbitrary ancient readers or hand-edited raw storage. Todo owns actual results.
 
 The01g smooth lane uses actual Desktop source-alpha/chroma pixels, fallback and
 edit/Workspace/Review/restore/cold continuation. Its separate capacity case uses

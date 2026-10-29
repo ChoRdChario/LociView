@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { captureEditor, editorMessage, inspectEditorMessage, checkEditorCapability } from '../src/projectMetadata/editorAttribution';
 import * as A from '@automerge/automerge'; // Node-only Wasm initialization, never a browser import.
 import { ProjectMetadataSource, type MetadataLimits } from '../src/projectMetadata/source';
 import { inspectProjectCandidates } from '../src/domain/projectCandidates';
@@ -33,6 +34,43 @@ function field(source: ProjectMetadataSource, name: string) {
 }
 
 const originalBudget = { maxNodes: PACKAGE_LIMITS.inspectionNodes, maxWork: PACKAGE_LIMITS.inspectionWork };
+
+describe('08b editor declarations in original change headers', () => {
+  it('preserves exact Unicode and hash-owned declarations without changing actor identity or no-op semantics', async () => {
+    const { source } = create(), provider = await readProjectScene(source.read(), limits, developmentContentVerifier([]));
+    if (provider.kind !== 'scene-provider') throw Error('provider');
+    const name = 'Cafe\u0301 👩‍🔬', context = captureEditor({ kind: 'self-declared', name });
+    const next = source.prepareEdit(source.token, { kind: 'editCaption', captionId: id('cap'), edits: { title: 'shared edit' } }, provider, 'a'.repeat(32), undefined, context);
+    const declaration = next.editorDeclarations()[0]!;
+    expect(declaration.declaration.editor.name).toBe(name);
+    expect(declaration.changeId).toBe(field(next, 'title').candidates[0]!.changeId);
+    expect(source.editorDeclarations()).toEqual([]);
+    const nextProvider = await readProjectScene(next.read(), limits, developmentContentVerifier([]));
+    const unchanged = next.prepareEdit(next.token, { kind: 'editCaption', captionId: id('cap'), edits: { title: 'shared edit' } }, nextProvider, 'b'.repeat(32), undefined, context);
+    expect(unchanged.originalChanges()).toEqual(next.originalChanges());
+    expect(ProjectMetadataSource.fromFullSource(next.encodeFullSource(), next.proof, limits).editorDeclarations()).toEqual(next.editorDeclarations());
+    expect(next.originalChanges().filter(b => source.originalChanges().some(old => A.decodeChange(old).hash === A.decodeChange(b).hash))).toEqual(source.originalChanges());
+  });
+  it('strictly validates only the reserved v2 grammar and the exact reader requirement', () => {
+    const tx = 'a'.repeat(32), valid = editorMessage(tx, { kind: 'self-declared', name: '現地担当' });
+    expect(inspectEditorMessage(valid, limits)?.transactionId).toBe(tx);
+    expect(editorMessage(tx)).toBe(`lociview:transaction:v1:${tx}`);
+    expect(inspectEditorMessage('arbitrary historical message', limits)).toBeUndefined();
+    for (const message of [valid.replace('"name":', '"name":"fake","name":'), valid + ' ', valid.replace('self-declared', 'verified'), valid.replace('現地担当', ' name '), valid.replace('現地担当', '\\ud800')])
+      expect(() => inspectEditorMessage(message, limits)).toThrow();
+    for (const name of ['', ' ', 'x'.repeat(257), 'a\nb', '\ud800']) expect(() => captureEditor({ kind: 'self-declared', name })).toThrow();
+    for (const [value, required] of [[undefined,true],[[],false],[['unknown'],true],[['editor-attribution-v1'],false]] as const)
+      expect(() => checkEditorCapability(value, required)).toThrow();
+    expect(() => checkEditorCapability(['unknown'], true)).toThrow('対応したLociView');
+    expect(() => checkEditorCapability(undefined, true)).toThrow('保存記録が一致しません');
+    const { source } = create(), doc = A.change(A.clone(raw(source)), { message: 'lociview:transaction:v2:{' }, draft => {
+      draft.captionsById[id('cap')].title = new A.ImmutableString(canonical('invalid header'));
+    });
+    expect(() => ProjectMetadataSource.reopen(A.getAllChanges(doc), source.proof, limits)).toThrow('編集者情報を確認できません');
+    expect(() => ProjectMetadataSource.fromFullSource(A.save(doc), source.proof, limits)).toThrow('編集者情報を確認できません');
+    expect(() => source.appendOriginal(A.getAllChanges(doc))).toThrow('編集者情報を確認できません');
+  });
+});
 describe('attachment atomic candidate selection', () => {
   const provider = async (source: ProjectMetadataSource) => {
     const p = await readProjectScene(source.read(), limits, developmentContentVerifier([]));

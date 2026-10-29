@@ -1,6 +1,6 @@
 # LociView active work
 
-Updated2026-10-29. This is the single current plan and check record.
+Updated2026-10-30. This is the single current plan and check record.
 [Inventory](implementation-inventory.md) owns route-specific coverage;
 [map](../PROJECT_MAP.md) and [document index](../docs/README.md) route contracts/code.
 Git owns checkpoint identity. [Retained checkpoint evidence](../docs/history/development-through-2026-10-29/tasks/todo-before-daily-authoring.md)
@@ -56,7 +56,63 @@ unchanged-feature-classification checks pass; independent review has no findings
 No runtime change or new capacity guarantee; no runtime suite is needed for this
 documentation checkpoint.
 
-## Current boundary —08b editor-name design
+## Current boundary —08b verified ProjectScene checkpoint
+
+PO2026-10-29 approved08b technical design and the complete implementation, including
+the explicit old-reader refusal. Outcome: optional Project-local editor-name opt-in
+→ future confirmed edits/candidates → five-purpose disclosure/omission → receive,
+exact retry, restore and cold reopen, preserving originals and local work.
+Completed plan: implement bounded message/capability codec and Source/Session capture; connect
+journal/package requirements and purpose-specific disclosure; connect settings and
+candidate UI; focused invariant/fault checks and representative browser file flow;
+required serial checkpoint checks and independent final diff review, then suitable
+g0-baseline push. Root alone writes; bounded mapping/review agents are read-only.
+No new dependency/schema/proof/actor policy, general history UI or release. Stop
+only for a genuine new contract conflict/authority. Physical/offline gates remain.
+Start audit: pushed6c3788e on g0-baseline; only modelFacts stat marker, no content
+diff. Existing08b design review was valid; runtime evidence was pending at that audit.
+
+Implementation connects Source headers, pre-await capture (including GS workflow
+confirmation), retained Session media context, exact journal/package capability
+validation and purpose-specific disclosure through typed ports. Independent safety
+and UX reviews PASS after closing complete-durable-head validation, typed recovery
+messages and verified-base OR selected-target activation requirements. Normal
+anonymous recovery remains valid; insufficient immutable starts stop before publish.
+Focused source/Session/package/media/GS tests PASS. Recorded-DOM regressions from
+a new string append/static-slot shift were corrected; representative existing
+Scene/Caption/file controls PASS. No assertions or acceptance limits were relaxed.
+
+Desktop Chromium main08b flow PASS: two profiles, named conflict candidates and
+resolution, anonymous delta, all purposes, first restore/cold/edit, exact originals,
+and the actual fixed old reader's package/local reopen refusal. Final GS-specific
+browser case PASS with an artificial digest hold and another tab's UI-preference
+change; this is injected concurrency evidence, not a claim that the viewer exposes
+settings. Old-reader fixture uses fixed Git6c3788e and pinned installed dependencies
+below ignored.artifacts, without network/install/active-tree writes. Main flow
+preceded the later GS-only/anonymous-ancestor-base refinements; those have focused
+regressions and the GS final-browser lane. Main run1793281243803-14976 and GS
+run1793283948481-7688 each have one expected result, zero errors/flaky/skipped.
+Initial checkpoint stopped at a nullable TypeScript annotation (fixed); the next
+run was interrupted for the GS timing gap and is not PASS. Failure artifacts remain.
+The third run was also interrupted during process diagnosis and is not PASS.
+The completed verbose root run had134PASS files/3048PASS cases and one failed
+candidate-selector expectation:08b appends author information to the option label.
+Only that test changed to select the verified candidate's operationId and assert
+the exact body/anonymous-editor label. Its existing causal/resolution/image checks
+remain; the focused case and independent test-diff review PASS. The corrected
+final tree's `npm run check:checkpoint` exits0: typecheck,135PASS files,
+3049PASS tests/21 existing TODO, and normal/Harness/Validation/Desktop builds.
+Four-artifact `verify:heic-isolation` PASS. Final43-file source/test/script hashes
+match the checked tree, and all19 Desktop runtime files match the final GS browser
+build. No dependency/lockfile change. Known chunk-size warnings and existing TODOs
+remain; these checks do not qualify performance, physical iOS, offline or release.
+No automatic retry, test exclusion or relaxed assertion; prior failure artifacts
+and raw-tree hashes remain under `.artifacts/e2e/editor-attribution/`.
+Independent final safety/UX reviews PASS, including the later GS/base/test-selector
+corrections. Changed Markdown links, retained history and contract consistency PASS.
+This is a suitable g0-baseline development checkpoint; Git owns commit/push identity.
+
+## Previous verified boundary —08b design
 
 PO2026-10-29 approved the [08b product policy](../docs/specs/08b-shared-editor-name-policy-proposal.md)
 and authorized concretizing its design. Explicit Project-local opt-in records a
@@ -417,19 +473,29 @@ boundary from the earlier08 continuation. Former Proxy carry/rekey remains outsi
 PO's selected unassigned-surface policy. No new dependency/profile/capacity promise
 or general adoption follows from the owned500k source/renderer/file lane.
 
-Current [08b](../docs/specs/08b-shared-editor-name-policy-proposal.md) product policy
-is PO-approved2026-10-29; exact message, local opt-in/capture/retry, required-reader
-capability, purpose-specific disclosure and acceptance are now proposed in08b.
-Technical/compatibility implementation is not yet approved or implemented. Next
-judgment is the grouped old-reader refusal plus implementation described above,
-not the already approved sharing policy. Current08 browser-local names stay private.
+The [08b](../docs/specs/08b-shared-editor-name-policy-proposal.md) workflow is connected
+and verified within the exact scope above, including old-reader refusal. Private
+names stay private until the separate Project-local opt-in. The milestone audit
+keeps this on the accepted daily-use path; no additional fully specified daily-use
+unit was found in the current inventory. This is not overall app/adoption completion.
+
+Next decision: Windows HEIC direct use. The existing
+[decoder PoC](../scripts/heic-decoder-poc/POC-RESULT.md) records a technical PASS
+from2026-09-03, not a fresh device result. [Specification02§29.2](../docs/specs/02-storage-package-migration.md)
+still holds product connection for distribution materials and separate HEVC rights
+review. Choose either the current native-browser path with separate JPEG-export
+guidance, preserving HEIC originals, or productization preparation for the evaluated
+decoder. The latter can organize reproducible inputs/source/relink/notice materials
+and independent review without product activation or distribution. Decoder adoption,
+resolved distribution/rights conditions and the concrete ProjectScene integration
+contract are still separate decisions. Retain device/offline/release gates.
 
 Local Undo covers the named confirmed Caption actions in this editor, not every
 Project action or historical rollback. Native Point/different-profile replacement
 is not granted by same01a/01c replacement; saved07k GS already uses01c and is
 eligible by profile, without a new Native-conversion-route claim from this fixture.
-Portable HEIC still needs a decoder/license/distribution or derivative decision;
-native-only acceptance does not close that cross-browser requirement.
+Native-only HEIC acceptance does not close that cross-browser requirement;
+an original-plus-derivative workflow is not an already approved alternative.
 
 Earlier500k observations (about202s to editor,47s edit,232s backup) remain retained
 as performance evidence; the current owned replacement lane is recorded above.

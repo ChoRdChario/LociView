@@ -1,5 +1,6 @@
 import type { ProjectWorkspaceFS } from '../platform/fs';
 import type { OriginBlobStore } from '../projectMetadata/blobStore';
+import { checkEditorCapability } from '../projectMetadata/editorAttribution';
 import { fail, type MetadataLimits } from '../projectMetadata/format';
 import { json, newId, readReceipt, technicalId, withMetadataRead, writeReceipt } from '../projectMetadata/persistence';
 import { ProjectMetadataSource } from '../projectMetadata/source';
@@ -134,6 +135,7 @@ export class BackupOutputJob {
     const source = ProjectMetadataSource.fromFullSource(originals[0]!.bytes, { identity: m.identity, envelope: m.metadataEnvelope }, packageSourceLimits(limits));
     const evidence = m.baseEvidence.map((reference, i) => ({ reference, bytes: originals[i + 3]!.bytes }));
     const description = await inspectBackupOriginals(source, originals[2]!.bytes, evidence, limits);
+    checkEditorCapability(m.requiredCapabilities, description.includesDeclaredEditorNames);
     if (json(description.inventory) !== json(canonicalControl(originals[1]!.bytes)) || json(description.blobs) !== json(m.blobs) ||
       json(description.summary) !== json(m.summary) || manifest.length + 64 + originals[1]!.bytes.length + originals[2]!.bytes.length + description.baseControlBytes > L.controlsBytes) fail('output-source');
     const start = await readReceipt<{ label?: string }>(fs, `${path}start.json`, limits);

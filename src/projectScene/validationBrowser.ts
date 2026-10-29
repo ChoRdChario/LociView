@@ -56,7 +56,8 @@ export async function createValidationBrowserWorkspace(document: Document, compo
     const connection = await openBrowserMetadataStorage(name, create);
     return { ...connection, factory: () => observed(connection.factory(), method => `io.idb.${method}`) };
   };
-  const options = { base, timing, lazyImages:composition.progressivePresentation, coordinator: ProjectMutationCoordinator.browser(locks), fileLimits: policy.nonGs, filePolicy:composition.filePolicy, packageLocks: locks,
+  const uiState = createValidationUiState();
+  const options = { base, timing, editorSettings: uiState.editorSettings, lazyImages:composition.progressivePresentation, coordinator: ProjectMutationCoordinator.browser(locks), fileLimits: policy.nonGs, filePolicy:composition.filePolicy, packageLocks: locks,
     generations: (id: string) => { const original = `${validationArea}-${id}`, prefix = `${original}-generation-`;
       return { listGenerations: async () => (await browserMetadataDatabaseNames()).filter(name => name.startsWith(prefix)).map(name => name.slice(prefix.length)),
         originalDatabasePresent: () => browserOriginalDatabasePresent(original),
@@ -65,7 +66,6 @@ export async function createValidationBrowserWorkspace(document: Document, compo
     store: new OriginBlobStore(base, { maxBlobBytes: Math.max(policy.nonGs.maxFileBytes,policy.gs.maxFileBytes),
       maxChunkBytes: 16 * 1024 * 1024, maxChunks: 100_000, metadata: validationMetadataLimits }, locks) };
   const storage = (id: string, create: boolean) => openStorage(`${validationArea}-${id}`, create);
-  const uiState = createValidationUiState();
   const scratch=createReviewEditScratch(base);
   const workspace = createValidationWorkspace(document, { ...options,smoothDisplay:!!composition.smoothDisplay,progressivePresentation:composition.progressivePresentation,reviewEditArchive:{write:produce=>workspaceFileOperation(locks,()=>scratch.write(produce))},initialFiles:composition.initialFiles,openLegacy:composition.openLegacy,mountEditor:composition.mountEditor,introduction:composition.introduction,lastProject: uiState.lastProject,
     storageEstimate: typeof navigator.storage?.estimate === 'function' ? () => navigator.storage.estimate() : undefined, localSettings: uiState.localSettings,

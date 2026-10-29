@@ -1,4 +1,5 @@
 import { usePointAnchorProof, type PointAnchorProof } from './pointAnchorProof';
+import { editorMessage, inspectEditorMessage, EditorAttributionError, type LocalEditorContext, type EditorDeclaration } from './editorAttribution';
 import * as A from '@automerge/automerge/slim';
 import { inspectProjectCandidates } from '../domain/projectCandidates';
 import { admitProjectRecords, checkProjectHeader, projectRecordMaps } from '../domain/projectRecords';
@@ -19,6 +20,7 @@ export type { MetadataLimits, MetadataProof } from './format';
  * interactive session. Callers initialize local Wasm before using this module.
  */
 export class ProjectMetadataSource {
+  private declarations?: readonly Readonly<{ changeId: string; declaration: EditorDeclaration }>[];
   private constructor(private readonly doc: PhysicalDoc, readonly proof: MetadataProof, private readonly limits: MetadataLimits,
     private readonly snapshot: ReturnType<typeof inspectPhysical>) {}
 
@@ -50,7 +52,7 @@ export class ProjectMetadataSource {
         if (persisted!.length !== bytes.length || persisted!.some((v, i) => v !== bytes[i])) fail('original-bytes');
       }
       return ProjectMetadataSource.validated(doc, p, limits);
-    } catch (error) { if (error instanceof MetadataSourceError) throw error; return fail('reopen'); }
+    } catch (error) { if (error instanceof MetadataSourceError || error instanceof EditorAttributionError) throw error; return fail('reopen'); }
   }
 
   private static validated(doc: PhysicalDoc, proof: MetadataProof, limits: MetadataLimits): ProjectMetadataSource {
@@ -68,7 +70,7 @@ export class ProjectMetadataSource {
       const doc = A.load<Record<string, any>>(bytes.slice(), { allowMissingChanges: false });
       if (A.getMissingDeps(doc, []).length) fail('full-source-dependencies');
       return ProjectMetadataSource.validated(doc, proof, limits);
-    } catch (error) { if (error instanceof MetadataSourceError) throw error; return fail('full-source-invalid'); }
+    } catch (error) { if (error instanceof MetadataSourceError || error instanceof EditorAttributionError) throw error; return fail('full-source-invalid'); }
   }
 
   // This instance owns an immutable doc. Storage reads still reopen and validate
@@ -80,6 +82,14 @@ export class ProjectMetadataSource {
   get token(): string { return this.snapshot.history.token; }
   get heads(): string[] { return A.getHeads(this.doc).sort(); }
   originalChanges(): Uint8Array[] { return A.getAllChanges(this.doc).map(b => b.slice()); }
+  /** Owned immutable header projection; never joins by actor, name or transaction ID. */
+  editorDeclarations() {
+    return this.declarations ??= Object.freeze(A.getAllChanges(this.doc).flatMap(bytes => {
+      const change = A.decodeChange(bytes), declaration = inspectEditorMessage(change.message, this.limits);
+      return declaration ? [Object.freeze({ changeId: change.hash, declaration })] : [];
+    }));
+  }
+  get includesDeclaredEditorNames(): boolean { return this.editorDeclarations().length > 0; }
 
   /** Closed history-free export profile: one empty root and one population change.
    * Scalar uniqueness/current-value equality are checked by the clean reader. */
@@ -122,13 +132,13 @@ export class ProjectMetadataSource {
       if (byHash.size === original.length) return this;
       return ProjectMetadataSource.reopen([...byHash.values()], this.proof, this.limits);
     } catch (error) {
-      if (error instanceof MetadataSourceError) throw error;
+      if (error instanceof MetadataSourceError || error instanceof EditorAttributionError) throw error;
       return fail('append-original');
     }
   }
 
   /** Internal typed command preparation; the Session supplies its own verified read. */
-  prepareEdit(expectedToken: string, command: MetadataEdit, provider: ProjectProviderRead, transactionId: string, pointProof?: PointAnchorProof): ProjectMetadataSource {
+  prepareEdit(expectedToken: string, command: MetadataEdit, provider: ProjectProviderRead, transactionId: string, pointProof?: PointAnchorProof, editor?: LocalEditorContext): ProjectMetadataSource {
     if (expectedToken !== this.token || provider.kind !== 'scene-provider' || provider.token !== this.token) return fail('stale-token');
     if (!/^[0-9a-f]{32}$/.test(transactionId)) return fail('transaction-id');
     const edits = planMetadataEdit(provider, command, this.limits, usePointAnchorProof(pointProof, this, command, transactionId)), creating = new Set<string>();
@@ -138,7 +148,7 @@ export class ProjectMetadataSource {
       if (creating.has(edit.id) || Object.keys(projectRecordMaps).some(map => Object.hasOwn(this.doc[map], edit.id))) fail('record-id-exists');
       creating.add(edit.id);
     }
-    const doc = A.change(A.clone(this.doc), { message: `lociview:transaction:v1:${transactionId}` }, draft => {
+    const doc = A.change(A.clone(this.doc), { message: editorMessage(transactionId, editor) }, draft => {
       // Pinned Automerge may encode assignment of the current conflict winner
       // as deletion of only its rivals. Our atomic profile requires a whole-field
       // write: remove all observed values, then set the explicit choice in the

@@ -1,4 +1,5 @@
 import { parseJsonWithoutDuplicateMembers } from '../core/json';
+import { hasEditorCapability, EditorAttributionError } from '../projectMetadata/editorAttribution';
 import { cloneCanonicalValue, reject, type JsonObject, type JsonValue } from '../domain/values';
 import { canonical } from '../domain/projectGraphSupport';
 import { ProjectRecordFields } from '../domain/projectRecordFields';
@@ -32,7 +33,7 @@ export function canonicalControl(input: Uint8Array): JsonValue {
   if (encoded.length !== input.length || encoded.some((b, i) => b !== input[i])) fail('canonical');
   return root;
 }
-const common = ['format', 'wireVersion', 'packageId', 'createdByVersion', 'memo', 'summary', 'blobs', 'payloadTotals', 'purpose'];
+const common = ['format', 'wireVersion', 'packageId', 'createdByVersion', 'memo', 'summary', 'blobs', 'payloadTotals', 'purpose', 'requiredCapabilities'];
 const causal = ['identity', 'metadataEnvelope', 'targetHeads'];
 const purposeKeys = {
   teamWorkspace: [...causal, 'metadata'], clean: [...causal, 'metadata'],
@@ -44,6 +45,7 @@ function checkedManifest(root: JsonValue): { manifest: PackageManifest; payloads
   const purpose = c.required(obj, 'purpose', []);
   c.enum(purpose, Object.keys(purposeKeys), ['purpose']);
   const p = purpose as PackagePurpose, r = c.shape(obj, [...common, ...purposeKeys[p]], []);
+  if (Object.hasOwn(r, 'requiredCapabilities') && (!hasEditorCapability(r.requiredCapabilities) || p === 'clean' || p === 'review')) throw new EditorAttributionError('invalid-capability');
   const req = (key: string) => c.required(r, key, []);
   c.enum(req('format'), [PACKAGE_FORMAT], ['format']); c.enum(req('wireVersion'), [PACKAGE_WIRE_VERSION], ['wireVersion']);
   c.id(req('packageId'), 'pkg', ['packageId']);

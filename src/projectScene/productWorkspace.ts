@@ -46,6 +46,7 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
     ...productSources(host,navigation?.smoothDisplay),
     openProject: navigation?.openProject, projectNavigationBlocked: navigation?.projectNavigationBlocked, resumedLastProject: navigation?.resumedLastProject, storageEstimate: navigation?.storageEstimate,
     localSettings: navigation?.localSettings,
+    editorSettings: host.editorSettings,
     createModelPreview: renderCandidate ? () => {
       let token = '', sceneId = '';
       const preview = createModelCandidatePreview(document, renderCandidate, () => !disposed && token === read().token && sceneId === viewportScene,open=>{previewOpen=open;if(open)mainRuntime?.setActive(false);

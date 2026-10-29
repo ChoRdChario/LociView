@@ -15,7 +15,8 @@ export class WorkspaceSourceCapture {
   readonly kind = 'workspace-source-capture';
   private constructor(private readonly bytes: Uint8Array, readonly token: string, readonly publication: string | null,
     readonly proof: MetadataProof, readonly targetHeads: readonly string[], readonly metadata: Entry,
-    readonly blobs: readonly Entry[], readonly summary: AutomaticSummary, readonly bodyRefs: readonly StoredBlobRef[]) { Object.freeze(this); }
+    readonly blobs: readonly Entry[], readonly summary: AutomaticSummary, readonly bodyRefs: readonly StoredBlobRef[],
+    readonly includesDeclaredEditorNames: boolean) { Object.freeze(this); }
   metadataBytes(): Uint8Array { return this.bytes.slice(); }
 
   static async prepare(session: Pick<MetadataProjectSession, 'read'>, expectedToken: string,
@@ -86,6 +87,6 @@ export class WorkspaceSourceCapture {
     const summary: AutomaticSummary = Object.freeze({ algorithm: summaryAlgorithm(reopened.semanticProfile), scope: 'entireHistory',
       entityClasses: counts.entityClasses, fieldClasses: counts.fieldClasses, blobEntryCount: closure.entries.length, blobBytes: measuredBytes });
     return new WorkspaceSourceCapture(bytes, expectedToken, publication, reopened.proof,
-      Object.freeze(reopened.heads), metadata, closure.entries, summary, closure.semanticRefs);
+      Object.freeze(reopened.heads), metadata, closure.entries, summary, closure.semanticRefs, reopened.includesDeclaredEditorNames);
   }
 }

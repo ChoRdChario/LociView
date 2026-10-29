@@ -61,9 +61,10 @@ windows and their galleries, sharing the workspace-level image viewer.
 Caption-action undo and tags to finite planners in `captionAuthoring.ts`, `captionUndo.ts` and
 `sceneOrganization.ts`. Startup recovery can explicitly restore a retained Scene
 without restoring its deleted children. Local name settings stay in browser UI
-state. [08b](docs/specs/08b-shared-editor-name-policy-proposal.md) records the approved
-future-sharing policy and proposed change-message/required-reader design; it is
-not an implemented identity system or a ratified compatibility change.
+state. [08b](docs/specs/08b-shared-editor-name-policy-proposal.md) owns the PO-approved
+change-message/required-reader extension for optional future self-declared names;
+`projectMetadata/editorAttribution.ts` owns its bounded codec. It is not an identity
+system; todo owns the connected implementation's executed scope and remaining gates.
 `captionReactivation.ts` derives only restored existing media from an exact
 local base/change batch; Session verifies those bytes before pending and again
 on recovery without changing journal semantics. [Specification08](docs/specs/08-daily-authoring-workflow.md) owns semantics;

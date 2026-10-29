@@ -82,6 +82,7 @@ import { identityPlacement, prepareValidationModel, sealValidationRecord } from 
 import { validationModelFacts, validationReceivedFacts } from '../src/projectFiles/modelFacts';
 import { ValidationContent } from '../src/projectFiles/content';
 import { ProjectMetadataSource } from '../src/projectMetadata/source';
+import { fixture } from './helpers/projectRecordsFixture';
 import { planRemoteChanges } from '../src/projectMetadata/remote';
 import { planNavigation } from '../src/ui/projectScene/navigationState';
 import { planMaterial, materialTargetKey, editMaterialDraft, type MaterialIntentRequest } from '../src/ui/projectScene/materialState';
@@ -463,11 +464,11 @@ class TestFS extends MemoryFS {
     return { size: file.size, stream: () => { this.reads++; return file.stream(); } }; }
 }
 
-async function openFileCaption(modelBytes = glb(),profile:'map1'|'map2'='map1') {
+async function openFileCaption(modelBytes = glb(),profile:'map1'|'map2'='map1', editorSettings?: Parameters<typeof openValidationHost>[0]['editorSettings']) {
   const fs = new TestFS(), locks = lockManager(), run = newId(), factory = storageFactory();
   const coordinator = ProjectMutationCoordinator.browser(locks);
   const store = new OriginBlobStore(fs, { maxBlobBytes: budget.maxFileBytes, maxChunkBytes: 1_000_000, maxChunks: 10000, metadata }, locks);
-  const options = { base: fs, coordinator, store, fileLimits: budget, decode, run, packageLocks: locks,
+  const options = { base: fs, coordinator, store, fileLimits: budget, decode, run, packageLocks: locks, editorSettings,
     openStorage: async () => ({ factory, dispose: async () => {} }) };
   const initial = prepareValidationCreation(await prepareValidationProject({ run, title: '追加の検証', models: [{ label: '3Dモデル', bytes: modelBytes }] }, budget, decode),profile);
   const host = await openValidationHost({ ...options, initial }), workspace = createSavedWorkspace(new RecordedDocument().asDocument(), host);
@@ -2521,6 +2522,24 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect(createValidationUiState(storage).localSettings.read()).toBe('現地担当'); expect(settings.ui.projectSceneResume).toBeNull();
     expect(settings.localSettings.save('bad\nname')).toBe(false); expect(settings.localSettings.save('a'.repeat(257))).toBe(false);
     const denied = createValidationUiState(() => { throw Error('unavailable'); }); expect(denied.localSettings.save('保持する入力')).toBe(false); expect(denied.localSettings.read()).toBe('');
+  });
+  it('08b scopes opt-in to the exact local Project lineage without silently sharing private names', () => {
+    const rows = new Map<string,string>(), storage = () => ({ getItem: (key: string) => rows.get(key) ?? null, setItem: (key: string,value: string) => { rows.set(key,value); } });
+    const state = createValidationUiState(storage), proof = ProjectMetadataSource.bootstrap(fixture().schema, fixture().identity, metadata).proof;
+    expect(state.localSettings.save('私的な名前')).toBe(true);
+    expect(state.editorSettings.read(proof)).toEqual({ enabled: false, name: '私的な名前' });
+    expect(state.editorSettings.save(proof, { enabled: true, name: ' Cafe\u0301 ' })).toBe(true);
+    expect(createValidationUiState(storage).editorSettings.read(proof)).toEqual({ enabled: true, name: 'Cafe\u0301' });
+    const different = { ...proof, envelope: { ...proof.envelope, lineageProof: { ...proof.envelope.lineageProof, rootChangeHash: 'f'.repeat(64) } } };
+    expect(state.editorSettings.read(different).enabled).toBe(false);
+    expect(createValidationUiState(() => ({ getItem: () => null, setItem: () => {} })).editorSettings.read(proof).enabled).toBe(false);
+    expect(state.editorSettings.save(proof, { enabled: true, name: '' })).toBe(false);
+    expect(state.editorSettings.save(proof, { enabled: false, name: '別名' })).toBe(true);
+    expect(state.editorSettings.read(proof)).toEqual({ enabled: false, name: '別名' });
+    const denied = createValidationUiState(() => { throw Error('denied'); }); expect(denied.editorSettings.save(proof, { enabled: true, name: '入力' })).toBe(false);
+    expect(denied.editorSettings.read(proof).enabled).toBe(false);
+    const scoped = [...rows.keys()].find(key => key.startsWith('lociview.ui.editor-attribution-1:'))!;
+    rows.set(scoped, JSON.stringify({ enabled: true, name: '' })); expect(() => state.editorSettings.read(proof)).toThrow();
   });
   it('named resume shows the actual last Project and protects edits/file selection before switching, saving and cold reopen', async () => {
     const f = resumeWorkspaceFixture(), a = await f.seed('調査A'), b = await f.seed('調査B'); f.reference({ run: a.run, mode: 'edit' });
@@ -5755,7 +5774,13 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     Object.assign(input, { files: [] }); input.fire('change');
     expect(host.authority.read().resources.captions[captionId]!.body.kind).toBe('unresolved'); expect(body.readOnly).toBe(true);
     const area = named('記録の競合', editor), select = h.all(area).find(n => n.tag === 'select')!;
-    const option = select.children.find(n => n.textContent.endsWith('：相手からの内容'))!; select.value = option.value; select.fire('change');
+    const provider = host.read().provider; if (provider?.kind !== 'scene-provider') throw Error('provider');
+    const candidate = provider.inspection.candidates.fields.find(f => f.path.join('/') === `captionsById/${captionId}/body`)!.candidates
+      .find(c => c.value.kind === 'value' && c.value.value === '相手からの内容')!;
+    expect(candidate).toBeDefined();
+    const option = select.children.find(n => n.value === candidate.operationId)!; expect(option).toBeDefined();
+    expect(option.textContent).toMatch(/：相手からの内容（\u2068編集者情報なし\u2069）$/u);
+    select.value = option.value; select.fire('change');
     expect(button('ファイルに保存', named('ファイル')).disabled).toBe(true);
     named('検索', editor).fire('input'); expect(h.all(area).find(n => n.tag === 'select')!.value).toBe(option.value);
     await edited(() => button('競合を解消', area).fire('click'));
@@ -8787,6 +8812,31 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect(Object.values(cold.authority.read().mediaData!.images!)[0]!.base64).toBe(fixtureMedia[0]!.base64);
     await cold.dispose();
   }, 15_000);
+  it('08b freezes the pre-await editor through media decode, deferred staging retry and cold publication recovery', async () => {
+    let preference = { enabled: false, name: '担当A' };
+    const editorSettings = { read: () => preference, save: (_proof: unknown, value: typeof preference) => { preference = value; return true; } };
+    const h = await openFileCaption(glb(), 'map2', editorSettings);
+    preference = { enabled: true, name: '担当A' };
+    let release!: (value: ArrayBuffer) => void;
+    const file = { name: '追加PNG', size: png.length, arrayBuffer: vi.fn(() => new Promise<ArrayBuffer>(resolve => { release = resolve; })) };
+    const put = vi.spyOn(h.store, 'put').mockRejectedValueOnce(Error('injected body quota'));
+    const operation = h.host.authority.addMediaFile!(h.host.read().source!.token, { file, sceneId: h.s.sceneId, captionId: h.captionId,
+      attachmentId: `att_${newId()}`, eventId: `evt_${newId()}`, orderKey: 'A' });
+    await vi.waitFor(() => expect(file.arrayBuffer).toHaveBeenCalledOnce());
+    const failed = expect(operation).rejects.toThrow('injected body quota');
+    preference = { enabled: true, name: '担当B' }; release(png.slice().buffer as ArrayBuffer); await failed;
+    h.fs.reject = path => path.endsWith('/published.json');
+    await expect(h.host.authority.retry!()).rejects.toThrow('injected quota');
+    expect(put).toHaveBeenCalledTimes(2);
+    const paths = (await h.fs.list(`${validationArea}/${h.options.run}/`)).filter(path => path.endsWith('.amchange'));
+    const originals = await Promise.all(paths.map(path => h.fs.readBytes(path)));
+    await h.workspace.dispose(); h.fs.reject = () => false;
+    const cold = await openValidationHost(h.options); await cold.authority.retry!();
+    expect(cold.read().source!.editorDeclarations().map(d => d.declaration.editor.name)).toEqual(['担当A']);
+    for (const bytes of originals) expect(cold.read().source!.originalChanges()).toContainEqual(bytes);
+    expect(captionAttachments(cold.authority.read().mediaData, h.captionId).ready).toHaveLength(1);
+    await cold.dispose();
+  });
   it('retries failed PNG staging from owned input and cold-recovers prepared attachment changes without duplication', async () => {
     const { host, workspace, s, options, captionId, fs, store } = await openFileCaption();
     const original = host.read().source!.token, bytes = png.slice();

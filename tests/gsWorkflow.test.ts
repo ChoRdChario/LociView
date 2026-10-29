@@ -1,4 +1,5 @@
 import {readFileSync} from 'node:fs';
+import { captureEditor } from '../src/projectMetadata/editorAttribution';
 import {meshSourceProfile} from '../src/projectFiles/meshSource';
 import { describe,it,expect,vi } from 'vitest';
 import * as A from '@automerge/automerge';
@@ -54,6 +55,19 @@ async function setup(fileBacked=false,budget:ProjectFilePolicyInput=limits,trans
   const workflow=createGsProxyWorkflow(service.content,read,(token,command)=>service.session.edit(token,command));return {...service,fs,storage,store,locks,read,target,workflow};
 }
 describe('01c same-GS Proxy commands and durable facts',()=>{
+  it('08b captures the editor before the first Proxy-confirmation read and keeps it through preparation', async () => {
+    const r = await setup(), { token, ...target } = await r.target(), bytes = triangleGlb();
+    let name = '確定した担当A', block = false, release!: () => void, entered!: () => void;
+    const gate = new Promise<void>(resolve => { release = resolve; }), started = new Promise<void>(resolve => { entered = resolve; });
+    const current = async () => { if (block) { block = false; entered(); await gate; } return r.read(); };
+    const capture = vi.fn(() => captureEditor({ kind: 'self-declared', name }));
+    const workflow = createGsProxyWorkflow(r.content, current, (currentToken, command, editor) => r.session.edit(currentToken, command, editor), capture);
+    const selected = await workflow.prepare(token, target, { name: 'surface.glb', size: bytes.length, arrayBuffer: async () => Uint8Array.from(bytes).buffer });
+    expect(capture).not.toHaveBeenCalled(); block = true;
+    const committed = workflow.commit(token, selected.id); await started; name = '後から設定した担当B'; release(); await committed;
+    expect(capture).toHaveBeenCalledOnce();
+    expect((await r.session.read()).source!.editorDeclarations().map(d => d.declaration.editor.name)).toEqual(['確定した担当A']);
+  });
   it('refuses material commands on GS, Point and an opaque Mesh Proxy before storage mutation',async()=>{
     const r=await setup(),{token,...target}=await r.target(),bytes=triangleGlb();
     const prepared=await r.workflow.prepare(token,target,{name:'surface.glb',size:bytes.length,arrayBuffer:async()=>Uint8Array.from(bytes).buffer});await r.workflow.commit(token,prepared.id);r.workflow.completed();

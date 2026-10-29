@@ -658,7 +658,9 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
         choice.disabled = busy || dirty() || ports.otherPending(); choice.setAttribute('aria-pressed', String(scene.id === sceneId)); scenes.append(choice);
       }
       if (!draft) draft = beginCaptionDraft(detailContext().source);
-      list.render(listContext()); inclusion.render(includeContext()); detail.render({ ...detailContext(), windowBlock: busy || pending || windowMoving || ports.otherPending() ? '現在の操作を完了してください。' : null });
+      list.render(listContext()); inclusion.render(includeContext()); detail.render({ ...detailContext(),
+        editorFields: memory().selectedCaptionId ? ports.captionEditors?.(memory().selectedCaptionId!) : undefined,
+        windowBlock: busy || pending || windowMoving || ports.otherPending() ? '現在の操作を完了してください。' : null });
       previousCaption.disabled = busy || ports.otherPending() || planCaptionList(listContext(), { kind: 'step', direction: 'previous' }).kind !== 'change';
       nextCaption.disabled = busy || ports.otherPending() || planCaptionList(listContext(), { kind: 'step', direction: 'next' }).kind !== 'change';
       windows.render({ source: listContext().source, memory: windowMemory(), selectedId: selected, moveBlock: windowBlock() });

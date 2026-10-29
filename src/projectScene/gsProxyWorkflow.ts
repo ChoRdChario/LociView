@@ -1,4 +1,5 @@
 import type { GsProxyTarget, GsProxyCommand } from '../projectMetadata/gsProxy';
+import type { LocalEditorContext } from '../projectMetadata/editorAttribution';
 import { readGsProxyTarget } from '../projectMetadata/gsProxy';
 import { newId } from '../projectMetadata/persistence';
 import { cloneCanonicalValue, type JsonObject } from '../domain/values';
@@ -10,7 +11,7 @@ import type { MediaFileSelection } from './mediaDisplay';
 
 /** Input preparation owns its captured target; Session alone publishes the eventual command. */
 export function createGsProxyWorkflow(content: ValidationContent, current: ()=>Promise<ProjectProviderRead>,
-  commit: (token:string,command:GsProxyCommand)=>Promise<unknown>) {
+  commit: (token:string,command:GsProxyCommand,editor?:LocalEditorContext)=>Promise<unknown>, capture?:()=>LocalEditorContext) {
   let prepared: { id:string; token:string; target:GsProxyTarget; proxy?:JsonObject } | undefined;
   let generation=0,journalOwned=false;
   const cancel=()=>{if(journalOwned)return;generation++;if(prepared?.proxy)content.releasePreparedModel(prepared.proxy.id as string);prepared=undefined;};
@@ -40,6 +41,7 @@ export function createGsProxyWorkflow(content: ValidationContent, current: ()=>P
     },
     async commit(token:string,id:string){
       const selected=prepared;if(!selected||selected.id!==id||selected.token!==token)throw Error('位置指定用の面を選び直してください。');
+      const editor=capture?.();
       const {revision:oldRevision,binding:oldBinding,gs}=await check(token,selected.target), {proxy}=selected;
       const revision=await sealValidationRecord('asset-revision',{id:`rev_${newId()}`,assetId:selected.target.assetId,parentRevisionId:oldRevision.id!,
         representationIds:[gs.id!,...(proxy?[proxy.id!]:[])],anchorCompatibilityClasses:oldRevision.anchorCompatibilityClasses!,provenance:{origin:'derived',inputBlobDigests:proxy?[(proxy.blob as JsonObject).digest!]:[]}});
@@ -48,7 +50,7 @@ export function createGsProxyWorkflow(content: ValidationContent, current: ()=>P
       await check(token,selected.target);
       journalOwned=true;
       let result:unknown;
-      try{result=await commit(token,{kind:proxy?selected.target.expectedProxyId===null?'attachGsProxy':'changeGsProxy':'removeGsProxy',...selected.target,revision,binding,...(proxy?{proxy}:{})});}
+      try{result=await commit(token,{kind:proxy?selected.target.expectedProxyId===null?'attachGsProxy':'changeGsProxy':'removeGsProxy',...selected.target,revision,binding,...(proxy?{proxy}:{})},editor);}
       catch(error){try{await current();journalOwned=false;}catch{/* Session owns interrupted bytes until its exact retry completes. */}throw error;}
       journalOwned=false;
       if(prepared===selected)prepared=undefined;content.releasePreparedModels();return result;

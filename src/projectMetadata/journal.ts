@@ -1,4 +1,5 @@
 import * as A from '@automerge/automerge/slim';
+import { hasEditorCapability, checkEditorCapability, localEditorMessageMatches, inspectEditorMessage, EditorAttributionError, type EditorCapabilities } from './editorAttribution';
 import type { ProjectWorkspaceFS } from '../platform/fs';
 import { cloneCanonicalValue, type JsonObject } from '../domain/values';
 import { ProjectRecordFields } from '../domain/projectRecordFields';
@@ -13,6 +14,7 @@ import { assertContributionBaseInReceiver, frozenBaseSource } from '../projectPa
 import { readManifestControl } from '../projectPackage/manifest';
 
 export interface JournalStart {
+  requiredCapabilities?: EditorCapabilities;
   transactionId: string;
   predecessor: string | null;
   repositoryId: string;
@@ -47,7 +49,8 @@ function heads(value: unknown): asserts value is string[] {
     json(value) !== json(sorted([...new Set(value)]))) fail('journal-heads');
 }
 function validateStart(s: JournalStart, limits: MetadataLimits): void {
-  if (!s || Object.keys(s).sort().join(',') !== 'baseHeads,predecessor,proof,purpose,repositoryId,transactionId') fail('journal-start');
+  if (!s || Object.keys(s).filter(k => k !== 'requiredCapabilities').sort().join(',') !== 'baseHeads,predecessor,proof,purpose,repositoryId,transactionId') fail('journal-start');
+  if (Object.hasOwn(s, 'requiredCapabilities') && !hasEditorCapability(s.requiredCapabilities)) throw new EditorAttributionError('invalid-capability');
   technicalId(s.transactionId); technicalId(s.repositoryId); if (s.predecessor !== null) technicalId(s.predecessor);
   checkedProof(s.proof, limits); heads(s.baseHeads);
   if (s.purpose === 'initialize' || s.purpose === 'importWorkspace' || s.purpose === 'restoreBackup' || s.purpose === 'importClean') {
@@ -103,6 +106,7 @@ export class TransactionJournal {
       const children = entries.filter(e => e.start.predecessor === predecessor);
       if (children.length !== 1) fail('journal-chain');
       const child = children[0]!;
+      if (chain.length && hasEditorCapability(chain.at(-1)!.start.requiredCapabilities)) checkEditorCapability(child.start.requiredCapabilities, true);
       if (chain.length && (!chain.at(-1)!.publication || child.start.repositoryId !== chain[0]!.start.repositoryId ||
         json(child.start.proof) !== json(chain[0]!.start.proof))) fail('journal-chain');
       chain.push(child); predecessor = child.start.transactionId;
@@ -218,7 +222,8 @@ export class TransactionJournal {
       if (!bytes || bytes.length !== part.byteLength || await digest(bytes) !== part.bytesSha256) fail('journal-part-digest');
       const decoded = A.decodeChange(bytes!);
       if (decoded.hash !== part.expectedChangeHash || json(sorted(decoded.deps)) !== json(part.dependencies) ||
-        (p.start.purpose === 'localCommand' && decoded.message !== `lociview:transaction:v1:${p.start.transactionId}`)) fail('journal-part-source');
+        (p.start.purpose === 'localCommand' && !localEditorMessageMatches(decoded.message, p.start.transactionId, this.limits))) fail('journal-part-source');
+      if (inspectEditorMessage(decoded.message, this.limits)) checkEditorCapability(p.start.requiredCapabilities, true);
       parts.push(bytes!);
     }
     if (p.start.purpose === 'initialize') ProjectMetadataSource.reopen(parts, p.start.proof, this.limits);
@@ -240,8 +245,8 @@ export class TransactionJournal {
   }
   /** Physical incoming inventory only, after the caller validates the published journal.
    * Base guarantees are not evidence that a Contribution supplied those bodies. */
-  async receivedBlobs(p: PreparedJournal): Promise<readonly { sha256: string; byteLength: number }[]> {
-    if (!p.remote || !isPackageRemote(p.remote)) return [];
+  async receivedInfo(p: PreparedJournal): Promise<{ blobs: readonly { sha256: string; byteLength: number }[]; requiresEditor: boolean }> {
+    if (!p.remote || !isPackageRemote(p.remote)) return { blobs: [], requiresEditor: false };
     const read = async (name: string, ref: { sha256: string; byteLength: number }) => {
       const path = this.path(p.start.transactionId, name), file = await this.fs.readStream(path);
       if (!file || file.size !== ref.byteLength) return fail('remote-source-size');
@@ -249,9 +254,11 @@ export class TransactionJournal {
       if (!bytes || bytes.length !== ref.byteLength || await digest(bytes) !== ref.sha256) return fail('remote-source-digest');
       return bytes;
     };
-    return readManifestControl(await read('source-manifest.json', p.remote.source.manifest),
-      await read('source-manifest.sha256', p.remote.source.checksum)).manifest.blobs;
+    const manifest = readManifestControl(await read('source-manifest.json', p.remote.source.manifest),
+      await read('source-manifest.sha256', p.remote.source.checksum)).manifest;
+    return { blobs: manifest.blobs, requiresEditor: hasEditorCapability(manifest.requiredCapabilities) };
   }
+  async receivedBlobs(p: PreparedJournal) { return (await this.receivedInfo(p)).blobs; }
   private async readRemoteSource(p: PreparedJournal): Promise<ProjectMetadataSource> {
     return validateJournalRemote(await this.readRemoteInput(p), p.start.proof, this.limits);
   }

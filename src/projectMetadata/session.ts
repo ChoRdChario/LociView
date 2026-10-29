@@ -1,4 +1,5 @@
 import { issuePointAnchorProof } from './pointAnchorProof';
+import { captureEditor, editorCapabilities, hasEditorCapability, checkEditorCapability, inspectEditorMessage, type LocalEditorContext } from './editorAttribution';
 import { reactivatedCaptionMedia } from './captionReactivation';
 import type { Anchor } from '../scene/types';
 import * as A from '@automerge/automerge/slim';
@@ -127,7 +128,7 @@ export class MetadataProjectSession {
   private retained: { start: JournalStart; parts: Uint8Array[]; stagedBlobs?: JsonObject[];
     modelFacts?: { plan: MetadataModelFactPlan; next: ProjectMetadataSource };
     remote?: JournalRemoteInput;
-    introduction?: { source: ProjectMetadataSource; command: Extract<MetadataEdit, { kind: 'createAttachment' }> } } | null = null;
+    introduction?: { source: ProjectMetadataSource; command: Extract<MetadataEdit, { kind: 'createAttachment' }>; editor: LocalEditorContext } } | null = null;
   private last: MetadataSessionRead = { state: 'empty', source: null, provider: null, publication: null };
   constructor(private readonly fs: ProjectWorkspaceFS, private readonly storage: MetadataStorageFactory, limits: MetadataLimits,
     /** Owned verifier, fresh durable inventory/evidence per request. Boolean permits initial fact creation only. */
@@ -149,10 +150,13 @@ export class MetadataProjectSession {
       const acknowledged = new Set<string>(), localChanges = new Set<string>();
       let witnessWork = 0;
       const witness = () => { if (++witnessWork > this.limits.maxWork) fail('retained-media-limit'); };
+      let inheritedEditor = false;
       for (const entry of entries.filter(e => e.publication)) {
+        let namesInParts = false;
         witness();
         for (const head of entry.publication!.heads) if (!originals.has(head)) fail('published-history-missing');
         for (const bytes of await this.journal.validateParts(entry.prepared!)) {
+          namesInParts ||= !!inspectEditorMessage(A.decodeChange(bytes).message, this.limits);
           const included = originals.get(A.decodeChange(bytes).hash);
           if (!included || !equalBytes(included, bytes)) fail('published-transaction-missing');
           if (['initialize', 'localCommand', 'importClean'].includes(entry.start.purpose)) localChanges.add(A.decodeChange(bytes).hash);
@@ -166,8 +170,12 @@ export class MetadataProjectSession {
           await this.journal.validateRemote(entry.prepared!, base!);
         }
         for (const ref of entry.prepared!.stagedBlobs ?? []) { witness(); acknowledged.add(blobKey(ref)); }
-        for (const ref of await this.journal.receivedBlobs(entry.prepared!)) { witness(); acknowledged.add(`${ref.sha256}:${ref.byteLength}`); }
+        const incoming = await this.journal.receivedInfo(entry.prepared!);
+        checkEditorCapability(entry.start.requiredCapabilities, inheritedEditor || namesInParts || incoming.requiresEditor);
+        inheritedEditor = hasEditorCapability(entry.start.requiredCapabilities);
+        for (const ref of incoming.blobs) { witness(); acknowledged.add(`${ref.sha256}:${ref.byteLength}`); }
       }
+      if (source!.includesDeclaredEditorNames) checkEditorCapability(published.start.requiredCapabilities, true);
       this.acknowledgedMedia = acknowledged;
       this.acknowledgedLocalChanges = localChanges;
       this.acknowledgmentsLoaded = true;
@@ -219,7 +227,7 @@ export class MetadataProjectSession {
       if (source.originalChanges().length !== 2) fail('initialization-source');
       const transactionId = newId();
       this.retained = { start: { transactionId, repositoryId: transactionId, predecessor: null,
-        purpose: 'initialize', proof: source.proof, baseHeads: [] }, parts: source.originalChanges() };
+        purpose: 'initialize', proof: source.proof, baseHeads: [], ...editorCapabilities(source.includesDeclaredEditorNames) }, parts: source.originalChanges() };
       await this.checked(source, true);
       return this.resume();
     });
@@ -237,7 +245,8 @@ export class MetadataProjectSession {
     return this.edit(expectedToken, { kind: 'editCaption', captionId, edits: normalized });
   }
 
-  async edit(expectedToken: string, command: MetadataEdit): Promise<MetadataSessionRead> {
+  async edit(expectedToken: string, command: MetadataEdit, editor?: LocalEditorContext): Promise<MetadataSessionRead> {
+    editor = captureEditor(editor);
     command = canonicalMetadataEdit(command, this.limits);
     return underWriteLease(this.fs, async () => {
       await assertReviewEditSlot(this.fs, this.limits);
@@ -254,8 +263,9 @@ export class MetadataProjectSession {
         this.media!.assertIntroduction?.(provider as Extract<ProjectProviderRead,{kind:'scene-provider'}>,command.media);
         const [doc] = A.applyChanges(A.init(), durable.originalChanges());
         this.retained = { start: { transactionId, repositoryId: prior.start.repositoryId, predecessor: prior.start.transactionId,
-          purpose: 'localCommand', proof: durable.proof, baseHeads: A.getHeads(doc).sort() }, parts: [],
-          stagedBlobs: [command.media.blob as JsonObject], introduction: { source: durable, command } };
+          purpose: 'localCommand', proof: durable.proof, baseHeads: A.getHeads(doc).sort(),
+          ...editorCapabilities(hasEditorCapability(prior.start.requiredCapabilities) || editor.kind === 'self-declared') }, parts: [],
+          stagedBlobs: [command.media.blob as JsonObject], introduction: { source: durable, command, editor } };
         return this.resume();
       }
       let pointProof;
@@ -265,7 +275,7 @@ export class MetadataProjectSession {
         if (json(owned) !== json(command.anchor)) fail('point-anchor-position');
         pointProof = issuePointAnchorProof(durable, command, transactionId);
       }
-      const prepared = durable.prepareEdit(expectedToken, command, provider, transactionId, pointProof);
+      const prepared = durable.prepareEdit(expectedToken, command, provider, transactionId, pointProof, editor);
       const known = new Set(durable.originalChanges().map(b => A.decodeChange(b).hash));
       const parts = prepared.originalChanges().filter(b => !known.has(A.decodeChange(b).hash));
       if (!parts.length) return read; // An unchanged value has no storage transaction.
@@ -274,7 +284,8 @@ export class MetadataProjectSession {
       await this.verifyDelta(await reactivatedCaptionMedia(durable, prepared, this.limits));
       const [doc] = A.applyChanges(A.init(), durable.originalChanges());
       this.retained = { start: { transactionId, repositoryId: prior.start.repositoryId, predecessor: prior.start.transactionId,
-        purpose: 'localCommand', proof: durable.proof, baseHeads: A.getHeads(doc).sort() }, parts,
+        purpose: 'localCommand', proof: durable.proof, baseHeads: A.getHeads(doc).sort(),
+        ...editorCapabilities(hasEditorCapability(prior.start.requiredCapabilities) || prepared.includesDeclaredEditorNames) }, parts,
         ...(facts ? { modelFacts: { plan: facts, next: prepared }, stagedBlobs: facts.stagedBlobs?.map(b => JSON.parse(json(b)) as JsonObject) } : {}) };
       return this.resume();
     });
@@ -300,7 +311,8 @@ export class MetadataProjectSession {
       if (!facts) await this.checked(final, false);
       if (!parts.length) return read;
       this.retained = { start: { transactionId: newId(), repositoryId: prior.start.repositoryId,
-        predecessor: prior.start.transactionId, purpose: 'remotePackageMerge', proof: base.proof, baseHeads: base.heads },
+        predecessor: prior.start.transactionId, purpose: 'remotePackageMerge', proof: base.proof, baseHeads: base.heads,
+        ...editorCapabilities(hasEditorCapability(prior.start.requiredCapabilities) || final.includesDeclaredEditorNames) },
         parts, ...(facts ? { modelFacts: { plan: facts, next: final } } : {}), remote: { bytes: captured.metadataBytes, proof: {
           source: { packageId: captured.packageId, metadataSha256, metadataByteLength: captured.metadataBytes.length,
             metadataEnvelope: captured.proof.envelope, remoteHeads: remote.heads }, expectedFinalHeads: final.heads } } };
@@ -601,7 +613,7 @@ export class MetadataProjectSession {
         const facts = await this.modelFacts.planRestored(source, ref => inspection.archive.entryBlob(`blobs/sha256/${ref.digest}`), inventory);
         if (facts.baseToken !== null || facts.finalToken !== source.token) return fail('model-facts-token');
         this.retained = { start: own?.start ?? { transactionId: job.id, repositoryId: job.id, predecessor: null,
-          purpose: 'restoreBackup', proof: source.proof, baseHeads: [] }, parts: initialWorkspaceChanges(source, this.limits), remote: input,
+          purpose: 'restoreBackup', proof: source.proof, baseHeads: [], ...editorCapabilities(hasEditorCapability(inspection.archive.control.manifest.requiredCapabilities)) }, parts: initialWorkspaceChanges(source, this.limits), remote: input,
           ...(facts.stagedBlobs?.length ? { stagedBlobs: [...facts.stagedBlobs] } : {}), modelFacts: { next: source, plan: facts } };
       } else this.retained = null;
       await this.resume(undefined, job);
@@ -646,7 +658,7 @@ export class MetadataProjectSession {
         if (!job.start) job = await job.persist(null, (facts.stagedBlobs ?? []).reduce((n, b) => n + (b.byteLength as number), 0) +
           parts.reduce((n, b) => n + b.length * 2, 0) + source.encodeFullSource().length * 3 + 4_194_304);
         this.retained = { start: own?.start ?? { transactionId: job.id, repositoryId: job.id, predecessor: null,
-          purpose: 'importWorkspace', proof: source.proof, baseHeads: [] }, parts, remote,
+          purpose: 'importWorkspace', proof: source.proof, baseHeads: [], ...editorCapabilities(source.includesDeclaredEditorNames) }, parts, remote,
           ...(facts.stagedBlobs?.length ? { stagedBlobs: [...facts.stagedBlobs] } : {}),
           modelFacts: { next: source, plan: { ...facts, stage: async () => { await facts.stage(); await this.media!.inventory!(inventory); } } } };
       } else { this.retained = null; await this.media.inventory(inventory); }
@@ -705,7 +717,8 @@ export class MetadataProjectSession {
         }
         if (parts.length) {
           this.retained = { start: own?.start ?? { transactionId: job.id, repositoryId: prior.start.repositoryId,
-            predecessor: prior.start.transactionId, purpose: 'remotePackageMerge', proof: base.proof, baseHeads: base.heads },
+            predecessor: prior.start.transactionId, purpose: 'remotePackageMerge', proof: base.proof, baseHeads: base.heads,
+            ...editorCapabilities(hasEditorCapability(prior.start.requiredCapabilities) || final.includesDeclaredEditorNames) },
             parts, ...(facts.stagedBlobs?.length ? { stagedBlobs: [...facts.stagedBlobs] } : {}), modelFacts: { plan: {
               ...facts, stage: async () => { await facts.stage(); await this.media!.inventory!(inventory); },
             }, next: final },
@@ -799,7 +812,8 @@ export class MetadataProjectSession {
             final.encodeFullSource().length * 2 + (facts?.stagedBlobs ?? []).reduce((n, b) => n + (b.byteLength as number), 0) + 4_194_304);
         }
         if (parts.length && facts) this.retained = { start: own?.start ?? { transactionId: job.id, repositoryId: prior.start.repositoryId,
-          predecessor: prior.start.transactionId, purpose: 'remotePackageMerge', proof: base.proof, baseHeads: base.heads }, parts,
+          predecessor: prior.start.transactionId, purpose: 'remotePackageMerge', proof: base.proof, baseHeads: base.heads,
+          ...editorCapabilities(hasEditorCapability(prior.start.requiredCapabilities) || final.includesDeclaredEditorNames) }, parts,
           remote: await job.journalInput(final.heads), ...(facts.stagedBlobs?.length ? { stagedBlobs: [...facts.stagedBlobs] } : {}),
           modelFacts: { next: final, plan: { ...facts, stage: async () => { await facts.stage(); await this.media!.inventory!(inventory); } } } };
       } else { this.retained = null; await this.media.inventory(inventory); }
@@ -894,12 +908,12 @@ export class MetadataProjectSession {
         delete this.retained.modelFacts; // Prepared/cold recovery can only verify already stored facts.
       }
       if (this.retained.introduction) {
-        const { source, command } = this.retained.introduction;
+        const { source, command, editor } = this.retained.introduction;
         await this.journal.begin(this.retained.start);
         await this.media!.stage(command.media, source.token);
         const durable = await this.repository.read(this.retained.start.repositoryId, source.proof);
         if (!durable || durable.token !== source.token) return fail('media-base-changed');
-        const next = durable.prepareEdit(source.token, command, await this.checked(durable, false), this.retained.start.transactionId);
+        const next = durable.prepareEdit(source.token, command, await this.checked(durable, false), this.retained.start.transactionId, undefined, editor);
         const known = new Set(durable.originalChanges().map(b => A.decodeChange(b).hash));
         this.retained.parts = next.originalChanges().filter(b => !known.has(A.decodeChange(b).hash));
         delete this.retained.introduction; // From here, retry can only replay these originals.
@@ -955,7 +969,11 @@ export class MetadataProjectSession {
     let witnessWork = 0;
     const witness = () => { if (++witnessWork > this.limits.maxWork) fail('retained-media-limit'); };
     for (const ref of prepared.stagedBlobs ?? []) { witness(); this.acknowledgedMedia.add(blobKey(ref)); }
-    for (const ref of await this.journal.receivedBlobs(prepared)) { witness(); this.acknowledgedMedia.add(`${ref.sha256}:${ref.byteLength}`); }
+    const incoming = await this.journal.receivedInfo(prepared);
+    const predecessor = entries.find(e => e.start.transactionId === start.predecessor);
+    checkEditorCapability(start.requiredCapabilities, hasEditorCapability(predecessor?.start.requiredCapabilities) ||
+      next.includesDeclaredEditorNames || incoming.requiresEditor);
+    for (const ref of incoming.blobs) { witness(); this.acknowledgedMedia.add(`${ref.sha256}:${ref.byteLength}`); }
     if (['initialize', 'localCommand', 'importClean'].includes(start.purpose))
       for (const part of prepared.changes) { witness(); this.acknowledgedLocalChanges.add(part.expectedChangeHash); }
     // Exact pending changes can coexist with legitimate extra local heads; never rebase or choose a winner.
@@ -966,6 +984,8 @@ export class MetadataProjectSession {
     await this.repository.persist(start.repositoryId, next);
     stored = await this.repository.read(start.repositoryId, start.proof);
     if (!stored) fail('durable-source-missing');
+    checkEditorCapability(start.requiredCapabilities, hasEditorCapability(predecessor?.start.requiredCapabilities) ||
+      stored!.includesDeclaredEditorNames || incoming.requiresEditor);
     const actual = new Map(stored!.originalChanges().map(b => [A.decodeChange(b).hash, b]));
     for (const bytes of parts) {
       const saved = actual.get(A.decodeChange(bytes).hash);

@@ -75,7 +75,7 @@ export function createValidationModeHost(initial: Host, open: (mode: LocalOpenMo
       try { await work; } finally { switching = false; if (operation === work) operation = undefined; }
     },
   };
-  const host: SavedWorkspaceHost & ValidationDisplayHost & Pick<Host, 'workspaceFiles' | 'workspaceOutput' | 'backupRestore' | 'dispatch' | 'conversionReport' | 'conversionReportAvailable'> & { content: Pick<Host['content'], 'model' | 'modelContent' | 'image' | 'modelSelectionNotice'>; imageScope(): string } = {
+  const host: SavedWorkspaceHost & ValidationDisplayHost & Pick<Host, 'editorSettings' | 'workspaceFiles' | 'workspaceOutput' | 'backupRestore' | 'dispatch' | 'conversionReport' | 'conversionReportAvailable'> & { content: Pick<Host['content'], 'model' | 'modelContent' | 'image' | 'modelSelectionNotice'>; imageScope(): string } = {
     authority, mode, limits: initial.limits, read: () => current.read(),
     hasPending: () => switching || current.hasPending(),
     refresh: () => run(() => current.refresh()), resolve: (...a) => run(() => current.resolve(...a)),
@@ -96,6 +96,7 @@ export function createValidationModeHost(initial: Host, open: (mode: LocalOpenMo
       cancelStale: (...a) => run(() => current.workspaceFiles.cancelStale(...a)),
     },
     workspaceOutput: {
+      get privacy() { return current.workspaceOutput.privacy; },
       get jobs() { return current.workspaceOutput.jobs; }, get error() { return current.workspaceOutput.error; },
       get bases() { return current.workspaceOutput.bases; },
       generate: (...a) => run(() => current.workspaceOutput.generate(...a)),
@@ -110,6 +111,7 @@ export function createValidationModeHost(initial: Host, open: (mode: LocalOpenMo
       verifyFile: (...a) => run(() => current.workspaceOutput.verifyFile(...a)),
       download: (...a) => run(() => current.workspaceOutput.download(...a)),
     },
+    editorSettings: current.editorSettings ? { read: () => current.editorSettings!.read(), save: value => current.editorSettings!.save(value) } : undefined,
     dispatch: (...args: Parameters<Host['dispatch']>) => run(() => current.dispatch(...args)),
     conversionReport: () => run(() => current.conversionReport()),
     conversionReportAvailable: () => run(() => current.conversionReportAvailable()),

@@ -72,10 +72,10 @@ candidate reads and command preparation. No UI storage writes or generic patch A
 - Local display name is an advisory browser preference, not an authentication
   identity or retroactive author attribution. Keep it outside Project history.
 
-[08b](08b-shared-editor-name-policy-proposal.md) records the PO-approved future
-opt-in sharing policy and its proposed technical design. This existing private
-preference is not automatically shared. Named-change storage and old-reader
-compatibility are not implemented or ratified by this08 clause.
+[08b](08b-shared-editor-name-policy-proposal.md) owns the separately PO-approved
+opt-in sharing/storage design and old-reader boundary. This existing private
+preference is not automatically shared. Todo owns the connected implementation
+and executed evidence; this08 clause alone grants no further compatibility change.
 
 ## Authorized continuation —Caption action Undo,2026-10-29
 

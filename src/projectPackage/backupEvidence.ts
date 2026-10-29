@@ -77,9 +77,11 @@ export async function inspectBackupOriginals(source: ProjectMetadataSource, tabl
     byHash.set(e.reference.sha256, e.bytes);
   }
   let work = 0, nodes = 0, operations = 0, dependencies = declared + source.heads.length, baseControlBytes = 0;
+  let includesDeclaredEditorNames = false;
   const controlHashes = new Set<string>(), semantic = new Map<string, StoredBlobRef>();
   const charge = (n: number) => { work += n; if (work > L.inspectionWork) fail('backup-inspection-budget'); };
   const inspect = async (s: ProjectMetadataSource) => {
+    includesDeclaredEditorNames ||= s.includesDeclaredEditorNames;
     for (const bytes of s.originalChanges()) {
       const change = A.decodeChange(bytes); operations += change.ops.length; dependencies += change.deps.length;
       if (operations > 100_000 || dependencies > L.dependencyReferences) fail('backup-source-budget');
@@ -111,5 +113,5 @@ export async function inspectBackupOriginals(source: ProjectMetadataSource, tabl
     fieldClasses: current.counts.fieldClasses, blobEntryCount: entries.length, blobBytes: entries.reduce((n, e) => n + e.byteLength, 0) });
   checkAbort(signal);
   return Object.freeze({ table, inventory, baseEvidence: expected, baseControlBytes, blobs: Object.freeze(entries),
-    bodyRefs: Object.freeze([...semantic.values()]), summary });
+    bodyRefs: Object.freeze([...semantic.values()]), summary, includesDeclaredEditorNames });
 }

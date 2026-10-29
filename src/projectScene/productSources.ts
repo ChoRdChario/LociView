@@ -36,7 +36,7 @@ import type { createValidationModeHost } from './validationModeHost';
 
 /** Read adapters only: no Session exposure, synthetic editor or mutation authority. */
 export function productSources(host: ReturnType<typeof createValidationModeHost>,smoothDisplay=false): Pick<ProjectWorkspacePorts,
-  'authoring' | 'modelDetails' | 'modelPlacement' | 'modelAngles' | 'modelReview' | 'modelDeletion' | 'prepareModelMembership' | 'views' | 'viewOrder' | 'viewReview' | 'materials' | 'mediaDescription' | 'captionDeletion' | 'pinPositionInParent' | 'recovery' | 'prepareCaptionMembership'> {
+  'authoring' | 'modelDetails' | 'modelPlacement' | 'modelAngles' | 'modelReview' | 'modelDeletion' | 'prepareModelMembership' | 'views' | 'viewOrder' | 'viewReview' | 'materials' | 'mediaDescription' | 'captionDeletion' | 'pinPositionInParent' | 'captionEditors' | 'recovery' | 'prepareCaptionMembership'> {
   const provider = () => { const p = host.read().provider; if (p?.kind !== 'scene-provider') throw Error('プロジェクトの内容を確認してください。'); return p; };
   const otherSceneReferences = (p: ReturnType<typeof provider>, kind: 'asset' | 'caption', id: string, sceneId: string) => {
     const map = kind === 'asset' ? 'sceneAssetMembershipsById' : 'sceneCaptionMembershipsById', field = kind === 'asset' ? 'assetId' : 'captionId';
@@ -105,8 +105,16 @@ export function productSources(host: ReturnType<typeof createValidationModeHost>
         planMetadataEdit(p, command, host.limits); return command;
       },
     },
+    captionEditors(captionId) {
+      const p = provider(), names = new Map(host.read().source?.editorDeclarations().map(d => [d.changeId, d.declaration.editor.name]));
+      return Object.entries({ title: 'タイトル', body: '本文', anchor: 'ピン位置', colorSrgb: 'ピンの色' }).map(([field, label]) => ({ label,
+        names: p.inspection.candidates.fields.find(f => f.path[0] === 'captionsById' && f.path[1] === captionId && f.path[2] === field)?.candidates.map(c => names.get(c.changeId) ?? null) ?? [null] }));
+    },
     recovery() {
       const p = provider(), groups: WorkspaceRecoveryGroup[] = [];
+      const editorNames = new Map(host.read().source?.editorDeclarations().map(d => [d.changeId, d.declaration.editor.name]));
+      const author = (changeId: string) => { const name = editorNames.get(changeId);
+        return name === undefined ? '編集者情報なし' : `編集者名：\u2068${name}\u2069`; };
       const sceneLabel = (id: string) => fieldValue(p.state.scenes[id]?.name) ?? (p.state.scenes[id] ? `シーン ${Object.keys(p.state.scenes).sort().indexOf(id) + 1}（名称を確認）` : '参照先を確認');
       const captionLabel = (id: string) => fieldValue(p.resources.captions[id]?.title) || `キャプション ${Object.keys(p.details.mutable.captionsById).sort().indexOf(id) + 1}`;
       const fieldLabels: Record<string, string> = { title: 'タイトル', body: '本文', anchor: 'ピン位置', colorSrgb: 'ピンの色' };
@@ -151,7 +159,7 @@ export function productSources(host: ReturnType<typeof createValidationModeHost>
             target: { kind: 'attachmentField', captionId, attachmentId, field: name },
             note: name === 'altText' ? 'このメディアの説明だけを変更します。メディア・添付先・順序は変わりません。' :
               `このメディアの順序だけを変更します。説明やほかの添付は変わりません。${order.uncertain ? '未解決のほかの添付は、この位置に含めていません。' : ''}`,
-            choices: field.candidates.map((c, i) => ({ id: c.operationId, label: `候補 ${i + 1}：${name === 'altText' && c.value.kind === 'absent' ? '説明なし（未設定）' :
+            choices: field.candidates.map((c, i) => ({ id: c.operationId, editorName: editorNames.get(c.changeId) ?? null, label: `候補 ${i + 1}：${name === 'altText' && c.value.kind === 'absent' ? '説明なし（未設定）' :
               c.value.kind !== 'value' || typeof c.value.value !== 'string' ? '確認が必要な値' : name === 'altText' ? c.value.value || '空の説明' : order.describe(c.value.value)}` })) });
         }
         if (map === 'scenesById' && name === 'name') {
@@ -167,7 +175,7 @@ export function productSources(host: ReturnType<typeof createValidationModeHost>
         groups.push({ key: `caption/${captionId}/${name}`, label: `${captionLabel(captionId)}：${({ title: 'タイトル', body: '本文', anchor: 'ピン位置', colorSrgb: 'ピンの色' })[name!]}`, ready,
           target: isText ? { kind: 'text', captionId, field: name } : { kind: 'field', captionId, field: name as 'anchor' | 'colorSrgb' },
           ...(isText ? { manual: name } : {}), ...(name === 'anchor' ? { note: '比較中の位置は未確定です。モデルが非表示、または座標の基準を確認できない場合は表示されません。' } : {}),
-          choices: field.candidates.map((c, i) => ({ id: c.operationId, label: `候補 ${i + 1}：${ready || isText ? describe(name!, c.value.kind === 'value' ? c.value.value : undefined) : '確認が必要な値'}`,
+          choices: field.candidates.map((c, i) => ({ id: c.operationId, editorName: editorNames.get(c.changeId) ?? null, label: `候補 ${i + 1}：${ready || isText ? describe(name!, c.value.kind === 'value' ? c.value.value : undefined) : '確認が必要な値'}`,
             ...(ready && name === 'anchor' && c.value.kind === 'value' ? { anchor: c.value.value as unknown as import('../scene/types').Anchor } : {}) })) });
       }
       for (const [attachmentId, row] of Object.entries(p.details.mutable.captionAttachmentsById)) {
@@ -181,7 +189,8 @@ export function productSources(host: ReturnType<typeof createValidationModeHost>
           target:{kind:'attachmentLifecycle',captionId,attachmentId,operationIds:source?.lifecycle.candidates.map(c=>c.operationId) ?? []},
           note:`添付状態だけを確定します。メディア本体と説明・順序の候補は変更しません。${order.uncertain ? '未解決のほかの添付は、順序の位置に含めていません。' : ''}`,
           choices:source?.states.map(state=>({id:state,label:state==='deleted' ? '添付を外した状態を維持' : source!.states.includes('deleted') ? '添付を復元' : '添付を残す'})) ?? [],
-          details:retained.flatMap(f=>f.candidates.map((c,i)=>`${f.path[2]==='altText' ? '説明' : '順序'} 候補 ${i+1}：${c.value.kind==='absent' ? '未設定' : typeof c.value.value!=='string' ? '確認が必要な値' : f.path[2]==='altText' ? c.value.value || '空の説明' : order.describe(c.value.value)}`)) });
+          details:[...(source?.lifecycle.candidates.map((c,i)=>`添付状態 候補 ${i+1}：${c.value.kind==='value' && (c.value.value as JsonObject).state==='deleted' ? '削除' : '有効'}（${author(c.changeId)}）`) ?? []),
+            ...retained.flatMap(f=>f.candidates.map((c,i)=>`${f.path[2]==='altText' ? '説明' : '順序'} 候補 ${i+1}：${c.value.kind==='absent' ? '未設定' : typeof c.value.value!=='string' ? '確認が必要な値' : f.path[2]==='altText' ? c.value.value || '空の説明' : order.describe(c.value.value)}（${author(c.changeId)}）`))] });
       }
       for (const [captionId] of Object.entries(p.details.mutable.captionsById)) {
         if (!p.issues.some(i => i.path.join('/') === `captionsById/${captionId}/lifecycle` && ['concurrent-delete-edit', 'atomic-field-conflict'].includes(i.code))) continue;
@@ -193,7 +202,8 @@ export function productSources(host: ReturnType<typeof createValidationModeHost>
           target: { kind: confirmedState ? 'captionLifecycleConfirm' : 'lifecycle', captionId, operationIds: source?.lifecycle.candidates.map(c => c.operationId) ?? [] },
           note: `キャプション本体だけを変更します。削除済みのシーン登録・添付・タグ登録は復元しません。${confirmedState==='active' ? '有効な登録・添付は再表示される場合があります。' : ''}`,
           choices: confirmedState ? [{id:confirmedState,label:confirmedState==='active' ? '記録を残す' : '削除状態を維持'}] : [{ id: 'deleted', label: '削除状態を維持' }, { id: 'active', label: 'キャプションを復元' }],
-          details: source ? [...source.fields.filter(f => ['title', 'body', 'anchor', 'colorSrgb'].includes(f.path[2]!)).flatMap(f => f.candidates.map((c, i) => `${fieldLabels[f.path[2]!]} 候補 ${i + 1}：${describe(f.path[2]!, c.value.kind === 'value' ? c.value.value : undefined)}`)),
+          details: source ? [...source.lifecycle.candidates.map((c,i)=>`記録の状態 候補 ${i+1}：${c.value.kind==='value' && (c.value.value as JsonObject).state==='deleted' ? '削除' : '有効'}（${author(c.changeId)}）`),
+            ...source.fields.filter(f => ['title', 'body', 'anchor', 'colorSrgb'].includes(f.path[2]!)).flatMap(f => f.candidates.map((c, i) => `${fieldLabels[f.path[2]!]} 候補 ${i + 1}：${describe(f.path[2]!, c.value.kind === 'value' ? c.value.value : undefined)}（${author(c.changeId)}）`)),
             ...source.children.map(c => `${c.kind === 'scene' ? `シーン登録：${sceneLabel(c.referenceId ?? '')}` : c.kind === 'attachment' ? '添付' : 'タグ登録'} — ${c.uncertain || c.state === 'unresolved' ? '状態を要確認' : c.state === 'deleted' ? '削除済み・復元しません' : '登録あり・親の復元後に再表示される場合があります'}`)] : [] });
       }
       for (const g of captionMembershipGroups(p, host.limits)) {
