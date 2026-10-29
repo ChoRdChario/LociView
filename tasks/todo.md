@@ -23,17 +23,29 @@ Fix latency when it prevents use or risks data. Keep the existing
 Root is sole writer; bounded independent reviewers are read-only. No small manual
 test or helper approvals. Continue in-scope work while device evidence is pending.
 
-## Next connected outcome —integrated Caption scale qualification
+## Current priority correction —defer large Caption qualification
 
-The500k Review→independent edit→backup→cold workflow below is verified. Resume the
-PO's feature/integration-first priority with accepted E04/03 G1-C:10k Captions and
-50k changes, open→browse/search/select→edit→verified save→cold reopen. List
-virtualization/full-list search already exist; this is a connected scale outcome,
-not a new list feature or a claim that device evidence alone is missing. Current
-route limits include1,000changes/20,000operations/100,000nodes. Qualify with existing
-fixtures/services and prepare a concrete scoped PC metadata-policy specification
-before widening production admission; review/obtain any genuinely new numeric or
-architecture authority. Do not silently widen global limits or create another matrix.
+PO2026-10-29 defers10k-Caption support for the foreseeable future and assigns it
+very low priority for completion. The combined10k-Caption/50k-change qualification
+is retained later, not a practical-team completion or sequencing blocker and not
+PASS. Aligned product/storage/gate/team clauses and inventory, retaining existing
+list behavior, fixtures/history, admission limits and all durability/conflict/
+privacy/recovery/smaller-test obligations. Documentation-only diff/local-link and
+unchanged-feature-classification checks pass; independent review has no findings.
+No runtime change or new capacity guarantee; no runtime suite is needed for this
+documentation checkpoint.
+
+## Next connected outcome —ordinary Point replacement
+
+Prioritize the accepted practical gap in M02/M08: same-profile ordinary XYZ/RGB
+ASCII Point replacement→needsReview pin correction→edit/save/send→cold reopen.
+Point replacement remains unimplemented. First specify/review its bounded ports
+and acceptance against01a and the existing replacement contract; preserve Asset/
+Frame/placement/Caption/media, use a fresh family/class and no automatic remap.
+Keep Mesh behavior and exclude Native/transformed Point, cross-format, GS/Proxy,
+new profiles/dependencies/limits and release. Stop affected implementation for an
+actual new coordinate/compatibility/ID decision. Do not substitute another large-
+capacity qualification or UI-only helper for this connected user workflow.
 
 The500k workflow is still slow (about202s to editor,47s edit,232s backup observed).
 Further fresh-inspection/calculation tuning stays pending behind accepted missing

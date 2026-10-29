@@ -1252,8 +1252,11 @@ touch, rendered contrast or iPhone evidence; keep those in the existing batch.
   candidate, restores authoritative projection and retains losing history.
 - `TEAM-HIST-04`: two integrators publishing from one base produce detectable
   divergent heads; time/order never replaces either branch.
-- `TEAM-HIST-05`: 10,000-Caption/50,000-change, two-tab and restart fixtures meet
-  the ratified metadata budgets before adapter adoption.
+- `TEAM-HIST-05`: two-tab and restart fixtures retain their existing durability
+  and ratified-budget obligations. Under the PO2026-10-29 [scope decision](00-product-contract.md),
+  combined10,000-Caption/50,000-change qualification is low-priority later work,
+  not a practical-team completion/sequencing blocker or PASS. Future large-scale
+  support claims require the resumed scale acceptance; aggregate adoption is not granted.
 - `TEAM-HIST-06`: duplicate Scene membership keys apply none. Resolution observes
   all known edge IDs and supports user-selected keep-one or keep-both. Keep-both
   creates independent Caption/model identities with an exact remap and no silent
@@ -1418,6 +1421,12 @@ not capacity or latency promises. Keep the current command/file guards, IME and
 source ownership; do not write metadata for scrolling. Reuse the existing list
 and host tests. Bounded recorded DOM at 10,000 rows is implementation evidence only;
 actual browser/iOS, full metadata history and G0 budgets remain G1-C adoption evidence.
+
+PO2026-10-29 defers the combined10k-Caption/50k-change qualification for the
+foreseeable future; it is not a practical-team completion or sequencing blocker.
+Retain existing virtualization, full admitted-list search, focus, keyboard, IME,
+source ownership and smaller tests. Old10k DOM evidence is not a capacity promise,
+and this deferral does not pass aggregate adoption or widen current admission.
 
 S1–S3 name delivery stages, not three indivisible commits. The immediate S1 entry
 is one disposable candidate-adapter harness for the existing `TEAM-PKG-08` causal

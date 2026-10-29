@@ -1297,7 +1297,7 @@ Specific rules:
 ### Metadata candidate
 
 - `STO-AUT-01`: exact versions are pinned; lockfile, licenses, offline build, CSP/WASM and `npm audit` pass.
-- `STO-AUT-02`: two tabs and a third-tab restart converge after 2 x 1,000 edits; 10,000-caption and 50,000-change fixtures remain within G0 budgets.
+- `STO-AUT-02`: two tabs and a third-tab restart converge after 2 x 1,000 edits. The combined10,000-Caption/50,000-change G0-budget qualification is retained as low-priority later work under the PO2026-10-29 [scope decision](00-product-contract.md), not a practical-team completion blocker or PASS. Current admission and durability checks are unchanged.
 - `STO-AUT-03`: same-field conflicts retain all candidates; delete versus scalar edit, atomic anchor/camera/material-object edits, child membership and parent-delete versus concurrent-child-add are distinguished causally, and keep/delete, reassign, restore and copy-to-new-ID resolutions pass. Concurrent delete/delete, delete/restore and restore/re-delete run in both merge orders and retain complete `EntityLifecycle` candidates; no state/event/reason hybrid can materialize.
 - `STO-AUT-04`: concurrent active bindings cannot silently render.
 - `STO-AUT-05`: every injected persistence interruption preserves all changes previously acknowledged durable.

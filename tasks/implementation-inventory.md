@@ -308,7 +308,7 @@ LociMyuからのタブ構成、Sceneに相当する記録切替、直接色選�
 | E01 | 保存／CAS／GC／大容量I/O | 新original-byte journal、metadata-only cold evidence、非活性OriginBlobStoreのbounded stream／保存後検証／不変receipt／実inventory→metadata作成・再開、隔離CAS・retentionと500 MiB保存本体のPO readback | **実装＋証拠**。新storeの実OPFS・Web Locks・iOS証拠とhost接続、全Project/conflict/opaque/未完了journal等のroot producer、origin-wide GC、bounded browser/iOS出力、実中断。MemoryFSの一般bytes試験をプラットフォーム採用証拠にせず、過去の500 MiB最初の完了ログ不明をFAIL扱いして同じreadbackを繰り返さない |
 | E02 | 実モデル・Representation／renderer | 旧Nativeの限定Mesh/Point/GS/Proxy、各loader、known triangle content verifier | **実装＋採用**。実body admission、Frame/catalog/texture/family証拠、Representation選択と対応外の局所的fallback、資源解放。shared-view合成・dither等の該当gateを確認。M01–M03/A02の技術前提で、同じ作業をここで重複加算しない。任意M14のhard mask等はその機能を採用する場合だけ別途確認する |
 | E03 | 新wire・移行recipe | 5-purposeの意味的closure PoC、原履歴／prepared migrationの隔離証拠 | **孤立実装＋採用／初回移行の残件**。06 §11の実装先行と§12.6のreview/edit-copy方針は承認済み。実装は各F行・todoを参照。一般profile／容量保証／採用、07の初回source mappingと必要target差分は残る。late bridgeは撤回済みで、そのPoCを再実行・採用条件化しない。 |
-| E04 | 規模・安全性・アクセシビリティ | 最終rootテスト、限定hostのfocus／失敗／古いtoken防御、既存runtime audit | **実装確認＋証拠**。10k Caption/50k changes、規定多tab workload、10k UI virtualizationとopen/edit budget達成、メモリ・CSP・不正入力、200%/狭幅/IME/keyboard/contrast/44pxの総合確認。未測定を性能FAILにしない。開発用依存の監査残件は未解消（最新結果はtodo）、runtimeの狭いhold解消とは別 |
+| E04 | 規模・安全性・アクセシビリティ | 最終rootテスト、限定hostのfocus／失敗／古いtoken防御、既存runtime audit | **実装確認＋証拠**。通常の規定多tab workload、メモリ・CSP・不正入力、200%/狭幅/IME/keyboard/contrast/44pxの総合確認は維持。10k Caption/50k changesとその規模のopen/edit budget受入れはPO2026-10-29判断で低優先の後続へ移し、当面の完成条件・次工程の妨げにしない。既存の窓化・検索・テストは保持し、未受入れをPASSや容量保証にしない。開発用依存の監査残件は未解消（最新結果はtodo）、runtimeの狭いhold解消とは別 |
 | E05 | Desktop／physical iPhone／offline | 旧Native受入れ、旧saved限定4群、修正後journalのPO再確認 | **新経路の証拠待ち**。新metadata hostの8群は一般的好評のみで全件PASSではない。新保存・描画に必要な実機は該当境界で実施し、全てを無条件に最終日へ先送りしない。最後は通常UIでTEAM-FLOW-01。dev serverはoffline/PWA証拠ではない |
 
 限定validationの狭幅経路は、100件の長い日本語一覧の通常Tab移動、模擬touch／composition、
@@ -342,6 +342,7 @@ LociMyuからのタブ構成、Sceneに相当する記録切替、直接色選�
 
 | 対象 | 扱い |
 |---|---|
+| 1万Caption／5万変更の大容量検証 | PO2026-10-29判断で当分後続・低優先。当面の実用版完成や着手順の阻害条件にしない。既存実装・試験・現在の制限を保持し、対応済み保証やPASSとは数えない |
 | Scene複製／削除／並替えUI | 05 §14で最初の限定candidateは明示deferred。core削除guardがあることとUI予定は別 |
 | 新規Project-space Caption、Sceneごとのrevision／alignment、Scene media layer、汎用Unity階層 | 明示非対象。既存ProjectAnchor読取・置き直しC11とは別 |
 | Captionの一般Undo/Redo・一般複製・前後巡回 | 現状なし。旧parityでも要追加判断／確認待ち。承認済み必須欠落として数えない。モデルalignment固有の復帰M13とは別 |

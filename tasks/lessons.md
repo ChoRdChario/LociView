@@ -33,6 +33,10 @@ Read only the relevant topic, not every historical incident.
   completion. Refactor as needed for integration; fix blocking/data-loss defects
   promptly and keep ordinary performance polish in backlog. Reports distinguish
   missing implementation, integration, acceptance and performance explicitly.
+  2026-10-29 refinement: a large synthetic capacity target without demonstrated
+  operational need is not automatically the next completion-critical feature.
+  PO defers10k Captions/50k changes; preserve the target/tests but prioritize missing
+  ordinary workflows and keep safety acceptance separate from scale qualification.
   Further PO correction: repeated limited evaluations/internal improvements must
   lead to a larger usable workflow. Use large SH4 open→position→save→cold resume
   and ordinary-entry integration as the completion unit; qualify alternatives

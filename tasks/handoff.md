@@ -10,6 +10,9 @@ PO prioritizes completing the accepted feature set before readiness-stage latenc
 work. Keep existing comfortable-UI guidance, original bytes/history, atomic Session
 commands, file/recovery/evidence fences and one writer. Read-only reviews may run
 in parallel. Continue ordinary approved work without small PO testing waits.
+PO2026-10-29 defers10k-Caption/50k-change qualification; it is low-priority later
+work, not a practical completion blocker. Follow todo for the next ordinary user
+workflow; retain current limits, safety checks and existing fixtures.
 
 For the500k Review→edit-copy workflow, [01e§8](../docs/specs/01e-desktop-large-gs-workflow.md)
 bounds the import-planning-only GS inspection reuse. Do not extend it to receive,

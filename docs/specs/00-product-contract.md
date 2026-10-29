@@ -570,6 +570,18 @@ Recorded on 2026-10-29, clarifying visual-repair scope:
   atomicity rules are retained. Existing interactionProxy relationships, GS
   initial-placement eligibility and saved manual-position authority are unchanged.
 
+Recorded on 2026-10-29, deferring large-Caption qualification:
+
+- support for10,000 Captions is low-priority later work for the foreseeable future;
+  the combined10,000-Caption/50,000-change scale pack is not a practical-team
+  completion or sequencing blocker;
+- retain the target, existing fixtures and evidence as deferred/unqualified, not
+  passed, withdrawn or a supported-capacity guarantee. A future large-scale support
+  claim requires resuming its acceptance; no aggregate adoption is granted here;
+- current admission limits and list/search behavior, acknowledged-change durability,
+  conflicts, privacy, recovery and existing smaller/multi-tab checks remain in force.
+  Prefer missing ordinary user workflows over widening limits for the scale pack.
+
 Still required later:
 
 - a scripted Product Owner usability walkthrough before public release, using the intended non-specialist persona to complete open/import, caption, merge, export and recovery without implementation terminology; `PROD-12` remains unaccepted until this succeeds;

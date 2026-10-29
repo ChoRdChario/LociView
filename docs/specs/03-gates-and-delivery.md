@@ -39,6 +39,14 @@ and first paired-slice prerequisite chain.
 
 ### 2.1 Fixture registry
 
+PO2026-10-29 [defers large-Caption qualification](00-product-contract.md): the
+combined10,000-Caption/50,000-change pack is retained/unqualified for later, not a
+practical-team completion or sequencing blocker. This does not pass its gate,
+grant aggregate adoption or change current limits, list behavior, durability,
+conflict, privacy, recovery or smaller/multi-tab tests. Future large-scale support
+claims require resuming that acceptance. This amendment also governs the scale
+clauses in §6 below.
+
 Each fixture records SHA-256, byte size, splat/triangle/texture counts, bounds, coordinates/units, provenance/license, anonymization, generation or restore instructions, and expected warnings/results.
 
 Required fixtures:
@@ -62,7 +70,7 @@ Required fixtures:
   manual AssetFrame Caption through save/reopen without proxy source/triangle
   authority, with the simple opaque mixed rule and all five fixed incomplete-data
   outcomes; direct-GS and proxy generation are optional later;
-- 10,000 captions and 50,000 metadata changes;
+- 10,000 captions and 50,000 metadata changes (retained deferred scale pack under the2026-10-29 amendment above);
 - deleted/private sentinel values for package privacy tests;
 - parent-delete/concurrent-child and unknown-minor-only-blob fixtures;
 - v1 media fixtures with equal bytes under distinct asset IDs and preserved initial occurrence count/order; later-copy prepend/reorder/duplicate-count/content-revision gates are withdrawn for ProjectScene by PO 2026-09-14 (G0-FX-21B–E), not PASS;
@@ -527,7 +535,7 @@ Scenarios:
 - two live tabs and a third-tab restart;
 - two offline package copies in both merge orders;
 - model-based random commands over multiple seeds;
-- 10,000 captions and 50,000 changes;
+- 10,000 captions and 50,000 changes (low-priority deferred qualification under §2.1; not a current completion blocker);
 - process kill at each persistence boundary;
 - blob staging versus metadata commit;
 - exact detached-change replay after metadata durability/before journal update, with a concurrent same-field replacement;
@@ -556,7 +564,7 @@ Hard merge/durability pass:
 - metadata-only command/recovery verifies existing large resources through the durable inventory without rereading or rehashing their payload bytes;
 - same-lineage package order yields equal semantic state; different lineage is rejected;
 - multi-tab live coordination is demonstrated, not inferred from IndexedDB safety;
-- the 10,000-caption UI remains usable with virtualization and stays within the G0 open/edit budgets; metadata-only speed is insufficient;
+- when large-scale qualification resumes, the 10,000-caption UI remains usable with virtualization and stays within the G0 open/edit budgets; metadata-only speed is insufficient. This scale clause is deferred under §2.1, not passed; current admitted-list behavior and safety checks remain required;
 - provisional desktop/iOS cold open, edit-to-durable and merge thresholds are approved in G0.
 
 Hard privacy pass:
