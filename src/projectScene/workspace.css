@@ -195,3 +195,30 @@
 .lv-project-files { padding: 8px 12px; border-bottom: 1px solid #b7b1aa; background: #f2f0ee; }
 .lv-project-files > summary { cursor: pointer; min-height: 32px; padding: 4px; }
 .lv-project-files > summary:focus-visible { outline: 2px solid #312f2d; outline-offset: 2px; }
+
+.lv-project-shell > p:empty, .lv-project-workspace > header > p:empty { display: none; }
+
+/* Only the compact Desktop editor owns the window height. Startup, recovery,
+   Review and narrow/short views keep their document scrolling. */
+@media (min-width: 761px) and (min-height: 720px) {
+  .lv-validation-host:has(> .lv-validation-content > .lv-project-shell[data-layout="workspace"]) {
+    display: flex; flex-direction: column; height: 100dvh; min-height: 0;
+  }
+  .lv-validation-host:has(> .lv-validation-content > .lv-project-shell[data-layout="workspace"]) > .lv-validation-status:empty { display: none; }
+  .lv-validation-content:has(> .lv-project-shell[data-layout="workspace"]) {
+    display: flex; flex-direction: column; flex: 1; min-height: 0;
+  }
+  .lv-project-shell[data-layout="workspace"], .lv-project-shell[data-layout="workspace"] > .lv-project-workspace {
+    display: flex; flex-direction: column; flex: 1; min-height: 0; min-width: 0;
+  }
+  .lv-project-shell[data-layout="workspace"] > :is(button, p, details) { flex-shrink: 0; }
+  .lv-project-shell[data-layout="workspace"] > button { align-self: flex-start; }
+  .lv-project-shell[data-layout="workspace"] > .lv-project-workspace > :is(header, .lv-project-viewport-tools) { flex-shrink: 0; }
+  .lv-project-shell[data-layout="workspace"] > .lv-project-workspace > header { gap: 8px 12px; padding: 8px 12px; max-height: 26dvh; overflow-y: auto; }
+  .lv-project-shell[data-layout="workspace"] > .lv-project-workspace > header > :is(h1, p) { margin: 0; }
+  .lv-project-shell[data-layout="workspace"] > .lv-project-workspace > header > details[open] { flex: 1 1 100%; min-width: 0; }
+  .lv-project-shell[data-layout="workspace"] .lv-project-body { flex: 1; height: auto; min-height: 0; }
+  .lv-project-shell[data-layout="workspace"] .lv-project-stage { min-height: 0; min-width: 0; }
+  .lv-project-shell[data-layout="workspace"] .lv-project-body > aside { min-height: 0; overscroll-behavior: contain; }
+  .lv-project-shell[data-layout="workspace"] > .lv-project-files[open] > section { max-height: min(30dvh, 240px); overflow-y: auto; overscroll-behavior: contain; }
+}

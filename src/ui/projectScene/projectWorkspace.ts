@@ -34,10 +34,10 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   const make = <K extends keyof HTMLElementTagNameMap>(tag: K, text = '') => { const node = document.createElement(tag); node.textContent = text; return node; };
   const button = (text: string, action: () => void) => { const b = make('button', text); b.type = 'button'; b.addEventListener('click', () => { if (!b.disabled && !disposed) action(); }); return b; };
   const root = make('main'); root.className = 'lv-project-workspace';
-  const header = make('header'), heading = make('h1', 'LociViewは3Dモデルと記録を編集できるアプリです。');
-  const projectTitle = make('h2'), resumeStatus = make('p'), fileStatus = make('p'), help = make('details');
+  const header = make('header'), introduction = make('p', 'LociViewは3Dモデルと記録を編集できるアプリです。');
+  const projectTitle = make('h1'), resumeStatus = make('p'), fileStatus = make('p'), help = make('details');
   projectTitle.setAttribute('aria-label', 'プロジェクト名'); resumeStatus.setAttribute('aria-label', '再開データの状態'); fileStatus.setAttribute('aria-label', '保存ファイルの状態');
-  help.setAttribute('aria-label', 'ヘルプ'); help.append(make('summary', 'ヘルプ'));
+  help.setAttribute('aria-label', 'ヘルプ'); help.append(make('summary', 'ヘルプ'), introduction);
   for (const [title, text] of [
     ['はじめる', 'プロジェクトを選び、変更するときは「編集を開始する」を選択します。シーンを切り替えても「開始シーン」は変わりません。'],
     ['記録する', '「ピンを追加」でモデルの面を選択し、位置を確定します。Shiftを押しながら面を選択しても追加できます。「数値で配置」では追加先モデルとX・Y・Zを指定します。未配置のピンは、最初にモデルの面を選択してください。'],
@@ -75,7 +75,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   });
   header.append(resumeNotice, otherProject);
   const status = make('p'); status.setAttribute('role', 'status'); status.className = 'lv-operation-status';
-  const retry = button('更新を再試行', () => { void runRetry(); }); header.append(heading, status, retry);
+  const retry = button('更新を再試行', () => { void runRetry(); }); header.append(status, retry);
   const revise = button('入力を修正する', () => { if (!busy && ports.status().kind === 'idle') { pending = null; feedback = ''; render(); } }); header.append(revise);
   const body = make('div'); body.className = 'lv-project-body';
   const stage = make('section'), canvas = make('canvas'), markers = make('div');

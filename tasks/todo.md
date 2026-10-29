@@ -56,7 +56,77 @@ unchanged-feature-classification checks pass; independent review has no findings
 No runtime change or new capacity guarantee; no runtime suite is needed for this
 documentation checkpoint.
 
-## Current boundary —PC everyday workflow and usable workspace
+## Current boundary —PC workspace stays visible during file work
+
+Audit start: g0-baseline HEAD5708e91, verified continuation checkpoint pushed;
+worktree clean. The next missing accepted UI condition is visible3D plus task
+pane at normal PC height, not another format or helper lane. Root remains sole
+writer; bounded layout/diff reviewers are read-only.
+
+Outcome: record/compare Captions → expand/save/check files → continue editing,
+without pushing the stage offscreen. Apply available-height sizing only to the
+compact Desktop active core; retain file tools outside inert core, input and
+comparison-window DOM. Bound the expanded file body with its own scroll, and
+retain ordinary document flow at narrow/short sizes and for home/startup/recovery/
+Review/legacy. Project name is the active heading; routine product explanation
+can stay in Help while the complete first-open introduction remains.
+
+Acceptance: stage and sidebar remain within1280×800/1440×900 PC views, including
+expanded files; sidebar/file scrolling leaves the stage visible. Existing cancel,
+failure/retry and comparison-window controls remain reachable, input and windows
+survive pane toggling/resize, and narrow/short/long-Japanese views have no page-wide
+horizontal overflow. Reuse the connected save/receive/restore browser lane plus
+geometry/gesture assertions, focused guards and the final serial checkpoint.
+Stop affected work only for a new product/architecture/authority decision; no
+package/storage/renderer/dependency change, numeric guarantee or device/offline/
+release acceptance is included. Independent baseline layout assessment PASS.
+
+Implementation: compact active-layout marker/content hook, shrinkable host→core→
+stage/sidebar chain and bounded file-body scrolling; project title becomes the
+active heading and the complete product explanation remains in Help. Focused
+continuation/review-copy guards7 PASS and typecheck PASS. Independent review found
+that separately capping Help/Settings could still collapse the stage when both
+were open; fixed by capping/scrolling their shared header, preserving both states.
+First browser run1793305064916-62136 stopped at the new gesture assertion: the
+test assumed DOM-last meant visually frontmost and dragged an overlapping other
+card. Read-only cause review confirmed the distinct drag state; now use the
+existing front selector and assert the hit target before the same real pointer/
+resize cancellation assertion. No product gesture change or assertion relaxation.
+Second run1793305182771-33900 passed the new layout/gesture/disclosure and real
+receive/restore operations, then exposed another test-order assumption: after
+adding a second Caption, DOM-first is not a stable identity. Select the intended
+record by its distinct title throughout the flow; preserve the same field/history
+assertions. Neither stopped run is a final PASS or a product data-loss finding.
+Final connected Chromium run1793305360486-58860 PASS,123.282s test/138.068s total:
+two independent contexts, two comparison windows, preserved Caption/settings
+drafts, real pointer+resize cancellation, bounded shared disclosures/file scrolling,
+save/cancel/reopen, disjoint receive, exact restored history and page reload.
+Wide1280×800/1440×900 geometry and320×740/640×400/1280×600 reflow assertions pass.
+Rendered evidence review PASS.640×400 is an equivalent CSS viewport, not actual
+browser zoom; no physical-device, full browser restart, native OS-dialog or offline
+shell acceptance is claimed. Final serial `check:checkpoint` PASS at the frozen5
+source/test files: typecheck,136 root files/3071 passed/21 unchanged TODO and all4
+builds. Root suite1520.17s; log `.artifacts/e2e/pc-layout/checkpoint.log`. The slower
+root run completed without retry or changed limits; its CPU activity was observed
+while waiting. No application-latency conclusion is inferred from suite duration.
+Frozen hashes match; final staging must retain the reviewed/tested source tree.
+Four-artifact HEIC isolation PASS. Independent source/delta and rendered-evidence
+reviews PASS; documentation diff/local links pass. This is a verified development
+checkpoint, with device/zoom/offline and release gates retained.
+After this unit, continue the same daily-use review across models/saved views/
+materials and reachable task navigation; do not return by default to wider legacy
+compatibility,10k qualification or new feature/profile guarantees.
+Bounded next candidate from read-only review: impossible exact-neighbor Saved View
+moves are still offered until the allocator refuses after selection. Pass the
+existing pure `viewOrder` allocator into `ViewAuthorContext`, probe the same
+insertion interval in the planner, and reuse existing blocked-plan/description UI.
+Targets: viewAuthoringState/projectViews, harness viewSession and their existing
+state/control/file tests; no new cross-layer import or command. With three equal
+keys, refuse only impossible edge moves while keeping representable middle moves;
+stale plans remain no-write. No collection rebalance, tie-group skipping or camera
+change. Reconfirm the source and accepted exact-neighbor contract before starting.
+
+## Previous boundary —PC everyday editing and file continuation
 
 PO2026-10-30 authorizes continuing the consolidated PC completion/usability work
 without small manual-test waits. Outcome: create/open → select Scene → record,

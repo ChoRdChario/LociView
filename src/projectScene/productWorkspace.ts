@@ -29,6 +29,7 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
   const external = () => switching || !!tools?.hasChanges();
   const changed = () => {
     if (disposed) return;
+    root.dataset.layout = fileMenu && core && !startup ? 'workspace' : 'flow';
     if(fileMenu&&(host.hasPending()||host.workspaceOutput.error||host.workspaceOutput.jobs.some(job=>
       job.state==='unstarted'||job.state==='incomplete'||job.state==='repair-required')))fileMenu.open=true;
     tools?.render(); mode.textContent = host.mode!.current === 'view' ? '編集を開始する' : '閲覧に切り替える';

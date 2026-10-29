@@ -48,10 +48,10 @@ manual pairing and offline-shell activation are not part of this implementation.
 Keep existing comfortable-UI guidance, original bytes/history, atomic Session
 commands, file/recovery/evidence fences and one writer. Read-only reviews may run
 in parallel. Continue ordinary approved work without small PO testing waits.
-The2026-10-30 PC everyday-use continuation unit is current in todo: tag-input
-ownership, optional file-selection cancellation and receive/restore feedback.
-Its next rendered finding is compact Desktop viewport/file-pane sizing; keep
-the startup/recovery and narrow-screen flow outside active-workspace constraints.
+The2026-10-30 PC everyday-use work covers tag-input ownership, optional file-
+selection cancellation, receive/restore feedback and compact Desktop viewport/
+file-pane sizing. Todo owns the exact checks and current unit; keep startup/
+recovery and narrow-screen flow outside active-workspace height constraints.
 PO2026-10-29 defers10k-Caption/50k-change qualification; it is low-priority later
 work, not a practical completion blocker. Follow todo for the next ordinary user
 workflow; retain current limits, safety checks and existing fixtures.

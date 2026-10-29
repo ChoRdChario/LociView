@@ -65,7 +65,7 @@ export interface ValidationWorkspacePorts {
 export function createValidationWorkspace(document: Document, ports: ValidationWorkspacePorts, initialRun?: string, initialMode: LocalOpenMode = 'edit') {
   const policy=projectFilePolicy(ports.filePolicy ?? ports.fileLimits);
   const root = document.createElement('section'), navigation = document.createElement('section'), content = document.createElement('section');
-  root.className = 'lv-validation-host'; navigation.className = 'lv-validation-home';
+  root.className = 'lv-validation-host'; navigation.className = 'lv-validation-home'; content.className = 'lv-validation-content';
   const heading = document.createElement('h1'); heading.textContent = 'LociView';
   const help = document.createElement('p'); help.textContent = ports.introduction ?? 'LociViewは、3Dモデルに記録を付け、ファイルで作業を受け渡すアプリです。';
   const legacy=document.createElement('button');legacy.type='button';legacy.textContent='以前のプロジェクトを開く';legacy.hidden=!ports.openLegacy;
