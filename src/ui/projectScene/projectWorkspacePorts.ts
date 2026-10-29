@@ -7,6 +7,17 @@ import type { Field } from '../../scene/types';
 import type { MaterialSource } from './materialState';
 import type { ViewCameraIntent, ViewRuntime, ViewSource } from './viewState';
 import type { ViewFieldVersions } from './viewAuthoringState';
+import type { CaptionSnapshot } from '../../projectMetadata/captionAuthoring';
+
+export type WorkspaceAuthoringIntent =
+  | { kind: 'duplicateCaption'; sceneId: string; sourceId: string }
+  | { kind: 'duplicateScene'; sourceId: string; name: string }
+  | { kind: 'deleteSceneContents'; sceneId: string }
+  | { kind: 'reorderScene'; sceneId: string; direction: 'up' | 'down' }
+  | { kind: 'createTag'; label: string; colorSrgb: number[] }
+  | { kind: 'editTag'; tagId: string; label: string; colorSrgb: number[] }
+  | { kind: 'deleteTag'; tagId: string }
+  | { kind: 'setCaptionTag'; captionId: string; tagId: string; included: boolean };
 
 export type WorkspaceProvider = Extract<ProjectProviderRead, { kind: 'scene-provider' }>;
 export type Point3 = readonly [number, number, number];
@@ -28,8 +39,10 @@ export interface WorkspaceRecoveryGroup {
 export interface WorkspaceFile { readonly name: string; readonly size: number; readonly blob?: Blob; arrayBuffer(): Promise<ArrayBuffer> }
 export interface WorkspacePlacement { readonly translation: Point3; readonly rotationXYZW: readonly [number, number, number, number]; readonly uniformScale: number }
 export interface WorkspaceModelTarget { readonly kind: 'model'; readonly token: string; readonly sceneId: string; readonly assetId: string; readonly bindingId: string }
-export interface WorkspaceModelProposal { readonly target: WorkspaceModelTarget; readonly placement: WorkspacePlacement; readonly mode: 'translate' | 'rotate' | 'scale' }
+export interface WorkspaceModelProposal { readonly target: WorkspaceModelTarget; readonly placement: WorkspacePlacement; readonly mode: 'translate' | 'rotate' | 'scale'; readonly pivotAsset?: Point3;
+  readonly fitReference?: { assetId: string; bindingId: string } }
 export interface WorkspaceModelDetails { readonly target: WorkspaceModelTarget; readonly placement: WorkspacePlacement;
+  readonly boundsAsset?: { readonly min: Point3; readonly max: Point3 }; readonly importedPlacement?: WorkspacePlacement;
   readonly gsProxyTarget?: {readonly sceneId:string;readonly assetId:string;readonly expectedBindingId:string;readonly gsRepresentationId:string;readonly gsPayloadDigest:string;readonly gsFamilyId:string;readonly expectedProxyId:string|null}; readonly replacementAvailable?: boolean; readonly pointCloud?: boolean; readonly rotationDegrees: readonly [string, string, string]; readonly sceneCount: Field<number> }
 export interface WorkspaceViewPayload { readonly camera: JsonObject; readonly background: { readonly kind: 'solid'; readonly colorSrgb: Point3 } }
 export interface WorkspaceMaterialReview { readonly key: string; readonly token: string; readonly sceneId: string; readonly overrideId: string;
@@ -74,11 +87,17 @@ export interface WorkspaceFileInteraction {
   refreshHistory(): void;
 }
 export interface ProjectWorkspacePorts {
+  authoring?: {
+    prepare(token: string, intent: WorkspaceAuthoringIntent): MetadataEdit;
+    snapshot(token: string, captionId: string): CaptionSnapshot;
+    sceneOrderChoices(token: string, sceneId: string): readonly { operationId: string; orderKey: string }[];
+  };
   read(): WorkspaceProvider;
   projectStatus(): { readonly title: string | null; readonly resumable: boolean; readonly backup: 'verified' | 'unconfirmed' | 'unavailable' };
   openProject?(): void;
   resumedLastProject?(): boolean;
   storageEstimate?(): Promise<Readonly<{ usage?: number; quota?: number }>>;
+  localSettings?: { read(): string; save(displayName: string): boolean };
   readonly readOnly: boolean;
   presentation?(): { readonly busy: boolean; readonly reason: string } | null;
   status(): { kind: 'idle' | 'checking' | 'failed'; error?: string; retryable?: boolean };
@@ -105,7 +124,7 @@ export interface ProjectWorkspacePorts {
   addModel(token: string, input: { sceneId: string; assetId: string; file: WorkspaceFile }): Promise<unknown>;
   modelSelectionNotice?(file:WorkspaceFile):Promise<{externalMaterialsUnavailable:boolean}>;
   replaceModel(token: string, input: { sceneId: string; assetId: string; expectedBindingId: string; file: WorkspaceFile }): Promise<unknown>;
-  transformModel(token: string, input: { sceneId: string; assetId: string; expectedBindingId: string; bindingId: string; placement: WorkspacePlacement }): Promise<unknown>;
+  transformModel(token: string, input: { sceneId: string; assetId: string; expectedBindingId: string; bindingId: string; placement: WorkspacePlacement; fitReference?: { assetId: string; bindingId: string } }): Promise<unknown>;
   modelDeletion(assetId: string): { readonly dependencies: readonly { kind: string; id: string; uncertain: boolean }[] };
   prepareModelMembership(token: string, sceneId: string, assetId: string, observedIds: readonly string[], keepId: string, choice: 'one' | 'both'): Promise<MetadataEdit>;
   views(sceneId: string, selected: string | null): { source: ViewSource; versions: ViewFieldVersions | null; entryVersion: string;

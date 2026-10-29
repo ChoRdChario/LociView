@@ -274,6 +274,24 @@ describe('synthetic Scene display; GPU mocked, not rendered/browser acceptance',
     expect(g.dragging).toBe(false); expect(proposal.manipulation!.uniformScale).toBe(1.5); expect(g.object.scale.toArray()).toEqual([1.5, 1.5, 1.5]);
     expect(project).toEqual(createSyntheticProject()); v.dispose();
   });
+  it('keeps an Asset centre pivot fixed through model gizmo rotation and uniform scaling, including Escape', () => {
+    const project = createSyntheticProject(), original = syntheticDisplay(project, f.overview, null, null), model = original.models.find(m => m.binding.assetId === f.equipment)!, canvas = fakeCanvas();
+    const pivot = [1, 2, 0] as const;
+    let proposal: GizmoProposal<ModelPlacementTarget> = { target: { kind: 'model', token: original.token, sceneId: f.overview, assetId: f.equipment, bindingId: model.binding.id },
+      position: [3, 4, 5], enabled: true, manipulation: { mode: 'rotate', rotationXYZW: [0, 0, 0, 1], uniformScale: 2, pivotAsset: pivot } };
+    const viewport = createSyntheticViewport(canvas.canvas as unknown as HTMLCanvasElement, () => {}, undefined, (target, position, manipulation) => {
+      proposal = { target, position, manipulation, enabled: true }; viewport.update(syntheticDisplay(project, f.overview, null, null, proposal)); return true;
+    });
+    viewport.update(syntheticDisplay(project, f.overview, null, null, proposal)); viewport.setActive(true); canvas.show();
+    const g = tracker.gizmos.at(-1), before = proposal, fixed = new THREE.Vector3(...pivot).multiplyScalar(2).add(new THREE.Vector3(...before.position));
+    expect(g.object.position).toEqual(fixed); g.dragging = true; g.object.quaternion.set(...degreesRotation(['0', '0', '90'])); g.dispatchEvent({ type: 'objectChange' });
+    const world = new THREE.Vector3(...pivot).multiplyScalar(proposal.manipulation!.uniformScale).applyQuaternion(new THREE.Quaternion(...proposal.manipulation!.rotationXYZW)).add(new THREE.Vector3(...proposal.position));
+    expect(world.distanceTo(fixed)).toBeLessThan(1e-12); canvas.canvas.fire('keydown', { key: 'Escape', preventDefault() {} }); expect(proposal).toEqual(before);
+    proposal = { ...before, manipulation: { ...before.manipulation!, mode: 'scale' } }; viewport.update(syntheticDisplay(project, f.overview, null, null, proposal));
+    g.axis = 'X'; g.dragging = true; g.object.scale.x = 6; g.dispatchEvent({ type: 'objectChange' });
+    const scaled = new THREE.Vector3(...pivot).multiplyScalar(proposal.manipulation!.uniformScale).applyQuaternion(new THREE.Quaternion(...proposal.manipulation!.rotationXYZW)).add(new THREE.Vector3(...proposal.position));
+    expect(scaled.distanceTo(fixed)).toBeLessThan(1e-12); expect(proposal.manipulation!.uniformScale).toBe(6); viewport.dispose();
+  });
   it('previews model translation and anchored pins without changing source or camera; cancels/commits through the shared gizmo', () => {
     const s = new SyntheticSession(), doc = new RecordedDocument();
     const w = createDevelopmentWorkspace(doc.asDocument(), s, { viewportFactory: (canvas, changed, pin, model) => {

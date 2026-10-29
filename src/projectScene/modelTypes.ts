@@ -40,6 +40,7 @@ export const renderPlacement = (model: DisplayModelClosure | ReadonlyRenderModel
 export interface ModelPlacementCommand {
   readonly sceneId: string; readonly assetId: string; readonly expectedBindingId: string;
   readonly bindingId: string; readonly placement: ModelPlacement;
+  readonly fitReference?: { readonly assetId: string; readonly bindingId: string };
 }
 export interface DisplayModelVersion {
   readonly assetId: string; readonly label: string; readonly projection: AssetProjection;

@@ -6,7 +6,7 @@ import { newProjectId, panelNodes, sameProjectValue, type ProjectPanelHost, type
 /** Attachment commands and local viewing only; binary verification stays in the current host. */
 export function createProjectMedia(document: Document, host: ProjectPanelHost, caption: () => string | null, viewer: MediaViewer) {
   const { make, button } = panelNodes(document), root = make('section'), galleryHost = make('div'), stored = make('details'), list = make('section');
-  root.setAttribute('aria-label', '画像の整理'); galleryHost.setAttribute('aria-label', '添付画像'); list.setAttribute('aria-label', '添付の編集');
+  root.setAttribute('aria-label', 'メディアの整理'); galleryHost.setAttribute('aria-label', '添付メディア'); list.setAttribute('aria-label', '添付の編集');
   stored.setAttribute('aria-label', '登録済みメディア'); stored.append(make('summary', '登録済みメディア'));
   const status = make('p'); status.setAttribute('role', 'status');
   type Scope = { token: string; sceneId: string; captionId: string };
@@ -35,10 +35,10 @@ export function createProjectMedia(document: Document, host: ProjectPanelHost, c
     return (): MediaPreviewGroup | null => {
       if (disposed || captured !== scope()) return null;
       const { provider } = source(), resources = projectMediaResources(provider);
-      if (captionId === null) return { scope: captured, label: '登録済みメディア', items: resources.map(r => ({ id: r.id, resourceId: r.id, label: r.label, description: '', image: image(r.id, r.record) })) };
+      if (captionId === null) return { scope: captured, label: '登録済みメディア', items: resources.map(r => ({ id: r.id, resourceId: r.id, label: r.label, kind:r.record.mediaKind as 'image'|'video'|'audio',description: '', image: image(r.id, r.record) })) };
       return { scope: JSON.stringify([captured, captionId]), label: String(fieldValue(provider.resources.captions[captionId]?.title) || 'キャプション'),
         items: rows(captionId).map(r => { const resource = resources.find(m => m.id === r.media!.id), alt = r.fields.altText;
-          return { id: r.id, resourceId: String(r.media!.id), label: r.label, description: alt?.kind === 'value' ? r.alt : '説明の更新候補を確認してください。',
+          return { id: r.id, resourceId: String(r.media!.id), label: r.label, kind:r.media!.mediaKind as 'image'|'video'|'audio', description: alt?.kind === 'value' ? r.alt : '説明の更新候補を確認してください。',
             image: resource ? image(resource.id, resource.record) : null }; }) };
     };
   };
@@ -97,9 +97,9 @@ export function createProjectMedia(document: Document, host: ProjectPanelHost, c
     form.hidden = !draft; input.readOnly = !!local; if (!draft?.composing) input.value = draft?.raw ?? '';
     apply.disabled = !!block || !draft || draft.composing || !isCurrent(draft) || !!uncertain; cancel.disabled = !!local || !!draft?.composing;
     confirmation.hidden = !removal; detach.disabled = !!block || !removal || !isCurrent(removal) || !!uncertain;
-    question.textContent = removal ? `「${removal.label}」の添付を解除しますか？ 同じ記録を使う全シーンに反映されます。元の画像と、別の記録への添付は残ります。` : '';
+    question.textContent = removal ? `「${removal.label}」の添付を解除しますか？ 同じ記録を使う全シーンに反映されます。元のメディアと、別の記録への添付は残ります。` : '';
     const unavailable = s.provider.issues.some(issue => issue.kind === 'unverified' && issue.code === 'verified-media-bytes-required' && issue.path[0] === 'mediaResourcesById');
-    status.textContent = [message, uncertain, unavailable && 'この環境では利用できない登録画像があります。元の画像がある環境で確認してください。',
+    status.textContent = [message, uncertain, unavailable && 'この環境では利用できない登録メディアがあります。対応するブラウザで確認してください。',
       (selected && !isCurrent(selected) || draft && !isCurrent(draft) || removal && !isCurrent(removal)) && '対象が更新されています。入力と操作を保持しています。取り消して選び直してください。'].filter(Boolean).join(' ');
     const nextList = JSON.stringify([s.provider.token, s.captionId, !!block, owned(), !!uncertain]); if (nextList === listKey) return; listKey = nextList; list.replaceChildren();
     for (const [index, row] of (s.captionId ? rows(s.captionId) : []).entries()) {
@@ -120,7 +120,7 @@ export function createProjectMedia(document: Document, host: ProjectPanelHost, c
   return { root, render, hasChanges: owned, composing: () => !!draft?.composing,
     gallery(captionId: string) {
       let lifetime = scope(), read = reader(captionId);
-      const thumbs = createMediaThumbnails(document, () => read(), viewer); thumbs.root.setAttribute('aria-label', '添付画像');
+      const thumbs = createMediaThumbnails(document, () => read(), viewer); thumbs.root.setAttribute('aria-label', '添付メディア');
       return { root: thumbs.root, render() { if (lifetime !== scope()) { lifetime = scope(); read = reader(captionId); } thumbs.render(); }, dispose: thumbs.dispose };
     },
     dispose() { disposed = true; gallery?.dispose(); picker.dispose(); bodies.clear(); root.remove(); } } satisfies ProjectPanel & { gallery(captionId: string): { root: HTMLElement; render(): void; dispose(): void } };

@@ -15,7 +15,7 @@ import { assetCopySource, prepareAssetMembershipCopy } from '../projectMetadata/
 import { entryViewCandidates, viewFieldCandidates } from '../projectMetadata/viewResolution';
 import { newId } from '../projectMetadata/persistence';
 import type { MaterialRecordPort, MaterialSource } from '../ui/projectScene/materialState';
-import type { ProjectWorkspacePorts, WorkspaceMaterialReview, WorkspaceRecoveryGroup } from '../ui/projectScene/projectWorkspacePorts';
+import type { ProjectWorkspacePorts, WorkspaceModelDetails, WorkspaceMaterialReview, WorkspaceRecoveryGroup } from '../ui/projectScene/projectWorkspacePorts';
 import { fieldValue, projectAttachments } from '../ui/projectScene/projectRead';
 import { metadataViewData } from './metadataViews';
 import { entryKey, viewKey, orderBetween } from './viewDisplay';
@@ -27,11 +27,15 @@ import { describeMaterialCandidate } from './materialLabels';
 import { normalizeAlt } from './mediaDisplay';
 import { canonicalDisplay } from './displaySupport';
 import { pinPositionInParent } from './pinParent';
+import { captionSnapshot } from '../projectMetadata/captionAuthoring';
+import { orderedAuthoringScenes, organizationSceneSource, sceneOrderChoices } from '../projectMetadata/sceneOrganization';
+import { candidateReader } from '../projectMetadata/membership';
+import type { MetadataEdit } from '../projectMetadata/commands';
 import type { createValidationModeHost } from './validationModeHost';
 
 /** Read adapters only: no Session exposure, synthetic editor or mutation authority. */
 export function productSources(host: ReturnType<typeof createValidationModeHost>,smoothDisplay=false): Pick<ProjectWorkspacePorts,
-  'modelDetails' | 'modelPlacement' | 'modelAngles' | 'modelReview' | 'modelDeletion' | 'prepareModelMembership' | 'views' | 'viewOrder' | 'viewReview' | 'materials' | 'mediaDescription' | 'captionDeletion' | 'pinPositionInParent' | 'recovery' | 'prepareCaptionMembership'> {
+  'authoring' | 'modelDetails' | 'modelPlacement' | 'modelAngles' | 'modelReview' | 'modelDeletion' | 'prepareModelMembership' | 'views' | 'viewOrder' | 'viewReview' | 'materials' | 'mediaDescription' | 'captionDeletion' | 'pinPositionInParent' | 'recovery' | 'prepareCaptionMembership'> {
   const provider = () => { const p = host.read().provider; if (p?.kind !== 'scene-provider') throw Error('プロジェクトの内容を確認してください。'); return p; };
   const otherSceneReferences = (p: ReturnType<typeof provider>, kind: 'asset' | 'caption', id: string, sceneId: string) => {
     const map = kind === 'asset' ? 'sceneAssetMembershipsById' : 'sceneCaptionMembershipsById', field = kind === 'asset' ? 'assetId' : 'captionId';
@@ -53,6 +57,50 @@ export function productSources(host: ReturnType<typeof createValidationModeHost>
       ...(uncertain && names.size ? ['ほかにも未解決の参照があります。元の参照先は変更しません。'] : [])];
   };
   return {
+    authoring: {
+      snapshot(token, captionId) { const p = provider(); if (p.token !== token) throw Error('記録が更新されています。'); return captionSnapshot(p, captionId, host.limits); },
+      sceneOrderChoices(token, sceneId) { const p = provider(); if (p.token !== token) throw Error('シーンが更新されています。'); return sceneOrderChoices(p, sceneId, host.limits); },
+      prepare(token, intent) {
+        const p = provider(); if (p.token !== token) throw Error('内容が更新されています。選び直してください。');
+        const fresh = (prefix: string) => `${prefix}_${newId()}`;
+        const copies = (rows: JsonObject[], prefix: string) => rows.map(row => ({ sourceId: row.id as string, targetId: fresh(prefix) }));
+        let command: MetadataEdit;
+        switch (intent.kind) {
+          case 'duplicateCaption': {
+            const c = captionCopySource(p, intent.sourceId, host.limits);
+            command = { ...intent, captionId: fresh('cap'), membershipId: fresh('scm'), attachments: copies(c.attachments, 'att'), tags: copies(c.tags, 'tgm'), orderKey: orderBetween(null, null), eventId: fresh('evt') }; break;
+          }
+          case 'duplicateScene': {
+            const s = organizationSceneSource(p, intent.sourceId, host.limits), scenes = orderedAuthoringScenes(p, host.limits);
+            const ids = [...copies(s.assets, 'sam'), ...copies(s.captions, 'scm'), ...copies(s.views, 'view'), ...copies(s.materials, 'ovr')];
+            for (const edge of s.captions) { const c = captionCopySource(p, edge.captionId as string, host.limits);
+              ids.push({ sourceId: c.caption.id as string, targetId: fresh('cap') }, ...copies(c.attachments, 'att'), ...copies(c.tags, 'tgm')); }
+            command = { ...intent, sceneId: fresh('scn'), ids, orderKey: orderBetween(scenes.at(-1)?.orderKey as string ?? null, null), eventId: fresh('evt') }; break;
+          }
+          case 'deleteSceneContents': {
+            const s = organizationSceneSource(p, intent.sceneId, host.limits);
+            command = { ...intent, observedIds: [...s.assets, ...s.captions, ...s.views, ...s.materials].map(row => row.id as string), eventId: fresh('evt') }; break;
+          }
+          case 'reorderScene': {
+            const scenes = orderedAuthoringScenes(p, host.limits), index = scenes.findIndex(s => s.id === intent.sceneId);
+            if (index < 0) throw Error('シーンを選び直してください。');
+            const moved = scenes.splice(index, 1)[0]!, target = index + (intent.direction === 'up' ? -1 : 1);
+            if (target < 0 || target > scenes.length) throw Error('この方向には移動できません。');
+            const before = scenes[target - 1], after = scenes[target];
+            command = { kind: 'reorderScene', sceneId: moved.id as string, beforeId: before?.id as string ?? null, afterId: after?.id as string ?? null,
+              orderKey: orderBetween(before?.orderKey as string ?? null, after?.orderKey as string ?? null) }; break;
+          }
+          case 'createTag': {
+            const r = candidateReader(p, host.limits), orders = r.related('captionTagsById', {}).map(id => r.exact('captionTagsById', id, 'orderKey') as string);
+            command = { ...intent, tagId: fresh('tag'), eventId: fresh('evt'), orderKey: orderBetween(orders.sort().at(-1) ?? null, null) }; break;
+          }
+          case 'editTag': command = intent; break;
+          case 'deleteTag': command = { ...intent, observedIds: candidateReader(p, host.limits).related('captionTagMembershipsById', { tagId: intent.tagId }), eventId: fresh('evt') }; break;
+          case 'setCaptionTag': command = { ...intent, observedIds: candidateReader(p, host.limits).related('captionTagMembershipsById', { captionId: intent.captionId, tagId: intent.tagId }), membershipId: fresh('tgm'), eventId: fresh('evt') }; break;
+        }
+        planMetadataEdit(p, command, host.limits); return command;
+      },
+    },
     recovery() {
       const p = provider(), groups: WorkspaceRecoveryGroup[] = [];
       const sceneLabel = (id: string) => fieldValue(p.state.scenes[id]?.name) ?? (p.state.scenes[id] ? `シーン ${Object.keys(p.state.scenes).sort().indexOf(id) + 1}（名称を確認）` : '参照先を確認');
@@ -77,7 +125,7 @@ export function productSources(host: ReturnType<typeof createValidationModeHost>
         return { uncertain, describe(key: string) {
           const at = siblings.filter(r => r.order < key || r.order === key && r.id.localeCompare(attachmentId) < 0).length;
           const next = siblings[at], previous = siblings[at - 1];
-          return `順序を確認できる画像の中で ${at + 1}/${siblings.length + 1} 番目${next ? `（「${next.label}」の前）` : previous ? `（「${previous.label}」の後）` : ''}`;
+          return `順序を確認できるメディアの中で ${at + 1}/${siblings.length + 1} 番目${next ? `（「${next.label}」の前）` : previous ? `（「${previous.label}」の後）` : ''}`;
         } };
       };
       for (const field of p.inspection.candidates.fields) {
@@ -95,10 +143,10 @@ export function productSources(host: ReturnType<typeof createValidationModeHost>
           try { attachmentFieldCandidates(p, captionId, attachmentId, name, host.limits); ready = true; } catch { /* Never accept only valid-looking choices. */ }
           const mediaId = fieldValue(row?.mediaResourceId), media = typeof mediaId === 'string' ? fieldValue(p.details.immutable.mediaResourcesById[mediaId]) : undefined;
           const order = attachmentOrder(captionId, attachmentId);
-          groups.push({ key: `attachment/${attachmentId}/${name}`, label: `${captionId ? captionLabel(captionId) : '添付先を確認'}：${typeof media?.label === 'string' ? media.label : '添付画像'}の${name === 'altText' ? '説明' : '順序'}`, ready,
+          groups.push({ key: `attachment/${attachmentId}/${name}`, label: `${captionId ? captionLabel(captionId) : '添付先を確認'}：${typeof media?.label === 'string' ? media.label : '添付メディア'}の${name === 'altText' ? '説明' : '順序'}`, ready,
             target: { kind: 'attachmentField', captionId, attachmentId, field: name },
-            note: name === 'altText' ? 'この画像の説明だけを変更します。画像・添付先・順序は変わりません。' :
-              `この画像の順序だけを変更します。説明やほかの添付は変わりません。${order.uncertain ? '未解決のほかの添付は、この位置に含めていません。' : ''}`,
+            note: name === 'altText' ? 'このメディアの説明だけを変更します。メディア・添付先・順序は変わりません。' :
+              `このメディアの順序だけを変更します。説明やほかの添付は変わりません。${order.uncertain ? '未解決のほかの添付は、この位置に含めていません。' : ''}`,
             choices: field.candidates.map((c, i) => ({ id: c.operationId, label: `候補 ${i + 1}：${name === 'altText' && c.value.kind === 'absent' ? '説明なし（未設定）' :
               c.value.kind !== 'value' || typeof c.value.value !== 'string' ? '確認が必要な値' : name === 'altText' ? c.value.value || '空の説明' : order.describe(c.value.value)}` })) });
         }
@@ -125,9 +173,9 @@ export function productSources(host: ReturnType<typeof createValidationModeHost>
         let source: ReturnType<typeof attachmentLifecycleRecovery> | undefined;
         try { source = attachmentLifecycleRecovery(p, captionId, attachmentId, host.limits); } catch { /* Invalid history/endpoints are not repaired by this choice. */ }
         const order = attachmentOrder(captionId, attachmentId), retained = p.inspection.candidates.fields.filter(f=>f.path[0]==='captionAttachmentsById' && f.path[1]===attachmentId && ['altText','orderKey'].includes(f.path[2]!));
-        groups.push({ key:`attachment/${attachmentId}/lifecycle`, label:`${captionId ? captionLabel(captionId) : '添付先を確認'}：${typeof media?.label==='string' ? media.label : '添付画像'}の添付状態`, ready:!!source,
+        groups.push({ key:`attachment/${attachmentId}/lifecycle`, label:`${captionId ? captionLabel(captionId) : '添付先を確認'}：${typeof media?.label==='string' ? media.label : '添付メディア'}の添付状態`, ready:!!source,
           target:{kind:'attachmentLifecycle',captionId,attachmentId,operationIds:source?.lifecycle.candidates.map(c=>c.operationId) ?? []},
-          note:`添付状態だけを確定します。画像本体と説明・順序の候補は変更しません。${order.uncertain ? '未解決のほかの添付は、順序の位置に含めていません。' : ''}`,
+          note:`添付状態だけを確定します。メディア本体と説明・順序の候補は変更しません。${order.uncertain ? '未解決のほかの添付は、順序の位置に含めていません。' : ''}`,
           choices:source?.states.map(state=>({id:state,label:state==='deleted' ? '添付を外した状態を維持' : source!.states.includes('deleted') ? '添付を復元' : '添付を残す'})) ?? [],
           details:retained.flatMap(f=>f.candidates.map((c,i)=>`${f.path[2]==='altText' ? '説明' : '順序'} 候補 ${i+1}：${c.value.kind==='absent' ? '未設定' : typeof c.value.value!=='string' ? '確認が必要な値' : f.path[2]==='altText' ? c.value.value || '空の説明' : order.describe(c.value.value)}`)) });
       }
@@ -154,7 +202,7 @@ export function productSources(host: ReturnType<typeof createValidationModeHost>
           target: { kind: 'membership', sceneId: g.sceneId, captionId: g.captionId, edgeIds: g.edgeIds },
           choices: g.edgeIds.map((id, i) => ({ id, label: `${captionLabel(g.captionId)}：登録 ${i + 1}` })),
           details: otherSceneReferences(p, 'caption', g.captionId, g.sceneId),
-          note: copyReady ? `同じキャプションへの登録が${g.edgeIds.length}件あります。選んだ登録が元の記録を引き継ぎます。「両方残す」では、他方をこのシーンだけの独立した記録にします。本文・ピン位置・画像の説明を別々に編集でき、ピンの親モデルと画像本体は引き継ぎます。` : '本文・添付などが未解決のため、両方残す操作はできません。一つにまとめる操作は内容を変更しません。' });
+          note: copyReady ? `同じキャプションへの登録が${g.edgeIds.length}件あります。選んだ登録が元の記録を引き継ぎます。「両方残す」では、他方をこのシーンだけの独立した記録にします。本文・ピン位置・メディアの説明を別々に編集でき、ピンの親モデルとメディア本体は引き継ぎます。` : '本文・添付などが未解決のため、両方残す操作はできません。一つにまとめる操作は内容を変更しません。' });
       }
       return groups;
     },
@@ -178,6 +226,14 @@ export function productSources(host: ReturnType<typeof createValidationModeHost>
       const asset = p.resources.assets[assetId], projection = asset?.projection;
       const version = projection?.kind === 'value' ? snapshot.modelVersions?.find(v => v.assetId === assetId && v.projection.bindingId === projection.value.bindingId) : undefined;
       if (!version || !isSavedModel(version.closure)) return null;
+      let original = version.closure.binding as JsonObject, importedPlacement: WorkspaceModelDetails['importedPlacement'];
+      const visited = new Set<string>();
+      while (original.parentBindingId && visited.size < host.limits.maxWork) {
+        if (visited.has(original.id as string)) break; visited.add(original.id as string);
+        const parent = p.details.immutable.assetBindingsById[original.parentBindingId as string];
+        if (parent?.kind !== 'value' || parent.value.assetId !== assetId) break; original = parent.value;
+      }
+      if (!original.parentBindingId && original.method === 'import') importedPlacement = original.assetToProject as unknown as WorkspaceModelDetails['placement'];
       const ids = new Set<string>(); let uncertain = false;
       for (const fields of Object.values(p.details.mutable.sceneAssetMembershipsById)) {
         if ((fieldValue(fields.lifecycle) as JsonObject | undefined)?.state === 'deleted') continue;
@@ -187,6 +243,7 @@ export function productSources(host: ReturnType<typeof createValidationModeHost>
         else ids.add(scene);
       }
       return { target: { kind: 'model', token: p.token, sceneId, assetId, bindingId: version.projection.bindingId },
+        boundsAsset: version.closure.representation.logicalBoundsAsset, ...(importedPlacement ? { importedPlacement } : {}),
         ...(version.closure.shape==='saved-gs'?{gsProxyTarget:{sceneId,assetId,expectedBindingId:version.closure.binding.id,gsRepresentationId:version.closure.representation.id,gsPayloadDigest:version.closure.representation.payloadDigest,gsFamilyId:version.closure.representation.variantFamilyId,expectedProxyId:version.closure.proxy?.id??null}}:{}),
         replacementAvailable: isSavedMesh(version.closure), pointCloud: version.closure.shape === 'saved-point', placement: version.closure.binding.assetToProject, rotationDegrees: rotationDegrees(version.closure.binding.assetToProject.rotationXYZW),
         sceneCount: uncertain ? { kind: 'unresolved', reason: 'conflict' } : value(ids.size) };

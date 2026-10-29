@@ -36,7 +36,9 @@ export function createPinGizmo<T = PinSurfaceTarget>(canvas: HTMLCanvasElement, 
       if (!Number.isFinite(scale) || scale <= 0) return false;
       marker.scale.setScalar(scale);
       const rotation = m.mode === 'rotate' ? canonicalRotation(marker.quaternion.toArray()) : m.rotationXYZW;
-      return propose(current.target, tuple(), { ...m, rotationXYZW: rotation, uniformScale: scale });
+      const pivot = new THREE.Vector3(...(m.pivotAsset ?? [0, 0, 0] as const)).multiplyScalar(scale).applyQuaternion(new THREE.Quaternion(...rotation));
+      const position: V3 = [marker.position.x - pivot.x, marker.position.y - pivot.y, marker.position.z - pivot.z];
+      return propose(current.target, position, { ...m, rotationXYZW: rotation, uniformScale: scale });
     } catch { return false; }
   };
   const stop = (restore: boolean) => {
@@ -96,6 +98,9 @@ export function createPinGizmo<T = PinSurfaceTarget>(canvas: HTMLCanvasElement, 
       if (!control.dragging) {
         marker.position.set(...next.position); marker.quaternion.set(...(next.manipulation?.rotationXYZW ?? [0, 0, 0, 1] as const));
         marker.scale.setScalar(next.manipulation?.uniformScale ?? 1); copy(accepted, marker);
+        if (next.manipulation?.pivotAsset) {
+          marker.position.add(new THREE.Vector3(...next.manipulation.pivotAsset).multiplyScalar(next.manipulation.uniformScale).applyQuaternion(marker.quaternion)); copy(accepted, marker);
+        }
       }
       marker.updateMatrixWorld(true); control.attach(marker); enable();
     },

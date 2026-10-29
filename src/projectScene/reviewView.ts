@@ -1,7 +1,8 @@
 import { inspectDeclaredValidationModel, inspectDeclaredValidationBlob, readValidationBody } from '../projectFiles/content';
 import { isPointModel, isGsModel, type ValidatedModel } from '../projectFiles/pointPly';
 import { nativeSpatialModelBounds } from '../projectFiles/nativeSpatial';
-import { inspectProjectImage, projectImageMime, type PhotoDecoder } from '../projectFiles/photo';
+import type { PhotoDecoder } from '../projectFiles/photo';
+import { inspectProjectMedia, projectMediaKind, type MediaDecoders } from '../projectFiles/media';
 import * as THREE from 'three';
 import { canonical, list, object, same, string } from '../domain/projectGraphSupport';
 import type { JsonObject } from '../domain/values';
@@ -21,7 +22,7 @@ const table = (r: JsonObject, name: string) => object(r[name]) as Record<string,
 const ordered = (rows: JsonObject[]) => rows.sort((a, b) => string(a.orderKey).localeCompare(string(b.orderKey)) || string(a.id).localeCompare(string(b.id)));
 
 /** Inspected read-only file content. No storage, history, synthetic Project or commands. */
-export async function prepareReviewView(file: Blob, budget: ProjectFilePolicyInput, decode?: PngDecoder, jpeg?: JpegDecoder, photo?: PhotoDecoder) {
+export async function prepareReviewView(file: Blob, budget: ProjectFilePolicyInput, decode?: PngDecoder, jpeg?: JpegDecoder, photo?: PhotoDecoder, mediaDecoders?:MediaDecoders) {
   const policy=projectFilePolicy(budget), limits=policy.nonGs;
   const original = file.slice(), inspection = await ReviewArchive.inspect(original, validationMetadataLimits), review = inspection.review;
   const snapshot = review.snapshot, scene = object(snapshot.scene), sceneId = string(scene.id), project = object(snapshot.project);
@@ -48,9 +49,9 @@ export async function prepareReviewView(file: Blob, budget: ProjectFilePolicyInp
     }
   }
   for (const record of Object.values(table(snapshot, 'mediaResourcesById'))) {
-    const blob = object(record.blob); if (record.mediaKind !== 'image' || !projectImageMime(blob.mediaType)) throw Error('このメディアの表示形式は未対応です。');
+    const blob = object(record.blob); if (!projectMediaKind(blob.mediaType)||record.mediaKind!==projectMediaKind(blob.mediaType)) throw Error('このメディアの表示形式は未対応です。');
     const bytes = await readValidationBody(inspection.archive.entryBlob(`blobs/sha256/${string(blob.digest)}`), limits.maxFileBytes);
-    if (await inspectProjectImage(bytes, limits, decode, jpeg, photo) !== blob.mediaType) throw Error('メディアの本体形式が一致しません。');
+    if ((await inspectProjectMedia(bytes, limits, decode, jpeg, photo,mediaDecoders)).mediaType !== blob.mediaType) throw Error('メディアの本体形式が一致しません。');
     images.set(string(record.id), new Blob([bytes.slice().buffer], { type: blob.mediaType }));
   }
   const savedMaterials: Record<string, ValidationMaterialEffects> = {};

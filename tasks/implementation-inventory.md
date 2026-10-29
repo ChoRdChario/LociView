@@ -35,6 +35,9 @@ GS専用上限と全既知本体の合計、画面全体の表示予定・実イ
 元の棚卸しは **64機能群**。2026-09-14のPO判断でF09（移行後の旧形式更新受信）を撤回し、
 2026-10-29のPO確認でM14（補修Mesh）を任意・完成条件外として整理した。必須要件は **62群**、
 今回の実用チーム版は後続M13を除く **61群** が対象。除外・任意化は完成ではない。
+これは以前の実用版境界の集計。PO2026-10-29の「1〜4をまとめて実装」により、
+限定alignmentと日常の整理・反復編集も現在の作業へ含めた。[仕様08](../docs/specs/08-daily-authoring-workflow.md)
+とtodoが現在の範囲・検証を管理し、この旧分母から優先順位や完成率を算出しない。
 2026-09-21の接続分類は限定接続済み **34群**、他分類 **29群** だった。
 以下はその接続分類を保ち、M14だけを新規実装から任意へ移したもの。現在の実装数の再集計ではない。
 「34/64完成」といった完成率・工数には換算しない。小さい部品接続と
@@ -110,7 +113,7 @@ GS専用上限と全既知本体の合計、画面全体の表示予定・実イ
 | M10 | GSの配置補助モデルと配置可否を確認する | 別経路のみ | 01cの選択GSへの明示GLB面追加・変更・解除をtyped commandへ接続。面は表示せず、近似位置から既存gizmoでmanual座標を確定。07kはNative Proxy固有の変換・GS派生／family関係を保持し、両面選択・copy remapも接続。GS identity/class/placementと既存Captionは保持。Proxyなし・表示準備失敗は近似指定のみ停止し、07lの四形式Proxyも受け入れる。対象外形式・一般採用は残る。 | [Proxy command](../src/projectMetadata/gsProxy.ts) / [workflow](../src/projectScene/gsProxyWorkflow.ts) / [07k](../docs/specs/07k-native-point-gs-proxy-conversion-proposal.md) |
 | M11 | ピンの表示サイズを調整する | 別経路のみ | 限定validationでは取込pinScaleを保持し、ピン描画へ反映済み。限定product compositionでは明示map2のAsset倍率編集・全Sceneのmarker反映・失敗時exact retry・backup/cold再開まで接続。map1は不変更。通常入口／実描画・実機受入れは未完で主分類は維持。 | [src/harness/projectScene/viewportModel.ts](../src/harness/projectScene/viewportModel.ts) / [src/harness/projectScene/viewportHost.ts](../src/harness/projectScene/viewportHost.ts) / [src/nativeGs/app.ts:1841](../src/nativeGs/app.ts) |
 | M12 | 点群の表示径を調整する | 別経路のみ | 01aの限定Point経路に既定3px・1〜20pxの一時表示径を接続。Assetごと・viewport内の設定で、Metadata／保存視点／fileへ混ぜず、現在のgesture receiptを更新する。exact3profile registryとbinary-only capabilityを分け、dither/smoothへfallbackしない。Native既存経路は不変更。Point全体／実機／採用の分類へ広げず、実行範囲はtodo参照。 | [src/domain/pointPresentation.ts](../src/domain/pointPresentation.ts) / [src/ui/projectScene/projectModels.ts](../src/ui/projectScene/projectModels.ts) |
-| M13 | 位置合わせの基準固定・bounds fit・reset／undo・redo | 新規実装 | 完全alignmentは新hostも限定Nativeも未達。M06/M07と別の残り。alignment固有のundo/redoで、一般Caption Undoの新設を含めない。 | [docs/specs/01-domain-rendering.md:769](../docs/specs/01-domain-rendering.md) / [docs/specs/01-domain-rendering.md:786](../docs/specs/01-domain-rendering.md) |
+| M13 | 位置合わせの基準固定・bounds fit・reset／undo・redo | 新規実装 | 分類は旧棚卸し時点を保持。仕様08の限定PC経路はローカル基準保護・原点／中心pivot・中心と大きさの粗合わせ・identity／証明できるimport配置へのreset・新bindingによるUndo/Redoを接続。原本／座標／Captionを保持し、基準／現在bindingが変われば拒否。実行結果はtodo参照。高度な対応点fit・ICPや一般採用／実機合格は含めず、CaptionのUndoとは別。 | [仕様08](../docs/specs/08-daily-authoring-workflow.md) / [src/domain/alignment.ts](../src/domain/alignment.ts) |
 | M14 | 既存モデルへ補修Meshを追加・配置し、任意hard exclusionと一体で保存する | 任意・完成条件外 | PO2026-10-29確認。手動ピン調整に必須ではなく、必須残件・自動的な後続予定から除外。利用者flowは未実装。将来必要になり実装する場合は、原本保持・repair-local配置・patch/maskの原子的commit・対応pin class保護と該当gateを満たす。位置指定用Proxyの既存動作は変更しない。 | [仕様00 §4.4／§10](../docs/specs/00-product-contract.md) |
 
 M08の限定product経路は、要確認ピンの補正で現在のモデル面を明示選択し、元の色と独立した要確認表示を保つ。
@@ -349,13 +352,13 @@ LociMyuからのタブ構成、Sceneに相当する記録切替、直接色選�
 | 対象 | 扱い |
 |---|---|
 | 1万Caption／5万変更の大容量検証 | PO2026-10-29判断で当分後続・低優先。当面の実用版完成や着手順の阻害条件にしない。既存実装・試験・現在の制限を保持し、対応済み保証やPASSとは数えない |
-| Scene複製／削除／並替えUI | 未接続。PO2026-10-29訂正で日常作業として優先して仕様整理する。05 §14の初回限定candidateのdeferは現在の低優先指示ではない。共有参照・複製範囲・削除影響・開始Scene・競合の規則は実装前に確定する |
+| Scene複製／削除／並替えUI | 仕様08の限定typed経路へ接続。記録は独立複製、モデル／画像／タグ本体は共有。削除は観測した所属・Scene専用設定だけを外し、Project資源を保持。開始／最後のSceneは通常削除を拒否し、全Scene削除を統合した場合は明示復旧と同一処理の再試行を提供。順序競合は明示選択。検証状況はtodo参照 |
 | 新規Project-space Caption、Sceneごとのrevision／alignment、Scene media layer、汎用Unity階層 | 明示非対象。既存ProjectAnchor読取・置き直しC11とは別 |
-| Captionの一般Undo/Redo・一般複製・前後巡回 | 未接続。PO2026-10-29訂正で反復編集の重要機能として優先して仕様整理する。Undo対象・共同編集との関係、複製のID／所属／添付の意味を確定する。モデルalignment固有の復帰M13とは別 |
+| Captionの一般Undo/Redo・一般複製・前後巡回 | 仕様08で独立複製・検索／色の絞り込み順の前後移動・この画面で確定したタイトル／本文／色のUndo/Redoを接続。原本／別Sceneを保持し、受信した変更を操作IDで保護。Undo履歴は画面内のみ。Caption作成／削除・添付の一般Undoは未接続で、この部分まで完成と数えない。M13の配置Undoとは別 |
 | 任意baseColor入力 | 元materialの色保持・描画解釈はあるが入力UIなし。現在のaccepted editable fieldsとは別なので、勝手に新機能化しない |
-| タグ編集UI | 新規作成・編集・管理UIは未接続。PO2026-10-29訂正で記録整理の使い勝手として優先して仕様整理する。既存タグの保持・copy・削除依存・package closureはC10/T04/F06–F08で維持し、管理範囲・削除影響は実装前に確定する |
-| ローカルprofile／表示名設定 | 旧homeにはあるが新hostは合成identity。PO2026-10-29訂正で日常設定・共同作業の分かりやすさとして優先して接続範囲を整理する。利用者identity／来歴表示の契約は実装前に確定し、クラウドaccountやrolesは作らない |
-| HEIC／video／audio | 直接decode／保存／表示は現candidate非対象。HEICのfresh選択には元画像を残して端末で別JPEGを書き出し再選択する案内を限定接続。PROD-16のpost-candidate要件を削除した意味ではない |
+| タグ編集UI | 仕様08の作成・名前／色編集・記録への付与／解除・確認付きProject全体削除と競合解消を接続。複製で独立した関連を作り、本体は共有。重複リンクの明示一括解除・色の未設定・削除と編集の選択を保護。記録／画像は削除せず、保存・共有・coldの状況はtodo参照 |
+| ローカルprofile／表示名設定 | 仕様08のブラウザ内表示名とヘッダ表示を接続。IME・未適用入力・別画面の設定変更・永続化失敗を扱い、保存失敗時は入力を保持。Projectや共有file・過去の編集者名へは反映しない。履歴の著者への永続的な対応付け、account／rolesは未実装・別の契約 |
+| HEIC／video／audio | PO2026-10-29の仕様08でPC候補のMP4（H.264/AAC）・M4A（AAC）・MP3と標準機能で読める単一HEICを承認。原本保持・追加・再生・共有・復旧・再開の確認状況はtodo。新依存なし。非対応環境は公開前に拒否し、HEICは別JPEGの再選択を案内。一般Windows HEIC・実機iOS・公開保証は未完了。既存Native／旧形式の変換recipeは拡張しない |
 | 自動同一モデル判定／relation推測／位置remap／conflict winner | 禁止。判断量削減で越えてはいけない境界 |
 | smooth-alpha一般保証、transmission、Compare、proxy自動生成／direct splat pick | 個別後続判断・research／gate。承認済み限定GS Proxyやhard chromaの継承とは別 |
 | license／version／main／Pages／Service Worker／release | 今回の監査・次sliceの非対象。デプロイ承認を意味しない |

@@ -144,7 +144,7 @@ async function restoredFacts(content: ValidationContent, next: ProjectMetadataSo
   let total = 0;
   for (const ref of refs) {
     const check = new ProjectRecordFields(); check.blob(ref, []);
-    if (check.unknown || !['model/gltf-binary','model/stl','text/plain','model/gltf+json', pointSourceMediaType, 'image/png', 'image/jpeg', 'image/webp', 'image/gif'].includes(ref.mediaType as string)) return fileError('復元する本体形式を確認してください。');
+    if (check.unknown || !['model/gltf-binary','model/stl','text/plain','model/gltf+json', pointSourceMediaType, 'image/png', 'image/jpeg', 'image/webp', 'image/gif','image/heic','video/mp4','audio/mp4','audio/mpeg'].includes(ref.mediaType as string)) return fileError('復元する本体形式を確認してください。');
     const key = json(ref), size = ref.byteLength as number, previous = sizes.get(ref.digest as string);
     if (previous !== undefined && previous !== size) return fileError('復元する本体の大きさが一致しません。');
     if (previous === undefined) { total += size; sizes.set(ref.digest as string, size); }

@@ -43,6 +43,7 @@ record executed evidence and connections; do not infer those from a document tit
 | Approved frozen-v1 model placement extension | [Placement companion](specs/07g-frozen-v1-placement-proposal.md); exact additive recipe-5 and saved-offset compatibility approved 2026-10-16; implementation/evidence in todo, not adopted |
 | Approved LociMyu Scene material extension | [Material companion](specs/07h-locimyu-material-proposal.md); exact recipe-4/Scene-slot identity and disabled-chroma source-only limit approved 2026-10-16; bounded implementation/evidence in todo, not adopted |
 | UI intent, writing, visual tone and interaction | [UI product guidelines](ui-product-guidelines.md); [UI task mapping](../tasks/uiux-handoff.md) for historical audit evidence |
+| Daily Scene/Caption organization, tags, local settings, alignment and media | [Specification08](specs/08-daily-authoring-workflow.md); grouped implementation and bounded native-media scope approved2026-10-29, independently reviewed finite commands over existing records. Exact checks and device limits are in todo |
 | Ownership, license or sponsorship | [licensing](licensing-and-ownership.md), [sponsorship](sponsorship-policy.md); direction is not adoption or a license grant |
 
 The [approved01e Desktop candidate](specs/01e-desktop-large-gs-workflow.md) groups

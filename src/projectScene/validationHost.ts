@@ -1,6 +1,7 @@
 import { createGsProxyWorkflow } from './gsProxyWorkflow';
 import { assertValidationBodyAllocation } from '../projectFiles/bodyBudget';
 import type { PhotoDecoder } from '../projectFiles/photo';
+import type { MediaDecoders } from '../projectFiles/media';
 import type { WorkspaceFS } from '../platform/fs';
 import { ProjectMutationCoordinator, type ProjectMutationSession } from '../platform/projectLock';
 import { technicalId, newId, metadataPath, json } from '../projectMetadata/persistence';
@@ -64,7 +65,7 @@ export interface ValidationHostOptions {
   lazyImages?: boolean;
   mode?: LocalOpenMode;
   run: string; base: WorkspaceFS; coordinator: ProjectMutationCoordinator; store: OriginBlobStore;
-  fileLimits: FileValidationLimits; filePolicy?: ProjectFilePolicy; decode?: PngDecoder; jpeg?: JpegDecoder; photo?: PhotoDecoder; initial?: ReturnType<typeof prepareValidationCreation>;
+  fileLimits: FileValidationLimits; filePolicy?: ProjectFilePolicy; decode?: PngDecoder; jpeg?: JpegDecoder; photo?: PhotoDecoder; mediaDecoders?:MediaDecoders; initial?: ReturnType<typeof prepareValidationCreation>;
   workspaceFile?: Blob;
   reviewEdit?: PreparedReviewEdit;
   firstBackup?: Readonly<{ file: Blob; archive: EvidenceRef }>;
@@ -195,7 +196,7 @@ async function validationProjectFrom(read: MetadataSessionRead, sourceContent: R
   const versions = await validationModelVersions(read.provider), unavailable = unreceivedWeakMedia(read.provider, limits), available: Record<string, MediaImage> = {};
   for (const [id, field] of Object.entries(read.provider.details.immutable.mediaResourcesById)) {
     if (unavailable.has(id)) continue;
-    if (field.kind !== 'value') throw Error('保存した画像の情報を確認できません。');
+    if (field.kind !== 'value') throw Error('保存したメディアの情報を確認できません。');
     if (lazyImages) continue;
     if (!cache[id]) cache[id] = { record: field.value as unknown as MediaImage['record'], base64: base64(await sourceContent.image(field.value)) };
     available[id] = cache[id]!;
@@ -515,10 +516,10 @@ async function openNormalValidationHost(options: ValidationHostOptions, inherite
         throw Error('対象が更新されています。キャプションを選び直してください。');
       // Enforce the same total validation budget before allocating the selected body.
       if (!Number.isSafeInteger(file.size) || file.size <= 0 || file.size > content.limits.maxFileBytes)
-        throw Error('画像を含む合計がこの検証の上限を超えています。');
+        throw Error('メディアを含む合計がこの検証の上限を超えています。');
       assertValidationBodyAllocation(before.provider,content.policy,file.size);
       const bytes = new Uint8Array(await file.arrayBuffer());
-      if (bytes.length !== file.size) throw Error('選択した画像の大きさが一致しません。');
+      if (bytes.length !== file.size) throw Error('選択したメディアの大きさが一致しません。');
       const media = await content.prepareImage({ label: file.name, bytes });
       try { const result = await ready(await session.edit(token, { kind: 'createAttachment', ...target, media, altText: '' }));
         content.releasePreparedImages(); return result;
@@ -643,10 +644,11 @@ async function openNormalValidationHost(options: ValidationHostOptions, inherite
           const source = versions.find(v => v.assetId === captured.assetId && v.projection.bindingId === captured.expectedBindingId)?.closure;
           if (!source || !isSavedModel(source)) throw Error('配置するモデルを確認してください。');
           const binding = await sealValidationRecord('asset-binding-revision', { id: captured.bindingId, assetId: captured.assetId,
-            assetRevisionId: source.revision.id, parentBindingId: source.binding.id, method: 'manual',
+            assetRevisionId: source.revision.id, parentBindingId: source.binding.id, method: captured.fitReference ? 'bounds' : 'manual',
             assetToProject: captured.placement as unknown as JsonObject });
-          return ready(await session.edit(token, { kind: 'transformAsset', sceneId: captured.sceneId, assetId: captured.assetId,
-            expectedBindingId: captured.expectedBindingId, binding }));
+          return ready(await session.edit(token, captured.fitReference ? { kind: 'fitAssetBounds', sceneId: captured.sceneId, assetId: captured.assetId,
+            expectedBindingId: captured.expectedBindingId, binding, referenceAssetId: captured.fitReference.assetId, expectedReferenceBindingId: captured.fitReference.bindingId } :
+            { kind: 'transformAsset', sceneId: captured.sceneId, assetId: captured.assetId, expectedBindingId: captured.expectedBindingId, binding }));
         }, true);
       },
       retry: () => execute(async () => { editable(true); return resume(); }),

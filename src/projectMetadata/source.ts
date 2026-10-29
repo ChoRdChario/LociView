@@ -150,6 +150,10 @@ export class ProjectMetadataSource {
       if (command.kind === 'resolveAssetStatus') delete draft.assetsById[command.assetId].status;
       if (command.kind === 'resolveDefaultScene') delete draft.project.defaultSceneId;
       if (command.kind === 'resolveSceneName') delete draft.scenesById[command.sceneId].name;
+      if (command.kind === 'resolveSceneOrder') delete draft.scenesById[command.sceneId].orderKey;
+      if (command.kind === 'restoreScene') { delete draft.scenesById[command.sceneId].lifecycle; delete draft.project.defaultSceneId; }
+      if (command.kind === 'resolveTagField') delete draft.captionTagsById[command.tagId][command.field];
+      if (command.kind === 'resolveTagLifecycle') delete draft.captionTagsById[command.tagId].lifecycle;
       if (command.kind === 'resolveViewField') delete draft.viewsById[command.viewId][command.field];
       if (command.kind === 'resolveMaterialIntent') {
         for (const edit of edits) for (const field of Object.keys(edit.fields))

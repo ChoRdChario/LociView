@@ -253,12 +253,14 @@ export const projectSceneApplicationImports:Readonly<Record<string,readonly stri
     "../projectMetadata/assetStatus",
     "../projectMetadata/captionCandidates",
     "../projectMetadata/captionDeletion",
+    "../projectMetadata/captionAuthoring",
     "../projectMetadata/commands",
     "../projectMetadata/materialResolution",
     "../projectMetadata/membership",
     "../projectMetadata/modelMembership",
     "../projectMetadata/persistence",
     "../projectMetadata/sceneAuthoring",
+    "../projectMetadata/sceneOrganization",
     "../projectMetadata/startupScene",
     "../projectMetadata/viewResolution",
     "../scene/resolve",
@@ -305,6 +307,7 @@ export const projectSceneApplicationImports:Readonly<Record<string,readonly stri
     "./modelTypes"
   ],
   "src/projectScene/reviewView.ts": [
+    "../projectFiles/media",
     "../projectFiles/nativeSpatial",
     "../domain/materialIntent",
     "../domain/projectGraphSupport",
@@ -336,6 +339,8 @@ export const projectSceneApplicationImports:Readonly<Record<string,readonly stri
     "./viewportPorts"
   ],
   "src/projectScene/startupControls.ts": [
+    "../projectMetadata/sceneOrganization",
+    "../projectMetadata/persistence",
     "../projectMetadata/startupScene",
     "./acknowledgment",
     "./hostPorts"
@@ -384,6 +389,7 @@ export const projectSceneApplicationImports:Readonly<Record<string,readonly stri
     "./validationHost"
   ],
   "src/projectScene/validationHost.ts": [
+    "../projectFiles/media",
     "../projectFiles/meshSource",
     "../projectFiles/nativeSpatialConversion",
     "../projectFiles/bodyBudget",
@@ -510,6 +516,7 @@ export const projectSceneApplicationImports:Readonly<Record<string,readonly stri
     "three/addons/loaders/GLTFLoader.js"
   ],
   "src/projectScene/validationWorkspace.ts": [
+    "../projectFiles/media",
     "../ui/projectScene/conversionNotice",
     "../projectFiles/meshSource",
     "./deferredViewport",

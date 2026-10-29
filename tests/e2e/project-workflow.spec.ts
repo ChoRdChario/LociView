@@ -26,7 +26,7 @@ async function checkCaption(page: Page, expectedBody = body) {
   const detail = page.getByRole('region', { name: 'キャプションの詳細', exact: true });
   await expect(detail.getByLabel('タイトル', { exact: true })).toHaveValue(captionName);
   await expect(detail.getByLabel('本文', { exact: true })).toHaveValue(expectedBody);
-  const image = page.getByRole('region', { name: '画像の整理', exact: true }).locator('img').first();
+  const image = page.getByRole('region', { name: 'メディアの整理', exact: true }).locator('img').first();
   await expect(image).toBeVisible();
   await expect.poll(() => image.evaluate((node: HTMLImageElement) => node.complete && node.naturalWidth)).toBe(2);
 }

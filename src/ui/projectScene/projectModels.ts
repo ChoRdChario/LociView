@@ -3,6 +3,8 @@ import { modelListPlanIsCurrent, newModelListMemory, type ModelListContext, type
 import { projectIdentity, projectModels } from './projectRead';
 import type { WorkspaceFile, WorkspaceModelProposal } from './projectWorkspacePorts';
 import { newProjectId, panelNodes, sameProjectValue, type ProjectPanelHost, type ProjectModelPanel } from './projectPanel';
+import { boundsCentre, placementAroundPivot, fitAlignmentBounds } from '../../domain/alignment';
+import type { WorkspacePlacement } from './projectWorkspacePorts';
 
 export function createProjectModels(document: Document, host: ProjectPanelHost): ProjectModelPanel {
   const { make, button } = panelNodes(document), root = make('section'), fileArea = make('section'), placement = make('section'), review = make('section');
@@ -10,6 +12,10 @@ export function createProjectModels(document: Document, host: ProjectPanelHost):
   const memories = new Map<string, ModelListMemory>();
   const preview = host.ports.createModelPreview?.();
   let edit: WorkspaceModelProposal | null = null, raw: string[] = [], composing = false, disposed = false;
+  let reference: { assetId: string; bindingId: string } | null = null, pivot: 'origin' | 'centre' = 'origin';
+  type PlacementStep = { before: WorkspacePlacement; after: WorkspacePlacement; bindingId: string };
+  const placementHistory = new Map<string, { past: PlacementStep[]; future: PlacementStep[] }>();
+  const setProposal = (proposal: WorkspaceModelProposal) => { edit = proposal; raw = [...proposal.placement.translation.map(String), ...host.ports.modelAngles(proposal.placement.rotationXYZW), String(proposal.placement.uniformScale)]; };
   let pinSize: { token: string; sceneId: string; assetId: string; raw: string } | null = null;
   let pinSizeScope: { token: string; sceneId: string; assetId: string } | null = null;
   let proxyScope: {token:string;target:NonNullable<ReturnType<typeof host.ports.modelDetails>>['gsProxyTarget'];removing:boolean;prepared?:{id:string;label:string;externalMaterialsUnavailable?:boolean}} | null=null;
@@ -106,16 +112,18 @@ export function createProjectModels(document: Document, host: ProjectPanelHost):
     const m = memory(), { sceneId } = host.source(), details = m.assetId ? host.ports.modelDetails(sceneId, m.assetId) : null;
     const item = context().source.kind === 'ready' ? projectModels(host.source().provider, sceneId, m.projectId, m.hiddenAssetIds, host.viewport().read()) : null;
     const available = item?.kind === 'ready' ? item.items.find(i => i.id === m.assetId)?.display : undefined;
-    if (!details || details.sceneCount.kind !== 'value' || available?.kind !== 'value' || available.value !== 'visible') return;
-    edit = { target: details.target, placement: details.placement, mode: 'translate' };
-    raw = [...details.placement.translation.map(String), ...details.rotationDegrees, String(details.placement.uniformScale)]; host.changed();
+    if (!details || reference?.assetId === details.target.assetId || details.sceneCount.kind !== 'value' || available?.kind !== 'value' || available.value !== 'visible') return;
+    setProposal({ target: details.target, placement: details.placement, mode: 'translate', ...(pivot === 'centre' && details.boundsAsset ? { pivotAsset: boundsCentre(details.boundsAsset) } : {}) }); host.changed();
   });
   const fields = make('div'), labels = ['モデル位置 X', 'モデル位置 Y', 'モデル位置 Z', 'モデル回転 X', 'モデル回転 Y', 'モデル回転 Z', 'モデル倍率'];
   const inputs = labels.map((text, index) => {
     const label = make('label', text), node = make('input'); node.type = 'number'; node.step = 'any'; node.setAttribute('aria-label', text); label.append(node); fields.append(label);
     node.addEventListener('input', () => { if (!edit || host.block('models')) return; raw[index] = node.value;
       try { const parsed = host.ports.modelPlacement(raw.slice(0, 3), raw.slice(3, 6), raw[6]!);
-        edit = { ...edit, placement: { ...parsed, rotationXYZW: index >= 3 && index <= 5 ? parsed.rotationXYZW : edit.placement.rotationXYZW } }; } catch { /* Invalid text stays in the form; last valid preview remains. */ } host.changed(); });
+        let placement = { ...parsed, rotationXYZW: index >= 3 && index <= 5 ? parsed.rotationXYZW : edit.placement.rotationXYZW };
+        if (index >= 3 && edit.pivotAsset) placement = placementAroundPivot(edit.placement, placement, edit.pivotAsset);
+        edit = { ...edit, placement, fitReference: undefined }; if (index >= 3 && edit.pivotAsset) { raw[0] = String(placement.translation[0]); raw[1] = String(placement.translation[1]); raw[2] = String(placement.translation[2]); }
+      } catch { /* Invalid text stays in the form; last valid preview remains. */ } host.changed(); });
     node.addEventListener('compositionstart', () => { composing = true; host.changed(); }); node.addEventListener('compositionend', () => { composing = false; host.changed(); }); return node;
   });
   const modes = make('div'); for (const [mode, text] of [['translate', '移動'], ['rotate', '回転'], ['scale', '拡大縮小']] as const)
@@ -126,11 +134,50 @@ export function createProjectModels(document: Document, host: ProjectPanelHost):
     if (!current || !sameProjectValue(current.target, captured.target)) { host.message('モデルが更新されています。入力を保持しています。'); return; }
     if (sameProjectValue(current.placement, captured.placement)) { edit = null; host.message('配置に変更はありません。'); return; }
     const command = { sceneId: captured.target.sceneId, assetId: captured.target.assetId, expectedBindingId: captured.target.bindingId,
-      bindingId: newProjectId('bnd'), placement: captured.placement };
-    host.execute('models', captured.target.token, () => host.ports.transformModel(captured.target.token, command), () => { edit = null; host.message('モデルの配置を確定しました。'); });
+      bindingId: newProjectId('bnd'), placement: captured.placement, ...(captured.fitReference ? { fitReference: captured.fitReference } : {}) };
+    host.execute('models', captured.target.token, () => host.ports.transformModel(captured.target.token, command), () => {
+      const h = placementHistory.get(captured.target.assetId) ?? { past: [], future: [] };
+      if (h.past.length && h.past.at(-1)!.bindingId !== current.target.bindingId) h.past = [];
+      h.past.push({ before: current.placement, after: captured.placement, bindingId: command.bindingId }); h.future = []; placementHistory.set(captured.target.assetId, h);
+      edit = null; host.message('モデルの配置を確定しました。');
+    });
   });
   const cancel = button('配置を取り消す', () => { if (!host.block('models', false) && !composing) { edit = null; host.changed(); } });
   const impact = make('p'); impact.setAttribute('role', 'status'); placement.append(begin, impact, fields, modes, confirm, cancel);
+  const alignment = make('details'); alignment.setAttribute('aria-label', '位置合わせ'); alignment.append(make('summary', '位置合わせ'));
+  const pivotLabel = make('label', '回転・拡縮の基準'), pivotSelect = make('select'); pivotSelect.setAttribute('aria-label', '回転・拡縮の基準');
+  for (const [value, label] of [['origin', 'モデルの原点'], ['centre', 'モデルの中心']]) { const option = make('option', label); option.value = value!; pivotSelect.append(option); } pivotLabel.append(pivotSelect);
+  pivotSelect.addEventListener('change', () => { if (host.block('models') || composing || host.viewport().read().dragging) return;
+    pivot = pivotSelect.value === 'centre' ? 'centre' : 'origin'; const details = memory().assetId ? host.ports.modelDetails(host.source().sceneId, memory().assetId!) : null;
+    if (edit) { const { pivotAsset: _, ...rest } = edit; edit = { ...rest, ...(pivot === 'centre' && details?.boundsAsset ? { pivotAsset: boundsCentre(details.boundsAsset) } : {}) }; } host.changed();
+  });
+  const setReference = button('このモデルを基準にする', () => { if (host.block('models') || ownInput()) return; const id = memory().assetId, d = id ? host.ports.modelDetails(host.source().sceneId, id) : null;
+    if (d) { reference = { assetId: d.target.assetId, bindingId: d.target.bindingId }; host.changed(); } });
+  const clearReference = button('基準を解除', () => { if (!host.block('models', false) && !ownInput()) { reference = null; host.changed(); } });
+  const referenceNote = make('p'); referenceNote.setAttribute('role', 'status');
+  const fit = button('基準の中心と大きさに合わせる', () => {
+    if (host.block('models') || ownInput() || !reference) return; const s = host.source(), id = memory().assetId;
+    const d = id ? host.ports.modelDetails(s.sceneId, id) : null, ref = host.ports.modelDetails(s.sceneId, reference.assetId);
+    if (!d?.boundsAsset || !ref?.boundsAsset || ref.target.bindingId !== reference.bindingId || d.target.assetId === reference.assetId) return;
+    try { setProposal({ target: d.target, placement: fitAlignmentBounds(d.boundsAsset, d.placement, ref.boundsAsset, ref.placement), mode: 'translate', fitReference: reference }); host.changed(); }
+    catch (error) { host.message((error as Error).message); }
+  });
+  const resetTo = (imported: boolean) => { if (host.block('models') || ownInput()) return; const id = memory().assetId, d = id ? host.ports.modelDetails(host.source().sceneId, id) : null;
+    if (!d || reference?.assetId === id || imported && !d.importedPlacement) return;
+    setProposal({ target: d.target, placement: imported ? d.importedPlacement! : { translation: [0, 0, 0], rotationXYZW: [0, 0, 0, 1], uniformScale: 1 }, mode: 'translate' }); host.changed(); };
+  const resetIdentity = button('原点・回転なし・倍率1に戻す', () => resetTo(false)), resetImported = button('読み込み時の配置に戻す', () => resetTo(true));
+  function compensatePlacement(forward: boolean) {
+    if (host.block('models') || ownInput()) return; const id = memory().assetId, d = id ? host.ports.modelDetails(host.source().sceneId, id) : null, h = id ? placementHistory.get(id) : undefined;
+    const step = (forward ? h?.future : h?.past)?.at(-1); if (!d || !h || !step || d.target.bindingId !== step.bindingId || reference?.assetId === id) return;
+    const bindingId = newProjectId('bnd'); host.execute('models', d.target.token, () => host.ports.transformModel(d.target.token, { sceneId: d.target.sceneId, assetId: d.target.assetId,
+      expectedBindingId: d.target.bindingId, bindingId, placement: forward ? step.after : step.before }), () => {
+      if (forward) { h.future.pop(); h.past.push({ ...step, bindingId }); if (h.future.length) h.future.at(-1)!.bindingId = bindingId; }
+      else { h.past.pop(); h.future.push({ ...step, bindingId }); if (h.past.length) h.past.at(-1)!.bindingId = bindingId; }
+      host.message(forward ? '配置をやり直しました。' : '配置を元に戻しました。');
+    });
+  }
+  const undoPlacement = button('配置を元に戻す', () => compensatePlacement(false)), redoPlacement = button('配置をやり直す', () => compensatePlacement(true));
+  alignment.append(referenceNote, setReference, clearReference, pivotLabel, fit, resetImported, resetIdentity, undoPlacement, redoPlacement); placement.append(alignment);
   function valid() { try { host.ports.modelPlacement(raw.slice(0, 3), raw.slice(3, 6), raw[6]!); return true; } catch { return false; } }
   const pinSizeArea = make('section'), pinSizeLabel = make('label', 'ピンの表示倍率'), pinSizeInput = make('input'), pinSizeNote = make('p');
   pinSizeInput.type = 'number'; pinSizeInput.min = '0.001'; pinSizeInput.max = '1000'; pinSizeInput.step = 'any'; pinSizeInput.setAttribute('aria-label', 'ピンの表示倍率'); pinSizeLabel.append(pinSizeInput);
@@ -199,7 +246,21 @@ export function createProjectModels(document: Document, host: ProjectPanelHost):
     cancelFile.hidden = !fileScope; cancelFile.disabled = !!host.block('models', false);
     fileNote.textContent = fileScope?.kind === 'replace' ? `${fileScope.file?.name ?? 'ファイルを選択してください。'} ${details?.sceneCount.kind === 'value' ? `${details.sceneCount.value}シーンのモデルを差し替えます。` : ''} 配置と記録は保持され、ピンは要確認になります。材質の調整は引き継ぎません。` : fileScope ? '追加するモデルを選択してください。' : '';
     if(fileScope?.externalMaterialsUnavailable)fileNote.textContent+=' OBJの外部材質・画像は読み込まず、既定の材質で表示します。';
-    begin.disabled = !!block || ownInput() || !details || !visible || details.sceneCount.kind !== 'value';
+    const referenceDetails = reference ? host.ports.modelDetails(sceneId, reference.assetId) : null;
+    const referenceChanged = !!reference && (!referenceDetails || referenceDetails.target.bindingId !== reference.bindingId);
+    const referenceSelected = !!reference && reference.assetId === selected;
+    begin.disabled = !!block || ownInput() || !details || !visible || details.sceneCount.kind !== 'value' || referenceSelected;
+    setReference.disabled = !!block || ownInput() || !details || !visible;
+    clearReference.hidden = !reference; clearReference.disabled = !!host.block('models', false) || ownInput();
+    pivotSelect.value = pivot; pivotSelect.disabled = !!block || composing || host.viewport().read().dragging || !!fileScope || !!deletion;
+    const name = reference ? provider.details.mutable.assetsById[reference.assetId]?.label : undefined;
+    referenceNote.textContent = referenceChanged ? '基準モデルの配置が変わっています。基準を選び直してください。' : reference ? `基準：${name?.kind === 'value' ? name.value : 'モデル名を確認'}。この画面では配置を変更しません。` : '';
+    fit.disabled = !!block || ownInput() || !visible || !details?.boundsAsset || !referenceDetails?.boundsAsset || referenceChanged || referenceSelected;
+    resetIdentity.disabled = !!block || ownInput() || !visible || !details || referenceSelected;
+    resetImported.disabled = resetIdentity.disabled || !details?.importedPlacement;
+    const history = selected ? placementHistory.get(selected) : undefined;
+    undoPlacement.disabled = resetIdentity.disabled || !history?.past.length || history.past.at(-1)!.bindingId !== details?.target.bindingId;
+    redoPlacement.disabled = resetIdentity.disabled || !history?.future.length || history.future.at(-1)!.bindingId !== details?.target.bindingId;
     fields.hidden = modes.hidden = confirm.hidden = cancel.hidden = !edit; confirm.disabled = !!block || composing || !valid(); cancel.disabled = !!host.block('models', false) || composing;
     inputs.forEach((node, index) => { node.disabled = !!block; if (!composing) node.value = raw[index] ?? ''; });
     impact.textContent = edit ? `${details?.sceneCount.kind === 'value' ? details.sceneCount.value : '要確認の'}シーンで共有されています。変更は全シーンに反映されます。` : '';

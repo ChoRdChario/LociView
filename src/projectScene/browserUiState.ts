@@ -4,8 +4,14 @@ import { projectResumeReference, type ProjectResumeReference } from '../ui/resum
 const key = 'lociview.validation-ui.last-project-1';
 /** Separate advisory UI setting. No Project, filesystem, database, journal or CAS access. */
 export function createValidationUiState(storage: () => Pick<Storage, 'getItem' | 'setItem'> = () => window.localStorage) {
-  const ui: Pick<UiState, 'projectSceneResume'> = { projectSceneResume: null };
-  return { ui, lastProject: {
+  const ui: Pick<UiState, 'projectSceneResume' | 'localDisplayName'> = { projectSceneResume: null, localDisplayName: '' };
+  const checkedName = (value: string) => value.length <= 256 && !/[\x00-\x1f\x7f]/.test(value) ? value.trim() : null;
+  const localSettings = {
+    read(): string { try { ui.localDisplayName = checkedName(storage().getItem('lociview.ui.display-name-1') ?? '') ?? ''; } catch { /* Keep current local preference. */ } return ui.localDisplayName ?? ''; },
+    save(value: string): boolean { const checked = checkedName(value); if (checked === null) return false;
+      try { storage().setItem('lociview.ui.display-name-1', checked); ui.localDisplayName = checked; return true; } catch { return false; } },
+  };
+  return { ui, localSettings, lastProject: {
     read(): ProjectResumeReference | null {
       try {
         const text = storage().getItem(key);

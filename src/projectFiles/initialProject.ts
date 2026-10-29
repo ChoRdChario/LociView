@@ -1,4 +1,5 @@
-import { inspectProjectImage, freshPhotoSelectionIssue, type PhotoDecoder } from './photo';
+import type { PhotoDecoder } from './photo';
+import { inspectProjectMedia, type MediaDecoders } from './media';
 import { immutableDigest } from '../domain/projectGraphSupport';
 import { admitProjectRecords, projectRecordMaps } from '../domain/projectRecords';
 import { cloneCanonicalValue, type JsonObject, type JsonValue } from '../domain/values';
@@ -93,10 +94,10 @@ export async function prepareValidationModel(input: ValidationModelFile, budget:
 
 /** New local identities from inspected files, never inferred from filenames or another Project. */
 type ValidationProjectInput<F = ValidationFile> = { run: string; title: string; models: readonly F[]; media?: readonly ValidationFile[] };
-export function prepareValidationProject(input: ValidationProjectInput, budget: ProjectFilePolicyInput, decode?: PngDecoder, jpeg?: JpegDecoder, photo?: PhotoDecoder): Promise<PreparedValidationProject>;
-export function prepareValidationProject(input: ValidationProjectInput<ValidationModelFile>, budget: ProjectFilePolicyInput, decode?: PngDecoder, jpeg?: JpegDecoder, photo?: PhotoDecoder): Promise<PreparedValidationProject<ValidationBody>>;
+export function prepareValidationProject(input: ValidationProjectInput, budget: ProjectFilePolicyInput, decode?: PngDecoder, jpeg?: JpegDecoder, photo?: PhotoDecoder, mediaDecoders?:MediaDecoders): Promise<PreparedValidationProject>;
+export function prepareValidationProject(input: ValidationProjectInput<ValidationModelFile>, budget: ProjectFilePolicyInput, decode?: PngDecoder, jpeg?: JpegDecoder, photo?: PhotoDecoder, mediaDecoders?:MediaDecoders): Promise<PreparedValidationProject<ValidationBody>>;
 export async function prepareValidationProject(input: ValidationProjectInput<ValidationModelFile>,
-  budget: ProjectFilePolicyInput, decode?: PngDecoder, jpeg?: JpegDecoder, photo?: PhotoDecoder): Promise<PreparedValidationProject<ValidationBody>> {
+  budget: ProjectFilePolicyInput, decode?: PngDecoder, jpeg?: JpegDecoder, photo?: PhotoDecoder, mediaDecoders?:MediaDecoders): Promise<PreparedValidationProject<ValidationBody>> {
   const policy=projectFilePolicy(budget), limits=policy.nonGs;
   checkFileLimits(limits);
   const run = technicalId(input.run), title = label(input.title), sceneId = fresh('scn'), frameId = fresh('frm');
@@ -121,7 +122,7 @@ export async function prepareValidationProject(input: ValidationProjectInput<Val
   records.schema = { major: 2, minor: 0 };
   records.identity = { projectId: `prj_${run}`, historyEpoch: fresh('hep'), lineageSeed: newId() + newId() };
   records.project = { title, defaultSceneId: sceneId, frame: { id: frameId, handedness: 'right', upAxis: '+Y', unit: { kind: 'meters', metersPerProjectUnit: 1 } } };
-  add('scenesById', { id: sceneId, name: '全体', orderKey: 'A', lifecycle: active() });
+  add('scenesById', { id: sceneId, name: 'シーン 1', orderKey: 'A', lifecycle: active() });
   for (const [index, file] of models.entries()) {
     const model = await prepareValidationModel(file, policy, decode, undefined, jpeg); blobs.push(model.body);
     if (model.representation.contentKind === 'gaussianSplat' || ['stl','ply','obj'].includes(meshSourceFormat(model.representation.formatProfile)??'')) records.project = { ...(records.project as JsonObject), frame: { id: frameId, handedness: 'right', upAxis: '+Y', unit: { kind: 'unknown' } } };
@@ -130,14 +131,13 @@ export async function prepareValidationProject(input: ValidationProjectInput<Val
     add('sceneAssetMembershipsById', { id: fresh('sam'), sceneId, assetId: model.asset.id!, orderKey: `A${index.toString(36).padStart(8, '0')}`, lifecycle: active() });
   }
   for (const file of media) {
-    const name = label(file.label), bytes = file.bytes.slice(), issue = freshPhotoSelectionIssue(bytes); if (issue) return fileError(issue);
-    const mime = await inspectProjectImage(bytes, limits, decode, jpeg, photo);
-    const ref = await blob(bytes, mime);
-    add('mediaResourcesById', await sealValidationRecord('media-resource', { id: fresh('med'), label: name, mediaKind: 'image', blob: ref as unknown as JsonObject }));
+    const name = label(file.label), bytes = file.bytes.slice(), {mediaKind,mediaType} = await inspectProjectMedia(bytes, limits, decode, jpeg, photo,mediaDecoders);
+    const ref = await blob(bytes, mediaType);
+    add('mediaResourcesById', await sealValidationRecord('media-resource', { id: fresh('med'), label: name, mediaKind, blob: ref as unknown as JsonObject }));
   }
   const sizes=new Map<string,number>();
   for(const body of blobs){const prior=sizes.get(body.ref.digest);if(prior!==undefined&&prior!==body.ref.byteLength)return fileError('本体の大きさが一致しません。');sizes.set(body.ref.digest,body.ref.byteLength);}
-  if([...sizes.values()].reduce((n,size)=>n+size,0)>policy.projectBodyBytes)return fileError('モデルと画像の合計が容量の上限を超えています。');
+  if([...sizes.values()].reduce((n,size)=>n+size,0)>policy.projectBodyBytes)return fileError('モデルとメディアの合計が容量の上限を超えています。');
   const checked = admitProjectRecords(records, validationMetadataLimits);
   if (checked.kind !== 'valid-records' || checked.hasUnknownFields) return fileError('初期プロジェクトの内容を確認できません。');
   return { records: cloneCanonicalValue(checked.records, validationMetadataLimits) as PreparedValidationProject['records'], blobs };

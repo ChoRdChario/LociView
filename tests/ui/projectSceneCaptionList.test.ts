@@ -68,6 +68,19 @@ function largeFixture() {
 }
 
 describe('disconnected Caption list contracts (not browser/render/storage evidence)', () => {
+  it('steps through the full filtered order without wrapping, changing filters or accepting stale/IME selections', () => {
+    const initial = fixture(); if (initial.source.kind !== 'ready') throw Error('fixture');
+    const source = { ...initial.source, captions: [item(a, '対象A', red), item(b, '除外', blue), item(c, '対象C', red)] };
+    const context = { ...initial, source, memory: { ...initial.memory, search: '対象', pinColors: [red] }, mutationBlock: '閲覧中' };
+    const next = planCaptionList(context, { kind: 'step', direction: 'next' }); expect(next.kind).toBe('change');
+    const changed = change(context, next); expect(changed.memory.selectedCaptionId).toBe(c); expect(changed.memory.search).toBe('対象');
+    expect(planCaptionList(changed, { kind: 'step', direction: 'next' }).kind).toBe('blocked');
+    expect(planCaptionList(context, { kind: 'step', direction: 'previous' }).kind).toBe('blocked');
+    expect(planCaptionList({ ...context, pending: 'composition' }, { kind: 'step', direction: 'next' }).kind).toBe('blocked');
+    expect(captionListPlanIsCurrent(next, { ...context, pending: 'text' })).toBe(false);
+    expect(captionListPlanIsCurrent(next, { ...context, source: { ...source, token: 'updated' } })).toBe(false);
+    expect(planCaptionList({ ...context, memory: { ...context.memory, selectedCaptionId: b } }, { kind: 'step', direction: 'next' }).kind).toBe('blocked');
+  });
   it('windows 10k logical records while revealing distant selections, preserving focus and searching all records', () => {
     const source = largeFixture(), before = structuredClone(source), doc = new MeasuredListDocument(), h = host(source, doc);
     const mounted = () => h.list.children.filter(row => row.className === 'lv-caption-row');

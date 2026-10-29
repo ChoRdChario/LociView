@@ -2320,7 +2320,7 @@ describe('new synthetic saved host (memory ports and recorded DOM, not real brow
     const reader = await h.open(), readonly = new SyntheticSession(reader.authority), readUI = mediaHost(readonly);
     expect(button(readUI.panel, '選択したメディアを添付').disabled).toBe(true); expect(button(readUI.panel, '説明を編集').disabled).toBe(true);
     const readGallery = area(named(readUI.root, 'キャプションのウィンドウ'), '添付メディア');
-    button(readGallery, '画像を表示').fire('click'); expect(named(readUI.root, '画像ビューア').open).toBe(true);
+    button(readGallery, '画像を表示').fire('click'); expect(named(readUI.root, 'メディアビューア').open).toBe(true);
     expect(readonly.media.add(readonly.mediaContext(), fixtureMedia[0]!.record.id)).toBe(false);
     readUI.w.dispose(); await reader.dispose();
     await ui.remove(); await ui.remove(); expect(rows()).toHaveLength(0); expect(host.read().state).toBe('ready');

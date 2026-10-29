@@ -1,4 +1,5 @@
 import type { PhotoDecoder } from './photo';
+import type { MediaDecoders } from './media';
 import type { ProjectWorkspaceFS } from '../platform/fs';
 import type { OriginBlobStore } from '../projectMetadata/blobStore';
 import { ProjectMetadataSource, type MetadataProof } from '../projectMetadata/source';
@@ -82,8 +83,8 @@ export async function writeValidationInitial(fs: ProjectWorkspaceFS, source: Pro
     return fileError('初期記録の保存を確認できません。');
 }
 export function validationProjectService(fs: ProjectWorkspaceFS, storage: MetadataStorageFactory, store: OriginBlobStore,
-  limits: ProjectFilePolicyInput, decode?: PngDecoder, checkContentRead?: () => Promise<void>, jpeg?: JpegDecoder, photo?: PhotoDecoder) {
-  const content = new ValidationContent(fs, store, limits, decode, checkContentRead, jpeg, photo);
+  limits: ProjectFilePolicyInput, decode?: PngDecoder, checkContentRead?: () => Promise<void>, jpeg?: JpegDecoder, photo?: PhotoDecoder, mediaDecoders?:MediaDecoders) {
+  const content = new ValidationContent(fs, store, limits, decode, checkContentRead, jpeg, photo,mediaDecoders);
   return { content, session: new MetadataProjectSession(fs, storage, metadataLimits, allow => content.verifier(allow), content, validationModelFacts(content)) };
 }
 /** Capture once; repeated execution uses identical source/IDs/bytes after a failed attempt. */

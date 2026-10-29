@@ -33,6 +33,7 @@ export type CaptionListIntent =
   | Readonly<{ kind: 'color'; color: string }>
   | Readonly<{ kind: 'allColors' | 'revealSelection' }>
   | Readonly<{ kind: 'scroll'; top: number }>
+  | Readonly<{ kind: 'step'; direction: 'previous' | 'next' }>
   | Readonly<{ kind: 'select' | 'showModel' | 'review'; captionId: string }>;
 interface PlanBase { readonly token: string; readonly sceneId: string; readonly baseMemory: SceneUiMemory }
 export type CaptionListPlan = Readonly<{ kind: 'blocked'; reason: string }> |
@@ -111,6 +112,12 @@ export function planCaptionList(context: CaptionListContext, intent: CaptionList
   const change = (patch: Partial<SceneUiMemory>): CaptionListPlan => ({ ...base, kind: 'change',
     memory: Object.freeze({ ...memory, ...patch }), intent: intent.kind });
   switch (intent.kind) {
+    case 'step': {
+      if (context.pending) return { kind: 'blocked', reason: sceneSwitchReason(context.pending) };
+      const index = view.rows.findIndex(row => row.item.id === memory.selectedCaptionId);
+      const row = index < 0 ? undefined : view.rows[index + (intent.direction === 'previous' ? -1 : 1)];
+      return row ? change({ selectedCaptionId: row.item.id }) : { kind: 'blocked', reason: 'この方向に記録はありません。' };
+    }
     case 'search': return intent.query === memory.search ? { kind: 'unchanged' } : change({ search: intent.query });
     case 'owner': return ownerFilterKey(intent.filter) === ownerFilterKey(memory.ownerFilter) ? { kind: 'unchanged' }
       : intent.filter.kind === 'all' || view.owners.some(owner => ownerFilterKey(owner.filter) === ownerFilterKey(intent.filter))
@@ -152,6 +159,6 @@ export function captionListPlanIsCurrent(plan: CaptionListPlan, context: Caption
   }
   return !captionSourceIssue(context.source) && plan.token === context.source.token &&
     plan.sceneId === context.source.sceneId && plan.baseMemory === context.memory &&
-    (!(plan.kind === 'effect' || plan.intent === 'select') || (plan.kind === 'effect' && plan.action === 'showModel' && context.showModelPending !== undefined ? context.showModelPending : context.pending) === null) &&
+    (!(plan.kind === 'effect' || plan.intent === 'select' || plan.intent === 'step') || (plan.kind === 'effect' && plan.action === 'showModel' && context.showModelPending !== undefined ? context.showModelPending : context.pending) === null) &&
     (!(plan.kind === 'effect' && plan.action === 'showModel') || context.mutationBlock === null);
 }

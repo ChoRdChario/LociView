@@ -3,6 +3,8 @@ interface StartupInteraction {readonly pending:boolean;readonly workingBlock:unk
   applyWorking(action:()=>unknown,confirmed:()=>void,failed:(error:unknown)=>void):boolean}
 import { WorkingAcknowledgment } from './acknowledgment';
 import { defaultSceneCandidates } from '../projectMetadata/startupScene';
+import { sceneRestoreSource } from '../projectMetadata/sceneOrganization';
+import { newId } from '../projectMetadata/persistence';
 
 /** Also usable BEFORE a Scene/session exists. No implicit navigation or direct storage writes. */
 export function createMetadataStartupControls(document: Document, host: SavedWorkspaceHost,
@@ -15,8 +17,13 @@ export function createMetadataStartupControls(document: Document, host: SavedWor
   apply.textContent = '開始シーンを確定'; cancel.textContent = '取り消す'; message.setAttribute('role', 'status');
   note.textContent = '次に開くシーンを選びます。シーンや記録は削除されません。';
   root.append(heading, note, values, select, apply, cancel, message);
+  const recovery = document.createElement('section'), recoverySelect = document.createElement('select'), restore = document.createElement('button');
+  const recoveryNote = document.createElement('p'); recovery.setAttribute('aria-label', 'シーンの復旧'); recoverySelect.setAttribute('aria-label', '復旧するシーン');
+  restore.type = 'button'; restore.textContent = 'このシーンを復旧して開く';
+  recoveryNote.textContent = 'シーンを選んで開始シーンに戻します。削除済みの所属・視点・材質設定は戻しません。記録やモデルは再び追加できます。';
+  recovery.append(recoveryNote, recoverySelect, restore); root.append(recovery);
   let token = '', ready = false, disposed = false, feedback = '';
-  const hasChanges = () => !!select.value || ack.state !== 'idle';
+  const hasChanges = () => !!select.value || !!recoverySelect.value || ack.state !== 'idle';
   const busy = () => ack.state === 'checking';
   const blocked = () => disposed || host.authority.readOnly || host.hasPending() || ack.state !== 'idle' ||
     !!session()?.pending || otherInput();
@@ -26,11 +33,22 @@ export function createMetadataStartupControls(document: Document, host: SavedWor
     const field = provider?.kind === 'scene-provider' ? provider.inspection.candidates.fields.find(f =>
       f.path.length === 2 && f.path[0] === 'project' && f.path[1] === 'defaultSceneId') : undefined;
     const conflict = !!field && field.candidates.length > 1;
-    root.hidden = !conflict && !hasChanges();
+    const defaultId = provider?.kind === 'scene-provider' && provider.state.defaultSceneId.kind === 'value' ? provider.state.defaultSceneId.value : null;
+    const defaultLifecycle = provider?.kind === 'scene-provider' && defaultId ? provider.state.scenes[defaultId]?.lifecycle : undefined;
+    const needsRecovery = provider?.kind === 'scene-provider' && (!defaultLifecycle || defaultLifecycle.kind !== 'value' || defaultLifecycle.value.state !== 'active');
+    root.hidden = !conflict && !needsRecovery && !hasChanges();
+    recovery.hidden = !needsRecovery && !recoverySelect.value;
     if (provider?.kind === 'scene-provider' && token !== provider.token && !hasChanges()) {
       token = provider.token; feedback = ''; ready = false; values.replaceChildren(); select.replaceChildren();
       const option = (value: string, label: string) => { const node = document.createElement('option'); node.value = value; node.textContent = label; select.append(node); };
       option('', '残す開始シーンを選択'); select.value = '';
+      recoverySelect.replaceChildren(); const empty = document.createElement('option'); empty.value = ''; empty.textContent = 'シーンを選択'; recoverySelect.append(empty); recoverySelect.value = '';
+      if (needsRecovery) for (const id of Object.keys(provider.details.mutable.scenesById)) {
+        const candidate = document.createElement('option'); candidate.value = id;
+        const name = provider.state.scenes[id]?.name; candidate.textContent = name?.kind === 'value' ? name.value : '名称を確認';
+        try { sceneRestoreSource(provider, id, host.limits); } catch { candidate.disabled = true; candidate.textContent += '（内容を確認）'; }
+        recoverySelect.append(candidate);
+      }
       if (conflict) {
         try { defaultSceneCandidates(provider, host.limits); ready = true; } catch { /* Show all, never accept a filtered subset. */ }
         field!.candidates.forEach((candidate, index) => {
@@ -44,17 +62,33 @@ export function createMetadataStartupControls(document: Document, host: SavedWor
     }
     const stale = !!select.value && token !== host.read().source?.token;
     select.disabled = blocked(); apply.disabled = blocked() || !ready || stale || !select.value;
+    recoverySelect.disabled = blocked(); restore.disabled = blocked() || !recoverySelect.value || token !== host.read().source?.token;
     cancel.disabled = disposed || host.hasPending() || ack.state !== 'idle' || !!session()?.workingBlock;
     message.textContent = feedback || (ack.block ?? (host.hasPending() ? '更新が未完了です。元の変更から再試行してください。' :
       stale ? '内容が更新されています。選択は保持しています。取り消して選び直してください。' :
+      needsRecovery ? '開始できるシーンがありません。記録は保持しています。復旧するシーンを選択してください。' :
       !ready && conflict ? '候補の状態を確認できないため解消できません。元の変更は保持しています。' :
       host.authority.readOnly ? 'このタブは閲覧専用です。編集用タブで確定し、再開用データを確認してください。' :
       select.value ? 'この選択はまだ適用されていません。' : '開始シーンが競合しています。自動では選びません。'));
   };
   select.addEventListener('change', () => { feedback = ''; render(); changed(); });
+  recoverySelect.addEventListener('change', () => { feedback = ''; render(); changed(); });
   cancel.addEventListener('click', () => {
     if (cancel.disabled || disposed) return;
-    select.value = ''; token = ''; feedback = ''; render(); changed();
+    select.value = ''; recoverySelect.value = ''; token = ''; feedback = ''; render(); changed();
+  });
+  restore.addEventListener('click', () => {
+    if (restore.disabled || blocked() || token !== host.read().source?.token) return;
+    const provider = host.read().provider; if (provider?.kind !== 'scene-provider') return;
+    let source: ReturnType<typeof sceneRestoreSource>;
+    try { source = sceneRestoreSource(provider, recoverySelect.value, host.limits); } catch { feedback = 'シーンの内容を確認できません。元の記録は保持しています。'; render(); return; }
+    const before = token, command = { kind: 'restoreScene' as const, sceneId: recoverySelect.value, observedOperationIds: source.operationIds, eventId: `evt_${newId()}` };
+    const confirmed = () => { if (!disposed) { recoverySelect.value = ''; select.value = ''; token = ''; feedback = ''; session()?.refreshHistory(); render(); changed(); } };
+    const failed = (error: unknown) => { if (!disposed) { feedback = error instanceof Error ? error.message : '復旧できません。選択は保持しています。'; render(); changed(); } };
+    const current = session();
+    if (current) current.applyWorking(() => host.resolve(before, command), confirmed, failed);
+    else ack.run(() => host.resolve(before, command), confirmed, failed, () => host.hasPending() ? async () => { await host.authority.retry!(); } : host.read().source?.token !== before ? () => {} : undefined);
+    render(); changed();
   });
   apply.addEventListener('click', () => {
     if (blocked() || !ready || token !== host.read().source?.token || !select.value) return;

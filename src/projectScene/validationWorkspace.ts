@@ -5,6 +5,7 @@ import type {createProductWorkspace} from './productWorkspace';
 import { isPointPly } from '../projectFiles/pointPly';
 import { classifyMeshSource, inspectMeshSource } from '../projectFiles/meshSource';
 import { isAdditionalPhoto, freshPhotoSelectionIssue, type PhotoDecoder } from '../projectFiles/photo';
+import { hasTimedOrHeicSignature, isHeic, inspectProjectMedia, type MediaDecoders } from '../projectFiles/media';
 import { projectResumeReference, type ProjectResumeReference } from '../ui/resumeReference';
 import { newId } from '../projectMetadata/persistence';
 import { prepareValidationProject, validationModelFile, type ValidationModelFile, type ValidationFile } from '../projectFiles/initialProject';
@@ -40,7 +41,7 @@ export interface MountedEditor {
 export type MountedEditorFactory=(host:Host,factory:ViewportFactory,tools:ReturnType<typeof createValidationReceiveControls>|undefined,
  renderCandidate:ModelCandidateRenderer|undefined,navigation:NonNullable<Parameters<typeof createProductWorkspace>[5]>)=>MountedEditor;
 export interface ValidationWorkspacePorts {
-  fileLimits: FileValidationLimits; filePolicy?: ProjectFilePolicy; decode?: PngDecoder; jpeg?: JpegDecoder; photo?: PhotoDecoder;
+  fileLimits: FileValidationLimits; filePolicy?: ProjectFilePolicy; decode?: PngDecoder; jpeg?: JpegDecoder; photo?: PhotoDecoder; mediaDecoders?:MediaDecoders;
   mountEditor:MountedEditorFactory;
   progressivePresentation?:boolean;
   smoothDisplay?:boolean;
@@ -49,6 +50,7 @@ export interface ValidationWorkspacePorts {
   openLegacy?(file?:File):Promise<void>;
   reviewEditArchive?:ReviewEditArchivePort;
   storageEstimate?(): Promise<Readonly<{ usage?: number; quota?: number }>>;
+  localSettings?: { read(): string; save(displayName: string): boolean };
   lastProject?: { read(): ProjectResumeReference | null; remember(reference: ProjectResumeReference): void };
   list(): Promise<ValidationProjectEntry[]>;
   open(run: string, initial?: ReturnType<typeof prepareValidationCreation>, mode?: LocalOpenMode, workspaceFile?: Blob, reviewEdit?: PreparedReviewEdit,
@@ -257,7 +259,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
       const refresh=()=>{if(!current())return;mounted=checked&&!state();if(mounted&&selectionHost===target&&!target.hasPending())clearSelection();rememberCurrent();controls();};
       presentation={busy:true,reason:'モデルを読み込んでいます。記録は閲覧・検索できます。'};
       workspace=ports.mountEditor(target,bridge.factory,receiveTools,ports.renderModelCandidate?display=>ports.renderModelCandidate!(target,display):undefined,
-        {smoothDisplay:ports.smoothDisplay,presentation:state,openProject:()=>{void selectProject();},resumedLastProject:()=>resumedLast,storageEstimate:ports.storageEstimate,changed:refresh});
+        {smoothDisplay:ports.smoothDisplay,presentation:state,openProject:()=>{void selectProject();},resumedLastProject:()=>resumedLast,storageEstimate:ports.storageEstimate,localSettings:ports.localSettings,changed:refresh});
       content.replaceChildren(workspace.root,retry);workspace.render();
       const load=async()=>{
         checked=false;mounted=false;presentation={busy:true,reason:'モデルを読み込んでいます。記録は閲覧・検索できます。'};retry.hidden=true;resident?.detachPreparation?.();workspace?.render();
@@ -283,7 +285,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     const fileTools = receiveTools;
     try { workspace=ports.mountEditor(target,next.factory,fileTools,
       ports.renderModelCandidate ? display=>ports.renderModelCandidate!(target,display) : undefined,
-      {smoothDisplay:ports.smoothDisplay,openProject:()=>{void selectProject();},resumedLastProject:()=>resumedLast,storageEstimate:ports.storageEstimate,
+      {smoothDisplay:ports.smoothDisplay,openProject:()=>{void selectProject();},resumedLastProject:()=>resumedLast,storageEstimate:ports.storageEstimate,localSettings:ports.localSettings,
         changed:()=>{rememberCurrent();controls();}});
       content.replaceChildren(workspace.root); workspace.render();
       if (target.backupRestore.needsDisplay) { target.backupRestore.displayReady(target.read().source!.token); workspace.render(); } }
@@ -507,7 +509,16 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
         finally{if(selectionAbort===controller){selectionAbort=undefined;nativeSelectionChecking=false;controls();}}
       }
       else if (isPointPly(bytes) || bytes.length >= 4 && new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength).getUint32(0, true) === 0x46546c67) models.push(file);
-      else if (isAdditionalPhoto(bytes) || isJpeg(bytes) || [137,80,78,71,13,10,26,10].every((b,i) => bytes[i] === b)) media.push(file);
+      else if(isHeic(bytes)){
+        const controller=new AbortController();selectionAbort=controller;nativeSelectionChecking=true;controls();
+        try{
+          await inspectProjectMedia(bytes,policy.nonGs,ports.decode,ports.jpeg,ports.photo,ports.mediaDecoders,controller.signal);
+          if(!guardSelection(generation,context)||draft!==creationDraft)return;
+          media.push(file);
+        }catch(error){if(controller.signal.aborted&&!selectionCurrent(generation,context))return;throw error;}
+        finally{if(selectionAbort===controller){selectionAbort=undefined;nativeSelectionChecking=false;controls();}}
+      }
+      else if (hasTimedOrHeicSignature(bytes) || isAdditionalPhoto(bytes) || isJpeg(bytes) || [137,80,78,71,13,10,26,10].every((b,i) => bytes[i] === b)) media.push(file);
       else {
         const issue = freshPhotoSelectionIssue(bytes); if (issue) throw Error(issue);
         // Existing package readers own container admission, including legacy ZIP forms.
@@ -574,7 +585,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     }
     if (purpose === 'contribution') throw Error('更新用ファイルです。対応するプロジェクトを開き、更新を受け取ってください。');
     if (purpose === 'review') {
-      const view = await prepareReviewView(file, policy, ports.decode, ports.jpeg, ports.photo);
+      const view = await prepareReviewView(file, policy, ports.decode, ports.jpeg, ports.photo,ports.mediaDecoders);
       if (!ports.renderReview) throw Error('閲覧用シーンの表示が未接続です。');
       const prepared = await ports.renderReview(view);
       try {
@@ -609,7 +620,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     ensureMaySwitch(); if (!rawSelection || form.hidden) throw Error('ファイルを選択して内容を確認してください。');
     if (!creationAttempt) {
       const generation = selectionGeneration, draft = creationDraft, context = selectionContext(), name = title.value, target = rawSelection;
-      const run = newId(), prepared = await prepareValidationProject({ run, title: name, ...target }, policy, ports.decode, ports.jpeg, ports.photo);
+      const run = newId(), prepared = await prepareValidationProject({ run, title: name, ...target }, policy, ports.decode, ports.jpeg, ports.photo,ports.mediaDecoders);
       if (!guardSelection(generation, context) || draft !== creationDraft || title.value !== name || rawSelection !== target) return;
       creationAttempt = { run, initial: prepareValidationCreation(prepared, 'map2') }; controls();
     }

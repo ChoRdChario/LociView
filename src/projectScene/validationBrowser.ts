@@ -68,7 +68,7 @@ export async function createValidationBrowserWorkspace(document: Document, compo
   const uiState = createValidationUiState();
   const scratch=createReviewEditScratch(base);
   const workspace = createValidationWorkspace(document, { ...options,smoothDisplay:!!composition.smoothDisplay,progressivePresentation:composition.progressivePresentation,reviewEditArchive:{write:produce=>workspaceFileOperation(locks,()=>scratch.write(produce))},initialFiles:composition.initialFiles,openLegacy:composition.openLegacy,mountEditor:composition.mountEditor,introduction:composition.introduction,lastProject: uiState.lastProject,
-    storageEstimate: typeof navigator.storage?.estimate === 'function' ? () => navigator.storage.estimate() : undefined,
+    storageEstimate: typeof navigator.storage?.estimate === 'function' ? () => navigator.storage.estimate() : undefined, localSettings: uiState.localSettings,
     list: () => listValidationProjects(options, storage),
     open: (id, initial, mode, workspaceFile, reviewEdit, firstBackup) => openValidationEntry({ ...options, run: id, initial, mode, workspaceFile, reviewEdit, firstBackup, openStorage: create => storage(id, create) }),
     renderModelCandidate: async (host, display) => {

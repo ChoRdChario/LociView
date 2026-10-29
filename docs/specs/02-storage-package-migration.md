@@ -2210,6 +2210,13 @@ decisions close.
 
 ### 29.3 First-candidate device-side HEIC compatibility (Product Owner approved 2026-09-04)
 
+Scoped exception approved2026-10-29: [08](08-daily-authoring-workflow.md) admits
+native-browser single-still HEIC and the specified video/audio only in the
+ProjectScene PC candidate, through complete local content/decode checks and
+existing original-byte media/package fences. The following first-candidate
+refusal remains for the legacy/Native routes and unadmitted input. No decoder
+PoC, Native schema2 transition or legacy conversion recipe is promoted.
+
 This section supersedes sections 29.1 and 29.2 only for what the first public
 candidate ships. Their original-byte, decoder and schema-2 work remains a later
 direct-HEIC requirement and their PoC results remain isolated evidence.

@@ -71,9 +71,9 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
     const caption = view.source.captions.find(c => c.id === captionId);
     return { scope: JSON.stringify([view.source.token, captionId]), label: caption?.title.kind === 'value' ? caption.title.value || 'キャプション' : 'キャプション',
       items: view.attachments.filter(a => a.captionId === captionId).map(a => {
-        const media = (view.inspection.review.snapshot.mediaResourcesById as Record<string, { label: string }>)[String(a.mediaResourceId)];
+        const media = (view.inspection.review.snapshot.mediaResourcesById as Record<string, { label: string;mediaKind:'image'|'video'|'audio' }>)[String(a.mediaResourceId)];
         const blob = view.images.get(String(a.mediaResourceId));
-        return { id: String(a.id), resourceId: String(a.mediaResourceId), label: media?.label ?? '画像', description: String(a.altText || ''), image: blob ? { blob } : null };
+        return { id: String(a.id), resourceId: String(a.mediaResourceId), label: media?.label ?? 'メディア',kind:media?.mediaKind, description: String(a.altText || ''), image: blob ? { blob } : null };
       }) };
   };
   const gallery = (captionId: string) => {

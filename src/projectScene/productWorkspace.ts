@@ -14,7 +14,7 @@ type Host = ReturnType<typeof createValidationModeHost>;
 type Tools = ReturnType<typeof createValidationReceiveControls>;
 /** Validation-only adapter. No synthetic Session or string-map writes enter product UI. */
 export function createProductWorkspace(document: Document, host: Host, factory: ViewportFactory, tools?: Tools, renderCandidate?: ModelCandidateRenderer,
-  navigation?: { compactFiles?:boolean;smoothDisplay?:boolean;presentation?():{busy:boolean;reason:string}|null;openProject(): void; resumedLastProject(): boolean; changed(): void; storageEstimate?(): Promise<Readonly<{ usage?: number; quota?: number }>> }) {
+  navigation?: { compactFiles?:boolean;smoothDisplay?:boolean;presentation?():{busy:boolean;reason:string}|null;openProject(): void; resumedLastProject(): boolean; changed(): void; storageEstimate?(): Promise<Readonly<{ usage?: number; quota?: number }>>;localSettings?:{read():string;save(displayName:string):boolean} }) {
   const root = document.createElement('section'), mode = document.createElement('button'), status = document.createElement('p');
   root.className = 'lv-project-shell';
   mode.type = 'button'; status.setAttribute('role', 'status');
@@ -32,9 +32,9 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
       job.state==='unstarted'||job.state==='incomplete'||job.state==='repair-required')))fileMenu.open=true;
     tools?.render(); mode.textContent = host.mode!.current === 'view' ? '編集を開始する' : '閲覧に切り替える';
     mode.disabled = switching || !!navigation?.presentation?.() || !!core?.inputPending() || !!startup?.hasChanges() || !!tools?.hasChanges();
-    if (core) core.root.inert = switching || !!tools?.busy();
+    if (core) core.root.inert = switching || !!tools?.busy() || !!startup?.busy();
     startup?.render();
-    retryStartup.hidden = !!core || !startup?.recoveryPending(); retryStartup.disabled = switching || !!navigation?.presentation?.() || !!host.authority.readOnly || !!tools?.hasChanges() || !!startup?.busy();
+    retryStartup.hidden = !startup?.recoveryPending(); retryStartup.disabled = switching || !!navigation?.presentation?.() || !!host.authority.readOnly || !!tools?.hasChanges() || !!startup?.busy();
     if (!core) status.textContent = modeFeedback || (host.hasPending() ? '更新が未完了です。元の変更から再試行してください。' : '開始シーンを確認してください。シーンと記録は保持しています。');
   };
   const retryStartup = document.createElement('button'); retryStartup.type = 'button'; retryStartup.textContent = '更新を再試行';
@@ -45,6 +45,7 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
     core = createProjectWorkspace(document, {
     ...productSources(host,navigation?.smoothDisplay),
     openProject: navigation?.openProject, resumedLastProject: navigation?.resumedLastProject, storageEstimate: navigation?.storageEstimate,
+    localSettings: navigation?.localSettings,
     createModelPreview: renderCandidate ? () => {
       let token = '', sceneId = '';
       const preview = createModelCandidatePreview(document, renderCandidate, () => !disposed && token === read().token && sceneId === viewportScene,open=>{previewOpen=open;if(open)mainRuntime?.setActive(false);
@@ -75,7 +76,7 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
     transformModel: async (token, input) => host.authority.transformModel!(token, input),
     image: async record => new Blob([(await host.content.image(record, true)).slice().buffer], { type: (record.blob as { mediaType: string }).mediaType }),
     imageScope: () => host.imageScope(),
-    changed, otherPending: external,
+    changed, otherPending: () => external() || !!startup?.hasChanges(),
     createViewport(canvas, update, propose, proposeModel): WorkspaceViewport {
       let state: WorkspaceViewportState | undefined, closed = false, rendered: EditableDisplay | undefined, pointerHeld = false;
       let renderedInput = '';
@@ -86,6 +87,7 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
       }, (target, position, manipulation) => {
         if (!state?.model || state.readOnly || host.authority.readOnly || JSON.stringify(state.model.target) !== JSON.stringify(target) || target.token !== read().token) return false;
         return !!proposeModel?.({ target, mode: manipulation?.mode ?? state.model.mode,
+          ...(state.model.pivotAsset ? { pivotAsset: state.model.pivotAsset } : {}),
           placement: { translation: position, rotationXYZW: manipulation?.rotationXYZW ?? state.model.placement.rotationXYZW,
             uniformScale: manipulation?.uniformScale ?? state.model.placement.uniformScale } });
       });
@@ -129,7 +131,8 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
             runtime.setPinPointerActive?.(pointerHeld || !!next.windowMoving || next.choosing && !next.readOnly); runtime.setActive(true); return;
           }
           const modelEdit = next.model && next.model.target.token === next.token ? { target: next.model.target, position: next.model.placement.translation,
-            enabled: !next.readOnly, manipulation: { mode: next.model.mode, rotationXYZW: next.model.placement.rotationXYZW, uniformScale: next.model.placement.uniformScale } } : undefined;
+            enabled: !next.readOnly, manipulation: { mode: next.model.mode, rotationXYZW: next.model.placement.rotationXYZW, uniformScale: next.model.placement.uniformScale,
+              ...(next.model.pivotAsset ? { pivotAsset: next.model.pivotAsset } : {}) } } : undefined;
           let display = projectDisplay(snapshot, next.sceneId, next.pinColors, next.selectedId, modelEdit, next.hiddenAssetIds ?? []);
           if (next.pin) {
             const model = display.models.find(m => m.binding.assetId === next.pin!.target.assetId);
@@ -179,10 +182,18 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
     root.append(core.root);
     startup?.dispose(); startup?.root.remove(); startup = undefined; status.textContent = '';
   };
-  const render = () => { if (!disposed) { mountCore(); core?.render(); changed(); navigation?.changed(); } };
-  if (!chooseStartupScene(read().state).sceneId) {
-    startup = createMetadataStartupControls(document, host, () => undefined, render, () => !!navigation?.presentation?.() || external()); root.append(startup.root);
-  }
+  const ensureStartup = () => {
+    if (!chooseStartupScene(read().state).sceneId && !startup) {
+      startup = createMetadataStartupControls(document, host, () => undefined, render,
+        () => !!navigation?.presentation?.() || external() || !!core?.inputPending()); root.append(startup.root);
+    } else if (startup && core && chooseStartupScene(read().state).sceneId && !startup.hasChanges()) {
+      const active = read().state.scenes[core.activeScene()]?.lifecycle;
+      if (active?.kind !== 'value' || active.value.state !== 'active') { core.unmount(); core = undefined; }
+      else { startup.dispose(); startup.root.remove(); startup = undefined; }
+    }
+  };
+  const render = () => { if (!disposed) { ensureStartup(); mountCore(); core?.render(); changed(); navigation?.changed(); } };
+  ensureStartup();
   mountCore();
   mode.addEventListener('click', () => { void (async () => {
     if (disposed || mode.disabled || core?.inputPending() || startup?.hasChanges() || tools?.hasChanges()) return;
@@ -196,7 +207,7 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
   const unmount = () => { if (!disposed) { disposed = true; startup?.dispose(); core?.unmount(); root.remove(); } };
   changed();
   const interaction = { get interactionPending() { return core?.session.interactionPending || !!startup?.hasChanges(); },
-    get acknowledgment() { return core?.session.acknowledgment ?? { state: startup?.busy() ? 'checking' as const : startup?.recoveryPending() ? 'failed' as const : 'idle' as const }; },
+    get acknowledgment() { return startup?.busy() || startup?.recoveryPending() ? { state: startup.busy() ? 'checking' as const : 'failed' as const } : core?.session.acknowledgment ?? { state: 'idle' as const }; },
     refreshHistory: render };
   return { root, session: interaction, render, hasProjectHeader: () => !!core,
     inputPending: (includePresentation=true) => switching || includePresentation && !!navigation?.presentation?.() || !!core?.inputPending() || !!startup?.hasChanges(),

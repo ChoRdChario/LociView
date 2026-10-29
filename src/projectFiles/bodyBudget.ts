@@ -17,7 +17,7 @@ export function validationDeclaredBodyBytes(provider: Extract<ProjectProviderRea
     sizes.set(hash,size);
   }
   const total=[...sizes.values()].reduce((n,size)=>n+size,0);
-  if(!Number.isSafeInteger(total)||policy&&total>policy.projectBodyBytes)return fileError('モデルと画像の合計が容量の上限を超えています。');
+  if(!Number.isSafeInteger(total)||policy&&total>policy.projectBodyBytes)return fileError('モデルとメディアの合計が容量の上限を超えています。');
   return total;
 }
 
@@ -31,5 +31,5 @@ export function assertValidationBodyAllocation(provider: Extract<ProjectProvider
   for(const map of ['representationsById','mediaResourcesById'] as const) for(const id of Object.keys(provider.details.immutable[map])) {
     if(fileObject(read(map,id).blob).byteLength===size)return;
   }
-  return fileError('モデルと画像の合計が容量の上限を超えています。');
+  return fileError('モデルとメディアの合計が容量の上限を超えています。');
 }

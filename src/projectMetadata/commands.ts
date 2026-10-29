@@ -27,8 +27,13 @@ import { planGsProxy, type GsProxyCommand } from './gsProxy';
 import { planModelReplacement, type ReplaceAssetModelCommand } from './modelReplacement';
 import { planViewResolution, type ViewResolution } from './viewResolution';
 import { planMaterialResolution, type MaterialResolution } from './materialResolution';
+import { planCaptionAuthoring, type CaptionAuthoringCommand } from './captionAuthoring';
+import { planSceneOrganization, type SceneOrganizationCommand } from './sceneOrganization';
+import { fitAlignmentBounds, type AlignmentBounds, type AlignmentPlacement } from '../domain/alignment';
 
 export type MetadataEdit =
+  | CaptionAuthoringCommand
+  | SceneOrganizationCommand
   | AddAssetCommand
   | AddGsAssetCommand
   | GsProxyCommand
@@ -52,6 +57,7 @@ export type MetadataEdit =
   | { kind: 'activatePreparedRevision'; sceneId: string; assetId: string; expectedBindingId: string; revisionId: string; binding: JsonObject }
   | { kind: 'moveAsset'; sceneId: string; assetId: string; expectedBindingId: string; binding: JsonObject }
   | { kind: 'transformAsset'; sceneId: string; assetId: string; expectedBindingId: string; binding: JsonObject }
+  | { kind: 'fitAssetBounds'; sceneId: string; assetId: string; expectedBindingId: string; binding: JsonObject; referenceAssetId: string; expectedReferenceBindingId: string }
   | { kind: 'editCaption'; captionId: string; edits: { title?: string; body?: string; colorSrgb?: readonly number[] } }
   | { kind: 'resolveCaptionText'; captionId: string; field: 'title' | 'body';
       choice: { kind: 'candidate'; operationId: string } | { kind: 'manual'; text: string } }
@@ -93,6 +99,10 @@ export function canonicalMetadataEdit(input: MetadataEdit, limits: MetadataLimit
 /** Plan only from the Session's fresh verified provider. Not a generic patch/import API. */
 export function planMetadataEdit(provider: Provider, input: MetadataEdit, limits: MetadataLimits, checkedPointAnchor = false): readonly MetadataWrite[] {
   const command = canonicalMetadataEdit(input, limits), raw = command as unknown as JsonObject;
+  if (['duplicateCaption', 'restoreCaptionFields', 'createTag', 'editTag', 'deleteTag', 'setCaptionTag', 'resolveTagField', 'resolveTagLifecycle'].includes(command.kind))
+    return planCaptionAuthoring(provider, command as CaptionAuthoringCommand, limits);
+  if (['duplicateScene', 'deleteSceneContents', 'reorderScene', 'resolveSceneOrder', 'restoreScene'].includes(command.kind))
+    return planSceneOrganization(provider, command as SceneOrganizationCommand, limits);
   if (command.kind === 'setAssetPinScale') {
     shape(raw, ['kind', 'assetId', 'pinScale']);
     if (provider.semanticProfile !== 'map2') fail('pin-scale-profile');
@@ -272,8 +282,8 @@ export function planMetadataEdit(provider: Provider, input: MetadataEdit, limits
       result.push({ map: 'assetBindingsById', id: next.id as string, create: true, fields: next });
       add('assetsById', command.assetId, { status: { kind: 'ready', activeBindingId: next.id! } }); break;
     }
-    case 'moveAsset': case 'transformAsset': {
-      shape(raw, ['kind', 'sceneId', 'assetId', 'expectedBindingId', 'binding']);
+    case 'moveAsset': case 'transformAsset': case 'fitAssetBounds': {
+      shape(raw, ['kind', 'sceneId', 'assetId', 'expectedBindingId', 'binding', ...(command.kind === 'fitAssetBounds' ? ['referenceAssetId', 'expectedReferenceBindingId'] : [])]);
       row('scenesById', command.sceneId); row('assetsById', command.assetId);
       memberships('asset', command.sceneId, command.assetId);
       const resolved = resolveScene(provider.state, provider.resources, command.sceneId);
@@ -285,7 +295,22 @@ export function planMetadataEdit(provider: Provider, input: MetadataEdit, limits
       const before = object(old.assetToProject), after = object(next.assetToProject);
       if (next.id === old.id || next.assetId !== command.assetId || old.assetId !== command.assetId ||
         next.assetRevisionId !== old.assetRevisionId || old.assetRevisionId !== projection!.revisionId ||
-        next.parentBindingId !== old.id || next.method !== 'manual') fail('placement-binding');
+        next.parentBindingId !== old.id || next.method !== (command.kind === 'fitAssetBounds' ? 'bounds' : 'manual')) fail('placement-binding');
+      if (command.kind === 'fitAssetBounds') {
+        row('assetsById', command.referenceAssetId); memberships('asset', command.sceneId, command.referenceAssetId);
+        const reference = resolved.kind === 'ready' ? resolved.composition.assets.find(a => a.assetId === command.referenceAssetId)?.projection : undefined;
+        if (!reference || command.referenceAssetId === command.assetId || reference.bindingId !== command.expectedReferenceBindingId) fail('placement-reference');
+        const binding = exact(provider.details.immutable.assetBindingsById[reference!.bindingId]);
+        checkProjectRecord(c, 'assetBindingsById', binding);
+        const bounds = (ids: readonly string[]): AlignmentBounds => {
+          const primary = ids.map(id => exact(provider.details.immutable.representationsById[id])).filter(rep => ['meshPrimary', 'pointPrimary', 'gsPrimary'].includes(rep.role as string));
+          if (primary.length !== 1) return fail('placement-bounds'); checkProjectRecord(c, 'representationsById', primary[0]!);
+          return primary[0]!.logicalBoundsAsset as unknown as AlignmentBounds;
+        };
+        const fitted = fitAlignmentBounds(bounds(projection!.representationIds), old.assetToProject as unknown as AlignmentPlacement,
+          bounds(reference!.representationIds), binding.assetToProject as unknown as AlignmentPlacement);
+        if (c.unknown || !same(next.assetToProject, fitted as unknown as JsonObject)) fail('placement-bounds-result');
+      }
       if (command.kind === 'moveAsset' && (!same(before.rotationXYZW, after.rotationXYZW) || before.uniformScale !== after.uniformScale))
         fail('placement-translation-only');
       // No optional registration evidence or unknown subtree is silently discarded.

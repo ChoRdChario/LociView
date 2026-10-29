@@ -6,7 +6,7 @@ import { validationProjectService } from '../projectFiles/creation';
 import { validationMetadataLimits as limits } from '../projectFiles/validation';
 import type { ValidationHostOptions } from './validationHost';
 
-type Options = Pick<ValidationHostOptions, 'run' | 'openStorage' | 'generations' | 'store' | 'fileLimits' | 'filePolicy' | 'decode' | 'jpeg' | 'photo'>;
+type Options = Pick<ValidationHostOptions, 'run' | 'openStorage' | 'generations' | 'store' | 'fileLimits' | 'filePolicy' | 'decode' | 'jpeg' | 'photo' | 'mediaDecoders'>;
 export function validationGenerationDatabases(options: Pick<Options, 'run' | 'openStorage' | 'generations'>): RestoreDatabasePorts {
   // Original-only injected hosts cannot activate or invent a dedicated database.
   return options.generations?.(options.run) ?? { listGenerations: async () => [], open: (id, create) => {
@@ -16,9 +16,9 @@ export function validationGenerationDatabases(options: Pick<Options, 'run' | 'op
 }
 
 export function validationGenerationService(scope: Pick<Awaited<ReturnType<typeof openWorkspaceGeneration>>, 'fs' | 'factory' | 'check'>,
-  options: Pick<Options, 'store' | 'fileLimits' | 'filePolicy' | 'decode' | 'jpeg' | 'photo'>) {
+  options: Pick<Options, 'store' | 'fileLimits' | 'filePolicy' | 'decode' | 'jpeg' | 'photo' | 'mediaDecoders'>) {
   return { fs: scope.fs, factory: scope.factory, store: options.store,
-    ...validationProjectService(scope.fs, scope.factory, options.store, options.filePolicy ?? options.fileLimits, options.decode, scope.check, options.jpeg, options.photo) };
+    ...validationProjectService(scope.fs, scope.factory, options.store, options.filePolicy ?? options.fileLimits, options.decode, scope.check, options.jpeg, options.photo,options.mediaDecoders) };
 }
 
 /** Inspect first-only controls before an original DB opener can be reached. No Session is fabricated. */

@@ -19,6 +19,17 @@ const count = (s: SyntheticSession, id = f.shared) => {
   return source.captions.find(c => c.id === id)!.mediaCount;
 };
 describe('same-host known PNG media connection; not decoder adoption, raster, IME or persistence', () => {
+  it('mounts only one selected native player, preserving pause/source/URL and stale-event cleanup',()=>{
+    const document=new RecordedDocument(),dom=document.asDocument(),createElement=dom.createElement.bind(dom),players:RecordedNode[]=[],pause=vi.fn(),load=vi.fn();
+    vi.spyOn(dom,'createElement').mockImplementation(((tag:string)=>{const node=createElement(tag);if(tag==='video'||tag==='audio'){Object.assign(node,{pause,load,removeAttribute:(name:string)=>record(node).attributes.delete(name)});players.push(record(node));}return node;}) as Document['createElement']);
+    const create=vi.spyOn(URL,'createObjectURL').mockReturnValue('blob:owned-test'),revoke=vi.spyOn(URL,'revokeObjectURL').mockImplementation(()=>{});
+    let group:MediaPreviewGroup={scope:'approved',label:'記録',items:[{id:'a',resourceId:'one',kind:'video',label:'動画',description:'説明',image:{blob:new Blob(['verified video'],{type:'video/mp4'})}},{id:'b',resourceId:'two',kind:'audio',label:'音声',description:'',image:{blob:new Blob(['verified audio'],{type:'audio/mpeg'})}}]};
+    const viewer=createMediaViewer(dom),thumbnails=createMediaThumbnails(dom,()=>group,viewer),root=record(viewer.root);expect(players).toHaveLength(0);thumbnails.render();expect(players).toHaveLength(0);
+    viewer.open(()=>group,'a',document.createElement('button') as unknown as HTMLElement);expect(players).toHaveLength(1);expect((players[0] as unknown as HTMLVideoElement).autoplay).toBe(false);expect((players[0] as unknown as HTMLVideoElement).controls).toBe(true);
+    named(root,'次のメディア').fire('click');expect(players).toHaveLength(2);expect(pause).toHaveBeenCalledOnce();expect(revoke).toHaveBeenCalledOnce();
+    const previousText=nodes(root).map(n=>n.textContent).join();players[0]!.fire('error');expect(nodes(root).map(n=>n.textContent).join()).toBe(previousText);
+    group={...group,scope:'other'};viewer.render();expect(root.open).toBe(false);expect(pause).toHaveBeenCalledTimes(2);expect(revoke).toHaveBeenCalledTimes(2);viewer.dispose();thumbnails.dispose();create.mockRestore();revoke.mockRestore();
+  });
   it('counts attachments rather than shared bytes or Scene memberships, including the Project inclusion list', () => {
     const s = new SyntheticSession(); choose(s);
     expect(count(s)).toEqual({ kind: 'value', value: 0 });
@@ -88,7 +99,7 @@ describe('same-host known PNG media connection; not decoder adoption, raster, IM
     expect(nodes(named(r, 'キャプション')).some(n => n.textContent === 'メディア 2')).toBe(true);
     const windows = named(r, 'キャプションのウィンドウ'), gallery = named(windows, '添付メディア'), firstImage = nodes(gallery).find(n => n.tag === 'img')!;
     button(gallery, '画像を表示').fire('click'); expect(session.memory.selectedCaptionId).toBe(f.shared);
-    const viewer = named(r, '画像ビューア'); expect(viewer.open).toBe(true); named(viewer, '閉じる').fire('click'); expect(viewer.open).toBe(false);
+    const viewer = named(r, 'メディアビューア'); expect(viewer.open).toBe(true); named(viewer, '閉じる').fire('click'); expect(viewer.open).toBe(false);
     button(panel, '説明を編集').fire('click'); const input = named(panel, 'メディアの説明');
     input.fire('compositionstart'); input.value = '<script>説明</script>'; input.fire('input'); expect(session.pending).toBe('composition');
     expect(named(r, 'シーン').children.every(n => n.disabled)).toBe(true); button(r, 'モデル').fire('click'); button(r, 'キャプション').fire('click'); expect(named(panel, 'メディアの説明')).toBe(input);
@@ -116,12 +127,12 @@ describe('same-host known PNG media connection; not decoder adoption, raster, IM
     const document = new RecordedDocument(), s = new SyntheticSession(); choose(s);
     s.media.add(s.mediaContext(), fixtureMedia[0]!.record.id); s.media.add(s.mediaContext(), fixtureMedia[0]!.record.id);
     const w = createDevelopmentWorkspace(document.asDocument(), s), root = record(w.root), panel = named(root, 'メディア');
-    const viewer = named(root, '画像ビューア'), gallery = named(panel, '添付メディア'), open = button(gallery, '画像を表示');
+    const viewer = named(root, 'メディアビューア'), gallery = named(panel, '添付メディア'), open = button(gallery, '画像を表示');
     open.fire('click'); expect(nodes(root).filter(n => n.tag === 'dialog')).toHaveLength(1);
-    expect(nodes(viewer).some(n => n.textContent === '1 / 2')).toBe(true); expect(named(viewer, '前の画像').disabled).toBe(true);
+    expect(nodes(viewer).some(n => n.textContent === '1 / 2')).toBe(true); expect(named(viewer, '前のメディア').disabled).toBe(true);
     const event = (key: string) => ({ key, preventDefault: vi.fn(), stopPropagation: vi.fn() });
     viewer.fire('keydown', event('ArrowRight')); expect(nodes(viewer).some(n => n.textContent === '2 / 2')).toBe(true);
-    expect(named(viewer, '次の画像').disabled).toBe(true);
+    expect(named(viewer, '次のメディア').disabled).toBe(true);
     const id = captionAttachments(s.snapshot.mediaData, f.shared).ready[0]!.id;
     expect(s.media.begin(s.mediaContext(), id)).toBe(true); s.media.input('未適用の説明', false); w.render();
     const draft = s.media.draft; viewer.fire('keydown', event('ArrowLeft')); expect(s.media.draft).toBe(draft);
@@ -147,7 +158,7 @@ describe('same-host known PNG media connection; not decoder adoption, raster, IM
     button(root, '画像を再試行').fire('click'); nodes(root).find(n => n.tag === 'img')!.fire('load'); expect(button(root, '画像を再試行').hidden).toBe(true);
     group = { ...group!, items: [{ ...group!.items[0]!, resourceId: 'another-resource' }] }; viewer.render();
     expect(nodes(root).filter(n => n.tag === 'img')).toHaveLength(0); expect(nodes(root).some(n => n.textContent.includes('選び直してください'))).toBe(true);
-    expect(named(root, '次の画像').disabled).toBe(true); expect(revoke).toHaveBeenCalledTimes(create.mock.calls.length);
+    expect(named(root, '次のメディア').disabled).toBe(true); expect(revoke).toHaveBeenCalledTimes(create.mock.calls.length);
     group = null; viewer.render(); expect(root.open).toBe(false); viewer.dispose(); create.mockRestore(); revoke.mockRestore();
   });
   it('bounds lazy thumbnails and preserves explicit choice without rendering old-scope sources or interpreting labels', () => {

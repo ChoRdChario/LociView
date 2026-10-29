@@ -1895,6 +1895,11 @@ tests. Node/recorded DOM and HTTP remain separate from browser/device/offline an
 ordinary-entry adoption.
 
 **Fresh media-selection and save recovery (2026-10-16).** This connects the
+subsequently approved2026-10-29 [08](08-daily-authoring-workflow.md) PC media
+exception as well: only complete content/decode inspection can admit its new
+media; a routing hint, filename or MIME never does. The earlier HEIF negative
+hint remains compatibility guidance for unadmitted input and existing converters.
+The original2026-10-16 scope below connects the
 already approved [PROD-16](00-product-contract.md) local
 HEIC/HEIF compatibility flow and contextual capacity help; it adds no decoder,
 format admission, storage permission or migration recipe. A small bounded
@@ -3945,6 +3950,14 @@ review the exact operation, identity/reference/deletion/default-Scene and
 concurrency effects before implementing these missing authoring commands; this
 amendment alone does not ratify those unspecified policies or expand other non-goals.
 
+The subsequent PO instruction explicitly requests groups1–4 together. Their
+finite existing-record operations and acceptance are now specified and independently
+reviewed in[08](08-daily-authoring-workflow.md): independent Caption copies, shared
+model/media/tag resources, exact non-cascading Scene cleanup and explicit startup
+restoration/order choices, guarded text/color compensation and tags. These replace
+the first-slice Scene-UI exclusion for this implementation unit. Unrelated non-goals,
+new media/decoder and actual adoption/release gates remain unchanged.
+
 - cloud backend, accounts, roles, authentication, signatures or real-time presence;
 - automatic same-model detection, registration, Caption reraycast or surface remap;
 - per-Scene Asset revision, transform or alignment;
@@ -3954,6 +3967,6 @@ amendment alone does not ratify those unspecified policies or expand other non-g
   membership and explicit re-anchoring remain required;
 - Scene duplicate/delete/reorder UI in the first bounded candidate;
 - multiple-Scene review export or automatic privacy sanitization;
-- HEIC/video/audio expansion, animation, renderer/material research or new format support;
+- HEIC/video/audio expansion beyond the bounded PO-approved specification08 PC path, animation, renderer/material research or new format support;
 - automatic conflict winners or automatic duplicate alternatives;
 - license/version/release selection, `main`, Pages, Service Worker or deployment.

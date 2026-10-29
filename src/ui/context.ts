@@ -14,6 +14,7 @@ import type { ProjectResumeReference } from './resumeReference';
 export interface UiState {
   /** Advisory validation-route resume choice; never Project or durability authority. */
   projectSceneResume?: ProjectResumeReference | null;
+  localDisplayName?: string;
   activeSetId: string | null;
   /** 現在の文脈モデル（ピン・マテリアルの帰属先）。描画中とは限らない */
   activeModelAssetId: string | null;

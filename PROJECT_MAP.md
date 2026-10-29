@@ -57,6 +57,16 @@ The composition's model, Saved View, material and attachment panels reuse their 
 `projectMedia.ts` connects attachment management to the common `mediaPreview.ts` viewer.
 The composition reuses `captionWindowControls.ts` for Scene-local comparison
 windows and their galleries, sharing the workspace-level image viewer.
+`projectOrganization.ts` connects Scene/Caption copy and organization, guarded
+text/color undo and tags to finite planners in `captionAuthoring.ts` and
+`sceneOrganization.ts`. Startup recovery can explicitly restore a retained Scene
+without restoring its deleted children. Local name settings stay in browser UI
+state. [Specification08](docs/specs/08-daily-authoring-workflow.md) owns semantics;
+todo owns verification. Approved native media admission lives in
+`projectFiles/media.ts`, bounded ISO-BMFF/MP3 inspection in `mediaContainer.ts`,
+and HEIC/AVC/HEVC checks in their finite companion readers. Existing media
+records and Session/package fences are reused; player UI owns only local Blob
+URLs and playback lifetime. General Windows HEIC and device/release gates remain.
 
 `playwright.config.ts`, `scripts/run-e2e.mjs` and `tests/e2e/*.spec.ts` own the
 dedicated Chromium regression lane for the built validation entry. See the

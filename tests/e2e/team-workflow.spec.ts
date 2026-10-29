@@ -44,7 +44,7 @@ async function addImage(page: Page, name: string, buffer: Buffer) {
   await expect(page.getByText('メディアを追加しました。', { exact: true })).toBeVisible({ timeout: 90_000 });
 }
 async function checkImages(page: Page, count: number) {
-  const images = page.getByRole('region', { name: '画像の整理', exact: true }).locator('img');
+  const images = page.getByRole('region', { name: 'メディアの整理', exact: true }).locator('img');
   await expect(images).toHaveCount(count);
   for (const image of await images.all()) {
     await expect(image).toBeVisible();

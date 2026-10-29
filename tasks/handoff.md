@@ -11,6 +11,14 @@ work. The2026-10-29 correction puts daily Scene/Caption organization and editing
 ahead of compatibility expansion and maintenance; later/additional labels do not
 establish low priority. Follow todo's current workflow rather than the former
 Point-first plan. Settle genuine operation-policy decisions before implementation.
+PO subsequently requested all four groups together. The finite existing-record
+Scene/Caption/tag/local/alignment design in[08](../docs/specs/08-daily-authoring-workflow.md)
+passed independent review. Root implements and verifies the connected workflow;
+todo owns current checks and checkpoint. PO also approved bounded MP4 AVC/AAC,
+M4A/AAC, MP3 and native-browser single-still HEIC in08, without a new dependency.
+The connected bounded workflow and final checks are verified; todo owns exact
+evidence and the remaining general Caption undo/name and Point-replacement gaps.
+General Windows HEIC and device/adoption/release gates remain separate.
 Keep existing comfortable-UI guidance, original bytes/history, atomic Session
 commands, file/recovery/evidence fences and one writer. Read-only reviews may run
 in parallel. Continue ordinary approved work without small PO testing waits.

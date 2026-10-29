@@ -159,6 +159,8 @@
 .lv-media-viewer-content { flex: 1; min-height: 96px; display: flex; align-items: center; justify-content: center; overflow: auto; }
 .lv-media-viewer-content .lv-media-image { width: 100%; max-height: 100%; text-align: center; }
 .lv-media-viewer-content img { display: block; width: 100%; height: min(52dvh, 540px); object-fit: contain; }
+.lv-media-viewer-content video { display: block; width: 100%; max-height: min(52dvh, 540px); object-fit: contain; }
+.lv-media-viewer-content audio { display: block; width: 100%; min-width: 0; }
 .lv-media-viewer > p { max-height: 18dvh; overflow: auto; overflow-wrap: anywhere; }
 .lv-media-viewer p:empty { display: none; }
 .lv-media-viewer > footer { display: flex; flex: 0 0 auto; align-items: center; justify-content: center; gap: 16px; position: sticky; bottom: 0; background: #f2f0ee; }

@@ -1,4 +1,6 @@
 import { photoStructure, isAdditionalPhoto, type PhotoDecoder } from '../src/projectFiles/photo';
+import { timedMediaStructure } from '../src/projectFiles/mediaContainer';
+import { isHeic, type MediaDecoders } from '../src/projectFiles/media';
 import { photoBytes } from './helpers/photoFixtures';
 import { createValidationUiState } from '../src/harness/projectScene/browserUiState';
 import { projectResumeReference, type ProjectResumeReference } from '../src/ui/resumeReference';
@@ -51,6 +53,8 @@ import { browserMetadataDatabaseNames, browserOriginalDatabasePresent } from '..
 import { createValidationModeHost } from '../src/harness/projectScene/validationModeHost';
 import { productSources } from '../src/harness/projectScene/productSources';
 import { createProductWorkspace } from '../src/projectScene/productWorkspace';
+import { organizationSceneSource } from '../src/projectMetadata/sceneOrganization';
+import type { MetadataEdit } from '../src/projectMetadata/commands';
 import type { ValidationModelClosure } from '../src/projectScene/modelTypes';
 import { fieldValue, projectCaptions, projectMediaResources, projectMediaUncertain, projectCaptionInventory } from '../src/ui/projectScene/projectRead';
 import type { WorkspaceProvider } from '../src/ui/projectScene/projectWorkspacePorts';
@@ -146,8 +150,8 @@ const decodeJpeg: JpegDecoder = async (bytes, use) => {
   return { width: swap ? source.height : source.width, height: swap ? source.width : source.height, close() {} };
 };
 const decodePhoto: PhotoDecoder = async bytes => { const shape = photoStructure(bytes, budget); return { width: shape.width, height: shape.height, close() {} }; };
-const photoMime = (bytes: Uint8Array) => isAdditionalPhoto(bytes) ? photoStructure(bytes, budget).mime : isJpeg(bytes) ? 'image/jpeg' : 'image/png';
-const imageFor = (format: 'jpeg' | 'webp' | 'gif') => format === 'jpeg' ? jpegBytes('rgb-exif-6') : photoBytes(format === 'webp' ? 'webp-animated' : 'gif-animated');
+const photoMime = (bytes: Uint8Array) => isHeic(bytes)?'image/heic':isAdditionalPhoto(bytes) ? photoStructure(bytes, budget).mime : isJpeg(bytes) ? 'image/jpeg' : 'image/png';
+const imageFor = (format: 'jpeg' | 'webp' | 'gif'|'heic') => format==='heic'?new Uint8Array(readFileSync(new URL('./fixtures/daily-media/owned-still.heic',import.meta.url))):format === 'jpeg' ? jpegBytes('rgb-exif-6') : photoBytes(format === 'webp' ? 'webp-animated' : 'gif-animated');
 /** Negative hint fixture only, with no compressed HEIF payload or decoder claim. */
 function syntheticHeif() { const bytes = new Uint8Array(24); new DataView(bytes.buffer).setUint32(0,24); bytes.set(new TextEncoder().encode('ftypheic'),4); return bytes; }
 const caseDisposals: (() => void | Promise<void>)[] = [];
@@ -661,9 +665,12 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     await expect(prepareValidationProject({run:newId(),title:'新規画像',models:[{label:'model',bytes:glb()}],media:[{label:'photo.jpg',bytes:heif}]},budget,decode,decodeJpeg)).rejects.toThrow('端末で別のJPEG');
     expect(await r.fs.list('')).toEqual(before); expect(heif).toEqual(syntheticHeif());
   });
-  it.each(['jpeg', 'webp', 'gif'] as const)('photo companion %s creates a byte-classified project with misleading names and cold exact bytes', async format => {
-    const r = firstWorkspaceRecipient(decodeJpeg), factories = new Map<string, MetadataStorageFactory>(); let host: Awaited<ReturnType<typeof openValidationHost>> | undefined;
-    const options = { base: r.fs, coordinator: ProjectMutationCoordinator.browser(r.locks), store: r.store, fileLimits: budget, decode, jpeg: decodeJpeg, photo: decodePhoto, packageLocks: r.locks };
+  it.each(['jpeg', 'webp', 'gif','heic'] as const)('photo companion %s creates a byte-classified project with misleading names and cold exact bytes', async format => {
+    // HEIC decoder dimensions are an injected service port, not native browser evidence.
+    let finishHeic:((bitmap:{width:number;height:number;close():void})=>void)|undefined;
+    const mediaDecoders:MediaDecoders|undefined=format==='heic'?{heic:async()=>{if(!finishHeic)return new Promise(resolve=>{finishHeic=resolve;});return{width:96,height:64,close(){}};}}:undefined;
+    const r = firstWorkspaceRecipient(decodeJpeg,undefined,mediaDecoders), factories = new Map<string, MetadataStorageFactory>(); let host: Awaited<ReturnType<typeof openValidationHost>> | undefined;
+    const options = { base: r.fs, coordinator: ProjectMutationCoordinator.browser(r.locks), store: r.store, fileLimits: budget, decode, jpeg: decodeJpeg, photo: decodePhoto, mediaDecoders,packageLocks: r.locks };
     const openStorage = async (run: string, create: boolean) => { if (!factories.has(run)) { if (!create) throw Error('missing'); factories.set(run, storageFactory()); } return { factory: factories.get(run)!, dispose: async () => {} }; };
     let display: Parameters<ReturnType<ViewportFactory>['update']>[0] | undefined;
     const factory: ViewportFactory = () => ({ update(next) { display = next; }, setActive() {}, camera() {}, retry() {}, dispose() {},
@@ -674,6 +681,12 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const create = all(root).find(n => n.tag === 'button' && n.textContent === 'プロジェクトを作成')!;
     await vi.waitFor(() => expect(all(root).find(n => n.tag === 'button' && n.textContent === 'ファイルを開く')!.disabled).toBe(false));
     const model = glb(j => { j.images[0].mimeType = 'image/jpeg'; }, true, jpegBytes('rgb-progressive')), photo = imageFor(format);
+    if(format==='heic'){
+      Object.assign(input,{files:[new File([model.slice().buffer],'model.data'),new File([photo.slice().buffer],'photo.bin')]});input.parent!.parent!.fire('submit',{preventDefault(){}});
+      await vi.waitFor(()=>expect(finishHeic).toBeTypeOf('function'));const cancel=all(root).find(n=>n.tag==='button'&&n.textContent==='選択を取り消す')!;expect(cancel.disabled).toBe(false);cancel.fire('click');
+      await vi.waitFor(()=>expect(input.disabled).toBe(false));expect(create.parent!.hidden).toBe(true);expect(host).toBeUndefined();expect(factories.size).toBe(0);expect(await r.fs.list('')).toEqual([]);
+      const close=vi.fn();finishHeic!({width:96,height:64,close});await vi.waitFor(()=>expect(close).toHaveBeenCalledOnce());
+    }
     if (format === 'jpeg') {
       Object.assign(input,{ files:[new File([model.slice().buffer],'model.data'),new File([syntheticHeif().buffer],'photo.jpg',{type:'image/jpeg'})] });
       input.parent!.parent!.fire('submit',{preventDefault(){}});
@@ -2429,11 +2442,11 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     if(copied.provider?.kind!=='scene-provider')throw Error('provider');expect(meaning(copied.provider.inspection.candidates.unambiguousRecords)).toEqual(meaning(ready.provider.inspection.candidates.unambiguousRecords));
     expect((await copy.reopen().session.read()).source!.token).toBe(copied.source!.token);expect((await a.reopen().session.read()).source!.token).toBe(ready.source!.token);
   }
-  function firstWorkspaceRecipient(jpeg?: JpegDecoder, photo?: PhotoDecoder) {
+  function firstWorkspaceRecipient(jpeg?: JpegDecoder, photo?: PhotoDecoder, mediaDecoders?:MediaDecoders) {
     const fs = new TestFS(), factory = storageFactory(), locks = lockManager();
     const store = new OriginBlobStore(fs, { maxBlobBytes: budget.maxFileBytes, maxChunkBytes: 1_000_000, maxChunks: 10000, metadata }, locks);
     const reopen = () => {
-      const { session } = validationProjectService(fs, factory, store, budget, decode, undefined, jpeg, photo);
+      const { session } = validationProjectService(fs, factory, store, budget, decode, undefined, jpeg, photo,mediaDecoders);
       return { session, receiver: new WorkspaceReceiver(fs, fs, session, metadata, locks) };
     };
     return { fs, factory, store, locks, reopen, ...reopen() };
@@ -2499,6 +2512,13 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       const invalid = createValidationUiState(() => ({ getItem: () => raw, setItem: writes })); expect(invalid.lastProject.read()).toBeNull();
     }
     const unavailable = createValidationUiState(() => { throw Error('denied'); }); expect(unavailable.lastProject.read()).toBeNull(); expect(() => unavailable.lastProject.remember(reference)).not.toThrow();
+  });
+  it('local display-name settings remain advisory, survive reopening and report unavailable persistence', () => {
+    const rows = new Map<string, string>(), storage = () => ({ getItem: (key: string) => rows.get(key) ?? null, setItem: (key: string, value: string) => { rows.set(key, value); } });
+    const settings = createValidationUiState(storage); expect(settings.localSettings.save('  現地担当  ')).toBe(true); expect(settings.ui.localDisplayName).toBe('現地担当');
+    expect(createValidationUiState(storage).localSettings.read()).toBe('現地担当'); expect(settings.ui.projectSceneResume).toBeNull();
+    expect(settings.localSettings.save('bad\nname')).toBe(false); expect(settings.localSettings.save('a'.repeat(257))).toBe(false);
+    const denied = createValidationUiState(() => { throw Error('unavailable'); }); expect(denied.localSettings.save('保持する入力')).toBe(false); expect(denied.localSettings.read()).toBe('');
   });
   it('named resume shows the actual last Project and protects edits/file selection before switching, saving and cold reopen', async () => {
     const f = resumeWorkspaceFixture(), a = await f.seed('調査A'), b = await f.seed('調査B'); f.reference({ run: a.run, mode: 'edit' });
@@ -4091,8 +4111,8 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
   }
   async function productWorkspaceFixture(includeInitial = false, duplicateModels = false, withTag = false, profile: 'map1' | 'map2' = 'map1',
     initial?: NonNullable<Parameters<typeof openValidationHost>[0]['initial']>,
-    setup: { jpeg?: JpegDecoder; photo?: PhotoDecoder; storageEstimate?: ValidationWorkspacePorts['storageEstimate']; restoreGenerations?: boolean; initialWorkspace?: boolean; scenes?: readonly { id: string; name: string; orderKey: string }[] } = {}) {
-    const r = firstWorkspaceRecipient(setup.jpeg, setup.photo), run = initial ? (initial.source.proof.identity.projectId as string).slice(4) : newId(), captionId = `cap_${newId()}`;
+    setup: { jpeg?: JpegDecoder; photo?: PhotoDecoder; mediaDecoders?:MediaDecoders; storageEstimate?: ValidationWorkspacePorts['storageEstimate']; restoreGenerations?: boolean; initialWorkspace?: boolean; scenes?: readonly { id: string; name: string; orderKey: string }[] } = {}) {
+    const r = firstWorkspaceRecipient(setup.jpeg, setup.photo,setup.mediaDecoders), run = initial ? (initial.source.proof.identity.projectId as string).slice(4) : newId(), captionId = `cap_${newId()}`;
     const generationFactories = new Map<string, MetadataStorageFactory>(), databases: RestoreDatabasePorts = {
       listGenerations: async () => [...generationFactories.keys()], open: async (id, create) => {
         if (id === null) return { factory: r.factory, dispose: async () => {} };
@@ -4101,7 +4121,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       },
     };
     const options = { run, base: r.fs, coordinator: ProjectMutationCoordinator.browser(r.locks), store: r.store,
-      fileLimits: budget, decode, jpeg: setup.jpeg, photo: setup.photo, generations: setup.restoreGenerations ? () => databases : undefined, packageLocks: r.locks, openStorage: async () => ({ factory: r.factory, dispose: async () => {} }) };
+      fileLimits: budget, decode, jpeg: setup.jpeg, photo: setup.photo, mediaDecoders:setup.mediaDecoders, generations: setup.restoreGenerations ? () => databases : undefined, packageLocks: r.locks, openStorage: async () => ({ factory: r.factory, dispose: async () => {} }) };
     // Use an admitted conversion or one fresh GLB, without unrelated receive/replacement histories.
     const prepared = initial ? undefined : structuredClone(await prepareValidationProject({ run, title: '統合画面の検証', models: [{ label: 'モデル', bytes: glb() }],
       media: includeInitial ? [{ label: '受信画像', bytes: png }] : [] }, budget, decode));
@@ -4294,11 +4314,11 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       expect(host.authority.read().resources.captions[unplaced.id]!.anchor).toMatchObject({ kind: 'value', value: { kind: 'asset' } });
       const mediaInput = named('メディアを追加', editor); mediaInput.fire('click'); Object.assign(mediaInput, { files: [new File([photo.slice().buffer], '追加写真.data', { type: 'text/plain' })] });
       await edited(() => mediaInput.fire('change'));
-      const media = named('画像の整理', editor), edits = named('添付の編集', media); button('説明を編集', edits).fire('click');
+      const media = named('メディアの整理', editor), edits = named('添付の編集', media); button('説明を編集', edits).fire('click');
       const alt = named('メディアの説明', media); alt.value = '向きを保持した写真'; alt.fire('input'); await edited(() => button('説明を適用', media).fire('click'));
       expect(captionAttachments(host.authority.read().mediaData, unplaced.id).ready[0]!.altText).toEqual({ kind: 'value', value: '向きを保持した写真' });
       const originalUrl = URL.createObjectURL, imageTypes: string[] = [], urls = vi.spyOn(URL, 'createObjectURL').mockImplementation(blob => { if (blob instanceof Blob) imageTypes.push(blob.type); return originalUrl(blob); });
-      try { button('画像を表示', named('添付画像', media)).fire('click'); await vi.waitFor(() => expect(imageTypes).toContain(photoMime(photo))); named('閉じる', named('画像ビューア', editor)).fire('click'); } finally { urls.mockRestore(); }
+      try { button('画像を表示', named('添付メディア', media)).fire('click'); await vi.waitFor(() => expect(imageTypes).toContain(photoMime(photo))); named('閉じる', named('メディアビューア', editor)).fire('click'); } finally { urls.mockRestore(); }
       const output = named('ファイル'), label = named('名前（任意）', output); label.value = '写真を含む保存'; label.fire('input'); button('ファイルに保存', output).fire('click');
       await vi.waitFor(() => expect(h!.downloads).toHaveBeenCalledOnce(), { timeout: 10000 }); const source = host.read().source!, job = host.workspaceOutput.jobs.find(j => j.purpose === 'backup')!;
       const backupFile = await host.workspaceOutput.download(job.id), backup = await BackupArchive.inspect(backupFile, metadata); expect(job.label).toBe('写真を含む保存'); expect(backup.source.originalChanges()).toEqual(source.originalChanges());
@@ -4879,7 +4899,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect(projectCaptions(p(), sceneId)).toHaveLength(0); expect(captionAttachments(host.authority.read().mediaData, captionId).ready).toHaveLength(0);
     await peer.receiver.receive((await peer.session.read()).source!.token, await returnFile());
     const picker = named('キャプションの追加・除外', editor), choose = named('キャプション', picker); choose.value = captionId; choose.fire('change'); await edited(() => button('このシーンに追加', picker).fire('click'));
-    selectCaption(captionId); const media = named('画像の整理', editor), stored = named('登録済みメディア', media); stored.open = true; stored.fire('toggle');
+    selectCaption(captionId); const media = named('メディアの整理', editor), stored = named('登録済みメディア', media); stored.open = true; stored.fire('toggle');
     button('受信画像', named('メディアを選択', media)).fire('click'); await edited(() => button('選択したメディアを添付', media).fire('click'));
     const attachment = captionAttachments(host.authority.read().mediaData, captionId).ready[0]!;
     await peer.session.edit((await peer.session.read()).source!.token, { kind: 'include', sceneId, resourceKind: 'caption', resourceId: captionId, membershipId: `scm_${newId()}`, orderKey: 'B', eventId: `evt_${newId()}` }); await receive();
@@ -5112,7 +5132,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect(all(a).some(n => n.textContent === '未適用の本文')).toBe(false);
     button('取り消す', detail).fire('click'); button('変更を取り消す', detail).fire('click'); expect(body.value).toBe('');
     await vi.waitFor(() => expect(all(a).filter(n => n.tag === 'img')).toHaveLength(1)); const image = all(a).find(n => n.tag === 'img')!;
-    button('モデル', editor).fire('click'); button('画像を表示', a).fire('click'); const viewer = named('画像ビューア', editor);
+    button('モデル', editor).fire('click'); button('画像を表示', a).fire('click'); const viewer = named('メディアビューア', editor);
     expect(viewer.open).toBe(true); expect(named('メディア', editor).contains(viewer)).toBe(false);
     expect(all(editor).filter(n => n.tag === 'dialog')).toHaveLength(1); expect(all(viewer).some(n => n.textContent.includes('最初の記録'))).toBe(true);
     named('閉じる', viewer).fire('click'); button('キャプション', editor).fire('click');
@@ -5372,6 +5392,115 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const views = ports.viewReview(sceneId); expect(views).toHaveLength(1); expect(views[0]!.choices.map(c => c.label).sort()).toEqual(['視点 inherit', '視点 lit']);
     expect(views[0]!.target).toEqual({ kind: 'view', viewId, field: 'name' }); expect(h.host.read().source!.token).toBe(seed.token); await h.ui.dispose();
   });
+  it('daily authoring organizes independent records and Scenes, guarded undo, tags, backup, Workspace and cold reopen', async () => {
+    const h = await productWorkspaceFixture(true, false, true), { host, editor, named, button, all, edited } = h;
+    const p = host.read().provider!; if (p.kind !== 'scene-provider') throw Error('provider');
+    const sceneId = (p.state.defaultSceneId as { value: string }).value, original = Object.keys(p.resources.captions)[0]!;
+    expect(p.state.scenes[sceneId]!.name).toEqual({ kind: 'value', value: 'シーン 1' });
+    all(editor).find(n => n.tag === 'button' && n.className === 'lv-project-marker' && n.textContent === '最初の記録')!.fire('click');
+    expect(button('前の記録', editor).disabled).toBe(true); expect(button('次の記録', editor).disabled).toBe(true);
+    const old = host.read().source!.originalChanges();
+    await edited(() => button('記録を複製', editor).fire('click'));
+    const copy = Object.keys(host.authority.read().resources.captions).find(id => id !== original)!;
+    expect(copy).toBeTruthy(); expect(captionAttachments(host.authority.read().mediaData, copy).ready).toHaveLength(1);
+    const body = named('本文', editor); body.value = 'コピーだけを変更'; body.fire('input');
+    expect(button('前の記録', editor).disabled).toBe(true); await edited(() => button('変更を適用', editor).fire('click'));
+    await edited(() => button('記録の変更を元に戻す', editor).fire('click')); expect(named('本文', editor).value).toBe('');
+    await edited(() => button('記録の変更をやり直す', editor).fire('click')); expect(named('本文', editor).value).toBe('コピーだけを変更');
+    expect(host.authority.read().resources.captions[original]!.body).toEqual({ kind: 'value', value: '' });
+    const tag = named('タグ名', editor); tag.value = '対応済み'; tag.fire('input');
+    await edited(() => button('タグを追加', editor).fire('click'));
+    const tagRow = all(named('タグの管理', editor)).find(n => n.tag === 'div' && n.children.some(c => c.tag === 'span' && c.textContent === '対応済み'))!;
+    await edited(() => button('この記録にタグを付ける', tagRow).fire('click'));
+    await edited(() => button('この記録からタグを外す', all(named('タグの管理', editor)).find(n => n.tag === 'div' && n.children.some(c => c.tag === 'span' && c.textContent === '対応済み'))!).fire('click'));
+    button('シーンを複製', editor).fire('click');
+    const sceneName = named('複製するシーン名', editor); sceneName.value = '調査のコピー'; sceneName.fire('input');
+    await edited(() => button('複製を作成', editor).fire('click'));
+    const nextScene = Object.values(host.authority.read().state.scenes).find(s => s.name.kind === 'value' && s.name.value === '調査のコピー')!.id;
+    expect(Object.keys(host.authority.read().resources.captions)).toHaveLength(4);
+    await edited(() => button('シーンを上へ', editor).fire('click'));
+    button('シーンを削除', editor).fire('click'); await edited(() => button('このシーンを削除する', editor).fire('click'));
+    expect(host.authority.read().state.scenes[nextScene]!.lifecycle).toMatchObject({ kind: 'value', value: { state: 'deleted' } });
+    expect(Object.keys(host.authority.read().resources.captions)).toHaveLength(4); expect(host.authority.read().state.defaultSceneId).toEqual({ kind: 'value', value: sceneId });
+    const token = host.read().source!.token, backupId = await host.workspaceOutput.generateBackup(token), backup = await host.workspaceOutput.download(backupId);
+    const inspected = await BackupArchive.inspect(backup, metadata); expect(inspected.source.originalChanges()).toEqual(host.read().source!.originalChanges());
+    const workspaceId = await host.workspaceOutput.generate(token), file = await host.workspaceOutput.download(workspaceId), peer = firstWorkspaceRecipient();
+    await peer.receiver.importWorkspace(file); const peerRead = await peer.session.read();
+    expect(peerRead.source!.read().history.changes).toEqual(host.read().source!.read().history.changes);
+    expect(host.read().source!.originalChanges().slice(0, old.length)).toEqual(old);
+    const records = host.read().source!.read(); await h.ui.dispose();
+    const cold = await openValidationHost(h.f.options); expect(cold.read().state).toBe('ready'); expect(cold.read().source!.read()).toEqual(records);
+    expect(cold.authority.read().resources.captions[copy]!.body).toEqual({ kind: 'value', value: 'コピーだけを変更' }); await cold.dispose();
+  });
+  it('approved media retains original bytes through attachment, Review, Workspace, Clean, backup restore and cold reopen',async()=>{
+    // Injected first-decode port is service/fault evidence; actual A/V playback is the Chromium lane.
+    const mediaDecoders:MediaDecoders={timed:async bytes=>{const shape=timedMediaStructure(bytes,budget);return{duration:shape.duration,...(shape.mediaKind==='video'?{width:96,height:64}:{})};},heic:async()=>({width:96,height:64,close(){}})};
+    const h=await productWorkspaceFixture(true,false,false,'map2',undefined,{mediaDecoders,restoreGenerations:true}),host=h.host,captionId=Object.keys(host.authority.read().resources.captions)[0]!,sceneId=h.display()!.sceneId;
+    const files=['owned-video.mp4','owned-audio.m4a','owned-audio.mp3','owned-still.heic'].map(name=>({name,bytes:new Uint8Array(readFileSync(new URL(`./fixtures/daily-media/${name}`,import.meta.url)))}));
+    for(const[fileIndex,file]of files.entries())await host.authority.addMediaFile!(host.read().source!.token,{sceneId,captionId,attachmentId:`att_${newId()}`,eventId:`evt_${newId()}`,orderKey:`B${fileIndex}`,file:{name:file.name,size:file.bytes.length,arrayBuffer:async()=>file.bytes.slice().buffer}});
+    const source=host.read().source!,original=source.originalChanges(),token=source.token;
+    const workspace=await host.workspaceOutput.download(await host.workspaceOutput.generate(token)),backup=await host.workspaceOutput.download(await host.workspaceOutput.generateBackup(token)),reviewFile=await host.workspaceOutput.download(await host.workspaceOutput.generateReview(token,{sceneId})),clean=await host.workspaceOutput.download(await host.workspaceOutput.generateClean(token));
+    const review=await prepareReviewView(reviewFile,budget,decode,undefined,undefined,mediaDecoders);expect(review.images.size).toBe(5);expect(review.attachments).toHaveLength(5);
+    const archives=[(await WorkspaceArchive.inspect(workspace,metadata)).archive,(await BackupArchive.inspect(backup,metadata)).archive,review.inspection.archive,(await CleanArchive.inspect(clean,metadata)).archive];
+    for(const file of files){const hash=await digest(file.bytes);for(const archive of archives)expect(await archive.entryBytes(`blobs/sha256/${hash}`,file.bytes.length)).toEqual(file.bytes);}
+    const peer=firstWorkspaceRecipient(undefined,undefined,mediaDecoders);await peer.receiver.importWorkspace(workspace);expect((await peer.session.read()).source!.originalChanges()).toEqual(original);
+    // A browser without an approved decoder must reject the incoming package before publication.
+    const unsupported=firstWorkspaceRecipient();await expect(unsupported.receiver.importWorkspace(workspace)).rejects.toThrow();expect((await unsupported.session.read()).state).toBe('empty');
+    await h.ui.dispose();const cold=await openValidationHost(h.f.options);expect(cold.read().source!.originalChanges()).toEqual(original);
+    await cold.dispatch(cold.read().source!.token,{kind:'editCaption',captionId,edits:{body:'復元前'}});await cold.backupRestore.prepare(backup);
+    let checked=false;await cold.backupRestore.confirm(async(next,content)=>{for(const record of next.mediaChoices!){const expected=files.find(f=>f.name===record.label);expect(await content.image(record as unknown as JsonObject)).toEqual(expected?.bytes??png);}checked=true;});expect(checked).toBe(true);cold.backupRestore.displayReady(cold.read().source!.token);expect(cold.read().source!.originalChanges()).toEqual(original);
+    await cold.dispose();const resumed=await openValidationHost(h.f.options);expect(resumed.read().source!.token).toBe(token);await resumed.dispose();
+  },30000);
+  it('daily authoring cancellation remains available after losing edit access without writing records', async () => {
+    const h = await productWorkspaceFixture(true), source = h.host.read().source!, access = vi.spyOn(h.host.authority, 'readOnly', 'get');
+    h.button('シーンを複製', h.editor).fire('click'); access.mockReturnValue(true); h.refresh();
+    const cancel = h.button('操作を取り消す', h.editor); expect(cancel.disabled).toBe(false); cancel.fire('click');
+    access.mockReturnValue(false); h.refresh(); const name = h.named('タグ名', h.editor); name.value = '保持する入力'; name.fire('input');
+    access.mockReturnValue(true); h.refresh(); const cancelTag = h.button('タグの入力を取り消す', h.editor); expect(cancelTag.disabled).toBe(false); cancelTag.fire('click');
+    expect(h.host.read().source!.token).toBe(source.token); expect(h.dispatch).not.toHaveBeenCalled(); access.mockRestore(); await h.ui.dispose();
+  });
+  it('daily authoring warm receive can explicitly recover all-deleted Scenes without reactivating their deleted children', async () => {
+    const second = `scn_${newId()}`, h = await productWorkspaceFixture(true, false, false, 'map1', undefined, { scenes: [{ id: second, name: '別のシーン', orderKey: 'Z' }] });
+    const source = h.host.read().source!, p = h.host.read().provider!; if (p.kind !== 'scene-provider' || p.state.defaultSceneId.kind !== 'value') throw Error('provider');
+    const first = p.state.defaultSceneId.value;
+    const read = async (s: ProjectMetadataSource) => { const p = await readProjectScene(s.read(), metadata, h.host.content.verifier(false)); if (p.kind !== 'scene-provider') throw Error('provider'); return p; };
+    const prepare = async (s: ProjectMetadataSource, command: MetadataEdit) => s.prepareEdit(s.token, command, await read(s), newId());
+    const deletion = async (s: ProjectMetadataSource, sceneId: string) => { const rows = organizationSceneSource(await read(s), sceneId, metadata);
+      return prepare(s, { kind: 'deleteSceneContents', sceneId, observedIds: [...rows.assets, ...rows.captions, ...rows.views, ...rows.materials].map(r => r.id as string), eventId: `evt_${newId()}` }); };
+    const left = await deletion(await prepare(source, { kind: 'setDefaultScene', sceneId: second }), first), right = await deletion(source, second);
+    const merged = left.appendOriginal(right.originalChanges()), provider = await read(merged), publication = newId();
+    const capture = await WorkspaceSourceCapture.prepare({ read: async () => ({ state: 'ready', source: merged, provider, publication }) }, merged.token, h.f.store, metadata);
+    const chunks: Uint8Array[] = []; await writeWorkspaceArchive(capture, h.f.store, new WritableStream({ write: bytes => { chunks.push(bytes.slice()); } }), { packageId: `pkg_${newId()}`, createdByVersion: 'validation' });
+    const input = h.named('更新ファイルを選択'); Object.assign(input, { files: [new Blob(chunks.map(b => b.slice().buffer))] }); input.fire('change');
+    await h.edited(() => h.button('更新を受け取る').parent!.fire('submit', { preventDefault() {} }));
+    // The recorder does not clear its injected FileList when native input.value is cleared.
+    Object.assign(input, { files: [] }); input.fire('change');
+    expect(h.host.read().state).toBe('ready'); expect(Object.values(h.host.authority.read().state.scenes).every(s => s.lifecycle.kind === 'value' && s.lifecycle.value.state === 'deleted')).toBe(true);
+    const restore = h.named('復旧するシーン'); expect(restore).toBeDefined(); restore.value = first; restore.fire('change');
+    const beforeRestoreChanges = h.host.read().source!.originalChanges().length;
+    h.f.fs.reject = path => path.endsWith('/published.json'); h.button('このシーンを復旧して開く').fire('click');
+    await vi.waitFor(() => expect(h.host.authority.status!().kind).toBe('failed'));
+    const retry = h.button('更新を再試行'); expect(retry.hidden).toBe(false); expect(retry.disabled).toBe(false);
+    h.f.fs.reject = () => false; retry.fire('click');
+    await vi.waitFor(() => expect(h.host.authority.read().state.defaultSceneId).toEqual({ kind: 'value', value: first }));
+    await vi.waitFor(() => expect(h.all(h.root).filter(n => n.className === 'lv-project-workspace')).toHaveLength(1));
+    const current = h.host.read().provider!; if (current.kind !== 'scene-provider') throw Error('provider');
+    expect(current.state.assetMemberships).toEqual(provider.state.assetMemberships); expect(current.state.captionMemberships).toEqual(provider.state.captionMemberships);
+    expect(current.resources.captions).toEqual(provider.resources.captions);
+    expect(h.host.read().source!.originalChanges()).toHaveLength(beforeRestoreChanges + 1);
+    const token = h.host.read().source!.token; await h.ui.dispose(); const cold = await openValidationHost(h.f.options); expect(cold.read().source!.token).toBe(token); expect(cold.read().state).toBe('ready'); await cold.dispose();
+  });
+  it('daily authoring undo never crosses a change outside this editor on the same Caption', async () => {
+    const h = await productWorkspaceFixture(true), { host, editor, named, button, all, edited } = h;
+    all(editor).find(n => n.tag === 'button' && n.className === 'lv-project-marker' && n.textContent === '最初の記録')!.fire('click');
+    const captionId = Object.keys(host.authority.read().resources.captions)[0]!;
+    const title = named('タイトル', editor); title.value = 'ローカル1'; title.fire('input'); await edited(() => button('変更を適用', editor).fire('click'));
+    await host.dispatch(host.read().source!.token, { kind: 'editCaption', captionId, edits: { body: '受信した本文' } }); h.refresh();
+    const next = named('タイトル', editor); next.value = 'ローカル2'; next.fire('input'); await edited(() => button('変更を適用', editor).fire('click'));
+    await edited(() => button('記録の変更を元に戻す', editor).fire('click'));
+    expect(host.authority.read().resources.captions[captionId]!.body).toEqual({ kind: 'value', value: '受信した本文' });
+    expect(button('記録の変更を元に戻す', editor).disabled).toBe(true); await h.ui.dispose();
+  });
   it('connects the product composition through typed edits, pin/media, named backup, two file rounds and cold reopen (injected viewport)', async () => {
     const { f, host, ui, editor, root, all, named, button, edited, failed, status, downloads, legacy, dispatch, pick, moveCamera, display } = await productWorkspaceFixture();
     const initialCaptionIds = new Set(Object.keys(host.authority.read().resources.captions));
@@ -5603,7 +5732,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     named('検索', editor).fire('input'); expect(h.all(area).find(n => n.tag === 'select')!.value).toBe(option.value);
     await edited(() => button('競合を解消', area).fire('click'));
     expect(host.authority.read().resources.captions[captionId]!.body).toEqual({ kind: 'value', value: '相手からの内容' });
-    const media = named('メディア', editor), gallery = named('添付画像', media), viewer = named('画像ビューア', editor);
+    const media = named('メディア', editor), gallery = named('添付メディア', media), viewer = named('メディアビューア', editor);
     button('画像を表示', gallery).fire('click'); expect(viewer.open).toBe(true);
     const images = () => h.all(viewer).filter(n => n.tag === 'img'); await vi.waitFor(() => expect(images(), h.all(viewer).map(n => n.textContent).join(' ')).toHaveLength(1));
     const old = images()[0]!; old.fire('error'); expect(h.all(viewer).some(n => n.textContent.includes('画像を表示できません'))).toBe(true);
@@ -5623,7 +5752,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     button('ピンを追加', editor).fire('click'); const canvas = named('3Dモデルの表示', editor), pointer = { pointerId: 8, isPrimary: true, button: 0, clientX: 70, clientY: 80 };
     canvas.fire('pointerdown', pointer); canvas.fire('pointerup', pointer); await Promise.resolve(); await edited(() => button('位置を確定', editor).fire('click'));
     const captionId = Object.keys(host.authority.read().resources.captions).find(id => id !== firstCaption)!;
-    const media = named('画像の整理', editor), stored = named('登録済みメディア', media); stored.open = true; stored.fire('toggle');
+    const media = named('メディアの整理', editor), stored = named('登録済みメディア', media); stored.open = true; stored.fire('toggle');
     for (let i = 0; i < 2; i++) { button('受信画像', named('メディアを選択', media)).fire('click'); await edited(() => button('選択したメディアを添付', media).fire('click')); }
     const rows = () => captionAttachments(host.authority.read().mediaData, captionId).ready;
     const ids = rows().map(r => r.id); expect(new Set(ids).size).toBe(2); expect(rows().every(r => r.mediaResourceId.kind === 'value' && r.mediaResourceId.value === mediaRecord.id)).toBe(true);
@@ -5641,8 +5770,8 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     await edited(() => button('更新を再試行', editor).fire('click')); expect(host.read().source!.originalChanges()).toHaveLength(before + 1);
     expect(await Promise.all(paths.map(p => h.f.fs.readBytes(p)))).toEqual(originals); expect(rows()[0]!.altText).toEqual({ kind: 'value', value: '位置を比較する画像' });
     await edited(() => button('後へ', editArea).fire('click')); expect(rows().map(r => r.id)).toEqual([ids[1], ids[0]]);
-    button('説明を編集', editArea).fire('click'); input.value = '未適用の説明'; input.fire('input'); button('画像を表示', named('添付画像', media)).fire('click');
-    const viewer = named('画像ビューア', editor); expect(all(editor).filter(n => n.tag === 'dialog')).toHaveLength(1); expect(viewer.open).toBe(true);
+    button('説明を編集', editArea).fire('click'); input.value = '未適用の説明'; input.fire('input'); button('画像を表示', named('添付メディア', media)).fire('click');
+    const viewer = named('メディアビューア', editor); expect(all(editor).filter(n => n.tag === 'dialog')).toHaveLength(1); expect(viewer.open).toBe(true);
     viewer.fire('keydown', { key: 'ArrowRight', preventDefault() {}, stopPropagation() {} }); expect(all(viewer).some(n => n.textContent === '2 / 2')).toBe(true);
     expect(input.value).toBe('未適用の説明'); named('閉じる', viewer).fire('click');
     button('取り消す', named('説明の編集', media)).fire('click');
@@ -5684,13 +5813,13 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
   it('reloads the exact PNG from the current image service after product view/edit handoff', async () => {
     const h = await productWorkspaceFixture(true), { editor, named, button, all } = h;
     named('キャプション一覧', editor).children[0]!.children[0]!.fire('click');
-    const gallery = named('添付画像', editor); await vi.waitFor(() => expect(all(gallery).filter(n => n.tag === 'img')).toHaveLength(1)); expect(h.imageReads[0]).toHaveBeenCalledTimes(1);
-    const card = named('最初の記録', named('キャプションのウィンドウ', editor)), viewer = named('画像ビューア', editor);
+    const gallery = named('添付メディア', editor); await vi.waitFor(() => expect(all(gallery).filter(n => n.tag === 'img')).toHaveLength(1)); expect(h.imageReads[0]).toHaveBeenCalledTimes(1);
+    const card = named('最初の記録', named('キャプションのウィンドウ', editor)), viewer = named('メディアビューア', editor);
     button('画像を表示', card).fire('click'); expect(viewer.open).toBe(true);
     const initial = h.host, token = initial.read().source!.token; button('閲覧に切り替える').fire('click');
     await vi.waitFor(() => expect(button('編集を開始する')?.disabled).toBe(false), { timeout: 10000 });
     await vi.waitFor(() => expect(h.imageReads[1]).toHaveBeenCalledTimes(1)); expect(h.liveHost()).not.toBe(initial); expect(h.liveHost().read().source!.token).toBe(token);
-    expect(all(gallery).filter(n => n.tag === 'img')).toHaveLength(1); expect(button('説明を編集', named('画像の整理', editor)).disabled).toBe(true);
+    expect(all(gallery).filter(n => n.tag === 'img')).toHaveLength(1); expect(button('説明を編集', named('メディアの整理', editor)).disabled).toBe(true);
     expect(button('プロジェクトから削除', named('キャプションの削除', editor)).disabled).toBe(true); expect(named('変更先モデル', editor).disabled).toBe(true);
     expect(viewer.open).toBe(false); const size = named('大きさを変更', card); expect(size.disabled).toBe(false);
     size.fire('keydown', { key: 'ArrowRight', preventDefault() {} }); expect(card.style.width).toBe('300px');
@@ -5738,7 +5867,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const orderChoices = p().inspection.candidates.fields.find(f=>f.path.join('/')===`captionAttachmentsById/${attachmentId}/orderKey`)!.candidates;
     const altChoices = p().inspection.candidates.fields.find(f=>f.path.join('/')===`captionAttachmentsById/${attachmentId}/altText`)!.candidates;
     if(withLifecycle){expect(all(form('添付状態')).map(n=>n.textContent)).toEqual(expect.arrayContaining([expect.stringContaining('説明 候補'),expect.stringContaining('順序 候補')]));
-      expect(select('説明').disabled).toBe(true);expect(select('順序').disabled).toBe(true);expect(named('添付の編集',named('画像の整理',editor)).children).toHaveLength(2);}
+      expect(select('説明').disabled).toBe(true);expect(select('順序').disabled).toBe(true);expect(named('添付の編集',named('メディアの整理',editor)).children).toHaveLength(2);}
     const stableSiblings = siblings.map(id=>p().details.mutable.captionAttachmentsById[id]);
     button('閲覧に切り替える').fire('click'); await vi.waitFor(()=>expect(button('編集を開始する')?.disabled).toBe(false),{timeout:10000});
     chooseDecision(); const readonlyToken=live().read().source!.token; expect(button('競合を解消',form(decision)).disabled).toBe(true); button('競合を解消',form(decision)).fire('click'); expect(live().read().source!.token).toBe(readonlyToken);
@@ -5761,7 +5890,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect(p().inspection.candidates.fields.find(f=>f.path.join('/')===`captionAttachmentsById/${attachmentId}/orderKey`)!.candidates).toEqual(orderChoices);
     const order=select('順序'); order.value=order.children.find(n=>n.textContent.includes('2/3 番目'))!.value; order.fire('change'); await edited(()=>button('競合を解消',form('順序')).fire('click'));
     expect(p().details.mutable.captionAttachmentsById[attachmentId]!.orderKey).toEqual({kind:'value',value:'D'}); expect(p().details.mutable.captionAttachmentsById[attachmentId]!.altText).toEqual({kind:'value',value:undefined});
-    const media=named('画像の整理',editor), cards=named('添付の編集',media); expect(cards.children).toHaveLength(3);
+    const media=named('メディアの整理',editor), cards=named('添付の編集',media); expect(cards.children).toHaveLength(3);
     const target=cards.children[1]!; expect(all(target).some(n=>n.textContent==='説明の更新候補を確認してください。')).toBe(false); expect(button('説明を編集',target).disabled).toBe(false);
     button('説明を編集',target).fire('click'); const description=named('メディアの説明',media); expect(description.value).toBe(''); description.value='解消後の説明'; description.fire('input'); await edited(()=>button('説明を適用',media).fire('click'));
     expect(p().details.mutable.captionAttachmentsById[attachmentId]!.altText).toEqual({kind:'value',value:'解消後の説明'}); expect(siblings.map(id=>p().details.mutable.captionAttachmentsById[id])).toEqual(stableSiblings);
@@ -6018,7 +6147,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     rows[mediaCaption]!.fire('click');
     const mediaPanel = all(page).find(n => n.attributes.get('aria-label') === '選択中のキャプションのメディア')!;
     all(mediaPanel).find(n => n.tag === 'button' && n.textContent === '画像を表示')!.fire('click');
-    const mediaViewer = all(page).find(n => n.attributes.get('aria-label') === '画像ビューア')!;
+    const mediaViewer = all(page).find(n => n.attributes.get('aria-label') === 'メディアビューア')!;
     expect(mediaViewer.open).toBe(true); expect(all(mediaViewer).filter(n => n.tag === 'img')).toHaveLength(1);
     expect(all(page).filter(n => n.tag === 'dialog')).toHaveLength(1); expect(open).not.toHaveBeenCalled();
     all(mediaViewer).find(n => n.attributes.get('aria-label') === '閉じる')!.fire('click'); expect(mediaViewer.open).toBe(false);

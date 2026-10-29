@@ -3,6 +3,7 @@ import type { ModelPlacement } from './displaySupport';
 
 export type ModelTransformMode = 'translate' | 'rotate' | 'scale';
 export interface ModelManipulation { readonly mode: ModelTransformMode;
+  readonly pivotAsset?: readonly [number, number, number];
   readonly rotationXYZW: ModelPlacement['rotationXYZW']; readonly uniformScale: number }
 export const finiteInput = (raw: string) => /^[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?$/i.test(raw.trim()) && Number.isFinite(Number(raw));
 export function isCanonicalRotation(q: readonly number[]): boolean {

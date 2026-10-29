@@ -66,7 +66,8 @@ export function projectMediaResources(provider: WorkspaceProvider) {
     const record = fieldValue(field), blob = record?.blob as JsonObject | undefined;
     const verified = record && provider.inspection.checks.some(c => c.outcome === 'verified' && c.request.token === provider.token &&
       c.request.fact === 'media' && c.request.records.length === 1 && same(c.request.records[0]!, record));
-    return verified && record.id === id && record.mediaKind === 'image' && (['image/png','image/jpeg','image/webp','image/gif'].includes(String(blob?.mediaType))) && typeof record.label === 'string' ? [{ id, record, label: record.label }] : [];
+      const types = { image: ['image/png','image/jpeg','image/webp','image/gif','image/heic'],video:['video/mp4'],audio:['audio/mp4','audio/mpeg'] };
+      return verified && record.id === id && Object.hasOwn(types,String(record.mediaKind)) && types[record.mediaKind as keyof typeof types].includes(String(blob?.mediaType)) && typeof record.label === 'string' ? [{ id, record, label: record.label }] : [];
   });
 }
 export function projectCaptionSceneCount(provider: WorkspaceProvider, captionId: string): Field<number> {
