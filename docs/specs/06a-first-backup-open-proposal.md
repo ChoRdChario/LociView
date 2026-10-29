@@ -260,3 +260,40 @@ They are local implementation evidence, not distributed input fixtures.
 The Start binds that Prepared and its exact backup proof/heads; the next snapshot
 binds the actual cancelled job and retained paths. The acceptance also compares
 all three refs against an independent digest of the actual canonical bytes.
+
+## Internal control-read refinement —2026-10-29, independently reviewed
+
+The08a connected restore exceeds its existing90s browser wait; the same owned
+214KiB backup completes alone in74.85s. Phase timing measures43.87s initialization,
+14.99s selection and11.22s reopening. A failed91.8s observation had20,671 control
+`readStream` opens and9,209 additional `readBytes` calls. Todo retains exact runs;
+these measurements establish amplification, not a new time guarantee or decode fault.
+
+Keep every staging/selected-generation check and every fresh control audit. Within
+one `readRestoreControls` call, first inspect all paths/sizes with the existing
+bounded4-open size pass, without consuming those size-only handles. For each receipt,
+then open a NEW `WorkspaceReadableFile` in the existing semantic order, bound its
+current size, and consume THAT fresh snapshot's stream with exact length/progress
+checks. Parse the same canonical UTF-8 object, enforce the same cumulative budgets,
+refs/shape/ownership/selection rules and compare against the earlier inventoried
+size. Do not call `readBytes(path)` to open the same receipt a third time.
+
+No size-pass handle, parsed result or byte snapshot survives into another receipt
+read/audit; no audit frequency or before/after I/O/write/publication/selection fence
+changes. Input ZIP/body verification is unchanged. The generic `readReceipt` I/O
+sequence remains unchanged; only its pure canonical decoder may be shared.
+Missing/changed/truncated/trailing/noncanonical/oversize streams refuse, stream
+read errors remain failures, cleanup cannot replace a primary error, and handles
+are released. Pre-Start torn-input detect/abandon behavior and failure order remain.
+
+Review this bounded implementation refinement before coding. Verify fresh reopening
+after the size pass, untouched stat streams, changed-after-inventory bytes, length/
+canonical failures and retained generation/acknowledgment fault cases. Remeasure the
+exact-file restore, then complete the connected workflow under unchanged waits and
+the final serial checks. This adds no cache, profile, schema, dependency, numeric
+guarantee or new control-file acceptance.
+
+Independent contract/security and source reviews PASS2026-10-29: this uses the
+existing fresh-read boundary, not a new PO policy. Focused11 cases PASS. Exact
+browser measurement, integrated acceptance and final-check results belong in todo;
+this paragraph does not supply unexecuted runtime or adoption evidence.

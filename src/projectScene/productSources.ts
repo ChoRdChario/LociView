@@ -1,4 +1,4 @@
-import { isSavedModel, isSavedMesh, isOrdinaryPoint } from './modelTypes';
+import { isSavedModel, isSavedMesh, isOrdinaryPoint, isOrdinaryGs } from './modelTypes';
 import { beginCaptionUndo, finishCaptionUndo, captionUndoSnapshot } from '../projectMetadata/captionUndo';
 import { value, type Field } from '../scene/types';
 import { resolveScene } from '../scene/resolve';
@@ -249,7 +249,7 @@ export function productSources(host: ReturnType<typeof createValidationModeHost>
       return { target: { kind: 'model', token: p.token, sceneId, assetId, bindingId: version.projection.bindingId },
         boundsAsset: version.closure.representation.logicalBoundsAsset, ...(importedPlacement ? { importedPlacement } : {}),
         ...(version.closure.shape==='saved-gs'?{gsProxyTarget:{sceneId,assetId,expectedBindingId:version.closure.binding.id,gsRepresentationId:version.closure.representation.id,gsPayloadDigest:version.closure.representation.payloadDigest,gsFamilyId:version.closure.representation.variantFamilyId,expectedProxyId:version.closure.proxy?.id??null}}:{}),
-        replacementAvailable: isSavedMesh(version.closure) || isOrdinaryPoint(version.closure), pointCloud: version.closure.shape === 'saved-point', placement: version.closure.binding.assetToProject, rotationDegrees: rotationDegrees(version.closure.binding.assetToProject.rotationXYZW),
+        replacementAvailable: isSavedMesh(version.closure) || isOrdinaryPoint(version.closure) || isOrdinaryGs(version.closure), pointCloud: version.closure.shape === 'saved-point', placement: version.closure.binding.assetToProject, rotationDegrees: rotationDegrees(version.closure.binding.assetToProject.rotationXYZW),
         sceneCount: uncertain ? { kind: 'unresolved', reason: 'conflict' } : value(ids.size) };
     },
     modelPlacement(translation, rotation, scale) {

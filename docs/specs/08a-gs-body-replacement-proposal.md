@@ -1,10 +1,12 @@
 # 08a: GS本体を更新して記録を引き継ぐ
 
-Status: **PO承認済み2026-10-29 —未実装**。仕様08のCaption Undo／通常Point差し替えの
+Status: **PO承認済み2026-10-29 —限定PC実装・自動検証済み**。仕様08のCaption Undo／通常Point差し替えの
 次工程として整理する。現在の作業・実行結果は[todo](../../tasks/todo.md)を参照。
 独立仕様レビュー2026-10-29はPASS。POは「面を未設定にして進める」を選択し、下記の
 同形式GS差し替えから共有・補正・返送・復元・再開までの一括実装・検証を承認した。
-現在の08チェックポイントを先に検証・Pushし、その後に着手する。実装・実行結果はtodoが正本。
+08チェックポイントに続いて実装・独立レビュー・必須チェックを完了。実行範囲はtodoが正本。
+小規模の共有・復元フローと、所有50万点2世代の通常Project保存／coldを分けて確認しており、
+50万点のバックアップ復元・一般採用・実機・公開の合格ではない。
 
 ## 利用者の結果
 
@@ -16,6 +18,9 @@ Status: **PO承認済み2026-10-29 —未実装**。仕様08のCaption Undo／�
 原本合計512MiB）を変更しない。容量は過去のモデル・メディアも含む既存の数え方を使う。
 01eの所有SH4検証入力は1世代178,002,206 bytes、2世代356,004,412 bytesなので、
 他の本体が少なければ既存合計枠内で検証できる。これは任意のProjectや端末の保証ではない。
+対象は保存済みprofileで決め、取込元による制限を追加しない。07kで既に01cへ変換したGSも
+同じ規則に従う。旧Nativeファイルを差し替え入力として直接開くことや、Native Point／Proxyの
+別profileをGS本体として扱うことは含めない。既存07k変換規則自体は変更しない。
 
 ## 承認されたProxy方針
 
@@ -46,11 +51,16 @@ Status: **PO承認済み2026-10-29 —未実装**。仕様08のCaption Undo／�
 - 推奨案のnew revisionはGS本体だけを含み、新しいProxy relationを作らない。
   原本・履歴、旧recipe、既存のprotected inventory／package規則は変更しない。
 - binary I/Oは既存WorkspaceFS／CAS／file-backed GS入力、編集はtyped Session command。
+  `ValidationContent.prepareModel`から`prepareValidationModel`へGS専用の任意context
+  `{representationToAsset}`だけを渡す。await前に所有・検査し、GS以外への指定は拒否する。
+  profile・IDs・旧bounds・Project配置はこのcontextに含めない。plannerは旧GS変換との
+  完全一致を別に確認する。通常の新規追加はcontextなしの既存identity規則を保つ。
   新しい512MiB入力全体の`arrayBuffer()`を追加しない。token／Asset／bindingを捕捉し、
   全係数・digest・宣言・capacity・次状態を検査してから既存publication／readbackへ進む。
 - 新旧の50万点を同時にdecode/displayして既存合計枠を超えない。既存の世代・資源解放・
   residency規則を使って表示を切り替え、準備中は対象モデルへloadingを表示する。
-  Caption閲覧・検索を保ち、古いモデルを新しいrevisionとして表示しない。
+  GPU表示の準備中はCaption閲覧・検索を保ち、古いモデルを新しいrevisionとして表示しない。
+  元ファイル検証・typed commandの確定中は既存のbusy／保存・公開fenceを保つ。
 - 失敗時は、保存前なら既存の状態を保持する。保存済みの表示準備失敗なら既存の局所表示
   診断／再試行を使い、途中の別モデルや選択へ対象を読み替えない。中断後は元partを検証する。
 

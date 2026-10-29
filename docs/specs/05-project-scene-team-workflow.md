@@ -3966,6 +3966,15 @@ They retain original bodies/history, Project-wide placement, explicit pin review
 typed commands and package/recovery fences. No unknown-profile conversion, automatic
 matching, dependency, general history rollback or adoption/release is inferred.
 
+PO2026-10-29 approved[08a](08a-gs-body-replacement-proposal.md) for exact01c saved
+GS body replacement, including07k GS already saved with that same declaration.
+Preserve the source-to-Asset transform and recompute bounds from the new original;
+new revision/family/class IDs are fresh even for identical bytes. The active new
+revision contains GS only, while old GS/Proxy records and originals retain their
+existing history/protection rules. A surface is explicitly selected again when
+needed. Existing File/Blob, Session, capacity and renderer-retirement fences remain;
+no new input profile, schema, dependency, capacity promise or release is granted.
+
 - cloud backend, accounts, roles, authentication, signatures or real-time presence;
 - automatic same-model detection, registration, Caption reraycast or surface remap;
 - per-Scene Asset revision, transform or alignment;

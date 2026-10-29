@@ -71,6 +71,11 @@ records and Session/package fences are reused; player UI owns only local Blob
 URLs and playback lifetime. General Windows HEIC and device/release gates remain.
 The same guarded model-replacement path also handles exact ordinary01a Point
 sources, retaining Frame/placement/records and issuing fresh compatibility IDs.
+The approved[08a](docs/specs/08a-gs-body-replacement-proposal.md) adds exact01c saved
+GS replacement through the same command and native File/Blob service.
+`initialProject.ts`/`content.ts` accept only a captured GS source transform and
+recompute new bounds. The active new revision starts without a Proxy; old source
+and surface history stay retained. Todo owns rendered/scale/final-check evidence.
 Weak historical hit diagnostics stay visible without fetching old provenance;
 active-source validation remains required. The selector's local busy port gates
 only its Project-navigation control during early mounting.
@@ -117,6 +122,9 @@ attempts, while an adopted Host owns durable retry. The approved
 recovery-only entry for a provably absent original Project; it transfers the same
 root lease to the real selected generation without opening the original database.
 Existing ready-Project replacement remains the separate Start-1 path.
+`projectPackage/restoreControls.ts` keeps every control audit and streams a fresh
+receipt snapshot after size inventory; `projectMetadata/persistence.ts` supplies
+only its shared canonical decoder. No cross-audit cache or generation-fence change.
 
 Fresh photo selection uses `projectFiles/photo.ts`'s negative HEIF guidance only
 at the three fresh entry points. The product workspace owns explicit cancellation

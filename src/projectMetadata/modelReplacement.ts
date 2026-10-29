@@ -2,6 +2,7 @@ import { checkProjectRecord, projectRecordMaps } from '../domain/projectRecords'
 import { ProjectRecordFields } from '../domain/projectRecordFields';
 import { meshSourceFormat, meshSourceDeclarations } from '../domain/meshSource';
 import { pointSourceDeclaration } from '../domain/pointSource';
+import { gsSourceDeclaration } from '../domain/gsSource';
 import { object, list, same } from '../domain/projectGraphSupport';
 import type { JsonObject, JsonValue } from '../domain/values';
 import type { ProjectProviderRead } from '../scene/projectProvider';
@@ -36,24 +37,29 @@ export function planModelReplacement(provider: Extract<ProjectProviderRead, { ki
   if (c.unknown) fail('model-replace-unknown');
   shape(binding, ['id', 'assetId', 'assetRevisionId', 'assetToProject', 'method', 'payloadDigest', 'parentBindingId']);
   shape(revision, ['id', 'assetId', 'representationIds', 'anchorCompatibilityClasses', 'provenance', 'payloadDigest']);
+  const gs = rep.contentKind === 'gaussianSplat';
   shape(rep, ['id', 'assetId', 'representationFrameId', 'contentKind', 'purposes', 'role', 'variantFamilyId', 'formatProfile',
-    'blob', 'representationToAsset', 'logicalBoundsAsset', 'derivedFrom', 'materialCatalog', 'payloadDigest']);
+    'blob', 'representationToAsset', 'logicalBoundsAsset', 'derivedFrom', ...(!gs ? ['materialCatalog'] : []), 'payloadDigest']);
   const identity = { translation: [0, 0, 0], rotationXYZW: [0, 0, 0, 1], uniformScale: 1 };
-  const catalog = object(rep.materialCatalog), classes = list(revision.anchorCompatibilityClasses), slots = list(catalog.slots);
+  const catalog = gs ? {} : object(rep.materialCatalog), classes = list(revision.anchorCompatibilityClasses), slots = gs ? [] : list(catalog.slots);
   const readImmutable = metadataImmutableReader(provider, limits), oldRevision = readImmutable('assetRevisionsById', projection.revisionId);
   const oldReps = list(oldRevision.representationIds).map(id => readImmutable('representationsById', id as string));
   const point = rep.contentKind === 'pointCloud';
-  if (oldReps.length !== 1 || (point ? oldReps[0]!.role !== 'pointPrimary' || !same(oldReps[0]!.formatProfile, pointSourceDeclaration) || !same(rep.formatProfile, pointSourceDeclaration) : oldReps[0]!.role !== 'meshPrimary')) fail('model-replace-source-profile');
+  const oldGs = oldReps.filter(r => r.role === 'gsPrimary');
+  if (gs) {
+    if (oldGs.length !== 1 || oldReps.length > 2 || !same(oldGs[0]!.formatProfile, gsSourceDeclaration) ||
+      !same(rep.formatProfile, gsSourceDeclaration) || oldReps.some(r => r !== oldGs[0] && (r.role !== 'interactionProxy' || r.proxyForGsVariantFamilyId !== oldGs[0]!.variantFamilyId))) fail('model-replace-source-profile');
+  } else if (oldReps.length !== 1 || (point ? oldReps[0]!.role !== 'pointPrimary' || !same(oldReps[0]!.formatProfile, pointSourceDeclaration) || !same(rep.formatProfile, pointSourceDeclaration) : oldReps[0]!.role !== 'meshPrimary')) fail('model-replace-source-profile');
   if (rep.assetId !== command.assetId || revision.assetId !== command.assetId || binding.assetId !== command.assetId ||
     old.assetId !== command.assetId || old.assetRevisionId !== projection.revisionId || binding.parentBindingId !== old.id ||
     !same(binding.assetToProject, old.assetToProject) || binding.method !== 'manual' || binding.assetRevisionId !== revision.id ||
-    !same(revision.representationIds, [rep.id!]) || !same(rep.representationToAsset, { ...identity, reflection: 'none' }) ||
-    rep.contentKind !== (point ? 'pointCloud' : 'mesh') || rep.role !== (point ? 'pointPrimary' : 'meshPrimary') || !same(rep.purposes, ['source', 'display']) || !same(rep.derivedFrom, []) ||
-    classes.length !== 1 || !same(object(classes[0]).targetVariantFamilyIds, [rep.variantFamilyId!]) || !slots.length)
+    !same(revision.representationIds, [rep.id!]) || !same(rep.representationToAsset, gs ? oldGs[0]!.representationToAsset : { ...identity, reflection: 'none' }) ||
+    rep.contentKind !== (gs ? 'gaussianSplat' : point ? 'pointCloud' : 'mesh') || rep.role !== (gs ? 'gsPrimary' : point ? 'pointPrimary' : 'meshPrimary') || !same(rep.purposes, ['source', 'display']) || !same(rep.derivedFrom, []) ||
+    classes.length !== 1 || !same(object(classes[0]).targetVariantFamilyIds, [rep.variantFamilyId!]) || !gs && !slots.length)
     fail('model-replace-closure');
   const blob = object(rep.blob);
   const mesh=meshSourceFormat(rep.formatProfile);
-  if (blob.mediaType !== (point ? 'application/ply' : mesh?meshSourceDeclarations[mesh].mediaType:'model/gltf-binary') ||
+  if (blob.mediaType !== (gs || point ? 'application/ply' : mesh?meshSourceDeclarations[mesh].mediaType:'model/gltf-binary') ||
     !same(revision.provenance, { origin: 'import', sourceMediaType: blob.mediaType!, inputBlobDigests: [blob.digest!] })) fail('model-replace-provenance');
   const reserved = new Set<string>();
   const reserve = (v: unknown): void => { reader.charge(); if (typeof v === 'string') reserved.add(v);
@@ -65,7 +71,7 @@ export function planModelReplacement(provider: Extract<ProjectProviderRead, { ki
   const fresh = (id: JsonValue | undefined, prefix: string) => { reader.charge(); c.id(id!, prefix, []);
     if (reserved.has(id as string)) fail('model-replace-id'); reserved.add(id as string); };
   for (const [id, prefix] of [[binding.id, 'bnd'], [revision.id, 'rev'], [rep.id, 'rep'], [rep.representationFrameId, 'frm'],
-    [rep.variantFamilyId, 'fam'], [object(classes[0]).id, 'cmp'], [catalog.layoutId, 'lay']]) fresh(id, prefix as string);
+    [rep.variantFamilyId, 'fam'], [object(classes[0]).id, 'cmp'], ...(!gs ? [[catalog.layoutId, 'lay']] : [])]) fresh(id, prefix as string);
   for (const slot of slots) fresh(object(slot).logicalMaterialSlotId, 'slot');
   edits.push({ map: 'assetsById', id: command.assetId, create: false, fields: { status: { kind: 'ready', activeBindingId: binding.id! } } });
   return edits;

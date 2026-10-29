@@ -235,6 +235,7 @@ export const projectSceneApplicationImports:Readonly<Record<string,readonly stri
     "../scene/types",
     "./mediaDisplay",
     "../domain/pointSource",
+    "../domain/gsSource",
     "../domain/projectGraphSupport"
   ],
   "src/projectScene/pinGizmo.ts": [
@@ -404,6 +405,7 @@ export const projectSceneApplicationImports:Readonly<Record<string,readonly stri
     "../projectFiles/creation",
     "../projectFiles/frozenV1Conversion",
     "../projectFiles/initialProject",
+    "../projectFiles/gsPly",
     "../projectFiles/jpeg",
     "../projectFiles/lociMyuConversion",
     "../projectFiles/nativeConversion",

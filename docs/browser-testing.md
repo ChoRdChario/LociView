@@ -13,8 +13,9 @@ Desktop evidence are separate. All previews use4182 exclusively; run them serial
 
 ```powershell
 npm run test:e2e -- --config playwright.desktop.config.ts desktop-entry.spec.ts
-npm run test:e2e -- --config playwright.desktop.config.ts gs-workflow.spec.ts --grep 'SH4と面'
+npm run test:e2e -- --config playwright.desktop.config.ts gs-workflow.spec.ts --grep 'SH4本体の差し替え'
 npm run test:e2e -- --config playwright.desktop.config.ts desktop-large-gs.spec.ts
+npm run test:e2e -- --config playwright.desktop.config.ts desktop-gs-replacement.spec.ts
 npm run test:e2e -- --config playwright.desktop.config.ts desktop-smooth.spec.ts desktop-smooth-team.spec.ts
 npm run test:e2e -- --config playwright.desktop.config.ts desktop-smooth-capacity.spec.ts
 ```
@@ -40,6 +41,13 @@ profiles, verifying original digest/history/records and forbidding whole-GS
 is not progressive paging or a total-RAM/device guarantee. The download deadline
 remains300s; the longer overall deadline only accommodates the connected actions.
 Artifacts and interrupted/failing profiles remain under ignored `.artifacts/e2e`.
+The08a `desktop-gs-replacement.spec.ts` lane uses two different owned178MB SH4
+generations. It checks new pixels, active binding/revision with no assigned Proxy,
+retained old GS/Proxy/Caption/placement, exact originals in saved files and cold
+reopening. Its two-body output wait is600s; this changes no existing case deadline.
+It is ordinary-Project source/renderer/save/cold evidence, not500k backup restore.
+`gs-workflow.spec.ts` covers the separate small two-profile exchange, local text/
+photo retention, surface reselection, correction, return, restore/save/cold flow.
 For a local candidate preview, use `npm run build:desktop` then
 `npm run preview:desktop`; it creates no SW/install assets. Continuing existing
 validation data requires the same origin/profile; a different output directory

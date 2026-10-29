@@ -56,7 +56,134 @@ unchanged-feature-classification checks pass; independent review has no findings
 No runtime change or new capacity guarantee; no runtime suite is needed for this
 documentation checkpoint.
 
-## Current workflow —Caption action Undo and ordinary Point replacement
+## Current boundary —GS workflow verified; editor-name policy pending
+
+The bounded08a Desktop workflow and required final checks are complete. Source,
+fault/file/browser evidence and independent final review are recorded below.
+The suitable g0-baseline development checkpoint retains device/offline/adoption/
+release limits. Next08b is a product-policy proposal awaiting PO judgment, not an
+authorized implementation. Current source/test bytes remain frozen through Git
+preflight and checkpoint publication; Git owns the checkpoint identity.
+
+PO approved08a2026-10-29 with no assigned Proxy in the new revision. Complete
+ordinary01c GS→same01c replacement, preserve placement/records/source transforms,
+then receive with local edits, explicitly set a surface, correct pins, return,
+restore and cold reopen. Existing500k SH4/512MiB limits stay fixed. Root is sole
+writer; bounded contract/source/evidence reviewers are read-only. No dependency,
+profile/schema, Native GS conversion, automatic surface carry or release change.
+
+Start-of-unit meta-audit: g0-baseline checkpoint3d1934b was verified and pushed;
+source/index diff was empty (modelFacts had a stat-only status marker). This next
+unit closes an approved missing daily-use workflow rather than adding another
+evaluation lane. Existing Session/file/recovery/residency ports remain the path.
+Extend model preparation with a GS-only captured source transform, recompute new
+bounds, and independently enforce the old/new closure and fresh IDs in the command.
+Expose exact01c replacement through the existing model panel and File/Blob service;
+no UI storage or viewer package imports. Reuse existing decode retirement accounting.
+
+Verify same-byte fresh compatibility, nonidentity transforms, unassigned active
+Proxy with retained history, stale/profile/ID/capacity refusal, interrupted exact
+retry, all file purposes, a small independent2-browser team flow and an owned
+500k-SH4 two-generation display/save/cold flow. Then final serial checks, four-output
+isolation and one independent final review; push the suitable checkpoint. Stop only
+an actual contract conflict or new policy/dependency/capacity/release decision.
+
+Implementation: exact01c saved-source availability, captured native File/Blob,
+GS-only owned transform context and independently checked new-GS-only command
+closure are connected. Initial source review PASS; early architecture12PASS.
+Transformed source/placement, same-byte fresh compatibility, original history,
+unassigned Proxy, stale/profile/ID/capacity refusal, exact publication retry and
+all5-purpose peer-edit retention pass focused checks. Earlier failures were test
+fixture ownership (frozen records, Buffer backing array, extra target token),
+not relaxed assertions or product acceptance. Final focused/browser/scale checks
+remain pending. Source scope is profile-based:07k saved GS also uses01c; no new
+Native converter or provenance gate is introduced, and the nonidentity fixture
+alone is not actual07k route evidence. Final focused GS/stream/residency/Point/
+architecture checks55PASS, including missing/corrupt acknowledged replacement
+bodies refused on cold retry. Typecheck PASS and all15 frozen source/test/config
+hashes match before the connected browser runs.
+The first small-team browser run1793268696156-58160 failed at GS selection:
+selection-consequence inspection still called whole-File arrayBuffer for a93KiB
+GS, so the strict source guard refused and confirmation remained disabled.
+Only that read-only hint now captures the native Blob and reads its64KiB prefix;
+the full command inspector remains mandatory. Prefix regression1PASS; preserve
+the failed run and supersede its15-file manifest only for this fix/test/diagnostics.
+The next run1793269069527-46376 passed actual replacement, new-body paint,
+Contribution receive and peer-local text/two-photo retention, then failed a test
+assumption: needsReview starts explicit new-surface selection before coordinates
+become editable. Select the newly assigned face normally, then apply the manual
+coordinate correction. No force-click, changed expectation or production change.
+Run1793269484555-30424 then exposed the selected Caption marker covering that
+test's chosen surface point. Use normal isolate/front controls and a distant point
+inside the new face. This is a test interaction correction, not a force-click or
+pin-visibility contract change; retain both failed runs and their distinct traces.
+Subsequent run1793269817056-49860 passed pin correction/return, Review including
+display retry, and Clean open/original equality, but first-backup restore exceeded its existing90s
+wait. Focused exact-file restore also exceeded90s without page errors. At91.8s it
+had completed2,213 restore-control listings,20,671 control readStream opens and
+9,209 control readBytes calls. Do not raise the deadline or remove/reuse fences
+from these counts alone. Added existing optional phase timing around first-restore
+persist/staging/initialize/projection/display/select/adopt to locate elapsed time.
+This is the current connected-workflow blocker; unexecuted500k and final checks
+remain pending. Independent read-only analysis places vendor decode after editor
+mount, and documents repeated per-I/O staging audits and selection/adoption checks.
+The phased exact-file diagnostic1793271030718-46332 PASS with unchanged90s:
+editor73.43s/display74.83s, errors0; initialize43.87s/select14.99s/adopt11.22s,
+display preparation0.21s. This proves finite completion, not a decoder deadlock,
+data defect or sender-contention cause. Retain~75s latency as performance work.
+The finished sender context now closes after its final exports/assertions before
+Review/Clean/restore; all acceptance remains. Optional timing observers cannot
+alter restoration (start and end notifications are exception-protected).
+No audit/cache/fresh-read policy or receipt batching was changed. Temporary focused
+diagnostic source/logs/measurements are retained only in ignored artifacts.
+
+Closing A did not fix the wait:1793271358586-63904 still failed90s restore. Stop
+fixture/poll adjustments. The independently reviewed06a internal refinement keeps
+all audits and the full size-only pass, then streams each newly reopened receipt
+instead of opening that same path a third time via readBytes. Only a pure decoder
+is shared; generic readReceipt I/O is unchanged. Focused11 control cases PASS,
+including after-inventory mutation/removal, untouched stat snapshots, stream/
+canonical failures and primary-error preservation. No cache, audit frequency,
+package/profile or validation-fence change; no new PO policy is needed.
+
+The owned500k-SH4 two-generation source/renderer/save/cold lane PASS,9.7min
+(runner10.0min): creation/display readiness92.58s, Workspace202.63s, replacement/new paint337.90s,
+both originals saved448.40s and cold/hash verification578.89s. Each source is
+178,002,206bytes; both fixed SHA-256 values match saved and cold archives, active
+new revision has no Proxy and old GS/Proxy/Caption/Frame/placement remain retained.
+Its start manifest is`large-start-tree.json`; this is unaffected-lane evidence,
+not an exact-final-tree check of the later control reader or500k restore acceptance.
+That lane never creates nonempty restore controls; generic decoder extraction is
+semantically unchanged. Exact final-source small restore/team/fault/whole checks
+remain required and now run serially, stopping at the first failure.
+
+Exact-file post-refinement diagnostic PASS under the unchanged90s: editor60.30s /
+display61.04s from test start, compared with73.43s/74.83s before. From the restore
+action, display wait is59.73s vs72.98s. Control-audit listings remain2,246 in both
+complete measurements; control readBytes falls9,413→6, without skipping fresh opens.
+Initialize35.85s/select12.32s/adopt9.01s; errors0. This is one paired synthetic-file
+measurement, not a general time guarantee; roughly1min restore latency remains.
+`final-tree.json` freezes18 final source/test/config files before the final small
+team flow and required serial checkpoint. Large evidence remains qualified above.
+Final18-tree team run1793273306309-69304 PASS12.9min/runner13.2min, retry0:
+replacement/new paint, peer-local text/two-photo retention, explicit surface
+reselection/manual pin correction, Contribution return, Review/display retry,
+Clean reopen, absent-Project backup restore→save/exact-record comparison→full
+browser close/cold/save all complete. Existing90s readiness and all byte/record
+assertions remain. Typecheck PASS; the required whole test/four builds/isolation
+sequence is running in`checkpoint-final.log`/`isolation-final.log`.
+Independent final connected-diff review PASS with no unresolved findings; all18
+hashes match. Loading/Caption-read evidence applies to asynchronous GPU display
+preparation. Durable input validation/journal/publication retains its normal busy
+fence; do not claim interactive editing/search throughout that command.
+Final serial `check:checkpoint` PASS, exit0: typecheck,135files/3,038tests
+(21existingTODOs;1,043.32s), normal/harness/validation/Desktop builds. Four-output
+HEIC isolation PASS, exit0; no local libde265 PoC enters production inputs or
+artifacts. All18 final hashes match; independent source/final-diff and executed
+evidence reviews have no unresolved findings. Diff/local-link checks pass. No
+dependency/lockfile, wire/profile, PWA path, audit/fence, deployment or release change.
+
+## Previous verified checkpoint —Caption action Undo and ordinary Point replacement
 
 ### Plan and authority
 
@@ -243,31 +370,32 @@ the final raw manifest and browser are refreshed. The corrected tree's serial
 check is recorded in `checkpoint-verified.log`. No timeout increase, assertion
 relaxation or test exclusion.
 
-## Remaining work after the grouped workflow
+## Next decision and remaining work
 
-Next authorized unit: the independently reviewed [08a GS replacement companion](../docs/specs/08a-gs-body-replacement-proposal.md)
-was PO-approved2026-10-29, not yet implemented. PO selected unassigned Proxy after
-GS replacement and authorized the full implementation/verification workflow.
-Current08 final checks and reviews PASS; Push that frozen checkpoint first.
-Then prioritize updating a GS scan while retaining its
-records before durable author-name mapping. Existing Proxy add/change/remove is
-already available; the new policy is what happens to the former Proxy when the
-GS body/family changes. Approved: new revision starts unassigned, retains old
-body/history and lets the user explicitly select a surface again. Automatic
-carry/rekey remains outside this authorization. Keep current08
-completion independent of the following implementation. No new dependency/profile or
-capacity guarantee is requested; exact500k two-generation acceptance remains a
-test obligation, not a small-fixture claim.
+The08a GS workflow is implemented and verified within the exact scope above,
+including the final required checks. Do not reconstruct the current
+boundary from the earlier08 continuation. Former Proxy carry/rekey remains outside
+PO's selected unassigned-surface policy. No new dependency/profile/capacity promise
+or general adoption follows from the owned500k source/renderer/file lane.
 
-The active continuation above implements creation/deletion/attachment Undo and
-ordinary01a Point replacement; its executed acceptance is recorded above. Local
-Undo covers the named confirmed actions in this editor, not all Project actions
-or historical rollback. Durable author/name mapping is still absent. Portable
-HEIC needs a decoder/license/distribution or derivative decision; native-only
-acceptance does not close that cross-browser requirement. Native/GS replacement
-and cross-profile conversion are not implied by same01a replacement.
+Next product decision: [08b editor-name sharing policy](../docs/specs/08b-shared-editor-name-policy-proposal.md)
+is PROPOSED, unapproved/unimplemented. Independent product-policy review PASS;
+PO response is pending. Optional self-declared names would apply only to future
+confirmed edits after explicit Project opt-in, retained in Workspace/Contribution/
+Backup and omitted from Review/Clean. Existing08 browser-local names must not be
+silently shared. Exact storage/profile/compatibility design remains unsettled;
+this policy proposal does not approve a substantial migration or schema decision.
+Current GS verification/Push does not depend on that response.
 
-The500k workflow is still slow (about202s to editor,47s edit,232s backup observed).
+Local Undo covers the named confirmed Caption actions in this editor, not every
+Project action or historical rollback. Native Point/different-profile replacement
+is not granted by same01a/01c replacement; saved07k GS already uses01c and is
+eligible by profile, without a new Native-conversion-route claim from this fixture.
+Portable HEIC still needs a decoder/license/distribution or derivative decision;
+native-only acceptance does not close that cross-browser requirement.
+
+Earlier500k observations (about202s to editor,47s edit,232s backup) remain retained
+as performance evidence; the current owned replacement lane is recorded above.
 Further fresh-inspection/calculation tuning stays pending behind accepted missing
 integration unless it blocks use/data safety. Keep current corruption detection,
 write/publication/recovery fences and originals.01h cross-command reuse is held for

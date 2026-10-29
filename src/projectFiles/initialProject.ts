@@ -2,6 +2,7 @@ import type { PhotoDecoder } from './photo';
 import { inspectProjectMedia, type MediaDecoders } from './media';
 import { immutableDigest } from '../domain/projectGraphSupport';
 import { admitProjectRecords, projectRecordMaps } from '../domain/projectRecords';
+import { ProjectRecordFields } from '../domain/projectRecordFields';
 import { cloneCanonicalValue, type JsonObject, type JsonValue } from '../domain/values';
 import { digest, newId, technicalId } from '../projectMetadata/persistence';
 import type { StoredBlobRef } from '../projectMetadata/blobStore';
@@ -18,6 +19,8 @@ import { checkFileLimits, fileError, validationGlbProfile, jpegGlbProfile, valid
 export interface ValidationFile { readonly label: string; readonly bytes: Uint8Array; readonly file?: never }
 export interface ValidationBlobFile { readonly label: string; readonly file: Blob; readonly bytes?: never }
 export type ValidationModelFile = ValidationFile | ValidationBlobFile;
+/** Same-source GS replacement only. Bounds are always recomputed from the new body. */
+export interface GsModelPreparation { readonly representationToAsset: JsonObject }
 export interface ValidationPackageFile { readonly label: string; readonly package: Blob }
 export type ValidationByteBody = { readonly ref: StoredBlobRef; readonly bytes: Uint8Array; readonly file?: never };
 export type ValidationBlobBody = { readonly ref: StoredBlobRef; readonly file: Blob; readonly bytes?: never };
@@ -60,16 +63,22 @@ export async function validationModelFile(input: {label:string;file:Blob}, budge
   return {label:name,bytes:new Uint8Array(await file.arrayBuffer())};
 }
 
-export function prepareValidationModel(input: ValidationFile, budget: ProjectFilePolicyInput, decode?: PngDecoder, assetId?: string, jpeg?: JpegDecoder): Promise<PreparedValidationModel>;
-export function prepareValidationModel(input: ValidationModelFile, budget: ProjectFilePolicyInput, decode?: PngDecoder, assetId?: string, jpeg?: JpegDecoder): Promise<PreparedValidationModel<ValidationBody>>;
-export async function prepareValidationModel(input: ValidationModelFile, budget: ProjectFilePolicyInput, decode?: PngDecoder, assetId = fresh('ast'), jpeg?: JpegDecoder): Promise<PreparedValidationModel<ValidationBody>> {
+export function prepareValidationModel(input: ValidationFile, budget: ProjectFilePolicyInput, decode?: PngDecoder, assetId?: string, jpeg?: JpegDecoder, gsContext?: GsModelPreparation): Promise<PreparedValidationModel>;
+export function prepareValidationModel(input: ValidationModelFile, budget: ProjectFilePolicyInput, decode?: PngDecoder, assetId?: string, jpeg?: JpegDecoder, gsContext?: GsModelPreparation): Promise<PreparedValidationModel<ValidationBody>>;
+export async function prepareValidationModel(input: ValidationModelFile, budget: ProjectFilePolicyInput, decode?: PngDecoder, assetId = fresh('ast'), jpeg?: JpegDecoder, gsContext?: GsModelPreparation): Promise<PreparedValidationModel<ValidationBody>> {
   const policy=projectFilePolicy(budget), limits=policy.nonGs;
   checkFileLimits(limits);
+  const context = gsContext && cloneCanonicalValue(gsContext as unknown as JsonObject, validationMetadataLimits) as unknown as GsModelPreparation;
+  if (context) {
+    const fields = new ProjectRecordFields(); fields.transform(context.representationToAsset, [], true);
+    if (fields.unknown || Object.keys(context).join(',') !== 'representationToAsset') return fileError('差し替えるGSの座標変換を確認してください。');
+  }
   if (!/^ast_[0-9a-f]{32}$/.test(assetId)) return fileError('追加するモデルの識別情報を確認してください。');
   const name = validationFileLabel(input.label), file = input.file && captureGsBlob(input.file);
   if(!file&&input.bytes!.length>limits.maxFileBytes)return fileError('大きなGSは元ファイルから選択してください。');
   const ply = !!file || isPointPly(input.bytes!), gs = !!file || ply && hasGsPlySignature(input.bytes!), mesh=!gs?classifyMeshSource(input.bytes!):null,point = ply && !gs && !mesh;
-  const inspected = mesh?await inspectMeshSource(mesh,input.bytes!,limits,decode,jpeg):file ? await inspectGsPlyFile(file, policy.gs) : gs ? await inspectGsPly(input.bytes!, policy.gs) : point ? await inspectPointPly(input.bytes!, limits) : await inspectFreshValidationGlb(input.bytes!.slice(), limits, decode, jpeg);
+  if (context && !gs) return fileError('差し替えにはGSファイルを選択してください。');
+  const inspected = mesh?await inspectMeshSource(mesh,input.bytes!,limits,decode,jpeg):file ? await inspectGsPlyFile(file, policy.gs, context) : gs ? await inspectGsPly(input.bytes!, policy.gs, context) : point ? await inspectPointPly(input.bytes!, limits) : await inspectFreshValidationGlb(input.bytes!.slice(), limits, decode, jpeg);
   const ref: StoredBlobRef = { algorithm: 'sha256', digest: inspected.kind==='gs' ? inspected.digest : await digest(inspected.bytes), byteLength: inspected.kind==='gs' ? inspected.byteLength : inspected.bytes.length, mediaType: mesh?meshSourceDeclarations[mesh].mediaType:ply ? pointSourceMediaType : 'model/gltf-binary' };
   const body: ValidationBody = inspected.kind==='gs' && inspected.file ? {ref,file:inspected.file} : {ref,bytes:inspected.bytes!};
   const revisionId = fresh('rev'), representationId = fresh('rep'), bindingId = fresh('bnd');
@@ -79,7 +88,7 @@ export async function prepareValidationModel(input: ValidationModelFile, budget:
   const representation = await sealValidationRecord('representation', {
     id: representationId, assetId, representationFrameId: fresh('frm'), contentKind: gs ? 'gaussianSplat' : point ? 'pointCloud' : 'mesh', purposes: ['source', 'display'], role: gs ? 'gsPrimary' : point ? 'pointPrimary' : 'meshPrimary',
     variantFamilyId: familyId, formatProfile: await (mesh?meshSourceProfile(mesh):gs ? gsSourceProfile() : point ? pointSourceProfile() : validationGlbUsesJpeg(inspected.bytes!, limits) ? jpegGlbProfile() : validationGlbProfile()), blob: ref as unknown as JsonObject,
-    representationToAsset: { ...identityPlacement(), reflection: 'none' }, logicalBoundsAsset: inspected.bounds,
+    representationToAsset: context?.representationToAsset ?? { ...identityPlacement(), reflection: 'none' }, logicalBoundsAsset: inspected.bounds,
     derivedFrom: [], ...(!gs ? { materialCatalog: { layoutId, slots } } : {}),
   });
   const revision = await sealValidationRecord('asset-revision', { id: revisionId, assetId, representationIds: [representationId],

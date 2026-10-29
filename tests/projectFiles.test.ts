@@ -3151,9 +3151,9 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       const paths=await fs.list('v2/local-restore/'),first=new Set<string>(),gates:{resolve():void;reject(error:Error):void}[]=[],stream=vi.fn(()=>{throw Error('stat must not consume a body');});
       const read=fs.readStream.bind(fs);let active=0,peak=0,finished=false;
       const opens=vi.spyOn(fs,'readStream').mockImplementation(async path=>{
-        const file=await read(path);if(!first.has(path)){first.add(path);active++;peak=Math.max(peak,active);
+        const file=await read(path),statOnly=!first.has(path);if(statOnly){first.add(path);active++;peak=Math.max(peak,active);
           try{await new Promise<void>((resolve,reject)=>{gates.push({resolve,reject});});}finally{active--;}}
-        return file&&{...file,size:mode==='size'&&path===paths[0]?PACKAGE_LIMITS.controlBytes+1:file.size,stream};
+        return file&&{...file,size:mode==='size'&&path===paths[0]?PACKAGE_LIMITS.controlBytes+1:file.size,stream:statOnly?stream:file.stream.bind(file)};
       }),bytes=vi.spyOn(fs,'readBytes');
       const done=readRestoreControls(fs,metadata).then(value=>({value,error:null}),error=>({value:null,error})).finally(()=>{finished=true;});
       await vi.waitFor(()=>expect(gates).toHaveLength(4));expect(peak).toBe(4);expect(bytes).not.toHaveBeenCalled();
@@ -3164,10 +3164,36 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       const result=await done;expect(active).toBe(0);expect(peak).toBe(4);expect(stream).not.toHaveBeenCalled();
       if(mode==='success'){
         expect(result.error).toBeNull();expect(result.value!.jobs.map(j=>j.id)).toEqual(paths.map(path=>path.split('/')[3]));
-        expect(opens).toHaveBeenCalledTimes(10);expect(bytes).toHaveBeenCalledTimes(5);
+        expect(opens).toHaveBeenCalledTimes(10);expect(bytes).not.toHaveBeenCalled();
       }else{expect(result.error).toBeInstanceOf(Error);expect(result.error.message).toContain(mode==='failure'?'first open failed':'restore-control-size');expect(opens).toHaveBeenCalledTimes(4);expect(bytes).not.toHaveBeenCalled();}
       opens.mockRestore();bytes.mockRestore();
     }
+  });
+  it.each(['changed','resized','missing','oversize','truncated','trailing','empty','noncanonical','read-error','cleanup-error'] as const)('fresh restore receipts reject %s after the inventory without consuming stat snapshots',async(mode)=>{
+    const fs=new TestFS(),id=newId(),path=`v2/local-restore/jobs/${id}/abandoned.json`,record={schema:'lociview-local-restore-abandoned-1',jobId:id,stage:'beforeStart'};
+    await fs.writeText(path,json(record));const read=fs.readStream.bind(fs),statStream=vi.fn(()=>{throw Error('stat body must stay unread');}),released=vi.fn(),primary=Error('control-read-fault'),cleanup=Error('control-cleanup-fault');let count=0;
+    const opened=vi.spyOn(fs,'readStream').mockImplementation(async key=>{
+      count++;if(count===2){
+        if(mode==='changed')await fs.writeText(path,json({...record,jobId:newId()}));
+        if(mode==='resized')await fs.writeText(path,json({...record,extra:'changed'}));
+        if(mode==='missing')await fs.remove(path);
+      }
+      const file=await read(key);if(!file)return null;if(count===1)return{...file,stream:statStream};
+      if(mode==='oversize')return{...file,size:PACKAGE_LIMITS.controlBytes+1,stream:statStream};
+      if(mode==='read-error'||mode==='cleanup-error'){
+        const bytes=new TextEncoder().encode(json(record));let readCount=0;
+        return{...file,stream:()=>({getReader:()=>({read:async()=>{if(mode==='read-error')throw primary;return readCount++?{done:true,value:undefined}:{done:false,value:bytes};},cancel:async()=>{throw cleanup;},releaseLock:released})}) as any};
+      }
+      if(['truncated','trailing','empty','noncanonical'].includes(mode)){
+        const original=new TextEncoder().encode(json(record)),bytes=mode==='truncated'?original.slice(0,-1):mode==='trailing'?new Uint8Array([...original,0]):mode==='empty'?new Uint8Array():new TextEncoder().encode(JSON.stringify(record));
+        return{...file,stream:()=>new ReadableStream({start(c){c.enqueue(bytes);c.close();}})};
+      }
+      return file;
+    });
+    const bytes=vi.spyOn(fs,'readBytes');let error:unknown;try{await readRestoreControls(fs,metadata);}catch(failure){error=failure;}
+    expect(error).toBeInstanceOf(Error);if(mode==='read-error'){expect(error).toBe(primary);expect(released).toHaveBeenCalledOnce();}else if(mode==='cleanup-error'){expect(error).toBe(cleanup);expect(released).toHaveBeenCalledOnce();}
+    expect(statStream).not.toHaveBeenCalled();expect(opened).toHaveBeenCalledTimes(2);expect(bytes).not.toHaveBeenCalled();
+    opened.mockRestore();bytes.mockRestore();
   });
   it('rejects lookalike restore control filenames and unknown generation namespaces', async () => {
     const fs = new TestFS(), id = newId(), path = `v2/local-restore/jobs/${id}/preparedXjson`;

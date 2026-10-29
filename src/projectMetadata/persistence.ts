@@ -22,6 +22,11 @@ export async function readReceipt<T>(fs: ProjectWorkspaceFS, path: string, limit
   if (file.size > limits.maxTotalBytes) fail('receipt-budget');
   const bytes = await fs.readBytes(path);
   if (!bytes || bytes.length !== file.size) return fail('receipt-read');
+  return decodeReceipt<T>(bytes, limits);
+}
+
+/** Pure local-receipt decoding; callers retain ownership of fresh, bounded I/O. */
+export function decodeReceipt<T>(bytes: Uint8Array, limits: MetadataLimits): T {
   try {
     const text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
     const value = cloneCanonicalValue(parseJsonWithoutDuplicateMembers(text), limits);

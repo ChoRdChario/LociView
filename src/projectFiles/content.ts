@@ -20,12 +20,12 @@ import { nativePointSourceProfile, nativeProxySourceProfile, nativeSpatialModelB
 import { meshSourceDeclarations, meshSourceFormat, type MeshSourceFormat } from '../domain/meshSource';
 import { classifyMeshSource, inspectMeshSource, meshSourceProfile } from './meshSource';
 import { validationGlbUsesJpeg } from './glb';
-import { inspectPointPly, isPointModel, isGsModel, isGlbModel, pointSourceProfile, pointSourceMediaType, type ValidatedModel } from './pointPly';
+import { inspectPointPly, isPointPly, isPointModel, isGsModel, isGlbModel, pointSourceProfile, pointSourceMediaType, type ValidatedModel } from './pointPly';
 import { gsSourceProfile, inspectGsPly, inspectGsPlyFile, captureGsBlob, gsBlobStream, hasGsPlySignature } from './gsPly';
 import type { PngDecoder } from './png';
 import type { JpegDecoder } from './jpeg';
 import { fileError, fileObject, validationGlbProfile, occurrenceGlbProfile, jpegGlbProfile, occurrenceJpegGlbProfile, validationMetadataLimits, projectFilePolicy, type FileValidationLimits, type ProjectFilePolicy, type ProjectFilePolicyInput } from './validation';
-import { identityPlacement, prepareValidationModel, sealValidationRecord, validationFileLabel, type ValidationFile, type ValidationModelFile } from './initialProject';
+import { identityPlacement, prepareValidationModel, sealValidationRecord, validationFileLabel, type ValidationFile, type ValidationModelFile, type GsModelPreparation } from './initialProject';
 
 export async function readValidationBody(file: WorkspaceReadableFile, maxBytes: number): Promise<Uint8Array> {
   if (!Number.isSafeInteger(file.size) || file.size <= 0 || file.size > maxBytes) return fileError('保存した本体が検査の上限を超えています。');
@@ -70,9 +70,9 @@ export class ValidationContent implements MetadataMediaPort {
   releasePreparedImages(): void { this.preparedImages.clear(); }
   releasePreparedModels(): void { this.preparedModels.clear(); }
   releasePreparedModel(id:string):void { this.preparedModels.delete(id); }
-  async prepareModel(input: ValidationModelFile, assetId: string) {
+  async prepareModel(input: ValidationModelFile, assetId: string, gsContext?: GsModelPreparation) {
     this.fs.mutationAuthority.assertWorkspaceWriteAuthorized();
-    const prepared = await prepareValidationModel(input, this.policy, this.decode, assetId, this.jpeg);
+    const prepared = await prepareValidationModel(input, this.policy, this.decode, assetId, this.jpeg, gsContext);
     this.preparedModels.set(prepared.representation.id as string, prepared);
     const { body: _body, ...records } = prepared;
     return cloneCanonicalValue(records, validationMetadataLimits) as typeof records;
@@ -106,11 +106,14 @@ export class ValidationContent implements MetadataMediaPort {
     const result = await this.modelContent(record, readOnly); if (!isGlbModel(result)) return fileError('この経路ではGLBモデルを選択してください。'); return result;
   }
   /** Inspect-only display consequence; never stages bytes or grants command evidence. */
-  async modelSelectionNotice(file:Readonly<{size:number;arrayBuffer():Promise<ArrayBuffer>}>):Promise<{externalMaterialsUnavailable:boolean}>{
+  async modelSelectionNotice(file:Readonly<{size:number;blob?:Blob;arrayBuffer():Promise<ArrayBuffer>}>):Promise<{externalMaterialsUnavailable:boolean}>{
+    const size=file.size,blob=file.blob&&captureGsBlob(file.blob),arrayBuffer=file.arrayBuffer.bind(file);
     await this.checkRead?.();
-    if(!Number.isSafeInteger(file.size)||file.size<=0)return fileError('モデルを選択してください。');
-    if(file.size>this.limits.maxFileBytes)return{externalMaterialsUnavailable:false};
-    const bytes=new Uint8Array(await file.arrayBuffer());if(bytes.length!==file.size)return fileError('選択したモデルの大きさが一致しません。');
+    if(!Number.isSafeInteger(size)||size<=0||blob&&blob.size!==size)return fileError('モデルを選択してください。');
+    if(size>this.limits.maxFileBytes)return{externalMaterialsUnavailable:false};
+    if(blob){const prefix=new Uint8Array(await blob.slice(0,65536).arrayBuffer());
+      if(isPointPly(prefix)&&hasGsPlySignature(prefix)){await this.checkRead?.();return{externalMaterialsUnavailable:false};}}
+    const bytes=new Uint8Array(await (blob?blob.arrayBuffer():arrayBuffer()));if(bytes.length!==size)return fileError('選択したモデルの大きさが一致しません。');
     const model=classifyMeshSource(bytes)==='obj'?await inspectMeshSource('obj',bytes,this.limits):undefined;
     await this.checkRead?.();return{externalMaterialsUnavailable:model?.externalMaterialsUnavailable??false};
   }

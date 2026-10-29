@@ -21,6 +21,7 @@ import { validationMetadataLimits as limits, type FileValidationLimits, type Pro
 import type { PngDecoder } from '../projectFiles/png';
 import type { JpegDecoder } from '../projectFiles/jpeg';
 import { sealValidationRecord, validationModelFile } from '../projectFiles/initialProject';
+import { captureGsBlob } from '../projectFiles/gsPly';
 import { cloneCanonicalValue, type JsonObject } from '../domain/values';
 import { metadataProjectView } from './providerProjection';
 import { validationModelVersions } from './validationProjection';
@@ -29,7 +30,7 @@ import type { ProjectAuthority } from './hostPorts';
 import type { SavedWorkspaceHost, LocalOpenMode } from './hostPorts';
 import type { MediaImage, MediaFileAddition } from './mediaDisplay';
 import type { ModelPlacementCommand, ModelFileAddition, ModelFileReplacement } from './modelTypes';
-import { isSavedModel, isSavedMesh, isOrdinaryPoint } from './modelTypes';
+import { isSavedModel, isSavedMesh, isOrdinaryPoint, isOrdinaryGs } from './modelTypes';
 import { classifyMeshSource } from '../projectFiles/meshSource';
 import { orderBetween } from './viewDisplay';
 import { resolveScene } from '../scene/resolve';
@@ -98,6 +99,10 @@ export async function openValidationEntry(options: ValidationHostOptions): Promi
   const lease = options.mode === 'view' ? options.coordinator.openView(options.base, root, `${validationArea}:${run}`) :
     await options.coordinator.tryAcquire(options.base, root, `${validationArea}:${run}`);
   const ordinary = { ...options, firstBackup: undefined }, databases = validationGenerationDatabases(options);
+  const measure = <T>(stage: string, action: () => Promise<T>): Promise<T> => {
+    try { options.timing?.(`restore.first.${stage}.start`, 0); } catch { /* Diagnostics cannot change restoration. */ }
+    return measureValidation(options.timing, `restore.first.${stage}`, action);
+  };
   let handedOff = false, closed = false, busy = false, operation: Promise<unknown> | undefined, failure = '', selectedRecovery = false;
   let prepared: BackupRestoreJob | undefined, existing: ValidationNormalHost | undefined;
   let title = '名前を確認できないプロジェクト', memo: string | null = null;
@@ -137,16 +142,16 @@ export async function openValidationEntry(options: ValidationHostOptions): Promi
   };
   const adopt = async () => {
     if (closed) throw Error('画面を閉じました。復元先は再度開いて確認してください。');
-    const opened = await openNormalValidationHost(ordinary, lease); handedOff = true; return opened;
+    const opened = await measure('adopt', () => openNormalValidationHost(ordinary, lease)); handedOff = true; return opened;
   };
   const runJob = async (job: BackupRestoreJob, prepare: FirstRestoreDisplay) => {
-    const staging = await job.openStaging(databases), service = validationGenerationService(staging, options);
+    const staging = await measure('open-staging', () => job.openStaging(databases)), service = validationGenerationService(staging, options);
     try {
-      const read = await service.session.initializeBackup(job), next = await validationProjectFrom(read, service.content);
+      const read = await measure('initialize', () => service.session.initializeBackup(job)), next = await measure('projection', () => validationProjectFrom(read, service.content));
       if (!next) throw Error('復元先の表示を確認できません。');
-      await prepare(next, service.content);
+      await measure('display', () => prepare(next, service.content));
       if (closed) throw Error('画面を閉じました。復元記録は保持しています。');
-      await job.select(null, service, databases, scope => validationGenerationService(scope, options));
+      await measure('select', () => job.select(null, service, databases, scope => validationGenerationService(scope, options)));
     } finally { service.content.releasePreparedImages(); service.content.releasePreparedModels(); await staging.dispose(); }
     return adopt();
   };
@@ -159,7 +164,7 @@ export async function openValidationEntry(options: ValidationHostOptions): Promi
     confirm: prepare => execute(async () => {
       if (existing) { await existing.backupRestore.confirm(prepare); handedOff = true; return existing; }
       if (!prepared) throw Error('復元するファイルを確認してください。');
-      activate(); const job = await prepared.persist(null, databases); prepared = undefined; return runJob(job, prepare);
+      activate(); const job = await measure('persist', () => prepared!.persist(null, databases)); prepared = undefined; return runJob(job, prepare);
     }),
     retry: prepare => execute(async () => {
       if (existing) { await existing.backupRestore.retry(prepare); handedOff = true; return existing; }
@@ -607,7 +612,7 @@ async function openNormalValidationHost(options: ValidationHostOptions, inherite
       },
       replaceModelFile: (token, input: ModelFileReplacement) => {
         const target = { sceneId: input.sceneId, assetId: input.assetId, expectedBindingId: input.expectedBindingId }, selected = input.file;
-        const file = { name: selected.name, size: selected.size, arrayBuffer: selected.arrayBuffer.bind(selected) };
+        const file = { name: selected.name, size: selected.size, blob: selected.blob && captureGsBlob(selected.blob), arrayBuffer: selected.arrayBuffer.bind(selected) };
         return execute(async () => {
           editable(); const before = await session.read();
           if (before.state !== 'ready' || before.source?.token !== token || before.provider?.kind !== 'scene-provider')
@@ -615,17 +620,20 @@ async function openNormalValidationHost(options: ValidationHostOptions, inherite
           const versions = await validationModelVersions(before.provider);
           const source = versions.find(v => v.assetId === target.assetId && v.projection.bindingId === target.expectedBindingId)?.closure;
           const view = authority.read(), scene = resolveScene(view.state, view.resources, target.sceneId);
-          if (!source || !(isSavedMesh(source) || isOrdinaryPoint(source)) || scene.kind !== 'ready' || !scene.composition.assets.some(a => a.assetId === target.assetId))
+          if (!source || !(isSavedMesh(source) || isOrdinaryPoint(source) || isOrdinaryGs(source)) || scene.kind !== 'ready' || !scene.composition.assets.some(a => a.assetId === target.assetId))
             throw Error('差し替えるモデルを確認してください。');
-          if (!Number.isSafeInteger(file.size) || file.size <= 0 || file.size > content.limits.maxFileBytes)
+          const gs = isOrdinaryGs(source), point = isOrdinaryPoint(source);
+          if (!Number.isSafeInteger(file.size) || file.size <= 0 || file.size > (gs && file.blob ? content.policy.gs.maxFileBytes : content.limits.maxFileBytes) || file.blob && file.blob.size !== file.size)
             throw Error('モデルを含む合計がこの検証の上限を超えています。');
           assertValidationBodyAllocation(before.provider,content.policy,file.size);
-          const bytes = new Uint8Array(await file.arrayBuffer());
-          if (bytes.length !== file.size) throw Error('選択したモデルの大きさが一致しません。');
-          if (!isOrdinaryPoint(source) && !(bytes.length>=4&&new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength).getUint32(0,true)===0x46546c67)&&!classifyMeshSource(bytes)) throw Error('差し替えには面を持つ3Dモデルを選択してください。');
-          const prepared = await content.prepareModel({ label: file.name, bytes }, target.assetId);
+          const chosen = file.blob ? await validationModelFile({ label: file.name, file: file.blob }, content.policy) : { label: file.name, bytes: new Uint8Array(await file.arrayBuffer()) };
+          if (chosen.bytes && chosen.bytes.length !== file.size) throw Error('選択したモデルの大きさが一致しません。');
+          if (!gs && !point && chosen.bytes && !(chosen.bytes.length>=4&&new DataView(chosen.bytes.buffer,chosen.bytes.byteOffset,chosen.bytes.byteLength).getUint32(0,true)===0x46546c67)&&!classifyMeshSource(chosen.bytes)) throw Error('差し替えには面を持つ3Dモデルを選択してください。');
+          const prepared = await content.prepareModel(chosen, target.assetId, gs ? { representationToAsset: source.representation.representationToAsset as unknown as JsonObject } : undefined);
           try {
-            if(isOrdinaryPoint(source) ? prepared.representation.role!=='pointPrimary' || !isOrdinaryPoint({ ...source, representation: prepared.representation } as typeof source) : prepared.representation.role!=='meshPrimary')throw Error(isOrdinaryPoint(source) ? '差し替えには同じ形式のXYZ・RGB点群を選択してください。' : '差し替えには面を持つ3Dモデルを選択してください。');
+            if (prepared.representation.role !== (gs ? 'gsPrimary' : point ? 'pointPrimary' : 'meshPrimary') ||
+              (gs || point) && !same(prepared.representation.formatProfile, source.representation.formatProfile))
+              throw Error(gs ? '差し替えにはGSファイルを選択してください。' : point ? '差し替えには同じ形式のXYZ・RGB点群を選択してください。' : '差し替えには面を持つ3Dモデルを選択してください。');
             const binding = await sealValidationRecord('asset-binding-revision', { id: prepared.binding.id!, assetId: target.assetId,
               assetRevisionId: prepared.revision.id!, parentBindingId: source.binding.id, method: 'manual', assetToProject: source.binding.assetToProject as unknown as JsonObject });
             const result = await ready(await session.edit(token, { kind: 'replaceAssetModel', ...target,

@@ -1,12 +1,24 @@
 import {describe,it,expect,vi} from 'vitest';
 import {inspectGsPly,inspectGsPlyFile,inspectGsPlyStream} from '../src/projectFiles/gsPly';
-import {validationModelFile} from '../src/projectFiles/initialProject';
+import {validationModelFile,prepareValidationModel} from '../src/projectFiles/initialProject';
 import {digest} from '../src/projectMetadata/persistence';
 import {gsFixture} from './helpers/gsFixture';
 const limits={maxFileBytes:64*1024*1024,maxItems:100_000,maxValues:8_000_000,maxJsonBytes:1_000_000,maxPixels:1000};
 const partition=(bytes:Uint8Array,step:number,size=bytes.length)=>({size,stream(){let at=0;return new ReadableStream<Uint8Array>({pull(c){if(at===bytes.length){c.close();return;}const end=Math.min(bytes.length,at+step);c.enqueue(bytes.slice(at,end));at=end;}},{highWaterMark:0});}});
 
 describe('01d identical GS inspection over bounded source partitions',()=>{
+  it('08a owns the GS-only preparation transform, recomputes new bounds, and never buffers the source',async()=>{
+    const row=[0,0,0,0,0,0,.2,0,0,...Array(72).fill(0),0,0,0,0,1,0,0,0],bytes=gsFixture(4,Array.from({length:256},()=>row)),file=new Blob([bytes.slice().buffer]);
+    const context={representationToAsset:{translation:[2,3,4],rotationXYZW:[0,0,1,0],uniformScale:2,reflection:'x'}};
+    const expected=await inspectGsPly(bytes,limits,context),original=Blob.prototype.arrayBuffer,reads:number[]=[];
+    const spy=vi.spyOn(Blob.prototype,'arrayBuffer').mockImplementation(function(this:Blob){reads.push(this.size);if(this.size>65536)throw Error('whole source forbidden');return original.call(this);});
+    try{const pending=prepareValidationModel({label:'replacement',file},limits,undefined,undefined,undefined,context);context.representationToAsset.translation[0]=100;
+      const model=await pending;expect(model.representation.logicalBoundsAsset).toEqual(expected.bounds);expect((model.representation.representationToAsset as any).translation).toEqual([2,3,4]);
+      expect(model.body.file).toBeInstanceOf(Blob);expect(model.body.bytes).toBeUndefined();expect(model.body.ref.digest).toBe(expected.digest);expect(Math.max(...reads)).toBeLessThanOrEqual(65536);
+      await expect(prepareValidationModel({label:'not GS',bytes:new Uint8Array([0])},limits,undefined,undefined,undefined,context)).rejects.toThrow('GS');
+      await expect(prepareValidationModel({label:'unknown context',file},limits,undefined,undefined,undefined,{...context,logicalBoundsAsset:expected.bounds} as any)).rejects.toThrow();
+    }finally{spy.mockRestore();}
+  });
   it('matches all degrees, newline styles, raw digest and literal retained bounds at arbitrary splits',async()=>{
     for(const degree of [0,1,2,3,4])for(const ending of ['\n','\r\n']){
       const bytes=gsFixture(degree,undefined,ending),{bytes:owned,...expected}=await inspectGsPly(bytes,limits);

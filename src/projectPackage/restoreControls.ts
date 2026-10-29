@@ -1,6 +1,6 @@
 import type { ProjectWorkspaceFS } from '../platform/fs';
 import { checkedProof, fail, type MetadataLimits, type MetadataProof } from '../projectMetadata/format';
-import { json, readReceipt, technicalId, writeReceipt } from '../projectMetadata/persistence';
+import { json, readReceipt, decodeReceipt, technicalId, writeReceipt } from '../projectMetadata/persistence';
 import { checkRemoteHeads } from '../projectMetadata/remote';
 import { PACKAGE_LIMITS as L, type EvidenceRef } from './contract';
 import { packageByteHash } from './manifest';
@@ -121,13 +121,38 @@ function prepared(value: RestorePrepared, id: string, limits: MetadataLimits) {
 }
 
 /** Structural control inspection only: never grants a selected destination capability. */
+/** A new receipt snapshot, never the inventory-only handle or a previous audit. */
+async function freshControlReceipt<T>(fs: ProjectWorkspaceFS, path: string, limits: MetadataLimits): Promise<T | null> {
+  const file = await fs.readStream(path);
+  if (!file) return null;
+  if (file.size > limits.maxTotalBytes) fail('receipt-budget');
+  if (!Number.isSafeInteger(file.size) || file.size < 0) fail('receipt-read');
+  const bytes = new Uint8Array(file.size), reader = file.stream().getReader();
+  let offset = 0, failed = false, failure: unknown, value!: T;
+  try {
+    for (;;) {
+      const part = await reader.read(); if (part.done) break;
+      if (!(part.value instanceof Uint8Array) || !part.value.length || part.value.length > bytes.length - offset) fail('receipt-read');
+      bytes.set(part.value, offset); offset += part.value.length;
+    }
+    if (offset !== file.size) fail('receipt-read');
+    value = decodeReceipt<T>(bytes, limits);
+  } catch (error) { failed = true; failure = error; }
+  finally {
+    try { await reader.cancel(); } catch (error) { if (!failed) { failed = true; failure = error; } }
+    try { reader.releaseLock(); } catch (error) { if (!failed) { failed = true; failure = error; } }
+  }
+  if (failed) throw failure;
+  return value;
+}
+
 export async function readRestoreControls(fs: ProjectWorkspaceFS, limits: MetadataLimits, readFirstPrepared: boolean | 'detect' = false) {
   const prefix = `${restoreRoot(fs)}v2/local-restore/`, paths = await fs.list(prefix), readLimits = restoreLimits(limits);
   if (paths.length > L.entryCount || new Set(paths).size !== paths.length) fail('restore-control-budget');
   const byJob = new Map<string, Map<string, string>>(), selectionPaths: string[] = [], sizes = new Map<string, number>();
   let controlBytes = 0, nodes = 0, work = 0;
   // Overlap size-only native opens within this audit; receipt bytes below are
-  // still freshly reopened, parsed and checked in the original order.
+  // still freshly reopened, streamed, parsed and checked in the original order.
   for (let at = 0; at < paths.length; at += 4) {
     const opened = await Promise.allSettled(paths.slice(at, at + 4).map(async path => {
       if (!path.startsWith(prefix)) return fail('restore-control-path');
@@ -149,7 +174,7 @@ export async function readRestoreControls(fs: ProjectWorkspaceFS, limits: Metada
     }
   }
   const read = async <T>(path: string): Promise<T> => {
-    const value = await readReceipt<T>(fs, path, readLimits); if (!value) return fail('restore-control-missing');
+    const value = await freshControlReceipt<T>(fs, path, readLimits); if (!value) return fail('restore-control-missing');
     if (restoreRef(value).byteLength !== sizes.get(path)) fail('restore-control-changed');
     // Cumulative parsing/inspection budget, including all retained jobs.
     const pending: unknown[] = [value];
