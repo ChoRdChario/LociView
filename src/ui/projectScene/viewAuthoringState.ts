@@ -22,6 +22,8 @@ export interface ViewAuthorContext {
   /** Complete current reference/deletion admission, not merely this Scene's entry pointer. */
   readonly deletion: Readonly<{ sourceToken: string; viewId: string; issue: string | null }> | null;
   readonly feedback: ViewFeedback;
+  /** Side-effect-free allocator used by the host; refusal leaves the exact adjacent move unavailable. */
+  readonly orderBetween: (before: string | null, after: string | null) => string;
 }
 export type ViewAuthorIntent = Readonly<{ kind: 'new' | 'edit' | 'capture' | 'apply' | 'delete' }> |
   Readonly<{ kind: 'move'; direction: 'earlier' | 'later' }>;
@@ -129,6 +131,9 @@ export function planViewAuthor(context: ViewAuthorContext, intent: ViewAuthorInt
     return blocked('視点の順序と状態を確認してください。');
   const index = choices.findIndex(row => row.id === item.id), neighbor = choices[index + (intent.direction === 'earlier' ? -1 : 1)];
   if (index < 0 || !neighbor) return blocked(intent.direction === 'earlier' ? '先頭の視点です。' : '末尾の視点です。');
+  const rows = choices.filter(row => row.id !== item.id), at = rows.findIndex(row => row.id === neighbor.id) + (intent.direction === 'later' ? 1 : 0);
+  try { context.orderBetween(rows[at - 1]?.order ?? null, rows[at]?.order ?? null); }
+  catch { return blocked(`この順序では${intent.direction === 'earlier' ? '前' : '後'}へ移動できません。`); }
   return Object.freeze({ kind: 'move', ...scope, viewId: item.id, direction: intent.direction, neighborId: neighbor.id });
 }
 export function viewAuthorPlanIsCurrent(plan: ViewAuthorPlan, context: ViewAuthorContext): boolean {

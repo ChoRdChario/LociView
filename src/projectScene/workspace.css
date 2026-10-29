@@ -219,6 +219,7 @@
   .lv-project-shell[data-layout="workspace"] > .lv-project-workspace > header > details[open] { flex: 1 1 100%; min-width: 0; }
   .lv-project-shell[data-layout="workspace"] .lv-project-body { flex: 1; height: auto; min-height: 0; }
   .lv-project-shell[data-layout="workspace"] .lv-project-stage { min-height: 0; min-width: 0; }
-  .lv-project-shell[data-layout="workspace"] .lv-project-body > aside { min-height: 0; overscroll-behavior: contain; }
+  .lv-project-shell[data-layout="workspace"] .lv-project-body > aside { min-height: 0; overscroll-behavior: contain; scroll-padding-top: 64px; }
+  .lv-project-shell[data-layout="workspace"] .lv-project-body > aside > [role="tablist"] { position: sticky; top: -12px; z-index: 1; padding: 4px 0; background: #f2f0ee; }
   .lv-project-shell[data-layout="workspace"] > .lv-project-files[open] > section { max-height: min(30dvh, 240px); overflow-y: auto; overscroll-behavior: contain; }
 }

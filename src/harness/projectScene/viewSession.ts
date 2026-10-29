@@ -106,7 +106,7 @@ export class SyntheticViewSession {
     return { view, draft: this.drafts.get(this.scene()) ?? null, capture,
       versions: id && camera && background ? { sourceToken: view.source.token, viewId: id, camera, background } : null,
       deletion: id ? { sourceToken: view.source.token, viewId: id, issue: used ? '開始時の視点の設定を確認してください。' : null } : null,
-      feedback: this.authorFeedback };
+      feedback: this.authorFeedback, orderBetween };
   }
   accept(plan: ViewPlan, context: ViewContext, camera: (payload: DisplayCapture | null) => void): boolean {
     const entryAction = plan.kind === 'entry' || (plan.kind === 'change' && plan.action !== 'select') || (plan.kind === 'review' && plan.target === 'entry');

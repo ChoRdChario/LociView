@@ -12,7 +12,8 @@
 .lv-project-body > aside { overflow-y: auto; min-width: 0; padding: 12px; display: flex; flex-direction: column; gap: 12px; border-left: 1px solid #b7b1aa; }
 .lv-project-body > aside > section { flex-shrink: 0; }
 .lv-project-body label { display: grid; gap: 4px; }
-.lv-project-body [role="tablist"] { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; flex-shrink: 0; }
+.lv-project-body [role="tablist"] { display: flex; flex-wrap: wrap; gap: 4px; flex-shrink: 0; }
+.lv-project-body [role="tab"] { flex: 1 0 auto; min-width: 44px; padding: 6px 4px; white-space: nowrap; }
 .lv-project-body [role="tab"][aria-selected="true"] { border-bottom: 3px solid #413d39; background: #e1ddd7; }
 .lv-project-body [aria-label="モデルの配置"] > div { display: flex; flex-wrap: wrap; gap: 6px; }
 .lv-project-body [aria-label="モデルの配置"] label { flex: 1 1 96px; min-width: 0; }

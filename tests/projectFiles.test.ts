@@ -5383,6 +5383,30 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect(cold.authority.read().materialData!.records[made.overrideId]!.intent).toMatchObject({kind:'value',value:{appearance:made.appearance,compositing:made.compositing}});
     await cold.dispose(); expect(h.legacy).not.toHaveBeenCalled();
   });
+  it('shows exact Saved View move refusal before dispatch and still moves one representable tied item (injected viewport)', async () => {
+    const prepared = structuredClone(await prepareValidationProject({ run: newId(), title: '視点の順序', models: [{ label: 'モデル', bytes: glb() }] }, budget, decode));
+    const project = prepared.records.project as JsonObject, sceneId = project.defaultSceneId as string, frameId = (project.frame as JsonObject).id as string;
+    const ids = [1, 2, 3].map(n => `view_${n.toString(16).padStart(32, '0')}`);
+    ids.forEach((viewId, index) => { (prepared.records.viewsById as Record<string, JsonObject>)[viewId] = { id: viewId, sceneId, projectFrameId: frameId,
+      name: `視点 ${index + 1}`, orderKey: 'A', lifecycle: { state: 'active', eventId: `evt_${newId()}`, reason: 'initial' },
+      camera: { position: [1, 0, 5], target: [0, 0, 0], up: [0, 1, 0], projection: { kind: 'perspective', verticalFovRadians: 1 } },
+      background: { kind: 'solid', colorSrgb: [0.1, 0.2, 0.3] } }; });
+    const h = await productWorkspaceFixture(false, false, false, 'map1', prepareValidationCreation(prepared)), { host, button, named, editor } = h;
+    button('保存した視点', editor).fire('click'); const views = named('視点の作業', editor), author = named('視点の作成と管理', views),
+      chooser = h.all(views).find(n => n.tag === 'select' && n.attributes.get('aria-label') === '保存した視点')!;
+    const select = (viewId: string) => { chooser.value = viewId; chooser.fire('change'); };
+    const before = host.read().source!, records = structuredClone(host.authority.read().viewData!.records);
+    select(ids[0]!); expect(button('後へ', author).disabled).toBe(true); button('後へ', author).fire('click');
+    expect(h.all(author).some(n => n.textContent.includes('後へ移動できません'))).toBe(true);
+    select(ids[2]!); expect(button('前へ', author).disabled).toBe(true); button('前へ', author).fire('click');
+    expect(h.dispatch).not.toHaveBeenCalled(); expect(host.read().source!.originalChanges()).toEqual(before.originalChanges());
+    select(ids[1]!); expect(button('前へ', author).disabled).toBe(false); expect(button('後へ', author).disabled).toBe(false);
+    await h.edited(() => button('前へ', author).fire('click')); expect(h.dispatch).toHaveBeenCalledOnce();
+    expect(h.dispatch.mock.calls[0]![1]).toMatchObject({ kind: 'editView', viewId: ids[1], edits: { orderKey: expect.any(String) } });
+    const after = host.authority.read().viewData!.records; expect(after[ids[0]!]).toEqual(records[ids[0]!]); expect(after[ids[2]!]).toEqual(records[ids[2]!]);
+    const movedOrder = after[ids[1]!]!.orderKey; expect(movedOrder.kind === 'value' && movedOrder.value < 'A').toBe(true);
+    expect(h.camera).not.toHaveBeenCalled(); expect(h.recall).not.toHaveBeenCalled(); expect(h.legacy).not.toHaveBeenCalled(); await h.ui.dispose();
+  });
   it('connects product Saved Views and material scope to exact capture, typed writes and file reopen (injected viewport)', async () => {
     const h = await productWorkspaceFixture(true), { host, button, named, editor, edited, all } = h;
     button('保存した視点', editor).fire('click'); const views = named('視点の作業', editor), author = named('視点の作成と管理', views), background = named('3D背景', views);
@@ -5391,6 +5415,14 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     await edited(() => button('視点を追加', author).fire('click'));
     const command = h.dispatch.mock.calls.map(c => c[1]).find(c => c.kind === 'createView')!; if (command.kind !== 'createView') throw Error('view');
     expect(command.camera).toEqual(captured.camera); expect(command.background).toEqual(captured.background);
+    button('視点を作る', author).fire('click'); name.value = '並べ替える視点'; name.fire('input'); await edited(() => button('視点を追加', author).fire('click'));
+    const secondView = h.dispatch.mock.calls.map(c => c[1]).filter(c => c.kind === 'createView').at(-1)!; if (secondView.kind !== 'createView') throw Error('second view');
+    const cameraBefore = h.payload(); await edited(() => button('前へ', author).fire('click'));
+    const ordered = host.authority.read().viewData!.records[secondView.viewId]!.orderKey; expect(ordered.kind).toBe('value');
+    expect(h.payload()).toEqual(cameraBefore); expect(h.recall).not.toHaveBeenCalled();
+    const move = h.dispatch.mock.calls.at(-1)![1]; expect(move).toMatchObject({ kind: 'editView', viewId: secondView.viewId, edits: { orderKey: expect.any(String) } });
+    expect(Object.keys((move as Extract<MetadataEdit, { kind: 'editView' }>).edits)).toEqual(['orderKey']);
+    const selectView = all(views).find(n => n.tag === 'select' && n.attributes.get('aria-label') === '保存した視点')!; selectView.value = command.viewId; selectView.fire('change');
     const entry = named('シーンを開いたときの視点', views); entry.value = command.viewId; entry.fire('change');
     expect(h.recall).not.toHaveBeenCalled(); await edited(() => button('設定を適用', views).fire('click')); expect(h.recall).not.toHaveBeenCalled();
     const color = named('背景色', background); color.value = '#123456'; color.fire('input'); button('背景に適用', background).fire('click'); expect(h.background).toHaveBeenCalledTimes(1);
@@ -5413,7 +5445,8 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect(h.legacy).not.toHaveBeenCalled(); const source = host.read().source!, blob = await host.workspaceOutput.download(await host.workspaceOutput.generate(source.token));
     await h.ui.dispose(); const peer = firstWorkspaceRecipient(); await peer.receiver.importWorkspace(blob);
     const reopened = (await peer.session.read()).source!; expect(reopened.originalChanges()).toEqual(source.originalChanges());
-    const cold = await openValidationHost(h.f.options); expect(cold.read().source!.originalChanges()).toEqual(source.originalChanges()); await cold.dispose();
+    const cold = await openValidationHost(h.f.options); expect(cold.read().source!.originalChanges()).toEqual(source.originalChanges());
+    expect(cold.authority.read().viewData!.records[secondView.viewId]!.orderKey).toEqual(ordered); await cold.dispose();
     expect(all(editor).length).toBeGreaterThan(0);
   });
   it('keeps every material owner conflict and exact View candidates in the product read adapter', async () => {

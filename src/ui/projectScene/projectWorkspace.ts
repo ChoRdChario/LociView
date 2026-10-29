@@ -426,7 +426,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       if (tab.disabled || !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
       const keys = [...tabButtons.keys()], at = keys.indexOf(key);
       const next = event.key === 'Home' ? 0 : event.key === 'End' ? keys.length - 1 : (at + (event.key === 'ArrowLeft' ? keys.length - 1 : 1)) % keys.length;
-      event.preventDefault(); const button = tabButtons.get(keys[next]!)!; button.focus({ preventScroll: true }); button.click();
+      event.preventDefault(); const button = tabButtons.get(keys[next]!)!; button.focus(); button.click();
     });
     const panel = key === 'captions' ? captionPanel : panels.get(key)!.root; panel.id = `lv-project-${key}`; panel.setAttribute('role', 'tabpanel'); panel.setAttribute('aria-labelledby', tab.id);
     if (key !== 'captions') sidebar.append(panel);

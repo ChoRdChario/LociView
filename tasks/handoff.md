@@ -52,6 +52,9 @@ The2026-10-30 PC everyday-use work covers tag-input ownership, optional file-
 selection cancellation, receive/restore feedback and compact Desktop viewport/
 file-pane sizing. Todo owns the exact checks and current unit; keep startup/
 recovery and narrow-screen flow outside active-workspace height constraints.
+Current daily-use continuation covers Saved View move availability and reachable
+whole-label task tabs, retaining model/View/material drafts and typed commands.
+Use todo for the connected evidence and remaining candidate/device/offline gates.
 PO2026-10-29 defers10k-Caption/50k-change qualification; it is low-priority later
 work, not a practical completion blocker. Follow todo for the next ordinary user
 workflow; retain current limits, safety checks and existing fixtures.

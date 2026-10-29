@@ -56,7 +56,86 @@ unchanged-feature-classification checks pass; independent review has no findings
 No runtime change or new capacity guarantee; no runtime suite is needed for this
 documentation checkpoint.
 
-## Current boundary —PC workspace stays visible during file work
+## Current boundary —Saved View organization and reachable task navigation
+
+PO2026-10-30 authorizes the next daily-use unit. Audit: g0-baseline HEAD6ded664,
+clean worktree, prior file-continuation/layout checkpoints verified and pushed.
+Outcome: model work → record/recall/organize Saved Views → material work → save
+and reopen, with task navigation readable/reachable and impossible moves explained
+before selection. Root is the sole writer; contract/navigation reviewers read-only.
+
+Ports before implementation: ViewAuthorContext gets a required synchronous pure
+`orderBetween(before,after):string` allocator. Product supplies existing
+`ProjectWorkspacePorts.viewOrder`; harness supplies its already-imported allocator.
+Planner probes the same remove-selected/exact-neighbor interval as the existing
+host write; existing relative plan, typed editView, token/field/runtime guards and
+dispatch-time allocation remain. UI state imports no application/storage code.
+No new import edge, command, key format, collection rebalance or tie-group jump.
+Specification05's exact-neighbor allocation-or-no-write-refusal contract remains.
+
+Acceptance: impossible equal/tight/exhausted intervals disable only the affected
+direction and show a useful reason; representable middle moves stay enabled.
+Stale source/selection/neighbors remain no-write; free-camera movement does not
+block ordering, and real View/name/background/material drafts retain their guards.
+Assess adjacent task presentation from rendered evidence; do not change shared
+data or cancel input to make navigation easier. Reuse pure/mounted controls plus
+one connected typed file flow and a dedicated Chromium model→views→material→
+save/reopen flow, then independent review and one final serial checkpoint.
+Stop only affected work for a genuine policy/architecture/authority decision.
+No dependency, storage/package/renderer change, capacity promise, device/offline
+adoption or release is part of this unit.
+Read-only navigation assessment confirms the tab strip scrolls away with the
+long task pane, and equal-width columns split the Caption label. Use whole-label
+wrapping tabs with existing names/roles/keyboard sequence and a sticky strip only
+in the bounded wide Desktop pane. Preserve all panel nodes and drafts; normal
+narrow/short document scrolling remains. Verify scroll→keyboard task switch→return
+with a pending material/View draft plus cancel/apply and saved-file reopen.
+Implementation and focused evidence: direct regression first reproduced the
+impossible move still being offered. The allocator/context connection now passes
+pure author/background14, typed equal-key no-dispatch + existing view/material
+file2, and existing harness-authoring/Caption-model-IME2 selections. Typecheck PASS.
+One test queried a same-named region instead of the select; corrected by role/tag,
+retaining exact field/history assertions. Field narrowing and style-handle typing
+were test-only corrections. Independent move and CSS reviews PASS. Removed an
+unreliable alternative-move suggestion; directional refusal alone stays accurate.
+Review also identified wrapped keyboard tabs could be focused offscreen because
+of preventScroll; use normal focus scrolling with the same key mapping/guards.
+Dedicated Chromium workflow is running, including emulated wrapped text, pending
+model/View/material drafts and actual Workspace save/import/re-save/reload.
+First Chromium run1793307992966-20984 passed model draft return/commit and first
+View creation, then timed out on a test-only region query: the composition exposes
+the View root as the named tabpanel. Correct the query to its actual role/name;
+retain all operation/assertion scope. New-test action waits use the existing15s
+browser-runbook pattern, with90s explicit operation waits/420s total unchanged;
+no global runner/product limit or retry is added. This stopped run is not PASS.
+Connected Chromium run1793308477663-36960 PASS; visual review found leading pane
+padding let scrolled labels peek above the sticky strip. Offset the strip by the
+existing12px padding and add actual focus/next-Tab visibility checks, without
+scroll compensation. Final run1793308631792-56796 PASS:26.833s test/40.455s total,
+two independent owned-Mesh contexts; model/View/material draft keyboard return,
+cancel/apply, View projection/capture/order, material values, actual Workspace
+download/import/re-save with exact originalChanges and page reload. Wide tabs
+remain whole-label/44px/reachable;320px with20px tab text exercises wrapped End-
+focus reveal. This is text/viewport emulation, not actual browser zoom/device or
+full browser restart/offline-shell evidence. Impossible intervals/no-dispatch are
+covered by pure/mounted Node controls; browser flow checks ordinary reorder.
+Independent source/delta and final rendered-evidence reviews PASS. Final serial
+`check:checkpoint` PASS at the frozen9 source/test files: typecheck,136 root files/
+3074 passed/21 unchanged TODO and all4 builds; root923.73s. Log:
+`.artifacts/e2e/pc-view-task/checkpoint.log`. Four-artifact HEIC isolation PASS;
+frozen hashes match. Staging must retain the reviewed/tested tree. Do not repeat
+runtime checks for unchanged staging or result prose. Next: consolidate the PC everyday candidate and its remaining
+offline/device acceptance conditions, distinguishing missing implementation from
+an external/activation gate before selecting further maintenance or UI helpers.
+Next-boundary audit (design only while the tested implementation stays frozen):
+Desktop offline cold launch is actually missing, not merely unexecuted evidence.
+01e§5 and current build/registration code explicitly forbid its SW/manifest/install
+activation. Prepare one reviewable PC-only shell/cache/update/origin proposal;
+preserve the static candidate/normal PWA and in-place data, and request the one
+genuine grouped activation decision only after the current verified checkpoint.
+No SW/cache/PWA implementation, registration or publication before that decision.
+
+## Previous boundary —PC workspace stays visible during file work
 
 Audit start: g0-baseline HEAD5708e91, verified continuation checkpoint pushed;
 worktree clean. The next missing accepted UI condition is visible3D plus task

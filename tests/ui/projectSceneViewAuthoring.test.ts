@@ -7,6 +7,7 @@ import { acceptViewBackground, editViewBackground, planViewBackground, viewBackg
   type ViewBackgroundContext } from '../../src/ui/projectScene/viewBackgroundState';
 import { createViewAuthorControls, createViewBackgroundControls, type ViewAuthorEvent, type ViewBackgroundEvent } from '../../src/ui/projectScene/viewAuthoringControls';
 import { RecordedDocument, record } from './domRecorder';
+import { orderBetween } from '../../src/projectScene/viewDisplay';
 
 const id = (kind: string, n: number) => `${kind}_${n.toString(16).padStart(32, '0')}`;
 const scene = id('scn', 1), other = id('scn', 2), frame = id('frm', 1), first = id('view', 1), second = id('view', 2), third = id('view', 3);
@@ -25,8 +26,10 @@ function author(): ViewAuthorContext {
     cameraBlock: null, mutationBlock: null, cameraFeedback: { kind: 'idle' }, entryFeedback: { kind: 'idle' } };
   return { view, draft: null, capture: { kind: 'ready', capture: { sceneId: scene, projectFrameId: frame, runtimeToken: 'runtime', token: 'exact-capture' } },
     versions: { viewId: second, sourceToken: 'source', camera: 'camera-field', background: 'background-field' },
-    deletion: { viewId: second, sourceToken: 'source', issue: null }, feedback: { kind: 'idle' } };
+    deletion: { viewId: second, sourceToken: 'source', issue: null }, feedback: { kind: 'idle' }, orderBetween };
 }
+// Pure state remains cloneable; the trusted host function is compared by identity separately.
+const stateSnapshot = (ctx: ViewAuthorContext) => structuredClone({ ...ctx, orderBetween: null });
 function start(ctx: ViewAuthorContext, kind: 'new' | 'edit' | 'capture'): ViewAuthorContext {
   const plan = planViewAuthor(ctx, { kind }); if (plan.kind !== 'draft') throw Error(`draft: ${JSON.stringify(plan)}`); return { ...ctx, draft: plan.draft };
 }
@@ -64,12 +67,12 @@ function backgroundHost() {
 
 describe('Scene-owned view authoring intentions', () => {
   it('captures exact host identity once; creation never chooses a default, ID, order or current view', () => {
-    const initial = author(), original = structuredClone(initial); let ctx = named(start(initial, 'new'), 'か\u3099');
+    const initial = author(), original = stateSnapshot(initial); let ctx = named(start(initial, 'new'), 'か\u3099');
     const saved = ctx.draft!.capture;
     ctx = { ...ctx, view: { ...ctx.view, runtime: { ...ctx.view.runtime, token: 'moved-camera' } } };
     const plan = planViewAuthor(ctx, { kind: 'apply' }); expect(plan).toMatchObject({ kind: 'apply', viewId: null, name: 'が', capture: saved });
     expect(plan).not.toHaveProperty('background'); expect(plan).not.toHaveProperty('defaultViewId'); expect(plan).not.toHaveProperty('orderKey');
-    expect(initial).toEqual(original); expect(ctx.draft!.capture).toBe(saved); expect(viewAuthorPlanIsCurrent(plan, ctx)).toBe(true);
+    expect(stateSnapshot(initial)).toEqual(original); expect(initial.orderBetween).toBe(orderBetween); expect(ctx.draft!.capture).toBe(saved); expect(viewAuthorPlanIsCurrent(plan, ctx)).toBe(true);
     expect(planViewAuthor(start(initial, 'new'), { kind: 'apply' })).toMatchObject({ kind: 'blocked' });
   });
   it('validates name scalars/controls/IME and refuses to capture stale or foreign runtime', () => {
@@ -100,14 +103,42 @@ describe('Scene-owned view authoring intentions', () => {
     ctx = start(ctx, 'capture'); expect(ctx.draft!.captureBase!.camera).toBe('camera-field'); expect(planViewAuthor(ctx, { kind: 'apply' }).kind).toBe('blocked');
   });
   it('requires exact deletion admission, never clears entry, and emits one-item relative order intent', () => {
-    const ctx = author(); const before = structuredClone(ctx);
+    const ctx = author(); const before = stateSnapshot(ctx);
     expect(planViewAuthor(ctx, { kind: 'delete' })).toMatchObject({ kind: 'delete', viewId: second });
     for (const entryViewId of [value(second), unknown<string | null>()]) expect(planViewAuthor({ ...ctx, view: { ...ctx.view, source: { ...source(), entryViewId } } }, { kind: 'delete' }).kind).toBe('blocked');
     for (const deletion of [null, { ...ctx.deletion!, sourceToken: 'stale' }, { ...ctx.deletion!, issue: '使用中' }]) expect(planViewAuthor({ ...ctx, deletion }, { kind: 'delete' }).kind).toBe('blocked');
     expect(planViewAuthor(ctx, { kind: 'move', direction: 'earlier' })).toMatchObject({ kind: 'move', viewId: second, neighborId: first });
     expect(planViewAuthor(ctx, { kind: 'move', direction: 'later' })).toMatchObject({ kind: 'move', viewId: second, neighborId: third });
     expect(planViewAuthor({ ...ctx, view: { ...ctx.view, source: { ...source(), views: [item(first, '不明', 'A'), { ...item(second, '不明', 'B'), orderKey: unknown<string>() }] } } }, { kind: 'move', direction: 'earlier' }).kind).toBe('blocked');
-    expect(ctx).toEqual(before);
+    expect(stateSnapshot(ctx)).toEqual(before); expect(ctx.orderBetween).toBe(orderBetween);
+  });
+  it('refuses impossible adjacent intervals before selection without blocking representable tied moves', () => {
+    const initial = author(), tied = { ...initial, orderBetween,
+      view: { ...initial.view, source: { ...source(), views: [item(first, '入口', 'A'), item(second, '全景', 'A'), item(third, '詳細', 'A')] } } };
+    const selected = (viewId: string) => ({ ...tied, view: { ...tied.view, memory: { ...tied.view.memory, selectedViewId: viewId } } });
+    expect(planViewAuthor(selected(first), { kind: 'move', direction: 'later' })).toMatchObject({ kind: 'blocked', reason: expect.stringContaining('後へ移動できません') });
+    expect(planViewAuthor(selected(third), { kind: 'move', direction: 'earlier' })).toMatchObject({ kind: 'blocked', reason: expect.stringContaining('前へ移動できません') });
+    for (const direction of ['earlier', 'later'] as const) expect(planViewAuthor(selected(second), { kind: 'move', direction })).toMatchObject({ kind: 'move', viewId: second, direction });
+    for (const [keys, selectedViewId, direction] of [
+      [['9', 'A', 'A0'], first, 'later'], [['A', 'B', 'z'.repeat(64)], second, 'later'],
+    ] as const) {
+      const ctx = { ...initial, orderBetween, view: { ...initial.view, memory: { ...initial.view.memory, selectedViewId },
+        source: { ...source(), views: [item(first, '入口', keys[0]), item(second, '全景', keys[1]), item(third, '詳細', keys[2])] } } };
+      expect(planViewAuthor(ctx, { kind: 'move', direction }).kind).toBe('blocked');
+    }
+    const h = authorHost(); h.render(selected(first)); expect(h.later.disabled).toBe(true);
+    const note = h.root.children[2]!.children[3]!; expect(note.textContent).toContain('後へ移動できません');
+    expect(h.later.attributes.get('aria-describedby')).toBe(note.id); h.later.fire('click'); expect(h.events).toEqual([]);
+    h.render(selected(second)); expect(h.earlier.disabled).toBe(false); expect(h.later.disabled).toBe(false); h.controls.dispose();
+  });
+  it('rechecks source, selection and exact neighbors while keeping reorder independent from free-camera capture', () => {
+    const ctx = author(), plan = planViewAuthor(ctx, { kind: 'move', direction: 'earlier' }); expect(plan.kind).toBe('move');
+    expect(viewAuthorPlanIsCurrent(plan, { ...ctx, view: { ...ctx.view, source: { ...source(), token: 'received' } } })).toBe(false);
+    expect(viewAuthorPlanIsCurrent(plan, { ...ctx, view: { ...ctx.view, memory: { ...ctx.view.memory, selectedViewId: third } } })).toBe(false);
+    expect(viewAuthorPlanIsCurrent(plan, { ...ctx, view: { ...ctx.view, source: { ...source(), views: [item(first, '入口', 'Z'), item(second, '全景', 'B'), item(third, '詳細', 'A')] } } })).toBe(false);
+    expect(viewAuthorPlanIsCurrent(plan, { ...ctx, capture: { kind: 'unavailable', reason: '表示の準備中です。' },
+      view: { ...ctx.view, runtime: { ...ctx.view.runtime, token: 'free-camera-moved' } } })).toBe(true);
+    const draft = start(ctx, 'edit'); expect(planViewAuthor(draft, { kind: 'move', direction: 'earlier' }).kind).toBe('blocked'); expect(draft.draft).not.toBeNull();
   });
   it('rejects duplicate/foreign/deleted selection and stale apply; acknowledges only the exact draft and verified receipt', () => {
     const initial = author(), src = source();

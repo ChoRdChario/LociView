@@ -36,7 +36,8 @@ export function createProjectViews(document: Document, host: ProjectPanelHost): 
       current = { kind: 'ready', capture };
     } catch (error) { current = { kind: 'unavailable', reason: (error as Error).message }; }
     const data = host.ports.views(view.source.sceneId, s.memory.selectedViewId);
-    return { view, draft: s.draft, capture: current, versions: data.versions, deletion: data.deletion, feedback: { kind: 'idle' } };
+    return { view, draft: s.draft, capture: current, versions: data.versions, deletion: data.deletion, feedback: { kind: 'idle' },
+      orderBetween: (before, after) => host.ports.viewOrder(before, after) };
   };
   const backgroundContext = (): ViewBackgroundContext => {
     const view = context('background'), scope = { sceneId: view.source.sceneId, projectFrameId: view.source.projectFrameId };
