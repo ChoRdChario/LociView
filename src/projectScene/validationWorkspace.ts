@@ -150,10 +150,10 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   conversionTitle.addEventListener('compositionstart', () => { composing = true; invalidateLoci(); controls(); });
   conversionTitle.addEventListener('compositionend', () => { composing = false; invalidateLoci(); controls(); });
   const execute = (action: () => Promise<void>) => {
-    if (busy || disposed) return; busy = true; controls();
+    if (busy || disposed) return; busy = true; controls(); workspace?.render();
     const work = action(); operation = work;
     return work.catch(error => { if (!disposed) status.textContent = error instanceof Error ? error.message : '処理できません。入力と再開用データは保持しています。'; })
-      .finally(() => { busy = false; if (operation === work) operation = undefined; if (!disposed) controls(); });
+      .finally(() => { busy = false; if (operation === work) operation = undefined; if (!disposed) { controls(); workspace?.render(); } });
   };
   const closeCurrent = async () => {
     const oldWorkspace=workspace,oldHost=host,oldResident=resident,oldReview=reviewWorkspace,oldAttempt=reviewEditAttempt,oldTools=receiveTools,oldRecovery=firstRecovery;
@@ -259,7 +259,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
       const refresh=()=>{if(!current())return;mounted=checked&&!state();if(mounted&&selectionHost===target&&!target.hasPending())clearSelection();rememberCurrent();controls();};
       presentation={busy:true,reason:'モデルを読み込んでいます。記録は閲覧・検索できます。'};
       workspace=ports.mountEditor(target,bridge.factory,receiveTools,ports.renderModelCandidate?display=>ports.renderModelCandidate!(target,display):undefined,
-        {smoothDisplay:ports.smoothDisplay,presentation:state,openProject:()=>{void selectProject();},resumedLastProject:()=>resumedLast,storageEstimate:ports.storageEstimate,localSettings:ports.localSettings,changed:refresh});
+        {smoothDisplay:ports.smoothDisplay,presentation:state,projectNavigationBlocked:()=>busy,openProject:()=>{void selectProject();},resumedLastProject:()=>resumedLast,storageEstimate:ports.storageEstimate,localSettings:ports.localSettings,changed:refresh});
       content.replaceChildren(workspace.root,retry);workspace.render();
       const load=async()=>{
         checked=false;mounted=false;presentation={busy:true,reason:'モデルを読み込んでいます。記録は閲覧・検索できます。'};retry.hidden=true;resident?.detachPreparation?.();workspace?.render();
@@ -285,7 +285,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     const fileTools = receiveTools;
     try { workspace=ports.mountEditor(target,next.factory,fileTools,
       ports.renderModelCandidate ? display=>ports.renderModelCandidate!(target,display) : undefined,
-      {smoothDisplay:ports.smoothDisplay,openProject:()=>{void selectProject();},resumedLastProject:()=>resumedLast,storageEstimate:ports.storageEstimate,localSettings:ports.localSettings,
+      {smoothDisplay:ports.smoothDisplay,projectNavigationBlocked:()=>busy,openProject:()=>{void selectProject();},resumedLastProject:()=>resumedLast,storageEstimate:ports.storageEstimate,localSettings:ports.localSettings,
         changed:()=>{rememberCurrent();controls();}});
       content.replaceChildren(workspace.root); workspace.render();
       if (target.backupRestore.needsDisplay) { target.backupRestore.displayReady(target.read().source!.token); workspace.render(); } }

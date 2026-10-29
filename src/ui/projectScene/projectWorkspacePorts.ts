@@ -8,6 +8,7 @@ import type { MaterialSource } from './materialState';
 import type { ViewCameraIntent, ViewRuntime, ViewSource } from './viewState';
 import type { ViewFieldVersions } from './viewAuthoringState';
 import type { CaptionSnapshot } from '../../projectMetadata/captionAuthoring';
+import type { CaptionUndoInput, CaptionUndoCapture, CaptionUndoReceipt, CaptionUndoTarget, CaptionUndoSnapshot } from '../../projectMetadata/captionUndo';
 
 export type WorkspaceAuthoringIntent =
   | { kind: 'duplicateCaption'; sceneId: string; sourceId: string }
@@ -88,6 +89,9 @@ export interface WorkspaceFileInteraction {
 }
 export interface ProjectWorkspacePorts {
   authoring?: {
+    beginUndo(token: string, command: CaptionUndoInput): CaptionUndoCapture | null;
+    finishUndo(token: string, capture: CaptionUndoCapture): CaptionUndoReceipt | null;
+    undoSnapshot(token: string, target: CaptionUndoTarget): CaptionUndoSnapshot;
     prepare(token: string, intent: WorkspaceAuthoringIntent): MetadataEdit;
     snapshot(token: string, captionId: string): CaptionSnapshot;
     sceneOrderChoices(token: string, sceneId: string): readonly { operationId: string; orderKey: string }[];
@@ -95,6 +99,7 @@ export interface ProjectWorkspacePorts {
   read(): WorkspaceProvider;
   projectStatus(): { readonly title: string | null; readonly resumable: boolean; readonly backup: 'verified' | 'unconfirmed' | 'unavailable' };
   openProject?(): void;
+  projectNavigationBlocked?(): boolean;
   resumedLastProject?(): boolean;
   storageEstimate?(): Promise<Readonly<{ usage?: number; quota?: number }>>;
   localSettings?: { read(): string; save(displayName: string): boolean };

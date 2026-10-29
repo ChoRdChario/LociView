@@ -193,7 +193,12 @@ First integration includes new raw point Project, point addition to an existing
 Project, local point diameter, Caption/media work, file exchange/restore and cold
 continuation. Existing local visibility and explicit Move/Rotate/positive-uniform-scale controls
 apply to the point Asset without rewriting original coordinates or Caption positions.
-Point replacement/format conversion, GS/Proxy, other Mesh formats and
+The2026-10-29 authorized [08 continuation](08-daily-authoring-workflow.md) extends
+the same-profile ordinary Point replacement workflow through the existing
+Session/file/recovery boundary. Its exact source/profile and preservation rules
+supersede only the earlier Point-replacement deferral; no automatic pin mapping.
+
+Point format conversion, GS/Proxy, other Mesh formats and
 remaining material effects follow with their real compatibility/recipe gates;
 this does not remove them from the accepted feature set or mark allM02/A03 complete.
 

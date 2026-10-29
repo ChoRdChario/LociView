@@ -71,7 +71,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   header.append(projectTitle, resumeStatus, fileStatus, help);
   const resumeNotice = make('p'); resumeNotice.setAttribute('role', 'status');
   const otherProject = button('別のプロジェクトを開く', () => {
-    if (!disposed && !busy && !dirty() && !ports.otherPending()) ports.openProject?.();
+    if (!disposed && !busy && !dirty() && !ports.otherPending() && !ports.projectNavigationBlocked?.()) ports.openProject?.();
   });
   header.append(resumeNotice, otherProject);
   const status = make('p'); status.setAttribute('role', 'status'); status.className = 'lv-operation-status';
@@ -286,8 +286,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       const edits = { ...(event.changes.title !== undefined ? { title: event.changes.title } : {}),
         ...(event.changes.body !== undefined ? { body: event.changes.body } : {}),
         ...(event.changes.color !== undefined ? { colorSrgb: colorBytes(event.changes.color) } : {}) };
-      const before = ports.authoring?.snapshot(provider().token, event.captionId);
-      void run({ kind: 'editCaption', captionId: event.captionId, edits }, () => { if (before) organization?.recordEdit(before); resetDraft(); feedback = '変更を適用しました。'; });
+      void run({ kind: 'editCaption', captionId: event.captionId, edits }, () => { resetDraft(); feedback = '変更を適用しました。'; });
     } else if (event.kind === 'review') feedback = '下の競合欄で残す内容を選択してください。';
     render();
   });
@@ -366,7 +365,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       if (block || token !== provider().token) { feedback = block ?? '対象が更新されています。入力を保持しています。'; render(); return; }
       void perform(action, complete);
     },
-    dispatch(owner, token, command, complete) { this.execute(owner, token, () => ports.dispatch(token, command), complete); },
+    dispatch(owner, token, command, complete) { const undo = organization?.beginAction(command) ?? null; this.execute(owner, token, () => ports.dispatch(token, command), () => { organization?.recordAction(undo); complete(); }); },
   };
   organization = createProjectOrganization(document, {
     ports, source: () => ({ provider: provider(), sceneId, captionId: memory().selectedCaptionId }),
@@ -489,7 +488,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
         ...impact.tags.map(e => `タグの登録：${String(fieldValue(p.details.mutable.captionTagsById[e.tagId]?.label) ?? '名称を確認')}（${e.id}）`));
       deletionEffects.replaceChildren(...rows.map(text => make('li', text)));
       deletionNote.textContent = deletion.token !== p.token ? '内容が更新されています。取り消して、影響を確認し直してください。' :
-        `${impact.memberships.length}件のシーン登録・添付${impact.attachments.length}件・タグ登録${impact.tags.length}件も削除します。メディア本体とタグは残ります。この画面では元に戻せません。`;
+        `${impact.memberships.length}件のシーン登録・添付${impact.attachments.length}件・タグ登録${impact.tags.length}件も削除します。メディア本体とタグは残ります。この画面の「記録の変更を元に戻す」で戻せます。別の更新や未解決の内容がある場合は戻せません。`;
     }
     const issues = p.issues.filter(i => i.kind === 'orphan' || i.code === 'concurrent-delete-edit' || i.code === 'pending-orphan-reference' ||
       i.code === 'atomic-field-conflict' && i.path[2] === 'lifecycle' && ['captionsById', 'sceneCaptionMembershipsById', 'captionAttachmentsById', 'captionTagMembershipsById'].includes(i.path[0]!));
@@ -506,7 +505,8 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   async function run(command: MetadataEdit, complete: () => void) {
     if (mutationBlock()) return;
     const token = provider().token;
-    await perform(() => ports.dispatch(token, command), complete);
+    const undo = organization?.beginAction(command) ?? null;
+    await perform(() => ports.dispatch(token, command), () => { organization?.recordAction(undo); complete(); });
   }
   async function runRetry() {
     if (busy || !pending || ports.readOnly || ports.otherPending()) return;
@@ -573,7 +573,8 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     const orders = projectAttachments(provider(), scope.captionId).map(a => a.order).sort();
     const input = { ...scope, attachmentId: id('att'), eventId: id('evt'), orderKey: (orders.at(-1) ?? '') + 'U',
       file: { name: file.name, size: file.size, arrayBuffer: file.arrayBuffer.bind(file) } };
-    void perform(() => ports.addMedia(scope.token, input), () => { pickerScope = null; mediaInput.value = ''; resetDraft(); feedback = 'メディアを追加しました。'; }, 'media');
+    const undo = organization?.beginAction({ kind: 'newMediaAttachment', captionId: scope.captionId, attachmentId: input.attachmentId }) ?? null;
+    void perform(() => ports.addMedia(scope.token, input), () => { organization?.recordAction(undo); pickerScope = null; mediaInput.value = ''; resetDraft(); feedback = 'メディアを追加しました。'; }, 'media');
   });
   const modifiedPointer = (event: PointerEvent) => event.altKey || event.ctrlKey || event.metaKey;
   const invalidateGesture = () => { gesture = null; gestureGeneration++; };
@@ -639,7 +640,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       projectTitle.textContent = summary.title?.trim() || '名前を確認できないプロジェクト';
       resumeNotice.textContent = ports.resumedLastProject?.() && summary.resumable && summary.title ? `最後のプロジェクトを再開しました：${summary.title}` : '';
       resumeNotice.hidden = !resumeNotice.textContent; otherProject.hidden = !ports.openProject;
-      otherProject.disabled = busy || dirty() || ports.otherPending() || !!ports.presentation?.();
+      otherProject.disabled = busy || dirty() || ports.otherPending() || !!ports.presentation?.() || !!ports.projectNavigationBlocked?.();
       resumeStatus.textContent = busy || ports.status().kind === 'checking' ? '変更を確定しています。' : pending || ports.status().kind === 'failed' ? '更新が未完了です。入力を保持しています。再試行してください。' :
         draftInput() || panelInput() || recovery?.hasChanges() || mediaManager?.hasChanges() ? '入力中の内容はまだ確定していません。' : summary.resumable ? 'このブラウザに再開用データがあります。' : '再開データの状態を確認してください。';
       fileStatus.textContent = summary.backup === 'verified' ? '確定済みの内容は、選択した保存ファイルと一致しています。' : summary.backup === 'unavailable' ? 'ファイルの保存状態を確認できません。ファイル欄を確認してください。' : '現在の内容を保存したファイルは未確認です。';

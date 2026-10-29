@@ -29,7 +29,7 @@ import type { ProjectAuthority } from './hostPorts';
 import type { SavedWorkspaceHost, LocalOpenMode } from './hostPorts';
 import type { MediaImage, MediaFileAddition } from './mediaDisplay';
 import type { ModelPlacementCommand, ModelFileAddition, ModelFileReplacement } from './modelTypes';
-import { isSavedModel, isSavedMesh } from './modelTypes';
+import { isSavedModel, isSavedMesh, isOrdinaryPoint } from './modelTypes';
 import { classifyMeshSource } from '../projectFiles/meshSource';
 import { orderBetween } from './viewDisplay';
 import { resolveScene } from '../scene/resolve';
@@ -615,17 +615,17 @@ async function openNormalValidationHost(options: ValidationHostOptions, inherite
           const versions = await validationModelVersions(before.provider);
           const source = versions.find(v => v.assetId === target.assetId && v.projection.bindingId === target.expectedBindingId)?.closure;
           const view = authority.read(), scene = resolveScene(view.state, view.resources, target.sceneId);
-          if (!source || !isSavedMesh(source) || scene.kind !== 'ready' || !scene.composition.assets.some(a => a.assetId === target.assetId))
+          if (!source || !(isSavedMesh(source) || isOrdinaryPoint(source)) || scene.kind !== 'ready' || !scene.composition.assets.some(a => a.assetId === target.assetId))
             throw Error('差し替えるモデルを確認してください。');
           if (!Number.isSafeInteger(file.size) || file.size <= 0 || file.size > content.limits.maxFileBytes)
             throw Error('モデルを含む合計がこの検証の上限を超えています。');
           assertValidationBodyAllocation(before.provider,content.policy,file.size);
           const bytes = new Uint8Array(await file.arrayBuffer());
           if (bytes.length !== file.size) throw Error('選択したモデルの大きさが一致しません。');
-          if (!(bytes.length>=4&&new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength).getUint32(0,true)===0x46546c67)&&!classifyMeshSource(bytes)) throw Error('差し替えには面を持つ3Dモデルを選択してください。点群の差し替えはまだ利用できません。');
+          if (!isOrdinaryPoint(source) && !(bytes.length>=4&&new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength).getUint32(0,true)===0x46546c67)&&!classifyMeshSource(bytes)) throw Error('差し替えには面を持つ3Dモデルを選択してください。');
           const prepared = await content.prepareModel({ label: file.name, bytes }, target.assetId);
           try {
-            if(prepared.representation.role!=='meshPrimary')throw Error('差し替えには面を持つ3Dモデルを選択してください。');
+            if(isOrdinaryPoint(source) ? prepared.representation.role!=='pointPrimary' || !isOrdinaryPoint({ ...source, representation: prepared.representation } as typeof source) : prepared.representation.role!=='meshPrimary')throw Error(isOrdinaryPoint(source) ? '差し替えには同じ形式のXYZ・RGB点群を選択してください。' : '差し替えには面を持つ3Dモデルを選択してください。');
             const binding = await sealValidationRecord('asset-binding-revision', { id: prepared.binding.id!, assetId: target.assetId,
               assetRevisionId: prepared.revision.id!, parentBindingId: source.binding.id, method: 'manual', assetToProject: source.binding.assetToProject as unknown as JsonObject });
             const result = await ready(await session.edit(token, { kind: 'replaceAssetModel', ...target,

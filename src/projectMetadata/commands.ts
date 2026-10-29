@@ -29,9 +29,11 @@ import { planViewResolution, type ViewResolution } from './viewResolution';
 import { planMaterialResolution, type MaterialResolution } from './materialResolution';
 import { planCaptionAuthoring, type CaptionAuthoringCommand } from './captionAuthoring';
 import { planSceneOrganization, type SceneOrganizationCommand } from './sceneOrganization';
+import { planCaptionUndo, type CaptionUndoCommand } from './captionUndo';
 import { fitAlignmentBounds, type AlignmentBounds, type AlignmentPlacement } from '../domain/alignment';
 
 export type MetadataEdit =
+  | CaptionUndoCommand
   | CaptionAuthoringCommand
   | SceneOrganizationCommand
   | AddAssetCommand
@@ -99,6 +101,7 @@ export function canonicalMetadataEdit(input: MetadataEdit, limits: MetadataLimit
 /** Plan only from the Session's fresh verified provider. Not a generic patch/import API. */
 export function planMetadataEdit(provider: Provider, input: MetadataEdit, limits: MetadataLimits, checkedPointAnchor = false): readonly MetadataWrite[] {
   const command = canonicalMetadataEdit(input, limits), raw = command as unknown as JsonObject;
+  if (command.kind === 'compensateCaptionAction') return planCaptionUndo(provider, command, limits);
   if (['duplicateCaption', 'restoreCaptionFields', 'createTag', 'editTag', 'deleteTag', 'setCaptionTag', 'resolveTagField', 'resolveTagLifecycle'].includes(command.kind))
     return planCaptionAuthoring(provider, command as CaptionAuthoringCommand, limits);
   if (['duplicateScene', 'deleteSceneContents', 'reorderScene', 'resolveSceneOrder', 'restoreScene'].includes(command.kind))

@@ -46,8 +46,12 @@ test('daily Scene and Caption organization, tags, alignment, settings and files 
     await p.getByText('数値で配置', { exact: true }).click(); const owner = p.getByLabel('追加先モデル', { exact: true }); await owner.focus(); await owner.selectOption({ label: '基準.glb' }); await expect(p.getByRole('button', { name: 'このモデルに追加', exact: true })).toBeEnabled(); await p.getByRole('button', { name: 'このモデルに追加', exact: true }).click();
     for (const [axis, value] of [['X', '0'], ['Y', '.5'], ['Z', '0']]) await p.getByLabel(`位置 ${axis}`, { exact: true }).fill(value!);
     await p.getByRole('button', { name: '位置を確定', exact: true }).click(); await ready(p, 'ピンの位置を確定しました。');
+    await p.getByRole('button', { name: '記録の変更を元に戻す', exact: true }).click(); await ready(p, '記録の変更を元に戻しました。'); await expect(p.locator('.lv-caption-select')).toHaveCount(0);
+    await p.getByRole('button', { name: '記録の変更をやり直す', exact: true }).click(); await ready(p, '記録の変更をやり直しました。'); await expect(p.locator('.lv-caption-select')).toHaveCount(1);
     await p.getByLabel('タイトル', { exact: true }).fill('元の記録'); await p.getByLabel('本文', { exact: true }).fill('元の本文'); await p.getByRole('button', { name: '変更を適用', exact: true }).click(); await ready(p, '変更を適用しました。');
     const chooser = p.waitForEvent('filechooser'); await p.getByLabel('メディアを追加', { exact: true }).click(); await (await chooser).setFiles({ name: '現地.png', mimeType: 'image/png', buffer: smallPng() }); await ready(p, 'メディアを追加しました。');
+    await p.getByRole('button', { name: '記録の変更を元に戻す', exact: true }).click(); await ready(p, '記録の変更を元に戻しました。'); await expect(p.getByRole('region', {name:'添付メディア',exact:true}).getByRole('figure')).toHaveCount(0);
+    await p.getByRole('button', { name: '記録の変更をやり直す', exact: true }).click(); await ready(p, '記録の変更をやり直しました。'); await expect(p.getByRole('region', {name:'添付メディア',exact:true}).getByRole('figure')).toHaveCount(1);
     const timedFiles=await Promise.all(['owned-video.mp4','owned-audio.m4a','owned-audio.mp3'].map(async name=>({name,mimeType:name.endsWith('.mp4')?'video/mp4':name.endsWith('.m4a')?'audio/mp4':'audio/mpeg',buffer:await readFile(`tests/fixtures/daily-media/${name}`)})));
     const play=async(page:Page,kind:'video'|'audio',name:string)=>{
       const gallery=page.getByRole('region',{name:'メディアの整理',exact:true});
@@ -70,6 +74,12 @@ test('daily Scene and Caption organization, tags, alignment, settings and files 
     await p.getByLabel('タイトル', { exact: true }).fill('複製の記録'); await p.getByLabel('本文', { exact: true }).fill('独立した本文'); await p.getByRole('button', { name: '変更を適用', exact: true }).click(); await ready(p, '変更を適用しました。');
     await p.getByRole('button', { name: '記録の変更を元に戻す', exact: true }).click(); await ready(p, '記録の変更を元に戻しました。'); await expect(p.getByLabel('本文', { exact: true })).toHaveValue('元の本文');
     await p.getByRole('button', { name: '記録の変更をやり直す', exact: true }).click(); await ready(p, '記録の変更をやり直しました。');
+    await p.getByRole('button', {name:'プロジェクトから削除',exact:true}).click(); await p.getByRole('region',{name:'削除の確認',exact:true}).getByRole('button',{name:'削除する',exact:true}).click(); await ready(p,'プロジェクトから削除しました。'); await expect(p.locator('.lv-caption-select')).toHaveCount(1);
+    await p.getByRole('button',{name:'記録の変更を元に戻す',exact:true}).click(); await ready(p,'記録の変更を元に戻しました。'); await expect(p.getByLabel('本文',{exact:true})).toHaveValue('独立した本文');
+    await p.getByRole('button',{name:'記録の変更を元に戻す',exact:true}).click(); await ready(p,'記録の変更を元に戻しました。'); await expect(p.getByLabel('本文',{exact:true})).toHaveValue('元の本文');
+    await p.getByRole('button',{name:'記録の変更を元に戻す',exact:true}).click(); await ready(p,'記録の変更を元に戻しました。'); await expect(p.locator('.lv-caption-select')).toHaveCount(1);
+    for(let i=0;i<3;i++){await p.getByRole('button',{name:'記録の変更をやり直す',exact:true}).click();await ready(p,'記録の変更をやり直しました。');}
+    await expect(p.locator('.lv-caption-select')).toHaveCount(1); await p.getByRole('button',{name:'記録の変更を元に戻す',exact:true}).click();await ready(p,'記録の変更を元に戻しました。');await expect(p.getByLabel('本文',{exact:true})).toHaveValue('独立した本文');
     await p.getByRole('button', { name: '次の記録', exact: true }).click(); await expect(p.getByLabel('タイトル', { exact: true })).toHaveValue('元の記録');
     await p.getByRole('button', { name: '前の記録', exact: true }).click(); await expect(p.getByLabel('タイトル', { exact: true })).toHaveValue('複製の記録');
     console.log('daily: records and undo verified');
@@ -98,6 +108,7 @@ test('daily Scene and Caption organization, tags, alignment, settings and files 
     }
     expect(Object.values(before.records.captionAttachmentsById)).toHaveLength(nativeHeic?20:16); expect(Object.values(before.records.mediaResourcesById)).toHaveLength(nativeHeic?5:4);
     await first.context.close(); contexts.delete(first.context); const cold = await launch(); await expect(cold.page.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText('日常の編集', { timeout: 90_000 });
+    await expect(cold.page.getByRole('button',{name:'記録の変更を元に戻す',exact:true})).toBeDisabled(); await expect(cold.page.getByRole('button',{name:'記録の変更をやり直す',exact:true})).toBeDisabled();
     await cold.page.getByLabel('設定', { exact: true }).locator('summary').click(); await expect(cold.page.getByLabel('このブラウザの表示名', { exact: true })).toHaveValue('現地担当');
     const after = await backupRecords(await output(cold.page, info, 'daily-cold', 'backup')); expect(after.records).toEqual(before.records); expect(after.archive.source.token).toBe(before.archive.source.token);
     await cold.page.getByRole('tab',{name:'キャプション',exact:true}).click();await cold.page.getByRole('list',{name:'キャプション一覧',exact:true}).locator('.lv-caption-select').filter({hasText:'複製の記録'}).click();await play(cold.page,'audio','owned-audio.mp3');

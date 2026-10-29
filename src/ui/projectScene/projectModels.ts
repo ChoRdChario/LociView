@@ -244,7 +244,7 @@ export function createProjectModels(document: Document, host: ProjectPanelHost):
     confirmAddition.hidden=fileScope?.kind!=='add'||!fileScope.file||!fileScope.externalMaterialsUnavailable;confirmAddition.disabled=!!block||fileScope?.token!==provider.token;
     confirmReplacement.hidden = fileScope?.kind !== 'replace' || !fileScope.file; confirmReplacement.disabled = !!block || fileScope?.token !== provider.token || !!host.ports.modelSelectionNotice&&fileScope?.externalMaterialsUnavailable===undefined;
     cancelFile.hidden = !fileScope; cancelFile.disabled = !!host.block('models', false);
-    fileNote.textContent = fileScope?.kind === 'replace' ? `${fileScope.file?.name ?? 'ファイルを選択してください。'} ${details?.sceneCount.kind === 'value' ? `${details.sceneCount.value}シーンのモデルを差し替えます。` : ''} 配置と記録は保持され、ピンは要確認になります。材質の調整は引き継ぎません。` : fileScope ? '追加するモデルを選択してください。' : '';
+    fileNote.textContent = fileScope?.kind === 'replace' ? `${fileScope.file?.name ?? 'ファイルを選択してください。'} ${details?.sceneCount.kind === 'value' ? `${details.sceneCount.value}シーンのモデルを差し替えます。` : ''} 配置と記録は保持され、ピンは要確認になります。${details?.pointCloud ? '同じ形式のXYZ・RGB点群を選択してください。' : '材質の調整は引き継ぎません。'}` : fileScope ? '追加するモデルを選択してください。' : '';
     if(fileScope?.externalMaterialsUnavailable)fileNote.textContent+=' OBJの外部材質・画像は読み込まず、既定の材質で表示します。';
     const referenceDetails = reference ? host.ports.modelDetails(sceneId, reference.assetId) : null;
     const referenceChanged = !!reference && (!referenceDetails || referenceDetails.target.bindingId !== reference.bindingId);

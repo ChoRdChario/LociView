@@ -137,6 +137,10 @@ selection after hiding that Mesh. Unsupported DPR3 is local to point display;
 existing Mesh/Caption/media stay usable. Individual run results and final-build
 identity remain in todo; a passing case never relabels a failed aggregate run.
 This is not arbitrary PLY/GS, physical-device, offline or adoption acceptance.
+The same test uses `LOCIVIEW_E2E_ENTRY` when explicitly selected by the Desktop
+config. Its08 extension covers same01a Point replacement, peer-local text retention,
+needsReview/manual confirmation and returned updates. Current exact executions
+remain in todo; validation and Desktop runs grant only their named route evidence.
 
 The connected regression creates a Project, places a pin using numeric model-local
 coordinates, edits Caption text and adds a generated image. It downloads a named

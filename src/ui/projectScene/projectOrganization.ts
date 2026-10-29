@@ -1,5 +1,5 @@
 import type { MetadataEdit } from '../../projectMetadata/commands';
-import type { CaptionSnapshot, CaptionRestoreValues } from '../../projectMetadata/captionAuthoring';
+import { rebaseCaptionUndo, type CaptionUndoSnapshot, type CaptionUndoReceipt, type CaptionUndoCapture, type CaptionUndoInput } from '../../projectMetadata/captionUndo';
 import type { WorkspaceAuthoringIntent, ProjectWorkspacePorts, WorkspaceProvider } from './projectWorkspacePorts';
 import { activeRecord, fieldValue } from './projectRead';
 import { newProjectId, panelNodes, sameProjectValue } from './projectPanel';
@@ -11,9 +11,6 @@ interface OrganizationHost {
   blocked(): string | null; run(command: MetadataEdit, complete: () => void): void;
   scene(id: string): void; caption(id: string): void; changed(): void; message(text: string): void;
 }
-type UndoEntry = { before: CaptionSnapshot; after: CaptionSnapshot };
-const restoredValues = (snapshot: CaptionSnapshot): CaptionRestoreValues => Object.fromEntries(snapshot.fields.flatMap(f =>
-  f.value.kind === 'value' ? [[f.field, f.value.value]] : [])) as CaptionRestoreValues;
 /** Task controls only; complete reads and typed command preparation belong to the Host. */
 export function createProjectOrganization(document: Document, host: OrganizationHost) {
   const { make, button } = panelNodes(document), sceneRoot = make('div'), captionRoot = make('div'), tagsRoot = make('details');
@@ -38,7 +35,9 @@ export function createProjectOrganization(document: Document, host: Organization
   });
   const cancelSettings = button('表示名の入力を取り消す', () => { if (!composing && !host.localBlocked()) { settingsDraft = null; settingsStatus.textContent = ''; host.changed(); } });
   settingsRoot.append(settingsSummary, displayNameLabel, make('p', 'このブラウザだけの設定です。共有ファイルや過去の編集者名は変わりません。'), applySettings, cancelSettings, settingsStatus);
-  const undoByCaption = new Map<string, { past: UndoEntry[]; future: UndoEntry[] }>();
+  const actionHistory: { past: CaptionUndoReceipt[]; future: CaptionUndoReceipt[] } = { past: [], future: [] };
+  const recorded = new WeakSet<CaptionUndoCapture>();
+  let undoWarning = '';
   const perform = (intent: WorkspaceAuthoringIntent, complete: (command: MetadataEdit) => void) => {
     if (disposed || host.blocked() || composing || !host.ports.authoring) return;
     try { const { provider } = host.source(), command = host.ports.authoring.prepare(provider.token, intent); host.run(command, () => complete(command)); }
@@ -74,18 +73,24 @@ export function createProjectOrganization(document: Document, host: Organization
     if (command.kind === 'duplicateCaption') { host.caption(command.captionId); host.message('記録を複製しました。元の記録は変わりません。'); }
   }); });
   const undo = button('記録の変更を元に戻す', () => compensate(false)), redo = button('記録の変更をやり直す', () => compensate(true));
-  const undoNote = make('p'); undoNote.textContent = 'この画面で確定したタイトル・本文・色を戻せます。';
+  const undoNote = make('p'); undoNote.textContent = 'この画面の記録作成・複製・削除・文章・色と、添付の操作を戻せます。別の更新がある場合は戻せません。';
   captionRoot.append(copyCaption, undo, redo, undoNote);
-  const history = () => { const id = host.source().captionId; if (!id) return null; if (!undoByCaption.has(id)) undoByCaption.set(id, { past: [], future: [] }); return undoByCaption.get(id)!; };
-  function currentMatches(snapshot: CaptionSnapshot) { try { const s = host.source(); return sameProjectValue(snapshot, host.ports.authoring!.snapshot(s.provider.token, snapshot.captionId)); } catch { return false; } }
+  const history = () => actionHistory;
+  function currentMatches(snapshot: CaptionUndoSnapshot) { try { const s = host.source(); return sameProjectValue(snapshot, host.ports.authoring!.undoSnapshot(s.provider.token, snapshot.target)); } catch { return false; } }
   function compensate(forward: boolean) {
-    const h = history(), entry = (forward ? h?.future : h?.past)?.at(-1); if (!entry || host.blocked() || form || captured) return;
-    const expected = forward ? entry.before : entry.after; if (!currentMatches(expected)) { host.message('記録が更新されているため戻せません。現在の内容は保持しています。'); return; }
-    host.run({ kind: 'restoreCaptionFields', expected, values: restoredValues(forward ? entry.after : entry.before) }, () => {
-      const s = host.source(), current = host.ports.authoring!.snapshot(s.provider.token, expected.captionId);
-      if (forward) { h!.future.pop(); h!.past.push({ before: entry.before, after: current }); if (h!.future.length && sameProjectValue(h!.future.at(-1)!.before, entry.after)) h!.future.at(-1)!.before = current; }
-      else { h!.past.pop(); h!.future.push({ before: current, after: entry.after }); if (h!.past.length && sameProjectValue(h!.past.at(-1)!.after, entry.before)) h!.past.at(-1)!.after = current; }
-      host.caption(expected.captionId); host.message(forward ? '記録の変更をやり直しました。' : '記録の変更を元に戻しました。');
+    const h = history(), entry = (forward ? h.future : h.past).at(-1); if (!entry || host.blocked() || form || captured) return;
+    const expected = forward ? entry.before : entry.after, goal = forward ? entry.after : entry.before;
+    if (!currentMatches(expected)) { host.message('別の更新があるため戻せません。現在の内容は保持しています。'); return; }
+    host.run({ kind: 'compensateCaptionAction', expected, goal, eventId: newProjectId('evt') }, () => {
+      const s = host.source(), current = host.ports.authoring!.undoSnapshot(s.provider.token, expected.target);
+      if (forward) { h.future.pop(); h.past.push({ before: entry.before, after: current }); }
+      else { h.past.pop(); h.future.push({ before: current, after: entry.after }); }
+      for (const previous of h.past) if (previous !== h.past.at(-1) || !forward) previous.after = rebaseCaptionUndo(previous.after, goal, current);
+      for (const next of h.future) if (next !== h.future.at(-1) || forward) next.before = rebaseCaptionUndo(next.before, goal, current);
+      const captionId = expected.target.captionId;
+      const included = Object.values(host.source().provider.state.captionMemberships).some(e => e.sceneId === s.sceneId && e.resourceId === captionId && fieldValue(e.lifecycle)?.state === 'active');
+      if (included && fieldValue(host.source().provider.resources.captions[captionId]?.lifecycle)?.state === 'active') host.caption(captionId);
+      host.message(forward ? '記録の変更をやり直しました。' : '記録の変更を元に戻しました。');
     });
   }
   const tagList = make('div'), tagForm = make('div'), tagNameLabel = make('label', 'タグ名'), tagName = make('input'), tagColor = make('input');
@@ -132,6 +137,7 @@ export function createProjectOrganization(document: Document, host: Organization
     undo.disabled = blocked || owned || !h?.past.length || !currentMatches(h.past.at(-1)!.after);
     redo.disabled = blocked || owned || !h?.future.length || !currentMatches(h.future.at(-1)!.before);
     undoNote.hidden = !h?.past.length && !h?.future.length;
+    if (undoWarning) { undoNote.hidden = false; undoNote.textContent = undoWarning; }
     saveTag.textContent = captured?.tagId ? 'タグを更新' : 'タグを追加'; saveTag.disabled = blocked || composing || !!stale || !captured || !tagName.value.trim();
     tagCancel.hidden = !captured && !form?.kind.startsWith('tag'); tagCancel.disabled = host.localBlocked() || composing;
     tagConfirm.hidden = form?.kind !== 'tagDelete'; tagConfirm.disabled = blocked || composing || !!stale;
@@ -171,8 +177,14 @@ export function createProjectOrganization(document: Document, host: Organization
     }
   }
   return { sceneRoot, captionRoot, tagsRoot, settingsRoot, displayNameBadge, render, hasChanges: () => !!form || !!captured || !!settingsDraft, composing: () => composing,
-    recordEdit(before: CaptionSnapshot) { const s = host.source(), after = host.ports.authoring!.snapshot(s.provider.token, before.captionId);
-      const h = undoByCaption.get(before.captionId) ?? { past: [], future: [] }; if (h.past.length && !sameProjectValue(h.past.at(-1)!.after, before)) h.past = [];
-      h.past.push({ before, after }); h.future = []; undoByCaption.set(before.captionId, h); },
-    dispose() { disposed = true; undoByCaption.clear(); sceneRoot.remove(); captionRoot.remove(); tagsRoot.remove(); settingsRoot.remove(); displayNameBadge.remove(); } };
+    beginAction(command: CaptionUndoInput) { const s = host.source(); return host.ports.authoring?.beginUndo(s.provider.token, command) ?? null; },
+    recordAction(capture: CaptionUndoCapture | null) {
+      if (!capture || recorded.has(capture)) return;
+      const s = host.source();
+      try {
+        const receipt = host.ports.authoring!.finishUndo(s.provider.token, capture); recorded.add(capture);
+        if (receipt) { actionHistory.past.push(receipt); actionHistory.future = []; undoWarning = ''; undoNote.textContent = 'この画面の記録作成・複製・削除・文章・色と、添付の操作を戻せます。別の更新がある場合は戻せません。'; }
+      } catch { recorded.add(capture); actionHistory.future = []; undoWarning = 'この操作は元に戻せません。確定した内容は保持しています。'; }
+    },
+    dispose() { disposed = true; actionHistory.past = []; actionHistory.future = []; sceneRoot.remove(); captionRoot.remove(); tagsRoot.remove(); settingsRoot.remove(); displayNameBadge.remove(); } };
 }

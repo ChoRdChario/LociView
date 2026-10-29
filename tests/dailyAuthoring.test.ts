@@ -1,3 +1,4 @@
+import { reactivatedCaptionMedia } from '../src/projectMetadata/captionReactivation';
 import { describe, expect, it } from 'vitest';
 import * as A from '@automerge/automerge';
 import { fixture, id, lifecycle, limits as structural } from './helpers/projectRecordsFixture';
@@ -5,6 +6,8 @@ import { ProjectMetadataSource } from '../src/projectMetadata/source';
 import { newId } from '../src/projectMetadata/persistence';
 import { readProjectScene } from '../src/scene/projectProvider';
 import { developmentContentVerifier } from '../poc/scene-history/content-verifier';
+import { beginCaptionUndo, finishCaptionUndo, captionUndoSnapshot, rebaseCaptionUndo, type CaptionUndoReceipt } from '../src/projectMetadata/captionUndo';
+import { captionDeletionImpact } from '../src/projectMetadata/captionDeletion';
 import { captionSnapshot } from '../src/projectMetadata/captionAuthoring';
 import { organizationSceneSource, sceneRestoreSource, sceneOrderChoices } from '../src/projectMetadata/sceneOrganization';
 import type { MetadataEdit } from '../src/projectMetadata/commands';
@@ -156,5 +159,104 @@ describe('alignment geometry', () => {
     const centre = boundsCentre(bounds), a = alignmentVector(centre, fitted), b = alignmentVector(centre, reference);
     a.forEach((n, i) => expect(n + fitted.translation[i]!).toBeCloseTo(b[i]! + reference.translation[i]!));
     expect(() => fitAlignmentBounds({ min: [0, 0, 0], max: [0, 0, 0] }, before, bounds, reference)).toThrow();
+  });
+});
+
+
+describe('local Caption action compensation over retained records', () => {
+  async function tracked(source: ProjectMetadataSource, command: MetadataEdit) {
+    const capture = beginCaptionUndo(await provider(source), command, limits); expect(capture).not.toBeNull();
+    const result = await edit(source, command), receipt = finishCaptionUndo(await provider(result), capture!, limits); expect(receipt).not.toBeNull();
+    return { source: result, receipt: receipt! };
+  }
+  const compensate = (source: ProjectMetadataSource, receipt: CaptionUndoReceipt, forward = false) => edit(source,
+    { kind: 'compensateCaptionAction', expected: forward ? receipt.before : receipt.after, goal: forward ? receipt.after : receipt.before, eventId: fresh('evt') });
+  it('undoes an edited duplicate back through creation and restores the same identities without deleting resources', async () => {
+    const source = seed(), sourceRows = (await provider(source)).inspection.candidates.unambiguousRecords;
+    const created = await tracked(source, { kind: 'duplicateCaption', sceneId: id('scn'), sourceId: id('cap'), captionId: fresh('cap'), membershipId: fresh('scm'),
+      attachments: [{ sourceId: id('att'), targetId: fresh('att') }], tags: [{ sourceId: id('tgm'), targetId: fresh('tgm') }], orderKey: 'Z', eventId: fresh('evt') });
+    const captionId = created.receipt.after.target.captionId;
+    const changed = await tracked(created.source, { kind: 'editCaption', captionId, edits: { body: '複製後の文章' } });
+    const undoneText = await compensate(changed.source, changed.receipt), current = captionUndoSnapshot(await provider(undoneText), changed.receipt.before.target, limits);
+    created.receipt.after = rebaseCaptionUndo(created.receipt.after, changed.receipt.before, current);
+    const undoneCreation = await compensate(undoneText, created.receipt), p = await provider(undoneCreation);
+    expect(p.resources.captions[captionId]!.lifecycle).toMatchObject({ value: { state: 'deleted' } });
+    expect(p.inspection.candidates.unambiguousRecords.mediaResourcesById).toEqual(sourceRows.mediaResourcesById);
+    expect(p.resources.captions[id('cap')]).toEqual((await provider(source)).resources.captions[id('cap')]);
+    created.receipt.before = captionUndoSnapshot(p, created.receipt.before.target, limits);
+    const redone = await compensate(undoneCreation, created.receipt, true), restored = await provider(redone);
+    expect(restored.resources.captions[captionId]!.lifecycle).toMatchObject({ value: { state: 'active', reason: 'restore' } });
+    expect(Object.keys(restored.resources.captions).sort()).toEqual(Object.keys((await provider(created.source)).resources.captions).sort());
+    const foreign = branch(created.source, d => { delete d.captionsById[captionId].title; d.captionsById[captionId].title = new A.ImmutableString(canonical('記録')); });
+    await expect(compensate(foreign, finishCaptionUndo(await provider(created.source), { target: created.receipt.after.target, before: null }, limits)!)).rejects.toThrow('caption-undo-changed');
+    const extra = await edit(created.source, { kind: 'createAttachment', sceneId: id('scn'), captionId, attachmentId: fresh('att'), media: fixture().mediaResourcesById[id('med')], orderKey: 'ZZ', altText: '', eventId: fresh('evt') });
+    await expect(compensate(extra, finishCaptionUndo(await provider(created.source), { target: created.receipt.after.target, before: null }, limits)!)).rejects.toThrow('caption-undo-new-child');
+  });
+  it('restores only the observed deletion closure across Scenes and refuses unavailable destinations', async () => {
+    const records = fixture(); records.scenesById[id('scn', 2)] = { id: id('scn', 2), name: '別Scene', orderKey: 'B', lifecycle: lifecycle() };
+    records.sceneCaptionMembershipsById[id('scm', 2)] = { ...records.sceneCaptionMembershipsById[id('scm')], id: id('scm', 2), sceneId: id('scn', 2) };
+    records.captionAttachmentsById[id('att', 2)] = { ...records.captionAttachmentsById[id('att')], id: id('att', 2), lifecycle: { state: 'deleted', reason: 'userDelete', eventId: fresh('evt') } };
+    const source = ProjectMetadataSource.bootstrap(records.schema, records.identity, limits).initialize(records), p = await provider(source), impact = captionDeletionImpact(p, id('cap'), limits);
+    const removed = await tracked(source, { kind: 'deleteCaption', captionId: id('cap'), observedMembershipIds: impact.memberships.map(r => r.id), observedAttachmentIds: impact.attachments.map(r => r.id), observedTagMembershipIds: impact.tags.map(r => r.id), eventId: fresh('evt') });
+    const restored = await compensate(removed.source, removed.receipt), actual = (await provider(restored)).inspection.candidates.unambiguousRecords as ReturnType<typeof fixture>;
+    expect(actual.captionAttachmentsById[id('att', 2)]).toEqual(records.captionAttachmentsById[id('att', 2)]);
+    for (const map of ['captionsById', 'sceneCaptionMembershipsById', 'captionAttachmentsById', 'captionTagMembershipsById'] as const)
+      for (const [key, row] of Object.entries(records[map] as Record<string, Record<string, unknown>>)) expect(actual[map][key]).toEqual({ ...row, ...(key === id('att', 2) ? {} : { lifecycle: expect.objectContaining({ state: 'active', reason: 'restore' }) }) });
+    const missingScene = branch(removed.source, d => { d.scenesById[id('scn', 2)].lifecycle = new A.ImmutableString(canonical({ state: 'deleted', reason: 'userDelete', eventId: fresh('evt') })); });
+    await expect(compensate(missingScene, removed.receipt)).rejects.toThrow();
+    const unknown = branch(removed.source, d => { d.captionAttachmentsById[id('att')].future = new A.ImmutableString(canonical('preserve')); });
+    await expect(compensate(unknown, removed.receipt)).rejects.toThrow();
+  });
+  it('retains conflict-preserving Caption deletion when the action cannot have a local Undo receipt', async () => {
+    const source = seed(), a = await edit(source, { kind: 'editCaption', captionId: id('cap'), edits: { title: '候補A' } }), b = await edit(source, { kind: 'editCaption', captionId: id('cap'), edits: { title: '候補B' } });
+    const merged = a.appendOriginal(b.originalChanges()), p = await provider(merged), impact = captionDeletionImpact(p, id('cap'), limits);
+    const command: MetadataEdit = { kind: 'deleteCaption', captionId: id('cap'), eventId: fresh('evt'), observedMembershipIds: impact.memberships.map(v => v.id), observedAttachmentIds: impact.attachments.map(v => v.id), observedTagMembershipIds: impact.tags.map(v => v.id) };
+    const capture = beginCaptionUndo(p, command, limits); expect(capture?.unavailable).toBe(true);
+    const removed = await edit(merged, command), after = await provider(removed);
+    expect(after.resources.captions[id('cap')]!.lifecycle).toMatchObject({ value: { state: 'deleted' } });
+    expect(after.inspection.candidates.fields.find(f => f.path.join('/') === `captionsById/${id('cap')}/title`)!.candidates).toEqual(p.inspection.candidates.fields.find(f => f.path.join('/') === `captionsById/${id('cap')}/title`)!.candidates);
+    expect(() => finishCaptionUndo(after, capture!, limits)).toThrow('caption-undo-unavailable');
+  });
+  it('does not let an unrelated attachment lifecycle conflict block target media reactivation', async () => {
+    const source = seed(), duplicated = await edit(source, { kind: 'duplicateCaption', sceneId: id('scn'), sourceId: id('cap'), captionId: id('cap', 2), membershipId: id('scm', 2), attachments: [{ sourceId: id('att'), targetId: id('att', 2) }], tags: [{ sourceId: id('tgm'), targetId: id('tgm', 2) }], orderKey: 'Z', eventId: fresh('evt') });
+    const removed = await tracked(duplicated, { kind: 'deleteAttachment', sceneId: id('scn'), captionId: id('cap'), attachmentId: id('att'), eventId: fresh('evt') });
+    const a = branch(removed.source, d => { d.captionAttachmentsById[id('att', 2)].lifecycle = new A.ImmutableString(canonical({ state: 'deleted', reason: 'userDelete', eventId: fresh('evt') })); });
+    const b = branch(removed.source, d => { d.captionAttachmentsById[id('att', 2)].lifecycle = new A.ImmutableString(canonical({ state: 'active', reason: 'restore', eventId: fresh('evt') })); });
+    const merged = a.appendOriginal(b.originalChanges()), restored = await compensate(merged, removed.receipt);
+    const refs = await reactivatedCaptionMedia(merged, restored, limits);
+    expect(refs).toEqual([fixture().mediaResourcesById[id('med')].blob]);
+    expect((await provider(restored)).details.mutable.captionAttachmentsById[id('att', 2)]!.lifecycle?.kind).toBe('unresolved');
+  });
+  it('reuses only identical immutable media candidates when reactivating an attachment', async () => {
+    const removed = await tracked(seed(), { kind: 'deleteAttachment', sceneId: id('scn'), captionId: id('cap'), attachmentId: id('att'), eventId: fresh('evt') }), record = fixture().mediaResourcesById[id('med')];
+    const rewrite = () => branch(removed.source, d => { delete d.mediaResourcesById[id('med')]; d.mediaResourcesById[id('med')] = new A.ImmutableString(canonical(record)); });
+    const a = rewrite(), b = rewrite(), merged = a.appendOriginal(b.originalChanges()), restored = await compensate(merged, removed.receipt);
+    expect((await provider(merged)).inspection.candidates.fields.find(f => f.path.join('/') === `mediaResourcesById/${id('med')}`)!.candidates).toHaveLength(2);
+    expect(await reactivatedCaptionMedia(merged, restored, limits)).toEqual([record.blob]);
+  });
+  it('restores an originally absent attachment description and rejects reused lifecycle events', async () => {
+    const source = branch(seed(), d => { delete d.captionAttachmentsById[id('att')].altText; });
+    const changed = await tracked(source, { kind: 'editAttachment', sceneId: id('scn'), captionId: id('cap'), attachmentId: id('att'), field: 'altText', value: '後から追加' });
+    const undone = await compensate(changed.source, changed.receipt);
+    expect(((await provider(undone)).inspection.candidates.unambiguousRecords as ReturnType<typeof fixture>).captionAttachmentsById[id('att')]).not.toHaveProperty('altText');
+    changed.receipt.before = captionUndoSnapshot(await provider(undone), changed.receipt.before.target, limits);
+    expect(((await provider(await compensate(undone, changed.receipt, true))).inspection.candidates.unambiguousRecords as ReturnType<typeof fixture>).captionAttachmentsById[id('att')]!.altText).toBe('後から追加');
+    const removed = await tracked(seed(), { kind: 'deleteAttachment', sceneId: id('scn'), captionId: id('cap'), attachmentId: id('att'), eventId: id('evt', 999) });
+    await expect(edit(removed.source, { kind: 'compensateCaptionAction', expected: removed.receipt.after, goal: removed.receipt.before, eventId: id('evt', 999) })).rejects.toThrow('caption-undo-event-reused');
+  });
+  it('undoes attachment addition/removal and exact description/order without changing media bodies', async () => {
+    const source = seed(), attachmentId = fresh('att'), media = fixture().mediaResourcesById[id('med')];
+    const added = await tracked(source, { kind: 'createAttachment', sceneId: id('scn'), captionId: id('cap'), attachmentId, media, orderKey: 'ZZ', altText: '', eventId: fresh('evt') });
+    const changed = await tracked(added.source, { kind: 'editAttachment', sceneId: id('scn'), captionId: id('cap'), attachmentId, field: 'altText', value: '説明' });
+    const undone = await compensate(changed.source, changed.receipt), snap = captionUndoSnapshot(await provider(undone), changed.receipt.before.target, limits);
+    added.receipt.after = rebaseCaptionUndo(added.receipt.after, changed.receipt.before, snap);
+    const removed = await compensate(undone, added.receipt); added.receipt.before = captionUndoSnapshot(await provider(removed), added.receipt.before.target, limits);
+    const restored = await compensate(removed, added.receipt, true);
+    expect(((await provider(restored)).inspection.candidates.unambiguousRecords as ReturnType<typeof fixture>).captionAttachmentsById[attachmentId]).toMatchObject({ id: attachmentId, altText: '', orderKey: 'ZZ', lifecycle: { state: 'active' } });
+    const moved = await tracked(restored, { kind: 'editAttachment', sceneId: id('scn'), captionId: id('cap'), attachmentId, field: 'orderKey', value: 'A' });
+    expect(((await provider(await compensate(moved.source, moved.receipt))).inspection.candidates.unambiguousRecords as ReturnType<typeof fixture>).captionAttachmentsById[attachmentId]!.orderKey).toBe('ZZ');
+    const detached = await tracked(restored, { kind: 'deleteAttachment', sceneId: id('scn'), captionId: id('cap'), attachmentId, eventId: fresh('evt') });
+    expect((await provider(await compensate(detached.source, detached.receipt))).details.attachments[attachmentId]?.kind).toBe('value');
+    expect((await provider(restored)).inspection.candidates.unambiguousRecords.mediaResourcesById).toEqual((await provider(source)).inspection.candidates.unambiguousRecords.mediaResourcesById);
   });
 });

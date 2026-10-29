@@ -1,6 +1,7 @@
 import { checkProjectRecord, projectRecordMaps } from '../domain/projectRecords';
 import { ProjectRecordFields } from '../domain/projectRecordFields';
 import { meshSourceFormat, meshSourceDeclarations } from '../domain/meshSource';
+import { pointSourceDeclaration } from '../domain/pointSource';
 import { object, list, same } from '../domain/projectGraphSupport';
 import type { JsonObject, JsonValue } from '../domain/values';
 import type { ProjectProviderRead } from '../scene/projectProvider';
@@ -39,16 +40,20 @@ export function planModelReplacement(provider: Extract<ProjectProviderRead, { ki
     'blob', 'representationToAsset', 'logicalBoundsAsset', 'derivedFrom', 'materialCatalog', 'payloadDigest']);
   const identity = { translation: [0, 0, 0], rotationXYZW: [0, 0, 0, 1], uniformScale: 1 };
   const catalog = object(rep.materialCatalog), classes = list(revision.anchorCompatibilityClasses), slots = list(catalog.slots);
+  const readImmutable = metadataImmutableReader(provider, limits), oldRevision = readImmutable('assetRevisionsById', projection.revisionId);
+  const oldReps = list(oldRevision.representationIds).map(id => readImmutable('representationsById', id as string));
+  const point = rep.contentKind === 'pointCloud';
+  if (oldReps.length !== 1 || (point ? oldReps[0]!.role !== 'pointPrimary' || !same(oldReps[0]!.formatProfile, pointSourceDeclaration) || !same(rep.formatProfile, pointSourceDeclaration) : oldReps[0]!.role !== 'meshPrimary')) fail('model-replace-source-profile');
   if (rep.assetId !== command.assetId || revision.assetId !== command.assetId || binding.assetId !== command.assetId ||
     old.assetId !== command.assetId || old.assetRevisionId !== projection.revisionId || binding.parentBindingId !== old.id ||
     !same(binding.assetToProject, old.assetToProject) || binding.method !== 'manual' || binding.assetRevisionId !== revision.id ||
     !same(revision.representationIds, [rep.id!]) || !same(rep.representationToAsset, { ...identity, reflection: 'none' }) ||
-    rep.contentKind !== 'mesh' || rep.role !== 'meshPrimary' || !same(rep.purposes, ['source', 'display']) || !same(rep.derivedFrom, []) ||
+    rep.contentKind !== (point ? 'pointCloud' : 'mesh') || rep.role !== (point ? 'pointPrimary' : 'meshPrimary') || !same(rep.purposes, ['source', 'display']) || !same(rep.derivedFrom, []) ||
     classes.length !== 1 || !same(object(classes[0]).targetVariantFamilyIds, [rep.variantFamilyId!]) || !slots.length)
     fail('model-replace-closure');
   const blob = object(rep.blob);
   const mesh=meshSourceFormat(rep.formatProfile);
-  if (blob.mediaType !== (mesh?meshSourceDeclarations[mesh].mediaType:'model/gltf-binary') ||
+  if (blob.mediaType !== (point ? 'application/ply' : mesh?meshSourceDeclarations[mesh].mediaType:'model/gltf-binary') ||
     !same(revision.provenance, { origin: 'import', sourceMediaType: blob.mediaType!, inputBlobDigests: [blob.digest!] })) fail('model-replace-provenance');
   const reserved = new Set<string>();
   const reserve = (v: unknown): void => { reader.charge(); if (typeof v === 'string') reserved.add(v);

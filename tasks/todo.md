@@ -56,7 +56,91 @@ unchanged-feature-classification checks pass; independent review has no findings
 No runtime change or new capacity guarantee; no runtime suite is needed for this
 documentation checkpoint.
 
-## Current checkpoint —daily authoring, grouped1–4
+## Current workflow —Caption action Undo and ordinary Point replacement
+
+### Plan and authority
+
+PO authorized continuation2026-10-29 after the grouped08 checkpoint. Outcome:
+create/copy/edit/attach/delete Captions, undo/redo confirmed actions without a
+selection, then replace an ordinary01a Point while retaining placement/records;
+save/share/restore/cold remain coherent. Root is sole writer; parallel bounded
+investigation/review is read-only. Update08 and the relevant01a/05 clauses before
+implementation. Use finite compensation commands and existing replacement,
+Session/body/publication/recovery ports; no schema/dependency or cache change.
+Verify action ordering, foreign-edit refusal, retry/bytes and replacement pins
+with focused tests and a connected Desktop browser/file flow. At the final tree,
+run one serial required checkpoint, artifact isolation and independent review;
+commit/push suitable verified work to g0-baseline. Stop only affected genuine new
+policy/dependency/format or publication decisions. No tiny PO testing waits.
+
+Undo remains editor-local, checked compensation, not arbitrary historical rollback.
+Point scope is exact ordinary01a→same01a: no Native/GS/profile conversion or pin
+auto-remap. Device/offline/adoption/release and portable HEIC remain separate.
+
+Point integration exposed a Session-readiness discrepancy with01's weak hit-source
+provenance invariant. The content/provider tests deliberately retain missing weak
+index diagnostics without fetching old bytes; Session rejected them. The08 exact
+resolved-weak-anchor correction passed independent contract review and is
+implemented. Active-source/invalid/unknown guards and existing
+publication/body/recovery fences stay intact; no cache or validation bypass.
+
+Focused core/authoring/Point checks39PASS and media-fence service cases5PASS.
+Same-length corrupt media exposed inventory-only receipt limits; the corrected
+reactivation path derives existing refs from the exact local batch at preflight/
+retry/cold and fully verifies only them, retaining journal semantics and original
+parts. Distinct media/duplicate blobs, missing/corrupt refusal and cold publication
+retry pass. Independent source reviews have no unresolved findings. An initial
+owned browser run was cancelled before completion for the affected-only conflict
+fix; its log is retained, not a PASS. Run1793263075211-44016 then passed Daily
+Undo/save/share/cold but failed Point's onscreen-marker assumption. Normal isolate/
+front/fit and explicit new-point selection fixed that test without weakening its
+assertions. Point-only run1793263631876-34112 passed replacement/peer-edit retention/
+correction/return/backup, then exposed a real cold-navigation click dropped during
+the selector's opening operation. Only that button now receives the owner-busy
+guard; its transitions rerender the control. Caption reading stays enabled.
+Recorded UI regression1PASS and independent resolution review PASS. The final
+two-case Desktop browser run1793264411344-57484 PASS: Daily4.6min +Point7.0min,
+runner11.8min, no retry. It verifies full action Undo/Redo, native playback,
+save/share/recipient/cold empty Undo stack, same01a Point replacement, peer-local
+text retention, explicit point selection/manual correction, Contribution return,
+Review's local DPR3 refusal, cold reopen and absent-Project backup restore/edit/save.
+The cold navigation transition now succeeds. Original bodies, Frame/placement and
+history are retained. Browser logs/results remain in their ignored directories;
+earlier failed aggregate runs remain failed.
+
+The22-file final raw manifest matches. Only a standalone Vitest regression for
+conflict-preserving deletion/unavailable Undo capture was added after browser
+start (1PASS); production/browser/config stayed identical. The pre-browser
+manifest is retained separately. The first serial whole check is retained in
+`continuation-checkpoint.log`; its superseding result is described below.
+No assertion/deadline relaxation or adoption/device/offline/release credit.
+
+The first whole check found the old recorded-DOM parent-only recovery with an
+ambiguous child was blocked by reactivation derivation before its publication
+failure/retry fence. The existing contract intentionally leaves that child
+unresolved. Stopped the owned run for the source fix; its log is not a PASS.
+Only resolved live attachments should yield media refs; ordinary Undo's stricter
+planner remains unchanged. Recheck that exact existing case plus media/refusal
+regressions and the representative changed integration before the final whole run.
+
+Resolution: the unchanged old UI case1PASS, core/authoring31PASS (including two
+actual identical immutable media candidates), and media/navigation service cases
+6PASS. Independent correction review has no findings. Final Daily browser
+run1793266225208-56676 PASS4.3min/runner4.6min at the corrected source, retry0.
+Retain Point's7.0min PASS from1793264411344-57484 as unaffected-flow evidence:
+its local commands do not enter the changed lifecycle-restore derivation branch;
+backup import/restore use separate existing fences. Do not call the earlier
+two-case run an exact final-tree browser build after this helper correction.
+All22 final source/test/config hashes match. Final required serial check PASS,
+exit0 in `continuation-checkpoint-final.log`: typecheck,135 test files/3,019tests
+(21existingTODOs,999.73s), normal/harness/validation/Desktop builds. Four-output
+HEIC isolation PASS, exit0 in `continuation-isolation-final.log`; no local decoder
+PoC enters production inputs or those artifacts. Independent source, evidence and
+documentation reviews have no unresolved findings. This is a verified development
+checkpoint, with device/offline/adoption/release acceptance still separate.
+
+
+## Previous verified checkpoint —daily authoring, grouped1–4
 
 PO2026-10-29 explicitly requested implementing all four groups together. Root is
 the sole writer. The bounded specification08 workflow now connects Scene
@@ -161,17 +245,27 @@ relaxation or test exclusion.
 
 ## Remaining work after the grouped workflow
 
-Specification08 now defines and connects the grouped daily-use operations; its
-active checks above replace the earlier design-only Scene plan. Text/color undo
-is limited to confirmed edits in this editor; general Caption creation/deletion/
-attachment undo and a durable author/name mapping are still absent. Keep those
-usability gaps visible rather than counting the bounded local stack as general
-history rollback. Portable HEIC needs a decoder/license/distribution or derivative
-decision; native-only acceptance does not close that cross-browser requirement.
+Next authorized unit: the independently reviewed [08a GS replacement companion](../docs/specs/08a-gs-body-replacement-proposal.md)
+was PO-approved2026-10-29, not yet implemented. PO selected unassigned Proxy after
+GS replacement and authorized the full implementation/verification workflow.
+Current08 final checks and reviews PASS; Push that frozen checkpoint first.
+Then prioritize updating a GS scan while retaining its
+records before durable author-name mapping. Existing Proxy add/change/remove is
+already available; the new policy is what happens to the former Proxy when the
+GS body/family changes. Approved: new revision starts unassigned, retains old
+body/history and lets the user explicitly select a surface again. Automatic
+carry/rekey remains outside this authorization. Keep current08
+completion independent of the following implementation. No new dependency/profile or
+capacity guarantee is requested; exact500k two-generation acceptance remains a
+test obligation, not a small-fixture claim.
 
-Ordinary same-profile Point replacement remains an accepted M02/M08 gap, queued
-behind this usability work: preserve Asset/Frame/placement/Caption/media, use fresh
-family/class and no automatic remap. No Point replacement code was started.
+The active continuation above implements creation/deletion/attachment Undo and
+ordinary01a Point replacement; its executed acceptance is recorded above. Local
+Undo covers the named confirmed actions in this editor, not all Project actions
+or historical rollback. Durable author/name mapping is still absent. Portable
+HEIC needs a decoder/license/distribution or derivative decision; native-only
+acceptance does not close that cross-browser requirement. Native/GS replacement
+and cross-profile conversion are not implied by same01a replacement.
 
 The500k workflow is still slow (about202s to editor,47s edit,232s backup observed).
 Further fresh-inspection/calculation tuning stays pending behind accepted missing

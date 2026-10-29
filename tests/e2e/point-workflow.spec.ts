@@ -13,7 +13,7 @@ import { validationMetadataLimits } from '../../src/projectFiles/validation';
 import { smallPng, triangleGlb } from './fixtures';
 import { presentedCanvas } from './presentedCanvas';
 
-const entry = 'http://127.0.0.1:4182/dev.html?editor=project';
+const entry = process.env.LOCIVIEW_E2E_ENTRY ?? 'http://127.0.0.1:4182/dev.html?editor=project';
 const tracing = process.env.LOCIVIEW_E2E_TRACE !== '0';
 const ply = Buffer.from('ply\nformat ascii 1.0\nelement vertex 5\nproperty float x\nproperty float y\nproperty float z\nproperty uchar red\nproperty uchar green\nproperty uchar blue\nend_header\n0 0 0 255 0 0\n-1 -1 0 0 255 0\n1 -1 0 0 0 255\n-1 1 0 255 255 0\n1 1 0 255 0 255\n');
 const largePly = Buffer.from('ply\nformat ascii 1.0\nelement vertex 1\nproperty float x\nproperty float y\nproperty float z\nproperty uchar red\nproperty uchar green\nproperty uchar blue\nend_header\n100000000 0 0 255 0 0\n');
@@ -28,6 +28,7 @@ async function edit(page: Page, title: string, body: string) {
   await detail(page).getByRole('button', { name: '変更を適用', exact: true }).click(); await expect(page.getByText('変更を適用しました。', { exact: true })).toBeVisible({timeout:90_000});
 }
 async function download(page: Page, info: TestInfo, name: string, purpose: 'backup' | 'teamWorkspace' | 'contribution' | 'review', base?: string) {
+  const menu=page.locator('details.lv-project-files'); if(await menu.count()&&!await menu.evaluate(n=>(n as HTMLDetailsElement).open))await menu.locator(':scope > summary').click();
   const area = files(page); if (purpose === 'review') { await area.locator('summary').filter({hasText:/^その他$/}).click(); await area.getByRole('button',{name:'シーンを共有',exact:true}).click(); } else await area.getByRole('button', { name: purpose === 'backup' ? '保存' : '相手に渡す', exact: true }).click();
   if (purpose === 'backup') await area.getByLabel('名前（任意）', { exact: true }).fill(name);
   else if (purpose !== 'review') { await area.getByLabel('渡す内容', { exact: true }).selectOption(purpose); if (base) await area.getByLabel('元にする作業一式', { exact: true }).selectOption(base); }
@@ -79,7 +80,7 @@ test('点群の元座標で記録し、画像・調整・受け渡し・閲覧�
     await models.locator('.lv-model-select').filter({hasText:'測量.ply'}).click();
     const diameter = models.getByLabel('点の大きさ（px）',{exact:true}); await expect(diameter).toHaveValue('3'); await diameter.focus(); await diameter.press('End'); await expect(diameter).toHaveValue('20');
     expect((await sample(page,8,0)).slice(0,3)).toEqual([255,0,0]); expect((await sample(page,8,8)).slice(0,3)).not.toEqual([255,0,0]);
-    await expect(models.getByRole('button',{name:'モデルを差し替える',exact:true})).toBeDisabled(); await diameter.press('Home'); await diameter.press('ArrowRight'); await diameter.press('ArrowRight');
+    await expect(models.getByRole('button',{name:'モデルを差し替える',exact:true})).toBeEnabled(); await diameter.press('Home'); await diameter.press('ArrowRight'); await diameter.press('ArrowRight');
     await page.getByRole('tab',{name:'キャプション',exact:true}).click(); await page.getByRole('button',{name:'ピンを追加',exact:true}).click();
     const canvas = page.getByLabel('3Dモデルの表示',{exact:true}), box = await canvas.boundingBox(); await canvas.click({position:{x:box!.width/2,y:box!.height/2}});
     await page.getByRole('button',{name:'位置を確定',exact:true}).click(); await expect(page.getByText('ピンの位置を確定しました。',{exact:true})).toBeVisible(); expect((await sample(page)).slice(0,3)).toEqual([255,0,0]); await edit(page,'元の点の記録','点群の本文');
@@ -101,13 +102,28 @@ test('点群の元座標で記録し、画像・調整・受け渡し・閲覧�
     await page.getByRole('tab',{name:'キャプション',exact:true}).click();
     const workspacePath = await download(page,info,'point-workspace','teamWorkspace'), workspace = await WorkspaceArchive.inspect(await fileBlob(workspacePath),validationMetadataLimits);
     const b = await launch(1,2); await b.page.getByLabel('ファイルを選択',{exact:true}).setInputFiles(workspacePath); await b.page.getByRole('button',{name:'ファイルを開く',exact:true}).click(); await ready(b.page); await caption(b.page); await edit(b.page,'元の点の記録','相手が追記');
+    const updatedPly=Buffer.from(ply.toString().replace('255 0 0','255 80 0'));
+    await page.getByRole('tab',{name:'モデル',exact:true}).click();await models.locator('.lv-model-select').filter({hasText:'測量.ply'}).click();
+    const replacement=page.waitForEvent('filechooser');await models.getByRole('button',{name:'モデルを差し替える',exact:true}).click();await(await replacement).setFiles({name:'更新点群.ply',mimeType:'application/ply',buffer:updatedPly});
+    await expect(models.getByRole('status').filter({hasText:'ピンは要確認'})).toBeVisible();await expect(models.getByRole('status').filter({hasText:'材質の調整は引き継ぎません'})).toHaveCount(0);await models.getByRole('button',{name:'差し替えを確定',exact:true}).click();await expect(page.getByText('モデルを差し替えました。配置と記録を保持しています。',{exact:true})).toBeVisible({timeout:90000});
+    await models.getByRole('button',{name:'このモデルだけ表示',exact:true}).click();await page.getByRole('button',{name:'正面',exact:true}).click();await page.getByRole('button',{name:'全体表示',exact:true}).click();
+    await page.getByRole('tab',{name:'キャプション',exact:true}).click();await caption(page);await expect(page.locator('.lv-project-marker[data-review="true"]')).toHaveCount(1);
+    const updatedWorkspace=await download(page,info,'point-update','teamWorkspace');
+    const peerMenu=b.page.locator('details.lv-project-files');if(await peerMenu.count()&&!await peerMenu.evaluate(n=>(n as HTMLDetailsElement).open))await peerMenu.locator(':scope > summary').click();
+    const peerReceive=b.page.getByRole('region',{name:'更新ファイル',exact:true});await peerReceive.getByLabel('更新ファイルを選択',{exact:true}).setInputFiles(updatedWorkspace);await peerReceive.getByRole('button',{name:'更新を受け取る',exact:true}).click();await expect(peerReceive.getByText('更新を受け取りました。',{exact:true})).toBeVisible({timeout:90000});
+    await b.page.getByRole('tab',{name:'モデル',exact:true}).click();const peerModels=b.page.getByRole('tabpanel',{name:'モデル',exact:true});await peerModels.locator('.lv-model-select').filter({hasText:'測量.ply'}).click();await peerModels.getByRole('button',{name:'このモデルだけ表示',exact:true}).click();await b.page.getByRole('button',{name:'正面',exact:true}).click();await b.page.getByRole('button',{name:'全体表示',exact:true}).click();await b.page.getByRole('tab',{name:'キャプション',exact:true}).click();
+    await caption(b.page);await expect(detail(b.page).getByLabel('本文',{exact:true})).toHaveValue('相手が追記');await expect(b.page.locator('.lv-project-marker[data-review="true"]')).toHaveCount(1);
+    await b.page.getByRole('button',{name:'位置を調整',exact:true}).click();const peerCanvas=b.page.getByLabel('3Dモデルの表示',{exact:true}),peerBox=(await peerCanvas.boundingBox())!;await peerCanvas.click({position:{x:peerBox.width/2,y:peerBox.height/2}});await b.page.getByLabel('位置 X',{exact:true}).fill('0.2');await b.page.getByRole('button',{name:'位置を確定',exact:true}).click();await expect(b.page.getByText('ピンの位置を確定しました。',{exact:true})).toBeVisible();await expect(b.page.locator('.lv-project-marker[data-review="false"]')).toHaveCount(1);
+
     const returned = await download(b.page,info,'point-return','contribution',workspace.archive.control.manifest.packageId);
     const receive = page.getByRole('region',{name:'更新ファイル',exact:true}); await receive.getByLabel('更新ファイルを選択',{exact:true}).setInputFiles(returned); await receive.getByRole('button',{name:'更新を受け取る',exact:true}).click(); await expect(receive.getByText('更新を受け取りました。',{exact:true})).toBeVisible({timeout:90_000});
     await caption(page); await expect(detail(page).getByLabel('本文',{exact:true})).toHaveValue('相手が追記');
     const finalPath = await download(page,info,'point-final','backup'), final = await backupRecords(finalPath);
     expect(Buffer.from(await final.backup.archive.entryBytes(`blobs/sha256/${hash(largePly)}`,largePly.length))).toEqual(largePly);
     expect(final.records.captionsById[original.id]).toMatchObject({title:'元の点の記録',body:'相手が追記',anchor:{positionAsset:[.2,0,0],hitEvidence:{method:'manual'}}});
-    expect(final.records.captionsById[original.id].anchor.hitEvidence.source).toBeUndefined(); expect(Object.values(final.records.representationsById).map((r:any)=>r.contentKind).sort()).toEqual(['mesh','pointCloud','pointCloud']); expect(Object.keys(final.records.captionAttachmentsById)).toHaveLength(1);
+    expect(final.records.captionsById[original.id].anchor.hitEvidence.source).toBeUndefined(); expect(Object.values(final.records.representationsById).map((r:any)=>r.contentKind).sort()).toEqual(['mesh','pointCloud','pointCloud','pointCloud']);
+    expect(Buffer.from(await final.backup.archive.entryBytes(`blobs/sha256/${hash(updatedPly)}`,updatedPly.length))).toEqual(updatedPly);
+    const assetId=original.anchor.assetId,oldAsset=initial.records.assetsById[assetId],newAsset=final.records.assetsById[assetId];expect(newAsset.assetFrameId).toBe(oldAsset.assetFrameId);expect(newAsset.status.activeBindingId).not.toBe(oldAsset.status.activeBindingId);expect(final.records.assetBindingsById[newAsset.status.activeBindingId].assetToProject).toMatchObject({translation:[3,0,0],uniformScale:2}); expect(Object.keys(final.records.captionAttachmentsById)).toHaveLength(1);
     const reviewPath = await download(page,info,'point-review','review'); await close(b.context,'B');
     const review = await launch(1,3); await ready(review.page); await review.page.getByRole('button',{name:'別のプロジェクトを開く',exact:true}).click(); await expect(review.page.getByLabel('ファイルを選択',{exact:true})).toBeVisible(); await expect(review.page.getByLabel('ファイルを選択',{exact:true})).toBeEnabled(); await review.page.getByLabel('ファイルを選択',{exact:true}).setInputFiles(reviewPath); await review.page.getByRole('button',{name:'ファイルを開く',exact:true}).click();
     await expect(review.page.getByText('閲覧用シーンを開きました。編集プロジェクトは作成していません。',{exact:true})).toBeVisible({timeout:180_000});
@@ -117,7 +133,7 @@ test('点群の元座標で記録し、画像・調整・受け渡し・閲覧�
     const restoredPath = await download(restored.page,info,'point-restored','backup'), restoredBackup = await backupRecords(restoredPath); expect(restoredBackup.backup.source.proof.identity).toEqual(final.backup.source.proof.identity);
     const previous = new Map(final.backup.source.originalChanges().map(b=>[hash(b),Buffer.from(b).toString('hex')])), restoredHistory=new Map(restoredBackup.backup.source.originalChanges().map(b=>[hash(b),Buffer.from(b).toString('hex')])); for (const [key,value] of previous) expect(restoredHistory.get(key)).toBe(value); expect(restoredBackup.backup.source.originalChanges().length).toBeGreaterThan(previous.size);
     await restored.page.screenshot({path:info.outputPath('point-restored.png'),fullPage:true}); await close(restored.context,'restored'); expect(errors).toEqual([]);
-  } finally { for (const context of contexts) { await context.pages()[0]?.screenshot({path:info.outputPath(`failure-${contexts.size}.png`),fullPage:true}).catch(()=>{}); if (tracing) await context.tracing.stop({path:info.outputPath(`failure-${contexts.size}.zip`)}).catch(()=>{}); await context.close(); } await info.attach('browser-errors',{body:JSON.stringify(errors),contentType:'application/json'}); }
+  } finally { for (const [failureIndex,context] of [...contexts].entries()) { await context.pages()[0]?.screenshot({path:info.outputPath(`failure-${failureIndex}.png`),fullPage:true}).catch(()=>{}); if (tracing) await context.tracing.stop({path:info.outputPath(`failure-${contexts.size}.zip`)}).catch(()=>{}); await context.close(); } await info.attach('browser-errors',{body:JSON.stringify(errors),contentType:'application/json'}); }
 });
 
 

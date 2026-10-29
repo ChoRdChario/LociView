@@ -16,8 +16,14 @@ Scene/Caption/tag/local/alignment design in[08](../docs/specs/08-daily-authoring
 passed independent review. Root implements and verifies the connected workflow;
 todo owns current checks and checkpoint. PO also approved bounded MP4 AVC/AAC,
 M4A/AAC, MP3 and native-browser single-still HEIC in08, without a new dependency.
-The connected bounded workflow and final checks are verified; todo owns exact
-evidence and the remaining general Caption undo/name and Point-replacement gaps.
+The grouped08 workflow and subsequent Caption-action Undo/ordinary Point replacement
+are verified through final checks; todo owns exact evidence and the next unit.
+Local Undo remains distinct from history rollback; durable author-name mapping
+and cross-profile/GS replacement are separate remaining boundaries.
+The independently reviewed[08a companion](../docs/specs/08a-gs-body-replacement-proposal.md)
+was PO-approved2026-10-29: next GS-body replacement starts without an assigned
+Proxy and retains old bodies/history. Complete/Push current08 first, then implement
+08a through the full file/correction/restore/cold workflow without helper approvals.
 General Windows HEIC and device/adoption/release gates remain separate.
 Keep existing comfortable-UI guidance, original bytes/history, atomic Session
 commands, file/recovery/evidence fences and one writer. Read-only reviews may run

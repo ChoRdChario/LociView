@@ -1,4 +1,5 @@
-import { isSavedModel, isSavedMesh } from './modelTypes';
+import { isSavedModel, isSavedMesh, isOrdinaryPoint } from './modelTypes';
+import { beginCaptionUndo, finishCaptionUndo, captionUndoSnapshot } from '../projectMetadata/captionUndo';
 import { value, type Field } from '../scene/types';
 import { resolveScene } from '../scene/resolve';
 import type { JsonObject } from '../domain/values';
@@ -58,6 +59,9 @@ export function productSources(host: ReturnType<typeof createValidationModeHost>
   };
   return {
     authoring: {
+      beginUndo(token, command) { const p = provider(); if (p.token !== token) throw Error('記録が更新されています。'); return beginCaptionUndo(p, command, host.limits); },
+      finishUndo(token, capture) { const p = provider(); if (p.token !== token) throw Error('記録が更新されています。'); return finishCaptionUndo(p, capture, host.limits); },
+      undoSnapshot(token, target) { const p = provider(); if (p.token !== token) throw Error('記録が更新されています。'); return captionUndoSnapshot(p, target, host.limits); },
       snapshot(token, captionId) { const p = provider(); if (p.token !== token) throw Error('記録が更新されています。'); return captionSnapshot(p, captionId, host.limits); },
       sceneOrderChoices(token, sceneId) { const p = provider(); if (p.token !== token) throw Error('シーンが更新されています。'); return sceneOrderChoices(p, sceneId, host.limits); },
       prepare(token, intent) {
@@ -245,7 +249,7 @@ export function productSources(host: ReturnType<typeof createValidationModeHost>
       return { target: { kind: 'model', token: p.token, sceneId, assetId, bindingId: version.projection.bindingId },
         boundsAsset: version.closure.representation.logicalBoundsAsset, ...(importedPlacement ? { importedPlacement } : {}),
         ...(version.closure.shape==='saved-gs'?{gsProxyTarget:{sceneId,assetId,expectedBindingId:version.closure.binding.id,gsRepresentationId:version.closure.representation.id,gsPayloadDigest:version.closure.representation.payloadDigest,gsFamilyId:version.closure.representation.variantFamilyId,expectedProxyId:version.closure.proxy?.id??null}}:{}),
-        replacementAvailable: isSavedMesh(version.closure), pointCloud: version.closure.shape === 'saved-point', placement: version.closure.binding.assetToProject, rotationDegrees: rotationDegrees(version.closure.binding.assetToProject.rotationXYZW),
+        replacementAvailable: isSavedMesh(version.closure) || isOrdinaryPoint(version.closure), pointCloud: version.closure.shape === 'saved-point', placement: version.closure.binding.assetToProject, rotationDegrees: rotationDegrees(version.closure.binding.assetToProject.rotationXYZW),
         sceneCount: uncertain ? { kind: 'unresolved', reason: 'conflict' } : value(ids.size) };
     },
     modelPlacement(translation, rotation, scale) {

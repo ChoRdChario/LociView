@@ -1,6 +1,8 @@
 import type { JsonObject } from '../domain/values';
 import type { AssetProjection } from '../scene/types';
 import type { MediaFileSelection } from './mediaDisplay';
+import { pointSourceDeclaration } from '../domain/pointSource';
+import { same } from '../domain/projectGraphSupport';
 
 export interface ModelFileAddition { readonly sceneId: string; readonly assetId: string; readonly file: MediaFileSelection }
 export interface ModelFileReplacement extends ModelFileAddition { readonly expectedBindingId: string }
@@ -50,6 +52,7 @@ export interface DisplayModelVersion {
 
 export const isSavedModel = (model: DisplayModelClosure): model is ValidationModelClosure => model.shape === 'saved-glb' || model.shape === 'saved-point' || model.shape === 'saved-gs' || model.shape==='saved-mesh';
 export const isSavedMesh=(model:DisplayModelClosure):model is ValidationModelClosure=>model.shape==='saved-glb'||model.shape==='saved-mesh';
+export const isOrdinaryPoint=(model:DisplayModelClosure):model is ValidationModelClosure=>model.shape==='saved-point'&&same(model.representation.formatProfile,pointSourceDeclaration);
 export function isReadonlyModel(model: DisplayModelClosure | ReadonlyRenderModel): model is ReadonlyRenderModel { return model.shape === 'render-glb' || model.shape === 'render-point' || model.shape === 'render-gs' || model.shape==='render-mesh'; }
 
 /** Structural display descriptor for injected geometry adapters; carries no source admission. */

@@ -1,3 +1,5 @@
+import { captionDeletionImpact } from '../src/projectMetadata/captionDeletion';
+import { beginCaptionUndo, finishCaptionUndo } from '../src/projectMetadata/captionUndo';
 import { photoStructure, isAdditionalPhoto, type PhotoDecoder } from '../src/projectFiles/photo';
 import { timedMediaStructure } from '../src/projectFiles/mediaContainer';
 import { isHeic, type MediaDecoders } from '../src/projectFiles/media';
@@ -7495,6 +7497,68 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       expect(await f.receiver.content.inspectReceived({ token: f.final.token, fact: 'representation', records: [copy], context: {} }, file)).toMatchObject({ outcome: 'failed' });
     }
     expect(record).toEqual(original);
+  });
+  it.each(['missing', 'corrupt'] as const)('Caption attachment Undo refuses %s acknowledged media before creating a pending transaction', async fault => {
+    const f = await openFileCaption(), { host, captionId } = f, sceneId = f.s.sceneId, attachmentId = `att_${newId()}`;
+    await host.authority.addMediaFile!(host.read().source!.token, { sceneId, captionId, attachmentId, eventId: `evt_${newId()}`, orderKey: 'A', file: { name: '記録.png', size: png.length, arrayBuffer: async () => png.slice().buffer } });
+    const command = { kind: 'deleteAttachment' as const, sceneId, captionId, attachmentId, eventId: `evt_${newId()}` }, before = host.read().provider!;
+    if (before.kind !== 'scene-provider') throw Error('provider'); const capture = beginCaptionUndo(before, command, metadata)!;
+    const mediaId = (before.details.mutable.captionAttachmentsById[attachmentId]!.mediaResourceId as any).value, media = (before.details.immutable.mediaResourcesById[mediaId] as any).value;
+    await host.dispatch(before.token, command); const removed = host.read().provider!; if (removed.kind !== 'scene-provider') throw Error('provider');
+    const receipt = finishCaptionUndo(removed, capture, metadata)!, token = host.read().source!.token;
+    const hash = media.blob.digest, index = JSON.parse((await f.fs.readText(`v2/cas/sha256/${hash.slice(0, 2)}/${hash.slice(2)}.json`))!), path = `v2/cas/objects/${index.objectId}.bin`;
+    if (fault === 'missing') await f.fs.remove(path); else { const bytes = (await f.fs.readBytes(path))!.slice(); bytes[0] = bytes[0]! ^ 255; await f.fs.writeBytes(path, bytes); }
+    const parts = (await f.fs.list('')).filter(p => p.endsWith('.amchange')), puts = vi.spyOn(f.store, 'put');
+    await expect(host.dispatch(token, { kind: 'compensateCaptionAction', expected: receipt.after, goal: receipt.before, eventId: `evt_${newId()}` })).rejects.toThrow();
+    expect(host.read().source!.token).toBe(token); expect((await f.fs.list('')).filter(p => p.endsWith('.amchange'))).toEqual(parts); expect(puts).not.toHaveBeenCalled();
+    await f.workspace.dispose();
+  });
+  it('retains one exact Caption restoration after publication failure and cold retry', async () => {
+    const f = await openFileCaption(), { host, captionId } = f, sceneId = f.s.sceneId, attachmentId = `att_${newId()}`;
+    await host.authority.addMediaFile!(host.read().source!.token, { sceneId, captionId, attachmentId, eventId: `evt_${newId()}`, orderKey: 'A', file: { name: '記録.png', size: png.length, arrayBuffer: async () => png.slice().buffer } });
+    const command = { kind: 'deleteAttachment' as const, sceneId, captionId, attachmentId, eventId: `evt_${newId()}` }, before = host.read().provider!;
+    if (before.kind !== 'scene-provider') throw Error('provider'); const capture = beginCaptionUndo(before, command, metadata)!;
+    await host.dispatch(before.token, command); const removed = host.read().provider!; if (removed.kind !== 'scene-provider') throw Error('provider');
+    const receipt = finishCaptionUndo(removed, capture, metadata)!, undo = { kind: 'compensateCaptionAction' as const, expected: receipt.after, goal: receipt.before, eventId: `evt_${newId()}` };
+    f.fs.reject = path => path.endsWith('/published.json'); await expect(host.dispatch(removed.token, undo)).rejects.toThrow();
+    const parts = (await f.fs.list('')).filter(p => p.endsWith('.amchange')), bytes = await Promise.all(parts.map(p => f.fs.readBytes(p)));
+    f.fs.reject = () => false; await f.workspace.dispose(); const cold = await openValidationHost(f.options); await cold.authority.retry!();
+    expect(cold.read().state).toBe('ready'); const current = cold.read().provider!; if (current.kind !== 'scene-provider') throw Error('provider'); expect(current.details.attachments[attachmentId]?.kind).toBe('value');
+    expect(await Promise.all(parts.map(p => f.fs.readBytes(p)))).toEqual(bytes);
+    const changes = cold.read().source!.originalChanges(); await expect(cold.dispatch(cold.read().source!.token, undo)).rejects.toThrow(); expect(cold.read().source!.originalChanges()).toEqual(changes);
+    await cold.dispose();
+  });
+  it.each([false, true])('re-derives distinct media for Caption Undo on cold retry, prepared body corruption=%s', async corrupt => {
+    const f = await openFileCaption(), { host, captionId } = f, sceneId = f.s.sceneId;
+    for (const [i, image] of [fixtureMedia[0]!, fixtureMedia[1]!, fixtureMedia[0]!].entries()) {
+      const bytes = Uint8Array.from(atob(image.base64), c => c.charCodeAt(0));
+      await host.authority.addMediaFile!(host.read().source!.token, { sceneId, captionId, attachmentId: `att_${newId()}`, eventId: `evt_${newId()}`, orderKey: `A${i}`, file: { name: `${i}.png`, size: bytes.length, arrayBuffer: async () => bytes.slice().buffer } });
+    }
+    const before = host.read().provider!; if (before.kind !== 'scene-provider') throw Error('provider'); const impact = captionDeletionImpact(before, captionId, metadata);
+    const command = { kind: 'deleteCaption' as const, captionId, eventId: `evt_${newId()}`, observedMembershipIds: impact.memberships.map(r => r.id), observedAttachmentIds: impact.attachments.map(r => r.id), observedTagMembershipIds: impact.tags.map(r => r.id) }, capture = beginCaptionUndo(before, command, metadata)!;
+    await host.dispatch(before.token, command); const removed = host.read().provider!; if (removed.kind !== 'scene-provider') throw Error('provider'); const receipt = finishCaptionUndo(removed, capture, metadata)!;
+    const verify = vi.spyOn(host.content, 'verify'), put = vi.spyOn(f.store, 'put'); f.fs.reject = path => path.endsWith('/published.json');
+    await expect(host.dispatch(removed.token, { kind: 'compensateCaptionAction', expected: receipt.after, goal: receipt.before, eventId: `evt_${newId()}` })).rejects.toThrow();
+    expect(verify.mock.calls.some(([refs]) => refs.length === 2)).toBe(true); expect(put).not.toHaveBeenCalled();
+    f.fs.reject = () => false; const parts = (await f.fs.list('')).filter(p => p.endsWith('.amchange')), saved = await Promise.all(parts.map(p => f.fs.readBytes(p)));
+    await f.workspace.dispose();
+    if (corrupt) { const hash = fixtureMedia[1]!.record.blob.digest, index = JSON.parse((await f.fs.readText(`v2/cas/sha256/${hash.slice(0,2)}/${hash.slice(2)}.json`))!), path = `v2/cas/objects/${index.objectId}.bin`, bytes = (await f.fs.readBytes(path))!.slice(); bytes[0] = bytes[0]! ^ 255; await f.fs.writeBytes(path, bytes); }
+    const cold = await openValidationHost(f.options);
+    if (corrupt) await expect(cold.authority.retry!()).rejects.toThrow();
+    else { await cold.authority.retry!(); const p = cold.read().provider!; if (p.kind !== 'scene-provider') throw Error('provider'); expect(cold.read().state).toBe('ready'); expect(Object.values(p.details.attachments).filter(f => f.kind === 'value')).toHaveLength(3); }
+    expect(await Promise.all(parts.map(p => f.fs.readBytes(p)))).toEqual(saved); await cold.dispose();
+  });
+  it('keeps only Project navigation blocked while its selector owns opening, preserving Caption reading', async () => {
+    const f = await openFileCaption(), mode = createValidationModeHost(f.host, async () => { throw Error('unexpected mode change'); }, () => {}), document = new RecordedDocument().asDocument();
+    let blocked = true, display: Parameters<ReturnType<ViewportFactory>['update']>[0] | undefined;
+    const open = vi.fn(), factory: ViewportFactory = () => ({ update(next) { display = next; }, setActive() {}, camera() {}, retry() {}, dispose() {}, read: () => ({ ready: true, display, token: 'navigation-owner', issue: null, dragging: false, pins: [], projection: 'perspective', axis: null }) });
+    const ui = createProductWorkspace(document, mode, factory, undefined, undefined, { projectNavigationBlocked: () => blocked, openProject: open, resumedLastProject: () => false, changed() {} });
+    const all = (n: RecordedNode): RecordedNode[] => [n, ...n.children.flatMap(all)], nodes = () => all(record(ui.root));
+    const other = () => nodes().find(n => n.tag === 'button' && n.textContent === '別のプロジェクトを開く')!, search = () => nodes().find(n => n.attributes.get('aria-label') === '検索')!;
+    try {
+      expect(other().disabled).toBe(true); expect(search().disabled).toBe(false); other().fire('click'); expect(open).not.toHaveBeenCalled();
+      blocked = false; ui.render(); expect(other().disabled).toBe(false); other().fire('click'); expect(open).toHaveBeenCalledOnce();
+    } finally { await ui.dispose(); await f.workspace.dispose(); }
   });
   it('replaces an explicitly selected GLB, retains team edits and returns corrected same-Asset pins through real files', async () => {
     const f = await openFileCaption(), { host, workspace, s, captionId } = f, sceneId = s.sceneId;

@@ -1,4 +1,5 @@
 import { issuePointAnchorProof } from './pointAnchorProof';
+import { reactivatedCaptionMedia } from './captionReactivation';
 import type { Anchor } from '../scene/types';
 import * as A from '@automerge/automerge/slim';
 import type { ProjectWorkspaceFS } from '../platform/fs';
@@ -99,6 +100,12 @@ export function metadataProviderReady(provider: ProjectProviderRead, limits: Met
       issue.path[0] === 'representationsById' && issue.path[2] === 'formatProfile' && !active.has(issue.path[1]!)) return false;
     if (issue.kind === 'unverified' && issue.code === 'verified-media-bytes-required' && issue.path.length === 3 &&
       issue.path[0] === 'mediaResourcesById' && issue.path[2] === 'blob' && media.has(issue.path[1]!)) return false;
+    if (issue.kind === 'unverified' && issue.path.length === 3 && issue.path[0] === 'captionsById' && issue.path[2] === 'anchor' &&
+      ['source-index-unverified', 'verified-source-index-range-required'].includes(issue.code)) {
+      const anchor = provider.resources.captions[issue.path[1]!]?.anchor;
+      if (anchor?.kind === 'value' && anchor.value.kind === 'asset' && anchor.value.hitEvidence?.source?.surfaceRef &&
+        !active.has(anchor.value.hitEvidence.source.representationId)) return false;
+    }
     return ['invalid', 'unverified'].includes(issue.kind) || issue.code === 'opaque-data-protection-required';
   });
 }
@@ -264,6 +271,7 @@ export class MetadataProjectSession {
       if (!parts.length) return read; // An unchanged value has no storage transaction.
       const facts = await this.prepareModelFacts(durable, prepared);
       if (!facts) await this.checked(prepared, false); // Refused preparation must not become a pending save.
+      await this.verifyDelta(await reactivatedCaptionMedia(durable, prepared, this.limits));
       const [doc] = A.applyChanges(A.init(), durable.originalChanges());
       this.retained = { start: { transactionId, repositoryId: prior.start.repositoryId, predecessor: prior.start.transactionId,
         purpose: 'localCommand', proof: durable.proof, baseHeads: A.getHeads(doc).sort() }, parts,
@@ -918,10 +926,12 @@ export class MetadataProjectSession {
     const parts = await this.journal.validateParts(prepared), start = prepared.start;
     const initial = start.purpose === 'initialize' || start.purpose === 'importWorkspace' || start.purpose === 'restoreBackup' || start.purpose === 'importClean';
     let stored = await this.repository.read(start.repositoryId, start.proof, undefined, initial);
+    let localBase: ProjectMetadataSource | null = null;
     if (!initial) {
       if (!stored) fail('journal-base-missing');
       const base = await this.repository.read(start.repositoryId, start.proof, start.baseHeads);
       if (!base) fail('journal-base-missing');
+      if (start.purpose === 'localCommand') localBase = base;
     }
     let next: ProjectMetadataSource;
     if (start.purpose === 'remotePackageMerge') {
@@ -950,6 +960,7 @@ export class MetadataProjectSession {
       for (const part of prepared.changes) { witness(); this.acknowledgedLocalChanges.add(part.expectedChangeHash); }
     // Exact pending changes can coexist with legitimate extra local heads; never rebase or choose a winner.
     await this.checked(next, false);
+    if (localBase) await this.verifyDelta(await reactivatedCaptionMedia(localBase, localBase.appendOriginal(parts), this.limits));
     if (receiveJob) await this.media!.inventory!(await receiveJob.inventory());
     if (restoreJob) await this.media!.verify(restoreJob.inventory());
     await this.repository.persist(start.repositoryId, next);

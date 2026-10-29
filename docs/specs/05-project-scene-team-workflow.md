@@ -3958,6 +3958,14 @@ restoration/order choices, guarded text/color compensation and tags. These repla
 the first-slice Scene-UI exclusion for this implementation unit. Unrelated non-goals,
 new media/decoder and actual adoption/release gates remain unchanged.
 
+PO2026-10-29 authorized the next08 continuation: chronological editor-local
+Caption create/copy/delete/attachment compensation and exact ordinary01a Point
+replacement. Its finite receipt/candidate guards and same-profile fresh-family/
+class rules extend the earlier text-only Undo and Mesh-only replacement boundary.
+They retain original bodies/history, Project-wide placement, explicit pin review,
+typed commands and package/recovery fences. No unknown-profile conversion, automatic
+matching, dependency, general history rollback or adoption/release is inferred.
+
 - cloud backend, accounts, roles, authentication, signatures or real-time presence;
 - automatic same-model detection, registration, Caption reraycast or surface remap;
 - per-Scene Asset revision, transform or alignment;

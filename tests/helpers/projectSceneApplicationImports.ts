@@ -233,7 +233,9 @@ export const projectSceneApplicationImports:Readonly<Record<string,readonly stri
   "src/projectScene/modelTypes.ts": [
     "../domain/values",
     "../scene/types",
-    "./mediaDisplay"
+    "./mediaDisplay",
+    "../domain/pointSource",
+    "../domain/projectGraphSupport"
   ],
   "src/projectScene/pinGizmo.ts": [
     "./modelTransform",
@@ -279,7 +281,8 @@ export const projectSceneApplicationImports:Readonly<Record<string,readonly stri
     "./validationMaterials",
     "./validationModeHost",
     "./viewCandidateLabels",
-    "./viewDisplay"
+    "./viewDisplay",
+    "../projectMetadata/captionUndo"
   ],
   "src/projectScene/productWorkspace.ts": [
     "../domain/values",

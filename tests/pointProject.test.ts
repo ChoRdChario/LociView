@@ -1,3 +1,6 @@
+import { readProjectScene } from '../src/scene/projectProvider';
+import { resolveScene } from '../src/scene/resolve';
+import type { ReplaceAssetModelCommand } from '../src/projectMetadata/modelReplacement';
 import { createPointSurface } from '../src/viewer/pointSurface';
 import * as THREE from 'three';
 import { pickPointAwareCreation } from '../src/harness/projectScene/viewportPointPicking';
@@ -5,10 +8,10 @@ import * as A from '@automerge/automerge';
 import { vi } from 'vitest';
 import { MemoryFS } from '../src/platform/fs';
 import { OriginBlobStore } from '../src/projectMetadata/blobStore';
-import { MetadataProjectSession } from '../src/projectMetadata/session';
+import { metadataProviderReady, MetadataProjectSession } from '../src/projectMetadata/session';
 import type { MetadataStorageFactory } from '../src/projectMetadata/repository';
 import { validationMetadataLimits as metadata } from '../src/projectFiles/validation';
-import { prepareValidationProject } from '../src/projectFiles/initialProject';
+import { prepareValidationProject, sealValidationRecord } from '../src/projectFiles/initialProject';
 import { prepareValidationCreation, validationProjectService } from '../src/projectFiles/creation';
 import { newId, json } from '../src/projectMetadata/persistence';
 import { surfaceAnchor } from '../src/ui/projectScene/projectWorkspacePorts';
@@ -151,4 +154,54 @@ it('shares the rounded projection for large translated coordinates and preserves
   const frame=surface.project(camera,24); expect(Array.from(frame.centersCss)).toEqual([150,100]); expect(positions[0]).toBe(100000000);
   expect(surface.mesh.geometry.getAttribute('pointScreen').getX(0)).toBe(frame.centersCss[0]); expect(surface.mesh.geometry.getAttribute('pointClip').getZ(0)).toBe(frame.depths[2]);
   asset.position.x=-100000000; asset.updateMatrixWorld(true); expect(Array.from(surface.project(camera,24).centersCss)).toEqual([100,100]); surface.dispose();
+});
+
+
+async function pointReplacement(r: Awaited<ReturnType<typeof pointService>>) {
+  const read = await r.session.read(); if (read.provider?.kind !== 'scene-provider') throw Error('provider');
+  const prior = (await validationModelVersions(read.provider))[0]!.closure;
+  if (prior.shape !== 'saved-point') throw Error('point');
+  const prepared = await r.content.prepareModel({ label: '更新点群.ply', bytes: bytes(source.accepted[0].utf8.replace('-1 0 -0', '-2 0 0')) }, r.target.assetId);
+  const binding = await sealValidationRecord('asset-binding-revision', { id: prepared.binding.id!, assetId: r.target.assetId, assetRevisionId: prepared.revision.id!, parentBindingId: prior.binding.id, method: 'manual', assetToProject: prior.binding.assetToProject as any });
+  const command: ReplaceAssetModelCommand = { kind: 'replaceAssetModel', sceneId: r.target.sceneId, assetId: r.target.assetId, expectedBindingId: prior.binding.id, revision: prepared.revision, representation: prepared.representation, binding };
+  return { prior, prepared, command, read };
+}
+it('replaces only the same ordinary Point profile, preserving placement, coordinates and old bodies with fresh compatibility', async () => {
+  const r = await pointService(); await r.session.edit(r.p.token, r.command);
+  const old = (await r.session.read()).provider!; if (old.kind !== 'scene-provider') throw Error('provider');
+  const change = await pointReplacement(r), history = change.read.source!.originalChanges(), original = old.resources.captions[r.command.captionId];
+  for (const command of [{ ...change.command, expectedBindingId: `bnd_${newId()}` },
+    { ...change.command, representation: { ...change.command.representation, formatProfile: { id: 'native-point', specificationSha256: '0'.repeat(64) } } },
+    { ...change.command, representation: { ...change.command.representation, variantFamilyId: change.prior.representation.variantFamilyId } }]) {
+    const files = await r.fs.list(''); await expect(r.session.edit(old.token, command)).rejects.toThrow(); expect(await r.fs.list('')).toEqual(files);
+  }
+  const next = await r.session.edit(old.token, change.command); if (next.provider?.kind !== 'scene-provider') throw Error('provider');
+  const updated = (await validationModelVersions(next.provider))[0]!;
+  expect(updated.projection.assetFrameId).toBe(r.target.assetFrameId); expect(updated.closure.binding.assetToProject).toEqual(change.prior.binding.assetToProject);
+  expect(updated.closure.binding.parentBindingId).toBe(change.prior.binding.id);
+  expect(updated.closure.representation.variantFamilyId).not.toBe(change.prior.representation.variantFamilyId);
+  expect(updated.projection.anchorCompatibilityIds).not.toEqual([r.target.compatibilityId]);
+  expect(next.provider.resources.captions[r.command.captionId]).toEqual(original);
+  expect(next.source!.originalChanges().slice(0, history.length)).toEqual(history);
+  expect(await r.content.modelContent(change.prior.representation)).toBeTruthy(); expect(await r.content.modelContent(updated.closure.representation)).toBeTruthy();
+  const requested: string[] = [], verifier = r.content.verifier(false);
+  const inspected = await readProjectScene(next.source!.read(), metadata, { scope: verifier.scope, verify: q => { requested.push(...q.records.map(row => row.id as string)); return verifier.verify(q); } });
+  expect(metadataProviderReady(inspected, metadata)).toBe(true); expect(requested).not.toContain(change.prior.representation.id);
+  expect(inspected.kind === 'scene-provider' && inspected.issues.some(i => i.code === 'source-index-unverified')).toBe(true);
+  const blocked = await readProjectScene(next.source!.read(), metadata, { scope: verifier.scope, verify: async q => q.records.some(row => row.id === updated.closure.representation.id) ? { request: q, scope: verifier.scope, outcome: 'missing' } : verifier.verify(q) });
+  expect(metadataProviderReady(blocked, metadata)).toBe(false);
+  expect(blocked.kind === 'scene-provider' && blocked.inspection.checks.some(c => c.request.fact === 'representation' && c.request.records[0]?.id === updated.closure.representation.id && c.outcome === 'missing')).toBe(true);
+
+  const scene = resolveScene(next.provider.state, next.provider.resources, r.target.sceneId); expect(scene.kind).toBe('ready');
+  if (scene.kind !== 'ready') throw Error('scene'); expect(scene.composition.captions[0]).toMatchObject({ marker: 'needsReview', anchor: { kind: 'value', value: { positionAsset: [-1, 0, 0] } } });
+});
+it('retains exact Point replacement after publication interruption and cold retry', async () => {
+  const r = await pointService(); await r.session.edit(r.p.token, r.command); const change = await pointReplacement(r);
+  r.fs.rejectPublication = true; await expect(r.session.edit(change.read.source!.token, change.command)).rejects.toThrow('point-publication-fault');
+  const paths = (await r.fs.list('')).filter(p => p.endsWith('.amchange')), pending = await Promise.all(paths.map(p => r.fs.readBytes(p)));
+  r.fs.rejectPublication = false; const cold = validationProjectService(r.fs, r.storage, r.store, limits); const next = await cold.session.retry();
+  expect(next.state).toBe('ready'); if (next.provider?.kind !== 'scene-provider') throw Error('provider');
+  expect(next.provider.resources.assets[r.target.assetId]!.projection).toMatchObject({ value: { bindingId: change.command.binding.id, revisionId: change.command.revision.id } });
+  expect(await Promise.all(paths.map(p => r.fs.readBytes(p)))).toEqual(pending);
+  await expect(cold.session.edit(next.provider.token, change.command)).rejects.toThrow();
 });

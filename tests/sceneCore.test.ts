@@ -252,7 +252,7 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
       // 06 §11/§12.3 permit these exact disconnected primitives, not an app importer.
       if (!applicationImports && !packageControl && !packageJournal) expect(source, path).not.toMatch(/(?:from\s+|import\s*\()['"][^'"]*\/projectPackage\//);
       const metadataFoundation = /[\\/]projectMetadata[\\/](format|source)\.ts$/.test(path);
-      const metadataService = /[\\/]projectMetadata[\\/](pointAnchorProof|persistence|generationScope|repository|journal|contentEvidence|blobStream|blobStore|blobInventory|session|commands|remote|packageRemote|membership|records|assetStatus|modelMembership|modelAddition|modelReplacement|gsProxy|captionCandidates|sceneAuthoring|viewResolution|materialResolution|captionDeletion|assetDeletion|startupScene|captionAuthoring|sceneOrganization)\.ts$/.test(path);
+      const metadataService = /[\\/]projectMetadata[\\/](pointAnchorProof|persistence|generationScope|repository|journal|contentEvidence|blobStream|blobStore|blobInventory|session|commands|remote|packageRemote|membership|records|assetStatus|modelMembership|modelAddition|modelReplacement|gsProxy|captionCandidates|sceneAuthoring|viewResolution|materialResolution|captionDeletion|assetDeletion|startupScene|captionAuthoring|captionUndo|captionReactivation|sceneOrganization)\.ts$/.test(path);
       // 05 §13.2 permits this exact new synthetic host, never ordinary/old saved activation.
       const metadataHost = /[\\/]harness[\\/]projectScene[\\/]metadata(Fixture|Storage|Host|Intent|MembershipControls|Models|ModelFacts|AssetStatusControls|ConflictControls|MaterialControls|CaptionLifecycleControls|StartupControls)\.ts$/.test(path);
       const validationFiles = /[\\/]projectFiles[\\/](materialNormalization|meshSource|meshSourceSupport|meshSourceBinding|meshDecode|meshStl|meshPly|meshObj|meshGltf|nativeSpatialConversion|nativeSpatial|bodyBudget|validation|png|jpeg|photo|media|mediaContainer|avcMedia|hevcMedia|heic|glb|glbMaterials|glbOccurrences|legacy180Occurrences|pointPly|gsPly|initialProject|content|creation|modelFacts|receiveWorkspace|sendWorkspace|nativeMapping|nativeConversion|frozenV1Source|frozenV1Mapping|frozenV1Conversion|lociMyuSource|lociMyuMapping|lociMyuConversion)\.ts$/.test(path);
@@ -451,6 +451,8 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
         const byFile: Record<string, string[]> = {
           // Repository type only: binds the read callback's FS/factory pair; no runtime Repo dependency.
           pointAnchorProof: ['./source', './commands', './persistence', './format'],
+          captionReactivation: ['../domain/values', '../domain/projectGraphSupport', '../domain/projectCandidates', './source', './format', './persistence'],
+          captionUndo: ['./records', '../domain/values', '../domain/projectGraphSupport', '../domain/projectMutableFields', '../domain/projectRecordFields', '../scene/projectProvider', './membership', './captionAuthoring', './format', './commands'],
           captionAuthoring: ['../domain/projectRecordFields', '../domain/projectMutableFields', '../domain/projectGraphSupport', '../domain/captionText', '../domain/values', '../scene/projectProvider', './membership', './format', './commands'],
           sceneOrganization: ['../domain/projectRecordFields', '../domain/projectMutableFields', '../domain/projectGraphSupport', '../domain/values', '../scene/projectProvider', '../scene/projectMaterialRoutes', './membership', './captionAuthoring', './format', './commands'],
           persistence: ['../core/json', '../domain/projectGraphSupport', '../domain/values', '../platform/fs', './format', './repository'],
@@ -469,7 +471,7 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
           modelAddition: ['../domain/gsSource', '../domain/pointSource', '../domain/projectRecords', '../domain/projectRecordFields', '../domain/projectMutableFields', '../domain/projectGraphSupport',
             '../domain/values', '../scene/projectProvider', './membership', './commands', './format'],
           gsProxy: ['../domain/meshSource','../domain/projectRecords','../domain/projectRecordFields','../domain/gsSource','../domain/projectGraphSupport','../domain/values','../scene/projectProvider','../scene/resolve','./membership','./records','./commands','./format'],
-          modelReplacement: ['../domain/meshSource','../domain/projectRecords', '../domain/projectRecordFields', '../domain/projectGraphSupport',
+          modelReplacement: ['../domain/pointSource', '../domain/meshSource','../domain/projectRecords', '../domain/projectRecordFields', '../domain/projectGraphSupport',
             '../domain/values', '../scene/projectProvider', '../scene/resolve', './membership', './records', './commands', './format'],
           captionCandidates: ['../scene/projectProvider', '../domain/projectMutableFields', '../domain/projectRecordFields', './membership', './format', './records'],
           captionDeletion: ['../scene/commands', '../scene/projectProvider', '../domain/projectRecordFields', './membership', './format', './commands', '../domain/projectMutableFields', '../domain/values'],
@@ -484,11 +486,11 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
           blobStream: ['../nativeGs/sha256'],
           blobStore: ['../platform/fs', '../platform/projectLock', '../domain/projectRecordFields', '../domain/values', './format', './persistence', './blobStream'],
           blobInventory: ['../domain/projectContentChecks', '../domain/values', './contentEvidence', './format', './blobStore'],
-          session: ['../scene/types', './pointAnchorProof', '@automerge/automerge/slim', '../platform/fs', '../domain/values', '../domain/projectContentChecks', '../domain/captionText', '../scene/projectProvider',
+          session: ['./captionReactivation', '../scene/types', './pointAnchorProof', '@automerge/automerge/slim', '../platform/fs', '../domain/values', '../domain/projectContentChecks', '../domain/captionText', '../scene/projectProvider',
             './format', './source', './repository', './journal', './persistence', './commands', './remote', './packageRemote', '../projectPackage/receiveJob', '../projectPackage/manifest', '../projectPackage/reviewEditControls',
             './blobStore', '../projectPackage/outputJob', '../projectPackage/contributionOutputJob', '../projectPackage/backupOutputJob', '../projectPackage/backupSource', '../projectPackage/cleanOutputJob', '../projectPackage/reviewOutputJob', '../projectPackage/reviewSource', '../projectPackage/reviewSelection', '../projectPackage/cleanInputJob', '../projectPackage/cleanSource', '../projectPackage/cleanRecords', '../projectPackage/contributionSource', '../projectPackage/outputJobs', '../projectPackage/workspaceBases', '../projectPackage/workspaceSource', '../projectPackage/protectedInventory', '../projectPackage/contract', '../projectPackage/contributionReceiveJob', '../projectPackage/contributionEvidence', '../projectPackage/receiveJobs', '../projectPackage/backupRestoreJob'],
           startupScene: ['../scene/projectProvider', '../domain/projectRecords', '../domain/projectRecordFields', './membership', './format'],
-          commands: ['../domain/alignment', './captionAuthoring', './sceneOrganization', '../domain/meshMaterialSource','./gsProxy', './materialResolution', '../domain/values', '../domain/projectMutableFields', '../domain/projectRecordFields', '../domain/projectRecords', '../domain/projectGraphSupport',
+          commands: ['./captionUndo', '../domain/alignment', './captionAuthoring', './sceneOrganization', '../domain/meshMaterialSource','./gsProxy', './materialResolution', '../domain/values', '../domain/projectMutableFields', '../domain/projectRecordFields', '../domain/projectRecords', '../domain/projectGraphSupport',
             '../domain/materialIntent', '../domain/captionText', '../scene/projectMaterialRoutes', '../scene/commands', '../scene/resolve', '../scene/types', '../scene/projectProvider', './format', './membership', './records', './assetStatus', './modelMembership', './captionCandidates', './sceneAuthoring', './viewResolution', './captionDeletion', './assetDeletion', './startupScene', './modelAddition', './modelReplacement'],
         };
         const name = path.split(/[\\/]/).at(-1)!.replace(/\.ts$/, '');
@@ -537,7 +539,7 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
         // not the Native controller/schema runtime or a general Native dependency.
         const shared = ['../../scene/types', '../../domain/captionText', '../../domain/values', '../../domain/materialIntent', '../../nativeGs/backgroundColor'];
         if (productComposition) shared.push('../../projectMetadata/commands', '../../scene/projectProvider', '../../scene/resolve');
-        if (/[\\/](projectWorkspacePorts|projectOrganization)\.ts$/.test(path)) shared.push('../../projectMetadata/captionAuthoring');
+        if (/[\\/](projectWorkspacePorts|projectOrganization)\.ts$/.test(path)) shared.push('../../projectMetadata/captionAuthoring', '../../projectMetadata/captionUndo');
         if (path.replaceAll('\\', '/').endsWith('/projectModels.ts')) shared.push('../../domain/alignment');
         if (path.replaceAll('\\', '/').endsWith('/projectWorkspacePorts.ts')) shared.push('../../scene/commands');
         if (path.replaceAll('\\', '/').endsWith('/projectRead.ts')) shared.push('../../domain/projectGraphSupport');

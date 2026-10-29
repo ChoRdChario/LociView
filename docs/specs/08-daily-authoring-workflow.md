@@ -1,6 +1,7 @@
 # Daily authoring integration
 
-Status: bounded PC implementation of groups1–4 verified2026-10-29; executed
+Status: initial bounded PC implementation of groups1–4 and the authorized
+Caption-action Undo/ordinary Point-replacement continuation verified2026-10-29. Executed
 checks and remaining acceptance are in [todo](../../tasks/todo.md). This document
 specifies conservative operations over existing records. Revised independent design
 review passed2026-10-29, including distributed deletion recovery and explicit order
@@ -70,6 +71,104 @@ candidate reads and command preparation. No UI storage writes or generic patch A
   live links only after explaining its Project-wide effect.
 - Local display name is an advisory browser preference, not an authentication
   identity or retroactive author attribution. Keep it outside Project history.
+
+## Authorized continuation —Caption action Undo,2026-10-29
+
+PO authorized the next usability workflow after the bounded checkpoint above.
+Extend its local stack to chronological Caption creation/duplication/deletion,
+attachment add/remove/description/order and existing title/body/color edits.
+The controls work without a selected Caption; restoring a record selects it where
+it belongs in the current Scene. Keep that Scene and the Project default unchanged;
+otherwise report restoration without selecting a hidden Caption. Closing the
+editor clears only this local stack.
+Each confirmed operation records a discriminated receipt exactly once after
+durable acknowledgement; failed retries retain it and new normal edits clear redo.
+No-op changes add no receipt. No Project history rewrite, new schema or dependency.
+
+Add finite ordinary lifecycle compensation and attachment-field restoration
+commands, distinct from conflict-only recovery commands. Creation Undo tombstones
+the same Caption and its created live children; Redo restores those same IDs.
+Deletion Undo restores only rows actually deleted by that action, never older
+deleted children. Append fresh lifecycle events (`restore` when activating), retain
+media bodies/tag resources and every original candidate. Attachment Undo changes
+only that edge's lifecycle or its selected description/order field.
+
+Provider-derived receipts capture exact field operation IDs/values, affected row
+identities and complete live child sets. The planner independently rechecks the
+same candidates and dependencies, including resolved deleted rows; no arbitrary
+map/patch write API. Unknown/conflicted rows, a foreign equal-value rewrite,
+new live children or unavailable parents/resources refuse compensation atomically.
+Existing deletion may still preserve conflicted non-lifecycle fields; inability
+to capture an Undo receipt must not narrow the existing deletion contract.
+Explain that such changes can prevent Undo. Reconnect local receipts only where
+their exact prior operation IDs match this editor's compensating writes; never
+bridge a foreign rewrite. Resolved tombstones not touched by an action stay deleted.
+Existing Session checked-next-state/body verification runs before pending and
+publication when media becomes live again; no staging shortcut or validation cache.
+
+A regression exposed that existing fact/inventory receipts detect missing/short
+bodies but do not freshly hash a same-length corrupted body. On lifecycle Undo/
+Redo that reactivates attachments, derive only their exact existing media BlobRefs
+from the checked base plus that action's original local change parts. Call existing
+Session verifyDelta/MetadataMediaPort.verify before retaining a pending command.
+Retry/cold reconstructs that same baseHeads+validated-parts batch and derives them
+again before persistence/publication. Also cover Caption restoration with still-live
+attachments. Keep journal stagedBlobs semantics/counts unchanged; no put/restage,
+new receipt/schema or repair permission. Corrupt/missing acknowledged bodies
+refuse; never refill them from UI input or a previous prepared selection.
+
+Preserve conflict-recovery semantics as well: restoring a Caption lifecycle alone
+does not resolve its children's owner/lifecycle/media-reference conflicts. Such
+known unresolved children are not live attachments and do not yield an arbitrary
+media choice for reactivation verification. Skip those unresolved children while
+retaining every diagnostic/candidate. Unknown/invalid fields still refuse; ordinary
+Undo's complete-row/child-set planner still refuses affected ambiguous children.
+Equivalent known immutable media candidates can supply their identical record;
+different immutable candidates never choose a winner. The existing parent-only
+recovery test must retain its same-host failure/retry behavior unchanged.
+
+Acceptance adds create→text→attach→delete Undo/Redo ordering, multi-Scene restore,
+pre-deleted child retention, same-value foreign edits/late children/unknown refusal,
+single receipt after retry, absent/corrupt media refusal before pending, and
+save/share/restore/cold equality with an empty cold local stack.
+
+## Authorized continuation —ordinary Point replacement,2026-10-29
+
+Use the existing guarded `replaceAssetModel`/WorkspaceFS/body pipeline for exact
+01a XYZ/RGB ASCII Point→same01a Point. Preserve Asset ID, AssetFrame, Project unit,
+all Scene memberships, placement transform, Caption coordinates and attachments.
+Append fresh revision/binding/RepresentationFrame/family/compatibility/catalog IDs;
+the new binding's parent is the expected current binding. Retain old bodies/history.
+Require exact source declarations at both ends, not merely `saved-point` shape.
+Native Point, GS/Proxy, Mesh↔Point and cross-profile conversion remain outside this
+same-profile extension. It adds no profile/schema/dependency or capacity promise.
+
+Do not infer point correspondence even for identical bytes. Existing pins retain
+coordinates and become `needsReview` under the fresh compatibility class until
+explicit point selection/manual confirmation. Explain this and Project-wide
+Scene impact before replacement; do not display irrelevant Mesh material-loss copy.
+Reject stale binding, reused IDs, mixed profiles or unsupported source atomically.
+Use the existing checked pending/publication/readback/recovery fences; no alternate
+writer or cached admission. Verify failure→cold retry, source/pin preservation,
+hand-edited peer receive→pin correction→return and saved/restored/cold records.
+
+Implementation found a pre-existing readiness discrepancy with specification01's
+weak-provenance rule: content inspection intentionally does not fetch an inactive
+old hit source and preserves its source-index-unverified diagnostic, while Session
+readiness rejected it. Retain those diagnostics and accept canonical coordinates
+only for a resolved Asset anchor whose exact hit source is outside the active
+strong Representation closure. Ignore only `verified-source-index-range-required`
+and `source-index-unverified` readiness diagnostics when unverified in that case. Active-source failures,
+invalid/out-of-range/unknown/conflicted anchors and all body/publication/recovery
+checks remain unchanged. Never fetch weak bytes or assert that old indices were
+verified. This repairs the accepted01 invariant; it adds no content cache lifetime.
+
+The connected cold-browser test also found that the early mounted editor could
+offer Project navigation while its selector still owned the opening operation;
+the selector then discarded that click. Pass only that navigation control's local
+owner-busy guard to the editor and refresh it on owner busy transitions. Keep
+Caption reading/search and ready geometry usable; do not turn selector busy into
+a global edit/read block or change loading/publication/recovery timing.
 
 ## Alignment and media boundary
 
