@@ -1,5 +1,5 @@
 import * as A from '@automerge/automerge/slim';
-import { checkEditorCapability } from '../projectMetadata/editorAttribution';
+import { capabilityUnion, checkRequiredCapabilities } from '../projectMetadata/requiredCapabilities';
 import { canonical } from '../domain/projectGraphSupport';
 import type { JsonValue } from '../domain/values';
 import { ProjectMetadataSource, type MetadataLimits, type MetadataProof } from '../projectMetadata/source';
@@ -104,7 +104,7 @@ export function frozenBaseSource(proof: ContributionBaseProof, manifestBytes: Ui
     !same(m.identity, proof.identity) || !same(m.metadataEnvelope, proof.metadataEnvelope) ||
     m.metadata.byteLength !== metadataBytes.length || m.metadata.sha256 !== packageByteHash(metadataBytes)) return fail('contribution-base-evidence');
   const source = ProjectMetadataSource.fromFullSource(metadataBytes, { identity: m.identity, envelope: m.metadataEnvelope }, packageSourceLimits(limits));
-  checkEditorCapability(m.requiredCapabilities, source.includesDeclaredEditorNames);
+  checkRequiredCapabilities(m.requiredCapabilities, source.requiredCapabilities);
   if (!same(source.heads, m.targetHeads)) fail('contribution-base-heads');
   return { source, manifest: m, blobs: m.blobs };
 }
@@ -139,7 +139,7 @@ export function contributionOriginals(input: ContributionEvidenceInput, limits: 
     if (c.hash !== d.expectedChangeHash || !same([...c.deps].sort(), d.dependencies)) fail('contribution-wire-original');
   }
   const target = contributionTargetView(base.source, input.wireParts, m.targetHeads, bounded), d = contributionDelta(base.source, target, bounded);
-  checkEditorCapability(m.requiredCapabilities, base.source.includesDeclaredEditorNames || target.includesDeclaredEditorNames);
+  checkRequiredCapabilities(m.requiredCapabilities, capabilityUnion(base.source.requiredCapabilities, target.requiredCapabilities));
   if (!same(d.changes, m.changes) || d.parts.some((b, i) => !equal(b, input.wireParts[i]!))) fail('contribution-delta-mismatch');
   const reconstruction = input.reconstruction;
   if (!reconstruction || !same(reconstruction, { kind: 'derivedTargetView', adapterId: CONTRIBUTION_RECONSTRUCTION,

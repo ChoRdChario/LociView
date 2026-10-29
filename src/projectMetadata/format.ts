@@ -90,6 +90,11 @@ export async function inspectOriginalSource(doc: PhysicalDoc, proof: MetadataPro
 export function inspectPhysical(doc: PhysicalDoc, inputProof: MetadataProof, limits: MetadataLimits): ProjectCandidateInput {
   return inspectPhysicalDetail(doc, inputProof, limits).input;
 }
+/** Capability use belongs to original physical scalars, including overwritten writes. */
+export function inspectPhysicalSource(doc: PhysicalDoc, inputProof: MetadataProof, limits: MetadataLimits) {
+  const result = inspectPhysicalDetail(doc, inputProof, limits);
+  return { input: result.input, portableChanges: result.portableChanges, mediaRecords: result.mediaRecords };
+}
 /** Encoding witness only, never a selected/default View. Include overwritten original scalars. */
 export function originalEntryWitness(doc: PhysicalDoc, proof: MetadataProof, limits: MetadataLimits, sceneId: string): string {
   const detail = inspectPhysicalDetail(doc, proof, limits, { maxNodes: limits.maxNodes, maxWork: limits.maxWork });
@@ -117,6 +122,8 @@ function inspectPhysicalDetail(doc: PhysicalDoc, inputProof: MetadataProof, limi
   const occupied = new Set<string>(), ancestors = new Map<string, Set<string>>();
   const changes: AtomicChange[] = [], scalars = new Map<string, { objectId: string; key: string }>();
   let work = 0, operations = 0, schema: JsonObject | undefined, identity: JsonValue | undefined, profileMarker: JsonValue | undefined;
+  const portableChanges = new Set<string>();
+  const mediaRecords: JsonObject[] = [];
   const originals: OriginalScalar[] = []; let nodesUsed = 0;
   const collect = (changeHash: string, operationId: string, path: string[], value: AtomicWrite['value']) => {
     if (!originalBudget) return;
@@ -174,6 +181,11 @@ function inspectPhysicalDetail(doc: PhysicalDoc, inputProof: MetadataProof, limi
           if (op.datatype !== undefined) fail('scalar-datatype');
           return { kind: 'value' as const, value: decodeScalar(op.value, limits) };
         })();
+        if (path.length === 2 && path[0] === 'mediaResourcesById' && value.kind === 'value' && value.value &&
+          typeof value.value === 'object' && !Array.isArray(value.value)) {
+          mediaRecords.push(value.value as JsonObject);
+          if (Object.hasOwn(value.value, 'portableDisplay')) portableChanges.add(hash);
+        }
         if (hash === rootHash) {
           if (writes.has(address)) fail('root-rewrite');
           if (op.key === 'schema' && value.kind === 'value') schema = value.value as JsonObject;
@@ -221,5 +233,5 @@ function inspectPhysicalDetail(doc: PhysicalDoc, inputProof: MetadataProof, limi
     }
   }
   const input = Object.freeze({ ...(map2 ? { semanticProfile: profile } : {}), schema: schema!, recordMaps: Object.freeze(Object.keys(projectRecordMaps)), history: read.history });
-  return { input, scalars: Object.freeze(originals), nodesUsed, workUsed: work + nodesUsed + read.workUsed };
+  return { input, portableChanges, mediaRecords, scalars: Object.freeze(originals), nodesUsed, workUsed: work + nodesUsed + read.workUsed };
 }

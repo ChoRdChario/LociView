@@ -241,6 +241,13 @@ This explicitly leaves general Windows/cross-browser direct HEIC incomplete.
 No bundled decoder, transcoder or new dependency is included. Broader HEIC needs
 a separately reviewed decoder/license/distribution or portable-derivative design.
 
+PO2026-10-30 subsequently approved proceeding with the local original-plus-display
+workflow in[08c](08c-portable-heic-display.md). That companion owns the exact new
+paired-record exception: preserve HEIC and a once-generated PNG, validate source
+structure and decoded display separately, and use the display on incapable peers.
+Its code/check status is in todo. Existing unpaired HEIC remains native-only;
+there is no bundled decoder, silent source replacement or offline-shell credit.
+
 Measure actual initial decoding and playback in the exact dedicated browser; do
 not infer codec support from its name or canPlayType. If bundled Chromium lacks
 AVC/AAC, use a dedicated temporary-profile installed Chrome/Edge test, following

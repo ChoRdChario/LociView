@@ -1,6 +1,7 @@
 import { active, GraphInspection, list, object, string } from './projectGraphSupport';
 import type { ProjectRecordMap } from './projectRecords';
 import type { JsonObject } from './values';
+import { portableDisplay } from './portableMedia';
 const knownUnavailable = (r: JsonObject | undefined) => !r || (r.lifecycle !== undefined && !active(r));
 
 /** Current records only. Candidate reservation and causal delete/edit still gate the provider. */
@@ -13,6 +14,8 @@ export function inspectResourceGraph(g: GraphInspection): void {
     for (const r of g.all(map)) if (active(r)) g.roots.add(string(r.id));
   for (const media of g.all('mediaResourcesById')) {
     g.edge(string(media.id), `blob:${string(object(media.blob).digest)}`, 'blob');
+    const display = portableDisplay(media);
+    if (display) g.edge(string(media.id), `blob:${string(display.blob.digest)}`, 'portableDisplay.blob');
     g.issue('mediaResourcesById', string(media.id), 'blob', 'verified-media-bytes-required', 'unverified');
   }
   const endpoint = (map: ProjectRecordMap, r: JsonObject, field: string, targetMap: ProjectRecordMap, immutable = false) => {

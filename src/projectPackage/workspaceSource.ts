@@ -1,3 +1,4 @@
+import type { ReaderCapabilities } from '../projectMetadata/requiredCapabilities';
 import type { MetadataProjectSession, MetadataSessionRead } from '../projectMetadata/session';
 import { ProjectMetadataSource, type MetadataLimits, type MetadataProof } from '../projectMetadata/source';
 import type { OriginBlobStore, StoredBlobRef } from '../projectMetadata/blobStore';
@@ -16,7 +17,7 @@ export class WorkspaceSourceCapture {
   private constructor(private readonly bytes: Uint8Array, readonly token: string, readonly publication: string | null,
     readonly proof: MetadataProof, readonly targetHeads: readonly string[], readonly metadata: Entry,
     readonly blobs: readonly Entry[], readonly summary: AutomaticSummary, readonly bodyRefs: readonly StoredBlobRef[],
-    readonly includesDeclaredEditorNames: boolean) { Object.freeze(this); }
+    readonly includesDeclaredEditorNames: boolean, readonly requiredCapabilities: ReaderCapabilities) { Object.freeze(this); }
   metadataBytes(): Uint8Array { return this.bytes.slice(); }
 
   static async prepare(session: Pick<MetadataProjectSession, 'read'>, expectedToken: string,
@@ -87,6 +88,6 @@ export class WorkspaceSourceCapture {
     const summary: AutomaticSummary = Object.freeze({ algorithm: summaryAlgorithm(reopened.semanticProfile), scope: 'entireHistory',
       entityClasses: counts.entityClasses, fieldClasses: counts.fieldClasses, blobEntryCount: closure.entries.length, blobBytes: measuredBytes });
     return new WorkspaceSourceCapture(bytes, expectedToken, publication, reopened.proof,
-      Object.freeze(reopened.heads), metadata, closure.entries, summary, closure.semanticRefs, reopened.includesDeclaredEditorNames);
+      Object.freeze(reopened.heads), metadata, closure.entries, summary, closure.semanticRefs, reopened.includesDeclaredEditorNames, reopened.requiredCapabilities);
   }
 }

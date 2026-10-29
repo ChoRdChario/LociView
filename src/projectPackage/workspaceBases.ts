@@ -1,5 +1,5 @@
 import * as A from '@automerge/automerge/slim';
-import { checkEditorCapability } from '../projectMetadata/editorAttribution';
+import { checkRequiredCapabilities } from '../projectMetadata/requiredCapabilities';
 import type { ProjectWorkspaceFS } from '../platform/fs';
 import { fail, type MetadataLimits, type MetadataProof } from '../projectMetadata/format';
 import { digest, json, readReceipt, withMetadataRead, writeReceipt } from '../projectMetadata/persistence';
@@ -138,7 +138,7 @@ export class WorkspaceBaseStore {
       if (m.purpose !== 'teamWorkspace' || m.packageId !== r.workspacePackageId || json(m.identity) !== json(r.identity) || json(m.metadataEnvelope) !== json(r.metadataEnvelope) ||
         json(m.targetHeads) !== json(r.declaredHeads) || json({ sha256: m.metadata.sha256, byteLength: m.metadata.byteLength }) !== json(r.evidence.metadata)) fail('receive-base-manifest');
       const source = ProjectMetadataSource.fromFullSource(metadataBytes, { identity: r.identity, envelope: r.metadataEnvelope }, this.limits);
-      checkEditorCapability(m.requiredCapabilities, source.includesDeclaredEditorNames);
+      checkRequiredCapabilities(m.requiredCapabilities, source.requiredCapabilities);
       if (json(source.heads) !== json(r.declaredHeads)) fail('receive-base-heads');
       for (const bytes of source.originalChanges()) { const change = A.decodeChange(bytes); dependencies += change.deps.length; operations += change.ops.length; }
       if (dependencies > L.dependencyReferences || operations > 100_000) fail('receive-base-budget');

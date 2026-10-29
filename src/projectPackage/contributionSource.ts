@@ -1,5 +1,5 @@
 import * as A from '@automerge/automerge/slim';
-import { checkEditorCapability } from '../projectMetadata/editorAttribution';
+import { capabilityUnion, checkRequiredCapabilities } from '../projectMetadata/requiredCapabilities';
 import { canonical } from '../domain/projectGraphSupport';
 import type { JsonValue } from '../domain/values';
 import type { OriginBlobStore, StoredBlobRef } from '../projectMetadata/blobStore';
@@ -59,7 +59,7 @@ export class VerifiedContributionBase {
       !same(reference(manifestBytes), record.evidence.manifest) || !same(reference(metadataBytes), record.evidence.metadata) ||
       m.metadata.byteLength !== metadataBytes.length || m.metadata.sha256 !== packageByteHash(metadataBytes)) return fail('contribution-base-evidence');
     const source = ProjectMetadataSource.fromFullSource(metadataBytes, { identity: m.identity, envelope: m.metadataEnvelope }, packageSourceLimits(limits));
-    checkEditorCapability(m.requiredCapabilities, source.includesDeclaredEditorNames);
+    checkRequiredCapabilities(m.requiredCapabilities, source.requiredCapabilities);
     if (!same(source.heads, m.targetHeads)) return fail('contribution-base-heads');
     const inspection = await source.inspectOriginal({ maxNodes: L.inspectionNodes, maxWork: L.inspectionWork }); checkAbort(signal);
     const counts = summarizeFullHistory(inspection), closure = planWorkspaceClosure(inspection.candidates);
@@ -177,7 +177,7 @@ export class ContributionArchive {
         packageByteHash(bytes) !== entry.bytesSha256) fail('contribution-wire-original'); parts.push(bytes);
     }
     const target = targetView(base.source, parts, m.targetHeads, bounded), d = delta(base.source, target, bounded);
-    checkEditorCapability(m.requiredCapabilities, base.source.includesDeclaredEditorNames || target.includesDeclaredEditorNames);
+    checkRequiredCapabilities(m.requiredCapabilities, capabilityUnion(base.source.requiredCapabilities, target.requiredCapabilities));
     if (!same(d.changes, m.changes) || d.parts.length !== parts.length || parts.some((b, i) => !equal(b, d.parts[i]!))) return fail('contribution-delta-mismatch');
     const description = await describeTarget(base, target, d.changes, signal);
     if (!same(description.blobs, m.blobs) || !same(description.summary, m.summary)) return fail('contribution-summary-closure');

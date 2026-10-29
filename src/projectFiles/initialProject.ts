@@ -1,5 +1,5 @@
 import type { PhotoDecoder } from './photo';
-import { inspectProjectMedia, type MediaDecoders } from './media';
+import { prepareProjectMedia, type MediaDecoders } from './media';
 import { immutableDigest } from '../domain/projectGraphSupport';
 import { admitProjectRecords, projectRecordMaps } from '../domain/projectRecords';
 import { ProjectRecordFields } from '../domain/projectRecordFields';
@@ -42,6 +42,24 @@ export const validationFileLabel = (input: string) => {
 };
 const label = validationFileLabel;
 const fresh = (prefix: string) => `${prefix}_${newId()}`;
+/** Freeze exact original/portable bytes once, before any Session staging. */
+export async function prepareValidationMedia(input: ValidationFile, limits: import('./validation').FileValidationLimits,
+  decode?: PngDecoder, jpeg?: JpegDecoder, photo?: PhotoDecoder, mediaDecoders?: MediaDecoders) {
+  const name = label(input.label), bytes = input.bytes.slice();
+  if (!bytes.length || bytes.length > limits.maxFileBytes) return fileError('メディアが容量の上限を超えています。');
+  const { mediaKind, mediaType, portable } = await prepareProjectMedia(bytes, limits, decode, jpeg, photo, mediaDecoders);
+  const ref: StoredBlobRef = { algorithm: 'sha256', digest: await digest(bytes), byteLength: bytes.length, mediaType };
+  const blobs: ValidationByteBody[] = [{ ref, bytes }];
+  let display: JsonObject | undefined;
+  if (portable) {
+    const rasterRef: StoredBlobRef = { algorithm: 'sha256', digest: await digest(portable.bytes), byteLength: portable.bytes.length, mediaType: 'image/png' };
+    blobs.push({ ref: rasterRef, bytes: portable.bytes });
+    display = { kind: 'native-heic-raster-v1', blob: rasterRef as unknown as JsonObject, width: portable.width, height: portable.height };
+  }
+  const record = await sealValidationRecord('media-resource', { id: fresh('med'), label: name, mediaKind, blob: ref as unknown as JsonObject,
+    ...(display ? { portableDisplay: display } : {}) });
+  return { record, blobs };
+}
 export const identityPlacement = () => ({ translation: [0, 0, 0], rotationXYZW: [0, 0, 0, 1], uniformScale: 1 });
 
 /** Own native input before awaits; GS and opted-in packages retain native views. */
@@ -140,9 +158,8 @@ export async function prepareValidationProject(input: ValidationProjectInput<Val
     add('sceneAssetMembershipsById', { id: fresh('sam'), sceneId, assetId: model.asset.id!, orderKey: `A${index.toString(36).padStart(8, '0')}`, lifecycle: active() });
   }
   for (const file of media) {
-    const name = label(file.label), bytes = file.bytes.slice(), {mediaKind,mediaType} = await inspectProjectMedia(bytes, limits, decode, jpeg, photo,mediaDecoders);
-    const ref = await blob(bytes, mediaType);
-    add('mediaResourcesById', await sealValidationRecord('media-resource', { id: fresh('med'), label: name, mediaKind, blob: ref as unknown as JsonObject }));
+    const prepared = await prepareValidationMedia(file, limits, decode, jpeg, photo, mediaDecoders);
+    add('mediaResourcesById', prepared.record); blobs.push(...prepared.blobs);
   }
   const sizes=new Map<string,number>();
   for(const body of blobs){const prior=sizes.get(body.ref.digest);if(prior!==undefined&&prior!==body.ref.byteLength)return fileError('本体の大きさが一致しません。');sizes.set(body.ref.digest,body.ref.byteLength);}

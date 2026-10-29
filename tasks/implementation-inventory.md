@@ -358,7 +358,7 @@ LociMyuからのタブ構成、Sceneに相当する記録切替、直接色選�
 | 任意baseColor入力 | 元materialの色保持・描画解釈はあるが入力UIなし。現在のaccepted editable fieldsとは別なので、勝手に新機能化しない |
 | タグ編集UI | 仕様08の作成・名前／色編集・記録への付与／解除・確認付きProject全体削除と競合解消を接続。複製で独立した関連を作り、本体は共有。重複リンクの明示一括解除・色の未設定・削除と編集の選択を保護。記録／画像は削除せず、保存・共有・coldの状況はtodo参照 |
 | ローカルprofile／表示名設定 | 仕様08の非公開のブラウザ内表示名とヘッダ表示を接続。IME・未適用入力・別画面の設定変更・永続化失敗を扱い、保存失敗時は入力を保持。この私的設定はProjectや共有file・過去の編集者名へ自動反映しない。別の明示的なProject設定による将来編集への名前共有は[08b](../docs/specs/08b-shared-editor-name-policy-proposal.md)として接続済み。保存／再試行／必須reader機能・旧版読込制限・共有／復旧／再開の実行範囲と残るgateはtodo参照。過去の人物推測やaccount／rolesは追加しない |
-| HEIC／video／audio | PO2026-10-29の仕様08でPC候補のMP4（H.264/AAC）・M4A（AAC）・MP3と標準機能で読める単一HEICを承認。原本保持・追加・再生・共有・復旧・再開の確認状況はtodo。新依存なし。非対応環境は公開前に拒否し、HEICは別JPEGの再選択を案内。一般Windows HEIC・実機iOS・公開保証は未完了。既存Native／旧形式の変換recipeは拡張しない |
+| HEIC／video／audio | PO2026-10-29の仕様08でPC候補のMP4（H.264/AAC）・M4A（AAC）・MP3と標準機能で読める単一HEICを承認。原本保持・追加・再生・共有・復旧・再開の確認状況はtodo。新依存なし。動画・音声と既存単体HEICは、非対応環境では新記録の公開前に拒否し、HEIC直接追加は別JPEGの再選択を案内。仕様08cでは新しく追加するHEICを原本＋端末内生成PNGのimmutableな組として保存し、非対応受信端末ではPNGを表示する限定ProjectScene経路を接続。五目的の本体・required reader・中断復旧・再開を保持し、既存単体HEICはnative検査のまま。実行済み範囲はtodo。一般WindowsでのHEIC直接追加・実機iOS・PWA cold・公開保証は未完了。既存Native／旧形式の変換recipeは拡張しない |
 | 自動同一モデル判定／relation推測／位置remap／conflict winner | 禁止。判断量削減で越えてはいけない境界 |
 | smooth-alpha一般保証、transmission、Compare、proxy自動生成／direct splat pick | 個別後続判断・research／gate。承認済み限定GS Proxyやhard chromaの継承とは別 |
 | license／version／main／Pages／Service Worker／release | 今回の監査・次sliceの非対象。デプロイ承認を意味しない |

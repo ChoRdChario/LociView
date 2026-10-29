@@ -289,6 +289,7 @@ export const projectSceneApplicationImports:Readonly<Record<string,readonly stri
     "../projectMetadata/captionUndo"
   ],
   "src/projectScene/productWorkspace.ts": [
+    "../domain/portableMedia",
     "../domain/values",
     "../scene/resolve",
     "../ui/projectScene/projectWorkspace",
@@ -314,6 +315,8 @@ export const projectSceneApplicationImports:Readonly<Record<string,readonly stri
     "./modelTypes"
   ],
   "src/projectScene/reviewView.ts": [
+    "../projectFiles/portableHeic",
+    "../domain/portableMedia",
     "../projectFiles/media",
     "../projectFiles/nativeSpatial",
     "../domain/materialIntent",
@@ -396,6 +399,7 @@ export const projectSceneApplicationImports:Readonly<Record<string,readonly stri
     "./validationHost"
   ],
   "src/projectScene/validationHost.ts": [
+    "../domain/portableMedia",
     "../projectFiles/media",
     "../projectFiles/meshSource",
     "../projectFiles/nativeSpatialConversion",

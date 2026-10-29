@@ -1,5 +1,6 @@
 import { inspectProjectCandidates, type CandidateField } from '../domain/projectCandidates';
 import { inspectProjectGraph } from '../domain/projectGraph';
+import { recordBlobRefs } from '../domain/portableMedia';
 import { canonical, immutableDigest, immutableKinds, list, object, same, string } from '../domain/projectGraphSupport';
 import { mutableFieldsFor, type MutableRecordMap } from '../domain/projectMutableFields';
 import type { ProjectSemanticProfile } from '../domain/projectProfile';
@@ -173,7 +174,7 @@ export async function prepareCleanRecords(input: JsonObject, limits: MetadataLim
   const recipe = frozenRecipe && cloneCanonicalValue(frozenRecipe, { maxDepth: L.maxDepth, maxNodes: L.maxNodes, maxStringScalars: L.maxStringScalars }) as unknown as CleanReconstruction | undefined;
   const records = admitted.records, keys = new Rekey(recipe), includedBlobs = new Set<string>();
   for (const map of ['representationsById', 'mediaResourcesById'] as const)
-    for (const r of Object.values(table(records, map))) includedBlobs.add(string(object(r.blob).digest));
+    for (const r of Object.values(table(records, map))) for (const ref of recordBlobRefs(r)) includedBlobs.add(string(ref.digest));
   const transform = () => {
     const id = keys.id, ids = (v: JsonValue | undefined, prefix: string, sorted = true) => {
       const result = list(v).map(v => id(v, prefix)); return sorted ? result.sort() : result;
@@ -235,7 +236,7 @@ export async function prepareCleanRecords(input: JsonObject, limits: MetadataLim
         if (r.proxyForGsVariantFamilyId) value.proxyForGsVariantFamilyId = id(r.proxyForGsVariantFamilyId, 'fam');
         if (r.materialCatalog) { const catalog = object(r.materialCatalog); value.materialCatalog = { layoutId: id(catalog.layoutId, 'lay'),
           slots: list(catalog.slots).map(object).map(s => ({ ...copy(s, ['sourceLocator', 'sourceSemantics', 'displayName']), logicalMaterialSlotId: id(s.logicalMaterialSlotId, 'slot') })).sort((a, b) => a.logicalMaterialSlotId.localeCompare(b.logicalMaterialSlotId)) }; }
-      } else if (map === 'mediaResourcesById') Object.assign(value, copy(r, ['blob', 'mediaKind', 'label']));
+      } else if (map === 'mediaResourcesById') Object.assign(value, copy(r, ['blob', 'mediaKind', 'label', 'portableDisplay']));
       else if (map === 'captionsById') Object.assign(value, copy(r, ['title', 'body', 'colorSrgb']), { anchor: anchor(object(r.anchor)) });
       else if (map === 'captionAttachmentsById') Object.assign(value, copy(r, ['altText', 'orderKey']), { captionId: id(r.captionId, 'cap'), mediaResourceId: id(r.mediaResourceId, 'med') });
       else if (map === 'captionTagsById') Object.assign(value, copy(r, ['label', 'colorSrgb', 'orderKey']));

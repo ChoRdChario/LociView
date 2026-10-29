@@ -1,4 +1,5 @@
 import type { ProjectProviderRead } from '../scene/projectProvider';
+import { recordBlobRefs } from '../domain/portableMedia';
 import type { JsonObject } from '../domain/values';
 import { metadataImmutableReader } from '../projectMetadata/records';
 import { validationMetadataLimits as limits, fileError, fileObject, type ProjectFilePolicy } from './validation';
@@ -9,8 +10,8 @@ export function validationDeclaredBodyBytes(provider: Extract<ProjectProviderRea
   const records:JsonObject[]=[];
   for(const map of ['representationsById','mediaResourcesById'] as const) for(const id of Object.keys(provider.details.immutable[map]))records.push(read(map,id));
   if(addition)records.push(addition);
-  for(const record of records) {
-    const blob=fileObject(record.blob), size=blob.byteLength as number, hash=blob.digest as string;
+  for(const record of records) for (const blob of recordBlobRefs(record)) {
+    const size=blob.byteLength as number, hash=blob.digest as string;
     if(!Number.isSafeInteger(size)||size<=0)return fileError('保存した本体の大きさを確認してください。');
     if(policy && size>(record.contentKind==='gaussianSplat'?policy.gs:policy.nonGs).maxFileBytes)return fileError('保存した本体が容量の上限を超えています。');
     if(sizes.has(hash)&&sizes.get(hash)!==size)return fileError('保存した本体の大きさが一致しません。');
@@ -29,7 +30,7 @@ export function assertValidationBodyAllocation(provider: Extract<ProjectProvider
   if(size<=policy.projectBodyBytes-total)return;
   const read=metadataImmutableReader(provider,limits);
   for(const map of ['representationsById','mediaResourcesById'] as const) for(const id of Object.keys(provider.details.immutable[map])) {
-    if(fileObject(read(map,id).blob).byteLength===size)return;
+    if(recordBlobRefs(read(map,id)).some(ref=>ref.byteLength===size))return;
   }
   return fileError('モデルとメディアの合計が容量の上限を超えています。');
 }

@@ -1,5 +1,5 @@
 import type { OriginBlobStore } from '../projectMetadata/blobStore';
-import { editorCapabilities } from '../projectMetadata/editorAttribution';
+import { capabilityUnion, capabilityFields } from '../projectMetadata/requiredCapabilities';
 import { canonical } from '../domain/projectGraphSupport';
 import type { JsonValue } from '../domain/values';
 import { PACKAGE_FORMAT, PACKAGE_WIRE_VERSION } from './contract';
@@ -15,7 +15,7 @@ export function prepareContributionManifest(capture: ContributionSourceCapture, 
     packageId: options.packageId, createdByVersion: options.createdByVersion, ...(options.memo !== undefined ? { memo: options.memo } : {}),
     identity: capture.target.proof.identity, metadataEnvelope: capture.target.proof.envelope, targetHeads: capture.target.heads,
     base: capture.base.selection, changes: capture.changes, blobs: capture.blobs, summary: capture.summary,
-    ...editorCapabilities(capture.base.source.includesDeclaredEditorNames || capture.target.includesDeclaredEditorNames),
+    ...capabilityFields(capabilityUnion(capture.base.source.requiredCapabilities, capture.target.requiredCapabilities)),
     payloadTotals: { entryCount: payloads.length, uncompressedBytes: payloads.reduce((n, e) => n + e.byteLength, 0),
       largestEntryBytes: Math.max(0, ...payloads.map(e => e.byteLength)) } } as unknown as JsonValue));
   const checksum = new TextEncoder().encode(packageByteHash(manifest));

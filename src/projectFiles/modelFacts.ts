@@ -3,6 +3,7 @@ import { pointSourceDeclaration } from '../domain/pointSource';
 import { nativePointSourceDeclaration, nativeProxySourceDeclaration, nativeSpatialTransform } from '../domain/nativeSpatialSource';
 import { meshSourceFormat } from '../domain/meshSource';
 import { same } from '../domain/projectGraphSupport';
+import { recordBlobRefs } from '../domain/portableMedia';
 import type { Anchor } from '../scene/types';
 import { readProjectScene, type ProjectProviderRead } from '../scene/projectProvider';
 import { metadataProviderReady, type MetadataModelFactPort, type MetadataModelFactPlan } from '../projectMetadata/session';
@@ -11,7 +12,7 @@ import { json } from '../projectMetadata/persistence';
 import type { ContentRequest } from '../domain/projectContentChecks';
 import { cloneCanonicalValue, type JsonObject } from '../domain/values';
 import { validationMetadataLimits as limits, fileError } from './validation';
-import { validationGsEquivalenceSource, type ValidationContent } from './content';
+import { validationGsEquivalenceSource, readValidationBody, type ValidationContent } from './content';
 import { pointSourceMediaType } from './pointPly';
 import { ProjectRecordFields } from '../domain/projectRecordFields';
 import { checkProjectRecord } from '../domain/projectRecords';
@@ -180,7 +181,7 @@ export async function validationReceivedFacts(content: ValidationContent, base: 
 }
 async function receivedFacts(content: ValidationContent, base: ProjectMetadataSource | null, next: ProjectMetadataSource,
   bodyFor: (ref: JsonObject) => Blob, hasIncoming?: (ref: JsonObject) => boolean,
-  inspectImported?: (request: ContentRequest, file: Blob) => Promise<unknown>): Promise<MetadataModelFactPlan> {
+  inspectImported?: (request: ContentRequest, file: Blob, displayFile?: Blob) => Promise<unknown>): Promise<MetadataModelFactPlan> {
   const oldIds = new Set<string>(), oldDigests = new Map<string, number>(), sizes = new Map<string, number>();
   const inspectionBudget = { maxNodes: limits.maxNodes, maxWork: limits.maxWork };
   const before = base ? await base.inspectOriginal(inspectionBudget) : null, after = await next.inspectOriginal(inspectionBudget);
@@ -192,13 +193,18 @@ async function receivedFacts(content: ValidationContent, base: ProjectMetadataSo
     if (!['representationsById', 'mediaResourcesById'].includes(scalar.path[0]!)) continue;
     if (old) oldIds.add(scalar.path[1]!);
     if (scalar.value.kind !== 'value') continue;
-    const record = fileObject(scalar.value.value), check = new ProjectRecordFields(); check.blob(record.blob as JsonObject, []);
+    const record = fileObject(scalar.value.value) as JsonObject, check = new ProjectRecordFields();
+    check.blob(record.blob!, []);
+    if (scalar.path[0] === 'mediaResourcesById' && record.portableDisplay !== undefined)
+      checkProjectRecord(check, 'mediaResourcesById', record);
     if (check.unknown) return fileError('受信する本体の情報を確認してください。');
-    const ref = record.blob as JsonObject, hash = ref.digest as string, size = ref.byteLength as number, previous = sizes.get(hash);
+    for (const ref of scalar.path[0] === 'mediaResourcesById' ? recordBlobRefs(record) : [record.blob as JsonObject]) {
+    const hash = ref.digest as string, size = ref.byteLength as number, previous = sizes.get(hash);
     if (previous !== undefined && previous !== size) return fileError('同じ本体の大きさが一致しません。');
     if (previous === undefined) { total += size; sizes.set(hash, size); }
     if (total > content.policy.projectBodyBytes) return fileError('モデルと画像の合計がこの検証の上限を超えています。');
     if (old) oldDigests.set(hash, size);
+    }
   }
   const requests = new Map<string, ContentRequest>(), bodies = new Map<string, { ref: JsonObject; file: Blob }>();
   const results = new Map<string, unknown>(), ordinary = content.verifier(false);
@@ -222,18 +228,28 @@ async function receivedFacts(content: ValidationContent, base: ProjectMetadataSo
       json(request.context) !== json(request.fact === 'family-envelope' ? { assetId: record.assetId, variantFamilyId: record.variantFamilyId } : {}))
       return fileError('受信するモデルまたは画像の検証情報を確認できません。');
     const key = json(request); if (results.has(key)) return results.get(key);
-    const ref = record.blob as JsonObject, hash = ref.digest as string;
+    const refs = recordBlobRefs(record), ref = refs[0]!;
     let result: unknown;
-    if (oldDigests.has(hash)) {
-      if (await content.store.inspect(ref) !== 'verified-present') return fileError('既存の本体を確認できません。受信ファイルからの補完はしていません。');
+    if (refs.every(body => oldDigests.has(body.digest as string))) {
+      for (const body of refs) if (await content.store.inspect(body) !== 'verified-present') return fileError('既存の本体を確認できません。受信ファイルからの補完はしていません。');
       result = await content.inspectStored(request);
     } else {
-      const input = bodies.get(json(ref)) ?? { ref, file: bodyFor(ref) };
-      if (!(input.file instanceof Blob) || input.file.size !== ref.byteLength) return fileError('受信する本体が不足しています。');
-      result = await (inspectImported ? inspectImported(request, input.file) : content.inspectReceived(request, input.file)); bodies.set(json(ref), input);
+      const files: Blob[] = [];
+      for (const body of refs) {
+        if (oldDigests.has(body.digest as string)) {
+          if (await content.store.inspect(body) !== 'verified-present') return fileError('既存の本体を確認できません。受信ファイルからの補完はしていません。');
+          const stored = await content.store.openReadOnly(body);
+          files.push(new Blob([(await readValidationBody(stored, content.limits.maxFileBytes)).slice().buffer]));
+        } else {
+          const input = bodies.get(json(body)) ?? { ref: body, file: bodyFor(body) };
+          if (!(input.file instanceof Blob) || input.file.size !== body.byteLength) return fileError('受信する本体が不足しています。');
+          bodies.set(json(body), input); files.push(input.file);
+        }
+      }
+      result = await (inspectImported ? inspectImported(request, files[0]!, files[1]) : content.inspectReceived(request, files[0]!, files[1]));
     }
     results.set(key, result); requests.set(key, request); return result;
-  } }, { verifyRetainedMedia: async record => !hasIncoming || hasIncoming(record.blob as JsonObject) || await content.retained(record) });
+  } }, { verifyRetainedMedia: async record => !hasIncoming || recordBlobRefs(record).every(hasIncoming) || await content.retained(record) });
   if (!metadataProviderReady(provider, limits) || provider.kind !== 'scene-provider') return fileError('受信後の参照を確認できません。');
   assertValidationModelClosures(provider);validationDeclaredBodyBytes(provider,content.policy);
   const staged: { ref: JsonObject; file: Blob }[] = [], completedBodies = new Set<string>(), completedFacts = new Set<string>();
@@ -251,8 +267,8 @@ async function receivedFacts(content: ValidationContent, base: ProjectMetadataSo
     for (const [key, request] of requests) {
       // Reused old bodies and old records must never be repaired from incoming bytes.
       const record=validationGsEquivalenceSource(request) ?? request.records[0]!;
-      if (oldDigests.has((record.blob as JsonObject).digest as string) &&
-        await content.store.inspect(record.blob as JsonObject) !== 'verified-present') return fileError('既存の本体を確認できません。');
+      for (const ref of recordBlobRefs(record)) if (oldDigests.has(ref.digest as string) &&
+        await content.store.inspect(ref) !== 'verified-present') return fileError('既存の本体を確認できません。');
       const result = await content.verifier(!completedFacts.has(key)).verify(request) as { outcome?: string };
       if (result.outcome !== 'verified') return fileError('受信した本体の検証情報を記録できません。');
       completedFacts.add(key);

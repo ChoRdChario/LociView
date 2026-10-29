@@ -70,7 +70,7 @@ export class PreparedReviewEdit {
     const source = ProjectMetadataSource.bootstrap(object(records.schema), object(records.identity), packageSourceLimits(limits), { time: 0, semanticProfile }).initialize(records, { time: 0 });
     const description = await inspectCleanSource(source, limits), bytes = source.encodeFullSource();
     if(!archivePort&&original.size>64*1024*1024)fail('review-edit-native-output-required');
-    const produce=(destination:WritableStream<Uint8Array>,signal?:AbortSignal)=>writeCleanArchive({ metadataBytes: () => bytes.slice(), proof: source.proof, targetHeads: source.heads,
+    const produce=(destination:WritableStream<Uint8Array>,signal?:AbortSignal)=>writeCleanArchive({ metadataBytes: () => bytes.slice(), proof: source.proof, targetHeads: source.heads, requiredCapabilities: source.requiredCapabilities,
       metadata: { path: 'metadata.am', sha256: packageByteHash(bytes), byteLength: bytes.length },
       blobs: description.closure.entries, bodyRefs: description.closure.semanticRefs, summary: description.summary },
     { openReadOnly: async ref => {

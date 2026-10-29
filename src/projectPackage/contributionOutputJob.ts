@@ -1,5 +1,5 @@
 import type { ProjectWorkspaceFS } from '../platform/fs';
-import { checkEditorCapability } from '../projectMetadata/editorAttribution';
+import { capabilityUnion, checkRequiredCapabilities } from '../projectMetadata/requiredCapabilities';
 import type { OriginBlobStore } from '../projectMetadata/blobStore';
 import { fail, type MetadataLimits } from '../projectMetadata/format';
 import { json, newId, readReceipt, technicalId, writeReceipt } from '../projectMetadata/persistence';
@@ -34,7 +34,7 @@ export class ContributionOutputJob {
     private readonly inputs: Inputs, readonly base: VerifiedContributionBase) {
     technicalId(id); const m = this.manifest();
     this.source = ProjectMetadataSource.fromFullSource(inputs.metadata, { identity: m.identity, envelope: m.metadataEnvelope }, packageSourceLimits(limits));
-    checkEditorCapability(m.requiredCapabilities, base.source.includesDeclaredEditorNames || this.source.includesDeclaredEditorNames);
+    checkRequiredCapabilities(m.requiredCapabilities, capabilityUnion(base.source.requiredCapabilities, this.source.requiredCapabilities));
     if (json(this.source.heads) !== json(m.targetHeads) || json(base.selection) !== json(m.base)) fail('output-source');
   }
   assertOwner(fs: ProjectWorkspaceFS) { if (fs !== this.fs) fail('output-owner'); }

@@ -1,5 +1,5 @@
 import { cloneCanonicalValue } from '../domain/values';
-import { checkEditorCapability } from './editorAttribution';
+import { checkRequiredCapabilities } from './requiredCapabilities';
 import { readManifestControl, packageByteHash, canonicalControl } from '../projectPackage/manifest';
 import { PACKAGE_LIMITS, type EvidenceRef } from '../projectPackage/contract';
 import { checkedProof, fail, type MetadataLimits, type MetadataProof } from './format';
@@ -158,7 +158,7 @@ export async function validateBackupRestore(input: BackupRestoreInput, target: M
   if (json(source.heads) !== json(s.remoteHeads)) fail('backup-restore-heads');
   const description = await inspectBackupOriginals(source, input.exchangeBasesBytes,
     s.baseEvidence.map((reference, i) => ({ reference, bytes: input.baseEvidenceBytes[i]! })), limits);
-  checkEditorCapability(m.requiredCapabilities, description.includesDeclaredEditorNames);
+  checkRequiredCapabilities(m.requiredCapabilities, description.requiredCapabilities);
   if (s.manifest.byteLength + 64 + s.protectedInventory.byteLength + s.exchangeBases.byteLength + description.baseControlBytes > PACKAGE_LIMITS.controlsBytes) fail('backup-control-budget');
   if (json(canonicalControl(input.protectedInventoryBytes)) !== json(description.inventory) || json(m.blobs) !== json(description.blobs) ||
     json(m.summary) !== json(description.summary)) fail('backup-restore-inventory');
@@ -179,7 +179,7 @@ function validateFullJournalRemote(input: FullJournalRemoteInput, target: Metada
       m.metadata.byteLength !== s.metadata.byteLength || m.metadata.sha256 !== s.metadata.sha256) fail('package-remote-manifest');
   } else if (Object.keys(input).sort().join(',') !== 'bytes,proof') fail('remote-input');
   const result = ProjectMetadataSource.fromFullSource(bytes, target, limits);
-  if (isPackageRemote(proof)) checkEditorCapability(readManifestControl(input.manifestBytes!, input.checksumBytes!).manifest.requiredCapabilities, result.includesDeclaredEditorNames);
+  if (isPackageRemote(proof)) checkRequiredCapabilities(readManifestControl(input.manifestBytes!, input.checksumBytes!).manifest.requiredCapabilities, result.requiredCapabilities);
   if (json(result.heads) !== json(source.remoteHeads)) fail('remote-source-heads');
   return result;
 }

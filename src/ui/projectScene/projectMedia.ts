@@ -1,5 +1,5 @@
 import type { JsonObject } from '../../domain/values';
-import { createMediaThumbnails, type MediaViewer, type MediaPreviewGroup, type PreviewPng } from './mediaPreview';
+import { createMediaThumbnails, mediaDisplayDescription, type MediaViewer, type MediaPreviewGroup, type PreviewPng } from './mediaPreview';
 import { fieldValue, projectAttachments, projectIdentity, projectMediaResources, projectMediaUncertain } from './projectRead';
 import { newProjectId, panelNodes, sameProjectValue, type ProjectPanelHost, type ProjectPanel } from './projectPanel';
 
@@ -35,10 +35,10 @@ export function createProjectMedia(document: Document, host: ProjectPanelHost, c
     return (): MediaPreviewGroup | null => {
       if (disposed || captured !== scope()) return null;
       const { provider } = source(), resources = projectMediaResources(provider);
-      if (captionId === null) return { scope: captured, label: '登録済みメディア', items: resources.map(r => ({ id: r.id, resourceId: r.id, label: r.label, kind:r.record.mediaKind as 'image'|'video'|'audio',description: '', image: image(r.id, r.record) })) };
+      if (captionId === null) return { scope: captured, label: '登録済みメディア', items: resources.map(r => ({ id: r.id, resourceId: r.id, label: r.label, kind:r.record.mediaKind as 'image'|'video'|'audio',description: mediaDisplayDescription('',r.record.portableDisplay!==undefined), image: image(r.id, r.record) })) };
       return { scope: JSON.stringify([captured, captionId]), label: String(fieldValue(provider.resources.captions[captionId]?.title) || 'キャプション'),
         items: rows(captionId).map(r => { const resource = resources.find(m => m.id === r.media!.id), alt = r.fields.altText;
-          return { id: r.id, resourceId: String(r.media!.id), label: r.label, kind:r.media!.mediaKind as 'image'|'video'|'audio', description: alt?.kind === 'value' ? r.alt : '説明の更新候補を確認してください。',
+          return { id: r.id, resourceId: String(r.media!.id), label: r.label, kind:r.media!.mediaKind as 'image'|'video'|'audio', description: mediaDisplayDescription(alt?.kind === 'value' ? r.alt : '説明の更新候補を確認してください。',resource?.record.portableDisplay!==undefined),
             image: resource ? image(resource.id, resource.record) : null }; }) };
     };
   };

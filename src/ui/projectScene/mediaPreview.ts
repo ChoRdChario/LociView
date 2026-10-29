@@ -9,6 +9,8 @@ export interface MediaPreviewGroup {
   readonly scope: string; readonly label: string; readonly items: readonly MediaPreviewItem[];
 }
 export type MediaPreviewReader = () => MediaPreviewGroup | null;
+export const mediaDisplayDescription = (description: string, portable: boolean) => portable ?
+  [description, 'HEIC原本から作った表示用画像です。HDRなどの見え方が変わる場合があります。'].filter(Boolean).join(' ') : description;
 const sameBody = (a: PreviewPng | null, b: PreviewPng | null) => a === b || !!a && !!b &&
   ('base64' in a && 'base64' in b ? a.base64 === b.base64 && (a.mediaType ?? 'image/png') === (b.mediaType ?? 'image/png') : 'blob' in a && 'blob' in b ? a.blob === b.blob : 'load' in a && 'load' in b && a.load === b.load);
 

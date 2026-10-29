@@ -1,4 +1,5 @@
 import type { OriginBlobStore } from '../projectMetadata/blobStore';
+import { capabilityFields, checkRequiredCapabilities } from '../projectMetadata/requiredCapabilities';
 import { canonical } from '../domain/projectGraphSupport';
 import type { JsonValue } from '../domain/values';
 import { ProjectMetadataSource, type MetadataLimits } from '../projectMetadata/source';
@@ -14,11 +15,11 @@ const fail = (code: string): never => { throw new PackageControlError(`clean-${c
 const encode = (v: unknown) => new TextEncoder().encode(canonical(v as JsonValue));
 const same = (a: unknown, b: unknown) => canonical(a as JsonValue) === canonical(b as JsonValue);
 
-export type CleanArchivePayload = Pick<CleanSourceCapture, 'metadataBytes' | 'metadata' | 'blobs' | 'bodyRefs' | 'summary' | 'proof' | 'targetHeads'>;
+export type CleanArchivePayload = Pick<CleanSourceCapture, 'metadataBytes' | 'metadata' | 'blobs' | 'bodyRefs' | 'summary' | 'proof' | 'targetHeads' | 'requiredCapabilities'>;
 export function prepareCleanManifest(capture: CleanArchivePayload, options: WorkspaceArchiveOptions) {
   const payloads = [capture.metadata, ...capture.blobs];
   const manifest = encode({ format: PACKAGE_FORMAT, wireVersion: PACKAGE_WIRE_VERSION, purpose: 'clean',
-    packageId: options.packageId, createdByVersion: options.createdByVersion, ...(options.memo !== undefined ? { memo: options.memo } : {}),
+    packageId: options.packageId, createdByVersion: options.createdByVersion, ...capabilityFields(capture.requiredCapabilities), ...(options.memo !== undefined ? { memo: options.memo } : {}),
     identity: capture.proof.identity, metadataEnvelope: capture.proof.envelope, targetHeads: capture.targetHeads,
     metadata: capture.metadata, blobs: capture.blobs, summary: capture.summary,
     payloadTotals: { entryCount: payloads.length, uncompressedBytes: payloads.reduce((n, e) => n + e.byteLength, 0), largestEntryBytes: Math.max(...payloads.map(e => e.byteLength)) } });
@@ -46,6 +47,7 @@ export class CleanArchive {
     if (manifest.purpose !== 'clean') return fail('purpose');
     const bytes = await archive.entryBytes('metadata.am', L.sourceBytes, signal);
     const source = ProjectMetadataSource.fromFullSource(bytes, { identity: manifest.identity, envelope: manifest.metadataEnvelope }, packageSourceLimits(limits));
+    checkRequiredCapabilities(manifest.requiredCapabilities, source.requiredCapabilities);
     if (!same(source.heads, manifest.targetHeads)) fail('heads');
     const description = await inspectCleanSource(source, limits); checkAbort(signal);
     if (!same(description.closure.entries, manifest.blobs) || !same(description.summary, manifest.summary)) fail('summary-or-closure');

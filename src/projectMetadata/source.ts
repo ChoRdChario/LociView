@@ -1,4 +1,5 @@
 import { usePointAnchorProof, type PointAnchorProof } from './pointAnchorProof';
+import { EDITOR_CAPABILITY, PORTABLE_MEDIA_CAPABILITY, type ReaderCapabilities } from './requiredCapabilities';
 import { editorMessage, inspectEditorMessage, EditorAttributionError, type LocalEditorContext, type EditorDeclaration } from './editorAttribution';
 import * as A from '@automerge/automerge/slim';
 import { inspectProjectCandidates } from '../domain/projectCandidates';
@@ -10,7 +11,7 @@ import { immutableKinds, object, same } from '../domain/projectGraphSupport';
 import { cloneCanonicalValue, type JsonObject } from '../domain/values';
 import type { ProjectProviderRead } from '../scene/projectProvider';
 import { planMetadataEdit, type MetadataEdit } from './commands';
-import { adapterFormatVersion, adapterFormatVersion2, metadataSemanticProfile, checkedChanges, checkedProof, checkLimits, fail, inspectPhysical, inspectOriginalSource, originalEntryWitness, scalar, MetadataSourceError,
+import { adapterFormatVersion, adapterFormatVersion2, metadataSemanticProfile, checkedChanges, checkedProof, checkLimits, fail, inspectPhysical, inspectPhysicalSource, inspectOriginalSource, originalEntryWitness, scalar, MetadataSourceError,
   type MetadataLimits, type MetadataProof, type PhysicalDoc, type OriginalInspectionBudget } from './format';
 
 export type { MetadataLimits, MetadataProof } from './format';
@@ -22,7 +23,8 @@ export type { MetadataLimits, MetadataProof } from './format';
 export class ProjectMetadataSource {
   private declarations?: readonly Readonly<{ changeId: string; declaration: EditorDeclaration }>[];
   private constructor(private readonly doc: PhysicalDoc, readonly proof: MetadataProof, private readonly limits: MetadataLimits,
-    private readonly snapshot: ReturnType<typeof inspectPhysical>) {}
+    private readonly snapshot: ReturnType<typeof inspectPhysical>, private readonly portableChanges: ReadonlySet<string>,
+    private readonly originalMedia: readonly JsonObject[]) {}
 
   static bootstrap(schema: JsonObject, identity: JsonObject, requested: MetadataLimits, options?: { time?: 0; semanticProfile?: ProjectSemanticProfile }): ProjectMetadataSource {
     const profile = projectSemanticProfile(options?.semanticProfile);
@@ -56,8 +58,8 @@ export class ProjectMetadataSource {
   }
 
   private static validated(doc: PhysicalDoc, proof: MetadataProof, limits: MetadataLimits): ProjectMetadataSource {
-    const p = checkedProof(proof, limits), snapshot = inspectPhysical(doc, p, limits);
-    return new ProjectMetadataSource(doc, p, limits, snapshot);
+    const p = checkedProof(proof, limits), snapshot = inspectPhysicalSource(doc, p, limits);
+    return new ProjectMetadataSource(doc, p, limits, snapshot.input, snapshot.portableChanges, snapshot.mediaRecords);
   }
 
   /** Complete pinned metadata encoding, not a package writer or durable save. */
@@ -90,6 +92,16 @@ export class ProjectMetadataSource {
     }));
   }
   get includesDeclaredEditorNames(): boolean { return this.editorDeclarations().length > 0; }
+  /** Original declarations are context, never reusable evidence of body integrity. */
+  mediaRecords(): readonly JsonObject[] { return this.originalMedia.map(r => cloneCanonicalValue(r, this.limits) as JsonObject); }
+  get requiredCapabilities(): ReaderCapabilities {
+    return Object.freeze([...(this.includesDeclaredEditorNames ? [EDITOR_CAPABILITY] : []),
+      ...(this.portableChanges.size ? [PORTABLE_MEDIA_CAPABILITY] : [])]);
+  }
+  requiredCapabilitiesForChanges(hashes: ReadonlySet<string>): ReaderCapabilities {
+    return Object.freeze([...(this.editorDeclarations().some(c => hashes.has(c.changeId)) ? [EDITOR_CAPABILITY] : []),
+      ...([...this.portableChanges].some(hash => hashes.has(hash)) ? [PORTABLE_MEDIA_CAPABILITY] : [])]);
+  }
 
   /** Closed history-free export profile: one empty root and one population change.
    * Scalar uniqueness/current-value equality are checked by the clean reader. */

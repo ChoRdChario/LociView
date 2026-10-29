@@ -5,7 +5,10 @@ import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 
 // Fixed prefeature reader, built outside the active tree. No network or install.
-const revision = '6c3788e06fa004f4c1f13ba2091f47f183695c2d';
+const pinnedReaders = { attribution: '6c3788e06fa004f4c1f13ba2091f47f183695c2d', portableHeic: 'fe2010900fabaacfee2e22c39b1d5e9e1196eabb' };
+const reader = process.argv[2] ?? 'attribution';
+if (!Object.hasOwn(pinnedReaders, reader) || process.argv.length > 3) throw Error('Unknown fixed old-reader fixture');
+const revision = pinnedReaders[reader];
 const root = fileURLToPath(new URL('../', import.meta.url));
 const cache = resolve(root, '.artifacts/e2e/editor-attribution-old-reader', revision);
 const output = join(cache, 'desktop-dist'), marker = join(cache, 'verified-build.json');

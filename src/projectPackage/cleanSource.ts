@@ -102,6 +102,7 @@ export class CleanSourceCapture {
   get token() { return this.source.token; }
   get proof() { return this.output.proof; }
   get targetHeads() { return this.output.heads; }
+  get requiredCapabilities() { return this.output.requiredCapabilities; }
 
   static async prepare(session: Pick<MetadataProjectSession, 'read'>, expectedToken: string,
     store: Pick<OriginBlobStore, 'openReadOnly'>, requested: MetadataLimits, signal?: AbortSignal) {

@@ -112,8 +112,17 @@ export function checkProjectRecord(c: ProjectRecordFields, map: ProjectRecordMap
     }));
   } else if (map === 'representationsById') representation(c, r);
   else if (map === 'mediaResourcesById') {
-    shape(['blob', 'mediaKind', 'label'], false); c.blob(required('blob'), ['blob']); c.enum(required('mediaKind'), ['image', 'video', 'audio', 'document'], ['mediaKind']);
+    shape(['blob', 'mediaKind', 'label', 'portableDisplay'], false); c.blob(required('blob'), ['blob']); c.enum(required('mediaKind'), ['image', 'video', 'audio', 'document'], ['mediaKind']);
     c.optional(r, 'label', [], (v, p) => c.text(v, 256, p));
+    c.optional(r, 'portableDisplay', [], (v, p) => {
+      const display = c.shape(v, ['kind', 'blob', 'width', 'height'], p), source = r.blob as JsonObject;
+      c.enum(c.required(display, 'kind', p), ['native-heic-raster-v1'], [...p, 'kind']);
+      c.blob(c.required(display, 'blob', p), [...p, 'blob']);
+      const blob = display.blob as JsonObject;
+      if (r.mediaKind !== 'image' || source.mediaType !== 'image/heic' || blob.mediaType !== 'image/png' || source.digest === blob.digest) reject('value', p);
+      const width = c.integer(c.required(display, 'width', p), [...p, 'width']), height = c.integer(c.required(display, 'height', p), [...p, 'height']);
+      if (!width || !height || !Number.isSafeInteger(width * height)) reject('value', p);
+    });
   }
 }
 

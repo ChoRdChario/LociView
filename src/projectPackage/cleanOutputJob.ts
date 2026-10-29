@@ -1,3 +1,4 @@
+import { checkRequiredCapabilities } from '../projectMetadata/requiredCapabilities';
 import type { ProjectWorkspaceFS } from '../platform/fs';
 import type { OriginBlobStore } from '../projectMetadata/blobStore';
 import type { ProjectContentVerifier } from '../domain/projectContentChecks';
@@ -39,6 +40,7 @@ export class CleanOutputJob {
     technicalId(id); const m = this.manifest();
     this.source = ProjectMetadataSource.fromFullSource(inputs.original, inputs.sourceProof, packageSourceLimits(limits));
     this.output = ProjectMetadataSource.fromFullSource(inputs.metadata, { identity: m.identity, envelope: m.metadataEnvelope }, packageSourceLimits(limits));
+    checkRequiredCapabilities(m.requiredCapabilities, this.output.requiredCapabilities);
     if (json(this.output.heads) !== json(m.targetHeads) || json(ref(inputs.metadata)) !== json({ sha256: m.metadata.sha256, byteLength: m.metadata.byteLength }) ||
       json(this.source.proof.identity) === json(this.output.proof.identity)) fail('output-source');
   }

@@ -53,9 +53,10 @@ export function createValidationOutputControls(document: Document, host: ReturnT
     b.disabled = busy || composing || otherBusy() || writes && !!host.authority.readOnly;
     b.addEventListener('click', () => { if (!b.disabled) action(); }); parent.append(b); return b;
   };
-  const privacyNotice = (value: { includesDeclaredEditorNames?: boolean; requiresEditorAttributionReader?: boolean }) => value.includesDeclaredEditorNames ?
+  const privacyNotice = (value: { includesDeclaredEditorNames?: boolean; requiresEditorAttributionReader?: boolean; requiresPortableMediaReader?: boolean }) => [value.includesDeclaredEditorNames ?
     '記録された編集者名を含みます。対応版のLociViewで開いてください。' : value.requiresEditorAttributionReader ?
-    'この変更分を開くには編集者名の表示に対応したLociViewが必要です。今回の変更分に編集者名は含みません。' : '';
+    'この変更分を開くには編集者名の表示に対応したLociViewが必要です。今回の変更分に編集者名は含みません。' : '',
+    value.requiresPortableMediaReader ? 'HEIC原本と表示用PNGの組に対応したLociViewで開いてください。' : ''].filter(Boolean).join(' ');
   const currentDisclosure = () => {
     const current = host.workspaceOutput.privacy, base = host.workspaceOutput.bases.find(b => b.selection.workspacePackageId === baseId);
     const requires = purpose === 'backup' ? current.backupIncludesNames : purpose === 'contribution' ? current.sourceIncludesNames || !!base?.includesDeclaredEditorNames : purpose === 'teamWorkspace' ? current.sourceIncludesNames : false;
@@ -68,7 +69,7 @@ export function createValidationOutputControls(document: Document, host: ReturnT
     // Generation is already durable even if the browser handoff then fails.
     // Keep that exact result available; retry must not silently create another job.
     resetChoice();
-    if (job && (!!job.includesDeclaredEditorNames !== !!expected.includesDeclaredEditorNames || !!job.requiresEditorAttributionReader !== !!expected.requiresEditorAttributionReader)) {
+    if (job && (!!job.includesDeclaredEditorNames !== !!expected.includesDeclaredEditorNames || !!job.requiresEditorAttributionReader !== !!expected.requiresEditorAttributionReader || job.requiresPortableMediaReader)) {
       needsDisclosure = true; history.open = true; return;
     }
     await handoff(id);

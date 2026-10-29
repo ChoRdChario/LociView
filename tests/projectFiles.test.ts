@@ -1,3 +1,6 @@
+import { portablePng, fixturePngDecoder } from './helpers/portableHeicFixtures';
+import { portableDisplay, recordBlobRefs } from '../src/domain/portableMedia';
+import { PORTABLE_MEDIA_CAPABILITY, EDITOR_CAPABILITY } from '../src/projectMetadata/requiredCapabilities';
 import { captionDeletionImpact } from '../src/projectMetadata/captionDeletion';
 import { beginCaptionUndo, finishCaptionUndo } from '../src/projectMetadata/captionUndo';
 import { photoStructure, isAdditionalPhoto, type PhotoDecoder } from '../src/projectFiles/photo';
@@ -146,7 +149,7 @@ import { writeZipEntries } from '../src/assets/zipio';
 const budget: FileValidationLimits = { maxFileBytes: 1_000_000, maxJsonBytes: 100_000, maxItems: 10_000, maxValues: 100_000, maxPixels: 10_000 };
 const png = Uint8Array.from(atob(fixtureMedia[0]!.base64), c => c.charCodeAt(0));
 // Decoder injection observes calls/failure/disposal, NOT actual browser/raster acceptance.
-const decodeImplementation = async (_: Uint8Array) => ({ width: 64, height: 48, close: vi.fn() });
+const decodeImplementation = async (bytes: Uint8Array) => ({ ...await fixturePngDecoder(bytes), close: vi.fn() });
 const decode = vi.fn(decodeImplementation);
 const decodeJpeg: JpegDecoder = async (bytes, use) => {
   const source = jpegStructure(bytes, budget, use), swap = use === 'photo' && source.orientation >= 5;
@@ -671,7 +674,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
   it.each(['jpeg', 'webp', 'gif','heic'] as const)('photo companion %s creates a byte-classified project with misleading names and cold exact bytes', async format => {
     // HEIC decoder dimensions are an injected service port, not native browser evidence.
     let finishHeic:((bitmap:{width:number;height:number;close():void})=>void)|undefined;
-    const mediaDecoders:MediaDecoders|undefined=format==='heic'?{heic:async()=>{if(!finishHeic)return new Promise(resolve=>{finishHeic=resolve;});return{width:96,height:64,close(){}};}}:undefined;
+    const mediaDecoders:MediaDecoders|undefined=format==='heic'?{raster:async()=>new Blob([portablePng().slice().buffer],{type:'image/png'}),heic:async()=>{if(!finishHeic)return new Promise(resolve=>{finishHeic=resolve;});return{width:96,height:64,close(){}};}}:undefined;
     const r = firstWorkspaceRecipient(decodeJpeg,undefined,mediaDecoders), factories = new Map<string, MetadataStorageFactory>(); let host: Awaited<ReturnType<typeof openValidationHost>> | undefined;
     const options = { base: r.fs, coordinator: ProjectMutationCoordinator.browser(r.locks), store: r.store, fileLimits: budget, decode, jpeg: decodeJpeg, photo: decodePhoto, mediaDecoders,packageLocks: r.locks };
     const openStorage = async (run: string, create: boolean) => { if (!factories.has(run)) { if (!create) throw Error('missing'); factories.set(run, storageFactory()); } return { factory: factories.get(run)!, dispose: async () => {} }; };
@@ -4158,7 +4161,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
   }
   async function productWorkspaceFixture(includeInitial = false, duplicateModels = false, withTag = false, profile: 'map1' | 'map2' = 'map1',
     initial?: NonNullable<Parameters<typeof openValidationHost>[0]['initial']>,
-    setup: { jpeg?: JpegDecoder; photo?: PhotoDecoder; mediaDecoders?:MediaDecoders; storageEstimate?: ValidationWorkspacePorts['storageEstimate']; restoreGenerations?: boolean; initialWorkspace?: boolean; scenes?: readonly { id: string; name: string; orderKey: string }[] } = {}) {
+    setup: { jpeg?: JpegDecoder; photo?: PhotoDecoder; mediaDecoders?:MediaDecoders; editorSettings?:Parameters<typeof openValidationHost>[0]['editorSettings']; storageEstimate?: ValidationWorkspacePorts['storageEstimate']; restoreGenerations?: boolean; initialWorkspace?: boolean; scenes?: readonly { id: string; name: string; orderKey: string }[] } = {}) {
     const r = firstWorkspaceRecipient(setup.jpeg, setup.photo,setup.mediaDecoders), run = initial ? (initial.source.proof.identity.projectId as string).slice(4) : newId(), captionId = `cap_${newId()}`;
     const generationFactories = new Map<string, MetadataStorageFactory>(), databases: RestoreDatabasePorts = {
       listGenerations: async () => [...generationFactories.keys()], open: async (id, create) => {
@@ -4168,7 +4171,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       },
     };
     const options = { run, base: r.fs, coordinator: ProjectMutationCoordinator.browser(r.locks), store: r.store,
-      fileLimits: budget, decode, jpeg: setup.jpeg, photo: setup.photo, mediaDecoders:setup.mediaDecoders, generations: setup.restoreGenerations ? () => databases : undefined, packageLocks: r.locks, openStorage: async () => ({ factory: r.factory, dispose: async () => {} }) };
+      fileLimits: budget, decode, jpeg: setup.jpeg, photo: setup.photo, mediaDecoders:setup.mediaDecoders, editorSettings:setup.editorSettings, generations: setup.restoreGenerations ? () => databases : undefined, packageLocks: r.locks, openStorage: async () => ({ factory: r.factory, dispose: async () => {} }) };
     // Use an admitted conversion or one fresh GLB, without unrelated receive/replacement histories.
     const prepared = initial ? undefined : structuredClone(await prepareValidationProject({ run, title: '統合画面の検証', models: [{ label: 'モデル', bytes: glb() }],
       media: includeInitial ? [{ label: '受信画像', bytes: png }] : [] }, budget, decode));
@@ -5479,9 +5482,110 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const cold = await openValidationHost(h.f.options); expect(cold.read().state).toBe('ready'); expect(cold.read().source!.read()).toEqual(records);
     expect(cold.authority.read().resources.captions[copy]!.body).toEqual({ kind: 'value', value: 'コピーだけを変更' }); await cold.dispose();
   });
+  it('08c receives a new display PNG while reusing acknowledged original HEIC bytes',async()=>{
+    const raw=imageFor('heic');let shown=portablePng();
+    const h=await productWorkspaceFixture(true,false,false,'map2',undefined,{mediaDecoders:{heic:async()=>({width:96,height:64,close(){}}),raster:async()=>new Blob([shown.slice().buffer],{type:'image/png'})}}),host=h.host;
+    const captionId=Object.keys(host.authority.read().resources.captions)[0]!,sceneId=h.display()!.sceneId;
+    const add=()=>host.authority.addMediaFile!(host.read().source!.token,{sceneId,captionId,attachmentId:`att_${newId()}`,eventId:`evt_${newId()}`,orderKey:newId(),file:{name:'同じ原本.heic',size:raw.length,arrayBuffer:async()=>raw.slice().buffer}});
+    await add();const first=await host.workspaceOutput.download(await host.workspaceOutput.generate(host.read().source!.token));
+    const denied=vi.fn(async()=>{throw Error('HEIC unavailable');}),peer=firstWorkspaceRecipient(undefined,undefined,{heic:denied});await peer.receiver.importWorkspace(first);
+    shown=portablePng(96,64,80);await add();const next=await host.workspaceOutput.download(await host.workspaceOutput.generate(host.read().source!.token));
+    const put=vi.spyOn(OriginBlobStore.prototype,'put');await peer.receiver.receive((await peer.session.read()).source!.token,next);
+    expect(put.mock.calls.map(c=>c[2]?.digest)).toEqual([await digest(shown)]);put.mockRestore();expect(denied).not.toHaveBeenCalled();
+    const records=(await peer.session.read()).source!.mediaRecords().filter(r=>r.portableDisplay);expect(new Set(records.map(r=>(r.blob as JsonObject).digest)).size).toBe(1);
+    expect(new Set(records.map(r=>(r.portableDisplay as JsonObject).blob)).size).toBe(2);await h.ui.dispose();
+  });
+  it('08c restores a portable pair used only by an archived exchange base on an incapable device',async()=>{
+    const raw=imageFor('heic'),raster=portablePng(),h=await productWorkspaceFixture(true,false,false,'map2',undefined,{mediaDecoders:{heic:async()=>({width:96,height:64,close(){}}),raster:async()=>new Blob([raster.slice().buffer],{type:'image/png'})}}),host=h.host;
+    const captionId=Object.keys(host.authority.read().resources.captions)[0]!,sceneId=h.display()!.sceneId;
+    await host.authority.addMediaFile!(host.read().source!.token,{sceneId,captionId,attachmentId:`att_${newId()}`,eventId:`evt_${newId()}`,orderKey:'B',file:{name:'原本.heic',size:raw.length,arrayBuffer:async()=>raw.slice().buffer}});
+    await host.workspaceOutput.generate(host.read().source!.token);const current=host.read().source!,observation=h.f.options.coordinator.openView(h.f.fs,`${validationArea}/${h.f.run}`,'test-observe'),bases=new WorkspaceBaseStore(observation.workspace,metadata,current.proof),table=await bases.snapshot();
+    const doc=A.change(A.load<Record<string,any>>(current.encodeFullSource()),draft=>{for(const key of ['assetsById','captionsById','captionAttachmentsById','sceneAssetMembershipsById','sceneCaptionMembershipsById','materialOverridesById','captionTagMembershipsById'])for(const row of Object.values(draft[key]) as Record<string,any>[])row.lifecycle=new A.ImmutableString(json({state:'deleted',reason:'userDelete',eventId:`evt_${newId()}`}));});
+    const source=ProjectMetadataSource.fromFullSource(A.save(doc),current.proof,metadata),evidence=[];
+    for(const reference of backupEvidenceRefs(table))evidence.push({reference,bytes:await bases.readEvidence(reference)});observation.release();
+    const capture=await BackupSourceCapture.restore(source.encodeFullSource(),source.proof,source.token,backupEncode(table),evidence,h.f.store,metadata),parts:BlobPart[]=[];
+    await writeBackupArchive(capture,h.f.store,new WritableStream({write(bytes){parts.push(bytes.slice().buffer);}}),{packageId:`pkg_${newId()}`,createdByVersion:'test'});
+    const r=await firstBackupRecipient(),prepared=await BackupRestoreJob.prepareFirstOpen(r.fs,new Blob(parts),metadata,r.databases);r.lease.activateNewProject();
+    const job=await prepared.persist(null,r.databases),staging=await job.openStaging(r.databases),denied=vi.fn(async()=>{throw Error('HEIC unavailable');}),service=validationProjectService(staging.fs,staging.factory,r.store,budget,decode,undefined,undefined,undefined,{heic:denied});
+    expect((await service.session.initializeBackup(job)).source!.originalChanges()).toEqual(source.originalChanges());
+    const media=current.mediaRecords().find(r=>r.portableDisplay)!;expect(await service.content.displayImage(media,true)).toEqual(raster);expect(denied).not.toHaveBeenCalled();
+    const ref=portableDisplay(media)!.blob,receipt=JSON.parse((await r.base.readText(`v2/cas/sha256/${String(ref.digest).slice(0,2)}/${String(ref.digest).slice(2)}.json`))!);await r.base.remove(`v2/cas/objects/${receipt.objectId}.bin`);
+    await expect(service.session.initializeBackup(job)).rejects.toThrow();expect(await r.store.inspect(ref)).not.toBe('verified-present');await staging.dispose();await h.ui.dispose();
+  });
+  it('08c derives reader requirements from every original scalar, including an overwritten declaration',async()=>{
+    const initial=prepareValidationCreation(await prepareValidationProject({run:newId(),title:'物理履歴',models:[{label:'モデル',bytes:glb()}]},budget,decode),'map2'),source=initial.source;
+    const raw=imageFor('heic'),raster=portablePng(),ref=async(bytes:Uint8Array,mediaType:string)=>({algorithm:'sha256',digest:await digest(bytes),byteLength:bytes.length,mediaType});
+    const base={id:`med_${newId()}`,label:'元写真',mediaKind:'image',blob:await ref(raw,'image/heic')},legacy=await sealValidationRecord('media-resource',base),
+      pair=await sealValidationRecord('media-resource',{...base,portableDisplay:{kind:'native-heic-raster-v1',blob:await ref(raster,'image/png'),width:96,height:64}});
+    const doc=A.change(A.load<any>(source.encodeFullSource()),d=>{d.mediaResourcesById[base.id]=new A.ImmutableString(json(pair));d.mediaResourcesById[base.id]=new A.ImmutableString(json(legacy));});
+    const changed=ProjectMetadataSource.fromFullSource(A.save(doc),source.proof,metadata),original=changed.originalChanges().map(A.decodeChange).find(c=>c.ops.filter(o=>o.action==='set'&&o.key===base.id).length===2)!;
+    expect(original).toBeTruthy();expect(changed.requiredCapabilities).toEqual([PORTABLE_MEDIA_CAPABILITY]);expect(changed.requiredCapabilitiesForChanges(new Set([original.hash]))).toEqual([PORTABLE_MEDIA_CAPABILITY]);
+    expect(changed.mediaRecords()).toEqual([pair,legacy]);
+  });
+  it('08c verifies the immutable pair, never grants a native-only record portable admission, and detects lost display bytes',async()=>{
+    const r=firstWorkspaceRecipient(),raw=imageFor('heic'),raster=portablePng(),heic=vi.fn(async()=>{throw Error('HEIC unavailable');});
+    const content=new ValidationContent(r.fs,r.store,budget,decode,undefined,undefined,undefined,{heic});
+    const ref=async(bytes:Uint8Array,mediaType:string)=>({algorithm:'sha256',digest:await digest(bytes),byteLength:bytes.length,mediaType});
+    const source=await ref(raw,'image/heic'),display=await ref(raster,'image/png');
+    const pair=await sealValidationRecord('media-resource',{id:`med_${newId()}`,label:'原本',mediaKind:'image',blob:source,portableDisplay:{kind:'native-heic-raster-v1',blob:display,width:96,height:64}});
+    await underWriteLease(r.fs,async()=>{for(const[bytes,body]of [[raw,source],[raster,display]] as const)await content.stageReceived(new Blob([bytes.slice().buffer]),body);await content.verify([display],[pair]);});
+    expect(await content.image(pair,true)).toEqual(raw);expect(await content.displayImage(pair,true)).toEqual(raster);expect(heic).not.toHaveBeenCalled();
+    await underWriteLease(r.fs,()=>content.verify([display],[pair,{id:`med_${newId()}`,blob:{...source,digest:'f'.repeat(64)},futureExtension:true}]));
+    expect(heic).not.toHaveBeenCalled();
+    const legacy=await sealValidationRecord('media-resource',{id:`med_${newId()}`,label:'旧単体',mediaKind:'image',blob:source,futureExtension:true});
+    await expect(underWriteLease(r.fs,()=>content.verify([source],[pair,legacy]))).rejects.toThrow('HEIC');expect(heic).toHaveBeenCalledOnce();
+    const bad=await sealValidationRecord('media-resource',{...pair,portableDisplay:{...pair.portableDisplay as JsonObject,width:64}});
+    await expect(content.image(bad,true)).rejects.toThrow();
+    await expect(underWriteLease(r.fs,()=>content.verify([display],[{...pair,portableDisplay:{kind:'native-heic-raster-v1'}}]))).rejects.toThrow();
+    const receipt=`v2/cas/sha256/${display.digest.slice(0,2)}/${display.digest.slice(2)}.json`,object=JSON.parse((await r.fs.readText(receipt))!).objectId;
+    await r.fs.remove(`v2/cas/objects/${object}.bin`);await expect(content.displayImage(pair,true)).rejects.toThrow();expect(heic).toHaveBeenCalledOnce();
+  });
+  it('08c portable HEIC survives partial staging, exact cold retry, all file purposes and an incapable recipient',async()=>{
+    const raw=imageFor('heic'),raster=portablePng(),native=vi.fn(async()=>({width:96,height:64,close(){}})),encode=vi.fn(async()=>new Blob([raster.slice().buffer],{type:'image/png'}));
+    let preference={enabled:false,name:'担当A'};
+    const editorSettings={read:()=>preference,save:(_proof:unknown,value:typeof preference)=>{preference=value;return true;}};
+    const h=await productWorkspaceFixture(true,false,false,'map2',undefined,{mediaDecoders:{heic:native,raster:encode},editorSettings,restoreGenerations:true}),host=h.host;
+    const captionId=Object.keys(host.authority.read().resources.captions)[0]!,sceneId=h.display()!.sceneId;
+    // Freeze editor + generated PNG once, even if the second body write fails.
+    preference={enabled:true,name:'担当A'};const realPut=h.f.store.put.bind(h.f.store);let writes=0;
+    const put=vi.spyOn(h.f.store,'put').mockImplementation(async(...args)=>{if(++writes===2)throw Error('injected PNG quota');return realPut(...args);});
+    await expect(host.authority.addMediaFile!(host.read().source!.token,{sceneId,captionId,attachmentId:`att_${newId()}`,eventId:`evt_${newId()}`,orderKey:'B',file:{name:'撮影原本.heic',size:raw.length,arrayBuffer:async()=>raw.slice().buffer}})).rejects.toThrow('injected PNG quota');
+    preference={enabled:true,name:'担当B'};put.mockRestore();h.f.fs.reject=path=>path.endsWith('/published.json');await expect(host.authority.retry!()).rejects.toThrow();
+    await h.ui.dispose();h.f.fs.reject=()=>false;let cold=await openValidationHost(h.f.options);await cold.authority.retry!();
+    expect(native).toHaveBeenCalledOnce();expect(encode).toHaveBeenCalledOnce();expect(cold.read().source!.editorDeclarations().map(d=>d.declaration.editor.name)).toEqual(['担当A']);
+    const source=cold.read().source!,records=source.mediaRecords(),media=records.find(r=>r.portableDisplay)!;expect(media).toBeTruthy();
+    expect(await cold.content.image(media,true)).toEqual(raw);expect(await cold.content.displayImage(media,true)).toEqual(raster);
+    expect(cold.authority.read().mediaData!.images![media.id as string]).toMatchObject({record:media,displayMediaType:'image/png'});
+    const workspace=await cold.workspaceOutput.download(await cold.workspaceOutput.generate(source.token)),backup=await cold.workspaceOutput.download(await cold.workspaceOutput.generateBackup(source.token)),
+      reviewFile=await cold.workspaceOutput.download(await cold.workspaceOutput.generateReview(source.token,{sceneId})),clean=await cold.workspaceOutput.download(await cold.workspaceOutput.generateClean(source.token));
+    const workspaceInspection=await WorkspaceArchive.inspect(workspace,metadata),backupInspection=await BackupArchive.inspect(backup,metadata),cleanInspection=await CleanArchive.inspect(clean,metadata);
+    const denied=vi.fn(async()=>{throw Error('HEIC unavailable');}),decoders={heic:denied},review=await prepareReviewView(reviewFile,budget,decode,undefined,undefined,decoders);
+    expect([...review.images.values()].some(blob=>blob.type==='image/png')).toBe(true);
+    for(const archive of [workspaceInspection.archive,backupInspection.archive,cleanInspection.archive,review.inspection.archive]){
+      for(const ref of recordBlobRefs(media))expect(await archive.entryBytes(`blobs/sha256/${ref.digest}`,ref.byteLength as number)).toEqual(ref.mediaType==='image/heic'?raw:raster);
+      expect(archive.control.manifest.requiredCapabilities).toEqual(archive.control.manifest.purpose==='clean'||archive.control.manifest.purpose==='review'?[PORTABLE_MEDIA_CAPABILITY]:[EDITOR_CAPABILITY,PORTABLE_MEDIA_CAPABILITY]);
+    }
+    for(const [file,inspect] of [[workspace,(f:Blob)=>WorkspaceArchive.inspect(f,metadata)],[backup,(f:Blob)=>BackupArchive.inspect(f,metadata)],[clean,(f:Blob)=>CleanArchive.inspect(f,metadata)],[reviewFile,(f:Blob)=>prepareReviewView(f,budget,decode)]] as const){
+      const entries=await readZipEntries(new Uint8Array(await file.arrayBuffer())),manifest=entries.find(e=>e.path==='manifest.json')!,control=JSON.parse(new TextDecoder().decode(manifest.data));delete control.requiredCapabilities;
+      manifest.data=new TextEncoder().encode(json(control));entries.find(e=>e.path==='manifest.sha256')!.data=new TextEncoder().encode(await digest(manifest.data));
+      await expect(inspect(new Blob([(await writeZipEntries(entries)).slice().buffer]))).rejects.toThrow();
+    }
+    const peer=firstWorkspaceRecipient(undefined,undefined,decoders);expect((await peer.receiver.importWorkspace(workspace)).state).toBe('ready');
+    const peerContent=new ValidationContent(peer.fs,peer.store,budget,decode,undefined,undefined,undefined,decoders);
+    expect(await peerContent.displayImage(media,true)).toEqual(raster);
+    const peerState=await peer.session.read();await peer.session.edit(peerState.source!.token,{kind:'editCaption',captionId,edits:{body:'受信側の追記'}});
+    const sender=new WorkspaceSender(peer.fs,peer.session,peer.store,metadata,peer.locks),contribution=await sender.download(await sender.generateContribution((await peer.session.read()).source!.token,(await sender.availableBases())[0]!.selection));
+    const received=await cold.workspaceFiles.receive(cold.read().source!.token,contribution);expect(received).toBeDefined();
+    expect(cold.authority.read().resources.captions[captionId]!.body).toEqual({kind:'value',value:'受信側の追記'});
+    const independent=firstWorkspaceRecipient(undefined,undefined,decoders);expect((await independent.receiver.importWorkspace(clean)).state).toBe('ready');
+    const copied=(await independent.session.read()).source!;expect(copied.proof.identity).not.toEqual(source.proof.identity);expect(copied.includesDeclaredEditorNames).toBe(false);
+    const copiedMedia=copied.mediaRecords().find(r=>r.portableDisplay)!;expect(copiedMedia.id).not.toBe(media.id);expect(recordBlobRefs(copiedMedia)).toEqual(recordBlobRefs(media));
+    await cold.backupRestore.prepare(backup);await cold.backupRestore.confirm(async(next,content)=>{expect(await content.displayImage(media,true)).toEqual(raster);});cold.backupRestore.displayReady(cold.read().source!.token);
+    expect(cold.read().source!.originalChanges()).toEqual(source.originalChanges());await cold.dispose();cold=await openValidationHost({...h.f.options,mediaDecoders:decoders});expect(cold.read().source!.originalChanges()).toEqual(source.originalChanges());expect(await cold.content.displayImage(media,true)).toEqual(raster);expect(denied).not.toHaveBeenCalled();await cold.dispose();
+  });
   it('approved media retains original bytes through attachment, Review, Workspace, Clean, backup restore and cold reopen',async()=>{
     // Injected first-decode port is service/fault evidence; actual A/V playback is the Chromium lane.
-    const mediaDecoders:MediaDecoders={timed:async bytes=>{const shape=timedMediaStructure(bytes,budget);return{duration:shape.duration,...(shape.mediaKind==='video'?{width:96,height:64}:{})};},heic:async()=>({width:96,height:64,close(){}})};
+    const mediaDecoders:MediaDecoders={raster:async()=>new Blob([portablePng().slice().buffer],{type:'image/png'}),timed:async bytes=>{const shape=timedMediaStructure(bytes,budget);return{duration:shape.duration,...(shape.mediaKind==='video'?{width:96,height:64}:{})};},heic:async()=>({width:96,height:64,close(){}})};
     const h=await productWorkspaceFixture(true,false,false,'map2',undefined,{mediaDecoders,restoreGenerations:true}),host=h.host,captionId=Object.keys(host.authority.read().resources.captions)[0]!,sceneId=h.display()!.sceneId;
     const files=['owned-video.mp4','owned-audio.m4a','owned-audio.mp3','owned-still.heic'].map(name=>({name,bytes:new Uint8Array(readFileSync(new URL(`./fixtures/daily-media/${name}`,import.meta.url)))}));
     for(const[fileIndex,file]of files.entries())await host.authority.addMediaFile!(host.read().source!.token,{sceneId,captionId,attachmentId:`att_${newId()}`,eventId:`evt_${newId()}`,orderKey:`B${fileIndex}`,file:{name:file.name,size:file.bytes.length,arrayBuffer:async()=>file.bytes.slice().buffer}});

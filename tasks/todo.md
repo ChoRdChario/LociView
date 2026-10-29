@@ -56,7 +56,68 @@ unchanged-feature-classification checks pass; independent review has no findings
 No runtime change or new capacity guarantee; no runtime suite is needed for this
 documentation checkpoint.
 
-## Current boundary —HEIC rights and alternative-workflow investigation
+## Current boundary —verified local HEIC original and portable display
+
+PO2026-10-30 approves the readable-browser/local-generation direction in
+[08c](../docs/specs/08c-portable-heic-display.md). Root was the sole writer;
+independent media, package/metadata and UI design/final reviews PASS, including
+narrow review of later compatibility/diagnostic corrections. Outcome: add →
+Caption/gallery/viewer → save/send/return → receive/restore/cold-resume. Original
+HEIC plus one frozen native-generated full-size PNG are one immutable record;
+original metadata/bytes, IDs/history and existing schema/map/proof remain intact.
+Native-only legacy HEIC is unchanged. No decoder/service/dependency/lockfile,
+profile/capacity promise, general adoption, offline-shell activation or release.
+
+Connected implementation retains both bodies in all five image-preserving file
+purposes, handles independent original reuse/new PNG, archived-base-only restore,
+acknowledged body loss, second-body failure and exact editor/PNG cold retry.
+Finite canonical reader requirements derive from every original scalar, including
+same-change overwritten declarations; older readers must refuse new tuples.
+Unpaired display retains the existing image() read/fault boundary. UI uses actual
+PNG MIME, labels the display image/HDR difference without rewriting descriptions,
+and discloses the actual frozen output's reader requirement before first download.
+
+Final automated evidence2026-10-30:
+
+- `npm run check:checkpoint` PASS at the final source/test tree: typecheck;
+  136 root files,3067 passed tests and21 unchanged existing TODO; ordinary,
+  harness, validation and Desktop builds. Root suite1006.41s. Full serial log:
+  `.artifacts/e2e/heic-portable/checkpoint.log`.
+- Focused helper/architecture/media-UI42, connected08c5, legacy gallery/mode/cold3,
+  helper+08c+HEIF-recovery20 and bounded metadata74/package62 checks passed; these
+  overlapping selections are not added into the root total.
+- Dedicated Chromium run1793297522186-68508 PASS: actual canvas→PNG, incapable
+  recipient's Caption/window image/viewer, warmed-page offline edit/save/project
+  reopen, full browser cold reopen, and fixed immediate08b reader fe20109:
+  names-only accepted, both/portable-only files refused, local journal refused
+  without changing metadata receipts/originals. Result and screenshot are under
+  `.artifacts/e2e/runs/1793297522186-68508/`. Native HEIC decode on the producer was
+  narrowly substituted with a known real PNG ImageBitmap; canvas/export/storage
+  and recipient PNG decoding are real. No Safari-native or offline-shell cold credit.
+- Final source/test/script digests match the tree tested and reviewed. Markdown
+  local links and diff checks pass. `verify:heic-isolation` PASS across dist,
+  dev-dist, validation-dist and desktop-dist; no local decoder PoC material ships.
+
+Retained failure evidence: default-sandbox full check stopped on existing hard-link
+EPERM; the exact publication case passes with managed escalation and unchanged
+code/assertions. Preserve `checkpoint-sandbox-permission-failure.log`. The unpaired
+gallery read/fault boundary regression was isolated and corrected without changing
+legacy assertions; preserve `checkpoint-before-legacy-display-fix.log`. The first
+completed normal root run passed3065/faulted2 on HEIF guidance; normalize structural
+HEIF refusal through the legacy guide without changing admission, then the final
+complete run above passed. Preserve `checkpoint-before-heif-guidance-fix.log`.
+Earlier browser attempts retain two corrected ambiguous test-selector failures;
+no automatic retries, exclusions, relaxed assertions or new runtime limits.
+
+Milestone audit: g0-baseline remains the authorized development branch; main-only
+Pages deployment is unchanged. Changes form one portable-media workflow; no
+auxiliary adoption lane. Keep Safari orientation/color/HDR/large-image and offline
+shell/device acceptance pending. Next is the consolidated PC-candidate everyday
+workflow/usability review described in Next decision below; ask only if a genuine
+new policy/architecture or release decision emerges. This is a verified development checkpoint within the standing g0 commit/push
+authority. Git owns its identity and remote status; no release is implied.
+
+## Previous boundary —HEIC rights and alternative-workflow investigation
 
 PO2026-10-30 requests a fresh separation of HEIC rights/distribution questions and
 practical alternatives to shipping a decoder, including OS display/screenshot.
@@ -511,27 +572,29 @@ names stay private until the separate Project-local opt-in. The milestone audit
 keeps this on the accepted daily-use path; no additional fully specified daily-use
 unit was found in the current inventory. This is not overall app/adoption completion.
 
-Current investigation: Windows HEIC direct use and alternatives. The existing
-[decoder PoC](../scripts/heic-decoder-poc/POC-RESULT.md) records a technical PASS
-from2026-09-03, not a fresh device result. [Specification02§29.2](../docs/specs/02-storage-package-migration.md)
-still holds product connection for distribution materials and separate HEVC rights
-review. PO requests comparing decoder-free product workflows as well, not only
-native support versus Wasm productization. The[research memo](../docs/heic-rights-and-workflow-review.md)
-recommends existing external JPEG/PNG input now, an ordinary image-paste entry as
-the smallest implementation candidate, and one-time native generation of a portable
-display image paired with retained HEIC as a future shared-file design candidate.
-Current backup omits any externally retained HEIC. The paired design needs a new
-explicit original/display/verification/receive/restore/old-reader contract; neither
-this investigation nor a screenshot exempts all underlying rights. Decoder adoption,
-distribution/rights conditions and package changes remain separate decisions.
-No product code, dependency, installed codec or accepted gate changed in this unit.
+Current connected outcome is08c original-plus-portable-display, authorized after
+the retained HEIC research. Its implementation and exact checks are recorded in
+the Current boundary above. The[research memo](../docs/heic-rights-and-workflow-review.md)
+and[decoder PoC](../scripts/heic-decoder-poc/POC-RESULT.md) remain historical evidence,
+not an active decoder-adoption task. The native reader on the adding device and
+one fixed PNG provide portable media for supported new tuples; raw-only legacy
+HEIC is unchanged. General direct HEIC input on incapable browsers is not solved.
+No bundled decoder or rights/distribution gate was adopted by08c.
+
+After the08c checkpoint, next is a consolidated PC-candidate completion/usability
+review of the accepted everyday workflows and inventory, fixing concrete in-scope
+inconsistencies found there. Keep missing Safari orientation/color/HDR/large-image
+and cold offline-shell evidence grouped as readiness lanes; do not invent a new
+feature solely to increase coverage. Broader Native/different-profile replacement,
+paste/manual image pairing or a decoder remains a separate explicit contract/scope.
 
 Local Undo covers the named confirmed Caption actions in this editor, not every
 Project action or historical rollback. Native Point/different-profile replacement
 is not granted by same01a/01c replacement; saved07k GS already uses01c and is
 eligible by profile, without a new Native-conversion-route claim from this fixture.
-Native-only HEIC acceptance does not close that cross-browser requirement;
-an original-plus-derivative workflow is not an already approved alternative.
+08c portable media closes the named new-tuple viewing/file workflow only; it does
+not claim native decoding on every browser, automatic legacy upgrade or device
+qualification.
 
 Earlier500k observations (about202s to editor,47s edit,232s backup) remain retained
 as performance evidence; the current owned replacement lane is recorded above.

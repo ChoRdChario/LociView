@@ -6,7 +6,7 @@ import type { SceneUiMemory } from '../ui/projectScene/navigationState';
 import type { ViewCameraIntent } from '../ui/projectScene/viewState';
 import type { ReviewView } from './reviewView';
 import type { ViewportFactory, ProjectViewport } from './viewportPorts';
-import { createMediaViewer, createMediaThumbnails, type MediaPreviewGroup } from '../ui/projectScene/mediaPreview';
+import { createMediaViewer, createMediaThumbnails, mediaDisplayDescription, type MediaPreviewGroup } from '../ui/projectScene/mediaPreview';
 
 /** Standalone snapshot viewing. Only an explicitly confirmed handoff may create an editing Project. */
 export function createReviewWorkspace(document: Document, view: ReviewView, factory: ViewportFactory, editCopy?: () => void | Promise<void>) {
@@ -71,9 +71,9 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
     const caption = view.source.captions.find(c => c.id === captionId);
     return { scope: JSON.stringify([view.source.token, captionId]), label: caption?.title.kind === 'value' ? caption.title.value || 'キャプション' : 'キャプション',
       items: view.attachments.filter(a => a.captionId === captionId).map(a => {
-        const media = (view.inspection.review.snapshot.mediaResourcesById as Record<string, { label: string;mediaKind:'image'|'video'|'audio' }>)[String(a.mediaResourceId)];
+        const media = (view.inspection.review.snapshot.mediaResourcesById as Record<string, { label: string;mediaKind:'image'|'video'|'audio';portableDisplay?:unknown }>)[String(a.mediaResourceId)];
         const blob = view.images.get(String(a.mediaResourceId));
-        return { id: String(a.id), resourceId: String(a.mediaResourceId), label: media?.label ?? 'メディア',kind:media?.mediaKind, description: String(a.altText || ''), image: blob ? { blob } : null };
+        return { id: String(a.id), resourceId: String(a.mediaResourceId), label: media?.label ?? 'メディア',kind:media?.mediaKind, description: mediaDisplayDescription(String(a.altText || ''),media?.portableDisplay!==undefined), image: blob ? { blob } : null };
       }) };
   };
   const gallery = (captionId: string) => {

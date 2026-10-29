@@ -209,7 +209,9 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   const media = make('section'), mediaLabel = make('label', 'メディアを追加'), mediaInput = make('input');
   media.setAttribute('aria-label', 'メディア'); mediaInput.type = 'file'; mediaInput.accept = 'image/png,image/jpeg,image/webp,image/gif,image/heic,image/heif,.heic,.heif,video/mp4,audio/mp4,audio/mpeg,.m4a,.mp3'; mediaInput.setAttribute('aria-label', 'メディアを追加'); mediaLabel.append(mediaInput);
   const cancelMedia = button('選択を取り消す', cancelMediaSelection);
-  media.append(make('h2', 'メディア'), mediaLabel, cancelMedia);
+  const heicHelp = make('p', 'HEICは、このブラウザで読み込める場合に追加できます。原本と表示用PNGを保存します。HDRなどの見え方が変わる場合があります。');
+  heicHelp.hidden = true; mediaInput.addEventListener('change', () => { heicHelp.hidden = !/\.hei[cf]$/i.test(mediaInput.files?.[0]?.name ?? ''); });
+  media.append(make('h2', 'メディア'), mediaLabel, cancelMedia, heicHelp);
   const conflicts = make('section');
   let sceneId = chooseStartupScene(ports.read().state).sceneId ?? '', disposed = false, busy = false, composing = false, feedback = '';
   let draft: CaptionDraft | null = null, pin: WorkspacePinProposal | null = null, choosing = false, placingCaption: string | null = null;
@@ -564,7 +566,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     return pending.owner === 'media' && !hasCaptionDraft(draft) && !pin && !numericTarget && !choosing && !deletion && !sceneEdit &&
       !panelInput() && !mediaManager?.hasChanges() && !recovery?.hasChanges() && !viewport.read().dragging;
   }
-  function cancelMediaSelection() { if (canCancelMedia()) { if (pending?.owner === 'media') { pending = null; feedback = ''; } pickerScope = null; mediaInput.value = ''; render(); } }
+  function cancelMediaSelection() { if (canCancelMedia()) { if (pending?.owner === 'media') { pending = null; feedback = ''; } pickerScope = null; mediaInput.value = ''; heicHelp.hidden = true; render(); } }
   mediaInput.addEventListener('cancel', cancelMediaSelection);
   mediaInput.addEventListener('change', () => {
     const file = mediaInput.files?.[0], scope = pickerScope;
@@ -574,7 +576,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     const input = { ...scope, attachmentId: id('att'), eventId: id('evt'), orderKey: (orders.at(-1) ?? '') + 'U',
       file: { name: file.name, size: file.size, arrayBuffer: file.arrayBuffer.bind(file) } };
     const undo = organization?.beginAction({ kind: 'newMediaAttachment', captionId: scope.captionId, attachmentId: input.attachmentId }) ?? null;
-    void perform(() => ports.addMedia(scope.token, input), () => { organization?.recordAction(undo); pickerScope = null; mediaInput.value = ''; resetDraft(); feedback = 'メディアを追加しました。'; }, 'media');
+    void perform(() => ports.addMedia(scope.token, input), () => { organization?.recordAction(undo); pickerScope = null; mediaInput.value = ''; heicHelp.hidden = true; resetDraft(); feedback = 'メディアを追加しました。'; }, 'media');
   });
   const modifiedPointer = (event: PointerEvent) => event.altKey || event.ctrlKey || event.metaKey;
   const invalidateGesture = () => { gesture = null; gestureGeneration++; };

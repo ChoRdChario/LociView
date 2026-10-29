@@ -1,6 +1,7 @@
 import { ProjectRecordFields } from './projectRecordFields';
 import { list, object, same, canonical } from './projectGraphSupport';
 import { reject, type JsonObject, type JsonValue } from './values';
+import { portableDisplay } from './portableMedia';
 
 /** Transient verifier facts, not imported metadata or a persisted receipt format. */
 export type ContentFact = 'representation' | 'family-envelope' | 'family-contribution' | 'surface-equivalence' | 'media';
@@ -70,9 +71,13 @@ export function checkContentFacts(q: ContentRequest, facts: JsonObject): void {
     c.shape(facts, ['equivalentVariantFamilyIds'], []);
     exact(c.required(facts, 'equivalentVariantFamilyIds', []), q.context.targetVariantFamilyIds);
   } else {
-    c.shape(facts, ['mediaKind', 'mediaType'], []);
+    const display = portableDisplay(r);
+    c.shape(facts, ['mediaKind', 'mediaType', ...(display ? ['portableDisplay'] : [])], []);
     exact(c.required(facts, 'mediaKind', []), r.mediaKind);
     exact(c.required(facts, 'mediaType', []), object(r.blob).mediaType);
+    if (display) exact(c.required(facts, 'portableDisplay', []), {
+      sourceCheck: 'structure', displayCheck: 'decoded', width: display.width, height: display.height,
+    });
   }
   // Future evidence fields need an explicit checker; don't silently treat opaque facts as proof.
   if (c.unknown) reject('key', ['facts']);

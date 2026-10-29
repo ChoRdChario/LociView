@@ -40,8 +40,11 @@ PO2026-10-30 requests rights re-evaluation and practical alternatives, including
 screenshots. Read the[HEIC investigation](../docs/heic-rights-and-workflow-review.md)
 and todo before decoder productization: LGPL conditions and patent scope are separate,
 and external PNG/JPEG input differs from a new original-plus-display-image package.
-This research does not authorize implementation, decoder distribution or an admission
-bypass. The existing native-only path and02§29.2 hold remain.
+PO subsequently approved proceeding with the original-plus-portable-display direction.
+Read[08c](../docs/specs/08c-portable-heic-display.md) for the exact design and todo
+for the verified bounded implementation, checks and checkpoint. Native-only
+legacy records and02§29.2's decoder distribution hold remain. Clipboard/screen capture,
+manual pairing and offline-shell activation are not part of this implementation.
 Keep existing comfortable-UI guidance, original bytes/history, atomic Session
 commands, file/recovery/evidence fences and one writer. Read-only reviews may run
 in parallel. Continue ordinary approved work without small PO testing waits.

@@ -5,13 +5,14 @@ import { heicStructure, heicGuidance, isHeic } from './heic';
 export { isHeic };
 import { timedMediaStructure, type TimedMediaShape } from './mediaContainer';
 import { fileError, type FileValidationLimits } from './validation';
+import { createPortableHeic, type HeicRasterEncoder } from './portableHeic';
 
 export type ProjectMediaMime = 'image/png'|'image/jpeg'|'image/webp'|'image/gif'|'image/heic'|'video/mp4'|'audio/mp4'|'audio/mpeg';
 export const projectMediaKind=(mime:unknown):'image'|'video'|'audio'|null=>projectImageMime(mime)||mime==='image/heic'?'image':mime==='video/mp4'?'video':mime==='audio/mp4'||mime==='audio/mpeg'?'audio':null;
 export interface DecodedTimedMedia {readonly duration:number;readonly width?:number;readonly height?:number}
 export type TimedMediaDecoder=(bytes:Uint8Array,shape:TimedMediaShape)=>Promise<DecodedTimedMedia>;
 export type HeicDecoder=(bytes:Uint8Array)=>Promise<{readonly width:number;readonly height:number;close():void}>;
-export interface MediaDecoders {readonly timed?:TimedMediaDecoder;readonly heic?:HeicDecoder}
+export interface MediaDecoders {readonly timed?:TimedMediaDecoder;readonly heic?:HeicDecoder;readonly raster?:HeicRasterEncoder}
 /** Routing hint only; inspectProjectMedia remains the admission authority. */
 export const hasTimedOrHeicSignature=(b:Uint8Array)=>isHeic(b)||String.fromCharCode(...b.subarray(4,8))==='ftyp'||String.fromCharCode(...b.subarray(0,3))==='ID3'||b[0]===255&&(b[1]!&224)===224;
 
@@ -30,6 +31,12 @@ export const browserTimedMediaDecoder:TimedMediaDecoder=async(bytes,shape)=>{
   });}finally{if(timer)clearTimeout(timer);node.pause();node.removeAttribute('src');node.load();URL.revokeObjectURL(url);}
 };
 const nativeHeic:HeicDecoder=async bytes=>{if(typeof createImageBitmap!=='function')return fileError(heicGuidance);return createImageBitmap(new Blob([bytes.slice().buffer],{type:'image/heic'}),{imageOrientation:'from-image',colorSpaceConversion:'default',premultiplyAlpha:'none'});};
+/** Preparation alone creates a portable image; legacy standalone validation remains unchanged. */
+export async function prepareProjectMedia(bytes:Uint8Array,limits:FileValidationLimits,png?:PngDecoder,jpeg?:JpegDecoder,photo?:PhotoDecoder,decoders:MediaDecoders={},signal?:AbortSignal){
+  if(isHeic(bytes))return{mediaKind:'image' as const,mediaType:'image/heic' as const,
+    portable:await createPortableHeic(bytes,limits,decoders.heic??nativeHeic,png,decoders.raster,signal)};
+  return{...await inspectProjectMedia(bytes,limits,png,jpeg,photo,decoders,signal),portable:undefined};
+}
 const mediaAbort=()=>new DOMException('選択を取り消しました。','AbortError');
 async function boundedHeic(decode:HeicDecoder,bytes:Uint8Array,signal?:AbortSignal){
   if(signal?.aborted)throw mediaAbort();let ended=false,timer:ReturnType<typeof setTimeout>|undefined,onAbort:(()=>void)|undefined;

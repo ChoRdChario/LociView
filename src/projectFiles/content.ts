@@ -2,10 +2,13 @@ import { validationDeclaredBodyBytes } from './bodyBudget';
 import type { ProjectProviderRead } from '../scene/projectProvider';
 import type { PhotoDecoder } from './photo';
 import { inspectProjectMedia, projectMediaKind, type MediaDecoders } from './media';
+import { portableDisplay, recordBlobRefs } from '../domain/portableMedia';
+import { inspectPortableHeic } from './portableHeic';
 import type { ProjectWorkspaceFS, WorkspaceReadableFile } from '../platform/fs';
 import type { ContentRequest, ProjectContentVerifier } from '../domain/projectContentChecks';
 import { checkContentFacts } from '../domain/projectContentChecks';
-import { canonical, same } from '../domain/projectGraphSupport';
+import { canonical, same, immutableDigest } from '../domain/projectGraphSupport';
+import { checkProjectRecord } from '../domain/projectRecords';
 import { cloneCanonicalValue, type JsonObject } from '../domain/values';
 import { ProjectRecordFields } from '../domain/projectRecordFields';
 import { PersistentContentVerifier } from '../projectMetadata/contentEvidence';
@@ -25,7 +28,7 @@ import { gsSourceProfile, inspectGsPly, inspectGsPlyFile, captureGsBlob, gsBlobS
 import type { PngDecoder } from './png';
 import type { JpegDecoder } from './jpeg';
 import { fileError, fileObject, validationGlbProfile, occurrenceGlbProfile, jpegGlbProfile, occurrenceJpegGlbProfile, validationMetadataLimits, projectFilePolicy, type FileValidationLimits, type ProjectFilePolicy, type ProjectFilePolicyInput } from './validation';
-import { identityPlacement, prepareValidationModel, sealValidationRecord, validationFileLabel, type ValidationFile, type ValidationModelFile, type GsModelPreparation } from './initialProject';
+import { identityPlacement, prepareValidationModel, prepareValidationMedia, sealValidationRecord, validationFileLabel, type ValidationFile, type ValidationModelFile, type GsModelPreparation } from './initialProject';
 
 export async function readValidationBody(file: WorkspaceReadableFile, maxBytes: number): Promise<Uint8Array> {
   if (!Number.isSafeInteger(file.size) || file.size <= 0 || file.size > maxBytes) return fileError('保存した本体が検査の上限を超えています。');
@@ -42,7 +45,7 @@ export async function readValidationBody(file: WorkspaceReadableFile, maxBytes: 
 
 /** Actual saved-content executor. A fixture/native profile cannot authorize this path. */
 export class ValidationContent implements MetadataMediaPort {
-  private readonly preparedImages = new Map<string, { record: JsonObject; bytes: Uint8Array; ref: StoredBlobRef }>();
+  private readonly preparedImages = new Map<string, Awaited<ReturnType<typeof prepareValidationMedia>>>();
   private readonly preparedModels = new Map<string, Awaited<ReturnType<typeof prepareValidationModel>>>();
   readonly limits: FileValidationLimits;
   readonly policy: ProjectFilePolicy;
@@ -59,13 +62,9 @@ export class ValidationContent implements MetadataMediaPort {
   /** Owned input only; no body or Project write until the existing journal stages it. */
   async prepareImage(input: ValidationFile): Promise<JsonObject> {
     this.fs.mutationAuthority.assertWorkspaceWriteAuthorized();
-    const label = validationFileLabel(input.label);
-    if (!input.bytes.length || input.bytes.length > this.limits.maxFileBytes) return fileError('メディアが容量の上限を超えています。');
-    const bytes = input.bytes.slice(), {mediaKind,mediaType} = await inspectProjectMedia(bytes, this.limits, this.decode, this.jpeg, this.photo,this.mediaDecoders);
-    const ref: StoredBlobRef = { algorithm: 'sha256', digest: await digest(bytes), byteLength: bytes.length, mediaType };
-    const record = await sealValidationRecord('media-resource', { id: `med_${newId()}`, label, mediaKind, blob: ref as unknown as JsonObject });
-    this.preparedImages.set(record.id as string, { record, bytes, ref });
-    return cloneCanonicalValue(record, validationMetadataLimits) as JsonObject;
+    const prepared = await prepareValidationMedia(input, this.limits, this.decode, this.jpeg, this.photo, this.mediaDecoders);
+    this.preparedImages.set(prepared.record.id as string, prepared);
+    return cloneCanonicalValue(prepared.record, validationMetadataLimits) as JsonObject;
   }
   releasePreparedImages(): void { this.preparedImages.clear(); }
   releasePreparedModels(): void { this.preparedModels.clear(); }
@@ -134,10 +133,23 @@ export class ValidationContent implements MetadataMediaPort {
     return blob;
   }
   async image(record: JsonObject, readOnly = false): Promise<Uint8Array> {
+    return (await this.imageBodies(record, readOnly)).source;
+  }
+  private async imageBodies(record: JsonObject, readOnly: boolean) {
     await this.checkRead?.();
     const blob = this.imageDeclaration(record);
     const bytes = await readValidationBody(await (readOnly ? this.store.openReadOnly(blob) : this.store.open(blob)), this.limits.maxFileBytes);
-    await this.inspectImage(bytes, blob); await this.checkRead?.(); return bytes;
+    const display = portableDisplay(record);
+    let raster = bytes;
+    if (display) {
+      raster = await readValidationBody(await (readOnly ? this.store.openReadOnly(display.blob) : this.store.open(display.blob)), this.limits.maxFileBytes);
+      await inspectPortableHeic(bytes, raster, display, this.limits, this.decode);
+    } else await this.inspectImage(bytes, blob);
+    await this.checkRead?.(); return { source: bytes, display: raster };
+  }
+  /** Display bytes have their own MIME; original retrieval continues to return original bytes. */
+  async displayImage(record: JsonObject, readOnly = false): Promise<Uint8Array> {
+    return portableDisplay(record) ? (await this.imageBodies(record, readOnly)).display : this.image(record, readOnly);
   }
   private async inspectImage(bytes: Uint8Array, blob: JsonObject) {
     if ((await inspectProjectMedia(bytes, this.limits, this.decode, this.jpeg, this.photo,this.mediaDecoders)).mediaType !== blob.mediaType) return fileError('メディアの本体形式が一致しません。');
@@ -146,7 +158,7 @@ export class ValidationContent implements MetadataMediaPort {
     return inspectDeclaredValidationModel(record, bytes, this.policy, this.decode, this.jpeg);
   }
   /** Original incoming record and immutable range, no ID allocation or storage/evidence writes. */
-  async inspectReceived(input: ContentRequest, file: Blob) {
+  async inspectReceived(input: ContentRequest, file: Blob, displayFile?: Blob) {
     const request = cloneCanonicalValue(input, validationMetadataLimits) as unknown as ContentRequest;
     if (request.records.length !== 1 || !(file instanceof Blob)) return fileError('受信する本体を確認できません。');
     const record = request.records[0]!, check = new ProjectRecordFields(); check.blob(record.blob!, []);
@@ -158,21 +170,28 @@ export class ValidationContent implements MetadataMediaPort {
     const bytes = await readValidationBody({ size: file.size, stream: () => file.stream() }, this.limits.maxFileBytes);
     if (await digest(bytes) !== ref.digest) return fileError('受信する本体が一致しません。');
     if (request.fact === 'media') {
-      await this.inspectImage(bytes, ref); return this.execute(request, { image: bytes });
+      const display = portableDisplay(record);
+      if (display) {
+        if (!(displayFile instanceof Blob) || displayFile.size !== display.blob.byteLength) return fileError('表示用画像の本体が不足しています。');
+        const raster = await readValidationBody({ size: displayFile.size, stream: () => displayFile.stream() }, this.limits.maxFileBytes);
+        if (await digest(raster) !== display.blob.digest) return fileError('表示用画像の本体が一致しません。');
+        await inspectPortableHeic(bytes, raster, display, this.limits, this.decode);
+      } else await this.inspectImage(bytes, ref);
+      return this.execute(request, { image: bytes });
     }
     return this.execute(request, { model: await this.inspectModel(record, bytes) });
   }
   /** One import-planning lifetime only. Persisted-body and recovery checks stay fresh. */
-  async withImportedGsInspection<T>(action: (inspect: (request: ContentRequest, file: Blob) => Promise<unknown>) => Promise<T>): Promise<T> {
+  async withImportedGsInspection<T>(action: (inspect: (request: ContentRequest, file: Blob, displayFile?: Blob) => Promise<unknown>) => Promise<T>): Promise<T> {
     const models = new Map<Blob, Map<string, Promise<ValidatedModel>>>(), policy = this.policy;
     let active = true;
     const assertActive = () => { if (!active) fileError('モデルの検証処理は終了しています。'); };
-    const inspect = async (input: ContentRequest, file: Blob) => {
+    const inspect = async (input: ContentRequest, file: Blob, displayFile?: Blob) => {
       assertActive();
       const request = cloneCanonicalValue(input, validationMetadataLimits) as unknown as ContentRequest;
       const record = validationGsEquivalenceSource(request) ?? (request.records.length === 1 ? request.records[0] : undefined);
       if (!record || record.contentKind !== 'gaussianSplat') {
-        const result = await this.inspectReceived(request, file); assertActive(); return result;
+        const result = await this.inspectReceived(request, file, displayFile); assertActive(); return result;
       }
       if (!(file instanceof Blob)) return fileError('受信する本体を確認できません。');
       const check = new ProjectRecordFields(); check.blob(record.blob!, []);
@@ -210,14 +229,36 @@ export class ValidationContent implements MetadataMediaPort {
     const prepared = this.preparedImages.get(record.id as string);
     if (prepared) {
       if (!same(record, prepared.record)) return fileError('追加するメディアの情報が一致しません。');
-      await this.store.put(new Blob([prepared.bytes.slice().buffer]).stream(), prepared.ref.mediaType, prepared.ref);
+      for (const body of prepared.blobs) await this.store.put(new Blob([body.bytes.slice().buffer]).stream(), body.ref.mediaType, body.ref);
     }
     // Existing catalog choices are already saved; new selections stage exact owned bytes.
     const result = await this.verifier(true).verify({ token, fact: 'media', records: [record], context: {} }) as { outcome: string };
     if (result.outcome !== 'verified') return fileError('追加するメディアの保存を確認できません。');
   }
-  async verify(blobs: readonly JsonObject[]): Promise<void> {
+  async verify(blobs: readonly JsonObject[], mediaRecords: readonly JsonObject[] = []): Promise<void> {
+    const requested = new Set(blobs.map(canonical)), byRef = new Map<string, JsonObject[]>(), seen = new Set<string>(), legacyRefs = new Set<string>();
+    let work = 0;
+    for (const record of mediaRecords) {
+      if (++work > validationMetadataLimits.maxWork) return fileError('メディアの検証が上限を超えています。');
+      const key = canonical(record); if (seen.has(key)) continue; seen.add(key);
+      // Legacy context never grants portable authority: keep its ref-only native
+      // validation, including when a pair shares the same raw body.
+      if (record.portableDisplay === undefined) {
+        if (record.blob && requested.has(canonical(record.blob))) legacyRefs.add(canonical(record.blob));
+        continue;
+      }
+      const check = new ProjectRecordFields(); checkProjectRecord(check, 'mediaResourcesById', record);
+      if (check.unknown || await immutableDigest('media-resource', record) !== record.payloadDigest) return fileError('メディアの原本と表示用画像の情報を確認できません。');
+      const refs = recordBlobRefs(record).filter(ref => requested.has(canonical(ref))); if (!refs.length) continue;
+      for (const ref of refs) { const k = canonical(ref), records = byRef.get(k) ?? []; records.push(record); byRef.set(k, records); }
+    }
+    const verified = new Set<string>();
     for (const blob of blobs) {
+      const records = byRef.get(canonical(blob));
+      if (records?.length) {
+        for (const record of records) { const key = canonical(record); if (!verified.has(key)) { await this.image(record); verified.add(key); } }
+        if (!legacyRefs.has(canonical(blob))) continue;
+      }
       const file=await this.store.open(blob);
       if(blob.mediaType===pointSourceMediaType&&file.blob){
         const snapshot=await file.blob(),prefix=new Uint8Array(await snapshot.slice(0,65536).arrayBuffer());
@@ -257,6 +298,8 @@ export class ValidationContent implements MetadataMediaPort {
     if (request.fact === 'media') {
       this.imageDeclaration(record); if (!prepared?.image) await this.image(record, readOnly);
       facts = { mediaKind: record.mediaKind!, mediaType: this.imageDeclaration(record).mediaType! };
+      const display = portableDisplay(record);
+      if (display) facts = { ...facts, portableDisplay: { sourceCheck: 'structure', displayCheck: 'decoded', width: display.width, height: display.height } };
     } else if (request.fact === 'representation' || request.fact === 'family-envelope' || request.fact === 'family-contribution') {
       await this.modelDeclaration(record); // Prepared decoding never bypasses declared profile/role/transform checks.
       const decoded = prepared?.model ?? await this.modelContent(record, readOnly);

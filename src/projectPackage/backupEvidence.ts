@@ -1,3 +1,4 @@
+import { capabilityUnion, type ReaderCapabilities } from '../projectMetadata/requiredCapabilities';
 import * as A from '@automerge/automerge/slim';
 import { canonical } from '../domain/projectGraphSupport';
 import { ProjectRecordFields } from '../domain/projectRecordFields';
@@ -77,16 +78,20 @@ export async function inspectBackupOriginals(source: ProjectMetadataSource, tabl
     byHash.set(e.reference.sha256, e.bytes);
   }
   let work = 0, nodes = 0, operations = 0, dependencies = declared + source.heads.length, baseControlBytes = 0;
-  let includesDeclaredEditorNames = false;
+  let includesDeclaredEditorNames = false; let requiredCapabilities: ReaderCapabilities = [];
+  const mediaRecords = new Map<string, JsonObject>();
   const controlHashes = new Set<string>(), semantic = new Map<string, StoredBlobRef>();
   const charge = (n: number) => { work += n; if (work > L.inspectionWork) fail('backup-inspection-budget'); };
   const inspect = async (s: ProjectMetadataSource) => {
-    includesDeclaredEditorNames ||= s.includesDeclaredEditorNames;
+    includesDeclaredEditorNames ||= s.includesDeclaredEditorNames; requiredCapabilities = capabilityUnion(requiredCapabilities, s.requiredCapabilities);
     for (const bytes of s.originalChanges()) {
       const change = A.decodeChange(bytes); operations += change.ops.length; dependencies += change.deps.length;
       if (operations > 100_000 || dependencies > L.dependencyReferences) fail('backup-source-budget');
     }
     const inspection = await s.inspectOriginal({ maxNodes: L.inspectionNodes - nodes, maxWork: L.inspectionWork - work }); checkAbort(signal);
+    for (const scalar of inspection.scalars) if (scalar.path.length === 2 && scalar.path[0] === 'mediaResourcesById' && scalar.value.kind === 'value') {
+      const record = scalar.value.value as JsonObject; mediaRecords.set(canonical(record), record);
+    }
     nodes += inspection.nodesUsed;
     const counts = summarizeFullHistory(inspection), closure = planWorkspaceClosure(inspection.candidates);
     if (counts.hasOpaque) fail('opaque-inventory-required');
@@ -113,5 +118,5 @@ export async function inspectBackupOriginals(source: ProjectMetadataSource, tabl
     fieldClasses: current.counts.fieldClasses, blobEntryCount: entries.length, blobBytes: entries.reduce((n, e) => n + e.byteLength, 0) });
   checkAbort(signal);
   return Object.freeze({ table, inventory, baseEvidence: expected, baseControlBytes, blobs: Object.freeze(entries),
-    bodyRefs: Object.freeze([...semantic.values()]), summary, includesDeclaredEditorNames });
+    bodyRefs: Object.freeze([...semantic.values()]), summary, includesDeclaredEditorNames, requiredCapabilities, mediaRecords: Object.freeze([...mediaRecords.values()]) });
 }

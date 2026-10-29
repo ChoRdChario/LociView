@@ -1,5 +1,6 @@
 import type { JsonObject, JsonValue } from '../domain/values';
 import { object } from '../domain/projectGraphSupport';
+import { recordBlobRefs } from '../domain/portableMedia';
 import { inspectProjectCandidates } from '../domain/projectCandidates';
 import type { ProjectMetadataSource } from './source';
 import { fail, type MetadataLimits } from './format';
@@ -62,8 +63,8 @@ export async function reactivatedCaptionMedia(base: ProjectMetadataSource, next:
     if (wasLive) continue;
     const mediaId = exact(current, ['captionAttachmentsById', id, 'mediaResourceId'], 'resolved');
     if (typeof mediaId !== 'string') continue;
-    const record = object(exact(current, ['mediaResourcesById', mediaId], 'immutable')), ref = object(record.blob);
-    refs.set(json(ref), ref);
+    const record = object(exact(current, ['mediaResourcesById', mediaId], 'immutable'));
+    for (const ref of recordBlobRefs(record)) refs.set(json(ref), ref);
   }
   return [...refs].sort(([a], [b]) => a.localeCompare(b)).map(([, ref]) => ref);
 }

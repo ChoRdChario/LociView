@@ -1,3 +1,4 @@
+import { displayBlobRef } from '../domain/portableMedia';
 import { createGsProxyWorkflow } from './gsProxyWorkflow';
 import { captureEditor } from '../projectMetadata/editorAttribution';
 import { assertValidationBodyAllocation } from '../projectFiles/bodyBudget';
@@ -208,7 +209,7 @@ async function validationProjectFrom(read: MetadataSessionRead, sourceContent: R
     if (unavailable.has(id)) continue;
     if (field.kind !== 'value') throw Error('保存したメディアの情報を確認できません。');
     if (lazyImages) continue;
-    if (!cache[id]) cache[id] = { record: field.value as unknown as MediaImage['record'], base64: base64(await sourceContent.image(field.value)) };
+    if (!cache[id]) cache[id] = { record: field.value as unknown as MediaImage['record'], base64: base64(await sourceContent.displayImage(field.value)), displayMediaType: displayBlobRef(field.value).mediaType as MediaImage['record']['blob']['mediaType'] };
     available[id] = cache[id]!;
   }
   return { ...metadataProjectView(read.provider, available, versions), mediaChoices: lazyImages ? Object.entries(read.provider.details.immutable.mediaResourcesById)

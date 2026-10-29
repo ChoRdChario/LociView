@@ -1,6 +1,6 @@
 import { ZipWriter, Uint8ArrayReader, type ReadableReader } from '@zip.js/zip.js';
 import { canonical } from '../domain/projectGraphSupport';
-import { editorCapabilities, checkEditorCapability } from '../projectMetadata/editorAttribution';
+import { capabilityFields, checkRequiredCapabilities } from '../projectMetadata/requiredCapabilities';
 import type { JsonValue } from '../domain/values';
 import type { OriginBlobStore } from '../projectMetadata/blobStore';
 import { checkedBlobStream } from '../projectMetadata/blobStream';
@@ -24,7 +24,7 @@ export function prepareWorkspaceManifest(capture: WorkspaceSourceCapture, option
   const manifest = encode({ format: PACKAGE_FORMAT, wireVersion: PACKAGE_WIRE_VERSION, purpose: 'teamWorkspace',
     packageId: options.packageId, createdByVersion: options.createdByVersion, ...(options.memo !== undefined ? { memo: options.memo } : {}),
     identity: capture.proof.identity, metadataEnvelope: capture.proof.envelope, targetHeads: capture.targetHeads,
-    metadata: capture.metadata, blobs: capture.blobs, summary: capture.summary, ...editorCapabilities(capture.includesDeclaredEditorNames),
+    metadata: capture.metadata, blobs: capture.blobs, summary: capture.summary, ...capabilityFields(capture.requiredCapabilities),
     payloadTotals: { entryCount: payloads.length, uncompressedBytes: payloads.reduce((n, e) => n + e.byteLength, 0),
       largestEntryBytes: Math.max(...payloads.map(e => e.byteLength)) } } as unknown as JsonValue);
   const checksum = new TextEncoder().encode(packageByteHash(manifest)), control = readManifestControl(manifest, checksum);
@@ -184,7 +184,7 @@ export class WorkspaceArchive {
     if (manifest.purpose !== 'teamWorkspace') return fail('workspace-purpose');
     const bytes = await archive.entryBytes('metadata.am', L.sourceBytes, signal);
     const source = ProjectMetadataSource.fromFullSource(bytes, { identity: manifest.identity, envelope: manifest.metadataEnvelope }, packageSourceLimits(limits));
-    checkEditorCapability(manifest.requiredCapabilities, source.includesDeclaredEditorNames);
+    checkRequiredCapabilities(manifest.requiredCapabilities, source.requiredCapabilities);
     if (!same(source.heads, manifest.targetHeads)) return fail('workspace-heads');
     const inspection = await source.inspectOriginal({ maxNodes: L.inspectionNodes, maxWork: L.inspectionWork }); checkAbort(signal);
     const counts = summarizeFullHistory(inspection); if (counts.hasOpaque) return fail('opaque-inventory-required');

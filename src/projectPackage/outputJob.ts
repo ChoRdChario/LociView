@@ -1,5 +1,5 @@
 import type { ProjectWorkspaceFS } from '../platform/fs';
-import { checkEditorCapability } from '../projectMetadata/editorAttribution';
+import { checkRequiredCapabilities } from '../projectMetadata/requiredCapabilities';
 import type { OriginBlobStore } from '../projectMetadata/blobStore';
 import { fail, type MetadataLimits } from '../projectMetadata/format';
 import { json, newId, readReceipt, technicalId, writeReceipt } from '../projectMetadata/persistence';
@@ -36,7 +36,7 @@ export class WorkspaceOutputJob {
     technicalId(id);
     const m = this.manifest();
     this.source = ProjectMetadataSource.fromFullSource(inputs.metadata, { identity: m.identity, envelope: m.metadataEnvelope }, limits);
-    checkEditorCapability(m.requiredCapabilities, this.source.includesDeclaredEditorNames);
+    checkRequiredCapabilities(m.requiredCapabilities, this.source.requiredCapabilities);
     if (json(this.source.heads) !== json(m.targetHeads) || json(ref(inputs.metadata)) !== json({ sha256: m.metadata.sha256, byteLength: m.metadata.byteLength })) fail('output-source');
   }
   assertOwner(fs: ProjectWorkspaceFS) { if (fs !== this.fs) fail('output-owner'); }

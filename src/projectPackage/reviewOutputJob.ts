@@ -1,3 +1,5 @@
+import { checkRequiredCapabilities } from '../projectMetadata/requiredCapabilities';
+import { reviewCapabilities } from './reviewSnapshot';
 import type { ProjectWorkspaceFS } from '../platform/fs';
 import type { OriginBlobStore } from '../projectMetadata/blobStore';
 import type { ProjectContentVerifier } from '../domain/projectContentChecks';
@@ -39,6 +41,7 @@ export class ReviewOutputJob {
   private constructor(private readonly fs: ProjectWorkspaceFS, readonly id: string, private readonly limits: MetadataLimits, private readonly inputs: Inputs,
     readonly review: ReviewSnapshot) {
     technicalId(id); const m = this.manifest();
+    checkRequiredCapabilities(m.requiredCapabilities, reviewCapabilities(review));
     this.source = ProjectMetadataSource.fromFullSource(inputs.original, inputs.sourceProof, packageSourceLimits(limits));
     if (review.token !== m.snapshot.sha256 || inputs.snapshot.length !== m.snapshot.byteLength ||
       packageByteHash(inputs.snapshot) !== review.token || review.snapshot.snapshotId !== m.snapshotId ||

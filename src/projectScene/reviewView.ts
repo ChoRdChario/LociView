@@ -3,6 +3,8 @@ import { isPointModel, isGsModel, type ValidatedModel } from '../projectFiles/po
 import { nativeSpatialModelBounds } from '../projectFiles/nativeSpatial';
 import type { PhotoDecoder } from '../projectFiles/photo';
 import { inspectProjectMedia, projectMediaKind, type MediaDecoders } from '../projectFiles/media';
+import { inspectPortableHeic } from '../projectFiles/portableHeic';
+import { portableDisplay, displayBlobRef } from '../domain/portableMedia';
 import * as THREE from 'three';
 import { canonical, list, object, same, string } from '../domain/projectGraphSupport';
 import type { JsonObject } from '../domain/values';
@@ -51,8 +53,12 @@ export async function prepareReviewView(file: Blob, budget: ProjectFilePolicyInp
   for (const record of Object.values(table(snapshot, 'mediaResourcesById'))) {
     const blob = object(record.blob); if (!projectMediaKind(blob.mediaType)||record.mediaKind!==projectMediaKind(blob.mediaType)) throw Error('このメディアの表示形式は未対応です。');
     const bytes = await readValidationBody(inspection.archive.entryBlob(`blobs/sha256/${string(blob.digest)}`), limits.maxFileBytes);
-    if ((await inspectProjectMedia(bytes, limits, decode, jpeg, photo,mediaDecoders)).mediaType !== blob.mediaType) throw Error('メディアの本体形式が一致しません。');
-    images.set(string(record.id), new Blob([bytes.slice().buffer], { type: blob.mediaType }));
+    const display = portableDisplay(record); let shown = bytes;
+    if (display) {
+      shown = await readValidationBody(inspection.archive.entryBlob(`blobs/sha256/${string(display.blob.digest)}`), limits.maxFileBytes);
+      await inspectPortableHeic(bytes, shown, display, limits, decode);
+    } else if ((await inspectProjectMedia(bytes, limits, decode, jpeg, photo,mediaDecoders)).mediaType !== blob.mediaType) throw Error('メディアの本体形式が一致しません。');
+    images.set(string(record.id), new Blob([shown.slice().buffer], { type: string(displayBlobRef(record).mediaType) }));
   }
   const savedMaterials: Record<string, ValidationMaterialEffects> = {};
   for (const model of models) {

@@ -1,5 +1,5 @@
 import type { ProjectWorkspaceFS } from '../platform/fs';
-import { hasEditorCapability } from '../projectMetadata/editorAttribution';
+import { hasEditorCapability, hasPortableMediaCapability } from '../projectMetadata/requiredCapabilities';
 import type { MetadataProjectSession, MetadataSessionRead } from '../projectMetadata/session';
 import type { OriginBlobStore } from '../projectMetadata/blobStore';
 import type { MetadataLimits, MetadataProof } from '../projectMetadata/format';
@@ -18,7 +18,7 @@ import { WorkspaceBaseStore } from '../projectPackage/workspaceBases';
 import { workspaceFileOperation } from './receiveWorkspace';
 import { fileError } from './validation';
 
-export interface WorkspaceOutputState { id: string; purpose: 'teamWorkspace' | 'contribution' | 'backup' | 'clean' | 'review'; includesDeclaredEditorNames?: boolean; requiresEditorAttributionReader?: boolean; label?: string; stale?: boolean; token?: string; cancellable?: boolean; state: 'unstarted' | 'incomplete' | 'generated' | 'file-verified' | 'abandoned' | 'cancelled' | 'repair-required' }
+export interface WorkspaceOutputState { id: string; purpose: 'teamWorkspace' | 'contribution' | 'backup' | 'clean' | 'review'; includesDeclaredEditorNames?: boolean; requiresEditorAttributionReader?: boolean; requiresPortableMediaReader?: boolean; label?: string; stale?: boolean; token?: string; cancellable?: boolean; state: 'unstarted' | 'incomplete' | 'generated' | 'file-verified' | 'abandoned' | 'cancelled' | 'repair-required' }
 export interface ContributionBaseChoice { selection: ContributionBaseSelection; label: string; includesDeclaredEditorNames?: boolean; deltaIncludesDeclaredEditorNames?: boolean }
 const settledOutputDisplay = (rows: readonly WorkspaceOutputState[]) =>
   rows.every(row => ['generated', 'file-verified', 'abandoned', 'cancelled'].includes(row.state));
@@ -149,6 +149,7 @@ export class WorkspaceSender {
         const includesNames = requiresEditor && (manifest.purpose !== 'contribution' ||
           job.source.editorDeclarations().some(d => manifest.changes.some(c => c.expectedChangeHash === d.changeId)));
         result.push({ id, purpose, ...extra, ...(requiresEditor ? { requiresEditorAttributionReader: true } : {}),
+          ...(hasPortableMediaCapability(manifest.requiredCapabilities) ? { requiresPortableMediaReader: true } : {}),
           ...(includesNames ? { includesDeclaredEditorNames: true } : {}), token: job.source.token, cancellable: kinds.length === 0, state: kinds.includes('cancelled') ? 'cancelled' : kinds.includes('externalFileVerified') ? 'file-verified' :
           kinds.includes(key.kind === 'workspace' ? 'baseRecorded' : 'artifactVerified') ? 'generated' : 'incomplete' });
       } catch { result.push({ id, purpose, state: 'repair-required' }); }

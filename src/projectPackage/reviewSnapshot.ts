@@ -4,10 +4,12 @@ import { canonical, immutableDigest, immutableKinds, list, object, same, string 
 import { checkMutableField, mutableFieldsFor, type MutableRecordMap } from '../domain/projectMutableFields';
 import type { ProjectSemanticProfile } from '../domain/projectProfile';
 import { ProjectRecordFields } from '../domain/projectRecordFields';
+import { recordBlobRefs } from '../domain/portableMedia';
 import { checkProjectHeader, checkProjectRecord, projectRecordMaps } from '../domain/projectRecords';
 import { cloneCanonicalValue, type JsonObject, type JsonValue } from '../domain/values';
 import type { StoredBlobRef } from '../projectMetadata/blobStore';
 import type { MetadataLimits } from '../projectMetadata/source';
+import { PORTABLE_MEDIA_CAPABILITY, type ReaderCapabilities } from '../projectMetadata/requiredCapabilities';
 import { prepareCleanRecords, type CleanReconstruction } from './cleanRecords';
 import { PACKAGE_LIMITS as L, summaryAlgorithm, type AutomaticSummary, type Entry } from './contract';
 import { packageByteHash, PackageControlError } from './manifest';
@@ -23,6 +25,9 @@ export function reviewSemanticProfile(schema: JsonValue | undefined): ProjectSem
 export const reviewMaps = ['assetsById', 'representationsById', 'captionsById', 'mediaResourcesById', 'captionAttachmentsById',
   'captionTagsById', 'captionTagMembershipsById', 'sceneAssetMembershipsById', 'sceneCaptionMembershipsById', 'viewsById', 'materialOverridesById'] as const;
 export type ReviewMap = typeof reviewMaps[number];
+export function reviewCapabilities(review: ReviewSnapshot): ReaderCapabilities {
+  return Object.values(table(review.snapshot, 'mediaResourcesById')).some(r => r.portableDisplay !== undefined) ? [PORTABLE_MEDIA_CAPABILITY] : [];
+}
 const fail = (code: string): never => { throw new PackageControlError(`review-${code}`); };
 const table = (r: JsonObject, map: string) => object(r[map]) as Record<string, JsonObject>;
 const encode = (r: JsonObject) => new TextEncoder().encode(canonical(r));
@@ -186,11 +191,13 @@ export async function inspectReviewSnapshot(input: unknown, limits: MetadataLimi
     !setsEqual(Object.keys(table(root, 'captionTagsById')), Object.values(table(root, 'captionTagMembershipsById')).map(r => string(r.tagId)))) fail('extra-closure');
   const physical = new Map<string, Entry>(), semantic = new Map<string, StoredBlobRef>(); let total = 0;
   for (const map of ['representationsById', 'mediaResourcesById']) for (const r of Object.values(table(root, map))) {
-    const ref = r.blob as unknown as StoredBlobRef, existing = physical.get(ref.digest);
-    if (existing && existing.byteLength !== ref.byteLength) fail('blob-length');
-    semantic.set(canonical(r.blob!), ref);
-    if (!existing) { total += ref.byteLength; if (total > L.blobBytes || physical.size >= L.blobCount) fail('blob-budget');
-      physical.set(ref.digest, { path: `blobs/sha256/${ref.digest}`, sha256: ref.digest, byteLength: ref.byteLength }); }
+    for (const blob of recordBlobRefs(r)) {
+      const ref = blob as unknown as StoredBlobRef, existing = physical.get(ref.digest);
+      if (existing && existing.byteLength !== ref.byteLength) fail('blob-length');
+      semantic.set(canonical(blob), ref);
+      if (!existing) { total += ref.byteLength; if (total > L.blobBytes || physical.size >= L.blobCount) fail('blob-budget');
+        physical.set(ref.digest, { path: `blobs/sha256/${ref.digest}`, sha256: ref.digest, byteLength: ref.byteLength }); }
+    }
   }
   const entries = [...physical.values()].sort((a, b) => a.sha256 < b.sha256 ? -1 : 1), bytes = encode(root);
   if (bytes.length > L.snapshotBytes) fail('bytes');

@@ -1,3 +1,4 @@
+import { displayBlobRef } from '../domain/portableMedia';
 import { createProjectWorkspace } from '../ui/projectScene/projectWorkspace';
 import type { WorkspaceSurface, WorkspaceViewport, WorkspaceViewportState } from '../ui/projectScene/projectWorkspacePorts';
 import { projectDisplay, pointInProject, type EditableDisplay } from './viewportModel';
@@ -75,7 +76,7 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
     modelSelectionNotice: file=>host.content.modelSelectionNotice(file),
     replaceModel: async (token, input) => host.authority.replaceModelFile!(token, input),
     transformModel: async (token, input) => host.authority.transformModel!(token, input),
-    image: async record => new Blob([(await host.content.image(record, true)).slice().buffer], { type: (record.blob as { mediaType: string }).mediaType }),
+    image: async record => new Blob([(await host.content.displayImage(record, true)).slice().buffer], { type: displayBlobRef(record).mediaType as string }),
     imageScope: () => host.imageScope(),
     changed, otherPending: () => external() || !!startup?.hasChanges(),
     createViewport(canvas, update, propose, proposeModel): WorkspaceViewport {

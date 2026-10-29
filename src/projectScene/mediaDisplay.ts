@@ -2,7 +2,7 @@ import { scalarLength, singleLineControls } from '../domain/values';
 import { value, type Field,type Lifecycle } from '../scene/types';
 import type { HistoryCell,HistoryChange } from './displayCells';
 export interface MediaImage {readonly record:{readonly id:string;readonly payloadDigest:string;readonly mediaKind:'image'|'video'|'audio';readonly label:string;
-  readonly blob:{readonly algorithm:'sha256';readonly digest:string;readonly byteLength:number;readonly mediaType:'image/png'|'image/jpeg'|'image/webp'|'image/gif'|'image/heic'|'video/mp4'|'audio/mp4'|'audio/mpeg'}};readonly base64:string}
+  readonly blob:{readonly algorithm:'sha256';readonly digest:string;readonly byteLength:number;readonly mediaType:'image/png'|'image/jpeg'|'image/webp'|'image/gif'|'image/heic'|'video/mp4'|'audio/mp4'|'audio/mpeg'}};readonly base64:string;readonly displayMediaType?:MediaImage['record']['blob']['mediaType']}
 export interface MediaFileSelection { readonly name: string; readonly size: number; readonly blob?: Blob; arrayBuffer(): Promise<ArrayBuffer> }
 export interface MediaFileAddition { readonly sceneId: string; readonly captionId: string; readonly attachmentId: string;
   readonly orderKey: string; readonly eventId: string; readonly file: MediaFileSelection }
