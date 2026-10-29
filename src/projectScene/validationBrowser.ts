@@ -1,4 +1,5 @@
 import {workspaceFileOperation} from '../projectFiles/receiveWorkspace';
+import type {DesktopOfflinePort} from '../platform/desktopOfflinePorts';
 import type { GsResidency } from '../viewer/gsDecodeQueue';
 import type {SmoothPresentation} from '../viewer/smoothComposite';
 import { createReviewEditScratch } from '../projectPackage/reviewEdit';
@@ -21,10 +22,10 @@ import { createValidationUiState } from './browserUiState';
 // Conservative execution budgets for this development lane, not measured product capacity.
 export const validationBrowserLimits: FileValidationLimits = { maxFileBytes: 64 * 1024 * 1024,
   maxJsonBytes: 4 * 1024 * 1024, maxItems: 100_000, maxValues: 8_000_000, maxPixels: 16_777_216 };
-export interface BrowserWorkspaceComposition { readonly mountEditor:MountedEditorFactory;readonly smoothDisplay?:SmoothPresentation;readonly progressivePresentation?:boolean;readonly filePolicy?:ProjectFilePolicy;readonly residency?:GsResidency;readonly introduction?:string;readonly initialFiles?:readonly File[];openLegacy?(file?:File):Promise<void> }
+export interface BrowserWorkspaceComposition { readonly offline?:DesktopOfflinePort;readonly mountEditor:MountedEditorFactory;readonly smoothDisplay?:SmoothPresentation;readonly progressivePresentation?:boolean;readonly filePolicy?:ProjectFilePolicy;readonly residency?:GsResidency;readonly introduction?:string;readonly initialFiles?:readonly File[];openLegacy?(file?:File):Promise<void> }
 export async function createValidationBrowserWorkspace(document: Document, composition:BrowserWorkspaceComposition, run?: string) {
-  if(composition.smoothDisplay&&import.meta.env.MODE!=='project-scene-desktop')throw Error('専用のPC候補ビルドで開いてください。');
-  if (!import.meta.env.DEV && import.meta.env.MODE !== 'project-scene-validation' && import.meta.env.MODE !== 'project-scene-desktop')
+  if(composition.smoothDisplay&&import.meta.env.MODE!=='project-scene-desktop'&&import.meta.env.MODE!=='project-scene-offline')throw Error('専用のPC候補ビルドで開いてください。');
+  if (!import.meta.env.DEV && import.meta.env.MODE !== 'project-scene-validation' && import.meta.env.MODE !== 'project-scene-desktop' && import.meta.env.MODE !== 'project-scene-offline')
     throw Error('開発サーバーまたは専用の検証ビルドで開いてください。');
   const policy=projectFilePolicy(composition.filePolicy ?? validationBrowserLimits);
   await initializeBrowserMetadata();
@@ -67,7 +68,7 @@ export async function createValidationBrowserWorkspace(document: Document, compo
       maxChunkBytes: 16 * 1024 * 1024, maxChunks: 100_000, metadata: validationMetadataLimits }, locks) };
   const storage = (id: string, create: boolean) => openStorage(`${validationArea}-${id}`, create);
   const scratch=createReviewEditScratch(base);
-  const workspace = createValidationWorkspace(document, { ...options,smoothDisplay:!!composition.smoothDisplay,progressivePresentation:composition.progressivePresentation,reviewEditArchive:{write:produce=>workspaceFileOperation(locks,()=>scratch.write(produce))},initialFiles:composition.initialFiles,openLegacy:composition.openLegacy,mountEditor:composition.mountEditor,introduction:composition.introduction,lastProject: uiState.lastProject,
+  const workspace = createValidationWorkspace(document, { ...options,offline:composition.offline,smoothDisplay:!!composition.smoothDisplay,progressivePresentation:composition.progressivePresentation,reviewEditArchive:{write:produce=>workspaceFileOperation(locks,()=>scratch.write(produce))},initialFiles:composition.initialFiles,openLegacy:composition.openLegacy,mountEditor:composition.mountEditor,introduction:composition.introduction,lastProject: uiState.lastProject,
     storageEstimate: typeof navigator.storage?.estimate === 'function' ? () => navigator.storage.estimate() : undefined, localSettings: uiState.localSettings,
     list: () => listValidationProjects(options, storage),
     open: (id, initial, mode, workspaceFile, reviewEdit, firstBackup) => openValidationEntry({ ...options, run: id, initial, mode, workspaceFile, reviewEdit, firstBackup, openStorage: create => storage(id, create) }),

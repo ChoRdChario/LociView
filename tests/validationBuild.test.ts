@@ -38,6 +38,23 @@ describe('approved static validation build', () => {
     const harness = readFileSync('src/harness/projectScene/validationBrowser.ts', 'utf8');
     expect(harness).toContain("from '../../projectScene/validationBrowser'");
     const browser = readFileSync('src/projectScene/validationBrowser.ts', 'utf8');
-    expect(browser).toContain("if (!import.meta.env.DEV && import.meta.env.MODE !== 'project-scene-validation' && import.meta.env.MODE !== 'project-scene-desktop')");
+    expect(browser).toContain("if (!import.meta.env.DEV && import.meta.env.MODE !== 'project-scene-validation' && import.meta.env.MODE !== 'project-scene-desktop' && import.meta.env.MODE !== 'project-scene-offline')");
+  });
+
+  it('keeps static Desktop free of PWA and isolates the explicitly approved offline artifact', () => {
+    const desktop=resolve('project-scene-desktop'),offline=resolve('project-scene-offline');
+    expect(desktop.build?.outDir).toBe('desktop-dist');expect(desktop.publicDir).toBe(false);
+    expect(desktop.plugins).toEqual([expect.objectContaining({name:'lociview-static-validation-shell'})]);
+    expect(offline.build?.outDir).toBe('offline-desktop-dist');expect(offline.publicDir).toBe(false);
+    expect(offline.build?.rollupOptions?.input).toEqual({main:'index.html'});
+    expect(offline.plugins).toEqual([
+      expect.objectContaining({name:'lociview-static-validation-shell'}),
+      expect.objectContaining({name:'lociview-offline-owned-icons-and-closure'}),
+      expect.objectContaining({name:'test-pwa',options:expect.objectContaining({strategies:'injectManifest',srcDir:'src/platform',filename:'desktop-offline-sw.ts',injectRegister:null,registerType:'prompt',manifestFilename:'desktop-offline.webmanifest',
+        injectManifest:expect.objectContaining({globPatterns:['**/*'],globIgnores:['**/*.map'],rollupFormat:'iife'})})}),
+    ]);
+    const pwa=(offline.plugins![2] as unknown as {options:{manifest:Record<string,unknown>}}).options;
+    expect(pwa.manifest).not.toHaveProperty('file_handlers');expect(pwa.manifest).not.toHaveProperty('share_target');
+    expect(offline.define?.__DESKTOP_OFFLINE_BUILD_ID__).not.toEqual(resolve('project-scene-offline').define?.__DESKTOP_OFFLINE_BUILD_ID__);
   });
 });

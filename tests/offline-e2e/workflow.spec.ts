@@ -1,0 +1,123 @@
+import {test,expect,chromium,type BrowserContext,type Page,type TestInfo} from '@playwright/test';
+import {mkdir,mkdtemp,readFile,writeFile} from 'node:fs/promises';
+import {resolve} from 'node:path';
+import * as A from '@automerge/automerge';
+import {ownedServer} from './server';
+import {triangleGlb,smallPng,nativeConversionBackup} from '../e2e/fixtures';
+import {largeGsFixture} from '../helpers/largeGsFixture';
+import {WorkspaceArchive} from '../../src/projectPackage/workspaceArchive';
+import {validationMetadataLimits as limits} from '../../src/projectFiles/validation';
+
+const builds=()=>process.env.LOCIVIEW_OFFLINE_BUILDS!;
+const offline=(p:Page)=>p.getByRole('region',{name:'オフライン利用',exact:true});
+const detail=(p:Page)=>p.getByRole('region',{name:'キャプションの詳細',exact:true});
+async function selected(p:Page,title:string){await expect(p.getByRole('heading',{name:'プロジェクト名',exact:true})).toHaveText(title,{timeout:180_000});await expect(p.getByLabel('3Dモデルの表示',{exact:true})).toHaveAttribute('aria-busy','false',{timeout:180_000});await expect(p.locator('.lv-project-viewport-status')).toBeEmpty({timeout:180_000});}
+async function ready(p:Page,text:string){await expect(p.getByText(text,{exact:true})).toBeVisible({timeout:180_000});await expect(p.locator('main.lv-project-workspace > header > p.lv-operation-status')).toHaveAttribute('data-busy','false');}
+async function file(p:Page,path:string){await expect(p.getByLabel('ファイルを選択',{exact:true})).toBeEnabled();await p.getByLabel('ファイルを選択',{exact:true}).setInputFiles(path);await p.getByRole('button',{name:'ファイルを開く',exact:true}).click();}
+async function home(p:Page){await p.getByRole('button',{name:'別のプロジェクトを開く',exact:true}).click();await expect(p.getByLabel('ファイルを選択',{exact:true})).toBeVisible();await expect(p.locator('.lv-validation-status')).toHaveAttribute('data-busy','false');}
+async function output(p:Page,info:TestInfo,name:string){
+  const menu=p.locator('details.lv-project-files');if(!await menu.evaluate(n=>(n as HTMLDetailsElement).open))await menu.locator(':scope > summary').click();
+  const area=p.getByRole('region',{name:'ファイル',exact:true});await area.getByRole('button',{name:'相手に渡す',exact:true}).click();await area.getByLabel('渡す内容',{exact:true}).selectOption('teamWorkspace');
+  const [download]=await Promise.all([p.waitForEvent('download',{timeout:180_000}),area.locator('button.lv-file-primary').click()]);const path=info.outputPath(name+'.zip');await download.saveAs(path);expect(await download.failure()).toBeNull();await expect(area.locator('.lv-operation-status')).toHaveAttribute('data-busy','false',{timeout:180_000});return path;
+}
+async function changes(path:string){return(await WorkspaceArchive.inspect(new Blob([Uint8Array.from(await readFile(path)).buffer]),limits)).source.originalChanges();}
+async function launch(profile:string,url:string,disconnected=false,errors:string[]=[]){
+  const context=await chromium.launchPersistentContext(profile,{channel:'chromium',headless:true,viewport:{width:1440,height:1000},serviceWorkers:'allow',acceptDownloads:true,offline:disconnected});context.setDefaultTimeout(20_000);
+  await context.route('**/*',route=>{const u=new URL(route.request().url());return u.origin===new URL(url).origin||['blob:','data:'].includes(u.protocol)?route.continue():route.abort('blockedbyclient');});
+  context.on('page',page=>page.on('pageerror',error=>errors.push(error.message)));for(const page of context.pages())page.on('pageerror',error=>errors.push(error.message));
+  const page=context.pages()[0]??await context.newPage();return{context,page};
+}
+async function profile(){await mkdir('.artifacts/e2e/profiles',{recursive:true});return await mkdtemp('.artifacts/e2e/profiles/of-');}
+async function prepare(p:Page){await offline(p).getByRole('button',{name:'オフラインで使う準備',exact:true}).click();await expect(offline(p).getByRole('status')).toContainText('アプリを保存しました。',{timeout:90_000});}
+async function recheck(p:Page){const settings=offline(p).locator('details');if(!await settings.evaluate(n=>(n as HTMLDetailsElement).open))await settings.locator(':scope > summary').click();await settings.getByRole('button',{name:'準備状態を確認',exact:true}).click();}
+async function cacheInventory(p:Page){return p.evaluate(async()=>{const result:Record<string,string[]>={};for(const name of await caches.keys())result[name]=(await(await caches.open(name)).keys()).map(r=>r.url).sort();return result;});}
+async function controllerBuild(p:Page){return p.evaluate(async()=>{const worker=navigator.serviceWorker.controller;if(!worker)return null;return await new Promise<string>(resolve=>{const c=new MessageChannel();c.port1.onmessage=e=>{c.port1.close();resolve(e.data.build);};worker.postMessage('lociview-desktop-offline-state-1',[c.port2]);});});}
+
+test('static data survives prepared cold offline Mesh/Point/500k SH4/Proxy/media work, initial conversion and same-address static return',async({},info)=>{
+  test.setTimeout(1_200_000);A.getHeads(A.init());const server=await ownedServer('desktop-dist'),owned=await profile(),errors:string[]=[],stages:string[]=[];let context:BrowserContext|undefined;
+  const open=async(disconnected=false)=>{const result=await launch(owned,server.url,disconnected,errors);context=result.context;const response=await result.page.goto(server.url);if(disconnected)expect(response?.fromServiceWorker()).toBe(true);return result.page;};
+  const close=async()=>{await context?.close();context=undefined;};
+  const mark=(text:string)=>{stages.push(text);console.log(text);};
+  try{
+    let p=await open();const mesh=info.outputPath('基準.glb'),point=info.outputPath('点群.ply'),photo=info.outputPath('現地.png');await writeFile(mesh,triangleGlb());await writeFile(photo,smallPng());
+    await writeFile(point,'ply\nformat ascii 1.0\nelement vertex 3\nproperty float x\nproperty float y\nproperty float z\nproperty uchar red\nproperty uchar green\nproperty uchar blue\nend_header\n0 0 0 255 0 0\n-1 0 0 0 255 0\n1 0 0 0 0 255\n');
+    const source=await largeGsFixture();await expect(p.getByLabel('ファイルを選択',{exact:true})).toBeEnabled();await p.getByLabel('ファイルを選択',{exact:true}).setInputFiles([mesh,point,source]);await p.getByRole('button',{name:'ファイルを開く',exact:true}).click();await p.getByLabel('プロジェクト名',{exact:true}).fill('オフライン現地作業');await p.getByRole('button',{name:'プロジェクトを作成',exact:true}).click();await selected(p,'オフライン現地作業');mark('static: mixed500k Project created');
+    await p.getByRole('tab',{name:'モデル',exact:true}).click();const models=p.getByRole('tabpanel',{name:'モデル',exact:true});await models.locator('.lv-model-select').filter({hasText:'500k'}).click();
+    const chooser=p.waitForEvent('filechooser');await models.getByRole('button',{name:'位置指定用の面を追加',exact:true}).click();await(await chooser).setFiles(mesh);await models.getByRole('button',{name:'このモデルに面を追加',exact:true}).click();await ready(p,'位置指定用の面を登録しました。');
+    await p.getByRole('tab',{name:'キャプション',exact:true}).click();await p.getByText('数値で配置',{exact:true}).click();await p.getByLabel('追加先モデル',{exact:true}).focus();await p.getByLabel('追加先モデル',{exact:true}).selectOption({label:'基準.glb'});await p.getByRole('button',{name:'このモデルに追加',exact:true}).click();for(const[axis,value]of [['X','0'],['Y','.5'],['Z','0']])await p.getByLabel(`位置 ${axis}`,{exact:true}).fill(value!);await p.getByRole('button',{name:'位置を確定',exact:true}).click();await ready(p,'ピンの位置を確定しました。');
+    await p.getByLabel('タイトル',{exact:true}).fill('現地の記録');await p.getByLabel('本文',{exact:true}).fill('通信前の本文');await p.getByRole('button',{name:'変更を適用',exact:true}).click();await ready(p,'変更を適用しました。');const media=p.waitForEvent('filechooser');await p.getByLabel('メディアを追加',{exact:true}).click();await(await media).setFiles(photo);await ready(p,'メディアを追加しました。');
+    const before=await changes(await output(p,info,'static-before'));await close();server.setRoot(resolve(builds(),'a'));p=await open();await selected(p,'オフライン現地作業');expect(await changes(await output(p,info,'offline-build-before'))).toEqual(before);await prepare(p);expect(await controllerBuild(p)).toBeNull();mark('prepared: same namespace/history; first page uncontrolled');
+    // Preserve unrelated cache/registration and an original-route local body as exact bytes.
+    await p.evaluate(async()=>{await(await caches.open('unrelated-retain')).put('/sentinel',new Response('untouched'));await navigator.serviceWorker.register('/foreign/worker.js',{scope:'/foreign/'});const base=await navigator.storage.getDirectory(),dir=await base.getDirectoryHandle('legacy-retain',{create:true}),handle=await dir.getFileHandle('original.zip',{create:true}),writer=await handle.createWritable();await writer.write('owned legacy source sentinel');await writer.close();});
+    const prepared=await cacheInventory(p);await close();await server.stop();p=await open(true);await selected(p,'オフライン現地作業');await expect(offline(p).getByRole('status')).toContainText('オフラインで起動できる');expect(await controllerBuild(p)).toMatch(/^offline-test-a-/);expect(await changes(await output(p,info,'cold-before'))).toEqual(before);mark('cold offline: server stopped; Mesh/Point/500k SH4/Proxy loaded');
+    await p.locator('.lv-caption-select').filter({hasText:'現地の記録'}).click();await detail(p).getByLabel('本文',{exact:true}).fill('通信なしで更新');await detail(p).getByRole('button',{name:'変更を適用',exact:true}).click();await ready(p,'変更を適用しました。');await expect(p.getByRole('region',{name:'添付メディア',exact:true}).locator('img')).toBeVisible();
+    const edited=await changes(await output(p,info,'cold-edited'));await p.screenshot({path:info.outputPath('cold-offline.png'),fullPage:true});await close();p=await open(true);await selected(p,'オフライン現地作業');expect(await changes(await output(p,info,'cold-reopened'))).toEqual(edited);mark('cold offline: edit/save/full-close reopen exact history');
+    await home(p);const native=info.outputPath('admitted-native.zip');await writeFile(native,await nativeConversionBackup(triangleGlb(),smallPng()));await file(p,native);await p.getByRole('button',{name:'新しいプロジェクトに変換',exact:true}).click();await selected(p,'Nativeから引き継ぐ記録');await p.locator('.lv-caption-select').filter({hasText:'既存のピン'}).click();await detail(p).getByLabel('本文',{exact:true}).fill('オフライン変換後');await detail(p).getByRole('button',{name:'変更を適用',exact:true}).click();await ready(p,'変更を適用しました。');const converted=await changes(await output(p,info,'converted-offline'));await close();p=await open(true);await selected(p,'Nativeから引き継ぐ記録');expect(await changes(await output(p,info,'converted-reopened'))).toEqual(converted);mark('cold offline: admitted initial conversion/edit/save/reopen');
+    await home(p);const count=await p.getByRole('button',{name:'編集で開く',exact:true}).count(),bad=info.outputPath('unsupported-native.zip');await writeFile(bad,await nativeConversionBackup(Buffer.from('invalid model'),smallPng()));await file(p,bad);await expect(p.locator('.lv-validation-status')).toHaveAttribute('data-busy','false');await expect(p.locator('.lv-validation-status')).not.toHaveText('');await expect(p.getByRole('button',{name:'新しいプロジェクトに変換',exact:true})).toBeHidden();expect(await p.getByRole('button',{name:'編集で開く',exact:true}).count()).toBe(count);mark('unsupported original: no partial Project');
+    await context!.setOffline(false);await server.start();await offline(p).getByText('オフラインの設定',{exact:true}).click();await offline(p).getByRole('button',{name:'オフライン準備を解除',exact:true}).click();await expect(offline(p).getByText(/解除すると、すべての画面/)).toBeVisible();await offline(p).getByRole('button',{name:'準備を解除',exact:true}).click();await expect(offline(p).getByRole('status')).toContainText('準備を解除しました。');
+    expect(await cacheInventory(p)).toEqual(prepared);expect(await p.evaluate(async()=>(await navigator.serviceWorker.getRegistrations()).map(r=>new URL(r.scope).pathname))).toEqual(['/foreign/']);
+    await close();server.setRoot('desktop-dist');p=await open();await expect(p.locator('.lv-validation-status')).toHaveAttribute('data-busy','false');if(await p.getByRole('heading',{name:'プロジェクト名',exact:true}).count())await home(p);
+    await expect(p.getByRole('button',{name:'以前のプロジェクトを開く',exact:true})).toBeVisible();await p.locator('.lv-validation-home p').filter({hasText:'オフライン現地作業 —'}).getByRole('button',{name:'編集で開く',exact:true}).click();await selected(p,'オフライン現地作業');expect(await changes(await output(p,info,'static-return'))).toEqual(edited);
+    await home(p);await p.locator('.lv-validation-home p').filter({hasText:'Nativeから引き継ぐ記録 —'}).getByRole('button',{name:'編集で開く',exact:true}).click();await selected(p,'Nativeから引き継ぐ記録');expect(await changes(await output(p,info,'static-native-return'))).toEqual(converted);
+    expect(await p.evaluate(async()=>{const dir=await(await navigator.storage.getDirectory()).getDirectoryHandle('legacy-retain');return(await(await dir.getFileHandle('original.zip')).getFile()).text();})).toBe('owned legacy source sentinel');mark('own unregister: all windows closed; reachable static same address; source/history/foreign cache retained');
+    await home(p);await p.getByRole('button',{name:'以前のプロジェクトを開く',exact:true}).click();await expect(p.getByRole('button',{name:'プロジェクトを選ぶ',exact:true})).toBeVisible();await expect.poll(()=>p.evaluate(()=>document.documentElement.classList.contains('lv-project-page'))).toBe(false);expect(errors).toEqual([]);
+  }finally{if(context)await context.pages()[0]?.screenshot({path:info.outputPath('last-state.png'),fullPage:true}).catch(()=>{});await close();await server.stop();await info.attach('stages',{body:JSON.stringify({owned,url:server.url,stages,errors}),contentType:'application/json'});}
+});
+
+test('two-window update preserves unapplied input, rejects wrong200/missing resources, retries, and waits for full close',async({},info)=>{
+  const server=await ownedServer(resolve(builds(),'a')),owned=await profile();let context:BrowserContext|undefined;const errors:string[]=[];
+  try{
+    let live=await launch(owned,server.url,false,errors);context=live.context;let p=live.page;await p.goto(server.url);await prepare(p);await context.close();context=undefined;
+    live=await launch(owned,server.url,false,errors);context=live.context;p=live.page;await p.goto(server.url);await expect(offline(p).getByRole('status')).toContainText('オフラインで起動できる');
+    // Explicit same-build repair: an unchanged script update alone cannot refill this entry.
+    const damaged=await p.evaluate(async()=>{const name=(await caches.keys()).find(n=>n.startsWith('lociview-desktop-offline-1:'))!,cache=await caches.open(name),key=(await cache.keys()).find(r=>r.url.includes('/assets/gsRender-'))!;await cache.put(key,new Response('wrong cached bytes'));return{name,url:key.url};});
+    await recheck(p);await expect(offline(p).getByRole('status')).toContainText('必要なアプリ資源を確認できません');
+    const worker=context.serviceWorkers().find(w=>w.url()===server.url+'desktop-offline-sw.js')!;
+    await worker.evaluate(()=>{const original=Cache.prototype.put;(self as any).__restoreOwnedPut=()=>{Cache.prototype.put=original;};Cache.prototype.put=function(){return Promise.reject(new DOMException('Owned E2E quota simulation','QuotaExceededError'));};});
+    await offline(p).getByRole('button',{name:'準備をやり直す',exact:true}).click();await expect(offline(p).getByRole('status')).toContainText('保存できませんでした');
+    expect(await p.evaluate(async target=>(await(await caches.open(target.name)).match(target.url))?.text(),damaged)).toBe('wrong cached bytes');
+    await worker.evaluate(()=>{(self as any).__restoreOwnedPut();});await offline(p).getByRole('button',{name:'準備をやり直す',exact:true}).click();await expect(offline(p).getByRole('status')).toContainText('オフラインで起動できる');
+    await p.evaluate(async target=>{await(await caches.open(target.name)).delete(target.url);},damaged);await recheck(p);await expect(offline(p).getByRole('status')).toContainText('必要なアプリ資源を確認できません');await offline(p).getByRole('button',{name:'準備をやり直す',exact:true}).click();await expect(offline(p).getByRole('status')).toContainText('オフラインで起動できる');
+    const model=info.outputPath('small.glb');await writeFile(model,triangleGlb());await file(p,model);await p.getByLabel('プロジェクト名',{exact:true}).fill('更新中の作業');await p.getByRole('button',{name:'プロジェクトを作成',exact:true}).click();await selected(p,'更新中の作業');
+    const other=await context.newPage();await other.goto(server.url);await expect(offline(other).getByRole('status')).toContainText('オフラインで起動できる');await p.bringToFront();
+    await p.setViewportSize({width:1280,height:800});await p.locator('details.lv-project-files > summary').click();await p.locator('details[aria-label="ヘルプ"] > summary').click();await p.getByText('設定',{exact:true}).click();if(!await offline(p).locator('details').evaluate(n=>(n as HTMLDetailsElement).open))await offline(p).getByText('オフラインの設定',{exact:true}).click();
+    await expect(offline(p).locator('details')).toHaveAttribute('open','');const stage=await p.locator('.lv-project-stage').boundingBox();expect(stage!.height).toBeGreaterThan(200);expect(stage!.y+stage!.height).toBeLessThanOrEqual(p.viewportSize()!.height+1);await p.screenshot({path:info.outputPath('combined-disclosures.png'),fullPage:true});
+    await offline(p).getByRole('button',{name:'オフライン準備を解除',exact:true}).focus();await p.keyboard.press('Tab');await expect(offline(p).locator('details')).not.toHaveAttribute('open');
+    const focused=await p.evaluate(()=>{const box=document.activeElement!.getBoundingClientRect();return{top:box.top,bottom:box.bottom};});expect(focused.top).toBeGreaterThanOrEqual(0);expect(focused.bottom).toBeLessThanOrEqual(p.viewportSize()!.height);
+    await p.locator('details.lv-project-files > summary').click();await p.locator('details[aria-label="ヘルプ"] > summary').click();await p.getByText('設定',{exact:true}).click();
+    await p.getByRole('tab',{name:'モデル',exact:true}).click();const models=p.getByRole('tabpanel',{name:'モデル',exact:true});await models.locator('.lv-model-select').first().click();await models.getByRole('button',{name:'配置を調整',exact:true}).click();await models.getByLabel('モデル位置 X',{exact:true}).fill('2.75');
+    const old=await cacheInventory(p);let faulted=false;server.setRoot(resolve(builds(),'b'));server.setFault(path=>path.includes('offlineEntry-')&&path.endsWith('.js')?(faulted=true,'wrong'):undefined);
+    await offline(p).getByRole('button',{name:'アプリの更新を確認',exact:true}).click();await expect(offline(p).getByRole('status')).toContainText('保存できませんでした',{timeout:90_000});expect(faulted).toBe(true);expect(await controllerBuild(p)).toMatch(/^offline-test-a-/);await expect(models.getByLabel('モデル位置 X',{exact:true})).toHaveValue('2.75');
+    let missing=false;server.setFault(path=>path.includes('offlineEntry-')&&path.endsWith('.js')?(missing=true,'missing'):undefined);await offline(p).getByRole('button',{name:'準備をやり直す',exact:true}).click();await expect(offline(p).getByRole('status')).toContainText('保存できませんでした',{timeout:90_000});expect(missing).toBe(true);
+    let interrupted=false;server.setFault(path=>path.includes('offlineEntry-')&&path.endsWith('.js')?(interrupted=true,'interrupted'):undefined);await offline(p).getByRole('button',{name:'準備をやり直す',exact:true}).click();await expect(offline(p).getByRole('status')).toContainText('保存できませんでした',{timeout:90_000});expect(interrupted).toBe(true);
+    for(const [name,urls]of Object.entries(old))expect((await cacheInventory(p))[name]).toEqual(urls);
+    server.setFault(undefined);await offline(p).getByRole('button',{name:'準備をやり直す',exact:true}).click();await expect(offline(p).getByRole('status')).toContainText('新しいアプリの準備ができました',{timeout:90_000});await expect(models.getByLabel('モデル位置 X',{exact:true})).toHaveValue('2.75');expect(await controllerBuild(p)).toMatch(/^offline-test-a-/);expect(await controllerBuild(other)).toMatch(/^offline-test-a-/);await p.screenshot({path:info.outputPath('waiting-update-draft.png'),fullPage:true});
+    await models.getByRole('button',{name:'配置を確定',exact:true}).click();await ready(p,'モデルの配置を確定しました。');const before=await changes(await output(p,info,'before-update'));await context.close();context=undefined;await server.stop();live=await launch(owned,server.url,true,errors);context=live.context;p=live.page;const response=await p.goto(server.url);expect(response?.fromServiceWorker()).toBe(true);await selected(p,'更新中の作業');expect(await controllerBuild(p)).toMatch(/^offline-test-b-/);expect(await changes(await output(p,info,'after-update'))).toEqual(before);expect(errors).toEqual([]);
+  }finally{if(context)await context.pages()[0]?.screenshot({path:info.outputPath('last-state.png'),fullPage:true}).catch(()=>{});await context?.close();await server.stop();}
+});
+
+test('a directory-base candidate cold-starts only its exact base/index and keeps cache ownership scoped',async()=>{
+  const server=await ownedServer(resolve(builds(),'subpath'),'/LociView/'),owned=await profile(),errors:string[]=[];let context:BrowserContext|undefined;
+  try{let live=await launch(owned,server.url,false,errors);context=live.context;await live.page.goto(server.url);await prepare(live.page);await context.close();context=undefined;await server.stop();
+    live=await launch(owned,server.url,true,errors);context=live.context;const response=await live.page.goto(server.url+'index.html?offline-check=1');expect(response?.fromServiceWorker()).toBe(true);await expect(offline(live.page).getByRole('status')).toContainText('オフラインで起動できる');
+    expect(await live.page.evaluate(async()=>(await navigator.serviceWorker.getRegistrations()).map(r=>new URL(r.scope).pathname))).toEqual(['/LociView/']);
+    for(const [name,urls]of Object.entries(await cacheInventory(live.page))){expect(name).toContain(encodeURIComponent(server.url));expect(urls.every(url=>new URL(url).pathname.startsWith('/LociView/'))).toBe(true);}
+    const unrelated=await context.newPage();await expect(unrelated.goto(server.url+'unrelated.html')).rejects.toThrow();await unrelated.close();expect(errors).toEqual([]);
+  }finally{await context?.close();await server.stop();}
+});
+
+test('Project storage bootstrap failure retains storage-independent preparation and own removal',async()=>{
+  const server=await ownedServer(resolve(builds(),'a')),owned=await profile();let context:BrowserContext|undefined;
+  try{const live=await launch(owned,server.url);context=live.context;await context.addInitScript(()=>{navigator.storage.getDirectory=async()=>{throw Error('Owned Project storage initialization failure');};});const p=live.page;await p.goto(server.url);
+    await expect(p.getByText('Owned Project storage initialization failure',{exact:true})).toBeVisible();await prepare(p);await p.reload();await expect(offline(p).getByRole('status')).toContainText('オフラインで起動できる');
+    await offline(p).getByText('オフラインの設定',{exact:true}).click();await offline(p).getByRole('button',{name:'オフライン準備を解除',exact:true}).click();await offline(p).getByRole('button',{name:'準備を解除',exact:true}).click();await expect(offline(p).getByRole('status')).toContainText('準備を解除しました');expect(await p.evaluate(async()=>(await navigator.serviceWorker.getRegistrations()).length)).toBe(0);
+  }finally{await context?.close();await server.stop();}
+});
+
+test('foreign controlling worker is refused; original-viewer query cannot activate old entry',async({},info)=>{
+  const server=await ownedServer(resolve(builds(),'a')),owned=await profile();let context:BrowserContext|undefined;
+  try{const live=await launch(owned,server.url);context=live.context;const p=live.page;await p.goto(server.url+'?mode=native-gs');await expect(p.getByText(/LociViewは、.*このPC版では、原本を新しいプロジェクトへ変換して開きます。/)).toBeVisible();expect(server.requests.some(url=>url.includes('native-gs-spark'))).toBe(false);
+    await p.evaluate(async()=>{await navigator.serviceWorker.register('/foreign-worker.js',{scope:'/'});await navigator.serviceWorker.ready;await(await caches.open('foreign-retain')).put('/sentinel',new Response('unchanged'));});await p.reload();await expect.poll(()=>p.evaluate(()=>navigator.serviceWorker.controller?.scriptURL)).toContain('foreign-worker.js');
+    await offline(p).getByRole('button',{name:'オフラインで使う準備',exact:true}).click();await expect(offline(p).getByRole('status')).toContainText('別のアプリ');expect(await p.evaluate(async()=>(await navigator.serviceWorker.getRegistrations()).map(r=>r.active?.scriptURL))).toEqual([server.url+'foreign-worker.js']);expect(await p.evaluate(async()=>(await(await caches.open('foreign-retain')).match('/sentinel'))?.text())).toBe('unchanged');
+  }finally{await context?.close();await server.stop();}
+});

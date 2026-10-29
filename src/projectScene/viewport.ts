@@ -262,7 +262,7 @@ export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: 
     if (!renderer || !camera) return;
     const smooth=presentation?smoothMeshes():[];syncSmoothLayout(smooth);
     const sources=[...resident.values()].filter(s=>s.gs&&s.asset.visible).map(s=>s.gs!);
-    if((import.meta.env.DEV||import.meta.env.MODE==='project-scene-validation'||import.meta.env.MODE==='project-scene-desktop')&&sources.length&&!gsRender&&!gsPreparing&&!gsIssue){gsPreparing=true;const generation=gsGeneration,currentRenderer=renderer,intent=gsIntent,abort=new AbortController();gsPreparationAbort=abort;
+    if((import.meta.env.DEV||import.meta.env.MODE==='project-scene-validation'||import.meta.env.MODE==='project-scene-desktop'||import.meta.env.MODE==='project-scene-offline')&&sources.length&&!gsRender&&!gsPreparing&&!gsIssue){gsPreparing=true;const generation=gsGeneration,currentRenderer=renderer,intent=gsIntent,abort=new AbortController();gsPreparationAbort=abort;
       void import('../viewer/gsRender').then(m=>{abort.signal.throwIfAborted();if(generation!==gsGeneration||renderer!==currentRenderer)throw new DOMException('表示準備を取り消しました。','AbortError');
         return m.createGsRender(currentRenderer,sources,()=>{if(abort.signal.aborted||generation!==gsGeneration)return;pickEpoch++;serial++;changed();},abort.signal,residency,intent??undefined,presentation?.budget);}).then(port=>{
         if(generation!==gsGeneration||renderer!==currentRenderer){port.dispose();return;}clearSmooth();gsRender=port;gsPreparing=false;serial++;changed();

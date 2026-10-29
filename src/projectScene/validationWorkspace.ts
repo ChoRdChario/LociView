@@ -1,4 +1,6 @@
 import { inspectZipContainerMetadata } from '../assets/zipio';
+import type {DesktopOfflinePort} from '../platform/desktopOfflinePorts';
+import {createOfflineControls} from '../ui/projectScene/offlineControls';
 import { PACKAGE_LIMITS } from '../projectPackage/contract';
 import type {WorkspaceFileInteraction} from '../ui/projectScene/projectWorkspacePorts';
 import type {createProductWorkspace} from './productWorkspace';
@@ -41,6 +43,7 @@ export interface MountedEditor {
 export type MountedEditorFactory=(host:Host,factory:ViewportFactory,tools:ReturnType<typeof createValidationReceiveControls>|undefined,
  renderCandidate:ModelCandidateRenderer|undefined,navigation:NonNullable<Parameters<typeof createProductWorkspace>[5]>)=>MountedEditor;
 export interface ValidationWorkspacePorts {
+  offline?:DesktopOfflinePort;
   fileLimits: FileValidationLimits; filePolicy?: ProjectFilePolicy; decode?: PngDecoder; jpeg?: JpegDecoder; photo?: PhotoDecoder; mediaDecoders?:MediaDecoders;
   mountEditor:MountedEditorFactory;
   progressivePresentation?:boolean;
@@ -66,6 +69,8 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   const policy=projectFilePolicy(ports.filePolicy ?? ports.fileLimits);
   const root = document.createElement('section'), navigation = document.createElement('section'), content = document.createElement('section');
   root.className = 'lv-validation-host'; navigation.className = 'lv-validation-home'; content.className = 'lv-validation-content';
+  const offline=ports.offline?createOfflineControls(document,ports.offline):undefined;
+  if(offline)root.append(offline.root);
   const heading = document.createElement('h1'); heading.textContent = 'LociView';
   const help = document.createElement('p'); help.textContent = ports.introduction ?? 'LociViewは、3Dモデルに記録を付け、ファイルで作業を受け渡すアプリです。';
   const legacy=document.createElement('button');legacy.type='button';legacy.textContent='以前のプロジェクトを開く';legacy.hidden=!ports.openLegacy;
@@ -672,5 +677,5 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
       stopPresentation();
       try { await operation; } catch { /* Original input and saved failure are never acknowledged here. */ }
       try { await creationAttempt?.candidate?.dispose(); }
-      finally { await closeCurrent(); root.remove(); } }, get selected() { return selected; } };
+      finally { await closeCurrent(); offline?.dispose(); root.remove(); } }, get selected() { return selected; } };
 }

@@ -1,9 +1,10 @@
 # 09 — PC候補のオフライン起動
 
-Status: **PROPOSED — PO判断待ち。実装・SW登録・採用・公開の許可ではない。**
+Status: **APPROVED — 専用PC候補への限定実装を承認。一般採用・公開は含まない。**
 Updated: 2026-10-30. 現在の実装・検証は[todo](../../tasks/todo.md)が管理する。
-技術・製品／UXの独立レビューを実施済み。候補自身の登録解除と静的版への復帰も、
-同じ一括判断に含める。これはPO承認や実機・オフラインの実行証拠ではない。
+技術・製品／UXの独立レビュー後、PO2026-10-30が「仕様案09で進める」と承認。
+候補自身の登録解除と静的版への復帰も同じ承認範囲に含む。
+承認は実装・関連修正・自動検証の権限であり、実行証拠や一般採用ではない。
 
 ## 1. 完了させる作業
 
@@ -11,10 +12,11 @@ Updated: 2026-10-30. 現在の実装・検証は[todo](../../tasks/todo.md)が�
 同じ保存場所でプロジェクトを開き、モデル・点群・GS・Caption・メディアを扱い、
 編集・ファイル保存・再開まで続けられるPC候補を作る。
 
-現状のDesktop候補は静的ビルドで、アプリ本体のオフライン起動は未実装。
+承認前のDesktop候補は静的ビルドで、アプリ本体のオフライン起動を持たない。
+本仕様は、既存の静的版を保持して追加のオフライン版を作る。
 [01e §5](01e-desktop-large-gs-workflow.md#5-approved-ordinary-root-desktop-candidate)
 はSW・precache・manifest・installの生成／登録を明示的に禁止している。
-本案は、その限定PC候補についての追加判断であり、既存の禁止を既決事項として解除しない。
+本仕様は、その限定PC候補とは別の追加ビルドだけに例外を認める。既存の静的版の禁止は保持する。
 
 ## 2. 一括判断の推奨範囲
 
@@ -115,7 +117,7 @@ Project保存の依存を追加しない。通常の`registerPwa()`をPCから�
 
 想定配置は、純粋なstate／portを`src/platform/desktopOfflinePorts.ts`、登録・状態の
 所有を`src/platform/desktopOffline.ts`、portだけを使う表示を
-`src/ui/projectScene/offlineControls.ts`とする。`desktopEntry.ts`が組み合わせ、
+`src/ui/projectScene/offlineControls.ts`とする。専用の`offlineEntry.ts`が組み合わせ、
 必要な準備・候補自身の登録解除portを既存のProjectScene UIへ渡す。platformはUI・Project保存へ依存せず、
 UIはCacheStorageやSWを直接操作しない。Worker生成には既存VitePWAを使い、新依存を前提にしない。
 
@@ -155,3 +157,44 @@ main／Pages配信、公開URL、通常入口の全面置換、一般採用、iO
 保存形式・renderer・旧reader契約の変更、
 新依存・新しい配信権限が必要と分かった場合は、該当部分を止めて具体的に再判断する。
 本案の承認後は、その範囲の通常実装・不具合修正・自動検証を一括で進める。
+
+## 8. 承認範囲内の実装設計
+
+内部の独立技術レビューを経て、明示modeを`project-scene-offline`、出力を
+`offline-desktop-dist`、専用bootstrapを`offlineEntry.ts`とする。既存Desktop入口を
+importせず、元形式viewerへの動的入口も残さない。互換検査・初回変換に必要な
+Nativeの純粋な読取り部品は保持する。既存modeのSW禁止は変更しない。
+
+platformの`DesktopOfflinePort`はread／subscribe／recheck／prepare／removeと、
+ブラウザが実際に提示したinstall promptだけを公開する。既存validation host内に
+任意の準備UIを1つ置き、ホーム・復旧・編集を通じて状態を保つ。Projectのdirtyや
+Session操作を準備処理の待ち状態に含めない。破棄後の応答は表示しない。
+
+既存VitePWAのInjectManifestと、同梱済みWorkboxの独立PrecacheControllerを使う。
+scope＋build IDごとにcacheを分け、同じcontrollerのrevision付きキーで全件を検査する。
+別cacheで不足を補わず、network fallbackや汎用runtime cacheは設けない。
+navigation fallbackはbase／indexだけを対象とする。app／workerは同じビルド識別を使い、
+MessageChannelで応答元worker・実際のbuild・全件存在を確認する。初回版は、別buildが
+並行install中である可能性を排除できないcacheを保持し、版をまたぐGCを実装しない。
+
+install時に生成資源のSHA-384 SRIを要求し、状態の確認でも同じdigestを検査する。
+HTTP200で別版の内容を返された場合を準備成功としない。worker応答後に登録と
+active／waiting／controllerの同一性を再確認し、別窓での解除を見逃さない。
+登録の存在と資源確認の成功は分け、確認失敗でも候補自身を解除できる表示を残す。
+Project保存領域の初期化失敗でも、storageに依存しない準備／解除UIを保持する。
+
+同じ版の登録更新だけでは欠落cacheのinstallが再実行されないため、明示的な再準備は
+当該workerの正確なmanifestで欠落・digest不一致を調べる。不良の項目だけを元のURL・
+SRIで再取得し、検証後に同じrevision付きキーへ置換する。正常な項目・別版・Projectは
+消さない。任意URLのruntime cachingや、別版の配信内容による代替は行わない。
+VitePWAが自動追加するmanifestの重複はURL・revision一致時だけ統合し、各一意資源に
+SRIが存在することを必須とする。
+
+既存の候補登録にはupdateを1回だけ要求し、呼出前から新しいworkerの参照を保持する。
+install失敗でregistrationのinstallingが消えても、その失敗を正常な旧版の存在で
+覆い隠さない。失敗表示は明示的な再試行・再確認、または新しいinstall／activateの
+結果まで保つ。旧activeが正常に終了する場合と、準備中workerの失敗を区別する。
+
+所有マークからローカル生成したアイコンだけを使い、manifestへfile/share handlersを
+追加しない。通知文書を含む資源をprecacheし、容量による除外はbuildエラーにする。
+この内部設計は新しい利用容量・描画・保存形式・公開権限を追加しない。

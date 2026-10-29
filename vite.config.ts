@@ -1,6 +1,9 @@
 import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 import { readFileSync } from 'node:fs';
+import { randomUUID, createHash } from 'node:crypto';
+import { resolve } from 'node:path';
+import { desktopOfflineBuild } from './scripts/desktop-offline-build';
 
 // PWA (docs/06 §5): アプリシェルを全precacheし、初回ロード後は完全オフラインで動作する。
 // プロジェクトデータはOPFSが担当するためSWのキャッシュ対象にしない（責務分離）。
@@ -11,16 +14,23 @@ export default defineConfig(({ mode }) => {
   const isSparkHarness = mode === 'spark-harness';
   const isProjectSceneValidation = mode === 'project-scene-validation';
   const isProjectSceneDesktop = mode === 'project-scene-desktop';
-  const isStaticScene = isProjectSceneValidation || isProjectSceneDesktop;
+  const isOffline = mode === 'project-scene-offline';
+  if(isOffline&&(!base.startsWith('/')||!base.endsWith('/')||base.includes('//')||/[?#\\]/.test(base)))throw Error('Offline candidate requires a same-origin directory base');
+  const offlineLabel = process.env.DESKTOP_OFFLINE_BUILD_ID ?? 'desktop';
+  const offlineBuild = `${offlineLabel}-${randomUUID()}`;
+  let offlineOutput='offline-desktop-dist';
+  if(isOffline&&!/^[a-zA-Z0-9_-]{1,80}$/.test(offlineLabel))throw Error('Invalid offline build identity');
+  const isStaticScene = isProjectSceneValidation || isProjectSceneDesktop || isOffline;
   const input: Record<string, string> = isSparkHarness || isProjectSceneValidation ? { dev: 'dev.html' } : { main: 'index.html' };
 
   return {
     base,
+    define: isOffline ? { __DESKTOP_OFFLINE_BUILD_ID__: JSON.stringify(offlineBuild) } : undefined,
     publicDir: isStaticScene ? false : undefined,
     build: {
       target: 'es2022',
       sourcemap: true,
-      outDir: isProjectSceneDesktop ? 'desktop-dist' : isProjectSceneValidation ? 'validation-dist' : isSparkHarness ? 'dev-dist' : 'dist',
+      outDir: isOffline ? 'offline-desktop-dist' : isProjectSceneDesktop ? 'desktop-dist' : isProjectSceneValidation ? 'validation-dist' : isSparkHarness ? 'dev-dist' : 'dist',
       // Keep the candidate GS bytes inspectable and independently cacheable.
       assetsInlineLimit: isSparkHarness || isStaticScene ? 0 : undefined,
       rollupOptions: {
@@ -32,7 +42,7 @@ export default defineConfig(({ mode }) => {
           : {
               chunkFileNames(chunk) {
                 if (chunk.name === 'native-gs-spark') return 'assets/native-gs-spark-2.1.0-three-0.186.0.js';
-                if (chunk.name === 'three-vendor') return 'assets/three-vendor-0.186.0.js';
+                if (!isOffline && chunk.name === 'three-vendor') return 'assets/three-vendor-0.186.0.js';
                 return 'assets/[name]-[hash].js';
               },
               manualChunks(id) {
@@ -55,7 +65,7 @@ export default defineConfig(({ mode }) => {
       transformIndexHtml: {
         order: 'pre',
         handler(html) {
-          if(isProjectSceneDesktop)return html.replace(/<link\b[^>]*rel="(?:icon|apple-touch-icon)"[^>]*>/g,'')
+          if(isProjectSceneDesktop||isOffline)return html.replace(/<link\b[^>]*rel="(?:icon|apple-touch-icon)"[^>]*>/g,'')
             .replace(/<meta\b[^>]*name="apple-mobile-web-app[^"]*"[^>]*>/g,'')
             .replace(/<meta\b[^>]*name="description"[^>]*>/g,'<meta name="description" content="LociViewは、3Dモデルに記録を付け、ファイルで作業を受け渡すアプリです。" />');
           // Reuse this page, without flashing the unrelated harness or fetching public assets.
@@ -64,7 +74,18 @@ export default defineConfig(({ mode }) => {
             .replace(/<body>[\s\S]*?<\/body>/, '<body><p role="status">ファイル検証画面を準備しています。</p><script type="module" src="/src/dev-entry.ts"></script></body>');
         },
       },
-    }] : [
+    }, ...(isOffline ? [desktopOfflineBuild(path=>{offlineOutput=path;}), VitePWA({
+      strategies: 'injectManifest', srcDir: 'src/platform', filename: 'desktop-offline-sw.ts',
+      registerType: 'prompt', injectRegister: null, scope: base,
+      injectManifest: { globPatterns: ['**/*'], globIgnores: ['**/*.map'], maximumFileSizeToCacheInBytes: 8 * 1024 * 1024, rollupFormat: 'iife',
+        manifestTransforms:[async entries=>({manifest:entries.map(entry=>({...entry,integrity:`sha384-${createHash('sha384').update(readFileSync(resolve(offlineOutput,entry.url))).digest('base64')}`})),warnings:[]})] },
+      manifestFilename: 'desktop-offline.webmanifest',
+      manifest: { id: base, name: 'LociView PC', short_name: 'LociView', lang: 'ja',
+        description: 'LociViewは、3Dモデルに記録を付け、ファイルで作業を受け渡すアプリです。',
+        start_url: base, scope: base, display: 'standalone', background_color: '#e6e4e1', theme_color: '#312f2d',
+        icons: [192,512].map(size=>({src:`offline-icons/icon-${size}.png`,sizes:`${size}x${size}`,type:'image/png'})) },
+      devOptions: { enabled: false },
+    })] : [])] : [
       isSparkHarness
         ? VitePWA({
             registerType: 'autoUpdate',

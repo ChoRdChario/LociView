@@ -1,5 +1,9 @@
 /** Reviewed composition/import boundary. Entries are exact files, never a directory exemption. */
 export const projectSceneApplicationImports:Readonly<Record<string,readonly string[]>> = {
+  "src/projectScene/offlineEntry.ts": [
+    "./styles.css", "./validationBrowser", "./productWorkspace", "../projectFiles/validation",
+    "../viewer/gsDecodeQueue", "../viewer/targetBudget", "../viewer/smoothComposite", "../platform/desktopOffline", "../ui/projectScene/offlineControls"
+  ],
   "src/harness/projectScene/acknowledgment.ts": [
     "../../projectScene/acknowledgment"
   ],
@@ -356,6 +360,7 @@ export const projectSceneApplicationImports:Readonly<Record<string,readonly stri
     "./hostPorts"
   ],
   "src/projectScene/validationBrowser.ts": [
+    "../platform/desktopOfflinePorts",
     "../platform/opfs",
     "../platform/projectLock",
     "../projectFiles/receiveWorkspace",
@@ -530,6 +535,7 @@ export const projectSceneApplicationImports:Readonly<Record<string,readonly stri
     "three/addons/loaders/GLTFLoader.js"
   ],
   "src/projectScene/validationWorkspace.ts": [
+    "../platform/desktopOfflinePorts", "../ui/projectScene/offlineControls",
     "../projectFiles/media",
     "../ui/projectScene/conversionNotice",
     "../projectFiles/meshSource",

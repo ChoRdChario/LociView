@@ -3,7 +3,9 @@ import './ui/style.css';
 
 const root = document.getElementById('app');
 if (root === null) throw new Error('missing #app');
-if(import.meta.env.MODE==='project-scene-desktop'){
+if(import.meta.env.MODE==='project-scene-offline'){
+  void import('./projectScene/offlineEntry').then(({bootOfflineDesktopApp})=>bootOfflineDesktopApp(root));
+}else if(import.meta.env.MODE==='project-scene-desktop'){
   void import('./projectScene/desktopEntry').then(({bootDesktopApp})=>bootDesktopApp(root));
 }else{
 const mode = new URLSearchParams(location.search).get('mode');

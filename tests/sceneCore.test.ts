@@ -541,6 +541,7 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
         // 05 §13.3 permits the existing side-effect-free presentation helper,
         // not the Native controller/schema runtime or a general Native dependency.
         const shared = ['../../scene/types', '../../domain/captionText', '../../domain/values', '../../domain/materialIntent', '../../nativeGs/backgroundColor'];
+        if (normalizedPath === 'src/ui/projectScene/offlineControls.ts') shared.push('../../platform/desktopOfflinePorts');
         if (productComposition) shared.push('../../projectMetadata/commands', '../../scene/projectProvider', '../../scene/resolve');
         if (/[\\/](projectWorkspacePorts|projectOrganization)\.ts$/.test(path)) shared.push('../../projectMetadata/captionAuthoring', '../../projectMetadata/captionUndo');
         if (path.replaceAll('\\', '/').endsWith('/projectModels.ts')) shared.push('../../domain/alignment');
@@ -628,9 +629,10 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
         expect([...source.matchAll(/(?:from\s+|import\s*\()['"]([^'"]*\/(?:scene|domain|projectScene)\/[^'"]+)['"]/g)].map(m => m[1]))
           .toEqual(['./harness/projectScene/validationEntry', './harness/projectScene/entry']);
       } else if(normalizedPath==='src/main.ts'){
-        expect(source).toContain("if(import.meta.env.MODE==='project-scene-desktop'){");
+        expect(source).toContain("if(import.meta.env.MODE==='project-scene-offline'){");
+        expect(source).toContain("}else if(import.meta.env.MODE==='project-scene-desktop'){");
         expect([...source.matchAll(/(?:from\s+|import\s*\(\s*|import\s+)(['"])([^'"]+)\1/g)].map(m=>m[2]))
-          .toEqual(['./ui/style.css','./projectScene/desktopEntry','./nativeGs/app','./ui/app']);
+          .toEqual(['./ui/style.css','./projectScene/offlineEntry','./projectScene/desktopEntry','./nativeGs/app','./ui/app']);
       } else expect(source).not.toMatch(/(?:from\s+|import\s*\()['"][^'"]*\/(scene|domain|projectScene)\//);
     }
     const backgroundHelper = readFileSync('src/nativeGs/backgroundColor.ts', 'utf8');

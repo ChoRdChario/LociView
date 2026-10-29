@@ -55,10 +55,14 @@ recovery and narrow-screen flow outside active-workspace height constraints.
 The verified daily-use continuation covers Saved View move availability and reachable
 whole-label task tabs, retaining model/View/material drafts and typed commands.
 Use todo for the connected evidence and remaining candidate/device/offline gates.
-The next [09 offline candidate](../docs/specs/09-desktop-offline-candidate-proposal.md)
-is a reviewed PROPOSED decision, not implementation or activation. It covers new-
+The [09 offline candidate](../docs/specs/09-desktop-offline-candidate-proposal.md)
+was PO-approved2026-10-30 for grouped implementation and automation. It covers new-
 format Projects/admitted conversions; normal/static original viewers remain.
-Read its exact preparation/removal/update scope and todo's one pending PO decision.
+Read its preparation/removal/update scope and todo's current plan/executed evidence.
+The bounded workflow is verified through dedicated Chromium cold/update/removal,
+independent reviews and final root/5-build checks recorded in todo. Same-origin/
+profile continuity is distinct from origin migration; device/install/adoption and
+release remain pending. Use Git for the actual checkpoint/remote identity.
 PO2026-10-29 defers10k-Caption/50k-change qualification; it is low-priority later
 work, not a practical completion blocker. Follow todo for the next ordinary user
 workflow; retain current limits, safety checks and existing fixtures.
@@ -178,9 +182,10 @@ that authority hold is resolved. Todo owns its executed checks and remaining
 acceptance. Preserve the existing read-only v1 entry and keep GS profile decisions subsequent.
 The superseded proposal/JSON remain in linked history, not an approval queue.
 
-Dedicated Chromium verifies only its recorded localhost/headless workflows. It
-does not fix the separate Chrome-plugin bootstrap failure or pass physical iPhone,
-offline/PWA, trusted HTTPS, ordinary entry, aggregate adoption or release gates.
+Dedicated Chromium verifies only its recorded localhost/headless workflows,
+including the exact09 built/offline/cold lane recorded in todo. It does not fix
+the separate Chrome-plugin bootstrap failure or pass physical iPhone, general PWA/
+OS install, trusted HTTPS, ordinary entry, aggregate adoption or release gates.
 Missing manual/device evidence does not stop other authorized implementation.
 
 The [browser runbook](../docs/browser-testing.md) owns test setup/artifact handling;

@@ -9,7 +9,40 @@ The approved01e PC candidate has a separate `playwright.desktop.config.ts` lane.
 It builds `desktop-dist` and opens the actual `index.html` root, with Service Workers
 blocked, local-only requests and matching dedicated Chromium. It neither activates
 the normal PWA nor connects to a personal Chrome profile. Normal/validation and
-Desktop evidence are separate. All previews use4182 exclusively; run them serially.
+Desktop evidence are separate. Existing validation/static Desktop lanes share4182;
+run them serially. The additional09 lane below owns separate test servers.
+
+Approved09 has an additional `playwright.offline.config.ts` lane:
+
+```powershell
+npm run test:e2e -- --config playwright.offline.config.ts
+```
+
+It uses the same installed dedicated Chromium, its own short persistent profiles
+and test-owned loopback server on a free port. It builds immutable A/B offline
+artifacts and the preserved static Desktop artifact, switches them at the same
+owned address, and actually stops/restarts that server. Existing SW-blocked lanes
+remain unchanged. All server responses disable HTTP caching; cold evidence closes
+the entire owned browser, stops the server and sets network offline before launch.
+Navigation must come from the candidate Service Worker. App asset SRI, controller
+build identity, Project history/body preservation and saved output are separate
+assertions; an open-tab reload alone cannot pass.
+
+The lane covers owned Mesh/Point/500k SH4/Proxy/photo work, representative admitted
+initial conversion, two-window waiting updates with a draft, wrong200/missing
+resources, same-build cache repair, exact-own removal, foreign cache/registration
+retention, same-address reachable static return, directory-base scope and Project
+bootstrap failure. A worker Cache.put fault simulates quota refusal; focused tests
+also cover ownership/disposal faults. These are not real disk-full evidence. An owned legacy-source sentinel is
+byte-retention evidence, not old-viewer offline acceptance. Chromium localhost
+automation does not establish OS install prompts, physical Edge/Chrome/iOS, trusted
+HTTPS, aggregate adoption or release. No personal browser/profile is used.
+
+`npm run build:offline` produces `offline-desktop-dist`; `preview:offline` explicitly
+serves it on4183. Use only a dedicated origin/profile. Do not put it over the normal
+PWA or infer origin migration. `npm run verify:offline-isolation` checks all emitted
+app resources/SRI, the dedicated manifest/worker and excluded old runtime. The
+checkpoint script also builds/checks this fifth artifact; it does not deploy it.
 
 ```powershell
 npm run test:e2e -- --config playwright.desktop.config.ts desktop-entry.spec.ts

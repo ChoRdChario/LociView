@@ -1,4 +1,15 @@
 /* Shared ProjectScene shell and viewport styles. Legacy/Native roots keep their own styles. */
+.lv-offline-controls { position: relative; z-index: 3; flex: 0 0 auto; display: flex; align-items: center; flex-wrap: wrap; gap: 4px 12px; padding: 6px 12px; background: #f2f0ee; border-bottom: 1px solid #b7b1aa; font: 400 13px/1.5 system-ui, sans-serif; }
+.lv-offline-controls [hidden] { display: none !important; }
+.lv-offline-controls > p { margin: 0; flex: 1 1 240px; }
+.lv-offline-controls button, .lv-offline-controls summary { min-height: 44px; box-sizing: border-box; font: inherit; cursor: pointer; }
+.lv-offline-controls button { padding: 6px 12px; color: #312f2d; background: #faf9f8; border: 1px solid #817c78; border-radius: 2px; }
+.lv-offline-controls summary { padding: 10px 0; }
+.lv-offline-controls details > div { position: absolute; right: 12px; top: 100%; box-sizing: border-box; width: min(calc(100% - 24px), 480px); max-height: min(55dvh, 420px); overflow-y: auto; padding: 12px; border: 1px solid #817c78; background: #f2f0ee; box-shadow: 0 6px 16px #312f2d33; }
+.lv-offline-controls details > div > p:first-child { margin-top: 0; }
+@media (max-width: 760px), (max-height: 719px) { .lv-offline-controls details[open] { flex: 1 1 100%; } .lv-offline-controls details > div { position: static; width: 100%; } }
+.lv-offline-controls details button { margin: 4px 8px 4px 0; }
+.lv-offline-controls :focus-visible { outline: 2px solid #312f2d; outline-offset: 2px; }
 :is(.lv-development-page,.lv-project-page) { color-scheme: light; }
 :is(.lv-development-page,.lv-project-page) body { display: block; height: auto; background: #e6e4e1; color: #312f2d; }
 .lv-development { display: flex; flex-direction: column; height: 100vh; height: 100dvh; min-height: 560px; font: 400 14px/1.5 system-ui, sans-serif; }
@@ -222,4 +233,7 @@
   .lv-project-shell[data-layout="workspace"] .lv-project-body > aside { min-height: 0; overscroll-behavior: contain; scroll-padding-top: 64px; }
   .lv-project-shell[data-layout="workspace"] .lv-project-body > aside > [role="tablist"] { position: sticky; top: -12px; z-index: 1; padding: 4px 0; background: #f2f0ee; }
   .lv-project-shell[data-layout="workspace"] > .lv-project-files[open] > section { max-height: min(30dvh, 240px); overflow-y: auto; overscroll-behavior: contain; }
+  /* Account for the offline status row when several disclosures are open. */
+  .lv-validation-host:has(> .lv-offline-controls) .lv-project-shell[data-layout="workspace"] > .lv-project-workspace > header { max-height: 22dvh; }
+  .lv-validation-host:has(> .lv-offline-controls) .lv-project-shell[data-layout="workspace"] > .lv-project-files[open] > section { max-height: min(22dvh, 176px); }
 }

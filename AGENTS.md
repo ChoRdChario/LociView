@@ -140,8 +140,10 @@ npm run build
 
 Also run `npm run build:harness` when the changed path ships in the isolated harness,
 and `npm run build:validation` for the approved static validation path. Also run
-`npm run build:desktop` for the approved01e static Desktop candidate.
-`npm run check:checkpoint` runs this full sequence, including the three isolated builds,
+`npm run build:desktop` for the approved01e static Desktop candidate, and
+`npm run build:offline` plus `npm run verify:offline-isolation` for the approved09
+separate offline candidate. `npm run check:checkpoint` runs this full sequence,
+including the four isolated builds,
 serially and stops on the first failure. Run it once at the connected workflow
 boundary, not after each component or just to create a commit.
 After a check passes, repeat or broaden it only for relevant subsequent changes,

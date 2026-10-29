@@ -283,6 +283,11 @@ extra engine-preparation/cache UI. Candidate browser evidence uses blocked Servi
 Workers on its dedicated test origin/profile. Continuing development data in place
 requires the same origin/profile; an output directory alone does not move data.
 
+PO2026-10-30 approved [09](09-desktop-offline-candidate-proposal.md) as a separate
+offline artifact with its own preparation/update/removal lifecycle. This narrow
+exception does not enable SW/manifest/install in the existing static Desktop build,
+replace the normal PWA or grant deployment/release authority.
+
 Default-entry, namespace access and this candidate-build policy are part of the
 approved§7 package. Later ordinary-release/offline activation must decide its
 app-shell precache with build-hashed GSL and exact notices; never pin an app-adapter

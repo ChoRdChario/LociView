@@ -56,30 +56,81 @@ unchanged-feature-classification checks pass; independent review has no findings
 No runtime change or new capacity guarantee; no runtime suite is needed for this
 documentation checkpoint.
 
-## Current boundary —PC offline candidate decision (PROPOSED)
+## Current boundary —approved09 PC offline workflow
 
-Audit: g0-baseline HEADdb27c41, verified Saved View/task-navigation unit pushed;
-no uncommitted product change. [Proposal09](../docs/specs/09-desktop-offline-candidate-proposal.md)
-is design only. Independent technical/product reviews passed, including explicit
-candidate-only manifest/install, cold initial conversion and data-preserving return
-to a reachable static build. No SW/cache/manifest/install implementation is active.
+PO2026-10-30 approved [09](../docs/specs/09-desktop-offline-candidate-proposal.md).
+Audit: g0-baseline HEAD11c46d6 before implementation, clean starting tree; root is
+sole writer. This connected unit follows the missing offline daily-use boundary.
+Dependency lock, data/schema/rendering semantics, capacity and deployment policy
+remain;09 adds the explicit app-shell integration and lifecycle only.
 
-The next missing daily-use outcome is closed-browser offline launch→new-format
-Project/Point/GS/Proxy or admitted initial conversion→edit/save/reopen. Proposed
-scope adds a separate candidate, own preparation/removal/update lifecycle and
-complete local app-resource cache; keeps data/namespace and current normal/static
-builds; does not make the old Native/v1 viewer itself offline-ready. No origin
-migration, foreign-SW replacement, source loss, new format/capacity or publication.
+Implemented: separate project-scene-offline build/bootstrap; same historical
+ProjectScene namespace; exact owned app precache/SRI and same-build repair; local
+preparation/install affordance, safe waiting updates and exact-own unregister.
+Original app/viewer entries are excluded from this artifact while admitted
+converters remain. Normal/static builds, originals/history and typed Session/
+package/storage fences stay unchanged. Failed updates retain old usable resources;
+late notifications cannot hide failure or undo a successful removal. No automatic
+registration, skipWaiting, claim, reload-on-update or cross-build cache GC.
 
-One grouped PO decision is necessary:01e§5 explicitly prohibits this candidate's
-SW/precache/manifest/install activation, and AGENTS keeps SW/release authority
-separate from checkpoint Push. Pending that decision, keep09 PROPOSED and current
-accepted01e unchanged. After approval, ordinary design refinement, implementation,
-relevant fixes and connected automation proceed as one workflow without helper
-approvals. New release/architecture/scope decisions retain their real gates.
+Independent source/contracts, final lifecycle, UI/dismissal/layout and docs/scope
+reviews PASS. Executed dedicated Chromium evidence (no retry/skip/flaky):
+- Main case PASS in run1793313130554-37420 (873.896s): static same-origin/profile
+  mixed Mesh/Point/500kSH4/Proxy/PNG Project → offline preparation → entire browser
+  close/server stopped/network off → cold read/edit/save/full-close reopen with
+  exact history; admitted Native initial conversion/edit/save/reopen; unsupported
+  whole-input refusal; own unregister/full-close/same-address reachable static
+  return with catalog-opened histories, foreign cache/registration and source bytes.
+  That run's aggregate is1PASS/1FAIL; its separate update failure is retained.
+- Latest run1793315090511-58816:4PASS/0FAIL/0skip/0flaky,90.977s total. Current
+  two-window update keeps X=2.75 draft/oldA through wrong200, missing and interrupted
+  B assets, then full-close/server-off cold B exact-history resume. Corrupt/missing
+  same-build entries repair; worker Cache.put quota refusal is explicitly simulated.
+  Directory-base cold/index-only scope, Project-bootstrap failure with preparation/
+  removal, and foreign-SW/original-viewer-query refusal also pass.
+- Main data-flow evidence predates only later popup and registration-failure fences;
+  current popup/first-install/update/remove paths were separately rechecked above.
+  Main media is owned PNG; legacy-retain is an OPFS source sentinel plus reachable
+  original app entry, not oldNative/v1 catalog or old-viewer offline acceptance.
+- Rendered independent review PASS: combined Offline/files/Help/Settings at1280×800
+  leaves~238px stage; native Tab leaves popup to visible controls; update guidance,
+  unapplied input, saved-status distinctions and cold Caption/photo are readable.
+- Focused3-file checks28PASS; validation-build/Scene-boundary checks15PASS after
+  correcting the exact approved-mode assertion and adding explicit artifact isolation.
+  Frozen25source/test inputs are in ignored
+  .artifacts/e2e/pc-offline/tested-source.json and currently match the tested tree.
 
-Proposal-only checks: diff/local links and existing01e/gate consistency; independent
-review, with no product runtime change or new test/build credit from the proposal.
+Final serial check PASS at the frozen25-input tree:138files,3091PASS,
+21existingTODO; root879.53s. Typecheck, normal/harness/validation/static Desktop/
+offline Desktop builds and exact14-resource SRI/worker/manifest isolation pass.
+Log: .artifacts/e2e/pc-offline/checkpoint.log. All5artifacts pass HEIC public-path
+isolation. Normal /LociView/ base build also passes (pages-build.log; ignored output).
+Independent source/rendered/evidence review PASS. The verified checkpoint belongs
+on existing g0-baseline; Git owns commit/remote identity, no release/deployment.
+Initial serial run: typecheck PASS,3089tests PASS/21existingTODO and1stale guard
+assertion FAIL (validationBuild still expected only the two earlier approved modes).
+Approved09 already requires the additional explicit mode; source behavior agrees
+with that contract. Corrected the exact assertion, kept strict exclusion of all
+other modes, added static/offline/PWA/OS-handler isolation coverage; focused PASS.
+No runtime source/contract was weakened. Retain checkpoint-initial.log as failure
+evidence. The complete final serial rerun above passes after this correction.
+No repeated runtime checks merely for staging/docs. Earlier failed runs remain in
+.artifacts/e2e/runs:1793310977128-660 (duplicate post-transform manifest),
+1793311586766-23772 (fixture preconditions),1793312137206-35920 (startup fixture
+race +142px layout),1793313130554-37420 (popup toggle),1793314271135-52948
+(healthy oldA masking failedB). Relevant code/fixtures were fixed; these aggregates
+are not relabelled PASS. Intermediate4PASS run1793314726220-67092 is retained too.
+
+Pending: actual OS install, physical Edge/Chrome/iOS, trusted HTTPS, general
+adoption/ordinary PWA replacement and publication. Local automation grants none.
+No origin migration or automatic install; own removal keeps caches/Project data.
+Stop only affected work for a new schema/reader/renderer/dependency, foreign-cache
+or Project deletion, scope/guarantee or deployment authority.
+
+Next: close the verified09 development checkpoint, then prepare grouped PC-candidate
+acceptance for everyday editing/exchange/recovery/offline and actual browser/install
+conditions. Keep10k-Caption qualification and comfort-only tuning deferred; ask
+only for the real device/install/adoption/publication decisions at that boundary.
 
 ## Previous boundary —Saved View organization and reachable task navigation
 
