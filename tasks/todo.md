@@ -56,7 +56,32 @@ unchanged-feature-classification checks pass; independent review has no findings
 No runtime change or new capacity guarantee; no runtime suite is needed for this
 documentation checkpoint.
 
-## Current boundary —Saved View organization and reachable task navigation
+## Current boundary —PC offline candidate decision (PROPOSED)
+
+Audit: g0-baseline HEADdb27c41, verified Saved View/task-navigation unit pushed;
+no uncommitted product change. [Proposal09](../docs/specs/09-desktop-offline-candidate-proposal.md)
+is design only. Independent technical/product reviews passed, including explicit
+candidate-only manifest/install, cold initial conversion and data-preserving return
+to a reachable static build. No SW/cache/manifest/install implementation is active.
+
+The next missing daily-use outcome is closed-browser offline launch→new-format
+Project/Point/GS/Proxy or admitted initial conversion→edit/save/reopen. Proposed
+scope adds a separate candidate, own preparation/removal/update lifecycle and
+complete local app-resource cache; keeps data/namespace and current normal/static
+builds; does not make the old Native/v1 viewer itself offline-ready. No origin
+migration, foreign-SW replacement, source loss, new format/capacity or publication.
+
+One grouped PO decision is necessary:01e§5 explicitly prohibits this candidate's
+SW/precache/manifest/install activation, and AGENTS keeps SW/release authority
+separate from checkpoint Push. Pending that decision, keep09 PROPOSED and current
+accepted01e unchanged. After approval, ordinary design refinement, implementation,
+relevant fixes and connected automation proceed as one workflow without helper
+approvals. New release/architecture/scope decisions retain their real gates.
+
+Proposal-only checks: diff/local links and existing01e/gate consistency; independent
+review, with no product runtime change or new test/build credit from the proposal.
+
+## Previous boundary —Saved View organization and reachable task navigation
 
 PO2026-10-30 authorizes the next daily-use unit. Audit: g0-baseline HEAD6ded664,
 clean worktree, prior file-continuation/layout checkpoints verified and pushed.

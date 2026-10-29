@@ -21,6 +21,7 @@ record executed evidence and connections; do not infer those from a document tit
 | Compatible Three display transition | [Approved07j](specs/07j-three-186-compatibility-proposal.md); actual0.180 proof/math and old records remain;0.186 display is checked through neutral values. PO explicitly approved ordinary-viewer recovery in§7.1; current checks and remaining acceptance are in [todo](../tasks/todo.md). Not adopted/released |
 | Storage, journal, Native package and migration boundaries | [specification 02](specs/02-storage-package-migration.md) |
 | Adoption, device/performance and release gates | [specification 03](specs/03-gates-and-delivery.md), [G0 coverage](g0/g0-coverage-map.md) |
+| Proposed PC offline candidate | [09 proposal](specs/09-desktop-offline-candidate-proposal.md); independently reviewed, PROPOSED pending one grouped decision. Separate new-format/admitted-conversion offline artifact, owned shell preparation/removal/update, preserved data and normal/static builds; no current SW activation, origin migration, old-viewer offline or release credit |
 | LociMyu → Native conversion | [specification 04](specs/04-locimyu-conversion.md) |
 | Project/Scene team work and TEAM-FLOW-01 | [specification 05](specs/05-project-scene-team-workflow.md), especially §§7.5, 12.6, 13.2 |
 | Approved first backup opening when the original Project is absent | [First-backup companion](specs/06a-first-backup-open-proposal.md); exact absent predecessor/P2/S2 recovery implemented and Node-verified in bounded validation; not adopted |
