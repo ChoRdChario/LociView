@@ -7,7 +7,11 @@ owns route-specific coverage. Check actual Git branch/HEAD/worktree and preserve
 existing changes. Do not reconstruct current work from completed checkpoint prose.
 
 PO prioritizes completing the accepted feature set before readiness-stage latency
-work. Keep existing comfortable-UI guidance, original bytes/history, atomic Session
+work. The2026-10-29 correction puts daily Scene/Caption organization and editing
+ahead of compatibility expansion and maintenance; later/additional labels do not
+establish low priority. Follow todo's current workflow rather than the former
+Point-first plan. Settle genuine operation-policy decisions before implementation.
+Keep existing comfortable-UI guidance, original bytes/history, atomic Session
 commands, file/recovery/evidence fences and one writer. Read-only reviews may run
 in parallel. Continue ordinary approved work without small PO testing waits.
 PO2026-10-29 defers10k-Caption/50k-change qualification; it is low-priority later

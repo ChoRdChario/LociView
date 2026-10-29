@@ -37,6 +37,12 @@ Read only the relevant topic, not every historical incident.
   operational need is not automatically the next completion-critical feature.
   PO defers10k Captions/50k changes; preserve the target/tests but prioritize missing
   ordinary workflows and keep safety acceptance separate from scale qualification.
+  Further priority correction: features marked later/additional can carry the
+  most everyday value. Prioritize Scene/Caption organization, repeated editing
+  and useful settings over compatibility expansion/maintenance. Unsettled
+  semantics require specification, not automatic deprioritization; do not choose
+  a tiny easy control merely to avoid a higher-value connected operation's design.
+  Preserve data-safety blockers and ask only about concrete new policy decisions.
   Further PO correction: repeated limited evaluations/internal improvements must
   lead to a larger usable workflow. Use large SH4 open→position→save→cold resume
   and ordinary-entry integration as the completion unit; qualify alternatives

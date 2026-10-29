@@ -3937,6 +3937,14 @@ Current todo owns exact executable evidence and remaining connections.
 
 ## 14. Explicit non-goals
 
+PO2026-10-29 sequencing amendment: the first bounded candidate's deferral of
+Scene duplicate/delete/reorder UI below is historical scope, not a standing
+low-priority instruction. Daily Scene/Caption organization and editing now take
+planning priority over compatibility expansion/maintenance per00§10. Specify and
+review the exact operation, identity/reference/deletion/default-Scene and
+concurrency effects before implementing these missing authoring commands; this
+amendment alone does not ratify those unspecified policies or expand other non-goals.
+
 - cloud backend, accounts, roles, authentication, signatures or real-time presence;
 - automatic same-model detection, registration, Caption reraycast or surface remap;
 - per-Scene Asset revision, transform or alignment;

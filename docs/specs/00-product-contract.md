@@ -582,6 +582,22 @@ Recorded on 2026-10-29, deferring large-Caption qualification:
   conflicts, privacy, recovery and existing smaller/multi-tab checks remain in force.
   Prefer missing ordinary user workflows over widening limits for the scale pack.
 
+Recorded on 2026-10-29, correcting everyday-use priority:
+
+- daily Scene organization, Caption copy/undo/review, record tags and local
+  settings previously labelled later/additional take priority in planning over
+  further legacy compatibility expansion and maintenance. An unsettled contract
+  does not imply low user value; use the current task record for the next workflow;
+- specify complete user operations and their saved/shared effects before coding.
+  This priority decision does not ratify unspecified clone identity, deletion,
+  concurrent undo, tag lifecycle or profile/provenance semantics. Bring genuinely
+  new policies as concrete grouped decisions, without per-control approval waits;
+- assess alignment and media work by practical user value rather than treating
+  their prior later status as an automatic scheduling barrier. Existing scope,
+  dependency/codec/device gates and data-safety obligations remain; no optional
+  research feature, new numeric guarantee, adoption or release is granted here.
+  The10k/50k deferral, optional M14 and withdrawn F09 remain unchanged.
+
 Still required later:
 
 - a scripted Product Owner usability walkthrough before public release, using the intended non-specialist persona to complete open/import, caption, merge, export and recovery without implementation terminology; `PROD-12` remains unaccepted until this succeeds;

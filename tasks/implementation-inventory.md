@@ -340,15 +340,21 @@ LociMyuからのタブ構成、Sceneに相当する記録切替、直接色選�
 限定snapshot writerと永続review edit-copyは接続されているが、07の移行profile、通常home／実機／公開の受入れ・批准を意味しない。
 以下の非対象・後続要件は維持する。
 
+2026-10-29のPO訂正により、Scene整理・Captionの反復編集・タグ・表示名など、
+日常の使い勝手に関わる未接続操作は、互換性拡張・保守より優先して仕様を固める対象。
+「最初の限定candidateでdeferred」「追加判断」は実装状態・契約の未確定を表し、
+低優先を意味しない。次のまとまった作業はtodoが管理する。64／62／61群の旧集計を
+完成順や価値の順位には使わず、全任意機能の一括承認・実装済みとも扱わない。
+
 | 対象 | 扱い |
 |---|---|
 | 1万Caption／5万変更の大容量検証 | PO2026-10-29判断で当分後続・低優先。当面の実用版完成や着手順の阻害条件にしない。既存実装・試験・現在の制限を保持し、対応済み保証やPASSとは数えない |
-| Scene複製／削除／並替えUI | 05 §14で最初の限定candidateは明示deferred。core削除guardがあることとUI予定は別 |
+| Scene複製／削除／並替えUI | 未接続。PO2026-10-29訂正で日常作業として優先して仕様整理する。05 §14の初回限定candidateのdeferは現在の低優先指示ではない。共有参照・複製範囲・削除影響・開始Scene・競合の規則は実装前に確定する |
 | 新規Project-space Caption、Sceneごとのrevision／alignment、Scene media layer、汎用Unity階層 | 明示非対象。既存ProjectAnchor読取・置き直しC11とは別 |
-| Captionの一般Undo/Redo・一般複製・前後巡回 | 現状なし。旧parityでも要追加判断／確認待ち。承認済み必須欠落として数えない。モデルalignment固有の復帰M13とは別 |
+| Captionの一般Undo/Redo・一般複製・前後巡回 | 未接続。PO2026-10-29訂正で反復編集の重要機能として優先して仕様整理する。Undo対象・共同編集との関係、複製のID／所属／添付の意味を確定する。モデルalignment固有の復帰M13とは別 |
 | 任意baseColor入力 | 元materialの色保持・描画解釈はあるが入力UIなし。現在のaccepted editable fieldsとは別なので、勝手に新機能化しない |
-| タグ編集UI | 新規作成・編集・管理UIは旧parity §7で追加判断。既存タグの保持・copy・削除依存・package closureは必須で、C10/T04/F06–F08側へ含める。schemaの存在だけで管理画面を必須にしない |
-| ローカルprofile／表示名設定 | 旧homeにはあるが新hostは合成identity。新Projectの利用者向けidentity／来歴表示要件と接続範囲をチーム導入時に確認。クラウドaccountやrolesは作らない |
+| タグ編集UI | 新規作成・編集・管理UIは未接続。PO2026-10-29訂正で記録整理の使い勝手として優先して仕様整理する。既存タグの保持・copy・削除依存・package closureはC10/T04/F06–F08で維持し、管理範囲・削除影響は実装前に確定する |
+| ローカルprofile／表示名設定 | 旧homeにはあるが新hostは合成identity。PO2026-10-29訂正で日常設定・共同作業の分かりやすさとして優先して接続範囲を整理する。利用者identity／来歴表示の契約は実装前に確定し、クラウドaccountやrolesは作らない |
 | HEIC／video／audio | 直接decode／保存／表示は現candidate非対象。HEICのfresh選択には元画像を残して端末で別JPEGを書き出し再選択する案内を限定接続。PROD-16のpost-candidate要件を削除した意味ではない |
 | 自動同一モデル判定／relation推測／位置remap／conflict winner | 禁止。判断量削減で越えてはいけない境界 |
 | smooth-alpha一般保証、transmission、Compare、proxy自動生成／direct splat pick | 個別後続判断・research／gate。承認済み限定GS Proxyやhard chromaの継承とは別 |

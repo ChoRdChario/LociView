@@ -14,7 +14,9 @@ Complete open → Project/Scene/model/Caption/media work → save/send → recei
 inventory groups: M13 remains later; M14 visual repair is optional and outside
 completion requirements per PO2026-10-29; F09 continuing old-format updates was withdrawn.
 Initial Native/frozen-v1/LociMyu conversion and new-format teamwork remain required.
-The inventory classification counts are dated observations, not completion rates.
+The inventory classification counts are dated observations, not completion rates
+or a ranking of user value. The priority correction below governs sequencing;
+the older61-group boundary does not exclude evaluating daily-use operations.
 
 PO prioritizes missing integrated features before readiness-stage tuning. Preserve
 originals/history, typed Session commands and existing write/readback/recovery fences.
@@ -23,7 +25,27 @@ Fix latency when it prevents use or risks data. Keep the existing
 Root is sole writer; bounded independent reviewers are read-only. No small manual
 test or helper approvals. Continue in-scope work while device evidence is pending.
 
-## Current priority correction —defer large Caption qualification
+## Current priority correction —daily-use workflows first
+
+PO2026-10-29 places the everyday-use features previously labelled later/additional
+ahead of compatibility expansion and maintenance. Do not equate an unsettled
+operation contract with low product value or let the dated inventory decide order.
+Start with Scene organization, then repeated Caption editing/copy/undo and record
+organization/settings. Evaluate alignment and media by the user task they enable,
+not by whether a basic internal path already exists. Point/GS replacement, wider
+legacy conversion, general GC and comfort-only tuning remain recorded but are no
+longer the default next work. Data-loss/security defects still take precedence.
+
+This is a sequencing decision, not implementation evidence or blanket ratification
+of every optional feature, undo/concurrency rule, media codec or dependency.
+Keep accepted originals/history and Session/file/recovery fences. No new numeric
+capacity guarantee, general adoption or release is inferred.
+
+This documentation-only correction aligns product/team specifications, inventory,
+handoff and lessons. Diff/local-link checks and independent read-only final review
+pass; no product code changed and no runtime suite/build is required.
+
+## Retained priority correction —defer large Caption qualification
 
 PO2026-10-29 defers10k-Caption support for the foreseeable future and assigns it
 very low priority for completion. The combined10k-Caption/50k-change qualification
@@ -35,17 +57,29 @@ unchanged-feature-classification checks pass; independent review has no findings
 No runtime change or new capacity guarantee; no runtime suite is needed for this
 documentation checkpoint.
 
-## Next connected outcome —ordinary Point replacement
+## Next connected outcome —organize Scenes and their records
 
-Prioritize the accepted practical gap in M02/M08: same-profile ordinary XYZ/RGB
-ASCII Point replacement→needsReview pin correction→edit/save/send→cold reopen.
-Point replacement remains unimplemented. First specify/review its bounded ports
-and acceptance against01a and the existing replacement contract; preserve Asset/
-Frame/placement/Caption/media, use a fresh family/class and no automatic remap.
-Keep Mesh behavior and exclude Native/transformed Point, cross-format, GS/Proxy,
-new profiles/dependencies/limits and release. Stop affected implementation for an
-actual new coordinate/compatibility/ID decision. Do not substitute another large-
-capacity qualification or UI-only helper for this connected user workflow.
+Prepare one usable workflow: arrange Scenes, duplicate a useful starting Scene,
+remove an unneeded Scene, continue editing its retained records, then save/send
+and cold reopen. These operations remain unimplemented. First write/review the
+exact scope, typed Session/provider ports and acceptance, including shared versus
+independent Caption content, views/materials/memberships, default/active Scene,
+last-Scene deletion and concurrent edits. Explain effects in ordinary language;
+preserve referenced models/media/history and use the existing command/file gates.
+Do not present duplication as independent if resources are shared, or deletion as
+harmless if it removes records. Settle any genuine new identity/lifecycle policy
+with a concrete grouped PO decision before affected implementation.
+
+Next address repeated Caption work (copy, undo/redo and previous/next review),
+then tags and local display-name/settings through connected edit/save/resume
+workflows. Specify those semantics before implementation; do not replace the
+useful workflow with whichever isolated button has the easiest existing contract.
+Alignment/media need bounded user outcomes and relevant device/format decisions;
+their prior later label alone is not a reason to put maintenance ahead of them.
+
+Ordinary same-profile Point replacement remains an accepted M02/M08 gap, queued
+behind this usability work: preserve Asset/Frame/placement/Caption/media, use fresh
+family/class and no automatic remap. No Point replacement code was started.
 
 The500k workflow is still slow (about202s to editor,47s edit,232s backup observed).
 Further fresh-inspection/calculation tuning stays pending behind accepted missing
@@ -65,8 +99,9 @@ Verified documentation-only diff, local links and classification arithmetic;
 independent read-only contract review passed. Runtime checks are not required for
 this documentation-only correction.
 No source/runtime, stored data, profile, Proxy relation or initial-placement
-policy change; no runtime acceptance credit. The next implementation unit below
-is unchanged. Stop only for an actual conflict outside this scope clarification.
+policy change; no runtime acceptance credit. The current next unit above supersedes
+the earlier Point-first plan. Stop only for an actual conflict outside this scope
+clarification.
 
 ## Verified checkpoint —500k Review edit-copy
 
