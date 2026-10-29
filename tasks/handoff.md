@@ -36,6 +36,12 @@ implementation are connected in the bounded ProjectScene path; todo owns execute
 review/checks, remaining gates and the next decision.
 Existing browser-local names remain private unless separately selected for sharing.
 General Windows HEIC and device/adoption/release gates remain separate.
+PO2026-10-30 requests rights re-evaluation and practical alternatives, including
+screenshots. Read the[HEIC investigation](../docs/heic-rights-and-workflow-review.md)
+and todo before decoder productization: LGPL conditions and patent scope are separate,
+and external PNG/JPEG input differs from a new original-plus-display-image package.
+This research does not authorize implementation, decoder distribution or an admission
+bypass. The existing native-only path and02§29.2 hold remain.
 Keep existing comfortable-UI guidance, original bytes/history, atomic Session
 commands, file/recovery/evidence fences and one writer. Read-only reviews may run
 in parallel. Continue ordinary approved work without small PO testing waits.

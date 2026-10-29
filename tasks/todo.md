@@ -56,7 +56,39 @@ unchanged-feature-classification checks pass; independent review has no findings
 No runtime change or new capacity guarantee; no runtime suite is needed for this
 documentation checkpoint.
 
-## Current boundary —08b verified ProjectScene checkpoint
+## Current boundary —HEIC rights and alternative-workflow investigation
+
+PO2026-10-30 requests a fresh separation of HEIC rights/distribution questions and
+practical alternatives to shipping a decoder, including OS display/screenshot.
+Outcome: current primary-source rights facts, a comparison of local/browser/OS/
+other-device workflows, and a concrete simple-UX recommendation with explicit
+original/quality/sharing limits. Root writes the record; bounded independent
+read-only agents check rights sources, OS/browser alternatives and current contracts.
+Plan: review existing PoC/holds and current code; verify official current sources;
+compare viable workflows and integration decisions; independently review the memo
+and update the handoff. This authorizes investigation/documentation, not decoder
+adoption, new packages/dependencies, OS installation, schema changes or publication.
+Stop only affected work for a genuine missing authority; do not treat a screenshot
+as avoiding every underlying decoding/patent issue or claim legal clearance.
+Checks are source attribution, contract consistency, diff/local links and review;
+unchanged runtime code needs no repeated full suite. Existing modelFacts stat-only
+marker remains preserved; verified08b checkpoint135359f is pushed to g0-baseline.
+
+[Research memo](../docs/heic-rights-and-workflow-review.md) records current official
+license/pool/platform/API sources and seven practical alternatives. LGPL is a
+conditional distribution path, not an established blanket ban; the exact patent
+coverage/exception remains unresolved. Existing dated PoC success is not universal
+HEIC/OS/color evidence. External JPEG/PNG import works through the existing service;
+paste/screen capture/native-generated companions are proposals, not implemented.
+Simply adding a JPEG beside HEIC does not remove current receive/restore decode
+requirements. An externally retained HEIC is absent from the Project backup.
+Independent rights/UX/contract memo reviews PASS; the conclusion now distinguishes
+existing native-only original retention from the proposed cross-device pair, and
+the HDR screenshot caveat covers iPhone and Mac. Final diff/local-link/unchanged-
+contract checks PASS. Documentation-only: no decoder/package/paste implementation,
+new runtime check/device result, external enquiry or legal clearance is claimed.
+
+## Previous verified boundary —08b ProjectScene checkpoint
 
 PO2026-10-29 approved08b technical design and the complete implementation, including
 the explicit old-reader refusal. Outcome: optional Project-local editor-name opt-in
@@ -479,16 +511,20 @@ names stay private until the separate Project-local opt-in. The milestone audit
 keeps this on the accepted daily-use path; no additional fully specified daily-use
 unit was found in the current inventory. This is not overall app/adoption completion.
 
-Next decision: Windows HEIC direct use. The existing
+Current investigation: Windows HEIC direct use and alternatives. The existing
 [decoder PoC](../scripts/heic-decoder-poc/POC-RESULT.md) records a technical PASS
 from2026-09-03, not a fresh device result. [Specification02§29.2](../docs/specs/02-storage-package-migration.md)
 still holds product connection for distribution materials and separate HEVC rights
-review. Choose either the current native-browser path with separate JPEG-export
-guidance, preserving HEIC originals, or productization preparation for the evaluated
-decoder. The latter can organize reproducible inputs/source/relink/notice materials
-and independent review without product activation or distribution. Decoder adoption,
-resolved distribution/rights conditions and the concrete ProjectScene integration
-contract are still separate decisions. Retain device/offline/release gates.
+review. PO requests comparing decoder-free product workflows as well, not only
+native support versus Wasm productization. The[research memo](../docs/heic-rights-and-workflow-review.md)
+recommends existing external JPEG/PNG input now, an ordinary image-paste entry as
+the smallest implementation candidate, and one-time native generation of a portable
+display image paired with retained HEIC as a future shared-file design candidate.
+Current backup omits any externally retained HEIC. The paired design needs a new
+explicit original/display/verification/receive/restore/old-reader contract; neither
+this investigation nor a screenshot exempts all underlying rights. Decoder adoption,
+distribution/rights conditions and package changes remain separate decisions.
+No product code, dependency, installed codec or accepted gate changed in this unit.
 
 Local Undo covers the named confirmed Caption actions in this editor, not every
 Project action or historical rollback. Native Point/different-profile replacement
