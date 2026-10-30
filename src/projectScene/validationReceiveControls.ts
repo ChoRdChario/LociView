@@ -118,7 +118,7 @@ export function createValidationReceiveControls(document: Document, host: Return
       if (job.state === 'input-required') button(row, '元のファイルを選び直す', () => {
         selectedJob = job.id; input.value = ''; feedback = ''; render(); changed(); input.click();
       });
-      if (job.state === 'incomplete' || job.state === 'completed') button(row, '受信を再開', () =>
+      if (job.state === 'incomplete' || job.state === 'completed') button(row, job.state === 'completed' ? '表示を再試行' : '受信を再開', () =>
         perform(() => host.workspaceFiles.retry(job.id), true, '更新を受け取りました。'));
       if (['input-required', 'unbound-input', 'stale'].includes(job.state)) button(row, 'この受信を取りやめる', () => {
         cancel = { id: job.id, stale: job.state === 'stale' }; render(); changed();
@@ -180,10 +180,11 @@ export function createValidationReceiveControls(document: Document, host: Return
   return { root, render, busy: () => busy || output.busy(), hasChanges,
     closeReason: () => busy ? 'ファイルを処理中です。完了をお待ちください。' : output.closeReason() ?? (restoreChanges() ? '復元の確認を完了するか、復元欄の取消操作を選択してください。' : input.files?.length || selectedJob || selectedCopy || cancel ? '受信欄の入力・確認を完了するか、取り消してください。' : null),
     showAll(){if(hasChanges())return false;surface='all';output.setPresentation('all');render();return true;},
+    currentSurface: () => surface,
     showSurface(next: Exclude<typeof surface,'all'>) {
       if(hasChanges())return false;
       surface=next; output.setPresentation(next === 'save' || next === 'share' ? next : 'all');
-      if(next==='share'||next==='save')output.choosePurpose(next==='share'?'teamWorkspace':'backup');
+      if(next==='share'||next==='save')output.choosePurpose(next==='share'?'teamWorkspace':'backup', false);
       render(); if(next==='restore' && host.backupRestore.enabled)restoreArea.open=true;
       return true;
     },

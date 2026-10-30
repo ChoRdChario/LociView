@@ -167,10 +167,13 @@ describe('same-host known PNG media connection; not decoder adoption, raster, IM
       id: String(i), resourceId: String(i), label: `${i}<script>`, description: '', image: { base64: fixtureMedia[0]!.base64 }
     })) }, selected: string | null = null;
     const chosen = vi.fn((id: string) => { selected = id; });
-    const grid = createMediaThumbnails(document.asDocument(), () => group, viewer, { selected: () => selected, choose: chosen }), root = record(grid.root);
+    const tools=new Map<string,HTMLElement>(), tool=(id:string)=>{if(!tools.has(id)){const node=document.createElement('button');node.textContent='整理'+id;tools.set(id,node as unknown as HTMLElement);}return tools.get(id)!;};
+    const grid = createMediaThumbnails(document.asDocument(), () => group, viewer, { selected: () => selected, choose: chosen },tool), root = record(grid.root);
     grid.render(); expect(nodes(root).filter(n => n.tag === 'img')).toHaveLength(12); expect(chosen).not.toHaveBeenCalled();
+    const firstTool=button(root,'整理0');grid.render();expect(button(root,'整理0')).toBe(firstTool);
     button(root, '0<script>').fire('click'); expect(chosen).toHaveBeenCalledWith('0'); expect(nodes(root).some(n => n.tag === 'script')).toBe(false);
     const old = nodes(root).find(n => n.tag === 'img')!; button(root, '次の一覧').fire('click'); expect(nodes(root).filter(n => n.tag === 'img')).toHaveLength(1);
+    expect(root.contains(firstTool)).toBe(false);expect(button(root,'整理12')).toBeDefined();expect(nodes(root).filter(n=>n.tag==='figure')).toHaveLength(1);
     group = { ...group, scope: 'two', items: [group.items[0]!] }; grid.render();
     const fresh = nodes(root).find(n => n.tag === 'img')!; expect(fresh).not.toBe(old); old.fire('error'); expect(button(root, '画像を再試行').hidden).toBe(true);
     expect((fresh as unknown as HTMLImageElement).loading).toBe('lazy'); grid.dispose(); viewer.dispose();

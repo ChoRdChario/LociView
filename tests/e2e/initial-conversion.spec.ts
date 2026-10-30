@@ -61,7 +61,7 @@ for (const lane of lanes) test(`${lane.kind}ファイルを内容確認して変
     await expect(files.locator('.lv-operation-status')).toHaveAttribute('data-busy', 'false', { timeout: 90_000 });
     if (verify) {
       const history = files.locator('details').filter({ has: page.locator('summary', { hasText: /^作成したファイル$/ }) }); await history.locator('summary').first().click();
-      const row = history.locator('section').filter({ hasText: `バックアップ ${name} —` }); await row.getByText('保存先のファイルを確認', { exact: true }).click();
+      const row = history.locator('section').filter({ hasText: `バックアップ ${name} —` }); await row.getByText('保存したファイルを確認', { exact: true }).click();
       const chooser = page.waitForEvent('filechooser'); await row.getByRole('button', { name: 'ファイルを選択', exact: true }).click(); await (await chooser).setFiles(path);
       await expect(files.getByText('選択したファイルの内容を確認しました。', { exact: true })).toBeVisible({ timeout: 90_000 });
       await expect(page.getByLabel('保存ファイルの状態', { exact: true })).toHaveText('保存ファイルと一致');
@@ -98,7 +98,7 @@ for (const lane of lanes) test(`${lane.kind}ファイルを内容確認して変
       };
       let convert = await preview(); const help = lane.kind === 'LociMyu' ? '元ZIPと変換の説明を別に保管してください。変換後のバックアップや共有ファイルには元データと説明は含まれません。' : '元ファイルは変更しません。チームでは変換後のファイルを使ってください。元ファイルは書き出しに含まれないため、別に保管してください。'; await expect(page.getByText(help, { exact: true })).toBeVisible();
       await convert.scrollIntoViewIfNeeded(); await page.screenshot({ path: info.outputPath(`${lane.kind}変換前の確認.png`), fullPage: true });
-      await page.getByRole('button', { name: 'キャンセル', exact: true }).click(); await expect(convert).toBeHidden(); convert = await preview(); await convert.click();
+      await page.getByRole('button', { name: '選択を取り消す', exact: true }).click(); await expect(convert).toBeHidden(); convert = await preview(); await convert.click();
       await expect(page.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText(title, { timeout: 90_000 });
       await page.getByRole('list', { name: 'キャプション一覧', exact: true }).locator('.lv-caption-select').filter({ hasText: lane.caption }).click();
       await expect(detail(page).getByLabel('本文', { exact: true })).toHaveValue(lane.previousBody); await detail(page).getByLabel('本文', { exact: true }).fill(body);

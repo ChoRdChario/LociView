@@ -93,9 +93,9 @@ export function createViewAuthorControls(document: Document, onEvent: (event: Vi
       (context.view.source.sceneId !== next.view.source.sceneId || context.view.source.projectFrameId !== next.view.source.projectFrameId ||
         context.view.memory.selectedViewId !== next.view.memory.selectedViewId)) { show('編集中の視点を適用・取り消しするか、処理の完了を待ってください。'); return false; }
     context = next; const draft = next.draft, busy = next.feedback.kind === 'applying', item = selectedAuthorView(next);
-    form.hidden = !draft; actions.hidden = !draft;
+    form.hidden = !draft; actions.hidden = !draft; edit.hidden = !item && !draft; manage.hidden = !item && !draft;
     const addIssue = reason(planViewAuthor(next, { kind: 'new' })), editIssue = reason(planViewAuthor(next, { kind: 'edit' }));
-    add.disabled = Boolean(addIssue); edit.disabled = Boolean(editIssue); target.textContent = item ? savedViewName(item) : '保存した視点を選択';
+    add.disabled = Boolean(addIssue); edit.disabled = Boolean(editIssue); target.textContent = item ? savedViewName(item) : ''; target.hidden = !item;
     const observedName = item?.name.kind === 'value' ? item.name.value : '';
     if (!draft?.composing) { const text = draft?.name ?? observedName; if (name.value !== text) name.value = text; }
     const nameUnknown = Boolean(draft && draft.viewId !== null && (draft.baseName.kind !== 'value' || item?.name.kind !== 'value'));
@@ -115,7 +115,7 @@ export function createViewAuthorControls(document: Document, onEvent: (event: Vi
     status.textContent = [next.feedback.kind === 'failed' && `変更できませんでした。${next.feedback.message}`,
       busy && '視点の変更を適用中です。', draft && '視点の編集は未適用です。',
       draft ? applyIssue !== '変更はありません。' && applyIssue : addIssue,
-      draft && captureIssue, !draft && editIssue].filter(Boolean).join(' '); status.hidden = !status.textContent;
+      draft && captureIssue, !draft && item && editIssue].filter(Boolean).join(' '); status.hidden = !status.textContent;
     review.hidden = !(nameUnknown || next.view.source.kind !== 'ready' || (draft && applyIssue && applyIssue !== '変更はありません。'));
     review.disabled = !next.view.source.token || busy;
     if (confirming && ('kind' in confirming ? !viewAuthorPlanIsCurrent(confirming, next) : confirming !== draft || Boolean(draft?.composing)) ) {
@@ -123,7 +123,7 @@ export function createViewAuthorControls(document: Document, onEvent: (event: Vi
     }
     confirm.disabled = busy; return true;
   }
-  return { root, actions, confirmation, render, dispose: () => { disposed = true; stopHelp(); cleanup(); actions.remove(); confirmation.remove(); root.remove(); } };
+  return { root, actions, confirmation, review, render, dispose: () => { disposed = true; stopHelp(); cleanup(); actions.remove(); confirmation.remove(); root.remove(); } };
 }
 
 export type ViewBackgroundEvent = ViewBackgroundPlan | Readonly<{ kind: 'draft'; baseDraft: ViewBackgroundDraft | null; draft: ViewBackgroundDraft }> |

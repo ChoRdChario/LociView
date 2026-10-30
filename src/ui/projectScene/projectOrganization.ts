@@ -17,7 +17,7 @@ interface OrganizationHost {
 export function createProjectOrganization(document: Document, host: OrganizationHost) {
   const { make, button } = panelNodes(document), sceneRoot = make('div'), captionRoot = make('div'), tagsRoot = make('details');
   sceneRoot.setAttribute('aria-label', 'シーンの整理'); captionRoot.setAttribute('aria-label', '記録の編集操作'); tagsRoot.setAttribute('aria-label', 'タグの管理');
-  tagsRoot.append(make('summary', 'タグを管理'));
+  const tagsSummary = make('summary', 'タグを管理'); tagsRoot.append(tagsSummary);
   let disposed = false, composing = false, form: { kind: 'sceneCopy' | 'sceneDelete' | 'tagEdit' | 'tagDelete'; token: string; id: string } | null = null;
   let captured: { token: string; tagId: string | null } | null = null;
   let settingsDraft: { before: string; value: string } | null = null;
@@ -177,14 +177,26 @@ export function createProjectOrganization(document: Document, host: Organization
     tagNote.textContent = stale ? '内容が更新されています。入力は保持しています。取り消して選び直してください。' : form?.kind === 'tagDelete' ? 'すべての記録からこのタグを外します。記録や添付は残ります。' : '';
     tagName.disabled = tagColor.disabled = blocked || !!form && form.kind !== 'tagEdit';
     tagList.replaceChildren();
+    const viewing = host.ports.mode === 'view'; tagsSummary.textContent = viewing ? 'タグ' : 'タグを管理';
+    const tagLinks = Object.values(s.provider.details.mutable.captionTagMembershipsById);
+    const uncertainLinks = tagLinks.some(f => (f.captionId?.kind !== 'value' || fieldValue(f.captionId) === s.captionId) &&
+      (fieldValue(f.lifecycle) as {state?:string}|undefined)?.state !== 'deleted' && !['captionId','tagId', 'lifecycle'].every(key => f[key]?.kind === 'value'));
+    if (uncertainLinks) tagNote.textContent += ' このプロジェクトに所属を確認できないタグ登録があります。元の記録は保持しています。';
     for (const [tagId, fields] of Object.entries(s.provider.details.mutable.captionTagsById)) {
       const lifecycle = fieldValue(fields.lifecycle) as { state?: string } | undefined;
       const retainedLink = Object.values(s.provider.details.mutable.captionTagMembershipsById).some(f => fieldValue(f.tagId) === tagId &&
         (fieldValue(f.lifecycle) as { state?: string } | undefined)?.state !== 'deleted');
       if (lifecycle?.state === 'deleted' && !retainedLink && !s.provider.issues.some(i => i.code === 'concurrent-delete-edit' && i.path[1] === tagId)) continue;
       const row = make('div'), label = fieldValue(fields.label), color = fieldValue(fields.colorSrgb);
-      row.append(make('span', typeof label === 'string' ? label : '名前を確認するタグ'));
       const related = Object.entries(s.provider.details.mutable.captionTagMembershipsById).filter(([, f]) => activeRecord(f) && fieldValue(f.tagId) === tagId && fieldValue(f.captionId) === s.captionId);
+      const uncertain = tagLinks.some(f => fieldValue(f.tagId) === tagId && fieldValue(f.captionId) === s.captionId && f.lifecycle?.kind !== 'value');
+      if (viewing && !related.length && !uncertain) continue;
+      row.className = 'lv-caption-tag'; row.dataset.included = String(related.length > 0);
+      const name = make('span', typeof label === 'string' ? label : '名前を確認するタグ'), swatch = make('i'); swatch.setAttribute('aria-hidden', 'true');
+      if (Array.isArray(color) && color.length === 3 && color.every(v => typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 1))
+        swatch.style.backgroundColor = '#' + color.map(v => Math.round(Number(v) * 255).toString(16).padStart(2, '0')).join('');
+      name.append(swatch); row.append(name);
+      if (uncertain) row.append(make('span', '所属を確認'));
       const toggle = button(related.length ? 'この記録からタグを外す' : 'この記録にタグを付ける', () => { if (s.captionId) perform({ kind: 'setCaptionTag', captionId: s.captionId, tagId, included: !related.length }, () => host.message('記録のタグを変更しました。')); });
       editOnly(toggle); toggle.disabled = blocked || owned || !s.captionId || !activeRecord(fields); row.append(toggle);
       const edit = button('タグを編集', () => { if (blocked || owned) return; form = { kind: 'tagEdit', token: s.provider.token, id: tagId }; captured = { token: s.provider.token, tagId }; tagName.value = typeof label === 'string' ? label : ''; if (Array.isArray(color)) tagColor.value = '#' + color.map(v => Math.round(Number(v) * 255).toString(16).padStart(2, '0')).join(''); host.changed(); });
@@ -208,6 +220,7 @@ export function createProjectOrganization(document: Document, host: Organization
       }
       tagList.append(row);
     }
+    tagsRoot.hidden = viewing && !tagList.children.length && !uncertainLinks && !form && !captured;
   }
   return { sceneRoot, captionRoot, tagsRoot, settingsRoot, displayNameBadge, render,
     inputOwner: () => settingsDraft || editorDraft ? 'settings' as const : form?.kind === 'sceneCopy' || form?.kind === 'sceneDelete' ? 'scene' as const : 'caption' as const,

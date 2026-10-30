@@ -342,6 +342,8 @@ export const projectSceneApplicationImports:Readonly<Record<string,readonly stri
     "three"
   ],
   "src/projectScene/reviewWorkspace.ts": [
+    "../ui/projectScene/cameraGizmo",
+    "../ui/projectScene/contextHelp",
     "../ui/projectScene/captionListControls",
     "../ui/projectScene/captionListState",
     "../ui/projectScene/captionWindowControls",

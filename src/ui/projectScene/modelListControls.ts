@@ -7,7 +7,7 @@ import { editOnly } from './modePresentation';
 
 let nextModelControl = 0;
 /** Project inventory with separate membership and local visibility intentions; no direct renderer/storage access. */
-export function createModelListControls(document: Document, onPlan: (plan: ModelListPlan) => void) {
+export function createModelListControls(document: Document, onPlan: (plan: ModelListPlan) => void, reviewAvailable?: (assetId: string) => boolean) {
   const make = <K extends keyof HTMLElementTagNameMap>(tag: K, text = '') => { const node = document.createElement(tag); node.textContent = text; return node; };
   const button = (text: string) => { const node = make('button', text); node.type = 'button'; return node; };
   const root = make('section'); root.className = 'lv-model-browser'; root.setAttribute('aria-label', 'モデル');
@@ -107,7 +107,7 @@ export function createModelListControls(document: Document, onPlan: (plan: Model
     else if (item.display.value === 'temporarilyHidden') notes.push('一時的に非表示です。シーンへの所属とは別の設定です。');
     if (toggleIssue && !notes.includes(toggleIssue) && context!.pending === null && context!.mutationBlock === null && context!.feedback.kind !== 'applying') notes.push(toggleIssue);
     entry.note.textContent = notes.join(' '); entry.note.hidden = !entry.note.textContent;
-    entry.review.hidden = !notes.length; return entry.node;
+    entry.review.hidden = !notes.length || reviewAvailable?.(item.id) === false || notes.length === 1 && item.display.kind === 'value' && item.display.value === 'temporarilyHidden'; return entry.node;
   }
   function orderNodes(wanted: HTMLElement[]) {
     const keep = new Set(wanted); for (const child of [...list.children]) if (!keep.has(child as HTMLElement)) child.remove();

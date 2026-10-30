@@ -6,7 +6,8 @@ import { editOnly } from './modePresentation';
 
 let nextViewControls = 0;
 /** Reusable controls only; rendering or selecting an option never applies a camera. */
-export function createViewControls(document: Document, onPlan: (plan: ViewPlan) => void) {
+export function createViewControls(document: Document, onPlan: (plan: ViewPlan) => void,
+  presentation?: { externalOrientation?: boolean }) {
   const make = <K extends keyof HTMLElementTagNameMap>(tag: K, text = '') => { const node = document.createElement(tag); node.textContent = text; return node; };
   const button = (text: string) => { const node = make('button', text); node.type = 'button'; return node; };
   const label = (text: string, control: HTMLElement) => { const node = make('label', text); control.setAttribute('aria-label', text); node.append(control); return node; };
@@ -21,7 +22,8 @@ export function createViewControls(document: Document, onPlan: (plan: ViewPlan) 
   const projection = make('select');
   const option = (value: string, text: string, disabled = false) => { const node = make('option', text); node.value = value; node.disabled = disabled; return node; };
   projection.append(option('', '投影方式を確認', true), option('perspective', '透視投影'), option('orthographic', '平行投影'));
-  camera.append(fit, axes, label('投影方式', projection), cameraNote, cameraStatus);
+  if (!presentation?.externalOrientation) camera.append(fit, axes);
+  camera.append(label('投影方式', projection), cameraNote, cameraStatus);
   const saved = make('section'), picker = make('select'), recall = button('表示'), savedNote = message(), savedReview = button('状態を確認');
   saved.setAttribute('aria-label', '保存した視点'); saved.append(label('保存した視点', picker), recall, savedNote, savedReview);
   const entry = make('section'), entryPicker = make('select'), apply = button('設定を適用'), cancel = button('取り消す');
@@ -86,7 +88,7 @@ export function createViewControls(document: Document, onPlan: (plan: ViewPlan) 
       node.disabled = reason(planView(next, { kind: 'axis', axis })) !== null;
       node.setAttribute('aria-pressed', String(observedRuntime?.axis === axis));
     }
-    cameraNote.textContent = [...new Set([fitIssue, projectionIssue].filter(Boolean))].join(' '); cameraNote.hidden = !cameraNote.textContent;
+    cameraNote.textContent = [...new Set([!presentation?.externalOrientation && fitIssue, projectionIssue].filter(Boolean))].join(' '); cameraNote.hidden = !cameraNote.textContent;
     cameraStatus.textContent = feedback(next.cameraFeedback); cameraStatus.hidden = !cameraStatus.textContent;
     quickNote.textContent = [fitIssue, feedback(next.cameraFeedback)].filter(Boolean).join(' '); quickNote.hidden = !quickNote.textContent;
     const choices = savedViewChoices(next), sourceIssue = viewSourceIssue(next);
@@ -122,5 +124,5 @@ export function createViewControls(document: Document, onPlan: (plan: ViewPlan) 
     entryReview.hidden = !observedIssue; entryReview.disabled = sourceIssue !== null || busy;
     return true;
   }
-  return { root, camera, stageTools, entryActions, render, dispose: () => { disposed = true; cleanups.forEach(cleanup => cleanup()); entryActions.remove(); root.remove(); stageTools.remove(); } };
+  return { root, camera, stageTools, entryActions, reviews: { selected: savedReview, entry: entryReview }, render, dispose: () => { disposed = true; cleanups.forEach(cleanup => cleanup()); entryActions.remove(); root.remove(); stageTools.remove(); } };
 }

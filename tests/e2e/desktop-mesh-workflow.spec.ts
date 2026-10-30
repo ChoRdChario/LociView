@@ -1,4 +1,4 @@
-import { revealModelManagement, lookAlongFront } from './workspaceUi';
+import { revealFileSurface, revealModelManagement, lookAlongFront } from './workspaceUi';
 import {test,expect,chromium,type Page,type BrowserContext,type TestInfo} from '@playwright/test';
 import {mkdir,mkdtemp,writeFile} from 'node:fs/promises';
 import {openAsBlob} from 'node:fs';
@@ -25,12 +25,14 @@ async function edit(p:Page,field:'タイトル'|'本文',text:string){await deta
 async function output(p:Page,info:TestInfo,name:string,purpose:'backup'|'teamWorkspace'|'contribution'|'review'|'clean',base?:string,reviewScene?:string){
   const menu=p.locator('details.lv-project-files');if(await menu.count()&&!await menu.evaluate(n=>(n as HTMLDetailsElement).open))await menu.locator(':scope > summary').click();
   const area=files(p);
-  if(purpose==='review'||purpose==='clean'){
+  const compact=await revealFileSurface(p,purpose==='backup'?'保存':'共有');
+  if(compact){if(purpose!=='backup')await area.getByLabel('渡す内容',{exact:true}).selectOption(purpose);}
+  else if(purpose==='review'||purpose==='clean'){
     const more=area.locator('summary').filter({hasText:/^その他$/});if(!await more.evaluate(n=>(n.parentElement as HTMLDetailsElement).open))await more.click();
     await area.getByRole('button',{name:purpose==='review'?'シーンを共有':'独立コピーを作る',exact:true}).click();
   }else await area.getByRole('button',{name:purpose==='backup'?'保存':'相手に渡す',exact:true}).click();
   if(purpose==='backup')await area.getByLabel('名前（任意）',{exact:true}).fill(name);
-  else if(purpose!=='review'&&purpose!=='clean'){await area.getByLabel('渡す内容',{exact:true}).selectOption(purpose);if(base)await area.getByLabel('元にする作業一式',{exact:true}).selectOption(base);}
+  else if(purpose!=='review'&&purpose!=='clean'){if(!compact)await area.getByLabel('渡す内容',{exact:true}).selectOption(purpose);if(base)await area.getByLabel('元にする作業一式',{exact:true}).selectOption(base);}
   if(purpose==='review'){const scenes=area.getByLabel('渡すシーン',{exact:true});await scenes.selectOption(reviewScene?{label:reviewScene}:(await scenes.locator('option').evaluateAll(ns=>ns.map(n=>(n as HTMLOptionElement).value).filter(Boolean)))[0]!);}
   if(purpose==='review'||purpose==='clean')await area.getByRole('button',{name:'内容を確認',exact:true}).click();
   const primary=area.locator('button.lv-file-primary');await expect(primary).toBeEnabled({timeout:300000});
@@ -106,7 +108,7 @@ for(const opaqueMaterials of [false,true,'standard']as const)test(opaqueMaterial
     let a=await run.launch(0);await expect(a.p.getByRole('button',{name:'ファイルを開く',exact:true})).toBeEnabled();const previewIo=standard?await a.p.evaluate(()=>(window as any).previewIo):null;
     await open(a.p,input);await expect(a.p.getByRole('button',{name:'新しいプロジェクトに変換',exact:true})).toBeVisible({timeout:180000});await expect(a.p.getByText(/OBJの外部材質・画像は読み込まず/)).toBeVisible();
     if(standard){const explanation=a.p.getByRole('region',{name:'材質の変換による変更',exact:true});await expect(explanation).toBeVisible();await explanation.locator('summary').click();await expect(explanation.locator('li').filter({hasText:'観察 / obj /'})).toContainText('不透明度を掛けます');await expect(explanation.locator('li').filter({hasText:'観察 / gltf /'})).toContainText('非表示になります');
-      expect(await a.p.evaluate(()=>(window as any).previewIo)).toEqual(previewIo);await a.p.getByRole('button',{name:'キャンセル',exact:true}).click();await expect(a.p.getByRole('button',{name:'ファイルを開く',exact:true})).toBeEnabled();expect(await a.p.evaluate(()=>(window as any).previewIo)).toEqual(previewIo);await expect(explanation).toBeHidden();await open(a.p,input);await expect(a.p.getByRole('button',{name:'新しいプロジェクトに変換',exact:true})).toBeVisible({timeout:180000});}
+      expect(await a.p.evaluate(()=>(window as any).previewIo)).toEqual(previewIo);await a.p.getByRole('button',{name:'選択を取り消す',exact:true}).click();await expect(a.p.getByRole('button',{name:'ファイルを開く',exact:true})).toBeEnabled();expect(await a.p.evaluate(()=>(window as any).previewIo)).toEqual(previewIo);await expect(explanation).toBeHidden();await open(a.p,input);await expect(a.p.getByRole('button',{name:'新しいプロジェクトに変換',exact:true})).toBeVisible({timeout:180000});}
     await a.p.getByRole('button',{name:'新しいプロジェクトに変換',exact:true}).click();await ready(a.p,title,standard?'smooth':'clear');await run.mark('converted',a.p);
     await a.p.getByRole('tab',{name:'モデル',exact:true}).click();const firstPanel=a.p.getByRole('tabpanel',{name:'モデル',exact:true});await firstPanel.locator('.lv-model-select').filter({hasText:'GS'}).click();await firstPanel.getByRole('button',{name:'このモデルだけ表示',exact:true}).click();await lookAlongFront(a.p);await a.p.screenshot({path:info.outputPath('converted-models.png'),fullPage:true});
     await expect.poll(async()=>(await presentedCanvas(a.p.getByLabel('3Dモデルの表示',{exact:true}))).red,{timeout:90000}).toBeGreaterThan(20);
@@ -142,10 +144,10 @@ for(const opaqueMaterials of [false,true,'standard']as const)test(opaqueMaterial
     for(let round=1;round<=2;round++){
       const previousTitle=round===1?'既存のピン':`返送前${round-1}`;await selectCaption(a.p,previousTitle);await edit(a.p,'本文',`手元の本文${round}`);await selectCaption(b.p,previousTitle);await edit(b.p,'タイトル',`返送前${round}`);
       const returned=await output(b.p,info,'return-'+round,'contribution',wire.archive.control.manifest.packageId),receive=a.p.getByRole('region',{name:'更新ファイル',exact:true});
-      await receive.getByLabel('更新ファイルを選択',{exact:true}).setInputFiles(returned);await receive.getByRole('button',{name:'更新を受け取る',exact:true}).click();await expect(receive.getByText('更新を受け取りました。',{exact:true})).toBeVisible({timeout:180000});await ready(a.p,title,standard?'smooth':'clear');
+      await revealFileSurface(a.p,'受信');await receive.getByLabel('更新ファイルを選択',{exact:true}).setInputFiles(returned);await receive.getByRole('button',{name:'更新を受け取る',exact:true}).click();await expect(receive.getByText('更新を受け取りました。',{exact:true})).toBeVisible({timeout:180000});await ready(a.p,title,standard?'smooth':'clear');
       const state=await backup(await output(a.p,info,'round-'+round,'backup'));verifyModels(state.records,fixture);if(opaqueMaterials)expect(materialMeaning(state.records)).toEqual(materialMeaning(first.records));
       expect(state.records.captionsById[originalCaptionId]).toMatchObject({title:`返送前${round}`,body:`手元の本文${round}`});
-      if(round===1){workspace=await output(a.p,info,'workspace-2','teamWorkspace');wire=await WorkspaceArchive.inspect(await openAsBlob(workspace),limits);const incoming=b.p.getByRole('region',{name:'更新ファイル',exact:true});await incoming.getByLabel('更新ファイルを選択',{exact:true}).setInputFiles(workspace);await incoming.getByRole('button',{name:'更新を受け取る',exact:true}).click();await expect(incoming.getByText('更新を受け取りました。',{exact:true})).toBeVisible({timeout:180000});await ready(b.p,title,standard?'smooth':'clear');}
+      if(round===1){workspace=await output(a.p,info,'workspace-2','teamWorkspace');wire=await WorkspaceArchive.inspect(await openAsBlob(workspace),limits);const incoming=b.p.getByRole('region',{name:'更新ファイル',exact:true});await revealFileSurface(b.p,'受信');await incoming.getByLabel('更新ファイルを選択',{exact:true}).setInputFiles(workspace);await incoming.getByRole('button',{name:'更新を受け取る',exact:true}).click();await expect(incoming.getByText('更新を受け取りました。',{exact:true})).toBeVisible({timeout:180000});await ready(b.p,title,standard?'smooth':'clear');}
     }
     await run.close(b.context);await run.mark('two-rounds',a.p);
     const finalPath=await output(a.p,info,'final','backup'),final=await backup(finalPath),reviewPath=await output(a.p,info,'review','review',undefined,opaqueMaterials?'観察':undefined),cleanPath=await output(a.p,info,'clean','clean');

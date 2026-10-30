@@ -1,3 +1,4 @@
+import { revealFileSurface } from './workspaceUi';
 import { test, expect, chromium } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import * as A from '@automerge/automerge';
@@ -37,7 +38,7 @@ test('delayed explanations stay readable and preserve a Caption draft through to
     await p.screenshot({ path: info.outputPath('narrow-context-help.png'), fullPage: true }); await p.keyboard.press('Escape'); await expect(title).toHaveValue('説明を開いても入力を保持');
     await p.setViewportSize({ width: 1440, height: 1000 }); const detail = p.getByRole('region', { name: 'キャプションの詳細', exact: true }); await detail.getByRole('button', { name: '変更を適用', exact: true }).click(); await expect(p.getByText('変更を適用しました。', { exact: true })).toBeVisible();
     const menu = p.locator('details.lv-project-files'); if (!await menu.evaluate(n => (n as HTMLDetailsElement).open)) await menu.locator(':scope > summary').click();
-    const files = p.getByRole('region', { name: 'ファイル', exact: true }); await files.getByRole('button', { name: '保存', exact: true }).click();
+    const files = p.getByRole('region', { name: 'ファイル', exact: true }); if(!await revealFileSurface(p,'保存')) await files.getByRole('button', { name: '保存', exact: true }).click();
     const [download] = await Promise.all([p.waitForEvent('download'), files.locator('button.lv-file-primary').click()]); const saved = info.outputPath('help-backup.zip'); await download.saveAs(saved);
     const archive = await BackupArchive.inspect(new Blob([Uint8Array.from(await readFile(saved)).buffer]), validationMetadataLimits), inspected = await inspectProjectCandidates(archive.source.read(), validationMetadataLimits);
     expect(inspected.kind).toBe('project-candidate-inspection'); if (inspected.kind !== 'project-candidate-inspection') throw Error('Saved metadata');

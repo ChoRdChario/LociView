@@ -51,6 +51,20 @@ there is no personal Chrome profile or plugin access. Width changes and dispatch
 composition events are desktop emulation, not physical-device/native-IME evidence.
 Todo owns results and qualifications; this pair does not rerun the broader E2E matrices.
 
+The2026-10-31 control audit is in [the design review](ui-design-review.md#2026-10-31-操作と機能の棚卸し).
+`desktop-workspace-completion.spec.ts` exercises the unified File tabs, attachment
+card/editor ownership, View-only tag membership and Point size, placement mode,
+and navigation to a real conflicting field before save/reload.
+`desktop-control-review.spec.ts` opens a generated Review file in a second isolated
+context, checks the shared camera gizmo and empty-Caption state, then verifies
+cancel/explicit independent-copy confirmation, distinct Project identity and
+save/reload. `desktop-file-continuation.spec.ts` now owns its offline-artifact
+server, including its peer context; receive/restore and retained editing use the
+actual unified menus. These cases do not access the personal4182 origin.
+`workspaceUi.ts` navigates actual File tabs without forced DOM changes and retains
+the older reader/noncompact fallback. Run results and earlier failures belong in
+todo, not an inferred matrix pass. Service Workers remain blocked in these cases.
+
 Approved09 has an additional `playwright.offline.config.ts` lane:
 
 ```powershell

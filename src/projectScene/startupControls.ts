@@ -17,7 +17,8 @@ export function createMetadataStartupControls(document: Document, host: SavedWor
   select.setAttribute('aria-label', '残す開始シーン'); apply.type = cancel.type = 'button';
   apply.textContent = '開始シーンを確定'; cancel.textContent = '取り消す'; message.setAttribute('role', 'status');
   note.textContent = '次に開くシーンを選びます。シーンや記録は削除されません。';
-  root.append(heading, note, values, select, apply, cancel, message);
+  const conflictControls = document.createElement('section'); conflictControls.setAttribute('aria-label', '開始シーンの選択');
+  conflictControls.append(values, select, apply); root.append(heading, note, conflictControls, cancel, message);
   const recovery = document.createElement('section'), recoverySelect = document.createElement('select'), restore = document.createElement('button');
   const recoveryNote = document.createElement('p'); recovery.setAttribute('aria-label', 'シーンの復旧'); recoverySelect.setAttribute('aria-label', '復旧するシーン');
   restore.type = 'button'; restore.textContent = 'このシーンを復旧して開く';
@@ -39,6 +40,9 @@ export function createMetadataStartupControls(document: Document, host: SavedWor
     const defaultLifecycle = provider?.kind === 'scene-provider' && defaultId ? provider.state.scenes[defaultId]?.lifecycle : undefined;
     const needsRecovery = provider?.kind === 'scene-provider' && (!defaultLifecycle || defaultLifecycle.kind !== 'value' || defaultLifecycle.value.state !== 'active');
     root.hidden = !conflict && !needsRecovery && !hasChanges();
+    conflictControls.hidden = !conflict && !select.value;
+    heading.textContent = conflict ? '開始シーンを選択' : 'シーンを復旧';
+    note.hidden = !conflict; cancel.hidden = !select.value && !recoverySelect.value && ack.state === 'idle';
     recovery.hidden = !needsRecovery && !recoverySelect.value;
     if (provider?.kind === 'scene-provider' && token !== provider.token && !hasChanges()) {
       token = provider.token; feedback = ''; ready = false; values.replaceChildren(); select.replaceChildren();
@@ -68,9 +72,9 @@ export function createMetadataStartupControls(document: Document, host: SavedWor
     cancel.disabled = disposed || host.hasPending() || ack.state !== 'idle' || !!session()?.workingBlock;
     message.textContent = feedback || (ack.block ?? (host.hasPending() ? '更新が未完了です。元の変更から再試行してください。' :
       stale ? '内容が更新されています。選択は保持しています。取り消して選び直してください。' :
+      host.authority.readOnly ? '閲覧中です。「編集する」から内容を確定できます。' :
       needsRecovery ? '開始できるシーンがありません。記録は保持しています。復旧するシーンを選択してください。' :
       !ready && conflict ? '候補の状態を確認できないため解消できません。元の変更は保持しています。' :
-      host.authority.readOnly ? 'このタブは閲覧専用です。編集用タブで確定し、再開用データを確認してください。' :
       select.value ? 'この選択はまだ適用されていません。' : '開始シーンが競合しています。自動では選びません。'));
   };
   select.addEventListener('change', () => { feedback = ''; render(); changed(); });

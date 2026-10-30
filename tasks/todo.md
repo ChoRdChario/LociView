@@ -1,6 +1,6 @@
 # LociView active work
 
-Updated2026-10-30. This is the single current plan and check record.
+Updated2026-10-31. This is the single current plan and check record.
 [Inventory](implementation-inventory.md) owns route-specific coverage;
 [map](../PROJECT_MAP.md) and [document index](../docs/README.md) route contracts/code.
 Git owns checkpoint identity. [Retained checkpoint evidence](../docs/history/development-through-2026-10-29/tasks/todo-before-daily-authoring.md)
@@ -56,7 +56,108 @@ unchanged-feature-classification checks pass; independent review has no findings
 No runtime change or new capacity guarantee; no runtime suite is needed for this
 documentation checkpoint.
 
-## Current boundary —one PC application across connected/offline startup
+## Current boundary —audit and simplify the complete PC control flow
+
+PO2026-10-31 requests checking each button/UI against its actual function, finding
+duplicates and development-only separation residue, and repairing unnecessary
+steps as part of final UX organization. Primary scope is the unified09 PC app:
+home/open/create/convert/recover → read/edit/organize/model/view/media → files/
+team/conflict/restore → Settings. Retained legacy and harness routes are internal
+compatibility evidence, not a reason to expose multiple PC user workflows.
+
+Plan: enumerate the complete rendered-state/control inventory with independent
+read-only audits before product fixes → record grouped findings and minimal repair
+acceptance in the existing UI review/design → repair one coherent product flow
+using existing ports → focused behavior and dedicated-Chromium verification →
+final serial checkpoint/5-build/isolation, independent diff review and verified Push.
+Root is sole writer. Start at clean/synced0da3f8e. Existing model/team continuation
+is subordinate to this latest UI audit; do not begin unrelated feature expansion.
+
+Acceptance: each retained action has a distinct user result or justified shortcut;
+labels and enabled/visible state match its handler; no empty/nonfunctional panels,
+avoidable repeated choice, or internal route/build/purpose selection masquerading
+as a user task. Review View/Edit and empty/selected/draft/busy/failure/recovery
+states, not just the default screen. Preserve all actual functions, originals,
+commands, unsaved/IME/write/recovery/privacy/worker fences and necessary warnings.
+No dependency, storage/schema, renderer, capacity, public-entry or release change.
+Stop only the affected item for a real product/compatibility/architecture conflict.
+No small PO test/approval waits; run the relevant automated checks autonomously.
+
+Complete source/control inventories from three independent read-only scopes and
+root's standalone Review/file adapter inspection are consolidated in the existing
+[UI review R1–R10](../docs/ui-design-review.md#2026-10-31-操作と機能の棚卸し), before
+product edits. Repair scope: one-purpose File/navigation; existing gizmo on Review
+and no duplicate axes; target/draft disclosure and placement mode; real issue
+navigation; local Point size in View; truthful tags; startup recovery; conversion
+recheck; human copy/optional diagnostics; single attachment cards. UI slots/import
+boundaries are recorded in the workspace design. Preserve the functional file
+purposes, Scene creation vs duplication, membership vs local hiding, independent
+copy, local/shared names and offline prepare/recheck/removal distinctions.
+
+Implemented R1–R10 through existing UI/file/Session ports. File now shows one
+purpose with four keyboard-operable tabs; opening does not create an unfinished
+choice. The retained Project-navigation node lives there rather than Help.
+Review uses the accepted gizmo; product saved-view controls retain projection
+without duplicate axes. Target/draft controls, actual candidate navigation,
+View-local Point size/tag membership, recovery/convert messages, optional technical
+details and one attachment card retain their original command/data authority.
+Source/control and final-diff reviews by three read-only reviewers have no remaining
+findings after their bounded fixes; reviewers did not execute browser tests.
+
+Focused component/import checks56PASS; representative project-file selection checks
+7PASS, then the corrected single-card description case1PASS. A separate earlier
+164-case focused run and typecheck pass are retained, not final-tree completion.
+Dedicated Chromium: workspace-completion handoff/conflict/save/reload case PASS;
+View/Edit case PASS28.2s; final empty Review/gizmo/cancel/copy/save/reload case
+PASS41.1s. File continuation PASS134.7s: empty tag-focus and cancelled verification
+retain navigation/editing; receive preserves local body, restore feedback respects
+reduced motion, post-restore File has one selected purpose, saved original changes
+match, reload and320/640/1280px layouts remain usable. This uses the owned09 artifact
+with Service Workers blocked, not a personal origin or offline-launch proof.
+Same-app cold/preparation/removal also passed the intermediate artifact. The final
+regenerated artifact's full same-app connected→prepared cold offline edit/save→
+remove→connected restart PASS40.0s (final-artifact-result.json): Project identity,
+original changes and model/media bytes retained, no automatic registration or
+foreign-cache removal. Owned4191 preview responds200 and matches the final index
+hash (preview.json). The first full
+checkpoint completed typecheck/root tests with3110PASS/1FAIL/21 existing TODO:
+the deletion-confirmation assertion counted both4 public effects and4 folded
+technical rows. Scoped it to the direct public list, retained all dependency names,
+and separately asserted4 technical rows in a closed disclosure. The complete
+delete/retry/files/cold case then PASS; independent review confirms no invariant
+was relaxed. No production source changed. Retain checkpoint-before-assertion-fix.log.
+Final serial check:checkpoint PASS on checkpoint-verified-source.json (50 source/
+test files): typecheck;140 files/3111PASS/21 existing TODO; all5 builds;14 exact
+offline resources/SRI and retained runtime separation. HEIC public-path isolation
+PASS across all5 artifacts. No source/test edits during or after that check.
+
+Retain all failed receipts under .artifacts/e2e/ui-control-cleanup. Failures corrected
+without weakening fences/assertions: exact import allowlist; canonical attachment
+description assertion after card consolidation; Node-side Automerge initialization;
+formatted conflict-option label matching with exact final value; renamed projection
+summary; duplicate empty-message locator; existing closed organization/comparison
+disclosures and navigation locators that included a hidden startup button. One
+obsolete continuation run was intentionally interrupted while it attempted to
+select a Caption behind the open File sheet; partial artifacts are retained, not
+counted as PASS. The final test explicitly closes File before returning to editing.
+Tests
+use actual UI disclosure/tab controls, not forced DOM changes; no deadline extension,
+automatic retry, skip or personal4182 access. Result files distinguish each tree.
+
+Meta-audit: R1–R10 close the requested action/function cleanup within existing UI
+ports and safety contracts. Independent implementation/input/document reviews have
+no remaining findings. The57 source/test/document files form the suitable verified
+g0 checkpoint; Git owns its final commit and remote identity. No package, dependency,
+capacity, renderer policy, ordinary-entry activation or deployment change. Local
+links/diff and frozen source/test equality remain the final staging checks;
+documentation/staging/Push alone does not justify repeating runtime verification.
+
+Next connected product unit is representative model replacement,
+pin correction and interrupted team/recovery through the simplified UI, then one
+grouped PC acceptance review. Physical devices/OS install/adoption/release remain
+separate; no fine PO testing dependency or aggregate AAA-quality pass.
+
+## Previous verified boundary —one PC application across connected/offline startup
 
 PO2026-10-30 approves one startup and the same application UI, with offline
 preparation/state in Settings. Use the existing09 PC candidate as that user entry;

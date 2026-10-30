@@ -118,12 +118,12 @@ export type MediaViewer = ReturnType<typeof createMediaViewer>;
 /** UI pagination bounds mounted thumbnails, not a persisted limit or format constraint. */
 const pageSize = 12;
 export function createMediaThumbnails(document: Document, read: MediaPreviewReader, viewer: MediaViewer,
-  selection?: { selected(): string | null; choose(id: string): void }) {
+  selection?: { selected(): string | null; choose(id: string): void }, cardTools?: (id: string) => HTMLElement | null) {
   const root = document.createElement('section'); root.className = 'lv-media-thumbnails';
   const grid = document.createElement('div'), pages = document.createElement('nav'), back = document.createElement('button'), forward = document.createElement('button'), count = document.createElement('span');
   grid.className = 'lv-media-grid'; back.type = forward.type = 'button'; back.textContent = '前の一覧'; forward.textContent = '次の一覧';
   pages.setAttribute('aria-label', 'メディア一覧のページ'); pages.append(back, count, forward); root.append(grid, pages);
-  type Card = { root: HTMLElement; label: HTMLElement; action: HTMLButtonElement; preview: ReturnType<typeof createPngPreview>; resourceId: string };
+  type Card = { root: HTMLElement; label: HTMLElement; action: HTMLButtonElement; preview: ReturnType<typeof createPngPreview>; resourceId: string; tools?: HTMLElement };
   const cards = new Map<string, Card>(); let page = 0, scope = '', order = '', disposed = false;
   function render() {
     if (disposed) return; const group = read(); if (scope !== group?.scope) {
@@ -149,11 +149,13 @@ export function createMediaThumbnails(document: Document, read: MediaPreviewRead
         figure.append(preview.root, label);
         if (selection) { const show = document.createElement('button'); show.type = 'button'; show.textContent = item.kind==='video'?'動画を再生':item.kind==='audio'?'音声を再生':'画像を表示';
           show.addEventListener('click', () => { if (!disposed && live()) viewer.open(read, item.id, show); }); figure.append(show); }
-        card = { root: figure, label, action, preview, resourceId }; cards.set(item.id, card);
+        const tools = cardTools ? document.createElement('div') : undefined; if (tools) figure.append(tools);
+        card = { root: figure, label, action, preview, resourceId, tools }; cards.set(item.id, card);
       }
       card.label.textContent = selection ? '' : `${item.label}${item.description ? ` — ${item.description}` : ''}`; card.label.hidden = !!selection;
       if (selection) card.action.setAttribute('aria-pressed', String(selection.selected() === item.id));
       card.preview.render();
+      if (card.tools) { const tools=cardTools!(item.id);if(card.tools.children[0]!==tools){card.tools.replaceChildren();if(tools)card.tools.append(tools);} }
     }
     const nextOrder = JSON.stringify([scope, visible.map(i => [i.id, i.resourceId])]);
     if (nextOrder !== order) { order = nextOrder; for (const item of visible) grid.append(cards.get(item.id)!.root); }

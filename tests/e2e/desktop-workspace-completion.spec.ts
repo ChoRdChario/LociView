@@ -1,7 +1,7 @@
+import { revealFileSurface, beginSceneCreation, revealModelManagement } from './workspaceUi';
 import { test, expect, chromium } from '@playwright/test';
 import { ownedServer } from '../offline-e2e/server';
 import { triangleGlb, smallPng } from './fixtures';
-import { beginSceneCreation, revealModelManagement } from './workspaceUi';
 
 test('content-first workspace keeps editing, pin completion and file exits coherent through save and resume', async ({}, info) => {
   test.setTimeout(180_000);
@@ -33,6 +33,14 @@ test('content-first workspace keeps editing, pin completion and file exits coher
       return !!(body.compareDocumentPosition(media) & Node.DOCUMENT_POSITION_FOLLOWING) && !!(media.compareDocumentPosition(props) & Node.DOCUMENT_POSITION_FOLLOWING);
     })).toBe(true);
     const comparison = p.locator('.lv-caption-window'), image = comparison.locator('img').first(); await expect(image).toBeVisible();
+    const attached=detail.getByRole('region',{name:'メディアの整理',exact:true});await expect(attached.locator('figure')).toHaveCount(1);
+    await attached.getByText('添付を整理',{exact:true}).click();await attached.getByRole('button',{name:'説明を編集',exact:true}).click();
+    const description=attached.getByLabel('メディアの説明',{exact:true});await expect(description).toBeFocused();await description.fill('柱と梁の写真');await description.dispatchEvent('compositionstart');
+    await expect(attached.getByRole('button',{name:'説明を適用',exact:true})).toBeDisabled();await description.dispatchEvent('compositionend');await attached.getByRole('button',{name:'説明を適用',exact:true}).click();await ready('メディアの説明を適用しました。');
+    await p.getByText('キャプションを整理',{exact:true}).click();const tags=p.getByLabel('タグの管理',{exact:true});await tags.locator(':scope > summary').click();
+    await tags.getByLabel('タグ名',{exact:true}).fill('選択中の記録');await tags.getByLabel('タグの色',{exact:true}).fill('#37a24b');await tags.getByRole('button',{name:'タグを追加',exact:true}).click();await ready('タグを保存しました。');
+    await tags.getByRole('button',{name:'この記録にタグを付ける',exact:true}).click();await ready('記録のタグを変更しました。');
+    await tags.getByLabel('タグ名',{exact:true}).fill('ほかの記録用');await tags.getByRole('button',{name:'タグを追加',exact:true}).click();await ready('タグを保存しました。');
     await expect(comparison.getByRole('group', { name: '比較ウィンドウの本文', exact: true })).toHaveAttribute('tabindex', '0');
     expect(await image.evaluate(node => { const a = node.getBoundingClientRect(), b = node.closest('.lv-caption-window-body')!.getBoundingClientRect(); return Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top); })).toBeGreaterThan(70);
     await p.screenshot({ path: info.outputPath('caption-media.png'), fullPage: false });
@@ -43,13 +51,22 @@ test('content-first workspace keeps editing, pin completion and file exits coher
     await expect(material.getByText('このモデルには材質の調整項目がありません。元の表示を保持します。', { exact: true })).toBeVisible(); await expect(material.locator('.lv-material-fields')).toBeHidden();
     await p.getByRole('button', { name: '閲覧する', exact: true }).click(); await expect(p.getByRole('button', { name: '編集する', exact: true })).toBeEnabled();
     await expect.poll(() => material.innerText()).not.toMatch(/編集を開始|未接続|適用します/); await expect(p.locator('[data-lv-edit-only]:visible')).toHaveCount(0);
+    await tab('モデル').click();const pointSize=p.getByLabel('点の大きさ（px）',{exact:true});await expect(pointSize).toBeEnabled();await pointSize.press('Home');for(let i=0;i<7;i++)await pointSize.press('ArrowRight');await expect(pointSize).toHaveValue('8');
+    await tab('キャプション').click();await expect(tags.locator('.lv-caption-tag')).toHaveCount(1);await expect(tags.locator('.lv-caption-tag')).toContainText('選択中の記録');
+    expect(await tags.locator('.lv-caption-tag i').evaluate(n=>getComputedStyle(n).backgroundColor)).toBe('rgb(55, 162, 75)');
+    await tab('材質').click();
     await p.getByRole('button', { name: '編集する', exact: true }).click(); await expect(p.getByRole('button', { name: '閲覧する', exact: true })).toBeEnabled();
     await material.getByLabel('モデル', { exact: true }).selectOption({ label: '建物.glb' }); const surface = material.getByLabel('面', { exact: true });
     const slot = await surface.locator('option').evaluateAll(ns => ns.map(n => (n as HTMLOptionElement).value).find(Boolean)); await surface.selectOption(slot!);
     await material.getByRole('button', { name: '設定を編集', exact: true }).click(); await material.getByLabel('不透明度（%）', { exact: true }).fill('70'); await material.getByRole('button', { name: '変更を適用', exact: true }).click(); await ready('材質の設定を適用しました。');
     const notice = p.getByRole('region', { name: '3D表示の操作', exact: true }); await expect(notice).toBeVisible();
     await expect.poll(async () => (await comparison.getByRole('button', { name: '閉じる', exact: true }).boundingBox())!.y - ((await notice.boundingBox())!.y + (await notice.boundingBox())!.height)).toBeGreaterThanOrEqual(0);
+    await tab('モデル').click();const modelTask=p.getByRole('tabpanel',{name:'モデル',exact:true});await modelTask.locator('.lv-model-select').filter({hasText:'建物.glb'}).click();
+    await expect(modelTask.getByLabel('モデル位置 X',{exact:true})).toBeHidden();await modelTask.getByRole('button',{name:'配置を調整',exact:true}).click();
+    const modes=modelTask.getByRole('group',{name:'配置の操作',exact:true});await expect(modes.getByRole('button',{name:'移動',exact:true})).toHaveAttribute('aria-pressed','true');
+    await modes.getByRole('button',{name:'回転',exact:true}).click();await expect(modes.getByRole('button',{name:'回転',exact:true})).toHaveAttribute('aria-pressed','true');await modelTask.getByRole('button',{name:'配置を取り消す',exact:true}).click();
     await tab('保存した視点').click(); const author = p.getByRole('region', { name: '視点の作成と管理', exact: true });
+    await expect(author.getByRole('button',{name:'編集',exact:true})).toBeHidden();await expect(author.getByText('その他の操作',{exact:true})).toBeHidden();await expect(p.locator('.lv-view-axes')).toHaveCount(0);
     await author.getByRole('button', { name: '視点を作る', exact: true }).click(); await author.getByLabel('視点の名称', { exact: true }).fill('入口');
     const finishView = p.getByRole('group', { name: '視点の終了操作', exact: true }).getByRole('button', { name: '視点を追加', exact: true });
     await p.setViewportSize({ width: 1280, height: 600 }); await expect(finishView).toBeInViewport(); await finishView.click(); await ready('保存した視点を更新しました。'); await p.setViewportSize({ width: 1440, height: 1000 });
@@ -61,12 +78,15 @@ test('content-first workspace keeps editing, pin completion and file exits coher
     expect(await files.locator('.lv-file-primary').evaluate(n => getComputedStyle(n).backgroundColor)).not.toBe('rgba(0, 0, 0, 0)');
     const [download] = await Promise.all([p.waitForEvent('download'), files.locator('.lv-file-primary').click()]); await download.saveAs(info.outputPath('completed-backup.zip')); expect(await download.failure()).toBeNull(); await expect(files.locator('.lv-operation-status')).toHaveAttribute('data-busy', 'false'); await menu.getByRole('button', { name: '閉じる', exact: true }).click();
     await p.getByRole('button', { name: '共有', exact: true }).click(); await expect(files.getByLabel('渡す内容', { exact: true }).locator('option')).toHaveCount(4); await expect(files.getByRole('button', { name: '相手に渡す', exact: true })).toHaveCount(0);
+    const fileTabs=menu.getByRole('tablist',{name:'ファイルの操作',exact:true}),shareTab=fileTabs.getByRole('tab',{name:'共有',exact:true});await expect(menu.getByRole('button',{name:'閉じる',exact:true})).toBeEnabled();
+    await shareTab.focus();await p.keyboard.press('ArrowLeft');await expect(fileTabs.getByRole('tab',{name:'保存',exact:true})).toBeFocused();await p.keyboard.press('ArrowRight');await expect(shareTab).toBeFocused();await expect(shareTab).toHaveAttribute('aria-selected','true');
     expect(await files.locator('.lv-file-primary').evaluate(n => ({ background: getComputedStyle(n).backgroundColor, color: getComputedStyle(n).color }))).not.toMatchObject({ background: 'rgba(0, 0, 0, 0)' });
     await p.screenshot({ path: info.outputPath('share.png'), fullPage: false });
     const [workspace] = await Promise.all([p.waitForEvent('download'), files.locator('.lv-file-primary').click()]), workspacePath = info.outputPath('team-workspace.zip'); await workspace.saveAs(workspacePath); await expect(files.locator('.lv-operation-status')).toHaveAttribute('data-busy', 'false');
     await expect(files.getByLabel('渡す内容', { exact: true })).toHaveValue('teamWorkspace'); await expect(files.locator('.lv-file-primary')).toHaveText('ダウンロード'); await expect(name).toBeHidden();
     await files.getByLabel('渡す内容', { exact: true }).selectOption('review'); await expect(menu.getByRole('button', { name: '閉じる', exact: true })).toBeDisabled(); await files.getByRole('button', { name: '選択を取り消す', exact: true }).click();
     await expect(files.getByLabel('渡す内容', { exact: true })).toHaveValue('teamWorkspace'); await menu.getByRole('button', { name: '閉じる', exact: true }).click(); await expect(p.getByRole('button', { name: '共有', exact: true })).toBeFocused();
+    await detail.getByLabel('本文',{exact:true}).fill('手元でも同じ本文を更新しました。');await detail.getByRole('button',{name:'変更を適用',exact:true}).click();await ready('変更を適用しました。');
     const peerContext = await browser.newContext({ viewport: { width: 1440, height: 1000 }, serviceWorkers: 'block', acceptDownloads: true }), peer = await peerContext.newPage(); peer.on('pageerror', e => errors.push(e.message));
     await peerContext.route('**/*', route => { const u = new URL(route.request().url()); if (u.origin === new URL(server.url).origin || ['data:', 'blob:'].includes(u.protocol)) return route.continue(); remote.push(u.href); return route.abort(); });
     await peer.goto(server.url); await peer.getByLabel('ファイルを選択', { exact: true }).setInputFiles(workspacePath); await peer.getByRole('button', { name: 'ファイルを開く', exact: true }).click(); await expect(peer.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText('現地調査', { timeout: 90_000 });
@@ -75,8 +95,12 @@ test('content-first workspace keeps editing, pin completion and file exits coher
     await peer.getByRole('button', { name: '共有', exact: true }).click(); const peerFiles = peer.getByRole('region', { name: 'ファイル', exact: true }); await peerFiles.getByLabel('渡す内容', { exact: true }).selectOption('contribution');
     const base = peerFiles.getByLabel('元にする作業一式', { exact: true }), baseId = await base.locator('option').evaluateAll(ns => ns.map(n => (n as HTMLOptionElement).value).find(Boolean)); expect(baseId).toBeTruthy(); await base.selectOption(baseId!);
     const [update] = await Promise.all([peer.waitForEvent('download'), peerFiles.locator('.lv-file-primary').click()]), updatePath = info.outputPath('returned-update.zip'); await update.saveAs(updatePath); expect(await update.failure()).toBeNull(); await peerContext.close();
-    await menu.locator(':scope > summary').click(); await menu.getByRole('button', { name: '受信', exact: true }).click(); const incoming = p.getByRole('region', { name: '更新ファイル', exact: true });
-    await incoming.getByLabel('更新ファイルを選択', { exact: true }).setInputFiles(updatePath); await incoming.getByRole('button', { name: '更新を受け取る', exact: true }).click(); await expect(incoming.getByText('更新を受け取りました。', { exact: true })).toBeVisible({ timeout: 90_000 }); await menu.getByRole('button', { name: '閉じる', exact: true }).click(); await expect(detail.getByLabel('本文', { exact: true })).toHaveValue(receivedBody);
+    await revealFileSurface(p,'受信'); const incoming = p.getByRole('region', { name: '更新ファイル', exact: true });
+    await incoming.getByLabel('更新ファイルを選択', { exact: true }).setInputFiles(updatePath); await incoming.getByRole('button', { name: '更新を受け取る', exact: true }).click(); await expect(incoming.getByText('更新を受け取りました。', { exact: true })).toBeVisible({ timeout: 90_000 }); await menu.getByRole('button', { name: '閉じる', exact: true }).click();
+    const bodyGroup=detail.getByLabel('本文',{exact:true}).locator('..').locator('..');await bodyGroup.getByRole('button',{name:'状態を確認',exact:true}).click();
+    const conflict=p.getByRole('region',{name:'記録の競合',exact:true}).locator(':scope > ul > li').filter({hasText:receivedBody});await expect(conflict).toBeFocused();
+    const keep=conflict.getByRole('combobox'), choices=await keep.locator('option').evaluateAll((nodes,text)=>nodes.map(n=>n as HTMLOptionElement).filter(n=>n.textContent?.includes(text)).map(n=>n.value),receivedBody);expect(choices).toHaveLength(1);await keep.selectOption(choices[0]!);
+    await conflict.getByRole('button',{name:'競合を解消',exact:true}).click();await ready('競合を解消しました。');await expect(detail.getByLabel('本文', { exact: true })).toHaveValue(receivedBody);
     const mode = p.locator('.lv-workspace-actions > button[aria-busy]'); await mode.click();
     await expect(mode).toBeDisabled(); await expect(mode).toHaveText('切替中…'); await expect(mode).toHaveAttribute('aria-busy', 'true');
     // Opening the received history revalidates durable state; wait for the actual

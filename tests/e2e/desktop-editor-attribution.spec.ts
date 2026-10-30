@@ -1,3 +1,4 @@
+import { revealFileSurface } from './workspaceUi';
 import { test, expect, chromium, type Page, type BrowserContext, type TestInfo } from '@playwright/test';
 import { mkdir, mkdtemp, readFile } from 'node:fs/promises';
 import { resolve, sep } from 'node:path';
@@ -34,8 +35,9 @@ async function edit(p: Page, field: 'タイトル' | '本文', value: string) {
 }
 async function output(p: Page, info: TestInfo, label: string, purpose: 'backup' | 'teamWorkspace' | 'contribution' | 'clean' | 'review', base?: string) {
   const menu = p.locator('details.lv-project-files'); if (!await menu.evaluate(n => (n as HTMLDetailsElement).open)) await menu.locator(':scope > summary').click();
-  const area = files(p); await area.getByRole('button', { name: purpose === 'backup' ? '保存' : '相手に渡す', exact: true }).click();
+  const area = files(p),compact=await revealFileSurface(p,purpose==='backup'?'保存':'共有'); if(!compact)await area.getByRole('button', { name: purpose === 'backup' ? '保存' : '相手に渡す', exact: true }).click();
   if (purpose === 'backup') await area.getByLabel('名前（任意）', { exact: true }).fill(label);
+  else if (compact) await area.getByLabel('渡す内容',{exact:true}).selectOption(purpose);
   else if (purpose === 'clean' || purpose === 'review') {
     const more = area.locator('.lv-file-intents > details'); if (!await more.evaluate(n => (n as HTMLDetailsElement).open)) await more.locator('summary').click();
     await more.getByRole('button', { name: purpose === 'clean' ? '独立コピーを作る' : 'シーンを共有', exact: true }).click();
@@ -51,6 +53,7 @@ async function output(p: Page, info: TestInfo, label: string, purpose: 'backup' 
   await expect(area.locator('.lv-operation-status')).toHaveAttribute('data-busy', 'false', { timeout: 120_000 }); return path;
 }
 async function receive(p: Page, path: string) {
+  await revealFileSurface(p,'受信');
   const menu = p.locator('details.lv-project-files'); if (!await menu.evaluate(n => (n as HTMLDetailsElement).open)) await menu.locator(':scope > summary').click();
   const area = p.getByRole('region', { name: '更新ファイル', exact: true });
   await area.getByLabel('更新ファイルを選択', { exact: true }).setInputFiles(path);

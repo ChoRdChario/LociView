@@ -76,23 +76,27 @@
 .lv-camera-axes > i { position: absolute; left: 56px; top: 56px; height: 2px; transform-origin: left center; background: var(--lv-axis); pointer-events: none; }
 .lv-camera-axes > i[data-depth="back"] { opacity: .45; }
 /* Match shell specificity: generic active/disabled button rules must not add plates. */
-.lv-project-workspace .lv-project-camera button,
-.lv-project-shell .lv-project-workspace .lv-project-camera button { position: relative; width: 44px; height: 44px; min-height: 44px; margin: 0; padding: 0; border: 0; border-radius: 50%; background: transparent; box-shadow: none; outline-offset: -2px; color: #171c25; font-size: 12px; font-weight: 700; line-height: 44px; text-align: center; pointer-events: auto; }
-.lv-project-workspace .lv-project-camera button:is(:hover,:active,:disabled,[aria-pressed="true"]),
-.lv-project-shell .lv-project-workspace .lv-project-camera button:is(:hover,:active,:disabled,[aria-pressed="true"]) { border: 0; background: transparent; box-shadow: none; }
-.lv-project-workspace .lv-camera-axes > button,
-.lv-project-shell .lv-project-workspace .lv-camera-axes > button { position: absolute; isolation: isolate; }
+:is(.lv-project-workspace, .lv-review-workspace) .lv-project-camera button,
+.lv-project-shell :is(.lv-project-workspace, .lv-review-workspace) .lv-project-camera button { position: relative; width: 44px; height: 44px; min-height: 44px; margin: 0; padding: 0; border: 0; border-radius: 50%; background: transparent; box-shadow: none; outline-offset: -2px; color: #171c25; font-size: 12px; font-weight: 700; line-height: 44px; text-align: center; pointer-events: auto; }
+:is(.lv-project-workspace, .lv-review-workspace) .lv-project-camera button:is(:hover,:active,:disabled,[aria-pressed="true"]),
+.lv-project-shell :is(.lv-project-workspace, .lv-review-workspace) .lv-project-camera button:is(:hover,:active,:disabled,[aria-pressed="true"]) { border: 0; background: transparent; box-shadow: none; }
+:is(.lv-project-workspace, .lv-review-workspace) .lv-camera-axes > button,
+.lv-project-shell :is(.lv-project-workspace, .lv-review-workspace) .lv-camera-axes > button { position: absolute; isolation: isolate; }
 .lv-camera-axes > button::before { content: ""; position: absolute; inset: 12px; z-index: -1; border-radius: 50%; background: var(--lv-axis); box-shadow: 0 0 0 1px #18202a55; }
 .lv-camera-axes > button[data-sign="-1"]::before { inset: 15px; background: #26303c; border: 2px solid var(--lv-axis); }
 .lv-camera-axes > button[data-depth="back"]::before { opacity: .7; }
-.lv-project-workspace .lv-project-camera button:focus-visible { outline: 2px solid #fff; box-shadow: 0 0 0 2px #202833; z-index: 50 !important; }
+:is(.lv-project-workspace, .lv-review-workspace) .lv-project-camera button:focus-visible { outline: 2px solid #fff; box-shadow: 0 0 0 2px #202833; z-index: 50 !important; }
 .lv-camera-axes > button[data-hovered="true"]:not(:disabled)::before { box-shadow: 0 0 0 2px #fff, 0 0 0 3px #202833; }
-.lv-project-workspace .lv-project-camera button:disabled { opacity: .45; cursor: default; }
-.lv-project-workspace .lv-project-camera .lv-camera-fit,
-.lv-project-shell .lv-project-workspace .lv-project-camera .lv-camera-fit { position: absolute; right: 0; top: 112px; }
+:is(.lv-project-workspace, .lv-review-workspace) .lv-project-camera button:disabled { opacity: .45; cursor: default; }
+:is(.lv-project-workspace, .lv-review-workspace) .lv-project-camera .lv-camera-fit,
+.lv-project-shell :is(.lv-project-workspace, .lv-review-workspace) .lv-project-camera .lv-camera-fit { position: absolute; right: 0; top: 112px; }
 .lv-camera-fit > span { display: inline-block; width: 16px; height: 16px; vertical-align: middle; background: linear-gradient(currentColor,currentColor) left top/6px 2px, linear-gradient(currentColor,currentColor) left top/2px 6px, linear-gradient(currentColor,currentColor) right top/6px 2px, linear-gradient(currentColor,currentColor) right top/2px 6px, linear-gradient(currentColor,currentColor) left bottom/6px 2px, linear-gradient(currentColor,currentColor) left bottom/2px 6px, linear-gradient(currentColor,currentColor) right bottom/6px 2px, linear-gradient(currentColor,currentColor) right bottom/2px 6px; background-repeat: no-repeat; filter: drop-shadow(0 0 1px #fff); }
-.lv-project-workspace .lv-project-camera .lv-camera-fit { color: #5e7188; }
+:is(.lv-project-workspace, .lv-review-workspace) .lv-project-camera .lv-camera-fit { color: #5e7188; }
 .lv-project-camera .lv-camera-fit:hover > span { color: #a4bfe0; }
+.lv-model-task [aria-label="配置の操作"] button[aria-pressed="true"] { background: #d9dfd1; border-color: #525f46; box-shadow: inset 0 -2px #525f46; }
+.lv-caption-tag { padding: 6px 0; }
+.lv-caption-tag > span:first-child { display: inline-flex; align-items: center; gap: 6px; }
+.lv-caption-tag i { width: 10px; height: 10px; border-radius: 50%; border: 1px solid #777c70; background: #bbbdb6; }
 .lv-project-viewport-tools { position: absolute; z-index: 3; left: 12px; top: 12px; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; max-width: calc(100% - 210px); padding: 6px 10px; border-radius: 6px; background: #f7f6f1ed; font-size: 13px; }
 .lv-project-viewport-tools:not(:has(> :not([hidden]))) { display: none; }
 .lv-comparison-actions { position: absolute; left: 12px; bottom: 12px; z-index: 4; max-width: calc(100% - 24px); max-height: 55%; overflow: auto; padding: 0 10px; border: 1px solid #b6b9af; border-radius: 6px; background: #f7f6f1f5; }

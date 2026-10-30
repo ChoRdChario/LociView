@@ -45,7 +45,7 @@ test('狭い画面とno-hover touchで100記録をキーボード移動し、編
     await expect(files.locator('.lv-operation-status')).toHaveAttribute('data-busy', 'false', { timeout: 90_000 });
     if (verify) {
       const rows = files.locator('details').filter({ has: page.locator('summary', { hasText: /^作成したファイル$/ }) }); await rows.locator('summary').first().tap();
-      const row = rows.locator('section').filter({ hasText: `バックアップ ${name} —` }); await row.getByText('保存先のファイルを確認', { exact: true }).tap();
+      const row = rows.locator('section').filter({ hasText: `バックアップ ${name} —` }); await row.getByText('保存したファイルを確認', { exact: true }).tap();
       const picker = page.waitForEvent('filechooser'); await row.getByRole('button', { name: 'ファイルを選択', exact: true }).tap(); await (await picker).setFiles(path);
       await expect(files.getByText('選択したファイルの内容を確認しました。', { exact: true })).toBeVisible({ timeout: 90_000 });
       await expect(page.getByLabel('保存ファイルの状態', { exact: true })).toHaveText('保存ファイルと一致');
@@ -87,7 +87,7 @@ test('狭い画面とno-hover touchで100記録をキーボード移動し、編
     await pins.getByRole('button', { name: '取り消す', exact: true }).tap(); await layout(page, 'shortHeight');
     await page.setViewportSize({ width: 320, height: 720 }); await page.getByRole('region', { name: 'キャプション', exact: true }).getByLabel('検索', { exact: true }).fill('既存のピン'); await list.locator('.lv-caption-select').filter({ hasText: '既存のピン' }).tap();
     const gallery = page.getByRole('region', { name: 'メディアの整理', exact: true }), thumb = gallery.getByRole('button').filter({ has: page.locator('img') }).first();
-    await gallery.getByRole('region', { name: '添付の編集', exact: true }).getByRole('button', { name: '説明を編集', exact: true }).first().tap();
+    const attachment=gallery.getByRole('region', { name: '添付メディア', exact: true }).locator('figure').first();await attachment.getByText('添付を整理',{exact:true}).tap();await attachment.getByRole('button', { name: '説明を編集', exact: true }).tap();
     await gallery.getByLabel('メディアの説明', { exact: true }).fill(imageDescription); await gallery.getByRole('button', { name: '説明を適用', exact: true }).tap();
     await expect(page.getByText('メディアの説明を適用しました。', { exact: true })).toBeVisible({ timeout: 90_000 });
     await thumb.tap(); const dialog = page.getByRole('dialog', { name: 'メディアビューア', exact: true }); await expect(dialog).toBeVisible();

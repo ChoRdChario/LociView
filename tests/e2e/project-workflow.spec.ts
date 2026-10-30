@@ -70,7 +70,7 @@ async function saveBackup(page: Page, path: string, name: string, boundaries?: R
   const history = files.locator('details').filter({ has: page.locator('summary', { hasText: /^作成したファイル$/ }) });
   await history.locator('summary').first().click();
   const row = history.locator('section').filter({ hasText: `バックアップ ${name} —` });
-  await row.getByText('保存先のファイルを確認', { exact: true }).click();
+  await row.getByText('保存したファイルを確認', { exact: true }).click();
   const choosing = page.waitForEvent('filechooser');
   await row.getByRole('button', { name: 'ファイルを選択', exact: true }).click();
   const chooser = await choosing, verifyStarted = performance.now(); await chooser.setFiles(path);

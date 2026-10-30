@@ -1,4 +1,4 @@
-import { revealModelManagement, lookAlongFront } from './workspaceUi';
+import { revealFileSurface, revealModelManagement, lookAlongFront } from './workspaceUi';
 import {test,expect,type Page,type TestInfo} from '@playwright/test';
 import {createHash} from 'node:crypto';
 import {openAsBlob} from 'node:fs';
@@ -10,7 +10,7 @@ import {smallPng,texturedTriangleGlb} from './fixtures';
 const ply=Buffer.from('ply\nformat ascii 1.0\nelement vertex 5\nproperty float x\nproperty float y\nproperty float z\nproperty uchar red\nproperty uchar green\nproperty uchar blue\nend_header\n0 0 0 255 0 0\n-1 -1 0 0 255 0\n1 -1 0 0 0 255\n-1 1 0 255 255 0\n1 1 0 255 0 255\n');
 async function backup(page:Page,info:TestInfo,name:string){
  const menu=page.locator('details.lv-project-files');if(!await menu.evaluate(n=>(n as HTMLDetailsElement).open))await menu.locator(':scope > summary').click();
- const files=page.getByRole('region',{name:'ファイル',exact:true});await files.getByRole('button',{name:'保存',exact:true}).click();
+ const files=page.getByRole('region',{name:'ファイル',exact:true});if(!await revealFileSurface(page,'保存')) await files.getByRole('button',{name:'保存',exact:true}).click();
  const primary=files.getByRole('button',{name:'ファイルに保存',exact:true});await expect(primary).toBeEnabled({timeout:90_000});
  const [download]=await Promise.all([page.waitForEvent('download'),primary.click()]);const path=info.outputPath(name+'.zip');await download.saveAs(path);
  await expect(files.locator('.lv-operation-status')).toHaveAttribute('data-busy','false',{timeout:90_000});
@@ -41,7 +41,7 @@ test('PCでモデル読込中も記録を検索・閲覧し、準備済み点群
  const pixels=await canvas.screenshot();expect(await canvas.evaluate(async(_node,png)=>{const image=new Image();image.src='data:image/png;base64,'+png;await image.decode();
   const copy=document.createElement('canvas');copy.width=image.width;copy.height=image.height;const context=copy.getContext('2d')!;context.drawImage(image,0,0);const bytes=context.getImageData(0,0,copy.width,copy.height).data;let red=0;for(let i=0;i<bytes.length;i+=4)if(bytes[i]!>200&&bytes[i+1]!<80&&bytes[i+2]!<80)red++;return red;},pixels.toString('base64'))).toBeGreaterThan(0);
  const initial=await canvas.screenshot();await lookAlongFront(page);const rotated=await canvas.screenshot();expect(createHash('sha256').update(rotated).digest('hex')).not.toBe(createHash('sha256').update(initial).digest('hex'));
- const menu=page.locator('details.lv-project-files');await menu.locator(':scope > summary').click();await expect(page.getByRole('region',{name:'ファイル',exact:true}).getByRole('button',{name:'保存',exact:true})).toBeDisabled();
+ const menu=page.locator('details.lv-project-files');await menu.locator(':scope > summary').click();await expect(menu.getByRole('tablist',{name:'ファイルの操作',exact:true}).getByRole('tab',{name:'保存',exact:true})).toBeDisabled();
  await menu.locator(':scope > summary').click();
  expect(await status.evaluate(n=>getComputedStyle(n,'::before').animationName)).toBe('lv-operation-spin');await page.emulateMedia({reducedMotion:'reduce'});expect(await status.evaluate(n=>getComputedStyle(n,'::before').animationName)).toBe('none');await page.emulateMedia({reducedMotion:'no-preference'});
  await page.screenshot({path:info.outputPath('usable-while-loading.png'),fullPage:true});

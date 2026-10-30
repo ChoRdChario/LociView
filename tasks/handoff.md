@@ -22,9 +22,15 @@ and state in Settings, removal followed by connected reopening of the same app.
 Internal static/legacy build isolation remains; no public-entry activation,
 existing-SW replacement or origin/profile migration. Todo owns the current checks
 and next unit; the older model/team/recovery follow-up is not a priority override.
-The same-app connected/cold/removal workflow now passes the final serial checkpoint,
-artifact isolation and dedicated-Chromium confirmation. The next unit in todo
-resumes representative model/team/recovery workflows through the unified UI.
+The same-app connected/cold/removal workflow passes its final serial checkpoint,
+artifact isolation and dedicated-Chromium confirmation. PO2026-10-31 then requests
+an action-by-action audit for duplicate controls and development-only separation.
+The complete [control/function inventory](../docs/ui-design-review.md#2026-10-31-操作と機能の棚卸し)
+was collected before repairs. R1–R10 retain existing commands, file purposes,
+draft/input/recovery fences and data. The grouped repairs and representative
+browser workflows now pass the final automated checkpoint and independent reviews;
+todo retains exact results/failures and remaining physical acceptance. Consult its
+current boundary before returning to representative model/team/recovery work.
 
 Latest PO steering raises the review target to AAA-title production UI/UX quality.
 Read the[consolidated design review](../docs/ui-design-review.md) for Q1–Q8,
@@ -47,14 +53,16 @@ Do not infer physical-device, general adoption or release acceptance.
 
 The owned product preview is http://127.0.0.1:4191/ (offline-desktop-dist), separate
 from the original validation origin and the4190 visual prototype. Its index hash
-and owned process/session are recorded in .artifacts/e2e/unified-startup/preview.json
-(previous receipts: .artifacts/e2e/workspace-completion/preview.json and
+and owned process/session are recorded in .artifacts/e2e/ui-control-cleanup/preview.json
+(previous receipts: .artifacts/e2e/unified-startup/preview.json,
+.artifacts/e2e/workspace-completion/preview.json and
 .artifacts/e2e/gizmo/preview.json).
 Existing resumption data stays at the original address; use an exported file here.
-The unified-startup source/test manifest, dedicated browser evidence and required
-final checks are under .artifacts/e2e/unified-startup; consult todo for their actual
-status. Earlier content-first workspace and compact-gizmo evidence stay in their
-own folders.
+The current source/test manifest is checkpoint-verified-source.json under
+.artifacts/e2e/ui-control-cleanup, alongside required checks, browser results and
+retained failures. Todo distinguishes the final generated artifact's cold cycle
+from reload-only cases. Earlier unified-startup/content-first/gizmo evidence stays
+in its own folders. No aggregate AAA-quality/device/adoption/release pass is implied.
 Documentation/staging/Push alone is not a reason to repeat runtime checks.
 
 PO prioritizes completing the accepted feature set before readiness-stage latency

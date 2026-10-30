@@ -215,6 +215,9 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   const deletionArea = make('section'), deletionBox = make('section'), deletionTitle = make('p'), deletionEffects = make('ul'), deletionNote = make('p'), referenceIssues = make('section');
   deletionArea.setAttribute('aria-label', 'キャプションの削除'); deletionBox.setAttribute('aria-label', '削除の確認'); deletionNote.setAttribute('role', 'status');
   referenceIssues.setAttribute('aria-label', '記録の状態');
+  const deletionDiagnostics=make('details'),deletionDiagnosticList=make('ul'),referenceDiagnostics=make('details'),referenceDiagnosticList=make('ul'),referenceMessages=make('div');
+  deletionDiagnostics.append(make('summary','技術情報'),deletionDiagnosticList);referenceDiagnostics.append(make('summary','技術情報'),referenceDiagnosticList);
+  referenceIssues.append(referenceMessages,referenceDiagnostics);
   const beginDelete = button('プロジェクトから削除', () => {
     if (!guardInput() || !memory().selectedCaptionId) return;
     try { const p = provider(), captionId = memory().selectedCaptionId!;
@@ -234,7 +237,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     });
   });
   const cancelDelete = button('取り消す', () => { if (!busy && !pending && ports.status().kind === 'idle' && !ports.otherPending() && !composing) { deletion = null; render(); } });
-  deletionBox.append(deletionTitle, deletionEffects, deletionNote, confirmDelete, cancelDelete); deletionArea.append(beginDelete, deletionBox, referenceIssues);
+  deletionBox.append(deletionTitle, deletionEffects, deletionNote, deletionDiagnostics, confirmDelete, cancelDelete); deletionArea.append(beginDelete, deletionBox, referenceIssues);
   const media = make('section'), mediaLabel = make('label', 'メディアを追加'), mediaInput = make('input');
   media.setAttribute('aria-label', 'メディア'); mediaInput.type = 'file'; mediaInput.accept = 'image/png,image/jpeg,image/webp,image/gif,image/heic,image/heif,.heic,.heif,video/mp4,audio/mp4,audio/mpeg,.m4a,.mp3'; mediaInput.setAttribute('aria-label', 'メディアを追加'); mediaLabel.className = 'lv-media-add'; mediaLabel.append(mediaInput);
   const cancelMedia = button('選択を取り消す', cancelMediaSelection);
@@ -305,6 +308,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       else feedback = mutationBlock()!;
     }
     render();
+    if (plan.kind === 'effect' && plan.action === 'review') recovery?.reveal(group => 'captionId' in group.target && group.target.captionId === plan.captionId);
     if (plan.kind === 'change' && plan.intent === 'select' || plan.kind === 'unchanged' && plan.explicitSelection) detailHeading.focus?.({ preventScroll: true });
   }, active => { composing = active; render(); });
   const detail = createCaptionDetailControls(document, event => {
@@ -312,6 +316,10 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       if (!disposed && !busy && !pending && !windowMoving && !ports.otherPending() && event.token === provider().token &&
         event.sceneId === sceneId && event.captionId === memory().selectedCaptionId) { openWindow(event.captionId); render(); }
       return;
+    }
+    if (event.kind === 'review') {
+      if (disposed || busy || pending || windowMoving || viewport.read().dragging || composingInput() || ports.otherPending() || event.token !== provider().token || event.captionId !== memory().selectedCaptionId) return;
+      render(); recovery?.reveal(group => (group.target.kind === 'text' || group.target.kind === 'field') && group.target.captionId === event.captionId && group.target.field === (event.field === 'color' ? 'colorSrgb' : event.field)); return;
     }
     if (disposed || mutationBlock() || panelInput() || mediaManager?.hasChanges()) return;
     if (event.kind === 'draft' && event.baseDraft === draft) draft = event.draft;
@@ -321,7 +329,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
         ...(event.changes.body !== undefined ? { body: event.changes.body } : {}),
         ...(event.changes.color !== undefined ? { colorSrgb: colorBytes(event.changes.color) } : {}) };
       void run({ kind: 'editCaption', captionId: event.captionId, edits }, () => { resetDraft(); feedback = '変更を適用しました。'; });
-    } else if (event.kind === 'review') feedback = '下の競合欄で残す内容を選択してください。';
+    }
     render();
   });
   const captionNavigation = make('nav'); captionNavigation.setAttribute('aria-label', '記録の前後移動');
@@ -544,17 +552,19 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     cancelDelete.disabled = busy || !!pending || ports.status().kind !== 'idle' || ports.otherPending() || composing;
     if (deletion) {
       const { impact } = deletion; deletionTitle.textContent = `「${deletion.title}」をプロジェクト全体から削除しますか？`;
-      const rows = impact.memberships.map(e => `シーン：${fieldValue(p.state.scenes[e.sceneId]?.name) ?? '名称を確認'}（${e.sceneId}）`);
-      rows.push(...impact.attachments.map(e => { const media = fieldValue(p.details.immutable.mediaResourcesById[e.mediaResourceId]); return `添付：${typeof media?.label === 'string' ? media.label : 'メディア'}（${e.id}）`; }),
-        ...impact.tags.map(e => `タグの登録：${String(fieldValue(p.details.mutable.captionTagsById[e.tagId]?.label) ?? '名称を確認')}（${e.id}）`));
+      const rows = impact.memberships.map(e => `シーン：${fieldValue(p.state.scenes[e.sceneId]?.name) ?? '名称を確認'}`);
+      rows.push(...impact.attachments.map(e => { const media = fieldValue(p.details.immutable.mediaResourcesById[e.mediaResourceId]); return `添付：${typeof media?.label === 'string' ? media.label : 'メディア'}`; }),
+        ...impact.tags.map(e => `タグの登録：${String(fieldValue(p.details.mutable.captionTagsById[e.tagId]?.label) ?? '名称を確認')}`));
       deletionEffects.replaceChildren(...rows.map(text => make('li', text)));
+      deletionDiagnosticList.replaceChildren(...[...impact.memberships.map(e=>`シーン ${e.sceneId} / 登録 ${e.id}`),...impact.attachments.map(e=>`添付 ${e.id}`),...impact.tags.map(e=>`タグ登録 ${e.id}`)].map(text=>make('li',text)));
       deletionNote.textContent = deletion.token !== p.token ? '内容が更新されています。取り消して、影響を確認し直してください。' :
         `${impact.memberships.length}件のシーン登録・添付${impact.attachments.length}件・タグ登録${impact.tags.length}件も削除します。メディア本体とタグは残ります。この画面の「記録の変更を元に戻す」で戻せます。別の更新や未解決の内容がある場合は戻せません。`;
     }
     const issues = p.issues.filter(i => i.kind === 'orphan' || i.code === 'concurrent-delete-edit' || i.code === 'pending-orphan-reference' ||
       i.code === 'atomic-field-conflict' && i.path[2] === 'lifecycle' && ['captionsById', 'sceneCaptionMembershipsById', 'captionAttachmentsById', 'captionTagMembershipsById'].includes(i.path[0]!));
     referenceIssues.hidden = !issues.length;
-    referenceIssues.replaceChildren(...[...new Set(issues.map(i => `${i.code === 'concurrent-delete-edit' ? '削除と編集が競合しています。内容は履歴に保持しています。' : i.code === 'atomic-field-conflict' ? '削除・復元の状態が競合しています。' : '参照先の確認が必要です。関係する内容は履歴に保持しています。'} ${i.path.join(' / ')}`))].map(text => make('p', text)));
+    referenceMessages.replaceChildren(...[...new Set(issues.map(i => i.code === 'concurrent-delete-edit' ? '削除と編集が競合しています。内容は履歴に保持しています。' : i.code === 'atomic-field-conflict' ? '削除・復元の状態が競合しています。' : '参照先の確認が必要です。関係する内容は履歴に保持しています。'))].map(text => make('p', text)));
+    referenceDiagnosticList.replaceChildren(...issues.map(i=>make('li',`${i.code}: ${i.path.join(' / ')}`)));
   }
   function positionValid() { return rawPosition.every(v => /^[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?$/i.test(v.trim()) && Number.isFinite(Number(v))); }
   async function perform(action: () => Promise<unknown>, complete: () => void, owner?: 'media') {
@@ -815,7 +825,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     } finally { rendering = false; if (renderAgain) { renderAgain = false; render(); } }
   }
   mounted = true; render();
-  return { root, headerActions, utilityArea: settingsSheet, clearNotice(){if(!pending&&ports.status().kind==='idle')feedback='';}, dismissDisclosures(){help.open=false;organization!.settingsRoot.open=false;}, setExternalBusy: (active:boolean) => { body.inert=busy||active; }, render, session: interaction, activeScene: () => sceneId, inputPending: () => dirty() || busy,
+  return { root, headerActions, projectNavigation: otherProject, utilityArea: settingsSheet, clearNotice(){if(!pending&&ports.status().kind==='idle')feedback='';}, dismissDisclosures(){help.open=false;organization!.settingsRoot.open=false;}, setExternalBusy: (active:boolean) => { body.inert=busy||active; }, render, session: interaction, activeScene: () => sceneId, inputPending: () => dirty() || busy,
     hasChanges: () => dirty() || busy || !!pending,
-    unmount() { if (disposed) return; disposed = true;document.defaultView?.clearTimeout(feedbackTimer);document.defaultView?.removeEventListener('resize',positionHeaderSheets);cameraGizmo.dispose();stopHelp();cancelObservation();storageEpoch++; gesture = null; gestureGeneration++; pressedPointers.clear(); viewport.reservePointer(false); recovery?.dispose(); organization?.dispose(); windows.dispose(); mediaManager?.dispose(); mediaViewer.dispose(); viewport.dispose(); list.dispose(); inclusion.dispose(); detail.dispose(); for (const panel of panels.values()) panel.dispose(); root.remove(); } };
+    unmount() { if (disposed) return; disposed = true;otherProject.remove();document.defaultView?.clearTimeout(feedbackTimer);document.defaultView?.removeEventListener('resize',positionHeaderSheets);cameraGizmo.dispose();stopHelp();cancelObservation();storageEpoch++; gesture = null; gestureGeneration++; pressedPointers.clear(); viewport.reservePointer(false); recovery?.dispose(); organization?.dispose(); windows.dispose(); mediaManager?.dispose(); mediaViewer.dispose(); viewport.dispose(); list.dispose(); inclusion.dispose(); detail.dispose(); for (const panel of panels.values()) panel.dispose(); root.remove(); } };
 }

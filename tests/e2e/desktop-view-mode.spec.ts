@@ -1,3 +1,4 @@
+import { revealFileSurface, revealProjectSelection, lookAlongFront, revealOfflineUtilities } from './workspaceUi';
 import { test, expect, chromium } from '@playwright/test';
 import { readFile, mkdir, mkdtemp } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -7,7 +8,6 @@ import { ownedServer } from '../offline-e2e/server';
 import { BackupArchive } from '../../src/projectPackage/backupArchive';
 import { inspectProjectCandidates } from '../../src/domain/projectCandidates';
 import { validationMetadataLimits } from '../../src/projectFiles/validation';
-import { lookAlongFront, revealOfflineUtilities } from './workspaceUi';
 
 test('view mode hides editing while preserving reading, local display, existing downloads and return to saved editing', async ({}, info) => {
   test.setTimeout(180_000); A.getHeads(A.init());
@@ -24,7 +24,7 @@ test('view mode hides editing while preserving reading, local display, existing 
     const stageBefore = await p.locator('.lv-project-stage').boundingBox();
     if (!await menu.evaluate(n => (n as HTMLDetailsElement).open)) await menu.locator(':scope > summary').click();
     expect(await p.locator('.lv-project-stage').boundingBox()).toEqual(stageBefore);
-    await files.getByRole('button', { name: '保存', exact: true }).click();
+    if(!await revealFileSurface(p,'保存')) await files.getByRole('button', { name: '保存', exact: true }).click();
     const [download] = await Promise.all([p.waitForEvent('download'), files.locator('button.lv-file-primary').click()]);
     const path = info.outputPath(name + '.zip'); await download.saveAs(path); expect(await download.failure()).toBeNull();
     await expect(files.locator('.lv-operation-status')).toHaveAttribute('data-busy', 'false');
@@ -83,8 +83,8 @@ test('view mode hides editing while preserving reading, local display, existing 
     await expect(settings.getByLabel('このブラウザの表示名',{exact:true})).toHaveValue('保持する入力');
     await settings.getByRole('button',{name:'表示名の入力を取り消す',exact:true}).click();await settings.locator(':scope > summary').click();
     await tab('キャプション').click();
-    for(const intent of ['受信','復元']){
-      await menu.locator(':scope > summary').click();await menu.getByRole('button',{name:intent,exact:true}).click();
+    for(const intent of ['受信','復元'] as const){
+      await revealFileSurface(p,intent);
       await expect(menu.getByRole('region',{name:'ファイル',exact:true})).toBeHidden();
       await menu.getByRole('button',{name:'閉じる',exact:true}).click();await expect(menu.locator(':scope > summary')).toBeFocused();
     }
@@ -104,7 +104,7 @@ test('view mode hides editing while preserving reading, local display, existing 
     await expect(models.getByRole('checkbox', { name: 'このシーンに表示', exact: true })).toHaveCount(0);
     await models.getByRole('button', { name: '隠す', exact: true }).click(); await models.getByRole('button', { name: '表示', exact: true }).click();
     await tab('保存した視点').click(); await expect(author).toHaveCount(0);
-    const views = p.getByRole('tabpanel', { name: '保存した視点', exact: true }); await views.getByText('投影とカメラ',{exact:true}).click(); await views.getByLabel('投影方式', { exact: true }).selectOption('orthographic'); await views.getByRole('combobox', { name: '保存した視点', exact: true }).selectOption({ label: '全景' }); await views.getByRole('button', { name: '表示', exact: true }).click();
+    const views = p.getByRole('tabpanel', { name: '保存した視点', exact: true }); await views.locator('summary').filter({hasText:/^投影方式$/}).click(); await views.getByLabel('投影方式', { exact: true }).selectOption('orthographic'); await views.getByRole('combobox', { name: '保存した視点', exact: true }).selectOption({ label: '全景' }); await views.getByRole('button', { name: '表示', exact: true }).click();
     await views.getByLabel('背景色', { exact: true }).fill('#334455'); await views.getByRole('button', { name: '背景に適用', exact: true }).click();
     await gizmo.screenshot({ path: info.outputPath('gizmo-dark.png') });
     await tab('材質').click(); const material = p.getByRole('region', { name: '材質', exact: true }); await material.getByLabel('モデル', { exact: true }).selectOption({ label: '閲覧するモデル.glb' });
@@ -210,7 +210,7 @@ test('one PC app keeps the same Project through connected, cold offline and prep
     await context!.close(); context = undefined; p = await open(); await selected();
     expect(await p.evaluate(() => navigator.serviceWorker.controller)).toBeNull(); expect(await p.evaluate(async () => (await navigator.serviceWorker.getRegistrations()).map(r => new URL(r.scope).pathname))).toEqual(['/foreign/']);
     await p.locator('.lv-caption-select').filter({ hasText: '同じ記録' }).click(); await expect(detail().getByLabel('本文', { exact: true })).toHaveValue('通信なしで追記した本文'); expect(await save('after-removal')).toEqual(saved);
-    await p.locator('details[aria-label="ヘルプ"] > summary').click(); await p.getByRole('button', { name: '別のプロジェクトを開く', exact: true }).click(); await expect(p.locator('.lv-home-settings')).not.toHaveAttribute('open');
+    await revealProjectSelection(p); await p.getByRole('button', { name: '別のプロジェクトを開く', exact: true }).click(); await expect(p.locator('.lv-home-settings')).not.toHaveAttribute('open');
     await revealOfflineUtilities(p); await expect(offline().getByRole('status')).toHaveText('オフライン未準備'); await expect(offline().getByRole('button', { name: 'オフラインで使う準備', exact: true })).toBeEnabled();
     expect(await p.evaluate(async () => (await (await caches.open('foreign-retain')).match('/sentinel'))?.text())).toBe('unchanged');
     await p.screenshot({ path: info.outputPath('same-home-after-removal.png'), fullPage: false }); expect(errors).toEqual([]);

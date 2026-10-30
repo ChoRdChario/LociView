@@ -12,6 +12,11 @@ import { newProjectId, panelNodes, sameProjectValue, type ProjectPanelHost, type
 export function createProjectViews(document: Document, host: ProjectPanelHost): ProjectPanel {
   const { make, button } = panelNodes(document), root = make('section'), review = make('section'); root.setAttribute('aria-label', '視点の作業'); review.setAttribute('aria-label', '視点の更新候補');
   const choices = new Map<string, { token: string; operationId: string }>();
+  const reviewNodes = new Map<string, HTMLElement>();
+  const revealReview = (viewId: string | null) => {
+    const group = host.ports.viewReview(host.source().sceneId).find(g => viewId === null ? g.target.kind === 'entry' : g.target.kind === 'view' && g.target.viewId === viewId);
+    const node = group && reviewNodes.get(group.key); node?.focus?.({ preventScroll: true }); node?.scrollIntoView?.({ block: 'nearest' });
+  };
   type State = { memory: ViewMemory; draft: ViewAuthorDraft | null; background: ViewBackgroundDraft | null; entryBase: string;
     cameraFeedback: ViewContext['cameraFeedback']; backgroundFeedback: ViewBackgroundContext['feedback'] };
   const states = new Map<string, State>(), captures = new WeakMap<ViewCapture, WorkspaceViewPayload>();
@@ -73,10 +78,11 @@ export function createProjectViews(document: Document, host: ProjectPanelHost): 
       else if (plan.kind === 'blocked') host.message(plan.reason);
     } catch (error) { s.cameraFeedback = { kind: 'failed', message: (error as Error).message }; }
     host.changed();
-  });
+    if (plan.kind === 'review') revealReview(plan.target === 'entry' ? null : s.memory.selectedViewId);
+  }, { externalOrientation: true });
   const author = createViewAuthorControls(document, event => {
     if (disposed) return; const s = state(), current = authorContext();
-    if (host.block('views', event.kind !== 'input' && event.kind !== 'cancel')) return;
+    if (host.block('views', event.kind !== 'input' && event.kind !== 'cancel' && event.kind !== 'review')) return;
     try {
     if (event.kind === 'input' && event.baseDraft === s.draft) s.draft = event.draft;
     else if (event.kind === 'cancel' && event.draft === s.draft) s.draft = null;
@@ -113,6 +119,7 @@ export function createProjectViews(document: Document, host: ProjectPanelHost): 
     }
     } catch (error) { host.message((error as Error).message); }
     host.changed();
+    if (event.kind === 'review') revealReview(event.viewId);
   });
   const background = createViewBackgroundControls(document, event => {
     const s = state(); if (disposed || host.block('views', false)) return;
@@ -133,8 +140,9 @@ export function createProjectViews(document: Document, host: ProjectPanelHost): 
     host.changed();
   });
   function renderReview() {
-    review.replaceChildren(); const { provider, sceneId } = host.source(), s = state();
+    review.replaceChildren(); reviewNodes.clear(); const { provider, sceneId } = host.source(), s = state();
     for (const group of host.ports.viewReview(sceneId)) {
+      const box=make('section');box.tabIndex=-1;box.setAttribute('aria-label',group.label);reviewNodes.set(group.key,box);review.append(box);
       const key = `${sceneId}/${group.key}`, owned = choices.get(key), row = make('label', group.label), select = make('select'), empty = make('option', '選択してください'); empty.value = ''; select.append(empty); select.setAttribute('aria-label', group.label);
       for (const item of group.choices) { const option = make('option', item.label); option.value = item.operationId; select.append(option); }
       const block = host.block('views') || s.draft || s.background || s.memory.entryDraft;
@@ -146,12 +154,18 @@ export function createProjectViews(document: Document, host: ProjectPanelHost): 
           { kind: 'resolveViewField', sceneId, viewId: group.target.viewId, field: group.target.field, choice: { kind: 'candidate', operationId: owned.operationId } };
         host.dispatch('views', provider.token, command, () => { choices.delete(key); host.message('視点の更新候補を確定しました。'); });
       }); editOnly(row, apply); apply.disabled = select.disabled || !owned?.operationId;
-      const cancel = button('選択を取り消す', () => { if (!host.block('views', false)) { choices.delete(key); host.changed(); } }); editOnly(cancel); cancel.hidden = !owned; cancel.disabled = !!host.block('views', false); review.append(row, apply, cancel, viewChoices(document, group.label, group.choices.map(item => item.label)));
+      const cancel = button('選択を取り消す', () => { if (!host.block('views', false)) { choices.delete(key); host.changed(); } }); editOnly(cancel); cancel.hidden = !owned; cancel.disabled = !!host.block('views', false); box.append(row, apply, cancel, viewChoices(document, group.label, group.choices.map(item => item.label)));
     }
   }
-  const cameraDetails=make('details');cameraDetails.append(make('summary','投影とカメラ'));controls.root.insertBefore(cameraDetails,controls.camera);cameraDetails.append(controls.camera);
+  const cameraDetails=make('details');cameraDetails.append(make('summary','投影方式'));controls.root.insertBefore(cameraDetails,controls.camera);cameraDetails.append(controls.camera);
   root.append(controls.root, author.root, background.root, review, controls.entryActions, author.actions, author.confirmation, background.actions, background.confirmation);
-  return { root, render() { if (!disposed) { controls.render(context()); author.render(authorContext()); background.render(backgroundContext()); renderReview(); } },
+  return { root, render() { if (!disposed) {
+      controls.render(context()); author.render(authorContext()); background.render(backgroundContext()); renderReview();
+      const groups=host.ports.viewReview(host.source().sceneId), selected=state().memory.selectedViewId;
+      controls.reviews.selected.hidden ||= !groups.some(g=>g.target.kind==='view'&&g.target.viewId===selected);
+      controls.reviews.entry.hidden ||= !groups.some(g=>g.target.kind==='entry');
+      author.review.hidden ||= !groups.some(g=>g.target.kind==='view'&&g.target.viewId===(state().draft?.viewId??selected));
+    } },
     hasChanges: () => !!state().draft || !!state().memory.entryDraft || !!state().background || choices.size > 0,
     composing: () => !!state().draft?.composing || !!state().background?.composing,
     dispose() { disposed = true; controls.dispose(); author.dispose(); background.dispose(); root.remove(); } };

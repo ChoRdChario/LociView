@@ -1,3 +1,4 @@
+import { revealFileSurface } from './workspaceUi';
 import { test, expect, chromium, type Page, type BrowserContext, type TestInfo } from '@playwright/test';
 import { mkdir, mkdtemp, readFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
@@ -11,7 +12,7 @@ import { validationMetadataLimits as limits } from '../../src/projectFiles/valid
 async function ready(page: Page, text: string) { await expect(page.getByText(text, { exact: true })).toBeVisible({ timeout: 90_000 }); await expect(page.locator('main.lv-project-workspace > header > p.lv-operation-status')).toHaveAttribute('data-busy', 'false'); }
 async function output(page: Page, info: TestInfo, name: string, purpose: 'backup' | 'teamWorkspace') {
   const menu = page.locator('details.lv-project-files'); if (!await menu.evaluate(n => (n as HTMLDetailsElement).open)) await menu.locator(':scope > summary').click();
-  const area = page.getByRole('region', { name: 'ファイル', exact: true }); await area.getByRole('button', { name: purpose === 'backup' ? '保存' : '相手に渡す', exact: true }).click();
+  const area = page.getByRole('region', { name: 'ファイル', exact: true }); if(!await revealFileSurface(page,purpose==='backup'?'保存':'共有')) await area.getByRole('button', { name: purpose === 'backup' ? '保存' : '相手に渡す', exact: true }).click();
   if (purpose === 'backup') await area.getByLabel('名前（任意）', { exact: true }).fill(name); else await area.getByLabel('渡す内容', { exact: true }).selectOption(purpose);
   const primary = area.locator('button.lv-file-primary'); await expect(primary).toBeEnabled();
   const [download] = await Promise.all([page.waitForEvent('download', { timeout: 90_000 }), primary.click()]), path = info.outputPath(name + '.zip'); await download.saveAs(path);

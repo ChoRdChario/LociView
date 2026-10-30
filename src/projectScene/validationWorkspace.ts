@@ -90,7 +90,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   const conversionPanel = document.createElement('section'), conversionNote = document.createElement('p'), conversionHelp = document.createElement('p');
   const materialNotice=createMaterialConversionNotice(document,ports.smoothDisplay);
   const convert = document.createElement('button'), cancelConversion = document.createElement('button');
-  convert.type = cancelConversion.type = 'button'; convert.textContent = '新しいプロジェクトに変換'; cancelConversion.textContent = 'キャンセル';
+  convert.type = cancelConversion.type = 'button'; convert.textContent = '新しいプロジェクトに変換'; cancelConversion.textContent = '選択を取り消す';
   conversionHelp.textContent = '元ファイルは変更しません。チームでは変換後のファイルを使ってください。元ファイルは書き出しに含まれないため、別に保管してください。';
   conversionPanel.append(conversionNote, conversionHelp, convert, cancelConversion); conversionPanel.hidden = true; workspaceForm.append(conversionPanel);
   const lociChoices = document.createElement('div'), workbookLabel = document.createElement('label'), workbook = document.createElement('select'),
@@ -378,7 +378,8 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     const state = target.state(), panel = document.createElement('section'), note = document.createElement('p'), commands = document.createElement('div');
     note.textContent = state.error || (state.phase === 'preview' ? state.replacing
       ? 'バックアップの時点に切り替えます。現在の作業と元ファイルは残ります。' : 'このプロジェクトの再開用データはありません。バックアップから元のプロジェクトを復元します。元ファイルは変更しません。'
-      : state.phase === 'terminal' ? 'プロジェクトはまだありません。復元の記録は保持しています。ファイルを選択して開き直せます。' : 'バックアップの初回復元が未完了です。記録を使って再開するか、取りやめてください。');
+      : state.phase === 'terminal' ? 'プロジェクトはまだありません。復元の記録は保持しています。ファイルを選択して開き直せます。' : state.phase === 'beforeStart'
+        ? '復元はまだ始まっていません。「復元を取りやめる」で一覧に戻り、元のバックアップを選び直してください。' : 'バックアップの初回復元が未完了です。記録を使って再開するか、取りやめてください。');
     const summary = document.createElement('p'); summary.textContent = `${state.title}${state.fileName ? ` — ${state.fileName}` : ''}${state.memo ? ` — ${state.memo}` : ''}`;
     const button = (label: string, action: () => Promise<void>) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = label;
       firstRecoveryButtons.add(b); b.addEventListener('click', () => { if (!b.disabled) execute(action); }); commands.append(b); };
@@ -412,7 +413,8 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     if (state.phase === 'terminal') button('一覧に戻る', () => leave(false));
     panel.append(summary, note, commands); content.replaceChildren(panel); controls();
   };
-  const invalidateLoci = () => { lociDraft++; lociEvaluation = null; lociDecision = undefined; conversion = null;materialNotice.render(); controls(); };
+  const invalidateLoci = () => { lociDraft++; lociEvaluation = null; lociDecision = undefined; conversion = null;materialNotice.render();
+    if (lociPreview) conversionNote.textContent = '入力が変わりました。「変換内容を確認」で確認し直してください。'; controls(); };
   const clearConversion = () => { legacyFile=undefined;fallback.hidden=true; lociDraft++; lociDecision = undefined; conversion = null; lociPreview = null; lociEvaluation = null; lociChoices.hidden = true; conversionPanel.hidden = true;materialNotice.render(); };
   const clearSelection = () => {
     selectionAbort?.abort(); selectionAbort = undefined; nativeSelectionChecking = false;
@@ -486,7 +488,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     if (!selection.length) throw Error('ファイルを選択してください。');
     const total = selection.reduce((n, item) => n + item.file.size, 0);
     if (selection.length > ports.fileLimits.maxItems || !Number.isSafeInteger(total) || !ports.filePolicy&&total>ports.fileLimits.maxFileBytes ||
-      selection.some(item => !Number.isSafeInteger(item.file.size) || item.file.size < 0)) throw Error('選択したファイルがこの検証の上限を超えています。');
+      selection.some(item => !Number.isSafeInteger(item.file.size) || item.file.size < 0)) throw Error('選択したファイルが読み込みの上限を超えています。');
     const generation = ++selectionGeneration, draft = creationDraft, context = selectionContext(); selectionPending = true;
     status.textContent = 'ファイルを確認しています。';
     clearConversion(); rawSelection = undefined; form.hidden = true;
@@ -499,12 +501,12 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
       if (!guardSelection(generation, context) || draft !== creationDraft) return;
       if('package' in selected){
         actualTotal+=selected.package.size;
-        if(!Number.isSafeInteger(actualTotal)||actualTotal>PACKAGE_LIMITS.archiveBytes)throw Error('選択したファイルがこの検証の上限を超えています。');
+        if(!Number.isSafeInteger(actualTotal)||actualTotal>PACKAGE_LIMITS.archiveBytes)throw Error('選択したファイルが読み込みの上限を超えています。');
         packages.push(new File([selected.package],selected.label));continue;
       }
       const file:ValidationModelFile=selected;
       actualTotal += file.file ? file.file.size : file.bytes.byteLength;
-      if (!Number.isSafeInteger(actualTotal)) throw Error('選択したファイルがこの検証の上限を超えています。');
+      if (!Number.isSafeInteger(actualTotal)) throw Error('選択したファイルが読み込みの上限を超えています。');
       if(file.file){models.push(file);continue;}
       const bytes=file.bytes;bufferedBytes+=bytes.byteLength;
       const meshFormat=classifyMeshSource(bytes);
@@ -581,6 +583,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     }
     if (lociPreview) {
       workbook.replaceChildren(); for (const source of lociPreview.sources) { const option = document.createElement('option'); option.value = String(source.index); option.textContent = `${source.path}（${source.captions}件）`; workbook.append(option); }
+      workbookLabel.hidden = lociPreview.sources.length === 1;
       workbook.value = String(lociPreview.selectedSourceIndex); conversionTitle.value = lociPreview.suggestedTitle; relation.checked = false;
       lociChoices.hidden = false; conversionPanel.hidden = false; await evaluateLoci(); status.textContent = ''; return;
     }

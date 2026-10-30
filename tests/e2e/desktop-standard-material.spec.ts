@@ -11,7 +11,7 @@ test('01g 変換前に近似表示と環境別の非表示が分かる',async({p
   await p.goto('http://127.0.0.1:4182/');const fixture=await nativeMeshBackup(true,true);
   await p.getByLabel('ファイルを選択',{exact:true}).setInputFiles({name:'材質の変換.zip',mimeType:'application/zip',buffer:fixture.file});await p.getByRole('button',{name:'ファイルを開く',exact:true}).click();
   const notice=p.getByRole('region',{name:'材質の変換による変更',exact:true});await expect(notice).toBeVisible();await expect(notice.locator('details')).toHaveJSProperty('open',false);await expect(notice.locator(':scope > p')).toContainText('透過表示は近似です。');await expect(p.getByRole('button',{name:'新しいプロジェクトに変換',exact:true})).toBeEnabled();
-  await p.screenshot({path:info.outputPath('conversion-warning.png'),fullPage:true});await p.getByRole('button',{name:'キャンセル',exact:true}).click();await expect(notice).toBeHidden();
+  await p.screenshot({path:info.outputPath('conversion-warning.png'),fullPage:true});await p.getByRole('button',{name:'選択を取り消す',exact:true}).click();await expect(notice).toBeHidden();
 });
 
 test('01g BLENDと色の透過は実画素と保守的な位置選択が一致する',async({},info)=>{

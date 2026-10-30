@@ -103,6 +103,10 @@ export function createProjectRecovery(document: Document, host: RecoveryHost) {
     root.hidden = !nodes.length;
   }
   return { root, render, composing, hasChanges: () => [...forms.values()].some(dirty),
+    reveal(match: (group: WorkspaceRecoveryGroup) => boolean) {
+      const form = [...forms.values()].find(f => match(f.group)); if (!form) return false;
+      form.root.tabIndex = -1; form.root.focus?.({ preventScroll: true }); form.root.scrollIntoView?.({ block: 'nearest' }); return true;
+    },
     comparison(): WorkspaceViewportState['comparison'] { for (const f of forms.values()) {
       const target = f.group.target, anchor = f.group.choices.find(c => c.id === f.select.value)?.anchor;
       if (!host.selectBlock() && !composing() && target.kind === 'field' && target.field === 'anchor' && anchor && f.group.ready && f.token === host.token()) return { token: f.token, captionId: target.captionId, anchor };

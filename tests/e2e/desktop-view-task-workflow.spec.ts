@@ -1,3 +1,4 @@
+import { revealFileSurface } from './workspaceUi';
 import { test, expect, type Page, type BrowserContext, type TestInfo } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import * as A from '@automerge/automerge';
@@ -34,7 +35,7 @@ async function scrollTask(p: Page) {
 }
 async function save(p: Page, info: TestInfo, name: string) {
   const menu = p.locator('details.lv-project-files'); if (!await menu.evaluate(n => (n as HTMLDetailsElement).open)) await menu.locator(':scope > summary').click();
-  const area = p.getByRole('region', { name: 'ファイル', exact: true }); await area.getByRole('button', { name: '相手に渡す', exact: true }).click(); await area.getByLabel('渡す内容', { exact: true }).selectOption('teamWorkspace');
+  const area = p.getByRole('region', { name: 'ファイル', exact: true }); if(!await revealFileSurface(p,'共有')) await area.getByRole('button', { name: '相手に渡す', exact: true }).click(); await area.getByLabel('渡す内容', { exact: true }).selectOption('teamWorkspace');
   const [download] = await Promise.all([p.waitForEvent('download', { timeout: 90_000 }), area.locator('button.lv-file-primary').click()]);
   const path = info.outputPath(name + '.zip'); await download.saveAs(path); expect(await download.failure()).toBeNull();
   await expect(area.locator('.lv-operation-status')).toHaveAttribute('data-busy', 'false', { timeout: 90_000 }); return path;
@@ -66,7 +67,7 @@ test('PC task navigation retains model, View and material drafts through keyboar
     await modelPanel.getByRole('button', { name: '配置を調整', exact: true }).click(); await modelPanel.getByLabel('モデル位置 X', { exact: true }).fill('1'); await modelPanel.getByLabel('モデル倍率', { exact: true }).fill('1.25'); await modelPanel.getByRole('button', { name: '配置を確定', exact: true }).click(); await ready(page, 'モデルの配置を確定しました。');
     await tab(page, '保存した視点').click();
     const create = async (name: string) => { await author(page).getByRole('button', { name: '視点を作る', exact: true }).click(); await author(page).getByLabel('視点の名称', { exact: true }).fill(name); await author(page).getByRole('button', { name: '視点を追加', exact: true }).click(); await ready(page, '保存した視点を更新しました。'); };
-    await views(page).getByText('投影とカメラ',{exact:true}).click();
+    await views(page).locator('summary').filter({hasText:/^投影方式$/}).click();
     await create('全景'); await views(page).getByRole('combobox', { name: '投影方式', exact: true }).selectOption('orthographic'); await expect(views(page).getByRole('combobox', { name: '投影方式', exact: true })).toHaveValue('orthographic'); await create('詳細');
     await author(page).getByText('その他の操作', { exact: true }).click(); await expect(author(page).getByRole('button', { name: '後へ', exact: true })).toBeDisabled();
     await author(page).getByRole('button', { name: '前へ', exact: true }).click(); await ready(page, '視点の順序を変更しました。');

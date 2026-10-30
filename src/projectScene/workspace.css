@@ -219,10 +219,14 @@
 .lv-project-files > summary { cursor: pointer; min-height: 44px; padding: 10px 12px; border-radius: 6px; }
 .lv-project-files > summary:focus-visible { outline: 2px solid #312f2d; outline-offset: 2px; }
 .lv-file-sheet { position: fixed; z-index: 50; right: 12px; top: 76px; box-sizing: border-box; width: min(600px, calc(100vw - 24px)); max-height: calc(100dvh - 88px); overflow-y: auto; overscroll-behavior: contain; padding: 16px; border: 1px solid #aaa99f; border-radius: 10px; background: #fbfaf6; box-shadow: 0 10px 48px #25282038; }
-.lv-file-sheet > button { position: sticky; top: 0; float: right; z-index: 1; }
-.lv-file-sheet > nav { display: flex; gap: 8px; }
-.lv-file-sheet > section { clear: both; padding-top: 12px; }
-.lv-file-sheet > section > :is(form,details) { margin-block: 12px; }
+.lv-file-sheet-header { position: sticky; top: -16px; z-index: 3; display: flex; align-items: start; justify-content: space-between; gap: 8px; padding-block: 8px; background: #fbfaf6; }
+.lv-file-sheet-header > button { min-width: 0; }
+.lv-file-sheet > [role="tablist"] { display: flex; flex-wrap: wrap; gap: 4px; clear: both; border-bottom: 1px solid #d2d4c9; margin-bottom: 12px; }
+.lv-file-sheet [role="tab"][aria-selected="true"] { background: #e0e5d7; border-bottom: 3px solid #525f46; }
+.lv-file-sheet > [role="tabpanel"] { clear: both; padding-top: 12px; }
+.lv-file-sheet > [role="tabpanel"] > section > :is(form,details) { margin-block: 12px; }
+.lv-review-workspace .lv-caption-windows:focus-within { z-index: 4; }
+.lv-review-workspace .lv-development-sidebar { min-height: 0; }
 .lv-file-sheet label { display: grid; gap: 6px; margin: 8px 0; }
 .lv-file-sheet button { margin: 3px; padding: 8px 12px; }
 .lv-file-sheet .lv-file-primary { background: #3c4637; color: #fff; }

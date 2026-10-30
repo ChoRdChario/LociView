@@ -7,18 +7,21 @@ import type { ViewCameraIntent } from '../ui/projectScene/viewState';
 import type { ReviewView } from './reviewView';
 import type { ViewportFactory, ProjectViewport } from './viewportPorts';
 import { createMediaViewer, createMediaThumbnails, mediaDisplayDescription, type MediaPreviewGroup } from '../ui/projectScene/mediaPreview';
+import { createCameraGizmo } from '../ui/projectScene/cameraGizmo';
+import { mountContextHelp } from '../ui/projectScene/contextHelp';
 
 /** Standalone snapshot viewing. Only an explicitly confirmed handoff may create an editing Project. */
 export function createReviewWorkspace(document: Document, view: ReviewView, factory: ViewportFactory, editCopy?: () => void | Promise<void>) {
   const make = <K extends keyof HTMLElementTagNameMap>(tag: K, text = '') => { const node = document.createElement(tag); node.textContent = text; return node; };
-  const root = make('main'); root.className = 'lv-development'; root.setAttribute('aria-label', '閲覧用のシーン');
+  const root = make('main'); root.className = 'lv-development lv-review-workspace'; root.setAttribute('aria-label', '閲覧用のシーン');
+  const stopHelp = mountContextHelp(document, root);
   const header = make('header'); header.className = 'lv-development-header'; header.append(make('span', 'LociView'), make('h1', view.title), make('span', '閲覧中'));
   const content = make('div'); content.className = 'lv-development-content';
   const stage = make('section'); stage.className = 'lv-development-stage'; const viewport = make('section'); viewport.className = 'lv-development-viewport'; viewport.setAttribute('aria-label', '3D表示');
   const canvas = make('canvas'); canvas.tabIndex = 0; canvas.setAttribute('aria-label', '3Dモデルの表示');
   const overlay = make('div'); overlay.className = 'lv-development-pin-layer';
   const sidebar = make('aside'); sidebar.className = 'lv-development-sidebar'; sidebar.setAttribute('aria-label', '閲覧パネル');
-  const sceneName = make('h2', view.sceneName), status = make('p'), retry = make('button', '3D表示を再試行'); status.setAttribute('role', 'status'); retry.type = 'button';
+  const sceneName = make('h2', view.sceneName), emptyCaptions=make('p','このシーンにキャプションはありません。'),status = make('p'), retry = make('button', '3D表示を再試行'); status.setAttribute('role', 'status'); retry.type = 'button';
   const footer = make('p', '閲覧用ファイルです。元ファイルとブラウザのプロジェクトは変更しません。');
   viewport.append(canvas, overlay); stage.append(viewport); content.append(stage, sidebar); root.append(header, status, retry, content, footer);
   const mediaViewer = createMediaViewer(document); root.append(mediaViewer.root);
@@ -66,7 +69,7 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
     if (plan.kind === 'change' && (plan.intent === 'select' || plan.intent === 'revealSelection') ||
       plan.kind === 'unchanged' && plan.explicitSelection || plan.kind === 'effect') list.revealSelected();
   }
-  const list = createCaptionListControls(document, accept, active => { composing = active; });
+  const list = createCaptionListControls(document, accept, active => { composing = active; paint(); });
   const mediaGroup = (captionId: string): MediaPreviewGroup => {
     const caption = view.source.captions.find(c => c.id === captionId);
     return { scope: JSON.stringify([view.source.token, captionId]), label: caption?.title.kind === 'value' ? caption.title.value || 'キャプション' : 'キャプション',
@@ -81,23 +84,33 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
     const thumbs = createMediaThumbnails(document, () => disposed ? null : mediaGroup(captionId), mediaViewer); root.append(thumbs.root);
     return { root, render: thumbs.render, dispose() { thumbs.dispose(); root.remove(); } };
   };
-  const windows = createCaptionWindowControls(document, windowPlan, active => { moving = active; }, gallery);
+  const windows = createCaptionWindowControls(document, windowPlan, active => { moving = active; paint(); }, gallery);
   const selectedMedia = make('section'); selectedMedia.setAttribute('aria-label', '選択中のキャプションのメディア');
   let panelGallery: ReturnType<typeof gallery> | null = null, panelCaption: string | null = null;
-  viewport.append(windows.root); sidebar.append(sceneName, list.root, selectedMedia);
+  viewport.append(windows.root); sidebar.append(sceneName, emptyCaptions, list.root, selectedMedia);
   const views = make('details'), title = make('summary', '視点'); views.append(title);
-  const cameraButton = (text: string, action: () => void) => { const button = make('button', text); button.type = 'button'; button.addEventListener('click', () => {
+  const cameraAction = (action: () => void) => {
     if (disposed || composing || moving) return; try { action(); failure = ''; } catch (error) { failure = (error as Error).message; } paint();
-  }); views.append(button); };
+  };
+  const cameraButtons: HTMLButtonElement[] = [];
+  const cameraButton = (text: string, action: () => void) => { const button = make('button', text); button.type = 'button'; button.addEventListener('click', () => { if (!button.disabled) cameraAction(action); }); cameraButtons.push(button); views.append(button); };
   const camera = (intent: ViewCameraIntent) => { if (!runtime) throw Error('3D表示を確認してください。'); runtime.camera(intent); };
-  cameraButton('全体表示', () => camera({ kind: 'fit' }));
-  for (const [axis, label] of [['+x', '右'], ['-x', '左'], ['+y', '上'], ['-y', '下'], ['+z', '正面'], ['-z', '背面']] as const)
-    cameraButton(label, () => camera({ kind: 'axis', axis }));
-  cameraButton('透視／平行', () => camera({ kind: 'projection', projection: runtime?.read().projection === 'perspective' ? 'orthographic' : 'perspective' }));
+  const axes = { right: '+x', left: '-x', top: '+y', bottom: '-y', front: '+z', back: '-z' } as const;
+  const cameraGizmo = createCameraGizmo(document, axis => cameraAction(() => camera({ kind: 'axis', axis: axes[axis] })), () => cameraAction(() => camera({ kind: 'fit' })));
+  viewport.append(cameraGizmo.root);
+  const projectionLabel = make('label', '投影方式'), projection = make('select'); projection.setAttribute('aria-label', '投影方式');
+  for (const [value, text] of [['perspective', '透視投影'], ['orthographic', '平行投影']]) { const option = make('option', text); option.value = value!; projection.append(option); }
+  projectionLabel.append(projection); views.append(projectionLabel);
+  projection.addEventListener('change', () => { if (!projection.disabled) cameraAction(() => camera({ kind: 'projection', projection: projection.value === 'orthographic' ? 'orthographic' : 'perspective' })); });
   for (const saved of view.views) cameraButton(String(saved.name), () => { if (!runtime?.recall) throw Error('視点を呼び出せません。'); runtime.recall(view.capture(String(saved.id))); });
   sidebar.append(views, windows.tools);
   function paint() {
     if (disposed) return; const observation = runtime?.read(), ready = !!observation?.ready && observation.display === display;
+    const cameraBlocked = !ready || composing || moving || !!observation?.dragging;
+    let captured: unknown; try { captured = runtime?.capture?.().camera; } catch { /* Camera preparation remains local. */ }
+    cameraGizmo.render({ camera: captured, axis: observation?.axis ?? null, blocked: cameraBlocked || !display.bounds });
+    projection.disabled = cameraBlocked; projection.value = observation?.projection ?? 'perspective';
+    for (const button of cameraButtons) button.disabled = cameraBlocked || !runtime?.recall;
     status.textContent = rendererFailure || failure || observation?.issue || observation?.notice || ''; retry.hidden = !!runtime && !observation?.issue&&!observation?.retryAvailable;
     const wanted = new Set(display.pins.map(p => p.id));
     for (const [id, pin] of pins) if (!wanted.has(id)) { pin.remove(); pins.delete(id); }
@@ -122,6 +135,7 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
       panelGallery?.render(); mediaViewer.render();
       windows.render({ source: view.source, memory: windowsMemory, selectedId: memory.selectedCaptionId,
       moveBlock: composing ? '文字の入力を確定してください。' : null });
+      const empty=view.source.captions.length===0;emptyCaptions.hidden=!empty;list.root.hidden=selectedMedia.hidden=windows.tools.hidden=empty;
       display = view.display(memory.pinColors, memory.selectedCaptionId); runtime?.update(display); paint(); }
     catch (error) { failure = (error as Error).message; paint(); } finally { rendering = false; }
   }
@@ -138,5 +152,5 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
   render();
   startRenderer(); paint();
   return { root, render, hasChanges: () => composing || moving, dispose() { if (disposed) return; disposed = true;
-    list.dispose(); panelGallery?.dispose(); windows.dispose(); mediaViewer.dispose(); runtime?.dispose(); pins.clear(); root.remove(); } };
+    cameraGizmo.dispose(); stopHelp(); list.dispose(); panelGallery?.dispose(); windows.dispose(); mediaViewer.dispose(); runtime?.dispose(); pins.clear(); root.remove(); } };
 }

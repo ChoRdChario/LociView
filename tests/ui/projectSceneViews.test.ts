@@ -46,6 +46,15 @@ function host() {
 }
 
 describe('disconnected viewing aids and entry-view intentions', () => {
+  it('uses an external orientation UI without losing projection or advertising unavailable fit actions', () => {
+    const events:ViewPlan[]=[],ui=createViewControls(new RecordedDocument().asDocument(),plan=>events.push(plan),{externalOrientation:true});
+    const ctx=context();if(ctx.runtime.kind!=='ready')throw Error('runtime');
+    ui.render({...ctx,runtime:{...ctx.runtime,bounds:value('empty')},mutationBlock:'閲覧中です。'});
+    const camera=record(ui.camera),projection=camera.children[0]!.children[0]!;
+    expect(camera.children.some(n=>n.tag==='button'||n.className==='lv-view-axes')).toBe(false);
+    expect(camera.children[1]!.textContent).toBe('');expect(projection.disabled).toBe(false);
+    projection.value='orthographic';projection.fire('change');expect(events[0]).toMatchObject({kind:'camera',action:{kind:'projection',projection:'orthographic'}});ui.dispose();
+  });
   it('separates six axis/fit/projection intentions from all Project content and editing state', () => {
     const ctx = context(), before = structuredClone(ctx), externalDraft = { body: '入力中', composing: true, pinMode: 'move' };
     const otherBefore = structuredClone(externalDraft);

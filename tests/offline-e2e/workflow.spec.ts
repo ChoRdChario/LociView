@@ -1,4 +1,4 @@
-import { revealProjectHelp, revealOfflineUtilities } from '../e2e/workspaceUi';
+import { revealFileSurface, revealProjectSelection, revealOfflineUtilities } from '../e2e/workspaceUi';
 import {test,expect,chromium,type BrowserContext,type Page,type TestInfo} from '@playwright/test';
 import {mkdir,mkdtemp,readFile,writeFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
@@ -15,10 +15,10 @@ const detail=(p:Page)=>p.getByRole('region',{name:'キャプションの詳細',
 async function selected(p:Page,title:string){await expect(p.getByRole('heading',{name:'プロジェクト名',exact:true})).toHaveText(title,{timeout:180_000});await expect(p.getByLabel('3Dモデルの表示',{exact:true})).toHaveAttribute('aria-busy','false',{timeout:180_000});await expect(p.locator('.lv-project-viewport-status')).toBeEmpty({timeout:180_000});}
 async function ready(p:Page,text:string){await expect(p.getByText(text,{exact:true})).toBeVisible({timeout:180_000});await expect(p.locator('main.lv-project-workspace > header > p.lv-operation-status')).toHaveAttribute('data-busy','false');}
 async function file(p:Page,path:string){await expect(p.getByLabel('ファイルを選択',{exact:true})).toBeEnabled();await p.getByLabel('ファイルを選択',{exact:true}).setInputFiles(path);await p.getByRole('button',{name:'ファイルを開く',exact:true}).click();}
-async function home(p:Page){await revealProjectHelp(p);await p.getByRole('button',{name:'別のプロジェクトを開く',exact:true}).click();await expect(p.getByLabel('ファイルを選択',{exact:true})).toBeVisible();await expect(p.locator('.lv-validation-status')).toHaveAttribute('data-busy','false');}
+async function home(p:Page){await revealProjectSelection(p);await p.getByRole('button',{name:'別のプロジェクトを開く',exact:true}).click();await expect(p.getByLabel('ファイルを選択',{exact:true})).toBeVisible();await expect(p.locator('.lv-validation-status')).toHaveAttribute('data-busy','false');}
 async function output(p:Page,info:TestInfo,name:string){
   const menu=p.locator('details.lv-project-files');if(!await menu.evaluate(n=>(n as HTMLDetailsElement).open))await menu.locator(':scope > summary').click();
-  const area=p.getByRole('region',{name:'ファイル',exact:true});await area.getByRole('button',{name:'相手に渡す',exact:true}).click();await area.getByLabel('渡す内容',{exact:true}).selectOption('teamWorkspace');
+  const area=p.getByRole('region',{name:'ファイル',exact:true});if(!await revealFileSurface(p,'共有'))await area.getByRole('button',{name:'相手に渡す',exact:true}).click();await area.getByLabel('渡す内容',{exact:true}).selectOption('teamWorkspace');
   const [download]=await Promise.all([p.waitForEvent('download',{timeout:180_000}),area.locator('button.lv-file-primary').click()]);const path=info.outputPath(name+'.zip');await download.saveAs(path);expect(await download.failure()).toBeNull();await expect(area.locator('.lv-operation-status')).toHaveAttribute('data-busy','false',{timeout:180_000});return path;
 }
 async function changes(path:string){return(await WorkspaceArchive.inspect(new Blob([Uint8Array.from(await readFile(path)).buffer]),limits)).source.originalChanges();}

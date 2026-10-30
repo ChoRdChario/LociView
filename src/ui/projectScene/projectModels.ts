@@ -24,6 +24,7 @@ export function createProjectModels(document: Document, host: ProjectPanelHost):
   let fileScope: { kind: 'add' | 'replace'; token: string; sceneId: string; assetId: string; expectedBindingId?: string; file?: WorkspaceFile; externalMaterialsUnavailable?:boolean } | null = null;
   let deletion: { token: string; assetId: string } | null = null;
   const choices = new Map<string, { token: string; value: string }>();
+  const reviewNodes = new Map<string, HTMLElement>();
   const membershipDecisions = new Map<string, { token: string; sceneId: string; value: 'one' | 'both' }>();
   const memory = () => { const { provider, sceneId } = host.source(); if (!memories.has(sceneId)) memories.set(sceneId, newModelListMemory(projectIdentity(provider), sceneId)); return memories.get(sceneId)!; };
   const setMemory = (next: ModelListMemory) => memories.set(host.source().sceneId, next);
@@ -45,10 +46,11 @@ export function createProjectModels(document: Document, host: ProjectPanelHost):
           if (plan.action === 'include') setMemory({ ...memory(), hiddenAssetIds: memory().hiddenAssetIds.filter(id => id !== plan.assetId) });
           host.message(plan.action === 'include' ? 'このシーンにモデルを追加しました。' : 'このシーンからモデルを外しました。');
         });
-    } else if (plan.kind === 'review') { if (!ownInput() && !memory().composing) setMemory({ ...memory(), assetId: plan.assetId }); host.message('下の更新候補と依存関係を確認してください。'); }
+    } else if (plan.kind === 'review') { if (!ownInput() && !memory().composing) setMemory({ ...memory(), assetId: plan.assetId }); }
     } catch (error) { host.message((error as Error).message); }
     host.changed();
-  });
+    if (plan.kind === 'review') { const node=plan.assetId?reviewNodes.get(plan.assetId):undefined; node?.focus?.({preventScroll:true});node?.scrollIntoView?.({block:'nearest'}); }
+  }, assetId => { const groups=host.ports.modelReview(host.source().sceneId);return groups.statuses.some(g=>g.assetId===assetId)||groups.memberships.some(g=>g.assetId===assetId); });
   const input = (label: string) => { const node = make('input'); node.type = 'file'; node.accept = '.glb,.gltf,.obj,.stl,.ply,model/gltf-binary,model/gltf+json,model/stl,application/ply,text/plain'; node.hidden = true; node.setAttribute('aria-label', label); fileArea.append(node); return node; };
   const addInput = input('3Dモデルを追加'), replaceInput = input('モデルを差し替える');
   const beginFile = (kind: 'add' | 'replace') => {
@@ -128,8 +130,12 @@ export function createProjectModels(document: Document, host: ProjectPanelHost):
       } catch { /* Invalid text stays in the form; last valid preview remains. */ } host.changed(); });
     node.addEventListener('compositionstart', () => { composing = true; host.changed(); }); node.addEventListener('compositionend', () => { composing = false; host.changed(); }); return node;
   });
-  const modes = make('div'); for (const [mode, text] of [['translate', '移動'], ['rotate', '回転'], ['scale', '拡大縮小']] as const)
-    modes.append(button(text, () => { if (edit && !host.block('models') && !composing) { edit = { ...edit, mode }; host.changed(); } }));
+  const modes = make('div'), modeButtons = new Map<string, HTMLButtonElement>();
+  modes.setAttribute('role', 'group'); modes.setAttribute('aria-label', '配置の操作');
+  for (const [mode, text] of [['translate', '移動'], ['rotate', '回転'], ['scale', '拡大縮小']] as const) {
+    const control = button(text, () => { if (edit && !host.block('models') && !composing) { edit = { ...edit, mode }; host.changed(); } });
+    modeButtons.set(mode, control); modes.append(control);
+  }
   const confirm = button('配置を確定', () => {
     if (!edit || host.block('models') || composing || !valid()) return;
     const captured = edit, current = host.ports.modelDetails(captured.target.sceneId, captured.target.assetId);
@@ -219,7 +225,7 @@ export function createProjectModels(document: Document, host: ProjectPanelHost):
   pointSizeInput.addEventListener('input', () => { const assetId = memory().assetId; if (assetId && !pointSizeInput.disabled) { host.viewport().setPointDiameter?.(assetId, Number(pointSizeInput.value)); host.changed(); } });
   const manage = make('details'); manage.className = 'lv-model-management'; manage.append(make('summary', 'モデルを管理'), fileArea, remove, deletionNote, deletionBox);
   root.append(list.root, proxyArea, placement, pinSizeArea, pointSizeArea, manage, review, placementActions); if (preview) root.append(preview.root);
-  editOnly(manage, placementActions, fileArea, proxyArea, placement, pinSizeArea, pointSizeArea, remove, deletionBox);
+  editOnly(manage, placementActions, fileArea, proxyArea, placement, pinSizeArea, remove, deletionBox);
   function render() {
     if (disposed) return; placementActions.hidden = !edit; if (fileScope || deletion) manage.open = true; list.render(context()); const block = host.block('models'), selected = memory().assetId, { provider, sceneId } = host.source();
     const details = selected ? host.ports.modelDetails(sceneId, selected) : null;
@@ -232,7 +238,9 @@ export function createProjectModels(document: Document, host: ProjectPanelHost):
     proxyNote.textContent=proxyScope?.token&&proxyScope.token!==provider.token?'モデルが更新されています。入力は保持しています。取り消して選び直してください。':proxyScope?.removing?'新しく位置を選ぶには面の追加が必要です。保存済みの記録位置は変わりません。':proxyScope?.prepared?`${proxyScope.prepared.label} を選択中のモデルに関連付けます。同じ原点・向き・倍率で用意した面であることを確認してください。面は通常表示されず、保存済みの記録位置は変わりません。`:'このモデルと同じ座標で用意した面のデータを選択してください。';
     if(proxyScope?.prepared?.externalMaterialsUnavailable)proxyNote.textContent+=' OBJの外部材質・画像は読み込まず、既定の材質で表示します。';
     const source = context().source, selectedItem = source.kind === 'ready' ? source.items.find(i => i.id === selected) : undefined;
-    pointSizeArea.hidden = !details?.pointCloud; pointSizeInput.disabled = !!block || !!edit || !!fileScope; if (selected) pointSizeInput.value = String(host.viewport().pointDiameter?.(selected) ?? 3);
+    placement.hidden = !selected && !edit && !reference; fields.hidden = modes.hidden = !edit;
+    for (const [mode, control] of modeButtons) { control.setAttribute('aria-pressed', String(edit?.mode === mode)); control.disabled = !edit || !!block || composing; }
+    pointSizeArea.hidden = !details?.pointCloud; pointSizeInput.disabled = !!host.block('models', false) || ownInput() || composing || memory().composing; if (selected) pointSizeInput.value = String(host.viewport().pointDiameter?.(selected) ?? 3);
     const included = selectedItem?.membership.kind === 'value' && selectedItem.membership.value.kind === 'included';
     const visible = selectedItem?.display.kind === 'value' && selectedItem.display.value === 'visible';
     const scale = selected ? provider.details.mutable.assetsById[selected]?.pinScale : undefined;
@@ -274,7 +282,7 @@ export function createProjectModels(document: Document, host: ProjectPanelHost):
     try { const deps = selected ? host.ports.modelDeletion(selected).dependencies : []; remove.disabled = !!block || ownInput() || !selected || deps.length > 0;
       deletionNote.textContent = deps.length ? `削除するには、参照しているシーン・記録・材質の設定を先に解除してください（${deps.length}件）。` : ''; }
     catch (error) { remove.disabled = true; deletionNote.textContent = selected ? (error as Error).message : ''; }
-    review.replaceChildren();
+    review.replaceChildren(); reviewNodes.clear();
     const groups = host.ports.modelReview(sceneId);
     const choice = (key: string, label: string, values: readonly { id: string; label: string }[], apply: (value: string) => void, area: HTMLElement = review) => {
       const owned = choices.get(key), row = make('label', label), select = make('select'), empty = make('option', '選択してください'); empty.value = ''; select.append(empty); select.setAttribute('aria-label', label);
@@ -286,15 +294,16 @@ export function createProjectModels(document: Document, host: ProjectPanelHost):
       const clear = button('選択を取り消す', () => { if (!host.block('models', false)) { choices.delete(key); membershipDecisions.delete(key); host.changed(); } }); clear.hidden = !owned && !membershipDecisions.has(key); clear.disabled = !!host.block('models', false);
       editOnly(row, save, clear); area.append(row, save, clear, viewChoices(document, label, values.map(item => item.label)));
     };
-    for (const group of groups.statuses) { if (group.issue) review.append(make('p', group.issue));
+    for (const group of groups.statuses) { const area=make('section');area.tabIndex=-1;area.setAttribute('aria-label',group.label);reviewNodes.set(group.assetId,area);review.append(area);if (group.issue) area.append(make('p', group.issue));
       if (preview) for (const [index, item] of group.choices.entries()) { const show = button(`${group.label}：候補 ${index + 1} を表示`, () => {
         if (host.block('models', false) || pinSize) return; try { preview.show(provider.token, sceneId, group.assetId, item.operationId, `${group.label}：候補 ${index + 1}`); } catch (error) { host.message((error as Error).message); }
-      }); show.disabled = !!host.block('models', false) || !!pinSize; review.append(show); }
+      }); show.disabled = !!host.block('models', false) || !!pinSize; area.append(show); }
       choice(`status/${group.assetId}`, `${group.label}：残すモデルと配置`, group.choices.map(c => ({ id: c.operationId, label: c.label })), operationId => {
       host.dispatch('models', provider.token, { kind: 'resolveAssetStatus', assetId: group.assetId, operationId }, () => { choices.delete(`status/${group.assetId}`); host.message('モデルと配置を確定しました。'); });
-    }); }
+    }, area); }
     for (const group of groups.memberships) {
       const area = make('section'); area.setAttribute('aria-label', group.label ?? 'モデル登録の重複');
+      area.tabIndex=-1;if(!reviewNodes.has(group.assetId))reviewNodes.set(group.assetId,area);
       area.append(make('h3', group.label ?? 'モデル登録の重複'));
       if (group.note) area.append(make('p', group.note));
       if (group.details?.length) { const details = make('ul'); for (const text of group.details) details.append(make('li', text)); area.append(details); }

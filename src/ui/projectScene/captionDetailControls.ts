@@ -151,7 +151,7 @@ export function createCaptionDetailControls(document: Document, onEvent: (event:
       control.note.textContent = [issue, raw !== undefined && issue && '入力内容は未適用です。',
         field === 'color' && raw === undefined && current?.kind === 'value' && current.value === '' && '未設定（標準色で表示）'].filter(Boolean).join(' ');
       control.note.hidden = !control.note.textContent;
-      control.review.hidden = !issue || source.kind !== 'ready';
+      control.review.hidden = !issue || source.kind !== 'ready' || current?.kind === 'value';
       control.review.disabled = inFlight || Boolean(owned?.composing);
     }
     const color = fields.get('color')!;

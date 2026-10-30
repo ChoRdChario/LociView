@@ -1,4 +1,4 @@
-import { lookAlongFront, revealCaptionList } from './workspaceUi';
+import { revealFileSurface, lookAlongFront, revealCaptionList } from './workspaceUi';
 import {test,expect,chromium,type Page,type TestInfo,type BrowserContext} from '@playwright/test';
 import {mkdir,mkdtemp} from 'node:fs/promises';
 import {openAsBlob} from 'node:fs';
@@ -22,16 +22,18 @@ async function edit(p:Page,field:'タイトル'|'本文',value:string){await det
 async function output(p:Page,info:TestInfo,name:string,purpose:'backup'|'teamWorkspace'|'contribution'|'review'|'clean',base?:string){
   const menu=p.locator('details.lv-project-files');if(await menu.count()&&!await menu.evaluate(n=>(n as HTMLDetailsElement).open))await menu.locator(':scope > summary').click();
   const area=p.getByRole('region',{name:'ファイル',exact:true});
-  if(purpose==='review'||purpose==='clean'){const more=area.locator('summary').filter({hasText:/^その他$/});if(!await more.evaluate(n=>(n.parentElement as HTMLDetailsElement).open))await more.click();await area.getByRole('button',{name:purpose==='review'?'シーンを共有':'独立コピーを作る',exact:true}).click();}
+  const compact=await revealFileSurface(p,purpose==='backup'?'保存':'共有');
+  if(compact){if(purpose!=='backup')await area.getByLabel('渡す内容',{exact:true}).selectOption(purpose);}
+  else if(purpose==='review'||purpose==='clean'){const more=area.locator('summary').filter({hasText:/^その他$/});if(!await more.evaluate(n=>(n.parentElement as HTMLDetailsElement).open))await more.click();await area.getByRole('button',{name:purpose==='review'?'シーンを共有':'独立コピーを作る',exact:true}).click();}
   else await area.getByRole('button',{name:purpose==='backup'?'保存':'相手に渡す',exact:true}).click();
   if(purpose==='backup')await area.getByLabel('名前（任意）',{exact:true}).fill(name);
-  else if(purpose!=='review'&&purpose!=='clean'){await area.getByLabel('渡す内容',{exact:true}).selectOption(purpose);if(base)await area.getByLabel('元にする作業一式',{exact:true}).selectOption(base);}
+  else if(purpose!=='review'&&purpose!=='clean'){if(!compact)await area.getByLabel('渡す内容',{exact:true}).selectOption(purpose);if(base)await area.getByLabel('元にする作業一式',{exact:true}).selectOption(base);}
   if(purpose==='review'){const scenes=area.getByLabel('渡すシーン',{exact:true});await scenes.selectOption((await scenes.locator('option').evaluateAll(ns=>ns.map(n=>(n as HTMLOptionElement).value).filter(Boolean)))[0]!);}
   if(purpose==='review'||purpose==='clean')await area.getByRole('button',{name:'内容を確認',exact:true}).click();
   const primary=area.locator('button.lv-file-primary');await expect(primary).toBeEnabled({timeout:300000});const [download]=await Promise.all([p.waitForEvent('download',{timeout:300000}),primary.click()]);const path=info.outputPath(name+'.zip');await download.saveAs(path);expect(await download.failure()).toBeNull();await expect(area.locator('.lv-operation-status')).toHaveAttribute('data-busy','false',{timeout:300000});return path;
 }
 async function backup(path:string){const archive=await BackupArchive.inspect(await openAsBlob(path),limits),c=await inspectProjectCandidates(archive.source.read(),limits);if(c.kind!=='project-candidate-inspection')throw Error('metadata');return{archive,records:c.unambiguousRecords as Record<string,any>};}
-async function receive(p:Page,path:string){const r=p.getByRole('region',{name:'更新ファイル',exact:true});await r.getByLabel('更新ファイルを選択',{exact:true}).setInputFiles(path);await r.getByRole('button',{name:'更新を受け取る',exact:true}).click();await expect(r.getByText('更新を受け取りました。',{exact:true})).toBeVisible({timeout:180000});await ready(p);}
+async function receive(p:Page,path:string){await revealFileSurface(p,'受信');const r=p.getByRole('region',{name:'更新ファイル',exact:true});await r.getByLabel('更新ファイルを選択',{exact:true}).setInputFiles(path);await r.getByRole('button',{name:'更新を受け取る',exact:true}).click();await expect(r.getByText('更新を受け取りました。',{exact:true})).toBeVisible({timeout:180000});await ready(p);}
 
 test('元の両面・照明なし・切り抜きを編集解除しGPU選択と5用途ファイル2往復と復旧coldを保つ',async({},info)=>{
   test.setTimeout(1200000);A.getHeads(A.init());await mkdir('.artifacts/e2e/profiles',{recursive:true});

@@ -59,6 +59,7 @@ describe('Caption detail: local draft/intents, not durable editor acceptance', (
     const properties = h.root.children.find(n => n.className === 'lv-caption-properties')!;
     expect(properties.open).toBe(false); h.render(initial); expect(properties.open).toBe(false);
     h.color.value = 'invalid'; h.color.fire('input'); expect(properties.open).toBe(true);
+    expect(h.color.parent!.parent!.children[2]!.hidden).toBe(true); expect(h.apply.disabled).toBe(true);
     h.render({ ...h.props, source: { kind: 'unavailable', captionId: cap, sceneId: scn, token: 'lost', reason: '状態を確認してください。' } });
     expect(properties.open).toBe(true); expect(h.color.value).toBe('invalid'); h.controls.dispose();
   });

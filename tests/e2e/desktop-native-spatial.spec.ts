@@ -1,4 +1,4 @@
-import { lookAlongFront, revealCaptionList } from './workspaceUi';
+import { revealFileSurface, lookAlongFront, revealCaptionList } from './workspaceUi';
 import {test,expect,chromium,type Page,type BrowserContext,type TestInfo} from '@playwright/test';
 import {mkdir,mkdtemp,writeFile} from 'node:fs/promises';
 import {openAsBlob} from 'node:fs';
@@ -24,12 +24,14 @@ async function edit(p:Page,field:'タイトル'|'本文',text:string){await deta
 async function output(p:Page,info:TestInfo,name:string,purpose:'backup'|'teamWorkspace'|'contribution'|'review'|'clean',base?:string){
   const menu=p.locator('details.lv-project-files');if(await menu.count()&&!await menu.evaluate(n=>(n as HTMLDetailsElement).open))await menu.locator(':scope > summary').click();
   const area=files(p);
-  if(purpose==='review'||purpose==='clean'){
+  const compact=await revealFileSurface(p,purpose==='backup'?'保存':'共有');
+  if(compact){if(purpose!=='backup')await area.getByLabel('渡す内容',{exact:true}).selectOption(purpose);}
+  else if(purpose==='review'||purpose==='clean'){
     const more=area.locator('summary').filter({hasText:/^その他$/});if(!await more.evaluate(n=>(n.parentElement as HTMLDetailsElement).open))await more.click();
     await area.getByRole('button',{name:purpose==='review'?'シーンを共有':'独立コピーを作る',exact:true}).click();
   }else await area.getByRole('button',{name:purpose==='backup'?'保存':'相手に渡す',exact:true}).click();
   if(purpose==='backup')await area.getByLabel('名前（任意）',{exact:true}).fill(name);
-  else if(purpose!=='review'&&purpose!=='clean'){await area.getByLabel('渡す内容',{exact:true}).selectOption(purpose);if(base)await area.getByLabel('元にする作業一式',{exact:true}).selectOption(base);}
+  else if(purpose!=='review'&&purpose!=='clean'){if(!compact)await area.getByLabel('渡す内容',{exact:true}).selectOption(purpose);if(base)await area.getByLabel('元にする作業一式',{exact:true}).selectOption(base);}
   if(purpose==='review'){const scenes=area.getByLabel('渡すシーン',{exact:true});await scenes.selectOption((await scenes.locator('option').evaluateAll(ns=>ns.map(n=>(n as HTMLOptionElement).value).filter(Boolean)))[0]!);}
   if(purpose==='review'||purpose==='clean')await area.getByRole('button',{name:'内容を確認',exact:true}).click();
   const primary=area.locator('button.lv-file-primary');await expect(primary).toBeEnabled({timeout:300000});
@@ -117,10 +119,10 @@ test('Native07kの点群GSと面を変換し共有返送Review編集コピー独
     for(let round=1;round<=2;round++){
       await selectCaption(a.p);await edit(a.p,'本文',`手元の本文${round}`);await selectCaption(b.p);await edit(b.p,'タイトル',`返送前${round}`);
       const returned=await output(b.p,info,'return-'+round,'contribution',wire.archive.control.manifest.packageId),receive=a.p.getByRole('region',{name:'更新ファイル',exact:true});
-      await receive.getByLabel('更新ファイルを選択',{exact:true}).setInputFiles(returned);await receive.getByRole('button',{name:'更新を受け取る',exact:true}).click();await expect(receive.getByText('更新を受け取りました。',{exact:true})).toBeVisible({timeout:180000});await ready(a.p);
+      await revealFileSurface(a.p,'受信');await receive.getByLabel('更新ファイルを選択',{exact:true}).setInputFiles(returned);await receive.getByRole('button',{name:'更新を受け取る',exact:true}).click();await expect(receive.getByText('更新を受け取りました。',{exact:true})).toBeVisible({timeout:180000});await ready(a.p);
       const state=await backup(await output(a.p,info,'round-'+round,'backup'));verifyModels(state.records,fixture);
       expect((Object.values(state.records.captionsById) as any[]).find(c=>c.anchor.kind==='asset')).toMatchObject({title:`返送前${round}`,body:`手元の本文${round}`});
-      if(round===1){workspace=await output(a.p,info,'workspace-2','teamWorkspace');wire=await WorkspaceArchive.inspect(await openAsBlob(workspace),limits);const incoming=b.p.getByRole('region',{name:'更新ファイル',exact:true});await incoming.getByLabel('更新ファイルを選択',{exact:true}).setInputFiles(workspace);await incoming.getByRole('button',{name:'更新を受け取る',exact:true}).click();await expect(incoming.getByText('更新を受け取りました。',{exact:true})).toBeVisible({timeout:180000});await ready(b.p);}
+      if(round===1){workspace=await output(a.p,info,'workspace-2','teamWorkspace');wire=await WorkspaceArchive.inspect(await openAsBlob(workspace),limits);const incoming=b.p.getByRole('region',{name:'更新ファイル',exact:true});await revealFileSurface(b.p,'受信');await incoming.getByLabel('更新ファイルを選択',{exact:true}).setInputFiles(workspace);await incoming.getByRole('button',{name:'更新を受け取る',exact:true}).click();await expect(incoming.getByText('更新を受け取りました。',{exact:true})).toBeVisible({timeout:180000});await ready(b.p);}
     }
     await run.close(b.context);await run.mark('two-rounds',a.p);
     const finalPath=await output(a.p,info,'final','backup'),final=await backup(finalPath),reviewPath=await output(a.p,info,'review','review'),cleanPath=await output(a.p,info,'clean','clean');

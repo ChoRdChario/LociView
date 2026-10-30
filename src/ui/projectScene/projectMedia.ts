@@ -6,23 +6,24 @@ import { newProjectId, panelNodes, sameProjectValue, type ProjectPanelHost, type
 
 /** Attachment commands and local viewing only; binary verification stays in the current host. */
 export function createProjectMedia(document: Document, host: ProjectPanelHost, caption: () => string | null, viewer: MediaViewer) {
-  const { make, button } = panelNodes(document), root = make('section'), galleryHost = make('div'), stored = make('details'), list = make('section');
-  root.setAttribute('aria-label', 'メディアの整理'); galleryHost.setAttribute('aria-label', '添付メディア'); list.setAttribute('aria-label', '添付の編集');
-  stored.setAttribute('aria-label', '登録済みメディア'); stored.append(make('summary', '登録済みメディア'));
+  const { make, button } = panelNodes(document), root = make('section'), galleryHost = make('section'), stored = make('details');
+  root.setAttribute('aria-label', 'メディアの整理'); galleryHost.setAttribute('aria-label', '添付メディア');
+  stored.setAttribute('aria-label', '既存のメディアを添付'); stored.append(make('summary', '既存のメディアを添付'));
   const status = make('p'); status.setAttribute('role', 'status');
   type Scope = { token: string; sceneId: string; captionId: string };
   type Choice = Scope & { id: string; record: JsonObject };
   type Draft = Scope & { attachmentId: string; raw: string; composing: boolean };
   let selected: Choice | null = null, draft: Draft | null = null, removal: (Scope & { attachmentId: string; label: string }) | null = null;
-  let disposed = false, galleryKey = '', listKey = '', message = '', imageScope = '';
+  let disposed = false, galleryKey = '', message = '', imageScope = '';
   const expanded = new Set<string>();
+  const actionCards = new Map<string, { key: string; root: HTMLElement }>();
   let gallery: ReturnType<typeof createMediaThumbnails> | undefined;
   const bodies = new Map<string, { record: JsonObject; image: PreviewPng }>();
   const source = () => { const s = host.source(); return { ...s, captionId: caption() }; };
   const scope = () => { const s = source(); return JSON.stringify([projectIdentity(s.provider), s.sceneId, host.ports.imageScope()]); };
   const owned = () => !!selected || !!draft || !!removal;
   const expected = (): Scope | null => { const s = source(); return s.captionId ? { token: s.provider.token, sceneId: s.sceneId, captionId: s.captionId } : null; };
-  const isCurrent = (s: Scope) => { const now = expected(); return !!now && sameProjectValue(s.token, now.token) && s.sceneId === now.sceneId && s.captionId === now.captionId; };
+  const isCurrent = (s: Scope) => { if(disposed)return false;const now = expected(); return !!now && sameProjectValue(s.token, now.token) && s.sceneId === now.sceneId && s.captionId === now.captionId; };
   const rows = (captionId: string) => projectAttachments(source().provider, captionId).filter(r => r.media && r.fields.orderKey?.kind === 'value');
   const uncertainty = () => { const s = source(); return s.captionId && projectMediaUncertain(s.provider, s.captionId) ? '未解決の添付があります。関連と順序を確認してください。' : null; };
   const image = (id: string, record: JsonObject): PreviewPng => {
@@ -62,7 +63,7 @@ export function createProjectMedia(document: Document, host: ProjectPanelHost, c
   });
   const cancelSelection = button('選択を取り消す', () => { if (!host.block('captions', false)) { selected = null; message = ''; host.changed(); } });
   stored.append(picker.root, attach, cancelSelection); stored.addEventListener('toggle', () => host.changed());
-  const form = make('section'), input = make('input'); input.setAttribute('aria-label', 'メディアの説明'); form.setAttribute('aria-label', '説明の編集');
+  const form = make('section'), formTitle=make('p'), input = make('input'); input.setAttribute('aria-label', 'メディアの説明'); form.setAttribute('aria-label', '説明の編集');
   const apply = button('説明を適用', () => {
     const d = draft; if (!d || d.composing || host.block('captions') || !isCurrent(d) || uncertainty()) return;
     try { const value = host.ports.mediaDescription(d.raw);
@@ -72,7 +73,7 @@ export function createProjectMedia(document: Document, host: ProjectPanelHost, c
       });
     } catch (error) { message = (error as Error).message; host.changed(); }
   });
-  const cancel = button('取り消す', () => { if (!host.block('captions', false) && !draft?.composing) { draft = null; message = ''; host.changed(); } }); form.append(input, apply, cancel);
+  const cancel = button('取り消す', () => { if (!host.block('captions', false) && !draft?.composing) { draft = null; message = ''; host.changed(); } }); form.append(formTitle,input, apply, cancel);
   const change = (composing = draft?.composing ?? false) => { if (draft && !host.block('captions', false)) { draft = { ...draft, raw: input.value, composing }; message = ''; host.changed(); } };
   input.addEventListener('input', () => change()); input.addEventListener('compositionstart', () => change(true)); input.addEventListener('compositionend', () => change(false));
   const confirmation = make('section'), question = make('p'); confirmation.setAttribute('aria-label', '添付解除の確認');
@@ -84,32 +85,34 @@ export function createProjectMedia(document: Document, host: ProjectPanelHost, c
     });
   });
   confirmation.append(question, detach, button('戻る', () => { if (!host.block('captions', false)) { removal = null; host.changed(); } }));
-  root.append(galleryHost, stored, list, form, confirmation, status);
-  editOnly(stored, list, form, confirmation);
+  root.append(galleryHost, stored, form, confirmation, status);
+  editOnly(stored, form, confirmation);
   function render() {
     if (disposed) return; const s = source(), block = host.block('captions'), local = host.block('captions', false), uncertain = uncertainty(), currentScope = scope();
     if (registeredScope !== currentScope) { registeredScope = currentScope; registeredReader = reader(null); picker.dispose(); picker = newPicker();
       picker.root.setAttribute('aria-label', 'メディアを選択'); stored.insertBefore(picker.root, attach); }
     const nextGallery = JSON.stringify([currentScope, s.captionId]);
-    if (galleryKey !== nextGallery) { galleryKey = nextGallery; gallery?.dispose(); gallery = s.captionId ? createMediaThumbnails(document, reader(s.captionId), viewer) : undefined;
+    if (galleryKey !== nextGallery) { galleryKey = nextGallery; gallery?.dispose(); actionCards.clear();gallery = s.captionId ? createMediaThumbnails(document, reader(s.captionId), viewer, undefined, attachmentTools) : undefined;
       galleryHost.replaceChildren(); if (gallery) galleryHost.append(gallery.root); }
     gallery?.render(); if (stored.open) picker.render(); viewer.render();
     root.hidden = !s.captionId && !owned(); stored.hidden = !projectMediaResources(s.provider).length;
     attach.disabled = !!block || !!draft || !!removal || !selected || !isCurrent(selected) || !!uncertain;
     cancelSelection.hidden = !selected; cancelSelection.disabled = !!local;
-    form.hidden = !draft; input.readOnly = !!local; if (!draft?.composing) input.value = draft?.raw ?? '';
+    const activeDraft=draft;form.hidden = !activeDraft;formTitle.textContent=activeDraft?`${rows(activeDraft.captionId).find(row=>row.id===activeDraft.attachmentId)?.label??'添付'}の説明`:''; input.readOnly = !!local; if (!draft?.composing) input.value = draft?.raw ?? '';
     apply.disabled = !!block || !draft || draft.composing || !isCurrent(draft) || !!uncertain; cancel.disabled = !!local || !!draft?.composing;
     confirmation.hidden = !removal; detach.disabled = !!block || !removal || !isCurrent(removal) || !!uncertain;
     question.textContent = removal ? `「${removal.label}」の添付を解除しますか？ 同じ記録を使う全シーンに反映されます。元のメディアと、別の記録への添付は残ります。` : '';
     const unavailable = s.provider.issues.some(issue => issue.kind === 'unverified' && issue.code === 'verified-media-bytes-required' && issue.path[0] === 'mediaResourcesById');
     status.textContent = [message, uncertain, unavailable && 'この環境では利用できない登録メディアがあります。対応するブラウザで確認してください。',
       (selected && !isCurrent(selected) || draft && !isCurrent(draft) || removal && !isCurrent(removal)) && '対象が更新されています。入力と操作を保持しています。取り消して選び直してください。'].filter(Boolean).join(' ');
-    const nextList = JSON.stringify([s.provider.token, s.captionId, !!block, owned(), !!uncertain]); if (nextList === listKey) return; listKey = nextList; list.replaceChildren();
-    for (const [index, row] of (s.captionId ? rows(s.captionId) : []).entries()) {
-      const card = make('section'); card.setAttribute('aria-label', `添付 ${index + 1} ${row.label}`); card.append(make('p', `${index + 1}. ${row.label}`), make('p', row.fields.altText?.kind === 'value' ? row.alt : '説明の更新候補を確認してください。'));
+  }
+  function attachmentTools(id: string): HTMLElement | null {
+      const s=source(), block=host.block('captions'), uncertain=uncertainty(), attachments=s.captionId?rows(s.captionId):[],index=attachments.findIndex(row=>row.id===id),row=attachments[index];
+      if(!row)return null; const key=JSON.stringify([s.provider.token,s.captionId,!!block,owned(),!!uncertain]),old=actionCards.get(id);if(old?.key===key)return old.root;
+      const card = make('section'); card.setAttribute('aria-label', `添付 ${index + 1} ${row.label}`);
       const organize=make('details'); organize.append(make('summary','添付を整理')); organize.open=expanded.has(row.id)||draft?.attachmentId===row.id||removal?.attachmentId===row.id;
-      organize.addEventListener('toggle',()=>{if(organize.open)expanded.add(row.id);else expanded.delete(row.id);});card.append(organize);
-      const held = expected()!, edit = button('説明を編集', () => { if (host.block('captions') || owned() || !isCurrent(held)) return; draft = { ...held, attachmentId: row.id, raw: row.alt, composing: false }; host.changed(); });
+      organize.addEventListener('toggle',()=>{if(organize.open)expanded.add(row.id);else expanded.delete(row.id);});editOnly(organize);card.append(organize);
+      const held = expected()!, edit = button('説明を編集', () => { if (host.block('captions') || owned() || !isCurrent(held)) return; draft = { ...held, attachmentId: row.id, raw: row.alt, composing: false }; host.changed();input.focus?.({preventScroll:true});input.scrollIntoView?.({block:'nearest'}); });
       edit.disabled = !!block || owned() || !!uncertain || row.fields.altText?.kind !== 'value'; organize.append(edit);
       for (const [offset, label] of [[-1, '前へ'], [1, '後へ']] as const) {
         const move = button(label, () => { if (host.block('captions') || owned() || !isCurrent(held) || uncertainty()) return;
@@ -119,8 +122,7 @@ export function createProjectMedia(document: Document, host: ProjectPanelHost, c
         }); move.disabled = !!block || owned() || !!uncertain || index + offset < 0 || index + offset >= rows(held.captionId).length; organize.append(move);
       }
       const remove = button('添付を解除', () => { if (!host.block('captions') && !owned() && isCurrent(held)) { removal = { ...held, attachmentId: row.id, label: row.label }; host.changed(); } });
-      remove.disabled = !!block || owned() || !!uncertain; organize.append(remove); list.append(card);
-    }
+      remove.disabled = !!block || owned() || !!uncertain; organize.append(remove); actionCards.set(id,{key,root:card});return card;
   }
   return { root, render, hasChanges: owned, composing: () => !!draft?.composing,
     gallery(captionId: string) {
@@ -128,5 +130,5 @@ export function createProjectMedia(document: Document, host: ProjectPanelHost, c
       const thumbs = createMediaThumbnails(document, () => read(), viewer); thumbs.root.setAttribute('aria-label', '添付メディア');
       return { root: thumbs.root, render() { if (lifetime !== scope()) { lifetime = scope(); read = reader(captionId); } thumbs.render(); }, dispose: thumbs.dispose };
     },
-    dispose() { disposed = true; gallery?.dispose(); picker.dispose(); bodies.clear(); root.remove(); } } satisfies ProjectPanel & { gallery(captionId: string): { root: HTMLElement; render(): void; dispose(): void } };
+    dispose() { disposed = true; gallery?.dispose(); picker.dispose(); actionCards.clear();bodies.clear(); root.remove(); } } satisfies ProjectPanel & { gallery(captionId: string): { root: HTMLElement; render(): void; dispose(): void } };
 }

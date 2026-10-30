@@ -1,5 +1,4 @@
-import { revealModelManagement, lookAlongFront, revealProjectHelp } from './workspaceUi';
-import { revealCaptionList } from './workspaceUi';
+import { revealModelManagement, lookAlongFront, revealProjectHelp, revealCaptionList } from './workspaceUi';
 import * as THREE from 'three';
 import { serializeGlb } from '../../src/assets/glbOptimize';
 import { defaultPose, fittedPose } from '../../src/harness/projectScene/viewportModel';
@@ -41,7 +40,7 @@ async function download(page: Page, info: TestInfo, name: string, purpose: 'back
   await expect(area.locator('.lv-operation-status')).toHaveAttribute('data-busy', 'false', { timeout: 180_000 });
   if (purpose === 'backup') {
     const history = area.locator('details').filter({has:page.locator('summary',{hasText:/^作成したファイル$/})}); await history.locator('summary').first().click();
-    const row = history.locator('section').filter({hasText:`バックアップ ${name} —`}); await row.getByText('保存先のファイルを確認',{exact:true}).click();
+    const row = history.locator('section').filter({hasText:`バックアップ ${name} —`}); await row.getByText('保存したファイルを確認',{exact:true}).click();
     const choosing=page.waitForEvent('filechooser'); await row.getByRole('button',{name:'ファイルを選択',exact:true}).click(); await (await choosing).setFiles(path);
     await expect(area.getByText('選択したファイルの内容を確認しました。',{exact:true})).toBeVisible({timeout:90_000});
     await expect(page.getByLabel('保存ファイルの状態',{exact:true})).toHaveText('保存ファイルと一致');

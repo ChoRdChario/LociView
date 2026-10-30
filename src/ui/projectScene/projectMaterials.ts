@@ -3,18 +3,20 @@ import { editOnly, viewChoices } from './modePresentation';
 import { createMaterialControls } from './materialControls';
 import { materialPlanIsCurrent, materialView, newMaterialSelection, type MaterialContext, type MaterialDraft, type MaterialSelection } from './materialState';
 import { newProjectId, panelNodes, sameProjectValue, type ProjectPanelHost, type ProjectPanel } from './projectPanel';
+import { fieldValue } from './projectRead';
 
 export function createProjectMaterials(document: Document, host: ProjectPanelHost): ProjectPanel {
   const { make, button } = panelNodes(document), root = make('section'), review = make('section');
   root.setAttribute('aria-label', '材質の作業'); review.setAttribute('aria-label', '材質の更新候補');
   const states = new Map<string, { selection: MaterialSelection; draft: MaterialDraft | null; followedModel?: string | null }>();
   const choices = new Map<string, { token: string; appearance?: string; compositing?: string; owner?: string }>();
+  const reviewNodes = new Map<string, HTMLElement>();
   let disposed = false;
   const state = () => { const key = host.source().sceneId; if (!states.has(key)) states.set(key, { selection: newMaterialSelection(), draft: null }); return states.get(key)!; };
   const context = (): MaterialContext => ({ source: host.ports.materials(host.source().sceneId).source, ...state(),
     pending: null, mutationBlock: host.block('materials') || (choices.size ? '更新候補の選択を確定するか、取り消してください。' : null), feedback: { kind: 'idle' } });
   const controls = createMaterialControls(document, plan => {
-    const local = plan.kind === 'cancel' || plan.kind === 'select' || plan.kind === 'draft' && plan.baseDraft !== null;
+    const local = plan.kind === 'cancel' || plan.kind === 'select' || plan.kind === 'review' || plan.kind === 'draft' && plan.baseDraft !== null;
     if (disposed || host.block('materials', !local) || !materialPlanIsCurrent(plan, context())) return;
     const owned = state();
     if (plan.kind === 'select') owned.selection = plan.selection;
@@ -37,7 +39,18 @@ export function createProjectMaterials(document: Document, host: ProjectPanelHos
       });
     }
     host.changed();
+    if (plan.kind === 'review') {
+      const node=matchingReview().map(g=>reviewNodes.get(g.key)).find(Boolean);
+      node?.focus?.({preventScroll:true});node?.scrollIntoView?.({block:'nearest'});
+    }
   });
+  function matchingReview() {
+    const {provider,sceneId}=host.source(), target=state().selection.target;
+    return host.ports.materials(sceneId).review.filter(g=>[g.overrideId,...g.owners.map(o=>o.id)].some(id=>{
+      const routing=fieldValue(provider.details.mutable.materialOverridesById[id]?.routing);
+      return target && routing && typeof routing==='object' && !Array.isArray(routing) && 'target' in routing && sameProjectValue(routing.target,target);
+    }));
+  }
   root.append(controls.root, review);
   function render() {
     if (disposed) return;
@@ -49,10 +62,10 @@ export function createProjectMaterials(document: Document, host: ProjectPanelHos
         s.selection={assetId:follow.assetId,target:surfaces.length===1?surfaces[0]!.target:null,scope:s.selection.scope};}
       s.followedModel=selected;
     }
-    controls.render(context(), { viewing: host.ports.mode === 'view', readBlock: host.block('materials', false) }); review.replaceChildren();
+    controls.render(context(), { viewing: host.ports.mode === 'view', readBlock: host.block('materials', false) }); controls.review.hidden=!matchingReview().length; review.replaceChildren(); reviewNodes.clear();
     const { provider, sceneId } = host.source(), groups = host.ports.materials(sceneId).review;
     for (const group of groups) {
-      const box = make('fieldset'), label = make('legend', group.label); box.append(label);
+      const box = make('fieldset'), label = make('legend', group.label); box.tabIndex=-1;reviewNodes.set(group.key,box);box.append(label);
       const key = `${sceneId}/${group.key}`, owned = choices.get(key), blocked = host.block('materials') || (state().draft ? '材質の入力を確定してください。' : null);
       const choose = (name: 'appearance' | 'compositing' | 'owner', label: string, values: readonly { id: string; label: string }[]) => {
         const row = make('label', label), select = make('select'), empty = make('option', '選択してください'); empty.value = ''; select.append(empty);

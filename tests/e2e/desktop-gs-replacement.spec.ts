@@ -1,4 +1,4 @@
-import { revealModelManagement, lookAlongFront } from './workspaceUi';
+import { revealFileSurface, revealModelManagement, lookAlongFront } from './workspaceUi';
 import {test,expect,chromium,type Page,type BrowserContext,type TestInfo} from '@playwright/test';
 import {mkdir,mkdtemp} from 'node:fs/promises';
 import {openAsBlob} from 'node:fs';
@@ -18,7 +18,7 @@ const models=(p:Page)=>p.getByRole('tabpanel',{name:'モデル',exact:true});
 async function ready(p:Page){await expect(p.getByRole('heading',{name:'プロジェクト名',exact:true})).toHaveText(title,{timeout:240_000});await expect(p.locator('.lv-project-viewport-status')).toBeEmpty({timeout:180_000});}
 async function output(p:Page,info:TestInfo,name:string,workspace=false){
  const menu=p.locator('details.lv-project-files');if(!await menu.evaluate(n=>(n as HTMLDetailsElement).open))await menu.locator(':scope > summary').click();
- const area=p.getByRole('region',{name:'ファイル',exact:true});await area.getByRole('button',{name:workspace?'相手に渡す':'保存',exact:true}).click();
+ const area=p.getByRole('region',{name:'ファイル',exact:true});if(!await revealFileSurface(p,workspace?'共有':'保存')) await area.getByRole('button',{name:workspace?'相手に渡す':'保存',exact:true}).click();
  if(workspace)await area.getByLabel('渡す内容',{exact:true}).selectOption('teamWorkspace');else await area.getByLabel('名前（任意）',{exact:true}).fill(name);
  const primary=area.locator('button.lv-file-primary');await expect(primary).toBeEnabled({timeout:600_000});
  const [download]=await Promise.all([p.waitForEvent('download',{timeout:600_000}),primary.click()]);const path=info.outputPath(name+'.zip');await download.saveAs(path);expect(await download.failure()).toBeNull();

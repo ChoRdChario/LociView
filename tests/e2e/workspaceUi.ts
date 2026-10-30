@@ -34,6 +34,25 @@ export async function revealProjectHelp(page: Page) {
   if (!await help.evaluate(node => (node as HTMLDetailsElement).open)) await help.locator(':scope > summary').click();
 }
 
+/** Select only through the actual compact File navigation; legacy validation keeps its own controls. */
+export async function revealFileSurface(page: Page, surface: '保存' | '共有' | '受信' | '復元') {
+  const menu = page.locator('details.lv-project-files');
+  if (!await menu.count()) return false;
+  if (!await menu.evaluate(node => (node as HTMLDetailsElement).open)) await menu.locator(':scope > summary').click();
+  const tabs = menu.getByRole('tablist', { name: 'ファイルの操作', exact: true });
+  if (!await tabs.count()) return false;
+  const tab = tabs.getByRole('tab', { name: surface, exact: true });
+  if (await tab.getAttribute('aria-selected') !== 'true') await tab.click();
+  return true;
+}
+
+export async function revealProjectSelection(page: Page) {
+  const menu = page.locator('details.lv-project-files');
+  if (await menu.getByRole('button', { name: '別のプロジェクトを開く', exact: true, includeHidden: true }).count()) {
+    if (!await menu.evaluate(node => (node as HTMLDetailsElement).open)) await menu.locator(':scope > summary').click();
+  } else await revealProjectHelp(page);
+}
+
 export async function revealOfflineUtilities(page: Page) {
   const offline = page.locator('.lv-offline-controls');
   await expect(offline).toHaveCount(1);

@@ -169,5 +169,5 @@ export function createMaterialControls(document: Document, onPlan: (plan: Materi
       next.feedback.kind === 'failed' && `${describe(next.feedback.plan.selection, view)}：${next.feedback.plan.kind === 'remove' ? '設定を解除' : '変更を適用'}できませんでした。${next.feedback.message} 入力と操作対象を保持しています。`].filter(Boolean).join(' ');
     status.hidden = !status.textContent; return true;
   }
-  return { root, render, isComposing: () => composing !== null, dispose: () => { disposed = true; cleanups.forEach(fn => fn()); root.remove(); } };
+  return { root, review, render, isComposing: () => composing !== null, dispose: () => { disposed = true; cleanups.forEach(fn => fn()); root.remove(); } };
 }
