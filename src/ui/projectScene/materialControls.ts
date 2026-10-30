@@ -23,7 +23,7 @@ export function createMaterialControls(document: Document, onPlan: (plan: Materi
   };
   options(scope, [['scene', 'このシーンだけ'], ['project', 'プロジェクト共通']], 'scene');
   const status = make('p'); status.id = `lv-material-status-${++nextMaterialControl}`; status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
-  const observed = make('p'), impact = make('p'), begin = button('設定を編集'), editor = make('div'); editor.className = 'lv-material-fields';
+  const observed = make('p'), impact = make('p'), unavailable = make('p'), begin = button('設定を編集'), editor = make('div'); editor.className = 'lv-material-fields';
   const controls = new Map<MaterialEditField, { group: HTMLLabelElement; input: HTMLInputElement | HTMLSelectElement; note: HTMLParagraphElement }>();
   const reading = make('dl'); reading.className = 'lv-material-values'; viewOnly(reading);
   const values = new Map<MaterialEditField, { group: HTMLElement; value: HTMLElement; note: HTMLElement }>();
@@ -75,7 +75,7 @@ export function createMaterialControls(document: Document, onPlan: (plan: Materi
   const actions = make('div'), apply = button('変更を適用'), cancel = button('取り消す'), remove = button('この範囲の設定を解除'), retry = button('再試行'), review = button('状態を確認');
   actions.className = 'lv-material-actions'; apply.className = 'lv-material-primary'; actions.append(apply, cancel, remove, retry, review);
   const confirmBox = make('section'), confirmText = make('p'), confirm = button(''), keep = button('戻る'); confirmBox.setAttribute('aria-label', '操作の確認'); confirmBox.hidden = true; confirmBox.append(confirmText, confirm, keep);
-  root.append(choices, status, observed, impact, begin, editor, actions, confirmBox);
+  root.append(choices, status, observed, impact, unavailable, begin, editor, actions, confirmBox);
   root.append(reading);
   editOnly(begin, editor, apply, cancel, remove, retry, review, confirmBox);
   listen(apply, 'click', () => { if (!apply.disabled) request({ kind: 'apply' }); });
@@ -107,13 +107,21 @@ export function createMaterialControls(document: Document, onPlan: (plan: Materi
     const surface = selection.target && surfaces.find(item => materialTargetKey(item.target) === materialTargetKey(selection.target!));
     return [model?.name.kind === 'value' ? model.name.value : '対象のモデル', surface && surface.name.kind === 'value' ? surface.name.value : '対象の面', materialScopeLabel(selection.scope)].join(' / ');
   }
-  function render(next: MaterialContext): boolean {
+  function render(next: MaterialContext, presentation?: { viewing: boolean; readBlock: string | null }): boolean {
     if (disposed) return false;
     if (context && (context.draft || composing || context.feedback.kind === 'applying') &&
       (context.source.projectId !== next.source.projectId || context.source.sceneId !== next.source.sceneId || materialSelectionKey(context.selection) !== materialSelectionKey(next.selection))) {
       status.textContent = '編集中の変更を適用するか取り消してください。'; status.hidden = false; return false;
     }
     context = next; const view = materialView(next), d = next.draft, inFlight = next.feedback.kind === 'applying';
+    const emptyCatalog = view.model?.surfaces.kind === 'value' && !view.model.surfaces.value.length && !view.model.reason;
+    const unsupported = !!view.surface && !view.targetIssue && Object.values(view.surface.fieldIssues).every(reason => reason !== null);
+    const noSettings = view.surface?.scene.kind === 'value' && view.surface.scene.value === null && view.surface.project.kind === 'value' && view.surface.project.value === null;
+    const noControls = !d && (emptyCatalog || unsupported);
+    unavailable.textContent = !noControls ? '' : emptyCatalog || noSettings ? 'このモデルには材質の調整項目がありません。元の表示を保持します。' : view.base ? 'この材質は調整できません。現在の設定を表示しています。' : '材質の状態を確認してください。';
+    unavailable.hidden = !noControls;
+    const sourceOnlySurface = unsupported && noSettings && view.surfaces.length === 1;
+    surface.parentElement!.hidden = scope.parentElement!.hidden = !d && (emptyCatalog || sourceOnlySurface);
     if (confirmation && !materialPlanIsCurrent(confirmation.kind === 'remove' ? confirmation.plan : { kind: 'cancel', draft: confirmation.draft }, next)) { confirmation = null; confirmBox.hidden = true; }
     const modelOptions: [string, string][] = [['', 'モデルを選択'], ...view.models.map(item => [item.assetId, item.name.kind === 'value' ? item.name.value : 'モデル名を確認'] as [string, string])];
     if (next.selection.assetId && !view.model) modelOptions.push([next.selection.assetId, '選択したモデルを確認']);
@@ -122,14 +130,15 @@ export function createMaterialControls(document: Document, onPlan: (plan: Materi
     const surfaceOptions: [string, string][] = [['', '面を選択'], ...view.surfaces.map(item => [materialTargetKey(item.target), item.name.kind === 'value' ? item.name.value : '面の名前を確認'] as [string, string])];
     if (key && !view.surface) surfaceOptions.push([key, '選択した面を確認']); options(surface, surfaceOptions, key); scope.value = next.selection.scope;
     for (const control of [model, surface, scope]) control.disabled = Boolean(d || composing || inFlight || next.pending || view.issue);
-    observed.textContent = view.surface ? view.origin ? `現在の見え方：${view.origin === 'source' ? 'モデル元の設定' : materialScopeLabel(view.origin)}` : '現在の見え方を確認してください。' : '';
-    impact.textContent = !view.surface ? '' : next.selection.scope === 'scene' ? 'このシーンだけに適用します。'
+    observed.textContent = sourceOnlySurface && !d ? '' : view.surface ? view.origin ? `現在の見え方：${view.origin === 'source' ? 'モデル元の設定' : materialScopeLabel(view.origin)}` : '現在の見え方を確認してください。' : '';
+    impact.textContent = !view.surface || noControls || presentation?.viewing ? '' : next.selection.scope === 'scene' ? 'このシーンだけに適用します。'
       : '同じモデル・面を使うシーンで共通になります。シーン専用の設定がある場合は、そちらが優先されます。';
-    const beginPlan = planMaterial(next, { kind: 'begin' }); begin.hidden = Boolean(d); begin.disabled = beginPlan.kind === 'blocked';
+    const beginPlan = planMaterial(next, { kind: 'begin' }); begin.hidden = Boolean(d) || noControls; begin.disabled = beginPlan.kind === 'blocked';
     const base = d?.base ?? view.base, raw = (field: MaterialEditField) => d?.edits[field] ?? (base ? materialInput(base.appearance, field, next.source.semanticProfile, base.compositing) : '');
     if(raw('coverage')==='mask'||raw('chroma')==='on'||d && ['chroma','keyColor','tolerance','softness','cutoff'].some(field=>d.edits[field as MaterialEditField]!==undefined))advanced.open=true;
     const coverageChoices=next.source.semanticProfile==='map2'?[...enums.coverage!,['smoothBlend','半透明']as const]:enums.coverage!;
-    editor.hidden = !base;
+    editor.hidden = !base || noControls || !d; reading.hidden = !d && (emptyCatalog || unsupported && noSettings);
+    reading.dataset.noneditable = String(!d && !reading.hidden);
     for (const [field, control] of controls) {
       const value = raw(field);
       if (field === 'coverage') options(control.input as HTMLSelectElement, coverageChoices.some(([key]) => key === value) ? coverageChoices :
@@ -145,7 +154,7 @@ export function createMaterialControls(document: Document, onPlan: (plan: Materi
       const current = values.get(field)!, canonical = view.base ? materialInput(view.base.appearance, field, next.source.semanticProfile, view.base.compositing) : '';
       const choices = field === 'coverage' ? coverageChoices : enums[field];
       current.value.textContent = choices?.find(([key]) => key === canonical)?.[1] ?? canonical;
-      current.note.textContent = reason ?? ''; current.note.hidden = !reason;
+      current.note.textContent = reason ?? ''; current.note.hidden = !reason || noControls && new Set(Object.values(view.surface!.fieldIssues)).size === 1;
       const inactive = view.base && (['keyColor', 'tolerance', 'softness'].includes(field) && materialInput(view.base.appearance, 'chroma', next.source.semanticProfile, view.base.compositing) !== 'on' ||
         field === 'cutoff' && materialInput(view.base.appearance, 'coverage', next.source.semanticProfile, view.base.compositing) !== 'mask');
       current.group.hidden = !view.base || !!inactive && !reason;
@@ -155,7 +164,7 @@ export function createMaterialControls(document: Document, onPlan: (plan: Materi
     remove.disabled = planMaterial(next, { kind: 'remove' }).kind !== 'remove'; remove.hidden = !view.record && !d;
     retry.hidden = next.feedback.kind !== 'failed'; retry.disabled = next.feedback.kind !== 'failed' || !materialPlanIsCurrent(next.feedback.plan, next);
     let displayNotice:string|null=null;try{if(base)displayNotice=view.surface?.displayNotice?.(d?editMaterialIntent(base,d.edits,next.source.semanticProfile):base)??null;}catch{/* Invalid draft retains its normal field/apply error. */}
-    status.textContent = [view.targetIssue, ...view.issues, displayNotice, next.mutationBlock, next.pending && 'ほかの操作を完了するか取り消してください。',
+    status.textContent = [emptyCatalog && !d ? null : view.targetIssue, ...view.issues, displayNotice, presentation?.viewing ? presentation.readBlock : next.mutationBlock, next.pending && 'ほかの操作を完了するか取り消してください。',
       inFlight && '設定を適用中です。', d && !inFlight && (applyIssue || '未適用の入力があります。'),
       next.feedback.kind === 'failed' && `${describe(next.feedback.plan.selection, view)}：${next.feedback.plan.kind === 'remove' ? '設定を解除' : '変更を適用'}できませんでした。${next.feedback.message} 入力と操作対象を保持しています。`].filter(Boolean).join(' ');
     status.hidden = !status.textContent; return true;

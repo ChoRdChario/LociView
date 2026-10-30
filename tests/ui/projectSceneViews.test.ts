@@ -39,8 +39,8 @@ function host() {
   const stage = record(controls.stageTools);
   return { controls, events, root, fit: camera.children[0]!, axes: camera.children[1]!, projection: camera.children[2]!.children[0]!,
     cameraNote: camera.children[3]!, cameraStatus: camera.children[4]!, picker: saved.children[0]!.children[0]!, recall: saved.children[1]!,
-    savedNote: saved.children[2]!, savedReview: saved.children[3]!, entry: start.children[0]!.children[0]!, apply: start.children[2]!,
-    cancel: start.children[3]!, entryNote: start.children[4]!, entryStatus: start.children[5]!, entryReview: start.children[6]!,
+    savedNote: saved.children[2]!, savedReview: saved.children[3]!, entry: start.children[0]!.children[0]!, apply: record(controls.entryActions).children[0]!,
+    cancel: record(controls.entryActions).children[1]!, entryNote: start.children[2]!, entryStatus: start.children[3]!, entryReview: start.children[4]!,
     quickFit: stage.children[0]!, quickNote: stage.children[1]!, get context() { return ctx; },
     render(next: ViewContext) { if (controls.render(next)) ctx = next; } };
 }

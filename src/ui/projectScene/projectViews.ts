@@ -150,7 +150,7 @@ export function createProjectViews(document: Document, host: ProjectPanelHost): 
     }
   }
   const cameraDetails=make('details');cameraDetails.append(make('summary','投影とカメラ'));controls.root.insertBefore(cameraDetails,controls.camera);cameraDetails.append(controls.camera);
-  root.append(controls.root, author.root, background.root, review);
+  root.append(controls.root, author.root, background.root, review, controls.entryActions, author.actions, author.confirmation, background.actions, background.confirmation);
   return { root, render() { if (!disposed) { controls.render(context()); author.render(authorContext()); background.render(backgroundContext()); renderReview(); } },
     hasChanges: () => !!state().draft || !!state().memory.entryDraft || !!state().background || choices.size > 0,
     composing: () => !!state().draft?.composing || !!state().background?.composing,

@@ -75,6 +75,7 @@ export function createCaptionWindowControls(document: Document, onPlan: (plan: C
     resize.title = '選択で大きさを切替。ドラッグ・矢印キーで調整。Escで取り消し';
     const body = make('div'), scroll = make('div'), note = make('p'), line = make('div'), extension = content?.(id);
     body.className = 'lv-caption-window-text'; scroll.className = 'lv-caption-window-body'; note.className = 'lv-caption-window-note';
+    body.tabIndex = 0; body.setAttribute('role', 'group'); body.setAttribute('aria-label', '比較ウィンドウの本文');
     scroll.append(body); if (extension) scroll.append(extension.root);
     line.className = 'lv-caption-window-line'; line.setAttribute('aria-hidden', 'true');
     header.append(title, close); footer.append(note, resize); node.append(header, scroll, footer); root.append(line, node);
@@ -163,6 +164,9 @@ export function createCaptionWindowControls(document: Document, onPlan: (plan: C
     for (const id of view.visibleIds) {
       const item = next.source.kind === 'ready' ? next.source.captions.find(c => c.id === id)! : null; if (!item) continue;
       let card = cards.get(id); if (!card) { card = createCard(id); cards.set(id, card); }
+      if (item.mediaCount.kind === 'value' && item.mediaCount.value > 0 && card.initial.height === 200 && !next.memory.placements.some(p => p.captionId === id)) {
+        card.initial = { ...card.initial, width: 280, height: 300 }; initialPositions.get(scope)!.set(id, card.initial);
+      }
       const title = captionTitle(item); if (card.title.textContent !== title) card.title.textContent = title;
       card.root.setAttribute('aria-label', title);
       const body = item.body.kind === 'value' ? item.body.value : '本文の更新候補を確認してください。';

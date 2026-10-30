@@ -2,6 +2,7 @@ import { modelListName, modelListPlanIsCurrent, modelListView, modelMembershipIs
   type ModelListContext, type ModelListIntent, type ModelListPlan, type ModelListRow } from './modelListState';
 import { sceneSwitchReason } from './navigationState';
 
+import { contextHelp } from './contextHelp';
 import { editOnly } from './modePresentation';
 
 let nextModelControl = 0;
@@ -32,7 +33,8 @@ export function createModelListControls(document: Document, onPlan: (plan: Model
   visibility.className = 'lv-model-visibility'; visibility.setAttribute('role', 'group'); visibility.setAttribute('aria-label', '一時表示');
   visibility.append(make('span', '一時表示'), toggleVisibility, isolate); details.append(visibility);
   showAll.title = 'このシーンの一時的な非表示を解除します。';
-  root.append(filters, status, failure, recovery, reveal, count, consequence, list, details, showAll);
+  const help = contextHelp(document, consequence.textContent ?? '', [list]); consequence.hidden = true;
+  root.append(filters, status, failure, recovery, reveal, count, consequence, list, details, showAll, help);
   let context: ModelListContext | undefined, disposed = false, composing = false, rendering = false, observedScrollTop = 0;
   const cleanups: (() => void)[] = [];
   const listen = (node: HTMLElement, name: string, handler: () => void) => { node.addEventListener(name, handler); cleanups.push(() => node.removeEventListener(name, handler)); };

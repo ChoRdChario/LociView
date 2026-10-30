@@ -72,7 +72,7 @@ test('view mode hides editing while preserving reading, local display, existing 
     await detail.getByRole('button', { name: '変更を適用', exact: true }).click(); await ready('変更を適用しました。');
     const pick = p.waitForEvent('filechooser'); await p.getByLabel('メディアを追加', { exact: true }).click(); await (await pick).setFiles({ name: '現地.png', mimeType: 'image/png', buffer: smallPng() }); await ready('メディアを追加しました。');
     await tab('保存した視点').click(); const author = p.getByRole('region', { name: '視点の作成と管理', exact: true });
-    await author.getByRole('button', { name: '視点を作る', exact: true }).click(); await author.getByLabel('視点の名称', { exact: true }).fill('全景'); await author.getByRole('button', { name: '視点を追加', exact: true }).click(); await ready('保存した視点を更新しました。');
+    await author.getByRole('button', { name: '視点を作る', exact: true }).click(); await author.getByLabel('視点の名称', { exact: true }).fill('全景'); await p.getByRole('group', { name: '視点の終了操作', exact: true }).getByRole('button', { name: '視点を追加', exact: true }).click(); await ready('保存した視点を更新しました。');
     await tab('キャプション').click(); await save('before-view');
     const help=p.locator('details[aria-label="ヘルプ"]'),settings=p.locator('details[aria-label="設定"]');
     await menu.locator(':scope > summary').click();await help.locator(':scope > summary').click();await expect(menu).not.toHaveAttribute('open');

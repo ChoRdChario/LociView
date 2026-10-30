@@ -5,9 +5,10 @@
 .lv-project-workspace h1 { font-size: 19px; line-height: 1.35; font-weight: 600; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lv-project-workspace h2 { font-size: 18px; font-weight: 600; }
 .lv-workspace-actions { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; }
+.lv-header-tools { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .lv-project-workspace > header > details { flex: 0 0 auto; }
 .lv-header-sheet { position: fixed; z-index: 40; right: 12px; top: 76px; box-sizing: border-box; width: min(420px, calc(100vw - 24px)); max-height: calc(100dvh - 88px); overflow: auto; padding: 16px; border: 1px solid #aaa99f; border-radius: 8px; background: #fbfaf6; box-shadow: 0 8px 32px #25282033; }
-.lv-project-workspace > header > .lv-operation-status:not(:empty) { position: absolute; z-index: 10; left: 12px; bottom: 12px; max-width: min(480px, calc(100% - 36px)); max-height: 30dvh; overflow: auto; padding: 8px 12px; border: 1px solid #bcb9af; border-radius: 6px; background: #fbfaf6; box-shadow: 0 2px 10px #25282018; font-size: 13px; }
+.lv-project-workspace > header > .lv-operation-status:not(:empty) { position: absolute; z-index: 10; right: 416px; bottom: 12px; max-width: min(360px, calc(100% - 440px)); max-height: 25dvh; overflow: auto; padding: 8px 12px; border: 1px solid #bcb9af; border-radius: 6px; background: #fbfaf6; box-shadow: 0 2px 10px #25282018; font-size: 13px; }
 .lv-project-workspace :is(button, input, select, textarea) { font: inherit; min-height: 44px; box-sizing: border-box; color: inherit; }
 .lv-project-workspace :is(input, select, textarea) { background: #faf9f8; }
 .lv-project-workspace button { border: 1px solid #c3c3b8; background: #fbfaf6; border-radius: 6px; padding: 8px 12px; font-size: 14px; cursor: pointer; }
@@ -29,7 +30,7 @@
 .lv-caption-reading .lv-caption-detail input, .lv-caption-reading .lv-caption-detail textarea { width: 100%; padding: 8px 10px; border: 1px solid #aaa99f; border-radius: 6px; }
 .lv-caption-reading textarea { min-height: 128px; resize: vertical; }
 .lv-caption-reading .lv-caption-detail > :is(div,section,details) { margin-block: 12px; }
-.lv-caption-reading .lv-caption-detail-actions:has(> button:first-child:nth-last-child(2)) { position: sticky; bottom: -16px; z-index: 2; display: flex; gap: 8px; margin: 12px -16px -16px; padding: 12px 16px; background: #f7f6f1; border-top: 1px solid #c9c5bd; }
+.lv-caption-reading [data-caption-completion] { position: sticky; bottom: -16px; z-index: 2; display: flex; gap: 8px; margin: 12px -16px -16px; padding: 12px 16px; background: #f7f6f1; border-top: 1px solid #c9c5bd; }
 .lv-caption-reading .lv-caption-detail-actions > button:first-child { flex: 1; }
 .lv-caption-reading .lv-caption-detail-actions > button:first-child:not(:disabled) { background: #3c4637; color: #fff; }
 .lv-caption-reading .lv-caption-value[data-caption-field="body"] p { line-height: 1.85; }
@@ -66,7 +67,7 @@
 .lv-project-workspace .lv-project-marker[data-review="true"]::after { content: "!"; position: absolute; right: 6px; top: 50%; transform: translateY(-50%); width: 16px; height: 16px; border: 1px solid #413d39; border-radius: 50%; background: #faf9f8; color: #413d39; font-size: 12px; font-weight: 700; line-height: 16px; text-align: center; }
 .lv-project-camera { position: absolute; top: 8px; right: 8px; z-index: 3; width: 112px; height: 156px; pointer-events: none; }
 .lv-project-camera > .lv-context-help { position: absolute; width: 0; height: 0; }
-.lv-project-stage > .lv-caption-windows:focus-within { z-index: 4; }
+.lv-stage-display > .lv-caption-windows:focus-within { z-index: 4; }
 .lv-project-camera:focus-within { z-index: 5; }
 .lv-camera-axes { position: relative; width: 112px; height: 112px; pointer-events: auto; touch-action: none; }
 .lv-camera-axes [data-axis="0"] { --lv-axis: #ee6378; }
@@ -113,4 +114,79 @@
   .lv-project-camera { right: 6px; top: auto; bottom: 72px; }
   .lv-project-body [role="tab"] { white-space: normal; flex: 1 1 21%; }
   .lv-project-workspace > header > .lv-operation-status:not(:empty) { bottom: 4px; max-height: 18dvh; }
+}
+
+/* Content and active tasks share one hierarchy across the workspace. */
+.lv-project-shell .lv-project-workspace button { border-color: transparent; background: transparent; }
+.lv-project-shell .lv-project-workspace button:hover:not(:disabled) { background: #e8e7df; }
+.lv-project-shell .lv-project-workspace button:disabled { border-style: solid; color: #73776d; opacity: .5; }
+.lv-project-shell .lv-project-workspace button[aria-pressed="true"] { border-left: 0; background: #e4e4da; }
+.lv-project-shell .lv-project-workspace .lv-workspace-primary,
+.lv-project-shell .lv-project-workspace .lv-file-primary:not(:disabled),
+.lv-project-shell .lv-project-workspace .lv-task-footer > button:first-of-type:not(:disabled),
+.lv-project-shell .lv-project-workspace .lv-pin-task-actions > button:nth-last-child(2):not(:disabled) { background: #3c4637; color: #fff; }
+.lv-project-shell .lv-project-workspace .lv-file-primary:disabled { background: #e3e5df; color: #555d4e; }
+.lv-project-stage { display: flex; flex-direction: column; }
+.lv-stage-display { position: relative; flex: 1; min-height: 0; min-width: 0; overflow: hidden; }
+.lv-project-viewport-tools { position: relative; inset: auto; z-index: auto; flex: 0 0 auto; box-sizing: border-box; max-width: 100%; border-radius: 0; padding: 6px 12px; }
+.lv-project-shell .lv-project-body [role="tab"] { border: 0; border-radius: 0; border-bottom: 3px solid transparent; background: transparent; }
+.lv-project-shell .lv-project-body [role="tab"][aria-selected="true"] { border-bottom-color: #59654f; font-weight: 600; }
+.lv-project-shell .lv-project-body [aria-label="シーン"] { padding-bottom: 8px; }
+.lv-project-shell .lv-project-body [aria-label="シーン"] h2 { margin: 0; font-size: 14px; font-weight: 500; }
+.lv-project-shell .lv-project-body [aria-label="シーン"] [aria-pressed="true"] { font-weight: 600; }
+.lv-project-shell .lv-project-body .lv-caption-select { border: 0; border-bottom: 1px solid #ddded5; border-radius: 0; box-shadow: none; }
+.lv-project-shell .lv-project-body .lv-caption-select[aria-current="true"] { background: #e9ece2; }
+.lv-caption-media-slot { margin-top: 16px; }
+.lv-caption-media-slot .lv-media-grid img { height: 160px; }
+.lv-caption-properties { border-top: 1px solid #dddcd3; padding-top: 4px; }
+.lv-caption-properties > div { margin-block: 10px; }
+.lv-project-workspace .lv-media-add { position: relative; display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 12px; border: 1px solid #b4b9ac; border-radius: 6px; cursor: pointer; }
+.lv-project-workspace .lv-media-add > input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+.lv-media-add:has(> input:disabled) { opacity: .5; cursor: default; }
+.lv-media-add:has(> input:focus-visible) { outline: 2px solid #312f2d; outline-offset: 2px; }
+.lv-project-workspace .lv-pin-add-row { display: flex; align-items: center; gap: 8px; }
+.lv-project-workspace .lv-pin-add-row > label { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+.lv-project-workspace .lv-pin-add-row input[type="color"] { width: 44px; min-width: 44px; height: 44px; padding: 6px; }
+.lv-project-shell .lv-model-list { padding: 0; margin-block: 8px 16px; }
+.lv-project-shell .lv-model-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 0 8px; padding-block: 4px; border: 0; border-bottom: 1px solid #ddded5; }
+.lv-project-shell .lv-project-workspace .lv-model-select { min-width: 0; border: 0; text-align: left; padding-inline: 6px; }
+.lv-project-shell .lv-project-body .lv-model-membership { display: flex; align-items: center; gap: 6px; min-height: 44px; font-size: 12px; cursor: pointer; }
+.lv-project-shell .lv-model-membership > input { width: 18px; height: 18px; min-height: 18px; min-width: 18px; margin: 0; }
+.lv-project-shell .lv-model-row > :is(p,button:last-child) { grid-column: 1 / -1; }
+.lv-model-management { border-top: 1px solid #ddded5; margin-top: 12px; }
+.lv-project-workspace .lv-task-footer, .lv-project-workspace .lv-task-confirmation { position: sticky; bottom: -16px; z-index: 4; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 12px -16px -16px; padding: 12px 16px; background: #f7f6f1; border-top: 1px solid #c9c5bd; }
+.lv-task-footer > p, .lv-task-confirmation > p { flex-basis: 100%; margin: 0; }
+.lv-task-footer > button:first-of-type { flex: 1; }
+.lv-project-workspace .lv-pin-task { position: absolute; z-index: 6; left: 50%; bottom: 12px; transform: translateX(-50%); box-sizing: border-box; width: min(440px, calc(100% - 24px)); padding: 12px; border: 1px solid #afb6a7; border-radius: 8px; background: #f7f6f1fa; box-shadow: 0 4px 20px #20251d22; }
+.lv-pin-task > p { margin: 0 0 6px; font-size: 13px; }
+.lv-pin-task > div { display: flex; gap: 8px; }
+.lv-pin-task label { flex: 1; min-width: 0; font-size: 12px; }
+.lv-pin-task input { width: 100%; min-width: 0; }
+.lv-pin-task-actions { flex-wrap: wrap; margin-top: 8px; }
+.lv-pin-task-actions > button:first-child { flex-basis: 100%; }
+.lv-pin-task-actions > button:nth-last-child(2) { flex: 1; }
+.lv-stage-display:has(.lv-pin-task:not([hidden])) > .lv-comparison-actions { bottom: 240px; }
+.lv-project-workspace .lv-settings-group { margin-bottom: 18px; padding-bottom: 16px; border-bottom: 1px solid #ddded5; }
+.lv-settings-group h2 { margin: 0 0 8px; font-size: 15px; }
+.lv-project-workspace .lv-settings-group label { display: grid; gap: 6px; margin-block: 8px; }
+.lv-settings-group input:not([type="checkbox"]) { width: 100%; padding: 8px 10px; border: 1px solid #aaa99f; }
+.lv-project-workspace .lv-settings-group .lv-checkbox-label { display: flex; gap: 8px; align-items: center; min-height: 44px; }
+.lv-checkbox-label > input { width: 20px; min-width: 20px; min-height: 20px; height: 20px; margin: 3px 0 0; }
+.lv-checkbox-label > span { flex: 1; }
+.lv-settings-group > p { margin-block: 8px; font-size: 13px; }
+@media (max-width: 760px) {
+  .lv-project-workspace > header { padding: 8px; gap: 4px; }
+  .lv-project-identity { flex-basis: 100%; }
+  .lv-header-tools { flex: 1 1 100%; gap: 4px; justify-content: space-between; }
+  .lv-workspace-actions { gap: 2px; }
+  .lv-header-tools :is(button,summary) { padding-inline: 6px; white-space: nowrap; }
+  .lv-project-workspace .lv-workspace-share { display: none; }
+  .lv-project-body { height: calc(100dvh - 168px); }
+  .lv-project-body > aside { padding: 12px; }
+  .lv-project-body [role="tab"] { flex: 1 1 auto; padding-inline: 2px; white-space: nowrap; }
+  .lv-project-workspace :is(.lv-task-footer,.lv-task-confirmation,[data-caption-completion]) { bottom: -12px; margin-inline: -12px; margin-bottom: -12px; padding-inline: 12px; }
+  .lv-project-body .lv-material-actions { bottom: -12px; }
+  .lv-project-workspace > header > .lv-operation-status:not(:empty) { right: 12px; bottom: 12px; max-width: calc(100% - 160px); }
+  .lv-project-workspace:has(.lv-pin-task:not([hidden])) > header > .lv-operation-status:not(:empty) { bottom: 230px; }
+  .lv-stage-display:has(.lv-pin-task:not([hidden])) > .lv-project-camera { bottom: 240px; }
 }

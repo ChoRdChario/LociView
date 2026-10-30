@@ -2631,9 +2631,10 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     f.remember.mockClear(); const mode=h.button('閲覧する'), change=h.button('別のプロジェクトを開く',h.editor());
     let disabled=mode.disabled; let finished!:()=>void; const completion=new Promise<void>(resolve=>{finished=resolve;});
     Object.defineProperty(mode,'disabled',{get:()=>disabled,set(value:boolean){const previous=disabled;disabled=value;if(previous&&!value)finished();}});
-    mode.fire('click'); expect(entered).toHaveBeenCalledOnce(); expect((h.editor() as unknown as HTMLElement).inert).toBe(true); change.fire('click'); h.button('別のプロジェクトを開く').fire('click'); await h.idle();
+    mode.fire('click'); expect(entered).toHaveBeenCalledOnce(); expect(mode.textContent).toBe('切替中…'); expect(mode.getAttribute('aria-busy')).toBe('true'); expect(mode.disabled).toBe(true);
+    expect((h.editor() as unknown as HTMLElement).inert).toBe(true); change.fire('click'); h.button('別のプロジェクトを開く').fire('click'); await h.idle();
     expect(h.ui.selected).toBe(a.run); expect(f.remember).not.toHaveBeenCalled(); release(); await completion;
-    expect(f.remember).toHaveBeenLastCalledWith({run:a.run,mode:'view'}); expect(f.host().authority.readOnly).toBe(true);
+    expect(f.remember).toHaveBeenLastCalledWith({run:a.run,mode:'view'}); expect(f.host().authority.readOnly).toBe(true); expect(mode.textContent).toBe('編集する'); expect(mode.getAttribute('aria-busy')).toBe('false');
     expect(f.host().read().source!.originalChanges()).toEqual(a.source.originalChanges()); await h.ui.dispose();
     const read=vi.fn(()=>({run:a.run,mode:'view' as const})), remember=vi.fn(()=>{throw Error('setting denied');});
     const cold=f.mount(undefined,{lastProject:{read,remember}}); await cold.idle(); expect(cold.ui.selected).toBe(a.run); expect(remember).toHaveBeenCalledOnce();
@@ -4295,7 +4296,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       h.setIssue('最初の表示エラー');h.refresh();h.setIssue('最新の表示エラー');h.refresh();expect(frames.size).toBe(1);flush();expect(h.all(h.editor).find(n=>n.className==='lv-project-viewport-status')!.textContent).toContain('最新の表示エラー');
       h.setIssue('');h.refresh();const cancelled=[...frames.values()][0]!;const count=rebuild.mock.calls.length;h.button('モデル',h.editor).fire('click');expect(frames.size).toBe(0);expect(rebuild).toHaveBeenCalledTimes(count+1);cancelled(0);expect(rebuild).toHaveBeenCalledTimes(count+1);
       h.button('キャプション',h.editor).fire('click');expect(h.button('ピンを追加',h.editor).disabled).toBe(false);h.dragging(true);expect(frames.size).toBe(1);h.button('ピンを追加',h.editor).fire('click');expect(h.pick).not.toHaveBeenCalled();expect(h.dispatch).not.toHaveBeenCalled();expect(frames.size).toBe(0);h.dragging(false);flush();
-      h.button('保存した視点',h.editor).fire('click');const author=h.named('視点の作成と管理',h.editor);h.moveCamera();h.refresh();h.button('視点を作る',author).fire('click');flush();h.button('視点を作る',author).fire('click');const name=h.named('視点の名称',author);name.value='最新の表示';name.fire('input');const captured=h.payload();await h.edited(()=>h.button('視点を追加',author).fire('click'));const command=h.dispatch.mock.calls.map(c=>c[1]).find(c=>c.kind==='createView')!;expect(command).toMatchObject({kind:'createView',camera:captured.camera,background:captured.background});
+      h.button('保存した視点',h.editor).fire('click');const author=h.named('視点の作成と管理',h.editor);h.moveCamera();h.refresh();h.button('視点を作る',author).fire('click');flush();h.button('視点を作る',author).fire('click');const name=h.named('視点の名称',author);name.value='最新の表示';name.fire('input');const captured=h.payload();await h.edited(()=>h.button('視点を追加',h.named('視点の終了操作',h.editor)).fire('click'));const command=h.dispatch.mock.calls.map(c=>c[1]).find(c=>c.kind==='createView')!;expect(command).toMatchObject({kind:'createView',camera:captured.camera,background:captured.background});
       h.refresh();const late=[...frames.values()][0]!;await h.ui.dispose();expect(frames.size).toBe(0);const stopped=rebuild.mock.calls.length;late(0);h.refresh();expect(rebuild).toHaveBeenCalledTimes(stopped);expect(frames.size).toBe(0);
     }finally{await h.ui.dispose();vi.unstubAllGlobals();}
   });
@@ -4728,9 +4729,9 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     h.pick.mockImplementation(targets=>{const target=targets.find(t=>t.assetId===secondId);return target?{target,position:[.25,.5,0] as const}:null;});
     const canvas=named('3Dモデルの表示',editor),pointer={pointerId:83,button:0,isPrimary:true,clientX:80,clientY:90};
     button('ピンを追加',editor).fire('click'); canvas.fire('pointerdown',pointer);canvas.fire('pointerup',pointer);await Promise.resolve();
-    expect(h.pick.mock.lastCall![0]).toHaveLength(2);expect(h.display()!.pinEdit!.target.assetId).toBe(secondId);button('取り消す',named('ピンの操作',editor)).fire('click');
+    expect(h.pick.mock.lastCall![0]).toHaveLength(2);expect(h.display()!.pinEdit!.target.assetId).toBe(secondId);button('取り消す',named('位置の調整',editor)).fire('click');
     const shifted={...pointer,shiftKey:true};canvas.fire('pointerdown',shifted);canvas.fire('pointerup',shifted);await Promise.resolve();expect(h.pick.mock.lastCall![0]).toHaveLength(2);expect(h.display()!.pinEdit!.target.assetId).toBe(secondId);
-    button('取り消す',named('ピンの操作',editor)).fire('click');expect(h.legacy).not.toHaveBeenCalled();await h.ui.dispose();
+    button('取り消す',named('位置の調整',editor)).fire('click');expect(h.legacy).not.toHaveBeenCalled();await h.ui.dispose();
   });
   it('connects colored Shift and numeric pins, local owner reveal, map2 scale retry and exact cold resume', async () => {
     const h = await productWorkspaceFixture(false, false, false, 'map2'), { host, editor, named, button, all, edited } = h;
@@ -4807,6 +4808,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const parent = named('変更先モデル', editor); parent.fire('focus'); parent.value = initial.modelVersions![0]!.assetId; parent.fire('change'); button('位置を確認', editor).fire('click');
     await edited(() => button('親モデルと位置を確定', editor).fire('click'));
     const firstWindow = named('最初の記録', named('キャプションのウィンドウ', editor)); named('大きさを変更', firstWindow).fire('keydown', { key: 'ArrowRight', preventDefault() {} });
+    button('シーンを作る', editor).fire('click');
     const form = named('シーンの変更', editor), name = named('シーン名', form); name.value = '現地'; name.fire('input');
     expect(all(form).some(n => n.textContent.includes('キャプションは追加されません'))).toBe(true);
     await edited(() => form.fire('submit', { preventDefault() {} }));
@@ -5004,7 +5006,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     let anchorForm = form('：ピン位置'), anchorChoice = all(anchorForm).find(n => n.tag === 'select')!; const option = anchorChoice.children.find(n => n.textContent.includes('4 / 2 / 1'))!;
     anchorChoice.value = option.value; anchorChoice.fire('change'); expect(h.display()!.preview).toBeUndefined(); expect(h.display()!.hiddenAssetIds).toEqual([assetId]); button('選択を取り消す', anchorForm).fire('click');
     button('モデル', editor).fire('click'); button('表示', models).fire('click'); button('キャプション', editor).fire('click'); button('ピンを追加', editor).fire('click');
-    anchorForm = form('：ピン位置'); anchorChoice = all(anchorForm).find(n => n.tag === 'select')!; expect(anchorChoice.disabled).toBe(true); expect(h.display()!.preview).toBeUndefined(); button('取り消す', named('ピンの操作', editor)).fire('click');
+    anchorForm = form('：ピン位置'); anchorChoice = all(anchorForm).find(n => n.tag === 'select')!; expect(anchorChoice.disabled).toBe(true); expect(h.display()!.preview).toBeUndefined(); button('取り消す', named('位置の調整', editor)).fire('click');
     anchorChoice.value = option.value; anchorChoice.fire('change'); expect(h.display()!.preview).toEqual(pointInProject([4, 2, 1], host.authority.read().modelVersions![0]!.closure.binding.assetToProject)); expect(h.display()!.pinEdit).toBeUndefined();
     h.f.fs.reject = path => path.endsWith('/published.json'); await h.failed(() => button('競合を解消', anchorForm).fire('click'));
     h.f.fs.reject = () => false; await edited(() => button('更新を再試行', editor).fire('click')); expect(host.authority.read().resources.captions[captionId]!.anchor).toEqual({ kind: 'value', value: remoteAnchor });
@@ -5015,6 +5017,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
   });
   it('guards product Scene drafts against IME, camera gestures and stale source while keeping readonly inventory usable', async () => {
     const h = await productWorkspaceFixture(true), { host, editor, named, button, all, edited } = h, captionId = h.f.f.captionId;
+    button('シーンを作る', editor).fire('click');
     const form = named('シーンの変更', editor), name = named('シーン名', form); name.value = '作業中'; name.fire('input'); await edited(() => form.fire('submit', { preventDefault() {} }));
     button('名前を変更', editor).fire('click'); name.fire('compositionstart'); name.value = '未確定の名称'; name.fire('input');
     expect(button('名前を確定', form).disabled).toBe(true); expect(button('モデル', editor).disabled).toBe(true); name.fire('compositionend');
@@ -5127,12 +5130,12 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       bindingId: `bnd_${newId()}`, placement: { translation: [4, 2, 0], rotationXYZW: degreesRotation(['0', '0', '90']), uniformScale: 2 } }); h.refresh();
     const beforePreview = host.read().source!; choose(secondId);
     expect(h.display()!.preview![0]).toBeCloseTo(0, 10); expect(h.display()!.preview![1]).toBeCloseTo(0, 10);
-    expect(all(named('ピンの操作', editor)).some(n => n.textContent.includes('モデルがないシーンでは一覧のみ'))).toBe(true);
-    expect(button('ファイルに保存', named('ファイル')).disabled).toBe(true); button('取り消す', named('ピンの操作', editor)).fire('click'); expect(host.read().source!.token).toBe(beforePreview.token);
+    expect(all(named('位置の調整', editor)).some(n => n.textContent.includes('モデルがないシーンでは一覧のみ'))).toBe(true);
+    expect(button('ファイルに保存', named('ファイル')).disabled).toBe(true); button('取り消す', named('位置の調整', editor)).fire('click'); expect(host.read().source!.token).toBe(beforePreview.token);
     const canvas = named('3Dモデルの表示', editor), pointer = { pointerId: 8, isPrimary: true, button: 0, clientX: 50, clientY: 60 };
-    choose(secondId); button('面で位置を指定', editor).fire('click'); canvas.fire('pointerdown', pointer); button('取り消す', named('ピンの操作', editor)).fire('click');
+    choose(secondId); button('面で位置を指定', editor).fire('click'); canvas.fire('pointerdown', pointer); button('取り消す', named('位置の調整', editor)).fire('click');
     choose(secondId); button('面で位置を指定', editor).fire('click'); const picks = h.pick.mock.calls.length; canvas.fire('pointerup', pointer); await Promise.resolve(); expect(h.pick).toHaveBeenCalledTimes(picks);
-    button('取り消す', named('ピンの操作', editor)).fire('click');
+    button('取り消す', named('位置の調整', editor)).fire('click');
     const firstEdge = Object.values(host.authority.read().state.assetMemberships).find(e => e.resourceId === first.assetId)!;
     await host.dispatch(host.read().source!.token, { kind: 'exclude', resourceKind: 'asset', membershipId: firstEdge.id, eventId: `evt_${newId()}` }); h.refresh();
     const before = host.read().source!, original = host.authority.read();
@@ -5157,7 +5160,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     destination.fire('focus'); await host.dispatch(host.read().source!.token, { kind: 'editCaption', captionId, edits: { body: '新しい内容' } }); h.refresh();
     destination.value = first.assetId; destination.fire('change'); expect(destination.value).toBe('');
     choose(first.assetId); const stale = named('位置 X', editor).value; await host.dispatch(host.read().source!.token, { kind: 'editCaption', captionId, edits: { body: '仮配置中の更新' } }); h.refresh();
-    expect(button('親モデルと位置を確定', editor).disabled).toBe(true); expect(named('位置 X', editor).value).toBe(stale); button('取り消す', named('ピンの操作', editor)).fire('click');
+    expect(button('親モデルと位置を確定', editor).disabled).toBe(true); expect(named('位置 X', editor).value).toBe(stale); button('取り消す', named('位置の調整', editor)).fire('click');
     const final = host.read().source!, output = await host.workspaceOutput.download(await host.workspaceOutput.generate(final.token)); await h.ui.dispose();
     const cold = await openValidationHost(h.f.options); expect(cold.read().source!.originalChanges()).toEqual(final.originalChanges()); expect(cold.authority.read().resources.captions[captionId]!.anchor).toEqual(changed.anchor); await cold.dispose();
     const peer = firstWorkspaceRecipient(); expect((await peer.receiver.importWorkspace(output)).state).toBe('ready'); expect((await peer.session.read()).source!.originalChanges()).toEqual(final.originalChanges()); expect(h.legacy).not.toHaveBeenCalled();
@@ -5206,6 +5209,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     handle.fire('pointerup', drag); h.extent({ left: 10, top: 20, width: 600, height: 400 }); expect(a.style.width).toBe('340px');
     expect(host.read().source!.originalChanges()).toEqual(source.originalChanges());
     const oldScene = Object.values(host.authority.read().state.scenes)[0]!, oldName = oldScene.name.kind === 'value' ? oldScene.name.value : '';
+    button('シーンを作る', editor).fire('click');
     const sceneName = named('シーン名', editor); sceneName.value = '比較用の別シーン'; sceneName.fire('input');
     await edited(() => button('シーンを追加', editor).parent!.fire('submit', { preventDefault() {} })); expect(cards()).toHaveLength(0);
     button(oldName, named('シーン', editor)).fire('click'); expect(cards()).toHaveLength(2); expect(named('最初の記録', windows).style.width).toBe('340px');
@@ -5228,7 +5232,9 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     h.pinPoint({ x: Number.NaN, y: 300 }); expect(line.hidden).toBe(true); h.pinPoint({ x: 500, y: 300 }); expect(line.hidden).toBe(false);
     h.setIssue('描画の再開が必要です。'); named('検索', editor).fire('input'); expect(line.hidden).toBe(true);
     const retry=button('3D表示を再試行', editor),canvas=named('3Dモデルの表示', editor);
-    expect(windows.contains(retry)).toBe(false);expect(canvas.contains(retry)).toBe(false);expect(canvas.parent!.contains(retry)).toBe(true);
+    const stage=all(editor).find(n=>n.className==='lv-project-stage')!;
+    expect(windows.contains(retry)).toBe(false);expect(canvas.contains(retry)).toBe(false);expect(stage.contains(retry)).toBe(true);
+    expect(canvas.parent!.contains(retry)).toBe(false);expect(canvas.parent!.contains(windows)).toBe(true);
     button('3D表示を再試行', editor).fire('click'); expect(h.retryViewport).toHaveBeenCalledTimes(1); expect(all(windows)).toContain(card);
     await h.ui.dispose();
   });
@@ -5416,10 +5422,10 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     button('保存した視点', editor).fire('click'); const views = named('視点の作業', editor), author = named('視点の作成と管理', views), background = named('3D背景', views);
     const captured = h.payload(); button('視点を作る', author).fire('click'); const name = named('視点の名称', author); name.value = '正確な視点'; name.fire('input');
     expect(named('背景色', background).readOnly).toBe(true);
-    await edited(() => button('視点を追加', author).fire('click'));
+    await edited(() => button('視点を追加', named('視点の終了操作', views)).fire('click'));
     const command = h.dispatch.mock.calls.map(c => c[1]).find(c => c.kind === 'createView')!; if (command.kind !== 'createView') throw Error('view');
     expect(command.camera).toEqual(captured.camera); expect(command.background).toEqual(captured.background);
-    button('視点を作る', author).fire('click'); name.value = '並べ替える視点'; name.fire('input'); await edited(() => button('視点を追加', author).fire('click'));
+    button('視点を作る', author).fire('click'); name.value = '並べ替える視点'; name.fire('input'); await edited(() => button('視点を追加', named('視点の終了操作', views)).fire('click'));
     const secondView = h.dispatch.mock.calls.map(c => c[1]).filter(c => c.kind === 'createView').at(-1)!; if (secondView.kind !== 'createView') throw Error('second view');
     const cameraBefore = h.payload(); await edited(() => button('前へ', author).fire('click'));
     const ordered = host.authority.read().viewData!.records[secondView.viewId]!.orderKey; expect(ordered.kind).toBe('value');
@@ -5429,7 +5435,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const selectView = all(views).find(n => n.tag === 'select' && n.attributes.get('aria-label') === '保存した視点')!; selectView.value = command.viewId; selectView.fire('change');
     const entry = named('シーンを開いたときの視点', views); entry.value = command.viewId; entry.fire('change');
     expect(h.recall).not.toHaveBeenCalled(); await edited(() => button('設定を適用', views).fire('click')); expect(h.recall).not.toHaveBeenCalled();
-    const color = named('背景色', background); color.value = '#123456'; color.fire('input'); button('背景に適用', background).fire('click'); expect(h.background).toHaveBeenCalledTimes(1);
+    const color = named('背景色', background); color.value = '#123456'; color.fire('input'); button('背景に適用', named('背景の終了操作', views)).fire('click'); expect(h.background).toHaveBeenCalledTimes(1);
     const token = host.read().source!.token; button('表示', views).fire('click'); expect(h.recall).toHaveBeenCalledTimes(1); expect(h.payload()).toEqual(captured); expect(host.read().source!.token).toBe(token);
     button('材質', editor).fire('click'); const materials = named('材質の作業', editor);
     const model = named('モデル', materials); model.value = host.authority.read().modelVersions![0]!.assetId; model.fire('change');
@@ -5778,6 +5784,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect(captionAttachments(host.authority.read().mediaData, captionId).ready).toHaveLength(1);
     const firstScene = host.authority.read().state.defaultSceneId; if (firstScene.kind !== 'value') throw Error('scene');
     const firstName = host.authority.read().state.scenes[firstScene.value]!.name; if (firstName.kind !== 'value') throw Error('name');
+    button('シーンを作る', editor).fire('click');
     const sceneName = named('シーン名', editor); sceneName.value = '二つ目のシーン'; sceneName.fire('input');
     await edited(() => all(editor).find(n => n.tag === 'form' && all(n).includes(sceneName))!.fire('submit', { preventDefault() {} }));
     expect(Object.keys(host.authority.read().state.scenes)).toHaveLength(initialSceneCount + 1);
@@ -5926,7 +5933,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const detach = host.setDisplayPreparation(prepare), before = host.read().source!.token;
     await h.failed(() => button('親モデルと位置を確定', editor).fire('click'));
     expect(host.read().source!.token).not.toBe(before); expect(h.display()!.token).toBe(before);
-    expect(x.value).toBe('0.375'); expect(x.disabled).toBe(true); expect(button('取り消す', named('ピンの操作', editor)).disabled).toBe(true);
+    expect(x.value).toBe('0.375'); expect(x.disabled).toBe(true); expect(button('取り消す', named('位置の調整', editor)).disabled).toBe(true);
     expect(button('入力を修正する', editor).hidden).toBe(true);
     const original = host.read().source!.originalChanges(); await h.completed(() => button('更新を再試行', editor).fire('click'));
     expect(host.authority.status!().kind).toBe('idle');
@@ -6803,6 +6810,21 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     all(output).find(n => n.tag === 'button' && n.textContent === '選択を取り消す')!.fire('click'); expect(tools.hasChanges()).toBe(false);
     await workspace.dispose();
   }, 20000);
+  it('keeps contextual sharing valid after cancellation and leaves receive/restore without a hidden output draft', async () => {
+    const f = await receivedHostFixture(), host = createValidationModeHost(f.host, mode => openValidationHost({ ...f.options, mode }), () => {});
+    const tools = createValidationReceiveControls(new RecordedDocument().asDocument(), host, () => undefined, () => {}, async () => {});
+    const root = record(tools.root), all = (n: RecordedNode): RecordedNode[] => [n, ...n.children.flatMap(all)];
+    const output = () => all(root).find(n => n.attributes.get('aria-label') === 'ファイル')!;
+    const buttons = () => all(output()).filter(n => n.tag === 'button');
+    expect(tools.showSurface('save')).toBe(true); expect(buttons().some(n => n.textContent === '保存' || n.textContent === '相手に渡す')).toBe(false);
+    expect(tools.showSurface('share')).toBe(true); expect(tools.hasChanges()).toBe(true); expect(tools.closeReason()).toContain('選択を取り消す');
+    const kind = () => all(output()).find(n => n.getAttribute('aria-label') === '渡す内容')!;
+    expect(kind().children).toHaveLength(4); buttons().find(n => n.textContent === '選択を取り消す')!.fire('click');
+    expect(tools.hasChanges()).toBe(false); expect(kind().value).toBe('teamWorkspace'); expect(buttons().some(n => n.textContent === 'ファイルに保存')).toBe(false);
+    expect(tools.showSurface('receive')).toBe(true); expect(tools.hasChanges()).toBe(false); expect(tools.closeReason()).toBeNull();
+    expect(tools.showSurface('restore')).toBe(true); expect(tools.hasChanges()).toBe(false); expect(tools.closeReason()).toBeNull();
+    tools.dispose(); await host.dispose();
+  });
   it('keeps backup names and file choices through IME, failures and unrelated download without claiming external save (recorded DOM)', async () => {
     const { f, options } = await initialWorkspaceHostFixture(), initial = await openValidationHost({ ...options, workspaceFile: f.file });
     await initial.workspaceOutput.generate(initial.read().source!.token);

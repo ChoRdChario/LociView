@@ -30,7 +30,8 @@ export function createViewAuthorControls(document: Document, onEvent: (event: Vi
   const form = make('section'), label = make('label', '視点の名称'), name = make('input'); name.type = 'text'; name.setAttribute('aria-label', '視点の名称');
   label.append(name); const nameNote = make('p'); nameNote.id = `lv-view-author-${++nextAuthorControl}`; name.setAttribute('aria-describedby', nameNote.id);
   const capture = button('現在の表示を使用'), captureNote = make('p'), apply = button('変更を適用'), cancel = button('取り消す'); apply.className = 'lv-view-primary';
-  form.append(label, nameNote, capture, captureNote, apply, cancel, contextHelp(document, '名称だけの変更ではカメラと背景は変わりません。「現在の表示を使用」で、今のカメラと背景を視点に記録します。', [name, capture])); root.append(form);
+  const actions = make('div'); actions.className = 'lv-task-footer'; actions.setAttribute('role', 'group'); actions.setAttribute('aria-label', '視点の終了操作'); editOnly(actions); actions.append(apply, cancel);
+  form.append(label, nameNote, capture, captureNote, contextHelp(document, '名称だけの変更ではカメラと背景は変わりません。「現在の表示を使用」で、今のカメラと背景を視点に記録します。', [name, capture])); root.append(form);
   const manage = make('details'), summary = make('summary', 'その他の操作');
   const earlier = button('前へ'), later = button('後へ'), remove = button('削除'); remove.className = 'lv-view-destructive';
   const orderNote = make('p'), deleteNote = make('p');
@@ -40,7 +41,8 @@ export function createViewAuthorControls(document: Document, onEvent: (event: Vi
   const status = live(), review = button('状態を確認'); root.append(status, review);
   for (const control of [add, edit, capture, apply]) control.setAttribute('aria-describedby', [status.id, control.getAttribute?.('aria-describedby')].filter(Boolean).join(' '));
   const confirmation = make('section'), question = make('p'), confirm = button('削除する'), keep = button('戻る'); confirmation.hidden = true;
-  confirmation.append(question, confirm, keep); root.append(confirmation);
+  confirmation.className = 'lv-task-confirmation'; editOnly(confirmation);
+  confirmation.append(question, confirm, keep); root.append(actions, confirmation);
   let context: ViewAuthorContext | undefined, disposed = false;
   let confirming: Extract<ViewAuthorPlan, { kind: 'delete' }> | ViewAuthorDraft | null = null;
   const show = (text: string) => { status.textContent = text; status.hidden = false; };
@@ -91,7 +93,7 @@ export function createViewAuthorControls(document: Document, onEvent: (event: Vi
       (context.view.source.sceneId !== next.view.source.sceneId || context.view.source.projectFrameId !== next.view.source.projectFrameId ||
         context.view.memory.selectedViewId !== next.view.memory.selectedViewId)) { show('編集中の視点を適用・取り消しするか、処理の完了を待ってください。'); return false; }
     context = next; const draft = next.draft, busy = next.feedback.kind === 'applying', item = selectedAuthorView(next);
-    form.hidden = !draft;
+    form.hidden = !draft; actions.hidden = !draft;
     const addIssue = reason(planViewAuthor(next, { kind: 'new' })), editIssue = reason(planViewAuthor(next, { kind: 'edit' }));
     add.disabled = Boolean(addIssue); edit.disabled = Boolean(editIssue); target.textContent = item ? savedViewName(item) : '保存した視点を選択';
     const observedName = item?.name.kind === 'value' ? item.name.value : '';
@@ -121,7 +123,7 @@ export function createViewAuthorControls(document: Document, onEvent: (event: Vi
     }
     confirm.disabled = busy; return true;
   }
-  return { root, render, dispose: () => { disposed = true; stopHelp(); cleanup(); root.remove(); } };
+  return { root, actions, confirmation, render, dispose: () => { disposed = true; stopHelp(); cleanup(); actions.remove(); confirmation.remove(); root.remove(); } };
 }
 
 export type ViewBackgroundEvent = ViewBackgroundPlan | Readonly<{ kind: 'draft'; baseDraft: ViewBackgroundDraft | null; draft: ViewBackgroundDraft }> |
@@ -135,9 +137,10 @@ export function createViewBackgroundControls(document: Document, onEvent: (event
   const standard = button('標準色'), apply = button('背景に適用'), cancel = button('取り消す'); apply.className = 'lv-view-primary';
   const note = contextHelp(document, '背景を視点にも残すには、視点を作成・更新してください。', [hex, picker, standard, apply]), status = live();
   for (const node of [hex, picker, standard, apply]) node.setAttribute('aria-describedby', [status.id, node.getAttribute?.('aria-describedby')].filter(Boolean).join(' '));
-  root.append(label, picker, standard, apply, cancel, note, status);
+  const actions = make('div'); actions.className = 'lv-task-footer'; actions.setAttribute('role', 'group'); actions.setAttribute('aria-label', '背景の終了操作'); actions.append(apply, cancel);
+  root.append(label, picker, standard, note, status, actions);
   const confirmation = make('section'), confirm = button('変更を取り消す'), keep = button('編集を続ける'); confirmation.hidden = true;
-  confirmation.append(make('p', '入力中の背景色を取り消しますか？'), confirm, keep); root.append(confirmation);
+  confirmation.className = 'lv-task-confirmation'; confirmation.append(make('p', '入力中の背景色を取り消しますか？'), confirm, keep); root.append(confirmation);
   let context: ViewBackgroundContext | undefined, disposed = false, cancelFor: ViewBackgroundDraft | null = null;
   const change = (value: string, composing = false) => {
     if (!context || disposed || context.feedback.kind === 'applying') return;
@@ -170,11 +173,12 @@ export function createViewBackgroundControls(document: Document, onEvent: (event
     picker.hidden = !color; picker.disabled = busy || Boolean(sourceIssue) || Boolean(draft?.composing);
     if (color) picker.value = color;
     standard.disabled = busy || Boolean(sourceIssue) || Boolean(draft?.composing);
+    actions.hidden = !draft;
     const issue = viewBackgroundIssue(next); apply.disabled = Boolean(issue); cancel.disabled = !draft || busy || draft.composing;
     status.textContent = [next.feedback.kind === 'failed' && `背景を変更できませんでした。${next.feedback.message}`,
       issue !== '変更はありません。' && issue, draft && !busy && '背景色は未適用です。'].filter(Boolean).join(' '); status.hidden = !status.textContent;
     if (cancelFor !== draft || draft?.composing) { cancelFor = null; confirmation.hidden = true; }
     confirm.disabled = cancel.disabled; return true;
   }
-  return { root, render, dispose: () => { disposed = true; stopHelp(); cleanup(); root.remove(); } };
+  return { root, actions, confirmation, render, dispose: () => { disposed = true; stopHelp(); cleanup(); actions.remove(); confirmation.remove(); root.remove(); } };
 }

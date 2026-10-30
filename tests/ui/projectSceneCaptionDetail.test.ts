@@ -34,15 +34,34 @@ function host(initial = context(), document = new RecordedDocument()) {
     }
   });
   controls.render(props);
-  const root = record(controls.root), titleGroup = root.children[2]!, bodyGroup = root.children[3]!, colorGroup = root.children[4]!;
-  const title = titleGroup.children[0]!.children[0]!, body = bodyGroup.children[0]!.children[0]!, color = colorGroup.children[0]!.children[0]!;
-  const actions = root.children[6]!, confirmation = root.children.find(n => n.children.some(child => child.textContent === '変更を取り消す'))!;
+  const root = record(controls.root);
+  const all = (n: typeof root): typeof root[] => [n, ...n.children.flatMap(all)];
+  const input = (name: string) => all(root).find(n => n.getAttribute('aria-label') === name)!;
+  const title = input('タイトル'), body = input('本文'), color = input('ピンの色'), titleGroup = title.parent!.parent!;
+  const actions = record(controls.actions), confirmation = record(controls.confirmation);
   return { controls, document, root, title, body, color, titleGroup, status: root.children[0]!, impact: root.children[1]!,
-    picker: root.children[5]!, apply: actions.children[0]!, cancel: actions.children[1]!, confirmation,
+    picker: input('色を選択'), apply: actions.children[0]!, cancel: actions.children[1]!, confirmation,
     events, get props() { return props; }, render(next: CaptionDetailProps) { if (controls.render(next)) props = next; } };
+
 }
 
 describe('Caption detail: local draft/intents, not durable editor acceptance', () => {
+  it('keeps one mounted draft with a media slot before secondary properties and the same completion controls', () => {
+    const h = host(), slot = record(h.controls.mediaSlot), properties = h.root.children.find(n => n.className === 'lv-caption-properties')!;
+    expect(h.root.children.indexOf(h.body.parent!.parent!)).toBeLessThan(h.root.children.indexOf(slot));
+    expect(h.root.children.indexOf(slot)).toBeLessThan(h.root.children.indexOf(properties));
+    expect(properties.contains(h.color)).toBe(true); expect(properties.open).toBe(false);
+    h.title.value = '入力を保持'; h.title.fire('input'); expect(h.title.value).toBe('入力を保持'); expect(h.apply.disabled).toBe(false);
+    expect(slot).toBe(record(h.controls.mediaSlot)); h.controls.dispose();
+  });
+  it('keeps secondary properties closed before selection while revealing retained color problems', () => {
+    const initial = context(), h = host({ ...initial, source: { kind: 'unavailable', captionId: null, sceneId: scn, token: 'none', reason: 'キャプションを選択してください。' }, draft: null });
+    const properties = h.root.children.find(n => n.className === 'lv-caption-properties')!;
+    expect(properties.open).toBe(false); h.render(initial); expect(properties.open).toBe(false);
+    h.color.value = 'invalid'; h.color.fire('input'); expect(properties.open).toBe(true);
+    h.render({ ...h.props, source: { kind: 'unavailable', captionId: cap, sceneId: scn, token: 'lost', reason: '状態を確認してください。' } });
+    expect(properties.open).toBe(true); expect(h.color.value).toBe('invalid'); h.controls.dispose();
+  });
   it('projects canonical text independently of retained input and clears unresolved values without hiding recovery', () => {
     const h = host(edit(context(), 'body', '未適用の本文'));
     const reading = h.root.children[3]!.children[3]!;

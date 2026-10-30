@@ -29,7 +29,7 @@ export function createValidationReceiveControls(document: Document, host: Return
   restoreStatus.setAttribute('role', 'status'); restoreStatus.className = 'lv-operation-status'; restoreArea.append(restoreSummary, restoreLabel, restoreStatus, restoreCommands);
   let restorePrepared = false, restoreCancel = false, restoreFeedback = '';
   const restoreChanges = () => !!restoreInput.files?.length || restorePrepared || restoreCancel;
-  const output = createValidationOutputControls(document, host, session, changed, () => otherInput() || busy || !!input.files?.length || !!selectedJob || !!cancel || restoreChanges());
+  const output = createValidationOutputControls(document, host, session, changed, () => otherInput() || busy || !!input.files?.length || !!selectedJob || !!selectedCopy || !!cancel || restoreChanges());
   root.append(restoreArea, output.root);
   editOnly(form, restoreLabel);
   const guard = (recovery: boolean, restore = false) => {
@@ -60,7 +60,7 @@ export function createValidationReceiveControls(document: Document, host: Return
     b.addEventListener('click', () => { if (!b.disabled) action(); }); parent.append(b);
   };
   const performRestore = (action: () => Promise<void>, recovery: boolean, completed: string, consume = true) => {
-    if (busy || disposed || output.hasChanges() || input.files?.length || selectedJob || cancel) return;
+    if (busy || disposed || output.hasChanges() || input.files?.length || selectedJob || selectedCopy || cancel) return;
     feedback = '';
     try { guard(recovery,true); } catch (error) { restoreFeedback = (error as Error).message; render(); return; }
     busy = true; activeOperation = 'restore'; restoreFeedback = '復元を確認しています。'; render(); changed();
@@ -178,11 +178,12 @@ export function createValidationReceiveControls(document: Document, host: Return
   render();
   const hasChanges = () => busy || output.hasChanges() || restoreChanges() || !!input.files?.length || !!selectedJob || !!selectedCopy || !!cancel;
   return { root, render, busy: () => busy || output.busy(), hasChanges,
-    showAll(){if(hasChanges())return false;surface='all';render();return true;},
+    closeReason: () => busy ? 'ファイルを処理中です。完了をお待ちください。' : output.closeReason() ?? (restoreChanges() ? '復元の確認を完了するか、復元欄の取消操作を選択してください。' : input.files?.length || selectedJob || selectedCopy || cancel ? '受信欄の入力・確認を完了するか、取り消してください。' : null),
+    showAll(){if(hasChanges())return false;surface='all';output.setPresentation('all');render();return true;},
     showSurface(next: Exclude<typeof surface,'all'>) {
       if(hasChanges())return false;
-      surface=next;
-      output.choosePurpose(next==='share'?'teamWorkspace':'backup');
+      surface=next; output.setPresentation(next === 'save' || next === 'share' ? next : 'all');
+      if(next==='share'||next==='save')output.choosePurpose(next==='share'?'teamWorkspace':'backup');
       render(); if(next==='restore' && host.backupRestore.enabled)restoreArea.open=true;
       return true;
     },

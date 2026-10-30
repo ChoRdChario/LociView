@@ -29,7 +29,8 @@ export function createViewControls(document: Document, onPlan: (plan: ViewPlan) 
   entry.setAttribute('aria-label', '開始時の設定');
   const entryLabel = label('シーンを開いたときの視点', entryPicker), entryHelp = contextHelp(document, '現在の表示は変わりません。次にシーンを開くときの視点を設定します。', [entryPicker]);
   editOnly(entryLabel, entryHelp, apply, cancel);
-  entry.append(entryLabel, entryHelp, apply, cancel, entryNote, entryStatus, entryReview);
+  const entryActions = make('div'); entryActions.className = 'lv-task-footer'; entryActions.setAttribute('role', 'group'); entryActions.setAttribute('aria-label', '開始視点の終了操作'); editOnly(entryActions); entryActions.append(apply, cancel);
+  entry.append(entryLabel, entryHelp, entryNote, entryStatus, entryReview, entryActions);
   root.append(camera, saved, entry);
   // One shared host/state/intent path, even when the task tab is not visible.
   const stageTools = make('section'); stageTools.className = 'lv-view-stage-tools'; stageTools.setAttribute('aria-label', '表示の復帰');
@@ -108,6 +109,7 @@ export function createViewControls(document: Document, onPlan: (plan: ViewPlan) 
       entryPicker.replaceChildren(option('', '指定なし'), ...entryOptions.map(item => option(item.value, item.text, item.disabled))); entryKey = entryFingerprint;
     }
     entryPicker.value = wanted;
+    entryActions.hidden = !next.memory.entryDraft;
     const busy = next.entryFeedback.kind === 'applying'; entryPicker.disabled = sourceIssue !== null || !observed || next.mutationBlock !== null || busy;
     const entryIssue = entryViewIssue(next);
     apply.disabled = entryIssue !== null; cancel.disabled = next.memory.entryDraft === null || busy;
@@ -120,5 +122,5 @@ export function createViewControls(document: Document, onPlan: (plan: ViewPlan) 
     entryReview.hidden = !observedIssue; entryReview.disabled = sourceIssue !== null || busy;
     return true;
   }
-  return { root, camera, stageTools, render, dispose: () => { disposed = true; cleanups.forEach(cleanup => cleanup()); root.remove(); stageTools.remove(); } };
+  return { root, camera, stageTools, entryActions, render, dispose: () => { disposed = true; cleanups.forEach(cleanup => cleanup()); entryActions.remove(); root.remove(); stageTools.remove(); } };
 }

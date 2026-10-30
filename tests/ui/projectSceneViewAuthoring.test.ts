@@ -45,9 +45,9 @@ function authorHost() {
     if (event.kind === 'cancel' && event.draft === ctx.draft) ctx = { ...ctx, draft: null };
     controls.render(ctx);
   });
-  controls.render(ctx); const root = record(controls.root), [start, form, manage, status, review, confirm] = root.children;
+  controls.render(ctx); const root = record(controls.root), [start, form, manage, status, review] = root.children, actions = record(controls.actions), confirm = record(controls.confirmation);
   return { controls, events, root, add: start!.children[0]!, edit: start!.children[1]!, name: form!.children[0]!.children[0]!, capture: form!.children[2]!,
-    captureNote: form!.children[3]!, apply: form!.children[4]!, cancel: form!.children[5]!, earlier: manage!.children[1]!, later: manage!.children[2]!,
+    captureNote: form!.children[3]!, apply: actions.children[0]!, cancel: actions.children[1]!, earlier: manage!.children[1]!, later: manage!.children[2]!,
     remove: manage!.children[4]!, deleteNote: manage!.children[5]!, status: status!, review: review!, confirmation: confirm!, confirm: confirm!.children[1]!,
     get context() { return ctx; }, render(next: ViewAuthorContext) { if (controls.render(next)) ctx = next; } };
 }
@@ -61,7 +61,7 @@ function backgroundHost() {
   }); controls.render(ctx);
   const root = record(controls.root);
   return { controls, events, root, hex: root.children[0]!.children[0]!, picker: root.children[1]!, standard: root.children[2]!,
-    apply: root.children[3]!, cancel: root.children[4]!, status: root.children[6]!, confirmation: root.children[7]!, confirm: root.children[7]!.children[1]!,
+    apply: record(controls.actions).children[0]!, cancel: record(controls.actions).children[1]!, status: root.children.find(n => n.getAttribute('role') === 'status')!, confirmation: record(controls.confirmation), confirm: record(controls.confirmation).children[1]!,
     get context() { return ctx; }, render(next: ViewBackgroundContext) { if (controls.render(next)) ctx = next; } };
 }
 

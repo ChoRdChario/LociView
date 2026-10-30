@@ -1,4 +1,4 @@
-import { lookAlongFront, revealCaptionList } from './workspaceUi';
+import { beginSceneCreation, revealModelManagement, lookAlongFront, revealCaptionList } from './workspaceUi';
 import { test, expect, chromium, type BrowserContext, type Page, type TestInfo } from '@playwright/test';
 import { createHash } from 'node:crypto';
 import { mkdir, mkdtemp, readFile, readdir } from 'node:fs/promises';
@@ -133,7 +133,7 @@ test('差し替えと受信の中断を元のファイルから復旧し、手�
       await models(a).getByRole('button', { name: '配置を確定', exact: true }).click(); await expect(a.getByText('モデルの配置を確定しました。', { exact: true })).toBeVisible({ timeout: actionTimeout });
       await a.getByRole('tab', { name: 'キャプション', exact: true }).click();
       const scenes = a.getByRole('region', { name: 'シーン', exact: true }), first = (await scenes.locator('button[aria-pressed="true"]').textContent())!; primaryScene = first;
-      await a.getByLabel('シーン名', { exact: true }).fill('共有した別シーン'); await a.getByRole('button', { name: 'シーンを追加', exact: true }).click();
+      await beginSceneCreation(a); await a.getByLabel('シーン名', { exact: true }).fill('共有した別シーン'); await a.getByRole('button', { name: 'シーンを追加', exact: true }).click();
       await expect(a.getByText('シーンを追加しました。', { exact: true })).toBeVisible({ timeout: actionTimeout }); await scenes.getByRole('button', { name: first, exact: true }).click(); await chooseCaption(a);
       const path = await download(a, info, 'W0-差し替え前', 'teamWorkspace'); initialWorkspacePath = path; base = await WorkspaceArchive.inspect(await blob(path), validationMetadataLimits);
       const inspected = await inspectProjectCandidates(base.source.read(), validationMetadataLimits); if (inspected.kind !== 'project-candidate-inspection') throw Error('initial metadata'); initialRecords = inspected.unambiguousRecords;
@@ -144,7 +144,7 @@ test('差し替えと受信の中断を元のファイルから復旧し、手�
     let recovered!: Awaited<ReturnType<typeof inspect>>, fault!: { prepared: PreparedJournal; durable: { transactionId: string; exactChangeSetDigest: string }; changes: string[]; published: boolean; hits: number; path: string[] };
     await step('差し替え確認と取消、公開中断後の完全終了と再試行', async () => {
       await a.getByRole('tab', { name: 'モデル', exact: true }).click(); await models(a).locator('.lv-model-select').first().click();
-      const select = async () => { const picker = a.waitForEvent('filechooser'); await models(a).getByRole('button', { name: 'モデルを差し替える', exact: true }).click();
+      const select = async () => { const picker = a.waitForEvent('filechooser'); await revealModelManagement(a); await models(a).getByRole('button', { name: 'モデルを差し替える', exact: true }).click();
         await (await picker).setFiles({ name: 'replacement.glb', mimeType: 'model/gltf-binary', buffer: newGlb }); };
       await select(); const note = models(a).getByRole('region', { name: 'モデルのファイル', exact: true });
       await expect(note).toContainText('2シーン'); await expect(note).toContainText('ピンは要確認'); await expect(note).toContainText('材質の調整は引き継ぎません');

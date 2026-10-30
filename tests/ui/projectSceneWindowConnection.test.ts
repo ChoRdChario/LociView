@@ -89,6 +89,9 @@ describe('same-host comparison windows; authored DOM only, not raster or native 
     select(s, f.second); workspace.render(); expect(visible(s)).toEqual([f.shared, f.second]);
     expect(descendants(root).some(n => n.textContent === '比較に残す')).toBe(false);
     const windows = named(root, 'キャプションのウィンドウ'), shared = named(windows, '設備の確認箇所');
+    const reading = named(windows, '比較ウィンドウの本文'), editor = descendants(root).find(n => n.tag === 'textarea' && n.attributes.get('aria-label') === '本文')!;
+    expect(named(root, '本文').tag).toBe('textarea'); expect(named(root, '本文')).toBe(editor);
+    expect(reading.attributes.get('role')).toBe('group'); expect((reading as unknown as HTMLElement).tabIndex).toBe(0);
     const retry = button(root, '3D表示を再試行'); expect(windows.contains(retry)).toBe(false);
     expect(named(root, '3D表示').contains(retry)).toBe(false); // Recovery is outside every floating overlap.
     button(shared, '設備の確認箇所').fire('click'); expect(s.memory.selectedCaptionId).toBe(f.second);

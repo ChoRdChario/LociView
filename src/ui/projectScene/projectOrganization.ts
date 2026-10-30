@@ -37,8 +37,8 @@ export function createProjectOrganization(document: Document, host: Organization
     else settingsStatus.textContent = '設定できませんでした。入力は保持しています。';
   });
   const cancelSettings = button('表示名の入力を取り消す', () => { if (!composing && !host.localBlocked()) { settingsDraft = null; settingsStatus.textContent = ''; host.changed(); } });
-  settingsRoot.append(settingsSummary, displayNameLabel, contextHelp(document, 'このブラウザだけの設定です。共有ファイルや過去の編集者名は変わりません。', [displayName]), applySettings, cancelSettings, settingsStatus);
-  const editorForm = make('div'), editorLabel = make('label', '編集者名'), editorInput = make('input'), editorToggleLabel = make('label'), editorToggle = make('input'), editorStatus = settingsStatus;
+  const localSettingsArea = make('section'); localSettingsArea.className = 'lv-settings-group'; localSettingsArea.append(make('h2', 'このブラウザの表示'), displayNameLabel, contextHelp(document, 'このブラウザだけの設定です。共有ファイルや過去の編集者名は変わりません。', [displayName]), applySettings, cancelSettings); settingsRoot.append(settingsSummary, localSettingsArea, settingsStatus);
+  const editorForm = make('section'), editorLabel = make('label', '編集者名'), editorInput = make('input'), editorToggleLabel = make('label'), editorToggle = make('input'), editorStatus = settingsStatus;
   editorInput.maxLength = 256; editorLabel.append(editorInput); editorToggle.type = 'checkbox';
   editorToggleLabel.append(editorToggle, make('span', 'このプロジェクトの今後の編集にこの名前を残す')); editorStatus.setAttribute('role', 'status');
   const readEditor = () => { try { return host.ports.editorSettings?.read() ?? { enabled: false, name: '' }; }
@@ -55,7 +55,8 @@ export function createProjectOrganization(document: Document, host: Organization
     else editorStatus.textContent = '設定できませんでした。名前を確認してください。入力は保持しています。';
   });
   const cancelEditor = button('編集者名の入力を取り消す', () => { if (!composing && !host.localBlocked()) { editorDraft = null; editorStatus.textContent = ''; host.changed(); } });
-  editorForm.append(editorLabel, editorToggleLabel,
+  editorForm.className = 'lv-settings-group'; editorToggleLabel.className = 'lv-checkbox-label';
+  editorForm.append(make('h2', '共有する編集者名'), editorLabel, editorToggleLabel,
     make('p', '自己申告の名前です。作業一式・変更分・バックアップに含まれます。停止しても過去の記録は残ります。'),
     make('p', '名前を残した編集を含むプロジェクトや共有ファイルは、対応版のLociViewで開く必要があります。'), applyEditor, cancelEditor);
   settingsRoot.append(editorForm, settingsStatus);

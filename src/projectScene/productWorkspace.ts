@@ -49,7 +49,7 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
       if(tools!.showSurface(surface)){core?.dismissDisclosures();fileMenu.open=true;filePanel.focus?.({preventScroll:true});}}); return b;
   };
   const saveEntry=fileEntry('保存','save'), shareEntry=fileEntry('共有','share'), receiveEntry=fileEntry('受信','receive'), restoreEntry=fileEntry('復元','restore');
-  saveEntry.className='lv-workspace-primary';
+  saveEntry.className='lv-workspace-primary'; shareEntry.className='lv-workspace-share';
   filePanel.tabIndex=-1;
   const fileNavigation=document.createElement('nav'); fileNavigation.setAttribute('aria-label','ファイルの目的');fileNavigation.append(receiveEntry,restoreEntry);filePanel.insertBefore(fileNavigation,fileClose);
   let initialFiles = true;
@@ -70,11 +70,12 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
     initialFiles=false;
     fileNotice.textContent=needsFiles?'未完了のファイル操作があります。「ファイル」から再開できます。':''; fileNotice.hidden=!needsFiles;
     fileClose.disabled=!!tools?.hasChanges();
-    fileCloseNote.hidden=!fileClose.disabled;
+    fileCloseNote.textContent=tools?.closeReason() ?? ''; fileCloseNote.hidden=!fileCloseNote.textContent;
     restoreEntry.hidden=!host.backupRestore.enabled;
     for(const b of [saveEntry,shareEntry,receiveEntry,restoreEntry])b.disabled=switching||!!navigation?.presentation?.()||!!core?.inputPending()||!!tools?.hasChanges()||!!startup?.hasChanges();
-    tools?.render(); mode.textContent = host.mode!.current === 'view' ? '編集する' : '閲覧する';
-    mode.className=host.mode!.current==='view'?'lv-workspace-primary':'';
+    tools?.render(); mode.textContent = switching ? '切替中…' : host.mode!.current === 'view' ? '編集する' : '閲覧する';
+    mode.className=[host.mode!.current==='view'?'lv-workspace-primary':'', switching?'lv-mode-switching':''].filter(Boolean).join(' ');
+    mode.setAttribute('aria-busy', String(switching));
     mode.disabled = switching || !!navigation?.presentation?.() || !!core?.inputPending() || !!startup?.hasChanges() || !!tools?.hasChanges();
     if (core) { core.root.inert = switching || !!startup?.busy(); core.setExternalBusy(!!tools?.busy()); }
     startup?.render();

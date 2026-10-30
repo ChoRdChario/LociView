@@ -1,4 +1,4 @@
-import { revealCaptionList } from './workspaceUi';
+import { beginSceneCreation, revealCaptionList } from './workspaceUi';
 import { test, expect, chromium, type BrowserContext, type Page, type TestInfo } from '@playwright/test';
 import { createHash } from 'node:crypto';
 import { mkdir, mkdtemp, readFile, readdir } from 'node:fs/promises';
@@ -180,7 +180,7 @@ test('独立した二人が実ファイルを二往復し、手元の画像と�
       await addImage(a, '共有画像.png', png);
       const scenes = a.getByRole('region', { name: 'シーン', exact: true });
       const initialName = (await scenes.locator('button[aria-pressed="true"]').textContent())!;
-      await a.getByLabel('シーン名', { exact: true }).fill('現地のシーン');
+      await beginSceneCreation(a); await a.getByLabel('シーン名', { exact: true }).fill('現地のシーン');
       await a.getByRole('button', { name: 'シーンを追加', exact: true }).click();
       await expect(a.getByText('シーンを追加しました。', { exact: true })).toBeVisible({ timeout: 90_000 });
       await scenes.getByRole('button', { name: initialName, exact: true }).click(); await selectCaption(a);

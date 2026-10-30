@@ -12,3 +12,4 @@
 .lv-material-fields p { font-size: 13px; }
 .lv-material-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .lv-material-editor .lv-material-primary { background: #413d39; color: #faf9f8; font-weight: 500; }
+.lv-material-editor .lv-material-values[data-noneditable="true"]:not([hidden]) { display: block !important; }

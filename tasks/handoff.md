@@ -9,10 +9,15 @@ existing changes. Do not reconstruct current work from completed checkpoint pros
 PO2026-10-30 corrects the UI work order: finish the whole-screen/connected-flow
 issue list and repair groups before individual fixes. Read todo's current boundary.
 The completed review and screen proposal now have explicit implementation approval.
-The first grouped workspace checkpoint is verified. Latest steering replaces its
-framed camera menu with compact Blender-style RGB XYZ axes and icon-only fit.
-Todo owns this bounded workflow, checks and the next connected navigation pass.
+The first grouped workspace checkpoint and compact Blender-style RGB XYZ axes
+are verified. PO accepted the gizmo, then authorized all eight follow-up review
+groups: disclosure/content order, active pin completion, contextual materials,
+comparison media, file exits, visual hierarchy, narrow layout and name Settings.
+Todo owns this connected workflow, current checks and next action.
 Preserve Y-up/+Z-front, existing camera intents, input/write fences and retained data.
+The eight repair groups now pass the required final checkpoint, connected Chromium
+flows and independent reviews. Todo retains failures/fixes and the exact evidence;
+the next unit is the broader model/team/recovery flow through the new navigation.
 
 Latest PO steering raises the review target to AAA-title production UI/UX quality.
 Read the[consolidated design review](../docs/ui-design-review.md) for Q1–Q8,
@@ -35,10 +40,12 @@ Do not infer physical-device, general adoption or release acceptance.
 
 The owned product preview is http://127.0.0.1:4191/ (offline-desktop-dist), separate
 from the original validation origin and the4190 visual prototype. Its index hash
-and owned process/session are recorded in .artifacts/e2e/gizmo/preview.json.
+and owned process/session are recorded in .artifacts/e2e/workspace-completion/preview.json
+(previous receipt: .artifacts/e2e/gizmo/preview.json).
 Existing resumption data stays at the original address; use an exported file here.
-The compact-gizmo source/test manifest, dedicated browser evidence and required
-final checks are under .artifacts/e2e/gizmo; consult todo for their actual status.
+The content-first workspace source/test manifest, dedicated browser evidence and
+required final checks are under .artifacts/e2e/workspace-completion; consult todo
+for their actual status. Earlier compact-gizmo evidence stays in its own folder.
 Documentation/staging/Push alone is not a reason to repeat runtime checks.
 
 PO prioritizes completing the accepted feature set before readiness-stage latency

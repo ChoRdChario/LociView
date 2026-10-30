@@ -56,7 +56,143 @@ unchanged-feature-classification checks pass; independent review has no findings
 No runtime change or new capacity guarantee; no runtime suite is needed for this
 documentation checkpoint.
 
-## Current boundary —compact orientation gizmo
+## Current boundary —content-first workspace completion
+
+PO2026-10-30 authorizes repairing the eight grouped review findings below.
+Outcome: choose a Scene/record → read/edit text and media → adjust a pin in3D →
+confirm/cancel → save/share/return, with relevant controls and coherent hierarchy.
+Root is sole writer; bounded port/contract/visual reviewers are read-only.
+Keep accepted gizmo, commands, data/history, separate drafts, IME/pointer guards,
+read-only authority and all write/recovery/choice fences. No dependency, schema,
+renderer, codec, capacity, ordinary activation or release change.
+
+Plan: record UI ports/layout acceptance → group information/disclosure and active
+task/file exits → align visual/copy/settings/comparison → focused behavior checks
+and actual wide/narrow/short browser workflows → serial required checkpoint and
+independent final review → verified g0-baseline checkpoint/Push. Stop only affected
+work for a genuine contract conflict or new authority. No per-control PO tests.
+Required acceptance: optional forms stay closed until invoked; title/body/media
+precede attributes;3D pin work exposes the same guarded confirm/cancel; unsupported
+material inputs are absent without hiding unresolved data; file purpose is retained
+with a clear path to cancel/exit; existing comparisons/manual placements remain;
+targets/focus/warnings and separate local/shared name scopes stay legible.
+
+Implemented within this boundary: idle Scene/model management disclosure; stable
+Caption title/body/media before secondary attributes; the same guarded pin controls
+on the3D surface with narrow focus/return; contextual material values/unsupported
+targets; larger media comparison defaults without replacing manual rectangles;
+purpose-carrying save/share and explicit pending-choice exits; quieter navigation,
+44px targets, compact header and separate local/shared name Settings. Success-only
+notices expire; persistent failures and disclosure remain. View/placement footers
+are at their panel end. A static notice row sits above the shared canvas/overlay
+origin. Mode switches retain existing verification and show busy text/spinner.
+No Session/storage/file/renderer authority or accepted gizmo behavior changes.
+
+Focused source/behavior checks pass, including inherited material canonical values,
+retained color/source-loss drafts, file choice/reset and held mode-switch fences.
+Independent bounded source/input/contract and rendered wide reviews have no
+remaining required findings. Final dedicated Chromium3 connected cases PASS127.8s:
+view hides edit controls while retaining reading/local display/downloads; full
+browser close/server stop → cold offline resume; new Scene/Caption/media/Point and
+Mesh-material editing → backup/workspace download → isolated second browser
+edits/returns a contribution → receive → narrow read/pin IME/cancel → reload.
+Narrow pin confirm/cancel are fully in view; media ordering/comparison, contextual
+file reset/exit, name-IME and busy mode transitions are asserted. No page errors
+or external requests. Evidence: final-fixed-browser and result.json in
+.artifacts/e2e/workspace-completion. This is dedicated Chromium evidence, not
+physical device, OS-native IME, general adoption or release acceptance.
+Independent final wide/narrow rendered review has no remaining required findings.
+Final required serial checkpoint PASS: typecheck;140 root files/3110 tests PASS,
+21 existing TODOs; all five builds; offline isolation14 exact SRI resources.
+HEIC isolation across all five artifacts PASS. The offline build intentionally
+mints a fresh build ID; final generated artifact cold browser-close/server-stop
+offline startup PASS11.3s after those builds (final-artifact-cold-result.json).
+Final source/test hashes in .artifacts/e2e/workspace-completion/tested-source.json
+match the reviewed and checked tree. Final log: checkpoint.log; no subsequent
+source/test change. This is a verified g0-baseline checkpoint; Git records commit
+identity and remote status. No adoption, physical-device or release credit.
+
+Retained diagnosis: the earlier full run passed139 files/3086 tests but found24
+projectFiles failures from a new comparison reading group named `本文` preceding
+the textarea in generic recorded-DOM lookup. Renamed it `比較ウィンドウの本文`,
+retaining focus/scroll and all old assertions/helpers; added a connected identity
+regression. Affected and related file cases PASS41 in193.3s, then the final browser
+and full checkpoint above PASS. Retain checkpoint-body-label-collision-failures.log.
+Retain earlier browser attempts and UI fixture-index failures in that folder:
+numeric owner selection needs focus; hidden retained notes are not visible copy;
+unselected color state incorrectly opened attributes (fixed); post-receive mode
+verification was observed complete at5048ms, just beyond a new test's5s assertion (diagnostic,
+not a performance pass). The new connected test waits for actual mode completion
+within its existing15s page-action budget and checks immediate busy/disabled state;
+no existing test assertion, timeout or safe publication fence is relaxed. All
+browser fixtures are synthetic and local; no private source files are committed.
+The first full checkpoint was stopped before completion after independent static
+review found two additional old DOM scopes in projectFiles tests. Focused runs
+reproduced both failures; corrected view-footer scope and explicit stage/shared
+overlay-parent assertions PASS2/2. The original command/source guards, captured
+values, stale-token and retry-count assertions remain. Retain the stopped log and
+retained-dom-scope-failures.log; the final full check uses the updated test manifest.
+
+Next connected unit: verify representative model replacement/pin correction and
+collaboration conflict/interrupted receive through this navigation, using dedicated
+browser contexts and owned test origins. Keep existing strict data/history/recovery
+assertions and cancellation paths. Then consolidate remaining grouped device/user
+acceptance on one integrated candidate. Large-Caption qualification remains deferred;
+no new product policy, compatibility expansion, general adoption or release follows.
+
+## Previous boundary —review likely next UI direction (repair authorized)
+
+PO accepts the compact gizmo and requests a fresh review against previous orders.
+Read-only product scope: inspect the current PC candidate and representative task
+states for content priority, cognitive/operation flow, progressive disclosure,
+short accurate copy, view-mode relevance and coherent polish. Group concrete
+findings and proposed repair order before implementation. Root inspects current
+screens; bounded independent reviewers read code/evidence. Record observed versus
+code-only concerns; do not repeat historical issues as current without checking.
+No product-code change, dependency, policy, release or external write authorized
+by this review. Dedicated isolated browser fixtures only; no per-control PO tests.
+
+Plan: current criteria/screens → targeted real-screen inspection of missing states
+→ consolidate reviewer findings and priorities → report remaining decisions and
+next engineering unit. Stop for a genuine scope/authority conflict only.
+
+Review outcome: current HEAD7352e2a, dedicated Chromium/isolated synthetic Project,
+17 captured states with no page errors in .artifacts/e2e/direction-review/stable
+(final capture14.4s; mode transitions explicitly awaited).
+Three bounded independent read-only reviews converged with current screenshots
+and targeted code. This is layout/flow evidence, not a new feature/acceptance pass.
+The two initial capture attempts stopped on existing draft/choice cancellation
+guards; the final script follows the actual confirmation/cancel routes. Retain
+those attempts as inspection evidence rather than claiming product regressions.
+
+Grouped findings before any repair:
+- High: Scene creation form remains visible with management collapsed; model
+  membership/management also consumes the everyday selection area.
+- High: Caption pin HEX/attributes and utilities precede attachments; content
+  should follow title→body→media before secondary metadata.
+- High: narrow pin adjustment hides confirm/cancel/instructions in the other
+  pane while the3D gesture is active; editing actions need coherent placement.
+- High: view material speaks about editing/applying, and an unsupported Point
+  material view/draft exposes repeated development-worded unavailable fields.
+- Medium: comparison's default280×200 makes images a clipped strip after text.
+- Medium: save/share repeats purpose selection; pending choices make the close
+  and cancellation relationship difficult to see at one location.
+- Medium: large framed navigation/disabled controls, full-width colour input,
+  native file input and stacked model checkboxes obscure hierarchy. Narrow edit
+  header and local task navigation still spend substantial space above content.
+- Medium: Settings mixes local display name and shared editor-name controls with
+  awkward inline wrapping; group the distinct scopes and align labels/fields.
+Success-feedback lifetime/overlap and some model/view footer conditions remain
+code-led follow-up checks, not newly browser-proven defects.
+
+Product source/tests and accepted gizmo are unchanged. Only this review record is
+updated; no commit/Push or new implementation follows from the read-only request.
+Next proposed connected repair groups: information order/disclosure → active-task
+completion and file exit routes → shared visual/copy/layout consistency. Preserve
+44px targets, keyboard focus, all features and existing draft/write/recovery rules;
+do not answer the density problem by adding more menus or shrinking all text.
+
+## Previous boundary —compact orientation gizmo (accepted)
 
 PO2026-10-30 requests Blender/Unity-style camera orientation: remove face-name
 text, status text and enclosing frame. Outcome: transparent RGB XYZ axes with

@@ -29,6 +29,8 @@ export function createCaptionDetailControls(document: Document, onEvent: (event:
   let props: CaptionDetailProps | undefined, disposed = false, cancelFor: CaptionDraft | null = null;
   const listen = (node: HTMLElement, name: string, handler: () => void) => { node.addEventListener(name, handler); cleanups.push(() => node.removeEventListener(name, handler)); };
   root.append(status, impact);
+  const mediaSlot = make('div'); mediaSlot.className = 'lv-caption-media-slot';
+  const properties = make('details'); properties.className = 'lv-caption-properties'; properties.append(make('summary', '属性'));
   const editors = make('details'), editorRows = make('ul'); editors.append(make('summary', '編集者情報'), editorRows);
   for (const field of ['title', 'body', 'color'] as const) {
     const group = make('div'), label = make('label', captionFieldLabels[field]);
@@ -41,7 +43,8 @@ export function createCaptionDetailControls(document: Document, onEvent: (event:
     const reading = make('div'), value = make('p'); reading.className = 'lv-caption-value';
     reading.setAttribute('data-caption-field', field); reading.append(make('span', captionFieldLabels[field]), value);
     editOnly(label, review); viewOnly(reading);
-    label.append(input); group.append(label, note, review, reading); root.append(group);
+    label.append(input); group.append(label, note, review, reading);
+    if (field === 'color') { root.append(mediaSlot, properties); properties.append(group); } else root.append(group);
     fields.set(field, { input, note, review, value });
     let bodyRange: TextareaEditRange | undefined;
     const beforeInput = (event: Event) => {
@@ -74,23 +77,24 @@ export function createCaptionDetailControls(document: Document, onEvent: (event:
     });
   }
   const picker = make('input'); picker.type = 'color'; picker.setAttribute('aria-label', '色を選択');
-  root.append(picker);
+  properties.append(picker);
   listen(picker, 'input', () => {
     if (props?.draft && !picker.disabled) onEvent({ kind: 'draft', baseDraft: props.draft,
       draft: editCaptionDraft(props.draft, props.source, 'color', picker.value) });
   });
   const actions = make('div'); actions.className = 'lv-caption-detail-actions';
+  actions.setAttribute('data-caption-completion', '');
   const apply = button('変更を適用'), cancel = button('取り消す'), showWindow = button('比較に表示');
   const windowActions = make('div'); windowActions.className = 'lv-caption-detail-actions';
   windowActions.setAttribute('aria-label', 'キャプションの表示');
-  actions.append(apply, cancel); windowActions.append(showWindow); root.append(actions, windowActions);
+  actions.append(apply, cancel); windowActions.append(showWindow); root.append(windowActions, properties, actions);
   const windowNote = make('p'); windowNote.id = `lv-caption-windows-${++nextDetail}`;
   showWindow.setAttribute('aria-describedby', windowNote.id);
   const confirmation = make('div'); confirmation.hidden = true;
   editOnly(actions, picker, confirmation);
   const confirm = button('変更を取り消す'), keep = button('編集を続ける');
   confirmation.append(make('p', '入力中の変更を取り消しますか？'), confirm, keep); root.append(confirmation);
-  root.append(windowNote);
+  windowActions.append(windowNote);
   listen(apply, 'click', () => {
     if (!props || apply.disabled) return;
     const plan = planCaptionApply(props);
@@ -110,7 +114,7 @@ export function createCaptionDetailControls(document: Document, onEvent: (event:
       sceneId: props.source.sceneId, token: props.source.token, action });
   };
   listen(showWindow, 'click', () => windowEvent('open'));
-  root.append(editors);
+  properties.append(editors);
 
   function render(next: CaptionDetailProps): boolean {
     if (disposed) return false;
@@ -140,6 +144,7 @@ export function createCaptionDetailControls(document: Document, onEvent: (event:
         if (!same) control.input.value = text;
       }
       const issue = captionDraftFieldIssue(next, field);
+      if (field === 'color' && (source.kind === 'ready' && issue || raw !== undefined || owned?.composing === 'color')) properties.open = true;
       // Validation errors stay editable; source conflicts/stale baselines stay explicit.
       const unavailable = current?.kind !== 'value';
       control.input.readOnly = owned?.composing !== field && (!owned || unavailable || next.mutationBlock !== null || inFlight || !!next.readonlyFields?.includes(field));
@@ -169,5 +174,5 @@ export function createCaptionDetailControls(document: Document, onEvent: (event:
     return true;
   }
   function dispose(): void { disposed = true; for (const cleanup of cleanups) cleanup(); root.remove(); }
-  return { root, actions, confirmation, windowActions, focusBody: () => fields.get('body')!.input.focus?.({preventScroll:false}), render, dispose };
+  return { root, mediaSlot, actions, confirmation, windowActions, focusBody: () => fields.get('body')!.input.focus?.({preventScroll:false}), render, dispose };
 }

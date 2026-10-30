@@ -74,7 +74,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     finally { if (!disposed && epoch === storageEpoch) { storageChecking = false; storageCheck.disabled = false; } }
   }
   const identity = make('div'); identity.className = 'lv-project-identity'; identity.append(projectTitle, resumeStatus, fileStatus);
-  header.append(identity, headerActions, help);
+  const headerTools = make('div'); headerTools.className = 'lv-header-tools'; headerTools.append(headerActions, help); header.append(identity, headerTools);
   const resumeNotice = make('p'); resumeNotice.setAttribute('role', 'status');
   const otherProject = button('別のプロジェクトを開く', () => {
     if (!disposed && !busy && !dirty() && !ports.otherPending() && !ports.projectNavigationBlocked?.()) ports.openProject?.();
@@ -92,7 +92,8 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   stage.className = 'lv-project-stage'; canvas.setAttribute('aria-label', '3Dモデルの表示'); canvas.tabIndex = 0;
   const viewportStatus = make('p'); viewportStatus.setAttribute('role', 'status'); viewportStatus.className = 'lv-project-viewport-status';
   const retryViewport = button('3D表示を再試行', () => viewAction(() => viewport.retry()));
-  markers.className = 'lv-project-markers'; stage.append(canvas, markers);
+  const stageDisplay = make('div'); stageDisplay.className = 'lv-stage-display';
+  markers.className = 'lv-project-markers'; stageDisplay.append(canvas, markers);
   const viewportTools = make('section'); viewportTools.className = 'lv-project-viewport-tools'; viewportTools.setAttribute('aria-label', '3D表示の操作');
   viewportTools.append(viewportStatus, retryViewport);
   const mediaViewer = createMediaViewer(document);
@@ -119,10 +120,11 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   const createScene = button('シーンを追加', () => {}); createScene.type = 'submit';
   const sceneNote = make('p'), sceneStatus = make('p'), sceneManagement = make('details'), sceneActions = make('div');
   sceneManagement.setAttribute('aria-label', 'シーンの管理'); sceneStatus.setAttribute('role', 'status');
+  const newScene = button('シーンを作る', () => beginSceneChange('create'));
   const renameScene = button('名前を変更', () => beginSceneChange('rename')), defaultScene = button('開始シーンにする', () => beginSceneChange('default'));
   const cancelScene = button('取り消す', () => { if (!busy && !pending && ports.status().kind === 'idle' && !ports.otherPending() && !sceneEdit?.composing) { clearSceneEdit(); render(); } });
-  sceneActions.append(renameScene, defaultScene); sceneManagement.append(make('summary', 'シーンを管理'), sceneActions);
-  sceneForm.append(sceneLabel, sceneNote, createScene, cancelScene); sceneArea.append(sceneStatus, sceneManagement, sceneForm);
+  sceneActions.append(newScene, renameScene, defaultScene); sceneManagement.append(make('summary', 'シーンを管理'), sceneStatus, sceneActions);
+  sceneForm.append(sceneLabel, sceneNote, createScene, cancelScene); sceneArea.append(sceneManagement, sceneForm);
   const pinArea = make('section'), pinStatus = make('p'), coords = make('div'); pinStatus.setAttribute('role', 'status');
   pinArea.setAttribute('aria-label', 'ピンの操作');
   const addPin = button('ピンを追加', () => { if (guardInput()) { pinAction = { kind: 'add', token: provider().token, sceneId, captionId: null, assetId: models?.selectedSurface() ?? undefined, color: addColorValue() }; choosing = true; placingCaption = null; render(); } });
@@ -200,12 +202,16 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     void run(command, () => {
       const captionId = command.kind === 'addPin' ? command.captionId : captured.captionId!;
       clearPin(); selectCaption(captionId); feedback = 'ピンの位置を確定しました。';
+      queueMicrotask(() => { if (!disposed) detailHeading.focus?.({ preventScroll: true }); });
     });
   });
-  const cancelPin = button('取り消す', () => { if (!busy && !pending && ports.status().kind === 'idle' && !ports.otherPending() && !composingInput()) { clearPin(); render(); } });
+  const cancelPin = button('取り消す', () => { if (!busy && !pending && ports.status().kind === 'idle' && !ports.otherPending() && !composingInput()) { clearPin(); render(); (memory().selectedCaptionId ? movePin : addPin).focus?.({preventScroll:true}); } });
   const repick = button('面で位置を指定', () => { if (pin && !mutationBlock() && !composingInput() && pinCurrent()) { gesture = null; choosing = true; placingCaption = pin.captionId; render(); } });
-  const addSurface=button('位置指定用の面を追加',()=>{if(!busy&&!pending){choosing=false;pinAction=null;placingCaption=null;task='models';render();}});
-  pinArea.append(addSurface,addColorLabel, addPin, numericAdd, movePin, parent, pinStatus, coords, repick, finishPin, cancelPin);
+  const addSurface=button('位置指定用の面を追加',()=>{if(!busy&&!pending){clearPin();task='models';render();const panel=panels.get('models')!.root;panel.tabIndex=-1;panel.focus?.({preventScroll:true});}});
+  const pinAddRow = make('div'); pinAddRow.className = 'lv-pin-add-row'; pinAddRow.append(addPin, addColorLabel);
+  pinArea.append(pinAddRow, numericAdd, movePin, parent);
+  const pinTask = make('section'), pinTaskActions = make('div'); pinTask.className = 'lv-pin-task'; pinTask.setAttribute('aria-label', '位置の調整');
+  pinTaskActions.className = 'lv-pin-task-actions'; pinTaskActions.append(repick, finishPin, cancelPin); pinTask.append(pinStatus, coords, addSurface, pinTaskActions);
   const deletionArea = make('section'), deletionBox = make('section'), deletionTitle = make('p'), deletionEffects = make('ul'), deletionNote = make('p'), referenceIssues = make('section');
   deletionArea.setAttribute('aria-label', 'キャプションの削除'); deletionBox.setAttribute('aria-label', '削除の確認'); deletionNote.setAttribute('role', 'status');
   referenceIssues.setAttribute('aria-label', '記録の状態');
@@ -230,7 +236,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   const cancelDelete = button('取り消す', () => { if (!busy && !pending && ports.status().kind === 'idle' && !ports.otherPending() && !composing) { deletion = null; render(); } });
   deletionBox.append(deletionTitle, deletionEffects, deletionNote, confirmDelete, cancelDelete); deletionArea.append(beginDelete, deletionBox, referenceIssues);
   const media = make('section'), mediaLabel = make('label', 'メディアを追加'), mediaInput = make('input');
-  media.setAttribute('aria-label', 'メディア'); mediaInput.type = 'file'; mediaInput.accept = 'image/png,image/jpeg,image/webp,image/gif,image/heic,image/heif,.heic,.heif,video/mp4,audio/mp4,audio/mpeg,.m4a,.mp3'; mediaInput.setAttribute('aria-label', 'メディアを追加'); mediaLabel.append(mediaInput);
+  media.setAttribute('aria-label', 'メディア'); mediaInput.type = 'file'; mediaInput.accept = 'image/png,image/jpeg,image/webp,image/gif,image/heic,image/heif,.heic,.heif,video/mp4,audio/mp4,audio/mpeg,.m4a,.mp3'; mediaInput.setAttribute('aria-label', 'メディアを追加'); mediaLabel.className = 'lv-media-add'; mediaLabel.append(mediaInput);
   const cancelMedia = button('選択を取り消す', cancelMediaSelection);
   const heicHelp = make('p', 'HEICは、このブラウザで読み込める場合に追加できます。原本と表示用PNGを保存します。HDRなどの見え方が変わる場合があります。');
   heicHelp.hidden = true; mediaInput.addEventListener('change', () => { heicHelp.hidden = !/\.hei[cf]$/i.test(mediaInput.files?.[0]?.name ?? ''); });
@@ -358,12 +364,13 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     });
   });
   inclusion.root.setAttribute('aria-label', 'キャプションの追加・除外');
-  editOnly(sceneManagement, sceneForm, pinArea, mediaLabel, cancelMedia, heicHelp, beginDelete, deletionBox, retry, revise);
+  editOnly(sceneManagement, sceneForm, pinArea, pinTask, mediaLabel, cancelMedia, heicHelp, beginDelete, deletionBox, retry, revise);
   const organizeCaptions = make('details'); organizeCaptions.append(make('summary', 'キャプションを整理'), inclusion.root, deletionArea);
-  detail.root.append(media, detail.actions, detail.confirmation);
+  detail.mediaSlot.append(media); detail.root.append(detail.actions, detail.confirmation);
   detailPane.append(captionNavigation, detailHeading, detail.root);
   captionPanel.append(sceneArea, list.root, openDetail, detailPane, pinArea, organizeCaptions, conflicts); sidebar.append(sceneContext, taskTabs, retainedEdit, captionPanel);
-  stage.append(viewportTools); body.append(stage, sidebar); root.append(header, compactNavigation, body, mediaViewer.root);
+  stageDisplay.append(pinTask); stage.append(viewportTools, stageDisplay); body.append(stage, sidebar); root.append(header, compactNavigation, body, mediaViewer.root);
+  let feedbackTimer: number | undefined;
   let mounted = false, observationFrame:number|null=null, observationEpoch=0;
   function cancelObservation(){
     const frame=observationFrame;observationFrame=null;observationEpoch++;
@@ -417,7 +424,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     scene(next) { sceneId = next; draft = null; }, caption: selectCaption, changed: render, message(text) { feedback = text; render(); },
   });
   sceneManagement.append(organization.sceneRoot); organizeCaptions.append(organization.captionRoot, organization.tagsRoot);
-  help.append(organization.displayNameBadge); header.append(organization.settingsRoot);
+  help.append(organization.displayNameBadge); headerTools.append(organization.settingsRoot);
   const wrapDisclosure=(disclosure:HTMLDetailsElement)=>{const panel=make('div');panel.className='lv-header-sheet';
     for(const child of Array.from(disclosure.children).slice(1))panel.append(child);disclosure.append(panel);return panel;};
   const helpSheet=wrapDisclosure(help),settingsSheet=wrapDisclosure(organization.settingsRoot);
@@ -467,7 +474,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     windowMoving = active; if (rendering) renderAgain = true; else render();
   }, captionId => mediaManager!.gallery(captionId));
   const compareTools = make('details'); compareTools.className = 'lv-comparison-actions'; compareTools.append(make('summary', '比較ウィンドウ'), windows.tools);
-  stage.append(windows.root, compareTools);
+  stageDisplay.append(windows.root, compareTools);
   models = createProjectModels(document, panelHost); panels.set('models', models);
   panels.set('views', createProjectViews(document, panelHost)); panels.set('materials', createProjectMaterials(document, panelHost));
   const tabButtons = new Map<ProjectTask, HTMLButtonElement>();
@@ -496,7 +503,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   function resetDraft() { draft = null; draft = beginCaptionDraft(detailContext().source); }
   function selectCaption(captionId: string) { memories.set(sceneId, { ...memory(), selectedCaptionId: captionId }); resetDraft(); openWindow(captionId); captionSurface = 'detail'; }
   function setPin(next: WorkspacePinProposal) { pin = next; numericTarget = null; choosing = false; rawPosition = next.position.map(String); }
-  function clearPin() { gesture = null; gestureGeneration++; pin = null; numericTarget = null; pinAction = null; choosing = false; placingCaption = null; rawPosition = ['', '', '']; }
+  function clearPin() { compactSurface = 'panel'; gesture = null; gestureGeneration++; pin = null; numericTarget = null; pinAction = null; choosing = false; placingCaption = null; rawPosition = ['', '', '']; }
   function pinCurrent() {
     if (!pinAction || pinAction.token !== provider().token || pinAction.sceneId !== sceneId || pinAction.captionId && pinAction.captionId !== memory().selectedCaptionId) return false;
     if (pinAction.captionId) { const caption = provider().resources.captions[pinAction.captionId];
@@ -551,8 +558,10 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   }
   function positionValid() { return rawPosition.every(v => /^[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?$/i.test(v.trim()) && Number.isFinite(Number(v))); }
   async function perform(action: () => Promise<unknown>, complete: () => void, owner?: 'media') {
-    busy = true; feedback = '変更を適用しています。'; pending = { action, complete, owner };
-    try { render(); await action(); if (!disposed) { complete(); pending = null; } }
+    document.defaultView?.clearTimeout(feedbackTimer); busy = true; feedback = '変更を適用しています。'; pending = { action, complete, owner };
+    try { render(); await action(); if (!disposed) { complete(); pending = null; const completed = feedback;
+      feedbackTimer = document.defaultView?.setTimeout(() => { if (!disposed && !busy && !pending && ports.status().kind === 'idle' && feedback === completed) { feedback = ''; render(); } }, 6000);
+    } }
     catch (error) { if (!disposed) feedback = error instanceof Error ? error.message : '変更を適用できません。入力を保持しています。'; }
     finally { busy = false; if (!disposed) render(); }
   }
@@ -571,17 +580,18 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     return mutationBlock() || (hasCaptionDraft(draft) || draft?.composing || panelInput() || mediaManager?.hasChanges() || composing || includeMemory().composing || pin || !!numericTarget || choosing || deletion || pickerScope || recovery?.hasChanges() || viewport.read().dragging ? '現在の入力・操作を完了してください。' : null);
   }
   function clearSceneEdit() { sceneEdit = null; sceneInputScope = null; sceneName.value = ''; }
-  function beginSceneChange(kind: 'rename' | 'default') {
+  function beginSceneChange(kind: 'create' | 'rename' | 'default') {
     if (!guardInput()) return;
     const p = provider(), scene = p.state.scenes[sceneId];
     if (!scene || fieldValue(scene.lifecycle)?.state !== 'active' || kind === 'rename' && scene.name.kind !== 'value' || kind === 'default' && p.state.defaultSceneId.kind !== 'value') return;
-    sceneEdit = { kind, token: p.token, sceneId, name: fieldValue(scene.name) ?? '', composing: false };
-    sceneInputScope = { token: p.token, sceneId }; render(); if (kind === 'rename') sceneName.focus();
+    sceneEdit = { kind, token: p.token, sceneId, name: kind === 'create' ? '' : fieldValue(scene.name) ?? '', composing: false };
+    sceneInputScope = { token: p.token, sceneId }; sceneManagement.open = true; render(); if (kind !== 'default') sceneName.focus();
   }
   const captureSceneInput = () => { if (!sceneEdit) sceneInputScope = { token: provider().token, sceneId }; };
   sceneName.addEventListener('focus', captureSceneInput); sceneName.addEventListener('pointerdown', captureSceneInput);
   function editSceneName(active = sceneEdit?.composing ?? false) {
-    const settling = !!sceneEdit?.composing && !active;
+    if (!sceneEdit) return;
+    const settling = !!sceneEdit.composing && !active;
     if ((sceneBlock() || sceneEdit?.kind === 'default') && !settling) return;
     sceneEdit = { ...(sceneEdit ?? { kind: 'create', ...(sceneInputScope ?? { token: provider().token, sceneId }) }), name: sceneName.value, composing: active };
     render();
@@ -677,7 +687,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     });
   }, true);
   const cameraGizmo = createCameraGizmo(document, axis => viewAction(() => viewport.camera(axis)), () => viewAction(() => viewport.camera('fit')));
-  stage.append(cameraGizmo.root);
+  stageDisplay.append(cameraGizmo.root);
   const viewBlocked = () => busy || !!pending || windowMoving || ports.otherPending() || composingInput() || viewport.read().dragging;
   function viewAction(action: () => void) {
     if (viewBlocked()) return;
@@ -722,6 +732,14 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       addPin.disabled = !!blocked || dirty() || !sceneId;
       movePin.disabled = !!blocked || dirty() || !selected;
       movePin.textContent = selected && fieldValue(p.resources.captions[selected]?.anchor)?.kind === 'unplaced' ? 'ピンを配置' : '位置を調整';
+      const pinActive = !!pinAction || !!pin || !!numericTarget || choosing;
+      if (pinTask.hidden && pinActive) {
+        compactSurface = 'stage'; const opening = pinAction;
+        queueMicrotask(() => { if (!disposed && pinAction === opening && !pinTask.hidden && document.defaultView?.matchMedia?.('(max-width:760px)').matches) {
+          const target = !coords.hidden && !coordinateInputs[0]!.disabled ? coordinateInputs[0]! : pinTask; target.tabIndex = target === pinTask ? -1 : 0; target.focus?.({preventScroll:true});
+        } });
+      }
+      pinTask.hidden = !pinActive;
       coords.hidden = !pin && !numericTarget; finishPin.hidden = !pin && !numericTarget; cancelPin.hidden = !pin && !numericTarget && !choosing;
       finishPin.textContent = pinAction?.kind === 'reparent' ? '親モデルと位置を確定' : '位置を確定';
       finishPin.disabled = !!blocked || composingInput() || choosing || viewport.read().dragging || !positionValid() || !pinCurrent(); cancelPin.disabled = busy || !!pending || ports.status().kind !== 'idle' || ports.otherPending() || composingInput();
@@ -734,7 +752,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       coordinateInputs.forEach((input, i) => { input.disabled = !!blocked || !pinCurrent(); if (!composing) input.value = rawPosition[i]!; });
       const scene = p.state.scenes[sceneId], start = fieldValue(p.state.defaultSceneId), staleScene = !!sceneEdit && (sceneEdit.token !== p.token || sceneEdit.sceneId !== sceneId);
       sceneName.disabled = !!sceneBlock(); if (!sceneEdit?.composing && sceneName.value !== (sceneEdit?.name ?? '')) sceneName.value = sceneEdit?.name ?? '';
-      sceneActions.hidden = !!sceneEdit; renameScene.disabled = !!blocked || dirty() || scene?.name.kind !== 'value';
+      sceneForm.hidden = !sceneEdit; sceneActions.hidden = !!sceneEdit; newScene.disabled = !!blocked || dirty(); renameScene.disabled = !!blocked || dirty() || scene?.name.kind !== 'value';
       defaultScene.disabled = !!blocked || dirty() || p.state.defaultSceneId.kind !== 'value' || start === sceneId;
       sceneLabel.hidden = sceneEdit?.kind === 'default';
       createScene.textContent = sceneEdit?.kind === 'rename' ? '名前を確定' : sceneEdit?.kind === 'default' ? '開始シーンを設定' : 'シーンを追加';
@@ -791,7 +809,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
         if (projected.status === 'needsReview') {
           marker.setAttribute('aria-description', projected.notice ?? '要確認'); marker.title = `${marker.textContent}（${projected.notice ?? '要確認'}）`;
         }
-        marker.setAttribute('aria-pressed', String(projected.id === selected)); markers.append(marker);
+        marker.setAttribute('aria-pressed', String(projected.id === selected)); marker.style.zIndex = projected.id === selected ? '2' : '1'; markers.append(marker);
       }
       ports.changed();
     } finally { rendering = false; if (renderAgain) { renderAgain = false; render(); } }
@@ -799,5 +817,5 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   mounted = true; render();
   return { root, headerActions, utilityArea: settingsSheet, clearNotice(){if(!pending&&ports.status().kind==='idle')feedback='';}, dismissDisclosures(){help.open=false;organization!.settingsRoot.open=false;}, setExternalBusy: (active:boolean) => { body.inert=busy||active; }, render, session: interaction, activeScene: () => sceneId, inputPending: () => dirty() || busy,
     hasChanges: () => dirty() || busy || !!pending,
-    unmount() { if (disposed) return; disposed = true;document.defaultView?.removeEventListener('resize',positionHeaderSheets);cameraGizmo.dispose();stopHelp();cancelObservation();storageEpoch++; gesture = null; gestureGeneration++; pressedPointers.clear(); viewport.reservePointer(false); recovery?.dispose(); organization?.dispose(); windows.dispose(); mediaManager?.dispose(); mediaViewer.dispose(); viewport.dispose(); list.dispose(); inclusion.dispose(); detail.dispose(); for (const panel of panels.values()) panel.dispose(); root.remove(); } };
+    unmount() { if (disposed) return; disposed = true;document.defaultView?.clearTimeout(feedbackTimer);document.defaultView?.removeEventListener('resize',positionHeaderSheets);cameraGizmo.dispose();stopHelp();cancelObservation();storageEpoch++; gesture = null; gestureGeneration++; pressedPointers.clear(); viewport.reservePointer(false); recovery?.dispose(); organization?.dispose(); windows.dispose(); mediaManager?.dispose(); mediaViewer.dispose(); viewport.dispose(); list.dispose(); inclusion.dispose(); detail.dispose(); for (const panel of panels.values()) panel.dispose(); root.remove(); } };
 }

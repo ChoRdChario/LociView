@@ -1,4 +1,4 @@
-import { revealCaptionList } from './workspaceUi';
+import { beginSceneCreation, revealCaptionList } from './workspaceUi';
 import { test, expect, chromium, type BrowserContext, type Page, type TestInfo } from '@playwright/test';
 import { createHash } from 'node:crypto';
 import { mkdir, mkdtemp, readFile, readdir } from 'node:fs/promises';
@@ -105,7 +105,7 @@ test('二人の重複登録を両方残し、元と独立コピーを別々に�
       await a.getByRole('tab', { name: 'モデル', exact: true }).click(); await modelRows(a).first().click(); await modelPanel(a).getByRole('button', { name: '配置を調整', exact: true }).click();
       await modelPanel(a).getByLabel('モデル位置 X', { exact: true }).fill('0.75'); await modelPanel(a).getByLabel('モデル倍率', { exact: true }).fill('1.25');
       await modelPanel(a).getByRole('button', { name: '配置を確定', exact: true }).click(); await done(a, 'モデルの配置を確定しました。');
-      await a.getByRole('tab', { name: 'キャプション', exact: true }).click(); await a.getByLabel('シーン名', { exact: true }).fill(targetScene); await a.getByRole('button', { name: 'シーンを追加', exact: true }).click(); await done(a, 'シーンを追加しました。');
+      await a.getByRole('tab', { name: 'キャプション', exact: true }).click(); await beginSceneCreation(a); await a.getByLabel('シーン名', { exact: true }).fill(targetScene); await a.getByRole('button', { name: 'シーンを追加', exact: true }).click(); await done(a, 'シーンを追加しました。');
       await a.getByRole('tab', { name: 'モデル', exact: true }).click(); const check = modelPanel(a).getByRole('checkbox', { name: 'このシーンに表示', exact: true });
       await check.click(); await done(a, 'このシーンからモデルを外しました。'); await expect(check).not.toBeChecked(); await scene(a, firstScene);
       const initial = await download(a, info, 'W0-登録前の作業一式', 'teamWorkspace'); base = await WorkspaceArchive.inspect(await fileBlob(initial), validationMetadataLimits); seed = await records(base.source);

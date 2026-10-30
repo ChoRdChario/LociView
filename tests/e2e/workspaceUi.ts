@@ -8,6 +8,17 @@ export async function lookAlongFront(page: Page) {
   await expect(axis).toHaveAttribute('aria-pressed', 'true');
 }
 
+export async function revealModelManagement(page: Page) {
+  const details = page.locator('.lv-model-management');
+  if (!await details.evaluate(node => (node as HTMLDetailsElement).open)) await details.locator(':scope > summary').click();
+}
+
+export async function beginSceneCreation(page: Page) {
+  const details = page.locator('details[aria-label="シーンの管理"]');
+  if (!await details.evaluate(node => (node as HTMLDetailsElement).open)) await details.locator(':scope > summary').click();
+  await details.getByRole('button', { name: 'シーンを作る', exact: true }).click();
+}
+
 /** Navigate the visible product UI; never bypass draft/IME or file guards. */
 export async function revealCaptionList(page: Page) {
   const panel = page.getByRole('button', { name: '作業パネル', exact: true });

@@ -44,12 +44,12 @@ export function createProjectMaterials(document: Document, host: ProjectPanelHos
     const s=state(), selected=host.selectedModel?.(), source=context().source;
     if(host.selectedModel && !s.draft && !choices.size && !host.block('materials',false) && source.kind==='ready'){
       const eligible=source.models.filter(m=>!m.reason && m.surfaces.kind==='value');
-      const follow=selected && selected!==s.followedModel ? eligible.find(m=>m.assetId===selected) : !s.selection.assetId && eligible.length===1 ? eligible[0] : undefined;
+      const follow=selected && selected!==s.followedModel ? source.models.find(m=>m.assetId===selected) : !s.selection.assetId && eligible.length===1 ? eligible[0] : undefined;
       if(follow){const surfaces=follow.surfaces.kind==='value'?follow.surfaces.value:[];
         s.selection={assetId:follow.assetId,target:surfaces.length===1?surfaces[0]!.target:null,scope:s.selection.scope};}
       s.followedModel=selected;
     }
-    controls.render(context()); review.replaceChildren();
+    controls.render(context(), { viewing: host.ports.mode === 'view', readBlock: host.block('materials', false) }); review.replaceChildren();
     const { provider, sceneId } = host.source(), groups = host.ports.materials(sceneId).review;
     for (const group of groups) {
       const box = make('fieldset'), label = make('legend', group.label); box.append(label);

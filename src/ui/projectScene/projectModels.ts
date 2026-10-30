@@ -10,7 +10,7 @@ import { editOnly, viewChoices } from './modePresentation';
 
 export function createProjectModels(document: Document, host: ProjectPanelHost): ProjectModelPanel {
   const { make, button } = panelNodes(document), root = make('section'), fileArea = make('section'), placement = make('section'), review = make('section');
-  root.setAttribute('aria-label', 'モデルの作業'); fileArea.setAttribute('aria-label', 'モデルのファイル'); placement.setAttribute('aria-label', 'モデルの配置'); review.setAttribute('aria-label', 'モデルの更新候補');
+  root.setAttribute('aria-label', 'モデルの作業'); root.className = 'lv-model-task'; fileArea.setAttribute('aria-label', 'モデルのファイル'); placement.setAttribute('aria-label', 'モデルの配置'); review.setAttribute('aria-label', 'モデルの更新候補');
   const memories = new Map<string, ModelListMemory>();
   const preview = host.ports.createModelPreview?.();
   let edit: WorkspaceModelProposal | null = null, raw: string[] = [], composing = false, disposed = false;
@@ -145,7 +145,8 @@ export function createProjectModels(document: Document, host: ProjectPanelHost):
     });
   });
   const cancel = button('配置を取り消す', () => { if (!host.block('models', false) && !composing) { edit = null; host.changed(); } });
-  const impact = make('p'); impact.setAttribute('role', 'status'); placement.append(begin, impact, fields, modes, confirm, cancel);
+  const impact = make('p'); impact.setAttribute('role', 'status'); placement.append(begin, fields, modes);
+  const placementActions = make('section'); placementActions.className = 'lv-task-footer'; placementActions.setAttribute('aria-label', '配置の終了操作'); placementActions.append(impact, confirm, cancel);
   const alignment = make('details'); alignment.setAttribute('aria-label', '位置合わせ'); alignment.append(make('summary', '位置合わせ'));
   const pivotLabel = make('label', '回転・拡縮の基準'), pivotSelect = make('select'); pivotSelect.setAttribute('aria-label', '回転・拡縮の基準');
   for (const [value, label] of [['origin', 'モデルの原点'], ['centre', 'モデルの中心']]) { const option = make('option', label); option.value = value!; pivotSelect.append(option); } pivotLabel.append(pivotSelect);
@@ -216,10 +217,11 @@ export function createProjectModels(document: Document, host: ProjectPanelHost):
   const pointSizeArea = make('section'), pointSizeLabel = make('label', '点の大きさ（px）'), pointSizeInput = make('input');
   pointSizeInput.type = 'range'; pointSizeInput.min = '1'; pointSizeInput.max = '20'; pointSizeInput.step = '1'; pointSizeInput.setAttribute('aria-label', '点の大きさ（px）'); pointSizeLabel.append(pointSizeInput); pointSizeArea.append(pointSizeLabel);
   pointSizeInput.addEventListener('input', () => { const assetId = memory().assetId; if (assetId && !pointSizeInput.disabled) { host.viewport().setPointDiameter?.(assetId, Number(pointSizeInput.value)); host.changed(); } });
-  root.append(list.root, fileArea, proxyArea, placement, pinSizeArea, pointSizeArea, review, remove, deletionNote, deletionBox); if (preview) root.append(preview.root);
-  editOnly(fileArea, proxyArea, placement, pinSizeArea, pointSizeArea, remove, deletionBox);
+  const manage = make('details'); manage.className = 'lv-model-management'; manage.append(make('summary', 'モデルを管理'), fileArea, remove, deletionNote, deletionBox);
+  root.append(list.root, proxyArea, placement, pinSizeArea, pointSizeArea, manage, review, placementActions); if (preview) root.append(preview.root);
+  editOnly(manage, placementActions, fileArea, proxyArea, placement, pinSizeArea, pointSizeArea, remove, deletionBox);
   function render() {
-    if (disposed) return; list.render(context()); const block = host.block('models'), selected = memory().assetId, { provider, sceneId } = host.source();
+    if (disposed) return; placementActions.hidden = !edit; if (fileScope || deletion) manage.open = true; list.render(context()); const block = host.block('models'), selected = memory().assetId, { provider, sceneId } = host.source();
     const details = selected ? host.ports.modelDetails(sceneId, selected) : null;
     proxyArea.hidden=!details?.gsProxyTarget&&!proxyScope;
     proxyAdd.textContent=details?.gsProxyTarget?.expectedProxyId?'位置指定用の面を変更':'位置指定用の面を追加';

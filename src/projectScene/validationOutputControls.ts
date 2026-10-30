@@ -9,7 +9,7 @@ export function createValidationOutputControls(document: Document, host: ReturnT
     commands = document.createElement('div'), status = document.createElement('p'), list = document.createElement('div'), select = document.createElement('input');
   heading.textContent = 'ファイル'; root.setAttribute('aria-label', 'ファイル'); status.setAttribute('role', 'status');
   status.className = 'lv-operation-status';
-  root.className = 'lv-file-output'; actions.className = 'lv-file-intents';
+  root.className = 'lv-file-output'; actions.className = 'lv-file-intents'; commands.className = 'lv-file-commands';
   select.type = 'file'; select.setAttribute('aria-label', '保存先のファイルを選択'); select.hidden = true;
   const nameField = document.createElement('label'), nameInput = document.createElement('input');
   nameField.textContent = '名前（任意）'; nameInput.type = 'text'; nameInput.setAttribute('aria-label', '名前（任意）'); nameField.append(nameInput);
@@ -18,12 +18,15 @@ export function createValidationOutputControls(document: Document, host: ReturnT
   root.append(heading, actions, nameField, commands, status, list, history, select);
   editOnly(actions, nameField, commands, select);
   let busy = false, disposed = false, feedback = '', selected: string | null = null, cancellation: string | null = null;
+  let completedFeedback = false;
+  let presentation: 'all' | 'save' | 'share' = 'all';
   let purpose: 'teamWorkspace' | 'contribution' | 'backup' | 'clean' | 'review' = 'backup', baseId = '', choicePending = false, checkpointName = '', composing = false;
   let cleanPreview: Awaited<ReturnType<typeof host.workspaceOutput.previewClean>> | null = null;
   let reviewPreview: Awaited<ReturnType<typeof host.workspaceOutput.previewReview>> | null = null, sceneId = '', omitEntry = false;
-  const resetChoice = () => { purpose = 'backup'; baseId = ''; checkpointName = ''; choicePending = false; cleanPreview = null; reviewPreview = null; sceneId = ''; omitEntry = false; };
+  const resetChoice = () => { purpose = presentation === 'share' ? 'teamWorkspace' : 'backup'; baseId = ''; checkpointName = ''; choicePending = false; cleanPreview = null; reviewPreview = null; sceneId = ''; omitEntry = false; };
   const choosePurpose = (next: typeof purpose) => {
     if (purpose === next) return;
+    if (completedFeedback) { feedback = ''; completedFeedback = false; }
     purpose = next; baseId = ''; cleanPreview = null; reviewPreview = null; sceneId = ''; omitEntry = false; choicePending = true; render(); changed();
   };
   const urls: string[] = [];
@@ -43,14 +46,14 @@ export function createValidationOutputControls(document: Document, host: ReturnT
     workingMessage = 'ファイルを確認しています。') => {
     if (disposed || busy || composing || otherBusy()) return;
     const s = session();
-    if (writes && host.authority.readOnly) { feedback = '編集を開始してから実行してください。'; render(); return; }
+    if (writes && host.authority.readOnly) { completedFeedback = false; feedback = '編集を開始してから実行してください。'; render(); return; }
     if (s?.interactionPending || s && s.acknowledgment.state !== 'idle' || host.hasPending()) {
-      feedback = '入力・操作を確定するか、取り消してから実行してください。'; render(); return;
+      completedFeedback = false; feedback = '入力・操作を確定するか、取り消してから実行してください。'; render(); return;
     }
-    busy = true; feedback = workingMessage; render(); changed();
+    completedFeedback = false; busy = true; feedback = workingMessage; render(); changed();
     void (async () => {
-      try { await action(); if (!disposed) { feedback = message; if (consumeChoice) resetChoice(); completed?.(); } }
-      catch (error) { if (!disposed) feedback = error instanceof Error ? error.message : 'ファイル処理を完了できません。'; }
+      try { await action(); if (!disposed) { feedback = message; completedFeedback = true; if (consumeChoice) resetChoice(); completed?.(); } }
+      catch (error) { completedFeedback = false; if (!disposed) feedback = error instanceof Error ? error.message : 'ファイル処理を完了できません。'; }
       finally { busy = false; if (!disposed) { render(); changed(); } }
     })();
   };
@@ -80,7 +83,7 @@ export function createValidationOutputControls(document: Document, host: ReturnT
       needsDisclosure = true; history.open = true; return;
     }
     await handoff(id);
-  }, handoffMessage, true, false, () => { if (needsDisclosure) feedback = '作成したファイルの内容を確認し、ダウンロードしてください。'; }, 'ファイルを作成しています。'); };
+  }, handoffMessage, true, false, () => { if (needsDisclosure) { feedback = '作成したファイルの内容を確認し、ダウンロードしてください。'; completedFeedback = false; } }, 'ファイルを作成しています。'); };
   const handoff = async (id: string) => {
     feedback = 'ダウンロードを準備しています。'; render();
     try { await download(id); }
@@ -89,6 +92,8 @@ export function createValidationOutputControls(document: Document, host: ReturnT
   const render = () => {
     displayMode(root, host.mode?.current ?? (host.authority.readOnly ? 'view' : 'edit'));
     if (disposed) return; actions.replaceChildren(); commands.replaceChildren(); list.replaceChildren(); completedFiles.replaceChildren();
+    root.dataset.presentation = presentation; heading.textContent = presentation === 'save' ? '保存' : presentation === 'share' ? '共有' : 'ファイル';
+    if (presentation === 'all') {
     const save = button(actions, '保存', () => choosePurpose('backup'));
     save.setAttribute('aria-pressed', String(purpose === 'backup'));
     const send = button(actions, '相手に渡す', () => choosePurpose('teamWorkspace'));
@@ -97,19 +102,20 @@ export function createValidationOutputControls(document: Document, host: ReturnT
     more.open = purpose === 'clean' || purpose === 'review'; actions.append(more);
     button(more, 'シーンを共有', () => choosePurpose('review')).setAttribute('aria-pressed', String(purpose === 'review'));
     button(more, '独立コピーを作る', () => choosePurpose('clean')).setAttribute('aria-pressed', String(purpose === 'clean'));
+    }
     const label = document.createElement('label'), kind = document.createElement('select'); label.textContent = '渡す内容';
     kind.setAttribute('aria-label', '渡す内容');
-    for (const [value, text] of [['teamWorkspace', '作業一式'], ['contribution', '変更分']]) {
+    for (const [value, text] of (presentation === 'share' ? [['teamWorkspace', '作業一式'], ['contribution', '変更分'], ['review', 'シーン（閲覧用）'], ['clean', '独立コピー']] : [['teamWorkspace', '作業一式'], ['contribution', '変更分']])) {
       const option = document.createElement('option'); option.value = value!; option.textContent = text!; kind.append(option);
     }
     kind.value = purpose; kind.disabled = busy || composing || otherBusy() || !!host.authority.readOnly; label.append(kind);
-    if (purpose === 'teamWorkspace' || purpose === 'contribution') actions.append(label);
+    if (presentation === 'share' || purpose === 'teamWorkspace' || purpose === 'contribution') actions.append(label);
     nameField.hidden = purpose !== 'backup'; nameInput.disabled = busy || otherBusy() || !!host.authority.readOnly;
     if(purpose==='backup'){const scope=document.createElement('p');scope.textContent='モデル・メディアと履歴を含む作業全体を、バックアップに書き出します。';actions.append(scope);}
     if (!composing && nameInput.value !== checkpointName) nameInput.value = checkpointName;
     kind.addEventListener('change', () => {
-      if (kind.disabled || !['teamWorkspace', 'contribution'].includes(kind.value)) return;
-      choosePurpose(kind.value as 'teamWorkspace' | 'contribution');
+      if (kind.disabled || !(presentation === 'share' ? ['teamWorkspace', 'contribution', 'review', 'clean'] : ['teamWorkspace', 'contribution']).includes(kind.value)) return;
+      choosePurpose(kind.value as typeof purpose);
     });
     const chosen = host.workspaceOutput.bases.find(b => b.selection.workspacePackageId === baseId);
     const disclosure = privacyNotice(currentDisclosure());
@@ -233,6 +239,7 @@ export function createValidationOutputControls(document: Document, host: ReturnT
   nameInput.addEventListener('input', () => { if (!nameInput.disabled) { checkpointName = nameInput.value; choicePending = true; changed(); } });
   nameInput.addEventListener('compositionstart', () => { composing = true; choicePending = true; changed(); });
   nameInput.addEventListener('compositionend', () => { checkpointName = nameInput.value; composing = false; choicePending = true; changed(); });
-  render(); return { root, render, choosePurpose, busy: () => busy, hasChanges: () => busy || composing || choicePending || !!selected || !!cancellation,
+  render(); return { root, render, choosePurpose, setPresentation(value: typeof presentation) { presentation = value; if (completedFeedback) { feedback = ''; completedFeedback = false; } },
+    closeReason: () => busy ? 'ファイルを処理中です。完了をお待ちください。' : composing ? '名前の入力を確定してください。' : selected ? '照合するファイルを選ぶか、「ファイル確認を取り消す」を選択してください。' : cancellation ? '取りやめの確認を完了するか、「戻る」を選択してください。' : choicePending ? '選択が未完了です。下の「選択を取り消す」で戻れます。' : null, busy: () => busy, hasChanges: () => busy || composing || choicePending || !!selected || !!cancellation,
     dispose: () => { disposed = true; for (const url of urls) URL.revokeObjectURL(url); root.remove(); } };
 }
