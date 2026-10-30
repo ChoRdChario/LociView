@@ -1,4 +1,4 @@
-import { revealCaptionList } from './workspaceUi';
+import { lookAlongFront, revealCaptionList } from './workspaceUi';
 import {test,expect,chromium,type Page,type TestInfo,type BrowserContext} from '@playwright/test';
 import {mkdir,mkdtemp} from 'node:fs/promises';
 import {openAsBlob} from 'node:fs';
@@ -40,7 +40,7 @@ test('元の両面・照明なし・切り抜きを編集解除しGPU選択と5�
   const launch=async(index:number)=>{const context=await chromium.launchPersistentContext(profiles[index]!,{channel:'chromium',headless:true,viewport:{width:1440,height:1000},deviceScaleFactor:1,serviceWorkers:'block',acceptDownloads:true});contexts.add(context);await context.route('**/*',r=>{const u=new URL(r.request().url());return u.origin==='http://127.0.0.1:4182'||['data:','blob:'].includes(u.protocol)?r.continue():r.abort('blockedbyclient');});const p=context.pages()[0]??await context.newPage();p.on('pageerror',e=>errors.push(e.message));p.on('console',m=>{if(m.type()==='error')errors.push(m.text());});await p.goto(entry);return{context,p};};
   const close=async(c:BrowserContext)=>{await c.close();contexts.delete(c);};
   try{
-    let a=await launch(0),p=a.p;await p.getByLabel('ファイルを選択',{exact:true}).setInputFiles({name:'元の材質.glb',mimeType:'model/gltf-binary',buffer:sourceMaterialPanelsGlb()});await p.getByRole('button',{name:'ファイルを開く',exact:true}).click();await p.getByRole('textbox',{name:'プロジェクト名',exact:true}).fill(title);await p.getByRole('button',{name:'プロジェクトを作成',exact:true}).click();await ready(p);await p.getByRole('button',{name:'正面',exact:true}).click();mark('created');
+    let a=await launch(0),p=a.p;await p.getByLabel('ファイルを選択',{exact:true}).setInputFiles({name:'元の材質.glb',mimeType:'model/gltf-binary',buffer:sourceMaterialPanelsGlb()});await p.getByRole('button',{name:'ファイルを開く',exact:true}).click();await p.getByRole('textbox',{name:'プロジェクト名',exact:true}).fill(title);await p.getByRole('button',{name:'プロジェクトを作成',exact:true}).click();await ready(p);await lookAlongFront(p);mark('created');
     const canvas=p.getByLabel('3Dモデルの表示',{exact:true});
     const at=async(x:number,y=0,z=0)=>{const box=await canvas.boundingBox();if(!box)throw Error('canvas');const pose=fittedPose({min:[-4,-1,0],max:[4,1,0]},defaultPose(),box.width/box.height,'+z');if(pose.projection.kind!=='perspective')throw Error('camera');const camera=new THREE.PerspectiveCamera(pose.projection.verticalFov*180/Math.PI,box.width/box.height,.000001,1e9);camera.position.set(...pose.position);camera.up.set(...pose.up);camera.lookAt(new THREE.Vector3(...pose.target));camera.updateMatrixWorld(true);const ndc=new THREE.Vector3(x,y,z).project(camera);return{x:(ndc.x+1)*box.width/2,y:(1-ndc.y)*box.height/2,dx:ndc.x*box.width/2,dy:-ndc.y*box.height/2};};
     const sample=async(x:number)=>{const point=await at(x);return(await presentedCanvas(canvas,point.dx,point.dy)).sample;};

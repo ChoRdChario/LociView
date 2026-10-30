@@ -1,4 +1,4 @@
-import { revealCaptionList } from './workspaceUi';
+import { lookAlongFront, revealCaptionList } from './workspaceUi';
 import { test, expect, chromium, type BrowserContext, type Page, type TestInfo } from '@playwright/test';
 import { createHash } from 'node:crypto';
 import { mkdir, mkdtemp, readFile, readdir } from 'node:fs/promises';
@@ -317,7 +317,7 @@ test('差し替えと受信の中断を元のファイルから復旧し、手�
       await expect(pinArea(b).getByRole('button', { name: '位置を確定', exact: true })).toBeHidden();
       await expect(pinArea(b)).toContainText('モデルの面を選択'); await pinArea(b).getByRole('button', { name: '取り消す', exact: true }).click();
       await expect(marker(b)).toHaveAttribute('data-review', 'true');
-      await b.getByRole('button', { name: '正面', exact: true }).click(); await b.getByRole('button', { name: '全体表示', exact: true }).click();
+      await lookAlongFront(b); await b.getByRole('button', { name: '全体表示', exact: true }).click();
       await pinArea(b).getByRole('button', { name: '位置を調整', exact: true }).click();
       const canvas = b.getByLabel('3Dモデルの表示', { exact: true }), box = await canvas.boundingBox(); expect(box).toBeTruthy();
       await canvas.click({ position: { x: box!.width / 2, y: box!.height / 2 } });

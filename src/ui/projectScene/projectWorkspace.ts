@@ -23,6 +23,7 @@ import type { WorkspaceRecoveryGroup } from './projectWorkspacePorts';
 import type { ProjectTask, ProjectPanel, ProjectPanelHost, ProjectModelPanel } from './projectPanel';
 import { contextHelp, mountContextHelp } from './contextHelp';
 import { editOnly, displayMode } from './modePresentation';
+import { createCameraGizmo } from './cameraGizmo';
 
 const id = (prefix: string) => `${prefix}_${crypto.randomUUID().replaceAll('-', '')}`;
 const emptyMemory = (): SceneUiMemory => ({ selectedCaptionId: null, search: '', listScrollTop: 0, pinColors: null, ownerFilter: { kind: 'all' } });
@@ -675,46 +676,8 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       } catch (error) { feedback = (error as Error).message; render(); }
     });
   }, true);
-  const cameraTools = make('details'); cameraTools.className = 'lv-project-camera'; cameraTools.setAttribute('aria-label', '方位');
-  const cameraSummary=make('summary','方位');cameraTools.append(cameraSummary);
-  const compactCamera=document.defaultView?.matchMedia?.('(max-width:760px)');cameraTools.open=!compactCamera?.matches;
-  const cameraLayout=()=>{cameraTools.open=!compactCamera?.matches;if(!cameraTools.open && cameraTools.contains(document.activeElement))cameraSummary.focus?.({preventScroll:true});};
-  compactCamera?.addEventListener('change',cameraLayout);
-  const dismissCamera=(event:Event)=>{if(compactCamera?.matches && cameraTools.open && !cameraTools.contains(event.target as Node))cameraTools.open=false;};
-  document.addEventListener?.('pointerdown',dismissCamera);
-  cameraTools.addEventListener('focusout',event=>{if(compactCamera?.matches && !cameraTools.contains(event.relatedTarget as Node))cameraTools.open=false;});
-  cameraTools.addEventListener('keydown',event=>{if(event.key==='Escape'&&compactCamera?.matches){event.preventDefault();event.stopPropagation();cameraTools.open=false;cameraSummary.focus?.({preventScroll:true});}});
-  const axes = make('div'); axes.className = 'lv-camera-axes';
-  const axisSpecs = [['right', '右面', 0, 1], ['left', '左面', 0, -1], ['top', '上面', 1, 1], ['bottom', '下面', 1, -1], ['front', '正面', 2, 1], ['back', '背面', 2, -1]] as const;
-  const axisLines = axisSpecs.map(() => { const line = make('i'); line.setAttribute('aria-hidden','true'); axes.append(line); return line; });
-  const axisButtons = axisSpecs.map(([action, label]) => { const b = button(label, () => viewAction(() => viewport.camera(action))); axes.append(b); return b; });
-  const fitCamera = button('全体表示', () => viewAction(() => viewport.camera('fit'))), cameraButtons = [...axisButtons, fitCamera];
-  const direction = make('p'); direction.className = 'lv-camera-direction';
-  cameraTools.append(axes, direction, fitCamera); stage.append(cameraTools);
-  let orientationKey = '';
-  function renderOrientation() {
-    const observed = viewport.read().view;
-    direction.textContent = observed?.kind === 'ready' && observed.axis ? `${observed.axis.toUpperCase()}方向` : '自由視点';
-    axisSpecs.forEach(([, , component, sign], i) => axisButtons[i]!.setAttribute('aria-pressed', String(observed?.kind === 'ready' && observed.axis === `${sign > 0 ? '+' : '-'}${['x', 'y', 'z'][component]}`)));
-    try {
-      const camera = viewport.capture().camera as unknown as { position: number[]; target: number[]; up: number[] };
-      const key=JSON.stringify(camera); if(key===orientationKey)return;
-      const normalize = (v: number[]) => { const n = Math.hypot(...v); if (!Number.isFinite(n) || n < 1e-9) throw Error('camera'); return v.map(x => x / n); };
-      const cross = (a: number[], b: number[]) => [a[1]! * b[2]! - a[2]! * b[1]!, a[2]! * b[0]! - a[0]! * b[2]!, a[0]! * b[1]! - a[1]! * b[0]!];
-      const z = normalize(camera.position.map((v, i) => v - camera.target[i]!)), x = normalize(cross(camera.up, z)), y = cross(z, x), placed: number[][] = [];
-      axisSpecs.forEach(([, , component, sign], i) => {
-        const wanted = [82 + 55 * x[component]! * sign, 82 - 55 * y[component]! * sign];
-        let best: number[] = [82, 82], distance = Infinity;
-        for (let px = 22; px <= 142; px += 4) for (let py = 22; py <= 142; py += 4) {
-          if (placed.some(p => Math.hypot(px - p[0]!, py - p[1]!) < 44)) continue;
-          const d = Math.hypot(px - wanted[0]!, py - wanted[1]!); if (d < distance) { distance = d; best = [px, py]; }
-        }
-        placed.push(best); axisButtons[i]!.style.left = `${best[0]! - 22}px`; axisButtons[i]!.style.top = `${best[1]! - 22}px`;
-        axisButtons[i]!.setAttribute('data-depth', z[component]! * sign < 0 ? 'back' : 'front');
-        axisLines[i]!.style.width=`${Math.hypot(best[0]!-82,best[1]!-82)}px`; axisLines[i]!.style.transform=`rotate(${Math.atan2(best[1]!-82,best[0]!-82)}rad)`;
-      }); orientationKey=key;
-    } catch { /* Before camera preparation, six stable CSS positions remain available. */ }
-  }
+  const cameraGizmo = createCameraGizmo(document, axis => viewAction(() => viewport.camera(axis)), () => viewAction(() => viewport.camera('fit')));
+  stage.append(cameraGizmo.root);
   const viewBlocked = () => busy || !!pending || windowMoving || ports.otherPending() || composingInput() || viewport.read().dragging;
   function viewAction(action: () => void) {
     if (viewBlocked()) return;
@@ -814,8 +777,9 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       canvas.setAttribute('aria-busy', viewportStatus.dataset.busy);
       viewportStatus.textContent = [ports.presentation?.()?.reason, viewportFeedback, seen.issue, seen.notice, resolved?.kind !== 'ready' && 'シーンを選択し、表示状態を確認してください。'].filter(Boolean).join(' ');
       viewportStatus.hidden = !viewportStatus.textContent;
-      retryViewport.hidden = !seen.issue && !viewportFeedback&&!seen.retryAvailable; retryViewport.disabled = viewBlocked(); cameraButtons.forEach(b => { b.disabled = viewBlocked(); });
-      renderOrientation();
+      retryViewport.hidden = !seen.issue && !viewportFeedback&&!seen.retryAvailable; retryViewport.disabled = viewBlocked();
+      let camera: unknown; try { camera = viewport.capture().camera; } catch { /* Preparation has no camera yet. */ }
+      cameraGizmo.render({ camera, axis: seen.view?.kind === 'ready' ? seen.view.axis : null, blocked: viewBlocked() });
       markers.replaceChildren();
       for (const projected of seen.pins) if (seen.ready && seen.token === p.token && seen.sceneId === sceneId && projected.visible && Number.isFinite(projected.x) && Number.isFinite(projected.y)) {
         const caption = p.resources.captions[projected.id]; if (!caption) continue;
@@ -835,5 +799,5 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   mounted = true; render();
   return { root, headerActions, utilityArea: settingsSheet, clearNotice(){if(!pending&&ports.status().kind==='idle')feedback='';}, dismissDisclosures(){help.open=false;organization!.settingsRoot.open=false;}, setExternalBusy: (active:boolean) => { body.inert=busy||active; }, render, session: interaction, activeScene: () => sceneId, inputPending: () => dirty() || busy,
     hasChanges: () => dirty() || busy || !!pending,
-    unmount() { if (disposed) return; disposed = true;document.defaultView?.removeEventListener('resize',positionHeaderSheets);compactCamera?.removeEventListener('change',cameraLayout);document.removeEventListener?.('pointerdown',dismissCamera);stopHelp();cancelObservation();storageEpoch++; gesture = null; gestureGeneration++; pressedPointers.clear(); viewport.reservePointer(false); recovery?.dispose(); organization?.dispose(); windows.dispose(); mediaManager?.dispose(); mediaViewer.dispose(); viewport.dispose(); list.dispose(); inclusion.dispose(); detail.dispose(); for (const panel of panels.values()) panel.dispose(); root.remove(); } };
+    unmount() { if (disposed) return; disposed = true;document.defaultView?.removeEventListener('resize',positionHeaderSheets);cameraGizmo.dispose();stopHelp();cancelObservation();storageEpoch++; gesture = null; gestureGeneration++; pressedPointers.clear(); viewport.reservePointer(false); recovery?.dispose(); organization?.dispose(); windows.dispose(); mediaManager?.dispose(); mediaViewer.dispose(); viewport.dispose(); list.dispose(); inclusion.dispose(); detail.dispose(); for (const panel of panels.values()) panel.dispose(); root.remove(); } };
 }

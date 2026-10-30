@@ -7,6 +7,7 @@ import { ownedServer } from '../offline-e2e/server';
 import { BackupArchive } from '../../src/projectPackage/backupArchive';
 import { inspectProjectCandidates } from '../../src/domain/projectCandidates';
 import { validationMetadataLimits } from '../../src/projectFiles/validation';
+import { lookAlongFront } from './workspaceUi';
 
 test('view mode hides editing while preserving reading, local display, existing downloads and return to saved editing', async ({}, info) => {
   test.setTimeout(180_000); A.getHeads(A.init());
@@ -33,6 +34,37 @@ test('view mode hides editing while preserving reading, local display, existing 
     await p.goto(server.url); await p.getByLabel('ファイルを選択', { exact: true }).setInputFiles({ name: '閲覧するモデル.glb', mimeType: 'model/gltf-binary', buffer: triangleGlb() });
     await p.getByRole('button', { name: 'ファイルを開く', exact: true }).click(); await p.getByRole('textbox', { name: 'プロジェクト名', exact: true }).fill('閲覧と編集'); await p.getByRole('button', { name: 'プロジェクトを作成', exact: true }).click();
     await expect(p.getByLabel('3Dモデルの表示', { exact: true })).toHaveAttribute('aria-busy', 'false', { timeout: 90_000 });
+    const gizmo = p.locator('.lv-project-camera'), axes = gizmo.locator('.lv-camera-axes'), z = gizmo.getByRole('button', { name: 'Z', exact: true });
+    await expect(axes).toHaveText('XYZ'); await expect(gizmo.getByRole('button', { name: '全体表示', exact: true })).toHaveText(''); await expect(gizmo.locator('summary')).toHaveCount(0);
+    expect(await gizmo.evaluate(n => ({ background: getComputedStyle(n).backgroundColor, border: getComputedStyle(n).borderTopWidth, shadow: getComputedStyle(n).boxShadow }))).toEqual({ background: 'rgba(0, 0, 0, 0)', border: '0px', shadow: 'none' });
+    for (const name of ['X', '−X', 'Y', '−Y', 'Z', '−Z']) {
+      const axis = gizmo.getByRole('button', { name, exact: true }); await axis.press('Enter'); await expect(axis).toHaveAttribute('aria-pressed', 'true');
+      expect(await axis.evaluate(n => ({ width: n.getBoundingClientRect().width, height: n.getBoundingClientRect().height, background: getComputedStyle(n).backgroundColor, border: getComputedStyle(n).borderTopWidth }))).toEqual({ width: 44, height: 44, background: 'rgba(0, 0, 0, 0)', border: '0px' });
+    }
+    await lookAlongFront(p); await axes.click({ position: { x: 56, y: 56 } }); await expect(gizmo.getByRole('button', { name: '−Z', exact: true })).toHaveAttribute('aria-pressed', 'true');
+    await axes.click({ position: { x: 56, y: 56 } }); await expect(z).toHaveAttribute('aria-pressed', 'true');
+    const xBefore = await gizmo.getByRole('button', { name: 'X', exact: true }).getAttribute('style'), display = p.getByLabel('3Dモデルの表示', { exact: true }), box = (await display.boundingBox())!;
+    await p.mouse.move(box.x + box.width * .45, box.y + box.height * .5); await p.mouse.down({ button: 'middle' }); await p.mouse.move(box.x + box.width * .6, box.y + box.height * .6, { steps: 12 }); await p.mouse.up({ button: 'middle' });
+    await expect(z).toHaveAttribute('aria-pressed', 'false'); await expect(gizmo.getByRole('button', { name: 'X', exact: true })).not.toHaveAttribute('style', xBefore!);
+    await gizmo.getByRole('button', { name: '全体表示', exact: true }).click(); await display.click({ position: { x: 20, y: 120 } }); await p.mouse.move(0, 0); await p.keyboard.press('Escape');
+    expect(await gizmo.boundingBox()).toMatchObject({ width: 112, height: 156 });
+    await gizmo.screenshot({ path: info.outputPath('gizmo-light.png') }); await p.screenshot({ path: info.outputPath('gizmo-workspace.png'), fullPage: false });
+    const overlap = await axes.evaluate(node => {
+      const rect = node.getBoundingClientRect(), buttons = [...node.querySelectorAll('button')];
+      const tips = buttons.map(button => ({ button, x: parseFloat(button.style.left) + 22, y: parseFloat(button.style.top) + 22, depth: +button.style.zIndex }));
+      for (const { x, y } of tips) {
+        const nearest = tips.filter(t => Math.hypot(t.x - x, t.y - y) <= 22).sort((a, b) => Math.hypot(a.x - x, a.y - y) - Math.hypot(b.x - x, b.y - y) || b.depth - a.depth)[0]!;
+        const native = document.elementFromPoint(rect.x + x, rect.y + y)?.closest('button');
+        if (native && native !== nearest.button) return { x, y, name: nearest.button.getAttribute('aria-label')!, help: nearest.button.getAttribute('aria-describedby')! };
+      }
+      return null;
+    });
+    expect(overlap).not.toBeNull();
+    const axisBox = (await axes.boundingBox())!; await p.mouse.move(axisBox.x + overlap!.x, axisBox.y + overlap!.y);
+    const hovered = gizmo.getByRole('button', { name: overlap!.name, exact: true }); await expect(hovered).toHaveAttribute('data-hovered', 'true');
+    await expect(p.locator('#' + overlap!.help)).toBeVisible();
+    await axes.click({ position: { x: overlap!.x, y: overlap!.y } }); await expect(hovered).toBeFocused(); await expect(hovered).toHaveAttribute('aria-pressed', 'true'); await expect(p.getByRole('tooltip')).toBeHidden();
+    await lookAlongFront(p);
     await p.getByText('数値で配置', { exact: true }).click(); const owner = p.getByLabel('追加先モデル', { exact: true }); await owner.focus(); await owner.selectOption({ label: '閲覧するモデル.glb' }); await p.getByRole('button', { name: 'このモデルに追加', exact: true }).click();
     for (const axis of ['X', 'Y', 'Z']) await p.getByLabel('位置 ' + axis, { exact: true }).fill(axis === 'Y' ? '.5' : '0');
     await p.getByRole('button', { name: '位置を確定', exact: true }).click(); await ready('ピンの位置を確定しました。');
@@ -74,6 +106,7 @@ test('view mode hides editing while preserving reading, local display, existing 
     await tab('保存した視点').click(); await expect(author).toHaveCount(0);
     const views = p.getByRole('tabpanel', { name: '保存した視点', exact: true }); await views.getByText('投影とカメラ',{exact:true}).click(); await views.getByLabel('投影方式', { exact: true }).selectOption('orthographic'); await views.getByRole('combobox', { name: '保存した視点', exact: true }).selectOption({ label: '全景' }); await views.getByRole('button', { name: '表示', exact: true }).click();
     await views.getByLabel('背景色', { exact: true }).fill('#334455'); await views.getByRole('button', { name: '背景に適用', exact: true }).click();
+    await gizmo.screenshot({ path: info.outputPath('gizmo-dark.png') });
     await tab('材質').click(); const material = p.getByRole('region', { name: '材質', exact: true }); await material.getByLabel('モデル', { exact: true }).selectOption({ label: '閲覧するモデル.glb' });
     const surface = material.getByLabel('面', { exact: true }), first = await surface.locator('option').evaluateAll(ns => ns.map(n => (n as HTMLOptionElement).value).find(Boolean)); expect(first).toBeTruthy(); await surface.selectOption(first!);
     await expect(material.getByRole('button', { name: '設定を編集', exact: true })).toHaveCount(0); await expect(material.locator('.lv-material-values')).toBeVisible();
@@ -85,7 +118,8 @@ test('view mode hides editing while preserving reading, local display, existing 
     await files.getByText('作成したファイル', { exact: true }).click(); const [existing] = await Promise.all([p.waitForEvent('download'), files.getByRole('button', { name: 'ダウンロード', exact: true }).click()]); expect(await existing.failure()).toBeNull(); await menu.locator(':scope > summary').click();
     await tab('キャプション').click(); await p.setViewportSize({ width: 390, height: 844 }); await p.screenshot({ path: info.outputPath('view-narrow.png'), fullPage: false });
     await p.getByRole('button',{name:'3D・比較',exact:true}).click(); await expect(p.getByLabel('3Dモデルの表示',{exact:true})).toBeVisible();
-    const compass=p.locator('.lv-project-camera');await compass.locator(':scope > summary').click();await compass.getByRole('button',{name:'上面',exact:true}).click();await compass.locator(':scope > summary').press('Escape');
+    const compass=p.locator('.lv-project-camera');await compass.getByRole('button',{name:'Y',exact:true}).press('Enter');await expect(compass.getByRole('button',{name:'Y',exact:true})).toHaveAttribute('aria-pressed','true');await p.getByRole('button',{name:'3D・比較',exact:true}).focus();
+    await expect(p.getByRole('tooltip')).toBeHidden();
     await expect(p.locator('.lv-caption-window').getByRole('button',{name:'閉じる',exact:true})).toBeInViewport();
     await p.screenshot({path:info.outputPath('narrow-stage.png'),fullPage:false});
     await p.locator('.lv-caption-window').getByRole('button',{name:'閉じる',exact:true}).click();await expect(p.locator('.lv-caption-window')).toHaveCount(0);
@@ -94,6 +128,7 @@ test('view mode hides editing while preserving reading, local display, existing 
     await p.getByRole('button',{name:'一覧へ戻る',exact:true}).click();await expect(captions.getByLabel('検索', { exact: true })).toHaveValue('現地');await p.locator('.lv-caption-select').click(); await expect(detail.getByLabel('本文', { exact: true })).toHaveValue('確認する本文\n二行目');
     await detail.getByLabel('本文', { exact: true }).fill('閲覧から戻って編集'); await expect(p.getByRole('button', { name: '閲覧する', exact: true })).toBeDisabled();
     await detail.getByLabel('本文',{exact:true}).dispatchEvent('compositionstart',{data:'編集中'});
+    await expect(z).toBeDisabled();
     await expect(tab('モデル')).toBeDisabled();await expect(p.locator('.lv-compact-navigation button').first()).toBeDisabled();
     await detail.getByLabel('本文',{exact:true}).dispatchEvent('compositionend',{data:'編集中'});
     await tab('モデル').click(); await expect(p.getByText('キャプションに未適用の変更があります。',{exact:true})).toBeVisible();

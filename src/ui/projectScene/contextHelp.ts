@@ -1,4 +1,10 @@
 let nextHelp = 0;
+const pointerAnchors = new WeakMap<HTMLElement, (event: PointerEvent) => HTMLElement | null>();
+
+/** Overlapping visual controls can share the same pointer target as their action. */
+export function registerContextHelpPointer(root: HTMLElement, resolve: (event: PointerEvent) => HTMLElement | null): () => void {
+  pointerAnchors.set(root, resolve); return () => { pointerAnchors.delete(root); };
+}
 
 /** Explicit optional copy only. Never infer help from paragraphs or user content. */
 export function contextHelp(document: Document, text: string, anchors: readonly HTMLElement[] = []): HTMLElement {
@@ -32,6 +38,14 @@ export function mountContextHelp(document: Document, root: HTMLElement): () => v
   let active: Source | null = null, pending: Source | null = null, hovered: HTMLElement | null = null;
   let delay: number | undefined, leaving: number | undefined, pointerFocus = '', disposed = false;
   const element = (target: EventTarget | null) => target && typeof (target as Element).closest === 'function' ? target as HTMLElement : null;
+  const pointer = (event: Event) => {
+    const target = element(event.target);
+    for (let node = target; node; node = node.parentElement) {
+      const resolve = pointerAnchors.get(node);
+      if (resolve) return { root: node, target: resolve(event as PointerEvent) };
+    }
+    return { root: null, target };
+  };
   const owned = (node: HTMLElement) => [...scopes.keys()].some(scope => scope.contains(node));
   const available = (node: HTMLElement) => node.isConnected && owned(node) && (!node.getClientRects || node.getClientRects().length > 0);
   const source = (target: EventTarget | null): Source | null => {
@@ -70,16 +84,29 @@ export function mountContextHelp(document: Document, root: HTMLElement): () => v
     if ((event as PointerEvent).pointerType === 'touch') return;
     const target = element(event.target);
     if (target && active?.note.contains(target)) { hovered = target; cancelLeave(); return; }
-    const next = source(event.target); if (!next) return;
+    const resolved = pointer(event), next = source(resolved.target); if (!next) return;
+    if (hovered === next.anchor) { cancelLeave(); return; }
     hovered = next.anchor; cancelLeave();
-    if (next.anchor.contains(element((event as PointerEvent).relatedTarget))) return;
+    if (!resolved.root && next.anchor.contains(element((event as PointerEvent).relatedTarget))) return;
     if (active?.note === next.note) { active = next; position(next); return; }
     cancelDelay(); pending = next;
     delay = browser.setTimeout(() => { delay = undefined; const wanted = pending; pending = null; if (wanted) show(wanted); }, 2_000);
   };
+  const move = (event: Event) => {
+    if ((event as PointerEvent).pointerType === 'touch') return;
+    const resolved = pointer(event); if (!resolved.root) return;
+    const next = source(resolved.target);
+    if (next?.anchor === hovered) return;
+    if (next) over(event); else { hovered = null; leave(); }
+  };
   const out = (event: Event) => {
     const target = element(event.target), related = element((event as PointerEvent).relatedTarget);
     if (!target) return;
+    const resolved = pointer(event);
+    if (resolved.root) {
+      if (!resolved.root.contains(related)) { hovered = null; leave(); }
+      return;
+    }
     const next = source(target);
     if (next?.anchor.contains(related) || active?.note.contains(related)) { hovered = related; return; }
     if (next || active?.note.contains(target)) { hovered = null; leave(); }
@@ -91,10 +118,16 @@ export function mountContextHelp(document: Document, root: HTMLElement): () => v
     leave();
   };
   const down = (event: Event) => {
-    const next = source(event.target); pointerFocus = next?.note.id ?? '';
+    const next = source(pointer(event).target); pointerFocus = next?.note.id ?? '';
     if (!next && !active?.note.contains(element(event.target))) hide();
   };
   const click = (event: Event) => {
+    const resolved = pointer(event);
+    if (resolved.root) {
+      pointerFocus = source(resolved.target)?.note.id ?? ''; hide();
+      // Keep suppression through the control's resolved focus. Tab/next down resets it.
+      return;
+    }
     pointerFocus = '';
     const trigger = element(event.target)?.closest('.lv-context-help-trigger');
     if (!trigger) return;
@@ -111,7 +144,7 @@ export function mountContextHelp(document: Document, root: HTMLElement): () => v
   const scroll = (event: Event) => { if (!active?.note.contains(element(event.target))) hide(); };
   const resize = () => hide();
   const pointerCancel = () => { pointerFocus = ''; cancelDelay(); };
-  const listeners: [string, EventListener][] = [['pointerover', over], ['pointerout', out], ['pointerdown', down],
+  const listeners: [string, EventListener][] = [['pointerover', over], ['pointermove', move], ['pointerout', out], ['pointerdown', down],
     ['pointercancel', pointerCancel], ['focusin', focus], ['focusout', blur], ['click', click], ['keydown', key], ['scroll', scroll]];
   for (const [name, handler] of listeners) document.addEventListener(name, handler, true);
   browser.addEventListener('resize', resize);

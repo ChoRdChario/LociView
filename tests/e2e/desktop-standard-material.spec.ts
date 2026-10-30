@@ -1,3 +1,4 @@
+import { lookAlongFront } from './workspaceUi';
 import {test,expect,chromium} from '@playwright/test';
 import {mkdir,mkdtemp} from 'node:fs/promises';
 import * as THREE from 'three';
@@ -23,7 +24,7 @@ test('01g BLENDと色の透過は実画素と保守的な位置選択が一致�
     const status=p.locator('.lv-project-viewport-status');await expect(status).toContainText('透過表示は近似です。',{timeout:180000});
     await p.getByRole('tab',{name:'モデル',exact:true}).click();const choosing=p.waitForEvent('filechooser');await p.getByRole('tabpanel',{name:'モデル',exact:true}).getByRole('button',{name:'3Dモデルを追加',exact:true}).click();
     const points=Buffer.from('ply\nformat ascii 1.0\nelement vertex 3\nproperty float x\nproperty float y\nproperty float z\nproperty uchar red\nproperty uchar green\nproperty uchar blue\nend_header\n2.5 0 -0.1 255 0 0\n3.5 0 -0.1 255 0 0\n5 0 -0.1 255 0 0\n');
-    await(await choosing).setFiles({name:'背後の点.ply',mimeType:'application/ply',buffer:points});await expect(p.getByText('モデルを追加しました。',{exact:true})).toBeVisible({timeout:180000});await p.getByRole('button',{name:'正面',exact:true}).click();
+    await(await choosing).setFiles({name:'背後の点.ply',mimeType:'application/ply',buffer:points});await expect(p.getByText('モデルを追加しました。',{exact:true})).toBeVisible({timeout:180000});await lookAlongFront(p);
     const canvas=p.getByLabel('3Dモデルの表示',{exact:true}),red=[255,0,0];
     const at=async(x:number,z=-.1)=>{const box=await canvas.boundingBox();if(!box)throw Error('canvas');const pose=fittedPose({min:[-4,-1,-.1],max:[5,1,0]},defaultPose(),box.width/box.height,'+z');if(pose.projection.kind!=='perspective')throw Error('camera');const camera=new THREE.PerspectiveCamera(pose.projection.verticalFov*180/Math.PI,box.width/box.height,.000001,1e9);camera.position.set(...pose.position);camera.up.set(...pose.up);camera.lookAt(new THREE.Vector3(...pose.target));camera.updateMatrixWorld(true);const n=new THREE.Vector3(x,0,z).project(camera);return{x:(n.x+1)*box.width/2,y:(1-n.y)*box.height/2,dx:n.x*box.width/2,dy:-n.y*box.height/2};};
     const sample=async(x:number,z=-.1)=>{const q=await at(x,z);return(await presentedCanvas(canvas,q.dx,q.dy)).sample.slice(0,3);};

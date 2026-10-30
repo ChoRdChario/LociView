@@ -56,7 +56,56 @@ unchanged-feature-classification checks pass; independent review has no findings
 No runtime change or new capacity guarantee; no runtime suite is needed for this
 documentation checkpoint.
 
-## Current boundary —verified first workspace candidate
+## Current boundary —compact orientation gizmo
+
+PO2026-10-30 requests Blender/Unity-style camera orientation: remove face-name
+text, status text and enclosing frame. Outcome: transparent RGB XYZ axes with
+small tips, six-direction selection and an icon-only fit action; retain actual
+camera orientation, keyboard focus,44px hit areas and existing input/write fences.
+Use existing axis/fit ports; no renderer, dependencies, coordinates or stored data
+change. Root writes; independent UI review is read-only. Keep Y-up/+Z-front.
+
+Plan: specify exact projection/depth/hit handling → replace the framed widget →
+focused geometry/input checks and real-screen wide/narrow/dark views → required
+serial checkpoint and independent review → verified g0-baseline checkpoint.
+Stop only for a genuine new authority/contract conflict. No per-control PO testing.
+
+Implementation:112px transparent XYZ compass,20px positive tips/smaller negative
+rings, exact camera projection/depth, six signed keyboard destinations, pointer
+reselection to the opposite side, icon-only fit and44px hit areas. The existing
+Y-up/+Z-front and viewAction/write/IME/window-move fences are retained. Narrow
+layout keeps the comparison close control reachable. No format, dependency or
+renderer change. The shared optional-help manager has one UI-owned nearest-tip
+pointer registration; hover/help/focus/click agree and disposal unregisters it.
+
+Focused geometry/input/import checks17PASS and existing connected composition
+regressions4PASS. Dedicated Chromium2 connected cases PASS36.1s: real native-hit
+overlap versus nearest tip, correct hover/help/focus/action, signed keyboard and
+pointer flip, camera-orbit tracking, transparent styles and44px targets, light/dark
+screens, narrow comparison close, IME fences, edit/save/reload and full browser
+close/server-stop offline resume. No page errors or external requests. Independent
+read-only final/substantive-fix review has no remaining required findings.
+The reviewer found hover/help disagreement and a test helper that skipped refit;
+both are corrected. The first browser failure used left drag instead of the
+existing middle-button orbit; its failure evidence is retained. A recorder-only
+missing pointerId case prompted an explicit down guard; no assertion was relaxed.
+
+Final serial checkpoint PASS: typecheck,140 root files/3104 tests with21 existing
+TODO, all five builds and offline exact-resource isolation. HEIC public-path
+isolation across those five artifacts also PASS. The22-file source/test manifest
+in .artifacts/e2e/gizmo/tested-source.json is unchanged through verification.
+Browser results/images, logs and retained failure evidence live in that directory.
+Independent review has no remaining required fixes; the verified checkpoint uses
+the existing g0-baseline Push authority. Existing chunk-size/dynamic-import build
+warnings remain. Changed-document local links51PASS; source/test whitespace PASS.
+Native IME/assistive technology/physical-device,
+general adoption, ordinary-entry activation and release remain separate.
+
+Next: broaden the integrated workspace's Scene/model/material/media organization
+and share/receive/restore scenarios using the revised navigation, and finish the
+connected copy/density/keyboard pass. Do not replace that work with10k qualification.
+
+## Previous boundary —verified first workspace candidate
 
 Outcome2026-10-30: the first grouped workspace UI is integrated and verified on
 the approved PC candidate. Its g0-baseline checkpoint follows the existing Push

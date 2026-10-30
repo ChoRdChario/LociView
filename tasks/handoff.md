@@ -9,9 +9,10 @@ existing changes. Do not reconstruct current work from completed checkpoint pros
 PO2026-10-30 corrects the UI work order: finish the whole-screen/connected-flow
 issue list and repair groups before individual fixes. Read todo's current boundary.
 The completed review and screen proposal now have explicit implementation approval.
-View-mode WIP is being integrated into the coherent workspace change; it is not
-an independently completed checkpoint. Todo owns the consolidated findings,
-retained safety boundaries and actual verification state.
+The first grouped workspace checkpoint is verified. Latest steering replaces its
+framed camera menu with compact Blender-style RGB XYZ axes and icon-only fit.
+Todo owns this bounded workflow, checks and the next connected navigation pass.
+Preserve Y-up/+Z-front, existing camera intents, input/write fences and retained data.
 
 Latest PO steering raises the review target to AAA-title production UI/UX quality.
 Read the[consolidated design review](../docs/ui-design-review.md) for Q1–Q8,
@@ -34,11 +35,11 @@ Do not infer physical-device, general adoption or release acceptance.
 
 The owned product preview is http://127.0.0.1:4191/ (offline-desktop-dist), separate
 from the original validation origin and the4190 visual prototype. Its index hash
-and owned process/session are recorded in .artifacts/e2e/workspace/preview.json.
+and owned process/session are recorded in .artifacts/e2e/gizmo/preview.json.
 Existing resumption data stays at the original address; use an exported file here.
-No executable source/test changed after the final checkpoint (one test-helper
-EOF blank-line cleanup is recorded separately). Documentation/staging/Push
-alone is not a reason to repeat its runtime checks.
+The compact-gizmo source/test manifest, dedicated browser evidence and required
+final checks are under .artifacts/e2e/gizmo; consult todo for their actual status.
+Documentation/staging/Push alone is not a reason to repeat runtime checks.
 
 PO prioritizes completing the accepted feature set before readiness-stage latency
 work. The2026-10-29 correction puts daily Scene/Caption organization and editing

@@ -1,3 +1,4 @@
+import { lookAlongFront } from './workspaceUi';
 import {test,expect,chromium,type Page,type BrowserContext,type TestInfo} from '@playwright/test';
 import {mkdir,mkdtemp} from 'node:fs/promises';
 import {openAsBlob} from 'node:fs';
@@ -39,7 +40,7 @@ test('50万点SH4を新しい本体へ差し替え、旧資源の解放・2世�
  try{
   let p=await launch();await p.getByLabel('ファイルを選択',{exact:true}).setInputFiles(original);await p.getByRole('button',{name:'ファイルを開く',exact:true}).click();await p.getByLabel('プロジェクト名',{exact:true}).fill(title);await p.getByRole('button',{name:'プロジェクトを作成',exact:true}).click();await ready(p);await mark('created',p);
   await p.getByRole('tab',{name:'モデル',exact:true}).click();await models(p).locator('.lv-model-select').first().click();const proxy=p.waitForEvent('filechooser');await models(p).getByRole('button',{name:'位置指定用の面を追加',exact:true}).click();await(await proxy).setFiles({name:'以前の面.glb',mimeType:'model/gltf-binary',buffer:triangleGlb()});await models(p).getByRole('button',{name:'このモデルに面を追加',exact:true}).click();await expect(p.getByText('位置指定用の面を登録しました。',{exact:true})).toBeVisible({timeout:240_000});await ready(p);
-  await p.getByRole('button',{name:'正面',exact:true}).click();await p.getByRole('tab',{name:'キャプション',exact:true}).click();await p.getByRole('button',{name:'ピンを追加',exact:true}).click();
+  await lookAlongFront(p);await p.getByRole('tab',{name:'キャプション',exact:true}).click();await p.getByRole('button',{name:'ピンを追加',exact:true}).click();
   const canvas=p.getByLabel('3Dモデルの表示',{exact:true}),box=(await canvas.boundingBox())!,extent=4*Math.exp(Math.fround(Math.log(.0007))),bounds={min:[-500/300-extent,-250/300-extent,-extent] as const,max:[499/300+extent,249/300+extent,.0006+extent] as const},pose=fittedPose(bounds,defaultPose(),box.width/box.height,'+z');
   if(pose.projection.kind!=='perspective')throw Error('Perspective');const camera=new THREE.PerspectiveCamera(pose.projection.verticalFov*180/Math.PI,box.width/box.height,.000001,1e9);camera.position.set(...pose.position);camera.up.set(...pose.up);camera.lookAt(new THREE.Vector3(...pose.target));camera.updateMatrixWorld(true);const hit=new THREE.Vector3(.1,.2,0).project(camera);await canvas.click({position:{x:(hit.x+1)*box.width/2,y:(1-hit.y)*box.height/2}});
   await p.getByLabel('位置 X',{exact:true}).fill('0.2');await p.getByRole('button',{name:'位置を確定',exact:true}).click();await expect(p.getByText('ピンの位置を確定しました。',{exact:true})).toBeVisible({timeout:240_000});

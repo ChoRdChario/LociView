@@ -1,3 +1,4 @@
+import { lookAlongFront } from './workspaceUi';
 import {test,expect,type Page,type TestInfo} from '@playwright/test';
 import {createHash} from 'node:crypto';
 import {openAsBlob} from 'node:fs';
@@ -27,7 +28,7 @@ test('PCでモデル読込中も記録を検索・閲覧し、準備済み点群
  await page.goto('/?timings=1');await page.getByLabel('ファイルを選択',{exact:true}).setInputFiles({name:'先に見える点群.ply',mimeType:'application/ply',buffer:ply});
  await page.getByRole('button',{name:'ファイルを開く',exact:true}).click();await page.getByLabel('プロジェクト名',{exact:true}).fill('読み込み中の作業');await page.getByRole('button',{name:'プロジェクトを作成',exact:true}).click();
  const status=page.locator('.lv-project-viewport-status'),canvas=page.getByLabel('3Dモデルの表示',{exact:true});await expect(status).toHaveAttribute('data-busy','false',{timeout:90_000});
- await page.getByRole('button',{name:'正面',exact:true}).click();await page.getByRole('button',{name:'ピンを追加',exact:true}).click();const box=(await canvas.boundingBox())!;await canvas.click({position:{x:box.width/2,y:box.height/2}});
+ await lookAlongFront(page);await page.getByRole('button',{name:'ピンを追加',exact:true}).click();const box=(await canvas.boundingBox())!;await canvas.click({position:{x:box.width/2,y:box.height/2}});
  await page.getByRole('button',{name:'位置を確定',exact:true}).click();await expect(page.getByText('ピンの位置を確定しました。',{exact:true})).toBeVisible();
  const detail=page.getByRole('region',{name:'キャプションの詳細',exact:true});await detail.getByLabel('タイトル',{exact:true}).fill('先に読める記録');await detail.getByLabel('本文',{exact:true}).fill('読み込み途中もこの文章を読めます');await detail.getByRole('button',{name:'変更を適用',exact:true}).click();await expect(page.getByText('変更を適用しました。',{exact:true})).toBeVisible();
  const image=page.waitForEvent('filechooser');await page.getByLabel('メディアを追加',{exact:true}).click();await(await image).setFiles({name:'写真.png',mimeType:'image/png',buffer:smallPng()});await expect(page.getByText('メディアを追加しました。',{exact:true})).toBeVisible();
@@ -39,7 +40,7 @@ test('PCでモデル読込中も記録を検索・閲覧し、準備済み点群
  await expect(detail.getByLabel('タイトル',{exact:true})).not.toBeEditable();await expect(detail.getByRole('button',{name:'変更を適用',exact:true})).toBeDisabled();await expect(page.getByRole('button',{name:'ピンを追加',exact:true})).toBeDisabled();await expect(status).toHaveAttribute('data-busy','true');await expect(canvas).toHaveAttribute('aria-busy','true');
  const pixels=await canvas.screenshot();expect(await canvas.evaluate(async(_node,png)=>{const image=new Image();image.src='data:image/png;base64,'+png;await image.decode();
   const copy=document.createElement('canvas');copy.width=image.width;copy.height=image.height;const context=copy.getContext('2d')!;context.drawImage(image,0,0);const bytes=context.getImageData(0,0,copy.width,copy.height).data;let red=0;for(let i=0;i<bytes.length;i+=4)if(bytes[i]!>200&&bytes[i+1]!<80&&bytes[i+2]!<80)red++;return red;},pixels.toString('base64'))).toBeGreaterThan(0);
- const initial=await canvas.screenshot();await page.getByRole('button',{name:'正面',exact:true}).click();const rotated=await canvas.screenshot();expect(createHash('sha256').update(rotated).digest('hex')).not.toBe(createHash('sha256').update(initial).digest('hex'));
+ const initial=await canvas.screenshot();await lookAlongFront(page);const rotated=await canvas.screenshot();expect(createHash('sha256').update(rotated).digest('hex')).not.toBe(createHash('sha256').update(initial).digest('hex'));
  const menu=page.locator('details.lv-project-files');await menu.locator(':scope > summary').click();await expect(page.getByRole('region',{name:'ファイル',exact:true}).getByRole('button',{name:'保存',exact:true})).toBeDisabled();
  await menu.locator(':scope > summary').click();
  expect(await status.evaluate(n=>getComputedStyle(n,'::before').animationName)).toBe('lv-operation-spin');await page.emulateMedia({reducedMotion:'reduce'});expect(await status.evaluate(n=>getComputedStyle(n,'::before').animationName)).toBe('none');await page.emulateMedia({reducedMotion:'no-preference'});

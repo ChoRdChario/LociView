@@ -1,4 +1,4 @@
-import { revealCaptionList } from './workspaceUi';
+import { lookAlongFront, revealCaptionList } from './workspaceUi';
 import { test, expect, chromium, type BrowserContext, type Page } from '@playwright/test';
 import { createHash } from 'node:crypto';
 import { mkdir, mkdtemp, readFile, readdir } from 'node:fs/promises';
@@ -211,7 +211,7 @@ test('GLBと画像の編集を保存し、ブラウザ再起動と別端末相�
       const pinArea = page.getByRole('region', { name: 'ピンの操作', exact: true }), canvas = page.getByLabel('3Dモデルの表示', { exact: true });
       const pick = async () => {
         await page.getByRole('tab', { name: 'キャプション', exact: true }).click();
-        await page.getByRole('button', { name: '正面', exact: true }).click();
+        await lookAlongFront(page);
         await page.getByRole('button', { name: '全体表示', exact: true }).click();
         await pinArea.getByRole('button', { name: 'ピンを追加', exact: true }).click();
         const box = await canvas.boundingBox(); expect(box).toBeTruthy();

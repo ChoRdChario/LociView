@@ -4329,7 +4329,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const h = await productWorkspaceFixture(), initial = h.display();
     h.refresh(); h.refresh();
     expect(h.display()).toBe(initial);
-    const pose = h.payload(); h.button('正面', h.editor).fire('click'); h.refresh();
+    const pose = h.payload(); h.button('Z', h.editor).fire('click'); h.refresh();
     expect(h.payload()).not.toEqual(pose); expect(h.display()).toBe(initial);
     const numeric = h.named('追加先モデル', h.editor); numeric.fire('focus');
     numeric.value = numeric.children[1]!.value; numeric.fire('change'); h.button('このモデルに追加', h.editor).fire('click');
@@ -5192,8 +5192,8 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     handle.fire('keydown', { key: 'ArrowRight', preventDefault() {} }); expect(a.style.width).toBe('300px');
     const beforeDrag = { ...a.style }; handle.fire('pointerdown', drag);
     expect(h.reservePointer).toHaveBeenLastCalledWith(true);
-    expect(button('ファイルに保存', named('ファイル')).disabled).toBe(true); expect(button('閲覧する').disabled).toBe(true); expect(button('正面', editor).disabled).toBe(true);
-    button('正面', editor).fire('click'); expect(h.camera).not.toHaveBeenCalled(); handle.fire('pointermove', { ...drag, clientX: 190, clientY: 150 });
+    expect(button('ファイルに保存', named('ファイル')).disabled).toBe(true); expect(button('閲覧する').disabled).toBe(true); expect(button('Z', editor).disabled).toBe(true);
+    button('Z', editor).fire('click'); expect(h.camera).not.toHaveBeenCalled(); handle.fire('pointermove', { ...drag, clientX: 190, clientY: 150 });
     handle.fire('keydown', { key: 'Escape', preventDefault() {} }); handle.fire('pointerup', drag); expect(a.style).toEqual(beforeDrag);
     expect(h.reservePointer).toHaveBeenLastCalledWith(false);
     expect(button('ファイルに保存', named('ファイル')).disabled).toBe(false);
@@ -5941,7 +5941,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     button('3D表示を再試行', editor).fire('click'); expect(h.retryViewport).toHaveBeenCalledTimes(2);
     expect(button('3D表示を再試行', editor).hidden).toBe(true);
     h.camera.mockImplementationOnce(() => { throw Error('表示するモデルがありません。'); });
-    expect(() => button('正面', editor).fire('click')).not.toThrow();
+    expect(() => button('Z', editor).fire('click')).not.toThrow();
     expect(h.all(editor).some(n => n.textContent?.includes('表示するモデルがありません。'))).toBe(true); await h.ui.dispose();
   });
   it('resolves product composition conflicts only after explicit choice and reports image display failure without stale callbacks (recorded DOM)', async () => {
@@ -7367,7 +7367,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       expect(button('ピンを追加').disabled).toBe(true);expect(button('保存').disabled).toBe(true);expect(remember).not.toHaveBeenCalled();
       button('ピンを追加').fire('click');expect(dispatch).not.toHaveBeenCalled();
       finish({factory,ready:complete,dispose(){}});await vi.waitFor(()=>expect(display).toBeDefined());
-      button('正面').fire('click');expect(camera).toHaveBeenCalledOnce();
+      button('Z').fire('click');expect(camera).toHaveBeenCalledOnce();
       const status=all(root).find(n=>n.className==='lv-project-viewport-status')!;expect(status.dataset.busy).toBe('true');expect(button('保存').disabled).toBe(true);
       ready();await ui.ready;expect(status.dataset.busy).toBe('false');expect(rows()).toHaveLength(initial);expect(search.value).toBe('');
       expect(button('保存').disabled).toBe(false);expect(remember).toHaveBeenCalled();expect(dispatch).not.toHaveBeenCalled();

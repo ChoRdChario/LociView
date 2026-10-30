@@ -1,4 +1,4 @@
-import { revealCaptionList } from './workspaceUi';
+import { lookAlongFront, revealCaptionList } from './workspaceUi';
 import {test,expect,chromium,type Page,type BrowserContext,type TestInfo} from '@playwright/test';
 import {mkdir,mkdtemp,writeFile} from 'node:fs/promises';
 import {openAsBlob} from 'node:fs';
@@ -89,7 +89,7 @@ test('Native07kの点群GSと面を変換し共有返送Review編集コピー独
   test.setTimeout(1800000);const fixture=await nativeSpatialBackup(),input=info.outputPath('native-small.zip');await writeFile(input,fixture.file);const run=await setup(info,fixture.bodyRanges);
   try{
     let a=await run.launch(0);await open(a.p,input);await expect(a.p.getByRole('button',{name:'新しいプロジェクトに変換',exact:true})).toBeVisible({timeout:180000});await a.p.getByRole('button',{name:'新しいプロジェクトに変換',exact:true}).click();await ready(a.p);await run.mark('converted',a.p);
-    await a.p.getByRole('tab',{name:'モデル',exact:true}).click();await a.p.getByRole('button',{name:'正面',exact:true}).click();await a.p.screenshot({path:info.outputPath('converted-models.png'),fullPage:true});
+    await a.p.getByRole('tab',{name:'モデル',exact:true}).click();await lookAlongFront(a.p);await a.p.screenshot({path:info.outputPath('converted-models.png'),fullPage:true});
     await expect.poll(async()=>(await presentedCanvas(a.p.getByLabel('3Dモデルの表示',{exact:true}))).red,{timeout:90000}).toBeGreaterThan(20);
     await selectCaption(a.p);await expect(detail(a.p).getByLabel('本文',{exact:true})).toHaveValue('本文を保持');await edit(a.p,'本文','変換後の編集');
     const first=await backup(await output(a.p,info,'first','backup'));verifyModels(first.records,fixture);
@@ -103,7 +103,7 @@ test('Native07kの点群GSと面を変換し共有返送Review編集コピー独
       const ndc=new THREE.Vector3(...position).project(camera);await canvas.click({position:{x:(ndc.x+1)*box.width/2,y:(1-ndc.y)*box.height/2}});
     };
     for(const kind of ['点群','GS']){
-      await a.p.getByRole('tab',{name:'モデル',exact:true}).click();const panel=a.p.getByRole('tabpanel',{name:'モデル',exact:true});await panel.locator('.lv-model-select').filter({hasText:kind}).click();await panel.getByRole('button',{name:'このモデルだけ表示',exact:true}).click();await a.p.getByRole('button',{name:'正面',exact:true}).click();
+      await a.p.getByRole('tab',{name:'モデル',exact:true}).click();const panel=a.p.getByRole('tabpanel',{name:'モデル',exact:true});await panel.locator('.lv-model-select').filter({hasText:kind}).click();await panel.getByRole('button',{name:'このモデルだけ表示',exact:true}).click();await lookAlongFront(a.p);
       await a.p.getByRole('tab',{name:'キャプション',exact:true}).click();await a.p.getByRole('button',{name:'ピンを追加',exact:true}).click();
       await hit(kind,kind==='点群'?[.5,0,0]:[-1.4,.3,.05]);
       if(kind==='GS'){await expect(a.p.getByLabel('位置 X',{exact:true})).toBeEnabled();await a.p.getByLabel('位置 X',{exact:true}).fill('.2');}

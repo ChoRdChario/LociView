@@ -143,6 +143,22 @@ Help／設定を開く前には表示専用portでファイルpanelを閉じら�
 初期配置は重なりを抑える案とする。新しい一窓固定や自動閉鎖は導入しない。
 方位ギズモは現在方向が分かり、既存の六方向・全体表示と同じcamera経路を使う。
 
+PO2026-10-30の修正：方位はBlender寄りの透明なRGB軸表示へ統一する。
+常時表示する文字は正側のX／Y／Zだけとし、負側は小さい輪で区別する。
+面名・自由視点・方向の文章、大きな外枠・背景面・影を除く。全体表示は独立した
+小さいアイコンと、必要時の説明で示す。既存のY-up／+Z-frontは変更しない。
+軸先端はカメラからの正しい投影位置に置き、重なり回避のために格子へ移さない。
+44pxの透明な操作範囲が重なる場合は、先端への距離と前後順で選ぶ。
+同じ軸の再選択は反対側へ切り替え、keyboardでは符号付きの六方向を選択できる。
+重なる操作範囲ではhover・説明・focus・選択を同じ最近傍先端へ統一する。
+狭幅では既存の比較窓の読取りを保つ右下配置とし、同じ小型表示を直接使う。
+`cameraGizmo`はcamera値・現在軸・入力可否を受け、axis／fit意図だけを返すUI部品。
+ProjectWorkspaceからだけ接続し、保存・描画器・新しいorbit-drag portは追加しない。
+任意説明のmanagerには、この部品のpointer先端を解決するUI内の登録口だけを追加する。
+既存の3D領域での自由回転は保持する。参考：
+[BlenderのNavigation Gizmo](https://docs.blender.org/manual/en/latest/editors/3dview/navigate/introduction.html)、
+[UnityのOrientation overlay](https://docs.unity3d.com/ja/current/Manual/SceneViewNavigation.html)。
+
 ## 文言の規則
 
 **名前は短く、操作は結果を表す動詞、注意は判断を変える一文にする。**

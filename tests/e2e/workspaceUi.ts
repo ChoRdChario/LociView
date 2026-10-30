@@ -1,4 +1,12 @@
-import type { Page } from '@playwright/test';
+import { expect, type Page } from '@playwright/test';
+
+/** Select an exact signed direction using the gizmo's keyboard route. */
+export async function lookAlongFront(page: Page) {
+  const axis = page.locator('.lv-project-camera').getByRole('button', { name: 'Z', exact: true });
+  await expect(axis).toBeEnabled();
+  await axis.press('Enter');
+  await expect(axis).toHaveAttribute('aria-pressed', 'true');
+}
 
 /** Navigate the visible product UI; never bypass draft/IME or file guards. */
 export async function revealCaptionList(page: Page) {
