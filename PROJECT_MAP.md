@@ -10,7 +10,7 @@ owns feature coverage. Read [document authority](docs/README.md) for contracts.
 - Existing bounded task: target source, its tests and direct imports.
 - UI work: [approved UI/UX principles](docs/ui-product-guidelines.md).
 - Current design evaluation: [AAA-quality review and control/function inventory](docs/ui-design-review.md), including the2026-10-31 R1–R10 repair groups. Todo distinguishes approved repairs/executed checks from proposed quality acceptance.
-- Approved UI direction: [workspace and copy design](docs/ui-workspace-design.md), [interactive screen reference](docs/mockups/loci-workspace.html). Product implementation, verification and remaining work belong in todo; the prototype is presentation-only.
+- Approved UI direction: [workspace and copy design](docs/ui-workspace-design.md), including the2026-10-31 actual-use record/camera revision; [interactive screen reference](docs/mockups/loci-workspace.html) retains the earlier presentation-only proposal. Product implementation, verification and remaining work belong in todo.
 - Historical claims: [preserved records](docs/history/development-through-2026-09-14/README.md), only when needed. Do not reconstruct current scope from them.
 
 ## Application routes

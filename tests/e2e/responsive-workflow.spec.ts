@@ -85,7 +85,7 @@ test('狭い画面とno-hover touchで100記録をキーボード移動し、編
     await text.dispatchEvent('compositionend'); await expect(text).toHaveValue(body); await detail(page).getByRole('button', { name: '変更を適用', exact: true }).tap(); await expect(page.getByText('変更を適用しました。', { exact: true })).toBeVisible({ timeout: 90_000 });
     const pins = page.getByRole('region', { name: 'ピンの操作', exact: true }); await pins.getByRole('button', { name: '位置を調整', exact: true }).tap(); await pins.getByLabel('位置 X', { exact: true }).fill('4.25');
     await pins.getByRole('button', { name: '取り消す', exact: true }).tap(); await layout(page, 'shortHeight');
-    await page.setViewportSize({ width: 320, height: 720 }); await page.getByRole('region', { name: 'キャプション', exact: true }).getByLabel('検索', { exact: true }).fill('既存のピン'); await list.locator('.lv-caption-select').filter({ hasText: '既存のピン' }).tap();
+    await page.setViewportSize({ width: 320, height: 720 }); await page.getByRole('region', { name: 'キャプション', exact: true }).locator('.lv-caption-search').getByLabel('検索', { exact: true }).fill('既存のピン'); await list.locator('.lv-caption-select').filter({ hasText: '既存のピン' }).tap();
     const gallery = page.getByRole('region', { name: 'メディアの整理', exact: true }), thumb = gallery.getByRole('button').filter({ has: page.locator('img') }).first();
     const attachment=gallery.getByRole('region', { name: '添付メディア', exact: true }).locator('figure').first();await attachment.getByText('添付を整理',{exact:true}).tap();await attachment.getByRole('button', { name: '説明を編集', exact: true }).tap();
     await gallery.getByLabel('メディアの説明', { exact: true }).fill(imageDescription); await gallery.getByRole('button', { name: '説明を適用', exact: true }).tap();
@@ -96,7 +96,7 @@ test('狭い画面とno-hover touchで100記録をキーボード移動し、編
     await page.screenshot({ path: info.outputPath('320pxのメディアビューア.png'), fullPage: true }); await page.keyboard.press('Escape'); await expect(thumb).toBeFocused();
     await layout(page, 'afterImage'); await page.screenshot({ path: info.outputPath('320pxで記録とファイル操作.png'), fullPage: true }); const first = await save(page, '狭い画面の保存', true);
     await close(); page = await launch(); await expect(page.getByText(`最後のプロジェクトを再開しました：${title}`, { exact: true })).toBeVisible({ timeout: 90_000 });
-    await page.getByRole('region', { name: 'キャプション', exact: true }).getByLabel('検索', { exact: true }).fill('100：'); await page.getByRole('list', { name: 'キャプション一覧', exact: true }).locator('.lv-caption-select').filter({ hasText: lastTitle }).tap();
+    await page.getByRole('region', { name: 'キャプション', exact: true }).locator('.lv-caption-search').getByLabel('検索', { exact: true }).fill('100：'); await page.getByRole('list', { name: 'キャプション一覧', exact: true }).locator('.lv-caption-select').filter({ hasText: lastTitle }).tap();
     await expect(detail(page).getByLabel('本文', { exact: true })).toHaveValue(body); await layout(page, 'cold320'); const cold = await save(page, '狭い画面から再開', false); expect(cold).toEqual(first);
     expect(errors).toEqual([]); await page.screenshot({ path: info.outputPath('320pxで末尾の記録を再開.png'), fullPage: true });
   } catch (error) { failed = true; if (current) await current.screenshot({ path: info.outputPath('narrow-failure.png'), fullPage: true }).catch(() => {}); throw error; }

@@ -1,4 +1,4 @@
-import { revealFileSurface, revealCaptionList, revealProjectSelection } from './workspaceUi';
+import { revealCoordinateAdd, revealFileSurface, revealCaptionList, revealProjectSelection } from './workspaceUi';
 import { test, expect, type Page, type TestInfo } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import * as A from '@automerge/automerge';
@@ -81,12 +81,12 @@ test('PC Caption work continues after empty tag focus and cancelled file checks,
     await page.getByRole('button', { name: 'ファイルを開く', exact: true }).click(); await page.getByRole('textbox', { name: 'プロジェクト名', exact: true }).fill('PCで記録を続ける'); await page.getByRole('button', { name: 'プロジェクトを作成', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText('PCで記録を続ける', { timeout: 90_000 });
     await expect(page.getByLabel('3Dモデルの表示', { exact: true })).toHaveAttribute('aria-busy', 'false');
-    await page.getByText('数値で配置', { exact: true }).click(); const owner = page.getByLabel('追加先モデル', { exact: true }); await owner.focus(); await owner.selectOption({ label: '現地モデル.glb' });
+    await revealCoordinateAdd(page); const owner = page.getByLabel('追加先モデル', { exact: true }); await owner.focus(); await owner.selectOption({ label: '現地モデル.glb' });
     await page.getByRole('button', { name: 'このモデルに追加', exact: true }).click();
     for (const [axis, value] of [['X', '0'], ['Y', '.5'], ['Z', '0']]) await page.getByLabel(`位置 ${axis}`, { exact: true }).fill(value!);
     await page.getByRole('button', { name: '位置を確定', exact: true }).click(); await ready(page, 'ピンの位置を確定しました。'); await edit(page, 'タイトル', '確認する場所');
     await workspaceFits(page); await chooseCaption(page, '確認する場所');
-    await page.getByText('キャプションを整理',{exact:true}).click();
+    await page.getByText('記録を整理',{exact:true}).click();
     await page.getByRole('button', { name: '記録を複製', exact: true }).click(); await ready(page, '記録を複製しました。元の記録は変わりません。');
     await edit(page, 'タイトル', '見比べる記録・長い日本語の見出しと現地で確認した内容');
     await chooseCaption(page, '確認する場所'); await chooseCaption(page, '見比べる記録・長い日本語の見出しと現地で確認した内容');
@@ -114,7 +114,7 @@ test('PC Caption work continues after empty tag focus and cancelled file checks,
     await settings.locator(':scope > summary').click(); await expect(help).not.toHaveAttribute('open');
     await expect(settings.getByLabel('このブラウザの表示名', { exact: true })).toHaveValue('入力中の表示名');
     await settings.getByRole('button', { name: '表示名の入力を取り消す', exact: true }).click(); await settings.locator(':scope > summary').click(); await workspaceFits(page);
-    const organize=page.getByText('キャプションを整理',{exact:true}).locator('..');if(!await organize.evaluate(n=>(n as HTMLDetailsElement).open))await organize.locator(':scope > summary').click();
+    const organize=page.getByText('記録を整理',{exact:true}).locator('..');if(!await organize.evaluate(n=>(n as HTMLDetailsElement).open))await organize.locator(':scope > summary').click();
     const tags = page.getByLabel('タグの管理', { exact: true }); await tags.locator(':scope > summary').click();
     await tags.getByLabel('タグ名', { exact: true }).focus(); await page.keyboard.press('Tab'); await page.keyboard.press('Tab');
     await expect(tags.getByRole('button', { name: 'タグの入力を取り消す', exact: true })).toBeHidden();

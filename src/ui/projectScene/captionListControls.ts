@@ -5,7 +5,7 @@ import { CaptionRowLayout } from './captionRowLayout';
 
 /** Synthetic-port UI only. Host owns metadata, editor drafts and renderer effects. */
 export function createCaptionListControls(document: Document, onPlan: (plan: CaptionListPlan) => void,
-  onComposition: (active: boolean) => void) {
+  onComposition: (active: boolean) => void, presentation?: { compact?:boolean }) {
   const make = <K extends keyof HTMLElementTagNameMap>(tag: K, text = '') => {
     const node = document.createElement(tag); node.textContent = text; return node;
   };
@@ -27,7 +27,10 @@ export function createCaptionListControls(document: Document, onPlan: (plan: Cap
   colorBar.append(colorLabel, colorChoices, all, unknown);
   const list = make('ul'); list.className = 'lv-caption-list'; list.setAttribute('aria-label', 'キャプション一覧');
   const empty = make('li'); empty.className = 'lv-caption-empty';
+  const tools=make('section');tools.className='lv-caption-list-tools';tools.setAttribute('aria-label','記録の操作');
   root.append(filters, status, reveal, count, colorBar, list);
+  root.append(tools);
+  if(presentation?.compact){root.className+=' lv-caption-browser-compact';const colors=make('details');colors.className='lv-caption-color-menu';colors.append(make('summary','ピンの色'),colorBar);filters.append(count,colors);}
   let context: CaptionListContext | undefined, composing = false, disposed = false, rendering = false;
   let observedScrollTop = 0;
   let currentView: ReturnType<typeof captionListView> | undefined, virtual = false, measuredWidth = 0;
@@ -276,5 +279,5 @@ export function createCaptionListControls(document: Document, onPlan: (plan: Cap
     for (const entry of colors.values()) entry.cleanup(); for (const entry of rows.values()) entry.cleanup();
     colors.clear(); rows.clear(); root.remove(); if (composing) onComposition(false); composing = false;
   }
-  return { root, render, revealSelected, focusSearch: () => search.focus?.({ preventScroll: true }), dispose, isComposing: () => composing };
+  return { root, tools, render, revealSelected, focusSearch: () => search.focus?.({ preventScroll: true }), dispose, isComposing: () => composing };
 }

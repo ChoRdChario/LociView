@@ -56,7 +56,84 @@ unchanged-feature-classification checks pass; independent review has no findings
 No runtime change or new capacity guarantee; no runtime suite is needed for this
 documentation checkpoint.
 
-## Current boundary —audit and simplify the complete PC control flow
+## Current boundary —record-first editing and direct camera navigation
+
+Verified development checkpoint2026-10-31; Git owns its commit identity. PO's
+actual-use directions cover unclear controls, persistent list/detail, list-owned
+pin work, 描画 completion and direct camera navigation. They supersede old layout
+choices, not data/command contracts. Root is sole writer; three bounded read-only
+reviewers cover operation meaning, input/ports and integration/rendered layout.
+No small PO testing waits or renewed ordinary implementation approvals.
+
+Outcome: select a record in the list → read/edit alongside it → start pin move,
+parent change or organization there → visibly finish/cancel → navigate beside3D
+→ apply drawing edits → save/share/reopen the same Project.
+
+Delivered: common Scene context and three tabs (Caption/model/描画); list/detail
+with stable form owners outside virtual rows; selected-record toolbar; symbol-only
+unselected pins preserving accessible names/color/scale/review; secondary coordinate
+and classification-tag controls; no empty comparison menu. Scene order means list
+order. Existing recorded camera/background/entry data lives in カメラ位置 beside3D,
+with retained input and visible close/completion, not a Saved View task tab.
+Active drawing/Caption completion stays visible; ファイルに保存 remains a separate result.
+Projection, left-drag orbit and hand-icon/keyboard pan are by the gizmo.
+
+Typed local navigation owns controls/display identity and gesture ID, releases on
+cancel/blur/disposal/Scene or display changes, and never writes Project history or
+places pins. Optional cameraReady distinguishes current local camera/controls from
+strict all-model ready, with legacy fallback and current display/Scene/token checks.
+Partial-ready content remains navigable; editing/files/pick/assetIds retain their
+existing strict preparation/write fences. Original data, Session authority, drafts,
+IME, selection, conflict, privacy and recovery rules are retained. No dependency,
+format/schema, migration, renderer/composition policy, capacity or release change.
+
+Final checks at the frozen44-file source/test tree:
+- Typecheck and complete root suite:140 files,3116PASS,21existingTODO (unexecuted).
+- Normal/harness/validation/Desktop/offline builds pass serially; dedicated offline
+  isolation passes14 exact SRI resources with the existing worker/manifest boundary.
+- HEIC isolation passes for all five artifacts; no local decoder PoC enters them.
+- Dedicated owned-Chromium connected cases cover record list/detail/pin actions,
+  orbit/pan/projection, unchanged metadata from navigation, drawing apply/save/reopen,
+  view/edit return, keyboard model/View/drawing drafts and independent-file reopening,
+  Review independent copy, tag-draft return and team conflict/file completion.
+- Held-texture loading flow passes (19.0s): readable/searchable records, actual
+  axis/orbit/pan pixel changes, edit/pin/file fences and exact completed metadata.
+- Final generated artifact's same-app connected → full browser/server shutdown →
+  cold offline edit/save → reconnect/remove preparation → reopen passes (39.5s).
+  Project identity, original changes and model/media bodies are retained.
+- Owned http://127.0.0.1:4191/ returns200 and exact final index/reference bytes.
+  Original4182/browser data are untouched. Preview process/hash receipt and frozen
+  source manifest are in .artifacts/e2e/record-camera-cleanup/preview.json and
+  checkpoint-verified-source.json. Source/test bytes remain unchanged after checks.
+
+Evidence and retained failures are in that same artifact folder. Initial browser runs and independent review exposed ambiguous old selectors, late organization nodes
+outside their sheet, covered close controls, short-layout toolbar overlap and
+intermediate-width clipping. Repaired and independently reviewed actual layout,
+owner return/focus, outside dismissal, unsupported-axis pointer and transparent-
+gizmo-corner behavior; final short/intermediate/narrow images and related cases pass.
+Tag draft return was corrected to focus inside its retained sheet, with dispatch0,
+unchanged token and actual browser coverage. The first root attempt was interrupted
+for that real fix; another environment transition stopped a run before a result.
+Their checkpoint-before-tag-focus-* and checkpoint-before-environment-interruption
+logs remain non-PASS evidence. A completed run's3114PASS/2FAIL is retained in
+checkpoint-before-two-selector-fixes-*: one hidden Apply selector and the partial-
+ready camera regression were fixed, preserving all exact assertions. The final
+full run is3116PASS; no automatic retry, timeout increase, exclusion or assertion weakening.
+The compact PC pin-color disclosure is an explicit documented layout exception;
+existing color matching/selection and noncompact direct controls are unchanged.
+
+Meta-audit: this closes the approved actual-use workflow with independent input,
+integration, visual and document review. Existing g0-baseline/origin and main-only
+Pages deployment boundary remain. No general AAA-quality/device/adoption/release
+pass is inferred; physical iOS/native IME/touch and grouped human acceptance remain
+pending. A staged-content/status update is not a reason to repeat runtime checks.
+
+Next: use this navigation for the already accepted model replacement → pin correction
+→ interrupted recovery and retained local editing flows. Reuse their service and
+owned-browser evidence, fix actual usability defects, then group user acceptance
+on an integrated candidate. No new format, capacity, public entry or deployment.
+
+## Previous verified boundary —audit and simplify the complete PC control flow
 
 PO2026-10-31 requests checking each button/UI against its actual function, finding
 duplicates and development-only separation residue, and repairing unnecessary

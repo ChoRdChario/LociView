@@ -17,7 +17,7 @@ interface OrganizationHost {
 export function createProjectOrganization(document: Document, host: OrganizationHost) {
   const { make, button } = panelNodes(document), sceneRoot = make('div'), captionRoot = make('div'), tagsRoot = make('details');
   sceneRoot.setAttribute('aria-label', 'シーンの整理'); captionRoot.setAttribute('aria-label', '記録の編集操作'); tagsRoot.setAttribute('aria-label', 'タグの管理');
-  const tagsSummary = make('summary', 'タグを管理'); tagsRoot.append(tagsSummary);
+  const tagsSummary = make('summary', '分類タグ'); tagsRoot.append(tagsSummary);
   let disposed = false, composing = false, form: { kind: 'sceneCopy' | 'sceneDelete' | 'tagEdit' | 'tagDelete'; token: string; id: string } | null = null;
   let captured: { token: string; tagId: string | null } | null = null;
   let settingsDraft: { before: string; value: string } | null = null;
@@ -78,8 +78,8 @@ export function createProjectOrganization(document: Document, host: Organization
     if (kind === 'sceneCopy') sceneName.focus();
   };
   const copyScene = button('シーンを複製', () => beginScene('sceneCopy')), removeScene = button('シーンを削除', () => beginScene('sceneDelete'));
-  const up = button('シーンを上へ', () => perform({ kind: 'reorderScene', sceneId: host.source().sceneId, direction: 'up' }, () => host.message('シーンの順序を変更しました。')));
-  const down = button('シーンを下へ', () => perform({ kind: 'reorderScene', sceneId: host.source().sceneId, direction: 'down' }, () => host.message('シーンの順序を変更しました。')));
+  const up = button('表示順を前へ', () => perform({ kind: 'reorderScene', sceneId: host.source().sceneId, direction: 'up' }, () => host.message('シーンの順序を変更しました。')));
+  const down = button('表示順を後へ', () => perform({ kind: 'reorderScene', sceneId: host.source().sceneId, direction: 'down' }, () => host.message('シーンの順序を変更しました。')));
   const confirmScene = button('複製を作成', () => {
     const f = form, s = host.source(); if (!f || f.token !== s.provider.token || f.id !== s.sceneId) return;
     perform(f.kind === 'sceneCopy' ? { kind: 'duplicateScene', sourceId: f.id, name: sceneName.value } : { kind: 'deleteSceneContents', sceneId: f.id }, command => {
@@ -177,7 +177,7 @@ export function createProjectOrganization(document: Document, host: Organization
     tagNote.textContent = stale ? '内容が更新されています。入力は保持しています。取り消して選び直してください。' : form?.kind === 'tagDelete' ? 'すべての記録からこのタグを外します。記録や添付は残ります。' : '';
     tagName.disabled = tagColor.disabled = blocked || !!form && form.kind !== 'tagEdit';
     tagList.replaceChildren();
-    const viewing = host.ports.mode === 'view'; tagsSummary.textContent = viewing ? 'タグ' : 'タグを管理';
+    const viewing = host.ports.mode === 'view'; tagsSummary.textContent = '分類タグ';
     const tagLinks = Object.values(s.provider.details.mutable.captionTagMembershipsById);
     const uncertainLinks = tagLinks.some(f => (f.captionId?.kind !== 'value' || fieldValue(f.captionId) === s.captionId) &&
       (fieldValue(f.lifecycle) as {state?:string}|undefined)?.state !== 'deleted' && !['captionId','tagId', 'lifecycle'].every(key => f[key]?.kind === 'value'));

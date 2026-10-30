@@ -194,3 +194,74 @@
   .lv-project-workspace:has(.lv-pin-task:not([hidden])) > header > .lv-operation-status:not(:empty) { bottom: 230px; }
   .lv-stage-display:has(.lv-pin-task:not([hidden])) > .lv-project-camera { bottom: 240px; }
 }
+/* Record-first workspace: stable list/detail and completion owners. */
+.lv-project-body > aside { overflow: hidden; gap: 8px; }
+.lv-project-body > aside > [aria-label="シーン"] { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; flex: 0 0 auto; max-height: 35%; overflow: auto; }
+.lv-project-body > aside > [aria-label="シーン"] > h2 { display: none; }
+.lv-project-body > aside > [aria-label="シーン"] > div { flex: 1; }
+.lv-project-body > aside > [aria-label="シーン"] > form { flex-basis: 100%; }
+.lv-project-body > aside > [aria-label="シーン"] > details[open] { flex-basis: 100%; }
+.lv-project-body > aside > [role="tabpanel"] { flex: 1 1 0; min-height: 0; overflow: auto; }
+.lv-project-body > aside > .lv-caption-task { display: grid; grid-template-rows: minmax(min-content, 43%) minmax(0, 1fr); gap: 8px; overflow: visible; }
+.lv-caption-task > .lv-caption-browser { min-height: 0; height: auto; display: flex; flex-direction: column; gap: 4px; overflow: visible; }
+.lv-caption-browser-compact > .lv-caption-search { display: flex; align-items: end; gap: 8px; flex: 0 0 auto; }
+.lv-caption-browser-compact .lv-caption-search > label { flex: 1; min-width: 0; }
+.lv-caption-browser-compact .lv-caption-search input { width: 100%; }
+.lv-caption-browser-compact .lv-caption-count { margin: 0 0 10px; white-space: nowrap; font-size: 12px; }
+.lv-caption-color-menu { position: relative; flex: 0 0 auto; }
+.lv-caption-color-menu > summary { min-height: 44px; box-sizing: border-box; padding: 10px 4px; cursor: pointer; }
+.lv-caption-color-menu > .lv-caption-colors { position: absolute; z-index: 7; right: 0; top: 100%; width: 240px; max-height: 180px; overflow: auto; padding: 8px; background: #fbfaf6; border: 1px solid #aaa99f; border-radius: 6px; box-shadow: 0 4px 16px #25282022; }
+.lv-project-body .lv-caption-task .lv-caption-list { flex: 1 1 0; height: 0; min-height: 44px; max-height: none; overflow-y: auto; margin-block: 0; }
+.lv-caption-list-tools { flex: 0 0 auto; }
+.lv-record-tools, .lv-project-workspace .lv-pin-add-row { display: flex; align-items: start; flex-wrap: wrap; gap: 4px; }
+.lv-record-tools > details { flex: 1 1 auto; }
+.lv-record-tools > details > summary { padding: 10px 4px; min-height: 44px; box-sizing: border-box; cursor: pointer; }
+.lv-project-workspace .lv-pin-add-row > details { flex: 1; }
+.lv-pin-add-row > details > summary { padding: 10px 4px; min-height: 44px; box-sizing: border-box; cursor: pointer; }
+.lv-caption-task > .lv-caption-reading { min-height: 0; display: flex; overflow: hidden; border-top: 1px solid #ccc9c1; }
+.lv-caption-reading > .lv-caption-detail { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+.lv-caption-content { flex: 1 1 0; min-height: 0; overflow: auto; scroll-padding-block: 12px; }
+.lv-caption-content > h2 { margin-block: 8px; font-size: 23px; }
+.lv-caption-content > nav { display: flex; justify-content: space-between; }
+.lv-caption-content > :is(div,section,details) { margin-block: 10px; }
+.lv-caption-reading .lv-caption-detail > [data-caption-completion] { position: static; flex: 0 0 auto; margin: 0; padding: 10px 0 0; }
+.lv-caption-reading .lv-caption-detail > [data-caption-completion] + div { flex: 0 0 auto; max-height: 35%; overflow: auto; }
+.lv-project-body > aside > .lv-drawing-task { display: flex; flex-direction: column; overflow: hidden; }
+.lv-drawing-task > .lv-material-editor { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+.lv-material-content { flex: 1 1 0; min-height: 0; overflow: auto; }
+.lv-drawing-task .lv-material-actions { position: static; flex: 0 0 auto; padding: 10px 0 0; }
+.lv-drawing-task > [aria-label="材質の更新候補"] { max-height: 35%; overflow: auto; }
+.lv-project-workspace .lv-project-marker:not([aria-pressed="true"]) { width: 44px; height: 44px; min-height: 44px; padding: 0; max-width: none; overflow: visible; border: 0; box-shadow: none; background: transparent !important; font-size: 0; }
+.lv-project-workspace .lv-project-marker:not([aria-pressed="true"])::before { position: absolute; width: 12px; height: 12px; top: 15px; left: 15px; margin: 0; box-shadow: 0 1px 4px #0005; }
+.lv-project-workspace .lv-project-marker:not([aria-pressed="true"])[data-review="true"]::after { right: -1px; }
+.lv-camera-positions { position: absolute; top: 8px; right: 132px; z-index: 5; }
+.lv-camera-positions > summary { min-height: 44px; padding: 10px 8px; box-sizing: border-box; cursor: pointer; font-size: 13px; }
+.lv-camera-sheet { position: absolute; top: 100%; right: 0; box-sizing: border-box; width: min(360px, calc(100vw - 24px)); max-height: min(560px, calc(100dvh - 180px)); display: flex; flex-direction: column; overflow: hidden; padding: 12px; border: 1px solid #aaa99f; border-radius: 8px; background: #fbfaf6; box-shadow: 0 8px 24px #25282033; }
+.lv-camera-sheet [role="group"] { position: static; flex: 0 0 auto; background: #fbfaf6; }
+.lv-project-camera > .lv-camera-projection { position: absolute; top: 156px; right: 0; width: 112px; pointer-events: auto; font-size: 12px; }
+.lv-camera-projection > label { display: grid; gap: 2px; }
+.lv-camera-projection select { width: 100%; min-height: 44px; font-size: 12px; }
+.lv-camera-projection > :is(p,div):empty { display: none; }
+.lv-project-camera { height: 222px; }
+@media (max-width: 760px) {
+  .lv-camera-positions { right: 126px; top: 8px; }
+  .lv-camera-sheet { position: fixed; top: 132px; right: 12px; max-height: calc(100dvh - 156px); }
+  .lv-project-camera { top: 8px; bottom: auto; }
+}
+@media (min-width: 761px) and (max-width: 900px) {
+  .lv-camera-sheet { position: fixed; top: 132px; left: 12px; right: auto; max-height: calc(100dvh - 156px); }
+}
+.lv-project-camera .lv-camera-pan, .lv-project-shell :is(.lv-project-workspace,.lv-review-workspace) .lv-project-camera .lv-camera-pan { position: absolute; top: 112px; left: 16px; color: #5e7188; touch-action: none; cursor: grab; }
+.lv-project-camera .lv-camera-pan:active { cursor: grabbing; }
+.lv-camera-pan > span { display: inline-block; width: 18px; height: 18px; vertical-align: middle; background: currentColor; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M8 12V5a2 2 0 0 1 4 0v7-9a2 2 0 0 1 4 0v9-6a2 2 0 0 1 4 0v8c0 5-3 8-7 8h-1c-2 0-4-1-5-3L3 13c-1-2 1-4 3-2l2 2' fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/contain no-repeat; }
+.lv-camera-sheet > [aria-label="視点の作業"] { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; max-height: none; }
+.lv-camera-position-content { flex: 1 1 auto; min-height: 0; overflow: auto; }
+.lv-camera-axes { cursor: grab; clip-path: circle(50%); }
+.lv-camera-axes:active { cursor: grabbing; }
+.lv-project-camera[data-navigation-available="false"] .lv-camera-axes { cursor: pointer; }
+.lv-record-tools > details[open], .lv-project-workspace .lv-pin-add-row > details[open] { flex: 1 1 auto; }
+.lv-record-sheet { position: fixed; z-index: 20; box-sizing: border-box; max-width: calc(100vw - 24px); overflow: auto; padding: 12px; border: 1px solid #aaa99f; border-radius: 8px; background: #fbfaf6; box-shadow: 0 8px 24px #25282033; }
+.lv-record-sheet label { margin-block: 6px; }
+.lv-record-sheet select, .lv-record-sheet input { max-width: 100%; }
+.lv-record-sheet > :first-child { margin-top: 0; }
+.lv-camera-sheet-header { display: flex; flex: 0 0 auto; align-items: center; justify-content: space-between; gap: 8px; padding-bottom: 8px; border-bottom: 1px solid #dddcd3; }

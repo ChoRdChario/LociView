@@ -45,10 +45,15 @@ export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: 
   let gsRender:GsRenderPort|null=null,gsGeneration=0,gsPreparing=false,gsIssue:string|null=null,gsPreparationAbort:AbortController|null=null;
   let gizmo: ReturnType<typeof createPinGizmo<PinSurfaceTarget | ModelPlacementTarget>> | null = null;
   let pinPointerActive = false;
+  let navigation:{id:string;kind:'orbit'|'pan';controls:OrbitControls;display:RenderDisplay}|null=null;
   let composite:SmoothComposite|null=null,smoothLayout:TargetLayout|null=null,smoothGeneration=0,smoothPending=false,smoothIssue:string|null=null,smoothPresented=false,waitingBudget=false,refusedAvailable=0,smoothAbort:AbortController|null=null;
   const overlayScene=new THREE.Scene();
   function syncOrbit(manipulating = Boolean(gizmo?.dragging)) {
-    if (controls) controls.enabled = !pinPointerActive && !manipulating;
+    if (controls) controls.enabled = !pinPointerActive && !manipulating && !navigation;
+  }
+  function endNavigation(id?:string,notify=true){
+    if(!navigation||id!==undefined&&navigation.id!==id)return false;
+    observePose();navigation=null;syncOrbit();if(notify){serial++;changed();}return true;
   }
   const mouseNavigation = (event: PointerEvent) => {
     if (!controls || event.pointerType === 'touch' || event.button !== 1) return;
@@ -104,6 +109,7 @@ export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: 
     }
   }
   function release() {
+    endNavigation(undefined,false);
     pickEpoch++;
     pinPointerActive = false;
     gizmo?.dispose(); gizmo = null;
@@ -160,6 +166,7 @@ export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: 
   }
   function installPose() {
     if (!renderer) return;
+    endNavigation(undefined,false);
     pickEpoch++;
     const previousCamera = camera, previousControls = controls, previousGizmo = gizmo, previousBackground = scene.background, previousTouchAction = canvas.style.touchAction;
     applying = true;
@@ -380,6 +387,7 @@ export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: 
   const viewport:ReturnType<ViewportFactory>={
     update(next) {
       if(!admitDisplay(next))return;
+      if(next!==display)endNavigation(undefined,false);
       const sceneChanged = display?.sceneId !== next.sceneId;
       const boundsChanged = JSON.stringify(display?.bounds) !== JSON.stringify(next.bounds);
       const visibilityChanged = JSON.stringify(display?.hiddenAssetIds) !== JSON.stringify(next.hiddenAssetIds);
@@ -403,14 +411,14 @@ export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: 
     },
     setPinPointerActive(next) { pinPointerActive = next; syncOrbit(); },
     pick(target, x, y) {
-      if (!active || disposed || !renderer || !camera || issue || contextLost || dragging || gizmo?.dragging || !display || display.readOnly) return null;
+      if (!active || disposed || !renderer || !camera || issue || contextLost || dragging || navigation || gizmo?.dragging || !display || display.readOnly) return null;
       try { if ([...resident.values()].some(s => s.points&&s.asset.visible&&s.points.object.visible)) { const hit = pointPick([target], x, y); reportPickIssue(); return coverageIssue ? null : hit?.position ?? null; }
         const sample = pickSample(x, y); if (!sample) return null;
         const current=display,currentCamera=camera;const result = presentedPick(()=>pickResidentSurface(current, target, resident, currentCamera, sample.ndc, sample.coverage)); reportPickIssue(); return coverageIssue ? null : result;
       } catch (error) { coverageIssue = errorText(error); reportPickIssue(); return null; }
     },
     pickCreation(targets, x, y) {
-      if (!active || disposed || !renderer || !camera || issue || contextLost || dragging || gizmo?.dragging || !display || display.readOnly) return null;
+      if (!active || disposed || !renderer || !camera || issue || contextLost || dragging || navigation || gizmo?.dragging || !display || display.readOnly) return null;
       try { if ([...resident.values()].some(s => s.points&&s.asset.visible&&s.points.object.visible)) { const hit = pointPick(targets, x, y); reportPickIssue(); return coverageIssue ? null : hit; }
         const sample = pickSample(x, y); if (!sample) return null;
         const current=display,currentCamera=camera;const result = presentedPick(()=>pickResidentCreation(current, targets, resident, currentCamera, sample.ndc, sample.coverage)); reportPickIssue(); return coverageIssue ? null : result;
@@ -434,17 +442,31 @@ export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: 
       return { token: JSON.stringify([serial, display?.sceneId, display?.projectFrameId, display?.bounds, width, height, pose, background]),
         display: display ?? undefined,
         pickToken: String(pickEpoch),
-        ready: Boolean(active && renderer && camera && !issue&&!capacityIssue&&!pendingGsTarget&&!pending.length), loading, issue,retryAvailable:!!capacityIssue||!!gsIssue||!!smoothIssue||[...resident.values()].some(s=>s.gs?.issue!==null&&s.gs?.issue!==undefined&&s.gs.issue!=='GSの表示を準備しています。'),
+        ready: Boolean(active && renderer && camera && !issue&&!capacityIssue&&!pendingGsTarget&&!pending.length), cameraReady:Boolean(active&&renderer&&camera&&controls&&!issue&&!contextLost&&display), loading, issue,retryAvailable:!!capacityIssue||!!gsIssue||!!smoothIssue||[...resident.values()].some(s=>s.gs?.issue!==null&&s.gs?.issue!==undefined&&s.gs.issue!=='GSの表示を準備しています。'),
         notice: [smoothPresented?'透過表示は近似です。':null,smoothPending?'透過表示を準備しています。':null,smoothIssue?`${smoothIssue} 透過の面は非表示です。設定と記録は保持しています。`:null,smoothLayout&&smoothLayout.renderScale<Math.min(1,2/(rawPixelRatio||1))?'3D表示の細かさを自動調整しています。元データと記録は変わりません。':null,pendingGsTarget&&'次のシーンのモデルを確認しています。前の表示を保持しています。',pending.join(' / '),capacityIssue, notice, coverageIssue, gsIssue, pointDiameterNotice, ...new Set([...resident.values()].flatMap(s => [s.points?.issue,s.asset.visible && s.gs ? s.gs.issue ?? (!s.gs.ready && !gsIssue ? 'GSの表示を準備しています。' : null) : null].filter(Boolean))), alphaPicking && !display?.readOnly ? presentation?'滑らかな透過の面は位置指定に使えません。位置の手動調整は利用できます。':'半透明・切り抜きの面へのピン配置は未接続です。原本の見た目は保持しています。' : null,
           ...new Set(materialNotices),
           ...new Set(display?.pins.flatMap(p => p.notice ? [p.notice] : []) ?? []),
           ...(display?.materialNotices ?? []), ...Object.values(display?.materials ?? {}).flatMap(m => 'issue' in m ? [m.issue] : []),
           ...Object.values(display?.savedMaterials ?? {}).flatMap(rows => Object.values(rows).flatMap(m => 'issue' in m ? [m.issue] : []))].filter(Boolean).join(' ') || null,
-        dragging: dragging || !!gizmo?.dragging, manipulating: !!gizmo?.dragging,
+        dragging: dragging || !!navigation || !!gizmo?.dragging, navigating:!!navigation, camera:{position:[...pose.position],target:[...pose.target],up:[...pose.up]}, manipulating: !!gizmo?.dragging,
         projection: pose.projection.kind, axis, pins, preview: display?.preview ? project(display.preview) : undefined };
     },
+    navigateCamera(event){
+      if(event.phase==='end')return endNavigation(event.id);
+      if(event.phase==='begin'){
+        if(disposed||!active||!renderer||!camera||!controls||issue||contextLost||!display||dragging||navigation||gizmo?.dragging)return false;
+        navigation={id:event.id,kind:event.kind,controls,display};syncOrbit();serial++;changed();return true;
+      }
+      const owner=navigation;
+      if(!owner||owner.id!==event.id)return false;
+      if(disposed||!active||!renderer||!camera||!controls||issue||contextLost||display!==owner.display||controls!==owner.controls||dragging||gizmo?.dragging){endNavigation(event.id);return false;}
+      if(!Number.isFinite(event.dx)||!Number.isFinite(event.dy))return false;
+      if(owner.kind==='pan')controls.pan(event.dx,event.dy);
+      else{controls.rotateLeft(2*Math.PI*event.dx/Math.max(1,height));controls.rotateUp(2*Math.PI*event.dy/Math.max(1,height));}
+      controls.update();changed();return true;
+    },
     camera(intent) {
-      if (!active || !renderer || issue || !display || dragging || gizmo?.dragging) throw new Error('3D表示を確認してください。');
+      if (!active || !renderer || issue || !display || dragging || navigation || gizmo?.dragging) throw new Error('3D表示を確認してください。');
       observePose();
       if (intent.kind === 'recall') throw new Error('保存した視点は未接続です。');
       if (intent.kind === 'projection') pose = switchProjection(pose, intent.projection);
@@ -452,12 +474,12 @@ export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: 
       axis = intent.kind === 'axis' ? intent.axis : null; installPose(); observePose(); serial++; changed();
     },
     capture() {
-      if (!active || !renderer || issue || !display || dragging || gizmo?.dragging) throw new Error('3D表示を確認してください。');
+      if (!active || !renderer || issue || !display || dragging || navigation || gizmo?.dragging) throw new Error('3D表示を確認してください。');
       return { camera: readProjectCamera({ position: pose.position, target: pose.target, up: pose.up,
         projection: pose.projection.kind === 'perspective' ? { kind: 'perspective', verticalFovRadians: pose.projection.verticalFov } : pose.projection }), background: readSolidBackground(background) };
     },
     setBackground(input, verify) {
-      if (!active || disposed || !renderer || !camera || issue || contextLost || !display || dragging || gizmo?.dragging) throw new Error('3D表示を確認してください。');
+      if (!active || disposed || !renderer || !camera || issue || contextLost || !display || dragging || navigation || gizmo?.dragging) throw new Error('3D表示を確認してください。');
       const next = readSolidBackground(input), previous = scene.background, previousValue = background;
       // No camera/Orbit/gizmo replacement, fitting, model I/O or rounded readback.
       scene.background = new THREE.Color().setRGB(...next.colorSrgb, THREE.SRGBColorSpace);
@@ -474,7 +496,7 @@ export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: 
       backgrounds.set(display.sceneId, next); serial++; changed();
     },
     recall(payload) {
-      if (!active || !renderer || issue || !display || dragging || gizmo?.dragging) throw new Error('3D表示を確認してください。');
+      if (!active || !renderer || issue || !display || dragging || navigation || gizmo?.dragging) throw new Error('3D表示を確認してください。');
       const previousPose = pose, previousBackground = background, previousAxis = axis;
       try { useCapture(payload); installPose(); }
       catch (e) { pose = previousPose; background = previousBackground; axis = previousAxis; throw e; }

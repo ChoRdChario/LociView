@@ -31,6 +31,11 @@ Read only the relevant topic, not every historical incident.
   and connected tasks before individual repairs. Consolidate causes and repair
   groups first; do not turn each newly mentioned control into an immediate
   implementation/checkpoint while the requested whole-screen review is unfinished.
+  2026-10-31 actual-use refinement: mapping every control to a handler does not
+  establish that its meaning, location or completion is discoverable. Review the
+  user's task and rendered state: list/detail coexistence, record-owned operations,
+  camera controls beside3D and visible active completion. Keep secondary features
+  subordinate and distinguish input application from external-file saving.
   2026-10-27 priority correction: keep the missing accepted features on the
   critical path until the complete set is integrated and coherent. Do not let
   measured latency, helper optimization or repeated verification displace feature

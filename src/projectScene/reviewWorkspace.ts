@@ -96,19 +96,24 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
   const cameraButton = (text: string, action: () => void) => { const button = make('button', text); button.type = 'button'; button.addEventListener('click', () => { if (!button.disabled) cameraAction(action); }); cameraButtons.push(button); views.append(button); };
   const camera = (intent: ViewCameraIntent) => { if (!runtime) throw Error('3D表示を確認してください。'); runtime.camera(intent); };
   const axes = { right: '+x', left: '-x', top: '+y', bottom: '-y', front: '+z', back: '-z' } as const;
-  const cameraGizmo = createCameraGizmo(document, axis => cameraAction(() => camera({ kind: 'axis', axis: axes[axis] })), () => cameraAction(() => camera({ kind: 'fit' })));
+  const cameraGizmo = createCameraGizmo(document, axis => cameraAction(() => camera({ kind: 'axis', axis: axes[axis] })), () => cameraAction(() => camera({ kind: 'fit' })),event=>{
+    if(event.phase==='end')return runtime?.navigateCamera?.(event)??false;
+    if(disposed||composing||moving||event.phase==='begin'&&runtime?.read().dragging)return false;
+    return runtime?.navigateCamera?.(event)??false;
+  });
   viewport.append(cameraGizmo.root);
   const projectionLabel = make('label', '投影方式'), projection = make('select'); projection.setAttribute('aria-label', '投影方式');
   for (const [value, text] of [['perspective', '透視投影'], ['orthographic', '平行投影']]) { const option = make('option', text); option.value = value!; projection.append(option); }
-  projectionLabel.append(projection); views.append(projectionLabel);
+  const projectionArea=make('section');projectionArea.className='lv-camera-projection';projectionLabel.append(projection);projectionArea.append(projectionLabel);cameraGizmo.root.append(projectionArea);
   projection.addEventListener('change', () => { if (!projection.disabled) cameraAction(() => camera({ kind: 'projection', projection: projection.value === 'orthographic' ? 'orthographic' : 'perspective' })); });
   for (const saved of view.views) cameraButton(String(saved.name), () => { if (!runtime?.recall) throw Error('視点を呼び出せません。'); runtime.recall(view.capture(String(saved.id))); });
-  sidebar.append(views, windows.tools);
+  views.hidden=view.views.length===0;sidebar.append(views, windows.tools);
   function paint() {
     if (disposed) return; const observation = runtime?.read(), ready = !!observation?.ready && observation.display === display;
-    const cameraBlocked = !ready || composing || moving || !!observation?.dragging;
-    let captured: unknown; try { captured = runtime?.capture?.().camera; } catch { /* Camera preparation remains local. */ }
-    cameraGizmo.render({ camera: captured, axis: observation?.axis ?? null, blocked: cameraBlocked || !display.bounds });
+    const cameraReady=!!(observation?.cameraReady??observation?.ready)&&observation?.display===display;
+    const cameraBlocked = !cameraReady || composing || moving || !!observation?.dragging;
+    let captured: unknown=observation?.camera; try { captured ??= runtime?.capture?.().camera; } catch { /* Camera preparation remains local. */ }
+    cameraGizmo.render({ camera: captured, axis: observation?.axis ?? null, blocked: cameraBlocked || !display.bounds,navigationBlocked:!cameraReady||composing||moving,navigating:observation?.navigating,navigationAvailable:!!runtime?.navigateCamera });
     projection.disabled = cameraBlocked; projection.value = observation?.projection ?? 'perspective';
     for (const button of cameraButtons) button.disabled = cameraBlocked || !runtime?.recall;
     status.textContent = rendererFailure || failure || observation?.issue || observation?.notice || ''; retry.hidden = !!runtime && !observation?.issue&&!observation?.retryAvailable;

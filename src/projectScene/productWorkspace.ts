@@ -50,7 +50,7 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
     b.addEventListener('click',()=>{if(!fileMenu||b.disabled)return;if(!fileMenu.open)fileOrigin=b;
       if(tools!.showSurface(surface)){core?.dismissDisclosures();fileMenu.open=true;if(b.getAttribute('role')!=='tab')filePanel.focus?.({preventScroll:true});}}); return b;
   };
-  const saveEntry=fileEntry('保存','save'), shareEntry=fileEntry('共有','share'), receiveEntry=fileEntry('受信','receive'), restoreEntry=fileEntry('復元','restore');
+  const saveEntry=fileEntry('ファイルに保存','save'), shareEntry=fileEntry('共有','share'), receiveEntry=fileEntry('受信','receive'), restoreEntry=fileEntry('復元','restore');
   saveEntry.className='lv-workspace-primary'; shareEntry.className='lv-workspace-share';
   filePanel.tabIndex=-1;
   const fileNavigation=document.createElement('div'); fileNavigation.setAttribute('role','tablist'); fileNavigation.setAttribute('aria-label','ファイルの操作');
@@ -177,13 +177,14 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
         try { if (seen.pickToken && runtime.capture) receipt = JSON.stringify([seen.pickToken, runtime.capture()]); } catch { /* No receipt, no pick. */ }
         const current = !!state?.available && rendered === seen.display && state.token === seen.display?.token && state.sceneId === seen.display.sceneId && state.token === read().token;
         const available = current && seen.ready && !seen.issue;
+        const cameraAvailable=current&&(seen.cameraReady??seen.ready)&&!seen.issue;
         const pinIds = new Set(available ? rendered!.pins.map(p => p.id) : []);
         return { token: seen.display?.token ?? '', sceneId: seen.display?.sceneId ?? '', pickToken: available ? receipt : '', ready: available,
-          dragging: seen.dragging || !!seen.manipulating,retryAvailable:seen.retryAvailable, pins: available ? seen.pins.filter(p => pinIds.has(p.id) && Number.isFinite(p.x) && Number.isFinite(p.y)).map(p => {
+          dragging: seen.dragging || !!seen.manipulating,navigating:seen.navigating,camera:seen.camera,cameraReady:cameraAvailable,retryAvailable:seen.retryAvailable, pins: available ? seen.pins.filter(p => pinIds.has(p.id) && Number.isFinite(p.x) && Number.isFinite(p.y)).map(p => {
             const source = rendered!.pins.find(pin => pin.id === p.id)!; return { ...p, scale: source.scale ?? 1, color: source.color, status: source.status, notice: source.notice };
           }) : [], issue: seen.issue, notice: seen.notice ?? null, loading: seen.loading,
           assetIds: available ? seen.display!.models.map(m => m.binding.assetId) : [],
-          view: available && !seen.dragging && !seen.manipulating ? { kind: 'ready' as const, token: seen.token, sceneId: state!.sceneId, projectFrameId: read().resources.projectFrameId,
+          view: cameraAvailable && !seen.dragging && !seen.manipulating ? { kind: 'ready' as const, token: seen.token, sceneId: state!.sceneId, projectFrameId: read().resources.projectFrameId,
             projection: seen.projection, axis: seen.axis, bounds: { kind: 'value' as const, value: seen.display!.bounds ? 'available' as const : 'empty' as const } } :
             { kind: 'unavailable' as const, token: seen.token, sceneId: state?.sceneId ?? '', projectFrameId: read().resources.projectFrameId, reason: seen.issue ?? '3D表示を確認してください。' } };
       };
@@ -245,6 +246,9 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
           return { camera: readProjectCamera(payload.camera) as unknown as import('../domain/values').JsonObject, background: readSolidBackground(payload.background) }; },
         recall(payload) { if (!runtime.recall) throw Error('視点を呼び出せません。'); runtime.recall({ camera: readProjectCamera(payload.camera), background: readSolidBackground(payload.background) }); },
         viewCamera: intent => runtime.camera(intent),
+        get navigateCamera(){if(!runtime.navigateCamera)return undefined;return(event:Parameters<NonNullable<ProjectViewport['navigateCamera']>>[0])=>{if(event.phase==='end')return runtime.navigateCamera?.(event)??false;
+          if(closed||!state||pointerHeld||state.windowMoving||state.token!==read().token||!observation().cameraReady)return false;
+          return runtime.navigateCamera?.(event)??false;};},
         background(input, verify) { if (!runtime.setBackground) throw Error('背景を変更できません。'); runtime.setBackground(input, verify); },
         dispose() { if (!closed) { closed = true;if(mainRuntime===runtime)mainRuntime=undefined; runtime.setActive(false); runtime.dispose(); } },
       };

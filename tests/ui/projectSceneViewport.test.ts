@@ -361,6 +361,23 @@ describe('synthetic Scene display; GPU mocked, not rendered/browser acceptance',
     expect(tracker.controls.at(-1).mouseButtons).toEqual({ MIDDLE: THREE.MOUSE.ROTATE });
     expect(v.capture!()).toEqual(beforeHide); v.dispose();
   });
+  it.each(['perspective','orthographic'] as const)('owns overlay orbit/pan without replacing controls or writing display data (%s)',projection=>{
+    tracker.realOrbit=true;const canvas=fakeCanvas();controlEventTarget(canvas.canvas as unknown as HTMLCanvasElement);
+    const v=createSyntheticViewport(canvas.canvas as unknown as HTMLCanvasElement,()=>{}),display=syntheticDisplay(createSyntheticProject(),f.overview,null,null);
+    v.update(display);expect(v.navigateCamera?.({phase:'begin',id:'not-ready',kind:'orbit'})).toBe(false);v.setActive(true);v.camera({kind:'projection',projection});
+    const controls=tracker.controls.at(-1),camera=controls.object,position=camera.position.clone(),target=controls.target.clone(),distance=position.distanceTo(target);
+    v.setPinPointerActive?.(true);expect(v.navigateCamera?.({phase:'begin',id:'rotate',kind:'orbit'})).toBe(true);expect(v.read().navigating).toBe(true);expect(()=>v.capture!()).toThrow();
+    expect(v.navigateCamera?.({phase:'move',id:'stale',dx:30,dy:20})).toBe(false);expect(v.navigateCamera?.({phase:'end',id:'stale'})).toBe(false);
+    expect(v.navigateCamera?.({phase:'move',id:'rotate',dx:30,dy:20})).toBe(true);expect(camera.position).not.toEqual(position);expect(controls.target).toEqual(target);
+    expect(camera.position.distanceTo(controls.target)).toBeCloseTo(distance,10);expect(v.read().camera?.position).toEqual(camera.position.toArray());expect(tracker.controls.at(-1)).toBe(controls);
+    expect(v.navigateCamera?.({phase:'end',id:'rotate'})).toBe(true);expect(v.capture!().camera.position).toEqual(camera.position.toArray());
+    const beforePan=camera.position.clone(),beforeTarget=controls.target.clone();expect(v.navigateCamera?.({phase:'begin',id:'pan',kind:'pan'})).toBe(true);
+    expect(v.navigateCamera?.({phase:'end',id:'rotate'})).toBe(false);expect(v.navigateCamera?.({phase:'move',id:'pan',dx:40,dy:-20})).toBe(true);
+    const translation=camera.position.clone().sub(beforePan);expect(translation.length()).toBeGreaterThan(0);translation.toArray().forEach((n:number,i:number)=>expect(n).toBeCloseTo(controls.target.clone().sub(beforeTarget).toArray()[i]!,10));
+    expect(v.navigateCamera?.({phase:'move',id:'pan',dx:NaN,dy:0})).toBe(false);expect(v.read().display).toBe(display);
+    v.update({...display,token:display.token+'-new'});expect(v.read().navigating).toBe(false);expect(v.navigateCamera?.({phase:'move',id:'pan',dx:1,dy:1})).toBe(false);
+    expect(v.navigateCamera?.({phase:'begin',id:'closing',kind:'pan'})).toBe(true);v.setActive(false);expect(v.read().navigating).toBe(false);expect(v.navigateCamera?.({phase:'end',id:'closing'})).toBe(false);v.dispose();
+  });
   it.each([false, true])('reserves placement before actual Orbit starts (Shift=%s), including tiny movement and cancellation', async shifted => {
     tracker.realOrbit = true;
     const doc = new RecordedDocument(), s = new SyntheticSession(); let v: ReturnType<typeof createSyntheticViewport>;
@@ -665,8 +682,8 @@ describe('synthetic Scene display; GPU mocked, not rendered/browser acceptance',
     const canvas=fakeCanvas(),create=vi.fn(()=>{const asset=new THREE.Group(),mesh=new THREE.Mesh(new THREE.BoxGeometry(),new THREE.MeshStandardMaterial());asset.add(mesh);surfaces.push(asset);
       const dispose=vi.fn(()=>{asset.removeFromParent();mesh.geometry.dispose();mesh.material.dispose();});releases.push(dispose);return{asset,mesh,dispose};});
     const v=sceneViewportFactory({create,dispose(){},gsDemand(){throw Error('A Mesh is not a GS demand');},state:m=>({phase:m.representation.id===rows[0]!.representation.id||loaded?'ready':'loading'}),subscribe(changed){notify=changed;return()=>{};}},createGsResidency(500,44500))(canvas.canvas as unknown as HTMLCanvasElement,()=>{});
-    v.update({...base,models:rows});v.setActive(true);canvas.show();expect(create).toHaveBeenCalledOnce();expect(v.read()).toMatchObject({ready:false,loading:true});
-    v.camera({kind:'axis',axis:'+x'});const pose=v.capture!(),control=tracker.controls.at(-1);
+    v.update({...base,models:rows});v.setActive(true);canvas.show();expect(create).toHaveBeenCalledOnce();expect(v.read()).toMatchObject({ready:false,cameraReady:true,loading:true});
+    v.camera({kind:'axis',axis:'+x'});expect(v.navigateCamera!({phase:'begin',id:'partial-camera',kind:'pan'})).toBe(true);expect(v.navigateCamera!({phase:'end',id:'partial-camera'})).toBe(true);expect(v.read().ready).toBe(false);const pose=v.capture!(),control=tracker.controls.at(-1);
     loaded=true;notify();expect(create).toHaveBeenCalledTimes(2);expect(releases[0]).not.toHaveBeenCalled();expect(v.capture!()).toEqual(pose);expect(tracker.controls.at(-1)).toBe(control);expect(v.read().ready).toBe(true);
     expect((tracker.renderers[0].scene.children[0] as THREE.Group).children).toEqual(surfaces);v.dispose();expect(releases.every(release=>release.mock.calls.length===1)).toBe(true);
   });

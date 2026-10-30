@@ -75,8 +75,8 @@ export function createMaterialControls(document: Document, onPlan: (plan: Materi
   const actions = make('div'), apply = button('変更を適用'), cancel = button('取り消す'), remove = button('この範囲の設定を解除'), retry = button('再試行'), review = button('状態を確認');
   actions.className = 'lv-material-actions'; apply.className = 'lv-material-primary'; actions.append(apply, cancel, remove, retry, review);
   const confirmBox = make('section'), confirmText = make('p'), confirm = button(''), keep = button('戻る'); confirmBox.setAttribute('aria-label', '操作の確認'); confirmBox.hidden = true; confirmBox.append(confirmText, confirm, keep);
-  root.append(choices, status, observed, impact, unavailable, begin, editor, actions, confirmBox);
-  root.append(reading);
+  const content=make('div');content.className='lv-material-content';content.append(choices,status,observed,impact,unavailable,begin,editor,reading);
+  root.append(content,actions,confirmBox);
   editOnly(begin, editor, apply, cancel, remove, retry, review, confirmBox);
   listen(apply, 'click', () => { if (!apply.disabled) request({ kind: 'apply' }); });
   listen(retry, 'click', () => { if (!retry.disabled) request({ kind: 'retry' }); });

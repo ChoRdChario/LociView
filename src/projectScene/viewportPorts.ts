@@ -1,4 +1,4 @@
-import type { ViewCameraIntent,ViewAxis } from '../ui/projectScene/viewState';
+import type { CameraNavigationEvent,CameraOrientation,ViewCameraIntent,ViewAxis } from '../ui/projectScene/viewState';
 import type { RenderDisplay,V3 } from './viewportModel';
 import type { PinSurfaceTarget } from './viewportPicking';
 import type { ModelPlacementTarget } from './pinGizmo';
@@ -12,6 +12,7 @@ export interface ViewportObservation {
   /** Changes for geometry/camera lifetime, but not an Orbit start/end without movement. */
   readonly pickToken?: string;
   readonly manipulating?: boolean;
+  readonly camera?:CameraOrientation;readonly navigating?:boolean;readonly cameraReady?:boolean;
   readonly notice?: string | null;
   readonly loading?: boolean;
   readonly retryAvailable?: boolean;
@@ -25,6 +26,7 @@ export interface ProjectViewport {
   /** Reserve placement input before Orbit receives pointerdown; independent of gizmo activity. */
   setPinPointerActive?(active: boolean): void;
   read(): ViewportObservation; camera(intent: ViewCameraIntent): void; retry(): void; dispose(): void;
+  navigateCamera?(event:CameraNavigationEvent):boolean;
   capture?(): DisplayCapture; recall?(payload: DisplayCapture): void;
   /** Includes exact readback verification; thrown verification must roll back before publication. */
   setBackground?(background: SolidBackground, verify?: () => void): void;

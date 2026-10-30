@@ -6,6 +6,13 @@ next action and actual stop conditions; [inventory](implementation-inventory.md)
 owns route-specific coverage. Check actual Git branch/HEAD/worktree and preserve
 existing changes. Do not reconstruct current work from completed checkpoint prose.
 
+PO2026-10-31 actual-use feedback now owns the current boundary: persistent
+Caption list/detail, list-owned pin/reparent/organization actions, symbol-only
+unselected pins, 描画 with visible completion, and camera positions/projection/
+orbit/pan beside3D. Read the first dated revision in the workspace design.
+Todo owns final checks, failures/fixes and remaining work. Earlier audit/prototype
+layouts below are historical context, not a reason to reinstate the Saved View tab.
+
 PO2026-10-30 corrects the UI work order: finish the whole-screen/connected-flow
 issue list and repair groups before individual fixes. Read todo's current boundary.
 The completed review and screen proposal now have explicit implementation approval.
@@ -53,14 +60,16 @@ Do not infer physical-device, general adoption or release acceptance.
 
 The owned product preview is http://127.0.0.1:4191/ (offline-desktop-dist), separate
 from the original validation origin and the4190 visual prototype. Its index hash
-and owned process/session are recorded in .artifacts/e2e/ui-control-cleanup/preview.json
-(previous receipts: .artifacts/e2e/unified-startup/preview.json,
+and owned preview process are recorded in .artifacts/e2e/record-camera-cleanup/preview.json
+(previous receipts: .artifacts/e2e/ui-control-cleanup/preview.json, .artifacts/e2e/unified-startup/preview.json,
 .artifacts/e2e/workspace-completion/preview.json and
 .artifacts/e2e/gizmo/preview.json).
 Existing resumption data stays at the original address; use an exported file here.
 The current source/test manifest is checkpoint-verified-source.json under
-.artifacts/e2e/ui-control-cleanup, alongside required checks, browser results and
-retained failures. Todo distinguishes the final generated artifact's cold cycle
+.artifacts/e2e/record-camera-cleanup, alongside required checks, browser results and
+retained failures. The record/camera workflow now passes its frozen-tree final
+checkpoint and final-artifact cold cycle; the earlier control-audit evidence stays
+in ui-control-cleanup. Todo distinguishes the final generated artifact's cold cycle
 from reload-only cases. Earlier unified-startup/content-first/gizmo evidence stays
 in its own folders. No aggregate AAA-quality/device/adoption/release pass is implied.
 Documentation/staging/Push alone is not a reason to repeat runtime checks.

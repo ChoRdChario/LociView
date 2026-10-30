@@ -23,6 +23,7 @@ export function createDeferredViewport() {
       update(next) { display = next; runtime?.update(next); }, setActive(next) { active = next; runtime?.setActive(next); },
       read: () => runtime?.read() ?? { token: '', display, ready: false, issue: null, loading: true, dragging: false, projection: 'perspective', axis: null, pins: [] },
       camera(intent) { if (!runtime) throw Error('3Dモデルを読み込んでいます。'); runtime.camera(intent); },
+      get navigateCamera(){return runtime?.navigateCamera?(event:Parameters<NonNullable<ProjectViewport['navigateCamera']>>[0])=>runtime?.navigateCamera?.(event)??false:undefined;},
       retry() { runtime?.retry(); }, capture() { if (!runtime?.capture) throw Error('3Dモデルを読み込んでいます。'); return runtime.capture(); },
       recall: payload => runtime?.recall?.(payload), setBackground(input, verify) { if (!runtime?.setBackground) throw Error('3Dモデルを読み込んでいます。'); runtime.setBackground(input, verify); },
       setPinPointerActive: value => runtime?.setPinPointerActive?.(value), pointDiameter: id => runtime?.pointDiameter?.(id) ?? 3,

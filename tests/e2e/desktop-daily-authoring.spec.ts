@@ -1,4 +1,4 @@
-import { revealFileSurface } from './workspaceUi';
+import { revealCoordinateAdd, revealFileSurface } from './workspaceUi';
 import { test, expect, chromium, type Page, type BrowserContext, type TestInfo } from '@playwright/test';
 import { mkdir, mkdtemp, readFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
@@ -44,7 +44,7 @@ test('daily Scene and Caption organization, tags, alignment, settings and files 
     console.log('daily: project created');
     const originalSceneName = await p.getByRole('region', { name: 'シーン', exact: true }).locator('button[aria-pressed="true"]').innerText();
     expect(originalSceneName).toBe('シーン 1');
-    await p.getByText('数値で配置', { exact: true }).click(); const owner = p.getByLabel('追加先モデル', { exact: true }); await owner.focus(); await owner.selectOption({ label: '基準.glb' }); await expect(p.getByRole('button', { name: 'このモデルに追加', exact: true })).toBeEnabled(); await p.getByRole('button', { name: 'このモデルに追加', exact: true }).click();
+    await revealCoordinateAdd(p); const owner = p.getByLabel('追加先モデル', { exact: true }); await owner.focus(); await owner.selectOption({ label: '基準.glb' }); await expect(p.getByRole('button', { name: 'このモデルに追加', exact: true })).toBeEnabled(); await p.getByRole('button', { name: 'このモデルに追加', exact: true }).click();
     for (const [axis, value] of [['X', '0'], ['Y', '.5'], ['Z', '0']]) await p.getByLabel(`位置 ${axis}`, { exact: true }).fill(value!);
     await p.getByRole('button', { name: '位置を確定', exact: true }).click(); await ready(p, 'ピンの位置を確定しました。');
     await p.getByRole('button', { name: '記録の変更を元に戻す', exact: true }).click(); await ready(p, '記録の変更を元に戻しました。'); await expect(p.locator('.lv-caption-select')).toHaveCount(0);
@@ -84,10 +84,10 @@ test('daily Scene and Caption organization, tags, alignment, settings and files 
     await p.getByRole('button', { name: '次の記録', exact: true }).click(); await expect(p.getByLabel('タイトル', { exact: true })).toHaveValue('元の記録');
     await p.getByRole('button', { name: '前の記録', exact: true }).click(); await expect(p.getByLabel('タイトル', { exact: true })).toHaveValue('複製の記録');
     console.log('daily: records and undo verified');
-    const search = p.getByRole('region', { name: 'キャプション', exact: true }).getByLabel('検索', { exact: true });
+    const search = p.getByRole('region', { name: 'キャプション', exact: true }).locator('.lv-caption-search').getByLabel('検索', { exact: true });
     await search.fill('複製'); await expect(p.getByRole('button', { name: '次の記録', exact: true })).toBeDisabled(); await search.fill('');
     await p.getByText('シーンを管理', { exact: true }).click(); await p.getByRole('button', { name: 'シーンを複製', exact: true }).click(); await p.getByLabel('複製するシーン名', { exact: true }).fill('現地調査'); await p.getByRole('button', { name: '複製を作成', exact: true }).click(); await ready(p, 'シーンを複製しました。記録は別々に編集できます。');
-    await p.getByRole('button', { name: 'シーンを上へ', exact: true }).click(); await ready(p, 'シーンの順序を変更しました。');
+    await p.getByRole('button', { name: '表示順を前へ', exact: true }).click(); await ready(p, 'シーンの順序を変更しました。');
     await p.getByRole('button', { name: '開始シーンにする', exact: true }).click(); await p.getByRole('button', { name: '開始シーンを設定', exact: true }).click(); await ready(p, '開始シーンを設定しました。');
     await p.getByRole('region', { name: 'シーン', exact: true }).getByRole('button', { name: originalSceneName, exact: true }).click(); await p.getByRole('button', { name: 'シーンを削除', exact: true }).click(); await p.getByRole('button', { name: 'このシーンを削除する', exact: true }).click(); await ready(p, 'シーンを削除しました。記録・モデル・画像はプロジェクトに残っています。');
     console.log('daily: Scene organization verified');

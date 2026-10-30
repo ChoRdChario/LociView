@@ -65,6 +65,19 @@ actual unified menus. These cases do not access the personal4182 origin.
 the older reader/noncompact fallback. Run results and earlier failures belong in
 todo, not an inferred matrix pass. Service Workers remain blocked in these cases.
 
+The record/camera revision uses `desktop-record-camera.spec.ts` for simultaneous
+list/detail, list-owned pin actions, unselected markers, pointer/keyboard camera
+navigation, unchanged metadata from navigation, drawing completion, real backup
+and reopen, short/intermediate/narrow layouts and retained camera input.
+`desktop-view-task-workflow.spec.ts` also owns its artifact server and peer context;
+keyboard task switching and View/material/model draft ownership retain their
+existing file assertions. These use the offline artifact with Service Workers
+blocked; the separate same-app cold cycle above owns offline evidence.
+`desktop-loading.spec.ts` owns its offline-artifact server as well. It holds a
+texture decode while reading/searching records and checks actual axis/orbit/pan
+pixel changes on ready content, unchanged edit/file/pin fences and exact metadata
+before/after completion. Local `cameraReady` is distinct from all-model `ready`.
+
 Approved09 has an additional `playwright.offline.config.ts` lane:
 
 ```powershell

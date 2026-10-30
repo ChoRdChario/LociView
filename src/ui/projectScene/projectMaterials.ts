@@ -7,7 +7,7 @@ import { fieldValue } from './projectRead';
 
 export function createProjectMaterials(document: Document, host: ProjectPanelHost): ProjectPanel {
   const { make, button } = panelNodes(document), root = make('section'), review = make('section');
-  root.setAttribute('aria-label', '材質の作業'); review.setAttribute('aria-label', '材質の更新候補');
+  root.className='lv-drawing-task';root.setAttribute('aria-label', '描画の作業'); review.setAttribute('aria-label', '材質の更新候補');
   const states = new Map<string, { selection: MaterialSelection; draft: MaterialDraft | null; followedModel?: string | null }>();
   const choices = new Map<string, { token: string; appearance?: string; compositing?: string; owner?: string }>();
   const reviewNodes = new Map<string, HTMLElement>();

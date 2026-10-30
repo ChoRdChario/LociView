@@ -1,4 +1,4 @@
-import { beginSceneCreation, revealCaptionList } from './workspaceUi';
+import { revealCoordinateAdd, beginSceneCreation, revealCaptionList } from './workspaceUi';
 import { test, expect, chromium, type BrowserContext, type Page, type TestInfo } from '@playwright/test';
 import { createHash } from 'node:crypto';
 import { mkdir, mkdtemp, readFile, readdir } from 'node:fs/promises';
@@ -168,7 +168,7 @@ test('独立した二人が実ファイルを二往復し、手元の画像と�
       await a.getByRole('textbox', { name: 'プロジェクト名', exact: true }).fill(projectName);
       await a.getByRole('button', { name: 'プロジェクトを作成', exact: true }).click();
       await expect(a.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText(projectName);
-      await a.getByText('数値で配置', { exact: true }).click();
+      await revealCoordinateAdd(a);
       const model = a.getByLabel('追加先モデル', { exact: true }); await model.focus();
       const options = await model.locator('option').evaluateAll(nodes => nodes.map(node => (node as HTMLOptionElement).value).filter(Boolean));
       expect(options).toHaveLength(1); await model.selectOption(options[0]!);

@@ -5,7 +5,7 @@ import type { Anchor } from '../../scene/types';
 import type { JsonObject } from '../../domain/values';
 import type { Field } from '../../scene/types';
 import type { MaterialSource } from './materialState';
-import type { ViewCameraIntent, ViewRuntime, ViewSource } from './viewState';
+import type { CameraNavigationEvent, CameraOrientation, ViewCameraIntent, ViewRuntime, ViewSource } from './viewState';
 import type { ViewFieldVersions } from './viewAuthoringState';
 import type { CaptionSnapshot } from '../../projectMetadata/captionAuthoring';
 import type { CaptionUndoInput, CaptionUndoCapture, CaptionUndoReceipt, CaptionUndoTarget, CaptionUndoSnapshot } from '../../projectMetadata/captionUndo';
@@ -71,7 +71,7 @@ export interface WorkspaceViewport {
   setPointDiameter?(assetId: string, diameter: number): void;
   pointDiameter?(assetId: string): number;
   reservePointer(active: boolean): void;
-  read(): { token: string; sceneId: string; pickToken: string; ready: boolean; dragging: boolean; issue: string | null; notice: string | null;readonly loading?:boolean;readonly retryAvailable?:boolean;
+  read(): { token: string; sceneId: string; pickToken: string; ready: boolean; dragging: boolean; issue: string | null; notice: string | null;readonly loading?:boolean;readonly retryAvailable?:boolean;readonly camera?:CameraOrientation;readonly navigating?:boolean;readonly cameraReady?:boolean;
     pins: readonly { id: string; x: number; y: number; visible: boolean; scale?: number; color?: string; status?: 'normal' | 'needsReview'; notice?: string }[]; readonly assetIds?: readonly string[]; readonly view?: ViewRuntime };
   target(assetId: string): WorkspaceSurface | null;
   camera(action: 'fit' | 'front' | 'back' | 'left' | 'right' | 'top' | 'bottom'): void;
@@ -79,6 +79,7 @@ export interface WorkspaceViewport {
   capture(): WorkspaceViewPayload;
   recall(payload: WorkspaceViewPayload): void;
   viewCamera(intent: ViewCameraIntent): void;
+  navigateCamera?(event:CameraNavigationEvent):boolean;
   background(background: WorkspaceViewPayload['background'], verify: () => void): void;
   dispose(): void;
 }

@@ -48,20 +48,20 @@ function host(initial = fixture()) {
       context = applyLocal(context, plan); controls.render(context);
     }
   });
-  controls.render(context); const root = record(controls.root), choices = root.children[0]!, actions = root.children.find(n => n.className === 'lv-material-actions')!, confirmation = root.children.find(n => n.getAttribute('aria-label') === '操作の確認')!;
+  controls.render(context); const root = record(controls.root), content=root.children.find(n=>n.className==='lv-material-content')!, choices = content.children[0]!, actions = root.children.find(n => n.className === 'lv-material-actions')!, confirmation = root.children.find(n => n.getAttribute('aria-label') === '操作の確認')!;
   const descendants = (node: ReturnType<typeof record>): ReturnType<typeof record>[] => [node,...node.children.flatMap(descendants)];
-  const fields = new Map(materialFields.map(field => [field, descendants(root.children.find(n => n.className === 'lv-material-fields')!).find(node=>node.attributes.get('aria-label')===materialFieldLabels[field])!]));
-  return { document, controls, root, fields, plans, model: choices.children[0]!.children[0]!, surface: choices.children[1]!.children[0]!, scope: choices.children[2]!.children[0]!,
-    status: root.children[1]!, observed: root.children[2]!, impact: root.children[3]!, begin: root.children.find(n => n.tag === 'button' && n.textContent === '設定を編集')!, apply: actions.children[0]!, cancel: actions.children[1]!, remove: actions.children[2]!, retry: actions.children[3]!, review: actions.children[4]!,
+  const fields = new Map(materialFields.map(field => [field, descendants(content.children.find(n => n.className === 'lv-material-fields')!).find(node=>node.attributes.get('aria-label')===materialFieldLabels[field])!]));
+  return { document, controls, root, content, fields, plans, model: choices.children[0]!.children[0]!, surface: choices.children[1]!.children[0]!, scope: choices.children[2]!.children[0]!,
+    status: content.children[1]!, observed: content.children[2]!, impact: content.children[3]!, begin: content.children.find(n => n.tag === 'button' && n.textContent === '設定を編集')!, apply: actions.children[0]!, cancel: actions.children[1]!, remove: actions.children[2]!, retry: actions.children[3]!, review: actions.children[4]!,
     confirmation, confirm: confirmation.children[1]!, get context() { return context; }, render(next: MaterialContext) { if (controls.render(next)) context = next; } };
 }
 
 describe('disconnected material controls (not rendering, browser or save acceptance)', () => {
   it('shows a proven empty or unsupported catalog once without hiding a retained draft or unresolved evidence', () => {
     const base = surface(), unsupported = { ...base, project: value(null), fieldIssues: Object.fromEntries(materialFields.map(field => [field, 'この設定は調整できません。'])) as Record<MaterialEditField, string> };
-    const h = host(fixture(true, unsupported)), fields = h.root.children.find(n => n.className === 'lv-material-fields')!;
+    const h = host(fixture(true, unsupported)), fields = h.content.children.find(n => n.className === 'lv-material-fields')!;
     expect(h.begin.hidden).toBe(true); expect(fields.hidden).toBe(true);
-    expect(h.root.children.filter(n => n.textContent.includes('調整項目がありません'))).toHaveLength(1);
+    expect(h.content.children.filter(n => n.textContent.includes('調整項目がありません'))).toHaveLength(1);
     const retained = edit(editing(fixture(true, { ...base, project: value(null) })), 'opacity', '50'), input = h.fields.get('opacity')!;
     h.render({ ...retained, source: fixture(true, unsupported).source });
     expect(fields.hidden).toBe(false); expect(h.fields.get('opacity')).toBe(input); expect(input.value).toBe('50'); expect(h.apply.disabled).toBe(true);
@@ -80,7 +80,7 @@ describe('disconnected material controls (not rendering, browser or save accepta
   });
   it('keeps inherited Project canonical values when source editing is unavailable', () => {
     const current = surface(), blocked = { ...current, fieldIssues: Object.fromEntries(materialFields.map(field => [field, 'この元材質は調整できません。'])) as Record<MaterialEditField, string> };
-    const h = host(fixture(true, blocked)), reading = h.root.children.find(n => n.className === 'lv-material-values')!;
+    const h = host(fixture(true, blocked)), reading = h.content.children.find(n => n.className === 'lv-material-values')!;
     expect(h.begin.hidden).toBe(true); expect(reading.hidden).toBe(false);
     expect(reading.dataset.noneditable).toBe('true');
     expect(reading.children.find(n => n.getAttribute('data-material-field') === 'opacity')!.children[1]!.textContent).toBe('40');
@@ -88,7 +88,7 @@ describe('disconnected material controls (not rendering, browser or save accepta
   });
   it('keeps canonical material values and field warnings readable separately from an editing draft', () => {
     const h = host(edit(editing(), 'lighting', 'unlit'));
-    const reading = h.root.children.find(n => n.className === 'lv-material-values')!, lighting = reading.children.find(n => n.attributes.get('data-material-field') === 'lighting')!;
+    const reading = h.content.children.find(n => n.className === 'lv-material-values')!, lighting = reading.children.find(n => n.attributes.get('data-material-field') === 'lighting')!;
     expect(reading.attributes.has('data-lv-view-only')).toBe(true);
     expect(lighting.children[1]!.textContent).toBe('元の設定'); expect(h.fields.get('lighting')!.value).toBe('unlit');
     expect(h.review.attributes.has('data-lv-edit-only')).toBe(true);
@@ -124,7 +124,7 @@ describe('disconnected material controls (not rendering, browser or save accepta
     expect(h.apply.disabled).toBe(false); h.apply.fire('click');
     const plan=h.plans.at(-1)!; if(plan.kind!=='apply') throw Error('apply');
     expect(plan.intent.appearance).toEqual(before); expect(plan.intent.compositing.coverage).toEqual({policy:'mask',alphaCutoff:0});
-    const help = h.root.children.find(n => n.className === 'lv-material-fields')!.children.at(-1)!.children[1]!;
+    const help = h.content.children.find(n => n.className === 'lv-material-fields')!.children.at(-1)!.children[1]!;
     expect(help.attributes.get('role')).toBe('tooltip'); expect(help.hidden).toBe(true);
     expect(help.textContent).toContain('滑らかな半透明にはなりません');
     expect(coverage.attributes.get('aria-describedby')?.split(' ')).toContain(help.id);

@@ -1,5 +1,24 @@
 import { expect, type Page } from '@playwright/test';
 
+/** Same pin-add intent; retained readers can still use their earlier wording. */
+export async function revealCoordinateAdd(page:Page){
+  const current=page.getByText('座標で追加',{exact:true}),summary=await current.count()?current:page.getByText('数値で配置',{exact:true});
+  if(!await summary.locator('..').evaluate(n=>(n as HTMLDetailsElement).open))await summary.click();
+}
+
+export async function revealWorkPanel(page:Page){
+  const panel=page.getByRole('button',{name:'作業パネル',exact:true});if(await panel.isVisible()&&await panel.getAttribute('aria-pressed')!=='true')await panel.click();
+}
+
+/** Uses the actual camera drawer; old fixed readers retain their tab. */
+export async function revealCameraPositions(page:Page){
+  const camera=page.locator('.lv-camera-positions');
+  if(await camera.count()){
+    const stage=page.getByRole('button',{name:'3D・比較',exact:true});if(await stage.isVisible()&&await stage.getAttribute('aria-pressed')!=='true')await stage.click();
+    if(!await camera.evaluate(n=>(n as HTMLDetailsElement).open))await camera.locator(':scope > summary').click();
+  }else await page.getByRole('tab',{name:'保存した視点',exact:true}).click();
+}
+
 /** Select an exact signed direction using the gizmo's keyboard route. */
 export async function lookAlongFront(page: Page) {
   const axis = page.locator('.lv-project-camera').getByRole('button', { name: 'Z', exact: true });

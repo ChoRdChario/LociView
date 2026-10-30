@@ -3,6 +3,10 @@ import type { Field, View } from '../../scene/types';
 export const viewAxes = Object.freeze(['+x', '-x', '+y', '-y', '+z', '-z'] as const);
 export type ViewAxis = typeof viewAxes[number];
 export type ViewProjection = 'perspective' | 'orthographic';
+/** Local camera input only; no metadata command or persisted coordinate. */
+export type CameraNavigationEvent = Readonly<{phase:'begin';id:string;kind:'orbit'|'pan'}> |
+  Readonly<{phase:'move';id:string;dx:number;dy:number}> | Readonly<{phase:'end';id:string}>;
+export interface CameraOrientation { readonly position:readonly number[];readonly target:readonly number[];readonly up:readonly number[] }
 /** Validated Project records, not raw metadata or a new camera schema. */
 export interface SavedViewItem extends View { readonly name: Field<string>; readonly orderKey: Field<string> }
 export type ViewSource = Readonly<{ token: string; sceneId: string; projectFrameId: string }> & (

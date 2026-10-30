@@ -1,4 +1,4 @@
-import { lookAlongFront, revealCaptionList } from './workspaceUi';
+import { revealCoordinateAdd, lookAlongFront, revealCaptionList } from './workspaceUi';
 import { test, expect, chromium, type BrowserContext, type Page } from '@playwright/test';
 import { createHash } from 'node:crypto';
 import { mkdir, mkdtemp, readFile, readdir } from 'node:fs/promises';
@@ -168,7 +168,7 @@ test('GLBと画像の編集を保存し、ブラウザ再起動と別端末相�
     await page.getByRole('button', { name: 'プロジェクトを作成', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText(projectName);
     await expect(page.locator('.lv-project-viewport-status')).toBeEmpty();
-    await page.getByText('数値で配置', { exact: true }).click();
+    await revealCoordinateAdd(page);
     const model = page.getByLabel('追加先モデル', { exact: true }); await model.focus();
     const options = await model.locator('option').evaluateAll(nodes => nodes.map(node => (node as HTMLOptionElement).value).filter(Boolean));
     expect(options).toHaveLength(1); await model.selectOption(options[0]!);

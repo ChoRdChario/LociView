@@ -1,4 +1,4 @@
-import { revealFileSurface } from './workspaceUi';
+import { revealCoordinateAdd, revealFileSurface } from './workspaceUi';
 import { test, expect, chromium } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import * as A from '@automerge/automerge';
@@ -21,7 +21,7 @@ test('delayed explanations stay readable and preserve a Caption draft through to
     await p.goto(server.url); await p.getByLabel('ファイルを選択', { exact: true }).setInputFiles({ name: '説明の確認.glb', mimeType: 'model/gltf-binary', buffer: triangleGlb() });
     await p.getByRole('button', { name: 'ファイルを開く', exact: true }).click(); await p.getByRole('textbox', { name: 'プロジェクト名', exact: true }).fill('補足説明の確認'); await p.getByRole('button', { name: 'プロジェクトを作成', exact: true }).click();
     await expect(p.getByLabel('3Dモデルの表示', { exact: true })).toHaveAttribute('aria-busy', 'false', { timeout: 90_000 });
-    await p.getByText('数値で配置', { exact: true }).click(); const owner = p.getByLabel('追加先モデル', { exact: true }); await owner.focus(); await owner.selectOption({ label: '説明の確認.glb' }); await p.getByRole('button', { name: 'このモデルに追加', exact: true }).click();
+    await revealCoordinateAdd(p); const owner = p.getByLabel('追加先モデル', { exact: true }); await owner.focus(); await owner.selectOption({ label: '説明の確認.glb' }); await p.getByRole('button', { name: 'このモデルに追加', exact: true }).click();
     for (const axis of ['X', 'Y', 'Z']) await p.getByLabel('位置 ' + axis, { exact: true }).fill(axis === 'Y' ? '.5' : '0');
     await p.getByRole('button', { name: '位置を確定', exact: true }).click(); await expect(p.getByText('ピンの位置を確定しました。', { exact: true })).toBeVisible();
     const title = p.getByRole('region', { name: 'キャプションの詳細', exact: true }).getByLabel('タイトル', { exact: true }); await title.fill('説明を開いても入力を保持');
@@ -29,7 +29,7 @@ test('delayed explanations stay readable and preserve a Caption draft through to
     const tooltip = p.getByRole('tooltip'); await help.hover(); await p.waitForTimeout(700); await expect(tooltip).toHaveCount(0);
     await expect(tooltip).toBeVisible({ timeout: 4_000 }); await expect(tooltip).toContainText('別の更新がある場合は戻せません。');
     await tooltip.hover(); await p.waitForTimeout(300); await expect(tooltip).toBeVisible(); await p.keyboard.press('Escape'); await expect(tooltip).toHaveCount(0); await expect(title).toHaveValue('説明を開いても入力を保持');
-    await p.getByText('数値で配置', { exact: true }).focus();
+    await p.getByText('座標で追加', { exact: true }).focus();
     for (let i = 0; i < 12 && !await help.evaluate(n => n === document.activeElement); i++) await p.keyboard.press('Tab');
     await expect(help).toBeFocused(); await expect(tooltip).toBeVisible(); await p.keyboard.press('Escape'); await expect(tooltip).toHaveCount(0);
     await help.tap(); await expect(tooltip).toBeVisible(); await p.screenshot({ path: info.outputPath('wide-context-help.png'), fullPage: true }); await help.tap(); await expect(tooltip).toHaveCount(0);

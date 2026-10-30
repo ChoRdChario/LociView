@@ -20,12 +20,12 @@ export type ViewAuthorEvent = ViewAuthorPlan | Readonly<{ kind: 'input'; baseDra
   Readonly<{ kind: 'cancel'; draft: ViewAuthorDraft }> | Readonly<{ kind: 'review'; sceneId: string; viewId: string | null; sourceToken: string }>;
 
 /** Mount beside the existing view chooser. No second selection, renderer or write authority. */
-export function createViewAuthorControls(document: Document, onEvent: (event: ViewAuthorEvent) => void) {
+export function createViewAuthorControls(document: Document, onEvent: (event: ViewAuthorEvent) => void,presentation?:{cameraPositions?:boolean}) {
   const { make, button, status: live, listen, cleanup } = nodes(document);
   const root = make('section'); root.className = 'lv-view-controls lv-view-authoring'; root.setAttribute('aria-label', '視点の作成と管理');
   editOnly(root);
   const stopHelp = mountContextHelp(document, root);
-  const start = make('section'), add = button('視点を作る'), edit = button('編集'), target = make('p');
+  const start = make('section'), add = button(presentation?.cameraPositions?'視点を記録':'視点を作る'), edit = button('編集'), target = make('p');
   start.append(add, edit, target); root.append(start);
   const form = make('section'), label = make('label', '視点の名称'), name = make('input'); name.type = 'text'; name.setAttribute('aria-label', '視点の名称');
   label.append(name); const nameNote = make('p'); nameNote.id = `lv-view-author-${++nextAuthorControl}`; name.setAttribute('aria-describedby', nameNote.id);

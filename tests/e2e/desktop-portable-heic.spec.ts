@@ -1,4 +1,4 @@
-import { revealFileSurface, revealProjectSelection } from './workspaceUi';
+import { revealCoordinateAdd, revealFileSurface, revealProjectSelection } from './workspaceUi';
 import { test, expect, chromium, type Page, type BrowserContext, type TestInfo } from '@playwright/test';
 import { mkdir, mkdtemp, readFile } from 'node:fs/promises';
 import { resolve, sep } from 'node:path';
@@ -71,7 +71,7 @@ test('08c uses native canvas generation, portable offline display/save/reopen an
     await p.getByLabel('ファイルを選択', { exact: true }).setInputFiles({ name: 'model.glb', mimeType: 'model/gltf-binary', buffer: triangleGlb() });
     await p.getByRole('button', { name: 'ファイルを開く', exact: true }).click(); await p.getByRole('textbox', { name: 'プロジェクト名', exact: true }).fill(title); await p.getByRole('button', { name: 'プロジェクトを作成', exact: true }).click();
     await expect(p.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText(title, { timeout: 90_000 }); await expect(p.getByLabel('3Dモデルの表示', { exact: true })).toHaveAttribute('aria-busy', 'false');
-    await p.getByText('数値で配置', { exact: true }).click(); const owner = p.getByLabel('追加先モデル', { exact: true }); await owner.focus(); await owner.selectOption({ label: 'model.glb' }); await p.getByRole('button', { name: 'このモデルに追加', exact: true }).click();
+    await revealCoordinateAdd(p); const owner = p.getByLabel('追加先モデル', { exact: true }); await owner.focus(); await owner.selectOption({ label: 'model.glb' }); await p.getByRole('button', { name: 'このモデルに追加', exact: true }).click();
     for (const [axis,value] of [['X','0'],['Y','.5'],['Z','0']]) await p.getByLabel(`位置 ${axis}`, { exact: true }).fill(value!);
     await p.getByRole('button', { name: '位置を確定', exact: true }).click(); await ready(p, 'ピンの位置を確定しました。');
     const settings=p.getByLabel('設定',{exact:true});await settings.locator('summary').click();await settings.getByLabel('編集者名',{exact:true}).fill('HEIC担当');await settings.getByLabel('このプロジェクトの今後の編集にこの名前を残す',{exact:true}).check();await settings.getByRole('button',{name:'編集者名を設定',exact:true}).click();

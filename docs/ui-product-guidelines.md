@@ -269,22 +269,24 @@ The normal Desktop workspace has three stable regions:
    distinct from internal pending/failure state (§9.1),
    and file/help actions;
 2. the 3D stage, with frequent view recovery close to it;
-3. a right-side task area with four purpose-based tabs.
+3. a right-side task area with three purpose-based tabs and a persistent Caption list/detail pair.
 
-The four tabs preserve LociMyu's useful function grouping while adding the
-model-management responsibility required by LociView:
+PO2026-10-31 moves camera controls beside3D and gives Scene selection common
+context. The three tabs preserve the useful record/model/drawing responsibilities:
 
 | Tab | User questions it answers | Contents |
 |---|---|---|
-| キャプション | What is recorded in this Scene? What should I add or correct? | Scene list, current-Scene search, pin-color filters, list, existing-Project Caption inclusion, add/place/move, title/body/color, attached media and secondary window tools |
+| キャプション | What is recorded in this Scene? What should I add or correct? | Common Scene context, current-Scene search, pin-color filters, list, existing-Project Caption inclusion, add/place/move, title/body/color, attached media and secondary window tools |
 | モデル | What Project models exist, and which belong to this Scene? | Model list/add and clearly separate Scene inclusion/local visibility; contextual placement, replacement, pin scale and supported format controls; Project deletion in secondary management |
-| マテリアル | How should this surface look in this Scene? | Current target and common adjustments first; surface targeting, cross-Scene scope, sidedness, unlit and applicable chroma controls progressively disclosed (§4.5) |
-| 視点 | From where and against what background should I inspect this Scene? | Fit, six directions, projection and Saved View recall first; view creation/management, entry view and background settings remain reachable but secondary (§4.5) |
+| 描画 | How should this surface look in this Scene? | Current target and common adjustments first; surface targeting, cross-Scene scope, sidedness, unlit and applicable chroma controls progressively disclosed; active completion is always reachable (§4.5) |
 
-Scene switching lives atop Caption; other tabs show the current Scene as context.
-Project save state and file exchange stay outside the tabs. Frequent `全体表示` and
-Saved View recall may also have a shortcut beside the 3D stage; the shortcut
-must use the same state and must not create a second view system.
+Scene switching is common context above the task tabs. Project save state and
+file exchange stay outside them. Fit, signed axes, projection and middle-button-free
+orbit/pan live beside3D. Existing recorded camera/background/entry UI lives there
+under camera-position management, with one retained state/draft owner. There is
+no Saved View task tab. Caption list/detail coexist; record operations start in
+the list and keep input forms outside virtualized row lifetimes. Unselected pins
+show pin symbols, with their accessible names and review/selection states retained.
 
 Tab changes move the UI only. They do not implicitly save, select a different
 model, apply a view, change Scene, end a mode or discard unfinished input.
@@ -296,9 +298,11 @@ default Scene.
 ### 4.3 Accepted Scene-first revision after manual acceptance (2026-09-10)
 
 **Accepted requirement (PO confirmed 2026-09-10); implemented in the bounded synthetic development host, new rendered acceptance pending:** ordinary Caption work starts with
-the Scene, then search and direct pin-color circles immediately above the list.
-Move Scene selection from the shared-header dropdown to a visible Scene list at
-the top of the Caption tab. Move window front/arrange tools out of the upper-left
+the Scene, then search and pin-color filtering immediately above the list. The
+original direct-circle layout has the compact PC exception below.
+The original revision moved Scene selection from the shared-header dropdown to
+the Caption tab. PO2026-10-31 places that same Scene context above all three task
+tabs. Move window front/arrange tools out of the upper-left
 stage into secondary Caption controls. The stage prioritizes content, view
 recovery and contextual placement controls. Do not require everyday model-based
 Caption organization. Make later pin adjustment discoverable from the selected
@@ -306,7 +310,7 @@ Caption, next to add, without requiring the user to select the owner model again
 
 **Accepted implementation direction:** retain one navigation state; Scene
 changes still affect models, materials and entry views, not only Captions. Other
-tabs show the current Scene as context. Tab changes never switch Scene or discard
+tabs share the common Scene context above them. Tab changes never switch Scene or discard
 drafts. Remove the normal owner filter and repeated owner subtitles; retain
 contextual model details for hidden/missing models, review and deliberate model
 management. Model-independent/unresolved records remain discoverable.
@@ -367,8 +371,8 @@ choices on every save. This organizes the existing intents in specification 06
   名前を示し、同じ対象の再選択を要求しない。複数候補がある場合は選択を残す。
   全シーン共通設定や専門的な項目は段階表示とし、適用範囲と他シーンへの影響は隠さない。
   設定を開いただけでは編集・保存せず、確定／取消と下書き保護を維持する。
-- 視点タブは全体表示・六方向・投影方式・保存した視点の呼び出しを中心にする。
-  開始視点は視点管理、背景編集は詳細へ分ける。現在のカメラ操作、保存視点の更新、
+- カメラ操作は3D付近に置き、全体表示・六方向・投影方式と直接回転／平行移動を使えるようにする。
+  記録したカメラ位置・開始視点・背景編集も同じ領域から開く。現在のカメラ操作、保存視点の更新、
   シーン開始設定は同じ操作にまとめず、背景をどこまで残すかも対象の操作で伝える。
 - 詳細は対象の近くから戻れるようにする。折りたたむことを機能の削除や、
   iPhoneでの操作不可に置き換えない。
@@ -401,9 +405,14 @@ hit, empty Scene or missing model ever creates one or fabricates an owner model.
 
 The Caption list stays in the right task area on Desktop. It must not live below
 the page or behind a collapsed section that forces page travel to identify the
-selected pin. Direct pin-color circles sit immediately above the list, below
-Scene/search controls; filtering should take one action per color and must not
-be hidden behind a generic menu.
+selected pin. The original Scene-first layout uses direct pin-color circles above
+the list, below Scene/search controls. The2026-10-31 record-first PC revision groups
+those same choices in the dedicated `ピンの色` disclosure beside search, keeping
+space for the simultaneous list/detail and selected-record actions. This is an
+explicit compact-layout exception to the former always-visible/one-action entry,
+not a change to color matching, selected colors, all/unknown colors or saved data.
+Once open, each color remains one action. Do not bury it in a generic menu;
+noncompact/harness controls retain their direct-circle presentation.
 
 Floating Caption windows are view aids on the 3D stage, connected to their pins
 when a connector is meaningful. They do not replace the list as the selection
@@ -417,8 +426,10 @@ arrange them without altering Project data. Use the familiar
 highlight and window title already convey the same state.
 
 The PO-specified Desktop camera uses Blender's basic mouse bindings: middle-button
-drag orbits, Shift+middle pans, and wheel/Ctrl+middle zooms. Left-button input is
-reserved for selection/placement, including Shift+left for pin addition. Keep
+drag orbits, Shift+middle pans, and wheel/Ctrl+middle zooms. Left-button canvas input
+is reserved for selection/placement, including Shift+left for pin addition. The
+PO2026-10-31 direction also adds left-drag orbit/pan on the camera overlay without
+replaying those events onto the canvas. Keep
 existing touch alternatives and explicit view controls; do not imply full Blender
 keymap, frame conventions, fly/walk or input-emulation support. Reference:
 [Blender navigation](https://docs.blender.org/manual/en/5.0/editors/3dview/navigate/navigation.html).
@@ -494,7 +505,7 @@ conflicts expose only their implemented resolution actions.
 - Confirmation buttons name the result (`復元する`, `統合する`, `削除する`),
   not `OK`.
 - Familiar symbols such as `×` and image arrows may replace words only when
-  their accessible name remains explicit. Do not iconize the four tab names.
+  their accessible name remains explicit. Do not iconize the three task-tab names.
 
 ### 7.2 Helper text test
 
@@ -687,8 +698,8 @@ required to confirm a selected pin.
 
 On a narrow or short display, reflow the same concepts instead of shrinking the
 Desktop layout. Preserve object names, action labels, save/failure state,
-selection and mode exits. The list and detail may switch within one Caption tab,
-but each provides a direct return to the other. Respect safe areas and the
+selection and mode exits. Caption list/detail remain accessible together;3D and
+the task area may alternate on narrow screens. Respect safe areas and the
 onscreen keyboard, and never hide the only way to end a placement or gizmo mode.
 
 Multiple floating windows may be arranged on a constrained stage, but that is

@@ -9,7 +9,7 @@ import { acceptViewBackground, solidViewBackgroundSource, viewBackgroundPlanIsCu
 import type { WorkspaceViewPayload } from './projectWorkspacePorts';
 import { newProjectId, panelNodes, sameProjectValue, type ProjectPanelHost, type ProjectPanel } from './projectPanel';
 
-export function createProjectViews(document: Document, host: ProjectPanelHost): ProjectPanel {
+export function createProjectViews(document: Document, host: ProjectPanelHost): ProjectPanel & { cameraControls: HTMLElement } {
   const { make, button } = panelNodes(document), root = make('section'), review = make('section'); root.setAttribute('aria-label', '視点の作業'); review.setAttribute('aria-label', '視点の更新候補');
   const choices = new Map<string, { token: string; operationId: string }>();
   const reviewNodes = new Map<string, HTMLElement>();
@@ -120,7 +120,7 @@ export function createProjectViews(document: Document, host: ProjectPanelHost): 
     } catch (error) { host.message((error as Error).message); }
     host.changed();
     if (event.kind === 'review') revealReview(event.viewId);
-  });
+  },{cameraPositions:true});
   const background = createViewBackgroundControls(document, event => {
     const s = state(); if (disposed || host.block('views', false)) return;
     if (event.kind === 'draft' && event.baseDraft === s.background) s.background = event.draft;
@@ -157,9 +157,10 @@ export function createProjectViews(document: Document, host: ProjectPanelHost): 
       const cancel = button('選択を取り消す', () => { if (!host.block('views', false)) { choices.delete(key); host.changed(); } }); editOnly(cancel); cancel.hidden = !owned; cancel.disabled = !!host.block('views', false); box.append(row, apply, cancel, viewChoices(document, group.label, group.choices.map(item => item.label)));
     }
   }
-  const cameraDetails=make('details');cameraDetails.append(make('summary','投影方式'));controls.root.insertBefore(cameraDetails,controls.camera);cameraDetails.append(controls.camera);
-  root.append(controls.root, author.root, background.root, review, controls.entryActions, author.actions, author.confirmation, background.actions, background.confirmation);
-  return { root, render() { if (!disposed) {
+  controls.camera.remove();controls.camera.className='lv-camera-projection';
+  const content=make('div');content.className='lv-camera-position-content';content.append(controls.root,author.root,background.root,review);
+  root.append(content,controls.entryActions,author.actions,author.confirmation,background.actions,background.confirmation);
+  return { root, cameraControls:controls.camera, render() { if (!disposed) {
       controls.render(context()); author.render(authorContext()); background.render(backgroundContext()); renderReview();
       const groups=host.ports.viewReview(host.source().sceneId), selected=state().memory.selectedViewId;
       controls.reviews.selected.hidden ||= !groups.some(g=>g.target.kind==='view'&&g.target.viewId===selected);
@@ -168,5 +169,5 @@ export function createProjectViews(document: Document, host: ProjectPanelHost): 
     } },
     hasChanges: () => !!state().draft || !!state().memory.entryDraft || !!state().background || choices.size > 0,
     composing: () => !!state().draft?.composing || !!state().background?.composing,
-    dispose() { disposed = true; controls.dispose(); author.dispose(); background.dispose(); root.remove(); } };
+    dispose() { disposed = true; controls.dispose(); controls.camera.remove(); author.dispose(); background.dispose(); root.remove(); } };
 }

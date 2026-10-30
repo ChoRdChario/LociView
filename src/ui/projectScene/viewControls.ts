@@ -25,7 +25,8 @@ export function createViewControls(document: Document, onPlan: (plan: ViewPlan) 
   if (!presentation?.externalOrientation) camera.append(fit, axes);
   camera.append(label('投影方式', projection), cameraNote, cameraStatus);
   const saved = make('section'), picker = make('select'), recall = button('表示'), savedNote = message(), savedReview = button('状態を確認');
-  saved.setAttribute('aria-label', '保存した視点'); saved.append(label('保存した視点', picker), recall, savedNote, savedReview);
+  const recordedLabel=presentation?.externalOrientation?'記録した視点':'保存した視点';
+  saved.setAttribute('aria-label', recordedLabel); saved.append(label(recordedLabel, picker), recall, savedNote, savedReview);
   const entry = make('section'), entryPicker = make('select'), apply = button('設定を適用'), cancel = button('取り消す');
   const entryNote = message(), entryStatus = live(), entryReview = button('状態を確認');
   entry.setAttribute('aria-label', '開始時の設定');
@@ -96,10 +97,10 @@ export function createViewControls(document: Document, onPlan: (plan: ViewPlan) 
     if (next.memory.selectedViewId && !savedOptions.some(item => item.value === next.memory.selectedViewId))
       savedOptions.unshift({ value: next.memory.selectedViewId, text: '選択した視点（状態を確認）', disabled: false });
     const key = JSON.stringify(savedOptions);
-    if (key !== savedKey) { picker.replaceChildren(option('', '保存した視点を選択'), ...savedOptions.map(item => option(item.value, item.text))); savedKey = key; }
+    if (key !== savedKey) { picker.replaceChildren(option('', presentation?.externalOrientation?'記録した視点を選択':'保存した視点を選択'), ...savedOptions.map(item => option(item.value, item.text))); savedKey = key; }
     picker.value = next.memory.selectedViewId ?? ''; picker.disabled = sourceIssue !== null;
     const recallIssue = reason(planView(next, { kind: 'recall' })); recall.disabled = recallIssue !== null;
-    savedNote.textContent = recallIssue || ''; savedNote.hidden = !savedNote.textContent;
+    savedNote.textContent = presentation?.externalOrientation?recallIssue?.replace('保存した視点','記録した視点')||'':recallIssue||''; savedNote.hidden = !savedNote.textContent;
     savedReview.hidden = next.memory.selectedViewId === null || savedViewIssue(next, next.memory.selectedViewId) === null;
     savedReview.disabled = sourceIssue !== null;
     const observed = next.source.kind === 'ready' && next.source.entryViewId.kind === 'value' ? next.source.entryViewId : null;

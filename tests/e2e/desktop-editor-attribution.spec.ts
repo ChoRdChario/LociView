@@ -1,4 +1,4 @@
-import { revealFileSurface } from './workspaceUi';
+import { revealCoordinateAdd, revealFileSurface } from './workspaceUi';
 import { test, expect, chromium, type Page, type BrowserContext, type TestInfo } from '@playwright/test';
 import { mkdir, mkdtemp, readFile } from 'node:fs/promises';
 import { resolve, sep } from 'node:path';
@@ -113,7 +113,7 @@ test('08b editor names remain exact through collaboration, purpose privacy, rest
     await a.p.getByRole('button', { name: 'ファイルを開く', exact: true }).click(); await a.p.getByRole('textbox', { name: 'プロジェクト名', exact: true }).fill(title);
     await a.p.getByRole('button', { name: 'プロジェクトを作成', exact: true }).click(); await expect(a.p.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText(title, { timeout: 90_000 });
     await expect(a.p.getByLabel('3Dモデルの表示', { exact: true })).toHaveAttribute('aria-busy', 'false', { timeout: 90_000 });
-    await a.p.getByText('数値で配置', { exact: true }).click(); const owner = a.p.getByLabel('追加先モデル', { exact: true }); await owner.focus(); await owner.selectOption({ label: 'model.glb' });
+    await revealCoordinateAdd(a.p); const owner = a.p.getByLabel('追加先モデル', { exact: true }); await owner.focus(); await owner.selectOption({ label: 'model.glb' });
     await expect(a.p.getByRole('button', { name: 'このモデルに追加', exact: true })).toBeEnabled();
     await a.p.getByRole('button', { name: 'このモデルに追加', exact: true }).click();
     for (const [axis, value] of [['X', '0'], ['Y', '.5'], ['Z', '0']]) await a.p.getByLabel(`位置 ${axis}`, { exact: true }).fill(value!);
