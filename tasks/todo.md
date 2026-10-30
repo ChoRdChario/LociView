@@ -56,7 +56,336 @@ unchanged-feature-classification checks pass; independent review has no findings
 No runtime change or new capacity guarantee; no runtime suite is needed for this
 documentation checkpoint.
 
-## Current boundary —delayed contextual explanations
+## Current boundary —verified first workspace candidate
+
+Outcome2026-10-30: the first grouped workspace UI is integrated and verified on
+the approved PC candidate. Its g0-baseline checkpoint follows the existing Push
+authorization; Git owns commit/remote identity. This is not general adoption,
+ordinary-entry activation, physical-device acceptance or release.
+
+Final checks PASS: typecheck;139 root test files/3099 tests, with21 existing TODO;
+ordinary, harness, validation, Desktop and offline builds; offline exact-resource
+isolation; HEIC public-path isolation across all five artifacts. The final54 changed
+source/test hashes match .artifacts/e2e/workspace/tested-source.json. Dedicated
+Chromium2 connected cases PASS30.9s; final source/input and test-diff reviews have
+no remaining required fixes. Full logs, images and retained failures are under
+.artifacts/e2e/workspace. Existing chunk-size/dynamic-import build warnings remain.
+Staged whitespace checking removed one trailing blank line in the test-only
+navigation helper; formatting.json retains the before/after hashes and exact
+trailing-newline-only proof. No executable code changed or runtime rerun was needed.
+
+Owned product preview: http://127.0.0.1:4191/ serves offline-desktop-dist (HTTP200,
+exact index hash; receipt preview.json, owned exec session72952). It is a separate
+origin from the existing validation screen, so existing resumption data stays at
+its original address. Open an exported file to try it here. The4190 design preview
+remains a separate presentation-only reference.
+
+Next connected workflow: broaden real-screen scenarios on the new navigation,
+including Scene/model/material/media organization and share/receive/restore, then
+finish copy, density, keyboard departure/Escape and conditional view controls as
+one UX pass. Existing broader E2E matrices need their remaining old-layout
+assumptions aligned and rerun; the focused pair does not substitute for them.
+Native IME/assistive technology/physical iOS remain grouped acceptance lanes.
+Do not return to10k qualification or comfort-only optimization as the next priority.
+
+### Implementation authority and retained check history
+
+PO2026-10-30 approves implementing the reviewed workspace design. Root is the
+sole writer; independent failure analysis, composition/copy mapping and final
+review are read-only. Outcome: one compact application bar, stage-local camera
+and comparison tools, Scene-first Caption list/detail, retained editing context,
+four coherent task panels, and file/recovery sheets that do not reflow the stage.
+Use the existing provider, typed commands, camera and file services. Presentation
+state stays local to the mounted UI; no schema, package, renderer, dependency,
+ordinary-entry or deployment change. Preserve selection-open comparison behavior,
+draft/IME/gesture/pending/privacy/readback/recovery fences and all existing features.
+
+Plan: classify the held GLB recovery failure → integrate layout/state/copy through
+the approved design → focused behavior checks and dedicated Chromium real-file
+flows at wide/narrow/short sizes → serial final checkpoint and independent review
+→ verified g0-baseline checkpoint/Push. Stop only affected work for a demonstrated
+contract conflict, new product policy or managed permission boundary. No per-control
+human testing waits. Native IME, assistive technology and physical iOS remain
+explicitly unverified; mockup screenshots do not verify production behavior.
+
+Implementation status: compact shared bar, retained list/detail and task drafts,
+stage-local six-axis camera/fit, compact stage/panel switch, read-only values and
+edit-only visibility, contextual material/media controls, and purpose-based file
+sheet are connected. Existing offline UI moves into Settings during work and
+returns to its original owner at home. No storage/format/render authority changed.
+Scene-wide inclusion/recovery stays reachable with no selected Caption. Files,
+Help and Settings coordinate presentation without discarding active input.
+
+The held GLB failure was a checking observation at the old polling deadline.
+The existing terminal-acknowledgment helper now waits for completion; strict failed/
+idle, injected error, pending publication, byte retention and cold idempotence
+assertions pass. No production recovery condition or timeout was relaxed.
+Focused core/input/material/window checks pass (latest5 files/68 cases), plus the
+three existing connected product-file flows. Independent source/input reviews
+found and closed empty-Scene access, hidden recovery, retained-owner/focus,
+compact IME/gesture guards, overlay scope and narrow HUD overlap findings.
+
+Dedicated Chromium prior pass: real file edit/save/reload, modes/search/comparison,
+retained drafts, compact and short layouts, plus prepared cold offline startup and
+utility reparent/home return. The offline test first failed with a long title-based
+Windows profile; the documented short owned profile passed, with original failure
+report/profile retained. This is test-environment evidence, not an SW repair.
+Final source integration and browser run are complete; the final checkpoint is
+recorded above.
+Existing E2E navigation helpers/copy are being aligned with the approved disclosures;
+older broad E2E matrices are not claimed rerun by the focused proof.
+
+Short meta-audit: g0-baseline at964999f, one writer, UI-only production scope and
+existing command/file/recovery contracts remain the critical path. Bound auxiliary
+work to changed navigation and concrete failures; no new matrix, technology, format
+or performance guarantee. Finish the grouped checkpoint rather than expanding
+test-count targets. Physical-device/adoption/release evidence remains separate.
+
+Final Chromium pair PASS:2 cases/30.9s on the final product source, including
+cross-tab Settings draft/focus, content-only header sheets and existing offline
+utilities after full close/server stop. No page errors; this is the owned Desktop
+candidate evidence in .artifacts/e2e/workspace/result.json and verified images.
+The first full checkpoint passed typecheck and3094 tests, with5 failed/21 existing
+TODO. All5 failures were recorded-DOM selectors tied to old Caption/media action
+order, the former out-of-stage retry location, or the old material region name.
+Their corrected checks retain the exact cancel/recovery/data assertions and now
+pass (2 files/5 cases). Product source hashes are unchanged from the browser run;
+no production recovery/guard change was required. Failure log/old hashes remain
+in .artifacts/e2e/workspace/*before-selector-fixes*. Final whole checkpoint restarts
+on the corrected test tree; its completed builds/HEIC isolation are recorded above.
+
+## Reviewed design evidence
+
+The following is the completed design-only unit. The current implementation
+authority and verification plan are above; its earlier no-edit/no-Push boundary
+does not prohibit the newly authorized production work.
+
+PO2026-10-30 accepts the AAA review and requests a design satisfying it, with short,
+precise wording. Outcome: a whole-workspace design, self-contained interactive
+screen proposals, and a reviewed copy/meaning table covering view/edit, list/detail,
+camera/placement, models/views/materials, comparison, file exchange and recovery.
+This is design/prototype work, not production implementation or publication.
+Root is sole writer; three independent design/copy/input reviewers are read-only.
+Keep current product source/test WIP, originals/history, four task tabs, Scene-first
+Caption navigation and all draft/IME/write/recovery/privacy contracts unchanged.
+Do not silently introduce auto-apply, new persisted settings, automatic conflict
+selection, reference removal, input loss, new dependencies or game-only features.
+
+Plan: specify layout/visual/state/copy rules together → build one local HTML
+prototype with representative states and input-neutral labels → inspect rendered
+wide/narrow/short views and exercise prototype navigation/retained drafts → review
+the meaningful result independently and update this record/handoff. Reuse installed
+dedicated Playwright/Chromium; no product suite/build or per-control PO test waits.
+Record what the prototype simulates and what still needs production/device evidence.
+Stop only affected design for a real contract conflict or new product policy.
+No commit/Push or production-code repair in this design unit.
+
+Design result: [workspace/copy design](../docs/ui-workspace-design.md) and
+[interactive screen proposal](../docs/mockups/loci-workspace.html) cover the
+shared frame, list/detail, existing four tabs, spatial labels/comparison, target/
+apply/cancel and purpose-based file/recovery sheets. Copy distinguishes apply,
+browser resumption, file generation/download/verification, restore/recovery and
+five file purposes. Important scope/name/privacy/source-archive consequences stay
+visible. Explicit selection still opens/retains its comparison window; no new
+mandatory comparison step or auto-apply policy was introduced.
+
+Dedicated Chromium prototype verification PASS on the final HTML, with no page
+errors or remote requests. It exercised Caption/material/pin/model draft values
+across tabs, model-versus-pin targets, comparison media identity, close/reselect,
+dirty guards/confirmation, unselected conflict candidates, keyboard tab navigation,
+2s-help/transfer/Escape, narrow320/390px and low600px layouts, long title wrapping,
+visible end actions, dark HUD and reduced motion. This is presentation simulation,
+not product/real3D/fileIO/storage/nativeIME/AT/device acceptance. Evidence:
+.artifacts/design-preview/workspace/result.json and screenshots; the recorded
+HTML SHA256 matches cba1e8a6… and independent final reviews. The owned local preview
+at http://127.0.0.1:4190/ returns the same source (HTTP200/expected identity);
+.artifacts/design-preview/server.json records the owned process. It serves only
+the proposal, without product data/services/SW.
+
+Independent visual, copy/contract and input/accessibility reviews have no remaining
+material findings after fixing draft retention, comparison identity, model scope,
+dark HUD/help transfer, compact/start state attribution and precise package/name
+wording. The27 held product source/test hashes still match; no production suite,
+build, commit or Push was performed. Documentation links/diff PASS, and the final
+prototype source matches the verified images/report. Held failed recovery
+evidence is unchanged.
+
+Next: use this coherent design for grouped product implementation through existing
+typed commands and provider UI, first classify the held failed recovery check,
+then integrate shared frame/state/copy, panels/spatial UI and file/recovery flows.
+Retain real camera, formats/history, privacy, validation and write/recovery fences;
+the disposable prototype code itself is not promoted into production.
+
+## Completed review boundary —AAA-quality whole-screen review
+
+Latest PO steering2026-10-30: repeat the design review at AAA-game-production
+UI/UX quality. This is a review target for clarity, coherence, interaction/state
+feedback and visual finish, not a WCAG AAA certificate or permission to implement.
+Evaluate the full visual/interaction system against current evidence and official
+game/accessibility guidance; distinguish existing strengths, redesign blockers,
+observable acceptance and unverified input/device lanes. Root updates review
+records only; three bounded independent reviews are read-only. No product edits,
+test/build reruns, commit/Push or new dependencies during this review. Preserve
+the held WIP and failed-test evidence. Deliver a consolidated direction and grouped
+plan before any implementation; concrete new product/interaction policies remain
+separate decisions.
+
+AAA review result: [full design review](../docs/ui-design-review.md) consolidates
+three independent visual/interaction/accessibility lanes and checked primary game
+design/accessibility sources. U01–U19 below remain the location-based issue list;
+Q1–Q8 in the review describe the missing system-level quality and observable
+acceptance for composition, target context, typography/visual hierarchy, input/
+state, spatial HUD, feedback, file/recovery and all-state adaptation. Current UI is
+not judged AAA-ready. Keep the low-chroma tone, existing input/data protections
+and useful viewing/comparison features. Marker re-render focus, focus behind
+comparison windows and repeated status narration are code-derived risks, not new
+browser-confirmed failures. Color contrast example is declared-value analysis,
+not a rendered conformance check. No runtime test or build was rerun.
+
+Next deliverable is one coherent placement/flow + visual/state specification and
+representative screen proposals, before grouped product implementation. Do not
+start by polishing isolated controls or assume that motion/input/device quality
+passed from screenshots. Independent final document reviews have no material
+findings. Review-only records are the only new changes this turn; the earlier
+uncommitted source/test WIP and failed-check evidence remain held.
+
+PO2026-10-30 corrects the order: enumerate the UI/UX issues across operation screens
+and connected tasks before implementing individual fixes. Keep current view-mode
+work uncommitted; no further product changes or Push during this review. The
+already-running checkpoint is evidence for that WIP, not authority to ship or
+continue piecemeal fixes. It has now stopped on one failed existing recovery
+assertion (details below). HEAD remains964999f on g0-baseline.
+
+Outcome: one consolidated issue list and grouped repair order covering the48
+captured operation states, current source and the latest view-mode WIP renders.
+Review visual hierarchy/proximity, target and state recognition, navigation,
+view/edit presentation, text/media flow, saves/sharing/recovery and offline entry.
+Root owns the integrated record; independent reviewers are read-only. Distinguish
+observed structural issues, older screenshots changed by tooltips/WIP, hypotheses
+and uncaptured device/conditional states. Do not claim an exhaustive bug proof.
+Record the consolidated findings here; reuse the existing screenshots/source,
+without reviving the old-route audit as current, adding a feature inventory/PoC
+or running per-control tests.
+Stop only affected review for missing evidence/authority. Further implementation
+follows the consolidated groups, retaining all existing data/safety contracts.
+
+### Consolidated UI review —2026-10-30
+
+Scope: the[48-screen gallery](../.artifacts/e2e/ui-screenbook-2026-10-30/index.html)
+at8e20984, current source at964999f plus held view-mode WIP, and its three latest
+renders. Independent visual/flow reviews cover all six groups: start/file5,
+record/media13, Scene/settings6, model/View/material13, save/share/recovery9 and
+offline2. These are rendered/code-backed design findings, not user-study results
+or a proof that all possible defects have been found. Old-route audit documents
+remain historical; optional copy already moved to help and WIP hidden edit-only
+controls are not counted again as wholly unimplemented.
+
+| ID | 修正項目・利用時の困り方 | 画面／現行根拠 | まとめる修正 |
+|---|---|---|---|
+| U01 | オフライン・モード・保存・Project状態・カメラが上部に積み重なり、3Dと記録が押し下がる。 | 04/06/23a、最新view-caption、workspace.cssのshell配置 | A: 全体の枠と共通状態 |
+| U02 | 通常の更新中にもファイル欄が自動展開し、作業領域が動く。終了後も開いたまま残る。 | 05a/06/08a、productWorkspace.tsのhost.hasPending→fileMenu.open | A: 処理中も安定する作業領域 |
+| U03 | カメラの向き・全体表示・投影と視点管理が上部／タブに分散する。 | 04/21/22、viewControls.ts | A: 3D内ギズモとカメラ操作、視点管理の区分 |
+| U04 | Scene選択より管理・作成が目立ち、全タブの前に同じ長いScene領域がある。 | 15/16/17、projectWorkspace.tsの共通sceneArea | A: 現在Sceneと管理入口を分ける |
+| U05 | 検索一覧・ピン・Undo・本文・競合・添付・削除・タグが狭い縦列に直列で並び、一覧／詳細／比較の役割が曖昧。 | 04–14、captionPanel.append順と比較窓 | B: 記録を選ぶ・編集する・見比べる配置 |
+| U06 | 長い入力で対象名・編集状態・確定／取消が離れ、別の位置へ戻らないと完了できない。 | 05a/08a/18a/23a、各panelフォーム | B: 全タブ共通の対象表示と完了操作 |
+| U07 | 本文が未適用のまま添付へ進むと無効になり、必要な適用操作が画面外になる。 | 06/08、projectWorkspace.tsのmediaInput.disabled | B: 本文適用→添付の既存手順を近接表示 |
+| U08 | 別タブの下書きなどで無効になった際、原因と戻る先を特定しづらい。 | projectWorkspace.tsの全体dirty/guard、モード切替 | A/B: 原因の対象名と適用／取消への入口。保護条件は維持 |
+| U09 | モデル所属の「このシーンに表示」と一時的な「隠す／表示」が、共有範囲の異なる操作と分かりにくい。 | 17/20、modelListControls.ts | B: 選択・所属・一時表示を区別 |
+| U10 | 配置・位置合わせ・差し替え・削除が連続し、基準／移動対象や削除を妨げる参照の確認先が遠い。 | 18–20c、projectModels.ts | B: 通常操作・配置・危険操作を分け、対象と影響を同じ場所に |
+| U11 | 現在のカメラ／保存視点／開始視点／背景、材質の対象／適用範囲／詳細調整が連続して見える。 | 21–23a、projectViews/materialControls | B: 閲覧・保存管理・開始設定と、材質の通常／詳細項目を整理 |
+| U12 | 添付閲覧カードと別の編集一覧に同じメディアが重複し、順序・解除等の操作が並ぶ。 | 08/08a、projectMedia.ts | B: 同じ添付の閲覧・編集・再利用を対象単位で整理 |
+| U13 | 保存／渡す／受け取る／復元／生成済み履歴が同じ領域に積まれ、目的・対象・結果が離れる。 | 26–29c、validationReceive/OutputControls | C: 目的別の一連の操作。共有範囲・保存未確認・原本保持を維持 |
+| U14 | 競合の候補を読んだ後、離れたselectで選び直す。対象・比較結果・確定が結びつきにくい。 | 29b、projectRecovery.tsとモデル／材質候補 | C: 比較→選択→結果→確定を一続きに。自動選択はしない |
+| U15 | 要点検：開く／変換／新規作成の段階・戻るの配置と、再開一覧でのProject識別。安全な内容判定の入口を大きく変える必然性は未確認。 | 01–03/33、validationWorkspace.ts。32画像は読み込み中 | C: 現在対象と戻るの一貫性を点検。完成した再開一覧は追加観察し、不要な再設計はしない |
+| U16 | オフライン・名前設定・ヘルプ等が主作業と競合し、狭い／短い画面では上部の折返しと縦移動が大きい。 | 24–25/30–31、最新390px画像、workspace.css | A/D: 管理入口と作業枠を統合。最後に幅・focus・説明配置を横断確認 |
+| U17 | 比較窓が重なって開き、画像は小さな窓内スクロールになり、整列操作はCaption列の末尾にある。 | 07/14、最新view-caption、captionWindowControls.tsと比較tools | B: 比較対象・窓・整列を近接。手動配置と複数窓を維持し、初期配置の変更は具体案で扱う |
+| U18 | 直前の成功通知が別作業でも上部に残り、持続すべき保存状態・失敗と同じ強さで見える。 | 18/19、最新view-material、projectWorkspace.tsのfeedback保持 | A: 現在状態と処理結果を分ける。未適用・失敗・復旧・保存未確認の情報を消す変更はしない |
+| U19 | ピン追加・窓表示・再生・並べ替え・解除などの主従と見た目が画面間で揃わない。 | 04/06/08a/19/23a/26、componentごとのprimary指定 | D（A/B設計時に規則を決める）: 主操作・補助・危険操作、余白・見出し・確定取消を共通化 |
+
+Grouped order: **A** stable application frame/current context/status and camera
+placement → **B** coherent list/detail/comparison and target/apply/cancel across
+all panels → **C** start/resume/save/share/receive/conflict/restore presentation →
+**D** integrated keyboard/focus/width/long-text/reduced-motion/help and regression
+verification. Define the complete layout and shared interaction rules before
+implementing A; bring held view-mode WIP into that plan, rather than shipping it
+as another independent repair. Do not alternate individual fields and full checks.
+
+Keep original commands/drafts/IME/drag, file/restore fences, source/history and
+privacy/ownership scopes. New combined text/media drafts or autosave, automatic
+conflict choices, reference removal/reparenting, changed save guarantees or forced
+single comparison windows require a distinct concrete PO decision. None is
+needed merely to enumerate or arrange existing actions. No new dependency,
+renderer/package policy, adoption, release or deployment is inferred.
+
+Evidence gaps remain explicit:32-project-list is not a completed-list capture;
+all conditional failure/install states, physical devices, native IME/200% browser
+zoom and assistive technology were not newly verified by these screenshots.
+Targeted observation may fill those gaps during layout design; they do not
+authorize starting another isolated product fix now.
+
+Review checkpoint: the consolidated U01–U19 list and group order passed independent
+read-only review for coverage, evidence limits and unchanged decision boundaries.
+Documentation diff/local links pass; product source/test hashes are unchanged.
+No commit or Push was made. Next is the whole-screen placement/flow proposal,
+including held view-mode work; do not ship that WIP as a standalone patch merely
+because the issue list is now available. Retain the failed recovery check for
+cause analysis before the next verified implementation checkpoint.
+
+## Retained uncommitted work —viewing without edit-only controls
+
+PO2026-10-30 authorizes hiding controls that function only in edit mode. Audit:
+g0-baseline HEAD964999f, clean starting tree; root is sole writer and bounded
+control/authority reviewers are read-only. Outcome: view a Project with useful
+camera/Scene/record/media/search/comparison controls, then return to edit with the
+same working context and all ordinary editing controls available.
+
+Use explicit pure UI edit-only/view-only markers and actual view/edit mode from
+the existing host. An optional typed mode display field separates true viewing
+from aggregate readOnly/loading/operation guards. Keep existing disabled checks,
+commands, drafts/IME/drag/pending switch fences and storage/package semantics.
+Render Caption values as text in view; do not hide records, attached media,
+diagnostic evidence, pending/recovery notices or generated-file downloads.
+Retain working local background, visibility, comparison/anchor preview and browser
+settings; no newly enabled feature or stricter authority policy is inferred.
+Mode changes must also dismiss help whose editing anchor disappears.
+
+Mark actual edit-only actions/inputs across core, models/views/materials/media,
+organization/recovery and file generation/receive/restore. Preserve each control's
+own conditional state rather than restoring all hidden/disabled flags on edit.
+Verify focused existing typed and mounted checks; actual dedicated Chromium
+view→camera/search/media/panel work→edit→save/reload, including transient guards,
+then independent diff/rendered review and one final serial checkpoint.
+No camera-gizmo/general layout rewrite, new dependency/schema/format or release.
+Stop only affected work for a genuine authority/product/contract change.
+
+Implementation and independent source/test/rendered reviews are complete with no
+remaining findings. Caption/material inspection uses canonical text and retains
+field warnings; edit-only startup/recovery and material-review actions are hidden.
+The dedicated Chromium connected workflow PASS31.2s on the built offline candidate:
+create model/Caption/photo/View → view → search/window/media/model visibility/
+camera/View/background/material inspection/existing download → edit with retained
+search/selection → guarded draft → apply/backup metadata inspection/reload.
+No page errors or remote requests. Screenshots at1440×1000 and390×844 are desktop
+emulation, with Service Workers blocked; no physical-device/offline-launch credit.
+Recorded DOM checks also verify actual edit mode survives transient loading guards.
+Final full serial checkpoint against the frozen27 source/test hashes in
+.artifacts/e2e/view-mode/tested-source.json: typecheck PASS; root138 files PASS/1
+failed,3098 PASS/1 failed/21 existing TODO,1491.77s. The existing new-GLB-body
+failure/cold-recovery case in tests/projectFiles.test.ts:8780 observed `checking`
+instead of the expected `failed` within its wait. Cause is unclassified; do not
+label it flaky/pre-existing or weaken the wait/assertion. Preserve the raw
+checkpoint.log and defer cause analysis/repair to the grouped plan. No automatic
+retry. The serial build stages did not run after this failure; the separately
+built offline candidate and browser result are narrower evidence only. The log,
+browser result and images remain in the same ignored directory. Documentation
+diff/local links pass. No dependencies or data/write/format/recovery semantics
+changed. This is uncommitted WIP, not a verified completion checkpoint.
+
+Superseded sequencing: this WIP is held for the full UI review above. Complete
+already-running checks as evidence, but do not commit/push or start another
+isolated fix before the consolidated issue list and repair groups are ready.
+
+## Previous boundary —delayed contextual explanations
 
 PO2026-10-30 authorizes moving explanatory prose into delayed hover help to keep
 the operation screens clean. Audit: g0-baseline HEAD8e20984; only the completed

@@ -119,7 +119,7 @@ export function mountContextHelp(document: Document, root: HTMLElement): () => v
     if (active && !available(active.anchor)) hide();
     if (pending && !available(pending.anchor)) cancelDelay();
   });
-  observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['hidden', 'aria-hidden'] });
+  observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['hidden', 'aria-hidden', 'data-lv-mode', 'data-surface'] });
   manager = { add(scope) {
     scopes.set(scope, (scopes.get(scope) ?? 0) + 1); let released = false;
     return () => {

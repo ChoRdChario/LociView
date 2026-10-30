@@ -2,6 +2,7 @@ import { MetadataSourceError } from '../projectMetadata/format';
 import type { createValidationModeHost } from './validationModeHost';
 import type { WorkspaceFileInteraction } from '../ui/projectScene/projectWorkspacePorts';
 import { createValidationOutputControls } from './validationOutputControls';
+import { editOnly, displayMode } from '../ui/projectScene/modePresentation';
 
 /** One file/recovery area, available even before a Scene editor can mount. */
 export function createValidationReceiveControls(document: Document, host: ReturnType<typeof createValidationModeHost>,
@@ -20,6 +21,7 @@ export function createValidationReceiveControls(document: Document, host: Return
   let busy = false, disposed = false, feedback = '', selectedJob: string | null = null, selectedCopy: string | null = null,
     cancel: { id: string; stale: boolean; review?: boolean } | null = null;
   let activeOperation: 'receive' | 'restore' | null = null;
+  let surface: 'all'|'save'|'share'|'receive'|'restore' = 'all';
   const restoreArea = document.createElement('details'), restoreSummary = document.createElement('summary'), restoreLabel = document.createElement('label'),
     restoreInput = document.createElement('input'), restoreCommands = document.createElement('div'), restoreStatus = document.createElement('p');
   restoreSummary.textContent = 'バックアップから復元'; restoreLabel.textContent = 'バックアップを選択';
@@ -29,6 +31,7 @@ export function createValidationReceiveControls(document: Document, host: Return
   const restoreChanges = () => !!restoreInput.files?.length || restorePrepared || restoreCancel;
   const output = createValidationOutputControls(document, host, session, changed, () => otherInput() || busy || !!input.files?.length || !!selectedJob || !!cancel || restoreChanges());
   root.append(restoreArea, output.root);
+  editOnly(form, restoreLabel);
   const guard = (recovery: boolean, restore = false) => {
     const s = session();
     if (host.authority.readOnly) throw Error('閲覧中は受信できません。編集を開始してください。');
@@ -53,6 +56,7 @@ export function createValidationReceiveControls(document: Document, host: Return
   };
   const button = (parent: HTMLElement, text: string, action: () => void) => {
     const b = document.createElement('button'); b.type = 'button'; b.textContent = text; b.disabled = busy || output.hasChanges() || !!host.authority.readOnly;
+    editOnly(b);
     b.addEventListener('click', () => { if (!b.disabled) action(); }); parent.append(b);
   };
   const performRestore = (action: () => Promise<void>, recovery: boolean, completed: string, consume = true) => {
@@ -71,6 +75,7 @@ export function createValidationReceiveControls(document: Document, host: Return
   };
   const render = () => {
     if (disposed) return;
+    displayMode(root, host.mode?.current ?? (host.authority.readOnly ? 'view' : 'edit'));
     const copies = host.workspaceFiles.reviewCopies, copyPending = !!host.workspaceFiles.reviewCopyError || copies.some(j => !['completed', 'abandoned'].includes(j.state));
     heading.textContent = copyPending ? '編集コピー' : host.workspaceFiles.initialImport ? 'ファイルを開く' : '更新ファイル';
     root.setAttribute('aria-label', heading.textContent);
@@ -78,7 +83,9 @@ export function createValidationReceiveControls(document: Document, host: Return
       '同じプロジェクトの作業一式・変更分を統合します。元ファイルは変更しません。';
     output.render(); form.inert = busy || output.hasChanges() || restoreChanges(); submit.disabled = busy || otherInput() || output.hasChanges() || restoreChanges() || host.authority.readOnly || !input.files?.length;
     clear.disabled = busy; clear.hidden = !input.files?.length && !selectedJob;
-    form.hidden = copyPending && !selectedCopy;
+    form.hidden = copyPending && !selectedCopy || !['all','receive'].includes(surface);
+    for(const node of [heading,help,status,jobs])node.hidden=!['all','receive'].includes(surface);
+    output.root.hidden=!['all','save','share'].includes(surface);
     labelText.textContent = selectedCopy ? '元の閲覧用ファイルを選び直す' : selectedJob ? '元のファイルを選び直す' : host.workspaceFiles.initialImport ? 'ファイルを選択' : '更新ファイルを選択';
     input.setAttribute('aria-label', labelText.textContent);
     submit.textContent = selectedCopy ? 'コピー作成を再開' : selectedJob ? '受信を再開' : host.workspaceFiles.initialImport ? 'ファイルを開く' : '更新を受け取る';
@@ -123,7 +130,7 @@ export function createValidationReceiveControls(document: Document, host: Return
         host.workspaceFiles.abandonInput(target.id), true, '受信を取りやめました。'));
       button(jobs, '戻る', () => { cancel = null; render(); changed(); });
     }
-    restoreArea.hidden = !host.backupRestore.enabled;
+    restoreArea.hidden = !host.backupRestore.enabled || !['all','restore'].includes(surface);
     if (host.backupRestore.pending || host.backupRestore.needsDisplay) restoreArea.open = true;
     restoreInput.disabled = busy || otherInput(true) || output.hasChanges() || host.authority.readOnly || host.backupRestore.pending;
     restoreStatus.dataset.busy = String(activeOperation === 'restore');
@@ -169,6 +176,15 @@ export function createValidationReceiveControls(document: Document, host: Return
     else { feedback = '再開用データを確認してから受信してください。'; render(); }
   });
   render();
-  return { root, render, busy: () => busy || output.busy(), hasChanges: () => busy || output.hasChanges() || restoreChanges() || !!input.files?.length || !!selectedJob || !!selectedCopy || !!cancel,
+  const hasChanges = () => busy || output.hasChanges() || restoreChanges() || !!input.files?.length || !!selectedJob || !!selectedCopy || !!cancel;
+  return { root, render, busy: () => busy || output.busy(), hasChanges,
+    showAll(){if(hasChanges())return false;surface='all';render();return true;},
+    showSurface(next: Exclude<typeof surface,'all'>) {
+      if(hasChanges())return false;
+      surface=next;
+      output.choosePurpose(next==='share'?'teamWorkspace':'backup');
+      render(); if(next==='restore' && host.backupRestore.enabled)restoreArea.open=true;
+      return true;
+    },
     dispose: () => { disposed = true; output.dispose(); root.remove(); } };
 }

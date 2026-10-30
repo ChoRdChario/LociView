@@ -15,12 +15,44 @@ type Host = ReturnType<typeof createValidationModeHost>;
 type Tools = ReturnType<typeof createValidationReceiveControls>;
 /** Validation-only adapter. No synthetic Session or string-map writes enter product UI. */
 export function createProductWorkspace(document: Document, host: Host, factory: ViewportFactory, tools?: Tools, renderCandidate?: ModelCandidateRenderer,
-  navigation?: { compactFiles?:boolean;smoothDisplay?:boolean;presentation?():{busy:boolean;reason:string}|null;projectNavigationBlocked?():boolean;openProject(): void; resumedLastProject(): boolean; changed(): void; storageEstimate?(): Promise<Readonly<{ usage?: number; quota?: number }>>;localSettings?:{read():string;save(displayName:string):boolean} }) {
+  navigation?: { utilitiesRoot?:HTMLElement;compactFiles?:boolean;smoothDisplay?:boolean;presentation?():{busy:boolean;reason:string}|null;projectNavigationBlocked?():boolean;openProject(): void; resumedLastProject(): boolean; changed(): void; storageEstimate?(): Promise<Readonly<{ usage?: number; quota?: number }>>;localSettings?:{read():string;save(displayName:string):boolean} }) {
   const root = document.createElement('section'), mode = document.createElement('button'), status = document.createElement('p');
   root.className = 'lv-project-shell';
+  const utilitiesParent=navigation?.utilitiesRoot?.parentElement;
   mode.type = 'button'; status.setAttribute('role', 'status');
   const fileMenu=tools&&navigation?.compactFiles?document.createElement('details'):undefined;
-  if(fileMenu){fileMenu.className='lv-project-files';const summary=document.createElement('summary');summary.textContent='保存・受け渡し';fileMenu.append(summary,tools!.root);}
+  const fileClose = document.createElement('button'), fileNotice = document.createElement('p');
+  let fileSummary: HTMLElement | undefined;
+  const filePanel = document.createElement('section'); filePanel.className = 'lv-file-sheet'; filePanel.setAttribute('aria-label', 'ファイル操作');
+  const fileCloseNote=document.createElement('p');fileCloseNote.textContent='入力・確認を完了するか、取り消してください。';
+  fileClose.type = 'button'; fileClose.textContent = '閉じる'; fileNotice.setAttribute('role', 'status');
+  if(fileMenu){fileMenu.className='lv-project-files';const summary=document.createElement('summary');fileSummary=summary;summary.textContent='ファイル';
+    filePanel.append(fileClose,fileCloseNote, tools!.root); fileMenu.append(summary,filePanel);
+    summary.addEventListener('click', event => { if(fileMenu.open && tools!.hasChanges()) event.preventDefault();
+      else if(!fileMenu.open) { fileOrigin=summary;tools!.showAll();core?.dismissDisclosures(); } });
+  }
+  let fileOrigin: HTMLElement | undefined;
+  const positionFiles = () => {
+    const rect=fileSummary?.getBoundingClientRect?.(), win=document.defaultView;
+    if(!rect||!win)return;
+    const top=Math.min(rect.bottom+8,Math.max(12,win.innerHeight-180));
+    filePanel.style.top=`${top}px`;filePanel.style.maxHeight=`${Math.max(120,win.innerHeight-top-12)}px`;
+  };
+  document.defaultView?.addEventListener('resize',positionFiles);
+  const closeFiles = () => { if (!fileMenu || tools!.hasChanges()) return; fileMenu.open = false;
+    (fileOrigin?.getClientRects?.().length && !(fileOrigin as HTMLButtonElement).disabled ? fileOrigin : fileSummary)?.focus?.({preventScroll:true}); };
+  fileClose.addEventListener('click', closeFiles);
+  filePanel.addEventListener('keydown', event => { if(event.key==='Escape' && !event.isComposing && !event.defaultPrevented){event.preventDefault();event.stopPropagation();closeFiles();} });
+  const fileEntry = (label:string,surface:'save'|'share'|'receive'|'restore') => {
+    const b=document.createElement('button'); b.type='button'; b.textContent=label; b.setAttribute('data-lv-edit-only','');
+    b.addEventListener('click',()=>{if(!fileMenu||b.disabled)return;if(!fileMenu.open)fileOrigin=b;
+      if(tools!.showSurface(surface)){core?.dismissDisclosures();fileMenu.open=true;filePanel.focus?.({preventScroll:true});}}); return b;
+  };
+  const saveEntry=fileEntry('保存','save'), shareEntry=fileEntry('共有','share'), receiveEntry=fileEntry('受信','receive'), restoreEntry=fileEntry('復元','restore');
+  saveEntry.className='lv-workspace-primary';
+  filePanel.tabIndex=-1;
+  const fileNavigation=document.createElement('nav'); fileNavigation.setAttribute('aria-label','ファイルの目的');fileNavigation.append(receiveEntry,restoreEntry);filePanel.insertBefore(fileNavigation,fileClose);
+  let initialFiles = true;
   let disposed = false, switching = false, core: ReturnType<typeof createProjectWorkspace> | undefined;
   let previewOpen=false,mainRuntime:ProjectViewport|undefined;
   let viewportScene = '', refreshPreview: (() => void) | undefined, modeFeedback = '';
@@ -29,19 +61,31 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
   const external = () => switching || !!tools?.hasChanges();
   const changed = () => {
     if (disposed) return;
+    root.setAttribute('data-lv-mode', host.mode!.current);
     root.dataset.layout = fileMenu && core && !startup ? 'workspace' : 'flow';
-    if(fileMenu&&(host.hasPending()||host.workspaceOutput.error||host.workspaceOutput.jobs.some(job=>
-      job.state==='unstarted'||job.state==='incomplete'||job.state==='repair-required')))fileMenu.open=true;
-    tools?.render(); mode.textContent = host.mode!.current === 'view' ? '編集を開始する' : '閲覧に切り替える';
+    const needsFiles = !!host.workspaceOutput.error||!!host.workspaceFiles.error||!!host.workspaceFiles.reviewCopyError||host.backupRestore.pending||host.backupRestore.needsDisplay||!!host.backupRestore.error||
+      host.workspaceOutput.jobs.some(job=>['unstarted','incomplete','repair-required'].includes(job.state))||
+      [...host.workspaceFiles.jobs,...host.workspaceFiles.reviewCopies].some(job=>['incomplete','input-required','unbound-input','stale','repair-required'].includes(job.state));
+    if(initialFiles && fileMenu && (needsFiles||host.hasPending())) fileMenu.open=true;
+    initialFiles=false;
+    fileNotice.textContent=needsFiles?'未完了のファイル操作があります。「ファイル」から再開できます。':''; fileNotice.hidden=!needsFiles;
+    fileClose.disabled=!!tools?.hasChanges();
+    fileCloseNote.hidden=!fileClose.disabled;
+    restoreEntry.hidden=!host.backupRestore.enabled;
+    for(const b of [saveEntry,shareEntry,receiveEntry,restoreEntry])b.disabled=switching||!!navigation?.presentation?.()||!!core?.inputPending()||!!tools?.hasChanges()||!!startup?.hasChanges();
+    tools?.render(); mode.textContent = host.mode!.current === 'view' ? '編集する' : '閲覧する';
+    mode.className=host.mode!.current==='view'?'lv-workspace-primary':'';
     mode.disabled = switching || !!navigation?.presentation?.() || !!core?.inputPending() || !!startup?.hasChanges() || !!tools?.hasChanges();
-    if (core) core.root.inert = switching || !!tools?.busy() || !!startup?.busy();
+    if (core) { core.root.inert = switching || !!startup?.busy(); core.setExternalBusy(!!tools?.busy()); }
     startup?.render();
     retryStartup.hidden = !startup?.recoveryPending(); retryStartup.disabled = switching || !!navigation?.presentation?.() || !!host.authority.readOnly || !!tools?.hasChanges() || !!startup?.busy();
     if (!core) status.textContent = modeFeedback || (host.hasPending() ? '更新が未完了です。元の変更から再試行してください。' : '開始シーンを確認してください。シーンと記録は保持しています。');
+    positionFiles();
   };
   const retryStartup = document.createElement('button'); retryStartup.type = 'button'; retryStartup.textContent = '更新を再試行';
+  retryStartup.setAttribute('data-lv-edit-only', '');
   retryStartup.addEventListener('click', () => { if (!retryStartup.disabled && !disposed) startup?.retry(); });
-  root.append(mode, status, retryStartup); if (tools) root.append(fileMenu??tools.root);
+  root.append(mode, status, retryStartup, fileNotice); if (tools) root.append(fileMenu??tools.root);
   const mountCore = () => {
     if (disposed || core || startup?.busy() || startup?.recoveryPending() || host.hasPending() || !chooseStartupScene(read().state).sceneId) return;
     core = createProjectWorkspace(document, {
@@ -49,6 +93,7 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
     openProject: navigation?.openProject, projectNavigationBlocked: navigation?.projectNavigationBlocked, resumedLastProject: navigation?.resumedLastProject, storageEstimate: navigation?.storageEstimate,
     localSettings: navigation?.localSettings,
     editorSettings: host.editorSettings,
+    disclosureOpening(){if(tools?.hasChanges())return false;if(fileMenu)fileMenu.open=false;return true;},
     createModelPreview: renderCandidate ? () => {
       let token = '', sceneId = '';
       const preview = createModelCandidatePreview(document, renderCandidate, () => !disposed && token === read().token && sceneId === viewportScene,open=>{previewOpen=open;if(open)mainRuntime?.setActive(false);
@@ -58,7 +103,7 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
         show(current, scene, asset, operation, label) { if (current !== read().token || scene !== viewportScene) throw Error('モデルの更新候補を確認してください。'); token = current; sceneId = scene;
           preview.show(label, modelCandidateDisplay(read(), scene, asset, operation, host.limits)); } };
     } : undefined,
-    read, presentation: navigation?.presentation, get readOnly() { return !!host.authority.readOnly || !!navigation?.presentation?.(); }, status: () => host.authority.status!(),
+    read, presentation: navigation?.presentation, get mode() { return host.mode!.current; }, get readOnly() { return !!host.authority.readOnly || !!navigation?.presentation?.(); }, status: () => host.authority.status!(),
     projectStatus() {
       const current = host.read(), provider = read(), jobs = host.workspaceOutput.jobs;
       const title = provider.inspection.candidates.fields.find(f => f.path.length === 2 && f.path[0] === 'project' && f.path[1] === 'title');
@@ -183,6 +228,8 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
     },
     });
     root.append(core.root);
+    core.headerActions.append(mode); if(fileMenu)core.headerActions.append(saveEntry,shareEntry,fileMenu);
+    if(navigation?.utilitiesRoot)core.utilityArea.append(navigation.utilitiesRoot);
     startup?.dispose(); startup?.root.remove(); startup = undefined; status.textContent = '';
   };
   const ensureStartup = () => {
@@ -191,7 +238,7 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
         () => !!navigation?.presentation?.() || external() || !!core?.inputPending()); root.append(startup.root);
     } else if (startup && core && chooseStartupScene(read().state).sceneId && !startup.hasChanges()) {
       const active = read().state.scenes[core.activeScene()]?.lifecycle;
-      if (active?.kind !== 'value' || active.value.state !== 'active') { core.unmount(); core = undefined; }
+      if (active?.kind !== 'value' || active.value.state !== 'active') { root.append(mode); if(fileMenu)root.append(fileMenu); core.unmount(); core = undefined; }
       else { startup.dispose(); startup.root.remove(); startup = undefined; }
     }
   };
@@ -205,9 +252,9 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
     modeFeedback = ''; switching = true; changed();
     try { await host.mode!.change(host.mode!.current === 'view' ? 'edit' : 'view', read().token, render); }
     catch (error) { if (!disposed) { modeFeedback = (error as Error).message; status.textContent = modeFeedback; } }
-    finally { switching = false; render(); }
+    finally { switching = false; core?.clearNotice(); render(); }
   })(); });
-  const unmount = () => { if (!disposed) { disposed = true; startup?.dispose(); core?.unmount(); root.remove(); } };
+  const unmount = () => { if (!disposed) { disposed = true; document.defaultView?.removeEventListener('resize',positionFiles); if(navigation?.utilitiesRoot)utilitiesParent?.append(navigation.utilitiesRoot); startup?.dispose(); core?.unmount(); root.remove(); } };
   changed();
   const interaction = { get interactionPending() { return core?.session.interactionPending || !!startup?.hasChanges(); },
     get acknowledgment() { return startup?.busy() || startup?.recoveryPending() ? { state: startup.busy() ? 'checking' as const : 'failed' as const } : core?.session.acknowledgment ?? { state: 'idle' as const }; },

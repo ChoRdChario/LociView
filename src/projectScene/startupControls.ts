@@ -5,6 +5,7 @@ import { WorkingAcknowledgment } from './acknowledgment';
 import { defaultSceneCandidates } from '../projectMetadata/startupScene';
 import { sceneRestoreSource } from '../projectMetadata/sceneOrganization';
 import { newId } from '../projectMetadata/persistence';
+import { editOnly } from '../ui/projectScene/modePresentation';
 
 /** Also usable BEFORE a Scene/session exists. No implicit navigation or direct storage writes. */
 export function createMetadataStartupControls(document: Document, host: SavedWorkspaceHost,
@@ -22,6 +23,7 @@ export function createMetadataStartupControls(document: Document, host: SavedWor
   restore.type = 'button'; restore.textContent = 'このシーンを復旧して開く';
   recoveryNote.textContent = 'シーンを選んで開始シーンに戻します。削除済みの所属・視点・材質設定は戻しません。記録やモデルは再び追加できます。';
   recovery.append(recoveryNote, recoverySelect, restore); root.append(recovery);
+  editOnly(select, apply, cancel, recoverySelect, restore);
   let token = '', ready = false, disposed = false, feedback = '';
   const hasChanges = () => !!select.value || !!recoverySelect.value || ack.state !== 'idle';
   const busy = () => ack.state === 'checking';

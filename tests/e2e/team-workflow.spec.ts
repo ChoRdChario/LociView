@@ -1,3 +1,4 @@
+import { revealCaptionList } from './workspaceUi';
 import { test, expect, chromium, type BrowserContext, type Page, type TestInfo } from '@playwright/test';
 import { createHash } from 'node:crypto';
 import { mkdir, mkdtemp, readFile, readdir } from 'node:fs/promises';
@@ -27,6 +28,7 @@ const files = (page: Page) => page.getByRole('region', { name: 'ファイル', e
 const detail = (page: Page) => page.getByRole('region', { name: 'キャプションの詳細', exact: true });
 
 async function selectCaption(page: Page, title = captionName) {
+  await revealCaptionList(page);
   await page.getByRole('list', { name: 'キャプション一覧', exact: true })
     .locator('.lv-caption-select').filter({ hasText: title }).click();
 }

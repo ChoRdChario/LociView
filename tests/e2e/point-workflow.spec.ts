@@ -1,3 +1,5 @@
+import { revealProjectHelp } from './workspaceUi';
+import { revealCaptionList } from './workspaceUi';
 import * as THREE from 'three';
 import { serializeGlb } from '../../src/assets/glbOptimize';
 import { defaultPose, fittedPose } from '../../src/harness/projectScene/viewportModel';
@@ -22,7 +24,7 @@ const fileBlob = async (path: string) => new Blob([new Uint8Array(await readFile
 const files = (page: Page) => page.getByRole('region', { name: 'ファイル', exact: true });
 const detail = (page: Page) => page.getByRole('region', { name: 'キャプションの詳細', exact: true });
 async function ready(page: Page) { await expect(page.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText('点群の作業', { timeout: 90_000 }); }
-async function caption(page: Page, title = '元の点の記録') { await page.getByRole('list', { name: 'キャプション一覧', exact: true }).locator('.lv-caption-select').filter({ hasText: title }).click(); }
+async function caption(page: Page, title = '元の点の記録') { await revealCaptionList(page); await page.getByRole('list', { name: 'キャプション一覧', exact: true }).locator('.lv-caption-select').filter({ hasText: title }).click(); }
 async function edit(page: Page, title: string, body: string) {
   await detail(page).getByLabel('タイトル', { exact: true }).fill(title); await detail(page).getByLabel('本文', { exact: true }).fill(body);
   await detail(page).getByRole('button', { name: '変更を適用', exact: true }).click(); await expect(page.getByText('変更を適用しました。', { exact: true })).toBeVisible({timeout:90_000});
@@ -42,7 +44,7 @@ async function download(page: Page, info: TestInfo, name: string, purpose: 'back
     const row = history.locator('section').filter({hasText:`バックアップ ${name} —`}); await row.getByText('保存先のファイルを確認',{exact:true}).click();
     const choosing=page.waitForEvent('filechooser'); await row.getByRole('button',{name:'ファイルを選択',exact:true}).click(); await (await choosing).setFiles(path);
     await expect(area.getByText('選択したファイルの内容を確認しました。',{exact:true})).toBeVisible({timeout:90_000});
-    await expect(page.getByLabel('保存ファイルの状態',{exact:true})).toHaveText('確定済みの内容は、選択した保存ファイルと一致しています。');
+    await expect(page.getByLabel('保存ファイルの状態',{exact:true})).toHaveText('保存ファイルと一致');
   }
   return path;
 }
@@ -125,7 +127,7 @@ test('点群の元座標で記録し、画像・調整・受け渡し・閲覧�
     expect(Buffer.from(await final.backup.archive.entryBytes(`blobs/sha256/${hash(updatedPly)}`,updatedPly.length))).toEqual(updatedPly);
     const assetId=original.anchor.assetId,oldAsset=initial.records.assetsById[assetId],newAsset=final.records.assetsById[assetId];expect(newAsset.assetFrameId).toBe(oldAsset.assetFrameId);expect(newAsset.status.activeBindingId).not.toBe(oldAsset.status.activeBindingId);expect(final.records.assetBindingsById[newAsset.status.activeBindingId].assetToProject).toMatchObject({translation:[3,0,0],uniformScale:2}); expect(Object.keys(final.records.captionAttachmentsById)).toHaveLength(1);
     const reviewPath = await download(page,info,'point-review','review'); await close(b.context,'B');
-    const review = await launch(1,3); await ready(review.page); await review.page.getByRole('button',{name:'別のプロジェクトを開く',exact:true}).click(); await expect(review.page.getByLabel('ファイルを選択',{exact:true})).toBeVisible(); await expect(review.page.getByLabel('ファイルを選択',{exact:true})).toBeEnabled(); await review.page.getByLabel('ファイルを選択',{exact:true}).setInputFiles(reviewPath); await review.page.getByRole('button',{name:'ファイルを開く',exact:true}).click();
+    const review = await launch(1,3); await ready(review.page); await revealProjectHelp(review.page); await review.page.getByRole('button',{name:'別のプロジェクトを開く',exact:true}).click(); await expect(review.page.getByLabel('ファイルを選択',{exact:true})).toBeVisible(); await expect(review.page.getByLabel('ファイルを選択',{exact:true})).toBeEnabled(); await review.page.getByLabel('ファイルを選択',{exact:true}).setInputFiles(reviewPath); await review.page.getByRole('button',{name:'ファイルを開く',exact:true}).click();
     await expect(review.page.getByText('閲覧用シーンを開きました。編集プロジェクトは作成していません。',{exact:true})).toBeVisible({timeout:180_000});
     await expect(review.page.getByText(/この描画倍率では点群を表示できません/).first()).toBeVisible(); await review.page.getByRole('list',{name:'キャプション一覧',exact:true}).locator('.lv-caption-select').first().click(); await expect(review.page.getByText('相手が追記',{exact:true}).first()).toBeVisible(); await close(review.context,'review');
     await close(a.context,'A'); a = await launch(0,2); await ready(a.page); await caption(a.page); await expect(detail(a.page).getByLabel('本文',{exact:true})).toHaveValue('相手が追記'); await close(a.context,'cold');

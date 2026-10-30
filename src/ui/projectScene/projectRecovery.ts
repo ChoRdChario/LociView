@@ -3,6 +3,7 @@ import { normalizeSceneName } from '../../domain/values';
 import { normalizeCaptionText } from '../../domain/captionText';
 import type { WorkspaceRecoveryGroup, WorkspaceViewportState } from './projectWorkspacePorts';
 import { newProjectId, panelNodes } from './projectPanel';
+import { editOnly } from './modePresentation';
 
 interface RecoveryHost {
   token(): string;
@@ -73,6 +74,8 @@ export function createProjectRecovery(document: Document, host: RecoveryHost) {
         const cancel = button('選択を取り消す', () => { if (!host.cancelBlock() && !composing()) { forms.delete(group.key); host.changed(); } });
         const note = make('p', group.note ?? ''), details = make('ul'); note.hidden = !group.note;
         for (const line of group.details ?? []) details.append(make('li', line)); details.hidden = !details.children.length;
+        editOnly(text, decision, apply);
+        if (group.target.kind !== 'field' || group.target.field !== 'anchor') editOnly(select, cancel);
         item.append(heading, note, values, details, select, text, decision, apply, cancel, message);
         f = { root: item, group, token: host.token(), select, text, decision, apply, cancel, message, composing: false }; forms.set(group.key, f);
         const current = f;

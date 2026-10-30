@@ -10,5 +10,6 @@ validation-dist/
 /.artifacts/acquisition/
 /.artifacts/heic-decoder-poc/
 /.artifacts/e2e/
+/.artifacts/design-preview/
 desktop-dist/
 offline-desktop-dist/

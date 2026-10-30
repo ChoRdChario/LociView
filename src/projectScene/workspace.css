@@ -127,6 +127,7 @@
 .lv-development-stage { overflow-y: auto; }
 .lv-development-sidebar > .lv-development-pending-panel { overflow-y: auto; min-height: 0; }
 .lv-caption-windows { position: absolute; inset: 0; pointer-events: none; }
+.lv-project-stage > .lv-caption-windows { z-index: 1; }
 .lv-caption-window { position: absolute; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; box-sizing: border-box; pointer-events: auto; background: #f2f0ee; border: 1px solid #817c78; box-shadow: 0 2px 6px #312f2d26; }
 .lv-caption-window > header { display: flex; min-width: 0; border-bottom: 1px solid #b7b1aa; }
 .lv-caption-window > header > button { border: 0; background: transparent; }
@@ -202,16 +203,32 @@
 .lv-project-shell summary { min-height: 44px; box-sizing: border-box; padding: 10px 0; cursor: pointer; }
 .lv-project-shell > section:not(.lv-project-workspace) { padding: 12px; }
 
-/* Candidate file actions stay close to the workspace without covering the model. */
-.lv-project-files { padding: 8px 12px; border-bottom: 1px solid #b7b1aa; background: #f2f0ee; }
-.lv-project-files > summary { cursor: pointer; min-height: 32px; padding: 4px; }
+/* File UI retains its command owners and occupies a separate floating surface. */
+.lv-project-files { padding: 0; }
+.lv-project-files > summary { cursor: pointer; min-height: 44px; padding: 10px 12px; border-radius: 6px; }
 .lv-project-files > summary:focus-visible { outline: 2px solid #312f2d; outline-offset: 2px; }
+.lv-file-sheet { position: fixed; z-index: 50; right: 12px; top: 76px; box-sizing: border-box; width: min(600px, calc(100vw - 24px)); max-height: calc(100dvh - 88px); overflow-y: auto; overscroll-behavior: contain; padding: 16px; border: 1px solid #aaa99f; border-radius: 10px; background: #fbfaf6; box-shadow: 0 10px 48px #25282038; }
+.lv-file-sheet > button { position: sticky; top: 0; float: right; z-index: 1; }
+.lv-file-sheet > nav { display: flex; gap: 8px; }
+.lv-file-sheet > section { clear: both; padding-top: 12px; }
+.lv-file-sheet > section > :is(form,details) { margin-block: 12px; }
+.lv-file-sheet label { display: grid; gap: 6px; margin: 8px 0; }
+.lv-file-sheet button { margin: 3px; padding: 8px 12px; }
+.lv-file-sheet .lv-file-primary { background: #3c4637; color: #fff; }
+.lv-project-shell .lv-workspace-primary { background: #3c4637; color: #fff; border-color: #3c4637; }
+.lv-project-shell .lv-project-workspace :is(button,input,select,textarea) { border-radius: 6px; }
+.lv-project-shell .lv-project-workspace .lv-camera-axes > button { border-radius: 50%; }
+.lv-project-workspace > header .lv-offline-controls { display: block; padding: 12px 0; background: transparent; border: 0; font-size: 13px; }
+.lv-project-workspace > header .lv-offline-controls > p { margin-bottom: 8px; }
+.lv-project-workspace > header .lv-offline-controls details > div { position: static; width: 100%; max-height: none; padding: 8px 0; border: 0; box-shadow: none; }
+.lv-project-shell [data-layout="workspace"] > header { flex-wrap: nowrap; }
+.lv-media-viewer[data-media-kind="audio"] { height: auto; min-height: 240px; }
+.lv-media-viewer[data-media-kind="audio"] .lv-media-viewer-content { flex: 0 0 auto; min-height: 64px; }
 
 .lv-project-shell > p:empty, .lv-project-workspace > header > p:empty { display: none; }
 
-/* Only the compact Desktop editor owns the window height. Startup, recovery,
-   Review and narrow/short views keep their document scrolling. */
-@media (min-width: 761px) and (min-height: 720px) {
+/* Desktop and compact views retain the same mounted context and scroll panels. */
+@media (min-width: 761px) {
   .lv-validation-host:has(> .lv-validation-content > .lv-project-shell[data-layout="workspace"]) {
     display: flex; flex-direction: column; height: 100dvh; min-height: 0;
   }
@@ -225,17 +242,12 @@
   .lv-project-shell[data-layout="workspace"] > :is(button, p, details) { flex-shrink: 0; }
   .lv-project-shell[data-layout="workspace"] > button { align-self: flex-start; }
   .lv-project-shell[data-layout="workspace"] > .lv-project-workspace > :is(header, .lv-project-viewport-tools) { flex-shrink: 0; }
-  .lv-project-shell[data-layout="workspace"] > .lv-project-workspace > header { gap: 8px 12px; padding: 8px 12px; max-height: 26dvh; overflow-y: auto; }
+  .lv-project-shell[data-layout="workspace"] > .lv-project-workspace > header { gap: 8px; padding: 8px 12px; }
   .lv-project-shell[data-layout="workspace"] > .lv-project-workspace > header > :is(h1, p) { margin: 0; }
-  .lv-project-shell[data-layout="workspace"] > .lv-project-workspace > header > details[open] { flex: 1 1 100%; min-width: 0; }
   .lv-project-shell[data-layout="workspace"] .lv-project-body { flex: 1; height: auto; min-height: 0; }
   .lv-project-shell[data-layout="workspace"] .lv-project-stage { min-height: 0; min-width: 0; }
   .lv-project-shell[data-layout="workspace"] .lv-project-body > aside { min-height: 0; overscroll-behavior: contain; scroll-padding-top: 64px; }
-  .lv-project-shell[data-layout="workspace"] .lv-project-body > aside > [role="tablist"] { position: sticky; top: -12px; z-index: 1; padding: 4px 0; background: #f2f0ee; }
-  .lv-project-shell[data-layout="workspace"] > .lv-project-files[open] > section { max-height: min(30dvh, 240px); overflow-y: auto; overscroll-behavior: contain; }
-  /* Account for the offline status row when several disclosures are open. */
-  .lv-validation-host:has(> .lv-offline-controls) .lv-project-shell[data-layout="workspace"] > .lv-project-workspace > header { max-height: 22dvh; }
-  .lv-validation-host:has(> .lv-offline-controls) .lv-project-shell[data-layout="workspace"] > .lv-project-files[open] > section { max-height: min(22dvh, 176px); }
+  .lv-project-shell[data-layout="workspace"] .lv-project-body > aside > [role="tablist"] { position: sticky; top: -16px; z-index: 3; padding: 4px 0; background: #f7f6f1; }
 }
 /* Optional app-authored explanations; their layer escapes scrolling panels. */
 .lv-context-help { display: inline-flex; vertical-align: middle; }
@@ -244,3 +256,8 @@
 .lv-context-help-trigger:focus-visible { outline: 2px solid #666f5f; outline-offset: -4px; }
 .lv-context-help-note { position: fixed; z-index: 10000; box-sizing: border-box; width: max-content; max-width: min(352px, calc(100vw - 16px)); max-height: calc(100dvh - 16px); overflow: auto; overflow-wrap: anywhere; padding: 12px 14px; border: 1px solid #a6aaa0; border-radius: 6px; background: #fbfaf6; color: #252820; box-shadow: 0 4px 18px #0002; font: 14px/1.6 system-ui, sans-serif; white-space: normal; }
 .lv-context-help-note[hidden] { display: none !important; }
+[data-lv-mode="view"] [data-lv-edit-only] { display: none !important; }
+[data-lv-view-only] { display: none; }
+[data-lv-mode="view"] [data-lv-view-only] { display: block; }
+.lv-caption-value > span { font-size: .875rem; color: #5a5b55; }
+.lv-caption-value > p { margin: .35rem 0 .75rem; white-space: pre-wrap; overflow-wrap: anywhere; }

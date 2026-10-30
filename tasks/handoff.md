@@ -6,12 +6,39 @@ next action and actual stop conditions; [inventory](implementation-inventory.md)
 owns route-specific coverage. Check actual Git branch/HEAD/worktree and preserve
 existing changes. Do not reconstruct current work from completed checkpoint prose.
 
-PO2026-10-30 requests delayed contextual explanations after the operation-screen
-review. Read todo's current boundary and UI guidelines§2.1.1. Only optional
-app-authored copy moves; user records, current failures/unsaved/conflicts and
-sharing/deletion/recovery consequences remain visible. Existing typed operations
-and data contracts remain. The camera gizmo/general header redesign is a separate
-next unit; todo owns current browser/final-check evidence and checkpoint status.
+PO2026-10-30 corrects the UI work order: finish the whole-screen/connected-flow
+issue list and repair groups before individual fixes. Read todo's current boundary.
+The completed review and screen proposal now have explicit implementation approval.
+View-mode WIP is being integrated into the coherent workspace change; it is not
+an independently completed checkpoint. Todo owns the consolidated findings,
+retained safety boundaries and actual verification state.
+
+Latest PO steering raises the review target to AAA-title production UI/UX quality.
+Read the[consolidated design review](../docs/ui-design-review.md) for Q1–Q8,
+preserved strengths, proposed observable acceptance and exact evidence limits.
+PO then accepted that direction and requested concrete design and concise copy.
+The[workspace/copy design](../docs/ui-workspace-design.md) and
+[interactive proposal](../docs/mockups/loci-workspace.html) are complete, with
+independent reviews and dedicated-Chromium prototype checks. Todo owns exact
+evidence and the owned localhost4190 prototype preview. The prototype simulates
+display only. The production change uses existing typed commands, camera/file
+services and retained DOM; it does not promote the prototype's code. The held
+GLB recovery test observed checking at a polling deadline; it now awaits the
+existing owner's terminal acknowledgment, retaining strict failure, byte and
+idempotence assertions. Focused evidence passes. Check todo for the actual final
+checkpoint/browser/review outcomes. The first integrated PC candidate now passes
+the required automated checkpoint and focused real-browser flows, with independent
+source/input review. Broader new-navigation scenarios and physical acceptance
+remain next; this is not an app-completion or release claim.
+Do not infer physical-device, general adoption or release acceptance.
+
+The owned product preview is http://127.0.0.1:4191/ (offline-desktop-dist), separate
+from the original validation origin and the4190 visual prototype. Its index hash
+and owned process/session are recorded in .artifacts/e2e/workspace/preview.json.
+Existing resumption data stays at the original address; use an exported file here.
+No executable source/test changed after the final checkpoint (one test-helper
+EOF blank-line cleanup is recorded separately). Documentation/staging/Push
+alone is not a reason to repeat its runtime checks.
 
 PO prioritizes completing the accepted feature set before readiness-stage latency
 work. The2026-10-29 correction puts daily Scene/Caption organization and editing

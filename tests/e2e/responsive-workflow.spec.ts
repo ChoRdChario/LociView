@@ -48,7 +48,7 @@ test('狭い画面とno-hover touchで100記録をキーボード移動し、編
       const row = rows.locator('section').filter({ hasText: `バックアップ ${name} —` }); await row.getByText('保存先のファイルを確認', { exact: true }).tap();
       const picker = page.waitForEvent('filechooser'); await row.getByRole('button', { name: 'ファイルを選択', exact: true }).tap(); await (await picker).setFiles(path);
       await expect(files.getByText('選択したファイルの内容を確認しました。', { exact: true })).toBeVisible({ timeout: 90_000 });
-      await expect(page.getByLabel('保存ファイルの状態', { exact: true })).toHaveText('確定済みの内容は、選択した保存ファイルと一致しています。');
+      await expect(page.getByLabel('保存ファイルの状態', { exact: true })).toHaveText('保存ファイルと一致');
     }
     const backup = await BackupArchive.inspect(new Blob([new Uint8Array(await readFile(path)).buffer]), validationMetadataLimits), parsed = await inspectProjectCandidates(backup.source.read(), validationMetadataLimits);
     if (parsed.kind !== 'project-candidate-inspection') throw Error('metadata'); const records = parsed.unambiguousRecords as Record<string, any>;

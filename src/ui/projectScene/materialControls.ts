@@ -3,13 +3,14 @@ import { editMaterialDraft, materialApplyIssue, materialPlanIsCurrent, materialS
   materialView, planMaterial, type MaterialContext, type MaterialDraft, type MaterialEffect, type MaterialIntentRequest, type MaterialPlan, type MaterialSelection } from './materialState';
 
 import { contextHelp, mountContextHelp } from './contextHelp';
+import { editOnly, viewOnly } from './modePresentation';
 
 let nextMaterialControl = 0;
 /** Disconnected static controls; emits intentions, never dispatches or applies a renderer fallback. */
 export function createMaterialControls(document: Document, onPlan: (plan: MaterialPlan) => void) {
   const make = <K extends keyof HTMLElementTagNameMap>(tag: K, text = '') => { const node = document.createElement(tag); node.textContent = text; return node; };
   const button = (text: string) => { const node = make('button', text); node.type = 'button'; return node; };
-  const root = make('section'); root.className = 'lv-material-editor'; root.setAttribute('aria-label', 'マテリアル');
+  const root = make('section'); root.className = 'lv-material-editor'; root.setAttribute('aria-label', '材質');
   const choices = make('div'); choices.className = 'lv-material-target';
   const select = (label: string) => { const wrapper = make('label', label), input = make('select'); input.setAttribute('aria-label', label); wrapper.append(input); choices.append(wrapper); return input; };
   const model = select('モデル'), surface = select('面'), scope = select('適用範囲');
@@ -24,6 +25,8 @@ export function createMaterialControls(document: Document, onPlan: (plan: Materi
   const status = make('p'); status.id = `lv-material-status-${++nextMaterialControl}`; status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
   const observed = make('p'), impact = make('p'), begin = button('設定を編集'), editor = make('div'); editor.className = 'lv-material-fields';
   const controls = new Map<MaterialEditField, { group: HTMLLabelElement; input: HTMLInputElement | HTMLSelectElement; note: HTMLParagraphElement }>();
+  const reading = make('dl'); reading.className = 'lv-material-values'; viewOnly(reading);
+  const values = new Map<MaterialEditField, { group: HTMLElement; value: HTMLElement; note: HTMLElement }>();
   const cleanups: (() => void)[] = []; let context: MaterialContext | undefined, disposed = false, composing: MaterialEditField | null = null;
   cleanups.push(mountContextHelp(document, root));
   let confirmation: { kind: 'cancel'; draft: MaterialDraft } | { kind: 'remove'; plan: Extract<MaterialEffect, { kind: 'remove' }> } | null = null;
@@ -55,6 +58,8 @@ export function createMaterialControls(document: Document, onPlan: (plan: Materi
     if (enums[field]) options(input as HTMLSelectElement, enums[field]!, '');
     else { (input as HTMLInputElement).type = 'text'; input.setAttribute('inputmode', field === 'keyColor' ? 'text' : 'decimal'); }
     group.append(input, note); editor.append(group); controls.set(field, { group, input, note });
+    const row = make('div'), value = make('dd'), warning = make('p'); row.setAttribute('data-material-field', field);
+    row.append(make('dt', materialFieldLabels[field]), value, warning); reading.append(row); values.set(field, { group: row, value, note: warning });
     listen(input, enums[field] ? 'change' : 'input', () => updateDraft(field, input));
     if (!enums[field]) {
       listen(input, 'compositionstart', () => { if (!context?.draft || input.disabled || (input as HTMLInputElement).readOnly) return;
@@ -63,11 +68,16 @@ export function createMaterialControls(document: Document, onPlan: (plan: Materi
         if (context?.draft) send({ kind: 'draft', baseDraft: context.draft, draft: Object.freeze({ ...context.draft, composing: null }) }); });
     }
   }
-  editor.append(contextHelp(document, '切り抜きでは、しきい値を下回る部分を非表示にします。滑らかな半透明にはなりません。', [controls.get('coverage')!.input]));
+  const coverageHelp=contextHelp(document, '切り抜きでは、しきい値を下回る部分を非表示にします。滑らかな半透明にはなりません。', [controls.get('coverage')!.input]);
+  const advanced=make('details'); advanced.append(make('summary','色の透過と詳細'));
+  for(const field of ['chroma','keyColor','tolerance','softness','cutoff'] as const) advanced.append(controls.get(field)!.group);
+  editor.append(advanced,coverageHelp);
   const actions = make('div'), apply = button('変更を適用'), cancel = button('取り消す'), remove = button('この範囲の設定を解除'), retry = button('再試行'), review = button('状態を確認');
   actions.className = 'lv-material-actions'; apply.className = 'lv-material-primary'; actions.append(apply, cancel, remove, retry, review);
   const confirmBox = make('section'), confirmText = make('p'), confirm = button(''), keep = button('戻る'); confirmBox.setAttribute('aria-label', '操作の確認'); confirmBox.hidden = true; confirmBox.append(confirmText, confirm, keep);
   root.append(choices, status, observed, impact, begin, editor, actions, confirmBox);
+  root.append(reading);
+  editOnly(begin, editor, apply, cancel, remove, retry, review, confirmBox);
   listen(apply, 'click', () => { if (!apply.disabled) request({ kind: 'apply' }); });
   listen(retry, 'click', () => { if (!retry.disabled) request({ kind: 'retry' }); });
   listen(review, 'click', () => {
@@ -117,6 +127,7 @@ export function createMaterialControls(document: Document, onPlan: (plan: Materi
       : '同じモデル・面を使うシーンで共通になります。シーン専用の設定がある場合は、そちらが優先されます。';
     const beginPlan = planMaterial(next, { kind: 'begin' }); begin.hidden = Boolean(d); begin.disabled = beginPlan.kind === 'blocked';
     const base = d?.base ?? view.base, raw = (field: MaterialEditField) => d?.edits[field] ?? (base ? materialInput(base.appearance, field, next.source.semanticProfile, base.compositing) : '');
+    if(raw('coverage')==='mask'||raw('chroma')==='on'||d && ['chroma','keyColor','tolerance','softness','cutoff'].some(field=>d.edits[field as MaterialEditField]!==undefined))advanced.open=true;
     const coverageChoices=next.source.semanticProfile==='map2'?[...enums.coverage!,['smoothBlend','半透明']as const]:enums.coverage!;
     editor.hidden = !base;
     for (const [field, control] of controls) {
@@ -131,6 +142,13 @@ export function createMaterialControls(document: Document, onPlan: (plan: Materi
       control.group.hidden = ['keyColor', 'tolerance', 'softness'].includes(field) && raw('chroma') !== 'on' && d?.edits[field] === undefined && composing !== field;
       if (field === 'cutoff') control.group.hidden = raw('coverage') !== 'mask' && d?.edits.cutoff === undefined;
       control.note.textContent = reason ?? ''; control.note.hidden = !control.note.textContent;
+      const current = values.get(field)!, canonical = view.base ? materialInput(view.base.appearance, field, next.source.semanticProfile, view.base.compositing) : '';
+      const choices = field === 'coverage' ? coverageChoices : enums[field];
+      current.value.textContent = choices?.find(([key]) => key === canonical)?.[1] ?? canonical;
+      current.note.textContent = reason ?? ''; current.note.hidden = !reason;
+      const inactive = view.base && (['keyColor', 'tolerance', 'softness'].includes(field) && materialInput(view.base.appearance, 'chroma', next.source.semanticProfile, view.base.compositing) !== 'on' ||
+        field === 'cutoff' && materialInput(view.base.appearance, 'coverage', next.source.semanticProfile, view.base.compositing) !== 'mask');
+      current.group.hidden = !view.base || !!inactive && !reason;
     }
     const applyIssue = materialApplyIssue(next); apply.disabled = applyIssue !== null; apply.hidden = !d;
     cancel.hidden = !d; cancel.disabled = !d || Boolean(composing || d.composing) || inFlight;

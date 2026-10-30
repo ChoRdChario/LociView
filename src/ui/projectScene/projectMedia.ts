@@ -1,4 +1,5 @@
 import type { JsonObject } from '../../domain/values';
+import { editOnly } from './modePresentation';
 import { createMediaThumbnails, mediaDisplayDescription, type MediaViewer, type MediaPreviewGroup, type PreviewPng } from './mediaPreview';
 import { fieldValue, projectAttachments, projectIdentity, projectMediaResources, projectMediaUncertain } from './projectRead';
 import { newProjectId, panelNodes, sameProjectValue, type ProjectPanelHost, type ProjectPanel } from './projectPanel';
@@ -14,6 +15,7 @@ export function createProjectMedia(document: Document, host: ProjectPanelHost, c
   type Draft = Scope & { attachmentId: string; raw: string; composing: boolean };
   let selected: Choice | null = null, draft: Draft | null = null, removal: (Scope & { attachmentId: string; label: string }) | null = null;
   let disposed = false, galleryKey = '', listKey = '', message = '', imageScope = '';
+  const expanded = new Set<string>();
   let gallery: ReturnType<typeof createMediaThumbnails> | undefined;
   const bodies = new Map<string, { record: JsonObject; image: PreviewPng }>();
   const source = () => { const s = host.source(); return { ...s, captionId: caption() }; };
@@ -83,6 +85,7 @@ export function createProjectMedia(document: Document, host: ProjectPanelHost, c
   });
   confirmation.append(question, detach, button('戻る', () => { if (!host.block('captions', false)) { removal = null; host.changed(); } }));
   root.append(galleryHost, stored, list, form, confirmation, status);
+  editOnly(stored, list, form, confirmation);
   function render() {
     if (disposed) return; const s = source(), block = host.block('captions'), local = host.block('captions', false), uncertain = uncertainty(), currentScope = scope();
     if (registeredScope !== currentScope) { registeredScope = currentScope; registeredReader = reader(null); picker.dispose(); picker = newPicker();
@@ -104,17 +107,19 @@ export function createProjectMedia(document: Document, host: ProjectPanelHost, c
     const nextList = JSON.stringify([s.provider.token, s.captionId, !!block, owned(), !!uncertain]); if (nextList === listKey) return; listKey = nextList; list.replaceChildren();
     for (const [index, row] of (s.captionId ? rows(s.captionId) : []).entries()) {
       const card = make('section'); card.setAttribute('aria-label', `添付 ${index + 1} ${row.label}`); card.append(make('p', `${index + 1}. ${row.label}`), make('p', row.fields.altText?.kind === 'value' ? row.alt : '説明の更新候補を確認してください。'));
+      const organize=make('details'); organize.append(make('summary','添付を整理')); organize.open=expanded.has(row.id)||draft?.attachmentId===row.id||removal?.attachmentId===row.id;
+      organize.addEventListener('toggle',()=>{if(organize.open)expanded.add(row.id);else expanded.delete(row.id);});card.append(organize);
       const held = expected()!, edit = button('説明を編集', () => { if (host.block('captions') || owned() || !isCurrent(held)) return; draft = { ...held, attachmentId: row.id, raw: row.alt, composing: false }; host.changed(); });
-      edit.disabled = !!block || owned() || !!uncertain || row.fields.altText?.kind !== 'value'; card.append(edit);
+      edit.disabled = !!block || owned() || !!uncertain || row.fields.altText?.kind !== 'value'; organize.append(edit);
       for (const [offset, label] of [[-1, '前へ'], [1, '後へ']] as const) {
         const move = button(label, () => { if (host.block('captions') || owned() || !isCurrent(held) || uncertainty()) return;
           try { const items = rows(held.captionId), rest = items.filter(r => r.id !== row.id), at = index + offset, value = host.ports.viewOrder(rest[at - 1]?.order ?? null, rest[at]?.order ?? null);
             host.dispatch('captions', held.token, { kind: 'editAttachment', sceneId: held.sceneId, captionId: held.captionId, attachmentId: row.id, field: 'orderKey', value }, () => host.message('添付の順序を変更しました。'));
           } catch (error) { message = (error as Error).message; host.changed(); }
-        }); move.disabled = !!block || owned() || !!uncertain || index + offset < 0 || index + offset >= rows(held.captionId).length; card.append(move);
+        }); move.disabled = !!block || owned() || !!uncertain || index + offset < 0 || index + offset >= rows(held.captionId).length; organize.append(move);
       }
       const remove = button('添付を解除', () => { if (!host.block('captions') && !owned() && isCurrent(held)) { removal = { ...held, attachmentId: row.id, label: row.label }; host.changed(); } });
-      remove.disabled = !!block || owned() || !!uncertain; card.append(remove); list.append(card);
+      remove.disabled = !!block || owned() || !!uncertain; organize.append(remove); list.append(card);
     }
   }
   return { root, render, hasChanges: owned, composing: () => !!draft?.composing,

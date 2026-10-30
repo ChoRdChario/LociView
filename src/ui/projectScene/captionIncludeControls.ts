@@ -1,4 +1,5 @@
 import { captionOwnerLabel, captionTitle } from './captionListState';
+import { editOnly } from './modePresentation';
 import { captionIncludeIssue, captionIncludeView, planCaptionInclude,
   type CaptionIncludeContext, type CaptionIncludeIntent, type CaptionIncludePlan } from './captionIncludeState';
 
@@ -12,6 +13,7 @@ export function createCaptionIncludeControls(document: Document, onPlan: (plan: 
   choices.setAttribute('aria-label', 'キャプション'); choiceLabel.append(choices);
   const selected = make('p'), status = make('p'); status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
   const include = make('button', 'このシーンに追加'), review = make('button', '状態を確認'); include.type = review.type = 'button';
+  editOnly(include);
   root.append(summary, searchLabel, choiceLabel, selected, status, include, review);
   let context: CaptionIncludeContext | undefined, disposed = false, fingerprint = '', action: 'include' | 'exclude' = 'include';
   const cleanups: (() => void)[] = [];

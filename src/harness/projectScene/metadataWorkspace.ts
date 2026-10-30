@@ -46,7 +46,7 @@ export function createSavedWorkspace(document: Document, host: SavedWorkspaceHos
       '開始シーンを確認してください。シーンと記録は保持しています。' : '');
     workspace?.render(); renderTools(); startup.render();
     if (host.mode) {
-      modeButton.textContent = host.mode.current === 'view' ? '編集を開始する' : '閲覧に切り替える';
+      modeButton.textContent = host.mode.current === 'view' ? '編集する' : '閲覧する';
       modeButton.disabled = refreshing || host.mode.busy || startup.busy();
       modeStatus.textContent = host.mode.busy ? '切替を確認しています。' : host.mode.current === 'view' ?
         `閲覧中。${host.mode.detail}` : host.hasPending() ? '更新の復旧が必要です。' : '編集中';

@@ -27,6 +27,10 @@ Read only the relevant topic, not every historical incident.
   Completion reports must state the delivered result and remaining limits; until
   the application is complete, always include the concrete next planned unit
   (PO instruction 2026-10-15). A verified slice is not application completion.
+  2026-10-30 UI review correction: enumerate issues across the operation screens
+  and connected tasks before individual repairs. Consolidate causes and repair
+  groups first; do not turn each newly mentioned control into an immediate
+  implementation/checkpoint while the requested whole-screen review is unfinished.
   2026-10-27 priority correction: keep the missing accepted features on the
   critical path until the complete set is integrated and coherent. Do not let
   measured latency, helper optimization or repeated verification displace feature

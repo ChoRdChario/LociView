@@ -353,6 +353,7 @@ export const projectSceneApplicationImports:Readonly<Record<string,readonly stri
     "./viewportPorts"
   ],
   "src/projectScene/startupControls.ts": [
+      "../ui/projectScene/modePresentation",
     "../projectMetadata/sceneOrganization",
     "../projectMetadata/persistence",
     "../projectMetadata/startupScene",
@@ -476,6 +477,7 @@ export const projectSceneApplicationImports:Readonly<Record<string,readonly stri
     "./validationHost"
   ],
   "src/projectScene/validationOutputControls.ts": [
+    "../ui/projectScene/modePresentation",
     "../ui/projectScene/projectWorkspacePorts",
     "./validationModeHost"
   ],
@@ -501,6 +503,7 @@ export const projectSceneApplicationImports:Readonly<Record<string,readonly stri
     "./modelTypes"
   ],
   "src/projectScene/validationReceiveControls.ts": [
+    "../ui/projectScene/modePresentation",
     "../projectMetadata/format",
     "../ui/projectScene/projectWorkspacePorts",
     "./validationModeHost",

@@ -15,7 +15,7 @@ const set = (n: RecordedNode, v: string) => { n.value = v; n.fire(n.tag === 'sel
 describe('connected fixture material editing, not raster/IME/device evidence', () => {
   it('selects exact target/scope, applies without changing camera/membership, confirms reset and retains IME across task tabs', () => {
     const doc = new RecordedDocument(), s = new SyntheticSession(), w = createDevelopmentWorkspace(doc.asDocument(), s);
-    const r = record(w.root); button(r, 'マテリアル').fire('click'); const m = named(r, 'マテリアル');
+    const r = record(w.root); button(r, 'マテリアル').fire('click'); const m = named(r, '材質');
     set(named(m, 'モデル'), f.equipment); expect(button(m, '設定を編集').disabled).toBe(true);
     const surface = named(m, '面'); set(surface, surface.children[1]!.value); set(named(m, '適用範囲'), 'project');
     button(m, '設定を編集').fire('click'); set(named(m, '照明'), 'unlit'); button(m, '変更を適用').fire('click');

@@ -231,7 +231,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
       retry.type = 'button'; retry.textContent = '更新を再試行'; retry.disabled = !!host.authority.readOnly;
       retry.addEventListener('click', () => execute(async () => { await host!.authority.retry!(); await mount(); }));
       content.append(note, retry); if (receiveTools) { receiveTools.render(); content.append(receiveTools.root); }
-      retry.hidden = host.workspaceFiles.initialImport && host.read().state === 'empty' ||
+      retry.hidden = host.mode?.current === 'view' || host.workspaceFiles.initialImport && host.read().state === 'empty' ||
         !!host.workspaceFiles.reviewCopyError || host.workspaceFiles.reviewCopies.some(j => !['completed', 'abandoned'].includes(j.state)) ||
         host.backupRestore.pending || !!host.workspaceFiles.jobs.some(j => !['completed', 'cancelled', 'abandoned'].includes(j.state));
       const recoveryHost = host, recovery = recoveryHost.authority.nativeConversionRecovery;
@@ -245,7 +245,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
         note.textContent = '変換元の保存が完了していません。同じファイルを選択すると、途中から再開できます。'; retry.hidden = true; content.append(label,resume);
       }
       if (host.mode?.current === 'view') {
-        const edit = document.createElement('button'); edit.type = 'button'; edit.textContent = '編集を開始する';
+        const edit = document.createElement('button'); edit.type = 'button'; edit.textContent = '編集する';
         edit.addEventListener('click', () => execute(async () => {
           await host!.mode!.change('edit', host!.read().source?.token, () => {}); await mount();
         }));
@@ -266,7 +266,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
       const refresh=()=>{if(!current())return;mounted=checked&&!state();if(mounted&&selectionHost===target&&!target.hasPending())clearSelection();rememberCurrent();controls();};
       presentation={busy:true,reason:'モデルを読み込んでいます。記録は閲覧・検索できます。'};
       workspace=ports.mountEditor(target,bridge.factory,receiveTools,ports.renderModelCandidate?display=>ports.renderModelCandidate!(target,display):undefined,
-        {smoothDisplay:ports.smoothDisplay,presentation:state,projectNavigationBlocked:()=>busy,openProject:()=>{void selectProject();},resumedLastProject:()=>resumedLast,storageEstimate:ports.storageEstimate,localSettings:ports.localSettings,changed:refresh});
+        {utilitiesRoot:offline?.root,smoothDisplay:ports.smoothDisplay,presentation:state,projectNavigationBlocked:()=>busy,openProject:()=>{void selectProject();},resumedLastProject:()=>resumedLast,storageEstimate:ports.storageEstimate,localSettings:ports.localSettings,changed:refresh});
       content.replaceChildren(workspace.root,retry);workspace.render();
       const load=async()=>{
         checked=false;mounted=false;presentation={busy:true,reason:'モデルを読み込んでいます。記録は閲覧・検索できます。'};retry.hidden=true;resident?.detachPreparation?.();workspace?.render();
@@ -292,7 +292,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     const fileTools = receiveTools;
     try { workspace=ports.mountEditor(target,next.factory,fileTools,
       ports.renderModelCandidate ? display=>ports.renderModelCandidate!(target,display) : undefined,
-      {smoothDisplay:ports.smoothDisplay,projectNavigationBlocked:()=>busy,openProject:()=>{void selectProject();},resumedLastProject:()=>resumedLast,storageEstimate:ports.storageEstimate,localSettings:ports.localSettings,
+      {utilitiesRoot:offline?.root,smoothDisplay:ports.smoothDisplay,projectNavigationBlocked:()=>busy,openProject:()=>{void selectProject();},resumedLastProject:()=>resumedLast,storageEstimate:ports.storageEstimate,localSettings:ports.localSettings,
         changed:()=>{rememberCurrent();controls();}});
       content.replaceChildren(workspace.root); workspace.render();
       if (target.backupRestore.needsDisplay) { target.backupRestore.displayReady(target.read().source!.token); workspace.render(); } }
@@ -381,7 +381,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
       firstRecoveryButtons.add(b); b.addEventListener('click', () => { if (!b.disabled) execute(action); }); commands.append(b); };
     const leave = async (cancel: boolean) => { if (cancel) await (state.phase === 'beforeStart' ? target.abandon() : target.cancel());
       await closeCurrent(); clearSelection(); selected = null; ports.selected(null); navigation.hidden = false; await updateList(); status.textContent = ''; };
-    if (target.readOnly) button('編集を開始する', async () => {
+    if (target.readOnly) button('編集する', async () => {
       try { const candidate = await target.edit(); if (disposed || firstRecovery !== target) { await candidate.dispose(); return; }
         await closeCurrent();
         if ('kind' in candidate) { firstRecovery = candidate; renderFirstRecovery(); } else await adoptProject(target.run, candidate);

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { value, type Field, type MaterialTarget } from '../../src/scene/types';
-import { materialFields, materialInput, validateMaterialIntent, type MaterialIntent, type MaterialEditField } from '../../src/domain/materialIntent';
+import { materialFields, materialFieldLabels, materialInput, validateMaterialIntent, type MaterialIntent, type MaterialEditField } from '../../src/domain/materialIntent';
 import { acceptMaterialApply, editMaterialDraft, materialApplyIssue, materialPlanIsCurrent, materialTargetKey, materialView,
   newMaterialSelection, planMaterial, type MaterialContext, type MaterialEffect, type MaterialPlan, type MaterialSurfacePort } from '../../src/ui/projectScene/materialState';
 import { createMaterialControls } from '../../src/ui/projectScene/materialControls';
@@ -49,13 +49,24 @@ function host(initial = fixture()) {
     }
   });
   controls.render(context); const root = record(controls.root), choices = root.children[0]!, actions = root.children[6]!, confirmation = root.children[7]!;
-  const fields = new Map(materialFields.map((field, i) => [field, root.children[5]!.children[i]!.children[0]!]));
+  const descendants = (node: ReturnType<typeof record>): ReturnType<typeof record>[] => [node,...node.children.flatMap(descendants)];
+  const fields = new Map(materialFields.map(field => [field, descendants(root.children[5]!).find(node=>node.attributes.get('aria-label')===materialFieldLabels[field])!]));
   return { document, controls, root, fields, plans, model: choices.children[0]!.children[0]!, surface: choices.children[1]!.children[0]!, scope: choices.children[2]!.children[0]!,
     status: root.children[1]!, observed: root.children[2]!, impact: root.children[3]!, begin: root.children[4]!, apply: actions.children[0]!, cancel: actions.children[1]!, remove: actions.children[2]!, retry: actions.children[3]!, review: actions.children[4]!,
     confirmation, confirm: confirmation.children[1]!, get context() { return context; }, render(next: MaterialContext) { if (controls.render(next)) context = next; } };
 }
 
 describe('disconnected material controls (not rendering, browser or save acceptance)', () => {
+  it('keeps canonical material values and field warnings readable separately from an editing draft', () => {
+    const h = host(edit(editing(), 'lighting', 'unlit'));
+    const reading = h.root.children[8]!, lighting = reading.children.find(n => n.attributes.get('data-material-field') === 'lighting')!;
+    expect(reading.attributes.has('data-lv-view-only')).toBe(true);
+    expect(lighting.children[1]!.textContent).toBe('元の設定'); expect(h.fields.get('lighting')!.value).toBe('unlit');
+    expect(h.review.attributes.has('data-lv-edit-only')).toBe(true);
+    const current = surface(); h.render(fixture(true, { ...current, fieldIssues: { ...current.fieldIssues, lighting: '陰影を確認してください。' } }));
+    expect(lighting.children[2]!.textContent).toBe('陰影を確認してください。'); expect(lighting.hidden).toBe(false);
+    h.controls.dispose();
+  });
   it('keeps a map2 smooth edit applicable while explaining its display consequence',()=>{
     const base=fixture(true,{...surface(),displayNotice:i=>i.compositing.coverage.policy==='smoothBlend'?'この材質の面は非表示になります。設定は保持します。':null});
     const h=host(editing({...base,source:{...base.source,semanticProfile:'map2'}})),coverage=h.fields.get('coverage')!;

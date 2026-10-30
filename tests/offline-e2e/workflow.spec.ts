@@ -1,3 +1,4 @@
+import { revealProjectHelp, revealOfflineUtilities } from '../e2e/workspaceUi';
 import {test,expect,chromium,type BrowserContext,type Page,type TestInfo} from '@playwright/test';
 import {mkdir,mkdtemp,readFile,writeFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
@@ -14,7 +15,7 @@ const detail=(p:Page)=>p.getByRole('region',{name:'キャプションの詳細',
 async function selected(p:Page,title:string){await expect(p.getByRole('heading',{name:'プロジェクト名',exact:true})).toHaveText(title,{timeout:180_000});await expect(p.getByLabel('3Dモデルの表示',{exact:true})).toHaveAttribute('aria-busy','false',{timeout:180_000});await expect(p.locator('.lv-project-viewport-status')).toBeEmpty({timeout:180_000});}
 async function ready(p:Page,text:string){await expect(p.getByText(text,{exact:true})).toBeVisible({timeout:180_000});await expect(p.locator('main.lv-project-workspace > header > p.lv-operation-status')).toHaveAttribute('data-busy','false');}
 async function file(p:Page,path:string){await expect(p.getByLabel('ファイルを選択',{exact:true})).toBeEnabled();await p.getByLabel('ファイルを選択',{exact:true}).setInputFiles(path);await p.getByRole('button',{name:'ファイルを開く',exact:true}).click();}
-async function home(p:Page){await p.getByRole('button',{name:'別のプロジェクトを開く',exact:true}).click();await expect(p.getByLabel('ファイルを選択',{exact:true})).toBeVisible();await expect(p.locator('.lv-validation-status')).toHaveAttribute('data-busy','false');}
+async function home(p:Page){await revealProjectHelp(p);await p.getByRole('button',{name:'別のプロジェクトを開く',exact:true}).click();await expect(p.getByLabel('ファイルを選択',{exact:true})).toBeVisible();await expect(p.locator('.lv-validation-status')).toHaveAttribute('data-busy','false');}
 async function output(p:Page,info:TestInfo,name:string){
   const menu=p.locator('details.lv-project-files');if(!await menu.evaluate(n=>(n as HTMLDetailsElement).open))await menu.locator(':scope > summary').click();
   const area=p.getByRole('region',{name:'ファイル',exact:true});await area.getByRole('button',{name:'相手に渡す',exact:true}).click();await area.getByLabel('渡す内容',{exact:true}).selectOption('teamWorkspace');
@@ -28,8 +29,8 @@ async function launch(profile:string,url:string,disconnected=false,errors:string
   const page=context.pages()[0]??await context.newPage();return{context,page};
 }
 async function profile(){await mkdir('.artifacts/e2e/profiles',{recursive:true});return await mkdtemp('.artifacts/e2e/profiles/of-');}
-async function prepare(p:Page){await offline(p).getByRole('button',{name:'オフラインで使う準備',exact:true}).click();await expect(offline(p).getByRole('status')).toContainText('アプリを保存しました。',{timeout:90_000});}
-async function recheck(p:Page){const settings=offline(p).locator('details');if(!await settings.evaluate(n=>(n as HTMLDetailsElement).open))await settings.locator(':scope > summary').click();await settings.getByRole('button',{name:'準備状態を確認',exact:true}).click();}
+async function prepare(p:Page){await revealOfflineUtilities(p);await offline(p).getByRole('button',{name:'オフラインで使う準備',exact:true}).click();await expect(offline(p).getByRole('status')).toContainText('アプリを保存しました。',{timeout:90_000});}
+async function recheck(p:Page){await revealOfflineUtilities(p);const settings=offline(p).locator('details');if(!await settings.evaluate(n=>(n as HTMLDetailsElement).open))await settings.locator(':scope > summary').click();await settings.getByRole('button',{name:'準備状態を確認',exact:true}).click();}
 async function cacheInventory(p:Page){return p.evaluate(async()=>{const result:Record<string,string[]>={};for(const name of await caches.keys())result[name]=(await(await caches.open(name)).keys()).map(r=>r.url).sort();return result;});}
 async function controllerBuild(p:Page){return p.evaluate(async()=>{const worker=navigator.serviceWorker.controller;if(!worker)return null;return await new Promise<string>(resolve=>{const c=new MessageChannel();c.port1.onmessage=e=>{c.port1.close();resolve(e.data.build);};worker.postMessage('lociview-desktop-offline-state-1',[c.port2]);});});}
 

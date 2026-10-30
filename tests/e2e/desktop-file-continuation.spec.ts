@@ -1,3 +1,4 @@
+import { revealCaptionList, revealProjectHelp } from './workspaceUi';
 import { test, expect, type Page, type TestInfo } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import * as A from '@automerge/automerge';
@@ -8,7 +9,7 @@ import { validationMetadataLimits as limits } from '../../src/projectFiles/valid
 const files = (p: Page) => p.getByRole('region', { name: 'ファイル', exact: true });
 const receive = (p: Page) => p.getByRole('region', { name: '更新ファイル', exact: true });
 const detail = (p: Page) => p.getByRole('region', { name: 'キャプションの詳細', exact: true });
-const chooseCaption = (p: Page, title: string) => p.locator('.lv-caption-select').filter({ hasText: title }).click();
+const chooseCaption = async (p: Page, title: string) => { await revealCaptionList(p); await p.locator('.lv-caption-select').filter({ hasText: title }).click(); };
 async function fileMenu(p: Page) {
   const menu = p.locator('details.lv-project-files');
   if (!await menu.evaluate(n => (n as HTMLDetailsElement).open)) await menu.locator(':scope > summary').click();
@@ -105,12 +106,15 @@ test('PC Caption work continues after empty tag focus and cancelled file checks,
     const help = page.getByLabel('ヘルプ', { exact: true }), settings = page.getByLabel('設定', { exact: true });
     await help.locator(':scope > summary').click(); await settings.locator(':scope > summary').click(); await workspaceFits(page);
     await settings.getByLabel('このブラウザの表示名', { exact: true }).fill('入力中の表示名'); await workspaceFits(page); await page.screenshot({ path: info.outputPath('workspace-expanded-tools.png'), fullPage: true });
-    await help.locator(':scope > summary').click(); await expect(settings.getByLabel('このブラウザの表示名', { exact: true })).toHaveValue('入力中の表示名');
+    await help.locator(':scope > summary').click(); await expect(settings).not.toHaveAttribute('open');
+    await settings.locator(':scope > summary').click(); await expect(help).not.toHaveAttribute('open');
+    await expect(settings.getByLabel('このブラウザの表示名', { exact: true })).toHaveValue('入力中の表示名');
     await settings.getByRole('button', { name: '表示名の入力を取り消す', exact: true }).click(); await settings.locator(':scope > summary').click(); await workspaceFits(page);
+    await page.getByText('キャプションを整理',{exact:true}).click();
     const tags = page.getByLabel('タグの管理', { exact: true }); await tags.locator(':scope > summary').click();
     await tags.getByLabel('タグ名', { exact: true }).focus(); await page.keyboard.press('Tab'); await page.keyboard.press('Tab');
     await expect(tags.getByRole('button', { name: 'タグの入力を取り消す', exact: true })).toBeHidden();
-    await expect(page.getByRole('button', { name: '別のプロジェクトを開く', exact: true })).toBeEnabled();
+    await expect(page.getByRole('button', { name: '別のプロジェクトを開く', exact: true, includeHidden: true })).toBeEnabled();
     await tags.getByLabel('タグ名', { exact: true }).fill('現地確認'); await tags.getByRole('button', { name: 'タグを追加', exact: true }).click(); await ready(page, 'タグを保存しました。');
     await tags.getByRole('button', { name: 'この記録にタグを付ける', exact: true }).click(); await ready(page, '記録のタグを変更しました。');
     // Empty-field keyboard navigation must still permit a real save, without cancellation.
@@ -119,7 +123,7 @@ test('PC Caption work continues after empty tag focus and cancelled file checks,
     const before = await BackupArchive.inspect(new Blob([Uint8Array.from(await readFile(backup)).buffer]), limits);
     await expect(page.getByLabel('保存ファイルの状態', { exact: true })).toContainText('未確認');
     const fileBody = page.locator('details.lv-project-files > section');
-    expect(await fileBody.evaluate(n => n.scrollHeight > n.clientHeight)).toBe(true);
+    const sheet=await fileBody.boundingBox();expect(sheet!.y).toBeGreaterThanOrEqual(0);expect(sheet!.y+sheet!.height).toBeLessThanOrEqual(page.viewportSize()!.height);
     await fileBody.evaluate(n => { n.scrollTop = n.scrollHeight; }); await workspaceFits(page);
     const history = files(page).locator('details').filter({ has: page.getByText('作成したファイル', { exact: true }) });
     if (!await history.evaluate(n => (n as HTMLDetailsElement).open)) await history.locator(':scope > summary').click();
@@ -127,8 +131,9 @@ test('PC Caption work continues after empty tag focus and cancelled file checks,
     const choose = page.waitForEvent('filechooser'); await verification.getByRole('button', { name: 'ファイルを選択', exact: true }).click(); const chooser = await choose;
     // Headless chooser is intercepted: inject its native cancel event, then retire it.
     await files(page).getByLabel('保存先のファイルを選択', { exact: true }).dispatchEvent('cancel');
-    await expect(page.getByRole('button', { name: '別のプロジェクトを開く', exact: true })).toBeEnabled(); await chooser.setFiles([]);
-    await page.getByRole('button', { name: '別のプロジェクトを開く', exact: true }).click(); await page.getByRole('button', { name: '編集で開く', exact: true }).first().click();
+    await expect(page.getByRole('button', { name: '別のプロジェクトを開く', exact: true, includeHidden: true })).toBeEnabled(); await chooser.setFiles([]);
+    await page.locator('details.lv-project-files').getByRole('button',{name:'閉じる',exact:true}).click();await revealProjectHelp(page);
+    await page.getByRole('button', { name: '別のプロジェクトを開く', exact: true, includeHidden: true }).click(); await page.getByRole('button', { name: '編集で開く', exact: true }).first().click();
     await expect(page.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText('PCで記録を続ける', { timeout: 90_000 }); await chooseCaption(page, '確認する場所');
     const workspace = await output(page, info, '作業一式', 'teamWorkspace');
     await b.goto('/'); await b.getByLabel('ファイルを選択', { exact: true }).setInputFiles(workspace); await b.getByRole('button', { name: 'ファイルを開く', exact: true }).click();
@@ -155,8 +160,8 @@ test('PC Caption work continues after empty tag focus and cancelled file checks,
     await expect(detail(page).getByLabel('タイトル', { exact: true })).toHaveValue('確認する場所'); await workspaceFits(page); await page.screenshot({ path: info.outputPath('continued-workspace.png'), fullPage: true });
     for (const size of [{ width: 640, height: 400 }, { width: 1280, height: 600 }, { width: 320, height: 740 }]) {
       await page.setViewportSize(size); await fileMenu(page);
-      await expect(page.getByRole('button', { name: '別のプロジェクトを開く', exact: true })).toBeEnabled();
-      await page.getByRole('button', { name: '別のプロジェクトを開く', exact: true }).scrollIntoViewIfNeeded();
+      await expect(page.getByRole('button', { name: '別のプロジェクトを開く', exact: true, includeHidden: true })).toBeEnabled();
+      await page.getByRole('button', { name: '別のプロジェクトを開く', exact: true, includeHidden: true }).scrollIntoViewIfNeeded();
       const dimensions = await page.evaluate(() => ({ page: document.documentElement.scrollWidth, window: innerWidth })); expect(dimensions.page).toBeLessThanOrEqual(dimensions.window + 1);
       await page.screenshot({ path: info.outputPath(`reflow-${size.width}-${size.height}.png`), fullPage: true });
     }

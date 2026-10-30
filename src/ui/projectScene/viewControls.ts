@@ -2,6 +2,7 @@ import { entryViewIssue, planView, savedViewChoices, savedViewIssue, viewAxes, v
   type ViewContext, type ViewIntent, type ViewPlan, type ViewProjection } from './viewState';
 
 import { contextHelp, mountContextHelp } from './contextHelp';
+import { editOnly } from './modePresentation';
 
 let nextViewControls = 0;
 /** Reusable controls only; rendering or selecting an option never applies a camera. */
@@ -26,7 +27,9 @@ export function createViewControls(document: Document, onPlan: (plan: ViewPlan) 
   const entry = make('section'), entryPicker = make('select'), apply = button('設定を適用'), cancel = button('取り消す');
   const entryNote = message(), entryStatus = live(), entryReview = button('状態を確認');
   entry.setAttribute('aria-label', '開始時の設定');
-  entry.append(label('シーンを開いたときの視点', entryPicker), contextHelp(document, '現在の表示は変わりません。次にシーンを開くときの視点を設定します。', [entryPicker]), apply, cancel, entryNote, entryStatus, entryReview);
+  const entryLabel = label('シーンを開いたときの視点', entryPicker), entryHelp = contextHelp(document, '現在の表示は変わりません。次にシーンを開くときの視点を設定します。', [entryPicker]);
+  editOnly(entryLabel, entryHelp, apply, cancel);
+  entry.append(entryLabel, entryHelp, apply, cancel, entryNote, entryStatus, entryReview);
   root.append(camera, saved, entry);
   // One shared host/state/intent path, even when the task tab is not visible.
   const stageTools = make('section'); stageTools.className = 'lv-view-stage-tools'; stageTools.setAttribute('aria-label', '表示の復帰');
@@ -117,5 +120,5 @@ export function createViewControls(document: Document, onPlan: (plan: ViewPlan) 
     entryReview.hidden = !observedIssue; entryReview.disabled = sourceIssue !== null || busy;
     return true;
   }
-  return { root, stageTools, render, dispose: () => { disposed = true; cleanups.forEach(cleanup => cleanup()); root.remove(); stageTools.remove(); } };
+  return { root, camera, stageTools, render, dispose: () => { disposed = true; cleanups.forEach(cleanup => cleanup()); root.remove(); stageTools.remove(); } };
 }

@@ -1,4 +1,5 @@
 import type { MetadataEdit } from '../../projectMetadata/commands';
+import { editOnly, viewChoices } from './modePresentation';
 import type { JsonObject } from '../../domain/values';
 import { createViewControls } from './viewControls';
 import { createViewAuthorControls, createViewBackgroundControls } from './viewAuthoringControls';
@@ -144,10 +145,11 @@ export function createProjectViews(document: Document, host: ProjectPanelHost): 
         const command: MetadataEdit = group.target.kind === 'entry' ? { kind: 'resolveEntryView', sceneId, operationId: owned.operationId } :
           { kind: 'resolveViewField', sceneId, viewId: group.target.viewId, field: group.target.field, choice: { kind: 'candidate', operationId: owned.operationId } };
         host.dispatch('views', provider.token, command, () => { choices.delete(key); host.message('視点の更新候補を確定しました。'); });
-      }); apply.disabled = select.disabled || !owned?.operationId;
-      const cancel = button('選択を取り消す', () => { if (!host.block('views', false)) { choices.delete(key); host.changed(); } }); cancel.hidden = !owned; cancel.disabled = !!host.block('views', false); review.append(row, apply, cancel);
+      }); editOnly(row, apply); apply.disabled = select.disabled || !owned?.operationId;
+      const cancel = button('選択を取り消す', () => { if (!host.block('views', false)) { choices.delete(key); host.changed(); } }); editOnly(cancel); cancel.hidden = !owned; cancel.disabled = !!host.block('views', false); review.append(row, apply, cancel, viewChoices(document, group.label, group.choices.map(item => item.label)));
     }
   }
+  const cameraDetails=make('details');cameraDetails.append(make('summary','投影とカメラ'));controls.root.insertBefore(cameraDetails,controls.camera);cameraDetails.append(controls.camera);
   root.append(controls.root, author.root, background.root, review);
   return { root, render() { if (!disposed) { controls.render(context()); author.render(authorContext()); background.render(backgroundContext()); renderReview(); } },
     hasChanges: () => !!state().draft || !!state().memory.entryDraft || !!state().background || choices.size > 0,

@@ -64,7 +64,7 @@ for (const lane of lanes) test(`${lane.kind}ファイルを内容確認して変
       const row = history.locator('section').filter({ hasText: `バックアップ ${name} —` }); await row.getByText('保存先のファイルを確認', { exact: true }).click();
       const chooser = page.waitForEvent('filechooser'); await row.getByRole('button', { name: 'ファイルを選択', exact: true }).click(); await (await chooser).setFiles(path);
       await expect(files.getByText('選択したファイルの内容を確認しました。', { exact: true })).toBeVisible({ timeout: 90_000 });
-      await expect(page.getByLabel('保存ファイルの状態', { exact: true })).toHaveText('確定済みの内容は、選択した保存ファイルと一致しています。');
+      await expect(page.getByLabel('保存ファイルの状態', { exact: true })).toHaveText('保存ファイルと一致');
     }
     const archive = await BackupArchive.inspect(new Blob([new Uint8Array(await readFile(path)).buffer]), validationMetadataLimits);
     const inspected = await inspectProjectCandidates(archive.source.read(), validationMetadataLimits); if (inspected.kind !== 'project-candidate-inspection') throw Error('converted metadata rejected');
@@ -115,7 +115,7 @@ for (const lane of lanes) test(`${lane.kind}ファイルを内容確認して変
     });
     if(lane.kind==='Native') await step('変換した面の材質を編集し、別ブラウザへ渡して変更を受け取る',async()=>{
       const chooseMaterial=async(p:Page)=>{
-        await p.getByRole('tab',{name:'材質',exact:true}).click();const controls=p.getByRole('region',{name:'マテリアル',exact:true});
+        await p.getByRole('tab',{name:'材質',exact:true}).click();const controls=p.getByRole('region',{name:'材質',exact:true});
         await controls.getByLabel('モデル',{exact:true}).selectOption({label:'建物'});await controls.getByLabel('面',{exact:true}).selectOption({index:1});return controls;
       };
       const editMaterial=async(p:Page,field:string,value:string)=>{

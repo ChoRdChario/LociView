@@ -6,6 +6,8 @@ export interface ProjectPanelHost {
   readonly ports: ProjectWorkspacePorts;
   source(): { provider: WorkspaceProvider; sceneId: string };
   viewport(): WorkspaceViewport;
+  /** Presentation selection only; never a mutation or persisted material target. */
+  selectedModel?(): string | null;
   block(owner: ProjectTask, writes?: boolean, allowDrag?: boolean): string | null;
   changed(): void;
   message(text: string): void;
@@ -20,6 +22,7 @@ export interface ProjectPanel {
   dispose(): void;
 }
 export interface ProjectModelPanel extends ProjectPanel {
+  selectedAsset?(): string | null;
   selectedSurface(): string | null;
   hidden(): readonly string[];
   proposal(): WorkspaceModelProposal | null;

@@ -1,3 +1,4 @@
+import { revealCaptionList } from './workspaceUi';
 import { test, expect, chromium, type BrowserContext, type Page, type TestInfo } from '@playwright/test';
 import { createHash } from 'node:crypto';
 import { mkdir, mkdtemp, readFile, readdir } from 'node:fs/promises';
@@ -24,11 +25,13 @@ const detail = (page: Page) => page.getByRole('region', { name: 'キャプショ
 async function settled(page: Page) { await expect(page.locator('header > .lv-operation-status')).toHaveAttribute('data-busy', 'false', { timeout: actionTimeout }); }
 async function done(page: Page, message: string) { await expect(page.getByText(message, { exact: true })).toBeVisible({ timeout: actionTimeout }); await settled(page); }
 async function scene(page: Page, name: string) {
+  await revealCaptionList(page);
   await page.getByRole('tab', { name: 'キャプション', exact: true }).click();
   await page.getByRole('region', { name: 'シーン', exact: true }).getByRole('button', { name, exact: true }).click();
   await expect(page.getByRole('region', { name: 'シーン', exact: true }).getByRole('button', { name, exact: true })).toHaveAttribute('aria-pressed', 'true');
 }
 async function caption(page: Page, title: string) {
+  await revealCaptionList(page);
   await page.getByRole('tab', { name: 'キャプション', exact: true }).click();
   await page.getByRole('list', { name: 'キャプション一覧', exact: true }).locator('.lv-caption-select').filter({ hasText: title }).click();
 }

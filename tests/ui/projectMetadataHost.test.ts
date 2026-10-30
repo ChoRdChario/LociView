@@ -89,7 +89,7 @@ const named = (r: RecordedNode, label: string) => descendants(r).find(n => n.att
 const setInput = (n: RecordedNode, text: string) => { n.value = text; n.fire(n.tag === 'select' ? 'change' : 'input'); };
 function materialHost(s: SyntheticSession, assetId: string = f.equipment) {
   const w = createDevelopmentWorkspace(new RecordedDocument().asDocument(), s), r = record(w.root);
-  button(r, 'マテリアル').fire('click'); const panel = named(r, 'マテリアル');
+  button(r, 'マテリアル').fire('click'); const panel = named(r, '材質');
   setInput(named(panel, 'モデル'), assetId); const surface = named(panel, '面'); setInput(surface, surface.children[1]!.value);
   return { w, panel, scope: (v: string) => setInput(named(panel, '適用範囲'), v),
     begin: () => button(panel, '設定を編集').fire('click'), edit: (label: string, text: string) => setInput(named(panel, label), text),

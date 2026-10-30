@@ -87,6 +87,7 @@ export function createMediaViewer(document: Document) {
     if (!reader || disposed) return; if (!active) { close(false); return; }
     const group = reader(); if (!group || group.scope !== scope) { close(false); return; }
     const index = group.items.findIndex(i => i.id === id && i.resourceId === resourceId), item = group.items[index];
+    root.setAttribute('data-media-kind', item?.kind ?? 'image');
     title.textContent = item ? `${group.label} — ${item.label}` : group.label;
     description.textContent = item?.description ?? ''; description.hidden = !description.textContent;
     status.textContent = item ? '' : 'この添付は変更されています。閉じて、メディアを選び直してください。';

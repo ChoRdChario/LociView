@@ -101,7 +101,7 @@ describe('same-host comparison windows; authored DOM only, not raster or native 
     workspace.render(); expect(visible(s)).toEqual([f.shared]);
     select(s, f.second); workspace.render(); // Same-row explicit selection reopens without changing the draft.
     expect(visible(s)).toContain(f.second); expect(s.detailContext().draft).toBe(draft);
-    button(named(windows, '入口の記録'), '×').fire('click'); button(detail, 'ウィンドウを表示').fire('click');
+    button(named(windows, '入口の記録'), '×').fire('click'); button(detail, '比較に表示').fire('click');
     expect(visible(s)).toContain(f.second);
     s.acceptDetail({ kind: 'cancel', draft });
     button(named(windows, '設備の確認箇所'), '×').fire('click'); select(s, f.shared); workspace.render();

@@ -43,6 +43,19 @@ function host(initial = context(), document = new RecordedDocument()) {
 }
 
 describe('Caption detail: local draft/intents, not durable editor acceptance', () => {
+  it('projects canonical text independently of retained input and clears unresolved values without hiding recovery', () => {
+    const h = host(edit(context(), 'body', '未適用の本文'));
+    const reading = h.root.children[3]!.children[3]!;
+    expect(reading.attributes.has('data-lv-view-only')).toBe(true);
+    expect(reading.children[1]!.textContent).toBe('本文\r\n二行目'); expect(h.body.value).toBe('未適用の本文');
+    expect(h.titleGroup.children[0]!.attributes.has('data-lv-edit-only')).toBe(true);
+    expect(record(h.controls.windowActions).attributes.has('data-lv-edit-only')).toBe(false);
+    const current = source(), conflicted = { ...current, caption: { ...current.caption, title: unresolved<string>() } };
+    h.render({ ...h.props, source: conflicted, mutationBlock: '閲覧中です。' });
+    expect(h.titleGroup.children[3]!.children[1]!.textContent).toBe('');
+    expect(h.titleGroup.children[2]!.hidden).toBe(false); expect(h.body.value).toBe('未適用の本文');
+    expect(h.status.textContent).toContain('未適用'); h.controls.dispose();
+  });
   it('uses exact scalar/control rules and preserves body newline sequence', () => {
     expect(normalizeCaptionText('title', '')).toBe('');
     expect(normalizeCaptionText('title', 'e\u0301')).toBe('é');

@@ -1,4 +1,5 @@
 import type { createValidationModeHost } from './validationModeHost';
+import { editOnly, displayMode } from '../ui/projectScene/modePresentation';
 import type { WorkspaceFileInteraction } from '../ui/projectScene/projectWorkspacePorts';
 
 /** Same editor, deliberate file handoff. No receipt follows a browser download click. */
@@ -15,11 +16,16 @@ export function createValidationOutputControls(document: Document, host: ReturnT
   const history = document.createElement('details'), historyTitle = document.createElement('summary'), completedFiles = document.createElement('div');
   historyTitle.textContent = '作成したファイル'; history.append(historyTitle, completedFiles);
   root.append(heading, actions, nameField, commands, status, list, history, select);
+  editOnly(actions, nameField, commands, select);
   let busy = false, disposed = false, feedback = '', selected: string | null = null, cancellation: string | null = null;
   let purpose: 'teamWorkspace' | 'contribution' | 'backup' | 'clean' | 'review' = 'backup', baseId = '', choicePending = false, checkpointName = '', composing = false;
   let cleanPreview: Awaited<ReturnType<typeof host.workspaceOutput.previewClean>> | null = null;
   let reviewPreview: Awaited<ReturnType<typeof host.workspaceOutput.previewReview>> | null = null, sceneId = '', omitEntry = false;
   const resetChoice = () => { purpose = 'backup'; baseId = ''; checkpointName = ''; choicePending = false; cleanPreview = null; reviewPreview = null; sceneId = ''; omitEntry = false; };
+  const choosePurpose = (next: typeof purpose) => {
+    if (purpose === next) return;
+    purpose = next; baseId = ''; cleanPreview = null; reviewPreview = null; sceneId = ''; omitEntry = false; choicePending = true; render(); changed();
+  };
   const urls: string[] = [];
   const download = async (id: string) => {
     const job = host.workspaceOutput.jobs.find(job => job.id === id);
@@ -50,6 +56,7 @@ export function createValidationOutputControls(document: Document, host: ReturnT
   };
   const button = (parent: HTMLElement, text: string, action: () => void, writes = true) => {
     const b = document.createElement('button'); b.type = 'button'; b.textContent = text;
+    if (writes) editOnly(b);
     b.disabled = busy || composing || otherBusy() || writes && !!host.authority.readOnly;
     b.addEventListener('click', () => { if (!b.disabled) action(); }); parent.append(b); return b;
   };
@@ -80,11 +87,8 @@ export function createValidationOutputControls(document: Document, host: ReturnT
     catch (error) { history.open = true; throw Error(`${error instanceof Error ? error.message : 'ダウンロードを開始できません。'} 作成したファイルから再試行してください。`); }
   };
   const render = () => {
+    displayMode(root, host.mode?.current ?? (host.authority.readOnly ? 'view' : 'edit'));
     if (disposed) return; actions.replaceChildren(); commands.replaceChildren(); list.replaceChildren(); completedFiles.replaceChildren();
-    const choosePurpose = (next: typeof purpose) => {
-      if (purpose === next) return;
-      purpose = next; baseId = ''; cleanPreview = null; reviewPreview = null; sceneId = ''; omitEntry = false; choicePending = true; render(); changed();
-    };
     const save = button(actions, '保存', () => choosePurpose('backup'));
     save.setAttribute('aria-pressed', String(purpose === 'backup'));
     const send = button(actions, '相手に渡す', () => choosePurpose('teamWorkspace'));
@@ -101,6 +105,7 @@ export function createValidationOutputControls(document: Document, host: ReturnT
     kind.value = purpose; kind.disabled = busy || composing || otherBusy() || !!host.authority.readOnly; label.append(kind);
     if (purpose === 'teamWorkspace' || purpose === 'contribution') actions.append(label);
     nameField.hidden = purpose !== 'backup'; nameInput.disabled = busy || otherBusy() || !!host.authority.readOnly;
+    if(purpose==='backup'){const scope=document.createElement('p');scope.textContent='モデル・メディアと履歴を含む作業全体を、バックアップに書き出します。';actions.append(scope);}
     if (!composing && nameInput.value !== checkpointName) nameInput.value = checkpointName;
     kind.addEventListener('change', () => {
       if (kind.disabled || !['teamWorkspace', 'contribution'].includes(kind.value)) return;
@@ -127,7 +132,7 @@ export function createValidationOutputControls(document: Document, host: ReturnT
         omit.disabled = kind.disabled; label.append(omit, '開始視点なしで渡す'); actions.append(label);
         omit.addEventListener('change', () => { if (!omit.disabled) { omitEntry = omit.checked; reviewPreview = null; choicePending = true; render(); changed(); } });
       }
-      const help = document.createElement('p'); help.textContent = '選んだシーンのモデル・記録だけを渡します。検索や色の絞り込みは反映しません。'; actions.append(help);
+      const help = document.createElement('p'); help.textContent = '選んだシーンのモデル・記録だけを渡します。検索や色の絞り込みは反映しません。元のプロジェクトへ変更分は返せません。'; actions.append(help);
       if (reviewPreview) {
         const counts = document.createElement('p'); counts.textContent = reviewConfirmed ? `${reviewPreview.name} — モデル ${reviewPreview.models}・キャプション ${reviewPreview.captions}・メディア ${reviewPreview.media}` : '内容が変わりました。もう一度確認してください。'; actions.append(counts);
         if (reviewPreview.missingModelCaptions) { const note = document.createElement('p'); note.textContent = `モデルを含まない記録 ${reviewPreview.missingModelCaptions} 件は一覧だけに表示されます。`; actions.append(note); }
@@ -196,6 +201,7 @@ export function createValidationOutputControls(document: Document, host: ReturnT
       if (complete) {
         button(row, 'ダウンロード', () => perform(() => handoff(job.id), handoffMessage, false), false);
         const details = document.createElement('details'), summary = document.createElement('summary'); summary.textContent = '保存先のファイルを確認';
+        editOnly(details);
         details.append(summary); row.append(details);
         button(details, 'ファイルを選択', () => { selected = job.id; select.value = ''; select.click(); changed(); });
       } else if (job.state === 'incomplete') button(row, '生成を再開', () => perform(async () => {
@@ -227,6 +233,6 @@ export function createValidationOutputControls(document: Document, host: ReturnT
   nameInput.addEventListener('input', () => { if (!nameInput.disabled) { checkpointName = nameInput.value; choicePending = true; changed(); } });
   nameInput.addEventListener('compositionstart', () => { composing = true; choicePending = true; changed(); });
   nameInput.addEventListener('compositionend', () => { checkpointName = nameInput.value; composing = false; choicePending = true; changed(); });
-  render(); return { root, render, busy: () => busy, hasChanges: () => busy || composing || choicePending || !!selected || !!cancellation,
+  render(); return { root, render, choosePurpose, busy: () => busy, hasChanges: () => busy || composing || choicePending || !!selected || !!cancellation,
     dispose: () => { disposed = true; for (const url of urls) URL.revokeObjectURL(url); root.remove(); } };
 }

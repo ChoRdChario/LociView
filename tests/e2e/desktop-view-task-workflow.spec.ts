@@ -9,7 +9,7 @@ import { validationMetadataLimits as limits } from '../../src/projectFiles/valid
 const tab = (p: Page, name: string) => p.getByRole('tab', { name, exact: true });
 const views = (p: Page) => p.getByRole('tabpanel', { name: '保存した視点', exact: true });
 const author = (p: Page) => p.getByRole('region', { name: '視点の作成と管理', exact: true });
-const materials = (p: Page) => p.getByRole('region', { name: 'マテリアル', exact: true });
+const materials = (p: Page) => p.getByRole('region', { name: '材質', exact: true });
 async function ready(p: Page, text: string) {
   await expect(p.getByText(text, { exact: true })).toBeVisible({ timeout: 90_000 });
   await expect(p.locator('main.lv-project-workspace > header > p.lv-operation-status')).toHaveAttribute('data-busy', 'false');
@@ -66,6 +66,7 @@ test('PC task navigation retains model, View and material drafts through keyboar
     await modelPanel.getByRole('button', { name: '配置を調整', exact: true }).click(); await modelPanel.getByLabel('モデル位置 X', { exact: true }).fill('1'); await modelPanel.getByLabel('モデル倍率', { exact: true }).fill('1.25'); await modelPanel.getByRole('button', { name: '配置を確定', exact: true }).click(); await ready(page, 'モデルの配置を確定しました。');
     await tab(page, '保存した視点').click();
     const create = async (name: string) => { await author(page).getByRole('button', { name: '視点を作る', exact: true }).click(); await author(page).getByLabel('視点の名称', { exact: true }).fill(name); await author(page).getByRole('button', { name: '視点を追加', exact: true }).click(); await ready(page, '保存した視点を更新しました。'); };
+    await views(page).getByText('投影とカメラ',{exact:true}).click();
     await create('全景'); await views(page).getByRole('combobox', { name: '投影方式', exact: true }).selectOption('orthographic'); await expect(views(page).getByRole('combobox', { name: '投影方式', exact: true })).toHaveValue('orthographic'); await create('詳細');
     await author(page).getByText('その他の操作', { exact: true }).click(); await expect(author(page).getByRole('button', { name: '後へ', exact: true })).toBeDisabled();
     await author(page).getByRole('button', { name: '前へ', exact: true }).click(); await ready(page, '視点の順序を変更しました。');

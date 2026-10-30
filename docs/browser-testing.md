@@ -27,6 +27,26 @@ remain blocked. This is not offline-launch or physical touch-device acceptance.
 Fixed explanations need viewport-only screenshots when full-page capture would
 scroll away from their trigger; keep runtime bounds and image evidence distinct.
 
+The view/edit presentation regression uses the separately built offline candidate:
+
+```powershell
+npm run build:offline
+npm run test:e2e -- --config playwright.desktop.config.ts desktop-view-mode.spec.ts
+```
+
+`desktop-view-mode.spec.ts` owns its loopback servers and dedicated Chromium
+contexts. Its main case blocks Service Workers and checks readable Caption/material values, absent
+edit-only controls, working search/media/windows/model visibility/camera/saved
+views/background, existing-file download, edit return with the same selection,
+draft switch protection, disclosure/draft/focus return, compact stage/panel and
+actual backup metadata/reload. Its second case uses a short owned persistent
+profile with Service Workers allowed, prepares the app, checks the utility UI
+inside Settings, closes the entire context/browser, stops its server, and verifies
+cold offline navigation plus home return. It preserves preparation/Project checks;
+there is no personal Chrome profile or plugin access. Width changes and dispatched
+composition events are desktop emulation, not physical-device/native-IME evidence.
+Todo owns results and qualifications; this pair does not rerun the broader E2E matrices.
+
 Approved09 has an additional `playwright.offline.config.ts` lane:
 
 ```powershell

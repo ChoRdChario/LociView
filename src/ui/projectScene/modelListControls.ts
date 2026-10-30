@@ -2,6 +2,8 @@ import { modelListName, modelListPlanIsCurrent, modelListView, modelMembershipIs
   type ModelListContext, type ModelListIntent, type ModelListPlan, type ModelListRow } from './modelListState';
 import { sceneSwitchReason } from './navigationState';
 
+import { editOnly } from './modePresentation';
+
 let nextModelControl = 0;
 /** Project inventory with separate membership and local visibility intentions; no direct renderer/storage access. */
 export function createModelListControls(document: Document, onPlan: (plan: ModelListPlan) => void) {
@@ -25,6 +27,7 @@ export function createModelListControls(document: Document, onPlan: (plan: Model
   const list = make('ul'); list.className = 'lv-model-list'; list.setAttribute('aria-label', 'プロジェクトのモデル一覧'); const empty = make('li');
   const details = make('section'), selectedName = make('h3'), scope = make('p', 'このモデルの配置・差し替えは、使用するすべてのシーンで共通です。');
   details.setAttribute('aria-label', 'モデルの設定範囲'); details.append(selectedName, scope);
+  editOnly(retry, consequence, scope);
   const visibility = make('div'), toggleVisibility = button('隠す'), isolate = button('このモデルだけ表示'), showAll = button('すべて表示');
   visibility.className = 'lv-model-visibility'; visibility.setAttribute('role', 'group'); visibility.setAttribute('aria-label', '一時表示');
   visibility.append(make('span', '一時表示'), toggleVisibility, isolate); details.append(visibility);
@@ -75,6 +78,7 @@ export function createModelListControls(document: Document, onPlan: (plan: Model
       const node = make('li'), select = button(''), check = make('input'), label = make('label'), note = make('p'), review = button('状態を確認');
       node.className = 'lv-model-row'; select.className = 'lv-model-select'; select.id = `lv-model-name-${++nextModelControl}`;
       check.type = 'checkbox'; check.setAttribute('aria-label', 'このシーンに表示'); label.className = 'lv-model-membership'; label.append(check, make('span', 'このシーンに表示'));
+      editOnly(label);
       note.id = `lv-model-note-${++nextModelControl}`; note.className = 'lv-model-note';
       check.setAttribute('aria-describedby', `${select.id} ${note.id} ${status.id} ${consequence.id}`); select.setAttribute('aria-describedby', note.id);
       node.append(select, label, note, review);

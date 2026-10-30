@@ -5,6 +5,7 @@ import { activeRecord, fieldValue } from './projectRead';
 import { newProjectId, panelNodes, sameProjectValue } from './projectPanel';
 import { sceneChoices } from './navigationState';
 import { contextHelp } from './contextHelp';
+import { editOnly } from './modePresentation';
 
 interface OrganizationHost {
   ports: ProjectWorkspacePorts; source(): { provider: WorkspaceProvider; sceneId: string; captionId: string | null };
@@ -134,6 +135,8 @@ export function createProjectOrganization(document: Document, host: Organization
   const tagCancel = button('タグの入力を取り消す', () => { if (!host.localBlocked() && !composing) { captured = null; form = null; tagName.value = ''; host.changed(); } });
   const tagConfirm = button('タグを削除する', () => { const f = form; if (f?.kind === 'tagDelete' && f.token === host.source().provider.token) perform({ kind: 'deleteTag', tagId: f.id }, () => { form = null; host.message('タグを削除しました。記録は残っています。'); }); });
   const tagNote = make('p'); tagForm.append(tagNameLabel, tagColor, saveTag, tagCancel, tagNote, tagConfirm); tagsRoot.append(tagList, tagForm);
+  editOnly(copyScene, up, down, removeScene, sceneForm, copyCaption, undo, redo, undoHelp,
+    tagNameLabel, tagColor, saveTag, tagCancel, tagConfirm);
   function render() {
     if (disposed) return; const s = host.source(), enabled = !!host.ports.authoring, blocked = !!host.blocked(), owned = !!form || !!captured || !!settingsDraft || !!editorDraft;
     settingsRoot.hidden = !host.ports.localSettings && !host.ports.editorSettings;
@@ -159,7 +162,7 @@ export function createProjectOrganization(document: Document, host: Organization
     orderChoices.replaceChildren(); const scene = s.provider.state.scenes[s.sceneId];
     if (enabled && scene?.orderKey.kind !== 'value') {
       try { const candidates = host.ports.authoring!.sceneOrderChoices(s.provider.token, s.sceneId);
-        for (const [i, c] of candidates.entries()) { const choose = button(`順序の候補 ${i + 1} を使う`, () => { if (host.source().provider.token === s.provider.token) host.run({ kind: 'resolveSceneOrder', sceneId: s.sceneId, operationId: c.operationId }, () => host.message('シーンの順序を確定しました。')); }); choose.disabled = blocked || owned; orderChoices.append(choose); }
+        for (const [i, c] of candidates.entries()) { const choose = button(`順序の候補 ${i + 1} を使う`, () => { if (host.source().provider.token === s.provider.token) host.run({ kind: 'resolveSceneOrder', sceneId: s.sceneId, operationId: c.operationId }, () => host.message('シーンの順序を確定しました。')); }); editOnly(choose); choose.disabled = blocked || owned; orderChoices.append(choose); }
       } catch { orderChoices.append(make('p', 'シーンの順序を確認してください。')); }
     }
     const h = history(); copyCaption.disabled = blocked || owned || !s.captionId;
@@ -182,16 +185,16 @@ export function createProjectOrganization(document: Document, host: Organization
       row.append(make('span', typeof label === 'string' ? label : '名前を確認するタグ'));
       const related = Object.entries(s.provider.details.mutable.captionTagMembershipsById).filter(([, f]) => activeRecord(f) && fieldValue(f.tagId) === tagId && fieldValue(f.captionId) === s.captionId);
       const toggle = button(related.length ? 'この記録からタグを外す' : 'この記録にタグを付ける', () => { if (s.captionId) perform({ kind: 'setCaptionTag', captionId: s.captionId, tagId, included: !related.length }, () => host.message('記録のタグを変更しました。')); });
-      toggle.disabled = blocked || owned || !s.captionId || !activeRecord(fields); row.append(toggle);
+      editOnly(toggle); toggle.disabled = blocked || owned || !s.captionId || !activeRecord(fields); row.append(toggle);
       const edit = button('タグを編集', () => { if (blocked || owned) return; form = { kind: 'tagEdit', token: s.provider.token, id: tagId }; captured = { token: s.provider.token, tagId }; tagName.value = typeof label === 'string' ? label : ''; if (Array.isArray(color)) tagColor.value = '#' + color.map(v => Math.round(Number(v) * 255).toString(16).padStart(2, '0')).join(''); host.changed(); });
       const remove = button('タグを削除', () => { if (!blocked && !owned) { form = { kind: 'tagDelete', token: s.provider.token, id: tagId }; host.changed(); } });
-      edit.disabled = remove.disabled = blocked || owned || !activeRecord(fields); row.append(edit, remove);
+      editOnly(edit, remove); edit.disabled = remove.disabled = blocked || owned || !activeRecord(fields); row.append(edit, remove);
       for (const field of ['label', 'colorSrgb', 'orderKey'] as const) {
         const raw = s.provider.inspection.candidates.fields.find(f => f.path.join('/') === `captionTagsById/${tagId}/${field}`);
         if (!raw || raw.candidates.length < 2) continue;
         for (const [i, c] of raw.candidates.entries()) { const choose = button(`${field === 'label' ? '名前' : field === 'colorSrgb' ? '色' : '順序'}の候補 ${i + 1} を使う`, () => { if (host.source().provider.token === s.provider.token) host.run({ kind: 'resolveTagField', tagId, field, operationId: c.operationId }, () => host.message('タグの内容を確定しました。')); });
           const description = c.value.kind !== 'value' ? '未設定' : field === 'label' ? String(c.value.value) : field === 'colorSrgb' && Array.isArray(c.value.value) ? '#' + c.value.value.map(v => Math.round(Number(v) * 255).toString(16).padStart(2, '0')).join('') : `並び順の候補 ${i + 1}`;
-          choose.disabled = blocked || owned; row.append(make('span', description), choose); }
+          editOnly(choose); choose.disabled = blocked || owned; row.append(make('span', description), choose); }
       }
       if (!activeRecord(fields) || s.provider.issues.some(i => i.code === 'concurrent-delete-edit' && i.path[1] === tagId)) {
         row.append(make('p', '削除として確定すると、すべての記録からこのタグを外します。記録や添付は残ります。'));
@@ -200,12 +203,14 @@ export function createProjectOrganization(document: Document, host: Organization
           host.run({ kind: 'resolveTagLifecycle', tagId, state, observedOperationIds: raw.candidates.map(c => c.operationId), observedIds: ids, eventId: newProjectId('evt') }, () => host.message(state === 'active' ? 'タグを残しました。解除済みの所属は戻しません。' : 'タグの削除を確定しました。記録は残っています。'));
         };
         const restore = button('このタグを残す', () => chooseLifecycle('active')), discard = button('タグの削除として確定', () => chooseLifecycle('deleted'));
-        restore.disabled = discard.disabled = blocked || owned; row.append(restore, discard);
+        editOnly(restore, discard); restore.disabled = discard.disabled = blocked || owned; row.append(restore, discard);
       }
       tagList.append(row);
     }
   }
-  return { sceneRoot, captionRoot, tagsRoot, settingsRoot, displayNameBadge, render, hasChanges: () => !!form || !!captured || !!settingsDraft || !!editorDraft, composing: () => composing,
+  return { sceneRoot, captionRoot, tagsRoot, settingsRoot, displayNameBadge, render,
+    inputOwner: () => settingsDraft || editorDraft ? 'settings' as const : form?.kind === 'sceneCopy' || form?.kind === 'sceneDelete' ? 'scene' as const : 'caption' as const,
+    hasChanges: () => !!form || !!captured || !!settingsDraft || !!editorDraft, composing: () => composing,
     beginAction(command: CaptionUndoInput) { const s = host.source(); return host.ports.authoring?.beginUndo(s.provider.token, command) ?? null; },
     recordAction(capture: CaptionUndoCapture | null) {
       if (!capture || recorded.has(capture)) return;

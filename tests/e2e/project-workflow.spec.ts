@@ -1,3 +1,4 @@
+import { revealCaptionList } from './workspaceUi';
 import { test, expect, chromium, type BrowserContext, type Page } from '@playwright/test';
 import { createHash } from 'node:crypto';
 import { mkdir, mkdtemp, readFile, readdir } from 'node:fs/promises';
@@ -18,6 +19,7 @@ async function projectReady(page: Page) {
   await expect(page.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText(projectName, { timeout: 90_000 });
 }
 async function selectCaption(page: Page) {
+  await revealCaptionList(page);
   await projectReady(page);
   await page.getByRole('list', { name: 'キャプション一覧', exact: true })
     .locator('.lv-caption-select').filter({ hasText: captionName }).click();
@@ -74,7 +76,7 @@ async function saveBackup(page: Page, path: string, name: string, boundaries?: R
   const chooser = await choosing, verifyStarted = performance.now(); await chooser.setFiles(path);
   await expect(files.getByText('選択したファイルの内容を確認しました。', { exact: true })).toBeVisible({ timeout: 90_000 });
   await expect(page.getByLabel('保存ファイルの状態', { exact: true }))
-    .toHaveText('確定済みの内容は、選択した保存ファイルと一致しています。');
+    .toHaveText('保存ファイルと一致');
   if (boundaries) boundaries[`${name}.selected-file-to-ack-ms`] = performance.now() - verifyStarted;
 }
 

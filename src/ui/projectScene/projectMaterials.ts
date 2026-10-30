@@ -1,4 +1,5 @@
 import type { MetadataEdit } from '../../projectMetadata/commands';
+import { editOnly, viewChoices } from './modePresentation';
 import { createMaterialControls } from './materialControls';
 import { materialPlanIsCurrent, materialView, newMaterialSelection, type MaterialContext, type MaterialDraft, type MaterialSelection } from './materialState';
 import { newProjectId, panelNodes, sameProjectValue, type ProjectPanelHost, type ProjectPanel } from './projectPanel';
@@ -6,7 +7,7 @@ import { newProjectId, panelNodes, sameProjectValue, type ProjectPanelHost, type
 export function createProjectMaterials(document: Document, host: ProjectPanelHost): ProjectPanel {
   const { make, button } = panelNodes(document), root = make('section'), review = make('section');
   root.setAttribute('aria-label', '材質の作業'); review.setAttribute('aria-label', '材質の更新候補');
-  const states = new Map<string, { selection: MaterialSelection; draft: MaterialDraft | null }>();
+  const states = new Map<string, { selection: MaterialSelection; draft: MaterialDraft | null; followedModel?: string | null }>();
   const choices = new Map<string, { token: string; appearance?: string; compositing?: string; owner?: string }>();
   let disposed = false;
   const state = () => { const key = host.source().sceneId; if (!states.has(key)) states.set(key, { selection: newMaterialSelection(), draft: null }); return states.get(key)!; };
@@ -39,7 +40,16 @@ export function createProjectMaterials(document: Document, host: ProjectPanelHos
   });
   root.append(controls.root, review);
   function render() {
-    if (disposed) return; controls.render(context()); review.replaceChildren();
+    if (disposed) return;
+    const s=state(), selected=host.selectedModel?.(), source=context().source;
+    if(host.selectedModel && !s.draft && !choices.size && !host.block('materials',false) && source.kind==='ready'){
+      const eligible=source.models.filter(m=>!m.reason && m.surfaces.kind==='value');
+      const follow=selected && selected!==s.followedModel ? eligible.find(m=>m.assetId===selected) : !s.selection.assetId && eligible.length===1 ? eligible[0] : undefined;
+      if(follow){const surfaces=follow.surfaces.kind==='value'?follow.surfaces.value:[];
+        s.selection={assetId:follow.assetId,target:surfaces.length===1?surfaces[0]!.target:null,scope:s.selection.scope};}
+      s.followedModel=selected;
+    }
+    controls.render(context()); review.replaceChildren();
     const { provider, sceneId } = host.source(), groups = host.ports.materials(sceneId).review;
     for (const group of groups) {
       const box = make('fieldset'), label = make('legend', group.label); box.append(label);
@@ -53,7 +63,7 @@ export function createProjectMaterials(document: Document, host: ProjectPanelHos
         select.addEventListener('change', () => {
           if (select.disabled || provider.token !== host.source().provider.token) return;
           choices.set(key, { ...owned, token: provider.token, [name]: select.value }); host.changed();
-        }); row.append(select); box.append(row); return select.value;
+        }); row.append(select); editOnly(row); box.append(row, viewChoices(document, label, values.map(item => item.label))); return select.value;
       };
       if (group.appearance.length > 1 || group.compositing.length > 1) {
         const appearance = choose('appearance', '残す見え方', group.appearance.map(a => ({ id: a.operationId, label: a.label })));
@@ -62,7 +72,7 @@ export function createProjectMaterials(document: Document, host: ProjectPanelHos
           if (host.block('materials') || state().draft || provider.token !== host.source().provider.token || !appearance || !compositing) return;
           host.dispatch('materials', group.token, { kind: 'resolveMaterialIntent', sceneId, overrideId: group.overrideId,
             appearanceOperationId: appearance, compositingOperationId: compositing }, () => { choices.delete(key); host.message('材質の更新候補を確定しました。'); });
-        }); apply.disabled = !!blocked || !appearance || !compositing || !!owned && owned.token !== provider.token; box.append(apply);
+        }); editOnly(apply); apply.disabled = !!blocked || !appearance || !compositing || !!owned && owned.token !== provider.token; box.append(apply);
       }
       if (group.owners.length > 1) {
         const owner = choose('owner', '残す設定', group.owners);
@@ -71,10 +81,10 @@ export function createProjectMaterials(document: Document, host: ProjectPanelHos
           if (host.block('materials') || state().draft || provider.token !== host.source().provider.token || !owner) return;
           host.dispatch('materials', group.token, { kind: 'resolveMaterialDuplicates', sceneId, overrideId: owner,
             observedOverrideIds: group.owners.map(o => o.id), eventId: newProjectId('evt') }, () => { choices.delete(key); host.message('重複する設定を整理しました。'); });
-        }); keep.disabled = !!blocked || !owner || !!owned && owned.token !== provider.token; box.append(keep);
+        }); editOnly(keep); keep.disabled = !!blocked || !owner || !!owned && owned.token !== provider.token; box.append(keep);
       }
       const cancel = button('選択を取り消す', () => { if (!host.block('materials', false)) { choices.delete(key); host.changed(); } });
-      cancel.hidden = !owned; cancel.disabled = !!host.block('materials', false); box.append(cancel); review.append(box);
+      editOnly(cancel); cancel.hidden = !owned; cancel.disabled = !!host.block('materials', false); box.append(cancel); review.append(box);
     }
   }
   return { root, render, hasChanges: () => !!state().draft || choices.size > 0,

@@ -1,0 +1,145 @@
+import { test, expect, chromium } from '@playwright/test';
+import { readFile, mkdir, mkdtemp } from 'node:fs/promises';
+import { join } from 'node:path';
+import * as A from '@automerge/automerge';
+import { triangleGlb, smallPng } from './fixtures';
+import { ownedServer } from '../offline-e2e/server';
+import { BackupArchive } from '../../src/projectPackage/backupArchive';
+import { inspectProjectCandidates } from '../../src/domain/projectCandidates';
+import { validationMetadataLimits } from '../../src/projectFiles/validation';
+
+test('view mode hides editing while preserving reading, local display, existing downloads and return to saved editing', async ({}, info) => {
+  test.setTimeout(180_000); A.getHeads(A.init());
+  const server = await ownedServer('offline-desktop-dist'), errors: string[] = [], remote: string[] = [];
+  const browser = await chromium.launch({ channel: 'chromium', headless: true });
+  const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, serviceWorkers: 'block', acceptDownloads: true });
+  await context.route('**/*', route => { const u = new URL(route.request().url()); if (u.origin === new URL(server.url).origin || ['blob:', 'data:'].includes(u.protocol)) return route.continue(); remote.push(u.href); return route.abort(); });
+  const p = await context.newPage(); p.setDefaultTimeout(15_000); p.on('pageerror', e => errors.push(e.message));
+  const detail = p.getByRole('region', { name: 'キャプションの詳細', exact: true });
+  const tab = (name: string) => p.getByRole('tab', { name, exact: true });
+  const ready = async (text: string) => { await expect(p.getByText(text, { exact: true })).toBeVisible(); await expect(p.locator('main.lv-project-workspace > header > p.lv-operation-status')).toHaveAttribute('data-busy', 'false'); };
+  const menu = p.locator('details.lv-project-files'), files = p.getByRole('region', { name: 'ファイル', exact: true });
+  const save = async (name: string) => {
+    const stageBefore = await p.locator('.lv-project-stage').boundingBox();
+    if (!await menu.evaluate(n => (n as HTMLDetailsElement).open)) await menu.locator(':scope > summary').click();
+    expect(await p.locator('.lv-project-stage').boundingBox()).toEqual(stageBefore);
+    await files.getByRole('button', { name: '保存', exact: true }).click();
+    const [download] = await Promise.all([p.waitForEvent('download'), files.locator('button.lv-file-primary').click()]);
+    const path = info.outputPath(name + '.zip'); await download.saveAs(path); expect(await download.failure()).toBeNull();
+    await expect(files.locator('.lv-operation-status')).toHaveAttribute('data-busy', 'false');
+    await menu.locator(':scope > summary').click(); return path;
+  };
+  try {
+    await p.goto(server.url); await p.getByLabel('ファイルを選択', { exact: true }).setInputFiles({ name: '閲覧するモデル.glb', mimeType: 'model/gltf-binary', buffer: triangleGlb() });
+    await p.getByRole('button', { name: 'ファイルを開く', exact: true }).click(); await p.getByRole('textbox', { name: 'プロジェクト名', exact: true }).fill('閲覧と編集'); await p.getByRole('button', { name: 'プロジェクトを作成', exact: true }).click();
+    await expect(p.getByLabel('3Dモデルの表示', { exact: true })).toHaveAttribute('aria-busy', 'false', { timeout: 90_000 });
+    await p.getByText('数値で配置', { exact: true }).click(); const owner = p.getByLabel('追加先モデル', { exact: true }); await owner.focus(); await owner.selectOption({ label: '閲覧するモデル.glb' }); await p.getByRole('button', { name: 'このモデルに追加', exact: true }).click();
+    for (const axis of ['X', 'Y', 'Z']) await p.getByLabel('位置 ' + axis, { exact: true }).fill(axis === 'Y' ? '.5' : '0');
+    await p.getByRole('button', { name: '位置を確定', exact: true }).click(); await ready('ピンの位置を確定しました。');
+    await detail.getByLabel('タイトル', { exact: true }).fill('現地の写真'); await detail.getByLabel('本文', { exact: true }).fill('確認する本文\n二行目');
+    await detail.getByRole('button', { name: '変更を適用', exact: true }).click(); await ready('変更を適用しました。');
+    const pick = p.waitForEvent('filechooser'); await p.getByLabel('メディアを追加', { exact: true }).click(); await (await pick).setFiles({ name: '現地.png', mimeType: 'image/png', buffer: smallPng() }); await ready('メディアを追加しました。');
+    await tab('保存した視点').click(); const author = p.getByRole('region', { name: '視点の作成と管理', exact: true });
+    await author.getByRole('button', { name: '視点を作る', exact: true }).click(); await author.getByLabel('視点の名称', { exact: true }).fill('全景'); await author.getByRole('button', { name: '視点を追加', exact: true }).click(); await ready('保存した視点を更新しました。');
+    await tab('キャプション').click(); await save('before-view');
+    const help=p.locator('details[aria-label="ヘルプ"]'),settings=p.locator('details[aria-label="設定"]');
+    await menu.locator(':scope > summary').click();await help.locator(':scope > summary').click();await expect(menu).not.toHaveAttribute('open');
+    await settings.locator(':scope > summary').click();await expect(help).not.toHaveAttribute('open');
+    await settings.getByLabel('このブラウザの表示名',{exact:true}).fill('保持する入力');await help.locator(':scope > summary').click();
+    await expect(settings).not.toHaveAttribute('open');await help.locator(':scope > summary').click();await tab('モデル').click();await p.getByRole('button',{name:'編集に戻る',exact:true}).click();
+    await expect(settings).toBeFocused();await expect(tab('モデル')).toHaveAttribute('aria-selected','true');
+    await expect(settings.getByLabel('このブラウザの表示名',{exact:true})).toHaveValue('保持する入力');
+    await settings.getByRole('button',{name:'表示名の入力を取り消す',exact:true}).click();await settings.locator(':scope > summary').click();
+    await tab('キャプション').click();
+    for(const intent of ['受信','復元']){
+      await menu.locator(':scope > summary').click();await menu.getByRole('button',{name:intent,exact:true}).click();
+      await expect(menu.getByRole('region',{name:'ファイル',exact:true})).toBeHidden();
+      await menu.getByRole('button',{name:'閉じる',exact:true}).click();await expect(menu.locator(':scope > summary')).toBeFocused();
+    }
+    await p.getByRole('button', { name: '閲覧する', exact: true }).click(); await expect(p.getByRole('button', { name: '編集する', exact: true })).toBeEnabled();
+    await expect(p.locator('[data-lv-edit-only]:visible')).toHaveCount(0);
+    await expect(detail.getByRole('textbox')).toHaveCount(0); await expect(detail.getByRole('button', { name: '変更を適用', exact: true })).toHaveCount(0);
+    await expect(detail.locator('[data-caption-field="title"] p')).toHaveText('現地の写真'); await expect(detail.locator('[data-caption-field="body"] p')).toHaveText('確認する本文\n二行目');
+    await expect(p.getByLabel('メディアを追加', { exact: true })).toBeHidden(); await expect(p.getByRole('region', { name: 'ピンの操作', exact: true })).toHaveCount(0);
+    await p.getByRole('button', {name:'一覧へ戻る',exact:true}).click();
+    const captions = p.getByRole('region', { name: 'キャプション', exact: true }); await captions.getByLabel('検索', { exact: true }).fill('現地'); await expect(p.locator('.lv-caption-select')).toHaveCount(1);
+    await p.locator('.lv-caption-select').click(); await expect(detail).toBeVisible();
+    await detail.getByRole('button', { name: '比較に表示', exact: true }).click(); await expect(p.locator('.lv-caption-window')).toBeVisible();
+    await expect(p.getByRole('region', { name: 'メディア', exact: true }).locator('img').first()).toBeVisible();
+    if (await menu.evaluate(n => (n as HTMLDetailsElement).open)) await menu.locator(':scope > summary').click();
+    await p.screenshot({ path: info.outputPath('view-caption.png'), fullPage: false });
+    await tab('モデル').click(); const models = p.getByRole('tabpanel', { name: 'モデル', exact: true }); await models.locator('.lv-model-select').click();
+    await expect(models.getByRole('checkbox', { name: 'このシーンに表示', exact: true })).toHaveCount(0);
+    await models.getByRole('button', { name: '隠す', exact: true }).click(); await models.getByRole('button', { name: '表示', exact: true }).click();
+    await tab('保存した視点').click(); await expect(author).toHaveCount(0);
+    const views = p.getByRole('tabpanel', { name: '保存した視点', exact: true }); await views.getByText('投影とカメラ',{exact:true}).click(); await views.getByLabel('投影方式', { exact: true }).selectOption('orthographic'); await views.getByRole('combobox', { name: '保存した視点', exact: true }).selectOption({ label: '全景' }); await views.getByRole('button', { name: '表示', exact: true }).click();
+    await views.getByLabel('背景色', { exact: true }).fill('#334455'); await views.getByRole('button', { name: '背景に適用', exact: true }).click();
+    await tab('材質').click(); const material = p.getByRole('region', { name: '材質', exact: true }); await material.getByLabel('モデル', { exact: true }).selectOption({ label: '閲覧するモデル.glb' });
+    const surface = material.getByLabel('面', { exact: true }), first = await surface.locator('option').evaluateAll(ns => ns.map(n => (n as HTMLOptionElement).value).find(Boolean)); expect(first).toBeTruthy(); await surface.selectOption(first!);
+    await expect(material.getByRole('button', { name: '設定を編集', exact: true })).toHaveCount(0); await expect(material.locator('.lv-material-values')).toBeVisible();
+    await expect(p.locator('[data-lv-edit-only]:visible')).toHaveCount(0); await p.screenshot({ path: info.outputPath('view-material.png'), fullPage: false });
+    if (!await menu.evaluate(n => (n as HTMLDetailsElement).open)) await menu.locator(':scope > summary').click();
+    await expect(files.getByRole('button', { name: '保存', exact: true })).toHaveCount(0);
+    await info.attach('view-files', { body: await menu.innerText(), contentType: 'text/plain' });
+    await expect(p.getByRole('button', { name: '更新を受け取る', exact: true })).toHaveCount(0);
+    await files.getByText('作成したファイル', { exact: true }).click(); const [existing] = await Promise.all([p.waitForEvent('download'), files.getByRole('button', { name: 'ダウンロード', exact: true }).click()]); expect(await existing.failure()).toBeNull(); await menu.locator(':scope > summary').click();
+    await tab('キャプション').click(); await p.setViewportSize({ width: 390, height: 844 }); await p.screenshot({ path: info.outputPath('view-narrow.png'), fullPage: false });
+    await p.getByRole('button',{name:'3D・比較',exact:true}).click(); await expect(p.getByLabel('3Dモデルの表示',{exact:true})).toBeVisible();
+    const compass=p.locator('.lv-project-camera');await compass.locator(':scope > summary').click();await compass.getByRole('button',{name:'上面',exact:true}).click();await compass.locator(':scope > summary').press('Escape');
+    await expect(p.locator('.lv-caption-window').getByRole('button',{name:'閉じる',exact:true})).toBeInViewport();
+    await p.screenshot({path:info.outputPath('narrow-stage.png'),fullPage:false});
+    await p.locator('.lv-caption-window').getByRole('button',{name:'閉じる',exact:true}).click();await expect(p.locator('.lv-caption-window')).toHaveCount(0);
+    await p.getByRole('button',{name:'作業パネル',exact:true}).click();await expect(detail).toBeVisible();await detail.getByRole('button',{name:'比較に表示',exact:true}).click();await p.setViewportSize({ width: 1440, height: 1000 });
+    await p.getByRole('button', { name: '編集する', exact: true }).click(); await expect(p.getByRole('button', { name: '閲覧する', exact: true })).toBeEnabled();
+    await p.getByRole('button',{name:'一覧へ戻る',exact:true}).click();await expect(captions.getByLabel('検索', { exact: true })).toHaveValue('現地');await p.locator('.lv-caption-select').click(); await expect(detail.getByLabel('本文', { exact: true })).toHaveValue('確認する本文\n二行目');
+    await detail.getByLabel('本文', { exact: true }).fill('閲覧から戻って編集'); await expect(p.getByRole('button', { name: '閲覧する', exact: true })).toBeDisabled();
+    await detail.getByLabel('本文',{exact:true}).dispatchEvent('compositionstart',{data:'編集中'});
+    await expect(tab('モデル')).toBeDisabled();await expect(p.locator('.lv-compact-navigation button').first()).toBeDisabled();
+    await detail.getByLabel('本文',{exact:true}).dispatchEvent('compositionend',{data:'編集中'});
+    await tab('モデル').click(); await expect(p.getByText('キャプションに未適用の変更があります。',{exact:true})).toBeVisible();
+    await p.getByRole('button',{name:'編集に戻る',exact:true}).click(); await expect(detail.getByLabel('本文',{exact:true})).toHaveValue('閲覧から戻って編集');
+    await expect(p.locator('.lv-caption-reading > h2')).toBeFocused();
+    await p.setViewportSize({width:1280,height:600});await expect(detail.getByRole('button',{name:'変更を適用',exact:true})).toBeInViewport();
+    await p.screenshot({path:info.outputPath('edit-short.png'),fullPage:false});await p.setViewportSize({width:1440,height:1000});
+    await p.getByRole('button',{name:'一覧へ戻る',exact:true}).click(); await expect(captions.getByLabel('検索',{exact:true})).toHaveValue('現地');
+    await p.getByRole('button',{name:'編集に戻る',exact:true}).click(); await expect(detail.getByLabel('本文',{exact:true})).toHaveValue('閲覧から戻って編集');
+    await detail.getByRole('button', { name: '変更を適用', exact: true }).click(); await ready('変更を適用しました。'); const path = await save('after-view');
+    const archive = await BackupArchive.inspect(new Blob([Uint8Array.from(await readFile(path)).buffer]), validationMetadataLimits), inspected = await inspectProjectCandidates(archive.source.read(), validationMetadataLimits);
+    if (inspected.kind !== 'project-candidate-inspection') throw Error('Saved metadata'); expect(Object.values((inspected.unambiguousRecords as any).captionsById)).toEqual([expect.objectContaining({ title: '現地の写真', body: '閲覧から戻って編集' })]);
+    await p.reload(); await expect(p.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText('閲覧と編集', { timeout: 90_000 }); await p.locator('.lv-caption-select').filter({ hasText: '現地の写真' }).click(); await expect(detail.getByLabel('本文', { exact: true })).toHaveValue('閲覧から戻って編集');
+    expect(errors).toEqual([]); expect(remote).toEqual([]); await info.attach('view-mode-environment', { body: JSON.stringify({ artifact: 'offline-desktop-dist', browser: browser.version(), serviceWorkers: 'blocked', physicalDevice: false }), contentType: 'application/json' });
+  } finally { await context.close(); await browser.close(); await server.stop(); }
+});
+
+test('workspace keeps offline utilities in settings and restores them at home after a cold offline start',async({},info)=>{
+  test.setTimeout(180_000);
+  const server=await ownedServer('offline-desktop-dist'),errors:string[]=[],diagnostics:string[]=[];
+  // Windows CacheStorage requires the existing short profile root; title-derived
+  // output paths can exceed its internal path limit (browser-testing.md).
+  const directory=join(process.cwd(),'.artifacts/e2e/profiles');await mkdir(directory,{recursive:true});const profile=await mkdtemp(join(directory,'wu-'));
+  let context:Awaited<ReturnType<typeof chromium.launchPersistentContext>>|undefined;
+  const open=async(disconnected=false)=>{
+    context=await chromium.launchPersistentContext(profile,{channel:'chromium',headless:true,viewport:{width:1280,height:800},serviceWorkers:'allow',offline:disconnected});
+    context.on('console',m=>{if(m.type()==='error')diagnostics.push(m.text());});
+    context.on('requestfailed',r=>diagnostics.push(`${r.url()}: ${r.failure()?.errorText}`));
+    await context.route('**/*',route=>{const url=new URL(route.request().url());return url.origin===new URL(server.url).origin||['data:','blob:'].includes(url.protocol)?route.continue():route.abort();});
+    const p=context.pages()[0]??await context.newPage();p.on('pageerror',e=>errors.push(e.message));
+    const response=await p.goto(server.url);if(disconnected)expect(response?.fromServiceWorker()).toBe(true);return p;
+  };
+  try{
+    let p=await open();const offline=p.locator('.lv-offline-controls');
+    await offline.getByRole('button',{name:'オフラインで使う準備',exact:true}).click();await expect(offline.getByRole('status')).toContainText('アプリを保存しました。',{timeout:90_000});
+    await p.getByLabel('ファイルを選択',{exact:true}).setInputFiles({name:'再開するモデル.glb',mimeType:'model/gltf-binary',buffer:triangleGlb()});
+    await p.getByRole('button',{name:'ファイルを開く',exact:true}).click();await p.getByRole('textbox',{name:'プロジェクト名',exact:true}).fill('オフライン配置');await p.getByRole('button',{name:'プロジェクトを作成',exact:true}).click();
+    await expect(p.getByLabel('3Dモデルの表示',{exact:true})).toHaveAttribute('aria-busy','false',{timeout:90_000});
+    await expect(p.locator('.lv-validation-host > .lv-offline-controls')).toHaveCount(0);
+    await p.locator('details[aria-label="設定"] > summary').click();await expect(p.locator('details[aria-label="設定"] .lv-offline-controls')).toBeVisible();
+    await p.screenshot({path:info.outputPath('workspace-settings.png'),fullPage:false});
+    await context!.close();context=undefined;await server.stop();p=await open(true);
+    await expect(p.getByRole('heading',{name:'プロジェクト名',exact:true})).toHaveText('オフライン配置',{timeout:90_000});
+    await expect(p.getByLabel('3Dモデルの表示',{exact:true})).toHaveAttribute('aria-busy','false',{timeout:90_000});
+    await p.locator('details[aria-label="ヘルプ"] > summary').click();await p.getByRole('button',{name:'別のプロジェクトを開く',exact:true}).click();
+    await expect(p.locator('.lv-validation-host > .lv-offline-controls')).toBeVisible();expect(errors).toEqual([]);
+    await info.attach('offline-utility-environment',{body:JSON.stringify({artifact:'offline-desktop-dist',browser:context!.browser()?.version(),coldNavigationFromServiceWorker:true,serverStopped:true,physicalDevice:false}),contentType:'application/json'});
+  }finally{await info.attach('offline-utility-diagnostics',{body:JSON.stringify({profile,diagnostics}),contentType:'application/json'});await context?.close();await server.stop();}
+});

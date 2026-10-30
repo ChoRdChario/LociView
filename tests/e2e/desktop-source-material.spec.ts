@@ -1,3 +1,4 @@
+import { revealCaptionList } from './workspaceUi';
 import {test,expect,chromium,type Page,type TestInfo,type BrowserContext} from '@playwright/test';
 import {mkdir,mkdtemp} from 'node:fs/promises';
 import {openAsBlob} from 'node:fs';
@@ -12,11 +13,11 @@ import {inspectProjectCandidates} from '../../src/domain/projectCandidates';
 import {validationMetadataLimits as limits} from '../../src/projectFiles/validation';
 
 const title='元の材質を編集',entry='http://127.0.0.1:4182/?timings=1';
-const materials=(p:Page)=>p.getByRole('region',{name:'マテリアル',exact:true});
+const materials=(p:Page)=>p.getByRole('region',{name:'材質',exact:true});
 const detail=(p:Page)=>p.getByRole('region',{name:'キャプションの詳細',exact:true});
 async function ready(p:Page){await expect(p.getByRole('heading',{name:'プロジェクト名',exact:true})).toHaveText(title,{timeout:240000});await expect(p.locator('.lv-project-viewport-status')).toBeEmpty({timeout:180000});}
 async function open(p:Page,path:string){await p.getByLabel('ファイルを選択',{exact:true}).setInputFiles(path);await p.getByRole('button',{name:'ファイルを開く',exact:true}).click();}
-async function caption(p:Page){await p.getByRole('tab',{name:'キャプション',exact:true}).click();await p.getByRole('list',{name:'キャプション一覧',exact:true}).locator('.lv-caption-select').first().click();}
+async function caption(p:Page){await revealCaptionList(p);await p.getByRole('tab',{name:'キャプション',exact:true}).click();await p.getByRole('list',{name:'キャプション一覧',exact:true}).locator('.lv-caption-select').first().click();}
 async function edit(p:Page,field:'タイトル'|'本文',value:string){await detail(p).getByLabel(field,{exact:true}).fill(value);await detail(p).getByRole('button',{name:'変更を適用',exact:true}).click();await expect(p.getByText('変更を適用しました。',{exact:true})).toBeVisible({timeout:180000});}
 async function output(p:Page,info:TestInfo,name:string,purpose:'backup'|'teamWorkspace'|'contribution'|'review'|'clean',base?:string){
   const menu=p.locator('details.lv-project-files');if(await menu.count()&&!await menu.evaluate(n=>(n as HTMLDetailsElement).open))await menu.locator(':scope > summary').click();

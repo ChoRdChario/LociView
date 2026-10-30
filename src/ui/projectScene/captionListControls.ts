@@ -276,5 +276,5 @@ export function createCaptionListControls(document: Document, onPlan: (plan: Cap
     for (const entry of colors.values()) entry.cleanup(); for (const entry of rows.values()) entry.cleanup();
     colors.clear(); rows.clear(); root.remove(); if (composing) onComposition(false); composing = false;
   }
-  return { root, render, revealSelected, dispose, isComposing: () => composing };
+  return { root, render, revealSelected, focusSearch: () => search.focus?.({ preventScroll: true }), dispose, isComposing: () => composing };
 }

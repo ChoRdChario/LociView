@@ -100,6 +100,8 @@ export interface ProjectWorkspacePorts {
   projectStatus(): { readonly title: string | null; readonly resumable: boolean; readonly backup: 'verified' | 'unconfirmed' | 'unavailable' };
   openProject?(): void;
   projectNavigationBlocked?(): boolean;
+  /** Coordinate presentation surfaces only; false retains the current file input. */
+  disclosureOpening?(): boolean;
   resumedLastProject?(): boolean;
   storageEstimate?(): Promise<Readonly<{ usage?: number; quota?: number }>>;
   localSettings?: { read(): string; save(displayName: string): boolean };
@@ -107,6 +109,8 @@ export interface ProjectWorkspacePorts {
   captionEditors?(captionId: string): readonly { label: string; names: readonly (string | null)[] }[];
   readonly readOnly: boolean;
   presentation?(): { readonly busy: boolean; readonly reason: string } | null;
+  /** Actual UI mode, distinct from temporary presentation/write guards. */
+  readonly mode?: 'view' | 'edit';
   status(): { kind: 'idle' | 'checking' | 'failed'; error?: string; retryable?: boolean };
   dispatch(token: string, command: MetadataEdit): Promise<unknown>;
   retry(): Promise<unknown>;

@@ -1,3 +1,4 @@
+import { revealProjectHelp } from './workspaceUi';
 import { test, expect, chromium, type Page, type BrowserContext, type TestInfo } from '@playwright/test';
 import { mkdir, mkdtemp, readFile } from 'node:fs/promises';
 import { resolve, sep } from 'node:path';
@@ -75,7 +76,7 @@ test('08c uses native canvas generation, portable offline display/save/reopen an
     await p.getByRole('button', { name: '位置を確定', exact: true }).click(); await ready(p, 'ピンの位置を確定しました。');
     const settings=p.getByLabel('設定',{exact:true});await settings.locator('summary').click();await settings.getByLabel('編集者名',{exact:true}).fill('HEIC担当');await settings.getByLabel('このプロジェクトの今後の編集にこの名前を残す',{exact:true}).check();await settings.getByRole('button',{name:'編集者名を設定',exact:true}).click();
     await p.getByLabel('本文',{exact:true}).fill('名前のみの履歴');await p.getByRole('button',{name:'変更を適用',exact:true}).click();await ready(p,'変更を適用しました。');
-    const namesOnly=await output(p,info,'names-only','teamWorkspace',false),old=await launch(2,true);await open(old.p,namesOnly);await expect(old.p.getByRole('heading',{name:'プロジェクト名',exact:true})).toHaveText(title,{timeout:90_000});await old.p.getByRole('button',{name:'別のプロジェクトを開く',exact:true}).click();
+    const namesOnly=await output(p,info,'names-only','teamWorkspace',false),old=await launch(2,true);await open(old.p,namesOnly);await expect(old.p.getByRole('heading',{name:'プロジェクト名',exact:true})).toHaveText(title,{timeout:90_000});await revealProjectHelp(old.p); await old.p.getByRole('button',{name:'別のプロジェクトを開く',exact:true}).click();
     const chooser = p.waitForEvent('filechooser'); await p.getByLabel('メディアを追加', { exact: true }).click(); await (await chooser).setFiles('tests/fixtures/daily-media/owned-still.heic'); await ready(p, 'メディアを追加しました。');
     await gallery(p); expect(await p.evaluate(() => (window as any).__heicDecodes)).toBe(1);
     const workspace = await output(p, info, 'portable-workspace', 'teamWorkspace');
@@ -84,7 +85,7 @@ test('08c uses native canvas generation, portable offline display/save/reopen an
     // Already-loaded shell only: no claim of offline app cold startup/PWA caching.
     await b.context.setOffline(true); await b.p.getByLabel('本文', { exact: true }).fill('オフラインの追記'); await b.p.getByRole('button', { name: '変更を適用', exact: true }).click(); await ready(b.p, '変更を適用しました。');
     const backup = await output(b.p, info, 'offline-backup', 'backup'); await gallery(b.p);
-    await b.p.getByRole('button', { name: '別のプロジェクトを開く', exact: true }).click(); await b.p.getByRole('button', { name: '編集で開く', exact: true }).first().click(); await gallery(b.p); expect(await b.p.evaluate(() => (window as any).__heicDecodes)).toBe(0);
+    await revealProjectHelp(b.p); await b.p.getByRole('button', { name: '別のプロジェクトを開く', exact: true }).click(); await b.p.getByRole('button', { name: '編集で開く', exact: true }).first().click(); await gallery(b.p); expect(await b.p.evaluate(() => (window as any).__heicDecodes)).toBe(0);
     await b.context.setOffline(false); await b.context.close(); contexts.delete(b.context); const cold = await launch(1); await expect(cold.p.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText(title, { timeout: 90_000 }); await gallery(cold.p); expect(await cold.p.evaluate(() => (window as any).__heicDecodes)).toBe(0);
     await open(old.p, workspace); await expect(old.p.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveCount(0); await expect(old.p.getByRole('status').filter({ hasText: /対応|機能|確認/ }).first()).toBeVisible();
     const portableOnly=await output(p,info,'portable-only-copy','clean');await open(old.p,portableOnly);await expect(old.p.getByRole('heading',{name:'プロジェクト名',exact:true})).toHaveCount(0);

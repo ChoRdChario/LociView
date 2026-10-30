@@ -6,6 +6,7 @@ import { newProjectId, panelNodes, sameProjectValue, type ProjectPanelHost, type
 import { boundsCentre, placementAroundPivot, fitAlignmentBounds } from '../../domain/alignment';
 import type { WorkspacePlacement } from './projectWorkspacePorts';
 import { contextHelp } from './contextHelp';
+import { editOnly, viewChoices } from './modePresentation';
 
 export function createProjectModels(document: Document, host: ProjectPanelHost): ProjectModelPanel {
   const { make, button } = panelNodes(document), root = make('section'), fileArea = make('section'), placement = make('section'), review = make('section');
@@ -216,6 +217,7 @@ export function createProjectModels(document: Document, host: ProjectPanelHost):
   pointSizeInput.type = 'range'; pointSizeInput.min = '1'; pointSizeInput.max = '20'; pointSizeInput.step = '1'; pointSizeInput.setAttribute('aria-label', '点の大きさ（px）'); pointSizeLabel.append(pointSizeInput); pointSizeArea.append(pointSizeLabel);
   pointSizeInput.addEventListener('input', () => { const assetId = memory().assetId; if (assetId && !pointSizeInput.disabled) { host.viewport().setPointDiameter?.(assetId, Number(pointSizeInput.value)); host.changed(); } });
   root.append(list.root, fileArea, proxyArea, placement, pinSizeArea, pointSizeArea, review, remove, deletionNote, deletionBox); if (preview) root.append(preview.root);
+  editOnly(fileArea, proxyArea, placement, pinSizeArea, pointSizeArea, remove, deletionBox);
   function render() {
     if (disposed) return; list.render(context()); const block = host.block('models'), selected = memory().assetId, { provider, sceneId } = host.source();
     const details = selected ? host.ports.modelDetails(sceneId, selected) : null;
@@ -280,7 +282,7 @@ export function createProjectModels(document: Document, host: ProjectPanelHost):
       const save = button('選択を確定', () => { if (!host.block('models') && !pinSize && owned?.token === host.source().provider.token && owned.value) apply(owned.value); });
       save.disabled = select.disabled || !owned?.value;
       const clear = button('選択を取り消す', () => { if (!host.block('models', false)) { choices.delete(key); membershipDecisions.delete(key); host.changed(); } }); clear.hidden = !owned && !membershipDecisions.has(key); clear.disabled = !!host.block('models', false);
-      area.append(row, save, clear);
+      editOnly(row, save, clear); area.append(row, save, clear, viewChoices(document, label, values.map(item => item.label)));
     };
     for (const group of groups.statuses) { if (group.issue) review.append(make('p', group.issue));
       if (preview) for (const [index, item] of group.choices.entries()) { const show = button(`${group.label}：候補 ${index + 1} を表示`, () => {
@@ -298,7 +300,7 @@ export function createProjectModels(document: Document, host: ProjectPanelHost):
       const key = `${sceneId}/membership/${group.assetId}`, selectedDecision = membershipDecisions.get(key), row = make('label', '重複するモデル'), decision = make('select'); decision.setAttribute('aria-label', '重複するモデル');
       for (const [value, label] of [['one', '一つにまとめる'], ['both', '別々のモデルとして両方残す']]) { const option = make('option', label); option.value = value!; option.disabled = value === 'both' && group.copyReady === false; decision.append(option); }
       decision.value = selectedDecision?.value ?? 'one'; decision.disabled = !!block || !!edit || !!fileScope || !!pinSize || composing || memory().composing || !!selectedDecision && selectedDecision.token !== provider.token;
-      decision.addEventListener('change', () => { if (!decision.disabled) { membershipDecisions.set(key, { token: provider.token, sceneId, value: decision.value as 'one' | 'both' }); host.changed(); } }); row.append(decision); area.append(row);
+      decision.addEventListener('change', () => { if (!decision.disabled) { membershipDecisions.set(key, { token: provider.token, sceneId, value: decision.value as 'one' | 'both' }); host.changed(); } }); editOnly(row); row.append(decision); area.append(row);
       choice(key, '残すモデル登録', group.edgeIds.map((id, i) => ({ id, label: `登録 ${i + 1}` })), originalMembershipId => {
         let prepared: ReturnType<typeof host.ports.prepareModelMembership> | undefined;
         const capturedDecision = membershipDecisions.get(key); if (capturedDecision && (capturedDecision.token !== provider.token || capturedDecision.sceneId !== sceneId)) return;
@@ -310,6 +312,7 @@ export function createProjectModels(document: Document, host: ProjectPanelHost):
     preview?.render(sceneId);
   }
   return { root, render, hasChanges: () => ownInput() || memory().composing || composing, composing: () => composing || memory().composing,
+    selectedAsset: () => memory().assetId,
     selectedSurface: () => { const assetId=memory().assetId,details=assetId?host.ports.modelDetails(host.source().sceneId,assetId):null; return assetId && (details?.pointCloud||details?.gsProxyTarget) ? assetId : null; }, hidden: () => memory().hiddenAssetIds, proposal: () => edit,
     show(assetId) { setMemory({ ...memory(), hiddenAssetIds: memory().hiddenAssetIds.filter(id => id !== assetId) }); },
     propose(next) { if (!edit || composing || memory().composing || next.mode !== edit.mode || host.block('models', true, true) || !sameProjectValue(next.target, edit.target)) return false;

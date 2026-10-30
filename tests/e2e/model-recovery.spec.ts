@@ -1,3 +1,4 @@
+import { revealCaptionList } from './workspaceUi';
 import { test, expect, chromium, type BrowserContext, type Page, type TestInfo } from '@playwright/test';
 import { createHash } from 'node:crypto';
 import { mkdir, mkdtemp, readFile, readdir } from 'node:fs/promises';
@@ -25,6 +26,7 @@ const pinArea = (page: Page) => page.getByRole('region', { name: 'ピンの操�
 const marker = (page: Page) => page.locator('.lv-project-marker');
 
 async function chooseCaption(page: Page, name = captionTitle) {
+  await revealCaptionList(page);
   await page.getByRole('tab', { name: 'キャプション', exact: true }).click();
   await page.getByRole('list', { name: 'キャプション一覧', exact: true }).locator('.lv-caption-select').filter({ hasText: name }).click();
 }
