@@ -5,7 +5,7 @@ import { projectFilePolicy } from '../projectFiles/validation';
 import { createGsResidency } from '../viewer/gsDecodeQueue';
 import { createTargetBudget, targetLayout } from '../viewer/targetBudget';
 import { createSmoothComposite } from '../viewer/smoothComposite';
-import { createDesktopOffline } from '../platform/desktopOffline';
+import { createDesktopOffline,initializeDesktopOffline } from '../platform/desktopOffline';
 import { createOfflineControls, createOfflineSettings } from '../ui/projectScene/offlineControls';
 
 /** Separate build graph: admitted converters, never the original app/viewer entrypoints. */
@@ -14,7 +14,7 @@ export async function bootOfflineDesktopApp(root: HTMLElement) {
   const offline = createDesktopOffline(import.meta.env.BASE_URL, __DESKTOP_OFFLINE_BUILD_ID__);
   document.documentElement.classList.add('lv-project-page');
   const status=document.createElement('p');status.setAttribute('role','status');status.textContent='LociViewを開いています。';
-  root.replaceChildren(status);void offline.port.recheck();let workspaceAttached=false;
+  root.replaceChildren(status);void initializeDesktopOffline(offline.port,navigator.onLine);let workspaceAttached=false;
   window.addEventListener('pagehide', event => { if (!event.persisted) offline.dispose(); });
   try{
   const policy = projectFilePolicy({ nonGs: validationBrowserLimits,

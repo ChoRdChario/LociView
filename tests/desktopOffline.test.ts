@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createDesktopOffline } from '../src/platform/desktopOffline';
+import { createDesktopOffline,initializeDesktopOffline } from '../src/platform/desktopOffline';
 import { desktopOfflineQuery, desktopOfflineScript,desktopOfflineManifest } from '../src/platform/desktopOfflinePorts';
 
 const origin='http://127.0.0.1:49231/',script=new URL(desktopOfflineScript,origin).href;
@@ -104,4 +104,15 @@ describe('dedicated offline app shell ownership (no Project/storage authority)',
     const f=fixture();f.reg.active=new Worker();const pending=new Worker('b');pending.state='installing';f.reg.installing=pending;f.all=[f.reg];await f.port.recheck();await f.port.remove();expect(f.port.read().phase).toBe('removed');
     f.reg.installing=null;pending.state='redundant';pending.dispatchEvent(new Event('statechange'));expect(f.port.read().phase).toBe('removed');await Promise.resolve();expect(f.port.read().phase).toBe('removed');
   });
+});
+
+it('automatically prepares once at first boot and keeps cached offline starts and same-page removal independent',async()=>{
+ const owner=fixture();await initializeDesktopOffline(owner.port);expect(owner.sw.register).toHaveBeenCalledOnce();
+ owner.sw.controller=owner.reg.active;await owner.port.recheck();expect(owner.port.read().phase).toBe('ready');owner.reg.update.mockClear();
+ await initializeDesktopOffline(owner.port,false);expect(owner.reg.update).not.toHaveBeenCalled();expect(owner.port.read().phase).toBe('ready');
+ await owner.port.remove();await initializeDesktopOffline(owner.port);expect(owner.sw.register).toHaveBeenCalledOnce();expect(owner.port.read().phase).toBe('removed');
+});
+
+it('keeps browser-blocked registration local without an unhandled preparation failure',async()=>{
+ const owner=fixture();owner.sw.register.mockResolvedValueOnce(undefined as never);await expect(initializeDesktopOffline(owner.port)).resolves.toBeUndefined();expect(owner.port.read()).toMatchObject({phase:'error',registered:false});expect(owner.sw.register).toHaveBeenCalledOnce();expect(owner.browser.location.reload).not.toHaveBeenCalled();
 });

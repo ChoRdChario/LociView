@@ -1,3 +1,4 @@
+import {beginMaterialEditing} from './workspaceUi';
 import { revealCameraPositions, revealWorkPanel, revealCoordinateAdd, revealFileSurface, beginSceneCreation, revealModelManagement } from './workspaceUi';
 import { test, expect, chromium } from '@playwright/test';
 import { ownedServer } from '../offline-e2e/server';
@@ -37,7 +38,7 @@ test('content-first workspace keeps editing, pin completion and file exits coher
     await attached.getByText('添付を整理',{exact:true}).click();await attached.getByRole('button',{name:'説明を編集',exact:true}).click();
     const description=attached.getByLabel('メディアの説明',{exact:true});await expect(description).toBeFocused();await description.fill('柱と梁の写真');await description.dispatchEvent('compositionstart');
     await expect(attached.getByRole('button',{name:'説明を適用',exact:true})).toBeDisabled();await description.dispatchEvent('compositionend');await attached.getByRole('button',{name:'説明を適用',exact:true}).click();await ready('メディアの説明を適用しました。');
-    await p.getByText('記録を整理',{exact:true}).click();const tags=p.getByLabel('タグの管理',{exact:true});await tags.locator(':scope > summary').click();
+    const tags=p.getByLabel('タグの管理',{exact:true});await tags.locator(':scope > summary').click();
     await tags.getByLabel('タグ名',{exact:true}).fill('選択中の記録');await tags.getByLabel('タグの色',{exact:true}).fill('#37a24b');await tags.getByRole('button',{name:'タグを追加',exact:true}).click();await ready('タグを保存しました。');
     await tags.getByRole('button',{name:'この記録にタグを付ける',exact:true}).click();await ready('記録のタグを変更しました。');
     await tags.getByLabel('タグ名',{exact:true}).fill('保持する分類入力');await tab('モデル').click();await expect(p.locator('.lv-retained-edit')).toBeVisible();await p.locator('.lv-retained-edit').getByRole('button',{name:'編集に戻る',exact:true}).click();await expect(tags).toHaveAttribute('open');await expect(tags).toBeFocused();await expect(tags.getByLabel('タグ名',{exact:true})).toHaveValue('保持する分類入力');await expect(tags.getByRole('button',{name:'タグを追加',exact:true})).toBeEnabled();
@@ -53,13 +54,13 @@ test('content-first workspace keeps editing, pin completion and file exits coher
     await p.getByRole('button', { name: '閲覧する', exact: true }).click(); await expect(p.getByRole('button', { name: '編集する', exact: true })).toBeEnabled();
     await expect.poll(() => material.innerText()).not.toMatch(/編集を開始|未接続|適用します/); await expect(p.locator('[data-lv-edit-only]:visible')).toHaveCount(0);
     await revealWorkPanel(p); await tab('モデル').click();const pointSize=p.getByLabel('点の大きさ（px）',{exact:true});await expect(pointSize).toBeEnabled();await pointSize.press('Home');for(let i=0;i<7;i++)await pointSize.press('ArrowRight');await expect(pointSize).toHaveValue('8');
-    await revealWorkPanel(p); await tab('キャプション').click();await p.getByText('記録を整理',{exact:true}).click();await expect(tags.locator('.lv-caption-tag')).toHaveCount(1);await expect(tags.locator('.lv-caption-tag')).toContainText('選択中の記録');
+    await revealWorkPanel(p); await tab('キャプション').click();await expect(tags.locator('.lv-caption-tag')).toHaveCount(1);await expect(tags.locator('.lv-caption-tag')).toContainText('選択中の記録');
     expect(await tags.locator('.lv-caption-tag i').evaluate(n=>getComputedStyle(n).backgroundColor)).toBe('rgb(55, 162, 75)');
     await revealWorkPanel(p); await tab('描画').click();
     await p.getByRole('button', { name: '編集する', exact: true }).click(); await expect(p.getByRole('button', { name: '閲覧する', exact: true })).toBeEnabled();
-    await material.getByLabel('モデル', { exact: true }).selectOption({ label: '建物.glb' }); const surface = material.getByLabel('面', { exact: true });
+    await material.getByLabel('モデル', { exact: true }).selectOption({ label: '建物.glb' }); const surface = material.getByLabel('マテリアル', { exact: true });
     const slot = await surface.locator('option').evaluateAll(ns => ns.map(n => (n as HTMLOptionElement).value).find(Boolean)); await surface.selectOption(slot!);
-    await material.getByRole('button', { name: '設定を編集', exact: true }).click(); await material.getByLabel('不透明度（%）', { exact: true }).fill('70'); await material.getByRole('button', { name: '変更を適用', exact: true }).click(); await ready('材質の設定を適用しました。');
+    await beginMaterialEditing(material); await material.getByLabel('不透明度（%）', { exact: true }).fill('70'); await material.getByRole('button', { name: '変更を適用', exact: true }).click(); await ready('材質の設定を適用しました。');
     const notice = p.getByRole('region', { name: '3D表示の操作', exact: true }); await expect(notice).toBeVisible();
     await expect.poll(async () => (await comparison.getByRole('button', { name: '閉じる', exact: true }).boundingBox())!.y - ((await notice.boundingBox())!.y + (await notice.boundingBox())!.height)).toBeGreaterThanOrEqual(0);
     await revealWorkPanel(p); await tab('モデル').click();const modelTask=p.getByRole('tabpanel',{name:'モデル',exact:true});await modelTask.locator('.lv-model-select').filter({hasText:'建物.glb'}).click();

@@ -5,7 +5,7 @@ import { CaptionRowLayout } from './captionRowLayout';
 
 /** Synthetic-port UI only. Host owns metadata, editor drafts and renderer effects. */
 export function createCaptionListControls(document: Document, onPlan: (plan: CaptionListPlan) => void,
-  onComposition: (active: boolean) => void, presentation?: { compact?:boolean }) {
+  onComposition: (active: boolean) => void, presentation?: { compact?:boolean;recordActions?:{available():boolean;invoke(action:'edit'|'delete',captionId:string,token:string,sceneId:string):void} }) {
   const make = <K extends keyof HTMLElementTagNameMap>(tag: K, text = '') => {
     const node = document.createElement(tag); node.textContent = text; return node;
   };
@@ -44,7 +44,7 @@ export function createCaptionListControls(document: Document, onPlan: (plan: Cap
     if (!context || disposed) return;
     const plan = planCaptionList(context, intent);
     if (plan.kind === 'blocked') { status.textContent = plan.reason; status.hidden = false; }
-    onPlan(plan);
+    onPlan(plan);return plan;
   };
   listen(search, 'compositionstart', () => { composing = true; onComposition(true); });
   listen(search, 'compositionend', () => {
@@ -62,7 +62,7 @@ export function createCaptionListControls(document: Document, onPlan: (plan: Cap
   });
   const colors = new Map<string, { node: HTMLButtonElement; mark: HTMLSpanElement; cleanup: () => void }>();
   const rows = new Map<string, { node: HTMLLIElement; select: HTMLButtonElement; title: HTMLSpanElement;
-    owner: HTMLSpanElement; note: HTMLSpanElement; swatch: HTMLSpanElement; action: HTMLButtonElement;
+    owner: HTMLSpanElement; note: HTMLSpanElement; swatch: HTMLSpanElement; action: HTMLButtonElement;edit:HTMLButtonElement;remove:HTMLButtonElement;
     cleanup: () => void; effect: 'review' | 'showModel' }>();
   const Observer = document.defaultView?.ResizeObserver;
   const observer = Observer ? new Observer(() => {
@@ -88,20 +88,23 @@ export function createCaptionListControls(document: Document, onPlan: (plan: Cap
     let entry = rows.get(item.id);
     if (!entry) {
       const node = make('li'), select = button(''), title = make('span'), ownerText = make('span');
-      const note = make('span'), swatch = make('span'), action = button('');
+      const note = make('span'), swatch = make('span'), action = button(''), edit=button('編集'),remove=button('削除');edit.setAttribute('data-lv-edit-only','');remove.setAttribute('data-lv-edit-only','');
       node.className = 'lv-caption-row'; select.className = 'lv-caption-select';
       title.className = 'lv-caption-title'; ownerText.className = 'lv-caption-owner'; note.className = 'lv-caption-note';
       swatch.className = 'lv-caption-swatch'; swatch.setAttribute('aria-hidden', 'true');
-      select.append(swatch, title, ownerText, note); node.append(select, action);
+      select.append(swatch, title, ownerText, note); node.append(select, action,edit,remove);
       const selectClick = () => request({ kind: 'select', captionId: item.id });
       const actionClick = () => { const current = rows.get(item.id); if (current) request({ kind: current.effect, captionId: item.id }); };
-      select.addEventListener('click', selectClick); action.addEventListener('click', actionClick);
-      entry = { node, select, title, owner: ownerText, note, swatch, action, effect: 'review', cleanup: () => {
-        select.removeEventListener('click', selectClick); action.removeEventListener('click', actionClick);
+      const invoke=(kind:'edit'|'delete')=>{if(!context||composing||context.pending||context.mutationBlock||!presentation?.recordActions?.available())return;const token=context.source.token,sceneId=context.source.sceneId;const selected=request({kind:'select',captionId:item.id});if(!selected||selected.kind==='blocked')return;if(context.source.token===token&&context.source.sceneId===sceneId&&context.memory.selectedCaptionId===item.id)presentation.recordActions.invoke(kind,item.id,token,sceneId);};
+      const editClick=()=>invoke('edit'),deleteClick=()=>invoke('delete');
+      select.addEventListener('click', selectClick); action.addEventListener('click', actionClick);edit.addEventListener('click',editClick);remove.addEventListener('click',deleteClick);
+      entry = { node, select, title, owner: ownerText, note, swatch, action, edit, remove, effect: 'review', cleanup: () => {
+        select.removeEventListener('click', selectClick); action.removeEventListener('click', actionClick);edit.removeEventListener('click',editClick);remove.removeEventListener('click',deleteClick);
       } };
       rows.set(item.id, entry);
       observer?.observe(node);
     }
+    for(const button of[entry.edit,entry.remove]){button.hidden=!presentation?.recordActions?.available();button.disabled=!!context!.pending||!!context!.mutationBlock;}
     entry.title.textContent = captionTitle(item); entry.owner.textContent = captionOwnerLabel(item);
     entry.owner.hidden = item.pin === 'visible' && item.owner.kind === 'value';
     entry.select.setAttribute('aria-current', String(item.id === context!.memory.selectedCaptionId));
@@ -184,7 +187,7 @@ export function createCaptionListControls(document: Document, onPlan: (plan: Cap
     const top = entry.node.offsetTop, bottom = top + entry.node.offsetHeight;
     if (top < list.scrollTop) list.scrollTop = top;
     else if (bottom > list.scrollTop + list.clientHeight) list.scrollTop = Math.min(top, bottom - list.clientHeight);
-    if (focus) (focus === 'last' && !entry.action.hidden && !entry.action.disabled ? entry.action : entry.select).focus({ preventScroll: true });
+    if(focus){const buttons=[entry.select,entry.action,entry.edit,entry.remove].filter(b=>!b.hidden&&!b.disabled);(focus==='last'?buttons.at(-1):entry.select)?.focus({preventScroll:true});}
     request({ kind: 'scroll', top: list.scrollTop });
   }
   const keyboard = (event: KeyboardEvent) => {
@@ -199,7 +202,7 @@ export function createCaptionListControls(document: Document, onPlan: (plan: Cap
     }
     if (event.key === 'Tab') {
       if (event.shiftKey && document.activeElement === entry.select && index > 0) { target = index - 1; focus = 'last'; }
-      else if (!event.shiftKey && (document.activeElement === entry.action || entry.action.hidden || entry.action.disabled) && index + 1 < currentView!.rows.length) target = index + 1;
+      else if(!event.shiftKey&&document.activeElement===[entry.select,entry.action,entry.edit,entry.remove].filter(b=>!b.hidden&&!b.disabled).at(-1)&&index+1<currentView!.rows.length)target=index+1;
     }
     if (target === undefined) return;
     event.preventDefault(); revealIndex(target, focus);

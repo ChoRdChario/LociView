@@ -84,6 +84,8 @@ export function createCaptionWindowControls(document: Document, onPlan: (plan: C
     const listen = (element: HTMLElement, type: string, fn: (event: Event) => void) => {
       element.addEventListener(type, fn); card.cleanups.push(() => element.removeEventListener(type, fn));
     };
+    const activate=()=>{if(context&&captionWindowView(context.source,context.memory,context.selectedId).visibleIds.at(-1)!==id)apply({kind:'front',captionId:id});};
+    listen(node,'pointerdown',activate);listen(node,'focusin',activate);
     listen(close, 'click', () => apply({ kind: 'close', captionId: id }));
     listen(title, 'click', () => apply({ kind: 'front', captionId: id }));
     listen(resize, 'click', event => {
@@ -136,7 +138,7 @@ export function createCaptionWindowControls(document: Document, onPlan: (plan: C
     const view = captionWindowView(context.source, context.memory, context.selectedId);
     root.hidden = projection.width <= 0 || projection.height <= 0;
     for (const [id, card] of cards) {
-      const index = view.visibleIds.indexOf(id);
+      const index = view.visibleIds.indexOf(id);card.root.dataset.active=String(index===view.visibleIds.length-1);
       const preferred = context.memory.placements.find(p => p.captionId === id)?.rect ?? card.initial;
       card.rect = displayedWindowRect(drag?.id === id ? drag.rect : preferred, projection.width, projection.height);
       Object.assign(card.root.style, { left: `${card.rect.left}px`, top: `${card.rect.top}px`,

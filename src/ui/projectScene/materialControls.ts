@@ -7,13 +7,13 @@ import { editOnly, viewOnly } from './modePresentation';
 
 let nextMaterialControl = 0;
 /** Disconnected static controls; emits intentions, never dispatches or applies a renderer fallback. */
-export function createMaterialControls(document: Document, onPlan: (plan: MaterialPlan) => void) {
+export function createMaterialControls(document: Document, onPlan: (plan: MaterialPlan) => void, presentationOptions?:{direct?:boolean}) {
   const make = <K extends keyof HTMLElementTagNameMap>(tag: K, text = '') => { const node = document.createElement(tag); node.textContent = text; return node; };
   const button = (text: string) => { const node = make('button', text); node.type = 'button'; return node; };
   const root = make('section'); root.className = 'lv-material-editor'; root.setAttribute('aria-label', '材質');
   const choices = make('div'); choices.className = 'lv-material-target';
   const select = (label: string) => { const wrapper = make('label', label), input = make('select'); input.setAttribute('aria-label', label); wrapper.append(input); choices.append(wrapper); return input; };
-  const model = select('モデル'), surface = select('面'), scope = select('適用範囲');
+  const model = select('モデル'), surface = select('マテリアル'), scope = select('適用範囲');
   const optionSignatures = new WeakMap<HTMLSelectElement, string>();
   const options = (input: HTMLSelectElement, values: readonly (readonly [string, string])[], selected: string) => {
     const key = JSON.stringify(values); if (optionSignatures.get(input) !== key) {
@@ -48,7 +48,9 @@ export function createMaterialControls(document: Document, onPlan: (plan: Materi
     coverage: [['inherit', '元の設定'], ['opaque', '不透明'], ['mask', '切り抜き']],
   };
   function updateDraft(field: MaterialEditField, input: HTMLInputElement | HTMLSelectElement) {
-    if (!context?.draft || disposed || input.disabled || ('readOnly' in input && input.readOnly)) return;
+    if (disposed || input.disabled || ('readOnly' in input && input.readOnly)) return;
+    if(!context?.draft&&presentationOptions?.direct){const value=input.value;request({kind:'begin'});input.value=value;}
+    if(!context?.draft)return;
     send({ kind: 'draft', baseDraft: context.draft, draft: editMaterialDraft(context.draft, field, input.value, composing) });
   }
   for (const field of materialFields) {
@@ -62,7 +64,7 @@ export function createMaterialControls(document: Document, onPlan: (plan: Materi
     row.append(make('dt', materialFieldLabels[field]), value, warning); reading.append(row); values.set(field, { group: row, value, note: warning });
     listen(input, enums[field] ? 'change' : 'input', () => updateDraft(field, input));
     if (!enums[field]) {
-      listen(input, 'compositionstart', () => { if (!context?.draft || input.disabled || (input as HTMLInputElement).readOnly) return;
+      listen(input, 'compositionstart', () => { if(input.disabled||(input as HTMLInputElement).readOnly)return;if(!context?.draft&&presentationOptions?.direct)request({kind:'begin'});if(!context?.draft)return;
         composing = field; updateDraft(field, input); });
       listen(input, 'compositionend', () => { if (composing !== field) return; updateDraft(field, input); composing = null;
         if (context?.draft) send({ kind: 'draft', baseDraft: context.draft, draft: Object.freeze({ ...context.draft, composing: null }) }); });
@@ -105,7 +107,7 @@ export function createMaterialControls(document: Document, onPlan: (plan: Materi
   function describe(selection: MaterialSelection, view: ReturnType<typeof materialView>) {
     const model = view.models.find(item => item.assetId === selection.assetId), surfaces = model?.surfaces.kind === 'value' ? model.surfaces.value : [];
     const surface = selection.target && surfaces.find(item => materialTargetKey(item.target) === materialTargetKey(selection.target!));
-    return [model?.name.kind === 'value' ? model.name.value : '対象のモデル', surface && surface.name.kind === 'value' ? surface.name.value : '対象の面', materialScopeLabel(selection.scope)].join(' / ');
+    return [model?.name.kind === 'value' ? model.name.value : '対象のモデル', surface && surface.name.kind === 'value' ? surface.name.value : '対象のマテリアル', materialScopeLabel(selection.scope)].join(' / ');
   }
   function render(next: MaterialContext, presentation?: { viewing: boolean; readBlock: string | null }): boolean {
     if (disposed) return false;
@@ -127,24 +129,24 @@ export function createMaterialControls(document: Document, onPlan: (plan: Materi
     if (next.selection.assetId && !view.model) modelOptions.push([next.selection.assetId, '選択したモデルを確認']);
     options(model, modelOptions, next.selection.assetId ?? '');
     const key = next.selection.target ? materialTargetKey(next.selection.target) : '';
-    const surfaceOptions: [string, string][] = [['', '面を選択'], ...view.surfaces.map(item => [materialTargetKey(item.target), item.name.kind === 'value' ? item.name.value : '面の名前を確認'] as [string, string])];
-    if (key && !view.surface) surfaceOptions.push([key, '選択した面を確認']); options(surface, surfaceOptions, key); scope.value = next.selection.scope;
+    const surfaceOptions: [string, string][] = [['', 'マテリアルを選択'], ...view.surfaces.map(item => [materialTargetKey(item.target), item.name.kind === 'value' ? item.name.value : 'マテリアル名を確認'] as [string, string])];
+    if (key && !view.surface) surfaceOptions.push([key, '選択したマテリアルを確認']); options(surface, surfaceOptions, key); scope.value = next.selection.scope;
     for (const control of [model, surface, scope]) control.disabled = Boolean(d || composing || inFlight || next.pending || view.issue);
     observed.textContent = sourceOnlySurface && !d ? '' : view.surface ? view.origin ? `現在の見え方：${view.origin === 'source' ? 'モデル元の設定' : materialScopeLabel(view.origin)}` : '現在の見え方を確認してください。' : '';
     impact.textContent = !view.surface || noControls || presentation?.viewing ? '' : next.selection.scope === 'scene' ? 'このシーンだけに適用します。'
-      : '同じモデル・面を使うシーンで共通になります。シーン専用の設定がある場合は、そちらが優先されます。';
-    const beginPlan = planMaterial(next, { kind: 'begin' }); begin.hidden = Boolean(d) || noControls; begin.disabled = beginPlan.kind === 'blocked';
+      : '同じマテリアルを使うシーンで共通になります。シーン専用の設定がある場合は、そちらが優先されます。';
+    const beginPlan = planMaterial(next, { kind: 'begin' }); begin.hidden = Boolean(d) || noControls || !!presentationOptions?.direct; begin.disabled = beginPlan.kind === 'blocked';
     const base = d?.base ?? view.base, raw = (field: MaterialEditField) => d?.edits[field] ?? (base ? materialInput(base.appearance, field, next.source.semanticProfile, base.compositing) : '');
     if(raw('coverage')==='mask'||raw('chroma')==='on'||d && ['chroma','keyColor','tolerance','softness','cutoff'].some(field=>d.edits[field as MaterialEditField]!==undefined))advanced.open=true;
     const coverageChoices=next.source.semanticProfile==='map2'?[...enums.coverage!,['smoothBlend','半透明']as const]:enums.coverage!;
-    editor.hidden = !base || noControls || !d; reading.hidden = !d && (emptyCatalog || unsupported && noSettings);
+    editor.hidden = !base || noControls || !d&&!presentationOptions?.direct; reading.hidden = !!presentationOptions?.direct&&!presentation?.viewing&&!noControls || !d && (emptyCatalog || unsupported && noSettings);
     reading.dataset.noneditable = String(!d && !reading.hidden);
     for (const [field, control] of controls) {
       const value = raw(field);
       if (field === 'coverage') options(control.input as HTMLSelectElement, coverageChoices.some(([key]) => key === value) ? coverageChoices :
         [...coverageChoices, [value, value === 'smoothBlend' ? '半透明（この環境では未対応）' : '現在の設定（この環境では未対応）']], value);
       if (composing !== field && d?.composing !== field && control.input.value !== value) control.input.value = value;
-      const reason = view.surface?.fieldIssues[field], enabled = d && reason === null && !inFlight && next.mutationBlock === null && !next.pending && !view.editIssue;
+      const reason = view.surface?.fieldIssues[field], enabled = (d || presentationOptions?.direct&&beginPlan.kind!=='blocked') && reason === null && !inFlight && next.mutationBlock === null && !next.pending && !view.editIssue;
       control.input.disabled = enums[field] ? !enabled : false;
       if (!enums[field]) (control.input as HTMLInputElement).readOnly = composing !== field && !enabled;
       // Keep all fields with retained input visible even after capability loss or disabling chroma.

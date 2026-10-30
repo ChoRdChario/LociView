@@ -446,3 +446,22 @@ Current execution outcomes and next work belong in [todo](../tasks/todo.md).
 Playwright references: [installation](https://playwright.dev/docs/intro),
 [web server ownership](https://playwright.dev/docs/test-webserver),
 [downloads](https://playwright.dev/docs/downloads).
+
+## Direct actions and automatic app preparation (2026-10-31)
+
+The record/camera, view-mode and keyboard task flows use an owned loopback server
+for `offline-desktop-dist`, dedicated Chromium and generated input. They retain
+list/detail, row edit/delete confirmation and cancellation, camera navigation with
+no metadata changes, Scene entry recording with old views retained, direct material
+apply, file inspection and independent/cold reopening. Existing generic saved-view
+service coverage remains; the product no longer exposes a saved-view picker.
+
+The unified-startup case now waits for first-visit automatic app-only preparation
+without pressing a prepare button, then closes the entire owned persistent browser,
+stops its server and navigates offline before editing/exporting/reopening the same
+Project. It checks original binary bytes/history lineage and unrelated worker/cache
+retention. Removal suppresses preparation in that page; a later connected app boot
+prepares again. It never forces activation, reloads input or uses the user's profile.
+Run with `node scripts/run-e2e.mjs --config <owned config>` so the existing dedicated
+browser cache is selected. Todo owns the actual final artifact evidence; these are
+Chromium automation checks, not physical-device, release or aggregate adoption.

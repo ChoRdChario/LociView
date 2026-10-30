@@ -10,11 +10,11 @@ it('keeps preparation local, confirms removal and ignores late results after dis
   const events=new Map<string,Set<(event:Event)=>void>>(),document=Object.assign(new RecordedDocument(),{
     addEventListener(type:string,listener:(event:Event)=>void){const set=events.get(type)??new Set();set.add(listener);events.set(type,set);},
     removeEventListener(type:string,listener:(event:Event)=>void){events.get(type)?.delete(listener);}});
-  const control=createOfflineControls(document.asDocument(),port),root=record(control.root),[status,prepare,details]=root.children;
+  const control=createOfflineControls(document.asDocument(),port),root=record(control.root),[status,details]=root.children,prepare=details!.children[1]!.children[0]!;
   const settings=createOfflineSettings(document.asDocument(),control.root);expect(record(settings.body).children).toContain(root);
   details!.open=true;for(const listener of events.get('focusin')!)listener({target:details!.children[0]}as unknown as Event);expect(details!.open).toBe(true);
-  for(const listener of events.get('pointerdown')!)listener({target:prepare}as unknown as Event);expect(details!.open).toBe(false);
-  const remove=details!.children[1]!.children[3]!,confirmation=details!.children[1]!.children[4]!,accept=confirmation.children[1]!,cancel=confirmation.children[2]!;
+  for(const listener of events.get('pointerdown')!)listener({target:status}as unknown as Event);expect(details!.open).toBe(false);
+  const remove=details!.children[1]!.children[4]!,confirmation=details!.children[1]!.children[5]!,accept=confirmation.children[1]!,cancel=confirmation.children[2]!;
   expect(confirmation.children[0]!.textContent).toContain('同じアプリ');expect(confirmation.children[0]!.textContent).not.toMatch(/静的|再配信|従来版へ戻る/);
   const escape={key:'Escape',isComposing:true,preventDefault:vi.fn(),stopPropagation:vi.fn()};details!.open=true;details!.fire('keydown',escape);expect(details!.open).toBe(true);
   details!.fire('keydown',{...escape,isComposing:false});expect(details!.open).toBe(false);expect(escape.stopPropagation).toHaveBeenCalledOnce();

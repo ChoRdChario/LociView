@@ -41,13 +41,13 @@ function effect(context: MaterialContext, kind: 'apply' | 'remove'): MaterialEff
   const plan = planMaterial(context, { kind }); expect(plan.kind).toBe(kind);
   if (plan.kind !== 'apply' && plan.kind !== 'remove') throw Error('not effect'); return plan;
 }
-function host(initial = fixture()) {
+function host(initial = fixture(),direct=false) {
   const document = new RecordedDocument(), plans: MaterialPlan[] = []; let context = initial;
   const controls = createMaterialControls(document.asDocument(), plan => {
     plans.push(plan); if (['draft', 'select', 'cancel'].includes(plan.kind) && materialPlanIsCurrent(plan, context)) {
       context = applyLocal(context, plan); controls.render(context);
     }
-  });
+  },{direct});
   controls.render(context); const root = record(controls.root), content=root.children.find(n=>n.className==='lv-material-content')!, choices = content.children[0]!, actions = root.children.find(n => n.className === 'lv-material-actions')!, confirmation = root.children.find(n => n.getAttribute('aria-label') === '操作の確認')!;
   const descendants = (node: ReturnType<typeof record>): ReturnType<typeof record>[] => [node,...node.children.flatMap(descendants)];
   const fields = new Map(materialFields.map(field => [field, descendants(content.children.find(n => n.className === 'lv-material-fields')!).find(node=>node.attributes.get('aria-label')===materialFieldLabels[field])!]));
@@ -55,6 +55,11 @@ function host(initial = fixture()) {
     status: content.children[1]!, observed: content.children[2]!, impact: content.children[3]!, begin: content.children.find(n => n.tag === 'button' && n.textContent === '設定を編集')!, apply: actions.children[0]!, cancel: actions.children[1]!, remove: actions.children[2]!, retry: actions.children[3]!, review: actions.children[4]!,
     confirmation, confirm: confirmation.children[1]!, get context() { return context; }, render(next: MaterialContext) { if (controls.render(next)) context = next; } };
 }
+
+it('shows product material inputs directly without a focus-only draft, beginning the retained edit on first actual input',()=>{
+ const h=host(fixture(),true),opacity=h.fields.get('opacity')!;expect(h.begin.hidden).toBe(true);expect(h.content.children.find(n=>n.className==='lv-material-fields')!.hidden).toBe(false);
+ opacity.fire('focus');expect(h.context.draft).toBeNull();expect(h.plans).toHaveLength(0);opacity.value='55';opacity.fire('input');expect(h.context.draft?.edits.opacity).toBe('55');expect(h.apply.disabled).toBe(false);h.controls.dispose();
+});
 
 describe('disconnected material controls (not rendering, browser or save acceptance)', () => {
   it('shows a proven empty or unsupported catalog once without hiding a retained draft or unresolved evidence', () => {
@@ -153,7 +158,7 @@ describe('disconnected material controls (not rendering, browser or save accepta
     let context = fixture(false); const before = context.source;
     expect(materialView(context).targetIssue).toContain('モデルを選択');
     context = applyLocal(context, planMaterial(context, { kind: 'model', assetId: asset }));
-    expect(context.selection.target).toBeNull(); expect(materialView(context).targetIssue).toContain('面を選択');
+    expect(context.selection.target).toBeNull(); expect(materialView(context).targetIssue).toContain('マテリアルを選択');
     context = applyLocal(context, planMaterial(context, { kind: 'surface', key: materialTargetKey(target) }));
     context = applyLocal(context, planMaterial(context, { kind: 'scope', scope: 'project' }));
     expect(context.selection).toEqual({ assetId: asset, target, scope: 'project' }); expect(context.draft).toBeNull(); expect(context.source).toBe(before);

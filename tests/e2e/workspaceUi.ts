@@ -1,7 +1,8 @@
-import { expect, type Page } from '@playwright/test';
+import { expect, type Page, type Locator } from '@playwright/test';
 
 /** Same pin-add intent; retained readers can still use their earlier wording. */
 export async function revealCoordinateAdd(page:Page){
+  const settings=page.locator('.lv-caption-add-settings');if(await settings.count()&&!await settings.evaluate(n=>(n as HTMLDetailsElement).open))await settings.locator(':scope > summary').click();
   const current=page.getByText('座標で追加',{exact:true}),summary=await current.count()?current:page.getByText('数値で配置',{exact:true});
   if(!await summary.locator('..').evaluate(n=>(n as HTMLDetailsElement).open))await summary.click();
 }
@@ -60,14 +61,14 @@ export async function revealFileSurface(page: Page, surface: '保存' | '共有'
   if (!await menu.evaluate(node => (node as HTMLDetailsElement).open)) await menu.locator(':scope > summary').click();
   const tabs = menu.getByRole('tablist', { name: 'ファイルの操作', exact: true });
   if (!await tabs.count()) return false;
-  const tab = tabs.getByRole('tab', { name: surface, exact: true });
+  const current=surface==='保存'?'書き出す':surface==='受信'?'更新を読み込む':surface;const modern=tabs.getByRole('tab',{name:current,exact:true});const tab=await modern.count()?modern:tabs.getByRole('tab',{name:surface,exact:true});
   if (await tab.getAttribute('aria-selected') !== 'true') await tab.click();
   return true;
 }
 
 export async function revealProjectSelection(page: Page) {
   const menu = page.locator('details.lv-project-files');
-  if (await menu.getByRole('button', { name: '別のプロジェクトを開く', exact: true, includeHidden: true }).count()) {
+  if (await menu.getByRole('button', { name: /^(?:ファイルを開く|別のプロジェクトを開く)$/, includeHidden: true }).count()) {
     if (!await menu.evaluate(node => (node as HTMLDetailsElement).open)) await menu.locator(':scope > summary').click();
   } else await revealProjectHelp(page);
 }
@@ -78,4 +79,9 @@ export async function revealOfflineUtilities(page: Page) {
   if (await offline.isVisible()) return;
   const settings = page.locator('.lv-home-settings, details[aria-label="設定"]');
   if (!await settings.evaluate(node => (node as HTMLDetailsElement).open)) await settings.locator(':scope > summary').click();
+}
+
+/** Retained validation readers expose a begin action; product fields begin on input. */
+export async function beginMaterialEditing(panel:Locator){
+ const begin=panel.getByRole('button',{name:'設定を編集',exact:true});if(await begin.isVisible())await begin.click();else await expect(panel.getByLabel('照明',{exact:true})).toBeEnabled();
 }

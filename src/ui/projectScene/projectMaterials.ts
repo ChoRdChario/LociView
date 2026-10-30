@@ -43,7 +43,7 @@ export function createProjectMaterials(document: Document, host: ProjectPanelHos
       const node=matchingReview().map(g=>reviewNodes.get(g.key)).find(Boolean);
       node?.focus?.({preventScroll:true});node?.scrollIntoView?.({block:'nearest'});
     }
-  });
+  },{direct:true});
   function matchingReview() {
     const {provider,sceneId}=host.source(), target=state().selection.target;
     return host.ports.materials(sceneId).review.filter(g=>[g.overrideId,...g.owners.map(o=>o.id)].some(id=>{
@@ -56,7 +56,7 @@ export function createProjectMaterials(document: Document, host: ProjectPanelHos
     if (disposed) return;
     const s=state(), selected=host.selectedModel?.(), source=context().source;
     if(host.selectedModel && !s.draft && !choices.size && !host.block('materials',false) && source.kind==='ready'){
-      const eligible=source.models.filter(m=>!m.reason && m.surfaces.kind==='value');
+      const eligible=source.models.filter(m=>!m.reason && m.surfaces.kind==='value' && m.surfaces.value.length>0);
       const follow=selected && selected!==s.followedModel ? source.models.find(m=>m.assetId===selected) : !s.selection.assetId && eligible.length===1 ? eligible[0] : undefined;
       if(follow){const surfaces=follow.surfaces.kind==='value'?follow.surfaces.value:[];
         s.selection={assetId:follow.assetId,target:surfaces.length===1?surfaces[0]!.target:null,scope:s.selection.scope};}

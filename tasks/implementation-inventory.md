@@ -70,7 +70,7 @@ GS専用上限と全既知本体の合計、画面全体の表示予定・実イ
 | 経路 | 実際に存在するもの | ここから主張してはいけないこと |
 |---|---|---|
 | 通常home → Native | 実モデル／画像、DisplaySet、限定backup／collaboration／review／clean、旧Desktop・iPhone合格 | 新ProjectScene／継続因果履歴／新保存サービスの完成 |
-| 専用 `project-scene-offline` PC候補 | 承認済み[09](../docs/specs/09-desktop-offline-candidate-proposal.md)の新形式／対応済み初回変換を、準備・完全終了後の通信断起動・編集保存再開・更新失敗と再試行・自身の登録解除／静的版復帰まで限定実装。専用Chromiumで所有Mesh／Point／50万点SH4／Proxy／PNGとNative初回変換、2窓の入力保持／新版再開、別SW保護を検証。保存領域・原本・履歴を保持し、通常／静的版とは別ビルド。実行範囲と別runの資格はtodoが管理 | 元形式viewer自体のオフライン化、旧Native／v1保存データ全般の受入れ、任意メディアのオフライン再生、別origin移行、OS install／実機／HTTPS／採用／公開の合格 |
+| 専用 `project-scene-offline` PC候補 | 承認済み[09](../docs/specs/09-desktop-offline-candidate-proposal.md)の新形式／対応済み初回変換を、初回のアプリ資源自動準備・完全終了後の通信断起動・編集保存再開・更新失敗と再試行・自身の登録解除／同じアプリの通信可能起動まで限定実装。専用Chromiumで所有Mesh／Point／50万点SH4／Proxy／PNGとNative初回変換、2窓の入力保持／新版再開、別SW保護を検証。保存領域・原本・履歴を保持し、通常／静的版とは別ビルド。実行範囲と別runの資格はtodoが管理 | 元形式viewer自体のオフライン化、旧Native／v1保存データ全般の受入れ、任意メディアのオフライン再生、別origin移行、OS install／実機／HTTPS／採用／公開の合格 |
 | project-scene memory／旧 `storage=saved` | 合成の2人チーム、更新・競合・独立copy・保存の限定ループ | 新metadata serviceまたは実ファイル製品wireの接続済み |
 | project-scene `storage=metadata` | 新source/repository/session/journalと従来25群＋C07/V04の合成UI接続、限定履歴受信・明示解消 | 任意モデル／任意画像／実ファイルのチーム受信／通常home／offlineの合格 |
 | project-scene `storage=validation` | 静的GLB／07lのSTL・Mesh PLY・OBJ・自己完結glTF／01aのXYZ-RGB ASCII PLY／01cのbinary SH0〜4 GSと任意Proxy、PNG/JPEG/WebP/GIF画像 Projectの作成・一覧・再開、実本体read/renderと編集、限定Workspace/Contributionの実file入出力・中断復旧、名前付きbackup出力と確認付き復元・復元後の編集／返送、独立コピー出力・入力・編集／再開、選択Sceneの閲覧用出力・内容由来のstandalone View、明示確認した編集コピー・中断復旧・編集／再開。専用Chromiumの限定実行結果はtodo参照 | 通常home、正式profile／任意形式、全ケースの実描画／実入力／実機／offlineの受入れ、全purpose／移行の完成 |

@@ -17,7 +17,7 @@ describe('connected fixture material editing, not raster/IME/device evidence', (
     const doc = new RecordedDocument(), s = new SyntheticSession(), w = createDevelopmentWorkspace(doc.asDocument(), s);
     const r = record(w.root); button(r, 'マテリアル').fire('click'); const m = named(r, '材質');
     set(named(m, 'モデル'), f.equipment); expect(button(m, '設定を編集').disabled).toBe(true);
-    const surface = named(m, '面'); set(surface, surface.children[1]!.value); set(named(m, '適用範囲'), 'project');
+    const surface = named(m, 'マテリアル'); set(surface, surface.children[1]!.value); set(named(m, '適用範囲'), 'project');
     button(m, '設定を編集').fire('click'); set(named(m, '照明'), 'unlit'); button(m, '変更を適用').fire('click');
     expect(s.pending).toBeNull(); const projectId = Object.keys(s.snapshot.resources.materials)[0]!;
     const base = syntheticDisplay(s.snapshot, f.overview, null, null);

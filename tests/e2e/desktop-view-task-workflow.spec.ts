@@ -48,7 +48,7 @@ async function inspect(path: string) {
 async function chooseMaterial(p: Page) {
   await revealWorkPanel(p);await tab(p, '描画').click(); const panel = materials(p);
   await panel.getByRole('combobox', { name: 'モデル', exact: true }).selectOption({ label: '作業するモデル.glb' });
-  const face = panel.getByRole('combobox', { name: '面', exact: true }), value = await face.locator('option').evaluateAll(ns => ns.map(n => (n as HTMLOptionElement).value).find(Boolean));
+  const face = panel.getByRole('combobox', { name: 'マテリアル', exact: true }), value = await face.locator('option').evaluateAll(ns => ns.map(n => (n as HTMLOptionElement).value).find(Boolean));
   expect(value).toBeTruthy(); await face.selectOption(value!); return panel;
 }
 
@@ -64,23 +64,15 @@ test('PC task navigation retains model, View and material drafts through keyboar
     await page.evaluate(() => { (window as any).__taskCanvas = document.querySelector('.lv-project-stage canvas'); });
     await tab(page, 'モデル').click(); const modelPanel = page.getByRole('tabpanel', { name: 'モデル', exact: true }); await modelPanel.locator('.lv-model-select').filter({ hasText: '作業するモデル.glb' }).click();
     await modelPanel.getByRole('button', { name: '配置を調整', exact: true }).click(); await modelPanel.getByLabel('モデル位置 X', { exact: true }).fill('2.5'); await scrollTask(page);
-    await tab(page, 'モデル').focus(); await page.keyboard.press('ArrowRight'); await expect(tab(page, '描画')).toHaveAttribute('aria-selected', 'true'); await revealCameraPositions(page);await expect(author(page).getByRole('button', { name: '視点を記録', exact: true })).toBeDisabled();await page.locator('.lv-camera-positions > summary').click();await tab(page,'描画').focus();
+    await tab(page, 'モデル').focus(); await page.keyboard.press('ArrowRight'); await expect(tab(page, '描画')).toHaveAttribute('aria-selected', 'true'); await revealCameraPositions(page);await expect(views(page).getByRole('button', { name: /開始視点を(?:記録|更新)/, exact: true })).toBeDisabled();await page.locator('.lv-camera-positions > summary').click();await tab(page,'描画').focus();
     await page.keyboard.press('ArrowLeft'); await expect(modelPanel.getByLabel('モデル位置 X', { exact: true })).toHaveValue('2.5'); await modelPanel.getByRole('button', { name: '配置を取り消す', exact: true }).click();
     await modelPanel.getByRole('button', { name: '配置を調整', exact: true }).click(); await modelPanel.getByLabel('モデル位置 X', { exact: true }).fill('1'); await modelPanel.getByLabel('モデル倍率', { exact: true }).fill('1.25'); await modelPanel.getByRole('button', { name: '配置を確定', exact: true }).click(); await ready(page, 'モデルの配置を確定しました。');
     await revealCameraPositions(page);
-    const create = async (name: string) => { await author(page).getByRole('button', { name: '視点を記録', exact: true }).click(); await author(page).getByLabel('視点の名称', { exact: true }).fill(name); await views(page).getByRole('group',{name:'視点の終了操作',exact:true}).getByRole('button', { name: '視点を追加', exact: true }).click(); await ready(page, '保存した視点を更新しました。'); };
-
-    await create('全景'); await page.locator('.lv-project-camera').getByRole('combobox', { name: '投影方式', exact: true }).selectOption('orthographic'); await expect(page.locator('.lv-project-camera').getByRole('combobox', { name: '投影方式', exact: true })).toHaveValue('orthographic'); await create('詳細');
-    await author(page).getByText('その他の操作', { exact: true }).click(); await expect(author(page).getByRole('button', { name: '後へ', exact: true })).toBeDisabled();
-    await author(page).getByRole('button', { name: '前へ', exact: true }).click(); await ready(page, '視点の順序を変更しました。');
-    const picker = views(page).getByRole('combobox', { name: '記録した視点', exact: true });
-    expect(await picker.locator('option').evaluateAll(ns => ns.filter(n => (n as HTMLOptionElement).value).map(n => n.textContent))).toEqual(['詳細', '全景']);
-    await expect(author(page).getByRole('button', { name: '前へ', exact: true })).toBeDisabled(); await expect(author(page).getByText('先頭の視点です。', { exact: true })).toBeVisible();
-    await picker.selectOption({ label: '全景' }); await views(page).getByRole('button', { name: '表示', exact: true }).click(); await expect(page.locator('.lv-project-camera').getByRole('combobox', { name: '投影方式', exact: true })).toHaveValue('perspective');
-    await author(page).getByRole('button', { name: '編集', exact: true }).click(); await author(page).getByLabel('視点の名称', { exact: true }).fill('全景（確認用）'); await scrollTask(page);
-    await page.locator('.lv-camera-positions > summary').click();await revealWorkPanel(page);await tab(page,'描画').click();await expect(page.locator('.lv-retained-edit')).toContainText('カメラ位置');await page.locator('.lv-retained-edit').getByRole('button',{name:'編集に戻る',exact:true}).click();
-    await expect(author(page).getByLabel('視点の名称', { exact: true })).toHaveValue('全景（確認用）'); await views(page).getByRole('group',{name:'視点の終了操作',exact:true}).getByRole('button', { name: '変更を適用', exact: true }).click(); await ready(page, '保存した視点を更新しました。');
-    const material = await chooseMaterial(page); await material.getByRole('button', { name: '設定を編集', exact: true }).click(); await material.getByLabel('照明', { exact: true }).selectOption('unlit'); await material.getByLabel('透過の表示方法', { exact: true }).selectOption('mask');
+    await views(page).getByRole('button',{name:'開始視点を記録',exact:true}).click();await ready(page,'開始視点を記録しました。');
+    await page.locator('.lv-project-camera').getByLabel('投影方式',{exact:true}).selectOption('orthographic');await views(page).getByRole('button',{name:'開始視点を更新',exact:true}).click();await ready(page,'開始視点を記録しました。');
+    const background=views(page).getByLabel('背景色',{exact:true});await background.fill('#334455');await scrollTask(page);
+    await page.locator('.lv-camera-positions > summary').click();await revealWorkPanel(page);await tab(page,'描画').click();await expect(page.locator('.lv-retained-edit')).toContainText('カメラ位置');await page.locator('.lv-retained-edit').getByRole('button',{name:'編集に戻る',exact:true}).click();await expect(background).toHaveValue('#334455');await views(page).getByRole('button',{name:'背景に適用',exact:true}).click();
+    const material = await chooseMaterial(page); await expect(material.getByRole('button', { name: '設定を編集', exact: true })).toBeHidden(); await material.getByLabel('照明', { exact: true }).selectOption('unlit'); await material.getByLabel('透過の表示方法', { exact: true }).selectOption('mask');
     await material.getByLabel('不透明度（%）', { exact: true }).fill('65'); await material.getByLabel('切り抜きのしきい値', { exact: true }).fill('0.4'); await scrollTask(page);
     await material.getByLabel('不透明度（%）', { exact: true }).focus();
     for (const key of ['', 'Tab']) {
@@ -89,20 +81,18 @@ test('PC task navigation retains model, View and material drafts through keyboar
       expect(bounds.inside).toBe(true); expect(bounds.top).toBeGreaterThanOrEqual(bounds.stripBottom); expect(bounds.bottom).toBeLessThanOrEqual(bounds.paneBottom);
     }
     await scrollTask(page);
-    await tab(page,'描画').focus();await page.keyboard.press('ArrowLeft');await expect(tab(page,'モデル')).toHaveAttribute('aria-selected','true');await revealCameraPositions(page);await expect(author(page).getByRole('button',{name:'視点を記録',exact:true})).toBeDisabled();await page.locator('.lv-camera-positions > summary').click();await tab(page,'モデル').focus();await page.keyboard.press('ArrowRight');
+    await tab(page,'描画').focus();await page.keyboard.press('ArrowLeft');await expect(tab(page,'モデル')).toHaveAttribute('aria-selected','true');await revealCameraPositions(page);await expect(views(page).getByRole('button',{name:/開始視点を(?:記録|更新)/,exact:true})).toBeDisabled();await page.locator('.lv-camera-positions > summary').click();await tab(page,'モデル').focus();await page.keyboard.press('ArrowRight');
     await expect(material.getByLabel('不透明度（%）', { exact: true })).toHaveValue('65'); await expect(material.getByLabel('切り抜きのしきい値', { exact: true })).toHaveValue('0.4'); await expect(material.getByLabel('照明', { exact: true })).toHaveValue('unlit');
     await material.getByRole('button', { name: '変更を適用', exact: true }).click(); await ready(page, '材質の設定を適用しました。'); await scrollTask(page);
     expect(await page.evaluate(() => (window as any).__taskCanvas === document.querySelector('.lv-project-stage canvas'))).toBe(true); await page.screenshot({ path: info.outputPath('sticky-material-task.png'), fullPage: true });
     const file = await save(page, info, '視点と材質'), saved = await inspect(file), savedViews = Object.values(saved.records.viewsById) as any[];
-    expect(savedViews.sort((a, b) => a.orderKey < b.orderKey ? -1 : 1).map(v => v.name)).toEqual(['詳細', '全景（確認用）']);
-    expect(savedViews.find(v => v.name === '詳細').camera.projection.kind).toBe('orthographic'); expect(savedViews.find(v => v.name === '全景（確認用）').camera.projection.kind).toBe('perspective');
+    expect(savedViews).toHaveLength(2);expect(savedViews.map(v=>v.camera.projection.kind).sort()).toEqual(['orthographic','perspective']);const entry=(Object.values(saved.records.scenesById) as any[])[0]!.defaultViewId;expect(saved.records.viewsById[entry].camera.projection.kind).toBe('orthographic');
     const storedMaterials = Object.values(saved.records.materialOverridesById) as any[]; expect(storedMaterials).toHaveLength(1); expect(storedMaterials[0]).toMatchObject({ appearance: { lighting: 'unlit', opacity: 0.65 }, compositing: { coverage: { policy: 'mask', alphaCutoff: 0.4 } } });
     const b = await peer.newPage(); b.setDefaultTimeout(15_000); b.on('pageerror', error => errors.push(error.message)); await b.goto(server.url); await b.getByLabel('ファイルを選択', { exact: true }).setInputFiles(file); await b.getByRole('button', { name: 'ファイルを開く', exact: true }).click();
     await expect(b.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText('視点と材質の整理', { timeout: 90_000 }); await expect(b.getByLabel('3Dモデルの表示', { exact: true })).toHaveAttribute('aria-busy', 'false'); await tabsVisible(b);
     await tab(b, 'モデル').click(); const peerModel = b.getByRole('tabpanel', { name: 'モデル', exact: true }); await peerModel.locator('.lv-model-select').filter({ hasText: '作業するモデル.glb' }).click(); await peerModel.getByRole('button', { name: '配置を調整', exact: true }).click();
     await expect(peerModel.getByLabel('モデル位置 X', { exact: true })).toHaveValue('1'); await expect(peerModel.getByLabel('モデル倍率', { exact: true })).toHaveValue('1.25'); await peerModel.getByRole('button', { name: '配置を取り消す', exact: true }).click();
-    await revealCameraPositions(b); const peerPicker = views(b).getByRole('combobox', { name: '記録した視点', exact: true }); expect(await peerPicker.locator('option').evaluateAll(ns => ns.filter(n => (n as HTMLOptionElement).value).map(n => n.textContent))).toEqual(['詳細', '全景（確認用）']);
-    await peerPicker.selectOption({ label: '詳細' }); await views(b).getByRole('button', { name: '表示', exact: true }).click(); await expect(b.locator('.lv-project-camera').getByRole('combobox', { name: '投影方式', exact: true })).toHaveValue('orthographic');
+    await revealCameraPositions(b);await expect(views(b).getByRole('button',{name:'開始視点を更新',exact:true})).toBeEnabled();await expect(views(b).getByLabel('記録した視点',{exact:true})).toHaveCount(0);await expect(b.locator('.lv-project-camera').getByLabel('投影方式',{exact:true})).toHaveValue('orthographic');
     const peerFile = await save(b, info, '開き直した作業'), reopened = await inspect(peerFile); expect(reopened.archive.source.originalChanges()).toEqual(saved.archive.source.originalChanges());
     await page.reload(); await expect(page.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText('視点と材質の整理', { timeout: 90_000 }); await expect(page.getByLabel('3Dモデルの表示', { exact: true })).toHaveAttribute('aria-busy', 'false');
     await page.setViewportSize({ width: 320, height: 740 }); const enlarged = await page.addStyleTag({ content: '.lv-project-workspace [role="tab"] { font-size: 32px; }' });

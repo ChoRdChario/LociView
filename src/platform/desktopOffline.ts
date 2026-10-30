@@ -78,8 +78,8 @@ export function createDesktopOffline(base: string, build: string, browser: Windo
       const existing=await registrations();
       if(disposed||ticket!==generation)return;
       publish({ phase: 'preparing', registered: state.registered, message: 'アプリを準備しています。作業は続けられます。' });
-      // Explicit user intent only, including after removal. No automatic registration.
-      const reg = existing??await sw.register(script, { scope, updateViaCache: 'none' }); removed = false;
+      // Called once at approved app boot, or by explicit repair; removal never calls it.
+      const reg = existing??await sw.register(script, { scope, updateViaCache: 'none' });if(!reg)throw preparationError(); removed = false;
       publish({...state,registered:true});
       await registrations(); if(disposed||ticket!==generation)return;watch(reg);
       let attempted=reg.installing;
@@ -125,4 +125,10 @@ export function createDesktopOffline(base: string, build: string, browser: Windo
   const port: DesktopOfflinePort = { read: () => state, subscribe: listener => { listeners.add(listener); return () => { listeners.delete(listener); }; }, recheck, prepare, remove,
     installAvailable: () => !!installEvent, install: async () => { const event = installEvent; installEvent = undefined; try{if (event) { await event.prompt(); await event.userChoice; }}catch{failure(Error('インストールを開始できませんでした。ブラウザの案内を確認してください。オフライン準備とは別の操作です。'));}finally{installed();} } };
   return { port, dispose() { disposed = true; ++generation; for(const cancel of [...pending])cancel();listeners.clear(); sw?.removeEventListener('controllerchange', changed); browser.removeEventListener('focus', changed); browser.removeEventListener('beforeinstallprompt', beforeInstall); browser.removeEventListener('appinstalled', installed);for(const [reg,found]of watched)reg.removeEventListener('updatefound',found);for (const [worker,change] of workers) worker.removeEventListener('statechange',change); } };
+}
+
+/** Once per app boot. A cached offline start must not require a network update. */
+export async function initializeDesktopOffline(port:DesktopOfflinePort,online=true){
+  await port.recheck();const state=port.read();
+  if(state.phase==='unprepared'||state.phase==='error'&&online)await port.prepare();
 }

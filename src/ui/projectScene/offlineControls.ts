@@ -17,7 +17,7 @@ export function createOfflineControls(document: Document, port: DesktopOfflinePo
   const stopHelp = mountContextHelp(document, root);
   const status = document.createElement('p'); status.className = 'lv-operation-status'; status.setAttribute('role', 'status');
   const prepare = document.createElement('button'); prepare.type = 'button';
-  const details = document.createElement('details'), summary = document.createElement('summary'); summary.textContent = 'オフラインの設定';
+  const details = document.createElement('details'), summary = document.createElement('summary'); summary.textContent = 'アプリの更新・修復';
   const help = document.createElement('p'); help.textContent = 'アプリの準備はプロジェクトのバックアップではありません。ファイル保存で別に残してください。';
   const usageHelp = contextHelp(document, '通信できる間に準備すると、同じアドレス・ブラウザのプロファイルでオフライン起動できます。', [prepare]);
   const check = document.createElement('button'); check.type = 'button'; check.textContent = '準備状態を確認';
@@ -28,7 +28,7 @@ export function createOfflineControls(document: Document, port: DesktopOfflinePo
   const accept = document.createElement('button'); accept.type = 'button'; accept.textContent = '準備を解除';
   const cancel = document.createElement('button'); cancel.type = 'button'; cancel.textContent = '解除を取り消す';
   const body=document.createElement('div');
-  confirm.append(consequence, accept, cancel);body.append(help, check, install, remove, confirm);details.append(summary,body);root.append(status, prepare, details, usageHelp);
+  confirm.append(consequence, accept, cancel);body.append(help, check, install, remove, confirm);details.append(summary,body);body.insertBefore(prepare,body.children[0]??null);root.append(status, details, usageHelp);
   details.addEventListener('keydown',event=>{if(event.key==='Escape'&&details.open&&!event.isComposing&&!event.defaultPrevented){event.preventDefault();event.stopPropagation();details.open=false;summary.focus();}});
   const dismiss=(event:Event)=>{if(details.open&&event.target&&!details.contains(event.target as Node))details.open=false;};
   document.addEventListener('pointerdown',dismiss);document.addEventListener('focusin',dismiss);
@@ -36,8 +36,8 @@ export function createOfflineControls(document: Document, port: DesktopOfflinePo
   const render = () => {
     if (disposed) return;
     const state = port.read(), pending = operating || state.phase === 'preparing' || state.phase === 'checking';
-    status.textContent = state.phase === 'unprepared' ? 'オフライン未準備' : state.message; status.dataset.busy = String(pending);
-    prepare.textContent = state.registered ? state.phase==='error'?'準備をやり直す':'アプリの更新を確認' : 'オフラインで使う準備';
+    status.textContent = state.message; status.dataset.busy = String(pending);status.hidden=!['error','blocked','update','reopen','removed'].includes(state.phase)&&!operating;
+    prepare.textContent = state.phase==='error'?'再試行':'更新を確認';
     prepare.hidden = state.phase === 'blocked' || state.phase === 'update' || state.phase === 'reopen';
     prepare.disabled = check.disabled = remove.disabled = accept.disabled = pending;
     remove.hidden = !state.registered || !confirm.hidden; install.hidden = !port.installAvailable(); install.disabled = pending;

@@ -107,7 +107,7 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
   const projectionArea=make('section');projectionArea.className='lv-camera-projection';projectionLabel.append(projection);projectionArea.append(projectionLabel);cameraGizmo.root.append(projectionArea);
   projection.addEventListener('change', () => { if (!projection.disabled) cameraAction(() => camera({ kind: 'projection', projection: projection.value === 'orthographic' ? 'orthographic' : 'perspective' })); });
   for (const saved of view.views) cameraButton(String(saved.name), () => { if (!runtime?.recall) throw Error('視点を呼び出せません。'); runtime.recall(view.capture(String(saved.id))); });
-  views.hidden=view.views.length===0;sidebar.append(views, windows.tools);
+  views.hidden=view.views.length===0;sidebar.append(views);
   function paint() {
     if (disposed) return; const observation = runtime?.read(), ready = !!observation?.ready && observation.display === display;
     const cameraReady=!!(observation?.cameraReady??observation?.ready)&&observation?.display===display;

@@ -265,3 +265,19 @@
 .lv-record-sheet select, .lv-record-sheet input { max-width: 100%; }
 .lv-record-sheet > :first-child { margin-top: 0; }
 .lv-camera-sheet-header { display: flex; flex: 0 0 auto; align-items: center; justify-content: space-between; gap: 8px; padding-bottom: 8px; border-bottom: 1px solid #dddcd3; }
+
+.lv-caption-window[data-active="true"] { border-color: #4f6351; box-shadow: 0 2px 10px #263b3544; }
+
+.lv-camera-projection > label { font-size: 0; line-height: 0; gap: 0; }
+.lv-camera-projection select { font-size: 12px; line-height: normal; }
+
+.lv-caption-add { font-size: 0 !important; min-width: 44px; }
+.lv-caption-add::before { content: '+'; font-size: 26px; line-height: 1; }
+.lv-caption-row { display:grid;grid-template-columns: minmax(0,1fr) repeat(3,auto); }
+.lv-caption-row > button:not(.lv-caption-select) { padding-inline: 6px; }
+.lv-caption-reading [aria-label="削除の確認"]:not([hidden]) { position:fixed;z-index:30;right:12px;bottom:12px;width:min(380px,calc(100vw - 24px));max-height:70dvh;overflow:auto;box-sizing:border-box;padding:16px;background:#fbfaf6;border:1px solid #aaa99f;border-radius:8px;box-shadow:0 8px 24px #25282033; }
+
+.lv-caption-add-settings > summary {font-size:0;min-width:32px;text-align:center;}
+.lv-caption-add-settings > summary::after {content:"▾";font-size:14px;}
+.lv-caption-add-settings .lv-record-sheet > label {display:flex;align-items:center;gap:10px;}
+.lv-caption-window[data-active="true"] > header {background:var(--lv-selected,#dfe6da);}

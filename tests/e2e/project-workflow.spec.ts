@@ -1,3 +1,4 @@
+import {beginMaterialEditing} from './workspaceUi';
 import { revealCoordinateAdd, lookAlongFront, revealCaptionList } from './workspaceUi';
 import { test, expect, chromium, type BrowserContext, type Page } from '@playwright/test';
 import { createHash } from 'node:crypto';
@@ -189,12 +190,12 @@ test('GLBと画像の編集を保存し、ブラウザ再起動と別端末相�
     await measure('切り抜きの描画とピン配置の一致', async () => {
       await page.getByRole('tab', { name: '材質', exact: true }).click();
       const panel = page.getByRole('tabpanel', { name: '材質', exact: true }); await expect(panel).toBeVisible();
-      const model = panel.getByLabel('モデル', { exact: true }), surface = panel.getByLabel('面', { exact: true });
+      const model = panel.getByLabel('モデル', { exact: true }), surface = panel.getByLabel('マテリアル', { exact: true });
       const modelIds = await model.locator('option').evaluateAll(nodes => nodes.map(n => (n as HTMLOptionElement).value).filter(Boolean));
       expect(modelIds).toHaveLength(1); await model.selectOption(modelIds[0]!);
       const slots = await surface.locator('option').evaluateAll(nodes => nodes.map(n => (n as HTMLOptionElement).value).filter(Boolean));
       expect(slots).toHaveLength(1); await surface.selectOption(slots[0]!);
-      await panel.getByRole('button', { name: '設定を編集', exact: true }).click();
+      await beginMaterialEditing(panel);
       await panel.getByLabel('透過の表示方法', { exact: true }).selectOption('mask');
       await panel.getByLabel('切り抜きのしきい値', { exact: true }).fill('0.4');
       await panel.getByLabel('透過の表示方法', { exact: true }).selectOption('inherit');
@@ -221,7 +222,7 @@ test('GLBと画像の編集を保存し、ブラウザ再起動と別端末相�
       await expect(pinArea.getByRole('button', { name: '位置を確定', exact: true })).toBeHidden();
       await pinArea.getByRole('button', { name: '取り消す', exact: true }).click();
       await page.getByRole('tab', { name: '材質', exact: true }).click();
-      await panel.getByRole('button', { name: '設定を編集', exact: true }).click();
+      await beginMaterialEditing(panel);
       await panel.getByLabel('切り抜きのしきい値', { exact: true }).fill('0');
       await panel.getByRole('button', { name: '変更を適用', exact: true }).click();
       await expect(page.getByText('材質の設定を適用しました。', { exact: true })).toBeVisible();

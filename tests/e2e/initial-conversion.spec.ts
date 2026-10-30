@@ -1,3 +1,4 @@
+import {beginMaterialEditing} from './workspaceUi';
 import { test, expect, chromium, type BrowserContext, type Page } from '@playwright/test';
 import { createHash } from 'node:crypto';
 import { mkdir, mkdtemp, readFile, readdir } from 'node:fs/promises';
@@ -116,10 +117,10 @@ for (const lane of lanes) test(`${lane.kind}ファイルを内容確認して変
     if(lane.kind==='Native') await step('変換した面の材質を編集し、別ブラウザへ渡して変更を受け取る',async()=>{
       const chooseMaterial=async(p:Page)=>{
         await p.getByRole('tab',{name:'材質',exact:true}).click();const controls=p.getByRole('region',{name:'材質',exact:true});
-        await controls.getByLabel('モデル',{exact:true}).selectOption({label:'建物'});await controls.getByLabel('面',{exact:true}).selectOption({index:1});return controls;
+        await controls.getByLabel('モデル',{exact:true}).selectOption({label:'建物'});await controls.getByLabel('マテリアル',{exact:true}).selectOption({index:1});return controls;
       };
       const editMaterial=async(p:Page,field:string,value:string)=>{
-        const controls=await chooseMaterial(p);await controls.getByRole('button',{name:'設定を編集',exact:true}).click();
+        const controls=await chooseMaterial(p);await beginMaterialEditing(controls);
         await controls.getByLabel(field,{exact:true}).selectOption(value);await controls.getByRole('button',{name:'変更を適用',exact:true}).click();
         await expect(controls.getByRole('button',{name:'設定を編集',exact:true})).toBeVisible();await expect(controls.getByLabel(field,{exact:true})).toHaveValue(value);
       };

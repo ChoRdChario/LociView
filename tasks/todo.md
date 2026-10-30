@@ -58,6 +58,29 @@ documentation checkpoint.
 
 ## Current boundary —record-first editing and direct camera navigation
 
+Latest PO steering (after this checkpoint): simplify further before the older
+model/recovery follow-up. Collect the entire correction group before source edits:
+remove the generic record-organization entrance; add list-top creation and row edit/
+delete actions with existing draft, confirmation, membership and virtualization
+fences. Remove the visible projection label, retaining its accessible name. Make
+camera recording serve each Scene's initial view without a general recorded-view
+picker; preserve existing view data and clarify initial-view update ownership.
+Clarify material target naming and make supported editing discoverable. Explain/
+remove the comparison-window manager entirely (latest explicit PO instruction),
+retaining normal stacking and active-window behavior, and expose file import/export intent.
+PO approved initial automatic app-only preparation with one online/offline product path. Accepted09§9.1 records same-origin/profile preservation, cached cold startup, one boot attempt, foreign-worker refusal and same-page removal suppression; no forced activation/reload or OS install. Implementation now removes comparison manager, activates windows by pointer/focus, places creation and row edit/delete in the list, retains membership/tags as secondary operations, records Scene entry atomically with old views retained, exposes direct material edits and clear File intents. Plus is primary, with color/coordinates in a secondary disclosure. Existing source/history and Session/write/readback/IME/virtual-row boundaries remain.
+
+Verification complete for this bounded PC workflow:
+- Required serial checkpoint PASS: typecheck,140 root files/3122PASS/21existingTODO (unexecuted), normal/harness/validation/Desktop/offline builds and offline isolation (14 exact SRI resources). Source and root-unit tree remain unchanged after this run.
+- HEIC isolation PASS for all five artifacts. Independent read-only reviews have no outstanding P1/P2.
+- Four connected Chromium flows PASS: records/camera/material/save, view/edit/IME, automatic cold-offline/removal, keyboard drafts/independent file. Final-build cold/removal PASS; final record flow (including deletion focus/geometry, compact rows, material apply, file inspection and cold reopen) PASS. The4191 HTML and its main assets match the final offline candidate;4182 is untouched.
+- First full root failures were3 obsolete UI references (removed manager, moved search scope, old material label); all were adapted without losing geometry/IME/owner/token/history/readiness checks and pass. Failure log/freeze remain in .artifacts/e2e/direct-ui-cleanup/checkpoint-before-selector-adaptation.*.
+- Final record export exceeded the generic15s Playwright input wait while still generating. Measured equivalent flow completed all data assertions: after-delete output14.1s, backup.total12.80s (generate9.64s, overview3.16s). This is known latency, not an improvement or performance guarantee. Only the download wait now uses the existing90s file-action diagnostic budget; other15s/overall240s deadlines and all data assertions remain. The changed E2E spec is outside Vitest's .test.ts selection; typecheck and that browser case were rerun, without rerunning unchanged root units/builds. Preserve final-browser failure, diagnostic-result and last-result under .artifacts/e2e/direct-ui-cleanup.
+
+Next priority: improve the measured user-facing file-output wait without weakening validation/recovery fences. Continue the remaining model/media/teamwork/recovery action audit at the same simple, intent-based UI standard. The old09 multi-build fault lane was not rerun and still needs its manual-preparation helper adapted to automatic startup before qualification; current cold evidence does not pass that full lane, physical-device/HTTPS, aggregate adoption or release gates. Keep10k-Caption qualification deferred.
+
+No PO testing dependency or new dependency/release authority.
+
 Verified development checkpoint2026-10-31; Git owns its commit identity. PO's
 actual-use directions cover unclear controls, persistent list/detail, list-owned
 pin work, 描画 completion and direct camera navigation. They supersede old layout

@@ -731,7 +731,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       expect((await BackupArchive.inspect(backup,metadata)).source.originalChanges()).toEqual(edited.originalChanges());
       handoff=await host!.workspaceOutput.download(await host!.workspaceOutput.generate(edited.token));
       expect((await WorkspaceArchive.inspect(handoff,metadata)).source.originalChanges()).toEqual(edited.originalChanges());
-      all(root).find(n=>n.tag==='button'&&n.textContent==='別のプロジェクトを開く')!.fire('click');await vi.waitFor(()=>expect(ui.selected).toBeNull());
+      all(all(root).find(n=>n.className==='lv-project-workspace')!).find(n=>n.tag==='button'&&n.textContent==='ファイルを開く')!.fire('click');await vi.waitFor(()=>expect(ui.selected).toBeNull());
     }
     await ui.dispose(); const cold = owned(await openValidationHost({ ...options, run, openStorage: create => openStorage(run, create) }));
     expect(cold.read().source!.originalChanges()).toEqual((edited??source).originalChanges()); expect(await cold.content.image(media as unknown as JsonObject, true)).toEqual(photo);
@@ -2549,7 +2549,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const h = f.mount(); await h.idle(); const editor = h.editor();
     expect(h.named('プロジェクト名',editor).textContent).toBe('調査A'); expect(h.all(editor).some(n => n.textContent === '最後のプロジェクトを再開しました：調査A')).toBe(true);
     expect(f.host().read().source!.originalChanges()).toEqual(a.source.originalChanges()); expect(f.remember).toHaveBeenLastCalledWith({ run: a.run, mode: 'edit' });
-    h.named('キャプション一覧',editor).children[0]!.children[0]!.fire('click'); const body = h.named('本文',editor), change = h.button('別のプロジェクトを開く',editor);
+    h.named('キャプション一覧',editor).children[0]!.children[0]!.fire('click'); const body = h.named('本文',editor), change = h.button('ファイルを開く',editor);
     body.fire('compositionstart'); expect(change.disabled).toBe(true); change.fire('click'); expect(h.ui.selected).toBe(a.run); body.fire('compositionend');
     body.value = '確定前の入力'; body.fire('input'); expect(change.disabled).toBe(true); change.fire('click'); expect(h.ui.selected).toBe(a.run);
     const fileInput = h.named('ファイルを選択'), file = new File([new Uint8Array([1])],'unread.bin'), read = vi.spyOn(file,'arrayBuffer'); Object.assign(fileInput,{files:[file]});
@@ -2628,11 +2628,11 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const f = resumeWorkspaceFixture(), a=await f.seed('閲覧と編集'); f.reference({run:a.run,mode:'edit'});
     let release!:()=>void; const held=new Promise<void>(resolve=>{release=resolve;}), entered=vi.fn();
     const h=f.mount(undefined,{open:async(...args)=>{if(args[2]==='view'){entered();await held;}return f.ports.open(...args);}}); caseDisposals.push(release); await h.idle();
-    f.remember.mockClear(); const mode=h.button('閲覧する'), change=h.button('別のプロジェクトを開く',h.editor());
+    f.remember.mockClear(); const mode=h.button('閲覧する'), change=h.button('ファイルを開く',h.editor());
     let disabled=mode.disabled; let finished!:()=>void; const completion=new Promise<void>(resolve=>{finished=resolve;});
     Object.defineProperty(mode,'disabled',{get:()=>disabled,set(value:boolean){const previous=disabled;disabled=value;if(previous&&!value)finished();}});
     mode.fire('click'); expect(entered).toHaveBeenCalledOnce(); expect(mode.textContent).toBe('切替中…'); expect(mode.getAttribute('aria-busy')).toBe('true'); expect(mode.disabled).toBe(true);
-    expect((h.editor() as unknown as HTMLElement).inert).toBe(true); change.fire('click'); h.button('別のプロジェクトを開く').fire('click'); await h.idle();
+    expect((h.editor() as unknown as HTMLElement).inert).toBe(true); change.fire('click'); h.button('ファイルを開く',h.editor()).fire('click'); await h.idle();
     expect(h.ui.selected).toBe(a.run); expect(f.remember).not.toHaveBeenCalled(); release(); await completion;
     expect(f.remember).toHaveBeenLastCalledWith({run:a.run,mode:'view'}); expect(f.host().authority.readOnly).toBe(true); expect(mode.textContent).toBe('編集する'); expect(mode.getAttribute('aria-busy')).toBe('false');
     expect(f.host().read().source!.originalChanges()).toEqual(a.source.originalChanges()); await h.ui.dispose();
@@ -4302,7 +4302,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       h.setIssue('最初の表示エラー');h.refresh();h.setIssue('最新の表示エラー');h.refresh();expect(frames.size).toBe(1);flush();expect(h.all(h.editor).find(n=>n.className==='lv-project-viewport-status')!.textContent).toContain('最新の表示エラー');
       h.setIssue('');h.refresh();const cancelled=[...frames.values()][0]!;const count=rebuild.mock.calls.length;h.button('モデル',h.editor).fire('click');expect(frames.size).toBe(0);expect(rebuild).toHaveBeenCalledTimes(count+1);cancelled(0);expect(rebuild).toHaveBeenCalledTimes(count+1);
       h.button('キャプション',h.editor).fire('click');expect(h.button('ピンを追加',h.editor).disabled).toBe(false);h.dragging(true);expect(frames.size).toBe(1);h.button('ピンを追加',h.editor).fire('click');expect(h.pick).not.toHaveBeenCalled();expect(h.dispatch).not.toHaveBeenCalled();expect(frames.size).toBe(0);h.dragging(false);flush();
-      h.named('カメラ位置',h.editor).open=true;h.named('カメラ位置',h.editor).fire('toggle');const author=h.named('視点の作成と管理',h.editor);h.moveCamera();h.refresh();h.button('視点を記録',author).fire('click');flush();h.button('視点を記録',author).fire('click');const name=h.named('視点の名称',author);name.value='最新の表示';name.fire('input');const captured=h.payload();await h.edited(()=>h.button('視点を追加',h.named('視点の終了操作',h.editor)).fire('click'));const command=h.dispatch.mock.calls.map(c=>c[1]).find(c=>c.kind==='createView')!;expect(command).toMatchObject({kind:'createView',camera:captured.camera,background:captured.background});
+      h.named('カメラ位置',h.editor).open=true;h.named('カメラ位置',h.editor).fire('toggle');const views=h.named('視点の作業',h.editor);h.moveCamera();h.refresh();const captured=h.payload();await h.edited(()=>h.button('開始視点を記録',views).fire('click'));flush();const command=h.dispatch.mock.calls.map(c=>c[1]).find(c=>c.kind==='createView')!;expect(command).toMatchObject({kind:'createView',makeEntry:true,camera:captured.camera,background:captured.background});
       h.refresh();const late=[...frames.values()][0]!;await h.ui.dispose();expect(frames.size).toBe(0);const stopped=rebuild.mock.calls.length;late(0);h.refresh();expect(rebuild).toHaveBeenCalledTimes(stopped);expect(frames.size).toBe(0);
     }finally{await h.ui.dispose();vi.unstubAllGlobals();}
   });
@@ -4425,7 +4425,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     };
     await checkDisplay(host.authority.read(),host.content,false);
     button('描画',editor).fire('click');const panel=named('描画の作業',editor),model=named('モデル',panel);model.value=version.assetId;model.fire('change');
-    const face=named('面',panel);face.value=face.children.find(n=>n.textContent==='材質 1')!.value;face.fire('change');expect(h.all(panel).some(n=>n.textContent.includes('滑らかな透過表示'))).toBe(true);
+    const face=named('マテリアル',panel);face.value=face.children.find(n=>n.textContent==='材質 1')!.value;face.fire('change');expect(h.all(panel).some(n=>n.textContent.includes('滑らかな透過表示'))).toBe(true);
     button('設定を編集',panel).fire('click');named('透過の表示方法',panel).value='smoothBlend';named('透過の表示方法',panel).fire('change');await edited(()=>button('変更を適用',panel).fire('click'));
     const mask=async()=>{button('設定を編集',panel).fire('click');named('透過の表示方法',panel).value='mask';named('透過の表示方法',panel).fire('change');named('切り抜きのしきい値',panel).value='0.2';named('切り抜きのしきい値',panel).fire('input');named('不透明度（%）',panel).value='40';named('不透明度（%）',panel).fire('input');await edited(()=>button('変更を適用',panel).fire('click'));};
     await mask();await checkDisplay(host.authority.read(),host.content,true);
@@ -4488,7 +4488,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       if(material==='opaque'){expect(materials(original.mesh).some(m=>m instanceof THREE.MeshBasicMaterial)).toBe(true);expect(materials(original.mesh).some(m=>m instanceof THREE.MeshStandardMaterial&&m.side===THREE.DoubleSide)).toBe(true);}else expect(materials(original.mesh).every(m=>m instanceof THREE.MeshStandardMaterial&&m.side===THREE.FrontSide)).toBe(true);
       changed.dispose!();original.dispose!();residents.dispose();
       button('描画',editor).fire('click');const panel=named('描画の作業',editor), target=named('モデル',panel);target.value=model.assetId;target.fire('change');
-      const face=named('面',panel);face.value=face.children.find(n=>n.textContent==='材質 1')!.value;face.fire('change');button('設定を編集',panel).fire('click');
+      const face=named('マテリアル',panel);face.value=face.children.find(n=>n.textContent==='材質 1')!.value;face.fire('change');button('設定を編集',panel).fire('click');
       named('照明',panel).value='lit';named('照明',panel).fire('change');named('表示する面',panel).value='front';named('表示する面',panel).fire('change');await edited(()=>button('変更を適用',panel).fire('click'));
       checkMaterials(host.authority.read());button('観察',named('シーン',editor)).fire('click');expect(effects()[slot.target.logicalMaterialSlotId]).toMatchObject({appearance:{lighting:'inherit',doubleSided:false}});
       button('全体',named('シーン',editor)).fire('click');button('キャプション',editor).fire('click');
@@ -4593,7 +4593,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
         if(variant==='opaque'){expect(meshes(plain.mesh).some(n=>n.material instanceof THREE.MeshBasicMaterial)).toBe(true);expect(meshes(plain.mesh).some(n=>n.material instanceof THREE.MeshStandardMaterial&&n.material.side===THREE.DoubleSide)).toBe(true);}else expect(meshes(plain.mesh).every(n=>n.material instanceof THREE.MeshStandardMaterial&&n.material.side===THREE.FrontSide)).toBe(true);
       }finally{surface.dispose!();plain.dispose!();residents.dispose();}
       button('描画',editor).fire('click');const panel=named('描画の作業',editor),model=named('モデル',panel);model.value=c.binding.assetId;model.fire('change');
-      const face=named('面',panel);face.value=face.children.find(n=>n.textContent==='材質 1')!.value;face.fire('change');button('設定を編集',panel).fire('click');
+      const face=named('マテリアル',panel);face.value=face.children.find(n=>n.textContent==='材質 1')!.value;face.fire('change');button('設定を編集',panel).fire('click');
       expect(named('照明',panel).value).toBe('unlit');expect(named('表示する面',panel).value).toBe('double');
       named('照明',panel).value='lit';named('照明',panel).fire('change');named('表示する面',panel).value='front';named('表示する面',panel).fire('change');
       await edited(()=>button('変更を適用',panel).fire('click'));checkMaterials(host.authority.read());button('キャプション',editor).fire('click');
@@ -4690,8 +4690,8 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect(new Set([...changed, ...originals]).size).toBe(4); surface.dispose!(); plain.dispose!(); residents.dispose();
 
     button('描画', editor).fire('click'); const panel = named('描画の作業', editor), target = named('モデル', panel);
-    target.value = model.assetId; target.fire('change'); const face = named('面', panel);
-    face.value = face.children.find(n => n.textContent === '面の材質 1')!.value; face.fire('change');
+    target.value = model.assetId; target.fire('change'); const face = named('マテリアル', panel);
+    face.value = face.children.find(n => n.textContent === 'マテリアル 1')!.value; face.fire('change');
     button('設定を編集', panel).fire('click'); expect(named('照明', panel).value).toBe('unlit'); expect(named('表示する面', panel).value).toBe('double');
     named('照明', panel).value = 'lit'; named('照明', panel).fire('change');
     named('表示する面', panel).value = 'front'; named('表示する面', panel).fire('change'); await edited(() => button('変更を適用', panel).fire('click'));
@@ -5190,7 +5190,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect(cards()).toHaveLength(2); expect(body.value).toBe('未適用の本文');
     const handle = named('大きさを変更', a), initial = { ...a.style }, drag = { button: 0, pointerId: 3, clientX: 100, clientY: 100, preventDefault() {} };
     handle.fire('pointerdown', drag); handle.fire('pointermove', { ...drag, clientX: 190 }); handle.fire('pointerup', drag);
-    button('ウィンドウを並べる', editor).fire('click'); expect(a.style).toEqual(initial); expect(handle.disabled).toBe(true);
+    expect(all(editor).some(n=>n.tag==='button'&&n.textContent==='ウィンドウを並べる')).toBe(false);a.fire('pointerdown',drag);expect(body.value).toBe('未適用の本文');expect(title.value).toBe('比較する記録');expect(host.read().source!.token).toBe(source.token);const{zIndex:oldDepth,...initialGeometry}=initial,{zIndex:newDepth,...geometry}=a.style;expect(geometry).toEqual(initialGeometry);expect(Number(newDepth)).toBeGreaterThan(Number(oldDepth));expect(a.dataset.active).toBe('true');expect(handle.disabled).toBe(true);
     expect(button('ファイルに保存', named('ファイル')).disabled).toBe(true); body.fire('compositionend');
     expect(all(a).some(n => n.textContent === '未適用の本文')).toBe(false);
     button('取り消す', h.captionTextActions()).fire('click'); button('変更を取り消す', detail).fire('click'); expect(body.value).toBe('');
@@ -5363,7 +5363,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const h = await productWorkspaceFixture(true,false,false,'map2'), {host,button,named,editor,edited,failed} = h;
     button('描画',editor).fire('click'); const panel = named('描画の作業',editor);
     const model = named('モデル',panel); model.value = host.authority.read().modelVersions![0]!.assetId; model.fire('change');
-    const surface = named('面',panel); surface.value = surface.children.find(n => n.value !== '')!.value; surface.fire('change');
+    const surface = named('マテリアル',panel); surface.value = surface.children.find(n => n.value !== '')!.value; surface.fire('change');
     const set = (label:string,value:string,event='input') => { const n = named(label,panel); n.value=value; n.fire(event); };
     set('適用範囲','project','change'); button('設定を編集',panel).fire('click');
     set('透過の表示方法','mask','change'); set('切り抜きのしきい値','0'); set('不透明度（%）','0');
@@ -5400,7 +5400,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect(cold.authority.read().materialData!.records[made.overrideId]!.intent).toMatchObject({kind:'value',value:{appearance:made.appearance,compositing:made.compositing}});
     await cold.dispose(); expect(h.legacy).not.toHaveBeenCalled();
   });
-  it('shows exact Saved View move refusal before dispatch and still moves one representable tied item (injected viewport)', async () => {
+  it('preserves tied original Saved Views while recording and updating the Scene entry from the product (injected viewport)', async () => {
     const prepared = structuredClone(await prepareValidationProject({ run: newId(), title: '視点の順序', models: [{ label: 'モデル', bytes: glb() }] }, budget, decode));
     const project = prepared.records.project as JsonObject, sceneId = project.defaultSceneId as string, frameId = (project.frame as JsonObject).id as string;
     const ids = [1, 2, 3].map(n => `view_${n.toString(16).padStart(32, '0')}`);
@@ -5409,49 +5409,46 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       camera: { position: [1, 0, 5], target: [0, 0, 0], up: [0, 1, 0], projection: { kind: 'perspective', verticalFovRadians: 1 } },
       background: { kind: 'solid', colorSrgb: [0.1, 0.2, 0.3] } }; });
     const h = await productWorkspaceFixture(false, false, false, 'map1', prepareValidationCreation(prepared)), { host, button, named, editor } = h;
-    named('カメラ位置',editor).open=true;named('カメラ位置',editor).fire('toggle'); const views = named('視点の作業', editor), author = named('視点の作成と管理', views),
-      chooser = h.all(views).find(n => n.tag === 'select' && n.attributes.get('aria-label') === '記録した視点')!;
-    const select = (viewId: string) => { chooser.value = viewId; chooser.fire('change'); };
-    const before = host.read().source!, records = structuredClone(host.authority.read().viewData!.records);
-    select(ids[0]!); expect(button('後へ', author).disabled).toBe(true); button('後へ', author).fire('click');
-    expect(h.all(author).some(n => n.textContent.includes('後へ移動できません'))).toBe(true);
-    select(ids[2]!); expect(button('前へ', author).disabled).toBe(true); button('前へ', author).fire('click');
-    expect(h.dispatch).not.toHaveBeenCalled(); expect(host.read().source!.originalChanges()).toEqual(before.originalChanges());
-    select(ids[1]!); expect(button('前へ', author).disabled).toBe(false); expect(button('後へ', author).disabled).toBe(false);
-    await h.edited(() => button('前へ', author).fire('click')); expect(h.dispatch).toHaveBeenCalledOnce();
-    expect(h.dispatch.mock.calls[0]![1]).toMatchObject({ kind: 'editView', viewId: ids[1], edits: { orderKey: expect.any(String) } });
-    const after = host.authority.read().viewData!.records; expect(after[ids[0]!]).toEqual(records[ids[0]!]); expect(after[ids[2]!]).toEqual(records[ids[2]!]);
-    const movedOrder = after[ids[1]!]!.orderKey; expect(movedOrder.kind === 'value' && movedOrder.value < 'A').toBe(true);
-    expect(h.camera).not.toHaveBeenCalled(); expect(h.recall).not.toHaveBeenCalled(); expect(h.legacy).not.toHaveBeenCalled(); await h.ui.dispose();
+    named('カメラ位置',editor).open=true;named('カメラ位置',editor).fire('toggle');const views=named('視点の作業',editor);
+    const before=host.read().source!,records=structuredClone(host.authority.read().viewData!.records),captured=h.payload();
+    expect(h.all(views).some(n=>n.attributes.get('aria-label')==='記録した視点')).toBe(false);
+    expect(h.all(views).some(n=>n.tag==='button'&&['前へ','後へ','表示'].includes(n.textContent))).toBe(false);
+    expect(h.dispatch).not.toHaveBeenCalled();expect(host.read().source!.originalChanges()).toEqual(before.originalChanges());
+    await h.edited(()=>button('開始視点を記録',views).fire('click'));expect(h.dispatch).toHaveBeenCalledOnce();
+    const first=h.dispatch.mock.calls[0]![1];if(first.kind!=='createView')throw Error('entry view');
+    expect(first).toMatchObject({kind:'createView',makeEntry:true,sceneId,projectFrameId:frameId,camera:captured.camera,background:captured.background});
+    const entry=()=>{const provider=host.read().provider;if(provider?.kind!=='scene-provider')throw Error('view provider');return provider.state.scenes[sceneId]!.defaultViewId;};
+    expect(entry()).toEqual({kind:'value',value:first.viewId});const storedFirst=structuredClone(host.authority.read().viewData!.records[first.viewId]!);
+    h.moveCamera();h.refresh();const updated=h.payload();await h.edited(()=>button('開始視点を更新',views).fire('click'));
+    const second=h.dispatch.mock.calls.at(-1)![1];if(second.kind!=='createView')throw Error('updated entry');
+    expect(second).toMatchObject({kind:'createView',makeEntry:true,sceneId,camera:updated.camera,background:updated.background});expect(second.viewId).not.toBe(first.viewId);
+    expect(entry()).toEqual({kind:'value',value:second.viewId});const after=host.authority.read().viewData!.records;
+    ids.forEach(id=>expect(after[id]).toEqual(records[id]));expect(after[first.viewId]).toEqual(storedFirst);
+    expect(h.recall).not.toHaveBeenCalled();expect(h.legacy).not.toHaveBeenCalled();await h.ui.dispose();
   });
   it('connects product Saved Views and material scope to exact capture, typed writes and file reopen (injected viewport)', async () => {
     const h = await productWorkspaceFixture(true), { host, button, named, editor, edited, all } = h;
-    named('カメラ位置',editor).open=true;named('カメラ位置',editor).fire('toggle'); const views = named('視点の作業', editor), author = named('視点の作成と管理', views), background = named('3D背景', views);
-    const captured = h.payload(); button('視点を記録', author).fire('click'); const name = named('視点の名称', author); name.value = '正確な視点'; name.fire('input');
-    expect(named('背景色', background).readOnly).toBe(true);
-    await edited(() => button('視点を追加', named('視点の終了操作', views)).fire('click'));
-    const command = h.dispatch.mock.calls.map(c => c[1]).find(c => c.kind === 'createView')!; if (command.kind !== 'createView') throw Error('view');
-    expect(command.camera).toEqual(captured.camera); expect(command.background).toEqual(captured.background);
-    button('視点を記録', author).fire('click'); name.value = '並べ替える視点'; name.fire('input'); await edited(() => button('視点を追加', named('視点の終了操作', views)).fire('click'));
-    const secondView = h.dispatch.mock.calls.map(c => c[1]).filter(c => c.kind === 'createView').at(-1)!; if (secondView.kind !== 'createView') throw Error('second view');
-    const cameraBefore = h.payload(); await edited(() => button('前へ', author).fire('click'));
-    const ordered = host.authority.read().viewData!.records[secondView.viewId]!.orderKey; expect(ordered.kind).toBe('value');
-    expect(h.payload()).toEqual(cameraBefore); expect(h.recall).not.toHaveBeenCalled();
-    const move = h.dispatch.mock.calls.at(-1)![1]; expect(move).toMatchObject({ kind: 'editView', viewId: secondView.viewId, edits: { orderKey: expect.any(String) } });
-    expect(Object.keys((move as Extract<MetadataEdit, { kind: 'editView' }>).edits)).toEqual(['orderKey']);
-    const selectView = all(views).find(n => n.tag === 'select' && n.attributes.get('aria-label') === '記録した視点')!; selectView.value = command.viewId; selectView.fire('change');
-    const entry = named('シーンを開いたときの視点', views); entry.value = command.viewId; entry.fire('change');
-    expect(h.recall).not.toHaveBeenCalled(); await edited(() => button('設定を適用', views).fire('click')); expect(h.recall).not.toHaveBeenCalled();
-    const color = named('背景色', background); color.value = '#123456'; color.fire('input'); button('背景に適用', named('背景の終了操作', views)).fire('click'); expect(h.background).toHaveBeenCalledTimes(1);
-    const token = host.read().source!.token; button('表示', views).fire('click'); expect(h.recall).toHaveBeenCalledTimes(1); expect(h.payload()).toEqual(captured); expect(host.read().source!.token).toBe(token);
+    named('カメラ位置',editor).open=true;named('カメラ位置',editor).fire('toggle');const views=named('視点の作業',editor),background=named('3D背景',views);
+    const originals=structuredClone(host.authority.read().viewData!.records),captured=h.payload();await edited(()=>button('開始視点を記録',views).fire('click'));
+    const command=h.dispatch.mock.calls.map(c=>c[1]).find(c=>c.kind==='createView')!;if(command.kind!=='createView')throw Error('view');
+    expect(command).toMatchObject({makeEntry:true,camera:captured.camera,background:captured.background});const firstStored=structuredClone(host.authority.read().viewData!.records[command.viewId]!);
+    const color=named('背景色',background);color.value='#123456';color.fire('input');expect(button('開始視点を更新',views).disabled).toBe(true);expect(button('ファイルに保存',named('ファイル')).disabled).toBe(true);
+    const token=host.read().source!.token;button('開始視点を更新',views).fire('click');expect(host.read().source!.token).toBe(token);
+    button('背景に適用',named('背景の終了操作',views)).fire('click');expect(h.background).toHaveBeenCalledTimes(1);expect(host.read().source!.token).toBe(token);
+    h.moveCamera();h.refresh();const updated=h.payload();await edited(()=>button('開始視点を更新',views).fire('click'));
+    const secondView=h.dispatch.mock.calls.map(c=>c[1]).filter(c=>c.kind==='createView').at(-1)!;if(secondView.kind!=='createView')throw Error('second view');
+    expect(secondView).toMatchObject({makeEntry:true,camera:updated.camera,background:updated.background});expect(secondView.viewId).not.toBe(command.viewId);const secondStored=structuredClone(host.authority.read().viewData!.records[secondView.viewId]!);
+    const entry=host.read().provider;if(entry?.kind!=='scene-provider')throw Error('entry');expect(entry.state.scenes[command.sceneId]!.defaultViewId).toEqual({kind:'value',value:secondView.viewId});
+    Object.entries(originals).forEach(([id,value])=>expect(host.authority.read().viewData!.records[id]).toEqual(value));expect(host.authority.read().viewData!.records[command.viewId]).toEqual(firstStored);
+    expect(h.payload()).toEqual(updated);expect(h.recall).not.toHaveBeenCalled();expect(all(views).some(n=>n.attributes.get('aria-label')==='記録した視点')).toBe(false);
     button('描画', editor).fire('click'); const materials = named('描画の作業', editor);
     const model = named('モデル', materials); model.value = host.authority.read().modelVersions![0]!.assetId; model.fire('change');
-    const surface = named('面', materials); surface.value = surface.children.find(n => n.value !== '')!.value; surface.fire('change');
-    button('設定を編集', materials).fire('click'); const lighting = named('照明', materials); lighting.value = 'unlit'; lighting.fire('change');
+    const surface = named('マテリアル', materials); surface.value = surface.children.find(n => n.value !== '')!.value; surface.fire('change');
+    const lighting = named('照明', materials); lighting.value = 'unlit'; lighting.fire('change');
     expect(button('ファイルに保存', named('ファイル')).disabled).toBe(true); await edited(() => button('変更を適用', materials).fire('click'));
     const material = h.dispatch.mock.calls.map(c => c[1]).find(c => c.kind === 'createMaterial')!; if (material.kind !== 'createMaterial') throw Error('material');
     expect(material.routing.scope).toEqual({ kind: 'scene', sceneId: command.sceneId }); expect(material.appearance.lighting).toBe('unlit');
-    const scope = named('適用範囲', materials); scope.value = 'project'; scope.fire('change'); button('設定を編集', materials).fire('click');
+    const scope = named('適用範囲', materials); scope.value = 'project'; scope.fire('change');
     named('照明', materials).value = 'lit'; named('照明', materials).fire('change'); await edited(() => button('変更を適用', materials).fire('click'));
     expect(h.dispatch.mock.calls.some(c => c[1].kind === 'createMaterial' && (c[1].routing.scope as JsonObject).kind === 'project')).toBe(true);
     const target = material.routing.target as JsonObject, effects = h.display()!.savedMaterials![target.assetId as string]!;
@@ -5463,7 +5460,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     await h.ui.dispose(); const peer = firstWorkspaceRecipient(); await peer.receiver.importWorkspace(blob);
     const reopened = (await peer.session.read()).source!; expect(reopened.originalChanges()).toEqual(source.originalChanges());
     const cold = await openValidationHost(h.f.options); expect(cold.read().source!.originalChanges()).toEqual(source.originalChanges());
-    expect(cold.authority.read().viewData!.records[secondView.viewId]!.orderKey).toEqual(ordered); await cold.dispose();
+    expect(cold.authority.read().viewData!.records[secondView.viewId]).toEqual(secondStored);expect(cold.authority.read().viewData!.records[command.viewId]).toEqual(firstStored);const coldViews=cold.read().provider;if(coldViews?.kind!=='scene-provider')throw Error('cold views');expect(coldViews.state.scenes[command.sceneId]!.defaultViewId).toEqual({kind:'value',value:secondView.viewId}); await cold.dispose();
     expect(all(editor).length).toBeGreaterThan(0);
   });
   it('keeps every material owner conflict and exact View candidates in the product read adapter', async () => {
@@ -5656,12 +5653,12 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const h=await productWorkspaceFixture(true,false,true,'map2'),{host,named,button,editor}=h,token=host.read().source!.token;
     const name=named('タグ名',editor),color=named('タグの色',editor),output=named('ファイル');
     for(const node of[name,color]){node.fire('focus');node.fire('blur');}h.refresh();
-    expect(h.ui.hasChanges()).toBe(false);expect(button('別のプロジェクトを開く',editor).disabled).toBe(false);expect(button('保存',output).disabled).toBe(false);expect(h.dispatch).not.toHaveBeenCalled();
+    expect(h.ui.hasChanges()).toBe(false);expect(button('ファイルを開く',editor).disabled).toBe(false);expect(button('保存',output).disabled).toBe(false);expect(h.dispatch).not.toHaveBeenCalled();
     name.fire('compositionstart');name.value='入力中';name.fire('input');expect(h.ui.hasChanges()).toBe(true);
     expect(button('タグを追加',editor).disabled).toBe(true);expect(button('タグの入力を取り消す',editor).disabled).toBe(true);expect(button('保存',output).disabled).toBe(true);
     name.fire('compositionend');expect(button('タグを追加',editor).disabled).toBe(false);
-    const tagOwner=named('タグの管理',editor),organizer=tagOwner.parent!.parent!;organizer.open=false;button('モデル',editor).fire('click');button('編集に戻る',editor).fire('click');
-    expect(tagOwner.open).toBe(true);expect(organizer.open).toBe(true);expect(tagOwner.document.activeElement).toBe(tagOwner);expect(name.value).toBe('入力中');expect(h.dispatch).not.toHaveBeenCalled();expect(host.read().source!.token).toBe(token);
+    const tagOwner=named('タグの管理',editor);tagOwner.open=false;button('モデル',editor).fire('click');button('編集に戻る',editor).fire('click');
+    expect(tagOwner.open).toBe(true);expect(h.all(editor).some(n=>n.tag==='summary'&&n.textContent==='記録を整理')).toBe(false);expect(tagOwner.document.activeElement).toBe(tagOwner);expect(name.value).toBe('入力中');expect(h.dispatch).not.toHaveBeenCalled();expect(host.read().source!.token).toBe(token);
     button('タグの入力を取り消す',editor).fire('click');
     expect(h.ui.hasChanges()).toBe(false);expect(host.read().source!.token).toBe(token);
     button('タグを編集',editor).fire('click');name.value='残すタグの入力';name.fire('input');
@@ -7393,7 +7390,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const button=(text:string)=>all(root).find(n=>n.tag==='button'&&n.textContent===text)!;
     try{
       await vi.waitFor(()=>expect(render).toHaveBeenCalledOnce());
-      const search=all(root).find(n=>n.attributes.get('aria-label')==='検索')!,rows=()=>all(root).filter(n=>n.className==='lv-caption-select');
+      const search=all(all(root).find(n=>n.className==='lv-caption-search')!).find(n=>n.attributes.get('aria-label')==='検索')!,rows=()=>all(root).filter(n=>n.className==='lv-caption-select');
       const initial=rows().length;expect(initial).toBeGreaterThan(0);search.value='見つからない検索語';search.fire('input');expect(rows()).toHaveLength(0);
       search.value='';search.fire('input');rows()[0]!.fire('click');
       expect(button('ピンを追加').disabled).toBe(true);expect(button('保存').disabled).toBe(true);expect(remember).not.toHaveBeenCalled();
@@ -7414,7 +7411,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const ui=createValidationWorkspace(document,{productEditor:true,progressivePresentation:true,fileLimits:budget,decode,selected(){},list:async()=>[],open:async()=>f.host,render},f.options.run);
     const root=record(ui.root),all=(n:RecordedNode):RecordedNode[]=>[n,...n.children.flatMap(all)];
     await ui.ready;expect(all(root).some(n=>n.textContent==='model unavailable')).toBe(true);
-    const search=all(root).find(n=>n.attributes.get('aria-label')==='検索')!;expect(search.disabled).toBe(false);
+    const search=all(all(root).find(n=>n.className==='lv-caption-search')!).find(n=>n.attributes.get('aria-label')==='検索')!;expect(search.disabled).toBe(false);
     all(root).find(n=>n.tag==='button'&&n.textContent==='モデルを再読み込み')!.fire('click');await vi.waitFor(()=>expect(render).toHaveBeenCalledTimes(2));
     await ui.dispose();const dispose=vi.fn(),lateFactory=vi.fn();finish({factory:lateFactory,dispose});await vi.waitFor(()=>expect(dispose).toHaveBeenCalledOnce());expect(lateFactory).not.toHaveBeenCalled();
   },30000);
@@ -7821,7 +7818,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const open = vi.fn(), factory: ViewportFactory = () => ({ update(next) { display = next; }, setActive() {}, camera() {}, retry() {}, dispose() {}, read: () => ({ ready: true, display, token: 'navigation-owner', issue: null, dragging: false, pins: [], projection: 'perspective', axis: null }) });
     const ui = createProductWorkspace(document, mode, factory, undefined, undefined, { presentation: () => preparing ? { busy: true, reason: 'モデルを準備中です。' } : null, projectNavigationBlocked: () => blocked, openProject: open, resumedLastProject: () => false, changed() {} });
     const all = (n: RecordedNode): RecordedNode[] => [n, ...n.children.flatMap(all)], nodes = () => all(record(ui.root));
-    const other = () => nodes().find(n => n.tag === 'button' && n.textContent === '別のプロジェクトを開く')!, search = () => nodes().find(n => n.attributes.get('aria-label') === '検索')!;
+    const other = () => nodes().find(n => n.tag === 'button' && n.textContent === 'ファイルを開く')!, search = () => nodes().find(n => n.attributes.get('aria-label') === '検索')!;
     try {
       expect(other().disabled).toBe(true); expect(search().disabled).toBe(false); other().fire('click'); expect(open).not.toHaveBeenCalled();
       preparing = true; ui.render();

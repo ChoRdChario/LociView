@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { value, type Field } from '../../src/scene/types';
 import { captionColorKey, captionListPlanIsCurrent, captionListView, ownerFilterKey, planCaptionList,
   type CaptionListContext, type CaptionListItem, type CaptionListPlan } from '../../src/ui/projectScene/captionListState';
@@ -22,13 +22,13 @@ function change(context: CaptionListContext, plan: CaptionListPlan): CaptionList
   expect(plan.kind).toBe('change'); if (plan.kind !== 'change') throw Error('not a change');
   expect(captionListPlanIsCurrent(plan, context)).toBe(true); return { ...context, memory: plan.memory };
 }
-function host(initial = fixture(), document = new RecordedDocument()) {
+function host(initial = fixture(), document = new RecordedDocument(),presentation?:Parameters<typeof createCaptionListControls>[3]) {
   const plans: CaptionListPlan[] = []; const compositions: boolean[] = [];
   let context = initial;
   const controls = createCaptionListControls(document.asDocument(), plan => {
     plans.push(plan);
     if (plan.kind === 'change' && captionListPlanIsCurrent(plan, context)) { context = { ...context, memory: plan.memory }; controls.render(context); }
-  }, active => compositions.push(active));
+  }, active => compositions.push(active),presentation);
   controls.render(context);
   const root = record(controls.root), filters = root.children[0]!, search = filters.children[0]!.children[0]!;
   const status = root.children[1]!, reveal = root.children[2]!;
@@ -313,4 +313,11 @@ describe('disconnected Caption list contracts (not browser/render/storage eviden
     h.list.scrollTop = 10; h.list.fire('scroll'); expect(h.context.memory.listScrollTop).toBe(10);
     h.controls.dispose();
   });
+});
+
+it('row edit/delete use the accepted current selection and refuse blocked or unavailable same-id actions',()=>{
+ const invoke=vi.fn(),h=host(fixture(),new RecordedDocument(),{recordActions:{available:()=>true,invoke}});
+ const rows=h.list.children.filter(n=>n.className==='lv-caption-row');const second=rows[1]!,edit=second.children.find(n=>n.textContent==='編集')!;
+ edit.fire('click');expect(h.context.memory.selectedCaptionId).toBe(b);expect(invoke).toHaveBeenLastCalledWith('edit',b,'snapshot-1',scene);invoke.mockClear();h.render({...h.context,pending:'text'});edit.fire('click');expect(invoke).not.toHaveBeenCalled();
+ h.render({...h.context,pending:null,source:{kind:'unavailable',token:'snapshot-2',sceneId:scene,reason:'検査中'}});edit.fire('click');expect(invoke).not.toHaveBeenCalled();h.controls.dispose();
 });

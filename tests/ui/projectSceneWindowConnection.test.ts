@@ -270,3 +270,9 @@ describe('same-host comparison windows; authored DOM only, not raster or native 
     h.layer.dispose(); expect(s.pending).toBeNull();
   });
 });
+
+it('window body pointer/focus activates and raises that window without changing Caption editing selection or Project data',()=>{
+ const h=mountedLayer();h.pick(f.shared);h.pick(f.second);const before=h.session.snapshot,selected=h.session.memory.selectedCaptionId,cards=h.root.children.filter(n=>n.className==='lv-caption-window');expect(cards).toHaveLength(2);
+ cards[0]!.fire('pointerdown');expect(visible(h.session).at(-1)).toBe(f.shared);expect(cards[0]!.dataset.active).toBe('true');expect(h.session.memory.selectedCaptionId).toBe(selected);expect(h.session.snapshot).toBe(before);
+ cards[1]!.fire('focusin');expect(visible(h.session).at(-1)).toBe(f.second);expect(cards[1]!.dataset.active).toBe('true');h.layer.dispose();
+});

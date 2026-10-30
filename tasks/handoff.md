@@ -6,12 +6,7 @@ next action and actual stop conditions; [inventory](implementation-inventory.md)
 owns route-specific coverage. Check actual Git branch/HEAD/worktree and preserve
 existing changes. Do not reconstruct current work from completed checkpoint prose.
 
-PO2026-10-31 actual-use feedback now owns the current boundary: persistent
-Caption list/detail, list-owned pin/reparent/organization actions, symbol-only
-unselected pins, 描画 with visible completion, and camera positions/projection/
-orbit/pan beside3D. Read the first dated revision in the workspace design.
-Todo owns final checks, failures/fixes and remaining work. Earlier audit/prototype
-layouts below are historical context, not a reason to reinstate the Saved View tab.
+PO2026-10-31 latest simplification owns the current boundary: list-top plus and row edit/delete, secondary membership/tags, no comparison-window manager, window-body pointer/focus activation, Scene-only initial camera recording, direct material editing and explicit File intents. Initial app-resource preparation is automatic under09§9.1; connected/offline use shares one origin/profile and Project. Normal ready state is quiet; update/repair/removal retain safe deferred activation and local recovery. Existing history/views remain. Read the first dated workspace-design revision and todo for actual checks/remaining work. Earlier layouts below do not reinstate the saved-view picker, generic organizer or manual offline startup split.
 
 PO2026-10-30 corrects the UI work order: finish the whole-screen/connected-flow
 issue list and repair groups before individual fixes. Read todo's current boundary.

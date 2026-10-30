@@ -90,7 +90,7 @@ const setInput = (n: RecordedNode, text: string) => { n.value = text; n.fire(n.t
 function materialHost(s: SyntheticSession, assetId: string = f.equipment) {
   const w = createDevelopmentWorkspace(new RecordedDocument().asDocument(), s), r = record(w.root);
   button(r, 'マテリアル').fire('click'); const panel = named(r, '材質');
-  setInput(named(panel, 'モデル'), assetId); const surface = named(panel, '面'); setInput(surface, surface.children[1]!.value);
+  setInput(named(panel, 'モデル'), assetId); const surface = named(panel, 'マテリアル'); setInput(surface, surface.children[1]!.value);
   return { w, panel, scope: (v: string) => setInput(named(panel, '適用範囲'), v),
     begin: () => button(panel, '設定を編集').fire('click'), edit: (label: string, text: string) => setInput(named(panel, label), text),
     async apply() { await acknowledge(s, () => button(panel, '変更を適用').fire('click')); w.render(); },
@@ -2979,6 +2979,15 @@ describe('new synthetic saved host (memory ports and recorded DOM, not real brow
     expect(cold.authority.read().viewData!.records[id]).toBeDefined(); await cold.dispose();
   });
 
+  it('creates a Scene entry view atomically without changing existing views or leaving half a command on rejection',async()=>{
+    const h=fixture(),host=await h.open(true),seed=host.read().source!,provider=host.read().provider!,tx='d'.repeat(32),viewId=`view_${'e'.repeat(32)}`,payload=displayCapture(),original=seed.originalChanges();
+    const command={kind:'createView' as const,makeEntry:true as const,sceneId:f.overview,viewId,projectFrameId:host.authority.read().resources.projectFrameId,name:'開始視点',orderKey:'Q',camera:{...payload.camera},background:{...payload.background},eventId:`evt_${'f'.repeat(32)}`};
+    const writes=h.base.writes,next=seed.prepareEdit(seed.token,command,provider,tx),checked=metadataProjectView(await readProjectScene(next.read(),metadataFixtureLimits,host.content.verifier(false)));
+    expect(next.originalChanges()).toHaveLength(original.length+1);expect(checked.state.scenes[f.overview]!.defaultViewId).toEqual({kind:'value',value:viewId});expect(checked.viewData!.records[viewId]!.camera).toEqual({kind:'value',value:payload.camera});
+    for(const id of Object.keys(metadataProjectView(provider).viewData?.records??{}))expect(checked.viewData!.records[id]).toEqual(metadataProjectView(provider).viewData!.records[id]);
+    expect(()=>seed.prepareEdit(seed.token,{...command,projectFrameId:`frame_${'0'.repeat(32)}`},provider,tx)).toThrow();expect(()=>seed.prepareEdit(seed.token,{...command,makeEntry:false}as unknown as MetadataEdit,provider,tx)).toThrow();
+    expect(seed.originalChanges()).toEqual(original);expect(h.base.writes).toBe(writes);await host.dispose();
+  });
   it('uses original per-field versions for recapture and refuses stale, conflicting, cross-Scene and referenced View writes', async () => {
     const h = fixture(), host = await h.open(true), seed = host.read().source!, provider = host.read().provider!, tx = 'b'.repeat(32);
     const id = `view_${'a'.repeat(32)}`, camera = { ...displayCapture().camera }, background = { ...displayCapture().background };

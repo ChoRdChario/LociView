@@ -56,7 +56,7 @@ export function materialSourceIssue(source: MaterialSource): string | null {
     for (const surface of model.surfaces.value) {
       const t = surface.target, key = materialTargetKey(t);
       if (t.assetId !== model.assetId || !t.variantFamilyId || !t.materialLayoutId || !t.logicalMaterialSlotId || targets.has(key))
-        return '面の対応を確認してください。';
+        return 'マテリアルの対応を確認してください。';
       targets.add(key);
     }
   }
@@ -81,8 +81,8 @@ export function materialView(context: MaterialContext) {
   const baseRecord = record ?? (selection.scope === 'scene' ? project : null);
   const base = baseRecord?.intent.kind === 'value' ? baseRecord.intent.value : surface?.sourceIntent.kind === 'value' ? surface.sourceIntent.value : null;
   const origin: MaterialScope | 'source' | null = scene ? 'scene' : project ? 'project' : surface?.sourceIntent.kind === 'value' ? 'source' : null;
-  const targetIssue = issue || (!model ? 'モデルを選択してください。' : model.surfaces.kind !== 'value' ? model.reason || '面の一覧を確認してください。'
-    : !surfaces.length ? model.reason || 'このモデルには編集できる面がありません。' : !surface ? '面を選択してください。' : null);
+  const targetIssue = issue || (!model ? 'モデルを選択してください。' : model.surfaces.kind !== 'value' ? model.reason || 'マテリアルの一覧を確認してください。'
+    : !surfaces.length ? model.reason || 'このモデルには編集できるマテリアルがありません。' : !surface ? 'マテリアルを選択してください。' : null);
   const editIssue = targetIssue || (surface && recordIssue(surface, selection.scope, source.sceneId)) || (!base ? '元になる設定を確認してください。' : null);
   const sourceFallback = surface?.sourceIntent.kind === 'value' ? 'モデル元の設定を使います。' : 'モデル元の設定が確認できず、表示状態の確認が必要です。';
   const fallback = selection.scope === 'scene' ? project ? 'プロジェクト共通の設定を使います。' : sourceFallback
@@ -132,7 +132,7 @@ export function planMaterial(context: MaterialContext, request: MaterialIntentRe
       next = { ...selection, assetId: request.assetId, target: selection.assetId === request.assetId ? selection.target : null };
     } else if (request.kind === 'surface') {
       const surface = view.surfaces.find(item => materialTargetKey(item.target) === request.key);
-      if (!surface) return blocked('面を選び直してください。'); next = { ...selection, target: surface.target };
+      if (!surface) return blocked('マテリアルを選び直してください。'); next = { ...selection, target: surface.target };
     } else {
       if (request.scope !== 'project' && request.scope !== 'scene') return blocked('適用範囲を選び直してください。'); next = { ...selection, scope: request.scope };
     }

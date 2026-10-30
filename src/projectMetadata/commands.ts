@@ -69,7 +69,7 @@ export type MetadataEdit =
   | { kind: 'include'; sceneId: string; resourceKind: 'asset' | 'caption'; resourceId: string; membershipId: string; orderKey: string; eventId: string }
   | { kind: 'exclude'; resourceKind: 'asset' | 'caption'; membershipId: string; eventId: string }
   | { kind: 'createView'; sceneId: string; viewId: string; projectFrameId: string; name: string; orderKey: string;
-      camera: JsonObject; background: JsonObject; eventId: string }
+      camera: JsonObject; background: JsonObject; eventId: string; makeEntry?:true }
   | { kind: 'editView'; sceneId: string; viewId: string; edits: { name?: string; orderKey?: string; camera?: JsonObject; background?: JsonObject } }
   | { kind: 'deleteView'; sceneId: string; viewId: string; eventId: string }
   | { kind: 'setEntryView'; sceneId: string; viewId: string | null }
@@ -444,13 +444,13 @@ export function planMetadataEdit(provider: Provider, input: MetadataEdit, limits
       edge(kind, (kind === 'asset' ? plan.next.assetMemberships : plan.next.captionMemberships)[command.membershipId]!, command.kind === 'include'); break;
     }
     case 'createView': {
-      shape(raw, ['kind', 'sceneId', 'viewId', 'projectFrameId', 'name', 'orderKey', 'camera', 'background', 'eventId']);
+      shape(raw, ['kind', 'sceneId', 'viewId', 'projectFrameId', 'name', 'orderKey', 'camera', 'background', 'eventId',...('makeEntry'in raw?['makeEntry']:[])]);if('makeEntry'in raw&&command.makeEntry!==true)fail('view-entry-intent');
       row('scenesById', command.sceneId);
       if (command.projectFrameId !== provider.resources.projectFrameId) fail('view-frame');
       capture(command.camera, command.background);
       add('viewsById', command.viewId, { id: command.viewId, sceneId: command.sceneId, projectFrameId: command.projectFrameId,
         name: command.name, orderKey: command.orderKey, camera: command.camera, background: command.background,
-        lifecycle: { state: 'active', eventId: command.eventId, reason: 'initial' } }, true); break;
+        lifecycle: { state: 'active', eventId: command.eventId, reason: 'initial' } }, true);if(command.makeEntry)add('scenesById',command.sceneId,{defaultViewId:command.viewId});break;
     }
     case 'editView': {
       shape(raw, ['kind', 'sceneId', 'viewId', 'edits']); view(command.sceneId, command.viewId);

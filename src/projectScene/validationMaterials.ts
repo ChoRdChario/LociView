@@ -18,7 +18,7 @@ export function validationMaterialSlots(c: ValidationModelClosure | ReadonlyRend
     variantFamilyId: c.representation.variantFamilyId, materialLayoutId: catalog.layoutId,
     logicalMaterialSlotId: slot.logicalMaterialSlotId }, locator: slot.sourceLocator, semantics: slot.sourceSemantics,source:meshMaterialSource(c.representation,slot.sourceSemantics),
     name: slot.sourceLocator.kind === 'gltfMaterial' ? `材質 ${Number(slot.sourceLocator.materialIndex) + 1}` :
-      validationMaterialMap2(c.representation.formatProfile) ? `面の材質 ${Number(slot.sourceLocator.slotIndex) + 1}` : '既定の材質' }));
+      validationMaterialMap2(c.representation.formatProfile) ? `マテリアル ${Number(slot.sourceLocator.slotIndex) + 1}` : '既定の材質' }));
 }
 export function validationMaterialSourceIssue(slot: ValidationMaterialSlot,profile:ProjectSemanticProfile='map1'): string | null {
   return (profile==='map2'||slot.source?.coverage.kind!=='blend')&&(slot.source || slot.source===undefined&&same(slot.semantics, { coverage: { kind: 'opaque' }, optics: 'surface', lighting: 'lit', doubleSided: false })) ? null :

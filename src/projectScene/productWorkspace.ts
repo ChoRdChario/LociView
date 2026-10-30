@@ -50,11 +50,11 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
     b.addEventListener('click',()=>{if(!fileMenu||b.disabled)return;if(!fileMenu.open)fileOrigin=b;
       if(tools!.showSurface(surface)){core?.dismissDisclosures();fileMenu.open=true;if(b.getAttribute('role')!=='tab')filePanel.focus?.({preventScroll:true});}}); return b;
   };
-  const saveEntry=fileEntry('ファイルに保存','save'), shareEntry=fileEntry('共有','share'), receiveEntry=fileEntry('受信','receive'), restoreEntry=fileEntry('復元','restore');
+  const saveEntry=fileEntry('ファイルに保存','save'), shareEntry=fileEntry('共有','share'), receiveEntry=fileEntry('更新を読み込む','receive'), restoreEntry=fileEntry('復元','restore');
   saveEntry.className='lv-workspace-primary'; shareEntry.className='lv-workspace-share';
   filePanel.tabIndex=-1;
   const fileNavigation=document.createElement('div'); fileNavigation.setAttribute('role','tablist'); fileNavigation.setAttribute('aria-label','ファイルの操作');
-  const fileTabs = new Map([['save',fileEntry('保存','save')],['share',fileEntry('共有','share')],['receive',receiveEntry],['restore',restoreEntry]] as const);
+  const fileTabs = new Map([['save',fileEntry('書き出す','save')],['share',fileEntry('共有','share')],['receive',receiveEntry],['restore',restoreEntry]] as const);
   for (const [surface, tab] of fileTabs) {
     tab.setAttribute('role','tab'); tab.id=`${fileContent.id}-${surface}`; tab.setAttribute('aria-controls',fileContent.id); fileNavigation.append(tab);
     tab.addEventListener('keydown', event => {
