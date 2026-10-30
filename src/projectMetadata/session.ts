@@ -14,7 +14,7 @@ import { checkLimits, fail, type MetadataLimits } from './format';
 import { ProjectMetadataSource } from './source';
 import { MetadataRepository, type MetadataStorageFactory } from './repository';
 import { TransactionJournal, type JournalStart, type PreparedJournal } from './journal';
-import { digest, equalBytes, json, newId, underWriteLease, metadataPath } from './persistence';
+import { digest, equalBytes, json, newId, underWriteLease, withMetadataRead, metadataPath } from './persistence';
 import { canonicalMetadataEdit, planMetadataEdit, type MetadataEdit } from './commands';
 import { checkRemoteStored, copyFullSource, initialWorkspaceChanges, planRemoteChanges, type FullMetadataSource, type RemoteBatchProof } from './remote';
 import { WorkspaceReceiveJob, type ReceiverProof } from '../projectPackage/receiveJob';
@@ -375,15 +375,18 @@ export class MetadataProjectSession {
     });
   }
   private async assertOutputSlot(ownId?: string) {
-    for (const key of await outputJobKeys(this.fs)) {
-      if (key.id === ownId) continue;
-      const state = await outputJobClass(key).state(this.fs, key.id, this.limits);
-      if (state === 'abandoned') continue;
-      if (state !== 'started') return fail('output-pending');
-      const job = await openOutputJob(this.fs, key, this.limits);
-      if (!await outputTerminal(job)) return fail('output-pending');
-      await job.validateCompletion();
-    }
+    const excluded = ownId, limits = { ...this.limits };
+    return withMetadataRead(this.fs, undefined, async ({ fs }) => {
+      for (const key of await outputJobKeys(fs)) {
+        if (key.id === excluded) continue;
+        const state = await outputJobClass(key).state(fs, key.id, limits);
+        if (state === 'abandoned') continue;
+        if (state !== 'started') return fail('output-pending');
+        const job = await openOutputJob(fs, key, limits);
+        if (!await outputTerminal(job)) return fail('output-pending');
+        await job.validateCompletion();
+      }
+    });
   }
   private async finishContributionOutput(job: ContributionOutputJob, store: OriginBlobStore, signal?: AbortSignal) {
     job.assertOwner(this.fs); const current = await this.outputReady();
@@ -427,21 +430,21 @@ export class MetadataProjectSession {
   }
 
   private async finishBackupOutput(job: BackupOutputJob, store: OriginBlobStore, signal?: AbortSignal, timing?: BackupOutputTiming) {
-    job.assertOwner(this.fs); const current = await this.outputReady();
+    job.assertOwner(this.fs); const current = await measureBackupOutput(timing, 'ready-finish', () => this.outputReady());
     if (json(current.source!.proof) !== json(job.source.proof)) return fail('output-lineage');
-    await this.assertOutputSlot(job.id); await validateOutputProtection(this.fs, job, store, this.limits);
+    await measureBackupOutput(timing, 'slot-finish', () => this.assertOutputSlot(job.id)); await measureBackupOutput(timing, 'protection-finish', () => validateOutputProtection(this.fs, job, store, this.limits));
     await measureBackupOutput(timing, 'job', () => job.generate(store, signal, timing)); return job.id;
   }
   async createManualCheckpoint(expectedToken: string, label: string | undefined, store: OriginBlobStore, version: string, signal?: AbortSignal, timing?: BackupOutputTiming) {
     checkedBackupLabel(label);
     return underWriteLease(this.fs, async () => {
-      const read = await this.outputReady(); if (read.source!.token !== expectedToken) return fail('output-stale');
-      await this.assertOutputSlot();
+      const read = await measureBackupOutput(timing, 'ready-before', () => this.outputReady()); if (read.source!.token !== expectedToken) return fail('output-stale');
+      await measureBackupOutput(timing, 'slot-before', () => this.assertOutputSlot());
       const bases = new WorkspaceBaseStore(this.fs, this.limits, read.source!.proof);
       const capture = await measureBackupOutput(timing, 'capture', () => BackupSourceCapture.prepare(this, expectedToken, bases, store, this.limits, signal));
       const job = BackupOutputJob.prepare(this.fs, capture, this.limits, version, label);
-      await validateOutputProtection(this.fs, job, store, this.limits);
-      const current = await this.outputReady();
+      await measureBackupOutput(timing, 'protection-before', () => validateOutputProtection(this.fs, job, store, this.limits));
+      const current = await measureBackupOutput(timing, 'ready-final', () => this.outputReady());
       if (current.source!.token !== expectedToken || current.publication !== capture.publication || json(await bases.snapshot()) !== json(job.frozenBases())) return fail('output-stale');
       await measureBackupOutput(timing, 'persist', () => job.persist()); return measureBackupOutput(timing, 'finish', () => this.finishBackupOutput(job, store, signal, timing));
     });

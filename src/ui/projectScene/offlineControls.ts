@@ -27,8 +27,9 @@ export function createOfflineControls(document: Document, port: DesktopOfflinePo
   const consequence = document.createElement('p'); consequence.textContent = '解除すると、すべての画面を閉じた後の起動には通信が必要です。同じアプリを開いてください。プロジェクトは残ります。';
   const accept = document.createElement('button'); accept.type = 'button'; accept.textContent = '準備を解除';
   const cancel = document.createElement('button'); cancel.type = 'button'; cancel.textContent = '解除を取り消す';
+  const diagnostics=document.createElement('details'),diagnosticTitle=document.createElement('summary');diagnosticTitle.textContent='詳細';diagnostics.append(diagnosticTitle,check);
   const body=document.createElement('div');
-  confirm.append(consequence, accept, cancel);body.append(help, check, install, remove, confirm);details.append(summary,body);body.insertBefore(prepare,body.children[0]??null);root.append(status, details, usageHelp);
+  confirm.append(consequence, accept, cancel);body.append(help, diagnostics, install, remove, confirm);details.append(summary,body);body.insertBefore(prepare,body.children[0]??null);root.append(status, details, usageHelp);
   details.addEventListener('keydown',event=>{if(event.key==='Escape'&&details.open&&!event.isComposing&&!event.defaultPrevented){event.preventDefault();event.stopPropagation();details.open=false;summary.focus();}});
   const dismiss=(event:Event)=>{if(details.open&&event.target&&!details.contains(event.target as Node))details.open=false;};
   document.addEventListener('pointerdown',dismiss);document.addEventListener('focusin',dismiss);

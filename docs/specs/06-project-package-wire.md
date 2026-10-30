@@ -3096,3 +3096,37 @@ checked before work and after decode, and host-owned recovery does not expose an
 unusable generic edit retry. Restored edits and Contribution use that same selected
 service. Executed checks and remaining browser/device evidence are recorded only
 in `tasks/todo.md`; this is not ordinary-route activation, adoption or release.
+
+
+### 2026-10-31 file-output timing observation
+
+For the approved file-output latency investigation, extend the existing optional
+backup timing observer with output-readiness, prior-output-slot and protection
+spans. These fixed, content-free measurements leave validation order, leases,
+publication, recovery and error behavior unchanged. Undefined observers execute
+the same action directly; observer failure has no command authority.
+
+### 2026-10-31 bounded prior-output-slot inspection
+
+The private Session prior-output-slot gate may group its sequential pure reads
+inside one existing withMetadataRead callback. Capture ownId and flat limits
+before entry; pass only that callback's read-only FS to key/state/open/terminal/
+completion checks. Keep order, every check, abandoned handling and ownId exclusion.
+No job, proof or scoped port escapes the callback. Opening/closing generation and
+structure audits, expiry and denied writes are unchanged. Each callback must close
+before the next operation that gate guards. A
+post-persist failure retains the already-started job for retry, without archive
+generation/publication proceeding. The parent write lease and
+pre/post write fences remain. Every new call starts fresh, including after loss
+of an acknowledged artifact/original/base. No generation, stream/write or
+publication work is enclosed, and no cross-operation cache is introduced.
+
+### 2026-10-31 fresh backup-open source ownership
+
+BackupOutputJob.open copies bounded readBytes results immediately. Its source,
+validated from that exact owned metadata and manifest identity/envelope, may be
+passed only within this open to the private constructor instead of decoding the
+same bytes twice. Keep target-head verification and every digest, capability,
+originals, inventory, control, receipt and step check. Prepare retains independent
+reconstruction. Later opens and artifact/download/protection checks stay fresh;
+there is no public source injection option or cross-operation cache.

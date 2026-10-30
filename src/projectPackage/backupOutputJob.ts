@@ -30,7 +30,7 @@ const checkRef = (r: EvidenceRef) => {
     !Number.isSafeInteger(r.byteLength) || r.byteLength <= 0 || r.byteLength > L.archiveBytes) fail('output-reference');
 };
 
-export type BackupOutputTiming = (stage: 'capture' | 'persist' | 'finish' | 'job' | 'inputs-before' | 'space' | 'stream-close' | 'artifact-inspect' | 'inputs-after' | 'receipt', milliseconds: number) => void;
+export type BackupOutputTiming = (stage: 'ready-before' | 'slot-before' | 'protection-before' | 'ready-final' | 'ready-finish' | 'slot-finish' | 'protection-finish' | 'capture' | 'persist' | 'finish' | 'job' | 'inputs-before' | 'space' | 'stream-close' | 'artifact-inspect' | 'inputs-after' | 'receipt', milliseconds: number) => void;
 /** Optional local observations have no authority over output or recovery. */
 export function measureBackupOutput<T>(observer: BackupOutputTiming | undefined, stage: Parameters<BackupOutputTiming>[0], action: () => Promise<T>): Promise<T> {
   if (!observer) return action();
@@ -42,9 +42,9 @@ export function measureBackupOutput<T>(observer: BackupOutputTiming | undefined,
 export class BackupOutputJob {
   readonly source: ProjectMetadataSource;
   private constructor(private readonly fs: ProjectWorkspaceFS, readonly id: string, private readonly limits: MetadataLimits,
-    private readonly inputs: Inputs, readonly label?: string) {
+    private readonly inputs: Inputs, readonly label?: string, sourceFromOpen?: ProjectMetadataSource) {
     technicalId(id); checkedBackupLabel(label); const m = this.manifest();
-    this.source = ProjectMetadataSource.fromFullSource(this.original('metadata.am'), { identity: m.identity, envelope: m.metadataEnvelope }, packageSourceLimits(limits));
+    this.source = sourceFromOpen ?? ProjectMetadataSource.fromFullSource(this.original('metadata.am'), { identity: m.identity, envelope: m.metadataEnvelope }, packageSourceLimits(limits));
     if (json(this.source.heads) !== json(m.targetHeads)) fail('output-source');
   }
   private original(path: string) { const entry = this.inputs.originals.find(e => e.path === path); if (!entry) return fail('output-input-missing'); return entry.bytes; }
@@ -122,7 +122,7 @@ export class BackupOutputJob {
     if (await this.state(fs, id, limits) !== 'started') return fail('output-unstarted');
     const path = root(fs, id), bytes = async (name: string, max: number) => {
       const f = await fs.readStream(`${path}${name}`); if (!f || f.size > max) return fail('output-input-missing');
-      const b = await fs.readBytes(`${path}${name}`); if (!b || b.length !== f.size) return fail('output-input-missing'); return b;
+      const b = await fs.readBytes(`${path}${name}`); if (!b || b.length !== f.size) return fail('output-input-missing'); return b.slice();
     };
     const manifest = await bytes('manifest.json', L.controlBytes), control = readManifestControl(manifest, new TextEncoder().encode(packageByteHash(manifest)));
     const m = control.manifest; if (m.purpose !== 'backup' || m.memo !== undefined) return fail('output-purpose');
@@ -139,7 +139,7 @@ export class BackupOutputJob {
     if (json(description.inventory) !== json(canonicalControl(originals[1]!.bytes)) || json(description.blobs) !== json(m.blobs) ||
       json(description.summary) !== json(m.summary) || manifest.length + 64 + originals[1]!.bytes.length + originals[2]!.bytes.length + description.baseControlBytes > L.controlsBytes) fail('output-source');
     const start = await readReceipt<{ label?: string }>(fs, `${path}start.json`, limits);
-    const job = new BackupOutputJob(fs, id, limits, { manifest, originals, description }, start?.label);
+    const job = new BackupOutputJob(fs, id, limits, { manifest, originals, description }, start?.label, source);
     for (const [name, value] of Object.entries(job.records())) if (json(await readReceipt(fs, `${path}${name}.json`, limits)) !== json(value)) fail('output-input-binding');
     await job.steps(); return job;
   }

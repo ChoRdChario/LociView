@@ -6,6 +6,12 @@ next action and actual stop conditions; [inventory](implementation-inventory.md)
 owns route-specific coverage. Check actual Git branch/HEAD/worktree and preserve
 existing changes. Do not reconstruct current work from completed checkpoint prose.
 
+PO2026-10-31 now requests measured file-output latency improvement and removal of
+meaningless development-era branches. Start at todo's current boundary for the
+accepted read-scope/source-ownership change, final checks and remaining refresh
+cost. File purposes, originals/history and all write/recovery fences remain; the
+prior simplification below is retained context, not the next task queue.
+
 PO2026-10-31 latest simplification owns the current boundary: list-top plus and row edit/delete, secondary membership/tags, no comparison-window manager, window-body pointer/focus activation, Scene-only initial camera recording, direct material editing and explicit File intents. Initial app-resource preparation is automatic under09§9.1; connected/offline use shares one origin/profile and Project. Normal ready state is quiet; update/repair/removal retain safe deferred activation and local recovery. Existing history/views remain. Read the first dated workspace-design revision and todo for actual checks/remaining work. Earlier layouts below do not reinstate the saved-view picker, generic organizer or manual offline startup split.
 
 PO2026-10-30 corrects the UI work order: finish the whole-screen/connected-flow

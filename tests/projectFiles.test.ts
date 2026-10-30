@@ -3000,6 +3000,28 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const index = `${workspacePackageRoot(f.scope.fs)}backup-output-index/${id}.json`; await f.fs.remove(index);
     await expect(BackupOutputJob.state(f.scope.fs, id, metadata)).rejects.toThrow('output-state'); expect(await f.fs.exists(index)).toBe(false);
   }, 60_000);
+  it('refuses a prior-output slot closing audit and later artifact loss before new output writes',async()=>{
+    const f=await auditedRestoredJournal(),service=validationProjectService(f.scope.fs,f.scope.factory,f.store,budget,decode),session=service.session;
+    const token=(await session.read()).source!.token,sender=new WorkspaceSender(f.scope.fs,session,f.store,metadata,f.locks);
+    const id=await sender.generateBackup(token,'最初'),job=await BackupOutputJob.open(f.scope.fs,id,metadata),before=(await f.fs.list('')).sort();
+    let inspected=false;const read=f.fs.readBytes.bind(f.fs),reading=vi.spyOn(f.fs,'readBytes').mockImplementation(async path=>{const value=await read(path);if(path===job.path('manifest.json'))inspected=true;return value;});
+    f.audit.before=async()=>{if(inspected)throw Error('slot closing audit');};const writes=vi.spyOn(f.fs,'writeBytes');
+    await expect(sender.generateBackup(token,'拒否')).rejects.toThrow('slot closing audit');expect(inspected).toBe(true);expect(writes).not.toHaveBeenCalled();expect((await f.fs.list('')).sort()).toEqual(before);
+    reading.mockRestore();f.audit.before=async()=>{};
+    const second=await sender.generateBackup(token,'次');expect(second).not.toBe(id);expect((await sender.jobs()).filter(j=>j.purpose==='backup').map(j=>j.state)).toEqual(['generated','generated']);
+    const artifact=(await f.fs.list(job.path('artifacts/')))[0]!;await f.fs.remove(artifact);writes.mockClear();
+    await expect(sender.generateBackup(token,'欠落後')).rejects.toThrow();expect(writes).not.toHaveBeenCalled();expect((await session.read()).source!.token).toBe(token);
+  },60000);
+  it('retains started backup originals when the finishing output-slot audit refuses, then cold retries',async()=>{
+    const f=await auditedRestoredJournal(),session=validationProjectService(f.scope.fs,f.scope.factory,f.store,budget,decode).session;
+    const source=(await session.read()).source!,sender=new WorkspaceSender(f.scope.fs,session,f.store,metadata,f.locks),first=await sender.generateBackup(source.token),job=await BackupOutputJob.open(f.scope.fs,first,metadata);
+    let scans=0;const read=f.fs.readBytes.bind(f.fs),reading=vi.spyOn(f.fs,'readBytes').mockImplementation(async path=>{const bytes=await read(path);if(path===job.path('manifest.json'))scans++;return bytes;});
+    f.audit.before=async()=>{if(scans===2)throw Error('finishing slot audit');};await expect(sender.generateBackup(source.token,'復旧用')).rejects.toThrow('finishing slot audit');expect(scans).toBe(2);
+    reading.mockRestore();f.audit.before=async()=>{};const incomplete=(await sender.jobs()).find(j=>j.state==='incomplete')!;expect(incomplete).toBeDefined();
+    const pending=await BackupOutputJob.open(f.scope.fs,incomplete.id,metadata),original=(await f.fs.readBytes(pending.path('metadata.am')))!;expect(original).toEqual(source.encodeFullSource());expect(await pending.steps()).toEqual([]);await expect(pending.artifactReceipt()).rejects.toThrow('output-unverified');
+    const cold=validationProjectService(f.scope.fs,f.scope.factory,f.store,budget,decode).session,retry=new WorkspaceSender(f.scope.fs,cold,f.store,metadata,f.locks);await retry.retry(incomplete.id);
+    expect((await BackupArchive.inspect(await retry.download(incomplete.id),metadata)).source.originalChanges()).toEqual(source.originalChanges());expect(await f.fs.readBytes(pending.path('metadata.am'))).toEqual(original);expect((await cold.read()).source!.token).toBe(source.token);
+  },60000);
   it('keeps base records, evidence and payload reads exact and owned within separate closing audits', async () => {
     const f = await auditedRestoredJournal(), proof = structuredClone(f.expected.source.proof), limits = { ...metadata };
     const strict = owned(await openWorkspaceGeneration(f.fs, { generationId: f.selected.generationId, allowCreate: false,
@@ -3465,7 +3487,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const before = await f.receiver.session.read(), token = before.source!.token, label = '現地調査前';
     const id = await sender.generateBackup(token, label), file = await sender.download(id), job = await BackupOutputJob.open(f.fs, id, metadata);
     const inspected = await BackupArchive.inspect(file, metadata);
-    expect([...new Set(timings.map(t => t.stage))].sort()).toEqual(['capture', 'persist', 'finish', 'job', 'inputs-before', 'space', 'stream-close', 'artifact-inspect', 'inputs-after', 'receipt'].sort());
+    expect([...new Set(timings.map(t => t.stage))].sort()).toEqual(['ready-before', 'slot-before', 'protection-before', 'ready-final', 'ready-finish', 'slot-finish', 'protection-finish', 'capture', 'persist', 'finish', 'job', 'inputs-before', 'space', 'stream-close', 'artifact-inspect', 'inputs-after', 'receipt'].sort());
     expect(timings.every(t => Number.isFinite(t.milliseconds) && t.milliseconds >= 0)).toBe(true);
     expect(inspected.source.encodeFullSource()).toEqual(before.source!.encodeFullSource());
     expect(inspected.description.table).toEqual(sent.snapshot);
@@ -3509,6 +3531,13 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect(f.fs.reads).toBe(listReads); expect((await f.receiver.session.read()).source!.token).toBe(token);
     expect((await BackupArchive.inspect(await sender.download(id), metadata)).description.table).toEqual(sent.snapshot);
   }, 20000);
+  it('owns fresh backup-open originals across later reads without a second source decode',async()=>{
+    const {f,sent}=await contributionTeam(),sender=new WorkspaceSender(f.fs,f.receiver.session,f.store,metadata,f.locks),id=await sender.generateBackup(sent.current.source!.token),job=await BackupOutputJob.open(f.fs,id,metadata);
+    const bytes=(await f.fs.readBytes(job.path('metadata.am')))!,expected=bytes.slice(),read=f.fs.readBytes.bind(f.fs);
+    const alias=vi.spyOn(f.fs,'readBytes').mockImplementation(async path=>{if(path===job.path('metadata.am'))return bytes;if(path===job.path('protected-inventory.json'))bytes[0]=bytes[0]!^255;return read(path);});
+    try{const opened=await BackupOutputJob.open(f.fs,id,metadata);expect(opened.source.encodeFullSource()).toEqual(expected);expect(opened.source.originalChanges()).toEqual(sent.current.source!.originalChanges());}finally{alias.mockRestore();}
+    expect(await f.fs.readBytes(job.path('metadata.am'))).toEqual(expected);
+  },30000);
   it('cold-retries partial backup output from frozen originals and keeps later edits outside the named checkpoint', async () => {
     const { f, sent } = await contributionTeam(), sender = new WorkspaceSender(f.fs, f.receiver.session, f.store, metadata, f.locks);
     const writeStream = f.fs.writeStream.bind(f.fs); let interrupted = false;

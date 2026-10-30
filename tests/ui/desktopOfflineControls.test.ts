@@ -23,3 +23,11 @@ it('keeps preparation local, confirms removal and ignores late results after dis
   prepare!.click();expect(status!.dataset.busy).toBe('true');expect(prepare!.disabled).toBe(true);expect(port.prepare).toHaveBeenCalledOnce();
   settings.dispose();expect(stop).not.toHaveBeenCalled();control.dispose();const before=status!.textContent;state={phase:'ready',registered:true,message:'late'};notify();finish();await Promise.resolve();expect(status!.textContent).toBe(before);expect(stop).toHaveBeenCalledOnce();expect([...events.values()].every(set=>!set.size)).toBe(true);
 });
+
+it('keeps cache-state diagnosis secondary and does not request network preparation for it',async()=>{
+  const state:DesktopOfflineState={phase:'ready',registered:true,message:'ready'};
+  const port:DesktopOfflinePort={read:()=>state,subscribe:()=>()=>{},recheck:vi.fn(async()=>{}),prepare:vi.fn(async()=>{}),remove:vi.fn(async()=>{}),install:vi.fn(async()=>{}),installAvailable:()=>false};
+  const document=Object.assign(new RecordedDocument(),{addEventListener(){},removeEventListener(){}}),control=createOfflineControls(document.asDocument(),port),root=record(control.root),body=root.children[1]!.children[1]!,diagnostics=body.children[2]!;
+  expect(body.children[0]!.textContent).toBe('更新を確認');expect(diagnostics.tag).toBe('details');expect(diagnostics.open).toBe(false);expect(diagnostics.children[1]!.textContent).toBe('準備状態を確認');
+  diagnostics.open=true;diagnostics.children[1]!.click();await Promise.resolve();expect(port.recheck).toHaveBeenCalledOnce();expect(port.prepare).not.toHaveBeenCalled();control.dispose();
+});

@@ -25,7 +25,7 @@ PO prioritizes missing integrated features before readiness-stage tuning. Preser
 originals/history, typed Session commands and existing write/readback/recovery fences.
 Fix latency when it prevents use or risks data. Keep the existing
 [comfortable UI targets](../docs/ui-product-guidelines.md); no new numeric guarantee.
-Root is sole writer; bounded independent reviewers are read-only. No small manual
+One implementation writer; bounded independent reviewers are read-only. No small manual
 test or helper approvals. Continue in-scope work while device evidence is pending.
 
 ## Current priority correction —daily-use workflows first
@@ -56,7 +56,81 @@ unchanged-feature-classification checks pass; independent review has no findings
 No runtime change or new capacity guarantee; no runtime suite is needed for this
 documentation checkpoint.
 
-## Current boundary —record-first editing and direct camera navigation
+## Current boundary —measured file output and one intent per operation
+
+PO explicitly requests improving file-output wait while preserving save safety,
+automatic verification and a careful check for meaningless development-era splits.
+Outcome: edit → export the intended file → verify/save → reopen or hand over with
+the same exact originals/history and existing recovery guarantees, with less wait.
+Baseline: direct-ui-cleanup diagnostic after-delete14.1s; backup.total12.80s,
+generate9.64s, overview3.16s. Treat prior figures as a baseline to reproduce, not
+a new numeric guarantee. No small manual test dependencies.
+
+Plan: measure browser action plus storage/validation/refresh/archive/download
+stages on the existing connected sample → audit File entry/handler/service mapping
+for duplicate intent or redundant refresh → specify any lifetime or boundary
+change before implementation → implement a bounded improvement → fault/invariant
+tests, comparable owned-browser timing and exact file/reopen verification →
+independent review and final required checks, then suitable g0 checkpoint/Push.
+One implementation writer; independent audit/review is read-only. Preserve all
+validation, write/readback/publication, leases, metadata/privacy, cancellation and
+recovery fences. No new dependency/schema, capacity, adoption or release scope.
+If evidence requires changing validation timing or recovery/publication contracts,
+record the precise discrepancy and stop only that affected decision for review.
+
+Current implementation/evidence:
+- Reproduced the same owned-Chromium two-Mesh/two-Caption/PNG sample: edit → four
+  backups → exact archive inspection/
+  reopen flow. Fresh before observations: after-delete10.206s and9.567s. Adding
+  optional diagnostic spans changed no control flow; ZIP stream work was about0.08s
+  in the second observation, while readiness/previous-output inspection and display
+  refresh dominated. These individual observations are not a performance guarantee.
+- Kept the complete prior-output gate within one existing metadata-read callback;
+  ownId, abandoned/state/open/terminal/completion checks and closing-generation
+  refusal remain. A fresh backup open now owns copied bytes and reuses only that
+  open's exact validated immutable source instead of decoding it twice. Later opens
+  and prepare still inspect independently; no cross-operation cache or write fence
+  was introduced. [Spec06](../docs/specs/06-project-package-wire.md) records the scope.
+- Scope-only after-delete9.756s did not show a whole-action improvement. With the
+  fresh-open duplicate decode removed, same-flow after-delete8.970s; generate5.492s
+  versus6.273s in the diagnostic-before observation, slot-before0.726/slot-finish0.808s
+  versus0.932/1.318s. Refresh remained2.839s versus2.625s. Overall benefit is modest
+  and subject to runtime variance. The final-artifact repeat completed at7.639s
+  (generate4.943s, refresh1.992s, download0.398s); the earlier after8.970s and both
+  before observations remain in .artifacts/e2e/output-latency/timing-summary.json.
+  This limited sample supports a bounded improvement, not a general speed claim.
+- Closing-audit faults before capture and after persistence refuse subsequent work;
+  post-persist originals remain as a started job and cold retry succeeds. Removing a
+  prior artifact still blocks a later output. Alias-mutation regression verifies
+  immediate ownership of fresh-open originals. Focused faults and existing backup/
+  interrupted/abandon paths pass; optional observer failure retains output authority.
+- File purposes/lineage/privacy contracts and valid shortcuts/download recovery remain.
+  UI audit also covered model/media/team/recovery: no other meaningless feature
+  branches found. Kept one update/repair primary action; cache-only recheck is under
+  closed Details, with unchanged ports/lifecycle. Proxy help now limits the required
+  surface to model-surface selection, preserving the numeric/manual placement path.
+- Independent read-only final source/test/spec review: no required findings. Required
+  serial checkpoint PASS: typecheck,140 root files/3126PASS/21existingTODO
+  (unexecuted), normal/harness/validation/Desktop/offline builds, offline isolation
+  with14 exact SRI resources. HEIC isolation PASS for all5 artifacts. The frozen
+  source/test tree is unchanged after the check. Final connected Chromium flow
+  PASS: generated/downloaded ZIP inspection, exact camera-only unchanged history,
+  editing, material apply, deletion and page-reopen persistence. The4191 HTML and
+  main assets match the final offline artifact. Physical/device/HTTPS/adoption and
+  release gates are unchanged. Final cold-offline/removal Chromium flow also PASS:
+  complete browser close → stopped-server cached startup → edit/download → normal
+  reconnect/removal/reopen; exact Project identity/history/media remain.
+
+Next: reduce the remaining output-history/display-refresh analysis within the
+accepted read lifetime; preserve immediate download verification and recovery. Do
+not merge the five file purposes or remove retained file verification as UI cleanup.
+Old09 multi-build fault qualification remains pending: its manual-prepare helper
+still needs adaptation to automatic startup. Do not count this small-sample timing
+or current cold test as that full lane, practical-device, aggregate or release
+qualification.10k-Caption qualification remains deferred. No PO test dependency.
+
+
+## Previous verified boundary —record-first editing and direct camera navigation
 
 Latest PO steering (after this checkpoint): simplify further before the older
 model/recovery follow-up. Collect the entire correction group before source edits:

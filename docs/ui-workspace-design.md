@@ -360,3 +360,13 @@ guard、IME・drag、入力保持、保存・照合・復旧の境界を保つ�
 共通枠・状態・文言、記録／各タブ／3D注釈とファイル／共有／復旧への接続結果は
 todoに記録し、既存の広い操作シナリオも新しい導線で順に確認する。
 新しい自動適用、候補の自動選択、参照の自動解除、共有保証、比較窓の自動閉鎖は含めない。
+
+
+## 2026-10-31 output-flow duplication audit
+
+Keep package purposes that differ in lineage, history or privacy. The header File
+shortcuts use the same services; do not add a parallel exporter. In app update/repair,
+keep the normal update action primary and move cache-only state recheck into a
+closed diagnostic detail. Existing recheck/prepare/remove ownership, pending and
+offline behavior stay unchanged. Proxy help must limit the need for a positioning
+surface to surface-hit selection, without implying manual coordinate entry is lost.
