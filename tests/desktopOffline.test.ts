@@ -57,6 +57,8 @@ describe('dedicated offline app shell ownership (no Project/storage authority)',
     const f=fixture();f.reg.active=new Worker();f.all=[f.reg];
     f.reg.unregister.mockImplementationOnce(async()=>true);await f.port.remove();expect(f.port.read().phase).toBe('error');expect(f.port.read().message).toContain('別の画面');
     await f.port.remove();expect(f.port.read().phase).toBe('removed');expect(f.sw.register).not.toHaveBeenCalled();await f.port.recheck();expect(f.port.read().phase).toBe('removed');
+    expect(f.port.read().message).toContain('通信できる状態で同じアプリ');expect(f.port.read().message).toContain('プロジェクトは残ります');
+    expect(f.port.read().message).not.toMatch(/静的|再配信|従来版へ戻る/);expect(f.browser.location.reload).not.toHaveBeenCalled();
   });
   it('rechecks registration after worker replies, so unregister in another window cannot masquerade as cold readiness',async()=>{
     const f=fixture();f.reg.active=new Worker();f.sw.controller=f.reg.active;f.all=[f.reg];let calls=0;

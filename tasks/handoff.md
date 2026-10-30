@@ -16,8 +16,15 @@ comparison media, file exits, visual hierarchy, narrow layout and name Settings.
 Todo owns this connected workflow, current checks and next action.
 Preserve Y-up/+Z-front, existing camera intents, input/write fences and retained data.
 The eight repair groups now pass the required final checkpoint, connected Chromium
-flows and independent reviews. Todo retains failures/fixes and the exact evidence;
-the next unit is the broader model/team/recovery flow through the new navigation.
+flows and independent reviews. Todo retains failures/fixes and the exact evidence.
+PO now approves one PC startup across connected/offline use (09§9): preparation
+and state in Settings, removal followed by connected reopening of the same app.
+Internal static/legacy build isolation remains; no public-entry activation,
+existing-SW replacement or origin/profile migration. Todo owns the current checks
+and next unit; the older model/team/recovery follow-up is not a priority override.
+The same-app connected/cold/removal workflow now passes the final serial checkpoint,
+artifact isolation and dedicated-Chromium confirmation. The next unit in todo
+resumes representative model/team/recovery workflows through the unified UI.
 
 Latest PO steering raises the review target to AAA-title production UI/UX quality.
 Read the[consolidated design review](../docs/ui-design-review.md) for Q1–Q8,
@@ -40,12 +47,14 @@ Do not infer physical-device, general adoption or release acceptance.
 
 The owned product preview is http://127.0.0.1:4191/ (offline-desktop-dist), separate
 from the original validation origin and the4190 visual prototype. Its index hash
-and owned process/session are recorded in .artifacts/e2e/workspace-completion/preview.json
-(previous receipt: .artifacts/e2e/gizmo/preview.json).
+and owned process/session are recorded in .artifacts/e2e/unified-startup/preview.json
+(previous receipts: .artifacts/e2e/workspace-completion/preview.json and
+.artifacts/e2e/gizmo/preview.json).
 Existing resumption data stays at the original address; use an exported file here.
-The content-first workspace source/test manifest, dedicated browser evidence and
-required final checks are under .artifacts/e2e/workspace-completion; consult todo
-for their actual status. Earlier compact-gizmo evidence stays in its own folder.
+The unified-startup source/test manifest, dedicated browser evidence and required
+final checks are under .artifacts/e2e/unified-startup; consult todo for their actual
+status. Earlier content-first workspace and compact-gizmo evidence stay in their
+own folders.
 Documentation/staging/Push alone is not a reason to repeat runtime checks.
 
 PO prioritizes completing the accepted feature set before readiness-stage latency
@@ -99,7 +108,9 @@ whole-label task tabs, retaining model/View/material drafts and typed commands.
 Use todo for the connected evidence and remaining candidate/device/offline gates.
 The [09 offline candidate](../docs/specs/09-desktop-offline-candidate-proposal.md)
 was PO-approved2026-10-30 for grouped implementation and automation. It covers new-
-format Projects/admitted conversions; normal/static original viewers remain.
+format Projects/admitted conversions. The published normal app and static
+compatibility builds remain; no old viewer is added to the new PC candidate.
+09§9 uses one user-facing PC app across network states.
 Read its preparation/removal/update scope and todo's current plan/executed evidence.
 The bounded workflow is verified through dedicated Chromium cold/update/removal,
 independent reviews and final root/5-build checks recorded in todo. Same-origin/

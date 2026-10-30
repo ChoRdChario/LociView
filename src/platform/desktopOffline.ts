@@ -1,7 +1,7 @@
 import { desktopOfflineQuery, desktopOfflineRepair,desktopOfflineScript, type DesktopOfflinePort, type DesktopOfflineReport, type DesktopOfflineState } from './desktopOfflinePorts';
 
 type InstallEvent = Event & { prompt(): Promise<void>; userChoice: Promise<{ outcome: string }> };
-const closedInstruction = '入力を確定し、必要なファイル保存を終えてから、このPC版の画面をすべて閉じて開き直してください。';
+const closedInstruction = '入力を確定し、必要なファイル保存を終えてから、LociViewの画面をすべて閉じて開き直してください。';
 const preparationError=()=>Error('アプリを保存できませんでした。通信と空き容量を確認して、準備をやり直してください。');
 /** Owns only the dedicated app shell. No Project/storage authority or ordinary PWA updater. */
 export function createDesktopOffline(base: string, build: string, browser: Window = window) {
@@ -52,7 +52,7 @@ export function createDesktopOffline(base: string, build: string, browser: Windo
     if (!supported()) { publish({ phase: 'blocked', registered: false, message: 'この環境ではオフライン準備を利用できません。対応するPCブラウザの専用アドレスで開いてください。' }); return; }
     const reg = await registrations();
     if (disposed || ticket !== generation) return;
-    if (!reg) { publish({ phase: removed ? 'removed' : 'unprepared', registered: false, message: removed ? `準備を解除しました。${closedInstruction}従来版へ戻るには、同じアドレスで静的PC版を配信し、通信できる状態で開きます。プロジェクトは保持しています。` : '通信できる間にアプリを準備すると、同じアドレス・ブラウザのプロファイルでオフライン起動できます。' }); return; }
+    if (!reg) { publish({ phase: removed ? 'removed' : 'unprepared', registered: false, message: removed ? 'オフライン準備を解除しました。入力を確定し、必要なファイル保存を終えてから、LociViewの画面をすべて閉じ、通信できる状態で同じアプリを開いてください。プロジェクトは残ります。' : '通信できる間にアプリを準備すると、同じアドレス・ブラウザのプロファイルでオフライン起動できます。' }); return; }
     removed=false;publish({...state,registered:true});
     watch(reg);
     const waitingWorker=reg.waiting,activeWorker=reg.active,controller=sw.controller;
@@ -64,7 +64,7 @@ export function createDesktopOffline(base: string, build: string, browser: Windo
     if(!current||current.waiting!==waitingWorker||current.active!==activeWorker||sw.controller!==controller)throw Error('アプリの準備状態が変わりました。もう一度確認してください。');
     if (waiting?.complete && active) publish({ phase: 'update', registered: true, message: `新しいアプリの準備ができました。${closedInstruction}` });
     else if (reg.installing) publish({ phase: 'preparing', registered: true, message: 'アプリを準備しています。作業は続けられます。' });
-    else if (active?.complete && controlled?.complete && active.build === build && controlled.build === build) publish({ phase: 'ready', registered: true, message: 'この画面はオフラインで起動できるアプリから開いています。' });
+    else if (active?.complete && controlled?.complete && active.build === build && controlled.build === build) publish({ phase: 'ready', registered: true, message: 'オフラインで起動できます。' });
     else if (active?.complete && active.build === build) publish({ phase: 'reopen', registered: true, message: `アプリを保存しました。${closedInstruction}` });
     else publish({ phase: 'error', registered: true, message: '必要なアプリ資源を確認できません。通信と空き容量を確認して、準備をやり直してください。' });
   };

@@ -56,7 +56,77 @@ unchanged-feature-classification checks pass; independent review has no findings
 No runtime change or new capacity guarantee; no runtime suite is needed for this
 documentation checkpoint.
 
-## Current boundary —content-first workspace completion
+## Current boundary —one PC application across connected/offline startup
+
+PO2026-10-30 approves one startup and the same application UI, with offline
+preparation/state in Settings. Use the existing09 PC candidate as that user entry;
+retain internal static/legacy verification builds and all publication gates.
+Outcome: unprepared connected start → prepare → full-close offline start → edit/
+save → reconnect → remove preparation → full-close connected start of the same
+artifact, retaining the same Project, history and bodies without re-registration.
+
+Plan: update09's approved direction and DOM/ownership acceptance → move home
+preparation into Settings and remove static-redeployment copy → focused controls/
+lifecycle checks and the connected dedicated-Chromium flow → final required
+checkpoint/5 builds/isolation and independent review → verified g0 checkpoint.
+Root is sole writer; lifecycle/contract/UX reviewers are read-only. Work started
+from clean/synced41f3e7f; no new dependency or actual deployment is needed.
+
+Acceptance: no online/offline startup selector; one mounted offline-control node
+across home/recovery/editor; explicit preparation remains independent of Project
+commands. Removal retains current screens until close, Project/foreign caches and
+all ownership checks; next connected start uses the same app and saved content.
+Keep original Native/v1 reader boundaries, SW identity/SRI, phase distinctions,
+write/IME/recovery fences and update/full-close rules. No origin/profile migration,
+old-viewer offline expansion, main/Pages activation, forced reload or auto-register.
+Stop only affected work for an actual contract conflict or new authority.
+
+Implemented: preparation/state in the same Settings envelope on home and editor;
+same control returned to its original owner; one product introduction; same-app
+connected reopening after removal. Loading shows status only; bootstrap failure
+retains preparation/removal in Settings. Registration, worker and storage algorithms
+are unchanged. Independent lifecycle/contract review has no remaining findings;
+wide/narrow home and narrow bootstrap-error Settings have no mandatory visual issue.
+Recovery-header spacing was checked from DOM/CSS, not a physical-device result.
+
+Focused lifecycle/control/import checks28PASS and typecheck PASS. Dedicated Chromium
+3 connected cases PASS164.0s (final-result.json): view/edit presentation, complete
+file handoff/receive/cold flow, and the same-artifact connected→prepared cold offline
+edit/save→remove→connected restart. The latter compares Project identity, original
+change bytes and model/media bytes; no registration reappears and foreign cache/
+registration survive. Bootstrap-storage failure and foreign-controller refusal
+PASS2 cases12.1s (lifecycle-final-result.json). No personal browser/profile is used.
+Evidence is in .artifacts/e2e/unified-startup; tested-source.json freezes10 changed
+source/test files. Final serial check:checkpoint PASS (typecheck;140 files,
+3110PASS/21 existing TODO; all5 builds;14 exact offline resources/SRI). HEIC
+isolation PASS across all5 artifacts. The final generated artifact's full same-app
+connected/cold/removal cycle PASS1 case45.7s (artifact-cycle-result.json), with no
+retry or skipped case. Owned4191 preview responds200 and matches the final index
+hash. No OS-native IME, physical-device, adoption or release claim.
+
+Retain earlier failed browser receipts: concurrent reads by the new ZIP-inspection
+test hit the existing sequential-reader guard (fixed to sequential reads without
+changing that guard); initial temporary controls could be replaced while startup
+settled (removed from loading, with Settings created only on bootstrap failure).
+Tests wait for the actual Settings owner, retaining existing deadlines/assertions.
+The preliminary whole check was intentionally stopped before its result to add
+three missing Settings-readiness awaits to retained offline E2E cases; its log
+is retained separately and is not counted as a completed check. Required checks
+were then run once on the frozen final source/test tree above.
+
+Meta-audit: the same-app startup workflow closes09§9 without a new dependency,
+storage/renderer policy or public-entry change. Independent final documentation
+review found no remaining gate/ownership discrepancy. Commit/Push only the18
+reviewed source/test/document files to the authorized g0-baseline checkpoint;
+Git owns its final identity. No runtime rerun is needed for result prose/staging.
+
+Next connected unit: exercise representative model replacement/pin correction and
+team conflicts/interrupted receive through this unified PC UI, fixing concrete
+usability defects within the accepted contracts. Reuse existing service cases and
+connected browser flows; then prepare one grouped PC acceptance review. Keep
+physical-device/OS-install/adoption/release evidence separate; no fine PO tests.
+
+## Previous verified boundary —content-first workspace completion
 
 PO2026-10-30 authorizes repairing the eight grouped review findings below.
 Outcome: choose a Scene/record → read/edit text and media → adjust a pin in3D →
@@ -1501,6 +1571,9 @@ relaxation or test exclusion.
 
 ## Next decision and remaining work
 
+The Current boundary near the top owns today's plan, evidence and next unit.
+The following retains feature qualifications and later decision lanes.
+
 The08a GS workflow is implemented and verified within the exact scope above,
 including the final required checks. Do not reconstruct the current
 boundary from the earlier08 continuation. Former Proxy carry/rekey remains outside
@@ -1513,17 +1586,17 @@ names stay private until the separate Project-local opt-in. The milestone audit
 keeps this on the accepted daily-use path; no additional fully specified daily-use
 unit was found in the current inventory. This is not overall app/adoption completion.
 
-Current connected outcome is08c original-plus-portable-display, authorized after
+The earlier08c outcome is original-plus-portable-display, authorized after
 the retained HEIC research. Its implementation and exact checks are recorded in
-the Current boundary above. The[research memo](../docs/heic-rights-and-workflow-review.md)
+the08c boundary above. The[research memo](../docs/heic-rights-and-workflow-review.md)
 and[decoder PoC](../scripts/heic-decoder-poc/POC-RESULT.md) remain historical evidence,
 not an active decoder-adoption task. The native reader on the adding device and
 one fixed PNG provide portable media for supported new tuples; raw-only legacy
 HEIC is unchanged. General direct HEIC input on incapable browsers is not solved.
 No bundled decoder or rights/distribution gate was adopted by08c.
 
-After the08c checkpoint, next is a consolidated PC-candidate completion/usability
-review of the accepted everyday workflows and inventory, fixing concrete in-scope
+After the08c checkpoint, the consolidated PC-candidate completion/usability
+review covers the accepted everyday workflows and inventory, fixing concrete in-scope
 inconsistencies found there. Keep missing Safari orientation/color/HDR/large-image
 and cold offline-shell evidence grouped as readiness lanes; do not invent a new
 feature solely to increase coverage. Broader Native/different-profile replacement,

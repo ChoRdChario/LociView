@@ -12,6 +12,20 @@ LociView is the local-first successor to LociMyu: an offline browser application
 > Public build: https://chordchario.github.io/LociView/
 > Fresh-session checkpoint: [`tasks/handoff.md`](tasks/handoff.md)
 
+## PC development candidate
+
+The current PC candidate uses one starting page and the same controls. After
+preparation, they also work offline. Offline preparation, update checks and removal are in
+Settings. After removing preparation, reopen the same app while connected;
+the Project and its files remain. Preparation stores the app, not a Project backup.
+See [the approved startup contract](docs/specs/09-desktop-offline-candidate-proposal.md#9-同じアプリへの起動統合po承認2026-10-30).
+
+For a dedicated local candidate origin, developers use `npm run build:offline`
+and `npm run preview:offline`. The internal mode/output names and the preserved
+static compatibility build are development boundaries, not startup modes for
+users. Keep the candidate separate from the published app and its existing data;
+this does not authorize a public-entry replacement or origin migration.
+
 ## HEIC/HEIF images in the first candidate
 
 The first public candidate accepts PNG, JPEG, WebP and GIF Caption images. For

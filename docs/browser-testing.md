@@ -40,9 +40,13 @@ edit-only controls, working search/media/windows/model visibility/camera/saved
 views/background, existing-file download, edit return with the same selection,
 draft switch protection, disclosure/draft/focus return, compact stage/panel and
 actual backup metadata/reload. Its second case uses a short owned persistent
-profile with Service Workers allowed, prepares the app, checks the utility UI
-inside Settings, closes the entire context/browser, stops its server, and verifies
-cold offline navigation plus home return. It preserves preparation/Project checks;
+profile with Service Workers allowed: edit/save before preparation, move the same
+utility node from home Settings to editor Settings, prepare, close browser/server,
+cold offline edit/save, reconnect/remove preparation, then close and reopen the
+same artifact online. It compares Project identity, original change bytes and
+model/media bodies, and checks no automatic registration or foreign-cache removal.
+The primary PC app is the same throughout; internal build isolation is retained.
+It preserves preparation/Project checks;
 there is no personal Chrome profile or plugin access. Width changes and dispatched
 composition events are desktop emulation, not physical-device/native-IME evidence.
 Todo owns results and qualifications; this pair does not rerun the broader E2E matrices.
@@ -129,8 +133,10 @@ reopening. Its two-body output wait is600s; this changes no existing case deadli
 It is ordinary-Project source/renderer/save/cold evidence, not500k backup restore.
 `gs-workflow.spec.ts` covers the separate small two-profile exchange, local text/
 photo retention, surface reselection, correction, return, restore/save/cold flow.
-For a local candidate preview, use `npm run build:desktop` then
-`npm run preview:desktop`; it creates no SW/install assets. Continuing existing
+For the primary local PC candidate, use `npm run build:offline` then
+`npm run preview:offline`; the same app starts with or without a connection after
+preparation. `build:desktop`/`preview:desktop` remain the internal static compatibility
+lane without SW/install assets. Continuing existing
 validation data requires the same origin/profile; a different output directory
 alone does not transfer data. Do not deploy this candidate over a normal PWA root.
 

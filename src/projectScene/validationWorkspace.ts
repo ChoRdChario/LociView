@@ -1,6 +1,6 @@
 import { inspectZipContainerMetadata } from '../assets/zipio';
 import type {DesktopOfflinePort} from '../platform/desktopOfflinePorts';
-import {createOfflineControls} from '../ui/projectScene/offlineControls';
+import {createOfflineControls,createOfflineSettings} from '../ui/projectScene/offlineControls';
 import { mountContextHelp } from '../ui/projectScene/contextHelp';
 import { PACKAGE_LIMITS } from '../projectPackage/contract';
 import type {WorkspaceFileInteraction} from '../ui/projectScene/projectWorkspacePorts';
@@ -72,7 +72,8 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   const stopHelp = mountContextHelp(document, root);
   root.className = 'lv-validation-host'; navigation.className = 'lv-validation-home'; content.className = 'lv-validation-content';
   const offline=ports.offline?createOfflineControls(document,ports.offline):undefined;
-  if(offline)root.append(offline.root);
+  const homeSettings=offline?createOfflineSettings(document,offline.root):undefined;
+  if(homeSettings)root.append(homeSettings.root);
   const heading = document.createElement('h1'); heading.textContent = 'LociView';
   const help = document.createElement('p'); help.textContent = ports.introduction ?? 'LociViewは、3Dモデルに記録を付け、ファイルで作業を受け渡すアプリです。';
   const legacy=document.createElement('button');legacy.type='button';legacy.textContent='以前のプロジェクトを開く';legacy.hidden=!ports.openLegacy;
@@ -137,6 +138,8 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     const opened = await ports.open(...args); if ('kind' in opened) { await opened.dispose(); throw Error('バックアップの初回復元を一覧から再開してください。'); } return opened;
   };
   const controls = () => { navigation.inert = busy; openFile.disabled = create.disabled = cancelConversion.disabled = busy || composing;
+    if(offline&&homeSettings){if(offline.root.parentElement===homeSettings.body){if(!homeSettings.root.parentElement)root.insertBefore(homeSettings.root,navigation);}
+      else{homeSettings.root.open=false;homeSettings.root.remove();}}
     status.setAttribute('data-busy',String(busy)); status.setAttribute('aria-busy',String(busy));
     for (const button of firstRecoveryButtons) button.disabled = busy;
     workspaceInput.disabled = title.disabled = busy || !!creationAttempt;
@@ -675,6 +678,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   });
   return { root,ready:ready??Promise.resolve(), hasChanges: () => busy || composing || changed() || !navigation.hidden && (selectionPending || !!rawSelection || !!creationAttempt || !form.hidden && title.value !== '新しいプロジェクト'),
     async dispose() { if (disposed) return; disposed = true; stopHelp();
+      homeSettings?.dispose();
       selectionAbort?.abort();
       stopPresentation();
       try { await operation; } catch { /* Original input and saved failure are never acknowledged here. */ }

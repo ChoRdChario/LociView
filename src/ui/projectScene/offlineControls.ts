@@ -1,6 +1,16 @@
 import type { DesktopOfflinePort } from '../../platform/desktopOfflinePorts';
 import { contextHelp, mountContextHelp } from './contextHelp';
 
+/** Owns the Settings envelope only; the app still owns the supplied control. */
+export function createOfflineSettings(document: Document, content: HTMLElement) {
+  const root=document.createElement('details'),summary=document.createElement('summary'),body=document.createElement('div');
+  root.className='lv-home-settings';root.setAttribute('aria-label','ホームの設定');summary.textContent='設定';body.append(content);root.append(summary,body);
+  root.addEventListener('keydown',event=>{if(event.key==='Escape'&&root.open&&!event.isComposing&&!event.defaultPrevented){event.preventDefault();event.stopPropagation();root.open=false;summary.focus();}});
+  const dismiss=(event:Event)=>{if(root.open&&event.target&&!root.contains(event.target as Node))root.open=false;};
+  document.addEventListener('pointerdown',dismiss);document.addEventListener('focusin',dismiss);
+  return{root,body,dispose(){document.removeEventListener('pointerdown',dismiss);document.removeEventListener('focusin',dismiss);root.remove();}};
+}
+
 /** Local app preparation, independent of Project commands, drafts and saved status. */
 export function createOfflineControls(document: Document, port: DesktopOfflinePort) {
   const root = document.createElement('section'); root.className = 'lv-offline-controls'; root.setAttribute('aria-label', 'オフライン利用');
@@ -9,17 +19,17 @@ export function createOfflineControls(document: Document, port: DesktopOfflinePo
   const prepare = document.createElement('button'); prepare.type = 'button';
   const details = document.createElement('details'), summary = document.createElement('summary'); summary.textContent = 'オフラインの設定';
   const help = document.createElement('p'); help.textContent = 'アプリの準備はプロジェクトのバックアップではありません。ファイル保存で別に残してください。';
-  const usageHelp = contextHelp(document, '通信できる間にアプリを準備すると、同じアドレス・ブラウザのプロファイルでオフライン起動できます。対応外の旧ファイルは、通信できる従来版で開いてください。', [prepare]);
+  const usageHelp = contextHelp(document, '通信できる間に準備すると、同じアドレス・ブラウザのプロファイルでオフライン起動できます。', [prepare]);
   const check = document.createElement('button'); check.type = 'button'; check.textContent = '準備状態を確認';
   const install = document.createElement('button'); install.type = 'button'; install.textContent = 'アプリをインストール';
   const remove = document.createElement('button'); remove.type = 'button'; remove.textContent = 'オフライン準備を解除';
   const confirm = document.createElement('div'); confirm.hidden = true;
-  const consequence = document.createElement('p'); consequence.textContent = '解除すると、すべての画面を閉じた後のオフライン起動ができなくなります。プロジェクトは残ります。従来版へ戻るには、同じアドレスで静的PC版を配信し、通信できる状態で開いてください。';
+  const consequence = document.createElement('p'); consequence.textContent = '解除すると、すべての画面を閉じた後の起動には通信が必要です。同じアプリを開いてください。プロジェクトは残ります。';
   const accept = document.createElement('button'); accept.type = 'button'; accept.textContent = '準備を解除';
   const cancel = document.createElement('button'); cancel.type = 'button'; cancel.textContent = '解除を取り消す';
   const body=document.createElement('div');
   confirm.append(consequence, accept, cancel);body.append(help, check, install, remove, confirm);details.append(summary,body);root.append(status, prepare, details, usageHelp);
-  details.addEventListener('keydown',event=>{if(event.key==='Escape'){details.open=false;summary.focus();}});
+  details.addEventListener('keydown',event=>{if(event.key==='Escape'&&details.open&&!event.isComposing&&!event.defaultPrevented){event.preventDefault();event.stopPropagation();details.open=false;summary.focus();}});
   const dismiss=(event:Event)=>{if(details.open&&event.target&&!details.contains(event.target as Node))details.open=false;};
   document.addEventListener('pointerdown',dismiss);document.addEventListener('focusin',dismiss);
   let disposed = false, operating = false;

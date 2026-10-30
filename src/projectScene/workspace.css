@@ -180,7 +180,18 @@
 @media (max-width: 480px) {
   .lv-media-viewer { width: calc(100vw - 12px); padding: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left)); }
 }
-.lv-validation-host { color: #312f2d; font: 14px/1.5 system-ui, sans-serif; }
+.lv-validation-host { position: relative; color: #312f2d; font: 14px/1.5 system-ui, sans-serif; }
+.lv-home-settings { position: absolute; z-index: 20; top: 20px; right: 20px; }
+.lv-home-settings > summary { box-sizing: border-box; min-height: 44px; padding: 10px 12px; cursor: pointer; }
+.lv-home-settings > div { position: absolute; top: 100%; right: 0; box-sizing: border-box; width: min(440px, calc(100vw - 40px)); max-height: calc(100dvh - 84px); overflow: auto; padding: 16px; border: 1px solid #bcb9af; border-radius: 8px; background: #fbfaf6; box-shadow: 0 10px 28px #25282029; }
+.lv-home-settings .lv-offline-controls { display: block; padding: 0; background: transparent; border: 0; }
+.lv-home-settings .lv-offline-controls > p { margin-bottom: 8px; }
+.lv-home-settings .lv-offline-controls details > div { position: static; width: 100%; max-height: none; padding: 8px 0; border: 0; box-shadow: none; }
+.lv-home-settings :focus-visible { outline: 2px solid #312f2d; outline-offset: 2px; }
+.lv-validation-host:has(> .lv-home-settings):has(> .lv-validation-home[hidden]) { padding-top: 64px; box-sizing: border-box; }
+.lv-startup-failure { padding: 24px; box-sizing: border-box; }
+.lv-startup-failure > h1 { margin: 0 80px 24px 0; font-size: 22px; font-weight: 500; }
+.lv-startup-failure > :is(p,button) { margin: 12px 0; }
 .lv-validation-host [hidden] { display: none !important; }
 .lv-validation-home { max-width: 948px; margin: 0 auto; padding: 24px; }
 .lv-validation-home h1 { font-size: 22px; font-weight: 500; }

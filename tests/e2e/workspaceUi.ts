@@ -36,7 +36,8 @@ export async function revealProjectHelp(page: Page) {
 
 export async function revealOfflineUtilities(page: Page) {
   const offline = page.locator('.lv-offline-controls');
+  await expect(offline).toHaveCount(1);
   if (await offline.isVisible()) return;
-  const settings = page.locator('details[aria-label="設定"]');
+  const settings = page.locator('.lv-home-settings, details[aria-label="設定"]');
   if (!await settings.evaluate(node => (node as HTMLDetailsElement).open)) await settings.locator(':scope > summary').click();
 }
