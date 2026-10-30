@@ -1,6 +1,7 @@
 import { inspectZipContainerMetadata } from '../assets/zipio';
 import type {DesktopOfflinePort} from '../platform/desktopOfflinePorts';
 import {createOfflineControls} from '../ui/projectScene/offlineControls';
+import { mountContextHelp } from '../ui/projectScene/contextHelp';
 import { PACKAGE_LIMITS } from '../projectPackage/contract';
 import type {WorkspaceFileInteraction} from '../ui/projectScene/projectWorkspacePorts';
 import type {createProductWorkspace} from './productWorkspace';
@@ -68,6 +69,7 @@ export interface ValidationWorkspacePorts {
 export function createValidationWorkspace(document: Document, ports: ValidationWorkspacePorts, initialRun?: string, initialMode: LocalOpenMode = 'edit') {
   const policy=projectFilePolicy(ports.filePolicy ?? ports.fileLimits);
   const root = document.createElement('section'), navigation = document.createElement('section'), content = document.createElement('section');
+  const stopHelp = mountContextHelp(document, root);
   root.className = 'lv-validation-host'; navigation.className = 'lv-validation-home'; content.className = 'lv-validation-content';
   const offline=ports.offline?createOfflineControls(document,ports.offline):undefined;
   if(offline)root.append(offline.root);
@@ -672,7 +674,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     }
   });
   return { root,ready:ready??Promise.resolve(), hasChanges: () => busy || composing || changed() || !navigation.hidden && (selectionPending || !!rawSelection || !!creationAttempt || !form.hidden && title.value !== '新しいプロジェクト'),
-    async dispose() { if (disposed) return; disposed = true;
+    async dispose() { if (disposed) return; disposed = true; stopHelp();
       selectionAbort?.abort();
       stopPresentation();
       try { await operation; } catch { /* Original input and saved failure are never acknowledged here. */ }

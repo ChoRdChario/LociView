@@ -535,6 +535,7 @@ export const projectSceneApplicationImports:Readonly<Record<string,readonly stri
     "three/addons/loaders/GLTFLoader.js"
   ],
   "src/projectScene/validationWorkspace.ts": [
+    "../ui/projectScene/contextHelp",
     "../platform/desktopOfflinePorts", "../ui/projectScene/offlineControls",
     "../projectFiles/media",
     "../ui/projectScene/conversionNotice",

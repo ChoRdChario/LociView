@@ -1,6 +1,8 @@
 import { entryViewIssue, planView, savedViewChoices, savedViewIssue, viewAxes, viewSourceIssue, viewRuntimeMatches,
   type ViewContext, type ViewIntent, type ViewPlan, type ViewProjection } from './viewState';
 
+import { contextHelp, mountContextHelp } from './contextHelp';
+
 let nextViewControls = 0;
 /** Reusable controls only; rendering or selecting an option never applies a camera. */
 export function createViewControls(document: Document, onPlan: (plan: ViewPlan) => void) {
@@ -24,16 +26,17 @@ export function createViewControls(document: Document, onPlan: (plan: ViewPlan) 
   const entry = make('section'), entryPicker = make('select'), apply = button('設定を適用'), cancel = button('取り消す');
   const entryNote = message(), entryStatus = live(), entryReview = button('状態を確認');
   entry.setAttribute('aria-label', '開始時の設定');
-  entry.append(label('シーンを開いたときの視点', entryPicker), make('p', '現在の表示は変わりません。'), apply, cancel, entryNote, entryStatus, entryReview);
+  entry.append(label('シーンを開いたときの視点', entryPicker), contextHelp(document, '現在の表示は変わりません。次にシーンを開くときの視点を設定します。', [entryPicker]), apply, cancel, entryNote, entryStatus, entryReview);
   root.append(camera, saved, entry);
   // One shared host/state/intent path, even when the task tab is not visible.
   const stageTools = make('section'); stageTools.className = 'lv-view-stage-tools'; stageTools.setAttribute('aria-label', '表示の復帰');
   const quickFit = button('全体表示'), quickNote = live(); stageTools.append(quickFit, quickNote);
   for (const control of [fit, ...axisButtons.values(), projection]) control.setAttribute('aria-describedby', `${cameraNote.id} ${cameraStatus.id}`);
   recall.setAttribute('aria-describedby', savedNote.id); quickFit.setAttribute('aria-describedby', quickNote.id);
-  for (const control of [entryPicker, apply]) control.setAttribute('aria-describedby', `${entryNote.id} ${entryStatus.id}`);
+  for (const control of [entryPicker, apply]) control.setAttribute('aria-describedby', [entryNote.id, entryStatus.id, control.getAttribute?.('aria-describedby')].filter(Boolean).join(' '));
   let context: ViewContext | undefined, disposed = false, savedKey = '', entryKey = '';
   const cleanups: (() => void)[] = [];
+  cleanups.push(mountContextHelp(document, root));
   const listen = (node: HTMLElement, event: string, action: () => void) => { node.addEventListener(event, action); cleanups.push(() => node.removeEventListener(event, action)); };
   const request = (intent: ViewIntent) => {
     if (!context || disposed) return;

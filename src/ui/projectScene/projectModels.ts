@@ -5,6 +5,7 @@ import type { WorkspaceFile, WorkspaceModelProposal } from './projectWorkspacePo
 import { newProjectId, panelNodes, sameProjectValue, type ProjectPanelHost, type ProjectModelPanel } from './projectPanel';
 import { boundsCentre, placementAroundPivot, fitAlignmentBounds } from '../../domain/alignment';
 import type { WorkspacePlacement } from './projectWorkspacePorts';
+import { contextHelp } from './contextHelp';
 
 export function createProjectModels(document: Document, host: ProjectPanelHost): ProjectModelPanel {
   const { make, button } = panelNodes(document), root = make('section'), fileArea = make('section'), placement = make('section'), review = make('section');
@@ -155,6 +156,7 @@ export function createProjectModels(document: Document, host: ProjectPanelHost):
     if (d) { reference = { assetId: d.target.assetId, bindingId: d.target.bindingId }; host.changed(); } });
   const clearReference = button('基準を解除', () => { if (!host.block('models', false) && !ownInput()) { reference = null; host.changed(); } });
   const referenceNote = make('p'); referenceNote.setAttribute('role', 'status');
+  const referenceHelp = contextHelp(document, '基準にしたモデルの配置は、この画面では変更しません。ほかのモデルを選んで、基準の中心と大きさに合わせられます。', [setReference, clearReference]);
   const fit = button('基準の中心と大きさに合わせる', () => {
     if (host.block('models') || ownInput() || !reference) return; const s = host.source(), id = memory().assetId;
     const d = id ? host.ports.modelDetails(s.sceneId, id) : null, ref = host.ports.modelDetails(s.sceneId, reference.assetId);
@@ -177,7 +179,7 @@ export function createProjectModels(document: Document, host: ProjectPanelHost):
     });
   }
   const undoPlacement = button('配置を元に戻す', () => compensatePlacement(false)), redoPlacement = button('配置をやり直す', () => compensatePlacement(true));
-  alignment.append(referenceNote, setReference, clearReference, pivotLabel, fit, resetImported, resetIdentity, undoPlacement, redoPlacement); placement.append(alignment);
+  alignment.append(referenceNote, setReference, clearReference, pivotLabel, fit, resetImported, resetIdentity, undoPlacement, redoPlacement, referenceHelp); placement.append(alignment);
   function valid() { try { host.ports.modelPlacement(raw.slice(0, 3), raw.slice(3, 6), raw[6]!); return true; } catch { return false; } }
   const pinSizeArea = make('section'), pinSizeLabel = make('label', 'ピンの表示倍率'), pinSizeInput = make('input'), pinSizeNote = make('p');
   pinSizeInput.type = 'number'; pinSizeInput.min = '0.001'; pinSizeInput.max = '1000'; pinSizeInput.step = 'any'; pinSizeInput.setAttribute('aria-label', 'ピンの表示倍率'); pinSizeLabel.append(pinSizeInput);
@@ -254,7 +256,7 @@ export function createProjectModels(document: Document, host: ProjectPanelHost):
     clearReference.hidden = !reference; clearReference.disabled = !!host.block('models', false) || ownInput();
     pivotSelect.value = pivot; pivotSelect.disabled = !!block || composing || host.viewport().read().dragging || !!fileScope || !!deletion;
     const name = reference ? provider.details.mutable.assetsById[reference.assetId]?.label : undefined;
-    referenceNote.textContent = referenceChanged ? '基準モデルの配置が変わっています。基準を選び直してください。' : reference ? `基準：${name?.kind === 'value' ? name.value : 'モデル名を確認'}。この画面では配置を変更しません。` : '';
+    referenceNote.textContent = referenceChanged ? '基準モデルの配置が変わっています。基準を選び直してください。' : reference ? `基準：${name?.kind === 'value' ? name.value : 'モデル名を確認'}` : '';
     fit.disabled = !!block || ownInput() || !visible || !details?.boundsAsset || !referenceDetails?.boundsAsset || referenceChanged || referenceSelected;
     resetIdentity.disabled = !!block || ownInput() || !visible || !details || referenceSelected;
     resetImported.disabled = resetIdentity.disabled || !details?.importedPlacement;

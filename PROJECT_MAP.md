@@ -55,6 +55,9 @@ their bounded byte fallback; current limits and Project/package authority remain
 [01e](docs/specs/01e-desktop-large-gs-workflow.md) records the approved integrated
 Desktop large-SH4/ordinary-root candidate; actual implementation/evidence is in todo.
 The composition's model, Saved View, material and attachment panels reuse their pure controls;
+`ui/projectScene/contextHelp.ts` owns explicitly authored optional explanations
+and shared UI-only hover/focus/touch lifetimes; active warnings and user text remain
+in their original controls. See UI guidelines§2.1.1 and todo for executed scope.
 `projectMedia.ts` connects attachment management to the common `mediaPreview.ts` viewer.
 The composition reuses `captionWindowControls.ts` for Scene-local comparison
 windows and their galleries, sharing the workspace-level image viewer.

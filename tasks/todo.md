@@ -56,7 +56,134 @@ unchanged-feature-classification checks pass; independent review has no findings
 No runtime change or new capacity guarantee; no runtime suite is needed for this
 documentation checkpoint.
 
-## Current boundary —approved09 PC offline workflow
+## Current boundary —delayed contextual explanations
+
+PO2026-10-30 authorizes moving explanatory prose into delayed hover help to keep
+the operation screens clean. Audit: g0-baseline HEAD8e20984; only the completed
+screenshot task record is initially dirty and retained. Root is the sole writer;
+copy mapping and UI/lifecycle review are read-only parallel tasks.
+
+Outcome: optional app-authored explanations across the ProjectScene workspace,
+models/views/materials/settings/offline controls become contextual help after2s mouse hover,
+with immediate keyboard/help-button access. Current errors, input/unsaved state,
+conflicts, affected targets/sharing/deletion/recovery consequences and user content
+stay visible. Keep original commands, drafts, storage/package/renderer and capacities.
+No camera-gizmo or general header redesign is bundled into this unit.
+
+UI boundary: a pure local UI helper produces explicit text-only help markup;
+UI-owned scopes manage delegated hover/focus/click/Escape events, timers and one
+viewport-clamped explanation layer per Document. No paragraph scanning or runtime
+dependency. Shared scopes are released at normal host/component disposal. Review
+the exact application import edge before connecting validation composition.
+
+Acceptance: no early mouse popup; leaving cancels pending display; explanation
+remains readable while hovered; Escape closes only active help; focus/touch can
+open help without changing commands/input; scrolling/removal/disposal cannot leave
+orphan popups. Existing visible warnings and accessible descriptions remain.
+Use focused Vitest/boundary checks, actual wide/narrow dedicated Chromium editing
+and save/reopen flow, independent review, then one serial final checkpoint.
+Stop only affected work for a new product/storage/format/renderer/dependency policy
+or release/deletion authority; no helper confirmation waits.
+
+Implemented: explicit text-only help and one reference-counted Document controller,
+with own component/host lifetimes including shared harness controls. Existing labels
+and inputs also provide hover targets; the separate explanation button supports
+keyboard/touch. The viewport-clamped layer remains outside scroll clipping; moving
+onto the text retains it. Pending Escape preserves ordinary cancellation; visible
+help consumes only its own dismissal. Shared-anchor focus, cancelled touch, hidden/
+removed anchors and final disposal have focused regressions. No paragraph scan,
+user-text conversion, Session edit, storage write or dependency was added.
+
+Copy/scope and final code review PASS. Important warning/unsaved/conflict/privacy/
+restore/removal copy remains visible; normal Undo guidance is separated from its
+warning, and MASK teaching is separated from field validation. Focused connected
+UI checks76PASS preceded the final small interaction fixes; final helper/boundary
+checks18PASS and typecheck PASS. The current15 source/test inputs are frozen in
+.artifacts/e2e/context-help/tested-source.json. Required full serial checkpoint PASS:
+139files/3097PASS/21existingTODO, root1054.66s; typecheck and all5 builds pass,
+with exact14-resource offline SRI/worker/manifest isolation. Log:
+.artifacts/e2e/context-help/checkpoint.log. Source/test hashes still match; no
+runtime checks are repeated merely for final prose/staging/commit. All5 built
+artifacts also pass HEIC public-path isolation. Lock/dependencies, public fixtures,
+workflows and deployment settings are unchanged.
+
+Actual dedicated Chromium connected case PASS10.8s at the final source tree:
+2s hover/no early popup, readable pointer transfer, native Tab/Escape, emulated
+touch open/close,320px bounds, retained Caption draft, real saved-backup metadata
+and reload continuation. Wide rendered tooltip review PASS. The narrow full-page
+PNG records reflow/draft only: screenshot scroll hid its fixed tooltip after the
+visible/bounds assertions. Additional viewport-only capture PASS5.2s with the
+tooltip visible before and after capture, bounded at320×740 and draft retained;
+narrow rendered review PASS. Image/evidence: narrow-tooltip-viewport.png and
+narrow-viewport-evidence.json in the same ignored context-help directory. This
+artifact-only capture did not change the15 frozen source/test inputs. SW is blocked;
+no physical-device, offline-launch, installation or adoption acceptance is inferred.
+
+PO's subsequent steering explicitly adds cognitive placement and operation-flow
+review to the next UI design. Judge target/state recognition without remembering
+offscreen details, proximity of related fields/actions, clear visual priority and
+the complete open→select→pin→Caption/media→apply→save/share→resume path. Current
+screens show management controls dominating, separated targets/confirmation and
+mixed list/edit/compare roles. These are design observations, not human usability
+test findings or a ratified new layout. Required state/next action must be apparent
+without opening optional help; keep existing drafts/undo/conflict/recovery fences.
+
+Next: close this verified development checkpoint on existing g0-baseline. Concrete
+camera-gizmo/header/panel proposals will follow the cognitive and flow review,
+with an integrated task walkthrough before implementation. They are not included
+in the current explanatory-copy change.
+Flow review also confirms that current unapplied Caption text blocks media addition.
+The next layout must expose the existing text→apply→media order and nearby paths
+out of input guards, rather than implying a new combined draft or automatic apply.
+List selection, right-side editing and3D comparison windows need visibly distinct
+roles with the same selected record. Any change to automatic window opening or
+compound-draft/command semantics remains a separate product decision.
+
+## Previous boundary —PC operation-screen screenshots
+
+PO2026-10-30 requests screenshots of the operation screens before further UI/UX
+changes. Audit: g0-baseline HEAD8e20984, clean starting tree. Root is sole writer;
+read-only screen mapping may run independently. Use the existing dedicated
+Chromium and current built offline PC candidate on an owned loopback origin,
+with a fresh owned profile and synthetic example data only.
+
+Outcome: a labelled local screenshot gallery and original PNGs covering startup,
+file opening, Caption/media work, models/placement, saved views/materials,
+Scene/tag/settings, save/share/receive/recovery and offline preparation where
+reachable. Capture real rendered states, identify examples and any uncaptured
+conditional screen; do not fabricate product screens or alter UI for the images.
+Product code, formats, data authorities, adoption and deployment remain unchanged.
+Check screenshot completeness/readability, local gallery links and capture errors;
+no full runtime suite/build is needed for this artifact-only unit. Stop affected
+capture only for real user data, destructive/global browser changes or new authority.
+
+Completed: [local gallery](../.artifacts/e2e/ui-screenbook-2026-10-30/index.html)
+contains48 actual1440×1000/DPR1 screenshots across6 groups, original PNGs,
+7 overview sheets and a ZIP (~15.5MB). The HTML embeds its images and supports
+enlargement; the ZIP includes the gallery, originals, overviews and captions only,
+not profiles, source packages or capture diagnostics. The example Project includes
+owned Mesh/Point/smallSH4/Proxy/PNG/video/audio and copied Scenes/records.
+Separate owned environments produce actual same-record conflicts and absent-Project
+backup-restore preview. Long pin/placement/material panes have lower-panel shots;
+save/share purpose controls and view/background settings were captured in their
+actual scrolled positions. Offline preparation is a displayed state, not new cold/
+OS-install/device/adoption acceptance. Conditional failures/install prompts and all
+possible control combinations are not claimed captured.
+
+Checks: all48 original PNGs exist with matching captions/dimensions; all48 embedded
+images decode;6 navigation targets and zoom open/close pass in dedicated Chromium.
+ZIP inspection confirms48 originals and gallery. Independent read-only visual review
+passes for overview, lower-panel controls, conflict and restore. Initial capture-driver
+iterations needed normal focus, exact selectors and completed cancellation; their
+diagnostics remain local and are not relabelled a complete functional-suite PASS.
+Product source/tests/build inputs remain unchanged; only this task record is tracked.
+No release/deployment or full runtime rerun for this screenshot-only work.
+
+Next: use this screenbook for the requested UI/UX and connected-function review,
+then fix identified issues and organize affected processing with existing behavior
+and storage/file safety preserved. No product change was made during photography.
+
+## Previous boundary —approved09 PC offline workflow
 
 PO2026-10-30 approved [09](../docs/specs/09-desktop-offline-candidate-proposal.md).
 Audit: g0-baseline HEAD11c46d6 before implementation, clean starting tree; root is

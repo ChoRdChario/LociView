@@ -2,6 +2,8 @@ import { materialFields, materialFieldLabels, materialInput,editMaterialIntent, 
 import { editMaterialDraft, materialApplyIssue, materialPlanIsCurrent, materialScopeLabel, materialSelectionKey, materialTargetKey,
   materialView, planMaterial, type MaterialContext, type MaterialDraft, type MaterialEffect, type MaterialIntentRequest, type MaterialPlan, type MaterialSelection } from './materialState';
 
+import { contextHelp, mountContextHelp } from './contextHelp';
+
 let nextMaterialControl = 0;
 /** Disconnected static controls; emits intentions, never dispatches or applies a renderer fallback. */
 export function createMaterialControls(document: Document, onPlan: (plan: MaterialPlan) => void) {
@@ -23,6 +25,7 @@ export function createMaterialControls(document: Document, onPlan: (plan: Materi
   const observed = make('p'), impact = make('p'), begin = button('設定を編集'), editor = make('div'); editor.className = 'lv-material-fields';
   const controls = new Map<MaterialEditField, { group: HTMLLabelElement; input: HTMLInputElement | HTMLSelectElement; note: HTMLParagraphElement }>();
   const cleanups: (() => void)[] = []; let context: MaterialContext | undefined, disposed = false, composing: MaterialEditField | null = null;
+  cleanups.push(mountContextHelp(document, root));
   let confirmation: { kind: 'cancel'; draft: MaterialDraft } | { kind: 'remove'; plan: Extract<MaterialEffect, { kind: 'remove' }> } | null = null;
   const listen = (node: HTMLElement, event: string, handler: () => void) => { node.addEventListener(event, handler); cleanups.push(() => node.removeEventListener(event, handler)); };
   const send = (plan: MaterialPlan) => { if (disposed || !context) return; if (plan.kind === 'blocked') { status.textContent = plan.reason; status.hidden = false; } else onPlan(plan); };
@@ -60,6 +63,7 @@ export function createMaterialControls(document: Document, onPlan: (plan: Materi
         if (context?.draft) send({ kind: 'draft', baseDraft: context.draft, draft: Object.freeze({ ...context.draft, composing: null }) }); });
     }
   }
+  editor.append(contextHelp(document, '切り抜きでは、しきい値を下回る部分を非表示にします。滑らかな半透明にはなりません。', [controls.get('coverage')!.input]));
   const actions = make('div'), apply = button('変更を適用'), cancel = button('取り消す'), remove = button('この範囲の設定を解除'), retry = button('再試行'), review = button('状態を確認');
   actions.className = 'lv-material-actions'; apply.className = 'lv-material-primary'; actions.append(apply, cancel, remove, retry, review);
   const confirmBox = make('section'), confirmText = make('p'), confirm = button(''), keep = button('戻る'); confirmBox.setAttribute('aria-label', '操作の確認'); confirmBox.hidden = true; confirmBox.append(confirmText, confirm, keep);
@@ -126,7 +130,7 @@ export function createMaterialControls(document: Document, onPlan: (plan: Materi
       // Keep all fields with retained input visible even after capability loss or disabling chroma.
       control.group.hidden = ['keyColor', 'tolerance', 'softness'].includes(field) && raw('chroma') !== 'on' && d?.edits[field] === undefined && composing !== field;
       if (field === 'cutoff') control.group.hidden = raw('coverage') !== 'mask' && d?.edits.cutoff === undefined;
-      control.note.textContent = reason ?? (field === 'coverage' && raw('coverage') === 'mask' ? 'しきい値を下回る部分を非表示にします。滑らかな半透明にはなりません。' : ''); control.note.hidden = !control.note.textContent;
+      control.note.textContent = reason ?? ''; control.note.hidden = !control.note.textContent;
     }
     const applyIssue = materialApplyIssue(next); apply.disabled = applyIssue !== null; apply.hidden = !d;
     cancel.hidden = !d; cancel.disabled = !d || Boolean(composing || d.composing) || inFlight;

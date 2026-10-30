@@ -4,6 +4,7 @@ import { savedViewName } from './viewState';
 import { backgroundSourceIssue, editViewBackground, planViewBackground, standardViewBackground, viewBackgroundIssue,
   type ViewBackgroundContext, type ViewBackgroundDraft, type ViewBackgroundPlan } from './viewBackgroundState';
 import { normalizeNativeBackgroundHex } from '../../nativeGs/backgroundColor';
+import { contextHelp, mountContextHelp } from './contextHelp';
 
 let nextAuthorControl = 0;
 function nodes(document: Document) {
@@ -21,12 +22,13 @@ export type ViewAuthorEvent = ViewAuthorPlan | Readonly<{ kind: 'input'; baseDra
 export function createViewAuthorControls(document: Document, onEvent: (event: ViewAuthorEvent) => void) {
   const { make, button, status: live, listen, cleanup } = nodes(document);
   const root = make('section'); root.className = 'lv-view-controls lv-view-authoring'; root.setAttribute('aria-label', '視点の作成と管理');
+  const stopHelp = mountContextHelp(document, root);
   const start = make('section'), add = button('視点を作る'), edit = button('編集'), target = make('p');
   start.append(add, edit, target); root.append(start);
   const form = make('section'), label = make('label', '視点の名称'), name = make('input'); name.type = 'text'; name.setAttribute('aria-label', '視点の名称');
   label.append(name); const nameNote = make('p'); nameNote.id = `lv-view-author-${++nextAuthorControl}`; name.setAttribute('aria-describedby', nameNote.id);
   const capture = button('現在の表示を使用'), captureNote = make('p'), apply = button('変更を適用'), cancel = button('取り消す'); apply.className = 'lv-view-primary';
-  form.append(label, nameNote, capture, captureNote, apply, cancel); root.append(form);
+  form.append(label, nameNote, capture, captureNote, apply, cancel, contextHelp(document, '名称だけの変更ではカメラと背景は変わりません。「現在の表示を使用」で、今のカメラと背景を視点に記録します。', [name, capture])); root.append(form);
   const manage = make('details'), summary = make('summary', 'その他の操作');
   const earlier = button('前へ'), later = button('後へ'), remove = button('削除'); remove.className = 'lv-view-destructive';
   const orderNote = make('p'), deleteNote = make('p');
@@ -34,7 +36,7 @@ export function createViewAuthorControls(document: Document, onEvent: (event: Vi
   earlier.setAttribute('aria-describedby', orderNote.id); later.setAttribute('aria-describedby', orderNote.id); remove.setAttribute('aria-describedby', deleteNote.id);
   manage.append(summary, earlier, later, orderNote, remove, deleteNote); root.append(manage);
   const status = live(), review = button('状態を確認'); root.append(status, review);
-  for (const control of [add, edit, capture, apply]) control.setAttribute('aria-describedby', status.id);
+  for (const control of [add, edit, capture, apply]) control.setAttribute('aria-describedby', [status.id, control.getAttribute?.('aria-describedby')].filter(Boolean).join(' '));
   const confirmation = make('section'), question = make('p'), confirm = button('削除する'), keep = button('戻る'); confirmation.hidden = true;
   confirmation.append(question, confirm, keep); root.append(confirmation);
   let context: ViewAuthorContext | undefined, disposed = false;
@@ -99,7 +101,7 @@ export function createViewAuthorControls(document: Document, onEvent: (event: Vi
     const captureIssue = reason(planViewAuthor(next, { kind: 'capture' })); capture.disabled = Boolean(captureIssue);
     captureNote.textContent = draft?.capture ? draft.capture.runtimeToken === next.view.runtime.token
       ? '記録したカメラと背景を使用します。' : '記録後に表示が変わっています。取り直す場合は「現在の表示を使用」を選択してください。'
-      : draft ? '名称だけの変更ではカメラと背景は変わりません。' : ''; captureNote.hidden = !captureNote.textContent;
+      : ''; captureNote.hidden = !captureNote.textContent;
     const applyIssue = viewAuthorApplyIssue(next); apply.disabled = Boolean(applyIssue); apply.textContent = draft?.viewId === null ? '視点を追加' : '変更を適用';
     cancel.disabled = !draft || busy || draft.composing;
     const earlierIssue = reason(planViewAuthor(next, { kind: 'move', direction: 'earlier' })), laterIssue = reason(planViewAuthor(next, { kind: 'move', direction: 'later' }));
@@ -117,7 +119,7 @@ export function createViewAuthorControls(document: Document, onEvent: (event: Vi
     }
     confirm.disabled = busy; return true;
   }
-  return { root, render, dispose: () => { disposed = true; cleanup(); root.remove(); } };
+  return { root, render, dispose: () => { disposed = true; stopHelp(); cleanup(); root.remove(); } };
 }
 
 export type ViewBackgroundEvent = ViewBackgroundPlan | Readonly<{ kind: 'draft'; baseDraft: ViewBackgroundDraft | null; draft: ViewBackgroundDraft }> |
@@ -125,11 +127,12 @@ export type ViewBackgroundEvent = ViewBackgroundPlan | Readonly<{ kind: 'draft';
 export function createViewBackgroundControls(document: Document, onEvent: (event: ViewBackgroundEvent) => void, standardHex: string = standardViewBackground) {
   const { make, button, status: live, listen, cleanup } = nodes(document);
   const root = make('section'); root.className = 'lv-view-controls lv-view-background'; root.setAttribute('aria-label', '3D背景');
+  const stopHelp = mountContextHelp(document, root);
   const label = make('label', '背景色'), hex = make('input'); hex.type = 'text'; hex.placeholder = '#rrggbb'; hex.setAttribute('aria-label', '背景色'); label.append(hex);
   const picker = make('input'); picker.type = 'color'; picker.setAttribute('aria-label', '背景色を選択');
   const standard = button('標準色'), apply = button('背景に適用'), cancel = button('取り消す'); apply.className = 'lv-view-primary';
-  const note = make('p', '背景を視点にも残すには、視点を作成・更新してください。'), status = live();
-  for (const node of [hex, picker, standard, apply]) node.setAttribute('aria-describedby', status.id);
+  const note = contextHelp(document, '背景を視点にも残すには、視点を作成・更新してください。', [hex, picker, standard, apply]), status = live();
+  for (const node of [hex, picker, standard, apply]) node.setAttribute('aria-describedby', [status.id, node.getAttribute?.('aria-describedby')].filter(Boolean).join(' '));
   root.append(label, picker, standard, apply, cancel, note, status);
   const confirmation = make('section'), confirm = button('変更を取り消す'), keep = button('編集を続ける'); confirmation.hidden = true;
   confirmation.append(make('p', '入力中の背景色を取り消しますか？'), confirm, keep); root.append(confirmation);
@@ -171,5 +174,5 @@ export function createViewBackgroundControls(document: Document, onEvent: (event
     if (cancelFor !== draft || draft?.composing) { cancelFor = null; confirmation.hidden = true; }
     confirm.disabled = cancel.disabled; return true;
   }
-  return { root, render, dispose: () => { disposed = true; cleanup(); root.remove(); } };
+  return { root, render, dispose: () => { disposed = true; stopHelp(); cleanup(); root.remove(); } };
 }

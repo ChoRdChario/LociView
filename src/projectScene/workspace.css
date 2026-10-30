@@ -237,3 +237,10 @@
   .lv-validation-host:has(> .lv-offline-controls) .lv-project-shell[data-layout="workspace"] > .lv-project-workspace > header { max-height: 22dvh; }
   .lv-validation-host:has(> .lv-offline-controls) .lv-project-shell[data-layout="workspace"] > .lv-project-files[open] > section { max-height: min(22dvh, 176px); }
 }
+/* Optional app-authored explanations; their layer escapes scrolling panels. */
+.lv-context-help { display: inline-flex; vertical-align: middle; }
+.lv-context-help-trigger { min-width: 44px; min-height: 44px; padding: 0; border: 0; background: transparent; color: #525850; border-radius: 50%; cursor: help; font-size: 16px; }
+.lv-context-help-trigger:hover { background: #00000009; }
+.lv-context-help-trigger:focus-visible { outline: 2px solid #666f5f; outline-offset: -4px; }
+.lv-context-help-note { position: fixed; z-index: 10000; box-sizing: border-box; width: max-content; max-width: min(352px, calc(100vw - 16px)); max-height: calc(100dvh - 16px); overflow: auto; overflow-wrap: anywhere; padding: 12px 14px; border: 1px solid #a6aaa0; border-radius: 6px; background: #fbfaf6; color: #252820; box-shadow: 0 4px 18px #0002; font: 14px/1.6 system-ui, sans-serif; white-space: normal; }
+.lv-context-help-note[hidden] { display: none !important; }

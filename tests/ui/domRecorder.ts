@@ -16,6 +16,7 @@ export class RecordedNode {
   close() { this.open = false; }
   click() { if (!this.disabled) this.fire('click'); }
   setAttribute(key: string, value: string) { this.attributes.set(key, value); }
+  getAttribute(key: string) { return this.attributes.get(key) ?? null; }
   append(...nodes: RecordedNode[]) { for (const node of nodes) this.insertBefore(node, null); }
   insertBefore(node: RecordedNode, before: RecordedNode | null) {
     node.remove(); const index = before === null ? this.children.length : this.children.indexOf(before);

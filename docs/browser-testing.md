@@ -12,6 +12,21 @@ the normal PWA nor connects to a personal Chrome profile. Normal/validation and
 Desktop evidence are separate. Existing validation/static Desktop lanes share4182;
 run them serially. The additional09 lane below owns separate test servers.
 
+The contextual-explanation regression can be selected with:
+
+```powershell
+npm run test:e2e -- --config playwright.desktop.config.ts desktop-context-help.spec.ts
+```
+
+It uses an owned loopback server for the selected built Desktop artifact and checks
+delayed mouse display, pointer transfer, native keyboard navigation/Escape,
+emulated touch, narrow viewport bounds and a retained Caption draft through actual
+backup metadata and reload. `LOCIVIEW_CONTEXT_HELP_ARTIFACT=offline-desktop-dist`
+selects the separately built offline candidate for this UI check; Service Workers
+remain blocked. This is not offline-launch or physical touch-device acceptance.
+Fixed explanations need viewport-only screenshots when full-page capture would
+scroll away from their trigger; keep runtime bounds and image evidence distinct.
+
 Approved09 has an additional `playwright.offline.config.ts` lane:
 
 ```powershell

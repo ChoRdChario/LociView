@@ -6,6 +6,13 @@ next action and actual stop conditions; [inventory](implementation-inventory.md)
 owns route-specific coverage. Check actual Git branch/HEAD/worktree and preserve
 existing changes. Do not reconstruct current work from completed checkpoint prose.
 
+PO2026-10-30 requests delayed contextual explanations after the operation-screen
+review. Read todo's current boundary and UI guidelines§2.1.1. Only optional
+app-authored copy moves; user records, current failures/unsaved/conflicts and
+sharing/deletion/recovery consequences remain visible. Existing typed operations
+and data contracts remain. The camera gizmo/general header redesign is a separate
+next unit; todo owns current browser/final-check evidence and checkpoint status.
+
 PO prioritizes completing the accepted feature set before readiness-stage latency
 work. The2026-10-29 correction puts daily Scene/Caption organization and editing
 ahead of compatibility expansion and maintenance; later/additional labels do not

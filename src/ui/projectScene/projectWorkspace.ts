@@ -21,6 +21,7 @@ import { createProjectRecovery } from './projectRecovery';
 import { createProjectOrganization } from './projectOrganization';
 import type { WorkspaceRecoveryGroup } from './projectWorkspacePorts';
 import type { ProjectTask, ProjectPanel, ProjectPanelHost, ProjectModelPanel } from './projectPanel';
+import { contextHelp, mountContextHelp } from './contextHelp';
 
 const id = (prefix: string) => `${prefix}_${crypto.randomUUID().replaceAll('-', '')}`;
 const emptyMemory = (): SceneUiMemory => ({ selectedCaptionId: null, search: '', listScrollTop: 0, pinColors: null, ownerFilter: { kind: 'all' } });
@@ -34,6 +35,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   const make = <K extends keyof HTMLElementTagNameMap>(tag: K, text = '') => { const node = document.createElement(tag); node.textContent = text; return node; };
   const button = (text: string, action: () => void) => { const b = make('button', text); b.type = 'button'; b.addEventListener('click', () => { if (!b.disabled && !disposed) action(); }); return b; };
   const root = make('main'); root.className = 'lv-project-workspace';
+  const stopHelp = mountContextHelp(document, root);
   const header = make('header'), introduction = make('p', 'LociViewは3Dモデルと記録を編集できるアプリです。');
   const projectTitle = make('h1'), resumeStatus = make('p'), fileStatus = make('p'), help = make('details');
   projectTitle.setAttribute('aria-label', 'プロジェクト名'); resumeStatus.setAttribute('aria-label', '再開データの状態'); fileStatus.setAttribute('aria-label', '保存ファイルの状態');
@@ -48,7 +50,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   storageHelp.setAttribute('aria-label', 'このサイトの保存容量'); storageStatus.setAttribute('role', 'status');
   const storageCheck = button('保存容量を確認', () => { void queryStorage(); });
   storageHelp.append(make('summary', 'このサイトの保存容量'),
-    make('p', 'このサイト全体の推定値です。プロジェクト単独の容量や端末の空き容量を示すものではありません。保存できるかは実際の保存結果で確認してください。'), storageCheck, storageStatus);
+    contextHelp(document, 'このサイト全体の推定値です。プロジェクト単独の容量や端末の空き容量を示すものではありません。保存できるかは実際の保存結果で確認してください。', [storageCheck]), storageCheck, storageStatus);
   help.append(storageHelp);
   async function queryStorage() {
     if (disposed || storageChecking) return;
@@ -729,5 +731,5 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   mounted = true; render();
   return { root, render, session: interaction, activeScene: () => sceneId, inputPending: () => dirty() || busy,
     hasChanges: () => dirty() || busy || !!pending,
-    unmount() { if (disposed) return; disposed = true;cancelObservation();storageEpoch++; gesture = null; gestureGeneration++; pressedPointers.clear(); viewport.reservePointer(false); recovery?.dispose(); organization?.dispose(); windows.dispose(); mediaManager?.dispose(); mediaViewer.dispose(); viewport.dispose(); list.dispose(); inclusion.dispose(); detail.dispose(); for (const panel of panels.values()) panel.dispose(); root.remove(); } };
+    unmount() { if (disposed) return; disposed = true;stopHelp();cancelObservation();storageEpoch++; gesture = null; gestureGeneration++; pressedPointers.clear(); viewport.reservePointer(false); recovery?.dispose(); organization?.dispose(); windows.dispose(); mediaManager?.dispose(); mediaViewer.dispose(); viewport.dispose(); list.dispose(); inclusion.dispose(); detail.dispose(); for (const panel of panels.values()) panel.dispose(); root.remove(); } };
 }

@@ -4,6 +4,7 @@ import type { WorkspaceAuthoringIntent, ProjectWorkspacePorts, WorkspaceProvider
 import { activeRecord, fieldValue } from './projectRead';
 import { newProjectId, panelNodes, sameProjectValue } from './projectPanel';
 import { sceneChoices } from './navigationState';
+import { contextHelp } from './contextHelp';
 
 interface OrganizationHost {
   ports: ProjectWorkspacePorts; source(): { provider: WorkspaceProvider; sceneId: string; captionId: string | null };
@@ -35,7 +36,7 @@ export function createProjectOrganization(document: Document, host: Organization
     else settingsStatus.textContent = '設定できませんでした。入力は保持しています。';
   });
   const cancelSettings = button('表示名の入力を取り消す', () => { if (!composing && !host.localBlocked()) { settingsDraft = null; settingsStatus.textContent = ''; host.changed(); } });
-  settingsRoot.append(settingsSummary, displayNameLabel, make('p', 'このブラウザだけの設定です。共有ファイルや過去の編集者名は変わりません。'), applySettings, cancelSettings, settingsStatus);
+  settingsRoot.append(settingsSummary, displayNameLabel, contextHelp(document, 'このブラウザだけの設定です。共有ファイルや過去の編集者名は変わりません。', [displayName]), applySettings, cancelSettings, settingsStatus);
   const editorForm = make('div'), editorLabel = make('label', '編集者名'), editorInput = make('input'), editorToggleLabel = make('label'), editorToggle = make('input'), editorStatus = settingsStatus;
   editorInput.maxLength = 256; editorLabel.append(editorInput); editorToggle.type = 'checkbox';
   editorToggleLabel.append(editorToggle, make('span', 'このプロジェクトの今後の編集にこの名前を残す')); editorStatus.setAttribute('role', 'status');
@@ -95,8 +96,9 @@ export function createProjectOrganization(document: Document, host: Organization
     if (command.kind === 'duplicateCaption') { host.caption(command.captionId); host.message('記録を複製しました。元の記録は変わりません。'); }
   }); });
   const undo = button('記録の変更を元に戻す', () => compensate(false)), redo = button('記録の変更をやり直す', () => compensate(true));
-  const undoNote = make('p'); undoNote.textContent = 'この画面の記録作成・複製・削除・文章・色と、添付の操作を戻せます。別の更新がある場合は戻せません。';
-  captionRoot.append(copyCaption, undo, redo, undoNote);
+  const undoNote = make('p'); undoNote.setAttribute('role', 'status');
+  const undoHelp = contextHelp(document, 'この画面の記録作成・複製・削除・文章・色と、添付の操作を戻せます。別の更新がある場合は戻せません。', [undo, redo]);
+  captionRoot.append(copyCaption, undo, redo, undoHelp, undoNote);
   const history = () => actionHistory;
   function currentMatches(snapshot: CaptionUndoSnapshot) { try { const s = host.source(); return sameProjectValue(snapshot, host.ports.authoring!.undoSnapshot(s.provider.token, snapshot.target)); } catch { return false; } }
   function compensate(forward: boolean) {
@@ -163,8 +165,8 @@ export function createProjectOrganization(document: Document, host: Organization
     const h = history(); copyCaption.disabled = blocked || owned || !s.captionId;
     undo.disabled = blocked || owned || !h?.past.length || !currentMatches(h.past.at(-1)!.after);
     redo.disabled = blocked || owned || !h?.future.length || !currentMatches(h.future.at(-1)!.before);
-    undoNote.hidden = !h?.past.length && !h?.future.length;
-    if (undoWarning) { undoNote.hidden = false; undoNote.textContent = undoWarning; }
+    undoHelp.hidden = !h?.past.length && !h?.future.length;
+    undoNote.textContent = undoWarning; undoNote.hidden = !undoWarning;
     saveTag.textContent = captured?.tagId ? 'タグを更新' : 'タグを追加'; saveTag.disabled = blocked || composing || !!stale || !captured || !tagName.value.trim();
     tagCancel.hidden = !captured && !form?.kind.startsWith('tag'); tagCancel.disabled = host.localBlocked() || composing;
     tagConfirm.hidden = form?.kind !== 'tagDelete'; tagConfirm.disabled = blocked || composing || !!stale;
@@ -210,7 +212,7 @@ export function createProjectOrganization(document: Document, host: Organization
       const s = host.source();
       try {
         const receipt = host.ports.authoring!.finishUndo(s.provider.token, capture); recorded.add(capture);
-        if (receipt) { actionHistory.past.push(receipt); actionHistory.future = []; undoWarning = ''; undoNote.textContent = 'この画面の記録作成・複製・削除・文章・色と、添付の操作を戻せます。別の更新がある場合は戻せません。'; }
+        if (receipt) { actionHistory.past.push(receipt); actionHistory.future = []; undoWarning = ''; undoNote.textContent = ''; }
       } catch { recorded.add(capture); actionHistory.future = []; undoWarning = 'この操作は元に戻せません。確定した内容は保持しています。'; }
     },
     dispose() { disposed = true; actionHistory.past = []; actionHistory.future = []; sceneRoot.remove(); captionRoot.remove(); tagsRoot.remove(); settingsRoot.remove(); displayNameBadge.remove(); } };

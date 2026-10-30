@@ -84,7 +84,11 @@ describe('disconnected material controls (not rendering, browser or save accepta
     expect(h.apply.disabled).toBe(false); h.apply.fire('click');
     const plan=h.plans.at(-1)!; if(plan.kind!=='apply') throw Error('apply');
     expect(plan.intent.appearance).toEqual(before); expect(plan.intent.compositing.coverage).toEqual({policy:'mask',alphaCutoff:0});
-    expect(coverage.parent!.children.at(-1)!.textContent).toContain('滑らかな半透明にはなりません');
+    const help = h.root.children[5]!.children.at(-1)!.children[1]!;
+    expect(help.attributes.get('role')).toBe('tooltip'); expect(help.hidden).toBe(true);
+    expect(help.textContent).toContain('滑らかな半透明にはなりません');
+    expect(coverage.attributes.get('aria-describedby')?.split(' ')).toContain(help.id);
+    expect(coverage.parent!.children.at(-1)!.textContent).toBe('');
     const stale={...h.context,source:{...h.context.source,token:'new'}}; h.render(stale); expect(h.apply.disabled).toBe(true);
     expect(cutoff.value).toBe('0'); h.controls.dispose();
   });
