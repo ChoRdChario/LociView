@@ -6,11 +6,16 @@ approved synthetic XYZ/RGB ASCII PLY and image inputs in dedicated profiles.
 It does not connect to the user's browser.
 
 The approved01e PC candidate has a separate `playwright.desktop.config.ts` lane.
-It builds `desktop-dist` and opens the actual `index.html` root, with Service Workers
-blocked, local-only requests and matching dedicated Chromium. It neither activates
-the normal PWA nor connects to a personal Chrome profile. Normal/validation and
-Desktop evidence are separate. Existing validation/static Desktop lanes share4182;
-run them serially. The additional09 lane below owns separate test servers.
+The tracked runner freshly builds both `desktop-dist` and `offline-desktop-dist`:
+the lane contains static-route checks and current-PC checks owning an offline-artifact
+server. No preceding manual build or existing output directory is a prerequisite.
+The runner selects a free loopback port and the static preview uses strict ownership
+without reusing another server; current-PC cases own additional free-port servers.
+Desktop URLs/allowlists derive from that run's origin, including manually launched
+persistent contexts. The lane never navigates or binds the personal4182 preview.
+Service Workers are blocked unless a case explicitly owns an offline profile.
+It neither activates the normal PWA nor connects to a personal Chrome profile.
+Normal/validation and Desktop evidence remain separate; builds/heavy runs are serial.
 
 The contextual-explanation regression can be selected with:
 
@@ -30,7 +35,6 @@ scroll away from their trigger; keep runtime bounds and image evidence distinct.
 The view/edit presentation regression uses the separately built offline candidate:
 
 ```powershell
-npm run build:offline
 npm run test:e2e -- --config playwright.desktop.config.ts desktop-view-mode.spec.ts
 ```
 
@@ -40,11 +44,12 @@ edit-only controls, working search/media/windows/model visibility/camera/saved
 views/background, existing-file download, edit return with the same selection,
 draft switch protection, disclosure/draft/focus return, compact stage/panel and
 actual backup metadata/reload. Its second case uses a short owned persistent
-profile with Service Workers allowed: edit/save before preparation, move the same
-utility node from home Settings to editor Settings, prepare, close browser/server,
-cold offline edit/save, reconnect/remove preparation, then close and reopen the
-same artifact online. It compares Project identity, original change bytes and
-model/media bodies, and checks no automatic registration or foreign-cache removal.
+profile with Service Workers allowed: wait for initial automatic app preparation,
+edit/save, move the same utility node from home Settings to editor Settings, close
+browser/server, cold offline edit/save, reconnect/remove preparation, then close
+and reopen the same artifact online. It compares Project identity, original change
+bytes and model/media bodies. Removal must not restart preparation in that page;
+the later connected boot prepares again while retaining foreign workers/caches.
 The primary PC app is the same throughout; internal build isolation is retained.
 It preserves preparation/Project checks;
 there is no personal Chrome profile or plugin access. Width changes and dispatched
@@ -77,6 +82,19 @@ blocked; the separate same-app cold cycle above owns offline evidence.
 texture decode while reading/searching records and checks actual axis/orbit/pan
 pixel changes on ready content, unchanged edit/file/pin fences and exact metadata
 before/after completion. Local `cameraReady` is distinct from all-model `ready`.
+
+`desktop-project-exclusion.spec.ts` opens the same Project in two pages of one
+Chromium context/origin, using actual shared Web Locks and OPFS. It checks denied
+editing/unchanged readonly content, explicit holder release into view mode, the
+other page acquiring editing and saving/reloading. Backup inspection checks the
+same Project identity, prior change bytes and original model bytes. This is
+different from two independent team peers or a package-operation lock test.
+
+The offline lane below waits for initial automatic app preparation; it never
+requires a removed manual preparation entry. Healthy readiness deliberately stays
+hidden, so tests inspect its status text and worker/cache state rather than require
+a permanent visible banner. Update/error/removal notices remain visible. Settings
+uses `アプリの更新・修復`; diagnostic recheck is under `詳細`.
 
 Approved09 has an additional `playwright.offline.config.ts` lane:
 
@@ -465,3 +483,30 @@ prepares again. It never forces activation, reloads input or uses the user's pro
 Run with `node scripts/run-e2e.mjs --config <owned config>` so the existing dedicated
 browser cache is selected. Todo owns the actual final artifact evidence; these are
 Chromium automation checks, not physical-device, release or aggregate adoption.
+
+## Regression cost and retained boundaries (2026-10-31)
+
+Optimize repeated preparation before removing connected safety checks. The G0
+verifier test can build one immutable synthetic Git repository, then physically
+copy its files and `.git` for each case and clone its JSON metadata. Each mutation,
+commit, environment override and real verifier CLI process remains case-local;
+no hardlinks, shared Git directory, shared live source or result cache is allowed.
+An isolation check must prove that editing/committing one copy changes neither a
+second copy nor the template's bytes, HEAD or registry digest. The existing CLI
+exit-code, redacted diagnostics, recorded-source identity, inherited-Git-environment,
+symlink and dangling-commit checks remain unchanged. Delete per-case copies after
+each case and the immutable template after the suite.
+
+The four07m/07n conversion return flows remain separate. Their shared roundtrip
+helper also protects recipe-specific material routing, post-return overrides,
+Clean-copy source locators/semantics and cold tokens; a common helper alone is not
+proof the variants are interchangeable. Media-format original-byte/profile checks,
+restore receipt mutations, generation/lease/late-callback faults and field-specific
+conflicts remain. Prepared Project sources, sessions, closures and recipient stores
+must never be shared as an optimization.
+
+Compare the changed G0 file before/after with the same `test:focus` command, worker
+count and timeout. The full checkpoint's Vitest duration is a separate end-to-end
+reference: file durations overlap under two workers, and runs at different times
+do not constitute a controlled hardware benchmark. Test count reduction is not an
+acceptance target. No retries, exclusions or timeout increases are implied.

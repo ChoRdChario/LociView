@@ -56,7 +56,143 @@ unchanged-feature-classification checks pass; independent review has no findings
 No runtime change or new capacity guarantee; no runtime suite is needed for this
 documentation checkpoint.
 
-## Current boundary —measured file output and one intent per operation
+## Current boundary —reproducible browser coverage and efficient regression
+
+PO authorizes the audited sequence: first fix browser execution/build prerequisites
+and missing auto-offline/update/same-Project two-window evidence, then consolidate
+heavy redundant tests while preserving all safety/compatibility checks. Report
+comparable before/after wall times and the next stage; no small manual test waits.
+
+Plan: establish one reproducible tracked current-PC lane with owned origins and
+fresh correct artifacts → adapt existing multi-build offline faults and add one
+same-profile same-Project exclusion/release workflow → independent review and
+execute these lanes → profile/consolidate the costly immutable preparation and
+shared full-roundtrip work with a retained-assertion mapping → focused/fault tests,
+full final serial checkpoint and before/after execution timings → docs/handoff and
+verified g0 checkpoint/Push. One implementation writer; parallel review is read-only.
+No new framework/dependency, production/storage/format/gate relaxation, arbitrary
+count target, automatic retry, assertion reduction or timeout increase. Distinct
+privacy/profile/recipe/original/lease/publication/recovery risks remain covered.
+Stop only the affected unit for a genuinely new product/architecture contract.
+
+Preserve the unrelated pre-existing investigation record and private artifacts;
+they are outside this implementation/commit. The initial task record is saved
+under ignored artifacts. Base f1f636e, g0-baseline.
+Baseline full run1058.78s,140 files/3126PASS/21existingTODO; file-time sum1280.93s
+with projectFiles879.61s, metadataHost167.23s, G0 verifier103.97s. New browser fault
+coverage has no valid old-runtime baseline; distinguish restored coverage from
+speedup, and compare the full root suite with the same flags/environment.
+
+
+Phase1 implemented: the tracked Desktop runner selects an owned free loopback
+origin, strictly refuses reuse and freshly builds both required artifacts; all
+Desktop URL/allowlists use that origin, including manually launched contexts.
+The existing five-case offline lane now waits for automatic preparation and reads
+hidden healthy status, with current Settings/repair labels and pre-app foreign
+worker seeding. New actual same-profile/same-Project exclusion/release/save/reload
+case PASS23.1s (55.1s with fresh builds), inspecting exact backup identity, old
+change bytes and original GLB bytes. Static Desktop entry PASS4.0s. New-test
+creation failures (unfocused model selector/Node Automerge initialization) remain
+in ignored run artifacts; no production defect or relaxed assertion resulted.
+The five existing offline cases now PASS:500k static→cold edit/save/reopen,
+admitted conversion/refusal, removal/static return681.056s (fresh4-build wall
+738.70s); A/B two-window update with wrong200/missing/interruption/quota/repair,
+cache/controller/draft preservation and full-close cold-B46.739s; directory scope
+7.087s, Project bootstrap failure5.395s, foreign worker5.402s. Runs
+1793432699852-57128 and1793432213271-67004 retain exact evidence. Earlier failures
+were old File/help overlays and an ambiguous two-gallery image locator; helpers
+now close actual owned menus and scope the Caption window, without forceclick,
+DOM writes, relaxed assertions or retries. Phase1 adds/restores coverage, not an
+old-versus-new speed comparison. Phase2 begins with a serial same-command G0
+before measurement; all four recipe-specific return flows remain unchanged.
+
+
+Phase2 retains every existing test/assertion and changes only G0 immutable
+preparation: one synthetic Git repository per suite, physical case-local copies
+including .git and deep-cloned metadata, separate failure-safe case/template
+cleanup. New isolation case proves A write/commit does not alter B/template
+HEAD, registry/fixture bytes or nested metadata. Both independent reviews have
+no required findings. Same-command serial G0 measurements: before82PASS,
+Vitest107.60s/npm process wall108.91s; after83PASS (one isolation case),
+82.44s/83.98s, about25s/23% less observed elapsed time. Single before/after
+observations are not a numeric guarantee. Production verifier, four recipe returns,
+media matrices and all fault/privacy/version/routing assertions remain unchanged.
+Final verification at the frozen source/test tree: serial check:checkpoint PASS
+(typecheck, full root suite, normal/harness/validation/Desktop/offline builds,
+offline isolation);140files/3127PASS/21existingTODO. Full Vitest1228.65s versus
+baseline1058.78s (+169.87s); complete checkpoint wall1333.89s. This is a qualified
+reference comparison, not an overall speedup. File durations before→after:
+projectFiles879.61→1219.20s, metadataHost167.23→185.67s, G0103.97→76.17s.
+The unchanged large file dominates elapsed time; collect27.71→68.07s and
+transform6.14→12.90s also increased. Causes are not separated. Summed file/test
+time1280.93→1733.78s is not parallel wall time. No numeric-driven rerun or
+removal of distinct safety coverage was used.
+
+Five-artifact HEIC public-path isolation PASS. Desktop collection PASS39cases in
+24files; collection is not execution of all those cases. The bounded executed
+browser cases are listed above; no aggregate browser/device/adoption claim.
+The existing4191 preview returns200 and exact final offline-artifact HTML and
+entry JS/CSS bytes. Frozen source/test19-file hashes match before/after the final
+checkpoint. Evidence is under ignored .artifacts/e2e/test-strategy; earlier failed
+runs and profiles remain. Documentation links/diff and staged scope are checked
+before the verified g0 checkpoint/Push; no release or normal PWA activation.
+
+Next: close this test-infrastructure slice and return to an integrated real-data
+operation/UI/UX pass, fixing concrete issues there. Retain the recipe-specific
+file workflows and recorded runtime bottleneck; do not continue auxiliary test
+consolidation without a concrete coverage-preserving need. Physical iOS, native
+IME, trusted HTTPS and real disk-full acceptance remain pending; existing21TODO
+are not counted as passes. No small PO test waits are introduced.
+
+## Previous boundary —test value, execution cost and coverage review
+
+PO requests reviewing whether the regression suite is optimal: identify duplication
+and unnecessary cost, and check for missing important behavior. This boundary is
+read-only investigation/reporting; no test removal, assertion relaxation, CI/gate
+change or production implementation is authorized by this review alone.
+Plan: inspect existing full-run timings/config selection, sample the expensive
+integration/fixture patterns, independently review redundancy and route/fault gaps,
+then report a prioritized retain/consolidate/add proposal with evidence. Reuse
+recorded runs; do not rerun the full suite merely to count tests. Stop before
+altering accepted coverage or final-check requirements. Root and two bounded
+reviewers remain read-only except this current task record.
+
+Review completed using the last full-run log and its matching140-file Vitest cache
+(sum of file durations1280.93s; parallel wall1058.78s). projectFiles879.61s,
+ui/projectMetadataHost167.23s and scripts/g0EvidenceVerifier103.97s account for
+about90% of summed file durations, not90% of wall. No new full run was needed.
+Independent reviews found both consolidation candidates and evidence gaps:
+- projectFiles exerciseOpaqueFileReturns repeats two-peer/two-round-trip/copy/cold
+  work for four07m/07n variants. Keep recipe/profile/original/privacy checks per
+  variant; evaluate shared round-trip coverage only after proving common paths.
+  Media-format package/restore matrices have a similar layering opportunity.
+- Explicit Caption/material/view test owners can replace ambiguous generic button
+  lookup; recent hidden/removed-control failures cost full-suite reruns. Evidence
+  verifier fixtures also repeatedly create Git repositories/commits and spawn CLI;
+  share immutable preparation while isolating mutations, retaining real CLI/Git
+  identity/redaction/environment boundary tests. Measure before claiming savings.
+- Restore receipt mutations, generation/lease/late-completion faults, field-specific
+  conflicts and original-byte/privacy assertions cover distinct risks; retain them.
+- Current PC browser specs read offline-desktop-dist, but the shared Desktop lane
+  builds only desktop-dist. Align tracked commands/artifact prerequisites so a
+  fresh checkout cannot use absent/stale offline output. Root check:checkpoint
+  does not execute browser specs and is not evidence of all browser routes.
+- Old09 multi-build fault helper still requires manual preparation/old UI. Adapt
+  existing tests to auto startup and rerun A-to-B update failure/old-cache retention,
+  quota/repair, two-window pending-update and ownership/scope cases. The passing
+  single-build cold/removal flow is not equivalent evidence.
+- A representative same-profile/same-Project two-window write-exclusion/release
+  browser case needs explicit confirmation; injected LockManager tests, separate
+  recipient contexts and package-lock GS tests do not alone prove that workflow.
+  Existing21TODO concern mostly old-v1/G0 contracts, not21 current feature defects;
+  physical iOS/native IME/HTTPS evidence remains separate.
+Recommended sequencing: repair reproducible/current browser coverage first, then
+profile expensive cases and consolidate setup/shared round-trips with unchanged
+risk coverage. Do not set a target test count or remove checks merely by count.
+Production/tests/configs are unchanged by this audit. Next implementation requires
+its own bounded plan; accepted final-check/release gates have not been weakened.
+
+## Previous verified boundary —measured file output and one intent per operation
 
 PO explicitly requests improving file-output wait while preserving save safety,
 automatic verification and a careful check for meaningless development-era splits.

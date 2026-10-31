@@ -1,10 +1,10 @@
 import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { copyFile, cp, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 
 type JsonObject = Record<string, unknown>;
 type CliResult = { exitCode: number; stdout: string; stderr: string };
@@ -31,6 +31,8 @@ const verifierPath = resolve(repositoryRoot, 'scripts', 'verify-g0-evidence.mjs'
 const evidenceSource = resolve(repositoryRoot, 'evidence', 'g0');
 const registrySchemaSource = resolve(repositoryRoot, 'fixtures', 'registry.schema.json');
 const createdRoots: string[] = [];
+let templateRoot: string | undefined;
+let templateWorkspace: SyntheticWorkspace;
 const SYNTHETIC_NOTE = 'SYNTHETIC TEST FIXTURE ONLY; this is not measured G0 evidence.';
 const EXTERNAL_FIXTURE_LOCATOR = 'https://github.com/ChoRdChario/LociView/releases/download/fixtures-v1.0.0/synthetic-g0-mesh-v1.glb';
 const EXTERNAL_ACQUISITION_WARNING = 'External transport identity requires separate acquisition verification.';
@@ -135,10 +137,7 @@ function expectRelativeDiagnostic(
   expect(result.stderr).not.toContain(root.replaceAll('\\', '/'));
 }
 
-async function makeWorkspace(): Promise<SyntheticWorkspace> {
-  const root = await mkdtemp(join(tmpdir(), 'lociview-g0-verifier-'));
-  createdRoots.push(root);
-
+async function buildWorkspace(root: string): Promise<SyntheticWorkspace> {
   for (const directory of ['schema', 'templates', 'devices', 'runs', 'manifests']) {
     await mkdir(resolve(root, 'evidence', 'g0', directory), { recursive: true });
   }
@@ -222,6 +221,14 @@ async function makeWorkspace(): Promise<SyntheticWorkspace> {
   const commits = await initialiseGit(root);
   const registrySha256 = sha256(await readFile(resolve(root, 'fixtures', 'registry.json')));
   return { root, ...commits, buildPackageLockSha256: sha256(lockBytes), registrySha256, fixture, trace };
+}
+
+/** Only immutable preparation is shared; every case gets its own files and Git repository. */
+async function makeWorkspace(): Promise<SyntheticWorkspace> {
+  const root = await mkdtemp(join(tmpdir(), 'lociview-g0-verifier-'));
+  createdRoots.push(root);
+  await cp(templateWorkspace.root, root, { recursive: true, force: false, errorOnExist: true });
+  return { ...clone(templateWorkspace), root };
 }
 
 async function deviceTemplate(root: string): Promise<JsonObject> {
@@ -537,11 +544,44 @@ async function createDanglingCommit(root: string): Promise<string> {
   return commitResult.stdout.trim();
 }
 
+beforeAll(async () => {
+  templateRoot = await mkdtemp(join(tmpdir(), 'lociview-g0-verifier-template-'));
+  templateWorkspace = await buildWorkspace(templateRoot);
+});
+
 afterEach(async () => {
   await Promise.all(createdRoots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
 });
 
+afterAll(async () => {
+  if (templateRoot) await rm(templateRoot, { recursive: true, force: true });
+});
+
 describe('G0 evidence verifier CLI', () => {
+  it('isolates copied Git history, fixture bytes and metadata from peers and the immutable template', async () => {
+    const first = await makeWorkspace(), second = await makeWorkspace(), original = clone(templateWorkspace);
+    const snapshot = async (workspace: SyntheticWorkspace) => {
+      const head = await runFile('git', ['rev-parse', 'HEAD'], { cwd: workspace.root });
+      const gitDirectory = await runFile('git', ['rev-parse', '--absolute-git-dir'], { cwd: workspace.root });
+      expect(head.exitCode).toBe(0); expect(gitDirectory.exitCode).toBe(0);
+      expect(resolve(gitDirectory.stdout.trim())).toBe(resolve(workspace.root, '.git'));
+      return { head: head.stdout.trim(),
+        registry: sha256(await readFile(resolve(workspace.root, 'fixtures/registry.json'))),
+        fixture: sha256(await readFile(resolve(workspace.root, 'fixtures/data/synthetic-g0-mesh.glb'))) };
+    };
+    const beforeSecond = await snapshot(second), beforeTemplate = await snapshot(templateWorkspace);
+    const registry = resolve(first.root, 'fixtures/registry.json');
+    await writeFile(registry, `${await readFile(registry, 'utf8')}\n`);
+    await writeFile(resolve(first.root, 'fixtures/data/synthetic-g0-mesh.glb'), 'case-local replacement bytes');
+    first.fixture.sha256 = SHA_A; first.trace.sha256 = SHA_B;
+    const commit = await commitFiles(first.root, ['fixtures/registry.json', 'fixtures/data/synthetic-g0-mesh.glb'], 'case-local mutation');
+    expect(commit).not.toBe(original.evidenceCommit);
+    expect(await snapshot(second)).toEqual(beforeSecond);
+    expect(await snapshot(templateWorkspace)).toEqual(beforeTemplate);
+    expect(second.fixture).toEqual(original.fixture); expect(second.trace).toEqual(original.trace);
+    expect(templateWorkspace).toEqual(original);
+  });
+
   it('accepts the pending-only synthetic workspace and prints a summary', async () => {
     const workspace = await makeWorkspace();
     const result = await runVerifier(workspace.root);

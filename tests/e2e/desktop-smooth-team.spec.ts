@@ -1,3 +1,4 @@
+import { desktopOrigin, desktopEntry } from './desktopEntry';
 import {beginMaterialEditing} from './workspaceUi';
 import { revealFileSurface, lookAlongFront } from './workspaceUi';
 import {test,expect,chromium,type Page,type BrowserContext,type TestInfo} from '@playwright/test';
@@ -35,8 +36,8 @@ async function inspect(path:string){const bytes=Uint8Array.from(await readFile(p
 
 test('01g GS/Proxy and points retain smooth appearance through edit, workspace, GPU recovery, backup restore and cold reopen',async({},info)=>{
   test.setTimeout(900000);A.getHeads(A.init());await mkdir('.artifacts/e2e/profiles',{recursive:true});const profiles=await Promise.all(['a','b','r','v'].map(x=>mkdtemp('.artifacts/e2e/profiles/sm-'+x+'-'))),contexts=new Set<BrowserContext>(),errors:string[]=[];
-  const launch=async(index:number)=>{const context=await chromium.launchPersistentContext(profiles[index]!,{channel:'chromium',headless:true,viewport:{width:2560,height:1440},deviceScaleFactor:index===1?2:1,serviceWorkers:'block',acceptDownloads:true});contexts.add(context);await context.route('**/*',r=>{const u=new URL(r.request().url());return u.origin==='http://127.0.0.1:4182'||['blob:','data:'].includes(u.protocol)?r.continue():r.abort('blockedbyclient');});
-    const p=context.pages()[0]??await context.newPage();p.on('pageerror',e=>errors.push(e.message));p.on('console',m=>{if(m.type()==='error')errors.push(m.text());});await p.goto('/');return{p,context};};
+  const launch=async(index:number)=>{const context=await chromium.launchPersistentContext(profiles[index]!,{channel:'chromium',headless:true,viewport:{width:2560,height:1440},deviceScaleFactor:index===1?2:1,serviceWorkers:'block',acceptDownloads:true});contexts.add(context);await context.route('**/*',r=>{const u=new URL(r.request().url());return u.origin===desktopOrigin||['blob:','data:'].includes(u.protocol)?r.continue():r.abort('blockedbyclient');});
+    const p=context.pages()[0]??await context.newPage();p.on('pageerror',e=>errors.push(e.message));p.on('console',m=>{if(m.type()==='error')errors.push(m.text());});await p.goto(desktopEntry);return{p,context};};
   const close=async(context:BrowserContext)=>{await context.close();contexts.delete(context);};
   try{
     const a=await launch(0),p=a.p;await p.getByLabel('ファイルを選択',{exact:true}).setInputFiles([{name:'透過.glb',mimeType:'model/gltf-binary',buffer:glb},{name:'全係数.ply',mimeType:'application/ply',buffer:gs},{name:'点.ply',mimeType:'application/ply',buffer:point}]);await p.getByRole('button',{name:'ファイルを開く',exact:true}).click();await p.getByRole('textbox',{name:'プロジェクト名',exact:true}).fill('GSと透過の作業');await p.getByRole('button',{name:'プロジェクトを作成',exact:true}).click();await healthy(p);

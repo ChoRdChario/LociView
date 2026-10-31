@@ -1,3 +1,4 @@
+import { desktopOrigin, desktopEntry } from './desktopEntry';
 import { revealCoordinateAdd, revealFileSurface } from './workspaceUi';
 import { test, expect, chromium, type Page, type BrowserContext, type TestInfo } from '@playwright/test';
 import { mkdir, mkdtemp, readFile } from 'node:fs/promises';
@@ -93,7 +94,7 @@ test('08b editor names remain exact through collaboration, purpose privacy, rest
     const oldRoot = resolve('.artifacts/e2e/editor-attribution-old-reader/6c3788e06fa004f4c1f13ba2091f47f183695c2d/desktop-dist');
     await context.route('**/*', async route => {
       const u = new URL(route.request().url()); if (['blob:', 'data:'].includes(u.protocol)) return route.continue();
-      if (u.origin !== 'http://127.0.0.1:4182') { errors.push('unexpected network origin'); return route.abort('blockedbyclient'); }
+      if (u.origin !== desktopOrigin) { errors.push('unexpected network origin'); return route.abort('blockedbyclient'); }
       if (!old) return route.continue();
       const path = resolve(oldRoot, u.pathname === '/' ? 'index.html' : '.' + u.pathname);
       if (!path.startsWith(oldRoot + sep)) throw Error('Old build path');
@@ -104,7 +105,7 @@ test('08b editor names remain exact through collaboration, purpose privacy, rest
     });
     const p = context.pages()[0] ?? await context.newPage(); p.setDefaultTimeout(15_000);
     p.on('pageerror', e => (old ? oldErrors : errors).push(e.message));
-    await p.goto('/'); return { context, p };
+    await p.goto(desktopEntry); return { context, p };
   };
   const close = async (context: BrowserContext) => { await context.close(); contexts.delete(context); };
   try {
@@ -182,10 +183,10 @@ test('08b GS confirmation keeps its editor when another tab changes the local se
   const profile = await mkdtemp('.artifacts/e2e/profiles/editor-gs-'), errors: string[] = [];
   const context = await chromium.launchPersistentContext(profile, { channel: 'chromium', headless: true, viewport: { width: 1440, height: 1000 }, serviceWorkers: 'block', acceptDownloads: true });
   const p = context.pages()[0] ?? await context.newPage(); p.setDefaultTimeout(15_000);
-  await context.route('**/*', route => { const u = new URL(route.request().url()); if (u.origin === 'http://127.0.0.1:4182' || ['blob:', 'data:'].includes(u.protocol)) return route.continue(); errors.push('unexpected network origin'); return route.abort(); });
+  await context.route('**/*', route => { const u = new URL(route.request().url()); if (u.origin === desktopOrigin || ['blob:', 'data:'].includes(u.protocol)) return route.continue(); errors.push('unexpected network origin'); return route.abort(); });
   p.on('pageerror', error => errors.push(error.message));
   try {
-    await p.goto('/'); await p.getByLabel('ファイルを選択', { exact: true }).setInputFiles({ name: 'model.ply', mimeType: 'application/octet-stream', buffer: Buffer.from(gsFixture()) });
+    await p.goto(desktopEntry); await p.getByLabel('ファイルを選択', { exact: true }).setInputFiles({ name: 'model.ply', mimeType: 'application/octet-stream', buffer: Buffer.from(gsFixture()) });
     await p.getByRole('button', { name: 'ファイルを開く', exact: true }).click(); await p.getByRole('textbox', { name: 'プロジェクト名', exact: true }).fill(title);
     await p.getByRole('button', { name: 'プロジェクトを作成', exact: true }).click(); await expect(p.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText(title, { timeout: 90_000 });
     await expect(p.getByLabel('3Dモデルの表示', { exact: true })).toHaveAttribute('aria-busy', 'false', { timeout: 90_000 }); await editor(p, nameA);
@@ -195,7 +196,7 @@ test('08b GS confirmation keeps its editor when another tab changes the local se
     const confirm = panel.getByRole('button', { name: 'このモデルに面を追加', exact: true }); await expect(confirm).toBeEnabled();
     // A second same-origin tab injects an advisory UI-preference change. Project
     // writes still go through the real Proxy confirmation and Session command.
-    const other = await context.newPage(); other.setDefaultTimeout(15_000); await other.goto('/');
+    const other = await context.newPage(); other.setDefaultTimeout(15_000); await other.goto(desktopEntry);
     other.on('pageerror', error => errors.push(error.message));
     await p.evaluate(() => {
       const w = window as any, original = crypto.subtle.digest.bind(crypto.subtle); w.__holdGsEditorDigest = true;

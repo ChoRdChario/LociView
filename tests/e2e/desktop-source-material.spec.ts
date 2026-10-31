@@ -1,3 +1,4 @@
+import { desktopEntry, desktopOrigin } from './desktopEntry';
 import {beginMaterialEditing} from './workspaceUi';
 import { revealFileSurface, lookAlongFront, revealCaptionList } from './workspaceUi';
 import {test,expect,chromium,type Page,type TestInfo,type BrowserContext} from '@playwright/test';
@@ -13,7 +14,7 @@ import {WorkspaceArchive} from '../../src/projectPackage/workspaceArchive';
 import {inspectProjectCandidates} from '../../src/domain/projectCandidates';
 import {validationMetadataLimits as limits} from '../../src/projectFiles/validation';
 
-const title='元の材質を編集',entry='http://127.0.0.1:4182/?timings=1';
+const title='元の材質を編集',entry=desktopEntry+'?timings=1';
 const materials=(p:Page)=>p.getByRole('region',{name:'材質',exact:true});
 const detail=(p:Page)=>p.getByRole('region',{name:'キャプションの詳細',exact:true});
 async function ready(p:Page){await expect(p.getByRole('heading',{name:'プロジェクト名',exact:true})).toHaveText(title,{timeout:240000});await expect(p.locator('.lv-project-viewport-status')).toBeEmpty({timeout:180000});}
@@ -40,7 +41,7 @@ test('元の両面・照明なし・切り抜きを編集解除しGPU選択と5�
   test.setTimeout(1200000);A.getHeads(A.init());await mkdir('.artifacts/e2e/profiles',{recursive:true});
   const profiles=await Promise.all(['a','b','review','clean','restore'].map(x=>mkdtemp('.artifacts/e2e/profiles/material-'+x+'-'))),contexts=new Set<BrowserContext>(),errors:string[]=[],stages:unknown[]=[];const started=Date.now();
   const mark=(name:string)=>{stages.push({name,ms:Date.now()-started});console.log(name,Date.now()-started);};
-  const launch=async(index:number)=>{const context=await chromium.launchPersistentContext(profiles[index]!,{channel:'chromium',headless:true,viewport:{width:1440,height:1000},deviceScaleFactor:1,serviceWorkers:'block',acceptDownloads:true});contexts.add(context);await context.route('**/*',r=>{const u=new URL(r.request().url());return u.origin==='http://127.0.0.1:4182'||['data:','blob:'].includes(u.protocol)?r.continue():r.abort('blockedbyclient');});const p=context.pages()[0]??await context.newPage();p.on('pageerror',e=>errors.push(e.message));p.on('console',m=>{if(m.type()==='error')errors.push(m.text());});await p.goto(entry);return{context,p};};
+  const launch=async(index:number)=>{const context=await chromium.launchPersistentContext(profiles[index]!,{channel:'chromium',headless:true,viewport:{width:1440,height:1000},deviceScaleFactor:1,serviceWorkers:'block',acceptDownloads:true});contexts.add(context);await context.route('**/*',r=>{const u=new URL(r.request().url());return u.origin===desktopOrigin||['data:','blob:'].includes(u.protocol)?r.continue():r.abort('blockedbyclient');});const p=context.pages()[0]??await context.newPage();p.on('pageerror',e=>errors.push(e.message));p.on('console',m=>{if(m.type()==='error')errors.push(m.text());});await p.goto(entry);return{context,p};};
   const close=async(c:BrowserContext)=>{await c.close();contexts.delete(c);};
   try{
     let a=await launch(0),p=a.p;await p.getByLabel('ファイルを選択',{exact:true}).setInputFiles({name:'元の材質.glb',mimeType:'model/gltf-binary',buffer:sourceMaterialPanelsGlb()});await p.getByRole('button',{name:'ファイルを開く',exact:true}).click();await p.getByRole('textbox',{name:'プロジェクト名',exact:true}).fill(title);await p.getByRole('button',{name:'プロジェクトを作成',exact:true}).click();await ready(p);await lookAlongFront(p);mark('created');

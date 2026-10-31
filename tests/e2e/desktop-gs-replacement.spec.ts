@@ -1,3 +1,4 @@
+import { desktopEntry, desktopOrigin } from './desktopEntry';
 import { revealFileSurface, revealModelManagement, lookAlongFront } from './workspaceUi';
 import {test,expect,chromium,type Page,type BrowserContext,type TestInfo} from '@playwright/test';
 import {mkdir,mkdtemp} from 'node:fs/promises';
@@ -13,7 +14,7 @@ import {WorkspaceArchive} from '../../src/projectPackage/workspaceArchive';
 import {inspectProjectCandidates} from '../../src/domain/projectCandidates';
 import {validationMetadataLimits} from '../../src/projectFiles/validation';
 import {presentedCanvas} from './presentedCanvas';
-const entry='http://127.0.0.1:4182/?timings=1',title='GSの本体更新';
+const entry=desktopEntry+'?timings=1',title='GSの本体更新';
 const models=(p:Page)=>p.getByRole('tabpanel',{name:'モデル',exact:true});
 async function ready(p:Page){await expect(p.getByRole('heading',{name:'プロジェクト名',exact:true})).toHaveText(title,{timeout:240_000});await expect(p.locator('.lv-project-viewport-status')).toBeEmpty({timeout:180_000});}
 async function output(p:Page,info:TestInfo,name:string,workspace=false){
@@ -33,7 +34,7 @@ test('50万点SH4を新しい本体へ差し替え、旧資源の解放・2世�
  await mkdir('.artifacts/e2e/profiles',{recursive:true});const profile=await mkdtemp('.artifacts/e2e/profiles/gs-replacement-');let context:BrowserContext|undefined;
  const mark=async(stage:string,p:Page)=>{await p.evaluate(()=>document.dispatchEvent(new Event('lociview-timing-snapshot')));stages.push({stage,wallMs:Date.now()-started,timing:await p.evaluate(()=>performance.getEntriesByType('measure').map(e=>({name:e.name,ms:e.duration,detail:(e as PerformanceMeasure).detail})))});console.log(stage,Date.now()-started);};
  const launch=async()=>{context=await chromium.launchPersistentContext(profile,{channel:'chromium',headless:true,viewport:{width:1440,height:1000},serviceWorkers:'block',acceptDownloads:true});context.setDefaultTimeout(15_000);
-  await context.route('**/*',route=>{const url=new URL(route.request().url());return url.origin==='http://127.0.0.1:4182'||['blob:','data:'].includes(url.protocol)?route.continue():route.abort('blockedbyclient');});
+  await context.route('**/*',route=>{const url=new URL(route.request().url());return url.origin===desktopOrigin||['blob:','data:'].includes(url.protocol)?route.continue():route.abort('blockedbyclient');});
   await context.addInitScript(()=>{const original=Blob.prototype.arrayBuffer;(window as any).wholeGsReads=0;Blob.prototype.arrayBuffer=async function(){if(this.size>1_048_576){const prefix=new Uint8Array(await original.call(Blob.prototype.slice.call(this,0,32)));if(new TextDecoder().decode(prefix).startsWith('ply\nformat binary_little_endian')){(window as any).wholeGsReads++;throw Error('Whole GS arrayBuffer forbidden');}}return original.call(this);};});
   await context.tracing.start({screenshots:true,snapshots:true,sources:true});const p=context.pages()[0]??await context.newPage();p.on('pageerror',e=>errors.push(e.message));p.on('console',m=>{if(m.type()==='error')errors.push(m.text());});await p.goto(entry);return p;};
  const close=async(label:string)=>{expect(await context!.pages()[0]!.evaluate(()=>(window as any).wholeGsReads)).toBe(0);await context!.tracing.stop({path:info.outputPath(label+'-trace.zip')});await context!.close();context=undefined;};

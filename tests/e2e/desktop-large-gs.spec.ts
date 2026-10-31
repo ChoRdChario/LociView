@@ -1,3 +1,4 @@
+import { desktopEntry, desktopOrigin } from './desktopEntry';
 import { revealFileSurface, lookAlongFront } from './workspaceUi';
 import {test,expect,chromium,type Page,type BrowserContext,type TestInfo} from '@playwright/test';
 import {mkdir,mkdtemp} from 'node:fs/promises';
@@ -13,7 +14,7 @@ import {WorkspaceArchive} from '../../src/projectPackage/workspaceArchive';
 import {PackageArchive} from '../../src/projectPackage/zipArchive';
 import {inspectProjectCandidates} from '../../src/domain/projectCandidates';
 import {validationMetadataLimits} from '../../src/projectFiles/validation';
-const entry='http://127.0.0.1:4182/?timings=1';
+const entry=desktopEntry+'?timings=1';
 const files=(p:Page)=>p.getByRole('region',{name:'ファイル',exact:true});
 const models=(p:Page)=>p.getByRole('tabpanel',{name:'モデル',exact:true});
 async function ready(p:Page){await expect(p.getByRole('heading',{name:'プロジェクト名',exact:true})).toHaveText('大容量SH4',{timeout:240_000});await expect(p.locator('.lv-project-viewport-status')).toBeEmpty({timeout:180_000});}
@@ -48,7 +49,7 @@ test('PC入口で50万点SH4の全5用途・返送・Review編集コピー・復
  await mkdir('.artifacts/e2e/profiles',{recursive:true});const profiles=await Promise.all(['a','b','review','clean','restore'].map(label=>mkdtemp('.artifacts/e2e/profiles/desktop500k-'+label+'-')));
  const mark=async(stage:string,p:Page)=>{await p.evaluate(()=>document.dispatchEvent(new Event('lociview-timing-snapshot')));stages.push({stage,wallMs:Date.now()-started,timing:await p.evaluate(()=>performance.getEntriesByType('measure').map(e=>({name:e.name,ms:e.duration,detail:(e as PerformanceMeasure).detail})))});console.log(stage,Date.now()-started);};
  const launch=async(index:number)=>{const context=await chromium.launchPersistentContext(profiles[index]!,{channel:'chromium',headless:true,viewport:{width:1440,height:1000},serviceWorkers:'block',acceptDownloads:true});contexts.add(context);context.setDefaultTimeout(15_000);
-  await context.route('**/*',route=>{const u=new URL(route.request().url());return u.origin==='http://127.0.0.1:4182'||['blob:','data:'].includes(u.protocol)?route.continue():route.abort('blockedbyclient');});
+  await context.route('**/*',route=>{const u=new URL(route.request().url());return u.origin===desktopOrigin||['blob:','data:'].includes(u.protocol)?route.continue():route.abort('blockedbyclient');});
   // ZIP inspection may capture bounded1MiB ranges; GS-source inspection has its
   // own64KiB unit test. Capturing this178MB source is forbidden on every path.
   await context.addInitScript(()=>{const original=Blob.prototype.arrayBuffer;(window as any).wholeGsReads=0;Blob.prototype.arrayBuffer=async function(){if(this.size>1_048_576){const prefix=new Uint8Array(await original.call(Blob.prototype.slice.call(this,0,32)));if(new TextDecoder().decode(prefix).startsWith('ply\nformat binary_little_endian')){(window as any).wholeGsReads++;throw Error('Whole GS arrayBuffer forbidden');}}return original.call(this);};});

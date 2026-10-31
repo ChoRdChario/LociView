@@ -6,11 +6,16 @@ next action and actual stop conditions; [inventory](implementation-inventory.md)
 owns route-specific coverage. Check actual Git branch/HEAD/worktree and preserve
 existing changes. Do not reconstruct current work from completed checkpoint prose.
 
-PO2026-10-31 now requests measured file-output latency improvement and removal of
-meaningless development-era branches. Start at todo's current boundary for the
-accepted read-scope/source-ownership change, final checks and remaining refresh
-cost. File purposes, originals/history and all write/recovery fences remain; the
-prior simplification below is retained context, not the next task queue.
+PO2026-10-31 now authorizes reproducible browser prerequisites and missing offline/
+same-Project exclusion coverage first, then safe regression setup consolidation.
+The integrated browser/G0 preparation slice now passes its required final checks;
+todo owns exact before/after measurements and limits. Next return to an integrated
+real-data operation/UI/UX pass and fix concrete issues there. Preserve distinct
+recipe/material/privacy/publication/recovery
+assertions rather than targeting a lower case count. Browser lanes use dedicated
+Chromium and owned origins; no personal4182 server is required. File purposes,
+originals/history and write/recovery fences remain. Earlier latency/simplification
+work below is retained context, not the next task queue.
 
 PO2026-10-31 latest simplification owns the current boundary: list-top plus and row edit/delete, secondary membership/tags, no comparison-window manager, window-body pointer/focus activation, Scene-only initial camera recording, direct material editing and explicit File intents. Initial app-resource preparation is automatic under09§9.1; connected/offline use shares one origin/profile and Project. Normal ready state is quiet; update/repair/removal retain safe deferred activation and local recovery. Existing history/views remain. Read the first dated workspace-design revision and todo for actual checks/remaining work. Earlier layouts below do not reinstate the saved-view picker, generic organizer or manual offline startup split.
 

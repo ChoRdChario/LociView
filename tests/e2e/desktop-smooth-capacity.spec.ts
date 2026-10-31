@@ -1,3 +1,4 @@
+import { desktopOrigin, desktopEntry } from './desktopEntry';
 import { lookAlongFront } from './workspaceUi';
 import {test,expect,type Page} from '@playwright/test';
 import {readFile,writeFile} from 'node:fs/promises';
@@ -12,12 +13,12 @@ test('01g production500k SH4 matched120s camera cost and target lifecycle',async
   const errors:string[]=[],results:Record<string,any>={},baseline=resolve('.artifacts/e2e/smooth01g-baseline-5e5bb9e/desktop-dist');
   for(const mode of ['baseline','candidate']){
     const context=await browser.newContext({viewport:{width:2200,height:1300},deviceScaleFactor:1,serviceWorkers:'block'});await context.addInitScript(installSmoothObservation);
-    await context.route('**/*',async route=>{const u=new URL(route.request().url());if(['blob:','data:'].includes(u.protocol))return route.continue();if(u.origin!=='http://127.0.0.1:4182')return route.abort();if(mode==='candidate')return route.continue();
+    await context.route('**/*',async route=>{const u=new URL(route.request().url());if(['blob:','data:'].includes(u.protocol))return route.continue();if(u.origin!==desktopOrigin)return route.abort();if(mode==='candidate')return route.continue();
       const path=resolve(baseline,'.'+decodeURIComponent(u.pathname==='/'?'/index.html':u.pathname));if(!path.startsWith(baseline+sep))throw Error('Baseline path');const type:Record<string,string>={'.html':'text/html','.js':'application/javascript','.css':'text/css','.wasm':'application/wasm','.json':'application/json'};await route.fulfill({body:await readFile(path),contentType:type[extname(path)]??'application/octet-stream'});
     });
     const p=await context.newPage();p.on('pageerror',e=>errors.push(e.message));p.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
     try{
-      await p.goto('/');await p.getByLabel('ファイルを選択',{exact:true}).setInputFiles([mesh,source]);await p.getByRole('button',{name:'ファイルを開く',exact:true}).click();await p.getByLabel('プロジェクト名',{exact:true}).fill('50万点の表示');await p.getByRole('button',{name:'プロジェクトを作成',exact:true}).click();
+      await p.goto(desktopEntry);await p.getByLabel('ファイルを選択',{exact:true}).setInputFiles([mesh,source]);await p.getByRole('button',{name:'ファイルを開く',exact:true}).click();await p.getByLabel('プロジェクト名',{exact:true}).fill('50万点の表示');await p.getByRole('button',{name:'プロジェクトを作成',exact:true}).click();
       const canvas=p.getByLabel('3Dモデルの表示',{exact:true}),status=p.locator('.lv-project-viewport-status');await expect(canvas).toHaveAttribute('aria-busy','false',{timeout:240000});await expect(status).not.toContainText('表示の準備中');
       if(mode==='candidate')await expect(status).toContainText('透過表示は近似です。');else await expect(status).toContainText('滑らかな透過表示は未対応');
       // Identical actual drawing-buffer size, below the36B/pixel budget in both builds.

@@ -1,3 +1,4 @@
+import { desktopOrigin, desktopEntry } from './desktopEntry';
 import { revealCoordinateAdd, revealFileSurface } from './workspaceUi';
 import { test, expect, chromium, type Page, type BrowserContext, type TestInfo } from '@playwright/test';
 import { mkdir, mkdtemp, readFile } from 'node:fs/promises';
@@ -28,8 +29,8 @@ test('daily Scene and Caption organization, tags, alignment, settings and files 
   const launch = async (ownedProfile=profile) => {
     const context = await chromium.launchPersistentContext(ownedProfile, { channel: 'chromium', headless: true, viewport: { width: 1440, height: 1000 }, serviceWorkers: 'block', acceptDownloads: true }); contexts.add(context);
     await context.addInitScript(()=>{const urls:string[]=[];(window as any).__releasedMediaUrls=urls;const revoke=URL.revokeObjectURL;URL.revokeObjectURL=function(url:string){urls.push(url);return revoke.call(URL,url);};});
-    await context.route('**/*', route => { const u = new URL(route.request().url()); if (u.origin === 'http://127.0.0.1:4182' || ['blob:', 'data:'].includes(u.protocol)) return route.continue(); remote.push(u.href); return route.abort('blockedbyclient'); });
-    const page = context.pages()[0] ?? await context.newPage(); page.setDefaultTimeout(15_000); page.on('pageerror', e => errors.push(e.message)); page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); }); await page.goto('/'); return { page, context };
+    await context.route('**/*', route => { const u = new URL(route.request().url()); if (u.origin === desktopOrigin || ['blob:', 'data:'].includes(u.protocol)) return route.continue(); remote.push(u.href); return route.abort('blockedbyclient'); });
+    const page = context.pages()[0] ?? await context.newPage(); page.setDefaultTimeout(15_000); page.on('pageerror', e => errors.push(e.message)); page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); }); await page.goto(desktopEntry); return { page, context };
   };
   try {
     const first = await launch(), p = first.page;

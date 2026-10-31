@@ -1,3 +1,4 @@
+import { desktopEntry, desktopOrigin } from './desktopEntry';
 import { revealFileSurface, lookAlongFront, revealCaptionList } from './workspaceUi';
 import {test,expect,chromium,type Page,type BrowserContext,type TestInfo} from '@playwright/test';
 import {mkdir,mkdtemp,writeFile} from 'node:fs/promises';
@@ -14,7 +15,7 @@ import {inspectProjectCandidates} from '../../src/domain/projectCandidates';
 import {validationMetadataLimits as limits} from '../../src/projectFiles/validation';
 import {presentedCanvas} from './presentedCanvas';
 
-const entry='http://127.0.0.1:4182/?timings=1',title='Native点群とGS';
+const entry=desktopEntry+'?timings=1',title='Native点群とGS';
 const files=(p:Page)=>p.getByRole('region',{name:'ファイル',exact:true});
 const detail=(p:Page)=>p.getByRole('region',{name:'キャプションの詳細',exact:true});
 async function ready(p:Page){await expect(p.getByRole('heading',{name:'プロジェクト名',exact:true})).toHaveText(title,{timeout:240000});await expect(p.locator('.lv-project-viewport-status')).toBeEmpty({timeout:180000});}
@@ -44,7 +45,7 @@ async function setup(info:TestInfo,bodyRanges:readonly {start:number;end:number}
   const contexts=new Set<BrowserContext>(),errors:string[]=[],stages:unknown[]=[],started=Date.now();
   const launch=async(index:number)=>{
     const context=await chromium.launchPersistentContext(profiles[index]!,{channel:'chromium',headless:true,viewport:{width:1440,height:1000},deviceScaleFactor:1,serviceWorkers:'block',acceptDownloads:true});contexts.add(context);context.setDefaultTimeout(15000);
-    await context.route('**/*',route=>{const u=new URL(route.request().url());return u.origin==='http://127.0.0.1:4182'||['blob:','data:'].includes(u.protocol)?route.continue():route.abort('blockedbyclient');});
+    await context.route('**/*',route=>{const u=new URL(route.request().url());return u.origin===desktopOrigin||['blob:','data:'].includes(u.protocol)?route.continue():route.abort('blockedbyclient');});
     await context.addInitScript((ranges)=>{
       const arrayBuffer=Blob.prototype.arrayBuffer,slice=Blob.prototype.slice,parents=new WeakMap<Blob,{parent:Blob;start:number}>();
       (window as any).nativeReads={wholeOriginalRefused:0,wholeGsRefused:0,maxNativeRange:0,maxNativeBodyRange:0,maxNativeMetadataRange:0};

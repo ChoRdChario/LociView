@@ -1,3 +1,4 @@
+import { desktopOrigin, desktopEntry } from './desktopEntry';
 import { revealCoordinateAdd, revealFileSurface, revealProjectSelection } from './workspaceUi';
 import { test, expect, chromium, type Page, type BrowserContext, type TestInfo } from '@playwright/test';
 import { mkdir, mkdtemp, readFile } from 'node:fs/promises';
@@ -59,12 +60,12 @@ test('08c uses native canvas generation, portable offline display/save/reopen an
     const oldRoot = resolve('.artifacts/e2e/editor-attribution-old-reader/fe2010900fabaacfee2e22c39b1d5e9e1196eabb/desktop-dist');
     await context.route('**/*', async route => {
       const u = new URL(route.request().url()); if (['blob:', 'data:'].includes(u.protocol)) return route.continue();
-      if (u.origin !== 'http://127.0.0.1:4182') { remote.push(u.href); return route.abort('blockedbyclient'); }
+      if (u.origin !== desktopOrigin) { remote.push(u.href); return route.abort('blockedbyclient'); }
       if (!old) return route.continue();
       const path = resolve(oldRoot, u.pathname === '/' ? 'index.html' : '.' + u.pathname); if (!path.startsWith(oldRoot + sep)) throw Error('Old build path');
       try { return await route.fulfill({ path }); } catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return route.fulfill({ status: 404, body: '' }); throw error; }
     });
-    const p = context.pages()[0] ?? await context.newPage(); p.setDefaultTimeout(15_000); p.on('pageerror', e => errors.push(e.message)); await p.goto('/'); return { context, p };
+    const p = context.pages()[0] ?? await context.newPage(); p.setDefaultTimeout(15_000); p.on('pageerror', e => errors.push(e.message)); await p.goto(desktopEntry); return { context, p };
   };
   try {
     const a = await launch(0), p = a.p;
