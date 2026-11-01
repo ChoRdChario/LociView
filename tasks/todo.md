@@ -1,6 +1,6 @@
 # LociView active work
 
-Updated2026-11-01. This is the single current plan and check record.
+Updated2026-11-02. This is the single current plan and check record.
 [Inventory](implementation-inventory.md) owns route-specific coverage;
 [map](../PROJECT_MAP.md) and [document index](../docs/README.md) route contracts/code.
 Git owns checkpoint identity. [Retained checkpoint evidence](../docs/history/development-through-2026-10-29/tasks/todo-before-daily-authoring.md)
@@ -57,7 +57,52 @@ unchanged-feature-classification checks pass; independent review has no findings
 No runtime change or new capacity guarantee; no runtime suite is needed for this
 documentation checkpoint.
 
-## Current boundary —comfortable daily reading, editing and saving
+## Current boundary —portable CI fixture and immutable golden bytes
+
+PO authorizes repairing the86 CI failures on the verified daily-use checkpoint:
+82 synthetic-workspace copies reject an already existing destination on Linux;
+four composition cases receive Git-normalized LF instead of the approved CRLF
+golden. Outcome: clean Windows/Linux checkouts run the same immutable fixtures
+without changing runtime policy, expected hashes or verifier refusal behavior.
+
+Keep mkdtemp as the registered cleanup parent and copy the immutable template
+into its absent workspace child. Preserve per-case Git/bytes isolation and the
+existing no-clobber options; reuse the existing isolation regression. Before the
+byte repair, document in01g that only the exact golden path bypasses text/EOL
+normalization. Preserve its approved5265bytes/288CRLF/SHA4e47993f…97ef and JSON
+values; no alternate hash, runtime normalization or regenerated vectors.
+
+The three CI-target files pass101cases (381.52s, Exit0); typecheck passes.
+Raw Git index and checkout under autocrlf=false/true retain the exact approved
+golden bytes and identical JSON values. Independent source/spec review is clean.
+The Windows all-root run is FAIL:145files pass/1fails,3222PASS/4FAIL/21TODO
+(1921.00s, Exit1), stopping before builds. Three cases hit30s (07m v1/LociMyu
+and received Caption restoration); one file-check UI case hit an incidental1s
+busy poll. Its test now awaits the real changed/render owner completion, keeps
+all assertions and20s budget, and registers failure cleanup. That exact focused
+case passes17.930s; this does not turn the original all-root result into PASS.
+
+A six-case fixture-token experiment returned2PASS/4timeoutFAIL (235.44s),
+including a60s07n v1 timeout. It was not accepted; only its helper/peer-token
+hunks were reverted, preserving the verified UI synchronization repair. One
+private unchanged-budget phase diagnostic reached Clean generation after both
+rounds at26.229s, then hit30s; it did not establish a stalled await. Concurrent
+machine load was observed, without proving that it caused the failures. Retain
+all failed evidence; do not claim the three Windows heavy cases are repaired.
+
+Meta-audit narrows this checkpoint to the original portable-CI repairs plus the
+verified UI-test synchronization/cleanup. No product, timeout, assertion, cache
+or validation change. Final-scope typecheck, five builds, offline isolation,
+then the CI-required BASE_PATH normal build and HEIC isolation pass serially
+(all nine steps Exit0). This is not a successful whole checkpoint script.
+Do not repeat an untargeted Windows whole run just to toggle its result.
+Actual remote Linux CI is required after the reviewed bounded g0 checkpoint;
+Windows whole-suite qualification remains pending. Root reviews actual index,
+raw golden bytes and privacy before commit/Push. Keep private audits/all.artifacts
+outside Git; stop affected work for a contract/authority conflict or managed
+denial. No dependency, policy, workflow or release expansion.
+
+## Completed boundary —comfortable daily reading, editing and saving
 
 Completed the approved daily-use unit from a fixed-c155 tour on a closed copy
 of the owned Ki84 profile. Inspect first, then group the five repairs in the

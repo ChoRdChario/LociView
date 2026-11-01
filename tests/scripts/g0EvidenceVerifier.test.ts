@@ -225,8 +225,9 @@ async function buildWorkspace(root: string): Promise<SyntheticWorkspace> {
 
 /** Only immutable preparation is shared; every case gets its own files and Git repository. */
 async function makeWorkspace(): Promise<SyntheticWorkspace> {
-  const root = await mkdtemp(join(tmpdir(), 'lociview-g0-verifier-'));
-  createdRoots.push(root);
+  const parent = await mkdtemp(join(tmpdir(), 'lociview-g0-verifier-'));
+  createdRoots.push(parent);
+  const root = join(parent, 'workspace');
   await cp(templateWorkspace.root, root, { recursive: true, force: false, errorOnExist: true });
   return { ...clone(templateWorkspace), root };
 }

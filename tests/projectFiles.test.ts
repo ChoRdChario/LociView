@@ -7131,16 +7131,24 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     tools.dispose(); await host.dispose();
   });
   it('keeps backup names and file choices through IME, failures and unrelated download without claiming external save (recorded DOM)', async () => {
-    const { f, options } = await initialWorkspaceHostFixture(), initial = await openValidationHost({ ...options, workspaceFile: f.file });
+    const { f, options } = await initialWorkspaceHostFixture(), initial = owned(await openValidationHost({ ...options, workspaceFile: f.file }));
     await initial.workspaceOutput.generate(initial.read().source!.token);
-    const host = createValidationModeHost(initial, mode => openValidationHost({ ...options, mode }), () => {});
+    const host = owned(createValidationModeHost(initial, mode => openValidationHost({ ...options, mode }), () => {}));
     const document = new RecordedDocument().asDocument(), create = document.createElement.bind(document), download = vi.fn();
     vi.spyOn(document, 'createElement').mockImplementation((tag: string) => {
       const node = create(tag); if (tag === 'a' || tag === 'input') Object.assign(node, { click: tag === 'a' ? download : () => {} }); return node;
     });
-    let workspace: ReturnType<typeof createSavedWorkspace>;
-    const tools = createValidationReceiveControls(document, host, () => workspace?.session, () => workspace?.render(), async () => {});
-    workspace = createSavedWorkspace(document, host, undefined, () => tools);
+    let workspace: ReturnType<typeof createSavedWorkspace>, tools!: ReturnType<typeof createValidationReceiveControls>, outputSettled: (() => void) | undefined;
+    tools = createValidationReceiveControls(document, host, () => workspace?.session, () => {
+      workspace?.render();
+      if (outputSettled && !tools.busy()) { const complete = outputSettled; outputSettled = undefined; complete(); }
+    }, async () => {});
+    workspace = owned(createSavedWorkspace(document, host, undefined, () => tools));
+    // Subscribe before the action and require its synchronous busy transition;
+    // a published job or vi.waitFor's incidental 1s budget is not UI completion.
+    const outputCompletion = (action: () => void) => new Promise<void>(resolve => {
+      expect(outputSettled).toBeUndefined(); outputSettled = resolve; action(); expect(tools.busy()).toBe(true);
+    });
     const root = record(workspace.root), all = (n: RecordedNode): RecordedNode[] => [n, ...n.children.flatMap(all)];
     const input = (name: string) => all(root).find(n => n.attributes.get('aria-label') === name)!;
     const output = input('ファイル'), button = (text: string) => all(output).find(n => n.tag === 'button' && n.textContent === text)!;
@@ -7154,37 +7162,37 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     name.fire('compositionend'); expect(tools.hasChanges()).toBe(true);
     expect((all(root).find(n => n.tag === 'form') as unknown as HTMLElement).inert).toBe(true);
     all(root).find(n => n.tag === 'button' && n.textContent === '閲覧する')!.fire('click'); expect(host.mode!.current).toBe('edit');
-    name.value = 'x'.repeat(257); name.fire('input'); button('ファイルに保存').fire('click');
+    name.value = 'x'.repeat(257); name.fire('input'); const invalidName = outputCompletion(() => button('ファイルに保存').fire('click'));
     expect(status.dataset.busy).toBe('true'); expect(status.textContent).toBe('ファイルを作成しています。');
-    await vi.waitFor(() => expect(tools.busy()).toBe(false));
+    await invalidName;
     expect(status.dataset.busy).toBe('false'); expect(status.textContent).not.toBe('ファイルを作成しています。');
     expect(name.value).toBe('x'.repeat(257)); expect(tools.hasChanges()).toBe(true);
     expect(host.workspaceOutput.jobs.some(j => j.purpose === 'backup')).toBe(false);
     name.value = '調査前'; name.fire('input');
     button('ファイルを選択').fire('click'); expect(button('ファイルに保存').disabled).toBe(true);
-    const selected = input('保存したファイルを選択'); Object.assign(selected, { files: [new Blob(['wrong'])] }); selected.fire('change');
-    await vi.waitFor(() => expect(tools.busy()).toBe(false));
-    button('ダウンロード').fire('click'); await vi.waitFor(() => expect(download).toHaveBeenCalledTimes(1));
-    await vi.waitFor(() => expect(tools.busy()).toBe(false));
+    const selected = input('保存したファイルを選択'); Object.assign(selected, { files: [new Blob(['wrong'])] });
+    await outputCompletion(() => selected.fire('change')); expect(tools.busy()).toBe(false);
+    await outputCompletion(() => button('ダウンロード').fire('click')); expect(download).toHaveBeenCalledTimes(1); expect(tools.busy()).toBe(false);
     expect(button('ファイル確認を取り消す')).toBeDefined(); expect(name.value).toBe('調査前'); expect(button('保存').attributes.get('aria-pressed')).toBe('true');
     button('ファイル確認を取り消す').fire('click'); expect(tools.hasChanges()).toBe(true);
     const session = workspace.session!, before = host.read().source!.token;
     const generate = host.workspaceOutput.generateBackup.bind(host.workspaceOutput);
     let release!: () => void;
     const gate = new Promise<void>(resolve => { release = resolve; });
+    caseDisposals.push(release);
     const generating = vi.spyOn(host.workspaceOutput, 'generateBackup').mockImplementation(async (...args) => { await gate; return generate(...args); });
     let handoffStatus: { busy: string; text: string } | undefined;
     download.mockImplementationOnce(() => {
       handoffStatus = { busy: status.dataset.busy!, text: status.textContent };
       throw Error('injected browser handoff failure');
     });
-    const save = button('ファイルに保存'); save.fire('click');
+    const save = button('ファイルに保存'), saved = outputCompletion(() => save.fire('click'));
     expect(status.dataset.busy).toBe('true'); expect(status.textContent).toBe('ファイルを作成しています。');
     expect(name.disabled).toBe(true); expect(button('ファイルに保存').disabled).toBe(true);
     save.fire('click'); button('ファイルに保存').fire('click'); expect(generating).toHaveBeenCalledOnce();
     release();
     await vi.waitFor(() => expect(host.workspaceOutput.jobs.some(j => j.purpose === 'backup' && j.state === 'generated')).toBe(true), { timeout: 10000 });
-    await vi.waitFor(() => expect(tools.hasChanges()).toBe(false));
+    await saved; expect(tools.hasChanges()).toBe(false);
     expect(status.dataset.busy).toBe('false'); generating.mockRestore();
     expect(handoffStatus).toEqual({ busy: 'true', text: 'ダウンロードを準備しています。' });
     const result = host.workspaceOutput.jobs.find(j => j.purpose === 'backup')!;
@@ -7193,8 +7201,8 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const history = all(output).find(n => n.tag === 'summary' && n.textContent === '作成したファイル')!.parent!;
     expect(history.open).toBe(true); expect(download).toHaveBeenCalledTimes(2);
     const savedRow = all(history).find(n => n.textContent.startsWith('バックアップ 調査前'))!.parent!;
-    all(savedRow).find(n => n.tag === 'button' && n.textContent === 'ダウンロード')!.fire('click');
-    await vi.waitFor(() => expect(tools.busy()).toBe(false));
+    await outputCompletion(() => all(savedRow).find(n => n.tag === 'button' && n.textContent === 'ダウンロード')!.fire('click'));
+    expect(tools.busy()).toBe(false);
     expect(host.workspaceOutput.jobs.filter(j => j.purpose === 'backup').map(j => j.id)).toEqual([result.id]);
     expect(output.children.find(n => n.attributes.get('role') === 'status')!.textContent).toBe('ダウンロードを開始しました。保存先で完了を確認してください。');
     expect(download).toHaveBeenCalledTimes(3);

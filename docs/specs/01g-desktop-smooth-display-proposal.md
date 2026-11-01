@@ -144,3 +144,14 @@ core hardening・一般採用・公開の未達項目は、そのまま残す。
 承認後は、port／受入れ条件の独立レビュー→製品実装→接続ブラウザ検証→
 最終checkと独立diff review→適切なg0 checkpointへ続ける。新しい材質／選択方式、
 容量の増額、依存追加、一般採用／公開が必要になった場合だけ該当作業を止める。
+
+## 2026-11-01 固定goldenのGitバイト保持
+
+既存の不変バイト契約を修復する。対象は
+`profiles/desktop-smooth-mrt-1.goldens.json`だけとし、承認済みの5265bytes・
+288CRLF・SHA-256 `4e47993fa3f11c653c7b6b1fb286ae30b0e35bc6e773e751e9843bf6aacf97ef`
+をGit blobと各OSのcheckoutでも保持する。全体のLF規則に対し、このpathだけ
+`.gitattributes`でtext変換を無効化し、元のCRLFバイトを格納する。
+JSON値・policy・shader・期待hashは変更せず、runtimeでの改行正規化や複数hashの
+許容は追加しない。既存の不変hashテストと、属性／stage／checkout往復の実長・
+改行数・digest照合で確認する。一般的な改行方針や公開範囲の変更ではない。

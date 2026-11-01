@@ -4,3 +4,5 @@
 *.webp binary
 *.glb binary
 *.ico binary
+# Preserve the ratified immutable golden digest across all checkouts.
+docs/specs/profiles/desktop-smooth-mrt-1.goldens.json -text

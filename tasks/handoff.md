@@ -6,6 +6,12 @@ checks, remaining work and genuine stop conditions; [inventory](implementation-i
 owns route-specific coverage. Check the actual Git branch/HEAD/worktree and
 preserve existing changes. Do not reconstruct current work from old checkpoints.
 
+Current CI maintenance preserves immutable golden bytes and portable synthetic
+workspace copies. See todo for the actual Windows full-run failures and focused
+repair evidence; do not call the whole Windows suite green. Actual remote Linux
+CI is required after the bounded reviewed checkpoint, with no timeout relaxation.
+Successful builds/isolation do not supersede the retained whole-suite failures.
+
 PO approved the connected current-PC quality plan and the
 [01i high-resolution workflow](../docs/specs/01i-high-resolution-pc-workflow-proposal.md):
 sequential import, real thumbnails, one active original image, shared resource
