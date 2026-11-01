@@ -56,7 +56,7 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
   saveEntry.className='lv-workspace-primary'; shareEntry.className='lv-workspace-share';
   filePanel.tabIndex=-1;
   const fileNavigation=document.createElement('div'); fileNavigation.setAttribute('role','tablist'); fileNavigation.setAttribute('aria-label','ファイルの操作');
-  const fileTabs = new Map([['save',fileEntry('書き出す','save')],['share',fileEntry('共有','share')],['receive',receiveEntry],['restore',restoreEntry]] as const);
+  const fileTabs = new Map([['save',fileEntry('保存','save')],['share',fileEntry('共有','share')],['receive',receiveEntry],['restore',restoreEntry]] as const);
   for (const [surface, tab] of fileTabs) {
     tab.setAttribute('role','tab'); tab.id=`${fileContent.id}-${surface}`; tab.setAttribute('aria-controls',fileContent.id); fileNavigation.append(tab);
     tab.addEventListener('keydown', event => {

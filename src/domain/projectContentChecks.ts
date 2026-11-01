@@ -17,6 +17,8 @@ export interface ProjectContentVerifier {
   readonly scope: EvidenceScope;
   /** Application-owned executable service; never deserialize a verifier from a package. */
   verify(request: ContentRequest): Promise<unknown>;
+  /** Optional pure-read lifetime. The domain owns invocation and the inspection result. */
+  withReadonlyContent?(action: (verifier: Pick<ProjectContentVerifier, 'scope' | 'verify'>) => Promise<void>): Promise<void>;
 }
 export interface ContentCheck {
   readonly request: ContentRequest;

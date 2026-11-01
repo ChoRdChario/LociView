@@ -28,12 +28,26 @@ async function readCapturedEvidence(fs: ProjectWorkspaceFS, limits: MetadataLimi
 /** Local executable evidence cache. Never accepts package-supplied verified bits. */
 export class PersistentContentVerifier implements ProjectContentVerifier {
   readonly scope: ProjectContentVerifier['scope'];
+  readonly withReadonlyContent?: NonNullable<ProjectContentVerifier['withReadonlyContent']>;
   private readonly limits: MetadataLimits;
   constructor(private readonly fs: ProjectWorkspaceFS, limits: MetadataLimits,
     private readonly executor: ProjectContentVerifier, private readonly version: string,
     private readonly inventory: VerifiedInventoryPort, private readonly allowNewEvidence = false) {
     this.scope = executor.scope; this.limits = checkLimits(limits);
     if (!version || version.length > 128) fail('verifier-version');
+    if (!allowNewEvidence) {
+      const ownedLimits = this.limits, scope = this.scope;
+      this.withReadonlyContent = action => withMetadataRead(fs, undefined, async ({ fs: readonlyFS }) => {
+        let active = true;
+        const live = () => { if (!active) fail('content-read-expired'); };
+        const reader = { scope, verify: async (input: ContentRequest) => {
+          live(); const captured = captureEvidence(input, ownedLimits, version, scope);
+          const response = await verifyReadonlyEvidence(readonlyFS, ownedLimits, captured, scope, inventory, live);
+          live(); return response;
+        } };
+        try { await action(reader); live(); } finally { active = false; }
+      });
+    }
   }
 
   private receipt(input: ContentRequest) {
@@ -50,14 +64,7 @@ export class PersistentContentVerifier implements ProjectContentVerifier {
       const captured = captureEvidence(input, this.limits, this.version, this.scope), limits = this.limits,
         scope = this.scope, inventory = this.inventory;
       return withMetadataRead(this.fs, undefined, async ({ fs }) => {
-        const { request, receipt } = await readCapturedEvidence(fs, limits, captured);
-        // Origin CAS has its own readonly presence port, outside the Project facade.
-        const presence = await inventory.inspect(request);
-        if (receipt && presence === 'verified-present') {
-          checkContentFacts(request, receipt.facts);
-          return { request, scope, outcome: 'verified', facts: receipt.facts };
-        }
-        return { request, scope, outcome: presence === 'missing' ? 'missing' : 'failed' };
+        return verifyReadonlyEvidence(fs, limits, captured, scope, inventory);
       });
     }
     const { request, key, path, receipt } = await this.receipt(input);
@@ -78,4 +85,16 @@ export class PersistentContentVerifier implements ProjectContentVerifier {
     await writeReceipt(this.fs, path, { key, facts, digest: await jsonDigest({ key, facts }) }, this.limits);
     return { request, scope: this.scope, outcome: 'verified', facts };
   }
+}
+
+async function verifyReadonlyEvidence(fs: ProjectWorkspaceFS, limits: MetadataLimits, captured: CapturedEvidence,
+  scope: ProjectContentVerifier['scope'], inventory: VerifiedInventoryPort, live = () => {}) {
+  live(); const { request, receipt } = await readCapturedEvidence(fs, limits, captured); live();
+  // Origin CAS stays separate and freshly observed on every request.
+  const presence = await inventory.inspect(request); live();
+  if (receipt && presence === 'verified-present') {
+    checkContentFacts(request, receipt.facts);
+    return { request, scope, outcome: 'verified', facts: receipt.facts };
+  }
+  return { request, scope, outcome: presence === 'missing' ? 'missing' : 'failed' };
 }

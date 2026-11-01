@@ -50,7 +50,8 @@ export function createCameraGizmo(document: Document, onAxis: (axis: AxisAction)
     onAxis(axes[target]![0]);
   };
   const help = (button: HTMLButtonElement, text: string) => {
-    const note = contextHelp(document, text, [button]); (note.children[0] as HTMLElement).hidden = true; root.append(note);
+    const note = contextHelp(document, text, [button], { side: 'left', bounds: () => root.closest('.lv-project-stage, .lv-development-viewport')?.getBoundingClientRect() ?? null });
+    (note.children[0] as HTMLElement).hidden = true; root.append(note);
   };
   const lines = axes.map(([, , component]) => {
     const line = document.createElement('i'); line.setAttribute('aria-hidden', 'true'); line.dataset.axis = String(component); compass.append(line); return line;

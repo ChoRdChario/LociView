@@ -27,6 +27,13 @@ export function createCaptionDetailControls(document: Document, onEvent: (event:
     review: HTMLButtonElement; value: HTMLElement }>();
   const cleanups: (() => void)[] = [];
   let props: CaptionDetailProps | undefined, disposed = false, cancelFor: CaptionDraft | null = null;
+  let returnFocus: { draft: CaptionDraft; captionId: string; sceneId: string; origin: HTMLElement } | null = null;
+  const rememberFocus = (origin: HTMLElement) => {
+    if (props?.draft && props.source.kind === 'ready' && document.activeElement === origin)
+      returnFocus = { draft: props.draft, captionId: props.source.caption.id, sceneId: props.source.sceneId, origin };
+  };
+  const movedFocus = (event: Event) => { if (returnFocus && event.target !== returnFocus.origin && event.target !== document.body) returnFocus = null; };
+  document.addEventListener?.('focusin', movedFocus); cleanups.push(() => document.removeEventListener?.('focusin', movedFocus));
   const listen = (node: HTMLElement, name: string, handler: () => void) => { node.addEventListener(name, handler); cleanups.push(() => node.removeEventListener(name, handler)); };
   root.append(status, impact);
   const mediaSlot = make('div'); mediaSlot.className = 'lv-caption-media-slot';
@@ -98,7 +105,7 @@ export function createCaptionDetailControls(document: Document, onEvent: (event:
   listen(apply, 'click', () => {
     if (!props || apply.disabled) return;
     const plan = planCaptionApply(props);
-    if (plan.kind === 'blocked') status.textContent = plan.reason; else onEvent(plan);
+    if (plan.kind === 'blocked') status.textContent = plan.reason; else { rememberFocus(apply); onEvent(plan); }
   });
   listen(cancel, 'click', () => {
     if (!props?.draft || cancel.disabled) return;
@@ -107,7 +114,7 @@ export function createCaptionDetailControls(document: Document, onEvent: (event:
   listen(keep, 'click', () => { cancelFor = null; confirmation.hidden = true; cancel.focus({ preventScroll: true }); });
   listen(confirm, 'click', () => {
     if (!props?.draft || props.draft !== cancelFor || props.draft.composing || props.feedback.kind === 'applying') return;
-    const draft = props.draft; cancelFor = null; confirmation.hidden = true; onEvent({ kind: 'cancel', draft });
+    const draft = props.draft; rememberFocus(confirm); cancelFor = null; confirmation.hidden = true; onEvent({ kind: 'cancel', draft });
   });
   const windowEvent = (action: 'open' | 'retain' | 'release') => {
     if (props?.source.kind === 'ready' && props.windowBlock == null) onEvent({ kind: 'window', captionId: props.source.caption.id,
@@ -125,6 +132,9 @@ export function createCaptionDetailControls(document: Document, onEvent: (event:
     props = next;
     if (cancelFor !== next.draft) { cancelFor = null; confirmation.hidden = true; }
     const source = next.source, owned = next.draft?.captionId === nextId ? next.draft : null;
+    const empty = source.kind === 'unavailable' && source.captionId === null && !hasCaptionDraft(owned);
+    for (const control of fields.values()) control.input.parentElement!.parentElement!.hidden = empty;
+    properties.hidden = empty; mediaSlot.hidden = empty; windowActions.hidden = empty;
     editors.hidden = source.kind !== 'ready' || !next.editorFields;
     editorRows.replaceChildren();
     for (const field of next.editorFields ?? []) for (const [i, name] of field.names.entries()) {
@@ -150,7 +160,7 @@ export function createCaptionDetailControls(document: Document, onEvent: (event:
       control.input.readOnly = owned?.composing !== field && (!owned || unavailable || next.mutationBlock !== null || inFlight || !!next.readonlyFields?.includes(field));
       control.note.textContent = [issue, raw !== undefined && issue && '入力内容は未適用です。',
         field === 'color' && raw === undefined && current?.kind === 'value' && current.value === '' && '未設定（標準色で表示）'].filter(Boolean).join(' ');
-      control.note.hidden = !control.note.textContent;
+      control.note.hidden = empty || !control.note.textContent;
       control.review.hidden = !issue || source.kind !== 'ready' || current?.kind === 'value';
       control.review.disabled = inFlight || Boolean(owned?.composing);
     }
@@ -160,17 +170,29 @@ export function createCaptionDetailControls(document: Document, onEvent: (event:
     const sceneCount = source.kind === 'ready' && source.sceneCount.kind === 'value' ? source.sceneCount.value : null;
     impact.textContent = sceneCount !== null && Number.isSafeInteger(sceneCount) && sceneCount > 1
       ? `${sceneCount}シーンで共有されています。変更はすべてに反映されます。` : sceneCount === 1 ? '' : '影響するシーンを確認してください。';
-    impact.hidden = !impact.textContent;
+    impact.hidden = empty || !impact.textContent;
     const applyIssue = captionApplyIssue(next);
     status.textContent = [next.feedback.kind === 'failed' && `適用できませんでした。${next.feedback.message} 入力は保持しています。`,
       inFlight && '変更を適用中です。', hasCaptionDraft(owned) && !inFlight && '未適用の入力があります。',
-      next.mutationBlock !== '閲覧中です。編集を開始してください。' && next.mutationBlock, source.kind !== 'ready' && (source.reason || 'キャプションを選択してください。'),
+      !inFlight && next.mutationBlock !== '閲覧中です。編集を開始してください。' && next.mutationBlock, source.kind !== 'ready' && (source.reason || 'キャプションを選択してください。'),
       hasCaptionDraft(owned) && applyIssue && !inFlight && applyIssue].filter(Boolean).join(' ');
     apply.disabled = applyIssue !== null;
     actions.hidden = !hasCaptionDraft(owned);
     cancel.disabled = !hasCaptionDraft(owned) || Boolean(owned?.composing) || inFlight;
     windowNote.textContent = next.windowBlock ?? ''; windowNote.hidden = next.windowBlock == null;
     showWindow.disabled = source.kind !== 'ready' || next.windowBlock != null;
+    const focus = returnFocus;
+    if (focus && (source.kind !== 'ready' || source.caption.id !== focus.captionId || source.sceneId !== focus.sceneId || next.feedback.kind === 'failed')) returnFocus = null;
+    else if (focus && !hasCaptionDraft(owned) && !inFlight && !next.mutationBlock) {
+      queueMicrotask(() => {
+        if (disposed || returnFocus !== focus) return;
+        returnFocus = null;
+        const current = props;
+        if (current?.source.kind === 'ready' && current.source.caption.id === focus.captionId && current.source.sceneId === focus.sceneId &&
+          !hasCaptionDraft(current.draft) && !current.draft?.composing && !current.mutationBlock &&
+          (document.activeElement === focus.origin || document.activeElement === document.body)) fields.get('body')!.input.focus({ preventScroll: false });
+      });
+    }
     return true;
   }
   function dispose(): void { disposed = true; for (const cleanup of cleanups) cleanup(); root.remove(); }

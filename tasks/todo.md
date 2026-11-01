@@ -57,7 +57,62 @@ unchanged-feature-classification checks pass; independent review has no findings
 No runtime change or new capacity guarantee; no runtime suite is needed for this
 documentation checkpoint.
 
-## Current boundary —existing evidence during an ordinary Caption edit
+## Current boundary —comfortable daily reading, editing and saving
+
+Completed the approved daily-use unit from a fixed-c155 tour on a closed copy
+of the owned Ki84 profile. Inspect first, then group the five repairs in the
+[design ledger](../docs/ui-design-review.md): explicit pin/previous-next reveal
+and stable marker focus; owned apply/discard/save focus; one empty-selection
+prompt and coherent apply progress with a non-inert live owner; the Save tab;
+readable camera help positioned inside its stage. No new screen or setting.
+
+The [spec06](../docs/specs/06-project-package-wire.md) domain-owned void invocation
+now groups one pure readonly content inspection only when every admitted media
+record belongs to its active strong closure. Weak-media cases use the old path
+and retained-callback order. Keep original bytes/identity/history, typed commands,
+strict staging and all write/readback/publication/recovery checks. No new policy,
+dependency, capacity guarantee, broad Session cache or payload-proof lifetime.
+
+One normal same-snapshot c155/d6 edit pair is53.022→22.209s actual and
+52.735→21.919s host edit. Both record native/HTML0,638 digests/1,160,318B and
+428 Blob arrays/964,178B. This is one bounded pair, not a general guarantee.
+The probe omitted its IO start listener: terminal IO is cumulative, not an action
+delta. Do not infer owner-count/seconds savings from it. Focused scope tests
+independently verify two boundary audits while retaining every receipt/inventory
+check. Baseline save overlapped focused tests and after save followed the tour;
+151.187s/79.466s are functional observations, not a matched save-speed comparison.
+
+Both actual files49,728,444B preserve all five input change byte sequences plus
+the expected edit, all records and27payloads:4Scenes/103Captions/27attachments/
+26media/4Views/23materials. Archive audit passes. The d6 real UI repro confirms
+selected-row visibility/marker focus, discard→body focus/manual scroll, camera
+help with a reachable model tab, and one empty prompt/no empty form. A later
+refresh still removed the Save primary, so final4d keeps that node/listener stable
+with the current action. The d6 backend/file evidence is reused with this exact
+File-only source difference. Actual download focus passes in final4d's small
+Desktop workspace case; the loading/workspace cases both pass (2cases/3.6min).
+Their config rebuilt the same code with a separate build nonce from the fixed
+cold candidate. Earlier source-qualified cohorts are not new all40-case evidence.
+
+Final4d normal SW preparation → full browser/server close → new offline/server-off/
+no-bypass context retains exact index/six assets, saved body, writable editing,
+discard/body focus, decoded320px photo and presented model. Its later1730ms command
+is not boot latency. Source/test freeze is
+4d04b0d7ebd8888268bd49ae1f67f07a909e37f5269f29eeb5403e532a78cbc4 (746files).
+All-root npm test exits0:146files/3226PASS,21 separate todo,1840.01s. Typecheck,
+all five builds and offline/HEIC isolation pass serially, reusing the same-tree
+Desktop/offline builds; no literal checkpoint-script Exit0 is claimed. Independent
+code/UI/data/runtime review has no mandatory findings. The suitable verified g0
+checkpoint contains only this scope; keep private sources/audits/all.artifacts out.
+
+The owned4191 preview serves the fixed final4d candidate; all20HTTP resources match
+its receipt. The existing synthetic local sample is unchanged. Push is not release.
+Next: measure remaining edit/output stages with complete IO start/end observations,
+separating writes, validation, streaming and presentation before choosing a fix.
+The large-GS fresh-copy performance failure and raw-ZIP repetition remain separate;
+§6/01h are unimplemented, physical-device/adoption/release gates remain pending.
+
+## Completed boundary —existing evidence during an ordinary Caption edit
 
 Outcome: apply a Caption body change, save and continue/cold-reopen without
 repeating per-I/O owner audits inside one accepted pure receipt read. First

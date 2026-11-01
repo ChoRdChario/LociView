@@ -1,5 +1,7 @@
 let nextHelp = 0;
 const pointerAnchors = new WeakMap<HTMLElement, (event: PointerEvent) => HTMLElement | null>();
+type Placement = { bounds(): DOMRect | null; side: 'left' };
+const placements = new WeakMap<HTMLElement, Placement>();
 
 /** Overlapping visual controls can share the same pointer target as their action. */
 export function registerContextHelpPointer(root: HTMLElement, resolve: (event: PointerEvent) => HTMLElement | null): () => void {
@@ -7,7 +9,7 @@ export function registerContextHelpPointer(root: HTMLElement, resolve: (event: P
 }
 
 /** Explicit optional copy only. Never infer help from paragraphs or user content. */
-export function contextHelp(document: Document, text: string, anchors: readonly HTMLElement[] = []): HTMLElement {
+export function contextHelp(document: Document, text: string, anchors: readonly HTMLElement[] = [], placement?: Placement): HTMLElement {
   const root = document.createElement('span'), trigger = document.createElement('button'), note = document.createElement('span');
   root.className = 'lv-context-help'; trigger.className = 'lv-context-help-trigger';
   trigger.type = 'button'; trigger.textContent = '?'; trigger.setAttribute('aria-label', '説明');
@@ -20,6 +22,7 @@ export function contextHelp(document: Document, text: string, anchors: readonly 
     const existing = anchor.getAttribute?.('aria-describedby') ?? '';
     anchor.setAttribute('aria-describedby', [existing, note.id].filter(Boolean).join(' '));
   }
+  if (placement) placements.set(root, placement);
   root.append(trigger, note); return root;
 }
 
@@ -67,12 +70,18 @@ export function mountContextHelp(document: Document, root: HTMLElement): () => v
   };
   const position = (next: Source) => {
     const rect = next.anchor.getBoundingClientRect(), margin = 8;
+    const placement = placements.get(next.holder), bounds = placement?.bounds();
+    const minX = bounds ? Math.max(margin, bounds.left + margin) : margin,
+      maxX = bounds ? Math.min(browser.innerWidth - margin, bounds.right - margin) : browser.innerWidth - margin,
+      minY = bounds ? Math.max(margin, bounds.top + margin) : margin,
+      maxY = bounds ? Math.min(browser.innerHeight - margin, bounds.bottom - margin) : browser.innerHeight - margin;
+    if (bounds) next.note.style.maxWidth = `min(352px, ${Math.max(1, maxX - minX)}px)`;
     next.note.style.left = `${margin}px`; next.note.style.top = `${margin}px`;
     const box = next.note.getBoundingClientRect();
-    const right=rect.right??rect.left+rect.width,roomRight=right+8+box.width<=browser.innerWidth-margin,roomLeft=rect.left-8-box.width>=margin;
-    const left = roomRight?right+8:roomLeft?rect.left-8-box.width:Math.max(margin,Math.min(rect.left,browser.innerWidth-box.width-margin));
-    const preferred=roomRight||roomLeft?rect.top:rect.top-box.height-4>=margin?rect.top-box.height-4:rect.bottom+4;
-    const top=Math.max(margin,Math.min(preferred,browser.innerHeight-box.height-margin));
+    const right=rect.right??rect.left+rect.width,roomRight=right+8+box.width<=maxX,roomLeft=rect.left-8-box.width>=minX;
+    const left = placement?.side==='left'&&roomLeft?rect.left-8-box.width:roomRight?right+8:roomLeft?rect.left-8-box.width:Math.max(minX,Math.min(rect.left,maxX-box.width));
+    const preferred=roomRight||roomLeft?rect.top:rect.top-box.height-4>=minY?rect.top-box.height-4:rect.bottom+4;
+    const top=Math.max(minY,Math.min(preferred,maxY-box.height));
     next.note.style.left = `${left}px`; next.note.style.top = `${top}px`;
   };
   const show = (next: Source,explicit=false) => {

@@ -21,6 +21,54 @@ const changeReply = (base: ProjectContentVerifier, edit: (reply: any, q: Content
 const codes = (r: Awaited<ReturnType<typeof inspect>>) => r.issues.map(i => i.code);
 
 describe('exact external-content composition; not SceneResources or profile adoption', () => {
+  it('keeps one scoped inspection domain-owned with the exact old request order and admission', async () => {
+    const records = fixture(), source = candidateFixture(records), base = verifierFor(records), requests: ContentRequest[] = [];
+    const expected = await inspect(records, base, source); let calls = 0;
+    const scoped: ProjectContentVerifier = { scope: base.scope, verify: async () => { throw Error('outer verifier must not run'); },
+      withReadonlyContent: async function(action) { expect(this).toBe(scoped); calls++; await action({ scope: base.scope, verify: async q => { requests.push(q); return base.verify(q); } }); } };
+    expect(await inspect(records, scoped, source)).toEqual(expected); expect(calls).toBe(1);
+    expect(requests).toEqual(expected.checks.map(c => c.request));
+    expect((await inspectProjectContent({ ...source, evidence: true }, limits, scoped)).kind).toBe('rejected'); expect(calls).toBe(1);
+    const candidate = await inspectProjectCandidates(source, limits); if (candidate.kind === 'rejected') throw Error();
+    expect((await inspectProjectContent(source, { ...limits, maxWork: candidate.workUsed + 1 }, scoped)).kind).toBe('rejected');
+  });
+  it.each(['missing', 'duplicate', 'scope', 'early', 'throw', 'caught'] as const)('rejects a %s invocation without accepting an incidental domain result', async kind => {
+    const base = verifierFor(); let late: (() => Promise<void>) | undefined;
+    const scoped: ProjectContentVerifier = { ...base, withReadonlyContent: async action => {
+      if (kind === 'missing') return;
+      if (kind === 'scope') { await action({ ...base, scope: 'ratified-profile' }).catch(() => {}); return; }
+      if (kind === 'early') { late = () => action(base); return; }
+      await action(base);
+      if (kind === 'duplicate') { await action(base).catch(() => {}); return; }
+      if (kind === 'throw') throw Error('closing failure');
+      if (kind === 'caught') { await action(base).catch(() => {}); }
+    } };
+    if (kind === 'throw') await expect(inspectProjectContent(candidateFixture(), limits, scoped)).rejects.toThrow('closing failure');
+    else expect((await inspectProjectContent(candidateFixture(), limits, scoped)).kind).toBe('rejected');
+    if (late) await expect(late()).rejects.toThrow();
+  });
+  it('rejects an unawaited in-flight action and observes its eventual failure', async () => {
+    const base = verifierFor(); let release!: () => void, pending!: Promise<void>, reads = 0;
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    const v: ProjectContentVerifier = { ...base, withReadonlyContent: async action => {
+      pending = action({ scope: base.scope, verify: async q => { reads++; await gate; return base.verify(q); } });
+    } };
+    expect((await inspectProjectContent(candidateFixture(), limits, v)).kind).toBe('rejected');
+    release(); await expect(pending).rejects.toThrow(); expect(reads).toBe(1);
+  });
+  it('keeps weak-media retained callbacks in their old order without entering the optional scope', async () => {
+    const records = fixture(), { fixtureMedia } = await import('../src/harness/projectScene/mediaHistory');
+    const weak = structuredClone(fixtureMedia[1]!.record); records.mediaResourcesById[weak.id] = weak;
+    const base = verifierFor(records), before: string[] = [], after: string[] = [];
+    const run = (events: string[], scoped: boolean) => {
+      const reader: ProjectContentVerifier = { ...base, verify: async q => { events.push(`verify:${q.fact}:${q.records[0]!.id}`); return base.verify(q); } };
+      if (scoped) Object.defineProperty(reader, 'withReadonlyContent', { get() { throw Error('weak media must not even access the new port'); } });
+      return inspectProjectContent(candidateFixture(records), limits, reader,
+        { verifyRetainedMedia: async r => { events.push(`retained:${r.id}`); return true; } });
+    };
+    expect(await run(after, true)).toEqual(await run(before, false)); expect(after).toEqual(before);
+    expect(after).toContain(`retained:${weak.id}`);
+  });
   it('executes triangle and both fixed PNG byte/content checks and retains the complete source and scope', async () => {
     const records = fixture(); const result = await inspect(records);
     expect(result.issues).toEqual([]); expect(result.checks).toHaveLength(3);

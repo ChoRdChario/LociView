@@ -3245,3 +3245,39 @@ same bytes twice. Keep target-head verification and every digest, capability,
 originals, inventory, control, receipt and step check. Prepare retains independent
 reconstruction. Later opens and artifact/download/protection checks stay fresh;
 there is no public source injection option or cross-operation cache.
+
+### 2026-11-01 one domain-owned readonly content inspection
+
+The existing selected/original pure-reader rule may cover one content inspection
+whose admitted unique media are all in its active strong closure. Add an optional
+application-owned `ProjectContentVerifier.withReadonlyContent(action)` void port;
+the action receives only `scope` and `verify`. Candidate admission, strong closure,
+request construction, response/facts validation, budgets, issue reduction and the
+inspection result remain domain-owned. The port cannot supply an inspection DTO.
+The domain accepts exactly one awaited invocation: missing, duplicate, late,
+unawaited or throwing invocations cannot publish a successful inspection. Match
+the original evidence scope, and reject use/results after the private lifetime.
+
+If any admitted media is outside the strong closure, keep the entire old path,
+including the exact position/order of the asynchronous retained-media callback.
+An absent port also keeps the old path. Do not wrap Session, scene provider,
+candidate admission, new-evidence execution, parsers or external callbacks.
+
+Only `PersistentContentVerifier` with `allowNewEvidence=false` exposes this port.
+Its one `withMetadataRead` callback builds a receipt-only scoped verifier from
+the facade FS, captured limits/version/scope and inspect-only Origin inventory.
+It has no executor or store object. Each request still captures owned input,
+freshly reads/validates the receipt structure/key/digest, calls the existing
+separate Origin inventory on every request, then checks facts only when a
+receipt exists and presence is verified, preserving the old conditional order.
+The inner verifier does not acquire another metadata callback. Expire its private
+lifetime in finally even with unregistered/strict fallback; check before and
+after awaited work. There is no receipt cache or new staging tag. Generic
+staging stays strict, and existing selected/original closing semantics remain.
+
+Acceptance: exact old/new inspection and request order; no invocation for weak
+media; retained callback order unchanged; domain-owned admission/closure/budgets;
+once/await/late/throw/scope refusal; expired scoped reads and denied writes;
+fresh receipt/inventory on repeated requests; no executor/write; unchanged
+allow-new-evidence/hasEvidence behavior. Close with ordinary Caption edit,
+actual backup inspection and cold continuation on the same representative data.

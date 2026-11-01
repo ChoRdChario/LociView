@@ -6,7 +6,7 @@ import { MetadataRepository, type MetadataStorageFactory, type MetadataStoragePo
 import { PersistentContentVerifier, type VerifiedInventoryPort } from '../src/projectMetadata/contentEvidence';
 import { TransactionJournal } from '../src/projectMetadata/journal';
 import { digest, json, jsonDigest, metadataPath, underWriteLease, withMetadataRead, writeReceipt } from '../src/projectMetadata/persistence';
-import type { ContentRequest } from '../src/domain/projectContentChecks';
+import type { ContentRequest, ProjectContentVerifier } from '../src/domain/projectContentChecks';
 import { ProjectMetadataSource, type MetadataLimits } from '../src/projectMetadata/source';
 import { planRemoteChanges, type FullMetadataSource } from '../src/projectMetadata/remote';
 import { captureJournalRemote, type JournalRemoteInput, type PackageRemoteBatchProof } from '../src/projectMetadata/packageRemote';
@@ -168,6 +168,41 @@ describe('local generation capabilities (ports only, not backup restore/selectio
     expect(e.inspect).toHaveBeenNthCalledWith(1, expected);
     expect(await e.verifier().verify(input)).toMatchObject({ request: input, outcome: 'failed' });
     expect(e.execute).not.toHaveBeenCalled();
+  });
+
+  it.each(['selected', 'unregistered', 'staging'] as const)('scoped content inspection keeps %s lifetime private and every receipt/inventory fresh', async kind => {
+    const f = local(); let audits = 0, owners = 0;
+    const scope = kind === 'staging' ? await openWorkspaceGeneration(f.fs,
+      { generationId: nextId, allowCreate: true, assertSelected: async () => { audits++; }, stagingReadOwner: { assertOwner() { owners++; } } },
+      async () => ({ factory: f.original.storage, dispose: async () => {} })) : await f.bind(null, false, async () => { audits++; }, kind === 'selected');
+    const e = await evidence(scope.fs, f.fs), v = e.verifier(), writes = f.fs.writes;
+    let escaped!: Pick<ProjectContentVerifier, 'scope' | 'verify'>;
+    audits = 0; owners = 0;
+    await v.withReadonlyContent!(async reader => {
+      escaped = reader; expect(Object.keys(reader).sort()).toEqual(['scope', 'verify']);
+      expect(await reader.verify(e.request)).toMatchObject({ outcome: 'verified' });
+      e.state.presence = 'missing'; expect(await reader.verify(e.request)).toMatchObject({ outcome: 'missing' });
+      e.state.presence = 'verified-present'; await f.fs.remove(e.path);
+      expect(await reader.verify(e.request)).toMatchObject({ outcome: 'failed' });
+    });
+    // Two present receipts use stream+bytes, the missing receipt only its stream probe.
+    expect(audits).toBe(kind === 'selected' ? 2 : 10); expect(owners).toBe(0);
+    expect(e.inspect).toHaveBeenCalledTimes(3); expect(e.execute).not.toHaveBeenCalled(); expect(f.fs.writes).toBe(writes);
+    await expect(escaped.verify(e.request)).rejects.toThrow('content-read-expired'); expect(e.inspect).toHaveBeenCalledTimes(3);
+    expect(e.verifier(true).withReadonlyContent).toBeUndefined(); await scope.dispose();
+  });
+
+  it('scoped content inspection refuses closing and pending late results without losing original inventory authority', async () => {
+    const f = local(); let closing = false, audits = 0;
+    const scope = await f.bind(null, false, async () => { audits++; if (closing) throw Error('closing owner lost'); }, true);
+    const e = await evidence(scope.fs, f.fs), entered = deferred(), release = deferred();
+    const pending = e.verifier().withReadonlyContent!(async reader => { await reader.verify(e.request); closing = true; });
+    await expect(pending).rejects.toThrow('closing owner lost');
+    closing = false; e.inspect.mockImplementation(async () => { entered.release(); await release.promise; return 'verified-present'; });
+    let read!: Promise<unknown>;
+    await e.verifier().withReadonlyContent!(async reader => { read = reader.verify(e.request); await entered.promise; });
+    release.release(); await expect(read).rejects.toThrow('content-read-expired');
+    expect(e.execute).not.toHaveBeenCalled(); await scope.dispose();
   });
 
   it('readonly content evidence refuses a closing selection change and never reuses an expired reader', async () => {

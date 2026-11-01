@@ -472,3 +472,33 @@ checkboxを文章と同じ行へ収め、確認が引継ぎ結果に効くこと
 GS拒否の2回目の失敗は、最初の説明表示後も古いcanvas座標を使った指定だった。
 毎回の実rectへ追従し、距離・拒否・RGBのassertは維持する。これらを製品の破損や
 選択規則の変更として扱わず、元の失敗経路を再実行する。
+
+## 2026-11-01 日常操作の快適さ — c155での修正前巡回
+
+最新版の閉じた専用Ki84 profileをコピーし、Chromium156・1440×1000・同じ固定
+c155 buildで閲覧／編集、Scene、検索、一覧／詳細、ピン、写真の原寸／拡大／pan、
+投影／keyboard平行移動、モデル／描画、Fileの保存／共有／受信／復元入口、下書き取消、
+720×500のcompactとkeyboardを一巡した。private証拠は既存pc-comfort-tour記録へ。
+原本再変換・新しい巨大往復はせず、エラー／外部通信0。閲覧中の編集非表示、Sceneの
+keyboard focus、手動list scroll保持、compactの詳細高さとFile名前欄は既対応を確認。
+
+| ID | 観測と修正する範囲 |
+|---|---|
+| PCQ-18 P2 | pinを明示選択すると詳細は変わるが一覧の選択行は画面外、keyboard pin focusはBODYへ消える。明示pin／前次だけ既存nearest revealを呼び、通常refresh／手動scrollとfilterは保持する。markerの既存キーを保ってfocus消失を避ける |
+| PCQ-19 P2 | 下書きの確認取消後にfocusがBODYへ消える。取消／適用の同じ操作が完了し操作ボタンが隠れる場合だけ、同じ記録の本文へ戻す。他のfocus、IME、別対象、失敗は奪わない。代表実保存でも後続refreshがprimaryを再作成してfocusを失うため、同じprimary nodeを保持し成功時のowned復帰を後続更新でも維持する。開示待ち／失敗では復帰を強制しない |
+| PCQ-20 P2 | 無選択時にreadonly空form、選択案内3件と影響Scene警告が出る。選択無しだけ一つの案内とし、選択済みの異常／競合／失敗は保持。適用中は実apply ownerを詳細へ渡し、未適用と適用中の併記を解消する（今回tourでは適用中は未実行のcode懸念） |
+| PCQ-21 P3 | 同じ保存操作のtabが「書き出す」、見出しが「保存」。tab／accessible名を「保存」へ統一し、実際の共有用途と保存形式は変えない |
+| PCQ-22 P2 | camera helpは黒背景で暗色透明。平行移動focus→矢印→投影select後のhelpがモデルtabを20秒遮る実再現。cameraだけ所属stage内へ左優先配置し、help可読性を改善する。gizmo形状／文字／枠、他helpのhoverと長文scrollは保持 |
+
+修正はこのまとまりで行う。新しい管理画面／設定／保存authorityは追加しない。
+元の再現、取消後focus、別focus／IME保持、通常refreshのscroll、compact、cameraと
+Inspectorの両入力をfocused回帰し、代表edit→実ファイル→coldで残る観測を閉じる。
+
+修正後の同じ実データで、pin選択行の可視化とmarkerのkeyboard focus、取消後の本文focusと
+手動scroll1515の保持を確認した。camera説明はstage内のx576–928へ収まり、モデルtabの
+実入力を遮らない。無選択の案内は1件、空入力は0件。適用中はcomponentで本文readonlyと
+inert外のlive進行通知を確認し、実適用完了後は本文へfocusが戻る。最後の実保存で判明した
+primary再作成も修正し、後続refreshを含む回帰と最終Desktopの実download/focusを通した。
+開示確認待ちは新しい生成へfocusを誘導しない。最終候補の通常SW準備／完全終了後の
+オフライン再開でも保存本文・取消・機体と写真の実描画が保たれた。実行環境、d6から
+Fileだけ変えた4dへの証拠再利用、有限速度pairと残件／device gateはtodoに集約する。

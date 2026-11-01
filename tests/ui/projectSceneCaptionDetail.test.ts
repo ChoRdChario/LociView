@@ -46,6 +46,31 @@ function host(initial = context(), document = new RecordedDocument()) {
 }
 
 describe('Caption detail: local draft/intents, not durable editor acceptance', () => {
+  it('shows one empty-state prompt while keeping unavailable selected records and drafts explicit', () => {
+    const h = host({ ...context(), source: { kind: 'unavailable', captionId: null, sceneId: scn, token: 'empty', reason: '記録を選択してください。' }, draft: null });
+    expect(h.status.textContent).toBe('記録を選択してください。'); expect(h.titleGroup.hidden).toBe(true); expect(h.impact.hidden).toBe(true);
+    h.render(context()); expect(h.titleGroup.hidden).toBe(false);
+    h.body.value = '下書き'; h.body.fire('input');
+    h.render({ ...h.props, source: { kind: 'unavailable', captionId: cap, sceneId: scn, token: 'lost', reason: '状態を確認してください。' } });
+    expect(h.titleGroup.hidden).toBe(false); expect(h.body.value).toBe('下書き'); expect(h.status.textContent).toContain('状態を確認'); h.controls.dispose();
+  });
+  it.each(['cancel', 'apply', 'other-focus', 'disposed'] as const)('recovers only the owned completed %s focus', async kind => {
+    const h = host(); h.title.value = '変更'; h.title.fire('input');
+    if (kind === 'cancel') { h.cancel.focus(); h.cancel.click(); h.confirmation.children[1]!.focus(); h.confirmation.children[1]!.click(); }
+    else {
+      h.apply.focus(); h.apply.click();
+      const plan = h.events.find(e => e.kind === 'apply') as CaptionApplyPlan;
+      expect(!!plan).toBe(true);
+      h.render({ ...h.props, feedback: { kind: 'applying', plan } });
+      expect(h.status.textContent).toBe('変更を適用中です。'); expect(h.body.readOnly).toBe(true);
+      if (kind === 'other-focus') h.color.focus();
+      h.render({ ...context(), source: { ...source(), caption: { ...source().caption, title: value('変更') } } });
+      if (kind === 'disposed') h.controls.dispose();
+    }
+    await Promise.resolve();
+    expect(h.document.activeElement === (kind === 'other-focus' ? h.color : kind === 'disposed' ? h.apply : h.body)).toBe(true);
+    h.controls.dispose();
+  });
   it('keeps one mounted draft with a media slot before secondary properties and the same completion controls', () => {
     const h = host(), slot = record(h.controls.mediaSlot), properties = h.root.children.find(n => n.className === 'lv-caption-properties')!;
     expect(h.root.children.indexOf(h.body.parent!.parent!)).toBeLessThan(h.root.children.indexOf(slot));

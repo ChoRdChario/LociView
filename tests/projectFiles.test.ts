@@ -4544,6 +4544,49 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       h.refresh();const late=[...frames.values()][0]!;await h.ui.dispose();expect(frames.size).toBe(0);const stopped=rebuild.mock.calls.length;late(0);h.refresh();expect(rebuild).toHaveBeenCalledTimes(stopped);expect(frames.size).toBe(0);
     }finally{await h.ui.dispose();vi.unstubAllGlobals();}
   });
+  it('reveals the explicitly selected pin row and retains its keyboard focus across ordinary refreshes', async () => {
+    const h = await productWorkspaceFixture(true), before = h.host.read().source!.token;
+    const markers = h.all(h.editor).find(n => n.className === 'lv-project-markers')!, marker = markers.children[0]!;
+    const list = h.all(h.editor).find(n => n.className === 'lv-caption-list')!, row = list.children[0]!;
+    list.clientHeight = 44; row.offsetTop = 200; row.offsetHeight = 44;
+    marker.focus(); marker.click(); expect(list.scrollTop).toBe(200);
+    expect(markers.children[0] === marker).toBe(true); expect(marker.document.activeElement === marker).toBe(true);
+    list.scrollTop = 30; list.fire('scroll'); h.refresh();
+    expect(list.scrollTop).toBe(30); expect(markers.children[0] === marker).toBe(true); expect(marker.document.activeElement === marker).toBe(true);
+    expect(h.host.read().source!.token).toBe(before); expect(h.dispatch).not.toHaveBeenCalled(); await h.ui.dispose();
+  });
+  it('keeps Caption apply announcements outside the inert work area without duplicating the visual progress card', async () => {
+    const h = await productWorkspaceFixture(true);
+    h.all(h.editor).find(n => n.className === 'lv-caption-select')!.click();
+    const title = h.named('タイトル', h.editor); title.value = '更新した題名'; title.fire('input');
+    const saving = h.edited(() => h.button('変更を適用', h.editor).click());
+    const area = h.all(h.editor).find(n => n.className === 'lv-project-body')!, detail = h.named('キャプションの詳細', h.editor);
+    expect(h.status.dataset.busy).toBe('true'); expect(h.status.dataset.captionApplying).toBe('true');
+    expect(h.status.textContent).toBe('変更を適用しています。'); expect(area.contains(h.status)).toBe(false);
+    expect((area as unknown as { inert: boolean }).inert).toBe(true);
+    expect(h.all(detail).find(n => n.attributes.get('role') === 'status')!.textContent).toBe('変更を適用中です。'); expect(h.named('本文', h.editor).readOnly).toBe(true);
+    await saving; expect(h.status.dataset.captionApplying).toBe('false'); expect(title.value).toBe('更新した題名'); await h.ui.dispose();
+  });
+  it.each(['handoff', 'disclosure'] as const)('returns File primary focus only after a completed %s', async result => {
+    const h = await productWorkspaceFixture(true), output = h.all(h.root).find(n => n.className === 'lv-file-output')!;
+    const primary = () => h.all(output).find(n => n.className === 'lv-file-primary')!;
+    // Supply only native selector behavior absent from the DOM recorder.
+    Object.assign(output, { querySelector: (selector: string) => selector === '.lv-file-primary' ? primary() : null });
+    const generate = h.host.workspaceOutput.generateBackup;
+    vi.spyOn(h.host.workspaceOutput, 'generateBackup').mockImplementation(async (...args) => {
+      const id = await generate(...args);
+      if (result === 'disclosure') Object.assign(h.host.workspaceOutput.jobs.find(j => j.id === id)!, { requiresPortableMediaReader: true });
+      return id;
+    });
+    const origin = primary(); origin.focus(); const focused = origin.focusCalls.length; origin.click();
+    const status = () => h.all(output).find(n => n.attributes.get('role') === 'status')!;
+    await vi.waitFor(() => expect(status().dataset.busy).toBe('false'), { timeout: 10000 });
+    expect(status().textContent).toBe(result === 'handoff' ? 'ダウンロードを開始しました。保存先で完了を確認してください。' : '作成したファイルの内容を確認し、ダウンロードしてください。');
+    expect(primary().focusCalls.length - focused).toBe(result === 'handoff' ? 1 : 0); expect(h.downloads).toHaveBeenCalledTimes(result === 'handoff' ? 1 : 0);
+    h.refresh(); h.refresh(); await Promise.resolve(); expect(primary() === origin).toBe(true);
+    if (result === 'handoff') expect(origin.document.activeElement === primary()).toBe(true);
+    await h.ui.dispose();
+  });
   it('reselects the exact interrupted update from the mounted product without losing local work', async () => {
     const h = await productWorkspaceFixture(true, false, false, 'map2', undefined, { initialWorkspace: true });
     const { host, editor, root, all, button, named } = h, incoming = h.f.f.file!;

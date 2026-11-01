@@ -14,11 +14,14 @@ export function createValidationOutputControls(document: Document, host: ReturnT
   const nameField = document.createElement('label'), nameInput = document.createElement('input');
   nameField.textContent = '名前（任意）'; nameInput.type = 'text'; nameInput.setAttribute('aria-label', '名前（任意）'); nameField.append(nameInput);
   const history = document.createElement('details'), historyTitle = document.createElement('summary'), completedFiles = document.createElement('div');
+  const primary = document.createElement('button'); primary.type = 'button'; primary.className = 'lv-file-primary'; editOnly(primary); commands.append(primary);
   historyTitle.textContent = '作成したファイル'; history.append(historyTitle, completedFiles);
   root.append(heading, actions, nameField, commands, status, list, history, select);
   editOnly(actions, nameField, commands, select);
   let busy = false, disposed = false, feedback = '', selected: string | null = null, cancellation: string | null = null;
   let completedFeedback = false;
+  let primaryAction = () => {};
+  primary.addEventListener('click', () => { if (!disposed && !primary.disabled) primaryAction(); });
   let presentation: 'all' | 'save' | 'share' = 'all';
   let purpose: 'teamWorkspace' | 'contribution' | 'backup' | 'clean' | 'review' = 'backup', baseId = '', choicePending = false, checkpointName = '', composing = false;
   let cleanPreview: Awaited<ReturnType<typeof host.workspaceOutput.previewClean>> | null = null;
@@ -51,11 +54,21 @@ export function createValidationOutputControls(document: Document, host: ReturnT
     if (s?.interactionPending || s && s.acknowledgment.state !== 'idle' || host.hasPending()) {
       completedFeedback = false; feedback = '入力・操作を確定するか、取り消してから実行してください。'; render(); return;
     }
+    const origin = document.activeElement;
+    let returnPrimary = (origin as HTMLElement | null)?.className === 'lv-file-primary';
+    const moved = (event: Event) => { if (event.target !== origin && event.target !== document.body) returnPrimary = false; };
+    document.addEventListener?.('focusin', moved);
+    let succeeded = false;
     completedFeedback = false; busy = true; feedback = workingMessage; render(); changed();
     void (async () => {
-      try { await action(); if (!disposed) { feedback = message; completedFeedback = true; if (consumeChoice) resetChoice(); completed?.(); } }
+      try { await action(); if (!disposed) { feedback = message; completedFeedback = true; if (consumeChoice) resetChoice(); completed?.(); succeeded = completedFeedback; } }
       catch (error) { completedFeedback = false; if (!disposed) feedback = error instanceof Error ? error.message : 'ファイル処理を完了できません。'; }
-      finally { busy = false; if (!disposed) { render(); changed(); } }
+      finally { busy = false; if (!disposed) { render(); changed(); }
+        document.removeEventListener?.('focusin', moved);
+        const target = root.querySelector?.<HTMLButtonElement>('.lv-file-primary');
+        if (!disposed && succeeded && returnPrimary && target && !target.disabled &&
+          (document.activeElement === origin || document.activeElement === document.body)) target.focus({ preventScroll: false });
+      }
     })();
   };
   const button = (parent: HTMLElement, text: string, action: () => void, writes = true) => {
@@ -92,7 +105,9 @@ export function createValidationOutputControls(document: Document, host: ReturnT
   };
   const render = () => {
     displayMode(root, host.mode?.current ?? (host.authority.readOnly ? 'view' : 'edit'));
-    if (disposed) return; actions.replaceChildren(); commands.replaceChildren(); list.replaceChildren(); completedFiles.replaceChildren();
+    if (disposed) return; actions.replaceChildren();
+    for (const child of Array.from(commands.children)) if (child !== primary) child.remove();
+    list.replaceChildren(); completedFiles.replaceChildren();
     const viewing=host.mode?.current === 'view' || host.authority.readOnly;
     root.dataset.presentation = presentation; heading.hidden=!!viewing;heading.textContent=viewing?'':presentation === 'save' ? '保存' : presentation === 'share' ? '共有' : 'ファイル';
     if (presentation === 'all') {
@@ -171,8 +186,11 @@ export function createValidationOutputControls(document: Document, host: ReturnT
       const help = document.createElement('p'); help.textContent = host.workspaceOutput.bases.length ?
         '相手と共有した作業一式を選択してください。' : '先に作業一式を受け取るか、作成してください。'; actions.append(help);
     }
-    const create = button(commands, purpose === 'clean' && !cleanConfirmed || purpose === 'review' && !reviewConfirmed ? '内容を確認' :
-      purpose === 'backup' ? 'ファイルに保存' : 'ダウンロード', () => {
+    const create = primary;
+    create.textContent = purpose === 'clean' && !cleanConfirmed || purpose === 'review' && !reviewConfirmed ? '内容を確認' :
+      purpose === 'backup' ? 'ファイルに保存' : 'ダウンロード';
+    create.disabled = busy || composing || otherBusy() || !!host.authority.readOnly;
+    primaryAction = () => {
       const token = host.read().source?.token; if (!token) return;
       if (purpose === 'contribution') {
         if (chosen) generateAndDownload(() => host.workspaceOutput.generateContribution(token, chosen.selection));
@@ -187,7 +205,7 @@ export function createValidationOutputControls(document: Document, host: ReturnT
         const name = checkpointName.trim().normalize('NFC') || undefined;
         generateAndDownload(() => host.workspaceOutput.generateBackup(token, name));
       } else generateAndDownload(() => host.workspaceOutput.generate(token));
-    });
+    };
     create.disabled ||= purpose === 'contribution' && !chosen || purpose === 'review' && !sceneId || !!selected || !!cancellation;
     create.className = 'lv-file-primary';
     if (choicePending) button(commands, '選択を取り消す', () => { resetChoice(); render(); changed(); });

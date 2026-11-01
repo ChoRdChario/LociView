@@ -6,7 +6,7 @@ import { captionListPlanIsCurrent, planCaptionList, type CaptionListContext } fr
 import { createCaptionDetailControls } from './captionDetailControls';
 import { createCaptionIncludeControls } from './captionIncludeControls';
 import { captionIncludePlanIsCurrent, newCaptionIncludeMemory, planCaptionInclude, type CaptionIncludeMemory, type CaptionIncludeContext } from './captionIncludeState';
-import { beginCaptionDraft, captionApplyIsCurrent, hasCaptionDraft, type CaptionDraft, type DetailContext } from './captionDetailState';
+import { beginCaptionDraft, captionApplyIsCurrent, hasCaptionDraft, type CaptionDraft, type CaptionApplyPlan, type DetailContext } from './captionDetailState';
 import { createCaptionWindowControls } from './captionWindowControls';
 import { captionWindowPlanIsCurrent, newCaptionWindowMemory, planCaptionWindow, type CaptionWindowMemory, type CaptionWindowPlan } from './captionWindowState';
 import { createMediaViewer } from './mediaPreview';
@@ -95,6 +95,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   const retryViewport = button('3D表示を再試行', () => viewAction(() => viewport.retry()));
   const stageDisplay = make('div'); stageDisplay.className = 'lv-stage-display';
   markers.className = 'lv-project-markers'; stageDisplay.append(canvas, markers);
+  const markerById = new Map<string, HTMLButtonElement>(), markerNodes = new Set<HTMLButtonElement>();
   const viewportTools = make('section'); viewportTools.className = 'lv-project-viewport-tools'; viewportTools.setAttribute('aria-label', '3D表示の操作');
   viewportTools.append(viewportStatus, retryViewport);
   const mediaViewer = createMediaViewer(document, ports.rasterResources,ports.imageDimensions);
@@ -261,6 +262,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   let parentKey = '', parentScope = '';
   let deletion: { token: string; sceneId: string; captionId: string; title: string; impact: ReturnType<ProjectWorkspacePorts['captionDeletion']> } | null = null;
   let rawPosition = ['', '', ''], pending: { action: () => Promise<unknown>; complete: () => void; owner?: 'media' } | null = null;
+  let applyingCaption: CaptionApplyPlan | null = null;
   let pickerScope: { token: string; sceneId: string; captionId: string } | null = null;
   let gesture: { pointerId: number; action: PinAction | null; token: string; sceneId: string; receipt: string; x: number; y: number; left: number; top: number; width: number; height: number; generation: number; shifted: boolean; color: string } | null = null;
   let gestureGeneration = 0, gestureContext = ''; const pressedPointers = new Set<number>();
@@ -291,7 +293,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     return { source: item ? { kind: 'ready', token: provider().token, sceneId, caption: item, sceneCount: projectCaptionSceneCount(provider(), item.id) } :
       { kind: 'unavailable', token: provider().token, sceneId, captionId: memory().selectedCaptionId,
         reason: memory().selectedCaptionId ? 'この記録は削除されたか、所属・更新の状態を確認する必要があります。未適用の入力は保持しています。' : '記録を選択してください。' },
-      draft, mutationBlock: mutationBlock() || (pin || !!numericTarget || surfaceOpening || choosing || deletion || sceneEdit || includeMemory().composing || pickerScope || recovery?.hasChanges() || panelInput() || mediaManager?.hasChanges() ? '現在の操作を完了してください。' : null), feedback: { kind: 'idle' } };
+      draft, mutationBlock: mutationBlock() || (pin || !!numericTarget || surfaceOpening || choosing || deletion || sceneEdit || includeMemory().composing || pickerScope || recovery?.hasChanges() || panelInput() || mediaManager?.hasChanges() ? '現在の操作を完了してください。' : null), feedback: busy && applyingCaption ? { kind: 'applying', plan: applyingCaption } : { kind: 'idle' } };
   };
   const list = createCaptionListControls(document, plan => {
     if (disposed || busy || pending || windowMoving || ports.otherPending()) return;
@@ -333,7 +335,9 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       const edits = { ...(event.changes.title !== undefined ? { title: event.changes.title } : {}),
         ...(event.changes.body !== undefined ? { body: event.changes.body } : {}),
         ...(event.changes.color !== undefined ? { colorSrgb: colorBytes(event.changes.color) } : {}) };
-      void run({ kind: 'editCaption', captionId: event.captionId, edits }, () => { resetDraft(); feedback = '変更を適用しました。'; });
+      applyingCaption = event;
+      void run({ kind: 'editCaption', captionId: event.captionId, edits }, () => { resetDraft(); feedback = '変更を適用しました。'; })
+        .finally(() => { applyingCaption = null; if (!disposed) render(); });
     }
     render();
   });
@@ -346,7 +350,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     if (disposed || busy || pending || windowMoving || ports.otherPending()) return;
     const context = listContext(), plan = planCaptionList(context, { kind: 'step', direction });
     if (plan.kind !== 'change' || !captionListPlanIsCurrent(plan, listContext())) return;
-    memories.set(sceneId, plan.memory); resetDraft();if(organizeCaptions.open)alignOrganization(); openWindow(plan.memory.selectedCaptionId!); render();
+    memories.set(sceneId, plan.memory); resetDraft();if(organizeCaptions.open)alignOrganization(); openWindow(plan.memory.selectedCaptionId!); render(); list.revealSelected();
   }
   const previousCaption = button('前の記録', () => stepCaption('previous')), nextCaption = button('次の記録', () => stepCaption('next'));
   captionNavigation.append(captionBack, previousCaption, nextCaption);
@@ -804,6 +808,8 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       const nextGestureContext = JSON.stringify([p.token, sceneId, ports.readOnly, ports.imageScope(), ports.otherPending(), models?.hidden(), memory().pinColors]);
       if (gestureContext !== nextGestureContext) { gestureContext = nextGestureContext; gesture = null; gestureGeneration++; }
       status.dataset.busy = String(busy); status.textContent = ports.status().kind === 'failed' ? ports.status().error || feedback : feedback;
+      // The detail is visually primary during apply; its inert parent cannot own live announcements.
+      status.dataset.captionApplying = String(busy && !!applyingCaption && ports.status().kind !== 'failed');
       status.dataset.passive = String(!busy && !pending && ports.status().kind === 'idle' && feedback === passiveFeedback);
       retry.hidden = !pending; retry.disabled = busy || ports.readOnly || ports.otherPending() || ports.status().retryable === false;
       revise.hidden = !pending || busy || ports.status().kind !== 'idle';
@@ -897,10 +903,14 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       retryViewport.hidden = !seen.issue && !viewportFeedback&&!seen.retryAvailable; retryViewport.disabled = viewBlocked();
       let camera: unknown=seen.camera; try { camera ??= viewport.capture().camera; } catch { /* Preparation has no camera yet. */ }
       cameraGizmo.render({ camera, axis: seen.view?.kind === 'ready' ? seen.view.axis : null, blocked: !(seen.cameraReady??seen.ready)||viewBlocked(),navigationBlocked:cameraNavigationBlocked()||!(seen.cameraReady??seen.ready),navigating:seen.navigating,navigationAvailable:!!viewport.navigateCamera });
-      markers.replaceChildren();
+      const focusedMarker = markerNodes.has(document.activeElement as HTMLButtonElement) ? document.activeElement as HTMLButtonElement : null;
+      const activeMarkers = new Set<string>(), markerChildren: HTMLElement[] = [];
       for (const projected of seen.pins) if (seen.ready && seen.token === p.token && seen.sceneId === sceneId && projected.visible && Number.isFinite(projected.x) && Number.isFinite(projected.y)) {
         const caption = p.resources.captions[projected.id]; if (!caption) continue;
-        const marker = button(fieldValue(caption.title) || '名称なし', () => { if (!dirty() && !busy && !ports.otherPending()) { selectCaption(projected.id); render(); } });
+        const key = `${sceneId}:${projected.id}`; activeMarkers.add(key);
+        let marker = markerById.get(key);
+        if (!marker) { marker = button('', () => { if (!dirty() && !busy && !ports.otherPending()) { selectCaption(projected.id); render(); list.revealSelected(); } }); markerById.set(key, marker); markerNodes.add(marker); }
+        marker.textContent = fieldValue(caption.title) || '名称なし';
         marker.className = 'lv-project-marker'; marker.style.left = `${projected.x}px`; marker.style.top = `${projected.y}px`;
         marker.style.transform = `translate(-50%, -50%) scale(${projected.scale ?? 1})`; if (projected.color) marker.style.backgroundColor = projected.color;
         marker.setAttribute('data-review', String(projected.status === 'needsReview'));
@@ -908,8 +918,12 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
         if (projected.status === 'needsReview') {
           marker.setAttribute('aria-description', projected.notice ?? '要確認'); marker.title = `${marker.textContent}（${projected.notice ?? '要確認'}）`;
         }
-        marker.setAttribute('aria-pressed', String(projected.id === selected)); marker.style.zIndex = projected.id === selected ? '2' : '1'; markers.append(marker);
+        else { marker.removeAttribute('aria-description'); marker.title = ''; }
+        marker.setAttribute('aria-pressed', String(projected.id === selected)); marker.style.zIndex = projected.id === selected ? '2' : '1'; markerChildren.push(marker);
       }
+      for (const [key, marker] of markerById) if (!activeMarkers.has(key)) { markerById.delete(key); markerNodes.delete(marker); }
+      markers.replaceChildren(...markerChildren);
+      if (focusedMarker && markerNodes.has(focusedMarker) && document.activeElement !== focusedMarker) focusedMarker.focus({ preventScroll: true });
       positionRecordSheets();ports.changed();
     } finally { rendering = false; if (renderAgain) { renderAgain = false; render(); } }
   }

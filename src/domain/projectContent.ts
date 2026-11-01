@@ -37,6 +37,7 @@ export async function inspectProjectContent(input: unknown, limits: HistoryReadL
     for (let i = 0; i < queue.length; i++) for (const to of outgoing.get(queue[i]!) ?? []) {
       charge(); if (!required.has(to)) { required.add(to); queue.push(to); }
     }
+    const inspect = async (reader: Pick<ProjectContentVerifier, 'scope' | 'verify'>, live = () => {}) => {
     const checks: ContentCheck[] = [], added: CandidateIssue[] = [];
     const report = (path: readonly string[], code: string, kind: CandidateIssue['kind'] = 'unverified', operationId?: string) => {
       added.push(Object.freeze({ path: Object.freeze([...path]), code, kind, ...(operationId ? { operationId } : {}) }));
@@ -46,7 +47,8 @@ export async function inspectProjectContent(input: unknown, limits: HistoryReadL
       charge(canonical(request as unknown as JsonValue).length);
       let result: ContentCheck = { request, path, outcome: 'failed' };
       try {
-        const raw = await verifier.verify(request), response = object(cloneCanonicalValue(raw, limits));
+        live(); const raw = await reader.verify(request); live();
+        const response = object(cloneCanonicalValue(raw, limits));
         charge(canonical(response).length);
         if (!response || typeof response !== 'object' || Array.isArray(response)) reject('type', ['response']);
         if (Object.keys(response).sort().join(',') !== (response.outcome === 'verified' ? 'facts,outcome,request,scope' : 'outcome,request,scope')) reject('key', ['response']);
@@ -60,7 +62,7 @@ export async function inspectProjectContent(input: unknown, limits: HistoryReadL
         if (error instanceof DomainValidationError && error.issue.path[0] === 'contentWork') throw error;
         result = { request, path, outcome: error instanceof DomainValidationError ? 'malformed' : 'failed' };
       }
-      const frozen = Object.freeze({ ...result, path: Object.freeze([...path]) }); checks.push(frozen);
+      live(); const frozen = Object.freeze({ ...result, path: Object.freeze([...path]) }); checks.push(frozen);
       if (result.outcome !== 'verified') report(path, `${fact}-${result.outcome}`);
       return frozen;
     };
@@ -140,8 +142,31 @@ export async function inspectProjectContent(input: unknown, limits: HistoryReadL
       }
       return true;
     });
-    return Object.freeze({ kind: 'project-content-inspection', token: candidates.token, scope, candidates, checks: Object.freeze(checks), workUsed: work,
+    live(); return Object.freeze({ kind: 'project-content-inspection' as const, token: candidates.token, scope, candidates, checks: Object.freeze(checks), workUsed: work,
       issues: Object.freeze([...new Map([...issues, ...added].map(i => [canonical(i as unknown as JsonValue), i])).values()]),
       pendingAuthority: Object.freeze(['affected-closure-projection-and-same-token-provider'] as const) });
+    };
+    if (media.some(r => !required.has(string(r.id)))) return await inspect(verifier);
+    const withReadonlyContent = verifier.withReadonlyContent;
+    if (!withReadonlyContent) return await inspect(verifier);
+    let open = true, invoked = false, completed = false, invalid = false;
+    let result: Awaited<ReturnType<typeof inspect>> | undefined;
+    const live = () => { if (!open || invalid) reject('value', ['contentInvocation']); };
+    try {
+      await withReadonlyContent.call(verifier, reader => {
+        const pending = (async () => {
+        if (!open || invoked) { invalid = true; reject('value', ['contentInvocation']); }
+        invoked = true;
+        try {
+          if (reader.scope !== scope) reject('value', ['contentInvocation']);
+          const owned = await inspect(reader, live); live(); result = owned; completed = true;
+        } catch (error) { invalid = true; throw error; }
+        })();
+        // A faulty port may ignore the promise; its late failure is still observed.
+        void pending.catch(() => {}); return pending;
+      });
+      live(); if (!invoked || !completed || !result) reject('value', ['contentInvocation']);
+      return result!;
+    } finally { open = false; }
   } catch (error) { if (error instanceof DomainValidationError) return Object.freeze({ kind: 'rejected', issue: error.issue }); throw error; }
 }

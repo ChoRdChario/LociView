@@ -43,6 +43,21 @@ function setup() {
   return { document, root, input, help, trigger: help.children[0]!, note: help.children[1]!, stop };
 }
 describe('optional contextual explanations', () => {
+  it('keeps camera-scoped help on the stage side after moving its note to document.body', () => {
+    const document = new HelpDocument(); document.defaultView.innerWidth = 1440; document.defaultView.innerHeight = 1000;
+    const root = document.createElement('section'), anchor = document.createElement('button');
+    anchor.getBoundingClientRect = () => ({ left: 900, right: 944, top: 200, bottom: 244, width: 44, height: 44 });
+    const help = record(contextHelp(document.asDocument(), 'カメラを平行移動します。', [anchor as unknown as HTMLElement],
+      { side: 'left', bounds: () => ({ left: 0, right: 1024, top: 76, bottom: 1000, width: 1024, height: 924 } as DOMRect) }));
+    const note = help.children[1]! as HelpNode;
+    note.getBoundingClientRect = () => ({ left: 0, right: 352, top: 0, bottom: 80, width: 352, height: 80 });
+    root.append(anchor, help); document.body.append(root); const stop = mountContextHelp(document.asDocument(), root as unknown as HTMLElement);
+    document.activeElement = anchor; document.event('focusin', anchor);
+    expect(note.parent).toBe(document.body); expect(note.hidden).toBe(false);
+    expect(note.style.left).toBe('540px'); expect(note.style.top).toBe('200px'); expect(note.style.maxWidth).toBe('min(352px, 1008px)');
+    document.event('pointerover', note); document.activeElement = document.body; document.event('focusout', anchor); vi.advanceTimersByTime(200);
+    expect(note.hidden).toBe(false); stop();
+  });
   it('preserves existing descriptions and waits two seconds; a brief pass never opens it', () => {
     const h = setup(); expect(h.input.getAttribute('aria-describedby')).toContain('current-error'); expect(h.note.hidden).toBe(true);
     h.document.event('pointerover', h.input); vi.advanceTimersByTime(1999); expect(h.note.hidden).toBe(true);
