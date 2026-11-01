@@ -57,7 +57,77 @@ unchanged-feature-classification checks pass; independent review has no findings
 No runtime change or new capacity guarantee; no runtime suite is needed for this
 documentation checkpoint.
 
-## Current boundary —owned pure reads during backup restore
+## Current boundary —continue editing after an ordinary backup
+
+After the verified06b g0 checkpoint, close one connected save/display consumer.
+Outcome: real backup → output state shown → editing continues, without reading
+the same ready metadata again solely for presentation. Existing5f baseline is
+host.backup.total43.6595s, generate38.408s, post-save overview5.2512s and
+download2.076s (actual46.272s). Measure actual contribution;5.2512s is not an
+eliminable-time guarantee. Body editing22.632s is separate.
+
+Specify the ephemeral success/read ports in06 before code. Keep the final ready
+read from the same successful backup command only for pure output presentation;
+exact host/Session/sender/token and ready state must match. Default/failed/nonready/
+mismatched/later calls stay fresh. Preserve every job/control/protection and
+write/Prepared/readback/publication/Selection/recovery check. No retained global
+read cache, new user setting or §6/01h implementation. Existing base-display
+callers and tests keep their previous defaults. Focused success/fault/fallback
+checks → actual save/edit/file/cold → independent review and required final checks
+precede the next suitable g0 checkpoint. Stop only the affected optimization if
+the result also grants command authority or needs a new validation lifetime.
+
+Implemented three-source port connection preserves public ID returns and all
+three ready fences. Session observes its actual final read after outer write
+success; Sender forwards after package-operation success; Host uses a guarded
+closure-local result for the immediate overview only. Old base-only/default
+callers remain fresh. Focused10 (new7 plus existing3), sceneCore12 and typecheck
+pass; independent source/test review has no mandatory findings. Frozen tree is
+873e92d9d7a96a0cf7f4e922a7aad98a9169b68fa1a9dcce2a178b5b5666f818
+(746files). Actual Ki84 backup49,728,227B passes full archive inspection:
+the original3 change byte sequences, expected single edit, all records and27
+payloads are exact. Editing continues after save; a new draft can be cancelled
+without changing the saved body. Full browser/server close → network-off restart
+uses the normal SW without bypass, with exact candidate index/six runtime asset
+hashes, writable saved body, cancellation, decoded320×180 thumbnail and presented
+3D. No browser errors or external requests were observed.
+
+One retained5f/new873 pair reduces post-save overview5.2512→1.8806s and its owner
+control reads1716→26; package job/control reads remain the same. All three ready
+fences still run. Generation38.408→50.4745s and actual output46.272→55.917s were
+slower in this pair, so this is a narrower presentation improvement, not an overall
+save-speed gain or guarantee. Native decode remains zero during output; observed
+crypto calls1456→1320. Environment/elapsed variation in the other stages is not
+isolated by that pair. One additional same-state second-backup pair uses the
+existing owned profiles: same records/original history plus one edit, one existing
+generated backup, same label, Chromium/origin/viewport/DPR, SW blocked/bypassed
+with no controller, and verified actual assets. Actual output61.961→55.728s,
+generate50.9757→50.1021s, overview7.6657→2.5167s and download2.7179→2.4183s.
+Overview owner reads again1716→26; package list/readStream/readBytes36/146/34
+and all three ready fences remain. Both archives retain exact records/history
+and27payloads. One late thumbnail bitmap crossed the before output phase; after
+had none, so this is not a claim of identical native timing. These finite
+observations support the narrow presentation change, not a general save-speed
+or no-regression guarantee. Do not broaden validation lifetimes to fit a target.
+Final all-root Vitest passes on the same frozen tree:146files,3197tests and21
+separate todo cases,1067.57s, one process Exit0. Typecheck, all five builds and
+offline/HEIC isolation pass on this same tree, executed serially using the already
+passed exact-tree offline build; this is the required sequence, not a claim of
+one literal checkpoint-script Exit0. Independent source/test and actual-file/
+image evidence reviews have no mandatory findings. The existing4191 local link
+now serves the fixed873 candidate, all20HTTP resource hashes/lengths matched;
+old immutable candidates remain evidence. Only the verified, reviewed scope may
+enter the g0 checkpoint; private source/audits and all.artifacts remain outside
+Git. Earlier06b and01i checks retain their own source/environment qualifications.
+
+Next: ordinary Caption edit → save → continue editing still has long command
+and generation stages. Measure the readonly receipt-verification contribution
+before selecting its bounded consumer. Keep new evidence/model/parser/CAS/write
+work and all Prepared/publication/recovery checks strict; no whole-Session cache,
+§6 or01h implementation. Physical-device, larger-copy latency and release gates
+remain separately pending.
+
+## Completed boundary —owned pure reads during backup restore
 
 PO2026-11-01 explicitly accepts [06b §§1–5](../docs/specs/06b-staging-read-operations-proposal.md).
 Outcome: restore the confirmed high-resolution backup, edit, write an actual

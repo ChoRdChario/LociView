@@ -260,13 +260,13 @@ async function openNormalValidationHost(options: ValidationHostOptions, inherite
     };
     let outputJobs: WorkspaceOutputState[] = [], outputFailure = '';
     let outputBases: ContributionBaseChoice[] = [], outputDiscoveryFailure = '';
-    const reloadOutput = async (current?: MetadataSessionRead) => {
+    const reloadOutput = async (current?: MetadataSessionRead, backupDisplayRead?: MetadataSessionRead) => {
       try {
         if (unfinishedReceive()) {
           outputJobs = await measure('host.output.jobs', () => sender.jobs());
           outputBases = await measure('host.output.bases', () => sender.availableBases());
         } else {
-          const overview = await measure('host.output.overview', () => current ? sender.outputOverview(current) : sender.outputOverview());
+          const overview = await measure('host.output.overview', () => current ? backupDisplayRead ? sender.outputOverview(current, backupDisplayRead) : sender.outputOverview(current) : sender.outputOverview());
           outputJobs = overview.jobs; outputBases = overview.bases;
         }
         outputDiscoveryFailure = '';
@@ -407,12 +407,17 @@ async function openNormalValidationHost(options: ValidationHostOptions, inherite
         workspaceFiles.importWorkspace(options.workspaceFile)); }
       catch { /* File and incomplete originals stay available through the same recovery controls. */ }
     }
-    const outputAction = <T>(action: () => Promise<T>, recovery = false) => execute(async () => {
+    const outputAction = <T>(action: () => Promise<T>, recovery = false, presentation?: () => MetadataSessionRead | undefined) => execute(async () => {
       editable(); if (!recovery && (outputDiscoveryFailure || unfinishedOutput() || last.state !== 'ready')) throw Error('中断したファイル生成を確認してください。');
       outputFailure = '';
-      try { return await action(); }
+      let succeeded = false;
+      try { const result = await action(); succeeded = true; return result; }
       catch (error) { outputFailure = error instanceof Error ? error.message : 'ファイル処理を完了できません。'; throw error; }
-      finally { await reloadOutput(); }
+      finally {
+        let read: MetadataSessionRead | undefined;
+        if (succeeded) { try { read = presentation?.(); } catch { /* Fall back to fresh display discovery. */ } }
+        await reloadOutput(read, read);
+      }
     }, true);
     const workspaceOutput = {
       get privacy() { const sourceIncludesNames = last.source?.includesDeclaredEditorNames ?? false;
@@ -424,7 +429,17 @@ async function openNormalValidationHost(options: ValidationHostOptions, inherite
       previewClean: (token: string) => outputAction(() => sender.previewClean(token)),
       previewReview: (token: string, selection: Parameters<typeof sender.previewReview>[1]) => outputAction(() => sender.previewReview(token, selection)),
       generateReview: (token: string, selection: Parameters<typeof sender.generateReview>[1]) => outputAction(() => sender.generateReview(token, selection)),
-      generateBackup: (token: string, label?: string) => measure('host.backup.total', () => outputAction(() => measure('host.backup.generate', () => sender.generateBackup(token, label)))),
+      generateBackup: (token: string, label?: string) => {
+        const owner = connection, ownedFs = fs, ownedSession = session, ownedSender = sender, publication = last.publication;
+        let read: MetadataSessionRead | undefined;
+        return measure('host.backup.total', () => outputAction(() => measure('host.backup.generate', () => ownedSender.generateBackup(token, label, undefined, next => { read = next; })), false, () => {
+          if (closed || restoreRetired || connection !== owner || fs !== ownedFs || session !== ownedSession || sender !== ownedSender ||
+            last.state !== 'ready' || last.source?.token !== token || last.publication !== publication || read?.state !== 'ready' ||
+            read.source?.token !== token || read.publication !== publication || read.provider?.kind !== 'scene-provider' || read.provider.token !== token ||
+            json(read.source.proof) !== json(last.source.proof)) return undefined;
+          return read;
+        }));
+      },
       generateContribution: (token: string, selection: ContributionBaseChoice['selection']) => measure('host.contribution.total', () => outputAction(() => measure('host.contribution.generate', () => sender.generateContribution(token, selection)))),
       retry: (id: string) => outputAction(() => sender.retry(id), true),
       cancel: (id: string) => outputAction(() => sender.cancel(id), true),

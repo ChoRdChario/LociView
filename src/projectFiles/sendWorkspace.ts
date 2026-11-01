@@ -1,6 +1,6 @@
 import type { ProjectWorkspaceFS } from '../platform/fs';
 import { hasEditorCapability, hasPortableMediaCapability } from '../projectMetadata/requiredCapabilities';
-import type { MetadataProjectSession, MetadataSessionRead } from '../projectMetadata/session';
+import type { MetadataProjectSession, MetadataSessionRead, BackupPresentationObserver } from '../projectMetadata/session';
 import type { OriginBlobStore } from '../projectMetadata/blobStore';
 import type { MetadataLimits, MetadataProof } from '../projectMetadata/format';
 import { json, withMetadataRead } from '../projectMetadata/persistence';
@@ -22,6 +22,7 @@ export interface WorkspaceOutputState { id: string; purpose: 'teamWorkspace' | '
 export interface ContributionBaseChoice { selection: ContributionBaseSelection; label: string; includesDeclaredEditorNames?: boolean; deltaIncludesDeclaredEditorNames?: boolean }
 const settledOutputDisplay = (rows: readonly WorkspaceOutputState[]) =>
   rows.every(row => ['generated', 'file-verified', 'abandoned', 'cancelled'].includes(row.state));
+interface BackupDisplaySource { readonly source: NonNullable<MetadataSessionRead['source']>; readonly proof: MetadataProof; readonly token: string }
 /** Explicit same-Project output commands. Download handoff has no completion receipt. */
 export class WorkspaceSender {
   constructor(private readonly fs: ProjectWorkspaceFS, private readonly session: MetadataProjectSession,
@@ -31,8 +32,16 @@ export class WorkspaceSender {
   previewClean(token: string) { return this.session.previewCleanOutput(token); }
   generateReview(token: string, selection: ReviewSelectionOptions, signal?: AbortSignal) { return workspaceFileOperation(this.locks, () => this.session.createReviewOutput(token, selection, this.store, '0.0.1', signal)); }
   previewReview(token: string, selection: ReviewSelectionOptions) { return this.session.previewReviewOutput(token, selection); }
-  generateBackup(token: string, label?: string, signal?: AbortSignal) {
-    return workspaceFileOperation(this.locks, () => this.session.createManualCheckpoint(token, label, this.store, '0.0.1', signal, this.backupTiming));
+  generateBackup(token: string, label?: string, signal?: AbortSignal, observePresentation?: BackupPresentationObserver) {
+    let read: MetadataSessionRead | undefined;
+    const capture = observePresentation ? (next: MetadataSessionRead) => { read = next; } : undefined;
+    const output = workspaceFileOperation(this.locks, () => this.session.createManualCheckpoint(token, label, this.store, '0.0.1', signal, this.backupTiming, capture));
+    if (!observePresentation) return output;
+    return output.then(id => {
+      // Package-operation success is a second boundary after the Session fence.
+      if (read && !signal?.aborted) { try { observePresentation(read); } catch { /* Display observers cannot reject a saved file. */ } }
+      return id;
+    });
   }
   generateContribution(token: string, selection: ContributionBaseSelection, signal?: AbortSignal) {
     const owned = structuredClone(selection);
@@ -67,13 +76,17 @@ export class WorkspaceSender {
       new WorkspaceSender(fs, this.session, this.store, this.limits, this.locks).availableBasesDirect(proof, current?.source ?? undefined));
   }
   /** One read-only display observation; never supplies output-command authority. */
-  async outputOverview(current?: MetadataSessionRead): Promise<{ jobs: WorkspaceOutputState[]; bases: ContributionBaseChoice[] }> {
+  async outputOverview(current?: MetadataSessionRead, backupDisplayRead?: MetadataSessionRead): Promise<{ jobs: WorkspaceOutputState[]; bases: ContributionBaseChoice[] }> {
     const commandProof = current?.state === 'ready' && current.source ? structuredClone(current.source.proof) : undefined;
+    const currentSource = current?.source ?? undefined;
+    const backupSource: BackupDisplaySource | undefined = current && backupDisplayRead === current && current.state === 'ready' && current.source && current.publication &&
+      current.provider?.kind === 'scene-provider' && current.provider.token === current.source.token ?
+      { source: current.source, proof: structuredClone(current.source.proof), token: current.source.token } : undefined;
     return withMetadataRead(this.fs, undefined, async ({ fs }) => {
       const sender = new WorkspaceSender(fs, this.session, this.store, this.limits, this.locks);
       let observed: MetadataProof | null | undefined;
-      const jobs = await sender.jobsDirect(proof => { observed = proof; });
-      const bases = await sender.availableBasesDirect(settledOutputDisplay(jobs) && observed !== null ? observed ?? commandProof : undefined, current?.source ?? undefined);
+      const jobs = await sender.jobsDirect(proof => { observed = proof; }, backupSource);
+      const bases = await sender.availableBasesDirect(settledOutputDisplay(jobs) && observed !== null ? observed ?? commandProof : undefined, currentSource);
       return { jobs, bases };
     });
   }
@@ -113,17 +126,19 @@ export class WorkspaceSender {
     return withMetadataRead(this.fs, undefined, ({ fs }) =>
       new WorkspaceSender(fs, this.session, this.store, this.limits, this.locks).jobsDirect());
   }
-  private async jobsDirect(observe?: (proof: MetadataProof | null) => void): Promise<WorkspaceOutputState[]> {
+  private async jobsDirect(observe?: (proof: MetadataProof | null) => void, backupSource?: BackupDisplaySource): Promise<WorkspaceOutputState[]> {
     const result: WorkspaceOutputState[] = [];
     let bases: ReturnType<WorkspaceBaseStore['read']> | undefined;
     const readCurrentBackup = async (protection: Awaited<ReturnType<typeof validateOutputProtection>>) => {
-      const current = await this.session.read(); if (!current.source) throw Error('output-source-missing');
-      const proof = structuredClone(current.source.proof), currentBases = new WorkspaceBaseStore(this.fs, this.limits, proof);
+      const supplied = backupSource && json(backupSource.proof) === json(protection.proof) ? backupSource : undefined;
+      const fresh = supplied ? undefined : await this.session.read(), source = supplied?.source ?? fresh?.source;
+      if (!source) throw Error('output-source-missing');
+      const proof = supplied?.proof ?? structuredClone(source.proof), currentBases = new WorkspaceBaseStore(this.fs, this.limits, proof);
       const snapshot = json(proof) === json(protection.proof) ? protection.snapshot : await currentBases.snapshot();
-      const inspection = await current.source.inspectOriginal({ maxNodes: L.inspectionNodes, maxWork: L.inspectionWork });
+      const inspection = await source.inspectOriginal({ maxNodes: L.inspectionNodes, maxWork: L.inspectionWork });
       const inventory = protectedWorkspaceInventory(inspection.candidates, await currentBases.payloads(snapshot.records));
-      return { token: current.source.token, snapshot: json(snapshot), inventory: json(inventory),
-        proof: current.state === 'ready' ? proof : undefined };
+      return { token: supplied?.token ?? source.token, snapshot: json(snapshot), inventory: json(inventory),
+        proof: supplied || fresh?.state === 'ready' ? proof : undefined };
     };
     // Only a complete successful projection lives inside this one read callback.
     let currentBackup: Awaited<ReturnType<typeof readCurrentBackup>> | undefined;

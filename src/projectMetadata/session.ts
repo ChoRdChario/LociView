@@ -70,6 +70,8 @@ export type MetadataSessionRead = Readonly<{
   /** Internal technical receipt, never an end-user label. */
   publication: string | null;
 }>;
+/** Synchronous presentation observation; never grants output/recovery authority. */
+export type BackupPresentationObserver = (read: MetadataSessionRead) => void;
 
 function weakContent(provider: Extract<ProjectProviderRead, { kind: 'scene-provider' }>, limits: MetadataLimits) {
   const candidates = provider.inspection.candidates, active = new Set(candidates.knownActiveRoots), queue = [...active];
@@ -433,11 +435,12 @@ export class MetadataProjectSession {
     job.assertOwner(this.fs); const current = await measureBackupOutput(timing, 'ready-finish', () => this.outputReady());
     if (json(current.source!.proof) !== json(job.source.proof)) return fail('output-lineage');
     await measureBackupOutput(timing, 'slot-finish', () => this.assertOutputSlot(job.id)); await measureBackupOutput(timing, 'protection-finish', () => validateOutputProtection(this.fs, job, store, this.limits));
-    await measureBackupOutput(timing, 'job', () => job.generate(store, signal, timing)); return job.id;
+    await measureBackupOutput(timing, 'job', () => job.generate(store, signal, timing)); return { id: job.id, read: current };
   }
-  async createManualCheckpoint(expectedToken: string, label: string | undefined, store: OriginBlobStore, version: string, signal?: AbortSignal, timing?: BackupOutputTiming) {
+  async createManualCheckpoint(expectedToken: string, label: string | undefined, store: OriginBlobStore, version: string, signal?: AbortSignal, timing?: BackupOutputTiming,
+    observePresentation?: BackupPresentationObserver) {
     checkedBackupLabel(label);
-    return underWriteLease(this.fs, async () => {
+    const result = await underWriteLease(this.fs, async () => {
       const read = await measureBackupOutput(timing, 'ready-before', () => this.outputReady()); if (read.source!.token !== expectedToken) return fail('output-stale');
       await measureBackupOutput(timing, 'slot-before', () => this.assertOutputSlot());
       const bases = new WorkspaceBaseStore(this.fs, this.limits, read.source!.proof);
@@ -448,9 +451,13 @@ export class MetadataProjectSession {
       if (current.source!.token !== expectedToken || current.publication !== capture.publication || json(await bases.snapshot()) !== json(job.frozenBases())) return fail('output-stale');
       await measureBackupOutput(timing, 'persist', () => job.persist()); return measureBackupOutput(timing, 'finish', () => this.finishBackupOutput(job, store, signal, timing));
     });
+    // The actual final ready read is observed only after the outer write fence
+    // succeeds. A failed/closing command cannot seed its display successor.
+    if (!signal?.aborted) { try { observePresentation?.(result.read); } catch { /* Presentation has no authority over the completed output. */ } }
+    return result.id;
   }
   async resumeBackupOutput(id: string, store: OriginBlobStore, signal?: AbortSignal, timing?: BackupOutputTiming) {
-    return underWriteLease(this.fs, async () => this.finishBackupOutput(await BackupOutputJob.open(this.fs, id, this.limits), store, signal, timing));
+    return (await underWriteLease(this.fs, async () => this.finishBackupOutput(await BackupOutputJob.open(this.fs, id, this.limits), store, signal, timing))).id;
   }
   async verifyBackupOutput(id: string, file: Blob, store: OriginBlobStore) {
     return underWriteLease(this.fs, async () => {

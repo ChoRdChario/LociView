@@ -2879,6 +2879,54 @@ Acceptance checks one-row duplicate-snapshot removal, multiple backups' exact st
 proof mismatch fallback, failed-projection retry, acknowledged evidence loss and
 closing refusal using existing service and actual restored-file workflows.
 
+**Same-command backup presentation (2026-11-01; bounded connection):**
+the successful backup's final `outputReady` already yields an owned ready read.
+An optional observer on `createManualCheckpoint` may deliver that actual read
+only after its outer write lease and closing fence succeed. The private finish
+helper may return `{ id, read }`; existing public create/resume return IDs remain
+compatible. The Sender forwards a presentation observation only after the
+package operation also succeeds. Observer failure never changes saved output;
+no observer fires for a failed write/closing fence. Do not fabricate a ready read
+from Host.last, a job source or a cached earlier command.
+
+Only the ordinary Host backup command keeps this observation in local variables.
+After success, require the same host connection, FS/Session/Sender, expected token,
+ready source and publication before using it for the immediately following pure
+output projection. Clear it at return/failure/close; a later command cannot borrow
+it. Existing `outputOverview(current)` keeps its base-display-only default, while
+an additional optional backup-display read is explicit. Capture proof/token/source
+before awaiting and require agreement with the command's owned current read.
+Otherwise retain the existing fresh Session read. Other output commands, retries,
+startup/receive discovery and ordinary `jobs()` keep their previous behavior.
+
+The concrete ports are a final optional synchronous observer on Session
+`createManualCheckpoint` and Sender `generateBackup`, plus a second optional read
+on `outputOverview(current, backupDisplayRead)` and the Host's private reload.
+The Host alone supplies both reads from the same captured successful result.
+The final read/publication/provider token must agree with the captured current
+view, and the owning connection/FS/Session/Sender must be unchanged. The extra
+read carries no FS, Job, new metadata field or authority. An observer exception
+is ignored as presentation-only; it cannot turn a completed save into failure.
+
+This extra channel feeds only the current-source part of backup **stale-display**
+calculation inside one overview. Every job state/step, original/artifact/completion,
+protection, current bases/payloads and inventory check still executes freshly.
+No command authority, persisted receipt, global/source cache, delayed body check,
+write/Prepared/readback/publication/Selection/recovery fence is changed. Late
+repair discards the successful overview observation and uses the existing fresh
+fallback for base display. No temporary FS/store/job capability escapes.
+
+Acceptance reuses real backup/overview/Host fixtures: preserve three fresh ready
+fences and every job/control/protection check; compare exact output/stale/base
+projection; observer rejection on failure/closing; old default/nonready/token or
+owner mismatch/next-command fallback; late repair/evidence loss refusal; actual
+save → file inspection → continued editing/cold reopen. Measure post-save overview
+and total separately against the retained5f observation; its5.2512s is not an
+eliminable-time or speed guarantee. No §6/01h inspection-lifetime change is allowed.
+The exact implementation, executed file/cold acceptance, measured qualifications
+and final checks are recorded in [current work](../../tasks/todo.md); this is not
+a cross-command cache or an adoption/release guarantee.
+
 **Shared OPFS sink refinement (2026-10-26):** coalesce small incoming chunks
 using one fixed 64 KiB owned buffer within the existing I/O accounting, never a
 whole-archive buffer. Preserve the original whole-input-chunk copy before any

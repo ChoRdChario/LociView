@@ -29,9 +29,10 @@ are existing workflow repairs, not new screens or settings. Online and offline
 use one app/Project; safe update/recovery remains visible when needed.
 
 [06b §§1–5](../docs/specs/06b-staging-read-operations-proposal.md) was explicitly
-accepted2026-11-01 and is the current connected implementation. Its named
-staging pure-read exception is implemented and verified in the exact scope
-recorded in todo. It does not authorize payload-proof
+accepted2026-11-01. Its named staging pure-read exception is implemented and
+verified in the exact scope recorded in todo. The following same-command backup
+presentation connection also keeps its current outcome and checks in todo;
+neither connection authorizes payload-proof
 reuse, inspection postponement or broad Session caching. The separate section6
 candidate is NOT SELECTED. Follow the exact decision boundary in todo; ordinary
 in-scope fixes do not need renewed approval.
