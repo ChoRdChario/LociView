@@ -176,10 +176,12 @@ serves only the frozen20-file candidate; independent HTTP200/byte/SHA checking
 matches every resource, including index and worker. This HTTP check itself does
 not claim browser SW registration. The small local synthetic sample is prepared.
 
-Current remaining work: finish the actual-index privacy/content review, then
-commit/Push only suitable verified g0-baseline scope. Private originals/audits and
-all.artifacts stay out of Git. General performance/device/adoption/release gates
-remain separate; unchanged source is not rerun merely for docs or staging.
+The verified g0-baseline development checkpoint is committed and pushed2026-11-01
+after actual-index privacy/content review. Git owns its identity; private
+originals/audits and all.artifacts remain outside the commit. No main/Pages release.
+Next engineering step is PO's06b §§1–5 decision for staging reads; large raw-ZIP
+validation lifetime needs a separate design. Performance/device/adoption/release
+gates remain separate. Unchanged source is not rerun for this status-only record.
 
 [06b §§1–5](../docs/specs/06b-staging-read-operations-proposal.md) is independently
 reviewed but PROPOSED/unapproved/unimplemented: a narrowly owned staging pure-read
