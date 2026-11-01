@@ -1,11 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 import * as A from '@automerge/automerge'; // Node-only local Wasm initialization.
-import { MemoryFS, type ProjectMutationAuthority } from '../src/platform/fs';
+import { MemoryFS, type ProjectMutationAuthority, type ProjectWorkspaceFS } from '../src/platform/fs';
 import { MetadataProjectSession, type MetadataSessionRead } from '../src/projectMetadata/session';
 import { MetadataRepository, type MetadataStorageFactory, type MetadataStoragePort } from '../src/projectMetadata/repository';
 import { PersistentContentVerifier, type VerifiedInventoryPort } from '../src/projectMetadata/contentEvidence';
 import { TransactionJournal } from '../src/projectMetadata/journal';
-import { digest, json, underWriteLease, withMetadataRead, writeReceipt } from '../src/projectMetadata/persistence';
+import { digest, json, jsonDigest, metadataPath, underWriteLease, withMetadataRead, writeReceipt } from '../src/projectMetadata/persistence';
+import type { ContentRequest } from '../src/domain/projectContentChecks';
 import { ProjectMetadataSource, type MetadataLimits } from '../src/projectMetadata/source';
 import { planRemoteChanges, type FullMetadataSource } from '../src/projectMetadata/remote';
 import { captureJournalRemote, type JournalRemoteInput, type PackageRemoteBatchProof } from '../src/projectMetadata/packageRemote';
@@ -122,6 +123,89 @@ describe('local generation capabilities (ports only, not backup restore/selectio
   }
   const deferred = () => { let release!: () => void;
     const promise = new Promise<void>(resolve => { release = resolve; }); return { promise, release }; };
+
+  async function evidence(fs: ProjectWorkspaceFS, root: FaultFS) {
+    const record = Object.values(fixture().mediaResourcesById)[0]! as JsonObject;
+    const request: ContentRequest = { token: 'owned-evidence', fact: 'media', records: [record], context: {} };
+    const scope = 'development-fixture' as const, version = 'readonly-evidence-fixture-1';
+    const key = { version, scope, fact: request.fact, records: request.records, context: request.context };
+    const path = metadataPath(fs, `evidence/${await jsonDigest(key)}.json`), facts = { mediaKind: record.mediaKind!, mediaType: (record.blob as JsonObject).mediaType! };
+    const write = async (value: JsonObject = facts) => root.writeText(path, json({ key, facts: value, digest: await jsonDigest({ key, facts: value }) }));
+    await write();
+    const state: { presence: Awaited<ReturnType<VerifiedInventoryPort['inspect']>> } = { presence: 'verified-present' };
+    const inspect = vi.fn(async (_request: ContentRequest) => state.presence);
+    const execute = vi.fn(async (request: ContentRequest) => ({ request, scope, outcome: 'unsupported' }));
+    const verifier = (allow = false) => new PersistentContentVerifier(fs, limits, { scope, verify: execute }, version, { inspect }, allow);
+    return { request, path, facts, write, state, inspect, execute, verifier };
+  }
+
+  it('readonly content evidence reads a fresh owned receipt with two audits, keeping hasEvidence and new-evidence calls strict', async () => {
+    const f = local(); let audits = 0;
+    const scope = await f.bind(null, false, async () => { audits++; }, true), e = await evidence(scope.fs, f.fs), writes = f.fs.writes;
+    audits = 0;
+    const first = await e.verifier().verify(e.request);
+    expect(first).toEqual({ request: e.request, scope: 'development-fixture', outcome: 'verified', facts: e.facts });
+    expect(Object.keys(first as object).sort()).toEqual(['facts', 'outcome', 'request', 'scope']);
+    expect(audits).toBe(2); expect(e.inspect).toHaveBeenCalledTimes(1);
+    audits = 0; expect(await e.verifier().hasEvidence(e.request)).toBe(true); expect(audits).toBe(4);
+    expect(e.inspect).toHaveBeenCalledTimes(1);
+    audits = 0; expect(await e.verifier(true).verify(e.request)).toEqual(first); expect(audits).toBe(4);
+    await f.fs.remove(e.path); audits = 0;
+    expect(await e.verifier().verify(e.request)).toMatchObject({ outcome: 'failed' }); expect(audits).toBe(2);
+    e.state.presence = 'missing'; expect(await e.verifier().verify(e.request)).toMatchObject({ outcome: 'missing' });
+    await e.write(); e.state.presence = 'verified-present'; expect(await e.verifier().verify(e.request)).toEqual(first);
+    expect(e.inspect).toHaveBeenCalledTimes(5); expect(e.execute).not.toHaveBeenCalled();
+    expect(f.fs.writes).toBe(writes + 1);
+  });
+
+  it('readonly content evidence captures records, context and token before a pending entry audit', async () => {
+    const f = local(), entered = deferred(), release = deferred(); let paused = false;
+    const scope = await f.bind(null, false, async () => { if (paused) { entered.release(); await release.promise; } }, true);
+    const e = await evidence(scope.fs, f.fs), input = structuredClone(e.request), expected = structuredClone(input);
+    paused = true; const reading = e.verifier().verify(input); await entered.promise;
+    Object.assign(input, { token: 'changed' }); Object.assign(input.records[0]!, { mediaKind: 'audio' }); Object.assign(input.context, { changed: true });
+    release.release(); expect(await reading).toEqual({ request: expected, scope: 'development-fixture', outcome: 'verified', facts: e.facts });
+    expect(e.inspect).toHaveBeenNthCalledWith(1, expected);
+    expect(await e.verifier().verify(input)).toMatchObject({ request: input, outcome: 'failed' });
+    expect(e.execute).not.toHaveBeenCalled();
+  });
+
+  it('readonly content evidence refuses a closing selection change and never reuses an expired reader', async () => {
+    const f = local(); let audits = 0;
+    const scope = await f.bind(null, false, async () => { audits++; }, true), e = await evidence(scope.fs, f.fs), writes = f.fs.writes;
+    e.inspect.mockImplementationOnce(async () => { f.allowed.delete(null); return 'verified-present'; }); audits = 0;
+    await expect(e.verifier().verify(e.request)).rejects.toThrow('Retired'); expect(audits).toBe(2);
+    f.allowed.add(null); expect(await e.verifier().verify(e.request)).toMatchObject({ outcome: 'verified' });
+    await scope.dispose(); const calls = e.inspect.mock.calls.length;
+    await expect(e.verifier().verify(e.request)).rejects.toThrow('generation-closed');
+    expect(e.inspect).toHaveBeenCalledTimes(calls); expect(e.execute).not.toHaveBeenCalled(); expect(f.fs.writes).toBe(writes);
+  });
+
+  it('readonly content evidence preserves receipt integrity, inventory and conditional facts order', async () => {
+    const f = local(), scope = await f.bind(null, false, async () => {}, true), e = await evidence(scope.fs, f.fs);
+    await e.write({ ...e.facts, mediaKind: 'audio' });
+    e.state.presence = 'missing'; expect(await e.verifier().verify(e.request)).toMatchObject({ outcome: 'missing' });
+    e.state.presence = 'suspect'; expect(await e.verifier().verify(e.request)).toMatchObject({ outcome: 'failed' });
+    e.state.presence = 'verified-present'; await expect(e.verifier().verify(e.request)).rejects.toThrow();
+    const inspections = e.inspect.mock.calls.length; await expect(e.verifier().hasEvidence(e.request)).rejects.toThrow();
+    expect(e.inspect).toHaveBeenCalledTimes(inspections);
+    e.state.presence = 'missing'; expect(await e.verifier(true).verify(e.request)).toMatchObject({ outcome: 'missing' });
+    expect(e.execute).not.toHaveBeenCalled();
+    e.state.presence = 'unverified'; expect(await e.verifier(true).verify(e.request)).toMatchObject({ outcome: 'unsupported' });
+    expect(e.execute).toHaveBeenCalledTimes(1);
+    const invalid = JSON.parse((await f.fs.readText(e.path))!); invalid.digest = '0'.repeat(64); await f.fs.writeText(e.path, json(invalid)); e.inspect.mockClear();
+    await expect(e.verifier().verify(e.request)).rejects.toThrow('content-evidence'); expect(e.inspect).not.toHaveBeenCalled();
+  });
+
+  it.each(['unregistered', 'staging'] as const)('readonly content evidence keeps %s receipt reads on their strict per-I/O path', async kind => {
+    const f = local(); let audits = 0, stagingOwners = 0;
+    const scope = kind === 'unregistered' ? await f.bind(null, false, async () => { audits++; }) : await openWorkspaceGeneration(f.fs,
+      { generationId: nextId, allowCreate: true, assertSelected: async () => { audits++; }, stagingReadOwner: { assertOwner() { stagingOwners++; } } },
+      async () => ({ factory: f.original.storage, dispose: async () => {} }));
+    const e = await evidence(scope.fs, f.fs); audits = 0; stagingOwners = 0;
+    expect(await e.verifier().verify(e.request)).toMatchObject({ outcome: 'verified' });
+    expect(audits).toBe(4); expect(stagingOwners).toBe(0); expect(e.inspect).toHaveBeenCalledTimes(1); expect(e.execute).not.toHaveBeenCalled();
+  });
 
   it('audits an explicit read twice, denies mutations and expires retained capabilities', async () => {
     const f = local(); let audits = 0;

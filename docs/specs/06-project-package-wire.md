@@ -2927,6 +2927,51 @@ The exact implementation, executed file/cold acceptance, measured qualifications
 and final checks are recorded in [current work](../../tasks/todo.md); this is not
 a cross-command cache or an adoption/release guarantee.
 
+**Readonly content-evidence consumer (2026-11-01; bounded connection):**
+only `PersistentContentVerifier.verify` with `allowNewEvidence=false` may use
+one existing `withMetadataRead(fs, undefined, callback)` operation. Capture the
+canonical request and version/scope/key synchronously before its entry audit.
+A module-private reader receives only the callback's FS, checked limits and this
+owned request/key; it derives the same evidence path, reads the current receipt
+and checks exact canonical structure/key/digest, without checking content facts.
+Preserve the old order: receipt checks → inventory inspect → check content facts
+only when the receipt exists and inventory is verified-present. Missing/suspect
+inventory must retain its old missing/failed result even for invalid receipt
+facts. Reuse the reader in the old strict receipt method; `hasEvidence` retains
+its separate receipt → facts order without inventory, and the new-evidence
+branch retains its execution, inventory recheck and receipt write order.
+
+The readonly callback captures only scope/limits, the owned input and the existing
+`VerifiedInventoryPort` (its inspect-only interface). It invokes inventory inspect
+freshly on every call. Origin CAS is a separate namespace: keep its existing
+readonly receipt/presence reader, with no reconstruction through the Project
+generation facade and no transfer of its coordinator, store, executor or writer.
+The callback returns owned request/facts/outcome data only; it cannot return a
+Job, FS capability, stream, decoder or delayed reader. No receipt/fact/body cache
+is introduced and no later call can reuse an earlier read or its capability.
+
+Selected/original registrations use their already accepted operation-owned
+audits. Omit the staging consumer tag, so unregistered and restore-staging calls
+retain their per-I/O strict path; the four-consumer06b exception is unchanged.
+Do not wrap Session/provider inspection, allow-new-evidence execution, media or
+CAS writes, Prepared/write/readback/publication/selection/recovery. Original
+path/key/receipt digest, missing/suspect inventory and fact validation remain
+fresh. Entry/closing failure and expired/denied-write capabilities retain the
+existing callback contract; no new authority or validation lifetime is granted.
+
+Acceptance checks exact verified/missing/failed responses, fresh repeated reads
+and acknowledged evidence loss; input mutation while entry is pending; same
+facade receipt ownership, denied writes and expiry/closing failure; no executor
+or receipt/CAS write in the readonly branch; unchanged strict has-evidence,
+allow-new-evidence, default/unregistered and staging behavior. Measure a normal
+same-state873/new-candidate Caption edit with existing outer IO snapshots, then
+actual backup inspection and continued/cold editing. The private diagnostic's
+168 readonly reads and receipt-time union choose this consumer only: its observer
+overhead and capped snapshot history are not normal speed acceptance. Do not
+compare nested sums or claim new capacity, latency, adoption or release guarantees.
+Current executed evidence and the remaining inspection-port decision belong in
+[current work](../../tasks/todo.md); no bulk inspection port is implemented here.
+
 **Shared OPFS sink refinement (2026-10-26):** coalesce small incoming chunks
 using one fixed 64 KiB owned buffer within the existing I/O accounting, never a
 whole-archive buffer. Preserve the original whole-input-chunk copy before any

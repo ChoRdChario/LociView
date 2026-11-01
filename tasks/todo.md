@@ -57,7 +57,86 @@ unchanged-feature-classification checks pass; independent review has no findings
 No runtime change or new capacity guarantee; no runtime suite is needed for this
 documentation checkpoint.
 
-## Current boundary —continue editing after an ordinary backup
+## Current boundary —existing evidence during an ordinary Caption edit
+
+Outcome: apply a Caption body change, save and continue/cold-reopen without
+repeating per-I/O owner audits inside one accepted pure receipt read. First
+measure the readonly evidence contribution within the existing edit stage on
+the verified873 baseline. A private diagnostic build may record only method/
+receipt/inventory start/end intervals; it grants no new production evidence and
+does not postpone validation. Reuse the owned Ki84 profile/input and browser
+driver, not another restore matrix.
+
+Before production changes, specify and independently review one consumer:
+`PersistentContentVerifier.verify` only when `allowNewEvidence=false`. Capture
+owned request/key before awaiting, read the same current receipt through the
+existing selected/original readonly callback and retain the existing origin-CAS
+`VerifiedInventoryPort.inspect` on every call. CAS is a separate namespace; do
+not reconstruct its store through a Project-generation facade. The callback's
+receipt reader has no executor/store authority and returns only owned facts.
+Unregistered/staging calls stay strict; do not add a staging tag or broaden06b.
+Keep `hasEvidence`, new-evidence execution/writes, model/parser/CAS put, whole
+Session/provider checks and all write/Prepared/publication/recovery fences out.
+
+Acceptance covers repeated fresh reads, exact facts, missing/corrupt receipts or
+inventory, denied writes, closing/expiry and no executor call in the readonly
+path, followed by actual edit → file inspection → continued edit/cold. Run the
+required final checks once on the meaningful final tree. Stop only the affected
+change if the reader needs a new authority or validation lifetime; no global
+cache, §6/01h implementation, dependency, numeric guarantee or release.
+
+The private873 diagnostic completes one actual edit:168 readonly verifications,
+about25.2s union inside34.1s outer edit, receipt IO about24.3s and inventory0.9s
+(nested, not additive). Its1346 rows have no drops/errors; two background photo
+decodes are recorded. The global snapshot publisher reached its lifetime cap,
+so its terminal IO counts/absent host span are not complete edit observations.
+This supports choosing the receipt consumer, not normal latency acceptance.
+The [concrete ports](../docs/specs/06-project-package-wire.md) are specified before
+production changes. Use a normal873/new-candidate edit on copies of the same
+closed profile for acceptance; do not rebuild the diagnostic benchmark.
+
+Implemented the single-module reader extraction and readonly branch; the shared
+helper validates receipt structure/key/digest only, preserving conditional facts
+order. New6 fault/invariant cases plus the existing capability case pass (7),
+sceneCore12 and typecheck pass; independent source/test review has no mandatory
+findings. A fixture-only readonly assignment was corrected before typecheck
+passed. Frozen source/test is
+c155ab2ebcb6bf43c6a218d3931a7d3a022e94d302ab09e1b3a988d2087b7493
+(same746paths); its offline candidate builds. The normal same-state873/c155 pair
+is33.810→23.104s actual and33.223→21.2512s host edit. Complete outer IO snapshots
+show owner reads10634→6292; metadata.readBytes243, crypto630/1,153,310B and
+native/HTML0 remain equal. Metadata.readStream246→247, so do not claim all IO
+counts match. This is one bounded pair, not a latency/no-regression guarantee.
+Actual backup49,728,344B preserves the previous4 change byte sequences plus the
+expected edit, all records and27payloads; continued editing/draft cancellation
+passes. Its57.358s output has different history/job count from earlier samples
+and is not a save-speed comparison. Normal SW preparation → full browser/server
+close → new offline context (server stopped, no bypass) retains saved body,
+writable editing/cancellation and decoded thumbnail/presented model. Exact
+candidate index/six loaded asset hashes match. Full/canvas model/photo painting
+was independently confirmed, including exact model-ROI pixel bytes. Independent
+data/runtime/cold review has no mandatory findings. Final all-root suite passes
+on this frozen tree:146files/3203tests,21 separate todo cases,1053.31s, one
+process Exit0. Typecheck and all five builds plus offline/HEIC isolation pass,
+executed serially with the earlier exact-tree offline build reused; this is the
+required sequence, not one literal checkpoint-script Exit0. Earlier Desktop/
+offline cohorts retain their source qualifications; this unit's current browser
+evidence is the normal edit/file/cold path above. The suitable g0 checkpoint
+contains only this reviewed scope; keep private source/audits and all.artifacts
+outside Git. The existing4191 local link serves the fixedc155 candidate, with
+all20HTTP resource hashes/lengths matched. Git owns its checkpoint identity.
+
+Short meta-audit: grouping content requests needs a bounded invocation port
+keeping inspection domain-owned, plus a retained-media callback rule. Fresh
+admission must stay inside that trusted inspection; exactly-once invocation,
+await/late-result refusal and the return boundary remain design questions.
+The bulk candidate is unimplemented, with provider/Session/decoder/executor
+outside; do not change authority or validation timing within this unit.
+Next is the bounded inspection-port design/decision, not automatic promotion of
+that candidate. Larger-copy latency, device/adoption and release gates remain
+pending; the measured23s edit/57s output are still long operations.
+
+## Completed boundary —continue editing after an ordinary backup
 
 After the verified06b g0 checkpoint, close one connected save/display consumer.
 Outcome: real backup → output state shown → editing continues, without reading
@@ -114,9 +193,10 @@ separate todo cases,1067.57s, one process Exit0. Typecheck, all five builds and
 offline/HEIC isolation pass on this same tree, executed serially using the already
 passed exact-tree offline build; this is the required sequence, not a claim of
 one literal checkpoint-script Exit0. Independent source/test and actual-file/
-image evidence reviews have no mandatory findings. The existing4191 local link
-now serves the fixed873 candidate, all20HTTP resource hashes/lengths matched;
-old immutable candidates remain evidence. Only the verified, reviewed scope may
+image evidence reviews have no mandatory findings. At that checkpoint4191 served
+the fixed873 candidate, all20HTTP resource hashes/lengths matched; current delivery
+is recorded above and old immutable candidates remain evidence. Only the
+verified, reviewed scope may
 enter the g0 checkpoint; private source/audits and all.artifacts remain outside
 Git. Earlier06b and01i checks retain their own source/environment qualifications.
 
