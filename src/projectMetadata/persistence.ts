@@ -52,16 +52,23 @@ const queues = new WeakMap<ProjectMutationAuthority, Promise<unknown>>();
 const writeFences = new WeakMap<ProjectWorkspaceFS, () => Promise<void>>();
 export interface MetadataReadPorts { readonly fs: ProjectWorkspaceFS; readonly factory?: MetadataStorageFactory }
 type ReadOperation = <T>(action: (ports: MetadataReadPorts) => Promise<T>) => Promise<T>;
-const readOperations = new WeakMap<ProjectWorkspaceFS, { factory: MetadataStorageFactory; run: ReadOperation }>();
+export type StagingReadConsumer = 'journal.entries' | 'journal.validateParts' | 'journal.readRestoredBases' | 'repository.read';
+const stagingConsumers: ReadonlySet<StagingReadConsumer> = new Set(['journal.entries', 'journal.validateParts', 'journal.readRestoredBases', 'repository.read']);
+const readOperations = new WeakMap<ProjectWorkspaceFS, { factory: MetadataStorageFactory; run: ReadOperation; staging?: true }>();
 /** Internal generation binding; does not grant writes or replace a root lease. */
 export function registerReadOperation(fs: ProjectWorkspaceFS, factory: MetadataStorageFactory, run: ReadOperation): void {
   if (readOperations.has(fs)) fail('read-operation-already-bound');
   readOperations.set(fs, { factory, run });
 }
+/** Exact restore-controller binding, restricted to the four accepted pure readers. */
+export function registerStagingReadOperation(fs: ProjectWorkspaceFS, factory: MetadataStorageFactory, run: ReadOperation): void {
+  if (readOperations.has(fs)) fail('read-operation-already-bound');
+  readOperations.set(fs, { factory, run, staging: true });
+}
 export function withMetadataRead<T>(fs: ProjectWorkspaceFS, factory: MetadataStorageFactory | undefined,
-  action: (ports: MetadataReadPorts) => Promise<T>): Promise<T> {
+  action: (ports: MetadataReadPorts) => Promise<T>, consumer?: StagingReadConsumer): Promise<T> {
   const operation = readOperations.get(fs);
-  if (!operation) return action({ fs, factory });
+  if (!operation || operation.staging && (!consumer || !stagingConsumers.has(consumer))) return action({ fs, factory });
   if (factory && operation.factory !== factory) return Promise.reject(Error('generation-storage-binding'));
   return operation.run(action);
 }

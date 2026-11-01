@@ -43,7 +43,7 @@ and native load scopes live in `viewer/rasterResources.ts`/`rasterLoadScope.ts`;
 `projectFiles/rasterDecoders.ts` composes the existing codec ports. UI-only derived
 images and original-view leases live in `ui/projectScene/mediaPreviewResources.ts`.
 Viewer code remains independent of package/storage formats. Current bounds,
-executed qualifications and the separate proposed06b decision stay in todo/specs.
+executed qualifications and the separately accepted06b staging pure-read work stay in todo/specs.
 
 Within validation, `editor=project` selects the bounded typed product composition
 in `src/ui/projectScene/projectWorkspace.ts`; its viewport/file adapter is

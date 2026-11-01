@@ -57,7 +57,95 @@ unchanged-feature-classification checks pass; independent review has no findings
 No runtime change or new capacity guarantee; no runtime suite is needed for this
 documentation checkpoint.
 
-## Current boundary —integrated current-PC quality improvement
+## Current boundary —owned pure reads during backup restore
+
+PO2026-11-01 explicitly accepts [06b §§1–5](../docs/specs/06b-staging-read-operations-proposal.md).
+Outcome: restore the confirmed high-resolution backup, edit, write an actual
+backup and reopen separately/cold, with exact originals/history/identity retained.
+Connect only Journal entries/parts/restored-bases and Repository pure reads to
+the exact staging Job/FS/factory/lease, with entry and closing audits, denied
+writes and operation expiry. Ordinary public accesses remain strict. Do not wrap
+initialization, Session read/resume, validateRestore, model/media/CAS work,
+receipts, publication or Selection. Keep every full ZIP/content inspection and
+write/readback/recovery fence; no validation cache or global staging opt-in.
+
+Before code changes, measure the fixed1308788 artifact using the same confirmed
+4Scene/103Caption/27attachment/26image/4View/23material backup in a new owned
+profile. Repeat with the new artifact at the same origin/Chromium/viewport and
+another fresh profile; record phase elapsed times, IO/native counts and content
+hashes. Relevant invariant/fault checks, actual file/cold flow, independent
+review and serial final checks precede a suitable g0 checkpoint. Personal4182,
+existing4191 and old profiles are untouched. Stop only the affected work for a
+new authority/contract decision; §6/50 raw-ZIP repetitions,01h, new dependencies,
+iPhone qualification and release remain excluded.
+
+Implemented named four-consumer registration reuses the existing readonly
+facade; the exact staging Job supplies live lease/pair checks and failure-path
+closing audits. Focused12 (including real opening-signal abort, parallel lifetimes,
+expiry and closing faults) and sceneCore12 pass. Independent boundary review
+has no mandatory findings. Frozen source/test is
+5f96447146bf049b0cf1ba65ebfd8f30a295ccd8753a7bd021f6ab61442aea14,
+using the same746-file manifest as baseline. No validation/assertion relaxation
+or new product capacity limit was introduced.
+
+Fresh baseline on fixed130 (same confirmed backup, dedicated Chromium156,
+1440×1000/DPR1, new profile, service workers blocked/controller absent, actual
+asset SHA matched): confirm→Caption/edit91.483s,3D91.729s; native160/HTMLdecode0.
+Full phase/IO and actual asset/profile/t0 receipts are retained privately.
+Existing4191/4182/old profiles remain unchanged. Private selector/completion
+probe errors were corrected and are not product failures or elapsed metrics.
+
+Same-condition fresh-profile after: Caption appearance/edit-mode marker77.640s and3D77.857s, compared
+with91.483/91.729s above. Initialize51.352→43.240s; its owning-control reads
+14,005→12,187. Select11.899→8.003s, adopt14.850→13.609s; all-restore control
+readStream22,831→19,411. Native count stays160 and HTMLdecode0; metadata/CAS and
+write counts are unchanged. This is one measured pair, not a speed guarantee.
+The later output47.224s before/46.272s after is functional evidence only because
+the before lane had an extra cold opening. Both actual49,728,227-byte outputs
+pass full BackupArchive inspection: same identity, all original change bytes
+preserved with exactly one intended edit, identical expected projection and all
+27 payload hashes/lengths (4Scene/103Caption/27attachments/26images/4Views/23materials).
+The edit-mode marker is the enabled mode control; actual body commands are
+confirmed separately. Array observations reach the4000-row instrumentation cap
+and are not a total-allocation count. Actual execution/profile/t0 notes and
+runtime SHA receipts are retained; independent metric/UI evidence review agrees.
+
+The actual after output restores in a third fresh profile; the saved body is
+writable and explicit discard retains it. That profile then prepares the normal
+SW, fully closes browser/server, and cold-starts offline with the server stopped,
+no bypass and document.fromServiceWorker=true. Index/all six actual runtime
+asset hashes match the new candidate; body/3D/edit availability, page errors0
+and external requests0 pass. Cold boot markers are24.911s Caption/29.897s3D/mode.
+These are functional cold observations, not the before/after restore pair.
+
+Milestone audit: accepted06b-only5-source diff on g0-baseline, source5f unchanged,
+connected workflow and boundary/UI evidence reviewed. Full root completes in
+one process:146files/3190PASS/21todo,899.00s/Exit0. No retries,
+exclusions or relaxed assertions. Typecheck/all five required builds and
+offline/HEIC isolation pass on the same5f tree, serially (equivalent required
+sequence, not a literal one-command checkpoint run). Small offline2–5 and the
+additional cold real-paint check pass: offline2–5 are4PASS/1.5min; cold actual
+canvas and visible320×180 thumbnail decode/2RAF capture are independently seen.
+The offscreen lazy-image probe and writer image-reading error were corrected
+using visible-window decode and identical screenshot SHA/independent inspection;
+no rendering defect or source fix resulted.
+The unchanged huge offline first case retains130 evidence with an explicit
+source-diff qualification (selected/original/SW implementation unchanged;
+new staging, real-data cold and all root cases checked separately).
+Final checks/review qualify this as a verified bounded g0 development checkpoint;
+actual-index privacy, remote and deployment scope are checked at delivery. Git
+owns commit/Push identity; this is not main/Pages release. A separate owned52962
+preview serves the fixed5f artifact; all20 HTTP resources match byte/SHA.
+Next connected candidate prioritizes ordinary Ki84 save/continued editing:
+existing5f metrics show backup.generate38.408s plus post-save overview5.2512s
+(total43.6595s, download2.076s; actual output46.272s). A same-command owned ready
+result may feed pure presentation only, with fresh fallback and every job/control/
+protection/write check retained; measure its actual contribution before claiming
+improvement. Do not assume the whole overview is removable. Body command22.632s
+is separate (display refresh is milliseconds). No new PoC, cross-command cache,
+§6/01h or unapproved validation/receipt lifetime change belongs to this completion.
+
+## Completed boundary —integrated current-PC quality improvement
 
 PO approved the connected quality plan and the01i sequential-import/real-thumbnail/
 active-original/hidden-resource direction. Preserve originals and full inspection;
@@ -179,14 +267,11 @@ not claim browser SW registration. The small local synthetic sample is prepared.
 The verified g0-baseline development checkpoint is committed and pushed2026-11-01
 after actual-index privacy/content review. Git owns its identity; private
 originals/audits and all.artifacts remain outside the commit. No main/Pages release.
-Next engineering step is PO's06b §§1–5 decision for staging reads; large raw-ZIP
-validation lifetime needs a separate design. Performance/device/adoption/release
-gates remain separate. Unchanged source is not rerun for this status-only record.
-
-[06b §§1–5](../docs/specs/06b-staging-read-operations-proposal.md) is independently
-reviewed but PROPOSED/unapproved/unimplemented: a narrowly owned staging pure-read
-audit exception. It does not remove payload inspection or solve the large-copy50
-archive scans. Section6 is NOT SELECTED, not an approval request or implementation.
+This completed01i checkpoint's subsequent06b decision is now accepted; its
+implementation and actual current checks are recorded at the top of this file.
+Large raw-ZIP validation lifetime still needs a separate design. Performance,
+device/adoption/release gates remain separate. Section6 remains NOT SELECTED and
+does not remove payload inspection or solve the large-copy50 archive scans.
 Broader payload lifetime, physical iOS/HEIC/GPU qualification and publication remain
 separate decisions. Stop only the affected work for a genuine new policy/wire/
 authority/safety conflict; do not reopen ordinary implementation approvals.

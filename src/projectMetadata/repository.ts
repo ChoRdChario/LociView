@@ -92,9 +92,9 @@ export class MetadataRepository {
   }
 
   async read(id: string, proof: MetadataProof, heads?: readonly string[], allowUninitialized = false): Promise<ProjectMetadataSource | null> {
-    const ownedProof = checkedProof(proof, this.limits), ownedHeads = heads ? [...heads] : undefined;
+    const ownedId = id, ownedProof = checkedProof(proof, this.limits), ownedHeads = heads ? [...heads] : undefined;
     return withMetadataRead(this.fs, this.factory, ({ fs, factory }) =>
-      new MetadataRepository(fs, factory!, this.limits).readDirect(id, ownedProof, ownedHeads, allowUninitialized));
+      new MetadataRepository(fs, factory!, this.limits).readDirect(ownedId, ownedProof, ownedHeads, allowUninitialized), 'repository.read');
   }
 
   private async readDirect(id: string, proof: MetadataProof, heads: readonly string[] | undefined, allowUninitialized: boolean): Promise<ProjectMetadataSource | null> {

@@ -2789,8 +2789,16 @@ or selection change during the read is rejected by the closing audit, not
 necessarily at the intervening individual read. No result is accepted without
 that audit. The existing write, publication, staging and restore fences remain
 strict in this first implementation; this exception cannot publish anything.
-Selected/original generation controllers opt in explicitly; restore staging does
-not register this exception and keeps its owning-job check at each I/O.
+Selected/original generation controllers opt in explicitly. PO2026-11-01 also
+accepts the separate [06b §§1–5](06b-staging-read-operations-proposal.md) exception:
+an exact restore Job may bind its private staging FS/factory to named pure
+Journal entries/parts/restored-bases and Repository reads only. This does not
+enable general staging opt-in or wrap initialization, Session read/resume,
+validateRestore, model/media/CAS, writes, publication or Selection. All other
+staging operations keep the owning-job check at each I/O. Staging callbacks
+audit on entry and closing even on reader failure, check live lease/closing,
+deny mutation and expire before any result is accepted. A retry gets a new
+lifetime; a retired exact Job/FS/factory cannot borrow it.
 
 The capability is explicit: no shared active-operation flag, time-based cache,
 metadata-token shortcut or implicit reuse by concurrent callers. Public ports
@@ -2813,7 +2821,7 @@ Journal, and return only owned records/bytes and the immutable source. Repeat th
 full content validation on every call; do not cache a successful result, token or
 receipt. Closing-audit refusal must reject the read. This does not wrap or relax
 `validateRestore`, initialization, publication, staging, write or Selection fences;
-unregistered staging scopes retain their per-I/O checks. Acceptance covers exact
+staging scopes outside the named06b pure reads retain per-I/O checks. Acceptance covers exact
 restored bytes/bases, closing refusal, concurrent strict access, argument mutation
 after entry and repeated refusal after acknowledged evidence loss/corruption.
 This is an extension of the existing pure-reader contract, independently reviewed;

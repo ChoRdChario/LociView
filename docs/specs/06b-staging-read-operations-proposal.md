@@ -1,16 +1,20 @@
 # 復元準備中の、操作に閉じた読み取り監査
 
-Status: **PROPOSED —未承認・未実装。** 2026-11-01。
-安全境界の独立レビュー済み。実装・速度改善・復旧の合格を示すものではない。
+Status: **§§1–5 ACCEPTED —PO承認2026-11-01、限定実装・検証済み。§6はPROPOSED・未採択。**
+安全境界・実差分・実行証拠の独立レビュー済み。正確な実行範囲・時間・残件はtodoを参照し、
+一般の容量・速度保証や採用／公開合格へ拡張しない。
 対象は[06](06-project-package-wire.md)の「Bounded read-operation audits」と
-[06a](06a-first-backup-open-proposal.md)の復元準備。現在の契約はstagingの各I/O監査を維持する。
-この文書はその例外を新しく判断するための案であり、01iによる実装承認には含めない。
+[06a](06a-first-backup-open-proposal.md)の復元準備。§§1–5だけが明示された純readの例外を認め、
+それ以外のstagingの各I/O監査は維持する。01iとは別のPO承認であり、§6を含めない。
 作業・実行結果は[todo](../../tasks/todo.md)を正本とする。
 
 ## 1. 利用者の結果と実測
 
 高画素Projectの復元中に同じ所有者記録を何千回も読み直す増幅を減らし、原本検査・
 中断復旧・公開前の確認を保つ。新しい画面や設定は追加しない。
+
+以下は提案時の原因整理のための観測。承認後の同条件before／after比較と接続結果は
+[todoの現在欄](../../tasks/todo.md)に記録し、この別条件の数値と混ぜない。
 
 01iの専用Chromium／自前ローカルorigin／新しいpersistent profileで、実データの
 バックアップから復元した。4Scene・103Caption・27添付・26画像・4視点・23材質設定。
@@ -54,7 +58,19 @@ generation factoryから、期限付きのreadonly FS／factoryを作る。Stora
 `withMetadataRead`の既存Selected/original動作は保持する。stagingは一般の登録を有効化せず、
 復元controllerが明示する純粋なsuboperationへだけcapabilityを渡す。
 
-最初の対象候補は、Journalの`entries`／`validateParts`／`readRestoredBases`とRepositoryの
+具体的には、`persistence`の内部登録を4つのclosed consumer名
+`journal.entries`／`journal.validateParts`／`journal.readRestoredBases`／`repository.read`
+に限定する。既存pure-reader呼出しだけがその名前を渡し、無名・対象外の呼出しは
+staging公開FS／factoryのstrict経路を使う。selected／originalの既存登録は変えない。
+generationのstaging owner portは同期`assertOwner(fs, factory): void`で、復元Jobが持つ
+private mapの正確なpairだけを認める。各live確認はこの照合と`assertEditable`、
+active／disposed確認を行い、rootの`pending`監査はentry／closingで実行する。
+`openStaging`に既存signalが渡された場合は同じowner closureへ捕捉し、返却後のabortも
+次live／closingで拒否する。通常の公開scopeやsignal未指定callerの取消契約は拡張しない。
+readerがthrow／取消で終わってもclosing監査を行い、その拒否をreader内部で隠さない。
+同authorityの`underWriteLease`を取り直さず、既存controllerのleaseを確認する。
+
+最初の対象は、Journalの`entries`／`validateParts`／`readRestoredBases`とRepositoryの
 `read`の、既存pure private-readerをstaging controllerが明示実行する範囲とする。
 rootのlocal-restoreにある永続input.zipのinspectはgeneration namespace外なので、この
 初回scopeから除く。`validateRestore`全体、`Session.read`全体、`modelFacts.stage`は包まない。
@@ -109,7 +125,7 @@ append-only進行を巻き戻さないことに依存する。変更したcontro
 同一backup・候補source・Chromium・viewport・profile条件で、変更前後のCaption／3D／編集、
 restore.first各段階、IO回数、native準備回数、実ファイル出力と再開を記録する。
 監査回数だけを速度合格とせず、実時間と画面の操作可能性を併記する。
-独立レビュー、必要な自動回帰と最終checkpoint、POによるこの契約例外の承認後に接続する。
+独立レビュー、必要な自動回帰と最終checkpointを経て接続する。POは§§1–5を承認済み。
 一般公開・iPhone実機合格・新たな速度保証を含めない。
 
 ## 6. 別の未承認事項：同じpure読取内のZIP整合性証拠

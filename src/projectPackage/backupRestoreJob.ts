@@ -229,7 +229,12 @@ export class BackupRestoreJob {
       const job = await this.pending(false); checkAbort(signal);
       let opening = true;
       const scope = await openWorkspaceGeneration(this.root, { generationId: this.id, allowCreate,
-        assertSelected: async () => { await this.pending(!opening); } }, databases.open);
+        assertSelected: async () => { await this.pending(!opening); },
+        stagingReadOwner: { assertOwner: (fs, factory) => {
+          checkAbort(signal);
+          const registered = this.scopes.get(fs);
+          if (!registered || registered.factory !== factory) fail('restore-staging-owner');
+        } } }, databases.open);
       try {
         if (!job.dbOpened) {
           if ((await scope.factory().loadRange([])).length) fail('restore-unacknowledged-database');

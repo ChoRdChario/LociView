@@ -4,7 +4,7 @@ import { readRequiredCapabilities, checkRequiredCapabilities, capabilityUnion, h
 import type { ProjectWorkspaceFS } from '../platform/fs';
 import { cloneCanonicalValue, type JsonObject } from '../domain/values';
 import { ProjectRecordFields } from '../domain/projectRecordFields';
-import { checkedChanges, checkedProof, fail, type MetadataLimits, type MetadataProof } from './format';
+import { checkedChanges, checkedProof, checkLimits, fail, type MetadataLimits, type MetadataProof } from './format';
 import { ProjectMetadataSource } from './source';
 import { digest, equalBytes, json, metadataPath, readReceipt, technicalId, withMetadataRead, writeReceipt } from './persistence';
 import { initialWorkspaceChanges, planRemoteChanges } from './remote';
@@ -64,7 +64,8 @@ export class TransactionJournal {
   constructor(private readonly fs: ProjectWorkspaceFS, private readonly limits: MetadataLimits) {}
   path(tx: string, name: string) { return metadataPath(this.fs, `journal/${technicalId(tx)}/${name}`); }
   async entries(): Promise<JournalEntry[]> {
-    return withMetadataRead(this.fs, undefined, ({ fs }) => new TransactionJournal(fs, this.limits).entriesDirect());
+    const limits = checkLimits(this.limits);
+    return withMetadataRead(this.fs, undefined, ({ fs }) => new TransactionJournal(fs, limits).entriesDirect(), 'journal.entries');
   }
 
   private async entriesDirect(): Promise<JournalEntry[]> {
@@ -209,8 +210,8 @@ export class TransactionJournal {
   }
 
   async validateParts(p: PreparedJournal): Promise<Uint8Array[]> {
-    const owned = cloneCanonicalValue(p, this.limits) as unknown as PreparedJournal;
-    return withMetadataRead(this.fs, undefined, ({ fs }) => new TransactionJournal(fs, this.limits).validatePartsDirect(owned));
+    const limits = checkLimits(this.limits), owned = cloneCanonicalValue(p, limits) as unknown as PreparedJournal;
+    return withMetadataRead(this.fs, undefined, ({ fs }) => new TransactionJournal(fs, limits).validatePartsDirect(owned), 'journal.validateParts');
   }
 
   private async validatePartsDirect(p: PreparedJournal): Promise<Uint8Array[]> {
@@ -313,8 +314,8 @@ export class TransactionJournal {
   }
   /** Historical authority comes from this published initialization, never from fabricated local receipts. */
   async readRestoredBases(entries?: readonly JournalEntry[]) {
-    const owned = entries === undefined ? undefined : structuredClone(entries);
-    return withMetadataRead(this.fs, undefined, ({ fs }) => new TransactionJournal(fs, this.limits).readRestoredBasesDirect(owned));
+    const limits = checkLimits(this.limits), owned = entries === undefined ? undefined : structuredClone(entries);
+    return withMetadataRead(this.fs, undefined, ({ fs }) => new TransactionJournal(fs, limits).readRestoredBasesDirect(owned), 'journal.readRestoredBases');
   }
 
   private async readRestoredBasesDirect(entries?: readonly JournalEntry[]) {

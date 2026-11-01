@@ -2983,6 +2983,114 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     audit.count = 0;
     return { ...f, job, expected, selected, scope, audit, journal: new TransactionJournal(scope.fs, metadata) };
   }
+  async function auditedStagingJournal() {
+    const f = await restoreFileFixture(), job = await (await f.prepare()).persist(f.ports, f.databases), scope = owned(await job.openStaging(f.databases));
+    const service = validationProjectService(scope.fs, scope.factory, f.store, budget, decode);
+    await service.session.initializeBackup(job);
+    const audit = vi.spyOn(job as unknown as { pending(requireDb: boolean): Promise<unknown> }, 'pending');
+    return { ...f, job, scope, service, audit, journal: new TransactionJournal(scope.fs, metadata) };
+  }
+  it('limits staging bulk audits to four exact owned pure readers while public and unnamed access stays strict', async () => {
+    const f = await auditedStagingJournal(), entries = await f.journal.entries(), prepared = entries[0]!.prepared!;
+    const expected = await f.journal.readRestoredBases();
+    expect(expected).not.toBeNull();
+    const readers = [() => f.journal.entries(), () => f.journal.validateParts(prepared), () => f.journal.readRestoredBases(entries),
+      () => new MetadataRepository(f.scope.fs, f.scope.factory, metadata).read(prepared.start.repositoryId, prepared.start.proof)];
+    for (const read of readers) { f.audit.mockClear(); expect(await read()).toBeTruthy(); expect(f.audit).toHaveBeenCalledTimes(2); }
+    f.audit.mockClear();
+    await withMetadataRead(f.scope.fs, f.scope.factory, async ({ fs, factory }) => {
+      expect(fs).toBe(f.scope.fs); expect(factory).toBe(f.scope.factory);
+      await fs.readBytes(f.journal.path(f.job.id, 'staging.json')); await factory!().loadRange([]);
+    });
+    expect(f.audit.mock.calls.length).toBeGreaterThan(2);
+    await expect(withMetadataRead(f.scope.fs, f.factory, async () => undefined, 'repository.read')).rejects.toThrow('generation-storage-binding');
+    const other = await BackupRestoreJob.open(f.fs, f.job.id, metadata, f.databases);
+    await expect(other.assertStaging(f.scope.fs, f.scope.factory)).rejects.toThrow('restore-staging-owner');
+    expect((await f.journal.readRestoredBases())!.source.originalChanges()).toEqual(expected!.source.originalChanges());
+    const aborted = new DOMException('cancelled', 'AbortError'); f.audit.mockClear();
+    await expect(withMetadataRead(f.scope.fs, f.scope.factory, async () => { throw aborted; }, 'journal.entries')).rejects.toBe(aborted);
+    expect(f.audit).toHaveBeenCalledTimes(2);
+  }, 60000);
+  it('denies staging callback writes and expires escaped factories and lazy streams independently of later reads', async () => {
+    const f = await auditedStagingJournal(), path = f.journal.path(f.job.id, 'source-exchange-bases.json'), original = await f.scope.fs.readBytes(path);
+    let escapedFs!: ProjectWorkspaceFS, escapedFactory!: MetadataStorageFactory, escapedStore!: ReturnType<MetadataStorageFactory>, escapedStream!: ReadableStream<Uint8Array>;
+    const paths = await f.fs.list(''), rows = await f.scope.factory().loadRange([]);
+    await withMetadataRead(f.scope.fs, f.scope.factory, async ({ fs, factory }) => {
+      escapedFs = fs; escapedFactory = factory!; escapedStore = factory!(); escapedStream = (await fs.readStream(path))!.stream();
+      for (const write of [() => fs.writeText(path, '{}'), () => fs.appendText(path, '{}'), () => fs.writeBytes(path, new Uint8Array()),
+        () => fs.appendBytes(path, new Uint8Array()), () => fs.remove(path), () => escapedStore.save(['x'], new Uint8Array()),
+        () => escapedStore.remove(['x']), () => escapedStore.removeRange([])]) await expect(write()).rejects.toThrow('generation-read-only');
+      let cancelled = false;
+      await expect(fs.writeStream(path, new ReadableStream({ cancel() { cancelled = true; } }))).rejects.toThrow('generation-read-only');
+      expect(cancelled).toBe(true);
+    }, 'journal.entries');
+    expect(() => escapedFactory()).toThrow('generation-read-expired');
+    await expect(escapedStore.loadRange([])).rejects.toThrow('generation-read-expired');
+    await expect(escapedFs.readBytes(path)).rejects.toThrow('generation-read-expired');
+    await expect(escapedStream.getReader().read()).rejects.toThrow('generation-read-expired');
+    let started!: () => void, finish!: () => void;
+    const entered = new Promise<void>(resolve => { started = resolve; }), held = new Promise<void>(resolve => { finish = resolve; }); caseDisposals.push(finish);
+    const next = withMetadataRead(f.scope.fs, f.scope.factory, async ({ fs }) => { started(); await held; expect(await fs.readBytes(path)).toEqual(original); }, 'journal.entries');
+    await entered;
+    await withMetadataRead(f.scope.fs, f.scope.factory, async ({ fs }) => {
+      expect(await fs.readBytes(path)).toEqual(original); await expect(escapedFs.readBytes(path)).rejects.toThrow('generation-read-expired');
+    }, 'journal.entries');
+    finish(); await next;
+    expect(await f.fs.list('')).toEqual(paths); expect(await f.scope.factory().loadRange([])).toEqual(rows);
+  }, 60000);
+  it.each(['success', 'throw', 'abort'] as const)('audits staging closing after %s and refuses changed controls before adopting a result', async outcome => {
+    const f = await auditedStagingJournal(), path = f.journal.path(f.job.id, 'source-exchange-bases.json');
+    let entered!: () => void, release!: () => void;
+    const started = new Promise<void>(resolve => { entered = resolve; }), held = new Promise<void>(resolve => { release = resolve; }); caseDisposals.push(release);
+    const failure = outcome === 'abort' ? new DOMException('cancelled', 'AbortError') : Error('reader failure');
+    f.audit.mockClear();
+    const pending = withMetadataRead(f.scope.fs, f.scope.factory, async ({ fs }) => {
+      await fs.readBytes(path); entered(); await held;
+      if (outcome !== 'success') throw failure;
+      return 'must not escape';
+    }, 'journal.entries');
+    await started; expect(f.audit).toHaveBeenCalledTimes(1);
+    const control = f.job.path('start.json'); await f.fs.remove(control);
+    await expect(f.scope.fs.readBytes(path)).rejects.toThrow(); // Public access cannot borrow the pending callback.
+    const refused = expect(pending).rejects.toThrow(); release(); await refused;
+    expect(f.audit).toHaveBeenCalledTimes(3); expect(await f.fs.exists(control)).toBe(false);
+  }, 60000);
+  it('rejects live staging reads on closing and never lends a disposed token to a cold same-job retry', async () => {
+    const f = await restoreFileFixture(), r = await firstBackupRecipient(), prepared = await BackupRestoreJob.prepareFirstOpen(r.fs, f.backupFile, metadata, r.databases);
+    r.lease.activateNewProject();
+    const job = await prepared.persist(null, r.databases),
+      scope = owned(await job.openStaging(r.databases)), service = r.ports(scope);
+    await service.session.initializeBackup(job);
+    const path = new TransactionJournal(scope.fs, metadata).path(job.id, 'source-exchange-bases.json');
+    let escaped!: ProjectWorkspaceFS;
+    await withMetadataRead(scope.fs, scope.factory, async ({ fs }) => { escaped = fs; expect(await fs.readBytes(path)).not.toBeNull(); }, 'journal.entries');
+    await scope.dispose();
+    const coldJob = await BackupRestoreJob.open(r.fs, job.id, metadata, r.databases), cold = owned(await coldJob.openStaging(r.databases));
+    await coldJob.assertStaging(cold.fs, cold.factory);
+    await expect(escaped.readBytes(path)).rejects.toThrow('generation-read-expired');
+    await expect(job.assertStaging(cold.fs, cold.factory)).rejects.toThrow('restore-staging-owner');
+    await expect(withMetadataRead(cold.fs, cold.factory, async ({ fs }) => {
+      r.lease.beginClose(); await expect(fs.readBytes(path)).rejects.toThrow();
+    }, 'journal.entries')).rejects.toThrow();
+  }, 60000);
+  it('invalidates an actual staging callback when the opening signal aborts after the scope was returned', async () => {
+    const f = await restoreFileFixture(), job = await (await f.prepare()).persist(f.ports, f.databases), controller = new AbortController(),
+      scope = owned(await job.openStaging(f.databases, controller.signal)), path = `${scope.fs.projectRoot}/v2/metadata/absent`;
+    let entered!: () => void, release!: () => void;
+    const started = new Promise<void>(resolve => { entered = resolve; }), held = new Promise<void>(resolve => { release = resolve; }); caseDisposals.push(release);
+    let refusedLive = false;
+    const pending = withMetadataRead(scope.fs, scope.factory, async ({ fs }) => {
+      await fs.readBytes(path); entered(); await held;
+      await expect(fs.readBytes(path)).rejects.toThrow(); refusedLive = true;
+      return 'must not escape';
+    }, 'journal.entries');
+    await started; controller.abort(); const refused = expect(pending).rejects.toThrow(); release(); await refused;
+    expect(refusedLive).toBe(true);
+    await expect(new TransactionJournal(scope.fs, metadata).entries()).rejects.toThrow();
+    // Ordinary access keeps the pre-existing public-scope contract; it cannot
+    // obtain or reactivate the cancelled named capability.
+    expect(await scope.fs.readBytes(path)).toBeNull();
+  }, 60000);
   it('audits owned restored-history reads once per operation and rechecks lost acknowledged originals', async () => {
     const f = await auditedRestoredJournal(), entries = structuredClone(await f.journal.entries()), first = entries[0]!;
     let entered!: () => void, release!: () => void, pause = true;

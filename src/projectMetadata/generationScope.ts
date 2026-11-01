@@ -1,6 +1,6 @@
 import type { ProjectWorkspaceFS, WorkspaceReadableFile } from '../platform/fs';
 import { fail } from './format';
-import { registerReadOperation, registerWriteFence, technicalId } from './persistence';
+import { registerReadOperation, registerStagingReadOperation, registerWriteFence, technicalId, type MetadataReadPorts } from './persistence';
 import type { MetadataStorageFactory, MetadataStoragePort } from './repository';
 
 /** Local storage identity only; Project identity and its logical-root lease do not change. */
@@ -11,6 +11,8 @@ export interface GenerationStorageConnection {
 }
 export type GenerationStorageOpener = (generationId: WorkspaceGenerationId,
   allowCreate: boolean) => Promise<GenerationStorageConnection>;
+/** Internal exact-Job binding; does not enable ordinary staging bulk reads. */
+export interface StagingReadOwner { assertOwner(fs: ProjectWorkspaceFS, factory: MetadataStorageFactory): void }
 
 const reserved = ['v2/generations', 'v2/local-restore'];
 const within = (path: string, root: string) => path === root || path.startsWith(`${root}/`);
@@ -67,10 +69,12 @@ function fencedStream(open: () => ReadableStream<Uint8Array>, check: () => Promi
  * unwrapped root. The opener MUST isolate each generation in its own database.
  */
 export async function openWorkspaceGeneration(root: ProjectWorkspaceFS,
-  input: Readonly<{ generationId: WorkspaceGenerationId; allowCreate: boolean; assertSelected: () => Promise<void>; assertWritable?: () => Promise<void>; auditReadOperations?: boolean }>,
+  input: Readonly<{ generationId: WorkspaceGenerationId; allowCreate: boolean; assertSelected: () => Promise<void>; assertWritable?: () => Promise<void>; auditReadOperations?: boolean; stagingReadOwner?: StagingReadOwner }>,
   openStorage: GenerationStorageOpener) {
   const generationId = checkedId(input.generationId), allowCreate = input.allowCreate,
-    assertSelected = input.assertSelected, assertWritable = input.assertWritable, auditReadOperations = input.auditReadOperations === true;
+    assertSelected = input.assertSelected, assertWritable = input.assertWritable, auditReadOperations = input.auditReadOperations === true,
+    stagingReadOwner = input.stagingReadOwner?.assertOwner.bind(input.stagingReadOwner);
+  if (auditReadOperations && stagingReadOwner || stagingReadOwner && generationId === null) fail('generation-read-binding');
   const logicalRoot = root.projectRoot === null ? '' : canonicalPath(root.projectRoot, false);
   const prefix = logicalRoot ? `${logicalRoot}/` : '';
   const projectRoot = generationId === null ? root.projectRoot : `${prefix}v2/generations/${generationId}`;
@@ -171,11 +175,15 @@ export async function openWorkspaceGeneration(root: ProjectWorkspaceFS,
       removeRange: key => { const owned = keyCopy(key); return write(() => base.removeRange(owned)); },
     } satisfies MetadataStoragePort;
   };
-  // Only selected/original readers opt in. Restore staging retains per-I/O audits.
-  if (auditReadOperations) registerReadOperation(fs, factory, async action => {
-    await check();
+  // Public ports always retain per-I/O audits. The exact restore controller can
+  // bind named pure readers only; no shared active-operation switch is used.
+  const readOperation = async <T>(action: (ports: MetadataReadPorts) => Promise<T>): Promise<T> => {
     let active = true;
-    const live = async () => { if (!active || disposed) fail('generation-read-expired'); };
+    const assertLive = () => {
+      if (!active || disposed) fail('generation-read-expired');
+      if (stagingReadOwner) { root.mutationAuthority.assertEditable(); stagingReadOwner(fs, factory); }
+    };
+    const live = async () => { assertLive(); };
     const perform = async <T>(work: () => Promise<T>): Promise<T> => {
       await live(); const result = await work(); await live(); return result;
     };
@@ -215,7 +223,7 @@ export async function openWorkspaceGeneration(root: ProjectWorkspaceFS,
       },
     });
     const readFactory: MetadataStorageFactory = () => {
-      if (!active || disposed) fail('generation-read-expired');
+      assertLive();
       const base = connection.factory();
       return {
         load: key => { const owned = keyCopy(key); return perform(async () => (await base.load(owned))?.slice()); },
@@ -229,9 +237,24 @@ export async function openWorkspaceGeneration(root: ProjectWorkspaceFS,
         save: denied, remove: denied, removeRange: denied,
       };
     };
-    try { const result = await action({ fs: readFs, factory: readFactory }); await check(); await live(); return result; }
+    try {
+      if (stagingReadOwner) await live();
+      await check();
+      if (stagingReadOwner) await live();
+      if (!stagingReadOwner) { const result = await action({ fs: readFs, factory: readFactory }); await check(); await live(); return result; }
+      let result: T | undefined, failure: unknown, failed = false;
+      try { result = await action({ fs: readFs, factory: readFactory }); }
+      catch (error) { failed = true; failure = error; }
+      // Closing refusal takes precedence even when the reader itself failed.
+      // No owned result is accepted before this root-backed audit completes.
+      await check(); await live();
+      if (failed) throw failure;
+      return result as T;
+    }
     finally { active = false; }
-  });
+  };
+  if (auditReadOperations) registerReadOperation(fs, factory, readOperation);
+  else if (stagingReadOwner) registerStagingReadOperation(fs, factory, readOperation);
   return Object.freeze({ generationId, fs, factory, check,
     async dispose() { if (disposed) return; disposed = true; await connection.dispose(); },
   });
