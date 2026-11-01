@@ -8,7 +8,9 @@ import {
   Uint8ArrayWriter,
   ZipReader,
   ZipWriter,
+  type FileEntry,
 } from '@zip.js/zip.js';
+import { NativeSha256 } from '../nativeGs/sha256';
 
 // Node(テスト)ではWeb Workerが無いため無効化。ブラウザでも動作は同一
 configure({ useWebWorkers: false });
@@ -34,7 +36,8 @@ export class ZipGuardError extends Error {
       | 'unsafe-path'
       | 'unsafe-entry-type'
       | 'ambiguous-path'
-      | 'nested-archive',
+      | 'nested-archive'
+      | 'encrypted',
     message: string,
   ) {
     super(message);
@@ -302,4 +305,149 @@ export async function writeZipEntries(entries: readonly ZipEntryData[]): Promise
     await writer.add(e.path, new Uint8ArrayReader(e.data));
   }
   return writer.close();
+}
+
+export interface VerifiedZipEntry {
+  readonly path: string; readonly index: number; readonly byteLength: number;
+  readonly digest: string; readonly prefix: readonly number[];
+}
+export interface VerifiedZipCatalog {
+  readonly original: Blob; readonly entries: readonly VerifiedZipEntry[];
+  withEntry<T>(path: string, consume: (stream: ReadableStream<Uint8Array>) => Promise<T>, signal?: AbortSignal): Promise<T>;
+  readBytes(path: string, maximum: number, signal?: AbortSignal): Promise<Uint8Array>;
+  dispose(): Promise<void>;
+}
+const zipAbort = (signal: AbortSignal) => signal.reason ?? new DOMException('Operation aborted', 'AbortError');
+function forwardAbort(signal: AbortSignal | undefined, controller: AbortController) {
+  const abort = () => controller.abort(signal?.reason);
+  if (signal?.aborted) abort(); else signal?.addEventListener('abort', abort, { once: true });
+  return () => signal?.removeEventListener('abort', abort);
+}
+
+/** All regular entries finish CRC/hash inspection; only compact facts survive. */
+export async function openVerifiedZipCatalog(input: Blob, options: {
+  readonly limits?: ZipLimits; readonly signal?: AbortSignal;
+  /** Borrowed scan facts only; observers must not retain full chunks. */
+  readonly observe?: (path: string, chunk: Uint8Array, offset: number) => void;
+} = {}): Promise<VerifiedZipCatalog> {
+  const limits = Object.freeze({ ...(options.limits ?? DEFAULT_ZIP_LIMITS) });
+  if (Object.values(limits).some(n => !Number.isSafeInteger(n) || n <= 0)) throw new Error('Invalid ZIP inspection limits');
+  let original: Blob | undefined = input.slice(), reader: ZipReader<Blob> | undefined = new ZipReader(new BoundedIdentityBlobReader(original), { strictness: 'strict' });
+  const owner = new AbortController(), detachOwner = forwardAbort(options.signal, owner);
+  let closed = false, tail: Promise<void> = Promise.resolve(), closing: Promise<void> | undefined;
+  const current = () => { if (closed || owner.signal.aborted) throw zipAbort(owner.signal); };
+  const metadata = new Map<string, FileEntry>(), facts = new Map<string, VerifiedZipEntry>();
+  const exclusive = <T>(run: () => Promise<T>) => {
+    const operation = tail.then(() => { current(); return run(); }); tail = operation.then(() => {}, () => {}); return operation;
+  };
+  async function extract(path: string, signal: AbortSignal, remaining: number,
+    write?: (chunk: Uint8Array) => Promise<void>, observe = false): Promise<VerifiedZipEntry> {
+    const entry = metadata.get(path)!; const sha = new NativeSha256(), prefix: number[] = [];
+    let count = 0, yielded = 0;
+    const destination = new WritableStream<Uint8Array>({ async write(chunk) {
+      if (signal.aborted) throw zipAbort(signal);
+      if (!(chunk instanceof Uint8Array)) throw new Error('Invalid ZIP chunk');
+      if (chunk.length > entry.uncompressedSize - count || chunk.length > limits.maxEntryBytes - count)
+        throw new ZipGuardError('entry-too-large', `${path}: actual size exceeds declared size or entry budget`);
+      if (chunk.length > remaining - count) throw new ZipGuardError('total-too-large', 'Actual ZIP expansion exceeds its budget');
+      const offset = count; count += chunk.length; sha.update(chunk);
+      for (let i = 0; i < chunk.length && prefix.length < 64; i++) prefix.push(chunk[i]!);
+      // Keep observation and forwarding bounded even if a codec chooses larger chunks.
+      for (let at = 0; at < chunk.length; at += 65536) {
+        const part = chunk.subarray(at, at + 65536);
+        if (observe) options.observe?.(path, part.slice(), offset + at);
+        if (write) await write(part);
+      }
+      yielded += chunk.length;
+      if (yielded >= 4 * 1024 * 1024) { yielded = 0; await new Promise<void>(resolve => setTimeout(resolve, 0)); }
+    } });
+    try {
+      await entry.getData(destination, { checkSignature: true, strictness: 'strict', preventClose: true, signal });
+      if (signal.aborted) throw zipAbort(signal);
+      if (count !== entry.uncompressedSize) throw new ZipGuardError('entry-too-large', `${path}: actual size differs from declared size`);
+      const digest = sha.digestHex(), expected = facts.get(path);
+      if (expected && (count !== expected.byteLength || digest !== expected.digest)) throw new Error('ZIP entry no longer matches its verified source');
+      if (hasZipSignature(new Uint8Array(prefix)) && !SUPPORTED_NESTED_CONTAINER_RE.test(path))
+        throw new ZipGuardError('nested-archive', `nested archive content rejected: ${path}`);
+      return Object.freeze({ path, index: expected?.index ?? facts.size, byteLength: count, digest, prefix: Object.freeze(prefix) });
+    } finally {
+      if (!destination.locked) { const writer = destination.getWriter(); try { await writer.close().catch(() => {}); } finally { writer.releaseLock(); } }
+    }
+  }
+  async function withEntry<T>(path: string, consume: (stream: ReadableStream<Uint8Array>) => Promise<T>, signal?: AbortSignal): Promise<T> {
+    return exclusive(async () => {
+      if (signal?.aborted) throw zipAbort(signal);
+      if (!facts.has(path)) throw new Error('Unknown verified ZIP entry');
+      const operation = new AbortController(), detach = [forwardAbort(owner.signal, operation), forwardAbort(signal, operation)];
+      const bridge = new TransformStream<Uint8Array, Uint8Array>(undefined, { highWaterMark: 1 }, { highWaterMark: 0 });
+      const writer = bridge.writable.getWriter(), source = bridge.readable.getReader();
+      let complete = false, released = false, failure: unknown;
+      const release = () => { if (!released) { released = true; source.releaseLock(); } };
+      const stream = new ReadableStream<Uint8Array>({
+        async pull(controller) {
+          try { const r = await source.read(); if (r.done) { complete = true; controller.close(); release(); } else controller.enqueue(r.value); }
+          catch (error) { controller.error(error); release(); }
+        },
+        async cancel(reason) { operation.abort(reason); try { await source.cancel(reason); } finally { release(); } },
+      }, { highWaterMark: 0 });
+      // Do not expose EOF until getData has finished its CRC/size/hash checks.
+      const producing = (async () => {
+        try { await extract(path, operation.signal, limits.maxEntryBytes, chunk => writer.write(chunk)); await writer.close(); }
+        catch (error) { failure = error; await writer.abort(error).catch(() => {}); }
+        finally { writer.releaseLock(); }
+      })();
+      try {
+        const value = await consume(stream);
+        if (!complete) throw new Error('ZIP consumer did not finish verified EOF');
+        await producing; if (failure) throw failure;
+        if (operation.signal.aborted) throw zipAbort(operation.signal); current(); return value;
+      } catch (error) {
+        operation.abort(error); await source.cancel(error).catch(() => {}); await producing; throw error;
+      } finally { detach.forEach(remove => remove()); release(); }
+    });
+  }
+  const dispose = () => closing ??= (async () => {
+    closed = true; owner.abort(); await tail; detachOwner();
+    try { await reader?.close(); } finally { reader = undefined; original = undefined; metadata.clear(); }
+  })();
+  try {
+    current(); const entries = await reader.getEntries({ strictness: 'strict', checkAmbiguity: true }); current();
+    if (entries.length > limits.maxEntries) throw new ZipGuardError('too-many-entries', `entries: ${entries.length} > ${limits.maxEntries}`);
+    const namespace: { path: string; directory: boolean }[] = []; let declared = 0;
+    for (const entry of entries) {
+      if (entry.bitFlag?.languageEncodingFlag === true) fatalUtf8Decoder.decode(entry.rawFilename);
+      const path = normalizedEntryPath(entry.filename, entry.directory);
+      if (path === null) throw new ZipGuardError('unsafe-path', `unsafe entry path: ${entry.filename}`);
+      const type = rawUnixEntryType(entry.versionMadeBy, entry.externalFileAttributes);
+      if (type === UNIX_ENTRY_TYPE_SYMLINK || type === UNIX_ENTRY_TYPE_FIFO) throw new ZipGuardError('unsafe-entry-type', `unsupported Unix entry type: ${path}`);
+      if (entry.encrypted) throw new ZipGuardError('encrypted', `encrypted entry is unsupported: ${path}`);
+      if (entry.directory && entry.uncompressedSize !== 0)
+        throw new ZipGuardError('unsafe-entry-type', `directory payload is unsupported: ${path}`);
+      if (!Number.isSafeInteger(entry.uncompressedSize) || entry.uncompressedSize < 0 || entry.uncompressedSize > limits.maxEntryBytes)
+        throw new ZipGuardError('entry-too-large', `invalid declared size: ${path}`);
+      declared += entry.uncompressedSize;
+      if (!Number.isSafeInteger(declared) || declared > limits.maxTotalBytes) throw new ZipGuardError('total-too-large', 'Declared ZIP expansion exceeds its budget');
+      namespace.push({ path, directory: entry.directory });
+      if (!entry.directory) {
+        if (NESTED_ARCHIVE_RE.test(path)) throw new ZipGuardError('nested-archive', `nested archive rejected: ${path}`);
+        metadata.set(path, entry);
+      }
+    }
+    assertUnambiguousNamespace(namespace);
+    let actual = 0;
+    for (const path of metadata.keys()) { current(); const checked = await extract(path, owner.signal, limits.maxTotalBytes - actual, undefined, true); actual += checked.byteLength; facts.set(path, checked); }
+    const catalog: VerifiedZipCatalog = {
+      get original() { current(); return original!; }, entries: Object.freeze([...facts.values()]), withEntry,
+      async readBytes(path, maximum, signal) {
+        const known = facts.get(path); if (!known || !Number.isSafeInteger(maximum) || maximum < 0 || known.byteLength > maximum)
+          throw new ZipGuardError('entry-too-large', `entry exceeds parser buffer budget: ${path}`);
+        return withEntry(path, async stream => {
+          const bytes = new Uint8Array(known.byteLength), r = stream.getReader(); let offset = 0;
+          try { for (;;) { const next = await r.read(); if (next.done) break; bytes.set(next.value, offset); offset += next.value.length; } return bytes; }
+          finally { r.releaseLock(); }
+        }, signal);
+      }, dispose,
+    };
+    return catalog;
+  } catch (error) { await dispose().catch(() => {}); throw error; }
 }

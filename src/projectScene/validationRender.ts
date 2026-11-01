@@ -22,8 +22,13 @@ import { decodeOccurrenceGlb, type DecodedOccurrenceSlot } from '../projectFiles
 import { materialForDisplay } from '../domain/materialIntent';
 import { readLegacyModelProof } from '../viewer/compat180/proof';
 import { trackGltfImages, snapshotTargets, assertTargetTables } from '../viewer/compat180/sceneProof';
+import { createRasterLoadScope, retainRasterModelReadStage } from '../viewer/rasterLoadScope';
+import type { RasterResources, ModelRasterFacts } from '../viewer/rasterResources';
 
 export interface SavedModelResidentPort {
+  readonly rasterResources?: RasterResources;
+  demand?(models: readonly (ValidationModelClosure | ReadonlyRenderModel)[]): void;
+  retry?(): void;
   state?(model: ValidationModelClosure | ReadonlyRenderModel): { phase:'loading'|'ready'|'failed'; issue?:string };
   label?(model:ValidationModelClosure|ReadonlyRenderModel):string;
   subscribe?(changed:()=>void):()=>void;
@@ -32,17 +37,18 @@ export interface SavedModelResidentPort {
 export interface ValidationResidentCache extends SavedModelResidentPort { prepare(versions: readonly DisplayModelVersion[]): Promise<void>;
   readonly ready:Promise<void>;
   validate(c: ValidationModelClosure, effects?: ValidationMaterialEffects): void }
-export interface DecodedValidationModel { point?: ValidatedPoint; gs?: ValidatedGs; proxy?:DecodedValidationModel; proxyIssue?:string; root: THREE.Object3D; materialLocators: ReadonlyMap<THREE.Material, JsonObject>; occurrenceSlots?: readonly DecodedOccurrenceSlot[]; dispose(): void }
+export interface DecodedValidationModel { readonly raster?: ModelRasterFacts; point?: ValidatedPoint; gs?: ValidatedGs; proxy?:DecodedValidationModel; proxyIssue?:string; root: THREE.Object3D; materialLocators: ReadonlyMap<THREE.Material, JsonObject>; occurrenceSlots?: readonly DecodedOccurrenceSlot[]; dispose(): void }
 
 /** No arbitrary URL/path input. The caller supplies already inspected, owned GLB bytes. */
-export async function decodeValidationModel(source: ValidatedGlb, signal?: AbortSignal): Promise<DecodedValidationModel> {
+export async function decodeValidationModel(source: ValidatedGlb, signal?: AbortSignal, resources?: RasterResources): Promise<DecodedValidationModel> {
   signal?.throwIfAborted();
-  if (source.occurrences) return decodeOccurrenceGlb(source, signal);
+  if (source.occurrences) return decodeOccurrenceGlb(source, signal, resources);
   const { bytes, ...metadata } = source;
   source = { ...structuredClone(metadata), bytes: bytes.slice() };
-  const legacy = await readLegacyModelProof('glb', source.bytes, { signal });
+  const legacy = await readLegacyModelProof('glb', source.bytes, { signal, rasterResources: resources });
   signal?.throwIfAborted();
   const manager = new THREE.LoadingManager(), owned = new Set<ImageBitmap>();
+  const native = createRasterLoadScope(resources, signal);
   const materialLocators = new Map<THREE.Material, JsonObject>();
   const sourceLocators = new Set(source.materials.map(s => canonical(s.sourceLocator!)));
   const all = new THREE.Group(); let failed = false, closed = false;
@@ -58,10 +64,10 @@ export async function decodeValidationModel(source: ValidatedGlb, signal?: Abort
   };
   class TrackedImages extends THREE.ImageBitmapLoader {
     override load(url: string, done?: (bitmap: ImageBitmap) => void, progress?: (event: ProgressEvent) => void, error?: (e: unknown) => void) {
-      return super.load(url, bitmap => {
+      return native.load((loaded, failed) => super.load(url, loaded, progress, failed), bitmap => {
         if (closed) { bitmap.close(); error?.(Error('表示を取り消しました。')); return; }
         owned.add(bitmap); done?.(bitmap);
-      }, progress, e => { failed = true; error?.(e); });
+      }, e => { failed = true; error?.(e); });
     }
   }
   try {
@@ -106,73 +112,115 @@ export async function decodeValidationModel(source: ValidatedGlb, signal?: Abort
       Math.abs(v - [...source.bounds.min, ...source.bounds.max][i]!) > 1e-6 * Math.max(1, Math.abs(v))))
       throw Error('保存したモデルと描画した形状が一致しません。');
     return { root, materialLocators, dispose };
-  } catch (error) { dispose(); throw error; }
+  } catch (error) { dispose(); throw error; } finally { await native.dispose(); }
 }
 
 /** Reusable resident cache, scoped to one opened validation Project; never shared metadata. */
 export async function prepareValidationResidents(versions: readonly DisplayModelVersion[], content: { modelContent?(record: JsonObject): Promise<ValidatedModel>; model?(record: JsonObject): Promise<ValidatedGlb> },
-  decode: (source: ValidatedGlb, signal?: AbortSignal) => Promise<DecodedValidationModel> = decodeValidationModel, progressive = false): Promise<ValidationResidentCache> {
+  decode: (source: ValidatedGlb, signal?: AbortSignal) => Promise<DecodedValidationModel> = decodeValidationModel, progressive = false, resources?: RasterResources): Promise<ValidationResidentCache> {
   const models = (rows: readonly DisplayModelVersion[]) => rows.map(v => {
     if (!isSavedModel(v.closure)) throw Error('実モデルの保存本体を選択してください。'); return renderModel(v.closure);
   });
-  const core = await prepareReadonlyResidents(models(versions), content, decode, progressive);
+  const core = await prepareReadonlyResidents(models(versions), content, decode, progressive, resources);
   return { ...core, label: c => versions.find(v=>v.assetId===renderModel(c).assetId)?.label??'3Dモデル', prepare: next => core.prepare(models(next)) };
 }
 export async function prepareReadonlyResidents(initial: readonly ReadonlyRenderModel[], content: { modelContent?(record: JsonObject): Promise<ValidatedModel>; model?(record: JsonObject): Promise<ValidatedGlb> },
-  decode: (source: ValidatedGlb, signal?: AbortSignal) => Promise<DecodedValidationModel> = decodeValidationModel, progressive = false) {
+  decode: (source: ValidatedGlb, signal?: AbortSignal) => Promise<DecodedValidationModel> = decodeValidationModel, progressive = false, resources?: RasterResources) {
   const lifetime = new AbortController();
   const templates = new Map<string, { record: string; model: DecodedValidationModel }>();
+  type Checked = { record: string; point: boolean; classes: { locator: JsonObject; kind: 'basic' | 'standard' | 'phong' | 'unsupported' }[] };
+  const checked = new Map<string, Checked>();
   const failures=new Map<string,string>(),listeners=new Set<()=>void>();
   const notify=()=>{for(const changed of listeners)changed();};
   const uses=new Map<string,number>();let wanted=new Set<string>();
   const collect=()=>{if(closed)return;for(const [key,item]of templates)if(!wanted.has(key)&&!uses.get(key)){item.model.dispose();templates.delete(key);}};
   const live = new Set<() => void>(); let closed = false, preparing = false;
+  let demandTask: Promise<void> | null = null, demandQueued = false;
+  let demanded = new Map<string, ReadonlyRenderModel>();
   const keyFor=(c:ValidationModelClosure|ReadonlyRenderModel)=>`${c.representation.id}/${c.proxy?.id??''}`;
   const dispose = () => { if (closed) return; closed = true; lifetime.abort(); for (const release of [...live]) release();
-    for (const item of templates.values()) item.model.dispose(); templates.clear();listeners.clear(); };
+    for (const item of templates.values()) item.model.dispose(); templates.clear();checked.clear();demanded.clear();listeners.clear(); };
+  const loadSingle = (record: JsonObject, proxy = false) => {
+    const blob = record.blob as JsonObject | undefined, count = blob?.byteLength;
+    if (resources && (typeof count !== 'number' || !Number.isSafeInteger(count) || count < 0)) throw Error('保存したモデルの容量を確認してください。');
+    return retainRasterModelReadStage<ValidatedModel, DecodedValidationModel>(typeof count === 'number' ? count : 0, record.contentKind === 'gaussianSplat' ? undefined : resources,
+      () => content.modelContent ? content.modelContent(record) : content.model!(record), async source => {
+        if (!same(nativeSpatialModelBounds(record, source), record.logicalBoundsAsset)) throw Error('保存したモデルの範囲が一致しません。');
+        if (proxy && (isPointModel(source) || isGsModel(source))) throw Error('位置指定用の面を確認してください。');
+        if (isGsModel(source)) return { gs: source, root: new THREE.Group(), materialLocators: new Map(), dispose() {} } as DecodedValidationModel;
+        if (isPointModel(source)) return { point: source, root: new THREE.Group(), materialLocators: new Map(), dispose() {} } as DecodedValidationModel;
+        const model = await (isMeshSourceModel(source) ? decodeMeshSource(source, lifetime.signal, resources) :
+          decode === decodeValidationModel ? decodeValidationModel(source, lifetime.signal, resources) : decode(source, lifetime.signal));
+        return source.raster ? { ...model, raster: source.raster } : model;
+      });
+  };
+  const load = async (c: ReadonlyRenderModel): Promise<DecodedValidationModel> => {
+    const model = await loadSingle(c.representation);
+    if (model.gs && c.proxy) try {
+      model.proxy = await loadSingle(c.proxy, true);
+      const original = model.dispose; model.dispose = () => { model.proxy?.dispose(); original(); };
+    } catch (error) { model.proxyIssue = error instanceof Error ? error.message : '位置指定用の面を読み込めません。'; }
+    if (closed) { model.dispose(); throw Error('画面を閉じました。'); } return model;
+  };
+  const remember = (c: ReadonlyRenderModel, model: DecodedValidationModel) => {
+    checked.set(keyFor(c), { record: canonical(c.representation), point: !!model.point,
+      classes: [...model.materialLocators].map(([material, locator]) => ({ locator: structuredClone(locator), kind: material instanceof THREE.MeshBasicMaterial ? 'basic' :
+        material instanceof THREE.MeshStandardMaterial ? 'standard' : material instanceof THREE.MeshPhongMaterial ? 'phong' : 'unsupported' })) });
+  };
+  const scheduleDemand = () => {
+    if (!resources || closed || demandQueued || preparing || demandTask) return;
+    demandQueued = true; queueMicrotask(() => {
+      demandQueued = false; if (closed || preparing || demandTask) return;
+      demandTask = (async () => {
+        for (const [key, model] of demanded) {
+          if (closed || !wanted.has(key) || templates.has(key) || failures.has(key) || !checked.has(key)) continue;
+          try { const decoded = await load(model); if (closed || !wanted.has(key)) { decoded.dispose(); continue; }
+            remember(model, decoded); templates.set(key, { record: canonical(model.representation), model: decoded }); failures.delete(key); notify();
+          } catch (error) { if (!closed) { failures.set(key, error instanceof Error ? error.message : 'モデルを読み込めません。'); notify(); } }
+        }
+      })().finally(() => { demandTask = null; if (!closed && [...demanded.keys()].some(key => checked.has(key) && !templates.has(key) && !failures.has(key))) scheduleDemand(); });
+    });
+  };
   const prepare = async (next: readonly ReadonlyRenderModel[], publish = false) => {
+    if (demandTask) await demandTask;
     if (closed || preparing) throw Error('モデルの表示準備を完了してください。');
     preparing = true; const staged = new Map<string, { record: string; model: DecodedValidationModel }>(),errors:unknown[]=[];
-    if(publish)wanted=new Set(next.map(keyFor));
+    if(publish && !resources)wanted=new Set(next.map(keyFor));
     try { for (const c of next) {
       try {
       const key = keyFor(c), record = canonical(c.representation);
-      const previous = templates.get(key) ?? staged.get(key);
+      const previous = templates.get(key) ?? staged.get(key) ?? (resources ? checked.get(key) : undefined);
       if (previous) { if (previous.record !== record) throw Error('モデルの本体が一致しません。'); continue; }
-      const source = content.modelContent ? await content.modelContent(c.representation) : await content.model!(c.representation);
-      if (!same(nativeSpatialModelBounds(c.representation, source), c.representation.logicalBoundsAsset)) throw Error('保存したモデルの範囲が一致しません。');
-      let decoded:DecodedValidationModel;
-      if(isGsModel(source)){
-        decoded={gs:source,root:new THREE.Group(),materialLocators:new Map(),dispose(){this.proxy?.dispose();}};
-        if(c.proxy){try{const proxy=content.modelContent?await content.modelContent(c.proxy):await content.model!(c.proxy);if(isPointModel(proxy)||isGsModel(proxy))throw Error('位置指定用の面を確認してください。');
-          decoded.proxy=isMeshSourceModel(proxy)?await decodeMeshSource(proxy,lifetime.signal):await decode(proxy,lifetime.signal);}catch(e){decoded.proxyIssue=(e as Error).message;}}
-      }else decoded=isPointModel(source)?{point:source,root:new THREE.Group(),materialLocators:new Map(),dispose(){}}:isMeshSourceModel(source)?await decodeMeshSource(source,lifetime.signal):await decode(source,lifetime.signal);
+      const decoded = await load(c); remember(c, decoded);
+      const laterCanonical = resources && (decoded.raster?.cpuBytes || decoded.proxy?.raster?.cpuBytes) && next.some(other => !checked.has(keyFor(other)));
+      if (resources && (!wanted.has(key) || laterCanonical)) { decoded.dispose(); failures.delete(key); continue; }
       staged.set(key, { record, model:decoded });
       if (closed) throw Error('画面を閉じました。');
       if(publish){templates.set(key,staged.get(key)!);staged.delete(key);failures.delete(key);notify();}
       }catch(error){if(!publish||closed)throw error;failures.set(keyFor(c),error instanceof Error?error.message:'モデルを読み込めません。');errors.push(error);notify();}
     }
       for (const [key, item] of staged) {templates.set(key, item);failures.delete(key);}
-      wanted=new Set(next.map(keyFor));collect();
+      if (!resources) wanted=new Set(next.map(keyFor));
+      collect();
       if(errors.length)throw new AggregateError(errors,'一部のモデルを読み込めません。記録と原本は保持しています。');
     } catch (error) { for (const item of staged.values()) item.model.dispose(); throw error; }
-    finally { preparing = false; }
+    finally { preparing = false; scheduleDemand(); }
   };
   const supportedClass=(material:THREE.Material,source:MeshMaterialSource|undefined|null,c:ValidationModelClosure|ReadonlyRenderModel)=>
     source?.lighting==='unlit'?material instanceof THREE.MeshBasicMaterial:
       material instanceof THREE.MeshStandardMaterial||meshSourceFormat(c.representation.formatProfile)==='obj'&&material instanceof THREE.MeshPhongMaterial;
   const validate = (c: ValidationModelClosure | ReadonlyRenderModel, effects: ValidationMaterialEffects = {}) => {
-    const item = templates.get(keyFor(c)), slots = validationMaterialSlots(c);
+    const item = checked.get(keyFor(c)), slots = validationMaterialSlots(c);
     if (closed || !item || item.record !== canonical(c.representation)) throw Error('保存したモデルの表示本体を再確認してください。');
     if (Object.keys(effects).some(id => !slots.some(s => s.target.logicalMaterialSlotId === id))) throw Error('材質の適用先がありません。');
-    if (item.model.point) return; // Unsupported point effects are diagnosed locally by the resident.
+    if (item.point) return; // Unsupported point effects are diagnosed locally by the resident.
     for (const slot of slots) {
       const effect = effects[slot.target.logicalMaterialSlotId];
       if (effect && !('issue' in effect)) {
         // The owning Project already projects semanticProfile into display intent.
         // A source FormatProfile never determines editable metadata semantics.
         const issue = validationMaterialIssue(slot, effect, 'map2'); if (issue) throw Error(issue);
-        for (const [material, locator] of item.model.materialLocators) if (same(locator, slot.locator) && !supportedClass(material,slot.source,c))
+        for (const material of item.classes) if (same(material.locator, slot.locator) && !(slot.source?.lighting === 'unlit' ? material.kind === 'basic' : material.kind === 'standard' || meshSourceFormat(c.representation.formatProfile) === 'obj' && material.kind === 'phong'))
           throw Error('元の材質の設定を確認してください。');
       }
     }
@@ -182,7 +230,10 @@ export async function prepareReadonlyResidents(initial: readonly ReadonlyRenderM
     const bytes=(model:ReadonlyRenderModel)=>{const blob=model.representation.blob;if(blob&&typeof blob==='object'&&!Array.isArray(blob)){const count=(blob as JsonObject).byteLength;if(typeof count==='number')return count;}return Number.MAX_SAFE_INTEGER;};
     const ready=prepare(progressive?[...initial].sort((a,b)=>bytes(a)-bytes(b)):initial,progressive);void ready.catch(()=>{});
     if(!progressive)await ready;
-    return { dispose, prepare, validate, ready,
+    return { dispose, prepare, validate, ready, ...(resources ? { rasterResources: resources } : {}),
+      ...(resources ? { demand(models: readonly (ValidationModelClosure | ReadonlyRenderModel)[]) {
+        demanded = new Map(models.map(input => { const model = renderModel(input); return [keyFor(model), model]; })); wanted = new Set(demanded.keys()); collect(); scheduleDemand();
+      }, retry() { for (const key of demanded.keys()) failures.delete(key); scheduleDemand(); } } : {}),
       state(input:ValidationModelClosure|ReadonlyRenderModel){const key=keyFor(input),issue=failures.get(key);return issue?{phase:'failed' as const,issue}:{phase:templates.has(key)?'ready' as const:'loading' as const};},
       subscribe(changed:()=>void){listeners.add(changed);return()=>{listeners.delete(changed);};},
       gsPending(models:readonly (ValidationModelClosure|ReadonlyRenderModel)[]){return models.some(c=>c.representation.contentKind==='gaussianSplat'&&!templates.has(keyFor(c)));},
@@ -269,7 +320,9 @@ export async function prepareReadonlyResidents(initial: readonly ReadonlyRenderM
         const representation = new THREE.Group(); representation.matrix.copy(placementMatrix(c.representation.representationToAsset)); representation.matrixAutoUpdate = false;
         representation.add(root); asset.add(representation);
         asset.matrix.copy(placementMatrix(c.assetToProject)); asset.matrixAutoUpdate = false; asset.updateMatrixWorld(true);
-        retain();live.add(release); return { mesh: root, asset,materialNotices, dispose: release };
+        const textures=new Set<THREE.Texture>();root.traverse(node=>{if(node instanceof THREE.Mesh)for(const material of Array.isArray(node.material)?node.material:[node.material])
+          for(const field of Object.values(material))if(field instanceof THREE.Texture)textures.add(field);});
+        retain();live.add(release); return { mesh: root, asset,materialNotices,gpuTextures:[...textures], dispose: release };
       } catch (error) { release(); throw error; }
     } };
   } catch (error) { dispose(); throw error; }

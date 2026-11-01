@@ -171,6 +171,16 @@
 .lv-media-viewer-content { flex: 1; min-height: 96px; display: flex; align-items: center; justify-content: center; overflow: auto; }
 .lv-media-viewer-content .lv-media-image { width: 100%; max-height: 100%; text-align: center; }
 .lv-media-viewer-content img { display: block; width: 100%; height: min(52dvh, 540px); object-fit: contain; }
+.lv-media-image-tools { display: flex; flex: 0 0 auto; align-items: center; flex-wrap: wrap; gap: 6px; }
+.lv-media-image-tools[hidden] { display: none; }
+.lv-media-image-tools button { min-width: 44px; min-height: 44px; }
+.lv-media-image-tools output { min-width: 5em; font-variant-numeric: tabular-nums; text-align: right; }
+.lv-media-viewer-content.lv-media-zoom-viewport { display: block; overscroll-behavior: contain; }
+.lv-media-zoom-viewport .lv-media-image { max-height: none; }
+.lv-media-zoom-canvas { position: relative; }
+.lv-media-zoom-viewport .lv-media-zoom-canvas img { position: absolute; display: block; max-width: none; max-height: none; object-fit: fill; user-select: none; }
+.lv-media-zoom-viewport[data-zoomed="true"] { cursor: grab; touch-action: none; }
+.lv-media-zoom-viewport[data-panning="true"] { cursor: grabbing; }
 .lv-media-viewer-content video { display: block; width: 100%; max-height: min(52dvh, 540px); object-fit: contain; }
 .lv-media-viewer-content audio { display: block; width: 100%; min-width: 0; }
 .lv-media-viewer > p { max-height: 18dvh; overflow: auto; overflow-wrap: anywhere; }
@@ -198,6 +208,10 @@
 .lv-validation-home h2 { margin-top: 28px; font-size: 17px; font-weight: 500; }
 .lv-validation-home form { display: grid; gap: 14px; margin: 24px 0; }
 .lv-validation-home label { display: grid; gap: 6px; }
+.lv-validation-home label.lv-conversion-relation { display: flex; align-items: center; gap: 10px; min-height: 44px; }
+.lv-validation-home .lv-conversion-relation input[type="checkbox"] { order: -1; width: 18px; height: 18px; min-height: 0; padding: 0; flex: none; }
+.lv-file-source-actions { margin-top: 16px; }
+.lv-file-source-actions > p:empty { display: none; }
 .lv-validation-host > button, .lv-validation-host > p { margin: 12px 20px; }
 .lv-validation-home :is(input, button), .lv-validation-host > button {
   box-sizing: border-box; min-height: 44px; padding: 8px 12px; border: 1px solid #817c78;
@@ -218,7 +232,7 @@
 .lv-project-files { padding: 0; }
 .lv-project-files > summary { cursor: pointer; min-height: 44px; padding: 10px 12px; border-radius: 6px; }
 .lv-project-files > summary:focus-visible { outline: 2px solid #312f2d; outline-offset: 2px; }
-.lv-file-sheet { position: fixed; z-index: 50; right: 12px; top: 76px; box-sizing: border-box; width: min(600px, calc(100vw - 24px)); max-height: calc(100dvh - 88px); overflow-y: auto; overscroll-behavior: contain; padding: 16px; border: 1px solid #aaa99f; border-radius: 10px; background: #fbfaf6; box-shadow: 0 10px 48px #25282038; }
+.lv-file-sheet { position: fixed; z-index: 50; right: 12px; top: 76px; box-sizing: border-box; width: min(600px, calc(100vw - 24px)); max-height: calc(100dvh - 88px); overflow-y: auto; overscroll-behavior: contain; scroll-padding-block: 64px 88px; padding: 16px; border: 1px solid #aaa99f; border-radius: 10px; background: #fbfaf6; box-shadow: 0 10px 48px #25282038; }
 .lv-file-sheet-header { position: sticky; top: -16px; z-index: 3; display: flex; align-items: start; justify-content: space-between; gap: 8px; padding-block: 8px; background: #fbfaf6; }
 .lv-file-sheet-header > button { min-width: 0; }
 .lv-file-sheet > [role="tablist"] { display: flex; flex-wrap: wrap; gap: 4px; clear: both; border-bottom: 1px solid #d2d4c9; margin-bottom: 12px; }

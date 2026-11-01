@@ -2,7 +2,7 @@ import { inspectDeclaredValidationModel, inspectDeclaredValidationBlob, readVali
 import { isPointModel, isGsModel, type ValidatedModel } from '../projectFiles/pointPly';
 import { nativeSpatialModelBounds } from '../projectFiles/nativeSpatial';
 import type { PhotoDecoder } from '../projectFiles/photo';
-import { inspectProjectMedia, projectMediaKind, type MediaDecoders } from '../projectFiles/media';
+import { inspectProjectMedia, projectMediaKind, mediaDisplayDimensions, type MediaDecoders } from '../projectFiles/media';
 import { inspectPortableHeic } from '../projectFiles/portableHeic';
 import { portableDisplay, displayBlobRef } from '../domain/portableMedia';
 import * as THREE from 'three';
@@ -19,6 +19,7 @@ import type { ReadonlyRenderModel } from './modelTypes';
 import { projectBounds, pointInProject, type ReadonlyDisplay, type V3 } from './viewportModel';
 import { readProjectCamera, readSolidBackground } from './viewDisplay';
 import { validationMaterialIssue, validationMaterialSlots, type ValidationMaterialEffects } from './validationMaterials';
+import { sourceStreamProof } from '../projectFiles/streamSource';
 
 const table = (r: JsonObject, name: string) => object(r[name]) as Record<string, JsonObject>;
 const ordered = (rows: JsonObject[]) => rows.sort((a, b) => string(a.orderKey).localeCompare(string(b.orderKey)) || string(a.id).localeCompare(string(b.id)));
@@ -45,12 +46,13 @@ export async function prepareReviewView(file: Blob, budget: ProjectFilePolicyInp
     if (!same(record.logicalBoundsAsset, nativeSpatialModelBounds(record, source)) || slots.length !== source.materials.length ||
       slots.some(s => !actual.delete(canonical({ sourceLocator: s.sourceLocator!, sourceSemantics: s.sourceSemantics! }))) || actual.size)
       throw Error('モデルの形状・材質と表示情報が一致しません。');
-    decoded.set(string(record.id), source);
+    if (isGsModel(source) || isPointModel(source)) decoded.set(string(record.id), source);
     if(record===visuals[0])models.push({ shape: isGsModel(source) ? 'render-gs' : isPointModel(source) ? 'render-point' : source.kind==='mesh-source'?'render-mesh':'render-glb', key: `${review.token}/${record.id}`, assetId: string(asset.id),
       assetToProject: asset.assetToProject as unknown as ReadonlyRenderModel['assetToProject'], representation: record as ReadonlyRenderModel['representation'],...(proxies[0]?{proxy:proxies[0] as NonNullable<ReadonlyRenderModel['proxy']>}: {}) });
     }
   }
-  for (const record of Object.values(table(snapshot, 'mediaResourcesById'))) {
+  const mediaRecords = table(snapshot, 'mediaResourcesById');
+  const verifyMedia = async (record: JsonObject) => {
     const blob = object(record.blob); if (!projectMediaKind(blob.mediaType)||record.mediaKind!==projectMediaKind(blob.mediaType)) throw Error('このメディアの表示形式は未対応です。');
     const bytes = await readValidationBody(inspection.archive.entryBlob(`blobs/sha256/${string(blob.digest)}`), limits.maxFileBytes);
     const display = portableDisplay(record); let shown = bytes;
@@ -58,8 +60,13 @@ export async function prepareReviewView(file: Blob, budget: ProjectFilePolicyInp
       shown = await readValidationBody(inspection.archive.entryBlob(`blobs/sha256/${string(display.blob.digest)}`), limits.maxFileBytes);
       await inspectPortableHeic(bytes, shown, display, limits, decode);
     } else if ((await inspectProjectMedia(bytes, limits, decode, jpeg, photo,mediaDecoders)).mediaType !== blob.mediaType) throw Error('メディアの本体形式が一致しません。');
-    images.set(string(record.id), new Blob([shown.slice().buffer], { type: string(displayBlobRef(record).mediaType) }));
-  }
+    const shownRef = displayBlobRef(record), view = inspection.archive.entryBlob(`blobs/sha256/${string(shownRef.digest)}`);
+    const proof = await sourceStreamProof(view);
+    if (proof.byteLength !== shownRef.byteLength || proof.digest !== shownRef.digest) throw Error('画像の原本が一致しません。');
+    // Native Blob slices retain the immutable archive, not another materialized body copy.
+    return view.slice(0, view.size, string(shownRef.mediaType));
+  };
+  for (const record of Object.values(mediaRecords)) images.set(string(record.id), await verifyMedia(record));
   const savedMaterials: Record<string, ValidationMaterialEffects> = {};
   for (const model of models) {
     const effects: Record<string, MaterialIntent | { issue: string }> = {};
@@ -108,9 +115,15 @@ export async function prepareReviewView(file: Blob, budget: ProjectFilePolicyInp
     pins: basePins.filter(p => colors === null || colors.includes(p.color)),
     bounds: box.isEmpty() ? null : { min: box.min.toArray() as [number, number, number], max: box.max.toArray() as [number, number, number] },
     entry: scene.defaultViewId ? { kind: 'ready', payload: capture(string(scene.defaultViewId)) } : { kind: 'none' } });
-  return { original, inspection, source, models, images, attachments, views, capture, display,
+  return { original, inspection, source, models, images, attachments, views, capture, display, rasterResources: decode?.rasterResources,
+    imageDimensions:(bytes:Uint8Array,mime:string)=>mediaDisplayDimensions(bytes,mime,limits,decode?.rasterResources),
     title: string(project.title), sceneName: string(scene.name),
-    content: { async modelContent(record: JsonObject) { const expected = representations[string(record.id)], body = decoded.get(string(record.id));
-      if (!expected || !same(expected, record) || !body) throw Error('モデルの表示本体を確認してください。'); return body; } } };
+    content: { async image(record: JsonObject) { const expected = mediaRecords[string(record.id)];
+      if (!expected || !same(expected, record)) throw Error('画像の表示本体を確認してください。'); return verifyMedia(record);
+    }, async modelContent(record: JsonObject) { const expected = representations[string(record.id)], body = decoded.get(string(record.id));
+      if (!expected || !same(expected, record)) throw Error('モデルの表示本体を確認してください。'); if (body) return body;
+      const ref = object(record.blob), file = inspection.archive.entryBlob(`blobs/sha256/${string(ref.digest)}`), proof = await sourceStreamProof(file);
+      if (proof.digest !== ref.digest || proof.byteLength !== ref.byteLength) throw Error('モデルの原本が一致しません。');
+      return inspectDeclaredValidationBlob(record, file, policy, decode, jpeg, 'review'); } } };
 }
 export type ReviewView = Awaited<ReturnType<typeof prepareReviewView>>;

@@ -7,7 +7,11 @@ import { digest } from '../projectMetadata/persistence';
 export interface FileValidationLimits {
   readonly maxFileBytes: number; readonly maxJsonBytes: number; readonly maxItems: number;
   readonly maxValues: number; readonly maxPixels: number;
+  readonly maxStaticPixels?: number; readonly maxModelImagePixels?: number;
+  readonly jpegScanBytesPerByte?: number; readonly jpegScanAllowanceBytes?: number;
 }
+export const desktopStaticRasterLimits = Object.freeze({ maxStaticPixels: 8192 * 8192, maxModelImagePixels: 3 * 8192 * 8192,
+  jpegScanBytesPerByte: 2, jpegScanAllowanceBytes: 65536 });
 /** Execution policy supplied by a composition root; never a source/profile declaration. */
 export interface ProjectFilePolicy {
   readonly nonGs: FileValidationLimits;
@@ -21,9 +25,20 @@ export function projectFilePolicy(input: ProjectFilePolicyInput): ProjectFilePol
   if (!Number.isSafeInteger(p.projectBodyBytes) || p.projectBodyBytes <= 0) fileError('検査の上限を確認してください。');
   return Object.freeze({ nonGs: Object.freeze({ ...p.nonGs }), gs: Object.freeze({ ...p.gs }), projectBodyBytes: p.projectBodyBytes });
 }
-export const fileError = (detail: string): never => { throw Error(`読み込めません。${detail} 元のファイルは変更していません。`); };
+export class FileReadError extends Error {
+  constructor(detail:string,readonly reason:'input'|'limit'|'unsupported'|'decode'='input',readonly limit?:{subject:string;actual:number;maximum:number;unit:string}) {
+    super(`読み込めません。${detail} 元のファイルは変更していません。`);this.name='FileReadError';
+  }
+}
+export const fileError = (detail: string,reason:FileReadError['reason']='input'): never => { throw new FileReadError(detail,reason); };
+/** Actual execution-budget refusal, distinct from an invalid codestream. */
+export const fileLimitError=(subject:string,actual:number,maximum:number,unit:string):never=>{
+  throw new FileReadError(`${subject}が上限を超えています（${actual.toLocaleString('ja-JP')}${unit}／上限${maximum.toLocaleString('ja-JP')}${unit}）。`,'limit',{subject,actual,maximum,unit});
+};
 export function checkFileLimits(limits: FileValidationLimits): void {
   for (const n of Object.values(limits)) if (!Number.isSafeInteger(n) || n <= 0) fileError('検査の上限を確認してください。');
+  const optional = [limits.maxStaticPixels, limits.maxModelImagePixels, limits.jpegScanBytesPerByte, limits.jpegScanAllowanceBytes];
+  if (optional.some(n => n !== undefined) && optional.some(n => n === undefined)) fileError('静止画像の検査条件が不足しています。');
 }
 export function fileObject(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return fileError('ファイルの構造を確認してください。');

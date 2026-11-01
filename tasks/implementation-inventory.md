@@ -1,6 +1,6 @@
 # 実装・接続の全体棚卸し
 
-> 更新: 2026-10-29（限定Point/GS・Proxy、Native・Mesh／標準材質変換と01gのPC候補表示を反映。接続分類は2026-09-21時点、M14の任意化のみ本日のPO確認を反映）。本書は機能対応の正本。
+> 更新: 2026-11-01（現PCの逐次取込み・高画素表示・実サムネイルの接続を反映。既存Point/GS・Proxy、Native・Mesh／標準材質変換と01gの範囲は保持。接続分類は2026-09-21時点、M14の任意化は2026-10-29のPO確認）。本書は機能対応の正本。
 > 実装順・現在の作業tree・実行結果は [todo](todo.md) を参照し、ここへ重複記載しない。
 > 限定接続と製品受入れを区別し、通常画面・実機の新たな合格は主張しない。
 > [以前の棚卸しと監査記録](../docs/history/development-through-2026-09-14/tasks/implementation-inventory.md) は履歴。
@@ -29,6 +29,16 @@ GS専用上限と全既知本体の合計、画面全体の表示予定・実イ
 独立した編集コピー→実際の追記→保存→完全終了後の再開・全記録一致を確認した。
 原本・ピン・添付と保存形式は保持する。対応全形式・一般採用・実機／offlineの
 合格とは区別し、現在の数え方や未対応profileの分類は変更しない。
+
+現PCの既存メディアviewerに全体／原寸（画像1画素＝CSS1px）／拡大縮小／panを統合した。
+所有2048×1024 PNGの表示・操作と前後backupの画像SHA／履歴不変を検証。
+Scene focus、補足説明、入力近傍の失敗理由、source textureのGPU解放も既存経路の品質修正で、
+新しい機能群の完成加算ではない。[承認された01i方向](../docs/specs/01i-high-resolution-pc-workflow-proposal.md)で
+LociMyuを項目ごとに検査するcatalog、PC PNG/JPEGの画像work、共有live資源、可視templateの
+再構築、実縮小画像と1つの原寸viewerを接続した。実データの8Kモデル・26原画像と
+変換／編集／ファイル／別環境／返送／復元／coldofflineの限定実行を、小規模GPU component
+証拠とは別に記録する。元画像・既存の保存／変換規則を保持し、全PCの容量保証にはしない。
+最終のDesktop／offline／checkpoint実行結果はtodoが管理する。
 
 ## 1. 結論と数え方
 

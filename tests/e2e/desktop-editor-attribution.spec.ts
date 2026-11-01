@@ -1,5 +1,5 @@
 import { desktopOrigin, desktopEntry } from './desktopEntry';
-import { revealCoordinateAdd, revealFileSurface } from './workspaceUi';
+import { closeFileSurface, revealCoordinateAdd, revealFileSurface } from './workspaceUi';
 import { test, expect, chromium, type Page, type BrowserContext, type TestInfo } from '@playwright/test';
 import { mkdir, mkdtemp, readFile } from 'node:fs/promises';
 import { resolve, sep } from 'node:path';
@@ -28,8 +28,9 @@ async function editor(p: Page, name: string, enabled = true) {
   await settings.getByLabel('このプロジェクトの今後の編集にこの名前を残す', { exact: true }).setChecked(enabled);
   await settings.getByRole('button', { name: '編集者名を設定', exact: true }).click();
   await expect(settings.getByRole('status')).toHaveText('編集者名の設定を保存しました。');
+  await settings.locator(':scope > summary').click();
 }
-async function edit(p: Page, field: 'タイトル' | '本文', value: string) {
+async function edit(p: Page, field: 'タイトル' | '本文', value: string) {await closeFileSurface(p);
   await detail(p).getByLabel(field, { exact: true }).fill(value);
   await detail(p).getByRole('button', { name: '変更を適用', exact: true }).click();
   await expect(p.getByText('変更を適用しました。', { exact: true })).toBeVisible({ timeout: 90_000 }); await settled(p);
@@ -51,7 +52,7 @@ async function output(p: Page, info: TestInfo, label: string, purpose: 'backup' 
   if (purpose === 'contribution') await expect(area.locator('.lv-file-intents')).toContainText('今回の変更分に編集者名は含みません。');
   const [download] = await Promise.all([p.waitForEvent('download', { timeout: 120_000 }), primary.click()]);
   const path = info.outputPath(label + '.zip'); await download.saveAs(path); expect(await download.failure()).toBeNull();
-  await expect(area.locator('.lv-operation-status')).toHaveAttribute('data-busy', 'false', { timeout: 120_000 }); return path;
+  await expect(area.locator('.lv-operation-status')).toHaveAttribute('data-busy', 'false', { timeout: 120_000 }); await closeFileSurface(p);return path;
 }
 async function receive(p: Page, path: string) {
   await revealFileSurface(p,'受信');
@@ -60,6 +61,7 @@ async function receive(p: Page, path: string) {
   await area.getByLabel('更新ファイルを選択', { exact: true }).setInputFiles(path);
   await area.getByRole('button', { name: '更新を受け取る', exact: true }).click();
   await expect(area.getByText('更新を受け取りました。', { exact: true })).toBeVisible({ timeout: 90_000 }); await settled(p);
+  await closeFileSurface(p);
 }
 async function records(path: string) {
   const backup = await BackupArchive.inspect(await blob(path), limits), inspected = await inspectProjectCandidates(backup.source.read(), limits);
@@ -123,6 +125,7 @@ test('08b editor names remain exact through collaboration, purpose privacy, rest
     await settings.getByLabel('このブラウザの表示名', { exact: true }).fill('私的な名前'); await settings.getByRole('button', { name: '表示名を設定', exact: true }).click();
     await expect(settings.getByLabel('編集者名', { exact: true })).toHaveValue('私的な名前'); await expect(settings.getByRole('checkbox')).not.toBeChecked();
     await editor(a.p, nameA); await edit(a.p, 'タイトル', caption); await edit(a.p, '本文', '配布時の本文');
+    await detail(a.p).getByText('属性', { exact: true }).click();
     await detail(a.p).getByText('編集者情報', { exact: true }).click(); await expect(detail(a.p)).toContainText(`編集者名：${nameA}`); await expect(detail(a.p)).toContainText('編集者情報なし');
     const initial = await output(a.p, info, 'named-workspace', 'teamWorkspace');
     console.log('08b: initial named Workspace downloaded');

@@ -22,7 +22,7 @@ import type { MetadataStorageFactory } from '../src/projectMetadata/repository';
 import { MetadataRepository } from '../src/projectMetadata/repository';
 import { openWorkspaceGeneration } from '../src/projectMetadata/generationScope';
 import { digest, newId, json, readReceipt, underWriteLease, withMetadataRead } from '../src/projectMetadata/persistence';
-import { validationMetadataLimits as metadata, validationGlbProfile, occurrenceGlbProfile, occurrenceGlbProfileText, jpegGlbProfile, occurrenceJpegGlbProfile, type FileValidationLimits } from '../src/projectFiles/validation';
+import { validationMetadataLimits as metadata, validationGlbProfile, occurrenceGlbProfile, occurrenceGlbProfileText, jpegGlbProfile, occurrenceJpegGlbProfile, FileReadError, desktopStaticRasterLimits, projectFilePolicy, type FileValidationLimits } from '../src/projectFiles/validation';
 import { inspectValidationGlb, inspectValidationJpegGlb, validationGlbParts } from '../src/projectFiles/glb';
 import { inspectOccurrenceGlb, decodeOccurrenceGlb } from '../src/projectFiles/glbOccurrences';
 import { inspectValidationPng } from '../src/projectFiles/png';
@@ -47,6 +47,8 @@ import { metadataProjectView } from '../src/harness/projectScene/metadataFixture
 import { syntheticDisplay, pointInProject } from '../src/harness/projectScene/viewportModel';
 import { degreesRotation } from '../src/harness/projectScene/modelTransform';
 import { prepareValidationResidents, prepareReadonlyResidents, decodeValidationModel } from '../src/harness/projectScene/validationRender';
+import { createRasterResources, RasterResourceError } from '../src/viewer/rasterResources';
+import { readLegacyModelProof } from '../src/viewer/compat180/proof';
 import { createModelCandidatePreview, type ModelCandidateRenderer } from '../src/harness/projectScene/modelCandidatePreview';
 import { assetStatusCandidates } from '../src/projectMetadata/assetStatus';
 import { assetMembershipGroups } from '../src/projectMetadata/membership';
@@ -60,7 +62,7 @@ import { productSources } from '../src/harness/projectScene/productSources';
 import { createProductWorkspace } from '../src/projectScene/productWorkspace';
 import { organizationSceneSource } from '../src/projectMetadata/sceneOrganization';
 import type { MetadataEdit } from '../src/projectMetadata/commands';
-import type { ValidationModelClosure } from '../src/projectScene/modelTypes';
+import type { ValidationModelClosure, ReadonlyRenderModel } from '../src/projectScene/modelTypes';
 import { fieldValue, projectCaptions, projectMediaResources, projectMediaUncertain, projectCaptionInventory } from '../src/ui/projectScene/projectRead';
 import type { WorkspaceProvider } from '../src/ui/projectScene/projectWorkspacePorts';
 import { surfaceAnchor } from '../src/ui/projectScene/projectWorkspacePorts';
@@ -107,7 +109,7 @@ import { ReviewArchive } from '../src/projectPackage/reviewArchive';
 import { ReviewOutputJob } from '../src/projectPackage/reviewOutputJob';
 import { PreparedReviewEdit, createReviewEditScratch } from '../src/projectPackage/reviewEdit';
 import { ReviewEditJob } from '../src/projectPackage/reviewEditJob';
-import { reviewEditRoot, type ReviewEditBinding } from '../src/projectPackage/reviewEditControls';
+import { assertReviewEditSlot, reviewEditRoot, type ReviewEditBinding } from '../src/projectPackage/reviewEditControls';
 import { prepareReviewView } from '../src/harness/projectScene/reviewView';
 import { inspectReviewSnapshot, prepareReviewEdit } from '../src/projectPackage/reviewSnapshot';
 import { BackupArchive, writeBackupArchive } from '../src/projectPackage/backupArchive';
@@ -519,6 +521,18 @@ const lociMyuTestReceiptBytes = (receipt: unknown) => {
 };
 
 describe('limited real-format validation (synthetic GLB bytes, injected PNG decoder, memory storage)', () => {
+  it('PC raster policy preflights all image work before native decoding and keeps geometry work independent', async () => {
+    const width = new DataView(png.buffer).getUint32(16), height = new DataView(png.buffer).getUint32(20);
+    const native = vi.fn(decodeImplementation), input = glb(j => { j.images.push(structuredClone(j.images[0])); }, true);
+    const pc = { ...budget, ...desktopStaticRasterLimits, maxModelImagePixels: width * height };
+    await expect(inspectValidationGlb(input, pc, native)).rejects.toMatchObject({ reason: 'limit' }); expect(native).not.toHaveBeenCalled();
+    const valid = await inspectValidationGlb(glb(undefined, true), { ...budget, ...desktopStaticRasterLimits }, native);
+    expect(valid.raster?.images).toEqual([{ width, height }]); expect(valid.raster!.cpuBytes).toBe(width * height * 4);
+    expect(valid.raster!.gpuBytes).toBeGreaterThanOrEqual(width * height * 4);
+    await expect(inspectValidationGlb(glb(), { ...pc, maxValues: 1 }, native)).rejects.toThrow('モデルの検査量');
+    expect(() => projectFilePolicy({ ...budget, maxStaticPixels: 100 })).toThrow('静止画像の検査条件');
+    expect(() => jpegStructure(jpegBytes('rgb-exif-6'), { ...budget, ...desktopStaticRasterLimits, jpegScanBytesPerByte: Number.MAX_SAFE_INTEGER }, 'photo')).toThrow('検査量');
+  });
   it('declines a foreign package without spreadsheets using metadata only, while retaining spreadsheet diagnostics', async () => {
     const writer = new ZipWriter(new Uint8ArrayWriter());
     await writer.add('manifest.json', new Uint8ArrayReader(new TextEncoder().encode('{}')), { level: 0 });
@@ -776,6 +790,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     ] as const){
       Object.assign(input,{files}); input.fire('change'); submit();
       await vi.waitFor(()=>expect(all(root).some(n=>n.textContent.includes(message))).toBe(true));
+      const status=all(root).find(n=>n.className.includes('lv-validation-status'))!;expect(status.parent!.className).toBe('lv-validation-home');expect((status.parent as unknown as HTMLElement).inert).toBe(false);
       expect(open).not.toHaveBeenCalled(); expect(await r.fs.list('')).toEqual([]); expect(create.parent!.hidden).toBe(true);
       button('閲覧で開く').fire('click'); await vi.waitFor(()=>expect(all(root).some(n=>n.textContent.includes('選択を取り消してください'))).toBe(true)); expect(open).not.toHaveBeenCalled();
       expect(button('選択を取り消す').hidden).toBe(false);cancel();expect(ui.hasChanges()).toBe(false);
@@ -1067,6 +1082,27 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     changed.data = new TextEncoder().encode(kind === 'external' ? text.replace('Target=', 'TargetMode="External" Target=') : kind === 'missing-sheet' ? text.replace('worksheets/sheet1.xml', 'worksheets/missing.xml') : kind === 'column-overflow' ? text.replace('r="A1"', 'r="AAA1"') : kind === 'prefixed-text' ? text.replace(/<c r="C2"[^>]*>[\s\S]*?<\/c>/, '<c r="C2" t="inlineStr"><is><x:t xmlns:x="http://schemas.openxmlformats.org/spreadsheetml/2006/main">保持する本文</x:t></is></c>') : kind === 'single-quote' ? text.replace('r="C2" t="s"', 'r="C2" t=\'s\'') : text.replace('</sheetData>', '<row/>' + '</sheetData>'));
     entry.data = await writeZipEntries(inner); const preview = (await prepareLociMyuConversion(new Blob([(await writeZipEntries(outer)).slice().buffer]), budget, decode))!;
     const choice = await preview.evaluate(preview.sources.find(s => s.path === 'data.xlsx')!.index, '名前'); expect(choice.blocked).toBe(true);
+  });
+  it.each(['duplicate-cell', 'column-overflow', 'shared-string', 'self-closing-row', 'opaque-target-duplicate', 'opaque-target-utf8'] as const)('LociMyu preflight guards a consumed sheet outside the worksheets directory: %s', async kind => {
+    const file = await lociMyuFile(), outer = await readZipEntries(new Uint8Array(await file.arrayBuffer())), entry = outer.find(e => e.path === 'data.xlsx')!;
+    const inner = await readZipEntries(entry.data), sheet = inner.find(e => e.path === 'xl/worksheets/sheet1.xml')!, rels = inner.find(e => e.path === 'xl/_rels/workbook.xml.rels')!;
+    sheet.path = kind.startsWith('opaque-') ? 'xl/sheets/opaque.data' : 'xl/drawings/drawing1.xml';
+    rels.data = new TextEncoder().encode(new TextDecoder().decode(rels.data).replace('worksheets/sheet1.xml', sheet.path.slice(3)));
+    const text = new TextDecoder().decode(sheet.data);
+    sheet.data = kind === 'opaque-target-utf8' ? new Uint8Array([...sheet.data, 0xff]) : new TextEncoder().encode(kind.includes('duplicate') ? text.replace('r="B1"', 'r="A1"') : kind === 'column-overflow' ? text.replace('r="A1"', 'r="AAA1"') : kind === 'shared-string' ? text.replace(/(<c r="C2" t="s"><v>)\d+/, (_match, prefix: string) => prefix + '99999999') : text.replace('</sheetData>', '<row/>' + '</sheetData>'));
+    expect(new TextDecoder().decode(sheet.data)).not.toBe(text);
+    entry.data = await writeZipEntries(inner);
+    const original = new Blob([(await writeZipEntries(outer)).slice().buffer]), before = await original.arrayBuffer(), preview = (await prepareLociMyuConversion(original, budget, decode))!;
+    const choice = await preview.evaluate(preview.sources.find(s => s.path === 'data.xlsx')!.index, '名前');
+    expect(choice.blocked).toBe(true); await expect(choice.create()).rejects.toThrow(); expect(await original.arrayBuffer()).toEqual(before);
+  });
+  it('LociMyu preflight retains lossless sheet content at a target without an XML suffix', async () => {
+    const outer = await readZipEntries(new Uint8Array(await (await lociMyuFile()).arrayBuffer())), entry = outer.find(e => e.path === 'data.xlsx')!;
+    const inner = await readZipEntries(entry.data), sheet = inner.find(e => e.path === 'xl/worksheets/sheet1.xml')!, rels = inner.find(e => e.path === 'xl/_rels/workbook.xml.rels')!;
+    sheet.path = 'xl/sheets/opaque.data'; rels.data = new TextEncoder().encode(new TextDecoder().decode(rels.data).replace('worksheets/sheet1.xml', 'sheets/opaque.data'));
+    entry.data = await writeZipEntries(inner);
+    const preview = (await prepareLociMyuConversion(new Blob([(await writeZipEntries(outer)).slice().buffer]), budget, decode))!, choice = await preview.evaluate(0, '名前');
+    expect(choice.blocked).toBe(false); expect(choice.summary.captions).toBe(3);
   });
   it('LociMyu conversion refuses cross-prefix full hashes and shortened target collisions without ID fallback', async () => {
     const mock = vi.spyOn(crypto.subtle, 'digest');
@@ -2491,9 +2527,12 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       const named = (name: string, parent = root) => all(parent).find(n => n.attributes.get('aria-label') === name)!;
       const button = (text: string, parent = root) => all(parent).find(n => n.tag === 'button' && n.textContent === text)!;
       const navigation = all(root).find(n => n.className === 'lv-validation-home')!;
-      let inert = (navigation as unknown as HTMLElement).inert; const waiters = new Set<() => void>();
-      Object.defineProperty(navigation,'inert',{ get: () => inert, set(value: boolean) { inert = value; if (!value) { for (const done of waiters) done(); waiters.clear(); } } });
-      const idle = () => inert ? new Promise<void>(resolve => waiters.add(resolve)) : Promise.resolve();
+      const status = all(root).find(n => n.className === 'lv-operation-status lv-validation-status')!, waiters = new Set<() => void>();
+      const setAttribute = status.setAttribute.bind(status);
+      status.setAttribute = (key, value) => { setAttribute(key, value); if (key === 'data-busy' && value === 'false') { for (const done of waiters) done(); waiters.clear(); } };
+      // The navigation keeps progress readable; startup and later actions have
+      // an explicit ready promise and busy status, rather than an inert owner.
+      const idle = async () => { await ui.ready; if (status.getAttribute('data-busy') === 'true') await new Promise<void>(resolve => waiters.add(resolve)); };
       const edit = async (action: () => void) => {
         const editor = all(root).find(n => n.className === 'lv-project-workspace')!, status = all(editor).find(n => n.className === 'lv-operation-status')!, data = status.dataset; let started = false;
         try { await new Promise<void>(resolve => {
@@ -2721,10 +2760,11 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const view = owned(await openValidationEntry({ ...r.options, mode: 'view' })); if (!('kind' in view)) throw Error('view recovery');
     expect(view.readOnly).toBe(true); const files = await r.base.list(''), bytes = await Promise.all(files.map(path => r.base.readBytes(path)));
     await expect(view.retry(async () => {})).rejects.toThrow('編集'); expect(await Promise.all(files.map(path => r.base.readBytes(path)))).toEqual(bytes); await view.dispose();
-    const cold = owned(await openValidationEntry(r.options)); if (!('kind' in cold)) throw Error('cold recovery');
-    const prepared = vi.fn(async (next, content) => { expect(next.validationFiles).toBe(true); expect(next.modelVersions).toHaveLength(2);
+    const images=vi.spyOn(ValidationContent.prototype,'displayImage'),projectionReads:number[]=[];let beforeProjection=0;
+    const cold = owned(await openValidationEntry({...r.options,lazyImages:true,timing(stage){if(stage==='restore.first.projection.start')beforeProjection=images.mock.calls.length;else if(stage==='restore.first.projection')projectionReads.push(images.mock.calls.length-beforeProjection);}})); if (!('kind' in cold)) throw Error('cold recovery');
+    const prepared = vi.fn(async (next, content) => { expect(next.validationFiles).toBe(true); expect(next.modelVersions).toHaveLength(2);expect(next.mediaChoices?.length).toBeGreaterThan(0);
       for (const version of next.modelVersions!) expect((await content.model(version.closure.representation)).bytes).toEqual((await f.reopen().content.model(version.closure.representation)).bytes); });
-    const host = owned(await cold.retry(prepared)); expect(prepared).toHaveBeenCalledOnce(); expect(host.read().source!.originalChanges()).toEqual(r.inspection.source.originalChanges());
+    const host = owned(await cold.retry(prepared)); expect(prepared).toHaveBeenCalledOnce();expect(projectionReads).toEqual([0]);images.mockRestore(); expect(host.read().source!.originalChanges()).toEqual(r.inspection.source.originalChanges());
     expect(host.authority.readOnly).toBe(false); await host.dispatch(host.read().source!.token, { kind: 'editCaption', captionId: f.captionId, edits: { body: '初回復元の実編集' } });
     const edited = host.read().source!, sent = await host.workspaceOutput.download(await host.workspaceOutput.generateContribution(edited.token, host.workspaceOutput.bases[0]!.selection));
     const accepted = await f.receiverService.receive((await f.receiver.session.read()).source!.token, sent); expect(accepted.state).toBe('ready');
@@ -4325,9 +4365,10 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
   it('batches renderer observations without delaying typed intents or accepting stale view captures',async()=>{
     const h=await productWorkspaceFixture(true),frames=new Map<number,FrameRequestCallback>();let next=0;
     vi.stubGlobal('requestAnimationFrame',(fn:FrameRequestCallback)=>{const id=++next;frames.set(id,fn);return id;});vi.stubGlobal('cancelAnimationFrame',(id:number)=>frames.delete(id));
-    const flush=()=>{for(const[id,fn]of [...frames]){frames.delete(id);fn(0);}},scene=h.named('シーン',h.editor).children.find(n=>n.tag==='div')!,rebuild=vi.spyOn(scene,'replaceChildren'),markers=h.all(h.editor).find(n=>n.className==='lv-project-markers')!,before=h.host.read().source!.token;
+    const flush=()=>{for(const[id,fn]of [...frames]){frames.delete(id);fn(0);}},scene=h.named('シーン',h.editor).children.find(n=>n.tag==='div')!,choices=[...scene.children],markers=h.all(h.editor).find(n=>n.className==='lv-project-markers')!,rebuild=vi.spyOn(markers,'replaceChildren'),before=h.host.read().source!.token;
+    choices[0]!.focus();
     try{
-      for(let i=0;i<20;i++)h.pinPoint({x:30+i,y:40+i});expect(frames.size).toBe(1);expect(rebuild).not.toHaveBeenCalled();expect(markers.children[0]!.style.left).toBe('30px');flush();expect(rebuild).toHaveBeenCalledOnce();expect(markers.children[0]!.style.left).toBe('49px');expect(markers.children[0]!.style.top).toBe('59px');expect(h.host.read().source!.token).toBe(before);expect(h.dispatch).not.toHaveBeenCalled();
+      for(let i=0;i<20;i++)h.pinPoint({x:30+i,y:40+i});expect(frames.size).toBe(1);expect(rebuild).not.toHaveBeenCalled();expect(markers.children[0]!.style.left).toBe('30px');flush();expect(rebuild).toHaveBeenCalledOnce();expect(markers.children[0]!.style.left).toBe('49px');expect(markers.children[0]!.style.top).toBe('59px');expect(scene.children).toEqual(choices);expect(scene.document.activeElement).toBe(choices[0]);expect(h.host.read().source!.token).toBe(before);expect(h.dispatch).not.toHaveBeenCalled();
       h.setIssue('最初の表示エラー');h.refresh();h.setIssue('最新の表示エラー');h.refresh();expect(frames.size).toBe(1);flush();expect(h.all(h.editor).find(n=>n.className==='lv-project-viewport-status')!.textContent).toContain('最新の表示エラー');
       h.setIssue('');h.refresh();const cancelled=[...frames.values()][0]!;const count=rebuild.mock.calls.length;h.button('モデル',h.editor).fire('click');expect(frames.size).toBe(0);expect(rebuild).toHaveBeenCalledTimes(count+1);cancelled(0);expect(rebuild).toHaveBeenCalledTimes(count+1);
       h.button('キャプション',h.editor).fire('click');expect(h.button('ピンを追加',h.editor).disabled).toBe(false);h.dragging(true);expect(frames.size).toBe(1);h.button('ピンを追加',h.editor).fire('click');expect(h.pick).not.toHaveBeenCalled();expect(h.dispatch).not.toHaveBeenCalled();expect(frames.size).toBe(0);h.dragging(false);flush();
@@ -6037,7 +6078,10 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const ids = rows().map(r => r.id); expect(new Set(ids).size).toBe(2); expect(rows().every(r => r.mediaResourceId.kind === 'value' && r.mediaResourceId.value === mediaRecord.id)).toBe(true);
     expect(captionAttachments(host.authority.read().mediaData, firstCaption).ready).toHaveLength(1);
     const reused = host.read().provider!; if (reused.kind !== 'scene-provider') throw Error('provider'); expect(Object.keys(reused.details.immutable.mediaResourcesById)).toHaveLength(1);
-    const editArea = named('添付メディア', media); button('説明を編集', editArea).fire('click'); const input = named('メディアの説明', media);
+    const editArea = named('添付メディア', media);
+    await vi.waitFor(() => expect(all(editArea).some(n => n.tag === 'img')).toBe(true));
+    const descriptionImage = all(editArea).find(n => n.tag === 'img')!, descriptionReads = h.imageReads[0]!.mock.calls.length;
+    button('説明を編集', editArea).fire('click'); const input = named('メディアの説明', media);
     input.fire('compositionstart'); input.value = '位置を比較する画像'; input.fire('input');
     expect(button('ファイルに保存', named('ファイル')).disabled).toBe(true); expect(button('モデル', editor).disabled).toBe(true);
     named('キャプション一覧', editor).children[0]!.children[0]!.fire('click'); expect(input.value).toBe('位置を比較する画像');
@@ -6048,6 +6092,9 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const originals = await Promise.all(paths.map(p => h.f.fs.readBytes(p))); h.f.fs.reject = () => false;
     await edited(() => button('更新を再試行', editor).fire('click')); expect(host.read().source!.originalChanges()).toHaveLength(before + 1);
     expect(await Promise.all(paths.map(p => h.f.fs.readBytes(p)))).toEqual(originals); expect(rows()[0]!.altText).toEqual({ kind: 'value', value: '位置を比較する画像' });
+    // Text-only editing/retry retains the shown image. Explicit original-view
+    // requests and card lifetimes below need not keep one global raw-body memo.
+    expect(all(editArea)).toContain(descriptionImage); expect(h.imageReads[0]).toHaveBeenCalledTimes(descriptionReads);
     await edited(() => button('後へ', editArea).fire('click')); expect(rows().map(r => r.id)).toEqual([ids[1], ids[0]]);
     button('説明を編集', editArea).fire('click'); input.value = '未適用の説明'; input.fire('input'); button('画像を表示', named('添付メディア', media)).fire('click');
     const viewer = named('メディアビューア', editor); expect(all(editor).filter(n => n.tag === 'dialog')).toHaveLength(1); expect(viewer.open).toBe(true);
@@ -6065,7 +6112,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     button('添付を解除', editArea).fire('click'); await edited(() => button('添付を解除する', media).fire('click')); expect(rows()).toHaveLength(0);
     named('キャプション一覧', editor).children[0]!.children[0]!.fire('click'); expect(captionAttachments(host.authority.read().mediaData, firstCaption).ready).toHaveLength(1);
     button('添付を解除', editArea).fire('click'); await edited(() => button('添付を解除する', media).fire('click'));
-    expect(captionAttachments(host.authority.read().mediaData, firstCaption).ready).toHaveLength(0); expect(h.imageReads[0]).toHaveBeenCalledTimes(1);
+    expect(captionAttachments(host.authority.read().mediaData, firstCaption).ready).toHaveLength(0);
     const final = host.read().source!, output = await host.workspaceOutput.download(await host.workspaceOutput.generate(final.token)); await h.ui.dispose();
     const cold = await openValidationHost(h.f.options); expect(cold.read().source!.originalChanges()).toEqual(final.originalChanges());
     expect(captionAttachments(cold.authority.read().mediaData, captionId).ready).toHaveLength(0); expect(captionAttachments(cold.authority.read().mediaData, firstCaption).ready).toHaveLength(0);
@@ -6427,7 +6474,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const mediaPanel = all(page).find(n => n.attributes.get('aria-label') === '選択中のキャプションのメディア')!;
     all(mediaPanel).find(n => n.tag === 'button' && n.textContent === '画像を表示')!.fire('click');
     const mediaViewer = all(page).find(n => n.attributes.get('aria-label') === 'メディアビューア')!;
-    expect(mediaViewer.open).toBe(true); expect(all(mediaViewer).filter(n => n.tag === 'img')).toHaveLength(1);
+    expect(mediaViewer.open).toBe(true); await vi.waitFor(() => expect(all(mediaViewer).filter(n => n.tag === 'img')).toHaveLength(1));
     expect(all(page).filter(n => n.tag === 'dialog')).toHaveLength(1); expect(open).not.toHaveBeenCalled();
     all(mediaViewer).find(n => n.attributes.get('aria-label') === '閉じる')!.fire('click'); expect(mediaViewer.open).toBe(false);
     const pageButton = (text: string) => all(page).find(n => n.tag === 'button' && n.textContent === text)!;
@@ -6493,6 +6540,17 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       expect(inspect).toHaveBeenCalledTimes(2); expect(inspect.mock.calls[0]![0].size).toBe(file.size); // Default input inspection stays fresh.
     } finally { inspect.mockRestore(); await scratch.dispose(); await source.workspace.dispose(); }
   }, 60000);
+  it('audits a fresh review-copy slot at entry and close and refuses closing failure or missing parent evidence',async()=>{
+    const source=await openFileCaption(),id=await source.host.workspaceOutput.generateReview(source.host.read().source!.token,{sceneId:source.s.sceneId});
+    const prepared=await PreparedReviewEdit.prepare(await source.host.workspaceOutput.download(id),metadata),r=firstWorkspaceRecipient();await new ReviewEditJob(r.fs,r.session,metadata).start(prepared);
+    let audits=0,refuseClosing=false;const scope=owned(await openWorkspaceGeneration(r.fs,{generationId:null,allowCreate:false,auditReadOperations:true,assertSelected:async()=>{if(++audits===2&&refuseClosing)throw Error('review slot closing audit');}},async()=>({factory:r.factory,dispose:async()=>{}})));
+    try{
+      const before=(await r.fs.list('')).sort(),writes=vi.spyOn(r.fs,'writeBytes');audits=0;await assertReviewEditSlot(scope.fs,metadata);expect(audits).toBe(2);expect(writes).not.toHaveBeenCalled();
+      audits=0;refuseClosing=true;await expect(assertReviewEditSlot(scope.fs,metadata)).rejects.toThrow('review slot closing audit');expect(audits).toBe(2);expect((await r.fs.list('')).sort()).toEqual(before);
+      refuseClosing=false;audits=0;await assertReviewEditSlot(scope.fs,metadata);expect(audits).toBe(2);
+      await r.fs.remove(`${reviewEditRoot(r.fs,prepared.id)}original.zip`);writes.mockClear();await expect(assertReviewEditSlot(scope.fs,metadata)).rejects.toThrow('review-edit-pending');expect(writes).not.toHaveBeenCalled();
+    }finally{await source.workspace.dispose();}
+  },60000);
   it('omits only the same-read completed private Review child and retains strict discovery by default', async () => {
     const source = await openFileCaption(), id = await source.host.workspaceOutput.generateReview(source.host.read().source!.token, { sceneId: source.s.sceneId });
     const prepared = await PreparedReviewEdit.prepare(await source.host.workspaceOutput.download(id), metadata), r = firstWorkspaceRecipient();
@@ -7841,6 +7899,84 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     else { await cold.authority.retry!(); const p = cold.read().provider!; if (p.kind !== 'scene-provider') throw Error('provider'); expect(cold.read().state).toBe('ready'); expect(Object.values(p.details.attachments).filter(f => f.kind === 'value')).toHaveLength(3); }
     expect(await Promise.all(parts.map(p => f.fs.readBytes(p)))).toEqual(saved); await cold.dispose();
   });
+  it('releases an initially hidden product viewport, edits Captions, and reveals a current surface only after preparation',async()=>{
+    const f=await openFileCaption(),document=new RecordedDocument().asDocument();let narrow=true,active=false,ready=true,notify=()=>{};
+    Object.assign(document,{defaultView:{innerWidth:720,innerHeight:500,matchMedia:()=>({matches:narrow}),addEventListener(){},removeEventListener(){},setTimeout,clearTimeout}});
+    const mode=createValidationModeHost(f.host,async()=>{throw Error('unexpected mode change');},()=>{}),activation=vi.fn((next:boolean)=>{active=next;});
+    let display:Parameters<ReturnType<ViewportFactory>['update']>[0]|undefined;
+    const factory:ViewportFactory=(_canvas,changed)=>{notify=changed;return{update(next){display=next;},setActive:activation,camera(){},retry(){},dispose(){},read:()=>({ready:active&&ready,display,token:'hidden-camera',issue:null,dragging:false,pins:[],projection:'perspective',axis:null})};};
+    const ui=createProductWorkspace(document,mode,factory),all=(n:RecordedNode):RecordedNode[]=>[n,...n.children.flatMap(all)],nodes=()=>all(record(ui.root));
+    const button=(text:string)=>nodes().find(n=>n.tag==='button'&&n.textContent===text)!,named=(label:string)=>nodes().find(n=>n.attributes.get('aria-label')===label)!;
+    try{
+      expect(activation).toHaveBeenLastCalledWith(false);nodes().find(n=>n.className==='lv-caption-select')!.fire('click');
+      const body=named('本文');body.value='非表示でも編集';body.fire('input');button('変更を適用').fire('click');
+      await vi.waitFor(()=>expect(f.host.authority.read().resources.captions[f.captionId]!.body).toMatchObject({value:'非表示でも編集'}));
+      expect(activation).toHaveBeenLastCalledWith(false);expect(f.host.hasPending()).toBe(false);
+      const saved=await f.host.workspaceOutput.download(await f.host.workspaceOutput.generate(f.host.read().source!.token));expect(saved.size).toBeGreaterThan(0);
+      ready=false;button('位置を調整').fire('click');expect(activation).toHaveBeenLastCalledWith(true);expect(display?.pinEdit).toBeUndefined();
+      const pinTask=named('位置の調整'),cancel=all(pinTask).find(n=>n.tag==='button'&&n.textContent==='取り消す')!;
+      expect(cancel.hidden).toBe(false);cancel.fire('click');ready=true;notify();ui.render();expect(display?.pinEdit).toBeUndefined();
+      expect(activation).toHaveBeenLastCalledWith(false);
+      ready=false;button('位置を調整').fire('click');expect(named('本文').readOnly).toBe(true);expect(named('メディアを追加').disabled).toBe(true);
+      await f.host.dispatch(f.host.read().source!.token,{kind:'renameScene',sceneId:f.s.sceneId,name:'更新されたシーン'});
+      ui.render();ready=true;notify();ui.render();expect(display?.pinEdit).toBeUndefined();expect(pinTask.hidden).toBe(true);
+      ready=false;button('位置を調整').fire('click');ready=true;notify();ui.render();
+      expect(display?.pinEdit?.target).toMatchObject({token:f.host.read().source!.token,sceneId:f.s.sceneId,assetId:f.s.snapshot.modelVersions![0]!.assetId});
+      expect(named('本文').value).toBe('非表示でも編集');cancel.fire('click');
+      body.value='未確定の入力';body.fire('input');body.fire('compositionstart');button('位置を調整').fire('click');expect(activation).toHaveBeenLastCalledWith(false);expect(body.value).toBe('未確定の入力');body.fire('compositionend');
+      narrow=false;ui.render();expect(activation).toHaveBeenLastCalledWith(true);expect(display?.pinEdit).toBeUndefined();
+    }finally{await ui.dispose();await mode.dispose();await f.workspace.dispose();}
+  });
+  it.each(['task','cancel','search','closed']as const)('keeps the owned waiting-position focus through preparation without stealing %s focus',async destination=>{
+    const f=await openFileCaption(),document=new RecordedDocument().asDocument();let active=false,ready=false,notify=()=>{};
+    Object.assign(document,{defaultView:{innerWidth:720,innerHeight:500,matchMedia:()=>({matches:true}),addEventListener(){},removeEventListener(){},setTimeout,clearTimeout}});
+    const mode=createValidationModeHost(f.host,async()=>{throw Error('unexpected mode change');},()=>{});
+    let display:Parameters<ReturnType<ViewportFactory>['update']>[0]|undefined;
+    const factory:ViewportFactory=(_canvas,changed)=>{notify=changed;return{update(next){display=next;},setActive(next){active=next;},camera(){},retry(){},dispose(){},read:()=>({ready:active&&ready,display,token:'waiting-focus',issue:null,dragging:false,pins:[],projection:'perspective',axis:null})};};
+    const ui=createProductWorkspace(document,mode,factory),all=(n:RecordedNode):RecordedNode[]=>[n,...n.children.flatMap(all)],nodes=()=>all(record(ui.root));
+    const button=(text:string)=>nodes().find(n=>n.tag==='button'&&n.textContent===text)!,named=(label:string)=>nodes().find(n=>n.attributes.get('aria-label')===label)!;
+    try{
+      nodes().find(n=>n.className==='lv-caption-select')!.fire('click');button('位置を調整').fire('click');await Promise.resolve();
+      const task=named('位置の調整'),x=named('位置 X'),cancel=all(task).find(n=>n.tag==='button'&&n.textContent==='取り消す')!;
+      expect(document.activeElement).toBe(task as unknown as Element);expect(display?.pinEdit).toBeUndefined();
+      const next=destination==='cancel'?cancel:destination==='search'?named('検索'):task;
+      next.focus();const token=f.host.read().source!.token;
+      if(destination==='closed')await ui.dispose();
+      ready=true;notify();if(destination!=='closed')ui.render();await Promise.resolve();
+      expect(document.activeElement).toBe((destination==='task'?x:next) as unknown as Element);
+      expect(f.host.read().source!.token).toBe(token);if(destination!=='closed')expect(display?.pinEdit).toBeDefined();
+      if(destination==='task'){cancel.fire('click');ready=false;button('位置を調整').fire('click');await Promise.resolve();cancel.fire('click');const focus=document.activeElement;ready=true;notify();ui.render();await Promise.resolve();expect(document.activeElement).toBe(focus);expect(display?.pinEdit).toBeUndefined();}
+    }finally{await ui.dispose();await mode.dispose();await f.workspace.dispose();}
+  });
+  it('returns from a parent-position preparation error without leaving an uncancellable task',async()=>{
+    const h=await productWorkspaceFixture(true),{button,named,editor,all,host}=h,parent=await import('../src/projectScene/pinParent');
+    const fail=vi.spyOn(parent,'pinPositionInParent').mockImplementation(()=>{throw Error('位置の読取を再試行してください。');});
+    try{
+      all(editor).find(n=>n.className==='lv-caption-select')!.fire('click');const target=named('変更先モデル',editor);target.fire('focus');target.value=target.children.find(n=>n.value&&!n.disabled)!.value;target.fire('change');
+      const before=host.read().source!.token;button('位置を確認',editor).fire('click');expect(named('位置の調整',editor).hidden).toBe(true);expect(h.display()?.pinEdit).toBeUndefined();expect(host.read().source!.token).toBe(before);
+      expect(all(editor).some(n=>n.textContent==='位置の読取を再試行してください。')).toBe(true);expect(button('位置を確認',editor).disabled).toBe(false);
+      fail.mockRestore();button('位置を確認',editor).fire('click');expect(named('位置の調整',editor).hidden).toBe(false);expect(h.display()?.pinEdit).toBeDefined();
+    }finally{fail.mockRestore();await h.ui.dispose();}
+  });
+  it.each(['checking','failed']as const)('expires only its completed toast during unrelated %s and retains a later failure for recovery',async kind=>{
+    const f=await openFileCaption(),document=new RecordedDocument().asDocument(),timers=new Map<number,{ms:number;run:()=>void}>();let serial=0;
+    Object.assign(document,{defaultView:{innerWidth:1440,innerHeight:1000,addEventListener(){},removeEventListener(){},
+      setTimeout(run:()=>void,ms:number){const id=++serial;timers.set(id,{run,ms});return id;},clearTimeout(id:number){timers.delete(id);}}});
+    const mode=createValidationModeHost(f.host,async()=>{throw Error('unexpected mode change');},()=>{});let display:Parameters<ReturnType<ViewportFactory>['update']>[0]|undefined;
+    const factory:ViewportFactory=()=>({update(next){display=next;},setActive(){},camera(){},retry(){},dispose(){},read:()=>({ready:true,display,token:'toast-camera',issue:null,dragging:false,pins:[],projection:'perspective',axis:null})});
+    const ui=createProductWorkspace(document,mode,factory),all=(n:RecordedNode):RecordedNode[]=>[n,...n.children.flatMap(all)],nodes=()=>all(record(ui.root));
+    const status=()=>nodes().find(n=>n.className==='lv-project-workspace')!.children[0]!.children.find(n=>n.className==='lv-operation-status')!;
+    try{
+      nodes().find(n=>n.className==='lv-caption-select')!.fire('click');const title=nodes().find(n=>n.attributes.get('aria-label')==='タイトル')!;title.value='完了した変更';title.fire('input');
+      nodes().find(n=>n.tag==='button'&&n.textContent==='変更を適用')!.fire('click');await vi.waitFor(()=>expect(status().textContent).toBe('変更を適用しました。'));
+      expect(status().dataset.passive).toBe('true');const timer=[...timers.values()].find(t=>t.ms===6000)!;expect(timer).toBeDefined();
+      const authority=f.host.authority as typeof f.host.authority&{status:NonNullable<typeof f.host.authority.status>};
+      const error='入力を保持しています。元の処理から再試行してください。'.repeat(40),state=vi.spyOn(authority,'status').mockReturnValue(kind==='checking'?{kind:'checking'}:{kind:'failed',error,retryable:true});
+      ui.render();expect(status().dataset.passive).toBe('false');timer.run();expect(status().textContent).toBe(kind==='checking'?'':error);
+      state.mockReturnValue({kind:'failed',error,retryable:true});ui.render();
+      expect(status().textContent).toBe(error);expect(status().dataset.passive).toBe('false');state.mockRestore();
+    }finally{await ui.dispose();await mode.dispose();await f.workspace.dispose();}
+  });
   it('keeps only Project navigation blocked while its selector owns opening, preserving Caption reading', async () => {
     const f = await openFileCaption(), mode = createValidationModeHost(f.host, async () => { throw Error('unexpected mode change'); }, () => {}), document = new RecordedDocument().asDocument();
     let blocked = true, preparing = false, display: Parameters<ReturnType<ViewportFactory>['update']>[0] | undefined;
@@ -8921,6 +9057,28 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       await cold.content.image(choices[0] as unknown as JsonObject,true);expect(image).toHaveBeenCalledOnce();
     }finally{image.mockRestore();await cold?.dispose();}
   });
+  it('finishes canonical raster checks before visible ownership can fill the pool, retries locally and avoids Caption-only reloads',async()=>{
+    const bytes=glb(),source={...await inspectValidationGlb(bytes,budget,decode),raster:{cpuBytes:6000,gpuBytes:0,images:[{width:30,height:50}],maximumEdge:50}};
+    const placement={translation:[0,0,0],rotationXYZW:[0,0,0,1],uniformScale:1},models=[0,1,2].map(i=>({shape:'render-glb',key:`r${i}`,assetId:`a${i}`,assetToProject:placement,
+      representation:{id:`rep${i}`,contentKind:'mesh',role:'meshPrimary',blob:{byteLength:bytes.length},representationToAsset:{...placement,reflection:'none'},logicalBoundsAsset:source.bounds}} as unknown as ReadonlyRenderModel));
+    const reads=vi.fn(async()=>source),decoder=vi.fn(async()=>({root:new THREE.Group(),materialLocators:new Map(),dispose:vi.fn()}));
+    const resources=createRasterResources({cpuBytes:12000+5*bytes.length,gpuBytes:0}),cache=await prepareReadonlyResidents(models,{modelContent:reads},decoder,true,resources);
+    await cache.ready;expect(reads).toHaveBeenCalledTimes(3);expect(resources.snapshot().cpuBytes).toBe(0);
+    cache.demand!(models);await vi.waitFor(()=>expect(cache.state(models[2]!).phase).toBe('failed'));
+    expect(cache.state(models[0]!).phase).toBe('ready');expect(cache.state(models[1]!).phase).toBe('ready');
+    const count=reads.mock.calls.length;await cache.prepare(models);cache.demand!(models);await Promise.resolve();expect(reads).toHaveBeenCalledTimes(count);
+    cache.demand!([models[2]!]);cache.retry!();await vi.waitFor(()=>expect(cache.state(models[2]!).phase).toBe('ready'));
+    cache.dispose();await resources.dispose();expect(resources.snapshot().cpuBytes).toBe(0);
+    const one=createRasterResources({cpuBytes:12000+5*bytes.length,gpuBytes:0});let finish!:()=>void;
+    const held=new Promise<void>(resolve=>{finish=resolve;}),startRead=vi.fn(async()=>source),single=await prepareReadonlyResidents([models[0]!],{modelContent:startRead},async()=>{await held;return decoder();},true,one);
+    single.demand!([models[0]!]);finish();await single.ready;single.create(models[0]!).dispose!();
+    expect(startRead).toHaveBeenCalledOnce();single.dispose();await one.dispose();expect(one.snapshot().cpuBytes).toBe(0);
+  });
+  it('refuses a full legacy texture proof when its injected native runtime is closed instead of accepting a missing texture',async()=>{
+    const resources=createRasterResources(),bitmap=vi.fn();await resources.dispose();vi.stubGlobal('self',globalThis);vi.stubGlobal('createImageBitmap',bitmap);
+    try {await expect(readLegacyModelProof('glb',glb(()=>{},true),{rasterResources:resources})).rejects.toBeInstanceOf(RasterResourceError);expect(bitmap).not.toHaveBeenCalled();}
+    finally {vi.unstubAllGlobals();}
+  });
   it('prepares added residents atomically, retains old geometry after partial decode failure and disposes late completion', async () => {
     const prepared = await prepareValidationProject({ run: newId(), title: '表示準備', models: [0, 1, 2].map(i => ({ label: `${i}`, bytes: glb() })) }, budget, decode);
     const initial = prepareValidationCreation(prepared), fs = new TestFS(), locks = lockManager();
@@ -9362,6 +9520,17 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     await expect(inspectValidationGlb(glb(j => { j.images[0].uri = 'missing.png'; }, true), budget, decode)).rejects.toThrow();
     await expect(inspectValidationGlb(glb(j => { delete j.meshes[0].primitives[0].attributes.TEXCOORD_0; }, true), budget, decode)).rejects.toThrow('UV');
   });
+  it('reports raster capacity and scan limits separately from malformed source without decoding rejected images', async () => {
+    const decoder=vi.fn(decode);
+    await expect(inspectValidationPng(png,{...budget,maxPixels:1},decoder)).rejects.toMatchObject({name:'FileReadError',reason:'limit',limit:{subject:'PNGの画素数（64×48）',actual:3072,maximum:1,unit:'画素'}});
+    const jpeg=jpegBytes('rgb-exif-6');
+    for(const [limits,subject]of [[{...budget,maxPixels:1},'JPEGの画素数'],[{...budget,maxValues:1},'JPEGの検査量'],[{...budget,maxFileBytes:1},'JPEGの容量']] as const){
+      let failure:unknown;try{jpegStructure(jpeg,limits,'photo');}catch(error){failure=error;}
+      expect(failure).toBeInstanceOf(FileReadError);expect(failure).toMatchObject({reason:'limit'});expect((failure as Error).message).toContain(subject);expect((failure as Error).message).toContain('元のファイルは変更していません');
+    }
+    try{jpegStructure(new Uint8Array([255,216,0]),budget,'photo');throw Error('must reject');}catch(error){expect(error).toMatchObject({name:'FileReadError',reason:'input'});}
+    expect(decoder).not.toHaveBeenCalled();
+  });
   it('creates from saved GLB/PNG, edits an actual-model pin, reopens original history and refuses corrupted saved bytes', async () => {
     expect(typeof A.init).toBe('function');
     const fs = new TestFS(), locks = lockManager(), store = new OriginBlobStore(fs,
@@ -9424,6 +9593,13 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       expect(materials.every(m => { const image: unknown = m.map?.image; return typeof image === 'object' && image !== null && 'width' in image && image.width === 64; })).toBe(true);
       expect(materials.filter(m => m instanceof THREE.MeshStandardMaterial).every(m => m.roughness === 0.7 && m.color.r === 0.2)).toBe(true);
       expect(materials.filter(m => m instanceof THREE.MeshBasicMaterial).every(m => m.alphaTest === 0.4 && m.side === THREE.DoubleSide)).toBe(true);
+      const placement:ReadonlyRenderModel['assetToProject']={translation:[0,0,0],rotationXYZW:[0,0,0,1],uniformScale:1},model:ReadonlyRenderModel={shape:'render-glb',key:'test-upload-owner',assetId:'test-asset',assetToProject:placement,
+        representation:{id:'test-representation',contentKind:'mesh',role:'meshPrimary',variantFamilyId:'test-family',formatProfile:{id:'development-validation-glb-1'},representationToAsset:{...placement,reflection:'none'},logicalBoundsAsset:inspected.bounds,
+          materialCatalog:{layoutId:'test-layout',slots:inspected.materials.map((m,i)=>({...m,logicalMaterialSlotId:`test-slot-${i}`}))}} as any};
+      const cache=await prepareReadonlyResidents([model],{model:async()=>inspected},async()=>result),surface=cache.create(model);
+      const sourceTextures=new Set(materials.flatMap(m=>m.map?[m.map]:[]));expect(new Set(surface.gpuTextures)).toEqual(sourceTextures);
+      const heldImages=[...sourceTextures].map(t=>t.image as {close:ReturnType<typeof vi.fn>});for(const texture of surface.gpuTextures!)texture.dispose();
+      for(const image of heldImages)expect(image.close).not.toHaveBeenCalled();surface.dispose!();cache.dispose();
       expect(bitmaps.length).toBeGreaterThan(0); result.dispose(); result.dispose();
       for (const bitmap of bitmaps) expect(bitmap.close).toHaveBeenCalledOnce();
       vi.stubGlobal('createImageBitmap', async () => { throw Error('injected decoder failure'); });

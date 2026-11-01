@@ -3121,6 +3121,20 @@ pre/post write fences remain. Every new call starts fresh, including after loss
 of an acknowledged artifact/original/base. No generation, stream/write or
 publication work is enclosed, and no cross-operation cache is introduced.
 
+### 2026-11-01 bounded review-copy slot inspection
+
+The same existing pure-reader rule covers the void `assertReviewEditSlot`
+preflight. Capture `ownChild` and flat limits before the callback; route all state,
+parent/child, journal and archive checks through that callback's read-only FS.
+Return no PreparedReviewEdit, Job or observation callback from this preflight.
+Its outer closing audit must reject even when the state reader caught an inner
+per-job failure. Keep every fresh preflight at the same write/output boundary;
+do not group Session, writes, publication or recovery in the read callback.
+The general `reviewEditStates` API and its observer remain unchanged. Staging
+without a registered read operation stays strict per I/O; this is not06b.
+Acceptance covers nested facade ownership, bounded entry/closing audits, closing
+rejection and later damaged evidence refusing output before new writes.
+
 ### 2026-10-31 fresh backup-open source ownership
 
 BackupOutputJob.open copies bounded readBytes results immediately. Its source,

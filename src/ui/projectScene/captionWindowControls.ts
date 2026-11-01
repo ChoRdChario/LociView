@@ -26,7 +26,7 @@ function resizedWindowRect(base: WindowRect, dx: number, dy: number, width: numb
 /** Read-only comparison layer. Selection/drafts/history remain owned by the host. */
 export function createCaptionWindowControls(document: Document, onPlan: (plan: CaptionWindowPlan) => boolean,
   onMoving: (active: boolean) => void,
-  content?: (captionId: string) => { root: HTMLElement; render(): void; dispose(): void }) {
+  content?: (captionId: string) => { root: HTMLElement; render(active?: boolean): void; dispose(): void }) {
   const make = <K extends keyof HTMLElementTagNameMap>(tag: K, text = '') => { const n = document.createElement(tag); n.textContent = text; return n; };
   const button = (text: string) => { const n = make('button', text); n.type = 'button'; return n; };
   const root = make('div'); root.className = 'lv-caption-windows'; root.setAttribute('aria-label', 'キャプションのウィンドウ');
@@ -173,7 +173,7 @@ export function createCaptionWindowControls(document: Document, onPlan: (plan: C
       card.root.setAttribute('aria-label', title);
       const body = item.body.kind === 'value' ? item.body.value : '本文の更新候補を確認してください。';
       if (card.body.textContent !== body) card.body.textContent = body;
-      card.content?.render();
+      card.content?.render(projection.width > 0 && projection.height > 0);
       card.note.textContent = [item.needsReview || item.pin === 'needsReview' ? '要確認：ピン位置を確認してください。' : '',
         item.pin === 'unplaced' ? '未配置' : item.pin === 'ownerMissing' ? '対応モデルなし。記録は保持しています。' : item.pin === 'ownerHidden' ? 'モデルは非表示です。' : item.pin === 'unavailable' ? 'ピンを表示できません。' : ''].filter(Boolean).join(' ');
       card.note.hidden = !card.note.textContent;

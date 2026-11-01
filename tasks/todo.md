@@ -1,6 +1,6 @@
 # LociView active work
 
-Updated2026-10-31. This is the single current plan and check record.
+Updated2026-11-01. This is the single current plan and check record.
 [Inventory](implementation-inventory.md) owns route-specific coverage;
 [map](../PROJECT_MAP.md) and [document index](../docs/README.md) route contracts/code.
 Git owns checkpoint identity. [Retained checkpoint evidence](../docs/history/development-through-2026-10-29/tasks/todo-before-daily-authoring.md)
@@ -28,16 +28,17 @@ Fix latency when it prevents use or risks data. Keep the existing
 One implementation writer; bounded independent reviewers are read-only. No small manual
 test or helper approvals. Continue in-scope work while device evidence is pending.
 
-## Current priority correction —daily-use workflows first
+## Product sequencing —daily-use workflows first
 
 PO2026-10-29 places the everyday-use features previously labelled later/additional
 ahead of compatibility expansion and maintenance. Do not equate an unsettled
 operation contract with low product value or let the dated inventory decide order.
 Start with Scene organization, then repeated Caption editing/copy/undo and record
 organization/settings. Evaluate alignment and media by the user task they enable,
-not by whether a basic internal path already exists. Point/GS replacement, wider
-legacy conversion, general GC and comfort-only tuning remain recorded but are no
-longer the default next work. Data-loss/security defects still take precedence.
+not by whether a basic internal path already exists. Completed Point/GS replacement
+and conversion paths remain represented in inventory; this priority does not mark
+them pending. General GC and deferred scalability are not the default next work.
+Data-loss/security defects still take precedence.
 
 This is a sequencing decision, not implementation evidence or blanket ratification
 of every optional feature, undo/concurrency rule, media codec or dependency.
@@ -56,7 +57,208 @@ unchanged-feature-classification checks pass; independent review has no findings
 No runtime change or new capacity guarantee; no runtime suite is needed for this
 documentation checkpoint.
 
-## Current boundary —reproducible browser coverage and efficient regression
+## Current boundary —integrated current-PC quality improvement
+
+PO approved the connected quality plan and the01i sequential-import/real-thumbnail/
+active-original/hidden-resource direction. Preserve originals and full inspection;
+manage live work/residency instead of treating compressed file size as RAM usage.
+[01i](../docs/specs/01i-high-resolution-pc-workflow-proposal.md) owns the accepted
+ports and acceptance. The old128MiB/2GiB/3GiB proposal is not adopted. No new wire,
+recipe/ID, dependency, total-RAM/capacity guarantee, iPhone qualification or release.
+One writer; independent reviewers are read-only. No per-control PO testing waits.
+
+### Implemented workflow and quality repairs
+
+- LociMyu conversion uses a verified streamed catalog and one-body parser ownership,
+  preserving exact legacy analysis/recipe/receipt identity. All-entry CRC/hash and
+  fresh retained-source/report semantic inspection remain. Bounded unused XLSX
+  auxiliary XML is preserved, with consumed targets still strictly inspected.
+- PC PNG/JPEG raster work is separate from geometry work. Shared model/native
+  queues and explicit CPU/GPU intents cover inspection, loaders, thumbnails and
+  the one original-image viewer. Canonical Project inspection stays complete;
+  hidden display templates are releasable/reloadable. GPU failures remain local
+  to their model, with a reason/retry and safe already-prepared viewing retained.
+- Actual320px derivatives and immutable keys replace original-sized card images.
+  Fit/100%/zoom/pan use one viewer. Existing unpaired HEIC and Photo inspection
+  share ownership; actual native bitmap identity reaches canvas, and late encoder
+  cleanup preserves the old standalone cancellation contract. No new codec.
+- Conversion summaries lead with inherited counts and unresolved items. File
+  intents/report feedback, relation confirmation, success-only passive notices,
+  keyed Scene focus and pending GS/Proxy demand/retry are integrated. The existing
+  [design ledger](../docs/ui-design-review.md) owns PCQ issues and rendered findings.
+- Actual compact visibility now releases3D without blocking Caption metadata or
+  safe saving. Deferred position/parent actions retain exact target/IME/draft and
+  cancellation guards; ready coordinates inherit only their waiting-task focus.
+  File sticky insets and short-height Caption scrolling fix covered/zero-height
+  inputs without adding screens or changing the normal-height list/detail layout.
+
+### Executed evidence and qualifications
+
+Exact Ki84 at the earlier01i candidate completes conversion/read/edit/real backup/
+fresh restore/team return and browser+server-stop offline/reopen. It preserves
+4Scenes/103Captions/27attachments/26unique media and all27 binary payload hashes/
+lengths;4 duplicate legacy IDs each remain independent twice. Missing-ID6 rows and
+unattached37 candidates are explained. Safe-default relations retain1View and3
+source-only Views; separately confirmed relations retain4Views/23material overrides.
+The earlier runs did not retain runtime asset SHA receipts and are not final130
+full-workflow credit. Their source freezes and later affected-media/UI/file lanes
+qualify reuse; the catalog/conversion/PNG-JPEG/ZIP/restore core is unchanged.
+
+Current frozen source/test fingerprint is1308788de2d74ec576bc6920f872fc4ed7bfc4192d6a0bd755bd9eb3780bb0c3
+(746files). A20-file final offline artifact snapshot and all file SHA receipts are
+retained privately. Final actual main/entry JS/CSS HTTP hashes match that snapshot.
+On real Ki84 at1440×1000→720×500CSS/DPR2→wide, all9 old8K/4K bitmaps close while
+3D is hidden; Caption search/edit/confirmed discard work. Re-show prepares in
+6.342s with64 pin identities/projections unchanged (maximum difference0) and saved
+body retained. New short-height detail is239px instead of0; actual Apply hit and
+Tab/Shift+Tab pass. File name bottom327.3px stays above footer347.3px; save hit,
+long Japanese input, keyboard return/cancel/close and no horizontal overflow pass.
+This is200%-equivalent layout, not native browser zoom or physical memory/GPU
+qualification. Owned profile's stale-SW attempts are separated; latest HTTP was
+explicitly bypassed/hashed for this UI lane, which is not offline/SW acceptance.
+
+The broad Desktop39+image sweep executed all40:35PASS/5busy FAIL. Later exact
+affected cases close point team/restore/cold, GS body replacement/Proxy/returns/
+five-purpose restoration, mixed GS, point GPU and workspace sharing/conflict/
+narrow focus/cold paths with unchanged waits/assertions. Qualified coverage is
+39PASS/1 remaining performance FAIL across source-qualified cohorts, not a single
+final40-process PASS. Current short-height CSS is additionally checked in the
+final-artifact Ki84 lane above. Original failures and stage/file evidence remain.
+
+Root unit run:145/146files pass,3157PASS/22FAIL/21todo,967.87s. Its22 failures are
+obsolete named-resume inert synchronization, Scene rebuild counting, global raw
+image memo counting and synchronous Review image paint observations. Test-only
+repairs retain all data/remember/race/RAF/marker/file/cold assertions and pass25
+focused cases. Later owned waiting-focus coverage adds4 cases; related29 pass.
+Qualified unique root coverage is3183PASS/21todo, without double counting focus
+overlap or claiming one-process npm-test Exit0. Other145files/unchanged cases are
+reused with exact change/call-site review. Earlier sandbox Temp Git refusal and
+dot/Tee diagnostic interruptions remain non-PASS evidence; approved-environment
+verbose execution resolves the fixture permission issue without product changes.
+
+Typecheck passes at the final TypeScript tree; the last delta is CSS only. All five
+required builds and offline/HEIC isolation pass at1308788, serially. Independent
+boundary/UI reviews have no unresolved mandatory findings, including later local
+changes. This sequence is not described as a single check:checkpoint Exit0.
+
+### Latency and remaining boundary
+
+Lazy first-backup projection improves2.876s/+26native→0.0205s/0; post-mount native
+work9→0, total195→160, Caption→3D7.841s→0.490s. Total restore nevertheless grows
+148.608s→182.450s as storage/control stages vary: overall latency is not solved.
+The tiny traced copy backup improves27.090s→23.067s, separately from queryless
+original-case success. Do not compare this with the historical different-data94s.
+
+The500k Review copy remains busy at240s in normal conditions and later completes;
+private phase measurement374.358s includes50 archive inspections/20.116GB SHA input
+and5 fresh GS inspections. Nested durations are not additive. A small SHA candidate
+was rejected; production hashing/fresh validation/write/readback/publication/
+selection/recovery fences are unchanged. Extended private functional completion
+does not turn this performance case into PASS.
+No same-condition pre-change500k full-copy PASS/time was found in the bounded
+retained runs. Its archive/copy/SHA core is unchanged, but the current change's
+latency contribution versus environment variance has not been isolated; neither
+"no performance regression" nor "pre-existing defect" is established.
+
+The same owned interrupted500k copy now resumes in137.177s, edits in46.503s and
+actually saves a178,012,308B backup in233.196s. Full browser/server shutdown and
+cold reopening retain the edit (138.356s from launch); a second actual backup takes
+234.246s. Independent Archive/oracle checking passes: a distinct Project identity,
+unchanged full SH4 source hash/length/profile, Proxy/manual pin/media/attachment,
+identical cold token and all records. Whole-GS arrayBuffer attempts/pageerrors/
+external requests remain0. This closes the functional tail, not its latency FAIL.
+
+All existing offline5 pass in10.3min using normal SW behavior without bypass:
+cold Mesh/Point/500k/Proxy/media/initial conversion/edit/save/reopen and same-address
+static return; two-window safe update and wrong200/missing-resource recovery;
+directory base; storage-bootstrap failure; foreign-worker refusal. Owned4191 now
+serves only the frozen20-file candidate; independent HTTP200/byte/SHA checking
+matches every resource, including index and worker. This HTTP check itself does
+not claim browser SW registration. The small local synthetic sample is prepared.
+
+Current remaining work: finish the actual-index privacy/content review, then
+commit/Push only suitable verified g0-baseline scope. Private originals/audits and
+all.artifacts stay out of Git. General performance/device/adoption/release gates
+remain separate; unchanged source is not rerun merely for docs or staging.
+
+[06b §§1–5](../docs/specs/06b-staging-read-operations-proposal.md) is independently
+reviewed but PROPOSED/unapproved/unimplemented: a narrowly owned staging pure-read
+audit exception. It does not remove payload inspection or solve the large-copy50
+archive scans. Section6 is NOT SELECTED, not an approval request or implementation.
+Broader payload lifetime, physical iOS/HEIC/GPU qualification and publication remain
+separate decisions. Stop only the affected work for a genuine new policy/wire/
+authority/safety conflict; do not reopen ordinary implementation approvals.
+
+### Retained review basis —Ki84 and high-resolution workflow
+
+This is the earlier review/proposal boundary, retained as evidence. The accepted
+01i implementation and current remaining work are above; this history does not
+make that work unapproved or restart its original proposal steps.
+
+PO asks to reconcile the pasted practical evaluation with the saved audit evidence
+and current contracts, then summarize improvements. This is a review/proposal,
+not product implementation or publication at that prior boundary. High-pixel originals and reasonable
+file-size growth are an accepted product direction; do not ask that decision again.
+
+Plan: inspect the private audit logs/screenshots → verify the current input,
+decode/render and file/recovery limits → distinguish current-PC blockers from
+legacy-only observations → propose one exact-Ki84 open/read/edit/external-save/
+fresh-profile-reopen workflow with actionable errors and usable initial display.
+Keep originals, offline use and safety fences. Numeric budgets/display strategy
+remain proposals until measured and specified; no guard removal, source reduction,
+dependency, format, release or runtime changes are part of this review. Preserve
+existing private evaluation records/artifacts; use bounded read-only reviewers.
+
+Review complete: current/normal audit JSON, screenshots and current source were
+checked with three bounded read-only reviews. The original ZIP stops at the input
+cap; a separate attempt with its extracted GLB stops at the embedded-JPEG pixel
+cap. Normal/Native pin, edit and local-reopen
+observations do not establish current-PC acceptance. The external-save audit
+records cancellation, not a demonstrated write failure. Command-log ms values
+are not end-to-end conversion/save timings. No browser run or product change was
+made in this review.
+
+Additional source findings: JPEG framing also charges entropy bytes against
+maxValues=8,000,000, so changing only64MiB/maxPixels is insufficient. ZIP input,
+expanded total and entry size currently share maxFileBytes; first conversion and
+retained-source reinspection need the same revised policy as content/file/recovery
+reads. Ki84's extracted GLB has two8K JPEGs and a4K PNG; RGBA8 base-bitmap sizing
+alone is576MiB (arithmetic estimate, not measured RAM/GPU use). Keep the existing
+Three180 correspondence proof, original integrity and Session/publication fences.
+
+The high-resolution user workflow proposal is:
+1. Define PC admission and execution budgets separately for source/archive bytes,
+   expanded entries, image validation work, decoded residency and GPU residency;
+   reuse existing Caption-first/lazy-image/model preparation and bound image-level
+   decode lifetimes. Apply consistently through import, retry, receive, output,
+   restore and cold reopen. Preserve originals/quality; a display-only lower-detail
+   path is an optional future design, not silent source resizing or current approval.
+2. Report capacity, unsupported input and actual invalid structure separately,
+   beside the affected input. Summarize planned records and warning counts before
+   optional details. Missing-ID rows already have approved warning/exclusion/report
+   behavior; do not call these nonempty rows blank or add a new migration rule.
+3. Extend the existing media viewer with whole-image/100%, zoom and pan so retained
+   high-pixel images are useful for inspection. Current viewer has only navigation/
+   close and fitted rendering. Keep one viewer and image-owned loading/release.
+4. Reassess initial pins on current-PC after exact input opens. The giant spheres
+   were legacy Native observations; current unselected markers use a12px visual
+   inside44px interaction area with saved scale. Do not copy0.03 as a new default
+   or alter coordinates/retained scale to match the old screenshot.
+5. Complete one exact-source conversion explanation → read/search/detail viewing
+   → edit → real external file → separate dedicated environment restore → re-edit
+   workflow, including interruption/retry and retained originals/history. Derive
+   Scene/Caption/media/view/material expectations from original tables and approved
+   mapping; old4displaySets/24media are comparison evidence, not new-route oracles.
+
+The private original ZIP remains separately retained under the current conversion
+contract; high-resolution support does not imply putting it into shared/backup
+files. Existing unsupported-material/ambiguous-source refusal rules remain until
+their exact input is evaluated. Next is measured capacity/lifetime specification
+with concrete candidate budgets and acceptance, then an authorized integrated
+implementation. High-pixel direction does not need another approval question;
+this review ratifies no numeric guarantee, new display degradation or release.
+
+## Completed boundary —reproducible browser coverage and efficient regression
 
 PO authorizes the audited sequence: first fix browser execution/build prerequisites
 and missing auto-offline/update/same-Project two-window evidence, then consolidate

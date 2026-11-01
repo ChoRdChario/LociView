@@ -91,17 +91,19 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   const materialNotice=createMaterialConversionNotice(document,ports.smoothDisplay);
   const convert = document.createElement('button'), cancelConversion = document.createElement('button');
   convert.type = cancelConversion.type = 'button'; convert.textContent = '新しいプロジェクトに変換'; cancelConversion.textContent = '選択を取り消す';
-  conversionHelp.textContent = '元ファイルは変更しません。チームでは変換後のファイルを使ってください。元ファイルは書き出しに含まれないため、別に保管してください。';
+  conversionHelp.textContent = '元ファイルは変更しません。チームでは変換後のファイルを使ってください。変換元のZIPと変換の説明は、別に保管してください。';
   conversionPanel.append(conversionNote, conversionHelp, convert, cancelConversion); conversionPanel.hidden = true; workspaceForm.append(conversionPanel);
   const lociChoices = document.createElement('div'), workbookLabel = document.createElement('label'), workbook = document.createElement('select'),
     conversionTitleLabel = document.createElement('label'), conversionTitle = document.createElement('input'), relationLabel = document.createElement('label'), relation = document.createElement('input'),
     relationNote = document.createElement('p'), previewAgain = document.createElement('button'), saveReport = document.createElement('button');
   workbookLabel.textContent = '変換する表'; workbook.setAttribute('aria-label', '変換する表'); workbookLabel.append(workbook);
   conversionTitleLabel.textContent = '変換後のプロジェクト名'; conversionTitle.setAttribute('aria-label', '変換後のプロジェクト名'); conversionTitleLabel.append(conversionTitle);
-  relation.type = 'checkbox'; relation.setAttribute('aria-label', '表と視点・材質の関連付けを確認'); relationLabel.textContent = '表と視点・材質の関連付けを確認'; relationLabel.append(relation);
+  relation.type = 'checkbox'; relation.setAttribute('aria-label', '表と視点・材質の関連付けを確認'); relationLabel.textContent = '表と視点・材質の関連付けを確認'; relationLabel.className='lv-conversion-relation';relationLabel.append(relation);
   previewAgain.type = saveReport.type = 'button'; previewAgain.textContent = '変換内容を確認'; saveReport.textContent = '変換の説明を保存';
   lociChoices.append(workbookLabel, conversionTitleLabel, relationNote, relationLabel, previewAgain); lociChoices.hidden = true; conversionPanel.replaceChildren(lociChoices, conversionNote, materialNotice.root,conversionHelp, saveReport, convert, cancelConversion);
-  const coldReport = document.createElement('button'); coldReport.type = 'button'; coldReport.textContent = '変換の説明を保存'; coldReport.hidden = true; root.append(coldReport);
+  const coldReport = document.createElement('button'),coldReportActions=document.createElement('div'),coldReportStatus=document.createElement('p'); coldReport.type = 'button'; coldReport.textContent = '変換の説明を保存'; coldReport.hidden = true;
+  coldReportActions.className='lv-file-source-actions';coldReportStatus.className='lv-operation-status';coldReportStatus.setAttribute('role','status');coldReportActions.append(coldReport,coldReportStatus);root.append(coldReportActions);
+  const showColdReport=(show:boolean)=>{coldReport.hidden=!show;coldReportActions.hidden=!show;};showColdReport(false);
   const status = document.createElement('p'); status.setAttribute('role', 'status'); status.className = 'lv-operation-status lv-validation-status';
   const list = document.createElement('section'), refresh = document.createElement('button'), back = document.createElement('button');
   refresh.type = back.type = 'button'; refresh.textContent = '一覧を更新'; back.textContent = '別のプロジェクトを開く';
@@ -137,7 +139,13 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   const openNormal = async (...args: Parameters<ValidationWorkspacePorts['open']>): Promise<ValidationNormalHost> => {
     const opened = await ports.open(...args); if ('kind' in opened) { await opened.dispose(); throw Error('バックアップの初回復元を一覧から再開してください。'); } return opened;
   };
-  const controls = () => { navigation.inert = busy; openFile.disabled = create.disabled = cancelConversion.disabled = busy || composing;
+  const controls = () => {
+    // Keep progress/errors readable beside the current decision, outside the
+    // temporarily inert forms. The existing execute fence still owns actions.
+    navigation.inert = false; workspaceForm.inert = form.inert = list.inert = busy; refresh.disabled = busy;
+    if(navigation.hidden){if(status.parentElement!==root)root.insertBefore(status,navigation);}
+    else navigation.insertBefore(status,form.hidden?form:listHeading);
+    openFile.disabled = create.disabled = cancelConversion.disabled = busy || composing;
     if(offline&&homeSettings){if(offline.root.parentElement===homeSettings.body){if(!homeSettings.root.parentElement)root.insertBefore(homeSettings.root,navigation);}
       else{homeSettings.root.open=false;homeSettings.root.remove();}}
     status.setAttribute('data-busy',String(busy)); status.setAttribute('aria-busy',String(busy));
@@ -168,7 +176,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   const closeCurrent = async () => {
     const oldWorkspace=workspace,oldHost=host,oldResident=resident,oldReview=reviewWorkspace,oldAttempt=reviewEditAttempt,oldTools=receiveTools,oldRecovery=firstRecovery;
     mounted=false;presentation=null;presentationState=()=>presentation;resumedLast=false;confirmingResume=false;workspace=undefined;host=undefined;resident=undefined;reviewWorkspace=undefined;reviewEditAttempt=undefined;receiveTools=undefined;firstRecovery=undefined;
-    coldReport.hidden=true;if(reportUrl)URL.revokeObjectURL(reportUrl);reportUrl=undefined;firstRecoveryButtons.clear();
+    showColdReport(false);coldReportStatus.textContent='';if(reportUrl)URL.revokeObjectURL(reportUrl);reportUrl=undefined;firstRecoveryButtons.clear();
     const errors:unknown[]=[],attempt=async(action:()=>unknown)=>{try{await action();return true;}catch(error){errors.push(error);return false;}};
     await attempt(()=>oldReview?.dispose());await attempt(()=>oldAttempt?.releaseScratch());
     const workspaceClosed=await attempt(()=>oldWorkspace?.dispose());if(!oldWorkspace||!workspaceClosed)await attempt(()=>oldHost?.dispose());
@@ -269,7 +277,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
       const refresh=()=>{if(!current())return;mounted=checked&&!state();if(mounted&&selectionHost===target&&!target.hasPending())clearSelection();rememberCurrent();controls();};
       presentation={busy:true,reason:'モデルを読み込んでいます。記録は閲覧・検索できます。'};
       workspace=ports.mountEditor(target,bridge.factory,receiveTools,ports.renderModelCandidate?display=>ports.renderModelCandidate!(target,display):undefined,
-        {utilitiesRoot:offline?.root,smoothDisplay:ports.smoothDisplay,presentation:state,projectNavigationBlocked:()=>busy,openProject:()=>{void selectProject();},resumedLastProject:()=>resumedLast,storageEstimate:ports.storageEstimate,localSettings:ports.localSettings,changed:refresh});
+        {utilitiesRoot:offline?.root,fileActionsRoot:coldReportActions,smoothDisplay:ports.smoothDisplay,presentation:state,projectNavigationBlocked:()=>busy,openProject:()=>{void selectProject();},resumedLastProject:()=>resumedLast,storageEstimate:ports.storageEstimate,localSettings:ports.localSettings,changed:refresh});
       content.replaceChildren(workspace.root,retry);workspace.render();
       const load=async()=>{
         checked=false;mounted=false;presentation={busy:true,reason:'モデルを読み込んでいます。記録は閲覧・検索できます。'};retry.hidden=true;resident?.detachPreparation?.();workspace?.render();
@@ -295,7 +303,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     const fileTools = receiveTools;
     try { workspace=ports.mountEditor(target,next.factory,fileTools,
       ports.renderModelCandidate ? display=>ports.renderModelCandidate!(target,display) : undefined,
-      {utilitiesRoot:offline?.root,smoothDisplay:ports.smoothDisplay,projectNavigationBlocked:()=>busy,openProject:()=>{void selectProject();},resumedLastProject:()=>resumedLast,storageEstimate:ports.storageEstimate,localSettings:ports.localSettings,
+      {utilitiesRoot:offline?.root,fileActionsRoot:coldReportActions,smoothDisplay:ports.smoothDisplay,projectNavigationBlocked:()=>busy,openProject:()=>{void selectProject();},resumedLastProject:()=>resumedLast,storageEstimate:ports.storageEstimate,localSettings:ports.localSettings,
         changed:()=>{rememberCurrent();controls();}});
       content.replaceChildren(workspace.root); workspace.render();
       if (target.backupRestore.needsDisplay) { target.backupRestore.displayReady(target.read().source!.token); workspace.render(); } }
@@ -363,8 +371,8 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     else if (resumedLast) status.textContent = '';
     // Discover availability without retaining an old host's private report or altering file jobs.
     const target = host;
-    try { const available = await target.conversionReportAvailable(); if (!disposed && host === target) coldReport.hidden = !available; }
-    catch { if (!disposed && host === target) { coldReport.hidden = false; status.textContent = '変換の説明を確認できません。元ZIPを保管し、説明の保存から再確認してください。'; } }
+    try { const available = await target.conversionReportAvailable(); if (!disposed && host === target) showColdReport(available); }
+    catch { if (!disposed && host === target) { showColdReport(true); coldReportStatus.textContent = '変換の説明を確認できません。元ZIPを保管し、説明の保存から再確認してください。'; } }
   };
   const openProject = async (run: string, initial?: ReturnType<typeof prepareValidationCreation>, mode: LocalOpenMode = 'edit', workspaceFile?: Blob, remembered = false) => {
     status.textContent = initial ? 'プロジェクトを作成しています。' : '再開用データを確認しています。';
@@ -415,7 +423,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   };
   const invalidateLoci = () => { lociDraft++; lociEvaluation = null; lociDecision = undefined; conversion = null;materialNotice.render();
     if (lociPreview) conversionNote.textContent = '入力が変わりました。「変換内容を確認」で確認し直してください。'; controls(); };
-  const clearConversion = () => { legacyFile=undefined;fallback.hidden=true; lociDraft++; lociDecision = undefined; conversion = null; lociPreview = null; lociEvaluation = null; lociChoices.hidden = true; conversionPanel.hidden = true;materialNotice.render(); };
+  const clearConversion = () => { const old = lociPreview; legacyFile=undefined;fallback.hidden=true; lociDraft++; lociDecision = undefined; conversion = null; lociPreview = null; lociEvaluation = null; lociChoices.hidden = true; conversionPanel.hidden = true;materialNotice.render(); void old?.dispose().catch(() => {}); };
   const clearSelection = () => {
     selectionAbort?.abort(); selectionAbort = undefined; nativeSelectionChecking = false;
     selectionGeneration++; creationDraft++; selectionPending = false; rawSelection = undefined; creationAttempt = undefined; selectionHost = undefined;
@@ -434,26 +442,33 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     catch (error) { await opened.dispose(); throw error; }
     await closeCurrent(); await adoptProject(run, opened);
   };
-  const exportReport = (blob: Blob) => { if (disposed) return; if (reportUrl) URL.revokeObjectURL(reportUrl); reportUrl = URL.createObjectURL(blob);
+  const exportReport = (blob: Blob, fromFile=false) => { if (disposed) return; if (reportUrl) URL.revokeObjectURL(reportUrl); reportUrl = URL.createObjectURL(blob);
     const a = document.createElement('a'); a.href = reportUrl; a.download = 'LociView-conversion-report.json'; a.hidden = true; root.append(a);
-    try { a.click(); } finally { a.remove(); } status.textContent = 'ダウンロードを開始しました。元ZIPと説明ファイルの保存先で完了を確認してください。'; };
+    try { a.click(); } finally { a.remove(); } (fromFile?coldReportStatus:status).textContent = 'ダウンロードを開始しました。元ZIPと説明ファイルの保存先で完了を確認してください。'; };
   const evaluateLoci = async () => {
     const target = lociPreview; if (!target || composing) return; invalidateLoci(); const draft = lociDraft, tuple = lociTuple();
     const evaluated = await target.evaluate(Number(workbook.value), conversionTitle.value, relation.checked);
     if (disposed || lociPreview !== target || draft !== lociDraft || tuple !== lociTuple() || composing) return; lociEvaluation = evaluated; lociDecision = tuple;
     relationLabel.hidden = evaluated.relation.kind !== 'confirmation-required';
-    relationNote.textContent = evaluated.relation.kind === 'confirmation-required' ? evaluated.relation.relations.map(r => `${r.sheetGid} → ${r.sheetName}`).join(' / ') :
+    relationNote.textContent = evaluated.relation.kind === 'confirmation-required' ? `${evaluated.relation.relations.map(r => `${r.sheetGid} → ${r.sheetName}`).join(' / ')}。関連付けを確認すると、対応する視点・材質を引き継ぎます。` :
       evaluated.relation.kind === 'unavailable' ? '表との対応を確認できない視点・材質は有効にしません。' : '';
-    const n = evaluated.summary; conversionNote.textContent = evaluated.blocked ? 'この内容は変換できません。説明ファイルで問題を確認してください。' : `LociMyuファイル：モデル ${n.models}・シーン ${n.scenes}・キャプション ${n.captions}・メディア ${n.media}・視点 ${n.views}`;
+    const n = evaluated.summary; conversionNote.textContent = evaluated.blocked ? `この内容は変換できません。${n.blockingReason ?? '問題の詳細は説明ファイルで確認できます。'}` : `LociMyuファイル：モデル ${n.models}・シーン ${n.scenes}・キャプション ${n.captions}・メディア ${n.media}・視点 ${n.views}`;
+    if (!evaluated.blocked) {
+      const notes: string[] = [];
+      if (Number(n.missingIdRows) > 0) notes.push(`IDのない${n.missingIdRows}行は記録にしません`);
+      if (Number(n.unattachedImages) > 0) notes.push(`画像${n.unattachedImages}件は添付できません`);
+      if (Number(n.approximateViews) > 0) notes.push(`視点${n.approximateViews}件の表示幅を近似します`);
+      if (Number(n.sourceOnlyViews) > 0) notes.push(`${evaluated.relation.kind === 'confirmation-required' && !relation.checked ? '関連付けを確認していない' : '関連付けや設定を確認できない'}視点${n.sourceOnlyViews}件は引き継ぎません`);
+      if (notes.length) conversionNote.textContent += `。要確認：${notes.join('。')}。元のZIPに保持します`;
+    }
     materialNotice.render(n.materialNotices as Parameters<typeof materialNotice.render>[0]);
     const effects = n.materialEffects as { scenes: number; overrides: number; sourceOnlyChromaRows: number } | null | undefined;
     const materialIssue = n.materialIssue as { field: string; reason: string } | null | undefined;
-    if (evaluated.blocked && materialIssue) conversionNote.textContent += ` ${materialIssue.field}：${materialIssue.reason}`;
     if (!evaluated.blocked && effects) {
       conversionNote.textContent += `。材質の見え方：${effects.scenes}シーン・${effects.overrides}件`;
       if (Number(effects.sourceOnlyChromaRows) > 0) conversionNote.textContent += '。色の透過が無効なときの色・許容範囲・ぼかしは、元のZIPと説明ファイルだけに残り、変換後の編集値には引き継ぎません。';
     }
-    conversionHelp.textContent = '元ZIPと変換の説明を別に保管してください。変換後のバックアップや共有ファイルには元データと説明は含まれません。'; controls();
+    conversionHelp.textContent = '変換元のZIPと変換の説明は、バックアップや共有ファイルに含めません。別に保管してください。'; controls();
   };
   workbook.addEventListener('change', () => { relation.checked = false; invalidateLoci(); if (!busy) execute(evaluateLoci); });
   conversionTitle.addEventListener('input', invalidateLoci);
@@ -462,8 +477,13 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   saveReport.addEventListener('click', () => { if (disposed || busy || composing) return;
     if (lociPreview && lociCurrent()) exportReport(lociEvaluation!.report());
     else if (conversion && 'report' in conversion && conversion.report) exportReport(conversion.report()); });
-  coldReport.addEventListener('click', () => execute(async () => { if (composing || workspace?.hasChanges() || reviewWorkspace?.hasChanges() || receiveTools?.hasChanges()) throw Error('入力・操作を確定するか取り消してください。'); const target = host; if (!target) return;
-    const report = await target.conversionReport(); if (disposed || host !== target) return; if (!report) { coldReport.hidden = true; return; } exportReport(report); }));
+  coldReport.addEventListener('click', () => execute(async () => {
+    coldReportStatus.dataset.busy='true';coldReportStatus.textContent='変換の説明を確認しています。';
+    try {if (composing || workspace?.hasChanges() || reviewWorkspace?.hasChanges() || receiveTools?.hasChanges()) throw Error('入力・操作を確定するか取り消してください。'); const target = host; if (!target) return;
+      const report = await target.conversionReport(); if (disposed || host !== target) return; if (!report) { showColdReport(false); return; } exportReport(report,true);
+    }catch(error){if(!disposed)coldReportStatus.textContent=error instanceof Error?error.message:'変換の説明を確認できません。元ZIPを保管して再試行してください。';}
+    finally{coldReportStatus.dataset.busy='false';}
+  }));
   workspaceInput.addEventListener('change', () => {
     if (creationAttempt) return;
     selectionGeneration++; creationDraft++; selectionPending = !!workspaceInput.files?.length; rawSelection = undefined;
@@ -550,7 +570,14 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     const hint=await inspectZipContainerMetadata(file); if(!guardSelection(generation,context))return;
     if(ports.openLegacy&&hint.identity!=='foreign'){legacyFile=file;fallback.hidden=false;}
     const legacy = hint.identity==='v1' ? await prepareFrozenV1Conversion(file, ports.fileLimits, ports.decode, ports.jpeg, ports.photo) : null; if (!guardSelection(generation, context)) return;
-    const loci = hint.identity!=='foreign'||!hint.hasSpreadsheetEntry ? null : await prepareLociMyuConversion(file, ports.fileLimits, ports.decode, ports.jpeg, ports.photo); if (!guardSelection(generation, context)) return;
+    let loci: Awaited<ReturnType<typeof prepareLociMyuConversion>> = null;
+    if (hint.identity === 'foreign' && hint.hasSpreadsheetEntry) {
+      const controller = new AbortController(); selectionAbort = controller; nativeSelectionChecking = true; controls();
+      try { loci = await prepareLociMyuConversion(file, ports.fileLimits, ports.decode, ports.jpeg, ports.photo, controller.signal); }
+      catch (error) { if (controller.signal.aborted && !selectionCurrent(generation, context)) return; throw error; }
+      finally { if (selectionAbort === controller) { selectionAbort = undefined; nativeSelectionChecking = false; controls(); } }
+    }
+    if (!guardSelection(generation, context)) { await loci?.dispose(); return; }
     let native: Awaited<ReturnType<typeof prepareNativeConversion>> = null;
     if(hint.identity==='native-portable') {
       const controller=new AbortController();selectionAbort=controller;nativeSelectionChecking=true;controls();
@@ -686,5 +713,5 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
       stopPresentation();
       try { await operation; } catch { /* Original input and saved failure are never acknowledged here. */ }
       try { await creationAttempt?.candidate?.dispose(); }
-      finally { await closeCurrent(); offline?.dispose(); root.remove(); } }, get selected() { return selected; } };
+      finally { await lociPreview?.dispose(); lociPreview = null; await closeCurrent(); offline?.dispose(); root.remove(); } }, get selected() { return selected; } };
 }

@@ -38,6 +38,11 @@ guarantee, device/offline adoption or release is proposed.
   ZIP/XLSX/CSV and metadata budgets, collision/path checks and byte inspectors.
   Do not fetch URLs or Drive content, run workbook formulas or use external
   workbook relationships. Recognize LociMyu content, not an arbitrary spreadsheet.
+- Worksheet preflight follows every validated workbook relationship target, even
+  when its archive path is not under `xl/worksheets/`. Apply the same row, column,
+  duplicate-cell and shared-string bounds to all consumed sheets before decoding;
+  conventional-path checks remain. This clarifies the existing no-loss guard and
+  adds no auxiliary-XML allowance or source identity rule.
 - Reuse 04's deterministic candidate ordering and coarse workbook selection.
   Bind the selected validated archive path, exact workbook bytes/length/digest,
   tables and diagnostics to this preparation. Changing a selection invalidates

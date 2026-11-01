@@ -1,8 +1,8 @@
 import type { Locator } from '@playwright/test';
 
-/** Inspect the presented image, not an already discarded default WebGL buffer. */
+/** Inspect the 3D image rather than DOM pins/windows or a discarded WebGL buffer. */
 export async function presentedCanvas(canvas: Locator, dx = 0, dy = 0) {
-  const png = await canvas.screenshot({ scale: 'device', style: '.lv-project-markers,.lv-development-pin-layer{visibility:hidden!important}' });
+  const png = await canvas.screenshot({ scale: 'device', style: '.lv-project-markers,.lv-development-pin-layer,.lv-caption-windows,.lv-caption-window-line{visibility:hidden!important}' });
   return canvas.evaluate(async (element, input) => {
     const blob = await (await fetch(`data:image/png;base64,${input.png}`)).blob();
     const bitmap = await createImageBitmap(blob), copy = document.createElement('canvas');

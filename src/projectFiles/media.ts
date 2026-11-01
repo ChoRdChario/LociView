@@ -5,13 +5,14 @@ import { heicStructure, heicGuidance, isHeic } from './heic';
 export { isHeic };
 import { timedMediaStructure, type TimedMediaShape } from './mediaContainer';
 import { fileError, type FileValidationLimits } from './validation';
-import { createPortableHeic, type HeicRasterEncoder } from './portableHeic';
+import { createPortableHeic, type HeicRasterEncoder, type HeicBitmap } from './portableHeic';
+import { RasterResourceError, type RasterResources } from '../viewer/rasterResources';
 
 export type ProjectMediaMime = 'image/png'|'image/jpeg'|'image/webp'|'image/gif'|'image/heic'|'video/mp4'|'audio/mp4'|'audio/mpeg';
 export const projectMediaKind=(mime:unknown):'image'|'video'|'audio'|null=>projectImageMime(mime)||mime==='image/heic'?'image':mime==='video/mp4'?'video':mime==='audio/mp4'||mime==='audio/mpeg'?'audio':null;
 export interface DecodedTimedMedia {readonly duration:number;readonly width?:number;readonly height?:number}
 export type TimedMediaDecoder=(bytes:Uint8Array,shape:TimedMediaShape)=>Promise<DecodedTimedMedia>;
-export type HeicDecoder=(bytes:Uint8Array)=>Promise<{readonly width:number;readonly height:number;close():void}>;
+export type HeicDecoder=(bytes:Uint8Array)=>Promise<HeicBitmap>;
 export interface MediaDecoders {readonly timed?:TimedMediaDecoder;readonly heic?:HeicDecoder;readonly raster?:HeicRasterEncoder}
 /** Routing hint only; inspectProjectMedia remains the admission authority. */
 export const hasTimedOrHeicSignature=(b:Uint8Array)=>isHeic(b)||String.fromCharCode(...b.subarray(4,8))==='ftyp'||String.fromCharCode(...b.subarray(0,3))==='ID3'||b[0]===255&&(b[1]!&224)===224;
@@ -30,11 +31,13 @@ export const browserTimedMediaDecoder:TimedMediaDecoder=async(bytes,shape)=>{
     node.src=url;node.load();
   });}finally{if(timer)clearTimeout(timer);node.pause();node.removeAttribute('src');node.load();URL.revokeObjectURL(url);}
 };
-const nativeHeic:HeicDecoder=async bytes=>{if(typeof createImageBitmap!=='function')return fileError(heicGuidance);return createImageBitmap(new Blob([bytes.slice().buffer],{type:'image/heic'}),{imageOrientation:'from-image',colorSpaceConversion:'default',premultiplyAlpha:'none'});};
+export const browserHeicDecoder:HeicDecoder=async bytes=>{if(typeof createImageBitmap!=='function')return fileError(heicGuidance);return createImageBitmap(new Blob([bytes.slice().buffer],{type:'image/heic'}),{imageOrientation:'from-image',colorSpaceConversion:'default',premultiplyAlpha:'none'});};
+export const mediaDisplayDimensions=(bytes:Uint8Array,mime:string,limits:FileValidationLimits,resources?:RasterResources)=>
+  mime==='image/heic'||mime==='image/heif'?heicStructure(bytes,limits,resources):null;
 /** Preparation alone creates a portable image; legacy standalone validation remains unchanged. */
 export async function prepareProjectMedia(bytes:Uint8Array,limits:FileValidationLimits,png?:PngDecoder,jpeg?:JpegDecoder,photo?:PhotoDecoder,decoders:MediaDecoders={},signal?:AbortSignal){
   if(isHeic(bytes))return{mediaKind:'image' as const,mediaType:'image/heic' as const,
-    portable:await createPortableHeic(bytes,limits,decoders.heic??nativeHeic,png,decoders.raster,signal)};
+    portable:await createPortableHeic(bytes,limits,decoders.heic??browserHeicDecoder,png,decoders.raster,signal)};
   return{...await inspectProjectMedia(bytes,limits,png,jpeg,photo,decoders,signal),portable:undefined};
 }
 const mediaAbort=()=>new DOMException('選択を取り消しました。','AbortError');
@@ -50,9 +53,9 @@ async function boundedHeic(decode:HeicDecoder,bytes:Uint8Array,signal?:AbortSign
 /** Exact content-derived type. File names and browser MIME hints grant no admission. */
 export async function inspectProjectMedia(bytes:Uint8Array,limits:FileValidationLimits,png?:PngDecoder,jpeg?:JpegDecoder,photo?:PhotoDecoder,decoders:MediaDecoders={},signal?:AbortSignal){
   if(signal?.aborted)throw mediaAbort();
-  if(isHeic(bytes)){let bitmap:Awaited<ReturnType<HeicDecoder>>|undefined;try{const shape=heicStructure(bytes,limits);bitmap=await boundedHeic(decoders.heic??nativeHeic,bytes.slice(),signal);
+  if(isHeic(bytes)){let bitmap:Awaited<ReturnType<HeicDecoder>>|undefined;try{const shape=heicStructure(bytes,limits,png?.rasterResources);bitmap=await boundedHeic(decoders.heic??browserHeicDecoder,bytes.slice(),signal);
       if(!(bitmap.width===shape.width&&bitmap.height===shape.height||bitmap.width===shape.height&&bitmap.height===shape.width))return fileError(heicGuidance);
-    }catch{if(signal?.aborted)throw mediaAbort();return fileError(heicGuidance);}finally{bitmap?.close();}return{mediaKind:'image' as const,mediaType:'image/heic' as const};}
+    }catch(error){if(error instanceof RasterResourceError||error instanceof DOMException&&error.name==='AbortError')throw error;if(signal?.aborted)throw mediaAbort();return fileError(heicGuidance);}finally{bitmap?.close();}return{mediaKind:'image' as const,mediaType:'image/heic' as const};}
   // Damaged familiar images retain their existing strict diagnostics.
   const text=(n:number)=>String.fromCharCode(...bytes.subarray(0,n));
   if(bytes[0]===137&&text(4)==='\x89PNG'||bytes[0]===255&&bytes[1]===216||text(4)==='RIFF'||text(4)==='GIF8')return{mediaKind:'image' as const,mediaType:await inspectProjectImage(bytes,limits,png,jpeg,photo)};

@@ -36,6 +36,8 @@ export function mountContextHelp(document: Document, root: HTMLElement): () => v
   if (manager) return manager.add(root);
   const scopes = new Map<HTMLElement, number>();
   let active: Source | null = null, pending: Source | null = null, hovered: HTMLElement | null = null;
+  let explicitActivation=false;
+  let pointerPosition:{x:number;y:number}|null=null;
   let delay: number | undefined, leaving: number | undefined, pointerFocus = '', disposed = false;
   const element = (target: EventTarget | null) => target && typeof (target as Element).closest === 'function' ? target as HTMLElement : null;
   const pointer = (event: Event) => {
@@ -60,28 +62,30 @@ export function mountContextHelp(document: Document, root: HTMLElement): () => v
   const cancelLeave = () => { if (leaving !== undefined) browser.clearTimeout(leaving); leaving = undefined; };
   const hide = () => {
     cancelDelay(); cancelLeave();
-    const shown = active; active = null;
+    const shown = active; active = null;explicitActivation=false;
     if (shown) { shown.note.hidden = true; shown.holder.append(shown.note); }
   };
   const position = (next: Source) => {
     const rect = next.anchor.getBoundingClientRect(), margin = 8;
     next.note.style.left = `${margin}px`; next.note.style.top = `${margin}px`;
     const box = next.note.getBoundingClientRect();
-    const left = Math.max(margin, Math.min(rect.left, browser.innerWidth - box.width - margin));
-    const below = rect.bottom + 4;
-    const top = below + box.height <= browser.innerHeight - margin ? below : Math.max(margin, rect.top - box.height - 4);
+    const right=rect.right??rect.left+rect.width,roomRight=right+8+box.width<=browser.innerWidth-margin,roomLeft=rect.left-8-box.width>=margin;
+    const left = roomRight?right+8:roomLeft?rect.left-8-box.width:Math.max(margin,Math.min(rect.left,browser.innerWidth-box.width-margin));
+    const preferred=roomRight||roomLeft?rect.top:rect.top-box.height-4>=margin?rect.top-box.height-4:rect.bottom+4;
+    const top=Math.max(margin,Math.min(preferred,browser.innerHeight-box.height-margin));
     next.note.style.left = `${left}px`; next.note.style.top = `${top}px`;
   };
-  const show = (next: Source) => {
+  const show = (next: Source,explicit=false) => {
     if (disposed || !available(next.anchor)) return;
-    if (active?.note === next.note) { cancelDelay(); cancelLeave(); active = next; position(next); return; }
-    hide(); active = next; next.note.hidden = false; document.body.append(next.note); position(next);
+    if (active?.note === next.note) { cancelDelay(); cancelLeave(); active = next;explicitActivation ||= explicit; position(next); return; }
+    hide(); active = next;explicitActivation=explicit; next.note.hidden = false; document.body.append(next.note); position(next);
   };
   const retained = () => !!active && (source(document.activeElement)?.note === active.note ||
     !!hovered && (source(hovered)?.note === active.note || active.note.contains(hovered)));
   const leave = () => { cancelDelay(); cancelLeave(); leaving = browser.setTimeout(() => { leaving = undefined; if (!retained()) hide(); }, 140); };
   const over = (event: Event) => {
     if ((event as PointerEvent).pointerType === 'touch') return;
+    pointerPosition={x:(event as PointerEvent).clientX,y:(event as PointerEvent).clientY};
     const target = element(event.target);
     if (target && active?.note.contains(target)) { hovered = target; cancelLeave(); return; }
     const resolved = pointer(event), next = source(resolved.target); if (!next) return;
@@ -94,6 +98,7 @@ export function mountContextHelp(document: Document, root: HTMLElement): () => v
   };
   const move = (event: Event) => {
     if ((event as PointerEvent).pointerType === 'touch') return;
+    pointerPosition={x:(event as PointerEvent).clientX,y:(event as PointerEvent).clientY};
     const resolved = pointer(event); if (!resolved.root) return;
     const next = source(resolved.target);
     if (next?.anchor === hovered) return;
@@ -111,13 +116,14 @@ export function mountContextHelp(document: Document, root: HTMLElement): () => v
     if (next?.anchor.contains(related) || active?.note.contains(related)) { hovered = related; return; }
     if (next || active?.note.contains(target)) { hovered = null; leave(); }
   };
-  const focus = (event: Event) => { const next = source(event.target); if (next && next.note.id !== pointerFocus) show(next); };
+  const focus = (event: Event) => { const next = source(event.target); if (next && next.note.id !== pointerFocus) show(next,true); };
   const blur = (event: Event) => {
     const related = element((event as FocusEvent).relatedTarget);
     if (active && (source(related)?.note === active.note || active.note.contains(related))) return;
     leave();
   };
   const down = (event: Event) => {
+    if((event as PointerEvent).pointerType==='touch')pointerPosition=null;
     const next = source(pointer(event).target); pointerFocus = next?.note.id ?? '';
     if (!next && !active?.note.contains(element(event.target))) hide();
   };
@@ -133,17 +139,30 @@ export function mountContextHelp(document: Document, root: HTMLElement): () => v
     if (!trigger) return;
     const next = source(trigger); if (!next) return;
     event.preventDefault(); event.stopPropagation();
-    if (active?.note === next.note && (event as MouseEvent).detail > 0) hide(); else show(next);
+    if (active?.note === next.note && (event as MouseEvent).detail > 0) hide(); else show(next,true);
   };
   const key = (event: Event) => {
-    if ((event as KeyboardEvent).key === 'Tab') pointerFocus = '';
+    if((event as KeyboardEvent).isComposing||event.defaultPrevented)return;
+    if ((event as KeyboardEvent).key === 'Tab') {pointerFocus = '';pointerPosition=null;}
     if ((event as KeyboardEvent).key !== 'Escape' || !active && !pending) return;
     const visible = !!active; hide();
     if (visible) { event.preventDefault(); event.stopPropagation(); }
   };
-  const scroll = (event: Event) => { if (!active?.note.contains(element(event.target))) hide(); };
-  const resize = () => hide();
-  const pointerCancel = () => { pointerFocus = ''; cancelDelay(); };
+  const scroll = (event: Event) => {
+    if(active?.note.contains(element(event.target)))return;
+    // Keyboard/touch notes follow an anchor scrolled into view without reopening
+    // one explicitly dismissed with Escape or a second tap.
+    if(active&&explicitActivation&&available(active.anchor)){
+      position(active);return;
+    }
+    const previous=pending??active;hide();
+    if(!previous||!pointerPosition)return;
+    const next=source(document.elementFromPoint(pointerPosition.x,pointerPosition.y));
+    hovered=next?.anchor??null;if(!next||!available(next.anchor))return;
+    pending=next;delay=browser.setTimeout(()=>{delay=undefined;const wanted=pending;pending=null;if(wanted)show(wanted);},2_000);
+  };
+  const resize = () => { if(active&&available(active.anchor))position(active);else if(active)hide(); };
+  const pointerCancel = () => { pointerFocus = '';pointerPosition=null;cancelDelay(); };
   const listeners: [string, EventListener][] = [['pointerover', over], ['pointermove', move], ['pointerout', out], ['pointerdown', down],
     ['pointercancel', pointerCancel], ['focusin', focus], ['focusout', blur], ['click', click], ['keydown', key], ['scroll', scroll]];
   for (const [name, handler] of listeners) document.addEventListener(name, handler, true);

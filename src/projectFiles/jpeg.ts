@@ -1,4 +1,5 @@
-import { checkFileLimits, fileError, type FileValidationLimits } from './validation';
+import { checkFileLimits, fileError, fileLimitError, type FileValidationLimits } from './validation';
+import { RasterResourceError } from '../viewer/rasterResources';
 import { inspectValidationPng, type PngDecoder } from './png';
 
 export type JpegUse = 'photo' | 'glb-texture';
@@ -47,10 +48,13 @@ function exifOrientation(bytes: Uint8Array, charge: (n?: number) => void): numbe
 /** Bounded codestream framing and scan references; pixel/entropy decoding belongs to the actual decoder. */
 export function jpegStructure(bytes: Uint8Array, limits: FileValidationLimits, use: JpegUse) {
   checkFileLimits(limits);
-  if (bytes.length > limits.maxFileBytes || !isJpeg(bytes)) return bad();
+  if (bytes.length > limits.maxFileBytes) return fileLimitError('JPEGの容量',bytes.length,limits.maxFileBytes,'B');
+  if (!isJpeg(bytes)) return bad();
   let at = 2, items = 0, work = 0, frame = 0, width = 0, height = 0, orientation = 1, exif = false, jfif = false, scans = 0, interval = 0;
   let adobe: number | undefined;
-  const charge = (n = 1) => { work += n; if (!Number.isSafeInteger(work) || work > limits.maxValues) bad(); };
+  const maximumWork = limits.jpegScanBytesPerByte === undefined ? limits.maxValues : bytes.length * limits.jpegScanBytesPerByte + limits.jpegScanAllowanceBytes!;
+  if (!Number.isSafeInteger(maximumWork)) return fileError('JPEGの検査量が不正です。');
+  const charge = (n = 1) => { work += n; if (!Number.isSafeInteger(work) || work > maximumWork) fileLimitError('JPEGの検査量',work,maximumWork,''); };
   const quant = new Map<number, { precision: number; values: string }>(), huffman = new Map<string, number[]>();
   const components = new Map<number, { q: number; blocks: number; precision: number[]; quant?: string }>();
   const u16 = (offset: number) => bytes[offset]! * 256 + bytes[offset + 1]!;
@@ -86,7 +90,9 @@ export function jpegStructure(bytes: Uint8Array, limits: FileValidationLimits, u
     if ([0xc0, 0xc1, 0xc2].includes(marker)) {
       if (frame || data.length < 6 || data[0] !== 8 || ![1, 3].includes(data[5]!)) return bad();
       frame = marker; height = u16(start + 1); width = u16(start + 3);
-      if (!width || !height || width * height > limits.maxPixels || data.length !== 6 + 3 * data[5]!) return bad();
+      if (!width || !height || data.length !== 6 + 3 * data[5]!) return bad();
+      const maximum = limits.maxStaticPixels ?? limits.maxPixels;
+      if(width*height>maximum)return fileLimitError(`JPEGの画素数（${width}×${height}）`,width*height,maximum,'画素');
       for (let i = 6; i < data.length; i += 3) {
         const id = data[i]!, h = data[i + 1]! >> 4, v = data[i + 1]! & 15, q = data[i + 2]!;
         if (components.has(id) || !h || h > 4 || !v || v > 4 || q > 3) return bad();
@@ -156,12 +162,12 @@ export function jpegStructure(bytes: Uint8Array, limits: FileValidationLimits, u
 }
 
 export async function inspectValidationJpeg(input: Uint8Array, limits: FileValidationLimits, use: JpegUse, decode: JpegDecoder = browserJpegDecoder) {
-  checkFileLimits(limits); if (input.length > limits.maxFileBytes) return bad();
+  checkFileLimits(limits); if (input.length > limits.maxFileBytes) return fileLimitError('JPEGの容量',input.length,limits.maxFileBytes,'B');
   const bytes = input.slice(), structure = jpegStructure(bytes, limits, use), swapped = use === 'photo' && structure.orientation >= 5;
   const width = swapped ? structure.height : structure.width, height = swapped ? structure.width : structure.height;
   let image: DecodedJpeg | undefined;
   try { image = await decode(bytes, use); if (image.width !== width || image.height !== height) return fileError('JPEGの表示サイズが一致しません。'); }
-  catch { return fileError('JPEGの画像を表示できません。'); }
+  catch (error) { if (error instanceof RasterResourceError || error instanceof Error && error.name === 'AbortError') throw error; return fileError('JPEGの画像を表示できません。','decode'); }
   finally { image?.close(); }
   return { width, height, orientation: structure.orientation };
 }

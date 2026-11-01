@@ -1,5 +1,5 @@
 import { desktopEntry, desktopOrigin } from './desktopEntry';
-import { revealFileSurface, revealModelManagement, lookAlongFront } from './workspaceUi';
+import { closeFileSurface, revealFileSurface, revealModelManagement, lookAlongFront } from './workspaceUi';
 import {test,expect,chromium,type Page,type BrowserContext,type TestInfo} from '@playwright/test';
 import {mkdir,mkdtemp} from 'node:fs/promises';
 import {openAsBlob} from 'node:fs';
@@ -15,6 +15,7 @@ import {inspectProjectCandidates} from '../../src/domain/projectCandidates';
 import {validationMetadataLimits} from '../../src/projectFiles/validation';
 import {presentedCanvas} from './presentedCanvas';
 const entry=desktopEntry+'?timings=1',title='GSの本体更新';
+const tracing=process.env.LOCIVIEW_E2E_TRACE==='1';
 const models=(p:Page)=>p.getByRole('tabpanel',{name:'モデル',exact:true});
 async function ready(p:Page){await expect(p.getByRole('heading',{name:'プロジェクト名',exact:true})).toHaveText(title,{timeout:240_000});await expect(p.locator('.lv-project-viewport-status')).toBeEmpty({timeout:180_000});}
 async function output(p:Page,info:TestInfo,name:string,workspace=false){
@@ -23,7 +24,7 @@ async function output(p:Page,info:TestInfo,name:string,workspace=false){
  if(workspace)await area.getByLabel('渡す内容',{exact:true}).selectOption('teamWorkspace');else await area.getByLabel('名前（任意）',{exact:true}).fill(name);
  const primary=area.locator('button.lv-file-primary');await expect(primary).toBeEnabled({timeout:600_000});
  const [download]=await Promise.all([p.waitForEvent('download',{timeout:600_000}),primary.click()]);const path=info.outputPath(name+'.zip');await download.saveAs(path);expect(await download.failure()).toBeNull();
- await expect(area.locator('.lv-operation-status')).toHaveAttribute('data-busy','false',{timeout:600_000});return path;
+ await expect(area.locator('.lv-operation-status')).toHaveAttribute('data-busy','false',{timeout:600_000});await closeFileSurface(p);return path;
 }
 function active(records:Record<string,any>){const asset=Object.values(records.assetsById)[0] as any,binding=records.assetBindingsById[asset.status.activeBindingId],revision=records.assetRevisionsById[binding.assetRevisionId],reps=revision.representationIds.map((id:string)=>records.representationsById[id]);return {asset,binding,revision,gs:reps.find((r:any)=>r.role==='gsPrimary'),proxy:reps.find((r:any)=>r.role==='interactionProxy')};}
 async function backup(path:string){const b=await BackupArchive.inspect(await openAsBlob(path),validationMetadataLimits),c=await inspectProjectCandidates(b.source.read(),validationMetadataLimits);if(c.kind!=='project-candidate-inspection')throw Error('Backup');const records=c.unambiguousRecords as Record<string,any>;return {b,records,...active(records)};}
@@ -36,12 +37,12 @@ test('50万点SH4を新しい本体へ差し替え、旧資源の解放・2世�
  const launch=async()=>{context=await chromium.launchPersistentContext(profile,{channel:'chromium',headless:true,viewport:{width:1440,height:1000},serviceWorkers:'block',acceptDownloads:true});context.setDefaultTimeout(15_000);
   await context.route('**/*',route=>{const url=new URL(route.request().url());return url.origin===desktopOrigin||['blob:','data:'].includes(url.protocol)?route.continue():route.abort('blockedbyclient');});
   await context.addInitScript(()=>{const original=Blob.prototype.arrayBuffer;(window as any).wholeGsReads=0;Blob.prototype.arrayBuffer=async function(){if(this.size>1_048_576){const prefix=new Uint8Array(await original.call(Blob.prototype.slice.call(this,0,32)));if(new TextDecoder().decode(prefix).startsWith('ply\nformat binary_little_endian')){(window as any).wholeGsReads++;throw Error('Whole GS arrayBuffer forbidden');}}return original.call(this);};});
-  await context.tracing.start({screenshots:true,snapshots:true,sources:true});const p=context.pages()[0]??await context.newPage();p.on('pageerror',e=>errors.push(e.message));p.on('console',m=>{if(m.type()==='error')errors.push(m.text());});await p.goto(entry);return p;};
- const close=async(label:string)=>{expect(await context!.pages()[0]!.evaluate(()=>(window as any).wholeGsReads)).toBe(0);await context!.tracing.stop({path:info.outputPath(label+'-trace.zip')});await context!.close();context=undefined;};
+  if(tracing)await context.tracing.start({screenshots:true,snapshots:true,sources:true});const p=context.pages()[0]??await context.newPage();p.on('pageerror',e=>errors.push(e.message));p.on('console',m=>{if(m.type()==='error')errors.push(m.text());});await p.goto(entry);return p;};
+ const close=async(label:string)=>{expect(await context!.pages()[0]!.evaluate(()=>(window as any).wholeGsReads)).toBe(0);if(tracing)await context!.tracing.stop({path:info.outputPath(label+'-trace.zip')});await context!.close();context=undefined;};
  try{
   let p=await launch();await p.getByLabel('ファイルを選択',{exact:true}).setInputFiles(original);await p.getByRole('button',{name:'ファイルを開く',exact:true}).click();await p.getByLabel('プロジェクト名',{exact:true}).fill(title);await p.getByRole('button',{name:'プロジェクトを作成',exact:true}).click();await ready(p);await mark('created',p);
   await p.getByRole('tab',{name:'モデル',exact:true}).click();await models(p).locator('.lv-model-select').first().click();const proxy=p.waitForEvent('filechooser');await models(p).getByRole('button',{name:'位置指定用の面を追加',exact:true}).click();await(await proxy).setFiles({name:'以前の面.glb',mimeType:'model/gltf-binary',buffer:triangleGlb()});await models(p).getByRole('button',{name:'このモデルに面を追加',exact:true}).click();await expect(p.getByText('位置指定用の面を登録しました。',{exact:true})).toBeVisible({timeout:240_000});await ready(p);
-  await lookAlongFront(p);await p.getByRole('tab',{name:'キャプション',exact:true}).click();await p.getByRole('button',{name:'ピンを追加',exact:true}).click();
+  await lookAlongFront(p);await p.getByRole('tab',{name:'キャプション',exact:true}).click();await p.getByRole('button',{name:'キャプションを追加',exact:true}).click();
   const canvas=p.getByLabel('3Dモデルの表示',{exact:true}),box=(await canvas.boundingBox())!,extent=4*Math.exp(Math.fround(Math.log(.0007))),bounds={min:[-500/300-extent,-250/300-extent,-extent] as const,max:[499/300+extent,249/300+extent,.0006+extent] as const},pose=fittedPose(bounds,defaultPose(),box.width/box.height,'+z');
   if(pose.projection.kind!=='perspective')throw Error('Perspective');const camera=new THREE.PerspectiveCamera(pose.projection.verticalFov*180/Math.PI,box.width/box.height,.000001,1e9);camera.position.set(...pose.position);camera.up.set(...pose.up);camera.lookAt(new THREE.Vector3(...pose.target));camera.updateMatrixWorld(true);const hit=new THREE.Vector3(.1,.2,0).project(camera);await canvas.click({position:{x:(hit.x+1)*box.width/2,y:(1-hit.y)*box.height/2}});
   await p.getByLabel('位置 X',{exact:true}).fill('0.2');await p.getByRole('button',{name:'位置を確定',exact:true}).click();await expect(p.getByText('ピンの位置を確定しました。',{exact:true})).toBeVisible({timeout:240_000});
@@ -55,5 +56,5 @@ test('50万点SH4を新しい本体へ差し替え、旧資源の解放・2世�
   await verifyBody(saved.b,largeGsDigest);await verifyBody(saved.b,updatedLargeGsDigest);await mark('both-originals-saved',p);await close('replaced');
   p=await launch();await ready(p);await p.getByRole('tab',{name:'モデル',exact:true}).click();await models(p).locator('.lv-model-select').first().click();await expect(models(p).getByRole('button',{name:'位置指定用の面を追加',exact:true})).toBeVisible();await expect(models(p).getByRole('button',{name:'位置指定用の面を外す',exact:true})).toBeHidden();
   const cold=await backup(await output(p,info,'two-generation-cold'));expect(cold.b.source.token).toBe(saved.b.source.token);expect(cold.records).toEqual(saved.records);await verifyBody(cold.b,largeGsDigest);await verifyBody(cold.b,updatedLargeGsDigest);await mark('cold-verified',p);expect(errors).toEqual([]);await close('cold');
- }finally{if(context){await context.pages()[0]?.screenshot({path:info.outputPath('failure.png'),fullPage:true}).catch(()=>{});await context.tracing.stop({path:info.outputPath('failure-trace.zip')}).catch(()=>{});await context.close();}await info.attach('stages',{body:JSON.stringify({profile,stages,errors}),contentType:'application/json'});}
+ }finally{if(context){await context.pages()[0]?.screenshot({path:info.outputPath('failure.png'),fullPage:true}).catch(()=>{});if(tracing)await context.tracing.stop({path:info.outputPath('failure-trace.zip')}).catch(()=>{});await context.close();}await info.attach('stages',{body:JSON.stringify({profile,stages,errors}),contentType:'application/json'});}
 });

@@ -1,3 +1,4 @@
+import { closeFileSurface } from './workspaceUi';
 import { desktopOrigin, desktopEntry } from './desktopEntry';
 import { revealCoordinateAdd, revealFileSurface, revealProjectSelection } from './workspaceUi';
 import { test, expect, chromium, type Page, type BrowserContext, type TestInfo } from '@playwright/test';
@@ -27,7 +28,7 @@ async function output(p: Page, info: TestInfo, name: string, purpose: 'backup' |
   if(portable)await expect(history).toContainText('HEIC原本と表示用PNGの組');
   const row=history.locator('section').filter({hasText:purpose==='backup'?'バックアップ':purpose==='clean'?'独立コピー':'作業一式'}).filter({hasText:portable?'HEIC原本と表示用PNGの組':'記録された編集者名'});
   const [download] = await Promise.all([p.waitForEvent('download', { timeout: 90_000 }), row.getByRole('button', { name: 'ダウンロード', exact: true }).click()]);
-  const path = info.outputPath(name + '.zip'); await download.saveAs(path); expect(await download.failure()).toBeNull(); return path;
+  const path = info.outputPath(name + '.zip'); await download.saveAs(path); expect(await download.failure()).toBeNull(); await closeFileSurface(p);return path;
 }
 async function open(p: Page, path: string) { await p.getByLabel('ファイルを選択', { exact: true }).setInputFiles(path); await p.getByRole('button', { name: 'ファイルを開く', exact: true }).click(); }
 async function gallery(p: Page) {

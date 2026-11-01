@@ -1,7 +1,7 @@
 import { validationDeclaredBodyBytes } from './bodyBudget';
 import type { ProjectProviderRead } from '../scene/projectProvider';
 import type { PhotoDecoder } from './photo';
-import { inspectProjectMedia, projectMediaKind, type MediaDecoders } from './media';
+import { inspectProjectMedia, projectMediaKind, mediaDisplayDimensions, type MediaDecoders } from './media';
 import { portableDisplay, recordBlobRefs } from '../domain/portableMedia';
 import { inspectPortableHeic } from './portableHeic';
 import type { ProjectWorkspaceFS, WorkspaceReadableFile } from '../platform/fs';
@@ -45,6 +45,8 @@ export async function readValidationBody(file: WorkspaceReadableFile, maxBytes: 
 
 /** Actual saved-content executor. A fixture/native profile cannot authorize this path. */
 export class ValidationContent implements MetadataMediaPort {
+  get rasterResources() { return this.decode?.rasterResources; }
+  displayDimensions(bytes:Uint8Array,mime:string){return mediaDisplayDimensions(bytes,mime,this.limits,this.rasterResources);}
   private readonly preparedImages = new Map<string, Awaited<ReturnType<typeof prepareValidationMedia>>>();
   private readonly preparedModels = new Map<string, Awaited<ReturnType<typeof prepareValidationModel>>>();
   readonly limits: FileValidationLimits;

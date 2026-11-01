@@ -4,7 +4,7 @@ import { checkFileLimits, fileError, type FileValidationLimits } from './validat
 import type { ValidatedGlb } from './glb';
 import { verifyPointProfileTexts } from '../domain/pointPresentation';
 import type { ValidatedGs } from './gsPly';
-import type { MeshSourceData } from '../domain/meshSource';
+import type { ValidatedMeshSource as MeshSourceData } from './meshSource';
 
 export const pointSourceProfileId = 'development-validation-point-ply-rgb-1';
 export const pointSourceProfileSha256 = 'c93909de6da2c44558d960c2620f967f8cd702b6171ae7df9e86df789ba35dd5';

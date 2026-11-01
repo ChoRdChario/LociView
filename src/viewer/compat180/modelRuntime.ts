@@ -11,6 +11,8 @@ import { PLYLoader } from 'three-compat-180/addons/loaders/PLYLoader.js';
 import { STLLoader } from 'three-compat-180/addons/loaders/STLLoader.js';
 import { trackGltfImages, trackMtlTextures } from './sceneProof';
 import { fitRasterWithinMaxEdge, rasterDimensions } from '../rasterDimensions';
+import type { RasterResources } from '../rasterResources';
+import { createRasterLoadScope } from '../rasterLoadScope';
 
 export type ModelFormat = 'glb' | 'gltf' | 'obj' | 'stl' | 'ply';
 
@@ -56,6 +58,7 @@ export function detectFormat(fileName: string, bytes: Uint8Array): ModelFormat |
 }
 
 export interface LoadDeps {
+  readonly rasterResources?: RasterResources;
   signal?: AbortSignal;
   /** OBJの.mtlテキスト（ZIP内の随伴ファイル解決。無ければ既定マテリアル） */
   mtlText?: string;
@@ -79,7 +82,7 @@ export async function loadModel(
   switch (format) {
     case 'glb':
     case 'gltf': {
-      root = await loadGltf(bytes, warnings, deps.gltfTextures);
+      root = await loadGltf(bytes, warnings, deps.gltfTextures, deps.rasterResources, deps.signal);
       break;
     }
     case 'obj': {
@@ -290,7 +293,10 @@ function loadGltf(
   bytes: Uint8Array,
   warnings: string[],
   texturePolicy?: GltfTexturePolicy,
+  resources?: RasterResources,
+  signal?: AbortSignal,
 ): Promise<THREE.Object3D> {
+  const native = createRasterLoadScope(resources, signal);
   // 外部URI参照はオフライン原則により拒否する（docs/03 §5）。
   // data:/blob: 以外の参照は空データに差し替え、警告として報告する。
   const manager = new THREE.LoadingManager();
@@ -313,8 +319,8 @@ function loadGltf(
     if (texturePolicy || !(parser.textureLoader instanceof THREE.ImageBitmapLoader)) return;
     class OwnedImages extends THREE.ImageBitmapLoader {
       override load(url:string, done?:(bitmap:ImageBitmap)=>void, progress?:(event:ProgressEvent)=>void, error?:(e:unknown)=>void) {
-        return super.load(url, bitmap => { if(modelClosed){closeBitmapOnce(bitmap);error?.(Error('モデルの読込を取り消しました。'));return;}
-          decodedBitmaps.add(bitmap);done?.(bitmap); }, progress, error);
+        return native.load((loaded, failed) => super.load(url, loaded, progress, failed), bitmap => { if(modelClosed){closeBitmapOnce(bitmap);error?.(Error('モデルの読込を取り消しました。'));return;}
+          decodedBitmaps.add(bitmap);done?.(bitmap); }, reason => { if (resources) textureFailures.push(reason instanceof Error ? reason : new Error('画像の準備を完了できません。')); error?.(reason); });
       }
     }
     parser.textureLoader=new OwnedImages(manager).setOptions({...parser.textureLoader.options}).setCrossOrigin(parser.options.crossOrigin).setRequestHeader(parser.options.requestHeader);
@@ -354,7 +360,7 @@ function loadGltf(
     bytes.byteOffset === 0 && bytes.byteLength === bytes.buffer.byteLength
       ? bytes.buffer
       : bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
-  return new Promise((resolve, reject) => {
+  return new Promise<THREE.Object3D>((resolve, reject) => {
     loader.parse(
       buf as ArrayBuffer,
       '',
@@ -364,7 +370,7 @@ function loadGltf(
           modelClosed=true;
           try { releaseOwnedResources(gltf.scenes, [...parserObjects], decodedBitmaps); releaseDecodedBitmaps(); }
           catch (error) { reject(error); return; }
-          reject(new Error(`embedded texture activation failed: ${textureFailures[0]!.message}`));
+          reject(resources ? textureFailures[0]! : new Error(`embedded texture activation failed: ${textureFailures[0]!.message}`));
           return;
         }
         rememberModelOwner(gltf.scene, [...gltf.scenes,...parserObjects], decodedBitmaps, () => { modelClosed=true; });
@@ -377,7 +383,7 @@ function loadGltf(
         reject(err instanceof Error ? err : new Error('GLTF parse error'));
       },
     );
-  });
+  }).finally(() => native.dispose());
 }
 
 async function loadObj(bytes: Uint8Array, deps: LoadDeps, warnings: string[]): Promise<THREE.Object3D> {

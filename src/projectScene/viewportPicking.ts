@@ -11,7 +11,10 @@ export interface PinSurfaceTarget {
   readonly familyId: string; readonly compatibilityId: string;
 }
 export interface ResidentPoints { readonly positions: Float32Array; readonly representationId: string; readonly object: THREE.Object3D; project(camera: THREE.Camera, depthBits: number): { readonly centersCss: Float32Array; readonly depths: Float32Array; readonly eligible: Uint8Array; readonly depthBits: number }; diameter: number; issue: string | null; configure(view: PointViewport, diameter: number): string | null }
-export interface ResidentSurface { readonly gs?: GsDisplayResident; readonly interaction?:THREE.Object3D;readonly interactionIssue?:string|null;readonly points?: ResidentPoints;readonly materialNotices?:readonly string[]; readonly mesh: THREE.Object3D; readonly asset: THREE.Group; dispose?(): void }
+export interface ResidentSurface { readonly gs?: GsDisplayResident; readonly interaction?:THREE.Object3D;readonly interactionIssue?:string|null;readonly points?: ResidentPoints;readonly materialNotices?:readonly string[];
+  /** Template-owned source maps only. GPU disposal preserves the CPU image. */
+  readonly gpuTextures?:readonly THREE.Texture[];
+  readonly mesh: THREE.Object3D; readonly asset: THREE.Group; dispose?(): void }
 export type PickCoverage = (hit: THREE.Intersection<THREE.Object3D>, material: THREE.Material) => 'covered' | 'discarded' | 'unknown';
 
 /** Other resident models can occlude, never become the requested target. */

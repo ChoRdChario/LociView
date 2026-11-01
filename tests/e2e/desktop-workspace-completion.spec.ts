@@ -67,11 +67,11 @@ test('content-first workspace keeps editing, pin completion and file exits coher
     await expect(modelTask.getByLabel('モデル位置 X',{exact:true})).toBeHidden();await modelTask.getByRole('button',{name:'配置を調整',exact:true}).click();
     const modes=modelTask.getByRole('group',{name:'配置の操作',exact:true});await expect(modes.getByRole('button',{name:'移動',exact:true})).toHaveAttribute('aria-pressed','true');
     await modes.getByRole('button',{name:'回転',exact:true}).click();await expect(modes.getByRole('button',{name:'回転',exact:true})).toHaveAttribute('aria-pressed','true');await modelTask.getByRole('button',{name:'配置を取り消す',exact:true}).click();
-    await revealCameraPositions(p); const author = p.getByRole('region', { name: '視点の作成と管理', exact: true });
+    await revealCameraPositions(p); const author = p.getByRole('region', { name: '視点の作業', exact: true });
     await expect(author.getByRole('button',{name:'編集',exact:true})).toBeHidden();await expect(author.getByText('その他の操作',{exact:true})).toBeHidden();await expect(p.locator('.lv-view-axes')).toHaveCount(0);
-    await author.getByRole('button', { name: '視点を記録', exact: true }).click(); await author.getByLabel('視点の名称', { exact: true }).fill('入口');
-    const finishView = p.getByRole('group', { name: '視点の終了操作', exact: true }).getByRole('button', { name: '視点を追加', exact: true });
-    await p.setViewportSize({ width: 1280, height: 600 }); await expect(finishView).toBeInViewport(); await finishView.click(); await ready('保存した視点を更新しました。'); await p.setViewportSize({ width: 1440, height: 1000 });
+    const finishView = author.getByRole('button', { name: '開始視点を記録', exact: true });
+    await p.setViewportSize({ width: 1280, height: 600 }); await expect(finishView).toBeInViewport(); await finishView.click(); await ready('開始視点を記録しました。');
+    await expect(author.getByRole('button', { name: '開始視点を更新', exact: true })).toBeEnabled(); await expect(p.getByLabel('記録した視点',{exact:true})).toHaveCount(0); await p.setViewportSize({ width: 1440, height: 1000 });
     const settings = p.locator('details[aria-label="設定"]'); await settings.locator(':scope > summary').click(); await expect(settings.getByRole('heading', { name: 'このブラウザの表示', exact: true })).toBeVisible(); await expect(settings.getByRole('heading', { name: '共有する編集者名', exact: true })).toBeVisible();
     await p.screenshot({ path: info.outputPath('settings.png'), fullPage: false }); await settings.locator(':scope > summary').click();
     await revealWorkPanel(p); await tab('キャプション').click(); const menu = p.locator('details.lv-project-files'), files = p.getByRole('region', { name: 'ファイル', exact: true });
@@ -81,7 +81,7 @@ test('content-first workspace keeps editing, pin completion and file exits coher
     const [download] = await Promise.all([p.waitForEvent('download'), files.locator('.lv-file-primary').click()]); await download.saveAs(info.outputPath('completed-backup.zip')); expect(await download.failure()).toBeNull(); await expect(files.locator('.lv-operation-status')).toHaveAttribute('data-busy', 'false'); await menu.getByRole('button', { name: '閉じる', exact: true }).click();
     await p.getByRole('button', { name: '共有', exact: true }).click(); await expect(files.getByLabel('渡す内容', { exact: true }).locator('option')).toHaveCount(4); await expect(files.getByRole('button', { name: '相手に渡す', exact: true })).toHaveCount(0);
     const fileTabs=menu.getByRole('tablist',{name:'ファイルの操作',exact:true}),shareTab=fileTabs.getByRole('tab',{name:'共有',exact:true});await expect(menu.getByRole('button',{name:'閉じる',exact:true})).toBeEnabled();
-    await shareTab.focus();await p.keyboard.press('ArrowLeft');await expect(fileTabs.getByRole('tab',{name:'保存',exact:true})).toBeFocused();await p.keyboard.press('ArrowRight');await expect(shareTab).toBeFocused();await expect(shareTab).toHaveAttribute('aria-selected','true');
+    await shareTab.focus();await p.keyboard.press('ArrowLeft');await expect(fileTabs.getByRole('tab',{name:'書き出す',exact:true})).toBeFocused();await p.keyboard.press('ArrowRight');await expect(shareTab).toBeFocused();await expect(shareTab).toHaveAttribute('aria-selected','true');
     expect(await files.locator('.lv-file-primary').evaluate(n => ({ background: getComputedStyle(n).backgroundColor, color: getComputedStyle(n).color }))).not.toMatchObject({ background: 'rgba(0, 0, 0, 0)' });
     await p.screenshot({ path: info.outputPath('share.png'), fullPage: false });
     const [workspace] = await Promise.all([p.waitForEvent('download'), files.locator('.lv-file-primary').click()]), workspacePath = info.outputPath('team-workspace.zip'); await workspace.saveAs(workspacePath); await expect(files.locator('.lv-operation-status')).toHaveAttribute('data-busy', 'false');

@@ -218,7 +218,7 @@ export async function prepareNativeConversion(input: Blob, budget: ProjectFilePo
     const model = await inspectNativeModel(bytes, appearance, limits, decode, jpeg);
     models.set(r.id, model); blobs.push({ ref: { ...r.blob }, bytes });
     if (appearance) { occurrenceCount += model.occurrences!.length; if (occurrenceCount > limits.maxItems) return fileError('材質の面の数が検査の上限を超えています。');
-      const decoded = await captureLegacyOccurrenceProof(model,signal);
+      const decoded = await captureLegacyOccurrenceProof(model,signal,decode?.rasterResources);
       sourceWitness.set(r.id, decoded.rows.map(row => ({ childPath:[...row.childPath], materialArraySlot:row.materialArraySlot, nodeIndex:row.nodeIndex, primitiveIndex:row.primitiveIndex, materialIndex:row.materialIndex, slotIndex:row.slotIndex }))); }
   }
   for (const m of snapshot.mediaResources ?? []) {
@@ -341,7 +341,7 @@ export async function resumeNativeConversion(fs: ProjectWorkspaceFS, store: Orig
       const model = await inspectNativeModel(body, nativeRecipeHasAppearance(receipt.recipe), limits, decode, jpeg); models.set(r.id, model);
       if (nativeRecipeHasAppearance(receipt.recipe)) {
         occurrenceCount += model.occurrences!.length; if (occurrenceCount > limits.maxItems) return fileError('材質の面の数が検査の上限を超えています。');
-        const decoded = await captureLegacyOccurrenceProof(model);
+        const decoded = await captureLegacyOccurrenceProof(model,undefined,decode?.rasterResources);
         rows.set(r.id, decoded.rows.map(row => ({ childPath:[...row.childPath], materialArraySlot:row.materialArraySlot, nodeIndex:row.nodeIndex, primitiveIndex:row.primitiveIndex, materialIndex:row.materialIndex, slotIndex:row.slotIndex })));
       }
     }

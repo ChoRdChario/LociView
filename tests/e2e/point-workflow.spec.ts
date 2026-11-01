@@ -1,4 +1,5 @@
-import { revealModelManagement, lookAlongFront, revealProjectHelp, revealCaptionList } from './workspaceUi';
+import { closeFileSurface, revealFileSurface } from './workspaceUi';
+import { revealModelManagement, lookAlongFront, revealProjectSelection, revealCaptionList } from './workspaceUi';
 import * as THREE from 'three';
 import { serializeGlb } from '../../src/assets/glbOptimize';
 import { defaultPose, fittedPose } from '../../src/harness/projectScene/viewportModel';
@@ -15,7 +16,7 @@ import { smallPng, triangleGlb } from './fixtures';
 import { presentedCanvas } from './presentedCanvas';
 
 const entry = process.env.LOCIVIEW_E2E_ENTRY ?? 'http://127.0.0.1:4182/dev.html?editor=project';
-const tracing = process.env.LOCIVIEW_E2E_TRACE !== '0';
+const tracing = process.env.LOCIVIEW_E2E_TRACE === '1';
 const ply = Buffer.from('ply\nformat ascii 1.0\nelement vertex 5\nproperty float x\nproperty float y\nproperty float z\nproperty uchar red\nproperty uchar green\nproperty uchar blue\nend_header\n0 0 0 255 0 0\n-1 -1 0 0 255 0\n1 -1 0 0 0 255\n-1 1 0 255 255 0\n1 1 0 255 0 255\n');
 const largePly = Buffer.from('ply\nformat ascii 1.0\nelement vertex 1\nproperty float x\nproperty float y\nproperty float z\nproperty uchar red\nproperty uchar green\nproperty uchar blue\nend_header\n100000000 0 0 255 0 0\n');
 const hash = (data: Uint8Array) => createHash('sha256').update(data).digest('hex');
@@ -30,9 +31,11 @@ async function edit(page: Page, title: string, body: string) {
 }
 async function download(page: Page, info: TestInfo, name: string, purpose: 'backup' | 'teamWorkspace' | 'contribution' | 'review', base?: string) {
   const menu=page.locator('details.lv-project-files'); if(await menu.count()&&!await menu.evaluate(n=>(n as HTMLDetailsElement).open))await menu.locator(':scope > summary').click();
-  const area = files(page); if (purpose === 'review') { await area.locator('summary').filter({hasText:/^その他$/}).click(); await area.getByRole('button',{name:'シーンを共有',exact:true}).click(); } else await area.getByRole('button', { name: purpose === 'backup' ? '保存' : '相手に渡す', exact: true }).click();
+  const area = files(page),compact=await revealFileSurface(page,purpose==='backup'?'保存':'共有');
+  if(compact){if(purpose!=='backup')await area.getByLabel('渡す内容',{exact:true}).selectOption(purpose);}
+  else if (purpose === 'review') { await area.locator('summary').filter({hasText:/^その他$/}).click(); await area.getByRole('button',{name:'シーンを共有',exact:true}).click(); } else await area.getByRole('button', { name: purpose === 'backup' ? '保存' : '相手に渡す', exact: true }).click();
   if (purpose === 'backup') await area.getByLabel('名前（任意）', { exact: true }).fill(name);
-  else if (purpose !== 'review') { await area.getByLabel('渡す内容', { exact: true }).selectOption(purpose); if (base) await area.getByLabel('元にする作業一式', { exact: true }).selectOption(base); }
+  else if (purpose !== 'review') { if(!compact)await area.getByLabel('渡す内容', { exact: true }).selectOption(purpose); if (base) await area.getByLabel('元にする作業一式', { exact: true }).selectOption(base); }
   if (purpose === 'review') { const scene = area.getByLabel('渡すシーン',{exact:true}); const ids = await scene.locator('option').evaluateAll(nodes=>nodes.map(n=>(n as HTMLOptionElement).value).filter(Boolean)); await scene.selectOption(ids[0]!); await area.getByRole('button',{name:'内容を確認',exact:true}).click(); }
   const primary=area.locator('button.lv-file-primary'); await expect(primary).toHaveText(purpose==='backup'?'ファイルに保存':'ダウンロード',{timeout:180_000}); await expect(primary).toBeEnabled({timeout:180_000});
   const [result] = await Promise.all([page.waitForEvent('download', { timeout: 180_000 }), primary.click()]);
@@ -45,7 +48,7 @@ async function download(page: Page, info: TestInfo, name: string, purpose: 'back
     await expect(area.getByText('選択したファイルの内容を確認しました。',{exact:true})).toBeVisible({timeout:90_000});
     await expect(page.getByLabel('保存ファイルの状態',{exact:true})).toHaveText('保存ファイルと一致');
   }
-  return path;
+  await closeFileSurface(page);return path;
 }
 async function backupRecords(path: string) {
   const backup = await BackupArchive.inspect(await fileBlob(path), validationMetadataLimits), inspection = await inspectProjectCandidates(backup.source.read(), validationMetadataLimits);
@@ -82,7 +85,7 @@ test('点群の元座標で記録し、画像・調整・受け渡し・閲覧�
     const diameter = models.getByLabel('点の大きさ（px）',{exact:true}); await expect(diameter).toHaveValue('3'); await diameter.focus(); await diameter.press('End'); await expect(diameter).toHaveValue('20');
     expect((await sample(page,8,0)).slice(0,3)).toEqual([255,0,0]); expect((await sample(page,8,8)).slice(0,3)).not.toEqual([255,0,0]);
     await revealModelManagement(page); await expect(models.getByRole('button',{name:'モデルを差し替える',exact:true})).toBeEnabled(); await diameter.press('Home'); await diameter.press('ArrowRight'); await diameter.press('ArrowRight');
-    await page.getByRole('tab',{name:'キャプション',exact:true}).click(); await page.getByRole('button',{name:'ピンを追加',exact:true}).click();
+    await page.getByRole('tab',{name:'キャプション',exact:true}).click(); await page.getByRole('button',{name:'キャプションを追加',exact:true}).click();
     const canvas = page.getByLabel('3Dモデルの表示',{exact:true}), box = await canvas.boundingBox(); await canvas.click({position:{x:box!.width/2,y:box!.height/2}});
     await page.getByRole('button',{name:'位置を確定',exact:true}).click(); await expect(page.getByText('ピンの位置を確定しました。',{exact:true})).toBeVisible(); expect((await sample(page)).slice(0,3)).toEqual([255,0,0]); await edit(page,'元の点の記録','点群の本文');
     const chooser = page.waitForEvent('filechooser'); await page.getByLabel('メディアを追加',{exact:true}).click(); await (await chooser).setFiles({name:'写真.png',mimeType:'image/png',buffer:smallPng()}); await expect(page.getByText('メディアを追加しました。',{exact:true})).toBeVisible();
@@ -111,13 +114,13 @@ test('点群の元座標で記録し、画像・調整・受け渡し・閲覧�
     await page.getByRole('tab',{name:'キャプション',exact:true}).click();await caption(page);await expect(page.locator('.lv-project-marker[data-review="true"]')).toHaveCount(1);
     const updatedWorkspace=await download(page,info,'point-update','teamWorkspace');
     const peerMenu=b.page.locator('details.lv-project-files');if(await peerMenu.count()&&!await peerMenu.evaluate(n=>(n as HTMLDetailsElement).open))await peerMenu.locator(':scope > summary').click();
-    const peerReceive=b.page.getByRole('region',{name:'更新ファイル',exact:true});await peerReceive.getByLabel('更新ファイルを選択',{exact:true}).setInputFiles(updatedWorkspace);await peerReceive.getByRole('button',{name:'更新を受け取る',exact:true}).click();await expect(peerReceive.getByText('更新を受け取りました。',{exact:true})).toBeVisible({timeout:90000});
+    await revealFileSurface(b.page,'受信');const peerReceive=b.page.getByRole('region',{name:'更新ファイル',exact:true});await peerReceive.getByLabel('更新ファイルを選択',{exact:true}).setInputFiles(updatedWorkspace);await peerReceive.getByRole('button',{name:'更新を受け取る',exact:true}).click();await expect(peerReceive.getByText('更新を受け取りました。',{exact:true})).toBeVisible({timeout:90000});await closeFileSurface(b.page);
     await b.page.getByRole('tab',{name:'モデル',exact:true}).click();const peerModels=b.page.getByRole('tabpanel',{name:'モデル',exact:true});await peerModels.locator('.lv-model-select').filter({hasText:'測量.ply'}).click();await peerModels.getByRole('button',{name:'このモデルだけ表示',exact:true}).click();await lookAlongFront(b.page);await b.page.getByRole('button',{name:'全体表示',exact:true}).click();await b.page.getByRole('tab',{name:'キャプション',exact:true}).click();
     await caption(b.page);await expect(detail(b.page).getByLabel('本文',{exact:true})).toHaveValue('相手が追記');await expect(b.page.locator('.lv-project-marker[data-review="true"]')).toHaveCount(1);
     await b.page.getByRole('button',{name:'位置を調整',exact:true}).click();const peerCanvas=b.page.getByLabel('3Dモデルの表示',{exact:true}),peerBox=(await peerCanvas.boundingBox())!;await peerCanvas.click({position:{x:peerBox.width/2,y:peerBox.height/2}});await b.page.getByLabel('位置 X',{exact:true}).fill('0.2');await b.page.getByRole('button',{name:'位置を確定',exact:true}).click();await expect(b.page.getByText('ピンの位置を確定しました。',{exact:true})).toBeVisible();await expect(b.page.locator('.lv-project-marker[data-review="false"]')).toHaveCount(1);
 
     const returned = await download(b.page,info,'point-return','contribution',workspace.archive.control.manifest.packageId);
-    const receive = page.getByRole('region',{name:'更新ファイル',exact:true}); await receive.getByLabel('更新ファイルを選択',{exact:true}).setInputFiles(returned); await receive.getByRole('button',{name:'更新を受け取る',exact:true}).click(); await expect(receive.getByText('更新を受け取りました。',{exact:true})).toBeVisible({timeout:90_000});
+    await revealFileSurface(page,'受信');const receive = page.getByRole('region',{name:'更新ファイル',exact:true}); await receive.getByLabel('更新ファイルを選択',{exact:true}).setInputFiles(returned); await receive.getByRole('button',{name:'更新を受け取る',exact:true}).click(); await expect(receive.getByText('更新を受け取りました。',{exact:true})).toBeVisible({timeout:90_000});await closeFileSurface(page);
     await caption(page); await expect(detail(page).getByLabel('本文',{exact:true})).toHaveValue('相手が追記');
     const finalPath = await download(page,info,'point-final','backup'), final = await backupRecords(finalPath);
     expect(Buffer.from(await final.backup.archive.entryBytes(`blobs/sha256/${hash(largePly)}`,largePly.length))).toEqual(largePly);
@@ -126,7 +129,7 @@ test('点群の元座標で記録し、画像・調整・受け渡し・閲覧�
     expect(Buffer.from(await final.backup.archive.entryBytes(`blobs/sha256/${hash(updatedPly)}`,updatedPly.length))).toEqual(updatedPly);
     const assetId=original.anchor.assetId,oldAsset=initial.records.assetsById[assetId],newAsset=final.records.assetsById[assetId];expect(newAsset.assetFrameId).toBe(oldAsset.assetFrameId);expect(newAsset.status.activeBindingId).not.toBe(oldAsset.status.activeBindingId);expect(final.records.assetBindingsById[newAsset.status.activeBindingId].assetToProject).toMatchObject({translation:[3,0,0],uniformScale:2}); expect(Object.keys(final.records.captionAttachmentsById)).toHaveLength(1);
     const reviewPath = await download(page,info,'point-review','review'); await close(b.context,'B');
-    const review = await launch(1,3); await ready(review.page); await revealProjectHelp(review.page); await review.page.getByRole('button',{name:'別のプロジェクトを開く',exact:true}).click(); await expect(review.page.getByLabel('ファイルを選択',{exact:true})).toBeVisible(); await expect(review.page.getByLabel('ファイルを選択',{exact:true})).toBeEnabled(); await review.page.getByLabel('ファイルを選択',{exact:true}).setInputFiles(reviewPath); await review.page.getByRole('button',{name:'ファイルを開く',exact:true}).click();
+    const review = await launch(1,3); await ready(review.page); await revealProjectSelection(review.page); await review.page.getByRole('button',{name:/^(?:ファイルを開く|別のプロジェクトを開く)$/,exact:true}).click(); await expect(review.page.getByLabel('ファイルを選択',{exact:true})).toBeVisible(); await expect(review.page.getByLabel('ファイルを選択',{exact:true})).toBeEnabled(); await review.page.getByLabel('ファイルを選択',{exact:true}).setInputFiles(reviewPath); await review.page.getByRole('button',{name:'ファイルを開く',exact:true}).click();
     await expect(review.page.getByText('閲覧用シーンを開きました。編集プロジェクトは作成していません。',{exact:true})).toBeVisible({timeout:180_000});
     await expect(review.page.getByText(/この描画倍率では点群を表示できません/).first()).toBeVisible(); await review.page.getByRole('list',{name:'キャプション一覧',exact:true}).locator('.lv-caption-select').first().click(); await expect(review.page.getByText('相手が追記',{exact:true}).first()).toBeVisible(); await close(review.context,'review');
     await close(a.context,'A'); a = await launch(0,2); await ready(a.page); await caption(a.page); await expect(detail(a.page).getByLabel('本文',{exact:true})).toHaveValue('相手が追記'); await close(a.context,'cold');
@@ -141,7 +144,7 @@ test('点群の元座標で記録し、画像・調整・受け渡し・閲覧�
 test('大座標GLBの実描画に隠れる点を拒否し、非表示にすると元の点を選べる', async ({},info) => {
   const root=info.outputPath('gpu-profile'); await mkdir(root,{recursive:true}); const profile=await mkdtemp(join(root,'owned-'));
   const context=await chromium.launchPersistentContext(profile,{channel:'chromium',headless:true,viewport:{width:1440,height:1000},acceptDownloads:true,serviceWorkers:'block'}), errors:string[]=[];
-  context.setDefaultTimeout(15_000); await context.tracing.start({screenshots:true,snapshots:true,sources:true});
+  context.setDefaultTimeout(15_000); if(tracing)await context.tracing.start({screenshots:true,snapshots:true,sources:true});
   await context.route('**/*',route=>{const url=new URL(route.request().url());return url.origin===new URL(entry).origin||['data:','blob:'].includes(url.protocol)?route.continue():route.abort('blockedbyclient');});
   const page=context.pages()[0]??await context.newPage();page.on('pageerror',e=>errors.push(e.message));
   const data=Buffer.from('ply\nformat ascii 1.0\nelement vertex 5\nproperty float x\nproperty float y\nproperty float z\nproperty uchar red\nproperty uchar green\nproperty uchar blue\nend_header\n-7.5 0 0 255 0 0\n-9 -9 0 0 255 0\n9 9 0 0 0 255\n-9 9 0 255 255 0\n9 -9 0 255 0 255\n');
@@ -152,7 +155,7 @@ test('大座標GLBの実描画に隠れる点を拒否し、非表示にする�
     await page.getByRole('tab',{name:'モデル',exact:true}).click();const models=page.getByRole('tabpanel',{name:'モデル',exact:true}),choosing=page.waitForEvent('filechooser');await revealModelManagement(page); await models.getByRole('button',{name:'3Dモデルを追加',exact:true}).click();await(await choosing).setFiles({name:'large-edge.glb',mimeType:'model/gltf-binary',buffer:glb});await expect(page.getByText('モデルを追加しました。',{exact:true})).toBeVisible();
     await models.locator('.lv-model-select').filter({hasText:'large-edge.glb'}).click();await models.getByRole('button',{name:'配置を調整',exact:true}).click();await models.getByLabel('モデル位置 X',{exact:true}).fill('-99999999');await models.getByRole('button',{name:'配置を確定',exact:true}).click();await expect(page.getByText('モデルの配置を確定しました。',{exact:true})).toBeVisible();await models.locator('.lv-model-select').filter({hasText:'point.ply'}).click();
     const location=async(meshVisible:boolean)=>{await lookAlongFront(page);await page.getByRole('button',{name:'全体表示',exact:true}).click();const box=(await page.getByLabel('3Dモデルの表示',{exact:true}).boundingBox())!,pose=fittedPose({min:[-9,-9,0],max:[9,9,meshVisible?1:0]},defaultPose(),box.width/box.height,'+z');if(pose.projection.kind!=='perspective')throw Error('camera');const camera=new THREE.PerspectiveCamera(THREE.MathUtils.radToDeg(pose.projection.verticalFov),box.width/box.height,.01,1000);camera.position.set(...pose.position);camera.up.set(...pose.up);camera.lookAt(new THREE.Vector3(...pose.target));camera.updateMatrixWorld(true);const ndc=new THREE.Vector3(-7.5,0,0).project(camera);return{x:(ndc.x+1)*box.width/2,y:(1-ndc.y)*box.height/2,dx:ndc.x*box.width/2,dy:-ndc.y*box.height/2};};
-    await page.getByRole('tab',{name:'キャプション',exact:true}).click();const pin=page.getByRole('region',{name:'ピンの操作',exact:true}),canvas=page.getByLabel('3Dモデルの表示',{exact:true});let p=await location(true);expect((await sample(page,p.dx,p.dy)).slice(0,3)).not.toEqual([255,0,0]);await pin.getByRole('button',{name:'ピンを追加',exact:true}).click();await canvas.click({position:{x:p.x,y:p.y}});await expect(page.getByText('配置する面を特定できません。視点を変えて選び直してください。',{exact:true})).toBeVisible();await expect(pin.getByRole('button',{name:'位置を確定',exact:true})).toBeHidden();await pin.getByRole('button',{name:'取り消す',exact:true}).click();
-    await page.getByRole('tab',{name:'モデル',exact:true}).click();await models.locator('.lv-model-select').filter({hasText:'large-edge.glb'}).click();await models.getByRole('button',{name:'隠す',exact:true}).click();await models.locator('.lv-model-select').filter({hasText:'point.ply'}).click();await page.getByRole('tab',{name:'キャプション',exact:true}).click();p=await location(false);expect((await sample(page,p.dx,p.dy)).slice(0,3)).toEqual([255,0,0]);await pin.getByRole('button',{name:'ピンを追加',exact:true}).click();await canvas.click({position:{x:p.x,y:p.y}});await expect(pin.getByLabel('位置 X',{exact:true})).toHaveValue('-7.5');await pin.getByRole('button',{name:'位置を確定',exact:true}).click();await expect(page.getByText('ピンの位置を確定しました。',{exact:true})).toBeVisible();expect(errors).toEqual([]);await page.screenshot({path:info.outputPath('large-mesh-occlusion.png'),fullPage:true});
-  } finally {await context.tracing.stop({path:info.outputPath('gpu-trace.zip')});await context.close();await info.attach('browser-errors',{body:JSON.stringify(errors),contentType:'application/json'});}
+    await page.getByRole('tab',{name:'キャプション',exact:true}).click();const pin=page.getByRole('region',{name:'ピンの操作',exact:true}),placement=page.getByRole('region',{name:'位置の調整',exact:true}),canvas=page.getByLabel('3Dモデルの表示',{exact:true});let p=await location(true);expect((await sample(page,p.dx,p.dy)).slice(0,3)).not.toEqual([255,0,0]);await pin.getByRole('button',{name:'キャプションを追加',exact:true}).click();await canvas.click({position:{x:p.x,y:p.y}});await expect(page.getByText('配置する面を特定できません。視点を変えて選び直してください。',{exact:true})).toBeVisible();await expect(placement.getByRole('button',{name:'位置を確定',exact:true})).toBeHidden();await placement.getByRole('button',{name:'取り消す',exact:true}).click();
+    await page.getByRole('tab',{name:'モデル',exact:true}).click();await models.locator('.lv-model-select').filter({hasText:'large-edge.glb'}).click();await models.getByRole('button',{name:'隠す',exact:true}).click();await models.locator('.lv-model-select').filter({hasText:'point.ply'}).click();await page.getByRole('tab',{name:'キャプション',exact:true}).click();p=await location(false);expect((await sample(page,p.dx,p.dy)).slice(0,3)).toEqual([255,0,0]);await pin.getByRole('button',{name:'キャプションを追加',exact:true}).click();await canvas.click({position:{x:p.x,y:p.y}});await expect(placement.getByLabel('位置 X',{exact:true})).toHaveValue('-7.5');await placement.getByRole('button',{name:'位置を確定',exact:true}).click();await expect(page.getByText('ピンの位置を確定しました。',{exact:true})).toBeVisible();expect(errors).toEqual([]);await page.screenshot({path:info.outputPath('large-mesh-occlusion.png'),fullPage:true});
+  } finally {await page.screenshot({path:info.outputPath('gpu.png'),fullPage:true}).catch(()=>{});if(tracing)await context.tracing.stop({path:info.outputPath('gpu-trace.zip')});await context.close();await info.attach('browser-errors',{body:JSON.stringify(errors),contentType:'application/json'});}
 });

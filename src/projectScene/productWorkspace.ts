@@ -15,10 +15,11 @@ type Host = ReturnType<typeof createValidationModeHost>;
 type Tools = ReturnType<typeof createValidationReceiveControls>;
 /** Validation-only adapter. No synthetic Session or string-map writes enter product UI. */
 export function createProductWorkspace(document: Document, host: Host, factory: ViewportFactory, tools?: Tools, renderCandidate?: ModelCandidateRenderer,
-  navigation?: { utilitiesRoot?:HTMLElement;compactFiles?:boolean;smoothDisplay?:boolean;presentation?():{busy:boolean;reason:string}|null;projectNavigationBlocked?():boolean;openProject(): void; resumedLastProject(): boolean; changed(): void; storageEstimate?(): Promise<Readonly<{ usage?: number; quota?: number }>>;localSettings?:{read():string;save(displayName:string):boolean} }) {
+  navigation?: { utilitiesRoot?:HTMLElement;fileActionsRoot?:HTMLElement;compactFiles?:boolean;smoothDisplay?:boolean;presentation?():{busy:boolean;reason:string}|null;projectNavigationBlocked?():boolean;openProject(): void; resumedLastProject(): boolean; changed(): void; storageEstimate?(): Promise<Readonly<{ usage?: number; quota?: number }>>;localSettings?:{read():string;save(displayName:string):boolean} }) {
   const root = document.createElement('section'), mode = document.createElement('button'), status = document.createElement('p');
   root.className = 'lv-project-shell';
   const utilitiesParent=navigation?.utilitiesRoot?.parentElement;
+  const fileActionsParent=navigation?.fileActionsRoot?.parentElement;
   mode.type = 'button'; status.setAttribute('role', 'status');
   const fileMenu=tools&&navigation?.compactFiles?document.createElement('details'):undefined;
   const fileClose = document.createElement('button'), fileNotice = document.createElement('p');
@@ -30,6 +31,7 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
   fileClose.type = 'button'; fileClose.textContent = '閉じる'; fileNotice.setAttribute('role', 'status');
   if(fileMenu){fileMenu.className='lv-project-files';const summary=document.createElement('summary');fileSummary=summary;summary.textContent='ファイル';
     fileContent.append(tools!.root); filePanel.append(fileHeader,fileCloseNote,fileContent); fileMenu.append(summary,filePanel);
+    if (navigation?.fileActionsRoot) filePanel.append(navigation.fileActionsRoot);
     summary.addEventListener('click', event => { if(fileMenu.open && tools!.hasChanges()) event.preventDefault();
       else if(!fileMenu.open) { fileOrigin=summary;core?.dismissDisclosures(); } });
   }
@@ -147,6 +149,8 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
     transformModel: async (token, input) => host.authority.transformModel!(token, input),
     image: async record => new Blob([(await host.content.displayImage(record, true)).slice().buffer], { type: displayBlobRef(record).mediaType as string }),
     imageScope: () => host.imageScope(),
+    rasterResources: host.content.rasterResources,
+    imageDimensions:(bytes,mime)=>host.content.displayDimensions(bytes,mime),
     changed, otherPending: () => external() || !!startup?.hasChanges(),
     createViewport(canvas, update, propose, proposeModel): WorkspaceViewport {
       let state: WorkspaceViewportState | undefined, closed = false, rendered: EditableDisplay | undefined, pointerHeld = false;
@@ -166,7 +170,7 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
         if (!state || state.readOnly || state.token !== read().token) return null;
         const snapshot = host.authority.read(), version = snapshot.modelVersions?.find(v => v.assetId === assetId);
         const seen = runtime.read(), display = seen.display;
-        if (!state.available || !seen.ready || seen.issue || rendered !== display || state.hiddenAssetIds?.includes(assetId) || snapshot.state.token !== state.token || !version || version.families.length !== 1 || !display || display.token !== state.token || display.sceneId !== state.sceneId || display.readOnly || !display.models.some(m => m.binding.assetId === assetId && m.binding.id === version.projection.bindingId)) return null;
+        if (!state.available || state.visible === false || !seen.ready || seen.issue || rendered !== display || state.hiddenAssetIds?.includes(assetId) || snapshot.state.token !== state.token || !version || version.families.length !== 1 || !display || display.token !== state.token || display.sceneId !== state.sceneId || display.readOnly || !display.models.some(m => m.binding.assetId === assetId && m.binding.id === version.projection.bindingId)) return null;
         const family = version.families[0]!;
         return { token: state.token, sceneId: state.sceneId, assetId, assetFrameId: version.projection.assetFrameId,
           bindingId: version.projection.bindingId, revisionId: version.projection.revisionId,
@@ -175,7 +179,7 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
       const observation = () => {
         const seen = runtime.read(); let receipt = '';
         try { if (seen.pickToken && runtime.capture) receipt = JSON.stringify([seen.pickToken, runtime.capture()]); } catch { /* No receipt, no pick. */ }
-        const current = !!state?.available && rendered === seen.display && state.token === seen.display?.token && state.sceneId === seen.display.sceneId && state.token === read().token;
+        const current = !!state?.available && state.visible !== false && rendered === seen.display && state.token === seen.display?.token && state.sceneId === seen.display.sceneId && state.token === read().token;
         const available = current && seen.ready && !seen.issue;
         const cameraAvailable=current&&(seen.cameraReady??seen.ready)&&!seen.issue;
         const pinIds = new Set(available ? rendered!.pins.map(p => p.id) : []);
@@ -194,7 +198,7 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
           if (closed) return; state = next; viewportScene = next.sceneId; refreshPreview?.();
           const snapshot = host.authority.read();
           if (previewOpen){runtime.setActive(false);return;}
-          if (!next.available || snapshot.state.token !== next.token) { renderedInput = ''; runtime.setPinPointerActive?.(false); runtime.setActive(false); return; }
+          if (!next.available || next.visible === false || snapshot.state.token !== next.token) { renderedInput = ''; runtime.setPinPointerActive?.(false); runtime.setActive(false); return; }
           // A renderer observation can request another UI render. Identical typed
           // input must retain the exact display and must not start a new renderer
           // revision/notification cycle (which would repeatedly replace controls).
@@ -282,7 +286,7 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
     catch (error) { if (!disposed) { modeFeedback = (error as Error).message; status.textContent = modeFeedback; } }
     finally { switching = false; core?.clearNotice(); render(); }
   })(); });
-  const unmount = () => { if (!disposed) { disposed = true; document.defaultView?.removeEventListener('resize',positionFiles); if(navigation?.utilitiesRoot)utilitiesParent?.append(navigation.utilitiesRoot); startup?.dispose(); core?.unmount(); root.remove(); } };
+  const unmount = () => { if (!disposed) { disposed = true; document.defaultView?.removeEventListener('resize',positionFiles); if(navigation?.utilitiesRoot)utilitiesParent?.append(navigation.utilitiesRoot);if(navigation?.fileActionsRoot)fileActionsParent?.append(navigation.fileActionsRoot); startup?.dispose(); core?.unmount(); root.remove(); } };
   changed();
   const interaction = { get interactionPending() { return core?.session.interactionPending || !!startup?.hasChanges(); },
     get acknowledgment() { return startup?.busy() || startup?.recoveryPending() ? { state: startup.busy() ? 'checking' as const : 'failed' as const } : core?.session.acknowledgment ?? { state: 'idle' as const }; },

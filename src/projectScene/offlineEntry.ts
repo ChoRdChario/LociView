@@ -1,7 +1,7 @@
 import './styles.css';
 import { createValidationBrowserWorkspace, validationBrowserLimits } from './validationBrowser';
 import { createProductWorkspace } from './productWorkspace';
-import { projectFilePolicy } from '../projectFiles/validation';
+import { projectFilePolicy, desktopStaticRasterLimits } from '../projectFiles/validation';
 import { createGsResidency } from '../viewer/gsDecodeQueue';
 import { createTargetBudget, targetLayout } from '../viewer/targetBudget';
 import { createSmoothComposite } from '../viewer/smoothComposite';
@@ -17,7 +17,7 @@ export async function bootOfflineDesktopApp(root: HTMLElement) {
   root.replaceChildren(status);void initializeDesktopOffline(offline.port,navigator.onLine);let workspaceAttached=false;
   window.addEventListener('pagehide', event => { if (!event.persisted) offline.dispose(); });
   try{
-  const policy = projectFilePolicy({ nonGs: validationBrowserLimits,
+  const policy = projectFilePolicy({ nonGs: { ...validationBrowserLimits, ...desktopStaticRasterLimits },
     gs: { ...validationBrowserLimits, maxFileBytes: 512 * 1024 * 1024, maxItems: 500_000, maxValues: 44_500_000 }, projectBodyBytes: 512 * 1024 * 1024 });
   const workspace = await createValidationBrowserWorkspace(document, {
     offline: offline.port, progressivePresentation: true, filePolicy: policy, residency: createGsResidency(500_000, 44_500_000),

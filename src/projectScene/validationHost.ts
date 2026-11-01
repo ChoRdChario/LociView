@@ -153,7 +153,7 @@ export async function openValidationEntry(options: ValidationHostOptions): Promi
   const runJob = async (job: BackupRestoreJob, prepare: FirstRestoreDisplay) => {
     const staging = await measure('open-staging', () => job.openStaging(databases)), service = validationGenerationService(staging, options);
     try {
-      const read = await measure('initialize', () => service.session.initializeBackup(job)), next = await measure('projection', () => validationProjectFrom(read, service.content));
+      const read = await measure('initialize', () => service.session.initializeBackup(job)), next = await measure('projection', () => validationProjectFrom(read, service.content, undefined, options.lazyImages));
       if (!next) throw Error('復元先の表示を確認できません。');
       await measure('display', () => prepare(next, service.content));
       if (closed) throw Error('画面を閉じました。復元記録は保持しています。');

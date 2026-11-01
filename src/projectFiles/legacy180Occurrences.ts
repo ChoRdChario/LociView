@@ -12,6 +12,8 @@ import { fileError, occurrenceGlbProfileText, occurrenceJpegGlbProfileText, type
 import { digestNativeBytes } from '../nativeGs/sha256';
 import type { MeshSourceData } from '../domain/meshSource';
 import { meshSourceInputKey } from './meshSourceBinding';
+import type { RasterResources } from '../viewer/rasterResources';
+import { createRasterLoadScope, withRasterModelStage } from '../viewer/rasterLoadScope';
 
 export function occurrenceInputKey(source:ValidatedGlb):string {
   const sha256=digestNativeBytes(source.bytes).sha256;
@@ -26,16 +28,17 @@ export interface LegacyOccurrenceRow {
   readonly nodeIndex: number; readonly primitiveIndex: number; readonly materialIndex: number | null; readonly slotIndex: number;
   readonly v1Key: string; readonly target: NeutralTarget;
 }
-export async function captureLegacyOccurrenceProof(source:ValidatedGlb, signal?:AbortSignal):Promise<LegacyOccurrenceProof> {
-  const {bytes,...metadata}=source;
-  const owned:ValidatedGlb={...structuredClone(metadata),bytes:bytes.slice()};
-  return captureOwnedOccurrenceProof(owned,signal);
+export async function captureLegacyOccurrenceProof(source:ValidatedGlb, signal?:AbortSignal, resources?:RasterResources):Promise<LegacyOccurrenceProof> {
+  return withRasterModelStage(source, resources, () => {
+    const {bytes,...metadata}=source, owned:ValidatedGlb={...structuredClone(metadata),bytes:bytes.slice()};
+    return captureOwnedOccurrenceProof(owned,signal,resources);
+  });
 }
 /** Only glbOccurrences' private capture may supply this already-owned input. */
-export async function captureOwnedOccurrenceProof(source:ValidatedGlb,signal?:AbortSignal):Promise<LegacyOccurrenceProof> {
+export async function captureOwnedOccurrenceProof(source:ValidatedGlb,signal?:AbortSignal,resources?:RasterResources):Promise<LegacyOccurrenceProof> {
   signal?.throwIfAborted();
   const inputKey=occurrenceInputKey(source);
-  const decoded=await decodeOccurrenceGlb(source);
+  const decoded=await decodeOccurrenceGlb(source,false,resources,signal);
   try {
     signal?.throwIfAborted();
     const rows = decoded.occurrenceSlots.map(slot => {
@@ -56,9 +59,9 @@ export async function captureOwnedOccurrenceProof(source:ValidatedGlb,signal?:Ab
 }
 
 /** New JSON-glTF binding; old GLB profile/input keys and URI policy stay closed. */
-export async function captureGltfMeshOccurrenceProof(input:MeshSourceData,signal?:AbortSignal):Promise<LegacyOccurrenceProof>{
+export async function captureGltfMeshOccurrenceProof(input:MeshSourceData,signal?:AbortSignal,resources?:RasterResources):Promise<LegacyOccurrenceProof>{
   if(input.kind!=='mesh-source'||input.format!=='gltf')throw Error('glTFの入力形式を確認してください。');
-  const source=structuredClone(input),inputKey=meshSourceInputKey(source);signal?.throwIfAborted();const decoded=await decodeOccurrenceGlb(source,true);
+  const source=structuredClone(input),inputKey=meshSourceInputKey(source);signal?.throwIfAborted();const decoded=await decodeOccurrenceGlb(source,true,resources,signal);
   try{signal?.throwIfAborted();const rows=decoded.occurrenceSlots.map(slot=>{const target=snapshotTargets(slot.node,undefined,false).rows[0];if(!target)throw Error('元の材質を確認できません。');
       return Object.freeze({childPath:Object.freeze([...slot.childPath]),materialArraySlot:slot.materialArraySlot,nodeIndex:slot.nodeIndex,primitiveIndex:slot.primitiveIndex,materialIndex:slot.materialIndex,slotIndex:slot.slotIndex,v1Key:'',target});});
     if(inputKey!==meshSourceInputKey(source))throw Error('元のモデル入力が変更されました。');return Object.freeze({inputKey,rows:Object.freeze(rows)});
@@ -70,7 +73,8 @@ interface DecodedOccurrenceSlot {
   readonly nodeIndex: number; readonly primitiveIndex: number; readonly materialIndex: number | null; readonly slotIndex: number;
 }
 /** Owned inspected input only. No source URLs, metadata, storage or UI authority. */
-async function decodeOccurrenceGlb(source: Pick<ValidatedGlb,'bytes'|'bounds'|'materials'|'surfaceRanges'|'occurrences'>,inlineResources=false) {
+async function decodeOccurrenceGlb(source: Pick<ValidatedGlb,'bytes'|'bounds'|'materials'|'surfaceRanges'|'occurrences'>,inlineResources=false,resources?:RasterResources,signal?:AbortSignal) {
+  const native = createRasterLoadScope(resources, signal);
   if (!source.occurrences || THREE.REVISION !== '180' || !THREE.ColorManagement.enabled || THREE.ColorManagement.workingColorSpace !== THREE.LinearSRGBColorSpace)
     throw Error('モデルと材質の対応を確認できません。');
   const manager = new THREE.LoadingManager(), owned = new Set<ImageBitmap>(), roots = new Set<THREE.Object3D>(), originals = new Set<THREE.Material>();
@@ -92,9 +96,9 @@ async function decodeOccurrenceGlb(source: Pick<ValidatedGlb,'bytes'|'bounds'|'m
   };
   class Images extends THREE.ImageBitmapLoader {
     override load(url: string, done?: (bitmap: ImageBitmap) => void, progress?: (event: ProgressEvent) => void, error?: (e: unknown) => void) {
-      return super.load(url, bitmap => { if (closed) { closeBitmapOnce(bitmap); error?.(Error('表示を取り消しました。')); return; }
+      return native.load((loaded, failed) => super.load(url, loaded, progress, failed), bitmap => { if (closed) { closeBitmapOnce(bitmap); error?.(Error('表示を取り消しました。')); return; }
         owned.add(bitmap); done?.(bitmap);
-      }, progress, e => { failed = true; error?.(e); });
+      }, e => { failed = true; error?.(e); });
     }
   }
   try {
@@ -142,5 +146,5 @@ async function decodeOccurrenceGlb(source: Pick<ValidatedGlb,'bytes'|'bounds'|'m
       materialLocators.set(material, locator);
     }
     return { root, materialLocators, occurrenceSlots, dispose };
-  } catch (error) { dispose(); throw error; }
+  } catch (error) { dispose(); throw error; } finally { await native.dispose(); }
 }

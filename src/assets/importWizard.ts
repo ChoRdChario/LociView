@@ -140,6 +140,10 @@ export interface BuildImportPlanOptions {
   readonly preserveBlockedLociMyuSource?: boolean;
 }
 
+/** Read-only source analysis does not own model, image or workbook bodies. */
+export type ImportSourceAnalysisPlan = Pick<ImportPlan, 'tables' | 'selectedSourceIndex' | 'migration' | 'diagnostics' | 'warnings' |
+  'allowBlockedLociMyuSource' | 'blockedLociMyuSource'> & { sources: Omit<SpreadsheetSource, 'sourceBytes'>[] };
+
 const BACKUP_HINT = /(backup|バックアップ|コピー|copy|_old|旧)/i;
 export const IMPORT_DIAGNOSTIC_DISPLAY_LIMIT = 5;
 export const IMPORT_SOURCE_ANALYSIS_FAILURE_NOTICE =
@@ -151,7 +155,7 @@ function boundedDiagnosticsSummary(messages: readonly string[]): string {
   return `${visible.join(' / ')}${omitted > 0 ? ` / 他${omitted}件の候補` : ''}`;
 }
 
-function refreshImportPlanWarnings(plan: ImportPlan): void {
+function refreshImportPlanWarnings(plan: ImportSourceAnalysisPlan): void {
   const selected = plan.sources[plan.selectedSourceIndex];
   plan.diagnostics.selection = plan.sources.length > 1 && selected !== undefined
     ? `スプレッドシートが${plan.sources.length}個見つかりました。「${selected.fileName}」を使用します（取込前に切り替えられます）`
@@ -165,7 +169,7 @@ function refreshImportPlanWarnings(plan: ImportPlan): void {
 }
 
 function commitSourceSelection(
-  plan: ImportPlan,
+  plan: ImportSourceAnalysisPlan,
   index: number,
   tables: SheetTable[],
   migration: LociMyuMigration,
@@ -179,7 +183,7 @@ function commitSourceSelection(
 }
 
 function commitBlockedSourceSelection(
-  plan: ImportPlan,
+  plan: ImportSourceAnalysisPlan,
   index: number,
   tables: SheetTable[],
   failure: NonNullable<SpreadsheetSource['validationFailure']>,
@@ -384,6 +388,11 @@ export async function buildImportPlan(
     }
   }
 
+  return analyzeImportPlanSources(plan);
+}
+
+/** Shared exact candidate ranking/diagnostics, independent of binary body ownership. */
+export async function analyzeImportPlanSources<T extends ImportSourceAnalysisPlan>(plan: T): Promise<T> {
   if (plan.sources.length > 0) {
     // 全候補を同じauthority解析に通し、その実結果から既定を選ぶ。
     // 複数のスプレッドシートを同時に取り込むと、同じ旧IDのキャプションが
@@ -432,7 +441,7 @@ export async function buildImportPlan(
           );
           continue;
         }
-        if (options.preserveBlockedLociMyuSource && error instanceof LociMyuIdentityCollisionError) {
+        if (plan.allowBlockedLociMyuSource && error instanceof LociMyuIdentityCollisionError) {
           const failure = { code: error.code, message: error.message } as const;
           source.validationFailure = failure;
           plan.diagnostics.rejectedCandidates.push(
@@ -445,7 +454,7 @@ export async function buildImportPlan(
       }
     }
     if (
-      options.preserveBlockedLociMyuSource &&
+      plan.allowBlockedLociMyuSource &&
       (best === null || best.migration.sets.length === 0)
     ) {
       const rejected = plan.sources

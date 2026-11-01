@@ -9,15 +9,17 @@ import type { PngDecoder } from './png';
 import type { JpegDecoder } from './jpeg';
 import { fileError, type FileValidationLimits } from './validation';
 import { captureOwnedOccurrenceProof, occurrenceInputKey } from './legacy180Occurrences';
+import { createRasterLoadScope } from '../viewer/rasterLoadScope';
+import type { RasterResources } from '../viewer/rasterResources';
 export { captureLegacyOccurrenceProof } from './legacy180Occurrences';
 
 /** Actual180 proof and release precede a separately verified186 display. */
-export async function decodeOccurrenceGlb(source: ValidatedGlb, signal?: AbortSignal) {
+export async function decodeOccurrenceGlb(source: ValidatedGlb, signal?: AbortSignal, resources?: RasterResources) {
   const {bytes,...metadata}=source;
   const owned:ValidatedGlb={...structuredClone(metadata),bytes:bytes.slice()};
-  const proof=await captureOwnedOccurrenceProof(owned,signal);
+  const proof=await captureOwnedOccurrenceProof(owned,signal,resources);
   signal?.throwIfAborted();
-  const display = await decodeOccurrenceDisplay(owned);
+  const display = await decodeOccurrenceDisplay(owned,false,resources,signal);
   try {
     signal?.throwIfAborted();
     if(proof.inputKey!==occurrenceInputKey(owned))throw Error('元のモデル入力が変更されました。');
@@ -58,7 +60,8 @@ export interface DecodedOccurrenceSlot {
   readonly nodeIndex: number; readonly primitiveIndex: number; readonly materialIndex: number | null; readonly slotIndex: number;
 }
 /** Owned inspected input only. No source URLs, metadata, storage or UI authority. */
-export async function decodeOccurrenceDisplay(source: Pick<ValidatedGlb,'bytes'|'bounds'|'materials'|'surfaceRanges'|'occurrences'>,inlineResources=false) {
+export async function decodeOccurrenceDisplay(source: Pick<ValidatedGlb,'bytes'|'bounds'|'materials'|'surfaceRanges'|'occurrences'>,inlineResources=false,resources?:RasterResources,signal?:AbortSignal) {
+  const native = createRasterLoadScope(resources, signal);
   if (!source.occurrences || THREE.REVISION !== '186' || !THREE.ColorManagement.enabled || THREE.ColorManagement.workingColorSpace !== THREE.LinearSRGBColorSpace)
     throw Error('モデルと材質の対応を確認できません。');
   const manager = new THREE.LoadingManager(), owned = new Set<ImageBitmap>(), roots = new Set<THREE.Object3D>(), originals = new Set<THREE.Material>();
@@ -82,9 +85,9 @@ export async function decodeOccurrenceDisplay(source: Pick<ValidatedGlb,'bytes'|
   };
   class Images extends THREE.ImageBitmapLoader {
     override load(url: string, done?: (bitmap: ImageBitmap) => void, progress?: (event: ProgressEvent) => void, error?: (e: unknown) => void) {
-      return super.load(url, bitmap => { if (closed) { bitmap.close(); error?.(Error('表示を取り消しました。')); return; }
+      return native.load((loaded, failed) => super.load(url, loaded, progress, failed), bitmap => { if (closed) { bitmap.close(); error?.(Error('表示を取り消しました。')); return; }
         owned.add(bitmap); done?.(bitmap);
-      }, progress, e => { failed = true; error?.(e); });
+      }, e => { failed = true; error?.(e); });
     }
   }
   try {
@@ -131,5 +134,5 @@ export async function decodeOccurrenceDisplay(source: Pick<ValidatedGlb,'bytes'|
       materialLocators.set(material, locator);
     }
     return { root, materialLocators, occurrenceSlots, dispose };
-  } catch (error) { dispose(); throw error; }
+  } catch (error) { dispose(); throw error; } finally { await native.dispose(); }
 }

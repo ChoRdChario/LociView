@@ -1,13 +1,19 @@
 import { mediaBoxes, mediaText } from './mediaContainer';
 import { fileError, type FileValidationLimits } from './validation';
 import { hevcSps, hevcNal } from './hevcMedia';
+import type { RasterResources } from '../viewer/rasterResources';
 
 export const heicGuidance = 'このブラウザでは、このHEIC/HEIF画像を読み込めません。元の画像を残し、端末で別のJPEGを書き出して選び直してください。';
 const bad=():never=>fileError(heicGuidance);
 export const isHeic=(b:Uint8Array)=>{if(mediaText(b,4,4)!=='ftyp'||b.length<16)return false;const n=new DataView(b.buffer,b.byteOffset,b.byteLength).getUint32(0);const brands=['heic','heix','hevc','hevx','heim','heis','hevm','hevs','mif1','msf1'];for(let p=8;p+4<=Math.min(n,b.length,128);p+=4)if(p!==12&&brands.includes(mediaText(b,p,4)))return true;return false;};
 
 /** Self-contained single-primary HEIF item graph; auxiliary/depth/thumbnail items remain intact. */
-export function heicStructure(bytes:Uint8Array,limits:FileValidationLimits){
+export function heicStructure(bytes:Uint8Array,limits:FileValidationLimits,resources?:RasterResources){
+  // mediaBoxes charges input and every copied extent before allocating an item.
+  const lease=resources?.reserve({cpuBytes:limits.maxValues,gpuBytes:0},'HEICの情報');
+  try{return inspectHeicStructure(bytes,limits);}finally{lease?.release();}
+}
+function inspectHeicStructure(bytes:Uint8Array,limits:FileValidationLimits){
   if(!isHeic(bytes))return bad();const{boxes,one,u32,u64,range,view,charge}=mediaBoxes(bytes,limits),top=boxes(0,bytes.length);
   if(top.some(b=>!['ftyp','meta','mdat','free','skip','uuid'].includes(b.type)))return bad();
   const meta=one(top,'meta');if(u32(meta.start)!==0)return bad();const mc=boxes(meta.start+4,meta.end),pitm=one(mc,'pitm');range(pitm.start,6,pitm.end);

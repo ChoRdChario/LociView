@@ -8,7 +8,7 @@ class HelpNode extends RecordedNode {
     const matches = selector === '[data-lv-help-for]' ? this.attributes.has('data-lv-help-for') : this.className.split(' ').includes(selector.slice(1));
     return matches ? this : (this.parent as HelpNode | null)?.closest(selector) ?? null;
   }
-  getBoundingClientRect() { return { left: 20, top: 20, bottom: 64, width: 44, height: 44 }; }
+  getBoundingClientRect() { return { left: 20, top: 20, right:64, bottom: 64, width: 44, height: 44 }; }
   getClientRects() { let node: RecordedNode | null = this; while (node) { if (node.hidden) return []; node = node.parent; } return [this.getBoundingClientRect()]; }
 }
 class HelpDocument extends RecordedDocument {
@@ -66,6 +66,17 @@ describe('optional contextual explanations', () => {
     const h = setup(); h.document.event('pointerdown', h.trigger, { pointerType: 'touch' });
     h.document.event('pointercancel', h.trigger); h.document.activeElement = h.input; h.document.event('focusin', h.input);
     expect(h.note.hidden).toBe(false); h.stop();
+  });
+  it('leaves composing or already handled Escape to its input without closing help or consuming the key',()=>{
+    const h=setup();h.document.activeElement=h.input;h.document.event('focusin',h.input);
+    for(const data of [{isComposing:true},{defaultPrevented:true}]){const event=h.document.event('keydown',h.input,{key:'Escape',...data});expect(event.preventDefault).not.toHaveBeenCalled();expect(event.stopPropagation).not.toHaveBeenCalled();expect(h.note.hidden).toBe(false);expect(h.input.value).toBe('入力を保持');}
+    h.stop();
+  });
+  it('keeps explicitly opened touch help readable through anchor scrolling without resurrecting a dismissed note',()=>{
+    const h=setup();h.document.activeElement=h.trigger;h.document.event('pointerdown',h.trigger,{pointerType:'touch'});h.document.event('click',h.trigger,{detail:1});
+    h.document.event('pointerover',h.root,{clientX:200,clientY:200});
+    h.document.event('scroll',h.root);expect(h.note.hidden).toBe(false);
+    h.document.event('keydown',h.trigger,{key:'Escape'});h.document.event('scroll',h.root);expect(h.note.hidden).toBe(true);h.stop();
   });
   it('does not swallow edit cancellation before help appears, and follows focus across shared anchors', () => {
     const h = setup(); h.document.event('pointerover', h.trigger);

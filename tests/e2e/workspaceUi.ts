@@ -23,6 +23,8 @@ export async function revealCameraPositions(page:Page){
 /** Select an exact signed direction using the gizmo's keyboard route. */
 export async function lookAlongFront(page: Page) {
   const axis = page.locator('.lv-project-camera').getByRole('button', { name: 'Z', exact: true });
+  // The fixed pre-01g comparison build has the same camera intent in its drawer.
+  if (!await axis.count()) { await page.getByRole('button', { name: '正面', exact: true }).click(); return; }
   await expect(axis).toBeEnabled();
   await axis.press('Enter');
   await expect(axis).toHaveAttribute('aria-pressed', 'true');
@@ -40,7 +42,13 @@ export async function beginSceneCreation(page: Page) {
 }
 
 /** Navigate the visible product UI; never bypass draft/IME or file guards. */
+export async function closeFileSurface(page:Page){
+  const menu=page.locator('details.lv-project-files');
+  if(await menu.count()&&await menu.evaluate(node=>(node as HTMLDetailsElement).open))await menu.getByRole('button',{name:'閉じる',exact:true}).click();
+}
+
 export async function revealCaptionList(page: Page) {
+  await closeFileSurface(page);
   const panel = page.getByRole('button', { name: '作業パネル', exact: true });
   if (await panel.isVisible() && await panel.getAttribute('aria-pressed') !== 'true') await panel.click();
   const tab = page.getByRole('tab', { name: 'キャプション', exact: true });

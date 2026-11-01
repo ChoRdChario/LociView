@@ -9,6 +9,8 @@ import type { ViewportFactory, ProjectViewport } from './viewportPorts';
 import { createMediaViewer, createMediaThumbnails, mediaDisplayDescription, type MediaPreviewGroup } from '../ui/projectScene/mediaPreview';
 import { createCameraGizmo } from '../ui/projectScene/cameraGizmo';
 import { mountContextHelp } from '../ui/projectScene/contextHelp';
+import { displayBlobRef } from '../domain/portableMedia';
+import type { JsonObject } from '../domain/values';
 
 /** Standalone snapshot viewing. Only an explicitly confirmed handoff may create an editing Project. */
 export function createReviewWorkspace(document: Document, view: ReviewView, factory: ViewportFactory, editCopy?: () => void | Promise<void>) {
@@ -24,7 +26,7 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
   const sceneName = make('h2', view.sceneName), emptyCaptions=make('p','このシーンにキャプションはありません。'),status = make('p'), retry = make('button', '3D表示を再試行'); status.setAttribute('role', 'status'); retry.type = 'button';
   const footer = make('p', '閲覧用ファイルです。元ファイルとブラウザのプロジェクトは変更しません。');
   viewport.append(canvas, overlay); stage.append(viewport); content.append(stage, sidebar); root.append(header, status, retry, content, footer);
-  const mediaViewer = createMediaViewer(document); root.append(mediaViewer.root);
+  const mediaViewer = createMediaViewer(document, view.rasterResources,view.imageDimensions); root.append(mediaViewer.root);
   let memory: SceneUiMemory = { selectedCaptionId: null, search: '', pinColors: null, listScrollTop: 0, ownerFilter: { kind: 'all' } };
   let windowsMemory = newCaptionWindowMemory(view.source.sceneId), composing = false, moving = false, disposed = false, rendering = false;
   let runtime: ProjectViewport | undefined, display = view.display(null, null), failure = '', rendererFailure = '';
@@ -74,9 +76,9 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
     const caption = view.source.captions.find(c => c.id === captionId);
     return { scope: JSON.stringify([view.source.token, captionId]), label: caption?.title.kind === 'value' ? caption.title.value || 'キャプション' : 'キャプション',
       items: view.attachments.filter(a => a.captionId === captionId).map(a => {
-        const media = (view.inspection.review.snapshot.mediaResourcesById as Record<string, { label: string;mediaKind:'image'|'video'|'audio';portableDisplay?:unknown }>)[String(a.mediaResourceId)];
+        const media = (view.inspection.review.snapshot.mediaResourcesById as Record<string, JsonObject & { label: string;mediaKind:'image'|'video'|'audio';portableDisplay?:JsonObject }>)[String(a.mediaResourceId)];
         const blob = view.images.get(String(a.mediaResourceId));
-        return { id: String(a.id), resourceId: String(a.mediaResourceId), label: media?.label ?? 'メディア',kind:media?.mediaKind, description: mediaDisplayDescription(String(a.altText || ''),media?.portableDisplay!==undefined), image: blob ? { blob } : null };
+        return { id: String(a.id), resourceId: String(a.mediaResourceId), label: media?.label ?? 'メディア',kind:media?.mediaKind, description: mediaDisplayDescription(String(a.altText || ''),media?.portableDisplay!==undefined), image: blob && media ? { key: JSON.stringify([view.source.token, displayBlobRef(media)]), byteLength: Number(displayBlobRef(media).byteLength), load: () => view.content.image(media) } : null };
       }) };
   };
   const gallery = (captionId: string) => {

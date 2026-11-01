@@ -12,6 +12,7 @@ import { inspectMeshObj } from './meshObj';
 import { inspectMeshGltf } from './meshGltf';
 import type { PngDecoder } from './png';
 import type { JpegDecoder } from './jpeg';
+import type { ValidatedGlb } from './glb';
 
 const texts={stl:stlText,ply:plyText,obj:objText,gltf:gltfText};
 const hash=async(text:string)=>[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(text)))].map(n=>n.toString(16).padStart(2,'0')).join('');
@@ -19,7 +20,7 @@ const profiles=new Map<MeshSourceFormat,Promise<JsonObject>>();
 export function meshSourceProfile(format:MeshSourceFormat):Promise<JsonObject>{let p=profiles.get(format);if(!p){p=(async()=>{const declaration=meshSourceDeclarations[format],text=texts[format],spec=JSON.parse(text),sha=await hash(text);
     if(sha!==declaration.sha256||spec.id!==declaration.id||spec.goldens.sha256!==await hash(goldenText)||spec.goldens.sha256!=='6fb753973ff29b782ae4f7d15b8b37ea6ec7c5ecd5fcf82e508a94db562697eb')return fileError('モデルの入力形式を確認できません。');
     return Object.freeze({id:declaration.id,specificationSha256:sha});})();profiles.set(format,p);}return p;}
-export type ValidatedMeshSource=MeshSourceData;
+export type ValidatedMeshSource=MeshSourceData & Pick<ValidatedGlb, 'raster'>;
 /** Exact existing Native declaration; target tuples are separately hash-bound. */
 export function nativeMeshSourceFormat(profile:{readonly id:string}):MeshSourceFormat|null{
   const match=/^lociview-native-model-(stl|ply|obj|gltf)-v1$/.exec(profile.id);return match?match[1] as MeshSourceFormat:null;

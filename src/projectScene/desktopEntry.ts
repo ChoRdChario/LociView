@@ -1,7 +1,7 @@
 import './styles.css';
 import {createValidationBrowserWorkspace,validationBrowserLimits} from './validationBrowser';
 import {createProductWorkspace} from './productWorkspace';
-import {projectFilePolicy} from '../projectFiles/validation';
+import {projectFilePolicy, desktopStaticRasterLimits} from '../projectFiles/validation';
 import {createGsResidency} from '../viewer/gsDecodeQueue';
 import {createTargetBudget,targetLayout} from '../viewer/targetBudget';
 import {createSmoothComposite} from '../viewer/smoothComposite';
@@ -10,7 +10,7 @@ import type {LegacyAppController} from '../ui/app';
 /** Explicit static PC candidate, never selected by URL or a persisted preference. */
 export async function bootDesktopApp(root:HTMLElement){
   if(import.meta.env.MODE!=='project-scene-desktop')throw Error('専用のPC候補ビルドで開いてください。');
-  const policy=projectFilePolicy({nonGs:validationBrowserLimits,
+  const policy=projectFilePolicy({nonGs:{...validationBrowserLimits,...desktopStaticRasterLimits},
     gs:{...validationBrowserLimits,maxFileBytes:512*1024*1024,maxItems:500_000,maxValues:44_500_000},projectBodyBytes:512*1024*1024});
   const residency=createGsResidency(500_000,44_500_000);
   const smoothDisplay={budget:createTargetBudget(),plan:targetLayout,create:createSmoothComposite};

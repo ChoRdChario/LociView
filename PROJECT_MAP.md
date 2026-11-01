@@ -36,6 +36,15 @@ presentation gate protects edits/files until canonical preparation succeeds;
 image/GPU loading and failure remain local. [01e§9](docs/specs/01e-desktop-large-gs-workflow.md#9-usable-loading-presentation-po-authorized2026-10-28)
 owns the loading contract; todo owns rendered and final-check evidence.
 
+The accepted [01i workflow](docs/specs/01i-high-resolution-pc-workflow-proposal.md)
+connects `assets/zipio.ts` and `projectFiles/lociMyuCatalog.ts` to sequential
+conversion while preserving exact legacy reports/receipts. Shared runtime intents
+and native load scopes live in `viewer/rasterResources.ts`/`rasterLoadScope.ts`;
+`projectFiles/rasterDecoders.ts` composes the existing codec ports. UI-only derived
+images and original-view leases live in `ui/projectScene/mediaPreviewResources.ts`.
+Viewer code remains independent of package/storage formats. Current bounds,
+executed qualifications and the separate proposed06b decision stay in todo/specs.
+
 Within validation, `editor=project` selects the bounded typed product composition
 in `src/ui/projectScene/projectWorkspace.ts`; its viewport/file adapter is
 `src/projectScene/productWorkspace.ts` (the harness path is a compatibility re-export). The existing editor remains available.

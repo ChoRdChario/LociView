@@ -1,5 +1,5 @@
 import { desktopEntry, desktopOrigin } from './desktopEntry';
-import { revealFileSurface, lookAlongFront, revealCaptionList } from './workspaceUi';
+import { closeFileSurface, revealFileSurface, lookAlongFront, revealCaptionList } from './workspaceUi';
 import {test,expect,chromium,type Page,type BrowserContext,type TestInfo} from '@playwright/test';
 import {mkdir,mkdtemp,writeFile} from 'node:fs/promises';
 import {openAsBlob} from 'node:fs';
@@ -20,8 +20,8 @@ const files=(p:Page)=>p.getByRole('region',{name:'ファイル',exact:true});
 const detail=(p:Page)=>p.getByRole('region',{name:'キャプションの詳細',exact:true});
 async function ready(p:Page){await expect(p.getByRole('heading',{name:'プロジェクト名',exact:true})).toHaveText(title,{timeout:240000});await expect(p.locator('.lv-project-viewport-status')).toBeEmpty({timeout:180000});}
 async function open(p:Page,path:string){await p.getByLabel('ファイルを選択',{exact:true}).setInputFiles(path);await p.getByRole('button',{name:'ファイルを開く',exact:true}).click();}
-async function selectCaption(p:Page){await revealCaptionList(p);await p.getByRole('tab',{name:'キャプション',exact:true}).click();await p.getByRole('list',{name:'キャプション一覧',exact:true}).locator('.lv-caption-select').first().click();}
-async function edit(p:Page,field:'タイトル'|'本文',text:string){await detail(p).getByLabel(field,{exact:true}).fill(text);await detail(p).getByRole('button',{name:'変更を適用',exact:true}).click();await expect(p.getByText('変更を適用しました。',{exact:true})).toBeVisible({timeout:180000});}
+async function selectCaption(p:Page,label='既存のピン'){await revealCaptionList(p);await p.getByRole('tab',{name:'キャプション',exact:true}).click();await p.getByRole('list',{name:'キャプション一覧',exact:true}).locator('.lv-caption-select').filter({hasText:label}).click();}
+async function edit(p:Page,field:'タイトル'|'本文',text:string){await closeFileSurface(p);await detail(p).getByLabel(field,{exact:true}).fill(text);await detail(p).getByRole('button',{name:'変更を適用',exact:true}).click();await expect(p.getByText('変更を適用しました。',{exact:true})).toBeVisible({timeout:180000});}
 async function output(p:Page,info:TestInfo,name:string,purpose:'backup'|'teamWorkspace'|'contribution'|'review'|'clean',base?:string){
   const menu=p.locator('details.lv-project-files');if(await menu.count()&&!await menu.evaluate(n=>(n as HTMLDetailsElement).open))await menu.locator(':scope > summary').click();
   const area=files(p);
@@ -37,7 +37,7 @@ async function output(p:Page,info:TestInfo,name:string,purpose:'backup'|'teamWor
   if(purpose==='review'||purpose==='clean')await area.getByRole('button',{name:'内容を確認',exact:true}).click();
   const primary=area.locator('button.lv-file-primary');await expect(primary).toBeEnabled({timeout:300000});
   const [download]=await Promise.all([p.waitForEvent('download',{timeout:300000}),primary.click()]);const path=info.outputPath(name+'.zip');await download.saveAs(path);expect(await download.failure()).toBeNull();
-  await expect(area.locator('.lv-operation-status')).toHaveAttribute('data-busy','false',{timeout:300000});return path;
+  await expect(area.locator('.lv-operation-status')).toHaveAttribute('data-busy','false',{timeout:300000});await closeFileSurface(p);return path;
 }
 async function backup(path:string){const archive=await BackupArchive.inspect(await openAsBlob(path),limits),c=await inspectProjectCandidates(archive.source.read(),limits);if(c.kind!=='project-candidate-inspection')throw Error('metadata');return{archive,records:c.unambiguousRecords as Record<string,any>};}
 async function setup(info:TestInfo,bodyRanges:readonly {start:number;end:number}[]){
@@ -96,18 +96,21 @@ test('Native07kの点群GSと面を変換し共有返送Review編集コピー独
     await expect.poll(async()=>(await presentedCanvas(a.p.getByLabel('3Dモデルの表示',{exact:true}))).red,{timeout:90000}).toBeGreaterThan(20);
     await selectCaption(a.p);await expect(detail(a.p).getByLabel('本文',{exact:true})).toHaveValue('本文を保持');await edit(a.p,'本文','変換後の編集');
     const first=await backup(await output(a.p,info,'first','backup'));verifyModels(first.records,fixture);
+    const originals=(Object.values(first.records.captionsById) as any[]).filter(c=>c.title==='既存のピン');expect(originals).toHaveLength(1);const originalCaptionId=originals[0].id;
     const canvas=a.p.getByLabel('3Dモデルの表示',{exact:true});
     const sourceGs=(Object.values(first.records.representationsById) as any[]).find(r=>r.role==='gsPrimary');
     const hit=async(kind:string,position:readonly number[])=>{
       const box=await canvas.boundingBox();if(!box)throw Error('canvas');
       const bounds=kind==='点群'?{min:[.5,0,0] as const,max:[1.5,.5,0] as const}:{min:[sourceGs.logicalBoundsAsset.min[0]-1.5,...sourceGs.logicalBoundsAsset.min.slice(1)] as [number,number,number],max:[sourceGs.logicalBoundsAsset.max[0]-1.5,...sourceGs.logicalBoundsAsset.max.slice(1)] as [number,number,number]};
-      const pose=fittedPose(bounds,defaultPose(),box.width/box.height,'+z');if(pose.projection.kind!=='perspective')throw Error('camera');
+      const sourceView=(Object.values(first.records.viewsById) as any[])[0];expect(sourceView.camera.projection).toEqual({kind:'perspective',verticalFovRadians:.7});
+      const reference={...defaultPose(),projection:{kind:'perspective' as const,verticalFov:sourceView.camera.projection.verticalFovRadians}};
+      const pose=fittedPose(bounds,reference,box.width/box.height,'+z');if(pose.projection.kind!=='perspective')throw Error('camera');
       const camera=new THREE.PerspectiveCamera(pose.projection.verticalFov*180/Math.PI,box.width/box.height,.000001,1e9);camera.position.set(...pose.position);camera.up.set(...pose.up);camera.lookAt(new THREE.Vector3(...pose.target));camera.updateMatrixWorld(true);
       const ndc=new THREE.Vector3(...position).project(camera);await canvas.click({position:{x:(ndc.x+1)*box.width/2,y:(1-ndc.y)*box.height/2}});
     };
     for(const kind of ['点群','GS']){
       await a.p.getByRole('tab',{name:'モデル',exact:true}).click();const panel=a.p.getByRole('tabpanel',{name:'モデル',exact:true});await panel.locator('.lv-model-select').filter({hasText:kind}).click();await panel.getByRole('button',{name:'このモデルだけ表示',exact:true}).click();await lookAlongFront(a.p);
-      await a.p.getByRole('tab',{name:'キャプション',exact:true}).click();await a.p.getByRole('button',{name:'ピンを追加',exact:true}).click();
+      await a.p.getByRole('tab',{name:'キャプション',exact:true}).click();await a.p.getByRole('button',{name:'キャプションを追加',exact:true}).click();
       await hit(kind,kind==='点群'?[.5,0,0]:[-1.4,.3,.05]);
       if(kind==='GS'){await expect(a.p.getByLabel('位置 X',{exact:true})).toBeEnabled();await a.p.getByLabel('位置 X',{exact:true}).fill('.2');}
       await a.p.getByRole('button',{name:'位置を確定',exact:true}).click();await expect(a.p.getByText('ピンの位置を確定しました。',{exact:true})).toBeVisible({timeout:180000});await edit(a.p,'タイトル',kind==='点群'?'引き継いだ点の指定':'引き継いだ面の指定');
@@ -118,11 +121,11 @@ test('Native07kの点群GSと面を変換し共有返送Review編集コピー独
     expect(captions.find(c=>c.title==='引き継いだ面の指定').anchor).toMatchObject({positionAsset:[.2,expect.any(Number),expect.any(Number)],hitEvidence:{method:'manual'}});
     let workspace=await output(a.p,info,'workspace-1','teamWorkspace'),wire=await WorkspaceArchive.inspect(await openAsBlob(workspace),limits),b=await run.launch(1);await open(b.p,workspace);await ready(b.p);
     for(let round=1;round<=2;round++){
-      await selectCaption(a.p);await edit(a.p,'本文',`手元の本文${round}`);await selectCaption(b.p);await edit(b.p,'タイトル',`返送前${round}`);
+      const currentTitle=round===1?'既存のピン':`返送前${round-1}`;await selectCaption(a.p,currentTitle);await edit(a.p,'本文',`手元の本文${round}`);await selectCaption(b.p,currentTitle);await edit(b.p,'タイトル',`返送前${round}`);
       const returned=await output(b.p,info,'return-'+round,'contribution',wire.archive.control.manifest.packageId),receive=a.p.getByRole('region',{name:'更新ファイル',exact:true});
       await revealFileSurface(a.p,'受信');await receive.getByLabel('更新ファイルを選択',{exact:true}).setInputFiles(returned);await receive.getByRole('button',{name:'更新を受け取る',exact:true}).click();await expect(receive.getByText('更新を受け取りました。',{exact:true})).toBeVisible({timeout:180000});await ready(a.p);
       const state=await backup(await output(a.p,info,'round-'+round,'backup'));verifyModels(state.records,fixture);
-      expect((Object.values(state.records.captionsById) as any[]).find(c=>c.anchor.kind==='asset')).toMatchObject({title:`返送前${round}`,body:`手元の本文${round}`});
+      expect(state.records.captionsById[originalCaptionId]).toMatchObject({title:`返送前${round}`,body:`手元の本文${round}`});
       if(round===1){workspace=await output(a.p,info,'workspace-2','teamWorkspace');wire=await WorkspaceArchive.inspect(await openAsBlob(workspace),limits);const incoming=b.p.getByRole('region',{name:'更新ファイル',exact:true});await revealFileSurface(b.p,'受信');await incoming.getByLabel('更新ファイルを選択',{exact:true}).setInputFiles(workspace);await incoming.getByRole('button',{name:'更新を受け取る',exact:true}).click();await expect(incoming.getByText('更新を受け取りました。',{exact:true})).toBeVisible({timeout:180000});await ready(b.p);}
     }
     await run.close(b.context);await run.mark('two-rounds',a.p);

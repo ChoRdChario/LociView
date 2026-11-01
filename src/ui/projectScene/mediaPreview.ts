@@ -1,5 +1,9 @@
+import { createMediaImageViewport } from './mediaImageViewport';
+import { createMediaPreviewResources, type MediaPreviewResources, type MediaDimensions } from './mediaPreviewResources';
+import type { RasterResources, RasterPriority } from '../../viewer/rasterResources';
+
 /** Host-verified image bodies only. Imported labels/URLs are never image sources. */
-export type PreviewPng = { readonly base64: string; readonly mediaType?: 'image/png' | 'image/jpeg' | 'image/webp' | 'image/gif' | 'image/heic' | 'video/mp4' | 'audio/mp4' | 'audio/mpeg' } | { readonly blob: Blob } | { readonly load: () => Promise<Blob> };
+export type PreviewPng = ({ readonly base64: string; readonly mediaType?: 'image/png' | 'image/jpeg' | 'image/webp' | 'image/gif' | 'image/heic' | 'video/mp4' | 'audio/mp4' | 'audio/mpeg' } | { readonly blob: Blob } | { readonly load: () => Promise<Blob> }) & { readonly key?: string; readonly byteLength?: number };
 export interface MediaPreviewItem {
   readonly id: string; readonly resourceId: string; readonly label: string;
   readonly description: string; readonly image: PreviewPng | null;
@@ -12,22 +16,41 @@ export type MediaPreviewReader = () => MediaPreviewGroup | null;
 export const mediaDisplayDescription = (description: string, portable: boolean) => portable ?
   [description, 'HEIC原本から作った表示用画像です。HDRなどの見え方が変わる場合があります。'].filter(Boolean).join(' ') : description;
 const sameBody = (a: PreviewPng | null, b: PreviewPng | null) => a === b || !!a && !!b &&
-  ('base64' in a && 'base64' in b ? a.base64 === b.base64 && (a.mediaType ?? 'image/png') === (b.mediaType ?? 'image/png') : 'blob' in a && 'blob' in b ? a.blob === b.blob : 'load' in a && 'load' in b && a.load === b.load);
+  (a.key !== undefined && b.key !== undefined ? a.key === b.key : 'base64' in a && 'base64' in b ? a.base64 === b.base64 && (a.mediaType ?? 'image/png') === (b.mediaType ?? 'image/png') : 'blob' in a && 'blob' in b ? a.blob === b.blob : 'load' in a && 'load' in b && a.load === b.load);
+let previewKey = 0;
 
 /** A new image node per attempt keeps old load/error events out of a retry. */
-function createPngPreview(document: Document, read: () => MediaPreviewItem | null, lazy: boolean, imageHost: HTMLElement = document.createElement('div')) {
+function createPngPreview(document: Document, read: () => MediaPreviewItem | null, lazy: boolean, imageHost: HTMLElement = document.createElement('div'), changedImage?: (image: HTMLImageElement | null) => void, resources?: MediaPreviewResources) {
   const root = document.createElement('div'), error = document.createElement('p'), retry = document.createElement('button');
   root.className = 'lv-media-image'; error.className='lv-operation-status';error.setAttribute('role', 'status'); retry.type = 'button'; retry.textContent = '画像を再試行';
   const loading=(value:boolean)=>{error.dataset.busy=String(value);root.setAttribute('aria-busy',String(value));};
   let body: PreviewPng | null = null, image: HTMLImageElement | null = null, player:HTMLVideoElement|HTMLAudioElement|null=null, release: (() => void) | null = null, disposed = false, epoch = 0;
-  function clear() { image?.remove(); image = null; if(player){player.pause();player.removeAttribute('src');player.load();player.remove();player=null;} release?.(); release = null; }
-  function load(item: MediaPreviewItem | null) {
+  const localKey = ++previewKey;
+  let visible = !resources || !lazy || typeof IntersectionObserver === 'undefined';
+  function clear() { image?.remove(); image = null; changedImage?.(null); if(player){player.pause();player.removeAttribute('src');player.load();player.remove();player=null;} release?.(); release = null; }
+  function load(item: MediaPreviewItem | null, priority: RasterPriority = 'thumbnail') {
     const attempt = ++epoch; clear();loading(false); body = item?.image ?? null;
     const subject=item?.kind&&item.kind!=='image'?'メディア':'画像';retry.textContent=`${subject}を再試行`;
     if(lazy&&item?.kind&&item.kind!=='image'){error.textContent=item.kind==='video'?'動画':'音声';retry.hidden=true;return;}
     if (!item || !body) { error.textContent = `${subject}を読み込めません。添付情報は変更していません。`; retry.hidden = false; return; }
     const expected = body;
     const current = () => { const next = read(); return !disposed && epoch === attempt && next?.id === item.id && next.resourceId === item.resourceId && sameBody(next.image, expected); };
+    if (resources && (!item.kind || item.kind === 'image')) {
+      loading(true); error.textContent = '画像を読み込んでいます。'; retry.hidden = true;
+      const source = async () => {
+        if ('load' in expected) return expected.load(); if ('blob' in expected) return expected.blob;
+        return new Blob([Uint8Array.from(atob(expected.base64), c => c.charCodeAt(0))], { type: expected.mediaType ?? 'image/png' }); };
+      if (lazy) {
+        const lease = resources.thumbnail(expected.key ?? `preview:${localKey}:${attempt}`, source, priority, expected.byteLength ?? ('blob' in expected ? expected.blob.size : undefined)); release = lease.release;
+        void lease.ready.then(blob => { if (current()) paint(item, { blob }); }, reason => { if (current()) { loading(false); error.textContent = reason instanceof Error ? reason.message : '画像を準備できません。'; retry.hidden = false; } });
+      } else {
+        const lease = resources.original(source, expected.byteLength ?? ('blob' in expected ? expected.blob.size : undefined)); release = lease.release;
+        void lease.ready.then(node => { if (!current()) return; image = node; node.draggable = false; node.alt = item.description || item.label;
+          imageHost.append(node); loading(false); error.textContent = ''; retry.hidden = true; changedImage?.(node);
+        }, reason => { if (current()) { loading(false); error.textContent = reason instanceof Error ? reason.message : '画像を準備できません。'; retry.hidden = false; } });
+      }
+      return;
+    }
     if ('load' in expected) {
       loading(true);error.textContent = `${subject}を読み込んでいます。`; retry.hidden = true;
       void Promise.resolve().then(() => expected.load()).then(blob => { if (current()) paint(read()!, { blob }); }, () => {
@@ -49,33 +72,40 @@ function createPngPreview(document: Document, read: () => MediaPreviewItem | nul
     const current = document.createElement('img'); image = current; current.draggable = false;
     current.alt = item.description || item.label; current.loading = lazy ? 'lazy' : 'eager'; current.decoding = 'async';
     current.addEventListener('error', () => { if (disposed || image !== current) return;
-      loading(false);current.hidden = true; error.textContent = '画像を表示できません。添付情報は変更していません。'; retry.hidden = false; });
+      loading(false);current.hidden = true; changedImage?.(null); error.textContent = '画像を表示できません。添付情報は変更していません。'; retry.hidden = false; });
     current.addEventListener('load', () => { if (disposed || image !== current) return;
-      loading(false);current.hidden = false; error.textContent = ''; retry.hidden = true; });
-    loading(true);error.textContent = '画像を読み込んでいます。'; retry.hidden = true; imageHost.append(current);
+      loading(false);current.hidden = false; changedImage?.(current); error.textContent = ''; retry.hidden = true; });
+    loading(true);error.textContent = '画像を読み込んでいます。'; retry.hidden = true; imageHost.append(current); changedImage?.(current);
     try {
       if ('base64' in png) current.src = `data:${png.mediaType ?? 'image/png'};base64,${png.base64}`;
-      else { const url = URL.createObjectURL(png.blob); release = () => URL.revokeObjectURL(url); current.src = url; }
-    } catch { loading(false);current.hidden = true; error.textContent = '画像を読み込めません。'; retry.hidden = false; }
+      else { const url = URL.createObjectURL(png.blob), previous = release; release = () => { URL.revokeObjectURL(url); previous?.(); }; current.src = url; }
+    } catch { loading(false);current.hidden = true; changedImage?.(null); error.textContent = '画像を読み込めません。'; retry.hidden = false; }
   }
-  retry.addEventListener('click', () => { if (!disposed) load(read()); }); root.append(imageHost, error, retry);
+  retry.addEventListener('click', () => { if (!disposed) load(read(), 'retry'); }); root.append(imageHost, error, retry);
+  const observer = resources && lazy && typeof IntersectionObserver !== 'undefined' ? new IntersectionObserver(entries => {
+    const showing = entries.some(entry => entry.isIntersecting); if (disposed || showing === visible) return; visible = showing;
+    if (showing) load(read()); else { epoch++; clear(); body = null; loading(false); error.textContent = ''; retry.hidden = true; }
+  }) : null; observer?.observe(root);
   return { root, render() { if (disposed) return; const item = read();
+    if (!visible) return;
     if (!sameBody(body, item?.image ?? null) || !image && !player && !error.textContent) load(item);
     if (image && item) image.alt = item.description || item.label;
-  }, dispose() { disposed = true; clear(); root.remove(); } };
+  }, dispose() { disposed = true; observer?.disconnect(); clear(); root.remove(); } };
 }
 
 /** One modal per workspace; navigation is local and never edits selection/history. */
-export function createMediaViewer(document: Document) {
+export function createMediaViewer(document: Document, raster?: RasterResources,dimensions?:MediaDimensions) {
+  const resources = raster ? createMediaPreviewResources(document, raster,{dimensions}) : undefined;
   const root = document.createElement('dialog'); root.className = 'lv-media-viewer'; root.setAttribute('aria-label', 'メディアビューア');
   const header = document.createElement('header'), title = document.createElement('h2'), closeButton = document.createElement('button');
   closeButton.type = 'button'; closeButton.textContent = '×'; closeButton.setAttribute('aria-label', '閉じる');
   const content = document.createElement('div'), description = document.createElement('p'), status = document.createElement('p');
   content.className = 'lv-media-viewer-content'; status.setAttribute('role', 'status');
+  const imageViewport = createMediaImageViewport(document, content);
   const footer = document.createElement('footer'), previous = document.createElement('button'), next = document.createElement('button'), count = document.createElement('span');
   previous.type = next.type = 'button'; previous.textContent = '←'; next.textContent = '→';
   previous.setAttribute('aria-label', '前のメディア'); next.setAttribute('aria-label', '次のメディア'); count.setAttribute('aria-live', 'polite');
-  header.append(title, closeButton); footer.append(previous, count, next); root.append(header, content, description, status, footer);
+  header.append(title, closeButton); footer.append(previous, count, next); root.append(header, imageViewport.toolbar, content, description, status, footer);
   let reader: MediaPreviewReader | null = null, scope = '', id = '', resourceId = '', opener: HTMLElement | null = null, disposed = false;
   let preview: ReturnType<typeof createPngPreview> | null = null;
   const selected = () => { const group = reader?.(); return group?.scope === scope ? group.items.find(i => i.id === id && i.resourceId === resourceId) ?? null : null; };
@@ -94,7 +124,7 @@ export function createMediaViewer(document: Document) {
     count.textContent = item ? `${index + 1} / ${group.items.length}` : '';
     previous.disabled = index <= 0; next.disabled = index < 0 || index === group.items.length - 1;
     if (!item) { preview?.dispose(); preview = null; content.replaceChildren(); }
-    else { if (!preview) { preview = createPngPreview(document, selected, false); content.append(preview.root); } preview.render(); }
+    else { if (!preview) { preview = createPngPreview(document, selected, false, imageViewport.imageHost, imageViewport.setImage, resources); content.append(preview.root); } preview.render(); imageViewport.render(); }
   }
   function step(offset: number) {
     if (disposed || !reader) return; const group = reader(); if (!group || group.scope !== scope) { close(false); return; }
@@ -107,11 +137,11 @@ export function createMediaViewer(document: Document) {
   root.addEventListener('keydown', event => { if (event.isComposing || event.altKey || event.ctrlKey || event.metaKey) return;
     if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); close(); }
     else if ((event.key === 'ArrowLeft' || event.key === 'ArrowRight') && !(event.target as Element|null)?.closest?.('video,audio')) { event.preventDefault(); event.stopPropagation(); step(event.key === 'ArrowLeft' ? -1 : 1); } });
-  return { root, render, open(read: MediaPreviewReader, itemId: string, from: HTMLElement) {
+  return { root, render, resources, open(read: MediaPreviewReader, itemId: string, from: HTMLElement) {
     if (disposed) return; const group = read(), item = group?.items.find(i => i.id === itemId); if (!group || !item) return;
     reader = read; scope = group.scope; id = item.id; resourceId = item.resourceId; opener = from;
     preview?.dispose(); preview = null; render(); if (!root.open) root.showModal(); closeButton.focus();
-  }, dispose() { if (disposed) return; close(false); disposed = true; root.remove(); } };
+  }, dispose() { if (disposed) return; close(false); disposed = true; imageViewport.dispose(); root.remove(); void resources?.dispose(); } };
 }
 export type MediaViewer = ReturnType<typeof createMediaViewer>;
 
@@ -125,7 +155,8 @@ export function createMediaThumbnails(document: Document, read: MediaPreviewRead
   pages.setAttribute('aria-label', 'メディア一覧のページ'); pages.append(back, count, forward); root.append(grid, pages);
   type Card = { root: HTMLElement; label: HTMLElement; action: HTMLButtonElement; preview: ReturnType<typeof createPngPreview>; resourceId: string; tools?: HTMLElement };
   const cards = new Map<string, Card>(); let page = 0, scope = '', order = '', disposed = false;
-  function render() {
+  function render(active = true) {
+    if (!active) { for (const card of cards.values()) { card.preview.dispose(); card.root.remove(); } cards.clear(); order = ''; root.hidden = true; return; }
     if (disposed) return; const group = read(); if (scope !== group?.scope) {
       for (const card of cards.values()) { card.preview.dispose(); card.root.remove(); } cards.clear();
       scope = group?.scope ?? ''; page = 0; order = '';
@@ -144,7 +175,7 @@ export function createMediaThumbnails(document: Document, read: MediaPreviewRead
         action.type = 'button'; action.className = 'lv-media-thumbnail-action';
         action.textContent = selection ? item.label : item.kind==='video'?'動画を再生':item.kind==='audio'?'音声を再生':'画像を表示';
         action.setAttribute('aria-label', action.textContent);
-        const preview = createPngPreview(document, live, true, action);
+        const preview = createPngPreview(document, live, true, action, undefined, viewer.resources);
         action.addEventListener('click', () => { if (disposed || !live()) return; if (selection) { selection.choose(item.id); render(); } else viewer.open(read, item.id, action); });
         figure.append(preview.root, label);
         if (selection) { const show = document.createElement('button'); show.type = 'button'; show.textContent = item.kind==='video'?'動画を再生':item.kind==='audio'?'音声を再生':'画像を表示';

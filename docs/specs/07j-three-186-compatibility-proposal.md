@@ -6,6 +6,23 @@
 
 ## 1. 利用者の結果と求める承認
 
+### 2026-10-31: existing display-resource ownership repair
+
+The approved cleanup contract separates template-owned CPU images from a renderer's
+GPU uploads. Three186 `renderer.dispose()` alone does not delete application texture
+handles. Saved Mesh residents expose a deduplicated, template-owned source-texture
+port, covering material arrays and all direct map slots used by Standard/Phong,
+mask and smooth derived materials. A viewport retains every such texture it has
+exposed, including earlier Scenes. Before renderer disposal it calls the public
+`Texture.dispose()` on this set, then clears the set and disposes the renderer.
+This GPU invalidation preserves `texture.source`/ImageBitmap for reupload and context
+recovery. It does not dispose the decoded template or close its CPU images. GS SDK
+textures, compositor targets and textures belonging to another owner are excluded.
+Existing SDK/target cleanup remains with its owner. No new capacity/profile/wire rule.
+Verify ordering and prior-Scene coverage with focused tests, then actual Three186
+create/delete/live upload evidence and retained pixels across handoff/recovery.
+
+
 既存のProjectや材質付きの旧ファイルを開く → 同じ面の材質を編集する → 保存・受け渡し
 → 別環境や再起動後に続ける、という現在の操作を維持し、表示側をThree0.186.0へ進める。
 利用者に移行操作、描画エンジン、Threeの版を選ばせない。開くだけで履歴を更新しない。

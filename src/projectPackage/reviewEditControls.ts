@@ -1,6 +1,6 @@
 import type { ProjectWorkspaceFS } from '../platform/fs';
 import { fail, type MetadataLimits } from '../projectMetadata/format';
-import { equalBytes, json, readReceipt, technicalId, writeReceipt } from '../projectMetadata/persistence';
+import { equalBytes, json, readReceipt, technicalId, writeReceipt, withMetadataRead } from '../projectMetadata/persistence';
 import { TransactionJournal } from '../projectMetadata/journal';
 import type { EvidenceRef } from './contract';
 import { PACKAGE_LIMITS as L } from './contract';
@@ -160,11 +160,14 @@ export async function reviewEditStates(fs: ProjectWorkspaceFS, limits: MetadataL
 }
 
 export async function assertReviewEditSlot(fs: ProjectWorkspaceFS, limits: MetadataLimits, ownChild?: string) {
-  for (const state of await reviewEditStates(fs, limits)) {
-    if (state.state === 'abandoned' || state.state === 'completed') continue;
-    if (state.state !== 'incomplete' || !ownChild || ownChild !== state.childId) fail('review-edit-pending');
-    const parent = await readReviewEdit(fs, state.id, limits); if (!parent.started) fail('review-edit-pending');
-  }
+  const child = ownChild, ownedLimits = { ...limits };
+  return withMetadataRead(fs, undefined, async ({ fs }) => {
+    for (const state of await reviewEditStates(fs, ownedLimits)) {
+      if (state.state === 'abandoned' || state.state === 'completed') continue;
+      if (state.state !== 'incomplete' || !child || child !== state.childId) fail('review-edit-pending');
+      const parent = await readReviewEdit(fs, state.id, ownedLimits); if (!parent.started) fail('review-edit-pending');
+    }
+  });
 }
 
 export async function abandonReviewEdit(fs: ProjectWorkspaceFS, id: string, limits: MetadataLimits) {

@@ -100,7 +100,7 @@ async function inspect(archive: Archive, budget: ProjectFilePolicyInput, png?: P
     if(format){
       if(r.contentKind!=='mesh'||r.blob.mediaType!==(format==='ply'?'application/octet-stream':meshSourceDeclarations[format].mediaType)||r.gsPly||r.pointPly)return fileError('モデルの元の形式を確認できません。');
       if(proxy){const parent=snapshot.representations.find(s=>s.id===r.derivedFrom[0]);if(r.derivedFrom.length!==1||!parent||parent.role!=='gsPrimary'||parent.assetId!==r.assetId||parent.variantFamilyId!==r.proxyForGsVariantFamilyId||r.variantFamilyId===parent.variantFamilyId)return fileError('位置指定用の面とGSの対応が不正です。');}
-      const model=await inspectMeshSource(format,bytes,limits,png,jpeg,signal),captured=await captureMeshOccurrenceProof(model,signal);
+      const model=await inspectMeshSource(format,bytes,limits,png,jpeg,signal),captured=await captureMeshOccurrenceProof(model,signal,png?.rasterResources);
       occurrenceCount+=captured.rows.length;if(occurrenceCount>limits.maxItems)return fileError('材質の面の数が上限を超えています。');
       rows.set(r.id,captured.rows.map(row=>({childPath:[...row.childPath],materialArraySlot:row.materialArraySlot,sourceAddress:row.sourceAddress,slotIndex:row.slotIndex})));
       models.set(r.id,{bounds:nativeSpatialModelBounds({formatProfile:await meshSourceProfile(format),representationToAsset:{...r.representationToAsset}},model),materials:model.materials,surfaceRanges:model.surfaceRanges,...(model.jpeg?{jpeg:true as const}:{}),...(model.occurrences?{occurrences:model.occurrences}:{}),newMesh:{format,externalMaterialsUnavailable:model.externalMaterialsUnavailable}});
@@ -118,7 +118,7 @@ async function inspect(archive: Archive, budget: ProjectFilePolicyInput, png?: P
     const model = await inspectGlb(bytes, limits, png, jpeg);
     if (!proxy) {
       occurrenceCount += model.occurrences!.length; if (occurrenceCount > limits.maxItems) return fileError('材質の面の数が上限を超えています。');
-      const captured = await captureLegacyOccurrenceProof(model,signal);
+      const captured = await captureLegacyOccurrenceProof(model,signal,png?.rasterResources);
       rows.set(r.id, captured.rows.map(row => ({childPath: [...row.childPath], materialArraySlot: row.materialArraySlot, nodeIndex: row.nodeIndex, primitiveIndex: row.primitiveIndex, materialIndex: row.materialIndex, slotIndex: row.slotIndex})));
     }
     models.set(r.id, {bounds: proxy ? nativeSpatialModelBounds({formatProfile: await nativeProxySourceProfile(), representationToAsset: {...r.representationToAsset}}, model) : model.bounds,

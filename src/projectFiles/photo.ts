@@ -1,6 +1,7 @@
 import { inspectValidationImage, type JpegDecoder } from './jpeg';
 import type { PngDecoder } from './png';
 import { checkFileLimits, fileError, type FileValidationLimits } from './validation';
+import { RasterResourceError } from '../viewer/rasterResources';
 
 export type PhotoMime = 'image/webp' | 'image/gif';
 export interface DecodedPhoto { readonly width: number; readonly height: number; close(): void }
@@ -150,7 +151,7 @@ export async function inspectValidationPhoto(input: Uint8Array, limits: FileVali
   try {
     bitmap = await decode(bytes, shape.mime);
     if (!(bitmap.width === shape.width && bitmap.height === shape.height || shape.mime === 'image/webp' && bitmap.width === shape.height && bitmap.height === shape.width)) return bad();
-  } catch { return fileError('WebP/GIFの画像を表示できません。'); }
+  } catch (error) { if(error instanceof RasterResourceError||error instanceof DOMException&&error.name==='AbortError')throw error;return fileError('WebP/GIFの画像を表示できません。'); }
   finally { bitmap?.close(); }
   return shape;
 }

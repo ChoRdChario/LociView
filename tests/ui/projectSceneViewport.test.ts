@@ -18,6 +18,7 @@ import { degreesRotation, proposedPlacement } from '../../src/harness/projectSce
 import type { GizmoProposal, ModelPlacementTarget } from '../../src/harness/projectScene/pinGizmo';
 import type { ReadonlyRenderModel, ValidationModelClosure } from '../../src/harness/projectScene/modelTypes';
 import { patchHardChroma } from '../../src/viewer/hardChroma';
+import { createRasterResources, rasterBytes } from '../../src/viewer/rasterResources';
 
 const tracker = vi.hoisted(() => ({ renderers: [] as any[], controls: [] as any[], resize: [] as (() => void)[],
   raf: new Map<number, () => void>(), nextRaf: 0, fail: false, gizmos: [] as any[], realOrbit: false }));
@@ -25,6 +26,7 @@ vi.mock('three', async importOriginal => {
   const actual = await importOriginal<typeof import('three')>();
   return { ...actual, WebGLRenderer: class {
     disposed = false; scene: any; camera: any; frames = 0;
+    capabilities = { maxTextureSize: 8192 };
     constructor() { if (tracker.fail) throw new Error('synthetic WebGL refusal'); tracker.renderers.push(this); }
     setPixelRatio() {} setSize() {} setDrawingBufferSize() {}
     render(scene: any, camera: any) { this.scene = scene; this.camera = camera; scene.updateMatrixWorld(true); this.frames++; }
@@ -103,6 +105,42 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('synthetic Scene display; GPU mocked, not rendered/browser acceptance', () => {
+  it('does not evict a staged startup template before first activation; real deactivation releases demand',()=>{
+    const base=syntheticDisplay(createSyntheticProject(),f.overview,null,null),source=base.models[0]!,canvas=fakeCanvas(),demand=vi.fn(),asset=new THREE.Group(),mesh=new THREE.Mesh(new THREE.PlaneGeometry(),new THREE.MeshStandardMaterial());asset.add(mesh);
+    const model:ReadonlyRenderModel={shape:'render-glb',key:'staged',assetId:source.binding.assetId,assetToProject:source.binding.assetToProject,representation:source.representation as ReadonlyRenderModel['representation']};
+    const v=sceneViewportFactory({demand,create(){return{asset,mesh,dispose(){asset.removeFromParent();}};},dispose(){}})(canvas.canvas as unknown as HTMLCanvasElement,()=>{});
+    v.update({...base,models:[model],readOnly:true,pinEdit:undefined,modelEdit:undefined,preview:undefined});expect(demand).not.toHaveBeenCalled();
+    v.setActive(true);canvas.show();expect(demand.mock.calls.some(([rows])=>rows.length===1)).toBe(true);
+    demand.mockClear();v.setActive(false);expect(demand).toHaveBeenCalledWith([]);v.dispose();mesh.geometry.dispose();(mesh.material as THREE.Material).dispose();
+  });
+  it('releases staged demand on an explicit initial hidden presentation before activation',()=>{
+    const base=syntheticDisplay(createSyntheticProject(),f.overview,null,null),demand=vi.fn(),canvas=fakeCanvas();
+    const v=sceneViewportFactory({demand,create(){throw Error('hidden renderer');},dispose(){}})(canvas.canvas as unknown as HTMLCanvasElement,()=>{});
+    v.update(base);expect(demand).not.toHaveBeenCalled();v.setActive(false);expect(demand).toHaveBeenLastCalledWith([]);expect(tracker.renderers).toHaveLength(0);v.dispose();
+  });
+  it('keeps an admitted model usable when another texture exceeds live GPU intent or actual edge, then retries after hiding',()=>{
+    const base=syntheticDisplay(createSyntheticProject(),f.overview,null,null),source=base.models[0]!,canvas=fakeCanvas(),raster=createRasterResources({cpuBytes:0,gpuBytes:rasterBytes(8,8,true)});
+    const textures=[new THREE.Texture({width:8,height:8} as any),new THREE.Texture({width:8,height:8} as any),new THREE.Texture({width:9000,height:1} as any)],released=vi.fn();
+    const model=(key:string):ReadonlyRenderModel=>({shape:'render-glb',key,assetId:key,assetToProject:source.binding.assetToProject,representation:{...source.representation,id:key} as ReadonlyRenderModel['representation']});
+    const models=[model('0'),model('1'),model('2')],create=(input:ReadonlyRenderModel)=>{const asset=new THREE.Group(),mesh=new THREE.Mesh(new THREE.PlaneGeometry(),new THREE.MeshStandardMaterial({map:textures[Number(input.key)]}));asset.add(mesh);return{asset,mesh,gpuTextures:[textures[Number(input.key)]!],dispose(){asset.removeFromParent();mesh.geometry.dispose();(mesh.material as THREE.Material).dispose();released(input.key);}};};
+    const v=sceneViewportFactory({rasterResources:raster,demand(){},create,dispose(){}})(canvas.canvas as unknown as HTMLCanvasElement,()=>{}),display={...base,models,readOnly:true as const,pinEdit:undefined,modelEdit:undefined,preview:undefined};
+    v.update(display);v.setActive(true);canvas.show();
+    expect(v.read()).toMatchObject({cameraReady:true,issue:null,retryAvailable:true});expect(v.read().notice).toContain('資源');expect(v.read().notice).toContain('原寸テクスチャ');
+    expect(tracker.renderers[0].disposed).toBe(false);expect(released.mock.calls.map(([key])=>key)).toEqual(['1','2']);
+    expect(raster.snapshot().gpuBytes).toBe(rasterBytes(8,8,true));
+    v.update({...display,hiddenAssetIds:['0','2']});v.retry();expect(v.read()).toMatchObject({cameraReady:true,ready:true,issue:null,retryAvailable:false});
+    expect(raster.snapshot().gpuBytes).toBe(rasterBytes(8,8,true));v.dispose();expect(raster.snapshot().gpuBytes).toBe(0);
+  });
+  it('invalidates source texture uploads from current and earlier Scenes before renderer disposal without closing CPU images',()=>{
+    const base=syntheticDisplay(createSyntheticProject(),f.overview,null,null),source=base.models[0]!,canvas=fakeCanvas(),closed=vi.fn(),events:string[]=[];
+    const textures=['a','b'].map(name=>{const texture=new THREE.Texture({close:closed} as any);texture.addEventListener('dispose',()=>{expect(tracker.renderers.at(-1).disposed).toBe(false);events.push(name);});return texture;});
+    const model=(key:string):ReadonlyRenderModel=>({shape:'render-glb',key,assetId:source.binding.assetId,assetToProject:source.binding.assetToProject,representation:source.representation as ReadonlyRenderModel['representation']});
+    const create=(input:ReadonlyRenderModel)=>{const asset=new THREE.Group(),texture=textures[input.key==='a'?0:1]!,mesh=new THREE.Mesh(new THREE.PlaneGeometry(),new THREE.MeshStandardMaterial({map:texture}));asset.add(mesh);return{asset,mesh,gpuTextures:[texture,texture],dispose(){mesh.geometry.dispose();(mesh.material as THREE.Material).dispose();}};};
+    const v=sceneViewportFactory({create,dispose(){}})(canvas.canvas as unknown as HTMLCanvasElement,()=>{}),display=(key:string)=>({...base,sceneId:key,models:[model(key)],readOnly:true as const,pinEdit:undefined,modelEdit:undefined,preview:undefined});
+    v.update(display('a'));v.setActive(true);canvas.show();v.update(display('b'));expect(events).toEqual([]);
+    v.setActive(false);expect(events).toEqual(['a','b']);expect(tracker.renderers[0].disposed).toBe(true);expect(closed).not.toHaveBeenCalled();
+    v.setActive(true);expect(v.read().ready).toBe(true);v.dispose();expect(events).toEqual(['a','b','b']);expect(closed).not.toHaveBeenCalled();
+  });
   it('retains a healthy active view without forced measurement while resize, DPR and reopen still prepare',()=>{
     const canvas=fakeCanvas(),v=createSyntheticViewport(canvas.canvas as unknown as HTMLCanvasElement,()=>{},()=>true),display=syntheticDisplay(createSyntheticProject(),f.overview,null,null);
     v.update(display);v.setActive(true);canvas.show();const measure=vi.spyOn(canvas.canvas as unknown as HTMLCanvasElement,'getBoundingClientRect'),renderer=tracker.renderers[0],pose=v.read().token;
@@ -215,6 +253,29 @@ describe('synthetic Scene display; GPU mocked, not rendered/browser acceptance',
     v.update(make([])); expect(surfaces.every(surface => surface.asset.visible)).toBe(true); expect(v.capture!()).toEqual(fitted);
     expect(create).toHaveBeenCalledTimes(2); v.dispose();
     expect(surfaces.every(surface => surface.dispose.mock.calls.length === 1)).toBe(true);
+  });
+  it('reports alpha-picking limits only for visible owners, ancestors, meshes and materials while retaining refusal', () => {
+    const project=createSyntheticProject(),canvas=fakeCanvas(),targets=new SyntheticSession().pinCreationTargets();
+    const make=(hidden:readonly string[]=[])=>{const d=syntheticDisplay(project,f.overview,null,f.shared,undefined,hidden);
+      return {...d,models:d.models.map(m=>({...m,shape:'saved-glb' as const} as ValidationModelClosure))};};
+    const surfaces=new Map<string,{asset:THREE.Group;mesh:THREE.Group;parent:THREE.Group;leaf:THREE.Mesh;material:THREE.MeshStandardMaterial}>();
+    const create=vi.fn((model:ValidationModelClosure)=>{
+      const material=new THREE.MeshStandardMaterial(),leaf=new THREE.Mesh(new THREE.PlaneGeometry(2,2),material),parent=new THREE.Group(),mesh=new THREE.Group(),asset=new THREE.Group();
+      parent.add(leaf);mesh.add(parent);asset.add(mesh);asset.matrixAutoUpdate=false;asset.matrix.copy(placementMatrix(model.binding.assetToProject));
+      const surface={asset,mesh,parent,leaf,material,dispose:vi.fn()};surfaces.set(model.binding.assetId,surface);return surface;
+    });
+    const v=sceneViewportFactory({create,dispose() {}})(canvas.canvas as unknown as HTMLCanvasElement,()=>{});
+    v.update(make());v.setActive(true);canvas.show();v.camera({kind:'axis',axis:'+z'});
+    const surface=surfaces.get(f.equipment)!,target=targets.find(t=>t.assetId===f.equipment)!,point=v.read().pins.find(p=>p.id===f.shared)!;
+    const hit=()=>v.pick!(target,point.x,point.y),warning=()=>v.read().notice??'';
+    expect(hit()).not.toBeNull();surface.material.transparent=true;surface.material.opacity=.5;
+    expect(warning()).toContain('半透明・切り抜き');expect(hit()).toBeNull();
+    v.update(make([f.equipment]));expect(warning()).not.toContain('半透明・切り抜き');expect(hit()).toBeNull();
+    v.update(make());expect(warning()).toContain('半透明・切り抜き');expect(hit()).toBeNull();
+    for(const node of [surface.parent,surface.leaf]){node.visible=false;expect(warning()).not.toContain('半透明・切り抜き');expect(hit()).toBeNull();node.visible=true;}
+    surface.material.visible=false;expect(warning()).not.toContain('半透明・切り抜き');expect(hit()).toBeNull();
+    surface.material.visible=true;expect(warning()).toContain('半透明・切り抜き');expect(hit()).toBeNull();expect(v.read().ready).toBe(true);
+    expect(create).toHaveBeenCalledTimes(2);v.dispose();
   });
   it('previews/cancels on the saved-resident branch without replacing nested content or moving the camera (injected geometry)', () => {
     const project = createSyntheticProject(), original = syntheticDisplay(project, f.overview, null, null);
@@ -706,6 +767,28 @@ describe('synthetic Scene display; GPU mocked, not rendered/browser acceptance',
     v.update(first);const intent=admit.mock.results[0]!.value;v.update(next);expect(v.read().display).toBe(first);expect(intent.active).toBe(true);expect(create).not.toHaveBeenCalled();
     v.setActive(false);const calls=admit.mock.calls.length;pending=false;notify();expect(admit).toHaveBeenCalledTimes(calls);const available=pool.admit([{count:500,degree:4}]);available.cancel();
     v.setActive(true);expect(admit.mock.calls.at(-1)![0]).toEqual([{count:200,degree:4},{count:400,degree:4}]);expect(v.read().display).toBe(first);expect(v.read().ready).toBe(false);v.dispose();
+  });
+  it('keeps the pending GS closure demanded when the host repeats active before queued loading starts',async()=>{
+    const base=syntheticDisplay(createSyntheticProject(),f.overview,null,null),source=base.models[0]!;
+    const model=(key:string):ReadonlyRenderModel=>({shape:'render-gs',key,assetId:key,assetToProject:source.binding.assetToProject,representation:{...source.representation,contentKind:'gaussianSplat'} as ReadonlyRenderModel['representation']});
+    const a=model('A'),b=model('B'),first={...base,models:[a],readOnly:true as const,pinEdit:undefined,modelEdit:undefined,preview:undefined},next={...first,models:[a,b]};
+    let loaded=false,notify!:()=>void,queued=false,wanted:readonly (ValidationModelClosure|ReadonlyRenderModel)[]=[];
+    const canvas=fakeCanvas(),demand=vi.fn((rows:typeof wanted)=>{wanted=rows;if(queued)return;queued=true;queueMicrotask(()=>{queued=false;loaded=wanted.some(m=>'key'in m&&m.key==='B');});});
+    const v=sceneViewportFactory({demand,create:vi.fn(),dispose(){},state:m=>({phase:'key'in m&&m.key==='B'&&!loaded?'loading':'ready'}),
+      gsPending:models=>!loaded&&models.some(m=>'key'in m&&m.key==='B'),gsDemand:()=>({count:200,degree:4}),subscribe(changed){notify=changed;return()=>{};}},createGsResidency(500,44500))(canvas.canvas as unknown as HTMLCanvasElement,()=>{});
+    v.update(first);v.setActive(true);await Promise.resolve();v.update(next);expect(v.read().display).toBe(first);
+    v.setActive(true);await Promise.resolve();expect(loaded).toBe(true);notify();expect(v.read().display).toBe(next);
+    v.setActive(false);expect(demand).toHaveBeenLastCalledWith([]);v.dispose();
+  });
+  it('reports a failed pending GS target and retries it while retaining the previous admitted view',()=>{
+    const base=syntheticDisplay(createSyntheticProject(),f.overview,null,null),source=base.models[0]!;
+    const model=(key:string):ReadonlyRenderModel=>({shape:'render-gs',key,assetId:key,assetToProject:source.binding.assetToProject,representation:{...source.representation,contentKind:'gaussianSplat'} as ReadonlyRenderModel['representation']});
+    const a=model('A'),b=model('B'),first={...base,models:[a],readOnly:true as const,pinEdit:undefined,modelEdit:undefined,preview:undefined},next={...first,models:[a,b]};
+    let failed=true;const canvas=fakeCanvas(),retry=vi.fn(()=>{failed=false;});
+    const v=sceneViewportFactory({create:vi.fn(),dispose(){},retry,label:m=>'key'in m?m.key:'モデル',state:m=>({phase:'key'in m&&m.key==='B'&&failed?'failed':'ready',issue:'key'in m&&m.key==='B'&&failed?'元ファイルを読み込めません。':undefined}),
+      gsPending:models=>failed&&models.some(m=>'key'in m&&m.key==='B'),gsDemand:()=>({count:200,degree:4})},createGsResidency(500,44500))(canvas.canvas as unknown as HTMLCanvasElement,()=>{});
+    v.update(first);v.setActive(true);v.update(next);expect(v.read().display).toBe(first);expect(v.read().retryAvailable).toBe(true);expect(v.read().notice).toContain('B: 元ファイルを読み込めません。');
+    expect(v.read().notice).toContain('前の表示と記録は保持');v.retry();expect(retry).toHaveBeenCalledOnce();expect(v.read().display).toBe(next);expect(v.read().retryAvailable).toBe(false);expect(v.read().notice).toBeNull();v.dispose();
   });
   it('initializes after measurable attachment, uses both transforms, retains pose through updates/Scenes and releases on hide', () => {
     let reentered = false;

@@ -10,6 +10,7 @@ import { PLYLoader } from 'three/addons/loaders/PLYLoader.js';
 import { STLLoader } from 'three/addons/loaders/STLLoader.js';
 import { trackGltfImages, trackMtlTextures } from './compat180/sceneProof';
 import { fitRasterWithinMaxEdge, rasterDimensions } from './rasterDimensions';
+import type { RasterResources } from './rasterResources';
 
 export type ModelFormat = 'glb' | 'gltf' | 'obj' | 'stl' | 'ply';
 
@@ -55,6 +56,7 @@ export function detectFormat(fileName: string, bytes: Uint8Array): ModelFormat |
 }
 
 export interface LoadDeps {
+  readonly rasterResources?: RasterResources;
   /** Preparation cancellation; never part of saved model semantics. */
   signal?: AbortSignal;
   /** OBJの.mtlテキスト（ZIP内の随伴ファイル解決。無ければ既定マテリアル） */

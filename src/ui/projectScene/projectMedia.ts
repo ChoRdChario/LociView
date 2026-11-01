@@ -1,4 +1,5 @@
 import type { JsonObject } from '../../domain/values';
+import { displayBlobRef } from '../../domain/portableMedia';
 import { editOnly } from './modePresentation';
 import { createMediaThumbnails, mediaDisplayDescription, type MediaViewer, type MediaPreviewGroup, type PreviewPng } from './mediaPreview';
 import { fieldValue, projectAttachments, projectIdentity, projectMediaResources, projectMediaUncertain } from './projectRead';
@@ -30,7 +31,9 @@ export function createProjectMedia(document: Document, host: ProjectPanelHost, c
     const lifetime = host.ports.imageScope(); if (imageScope !== lifetime) { imageScope = lifetime; bodies.clear(); }
     const old = bodies.get(id); if (old && sameProjectValue(old.record, record)) return old.image;
     let request: Promise<Blob> | undefined;
-    const value: PreviewPng = { load() { request ??= host.ports.image(record).catch(error => { request = undefined; throw error; }); return request; } };
+    const value: PreviewPng = { key: JSON.stringify([projectIdentity(source().provider), lifetime, displayBlobRef(record)]), byteLength: Number(displayBlobRef(record).byteLength),
+      load() { if (!request) { const current = host.ports.image(record); request = current;
+        void current.finally(() => { if (request === current) request = undefined; }).catch(() => {}); } return request; } };
     bodies.set(id, { record, image: value }); return value;
   };
   const reader = (captionId: string | null) => {
@@ -50,6 +53,7 @@ export function createProjectMedia(document: Document, host: ProjectPanelHost, c
     choose(id) { const s = expected(), record = projectMediaResources(source().provider).find(r => r.id === id)?.record;
       if (s && record && !host.block('captions') && !draft && !removal) { selected = { ...s, id, record }; host.changed(); } } });
   let picker = newPicker();
+  stored.addEventListener('toggle', () => { if (!disposed) picker.render(stored.open); });
   picker.root.setAttribute('aria-label', 'メディアを選択');
   const attach = button('選択したメディアを添付', () => {
     const choice = selected; if (!choice || host.block('captions') || !isCurrent(choice) || uncertainty()) return;
@@ -94,7 +98,7 @@ export function createProjectMedia(document: Document, host: ProjectPanelHost, c
     const nextGallery = JSON.stringify([currentScope, s.captionId]);
     if (galleryKey !== nextGallery) { galleryKey = nextGallery; gallery?.dispose(); actionCards.clear();gallery = s.captionId ? createMediaThumbnails(document, reader(s.captionId), viewer, undefined, attachmentTools) : undefined;
       galleryHost.replaceChildren(); if (gallery) galleryHost.append(gallery.root); }
-    gallery?.render(); if (stored.open) picker.render(); viewer.render();
+    gallery?.render(); picker.render(stored.open); viewer.render();
     root.hidden = !s.captionId && !owned(); stored.hidden = !projectMediaResources(s.provider).length;
     attach.disabled = !!block || !!draft || !!removal || !selected || !isCurrent(selected) || !!uncertain;
     cancelSelection.hidden = !selected; cancelSelection.disabled = !!local;
@@ -128,7 +132,7 @@ export function createProjectMedia(document: Document, host: ProjectPanelHost, c
     gallery(captionId: string) {
       let lifetime = scope(), read = reader(captionId);
       const thumbs = createMediaThumbnails(document, () => read(), viewer); thumbs.root.setAttribute('aria-label', '添付メディア');
-      return { root: thumbs.root, render() { if (lifetime !== scope()) { lifetime = scope(); read = reader(captionId); } thumbs.render(); }, dispose: thumbs.dispose };
+      return { root: thumbs.root, render(active = true) { if (lifetime !== scope()) { lifetime = scope(); read = reader(captionId); } thumbs.render(active); }, dispose: thumbs.dispose };
     },
-    dispose() { disposed = true; gallery?.dispose(); picker.dispose(); actionCards.clear();bodies.clear(); root.remove(); } } satisfies ProjectPanel & { gallery(captionId: string): { root: HTMLElement; render(): void; dispose(): void } };
+    dispose() { disposed = true; gallery?.dispose(); picker.dispose(); actionCards.clear();bodies.clear(); root.remove(); } } satisfies ProjectPanel & { gallery(captionId: string): { root: HTMLElement; render(active?: boolean): void; dispose(): void } };
 }

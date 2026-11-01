@@ -9,6 +9,7 @@ import type { CameraNavigationEvent, CameraOrientation, ViewCameraIntent, ViewRu
 import type { ViewFieldVersions } from './viewAuthoringState';
 import type { CaptionSnapshot } from '../../projectMetadata/captionAuthoring';
 import type { CaptionUndoInput, CaptionUndoCapture, CaptionUndoReceipt, CaptionUndoTarget, CaptionUndoSnapshot } from '../../projectMetadata/captionUndo';
+import type { RasterResources } from '../../viewer/rasterResources';
 
 export type WorkspaceAuthoringIntent =
   | { kind: 'duplicateCaption'; sceneId: string; sourceId: string }
@@ -61,6 +62,8 @@ export interface WorkspaceViewportState {
   readonly pin: WorkspacePinProposal | null; readonly choosing: boolean; readonly readOnly: boolean;
   readonly pinColors: readonly string[] | null;
   readonly available: boolean;
+  /** Presentation lifetime only; metadata and editing remain available while hidden. */
+  readonly visible?: boolean;
   readonly hiddenAssetIds?: readonly string[]; readonly model?: WorkspaceModelProposal | null;
   readonly windowMoving?: boolean;
   readonly comparison?: { token: string; captionId: string; anchor: Anchor } | null;
@@ -89,6 +92,8 @@ export interface WorkspaceFileInteraction {
   refreshHistory(): void;
 }
 export interface ProjectWorkspacePorts {
+  readonly rasterResources?: RasterResources;
+  readonly imageDimensions?:(bytes:Uint8Array,mime:string)=>{readonly width:number;readonly height:number}|null;
   authoring?: {
     beginUndo(token: string, command: CaptionUndoInput): CaptionUndoCapture | null;
     finishUndo(token: string, capture: CaptionUndoCapture): CaptionUndoReceipt | null;

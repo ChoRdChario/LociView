@@ -18,6 +18,9 @@ import type { ProjectDisplay } from './displayTypes';
 import { generationDatabaseName } from '../projectMetadata/generationScope';
 import { isSavedModel } from './modelTypes';
 import { createValidationUiState } from './browserUiState';
+import { createRasterResources } from '../viewer/rasterResources';
+import { createRasterDecoders } from '../projectFiles/rasterDecoders';
+import { chooseStartupScene } from '../scene/resolve';
 
 // Conservative execution budgets for this development lane, not measured product capacity.
 export const validationBrowserLimits: FileValidationLimits = { maxFileBytes: 64 * 1024 * 1024,
@@ -28,6 +31,8 @@ export async function createValidationBrowserWorkspace(document: Document, compo
   if (!import.meta.env.DEV && import.meta.env.MODE !== 'project-scene-validation' && import.meta.env.MODE !== 'project-scene-desktop' && import.meta.env.MODE !== 'project-scene-offline')
     throw Error('開発サーバーまたは専用の検証ビルドで開いてください。');
   const policy=projectFilePolicy(composition.filePolicy ?? validationBrowserLimits);
+  const raster = policy.nonGs.maxStaticPixels === undefined ? undefined : createRasterResources();
+  const rasterDecoders = raster ? createRasterDecoders(policy.nonGs, raster) : undefined;
   await initializeBrowserMetadata();
   const metrics = new Map<string, { count: number; milliseconds: number }>(); let measures = 0;
   const publish = (stage: string, milliseconds: number) => {
@@ -58,7 +63,7 @@ export async function createValidationBrowserWorkspace(document: Document, compo
     return { ...connection, factory: () => observed(connection.factory(), method => `io.idb.${method}`) };
   };
   const uiState = createValidationUiState();
-  const options = { base, timing, editorSettings: uiState.editorSettings, lazyImages:composition.progressivePresentation, coordinator: ProjectMutationCoordinator.browser(locks), fileLimits: policy.nonGs, filePolicy:composition.filePolicy, packageLocks: locks,
+  const options = { base, timing, decode: rasterDecoders?.png, jpeg: rasterDecoders?.jpeg, photo:rasterDecoders?.photo,mediaDecoders:rasterDecoders?.media, editorSettings: uiState.editorSettings, lazyImages:composition.progressivePresentation, coordinator: ProjectMutationCoordinator.browser(locks), fileLimits: policy.nonGs, filePolicy:composition.filePolicy, packageLocks: locks,
     generations: (id: string) => { const original = `${validationArea}-${id}`, prefix = `${original}-generation-`;
       return { listGenerations: async () => (await browserMetadataDatabaseNames()).filter(name => name.startsWith(prefix)).map(name => name.slice(prefix.length)),
         originalDatabasePresent: () => browserOriginalDatabasePresent(original),
@@ -73,11 +78,11 @@ export async function createValidationBrowserWorkspace(document: Document, compo
     list: () => listValidationProjects(options, storage),
     open: (id, initial, mode, workspaceFile, reviewEdit, firstBackup) => openValidationEntry({ ...options, run: id, initial, mode, workspaceFile, reviewEdit, firstBackup, openStorage: create => storage(id, create) }),
     renderModelCandidate: async (host, display) => {
-      const resident = await prepareReadonlyResidents(display.models, { modelContent: record => host.content.modelContent(record, true) });
+      const resident = await prepareReadonlyResidents(display.models, { modelContent: record => host.content.modelContent(record, true) }, undefined, false, raster);
       return { factory: sceneViewportFactory(resident,composition.residency,undefined,composition.smoothDisplay), dispose: () => resident.dispose() };
     },
     renderReview: async view => {
-      const resident = await prepareReadonlyResidents(view.models, view.content);
+      const resident = await prepareReadonlyResidents(view.models, view.content, undefined, false, raster);
       try {
         const display = view.display(null, null);
         for (const model of view.models) resident.validate(model, display.savedMaterials?.[model.assetId]);
@@ -85,7 +90,7 @@ export async function createValidationBrowserWorkspace(document: Document, compo
       } catch (error) { resident.dispose(); throw error; }
     },
     render: async host => {
-      const resident = await prepareValidationResidents(host.authority.read().modelVersions!, host.content,undefined,composition.progressivePresentation);
+      const resident = await prepareValidationResidents(host.authority.read().modelVersions!, host.content,undefined,composition.progressivePresentation,raster);
       try {
         const prepare = async (next: ProjectDisplay) => {
           await resident.prepare(next.modelVersions!);
@@ -96,6 +101,8 @@ export async function createValidationBrowserWorkspace(document: Document, compo
           }
         };
         const initial=host.authority.read();
+        const startup=chooseStartupScene(initial.state);
+        if(raster&&composition.progressivePresentation&&startup.sceneId)resident.demand?.(projectDisplay(initial,startup.sceneId,null,null).models.filter(isSavedModel));
         const ready=resident.ready.then(()=>{for(const scene of Object.values(initial.state.scenes)){
           if(scene.lifecycle.kind!=='value'||scene.lifecycle.value.state!=='active')continue;
           const display=projectDisplay(initial,scene.id,null,null);for(const model of display.models)if(isSavedModel(model))resident.validate(model,display.savedMaterials?.[model.binding.assetId]);
@@ -112,7 +119,7 @@ export async function createValidationBrowserWorkspace(document: Document, compo
       history.replaceState(null, '', url);
     },
   }, run, new URL(location.href).searchParams.get('access') === 'view' ? 'view' : 'edit');
-  const dispose = async () => { window.removeEventListener('pagehide', dispose);document.removeEventListener('lociview-timing-snapshot',snapshot); scratch.cancel();try{await workspace.dispose();}finally{await scratch.dispose();} };
+  const dispose = async () => { window.removeEventListener('pagehide', dispose);document.removeEventListener('lociview-timing-snapshot',snapshot); scratch.cancel();try{await workspace.dispose();}finally{await scratch.dispose();await raster?.dispose();} };
   window.addEventListener('pagehide', dispose);
   return { root: workspace.root,ready:workspace.ready, hasChanges: workspace.hasChanges, dispose };
 }

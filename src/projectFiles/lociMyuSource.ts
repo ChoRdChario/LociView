@@ -2,8 +2,9 @@ import { meshMaterialSemantics } from '../domain/meshMaterialSource';
 import type {MaterialIntent} from '../domain/materialIntent';
 import {standardMaterialNeeded,normalizedLegacyChroma,materialConversionNotice,sourceBlendNotice,type MaterialConversionNotice} from './materialNormalization';
 import { inspectProjectImage, type PhotoDecoder } from './photo';
-import { inspectZipContainerMetadata, readZipEntries, sanitizeZipPath, type ZipEntryData } from '../assets/zipio';
-import { buildImportPlan, sniffImageExt, type ImportPlan } from '../assets/importWizard';
+import { inspectZipContainerMetadata, openVerifiedZipCatalog, readZipEntries, sanitizeZipPath, type VerifiedZipCatalog, type VerifiedZipEntry } from '../assets/zipio';
+import { sniffImageExt } from '../assets/importWizard';
+import { analyzeLociMyuCatalog, type LociMyuCatalogPlan } from './lociMyuCatalog';
 import { parseCsv } from '../io/csv';
 import { analyzeLociMyuSheets, isLociMyuCaptionSheet, lociMyuTrimV1 as trim, projectLociMyuCaptionSheetIdentities,
   planLociMyuDisplaySetRelationConfirmation, LociMyuIdentityCollisionError, LociMyuSourceValidationError,
@@ -11,7 +12,6 @@ import { analyzeLociMyuSheets, isLociMyuCaptionSheet, lociMyuTrimV1 as trim, pro
 import { scalarLength, type JsonObject, type JsonValue } from '../domain/values';
 import { digest, json } from '../projectMetadata/persistence';
 import type { StoredBlobRef } from '../projectMetadata/blobStore';
-import { readValidationBody } from './content';
 import { inspectFreshValidationGlb, validationGlbParts, type ValidatedGlb } from './glb';
 import type { PngDecoder } from './png';
 import type { JpegDecoder } from './jpeg';
@@ -27,7 +27,8 @@ export type LociMyuRecipe = typeof lociMyuStandardMaterialRecipe | typeof lociMy
 export const lociMyuByteProof = async (bytes: Uint8Array) => ({ byteLength: bytes.length, digest: await digest(bytes) });
 export interface LociMyuIssue { severity: 'info' | 'warning' | 'blocking'; sheet: string | null; row: number | null; sourceId: string | null;
   field: string; reason: string; impact: string; candidates: string[] }
-export interface LociMyuBody { path: string; label: string; bytes: Uint8Array; ref: StoredBlobRef }
+export interface LociMyuBody { path: string; label: string; ref: StoredBlobRef;
+  withStream<T>(consume: (stream: ReadableStream<Uint8Array>) => Promise<T>): Promise<T> }
 export interface LociMyuScene { name: string; identity: LociMyuCaptionSheetIdentity; captions: { value: LociMyuCaption; row: number; imagePath?: string }[] }
 export interface LociMyuView { row: number; scene: string; name: string; camera: JsonObject; background: number[] }
 export interface LociMyuMaterial { row: number; scene: string; identity: LociMyuCaptionSheetIdentity; key: string; indices: number[];
@@ -35,7 +36,7 @@ export interface LociMyuMaterial { row: number; scene: string; identity: LociMyu
 export interface LociMyuSourcePlan {
   recipe: LociMyuRecipe;
   workbook: { path: string; byteLength: number; digest: string }; confirmation: readonly { sheetGid: string; sheetName: string }[] | null;
-  title: string; model: LociMyuBody & { model: ValidatedGlb }; media: LociMyuBody[]; scenes: LociMyuScene[]; views: LociMyuView[];
+  title: string; model: LociMyuBody & { model: Omit<ValidatedGlb, 'bytes'> }; media: LociMyuBody[]; scenes: LociMyuScene[]; views: LociMyuView[];
   fingerprints: { path: string; role: string; byteLength: number; digest: string }[];
   inventory: { count: number; byteLength: number; digest: string }; issues: LociMyuIssue[];
   sourceEvidence: JsonObject;
@@ -44,8 +45,8 @@ export interface LociMyuSourcePlan {
   accounting: { tables: number; rows: number; entries: number; sourceOnlyEntries: number; missingIds: number };
 }
 /** Private legacy evidence permits exact scalar sequences; target record admission remains NFC. */
-export function lociMyuEvidence(value: unknown): JsonValue {
-  let nodes = 0; const ancestors = new Set<object>();
+export function lociMyuEvidence(value: unknown, budget?: { nodes: number }): JsonValue {
+  let nodes = budget?.nodes ?? 0; const ancestors = new Set<object>();
   const copy = (v: unknown, depth: number): JsonValue => {
     if (++nodes > validationMetadataLimits.maxNodes || depth > validationMetadataLimits.maxDepth) refuse('元データの項目数が上限を超えています。');
     if (typeof v === 'string') { scalarLength(v, validationMetadataLimits.maxStringScalars, []); return v; }
@@ -62,7 +63,7 @@ export function lociMyuEvidence(value: unknown): JsonValue {
         result[key] = copy((v as Record<string, unknown>)[key], depth + 1); }
       return result;
     } finally { ancestors.delete(v); }
-  }; return copy(value, 0);
+  }; const result = copy(value, budget ? 1 : 0); if (budget) budget.nodes = nodes; return result;
 }
 export class LociMyuPreflightError extends Error {}
 function refuse(reason: string): never { throw new LociMyuPreflightError(reason); }
@@ -79,15 +80,35 @@ async function preflightWorkbook(bytes: Uint8Array, limits: FileValidationLimits
   let total = 0;
   const xml = (data: Uint8Array) => { total += data.length; if (total > limits.maxJsonBytes) refuse('表の検査量が上限を超えています。');
     const text = new TextDecoder('utf-8', { fatal: true }).decode(data);
-    if (/<!DOCTYPE|<!ENTITY|<[A-Za-z_][\w.-]*:|<[^!?][^>]*\b[\w:.-]+(?:\s+=|=\s+|\s*=\s*')/.test(text)) refuse('未対応の表の構造です。'); return text; };
+    if (/<!DOCTYPE|<!ENTITY/.test(text)) refuse('未対応の表の構造です。'); return text; };
+  const strict = (text: string) => { if (/<[A-Za-z_][\w.-]*:|<[^!?][^>]*\b[\w:.-]+(?:\s+=|=\s+|\s*=\s*')/.test(text)) refuse('未対応の表の構造です。'); };
   const documents = new Map(entries.filter(e => /\.xml$|\.rels$/i.test(e.path)).map(e => [e.path, xml(e.data)]));
   const sharedCount = [...(documents.get('xl/sharedStrings.xml') ?? '').matchAll(/<si\b[^>]*>[\s\S]*?<\/si>/g)].length;
   for (const [path, text] of documents) {
-    if (/\.rels$/.test(path)) for (const match of text.matchAll(/<Relationship\b([^>]*)\/?\s*>/g)) {
+    if (/\.rels$/i.test(path)) { strict(text); for (const match of text.matchAll(/<Relationship\b([^>]*)\/?\s*>/g)) {
       const mode = /\bTargetMode="([^"]*)"/.exec(match[1]!)?.[1];
       if (mode && mode !== 'Internal') refuse('外部参照を含む表は変換できません。');
-    }
-    if (/worksheets\//.test(path)) {
+    } }
+  }
+  const workbook = documents.get('xl/workbook.xml'), rels = documents.get('xl/_rels/workbook.xml.rels');
+  if (!workbook || !rels) refuse('表のシート参照が不足しています。');
+  strict(workbook); strict(rels);
+  const targets = new Map<string, string>(), consumedSheets = new Set<string>();
+  for (const match of rels.matchAll(/<Relationship\b([^>]*)\/?\s*>/g)) {
+    const id = /\bId="([^"]*)"/.exec(match[1]!)?.[1], raw = /\bTarget="([^"]*)"/.exec(match[1]!)?.[1];
+    if (!id || !raw || targets.has(id) || /[&'\\]/.test(raw)) refuse('表のシート参照が不正です。');
+    targets.set(id, raw.startsWith('/') ? raw.slice(1) : `xl/${raw.replace(/^\.\//, '')}`);
+  }
+  for (const match of workbook.matchAll(/<sheet\b([^>]*)\/?\s*>/g)) {
+    const rid = /\br:id="([^"]*)"/.exec(match[1]!)?.[1], target = rid && targets.get(rid);
+    if (!target || sanitizeZipPath(target) !== target || !files.has(target)) refuse('表のシート参照が不足しています。');
+    consumedSheets.add(target);
+    if (!documents.has(target)) documents.set(target, xml(files.get(target)!));
+  }
+  for (const [path, text] of documents) {
+    const auxiliary = /^xl\/(?:drawings\/drawing[0-9]+\.xml|theme\/theme[0-9]+\.xml|persons\/person\.xml)$/.test(path);
+    if (!auxiliary || consumedSheets.has(path)) strict(text);
+    if (/worksheets\//.test(path) || consumedSheets.has(path)) {
       const rows = [...text.matchAll(/<row\b[^>]*>([\s\S]*?)<\/row>/g)];
       if (rows.length > Math.min(100000, limits.maxItems) || /<row\b[^>]*\/>/.test(text)) refuse('表の行を省略せず読み取れません。');
       for (const row of rows) {
@@ -102,42 +123,23 @@ async function preflightWorkbook(bytes: Uint8Array, limits: FileValidationLimits
       }
     }
   }
-  const workbook = documents.get('xl/workbook.xml'), rels = documents.get('xl/_rels/workbook.xml.rels');
-  if (!workbook || !rels) refuse('表のシート参照が不足しています。');
-  const targets = new Map<string, string>();
-  for (const match of rels.matchAll(/<Relationship\b([^>]*)\/?\s*>/g)) {
-    const id = /\bId="([^"]*)"/.exec(match[1]!)?.[1], raw = /\bTarget="([^"]*)"/.exec(match[1]!)?.[1];
-    if (!id || !raw || targets.has(id) || /[&'\\]/.test(raw)) refuse('表のシート参照が不正です。');
-    targets.set(id, raw.startsWith('/') ? raw.slice(1) : `xl/${raw.replace(/^\.\//, '')}`);
-  }
-  for (const match of workbook.matchAll(/<sheet\b([^>]*)\/?\s*>/g)) {
-    const rid = /\br:id="([^"]*)"/.exec(match[1]!)?.[1], target = rid && targets.get(rid);
-    if (!target || sanitizeZipPath(target) !== target || !files.has(target)) refuse('表のシート参照が不足しています。');
-  }
 }
 
-export interface OpenedLociMyuSource { original: Uint8Array; imported: ImportPlan; entries: ZipEntryData[];
-  preflightFailures: Map<string, string>; rawAnalyzerDiagnostics: JsonObject; limits: FileValidationLimits; decode?: PngDecoder; jpeg?: JpegDecoder; photo?: PhotoDecoder }
+export interface OpenedLociMyuSource { original: Blob; imported: LociMyuCatalogPlan; entries: readonly VerifiedZipEntry[]; catalog: VerifiedZipCatalog;
+  dispose(): Promise<void>; preflightFailures: Map<string, string>; rawAnalyzerDiagnostics: JsonObject; limits: FileValidationLimits; decode?: PngDecoder; jpeg?: JpegDecoder; photo?: PhotoDecoder }
 /** Read-only source authority. No Native DTO, importer write or repaired GID map. */
-export async function openLociMyuSource(input: Blob, limits: FileValidationLimits, decode?: PngDecoder, jpeg?: JpegDecoder, photo?: PhotoDecoder): Promise<OpenedLociMyuSource | null> {
+export async function openLociMyuSource(input: Blob, limits: FileValidationLimits, decode?: PngDecoder, jpeg?: JpegDecoder, photo?: PhotoDecoder, signal?: AbortSignal): Promise<OpenedLociMyuSource | null> {
   checkFileLimits(limits); const file = input.slice();
-  if (file.size > limits.maxFileBytes) refuse('ファイルが検査の上限を超えています。');
   const container = await inspectZipContainerMetadata(file);
   if (container.identity !== 'foreign' || !container.hasSpreadsheetEntry) return null;
-  const original = await readValidationBody({ size: file.size, stream: () => file.stream() }, limits.maxFileBytes);
-  const entries = await readZipEntries(original, zipLimits(limits)), preflightFailures = new Map<string, string>();
-  for (const e of entries) if (/\.xlsx$/i.test(e.path)) {
-    try { await preflightWorkbook(e.data, limits); }
-    catch (error) { preflightFailures.set(e.path, error instanceof Error ? error.message : '表を検査できません。'); }
-  }
-  // Do not pass a dangerous workbook to a legacy decoder with larger default budgets.
-  const safeEntries = entries.filter(e => !preflightFailures.has(e.path));
-  const imported = await buildImportPlan(safeEntries, { preserveBlockedLociMyuSource: true });
-  const rawAnalyzerDiagnostics = lociMyuEvidence({ diagnostics: imported.diagnostics, selectedSourceIndex: imported.selectedSourceIndex,
-    candidates: imported.sources.map(s => ({ path: s.archivePath, failure: s.validationFailure ?? null })) }) as JsonObject;
-  for (const e of entries) if (preflightFailures.has(e.path)) imported.sources.push({ fileName: e.path.split('/').at(-1)!, archivePath: e.path,
-    sourceBytes: e.data, tables: [], looksLikeBackup: false, captionCount: 0, validationFailure: { code: 'workbook-unreadable', message: preflightFailures.get(e.path)! } });
-  if (!imported.sources.some(s => s.tables.some(t => isLociMyuCaptionSheet(t.rows))) && !preflightFailures.size) return null;
+  const catalog = await openVerifiedZipCatalog(file, { signal });
+  try {
+  const tableWork = { nodes: 1 };
+  const { imported, failures: preflightFailures, rawAnalyzerDiagnostics: diagnostics } = await analyzeLociMyuCatalog(catalog, limits,
+    bytes => preflightWorkbook(bytes, limits), source => { lociMyuEvidence({ path: source.archivePath, tables: source.tables }, tableWork); });
+  signal?.throwIfAborted();
+  const entries = catalog.entries, rawAnalyzerDiagnostics = lociMyuEvidence(diagnostics) as JsonObject;
+  if (!imported.sources.some(s => s.tables.some(t => isLociMyuCaptionSheet(t.rows))) && !preflightFailures.size) { await catalog.dispose(); return null; }
   // Bound every decoded cell across every workbook, not a fresh budget for each row.
   lociMyuEvidence(imported.sources.map(s => ({ path: s.archivePath, tables: s.tables })));
   const admitted: { index: number; count: number; backup: boolean }[] = [];
@@ -153,7 +155,8 @@ export async function openLociMyuSource(input: Blob, limits: FileValidationLimit
   }
   admitted.sort((a, b) => Number(b.count > 0) - Number(a.count > 0) || Number(a.backup) - Number(b.backup) || b.count - a.count || a.index - b.index);
   if (admitted.length) imported.selectedSourceIndex = admitted[0]!.index;
-  return { original, imported, entries, preflightFailures, rawAnalyzerDiagnostics, limits, decode, jpeg, photo };
+  return { original: file, imported, entries, catalog, dispose: () => catalog.dispose(), preflightFailures, rawAnalyzerDiagnostics, limits, decode, jpeg, photo };
+  } catch (error) { await catalog.dispose().catch(() => {}); throw error; }
 }
 
 export async function planLociMyuSource(opened: OpenedLociMyuSource, selection: number, title: string, confirmRelations: boolean): Promise<{
@@ -166,15 +169,15 @@ export async function planLociMyuSource(opened: OpenedLociMyuSource, selection: 
   const issues: LociMyuIssue[] = [];
   const issue = (severity: LociMyuIssue['severity'], sheet: string | null, row: number | null, sourceId: string | null, field: string, reason: string,
     impact = '元のZIPと説明ファイルに保持します。', candidates: string[] = []) => issues.push({ severity, sheet, row, sourceId, field, reason, impact, candidates });
-  const workbook = { path: source.archivePath, ...await lociMyuByteProof(source.sourceBytes) };
+  const workbook = { path: source.archivePath, ...source.proof };
   const tables = source.tables;
   let relation: ReturnType<typeof planLociMyuDisplaySetRelationConfirmation> = { kind: 'unavailable', relations: [], reason: 'missing-corroborating-table' };
   const inventoryRows = tables.flatMap((t, i) => t.rows.map((r, n) => [i, n + 1, [...r]]));
   const inventory = { count: inventoryRows.length, ...await lociMyuByteProof(new TextEncoder().encode(JSON.stringify(inventoryRows))) };
   const fingerprints: LociMyuSourcePlan['fingerprints'] = [];
   const accounting = { tables: tables.length, rows: inventoryRows.length, entries: entries.length, sourceOnlyEntries: 0, missingIds: 0 };
-  const sourceEvidence = lociMyuEvidence({ candidates: await Promise.all(imported.sources.map(async s => ({ path: s.archivePath, ...await lociMyuByteProof(s.sourceBytes),
-    diagnostics: s.validationFailure ?? null, admittedCaptions: s.captionCount, tables: s.tables.map(t => ({ name: t.name, headers: t.rows[0] ?? [], rows: t.rows.length })) }))),
+  const sourceEvidence = lociMyuEvidence({ candidates: imported.sources.map(s => ({ path: s.archivePath, ...s.proof,
+    diagnostics: s.validationFailure ?? null, admittedCaptions: s.captionCount, tables: s.tables.map(t => ({ name: t.name, headers: t.rows[0] ?? [], rows: t.rows.length })) })),
     diagnostics: { selectedWorkbook: source.archivePath, candidateFailures: imported.sources.filter(s => s.validationFailure).map(s => ({ path: s.archivePath, failure: s.validationFailure! })) },
     rawAnalyzerDiagnostics: opened.rawAnalyzerDiagnostics, fileIdMapRows: imported.fileIdMapRows ?? [] }) as JsonObject;
   const base: Pick<LociMyuSourcePlan, 'workbook' | 'confirmation' | 'title' | 'inventory' | 'fingerprints' | 'issues' | 'accounting' | 'sourceEvidence'> & { materialSelected?: true; materialRecipe?:typeof lociMyuMaterialRecipe|typeof lociMyuOpaqueMaterialRecipe|typeof lociMyuStandardMaterialRecipe } = { workbook, confirmation: null, title, inventory, fingerprints, issues, accounting, sourceEvidence };
@@ -200,10 +203,13 @@ export async function planLociMyuSource(opened: OpenedLociMyuSource, selection: 
     const analyzed = await analyzeLociMyuSheets(conversionTables);
     if (imported.models.length !== 1) refuse('最初の対応範囲では、モデルを1つだけ含むZIPを選択してください。');
     const candidate = imported.models[0]!;
-    const inspected = await inspectFreshValidationGlb(candidate.data, limits, decode, jpeg);
-    const model = { path: candidate.path, label: candidate.path.split('/').at(-1)!, bytes: candidate.data, model: inspected,
-      ref: { algorithm: 'sha256', ...await lociMyuByteProof(candidate.data), mediaType: 'model/gltf-binary' } as StoredBlobRef };
-    const rawGlb = validationGlbParts(candidate.data, limits).json, rawMaterials = rawGlb.materials as { name?: string }[] | undefined;
+    const candidateBytes = await opened.catalog.readBytes(candidate.path, limits.maxFileBytes);
+    const inspected = await inspectFreshValidationGlb(candidateBytes, limits, decode, jpeg);
+    const { bytes: _modelBytes, ...modelFacts } = inspected;
+    const model = { path: candidate.path, label: candidate.name, model: modelFacts,
+      withStream: <T>(consume: (stream: ReadableStream<Uint8Array>) => Promise<T>) => opened.catalog.withEntry(candidate.path, consume),
+      ref: { algorithm: 'sha256', byteLength: candidate.entry.byteLength, digest: candidate.entry.digest, mediaType: 'model/gltf-binary' } as StoredBlobRef };
+    const rawGlb = validationGlbParts(candidateBytes, limits).json, rawMaterials = rawGlb.materials as { name?: string }[] | undefined;
     const materialNames = new Set<string>(), materialIndices = new Map<string, Set<number>>();
     for (const surface of inspected.surfaceRanges) {
       const node = (rawGlb.nodes as { mesh?: number }[])[surface.nodeIndex as number]!, mesh = (rawGlb.meshes as { primitives: { material?: number }[] }[])[node.mesh!]!;
@@ -238,12 +244,14 @@ export async function planLociMyuSource(opened: OpenedLociMyuSource, selection: 
           if (!exact) issue('warning', scene.name, n + 1, value.legacyId, 'imageFileId', '画像の対応が一意に確認できないため添付しません。', undefined, name ? matches.map(m => m.path) : []);
           else {
             const image = matches[0]!;
-            if (sniffImageExt(image.data) === 'heic')
+            const imageBytes = image.imageExt === 'heic' ? null : await opened.catalog.readBytes(image.path, limits.maxFileBytes);
+            if (image.imageExt === 'heic' || sniffImageExt(imageBytes!) === 'heic')
               issue('warning', scene.name, n + 1, value.legacyId, 'imageFileId', 'HEIC/HEIFはこの変換では添付できません。');
             else {
-              const mediaType = await inspectProjectImage(image.data, limits, decode, jpeg, photo); caption.imagePath = image.path;
-              if (!images.has(image.path)) images.set(image.path, { path: image.path, label: image.name, bytes: image.data,
-                ref: { algorithm: 'sha256', ...await lociMyuByteProof(image.data), mediaType } });
+              const mediaType = await inspectProjectImage(imageBytes!, limits, decode, jpeg, photo); caption.imagePath = image.path;
+              if (!images.has(image.path)) images.set(image.path, { path: image.path, label: image.name,
+                withStream: consume => opened.catalog.withEntry(image.path, consume),
+                ref: { algorithm: 'sha256', byteLength: image.entry.byteLength, digest: image.entry.digest, mediaType } });
             }
           }
         }
@@ -322,12 +330,12 @@ export async function planLociMyuSource(opened: OpenedLociMyuSource, selection: 
         imported.images.some(f => f.path === entry.path) || imported.videos.some(f => f.path === entry.path) ? 'unlinked-media' : null;
       const basename = entry.path.split('/').at(-1)!;
       if (!role && /\.csv$/i.test(entry.path) && !basename.startsWith('.') && !basename.startsWith('~$')) {
-        const rows = parseCsv(new TextDecoder().decode(entry.data)), header = rows[0]?.map(v => trim(v).toLowerCase());
+        const rows = parseCsv(new TextDecoder().decode(await opened.catalog.readBytes(entry.path, limits.maxFileBytes))), header = rows[0]?.map(v => trim(v).toLowerCase());
         if (!isLociMyuCaptionSheet(rows) && (header?.[0] === 'fileid' || header?.[0] === 'id') && header[1] === 'filename') role = 'file-id-map';
       }
       if (!role) refuse('内容を説明できないZIP項目が含まれています。');
       if (role === 'unselected-workbook' || role === 'unlinked-media') { accounting.sourceOnlyEntries++; issue('info', entry.path, null, null, 'entry', 'この項目は元ファイルだけに保持します。'); }
-      fingerprints.push({ path: entry.path, role, ...await lociMyuByteProof(entry.data) });
+      fingerprints.push({ path: entry.path, role, byteLength: entry.byteLength, digest: entry.digest });
     }
     if(base.materialRecipe===lociMyuStandardMaterialRecipe)for(const row of materialRows)row.standardIntent=standardIntents.get(row.row)!;
     const materialNotices:MaterialConversionNotice[]=[];
@@ -344,7 +352,7 @@ export async function planLociMyuSource(opened: OpenedLociMyuSource, selection: 
     if (!(error instanceof LociMyuPreflightError || error instanceof LociMyuSourceValidationError) && !(error instanceof Error && error.message.startsWith('読み込めません。'))) throw error;
     issue('blocking', null, null, null, 'conversion', error.message, 'プロジェクトは作成していません。');
     // Even failed source admission retains a complete entry fingerprint inventory for explicit reporting.
-    fingerprints.splice(0); for (const e of entries) fingerprints.push({ path: e.path, role: 'unpublished-source', ...await lociMyuByteProof(e.data) });
+    fingerprints.splice(0); for (const e of entries) fingerprints.push({ path: e.path, role: 'unpublished-source', byteLength: e.byteLength, digest: e.digest });
     return { relation, base, plan: null };
   }
 }

@@ -1,9 +1,10 @@
 import * as THREE from 'three-compat-180';
 import type { JsonObject } from '../domain/values';
-import { inspectValidationPng, type PngDecoder } from './png';
-import { inspectValidationJpeg, type JpegDecoder } from './jpeg';
+import { inspectValidationPng, pngStructure, type PngDecoder } from './png';
+import { inspectValidationJpeg, jpegStructure, type JpegDecoder } from './jpeg';
+import { rasterBytes, type ModelRasterFacts } from '../viewer/rasterResources';
 import { inspectGlbMaterials } from './glbMaterials';
-import { checkFileLimits, fileError, fileFields, fileInteger, fileList, fileNumber, fileObject, fileVector, limitedJson, type FileValidationLimits } from './validation';
+import { checkFileLimits, fileError, fileLimitError, fileFields, fileInteger, fileList, fileNumber, fileObject, fileVector, limitedJson, type FileValidationLimits } from './validation';
 
 export interface ValidatedGlb {
   readonly kind?: 'glb';
@@ -13,6 +14,7 @@ export interface ValidatedGlb {
   readonly materials: readonly JsonObject[];
   readonly surfaceRanges: readonly JsonObject[];
   readonly occurrences?: readonly { nodeIndex: number; primitiveIndex: number; materialIndex: number | null; slotIndex: number }[];
+  readonly raster?: ModelRasterFacts;
 }
 /** Own container checks: legacy parseGlb accepts duplicate/truncated chunks and is not admission. */
 export function validationGlbParts(bytes: Uint8Array, limits: FileValidationLimits) {
@@ -101,13 +103,35 @@ export async function inspectStaticMeshDocument(j:Record<string,unknown>,bin:Uin
   });
   const { materials, usedUVs } = inspectGlbMaterials(j, max);
   const images = fileList(j.images ?? [], max);
-  for (const raw of images) {
+  const imageBodies = images.map(raw => {
     const image = fileObject(raw); fileFields(image, ['bufferView', 'mimeType']);
     const view = views[fileInteger(image.bufferView)];
     if (!view || view.stride || image.mimeType !== 'image/png' && !(jpeg && image.mimeType === 'image/jpeg')) return fileError('内蔵画像の形式にはまだ対応していません。');
-    const body = bin.subarray(view.offset, view.offset + view.length);
-    const dimensions = image.mimeType === 'image/jpeg' ? await inspectValidationJpeg(body, limits, 'glb-texture', decodeJpeg) : await inspectValidationPng(body, limits, decodePng);
-    charge(dimensions.width * dimensions.height);
+    return { body: bin.subarray(view.offset, view.offset + view.length), jpeg: image.mimeType === 'image/jpeg' };
+  });
+  let raster: ModelRasterFacts | undefined;
+  if (limits.maxModelImagePixels !== undefined) {
+    let pixels = 0;
+    const shapes = imageBodies.map(image => {
+      const dimensions = image.jpeg ? jpegStructure(image.body, limits, 'glb-texture') : pngStructure(image.body, limits);
+      pixels += dimensions.width * dimensions.height;
+      if (!Number.isSafeInteger(pixels) || pixels > limits.maxModelImagePixels!) fileLimitError('モデル内画像の合計画素数', pixels, limits.maxModelImagePixels!, '画素');
+      return { width: dimensions.width, height: dimensions.height };
+    });
+    const multiplicity = shapes.map(() => 0); let gpuBytes = 0;
+    for (const raw of fileList(j.textures ?? [], max)) {
+      const source = fileInteger(fileObject(raw).source), shape = shapes[source];
+      if (!shape) return fileError('テクスチャの元画像がありません。');
+      multiplicity[source] = multiplicity[source]! + 1; gpuBytes += rasterBytes(shape.width, shape.height, true);
+      if (!Number.isSafeInteger(gpuBytes)) return fileError('テクスチャの大きさが不正です。');
+    }
+    const cpuBytes = shapes.reduce((n, image, index) => n + rasterBytes(image.width, image.height) * Math.max(1, multiplicity[index]!), 0);
+    if (!Number.isSafeInteger(cpuBytes)) return fileError('画像の大きさが不正です。');
+    raster = { images: shapes, maximumEdge: shapes.reduce((n, i) => Math.max(n, i.width, i.height), 0), cpuBytes, gpuBytes };
+  }
+  for (const image of imageBodies) {
+    const dimensions = image.jpeg ? await inspectValidationJpeg(image.body, limits, 'glb-texture', decodeJpeg) : await inspectValidationPng(image.body, limits, decodePng);
+    if (limits.maxModelImagePixels === undefined) charge(dimensions.width * dimensions.height);
   }
   let implicitMaterial = false;
   const meshes = fileList(j.meshes, max).map(raw => {
@@ -195,5 +219,5 @@ export async function inspectStaticMeshDocument(j:Record<string,unknown>,bin:Uin
   if (!surfaceRanges.length || box.isEmpty()) return fileError('開始シーンに表示できる面がありません。');
   if (implicitMaterial) materials.push({ sourceLocator: { kind: 'representationMaterial', slotIndex: 0 },
     sourceSemantics: { coverage: { kind: 'opaque' }, optics: 'surface', lighting: 'lit', doubleSided: false } });
-  return { bounds: { min: box.min.toArray().map(n => n || 0), max: box.max.toArray().map(n => n || 0) }, materials, surfaceRanges };
+  return { bounds: { min: box.min.toArray().map(n => n || 0), max: box.max.toArray().map(n => n || 0) }, materials, surfaceRanges, ...(raster ? { raster } : {}) };
 }

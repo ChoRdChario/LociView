@@ -200,7 +200,7 @@ async function materialProof(rows: readonly EntityRecord[], models: readonly Fro
   for (const model of models) {
     const own = byModel.get(model.record.id); if (!own) continue;
     const inspected = model.model!.jpeg ? await inspectOccurrenceJpegGlb(model.bytes, limits, png, jpeg) : await inspectOccurrenceGlb(model.bytes, limits, png);
-    const decoded = await captureLegacyOccurrenceProof(inspected);
+    const decoded = await captureLegacyOccurrenceProof(inspected,undefined,png?.rasterResources);
     {
       const keys = new Map<string, typeof decoded.rows[number][]>(), counts = new Map<number | null, number>();
       for (const slot of decoded.rows) {

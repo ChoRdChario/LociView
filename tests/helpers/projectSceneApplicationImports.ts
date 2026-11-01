@@ -319,6 +319,7 @@ export const projectSceneApplicationImports:Readonly<Record<string,readonly stri
     "./modelTypes"
   ],
   "src/projectScene/reviewView.ts": [
+    "../projectFiles/streamSource",
     "../projectFiles/portableHeic",
     "../domain/portableMedia",
     "../projectFiles/media",
@@ -342,6 +343,8 @@ export const projectSceneApplicationImports:Readonly<Record<string,readonly stri
     "three"
   ],
   "src/projectScene/reviewWorkspace.ts": [
+    "../domain/values",
+    "../domain/portableMedia",
     "../ui/projectScene/cameraGizmo",
     "../ui/projectScene/contextHelp",
     "../ui/projectScene/captionListControls",
@@ -363,6 +366,9 @@ export const projectSceneApplicationImports:Readonly<Record<string,readonly stri
     "./hostPorts"
   ],
   "src/projectScene/validationBrowser.ts": [
+    "../scene/resolve",
+    "../viewer/rasterResources",
+    "../projectFiles/rasterDecoders",
     "../platform/desktopOfflinePorts",
     "../platform/opfs",
     "../platform/projectLock",
@@ -512,6 +518,8 @@ export const projectSceneApplicationImports:Readonly<Record<string,readonly stri
     "./validationOutputControls"
   ],
   "src/projectScene/validationRender.ts": [
+    "../viewer/rasterLoadScope",
+    "../viewer/rasterResources",
     "../domain/materialIntent",
     "../domain/meshMaterialSource",
     "../domain/meshSource",
@@ -586,6 +594,7 @@ export const projectSceneApplicationImports:Readonly<Record<string,readonly stri
     "./displaySupport"
   ],
   "src/projectScene/viewport.ts": [
+    "../viewer/rasterResources",
     "../domain/pointPresentation",
     "../viewer/gsDecodeQueue",
     "../viewer/gsRender",

@@ -19,6 +19,7 @@ import type { GsRenderPort,GsFrame } from '../viewer/gsRender';
 import type {SmoothComposite,SmoothPresentation,SmoothMesh} from '../viewer/smoothComposite';
 import type {TargetLayout} from '../viewer/targetBudget';
 import {smoothCoverage} from '../viewer/smoothMaterial';
+import { rasterBytes, type RasterLease } from '../viewer/rasterResources';
 
 /** Application viewport. Actual saved residents are required; geometry adapters own any non-file preview. */
 export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: GsResidency, geometry?: (model:RenderDisplay['models'][number],appearance:NonNullable<EditableDisplay['materials']>[string]|undefined)=>ResidentSurface,presentation?:SmoothPresentation): ViewportFactory => (canvas, changed, proposePin, proposeModel) => {
@@ -27,7 +28,29 @@ export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: 
   const scene = new THREE.Scene(), models = new THREE.Group(); scene.add(models); scene.background = new THREE.Color(PROJECT_SCENE_STANDARD_BACKGROUND_HEX);
   const resident = new Map<string, ResidentSurface>();
   const residentKeys = new Map<string,string>();
-  const fileModels=(rows:RenderDisplay['models'])=>rows.flatMap(m=>isReadonlyModel(m)||isSavedModel(m)?[m]:[]);
+  const rendererTextures=new Set<THREE.Texture>();
+  const textureLeases = new Map<THREE.Texture, RasterLease>();
+  const modelFailures = new Map<string, { key: string; issue: string }>();
+  const forgetUnusedTextures = () => {
+    if (!saved.rasterResources) return;
+    const used = new Set([...resident.values()].flatMap(surface => surface.gpuTextures ?? []));
+    for (const texture of [...rendererTextures]) if (!used.has(texture)) texture.dispose();
+  };
+  let rendererTarget: RasterLease | undefined;
+  const fileModels=(rows:readonly RenderDisplay['models'][number][])=>rows.flatMap(m=>isReadonlyModel(m)||isSavedModel(m)?[m]:[]);
+  const wantedModels = (next: RenderDisplay) => fileModels(saved.demand ? next.models.filter(m => !next.hiddenAssetIds?.includes(renderOwner(m))) : next.models);
+  const requestModels = (next: RenderDisplay | null) => { if (next && active) saved.demand?.(wantedModels(next)); };
+  const trackTexture = (texture: THREE.Texture) => {
+    if (!renderer || !saved.rasterResources) { rendererTextures.add(texture); return; }
+    if (rendererTextures.has(texture)) return;
+    const image = texture.source.data as { width?: number; height?: number } | null;
+    if (!image || !image.width || !image.height || image.width > renderer.capabilities.maxTextureSize || image.height > renderer.capabilities.maxTextureSize)
+      throw Error('この端末ではモデルの原寸テクスチャを表示できません。原本と記録は保持しています。');
+    const lease = saved.rasterResources.reserve({ cpuBytes: 0, gpuBytes: rasterBytes(image.width, image.height, true) }, 'モデルのテクスチャ');
+    textureLeases.set(texture, lease); rendererTextures.add(texture);
+    const freed = () => { texture.removeEventListener('dispose', freed); rendererTextures.delete(texture); textureLeases.delete(texture); lease.release(); };
+    texture.addEventListener('dispose', freed);
+  };
   const loadState=(m:RenderDisplay['models'][number])=>isReadonlyModel(m)||isSavedModel(m)?saved.state?.(m):undefined;
   scene.add(new THREE.HemisphereLight(0xffffff, 0x77736e, 2));
   const light = new THREE.DirectionalLight(0xffffff, 2); light.position.set(3, 5, 4); scene.add(light);
@@ -109,22 +132,31 @@ export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: 
     }
   }
   function release() {
+    saved.demand?.([]);
     endNavigation(undefined,false);
     pickEpoch++;
     pinPointerActive = false;
     gizmo?.dispose(); gizmo = null;
     observePose(); cancelAnimationFrame(raf); raf = 0; controls?.dispose(); controls = null; camera = null;
-    clearModels(); renderer?.dispose(); renderer = null; modelKey = ''; dragging = false;
+    clearModels();
+    // Three clears renderer properties during dispose. Release its source-map
+    // uploads first, retaining template CPU images for the next renderer.
+    for(const texture of rendererTextures)texture.dispose();rendererTextures.clear();
+    for (const lease of textureLeases.values()) lease.release(); textureLeases.clear();
+    renderer?.dispose(); renderer = null; modelKey = ''; dragging = false;
+    modelFailures.clear();
+    rendererTarget?.release(); rendererTarget = undefined;
   }
   function fail(e: unknown) { issue = `3D表示を停止しました。${errorText(e)} 編集内容は保持しています。`; release(); serial++; changed(); }
   function buildModels() {
     if (!display || !renderer) return;
-    const key = JSON.stringify([display.models.map(m => [isReadonlyModel(m) ? m.key : m.binding.id,loadState(m)]), display.materials, display.savedMaterials]); if (key === modelKey) return;
+    const key = JSON.stringify([display.models.map(m => [isReadonlyModel(m) ? m.key : m.binding.id,loadState(m)]), display.materials, display.savedMaterials, saved.demand ? display.hiddenAssetIds : null]); if (key === modelKey) return;
     clearSmooth();pickEpoch++;
     coverageProbe?.dispose();coverageProbe=null;coverageIssue=null;
     const target=new Map<string,string>();
-    const pendingGs=saved.gsPending?.(fileModels(display.models))??false;
+    const pendingGs=saved.gsPending?.(wantedModels(display))??false;
     for(const model of display.models){const id=renderOwner(model),state=loadState(model);
+      if (saved.demand && display.hiddenAssetIds?.includes(id)) continue;
       if(state&&state.phase!=='ready'||pendingGs&&model.representation.contentKind==='gaussianSplat'||display.materials?.[id]&&'issue' in display.materials[id]!)continue;
       target.set(id,JSON.stringify([isReadonlyModel(model)?model.key:model.binding.id,display.materials?.[id],display.savedMaterials?.[id]]));}
     const gsChanged=[...resident].some(([id,surface])=>surface.gs&&target.get(id)!==residentKeys.get(id))||display.models.some(m=>target.has(renderOwner(m))&&!resident.has(renderOwner(m))&&m.representation.contentKind==='gaussianSplat');
@@ -134,13 +166,19 @@ export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: 
       if(surface.dispose)surface.dispose();else {surface.asset.removeFromParent();surface.asset.traverse(node=>{if(node instanceof THREE.Mesh){node.geometry.dispose();for(const material of Array.isArray(node.material)?node.material:[node.material])material.dispose();}});}
       resident.delete(id);residentKeys.delete(id);
     }
+    forgetUnusedTextures();
+    for (const [id, failure] of modelFailures) if (target.get(id) !== failure.key) modelFailures.delete(id);
     try {
       for (const model of display.models) {
         const assetId = renderOwner(model), appearance = display.materials?.[assetId];
-        if (!target.has(assetId)||resident.has(assetId)) continue;
+        if (!target.has(assetId)||resident.has(assetId)||modelFailures.has(assetId)) continue;
         const surface = !isReadonlyModel(model)&&!isSavedModel(model)
           ? geometry ? geometry(model,appearance) : (()=>{throw Error('保存したモデルの表示本体を確認してください。');})()
           : saved.create(model, display.savedMaterials?.[assetId],!!presentation);
+        try { for(const texture of surface.gpuTextures??[])trackTexture(texture); } catch (error) {
+          surface.dispose?.(); forgetUnusedTextures();
+          modelFailures.set(assetId, { key: target.get(assetId)!, issue: errorText(error) }); continue;
+        }
         models.add(surface.asset);resident.set(assetId,surface);residentKeys.set(assetId,target.get(assetId)!);
       }
       for(const model of display.models){const surface=resident.get(renderOwner(model));if(surface)models.add(surface.asset);}
@@ -298,7 +336,7 @@ export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: 
   function admitDisplay(next:RenderDisplay):boolean {
     if(!residency)return true;
     // Mesh/Point may display while GS sources are checked. Unknown GS is never zero demand.
-    if(saved.gsPending?.(fileModels(next.models))){
+    if(saved.gsPending?.(wantedModels(next))){
       if(gsIntent?.active){blockedNext=next;pendingGsTarget=true;capacityIssue=null;serial++;changed();return false;}
       blockedNext=null;pendingGsTarget=false;capacityIssue=null;return true;}
     const key=JSON.stringify([next.models.map(m=>isReadonlyModel(m)?m.key:m.binding.id),next.materials,next.savedMaterials,next.hiddenAssetIds]);
@@ -319,6 +357,8 @@ export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: 
     if (resized) pickEpoch++;
     try {
       if (!renderer) {
+        if (presentation && saved.rasterResources) rendererTarget = saved.rasterResources.reserve({ cpuBytes: 0,
+          gpuBytes: presentation.budget.available + presentation.budget.used + 1 }, '透過表示の資源');
         renderer = new THREE.WebGLRenderer({ canvas, antialias: true }); renderer.outputColorSpace = THREE.SRGBColorSpace;renderer.toneMapping=THREE.NoToneMapping;
         renderer.setPixelRatio(Math.min(globalThis.devicePixelRatio || 1, 2));
         if (entryPending) enterScene();
@@ -386,6 +426,7 @@ export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: 
     queueMicrotask(()=>{retryScheduled=false;if(blockedNext&&!disposed&&active){viewport.update(blockedNext);ensure();}});});
   const viewport:ReturnType<ViewportFactory>={
     update(next) {
+      requestModels(next);
       if(!admitDisplay(next))return;
       if(next!==display)endNavigation(undefined,false);
       const sceneChanged = display?.sceneId !== next.sceneId;
@@ -403,7 +444,8 @@ export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: 
       pointDiameters.set(assetId, diameter); configurePoints(); pickEpoch++; serial++; changed(); },
     setActive(next) {
       const activating=next&&!active,retained=Boolean(next&&active&&renderer&&camera&&!issue);
-      if (!next && (active||gsIntent)) release(); active = next;
+      if (!next) release(); active = next;
+      requestModels(blockedNext ?? display);
       if(activating&&blockedNext)viewport.update(blockedNext);
       // Unchanged active state is common after camera/sort observations. Actual
       // size/DPR changes still enter ensure through ResizeObserver/the draw loop.
@@ -432,18 +474,19 @@ export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: 
       };
       const pins = display?.pins.map(pin => ({ id: pin.id, ...project(pin.position) })) ?? [];
       let alphaPicking = false;
-      for (const surface of resident.values()) if (surface.dispose) surface.mesh.traverse(node => {
+      for (const surface of resident.values()) if (surface.asset.visible && surface.dispose) surface.mesh.traverseVisible(node => {
         if (node instanceof THREE.Mesh && (Array.isArray(node.material) ? node.material : [node.material])
           .some(m => m.visible&&!hasBinaryCoverage(m)&&(m.transparent || m.alphaTest > 0 || m.opacity < 1))) alphaPicking = true;
       });
-      const pending=display?.models.flatMap((model,i)=>{const state=loadState(model),label=(isReadonlyModel(model)||isSavedModel(model))?saved.label?.(model):undefined;return state&&state.phase!=='ready'?[`${label??`モデル ${i+1}`}: ${state.issue??'読み込み中'}`]:[];})??[];
+      const pending=display?.models.flatMap((model,i)=>{if(saved.demand&&display?.hiddenAssetIds?.includes(renderOwner(model)))return[];const state=loadState(model),local=modelFailures.get(renderOwner(model)),label=(isReadonlyModel(model)||isSavedModel(model))?saved.label?.(model):undefined;return local?[`${label??`モデル ${i+1}`}: ${local.issue}`]:state&&state.phase!=='ready'?[`${label??`モデル ${i+1}`}: ${state.issue??'読み込み中'}`]:[];})??[];
+      const blockedFailures=blockedNext?.models.flatMap((model,i)=>{if(saved.demand&&blockedNext?.hiddenAssetIds?.includes(renderOwner(model)))return[];const state=loadState(model),label=(isReadonlyModel(model)||isSavedModel(model))?saved.label?.(model):undefined;return state?.phase==='failed'?[`${label??`モデル ${i+1}`}: ${state.issue??'モデルを読み込めません。'}`]:[];})??[];
       const materialNotices=[...resident.entries()].flatMap(([id,s])=>{if(!s.asset.visible)return[];const model=display?.models.find(m=>renderOwner(m)===id),label=model&&(isReadonlyModel(model)||isSavedModel(model))?saved.label?.(model):undefined;return(s.materialNotices??[]).map(n=>`${label??'モデル'} / ${n}`);});
-      const loading=Boolean(smoothPending||pendingGsTarget&&!blockedNext?.models.some(m=>loadState(m)?.phase==='failed')||!issue&&(!renderer||!camera)||pending.length&&display?.models.some(model=>loadState(model)?.phase==='loading')||gsPreparing||[...resident.values()].some(s=>s.asset.visible&&s.gs&&!s.gs.ready&&(!s.gs.issue||s.gs.issue==='GSの表示を準備しています。')));
+      const loading=Boolean(smoothPending||pendingGsTarget&&!blockedFailures.length||!issue&&(!renderer||!camera)||pending.length&&display?.models.some(model=>loadState(model)?.phase==='loading')||gsPreparing||[...resident.values()].some(s=>s.asset.visible&&s.gs&&!s.gs.ready&&(!s.gs.issue||s.gs.issue==='GSの表示を準備しています。')));
       return { token: JSON.stringify([serial, display?.sceneId, display?.projectFrameId, display?.bounds, width, height, pose, background]),
         display: display ?? undefined,
         pickToken: String(pickEpoch),
-        ready: Boolean(active && renderer && camera && !issue&&!capacityIssue&&!pendingGsTarget&&!pending.length), cameraReady:Boolean(active&&renderer&&camera&&controls&&!issue&&!contextLost&&display), loading, issue,retryAvailable:!!capacityIssue||!!gsIssue||!!smoothIssue||[...resident.values()].some(s=>s.gs?.issue!==null&&s.gs?.issue!==undefined&&s.gs.issue!=='GSの表示を準備しています。'),
-        notice: [smoothPresented?'透過表示は近似です。':null,smoothPending?'透過表示を準備しています。':null,smoothIssue?`${smoothIssue} 透過の面は非表示です。設定と記録は保持しています。`:null,smoothLayout&&smoothLayout.renderScale<Math.min(1,2/(rawPixelRatio||1))?'3D表示の細かさを自動調整しています。元データと記録は変わりません。':null,pendingGsTarget&&'次のシーンのモデルを確認しています。前の表示を保持しています。',pending.join(' / '),capacityIssue, notice, coverageIssue, gsIssue, pointDiameterNotice, ...new Set([...resident.values()].flatMap(s => [s.points?.issue,s.asset.visible && s.gs ? s.gs.issue ?? (!s.gs.ready && !gsIssue ? 'GSの表示を準備しています。' : null) : null].filter(Boolean))), alphaPicking && !display?.readOnly ? presentation?'滑らかな透過の面は位置指定に使えません。位置の手動調整は利用できます。':'半透明・切り抜きの面へのピン配置は未接続です。原本の見た目は保持しています。' : null,
+        ready: Boolean(active && renderer && camera && !issue&&!capacityIssue&&!pendingGsTarget&&!pending.length), cameraReady:Boolean(active&&renderer&&camera&&controls&&!issue&&!contextLost&&display), loading, issue,retryAvailable:!!blockedFailures.length||!!modelFailures.size||!!capacityIssue||!!gsIssue||!!smoothIssue||[...resident.values()].some(s=>s.gs?.issue!==null&&s.gs?.issue!==undefined&&s.gs.issue!=='GSの表示を準備しています。'),
+        notice: [smoothPresented?'透過表示は近似です。':null,smoothPending?'透過表示を準備しています。':null,smoothIssue?`${smoothIssue} 透過の面は非表示です。設定と記録は保持しています。`:null,smoothLayout&&smoothLayout.renderScale<Math.min(1,2/(rawPixelRatio||1))?'3D表示の細かさを自動調整しています。元データと記録は変わりません。':null,pendingGsTarget&&(blockedFailures.length?'次の表示を準備できません。前の表示と記録は保持しています。':'モデルを準備しています。前の表示を保持しています。'),blockedFailures.join(' / '),pending.join(' / '),capacityIssue, notice, coverageIssue, gsIssue, pointDiameterNotice, ...new Set([...resident.values()].flatMap(s => [s.points?.issue,s.asset.visible && s.gs ? s.gs.issue ?? (!s.gs.ready && !gsIssue ? 'GSの表示を準備しています。' : null) : null].filter(Boolean))), alphaPicking && !display?.readOnly ? presentation?'滑らかな透過の面は位置指定に使えません。位置の手動調整は利用できます。':'半透明・切り抜きの面へのピン配置は未接続です。原本の見た目は保持しています。' : null,
           ...new Set(materialNotices),
           ...new Set(display?.pins.flatMap(p => p.notice ? [p.notice] : []) ?? []),
           ...(display?.materialNotices ?? []), ...Object.values(display?.materials ?? {}).flatMap(m => 'issue' in m ? [m.issue] : []),
@@ -502,7 +545,7 @@ export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: 
       catch (e) { pose = previousPose; background = previousBackground; axis = previousAxis; throw e; }
       poses.set(display.sceneId, pose); backgrounds.set(display.sceneId, background); notice = null; serial++; changed();
     },
-    retry() { if(blockedNext){this.update(blockedNext);ensure();return;} if (contextLost) throw new Error('描画環境の復旧を待って再試行してください。'); release(); issue = null; ensure(); },
+    retry() { saved.retry?.(); if(blockedNext){this.update(blockedNext);ensure();return;} if (contextLost) throw new Error('描画環境の復旧を待って再試行してください。'); release(); issue = null; requestModels(display); ensure(); },
     dispose() { disposed = true;unsubscribeTargets?.();unsubscribeResidents?.();unsubscribeAdmission?.(); release(); resize.disconnect(); canvas.removeEventListener('pointerdown', mouseNavigation, true);
       canvas.removeEventListener('webglcontextlost', lost); canvas.removeEventListener('webglcontextrestored', restored); },
   };

@@ -2,12 +2,12 @@ import type { MeshSourceData, MeshSourceSlot } from '../domain/meshSource';
 import type { JsonObject } from '../domain/values';
 import type { PngDecoder } from './png';
 import type { JpegDecoder } from './jpeg';
-import { inspectStaticMeshDocument } from './glb';
+import { inspectStaticMeshDocument, type ValidatedGlb } from './glb';
 import { fileFields, fileInteger, fileList, fileObject, limitedJson, type FileValidationLimits } from './validation';
 import { meshError } from './meshSourceSupport';
 
 /** Strict URI adapter into shared checked static facts; original JSON is never rewritten/exported. */
-export async function inspectMeshGltf(bytes:Uint8Array,limits:FileValidationLimits,png?:PngDecoder,jpeg?:JpegDecoder,signal?:AbortSignal):Promise<MeshSourceData>{
+export async function inspectMeshGltf(bytes:Uint8Array,limits:FileValidationLimits,png?:PngDecoder,jpeg?:JpegDecoder,signal?:AbortSignal):Promise<MeshSourceData & Pick<ValidatedGlb, 'raster'>>{
   signal?.throwIfAborted();const source=limitedJson(bytes,limits),j=structuredClone(source),buffers=fileList(source.buffers,1);if(buffers.length!==1)return meshError('glTF内の本体を確認してください。');
   const buffer=fileObject(buffers[0]);fileFields(buffer,['byteLength','uri']);let decodedTotal=0;
   const dataUri=(value:unknown,types:readonly string[])=>{
@@ -39,5 +39,5 @@ export async function inspectMeshGltf(bytes:Uint8Array,limits:FileValidationLimi
   for(const o of occurrences){const sourceMaterial=facts.materials.find(m=>{const locator=m.sourceLocator as JsonObject;return o.materialIndex===null?locator.kind==='representationMaterial':locator.kind==='gltfMaterial'&&locator.materialIndex===o.materialIndex;});if(!sourceMaterial)return meshError('glTFの材質の対応を確認できません。');
     materials.push({sourceLocator:{kind:'representationMaterial',slotIndex:o.slotIndex},sourceSemantics:sourceMaterial.sourceSemantics!});sourceSlots.push({slotIndex:o.slotIndex,address:{kind:'gltf-occurrence',...o}});
   }
-  return{kind:'mesh-source',format:'gltf',bytes,bounds:facts.bounds,materials,surfaceRanges:facts.surfaceRanges,sourceSlots,externalMaterialsUnavailable:false,occurrences,...(usesJpeg?{jpeg:true}: {})};
+  return{kind:'mesh-source',format:'gltf',bytes,bounds:facts.bounds,materials,surfaceRanges:facts.surfaceRanges,sourceSlots,externalMaterialsUnavailable:false,occurrences,...(usesJpeg?{jpeg:true}: {}),...(facts.raster?{raster:facts.raster}: {})};
 }

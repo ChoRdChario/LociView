@@ -370,3 +370,41 @@ keep the normal update action primary and move cache-only state recheck into a
 closed diagnostic detail. Existing recheck/prepare/remove ownership, pending and
 offline behavior stay unchanged. Proxy help must limit the need for a positioning
 surface to surface-hit selection, without implying manual coordinate entry is lost.
+
+## 2026-10-31 integrated-PC quality repair behavior
+
+The PO-approved quality plan adds image inspection to the existing media dialog.
+Keep previous/next/close and native video/audio controls. For a decoded still image,
+show compact whole-image, original-size, zoom-out and zoom-in actions plus the
+current percentage. Original size means one image pixel per CSS pixel. Whole-image
+fits the visible image viewport. Zoom/pan is local UI state: preserve it across
+ordinary Host renders, reset it only for a new image/attempt, close or explicit fit.
+Support pointer pan and keyboard/scroll alternatives; retain browser zoom, IME,
+Escape, existing media navigation and focus return. Video/audio do not show image
+zoom controls. Late image events cannot replace a newer image; closing releases
+the existing preview/Blob URL. No source resizing, metadata edit or new viewer.
+
+Keep Scene selection controls alive across normal renders so keyboard focus stays
+with the selected Scene. Header Help/Settings follow the existing disclosure model:
+Escape closes and returns focus to the summary unless composing or already handled;
+outside pointer/focus closes without stealing focus or discarding retained settings
+input. Optional context-help remains readable, including after the anchor's initial
+scroll-into-view. A scroll may hide the old note, but a pointer still over a valid
+help anchor starts a fresh delayed display rather than becoming permanently silent.
+Explicit keyboard/touch help follows its anchor through scroll/resize until
+dismissed. Place notes beside the anchor when room exists, then above it; avoid
+covering the next action below an input. Escape/second tap does not resurrect on scroll.
+
+Input/conversion errors stay beside their current file/decision. Distinguish the
+known capacity/inspection limit from invalid/unsupported structure without guessing
+RAM exhaustion or corruption. Say exactly that conversion-source ZIP/report are
+excluded from normal output; model and admitted image originals remain preserved.
+Use current intent labels in help. Expanded capacity and auxiliary-workbook input
+rules remain a separate measured proposal, not activated by these UI repairs.
+
+Picking warnings describe the visible scene only. Ignore hidden Asset owners and
+invisible descendants/materials when collecting the translucent-surface warning;
+restore it when the affected surface is shown. This changes no rendering, picking
+predicate, manual-position permission or saved material. Verify hidden→shown and
+the retained conservative picking refusal with the original07n and mixed-surface
+browser paths, not by weakening ready-state or pixel/picking assertions.

@@ -264,6 +264,7 @@ export async function writeZipWithFalseCrc32(
 export async function writeZipWithFalseUncompressedSize(
   entries: readonly ZipEntryData[],
   filename: string,
+  delta = 1,
 ): Promise<Uint8Array> {
   const zip = new Uint8Array(await writeDirectZip(entries));
   const record = uniqueCentralRecord(zip, filename);
@@ -272,7 +273,9 @@ export async function writeZipWithFalseUncompressedSize(
   if (centralSize !== localSize || centralSize === 0xffffffff) {
     throw new Error('false-size fixture source local and central sizes must match and be non-ZIP64');
   }
-  const falseSize = centralSize + 1;
+  const falseSize = centralSize + delta;
+  if (!Number.isSafeInteger(falseSize) || falseSize < 0 || falseSize >= 0xffffffff || falseSize === centralSize)
+    throw new Error('false-size fixture needs a different finite non-ZIP64 size');
   setUint32(zip, record.offset + 24, falseSize);
   setUint32(zip, record.localOffset + 22, falseSize);
   return zip;

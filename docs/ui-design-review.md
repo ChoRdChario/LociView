@@ -390,3 +390,85 @@ POは、各ボタン・UIを実処理と照合し、重複、開発用分離の�
 新しい機能の削除、複製と所属の統合、閲覧用ファイルと通常Projectの権限混同、
 自動マージや復旧原本の省略は行わない。修正後も公開・OS install・実機・AAA品質の
 合格は別の受入れであり、個々の無効ボタンを消した数を完成度としない。
+
+## 2026-10-31 現行PC版の通し操作・修正前の問題一覧
+
+PO承認済みのPC品質向上計画に基づく最初の巡回。基点262b8e6、専用Chromium156、
+1440×1000を基準とし、既存の狭幅・keyboard・cold/file操作を含む10ケースを実行した。
+6PASS/4FAIL、ビルド込み825.70秒。これは既存Desktop全39ケースの合格ではない。
+証拠はprivateな`.artifacts/e2e/test-strategy/quality-baseline*`と
+`.artifacts/e2e/pc-quality/`。利用者の既存ブラウザ／原本は変更していない。
+
+| ID・重要度 | 問題と再現／期待する結果 | 証拠・分類 | 修正単位 |
+|---|---|---|---|
+| PCQ-01 P1 | 原ZIPが64MiBで停止。抽出GLBは8K JPEGで停止。容量・画素数・JPEG走査・GLB画像合算をgeometryと分け、安全に開く必要がある | 既存private実画面監査＋今回のsource照合。XLSX補助XMLの拒否もsourceから判明し、まだ現PC実変換では未到達 | 一括の容量／受入れ仕様案。具体値・補助XMLの新受入れは未批准 |
+| PCQ-02 P1 | 高画素写真を既存viewerで原寸・拡大して読めない | 現行viewerに全体／原寸／zoom／panがないことをcodeで確認。巨大ピンは旧Nativeの別観測 | 同じviewerに画像専用の閲覧操作 |
+| PCQ-03 P2 | Sceneボタンへfocus→EnterでSceneを選択するとfocusがBODYへ消える。選択した操作へfocusを残す | 修正前の実Chromium probe、02-scene-keyboard-focus | SceneボタンのDOM寿命を保持 |
+| PCQ-04 P2 | ヘルプ／設定でEscapeが効かず、3Dを選択してもヘルプが残る。既存の一時UIと同じ終了操作が必要 | 実probeの3フラグ全false、03〜05画像 | Escape／外側操作による開閉。設定draft／IMEは保持 |
+| PCQ-05 P2 | 説明にhoverした直後の自動scrollで2秒待機が破棄され、そのままhoverしても説明が出ない | context-help既存case失敗＋実probeでpointerover→lv-caption-content scroll→visible tooltip0を確認 | pointer位置を確かめた待機の再開 |
+| PCQ-06 P2 | 読込エラーが選択欄から離れる。容量拒否をJPEG不正と表示。変換説明の「元データを含まない」がmodel／写真原本も欠けるように読める。helpに旧名称が残る | private現PC画像＋現行source。旧Native暗色dialogは現PC再現項目に加算しない | 対象近傍の状態と正確な短い説明 |
+| PCQ-07 P1 | workbookが通常worksheet以外の内部XMLをsheetとして参照すると、row/cell検査が適用されない | source上のreader/preflight不一致。小規模の別path／非XML拡張子targetで既存の列重複・超過・UTF8等の拒否を検証し、無損失targetは受入れ | 全resolved sheet targetへ既存のlossiness guardを適用 |
+| PCQ-08 P1 | rendererを閉じてもtemplate由来textureのGPU handleが解放されない。main／候補／再開で原寸画像のGPU常駐が重複する | Three186 sourceの独立reviewで確定。実Threeのsource-upload/delete/liveと画像を補足 | source-only GPU portとTexture.dispose→renderer.dispose順序。CPU bitmapは保持 |
+| PCQ-09 P2 | keyboard focus後の自動scrollが説明を消す。説明が設定の適用ボタンを覆う。IME中のEscapeをglobal tooltipが消費する | 実eventtrace、daily実画面のpointer遮蔽、独立review | explicit activation分離、横／上優先、IME/defaultPrevented保持 |
+| PCQ-10 P2 | 半透明Meshを非表示にしてGSだけを表示しても、面の位置指定を制限する警告が残る | 最初の修正後07n実画面で再現。read()の警告収集だけがowner／nodeの可視条件を見ていない | 表示中のsurfaceだけに通知を限定。描画・選択の保守的な拒否と保存値は保持 |
+| PCQ-11 P1 | 新GS／Proxyを待つ需要を同ターンのactivateが旧表示で上書きし、準備が終わらない。失敗した次のモデルの理由／retryも隠れる | 実GS差し替え停止＋同期callgraph・queued実順序のunit。修正後GS差し替え16.7分で全経路PASS | pending需要・失敗対象・retryを保持し、正常な旧表示を継続 |
+| PCQ-12 P2 | 短い成功通知が3D入力を遮り、期限時に別処理中だと残る | image実画面＋実perform／仮想時間の回帰。修正後の通知が見えたままの実選択PASS | perform成功だけ透過／自分の期限で消去。長い失敗のscroll・選択は維持 |
+| PCQ-13 P2 | 720×500CSS／DPR2のFileでTabした名前入力がsticky footerに隠れる | 最終artifact実Tab／ShiftTab・長い日本語・保存hit／取消close PASS。入力bottom327.3px＜footer347.3px。独立画像reviewで確認 | Fileのscroll-padding。実browser zoomとは区別 |
+| PCQ-14 P2 | compactの非表示3Dがseeded CPU需要を保持。位置準備後の入力focusもtaskに残る | 実productのhidden編集／backup／取消・stale・例外回復、元workspace通しPASS。最終Ki84で全9旧bitmap解放→再準備、64pin投影差0・本文保持 | visibilityとmetadata可否を分離。準備後だけ既存target照合。task自身のfocusだけready Xへ移し、別focus／取消／closeを保持 |
+| PCQ-15 P2 | 旧native-only HEICが新画像UIで寸法拒否され、HEIC／Photo前段検査も共有所有を迂回する | sourceで到達確認。decoder／parser／native source／late encoder所有を接続、focused PASS。注入native成功による実ImageBitmap＋canvas／保存／再開の関連browser PASS | 既存codec／bounded parser／中立dimensions portを再利用。物理HEIC対応を推定しない |
+| PCQ-16 P1 | 50万点Review→編集コピーが240秒を超える。小規模の共有／GS操作と点復元にもbusy待ち失敗 | 初回全40実行35PASS／5busy FAIL、後続の元関連caseで39PASS／copy性能1FAILへ。通常copyも240秒超→editor、私的phase374.358秒・archive50巡／20.116GB hash | 検査内容とfresh fenceを保持。SHA小改善は不採用、06bだけでpayload反復を解決するとしない。copy後半の機能確認を性能合格へ読み替えない |
+| PCQ-17 P2 | 正しい現行build・720×500CSS/DPR2の実Ki84で一覧238pxが詳細を0pxに潰し、本文の適用が一覧の親変更に遮られる | 最終artifactでdetail239px・Tab/ShiftTab・適用hit・確認取消・hidden本文保持PASS。独立画像reviewも確認 | 高さ640px以下だけ詳細行min240px＋task自身scroll。通常高さ・一覧/詳細・既存入力ガードを保持 |
+
+### 製品の不具合と区別した検証不足
+
+- daily-authoringはCaption窓と編集galleryの両方を数える旧generic locatorで停止。
+- loadingは現行accessible名が「キャプションを追加」の入口を「ピンを追加」で探して停止。
+- workspace-completionの最初の停止は撤去済み「視点を記録」／視点名管理の指定。現行はSceneの「開始視点を記録」。loading等には現在の「書き出す」を旧「保存」tabで探す指定も残る。
+  正しいowner／現在の名前へ追従し、保存・原本・履歴・入力保持のassertは維持する。
+- loading、daily、workspaceの未到達後半と、GSの未配置記録に対する数値配置は未確認として残す。
+  staticな懸念や旧画面の結果だけを現PC不具合／合格に置き換えない。
+- 今回PASSしたものはfile受信／復元、同Project二窓排他、record／camera、view／offline、
+  task draft保持。全て小規模の既存ケースであり、8Kの受渡し／offlineの証拠ではない。
+
+最初の巡回はここで完了。上記をまとめた仕様と順序に従い、原本・typed command・保存／
+復旧fenceを維持して修正し、元の再現と周辺操作を同じ証拠laneで再確認する。
+
+### 通常修正の再現解消と残るlane
+
+2048×1024の実PNGを既存viewerで全体→原寸→pointer/keyboard pan→resize→全体表示。
+原寸2048px、pan後の画面変化、前後backupの原PNG SHA・履歴・Project identity不変を
+実Chromiumで確認した。Scene keyboard focus、Help/Settings Escape・outside dismiss、
+設定IMEとdraft保持、画像を閉じた後のfocus returnも同じconnected caseで確認。
+代表画像とJSONは既存のprivate e2e run1793443580288-67336に保持。
+
+GPU修正は公開Texture.disposeでsource uploadを先に解放する。実production
+viewport/resident/candidate componentを使う隔離browser integrationでは、Scene A→Bで
+2sourceを表示後、previewへの交代でmainの2sourceがdeleteされlive0、preview終了でも
+source live0。再表示とcontext復旧後は初回と同じ画像SHA、初回21,904非背景画素・497色、
+Scene Bは別画像SHA、最後は全owned source live0・browser error0だった。
+画像4枚と計測JSONをprivate pc-qualityへ保持し独立review済み。renderer内部の既定textureと
+compositor/SDKの所有物はsource計数から除外し、全create/deleteは別記する。
+これは通常資源所有のcomponent証拠であり、PC入口の全経路・8K統合・一般端末合格ではない。
+
+この通常修正の時点では、原本Ki84の現PC読込み・共有・offlineは01iの方式／数値判断が未了で未到達だった。
+大容量の合格へ小規模の結果を転用しない。通常修正の最終Desktop/offline結果とcheckpointは
+todoへ集約する。
+
+2026-11-01追記：01iの方向承認後、原本を変えないcatalog取込みと表示資源の所有を接続した。
+同じ実データで8K模型、320px縮小画像／1920px原寸、4Scene／103Caption、実ファイルと
+別環境・返送・復元・server／browser完全終了後のoffline編集／保存／再開を確認した。
+関連未確認時は1Viewと原本だけの3View、確認時は4View／23材質設定を区別する。
+checkboxを文章と同じ行へ収め、確認が引継ぎ結果に効くことと未引継ぎを変換前に示す。
+変換説明の保存と待機／失敗／成功は既存File内へ移し、編集画面上端の独立した行を解消した。
+大きなピンや未選択titleの問題は現PCでは再現せず、保存倍率を無断で変更していない。
+復元／復元後保存には大きな待ち時間が残る。段階別の実測と必要な契約判断はtodo／06bへ。
+最終ソースでの回帰とrequired checkpoint前なので、この追記を製品全体の合格としない。
+
+後続の実regressionでPCQ-10を検出し、可視owner／ancestor／mesh／materialだけで
+位置指定の制約を案内する条件に揃えた。unitでopaqueの実hit、透明時の既存拒否、
+非表示／再表示を確認した。描画・選択・保存の規則は変えない。
+点の実RGBが1ずれた別件は、DOM Caption接続線のスクリーンショットへの混入だった。
+同じ状態でそのUIだけを隠すと元のRGBへ戻る実probeを保持し、3D専用の採取helperを補正。
+GS拒否の2回目の失敗は、最初の説明表示後も古いcanvas座標を使った指定だった。
+毎回の実rectへ追従し、距離・拒否・RGBのassertは維持する。これらを製品の破損や
+選択規則の変更として扱わず、元の失敗経路を再実行する。
