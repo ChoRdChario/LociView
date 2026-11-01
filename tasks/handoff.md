@@ -6,11 +6,19 @@ checks, remaining work and genuine stop conditions; [inventory](implementation-i
 owns route-specific coverage. Check the actual Git branch/HEAD/worktree and
 preserve existing changes. Do not reconstruct current work from old checkpoints.
 
-Current CI maintenance preserves immutable golden bytes and portable synthetic
-workspace copies. See todo for the actual Windows full-run failures and focused
-repair evidence; do not call the whole Windows suite green. Actual remote Linux
-CI is required after the bounded reviewed checkpoint, with no timeout relaxation.
-Successful builds/isolation do not supersede the retained whole-suite failures.
+The current05 performance candidate removes one duplicate history clone inside
+an invocation-owned candidate inspection; strict public admission and all storage
+fences remain. Its five original-budget workflows and actual Ki84 file/cold
+oracle pass. One new edit pair improves27.544→16.163s; save observes old79.157→
+candidate100.272→the one old-artifact control122.165s. No save improvement,
+environment-only cause or general no-regression claim is made. Windows final
+all-root passes146files/3232cases/21TODO (1994.54s); see todo for its serial build/
+isolation results and actual Linux CI qualification under the existing g0 workflow.
+The last selector-fixture delta synchronizes the existing owner only and leaves
+the measured product/runtime unchanged. The previous
+[Linux CI](https://github.com/ChoRdChario/LociView/actions/runs/41320308352) passes
+for the portable-fixture/golden checkpoint only; new actual Linux CI is required.
+No timeout relaxation; retain all earlier Windows failures as dated evidence.
 
 PO approved the connected current-PC quality plan and the
 [01i high-resolution workflow](../docs/specs/01i-high-resolution-pc-workflow-proposal.md):

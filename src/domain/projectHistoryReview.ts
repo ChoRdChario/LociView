@@ -1,9 +1,9 @@
-import { inspectAtomicHistory, HistoryIndex, type AtomicCandidate, type AtomicField, type AtomicHistory, type HistoryReadLimits } from './atomicHistory';
+import { inspectAtomicHistory, withClonedAtomicHistoryRoot, HistoryIndex, type AtomicCandidate, type AtomicField, type AtomicHistory, type AtomicHistoryInspection, type HistoryReadLimits } from './atomicHistory';
 import { canonical, immutableKinds } from './projectGraphSupport';
 import { projectRecordMaps, type ProjectRecordMap } from './projectRecords';
 import type { ProjectSemanticProfile } from './projectProfile';
 import { lifecycleValue, logicalId } from './recordFields';
-import { DomainValidationError, reject, type ValidationIssue } from './values';
+import { DomainValidationError, reject, type JsonValue, type ValidationIssue } from './values';
 
 export type FieldPolicy = 'immutable' | 'existence' | 'root-default' | 'parent' | 'optional-default' | 'spatial' | 'order' | 'scalar' | 'unknown';
 export type HistoryIssue = Readonly<{ path: readonly string[]; kind: 'invalid' | 'review' | 'unverified'; code: string }>;
@@ -37,7 +37,20 @@ export function projectFieldPolicy(path: readonly string[], profile: ProjectSema
 
 /** Inspection only. Every unknown candidate and historical value is retained; no field winner or Project projection. */
 export function reviewProjectHistory(input: unknown, limits: HistoryReadLimits, profile: ProjectSemanticProfile = 'map1'): ProjectHistoryReview {
-  const read = inspectAtomicHistory(input, limits); if (read.kind === 'rejected') return read;
+  return reviewAtomicHistory(inspectAtomicHistory(input, limits), limits, profile);
+}
+
+/** Review only the actual private atomic inspection of this freshly cloned root. */
+export function withClonedProjectHistoryRoot<T>(input: unknown, config: HistoryReadLimits,
+  consume: (root: JsonValue, reviewHistory: (profile: ProjectSemanticProfile) => ProjectHistoryReview) => T): T {
+  const limits = Object.freeze({ maxNodes: config.maxNodes, maxDepth: config.maxDepth,
+    maxStringScalars: config.maxStringScalars, maxWork: config.maxWork });
+  return withClonedAtomicHistoryRoot(input, limits, (root, inspectHistory) =>
+    consume(root, profile => reviewAtomicHistory(inspectHistory(), limits, profile)));
+}
+
+function reviewAtomicHistory(read: AtomicHistoryInspection, limits: HistoryReadLimits, profile: ProjectSemanticProfile): ProjectHistoryReview {
+  if (read.kind === 'rejected') return read;
   try {
     const index = new HistoryIndex(read.history, limits.maxWork - read.workUsed), issues: HistoryIssue[] = [], allWrites = new Map<string, AtomicCandidate[]>();
     const key = (path: readonly string[]) => JSON.stringify(path);

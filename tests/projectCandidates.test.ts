@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { inspectProjectCandidates, type ProjectCandidateInput } from '../src/domain/projectCandidates';
+import { describe, expect, it, vi } from 'vitest';
+import { createProjectCandidateInspector, inspectProjectCandidates, type ProjectCandidateInput } from '../src/domain/projectCandidates';
 import { admitProjectRecords } from '../src/domain/projectRecords';
 import { admitSceneRecord } from '../src/domain/sceneRecords';
 import { admitMaterialRecord } from '../src/domain/materialRecords';
@@ -18,6 +18,46 @@ const fork = (source: ProjectCandidateInput, path: string[], a: any, b: any) => 
 const codes = (r: Awaited<ReturnType<typeof read>>) => r.issues.map(i => i.code);
 
 describe('all-current-candidate Project values/references, not full provider or content authority', () => {
+  it('keeps configured owned inspections equivalent and independent across caller mutation and later calls', async () => {
+    const source = candidateFixture(fixture()), expected = structuredClone(source), config = { ...limits }, inspect = createProjectCandidateInspector(config);
+    const baseline = await inspectProjectCandidates(expected, limits), pending = inspect(source);
+    (source.history as any).token = 'changed input'; config.maxNodes = 1; config.maxWork = 1;
+    const first = await pending, second = await inspect(expected);
+    expect(first).toEqual(baseline); expect(second).toEqual(baseline);
+    if (first.kind !== 'project-candidate-inspection' || second.kind !== 'project-candidate-inspection') throw Error('inspection');
+    expect(first.source.history).not.toBe(source.history); expect(first.source.history).not.toBe(second.source.history);
+    expect(Object.isFrozen(first.source.history)).toBe(true); expect(Object.isFrozen(first.source.history.changes)).toBe(true);
+    expect((await inspectProjectCandidates(expected, config)).kind).toBe('rejected');
+  });
+
+  it('retains whole-root limits and schema/maps rejection before atomic work validation', async () => {
+    const source = candidateFixture(fixture());
+    for (const config of [{ ...limits, maxNodes: 5 }, { ...limits, maxDepth: 2 }, { ...limits, maxStringScalars: 3 }, { ...limits, maxWork: 0 }]) {
+      expect(await createProjectCandidateInspector(config)(source)).toEqual(await inspectProjectCandidates(source, config));
+      const malformed = { ...source, schema: null };
+      expect(await createProjectCandidateInspector(config)(malformed)).toEqual(await inspectProjectCandidates(malformed, config));
+    }
+    let calls = 0;
+    const getter = { ...source }; Object.defineProperty(getter, 'history', { enumerable: true, get() { calls++; return source.history; } });
+    expect((await createProjectCandidateInspector(limits)(getter)).kind).toBe('rejected'); expect(calls).toBe(0);
+  });
+
+  it('keeps the old public async rejection and mutable limits while configured calls retain their own budget', async () => {
+    const source = candidateFixture(fixture()), config = { ...limits }, inspect = createProjectCandidateInspector(config), digest = crypto.subtle.digest.bind(crypto.subtle);
+    let started!: () => void, release!: () => void;
+    const reached = new Promise<void>(resolve => { started = resolve; }), gate = new Promise<void>(resolve => { release = resolve; });
+    const spy = vi.spyOn(crypto.subtle, 'digest').mockImplementation(async (...args) => { started(); await gate; return digest(...args); });
+    try {
+      const pending = inspect(source); await reached; config.maxNodes = 1; release();
+      expect((await pending).kind).toBe('project-candidate-inspection');
+    } finally { release(); spy.mockRestore(); }
+    const dynamic = { ...limits }; let lowered = false;
+    const lower = vi.spyOn(crypto.subtle, 'digest').mockImplementation(async (...args) => {
+      const result = await digest(...args); if (!lowered) { lowered = true; dynamic.maxNodes = 1; } return result;
+    });
+    try { expect(await inspectProjectCandidates(source, dynamic)).toMatchObject({ kind: 'rejected', issue: { code: 'limit' } }); }
+    finally { lower.mockRestore(); }
+  });
   it('composes all 14 record maps without a field winner and retains source evidence and explicit missing content authority', async () => {
     const records = fixture(), source = candidateFixture(records), r = await read(source);
     expect(r.unambiguousRecords).toEqual(records); expect(r.source).toEqual(source);

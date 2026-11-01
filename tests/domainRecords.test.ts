@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { admitSceneRecord, type SceneRecordKind } from '../src/domain/sceneRecords';
-import { cloneCanonicalValue, DomainValidationError, normalizeSceneName, type ValueLimits } from '../src/domain/values';
+import { cloneCanonicalValue, DomainValidationError, normalizeSceneName, type JsonObject, type ValueLimits } from '../src/domain/values';
 
 const limits: ValueLimits = { maxNodes: 500, maxDepth: 12, maxStringScalars: 65_536 };
 const id = (prefix: string, number = 1) => `${prefix}_${number.toString(16).padStart(32, '0')}`;
@@ -135,5 +135,36 @@ describe('reusable v2 individual record admission (not Project/storage admission
       { maxNodes: 1.5 }, { maxStringScalars: NaN }]) invalidValue({}, 'limit', { ...limits, ...bad });
     const result = admitSceneRecord('scene', { ...scene(), future: [1, 2, 3] }, { ...limits, maxNodes: 2 });
     expect(result).toMatchObject({ kind: 'rejected', issue: { code: 'limit' } });
+  });
+
+  it('retains independent frozen nested diagnostic paths after unwinding and later calls', () => {
+    const issue = (input: unknown) => {
+      try { cloneCanonicalValue(input, limits); throw Error('Unexpected admission'); }
+      catch (error) { expect(error).toBeInstanceOf(DomainValidationError); return (error as DomainValidationError).issue; }
+    };
+    const first = issue({ siblings: [0, { detail: { value: Infinity } }], later: true });
+    expect(first).toEqual({ code: 'value', path: ['siblings', 1, 'detail', 'value'] });
+    expect(Object.isFrozen(first)).toBe(true); expect(Object.isFrozen(first.path)).toBe(true);
+    let getterCalls = 0;
+    const accessor = Object.create(null); Object.defineProperty(accessor, 'value', { enumerable: true, get() { getterCalls++; return 1; } });
+    const second = issue({ other: [accessor] });
+    expect(second).toEqual({ code: 'type', path: ['other', 0, 'value'] }); expect(getterCalls).toBe(0);
+    expect(second.path).not.toBe(first.path); expect(Object.isFrozen(second.path)).toBe(true);
+    expect(issue({ other: [{ label: 'e\u0301' }] })).toEqual({ code: 'canonical', path: ['other', 0, 'label'] });
+    expect(first.path).toEqual(['siblings', 1, 'detail', 'value']);
+    expect(second.path).toEqual(['other', 0, 'value']);
+  });
+
+  it('clones a shared decoded subtree independently at every occurrence', () => {
+    const child = { nested: { label: '原本' }, values: [0.5, false] };
+    const cloned = cloneCanonicalValue([child, child], limits) as readonly JsonObject[];
+    expect(cloned).toEqual([child, child]); expect(cloned[0]).not.toBe(cloned[1]);
+    expect(cloned[0]!.nested).not.toBe(cloned[1]!.nested); expect(cloned[0]!.values).not.toBe(cloned[1]!.values);
+    child.nested.label = '変更'; child.values.push(1);
+    for (const result of cloned) {
+      expect(result).toEqual({ nested: { label: '原本' }, values: [0.5, false] });
+      expect(Object.getPrototypeOf(result)).toBeNull(); expect(Object.isFrozen(result)).toBe(true);
+      expect(Object.isFrozen(result.nested)).toBe(true); expect(Object.isFrozen(result.values)).toBe(true);
+    }
   });
 });

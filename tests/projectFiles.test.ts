@@ -9579,9 +9579,25 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const ports: ValidationWorkspacePorts = { fileLimits: budget, decode, selected: vi.fn(),
       list: () => listValidationProjects(options, openStorage), render: draw,
       open: vi.fn(async (run, initial, mode) => host = await openValidationHost({ ...options, run, initial, mode, openStorage: create => openStorage(run, create) })) };
-    const u = createValidationWorkspace(new RecordedDocument().asDocument(), ports), root = record(u.root);
+    const u = owned(createValidationWorkspace(new RecordedDocument().asDocument(), ports)), root = record(u.root);
     const all = (n: RecordedNode): RecordedNode[] => [n, ...n.children.flatMap(all)];
     const button = (text: string) => all(root).find(n => n.tag === 'button' && n.textContent === text)!;
+    const status = all(root).find(n => n.className === 'lv-operation-status lv-validation-status')!;
+    const selectorAction = async (action: () => void) => {
+      const setAttribute = status.setAttribute.bind(status); let settled: (() => void) | undefined, started = false;
+      status.setAttribute = (key, value) => { setAttribute(key, value); if (key === 'data-busy') {
+        if (value === 'true') started = true;
+        else if (settled) { const complete = settled; settled = undefined; complete(); }
+      } };
+      try {
+        await u.ready;
+        if (status.attributes.get('data-busy') === 'true') await new Promise<void>(resolve => { settled = resolve; });
+        expect(status.attributes.get('data-busy')).toBe('false');
+        started = false;
+        await new Promise<void>(resolve => { settled = resolve; action(); expect(started).toBe(true); });
+        expect(status.attributes.get('data-busy')).toBe('false');
+      } finally { settled = undefined; status.setAttribute = setAttribute; }
+    };
     const title = all(root).find(n => n.attributes.get('aria-label') === 'プロジェクト名')!, files = all(root).find(n => n.attributes.get('aria-label') === 'ファイルを選択')!;
     const form = files.parent!.parent!, submit = () => form.fire('submit', { preventDefault() {} });
     await vi.waitFor(() => expect(button('一覧を更新').parent && !u.hasChanges()).toBe(true));
@@ -9595,8 +9611,8 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     await vi.waitFor(()=>expect(all(root).some(n=>n.textContent==='initial display preparation failed')).toBe(true),{timeout:5000});
     const created=u.selected!,originals=host!.read().source!.originalChanges();expect(host!.read().state).toBe('ready');expect(host!.hasPending()).toBe(false);expect(released).not.toHaveBeenCalled();
     // Saved data is recoverable even though mounting did not succeed; explicit return does not acknowledge resume.
-    button('別のプロジェクトを開く').fire('click');await vi.waitFor(()=>expect(u.selected).toBeNull());
-    await vi.waitFor(()=>expect(button('編集で開く')).toBeDefined());button('編集で開く').fire('click');
+    await selectorAction(() => button('別のプロジェクトを開く').fire('click'));await vi.waitFor(()=>expect(u.selected).toBeNull());
+    await vi.waitFor(()=>expect(button('編集で開く')).toBeDefined());await selectorAction(() => button('編集で開く').fire('click'));
     await vi.waitFor(() => expect(all(root).some(n => n.textContent.startsWith('検証用プロジェクト。'))).toBe(true), { timeout: 5000 });
     expect(host!.authority.read().modelVersions).toHaveLength(1); const id = u.selected!;
     expect(id).toBe(created);expect(host!.read().source!.originalChanges()).toEqual(originals);
@@ -9610,11 +9626,11 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     button('別のプロジェクトを開く').fire('click'); await new Promise(resolve => setTimeout(resolve, 0));
     expect(u.selected).toBe(id); expect(u.hasChanges()).toBe(true);
     fs.reject = () => false; await host!.authority.retry!();
-    button('別のプロジェクトを開く').fire('click');
+    await selectorAction(() => button('別のプロジェクトを開く').fire('click'));
     await vi.waitFor(() => expect(u.selected).toBeNull());
     expect(released).toHaveBeenCalledOnce();
     await vi.waitFor(() => expect(all(root).some(n => n.textContent === '選択から作成 — 再開用データ ')).toBe(true));
-    button('閲覧で開く').fire('click'); await vi.waitFor(() => expect(u.selected).toBe(id));
+    await selectorAction(() => button('閲覧で開く').fire('click')); await vi.waitFor(() => expect(u.selected).toBe(id));
     await vi.waitFor(() => expect(all(root).some(n => n.textContent.startsWith('検証用プロジェクト。'))).toBe(true));
     expect(host!.authority.readOnly).toBe(true); expect(ports.selected).toHaveBeenLastCalledWith(id, 'view');
     expect(host!.read().source!.semanticProfile).toBe('map2');
@@ -9622,18 +9638,20 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     await vi.waitFor(() => expect(button('閲覧する')?.disabled).toBe(false));
     expect(host!.authority.readOnly).toBe(false); expect(ports.selected).toHaveBeenLastCalledWith(id, 'edit');
     await u.dispose(); expect(released).toHaveBeenCalledTimes(2);
-    let finish!: (r: Awaited<ReturnType<ValidationWorkspacePorts['render']>>) => void;
-    const lateRelease = vi.fn(), lateRender = vi.fn(() => new Promise<Awaited<ReturnType<ValidationWorkspacePorts['render']>>>(r => { finish = r; }));
+    let finish: ((r: Awaited<ReturnType<ValidationWorkspacePorts['render']>>) => void) | undefined, closingLate = false;
+    const lateRelease = vi.fn(), lateResult = () => ({ factory: () => { throw Error('must not mount after disposal'); }, dispose: lateRelease });
+    const lateRender = vi.fn(() => new Promise<Awaited<ReturnType<ValidationWorkspacePorts['render']>>>(r => { finish = r; if (closingLate) r(lateResult()); }));
     const late = createValidationWorkspace(new RecordedDocument().asDocument(), { ...ports, render: lateRender }, id);
+    caseDisposals.push(async () => { closingLate = true; const closing = late.dispose(); finish?.(lateResult()); await closing; });
     await vi.waitFor(() => expect(lateRender).toHaveBeenCalledOnce());
-    const closing = late.dispose(); finish({ factory: () => { throw Error('must not mount after disposal'); }, dispose: lateRelease });
+    const closing = late.dispose(); finish!(lateResult());
     await closing; expect(lateRelease).toHaveBeenCalledOnce();
     const reopened = await ports.open(id); if ('kind' in reopened) throw Error('normal selector host'); expect(reopened.authority.readOnly).toBe(false);
     // Publication may be ready while host-owned image/projection preparation has failed.
     let displayFailed = true; const originalRetry = reopened.authority.retry!;
     reopened.hasPending = () => displayFailed;
     reopened.authority.retry = async () => { const p = await originalRetry(); displayFailed = false; return p; };
-    const afterSave = createValidationWorkspace(new RecordedDocument().asDocument(), { ...ports, open: async () => reopened }, id);
+    const afterSave = owned(createValidationWorkspace(new RecordedDocument().asDocument(), { ...ports, open: async () => reopened }, id));
     const afterRoot = record(afterSave.root);
     await vi.waitFor(() => expect(all(afterRoot).some(n => n.textContent === '更新を再試行')).toBe(true));
     all(afterRoot).find(n => n.textContent === '更新を再試行')!.fire('click');

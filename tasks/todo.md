@@ -57,7 +57,96 @@ unchanged-feature-classification checks pass; independent review has no findings
 No runtime change or new capacity guarantee; no runtime suite is needed for this
 documentation checkpoint.
 
-## Current boundary —portable CI fixture and immutable golden bytes
+## Current boundary —Windows heavy workflows and daily-use latency
+
+PO authorizes product/backend performance work so the07m v1/LociMyu material
+exchange and Caption restore/duplicates workflows pass their original Windows
+budgets, followed by meaningful Windows and actual Linux CI verification.
+Start from the pushed CI repair and the retained failures; preserve the dirty
+CI-result notes, private audit block and every original data/assertion oracle.
+
+Reuse the bounded private07m phase diagnostic on current code, recording CPU and
+wall time across creation, persistence, read/validation, generation, receive and
+cold reopening. Identify one measured production hot path; record concrete
+ports/specification intent and independent boundary review before sensitive
+changes. Confirm elapsed impact in a representative actual browser workflow,
+then focused original-budget cases before one meaningful final serial check.
+
+No timeout/assertion/exclusion/retry changes, test-only token savings, new
+dependencies/schema, unchecked cache, inspection-lifetime expansion or altered
+write/publication/recovery fences. Stop only affected work if the measured fix
+requires a new policy/authority/large architecture decision; continue other
+authorized work. Root reviews the final diff/index before g0 commit/Push; no
+release or public deployment. Synthetic IO counts are diagnostic, not latency
+acceptance. Keep all private artifacts outside Git.
+
+The retained baseline-code07m diagnostic reaches Clean at26.623s and times out at30s. A20.198s
+worker CPU sample places4.061s of sample time under decoded-value cloning and
+1.784s under canonical serialization (nested timings are not additive); the
+repository-only second history application accounts for0.376s. A reviewed private
+path-stack implementation passes the nine domain guard cases but still times
+out in the original07m workflow. Its comparable Clean-start boundary worsens
+26.623→28.535s wall/30.282→32.672s CPU, so it is not accepted as faster and the
+runtime/specification experiment is reverted. Keep the two general frozen-path/
+shared-copy regressions. No unchecked trust flag, clone bypass or cross-read cache.
+
+The selected05 candidate gives one whole-root inspection a private zero-argument
+history inspector using its own frozen numeric configuration. Only the known
+original-source composition uses it; public unknown-input/default inspectors
+remain strict. Preserve schema/work/error ordering, final projection cloning,
+cross-input/call independence and every storage/content/write/recovery fence.
+Independent meaningful source/fault review is clean. Focused guards/import
+boundaries and the final atomic ownership regressions pass. All five unchanged
+original-budget workflows pass:07m v1/LociMyu, received Caption restoration and
+07n v1/LociMyu. These are functional budget results, not a speed percentage.
+
+One new actual Ki84 pair uses two exact copies of one closed seed, original and
+new fixed assets, identical Chromium/viewport/controller and saved operation
+code. Body edit takes27.544→16.163s (host27.223→15.895s). Each side then fully
+closes, reopens and saves:79.157→100.272s, so save/overall speed improvement and
+absence of regression are not established. Capture/early readiness shrink but
+stream-close/job/overview grow; do not assign that difference to environment
+alone. Both actions have real start/end IO snapshots. Native/HTML observations
+are zero; hash/array counts and bytes agree below the observation cap. Owner
+read counts also agree; diagnostics do not prove elapsed causality.
+
+Both real outputs pass the existing archive oracle: six original changes remain
+byte-exact plus the intended one body change, all4Scenes/103Captions/27attachments/
+26media/4Views/23materials and27payloads (49,671,020bytes) are preserved. Normal
+SW preparation followed by a new offline context confirms exact candidate
+assets, saved body, draft cancellation/focus and real aircraft/pin/photo paint.
+The first Windows all-root run exits1:145files pass/one fails,3231PASS/one FAIL/21TODO
+(2032.22s), stopping before builds. All original heavy workflows pass. The new
+failure is selector UI9617: selected/null and an existing row do not imply the
+previous return/list owner has finished, so recorded-DOM fire can be ignored
+while busy. Its reviewed case-local observer now waits for the actual normal
+back/open owner transitions; blocked-pending assertions and the original budget
+remain. Focus passes in2.39s and typecheck passes; late-render failure cleanup
+releases its gate before awaiting disposal. This is fixture synchronization,
+not a product delay. Preserve the full failed run. Final all-root verification
+passes146files/3232cases with21TODO in1994.54s (Exit0) on the new test freeze,
+with unchanged product code and every original budget/assertion retained.
+The one planned old-artifact edit→close→cold→save control on a third exact seed
+copy completes in122.165s. Retain old79.157→candidate100.272→old122.165s; this
+does not establish a reproducible candidate-specific regression, general
+no-regression, environment-only causality or save improvement. Control IO/quality
+counts agree and its archive passes the same original-history/records/payload
+oracle. No further speed controls. Required local verification is complete:
+latest typecheck and final all-root, normal/harness/validation/Desktop builds,
+offline isolation, the existing CI BASE_PATH normal build and adjacent HEIC
+isolation all exit0. The earlier offline build is reused with identical product/
+build inputs; the final delta is the reviewed selector fixture only. This is a
+qualified serial sequence, not a literal checkpoint-script exit0.
+
+Independent code/fault/data/UI evidence reviews have no mandatory findings.
+The locally verified change follows the existing g0 checkpoint workflow; actual
+Linux CI for that checkout remains pending. Root verifies index/privacy before
+delivery. No further runtime check solely for documentation/staging. Remaining save latency
+needs stage-specific investigation of validation, write/stream and refresh cost;
+the control does not settle its cause. No raw-ZIP proof-lifetime/section6/01h
+implementation, new dependency/policy, capacity guarantee or release is included.
+
+## Completed boundary —portable CI fixture and immutable golden bytes
 
 PO authorizes repairing the86 CI failures on the verified daily-use checkpoint:
 82 synthetic-workspace copies reject an already existing destination on Linux;
@@ -75,6 +164,13 @@ values; no alternate hash, runtime normalization or regenerated vectors.
 The three CI-target files pass101cases (381.52s, Exit0); typecheck passes.
 Raw Git index and checkout under autocrlf=false/true retain the exact approved
 golden bytes and identical JSON values. Independent source/spec review is clean.
+The bounded checkpoint is committed and pushed to g0-baseline.
+[Actual Linux CI](https://github.com/ChoRdChario/LociView/actions/runs/41320308352)
+succeeds on that exact checkout:146filesPASS/3226PASS/21TODO (610.06s),
+all steps successful, including the BASE_PATH build and HEIC isolation. The
+terminal log contains no EEXIST SystemErrors or FAIL lines. This is actual remote
+evidence, separate from the local Windows results below.
+
 The Windows all-root run is FAIL:145files pass/1fails,3222PASS/4FAIL/21TODO
 (1921.00s, Exit1), stopping before builds. Three cases hit30s (07m v1/LociMyu
 and received Caption restoration); one file-check UI case hit an incidental1s
@@ -96,11 +192,13 @@ or validation change. Final-scope typecheck, five builds, offline isolation,
 then the CI-required BASE_PATH normal build and HEIC isolation pass serially
 (all nine steps Exit0). This is not a successful whole checkpoint script.
 Do not repeat an untargeted Windows whole run just to toggle its result.
-Actual remote Linux CI is required after the reviewed bounded g0 checkpoint;
-Windows whole-suite qualification remains pending. Root reviews actual index,
-raw golden bytes and privacy before commit/Push. Keep private audits/all.artifacts
+Actual index, raw golden bytes and privacy were independently reviewed before
+commit/Push. Windows whole-suite qualification remains pending. Next stabilize
+the three heavy Windows cases, then return to Ki84 editing/saving stage latency
+(write, validation, streaming and refresh). Keep private audits/all.artifacts
 outside Git; stop affected work for a contract/authority conflict or managed
-denial. No dependency, policy, workflow or release expansion.
+denial. No dependency, policy, workflow or release expansion. Record the CI result
+locally without a documentation-only commit that would trigger another CI run.
 
 ## Completed boundary —comfortable daily reading, editing and saving
 

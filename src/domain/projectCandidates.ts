@@ -1,4 +1,4 @@
-import { reviewProjectHistory, type FieldPolicy } from './projectHistoryReview';
+import { reviewProjectHistory, withClonedProjectHistoryRoot, type FieldPolicy, type ProjectHistoryReview } from './projectHistoryReview';
 import type { AtomicCandidate, AtomicField, AtomicHistory, HistoryReadLimits } from './atomicHistory';
 import { checkProjectHeader, checkProjectRecord, projectRecordMaps, type ProjectRecordMap } from './projectRecords';
 import { checkMutableField, mutableFieldsFor, type MutableRecordMap } from './projectMutableFields';
@@ -33,14 +33,34 @@ const headerPaths = [['identity'], ['project', 'title'], ['project', 'frame'], [
 /** Complete current candidate values and reference inspection; no winner, storage or SceneResources receipt. */
 export async function inspectProjectCandidates(input: unknown, limits: HistoryReadLimits): Promise<ProjectCandidatesInspection> {
   try {
-    const raw = cloneCanonicalValue(input, limits), envelope = new ProjectRecordFields().object(raw, []);
+    return await inspectCandidateRoot(cloneCanonicalValue(input, limits), limits,
+      (history, profile) => reviewProjectHistory(history, limits, profile));
+  } catch (error) { if (error instanceof DomainValidationError) return Object.freeze({ kind: 'rejected', issue: error.issue }); throw error; }
+}
+
+/** Fixed numeric configuration only. Every call admits a new complete unknown root. */
+export function createProjectCandidateInspector(config: HistoryReadLimits): (input: unknown) => Promise<ProjectCandidatesInspection> {
+  const limits = Object.freeze({ maxNodes: config.maxNodes, maxDepth: config.maxDepth,
+    maxStringScalars: config.maxStringScalars, maxWork: config.maxWork });
+  return async input => {
+    try {
+      return await withClonedProjectHistoryRoot(input, limits, (root, reviewHistory) =>
+        inspectCandidateRoot(root, limits, (_history, profile) => reviewHistory(profile)));
+    } catch (error) { if (error instanceof DomainValidationError) return Object.freeze({ kind: 'rejected', issue: error.issue }); throw error; }
+  };
+}
+
+async function inspectCandidateRoot(raw: JsonValue, limits: HistoryReadLimits,
+  reviewHistory: (history: JsonValue, profile: ProjectSemanticProfile) => ProjectHistoryReview): Promise<ProjectCandidatesInspection> {
+  try {
+    const envelope = new ProjectRecordFields().object(raw, []);
     const profile = projectSemanticProfile(envelope.semanticProfile), c = new ProjectRecordFields(profile), mutableRecordFields = mutableFieldsFor(profile);
     if (!['history,recordMaps,schema', 'history,recordMaps,schema,semanticProfile'].includes(Object.keys(envelope).sort().join(','))) reject('key', []);
     checkProjectHeader(c, 'schema', c.required(envelope, 'schema', []));
     const maps = c.list(c.required(envelope, 'recordMaps', []), limits.maxNodes, ['recordMaps']);
     if (maps.some(m => typeof m !== 'string' || !m.length) || new Set(maps).size !== maps.length ||
       Object.keys(projectRecordMaps).some(map => !maps.includes(map))) reject('missing', ['recordMaps']);
-    const read = reviewProjectHistory(c.required(envelope, 'history', []), limits, profile); if (read.kind === 'rejected') return read;
+    const read = reviewHistory(c.required(envelope, 'history', []), profile); if (read.kind === 'rejected') return read;
     let work = read.workUsed;
     const charge = (n = 1) => { work += n; if (work > limits.maxWork) reject('limit', ['candidateWork']); };
     const issues: CandidateIssue[] = [...read.issues], fields: CandidateField[] = [], bad = new Set<string>();

@@ -1,4 +1,4 @@
-import { cloneCanonicalValue, DomainValidationError, reject, type JsonValue, type ValidationIssue, type ValueLimits } from './values';
+import { cloneCanonicalValue, DomainValidationError, reject, type JsonObject, type JsonValue, type ValidationIssue, type ValueLimits } from './values';
 import { canonical } from './projectGraphSupport';
 
 export type AtomicValue = Readonly<{ kind: 'value'; value: JsonValue }> | Readonly<{ kind: 'absent' }>;
@@ -38,7 +38,32 @@ export class HistoryIndex {
 export function inspectAtomicHistory(input: unknown, limits: HistoryReadLimits): AtomicHistoryInspection {
   try {
     if (!Number.isSafeInteger(limits.maxWork) || limits.maxWork < 1) reject('limit', ['maxWork']);
-    const raw = cloneCanonicalValue(input, limits), obj = (v: any, keys: readonly string[], p: (string | number)[]): any => {
+    return inspectCanonicalAtomicHistory(cloneCanonicalValue(input, limits), limits);
+  } catch (error) { if (error instanceof DomainValidationError) return Object.freeze({ kind: 'rejected', issue: error.issue }); throw error; }
+}
+
+/** Whole-root admission owned by this invocation; no supplied history can borrow it. */
+export function withClonedAtomicHistoryRoot<T>(input: unknown, config: HistoryReadLimits,
+  consume: (root: JsonValue, inspectHistory: () => AtomicHistoryInspection) => T): T {
+  const limits = Object.freeze({ maxNodes: config.maxNodes, maxDepth: config.maxDepth,
+    maxStringScalars: config.maxStringScalars, maxWork: config.maxWork });
+  const root = cloneCanonicalValue(input, limits);
+  let live = true;
+  const inspectHistory = (): AtomicHistoryInspection => {
+    if (!live) throw Error('Owned history inspection expired');
+    try {
+      if (!Number.isSafeInteger(limits.maxWork) || limits.maxWork < 1) reject('limit', ['maxWork']);
+      const history = root !== null && typeof root === 'object' && !Array.isArray(root) ? (root as JsonObject).history : undefined;
+      return inspectCanonicalAtomicHistory(history, limits);
+    } catch (error) { if (error instanceof DomainValidationError) return Object.freeze({ kind: 'rejected', issue: error.issue }); throw error; }
+  };
+  try { return consume(root, inspectHistory); }
+  finally { live = false; }
+}
+
+function inspectCanonicalAtomicHistory(raw: JsonValue | undefined, limits: HistoryReadLimits): AtomicHistoryInspection {
+  try {
+    const obj = (v: any, keys: readonly string[], p: (string | number)[]): any => {
       if (!v || typeof v !== 'object' || Array.isArray(v) || Object.keys(v).some(k => !keys.includes(k)) || keys.some(k => !Object.hasOwn(v, k))) reject('type', p); return v;
     };
     const nonempty = (v: unknown, p: (string | number)[]) => { if (typeof v !== 'string' || !v.length) reject('type', p); };

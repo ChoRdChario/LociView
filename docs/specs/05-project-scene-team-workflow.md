@@ -3987,3 +3987,45 @@ no new input profile, schema, dependency, capacity promise or release is granted
 - HEIC/video/audio expansion beyond the bounded PO-approved specification08 PC path, animation, renderer/material research or new format support;
 - automatic conflict winners or automatic duplicate alternatives;
 - license/version/release selection, `main`, Pages, Service Worker or deployment.
+
+## 2026-11-02 One owned candidate/history composition
+
+Remove only the duplicate history-subtree clone within one candidate inspection.
+Keep public `inspectAtomicHistory`, `reviewProjectHistory` and
+`inspectProjectCandidates` strict: their unknown-input admission and current
+mutable/accessor-limit behavior remain the default. This does not reuse a
+source, receipt or result across reads and changes no storage/content fence.
+
+The concrete pure ports are `withClonedAtomicHistoryRoot(input, limits, consume)`
+and `withClonedProjectHistoryRoot(input, limits, consume)`. The new atomic
+wrappers first capture their own four primitive numeric limits, even for direct
+callers; later mutation/accessors cannot change the skipped-clone bounds. This
+new port does not alter either existing strict public entry. The atomic wrapper owns a fresh
+whole-root canonical clone and supplies a zero-argument inspector that can read
+only that root's history member. Structural atomic/review cores stay private;
+the consumer cannot supply an admitted DTO or substitute another history. The
+private invocation expires synchronously in `finally`, even if consume returns
+a Promise. Actual candidate history inspection occurs before its first await;
+late/escaped inspectors reject and cannot borrow another invocation.
+
+`createProjectCandidateInspector(config)` copies the four primitive node/depth/
+string/work limits into its own frozen configuration and returns an unknown-input
+inspector. This is configuration, never cached evidence. The first connection
+is only `format.inspectOriginalSource`, reached with Source's checkLimits-owned
+configuration. Other callers retain the old strict entry. Each invocation still
+clones/admit-checks its complete unknown root, then checks envelope, profile,
+schema, maps and required history before atomic maxWork rejection, DAG/heads/
+writes and HistoryIndex work. Successful whole-root admission with the same
+fixed limits implies its history subtree satisfies those node/depth/string
+bounds; do not merge the independent work accounting or move its rejection.
+Keep the final newly assembled records clone and all semantic/digest checks.
+
+Within one result, fields may share its owned frozen root history. Results must
+remain independent of caller input and every other invocation; the former
+redundant two-copy identity is not an output guarantee. Acceptance covers strict
+public fallback, fixed config capture, unknown/malformed inputs and error order,
+whole-root budget boundaries, late capability rejection and cross-input/call
+independence. Preserve async DomainValidationError conversion after digest
+awaits. Original-budget workflows and the new fixed-artifact browser pair judge
+elapsed effect; sampled CPU unions are diagnostic only. No global brand/cache,
+input trust flag, schema/recipe change or broader adoption is introduced.

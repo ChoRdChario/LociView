@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { inspectAtomicHistory, type AtomicChange, type AtomicHistory, type AtomicWrite, type HistoryReadLimits } from '../src/domain/atomicHistory';
-import { projectFieldPolicy, reviewProjectHistory } from '../src/domain/projectHistoryReview';
+import { inspectAtomicHistory, withClonedAtomicHistoryRoot, type AtomicChange, type AtomicHistory, type AtomicHistoryInspection, type AtomicWrite, type HistoryReadLimits } from '../src/domain/atomicHistory';
+import { projectFieldPolicy, reviewProjectHistory, withClonedProjectHistoryRoot } from '../src/domain/projectHistoryReview';
 import type { JsonValue } from '../src/domain/values';
 import { fixture } from './helpers/projectRecordsFixture';
 
@@ -16,6 +16,37 @@ const inspect = (h: AtomicHistory) => { const r = inspectAtomicHistory(h, limits
 const review = (h: AtomicHistory) => { const r = reviewProjectHistory(h, limits); expect(r.kind).toBe('project-history-inspection'); if (r.kind === 'rejected') throw Error(); return r; };
 
 describe('neutral original atomic history inspection, not Project/provider adoption', () => {
+  it('owns the root and fixed configuration while binding independent synchronous history inspectors', async () => {
+    const input = { history: history(['root'], base) }, expected = structuredClone(input.history), config = { ...limits };
+    let first!: () => AtomicHistoryInspection, second!: () => AtomicHistoryInspection;
+    const result = withClonedAtomicHistoryRoot(input, config, (root, inspectHistory) => {
+      first = inspectHistory; config.maxNodes = 1; config.maxDepth = 1; config.maxStringScalars = 1; config.maxWork = 1;
+      (input.history as any).token = 'caller changed';
+      expect(Object.isFrozen(root)).toBe(true);
+      const read = inspectHistory(); expect(read.kind).toBe('atomic-history-inspection');
+      if (read.kind !== 'atomic-history-inspection') throw Error('history');
+      expect(read.history).toEqual(expected); expect(read.history).not.toBe(input.history);
+      withClonedAtomicHistoryRoot({ history: history(['different'], change('different', [])) }, limits, (_other, inspectOther) => {
+        second = inspectOther; const other = inspectOther();
+        expect(other.kind === 'atomic-history-inspection' && other.history.heads).toEqual(['different']);
+        expect(inspectHistory()).toEqual(read);
+      });
+      expect(second).toThrow('expired'); return read;
+    });
+    expect(result.kind).toBe('atomic-history-inspection'); expect(first).toThrow('expired');
+    const late = withClonedAtomicHistoryRoot({ history: expected }, limits, async (_root, inspectHistory) => {
+      await Promise.resolve(); return inspectHistory();
+    });
+    await expect(late).rejects.toThrow('expired');
+    const reviewConfig = { ...limits };
+    const reviewed = withClonedProjectHistoryRoot({ history: expected }, reviewConfig, (_root, reviewHistory) => {
+      reviewConfig.maxWork = 1; return reviewHistory('map1');
+    });
+    expect(reviewed.kind).toBe('project-history-inspection');
+    let failed!: () => AtomicHistoryInspection;
+    expect(() => withClonedAtomicHistoryRoot({ history: expected }, limits, (_root, inspectHistory) => { failed = inspectHistory; throw Error('consumer failed'); })).toThrow('consumer failed');
+    expect(failed).toThrow('expired');
+  });
   it('retains equal and unequal concurrent candidates, independent fields and the exact original DAG', () => {
     const a = change('a', ['root'], write('oa', title, '同じ')), b = change('b', ['root'], write('ob', title, '同じ'));
     const input = history(['a', 'b'], base, a, b), r = inspect(input);

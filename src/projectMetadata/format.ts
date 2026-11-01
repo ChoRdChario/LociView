@@ -7,7 +7,7 @@ import { projectRecordMaps, checkProjectHeader } from '../domain/projectRecords'
 import { ProjectRecordFields } from '../domain/projectRecordFields';
 import type { ProjectSemanticProfile } from '../domain/projectProfile';
 import { cloneCanonicalValue, type JsonObject, type JsonValue } from '../domain/values';
-import { inspectProjectCandidates, type ProjectCandidateInput } from '../domain/projectCandidates';
+import { createProjectCandidateInspector, type ProjectCandidateInput } from '../domain/projectCandidates';
 
 export const adapterFormatVersion = 'lociview-automerge-atomic-map-1';
 export const adapterFormatVersion2 = 'lociview-automerge-atomic-map-2';
@@ -79,7 +79,7 @@ export interface OriginalInspectionBudget { readonly maxNodes: number; readonly 
 export async function inspectOriginalSource(doc: PhysicalDoc, proof: MetadataProof, limits: MetadataLimits, budget: OriginalInspectionBudget) {
   if (![budget.maxNodes, budget.maxWork].every(n => Number.isSafeInteger(n) && n > 0)) fail('original-budget');
   const detail = inspectPhysicalDetail(doc, proof, limits, budget);
-  const candidates = await inspectProjectCandidates(detail.input, limits);
+  const candidates = await createProjectCandidateInspector(limits)(detail.input);
   if (candidates.kind !== 'project-candidate-inspection' || candidates.issues.some(i => i.kind === 'invalid')) return fail('original-candidates');
   const workUsed = detail.workUsed + candidates.workUsed;
   if (workUsed > budget.maxWork) fail('original-work-budget');
