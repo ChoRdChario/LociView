@@ -1,9 +1,12 @@
 # 復元準備中の、内容照合に閉じた読み取り
 
-Status: **PROPOSED —独立設計レビュー済み。PO未承認・未実装。**
+Status: **ACCEPTED / Implemented（限定PC候補）—PO承認2026-11-03、独立設計・実差分・証拠レビュー済み。
+正確な復元Job/pairのreadonly content hookだけを接続し、Ki84の実測・編集・外部保存・
+別環境復元・cold再開と最終自動検証を確認した。一般の性能保証・採用合格・公開は含まない。**
 
 この案は[06](06-project-package-wire.md)が許可するstaging読取consumerを追加する判断であり、
-[06b §§1–5](06b-staging-read-operations-proposal.md)の既存4consumerへの承認には含まれない。
+[06b §§1–5](06b-staging-read-operations-proposal.md)の既存4consumerに加え、ここで明示した
+readonly content hookだけが追加承認された。
 06b §6のZIP証拠共有、01hの検査延期、Session全体の一括化は含めない。
 実行結果・現在の作業は[todo](../../tasks/todo.md)を正本とする。
 
@@ -25,7 +28,7 @@ family別I/O集計にはgeneration内のdata読み取りも含まれるため、
 
 ## 2. 一括判断する範囲・port
 
-- `StagingReadConsumer`のclosed allowlistに`content.readonlyInspection`を追加する候補とする。
+- `StagingReadConsumer`のclosed allowlistに`content.readonlyInspection`を追加する。
   使えるのは`PersistentContentVerifier(allowNewEvidence=false).withReadonlyContent`だけ。
 - 既存`withMetadataRead`から、その正確なJob・private FS/factory pairに結び付いたreadonly
   facadeを受け取り、receipt-only readerを構成する。元SessionやValidationContentの

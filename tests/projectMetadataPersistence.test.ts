@@ -186,7 +186,8 @@ describe('local generation capabilities (ports only, not backup restore/selectio
       expect(await reader.verify(e.request)).toMatchObject({ outcome: 'failed' });
     });
     // Two present receipts use stream+bytes, the missing receipt only its stream probe.
-    expect(audits).toBe(kind === 'selected' ? 2 : 10); expect(owners).toBe(0);
+    expect(audits).toBe(kind === 'unregistered' ? 10 : 2);
+    if (kind === 'staging') expect(owners).toBeGreaterThan(0); else expect(owners).toBe(0);
     expect(e.inspect).toHaveBeenCalledTimes(3); expect(e.execute).not.toHaveBeenCalled(); expect(f.fs.writes).toBe(writes);
     await expect(escaped.verify(e.request)).rejects.toThrow('content-read-expired'); expect(e.inspect).toHaveBeenCalledTimes(3);
     expect(e.verifier(true).withReadonlyContent).toBeUndefined(); await scope.dispose();
@@ -240,6 +241,9 @@ describe('local generation capabilities (ports only, not backup restore/selectio
     const e = await evidence(scope.fs, f.fs); audits = 0; stagingOwners = 0;
     expect(await e.verifier().verify(e.request)).toMatchObject({ outcome: 'verified' });
     expect(audits).toBe(4); expect(stagingOwners).toBe(0); expect(e.inspect).toHaveBeenCalledTimes(1); expect(e.execute).not.toHaveBeenCalled();
+    audits = 0; expect(await e.verifier().hasEvidence(e.request)).toBe(true); expect(audits).toBe(4); expect(stagingOwners).toBe(0);
+    audits = 0; expect(await e.verifier(true).verify(e.request)).toMatchObject({ outcome: 'verified' }); expect(audits).toBe(4);
+    expect(stagingOwners).toBe(0); expect(e.inspect).toHaveBeenCalledTimes(2); expect(e.execute).not.toHaveBeenCalled();
   });
 
   it('audits an explicit read twice, denies mutations and expires retained capabilities', async () => {

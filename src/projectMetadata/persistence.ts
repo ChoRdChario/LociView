@@ -52,15 +52,15 @@ const queues = new WeakMap<ProjectMutationAuthority, Promise<unknown>>();
 const writeFences = new WeakMap<ProjectWorkspaceFS, () => Promise<void>>();
 export interface MetadataReadPorts { readonly fs: ProjectWorkspaceFS; readonly factory?: MetadataStorageFactory }
 type ReadOperation = <T>(action: (ports: MetadataReadPorts) => Promise<T>) => Promise<T>;
-export type StagingReadConsumer = 'journal.entries' | 'journal.validateParts' | 'journal.readRestoredBases' | 'repository.read';
-const stagingConsumers: ReadonlySet<StagingReadConsumer> = new Set(['journal.entries', 'journal.validateParts', 'journal.readRestoredBases', 'repository.read']);
+export type StagingReadConsumer = 'journal.entries' | 'journal.validateParts' | 'journal.readRestoredBases' | 'repository.read' | 'content.readonlyInspection';
+const stagingConsumers: ReadonlySet<StagingReadConsumer> = new Set(['journal.entries', 'journal.validateParts', 'journal.readRestoredBases', 'repository.read', 'content.readonlyInspection']);
 const readOperations = new WeakMap<ProjectWorkspaceFS, { factory: MetadataStorageFactory; run: ReadOperation; staging?: true }>();
 /** Internal generation binding; does not grant writes or replace a root lease. */
 export function registerReadOperation(fs: ProjectWorkspaceFS, factory: MetadataStorageFactory, run: ReadOperation): void {
   if (readOperations.has(fs)) fail('read-operation-already-bound');
   readOperations.set(fs, { factory, run });
 }
-/** Exact restore-controller binding, restricted to the four accepted pure readers. */
+/** Exact restore-controller binding, restricted to the accepted named pure readers. */
 export function registerStagingReadOperation(fs: ProjectWorkspaceFS, factory: MetadataStorageFactory, run: ReadOperation): void {
   if (readOperations.has(fs)) fail('read-operation-already-bound');
   readOperations.set(fs, { factory, run, staging: true });

@@ -8,6 +8,18 @@ preserve existing changes. Do not reconstruct current work from old checkpoints.
 
 ## Current boundary
 
+PO explicitly approved06c on2026-11-03. The active unit is its bounded restore
+content inspection, starting from85fe474; see current todo for plan/acceptance.
+Only the exact readonly hook joins the staging allowlist. Fixed source39517f6f
+has matched Ki84 elapsed/integrity, edit/file verification, normal-SW cold and
+third-profile restored reedit evidence; source/fault and evidence reviews are clean.
+The final serial checkpoint and supplementary HEIC isolation pass. Delivery/CI/
+preview are recorded after the suitable checkpoint; Git owns its actual identity.
+No general Session/model/media/write batching or payload cache is authorized.
+Preserve private originals/todo and the previous verified preview until delivery.
+
+## Previous completed restore checkpoint
+
 The overall-review-first restore unit has a safe, independently reviewed duplicate
 read removal and complete final checkpoint/HEIC success. Source1d56 is frozen;
 actual Ki84 restore→edit→saved-file verification→normal-SW cold reopen preserves
@@ -15,13 +27,19 @@ originals/history/payloads. The paired wall time does not establish speedup.
 Read [current todo](todo.md) for exact source, failed attempts, timings, executed
 scope and remaining acceptance; do not substitute earlier Desktop/device evidence.
 
-The next latency decision is [PROPOSED06c](../docs/specs/06c-staging-content-inspection-proposal.md),
-independently design-reviewed but PO-unapproved/unimplemented. Active06/06b still
-permit only the existing four staging consumers. Do not broaden Session/content/
-write/Selection lifetimes from general performance authority. Short-PC list/detail
-layout remains the next ordinary UX unit. Index/privacy review, suitable g0 Push/
-CI and owned4191 delivery must be checked against actual receipts before claiming
-them complete. Preserve the private todo block and all private originals/artifacts.
+At the completed85fe checkpoint, [06c](../docs/specs/06c-staging-content-inspection-proposal.md)
+was design-reviewed but PROPOSED, PO-unapproved and unimplemented;06/06b then
+permitted four staging consumers. The explicit PO approval and current boundary
+above supersede that dated state. General Session/content/write/Selection lifetime
+expansion remains outside06c. Index/privacy review and the suitable
+g0 Push were complete; owned4191 served the verified immutable root-base candidate
+with matching20 HTTP resources and actual fresh-browser home/file selection.
+CI41465782994 succeeds on the actual85fe474 checkout: all steps, including the
+complete root tests, BASE_PATH normal build and HEIC isolation. See todo for exact
+executed scope and timings. Delivery notes stay local
+without a doc-only CI loop. Preserve the private todo block and all private
+originals/artifacts. The suggested06c option was not approval at that checkpoint;
+the subsequent explicit PO reply is recorded in the current boundary above.
 
 ## Previous completed checkpoint context
 

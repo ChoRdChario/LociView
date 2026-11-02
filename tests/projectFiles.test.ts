@@ -39,7 +39,7 @@ import { WorkingAcknowledgment } from '../src/harness/projectScene/acknowledgmen
 import { readProjectScene } from '../src/scene/projectProvider';
 import { resolveScene } from '../src/scene/resolve';
 import type { JsonObject } from '../src/domain/values';
-import type { ContentRequest } from '../src/domain/projectContentChecks';
+import type { ContentRequest, ProjectContentVerifier } from '../src/domain/projectContentChecks';
 import type { Anchor } from '../src/scene/types';
 import * as THREE from 'three';
 import { validationModelVersions } from '../src/harness/projectScene/validationProjection';
@@ -3068,7 +3068,49 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const audit = vi.spyOn(job as unknown as { pending(requireDb: boolean): Promise<unknown> }, 'pending');
     return { ...f, job, scope, service, audit, journal: new TransactionJournal(scope.fs, metadata) };
   }
-  it('limits staging bulk audits to four exact owned pure readers while public and unnamed access stays strict', async () => {
+  it('scopes real staging content inspection without changing strict evidence reads, provider or original history', async () => {
+    const f = await auditedStagingJournal(), read = await f.service.session.read(), source = read.source!, verifier = f.service.content.verifier(false);
+    if (read.provider?.kind !== 'scene-provider') throw Error('provider');
+    const request = read.provider.inspection.checks[0]!.request, paths = await f.fs.list(''), changes = source.originalChanges();
+    const requests: ContentRequest[] = [], hook = vi.fn<NonNullable<ProjectContentVerifier['withReadonlyContent']>>(action =>
+      verifier.withReadonlyContent!(reader => action({ scope: reader.scope, verify: q => { requests.push(q); return reader.verify(q); } })));
+    f.audit.mockClear();
+    const scoped = await readProjectScene(source.read(), metadata, { scope: verifier.scope, verify: q => verifier.verify(q), withReadonlyContent: hook });
+    expect(scoped.kind).toBe('scene-provider'); expect(hook).toHaveBeenCalledOnce(); expect(f.audit).toHaveBeenCalledTimes(2);
+    f.audit.mockClear();
+    const strict = await readProjectScene(source.read(), metadata, { scope: verifier.scope, verify: q => verifier.verify(q) });
+    expect(f.audit.mock.calls.length).toBeGreaterThan(2); expect(scoped).toEqual(strict);
+    if (strict.kind !== 'scene-provider') throw Error('provider');
+    expect(requests).toEqual(strict.inspection.checks.map(check => check.request));
+    f.audit.mockClear(); expect(await verifier.verify(request)).toMatchObject({ outcome: 'verified' }); expect(f.audit).toHaveBeenCalledTimes(4);
+    f.audit.mockClear(); expect(await verifier.hasEvidence(request)).toBe(true); expect(f.audit).toHaveBeenCalledTimes(4);
+    expect(source.originalChanges()).toEqual(changes); expect(await f.fs.list('')).toEqual(paths);
+  }, 60000);
+  it.each(['success', 'caught-query-failure'] as const)('refuses real staging content closing after %s without exposing a provider or retaining its reader', async outcome => {
+    const f = await auditedStagingJournal(), source = (await f.service.session.read()).source!, verifier = f.service.content.verifier(false);
+    const paths = await f.fs.list('');
+    let entered!: () => void, release!: () => void, first = true, completed = false;
+    let escaped!: Pick<ProjectContentVerifier, 'scope' | 'verify'>, request!: ContentRequest;
+    const started = new Promise<void>(resolve => { entered = resolve; }), held = new Promise<void>(resolve => { release = resolve; }); caseDisposals.push(release);
+    const wrapped: ProjectContentVerifier = { scope: verifier.scope, verify: q => verifier.verify(q), withReadonlyContent: action =>
+      verifier.withReadonlyContent!(async reader => {
+        escaped = reader;
+        await action({ scope: reader.scope, verify: async q => {
+          const result = await reader.verify(q);
+          if (first) { first = false; request = q; entered(); await held; if (outcome === 'caught-query-failure') throw Error('query failure'); }
+          return result;
+        } }); completed = true;
+      }) };
+    f.audit.mockClear(); const pending = readProjectScene(source.read(), metadata, wrapped); await started;
+    expect(f.audit).toHaveBeenCalledTimes(1);
+    const control = f.job.path('start.json'); await f.fs.remove(control);
+    await expect(f.scope.fs.readBytes(f.journal.path(f.job.id, 'source-exchange-bases.json'))).rejects.toThrow();
+    const refused = expect(pending).rejects.toThrow(); release(); await refused;
+    expect(completed).toBe(true); // Even a caught per-query error cannot bypass the outer closing audit.
+    await expect(escaped.verify(request)).rejects.toThrow('content-read-expired');
+    expect(await f.fs.exists(control)).toBe(false); expect(await f.fs.list('')).toEqual(paths.filter(path => path !== control));
+  }, 60000);
+  it('keeps the four journal/repository staging readers scoped while public and unnamed access stays strict', async () => {
     const f = await auditedStagingJournal(), entries = await f.journal.entries(), prepared = entries[0]!.prepared!;
     const expected = await f.journal.readRestoredBases();
     expect(expected).not.toBeNull();

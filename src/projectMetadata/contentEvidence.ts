@@ -46,7 +46,7 @@ export class PersistentContentVerifier implements ProjectContentVerifier {
           live(); return response;
         } };
         try { await action(reader); live(); } finally { active = false; }
-      });
+      }, 'content.readonlyInspection');
     }
   }
 

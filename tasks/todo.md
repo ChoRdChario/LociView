@@ -1,6 +1,6 @@
 # LociView active work
 
-Updated2026-11-02. This is the single current plan and check record.
+Updated2026-11-03. This is the single current plan and check record.
 [Inventory](implementation-inventory.md) owns route-specific coverage;
 [map](../PROJECT_MAP.md) and [document index](../docs/README.md) route contracts/code.
 Git owns checkpoint identity. [Retained checkpoint evidence](../docs/history/development-through-2026-10-29/tasks/todo-before-daily-authoring.md)
@@ -57,7 +57,93 @@ unchanged-feature-classification checks pass; independent review has no findings
 No runtime change or new capacity guarantee; no runtime suite is needed for this
 documentation checkpoint.
 
-## Current boundary —whole-PC review and restore performance checkpoint
+## Current boundary —06c bounded restore content inspection
+
+PO explicitly approves06c on2026-11-03. Starting checkpoint85fe474 on g0-baseline;
+preserve local delivery notes, the5633-byte private block, golden and all originals.
+Outcome: reduce actual Ki84 restore wait while retaining every receipt/content/
+inventory check and strict downstream write/readback/publication/Selection fence.
+No new screen, dependency, format, limit, cache or ordinary release.
+
+Record acceptance in06/06c before source edits. First observe the actual eligible
+readonly content callback in a fresh private baseline using existing Chromium/
+driver and content-free timing/IO snapshots; retain custom detail explicitly.
+Same probe/backup/source qualification/viewport/profile conditions for candidate.
+Then name only false-verifier withReadonlyContent in the closed staging allowlist;
+leave standalone verify/hasEvidence, true verifier and weak-media fallback alone.
+Reuse existing content/staging/recovery tests with minimal integrated closing,
+expiry/ownership/freshness checks, and independent read-only meaningful-diff review.
+Run the complete real restore→edit→file/integrity→cold workflow and final required
+serial checks once at the final source/test boundary. Check actual CI/owned preview
+for a suitable g0 checkpoint. Human control-by-control confirmation is not a gate.
+
+Stop only affected work for a genuine contract conflict, new policy or failed
+integrity/connection condition. No unmeasured IO count or older differing run is
+speed acceptance; if this hook is unused or benefit unproven, do not broaden it.
+Short-PC list/detail UX remains the following ordinary unit.
+
+Baseline06c: immutable85fe/source1d56 artifact, fixed Ki84 backup SHA c714c6cd…,
+Chromium156/1440×1000/DPR1/new private profile, explicit SW bypass for online
+diagnostics. Corrected private logpoint probe observes9 complete hooks×44requests,
+no probe/app errors or truncation; first6 staging bodies5.751–8.238s with1584
+restore-control readStream calls each. Whole restore176.873s, Caption/edit175.429s,
+model175.841s. Body spans exclude opening/closing audits; elapsed and stage IO
+must be compared separately.43 original bodies and3 retained source/control facts
+captured. Earlier175.223s diagnostic has request-key lexical probe errors and is
+retained/excluded from matched acceptance, not an application failure. Evidence:
+`.artifacts/e2e/ki84-evaluation/06c-before-valid-20261103/restore-observed.json`.
+Implementation names only the existing readonly hook. Source39517f6f… frozen
+(719 source/test/script files+7 support inputs). Focused content/persistence/core117
+and actual staging10 cases pass; independent meaningful-diff review has no finding.
+Same-condition candidate whole restore124.559s, Caption/edit123.144s,
+model123.751s, initialize105.852→71.651s.9×44 requests, image preparation240/8K20
+and2853 hashes are unchanged. First5 hooks are initialize, sixth Selection,
+last3 adopt (already no staging body audits before); do not attribute all9 to06c.
+Initialize control readStream15931→8101, list1770→900, consistent with5 exact
+operation scopes retaining entry/closing audits. ArrayBuffer records reach4000
+on both runs and are not total-byte/memory evidence. The matched single pair
+observes29.6% whole-time reduction, not an all-environment guarantee. Independent
+evidence review confirms source/runtime qualification, matched inputs and all43
+bodies/3 retained facts. Photo8 original/full HTML-decoded pixels and one actual
+Caption edit pass. Actual edit22.358s and backup69.548s/stream-close23.296s are
+observations, not a claimed improvement outside restore. Saved ZIP6f120985… is
+51,271,012B: all3 original AMchanges retained, only the intended Caption body
+adds1 change; every body/base is exact. Real file chooser verification reaches
+saved-file match. Normal SW cold startup after full browser/server stop, offline,
+no CDP bypass preserves body/photo/full pixels/draft cancellation/save-match;
+9 current response bodies all match candidate. Explicit executed launch/exit
+conditions are in private `06c-20261103/orchestration.json`, not inferred only
+from SW/online flags. New saved ZIP also restores in a third fresh profile;
+all43 bodies and3 retained archive originals match, actual reedit survives reload.
+Its initial diagnostic tried old response.body after navigation and failed only
+after the real edit/reload; no write repeated. Readonly confirmation qualifies
+the current reload's6 responses and durable body, not the lost old responses.
+Independent file/byte/evidence review has no integrity finding. The literal
+`npm run check:checkpoint` exits0 at the final source:147files/3276PASS/21existing
+TODO,1903.27s for tests,2064.12s for the full serial sequence. Typecheck, all5
+builds and offline isolation pass; supplementary HEIC isolation exits0. The
+actual immutable browser-tested candidate also passes its own14-resource exact
+SRI/worker/manifest isolation. Final rebuilds have fresh generated build tokens;
+delivery retains the immutable artifact actually tested, not a silent artifact
+substitution. No new
+whole Desktop41/offline5, iOS/device/GPU/adoption/release credit is claimed.
+
+Milestone meta-audit: branch/HEAD and exact source are unchanged, the accepted
+restore→edit→file→cold/independent-resume workflow is closed in browser evidence,
+and no new integrity/P0/P1 issue was established. The small06c change follows the
+critical path; finish required serial checks and safe delivery, then address the
+known short-height Caption UX. Do not expand into a general cache/audit bypass.
+
+Final documentation/privacy review found one stale historical approval instruction;
+it now explicitly says that85fe-era pending06c state is superseded by current PO
+approval. Private5633B block and golden stay exact,163 local document links pass.
+Source/test content is unchanged after review/testing. Suitable g0 delivery,
+actual CI and owned4191 HTTP/fresh-browser verification follow this prepared
+checkpoint; record them locally without a doc-only CI loop or repeating runtime
+checks. Next outcome: keep the Caption list/detail usable on short PC screens,
+using existing controls/commands and preserving selection/drafts/focus/recovery.
+
+## Completed boundary —whole-PC review and restore performance checkpoint
 
 PO requested overall review first, then performance improvement. Three independent
 readonly UI/safety/verification reviews completed before product edits, using
@@ -133,18 +219,30 @@ sample/full or cross-API pixel comparison; wrong verification-label wait; missin
 the existing draft-discard confirmation. Continued actual state/source checks
 resolve those without repeating writes, loosening validators or hiding failures.
 
-Next judgment: [06c](../docs/specs/06c-staging-content-inspection-proposal.md) is
-independently design-reviewed, PROPOSED, PO-unapproved and unimplemented. It would
-name only the existing readonly content hook as a fifth staging consumer, changing
-owner-audit detection timing to operation closing while retaining fresh receipts/
-inventory and all downstream strict fences. Graph42media/46active attachments
-suggests hook eligibility; actual hook/time evidence is still a connection gate.
-Do not implement this proposal, weaken the weak-media fallback or claim a speed
-gain before that decision/evidence. Short-height list/detail improvement is the
-next ordinary UX unit; physical iOS/real-GPU/adoption/release gates remain pending.
+At85fe, [06c](../docs/specs/06c-staging-content-inspection-proposal.md) was
+design-reviewed, PROPOSED, PO-unapproved and unimplemented. The candidate named
+only the existing readonly hook as a fifth staging consumer, retaining fresh
+receipts/inventory and downstream strict fences. Graph42media/46active attachments
+suggested eligibility; actual hook/time evidence was still pending at that point.
+The subsequent explicit PO approval and executed evidence in the current boundary
+above supersede that dated state. Weak-media fallback and general Session/write
+lifetimes remain outside06c; physical iOS/real-GPU/adoption/release gates remain pending.
 
-Checkpoint/index/CI/preview delivery results will be appended here after actual
-verification. A pending delivery is not a reason to repeat completed runtime checks.
+Independent index/privacy review confirms all726 frozen inputs, Git-clean-filter
+source/test equivalence, exact9-path scope, no private block/media/artifacts and
+unchanged golden. The suitable reviewed checkpoint is committed/pushed to g0;
+Git owns its identity. The owned4191 preview now serves this immutable candidate
+with explicit root base: all20 HTTP resources and7 actual fresh normal-SW-allowed
+browser responses match; home/product statement/file picker work, errors/remote0.
+Personal4182/Chrome are untouched. [Actual CI41465782994](https://github.com/ChoRdChario/LociView/actions/runs/41465782994)
+completes successfully on the exact85fe474 checkout:147 files/3273 PASS/21 existing
+TODO (991.84s), npm ci/typecheck/test, BASE_PATH=/LociView/ normal build and HEIC
+isolation all success. Actual checkout log and job125346162415 agree; the private
+ci-receipt.json retains the selected evidence. This is not remote Desktop/offline
+browser acceptance or a new release.
+These delivery notes were retained locally at that checkpoint without a doc-only
+Push/CI loop or repeating completed runtime checks. The grouped06c decision was
+then pending; the current explicit PO approval above supersedes that state.
 
 ## Completed boundary —Drawing, camera synchronization and image relationships
 

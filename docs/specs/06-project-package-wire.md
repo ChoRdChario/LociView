@@ -2809,7 +2809,12 @@ strict in this first implementation; this exception cannot publish anything.
 Selected/original generation controllers opt in explicitly. PO2026-11-01 also
 accepts the separate [06b §§1–5](06b-staging-read-operations-proposal.md) exception:
 an exact restore Job may bind its private staging FS/factory to named pure
-Journal entries/parts/restored-bases and Repository reads only. This does not
+Journal entries/parts/restored-bases and Repository reads. PO2026-11-03 separately
+accepts [06c](06c-staging-content-inspection-proposal.md): only the existing
+PersistentContentVerifier(false).withReadonlyContent receipt-inspection hook may
+use the named content.readonlyInspection consumer, subject to its measured-use,
+integrity and connection gates. Standalone verify/hasEvidence and weak-media
+fallback retain their strict paths. This does not
 enable general staging opt-in or wrap initialization, Session read/resume,
 validateRestore, model/media/CAS, writes, publication or Selection. All other
 staging operations keep the owning-job check at each I/O. Staging callbacks
