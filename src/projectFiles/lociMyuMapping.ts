@@ -3,7 +3,7 @@ import { cloneCanonicalValue, scalarLength, type JsonObject, type JsonValue } fr
 import { planLociMyuCaptionIdentity } from '../io/locimyu';
 import { digest, newId, technicalId } from '../projectMetadata/persistence';
 import { identityPlacement, sealValidationRecord, type PreparedValidationProject } from './initialProject';
-import { lociMyuRecipe, lociMyuMaterialRecipe, lociMyuOpaqueMaterialRecipe,lociMyuStandardMaterialRecipe, type LociMyuRecipe, LociMyuPreflightError, type LociMyuSourcePlan } from './lociMyuSource';
+import { lociMyuRecipe, lociMyuMaterialRecipe, lociMyuOpaqueMaterialRecipe,lociMyuStandardMaterialRecipe,lociMyuImageRecipe, type LociMyuRecipe, LociMyuPreflightError, type LociMyuSourcePlan } from './lociMyuSource';
 import { fileError, validationGlbProfile, jpegGlbProfile, validationMetadataLimits as limits } from './validation';
 
 export type LociMyuKey = readonly (string | number | LociMyuKey)[];
@@ -23,8 +23,8 @@ export function lociMyuSourceKey(prefix: unknown, key: unknown, nested = false, 
   if (prefix === 'att') return key.length === 4 && key[0] === 'attachment' && caption(key[1]) && key[2] === 0 && path(key[3]);
   if (prefix === 'view') return key.length === 3 && key[0] === 'view' && key[1] === '__LM_VIEWS' && Number.isSafeInteger(key[2]) && key[2] >= 2;
   if (prefix === 'slot') return key.length === 4 && key[0] === 'material-slot' && path(key[1]) && (key[2] === 'gltfMaterial' && Number.isSafeInteger(key[3]) && key[3] >= 0 || key[2] === 'representationMaterial' && key[3] === 0);
-  if (prefix === 'ovr') return (recipe === lociMyuMaterialRecipe || recipe === lociMyuOpaqueMaterialRecipe||recipe===lociMyuStandardMaterialRecipe) && key.length === 7 && key[0] === 'material-row' && key[1] === '__LM_MATERIALS' && Number.isSafeInteger(key[2]) && key[2] >= 2 && sheet(key[3]) && path(key[4]) && key[5] === 'gltfMaterial' && Number.isSafeInteger(key[6]) && key[6] >= 0;
-  return prefix === 'evt' && !nested && key.length === 3 && key[0] === 'initial-event' && ['ast', 'scn', 'sam', 'cap', 'scm', 'att', 'view', ...((recipe === lociMyuMaterialRecipe || recipe === lociMyuOpaqueMaterialRecipe||recipe===lociMyuStandardMaterialRecipe) ? ['ovr'] : [])].includes(key[1]) && lociMyuSourceKey(key[1], key[2], true, recipe);
+  if (prefix === 'ovr') return (recipe === lociMyuMaterialRecipe || recipe === lociMyuOpaqueMaterialRecipe||recipe===lociMyuStandardMaterialRecipe||recipe===lociMyuImageRecipe) && key.length === 7 && key[0] === 'material-row' && key[1] === '__LM_MATERIALS' && Number.isSafeInteger(key[2]) && key[2] >= 2 && sheet(key[3]) && path(key[4]) && key[5] === 'gltfMaterial' && Number.isSafeInteger(key[6]) && key[6] >= 0;
+  return prefix === 'evt' && !nested && key.length === 3 && key[0] === 'initial-event' && ['ast', 'scn', 'sam', 'cap', 'scm', 'att', 'view', ...((recipe === lociMyuMaterialRecipe || recipe === lociMyuOpaqueMaterialRecipe||recipe===lociMyuStandardMaterialRecipe||recipe===lociMyuImageRecipe) ? ['ovr'] : [])].includes(key[1]) && lociMyuSourceKey(key[1], key[2], true, recipe);
 }
 export function lociMyuConversionIds(conversionId: string, sourceZipSha256: string, workbookPath: string, recipe: LociMyuRecipe = lociMyuRecipe) {
   technicalId(conversionId); if (!/^[0-9a-f]{64}$/.test(sourceZipSha256) || !path(workbookPath)) return fileError('変換元の識別情報が不正です。');
@@ -94,7 +94,7 @@ export async function mapLociMyuProject(plan: LociMyuSourcePlan, conversionId: s
       add('viewsById', { id: await id('view', key), sceneId: scn, projectFrameId, name: v.name, orderKey: rank(n), lifecycle: await active('view', key), camera: v.camera, background: { kind: 'solid', colorSrgb: v.background } }); }
   }
   const materialMappings: JsonObject[] = [], routes = new Set<string>();
-  if ((plan.recipe === lociMyuMaterialRecipe || plan.recipe === lociMyuOpaqueMaterialRecipe||plan.recipe===lociMyuStandardMaterialRecipe)) {
+  if ((plan.recipe === lociMyuMaterialRecipe || plan.recipe === lociMyuOpaqueMaterialRecipe||plan.recipe===lociMyuStandardMaterialRecipe||plan.recipe===lociMyuImageRecipe&&!!plan.materialRows?.length)) {
     if (!plan.materialRows?.length) return fileError('変換元の材質対応が不足しています。');
     const catalog = new Map(slots.filter(slot => (slot.sourceLocator as JsonObject).kind === 'gltfMaterial').map(slot => [(slot.sourceLocator as JsonObject).materialIndex, slot]));
     for (const row of plan.materialRows) {
@@ -106,7 +106,7 @@ export async function mapLociMyuProject(plan: LociMyuSourcePlan, conversionId: s
         const key: LociMyuKey = ['material-row', '__LM_MATERIALS', row.row, S, s, 'gltfMaterial', index], ovr = await id('ovr', key);
         add('materialOverridesById', { id: ovr, routing: { scope: { kind: 'scene', sceneId: scn }, target: { assetId, variantFamilyId: familyId,
           materialLayoutId: (representation.materialCatalog as JsonObject).layoutId!, logicalMaterialSlotId: slot.logicalMaterialSlotId } },
-          ...(plan.recipe===lociMyuStandardMaterialRecipe?row.standardIntent??fileError('材質の正規化記録が不足しています。'):{appearance: { opacity: 1, doubleSided: row.doubleSided, lighting: row.unlit ? 'unlit' : 'inherit' },
+          ...((plan.recipe===lociMyuStandardMaterialRecipe||plan.recipe===lociMyuImageRecipe)?row.standardIntent??fileError('材質の正規化記録が不足しています。'):{appearance: { opacity: 1, doubleSided: row.doubleSided, lighting: row.unlit ? 'unlit' : 'inherit' },
           compositing: { coverage: { policy: 'inherit' }, optics: 'inherit' }}), lifecycle: await active('ovr', key) });
         materialMappings.push({ sourceTable: '__LM_MATERIALS', sourceRow: row.row, sceneSource: S as JsonValue, modelPath: s,
           modelBlob: { digest: plan.model.ref.digest, byteLength: plan.model.ref.byteLength, mediaType: plan.model.ref.mediaType }, formatProfile: representation.formatProfile!,

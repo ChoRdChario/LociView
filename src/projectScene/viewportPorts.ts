@@ -21,7 +21,16 @@ export interface ViewportObservation {
   readonly pins: readonly { id: string; x: number; y: number; visible: boolean }[];
   readonly preview?: { readonly x: number; readonly y: number; readonly visible: boolean };
 }
+/** Draw-owned presentation only. Never a pick, capture, readiness or storage receipt. */
+export interface ViewportPresentationFrame {
+  readonly display: RenderDisplay; readonly generation: number;
+  readonly width: number; readonly height: number;
+  readonly camera: CameraOrientation; readonly projection: 'perspective' | 'orthographic'; readonly axis: ViewAxis | null;
+  readonly navigating: boolean;
+  readonly pins: readonly { readonly id: string; readonly x: number; readonly y: number; readonly visible: boolean }[];
+}
 export interface ProjectViewport {
+  observePresentation?(listener: (frame: ViewportPresentationFrame) => boolean): () => void;
   setPointDiameter?(assetId: string, diameter: number): void; pointDiameter?(assetId: string): number;
   update(display: RenderDisplay): void; setActive(active: boolean): void;
   /** Reserve placement input before Orbit receives pointerdown; independent of gizmo activity. */

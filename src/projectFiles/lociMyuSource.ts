@@ -15,7 +15,7 @@ import type { StoredBlobRef } from '../projectMetadata/blobStore';
 import { inspectFreshValidationGlb, validationGlbParts, type ValidatedGlb } from './glb';
 import type { PngDecoder } from './png';
 import type { JpegDecoder } from './jpeg';
-import { checkFileLimits, validationMetadataLimits, type FileValidationLimits } from './validation';
+import { checkFileLimits, FileReadError, validationMetadataLimits, type FileValidationLimits } from './validation';
 
 export const lociMyuRecipe = 'locimyu-project-scene-migration-recipe-1';
 export const lociMyuJpegRecipe = 'locimyu-project-scene-migration-recipe-2';
@@ -23,10 +23,13 @@ export const lociMyuPhotoRecipe = 'locimyu-project-scene-migration-recipe-3';
 export const lociMyuMaterialRecipe = 'locimyu-project-scene-migration-recipe-4';
 export const lociMyuOpaqueMaterialRecipe = 'locimyu-project-scene-migration-recipe-5';
 export const lociMyuStandardMaterialRecipe = 'locimyu-project-scene-migration-recipe-6';
-export type LociMyuRecipe = typeof lociMyuStandardMaterialRecipe | typeof lociMyuOpaqueMaterialRecipe | typeof lociMyuMaterialRecipe | typeof lociMyuPhotoRecipe | typeof lociMyuRecipe | typeof lociMyuJpegRecipe;
+export const lociMyuImageRecipe = 'locimyu-project-scene-migration-recipe-7';
+export type LociMyuRecipe = typeof lociMyuImageRecipe | typeof lociMyuStandardMaterialRecipe | typeof lociMyuOpaqueMaterialRecipe | typeof lociMyuMaterialRecipe | typeof lociMyuPhotoRecipe | typeof lociMyuRecipe | typeof lociMyuJpegRecipe;
 export const lociMyuByteProof = async (bytes: Uint8Array) => ({ byteLength: bytes.length, digest: await digest(bytes) });
 export interface LociMyuIssue { severity: 'info' | 'warning' | 'blocking'; sheet: string | null; row: number | null; sourceId: string | null;
   field: string; reason: string; impact: string; candidates: string[] }
+/** Ephemeral presentation only; not part of a conversion report, receipt or validation proof. */
+export interface LociMyuImageOmission { readonly scene:string;readonly row:number;readonly caption:string;readonly filename:string|null;readonly reason:string }
 export interface LociMyuBody { path: string; label: string; ref: StoredBlobRef;
   withStream<T>(consume: (stream: ReadableStream<Uint8Array>) => Promise<T>): Promise<T> }
 export interface LociMyuScene { name: string; identity: LociMyuCaptionSheetIdentity; captions: { value: LociMyuCaption; row: number; imagePath?: string }[] }
@@ -159,14 +162,25 @@ export async function openLociMyuSource(input: Blob, limits: FileValidationLimit
   } catch (error) { await catalog.dispose().catch(() => {}); throw error; }
 }
 
-export async function planLociMyuSource(opened: OpenedLociMyuSource, selection: number, title: string, confirmRelations: boolean): Promise<{
+export function planLociMyuSource(opened: OpenedLociMyuSource, selection: number, title: string, confirmRelations: boolean) {
+  return planLociMyuSourceCore(opened,selection,title,confirmRelations);
+}
+/** Reconstruct a validated receipt with its frozen relationship policy, never a UI trust flag. */
+export function planLociMyuSourceForRecipe(opened: OpenedLociMyuSource, selection: number, title: string, confirmRelations: boolean, recipe:LociMyuRecipe) {
+  if(![lociMyuRecipe,lociMyuJpegRecipe,lociMyuPhotoRecipe,lociMyuMaterialRecipe,lociMyuOpaqueMaterialRecipe,lociMyuStandardMaterialRecipe,lociMyuImageRecipe].includes(recipe))refuse('変換元の方式を確認できません。');
+  return planLociMyuSourceCore(opened,selection,title,confirmRelations,recipe);
+}
+async function planLociMyuSourceCore(opened: OpenedLociMyuSource, selection: number, title: string, confirmRelations: boolean, replayRecipe?:LociMyuRecipe): Promise<{
   relation: ReturnType<typeof planLociMyuDisplaySetRelationConfirmation>;
   base: Pick<LociMyuSourcePlan, 'workbook' | 'confirmation' | 'title' | 'inventory' | 'fingerprints' | 'issues' | 'accounting' | 'sourceEvidence'> & { materialSelected?: true; materialRecipe?:typeof lociMyuMaterialRecipe|typeof lociMyuOpaqueMaterialRecipe|typeof lociMyuStandardMaterialRecipe };
   plan: LociMyuSourcePlan | null;
+  imageOmissions:readonly LociMyuImageOmission[];
 }> {
   const { imported, entries, limits, decode, jpeg, photo } = opened, source = imported.sources[selection];
   if (!source || !Number.isSafeInteger(selection)) refuse('変換する表を選択してください。');
   const issues: LociMyuIssue[] = [];
+  const imageOmissionRefs:{warning:LociMyuIssue;scene:string;row:number;caption:string;filename:string|null}[]=[];
+  const imageOmissions=()=>Object.freeze(imageOmissionRefs.map(({warning,...item})=>Object.freeze({...item,reason:warning.reason})));
   const issue = (severity: LociMyuIssue['severity'], sheet: string | null, row: number | null, sourceId: string | null, field: string, reason: string,
     impact = '元のZIPと説明ファイルに保持します。', candidates: string[] = []) => issues.push({ severity, sheet, row, sourceId, field, reason, impact, candidates });
   const workbook = { path: source.archivePath, ...source.proof };
@@ -228,6 +242,12 @@ export async function planLociMyuSource(opened: OpenedLociMyuSource, selection: 
       if (!id || !name) issue('warning', r.archivePath, r.rowNumber, id || null, 'fileId/filename', '不完全な画像対応行は関連付けに使いません。');
     }
     const images = new Map<string, LociMyuBody>();
+    let extensionAttached=false;
+    const extensionRefusals:{warning:LociMyuIssue;reason:string;candidates:string[]}[]=[];
+    const allowExtension=replayRecipe===undefined||replayRecipe===lociMyuImageRecipe;
+    const stem=(name:string)=>{const dot=name.lastIndexOf('.');return dot>0&&dot<name.length-1?name.slice(0,dot):name;};
+    const aliasIds=new Map<string,Set<string>>(),taintedStems=new Set([...taintedNames].map(stem));
+    for(const [name,ids]of idsByName){const key=stem(name),merged=aliasIds.get(key)??new Set<string>();for(const id of ids)merged.add(id);aliasIds.set(key,merged);}
     const scenes: LociMyuScene[] = [];
     for (const [i, t] of captionTables.entries()) {
       const values = analyzed.sets[i]!.captions, acceptedRows = t.rows.map((r, n) => ({ r, n })).filter(({ r, n }) => n && nonempty(r) && cell(r, 0) !== '');
@@ -240,17 +260,50 @@ export async function planLociMyuSource(opened: OpenedLociMyuSource, selection: 
         if (imageId) {
           const names = namesById.get(imageId), name = names?.size === 1 ? [...names][0]! : null;
           const matches = name ? imported.images.filter(f => trim(f.name) === name) : [];
-          const exact = name && !taintedIds.has(imageId) && !taintedNames.has(name) && idsByName.get(name)?.size === 1 && matches.length === 1;
-          if (!exact) issue('warning', scene.name, n + 1, value.legacyId, 'imageFileId', '画像の対応が一意に確認できないため添付しません。', undefined, name ? matches.map(m => m.path) : []);
+          const mapUnique=!!name&&!taintedIds.has(imageId)&&!taintedNames.has(name)&&idsByName.get(name)?.size===1;
+          let image=mapUnique&&matches.length===1?matches[0]:undefined;
+          let admittedType:StoredBlobRef['mediaType']|undefined;
+          let extensionMatch=false;
+          let omissionFilename=image?.name??name;
+          let extensionRefusal:{reason:string;candidates:string[]}|undefined;
+          if(!image&&mapUnique&&matches.length===0&&allowExtension&&!name!.includes('.')){
+            // Count all byte/extension-recognized images before filtering support; an unknown suffix may compete too.
+            const candidates=imported.images.filter(file=>stem(trim(file.name))===name),aliases=aliasIds.get(name!);
+            if(candidates.length===1&&!taintedStems.has(name!)&&aliases?.size===1&&aliases.has(imageId)){
+              const candidate=candidates[0]!;
+              omissionFilename=candidate.name;
+              if(/\.(?:jpe?g|png|gif|webp|bmp|avif|heic|heif|heix)$/iu.test(trim(candidate.name))&&candidate.imageExt!=='heic'){
+                const bytes=await opened.catalog.readBytes(candidate.path,limits.maxFileBytes);
+                if(sniffImageExt(bytes)!=='heic'){
+                  try{admittedType=await inspectProjectImage(bytes,limits,decode,jpeg,photo);}
+                  catch(error){
+                    // Optional unlinked input remains exact-only if normal image admission refuses it.
+                    // Catalog/stream errors above and unknown/abort errors still propagate.
+                    if(!(error instanceof Error&&error.message.startsWith('読み込めません。')))throw error;
+                    if(error instanceof FileReadError)extensionRefusal={reason:error.message,
+                      candidates:['rule=unique-extension-only',`fileId=${imageId}`,`mappedFilename=${name}`,`archivePath=${candidate.path}`]};
+                  }
+                  if(admittedType){image=candidate;extensionMatch=true;}
+                }
+              }
+            }
+          }
+          if (!image) {
+            issue('warning', scene.name, n + 1, value.legacyId, 'imageFileId', '画像の対応が一意に確認できないため添付しません。', undefined, name ? matches.map(m => m.path) : []);
+            imageOmissionRefs.push({warning:issues[issues.length-1]!,scene:scene.name,row:n+1,caption:value.title,filename:omissionFilename});
+            if(extensionRefusal)extensionRefusals.push({warning:issues[issues.length-1]!,...extensionRefusal});
+          }
           else {
-            const image = matches[0]!;
-            const imageBytes = image.imageExt === 'heic' ? null : await opened.catalog.readBytes(image.path, limits.maxFileBytes);
-            if (image.imageExt === 'heic' || sniffImageExt(imageBytes!) === 'heic')
+            const imageBytes = admittedType||image.imageExt==='heic' ? null : await opened.catalog.readBytes(image.path, limits.maxFileBytes);
+            if (image.imageExt === 'heic' || imageBytes&&sniffImageExt(imageBytes) === 'heic') {
               issue('warning', scene.name, n + 1, value.legacyId, 'imageFileId', 'HEIC/HEIFはこの変換では添付できません。');
-            else {
-              const mediaType = await inspectProjectImage(imageBytes!, limits, decode, jpeg, photo); caption.imagePath = image.path;
+              imageOmissionRefs.push({warning:issues[issues.length-1]!,scene:scene.name,row:n+1,caption:value.title,filename:image.name});
+            } else {
+              const mediaType = admittedType??await inspectProjectImage(imageBytes!, limits, decode, jpeg, photo); caption.imagePath = image.path;
+              if(extensionMatch){extensionAttached=true;issue('info',scene.name,n+1,value.legacyId,'imageFileId','拡張子を省いた画像名が一意に一致したため添付します。','選択した画像を添付します。',
+                ['rule=unique-extension-only',`fileId=${imageId}`,`mappedFilename=${name}`,`archivePath=${image.path}`]);}
               if (!images.has(image.path)) images.set(image.path, { path: image.path, label: image.name,
-                withStream: consume => opened.catalog.withEntry(image.path, consume),
+                withStream: consume => opened.catalog.withEntry(image!.path, consume),
                 ref: { algorithm: 'sha256', byteLength: image.entry.byteLength, digest: image.entry.digest, mediaType } });
             }
           }
@@ -337,22 +390,24 @@ export async function planLociMyuSource(opened: OpenedLociMyuSource, selection: 
       if (role === 'unselected-workbook' || role === 'unlinked-media') { accounting.sourceOnlyEntries++; issue('info', entry.path, null, null, 'entry', 'この項目は元ファイルだけに保持します。'); }
       fingerprints.push({ path: entry.path, role, byteLength: entry.byteLength, digest: entry.digest });
     }
-    if(base.materialRecipe===lociMyuStandardMaterialRecipe)for(const row of materialRows)row.standardIntent=standardIntents.get(row.row)!;
+    if(base.materialRecipe===lociMyuStandardMaterialRecipe||extensionAttached)for(const row of materialRows)row.standardIntent=standardIntents.get(row.row)!;
     const materialNotices:MaterialConversionNotice[]=[];
     for(const row of materialRows)if(row.standardIntent)for(const index of row.indices){const slot=materialSlots.get(index)!,source=meshMaterialSemantics(slot.sourceSemantics)!,notice=materialConversionNotice({scene:row.scene,model:model.label,material:`${row.key}（材質 ${index+1}）`},source,row.standardIntent,row.standardIntent.appearance.chroma?.softness===0);if(notice)materialNotices.push(notice);}
     for(const slot of model.model.materials){const source=meshMaterialSemantics(slot.sourceSemantics),index=Number((slot.sourceLocator as JsonObject).materialIndex);if(!source||source.coverage.kind!=='blend')continue;
       const addressed=new Set(materialRows.filter(r=>r.indices.includes(index)).map(r=>r.scene));for(const scene of scenes)if(!addressed.has(scene.name)){const notice=sourceBlendNotice({scene:scene.name,model:model.label,material:`材質 ${index+1}`},source);if(notice)materialNotices.push(notice);}}
-    const plan: LociMyuSourcePlan = { ...base, recipe: base.materialSelected ? base.materialRecipe??lociMyuMaterialRecipe : [...images.values()].some(m => m.ref.mediaType === 'image/webp' || m.ref.mediaType === 'image/gif') ? lociMyuPhotoRecipe : model.model.jpeg || [...images.values()].some(m => m.ref.mediaType === 'image/jpeg') ? lociMyuJpegRecipe : lociMyuRecipe, model, media: [...images.values()], scenes, views,...(materialNotices.length?{materialNotices}:{}),
+    // Publish richer refusal details only in the new recipe; exact-only replay keeps its original report.
+    if(extensionAttached)for(const refusal of extensionRefusals){refusal.warning.reason=`一意に対応する画像を検証できないため添付しません。${refusal.reason}`;refusal.warning.candidates=refusal.candidates;}
+    const plan: LociMyuSourcePlan = { ...base, recipe: extensionAttached ? lociMyuImageRecipe : base.materialSelected ? base.materialRecipe??lociMyuMaterialRecipe : [...images.values()].some(m => m.ref.mediaType === 'image/webp' || m.ref.mediaType === 'image/gif') ? lociMyuPhotoRecipe : model.model.jpeg || [...images.values()].some(m => m.ref.mediaType === 'image/jpeg') ? lociMyuJpegRecipe : lociMyuRecipe, model, media: [...images.values()], scenes, views,...(materialNotices.length?{materialNotices}:{}),
       ...(base.materialSelected ? { materialRows } : {}) };
     if (base.materialSelected) lociMyuEvidence(materialRows);
     lociMyuEvidence({ ...base, scenes: scenes.map(s => ({ name: s.name, identity: s.identity, captions: s.captions.map(c => ({ row: c.row, id: c.value.captionId })) })) });
-    return { relation, base, plan };
+    return { relation, base, plan, imageOmissions:imageOmissions() };
   } catch (error) {
     if (error instanceof LociMyuIdentityCollisionError) throw error;
     if (!(error instanceof LociMyuPreflightError || error instanceof LociMyuSourceValidationError) && !(error instanceof Error && error.message.startsWith('読み込めません。'))) throw error;
     issue('blocking', null, null, null, 'conversion', error.message, 'プロジェクトは作成していません。');
     // Even failed source admission retains a complete entry fingerprint inventory for explicit reporting.
     fingerprints.splice(0); for (const e of entries) fingerprints.push({ path: e.path, role: 'unpublished-source', byteLength: e.byteLength, digest: e.digest });
-    return { relation, base, plan: null };
+    return { relation, base, plan: null, imageOmissions:imageOmissions() };
   }
 }

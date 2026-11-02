@@ -142,7 +142,8 @@ import { frozenV1ConversionIds, frozenV1SourceKey } from '../src/projectFiles/fr
 import { frozenV1Recipe, frozenV1DefaultViewRecipe, frozenV1PlacementRecipe, frozenV1MaterialRecipe,frozenV1OpaqueMaterialRecipe,frozenV1StandardMaterialRecipe, inspectFrozenV1Source } from '../src/projectFiles/frozenV1Source';
 import { prepareLociMyuConversion, resumeLociMyuConversion, readLociMyuConversionReport } from '../src/projectFiles/lociMyuConversion';
 import { lociMyuConversionIds, lociMyuSourceKey } from '../src/projectFiles/lociMyuMapping';
-import { lociMyuRecipe, lociMyuMaterialRecipe,lociMyuOpaqueMaterialRecipe,lociMyuStandardMaterialRecipe, openLociMyuSource } from '../src/projectFiles/lociMyuSource';
+import { lociMyuRecipe, lociMyuMaterialRecipe,lociMyuOpaqueMaterialRecipe,lociMyuStandardMaterialRecipe,lociMyuImageRecipe, openLociMyuSource } from '../src/projectFiles/lociMyuSource';
+import * as lociMyuSourceModule from '../src/projectFiles/lociMyuSource';
 import { makeXlsx, type XlsxSheetSpec } from './helpers/makeXlsx';
 import { LOCIMYU_CAPTION_HEADER, planLociMyuCaptionIdentity } from '../src/io/locimyu';
 import { readZipEntries } from '../src/assets/zipio';
@@ -1140,14 +1141,17 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     }), budget, decode))!;
     const choice = await preview.evaluate(0, '名前'); expect(choice.blocked).toBe(false); expect(JSON.parse(await choice.report().text()).issues.some((i: any) => i.field === 'material')).toBe(true);
   });
-  it.each([false,true,'opaque','standard'] as const)('LociMyu conversion material=%s retains captured initialization/source/report through interrupted publication, cold recovery and completed retry', async material => {
-    const file = await lociMyuFile(material==='standard'?standardLociMaterials:material==='opaque'?opaqueLociMaterials:material?lociMyuMaterials:undefined), original = await file.arrayBuffer(), preview = (await prepareLociMyuConversion(file, budget, decode))!, initial = await (await preview.evaluate(0, '確認した名前')).create();
+  it.each([false,true,'opaque','standard','extension','standard-extension'] as const)('LociMyu conversion material=%s retains captured initialization/source/report through interrupted publication, cold recovery and completed retry', async material => {
+    const extension=material==='extension'||material==='standard-extension',standard=material==='standard'||material==='standard-extension';
+    const file = await lociMyuFile((sheets,entries)=>{if(standard)standardLociMaterials(sheets,entries);else if(material==='opaque')opaqueLociMaterials(sheets,entries);else if(material===true)lociMyuMaterials(sheets,entries);
+      if(extension)entries.find(e=>e.path==='file_ids.csv')!.data=new TextEncoder().encode('fileId,filename\nimage1,a\nimage2,b.png\n');}), original = await file.arrayBuffer(), preview = (await prepareLociMyuConversion(file, budget, decode))!, initial = await (await preview.evaluate(0, '確認した名前')).create();
     const fs = new TestFS(), storage = storageFactory(), store = new OriginBlobStore(fs, { maxBlobBytes: budget.maxFileBytes, maxChunkBytes: 1_000_000, maxChunks: 10000, metadata }, lockManager());
     const service = validationProjectService(fs, storage, store, budget, decode), projectId = initial.source.proof.identity.projectId as string;
     fs.reject = p => p.endsWith('/published.json'); await expect(initial.persist(fs, store, service.session)).rejects.toThrow('quota'); fs.reject = () => false;
     const path = (await fs.list('')).find(p => p.endsWith('/locimyu-conversion.json'))!, receiptBytes = (await fs.readBytes(path))!, receipt = readLociMyuTestReceipt(receiptBytes);
-    expect(receipt.recipe).toBe(material==='standard'?lociMyuStandardMaterialRecipe:material==='opaque'?lociMyuOpaqueMaterialRecipe:material?lociMyuMaterialRecipe:lociMyuRecipe); expect(receipt.report.sourceIdentities).toHaveLength(3);
-    if(material){expect(receipt.report.materialMappings).toHaveLength(4);expect(receipt.report.materialEffects).toEqual({scenes:2,overrides:4,sourceOnlyChromaRows:material==='standard'?0:2});}
+    expect(receipt.recipe).toBe(extension?lociMyuImageRecipe:standard?lociMyuStandardMaterialRecipe:material==='opaque'?lociMyuOpaqueMaterialRecipe:material?lociMyuMaterialRecipe:lociMyuRecipe); expect(receipt.report.sourceIdentities).toHaveLength(3);
+    if(material&&material!=='extension'){expect(receipt.report.materialMappings).toHaveLength(4);expect(receipt.report.materialEffects).toEqual({scenes:2,overrides:4,sourceOnlyChromaRows:standard?0:2});}
+    if(extension){expect(receipt.report.converted.media).toBe(2);expect(receipt.report.issues.some((i:any)=>i.candidates.includes('rule=unique-extension-only')&&i.candidates.includes('mappedFilename=a')&&i.candidates.includes('archivePath=media/a.png'))).toBe(true);}
     const cold = validationProjectService(fs, storage, store, budget, decode), ready = await resumeLociMyuConversion(fs, store, cold.session, budget, projectId, decode);
     expect(ready.source!.originalChanges()).toEqual(initial.source.originalChanges()); expect(await fs.readBytes(path)).toEqual(receiptBytes);
     const captionId = Object.keys(ready.provider!.kind === 'scene-provider' ? ready.provider!.resources.captions : {})[0]!;
@@ -1158,6 +1162,64 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     await expect(resumeLociMyuConversion(fs, store, cold.session, budget, projectId, decode)).rejects.toThrow('変換記録');
     await expect(readLociMyuConversionReport(fs, budget, projectId, decode)).rejects.toThrow('変換記録'); expect((await cold.session.read()).source!.token).toBe(later.source!.token);
     expect(readLociMyuTestReceipt((await fs.readBytes(path))!)).toEqual(forged); expect(await file.arrayBuffer()).toEqual(original);
+  });
+  it.each(['supported-sibling','unsupported-sibling','unknown-sibling','unknown-only','alias-id','tainted-full-name','invalid-optional','heic-optional','dot-name','case-name'] as const)(
+    '07o refuses unsafe optional image fallback without changing an exact-only plan or receipt: %s',async fault=>{
+      const file=await lociMyuFile((_sheets,entries)=>{
+        const a=entries.find(e=>e.path==='media/a.png')!,map=entries.find(e=>e.path==='file_ids.csv')!;let rows='fileId,filename\nimage1,a\nimage2,b.png\n';
+        if(fault==='supported-sibling')entries.push({path:'other/a.jpg',data:a.data.slice()});
+        if(fault==='unsupported-sibling')entries.push({path:'other/a.heic',data:syntheticHeif()});
+        if(fault==='unknown-sibling')entries.push({path:'other/a.bin',data:a.data.slice()});
+        if(fault==='unknown-only')a.path='media/a.bin';
+        if(fault==='alias-id')rows='fileId,filename\nimage1,a\nimage2,a.png\n';
+        if(fault==='tainted-full-name')rows+=',a.png\n';
+        if(fault==='invalid-optional'){a.data=a.data.slice();a.data[a.data.length-1]=a.data[a.data.length-1]!^1;}
+        if(fault==='heic-optional'){a.path='media/a.heic';a.data=syntheticHeif();}
+        if(fault==='dot-name'){a.path='media/a.v1.png';rows='fileId,filename\nimage1,a.v1\nimage2,b.png\n';}
+        if(fault==='case-name')rows='fileId,filename\nimage1,A\nimage2,b.png\n';
+        map.data=new TextEncoder().encode(rows);
+      });
+      const original=await file.arrayBuffer(),opened=(await openLociMyuSource(file,budget,decode))!;
+      try{
+        const fresh=await lociMyuSourceModule.planLociMyuSource(opened,0,'保持',false),strict=await lociMyuSourceModule.planLociMyuSourceForRecipe(opened,0,'保持',false,lociMyuRecipe);
+        expect(fresh.base).toEqual(strict.base);expect(fresh.plan?.scenes).toEqual(strict.plan?.scenes);expect(fresh.plan?.media.map(({path,label,ref})=>({path,label,ref}))).toEqual(strict.plan?.media.map(({path,label,ref})=>({path,label,ref})));
+        expect(fresh.plan?.recipe).toBe(lociMyuRecipe);expect(fresh.plan?.media).toHaveLength(1);
+        const preview=(await prepareLociMyuConversion(file,budget,decode))!,choice=await preview.evaluate(0,'保持');expect(choice.blocked).toBe(false);
+        const initial=await choice.create();expect(initial.source.proof.identity.projectId).toMatch(/^prj_/);expect(JSON.parse(await choice.report().text()).recipe).toBe(lociMyuRecipe);preview.dispose();
+      }finally{await opened.dispose();}
+      expect(await file.arrayBuffer()).toEqual(original);
+    });
+  it('07o reports a rejected unique image only when another admitted fallback selects recipe7 and retains its cold report',async()=>{
+    const file=await lociMyuFile((_sheets,entries)=>{
+      entries.find(e=>e.path==='file_ids.csv')!.data=new TextEncoder().encode('fileId,filename\nimage1,a\nimage2,b\n');
+      const b=entries.find(e=>e.path==='media/b.png')!;b.data=b.data.slice();b.data[b.data.length-1]=b.data[b.data.length-1]!^1;
+    }),original=await file.arrayBuffer(),preview=(await prepareLociMyuConversion(file,budget,decode))!,choice=await preview.evaluate(0,'検査結果を保持');
+    expect(choice.blocked).toBe(false);const report=JSON.parse(await choice.report().text());expect(report.recipe).toBe(lociMyuImageRecipe);expect(report.converted.media).toBe(1);
+    const warnings=report.issues.filter((i:any)=>i.severity==='warning'&&i.field==='imageFileId');expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toMatchObject({sheet:'全体',row:3,sourceId:'c_SYNTH_A',impact:'元のZIPと説明ファイルに保持します。',
+      reason:expect.stringContaining('PNG'),candidates:['rule=unique-extension-only','fileId=image2','mappedFilename=b','archivePath=media/b.png']});
+    expect(warnings[0].reason).toContain('一意に対応する画像を検証できないため添付しません。読み込めません。');
+    expect(choice.imageOmissions).toEqual([{scene:'全体',row:3,caption:'未配置の記録',filename:'b.png',reason:warnings[0].reason}]);
+    expect(Object.isFrozen(choice.imageOmissions)).toBe(true);expect(Object.isFrozen(choice.imageOmissions[0])).toBe(true);expect(report).not.toHaveProperty('imageOmissions');
+    expect(report.issues.filter((i:any)=>i.severity==='info'&&i.field==='imageFileId')).toHaveLength(2);
+    const initial=await choice.create(),fs=new TestFS(),storage=storageFactory(),store=new OriginBlobStore(fs,{maxBlobBytes:budget.maxFileBytes,maxChunkBytes:1_000_000,maxChunks:10000,metadata},lockManager()),service=validationProjectService(fs,storage,store,budget,decode);
+    await initial.persist(fs,store,service.session);const projectId=initial.source.proof.identity.projectId as string,cold=await readLociMyuConversionReport(fs,budget,projectId,decode);
+    expect(JSON.parse(await cold!.text()).issues).toEqual(report.issues);expect(await file.arrayBuffer()).toEqual(original);preview.dispose();
+  });
+  it('07o creates a separate same-ZIP Project while cold replay preserves an edited exact-only receipt',async()=>{
+    const file=await lociMyuFile((_sheets,entries)=>{entries.find(e=>e.path==='file_ids.csv')!.data=new TextEncoder().encode('fileId,filename\nimage1,a\nimage2,b.png\n');});
+    const original=await file.arrayBuffer(),strict=vi.spyOn(lociMyuSourceModule,'planLociMyuSource').mockImplementation((opened,selection,title,confirm)=>lociMyuSourceModule.planLociMyuSourceForRecipe(opened,selection,title,confirm,lociMyuRecipe));
+    const oldInitial=await(async()=>{try{return await(await(await prepareLociMyuConversion(file,budget,decode))!.evaluate(0,'既存の編集')).create();}finally{strict.mockRestore();}})();
+    const origin=new TestFS(),store=new OriginBlobStore(origin,{maxBlobBytes:budget.maxFileBytes,maxChunkBytes:1_000_000,maxChunks:10000,metadata},lockManager()),oldFs=new TestFS(),oldStorage=storageFactory(),old=validationProjectService(oldFs,oldStorage,store,budget,decode);
+    const ready=await oldInitial.persist(oldFs,store,old.session),oldId=oldInitial.source.proof.identity.projectId as string;if(ready.provider?.kind!=='scene-provider')throw Error('old provider');const captionId=Object.keys(ready.provider.resources.captions)[0]!;
+    const edited=await old.session.edit(ready.source!.token,{kind:'editCaption',captionId,edits:{body:'既存の追記を維持'}}),oldReceiptPath=(await oldFs.list('')).find(p=>p.endsWith('/locimyu-conversion.json'))!,oldReceiptBytes=(await oldFs.readBytes(oldReceiptPath))!;
+    expect(readLociMyuTestReceipt(oldReceiptBytes).recipe).toBe(lociMyuRecipe);
+    const preview=(await prepareLociMyuConversion(file,budget,decode))!,choice=await preview.evaluate(0,'画像を補った別Project'),next=await choice.create(),nextId=next.source.proof.identity.projectId as string;
+    expect(nextId).not.toBe(oldId);const fs=new TestFS(),storage=storageFactory(),service=validationProjectService(fs,storage,store,budget,decode);await next.persist(fs,store,service.session);
+    const path=(await fs.list('')).find(p=>p.endsWith('/locimyu-conversion.json'))!,receipt=readLociMyuTestReceipt((await fs.readBytes(path))!);
+    expect(receipt.recipe).toBe(lociMyuImageRecipe);expect(receipt.original).toEqual(readLociMyuTestReceipt(oldReceiptBytes).original);expect(receipt.report.converted.media).toBe(2);
+    const cold=validationProjectService(oldFs,oldStorage,store,budget,decode),reopened=await resumeLociMyuConversion(oldFs,store,cold.session,budget,oldId,decode);
+    if(reopened.provider?.kind!=='scene-provider')throw Error('cold provider');expect(reopened.source!.token).toBe(edited.source!.token);expect(reopened.provider.resources.captions[captionId]!.body).toEqual({kind:'value',value:'既存の追記を維持'});expect(await oldFs.readBytes(oldReceiptPath)).toEqual(oldReceiptBytes);expect(await file.arrayBuffer()).toEqual(original);preview.dispose();
   });
   it.each(['original-loss', 'acknowledged-body-loss', 'mapping-forgery', 'empty-envelope-chunk'] as const)('LociMyu conversion refuses acknowledged evidence loss/forgery without repair: %s', async fault => {
     const initial = await (await (await prepareLociMyuConversion(await lociMyuFile(), budget, decode))!.evaluate(0, '名前')).create(), projectId = initial.source.proof.identity.projectId as string;
@@ -1279,12 +1341,23 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     caseDisposals.push(() => { pause = false; release(); }); // Unblock before owned UI disposal, including failed assertions.
     const root = record(ui.root), all = (n: RecordedNode): RecordedNode[] => [n, ...n.children.flatMap(all)], button = (name: string) => all(root).find(n => n.tag === 'button' && n.textContent === name && !n.hidden)!;
     const named = (name: string) => all(root).find(n => n.attributes.get('aria-label') === name)!;
-    await vi.waitFor(() => expect(button('ファイルを開く').disabled).toBe(false)); Object.assign(named('ファイルを選択'), { files: [await lociMyuFile()] });
+    const file=await lociMyuFile((sheets,entries)=>{
+      entries.find(e=>e.path==='file_ids.csv')!.data=new TextEncoder().encode('fileId,filename\nimage1,a\nimage2,b\n');
+      const b=entries.find(e=>e.path==='media/b.png')!;b.data=b.data.slice();b.data[b.data.length-1]=b.data[b.data.length-1]!^1;
+      sheets[0]!.rows.push(['c_UNKNOWN','関連する画像が不明','','#ffffff','','','','private-unknown-file-id']);
+    });
+    await vi.waitFor(() => expect(button('ファイルを開く').disabled).toBe(false)); Object.assign(named('ファイルを選択'), { files: [file] });
     named('ファイルを選択').parent!.parent!.fire('submit', { preventDefault() {} }); await vi.waitFor(() => expect(button('新しいプロジェクトに変換').disabled).toBe(false));
+    const omission=all(root).find(n=>n.tag==='details'&&n.className==='lv-conversion-images')!,items=()=>omission.children.find(n=>n.tag==='ul')!.children;
+    expect(omission.hidden).toBe(false);expect(omission.open).toBeFalsy();expect(omission.children[0]!.textContent).toBe('添付できない画像（2件）');expect(items()).toHaveLength(2);
+    expect(items().map(n=>all(n).map(c=>c.textContent).join('|'))).toEqual([expect.stringContaining('全体・3行目／b.png'),expect.stringContaining('ファイル名を確認できません')]);
+    expect(all(omission).some(n=>n.textContent.includes('PNG'))).toBe(true);expect(all(omission).some(n=>n.textContent.includes('private-unknown-file-id'))).toBe(false);omission.open=true;
     const title = named('変換後のプロジェクト名'); title.value = '最初の入力'; title.fire('input'); pause = true; button('変換内容を確認').fire('click'); await arrived;
+    expect(omission.hidden).toBe(true);expect(items()).toHaveLength(0);
     title.fire('compositionstart'); title.value = '待機中の最新入力'; title.fire('input'); title.fire('compositionend'); release(); pause = false;
     await vi.waitFor(() => expect(button('変換内容を確認').disabled).toBe(false)); expect(button('新しいプロジェクトに変換').disabled).toBe(true); expect(button('変換の説明を保存').disabled).toBe(true);
-    button('変換内容を確認').fire('click'); await vi.waitFor(() => expect(button('新しいプロジェクトに変換').disabled).toBe(false)); button('新しいプロジェクトに変換').fire('click');
+    expect(omission.hidden).toBe(true);expect(items()).toHaveLength(0);
+    button('変換内容を確認').fire('click'); await vi.waitFor(() => expect(button('新しいプロジェクトに変換').disabled).toBe(false));expect(omission.open).toBe(true);expect(omission.hidden).toBe(false);expect(items()).toHaveLength(2); button('新しいプロジェクトに変換').fire('click');
     await vi.waitFor(() => expect(open).toHaveBeenCalledOnce()); expect((await open.mock.calls[0]![1]!.source.inspectOriginal(metadata)).candidates.unambiguousRecords.project).toMatchObject({ title: '待機中の最新入力' });
     await ui.dispose(); const download = vi.spyOn(URL, 'createObjectURL'); try { button('変換の説明を保存').fire('click'); expect(download).not.toHaveBeenCalled(); } finally { download.mockRestore(); }
   });
@@ -4455,7 +4528,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
   }
   async function productWorkspaceFixture(includeInitial = false, duplicateModels = false, withTag = false, profile: 'map1' | 'map2' = 'map1',
     initial?: NonNullable<Parameters<typeof openValidationHost>[0]['initial']>,
-    setup: { jpeg?: JpegDecoder; photo?: PhotoDecoder; mediaDecoders?:MediaDecoders; editorSettings?:Parameters<typeof openValidationHost>[0]['editorSettings']; storageEstimate?: ValidationWorkspacePorts['storageEstimate']; restoreGenerations?: boolean; initialWorkspace?: boolean; scenes?: readonly { id: string; name: string; orderKey: string }[] } = {}) {
+    setup: { jpeg?: JpegDecoder; photo?: PhotoDecoder; mediaDecoders?:MediaDecoders; editorSettings?:Parameters<typeof openValidationHost>[0]['editorSettings']; storageEstimate?: ValidationWorkspacePorts['storageEstimate']; restoreGenerations?: boolean; initialWorkspace?: boolean; visualFrames?:boolean; scenes?: readonly { id: string; name: string; orderKey: string }[] } = {}) {
     const r = firstWorkspaceRecipient(setup.jpeg, setup.photo,setup.mediaDecoders), run = initial ? (initial.source.proof.identity.projectId as string).slice(4) : newId(), captionId = `cap_${newId()}`;
     const generationFactories = new Map<string, MetadataStorageFactory>(), databases: RestoreDatabasePorts = {
       listGenerations: async () => [...generationFactories.keys()], open: async (id, create) => {
@@ -4504,6 +4577,8 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     } });
     let cameraEpoch = 1, display: Parameters<ReturnType<ViewportFactory>['update']>[0] | undefined, issue: string | null = null;
     let projected: typeof display, holdFrame = false, viewportDragging = false, notifyViewport = () => {}, pinPoint = { x: 30, y: 40 };
+    const visualListeners=new Set<(frame:import('../src/projectScene/viewportPorts').ViewportPresentationFrame)=>boolean>();
+    let runtimeReads=0;
     let extent = { left: 10, top: 20, width: 600, height: 400 };
     const retryViewport = vi.fn(() => { issue = null; }), reservePointer = vi.fn(), navigateCamera = vi.fn((_event:Parameters<NonNullable<import('../src/projectScene/viewportPorts').ProjectViewport['navigateCamera']>>[0]) => true);
     let payload: DisplayCapture = { camera: { position: [1, 0, 5], target: [0, 0, 0], up: [0, 1, 0], projection: { kind: 'perspective', verticalFovRadians: Math.PI / 4 } },
@@ -4520,12 +4595,13 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const factory: ViewportFactory = (canvas, changed, pin, model) => { proposeModel = model; proposePin = pin; notifyViewport = changed;
       Object.assign(canvas, { getBoundingClientRect: () => ({ ...extent }) });
       return { update: next => { display = next; if (!holdFrame) projected = next; }, setActive() {}, setPinPointerActive: reservePointer, camera, retry: retryViewport, dispose: vi.fn(), pickCreation: pick,
+        ...(setup.visualFrames?{observePresentation(listener:(frame:import('../src/projectScene/viewportPorts').ViewportPresentationFrame)=>boolean){visualListeners.add(listener);return()=>{visualListeners.delete(listener);};}}:{}),
         capture: () => structuredClone(payload), recall, setBackground: background, navigateCamera,
-        read: () => ({ ready: !!projected, token: String(cameraEpoch), pickToken: String(cameraEpoch), display: projected, pins: projected?.pins.map(p => ({ id: p.id, ...pinPoint, visible: true })) ?? [],
-          issue, notice: '検証用の表示通知', dragging: viewportDragging, projection: payload.camera.projection.kind, axis: null }) };
+        read: () => {runtimeReads++;return { ready: !!projected, token: String(cameraEpoch), pickToken: String(cameraEpoch), display: projected, pins: projected?.pins.map(p => ({ id: p.id, ...pinPoint, visible: true })) ?? [],
+          issue, notice: '検証用の表示通知', dragging: viewportDragging, projection: payload.camera.projection.kind, axis: null };} };
     };
     let opened = false, liveHost = host; const imageReads = [vi.spyOn(host.content, 'image')];
-    const ui = owned(createValidationWorkspace(document, { productEditor: true, fileLimits: budget, decode, jpeg: setup.jpeg, photo: setup.photo, storageEstimate: setup.storageEstimate, list: async () => [], selected() {},
+    const ui = owned(createValidationWorkspace(document, { productEditor: true, progressivePresentation:setup.visualFrames, fileLimits: budget, decode, jpeg: setup.jpeg, photo: setup.photo, storageEstimate: setup.storageEstimate, list: async () => [], selected() {},
       open: async (_run, _initial, mode) => { if (!opened) { opened = true; return host; } liveHost = await openValidationHost({ ...options, mode }); imageReads.push(vi.spyOn(liveHost.content, 'image')); return liveHost; },
       render: async () => ({ factory, dispose() {} }) }, f.run));
     const root = record(ui.root), all = (n: RecordedNode): RecordedNode[] => [n, ...n.children.flatMap(all)];
@@ -4574,6 +4650,13 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       expect(liveHost.read().source!.token).not.toBe(before);
     };
     return { f, host, ui, editor, root, all, named, button, edited, completed, failed, status, downloads, legacy, dispatch, pick, navigateCamera,
+      runtimeReads:()=>runtimeReads,
+      present(generation:number,overrides:Partial<import('../src/projectScene/viewportPorts').ViewportPresentationFrame>={}){
+        if(!display||!visualListeners.size)return false;
+        const frame={display,generation,width:extent.width,height:extent.height,camera:{position:[1,0,5],target:[0,0,0],up:[0,1,0]},projection:'perspective' as const,axis:null,navigating:false,
+          pins:display.pins.map(p=>({id:p.id,x:80,y:90,visible:true})),...overrides};
+        return [...visualListeners].map(listener=>listener(frame)).every(Boolean);
+      },
       // The Caption now contains media forms too. Select its text-action footer,
       // rather than an unrelated hidden media cancel in this DOM recorder.
       captionTextActions: () => all(named('キャプションの詳細',editor)).find(n=>n.className==='lv-caption-detail-actions' && n.children.some(child=>child.textContent==='変更を適用'))!,
@@ -4586,6 +4669,23 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       proposePin: (...args: Parameters<NonNullable<Parameters<ViewportFactory>[2]>>) => proposePin?.(...args),
       proposeModel: (...args: Parameters<NonNullable<Parameters<ViewportFactory>[3]>>) => proposeModel?.(...args) };
   }
+  it('paints only current visual frames without borrowing authority or rebuilding focused pin nodes',async()=>{
+    const h=await productWorkspaceFixture(true,false,false,'map1',undefined,{visualFrames:true});
+    const before=h.host.authority.read(),marker=h.all(h.editor).find(n=>n.className==='lv-project-marker')!;expect(marker).toBeDefined();marker.focus();
+    const reads=h.runtimeReads(),authority=vi.spyOn(h.host.authority,'read').mockImplementation(()=>{throw Error('visual frame must not read authority');});
+    try{
+      expect(h.present(10)).toBe(true);expect(marker.style.left).toBe('80px');expect(marker.style.top).toBe('90px');expect(marker.document.activeElement).toBe(marker);
+      expect(h.runtimeReads()).toBe(reads);expect(authority).not.toHaveBeenCalled();expect(h.dispatch).not.toHaveBeenCalled();expect(h.pick).not.toHaveBeenCalled();
+      expect(h.present(10,{pins:[]})).toBe(false);expect(marker.style.left).toBe('80px');
+      expect(h.present(11,{display:{...h.display()!,sceneId:'foreign-scene'}})).toBe(false);
+      expect(h.present(11,{pins:[{id:'unknown-visible',x:1,y:2,visible:true}]})).toBe(false);
+      const id=h.display()!.pins[0]!.id;expect(h.present(12,{pins:[{id,x:120,y:130,visible:false}]})).toBe(true);
+      expect(marker.hidden).toBe(false);expect(marker.style.opacity).toBe('0');expect(marker.document.activeElement).toBe(marker);
+      expect(h.runtimeReads()).toBe(reads);expect(authority).not.toHaveBeenCalled();
+    }finally{authority.mockRestore();}
+    expect(h.host.authority.read().state.token).toBe(before.state.token);expect(h.host.authority.read().resources).toEqual(before.resources);
+    await h.ui.dispose();expect(h.present(13)).toBe(false);
+  });
   it('batches renderer observations without delaying typed intents or accepting stale view captures',async()=>{
     const h=await productWorkspaceFixture(true),frames=new Map<number,FrameRequestCallback>();let next=0;
     vi.stubGlobal('requestAnimationFrame',(fn:FrameRequestCallback)=>{const id=++next;frames.set(id,fn);return id;});vi.stubGlobal('cancelAnimationFrame',(id:number)=>frames.delete(id));
@@ -9727,6 +9827,21 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect(captionAttachments(s.snapshot.mediaData, captionId).ready).toHaveLength(1);
     expect(file.arrayBuffer).toHaveBeenCalledOnce(); await workspace.dispose();
   }, 15_000);
+  it('home Project row buttons reflect operation readiness through held refresh and IME (recorded DOM only)',async()=>{
+    const document=new RecordedDocument(),create=document.createElement.bind(document),insertedDisabled:boolean[]=[];
+    document.createElement=tag=>{const node=create(tag);if(tag==='p'){const append=node.append.bind(node);node.append=(...children)=>{
+      for(const child of children)if(child.tag==='button'&&['編集で開く','閲覧で開く'].includes(child.textContent))insertedDisabled.push(child.disabled);append(...children);
+    };}return node;};
+    let hold=false,release=()=>{};const gate=new Promise<void>(resolve=>{release=resolve;}),open=vi.fn<ValidationWorkspacePorts['open']>(async()=>{throw Error('injected opening refusal');});
+    const ui=owned(createValidationWorkspace(document.asDocument(),{fileLimits:budget,decode,selected(){},list:async()=>{if(hold)await gate;return[{run:'1'.repeat(32),title:'保持するProject',state:'ready'}];},open,render:async()=>{throw Error('no render');}}));
+    caseDisposals.push(()=>{hold=false;release();});const root=record(ui.root),all=(n:RecordedNode):RecordedNode[]=>[n,...n.children.flatMap(all)],buttons=()=>all(root).filter(n=>n.tag==='button'&&['編集で開く','閲覧で開く'].includes(n.textContent));
+    await ui.ready;expect(insertedDisabled).toEqual([true,true]);const first=buttons();expect(first).toHaveLength(2);expect(first.every(n=>!n.disabled)).toBe(true);
+    const title=all(root).find(n=>n.attributes.get('aria-label')==='プロジェクト名')!;title.fire('compositionstart');expect(buttons()).toEqual(first);expect(first.every(n=>n.disabled)).toBe(true);
+    title.fire('compositionend');expect(first.every(n=>!n.disabled)).toBe(true);
+    hold=true;all(root).find(n=>n.tag==='button'&&n.textContent==='一覧を更新')!.fire('click');expect(buttons()).toEqual(first);expect(first.every(n=>n.disabled)).toBe(true);
+    first[1]!.fire('click');expect(open).not.toHaveBeenCalled();release();await vi.waitFor(()=>expect(buttons().every(n=>!n.disabled)).toBe(true));
+    expect(insertedDisabled).toEqual([true,true,true,true]);expect(buttons()[0]).not.toBe(first[0]);buttons()[1]!.fire('click');await vi.waitFor(()=>expect(open).toHaveBeenCalledOnce());await ui.dispose();
+  });
   it('connects file selection/create/list/reopen, guards composition/pending save and disposes a late renderer (recorded DOM only)', async () => {
     const fs = new TestFS(), locks = lockManager(), coordinator = ProjectMutationCoordinator.browser(locks);
     const store = new OriginBlobStore(fs, { maxBlobBytes: budget.maxFileBytes, maxChunkBytes: 1_000_000, maxChunks: 10000, metadata }, locks);

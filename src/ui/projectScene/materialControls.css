@@ -1,5 +1,5 @@
 /* Shared typed material-control presentation; commands remain owned by callers. */
-.lv-material-editor { display: flex; flex-direction: column; gap: 10px; min-width: 0; min-height: 0; overflow: auto; color: #312f2d; background: #f2f0ee; font: 400 14px/1.5 system-ui, sans-serif; }
+.lv-material-editor { display: flex; flex-direction: column; gap: 10px; min-width: 0; min-height: 0; overflow: auto; color: #312f2d; background: #f2f0ee; font: 400 14px/1.5 system-ui, sans-serif; container: material-panel / inline-size; }
 .lv-material-editor[hidden], .lv-material-editor [hidden] { display: none !important; }
 .lv-material-editor :is(button, input, select) { box-sizing: border-box; min-width: 44px; min-height: 44px; max-width: 100%; padding: 6px 10px; border: 1px solid #817c78; border-radius: 2px; color: inherit; background: #faf9f8; font: inherit; }
 .lv-material-editor :is(button, input, select):focus-visible { outline: 2px solid #312f2d; outline-offset: 2px; }
@@ -8,12 +8,27 @@
 .lv-material-editor :read-only { color: #504d4a; }
 .lv-material-editor label { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .lv-material-editor p { margin: 0; overflow-wrap: anywhere; }
-.lv-material-target, .lv-material-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 140px), 1fr)); gap: 8px; }
+.lv-material-editor fieldset { min-inline-size: 0; margin: 0; padding: 0; border: 0; }
+.lv-material-editor legend { padding: 0; margin-bottom: 8px; font-size: 13px; font-weight: 600; }
+.lv-material-target, .lv-material-fields, .lv-material-advanced-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.lv-material-target { padding-bottom: 16px !important; border-bottom: 1px solid #c9c5bd !important; }
+.lv-material-wide, .lv-material-impact, .lv-material-advanced { grid-column: 1 / -1; }
+.lv-material-editor :is(input, select) { width: 100%; }
+.lv-material-origin { margin-block: 8px 12px !important; color: #62615b; font-size: 13px; }
+.lv-material-origin:empty { display: none; }
+.lv-material-impact { color: #62615b; font-size: 13px; }
+.lv-material-advanced { border-top: 1px solid #d7d3cb; padding-top: 8px; }
+.lv-material-advanced > summary { box-sizing: border-box; min-height: 44px; padding-block: 10px; cursor: pointer; }
+.lv-material-advanced-fields { padding-top: 8px; }
 .lv-material-fields p { font-size: 13px; }
-.lv-material-fields > label { align-self: start; }
-.lv-material-label:has(> .lv-context-help) { position: relative; display: flex; align-items: center; min-height: 44px; box-sizing: border-box; padding-inline-end: 44px; }
+.lv-material-fields label { align-self: start; }
+.lv-material-label { position: relative; display: flex; align-items: center; min-height: 44px; box-sizing: border-box; }
+.lv-material-label:has(> .lv-context-help) { padding-inline-end: 44px; }
 .lv-material-label > .lv-context-help { position: absolute; top: 0; right: 0; width: 44px; flex: 0 0 44px; }
 .lv-material-label > .lv-context-help > .lv-context-help-trigger { width: 44px; }
 .lv-material-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .lv-material-editor .lv-material-primary { background: #413d39; color: #faf9f8; font-weight: 500; }
 .lv-material-editor .lv-material-values[data-noneditable="true"]:not([hidden]) { display: block !important; }
+@container material-panel (max-width: 380px) {
+  .lv-material-target, .lv-material-fields, .lv-material-advanced-fields { grid-template-columns: minmax(0, 1fr); }
+}

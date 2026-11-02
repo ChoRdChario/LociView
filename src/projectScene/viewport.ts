@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { defaultPose, fittedPose, placementMatrix, projectBounds, switchProjection, type CameraPose, type RenderDisplay, type EditableDisplay } from './viewportModel';
 import { renderOwner, renderPlacement, isReadonlyModel, isSavedModel } from './modelTypes';
-import type { ViewportFactory, ViewportObservation } from './viewportPorts';
+import type { ViewportFactory, ViewportObservation, ViewportPresentationFrame } from './viewportPorts';
 import { PROJECT_SCENE_STANDARD_BACKGROUND_HEX, readProjectCamera, readSolidBackground, type SolidBackground } from './viewDisplay';
 import type { DisplayCapture } from './displayCapture';
 import { pickResidentCreation, pickResidentSurface, type PinSurfaceTarget, type ResidentSurface } from './viewportPicking';
@@ -64,6 +64,26 @@ export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: 
   let pose = defaultPose(), display: RenderDisplay | null = null, modelKey = '', modelStructureKey = '', active = false, disposed = false, applying = false;
   let issue: string | null = null, contextLost = false, dragging = false, axis: ViewportObservation['axis'] = null, serial = 0, raf = 0, lastObservation = '';
   let lastDrawSerial = -1, visualDirty = true;
+  let semanticRevision = 0, observedSemanticRevision = -1, frameGeneration = 0;
+  const presentationListeners = new Set<(frame: ViewportPresentationFrame) => boolean>();
+  function notify() { semanticRevision++; changed(); }
+  function projectPosition(position: readonly [number, number, number]) {
+    const p = new THREE.Vector3(...position); if (camera) p.project(camera);
+    return { x: (p.x + 1) * width / 2, y: (1 - p.y) * height / 2,
+      visible: Boolean(camera && p.z >= -1 && p.z <= 1 && Math.abs(p.x) <= 1 && Math.abs(p.y) <= 1) };
+  }
+  function presentFrame() {
+    if (!presentationListeners.size || !display || !camera) return false;
+    camera.updateMatrixWorld(true);
+    const frame: ViewportPresentationFrame = Object.freeze({ display, generation: ++frameGeneration, width, height,
+      camera: Object.freeze({ position: Object.freeze([...pose.position]), target: Object.freeze([...pose.target]), up: Object.freeze([...pose.up]) }),
+      projection: pose.projection.kind, axis, navigating: !!navigation,
+      pins: Object.freeze(display.pins.map(pin => Object.freeze({ id: pin.id, ...projectPosition(pin.position) }))) });
+    const beforeSerial=serial, beforeSemantic=semanticRevision;
+    let handled = true;
+    for (const listener of presentationListeners) { try { if (listener(frame) !== true) handled = false; } catch { handled = false; } }
+    return handled && active && !disposed && display===frame.display && frameGeneration===frame.generation && serial===beforeSerial && semanticRevision===beforeSemantic;
+  }
   let width = 1, height = 1, rawPixelRatio = 0; let pointDiameterNotice: string | null = null; const pointDiameters = new Map<string, number>();
   let pickEpoch = 0;
   let coverageProbe: ReturnType<typeof createValidationCoverage> | null = null, coverageIssue: string | null = null;
@@ -76,9 +96,9 @@ export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: 
   function syncOrbit(manipulating = Boolean(gizmo?.dragging)) {
     if (controls) controls.enabled = !pinPointerActive && !manipulating && !navigation;
   }
-  function endNavigation(id?:string,notify=true){
+  function endNavigation(id?:string,shouldNotify=true){
     if(!navigation||id!==undefined&&navigation.id!==id)return false;
-    observePose();navigation=null;syncOrbit();if(notify){serial++;changed();}return true;
+    observePose();navigation=null;syncOrbit();if(shouldNotify){serial++;notify();}return true;
   }
   const mouseNavigation = (event: PointerEvent) => {
     if (!controls || event.pointerType === 'touch' || event.button !== 1) return;
@@ -134,6 +154,7 @@ export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: 
     }
   }
   function release() {
+    frameGeneration++;
     saved.demand?.([]);
     endNavigation(undefined,false);
     pickEpoch++;
@@ -149,7 +170,7 @@ export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: 
     modelFailures.clear();
     rendererTarget?.release(); rendererTarget = undefined;
   }
-  function fail(e: unknown) { issue = `3D表示を停止しました。${errorText(e)} 編集内容は保持しています。`; release(); serial++; changed(); }
+  function fail(e: unknown) { issue = `3D表示を停止しました。${errorText(e)} 編集内容は保持しています。`; release(); serial++; notify(); }
   function buildModels() {
     if (!display || !renderer) return;
     const structure=JSON.stringify([display.sceneId,display.readOnly,display.models.map(m=>[residentModelKey(m),loadState(m)]),display.hiddenAssetIds]);
@@ -253,11 +274,11 @@ export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: 
         surface.asset.updateMatrixWorld(true);
         const p = surface.asset.worldToLocal(new THREE.Vector3(...world));
         return [p.x, p.y, p.z].every(Number.isFinite) && proposePin(target, [p.x || 0, p.y || 0, p.z || 0], phase);
-      }, busy => { syncOrbit(busy); serial++; if (!applying) changed(); }, () => { visualDirty = true; }) : null;
+      }, busy => { syncOrbit(busy); serial++; if (!applying) notify(); }, () => { visualDirty = true; }) : null;
       controls = new OrbitControls(camera, canvas); controls.enableDamping = false; controls.target.copy(target);
       controls.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.ROTATE, RIGHT: THREE.MOUSE.PAN };
-      controls.addEventListener('start', () => { dragging = true; serial++; changed(); });
-      controls.addEventListener('end', () => { dragging = false; observePose(); serial++; changed(); });
+      controls.addEventListener('start', () => { dragging = true; serial++; notify(); });
+      controls.addEventListener('end', () => { dragging = false; observePose(); serial++; notify(); });
       controls.addEventListener('change', () => {
         if (!applying) { try { axis = null; observePose(); updateClipping(); serial++; pickEpoch++; } catch (e) { fail(e); } }
       });
@@ -309,7 +330,7 @@ export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: 
       const next=presentation.plan(width,height,rawPixelRatio,available,Math.min(renderer.capabilities.maxTextureSize,gl.getParameter(gl.MAX_RENDERBUFFER_SIZE) as number));
       if(smoothLayout)clearSmooth();
       smoothLayout=next;renderer.setDrawingBufferSize(next.width,next.height,1);configurePoints();coverageProbe?.dispose();coverageProbe=null;pickEpoch++;serial++;
-    }catch(error){smoothIssue=errorText(error);waitingBudget=true;refusedAvailable=presentation.budget.available;serial++;changed();}
+    }catch(error){smoothIssue=errorText(error);waitingBudget=true;refusedAvailable=presentation.budget.available;serial++;notify();}
   }
   function drawSmooth(meshes:readonly SmoothMesh[],before:()=>void,frame?:GsFrame){
     if(!renderer||!camera||!presentation)return;
@@ -317,14 +338,14 @@ export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: 
     if(!smoothLayout||smoothIssue){smoothPresented=false;fallback();return;}
     if(!composite&&!smoothPending){smoothPending=true;smoothAbort=new AbortController();const generation=smoothGeneration,current=renderer,layout=smoothLayout;
       void presentation.create(current,presentation.budget,layout,frame,smoothAbort.signal).then(created=>{
-        if(disposed||renderer!==current||generation!==smoothGeneration){created.dispose();return;}composite=created;smoothPending=false;smoothAbort=null;serial++;changed();
-      },error=>{if(generation!==smoothGeneration||disposed)return;smoothIssue=errorText(error);waitingBudget=smoothIssue.includes('空き容量');refusedAvailable=presentation.budget.available;smoothPending=false;serial++;changed();});
+        if(disposed||renderer!==current||generation!==smoothGeneration){created.dispose();return;}composite=created;smoothPending=false;smoothAbort=null;serial++;notify();
+      },error=>{if(generation!==smoothGeneration||disposed)return;smoothIssue=errorText(error);waitingBudget=smoothIssue.includes('空き容量');refusedAvailable=presentation.budget.available;smoothPending=false;serial++;notify();});
     }
     if(!composite){fallback();return;}
     const helper=gizmo?.helper,wasVisible=helper?.visible;
     try{if(helper)helper.visible=false;before();composite.render(scene,camera,meshes,frame);smoothPresented=true;
       canvas.dataset.compositionBytes=String(composite.layout.bytes);canvas.dataset.renderScale=String(smoothLayout.renderScale);
-    }catch(error){smoothIssue=errorText(error);const failed=composite;composite=null;failed.dispose();delete canvas.dataset.compositionBytes;delete canvas.dataset.renderScale;smoothPresented=false;fallback();serial++;changed();}
+    }catch(error){smoothIssue=errorText(error);const failed=composite;composite=null;failed.dispose();delete canvas.dataset.compositionBytes;delete canvas.dataset.renderScale;smoothPresented=false;fallback();serial++;notify();}
     finally{if(helper)helper.visible=wasVisible!;}
     if(smoothPresented&&helper&&wasVisible){const parent=helper.parent,auto=renderer.autoClear;try{overlayScene.add(helper);renderer.autoClear=false;renderer.clearDepth();renderer.render(overlayScene,camera);}finally{helper.removeFromParent();parent?.add(helper);renderer.autoClear=auto;}}
   }
@@ -334,12 +355,12 @@ export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: 
     const sources=[...resident.values()].filter(s=>s.gs&&s.asset.visible).map(s=>s.gs!);
     if((import.meta.env.DEV||import.meta.env.MODE==='project-scene-validation'||import.meta.env.MODE==='project-scene-desktop'||import.meta.env.MODE==='project-scene-offline')&&sources.length&&!gsRender&&!gsPreparing&&!gsIssue){gsPreparing=true;const generation=gsGeneration,currentRenderer=renderer,intent=gsIntent,abort=new AbortController();gsPreparationAbort=abort;
       void import('../viewer/gsRender').then(m=>{abort.signal.throwIfAborted();if(generation!==gsGeneration||renderer!==currentRenderer)throw new DOMException('表示準備を取り消しました。','AbortError');
-        return m.createGsRender(currentRenderer,sources,()=>{if(abort.signal.aborted||generation!==gsGeneration)return;pickEpoch++;serial++;changed();},abort.signal,residency,intent??undefined,presentation?.budget);}).then(port=>{
-        if(generation!==gsGeneration||renderer!==currentRenderer){port.dispose();return;}clearSmooth();gsRender=port;gsPreparing=false;serial++;changed();
-      },e=>{if(generation===gsGeneration){gsIssue=errorText(e);gsPreparing=false;for(const source of sources){source.ready=false;source.issue=gsIssue;}serial++;changed();}});}
+        return m.createGsRender(currentRenderer,sources,()=>{if(abort.signal.aborted||generation!==gsGeneration)return;pickEpoch++;serial++;notify();},abort.signal,residency,intent??undefined,presentation?.budget);}).then(port=>{
+        if(generation!==gsGeneration||renderer!==currentRenderer){port.dispose();return;}clearSmooth();gsRender=port;gsPreparing=false;serial++;notify();
+      },e=>{if(generation===gsGeneration){gsIssue=errorText(e);gsPreparing=false;for(const source of sources){source.ready=false;source.issue=gsIssue;}serial++;notify();}});}
     // Upload new projected attributes before Three traverses/uploads geometry, never in onBeforeRender.
     const before=()=>{for (const surface of resident.values()) if (surface.points) { const gl=renderer!.getContext(); surface.points.project(camera!,gsRender?.depthBits??gl.getParameter(gl.DEPTH_BITS) as number); }};
-    if(gsRender){try{if(presentation&&smooth.length&&smoothLayout&&!smoothIssue)gsRender.render(scene,camera,before,frame=>drawSmooth(smooth,before,frame));else hideSmooth(smooth,()=>gsRender!.render(scene,camera!,before));}catch(e){gsIssue=errorText(e);clearSmooth();const failed=gsRender;gsRender=null;try{failed.dispose();}catch(cleanup){gsIssue+=` ${errorText(cleanup)}`;}for(const s of sources){s.ready=false;s.issue=gsIssue;}pickEpoch++;serial++;changed();hideSmooth(smooth,()=>{before();renderer!.render(scene,camera!);});}}
+    if(gsRender){try{if(presentation&&smooth.length&&smoothLayout&&!smoothIssue)gsRender.render(scene,camera,before,frame=>drawSmooth(smooth,before,frame));else hideSmooth(smooth,()=>gsRender!.render(scene,camera!,before));}catch(e){gsIssue=errorText(e);clearSmooth();const failed=gsRender;gsRender=null;try{failed.dispose();}catch(cleanup){gsIssue+=` ${errorText(cleanup)}`;}for(const s of sources){s.ready=false;s.issue=gsIssue;}pickEpoch++;serial++;notify();hideSmooth(smooth,()=>{before();renderer!.render(scene,camera!);});}}
     else if(presentation&&smooth.length)drawSmooth(smooth,before);else{before();renderer.render(scene,camera);}
     if(presentation)canvas.dataset.compositionDocumentBytes=String(presentation.budget.used);
     // New draw owners have acquired their program refs before the old source table retires.
@@ -351,20 +372,31 @@ export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: 
       // Reserve before notification: ready -> host render -> ensure may reenter synchronously.
       raf = requestAnimationFrame(draw);
       if (rawPixelRatio !== (globalThis.devicePixelRatio || 1)) ensure();
+      const owner = { display, generation: frameGeneration, renderer, camera, serial };
+      let drew = false;
       if (visualDirty || lastDrawSerial !== serial) {
         // Clear before drawing: decoder/sort callbacks may invalidate this frame.
         visualDirty = false; lastDrawSerial = serial;
-        renderFrame();
+        renderFrame(); drew = true;
       }
       const fingerprint = JSON.stringify([serial, width, height, display?.token, display?.pins, display?.preview, pose, background]);
-      if (fingerprint !== lastObservation) { lastObservation = fingerprint; changed(); }
+      if (fingerprint !== lastObservation) {
+        lastObservation = fingerprint;
+        const semanticChange = observedSemanticRevision !== semanticRevision;
+        observedSemanticRevision = semanticRevision;
+        const current = active && !disposed && !issue && !contextLost && display === owner.display && frameGeneration === owner.generation &&
+          renderer === owner.renderer && camera === owner.camera && serial === owner.serial;
+        // A resource callback may reenter/update during renderFrame. It must not publish the old frame.
+        const handled = !semanticChange && drew && current && presentFrame();
+        if (!handled) changed();
+      }
     } catch (e) { fail(e); }
   }
   function admitDisplay(next:RenderDisplay):boolean {
     if(!residency)return true;
     // Mesh/Point may display while GS sources are checked. Unknown GS is never zero demand.
     if(saved.gsPending?.(wantedModels(next))){
-      if(gsIntent?.active){blockedNext=next;pendingGsTarget=true;capacityIssue=null;serial++;changed();return false;}
+      if(gsIntent?.active){blockedNext=next;pendingGsTarget=true;capacityIssue=null;serial++;notify();return false;}
       blockedNext=null;pendingGsTarget=false;capacityIssue=null;return true;}
     const key=JSON.stringify([next.models.map(m=>isReadonlyModel(m)?m.key:m.binding.id),next.materials,next.savedMaterials,next.hiddenAssetIds]);
     if(gsIntent?.active&&gsIntentKey===key){blockedNext=null;pendingGsTarget=false;capacityIssue=null;return true;}
@@ -374,13 +406,14 @@ export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: 
         const demand=saved.gsDemand?.(model);return demand?[demand]:[];});
       const nextIntent=demands.length?residency.admit(demands,gsIntent??undefined):null;
       if(!nextIntent)gsIntent?.cancel();gsIntent=nextIntent;gsIntentKey=key;blockedNext=null;pendingGsTarget=false;capacityIssue=null;return true;
-    }catch(error){blockedNext=next;pendingGsTarget=false;capacityIssue=`${errorText(error)} ${display?'前の表示を保持しています。':'原本と記録は保持しています。'}`;serial++;changed();return false;}
+    }catch(error){blockedNext=next;pendingGsTarget=false;capacityIssue=`${errorText(error)} ${display?'前の表示を保持しています。':'原本と記録は保持しています。'}`;serial++;notify();return false;}
   }
   function ensure() {
     if (!active || disposed || issue || !display) return;
     if(!renderer&&!gsIntent?.active){const target=blockedNext??display;if(!admitDisplay(target))return;if(target!==display)viewport.update(target);}
     const rect = canvas.getBoundingClientRect(); if (rect.width <= 0 || rect.height <= 0) return;
     const resized = width !== rect.width || height !== rect.height || rawPixelRatio !== (globalThis.devicePixelRatio || 1); width = rect.width; height = rect.height; rawPixelRatio = globalThis.devicePixelRatio || 1;
+    if(resized){frameGeneration++;semanticRevision++;}
     if (resized) pickEpoch++;
     try {
       if (!renderer) {
@@ -406,7 +439,7 @@ export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: 
   }
   const resize = new ResizeObserver(ensure); resize.observe(canvas);
   const lost = (event: Event) => { event.preventDefault(); contextLost = true; fail(new Error('描画環境の復旧を待って再試行してください。')); };
-  const restored = () => { contextLost = false; issue = '描画環境が復旧しました。3D表示を再試行してください。'; serial++; changed(); };
+  const restored = () => { contextLost = false; issue = '描画環境が復旧しました。3D表示を再試行してください。'; serial++; notify(); };
   function pickSample(x: number, y: number) {
     if(presentation)renderFrame();
     const ndc = new THREE.Vector2(x * 2 / width - 1, 1 - y * 2 / height);
@@ -444,18 +477,19 @@ export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: 
     }, gsRender?.depthBits??currentRenderer.getContext().getParameter(currentRenderer.getContext().DEPTH_BITS) as number,checkedVisibility); } finally { visible.dispose(); }
     });
   }
-  function reportPickIssue() { if (coverageIssue) { serial++; changed(); } }
+  function reportPickIssue() { if (coverageIssue) { serial++; notify(); } }
   function presentedPick<T>(action:()=>T):T{return presentation&&!smoothPresented?hideSmooth(smoothMeshes(),action):action();}
   canvas.addEventListener('webglcontextlost', lost);
   canvas.addEventListener('webglcontextrestored', restored);
-  const unsubscribeTargets=presentation?.budget.subscribe(()=>{if(!waitingBudget||disposed||!active||presentation.budget.available<=refusedAvailable)return;waitingBudget=false;smoothIssue=null;smoothLayout=null;serial++;changed();});
+  const unsubscribeTargets=presentation?.budget.subscribe(()=>{if(!waitingBudget||disposed||!active||presentation.budget.available<=refusedAvailable)return;waitingBudget=false;smoothIssue=null;smoothLayout=null;serial++;notify();});
   const unsubscribeAdmission=residency?.subscribe(()=>{if(!blockedNext||disposed||!active||retryScheduled)return;retryScheduled=true;
     queueMicrotask(()=>{retryScheduled=false;if(blockedNext&&!disposed&&active){viewport.update(blockedNext);ensure();}});});
   const viewport:ReturnType<ViewportFactory>={
+    observePresentation(listener) { if(disposed)return()=>{};presentationListeners.add(listener);return()=>{presentationListeners.delete(listener);}; },
     update(next) {
       requestModels(next);
       if(!admitDisplay(next))return;
-      if(next!==display)endNavigation(undefined,false);
+      if(next!==display){frameGeneration++;semanticRevision++;endNavigation(undefined,false);}
       const sceneChanged = display?.sceneId !== next.sceneId;
       const boundsChanged = JSON.stringify(display?.bounds) !== JSON.stringify(next.bounds);
       const visibilityChanged = JSON.stringify(display?.hiddenAssetIds) !== JSON.stringify(next.hiddenAssetIds);
@@ -469,7 +503,7 @@ export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: 
     pointDiameter(assetId) { return pointDiameters.get(assetId) ?? 3; },
     setPointDiameter(assetId, input) { const resolved = resolvePointPresentation(pointRegistrySnapshot, defaultPointProfile, input), diameter = resolved.diameterCssPixels; pointDiameterNotice = resolved.diagnosedDefault ? '点の大きさを既定の3pxに戻しました。' : null;
       if (diameter === (pointDiameters.get(assetId) ?? 3)) return;
-      pointDiameters.set(assetId, diameter); configurePoints(); pickEpoch++; serial++; changed(); },
+      pointDiameters.set(assetId, diameter); configurePoints(); pickEpoch++; serial++; notify(); },
     setActive(next) {
       const activating=next&&!active,retained=Boolean(next&&active&&renderer&&camera&&!issue);
       if (!next) release(); active = next;
@@ -495,12 +529,8 @@ export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: 
       } catch (error) { coverageIssue = errorText(error); reportPickIssue(); return null; }
     },
     read() {
-      const project = (position: readonly [number, number, number]) => {
-        const p = new THREE.Vector3(...position); if (camera) { camera.updateMatrixWorld(true); p.project(camera); }
-        return { x: (p.x + 1) * width / 2, y: (1 - p.y) * height / 2,
-          visible: Boolean(camera && p.z >= -1 && p.z <= 1 && Math.abs(p.x) <= 1 && Math.abs(p.y) <= 1) };
-      };
-      const pins = display?.pins.map(pin => ({ id: pin.id, ...project(pin.position) })) ?? [];
+      camera?.updateMatrixWorld(true);
+      const pins = display?.pins.map(pin => ({ id: pin.id, ...projectPosition(pin.position) })) ?? [];
       let alphaPicking = false;
       for (const surface of resident.values()) if (surface.asset.visible && surface.dispose) surface.mesh.traverseVisible(node => {
         if (node instanceof THREE.Mesh && (Array.isArray(node.material) ? node.material : [node.material])
@@ -521,13 +551,13 @@ export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: 
           ...(display?.materialNotices ?? []), ...Object.values(display?.materials ?? {}).flatMap(m => 'issue' in m ? [m.issue] : []),
           ...Object.values(display?.savedMaterials ?? {}).flatMap(rows => Object.values(rows).flatMap(m => 'issue' in m ? [m.issue] : []))].filter(Boolean).join(' ') || null,
         dragging: dragging || !!navigation || !!gizmo?.dragging, navigating:!!navigation, camera:{position:[...pose.position],target:[...pose.target],up:[...pose.up]}, manipulating: !!gizmo?.dragging,
-        projection: pose.projection.kind, axis, pins, preview: display?.preview ? project(display.preview) : undefined };
+        projection: pose.projection.kind, axis, pins, preview: display?.preview ? projectPosition(display.preview) : undefined };
     },
     navigateCamera(event){
       if(event.phase==='end')return endNavigation(event.id);
       if(event.phase==='begin'){
         if(disposed||!active||!renderer||!camera||!controls||issue||contextLost||!display||dragging||navigation||gizmo?.dragging)return false;
-        navigation={id:event.id,kind:event.kind,controls,display};syncOrbit();serial++;changed();return true;
+        navigation={id:event.id,kind:event.kind,controls,display};syncOrbit();serial++;notify();return true;
       }
       const owner=navigation;
       if(!owner||owner.id!==event.id)return false;
@@ -535,7 +565,7 @@ export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: 
       if(!Number.isFinite(event.dx)||!Number.isFinite(event.dy))return false;
       if(owner.kind==='pan')controls.pan(event.dx,event.dy);
       else{controls.rotateLeft(2*Math.PI*event.dx/Math.max(1,height));controls.rotateUp(2*Math.PI*event.dy/Math.max(1,height));}
-      controls.update();changed();return true;
+      controls.update();if(!presentationListeners.size)notify();return true;
     },
     camera(intent) {
       if (!active || !renderer || issue || !display || dragging || navigation || gizmo?.dragging) throw new Error('3D表示を確認してください。');
@@ -543,7 +573,7 @@ export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: 
       if (intent.kind === 'recall') throw new Error('保存した視点は未接続です。');
       if (intent.kind === 'projection') pose = switchProjection(pose, intent.projection);
       else { if (!display.bounds) throw new Error('表示するモデルがありません。'); pose = fittedPose(display.bounds, pose, width / height, intent.kind === 'axis' ? intent.axis : undefined); }
-      axis = intent.kind === 'axis' ? intent.axis : null; installPose(); observePose(); serial++; changed();
+      axis = intent.kind === 'axis' ? intent.axis : null; installPose(); observePose(); serial++; notify();
     },
     capture() {
       if (!active || !renderer || issue || !display || dragging || navigation || gizmo?.dragging) throw new Error('3D表示を確認してください。');
@@ -565,21 +595,21 @@ export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: 
         try { renderFrame(); } catch (rollbackError) { fail(rollbackError); }
         throw e;
       }
-      backgrounds.set(display.sceneId, next); serial++; changed();
+      backgrounds.set(display.sceneId, next); serial++; notify();
     },
     recall(payload) {
       if (!active || !renderer || issue || !display || dragging || navigation || gizmo?.dragging) throw new Error('3D表示を確認してください。');
       const previousPose = pose, previousBackground = background, previousAxis = axis;
       try { useCapture(payload); installPose(); }
       catch (e) { pose = previousPose; background = previousBackground; axis = previousAxis; throw e; }
-      poses.set(display.sceneId, pose); backgrounds.set(display.sceneId, background); notice = null; serial++; changed();
+      poses.set(display.sceneId, pose); backgrounds.set(display.sceneId, background); notice = null; serial++; notify();
     },
     retry() { saved.retry?.(); if(blockedNext){this.update(blockedNext);ensure();return;} if (contextLost) throw new Error('描画環境の復旧を待って再試行してください。'); release(); issue = null; requestModels(display); ensure(); },
-    dispose() { disposed = true;unsubscribeTargets?.();unsubscribeResidents?.();unsubscribeAdmission?.(); release(); resize.disconnect(); canvas.removeEventListener('pointerdown', mouseNavigation, true);
+    dispose() { disposed = true;presentationListeners.clear();unsubscribeTargets?.();unsubscribeResidents?.();unsubscribeAdmission?.(); release(); resize.disconnect(); canvas.removeEventListener('pointerdown', mouseNavigation, true);
       canvas.removeEventListener('webglcontextlost', lost); canvas.removeEventListener('webglcontextrestored', restored); },
   };
   const unsubscribeResidents=saved.subscribe?.(()=>{if(disposed||!display&&!blockedNext)return;
-    if(!active){modelKey='';serial++;changed();return;}
-    try{viewport.update(blockedNext??display!);configurePoints();ensure();serial++;changed();}catch(error){fail(error);}});
+    if(!active){modelKey='';serial++;notify();return;}
+    try{viewport.update(blockedNext??display!);configurePoints();ensure();serial++;notify();}catch(error){fail(error);}});
   return viewport;
 };

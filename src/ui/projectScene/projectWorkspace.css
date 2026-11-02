@@ -240,6 +240,9 @@
 .lv-drawing-task > .lv-material-editor { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
 .lv-material-content { flex: 1 1 0; min-height: 0; overflow: auto; }
 .lv-drawing-task .lv-material-actions { position: static; flex: 0 0 auto; padding: 10px 0 0; }
+.lv-project-shell .lv-project-workspace .lv-material-primary { background: #3c4637; border-color: #3c4637; color: #fff; }
+.lv-project-shell .lv-project-workspace .lv-material-primary:hover:not(:disabled) { background: #303b2c; }
+.lv-project-shell .lv-project-workspace .lv-material-primary:disabled { background: #e4e4da; border-color: #c3c3b8; color: #62675b; }
 .lv-drawing-task > [aria-label="材質の更新候補"] { max-height: 35%; overflow: auto; }
 .lv-project-workspace .lv-project-marker[data-review="true"]::after { right: -1px; }
 .lv-camera-positions { position: absolute; top: 8px; right: 132px; z-index: 5; }

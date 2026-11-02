@@ -10,7 +10,7 @@ import { checkContentFacts } from '../domain/projectContentChecks';
 import { readProjectScene } from '../scene/projectProvider';
 import { sourceBlob, sourceStreamProof, equalSourceStreams } from './streamSource';
 import { readValidationInitialRecord, writeValidationInitial, validationInitialOrigin } from './creation';
-import { lociMyuRecipe, lociMyuJpegRecipe, lociMyuPhotoRecipe, lociMyuMaterialRecipe, lociMyuOpaqueMaterialRecipe,lociMyuStandardMaterialRecipe, type LociMyuRecipe, lociMyuEvidence, openLociMyuSource, planLociMyuSource, lociMyuByteProof, LociMyuPreflightError, type LociMyuSourcePlan, type OpenedLociMyuSource } from './lociMyuSource';
+import { lociMyuRecipe, lociMyuJpegRecipe, lociMyuPhotoRecipe, lociMyuMaterialRecipe, lociMyuOpaqueMaterialRecipe,lociMyuStandardMaterialRecipe,lociMyuImageRecipe, type LociMyuRecipe, lociMyuEvidence, openLociMyuSource, planLociMyuSource,planLociMyuSourceForRecipe, lociMyuByteProof, LociMyuPreflightError, type LociMyuSourcePlan, type OpenedLociMyuSource } from './lociMyuSource';
 import { mapLociMyuProject, lociMyuSourceKey, type LociMyuMappingEntry } from './lociMyuMapping';
 import type { PngDecoder } from './png';
 import type { JpegDecoder } from './jpeg';
@@ -25,7 +25,7 @@ interface ConversionReceipt {
 const receiptPath = (fs: ProjectWorkspaceFS) => metadataPath(fs, 'locimyu-conversion.json');
 const sourcePath = (fs: ProjectWorkspaceFS) => metadataPath(fs, 'locimyu-conversion-source.zip');
 export const hasLociMyuConversion = async (fs: ProjectWorkspaceFS, checkBoundInitial = true) => !!await fs.readStream(receiptPath(fs)) || !!await fs.readStream(sourcePath(fs)) ||
-  checkBoundInitial && [lociMyuRecipe, lociMyuJpegRecipe, lociMyuPhotoRecipe, lociMyuMaterialRecipe, lociMyuOpaqueMaterialRecipe,lociMyuStandardMaterialRecipe].includes(await validationInitialOrigin(fs) as LociMyuRecipe);
+  checkBoundInitial && [lociMyuRecipe, lociMyuJpegRecipe, lociMyuPhotoRecipe, lociMyuMaterialRecipe, lociMyuOpaqueMaterialRecipe,lociMyuStandardMaterialRecipe,lociMyuImageRecipe].includes(await validationInitialOrigin(fs) as LociMyuRecipe);
 const fail = () => fileError('LociMyuの変換記録が不足しているか一致しません。保持した記録は上書きしていません。');
 const reportBlob = (report: JsonObject) => new Blob([json(lociMyuEvidence(report))], { type: 'application/json' });
 const ascii = (value: unknown) => json(lociMyuEvidence(value)).replace(/[\u007f-\uffff]/g, c => `\\u${c.charCodeAt(0).toString(16).padStart(4, '0')}`);
@@ -48,7 +48,7 @@ async function checkReceipt(r: ConversionReceipt, projectId: string) {
   const proof = (p: unknown): boolean => keys(p, ['byteLength', 'digest']) && Number.isSafeInteger((p as ConversionReceipt['original']).byteLength) &&
     (p as ConversionReceipt['original']).byteLength > 0 && /^[0-9a-f]{64}$/.test((p as ConversionReceipt['original']).digest);
   if (!keys(r, ['recipe', 'conversionId', 'projectId', 'original', 'initial', 'selection', 'workbook', 'confirmation', 'title', 'fingerprints', 'inventory', 'sourceIdentities', 'mapping', 'report']) ||
-    ![lociMyuRecipe, lociMyuJpegRecipe, lociMyuPhotoRecipe, lociMyuMaterialRecipe, lociMyuOpaqueMaterialRecipe,lociMyuStandardMaterialRecipe].includes(r.recipe) || !/^[0-9a-f]{32}$/.test(r.conversionId) || r.projectId !== projectId || projectId !== `prj_${r.conversionId}` || !proof(r.original) ||
+    ![lociMyuRecipe, lociMyuJpegRecipe, lociMyuPhotoRecipe, lociMyuMaterialRecipe, lociMyuOpaqueMaterialRecipe,lociMyuStandardMaterialRecipe,lociMyuImageRecipe].includes(r.recipe) || !/^[0-9a-f]{32}$/.test(r.conversionId) || r.projectId !== projectId || projectId !== `prj_${r.conversionId}` || !proof(r.original) ||
     !keys(r.initial, ['byteLength', 'digest', 'proof']) || !proof({ byteLength: r.initial.byteLength, digest: r.initial.digest }) || !Number.isSafeInteger(r.selection) || r.selection < 0 ||
     !keys(r.workbook, ['path', 'byteLength', 'digest']) || typeof r.workbook.path !== 'string' || typeof r.title !== 'string' || !Array.isArray(r.mapping) || !r.mapping.length) return fail();
   const ids = new Set<string>(), hashes = new Map<string, string>();
@@ -75,11 +75,11 @@ function makeReport(original: ConversionReceipt['original'], evaluated: Awaited<
     targetIdentity: source?.proof.identity ?? null, initialProof: source?.proof ?? null, capturedBeforePublication: true,
     originalExcludedFromExports: true, sourceAndReportMustBeSavedSeparately: true,
     ...(material ? { materialEffects, materialMappings: source ? mapped!.materialMappings : [] } : {}),
-    ...(plan?.recipe===lociMyuStandardMaterialRecipe?{materialNormalization:plan.materialNotices??[]}: {}) }) as JsonObject;
+    ...((plan?.recipe===lociMyuStandardMaterialRecipe||plan?.recipe===lociMyuImageRecipe)?{materialNormalization:plan.materialNotices??[]}: {}) }) as JsonObject;
 }
 async function verifyRetained(r: ConversionReceipt, source: ProjectMetadataSource, opened: OpenedLociMyuSource) {
   if (source.semanticProfile !== 'map2') return fail(); await checkReceipt(r, source.proof.identity.projectId as string);
-  const evaluated = await planLociMyuSource(opened, r.selection, r.title, r.confirmation !== null), plan = evaluated.plan;
+  const evaluated = await planLociMyuSourceForRecipe(opened, r.selection, r.title, r.confirmation !== null,r.recipe), plan = evaluated.plan;
   if (!plan || plan.recipe !== r.recipe || json(source.proof) !== json(r.initial.proof) || json(plan.workbook) !== json(r.workbook) || json(plan.confirmation) !== json(r.confirmation) ||
     json(plan.fingerprints) !== json(r.fingerprints) || json(plan.inventory) !== json(r.inventory)) return fail();
   const expected = await mapLociMyuProject(plan, r.conversionId, r.original.digest, source.proof.identity);
@@ -157,9 +157,9 @@ export async function prepareLociMyuConversion(input: Blob, limits: FileValidati
         } };
       }
       const materialIssue = evaluated.base.issues.find(issue => issue.severity === 'blocking');
-      return { relation: evaluated.relation, summary: { ...report.converted as JsonObject,
+      return { relation: evaluated.relation, imageOmissions:evaluated.imageOmissions, summary: { ...report.converted as JsonObject,
         missingIdRows: evaluated.base.accounting.missingIds,
-        unattachedImages: evaluated.base.issues.filter(i => i.severity === 'warning' && i.field === 'imageFileId').length,
+        unattachedImages: evaluated.imageOmissions.length,
         approximateViews: evaluated.base.issues.filter(i => i.severity === 'warning' && i.field === 'projection').length,
         sourceOnlyViews: evaluated.base.issues.filter(i => i.severity === 'warning' && i.field === 'view').length,
         blockingReason: materialIssue?.reason ?? null,

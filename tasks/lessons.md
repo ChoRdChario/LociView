@@ -133,6 +133,16 @@ Read only the relevant topic, not every historical incident.
   and creation/reopen path. A similarly named or synthetic in-test fixture is not
   evidence for the file handed to the tester; keep local-only samples out of public builds.
 
+  2026-11-02 delivery refinement: verify the exact HTML script/style/manifest
+  references and build base at the delivered URL, then load the actual home in a
+  fresh dedicated browser. HTTP200 and hashing files by guessed root paths do not
+  establish a rendered app. A later directory-base test build may overwrite the
+  output; retain a base-matched immutable artifact and explicit preview base.
+  A copied persistent profile can serve old cached HTML even with
+  `serviceWorkers: 'block'`. Pin the actual first HTML and loaded asset response
+  body hashes and controller; use a fresh dedicated profile or explicit SW bypass
+  for an online probe. Offline cold acceptance requires normal SW operation and
+  actual first-navigation byte verification, with the server unavailable.
 ## Historical topic lookup
 
 The [original lesson record](../docs/history/development-through-2026-09-14/tasks/lessons.md)

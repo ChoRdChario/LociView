@@ -88,6 +88,9 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   workspaceLabel.textContent = 'ファイルを選択'; workspaceInput.type = 'file'; workspaceInput.multiple = true; workspaceInput.setAttribute('aria-label', 'ファイルを選択'); workspaceLabel.append(workspaceInput);
   openFile.type = 'submit'; openFile.textContent = 'ファイルを開く'; workspaceForm.append(workspaceLabel, openFile,fallback);
   const conversionPanel = document.createElement('section'), conversionNote = document.createElement('p'), conversionHelp = document.createElement('p');
+  const imageOmissions=document.createElement('details'),imageOmissionsSummary=document.createElement('summary'),imageOmissionsList=document.createElement('ul');
+  imageOmissions.className='lv-conversion-images';imageOmissions.hidden=true;imageOmissions.append(imageOmissionsSummary,imageOmissionsList);
+  const clearImageOmissions=(reset=false)=>{imageOmissions.hidden=true;imageOmissionsList.replaceChildren();if(reset)imageOmissions.open=false;};
   const materialNotice=createMaterialConversionNotice(document,ports.smoothDisplay);
   const convert = document.createElement('button'), cancelConversion = document.createElement('button');
   convert.type = cancelConversion.type = 'button'; convert.textContent = '新しいプロジェクトに変換'; cancelConversion.textContent = '選択を取り消す';
@@ -100,7 +103,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   conversionTitleLabel.textContent = '変換後のプロジェクト名'; conversionTitle.setAttribute('aria-label', '変換後のプロジェクト名'); conversionTitleLabel.append(conversionTitle);
   relation.type = 'checkbox'; relation.setAttribute('aria-label', '表と視点・材質の関連付けを確認'); relationLabel.textContent = '表と視点・材質の関連付けを確認'; relationLabel.className='lv-conversion-relation';relationLabel.append(relation);
   previewAgain.type = saveReport.type = 'button'; previewAgain.textContent = '変換内容を確認'; saveReport.textContent = '変換の説明を保存';
-  lociChoices.append(workbookLabel, conversionTitleLabel, relationNote, relationLabel, previewAgain); lociChoices.hidden = true; conversionPanel.replaceChildren(lociChoices, conversionNote, materialNotice.root,conversionHelp, saveReport, convert, cancelConversion);
+  lociChoices.append(workbookLabel, conversionTitleLabel, relationNote, relationLabel, previewAgain); lociChoices.hidden = true; conversionPanel.replaceChildren(lociChoices, conversionNote, imageOmissions,materialNotice.root,conversionHelp, saveReport, convert, cancelConversion);
   const coldReport = document.createElement('button'),coldReportActions=document.createElement('div'),coldReportStatus=document.createElement('p'); coldReport.type = 'button'; coldReport.textContent = '変換の説明を保存'; coldReport.hidden = true;
   coldReportActions.className='lv-file-source-actions';coldReportStatus.className='lv-operation-status';coldReportStatus.setAttribute('role','status');coldReportActions.append(coldReport,coldReportStatus);root.append(coldReportActions);
   const showColdReport=(show:boolean)=>{coldReport.hidden=!show;coldReportActions.hidden=!show;};showColdReport(false);
@@ -135,6 +138,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   let reportUrl: string | undefined;
   let mounted = false, resumedLast = false, confirmingResume = false, lastRemembered: string | undefined;
   let catalog: readonly ValidationProjectEntry[] = [];
+  const projectOpenButtons=new Set<HTMLButtonElement>();
   const changed = () => !!workspace?.hasChanges() || !!reviewWorkspace?.hasChanges() || !!receiveTools?.hasChanges() || !!host?.hasPending() || !!firstRecovery;
   const openNormal = async (...args: Parameters<ValidationWorkspacePorts['open']>): Promise<ValidationNormalHost> => {
     const opened = await ports.open(...args); if ('kind' in opened) { await opened.dispose(); throw Error('バックアップの初回復元を一覧から再開してください。'); } return opened;
@@ -143,6 +147,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     // Keep progress/errors readable beside the current decision, outside the
     // temporarily inert forms. The existing execute fence still owns actions.
     navigation.inert = false; workspaceForm.inert = form.inert = list.inert = busy; refresh.disabled = busy;
+    for(const button of projectOpenButtons)button.disabled=busy||composing;
     if(navigation.hidden){if(status.parentElement!==root)root.insertBefore(status,navigation);}
     else navigation.insertBefore(status,form.hidden?form:listHeading);
     openFile.disabled = create.disabled = cancelConversion.disabled = busy || composing;
@@ -216,7 +221,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   const updateList = async () => {
     const entries = await ports.list(); if (disposed) return;
     catalog = entries;
-    list.replaceChildren();
+    projectOpenButtons.clear();list.replaceChildren();
     if (!entries.length) { list.textContent = 'このブラウザの再開用データはありません。'; return; }
     for (const item of entries) {
       const row = document.createElement('p'), name = document.createElement('span');
@@ -224,6 +229,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
       row.append(name);
       for (const mode of item.firstRestore === 'terminal' ? [] : item.firstRestore === 'pending' ? ['edit'] as const : ['view', 'edit'] as const) {
         const open = document.createElement('button'); open.type = 'button';
+        open.disabled=busy||composing;projectOpenButtons.add(open);
         open.textContent = item.firstRestore === 'pending' ? '復元を再開' : mode === 'view' ? '閲覧で開く' : '編集で開く';
         open.addEventListener('click', () => execute(async () => { ensureMayLeaveSelection(); await closeCurrent(); await openProject(item.run, undefined, mode); }));
         row.append(open);
@@ -421,9 +427,9 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     if (state.phase === 'terminal') button('一覧に戻る', () => leave(false));
     panel.append(summary, note, commands); content.replaceChildren(panel); controls();
   };
-  const invalidateLoci = () => { lociDraft++; lociEvaluation = null; lociDecision = undefined; conversion = null;materialNotice.render();
+  const invalidateLoci = () => { lociDraft++; lociEvaluation = null; lociDecision = undefined; conversion = null;materialNotice.render();clearImageOmissions();
     if (lociPreview) conversionNote.textContent = '入力が変わりました。「変換内容を確認」で確認し直してください。'; controls(); };
-  const clearConversion = () => { const old = lociPreview; legacyFile=undefined;fallback.hidden=true; lociDraft++; lociDecision = undefined; conversion = null; lociPreview = null; lociEvaluation = null; lociChoices.hidden = true; conversionPanel.hidden = true;materialNotice.render(); void old?.dispose().catch(() => {}); };
+  const clearConversion = () => { const old = lociPreview; legacyFile=undefined;fallback.hidden=true; lociDraft++; lociDecision = undefined; conversion = null; lociPreview = null; lociEvaluation = null; lociChoices.hidden = true; conversionPanel.hidden = true;materialNotice.render();clearImageOmissions(true); void old?.dispose().catch(() => {}); };
   const clearSelection = () => {
     selectionAbort?.abort(); selectionAbort = undefined; nativeSelectionChecking = false;
     selectionGeneration++; creationDraft++; selectionPending = false; rawSelection = undefined; creationAttempt = undefined; selectionHost = undefined;
@@ -453,10 +459,14 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     relationNote.textContent = evaluated.relation.kind === 'confirmation-required' ? `${evaluated.relation.relations.map(r => `${r.sheetGid} → ${r.sheetName}`).join(' / ')}。関連付けを確認すると、対応する視点・材質を引き継ぎます。` :
       evaluated.relation.kind === 'unavailable' ? '表との対応を確認できない視点・材質は有効にしません。' : '';
     const n = evaluated.summary; conversionNote.textContent = evaluated.blocked ? `この内容は変換できません。${n.blockingReason ?? '問題の詳細は説明ファイルで確認できます。'}` : `LociMyuファイル：モデル ${n.models}・シーン ${n.scenes}・キャプション ${n.captions}・メディア ${n.media}・視点 ${n.views}`;
+    imageOmissionsSummary.textContent=`添付できない画像（${evaluated.imageOmissions.length}件）`;
+    for(const item of evaluated.imageOmissions){const li=document.createElement('li'),caption=document.createElement('strong'),context=document.createElement('p'),reason=document.createElement('p');
+      caption.textContent=item.caption||'題名なしの記録';context.textContent=`${item.scene}・${item.row}行目／${item.filename??'ファイル名を確認できません'}`;reason.textContent=item.reason;
+      li.append(caption,context,reason);imageOmissionsList.append(li);}
+    imageOmissions.hidden=evaluated.imageOmissions.length===0;
     if (!evaluated.blocked) {
       const notes: string[] = [];
       if (Number(n.missingIdRows) > 0) notes.push(`IDのない${n.missingIdRows}行は記録にしません`);
-      if (Number(n.unattachedImages) > 0) notes.push(`画像${n.unattachedImages}件は添付できません`);
       if (Number(n.approximateViews) > 0) notes.push(`視点${n.approximateViews}件の表示幅を近似します`);
       if (Number(n.sourceOnlyViews) > 0) notes.push(`${evaluated.relation.kind === 'confirmation-required' && !relation.checked ? '関連付けを確認していない' : '関連付けや設定を確認できない'}視点${n.sourceOnlyViews}件は引き継ぎません`);
       if (notes.length) conversionNote.textContent += `。要確認：${notes.join('。')}。元のZIPに保持します`;
@@ -713,5 +723,5 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
       stopPresentation();
       try { await operation; } catch { /* Original input and saved failure are never acknowledged here. */ }
       try { await creationAttempt?.candidate?.dispose(); }
-      finally { await lociPreview?.dispose(); lociPreview = null; await closeCurrent(); offline?.dispose(); root.remove(); } }, get selected() { return selected; } };
+      finally { await lociPreview?.dispose(); lociPreview = null; await closeCurrent(); offline?.dispose(); projectOpenButtons.clear();root.remove(); } }, get selected() { return selected; } };
 }

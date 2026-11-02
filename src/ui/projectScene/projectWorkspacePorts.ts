@@ -76,6 +76,8 @@ export interface WorkspaceViewportState {
   readonly comparison?: { token: string; captionId: string; anchor: Anchor } | null;
 }
 export interface WorkspaceViewport {
+  /** Visual output of the exact installed state; contains no command/capture proof. */
+  observePresentation?(listener: (frame: WorkspaceViewportPresentation) => boolean): () => void;
   update(state: WorkspaceViewportState): void;
   pick(xCss: number, yCss: number, assetId?: string, directCreation?: boolean): { target: WorkspaceSurface; position: Point3; point?: { readonly pointIndex: number } } | null;
   setPointDiameter?(assetId: string, diameter: number): void;
@@ -93,6 +95,12 @@ export interface WorkspaceViewport {
   navigateCamera?(event:CameraNavigationEvent):boolean;
   background(background: WorkspaceViewPayload['background'], verify: () => void): void;
   dispose(): void;
+}
+export interface WorkspaceViewportPresentation {
+  readonly input: WorkspaceViewportState; readonly generation: number;
+  readonly width: number; readonly height: number; readonly camera: CameraOrientation;
+  readonly axis: string | null; readonly navigating: boolean;
+  readonly pins: readonly { readonly id: string; readonly x: number; readonly y: number; readonly visible: boolean }[];
 }
 export interface WorkspaceFileInteraction {
   readonly interactionPending: boolean | string | null;

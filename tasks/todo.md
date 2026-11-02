@@ -57,7 +57,74 @@ unchanged-feature-classification checks pass; independent review has no findings
 No runtime change or new capacity guarantee; no runtime suite is needed for this
 documentation checkpoint.
 
-## Current boundary —pin, camera and Caption/drawing comfort
+## Current boundary —Drawing, camera synchronization and image relationships
+
+The PO-requested connected group is implemented: organized Drawing targets and
+appearance controls, camera-frame pin/window presentation, and the explicitly
+approved [07o](../docs/specs/07o-locimyu-image-extension-link-proposal.md) extension-
+only relationship rule for a separate new conversion. Existing Projects/edits and
+recipe1–6 replay remain unchanged. No new dependency, storage schema, renderer
+method, numeric limit, write/recovery lifetime, adoption or release is introduced.
+
+Drawing uses one target group, aligned maximum-two-column appearance fields,
+full-width advanced disclosure and the existing Apply/Cancel footer; narrow
+panels use one column. Scrub/live preview/raw precision/IME/draft/token/Scene and
+Session ownership remain. Actual normal/narrow draft/Cancel/scrub/Esc/Apply/file/
+reopen and small Mesh/GS checks pass, with independent code/rendered review. The
+subsequent image/report/ephemeral-display differences leave camera/Drawing/JPEG
+and Session/package authority code unchanged, as qualified by saved manifests.
+
+The source-qualified matched Ki84 camera pair observes GL-call-end to marker
+completion49.7→0.7ms median (p95 75.6→1.7ms); candidate combined draw/DOM callback
+2.4ms median/p95 4.1ms. All64 marker nodes and172 existing OPFS payloads remain
+unchanged with no readback/decode/Blob/hash work. This is one CPU/DOM pair, not GPU
+completion or general FPS; the cached-runtime attempts remain excluded evidence.
+The actual PC deferred bridge and lifecycle/import-boundary checks also pass.
+
+Real Ki84 conversion admits42 media/46 attachments:19 new references to16 bodies.
+An independent raw-source-to-archive association oracle verifies all37 originally
+missing references;18 remain excluded (15 HEIC, two source ID/name mismatches,
+one structurally nonconforming JPEG). Every one of the43 model/image payloads
+matches the original bytes. A separate new Project preserves the old Project's
+edited body/materials. New-image display, viewer zoom/pan, body edit, real backup
+and independent persistent-profile restore pass; the original ZIP is unchanged.
+The whole legacy ZIP/unattached images stay outside ordinary exports, so retain
+that ZIP and the separate report. The JPEG validator is unchanged; a separately
+created display-derived PNG is a manual option, not an automatic attachment or
+new photo-admission policy. See [T.81 B.2.1](https://www.w3.org/Graphics/JPEG/itu-t81.pdf)
+and [07d](../docs/specs/07d-jpeg-project-scene-proposal.md).
+
+Final source345d adds a typed, nonpersistent18-entry omission disclosure with
+Caption/Scene-row/filename/reason and truthful busy/IME native readiness for home
+row buttons. Independent source/actual-image review is clean, typecheck and16
+focused cases pass, and Desktop/offline builds pass. Actual old/new home keyboard
+opening,44px inline summary and its18 explanations pass; the small report is byte-
+identical to the preceding core candidate. Normal SW update→complete close→server-
+off offline cold verifies the final HTML/runtime bytes, saved body, photo pixels
+and nonblank3D drawing, with no page errors/remote requests. Earlier failed home/File
+observations and the first CSS metric failure remain separate failed evidence.
+
+The source/test tree is frozen (719 files plus supporting build inputs). Final
+unfiltered installed Vitest passes147 files/3272 tests with21 known TODOs in
+1457.87s, actual Exit0. The equivalent required serial sequence completes with
+every Exit0: remaining normal/harness/validation builds, offline isolation,
+BASE_PATH normal build and HEIC isolation, plus exact-source/settings successful
+typecheck/Desktop/offline builds reused from this same final tree. This is not a
+literal check:checkpoint invocation. No retries, exclusions or timeout/assertion
+relaxation were introduced, and post-check source/supporting hashes match.
+Root now owns staging/privacy review, g0 checkpoint/push, actual NEW Linux CI and
+the verified root-base4191 preview update; these delivery steps remain pending.
+Personal4182/Chrome, original profiles, private audit block and dated prior CI
+results remain intact. Record/stage-only changes require no runtime repetition.
+
+Short milestone audit: g0/ee460a9→tested345d remains the connected user-workflow
+critical path; implementation, actual file/cold acceptance and final Windows checks are closed;
+Git/CI/preview delivery remains. Next work is unresolved Ki84 save-stage and
+previously recorded large-GS copy latency, plus short/high-zoom editing chrome
+(37px body viewport in the earlier 720×500/DPR2 check), not a general comfort/performance guarantee. Stop only affected
+work for a genuine policy/authority conflict or newly evidenced failure.
+
+## Completed boundary —pin, camera and Caption/drawing comfort
 
 PO prioritizes the six connected UI repairs in the workspace design and PCQ23–28:
 unobstructed pin roots/outlined window lines; ordinary left-orbit/right-pan;
@@ -71,9 +138,10 @@ No new schema, dependency, renderer method, numeric policy or deployment.
 Focused checks, dedicated Chromium/file/reopen and copied private Ki84 layout
 acceptance are complete. Final whole Desktop41 and normal-SW offline5 pass, followed
 by the required Windows checks on the aligned test tree. Keep the original seed,
-personal4182/Chrome, private audit block and prior CI-result notes intact. Finish
-with independent index/privacy verification, a suitable g0 checkpoint and actual
-Linux CI; no runtime repetition for record/stage-only changes. Broader Ki84 save
+personal4182/Chrome, private audit block and prior CI-result notes intact. Independent
+index/privacy verification, the g0 commit/Push and actual Linux CI are complete.
+These result notes remain local, without a doc-only commit/CI loop or runtime
+repetition for record/stage-only changes. Broader Ki84 save
 latency remains follow-up work. No timeout/assertion relaxation or extra large
 file roundtrip per control; stop only a genuinely new authority/policy decision.
 
@@ -140,7 +208,7 @@ work received exact ports/specifications and independent review before sensitive
 edits, grouped with intrinsic Undo sizing and the two fixture alignments. Failed
 attempts and fresh/write/closing/source fences were retained. The resulting final
 tree subsequently passed whole41, offline5 and the Windows required sequence as
-recorded below; actual Linux CI remains the delivery step. No timeout/assertion/
+recorded below; Linux CI was still the delivery step at that audit. No timeout/assertion/
 exclusion changes, helper-level full-suite repetitions or old-source PASS
 substitution were used.
 
@@ -200,20 +268,38 @@ The required checks complete as an equivalent serial sequence, not a literal
 check:checkpoint invocation: typecheck, unfiltered root, normal/harness/validation/
 Desktop/offline builds, offline isolation, BASE_PATH=/LociView/ normal build and
 HEIC isolation all Exit0. Source/test identity is unchanged after all ten steps.
-New Linux CI is pending the reviewed g0 checkpoint. The initial35/6 run and every
-failed/focused/diagnostic attempt remain separately qualified; no matched speed
-percentage, environment-only cause or general no-regression guarantee is claimed.
+The reviewed g0 checkpoint is committed/pushed. Its exact checkout passes
+[actual Linux CI](https://github.com/ChoRdChario/LociView/actions/runs/41389266006):
+147files/3253PASS/21TODO (640.01s), with all steps successful, including typecheck,
+BASE_PATH=/LociView/ build and HEIC isolation. The owned
+[4191 preview](http://127.0.0.1:4191/) now serves the immutable Desktop41-tested
+`final-tested-offline` root-base build, explicitly started with `--base /`.
+The delivery repair on2026-11-02 corrects a blank page: the post-offline5
+snapshot had `/LociView/` HTML references and was incorrectly served at `/`.
+HTTP200 and hashes checked by filenames alone missed the actual script failure.
+Corrected HTML references and all20 HTTP resource bytes now match; a fresh
+dedicated Chromium displays the home/file chooser with no failed requests or
+page errors (`link-check-fixed.json`). The directory-base offline5 snapshot stays
+separate evidence. Personal4182/Chrome and existing Project data are untouched.
+The initial35/6 run and every failed/focused/diagnostic attempt
+remain separately qualified; no matched speed percentage, environment-only cause
+or general no-regression guarantee is claimed.
 
 Milestone audit: g0/798 to the fixed browser source and test-only observation
 alignment closes the six UI repairs and bounded output deadlines, with41+5 and
 Windows checks passed; no dependency/schema/migration/adoption/release change.
-Only index/privacy/checkpoint and actual Linux CI remain in this unit, followed
-by the retained save-stage and short-height editing refinements.
+Index/privacy verification, normal g0 delivery, actual Linux CI and the owned
+preview update are complete. Next are the retained save-stage and short-height
+editing refinements; no release or public deployment was performed.
 
 Follow-up UI refinement: short/high-magnification editing still has only37px of
 body content viewport in the Ki84 DPR2 sample. Scroll access and safe Apply/Cancel
 work, but this is cramped rather than broad comfort acceptance. Reduce surrounding
-chrome in a later bounded UI unit; no further source/test change in this frozen run.
+chrome in a later bounded UI unit. The final500k GS Review-copy still takes191.549s
+to its editor and201.781s to display, within the original240s assertion but far from
+a comfortable wait. Continue stage measurement for that path and the retained
+Ki84 save wait, without treating environment alone as the cause or claiming a
+general no-regression result. No further source/test change in this completed unit.
 
 
 ## Completed boundary —Windows heavy workflows and daily-use latency

@@ -265,6 +265,11 @@ matches remain inactive and reportable.
 
 ### 4.2 Media relationships
 
+The exact rule below remains frozen for Native and ProjectScene recipes1–6.
+The PO-approved [07o companion](07o-locimyu-image-extension-link-proposal.md)
+adds its explicit extension-only exception solely to a separate new ProjectScene
+recipe7 conversion; existing Projects, identities and receipts are not reinterpreted.
+
 The optional file-ID map is source-authoritative for one Caption attachment
 only when one `LociMyuTrimV1` file ID maps to one distinct
 `LociMyuTrimV1` filename, that filename maps back to only that file ID, and the

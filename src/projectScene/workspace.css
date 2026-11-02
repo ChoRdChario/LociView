@@ -208,6 +208,10 @@
 .lv-validation-home h2 { margin-top: 28px; font-size: 17px; font-weight: 500; }
 .lv-validation-home form { display: grid; gap: 14px; margin: 24px 0; }
 .lv-validation-home label { display: grid; gap: 6px; }
+.lv-conversion-images { margin: 16px 0; overflow-wrap: anywhere; }
+.lv-conversion-images > summary { min-height: 44px; padding: 10px 0; box-sizing: border-box; cursor: pointer; }
+.lv-conversion-images li { margin: 14px 0; }
+.lv-conversion-images li p { margin: 4px 0; }
 .lv-validation-home label.lv-conversion-relation { display: flex; align-items: center; gap: 10px; min-height: 44px; }
 .lv-validation-home .lv-conversion-relation input[type="checkbox"] { order: -1; width: 18px; height: 18px; min-height: 0; padding: 0; flex: none; }
 .lv-file-source-actions { margin-top: 16px; }

@@ -158,6 +158,8 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
     createViewport(canvas, update, propose, proposeModel): WorkspaceViewport {
       let state: WorkspaceViewportState | undefined, closed = false, rendered: EditableDisplay | undefined, pointerHeld = false;
       let renderedInput = '';
+      let navigationOwner: { id:string; token:string; scene:string; display:EditableDisplay } | undefined;
+      const presentationStops=new Set<()=>void>();
       const runtime = factory(canvas, update, (target, position, phase) => {
         if (!state?.pin || rendered?.materialPreview || state.readOnly || host.authority.readOnly || target.token !== read().token ||
           JSON.stringify(target) !== JSON.stringify(state.pin.target)) return false;
@@ -197,6 +199,21 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
       };
       mainRuntime=runtime;
       return {
+        observePresentation(listener) {
+          let lastGeneration=-1;
+          const stop=runtime.observePresentation?.(frame=>{
+            const input=state;
+            if(closed||!input?.available||input.visible===false||rendered!==frame.display||input.token!==frame.display.token||
+              input.sceneId!==frame.display.sceneId||frame.generation<=lastGeneration||!Number.isSafeInteger(frame.generation))return false;
+            if(!frame.pins.every(pin=>Number.isFinite(pin.x)&&Number.isFinite(pin.y)))return false;
+            const accepted=listener({input,generation:frame.generation,width:frame.width,height:frame.height,camera:frame.camera,
+              axis:frame.axis,navigating:frame.navigating,pins:frame.pins});
+            if(accepted)lastGeneration=frame.generation;
+            return accepted&&state===input&&!closed&&rendered===frame.display;
+          });
+          if(!stop)return()=>{};
+          const unsubscribe=()=>{stop();presentationStops.delete(unsubscribe);};presentationStops.add(unsubscribe);return unsubscribe;
+        },
         update(next) {
           if (closed) return; state = next; viewportScene = next.sceneId; refreshPreview?.();
           const snapshot = host.authority.read();
@@ -275,11 +292,22 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
           return { camera: readProjectCamera(payload.camera) as unknown as import('../domain/values').JsonObject, background: readSolidBackground(payload.background) }; },
         recall(payload) { if (!runtime.recall) throw Error('視点を呼び出せません。'); runtime.recall({ camera: readProjectCamera(payload.camera), background: readSolidBackground(payload.background) }); },
         viewCamera: intent => runtime.camera(intent),
-        get navigateCamera(){if(!runtime.navigateCamera)return undefined;return(event:Parameters<NonNullable<ProjectViewport['navigateCamera']>>[0])=>{if(event.phase==='end')return runtime.navigateCamera?.(event)??false;
-          if(closed||!state||pointerHeld||state.windowMoving||state.token!==read().token||!observation().cameraReady)return false;
-          return runtime.navigateCamera?.(event)??false;};},
+        get navigateCamera(){if(!runtime.navigateCamera)return undefined;return(event:Parameters<NonNullable<ProjectViewport['navigateCamera']>>[0])=>{
+          if(event.phase==='end'){navigationOwner=undefined;return runtime.navigateCamera?.(event)??false;}
+          if(event.phase==='move'){
+            const owner=navigationOwner;
+            if(!owner||event.id!==owner.id||closed||!state?.available||state.visible===false||pointerHeld||state.windowMoving||
+              state.token!==owner.token||state.sceneId!==owner.scene||rendered!==owner.display){
+              if(owner)runtime.navigateCamera?.({phase:'end',id:owner.id});navigationOwner=undefined;return false;
+            }
+            return runtime.navigateCamera?.(event)??false;
+          }
+          if(closed||!state||pointerHeld||state.windowMoving||state.token!==read().token||!observation().cameraReady||!rendered)return false;
+          const accepted=runtime.navigateCamera?.(event)??false;
+          if(accepted)navigationOwner={id:event.id,token:state.token,scene:state.sceneId,display:rendered};return accepted;
+        };},
         background(input, verify) { if (!runtime.setBackground) throw Error('背景を変更できません。'); runtime.setBackground(input, verify); },
-        dispose() { if (!closed) { closed = true;if(mainRuntime===runtime)mainRuntime=undefined; runtime.setActive(false); runtime.dispose(); } },
+        dispose() { if (!closed) { closed = true;navigationOwner=undefined;for(const stop of [...presentationStops])stop();if(mainRuntime===runtime)mainRuntime=undefined; runtime.setActive(false); runtime.dispose(); } },
       };
     },
     });

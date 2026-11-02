@@ -52,8 +52,9 @@ function host(initial = fixture(),direct=false, frames?: Map<number, FrameReques
   controls.render(context); const root = record(controls.root), content=root.children.find(n=>n.className==='lv-material-content')!, choices = content.children[0]!, actions = root.children.find(n => n.className === 'lv-material-actions')!, confirmation = root.children.find(n => n.getAttribute('aria-label') === '操作の確認')!;
   const descendants = (node: ReturnType<typeof record>): ReturnType<typeof record>[] => [node,...node.children.flatMap(descendants)];
   const fields = new Map(materialFields.map(field => [field, descendants(content.children.find(n => n.className === 'lv-material-fields')!).find(node=>node.attributes.get('aria-label')===materialFieldLabels[field])!]));
-  return { document, controls, root, content, fields, plans, model: choices.children[0]!.children[0]!, surface: choices.children[1]!.children[0]!, scope: choices.children[2]!.children[0]!,
-    status: content.children[1]!, observed: content.children[2]!, impact: content.children[3]!, begin: content.children.find(n => n.tag === 'button' && n.textContent === '設定を編集')!, apply: actions.children[0]!, cancel: actions.children[1]!, remove: actions.children[2]!, retry: actions.children[3]!, review: actions.children[4]!,
+  const choice = (name: string) => descendants(choices).find(n => n.tag === 'select' && n.getAttribute('aria-label') === name)!;
+  return { document, controls, root, content, fields, plans, model: choice('モデル'), surface: choice('マテリアル'), scope: choice('適用範囲'),
+    status: content.children[1]!, observed: content.children.find(n=>n.className==='lv-material-origin')!, impact: choices.children.find(n=>n.className==='lv-material-impact')!, begin: content.children.find(n => n.tag === 'button' && n.textContent === '設定を編集')!, apply: actions.children[0]!, cancel: actions.children[1]!, remove: actions.children[2]!, retry: actions.children[3]!, review: actions.children[4]!,
     confirmation, confirm: confirmation.children[1]!, get context() { return context; }, render(next: MaterialContext) { if (controls.render(next)) context = next; } };
 }
 

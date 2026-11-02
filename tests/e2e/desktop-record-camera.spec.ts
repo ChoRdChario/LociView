@@ -55,7 +55,27 @@ test('record list, pin actions and direct camera navigation remain coherent thro
     const after=await backup('after-camera');expect(after.identity).toEqual(before.identity);expect(after.changes).toEqual(before.changes);
     await revealCameraPositions(p);await p.getByRole('button',{name:'開始視点を記録',exact:true}).click();await ready('開始視点を記録しました。');await expect(p.getByRole('button',{name:'開始視点を更新',exact:true})).toBeEnabled();await expect(p.getByLabel('記録した視点',{exact:true})).toHaveCount(0);await p.locator('.lv-camera-positions > summary').click();
     await task('描画');const drawing=p.getByRole('region',{name:'材質',exact:true});await drawing.getByLabel('モデル',{exact:true}).selectOption({label:'模型A.glb'});const face=drawing.getByLabel('マテリアル',{exact:true});await face.selectOption((await face.locator('option').evaluateAll(nodes=>nodes.map(n=>(n as HTMLOptionElement).value).find(Boolean)))!);await expect(drawing.getByRole('button',{name:'設定を編集',exact:true})).toBeHidden();await drawing.getByLabel('照明',{exact:true}).selectOption('unlit');
-    const opacity=drawing.getByLabel('不透明度（%）',{exact:true});await expect(opacity).toHaveValue('100');await expect(canvas).toHaveAttribute('aria-busy','false');await p.evaluate(()=>new Promise<void>(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve()))));const originalPixels=await captureCanvas('numeric-original-canvas.png'),r=(await opacity.boundingBox())!;
+    const opacity=drawing.getByLabel('不透明度（%）',{exact:true}),advanced=drawing.locator('.lv-material-advanced');await advanced.locator(':scope > summary').click();
+    const drawingLayout=async(name:string,columns:number)=>{
+      const layout=await drawing.evaluate(root=>{
+        const rect=(n:Element)=>{const r=n.getBoundingClientRect();return{x:r.x,y:r.y,width:r.width,height:r.height};};
+        const fields=root.querySelector('.lv-material-fields')!,target=root.querySelector('.lv-material-target')!,detail=root.querySelector('.lv-material-advanced')!;
+        return{gridTemplateColumns:getComputedStyle(fields).gridTemplateColumns,target:rect(target),advanced:rect(detail),
+          fields:[...fields.querySelectorAll(':scope > label')].map(n=>({label:n.querySelector('input,select')!.getAttribute('aria-label'),...rect(n.querySelector('input,select')!)})),
+          actions:[...root.querySelectorAll('.lv-material-actions > button')].filter(n=>!n.hasAttribute('hidden')).map(n=>({name:n.textContent,background:getComputedStyle(n).backgroundColor,color:getComputedStyle(n).color,...rect(n)})),
+          scrollTop:root.querySelector('.lv-material-content')!.scrollTop};
+      });
+      await info.attach(name+'-layout',{body:JSON.stringify(layout),contentType:'application/json'});await p.screenshot({path:info.outputPath(name+'.png'),fullPage:false});
+      // Verify visible occupied columns and full width, independently of CSS track serialization.
+      expect(new Set(layout.fields.map(field=>Math.round(field.x))).size).toBe(columns);expect(layout.advanced.width).toBeCloseTo(layout.target.width,0);
+      for(const field of layout.fields){expect(field.height).toBeGreaterThanOrEqual(44);expect(field.width).toBeGreaterThanOrEqual(44);}
+      expect(Math.min(...layout.fields.map(field=>field.x))).toBeCloseTo(layout.target.x,0);expect(Math.max(...layout.fields.map(field=>field.x+field.width))).toBeCloseTo(layout.target.x+layout.target.width,0);
+      if(columns===2){expect(layout.fields[0]!.y).toBe(layout.fields[1]!.y);expect(layout.fields[2]!.y).toBe(layout.fields[3]!.y);}
+      for(const name of ['変更を適用','取り消す'])await expect(drawing.getByRole('button',{name,exact:true})).toBeInViewport({ratio:1});
+    };
+    await drawingLayout('drawing-normal-draft',2);await p.setViewportSize({width:390,height:844});await revealWorkPanel(p);await drawingLayout('drawing-narrow-draft',1);
+    await drawing.getByRole('button',{name:'取り消す',exact:true}).click();await drawing.getByRole('region',{name:'操作の確認',exact:true}).getByRole('button',{name:'変更を取り消す',exact:true}).click();await expect(drawing.getByLabel('照明',{exact:true})).toHaveValue('inherit');await expect(opacity).toHaveValue('100');
+    await p.setViewportSize({width:1440,height:1000});await task('描画');await drawing.getByLabel('照明',{exact:true}).selectOption('unlit');await expect(opacity).toHaveValue('100');await expect(canvas).toHaveAttribute('aria-busy','false');await p.evaluate(()=>new Promise<void>(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve()))));const originalPixels=await captureCanvas('numeric-original-canvas.png'),r=(await opacity.boundingBox())!;
     await p.mouse.move(r.x+r.width/2,r.y+r.height/2);await p.mouse.down();await p.mouse.move(r.x+r.width/2-40,r.y+r.height/2,{steps:10});await expect(opacity).toHaveValue('80');await expect(canvas).toHaveAttribute('aria-busy','false');await p.evaluate(()=>new Promise<void>(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve()))));
     const draggingPixels=await captureCanvas('numeric-held-canvas.png');expect(Buffer.compare(originalPixels,draggingPixels)).not.toBe(0);await p.screenshot({path:info.outputPath('numeric-preview-held.png')});await p.keyboard.press('Escape');await p.mouse.up();await expect(opacity).toHaveValue('100');await expect(canvas).toHaveAttribute('aria-busy','false');await p.evaluate(()=>new Promise<void>(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve()))));expect(Buffer.compare(originalPixels,await captureCanvas('numeric-restored-canvas.png'))).toBe(0);await expect(drawing.getByRole('button',{name:'変更を適用',exact:true})).toBeEnabled();
     await drag(opacity,-60,0);await expect(opacity).toHaveValue('70');await expect(drawing.getByRole('button',{name:'変更を適用',exact:true})).toBeEnabled();

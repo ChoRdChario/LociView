@@ -12,7 +12,7 @@ import { captionWindowPlanIsCurrent, newCaptionWindowMemory, planCaptionWindow, 
 import { createMediaViewer } from './mediaPreview';
 import type { SceneUiMemory } from './navigationState';
 import { fieldValue, projectAttachments, projectCaptions, projectCaptionSceneCount, projectCaptionInventory, projectModels, projectIdentity } from './projectRead';
-import { surfaceAnchor, type ProjectWorkspacePorts, type WorkspaceFileInteraction, type WorkspacePinProposal, type WorkspaceSurface, type Point3 } from './projectWorkspacePorts';
+import { surfaceAnchor, type ProjectWorkspacePorts, type WorkspaceFileInteraction, type WorkspacePinProposal, type WorkspaceSurface, type WorkspaceViewportState, type WorkspaceViewportPresentation, type Point3 } from './projectWorkspacePorts';
 import { createProjectModels } from './projectModels';
 import { createProjectPinScale } from './projectPinScale';
 import { createProjectViews } from './projectViews';
@@ -433,6 +433,9 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   stageDisplay.append(pinTask); stage.append(viewportTools, stageDisplay); body.append(stage, sidebar); root.append(header, compactNavigation, body, mediaViewer.root);
   let feedbackTimer: number | undefined, passiveFeedback: string | null = null;
   let mounted = false, observationFrame:number|null=null, observationEpoch=0;
+  let installedViewportInput: WorkspaceViewportState | undefined;
+  let overlayBaseline: { input:WorkspaceViewportState; ready:boolean; cameraReady:boolean; gizmo:Parameters<ReturnType<typeof createCameraGizmo>['render']>[0] } | undefined;
+  let lastPresentationGeneration=-1;
   function cancelObservation(){
     const frame=observationFrame;observationFrame=null;observationEpoch++;
     if(frame!==null&&typeof globalThis.cancelAnimationFrame==='function')globalThis.cancelAnimationFrame(frame);
@@ -453,6 +456,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     if (phase === 'restore' && beforePinDrag && sameTarget(target, beforePinDrag.target)) setPin(beforePinDrag);
     else setPin({ ...pin, position, point: undefined }); render(); return true;
   }, proposal => models?.propose(proposal) ?? false);
+  const stopPresentation=viewport.observePresentation?.(paintViewportPresentation);
   function panelBlock(owner: ProjectTask, writes = true, allowDrag = false): string | null {
     if (windowMoving) return 'ウィンドウの操作を完了してください。';
     const global = writes ? mutationBlock() : busy || pending || ports.status().kind !== 'idle' ? '現在の更新を完了してください。' : ports.otherPending() ? 'ファイルの操作を完了してください。' : null;
@@ -825,7 +829,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     node.addEventListener('pointermove', event => {
       const held = markerNavigation; if (!held || event.pointerId !== held.pointer) return;
       if (disposed || busy || pending || windowMoving || ports.otherPending() || composingInput() ||
-        pressedPointers.size !== 1 || held.token !== provider().token || held.scene !== sceneId ||
+        pressedPointers.size !== 1 || held.token !== installedViewportInput?.token || held.scene !== sceneId ||
         ![event.clientX,event.clientY].every(Number.isFinite) || event.buttons === 0) { finishMarkerNavigation(); return; }
       if (!held.started) {
         if (Math.hypot(event.clientX-held.startX,event.clientY-held.startY) <= 4) return;
@@ -845,6 +849,28 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     node.addEventListener('pointerup', end); node.addEventListener('pointercancel', end); node.addEventListener('lostpointercapture', end);
   }
   const viewBlocked = () => cameraNavigationBlocked() || viewport.read().dragging;
+  function paintViewportPresentation(frame:WorkspaceViewportPresentation):boolean {
+    const baseline=overlayBaseline;
+    if(!mounted||disposed||rendering||!baseline?.ready||!baseline.cameraReady||frame.input!==installedViewportInput||frame.input!==baseline.input||
+      frame.input.token!==baseline.input.token||frame.input.sceneId!==sceneId||!frame.input.available||frame.input.visible===false||
+      frame.generation<=lastPresentationGeneration||![frame.width,frame.height].every(n=>Number.isFinite(n)&&n>0))return false;
+    const moves:{node:HTMLButtonElement;x:number;y:number;visible:boolean}[]=[];
+    const ids=new Set<string>();
+    for(const pin of frame.pins){
+      if(!Number.isFinite(pin.x)||!Number.isFinite(pin.y)||ids.has(pin.id))return false;ids.add(pin.id);
+      const node=markerById.get(`${sceneId}:${pin.id}`);
+      if(!node){if(pin.visible)return false;continue;}
+      moves.push({node,x:pin.x,y:pin.y,visible:pin.visible});
+    }
+    for(const key of markerById.keys())if(key.startsWith(sceneId+':')&&!ids.has(key.slice(sceneId.length+1)))return false;
+    for(const move of moves){
+      const retained=markerNavigation?.node===move.node||document.activeElement===move.node;
+      move.node.hidden=!move.visible&&!retained;move.node.style.left=`${move.x}px`;move.node.style.top=`${move.y}px`;move.node.style.opacity=move.visible?'':'0';
+    }
+    windows.project({ready:true,sourceToken:frame.input.token,sceneId:frame.input.sceneId,width:frame.width,height:frame.height,pins:frame.pins});
+    cameraGizmo.render({...baseline.gizmo,camera:frame.camera,axis:frame.axis,navigating:frame.navigating});
+    lastPresentationGeneration=frame.generation;return true;
+  }
   function viewAction(action: () => void) {
     if (viewBlocked()) return;
     try { action(); viewportFeedback = ''; }
@@ -939,9 +965,10 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       organization!.render();
       body.setAttribute('aria-busy', String(busy)); body.inert = busy;
       const resolved = sceneId ? resolveScene(p.state, p.resources, sceneId) : null;
-      viewport.update({ token: p.token, sceneId, selectedId: selected, pin, choosing,
+      const viewportInput:WorkspaceViewportState={ token: p.token, sceneId, selectedId: selected, pin, choosing,
         pinColors: memory().pinColors, hiddenAssetIds: models!.hidden(), model: models!.proposal(), windowMoving,
-        available: resolved?.kind === 'ready', visible: stageVisible(), readOnly: !!blocked || resolved?.kind !== 'ready', comparison: recovery!.comparison(), material: materials.proposal() });
+        available: resolved?.kind === 'ready', visible: stageVisible(), readOnly: !!blocked || resolved?.kind !== 'ready', comparison: recovery!.comparison(), material: materials.proposal() };
+      installedViewportInput=viewportInput;viewport.update(viewportInput);
       finishSurfaceOpening();
       renderCaptionActions();
       for (const [key, tab] of tabButtons) { tab.setAttribute('aria-selected', String(task === key)); tab.tabIndex = task === key ? 0 : -1;
@@ -968,7 +995,8 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       viewportStatus.hidden = !viewportStatus.textContent;
       retryViewport.hidden = !seen.issue && !viewportFeedback&&!seen.retryAvailable; retryViewport.disabled = viewBlocked();
       let camera: unknown=seen.camera; try { camera ??= viewport.capture().camera; } catch { /* Preparation has no camera yet. */ }
-      cameraGizmo.render({ camera, axis: seen.view?.kind === 'ready' ? seen.view.axis : null, blocked: !(seen.cameraReady??seen.ready)||viewBlocked(),navigationBlocked:cameraNavigationBlocked()||!(seen.cameraReady??seen.ready),navigating:seen.navigating,navigationAvailable:!!viewport.navigateCamera });
+      const cameraState={ camera, axis: seen.view?.kind === 'ready' ? seen.view.axis : null, blocked: !(seen.cameraReady??seen.ready)||viewBlocked(),navigationBlocked:cameraNavigationBlocked()||!(seen.cameraReady??seen.ready),navigating:seen.navigating,navigationAvailable:!!viewport.navigateCamera };
+      cameraGizmo.render(cameraState);
       const focusedMarker = markerNodes.has(document.activeElement as HTMLButtonElement) ? document.activeElement as HTMLButtonElement : null;
       const activeMarkers = new Set<string>(), markerChildren: HTMLElement[] = [];
       for (const projected of seen.pins) if (seen.ready && seen.token === p.token && seen.sceneId === sceneId &&
@@ -981,7 +1009,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
           bindMarkerNavigation(marker); markerById.set(key, marker); markerNodes.add(marker); }
         const markerName = fieldValue(caption.title) || '名称なし';
         marker.textContent = markerName; marker.setAttribute('aria-label', markerName);
-        marker.className = 'lv-project-marker'; marker.style.left = `${projected.x}px`; marker.style.top = `${projected.y}px`;
+        marker.hidden=false;marker.className = 'lv-project-marker'; marker.style.left = `${projected.x}px`; marker.style.top = `${projected.y}px`;
         marker.style.opacity = projected.visible ? '' : '0';
         marker.style.transform = 'translate(-50%, -50%)';
         marker.style.setProperty?.('--lv-pin-scale', String(projected.scale ?? 1));
@@ -1001,11 +1029,12 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       for (const node of Array.from(markers.children)) if (!wantedMarkerNodes.has(node as HTMLButtonElement)) node.remove();
       markerChildren.forEach((node,index) => { if (markers.children[index] !== node) markers.insertBefore(node,markers.children[index] ?? null); });
       if (focusedMarker && markerNodes.has(focusedMarker) && document.activeElement !== focusedMarker) focusedMarker.focus({ preventScroll: true });
+      overlayBaseline={input:viewportInput,ready:seen.ready&&seen.token===p.token&&seen.sceneId===sceneId,cameraReady:seen.cameraReady??seen.ready,gizmo:cameraState};
       positionRecordSheets();ports.changed();
     } finally { rendering = false; if (renderAgain) { renderAgain = false; render(); } }
   }
   mounted = true; render();
   return { root, headerActions, projectNavigation: otherProject, utilityArea: settingsSheet, clearNotice(){if(!pending&&ports.status().kind==='idle')feedback='';}, dismissDisclosures(){help.open=false;organization!.settingsRoot.open=false;}, setExternalBusy: (active:boolean) => { body.inert=busy||active; }, render, session: interaction, activeScene: () => sceneId, inputPending: () => dirty() || busy,
     hasChanges: () => dirty() || busy || !!pending,
-    unmount() { if (disposed) return; disposed = true;finishMarkerNavigation();document.removeEventListener?.('pointerdown',closeRecordSheets,true);document.removeEventListener?.('focusin',closeRecordSheets);document.removeEventListener?.('pointerdown',dismissHeaderSheets,true);document.removeEventListener?.('focusin',dismissHeaderSheets);otherProject.remove();document.defaultView?.clearTimeout(feedbackTimer);document.defaultView?.removeEventListener('resize',positionHeaderSheets);document.defaultView?.removeEventListener('resize',render);cameraGizmo.dispose();stopHelp();cancelObservation();storageEpoch++; gesture = null; gestureGeneration++; pressedPointers.clear(); viewport.reservePointer(false); recovery?.dispose(); organization?.dispose(); windows.dispose(); mediaManager?.dispose(); mediaViewer.dispose(); viewport.dispose(); list.dispose(); inclusion.dispose(); detail.dispose(); for (const panel of panels.values()) panel.dispose(); root.remove(); } };
+    unmount() { if (disposed) return; disposed = true;finishMarkerNavigation();document.removeEventListener?.('pointerdown',closeRecordSheets,true);document.removeEventListener?.('focusin',closeRecordSheets);document.removeEventListener?.('pointerdown',dismissHeaderSheets,true);document.removeEventListener?.('focusin',dismissHeaderSheets);otherProject.remove();document.defaultView?.clearTimeout(feedbackTimer);document.defaultView?.removeEventListener('resize',positionHeaderSheets);document.defaultView?.removeEventListener('resize',render);cameraGizmo.dispose();stopHelp();stopPresentation?.();overlayBaseline=undefined;cancelObservation();storageEpoch++; gesture = null; gestureGeneration++; pressedPointers.clear(); viewport.reservePointer(false); recovery?.dispose(); organization?.dispose(); windows.dispose(); mediaManager?.dispose(); mediaViewer.dispose(); viewport.dispose(); list.dispose(); inclusion.dispose(); detail.dispose(); for (const panel of panels.values()) panel.dispose(); root.remove(); } };
 }

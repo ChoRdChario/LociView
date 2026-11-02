@@ -109,6 +109,32 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('synthetic Scene display; GPU mocked, not rendered/browser acceptance', () => {
+  it('hands camera-only draw frames to every visual listener while retaining semantic and failure fallback',()=>{
+    const canvas=fakeCanvas(),changed=vi.fn(),v=createSyntheticViewport(canvas.canvas as unknown as HTMLCanvasElement,changed),display=syntheticDisplay(createSyntheticProject(),f.overview,null,null);
+    const observed:{frame:import('../../src/projectScene/viewportPorts').ViewportPresentationFrame;draws:number}[]=[];
+    const stop=v.observePresentation!(frame=>{observed.push({frame,draws:tracker.renderers[0].frames});return true;});
+    const tick=()=>{const [id,fn]=[...tracker.raf][0]!;tracker.raf.delete(id);fn();};
+    v.update(display);v.setActive(true);canvas.show();changed.mockClear();
+    const orbit=tracker.controls.at(-1),move=()=>{orbit.object.position.x+=.1;orbit.update();orbit.dispatchEvent({type:'change'});tick();};
+    move();expect(observed).toHaveLength(1);expect(changed).not.toHaveBeenCalled();
+    expect(observed[0]!.draws).toBe(tracker.renderers[0].frames);expect(observed[0]!.frame.display).toBe(display);
+    expect(observed[0]!.frame).not.toHaveProperty('pickToken');expect(Object.isFrozen(observed[0]!.frame.pins)).toBe(true);
+    const first=observed[0]!.frame;move();expect(observed[1]!.frame.generation).toBeGreaterThan(first.generation);expect(observed[1]!.frame.pins).not.toEqual(first.pins);
+    const reject=v.observePresentation!(()=>false);move();expect(changed).toHaveBeenCalledOnce();reject();changed.mockClear();
+    const throwing=v.observePresentation!(()=>{throw Error('visual subscriber failure');});move();expect(changed).toHaveBeenCalledOnce();expect(v.read().issue).toBeNull();throwing();
+    const count=observed.length;v.camera({kind:'axis',axis:'+z'});tick();expect(changed).toHaveBeenCalled();expect(observed).toHaveLength(count);
+    changed.mockClear();v.update({...display,selectedId:f.shared});tick();expect(changed).toHaveBeenCalled();expect(observed).toHaveLength(count);
+    stop();v.dispose();expect(tracker.raf.size).toBe(0);
+  });
+  it('refuses a draw frame invalidated by a synchronous display replacement during rendering',()=>{
+    const canvas=fakeCanvas(),changed=vi.fn(),v=createSyntheticViewport(canvas.canvas as unknown as HTMLCanvasElement,changed),display=syntheticDisplay(createSyntheticProject(),f.overview,null,null),listener=vi.fn(()=>true);
+    v.observePresentation!(listener);v.update(display);v.setActive(true);canvas.show();changed.mockClear();
+    const renderer=tracker.renderers[0],render=renderer.render.bind(renderer),replacement={...display,token:'new-display'};
+    renderer.render=(scene:THREE.Scene,camera:THREE.Camera)=>{render(scene,camera);v.update(replacement);};
+    const orbit=tracker.controls.at(-1);orbit.object.position.x+=1;orbit.update();orbit.dispatchEvent({type:'change'});
+    const [id,fn]=[...tracker.raf][0]!;tracker.raf.delete(id);fn();
+    expect(listener).not.toHaveBeenCalled();expect(changed).toHaveBeenCalled();expect(v.read().display).toBe(replacement);v.dispose();
+  });
   it('does not evict a staged startup template before first activation; real deactivation releases demand',()=>{
     const base=syntheticDisplay(createSyntheticProject(),f.overview,null,null),source=base.models[0]!,canvas=fakeCanvas(),demand=vi.fn(),asset=new THREE.Group(),mesh=new THREE.Mesh(new THREE.PlaneGeometry(),new THREE.MeshStandardMaterial());asset.add(mesh);
     const model:ReadonlyRenderModel={shape:'render-glb',key:'staged',assetId:source.binding.assetId,assetToProject:source.binding.assetToProject,representation:source.representation as ReadonlyRenderModel['representation']};

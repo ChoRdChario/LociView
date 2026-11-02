@@ -6,7 +6,18 @@ checks, remaining work and genuine stop conditions; [inventory](implementation-i
 owns route-specific coverage. Check the actual Git branch/HEAD/worktree and
 preserve existing changes. Do not reconstruct current work from old checkpoints.
 
-The current PO priority is the six connected pin/camera/Caption/drawing repairs,
+Current grouped Drawing/camera/approved07o work has clean independent review and
+actual Ki84 conversion→image/edit→backup→independent restore→final normal-SW cold
+acceptance. The final UI also verifies native home keyboard opening and18 readable
+image-omission explanations; existing Projects/edits and old recipes stay intact.
+Strict JPEG admission is unchanged. Read [current todo](todo.md) for exact scope,
+retained failed attempts and qualifications. The frozen final source passes
+147 files/3272 tests with21 known TODOs (1457.87s), actual Exit0, and the equivalent
+required serial Windows checks all succeed with qualified exact-source/settings
+reuse of typecheck/Desktop/offline builds. New Git/actual Linux CI/4191 delivery
+remains pending with root. No source edits or doc-only runtime repeats are planned.
+
+The preceding completed unit is the six connected pin/camera/Caption/drawing repairs,
 recorded in [current todo](todo.md) and [the workspace design](../docs/ui-workspace-design.md).
 Their source/resource and actual rendered reviews are clean, including short
 DPR2/View and final44px help. The bounded material/program handover keeps every
@@ -29,10 +40,23 @@ reviewed test-only repairs pass focused checks and the new unfiltered root:
 identical to the browser tree. The equivalent required serial checks, including
 all five builds, offline isolation and BASE_PATH normal build to HEIC isolation,
 complete with every Exit0. No literal checkpoint-script execution is claimed.
-Finish index/privacy verification, the reviewed g0 checkpoint and new actual
-Linux CI. Root owns Git/preview/CI delivery; keep implementation and records frozen
-once ready. Saving latency and cramped short-height editing chrome remain future
-work; the DPR2 body viewport37px is reachability evidence, not broad comfort PASS.
+Independent index/privacy verification and the reviewed g0 commit/Push are complete.
+[Actual Linux CI](https://github.com/ChoRdChario/LociView/actions/runs/41389266006)
+passes the exact checkout:147files/3253PASS/21TODO (640.01s), all steps successful,
+including typecheck, BASE_PATH=/LociView/ build and HEIC isolation. The owned
+[4191 preview](http://127.0.0.1:4191/) serves the immutable Desktop41-tested
+`final-tested-offline` root-base build with explicit `--base /`. Corrected HTML
+references and all20 HTTP resources match, and fresh dedicated Chromium displays
+home/file selection without failed requests or page errors. The post-offline5
+snapshot uses `/LociView/`; its earlier root delivery produced a blank page despite
+HTTP200/file hashes. Keep that directory-base evidence separate from the corrected
+root preview. Personal4182/Chrome and existing Project data are untouched.
+These final result notes stay local without a doc-only commit/CI loop or runtime
+repetition. Next: save-stage measurement/improvement and short-height editing chrome.
+The final500k GS Review-copy editor191.549s/display201.781s pass the original budget
+but remain long waits, alongside Ki84 saving. The DPR2 body viewport37px proves
+reachability, not broad comfort PASS. No environment-only cause, general
+no-regression result or release/public deployment is claimed.
 
 The preceding verified05 performance checkpoint removes one duplicate history clone inside
 an invocation-owned candidate inspection; strict public admission and all storage

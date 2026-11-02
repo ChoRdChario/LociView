@@ -529,3 +529,128 @@ scroll and external Apply/Cancel footer, node/focus/draft/IME/list-scroll owners
 No test-only scrolling or relaxed viewport assertions: the original View return/
 resize and Workspace narrow-photo sequences must pass, and the dense Ki84 list
 must retain its reading space. This is responsive layout, not a saved setting.
+
+### Drawing panel organization —2026-11-02 PO screenshot correction
+
+The supplied whole-panel screenshot shows the target and appearance controls in
+three narrow columns, mismatched label baselines and an advanced disclosure
+occupying an incidental grid cell. Correct the whole panel as one bounded layout,
+without changing material semantics or introducing new visual settings.
+
+- Group Model, Material and Scope as one target section. Model occupies a full-width
+  row for long names; Material/Scope use two equal columns at the normal480px
+  sidebar, becoming one column at narrow content width.
+- Group the four ordinary appearance fields as Opacity/Lighting and Sides/Coverage,
+  with aligned label/help rows and full-width44px controls. Use at most two columns,
+  and one column below380px of actual panel content width; long text may wrap
+  naturally without colliding with help or a neighboring control.
+- Put color transparency and threshold controls in one full-width disclosure below
+  the ordinary fields, with their own responsive grid. Preserve automatic reveal
+  for an active mask/chroma or retained input; never hide important field failures.
+- Keep Apply/Cancel in the existing persistent footer outside the scrolling content.
+  Keep every input node and its accessible label, focus, scrubbing, raw precision,
+  composition, retained draft and explicit Session-command boundary unchanged.
+- Keep one canonical applied-origin summary. The Scope choice already says
+  "this Scene only"; remove its repeated explanatory sentence. Project-wide scope
+  still states that Scene-specific settings take precedence. Unavailable/stale/
+  failure/unsaved/recovery notices remain beside the affected controls.
+
+Acceptance uses actual normal/narrow dedicated Chromium screenshots,44px/non-
+overlapping controls and footer, keyboard reachability, held local preview,
+Cancel restoration and one explicit Apply. Existing focused material guards remain;
+this is layout/copy work, not renderer or image-conversion acceptance.
+
+### Camera-frame overlay handoff —2026-11-02 measured refinement
+
+The source-qualified fixed Ki8424-step old-control orbit measures3.0ms median JS
+draw callback versus46.5ms median full UI observation callback (p95 6.8/72.0ms).
+GL-call-end to marker batch-end is49.7ms median (p95 75.6ms). The original cached-
+runtime attempt remains separate provenance-uncertain evidence. These are CPU/DOM
+endpoints, not GPU or presentation completion; refine only this measured path.
+
+- Add optional `ProjectViewport.observePresentation(listener): unsubscribe`. The
+  synchronous listener receives a read-only draw-owned frame: exact RenderDisplay
+  reference, local generation, CSS extent, camera orientation/axis/projection and
+  projected pin coordinates. No pickToken, capture, provider, Source or save proof.
+- After a successful current draw, publish at most one current frame in that same
+  callback. Hidden/disposed/context-failed or replaced generations cannot publish.
+  Listener rejection/throw falls back to the existing changed/full-render path;
+  old adapters without this optional port retain their behavior.
+- Keep all semantic/start/end/Scene/display/load/error/resource notifications and
+  their deferred full UI render. Track their local revision separately so a
+  handled pure camera frame alone may omit full rediscovery. Camera-navigation
+  move must not request another full render for the same handled pose.
+- The product adapter exposes an optional matching WorkspaceViewport observer,
+  binding the frame to its exact installed WorkspaceViewportState and rendered
+  display. Check closed/available/visible, token/Scene, exact display identity and
+  generation using captured installed values; never call host/read/runtime.read
+  or traverse resident materials from this per-frame path.
+- The ordinary PC deferred bridge forwards this optional observer across late
+  attachment/replacement. It owns one current-runtime subscription and one monotonic
+  presentation sequence across runtime replacements; old high runtime generations
+  cannot block a replacement starting low. Unsubscribe the old owner before
+  disposal, retain pending subscribers through failed installation, and refuse
+  hidden/foreign/old-owner/closed callbacks. No subscriber means legacy fallback.
+- The UI accepts only the last fully rendered input/Scene/token generation and
+  its ready visual state. Update only stable marker positions/visibility, existing
+  Caption-window connector projection and camera-gizmo orientation with captured
+  control restrictions. Do not rebuild panels, provider, media, captions or nodes;
+  a newly visible pin without a stable node requires the ordinary full fallback.
+  Preserve focused/captured markers and window dragging; do not steal focus.
+- Unsubscribe on unmount/dispose; stale/foreign/late frames are ignored with safe
+  fallback. Picking, placement, capture, saved views and file commands continue to
+  use their existing current authority reads and checks, never this visual DTO.
+
+Focused tests cover same-frame visual updates without provider reads, semantic
+fallback, missing/stale/foreign/hidden/closed frames, old adapters and pointer/
+preview ownership. Reuse the same24-step Ki84 action once for the candidate with
+matched profile/runtime/viewport qualifications, actual frame/DOM/CPU endpoints
+and source/data invariance. Do not infer universal smoothness/fps from call counts.
+
+
+### Conversion image omissions —2026-11-02 contextual explanation
+
+Show the reason beside the conversion decision, not only in a downloaded report.
+The existing LociMyu conversion panel adds one initially collapsed disclosure,
+`添付できない画像（N件）`, listing each affected Caption, source filename and
+reason. Include Scene/row to distinguish repeated titles. Use text nodes and
+normal wrapping; do not expose raw file IDs as control labels. Unknown filenames
+say `ファイル名を確認できません`. Preserve the separate source/report retention
+warning and all existing confirmation, create, cancel and report actions.
+
+At the typed planner's image-warning event, retain an invocation-owned display
+reference with Caption title, Scene/row, selected candidate filename (or mapped
+filename when unresolved) and that same warning. Return a read-only primitive
+`imageOmissions` DTO separately from base/plan/report/receipt/evidence. The prepared
+choice exposes that DTO; its summary count uses the same items. This is display
+information only, never source/receipt validation or command authority. No report
+JSON, candidate-string or reason-prefix parsing in UI; no storage reads, new
+schema or change to recipes1–7, fingerprints, source bytes or validation.
+
+The existing evaluation-generation/title/relation/IME guards own adoption.
+Invalidate/clear hides and clears stale rows immediately; a late result cannot
+restore them. Keep the stable disclosure node/open state through rechecks of the
+same source, reset it on a different source/cancellation, and do not move focus.
+Acceptance covers mixed rejection reasons and count/Caption/filename association,
+unknown filename, stale/IME clearing and no persistent report change. Verify the
+actual Ki84 preflight's18 human-readable entries, including the JPEG refusal, on
+the final UI bundle. Reuse the separately qualified core42/46 file/restore chain
+only when its authority code/report/receipt output remain exact; no duplicate
+large file roundtrip is needed solely for this presentation addition.
+
+
+### Home Project action readiness —2026-11-02
+
+Keep the existing list inert and execute fence, and make each current Project-row
+button natively disabled while its owning workspace operation or IME composition
+is active. Track only the installed row buttons; initialize new buttons from the
+current busy/composition state, update them in controls without rebuilding rows,
+and release old references on list replacement/disposal. Do not queue or replay
+input and do not weaken opening, unsaved-input or storage guards.
+
+A visible row can precede operation completion. Disabled appearance and native
+keyboard eligibility must agree with that fact, then become enabled on genuine
+owner idle. Verify held list refresh preserves nodes and disables both open
+modes, newly inserted busy rows start disabled, composition toggles them, and
+actual home keyboard opening succeeds after idle. Preserve the real Ki84 home
+attempt failure evidence; a deep-link data check is not a home-input PASS.
