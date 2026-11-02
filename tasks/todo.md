@@ -57,7 +57,96 @@ unchanged-feature-classification checks pass; independent review has no findings
 No runtime change or new capacity guarantee; no runtime suite is needed for this
 documentation checkpoint.
 
-## Current boundary —Drawing, camera synchronization and image relationships
+## Current boundary —whole-PC review and restore performance checkpoint
+
+PO requested overall review first, then performance improvement. Three independent
+readonly UI/safety/verification reviews completed before product edits, using
+current c47 rendering and qualified retained exact-source file/cold evidence.
+No established new P0/P1 was found in the sampled flow. Current P2:1280x720 four-
+Scene chrome leaves111px of Caption list and pushes detail below the viewport.
+Coverage gap, not an observed product bug: the richest interrupted-reselection/
+keep-both browser chain is validation-route evidence, not current Desktop proof.
+See [the existing design ledger](../docs/ui-design-review.md) PCQ29–31.
+
+Implemented the independently reviewed adjacent-result clarification in
+[06](../docs/specs/06-project-package-wire.md): initializeBackup immediately uses
+THIS resume's fresh persisted postpublication read under the same lease, retaining
+ready/job/source-token and closing checks. Reentry, retry, full content and all
+writes/readback/publication/Selection remain fresh. No new staging consumer,
+cache, persisted field, dependency, admission limit, compatibility or release.
+
+Final source/test fingerprint1d560b16a60f2b7a86acb8e38509b83153938edfb52488a7ae634c8ee4efabe5
+pins719 files plus7 unchanged supporting inputs. Literal check:checkpoint passes
+with actual Exit0: typecheck, unfiltered147-file Vitest3273 PASS/21 existing TODO
+(2139.68s), all five builds and offline isolation. Additional HEIC isolation passes.
+Source/support bytes match afterward. Architecture and meaningful source/test
+diff review are clean; later changes are records/proposal only.
+
+Same51,270,879-byte backup c714c6cd04f99ac7aa0b84e9e2ca82a0147bbbc0eeb029be475d94e68ccf501c,
+fresh private profiles, Chromium156/DPR1/1440x1000 and actual runtime SHA matching:
+
+| Observation | Before | After |
+|---|---:|---:|
+| Confirmation through diagnostic capture |160.625s|169.547s|
+| Caption/edit ready |159.304s|167.858s|
+| Model ready |159.725s|168.398s|
+| initialize |98.695s|110.641s|
+| Native bitmap preparations /8K preparations |240/20|240/20|
+
+**No wall-time improvement is established.** One exact published Session read is
+removed and the real-reader identity/fault tests pass; this is not latency
+acceptance. The older unchanged-c47 run90.934s is separate evidence, not a speed
+comparison or proof of an environment cause. PerformanceEntry.toJSON omitted
+custom IO detail from this pair, so no paired stage-IO count claim is made.
+
+All43 model/image payload hashes and retained source/inventory/base bytes match.
+Actual restored Caption edit succeeds; host.edit24.249s, display data19.4ms /
+prepare5.3ms, no8K decode during that edit. Actual backup/download69.200s (stream-
+close23.602s); the selected saved file is verified by the app. Independent full
+archive CRC/content/history check preserves all3 original changes, adds only the
+one intended Caption body change, and keeps all payloads/exchange bases exact.
+Saved backup SHA d102b88322b38e19bac687c944f61e9b3cab97e9a930602f19df3ce86a429f9e.
+
+Normal-SW cold evidence after complete browser/server close: first9 recorded
+responses are current candidate bytes/fromSW, offline true, server stopped and
+no bypass; Caption20.105s/model+edit28.240s. Saved body and original Photo8 encoded
+SHA match; actual506x390 HTML-native pixels match independent same-API decoding
+and cold reopening. Editing/draft-confirmed cancellation and verified-file state
+work. Nonblank3D is rendered. Browser errors/remote requests0; owned QA browser/
+server closed. This is not a new whole Desktop41/offline5 run, physical-device
+proof or a third-profile restoration of the newly generated output.
+
+Private evidence: .artifacts/e2e/whole-review-performance-20261102 and
+.artifacts/e2e/ki84-evaluation/whole-{ui-review,restore-before,restore-after,restore-cold}-20261102.
+Keep originals, private audit and all.artifacts out of Git/public builds. The
+5633-byte private todo block and exact CRLF golden remain unchanged.
+
+Retained failures: initial sandbox Git-init permission refusal prevents shared
+setup (83 bodies unrun); authorized setup9 passes. An interrupted initial full
+attempt is incomplete. A later full3272PASS/1FAIL has an incidental1s DOM poll
+failure in second conflict resolution. Reviewed test-only correction waits for
+the existing real mounted owner's checking→idle confirmation in that case; exact
+data/history/replay assertions and30s budget remain, then final full3273 passes.
+Failed diagnostic attachment produced no CPU profile. Browser helper failures
+are preserved: submit mistaken for picker; omitted IO JSON detail; historical
+sample/full or cross-API pixel comparison; wrong verification-label wait; missing
+the existing draft-discard confirmation. Continued actual state/source checks
+resolve those without repeating writes, loosening validators or hiding failures.
+
+Next judgment: [06c](../docs/specs/06c-staging-content-inspection-proposal.md) is
+independently design-reviewed, PROPOSED, PO-unapproved and unimplemented. It would
+name only the existing readonly content hook as a fifth staging consumer, changing
+owner-audit detection timing to operation closing while retaining fresh receipts/
+inventory and all downstream strict fences. Graph42media/46active attachments
+suggests hook eligibility; actual hook/time evidence is still a connection gate.
+Do not implement this proposal, weaken the weak-media fallback or claim a speed
+gain before that decision/evidence. Short-height list/detail improvement is the
+next ordinary UX unit; physical iOS/real-GPU/adoption/release gates remain pending.
+
+Checkpoint/index/CI/preview delivery results will be appended here after actual
+verification. A pending delivery is not a reason to repeat completed runtime checks.
+
+## Completed boundary —Drawing, camera synchronization and image relationships
 
 The PO-requested connected group is implemented: organized Drawing targets and
 appearance controls, camera-frame pin/window presentation, and the explicitly
@@ -112,17 +201,50 @@ BASE_PATH normal build and HEIC isolation, plus exact-source/settings successful
 typecheck/Desktop/offline builds reused from this same final tree. This is not a
 literal check:checkpoint invocation. No retries, exclusions or timeout/assertion
 relaxation were introduced, and post-check source/supporting hashes match.
-Root now owns staging/privacy review, g0 checkpoint/push, actual NEW Linux CI and
-the verified root-base4191 preview update; these delivery steps remain pending.
-Personal4182/Chrome, original profiles, private audit block and dated prior CI
-results remain intact. Record/stage-only changes require no runtime repetition.
+The reviewed checkpoint c47ac3b is committed and pushed to g0. Root's owned4191
+preview (PID37448 at verification) serves the immutable final root-base345d
+artifact: all20 HTTP resources/HTML references/manifest match, and fresh normal-SW
+Chromium verifies home/file selection plus seven loaded response hashes with no
+page errors. Actual [Linux CI41437540951](https://github.com/ChoRdChario/LociView/actions/runs/41437540951)
+(job125251005129) succeeds on the exact c47ac3b checkout:147 files/3272 PASS/21 TODO,
+845.54s, with typecheck, npm ci, BASE_PATH=/LociView/ normal build, HEIC isolation and all
+steps successful. Personal4182/Chrome, original profiles, private audit block and
+dated prior CI results remain intact. These are local delivery-result notes;
+no doc-only commit/push or repeated completed runtime checks are planned.
 
-Short milestone audit: g0/ee460a9→tested345d remains the connected user-workflow
-critical path; implementation, actual file/cold acceptance and final Windows checks are closed;
-Git/CI/preview delivery remains. Next work is unresolved Ki84 save-stage and
-previously recorded large-GS copy latency, plus short/high-zoom editing chrome
-(37px body viewport in the earlier 720×500/DPR2 check), not a general comfort/performance guarantee. Stop only affected
-work for a genuine policy/authority conflict or newly evidenced failure.
+The one additional diagnostic is complete: the same unchanged51,270,879-byte
+backup restored into a fresh private profile on final345d in90.934s. Existing
+restore.first measures show persist4.10s, open-staging2.82s, initialize58.62s,
+projection0.010s, display5.83s, select10.33s and adopt7.88s. No edit/export/cold
+loop, retry, source/format/limit change occurred; all owned browsers closed.
+This is a distinct unchanged-code run, not an improvement claim versus the prior
+150.755s restore or proof of an environment cause.
+
+During initialize, the IO path-family counter records17,659 restore-controls
+readStream calls,1,962 restore-controls list and1,962 other list calls. This
+family also includes generation paths; it is not a proven count of redundant
+owner audits. IO durations overlap/nest and must not be summed into wall time.
+Across the measured restore, the diagnostic records240 bitmap decodes (aggregate9.50s), including20 at8192x8192
+(6.61s) and10 at4096x4096. The arrayBuffer diagnostic reaches its4000-entry cap:
+310.6MB is a lower bound, not total input traffic. Display preparation5.83s is a
+scope duration, not total GPU time.
+
+Next bounded latency work should isolate initializeBackup's input inspection,
+model-fact planning, resume/staging/publication and final readback before choosing
+an optimization. Investigate pure-read/control-audit amplification and duplicate
+image inspection inside one owned invocation; keep existing strict writes,
+readbacks, publication and Selection fresh fences. Do not wrap all initialize in
+one read callback or reuse earlier archive evidence across those boundaries.
+The next change must be selected from measured work, not a blind GPU adjustment.
+Previously recorded Ki84 save-stage and large-GS copy latency, plus short/high-zoom
+editing chrome (37px body viewport in the earlier 720x500/DPR2 check), remain next
+work; no general comfort/performance guarantee follows from this measurement.
+
+Short milestone audit: g0/c47ac3b binds tested345d; implementation, real file/cold
+acceptance, final Windows checks, actual Linux CI and preview delivery are closed.
+The additional diagnosis narrows the next performance unit without new product
+policy or source changes. Stop only affected future work for a genuine authority/
+policy conflict; do not weaken validation or manufacture a new check/commit loop.
 
 ## Completed boundary —pin, camera and Caption/drawing comfort
 

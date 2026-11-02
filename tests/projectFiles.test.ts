@@ -3002,7 +3002,12 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const service = validationProjectService(scope.fs, scope.factory, f.store, budget, decode);
     await expect(f.session.initializeBackup(job)).rejects.toThrow('restore-staging-owner');
     await expect(validationProjectService(scope.fs, f.factory, f.store, budget, decode).session.initializeBackup(job)).rejects.toThrow('restore-staging-owner');
-    const done = await service.session.initializeBackup(job);
+    const publishedReads: Awaited<ReturnType<typeof service.session.read>>[] = [], read = service.session.read.bind(service.session);
+    const readSpy = vi.spyOn(service.session, 'read').mockImplementation(async () => {
+      const current = await read(); if (current.publication === job.id) publishedReads.push(current); return current;
+    });
+    const done = await service.session.initializeBackup(job); readSpy.mockRestore();
+    expect(publishedReads).toHaveLength(1); expect(done).toBe(publishedReads[0]); expect(done.publication).toBe(job.id);
     expect(done.state).toBe('ready'); expect(done.source!.originalChanges()).toEqual(job.inspection.source.originalChanges());
     expect(done.source!.heads).toEqual(job.inspection.source.heads);
     expect(await f.factory().loadRange([])).toEqual(originalDb);
@@ -3292,6 +3297,20 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     await expect(bases.payloads(rows)).rejects.toThrow('receive-base-missing');
     expect(await f.scope.fs.list(`${prefix}bases/`)).toEqual([]);
     expect(await f.scope.fs.list(`${prefix}evidence/`)).toEqual([]);
+  }, 60_000);
+  it('refuses backup initialization when its actual publication disappears before postpublication readback', async () => {
+    const f = await restoreFileFixture(), job = await (await f.prepare()).persist(f.ports, f.databases), scope = await job.openStaging(f.databases),
+      service = validationProjectService(scope.fs, scope.factory, f.store, budget, decode), publish = TransactionJournal.prototype.publish;
+    const publication = vi.spyOn(TransactionJournal.prototype, 'publish').mockImplementation(async function (this: TransactionJournal, ...args) {
+      await publish.apply(this, args);
+      if (args[0].start.transactionId === job.id) await f.fs.remove(this.path(job.id, 'published.json'));
+    });
+    await expect(service.session.initializeBackup(job)).rejects.toThrow('publication-readback'); publication.mockRestore();
+    expect((await service.session.read()).state).toBe('pending');
+    expect((await readRestoreControls(f.fs, metadata)).selection).toBeNull();
+    expect((await f.session.read()).source!.token).toBe(f.current.source!.token);
+    expect(await scope.fs.exists(new TransactionJournal(scope.fs, metadata).path(job.id, 'published.json'))).toBe(false);
+    await scope.dispose();
   }, 60_000);
   it('cold-recovers backup initialization only with its original job and rejects lost acknowledged source', async () => {
     const f = await restoreFileFixture(), job = await (await f.prepare()).persist(f.ports, f.databases), scope = await job.openStaging(f.databases);
@@ -7644,8 +7663,9 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect(await Promise.all(paths.map(p => f.fs.readBytes(p)))).toEqual(bytes);
     all(root).find(n => n.className === 'lv-caption-select')!.fire('click');
     const detail = named('キャプションの詳細'); choose(named('本文', detail), '解消後の追記');
-    expect(button('変更を適用', detail).disabled).toBe(false); button('変更を適用', detail).fire('click');
-    await vi.waitFor(() => expect(value()).toEqual({ kind: 'value', value: '解消後の追記' }));
+    expect(button('変更を適用', detail).disabled).toBe(false);
+    await mountedWork.run(() => button('変更を適用', detail).fire('click'));
+    expect(value()).toEqual({ kind: 'value', value: '解消後の追記' });
 
     const participant = firstWorkspaceRecipient(), first = await participant.receiver.importWorkspace(f.file);
     await participant.session.editCaption(first.source!.token, f.captionId, 'body', '二巡目の本文');
@@ -7658,9 +7678,10 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const provider = f.host.read().provider; if (provider?.kind !== 'scene-provider') throw Error('provider');
     const field = provider.inspection.candidates.fields.find(v => v.path.join('/') === `captionsById/${f.captionId}/body`)!;
     const candidate = field.candidates.find(c => c.value.kind === 'value' && c.value.value === '二巡目の本文')!;
-    choose(choice, candidate.operationId); button('競合を解消', form).fire('click');
-    await vi.waitFor(() => expect(value()).toEqual({ kind: 'value', value: '二巡目の本文' }));
-    await vi.waitFor(() => expect(list.children).toHaveLength(0));
+    choose(choice, candidate.operationId);
+    await mountedWork.run(() => button('競合を解消', form).fire('click'));
+    expect(value()).toEqual({ kind: 'value', value: '二巡目の本文' });
+    expect(list.children).toHaveLength(0);
     const final = f.host.read().source!; setFile(reply.file); submit();
     await received(); clearFile();
     expect(f.host.read().source!.token).toBe(final.token); expect(f.host.read().source!.originalChanges()).toEqual(final.originalChanges());

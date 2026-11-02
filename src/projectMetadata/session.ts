@@ -635,8 +635,8 @@ export class MetadataProjectSession {
           purpose: 'restoreBackup', proof: source.proof, baseHeads: [], ...capabilityFields(readRequiredCapabilities(inspection.archive.control.manifest.requiredCapabilities)) }, parts: initialWorkspaceChanges(source, this.limits), remote: input,
           ...(facts.stagedBlobs?.length ? { stagedBlobs: [...facts.stagedBlobs] } : {}), modelFacts: { next: source, plan: facts } };
       } else this.retained = null;
-      await this.resume(undefined, job);
-      const current = await this.read();
+      // resume returns its fresh post-publication readback under this same lease.
+      const current = await this.resume(undefined, job);
       if (current.state !== 'ready' || current.publication !== job.id || current.source?.token !== source.token) return fail('restore-publication-readback');
       return current;
     });

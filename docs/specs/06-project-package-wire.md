@@ -3276,6 +3276,28 @@ service. Executed checks and remaining browser/device evidence are recorded only
 in `tasks/todo.md`; this is not ordinary-route activation, adoption or release.
 
 
+### 2026-11-02 adjacent backup-initialization result
+
+`initializeBackup` may consume the owned read returned by its immediately awaited
+`resume(undefined, job)` in the same exclusive lease and exact staging pair.
+`resume` must still publish, perform its fresh persisted Session read, and reject
+non-ready or mismatched stored-source tokens before returning. Initialization
+must additionally check ready state, this exact Job's publication ID and the
+inspected backup's source token. No operation, write or controller transition
+may intervene before these checks. A second identical Session read at that point
+is not required. This does not reuse an earlier planning read or cache evidence.
+
+The published-reentry branch still freshly validates retained restore evidence,
+bodies and current Session state; later commands, retries, cold reopen and
+Selection retain their separate fresh checks. Outer write-lease closing audits,
+strict per-I/O staging checks, archive validation and publication readback remain.
+No read-only callback is extended. Acceptance covers the returned read's identity
+and exact originals, failure injected after publication before its readback,
+reentry after later edits, lost acknowledged evidence, same-job cold recovery,
+and independent destination verification before Selection. Compare the same
+Ki84 backup in fresh dedicated browser profiles with source-qualified builds;
+report actual stage times separately from I/O counts and environment variance.
+
 ### 2026-10-31 file-output timing observation
 
 For the approved file-output latency investigation, extend the existing optional

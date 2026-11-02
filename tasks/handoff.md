@@ -6,7 +6,26 @@ checks, remaining work and genuine stop conditions; [inventory](implementation-i
 owns route-specific coverage. Check the actual Git branch/HEAD/worktree and
 preserve existing changes. Do not reconstruct current work from old checkpoints.
 
-Current grouped Drawing/camera/approved07o work has clean independent review and
+## Current boundary
+
+The overall-review-first restore unit has a safe, independently reviewed duplicate
+read removal and complete final checkpoint/HEIC success. Source1d56 is frozen;
+actual Ki84 restore→edit→saved-file verification→normal-SW cold reopen preserves
+originals/history/payloads. The paired wall time does not establish speedup.
+Read [current todo](todo.md) for exact source, failed attempts, timings, executed
+scope and remaining acceptance; do not substitute earlier Desktop/device evidence.
+
+The next latency decision is [PROPOSED06c](../docs/specs/06c-staging-content-inspection-proposal.md),
+independently design-reviewed but PO-unapproved/unimplemented. Active06/06b still
+permit only the existing four staging consumers. Do not broaden Session/content/
+write/Selection lifetimes from general performance authority. Short-PC list/detail
+layout remains the next ordinary UX unit. Index/privacy review, suitable g0 Push/
+CI and owned4191 delivery must be checked against actual receipts before claiming
+them complete. Preserve the private todo block and all private originals/artifacts.
+
+## Previous completed checkpoint context
+
+Previous grouped Drawing/camera/approved07o work has clean independent review and
 actual Ki84 conversion→image/edit→backup→independent restore→final normal-SW cold
 acceptance. The final UI also verifies native home keyboard opening and18 readable
 image-omission explanations; existing Projects/edits and old recipes stay intact.
@@ -14,8 +33,21 @@ Strict JPEG admission is unchanged. Read [current todo](todo.md) for exact scope
 retained failed attempts and qualifications. The frozen final source passes
 147 files/3272 tests with21 known TODOs (1457.87s), actual Exit0, and the equivalent
 required serial Windows checks all succeed with qualified exact-source/settings
-reuse of typecheck/Desktop/offline builds. New Git/actual Linux CI/4191 delivery
-remains pending with root. No source edits or doc-only runtime repeats are planned.
+reuse of typecheck/Desktop/offline builds. The reviewed checkpoint is committed/
+pushed to g0, the final root-base4191 preview is verified by all20 HTTP resources
+and fresh normal-SW Chromium, and actual Linux CI succeeds on the exact checkout:
+147 files/3272 PASS/21 TODO (845.54s), including typecheck/build/HEIC checks.
+
+The one unchanged-backup/fresh-profile restore diagnosis is complete at90.934s;
+initialize is the largest measured phase at58.62s. This is not a speed comparison
+with the earlier150.755s run or proof of an environment cause. Next work is its
+pure-read/control-audit amplification and repeated image inspection, first split
+inside initialization while keeping write/readback/publication/Selection fences.
+No whole-initialize read batch, cross-read evidence cache or validation relaxation
+is authorized by
+that observation. See [current todo](todo.md) for the capped diagnostics and
+remaining save/copy/short-height work. No source changes, new commit/push or
+repetition of completed runtime checks are planned for these local result notes.
 
 The preceding completed unit is the six connected pin/camera/Caption/drawing repairs,
 recorded in [current todo](todo.md) and [the workspace design](../docs/ui-workspace-design.md).

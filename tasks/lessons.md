@@ -71,6 +71,13 @@ Read only the relevant topic, not every historical incident.
   Repeated output discovery and harness conversion are hypotheses to investigate,
   not established browser bottlenecks. Preserve the accepted read-operation
   lifetime and all write/publication/recovery checks.
+  2026-11-02 managed-environment refinement: Git executable availability does not
+  prove permission to create the synthetic test repositories. If that authority
+  is uncertain, use the existing Git-copy isolation case before a long full run;
+  a shared setup refusal does not establish failures in its skipped case bodies.
+  Retain the refusal and request the actual environment permission rather than
+  changing tests or bypassing the sandbox. Quiet buffered output plus CPU activity
+  alone is not proof that a test has hung; qualify an interrupted run as incomplete.
   When different connected cases exceed waits in consecutive full runs, stop
   individual poll fixes/full reruns and inspect their common operation completion
   and resource lifetime. Await actual owner/UI confirmation, close fixture-owned
