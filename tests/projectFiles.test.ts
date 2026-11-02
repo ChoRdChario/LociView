@@ -3568,13 +3568,33 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect(captionId).not.toBe(f.captionId);
     const edited = await r.session.editCaption(imported.source!.token, captionId, 'body', '独立した記録');
     const cold = r.reopen(), [jobId] = await CleanInputJob.ids(r.fs);
-    expect((await cold.session.read()).source!.originalChanges()).toEqual(edited.source!.originalChanges());
+    const openInput = vi.spyOn(CleanInputJob, 'open');
+    try {
+      expect((await cold.session.read()).source!.originalChanges()).toEqual(edited.source!.originalChanges());
+      expect(openInput).toHaveBeenCalledTimes(1);
+    } finally { openInput.mockRestore(); }
     expect((await cold.receiver.retry(jobId!)).source!.token).toBe(edited.source!.token);
     await expect(cold.receiver.receive(edited.source!.token, file)).rejects.toThrow('独立コピー');
     await expect(cold.receiver.importWorkspace(file)).rejects.toThrow('clean-import-not-empty');
     expect((await cold.receiver.jobs())[0]).toMatchObject({ state: 'completed' });
     await sender.verifyFile(id, file); expect((await sender.jobs()).find(j => j.id === id)?.state).toBe('file-verified');
+    const heldInput = await CleanInputJob.open(r.fs, jobId!, metadata);
+    const prepared = (await new TransactionJournal(r.fs, metadata).entries()).find(entry => entry.start.transactionId === jobId)!.prepared!;
+    const completionSteps = vi.spyOn(CleanInputJob.prototype, 'steps');
+    try {
+      expect((await cold.session.previewCleanOutput(edited.source!.token)).token).toBe(edited.source!.token);
+      expect(completionSteps).toHaveBeenCalledTimes(1);
+    } finally { completionSteps.mockRestore(); }
+    const completionPath = `v2/packages/clean-input/${jobId}/published.json`, completion = (await r.fs.readText(completionPath))!;
+    await r.fs.remove(completionPath);
+    await expect(cold.session.previewCleanOutput(edited.source!.token)).rejects.toThrow('output-receive-pending');
+    await r.fs.writeText(completionPath, '{}');
+    await expect(cold.session.previewCleanOutput(edited.source!.token)).rejects.toThrow('clean-input-completion');
+    await r.fs.writeText(completionPath, completion);
     await r.fs.remove(`v2/packages/clean-input/${jobId}/input.zip`);
+    await expect(CleanInputJob.validateJournalFresh(r.fs, jobId!, metadata, prepared)).rejects.toThrow();
+    await expect(heldInput.validateJournal(prepared)).rejects.toThrow();
+    expect(await r.fs.exists(`v2/packages/clean-input/${jobId}/input.zip`)).toBe(false);
     expect((await cold.session.read()).state).toBe('repair-required');
     await expect(cold.receiver.retry(jobId!)).rejects.toThrow();
     expect((await f.receiver.session.read()).source!.encodeFullSource()).toEqual(sourceBytes);
@@ -3851,6 +3871,42 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect(observed).toHaveBeenCalledExactlyOnceWith(finalRead); expect(finalRead.state).toBe('ready'); expect(finalRead.source!.token).toBe(sent.current.source!.token);
     const inspected = await BackupArchive.inspect(await sender.download(id), metadata); expect(inspected.source.originalChanges()).toEqual(finalRead.source!.originalChanges());
     await expect(sender.generateBackup(finalRead.source!.token, undefined, undefined, () => { throw Error('display observer'); })).resolves.toEqual(expect.any(String));
+  }, 20000);
+  it('observes Workspace metadata only after success and freshly marks an unchanged-token backup stale when the new base is recorded', async () => {
+    const { f, sent } = await contributionTeam(), session = f.receiver.session, sender = new WorkspaceSender(f.fs, session, f.store, metadata, f.locks);
+    const token = sent.current.source!.token, backupId = await sender.generateBackup(token), before = await sender.outputOverview();
+    expect(before.jobs.find(j => j.id === backupId)).toMatchObject({ stale: false });
+    const observed = vi.fn(), reads = vi.spyOn(session, 'read');
+    try {
+      const id = await sender.generate(token, undefined, observed), current = await reads.mock.results.at(-1)!.value;
+      expect(observed).toHaveBeenCalledExactlyOnceWith(current); expect(current.source!.token).toBe(token);
+      const expected = await sender.outputOverview(); reads.mockClear();
+      const overview = await sender.outputOverview(current, current);
+      expect(overview).toEqual(expected); expect(reads).not.toHaveBeenCalled();
+      expect(overview.jobs.find(j => j.id === backupId)).toMatchObject({ state: 'generated', stale: true });
+      expect(overview.jobs.find(j => j.id === id)).toMatchObject({ purpose: 'teamWorkspace', state: 'generated' });
+      expect(overview.bases).toHaveLength(before.bases.length + 1);
+      const archive = await WorkspaceArchive.inspect(await sender.download(id), metadata);
+      expect(archive.source.originalChanges()).toEqual(current.source!.originalChanges());
+    } finally { reads.mockRestore(); }
+  }, 20000);
+  it.each(['write', 'package'] as const)('forwards no Workspace presentation when the outer %s boundary rejects', async boundary => {
+    const { f, sent } = await contributionTeam(), observed = vi.fn(); let recorded = false, rejectClosing = true;
+    const priorIds = await WorkspaceOutputJob.ids(f.fs);
+    const baseRecorded = WorkspaceOutputJob.prototype.baseRecorded, record = vi.spyOn(WorkspaceOutputJob.prototype, 'baseRecorded').mockImplementation(async function(this: WorkspaceOutputJob, ...args) {
+      const result = await baseRecorded.apply(this, args); recorded = true; return result;
+    });
+    if (boundary === 'write') registerWriteFence(f.fs, async () => { if (recorded && rejectClosing) throw Error('Workspace outer write refused'); });
+    const locks = boundary === 'write' ? f.locks : { request(name: string, options: LockOptions, action: (lock: Lock | null) => Promise<unknown>) {
+      return f.locks.request(name, options, async lock => { await action(lock); throw Error('Workspace outer package refused'); });
+    } } as unknown as LockManager;
+    try {
+      const sender = new WorkspaceSender(f.fs, f.receiver.session, f.store, metadata, locks);
+      await expect(sender.generate(sent.current.source!.token, undefined, observed)).rejects.toThrow(`Workspace outer ${boundary} refused`);
+      expect(recorded).toBe(true); expect(observed).not.toHaveBeenCalled(); rejectClosing = false;
+      const id = (await WorkspaceOutputJob.ids(f.fs)).find(value => !priorIds.includes(value)), normal = new WorkspaceSender(f.fs, f.receiver.session, f.store, metadata, f.locks);
+      await normal.retry(id!); expect((await normal.jobs()).find(j => j.id === id)).toMatchObject({ state: 'generated' });
+    } finally { record.mockRestore(); }
   }, 20000);
   it('does not observe a backup result rejected by its outer write fence, retaining the exact artifact for strict retry', async () => {
     const { f, sent } = await contributionTeam(), observed = vi.fn(); let finished = false;
@@ -4449,7 +4505,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     let cameraEpoch = 1, display: Parameters<ReturnType<ViewportFactory>['update']>[0] | undefined, issue: string | null = null;
     let projected: typeof display, holdFrame = false, viewportDragging = false, notifyViewport = () => {}, pinPoint = { x: 30, y: 40 };
     let extent = { left: 10, top: 20, width: 600, height: 400 };
-    const retryViewport = vi.fn(() => { issue = null; }), reservePointer = vi.fn();
+    const retryViewport = vi.fn(() => { issue = null; }), reservePointer = vi.fn(), navigateCamera = vi.fn((_event:Parameters<NonNullable<import('../src/projectScene/viewportPorts').ProjectViewport['navigateCamera']>>[0]) => true);
     let payload: DisplayCapture = { camera: { position: [1, 0, 5], target: [0, 0, 0], up: [0, 1, 0], projection: { kind: 'perspective', verticalFovRadians: Math.PI / 4 } },
       background: { kind: 'solid', colorSrgb: [0.123456, 0.654321, 0.333333] } };
     const camera = vi.fn((intent: Parameters<ReturnType<ViewportFactory>['camera']>[0]) => { cameraEpoch++;
@@ -4464,7 +4520,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const factory: ViewportFactory = (canvas, changed, pin, model) => { proposeModel = model; proposePin = pin; notifyViewport = changed;
       Object.assign(canvas, { getBoundingClientRect: () => ({ ...extent }) });
       return { update: next => { display = next; if (!holdFrame) projected = next; }, setActive() {}, setPinPointerActive: reservePointer, camera, retry: retryViewport, dispose: vi.fn(), pickCreation: pick,
-        capture: () => structuredClone(payload), recall, setBackground: background,
+        capture: () => structuredClone(payload), recall, setBackground: background, navigateCamera,
         read: () => ({ ready: !!projected, token: String(cameraEpoch), pickToken: String(cameraEpoch), display: projected, pins: projected?.pins.map(p => ({ id: p.id, ...pinPoint, visible: true })) ?? [],
           issue, notice: '検証用の表示通知', dragging: viewportDragging, projection: payload.camera.projection.kind, axis: null }) };
     };
@@ -4517,7 +4573,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       const before = liveHost.read().source!.token; await completed(action);
       expect(liveHost.read().source!.token).not.toBe(before);
     };
-    return { f, host, ui, editor, root, all, named, button, edited, completed, failed, status, downloads, legacy, dispatch, pick,
+    return { f, host, ui, editor, root, all, named, button, edited, completed, failed, status, downloads, legacy, dispatch, pick, navigateCamera,
       // The Caption now contains media forms too. Select its text-action footer,
       // rather than an unrelated hidden media cancel in this DOM recorder.
       captionTextActions: () => all(named('キャプションの詳細',editor)).find(n=>n.className==='lv-caption-detail-actions' && n.children.some(child=>child.textContent==='変更を適用'))!,
@@ -4533,16 +4589,57 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
   it('batches renderer observations without delaying typed intents or accepting stale view captures',async()=>{
     const h=await productWorkspaceFixture(true),frames=new Map<number,FrameRequestCallback>();let next=0;
     vi.stubGlobal('requestAnimationFrame',(fn:FrameRequestCallback)=>{const id=++next;frames.set(id,fn);return id;});vi.stubGlobal('cancelAnimationFrame',(id:number)=>frames.delete(id));
-    const flush=()=>{for(const[id,fn]of [...frames]){frames.delete(id);fn(0);}},scene=h.named('シーン',h.editor).children.find(n=>n.tag==='div')!,choices=[...scene.children],markers=h.all(h.editor).find(n=>n.className==='lv-project-markers')!,rebuild=vi.spyOn(markers,'replaceChildren'),before=h.host.read().source!.token;
+    const flush=()=>{for(const[id,fn]of [...frames]){frames.delete(id);fn(0);}},scene=h.named('シーン',h.editor).children.find(n=>n.tag==='div')!,choices=[...scene.children],markers=h.all(h.editor).find(n=>n.className==='lv-project-markers')!,rebuild=vi.fn(),before=h.host.read().source!.token;
+    const marker=markers.children[0]!,dataset=h.status.dataset;h.status.dataset=new Proxy(dataset,{set(target,key,value){if(key==='busy')rebuild();return Reflect.set(target,key,value);}});
     choices[0]!.focus();
     try{
-      for(let i=0;i<20;i++)h.pinPoint({x:30+i,y:40+i});expect(frames.size).toBe(1);expect(rebuild).not.toHaveBeenCalled();expect(markers.children[0]!.style.left).toBe('30px');flush();expect(rebuild).toHaveBeenCalledOnce();expect(markers.children[0]!.style.left).toBe('49px');expect(markers.children[0]!.style.top).toBe('59px');expect(scene.children).toEqual(choices);expect(scene.document.activeElement).toBe(choices[0]);expect(h.host.read().source!.token).toBe(before);expect(h.dispatch).not.toHaveBeenCalled();
+      for(let i=0;i<20;i++)h.pinPoint({x:30+i,y:40+i});expect(frames.size).toBe(1);expect(rebuild).not.toHaveBeenCalled();expect(markers.children[0]!.style.left).toBe('30px');flush();expect(rebuild).toHaveBeenCalledOnce();expect(markers.children[0]!.style.left).toBe('49px');expect(markers.children[0]!.style.top).toBe('59px');expect(markers.children[0]).toBe(marker);expect(scene.children).toEqual(choices);expect(scene.document.activeElement).toBe(choices[0]);expect(h.host.read().source!.token).toBe(before);expect(h.dispatch).not.toHaveBeenCalled();
       h.setIssue('最初の表示エラー');h.refresh();h.setIssue('最新の表示エラー');h.refresh();expect(frames.size).toBe(1);flush();expect(h.all(h.editor).find(n=>n.className==='lv-project-viewport-status')!.textContent).toContain('最新の表示エラー');
       h.setIssue('');h.refresh();const cancelled=[...frames.values()][0]!;const count=rebuild.mock.calls.length;h.button('モデル',h.editor).fire('click');expect(frames.size).toBe(0);expect(rebuild).toHaveBeenCalledTimes(count+1);cancelled(0);expect(rebuild).toHaveBeenCalledTimes(count+1);
       h.button('キャプション',h.editor).fire('click');expect(h.button('ピンを追加',h.editor).disabled).toBe(false);h.dragging(true);expect(frames.size).toBe(1);h.button('ピンを追加',h.editor).fire('click');expect(h.pick).not.toHaveBeenCalled();expect(h.dispatch).not.toHaveBeenCalled();expect(frames.size).toBe(0);h.dragging(false);flush();
       h.named('カメラ位置',h.editor).open=true;h.named('カメラ位置',h.editor).fire('toggle');const views=h.named('視点の作業',h.editor);h.moveCamera();h.refresh();const captured=h.payload();await h.edited(()=>h.button('開始視点を記録',views).fire('click'));flush();const command=h.dispatch.mock.calls.map(c=>c[1]).find(c=>c.kind==='createView')!;expect(command).toMatchObject({kind:'createView',makeEntry:true,camera:captured.camera,background:captured.background});
       h.refresh();const late=[...frames.values()][0]!;await h.ui.dispose();expect(frames.size).toBe(0);const stopped=rebuild.mock.calls.length;late(0);h.refresh();expect(rebuild).toHaveBeenCalledTimes(stopped);expect(frames.size).toBe(0);
     }finally{await h.ui.dispose();vi.unstubAllGlobals();}
+  });
+  it('owns marker camera drags without selecting, retaining ignored input or accepting late pointer work', async () => {
+    const h=await productWorkspaceFixture(true), marker=h.all(h.editor).find(n=>n.className==='lv-project-marker')!;
+    const capture=new Set<number>();Object.assign(marker,{setPointerCapture:(id:number)=>capture.add(id),hasPointerCapture:(id:number)=>capture.has(id),releasePointerCapture:(id:number)=>capture.delete(id)});
+    const down={pointerId:31,isPrimary:true,pointerType:'mouse',button:0,buttons:1,clientX:30,clientY:40,preventDefault(){}};
+    const before=h.host.read().source!.token;
+    for(const extra of [{altKey:true},{ctrlKey:true},{pointerType:'touch'}]){marker.fire('pointerdown',{...down,...extra});expect(capture.size).toBe(0);}
+    marker.fire('pointerdown',down);marker.fire('pointermove',{...down,clientX:50});
+    expect(h.navigateCamera.mock.calls).toMatchObject([[{phase:'begin',kind:'orbit'}],[{phase:'move',dx:20,dy:0}]]);
+    h.pinPoint({x:60,y:70});h.button('モデル',h.editor).fire('click');expect(h.all(h.editor)).toContain(marker);expect(capture.size).toBe(1);
+    marker.fire('pointerup',down);marker.fire('click');expect(h.named('本文',h.editor).value).toBe('');
+    expect(h.navigateCamera).toHaveBeenLastCalledWith(expect.objectContaining({phase:'end'}));expect(capture.size).toBe(0);expect(h.dispatch).not.toHaveBeenCalled();
+    marker.fire('pointerdown',{...down,pointerId:32,button:2,buttons:2});marker.fire('pointermove',{...down,pointerId:32,button:2,buttons:2,clientY:60});marker.fire('pointercancel',{...down,pointerId:32});
+    expect(h.navigateCamera.mock.calls.some(c=>(c[0] as any).kind==='pan')).toBe(true);
+    const calls=h.navigateCamera.mock.calls.length;marker.fire('pointermove',{...down,pointerId:32,clientX:70});expect(h.navigateCamera).toHaveBeenCalledTimes(calls);
+    marker.fire('pointerdown',{...down,pointerId:33});await h.ui.dispose();expect(capture.size).toBe(0);marker.fire('pointermove',{...down,pointerId:33,clientX:90});expect(h.navigateCamera).toHaveBeenCalledTimes(calls);expect(h.host.read().source!.token).toBe(before);
+  });
+  it('keeps material preview local, preserves Scene precedence and restores canonical display on cancel or stale input', async () => {
+    const h=await productWorkspaceFixture(true,false,false,'map2'),{host,editor,named,button}=h;
+    button('描画',editor).fire('click');const panel=named('描画の作業',editor),opacity=named('不透明度（%）',panel),before=host.read().source!.token;
+    const display=()=>h.display()! as import('../src/projectScene/viewportModel').RenderDisplay;
+    const model=host.authority.read().modelVersions![0]!.closure as ValidationModelClosure,slot=validationMaterialSlots(model)[0]!,asset=model.binding.assetId;
+    opacity.value='55';opacity.fire('input');expect(display().materialPreview).toBe(true);expect(display().savedMaterials![asset]![slot.target.logicalMaterialSlotId]).toMatchObject({appearance:{opacity:.55}});
+    expect(host.read().source!.token).toBe(before);expect(h.dispatch).not.toHaveBeenCalled();expect(display().pinEdit).toBeUndefined();
+    button('取り消す',panel).fire('click');button('変更を取り消す',panel).fire('click');expect(display().materialPreview).not.toBe(true);expect(host.read().source!.token).toBe(before);
+    const sceneId=display().sceneId;
+    await host.dispatch(before,{kind:'createMaterial',sceneId,overrideId:`ovr_${newId()}`,eventId:`evt_${newId()}`,routing:{target:{...slot.target},scope:{kind:'scene',sceneId}},appearance:{opacity:.8},compositing:{coverage:{policy:'inherit'},optics:'inherit'}});h.refresh();button('描画',editor).fire('click');
+    const scope=named('適用範囲',panel);scope.value='project';scope.fire('change');opacity.value='25';opacity.fire('input');
+    expect(display().materialPreview).toBe(true);expect(display().savedMaterials![asset]![slot.target.logicalMaterialSlotId]).toMatchObject({appearance:{opacity:.8}});
+    const caption=Object.keys(host.authority.read().resources.captions)[0]!;await host.dispatch(host.read().source!.token,{kind:'editCaption',captionId:caption,edits:{body:'new source'}});h.refresh();button('描画',editor).fire('click');
+    expect(opacity.value).toBe('25');expect(button('変更を適用',panel).disabled).toBe(true);expect(display().materialPreview).not.toBe(true);expect(display().savedMaterials![asset]![slot.target.logicalMaterialSlotId]).toMatchObject({appearance:{opacity:.8}});
+    await h.ui.dispose();
+  });
+  it('keeps pristine text and file focus in the reading layout, opening editing space only for an actual draft',async()=>{
+    const h=await productWorkspaceFixture(true),reading=h.all(h.editor).find(n=>n.className==='lv-caption-reading')!,task=h.all(h.editor).find(n=>n.className==='lv-caption-task')!;
+    h.all(h.editor).find(n=>n.className==='lv-project-marker')!.fire('click');
+    const file=h.named('メディアを追加',h.editor),body=h.named('本文',h.editor);Object.assign(file,{tagName:'INPUT'});Object.assign(body,{tagName:'TEXTAREA'});
+    file.focus();reading.fire('focusin');expect(task.dataset.editing).toBe('false');expect(file.disabled).toBe(false);
+    body.focus();reading.fire('focusin');expect(task.dataset.editing).toBe('false');file.focus();reading.fire('focusin');expect(task.dataset.editing).toBe('false');
+    body.value='an actual edit';body.fire('input');expect(task.dataset.editing).toBe('true');expect(h.dispatch).not.toHaveBeenCalled();await h.ui.dispose();
   });
   it('reveals the explicitly selected pin row and retains its keyboard focus across ordinary refreshes', async () => {
     const h = await productWorkspaceFixture(true), before = h.host.read().source!.token;
@@ -5059,14 +5156,16 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect(second.colorSrgb).toEqual([0xab / 255, 0xcd / 255, 0xef / 255]);
     expect(host.authority.read().resources.captions[second.captionId]!.anchor).toMatchObject({ value: { positionAsset: [-2.5, 0, 0.01] } });
     expect(host.authority.read().resources.captions[first.captionId]!.anchor).toEqual(position);
-    button('モデル', editor).fire('click');
-    const size = named('ピンの表示倍率', panel); expect(size.value).toBe('1'); size.fire('focus'); size.value = '2.5'; size.fire('input');
-    h.f.fs.reject = path => path.endsWith('/published.json'); await h.failed(() => button('倍率を適用', panel).fire('click'));
+    button('キャプション', editor).fire('click');
+    const scalePanel=named('ピンの大きさ',editor),scaleModel=named('ピンのモデル',scalePanel);expect(scaleModel.value).toBe('');scaleModel.value=host.authority.read().modelVersions![0]!.assetId;scaleModel.fire('change');
+    const markerStyles=all(editor).filter(n=>n.className==='lv-project-marker').map(n=>n.style);for(const style of markerStyles)Object.defineProperty(style,'setProperty',{value:(key:string,value:string)=>{style[key]=value;}});
+    const size = named('ピンの表示倍率', scalePanel); expect(size.value).toBe('1'); size.fire('focus'); size.value = '2.5'; size.fire('input');
+    h.f.fs.reject = path => path.endsWith('/published.json'); await h.failed(() => button('倍率を適用', scalePanel).fire('click'));
     expect(size.value).toBe('2.5'); const changes = host.read().source!.originalChanges().length;
     h.f.fs.reject = () => false; await edited(() => button('更新を再試行', editor).fire('click'));
     expect(host.read().source!.originalChanges()).toHaveLength(changes + 1);
     expect(h.display()!.pins.filter(p => [first.captionId, second.captionId].includes(p.id)).map(p => p.scale)).toEqual([2.5, 2.5]);
-    expect(all(editor).filter(n => n.className === 'lv-project-marker').every(n => n.style.transform?.includes('scale(2.5)'))).toBe(true);
+    expect(markerStyles.every(style=>style['--lv-pin-scale']==='2.5')).toBe(true);expect(all(editor).filter(n=>n.className==='lv-project-marker').every(n=>n.style.transform==='translate(-50%, -50%)')).toBe(true);
     expect(h.payload()).toEqual(camera);
     const model = host.authority.read().modelVersions![0]!, edge = Object.values(host.authority.read().state.assetMemberships).find(e => e.resourceId === model.assetId)!;
     await host.dispatch(host.read().source!.token, { kind: 'exclude', resourceKind: 'asset', membershipId: edge.id, eventId: `evt_${newId()}` }); h.refresh();
@@ -5429,8 +5528,12 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const before = host.read().source!, original = host.authority.read();
     const missingSource = vi.spyOn(host.authority, 'read').mockImplementation(() => ({ ...original, modelVersions: original.modelVersions!.filter(v => v.assetId !== first.assetId) })); h.refresh();
     choose(secondId); expect(h.display()!.preview).toBeUndefined(); expect(named('位置 X', editor).parent!.parent!.hidden).toBe(true);
-    expect(all(editor).some(n => n.textContent.includes('元の位置を確認できません'))).toBe(true); expect(h.reservePointer.mock.lastCall).toEqual([true]);
-    canvas.fire('pointerdown', pointer); canvas.fire('pointerup', pointer); await Promise.resolve(); expect(h.pick.mock.lastCall![0].map(t => t.assetId)).toEqual([secondId]);
+    expect(all(editor).some(n => n.textContent.includes('元の位置を確認できません'))).toBe(true); expect(h.reservePointer.mock.lastCall).toEqual([false]);
+    const beforeSurfaceInput = host.read().source!.token, beforeSurfaceDispatch = h.dispatch.mock.calls.length;
+    canvas.fire('pointerdown', pointer); expect(h.reservePointer.mock.lastCall).toEqual([true]);
+    canvas.fire('pointerup', pointer); expect(h.reservePointer.mock.lastCall).toEqual([false]);
+    await Promise.resolve(); expect(h.pick.mock.lastCall![0].map(t => t.assetId)).toEqual([secondId]);
+    expect(host.read().source!.token).toBe(beforeSurfaceInput); expect(h.dispatch).toHaveBeenCalledTimes(beforeSurfaceDispatch);
     missingSource.mockRestore(); h.refresh();
     button('面で位置を指定', editor).fire('click'); canvas.fire('pointerdown', pointer); canvas.fire('pointerup', pointer); await Promise.resolve();
     const x = named('位置 X', editor); x.fire('compositionstart'); x.value = '0.9'; x.fire('input');
@@ -5593,8 +5696,10 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     button('位置を確定', editor).fire('click');
     expect(host.read().source!.token).toBe(before); expect(h.dispatch).toHaveBeenCalledTimes(calls);
     const marker = all(editor).find(n => n.className === 'lv-project-marker')!;
+    Object.defineProperty(marker.style, 'setProperty', { value: (key: string, value: string) => { marker.style[key] = value; } });
+    h.refresh();
     expect(marker.attributes.get('data-review')).toBe('true'); expect(marker.attributes.get('aria-description')).toContain('要確認');
-    expect(marker.style.backgroundColor).toBe(oldColor); expect(h.display()!.pins[0]!.position).toEqual([0.2, 0.2, 0]);
+    expect(marker.style['--lv-pin-color']).toBe(oldColor); expect(h.display()!.pins[0]!.color).toBe(oldColor); expect(h.display()!.pins[0]!.position).toEqual([0.2, 0.2, 0]);
     const pointer = { pointerId: 51, button: 0, isPrimary: true, clientX: 80, clientY: 90 };
     canvas.fire('pointerdown', pointer); canvas.fire('pointerup', pointer); await Promise.resolve();
     expect(button('位置を確定', editor).disabled).toBe(false);
@@ -5621,11 +5726,12 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     button('モデル', editor).fire('click');
     named('プロジェクトのモデル一覧', panel).children[0]!.children[0]!.fire('click');
     expect(all(named('モデルの更新候補', panel)).some(n => n.textContent.includes('既存のキャプションは元のモデルに残ります'))).toBe(true);
-    const size = named('ピンの表示倍率', panel); size.fire('focus'); size.value = '2'; size.fire('input');
+    button('キャプション',editor).fire('click');const scalePanel=named('ピンの大きさ',editor),scaleModel=named('ピンのモデル',scalePanel);scaleModel.value=host.authority.read().modelVersions![0]!.assetId;scaleModel.fire('change');
+    const size = named('ピンの表示倍率', scalePanel); size.fire('focus'); size.value = '2'; size.fire('input');button('モデル',editor).fire('click');
     const beforeSize = host.read().source!.token, calls = h.dispatch.mock.calls.length;
     expect(named('重複するモデル', panel).disabled).toBe(true); expect(named('残すモデル登録', panel).disabled).toBe(true);
     button('選択を確定', panel).fire('click'); expect(h.dispatch).toHaveBeenCalledTimes(calls); expect(host.read().source!.token).toBe(beforeSize); expect(size.value).toBe('2');
-    button('倍率の変更を取り消す', panel).fire('click');
+    button('キャプション',editor).fire('click');button('倍率の変更を取り消す', scalePanel).fire('click');button('モデル',editor).fire('click');
     let decision = named('重複するモデル', panel); decision.value = 'both'; decision.fire('change');
     expect(all(panel).some(n => n.textContent.includes('モデルの配置を確定するか'))).toBe(false);
     expect(button('ファイルに保存', named('ファイル')).disabled).toBe(true);
@@ -7216,6 +7322,64 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect(button('保存').disabled).toBe(true); expect(name.disabled).toBe(true); expect(button('ファイルに保存').disabled).toBe(true);
     await workspace.dispose();
   }, 20000);
+  it('keeps successful readonly preview history without rediscovery and owns the requested Review selection', async () => {
+    const { f, fs, options } = await initialWorkspaceHostFixture(), host = owned(await openValidationHost({ ...options, workspaceFile: f.file }));
+    const before = structuredClone(host.workspaceOutput.jobs), token = host.read().source!.token, overview = vi.spyOn(WorkspaceSender.prototype, 'outputOverview');
+    let release!: () => void;
+    const gate = new Promise<void>(resolve => { release = resolve; }), original = WorkspaceSender.prototype.previewReview;
+    const pending = vi.spyOn(WorkspaceSender.prototype, 'previewReview').mockImplementation(async function(this: WorkspaceSender, ...args) { await gate; return original.apply(this, args); });
+    try {
+      expect((await host.workspaceOutput.previewClean(token)).token).toBe(token);
+      const sceneId = Object.keys(host.authority.read().state.scenes)[0]!, selection = { sceneId }, preview = host.workspaceOutput.previewReview(token, selection);
+      selection.sceneId = `scn_${newId()}`; release();
+      expect(await preview).toMatchObject({ token, sceneId, omittedEntryView: false });
+      expect(overview).not.toHaveBeenCalled(); expect(host.workspaceOutput.jobs).toEqual(before); expect(host.read().source!.token).toBe(token);
+      const generated = await host.workspaceOutput.generateClean(token);
+      expect(overview).toHaveBeenCalled(); expect(host.workspaceOutput.jobs.find(j => j.id === generated)).toMatchObject({ purpose: 'clean', state: 'generated' });
+      for (const path of await fs.list(`${validationArea}/${options.run}/v2/packages/clean-output/${generated}/artifacts/`)) await fs.remove(path);
+      await expect(host.workspaceOutput.generateClean(token)).rejects.toThrow();
+      expect(host.workspaceOutput.jobs.find(j => j.id === generated)).toMatchObject({ state: 'repair-required' });
+    } finally { release(); pending.mockRestore(); overview.mockRestore(); }
+  }, 20000);
+  it.each(['stale', 'closing', 'failure'] as const)('rejects a %s readonly preview and retains fresh recovery discovery', async variant => {
+    const { f, options } = await initialWorkspaceHostFixture(), host = owned(await openValidationHost({ ...options, workspaceFile: f.file }));
+    const token = host.read().source!.token, original = WorkspaceSender.prototype.previewClean, overview = vi.spyOn(WorkspaceSender.prototype, 'outputOverview');
+    let release!: () => void, entered!: () => void;
+    const gate = new Promise<void>(resolve => { release = resolve; }), ready = new Promise<void>(resolve => { entered = resolve; });
+    const command = vi.spyOn(WorkspaceSender.prototype, 'previewClean').mockImplementation(async function(this: WorkspaceSender, ...args) {
+      const result = await original.apply(this, args); entered(); await gate;
+      if (variant === 'failure') throw Error('readonly preview failed');
+      return variant === 'stale' ? { ...result, token: 'stale' } : result;
+    });
+    let closing: Promise<void> | undefined;
+    try {
+      const preview = host.workspaceOutput.previewClean(token), rejected = expect(preview).rejects.toThrow();
+      await ready;
+      if (variant === 'closing') closing = host.dispose();
+      release(); await rejected; await closing;
+      expect(overview).toHaveBeenCalled(); expect(host.workspaceOutput.jobs.some(j => j.purpose === 'clean')).toBe(false);
+    } finally { release(); await closing; command.mockRestore(); overview.mockRestore(); }
+  }, 20000);
+  it.each(['observed', 'missing'] as const)('keeps Workspace %s display local with fresh base discovery', async variant => {
+    const { f, options } = await initialWorkspaceHostFixture(), host = owned(await openValidationHost({ ...options, workspaceFile: f.file }));
+    const generate = WorkspaceSender.prototype.generate, seen: { supplied: boolean; reads: number }[] = [], overview = WorkspaceSender.prototype.outputOverview;
+    const command = vi.spyOn(WorkspaceSender.prototype, 'generate').mockImplementation(function(this: WorkspaceSender, token, signal, observer) {
+      return generate.call(this, token, signal, variant === 'missing' ? undefined : observer);
+    });
+    const discovery = vi.spyOn(WorkspaceSender.prototype, 'outputOverview').mockImplementation(async function(this: WorkspaceSender, current, display) {
+      const session = (this as unknown as { session: ReturnType<typeof validationProjectService>['session'] }).session, reads = vi.spyOn(session, 'read');
+      try { return await overview.call(this, current, display); }
+      finally { seen.push({ supplied: !!display, reads: reads.mock.calls.length }); reads.mockRestore(); }
+    });
+    try {
+      const token = host.read().source!.token, backup = await host.workspaceOutput.generateBackup(token), bases = host.workspaceOutput.bases.length; seen.length = 0;
+      const workspace = await host.workspaceOutput.generate(token);
+      expect(seen).toEqual([{ supplied: variant === 'observed', reads: variant === 'observed' ? 0 : 1 }]);
+      expect(host.workspaceOutput.jobs.find(j => j.id === backup)).toMatchObject({ stale: true });
+      expect(host.workspaceOutput.jobs.find(j => j.id === workspace)).toMatchObject({ state: 'generated', purpose: 'teamWorkspace' });
+      expect(host.workspaceOutput.bases).toHaveLength(bases + 1); expect(host.read().source!.token).toBe(token);
+    } finally { command.mockRestore(); discovery.mockRestore(); }
+  }, 30000);
   it.each(['missing', 'nonready', 'publication'] as const)('keeps successful backup display local and falls back freshly after a later %s observation', async variant => {
     const { f, options } = await initialWorkspaceHostFixture(), host = owned(await openValidationHost({ ...options, workspaceFile: f.file }));
     const overview = WorkspaceSender.prototype.outputOverview, generate = WorkspaceSender.prototype.generateBackup;
@@ -9870,10 +10034,26 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       const placement:ReadonlyRenderModel['assetToProject']={translation:[0,0,0],rotationXYZW:[0,0,0,1],uniformScale:1},model:ReadonlyRenderModel={shape:'render-glb',key:'test-upload-owner',assetId:'test-asset',assetToProject:placement,
         representation:{id:'test-representation',contentKind:'mesh',role:'meshPrimary',variantFamilyId:'test-family',formatProfile:{id:'development-validation-glb-1'},representationToAsset:{...placement,reflection:'none'},logicalBoundsAsset:inspected.bounds,
           materialCatalog:{layoutId:'test-layout',slots:inspected.materials.map((m,i)=>({...m,logicalMaterialSlotId:`test-slot-${i}`}))}} as any};
+      const normalMap=new THREE.Texture(materials[0]!.map!.image);for(const material of materials)if(material instanceof THREE.MeshStandardMaterial)material.normalMap=normalMap;
       const cache=await prepareReadonlyResidents([model],{model:async()=>inspected},async()=>result),surface=cache.create(model);
-      const sourceTextures=new Set(materials.flatMap(m=>m.map?[m.map]:[]));expect(new Set(surface.gpuTextures)).toEqual(sourceTextures);
+      const nodes:THREE.Mesh[]=[];surface.mesh.traverse(node=>{if(node instanceof THREE.Mesh)nodes.push(node);});const geometry=nodes.map(n=>n.geometry),initialMaterials=nodes.map(n=>n.material),oldDisposed=[...new Set(initialMaterials as THREE.Material[])].map(m=>vi.spyOn(m,'dispose'));
+      const slot=validationMaterialSlots(model).find(s=>s.source?.lighting==='lit')!;
+      const unlit={appearance:{lighting:'unlit' as const},compositing:{coverage:{policy:'inherit' as const},optics:'inherit' as const}};
+      surface.materialFrameSeen!();
+      const admit=vi.fn();expect(surface.gpuTextures).toContain(normalMap);surface.setMaterialEffects!({[slot.target.logicalMaterialSlotId]:unlit},admit);
+      expect(admit).toHaveBeenCalledOnce();expect(surface.gpuTextures).not.toContain(normalMap);expect(nodes.map(n=>n.geometry)).toEqual(geometry);for(const disposed of oldDisposed)expect(disposed).not.toHaveBeenCalled();
+      const intermediate=[...new Set(nodes.map(n=>n.material as THREE.Material))].map(m=>vi.spyOn(m,'dispose'));
+      surface.setMaterialEffects!({[slot.target.logicalMaterialSlotId]:{...unlit,appearance:{lighting:'unlit',opacity:.9}}},admit);
+      for(const dispose of intermediate)expect(dispose).toHaveBeenCalledOnce();for(const dispose of oldDisposed)expect(dispose).not.toHaveBeenCalled();surface.materialFrameSeen!();for(const dispose of oldDisposed)expect(dispose).toHaveBeenCalledOnce();
+      const previewMaterials=nodes.map(n=>n.material),previewTextures=surface.gpuTextures;
+      expect(()=>surface.setMaterialEffects!({},textures=>{expect(textures).toContain(normalMap);throw Error('texture admission refused');})).toThrow('texture admission refused');
+      expect(nodes.map(n=>n.material)).toEqual(previewMaterials);expect(surface.gpuTextures).toBe(previewTextures);expect(nodes.map(n=>n.geometry)).toEqual(geometry);
+      expect(()=>surface.setMaterialEffects!({[slot.target.logicalMaterialSlotId]:{...unlit,appearance:{opacity:2}}},admit)).toThrow();expect(nodes.map(n=>n.material)).toEqual(previewMaterials);
+      surface.setMaterialEffects!({},admit);expect(surface.gpuTextures).toContain(normalMap);expect(nodes.map(n=>n.geometry)).toEqual(geometry);
+      for(const material of materials)if(material instanceof THREE.MeshStandardMaterial)expect(material.normalMap).toBe(normalMap);
+      const sourceTextures=new Set([...materials.flatMap(m=>m.map?[m.map]:[]),normalMap]);expect(new Set(surface.gpuTextures)).toEqual(sourceTextures);
       const heldImages=[...sourceTextures].map(t=>t.image as {close:ReturnType<typeof vi.fn>});for(const texture of surface.gpuTextures!)texture.dispose();
-      for(const image of heldImages)expect(image.close).not.toHaveBeenCalled();surface.dispose!();cache.dispose();
+      for(const image of heldImages)expect(image.close).not.toHaveBeenCalled();surface.dispose!();cache.dispose();expect(()=>surface.setMaterialEffects!({},admit)).toThrow('閉じ');
       expect(bitmaps.length).toBeGreaterThan(0); result.dispose(); result.dispose();
       for (const bitmap of bitmaps) expect(bitmap.close).toHaveBeenCalledOnce();
       vi.stubGlobal('createImageBitmap', async () => { throw Error('injected decoder failure'); });

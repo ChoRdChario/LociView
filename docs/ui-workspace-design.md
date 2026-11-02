@@ -34,7 +34,7 @@ wire/schema/ID規則は変えない。部分成功を表示せず、記録とent
 | Caption | 同じ右ペイン内に一覧と詳細を同時表示。検索／一覧スクロールと、本文・添付・編集中の確定／取消がそれぞれ利用できる。詳細のDOM／draftは一つだけ |
 | 記録の操作 | 一覧枠内の選択対象用操作列に位置調整・親モデル変更・記録整理を置く。フォームはvirtualized行へ埋めず、同じ安定したownerで保持する |
 | ピン色の絞り込み | PCの一覧・詳細同時表示では検索横の専用「ピンの色」内に既存選択肢をまとめる。旧常設サークル配置の例外をUI指針に明記し、色の判定・選択保持・全色／未知色の規則は変えない |
-| ピン | 未選択ピンは色付きのピンだけを表示し、題名の常時ラベルを出さない。選択強調・色・倍率・要確認・44px操作域・accessible nameは保持する |
+| ピン | 選択中を含む全ピンは色付きのピンだけを表示し、題名の常時ラベルを出さない。小さい輪郭の選択強調・色・倍率・要確認・44px操作域・accessible nameは保持する。浮遊Caption窓の題名は保持する |
 | ピン追加 | 通常は面を選んで追加。「座標で追加」は同じ追加の補助入口としてまとめ、モデル内XYZを指定することを任意説明で伝える。GS／面なし経路も保持 |
 | タグ | 仕様08で後から接続した分類機能。記録整理内の二次操作とし、既存タグ・所属・色を保持。実装されていないタグ検索を案内しない |
 | 比較 | 記録を複数並べて読む補助機能。窓や問題がない場合は左下管理を隠す。「比較に表示」の入口、保持・配置・閉じた状態は保持する |
@@ -408,3 +408,124 @@ restore it when the affected surface is shown. This changes no rendering, pickin
 predicate, manual-position permission or saved material. Verify hidden→shown and
 the retained conservative picking refusal with the original07n and mixed-surface
 browser paths, not by weakening ready-state or pixel/picking assertions.
+
+## 2026-11-02 Pin, camera and drawing comfort
+
+PO's six changes amend the earlier selected-pin title and middle-only navigation
+presentation. They do not alter records, rendering semantics or command authority.
+
+1. All pin roots, including the selected pin, are compact colored dots without
+   a visible title plate. Keep the44px hit area and accessible Caption name;
+   selection/focus outlines follow the small dot, and needs-review remains
+   accessible/visible. Floating Caption windows keep their title/content. Their
+   existing nearest-edge connector gains a thin contrasting outline on light
+   and dark backgrounds, remains pointer-transparent and uses the same receipt.
+2. Ordinary canvas left-drag orbits and right-drag pans; existing middle/modifier,
+   wheel, keyboard and camera-gizmo alternatives remain. Pin overlays reuse
+   `navigateCamera(begin/move/end)` after the existing4px click threshold, with
+   owned pointer/target/token/Scene lifetime and cancellation. No synthetic canvas
+   events, drag-end writes or guessed hits. Placement left capture, Shift+left,
+   pin/model gizmos and window manipulation win; right pan remains available
+   between placement hits without changing the proposal.
+3. While no Caption input/IME/position operation is active, give the list most
+   available height and compact the selected reading detail; no selection needs
+   only one short detail hint. Entering editing retains the same detail DOM,
+   draft and focus and gives its controls space. Preserve search/manual scroll,
+   selected-row reveal, both list/detail and Apply/Cancel access, short-height
+   overflow, narrow width and200%-equivalent keyboard operation.
+4. Move the existing Asset-wide `setAssetPinScale` control into Caption, with an
+   explicit model selector and the existing0.001–1000 range/default/saved value.
+   It affects that model's pins across all Scenes, never just one Caption or all
+   models. Unplaced/no selected Caption and multiple models still allow explicit
+   target choice. Keep readonly/conflict/stale/IME/draft guards and one Apply.
+5. Numeric drawing fields retain text/keyboard entry and gain horizontal label/
+   value scrubbing with visible focus/cursor. Parse/range/admit rules stay the
+   same. Coalesce local previews to one animation frame; do not dispatch while
+   moving or commit on release. Escape/pointer-cancel restores that gesture's
+   starting draft. Explicit Apply is the existing single Session command; Cancel
+   restores the saved display. Display rounding must not rewrite saved precision.
+6. Normal approximation guidance has one short visible owner and optional
+   contextual detail. Keep actual unsupported/hidden/error/retry and picking
+   restrictions visible beside the affected action; never imply accurate smooth
+   picking or silently hide a blocking warning.
+
+The typed presentation proposal contains source token, Scene, exact MaterialTarget,
+scope, existing override identity and validated MaterialIntent. The material panel
+exposes only this current local proposal; `WorkspaceViewportState` carries it to
+the product adapter. Reuse material parsing/admission and current Scene-vs-Project
+precedence. Invalid/IME/stale/source/Scene/model/selection changes clear preview;
+the provider, templates, saved records, CAS and file capture remain unchanged.
+Preview grants no pick/save/publication evidence and restores saved presentation
+before applying or changing authority.
+
+For existing loaded Meshes, the internal ResidentSurface may expose
+`setMaterialEffects(effects, admitTextures): void`, where effects retain the
+existing `ValidationMaterialEffects` type and the synchronous callback receives
+the exact next source-texture set. The hook is bound to that live surface and
+captured representation/catalog/policy; disposed calls reject. Re-run existing
+material validation and build every replacement from original template materials,
+never the previous preview. Invoke texture admission before any node swap. The
+viewport tracks/reserves newly needed uploads transactionally; admission failure
+releases only its new reservations, disposes new materials and preserves the old
+set. Success swaps and retires superseded materials under the frame handover below, updates the exact dynamic
+texture set and releases only globally unused uploads. Never pre-reserve a fixed
+texture superset, close CPU bitmaps, or forget maps between detach and swap.
+Geometry/source texture identities, model placement and resident use count stay
+identical. Point/GS/unknown surfaces keep existing fallback, with no forced hook.
+Every effective change still invalidates coverage probes and the pick epoch.
+Full compositor teardown remains required for Scene/model/geometry/resident-set,
+visibility/context/layout or GS-base generation changes and unknown adapters.
+For an exact material-only update, all existing resident identities and load states
+must match and each resident must support the owned material hook and frame callback.
+This first refinement is Mesh-only; Point/GS/unknown adapters keep full clear even
+when unchanged. Retain the existing compositor/targets only inside that same owner. Its render builds
+current accumulation variants while previous variants still hold program refs;
+after a successful actual draw, dispose/prune unused variants, retaining skip and
+only the current GS variant if present. Pruning releases materials, never source
+textures, targets or GS claims. Failure/closing follows existing full teardown.
+The Mesh surface also exposes optional `materialFrameSeen(): void`. It owns
+only its current source-material table and at most the last presented table;
+unpresented intermediate tables are disposed immediately, never queued. A
+completed viewport draw (including the existing explicit fallback policy) marks
+the current table seen and retires the previous table after compositor draw/prune.
+Owner failure/close disposes both tables exactly once; this does not retain GPU
+texture uploads, geometry or CPU bitmaps or certify picking/saving evidence.
+This is bounded handover, not a persistent variant cache or new shader/uniform API.
+Changed shader classes/coverage keys may legitimately compile new programs.
+Accept with scalar-run/Cancel pixels, actual GL events, bounded variants/leases,
+and a structural transition that still performs full clear; no numeric guarantee.
+No decode/template rebuild per pointer move. The application viewport may refresh
+its existing coverage/composition observation, never a new renderer algorithm.
+Apply's resulting saved display must match the preview under the same precedence.
+Saved effects remain the canonical baseline, separate from the proposal; restore
+the latest same verified display on cancellation/invalid/stale/closing, never an
+old initial snapshot. The typed viewport adapter refuses placement while an
+uncommitted material preview is active, and file/view command guards retain their
+existing draft restrictions. No proposal can mint current pick or save evidence.
+Focused tests cover identity/disposal/rollback, invalid/IME/stale cancellation,
+old/public callers, no commands during scrub and exactly one explicit Apply.
+The dedicated connected browser scenario checks pixels, real file/reopen, camera
+history invariance, list scroll/edit return and pin-scale persistence; a copied
+Ki84 profile supplies representative dense pins/list/layout screenshots. Neither
+200%-equivalent viewport testing nor injected limits qualify physical devices.
+
+Post-cohort correction: when no Caption is selected, global record Undo/Redo
+still belongs to the detail content. Its content must contribute intrinsic height
+to the auto grid row and scroll with the outer task, rather than overflowing a
+zero-basis flex row underneath the aside. Selected reading-first proportions stay
+unchanged. Check deletion→no selection→actual Undo click and all visible action
+hit regions in the original daily workflow; no overlay/pointer bypass is allowed.
+
+The subsequent mode-return/resize checks expose two further allocation corners:
+at1280×600 an editing task has381px but reserves180+240px plus its gap; at390×844
+a one-row reading list consumes325px while the photo is clipped in179px content.
+Use only the existing filtered UI row count to mark small lists (up to three).
+When not editing, let those lists take intrinsic content height and return unused
+space to detail; dense lists retain the established reading-first allocation.
+For short editing, divide the available task height between a bounded browser
+row and the remaining detail row, containing browser controls with its own scroll
+instead of allowing them to overlap detail. Keep the detail's existing content
+scroll and external Apply/Cancel footer, node/focus/draft/IME/list-scroll ownership.
+No test-only scrolling or relaxed viewport assertions: the original View return/
+resize and Workspace narrow-photo sequences must pass, and the dense Ki84 list
+must retain its reading space. This is responsive layout, not a saved setting.

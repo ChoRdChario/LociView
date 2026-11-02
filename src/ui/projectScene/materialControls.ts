@@ -24,7 +24,7 @@ export function createMaterialControls(document: Document, onPlan: (plan: Materi
   options(scope, [['scene', 'このシーンだけ'], ['project', 'プロジェクト共通']], 'scene');
   const status = make('p'); status.id = `lv-material-status-${++nextMaterialControl}`; status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
   const observed = make('p'), impact = make('p'), unavailable = make('p'), begin = button('設定を編集'), editor = make('div'); editor.className = 'lv-material-fields';
-  const controls = new Map<MaterialEditField, { group: HTMLLabelElement; input: HTMLInputElement | HTMLSelectElement; note: HTMLParagraphElement }>();
+  const controls = new Map<MaterialEditField, { group: HTMLLabelElement; heading: HTMLSpanElement; input: HTMLInputElement | HTMLSelectElement; note: HTMLParagraphElement }>();
   const reading = make('dl'); reading.className = 'lv-material-values'; viewOnly(reading);
   const values = new Map<MaterialEditField, { group: HTMLElement; value: HTMLElement; note: HTMLElement }>();
   const cleanups: (() => void)[] = []; let context: MaterialContext | undefined, disposed = false, composing: MaterialEditField | null = null;
@@ -53,13 +53,81 @@ export function createMaterialControls(document: Document, onPlan: (plan: Materi
     if(!context?.draft)return;
     send({ kind: 'draft', baseDraft: context.draft, draft: editMaterialDraft(context.draft, field, input.value, composing) });
   }
+  const numeric = new Set<MaterialEditField>(['opacity', 'tolerance', 'softness', 'cutoff']);
+  const browser = document.defaultView;
+  const exactValue = (field: MaterialEditField) => { const base = context?.draft?.base ?? (context && materialView(context).base);
+    return context?.draft?.edits[field] ?? (base ? materialInput(base.appearance, field, context!.source.semanticProfile, base.compositing) : ''); };
+  const compact = (raw: string) => raw.trim() && Number.isFinite(Number(raw)) ? String(Number(Number(raw).toPrecision(5))) : raw;
+  type Scrub = { field: MaterialEditField; input: HTMLInputElement; group: HTMLLabelElement; pointer: number; x: number; start: number;
+    raw: string; draft: MaterialDraft | null; token: string; scene: string; project: string; selection: string; started: boolean; pending: string | null };
+  let scrub: Scrub | null = null, scrubFrame: number | undefined, suppressScrubClick = false;
+  function scrubCurrent(held: Scrub) { return !disposed && scrub === held && context && !composing && !context.draft?.composing &&
+    held.token === context.source.token && held.project === context.source.projectId && held.scene === context.source.sceneId &&
+    held.selection === materialSelectionKey(context.selection) && !context.mutationBlock && !context.pending && context.feedback.kind !== 'applying' &&
+    !held.input.readOnly && !held.input.disabled; }
+  function flushScrub() { scrubFrame = undefined; const held = scrub; if (!held || !scrubCurrent(held) || held.pending === null) return;
+    held.input.value = held.pending; held.pending = null; updateDraft(held.field, held.input); }
+  function endScrub(restore: boolean) {
+    const held = scrub; if (!held) return;
+    if (scrubFrame !== undefined) browser?.cancelAnimationFrame(scrubFrame); scrubFrame = undefined;
+    const current = scrubCurrent(held);
+    if (current && held.started && !restore) flushScrub();
+    scrub = null; suppressScrubClick = held.started;
+    try { held.group.releasePointerCapture?.(held.pointer); } catch { /* Capture may already have ended. */ }
+    if (current && held.started && restore && context?.draft) {
+      held.input.value = held.raw;
+      if (!held.draft) send({ kind: 'cancel', draft: context.draft });
+      else { const edits={...context.draft.edits}; if(held.draft.edits[held.field]===undefined)delete edits[held.field];else edits[held.field]=held.draft.edits[held.field];
+        send({kind:'draft',baseDraft:context.draft,draft:Object.freeze({...context.draft,edits:Object.freeze(edits)})}); }
+    }
+    if (context && !disposed) render(context);
+  }
+  function bindScrub(field: MaterialEditField, group: HTMLLabelElement, input: HTMLInputElement, heading: HTMLSpanElement) {
+    group.className = 'lv-material-numeric';
+    const down = (event: PointerEvent) => {
+      if (scrub) { endScrub(true); return; }
+      suppressScrubClick = false;
+      if (event.button !== 0 || event.pointerType === 'touch' || event.isPrimary === false || composing || context?.draft?.composing ||
+        input.disabled || input.readOnly || !context || !Number.isFinite(event.clientX) || event.target !== group && event.target !== input && event.target !== heading) return;
+      const raw = exactValue(field), start = Number(raw); if (!raw.trim() || !Number.isFinite(start)) return;
+      const held: Scrub = { field, group, input, pointer: event.pointerId, x: event.clientX, start, raw, draft: context.draft,
+        token: context.source.token, project: context.source.projectId, scene: context.source.sceneId, selection: materialSelectionKey(context.selection), started: false, pending: null };
+      scrub = held; try { group.setPointerCapture?.(event.pointerId); } catch { scrub = null; }
+      if(scrub===held&&event.target!==input)input.focus({preventScroll:true});
+    };
+    const move = (event: PointerEvent) => {
+      const held = scrub; if (!held || held.group !== group || held.pointer !== event.pointerId) return;
+      if (!scrubCurrent(held) || event.buttons === 0 || !Number.isFinite(event.clientX)) { endScrub(true); return; }
+      const dx = event.clientX - held.x; if (!held.started && Math.abs(dx) < 4) return;
+      event.preventDefault?.();
+      if (!held.started) { held.started = true; if (!context?.draft) request({ kind: 'begin' }); if (!context?.draft) { endScrub(true); return; } }
+      const max = field === 'opacity' ? 100 : 1, step = max / 200 * (event.shiftKey ? .1 : event.ctrlKey ? 10 : 1);
+      held.pending = String(Math.min(max, Math.max(0, held.start + dx * step)));
+      input.value = compact(held.pending);
+      if (scrubFrame === undefined) {
+        if (browser) scrubFrame = browser.requestAnimationFrame(flushScrub); else flushScrub();
+      }
+    };
+    const end = (event: PointerEvent) => { if (scrub?.group === group && scrub.pointer === event.pointerId) endScrub(event.type !== 'pointerup'); };
+    const key = (event: KeyboardEvent) => { if (event.key === 'Escape' && scrub?.group === group) { event.preventDefault(); event.stopPropagation(); endScrub(true); } };
+    const click = (event: MouseEvent) => { if (suppressScrubClick) { suppressScrubClick = false; event.preventDefault(); } };
+    group.addEventListener('pointerdown', down); group.addEventListener('pointermove', move);
+    for (const event of ['pointerup','pointercancel','lostpointercapture'] as const) group.addEventListener(event, end);
+    group.addEventListener('keydown', key); group.addEventListener('click', click);
+    cleanups.push(() => { group.removeEventListener('pointerdown', down); group.removeEventListener('pointermove', move);
+      for (const event of ['pointerup','pointercancel','lostpointercapture'] as const) group.removeEventListener(event, end);
+      group.removeEventListener('keydown', key); group.removeEventListener('click', click); });
+    listen(input, 'focus', () => { if (!scrub && !composing) input.value = exactValue(field); });
+    listen(input, 'blur', () => { if (!scrub && !composing && !context?.draft?.edits[field]) input.value = compact(exactValue(field)); });
+  }
   for (const field of materialFields) {
-    const group = make('label', materialFieldLabels[field]), input = enums[field] ? make('select') : make('input'), note = make('p');
+    const group = make('label'), heading = make('span',materialFieldLabels[field]), input = enums[field] ? make('select') : make('input'), note = make('p');heading.className='lv-material-label';
     input.setAttribute('aria-label', materialFieldLabels[field]); note.id = `lv-material-field-${++nextMaterialControl}`;
     input.setAttribute('aria-describedby', `${note.id} ${status.id}`);
     if (enums[field]) options(input as HTMLSelectElement, enums[field]!, '');
     else { (input as HTMLInputElement).type = 'text'; input.setAttribute('inputmode', field === 'keyColor' ? 'text' : 'decimal'); }
-    group.append(input, note); editor.append(group); controls.set(field, { group, input, note });
+    group.append(heading,input, note); editor.append(group); controls.set(field, { group, heading, input, note });
+    if (numeric.has(field)) bindScrub(field, group, input as HTMLInputElement,heading);
     const row = make('div'), value = make('dd'), warning = make('p'); row.setAttribute('data-material-field', field);
     row.append(make('dt', materialFieldLabels[field]), value, warning); reading.append(row); values.set(field, { group: row, value, note: warning });
     listen(input, enums[field] ? 'change' : 'input', () => updateDraft(field, input));
@@ -70,10 +138,12 @@ export function createMaterialControls(document: Document, onPlan: (plan: Materi
         if (context?.draft) send({ kind: 'draft', baseDraft: context.draft, draft: Object.freeze({ ...context.draft, composing: null }) }); });
     }
   }
-  const coverageHelp=contextHelp(document, '切り抜きでは、しきい値を下回る部分を非表示にします。滑らかな半透明にはなりません。', [controls.get('coverage')!.input]);
+  const coverageHelp=contextHelp(document, '切り抜きはしきい値未満を非表示にします。滑らかな半透明にはなりません。半透明の表示は近似です。位置指定に使えない面は、位置を手動で調整できます。', [controls.get('coverage')!.input]);
+  const numericHelp=contextHelp(document, '数値や項目名を左右にドラッグすると、見え方を確認できます。Shiftで細かく調整、Escでドラッグ前に戻します。数値を入力することもできます。「変更を適用」で確定します。', [...controls].filter(([field])=>numeric.has(field)).map(([,control])=>control.input));
   const advanced=make('details'); advanced.append(make('summary','色の透過と詳細'));
   for(const field of ['chroma','keyColor','tolerance','softness','cutoff'] as const) advanced.append(controls.get(field)!.group);
-  editor.append(advanced,coverageHelp);
+  controls.get('coverage')!.heading.append(coverageHelp);controls.get('opacity')!.heading.append(numericHelp);
+  editor.append(advanced);
   const actions = make('div'), apply = button('変更を適用'), cancel = button('取り消す'), remove = button('この範囲の設定を解除'), retry = button('再試行'), review = button('状態を確認');
   actions.className = 'lv-material-actions'; apply.className = 'lv-material-primary'; actions.append(apply, cancel, remove, retry, review);
   const confirmBox = make('section'), confirmText = make('p'), confirm = button(''), keep = button('戻る'); confirmBox.setAttribute('aria-label', '操作の確認'); confirmBox.hidden = true; confirmBox.append(confirmText, confirm, keep);
@@ -115,7 +185,9 @@ export function createMaterialControls(document: Document, onPlan: (plan: Materi
       (context.source.projectId !== next.source.projectId || context.source.sceneId !== next.source.sceneId || materialSelectionKey(context.selection) !== materialSelectionKey(next.selection))) {
       status.textContent = '編集中の変更を適用するか取り消してください。'; status.hidden = false; return false;
     }
-    context = next; const view = materialView(next), d = next.draft, inFlight = next.feedback.kind === 'applying';
+    context = next;
+    if (scrub && !scrubCurrent(scrub)) endScrub(false);
+    const view = materialView(next), d = next.draft, inFlight = next.feedback.kind === 'applying';
     const emptyCatalog = view.model?.surfaces.kind === 'value' && !view.model.surfaces.value.length && !view.model.reason;
     const unsupported = !!view.surface && !view.targetIssue && Object.values(view.surface.fieldIssues).every(reason => reason !== null);
     const noSettings = view.surface?.scene.kind === 'value' && view.surface.scene.value === null && view.surface.project.kind === 'value' && view.surface.project.value === null;
@@ -132,7 +204,7 @@ export function createMaterialControls(document: Document, onPlan: (plan: Materi
     const surfaceOptions: [string, string][] = [['', 'マテリアルを選択'], ...view.surfaces.map(item => [materialTargetKey(item.target), item.name.kind === 'value' ? item.name.value : 'マテリアル名を確認'] as [string, string])];
     if (key && !view.surface) surfaceOptions.push([key, '選択したマテリアルを確認']); options(surface, surfaceOptions, key); scope.value = next.selection.scope;
     for (const control of [model, surface, scope]) control.disabled = Boolean(d || composing || inFlight || next.pending || view.issue);
-    observed.textContent = sourceOnlySurface && !d ? '' : view.surface ? view.origin ? `現在の見え方：${view.origin === 'source' ? 'モデル元の設定' : materialScopeLabel(view.origin)}` : '現在の見え方を確認してください。' : '';
+    observed.textContent = sourceOnlySurface && !d ? '' : view.surface ? view.origin ? `適用済みの設定：${view.origin === 'source' ? 'モデル元の設定' : materialScopeLabel(view.origin)}` : '適用済みの設定を確認してください。' : '';
     impact.textContent = !view.surface || noControls || presentation?.viewing ? '' : next.selection.scope === 'scene' ? 'このシーンだけに適用します。'
       : '同じマテリアルを使うシーンで共通になります。シーン専用の設定がある場合は、そちらが優先されます。';
     const beginPlan = planMaterial(next, { kind: 'begin' }); begin.hidden = Boolean(d) || noControls || !!presentationOptions?.direct; begin.disabled = beginPlan.kind === 'blocked';
@@ -145,7 +217,8 @@ export function createMaterialControls(document: Document, onPlan: (plan: Materi
       const value = raw(field);
       if (field === 'coverage') options(control.input as HTMLSelectElement, coverageChoices.some(([key]) => key === value) ? coverageChoices :
         [...coverageChoices, [value, value === 'smoothBlend' ? '半透明（この環境では未対応）' : '現在の設定（この環境では未対応）']], value);
-      if (composing !== field && d?.composing !== field && control.input.value !== value) control.input.value = value;
+      const shown = numeric.has(field) && d?.edits[field] === undefined && document.activeElement !== control.input ? compact(value) : value;
+      if (scrub?.field !== field && composing !== field && d?.composing !== field && control.input.value !== shown) control.input.value = shown;
       const reason = view.surface?.fieldIssues[field], enabled = (d || presentationOptions?.direct&&beginPlan.kind!=='blocked') && reason === null && !inFlight && next.mutationBlock === null && !next.pending && !view.editIssue;
       control.input.disabled = enums[field] ? !enabled : false;
       if (!enums[field]) (control.input as HTMLInputElement).readOnly = composing !== field && !enabled;
@@ -155,21 +228,22 @@ export function createMaterialControls(document: Document, onPlan: (plan: Materi
       control.note.textContent = reason ?? ''; control.note.hidden = !control.note.textContent;
       const current = values.get(field)!, canonical = view.base ? materialInput(view.base.appearance, field, next.source.semanticProfile, view.base.compositing) : '';
       const choices = field === 'coverage' ? coverageChoices : enums[field];
-      current.value.textContent = choices?.find(([key]) => key === canonical)?.[1] ?? canonical;
+      current.value.textContent = choices?.find(([key]) => key === canonical)?.[1] ?? (numeric.has(field) ? compact(canonical) : canonical);
       current.note.textContent = reason ?? ''; current.note.hidden = !reason || noControls && new Set(Object.values(view.surface!.fieldIssues)).size === 1;
       const inactive = view.base && (['keyColor', 'tolerance', 'softness'].includes(field) && materialInput(view.base.appearance, 'chroma', next.source.semanticProfile, view.base.compositing) !== 'on' ||
         field === 'cutoff' && materialInput(view.base.appearance, 'coverage', next.source.semanticProfile, view.base.compositing) !== 'mask');
       current.group.hidden = !view.base || !!inactive && !reason;
     }
-    const applyIssue = materialApplyIssue(next); apply.disabled = applyIssue !== null; apply.hidden = !d;
+    const applyIssue = materialApplyIssue(next); apply.disabled = applyIssue !== null || !!scrub; apply.hidden = !d;
     cancel.hidden = !d; cancel.disabled = !d || Boolean(composing || d.composing) || inFlight;
     remove.disabled = planMaterial(next, { kind: 'remove' }).kind !== 'remove'; remove.hidden = !view.record && !d;
     retry.hidden = next.feedback.kind !== 'failed'; retry.disabled = next.feedback.kind !== 'failed' || !materialPlanIsCurrent(next.feedback.plan, next);
     let displayNotice:string|null=null;try{if(base)displayNotice=view.surface?.displayNotice?.(d?editMaterialIntent(base,d.edits,next.source.semanticProfile):base)??null;}catch{/* Invalid draft retains its normal field/apply error. */}
-    status.textContent = [emptyCatalog && !d ? null : view.targetIssue, ...view.issues, displayNotice, presentation?.viewing ? presentation.readBlock : next.mutationBlock, next.pending && 'ほかの操作を完了するか取り消してください。',
+    const statusText = [emptyCatalog && !d ? null : view.targetIssue, ...view.issues, displayNotice, presentation?.viewing ? presentation.readBlock : next.mutationBlock, next.pending && 'ほかの操作を完了するか取り消してください。',
       inFlight && '設定を適用中です。', d && !inFlight && (applyIssue || '未適用の入力があります。'),
       next.feedback.kind === 'failed' && `${describe(next.feedback.plan.selection, view)}：${next.feedback.plan.kind === 'remove' ? '設定を解除' : '変更を適用'}できませんでした。${next.feedback.message} 入力と操作対象を保持しています。`].filter(Boolean).join(' ');
-    status.hidden = !status.textContent; return true;
+    if(status.textContent!==statusText)status.textContent=statusText;
+    status.hidden = !statusText; return true;
   }
-  return { root, review, render, isComposing: () => composing !== null, dispose: () => { disposed = true; cleanups.forEach(fn => fn()); root.remove(); } };
+  return { root, review, render, isComposing: () => composing !== null, dispose: () => { disposed = true; endScrub(false); cleanups.forEach(fn => fn()); root.remove(); } };
 }

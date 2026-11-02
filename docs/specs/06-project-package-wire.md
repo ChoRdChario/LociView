@@ -1376,6 +1376,23 @@ repository originals; publish exactly the declared heads once. A single local
 Cold retry validates these bindings and preserves later legitimate edits.
 Independent read-only design review established these guards before implementation.
 
+The Session read composition may call `CleanInputJob.validateJournalFresh(fs,id,
+limits,prepared)` directly. This strict static validator opens the current input
+itself, then invokes a private validation body on that newly opened owner. Remove
+only the unused discovery-open which previously preceded the validator's fresh
+open. The existing instance `validateJournal` delegates to the same fresh static
+entry and always reopens, including for a retained instance. Accept no supplied
+Job/source/inspection, cache, new facade/tag or lifetime extension. Keep the last
+open's archive/length/CRC/SHA, child/index/start bindings, then the existing
+purpose/id/repository/predecessor/heads/remote/proof checks and actual journal
+parts/count/byte comparison in their order. Missing/changed acknowledged input
+still fails without reseeding. All three output-ready reads, capture before/after,
+independent Prepared reconstruction, write/readback, selection and recovery fences
+remain. Acceptance includes one open in a normal Session read, held-instance and
+static rejection after input loss, existing interruption/recovery oracles and the
+unchanged actual Review copy→backup→reopen budgets. Open counts diagnose the
+duplicate; elapsed acceptance remains the actual browser operation.
+
 ### 12.2 Protected inventory: portability is not garbage collection
 
 Compute roots from the complete admitted source and all live candidates at the
@@ -2896,7 +2913,8 @@ output projection. Clear it at return/failure/close; a later command cannot borr
 it. Existing `outputOverview(current)` keeps its base-display-only default, while
 an additional optional backup-display read is explicit. Capture proof/token/source
 before awaiting and require agreement with the command's owned current read.
-Otherwise retain the existing fresh Session read. Other output commands, retries,
+Otherwise retain the existing fresh Session read. Except for the explicit
+Workspace presentation extension below, other output commands, retries,
 startup/receive discovery and ordinary `jobs()` keep their previous behavior.
 
 The concrete ports are a final optional synchronous observer on Session
@@ -2926,6 +2944,65 @@ eliminable-time or speed guarantee. No §6/01h inspection-lifetime change is all
 The exact implementation, executed file/cold acceptance, measured qualifications
 and final checks are recorded in [current work](../../tasks/todo.md); this is not
 a cross-command cache or an adoption/release guarantee.
+
+**Grouped output readiness and presentation repair (2026-11-02):**
+The initial Desktop41 cohort exposes three unchanged15s output/preview deadlines.
+The retained named-editor Project's one Clean-preview click takes10.590s, including
+7.611s of post-preview output overview. The original Workspace case completes
+generation in12.042s but remains busy at15.006s; the terminal overview span is not
+observed. These are stage evidence, not a guarantee of a fixed saving or a PASS
+for the original failed cases. Keep those failures and qualify the Workspace
+runtime by the test-owned server's environment-root binding and immutable files;
+its actual page-response hashes were not recorded in that attempt.
+
+1. Clean terminal validation: add `CleanInputJob.validateTerminalCompletion()`
+   returning a boolean derived from its own single full `await steps()`.
+   `MetadataProjectSession.outputReady` uses it only for a Clean input, replacing
+   its immediately adjacent terminal `steps()` and `validateCompletion()` calls.
+   Keep the outer `openReceiveJob`: its descriptor/start binding is used. Keep the
+   publication's strict `validateJournalFresh` final open, all parts/byte/proof/
+   parent checks and all output-ready/capture/Prepared/readback fences. Existing
+   public `steps`, `validateCompletion`, other receive kinds and recovery callers
+   remain strict. No supplied inspection or retained proof is accepted. Extend
+   the existing clean/cold fixture to check one full completion traversal,
+   nonterminal/malformed publication refusal and existing lost-input refusal.
+2. Successful readonly preview: only Host `previewClean` and `previewReview` may
+   retain the already displayed output history instead of rediscovering it after
+   their successful no-write Session preview. A private operation-local wrapper
+   captures exact connection/FS/Session/Sender, ready source/provider/publication,
+   expected token, and an owned Review selection before any await. Before adopting
+   the preview DTO, require the same connection and read identity, matching DTO
+   token/Review selection, live editable lease, no close/restore/review/receive
+   transition, and no new incomplete-output/discovery failure. Failure, mismatch
+   or unknown postcondition retains the prior fresh reload/recovery path and
+   rejects stale DTO adoption. The decision is Host-owned, never a UI boolean.
+   Successful previews create no file/job/base and lend no authority to actual
+   generation: createClean/createReview revalidate independently as before.
+   Other output actions keep unconditional recovery discovery. Test success
+   without overview, failure/closing/stale fallback, owned selection capture,
+   preserved history and subsequent fresh generation after evidence loss.
+3. Successful Workspace presentation: add a final optional synchronous observer
+   to Session `createWorkspaceOutput` and Sender `generate`, compatible with
+   existing ID returns. The private finish returns `{id,read}` using its actual
+   final `outputReady`; Session observes only after the outer write fence succeeds,
+   Sender only after `workspaceFileOperation` also succeeds. Resume/retry/default
+   behavior stays strict; observer exceptions cannot fail a completed file.
+   Host accepts it only for this immediate overview with the same exact owner,
+   token/publication/provider/source-proof guards as backup presentation and a
+   still-live editable connection. Feed only metadata Source/token through the
+   existing explicit display-read channel. Workspace records a NEW base after
+   that read: every job/state/step/artifact/completion/protection/current base
+   snapshot/payload/inventory remains freshly read, including backup staleness.
+   Test backup→Workspace with unchanged metadata token: old backup becomes stale
+   because its frozen base set is old, and the new base is selectable. Keep outer
+   closing/package failure, missing observation and next-command fallback tests.
+
+These are ordinary bounded connections under the existing pure-read contract;
+there is no cache, new receipt lifetime/tag, skipped output authority, §6 change
+or parent-ZIP omission. Judge elapsed acceptance with the original Review,
+editor-attribution and Workspace cases and final whole Desktop/offline cohorts;
+operation counts are diagnostic only. Group the no-selection Undo flow sizing and
+the two fixture alignments with this repair before final required checks.
 
 **Readonly content-evidence consumer (2026-11-01; bounded connection):**
 only `PersistentContentVerifier.verify` with `allowNewEvidence=false` may use

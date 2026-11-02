@@ -57,7 +57,166 @@ unchanged-feature-classification checks pass; independent review has no findings
 No runtime change or new capacity guarantee; no runtime suite is needed for this
 documentation checkpoint.
 
-## Current boundary —Windows heavy workflows and daily-use latency
+## Current boundary —pin, camera and Caption/drawing comfort
+
+PO prioritizes the six connected UI repairs in the workspace design and PCQ23–28:
+unobstructed pin roots/outlined window lines; ordinary left-orbit/right-pan;
+reading-first Caption list space; Asset pin scale in Caption; numeric material
+drag with local preview and explicit Apply/Cancel; concise contextual transparency
+warnings. The concrete ports/specifications precede the implemented group and its
+independent resource/lifetime review. Preserve saved values/Session commands,
+IME/drafts, target/token/Scene checks and placement/picking/resource ownership.
+No new schema, dependency, renderer method, numeric policy or deployment.
+
+Focused checks, dedicated Chromium/file/reopen and copied private Ki84 layout
+acceptance are complete. Final whole Desktop41 and normal-SW offline5 pass, followed
+by the required Windows checks on the aligned test tree. Keep the original seed,
+personal4182/Chrome, private audit block and prior CI-result notes intact. Finish
+with independent index/privacy verification, a suitable g0 checkpoint and actual
+Linux CI; no runtime repetition for record/stage-only changes. Broader Ki84 save
+latency remains follow-up work. No timeout/assertion relaxation or extra large
+file roundtrip per control; stop only a genuinely new authority/policy decision.
+
+
+Current implementation: the six UI groups and bounded material/program handover
+are connected; independent source/resource and rendered-UI reviews have no open
+mandatory finding. Focused lifecycle/guard/import tests pass. Dedicated Chromium
+record-camera passes numeric held pixels/Esc/explicit Apply, Asset pin scale,
+native media selection, actual backup and reopening. The small mixed Mesh+GS
+preview/cancel/camera case also passes. Private Ki84 confirms wider reading-first
+list, pin-only selection, outlined line, View guards,720×500/DPR2 reachability and
+final44px nonoverlapping help. DPR2 is200%-equivalent, not native browser zoom or
+physical-device evidence.
+
+One warm same-action Ki84 pair reduces each create/link/delete program count
+114→2. All six3D-only images match between versions and Esc restores the original
+exactly; motion performs no native image/Blob/hash work. Arrival→last observed GL
+draw-call entry is534/368/432/405/425/457→516/260/248/222/204/217ms. Value/wait endpoints
+vary (including a slower first new step); PNG time is separate. This is one pair,
+not GPU completion, continuous presentation/fps or a general speed guarantee.
+The earlier helper's unnecessary post-Esc Cancel wait stays separate from product
+latency. Shader-class/coverage changes may still compile legitimately.
+
+The first full Review camera run passes the camera/copy transition but its first
+independent-copy backup exceeds the unchanged15s download assertion. Both that
+normal failure and the approved timed diagnostic are retained. Diagnostic state
+is genuinely busy, without
+page/remote errors: three ready reads take3.481/3.242/4.113s and capture2.886s;
+artifact inspection is reached before observation ends. Do not infer a deadlock,
+click rejection or environment-only cause, skip the case, or relax a fence/budget.
+Do not turn these failed attempts into PASS.
+The old-UI fixed-artifact/HEAD-test control also exceeds15s, overlapping a known
+read-only scan; it is neither an elapsed comparison nor an environment-only cause.
+One private Clean-open probe identifies five discarded discovery-opens≈2.53s
+inside the ready-before→finish interval. Spec06's strict static fresh-validator
+composition is implemented, retaining the last actual open and every fresh
+fence. Independent delta review is clean and seven related clean/Review recovery
+cases pass, including held-instance/static rejection after acknowledged ZIP loss.
+The normal queryless Review case now passes its original15s assertions through
+copy→actual backup→reopen: independent handoff11.956s/save-and-idle12.180s,
+reopened14.315s/14.556s (archive auditing excluded). This is finite budget evidence,
+not a general latency guarantee. The no-draft preview proposal now
+returns before projecting material context; active-draft admission stays intact.
+The initial frozen-source complete Desktop group finishes35PASS/6FAIL, with no
+skips/retries/unhandled errors, actual Exit1 and148.19min. This41-case run (the
+prior40 plus the small mixed case) collects findings; it is not the final PASS.
+Do not substitute old-source PASS; retain the earlier500k copy performance failure
+as dated evidence. On this cohort source the complete500k SH4 five-purpose/return/
+Review-copy/restore/cold case now passes in28.5min: copy editor180.213s (original
+240s assertion), display191.144s. This closes that current threshold, not a general
+speed guarantee or a matched percentage against the old314/374s diagnostics.
+The six findings are three unsettled save/preflight deadlines (reopened Review
+backup, first named-editor Clean preview, first Workspace output), no-selection
+Undo intercepted by detail/aside after deletion, one stale viewport-notice
+expectation and one incidental six-axis-center overlap assumption. The standalone
+Review PASS does not establish stable full-group latency.
+
+Retained pre-repair milestone audit (2026-11-02): g0/HEAD and the tested source
+were fixed; large original/file/cold workflows had completed, with no new dependency,
+release, architecture or safety P0/P1. The chosen path was executed: copy the closed
+owned editor-A profile and measure one Clean-preview click, then the original
+Workspace failure and Clean completion duplicate, serially. The measured bounded
+work received exact ports/specifications and independent review before sensitive
+edits, grouped with intrinsic Undo sizing and the two fixture alignments. Failed
+attempts and fresh/write/closing/source fences were retained. The resulting final
+tree subsequently passed whole41, offline5 and the Windows required sequence as
+recorded below; actual Linux CI remains the delivery step. No timeout/assertion/
+exclusion changes, helper-level full-suite repetitions or old-source PASS
+substitution were used.
+
+Current grouped repair: the retained editor-A one-click probe finishes10.590s,
+including7.611s post-preview output overview; no history/body mutation or writes.
+The original Workspace probe retains its15.006s failure: generation completes
+12.042s, then output rediscovery is still pending (no terminal overview duration).
+Its test owns a separate server rooted at the frozen FFD artifact; actual response
+hashes were not captured, so do not claim a page-runtime hash receipt. Preserve
+the719-file FFD cohort manifest separately. Spec06 records three exact ports:
+Clean-only same-call terminal/completion validation, guarded successful readonly
+preview history retention, and post-both-fences Workspace metadata-only display
+handover with fresh new-base/protection/inventory. Those ports were independently
+reviewed before code and their meaningful implementation delta has no mandatory
+finding. No-selection Undo intrinsic sizing, viewport-copy expectation and
+deterministic axis-overlap setup are grouped with them. Fifteen relevant output/
+preview cases pass: fourteen initially plus the new write-fault case after its
+injected failure was correctly disabled for the explicit retry oracle. Preserve
+that14PASS/1FAIL attempt; it is not a product failure or a whole-suite result.
+Typecheck and same-production offline/Desktop builds pass. The original six failed
+Desktop cases finish4PASS/2FAIL (18.0min): all three original save/preview deadlines
+are passed, while newly reached View short-edit Apply and Workspace narrow-photo
+viewport assertions fail. A two-case bbox-only diagnostic preserves both failures:
+short edit reserves428px in381px, and one-row reading allocates325px to the list
+while photo content has179px and retained scroll clips the image. Group a small-
+list intrinsic cap and contained short-edit allocation, keeping dense-list reading
+space and all original viewport assertions. Backend code stays fixed. The corrected
+two original cases pass on the fixed candidate (View23.2s, Workspace1.3min), with
+both short-edit actions fully visible/44px/hit-tested. Narrow reading initially
+shows the body and about118px of the160px photo; the remainder uses ordinary detail
+scroll. Ki84 retains64rows in447×276px, and720×500/DPR2 supports44px Apply/Cancel
+and restores the body after cancellation. Seven actual runtime resources match
+the fixed artifact; wide is alsoDPR2, not a pixel/timing pair with oldDPR1 evidence.
+Private helper setup/selector failures remain separate from product acceptance.
+The final frozen-source Desktop run passes all41 (105.05min), with zero retries,
+skips, unexpected/flaky results or unhandled errors and actual Exit0. Both actual
+Desktop/offline output directories are preserved as immutable tested snapshots
+before subsequent builds; source/tests/supporting bytes remain unchanged.
+In this final queryless run, Review original/independent/reopened backup handoff
+is1313/4217/4990ms and actual save+idle2021/4821/5668ms; Workspace handoff6820ms
+and save+idle6941ms, busy terminal/errors/remote clean. Archive inspection is
+outside those endpoints. Earlier focused timings stay tied to their own runs.
+Offline5 also passes all five through its normal SW path (10.01min, actual Exit0,
+zero skips/retries/flaky/unhandled errors). Its20-resource tested snapshot has
+the same source/settings with a distinct build nonce from the Desktop snapshots.
+The first Windows root terminal remains147files,3251PASS/2FAIL/21TODO (948.09s),
+actual Exit1, stopped before builds. Independent review identifies two stale
+fixture observations: placement reserves only an actual left gesture, and pin
+color belongs to the dot CSS variable. Test-only alignment retains idle/down/up
+ownership, target/data/retry/cold oracles and records the actual rendered CSS
+variable through a generic style setter; the two focused cases pass. Its719-file
+test freeze differs from the browser tree only in tests/projectFiles.test.ts;
+production/scripts/E2E/supporting bytes remain identical, preserving the41+5
+runtime qualification. The immutable browser manifest is retained separately.
+The repaired Windows root passes147files/3253cases/21TODO (936.95s), actual Exit0.
+The required checks complete as an equivalent serial sequence, not a literal
+check:checkpoint invocation: typecheck, unfiltered root, normal/harness/validation/
+Desktop/offline builds, offline isolation, BASE_PATH=/LociView/ normal build and
+HEIC isolation all Exit0. Source/test identity is unchanged after all ten steps.
+New Linux CI is pending the reviewed g0 checkpoint. The initial35/6 run and every
+failed/focused/diagnostic attempt remain separately qualified; no matched speed
+percentage, environment-only cause or general no-regression guarantee is claimed.
+
+Milestone audit: g0/798 to the fixed browser source and test-only observation
+alignment closes the six UI repairs and bounded output deadlines, with41+5 and
+Windows checks passed; no dependency/schema/migration/adoption/release change.
+Only index/privacy/checkpoint and actual Linux CI remain in this unit, followed
+by the retained save-stage and short-height editing refinements.
+
+Follow-up UI refinement: short/high-magnification editing still has only37px of
+body content viewport in the Ki84 DPR2 sample. Scroll access and safe Apply/Cancel
+work, but this is cramped rather than broad comfort acceptance. Reduce surrounding
+chrome in a later bounded UI unit; no further source/test change in this frozen run.
+
+
+## Completed boundary —Windows heavy workflows and daily-use latency
 
 PO authorizes product/backend performance work so the07m v1/LociMyu material
 exchange and Caption restore/duplicates workflows pass their original Windows
@@ -139,9 +298,13 @@ build inputs; the final delta is the reviewed selector fixture only. This is a
 qualified serial sequence, not a literal checkpoint-script exit0.
 
 Independent code/fault/data/UI evidence reviews have no mandatory findings.
-The locally verified change follows the existing g0 checkpoint workflow; actual
-Linux CI for that checkout remains pending. Root verifies index/privacy before
-delivery. No further runtime check solely for documentation/staging. Remaining save latency
+The verified g0 checkpoint is committed and pushed. Root confirms
+[actual Linux CI](https://github.com/ChoRdChario/LociView/actions/runs/41336198389)
+on its exact checkout:146files/3232PASS/21TODO in601.33s, all steps successful,
+including typecheck, the BASE_PATH build and HEIC isolation; no FAIL, EEXIST
+SystemError or unhandled error. Index/privacy and actual remote identity checks
+pass. This result update is local only; no doc-only Push/CI loop or repeated
+runtime check. Remaining save latency
 needs stage-specific investigation of validation, write/stream and refresh cost;
 the control does not settle its cause. No raw-ZIP proof-lifetime/section6/01h
 implementation, new dependency/policy, capacity guarantee or release is included.

@@ -502,3 +502,32 @@ primary再作成も修正し、後続refreshを含む回帰と最終Desktopの�
 開示確認待ちは新しい生成へfocusを誘導しない。最終候補の通常SW準備／完全終了後の
 オフライン再開でも保存本文・取消・機体と写真の実描画が保たれた。実行環境、d6から
 Fileだけ変えた4dへの証拠再利用、有限速度pairと残件／device gateはtodoに集約する。
+
+## 2026-11-02 PO pin／camera／Caption・描画の6点
+
+実装前のcode確認とPO画像指摘。具体操作・typed port・
+guardはworkspace designの同日節へ集約し、今回のconnected一式で修正／検証する。
+
+| ID | 問題と今回の修正範囲 |
+|---|---|
+| PCQ-23 | selectedだけtitle plateが残りpin根本を隠す。全pinを小dot＋小さい選択/focus輪郭へ統一しaccessible名・44px hit・要確認を保持。窓との1px線に明暗の縁を加える |
+| PCQ-24 | canvasはMIDDLEだけ、pin overlay上はcanvas dragに届かず、choosing中は全Orbit無効。通常LEFT orbit／RIGHT panとpin上の既存navigation portを接続。閾値超dragは選択しない。実left配置/gizmo/windowdragを優先し、右panで仮位置は変えない |
+| PCQ-25 | Caption grid43%固定＋detail最小高で一覧が狭い。非編集中はlist高優先、編集時だけ同detailへ配分。検索/手動scroll/draft/keyboard/short-height/200%相当の両paneと終了操作を保持 |
+| PCQ-26 | pin倍率が現在モデル作業内にありCaption操作から遠い。Captionへ既存Asset単位controlを移し対象modelを明示選択。全Scene作用・保存値/range・未配置/複数model・readonly/IME/staleを保持 |
+| PCQ-27 | 描画のtext数値は連続調整できず、draftは3Dへpreviewされない。ラベル/値scrub＋per-frame表示専用提案、既存parse/admitとscope優先、Apply1command／Cancel復帰。geometry/texture再生成なしのmaterial-only局所hookは独立資源review対象 |
+| PCQ-28 | 通常近似説明と位置指定制約がviewport／材質contextで重複し長文常駐。通常情報は短い1owner＋context詳細へ、非対応/非表示/失敗/再試行と実picking制約は該当操作に残す |
+
+修正後の専用Chromiumで、pin根本／接続線、左右drag、読む時の一覧高／幅、Caption内の
+Asset倍率、押下中numeric preview／Esc／明示適用、警告contextを確認した。代表小規模flowは
+実backup／再開で数値70と倍率1.5を保持し、mixed Mesh＋GSのpreview／取消／cameraも通過。
+私的Ki84の1440×1000、720×500/DPR2、View、最終help44pxの画面reviewは必須指摘なし。
+初期focusだけのlayout切替によるnative chooser不成立は、実編集intentだけで配分する修正で
+解消した。program churn114→2の有限pairは全段pixelと取消復帰を保持し、速度保証へ広げない。
+Reviewのcamera／copy後のbackup15秒超は、使われない最初の入力openだけを省き、最後の
+実検査を保持して修正した。元15秒の実backup／再開caseも通過し、最終全体検証はtodoへ。
+
+初回通しでは、削除後の未選択状態でUndoがdetail外へはみ出しasideに遮られた。
+PCQ-25の追修正として、未選択時だけcontentのintrinsic高さを外taskのscrollへ載せ、
+選択中の配分は保持した。修正後は実hit／全域表示と元のUndo／本文assertを確認し、
+日常編集の元caseは保存・cold再開まで通過。ほかの初回失敗と最終候補の全体結果は
+todoで区別し、旧sourceの画面確認を新source全体PASSへ拡張しない。

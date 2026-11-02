@@ -6,7 +6,7 @@ import { triangleGlb, smallPng } from './fixtures';
 
 test('content-first workspace keeps editing, pin completion and file exits coherent through save and resume', async ({}, info) => {
   test.setTimeout(180_000);
-  const server = await ownedServer('offline-desktop-dist'), browser = await chromium.launch({ channel: 'chromium', headless: true });
+  const server = await ownedServer(process.env.LOCIVIEW_E2E_ARTIFACT??'offline-desktop-dist'), browser = await chromium.launch({ channel: 'chromium', headless: true });
   const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, serviceWorkers: 'block', acceptDownloads: true });
   const p = await context.newPage(), errors: string[] = [], remote: string[] = [];
   p.on('pageerror', e => errors.push(e.message)); p.setDefaultTimeout(15_000);
@@ -17,7 +17,7 @@ test('content-first workspace keeps editing, pin completion and file exits coher
   const idle = async () => { await expect(p.locator('main.lv-project-workspace > header > .lv-operation-status')).toHaveAttribute('data-busy', 'false'); };
   const ready = async (text: string) => { await expect(p.getByText(text, { exact: true })).toBeVisible(); await idle(); };
   try {
-    await p.goto(server.url); await p.getByLabel('ファイルを選択', { exact: true }).setInputFiles({ name: '建物.glb', mimeType: 'model/gltf-binary', buffer: triangleGlb() });
+    await p.goto(server.url+(process.env.LOCIVIEW_E2E_TIMINGS==='1'?'?timings=1':'')); await p.getByLabel('ファイルを選択', { exact: true }).setInputFiles({ name: '建物.glb', mimeType: 'model/gltf-binary', buffer: triangleGlb() });
     await p.getByRole('button', { name: 'ファイルを開く', exact: true }).click(); await p.getByRole('textbox', { name: 'プロジェクト名', exact: true }).fill('現地調査'); await p.getByRole('button', { name: 'プロジェクトを作成', exact: true }).click();
     await expect(p.getByLabel('3Dモデルの表示', { exact: true })).toHaveAttribute('aria-busy', 'false', { timeout: 90_000 });
     await expect(p.getByRole('form', { name: 'シーンの変更', exact: true })).toBeHidden();
@@ -84,7 +84,13 @@ test('content-first workspace keeps editing, pin completion and file exits coher
     await shareTab.focus();await p.keyboard.press('ArrowLeft');await expect(fileTabs.getByRole('tab',{name:'保存',exact:true})).toBeFocused();await p.keyboard.press('ArrowRight');await expect(shareTab).toBeFocused();await expect(shareTab).toHaveAttribute('aria-selected','true');
     expect(await files.locator('.lv-file-primary').evaluate(n => ({ background: getComputedStyle(n).backgroundColor, color: getComputedStyle(n).color }))).not.toMatchObject({ background: 'rgba(0, 0, 0, 0)' });
     await p.screenshot({ path: info.outputPath('share.png'), fullPage: false });
-    const [workspace] = await Promise.all([p.waitForEvent('download'), files.locator('.lv-file-primary').click()]), workspacePath = info.outputPath('team-workspace.zip'); await workspace.saveAs(workspacePath); await expect(files.locator('.lv-operation-status')).toHaveAttribute('data-busy', 'false');
+    await p.evaluate(()=>{performance.clearMeasures();document.dispatchEvent(new Event('lociview-timing-snapshot'));});
+    const workspaceStarted=Date.now(), workspaceState=async()=>({elapsedMs:Date.now()-workspaceStarted,fileText:await files.innerText(),busy:await files.locator('.lv-operation-status').getAttribute('data-busy'),timings:await p.evaluate(()=>{document.dispatchEvent(new Event('lociview-timing-snapshot'));return performance.getEntriesByType('measure').filter(entry=>entry.name.startsWith('lociview.')).map(entry=>({...entry.toJSON(),detail:(entry as PerformanceMeasure).detail}));}),errors,remote});
+    const [workspace] = await Promise.all([p.waitForEvent('download'), files.locator('.lv-file-primary').click()]).catch(async error=>{
+      await info.attach('workspace-download-failure-state',{body:JSON.stringify(await workspaceState()),contentType:'application/json'});
+      await p.screenshot({path:info.outputPath('workspace-download-failure.png')});throw error;
+    }), workspaceHandoffMs=Date.now()-workspaceStarted,workspacePath = info.outputPath('team-workspace.zip'); await workspace.saveAs(workspacePath); await expect(files.locator('.lv-operation-status')).toHaveAttribute('data-busy', 'false');
+    await info.attach('workspace-download-duration',{body:JSON.stringify({workspaceHandoffMs,saveAndIdleMs:Date.now()-workspaceStarted,...await workspaceState()}),contentType:'application/json'});
     await expect(files.getByLabel('渡す内容', { exact: true })).toHaveValue('teamWorkspace'); await expect(files.locator('.lv-file-primary')).toHaveText('ダウンロード'); await expect(name).toBeHidden();
     await files.getByLabel('渡す内容', { exact: true }).selectOption('review'); await expect(menu.getByRole('button', { name: '閉じる', exact: true })).toBeDisabled(); await files.getByRole('button', { name: '選択を取り消す', exact: true }).click();
     await expect(files.getByLabel('渡す内容', { exact: true })).toHaveValue('teamWorkspace'); await menu.getByRole('button', { name: '閉じる', exact: true }).click(); await expect(p.getByRole('button', { name: '共有', exact: true })).toBeFocused();
@@ -108,7 +114,12 @@ test('content-first workspace keeps editing, pin completion and file exits coher
     // Opening the received history revalidates durable state; wait for the actual
     // terminal mode using the existing page-action budget, not a five-second UX guarantee.
     await expect(mode).toHaveText('編集する', { timeout: 15_000 }); await expect(mode).toBeEnabled(); await expect(mode).toHaveAttribute('aria-busy', 'false'); await p.setViewportSize({ width: 390, height: 844 });
-    const photo = detail.getByRole('region', { name: 'メディア', exact: true }).locator('img').first(); await expect(photo).toBeInViewport(); await p.screenshot({ path: info.outputPath('reading-narrow.png'), fullPage: false });
+    const photo = detail.getByRole('region', { name: 'メディア', exact: true }).locator('img').first();
+    await info.attach('narrow-read-layout',{body:JSON.stringify(await p.evaluate(()=>{
+      const selectors=['.lv-caption-task','.lv-caption-browser','.lv-caption-reading','.lv-caption-detail','.lv-caption-content','.lv-caption-detail img'];
+      return{viewport:{width:innerWidth,height:innerHeight},active:{tag:document.activeElement?.tagName,className:document.activeElement?.className},nodes:selectors.map(selector=>{const n=document.querySelector(selector)!,r=n.getBoundingClientRect(),s=getComputedStyle(n);return{selector,rect:{x:r.x,y:r.y,width:r.width,height:r.height},scrollTop:n.scrollTop,scrollHeight:n.scrollHeight,clientHeight:n.clientHeight,overflow:s.overflow,rows:s.gridTemplateRows};})};
+    })),contentType:'application/json'});
+    await expect(photo).toBeInViewport(); await p.screenshot({ path: info.outputPath('reading-narrow.png'), fullPage: false });
     await mode.click(); await expect(mode).toHaveText('閲覧する', { timeout: 15_000 }); await expect(mode).toBeEnabled(); await p.getByRole('button', { name: '位置を調整', exact: true }).click();
     await expect(pin).toBeVisible(); await expect(pin.getByRole('button', { name: '位置を確定', exact: true })).toBeInViewport({ ratio: 1 }); await expect(pin.getByRole('button', { name: '取り消す', exact: true })).toBeInViewport({ ratio: 1 });
     const x = pin.getByLabel('位置 X', { exact: true }); await expect(x).toBeFocused(); await x.dispatchEvent('compositionstart'); await expect(pin.getByRole('button', { name: '位置を確定', exact: true })).toBeDisabled(); await x.dispatchEvent('compositionend');

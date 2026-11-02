@@ -1,11 +1,11 @@
 import type { MetadataEdit } from '../../projectMetadata/commands';
 import { editOnly, viewChoices } from './modePresentation';
 import { createMaterialControls } from './materialControls';
-import { materialPlanIsCurrent, materialView, newMaterialSelection, type MaterialContext, type MaterialDraft, type MaterialSelection } from './materialState';
-import { newProjectId, panelNodes, sameProjectValue, type ProjectPanelHost, type ProjectPanel } from './projectPanel';
+import { materialPlanIsCurrent, materialView, newMaterialSelection, planMaterial, type MaterialContext, type MaterialDraft, type MaterialSelection } from './materialState';
+import { newProjectId, panelNodes, sameProjectValue, type ProjectPanelHost, type ProjectMaterialPanel } from './projectPanel';
 import { fieldValue } from './projectRead';
 
-export function createProjectMaterials(document: Document, host: ProjectPanelHost): ProjectPanel {
+export function createProjectMaterials(document: Document, host: ProjectPanelHost): ProjectMaterialPanel {
   const { make, button } = panelNodes(document), root = make('section'), review = make('section');
   root.className='lv-drawing-task';root.setAttribute('aria-label', '描画の作業'); review.setAttribute('aria-label', '材質の更新候補');
   const states = new Map<string, { selection: MaterialSelection; draft: MaterialDraft | null; followedModel?: string | null }>();
@@ -101,6 +101,12 @@ export function createProjectMaterials(document: Document, host: ProjectPanelHos
     }
   }
   return { root, render, hasChanges: () => !!state().draft || choices.size > 0,
+    proposal() {
+      if (disposed || !state().draft) return null;
+      const current = context(), plan = planMaterial({ ...current, mutationBlock: host.block('materials', true, true) || (choices.size ? '更新候補を確認してください。' : null) }, { kind: 'apply' });
+      return plan.kind === 'apply' ? { token: plan.token, projectId: plan.projectId, sceneId: plan.sceneId,
+        target: plan.selection.target!, scope: plan.selection.scope, recordId: plan.recordId, intent: plan.intent } : null;
+    },
     composing: () => !!state().draft?.composing || controls.isComposing(),
     dispose() { disposed = true; controls.dispose(); root.remove(); } };
 }

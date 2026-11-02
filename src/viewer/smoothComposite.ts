@@ -71,7 +71,7 @@ function allocateSmoothComposite(renderer:THREE.WebGLRenderer,budget:TargetBudge
     return {layout,depthBits,leaseBytes:lease.bytes,dispose,render(scene,camera,meshes,frame){
       if(closed||frame?.baseTarget!==gs?.baseTarget)throw Error('透過表示の世代が一致しません。');
       const visibility=new Map<THREE.Object3D,boolean>(),swaps=new Map<THREE.Mesh,THREE.Material|THREE.Material[]>(),sourceVisibility=new Map<THREE.Material,boolean>(),background=scene.background;
-      const allowed=new Set(meshes.map(row=>row.object));if(frame)allowed.add(frame.object);
+      const allowed=new Set(meshes.map(row=>row.object)),usedSources=new Set<THREE.Material>([skip]);if(frame)allowed.add(frame.object);
       try{withState(()=>{
         for(const {object}of meshes)for(const material of Array.isArray(object.material)?object.material:[object.material])if(smoothCoverage(material)&&!sourceVisibility.has(material)){sourceVisibility.set(material,material.visible);material.visible=false;}
         if(frame){visibility.set(frame.object,frame.object.visible);frame.object.visible=false;}
@@ -81,11 +81,14 @@ function allocateSmoothComposite(renderer:THREE.WebGLRenderer,budget:TargetBudge
         scene.background=null;
         // Hide only each draw, never its descendants: glTF may parent a smooth Mesh under an opaque Mesh.
         scene.traverse(object=>{if(object instanceof THREE.Mesh&&!allowed.has(object)){swaps.set(object,object.material);object.material=skip;}});
-        for(const {object}of meshes){swaps.set(object,object.material);const convert=(source:THREE.Material)=>{if(!smoothCoverage(source))return skip;let material=materials.get(source);if(!material){material=smoothAccumulationMaterial(source as CoverageMaterial);materials.set(source,material);}return material;};object.material=Array.isArray(object.material)?object.material.map(convert):convert(object.material);}
+        for(const {object}of meshes){swaps.set(object,object.material);const convert=(source:THREE.Material)=>{if(!source.visible||!smoothCoverage(source))return skip;usedSources.add(source);let material=materials.get(source);if(!material){material=smoothAccumulationMaterial(source as CoverageMaterial);materials.set(source,material);}return material;};object.material=Array.isArray(object.material)?object.material.map(convert):convert(object.material);}
         bind(mrt!);renderer.setClearColor(0,0);renderer.clear(true,false,false);
-        if(frame)frame.withMaterial(gsVariant(frame),()=>renderer.render(scene,camera));else renderer.render(scene,camera);
+        if(frame){usedSources.add(frame.sourceMaterial);frame.withMaterial(gsVariant(frame),()=>renderer.render(scene,camera));}else renderer.render(scene,camera);
         renderer.setRenderTarget(null);renderer.render(output,outputCamera);
       });}finally{scene.background=background;for(const [object,material]of swaps)object.material=material;for(const [object,visible]of visibility)object.visible=visible;for(const [material,visible]of sourceVisibility)material.visible=visible;}
+      // Keep old same-key programs until replacement variants have actually drawn, not merely been created.
+      const errors:unknown[]=[];for(const [source,material]of materials)if(!usedSources.has(source)){materials.delete(source);try{material.dispose();}catch(error){errors.push(error);}}
+      if(errors.length)throw new AggregateError(errors,'透過表示の古い材質を解放できません。');
     }};
   }catch(error){try{dispose();}catch(cleanup){throw new AggregateError([error,cleanup],'透過表示を準備できません。');}throw error;}
 }

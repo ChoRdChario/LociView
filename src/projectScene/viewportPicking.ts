@@ -3,6 +3,7 @@ import type { EditableDisplay, V3 } from './viewportModel';
 import type { PointViewport } from '../domain/pointPresentation';
 import { hasBinaryCoverage } from '../viewer/hardChroma';
 import type { GsDisplayResident } from '../viewer/gsRender';
+import type { ValidationMaterialEffects } from './validationMaterials';
 
 /** Ephemeral exact resident target; never saved source provenance or an inferred relation. */
 export interface PinSurfaceTarget {
@@ -14,6 +15,10 @@ export interface ResidentPoints { readonly positions: Float32Array; readonly rep
 export interface ResidentSurface { readonly gs?: GsDisplayResident; readonly interaction?:THREE.Object3D;readonly interactionIssue?:string|null;readonly points?: ResidentPoints;readonly materialNotices?:readonly string[];
   /** Template-owned source maps only. GPU disposal preserves the CPU image. */
   readonly gpuTextures?:readonly THREE.Texture[];
+  /** Synchronous material-only transaction; admission runs before any node swap. */
+  setMaterialEffects?(effects: ValidationMaterialEffects, admitTextures: (next: readonly THREE.Texture[]) => void): void;
+  /** Completed viewport draw; retire the last presented material table, never a pick/save receipt. */
+  materialFrameSeen?(): void;
   readonly mesh: THREE.Object3D; readonly asset: THREE.Group; dispose?(): void }
 export type PickCoverage = (hit: THREE.Intersection<THREE.Object3D>, material: THREE.Material) => 'covered' | 'discarded' | 'unknown';
 

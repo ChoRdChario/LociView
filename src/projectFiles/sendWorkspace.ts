@@ -27,7 +27,16 @@ interface BackupDisplaySource { readonly source: NonNullable<MetadataSessionRead
 export class WorkspaceSender {
   constructor(private readonly fs: ProjectWorkspaceFS, private readonly session: MetadataProjectSession,
     private readonly store: OriginBlobStore, private readonly limits: MetadataLimits, private readonly locks: LockManager | null, private readonly backupTiming?: BackupOutputTiming) {}
-  generate(token: string, signal?: AbortSignal) { return workspaceFileOperation(this.locks, () => this.session.createWorkspaceOutput(token, this.store, '0.0.1', signal)); }
+  generate(token: string, signal?: AbortSignal, observePresentation?: BackupPresentationObserver) {
+    let read: MetadataSessionRead | undefined;
+    const output = workspaceFileOperation(this.locks, () => this.session.createWorkspaceOutput(token, this.store, '0.0.1', signal,
+      observePresentation ? next => { read = next; } : undefined));
+    if (!observePresentation) return output;
+    return output.then(id => {
+      if (read && !signal?.aborted) { try { observePresentation(read); } catch { /* Display observers cannot reject a saved file. */ } }
+      return id;
+    });
+  }
   generateClean(token: string, signal?: AbortSignal) { return workspaceFileOperation(this.locks, () => this.session.createCleanOutput(token, this.store, '0.0.1', signal)); }
   previewClean(token: string) { return this.session.previewCleanOutput(token); }
   generateReview(token: string, selection: ReviewSelectionOptions, signal?: AbortSignal) { return workspaceFileOperation(this.locks, () => this.session.createReviewOutput(token, selection, this.store, '0.0.1', signal)); }

@@ -28,6 +28,8 @@ export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: 
   const scene = new THREE.Scene(), models = new THREE.Group(); scene.add(models); scene.background = new THREE.Color(PROJECT_SCENE_STANDARD_BACKGROUND_HEX);
   const resident = new Map<string, ResidentSurface>();
   const residentKeys = new Map<string,string>();
+  const residentModelKeys = new Map<string,string>();
+  const residentModelKey = (model: RenderDisplay['models'][number]) => JSON.stringify(model);
   const rendererTextures=new Set<THREE.Texture>();
   const textureLeases = new Map<THREE.Texture, RasterLease>();
   const modelFailures = new Map<string, { key: string; issue: string }>();
@@ -59,7 +61,7 @@ export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: 
   let background: SolidBackground = { kind: 'solid', colorSrgb: [232 / 255, 230 / 255, 226 / 255] };
   let blockedNext:RenderDisplay|null=null,pendingGsTarget=false,capacityIssue:string|null=null,gsIntent:GsViewIntent|null=null,gsIntentKey='',retryScheduled=false;
   let entryPending = false, notice: string | null = null;
-  let pose = defaultPose(), display: RenderDisplay | null = null, modelKey = '', active = false, disposed = false, applying = false;
+  let pose = defaultPose(), display: RenderDisplay | null = null, modelKey = '', modelStructureKey = '', active = false, disposed = false, applying = false;
   let issue: string | null = null, contextLost = false, dragging = false, axis: ViewportObservation['axis'] = null, serial = 0, raf = 0, lastObservation = '';
   let lastDrawSerial = -1, visualDirty = true;
   let width = 1, height = 1, rawPixelRatio = 0; let pointDiameterNotice: string | null = null; const pointDiameters = new Map<string, number>();
@@ -125,7 +127,7 @@ export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: 
     clearGs(preserve);
     coverageProbe?.dispose(); coverageProbe = null; coverageIssue = null;
     for (const surface of resident.values()) surface.dispose?.();
-    resident.clear();residentKeys.clear();
+    resident.clear();residentKeys.clear();residentModelKeys.clear();modelStructureKey='';
     for (const child of [...models.children]) {
       child.traverse(node => { if (node instanceof THREE.Mesh) { node.geometry.dispose(); (node.material as THREE.Material).dispose(); } });
       models.remove(child);
@@ -150,24 +152,46 @@ export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: 
   function fail(e: unknown) { issue = `3D表示を停止しました。${errorText(e)} 編集内容は保持しています。`; release(); serial++; changed(); }
   function buildModels() {
     if (!display || !renderer) return;
-    const key = JSON.stringify([display.models.map(m => [isReadonlyModel(m) ? m.key : m.binding.id,loadState(m)]), display.materials, display.savedMaterials, saved.demand ? display.hiddenAssetIds : null]); if (key === modelKey) return;
-    clearSmooth();pickEpoch++;
+    const structure=JSON.stringify([display.sceneId,display.readOnly,display.models.map(m=>[residentModelKey(m),loadState(m)]),display.hiddenAssetIds]);
+    const key = JSON.stringify([structure, display.materials, display.savedMaterials]); if (key === modelKey) return;
+    pickEpoch++;
     coverageProbe?.dispose();coverageProbe=null;coverageIssue=null;
     const target=new Map<string,string>();
     const pendingGs=saved.gsPending?.(wantedModels(display))??false;
     for(const model of display.models){const id=renderOwner(model),state=loadState(model);
       if (saved.demand && display.hiddenAssetIds?.includes(id)) continue;
       if(state&&state.phase!=='ready'||pendingGs&&model.representation.contentKind==='gaussianSplat'||display.materials?.[id]&&'issue' in display.materials[id]!)continue;
-      target.set(id,JSON.stringify([isReadonlyModel(model)?model.key:model.binding.id,display.materials?.[id],display.savedMaterials?.[id]]));}
+      target.set(id,JSON.stringify([residentModelKey(model),display.materials?.[id],display.savedMaterials?.[id]]));}
+    const materialOnly=!!modelKey&&structure===modelStructureKey&&resident.size===target.size&&[...resident].every(([id,surface])=>{
+      const model=display!.models.find(m=>renderOwner(m)===id);
+      return target.has(id)&&model&&residentModelKeys.get(id)===residentModelKey(model)&&
+        !surface.gs&&!surface.points&&!!surface.setMaterialEffects&&!!surface.materialFrameSeen;
+    });
+    if(!materialOnly)clearSmooth();
     const gsChanged=[...resident].some(([id,surface])=>surface.gs&&target.get(id)!==residentKeys.get(id))||display.models.some(m=>target.has(renderOwner(m))&&!resident.has(renderOwner(m))&&m.representation.contentKind==='gaussianSplat');
     if(gsChanged)clearGs(gsIntent);
+    for (const [id, failure] of modelFailures) if (target.get(id) !== failure.key) modelFailures.delete(id);
     for(const [id,surface]of resident)if(target.get(id)!==residentKeys.get(id)){
+      const model = display.models.find(m=>renderOwner(m)===id), nextKey = target.get(id);
+      if (model && nextKey && surface.setMaterialEffects && residentModelKeys.get(id) === residentModelKey(model)) {
+        if (modelFailures.get(id)?.key === nextKey) continue;
+        const newlyTracked: THREE.Texture[] = [];
+        try {
+          surface.setMaterialEffects(display.savedMaterials?.[id] ?? {},textures=>{
+            for(const texture of textures)if(!rendererTextures.has(texture)){trackTexture(texture);newlyTracked.push(texture);}
+          });
+          residentKeys.set(id,nextKey);
+        } catch (error) {
+          for(const texture of newlyTracked)texture.dispose();
+          modelFailures.set(id,{key:nextKey,issue:`${errorText(error)} 前の見え方を保持しています。`});
+        }
+        continue;
+      }
       surface.asset.removeFromParent();
       if(surface.dispose)surface.dispose();else {surface.asset.removeFromParent();surface.asset.traverse(node=>{if(node instanceof THREE.Mesh){node.geometry.dispose();for(const material of Array.isArray(node.material)?node.material:[node.material])material.dispose();}});}
-      resident.delete(id);residentKeys.delete(id);
+      resident.delete(id);residentKeys.delete(id);residentModelKeys.delete(id);
     }
     forgetUnusedTextures();
-    for (const [id, failure] of modelFailures) if (target.get(id) !== failure.key) modelFailures.delete(id);
     try {
       for (const model of display.models) {
         const assetId = renderOwner(model), appearance = display.materials?.[assetId];
@@ -180,9 +204,10 @@ export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: 
           modelFailures.set(assetId, { key: target.get(assetId)!, issue: errorText(error) }); continue;
         }
         models.add(surface.asset);resident.set(assetId,surface);residentKeys.set(assetId,target.get(assetId)!);
+        residentModelKeys.set(assetId,residentModelKey(model));
       }
       for(const model of display.models){const surface=resident.get(renderOwner(model));if(surface)models.add(surface.asset);}
-      modelKey = key;
+      modelKey = key;modelStructureKey=structure;
     } catch (e) { clearModels(); throw e; }
   }
   function configurePoints() {
@@ -230,7 +255,7 @@ export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: 
         return [p.x, p.y, p.z].every(Number.isFinite) && proposePin(target, [p.x || 0, p.y || 0, p.z || 0], phase);
       }, busy => { syncOrbit(busy); serial++; if (!applying) changed(); }, () => { visualDirty = true; }) : null;
       controls = new OrbitControls(camera, canvas); controls.enableDamping = false; controls.target.copy(target);
-      controls.mouseButtons = { MIDDLE: THREE.MOUSE.ROTATE };
+      controls.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.ROTATE, RIGHT: THREE.MOUSE.PAN };
       controls.addEventListener('start', () => { dragging = true; serial++; changed(); });
       controls.addEventListener('end', () => { dragging = false; observePose(); serial++; changed(); });
       controls.addEventListener('change', () => {
@@ -282,7 +307,7 @@ export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: 
     if(smoothLayout&&smoothLayout.cssWidth===width&&smoothLayout.cssHeight===height&&smoothLayout.devicePixelRatio===rawPixelRatio)return;
     try{const gl=renderer.getContext(),available=presentation.budget.available+(composite?.leaseBytes??0)+(gsRender?.targetBytes??0);
       const next=presentation.plan(width,height,rawPixelRatio,available,Math.min(renderer.capabilities.maxTextureSize,gl.getParameter(gl.MAX_RENDERBUFFER_SIZE) as number));
-      if(smoothLayout&&(smoothLayout.width!==next.width||smoothLayout.height!==next.height))clearSmooth();
+      if(smoothLayout)clearSmooth();
       smoothLayout=next;renderer.setDrawingBufferSize(next.width,next.height,1);configurePoints();coverageProbe?.dispose();coverageProbe=null;pickEpoch++;serial++;
     }catch(error){smoothIssue=errorText(error);waitingBudget=true;refusedAvailable=presentation.budget.available;serial++;changed();}
   }
@@ -317,6 +342,8 @@ export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: 
     if(gsRender){try{if(presentation&&smooth.length&&smoothLayout&&!smoothIssue)gsRender.render(scene,camera,before,frame=>drawSmooth(smooth,before,frame));else hideSmooth(smooth,()=>gsRender!.render(scene,camera!,before));}catch(e){gsIssue=errorText(e);clearSmooth();const failed=gsRender;gsRender=null;try{failed.dispose();}catch(cleanup){gsIssue+=` ${errorText(cleanup)}`;}for(const s of sources){s.ready=false;s.issue=gsIssue;}pickEpoch++;serial++;changed();hideSmooth(smooth,()=>{before();renderer!.render(scene,camera!);});}}
     else if(presentation&&smooth.length)drawSmooth(smooth,before);else{before();renderer.render(scene,camera);}
     if(presentation)canvas.dataset.compositionDocumentBytes=String(presentation.budget.used);
+    // New draw owners have acquired their program refs before the old source table retires.
+    for(const surface of resident.values())surface.materialFrameSeen?.();
   }
   function draw() {
     if (!active || disposed || !renderer || !camera) return;
@@ -432,6 +459,7 @@ export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: 
       const sceneChanged = display?.sceneId !== next.sceneId;
       const boundsChanged = JSON.stringify(display?.bounds) !== JSON.stringify(next.bounds);
       const visibilityChanged = JSON.stringify(display?.hiddenAssetIds) !== JSON.stringify(next.hiddenAssetIds);
+      if (Boolean(display?.materialPreview) !== Boolean(next.materialPreview)) pickEpoch++;
       if (visibilityChanged) {pickEpoch++;if([...resident.values()].some(s=>s.gs))clearGs(gsIntent);}
       if (sceneChanged) observePose(); display = next;
       if (sceneChanged) { entryPending = true; if (renderer) { enterScene(); installPose(); } }
@@ -453,14 +481,14 @@ export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: 
     },
     setPinPointerActive(next) { pinPointerActive = next; syncOrbit(); },
     pick(target, x, y) {
-      if (!active || disposed || !renderer || !camera || issue || contextLost || dragging || navigation || gizmo?.dragging || !display || display.readOnly) return null;
+      if (!active || disposed || !renderer || !camera || issue || contextLost || dragging || navigation || gizmo?.dragging || !display || display.readOnly || display.materialPreview) return null;
       try { if ([...resident.values()].some(s => s.points&&s.asset.visible&&s.points.object.visible)) { const hit = pointPick([target], x, y); reportPickIssue(); return coverageIssue ? null : hit?.position ?? null; }
         const sample = pickSample(x, y); if (!sample) return null;
         const current=display,currentCamera=camera;const result = presentedPick(()=>pickResidentSurface(current, target, resident, currentCamera, sample.ndc, sample.coverage)); reportPickIssue(); return coverageIssue ? null : result;
       } catch (error) { coverageIssue = errorText(error); reportPickIssue(); return null; }
     },
     pickCreation(targets, x, y) {
-      if (!active || disposed || !renderer || !camera || issue || contextLost || dragging || navigation || gizmo?.dragging || !display || display.readOnly) return null;
+      if (!active || disposed || !renderer || !camera || issue || contextLost || dragging || navigation || gizmo?.dragging || !display || display.readOnly || display.materialPreview) return null;
       try { if ([...resident.values()].some(s => s.points&&s.asset.visible&&s.points.object.visible)) { const hit = pointPick(targets, x, y); reportPickIssue(); return coverageIssue ? null : hit; }
         const sample = pickSample(x, y); if (!sample) return null;
         const current=display,currentCamera=camera;const result = presentedPick(()=>pickResidentCreation(current, targets, resident, currentCamera, sample.ndc, sample.coverage)); reportPickIssue(); return coverageIssue ? null : result;
@@ -484,9 +512,10 @@ export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: 
       const loading=Boolean(smoothPending||pendingGsTarget&&!blockedFailures.length||!issue&&(!renderer||!camera)||pending.length&&display?.models.some(model=>loadState(model)?.phase==='loading')||gsPreparing||[...resident.values()].some(s=>s.asset.visible&&s.gs&&!s.gs.ready&&(!s.gs.issue||s.gs.issue==='GSの表示を準備しています。')));
       return { token: JSON.stringify([serial, display?.sceneId, display?.projectFrameId, display?.bounds, width, height, pose, background]),
         display: display ?? undefined,
-        pickToken: String(pickEpoch),
+        pickToken: display?.materialPreview ? undefined : String(pickEpoch),
+        placementNotice: alphaPicking && !display?.readOnly ? presentation ? '透過の面は位置指定に使えません。座標で調整できます。' : '半透明・切り抜きの面は位置指定に使えません。座標で調整できます。' : null,
         ready: Boolean(active && renderer && camera && !issue&&!capacityIssue&&!pendingGsTarget&&!pending.length), cameraReady:Boolean(active&&renderer&&camera&&controls&&!issue&&!contextLost&&display), loading, issue,retryAvailable:!!blockedFailures.length||!!modelFailures.size||!!capacityIssue||!!gsIssue||!!smoothIssue||[...resident.values()].some(s=>s.gs?.issue!==null&&s.gs?.issue!==undefined&&s.gs.issue!=='GSの表示を準備しています。'),
-        notice: [smoothPresented?'透過表示は近似です。':null,smoothPending?'透過表示を準備しています。':null,smoothIssue?`${smoothIssue} 透過の面は非表示です。設定と記録は保持しています。`:null,smoothLayout&&smoothLayout.renderScale<Math.min(1,2/(rawPixelRatio||1))?'3D表示の細かさを自動調整しています。元データと記録は変わりません。':null,pendingGsTarget&&(blockedFailures.length?'次の表示を準備できません。前の表示と記録は保持しています。':'モデルを準備しています。前の表示を保持しています。'),blockedFailures.join(' / '),pending.join(' / '),capacityIssue, notice, coverageIssue, gsIssue, pointDiameterNotice, ...new Set([...resident.values()].flatMap(s => [s.points?.issue,s.asset.visible && s.gs ? s.gs.issue ?? (!s.gs.ready && !gsIssue ? 'GSの表示を準備しています。' : null) : null].filter(Boolean))), alphaPicking && !display?.readOnly ? presentation?'滑らかな透過の面は位置指定に使えません。位置の手動調整は利用できます。':'半透明・切り抜きの面へのピン配置は未接続です。原本の見た目は保持しています。' : null,
+        notice: [smoothPresented?'透過表示（近似）':null,smoothPending?'透過表示を準備しています。':null,smoothIssue?`${smoothIssue} 透過の面は非表示です。設定と記録は保持しています。`:null,smoothLayout&&smoothLayout.renderScale<Math.min(1,2/(rawPixelRatio||1))?'3D表示の細かさを自動調整しています。元データと記録は変わりません。':null,pendingGsTarget&&(blockedFailures.length?'次の表示を準備できません。前の表示と記録は保持しています。':'モデルを準備しています。前の表示を保持しています。'),blockedFailures.join(' / '),pending.join(' / '),capacityIssue, notice, coverageIssue, gsIssue, pointDiameterNotice, ...new Set([...resident.values()].flatMap(s => [s.points?.issue,s.asset.visible && s.gs ? s.gs.issue ?? (!s.gs.ready && !gsIssue ? 'GSの表示を準備しています。' : null) : null].filter(Boolean))),
           ...new Set(materialNotices),
           ...new Set(display?.pins.flatMap(p => p.notice ? [p.notice] : []) ?? []),
           ...(display?.materialNotices ?? []), ...Object.values(display?.materials ?? {}).flatMap(m => 'issue' in m ? [m.issue] : []),

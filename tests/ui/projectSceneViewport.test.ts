@@ -19,6 +19,9 @@ import type { GizmoProposal, ModelPlacementTarget } from '../../src/harness/proj
 import type { ReadonlyRenderModel, ValidationModelClosure } from '../../src/harness/projectScene/modelTypes';
 import { patchHardChroma } from '../../src/viewer/hardChroma';
 import { createRasterResources, rasterBytes } from '../../src/viewer/rasterResources';
+import {sceneViewportFactory as applicationViewportFactory} from '../../src/projectScene/viewport';
+import {patchSmoothCoverage} from '../../src/viewer/smoothMaterial';
+import {createTargetBudget,targetLayout} from '../../src/viewer/targetBudget';
 
 const tracker = vi.hoisted(() => ({ renderers: [] as any[], controls: [] as any[], resize: [] as (() => void)[],
   raf: new Map<number, () => void>(), nextRaf: 0, fail: false, gizmos: [] as any[], realOrbit: false }));
@@ -27,6 +30,7 @@ vi.mock('three', async importOriginal => {
   return { ...actual, WebGLRenderer: class {
     disposed = false; scene: any; camera: any; frames = 0;
     capabilities = { maxTextureSize: 8192 };
+    getContext(){return{MAX_RENDERBUFFER_SIZE:1,getParameter:()=>8192};}
     constructor() { if (tracker.fail) throw new Error('synthetic WebGL refusal'); tracker.renderers.push(this); }
     setPixelRatio() {} setSize() {} setDrawingBufferSize() {}
     render(scene: any, camera: any) { this.scene = scene; this.camera = camera; scene.updateMatrixWorld(true); this.frames++; }
@@ -130,6 +134,40 @@ describe('synthetic Scene display; GPU mocked, not rendered/browser acceptance',
     expect(raster.snapshot().gpuBytes).toBe(rasterBytes(8,8,true));
     v.update({...display,hiddenAssetIds:['0','2']});v.retry();expect(v.read()).toMatchObject({cameraReady:true,ready:true,issue:null,retryAvailable:false});
     expect(raster.snapshot().gpuBytes).toBe(rasterBytes(8,8,true));v.dispose();expect(raster.snapshot().gpuBytes).toBe(0);
+  });
+  it('updates material-only GPU intent transactionally without rebuilding geometry or authorizing preview picks',()=>{
+    const base=syntheticDisplay(createSyntheticProject(),f.overview,null,null),source=base.models[0]!,canvas=fakeCanvas(),bytes=rasterBytes(8,8,true),raster=createRasterResources({cpuBytes:0,gpuBytes:bytes*2}),closed=vi.fn();
+    const textures=[8,8,9000].map(width=>new THREE.Texture({width,height:8,close:closed} as any));
+    const model:ReadonlyRenderModel={shape:'render-glb',key:'same',assetId:source.binding.assetId,assetToProject:source.binding.assetToProject,representation:source.representation as ReadonlyRenderModel['representation']};
+    let held:readonly THREE.Texture[]=[textures[0]!],mode='base';const mesh=new THREE.Mesh(new THREE.PlaneGeometry(),new THREE.MeshStandardMaterial({map:textures[0]})),asset=new THREE.Group();asset.add(mesh);
+    const geometry=mesh.geometry,apply=vi.fn((effects:any,admit:(textures:readonly THREE.Texture[])=>void)=>{const next=effects?.slot?.appearance?.lighting??'base',wanted=next==='unlit'?[textures[0]!]:next==='bad'?textures:[textures[0]!,textures[1]!];admit(wanted);held=wanted;mode=next;});
+    const create=vi.fn(()=>({asset,mesh,get gpuTextures(){return held;},setMaterialEffects:apply,dispose(){mesh.geometry.dispose();mesh.material.dispose();}}));
+    const v=sceneViewportFactory({rasterResources:raster,create,dispose(){}})(canvas.canvas as unknown as HTMLCanvasElement,()=>{});
+    const display={...base,models:[model],readOnly:true as const,pinEdit:undefined,modelEdit:undefined,preview:undefined};const changed=(lighting:string)=>({...display,materialPreview:true,savedMaterials:{[model.assetId]:{slot:{appearance:{lighting},compositing:{coverage:{policy:'inherit'},optics:'inherit'}}}}} as any);
+    v.update(display);v.setActive(true);canvas.show();expect(raster.snapshot().gpuBytes).toBe(bytes);
+    v.update(changed('bad'));expect(mode).toBe('base');expect(v.read().notice).toContain('前の見え方');expect(raster.snapshot().gpuBytes).toBe(bytes);expect(create).toHaveBeenCalledOnce();expect(mesh.geometry).toBe(geometry);
+    v.update(changed('lit'));expect(mode).toBe('lit');expect(raster.snapshot().gpuBytes).toBe(bytes*2);expect(v.read().pickToken).toBeUndefined();expect(v.pick?.({}as any,1,1)).toBeNull();
+    const count=apply.mock.calls.length;v.update(changed('lit'));expect(apply).toHaveBeenCalledTimes(count);v.update(changed('unlit'));expect(raster.snapshot().gpuBytes).toBe(bytes);expect(create).toHaveBeenCalledOnce();expect(closed).not.toHaveBeenCalled();
+    v.dispose();expect(raster.snapshot().gpuBytes).toBe(0);expect(closed).not.toHaveBeenCalled();
+  });
+  it('retains only exact Mesh material frames while Scene and layout transitions still clear compositor owners',async()=>{
+    const base=syntheticDisplay(createSyntheticProject(),f.overview,null,null),source=base.models[0]!,canvas=fakeCanvas(),budget=createTargetBudget();
+    const model:ReadonlyRenderModel={shape:'render-glb',key:'mesh',assetId:source.binding.assetId,assetToProject:source.binding.assetToProject,representation:source.representation as ReadonlyRenderModel['representation']};
+    const material=new THREE.MeshBasicMaterial();patchSmoothCoverage(material,{opacity:.5});const mesh=new THREE.Mesh(new THREE.PlaneGeometry(),material),asset=new THREE.Group();asset.add(mesh);
+    const frameSeen=vi.fn(),setEffects=vi.fn((effects:any)=>{const previous=mesh.material;mesh.material=new THREE.MeshBasicMaterial();patchSmoothCoverage(mesh.material,{opacity:effects?.slot?.appearance?.opacity??.5});previous.dispose();});
+    const composites:{render:ReturnType<typeof vi.fn>;dispose:ReturnType<typeof vi.fn>}[]=[];
+    const presentation={budget,plan:targetLayout,create:vi.fn(async(renderer:any,_budget:any,layout:any)=>{const lease=budget.reserve(layout.bytes),port={layout,depthBits:24,leaseBytes:lease.bytes,render:vi.fn((s:THREE.Scene,c:THREE.Camera)=>renderer.render(s,c)),dispose:vi.fn(()=>lease.release())};composites.push(port);return port;})};
+    const v=applicationViewportFactory({create:()=>({asset,mesh,setMaterialEffects:setEffects,materialFrameSeen:frameSeen,dispose(){mesh.geometry.dispose();mesh.material.dispose();}}),dispose(){}},undefined,undefined,presentation)(canvas.canvas as unknown as HTMLCanvasElement,()=>{}),display={...base,models:[model],readOnly:true as const,pinEdit:undefined,modelEdit:undefined,preview:undefined};
+    const tick=()=>{const [id,frame]=[...tracker.raf][0]!;tracker.raf.delete(id);frame();};
+    v.update(display);v.setActive(true);canvas.show();await Promise.resolve();tick();const first=composites[0]!,geometry=mesh.geometry;expect(presentation.create).toHaveBeenCalledOnce();
+    for(let i=0;i<12;i++) {
+      const effect={appearance:{opacity:.2+i/100},compositing:{coverage:{policy:'inherit' as const},optics:'inherit' as const}};
+      v.update({...display,savedMaterials:{[model.assetId]:{slot:effect}}});
+    }
+    tick();expect(presentation.create).toHaveBeenCalledOnce();expect(first.dispose).not.toHaveBeenCalled();expect(mesh.geometry).toBe(geometry);expect(first.render.mock.invocationCallOrder.at(-1)).toBeLessThan(frameSeen.mock.invocationCallOrder.at(-1)!);
+    v.update({...display,sceneId:'another-scene'});tick();await Promise.resolve();tick();expect(first.dispose).toHaveBeenCalledOnce();expect(presentation.create).toHaveBeenCalledTimes(2);
+    canvas.show(700,500);tick();await Promise.resolve();tick();expect(composites[1]!.dispose).toHaveBeenCalledOnce();expect(presentation.create).toHaveBeenCalledTimes(3);
+    v.dispose();for(const port of composites)expect(port.dispose).toHaveBeenCalledOnce();expect(budget.used).toBe(0);
   });
   it('invalidates source texture uploads from current and earlier Scenes before renderer disposal without closing CPU images',()=>{
     const base=syntheticDisplay(createSyntheticProject(),f.overview,null,null),source=base.models[0]!,canvas=fakeCanvas(),closed=vi.fn(),events:string[]=[];
@@ -267,7 +305,7 @@ describe('synthetic Scene display; GPU mocked, not rendered/browser acceptance',
     const v=sceneViewportFactory({create,dispose() {}})(canvas.canvas as unknown as HTMLCanvasElement,()=>{});
     v.update(make());v.setActive(true);canvas.show();v.camera({kind:'axis',axis:'+z'});
     const surface=surfaces.get(f.equipment)!,target=targets.find(t=>t.assetId===f.equipment)!,point=v.read().pins.find(p=>p.id===f.shared)!;
-    const hit=()=>v.pick!(target,point.x,point.y),warning=()=>v.read().notice??'';
+    const hit=()=>v.pick!(target,point.x,point.y),warning=()=>v.read().placementNotice??'';
     expect(hit()).not.toBeNull();surface.material.transparent=true;surface.material.opacity=.5;
     expect(warning()).toContain('半透明・切り抜き');expect(hit()).toBeNull();
     v.update(make([f.equipment]));expect(warning()).not.toContain('半透明・切り抜き');expect(hit()).toBeNull();
@@ -403,8 +441,6 @@ describe('synthetic Scene display; GPU mocked, not rendered/browser acceptance',
       canvas.canvas.fire('pointerup', { ...pointer, ...modifiers });
     };
     const initial = camera.position.clone(), initialTarget = orbit.target.clone();
-    drag({ button: 0 }); drag({ button: 2 });
-    expect(starts).toBe(0); expect(camera.position).toEqual(initial); expect(orbit.target).toEqual(initialTarget);
     drag({}); expect(starts).toBe(1); expect(camera.position).not.toEqual(initial);
     expect(orbit.target).toEqual(initialTarget); expect(camera.position.distanceTo(orbit.target)).toBeCloseTo(initial.distanceTo(initialTarget), 10);
     const rotated = camera.position.clone();
@@ -418,8 +454,14 @@ describe('synthetic Scene display; GPU mocked, not rendered/browser acceptance',
     const beforeWheel = zoomMeasure();
     canvas.canvas.fire('wheel', { deltaY: -100, deltaMode: 0, ctrlKey: false, clientX: 400, clientY: 300, preventDefault() {} });
     expect(starts).toBe(4); expect(zoomMeasure()).not.toBe(beforeWheel); expect(orbit.target.distanceTo(pannedTarget)).toBeLessThan(1e-10);
+    const beforeLeft = camera.position.clone(), leftTarget = orbit.target.clone();
+    drag({ button: 0 }); expect(starts).toBe(5); expect(camera.position).not.toEqual(beforeLeft); expect(orbit.target.distanceTo(leftTarget)).toBeLessThan(1e-10);
+    const leftRotated = camera.position.clone();
+    drag({ button: 2 }); expect(starts).toBe(6); expect(orbit.target).not.toEqual(leftTarget);
+    const rightDelta = camera.position.clone().sub(leftRotated), rightTargetDelta = orbit.target.clone().sub(leftTarget);
+    rightDelta.toArray().forEach((n,i) => expect(n).toBeCloseTo(rightTargetDelta.toArray()[i]!,10));
     const beforeHide = v.capture!(); v.setActive(false); v.setActive(true);
-    expect(tracker.controls.at(-1).mouseButtons).toEqual({ MIDDLE: THREE.MOUSE.ROTATE });
+    expect(tracker.controls.at(-1).mouseButtons).toEqual({ LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.ROTATE, RIGHT: THREE.MOUSE.PAN });
     expect(v.capture!()).toEqual(beforeHide); v.dispose();
   });
   it.each(['perspective','orthographic'] as const)('owns overlay orbit/pan without replacing controls or writing display data (%s)',projection=>{

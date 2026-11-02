@@ -35,6 +35,8 @@ export interface EditableDisplay {
   readonly materials?: Readonly<Record<string, ReturnType<typeof resolveFixtureMaterial> | { readonly issue: string }>>;
   readonly savedMaterials?: Readonly<Record<string, ValidationMaterialEffects>>;
   readonly materialNotices?: readonly string[];
+  /** Uncommitted UI effects; never valid placement or saved-source evidence. */
+  readonly materialPreview?: boolean;
   readonly entry?: { readonly kind: 'none' } | { readonly kind: 'blocked'; readonly reason: string } | { readonly kind: 'ready'; readonly payload: DisplayCapture };
 }
 export interface ReadonlyDisplay extends Omit<EditableDisplay, 'models' | 'readOnly' | 'pinEdit' | 'modelEdit' | 'preview'> {

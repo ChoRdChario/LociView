@@ -1,5 +1,5 @@
 import type { MetadataEdit } from '../../projectMetadata/commands';
-import type { ProjectWorkspacePorts, WorkspaceViewport, WorkspaceProvider, WorkspaceModelProposal } from './projectWorkspacePorts';
+import type { ProjectWorkspacePorts, WorkspaceViewport, WorkspaceProvider, WorkspaceModelProposal, WorkspaceMaterialProposal } from './projectWorkspacePorts';
 
 export type ProjectTask = 'captions' | 'models' | 'views' | 'materials';
 export interface ProjectPanelHost {
@@ -29,6 +29,7 @@ export interface ProjectModelPanel extends ProjectPanel {
   propose(next: WorkspaceModelProposal): boolean;
   show(assetId: string): void;
 }
+export interface ProjectMaterialPanel extends ProjectPanel { proposal(): WorkspaceMaterialProposal | null }
 export const projectId = () => crypto.randomUUID().replaceAll('-', '');
 export const newProjectId = (prefix: string) => `${prefix}_${projectId()}`;
 /** Equality for already verified JSON UI receipts, not a wire encoder. */

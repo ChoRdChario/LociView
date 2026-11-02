@@ -41,8 +41,9 @@ function effect(context: MaterialContext, kind: 'apply' | 'remove'): MaterialEff
   const plan = planMaterial(context, { kind }); expect(plan.kind).toBe(kind);
   if (plan.kind !== 'apply' && plan.kind !== 'remove') throw Error('not effect'); return plan;
 }
-function host(initial = fixture(),direct=false) {
+function host(initial = fixture(),direct=false, frames?: Map<number, FrameRequestCallback>) {
   const document = new RecordedDocument(), plans: MaterialPlan[] = []; let context = initial;
+  if (frames) { let serial=0; Object.assign(document,{defaultView:{requestAnimationFrame(fn:FrameRequestCallback){frames.set(++serial,fn);return serial;},cancelAnimationFrame(id:number){frames.delete(id);}}}); }
   const controls = createMaterialControls(document.asDocument(), plan => {
     plans.push(plan); if (['draft', 'select', 'cancel'].includes(plan.kind) && materialPlanIsCurrent(plan, context)) {
       context = applyLocal(context, plan); controls.render(context);
@@ -59,6 +60,41 @@ function host(initial = fixture(),direct=false) {
 it('shows product material inputs directly without a focus-only draft, beginning the retained edit on first actual input',()=>{
  const h=host(fixture(),true),opacity=h.fields.get('opacity')!;expect(h.begin.hidden).toBe(true);expect(h.content.children.find(n=>n.className==='lv-material-fields')!.hidden).toBe(false);
  opacity.fire('focus');expect(h.context.draft).toBeNull();expect(h.plans).toHaveLength(0);opacity.value='55';opacity.fire('input');expect(h.context.draft?.edits.opacity).toBe('55');expect(h.apply.disabled).toBe(false);h.controls.dispose();
+});
+
+it('previews coalesced numeric drags locally, retains explicit apply, and restores only the scrubbed field on Escape', () => {
+  const frames = new Map<number, FrameRequestCallback>(), h = host(edit(editing(fixture()), 'lighting', 'unlit'), true, frames), input = h.fields.get('opacity')!, label = input.parent!;
+  const flush=()=>{for(const [id,fn]of [...frames]){frames.delete(id);fn(0);}};
+  const event = { pointerId: 1, pointerType: 'mouse', isPrimary: true, button: 0, buttons: 1, clientX: 10, target: input, preventDefault() {} };
+  label.fire('pointerdown', event); label.fire('pointermove', { ...event, clientX: 30 }); label.fire('pointermove', { ...event, clientX: 50 });
+  expect(frames.size).toBe(1); expect(h.context.draft?.edits.opacity).toBeUndefined(); flush();
+  expect(h.context.draft?.edits).toMatchObject({ opacity: '60', lighting: 'unlit' });
+  expect(h.plans.every(p => p.kind !== 'apply')).toBe(true); expect(h.apply.disabled).toBe(true);
+  label.fire('keydown', { key: 'Escape', preventDefault() {}, stopPropagation() {} });
+  expect(h.context.draft?.edits).toEqual({ lighting: 'unlit' }); expect(h.apply.disabled).toBe(false);
+  label.fire('pointerdown', event); label.fire('pointermove', { ...event, clientX: 30 }); label.fire('pointerup', { ...event, type: 'pointerup' });
+  expect(h.context.draft?.edits.opacity).toBe('50'); expect(h.plans.every(p => p.kind !== 'apply')).toBe(true);
+  h.apply.fire('click'); expect(h.plans.at(-1)?.kind).toBe('apply'); h.controls.dispose();
+});
+
+it('keeps untouched numeric precision and refuses late drag work after source changes or IME', () => {
+  const base = surface(); const raw = 0.123456789123456;
+  const h = host(fixture(true, { ...base, project: value({ id: id('ovr',1), target, scope:'project',sceneId:null,intent:value(intent({opacity:raw})) }) }), true);
+  const input=h.fields.get('opacity')!, label=input.parent!, exact=String(raw*100);
+  expect(input.value.length).toBeLessThan(exact.length); input.focus(); input.fire('focus'); expect(input.value).toBe(exact); expect(h.context.draft).toBeNull();
+  const event={pointerId:2,pointerType:'mouse',isPrimary:true,button:0,buttons:1,clientX:0,target:label,preventDefault(){}};
+  label.fire('pointerdown',event); const next={...h.context,source:{...h.context.source,token:'updated'}}; h.render(next);
+  label.fire('pointermove',{...event,clientX:20}); expect(h.context.draft).toBeNull();
+  input.fire('compositionstart'); const count=h.plans.length; label.fire('pointerdown',event);label.fire('pointermove',{...event,clientX:30});expect(h.plans).toHaveLength(count);
+  input.fire('compositionend');h.controls.dispose();
+});
+
+it('ignores nonfinite scrub input and cancels a corrupted move without leaving an edited field',()=>{
+  const h=host(edit(editing(fixture()),'lighting','unlit'),true),input=h.fields.get('opacity')!,label=input.parent!;
+  const e={pointerId:9,pointerType:'mouse',button:0,buttons:1,isPrimary:true,target:input,clientX:0,preventDefault(){}};
+  label.fire('pointerdown',{...e,clientX:NaN});label.fire('pointermove',{...e,clientX:12});expect(h.context.draft?.edits).toEqual({lighting:'unlit'});
+  label.fire('pointerdown',e);label.fire('pointermove',{...e,clientX:12});expect(h.context.draft?.edits.opacity).toBe('46');
+  label.fire('pointermove',{...e,clientX:Infinity});expect(h.context.draft?.edits).toEqual({lighting:'unlit'});expect(input.value).toBe('40');h.controls.dispose();
 });
 
 describe('disconnected material controls (not rendering, browser or save acceptance)', () => {
@@ -129,11 +165,11 @@ describe('disconnected material controls (not rendering, browser or save accepta
     expect(h.apply.disabled).toBe(false); h.apply.fire('click');
     const plan=h.plans.at(-1)!; if(plan.kind!=='apply') throw Error('apply');
     expect(plan.intent.appearance).toEqual(before); expect(plan.intent.compositing.coverage).toEqual({policy:'mask',alphaCutoff:0});
-    const help = h.content.children.find(n => n.className === 'lv-material-fields')!.children.at(-1)!.children[1]!;
+    const help = coverage.parent!.children.find(n => n.className === 'lv-material-label')!.children.find(n=>n.className==='lv-context-help')!.children[1]!;
     expect(help.attributes.get('role')).toBe('tooltip'); expect(help.hidden).toBe(true);
     expect(help.textContent).toContain('滑らかな半透明にはなりません');
     expect(coverage.attributes.get('aria-describedby')?.split(' ')).toContain(help.id);
-    expect(coverage.parent!.children.at(-1)!.textContent).toBe('');
+    expect(coverage.parent!.children.find(n=>n.tag==='p')!.textContent).toBe('');
     const stale={...h.context,source:{...h.context.source,token:'new'}}; h.render(stale); expect(h.apply.disabled).toBe(true);
     expect(cutoff.value).toBe('0'); h.controls.dispose();
   });

@@ -293,6 +293,9 @@ export const projectSceneApplicationImports:Readonly<Record<string,readonly stri
     "../projectMetadata/captionUndo"
   ],
   "src/projectScene/productWorkspace.ts": [
+    "../scene/types",
+    "../domain/materialIntent",
+    "../ui/projectScene/materialState",
     "../domain/portableMedia",
     "../domain/values",
     "../scene/resolve",
@@ -633,6 +636,7 @@ export const projectSceneApplicationImports:Readonly<Record<string,readonly stri
     "three"
   ],
   "src/projectScene/viewportPicking.ts": [
+    "./validationMaterials",
     "../domain/pointPresentation",
     "../viewer/gsRender",
     "../viewer/hardChroma",

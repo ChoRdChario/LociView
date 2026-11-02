@@ -10,6 +10,8 @@ import type { ViewFieldVersions } from './viewAuthoringState';
 import type { CaptionSnapshot } from '../../projectMetadata/captionAuthoring';
 import type { CaptionUndoInput, CaptionUndoCapture, CaptionUndoReceipt, CaptionUndoTarget, CaptionUndoSnapshot } from '../../projectMetadata/captionUndo';
 import type { RasterResources } from '../../viewer/rasterResources';
+import type { MaterialIntent } from '../../domain/materialIntent';
+import type { MaterialTarget } from '../../scene/types';
 
 export type WorkspaceAuthoringIntent =
   | { kind: 'duplicateCaption'; sceneId: string; sourceId: string }
@@ -47,6 +49,10 @@ export interface WorkspaceModelDetails { readonly target: WorkspaceModelTarget; 
   readonly boundsAsset?: { readonly min: Point3; readonly max: Point3 }; readonly importedPlacement?: WorkspacePlacement;
   readonly gsProxyTarget?: {readonly sceneId:string;readonly assetId:string;readonly expectedBindingId:string;readonly gsRepresentationId:string;readonly gsPayloadDigest:string;readonly gsFamilyId:string;readonly expectedProxyId:string|null}; readonly replacementAvailable?: boolean; readonly pointCloud?: boolean; readonly rotationDegrees: readonly [string, string, string]; readonly sceneCount: Field<number> }
 export interface WorkspaceViewPayload { readonly camera: JsonObject; readonly background: { readonly kind: 'solid'; readonly colorSrgb: Point3 } }
+export interface WorkspaceMaterialProposal {
+  readonly token: string; readonly projectId: string; readonly sceneId: string; readonly target: MaterialTarget;
+  readonly scope: 'scene' | 'project'; readonly recordId: string | null; readonly intent: MaterialIntent;
+}
 export interface WorkspaceMaterialReview { readonly key: string; readonly token: string; readonly sceneId: string; readonly overrideId: string;
   readonly label: string; readonly appearance: readonly { operationId: string; label: string }[];
   readonly compositing: readonly { operationId: string; label: string }[]; readonly owners: readonly { id: string; label: string }[] }
@@ -65,6 +71,7 @@ export interface WorkspaceViewportState {
   /** Presentation lifetime only; metadata and editing remain available while hidden. */
   readonly visible?: boolean;
   readonly hiddenAssetIds?: readonly string[]; readonly model?: WorkspaceModelProposal | null;
+  readonly material?: WorkspaceMaterialProposal | null;
   readonly windowMoving?: boolean;
   readonly comparison?: { token: string; captionId: string; anchor: Anchor } | null;
 }
@@ -75,6 +82,7 @@ export interface WorkspaceViewport {
   pointDiameter?(assetId: string): number;
   reservePointer(active: boolean): void;
   read(): { token: string; sceneId: string; pickToken: string; ready: boolean; dragging: boolean; issue: string | null; notice: string | null;readonly loading?:boolean;readonly retryAvailable?:boolean;readonly camera?:CameraOrientation;readonly navigating?:boolean;readonly cameraReady?:boolean;
+    readonly placementNotice?: string | null;
     pins: readonly { id: string; x: number; y: number; visible: boolean; scale?: number; color?: string; status?: 'normal' | 'needsReview'; notice?: string }[]; readonly assetIds?: readonly string[]; readonly view?: ViewRuntime };
   target(assetId: string): WorkspaceSurface | null;
   camera(action: 'fit' | 'front' | 'back' | 'left' | 'right' | 'top' | 'bottom'): void;

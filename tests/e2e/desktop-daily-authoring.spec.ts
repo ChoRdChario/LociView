@@ -78,7 +78,11 @@ test('daily Scene and Caption organization, tags, alignment, settings and files 
     await p.getByRole('button', { name: '記録の変更を元に戻す', exact: true }).click(); await ready(p, '記録の変更を元に戻しました。'); await expect(p.getByLabel('本文', { exact: true })).toHaveValue('元の本文');
     await p.getByRole('button', { name: '記録の変更をやり直す', exact: true }).click(); await ready(p, '記録の変更をやり直しました。');
     await p.getByRole('list',{name:'キャプション一覧',exact:true}).getByRole('listitem').filter({has:p.locator('.lv-caption-select').filter({hasText:'複製の記録'})}).getByRole('button',{name:'削除',exact:true}).click(); await p.getByRole('region',{name:'削除の確認',exact:true}).getByRole('button',{name:'削除する',exact:true}).click(); await ready(p,'プロジェクトから削除しました。'); await expect(p.locator('.lv-caption-select')).toHaveCount(1);
-    await p.getByRole('button',{name:'記録の変更を元に戻す',exact:true}).click(); await ready(p,'記録の変更を元に戻しました。'); await expect(p.getByLabel('本文',{exact:true})).toHaveValue('独立した本文');
+    const undoAfterDeletion=p.getByRole('button',{name:'記録の変更を元に戻す',exact:true});await undoAfterDeletion.scrollIntoViewIfNeeded();
+    const undoHit=await undoAfterDeletion.evaluate(node=>{const r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return{rect:{x:r.x,y:r.y,width:r.width,height:r.height},hit:hit===node||!!hit&&node.contains(hit)};});
+    await info.attach('no-selection-undo-hit',{body:JSON.stringify(undoHit),contentType:'application/json'});expect(undoHit.hit).toBe(true);
+    await p.screenshot({path:info.outputPath('no-selection-undo.png')});
+    await undoAfterDeletion.click(); await ready(p,'記録の変更を元に戻しました。'); await expect(p.getByLabel('本文',{exact:true})).toHaveValue('独立した本文');
     await p.getByRole('button',{name:'記録の変更を元に戻す',exact:true}).click(); await ready(p,'記録の変更を元に戻しました。'); await expect(p.getByLabel('本文',{exact:true})).toHaveValue('元の本文');
     await p.getByRole('button',{name:'記録の変更を元に戻す',exact:true}).click(); await ready(p,'記録の変更を元に戻しました。'); await expect(p.locator('.lv-caption-select')).toHaveCount(1);
     for(let i=0;i<3;i++){await p.getByRole('button',{name:'記録の変更をやり直す',exact:true}).click();await ready(p,'記録の変更をやり直しました。');}

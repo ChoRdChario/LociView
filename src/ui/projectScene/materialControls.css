@@ -1,4 +1,4 @@
-/* Reusable component only; not imported into the current application. */
+/* Shared typed material-control presentation; commands remain owned by callers. */
 .lv-material-editor { display: flex; flex-direction: column; gap: 10px; min-width: 0; min-height: 0; overflow: auto; color: #312f2d; background: #f2f0ee; font: 400 14px/1.5 system-ui, sans-serif; }
 .lv-material-editor[hidden], .lv-material-editor [hidden] { display: none !important; }
 .lv-material-editor :is(button, input, select) { box-sizing: border-box; min-width: 44px; min-height: 44px; max-width: 100%; padding: 6px 10px; border: 1px solid #817c78; border-radius: 2px; color: inherit; background: #faf9f8; font: inherit; }
@@ -10,6 +10,10 @@
 .lv-material-editor p { margin: 0; overflow-wrap: anywhere; }
 .lv-material-target, .lv-material-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 140px), 1fr)); gap: 8px; }
 .lv-material-fields p { font-size: 13px; }
+.lv-material-fields > label { align-self: start; }
+.lv-material-label:has(> .lv-context-help) { position: relative; display: flex; align-items: center; min-height: 44px; box-sizing: border-box; padding-inline-end: 44px; }
+.lv-material-label > .lv-context-help { position: absolute; top: 0; right: 0; width: 44px; flex: 0 0 44px; }
+.lv-material-label > .lv-context-help > .lv-context-help-trigger { width: 44px; }
 .lv-material-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .lv-material-editor .lv-material-primary { background: #413d39; color: #faf9f8; font-weight: 500; }
 .lv-material-editor .lv-material-values[data-noneditable="true"]:not([hidden]) { display: block !important; }

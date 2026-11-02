@@ -99,7 +99,15 @@ export class CleanInputJob {
   }
   async inventory() { return this.inspection.description.closure.semanticRefs.map(r => ({ ...r })); }
   async validateJournal(prepared: PreparedJournal) {
-    const saved = await CleanInputJob.open(this.fs, this.id, this.limits), source = saved.inspection.source, s = prepared.start;
+    return CleanInputJob.validateJournalFresh(this.fs, this.id, this.limits, prepared);
+  }
+  /** Opens current acknowledged bytes itself; a retained Job never supplies validation evidence. */
+  static async validateJournalFresh(fs: ProjectWorkspaceFS, id: string, limits: MetadataLimits, prepared: PreparedJournal) {
+    const saved = await CleanInputJob.open(fs, id, limits);
+    return saved.validateOpenedJournal(prepared);
+  }
+  private async validateOpenedJournal(prepared: PreparedJournal) {
+    const source = this.inspection.source, s = prepared.start;
     if (s.purpose !== 'importClean' || s.transactionId !== this.id || s.repositoryId !== this.id || s.predecessor !== null || s.baseHeads.length ||
       prepared.remote || json(s.proof) !== json(source.proof)) return fail('clean-input-journal');
     const parts = await new TransactionJournal(this.fs, this.limits).validateParts(prepared), original = source.originalChanges();
@@ -122,6 +130,8 @@ export class CleanInputJob {
     return [{ detail: { kind: 'cleanPublished' as const } }];
   }
   async validateCompletion() { await this.steps(); }
+  /** One strict completion traversal, used only by the output readiness check. */
+  async validateTerminalCompletion() { return (await this.steps()).some(step => step.detail.kind === 'cleanPublished'); }
   static async abandon(fs: ProjectWorkspaceFS, id: string, limits: MetadataLimits) {
     if (await reviewEditChildBinding(fs, id, limits)) return fail('review-edit-private-child');
     if (await this.inputState(fs, id, limits) === 'started') return fail('clean-input-abandon-denied');

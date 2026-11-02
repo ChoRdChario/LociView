@@ -227,6 +227,7 @@ export function createCaptionListControls(document: Document, onPlan: (plan: Cap
     context = next; rendering = true;
     const view = captionListView(next.source, next.memory), active = document.activeElement;
     currentView = view; virtual = view.rows.length > 100;
+    root.dataset.fewRows = String(view.rows.length <= 3);
     // A hidden task has zero width; it has not changed the wrapping width.
     const width = list.clientWidth || measuredWidth;
     layout.update(view.rows.map(row => row.item.id), measuredWidth !== width); measuredWidth = width;

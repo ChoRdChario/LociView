@@ -407,27 +407,62 @@ async function openNormalValidationHost(options: ValidationHostOptions, inherite
         workspaceFiles.importWorkspace(options.workspaceFile)); }
       catch { /* File and incomplete originals stay available through the same recovery controls. */ }
     }
-    const outputAction = <T>(action: () => Promise<T>, recovery = false, presentation?: () => MetadataSessionRead | undefined) => execute(async () => {
+    const outputAction = <T>(action: () => Promise<T>, recovery = false, presentation?: () => MetadataSessionRead | undefined,
+      retainReadonlyHistory?: (result: T) => void) => execute(async () => {
       editable(); if (!recovery && (outputDiscoveryFailure || unfinishedOutput() || last.state !== 'ready')) throw Error('中断したファイル生成を確認してください。');
       outputFailure = '';
-      let succeeded = false;
-      try { const result = await action(); succeeded = true; return result; }
+      let succeeded = false, retainedHistory = false;
+      try {
+        const result = await action();
+        if (retainReadonlyHistory) { retainReadonlyHistory(result); retainedHistory = true; }
+        succeeded = true; return result;
+      }
       catch (error) { outputFailure = error instanceof Error ? error.message : 'ファイル処理を完了できません。'; throw error; }
       finally {
         let read: MetadataSessionRead | undefined;
         if (succeeded) { try { read = presentation?.(); } catch { /* Fall back to fresh display discovery. */ } }
-        await reloadOutput(read, read);
+        if (!retainedHistory) await reloadOutput(read, read);
       }
     }, true);
+    const previewOutput = <T extends { token: string; sceneId?: string; omittedEntryView?: boolean }>(token: string,
+      action: (sender: WorkspaceSender, selection?: Parameters<typeof sender.previewReview>[1]) => Promise<T>,
+      selection?: Parameters<typeof sender.previewReview>[1]) => {
+      const owner = connection, ownedFs = fs, ownedSession = session, ownedSender = sender, read = last;
+      const source = read.source, provider = read.provider, publication = read.publication, proof = source && json(source.proof);
+      const ownedSelection = selection && structuredClone(selection), sceneId = ownedSelection?.sceneId,
+        omittedEntryView = !!ownedSelection?.omitConflictedEntryView;
+      return outputAction(() => action(ownedSender, ownedSelection), false, undefined, result => {
+        editable(); ownedFs.mutationAuthority.assertEditable();
+        if (connection !== owner || fs !== ownedFs || session !== ownedSession || sender !== ownedSender || last !== read ||
+          last.state !== 'ready' || last.source !== source || last.provider !== provider || last.publication !== publication ||
+          !source || source.token !== token || json(source.proof) !== proof || provider?.kind !== 'scene-provider' || provider.token !== token ||
+          !publication || result.token !== token || selection && (result.sceneId !== sceneId || result.omittedEntryView !== omittedEntryView) ||
+          outputDiscoveryFailure || unfinishedOutput()) throw Error('表示内容が変わりました。内容を確認し直してください。');
+      });
+    };
     const workspaceOutput = {
       get privacy() { const sourceIncludesNames = last.source?.includesDeclaredEditorNames ?? false;
         return { sourceIncludesNames, backupIncludesNames: sourceIncludesNames || outputBases.some(b => b.includesDeclaredEditorNames) }; },
       get jobs() { return outputJobs; }, get error() { return outputFailure || outputDiscoveryFailure; },
       get bases() { return outputBases; },
-      generate: (token: string) => measure('host.workspace.total', () => outputAction(() => measure('host.workspace.generate', () => sender.generate(token)))),
+      generate: (token: string) => {
+        const owner = connection, ownedFs = fs, ownedSession = session, ownedSender = sender, publication = last.publication;
+        let read: MetadataSessionRead | undefined;
+        return measure('host.workspace.total', () => outputAction(() => measure('host.workspace.generate', () => ownedSender.generate(token, undefined, next => { read = next; })), false, () => {
+          if (closed || restoreRetired || connection?.restorePending || restoreDisplayPending || connection !== owner || fs !== ownedFs ||
+            session !== ownedSession || sender !== ownedSender || fs.mutationAuthority.accessState !== 'editable' ||
+            last.state !== 'ready' || last.source?.token !== token || last.publication !== publication || read?.state !== 'ready' ||
+            read.source?.token !== token || read.publication !== publication || read.provider?.kind !== 'scene-provider' || read.provider.token !== token ||
+            json(read.source.proof) !== json(last.source.proof)) return undefined;
+          try { ownedFs.mutationAuthority.assertEditable(); } catch { return undefined; }
+          // Its source is current, but Workspace has since recorded a new base.
+          // The overview still freshly reads every base/protection/inventory.
+          return read;
+        }));
+      },
       generateClean: (token: string) => outputAction(() => sender.generateClean(token)),
-      previewClean: (token: string) => outputAction(() => sender.previewClean(token)),
-      previewReview: (token: string, selection: Parameters<typeof sender.previewReview>[1]) => outputAction(() => sender.previewReview(token, selection)),
+      previewClean: (token: string) => previewOutput(token, owned => owned.previewClean(token)),
+      previewReview: (token: string, selection: Parameters<typeof sender.previewReview>[1]) => previewOutput(token, (owned, choice) => owned.previewReview(token, choice!), selection),
       generateReview: (token: string, selection: Parameters<typeof sender.generateReview>[1]) => outputAction(() => sender.generateReview(token, selection)),
       generateBackup: (token: string, label?: string) => {
         const owner = connection, ownedFs = fs, ownedSession = session, ownedSender = sender, publication = last.publication;

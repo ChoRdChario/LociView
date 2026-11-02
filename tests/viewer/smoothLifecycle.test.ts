@@ -17,10 +17,10 @@ class Gl {
 }
 class Renderer {
   gl=new Gl();target:THREE.WebGLRenderTarget|null=null;autoClear=true;debug={checkShaderErrors:false,onShaderError:undefined as undefined|(()=>void)};xr={enabled:false};shadowMap={autoUpdate:false};color=new THREE.Color(.1,.2,.3);alpha=.7;
-  draws:THREE.Mesh[][]=[];getContext(){return this.gl;}getRenderTarget(){return this.target;}getActiveCubeFace(){return 0;}getActiveMipmapLevel(){return 0;}
+  draws:THREE.Mesh[][]=[];drawMaterials:THREE.Material[][]=[];getContext(){return this.gl;}getRenderTarget(){return this.target;}getActiveCubeFace(){return 0;}getActiveMipmapLevel(){return 0;}
   getClearColor(out:THREE.Color){return out.copy(this.color);}getClearAlpha(){return this.alpha;}setRenderTarget(t:THREE.WebGLRenderTarget|null){this.target=t;}setClearColor(c:THREE.ColorRepresentation,a:number){this.color.set(c);this.alpha=a;}clear(){}
   getDrawingBufferSize(out:THREE.Vector2){return out.set(8,8);}readRenderTargetPixels(_t:unknown,_x:unknown,_y:unknown,_w:unknown,_h:unknown,p:Uint8Array){p.fill(0);}
-  render(scene:THREE.Scene,camera:THREE.Camera){scene.updateMatrixWorld(true);camera.updateMatrixWorld(true);const drawn:THREE.Mesh[]=[];scene.traverse(o=>{if(!(o instanceof THREE.Mesh))return;for(let p:THREE.Object3D|null=o;p;p=p.parent)if(!p.visible)return;if((Array.isArray(o.material)?o.material:[o.material]).some(m=>m.visible))drawn.push(o);});this.draws.push(drawn);}
+  render(scene:THREE.Scene,camera:THREE.Camera){scene.updateMatrixWorld(true);camera.updateMatrixWorld(true);const drawn:THREE.Mesh[]=[];scene.traverse(o=>{if(!(o instanceof THREE.Mesh))return;for(let p:THREE.Object3D|null=o;p;p=p.parent)if(!p.visible)return;if((Array.isArray(o.material)?o.material:[o.material]).some(m=>m.visible))drawn.push(o);});this.draws.push(drawn);this.drawMaterials.push(drawn.flatMap(o=>Array.isArray(o.material)?o.material:[o.material]).filter(m=>m.visible));}
 }
 afterEach(()=>vi.unstubAllGlobals());
 describe('01g resource ownership and presented geometry',()=>{
@@ -33,6 +33,20 @@ describe('01g resource ownership and presented geometry',()=>{
     const material=new THREE.MeshBasicMaterial();patchSmoothCoverage(material,{opacity:.5});const geometry=new THREE.PlaneGeometry(1,1),a=new THREE.Mesh(geometry,material),b=new THREE.Mesh(geometry,material),parent=new THREE.Mesh(geometry,new THREE.MeshBasicMaterial()),scene=new THREE.Scene();parent.add(b);scene.add(a,parent);const camera=new THREE.PerspectiveCamera();renderer.draws=[];
     port.render(scene,camera,[{object:a},{object:b}]);expect(material.visible).toBe(true);expect(a.material).toBe(material);expect(b.material).toBe(material);expect(parent.visible).toBe(true);expect(renderer.draws[1]).toEqual([a,b]);
     port.render(scene,camera,[{object:a},{object:b}]);expect(material.visible).toBe(true);port.dispose();expect(budget.used).toBe(0);geometry.dispose();material.dispose();(parent.material as THREE.Material).dispose();
+  });
+  it('hands off same-key variants only after draw, prunes every retired generation and releases failed owners',async()=>{
+    vi.stubGlobal('WebGL2RenderingContext',Gl);const renderer=new Renderer(),budget=createTargetBudget(),layout=targetLayout(8,8,1,budget.available,8192),port=await createSmoothComposite(renderer as unknown as THREE.WebGLRenderer,budget,layout),texture=new THREE.Texture(),textureDispose=vi.spyOn(texture,'dispose');
+    const source=(opacity:number)=>{const material=new THREE.MeshBasicMaterial({map:texture});patchSmoothCoverage(material,{opacity});return material;};
+    const scene=new THREE.Scene(),mesh=new THREE.Mesh(new THREE.PlaneGeometry(),source(.5)),camera=new THREE.PerspectiveCamera();scene.add(mesh);const variants:THREE.Material[]=[],disposals:ReturnType<typeof vi.spyOn>[]=[];
+    const render=renderer.render.bind(renderer);let fail=false;
+    vi.spyOn(renderer,'render').mockImplementation((s,c)=>{if(renderer.target?.textures.length===2){const material=mesh.material;expect(disposals.filter(d=>d.mock.calls.length===0).length).toBeLessThanOrEqual(1);if(variants.length)expect(disposals.at(-1)).not.toHaveBeenCalled();variants.push(material);disposals.push(vi.spyOn(material,'dispose'));if(fail)throw Error('draw failed');}render(s,c);});
+    for(let i=0;i<20;i++){
+      const previous=mesh.material;if(i)mesh.material=source(.5+i/100);port.render(scene,camera,[{object:mesh}]);if(i)previous.dispose();
+      expect(disposals.filter(d=>d.mock.calls.length===0)).toHaveLength(1);expect(budget.used).toBe(layout.bytes);
+      const shader:any={fragmentShader:THREE.ShaderLib.basic.fragmentShader,uniforms:{}};variants.at(-1)!.onBeforeCompile(shader,renderer as unknown as THREE.WebGLRenderer);expect(shader.uniforms.lvSmoothOpacity.value).toBe(.5+i/100);
+    }
+    const previous=mesh.material;mesh.material=source(.8);fail=true;expect(()=>port.render(scene,camera,[{object:mesh}])).toThrow('draw failed');previous.dispose();expect(disposals.filter(d=>d.mock.calls.length===0)).toHaveLength(2);
+    port.dispose();port.dispose();for(const dispose of disposals)expect(dispose).toHaveBeenCalledOnce();expect(budget.used).toBe(0);expect(textureDispose).not.toHaveBeenCalled();mesh.material.dispose();mesh.geometry.dispose();texture.dispose();
   });
   it('borrowed GS base stays charged after MRT disposal until the actual base owner releases it',async()=>{
     vi.stubGlobal('WebGL2RenderingContext',Gl);const renderer=new Renderer(),budget=createTargetBudget(),layout=targetLayout(8,8,1,budget.available,8192),base=new THREE.WebGLRenderTarget(8,8,{depthTexture:new THREE.DepthTexture(8,8,THREE.UnsignedIntType)}),source=new THREE.ShaderMaterial(),object=new THREE.Mesh(new THREE.PlaneGeometry(),source);let lease:TargetLease|undefined;

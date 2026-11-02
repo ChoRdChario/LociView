@@ -14,6 +14,7 @@ import type { SceneUiMemory } from './navigationState';
 import { fieldValue, projectAttachments, projectCaptions, projectCaptionSceneCount, projectCaptionInventory, projectModels, projectIdentity } from './projectRead';
 import { surfaceAnchor, type ProjectWorkspacePorts, type WorkspaceFileInteraction, type WorkspacePinProposal, type WorkspaceSurface, type Point3 } from './projectWorkspacePorts';
 import { createProjectModels } from './projectModels';
+import { createProjectPinScale } from './projectPinScale';
 import { createProjectViews } from './projectViews';
 import { createProjectMaterials } from './projectMaterials';
 import { createProjectMedia } from './projectMedia';
@@ -112,10 +113,12 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     if(organization?.hasChanges()&&organization.inputOwner()==='caption')organization.tagsRoot.open=true;
     compactSurface = retainedOwner==='views'?'stage':'panel'; render();
     const target=settingsOwner ? organization!.settingsRoot : organizationCaption ? organization!.tagsRoot : retainedOwner==='captions' ? sceneEdit || organization?.inputOwner()==='scene' ? sceneArea : detailHeading : panels.get(retainedOwner)!.root;
-    target.tabIndex=-1;target.focus?.({preventScroll:false}); });
+    if (retainedOwner === 'captions' && pinScale?.hasChanges()) pinScale.reveal();
+    else { target.tabIndex=-1;target.focus?.({preventScroll:false}); } });
   retainedEdit.append(retainedNote, returnToEdit);
   const taskTabs = make('div'), captionPanel = make('section'); taskTabs.setAttribute('role', 'tablist'); taskTabs.setAttribute('aria-label', '作業');
   const panels = new Map<ProjectTask, ProjectPanel>(); let task: ProjectTask = 'captions', models: ProjectModelPanel | undefined, mediaManager: ReturnType<typeof createProjectMedia> | undefined;
+  let pinScale: ReturnType<typeof createProjectPinScale> | undefined;
   const sceneArea = make('section'), scenes = make('div'), sceneButtons = new Map<string, HTMLButtonElement>(); sceneArea.setAttribute('aria-label', 'シーン'); sceneArea.append(make('h2', 'シーン'), scenes);
   const sceneForm = make('form'), sceneLabel = make('label', 'シーン名'), sceneName = make('input');
   sceneForm.setAttribute('aria-label', 'シーンの変更');
@@ -266,6 +269,9 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   let pickerScope: { token: string; sceneId: string; captionId: string } | null = null;
   let gesture: { pointerId: number; action: PinAction | null; token: string; sceneId: string; receipt: string; x: number; y: number; left: number; top: number; width: number; height: number; generation: number; shifted: boolean; color: string } | null = null;
   let gestureGeneration = 0, gestureContext = ''; const pressedPointers = new Set<number>();
+  let markerNavigation: { id: string; pointer: number; node: HTMLButtonElement; token: string; scene: string;
+    startX: number; startY: number; x: number; y: number; kind: 'orbit' | 'pan'; started: boolean } | null = null;
+  let markerNavigationSerial = 0, skipMarkerClick: HTMLButtonElement | null = null;
   let rendering = false, renderAgain = false, windowMoving = false;
   let viewportFeedback = '';
   const memories = new Map<string, SceneUiMemory>();
@@ -396,12 +402,13 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   list.tools.append(recordTools);list.root.insertBefore(pinArea,list.root.children[0]??null);addPin.className='lv-caption-add';addPin.setAttribute('aria-label','キャプションを追加');editOnly(movePin,parent);
   captionPanel.className='lv-caption-task';
   const recordSheets=new Map<HTMLDetailsElement,HTMLElement>();
-  for(const disclosure of [addSettings,numericAdd,parent]){
-    const sheet=make('div');sheet.className='lv-record-sheet';for(const child of Array.from(disclosure.children).slice(1))sheet.append(child);disclosure.append(sheet);recordSheets.set(disclosure,sheet);
+  function registerRecordSheet(disclosure: HTMLDetailsElement, existing?: HTMLElement) {
+    const sheet=existing??make('div');sheet.className='lv-record-sheet';if(!existing){for(const child of Array.from(disclosure.children).slice(1))sheet.append(child);disclosure.append(sheet);}recordSheets.set(disclosure,sheet);
     disclosure.addEventListener('toggle',()=>{if(disclosure.open)for(const other of recordSheets.keys())if(other!==disclosure&&!other.contains(disclosure)&&!disclosure.contains(other)&&!composingInput())other.open=false;positionRecordSheets();});
     disclosure.addEventListener('click',event=>{if((event.target as Element)?.closest?.('summary')&&composingInput())event.preventDefault();});
     disclosure.addEventListener('keydown',event=>{if(event.key==='Escape'&&!event.isComposing&&!composingInput()&&!busy&&!pending&&!ports.otherPending()){event.preventDefault();disclosure.open=false;(disclosure.children[0] as HTMLElement).focus?.({preventScroll:true});}});
   }
+  for(const disclosure of [addSettings,numericAdd,parent])registerRecordSheet(disclosure);
   function positionRecordSheets(){
     const win=document.defaultView;if(!win)return;
     for(const [owner,sheet] of recordSheets){if(!owner.open)continue;const rect=owner.getBoundingClientRect?.();if(!rect)continue;
@@ -537,7 +544,9 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   }, captionId => mediaManager!.gallery(captionId));
   stageDisplay.append(windows.root);
   models = createProjectModels(document, panelHost); panels.set('models', models);
-  const views=createProjectViews(document,panelHost);panels.set('views',views); panels.set('materials', createProjectMaterials(document, panelHost));
+  pinScale = createProjectPinScale(document,panelHost); panels.set('captions',pinScale);
+  recordTools.append(pinScale.root); registerRecordSheet(pinScale.root,pinScale.body);
+  const views=createProjectViews(document,panelHost), materials=createProjectMaterials(document,panelHost);panels.set('views',views);panels.set('materials',materials);
   const cameraPositions=make('details'),cameraSheet=make('div');cameraPositions.className='lv-camera-positions';cameraPositions.setAttribute('aria-label','カメラ位置');
   const cameraHeader=make('div'),closeCamera=button('閉じる',()=>{if(!viewBlocked()&&!views.composing()){cameraPositions.open=false;render();(cameraPositions.children[0] as HTMLElement).focus?.({preventScroll:true});}});cameraHeader.className='lv-camera-sheet-header';cameraHeader.append(make('strong','カメラ位置'),closeCamera);
   cameraSheet.className='lv-camera-sheet';cameraSheet.append(cameraHeader,views.root);cameraPositions.append(make('summary','カメラ位置'),cameraSheet);stageDisplay.append(cameraPositions);
@@ -735,7 +744,11 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   const invalidateGesture = () => { gesture = null; gestureGeneration++; };
   canvas.addEventListener('pointerdown', event => {
     if (disposed) return;
+    const hadMarkerNavigation = !!markerNavigation; finishMarkerNavigation();
     pressedPointers.add(event.pointerId); invalidateGesture();
+    try { canvas.setPointerCapture?.(event.pointerId); }
+    catch { pressedPointers.delete(event.pointerId); if (!pressedPointers.size) viewport.reservePointer(false); return; }
+    if (hadMarkerNavigation) return;
     const read = viewport.read(), direct = event.shiftKey && !pinAction && !dirty();
     if (pressedPointers.size === 1 && event.isPrimary && event.button === 0 && (choosing || direct) && !read.dragging) {
       viewport.reservePointer(true); canvas.setPointerCapture?.(event.pointerId);
@@ -784,6 +797,53 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   });
   cameraGizmo.root.append(views.cameraControls);stageDisplay.append(cameraGizmo.root);
   const cameraNavigationBlocked=()=>disposed||busy||!!pending||windowMoving||ports.otherPending()||composingInput()||pressedPointers.size>0;
+  function finishMarkerNavigation() {
+    const held = markerNavigation; if (!held) return; markerNavigation = null;
+    pressedPointers.delete(held.pointer);
+    if (held.started) { skipMarkerClick = held.node; viewport.navigateCamera?.({ phase: 'end', id: held.id }); }
+    if (held.node.hasPointerCapture?.(held.pointer)) held.node.releasePointerCapture?.(held.pointer);
+    if (!pressedPointers.size) viewport.reservePointer(false);
+  }
+  function bindMarkerNavigation(node: HTMLButtonElement) {
+    node.addEventListener('contextmenu', event => event.preventDefault());
+    node.addEventListener('keydown', () => { skipMarkerClick = null; });
+    node.addEventListener('pointerdown', event => {
+      skipMarkerClick = null;
+      const blocked = cameraNavigationBlocked(), wasHeld = !!markerNavigation;
+      if (wasHeld) { finishMarkerNavigation(); return; }
+      if (blocked || !viewport.navigateCamera || !event.isPrimary || event.pointerType === 'touch' ||
+        event.button !== 0 && event.button !== 2 || event.altKey || event.metaKey || event.ctrlKey ||
+        event.button === 0 && (choosing || event.shiftKey) || ![event.clientX,event.clientY].every(Number.isFinite)) return;
+      const current = viewport.read(); if (!(current.cameraReady ?? current.ready) || current.dragging) return;
+      pressedPointers.add(event.pointerId); invalidateGesture();
+      markerNavigation = { id: `marker-camera-${++markerNavigationSerial}`, pointer: event.pointerId, node,
+        token: provider().token, scene: sceneId, startX: event.clientX, startY: event.clientY,
+        x: event.clientX, y: event.clientY, kind: event.button === 2 ? 'pan' : 'orbit', started: false };
+      try { node.setPointerCapture?.(event.pointerId); } catch { finishMarkerNavigation(); return; }
+      if (event.button === 2) event.preventDefault();
+    });
+    node.addEventListener('pointermove', event => {
+      const held = markerNavigation; if (!held || event.pointerId !== held.pointer) return;
+      if (disposed || busy || pending || windowMoving || ports.otherPending() || composingInput() ||
+        pressedPointers.size !== 1 || held.token !== provider().token || held.scene !== sceneId ||
+        ![event.clientX,event.clientY].every(Number.isFinite) || event.buttons === 0) { finishMarkerNavigation(); return; }
+      if (!held.started) {
+        if (Math.hypot(event.clientX-held.startX,event.clientY-held.startY) <= 4) return;
+        held.started = viewport.navigateCamera?.({ phase: 'begin', id: held.id, kind: held.kind }) === true;
+        if (!held.started) { finishMarkerNavigation(); return; }
+        skipMarkerClick = node;
+      }
+      const dx = event.clientX-held.x, dy = event.clientY-held.y; held.x = event.clientX; held.y = event.clientY;
+      event.preventDefault();
+      if (!viewport.navigateCamera?.({ phase: 'move', id: held.id, dx, dy })) finishMarkerNavigation();
+    });
+    const end = (event: PointerEvent) => {
+      pressedPointers.delete(event.pointerId); invalidateGesture();
+      if (markerNavigation?.pointer === event.pointerId) finishMarkerNavigation();
+      if (!pressedPointers.size) viewport.reservePointer(false);
+    };
+    node.addEventListener('pointerup', end); node.addEventListener('pointercancel', end); node.addEventListener('lostpointercapture', end);
+  }
   const viewBlocked = () => cameraNavigationBlocked() || viewport.read().dragging;
   function viewAction(action: () => void) {
     if (viewBlocked()) return;
@@ -795,6 +855,11 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     if (disposed || rendering) return;cancelObservation();rendering = true;
     try {
       const p = provider(), blocked = mutationBlock(), selected = memory().selectedCaptionId;
+      if (markerNavigation && (markerNavigation.token !== p.token || markerNavigation.scene !== sceneId)) finishMarkerNavigation();
+      captionPanel.dataset.selected = String(!!selected);
+      // Explicit drafts/operations own the layout; focus alone cannot move native activation targets.
+      captionPanel.dataset.editing = String(hasCaptionDraft(draft) || !!draft?.composing || composing || positionInput() ||
+        !!deletion || !!pickerScope || !!mediaManager?.hasChanges());
       displayMode(root, ports.mode ?? (ports.readOnly ? 'view' : 'edit'));
       positionHeaderSheets();
       const summary = ports.projectStatus();
@@ -851,6 +916,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       const selectedSurface=models?.selectedSurface(), gsTarget=selectedSurface?ports.modelDetails(sceneId,selectedSurface)?.gsProxyTarget:undefined;
       addSurface.hidden=!choosing||!gsTarget||gsTarget.expectedProxyId!==null;addSurface.disabled=busy||!!pending;
       pinStatus.textContent = [pinAction && !pinCurrent() ? '対象が更新されています。取り消して選び直してください。' : surfaceOpening ? 'モデルを準備しています。準備後に位置を表示します。' : choosing ? gsTarget&&gsTarget.expectedProxyId===null?'このモデルの位置指定用の面を追加してください。本文や画像は面がなくても編集できます。':'配置先のモデルの面を選択してください。' : pin ? '位置を確認して確定してください。' : numericTarget ? 'X・Y・Zを入力してください。' : '',
+        choosing ? viewport.read().placementNotice : null,
         pinAction?.kind === 'reparent' && count?.kind === 'value' ? `${count.value}シーンに反映されます。変更先モデルがないシーンでは一覧のみになります。` : ''].filter(Boolean).join(' ');
       coordinateInputs.forEach((input, i) => { input.disabled = !!blocked || !pinCurrent(); if (!composing) input.value = rawPosition[i]!; });
       const focus = surfaceFocus; surfaceFocus = null;
@@ -875,7 +941,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       const resolved = sceneId ? resolveScene(p.state, p.resources, sceneId) : null;
       viewport.update({ token: p.token, sceneId, selectedId: selected, pin, choosing,
         pinColors: memory().pinColors, hiddenAssetIds: models!.hidden(), model: models!.proposal(), windowMoving,
-        available: resolved?.kind === 'ready', visible: stageVisible(), readOnly: !!blocked || resolved?.kind !== 'ready', comparison: recovery!.comparison() });
+        available: resolved?.kind === 'ready', visible: stageVisible(), readOnly: !!blocked || resolved?.kind !== 'ready', comparison: recovery!.comparison(), material: materials.proposal() });
       finishSurfaceOpening();
       renderCaptionActions();
       for (const [key, tab] of tabButtons) { tab.setAttribute('aria-selected', String(task === key)); tab.tabIndex = task === key ? 0 : -1;
@@ -905,24 +971,35 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       cameraGizmo.render({ camera, axis: seen.view?.kind === 'ready' ? seen.view.axis : null, blocked: !(seen.cameraReady??seen.ready)||viewBlocked(),navigationBlocked:cameraNavigationBlocked()||!(seen.cameraReady??seen.ready),navigating:seen.navigating,navigationAvailable:!!viewport.navigateCamera });
       const focusedMarker = markerNodes.has(document.activeElement as HTMLButtonElement) ? document.activeElement as HTMLButtonElement : null;
       const activeMarkers = new Set<string>(), markerChildren: HTMLElement[] = [];
-      for (const projected of seen.pins) if (seen.ready && seen.token === p.token && seen.sceneId === sceneId && projected.visible && Number.isFinite(projected.x) && Number.isFinite(projected.y)) {
+      for (const projected of seen.pins) if (seen.ready && seen.token === p.token && seen.sceneId === sceneId &&
+        (projected.visible || markerNavigation?.node === markerById.get(`${sceneId}:${projected.id}`)) && Number.isFinite(projected.x) && Number.isFinite(projected.y)) {
         const caption = p.resources.captions[projected.id]; if (!caption) continue;
         const key = `${sceneId}:${projected.id}`; activeMarkers.add(key);
         let marker = markerById.get(key);
-        if (!marker) { marker = button('', () => { if (!dirty() && !busy && !ports.otherPending()) { selectCaption(projected.id); render(); list.revealSelected(); } }); markerById.set(key, marker); markerNodes.add(marker); }
-        marker.textContent = fieldValue(caption.title) || '名称なし';
+        if (!marker) { marker = button('', () => { if (skipMarkerClick === marker) { skipMarkerClick = null; return; }
+          if (!dirty() && !busy && !ports.otherPending()) { selectCaption(projected.id); render(); list.revealSelected(); } });
+          bindMarkerNavigation(marker); markerById.set(key, marker); markerNodes.add(marker); }
+        const markerName = fieldValue(caption.title) || '名称なし';
+        marker.textContent = markerName; marker.setAttribute('aria-label', markerName);
         marker.className = 'lv-project-marker'; marker.style.left = `${projected.x}px`; marker.style.top = `${projected.y}px`;
-        marker.style.transform = `translate(-50%, -50%) scale(${projected.scale ?? 1})`; if (projected.color) marker.style.backgroundColor = projected.color;
+        marker.style.opacity = projected.visible ? '' : '0';
+        marker.style.transform = 'translate(-50%, -50%)';
+        marker.style.setProperty?.('--lv-pin-scale', String(projected.scale ?? 1));
         marker.setAttribute('data-review', String(projected.status === 'needsReview'));
         marker.style.setProperty?.('--lv-pin-color', projected.color ?? '#a08045');
         if (projected.status === 'needsReview') {
-          marker.setAttribute('aria-description', projected.notice ?? '要確認'); marker.title = `${marker.textContent}（${projected.notice ?? '要確認'}）`;
+          marker.setAttribute('aria-description', projected.notice ?? '要確認'); marker.title = `${markerName}（${projected.notice ?? '要確認'}）`;
         }
         else { marker.removeAttribute('aria-description'); marker.title = ''; }
         marker.setAttribute('aria-pressed', String(projected.id === selected)); marker.style.zIndex = projected.id === selected ? '2' : '1'; markerChildren.push(marker);
       }
-      for (const [key, marker] of markerById) if (!activeMarkers.has(key)) { markerById.delete(key); markerNodes.delete(marker); }
-      markers.replaceChildren(...markerChildren);
+      for (const [key, marker] of markerById) if (!activeMarkers.has(key)) {
+        if (markerNavigation?.node === marker) finishMarkerNavigation();
+        markerById.delete(key); markerNodes.delete(marker);
+      }
+      const wantedMarkerNodes = new Set(markerChildren);
+      for (const node of Array.from(markers.children)) if (!wantedMarkerNodes.has(node as HTMLButtonElement)) node.remove();
+      markerChildren.forEach((node,index) => { if (markers.children[index] !== node) markers.insertBefore(node,markers.children[index] ?? null); });
       if (focusedMarker && markerNodes.has(focusedMarker) && document.activeElement !== focusedMarker) focusedMarker.focus({ preventScroll: true });
       positionRecordSheets();ports.changed();
     } finally { rendering = false; if (renderAgain) { renderAgain = false; render(); } }
@@ -930,5 +1007,5 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   mounted = true; render();
   return { root, headerActions, projectNavigation: otherProject, utilityArea: settingsSheet, clearNotice(){if(!pending&&ports.status().kind==='idle')feedback='';}, dismissDisclosures(){help.open=false;organization!.settingsRoot.open=false;}, setExternalBusy: (active:boolean) => { body.inert=busy||active; }, render, session: interaction, activeScene: () => sceneId, inputPending: () => dirty() || busy,
     hasChanges: () => dirty() || busy || !!pending,
-    unmount() { if (disposed) return; disposed = true;document.removeEventListener?.('pointerdown',closeRecordSheets,true);document.removeEventListener?.('focusin',closeRecordSheets);document.removeEventListener?.('pointerdown',dismissHeaderSheets,true);document.removeEventListener?.('focusin',dismissHeaderSheets);otherProject.remove();document.defaultView?.clearTimeout(feedbackTimer);document.defaultView?.removeEventListener('resize',positionHeaderSheets);document.defaultView?.removeEventListener('resize',render);cameraGizmo.dispose();stopHelp();cancelObservation();storageEpoch++; gesture = null; gestureGeneration++; pressedPointers.clear(); viewport.reservePointer(false); recovery?.dispose(); organization?.dispose(); windows.dispose(); mediaManager?.dispose(); mediaViewer.dispose(); viewport.dispose(); list.dispose(); inclusion.dispose(); detail.dispose(); for (const panel of panels.values()) panel.dispose(); root.remove(); } };
+    unmount() { if (disposed) return; disposed = true;finishMarkerNavigation();document.removeEventListener?.('pointerdown',closeRecordSheets,true);document.removeEventListener?.('focusin',closeRecordSheets);document.removeEventListener?.('pointerdown',dismissHeaderSheets,true);document.removeEventListener?.('focusin',dismissHeaderSheets);otherProject.remove();document.defaultView?.clearTimeout(feedbackTimer);document.defaultView?.removeEventListener('resize',positionHeaderSheets);document.defaultView?.removeEventListener('resize',render);cameraGizmo.dispose();stopHelp();cancelObservation();storageEpoch++; gesture = null; gestureGeneration++; pressedPointers.clear(); viewport.reservePointer(false); recovery?.dispose(); organization?.dispose(); windows.dispose(); mediaManager?.dispose(); mediaViewer.dispose(); viewport.dispose(); list.dispose(); inclusion.dispose(); detail.dispose(); for (const panel of panels.values()) panel.dispose(); root.remove(); } };
 }

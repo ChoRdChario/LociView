@@ -49,13 +49,16 @@ test('view mode hides editing while preserving reading, local display, existing 
     await gizmo.getByRole('button', { name: '全体表示', exact: true }).click(); await display.click({ position: { x: 20, y: 120 } }); await p.mouse.move(0, 0); await p.keyboard.press('Escape');
     expect(await gizmo.boundingBox()).toMatchObject({ width: 112, height: 222 });
     await gizmo.screenshot({ path: info.outputPath('gizmo-light.png') }); await p.screenshot({ path: info.outputPath('gizmo-workspace.png'), fullPage: false });
+    await lookAlongFront(p); await expect(z).toHaveAttribute('aria-pressed', 'true');
     const overlap = await axes.evaluate(node => {
       const rect = node.getBoundingClientRect(), buttons = [...node.querySelectorAll('button')];
       const tips = buttons.map(button => ({ button, x: parseFloat(button.style.left) + 22, y: parseFloat(button.style.top) + 22, depth: +button.style.zIndex }));
-      for (const { x, y } of tips) {
-        const nearest = tips.filter(t => Math.hypot(t.x - x, t.y - y) <= 22).sort((a, b) => Math.hypot(a.x - x, a.y - y) - Math.hypot(b.x - x, b.y - y) || b.depth - a.depth)[0]!;
+      for (let y = 1; y < rect.height - 1; y++) for (let x = 1; x < rect.width - 1; x++) {
+        const ranked = tips.map(t => ({ ...t, distance: Math.hypot(t.x - x, t.y - y) })).sort((a, b) => a.distance - b.distance || b.depth - a.depth);
+        const nearest = ranked[0]!;
+        if (nearest.distance > 20 || ranked[1]!.distance - nearest.distance < 2) continue;
         const native = document.elementFromPoint(rect.x + x, rect.y + y)?.closest('button');
-        if (native && native !== nearest.button) return { x, y, name: nearest.button.getAttribute('aria-label')!, help: nearest.button.getAttribute('aria-describedby')! };
+        if (native && buttons.includes(native) && native !== nearest.button) return { x, y, name: nearest.button.getAttribute('aria-label')!, help: nearest.button.getAttribute('aria-describedby')! };
       }
       return null;
     });
@@ -134,7 +137,15 @@ test('view mode hides editing while preserving reading, local display, existing 
     await revealWorkPanel(p); await tab('モデル').click(); await expect(p.getByText('キャプションに未適用の変更があります。',{exact:true})).toBeVisible();
     await p.getByRole('button',{name:'編集に戻る',exact:true}).click(); await expect(detail.getByLabel('本文',{exact:true})).toHaveValue('閲覧から戻って編集');
     await expect(detail.getByRole('heading',{name:'現地の写真',exact:true})).toBeFocused();
-    await p.setViewportSize({width:1280,height:600});await expect(detail.getByRole('button',{name:'変更を適用',exact:true})).toBeInViewport();
+    await p.setViewportSize({width:1280,height:600});
+    await info.attach('short-edit-layout',{body:JSON.stringify(await p.evaluate(()=>{
+      const selectors=['.lv-caption-task','.lv-caption-browser','.lv-caption-reading','.lv-caption-detail','.lv-caption-content','[data-caption-completion]'];
+      return{viewport:{width:innerWidth,height:innerHeight},active:{tag:document.activeElement?.tagName,className:document.activeElement?.className},nodes:selectors.map(selector=>{const n=document.querySelector(selector)!,r=n.getBoundingClientRect(),s=getComputedStyle(n);return{selector,rect:{x:r.x,y:r.y,width:r.width,height:r.height},scrollTop:n.scrollTop,scrollHeight:n.scrollHeight,clientHeight:n.clientHeight,overflow:s.overflow,rows:s.gridTemplateRows};})};
+    })),contentType:'application/json'});
+    await expect(detail.getByRole('button',{name:'変更を適用',exact:true})).toBeInViewport().catch(async error=>{await p.screenshot({path:info.outputPath('short-edit-failure.png')});throw error;});
+    for(const name of ['変更を適用','取り消す'])await expect(detail.locator('[data-caption-completion]').getByRole('button',{name,exact:true})).toBeInViewport({ratio:1});
+    const completionHits=await detail.locator('[data-caption-completion] > button').evaluateAll(nodes=>nodes.map(n=>{const r=n.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return{text:n.textContent,width:r.width,height:r.height,hit:hit===n||!!hit&&n.contains(hit)};}));
+    await info.attach('short-edit-completion-hits',{body:JSON.stringify(completionHits),contentType:'application/json'});expect(completionHits.every(n=>n.hit&&n.width>=44&&n.height>=44)).toBe(true);
     await p.screenshot({path:info.outputPath('edit-short.png'),fullPage:false});await p.setViewportSize({width:1440,height:1000});
     await expect(p.getByRole('list',{name:'キャプション一覧',exact:true})).toBeVisible(); await expect(captions.locator('.lv-caption-search').getByLabel('検索',{exact:true})).toHaveValue('現地');
     await expect(detail.getByLabel('本文',{exact:true})).toHaveValue('閲覧から戻って編集');

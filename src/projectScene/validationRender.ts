@@ -267,15 +267,33 @@ export async function prepareReadonlyResidents(initial: readonly ReadonlyRenderM
       }
       const root = item.model.root.clone(true), asset = new THREE.Group();
       const slots = validationMaterialSlots(c), byLocator = new Map(slots.map(s => [canonical(s.locator), s]));
-      const geometries = new Map<THREE.BufferGeometry, THREE.BufferGeometry>(), materials = new Map<THREE.Material, THREE.Material>();
-      const materialNotices:string[]=[];
+      const geometries = new Map<THREE.BufferGeometry, THREE.BufferGeometry>();
+      const originals = new Map<THREE.Mesh, THREE.Material | THREE.Material[]>();
+      let materials = new Map<THREE.Material, THREE.Material>(), materialNotices: string[] = [], gpuTextures: THREE.Texture[] = [], materialRevision = 0;
+      let presentedMaterials: Map<THREE.Material, THREE.Material> | null = null;
+      const disposeMaterials = (table: Map<THREE.Material, THREE.Material>) => {
+        const owned = [...table.values()]; table.clear(); const errors: unknown[] = [];
+        for (const material of owned) try { material.dispose(); } catch (error) { errors.push(error); }
+        if (errors.length) throw new AggregateError(errors, '材質の表示資源を解放できません。');
+      };
       let released = false;
       const release = () => { if (released) return; released = true; const retained=live.delete(release); asset.removeFromParent();
-        for (const g of geometries.values()) g.dispose(); for (const m of materials.values()) m.dispose(); if(retained)drop(); };
+        const errors:unknown[]=[];const attempt=(action:()=>void)=>{try{action();}catch(error){errors.push(error);}};
+        for (const g of geometries.values()) attempt(()=>g.dispose());attempt(()=>disposeMaterials(materials));
+        if(presentedMaterials&&presentedMaterials!==materials)attempt(()=>disposeMaterials(presentedMaterials!));presentedMaterials=null;
+        if(retained)attempt(drop);if(errors.length)throw new AggregateError(errors,'モデルの表示資源を解放できません。'); };
       try {
         root.traverse(node => { if (node instanceof THREE.Mesh) {
           if (!geometries.has(node.geometry)) geometries.set(node.geometry, node.geometry.clone());
           node.geometry = geometries.get(node.geometry)!;
+          originals.set(node,node.material);
+        } });
+        const stageMaterials = (effects: ValidationMaterialEffects) => {
+          validate(c,effects);
+          const materials = new Map<THREE.Material, THREE.Material>(), materialNotices: string[] = [];
+          const assignments = new Map<THREE.Mesh, THREE.Material | THREE.Material[]>();
+          try {
+          for (const [node,originalMaterials] of originals) {
           const clone = (m: THREE.Material) => {
             if (materials.has(m)) return materials.get(m)!;
             const locator = item.model.materialLocators.get(m), slot = locator && byLocator.get(canonical(locator));
@@ -289,9 +307,10 @@ export async function prepareReadonlyResidents(initial: readonly ReadonlyRenderM
               const displayed = materialForDisplay(effect, 'map2');
               const a = displayed.appearance;
               if (a.lighting === 'unlit'&&!(m instanceof THREE.MeshBasicMaterial)) {
-                result.dispose(); result = new THREE.MeshBasicMaterial({ color: original.color.clone(), map: original.map,
+                const replacement = new THREE.MeshBasicMaterial({ color: original.color.clone(), map: original.map,
                   vertexColors: original.vertexColors, side: m.side, opacity: m.opacity, alphaMap: original.alphaMap, alphaTest: m.alphaTest,
                   transparent: m.transparent, toneMapped: m.toneMapped, depthTest: m.depthTest, depthWrite: m.depthWrite, visible: m.visible });
+                result.dispose(); result = replacement;
                 materials.set(m, result);
               }
               if (a.baseColorSrgb) (result as CoverageMaterial).color.setRGB(...a.baseColorSrgb as [number, number, number], THREE.SRGBColorSpace);
@@ -315,14 +334,36 @@ export async function prepareReadonlyResidents(initial: readonly ReadonlyRenderM
             }
             return result;
           };
-          node.material = Array.isArray(node.material) ? node.material.map(clone) : clone(node.material);
-        } });
+          assignments.set(node,Array.isArray(originalMaterials) ? originalMaterials.map(clone) : clone(originalMaterials));
+          }
+          const textures = new Set<THREE.Texture>();
+          for (const material of materials.values()) for (const field of Object.values(material)) if (field instanceof THREE.Texture) textures.add(field);
+          return { materials, materialNotices, assignments, textures: [...textures] };
+          } catch (error) { for (const material of materials.values()) material.dispose(); throw error; }
+        };
+        const setMaterialEffects = (next: ValidationMaterialEffects, admitTextures: (textures: readonly THREE.Texture[]) => void) => {
+          if (closed || released) throw Error('表示するモデルは既に閉じています。');
+          const revision = materialRevision, staged = stageMaterials(next); let committed = false;
+          try {
+            admitTextures(staged.textures);
+            if (closed || released || revision !== materialRevision) throw Error('表示するモデルが更新されています。');
+            for (const [node, material] of staged.assignments) node.material = material;
+            const previous = materials; materials = staged.materials; materialNotices = staged.materialNotices; gpuTextures = staged.textures;
+            materialRevision++; committed = true;
+            // Keep only the last actually presented table; never queue intermediate drag states.
+            if(previous!==presentedMaterials)disposeMaterials(previous);
+          } finally { if (!committed) for (const material of staged.materials.values()) material.dispose(); }
+        };
+        const materialFrameSeen = () => {
+          if(closed||released)return;
+          const previous=presentedMaterials;presentedMaterials=materials;
+          if(previous&&previous!==materials)disposeMaterials(previous);
+        };
+        setMaterialEffects(effects,() => {});
         const representation = new THREE.Group(); representation.matrix.copy(placementMatrix(c.representation.representationToAsset)); representation.matrixAutoUpdate = false;
         representation.add(root); asset.add(representation);
         asset.matrix.copy(placementMatrix(c.assetToProject)); asset.matrixAutoUpdate = false; asset.updateMatrixWorld(true);
-        const textures=new Set<THREE.Texture>();root.traverse(node=>{if(node instanceof THREE.Mesh)for(const material of Array.isArray(node.material)?node.material:[node.material])
-          for(const field of Object.values(material))if(field instanceof THREE.Texture)textures.add(field);});
-        retain();live.add(release); return { mesh: root, asset,materialNotices,gpuTextures:[...textures], dispose: release };
+        retain();live.add(release); return { mesh: root, asset,get materialNotices(){return materialNotices;},get gpuTextures(){return gpuTextures;},setMaterialEffects,materialFrameSeen, dispose: release };
       } catch (error) { release(); throw error; }
     } };
   } catch (error) { dispose(); throw error; }

@@ -10,6 +10,9 @@ import { readProjectCamera, readSolidBackground } from './viewDisplay';
 import { createModelCandidatePreview, modelCandidateDisplay, type ModelCandidateRenderer } from './modelCandidatePreview';
 import { createMetadataStartupControls } from './startupControls';
 import { chooseStartupScene } from '../scene/resolve';
+import { value, type Material } from '../scene/types';
+import { validateMaterialIntent } from '../domain/materialIntent';
+import { materialView } from '../ui/projectScene/materialState';
 
 type Host = ReturnType<typeof createValidationModeHost>;
 type Tools = ReturnType<typeof createValidationReceiveControls>;
@@ -156,18 +159,18 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
       let state: WorkspaceViewportState | undefined, closed = false, rendered: EditableDisplay | undefined, pointerHeld = false;
       let renderedInput = '';
       const runtime = factory(canvas, update, (target, position, phase) => {
-        if (!state?.pin || state.readOnly || host.authority.readOnly || target.token !== read().token ||
+        if (!state?.pin || rendered?.materialPreview || state.readOnly || host.authority.readOnly || target.token !== read().token ||
           JSON.stringify(target) !== JSON.stringify(state.pin.target)) return false;
         return propose(target, position, phase);
       }, (target, position, manipulation) => {
-        if (!state?.model || state.readOnly || host.authority.readOnly || JSON.stringify(state.model.target) !== JSON.stringify(target) || target.token !== read().token) return false;
+        if (!state?.model || rendered?.materialPreview || state.readOnly || host.authority.readOnly || JSON.stringify(state.model.target) !== JSON.stringify(target) || target.token !== read().token) return false;
         return !!proposeModel?.({ target, mode: manipulation?.mode ?? state.model.mode,
           ...(state.model.pivotAsset ? { pivotAsset: state.model.pivotAsset } : {}),
           placement: { translation: position, rotationXYZW: manipulation?.rotationXYZW ?? state.model.placement.rotationXYZW,
             uniformScale: manipulation?.uniformScale ?? state.model.placement.uniformScale } });
       });
       const target = (assetId: string): WorkspaceSurface | null => {
-        if (!state || state.readOnly || state.token !== read().token) return null;
+        if (!state || rendered?.materialPreview || state.readOnly || state.token !== read().token) return null;
         const snapshot = host.authority.read(), version = snapshot.modelVersions?.find(v => v.assetId === assetId);
         const seen = runtime.read(), display = seen.display;
         if (!state.available || state.visible === false || !seen.ready || seen.issue || rendered !== display || state.hiddenAssetIds?.includes(assetId) || snapshot.state.token !== state.token || !version || version.families.length !== 1 || !display || display.token !== state.token || display.sceneId !== state.sceneId || display.readOnly || !display.models.some(m => m.binding.assetId === assetId && m.binding.id === version.projection.bindingId)) return null;
@@ -186,7 +189,7 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
         return { token: seen.display?.token ?? '', sceneId: seen.display?.sceneId ?? '', pickToken: available ? receipt : '', ready: available,
           dragging: seen.dragging || !!seen.manipulating,navigating:seen.navigating,camera:seen.camera,cameraReady:cameraAvailable,retryAvailable:seen.retryAvailable, pins: available ? seen.pins.filter(p => pinIds.has(p.id) && Number.isFinite(p.x) && Number.isFinite(p.y)).map(p => {
             const source = rendered!.pins.find(pin => pin.id === p.id)!; return { ...p, scale: source.scale ?? 1, color: source.color, status: source.status, notice: source.notice };
-          }) : [], issue: seen.issue, notice: seen.notice ?? null, loading: seen.loading,
+          }) : [], issue: seen.issue, notice: seen.notice ?? null, placementNotice: seen.placementNotice, loading: seen.loading,
           assetIds: available ? seen.display!.models.map(m => m.binding.assetId) : [],
           view: cameraAvailable && !seen.dragging && !seen.manipulating ? { kind: 'ready' as const, token: seen.token, sceneId: state!.sceneId, projectFrameId: read().resources.projectFrameId,
             projection: seen.projection, axis: seen.axis, bounds: { kind: 'value' as const, value: seen.display!.bounds ? 'available' as const : 'empty' as const } } :
@@ -204,12 +207,33 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
           // revision/notification cycle (which would repeatedly replace controls).
           const input = JSON.stringify(next);
           if (input === renderedInput) {
-            runtime.setPinPointerActive?.(pointerHeld || !!next.windowMoving || next.choosing && !next.readOnly); runtime.setActive(true); return;
+            runtime.setPinPointerActive?.(pointerHeld || !!next.windowMoving); runtime.setActive(true); return;
           }
           const modelEdit = next.model && next.model.target.token === next.token ? { target: next.model.target, position: next.model.placement.translation,
             enabled: !next.readOnly, manipulation: { mode: next.model.mode, rotationXYZW: next.model.placement.rotationXYZW, uniformScale: next.model.placement.uniformScale,
               ...(next.model.pivotAsset ? { pivotAsset: next.model.pivotAsset } : {}) } } : undefined;
-          let display = projectDisplay(snapshot, next.sceneId, next.pinColors, next.selectedId, modelEdit, next.hiddenAssetIds ?? []);
+          let displaySource = snapshot, materialPreview = false;
+          const proposal = next.material;
+          if (proposal && !next.readOnly && proposal.token === next.token && proposal.sceneId === next.sceneId && proposal.projectId === snapshot.projectId) {
+            try {
+              const source = productSources(host,navigation?.smoothDisplay).materials(next.sceneId).source;
+              const selection = { assetId: proposal.target.assetId, target: proposal.target, scope: proposal.scope };
+              const current = materialView({ source, selection, draft: null, pending: null, mutationBlock: null, feedback: { kind: 'idle' } });
+              if (!current.editIssue && current.surface && proposal.recordId === (current.record?.id ?? null)) {
+                const intent = validateMaterialIntent(proposal.intent,source.limits,source.semanticProfile);
+                if (current.surface.admit(intent) === null) {
+                  let recordId = proposal.recordId;
+                  if (!recordId) { let serial=0;do { recordId=`__material_preview_${serial++}`; } while(snapshot.resources.materials[recordId]); }
+                  const scope = proposal.scope === 'scene' ? { kind: 'scene' as const, sceneId: next.sceneId } : { kind: 'project' as const };
+                  // Resolver-only overlay identity: never published as provider, Session input or file evidence.
+                  const record: Material = { id: recordId, lifecycle: value({ state: 'active', eventId: 'evt_' + '0'.repeat(32) }), routing: value({ target: proposal.target, scope }), intent: value(intent) };
+                  displaySource = { ...snapshot, resources: { ...snapshot.resources, materials: { ...snapshot.resources.materials, [recordId]: record } } };
+                  materialPreview = true;
+                }
+              }
+            } catch { /* Invalid/stale drafts keep their field errors and canonical display. */ }
+          }
+          let display = projectDisplay(displaySource, next.sceneId, next.pinColors, next.selectedId, modelEdit, next.hiddenAssetIds ?? []);
           if (next.pin) {
             const model = display.models.find(m => m.binding.assetId === next.pin!.target.assetId);
             if (model && next.pin.target.token === next.token) {
@@ -225,13 +249,14 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
               if (owner) display = { ...display, preview: pointInProject(anchor.positionAsset, owner.binding.assetToProject) };
             }
           }
+          if (materialPreview) display = { ...display, materialPreview: true, pinEdit: undefined, modelEdit: undefined };
           rendered = next.readOnly ? { ...display, pinEdit: undefined } : display;
           runtime.update(rendered);
           renderedInput = input;
-          runtime.setPinPointerActive?.(pointerHeld || !!next.windowMoving || next.choosing && !next.readOnly); runtime.setActive(true);
+          runtime.setPinPointerActive?.(pointerHeld || !!next.windowMoving); runtime.setActive(true);
         },
         read: observation, target, setPointDiameter: (assetId, diameter) => runtime.setPointDiameter?.(assetId, diameter), pointDiameter: assetId => runtime.pointDiameter?.(assetId) ?? 3,
-        reservePointer(active) { pointerHeld = active; if (!closed) runtime.setPinPointerActive?.(active || !!state?.windowMoving || !!state?.choosing && !state.readOnly); },
+        reservePointer(active) { pointerHeld = active; if (!closed) runtime.setPinPointerActive?.(active || !!state?.windowMoving); },
         pick(x, y, assetId, directCreation = false) {
           if (closed || !state || state.readOnly || host.authority.readOnly || !state.choosing && !directCreation) return null;
           const before = observation();

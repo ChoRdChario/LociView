@@ -166,7 +166,7 @@ export class MetadataProjectSession {
           if (['initialize', 'localCommand', 'importClean'].includes(entry.start.purpose)) localChanges.add(A.decodeChange(bytes).hash);
         }
         if (entry.start.purpose === 'importWorkspace') await this.journal.validateImport(entry.prepared!);
-        else if (entry.start.purpose === 'importClean') await (await CleanInputJob.open(this.fs, entry.start.transactionId, this.limits)).validateJournal(entry.prepared!);
+        else if (entry.start.purpose === 'importClean') await CleanInputJob.validateJournalFresh(this.fs, entry.start.transactionId, this.limits, entry.prepared!);
         else if (entry.start.purpose === 'restoreBackup') { /* Original history and binding checked together above. */ }
         else if (entry.prepared!.remote) {
           const base = await this.repository.read(entry.start.repositoryId, entry.start.proof, entry.start.baseHeads);
@@ -335,8 +335,12 @@ export class MetadataProjectSession {
       if (state === 'abandoned') continue;
       if (state !== 'started') return fail('output-receive-pending');
       const job = await openReceiveJob(this.fs, key, this.receiveStore(), this.limits);
-      if (!await receiveTerminal(job)) return fail('output-receive-pending');
-      await job.validateCompletion();
+      if (job instanceof CleanInputJob) {
+        if (!await job.validateTerminalCompletion()) return fail('output-receive-pending');
+      } else {
+        if (!await receiveTerminal(job)) return fail('output-receive-pending');
+        await job.validateCompletion();
+      }
     }
     return read;
   }
@@ -346,10 +350,10 @@ export class MetadataProjectSession {
     await this.assertOutputSlot(job.id);
     const { bases } = await validateOutputProtection(this.fs, job, store, this.limits);
     await bases.preflightRecord(job.baseRecord(), job.originalEvidence()); await job.generate(store, signal);
-    await job.baseRecorded(await bases.recordGenerated(job)); return job.id;
+    await job.baseRecorded(await bases.recordGenerated(job)); return { id: job.id, read: current };
   }
-  async createWorkspaceOutput(expectedToken: string, store: OriginBlobStore, version: string, signal?: AbortSignal) {
-    return underWriteLease(this.fs, async () => {
+  async createWorkspaceOutput(expectedToken: string, store: OriginBlobStore, version: string, signal?: AbortSignal, observePresentation?: BackupPresentationObserver) {
+    const result = await underWriteLease(this.fs, async () => {
       const read = await this.outputReady(); if (read.source!.token !== expectedToken) return fail('output-stale');
       await this.assertOutputSlot();
       const bases = new WorkspaceBaseStore(this.fs, this.limits, read.source!.proof), snapshot = await bases.snapshot();
@@ -360,9 +364,11 @@ export class MetadataProjectSession {
       const job = WorkspaceOutputJob.prepare(this.fs, capture, inventory, snapshot, this.limits, version);
       await bases.preflightRecord(job.baseRecord(), job.originalEvidence()); await job.persist(); return this.finishWorkspaceOutput(job, store, signal);
     });
+    if (!signal?.aborted) { try { observePresentation?.(result.read); } catch { /* Presentation cannot reject a completed output. */ } }
+    return result.id;
   }
   async resumeWorkspaceOutput(id: string, store: OriginBlobStore, signal?: AbortSignal) {
-    return underWriteLease(this.fs, async () => this.finishWorkspaceOutput(await WorkspaceOutputJob.open(this.fs, id, this.limits), store, signal));
+    return (await underWriteLease(this.fs, async () => this.finishWorkspaceOutput(await WorkspaceOutputJob.open(this.fs, id, this.limits), store, signal))).id;
   }
   async verifyWorkspaceOutput(id: string, file: Blob) {
     return underWriteLease(this.fs, async () => {

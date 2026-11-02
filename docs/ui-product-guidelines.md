@@ -276,8 +276,8 @@ context. The three tabs preserve the useful record/model/drawing responsibilitie
 
 | Tab | User questions it answers | Contents |
 |---|---|---|
-| キャプション | What is recorded in this Scene? What should I add or correct? | Common Scene context, current-Scene search, pin-color filters, list, existing-Project Caption inclusion, add/place/move, title/body/color, attached media and secondary window tools |
-| モデル | What Project models exist, and which belong to this Scene? | Model list/add and clearly separate Scene inclusion/local visibility; contextual placement, replacement, pin scale and supported format controls; Project deletion in secondary management |
+| キャプション | What is recorded in this Scene? What should I add or correct? | Common Scene context, current-Scene search, pin-color filters, list, existing-Project Caption inclusion, add/place/move, title/body/color, attached media, explicitly targeted Asset-wide pin scale and secondary window tools |
+| モデル | What Project models exist, and which belong to this Scene? | Model list/add and clearly separate Scene inclusion/local visibility; contextual placement, replacement and supported format controls; Project deletion in secondary management |
 | 描画 | How should this surface look in this Scene? | Current target and common adjustments first; surface targeting, cross-Scene scope, sidedness, unlit and applicable chroma controls progressively disclosed; active completion is always reachable (§4.5) |
 
 Scene switching is common context above the task tabs. Project save state and
@@ -285,8 +285,9 @@ file exchange stay outside them. Fit, signed axes, projection and middle-button-
 orbit/pan live beside3D. Existing recorded camera/background/entry UI lives there
 under camera-position management, with one retained state/draft owner. There is
 no Saved View task tab. Caption list/detail coexist; record operations start in
-the list and keep input forms outside virtualized row lifetimes. Unselected pins
-show pin symbols, with their accessible names and review/selection states retained.
+the list and keep input forms outside virtualized row lifetimes. All pins,
+including selected pins, show only pin symbols with their accessible names and
+review/selection states retained. Floating windows keep their titles.
 
 Tab changes move the UI only. They do not implicitly save, select a different
 model, apply a view, change Scene, end a mode or discard unfinished input.
@@ -425,11 +426,13 @@ arrange them without altering Project data. Use the familiar
 `×` for closing, with an accessible name. Do not repeat `選択中 01` when the list
 highlight and window title already convey the same state.
 
-The PO-specified Desktop camera uses Blender's basic mouse bindings: middle-button
-drag orbits, Shift+middle pans, and wheel/Ctrl+middle zooms. Left-button canvas input
-is reserved for selection/placement, including Shift+left for pin addition. The
-PO2026-10-31 direction also adds left-drag orbit/pan on the camera overlay without
-replaying those events onto the canvas. Keep
+PO2026-11-02 adds ordinary left-drag orbit and right-drag pan on the Desktop
+canvas, including over pin hit areas. Middle-button orbit, Shift+middle pan and
+wheel/Ctrl+middle zoom remain available. Shift+left pin addition and active
+left-button placement/gizmo gestures retain capture-phase priority; right pan
+between placement hits does not commit or discard a proposal. A pin click still
+selects/opens it, while a threshold-crossing drag does not select it. The existing
+camera overlay keeps its own navigation port without replaying canvas events. Keep
 existing touch alternatives and explicit view controls; do not imply full Blender
 keymap, frame conventions, fly/walk or input-emulation support. Reference:
 [Blender navigation](https://docs.blender.org/manual/en/5.0/editors/3dview/navigate/navigation.html).
