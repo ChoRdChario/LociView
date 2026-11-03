@@ -37,6 +37,11 @@ export class ReviewArchive {
   static async inspect(file: Blob, limits: MetadataLimits, signal?: AbortSignal) {
     return this.fromArchive(await PackageArchive.inspect(file, signal), limits, signal);
   }
+  /** Derive Review content from the full ZIP scan of this file selection. */
+  static fromSelectedArchive(archive: PackageArchive, limits: MetadataLimits) {
+    if (!(archive instanceof PackageArchive)) return fail('archive');
+    return this.fromArchive(archive, limits);
+  }
   /** Only the currently live input owner may reuse its immutable native capture. */
   async reopen(limits: MetadataLimits) { return ReviewArchive.fromArchive(await this.archive.reopenCapturedControl(), limits); }
   private static async fromArchive(archive: PackageArchive, limits: MetadataLimits, signal?: AbortSignal) {

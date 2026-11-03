@@ -10,6 +10,7 @@ import { canonical, list, object, same, string } from '../domain/projectGraphSup
 import type { JsonObject } from '../domain/values';
 import { materialForDisplay, type MaterialIntent } from '../domain/materialIntent';
 import { ReviewArchive } from '../projectPackage/reviewArchive';
+import type { PackageArchive } from '../projectPackage/zipArchive';
 import type { PngDecoder } from '../projectFiles/png';
 import type { JpegDecoder } from '../projectFiles/jpeg';
 import { validationMetadataLimits, projectFilePolicy, type ProjectFilePolicyInput } from '../projectFiles/validation';
@@ -25,9 +26,11 @@ const table = (r: JsonObject, name: string) => object(r[name]) as Record<string,
 const ordered = (rows: JsonObject[]) => rows.sort((a, b) => string(a.orderKey).localeCompare(string(b.orderKey)) || string(a.id).localeCompare(string(b.id)));
 
 /** Inspected read-only file content. No storage, history, synthetic Project or commands. */
-export async function prepareReviewView(file: Blob, budget: ProjectFilePolicyInput, decode?: PngDecoder, jpeg?: JpegDecoder, photo?: PhotoDecoder, mediaDecoders?:MediaDecoders) {
+export async function prepareReviewView(file: Blob | PackageArchive, budget: ProjectFilePolicyInput, decode?: PngDecoder, jpeg?: JpegDecoder, photo?: PhotoDecoder, mediaDecoders?:MediaDecoders) {
   const policy=projectFilePolicy(budget), limits=policy.nonGs;
-  const original = file.slice(), inspection = await ReviewArchive.inspect(original, validationMetadataLimits), review = inspection.review;
+  const inspection = file instanceof Blob ? await ReviewArchive.inspect(file, validationMetadataLimits) :
+    await ReviewArchive.fromSelectedArchive(file, validationMetadataLimits);
+  const original = inspection.archive.sourceSnapshot(), review = inspection.review;
   const snapshot = review.snapshot, scene = object(snapshot.scene), sceneId = string(scene.id), project = object(snapshot.project);
   if (review.closure.entries.reduce((n, b) => n + b.byteLength, 0) > policy.projectBodyBytes)
     throw Error('この検証画面の容量上限を超えています。元のファイルは変更していません。');

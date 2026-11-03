@@ -241,11 +241,51 @@ driver uses the same focus-then-select action as the existing Desktop tests.
 Synthetic GLB/PNG and the existing Playwright setup supply this evidence; there
 were no product changes for the recovery check or changes to package contracts.
 
-Next performance unit: measure normal PC 500k SH4 Review-to-edit copy stages at
-the current checkpoint. Compare exact-file archive inspection, storage work and
-time until editing is available, using the existing fixture and stage timing.
-Preserve source, validation and publication fences. The current test establishes
-completion, while prior extended runs still show a long wait for this workflow.
+Delivery: the independently reviewed16-path checkpoint was pushed to g0-baseline.
+The local4191 preview serves the verified v5 candidate with20 matching HTTP
+resources, and fresh Chromium opened the home file chooser. GitHub Actions
+41560782818 passed on that exact pushed tree, including the full test suite,
+public-base build and HEIC isolation. Local delivery evidence is retained with
+the browser receipts.
+
+### Current performance unit —Review opening and edit-copy diagnosis
+
+The normal PC path now uses the same full, selector-owned ZIP inspection to
+route a Review file and to derive its View. Snapshot/closure/model/media
+validation, selection fences and all durable copy and recovery checks remain.
+The connected DOM test observes one full archive scan. The architecture test
+passes with a single type-only archive import at this composition boundary.
+
+One paired browser measurement used the same retained178,011,532B 500k SH4
+Review and fresh dedicated profiles. Open action to visible 3D went from32.516s
+to27.326s. Copy confirmation to editor was272.650s and276.553s respectively,
+both beyond240s. Display completion after confirmation was290.640s and292.555s.
+The baseline measured238.603s in the copy command; CPU sampling attributes
+about95s to SHA compression self time. This is diagnostic sampling, not an
+independent count or a measurement of all repeated archive scans.
+
+The candidate's edited copy wrote an actual backup in268.223s. The first
+post-save Node oracle stopped before reading metadata because it had not
+initialized Automerge. Follow-up inspection of those exact files verified a
+separate Project ID and all three original body hashes (GS/Proxy/PNG); reopening
+the same closed Chromium profile displayed the applied Caption text again.
+The baseline's separate180s download observation ended before its export
+completed. This pair measures opening only as an improvement, and the candidate
+copy's extended diagnostic does not pass the original240s readiness condition.
+
+The first two canonical runs timed out in the existing07m LociMyu material
+case, which does not enter the changed Review selector. The unchanged focused
+case passed in24.47s. Its shared test helper now uses the read returned by each
+completed command instead of extra reads to acquire the next token. Both round
+trips, all assertions, independent cold reads and the30s limit remain. All four
+affected07m/07n cases passed. The final source/test freezebfd515d2… passed the
+147-suite checkpoint (3279 passed,21 todo), five builds, offline isolation and
+HEIC public-path isolation.
+
+Next: map and quantify the fresh SHA work by copy phase on the current build,
+then design any change to verification lifetime against tamper, write/readback
+and restart cases. Keep the copy contract and SHA implementation until an
+approved design changes that boundary.
 
 ## Completed boundary —06c bounded restore content inspection
 

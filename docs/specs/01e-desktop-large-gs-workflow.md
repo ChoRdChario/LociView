@@ -439,6 +439,15 @@ fresh default/durable checks and stale/disposed selection.
 Acceptance reuses completed-Review display discovery plus existing parent/child
 tamper/interruption tests, and repeats the240s/300s browser workflow unchanged.
 
+The initial Review file selection uses its own freshly inspected PackageArchive
+for purpose routing and immediate Review derivation. Pass that archive alone,
+derive the source Blob from its capture, and still check the bounded Review
+snapshot, capabilities, closure, summary and display content. The selection
+guards remain in force. Direct Blob inspection and all copy, readback, retry and
+cold checks keep their existing validation. Acceptance checks one full ZIP scan
+in the connected View-open case and measures View opening separately from copy
+creation with the same500k Review file.
+
 The500k Review edit-copy refinement (PO-authorized2026-10-29) may share only the
 complete GS source inspection within one fresh `planImported` provider-planning
 invocation. Bind reuse to the complete canonical Representation record and the

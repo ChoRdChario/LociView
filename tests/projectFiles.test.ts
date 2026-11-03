@@ -2538,17 +2538,25 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     return { ...f, source, file, receiverService: receiver, reopen, capture, senderStore };
   }
   async function exerciseOpaqueFileReturns(workspace:Blob,existingOrigin?:ReturnType<typeof firstWorkspaceRecipient>){
-    const a=existingOrigin??firstWorkspaceRecipient(),b=firstWorkspaceRecipient();if(!existingOrigin)await a.receiver.importWorkspace(workspace);await b.receiver.importWorkspace(workspace);
+    const a=existingOrigin??firstWorkspaceRecipient(),b=firstWorkspaceRecipient();
+    let currentA = existingOrigin ? await a.session.read() : await a.receiver.importWorkspace(workspace);
+    let currentB = await b.receiver.importWorkspace(workspace);
     const senderA=new WorkspaceSender(a.fs,a.session,a.store,metadata,a.locks),senderB=new WorkspaceSender(b.fs,b.session,b.store,metadata,b.locks);
-    const first=await a.session.read();if(first.provider?.kind!=='scene-provider')throw Error('provider');const caption=Object.keys(first.provider.resources.captions)[0]!,originalMaterials=first.provider.inspection.candidates.unambiguousRecords.materialOverridesById;
+    if(currentA.provider?.kind!=='scene-provider')throw Error('provider');
+    const caption=Object.keys(currentA.provider.resources.captions)[0]!,originalMaterials=currentA.provider.inspection.candidates.unambiguousRecords.materialOverridesById;
     for(let round=1;round<=2;round++){
-      await a.session.editCaption((await a.session.read()).source!.token,caption,'body',`手元の編集${round}`);await b.session.editCaption((await b.session.read()).source!.token,caption,'title',`返送${round}`);
-      const base=(await senderB.availableBases()).at(-1)!.selection,file=await senderB.download(await senderB.generateContribution((await b.session.read()).source!.token,base));
-      const merged=await a.receiver.receive((await a.session.read()).source!.token,file);expect(merged.provider?.kind==='scene-provider'&&merged.provider.resources.captions[caption]).toMatchObject({title:{kind:'value',value:`返送${round}`},body:{kind:'value',value:`手元の編集${round}`}});
-      if(merged.provider?.kind!=='scene-provider')throw Error('provider');expect(merged.provider.inspection.candidates.unambiguousRecords.materialOverridesById).toEqual(originalMaterials);
-      if(round===1){const next=await senderA.download(await senderA.generate(merged.source!.token));await b.receiver.receive((await b.session.read()).source!.token,next);}
+      currentA = await a.session.editCaption(currentA.source!.token,caption,'body',`手元の編集${round}`);
+      currentB = await b.session.editCaption(currentB.source!.token,caption,'title',`返送${round}`);
+      const base=(await senderB.availableBases()).at(-1)!.selection,file=await senderB.download(await senderB.generateContribution(currentB.source!.token,base));
+      currentA = await a.receiver.receive(currentA.source!.token,file);
+      expect(currentA.provider?.kind==='scene-provider'&&currentA.provider.resources.captions[caption]).toMatchObject({title:{kind:'value',value:`返送${round}`},body:{kind:'value',value:`手元の編集${round}`}});
+      if(currentA.provider?.kind!=='scene-provider')throw Error('provider');expect(currentA.provider.inspection.candidates.unambiguousRecords.materialOverridesById).toEqual(originalMaterials);
+      if(round===1){
+        const next=await senderA.download(await senderA.generate(currentA.source!.token));
+        currentB = await b.receiver.receive(currentB.source!.token,next);
+      }
     }
-    const ready=await a.session.read();if(ready.provider?.kind!=='scene-provider')throw Error('provider');
+    const ready=currentA;if(ready.provider?.kind!=='scene-provider')throw Error('provider');
     const clean=await senderA.download(await senderA.generateClean(ready.source!.token)),copy=firstWorkspaceRecipient(),copied=await copy.receiver.importWorkspace(clean);expect(copied.state).toBe('ready');
     const meaning=(records:JsonObject)=>{
       const reps=Object.values(records.representationsById as Record<string,any>),scenes=records.scenesById as Record<string,any>;
@@ -6940,8 +6948,13 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const page = record(u.root), openButton = () => all(page).find(n => n.tag === 'button' && n.textContent === 'ファイルを開く')!;
     await vi.waitFor(() => expect(openButton().disabled).toBe(false));
     const input = all(page).find(n => n.attributes.get('aria-label') === 'ファイルを選択')!;
-    Object.assign(input, { files: [file] }); input.parent!.parent!.fire('submit', { preventDefault() {} });
-    await vi.waitFor(() => expect(all(page).some(n => n.textContent.includes('編集プロジェクトは作成していません'))).toBe(true));
+    const inspectSelection = vi.spyOn(PackageArchive, 'inspect');
+    try {
+      Object.assign(input, { files: [file] }); input.parent!.parent!.fire('submit', { preventDefault() {} });
+      await vi.waitFor(() => expect(all(page).some(n => n.textContent.includes('編集プロジェクトは作成していません'))).toBe(true));
+      expect(inspectSelection).toHaveBeenCalledOnce();
+      expect(inspectSelection.mock.calls[0]![0].size).toBe(file.size);
+    } finally { inspectSelection.mockRestore(); }
     expect(open).not.toHaveBeenCalled(); expect(render).not.toHaveBeenCalled(); expect(renderReview).toHaveBeenCalledOnce();
     const rows = all(page).filter(n => n.className === 'lv-caption-select'); expect(rows).toHaveLength(2);
     rows[0]!.fire('click'); rows[1]!.fire('click'); expect(all(page).filter(n => n.className === 'lv-caption-window')).toHaveLength(2);

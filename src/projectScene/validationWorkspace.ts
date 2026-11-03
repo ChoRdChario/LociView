@@ -624,7 +624,8 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
       workbook.value = String(lociPreview.selectedSourceIndex); conversionTitle.value = lociPreview.suggestedTitle; relation.checked = false;
       lociChoices.hidden = false; conversionPanel.hidden = false; await evaluateLoci(); status.textContent = ''; return;
     }
-    const purpose = (await PackageArchive.inspect(file)).control.manifest.purpose; if (!guardSelection(generation, context)) return;
+    const selectedArchive = await PackageArchive.inspect(file); if (!guardSelection(generation, context)) return;
+    const purpose = selectedArchive.control.manifest.purpose;
     if (purpose === 'backup') {
       const archive = await BackupArchive.inspect(file, validationMetadataLimits); if (!guardSelection(generation, context)) return;
       const run = (archive.source.proof.identity.projectId as string).slice(4), opened = await ports.open(run, undefined, 'edit', undefined, undefined,
@@ -635,7 +636,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     }
     if (purpose === 'contribution') throw Error('更新用ファイルです。対応するプロジェクトを開き、更新を受け取ってください。');
     if (purpose === 'review') {
-      const view = await prepareReviewView(file, policy, ports.decode, ports.jpeg, ports.photo,ports.mediaDecoders);
+      const view = await prepareReviewView(selectedArchive, policy, ports.decode, ports.jpeg, ports.photo,ports.mediaDecoders);
       if (!ports.renderReview) throw Error('閲覧用シーンの表示が未接続です。');
       const prepared = await ports.renderReview(view);
       try {

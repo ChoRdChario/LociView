@@ -337,6 +337,7 @@ export const projectSceneApplicationImports:Readonly<Record<string,readonly stri
     "../projectFiles/pointPly",
     "../projectFiles/validation",
     "../projectPackage/reviewArchive",
+    "../projectPackage/zipArchive",
     "../scene/types",
     "../ui/projectScene/captionListState",
     "./modelTypes",
