@@ -332,11 +332,111 @@ is limited to the private Playwright driver.
 Final source/test freeze64ff4474… passed the147-suite checkpoint (3280 passed,
 21 todo), typecheck, all five builds and offline/HEIC isolation.
 
-Next policy decision is [06b §6.1](../docs/specs/06b-staging-read-operations-proposal.md#61-工程別計測後の次案).
-It proposes joining two pairs of read-only parent inspections while retaining
-fresh inspections at writes and recovery. It changes detection times within
-those phases and awaits specific approval. The estimated four scans represent
-about11s of SHA processing, with wall time and acceptance to be measured.
+Delivery: seven reviewed paths pushed to g0-baseline. CI41665725849 passed
+on the same commit. The owned4191 preview serves20 matching resources from
+the final candidate and opened the chooser in fresh Chromium.
+
+### Current unit —06b §6.1 and practical PC review
+
+PO approved both read-only inspection changes in [06b §6.1](../docs/specs/06b-staging-read-operations-proposal.md#61-工程別計測後の改善)
+on2026-11-04. Keep independent write/readback and recovery checks, compare the
+same500k SH4 file and prove tamper refusal, interruption, saved bytes and reopen.
+In parallel review open → find → edit → save/share → resume as a whole on the PC
+candidate. Distinguish usability observed on this machine from typical-PC/user
+qualification, and prioritize unnecessary user work by impact. Changes beyond
+the two approved verification phases require a separate decision.
+
+On the same178,011,532B Review with matched diagnostic hooks and fresh Chromium
+profiles, full ZIP scans fell40→36, and SHA input16.556GB→15.132GB. The parent
+phase fell30→26 scans and66.05→60.63s instrumented SHA execution. Child ZIP
+readback/journal/completion/discovery stayed at9 scans, scratch at1. Wall time
+from copy confirmation to the editor heading was192.325s/194.284s; 3D-ready
+indication207.219s/217.478s. Both editor runs passed the existing240s check in
+this pair. The single pair does not establish a wall-time gain or a regression.
+The separate preceding pair measured over240s, so ordinary-PC latency
+acceptance is still open. Architecture12 and focused Review7 passed.
+
+The uninstrumented Desktop candidate recovered the same500k job after one
+injected interruption before original.zip creation and a full browser close.
+Original-file reselection to editor244.158s, backup186.962s and cold reopen
+122.136s. The backup and cold Profile retain the edited Caption, and the saved
+GS/Proxy/PNG bytes match their three original hashes. Focused coverage also
+refuses altered parent/child archives, wrong Prepared binding, missing child
+publication and preserves the exact parent receipt after failed readback.
+
+The current Ki84 browser journey completes new-profile restore, search,
+four-record browsing, edit, saved-file inspection and full-browser reopen.
+Confirmation→restore105.7s, search58ms, apply31.1s, download63.99s and cold
+resume37.6s. Sequential browse leaves four overlapping windows, and the
+header says ファイル未確認 both before and after download. See the
+[practical PC review](../docs/ui-design-review.md#2026-11-04-pc版の実用性と操作の重複)
+for observations, priority and hardware limits. Next prioritize repeated
+Caption apply and save, then navigation and clearer save/share state.
+
+Typecheck, all five builds, offline/HEIC isolation and the small Caption
+continuation case passed. The existing small Workspace download case exceeded
+its15s wait on both the first current run and previous-artifact control; the
+current instrumented follow-up completed at the boundary (15.000s to handoff).
+Generation9.846s, full output overview4.230s and handoff0.861s were measured
+on that follow-up. The next audit should separate exact generated-file/privacy
+evidence needed for handoff from refreshing the entire output list.
+
+Final checkpoint remains red on three30s test timeouts (07m v1 and LociMyu
+roundtrips and Scene-name cold recovery;3278 passed/21 todo). All three
+repeated under the unchanged focused threshold; the exact previous source
+control reproduced the v1 timeout and passed the other two. Cause is not
+established for all failures. Required checks are retained without threshold
+changes. The approved change and review remain local pending that check.
+
+### Current unit —Ki84 daily edit, export and resume
+
+First isolate the three existing timeout cases without changing assertions or
+deadlines. Then use the same retained Ki84 backup and fresh normal Desktop
+profiles for paired one-Caption edit → external backup → cold-resume runs.
+Measure commit, display, package, output overview and handoff separately. Keep
+the exact source/history/body/receipt and recovery checks. Improve only proven
+duplicate work inside the accepted operation boundaries, and require the
+edited body, exact original asset digests and independent review.
+
+Baseline on the pending06b tree: the three exact cases passed at 17.372s,
+14.395s and 14.652s under their unchanged 30s limit. The fixed Ki84 file
+passed with apply11.646s, download45.544s and cold35.873s. Apply and export
+issued 2,083 and 7,722 restore control opens. First refine OPFS directory
+listing for ordinary slash-terminated directory paths: resolve the directory
+fresh by name before walking it. Retain lexical partial-prefix behavior,
+sorted results and storage errors. Do not change any restore audit, receipt
+read, write, close, publication or recovery fence. The directory experiment
+passed content checks but was slower in all three stages (15.912s, 50.420s,
+40.756s) and was reverted. The independent follow-up reviewed one complete
+control scan for both write conditions at each existing before/after fence,
+only in the already selected restored generation. Preserve every original,
+staging, read, mutation, close, acknowledgement and recovery boundary. Add
+targeted pre/post refusal and expiry checks and rerun the same browser journey.
+
+Final selected-fence diff passes independent review. The initial timing process
+ended without a result; reran in a fresh dedicated Chromium profile with the
+same source, fixture, browser and viewport. The edited Caption and exact
+Project identity, 3 prior changes plus exactly 1 new change, and all 43
+retained payload lengths/digests pass independent archive inspection; the
+fully restarted browser opens the edited body. On the i9-10850K/64GiB/RTX5080
+host (Chromium156, 1280x720, DPR1), apply11.646→9.209s, download45.544→25.897s,
+cold35.873→27.781s. First-restore ready77.604→69.354s is ancillary. Apply
+and export control opens fall 2,083→1,720 and 7,722→4,550; export ZIP
+stream/close16.876→4.676s. Cold observed control opens stay936, so do not
+attribute the cold time difference to this change. These are paired local
+measurements, not a PC-class time guarantee. The saved file's independent
+inspection and same-profile cold start are separate checks. Baseline and
+candidate timings are in the private `ki84-daily-edit` journey results.
+The final Windows `check:checkpoint` passed on source/test freeze `f142bf54`:
+147 files, 3,282 passed, 21 existing TODOs, no failed/timeout cases under the
+unchanged threshold. Vitest took978.68s; the serial checkpoint took1090.9s.
+All builds and offline isolation passed, followed by HEIC isolation (3.4s).
+The three earlier timeouts are no longer reproduced; no common cause was
+established and their assertions and deadlines were retained.
+Next isolate cold selection/destination checks from rendering and review the
+actual save feedback: the external download succeeds but the workspace still
+shows `ファイル未確認`. Keep exact verification semantics and clarify the
+difference between a successful export and comparison with an external file.
 
 ## Completed boundary —06c bounded restore content inspection
 

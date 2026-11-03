@@ -460,6 +460,38 @@ describe('local generation capabilities (ports only, not backup restore/selectio
     await scope.dispose();
   });
 
+  it('runs one fresh combined audit at each selected write fence and refuses stale success', async () => {
+    const f = local(), entered = deferred(), release = deferred();
+    const selected = setup(f.fs);
+    let allowed = true, pause = false;
+    const assertSelected = vi.fn(async () => {}), assertSelectedWritable = vi.fn(async () => {
+      if (pause) { entered.release(); await release.promise; }
+      if (!allowed) throw Error('Selected generation is not writable');
+    });
+    const scope = await openWorkspaceGeneration(f.fs, { generationId: nextId, allowCreate: false, auditReadOperations: true,
+      assertSelected, assertSelectedWritable }, async () => ({ factory: selected.storage, dispose: async () => {} }));
+    assertSelected.mockClear();
+    const path = `${scope.fs.projectRoot}/test`;
+    await underWriteLease(scope.fs, () => scope.fs.writeText(path, 'saved'));
+    expect(assertSelectedWritable).toHaveBeenCalledTimes(4); // Outer lease and the actual FS write.
+    expect(assertSelected).not.toHaveBeenCalled();
+    assertSelectedWritable.mockClear();
+    await underWriteLease(scope.fs, () => scope.factory().save(['test'], new Uint8Array([1])));
+    expect(assertSelectedWritable).toHaveBeenCalledTimes(4);
+    allowed = false;
+    const forbidden = vi.fn(async () => 'false success');
+    await expect(underWriteLease(scope.fs, forbidden)).rejects.toThrow('not writable');
+    expect(forbidden).not.toHaveBeenCalled();
+    allowed = true;
+    await expect(underWriteLease(scope.fs, async () => { allowed = false; return 'false success'; })).rejects.toThrow('not writable');
+    allowed = true; pause = true;
+    const late = underWriteLease(scope.fs, forbidden);
+    await entered.promise; await scope.dispose(); release.release();
+    await expect(late).rejects.toThrow('generation-closed');
+    expect(forbidden).not.toHaveBeenCalled();
+    expect(await f.fs.readText(path)).toBe('saved');
+  });
+
   it('owns a streamed chunk before the asynchronous post-read fence', async () => {
     const f = local(), entered = deferred(), release = deferred(), bytes = new Uint8Array([1]);
     let delivered = false;

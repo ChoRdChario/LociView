@@ -109,7 +109,7 @@ import { ReviewArchive } from '../src/projectPackage/reviewArchive';
 import { ReviewOutputJob } from '../src/projectPackage/reviewOutputJob';
 import { PreparedReviewEdit, createReviewEditScratch } from '../src/projectPackage/reviewEdit';
 import { ReviewEditJob } from '../src/projectPackage/reviewEditJob';
-import { assertReviewEditSlot, reviewEditRoot, type ReviewEditBinding } from '../src/projectPackage/reviewEditControls';
+import { assertReviewEditSlot, readReviewEdit, reviewEditRoot, type ReviewEditBinding } from '../src/projectPackage/reviewEditControls';
 import { prepareReviewView } from '../src/harness/projectScene/reviewView';
 import { inspectReviewSnapshot, prepareReviewEdit } from '../src/projectPackage/reviewSnapshot';
 import { BackupArchive, writeBackupArchive } from '../src/projectPackage/backupArchive';
@@ -3438,6 +3438,11 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     await expect(original.check()).rejects.toThrow('restore-generation-retired');
     await expect(staging.check()).rejects.toThrow('restore-staging-retired');
     f.fs.reject = () => false;
+    const unfinished = await BackupRestoreJob.openSelected(f.fs, metadata, f.databases, ports);
+    const forbidden = vi.fn(async () => {});
+    await expect(underWriteLease(unfinished.fs, forbidden)).rejects.toThrow('restore-pending');
+    expect(forbidden).not.toHaveBeenCalled();
+    await unfinished.dispose();
     const selection = await BackupRestoreJob.resumeSelection(f.fs, metadata, f.databases, ports);
     expect(await BackupRestoreJob.resumeSelection(f.fs, metadata, f.databases, ports)).toEqual(selection);
     const selected = await BackupRestoreJob.openSelected(f.fs, metadata, f.databases, ports), selectedPorts = ports(selected);
@@ -3451,6 +3456,8 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       stagedAgain = await again.openStaging(f.databases), againPorts = ports(stagedAgain);
     await againPorts.session.initializeBackup(again); await again.select(selectedPorts, againPorts, f.databases, ports);
     await expect(selected.check()).rejects.toThrow('restore-generation-retired');
+    await expect(underWriteLease(selected.fs, forbidden)).rejects.toThrow('restore-generation-retired');
+    expect(forbidden).not.toHaveBeenCalled();
     const final = await BackupRestoreJob.openSelected(f.fs, metadata, f.databases, ports);
     expect(final.generationId).toBe(again.id); expect((await final.ports.session.read()).source!.token).toBe(initialized.source!.token);
     expect((await readRestoreControls(f.fs, metadata)).selections).toHaveLength(2);
@@ -7094,9 +7101,62 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
         expect(scans).toHaveBeenCalledTimes(2);
         expect(child.inspection.archive.sha256).toBe(prepared.clean.archive.sha256);
         expect(new Uint8Array(await child.inspection.archive.sourceSnapshot().arrayBuffer())).toEqual(exact);
+        scans.mockClear();
+        await assertReviewEditSlot(r.fs, metadata, prepared.childId);
+        expect(scans).toHaveBeenCalledTimes(2);
+        await expect(assertReviewEditSlot(r.fs, metadata, newId())).rejects.toThrow('review-edit-pending');
+        const startPath = `${reviewEditRoot(r.fs, prepared.id)}start.json`;
+        const start = (await r.fs.readBytes(startPath))!;
+        await r.fs.writeText(startPath, '{}');
+        await expect(assertReviewEditSlot(r.fs, metadata, prepared.childId)).rejects.toThrow('review-edit-pending');
+        await r.fs.writeBytes(startPath, start);
         expect(writes).not.toHaveBeenCalled();
       } finally { writes.mockRestore(); scans.mockRestore(); }
     } finally { prepare.mockRestore(); await source.workspace.dispose(); }
+  });
+  it('checks current Review parent and child once before deriving a parent publication', async () => {
+    const source = await openFileCaption();
+    const output = await source.host.workspaceOutput.generateReview(source.host.read().source!.token, { sceneId: source.s.sceneId });
+    const prepared = await PreparedReviewEdit.prepare(await source.host.workspaceOutput.download(output), metadata);
+    const r = firstWorkspaceRecipient(), job = new ReviewEditJob(r.fs, r.session, metadata);
+    const parentRoot = reviewEditRoot(r.fs, prepared.id), published = `${parentRoot}published.json`;
+    try {
+      r.fs.reject = path => path === published;
+      await expect(job.start(prepared)).rejects.toThrow('injected quota');
+      r.fs.reject = () => false;
+      const child = await CleanInputJob.open(r.fs, prepared.childId, metadata);
+      const { binding } = await readReviewEdit(r.fs, prepared.id, metadata);
+      const derive = (expected = binding) => underWriteLease(r.fs, () => child.reviewParentPublication(expected));
+      const scans = vi.spyOn(PackageArchive, 'inspect');
+      let expected;
+      try {
+        expected = await derive();
+        expect(scans).toHaveBeenCalledTimes(3);
+      } finally { scans.mockRestore(); }
+      await expect(derive({ ...binding, prepared: { ...binding.prepared, sha256: 'f'.repeat(64) } })).rejects.toThrow('review-edit-child-binding');
+      for (const path of [`${parentRoot}copy.zip`, child.path('input.zip'), child.path('published.json')]) {
+        const exact = (await r.fs.readBytes(path))!;
+        if (path.endsWith('.zip')) {
+          const altered = exact.slice();
+          altered[altered.length - 1] = altered[altered.length - 1]! ^ 1;
+          await r.fs.writeBytes(path, altered);
+        } else await r.fs.remove(path);
+        await expect(derive()).rejects.toThrow();
+        expect(await r.fs.exists(published)).toBe(false);
+        await r.fs.writeBytes(path, exact);
+      }
+      const read = r.fs.readBytes.bind(r.fs);
+      const readback = vi.spyOn(r.fs, 'readBytes').mockImplementation(async path => {
+        if (path === published && await r.fs.exists(path)) throw Error('parent readback interrupted');
+        return read(path);
+      });
+      try { await expect(job.retry(prepared.id)).rejects.toThrow('parent readback interrupted'); }
+      finally { readback.mockRestore(); }
+      expect(await readReceipt(r.fs, published, metadata)).toEqual(expected);
+      await job.retry(prepared.id);
+      expect(await readReceipt(r.fs, published, metadata)).toEqual(expected);
+      expect((await r.session.read()).source!.originalChanges()).toEqual(prepared.clean.source.originalChanges());
+    } finally { await source.workspace.dispose(); }
   });
   it.each(['original', 'child', 'completion'] as const)('cold resumes a review edit-copy stopped at %s through one parent recovery row', async stage => {
     const source = await openFileCaption(), id = await source.host.workspaceOutput.generateReview(source.host.read().source!.token, { sceneId: source.s.sceneId });

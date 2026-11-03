@@ -5,7 +5,7 @@ import type { MetadataProjectSession } from '../projectMetadata/session';
 import { cleanInputDescriptor } from './cleanInputDescriptor';
 import { CleanInputJob } from './cleanInputJob';
 import { PreparedReviewEdit } from './reviewEdit';
-import { abandonReviewEdit, persistReviewEdit, readReviewEdit, reviewEditRoot, reviewEditPublication, reviewEditStates, type CompletedReviewChild } from './reviewEditControls';
+import { abandonReviewEdit, persistReviewEdit, readReviewEdit, reviewEditRoot, reviewEditStates, type CompletedReviewChild } from './reviewEditControls';
 
 /** Parent persistence and clean initialization take successive, never nested, write leases.
  * The existing file service owns one outer package-operation lock. */
@@ -26,9 +26,8 @@ export class ReviewEditJob {
     const job = await CleanInputJob.prepareReview(this.fs, input, parent.binding, this.limits);
     await this.session.initializeClean(job);
     await underWriteLease(this.fs, async () => {
-      parent = await readReviewEdit(this.fs, id, this.limits);
-      await job.validateCompletion();
-      await writeReceipt(this.fs, `${reviewEditRoot(this.fs, id)}published.json`, await reviewEditPublication(this.fs, parent, this.limits), this.limits);
+      const publication = await job.reviewParentPublication(parent.binding);
+      await writeReceipt(this.fs, `${reviewEditRoot(this.fs, id)}published.json`, publication, this.limits);
     });
     return this.session.read(); // Preserve any later edits when completion is retried.
   }

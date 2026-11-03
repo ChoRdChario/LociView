@@ -305,10 +305,13 @@ export class BackupRestoreJob {
       const next = await readRestoreControls(root, limits);
       if (!restoreEqual(next.selection, selected)) fail('restore-generation-retired'); return next;
     };
+    const checkWritable = async () => {
+      const next = await checkSelected();
+      if (next.pending || next.tail && !next.jobs.find(j => j.id === next.tail!.jobId)?.result) fail('restore-pending');
+    };
     const scope = await openWorkspaceGeneration(root, { generationId, allowCreate: false, auditReadOperations: true,
       assertSelected: async () => { await checkSelected(); },
-      assertWritable: async () => { const next = await checkSelected();
-        if (next.pending || next.tail && !next.jobs.find(j => j.id === next.tail!.jobId)?.result) fail('restore-pending'); } }, databases.open);
+      ...(generationId === null ? { assertWritable: checkWritable } : { assertSelectedWritable: checkWritable }) }, databases.open);
     try {
       const ports = createPorts(scope);
       if (ports.fs !== scope.fs || ports.factory !== scope.factory) fail('restore-selected-scope');

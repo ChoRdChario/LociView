@@ -5,7 +5,7 @@ import { TransactionJournal, type JournalEntry, type PreparedJournal } from '../
 import { CleanArchive } from './cleanArchive';
 import { PACKAGE_LIMITS as L } from './contract';
 import { cleanInputDescriptor, packageReference as reference } from './cleanInputDescriptor';
-import { reviewCleanMarker, reviewEditChildBinding, validateReviewEditChild, type ReviewEditBinding } from './reviewEditControls';
+import { reviewCleanMarker, reviewEditChildBinding, reviewEditPublication, validateReviewEditChild, type ReviewEditBinding } from './reviewEditControls';
 import { workspacePackageRoot } from './workspaceBases';
 
 const root = (fs: ProjectWorkspaceFS, id: string) => `${workspacePackageRoot(fs)}clean-input/${technicalId(id)}/`;
@@ -67,16 +67,19 @@ export class CleanInputJob {
   private async checkBinding() {
     if (json(await readReceipt(this.fs, this.path('input.json'), this.limits)) !== json(this.descriptor()) ||
       json(await readReceipt(this.fs, index(this.fs, this.id), this.limits)) !== json(this.marker('index'))) fail('clean-input-binding');
-    if (this.reviewEdit) await validateReviewEditChild(this.fs, this.id, this.descriptor(), this.reviewEdit, this.limits);
+    if (this.reviewEdit) return validateReviewEditChild(this.fs, this.id, this.descriptor(), this.reviewEdit, this.limits);
   }
   static async open(fs: ProjectWorkspaceFS, id: string, limits: MetadataLimits) {
+    return (await this.openVerified(fs, id, limits)).job;
+  }
+  private static async openVerified(fs: ProjectWorkspaceFS, id: string, limits: MetadataLimits) {
     if (await this.inputState(fs, id, limits) !== 'started') return fail('clean-input-incomplete');
     const f = await fs.readStream(`${root(fs, id)}input.zip`); if (!f?.blob || f.size > L.archiveBytes) return fail('clean-input-missing');
     const blob = await f.blob(); if (blob.size !== f.size) fail('clean-input-size');
     const job = new CleanInputJob(fs, id, limits, await CleanArchive.inspect(blob, limits), blob, { operation: 'importClean' }, false, await reviewEditChildBinding(fs, id, limits));
-    await job.checkBinding();
+    const parent = await job.checkBinding();
     if (json(await readReceipt(fs, job.path('start.json'), limits)) !== json(job.startRecord())) fail('clean-input-start');
-    return job;
+    return { job, parent };
   }
   async persist(additionalBytes: number) {
     this.fs.mutationAuthority.assertWorkspaceWriteAuthorized();
@@ -115,13 +118,32 @@ export class CleanInputJob {
     if (parts.length !== original.length || parts.some((p, i) => !equalBytes(p, original[i]!))) fail('clean-input-originals');
     return source;
   }
-  private async publication(entry?: JournalEntry) {
-    entry ??= (await new TransactionJournal(this.fs, this.limits).entries()).find(e => e.start.transactionId === this.id);
+  private async publicationEntry() {
+    const entry = (await new TransactionJournal(this.fs, this.limits).entries()).find(e => e.start.transactionId === this.id);
     if (!entry?.prepared || !entry.publication) return fail('clean-input-unpublished');
-    const source = await this.validateJournal(entry.prepared);
-    if (json(entry.publication.heads) !== json(source.heads)) fail('clean-input-publication');
+    return { prepared: entry.prepared, publication: entry.publication };
+  }
+  private publicationRecord(entry: { prepared: PreparedJournal; publication: NonNullable<JournalEntry['publication']> }, heads: readonly string[]) {
+    if (json(entry.publication.heads) !== json(heads)) fail('clean-input-publication');
     return { schema: 'lociview-clean-input-published-1', jobId: this.id, start: reference(this.startRecord()),
       journal: reference(entry.prepared), publication: reference(entry.publication) };
+  }
+  private async publication() {
+    const entry = await this.publicationEntry(), source = await this.validateJournal(entry.prepared);
+    return this.publicationRecord(entry, source.heads);
+  }
+  /** Parent receipt derivation inside the caller's write lease. No archive proof escapes. */
+  async reviewParentPublication(expected: ReviewEditBinding) {
+    this.fs.mutationAuthority.assertWorkspaceWriteAuthorized();
+    const binding = structuredClone(expected);
+    const receipt = await readReceipt(this.fs, this.path('published.json'), this.limits);
+    if (!receipt) return fail('clean-input-completion');
+    const entry = await this.publicationEntry();
+    const { job, parent } = await CleanInputJob.openVerified(this.fs, this.id, this.limits);
+    if (!parent || json(parent.binding) !== json(binding)) return fail('review-edit-child-binding');
+    const source = await job.validateOpenedJournal(entry.prepared);
+    if (json(receipt) !== json(this.publicationRecord(entry, source.heads))) fail('clean-input-completion');
+    return reviewEditPublication(this.fs, parent, this.limits);
   }
   async complete() { await writeReceipt(this.fs, this.path('published.json'), await this.publication(), this.limits); }
   async steps() {

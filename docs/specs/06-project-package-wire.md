@@ -3115,6 +3115,21 @@ its owned root has a pending restore, but ordinary writes are refused. Staging
 retains the owning-pending-job guard for both reads and writes. Neither fence
 grants the underlying logical Project lease.
 
+**Selected restore write fence refinement (2026-11-04):** For an existing
+non-original generation opened by `BackupRestoreJob.openSelected`, the two
+write conditions use one fresh complete root control audit at each existing
+before/after fence. The same audit must match the captured Selection and show
+no pending restore and a completed selected Result. Scope liveness brackets
+the audit. Keep both fences on every FS/IDB mutation, stream pull and outer
+write lease. Neither the audit nor its result crosses a fence or authorizes
+publication. Read fences, original and staging bindings, complete audit order,
+and every archive/body/durable readback and cold recovery check are unchanged.
+This removes repeated scans inside one fence without promising atomic root
+observation or identical detection timing for out-of-band changes mid-audit.
+Acceptance checks pre-fence refusal with no mutation, post-fence refusal before
+success, disposed scope during audit, existing selected restore recovery, and
+the paired Ki84 edit/export/close/reopen workflow with original-byte checks.
+
 The shared selected-generation resolver reads root controls and the actual DB
 list, captures the exact Selection (or original-generation absence), opens only
 an existing matching DB, and verifies the selected initialization's original
@@ -3348,6 +3363,13 @@ The general `reviewEditStates` API and its observer remain unchanged. Staging
 without a registered read operation stays strict per I/O; this is not06b.
 Acceptance covers nested facade ownership, bounded entry/closing audits, closing
 rejection and later damaged evidence refusing output before new writes.
+
+The separately approved [06b §6.1](06b-staging-read-operations-proposal.md#61-工程別計測後の改善)
+permits two Review-copy observations to be combined. The private slot check
+uses the validated Start and child binding from that same read callback.
+Parent publication uses the parent freshly inspected by the child-open check
+inside the completion lease. All child, journal, receipt, write/readback and
+recovery boundaries remain. There is no evidence reuse across either operation.
 
 ### 2026-10-31 fresh backup-open source ownership
 

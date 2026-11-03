@@ -69,23 +69,31 @@ function fencedStream(open: () => ReadableStream<Uint8Array>, check: () => Promi
  * unwrapped root. The opener MUST isolate each generation in its own database.
  */
 export async function openWorkspaceGeneration(root: ProjectWorkspaceFS,
-  input: Readonly<{ generationId: WorkspaceGenerationId; allowCreate: boolean; assertSelected: () => Promise<void>; assertWritable?: () => Promise<void>; auditReadOperations?: boolean; stagingReadOwner?: StagingReadOwner }>,
+  input: Readonly<{ generationId: WorkspaceGenerationId; allowCreate: boolean; assertSelected: () => Promise<void>;
+    assertWritable?: () => Promise<void>; assertSelectedWritable?: () => Promise<void>;
+    auditReadOperations?: boolean; stagingReadOwner?: StagingReadOwner }>,
   openStorage: GenerationStorageOpener) {
   const generationId = checkedId(input.generationId), allowCreate = input.allowCreate,
-    assertSelected = input.assertSelected, assertWritable = input.assertWritable, auditReadOperations = input.auditReadOperations === true,
+    assertSelected = input.assertSelected, assertWritable = input.assertWritable, assertSelectedWritable = input.assertSelectedWritable,
+    auditReadOperations = input.auditReadOperations === true,
     stagingReadOwner = input.stagingReadOwner?.assertOwner.bind(input.stagingReadOwner);
   if (auditReadOperations && stagingReadOwner || stagingReadOwner && generationId === null) fail('generation-read-binding');
+  if (assertSelectedWritable && (!auditReadOperations || stagingReadOwner || assertWritable || allowCreate || generationId === null)) fail('generation-write-binding');
   const logicalRoot = root.projectRoot === null ? '' : canonicalPath(root.projectRoot, false);
   const prefix = logicalRoot ? `${logicalRoot}/` : '';
   const projectRoot = generationId === null ? root.projectRoot : `${prefix}v2/generations/${generationId}`;
   const namespace = projectRoot ?? '';
   let disposed = false;
-  const check = async () => {
+  const checkState = async (assertState: () => Promise<void>) => {
     if (disposed) fail('generation-closed');
-    await assertSelected();
+    await assertState();
     if (disposed) fail('generation-closed');
   };
-  const checkWrite = async () => { await check(); if (assertWritable) await assertWritable(); await check(); };
+  const check = () => checkState(assertSelected);
+  const checkWrite = async () => {
+    if (assertSelectedWritable) return checkState(assertSelectedWritable);
+    await check(); if (assertWritable) await assertWritable(); await check();
+  };
   const ownPath = (path: string, listing = false) => {
     const canonical = canonicalPath(path, listing);
     if (namespace && !within(canonical, namespace)) fail('generation-path-outside');

@@ -8,12 +8,16 @@ preserve existing changes. Do not reconstruct current work from old checkpoints.
 
 ## Current boundary
 
-The short-PC Caption list/detail repair (PCQ-30) passed the final browser and
-required checkpoint checks. Ki84 small-screen and exact-artifact cold proofs
-pass. Normal Desktop receive continuation (PCQ-31) passed through rejection of a
-different file, full receiver restart, exact-original reselection, receipt and
-return of applied text and photo. Todo owns the results and next bounded
-performance work on the 500k SH4 editing-copy wait.
+The Ki84 one-Caption edit, external backup and cold reopen pass on the selected
+restore write-fence refinement. The same host measured apply11.646→9.209s and
+download45.544→25.897s. The cold timing moved with unchanged control-open count.
+Full Windows checkpoint and isolation pass with unchanged test deadlines.
+Next separate cold validation and rendering time, and review the external
+download versus external file verification feedback. See todo for exact evidence.
+
+The approved06b §6.1 Review-copy phases eliminate four full parent ZIP scans.
+The same500k pair did not establish a wall-time improvement. The normal
+Desktop recovery, saved originals and cold reopen are verified.
 
 The preceding PO-approved06c checkpoint is complete and pushed to g0 with actual
 Windows/CI and Ki84 file/cold/independent-resume evidence. Do not repeat approval

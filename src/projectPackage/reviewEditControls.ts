@@ -116,8 +116,8 @@ export async function reviewEditPublication(fs: ProjectWorkspaceFS, parent: Awai
   return { schema: 'lociview-review-edit-published-1', jobId: d.jobId, prepared: reference(d), childId: d.childId, publication: reference(publication) };
 }
 
-export async function reviewEditStates(fs: ProjectWorkspaceFS, limits: MetadataLimits,
-  completedChild?: (observation: CompletedReviewChild) => void): Promise<ReviewEditState[]> {
+async function readReviewEditStates(fs: ProjectWorkspaceFS, limits: MetadataLimits,
+  completedChild?: (observation: CompletedReviewChild) => void, startedIncomplete?: (id: string, childId: string) => void): Promise<ReviewEditState[]> {
   const result: ReviewEditState[] = [];
   const children = await reviewEditChildren(fs, limits);
   for (const id of await reviewEditIds(fs, limits)) {
@@ -153,19 +153,27 @@ export async function reviewEditStates(fs: ProjectWorkspaceFS, limits: MetadataL
       }
       if (receipt && json(receipt) !== json(await reviewEditPublication(fs, parent, limits))) fail('review-edit-completion');
       if (receipt) completedChild?.({ childId: parent.descriptor.childId, binding: structuredClone(parent.binding) });
+      else if (parent.started && childId === parent.descriptor.childId) startedIncomplete?.(id, childId);
       result.push({ id, childId, state: receipt ? 'completed' : 'incomplete' });
     } catch { result.push({ id, childId, state: 'repair-required' }); }
   }
   return result;
 }
 
+export function reviewEditStates(fs: ProjectWorkspaceFS, limits: MetadataLimits, completedChild?: (observation: CompletedReviewChild) => void) {
+  return readReviewEditStates(fs, limits, completedChild);
+}
+
 export async function assertReviewEditSlot(fs: ProjectWorkspaceFS, limits: MetadataLimits, ownChild?: string) {
   const child = ownChild, ownedLimits = { ...limits };
   return withMetadataRead(fs, undefined, async ({ fs }) => {
-    for (const state of await reviewEditStates(fs, ownedLimits)) {
+    const eligible = new Set<string>();
+    const states = await readReviewEditStates(fs, ownedLimits, undefined, (id, childId) => {
+      if (childId === child) eligible.add(id);
+    });
+    for (const state of states) {
       if (state.state === 'abandoned' || state.state === 'completed') continue;
-      if (state.state !== 'incomplete' || !child || child !== state.childId) fail('review-edit-pending');
-      const parent = await readReviewEdit(fs, state.id, ownedLimits); if (!parent.started) fail('review-edit-pending');
+      if (state.state !== 'incomplete' || !eligible.has(state.id)) fail('review-edit-pending');
     }
   });
 }
