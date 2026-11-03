@@ -132,9 +132,15 @@
 .lv-project-shell .lv-project-workspace .lv-task-footer > button:first-of-type:not(:disabled),
 .lv-project-shell .lv-project-workspace .lv-pin-task-actions > button:nth-last-child(2):not(:disabled) { background: #3c4637; color: #fff; }
 .lv-project-shell .lv-project-workspace .lv-file-primary:disabled { background: #e3e5df; color: #555d4e; }
+.lv-project-shell .lv-project-workspace :is(.lv-workspace-primary,.lv-file-primary):is(:hover,:active):not(:disabled) { background: #303b2c; }
 .lv-project-stage { display: flex; flex-direction: column; }
 .lv-stage-display { position: relative; flex: 1; min-height: 0; min-width: 0; overflow: hidden; }
-.lv-project-viewport-tools { position: relative; inset: auto; z-index: auto; flex: 0 0 auto; box-sizing: border-box; max-width: 100%; border-radius: 0; padding: 6px 12px; }
+.lv-stage-overlay { position: absolute; inset: auto 12px 12px; display: flex; flex-direction: column; align-items: start; gap: 8px; max-height: calc(100% - 24px); pointer-events: none; }
+.lv-stage-overlay > .lv-project-viewport-tools { position: static; inset: auto; align-self: end; margin-right: 136px; flex: 0 1 auto; flex-direction: column; align-items: stretch; min-height: 0; max-width: min(240px, calc(100% - 136px)); max-height: 35dvh; box-sizing: border-box; overflow: hidden; overflow-wrap: anywhere; pointer-events: auto; }
+.lv-stage-overlay > .lv-project-viewport-tools > .lv-project-viewport-status { flex: 0 1 auto; min-height: 0; overflow: auto; }
+.lv-stage-overlay > .lv-project-viewport-tools > button { flex: 0 0 auto; }
+.lv-stage-overlay > .lv-project-viewport-tools:has(> button:not([hidden])) { min-height: 88px; }
+.lv-project-workspace .lv-stage-overlay > .lv-pin-task { position: static; inset: auto; transform: none; align-self: center; flex: 0 1 auto; min-height: 0; max-width: 100%; overflow: auto; pointer-events: auto; }
 .lv-project-shell .lv-project-body [role="tab"] { border: 0; border-radius: 0; border-bottom: 3px solid transparent; background: transparent; }
 .lv-project-shell .lv-project-body [role="tab"][aria-selected="true"] { border-bottom-color: #59654f; font-weight: 600; }
 .lv-project-shell .lv-project-body [aria-label="シーン"] { padding-bottom: 8px; }
@@ -194,27 +200,36 @@
   .lv-project-body .lv-material-actions { bottom: -12px; }
   .lv-project-workspace > header > .lv-operation-status:not(:empty) { right: 12px; bottom: 12px; max-width: calc(100% - 160px); }
   .lv-project-workspace:has(.lv-pin-task:not([hidden])) > header > .lv-operation-status:not(:empty) { bottom: 230px; }
-  .lv-stage-display:has(.lv-pin-task:not([hidden])) > .lv-project-camera { bottom: 240px; }
+  .lv-stage-display:has(.lv-pin-task:not([hidden])) > .lv-project-camera { top: 12px; bottom: auto; }
 }
 /* Record-first workspace: stable list/detail and completion owners. */
 .lv-project-body > aside { overflow: hidden; gap: 8px; }
-.lv-project-body > aside > [aria-label="シーン"] { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; flex: 0 0 auto; max-height: 35%; overflow: auto; }
-.lv-project-body > aside > [aria-label="シーン"] > h2 { display: none; }
-.lv-project-body > aside > [aria-label="シーン"] > div { flex: 1; }
-.lv-project-body > aside > [aria-label="シーン"] > form { flex-basis: 100%; }
-.lv-project-body > aside > [aria-label="シーン"] > details[open] { flex-basis: 100%; }
+.lv-sidebar-toolbar { display: contents; }
+.lv-project-body .lv-sidebar-toolbar > [aria-label="シーン"] { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; flex: 0 0 auto; max-height: 35%; overflow: auto; }
+.lv-project-body .lv-sidebar-toolbar > [aria-label="シーン"] > h2 { display: none; }
+.lv-project-body .lv-sidebar-toolbar > [aria-label="シーン"] > div { flex: 1; min-width: 0; flex-wrap: nowrap; overflow-x: auto; padding: 2px; scrollbar-width: thin; }
+.lv-project-body .lv-sidebar-toolbar > [aria-label="シーン"] > div > button { flex: 0 0 auto; white-space: nowrap; }
+.lv-project-body .lv-sidebar-toolbar > [aria-label="シーン"] > details { flex: 0 0 auto; }
+.lv-project-body .lv-sidebar-toolbar > [aria-label="シーン"] > form { flex-basis: 100%; }
+.lv-project-body .lv-sidebar-toolbar > [aria-label="シーン"] > details[open] { flex-basis: 100%; }
 .lv-project-body > aside > [role="tabpanel"] { flex: 1 1 0; min-height: 0; overflow: auto; }
-.lv-project-body > aside > .lv-caption-task { display: grid; grid-template-rows: minmax(280px, 1fr) minmax(180px, 38%); gap: 8px; overflow: auto; scroll-padding-block: 12px; }
-.lv-project-body > aside > .lv-caption-task[data-editing="true"] { grid-template-rows: minmax(180px, 35%) minmax(240px, 1fr); }
-.lv-project-body > aside > .lv-caption-task[data-selected="false"] { grid-template-rows: minmax(280px, 1fr) auto; }
+.lv-project-body > aside > .lv-caption-task { display: grid; grid-template-rows: minmax(0, 62fr) minmax(0, 38fr); gap: 8px; overflow: hidden; }
+.lv-project-body > aside > .lv-caption-task[data-editing="true"] { grid-template-rows: minmax(0, 35fr) minmax(0, 65fr); }
+.lv-project-body > aside > .lv-caption-task[data-selected="false"] { grid-template-rows: minmax(min-content, 1fr) auto; overflow: auto; }
 .lv-caption-task[data-selected="false"] > .lv-caption-reading,
 .lv-caption-task[data-selected="false"] .lv-caption-detail { min-height: auto; overflow: visible; }
 .lv-caption-task[data-selected="false"] .lv-caption-content { flex: 0 0 auto; overflow: visible; }
-.lv-project-body > aside > .lv-caption-task[data-selected="true"]:not([data-editing="true"]):has(> .lv-caption-browser[data-few-rows="true"]) { grid-template-rows: max-content minmax(180px, 1fr); }
+.lv-project-body > aside > .lv-caption-task[data-selected="true"]:not([data-editing="true"]):has(> .lv-caption-browser[data-few-rows="true"]) { grid-template-rows: fit-content(62%) minmax(0, 1fr); }
 .lv-caption-task:not([data-editing="true"]) > .lv-caption-browser[data-few-rows="true"] .lv-caption-list { flex: 0 0 auto; height: auto; }
 .lv-caption-task, .lv-caption-browser, .lv-caption-reading { min-width: 0; }
-.lv-caption-task > .lv-caption-browser { min-height: 0; height: auto; display: flex; flex-direction: column; gap: 4px; overflow: visible; }
-.lv-caption-browser-compact > .lv-caption-search { display: flex; align-items: end; gap: 8px; flex: 0 0 auto; }
+.lv-caption-task > .lv-caption-browser { min-height: 0; height: auto; display: flex; flex-direction: column; gap: 4px; overflow: auto; }
+.lv-caption-toolbar { display: flex; flex: 0 0 auto; align-items: center; gap: 8px; min-width: 0; }
+.lv-caption-toolbar > .lv-pin-add-row { flex: 0 0 auto; }
+.lv-caption-browser-compact .lv-caption-toolbar > .lv-caption-search { flex: 1 1 0; min-width: 0; }
+.lv-caption-toolbar .lv-caption-search > label { font-size: 0; line-height: 0; gap: 0; }
+.lv-caption-toolbar .lv-caption-search input { font-size: 15px; line-height: 1.6; }
+.lv-caption-browser-compact .lv-caption-toolbar .lv-caption-count { margin: 0; }
+.lv-caption-browser-compact .lv-caption-search { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
 .lv-caption-browser-compact .lv-caption-search > label { flex: 1; min-width: 0; }
 .lv-caption-browser-compact .lv-caption-search input { width: 100%; }
 .lv-caption-browser-compact .lv-caption-count { margin: 0 0 10px; white-space: nowrap; font-size: 12px; }
@@ -231,8 +246,15 @@
 .lv-caption-task > .lv-caption-reading { min-height: 0; display: flex; overflow: hidden; border-top: 1px solid #ccc9c1; }
 .lv-caption-reading > .lv-caption-detail { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
 .lv-caption-content { flex: 1 1 0; min-height: 0; overflow: auto; scroll-padding-block: 12px; }
-.lv-caption-content > h2 { margin-block: 8px; font-size: 23px; }
-.lv-caption-content > nav { display: flex; justify-content: space-between; }
+.lv-caption-reading .lv-caption-detail > .lv-caption-content { margin: 0; }
+.lv-caption-content > .lv-caption-heading { display: flex; align-items: start; gap: 8px; margin: 0 0 8px; }
+.lv-caption-heading > h2 { flex: 1; min-width: 0; margin: 0; font-size: 23px; overflow-wrap: anywhere; }
+.lv-caption-heading > nav { display: flex; flex: 0 0 auto; gap: 4px; }
+.lv-project-workspace .lv-caption-heading :is(.lv-caption-previous,.lv-caption-next) { width: 44px; min-width: 44px; padding: 0; font-size: 0; }
+.lv-caption-previous::before { content: '‹'; font-size: 28px; line-height: 1; }
+.lv-caption-next::before { content: '›'; font-size: 28px; line-height: 1; }
+.lv-project-workspace[data-lv-mode="view"] .lv-caption-content > div:has(> .lv-caption-value[data-caption-field="title"]):not(:has(> p:not(:empty))) { display: none; }
+.lv-caption-reading .lv-caption-value[data-caption-field="body"] > span { display: none; }
 .lv-caption-content > :is(div,section,details) { margin-block: 10px; }
 .lv-caption-reading .lv-caption-detail > [data-caption-completion] { position: static; flex: 0 0 auto; margin: 0; padding: 10px 0 0; }
 .lv-caption-reading .lv-caption-detail > [data-caption-completion] + div { flex: 0 0 auto; max-height: 35%; overflow: auto; }
@@ -295,9 +317,14 @@
 .lv-material-numeric > input:not(:focus) { cursor: ew-resize; }
 .lv-caption-add-settings .lv-record-sheet > label {display:flex;align-items:center;gap:10px;}
 .lv-caption-window[data-active="true"] > header {background:var(--lv-selected,#dfe6da);}
+@media (min-width: 600px) and (max-width: 760px) {
+  .lv-sidebar-toolbar { display: flex; flex: 0 0 auto; align-items: start; gap: 8px; }
+  .lv-project-body .lv-sidebar-toolbar > [aria-label="シーン"] { flex: 1 1 0; min-width: 0; max-height: 35dvh; }
+  .lv-sidebar-toolbar > [role="tablist"] { flex: 0 0 auto; }
+}
 @media (max-height: 640px) {
-  .lv-project-body > aside > .lv-caption-task { grid-template-rows: minmax(280px, 1fr) minmax(240px, 1fr); }
-  .lv-project-body > aside > .lv-caption-task[data-editing="true"] { grid-template-rows: minmax(0, 35%) minmax(0, 1fr); }
-  .lv-caption-task[data-editing="true"] > .lv-caption-browser { overflow: auto; }
-  .lv-project-body > aside > .lv-caption-task[data-selected="false"] { grid-template-rows: minmax(280px, 1fr) auto; }
+  .lv-project-body > aside { gap: 4px; padding-block: 8px; }
+  .lv-project-shell .lv-project-body [aria-label="シーン"] { padding-bottom: 0; }
+  .lv-project-body > aside > .lv-caption-task[data-selected="true"]:not([data-editing="true"]) { grid-template-rows: minmax(0, 1fr) minmax(0, 1fr); }
+  .lv-project-body > aside > .lv-caption-task[data-selected="true"]:not([data-editing="true"]):has(> .lv-caption-browser[data-few-rows="true"]) { grid-template-rows: fit-content(50%) minmax(0, 1fr); }
 }

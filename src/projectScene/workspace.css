@@ -286,14 +286,14 @@
   .lv-project-shell[data-layout="workspace"] .lv-project-body { flex: 1; height: auto; min-height: 0; }
   .lv-project-shell[data-layout="workspace"] .lv-project-stage { min-height: 0; min-width: 0; }
   .lv-project-shell[data-layout="workspace"] .lv-project-body > aside { min-height: 0; overscroll-behavior: contain; scroll-padding-top: 64px; }
-  .lv-project-shell[data-layout="workspace"] .lv-project-body > aside > [role="tablist"] { position: sticky; top: -16px; z-index: 3; padding: 4px 0; background: #f7f6f1; }
+  .lv-project-shell[data-layout="workspace"] .lv-project-body .lv-sidebar-toolbar > [role="tablist"] { position: sticky; top: -16px; z-index: 3; padding: 4px 0; background: #f7f6f1; }
 }
 /* Optional app-authored explanations; their layer escapes scrolling panels. */
 .lv-context-help { display: inline-flex; vertical-align: middle; }
 .lv-context-help-trigger { min-width: 44px; min-height: 44px; padding: 0; border: 0; background: transparent; color: #525850; border-radius: 50%; cursor: help; font-size: 16px; }
 .lv-context-help-trigger:hover { background: #00000009; }
 .lv-context-help-trigger:focus-visible { outline: 2px solid #666f5f; outline-offset: -4px; }
-.lv-context-help-note { position: fixed; z-index: 10000; box-sizing: border-box; width: max-content; max-width: min(352px, calc(100vw - 16px)); max-height: calc(100dvh - 16px); overflow: auto; overflow-wrap: anywhere; padding: 12px 14px; border: 1px solid #a6aaa0; border-radius: 6px; background: #fbfaf6; color: #252820; box-shadow: 0 4px 18px #0002; font: 14px/1.6 system-ui, sans-serif; white-space: normal; }
+.lv-context-help-note { position: fixed; z-index: 10000; box-sizing: border-box; width: max-content; max-width: min(352px, calc(100vw - 16px)); max-height: calc(100dvh - 16px); overflow: auto; overflow-wrap: anywhere; padding: 12px 14px; border: 1px solid #a6aaa0; border-radius: 6px; background: #fbfaf6; color: #252820; box-shadow: 0 4px 18px #0002; font: 14px/1.6 system-ui, sans-serif; white-space: normal; pointer-events: none; }
 .lv-context-help-note[hidden] { display: none !important; }
 
 .lv-file-sheet .lv-file-commands { position: sticky; bottom: -16px; z-index: 2; display: flex; flex-wrap: wrap; gap: 8px; padding-block: 12px; background: #fbfaf6; border-top: 1px solid #ddded5; }

@@ -8,15 +8,18 @@ preserve existing changes. Do not reconstruct current work from old checkpoints.
 
 ## Current boundary
 
-PO explicitly approved06c on2026-11-03. The active unit is its bounded restore
-content inspection, starting from85fe474; see current todo for plan/acceptance.
-Only the exact readonly hook joins the staging allowlist. Fixed source39517f6f
-has matched Ki84 elapsed/integrity, edit/file verification, normal-SW cold and
-third-profile restored reedit evidence; source/fault and evidence reviews are clean.
-The final serial checkpoint and supplementary HEIC isolation pass. Delivery/CI/
-preview are recorded after the suitable checkpoint; Git owns its actual identity.
-No general Session/model/media/write batching or payload cache is authorized.
-Preserve private originals/todo and the previous verified preview until delivery.
+The short-PC Caption list/detail repair (PCQ-30) passed the final browser and
+required checkpoint checks. Ki84 small-screen and exact-artifact cold proofs
+pass. Normal Desktop receive continuation (PCQ-31) passed through rejection of a
+different file, full receiver restart, exact-original reselection, receipt and
+return of applied text and photo. Todo owns the results and next bounded
+performance work on the 500k SH4 editing-copy wait.
+
+The preceding PO-approved06c checkpoint is complete and pushed to g0 with actual
+Windows/CI and Ki84 file/cold/independent-resume evidence. Do not repeat approval
+or broaden its readonly staging allowlist. No general Session/model/media/write
+batching or payload cache is authorized. Preserve private originals/todo and
+the immutable verified preview until the new candidate passes final checks.
 
 ## Previous completed restore checkpoint
 

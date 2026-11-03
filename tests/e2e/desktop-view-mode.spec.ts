@@ -1,13 +1,106 @@
 import { revealCameraPositions, revealWorkPanel, revealCoordinateAdd, revealFileSurface, revealProjectSelection, lookAlongFront, revealOfflineUtilities } from './workspaceUi';
-import { test, expect, chromium } from '@playwright/test';
+import { test, expect, chromium, type Locator } from '@playwright/test';
 import { readFile, mkdir, mkdtemp } from 'node:fs/promises';
 import { join } from 'node:path';
 import * as A from '@automerge/automerge';
-import { triangleGlb, smallPng } from './fixtures';
+import { triangleGlb, smallPng, nativeConversionBackup } from './fixtures';
 import { ownedServer } from '../offline-e2e/server';
 import { BackupArchive } from '../../src/projectPackage/backupArchive';
 import { inspectProjectCandidates } from '../../src/domain/projectCandidates';
 import { validationMetadataLimits } from '../../src/projectFiles/validation';
+
+async function readablePrimaryHover(control:Locator){
+  await expect(control).toBeEnabled();await control.hover();
+  const colors=await control.evaluate(node=>{
+    const style=getComputedStyle(node),rgb=(value:string)=>value.match(/[\d.]+/g)!.map(Number),front=rgb(style.color),back=rgb(style.backgroundColor);
+    const luminance=(color:number[])=>color.slice(0,3).map(v=>v/255).map(v=>v<=.04045?v/12.92:((v+.055)/1.055)**2.4).reduce((sum,v,i)=>sum+v*[.2126,.7152,.0722][i]!,0);
+    const a=luminance(front),b=luminance(back);return{foregroundAlpha:front[3]??1,backgroundAlpha:back[3]??1,contrast:(Math.max(a,b)+.05)/(Math.min(a,b)+.05)};
+  });
+  expect(colors.foregroundAlpha).toBe(1);expect(colors.backgroundAlpha).toBe(1);expect(colors.contrast).toBeGreaterThanOrEqual(4.5);
+}
+
+test('short Caption workspace keeps dense and filtered lists, Scene choices and draft completion reachable', async ({}, info) => {
+  const server = await ownedServer('offline-desktop-dist'), browser = await chromium.launch({ channel: 'chromium', headless: true });
+  const context = await browser.newContext({ viewport: { width: 1280, height: 720 }, serviceWorkers: 'block' }), p = await context.newPage();
+  const errors: string[] = [], remote: string[] = [];
+  p.on('pageerror', error => errors.push(error.message));
+  await context.route('**/*', route => { const url = new URL(route.request().url()); if (url.origin === new URL(server.url).origin || ['blob:', 'data:'].includes(url.protocol)) return route.continue(); remote.push(url.href); return route.abort(); });
+  const input = await nativeConversionBackup(triangleGlb(), smallPng(), 36, false, { bodies: new Map(), update(snapshot) {
+    snapshot.project.title = '小さな画面の記録';
+    snapshot.displaySets[0].name = '観察する部品と写真を切り替える長いシーン';
+    snapshot.displaySets[1].name = '資料全体と記録の位置を確認するシーン';
+    for (const n of [3, 4]) snapshot.displaySets.push({ id: `set_${String(n).padStart(26, '0')}`, name: `追加${n}：長い日本語のシーンを選択して確認する`, orderKey: `B${n}`, defaultSavedViewId: null });
+    for (const n of [2, 3, 4]) snapshot.captions[n].title = `絞込三件 ${n}：現地の長い記録名`;
+  } });
+  const scenes = p.getByRole('region', { name: 'シーン', exact: true }), strip = scenes.locator(':scope > div');
+  const task = p.locator('.lv-caption-task'), list = p.getByRole('list', { name: 'キャプション一覧', exact: true });
+  const detail = p.getByRole('region', { name: 'キャプションの詳細', exact: true }), search = p.locator('.lv-caption-search').getByRole('searchbox', { name: '検索', exact: true });
+  const split = () => Promise.all([task.locator(':scope > .lv-caption-browser').boundingBox(), task.locator(':scope > .lv-caption-reading').boundingBox()]);
+  const layout = async (name: string, dense = false) => {
+    const data = await task.evaluate(root => {
+      const rect = (n: Element) => { const r = n.getBoundingClientRect(); return { top: r.top, bottom: r.bottom, height: r.height }; };
+      const browser = root.querySelector('.lv-caption-browser')!, reading = root.querySelector('.lv-caption-reading')!, list = root.querySelector('.lv-caption-list')!;
+      return { task: rect(root), browser: rect(browser), detail: rect(reading), list: rect(list), client: root.clientHeight, scroll: root.scrollHeight, bodyScroll: document.documentElement.scrollWidth, viewport: innerWidth };
+    });
+    await info.attach(name, { body: JSON.stringify(data), contentType: 'application/json' });
+    expect(data.browser.top).toBeGreaterThanOrEqual(data.task.top - 1); expect(data.detail.bottom).toBeLessThanOrEqual(data.task.bottom + 1);
+    expect(data.browser.height).toBeGreaterThan(0); expect(data.detail.height).toBeGreaterThan(0); expect(data.scroll).toBeLessThanOrEqual(data.client + 1); expect(data.bodyScroll).toBeLessThanOrEqual(data.viewport);
+    if (dense) expect(data.list.height).toBeGreaterThanOrEqual(3 * 44);
+  };
+  try {
+    await p.goto(server.url); await p.getByLabel('ファイルを選択', { exact: true }).setInputFiles({ name: '四つのシーン.zip', mimeType: 'application/zip', buffer: input });
+    await p.getByRole('button', { name: 'ファイルを開く', exact: true }).click(); await p.getByRole('button', { name: '新しいプロジェクトに変換', exact: true }).click();
+    await expect(p.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText('小さな画面の記録', { timeout: 90_000 });
+    await expect(p.getByLabel('3Dモデルの表示', { exact: true })).toHaveAttribute('aria-busy', 'false');
+    await expect(strip.locator('button')).toHaveCount(4); await list.locator('.lv-caption-select').filter({ hasText: '既存のピン' }).click();
+    const selected = strip.locator('button[aria-pressed="true"]');
+    await expect.poll(() => selected.evaluate(node => { const r = node.getBoundingClientRect(), parent = node.parentElement!.getBoundingClientRect(); return r.left >= parent.left - 1 && r.left < parent.right - 44; })).toBe(true);
+    await layout('dense-short', true); await p.screenshot({ path: info.outputPath('dense-short.png') });
+    const header = p.locator('main.lv-project-workspace > header');
+    await header.getByRole('button', { name: '閲覧する', exact: true }).click(); await expect(header.getByRole('button', { name: '編集する', exact: true })).toBeEnabled();
+    await readablePrimaryHover(header.getByRole('button',{name:'編集する',exact:true}));
+    await p.setViewportSize({ width: 720, height: 500 }); await revealWorkPanel(p); await layout('reading-200percent');
+    await expect(detail.getByRole('heading', { name: '既存のピン', exact: true })).toBeInViewport({ ratio: 1 });
+    await expect(detail.locator('[data-caption-field="body"] p')).toBeInViewport({ ratio: 1 });
+    await expect(list.locator('.lv-caption-select').first()).toBeInViewport({ ratio: 1 });
+    for (const name of ['前の記録', '次の記録']) expect((await detail.getByRole('button', { name, exact: true }).boundingBox())!.width).toBeGreaterThanOrEqual(44);
+    await p.screenshot({ path: info.outputPath('reading-200percent.png') });
+    await p.setViewportSize({ width: 1280, height: 720 }); await header.getByRole('button', { name: '編集する', exact: true }).click(); await expect(header.getByRole('button', { name: '閲覧する', exact: true })).toBeEnabled();
+    const beforeFocus = await split(); await search.focus(); expect(await split()).toEqual(beforeFocus); await expect(task).toHaveAttribute('data-editing', 'false');
+    await list.hover(); await p.mouse.wheel(0, 500); await expect.poll(() => list.evaluate(node => node.scrollTop)).toBeGreaterThan(0);
+    const manualTop = await list.evaluate(node => node.scrollTop); await search.focus(); expect(await list.evaluate(node => node.scrollTop)).toBe(manualTop);
+    const stripMotion = strip.evaluate(node => new Promise<number>(resolve => node.addEventListener('scrollend', () => resolve(node.scrollLeft), { once: true })));
+    await strip.hover(); await p.mouse.wheel(180, 0); const manualSceneLeft = await stripMotion; expect(manualSceneLeft).toBeGreaterThan(0);
+    await search.fill('絞込三件'); expect(await strip.evaluate(node => node.scrollLeft)).toBe(manualSceneLeft);
+    for (const [query, count] of [['絞込三件', 3], ['既存のピン', 1], ['該当しない長い日本語の検索文字列', 0]] as const) {
+      await search.fill(query); await expect(list.locator('.lv-caption-select')).toHaveCount(count); await layout(`filtered-${count}`);
+      await expect(detail.getByLabel('本文', { exact: true })).toHaveValue('本文を保持');
+    }
+    await search.fill('既存のピン'); await list.locator('.lv-caption-select').click();
+    const body = detail.getByLabel('本文', { exact: true }), beforeBodyFocus = await split(); await body.focus(); expect(await split()).toEqual(beforeBodyFocus); await expect(task).toHaveAttribute('data-editing', 'false');
+    await body.fill('小画面で保持する入力'); await expect(task).toHaveAttribute('data-editing', 'true');
+    await p.setViewportSize({ width: 720, height: 500 }); await revealWorkPanel(p); await body.focus();
+    await body.dispatchEvent('compositionstart', { data: '入力中' }); await p.setViewportSize({ width: 1280, height: 600 });
+    await expect(body).toBeFocused(); await expect(body).toHaveValue('小画面で保持する入力'); await body.dispatchEvent('compositionend', { data: '入力中' });
+    for (const size of [{ width: 1280, height: 600 }, { width: 720, height: 500 }]) {
+      await p.setViewportSize(size); await revealWorkPanel(p); await layout(`edit-${size.width}`);
+      for (const name of ['変更を適用', '取り消す']) await expect(detail.locator('[data-caption-completion]').getByRole('button', { name, exact: true })).toBeInViewport({ ratio: 1 });
+      expect(await detail.locator('[data-caption-completion] > button').evaluateAll(nodes => nodes.every(node => { const r = node.getBoundingClientRect(), hit = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2); return r.width >= 44 && r.height >= 44 && (hit === node || node.contains(hit)); }))).toBe(true);
+    }
+    await detail.getByRole('button', { name: '取り消す', exact: true }).click(); await detail.getByRole('button', { name: '変更を取り消す', exact: true }).click(); await expect(body).toHaveValue('本文を保持');
+    await p.setViewportSize({ width: 1280, height: 720 }); await search.fill(''); await layout('return-dense', true);
+    const otherName = await strip.locator('button[aria-pressed="false"]').first().innerText(), other = strip.getByRole('button', { name: otherName, exact: true });
+    await other.focus(); await p.keyboard.press('Enter'); await expect(other).toHaveAttribute('aria-pressed', 'true');
+    await p.setViewportSize({ width: 720, height: 500 }); await revealWorkPanel(p); await expect(task).toHaveAttribute('data-selected', 'false');
+    await expect(search).toBeInViewport({ ratio: 1 }); await expect(p.getByRole('button', { name: 'キャプションを追加', exact: true })).toBeInViewport({ ratio: 1 });
+    await p.setViewportSize({ width: 1280, height: 720 });
+    await strip.getByRole('button', { name: '観察する部品と写真を切り替える長いシーン', exact: true }).focus(); await p.keyboard.press('Enter');
+    await expect(list.locator('.lv-caption-select').filter({ hasText: '既存のピン' })).toBeVisible();
+    await scenes.getByText('シーンを管理', { exact: true }).click(); await expect(scenes.getByRole('button', { name: 'シーンを作る', exact: true })).toBeInViewport();
+    await scenes.getByText('シーンを管理', { exact: true }).click(); await p.screenshot({ path: info.outputPath('returned-short.png') });
+    expect(errors).toEqual([]); expect(remote).toEqual([]);
+  } finally { await context.close(); await browser.close(); await server.stop(); }
+});
 
 test('view mode hides editing while preserving reading, local display, existing downloads and return to saved editing', async ({}, info) => {
   test.setTimeout(180_000); A.getHeads(A.init());
@@ -25,6 +118,7 @@ test('view mode hides editing while preserving reading, local display, existing 
     if (!await menu.evaluate(n => (n as HTMLDetailsElement).open)) await menu.locator(':scope > summary').click();
     expect(await p.locator('.lv-project-stage').boundingBox()).toEqual(stageBefore);
     if(!await revealFileSurface(p,'保存')) await files.getByRole('button', { name: '保存', exact: true }).click();
+    await readablePrimaryHover(files.locator('button.lv-file-primary'));
     const [download] = await Promise.all([p.waitForEvent('download'), files.locator('button.lv-file-primary').click()]);
     const path = info.outputPath(name + '.zip'); await download.saveAs(path); expect(await download.failure()).toBeNull();
     await expect(files.locator('.lv-operation-status')).toHaveAttribute('data-busy', 'false');

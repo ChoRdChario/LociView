@@ -77,7 +77,7 @@ test('PC task navigation retains model, View and material drafts through keyboar
     await material.getByLabel('不透明度（%）', { exact: true }).focus();
     for (const key of ['', 'Tab']) {
       if (key) await page.keyboard.press(key);
-      const bounds = await material.evaluate(panel => { const focused = document.activeElement!, active = focused.getBoundingClientRect(), strip = document.querySelector('.lv-project-body > aside > [role="tablist"]')!.getBoundingClientRect(); return { inside: panel.contains(focused), top: active.top, bottom: active.bottom, stripBottom: strip.bottom, paneBottom: panel.closest('aside')!.getBoundingClientRect().bottom }; });
+      const bounds = await material.evaluate(panel => { const focused = document.activeElement!, active = focused.getBoundingClientRect(), strip = document.querySelector('.lv-project-body .lv-sidebar-toolbar > [role="tablist"]')!.getBoundingClientRect(); return { inside: panel.contains(focused), top: active.top, bottom: active.bottom, stripBottom: strip.bottom, paneBottom: panel.closest('aside')!.getBoundingClientRect().bottom }; });
       expect(bounds.inside).toBe(true); expect(bounds.top).toBeGreaterThanOrEqual(bounds.stripBottom); expect(bounds.bottom).toBeLessThanOrEqual(bounds.paneBottom);
     }
     await scrollTask(page);

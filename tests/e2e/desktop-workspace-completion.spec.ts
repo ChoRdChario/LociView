@@ -61,8 +61,12 @@ test('content-first workspace keeps editing, pin completion and file exits coher
     await material.getByLabel('モデル', { exact: true }).selectOption({ label: '建物.glb' }); const surface = material.getByLabel('マテリアル', { exact: true });
     const slot = await surface.locator('option').evaluateAll(ns => ns.map(n => (n as HTMLOptionElement).value).find(Boolean)); await surface.selectOption(slot!);
     await beginMaterialEditing(material); await material.getByLabel('不透明度（%）', { exact: true }).fill('70'); await material.getByRole('button', { name: '変更を適用', exact: true }).click(); await ready('材質の設定を適用しました。');
-    const notice = p.getByRole('region', { name: '3D表示の操作', exact: true }); await expect(notice).toBeVisible();
-    await expect.poll(async () => (await comparison.getByRole('button', { name: '閉じる', exact: true }).boundingBox())!.y - ((await notice.boundingBox())!.y + (await notice.boundingBox())!.height)).toBeGreaterThanOrEqual(0);
+    const notice = p.getByRole('region', { name: '3D表示の操作', exact: true });
+    await expect(notice.getByText('透過表示（近似）', { exact: true })).toBeVisible();
+    const closeCaption = comparison.getByRole('button', { name: '閉じる', exact: true });
+    await expect(closeCaption).toBeInViewport({ ratio: 1 });
+    expect((await closeCaption.boundingBox())!.width).toBeGreaterThanOrEqual(44);
+    await closeCaption.click({ trial: true });
     await revealWorkPanel(p); await tab('モデル').click();const modelTask=p.getByRole('tabpanel',{name:'モデル',exact:true});await modelTask.locator('.lv-model-select').filter({hasText:'建物.glb'}).click();
     await expect(modelTask.getByLabel('モデル位置 X',{exact:true})).toBeHidden();await modelTask.getByRole('button',{name:'配置を調整',exact:true}).click();
     const modes=modelTask.getByRole('group',{name:'配置の操作',exact:true});await expect(modes.getByRole('button',{name:'移動',exact:true})).toHaveAttribute('aria-pressed','true');

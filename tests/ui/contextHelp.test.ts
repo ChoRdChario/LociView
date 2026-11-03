@@ -43,6 +43,38 @@ function setup() {
   return { document, root, input, help, trigger: help.children[0]!, note: help.children[1]!, stop };
 }
 describe('optional contextual explanations', () => {
+  it('retains pointer-transparent text by geometry and lets an underlying action dismiss it without consuming the action',()=>{
+    const h=setup();h.document.activeElement=h.trigger;h.document.event('focusin',h.trigger);
+    expect(h.note.style.pointerEvents).toBe('none');
+    h.document.activeElement=h.document.body;h.document.event('focusout',h.trigger);
+    h.document.event('pointermove',h.root,{pointerType:'mouse',clientX:30,clientY:30});
+    vi.advanceTimersByTime(1000);expect(h.note.hidden).toBe(false);
+    const down=h.document.event('pointerdown',h.root,{pointerType:'mouse',clientX:30,clientY:30});
+    expect(h.note.hidden).toBe(true);expect(down.preventDefault).not.toHaveBeenCalled();expect(down.stopPropagation).not.toHaveBeenCalled();h.stop();
+  });
+  it('reads overflowing text with ordinary wheel and help-button keys without taking zoom or input keys',()=>{
+    const h=setup(),note=Object.assign(h.note,{scrollHeight:400,clientHeight:40,scrollWidth:100,clientWidth:100,scrollLeft:0});
+    h.document.activeElement=h.trigger;h.document.event('focusin',h.trigger);
+    for(const modifier of ['ctrlKey','metaKey','altKey','shiftKey']){
+      const event=h.document.event('wheel',h.root,{clientX:30,clientY:30,deltaX:0,deltaY:80,deltaMode:0,[modifier]:true});
+      expect(event.preventDefault).not.toHaveBeenCalled();expect(note.scrollTop).toBe(0);
+    }
+    const outside=h.document.event('wheel',h.root,{clientX:200,clientY:200,deltaX:0,deltaY:80,deltaMode:0});expect(outside.preventDefault).not.toHaveBeenCalled();
+    const wheel=h.document.event('wheel',h.root,{clientX:30,clientY:30,deltaX:0,deltaY:80,deltaMode:0});
+    expect(note.scrollTop).toBe(80);expect(wheel.preventDefault).toHaveBeenCalledOnce();expect(wheel.stopPropagation).toHaveBeenCalledOnce();
+    const page=h.document.event('keydown',h.trigger,{key:'PageDown'});expect(note.scrollTop).toBeGreaterThan(80);expect(page.preventDefault).toHaveBeenCalledOnce();
+    h.document.event('keydown',h.trigger,{key:'End'});expect(note.scrollTop).toBe(360);
+    h.document.activeElement=h.input;const input=h.document.event('keydown',h.input,{key:'Home'});expect(input.preventDefault).not.toHaveBeenCalled();expect(note.scrollTop).toBe(360);expect(h.input.value).toBe('入力を保持');h.stop();
+  });
+  it('cancels stale mouse hover on touch down and restores pass-through before the next mouse action',()=>{
+    const h=setup(),second=record(contextHelp(h.document.asDocument(),'別の説明')),trigger=second.children[0]!,note=second.children[1]!;h.root.append(second);
+    h.document.event('pointerover',h.trigger,{pointerType:'mouse'});vi.advanceTimersByTime(1000);
+    h.document.event('pointerdown',trigger,{pointerType:'touch'});vi.advanceTimersByTime(3000);expect(h.note.hidden).toBe(true);expect(note.hidden).toBe(true);
+    h.document.activeElement=trigger;h.document.event('focusin',trigger);h.document.event('click',trigger,{detail:1});expect(note.hidden).toBe(false);expect(note.style.pointerEvents).toBe('auto');
+    h.document.event('pointerover',note,{pointerType:'mouse',clientX:30,clientY:30,movementX:0,movementY:0});expect(note.style.pointerEvents).toBe('auto');
+    h.document.event('pointermove',h.root,{pointerType:'mouse',clientX:30,clientY:30});expect(note.style.pointerEvents).toBe('none');expect(note.hidden).toBe(false);
+    const down=h.document.event('pointerdown',h.root,{pointerType:'mouse',clientX:30,clientY:30});expect(note.hidden).toBe(true);expect(down.preventDefault).not.toHaveBeenCalled();h.stop();
+  });
   it('keeps camera-scoped help on the stage side after moving its note to document.body', () => {
     const document = new HelpDocument(); document.defaultView.innerWidth = 1440; document.defaultView.innerHeight = 1000;
     const root = document.createElement('section'), anchor = document.createElement('button');

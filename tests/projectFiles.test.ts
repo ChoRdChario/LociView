@@ -5783,10 +5783,14 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     h.holdFrame(false); expect(line.hidden).toBe(true); button('表示', editor).fire('click'); expect(line.hidden).toBe(false);
     h.pinPoint({ x: Number.NaN, y: 300 }); expect(line.hidden).toBe(true); h.pinPoint({ x: 500, y: 300 }); expect(line.hidden).toBe(false);
     h.setIssue('描画の再開が必要です。'); named('検索', editor).fire('input'); expect(line.hidden).toBe(true);
-    const retry=button('3D表示を再試行', editor),canvas=named('3Dモデルの表示', editor);
-    const stage=all(editor).find(n=>n.className==='lv-project-stage')!;
-    expect(windows.contains(retry)).toBe(false);expect(canvas.contains(retry)).toBe(false);expect(stage.contains(retry)).toBe(true);
-    expect(canvas.parent!.contains(retry)).toBe(false);expect(canvas.parent!.contains(windows)).toBe(true);
+    const retry = button('3D表示を再試行', editor), canvas = named('3Dモデルの表示', editor);
+    const stage = all(editor).find(n => n.className === 'lv-project-stage')!;
+    const overlay = all(stage).find(n => n.className === 'lv-stage-overlay')!;
+    expect(overlay.parent).toBe(canvas.parent);
+    expect(overlay.contains(retry)).toBe(true);
+    expect(windows.contains(retry)).toBe(false);
+    expect(canvas.contains(retry)).toBe(false);
+    expect(windows.parent).toBe(canvas.parent);
     button('3D表示を再試行', editor).fire('click'); expect(h.retryViewport).toHaveBeenCalledTimes(1); expect(all(windows)).toContain(card);
     await h.ui.dispose();
   });

@@ -120,6 +120,17 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   const panels = new Map<ProjectTask, ProjectPanel>(); let task: ProjectTask = 'captions', models: ProjectModelPanel | undefined, mediaManager: ReturnType<typeof createProjectMedia> | undefined;
   let pinScale: ReturnType<typeof createProjectPinScale> | undefined;
   const sceneArea = make('section'), scenes = make('div'), sceneButtons = new Map<string, HTMLButtonElement>(); sceneArea.setAttribute('aria-label', 'シーン'); sceneArea.append(make('h2', 'シーン'), scenes);
+  let sceneStripState: { width: number; sceneId: string; shape: string } | undefined;
+  function revealSceneChoice(shape: string) {
+    if (disposed || !scenes.clientWidth) return;
+    const choice = sceneButtons.get(sceneId); if (!choice) return;
+    const width = scenes.clientWidth;
+    if (sceneStripState?.width === width && sceneStripState.sceneId === sceneId && sceneStripState.shape === shape) return;
+    sceneStripState = { width, sceneId, shape };
+    const strip = scenes.getBoundingClientRect(), item = choice.getBoundingClientRect();
+    const left = item.left - strip.left - 2, right = item.right - strip.right + 2;
+    if (left < 0 || right > 0) scenes.scrollLeft += item.width > width || left < 0 ? left : right;
+  }
   const sceneForm = make('form'), sceneLabel = make('label', 'シーン名'), sceneName = make('input');
   sceneForm.setAttribute('aria-label', 'シーンの変更');
   sceneName.setAttribute('aria-label', 'シーン名'); sceneLabel.append(sceneName);
@@ -359,6 +370,8 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     memories.set(sceneId, plan.memory); resetDraft();if(organizeCaptions.open)alignOrganization(); openWindow(plan.memory.selectedCaptionId!); render(); list.revealSelected();
   }
   const previousCaption = button('前の記録', () => stepCaption('previous')), nextCaption = button('次の記録', () => stepCaption('next'));
+  previousCaption.className = 'lv-caption-previous'; nextCaption.className = 'lv-caption-next';
+  previousCaption.setAttribute('aria-label', '前の記録'); nextCaption.setAttribute('aria-label', '次の記録');
   captionNavigation.append(captionBack, previousCaption, nextCaption);
   const includeContext = (): CaptionIncludeContext => ({ source: projectCaptionInventory(provider(), sceneId, models?.hidden()), memory: includeMemory(),
     pending: dirty() ? 'text' : null, mutationBlock: mutationBlock(), feedback: { kind: busy ? 'applying' : 'idle' } });
@@ -399,7 +412,9 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   }
   organizeCaptions.addEventListener('click',event=>{if((event.target as Element)?.closest?.('summary')&&!organizeCaptions.open){alignOrganization();render();}});
   const recordTools=make('div');recordTools.className='lv-record-tools';recordTools.setAttribute('aria-label','選択した記録の操作');recordTools.append(movePin,parent);
-  list.tools.append(recordTools);list.root.insertBefore(pinArea,list.root.children[0]??null);addPin.className='lv-caption-add';addPin.setAttribute('aria-label','キャプションを追加');editOnly(movePin,parent);
+  const captionToolbar=make('div');captionToolbar.className='lv-caption-toolbar';
+  captionToolbar.append(pinArea,list.root.children[0]!);list.root.insertBefore(captionToolbar,list.root.children[0]??null);
+  list.tools.append(recordTools);addPin.className='lv-caption-add';addPin.setAttribute('aria-label','キャプションを追加');editOnly(movePin,parent);
   captionPanel.className='lv-caption-task';
   const recordSheets=new Map<HTMLDetailsElement,HTMLElement>();
   function registerRecordSheet(disclosure: HTMLDetailsElement, existing?: HTMLElement) {
@@ -426,11 +441,14 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   document.addEventListener?.('pointerdown',closeRecordSheets,true);
   document.addEventListener?.('focusin',closeRecordSheets);
   const captionContent=make('div');captionContent.className='lv-caption-content';
-  detail.mediaSlot.append(media);captionContent.append(captionNavigation,detailHeading);
+  const captionHeading=make('div');captionHeading.className='lv-caption-heading';captionHeading.append(detailHeading,captionNavigation);
+  detail.mediaSlot.append(media);captionContent.append(captionHeading);
   for(const child of Array.from(detail.root.children))if(child!==detail.actions&&child!==detail.confirmation)captionContent.append(child);
   captionContent.append(conflicts);detail.root.append(captionContent,detail.actions,detail.confirmation);detailPane.append(detail.root);
-  captionPanel.append(list.root,openDetail,detailPane);sidebar.append(sceneArea,sceneContext,taskTabs,retainedEdit,captionPanel);
-  stageDisplay.append(pinTask); stage.append(viewportTools, stageDisplay); body.append(stage, sidebar); root.append(header, compactNavigation, body, mediaViewer.root);
+  const sidebarToolbar=make('div');sidebarToolbar.className='lv-sidebar-toolbar';sidebarToolbar.append(sceneArea,taskTabs);
+  captionPanel.append(list.root,openDetail,detailPane);sidebar.append(sidebarToolbar,sceneContext,retainedEdit,captionPanel);
+  const stageOverlay=make('div');stageOverlay.className='lv-stage-overlay';stageOverlay.append(viewportTools,pinTask);
+  stageDisplay.append(stageOverlay); stage.append(stageDisplay); body.append(stage, sidebar); root.append(header, compactNavigation, body, mediaViewer.root);
   let feedbackTimer: number | undefined, passiveFeedback: string | null = null;
   let mounted = false, observationFrame:number|null=null, observationEpoch=0;
   let installedViewportInput: WorkspaceViewportState | undefined;
@@ -916,6 +934,8 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       }
       for(const [key,choice]of sceneButtons)if(!activeScenes.has(key)){choice.remove();sceneButtons.delete(key);}
       if(focusedScene){const choice=sceneButtons.get(focusedScene);if(choice&&document.activeElement!==choice)choice.focus({preventScroll:true});}
+      const sceneStripShape = JSON.stringify([...activeScenes].map(key => [key, sceneButtons.get(key)!.textContent]));
+      queueMicrotask(() => revealSceneChoice(sceneStripShape));
       if (!draft) draft = beginCaptionDraft(detailContext().source);
       list.render(listContext()); inclusion.render(includeContext()); detail.render({ ...detailContext(),
         editorFields: memory().selectedCaptionId ? ports.captionEditors?.(memory().selectedCaptionId!) : undefined,

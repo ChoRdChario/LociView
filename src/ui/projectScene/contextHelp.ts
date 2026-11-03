@@ -40,6 +40,7 @@ export function mountContextHelp(document: Document, root: HTMLElement): () => v
   const scopes = new Map<HTMLElement, number>();
   let active: Source | null = null, pending: Source | null = null, hovered: HTMLElement | null = null;
   let explicitActivation=false;
+  let touchInteraction=false;
   let pointerPosition:{x:number;y:number}|null=null;
   let delay: number | undefined, leaving: number | undefined, pointerFocus = '', disposed = false;
   const element = (target: EventTarget | null) => target && typeof (target as Element).closest === 'function' ? target as HTMLElement : null;
@@ -63,6 +64,25 @@ export function mountContextHelp(document: Document, root: HTMLElement): () => v
   };
   const cancelDelay = () => { if (delay !== undefined) browser.clearTimeout(delay); delay = undefined; pending = null; };
   const cancelLeave = () => { if (leaving !== undefined) browser.clearTimeout(leaving); leaving = undefined; };
+  const interaction = (touch: boolean) => {
+    if(touchInteraction===touch)return;
+    touchInteraction=touch;if(active)active.note.style.pointerEvents=touch?'auto':'none';
+  };
+  const overNote = (event: Event) => {
+    if(!active)return false;
+    const {clientX:x,clientY:y}=event as MouseEvent,rect=active.note.getBoundingClientRect();
+    return Number.isFinite(x)&&Number.isFinite(y)&&rect.width>0&&rect.height>0&&x>=rect.left&&x<rect.right&&y>=rect.top&&y<rect.bottom;
+  };
+  const retainNotePointer = (event: Event) => {
+    if(!active||!overNote(event))return false;
+    hovered=active.note;cancelLeave();return true;
+  };
+  const scrollNote = (dx: number,dy: number) => {
+    if(!active)return;
+    const note=active.note;
+    note.scrollTop=Math.max(0,Math.min(Math.max(0,note.scrollHeight-note.clientHeight),note.scrollTop+dy));
+    note.scrollLeft=Math.max(0,Math.min(Math.max(0,note.scrollWidth-note.clientWidth),note.scrollLeft+dx));
+  };
   const hide = () => {
     cancelDelay(); cancelLeave();
     const shown = active; active = null;explicitActivation=false;
@@ -86,15 +106,20 @@ export function mountContextHelp(document: Document, root: HTMLElement): () => v
   };
   const show = (next: Source,explicit=false) => {
     if (disposed || !available(next.anchor)) return;
-    if (active?.note === next.note) { cancelDelay(); cancelLeave(); active = next;explicitActivation ||= explicit; position(next); return; }
-    hide(); active = next;explicitActivation=explicit; next.note.hidden = false; document.body.append(next.note); position(next);
+    if (active?.note === next.note) { cancelDelay(); cancelLeave(); active = next;explicitActivation ||= explicit; next.note.style.pointerEvents=touchInteraction?'auto':'none';position(next); return; }
+    hide(); active = next;explicitActivation=explicit; next.note.hidden = false;next.note.style.pointerEvents=touchInteraction?'auto':'none'; document.body.append(next.note); position(next);
   };
   const retained = () => !!active && (source(document.activeElement)?.note === active.note ||
     !!hovered && (source(hovered)?.note === active.note || active.note.contains(hovered)));
   const leave = () => { cancelDelay(); cancelLeave(); leaving = browser.setTimeout(() => { leaving = undefined; if (!retained()) hide(); }, 140); };
   const over = (event: Event) => {
     if ((event as PointerEvent).pointerType === 'touch') return;
+    // Showing a touch note can synthesize stationary mouse boundary events.
+    // A real move/down/key changes modality; layout alone must not disable touch reading.
+    if(touchInteraction)return;
+    interaction(false);
     pointerPosition={x:(event as PointerEvent).clientX,y:(event as PointerEvent).clientY};
+    if(retainNotePointer(event))return;
     const target = element(event.target);
     if (target && active?.note.contains(target)) { hovered = target; cancelLeave(); return; }
     const resolved = pointer(event), next = source(resolved.target); if (!next) return;
@@ -107,13 +132,19 @@ export function mountContextHelp(document: Document, root: HTMLElement): () => v
   };
   const move = (event: Event) => {
     if ((event as PointerEvent).pointerType === 'touch') return;
+    const wasTouch=touchInteraction;
+    interaction(false);
     pointerPosition={x:(event as PointerEvent).clientX,y:(event as PointerEvent).clientY};
-    const resolved = pointer(event); if (!resolved.root) return;
+    if(retainNotePointer(event))return;
+    if(active&&hovered===active.note){hovered=null;leave();}
+    const resolved = pointer(event); if (!resolved.root) {if(wasTouch)over(event);return;}
     const next = source(resolved.target);
     if (next?.anchor === hovered) return;
     if (next) over(event); else { hovered = null; leave(); }
   };
   const out = (event: Event) => {
+    if(touchInteraction&&(event as PointerEvent).pointerType!=='touch')return;
+    if((event as PointerEvent).pointerType!=='touch'&&retainNotePointer(event))return;
     const target = element(event.target), related = element((event as PointerEvent).relatedTarget);
     if (!target) return;
     const resolved = pointer(event);
@@ -132,7 +163,8 @@ export function mountContextHelp(document: Document, root: HTMLElement): () => v
     leave();
   };
   const down = (event: Event) => {
-    if((event as PointerEvent).pointerType==='touch')pointerPosition=null;
+    const touch=(event as PointerEvent).pointerType==='touch';interaction(touch);
+    if(touch){pointerPosition=null;hovered=null;cancelDelay();cancelLeave();}
     const next = source(pointer(event).target); pointerFocus = next?.note.id ?? '';
     if (!next && !active?.note.contains(element(event.target))) hide();
   };
@@ -152,10 +184,24 @@ export function mountContextHelp(document: Document, root: HTMLElement): () => v
   };
   const key = (event: Event) => {
     if((event as KeyboardEvent).isComposing||event.defaultPrevented)return;
+    interaction(false);
+    const keyboard=event as KeyboardEvent,note=active?.note,focused=element(document.activeElement);
+    if(note&&focused&&focused.closest('.lv-context-help-trigger')===focused&&note.scrollHeight>note.clientHeight&&
+      !keyboard.ctrlKey&&!keyboard.metaKey&&!keyboard.altKey&&!keyboard.shiftKey){
+      const amount=keyboard.key==='PageDown'?note.clientHeight*.9:keyboard.key==='PageUp'?-note.clientHeight*.9:
+        keyboard.key==='ArrowDown'?16:keyboard.key==='ArrowUp'?-16:keyboard.key==='Home'?-note.scrollHeight:keyboard.key==='End'?note.scrollHeight:null;
+      if(amount!==null){scrollNote(0,amount);event.preventDefault();event.stopPropagation();return;}
+    }
     if ((event as KeyboardEvent).key === 'Tab') {pointerFocus = '';pointerPosition=null;}
     if ((event as KeyboardEvent).key !== 'Escape' || !active && !pending) return;
     const visible = !!active; hide();
     if (visible) { event.preventDefault(); event.stopPropagation(); }
+  };
+  const wheel = (event: WheelEvent) => {
+    if(!active||event.ctrlKey||event.metaKey||event.altKey||event.shiftKey||!overNote(event))return;
+    const note=active.note;if(note.scrollHeight<=note.clientHeight&&note.scrollWidth<=note.clientWidth)return;
+    const factor=event.deltaMode===1?16:event.deltaMode===2?note.clientHeight:1;
+    scrollNote(event.deltaX*factor,event.deltaY*factor);event.preventDefault();event.stopPropagation();
   };
   const scroll = (event: Event) => {
     if(active?.note.contains(element(event.target)))return;
@@ -175,6 +221,7 @@ export function mountContextHelp(document: Document, root: HTMLElement): () => v
   const listeners: [string, EventListener][] = [['pointerover', over], ['pointermove', move], ['pointerout', out], ['pointerdown', down],
     ['pointercancel', pointerCancel], ['focusin', focus], ['focusout', blur], ['click', click], ['keydown', key], ['scroll', scroll]];
   for (const [name, handler] of listeners) document.addEventListener(name, handler, true);
+  document.addEventListener('wheel',wheel,{capture:true,passive:false});
   browser.addEventListener('resize', resize);
   const observer = new MutationObserver(() => {
     if (active && !available(active.anchor)) hide();
@@ -191,6 +238,7 @@ export function mountContextHelp(document: Document, root: HTMLElement): () => v
       if (scopes.size) return;
       disposed = true; hide(); observer.disconnect();
       for (const [name, handler] of listeners) document.removeEventListener(name, handler, true);
+      document.removeEventListener('wheel',wheel,true);
       browser.removeEventListener('resize', resize); managers.delete(document);
     };
   } };

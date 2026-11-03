@@ -57,7 +57,197 @@ unchanged-feature-classification checks pass; independent review has no findings
 No runtime change or new capacity guarantee; no runtime suite is needed for this
 documentation checkpoint.
 
-## Current boundary —06c bounded restore content inspection
+## Current boundary —short-PC Caption UX after verified06c
+
+The approved06c restore workflow is complete in the bounded PC candidate and
+pushed to g0. Its Windows checkpoint, real Ki84 file/cold/independent-resume
+evidence, independent reviews, exact preview and actual Linux CI all pass; see
+the completed boundary below. This does not pass aggregate device/adoption/release
+gates or finish the whole app. Preserve originals, histories and private evidence.
+
+PO2026-11-03 authorizes this connected unit and self-evident follow-on repairs:
+fix PCQ-30 so the
+Caption list/detail remain useful at1280×720 and smaller available heights with
+four Scenes/long Japanese names. Review existing Scene chrome and height allocation
+first; use existing controls and typed commands, retain selection/search/manual
+scroll/drafts/IME/focus/apply/cancel and viewing-mode behavior. Avoid adding a
+separate screen or user setting. Reuse focused UI tests and a representative
+current-artifact Ki84 visual/keyboard flow, including narrow/200%-equivalent states;
+run final required checks once at the resulting connected boundary. Stop only for
+a real new policy/contract conflict or safety dependency. Later restore/image/ZIP
+work must keep existing lifetime gates; do not broaden06c or invent guarantees.
+
+Working direction after readonly layout review: measure current d595908 UI using
+the immutable39517f6f artifact and a copy of the closed private Ki84 profile.
+Keep Scene buttons/management, fit their chrome on one horizontal row with native
+scroll and keyboard/selected visibility. Replace absolute Caption row minima by
+available-height proportions; contain scroll within the list/detail content and
+retain the existing completion footer. Align few-row/empty/short-height branches;
+never change allocation merely on focus. Extend the existing responsive browser
+case rather than adding large file roundtrips per layout. Root is sole writer;
+independent reviewers are readonly. Reuse one final source/check boundary for
+adjacent in-scope layout repairs, then safe g0/CI/owned-preview delivery. No format,
+storage, renderer, dependency, new guarantee or release change is planned.
+
+PCQ-30 baseline reproduced at1280×720, d595908/immutable39517f6f: Scene chrome
+152px, task401.36px but468px intrinsic rows, list111px and detail bottom770.64
+outside720. Exact6 loaded app-response hashes match; original private profile was
+copied while closed, no user profile/original changed. Evidence is private
+`ki84-evaluation/pcq30-before-20261103/before-small.{json,png}`.
+Implemented one-row Scene strip, mount-only existing-control toolbar, available-
+height read/edit tracks, bounded few-result allocation and intrinsic empty-state
+fallback. Scroll stays in the two panes; footer and input/IME ownership persist.
+Focused Vitest46pass. Existing4 rendered camera/view/file/cold/offline workflows
+pass on the current production UI. The added responsive case initially passed
+its dense/filter/IME/cancel checks; its new empty-Scene extension exposed two
+test-identity assumptions (already-current first button, then a live false-state
+selector changing after activation). Both failed runs are retained; the test now
+captures a stable noncurrent name and keeps its assertions. Added native horizontal
+wheel→scrollend→unrelated filter check as independently requested. Its final run,
+real Ki84 after-layout review and final source/check boundary were then pending.
+The final responsive case passes, including Scene-strip manual scroll preservation
+and stable noncurrent-Scene switching; neither expected state nor timeouts were
+relaxed. Fixed source4605fb3b… (719+7 inputs) matches the20-file immutable candidate.
+Real Ki84 at1280×720: Scene chrome152→56px; list111→207.39px; selected detail bottom
+770.64→703.98 within720, task scroll497=client497. View/edit/IME/draft cancellation,
+native empty media chooser and saved-file match pass at small CSS viewports.
+Fresh-process normal-SW cold boot at720×500/DPR2 with offline1/serverOff1/bypass0
+gets9 exact current-artifact responses; same Scene/Caption body/save-match retained.
+This is CSS/DPR equivalence, not actual browser zoom, iOS or real-GPU acceptance.
+
+Milestone meta-audit: same g0 base/approved UI scope, no storage/renderer/format
+change or new safety finding. The original dense-layout failure is repaired and
+adjacent empty/IME/chooser/focus cases are covered. Because the shared workspace
+UI serves all Desktop workflows, finish the canonical full Desktop and offline
+browser lanes once at this fixed tree, then final serial root checks/HEIC and
+safe delivery. These broadened checks are pending, not inherited from earlier
+sources; retain previous failure records and avoid further source edits unless
+a relevant failure/finding requires them.
+
+Rendered independent review found that the720×500 view initially displayed only
+previous/next navigation. Interrupted the first full Desktop run after1/42;
+it is not a completed pass. Complete the same UI unit with compact heading
+navigation, preserved accessible names/warnings, balanced short reading tracks
+and a600–760px Scene/tab row. The added strict checks now pass: whole first list
+row, selected heading/body and44px navigation at720×500, alongside existing
+dense/filter/manual-scroll/IME/cancel/empty-Scene checks (7.8s). Retain failed
+pre-refinement runs, including the glyph accessible-name finding; no assertions
+or timeouts were weakened. Requalify actual Ki84/current artifact and readonly
+review before the final full Desktop/offline/root checks.
+
+Source52b68f91… and immutable candidate-v2 have exact6-response
+qualification and real Ki84 review. At1280×720 in view mode, list256.36px and
+detail189px both fit the505px task (bottom704); at720×500, first complete list
+row, selected heading/body and44px navigation are readable. Scene creation/name
+change→cancel works within its own scroll at720×500, without horizontal overflow.
+Real resize/IME/focus/draft cancellation, actual empty media chooser, footer hit
+targets and unchanged body/save-match pass. Independent code/drawing review has
+no further findings. Fresh browser process, offline1/serverOff1/bypass0/allowSW1,
+720×500/DPR2 loads9 exact candidate-v2 responses through normal SW and retains
+the same body/save-match; browser/server closed before final heavy checks.
+The second full Desktop attempt was interrupted after2/42 when independent final
+diff review identified two old direct-child tab selectors. Retargeted the existing
+sticky CSS and existing focus-boundary test to the mount-only wrapper; assertions
+and sticky behavior remain intact. Fresh focused small-screen and complete
+model/View/material→external-file→peer-reopen workflows pass (6.5s/22.8s).
+Final source8d74d98e…/candidate-v3 is frozen; fresh Ki846-response and normal-SW
+offline/server-off9-response body/save-match proofs pass on that exact artifact.
+Final Desktop42→offline5→literal checkpoint→HEIC are now running serially at this
+source. No aggregate quality, physical device or new speed guarantee.
+
+Final8d74 Desktop run1793650164733-29648 found one concrete adjacent layout
+failure at case20, record/camera numeric preview→Escape: original canvas960×934,
+held960×901, restored960×934 but raw pixels still differ in the triangle region.
+The inline approximation notice adds/removes33px above the display; value100
+returns, so do not weaken the pixel rollback assertion or count this as passed.
+Retain the full failure images/context; independent readonly cause review is
+running. Let the remaining Desktop cases finish before grouped repairs. Keep
+the source frozen while they run; later final checks must cover the actual fix.
+Readonly pixel/code review separates two findings: original/restored geometry is
+unchanged but color differs, and the raster test leaves identical A/B meshes
+coplanar. Material cloning can reorder their opaque draw; this is a fixture
+confounder, not proved camera corruption. Isolate A through the existing model
+visibility UI before raster assertions, retain both-model/reparent tests earlier,
+and keep exact rollback pixels/values/history assertions. The independent33px
+status layout shift still merits an out-of-flow, bounded readable notice/retry
+repair; review placement against floating windows/gizmo/pin form before edits.
+Do not claim a causal renderer fix or introduce tolerance, retries or new limits.
+The complete8d74 Desktop scan finishes39PASS/3FAIL in6970.9s; canonical result
+is runs/1793650164733-29648/result.json. Offline/checkpoint/HEIC did not run:
+the serial script stopped at Desktop Exit1 as intended. Failures are record/camera
+exact raster rollback, standard-material Apply intercepted by plain tooltip, and
+fresh-mesh chroma raster comparison selecting an arbitrary first material option.
+The last image shows material2 selected while the sampled lower-right triangle
+is unchanged; independently verify fixture face/label mapping before correction.
+Group the already reviewed bottom status/pin stack, pointer-transparent readable
+help and deterministic raster subjects/selectors. Preserve pointer/keyboard/touch,
+exact pixel/value/file assertions and all failure evidence; no source was changed
+during the completed scan. Finish focused actual UI/GPU failure/retry/hit checks,
+readonly final diff/render review, then final serial checks at the repaired tree.
+Grouped repairs pass the original3 cases (run1793657954171-46572): deterministic
+source material1, isolated raster subject with unchanged exact rollback pixels,
+and actual Apply-through-explanation. Added real context loss/recovery at720×500
+with notice/retry/pin/camera/Caption-close44px hits and constant canvas extent.
+Bottom-stack and event lifetime/hover/readability reviews have no remaining findings.
+Long explanation testing found a genuine touch race: portal layout generated a
+stationary mouse boundary event, reverting native touch reading. Retained event
+evidence, ignored layout-only boundaries until real move/down/key, removed the
+diagnostic logger and preserved the native reader.12help unit tests and the
+complete mouse/wheel/keyboard/emulated-native-touch→Apply→file/reopen case pass.
+The initial added keyboard-entry failure was a test starting from an already
+dismissed focused trigger; it now starts from the real title input and uses Tab.
+Final Ki84 review also exposed pale generic hover overriding white-text primary
+buttons. The bounded workspace/file hover selector preserves dark backgrounds,
+disabled/focus styles; rendered contrast plus existing view/save/reopen cases pass.
+
+Milestone meta-audit: g0 remains on d595908; only UI placement/help/hover and
+direct tests/records changed, with no renderer/storage/package/dependency or
+product-policy expansion. Fixed sourcef947df74… (719+7 inputs) and immutable
+candidate-v5 are the final boundary; real Ki846-response qualification/body and
+dark hover are confirmed. Finish draft/cancel/cold checks, then execute the
+complete serial Desktop/offline/checkpoint/HEIC at this source. Preserve all
+failed/interrupted evidence, the private5633bytes and golden; no release credit.
+
+The fixed f947 Desktop scan finished with41 passes and one failure in6647.4s
+(run1793659867510-15376). The old notice-above-Caption assertion assumed the old
+placement. The corrected case checks the notice text, full viewport inclusion,
+44px close-button width and an unobstructed trial click. It passes in77.0s
+(run1793666530285-45452), including the unchanged narrow-photo, edit, conflict,
+save and resume checks. The390×844 initial layout shows the full160px photo at
+scrollTop0. Follow-up typecheck corrected three style-element type annotations in
+the help test. Full Vitest identified one old retry DOM-parent assertion, which now
+checks the overlay alongside the canvas and retains the retry and card checks.
+The help browser and overlay unit cases passed again. All production inputs match
+f947. Desktop evidence is the full scan plus focused passes of affected cases.
+
+Final source/test freeze4be636b5…: Desktop42 cases covered, offline5 passed
+in608.2s, checkpoint passed in1042.1s (typecheck,147 suites,3279 passed/21 todo,
+five builds and offline isolation), and HEIC public-path isolation passed.
+The exact v5 Ki84 cold and small-screen evidence applies to the unchanged product
+sources. Browser evidence is dedicated Chromium, with physical device acceptance
+still pending.
+
+The approved normal Desktop receive continuation passed (85.1s test,84.3s through return/save) on the final
+static Desktop artifact (seven served resource hashes matched). Two isolated
+Chromium profiles exchanged actual files. One injected AbortError after durable
+binding and before input.zip creation left a recoverable receive. A different
+file was refused with the same pending state. The receiver browser then closed
+fully, reopened its profile and published the same job after reselecting the exact
+original. Its applied Caption body and PNG survived, and the returned Contribution
+used the original Workspace as its base. The sender received it, saw both edits,
+and saved a backup with the retained original change hashes and exact PNG bytes.
+The first driver attempt stopped at model selection before the fault. The passing
+driver uses the same focus-then-select action as the existing Desktop tests.
+Synthetic GLB/PNG and the existing Playwright setup supply this evidence; there
+were no product changes for the recovery check or changes to package contracts.
+
+Next performance unit: measure normal PC 500k SH4 Review-to-edit copy stages at
+the current checkpoint. Compare exact-file archive inspection, storage work and
+time until editing is available, using the existing fixture and stage timing.
+Preserve source, validation and publication fences. The current test establishes
+completion, while prior extended runs still show a long wait for this workflow.
+
+## Completed boundary —06c bounded restore content inspection
 
 PO explicitly approves06c on2026-11-03. Starting checkpoint85fe474 on g0-baseline;
 preserve local delivery notes, the5633-byte private block, golden and all originals.
@@ -138,10 +328,23 @@ Final documentation/privacy review found one stale historical approval instructi
 it now explicitly says that85fe-era pending06c state is superseded by current PO
 approval. Private5633B block and golden stay exact,163 local document links pass.
 Source/test content is unchanged after review/testing. Suitable g0 delivery,
-actual CI and owned4191 HTTP/fresh-browser verification follow this prepared
-checkpoint; record them locally without a doc-only CI loop or repeating runtime
-checks. Next outcome: keep the Caption list/detail usable on short PC screens,
+actual CI and owned4191 HTTP/fresh-browser verification followed this prepared
+checkpoint; results below remain local without a doc-only CI loop or repeating
+runtime checks. Next outcome: keep the Caption list/detail usable on short PC screens,
 using existing controls/commands and preserving selection/drafts/focus/recovery.
+
+Delivery: the independently reviewed10-path checkpoint is committed/pushed to
+g0 (Git owns identity). Owned4191 now serves the exact browser-tested immutable
+source39517f6f candidate: all20 HTTP resources and7 fresh normal-SW-allowed
+Chromium responses match; home/product statement/native file picker pass with
+errors/failed/remote0. Canonical ownership record has PID13668; replaced only
+verified owned45480, never personal4182/Chrome. Actual CI41498629403 on
+d59590873aaca42ba61e0f13904c1f5c04cee0ce completes successfully: actual checkout
+log matches,147files/3276PASS/21existingTODO(844.98s), npm ci/typecheck/test,
+BASE_PATH=/LociView/ normal build and HEIC isolation all succeed. Job125460066685
+and the selected primary logs are retained in private `ci-receipt.json`; this is
+not remote browser/device/offline or release acceptance.
+The private receipt/proof directory is `.artifacts/e2e/06c-20261103/`.
 
 ## Completed boundary —whole-PC review and restore performance checkpoint
 

@@ -530,6 +530,81 @@ No test-only scrolling or relaxed viewport assertions: the original View return/
 resize and Workspace narrow-photo sequences must pass, and the dense Ki84 list
 must retain its reading space. This is responsive layout, not a saved setting.
 
+### Short PC Caption workspace —2026-11-03 responsive refinement
+
+Keep the existing Scene buttons in one horizontally scrollable strip beside
+management. Preserve full names, native scrollbar and keyboard focus; reveal the
+current choice after initial mount, Scene/list changes or width changes by scrolling
+only that strip. Unrelated renders must not reset deliberate horizontal scrolling.
+Opened management retains its bounded vertical scroll and existing input ownership.
+
+Fit list/detail tracks to available height rather than adding fixed pixel minima.
+Keep the established list-first reading and detail-first actual editing intent;
+focus alone does not resize them. Bound few-result lists by the same available
+space while returning unused intrinsic height to detail. List and detail content
+own scrolling; completion stays outside detail's scroll. The browser may scroll
+its controls when the viewport cannot contain their minimum hit areas.
+
+The existing add/settings and search/color/count controls share one compact
+toolbar, mounted once. Keep the accessible search label and descriptive placeholder;
+remove its repeated visible label in that compact presentation. Preserve search,
+list anchors, selection, drafts/IME, media chooser, completion and view-mode behavior.
+Validate dense Ki84/four Scenes at1280×720, narrow/200%-equivalent layouts, empty/
+few-result lists, management, native focus and Apply/Cancel. These are UI-only
+layout rules, not a saved setting, storage/renderer change or new numeric guarantee.
+
+Rendered review also found a720×500 reading pane whose whole initial viewport
+was consumed by previous/next navigation. Complete this same repair before final
+regression: place the existing44px previous/next icon buttons beside the selected
+heading, remove empty detail-content margins and redundant readonly field chrome,
+and balance the two tracks when vertical space is scarce. Keep editable labels,
+full accessible action names, input/footer ownership and a readable first body
+line alongside a reachable list. Do not count a bounded but navigation-only pane
+as comfortable reading. Retain the partial pre-refinement run as interrupted.
+At600–760px viewport width, put the existing Scene strip and task tabs on one
+row to leave space for both the first complete list row and selected body. Other
+widths retain their existing order. Hide only the empty readonly title editor
+chrome; preserve nonempty unresolved-title warnings and all editable labels.
+
+Final regression refinement: viewport notice/retry must not add a normal-flow
+row above the canvas. The existing inline approximation notice changes its height
+by33px during numeric preview. Keep the display extent stable using a mount-only
+bottom overlay stack inside stageDisplay: existing notice/retry above existing
+pin adjustment, intrinsic heights, bounded wrapping/scrolling and no empty rail.
+Keep overlay wrapper noninteractive and without a new stacking context; the
+existing notice and pin task retain their own pointer/stack ownership. Allow
+children to shrink/scroll in a short stage, retain44px retry and reachable
+confirm/cancel, and verify actual hit centers against camera and Caption close.
+Keep retry outside the notice text's scroll; reserve the right camera strip and
+anchor the narrow-screen gizmo at the top while pin adjustment is open instead
+of lifting it by a guessed form height.
+This changes UI placement, not camera pose, renderer, pick or storage contracts.
+
+Raster rollback verification must isolate the target through the existing local
+model-visibility UI after the earlier two-model/reparent checks. Two identical
+coplanar test meshes can change the visible winner when materials are cloned;
+do not attribute that color difference to camera corruption. Verify accepted
+lighting/draft state before capture and retain exact Escape pixel/value/history
+rollback; no tolerance, timeout relaxation or new production test hook.
+
+The same regression exposed a plain explanation intercepting the material Apply
+button. Mouse/keyboard explanations must be pointer-transparent while document
+pointer coordinates retain hover over their visible rectangle; outside clicks
+continue to the real control through existing guards. Preserve existing delays,
+Escape, focus/tap and shared-manager disposal. Long mouse explanations keep a
+geometry-scoped ordinary-wheel reader (not browser zoom/modifier gestures), and
+overflow keyboard scrolling only while the help trigger itself is focused.
+Touch-opened notes retain native pointer scrolling; switch back before mouse
+interaction on actual mouse movement/down or keyboard input and cancel stale
+hover timers on touch down. A stationary mouse boundary event caused by laying
+out a touch-opened note must not switch modality or disable native touch reading.
+Verify real Apply-through-note, note hover/full reading, keyboard/touch and draft
+retention without forced clicks, timeout growth or synthetic production hooks.
+Keep the workspace and file primary buttons on a dark surface while hovered or
+pressed. The generic pale hover must not override their background while leaving
+white text. Preserve disabled appearance and the existing focus-visible outline;
+verify rendered foreground/background contrast on the two existing actions.
+
 ### Drawing panel organization —2026-11-02 PO screenshot correction
 
 The supplied whole-panel screenshot shows the target and appearance controls in
