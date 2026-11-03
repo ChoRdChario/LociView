@@ -913,7 +913,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       otherProject.disabled = busy || dirty() || ports.otherPending() || !!ports.presentation?.() || !!ports.projectNavigationBlocked?.();
       resumeStatus.textContent = busy || ports.status().kind === 'checking' ? '変更を適用中' : pending || ports.status().kind === 'failed' ? '更新が未完了です。入力を保持しています。再試行してください。' :
         draftInput() || panelInput() || recovery?.hasChanges() || mediaManager?.hasChanges() ? '未適用の変更' : summary.resumable ? '再開データあり' : '再開データを確認してください。';
-      fileStatus.textContent = summary.backup === 'verified' ? '保存ファイルと一致' : summary.backup === 'unavailable' ? '保存ファイルを確認してください。' : 'ファイル未確認';
+      fileStatus.textContent = summary.backup === 'verified' ? '保存ファイルと一致' : summary.backup === 'unavailable' ? '保存ファイルを確認してください。' : '外部ファイル未照合';
       const nextGestureContext = JSON.stringify([p.token, sceneId, ports.readOnly, ports.imageScope(), ports.otherPending(), models?.hidden(), memory().pinColors]);
       if (gestureContext !== nextGestureContext) { gestureContext = nextGestureContext; gesture = null; gestureGeneration++; }
       status.dataset.busy = String(busy); status.textContent = ports.status().kind === 'failed' ? ports.status().error || feedback : feedback;

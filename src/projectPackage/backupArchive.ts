@@ -42,7 +42,15 @@ export class BackupArchive {
   private constructor(readonly archive: PackageArchive, readonly source: ProjectMetadataSource,
     readonly description: Awaited<ReturnType<typeof inspectBackupOriginals>>) { Object.freeze(this); }
   static async inspect(file: Blob, limits: MetadataLimits, signal?: AbortSignal) {
-    const archive = await PackageArchive.inspect(file, signal), m = archive.control.manifest;
+    return this.fromArchive(await PackageArchive.inspect(file, signal), limits, signal);
+  }
+  /** Derive Backup content from the full ZIP scan of this file selection. */
+  static fromSelectedArchive(archive: PackageArchive, limits: MetadataLimits) {
+    if (!(archive instanceof PackageArchive)) return fail('backup-archive');
+    return this.fromArchive(archive, limits);
+  }
+  private static async fromArchive(archive: PackageArchive, limits: MetadataLimits, signal?: AbortSignal) {
+    const m = archive.control.manifest;
     if (m.purpose !== 'backup') return fail('backup-purpose');
     const bytes = await archive.entryBytes('metadata.am', L.sourceBytes, signal);
     const source = ProjectMetadataSource.fromFullSource(bytes, { identity: m.identity, envelope: m.metadataEnvelope }, packageSourceLimits(limits));

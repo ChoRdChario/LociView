@@ -3583,6 +3583,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const f = await restoreFileFixture(), bytes = new Uint8Array(await f.backupFile.arrayBuffer()); bytes[128] = bytes[128]! ^ 1;
     await expect(BackupRestoreJob.prepare(f.fs, f.ports, new Blob([bytes]), metadata, f.databases)).rejects.toThrow();
     await expect(BackupRestoreJob.prepare(f.fs, f.ports, f.file, metadata, f.databases)).rejects.toThrow('backup-purpose');
+    await expect(BackupArchive.fromSelectedArchive(await PackageArchive.inspect(f.file), metadata)).rejects.toThrow('backup-purpose');
     expect(await f.fs.list('v2/local-restore/')).toEqual([]);
   }, 30000);
   it('refuses restore preparation and confirmation while a completed output has lost its acknowledged artifact', async () => {
@@ -3804,6 +3805,10 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const before = await f.receiver.session.read(), token = before.source!.token, label = '現地調査前';
     const id = await sender.generateBackup(token, label), file = await sender.download(id), job = await BackupOutputJob.open(f.fs, id, metadata);
     const inspected = await BackupArchive.inspect(file, metadata);
+    const selected = await BackupArchive.fromSelectedArchive(inspected.archive, metadata);
+    expect(selected.archive).toBe(inspected.archive);
+    expect(selected.source.originalChanges()).toEqual(inspected.source.originalChanges());
+    expect(selected.description.inventory).toEqual(inspected.description.inventory);
     expect([...new Set(timings.map(t => t.stage))].sort()).toEqual(['ready-before', 'slot-before', 'protection-before', 'ready-final', 'ready-finish', 'slot-finish', 'protection-finish', 'capture', 'persist', 'finish', 'job', 'inputs-before', 'space', 'stream-close', 'artifact-inspect', 'inputs-after', 'receipt'].sort());
     expect(timings.every(t => Number.isFinite(t.milliseconds) && t.milliseconds >= 0)).toBe(true);
     expect(inspected.source.encodeFullSource()).toEqual(before.source!.encodeFullSource());
@@ -6316,7 +6321,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const initialCaptionIds = new Set(Object.keys(host.authority.read().resources.captions));
     expect(named('プロジェクト名', editor).textContent).toBe('統合画面の検証');
     expect(named('再開データの状態', editor).textContent).toBe('再開データあり');
-    expect(named('保存ファイルの状態', editor).textContent).toContain('未確認');
+    expect(named('保存ファイルの状態', editor).textContent).toBe('外部ファイル未照合');
     const initialSceneCount = Object.keys(host.authority.read().state.scenes).length;
     button('ピンを追加', editor).fire('click'); const canvas = named('3Dモデルの表示', editor);
     const down = { pointerId: 7, button: 0, isPrimary: true, clientX: 80, clientY: 90 };
@@ -6370,7 +6375,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const backup = host.workspaceOutput.jobs.find(j => j.purpose === 'backup')!;
     expect((await BackupArchive.inspect(await host.workspaceOutput.download(backup.id), metadata)).source.originalChanges()).toEqual(host.read().source!.originalChanges());
     await vi.waitFor(() => expect(output.children.find(n => n.attributes.get('role') === 'status')!.dataset.busy).toBe('false'));
-    expect(named('保存ファイルの状態', editor).textContent).toContain('未確認');
+    expect(named('保存ファイルの状態', editor).textContent).toBe('外部ファイル未照合');
     button('ファイルを選択', output).fire('click');
     const verify = named('保存したファイルを選択', output); Object.assign(verify, { files: [await host.workspaceOutput.download(backup.id)] }); verify.fire('change');
     await vi.waitFor(() => expect(named('保存ファイルの状態', editor).textContent).toBe('保存ファイルと一致'), { timeout: 10000 });
@@ -6379,7 +6384,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     await vi.waitFor(() => expect(downloads).toHaveBeenCalledTimes(2), { timeout: 10000 });
     const workspaceJob = host.workspaceOutput.jobs.find(j => j.purpose === 'teamWorkspace')!;
     expect(host.read().source!.token).toBe(verifiedToken); expect(host.workspaceOutput.jobs.find(j => j.id === backup.id)!.stale).toBe(true);
-    expect(named('保存ファイルの状態', editor).textContent).toContain('未確認');
+    expect(named('保存ファイルの状態', editor).textContent).toBe('外部ファイル未照合');
     const workspaceFile = await host.workspaceOutput.download(workspaceJob.id), peer = firstWorkspaceRecipient();
     const sharedBaseId = (await WorkspaceArchive.inspect(workspaceFile, metadata)).archive.control.manifest.packageId;
     await peer.receiver.importWorkspace(workspaceFile);

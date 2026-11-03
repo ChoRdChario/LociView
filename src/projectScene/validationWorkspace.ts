@@ -627,7 +627,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     const selectedArchive = await PackageArchive.inspect(file); if (!guardSelection(generation, context)) return;
     const purpose = selectedArchive.control.manifest.purpose;
     if (purpose === 'backup') {
-      const archive = await BackupArchive.inspect(file, validationMetadataLimits); if (!guardSelection(generation, context)) return;
+      const archive = await BackupArchive.fromSelectedArchive(selectedArchive, validationMetadataLimits); if (!guardSelection(generation, context)) return;
       const run = (archive.source.proof.identity.projectId as string).slice(4), opened = await ports.open(run, undefined, 'edit', undefined, undefined,
         { file, archive: { sha256: archive.archive.sha256, byteLength: archive.archive.byteLength } });
       try { if (!guardSelection(generation, context)) { await opened.dispose(); return; } } catch (error) { await opened.dispose(); throw error; }

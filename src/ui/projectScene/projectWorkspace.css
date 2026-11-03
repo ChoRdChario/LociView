@@ -136,7 +136,7 @@
 .lv-project-stage { display: flex; flex-direction: column; }
 .lv-stage-display { position: relative; flex: 1; min-height: 0; min-width: 0; overflow: hidden; }
 .lv-stage-overlay { position: absolute; inset: auto 12px 12px; display: flex; flex-direction: column; align-items: start; gap: 8px; max-height: calc(100% - 24px); pointer-events: none; }
-.lv-stage-overlay > .lv-project-viewport-tools { position: static; inset: auto; align-self: end; margin-right: 136px; flex: 0 1 auto; flex-direction: column; align-items: stretch; min-height: 0; max-width: min(240px, calc(100% - 136px)); max-height: 35dvh; box-sizing: border-box; overflow: hidden; overflow-wrap: anywhere; pointer-events: auto; }
+.lv-stage-overlay > .lv-project-viewport-tools { position: static; inset: auto; align-self: end; margin-right: 136px; flex: 0 1 auto; flex-flow: column nowrap; align-items: stretch; min-height: 0; max-width: min(240px, calc(100% - 136px)); max-height: 35dvh; box-sizing: border-box; overflow: hidden; overflow-wrap: anywhere; pointer-events: auto; }
 .lv-stage-overlay > .lv-project-viewport-tools > .lv-project-viewport-status { flex: 0 1 auto; min-height: 0; overflow: auto; }
 .lv-stage-overlay > .lv-project-viewport-tools > button { flex: 0 0 auto; }
 .lv-stage-overlay > .lv-project-viewport-tools:has(> button:not([hidden])) { min-height: 88px; }
@@ -177,6 +177,9 @@
 .lv-pin-task-actions { flex-wrap: wrap; margin-top: 8px; }
 .lv-pin-task-actions > button:first-child { flex-basis: 100%; }
 .lv-pin-task-actions > button:nth-last-child(2) { flex: 1; }
+@media (max-height: 640px) {
+  .lv-pin-task-actions > button:first-child { flex-basis: auto; }
+}
 .lv-stage-display:has(.lv-pin-task:not([hidden])) > .lv-comparison-actions { bottom: 240px; }
 .lv-project-workspace .lv-settings-group { margin-bottom: 18px; padding-bottom: 16px; border-bottom: 1px solid #ddded5; }
 .lv-settings-group h2 { margin: 0 0 8px; font-size: 15px; }

@@ -433,10 +433,81 @@ unchanged threshold. Vitest took978.68s; the serial checkpoint took1090.9s.
 All builds and offline isolation passed, followed by HEIC isolation (3.4s).
 The three earlier timeouts are no longer reproduced; no common cause was
 established and their assertions and deadlines were retained.
+After the verified checkpoint push, an independent empty Chromium context
+restored the exported ZIP alone and displayed the exact edited Caption. From
+restore to the confirmed body took66.406s, with no page errors. This is an
+additional local evidence note, without a doc-only verification or push cycle.
+Checkpoint `fbca92d` is on `g0-baseline`; [Linux CI41732083737](https://github.com/ChoRdChario/LociView/actions/runs/41732083737)
+passed in16m47s including typecheck, full root tests, build and HEIC isolation.
 Next isolate cold selection/destination checks from rendering and review the
 actual save feedback: the external download succeeds but the workspace still
 shows `ファイル未確認`. Keep exact verification semantics and clarify the
 difference between a successful export and comparison with an external file.
+
+### Current unit —whole PC workflow and response times
+
+Review the connected workflow at fbca92d, including opening and cold resume,
+Scene/search/photo/camera, edits, file output, sharing, interruption and offline
+use. Use the same retained Ki84 fixture for real-data timing and existing small
+browser fixtures for fault paths. Keep direct observation separate from prior
+evidence and code concerns. Optimize measured repeat work within accepted
+boundaries, and keep write, archive, publication and recovery verification.
+Review the diff independently, compare the same user operations and run the
+required final checks. Report any remaining delays and redundant user steps.
+
+Baseline browser tour ran eight scenarios. Seven passed across Caption and
+photos, loading, short-layout reading, file/receive, editing exclusion and
+offline restart. The camera workflow exposed a real 720×500 recovery issue:
+when WebGL stops during pin adjustment, only 1.7% of the retry button intersected
+the viewport. A vertical flex container inherited wrapping and put the button
+outside the clipped panel. Keep the stage extent, the pin input and both exits;
+use the original browser case to verify real pointer hits and recovery.
+The first change restored the retry button and exposed a second clipping issue
+in the pin Cancel button. Allow the pin actions to use a single row when there
+is width in a short window. The final original browser case passed with both
+buttons, camera controls, Caption-window hit targets, unchanged canvas extent,
+and actual 3D recovery. The updated file/receive browser case also passed.
+
+Same Ki84 input, static candidate, Chromium and 1280×720: alternated three
+fresh contexts per build. File-open to enabled Restore median5.431→4.334s
+(before5.332/5.431/5.539, after4.395/4.334/4.251), matching four→three reads
+of the exact archive tail. Reuse is limited to the first selection; checks at
+restore and durable readback retain separate source observations.
+
+Final Ki84 practical pass on the desktop candidate: four Scenes and103
+Captions; cached Scene switch216ms, search56ms and one506×390 photo436ms to
+decoded display, then original-size view. Real camera drag moved the camera;
+74 requestAnimationFrame intervals, median6.1ms, one interval over50ms
+(78.9ms), a local main-thread/display observation rather than GPU FPS or INP.
+Apply9.122s; download28.197s; initial restored readiness73.314s. Cold restart
+from launch to Caption22.048s, 3D/edit-ready28.429s, checked edited text28.696s.
+Export independently verified identity, all 43 original payloads and all3
+previous changes plus one Caption change. The updated file/receive case passed
+with `外部ファイル未照合`, distinct from a confirmed external-file comparison.
+The first private tour test used a self-changing Scene locator; fixed the probe
+and reran without any product change. Wrong-purpose/modified backup, restored
+write fences and backup parity focused cases passed. The first full checkpoint
+reported one composition assertion still using the old Japanese status label.
+Align the three assertions for that exact status, retain the file-verification
+checks, and rerun the affected composition and the final checkpoint.
+The affected composition passed (including its external verification and two
+round trips). Final source/test freeze `beb54700` passed Windows checkpoint
+and HEIC isolation:147 files,3,282 passed,21 existing TODOs, no failures.
+Vitest1032.13s and serial checkpoint1101.8s. No product code changed between
+the paired browser observation and that final freeze.
+
+Remaining by observed impact: (1) large restore/cold resume delays reading;
+catalog and actual host each inspect the retained restore evidence independently,
+and the ~22s before Caption needs separate catalog/host measurement before any
+contract decision; (2) three Next actions grew one 3D Caption window to four;
+review panel-only sequential reading while keeping explicitly opened windows;
+(3) write/export still takes seconds and this GPU showed a frame stall during a
+short drag; qualify sustained rotation and the ordinary PC range separately;
+(4) Clean/Workspace have a similar dispatch duplicate and download URLs are
+retained until leaving the workspace in code, unmeasured in this tour. Earlier
+500k Review-copy and current Ki84 timing are different workloads. Treat the
+short-window recovery fix, eight representative browser journeys (including
+actual offline relaunch), and retained narrow fault checks as bounded evidence.
 
 ## Completed boundary —06c bounded restore content inspection
 

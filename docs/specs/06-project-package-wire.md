@@ -3350,6 +3350,18 @@ pre/post write fences remain. Every new call starts fresh, including after loss
 of an acknowledged artifact/original/base. No generation, stream/write or
 publication work is enclosed, and no cross-operation cache is introduced.
 
+### 2026-11-04 selected Backup inspection
+
+The home file picker may derive Backup semantics from the `PackageArchive`
+owned by that same selection's complete ZIP inspection. Match purpose, original
+metadata and heads, base evidence, capabilities, protected inventory and summary
+before using its Project identity. Reuse only that single live dispatch result;
+the file passed to opening and restore is still bound by digest and length.
+The actual recovery entry, durable preparation, output inspection, re-selection
+and cold restore retain their independent checks. Accept no manifest-only or
+caller-supplied integrity assertion. Compare the original and updated home file
+flow on the same Backup and cover malformed contents and valid restoration.
+
 ### 2026-11-01 bounded review-copy slot inspection
 
 The same existing pure-reader rule covers the void `assertReviewEditSlot`

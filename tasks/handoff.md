@@ -8,6 +8,11 @@ preserve existing changes. Do not reconstruct current work from old checkpoints.
 
 ## Current boundary
 
+The whole PC workflow tour measures the first Backup file selection at
+5.431→4.334s on the same Ki84, and fixes the 720×500 3D retry and pin exit.
+Large restore/cold startup and incidental 3D Caption windows remain the main
+observed issues. See the whole-PC unit in todo for checks, timing and priorities.
+
 The Ki84 one-Caption edit, external backup and cold reopen pass on the selected
 restore write-fence refinement. The same host measured apply11.646→9.209s and
 download45.544→25.897s. The cold timing moved with unchanged control-open count.
