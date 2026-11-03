@@ -1,6 +1,6 @@
 # LociView active work
 
-Updated2026-11-03. This is the single current plan and check record.
+Updated2026-11-04. This is the single current plan and check record.
 [Inventory](implementation-inventory.md) owns route-specific coverage;
 [map](../PROJECT_MAP.md) and [document index](../docs/README.md) route contracts/code.
 Git owns checkpoint identity. [Retained checkpoint evidence](../docs/history/development-through-2026-10-29/tasks/todo-before-daily-authoring.md)
@@ -282,10 +282,61 @@ affected07m/07n cases passed. The final source/test freezebfd515d2… passed the
 147-suite checkpoint (3279 passed,21 todo), five builds, offline isolation and
 HEIC public-path isolation.
 
-Next: map and quantify the fresh SHA work by copy phase on the current build,
-then design any change to verification lifetime against tamper, write/readback
-and restart cases. Keep the copy contract and SHA implementation until an
-approved design changes that boundary.
+Delivery: the seven-path checkpoint is on g0-baseline. CI41623434024 passed
+on that exact tree. The owned4191 preview serves20 matching resources from
+the final candidate and opens the file chooser in fresh Chromium. Independent
+inspection of the exported backup also confirmed the edited Caption body.
+
+### Current performance unit —500k SH4 edit-copy checks
+
+Measure exact SHA-256 input, scan count and elapsed time by phase on the
+normal Desktop route, using the same 500k Review file and a fresh Chromium
+profile. Remove duplicate inspection of an already owned immutable input where
+this keeps the existing fresh durable verification boundaries. Compare the same
+flow before and after, then verify write/readback, saved originals and cold
+interruption/reselection. Any change to when tampering or evidence loss is
+detected needs separate design review and a Product Owner decision.
+
+Paired same-file Desktop diagnostics through editor readiness, with identical
+private instrumentation and fresh Chromium profiles:
+
+| SHA phase | Full ZIP scans before → after | SHA input GB before → after | SHA execution s before → after |
+|---|---:|---:|---:|
+| Scratch generation/readback | 1 → 1 | 0.71 → 0.71 | 5.7 → 6.4 |
+| Fresh durable parent original/copy | 30 → 30 | 10.68 → 10.68 | 83.9 → 84.0 |
+| Re-scan of earlier immutable copy during child preparation | 1 → 0 | 0.356 → 0 | 2.75 → 0 |
+| Child ZIP readback, journal, completion and discovery | 9 → 9 | 3.20 → 3.20 | 24.9 → 24.4 |
+| Remaining SHA work | 0 → 0 | 1.96 → 1.96 | 15.3 → 15.6 |
+
+The candidate derives child input from the unchanged second, fully inspected
+parent read. The first parent read supplies only the expected descriptor.
+Exactly one full ZIP scan and about356MB of SHA input are removed; both fresh
+parent reads and subsequent durable checks remain. Actual editor readiness was
+302.983s/304.486s and 3D readiness331.529s/328.217s in these diagnostic builds.
+Both missed240s; the paired elapsed samples do not show a copy-start improvement.
+Architecture12 and focused Review6 pass, including a same-length ZIP structural
+mutation between parent reads, two scans on intact admission, three cold
+interruption stages and refusal of acknowledged evidence loss. Independent
+review found no remaining issue in the bounded source/test change.
+
+On the normal uninstrumented Desktop build, one test fault before original.zip
+creation left the parent bound and the child unstarted. After full Chromium
+shutdown, the same profile reselected the exact retained Review file and
+finished the same parent/child publication. Reselection to editor took268.863s,
+backup212.044s and later cold reopen165.105s. The backup retains all three
+exact original body hashes, the same independent copy ID and the new Caption
+body, which was also read on reopen. The first driver attempt selected the
+ordinary receive region instead of the dedicated Edit Copy region; correction
+is limited to the private Playwright driver.
+
+Final source/test freeze64ff4474… passed the147-suite checkpoint (3280 passed,
+21 todo), typecheck, all five builds and offline/HEIC isolation.
+
+Next policy decision is [06b §6.1](../docs/specs/06b-staging-read-operations-proposal.md#61-工程別計測後の次案).
+It proposes joining two pairs of read-only parent inspections while retaining
+fresh inspections at writes and recovery. It changes detection times within
+those phases and awaits specific approval. The estimated four scans represent
+about11s of SHA processing, with wall time and acceptance to be measured.
 
 ## Completed boundary —06c bounded restore content inspection
 

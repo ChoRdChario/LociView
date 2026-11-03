@@ -7069,6 +7069,35 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       const complete = vi.fn(); expect((await job.states(complete))[0]!.state).toBe('incomplete'); expect(complete).not.toHaveBeenCalled();
     } finally { openChild.mockRestore(); await source.workspace.dispose(); }
   }, 60000);
+  it('prepares the private Review child from freshly verified parent bytes', async () => {
+    const source = await openFileCaption();
+    const output = await source.host.workspaceOutput.generateReview(source.host.read().source!.token, { sceneId: source.s.sceneId });
+    const prepared = await PreparedReviewEdit.prepare(await source.host.workspaceOutput.download(output), metadata);
+    const r = firstWorkspaceRecipient(), job = new ReviewEditJob(r.fs, r.session, metadata);
+    const prepare = vi.spyOn(CleanInputJob, 'prepareReview').mockRejectedValueOnce(Error('stop before child preparation'));
+    try {
+      await expect(job.start(prepared)).rejects.toThrow('stop before child preparation');
+      expect(prepare).toHaveBeenCalledOnce();
+      const args = prepare.mock.calls[0]!;
+      prepare.mockRestore();
+      const path = `${reviewEditRoot(r.fs, prepared.id)}copy.zip`;
+      const exact = (await r.fs.readBytes(path))!, altered = exact.slice();
+      altered[altered.length - 1] = altered[altered.length - 1]! ^ 1;
+      await r.fs.writeBytes(path, altered);
+      const writes = vi.spyOn(r.fs, 'writeStream'), scans = vi.spyOn(PackageArchive, 'inspect');
+      try {
+        await expect(CleanInputJob.prepareReview(...args)).rejects.toThrow('zip-eocd');
+        expect(writes).not.toHaveBeenCalled();
+        await r.fs.writeBytes(path, exact);
+        scans.mockClear();
+        const child = await CleanInputJob.prepareReview(...args);
+        expect(scans).toHaveBeenCalledTimes(2);
+        expect(child.inspection.archive.sha256).toBe(prepared.clean.archive.sha256);
+        expect(new Uint8Array(await child.inspection.archive.sourceSnapshot().arrayBuffer())).toEqual(exact);
+        expect(writes).not.toHaveBeenCalled();
+      } finally { writes.mockRestore(); scans.mockRestore(); }
+    } finally { prepare.mockRestore(); await source.workspace.dispose(); }
+  });
   it.each(['original', 'child', 'completion'] as const)('cold resumes a review edit-copy stopped at %s through one parent recovery row', async stage => {
     const source = await openFileCaption(), id = await source.host.workspaceOutput.generateReview(source.host.read().source!.token, { sceneId: source.s.sceneId });
     const file = await source.host.workspaceOutput.download(id), prepared = await PreparedReviewEdit.prepare(file, metadata);

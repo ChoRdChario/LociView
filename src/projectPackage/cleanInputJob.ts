@@ -27,9 +27,10 @@ export class CleanInputJob {
     const input = file.slice(); return new CleanInputJob(fs, newId(), limits, await CleanArchive.inspect(input, limits), input, null);
   }
   /** Fixed private child; never expose its ZIP as a file-reselection choice. */
-  static async prepareReview(fs: ProjectWorkspaceFS, id: string, file: Blob, binding: ReviewEditBinding, limits: MetadataLimits) {
-    technicalId(id); const input = file.slice(), inspection = await CleanArchive.inspect(input, limits);
-    await validateReviewEditChild(fs, id, cleanInputDescriptor(id, inspection), binding, limits);
+  static async prepareReview(fs: ProjectWorkspaceFS, expected: ReturnType<typeof cleanInputDescriptor>, binding: ReviewEditBinding, limits: MetadataLimits) {
+    const descriptor = structuredClone(expected), id = technicalId(descriptor.jobId);
+    const parent = await validateReviewEditChild(fs, id, descriptor, binding, limits);
+    const inspection = parent.prepared.clean, input = inspection.archive.sourceSnapshot();
     if (await fs.exists(`${root(fs, id)}start.json`) || await fs.exists(`${root(fs, id)}published.json`) ||
       (await new TransactionJournal(fs, limits).entries()).some(e => e.start.transactionId === id)) return this.open(fs, id, limits);
     const exists = (await fs.list(root(fs, id))).length > 0 || await fs.exists(index(fs, id));

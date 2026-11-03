@@ -2,6 +2,7 @@ import type { ProjectWorkspaceFS } from '../platform/fs';
 import { fail, type MetadataLimits } from '../projectMetadata/format';
 import { underWriteLease, writeReceipt } from '../projectMetadata/persistence';
 import type { MetadataProjectSession } from '../projectMetadata/session';
+import { cleanInputDescriptor } from './cleanInputDescriptor';
 import { CleanInputJob } from './cleanInputJob';
 import { PreparedReviewEdit } from './reviewEdit';
 import { abandonReviewEdit, persistReviewEdit, readReviewEdit, reviewEditRoot, reviewEditPublication, reviewEditStates, type CompletedReviewChild } from './reviewEditControls';
@@ -21,7 +22,8 @@ export class ReviewEditJob {
       await underWriteLease(this.fs, () => persistReviewEdit(this.fs, parent.prepared, this.limits));
       parent = await readReviewEdit(this.fs, id, this.limits);
     }
-    const job = await CleanInputJob.prepareReview(this.fs, parent.descriptor.childId, parent.prepared.copy, parent.binding, this.limits);
+    const input = cleanInputDescriptor(parent.descriptor.childId, parent.prepared.clean);
+    const job = await CleanInputJob.prepareReview(this.fs, input, parent.binding, this.limits);
     await this.session.initializeClean(job);
     await underWriteLease(this.fs, async () => {
       parent = await readReviewEdit(this.fs, id, this.limits);

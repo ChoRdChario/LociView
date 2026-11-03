@@ -2033,6 +2033,15 @@ Only that fixed child may initialize while the parent is unfinished. The child
 may be prepared from the exact private ZIP before its own Start; after child Start,
 its missing input/receipts remain repair-required and are not replenished.
 
+Private child preparation takes the expected child input descriptor from the
+preceding parent read. It captures that descriptor and freshly validates the
+current parent original and copy as part of child admission. Compare the whole
+descriptor with the bound child input, and take the child's archive and bytes
+from that same successful fresh inspection. The earlier copy Blob is unused.
+Keep both parent reads, the child write/readback, Start, journal, publication and
+all recovery checks. Verify that a same-length change between the two parent
+reads is refused and that intact preparation scans the two current archives once.
+
 First-open ordering is part of the contract: pass the explicit prepared review
 copy as a new-Project creation trigger, then use the existing empty-run guard,
 Project lease and first database creation **before** writing parent records.
