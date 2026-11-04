@@ -495,6 +495,8 @@ round trips). Final source/test freeze `beb54700` passed Windows checkpoint
 and HEIC isolation:147 files,3,282 passed,21 existing TODOs, no failures.
 Vitest1032.13s and serial checkpoint1101.8s. No product code changed between
 the paired browser observation and that final freeze.
+Checkpoint `38b6097` is on `g0-baseline`; [Linux CI41742178916](https://github.com/ChoRdChario/LociView/actions/runs/41742178916)
+passed typecheck, full root tests, build and HEIC isolation in19m17s.
 
 Remaining by observed impact: (1) large restore/cold resume delays reading;
 catalog and actual host each inspect the retained restore evidence independently,
@@ -508,6 +510,46 @@ retained until leaving the workspace in code, unmeasured in this tour. Earlier
 500k Review-copy and current Ki84 timing are different workloads. Treat the
 short-window recovery fix, eight representative browser journeys (including
 actual offline relaunch), and retained narrow fault checks as bounded evidence.
+
+### Current unit —cold resume and sequential Caption reading
+
+Measure the same saved Ki84 Project from a fully closed dedicated browser,
+including catalog eligibility, actual host checks, first Caption and 3D ready.
+Preserve actual open, recovery, identity, receipts and write authority; isolate
+any proven redundant reads under the accepted scope. Previous/Next should
+select the detail without creating a floating window. Verify explicit window
+opening, navigation/draft behavior, corruption refusal and cold restore.
+
+Paired dedicated Chromium156 /1280×720 run, two fresh copies per build of
+one fully closed Ki84 profile with a saved Caption change and backup output.
+Baseline included only opt-in timing instrumentation. Time to first Caption
+21.555/23.096s→19.104/20.817s (mean22.326→19.961s); 3D/edit-ready
+28.030/30.112s→26.170/27.273s. Mean catalog10.937→9.060s, selected-generation
+open inside catalog5.903→5.575s, separate catalog Session1.477s→folded into
+that already verified read. Actual host generation4.618→4.453s, discovery
+overview2.953→2.871s, and host Session1.481→1.369s all retained. Do not
+attribute their small timing differences to skipped checks or a speed guarantee.
+Both before/after paths reopened the edited body. Explicit list selection
+opened one window. Three Next and three Previous steps grew it to four on
+baseline and kept it at one in the candidate, with the expected detail values.
+Independent diff review found no blocker. The import check detected new direct
+type references; resolved through the existing validation host type boundary
+and reran without changing runtime behavior or the allowlist.
+Focused architecture and window-state17 cases and selected restore/output
+safety16 cases passed. The retained ZIP corruption added after a ready row
+rejected actual open and the next catalog, retaining original DB and changed
+evidence for repair. The normal-PC authoring browser case passed with a closed
+window staying closed on step and reopening on explicit list selection, plus
+search, undo, saved output and full browser restart.
+The first root suite caught one implementation-spy expectation for the old
+Backup completion helper. Assert the new single row check and keep the actual
+missing-artifact refusal, protected base and strict generation assertions.
+The affected output cases (6) and final Windows serial checkpoint passed on
+freeze `31c04c1e` (147 files,3,282 tests,21 existing TODOs). Vitest989.75s,
+checkpoint1059s, followed by HEIC isolation. No product runtime code changed
+after the paired browser run. Next measure retained ZIP scan, durable DB and
+protected body verification separately within the still-dominant generation
+opening stage, and keep ordinary-PC/device qualification separate.
 
 ## Completed boundary —06c bounded restore content inspection
 

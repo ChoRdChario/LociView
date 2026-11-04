@@ -4,7 +4,7 @@ import type { OriginBlobStore } from '../projectMetadata/blobStore';
 import { checkLimits, fail, type MetadataLimits } from '../projectMetadata/format';
 import { openWorkspaceGeneration, type GenerationStorageOpener } from '../projectMetadata/generationScope';
 import { newId, underWriteLease } from '../projectMetadata/persistence';
-import type { MetadataProjectSession } from '../projectMetadata/session';
+import type { MetadataProjectSession, MetadataSessionRead } from '../projectMetadata/session';
 import { TransactionJournal } from '../projectMetadata/journal';
 import { MetadataRepository, type MetadataStorageFactory } from '../projectMetadata/repository';
 import type { BackupRestoreInput } from '../projectMetadata/packageRemote';
@@ -298,7 +298,8 @@ export class BackupRestoreJob {
   }
   /** Resolve existing selected data only. Read permission survives a pending restore; ordinary writes do not. */
   static async openSelected(root: ProjectWorkspaceFS, limits: MetadataLimits, databases: RestoreDatabasePorts,
-    createPorts: (scope: Awaited<ReturnType<typeof openWorkspaceGeneration>>) => RestoreSourcePorts) {
+    createPorts: (scope: Awaited<ReturnType<typeof openWorkspaceGeneration>>) => RestoreSourcePorts,
+    observeCatalogRead?: (read: MetadataSessionRead) => void) {
     const state = await reconcileRestoreDatabases(root, limits, () => databases.listGenerations()), selected = state.selection,
       generationId = state.tail?.jobId ?? null;
     const checkSelected = async () => {
@@ -315,12 +316,16 @@ export class BackupRestoreJob {
     try {
       const ports = createPorts(scope);
       if (ports.fs !== scope.fs || ports.factory !== scope.factory) fail('restore-selected-scope');
+      let catalogRead: MetadataSessionRead | undefined;
       if (state.tail) {
         const job = state.jobs.find(j => j.id === generationId)!;
         if (!job.prepared) return fail('restore-destination-job');
-        await this.verifyDestination(root, ports, scope.factory, job, limits, state.tail);
+        const verified = await this.verifyDestination(root, ports, scope.factory, job, limits, state.tail);
+        if (observeCatalogRead) catalogRead = verified.read;
       }
-      await scope.check(); return { ...scope, ports, selection: selected, pending: state.pending };
+      await scope.check();
+      if (catalogRead) observeCatalogRead?.(catalogRead);
+      return { ...scope, ports, selection: selected, pending: state.pending };
     } catch (error) { await scope.dispose().catch(() => {}); throw error; }
   }
   /** One authoritative switch. An already retained switch is completed, never rewritten or rolled back. */

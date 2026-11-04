@@ -55,6 +55,7 @@ import { BackupArchive } from '../projectPackage/backupArchive';
 import { openValidationGeneration, validationGenerationDatabases, validationGenerationService, inspectValidationFirstBackup } from './validationGeneration';
 
 export const validationArea = 'lociview-development-validation-1';
+export type { MetadataSessionRead };
 export type ValidationTiming = (stage: string, milliseconds: number) => void;
 /** Optional local diagnostics; observers never change an operation's outcome. */
 export function measureValidation<T>(observer: ValidationTiming | undefined, stage: string, action: () => Promise<T>): Promise<T> {
@@ -241,12 +242,12 @@ async function openNormalValidationHost(options: ValidationHostOptions, inherite
     try { await operation; } catch { /* Stored journal/initial input remain authoritative, never silently discarded. */ }
     await lease.waitForWorkspaceIdle(); if (ownsLease) { lease.sealWorkspaceWritesForRelease(); lease.release(); } await connection?.dispose(); };
   try {
-    if (await inspectValidationFirstBackup(lease.workspace, options)) throw Error('バックアップの初回復元を専用の入口から再開してください。');
+    if (await measure('host.open.first-restore', () => inspectValidationFirstBackup(lease.workspace, options))) throw Error('バックアップの初回復元を専用の入口から再開してください。');
     const fresh = !(await options.base.list(`${root}/`)).length;
     if (fresh && (!(options.initial || incoming || options.reviewEdit) || !lease.holdsWriteLock)) throw Error('保存データがありません。プロジェクトを選び直してください。');
     if (!fresh && options.initial) throw Error('作成先に保存データがあります。既存データは変更していません。');
     if (fresh) lease.activateNewProject();
-    connection = await openValidationGeneration(lease.workspace, options, fresh && !!(options.initial || incoming || options.reviewEdit) && lease.holdsWriteLock);
+    connection = await measure('host.open.generation', () => openValidationGeneration(lease.workspace, options, fresh && !!(options.initial || incoming || options.reviewEdit) && lease.holdsWriteLock));
     let { fs, content, session } = connection.service;
     let receiver = new WorkspaceReceiver(options.base, fs, session, limits, options.packageLocks ?? null);
     let sender = new WorkspaceSender(fs, session, options.store, limits, options.packageLocks ?? null, options.timing ? (stage, ms) => options.timing!(`host.backup.${stage}`, ms) : undefined);
@@ -291,7 +292,7 @@ async function openNormalValidationHost(options: ValidationHostOptions, inherite
       await reloadOutput(!unfinishedReceive() && current?.state === 'ready' ? current : undefined);
     };
     await reloadReceive();
-    let last = await session.read(), project: ProjectDisplay | undefined;
+    let last = await measure('host.open.session', () => session.read()), project: ProjectDisplay | undefined;
     if (incoming instanceof CleanArchive && last.source) throw Error('この独立コピーの再開用データがあります。ファイルを取り込まず、プロジェクト一覧から再開してください。');
     if (last.source && (last.source.proof.identity.projectId !== `prj_${run}` || incoming && json(last.source.proof) !== json(incoming.source.proof)))
       throw Error('ファイルと再開用データのプロジェクトが一致しません。既存データは変更していません。');

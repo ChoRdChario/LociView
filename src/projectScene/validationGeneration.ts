@@ -4,7 +4,7 @@ import { BackupRestoreJob, type RestoreDatabasePorts } from '../projectPackage/b
 import { readRestoreControls, restoreEqual } from '../projectPackage/restoreControls';
 import { validationProjectService } from '../projectFiles/creation';
 import { validationMetadataLimits as limits } from '../projectFiles/validation';
-import type { ValidationHostOptions } from './validationHost';
+import type { MetadataSessionRead, ValidationHostOptions } from './validationHost';
 
 type Options = Pick<ValidationHostOptions, 'run' | 'openStorage' | 'generations' | 'store' | 'fileLimits' | 'filePolicy' | 'decode' | 'jpeg' | 'photo' | 'mediaDecoders'>;
 export function validationGenerationDatabases(options: Pick<Options, 'run' | 'openStorage' | 'generations'>): RestoreDatabasePorts {
@@ -34,7 +34,7 @@ export async function inspectValidationFirstBackup(root: ProjectWorkspaceFS, opt
 }
 
 /** Host and catalog resolve exactly the same FS/DB generation. Never recreate an existing database. */
-export async function openValidationGeneration(root: ProjectWorkspaceFS, options: Options, create = false) {
+export async function openValidationGeneration(root: ProjectWorkspaceFS, options: Options & { observeCatalogRead?: (read: MetadataSessionRead) => void }, create = false) {
   const databases = validationGenerationDatabases(options);
   let service: ReturnType<typeof validationGenerationService> | undefined;
   const controls = await readRestoreControls(root, limits);
@@ -45,7 +45,7 @@ export async function openValidationGeneration(root: ProjectWorkspaceFS, options
     assertSelected: async () => { const current = await readRestoreControls(root, limits);
       if (current.selection) throw Error('プロジェクトの作成先が変わりました。'); },
     assertWritable: async () => { if ((await readRestoreControls(root, limits)).pending) throw Error('バックアップの復元が未完了です。'); } }, databases.open) :
-    await BackupRestoreJob.openSelected(root, limits, databases, selected => service = validationGenerationService(selected, options));
+    await BackupRestoreJob.openSelected(root, limits, databases, selected => service = validationGenerationService(selected, options), options.observeCatalogRead);
   try {
     service ??= validationGenerationService(scope, options);
     const current = await readRestoreControls(root, limits);

@@ -156,9 +156,12 @@ export class WorkspaceSender {
       try {
         const state = await outputJobClass(key).state(this.fs, id, this.limits);
         if (state !== 'started') { result.push({ id, purpose, state, cancellable: state === 'unstarted' }); continue; }
-        const job = await openOutputJob(this.fs, key, this.limits), steps = await job.steps(), kinds: string[] = steps.map(s => s.detail.kind);
-        if (kinds.includes('artifactVerified')) await job.artifactReceipt();
-        await job.validateCompletion();
+        const job = await openOutputJob(this.fs, key, this.limits);
+        const kinds: string[] = job instanceof BackupOutputJob ? await job.displayStepKinds() : (await job.steps()).map(s => s.detail.kind);
+        if (!(job instanceof BackupOutputJob)) {
+          if (kinds.includes('artifactVerified')) await job.artifactReceipt();
+          await job.validateCompletion();
+        }
         if (job instanceof WorkspaceOutputJob && kinds.includes('baseRecorded')) {
           const rows = await (bases ??= new WorkspaceBaseStore(this.fs, this.limits, job.source.proof).read());
           if (!rows.some(r => json(r) === json(job.baseRecord()))) throw Error('output-base-missing');

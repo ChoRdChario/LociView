@@ -213,11 +213,19 @@ export class BackupOutputJob {
     await writeReceipt(this.fs, this.path(`steps/${reference(step).sha256}.json`), step, this.limits); await this.steps();
   }
   async artifactReceipt() {
-    const step = (await this.steps()).find(s => s.detail.kind === 'artifactVerified');
+    return this.readArtifactStep((await this.steps()).find(s => s.detail.kind === 'artifactVerified'));
+  }
+  private async readArtifactStep(step: Step | undefined) {
     if (!step || step.detail.kind !== 'artifactVerified') return fail('output-unverified');
     const d = step.detail, file = await this.fs.readStream(this.path(`artifacts/${d.sinkId}.zip`));
     if (!file?.blob || file.size !== d.archive.byteLength) return fail('output-artifact-missing');
     return { file, step, detail: d };
+  }
+  /** Used by output discovery inside its owning read-only observation. */
+  async displayStepKinds() {
+    const steps = await this.steps(), artifact = steps.find(s => s.detail.kind === 'artifactVerified');
+    if (artifact) await this.readArtifactStep(artifact);
+    return steps.map(s => s.detail.kind);
   }
   async artifact() {
     const { file, step, detail: d } = await this.artifactReceipt();

@@ -87,8 +87,16 @@ test('daily Scene and Caption organization, tags, alignment, settings and files 
     await p.getByRole('button',{name:'記録の変更を元に戻す',exact:true}).click(); await ready(p,'記録の変更を元に戻しました。'); await expect(p.locator('.lv-caption-select')).toHaveCount(1);
     for(let i=0;i<3;i++){await p.getByRole('button',{name:'記録の変更をやり直す',exact:true}).click();await ready(p,'記録の変更をやり直しました。');}
     await expect(p.locator('.lv-caption-select')).toHaveCount(1); await p.getByRole('button',{name:'記録の変更を元に戻す',exact:true}).click();await ready(p,'記録の変更を元に戻しました。');await expect(p.getByLabel('本文',{exact:true})).toHaveValue('独立した本文');
+    const windows = p.locator('.lv-caption-window'), nextWindow = windows.filter({ hasText: '元の記録' });
+    if (await nextWindow.count()) await nextWindow.getByRole('button', { name: '閉じる', exact: true }).press('Enter');
+    await expect(nextWindow).toHaveCount(0);
+    const openWindows = await windows.count();
     await p.getByRole('button', { name: '次の記録', exact: true }).click(); await expect(p.getByLabel('タイトル', { exact: true })).toHaveValue('元の記録');
+    await expect(windows).toHaveCount(openWindows);
     await p.getByRole('button', { name: '前の記録', exact: true }).click(); await expect(p.getByLabel('タイトル', { exact: true })).toHaveValue('複製の記録');
+    await expect(windows).toHaveCount(openWindows);
+    await p.locator('.lv-caption-select').filter({ hasText: '元の記録' }).click(); await expect(nextWindow).toHaveCount(1);
+    await p.locator('.lv-caption-select').filter({ hasText: '複製の記録' }).click();
     console.log('daily: records and undo verified');
     const search = p.getByRole('region', { name: 'キャプション', exact: true }).locator('.lv-caption-search').getByLabel('検索', { exact: true });
     await search.fill('複製'); await expect(p.getByRole('button', { name: '次の記録', exact: true })).toBeDisabled(); await search.fill('');

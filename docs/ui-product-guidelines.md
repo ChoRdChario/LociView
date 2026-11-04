@@ -417,8 +417,9 @@ noncompact/harness controls retain their direct-circle presentation.
 
 Floating Caption windows are view aids on the 3D stage, connected to their pins
 when a connector is meaningful. They do not replace the list as the selection
-authority. Explicit selection opens and retains each window by default; selecting
-the next Caption does not replace earlier windows. Re-selecting an open Caption
+authority. Explicit selection opens and retains each window by default. The
+Previous/Next buttons move the selection in the list and detail without opening
+or raising a floating window. Re-selecting an open Caption
 brings the same window forward without duplicates. No separate retain action is
 required. Users close windows individually; refresh does not reopen a dismissed
 window, but an explicit re-selection/open does. The user can bring one forward or

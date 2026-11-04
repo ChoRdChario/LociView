@@ -8,6 +8,11 @@ preserve existing changes. Do not reconstruct current work from old checkpoints.
 
 ## Current boundary
 
+Ki84 cold resume first Caption improved from22.326s to19.961s in two copied
+profiles per build. The selected catalog row reuses its own verified read;
+actual resume and recovery checks remain separate. Previous/Next no longer
+opens floating Caption windows. See todo for safety checks and remaining time.
+
 The whole PC workflow tour measures the first Backup file selection at
 5.431→4.334s on the same Ki84, and fixes the 720×500 3D retry and pin exit.
 Large restore/cold startup and incidental 3D Caption windows remain the main

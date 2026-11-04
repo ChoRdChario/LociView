@@ -4089,8 +4089,8 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const { f, sent } = await contributionTeam(), session = f.receiver.session, sender = new WorkspaceSender(f.fs, session, f.store, metadata, f.locks);
     let current!: Awaited<ReturnType<typeof session.read>>;
     const id = await sender.generateBackup(sent.current.source!.token, undefined, undefined, read => { current = read; });
-    const expected = await sender.outputOverview(), reads = vi.spyOn(session, 'read'), completions = vi.spyOn(BackupOutputJob.prototype, 'validateCompletion');
-    expect(await sender.outputOverview(current, current)).toEqual(expected); expect(reads).not.toHaveBeenCalled(); expect(completions).toHaveBeenCalled();
+    const expected = await sender.outputOverview(), reads = vi.spyOn(session, 'read'), completions = vi.spyOn(BackupOutputJob.prototype, 'displayStepKinds');
+    expect(await sender.outputOverview(current, current)).toEqual(expected); expect(reads).not.toHaveBeenCalled(); expect(completions).toHaveBeenCalledOnce();
     const display = { ...current }; reads.mockClear();
     const owned = sender.outputOverview(display, display); display.state = 'pending'; display.source = null; display.publication = null;
     expect(await owned).toEqual(expected); expect(reads).not.toHaveBeenCalled();
@@ -6811,6 +6811,13 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect(cold.authority.read().modelVersions!.some(m => m.assetId === oldModel.assetId)).toBe(true);
     expect(cold.workspaceOutput.bases.some(b => b.selection.workspacePackageId === choice.workspacePackageId)).toBe(true);
     await cold.dispose();
+    const retainedZip = (await f.fs.list(`${validationArea}/${f.run}/v2/local-restore/jobs/`)).find(path => path.endsWith('/input.zip'))!;
+    const altered = (await f.fs.readBytes(retainedZip))!.slice(); altered[128] = altered[128]! ^ 1;
+    await f.fs.writeBytes(retainedZip, altered);
+    await expect(openValidationHost(f.options)).rejects.toThrow(); // A previously ready row supplies no open authority.
+    expect((await listValidationProjects(f.options, f.options.openStorage))[0]!.state).toBe('unavailable');
+    expect(await f.fs.readBytes(retainedZip)).toEqual(altered);
+    expect(await f.factory().loadRange([])).toEqual(originalDb);
   }, 60000);
   it('keeps a pre-switch render failure on old data, cancels explicitly, and cold-recovers a missing selection Result', async () => {
     const f = await restoredWorkspaceHostFixture(), host = f.host, token = host.read().source!.token;

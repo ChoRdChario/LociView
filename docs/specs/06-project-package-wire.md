@@ -3362,6 +3362,29 @@ and cold restore retain their independent checks. Accept no manifest-only or
 caller-supplied integrity assertion. Compare the original and updated home file
 flow on the same Backup and cover malformed contents and valid restoration.
 
+### 2026-11-04 Backup row discovery
+
+The read-only output row may use one freshly validated Backup step chain for
+its state and exact local artifact presence/size checks in the same scoped
+observation. Keep the earlier Job open validation, frozen base/inventory
+checks, current Session observation, outer audit and error classification.
+Return only step kinds. Download, write, artifact inspection, restore and
+recovery keep their own validations. A missing acknowledged artifact remains
+a repair state on the next list or reopen.
+
+### 2026-11-04 selected catalog projection
+
+Within one catalog row, the selected-generation resolver may report the
+Session read it already validated for destination readiness, after the full
+destination proof and its closing Selection check pass. Use that result only
+for this row's identity, title and read state. Keep fresh receive, output and
+Review-copy discovery. Keep the original generation's catalog Session read.
+The actual host still independently opens and validates the selected generation,
+reads the current Session and enforces recovery and lease rules. No catalog
+result or capability enters that host. The row is an observation, with no new
+atomicity guarantee. Verify readiness, pending/lost evidence, failed actual open
+after a ready row, and exact cold resume in a copied browser profile.
+
 ### 2026-11-01 bounded review-copy slot inspection
 
 The same existing pure-reader rule covers the void `assertReviewEditSlot`

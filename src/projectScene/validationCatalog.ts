@@ -1,5 +1,5 @@
-import type { ValidationHostOptions } from './validationHost';
-import { validationArea } from './validationHost';
+import type { MetadataSessionRead, ValidationHostOptions } from './validationHost';
+import { measureValidation, validationArea } from './validationHost';
 import { openValidationGeneration, inspectValidationFirstBackup } from './validationGeneration';
 import { WorkspaceReceiver } from '../projectFiles/receiveWorkspace';
 import { WorkspaceSender } from '../projectFiles/sendWorkspace';
@@ -11,6 +11,7 @@ export type ValidationStorage = (run: string, create: boolean) => ReturnType<Val
 /** Read-only enumeration of this opt-in namespace, never an old Project or a mutable ready flag. */
 export async function listValidationProjects(options: Omit<ValidationHostOptions, 'run' | 'initial' | 'openStorage'>,
   openStorage: ValidationStorage): Promise<ValidationProjectEntry[]> {
+  const measure = <T>(stage: string, action: () => Promise<T>) => measureValidation(options.timing, `catalog.${stage}`, action);
   const prefix = `${validationArea}/`, runs = [...new Set((await options.base.list(prefix))
     .map(path => path.slice(prefix.length).split('/')[0]!).filter(id => /^[0-9a-f]{32}$/.test(id)))];
   const result: ValidationProjectEntry[] = [];
@@ -18,15 +19,18 @@ export async function listValidationProjects(options: Omit<ValidationHostOptions
     const lease = options.coordinator.openView(options.base, `${prefix}${run}`, `${validationArea}:${run}`);
     let storage: Awaited<ReturnType<typeof openValidationGeneration>> | undefined;
     try {
-      const first = await inspectValidationFirstBackup(lease.workspace, { ...options, run, openStorage: create => openStorage(run, create) });
+      const project = { ...options, run, openStorage: (create: boolean) => openStorage(run, create) };
+      const first = await measure('first-restore', () => inspectValidationFirstBackup(lease.workspace, project));
       if (first) { result.push({ run, title: first.controls.pending ? 'バックアップの初回復元が未完了' : 'プロジェクトなし・復元記録を保持',
         state: first.controls.pending ? 'incomplete' : 'unavailable', firstRestore: first.controls.pending ? 'pending' : 'terminal' }); continue; }
-      storage = await openValidationGeneration(lease.workspace, { ...options, run, openStorage: create => openStorage(run, create) });
+      const observation: { selected?: MetadataSessionRead } = {};
+      storage = await measure('generation', () => openValidationGeneration(lease.workspace,
+        { ...project, observeCatalogRead: read => { observation.selected = read; } }));
       const { session, fs } = storage.service;
-      const read = await session.read(), provider = read.provider;
-      const jobs = await new WorkspaceReceiver(options.base, fs, session, validationMetadataLimits, null).jobs();
-      const outputs = await new WorkspaceSender(fs, session, options.store, validationMetadataLimits, null).jobs();
-      const copies = await reviewEditStates(fs, validationMetadataLimits);
+      const read = observation.selected ?? await measure('session', () => session.read()), provider = read.provider;
+      const jobs = await measure('receive', () => new WorkspaceReceiver(options.base, fs, session, validationMetadataLimits, null).jobs());
+      const outputs = await measure('output', () => new WorkspaceSender(fs, session, options.store, validationMetadataLimits, null).jobs());
+      const copies = await measure('review-copies', () => reviewEditStates(fs, validationMetadataLimits));
       if (read.source && read.source.proof.identity.projectId !== `prj_${run}`) throw Error('Project mismatch');
       const title = provider?.kind === 'scene-provider' ? provider.inspection.candidates.fields
         .find(f => f.path.length === 2 && f.path[0] === 'project' && f.path[1] === 'title') : undefined;

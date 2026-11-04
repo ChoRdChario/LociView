@@ -367,7 +367,13 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     if (disposed || busy || pending || windowMoving || ports.otherPending()) return;
     const context = listContext(), plan = planCaptionList(context, { kind: 'step', direction });
     if (plan.kind !== 'change' || !captionListPlanIsCurrent(plan, listContext())) return;
-    memories.set(sceneId, plan.memory); resetDraft();if(organizeCaptions.open)alignOrganization(); openWindow(plan.memory.selectedCaptionId!); render(); list.revealSelected();
+    memories.set(sceneId, plan.memory); resetDraft();if(organizeCaptions.open)alignOrganization();
+    const selected = plan.memory.selectedCaptionId!, windows = windowMemory();
+    if (!windows.retained.includes(selected) && !windows.dismissed.includes(selected)) {
+      const suppress = planCaptionWindow(listContext().source, windows, selected, { kind: 'close', captionId: selected });
+      if (suppress.kind === 'change') windowMemories.set(sceneId, suppress.memory);
+    }
+    render(); list.revealSelected();
   }
   const previousCaption = button('前の記録', () => stepCaption('previous')), nextCaption = button('次の記録', () => stepCaption('next'));
   previousCaption.className = 'lv-caption-previous'; nextCaption.className = 'lv-caption-next';
