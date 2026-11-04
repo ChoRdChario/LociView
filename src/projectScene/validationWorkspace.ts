@@ -27,7 +27,8 @@ import { isJpeg, type JpegDecoder } from '../projectFiles/jpeg';
 import type { openValidationHost, ValidationHostOptions, ValidationNormalHost, FirstBackupRecovery } from './validationHost';
 import { createValidationModeHost, type ValidationDisplayHost } from './validationModeHost';
 import type { LocalOpenMode } from './hostPorts';
-import type { ValidationProjectEntry } from './validationCatalog';
+import type { ResumeReadingRequest, ValidationProjectEntry } from './validationCatalog';
+import { createResumeReading } from './resumeReading';
 import type { ModelCandidateRenderer } from './modelCandidatePreview';
 import type { ViewportFactory } from './viewportPorts';
 import { createValidationReceiveControls } from './validationReceiveControls';
@@ -56,7 +57,7 @@ export interface ValidationWorkspacePorts {
   storageEstimate?(): Promise<Readonly<{ usage?: number; quota?: number }>>;
   localSettings?: { read(): string; save(displayName: string): boolean };
   lastProject?: { read(): ProjectResumeReference | null; remember(reference: ProjectResumeReference): void };
-  list(): Promise<ValidationProjectEntry[]>;
+  list(reading?: ResumeReadingRequest): Promise<ValidationProjectEntry[]>;
   open(run: string, initial?: ReturnType<typeof prepareValidationCreation>, mode?: LocalOpenMode, workspaceFile?: Blob, reviewEdit?: PreparedReviewEdit,
     firstBackup?: ValidationHostOptions['firstBackup']): Promise<ValidationNormalHost | FirstBackupRecovery>;
   render(host: ValidationDisplayHost): Promise<{ factory: ViewportFactory; readonly ready?:Promise<void>; detachPreparation?():void; dispose(): void }>;
@@ -113,6 +114,8 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   const listHeading = document.createElement('h2'); listHeading.textContent = 'このブラウザの再開用データ';
   navigation.append(heading, help, workspaceForm, form, listHeading, refresh, list,legacy); root.append(back, status, cancelSelection, navigation, content);
   let host: Host | undefined, workspace: MountedEditor | undefined;
+  let resumeReading: ReturnType<typeof createResumeReading> | undefined;
+  const clearResumeReading = () => { resumeReading?.dispose(); resumeReading = undefined; };
   let presentation:{busy:boolean;reason:string}|null=null;
   let presentationState=()=>presentation;
   let stopPresentation!:()=>void;const presentationStopped=new Promise<void>(resolve=>{stopPresentation=resolve;});
@@ -179,6 +182,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
       .finally(() => { busy = false; if (operation === work) operation = undefined; if (!disposed) { controls(); workspace?.render(); } });
   };
   const closeCurrent = async () => {
+    clearResumeReading();
     const oldWorkspace=workspace,oldHost=host,oldResident=resident,oldReview=reviewWorkspace,oldAttempt=reviewEditAttempt,oldTools=receiveTools,oldRecovery=firstRecovery;
     mounted=false;presentation=null;presentationState=()=>presentation;resumedLast=false;confirmingResume=false;workspace=undefined;host=undefined;resident=undefined;reviewWorkspace=undefined;reviewEditAttempt=undefined;receiveTools=undefined;firstRecovery=undefined;
     showColdReport(false);coldReportStatus.textContent='';if(reportUrl)URL.revokeObjectURL(reportUrl);reportUrl=undefined;firstRecoveryButtons.clear();
@@ -218,8 +222,8 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     if (lastRemembered === key) return; lastRemembered = key;
     try { ports.lastProject.remember(reference); } catch { /* Advisory settings never change a successful Project acknowledgment. */ }
   };
-  const updateList = async () => {
-    const entries = await ports.list(); if (disposed) return;
+  const updateList = async (reading?: ResumeReadingRequest) => {
+    const entries = await ports.list(reading); if (disposed) return;
     catalog = entries;
     projectOpenButtons.clear();list.replaceChildren();
     if (!entries.length) { list.textContent = 'このブラウザの再開用データはありません。'; return; }
@@ -240,6 +244,10 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   const mount = async (prepared?: Awaited<ReturnType<ValidationWorkspacePorts['render']>>) => {
     mounted = false;
     if (!host || disposed) { prepared?.dispose(); return; }
+    const composition = resumeReading?.composition();
+    if (composition) await untilOpen(composition);
+    if (!host || disposed) { prepared?.dispose(); return; }
+    const initialReading = resumeReading?.selection(); clearResumeReading();
     content.replaceChildren();
     if (host.read().state !== 'ready' || host.hasPending() && !(host.backupRestore.needsDisplay && !host.backupRestore.pending)) {
       prepared?.dispose();
@@ -283,7 +291,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
       const refresh=()=>{if(!current())return;mounted=checked&&!state();if(mounted&&selectionHost===target&&!target.hasPending())clearSelection();rememberCurrent();controls();};
       presentation={busy:true,reason:'モデルを読み込んでいます。記録は閲覧・検索できます。'};
       workspace=ports.mountEditor(target,bridge.factory,receiveTools,ports.renderModelCandidate?display=>ports.renderModelCandidate!(target,display):undefined,
-        {utilitiesRoot:offline?.root,fileActionsRoot:coldReportActions,smoothDisplay:ports.smoothDisplay,presentation:state,projectNavigationBlocked:()=>busy,openProject:()=>{void selectProject();},resumedLastProject:()=>resumedLast,storageEstimate:ports.storageEstimate,localSettings:ports.localSettings,changed:refresh});
+        {utilitiesRoot:offline?.root,fileActionsRoot:coldReportActions,smoothDisplay:ports.smoothDisplay,presentation:state,projectNavigationBlocked:()=>busy,openProject:()=>{void selectProject();},resumedLastProject:()=>resumedLast,storageEstimate:ports.storageEstimate,localSettings:ports.localSettings,initialReading,changed:refresh});
       content.replaceChildren(workspace.root,retry);workspace.render();
       const load=async()=>{
         checked=false;mounted=false;presentation={busy:true,reason:'モデルを読み込んでいます。記録は閲覧・検索できます。'};retry.hidden=true;resident?.detachPreparation?.();workspace?.render();
@@ -381,9 +389,9 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     catch { if (!disposed && host === target) { showColdReport(true); coldReportStatus.textContent = '変換の説明を確認できません。元ZIPを保管し、説明の保存から再確認してください。'; } }
   };
   const openProject = async (run: string, initial?: ReturnType<typeof prepareValidationCreation>, mode: LocalOpenMode = 'edit', workspaceFile?: Blob, remembered = false) => {
-    status.textContent = initial ? 'プロジェクトを作成しています。' : '再開用データを確認しています。';
+    if (!resumeReading) status.textContent = initial ? 'プロジェクトを作成しています。' : '再開用データを確認しています。';
     const opened = await ports.open(run, initial, mode, workspaceFile);
-    if ('kind' in opened) { if (disposed) { await opened.dispose(); return; } firstRecovery = opened; selected = run; navigation.hidden = true; renderFirstRecovery(); return; }
+    if ('kind' in opened) { clearResumeReading(); if (disposed) { await opened.dispose(); return; } firstRecovery = opened; selected = run; navigation.hidden = true; renderFirstRecovery(); return; }
     await adoptProject(run, opened, remembered ? mode : undefined);
   };
   const renderFirstRecovery = () => {
@@ -699,11 +707,24 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
       catch (error) { if (!host && !disposed) await updateList(); throw error; }
       return;
     }
-    await updateList(); if (disposed) return;
     let reference: ProjectResumeReference | null = null;
     try { reference = projectResumeReference(ports.lastProject?.read()); } catch { /* No advisory hint is a normal selector start. */ }
+    try {
+      await updateList(reference && ports.progressivePresentation ? { run: reference.run, show(reading) {
+        if (disposed) return;
+        const next = reading ? createResumeReading(document, reading) : undefined;
+        clearResumeReading(); resumeReading = next; navigation.hidden = !!next;
+        if (next) {
+          status.textContent = '再開を確認しています。記録は閲覧・検索できます。';
+          content.append(next.root);
+        }
+        controls();
+      } } : undefined);
+    } catch (error) { clearResumeReading(); navigation.hidden = false; throw error; }
+    if (disposed) return;
     if (!reference) return;
     if (!catalog.some(entry => entry.run === reference.run && entry.state === 'ready')) {
+      clearResumeReading(); navigation.hidden = false;
       status.textContent = '最後のプロジェクトを再開できません。一覧またはファイルから開いてください。'; return;
     }
     try { await openProject(reference.run, undefined, reference.mode, undefined, true); }
@@ -718,7 +739,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     }
   });
   return { root,ready:ready??Promise.resolve(), hasChanges: () => busy || composing || changed() || !navigation.hidden && (selectionPending || !!rawSelection || !!creationAttempt || !form.hidden && title.value !== '新しいプロジェクト'),
-    async dispose() { if (disposed) return; disposed = true; stopHelp();
+    async dispose() { if (disposed) return; disposed = true; clearResumeReading(); stopHelp();
       homeSettings?.dispose();
       selectionAbort?.abort();
       stopPresentation();

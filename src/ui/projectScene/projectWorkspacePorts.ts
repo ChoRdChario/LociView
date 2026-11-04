@@ -107,7 +107,15 @@ export interface WorkspaceFileInteraction {
   readonly acknowledgment: { readonly state: 'idle' | 'checking' | 'failed' };
   refreshHistory(): void;
 }
+export interface WorkspaceReadingSelection {
+  readonly token: string;
+  readonly sceneId: string;
+  readonly query: string;
+  readonly captionId: string | null;
+  readonly focus: 'search' | 'detail' | null;
+}
 export interface ProjectWorkspacePorts {
+  readonly initialReading?: WorkspaceReadingSelection;
   readonly rasterResources?: RasterResources;
   readonly imageDimensions?:(bytes:Uint8Array,mime:string)=>{readonly width:number;readonly height:number}|null;
   authoring?: {

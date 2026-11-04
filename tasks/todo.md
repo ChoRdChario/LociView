@@ -589,6 +589,43 @@ Windows final checkpoint and HEIC isolation passed on freeze `577bd59f`
 Next examine the record-display boundary separately from full edit readiness
 and profile the remaining Session/ZIP work before proposing any change to
 when verification completes. Preserve existing selection and write authority.
+Checkpoint `456e2d3` is on `g0-baseline`; [Linux CI41805636144](https://github.com/ChoRdChario/LociView/actions/runs/41805636144)
+passed typecheck, full root tests, build and HEIC isolation in13m45s.
+
+### Current unit —read saved Captions while automatic resume verifies
+
+Expose text/search for the remembered restored Project from the catalog's
+already fully verified selected-generation read. Measure first readable text,
+archive/session checks, and normal edit readiness on the same cold Ki84 profile.
+The temporary reader has no command, file, media or lease ports. Keep the final
+catalog-ready gate, independent host and all durable verification. Remove the
+reader on refusal or disposal. Keep its query and selection only when the
+authoritative editor matches the exact saved token and Scene. Verify valid,
+pending and failed reopen plus final checks. No new persistent data or limits.
+
+Final Ki84 comparison, two alternating clean copies per build on dedicated
+Chromium156,1280×720: first readable20.346/20.333s→7.080/7.535s
+(mean20.340→7.308s); full3D/edit-ready26.777→27.612s mean. Combined
+archive verification2.898→2.987s; combined observed Session reads4.679→4.709s.
+This improves time to text by overlapping reading with the remaining startup,
+without promising faster edit-ready. Preview uses only the resolved starting
+Scene, and is withdrawn for catalog/actual-open failures. No preview from a
+corrupt selected archive. Browser tests pause then corrupt the independent
+actual-open ZIP scan after showing checked saved text: no action controls,
+correct search/body, refusal back to selector on corruption. Successful resume
+waits for active IME; exact query, focus and selected body survive the handoff,
+no floating window opens, then a real Caption edit and ZIP download pass.
+Independent review PASS after fresh Selection, status placement, IME/disposal
+and recovery-surface fixes. Focused 11 restore/recovery cases pass, including
+latest saved text and refusal to preview corrupt input. First test fixture had
+no Caption membership; assigned one through the existing typed command.
+The real exported ZIP passes independent original-byte checks for all43 blobs,
+preserves Project identity and the four prior changes, and adds exactly one
+Caption edit. Final Windows checkpoint and HEIC isolation pass on freeze
+`4e9fb2a8` (147 files,3,282 passing,21 existing TODOs; Vitest977.76s,
+checkpoint1050.7s). Next profile the independently verified host preparation
+and 3D build between first text and edit-ready; qualify on an ordinary PC.
+The existing connected-to-cold-offline PC restart browser case also passed.
 
 ## Completed boundary —06c bounded restore content inspection
 

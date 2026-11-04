@@ -291,6 +291,15 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   let recovery: ReturnType<typeof createProjectRecovery> | undefined;
   let organization: ReturnType<typeof createProjectOrganization> | undefined;
   const provider = () => ports.read();
+  const reading = ports.initialReading?.sceneId === sceneId && ports.initialReading.token === provider().token ? ports.initialReading : undefined;
+  if (reading) {
+    const captionId = projectCaptions(provider(), sceneId).some(caption => caption.id === reading.captionId) ? reading.captionId : null;
+    memories.set(sceneId, { ...emptyMemory(), search: reading.query, selectedCaptionId: captionId });
+    if (captionId) {
+      windowMemories.set(sceneId, { ...newCaptionWindowMemory(sceneId), dismissed: [captionId] });
+      if (reading.focus !== 'search') captionSurface = 'detail';
+    }
+  }
   const memory = () => { if (!memories.has(sceneId)) memories.set(sceneId, emptyMemory()); return memories.get(sceneId)!; };
   const windowMemory = () => { if (!windowMemories.has(sceneId)) windowMemories.set(sceneId, newCaptionWindowMemory(sceneId)); return windowMemories.get(sceneId)!; };
   const includeMemory = () => { if (!includeMemories.has(sceneId)) includeMemories.set(sceneId, newCaptionIncludeMemory(sceneId)); return includeMemories.get(sceneId)!; };
@@ -1060,6 +1069,11 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     } finally { rendering = false; if (renderAgain) { renderAgain = false; render(); } }
   }
   mounted = true; render();
+  if (reading?.focus) queueMicrotask(() => {
+    if (disposed || !root.isConnected) return;
+    if (reading.focus === 'detail' && memory().selectedCaptionId) detailHeading.focus({ preventScroll: true });
+    else list.focusSearch();
+  });
   return { root, headerActions, projectNavigation: otherProject, utilityArea: settingsSheet, clearNotice(){if(!pending&&ports.status().kind==='idle')feedback='';}, dismissDisclosures(){help.open=false;organization!.settingsRoot.open=false;}, setExternalBusy: (active:boolean) => { body.inert=busy||active; }, render, session: interaction, activeScene: () => sceneId, inputPending: () => dirty() || busy,
     hasChanges: () => dirty() || busy || !!pending,
     unmount() { if (disposed) return; disposed = true;finishMarkerNavigation();document.removeEventListener?.('pointerdown',closeRecordSheets,true);document.removeEventListener?.('focusin',closeRecordSheets);document.removeEventListener?.('pointerdown',dismissHeaderSheets,true);document.removeEventListener?.('focusin',dismissHeaderSheets);otherProject.remove();document.defaultView?.clearTimeout(feedbackTimer);document.defaultView?.removeEventListener('resize',positionHeaderSheets);document.defaultView?.removeEventListener('resize',render);cameraGizmo.dispose();stopHelp();stopPresentation?.();overlayBaseline=undefined;cancelObservation();storageEpoch++; gesture = null; gestureGeneration++; pressedPointers.clear(); viewport.reservePointer(false); recovery?.dispose(); organization?.dispose(); windows.dispose(); mediaManager?.dispose(); mediaViewer.dispose(); viewport.dispose(); list.dispose(); inclusion.dispose(); detail.dispose(); for (const panel of panels.values()) panel.dispose(); root.remove(); } };

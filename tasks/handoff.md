@@ -8,6 +8,11 @@ preserve existing changes. Do not reconstruct current work from old checkpoints.
 
 ## Current boundary
 
+Remembered restored Ki84 can read/search checked starting-Scene Captions while
+actual resume still verifies. Same saved profile measured20.340→7.308s for
+first readable text. Edit readiness and full independent checks remain gated.
+See todo for timing phases, deferred/corrupt ZIP tests and remaining wait.
+
 The next Ki84 cold run separates ZIP, journal, Session, repository, original
 payloads and base checks. The read-only body phase now opens each receipt and
 object once per check, and decoded history is reused within the same read.

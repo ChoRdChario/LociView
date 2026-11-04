@@ -1,4 +1,10 @@
 /* Shared ProjectScene shell and viewport styles. Legacy/Native roots keep their own styles. */
+.lv-resume-reading { max-width: 960px; margin: 0 auto; padding: 16px; }
+.lv-resume-reading > label { display: flex; gap: 8px; align-items: center; }
+.lv-resume-reading ul { max-height: 36dvh; overflow: auto; padding: 0; list-style: none; }
+.lv-resume-reading button { width: 100%; min-height: 44px; text-align: start; }
+.lv-resume-reading button[aria-pressed="true"] { background: #d9dfd1; }
+.lv-resume-reading p { white-space: pre-wrap; overflow-wrap: anywhere; }
 .lv-offline-controls { position: relative; z-index: 3; flex: 0 0 auto; display: flex; align-items: center; flex-wrap: wrap; gap: 4px 12px; padding: 6px 12px; background: #f2f0ee; border-bottom: 1px solid #b7b1aa; font: 400 13px/1.5 system-ui, sans-serif; }
 .lv-offline-controls [hidden] { display: none !important; }
 .lv-offline-controls > p { margin: 0; flex: 1 1 240px; }

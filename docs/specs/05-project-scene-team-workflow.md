@@ -3191,6 +3191,21 @@ repair data or alter the selected Project/history. Normal explicit opening is no
 labelled as remembered resume. Advisory failures never turn a valid Project write
 into failure or saved-file acknowledgment.
 
+### 2026-11-04 read saved text during restored Project startup
+
+For the validated remembered run only, the catalog can show a temporary text
+reader after its selected destination has passed archive, published metadata,
+stored body, base table and closing Selection checks. Require matching Project
+identity, completed restore, ready Session and a resolved starting Scene.
+Expose only that Scene's resolved saved titles and bodies, with local search.
+The full catalog must still mark the row ready, and the actual host must pass
+its own full verification and lease/recovery gates before offering actions.
+The reader carries no mutation, media, output, recovery or resume authority.
+Remove it on refusal, disposal or workspace adoption. Carry the search and
+selected Caption only to the same verified token and Scene; keep input focus
+through the handoff and finish IME composition before replacing its input.
+There is no persisted preview or new storage format.
+
 The adjacent/header `別のプロジェクトを開く` action reuses the same selector and
 switch guard. Pending input/IME, active save, failed update, file operation, mode
 switch and restore must retain their existing finish/cancel/retry paths; navigation

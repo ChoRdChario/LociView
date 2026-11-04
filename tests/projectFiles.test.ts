@@ -6800,10 +6800,18 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     await peer.session.editCaption(received.source!.token, f.f.captionId, 'title', '返送された確認');
     const reply = await contributionFile(peer.session, peer.fs, peer.store);
     await host.workspaceFiles.receive(host.read().source!.token, reply.file);
-    const final = host.read().source!.token;
-    await host.workspaceFiles.receive(final, reply.file); expect(host.read().source!.token).toBe(final);
+    const exchanged = host.read().source!.token;
+    await host.workspaceFiles.receive(exchanged, reply.file); expect(host.read().source!.token).toBe(exchanged);
     expect(await f.factory().loadRange([])).toEqual(originalDb);
-    expect((await listValidationProjects(f.options, f.options.openStorage))[0]!.state).toBe('ready');
+    const startScene = host.authority.read().state.defaultSceneId;
+    if (startScene.kind !== 'value' || !startScene.value) throw Error('starting Scene');
+    await host.dispatch(exchanged, { kind: 'include', sceneId: startScene.value, resourceKind: 'caption', resourceId: f.f.captionId,
+      membershipId: `scm_${newId()}`, orderKey: 'A', eventId: `evt_${newId()}` });
+    const final = host.read().source!.token, show = vi.fn();
+    expect((await listValidationProjects(f.options, f.options.openStorage, { run: f.run, show }))[0]!.state).toBe('ready');
+    expect(show).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ token: final, records: expect.arrayContaining([
+      { id: f.f.captionId, title: '返送された確認', body: '復元後の追記' },
+    ]) }));
     await host.dispose();
     const cold = await openValidationHost(f.options);
     expect(cold.read().source!.token).toBe(final); expect(cold.hasPending()).toBe(false);
@@ -6815,7 +6823,9 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const altered = (await f.fs.readBytes(retainedZip))!.slice(); altered[128] = altered[128]! ^ 1;
     await f.fs.writeBytes(retainedZip, altered);
     await expect(openValidationHost(f.options)).rejects.toThrow(); // A previously ready row supplies no open authority.
-    expect((await listValidationProjects(f.options, f.options.openStorage))[0]!.state).toBe('unavailable');
+    show.mockClear();
+    expect((await listValidationProjects(f.options, f.options.openStorage, { run: f.run, show }))[0]!.state).toBe('unavailable');
+    expect(show).toHaveBeenCalledExactlyOnceWith(null);
     expect(await f.fs.readBytes(retainedZip)).toEqual(altered);
     expect(await f.factory().loadRange([])).toEqual(originalDb);
   }, 60000);

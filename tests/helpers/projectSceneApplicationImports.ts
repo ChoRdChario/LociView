@@ -399,6 +399,7 @@ export const projectSceneApplicationImports:Readonly<Record<string,readonly stri
     "../projectFiles/sendWorkspace",
     "../projectFiles/validation",
     "../projectPackage/reviewEditControls",
+    "../scene/resolve",
     "./validationGeneration",
     "./validationHost"
   ],
@@ -581,6 +582,7 @@ export const projectSceneApplicationImports:Readonly<Record<string,readonly stri
     "./hostPorts",
     "./modelCandidatePreview",
     "./productWorkspace",
+    "./resumeReading",
     "./reviewView",
     "./reviewWorkspace",
     "./validationCatalog",
@@ -591,6 +593,9 @@ export const projectSceneApplicationImports:Readonly<Record<string,readonly stri
   ],
   "src/projectScene/viewCandidateLabels.ts": [
     "../scene/projectProvider"
+  ],
+  "src/projectScene/resumeReading.ts": [
+    "./validationCatalog"
   ],
   "src/projectScene/viewDisplay.ts": [
     "../scene/types",
