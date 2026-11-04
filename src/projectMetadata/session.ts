@@ -160,10 +160,11 @@ export class MetadataProjectSession {
         witness();
         for (const head of entry.publication!.heads) if (!originals.has(head)) fail('published-history-missing');
         for (const bytes of await this.journal.validateParts(entry.prepared!)) {
-          partHashes.add(A.decodeChange(bytes).hash);
-          const included = originals.get(A.decodeChange(bytes).hash);
+          const hash = A.decodeChange(bytes).hash;
+          partHashes.add(hash);
+          const included = originals.get(hash);
           if (!included || !equalBytes(included, bytes)) fail('published-transaction-missing');
-          if (['initialize', 'localCommand', 'importClean'].includes(entry.start.purpose)) localChanges.add(A.decodeChange(bytes).hash);
+          if (['initialize', 'localCommand', 'importClean'].includes(entry.start.purpose)) localChanges.add(hash);
         }
         if (entry.start.purpose === 'importWorkspace') await this.journal.validateImport(entry.prepared!);
         else if (entry.start.purpose === 'importClean') await CleanInputJob.validateJournalFresh(this.fs, entry.start.transactionId, this.limits, entry.prepared!);

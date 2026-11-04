@@ -1605,6 +1605,15 @@ evade the chunk bound. Whole-file buffering is not an export fallback.
 It does not publish Project data, mutate CAS metadata or turn verification into
 a repair. Missing/corrupt input is reported to the caller and must be resolved
 before a later capture can complete.
+
+The read-only CAS open uses the body handle from its own successful fresh
+suspect-marker, exact receipt and size observation. It does not immediately
+reopen the same receipt and body within that call. Every later open observes
+storage afresh, and consuming either the stream or the native Blob still
+checks the captured bytes against the exact SHA-256 and length. The handle
+does not guarantee continued storage presence after observation. Diagnostic
+opens, write/readback, suspect persistence and recovery fences keep their
+existing behavior.
 Recheck ready/token/publication after asynchronous verification; missing, corrupt,
 pending, stale or cancelled work produces no completed capture. The returned owned
 bytes/descriptors are not a durable job, output receipt, exchange base, file-save

@@ -8,6 +8,12 @@ preserve existing changes. Do not reconstruct current work from old checkpoints.
 
 ## Current boundary
 
+The next Ki84 cold run separates ZIP, journal, Session, repository, original
+payloads and base checks. The read-only body phase now opens each receipt and
+object once per check, and decoded history is reused within the same read.
+Ki84 record readiness averaged20.489→19.160s on this run. See todo for exact
+conditions, independently reviewed contracts and remaining startup cost.
+
 Ki84 cold resume first Caption improved from22.326s to19.961s in two copied
 profiles per build. The selected catalog row reuses its own verified read;
 actual resume and recovery checks remain separate. Previous/Next no longer

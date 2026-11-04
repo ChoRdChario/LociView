@@ -8,6 +8,8 @@ import { BlobStoreError, checkedBlobStream, storedBlobStream, type BlobDigest, t
 
 export interface StoredBlobRef extends BlobDigest { readonly algorithm: 'sha256'; readonly mediaType: string }
 export type BlobPresence = 'verified-present' | 'missing' | 'suspect' | 'unverified';
+type BlobObservation = { presence: 'verified-present'; file: WorkspaceReadableFile } |
+  { presence: Exclude<BlobPresence, 'verified-present'> };
 export interface BlobStoreLimits extends BlobStreamLimits { readonly metadata: MetadataLimits }
 interface Receipt extends BlobDigest { version: 'cas-object-1'; objectId: string }
 const root = 'v2/cas', lockId = 'v2-cas';
@@ -100,13 +102,17 @@ export class OriginBlobStore {
     });
   }
   async inspect(input: JsonObject | StoredBlobRef): Promise<BlobPresence> {
-    const ref = this.ref(input);
+    return (await this.observe(this.ref(input))).presence;
+  }
+  private async observe(ref: StoredBlobRef): Promise<BlobObservation> {
     try {
-      if (this.suspect.has(ref.digest) || await this.readFS.exists(suspectPath(ref.digest))) return 'suspect';
-      const r = await this.receipt(this.readFS, ref); if (!r) return 'unverified';
+      if (this.suspect.has(ref.digest) || await this.readFS.exists(suspectPath(ref.digest))) return { presence: 'suspect' };
+      const r = await this.receipt(this.readFS, ref); if (!r) return { presence: 'unverified' };
       const file = await this.readFS.readStream(objectPath(r.objectId));
-      return !file ? 'missing' : file.size !== ref.byteLength ? 'suspect' : 'verified-present';
-    } catch { return 'suspect'; }
+      if (!file) return { presence: 'missing' };
+      if (file.size !== ref.byteLength) return { presence: 'suspect' };
+      return { presence: 'verified-present', file };
+    } catch { return { presence: 'suspect' }; }
   }
   private async readStored(input: JsonObject | StoredBlobRef) {
     const ref = this.ref(input);
@@ -148,7 +154,9 @@ export class OriginBlobStore {
       if (!Number.isSafeInteger(n) || n <= 0) throw new BlobStoreError('invalid');
     const limits = { maxBlobBytes: Math.min(ceiling.maxBlobBytes, this.limits.maxBlobBytes),
       maxChunkBytes: Math.min(ceiling.maxChunkBytes, this.limits.maxChunkBytes), maxChunks: Math.min(ceiling.maxChunks, this.limits.maxChunks) };
-    const { ref, file } = await this.readStored(input);
+    const ref = this.ref(input), observation = await this.observe(ref);
+    if (observation.presence !== 'verified-present') throw new BlobStoreError('unverified');
+    const { file } = observation;
     if (file.size > limits.maxBlobBytes) throw new BlobStoreError('limit');
     const checked = (input: ReadableStream<Uint8Array>, complete: () => void) => checkedBlobStream(input, limits, complete, ref);
     return { size: file.size, stream: () => checked(file.stream(), () => {}), ...this.blobView(file, ref, checked) };

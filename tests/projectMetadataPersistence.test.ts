@@ -682,12 +682,16 @@ describe('streamed bodies connected to metadata creation (memory FS/fake origin 
     const fs = new Bodies(), lock = locks(), store = new OriginBlobStore(fs, budget, lock.manager);
     const bytes = new Uint8Array([1, 2, 3]), ref = await store.put(chunks(bytes), 'application/octet-stream');
     const readerStore = new OriginBlobStore(fs, budget, null), writes = fs.writes, leases = lock.names.length;
+    const opened = vi.spyOn(fs, 'readStream');
     const consume = async (chunkLimit = 3) => {
       const file = await readerStore.openReadOnly(ref, { ...budget, maxChunkBytes: chunkLimit });
       const reader = file.stream().getReader();
       try { while (!(await reader.read()).done) {} } finally { reader.releaseLock(); }
     };
-    await consume(); await expect(consume(2)).rejects.toMatchObject({ code: 'limit' });
+    await consume();
+    expect(opened.mock.calls.filter(([path]) => path.startsWith('v2/cas/sha256/'))).toHaveLength(1);
+    expect(opened.mock.calls.filter(([path]) => path.startsWith('v2/cas/objects/'))).toHaveLength(1);
+    await expect(consume(2)).rejects.toMatchObject({ code: 'limit' });
     await expect(readerStore.openReadOnly(ref, { ...budget, maxChunks: NaN })).rejects.toMatchObject({ code: 'invalid' });
     const path = (await fs.list('v2/cas/objects/'))[0]!;
     await fs.writeBytes(path, new Uint8Array([1, 2, 4])); const afterCorruption = fs.writes;
@@ -695,6 +699,8 @@ describe('streamed bodies connected to metadata creation (memory FS/fake origin 
     expect(fs.writes).toBe(afterCorruption); expect(afterCorruption).toBe(writes + 1);
     expect(lock.names).toHaveLength(leases); expect(await fs.list('v2/cas/suspect/')).toEqual([]);
     expect(await readerStore.inspect(ref)).toBe('verified-present'); // No diagnostic marker; not a digest claim.
+    await fs.remove(path);
+    await expect(readerStore.openReadOnly(ref)).rejects.toMatchObject({ code: 'unverified' });
   });
 
   it('verifies the same captured native Blob, not another stream or a second snapshot, without read-only mutation', async () => {

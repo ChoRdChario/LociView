@@ -32,6 +32,7 @@ export interface RestoreDatabasePorts {
   originalDatabasePresent?(): Promise<boolean>;
   open: GenerationStorageOpener;
 }
+type DestinationTiming = (stage: string, milliseconds: number) => void;
 const evidence = ({ sha256, byteLength }: EvidenceRef): EvidenceRef => ({ sha256, byteLength });
 const terminal = (job: RestoreControlJob) => job.abandoned || job.result !== null;
 
@@ -268,14 +269,20 @@ export class BackupRestoreJob {
   }
   inventory(): JsonObject[] { return this.inspection.description.bodyRefs.map(r => ({ ...r })); }
   private static async verifyDestination(root: ProjectWorkspaceFS, ports: RestoreSourcePorts, factory: MetadataStorageFactory, job: RestoreControlJob,
-    limits: MetadataLimits, selected?: GenerationSelection) {
+    limits: MetadataLimits, selected?: GenerationSelection, timing?: DestinationTiming) {
+    const measure = async <T>(stage: string, action: () => Promise<T>): Promise<T> => {
+      if (!timing) return action();
+      const started = performance.now();
+      try { return await action(); }
+      finally { try { timing(stage, performance.now() - started); } catch { /* Diagnostics have no authority. */ } }
+    };
     if (!job.prepared) return fail('restore-destination-job');
     // Selection must not acknowledge a destination whose retained recovery archive is already corrupt.
-    const inspection = await this.inspectInput(root, job.id, job.prepared, limits);
+    const inspection = await measure('archive', () => this.inspectInput(root, job.id, job.prepared!, limits));
     if (job.start?.schema === 'lociview-local-restore-start-2' && (job.prepared.schema !== 'lociview-local-restore-prepared-2' ||
       !restoreEqual(job.start.backup, { proof: inspection.source.proof, heads: [...inspection.source.heads] }) || !restoreEqual(job.prepared.backup, job.start.backup)))
       fail('restore-input-backup');
-    const restored = await new TransactionJournal(ports.fs, limits).readRestoredBases();
+    const restored = await measure('journal', () => new TransactionJournal(ports.fs, limits).readRestoredBases());
     if (!job.prepared || !job.start || !job.dbOpened || !restored || restored.entry.start.transactionId !== job.id ||
       !restoreEqual(restored.entry.start.proof, restoreBackupProof(job.start))) return fail('restore-destination-journal');
     const original = restored.input.proof.source;
@@ -283,23 +290,26 @@ export class BackupRestoreJob {
       if (!restoreEqual(original[key], job.prepared[key])) fail('restore-destination-originals');
     const destination = { journal: restoreRef(restored.entry.prepared), publication: restoreRef(restored.entry.publication), baseBinding: restoreRef(restored.binding) };
     if (selected && !restoreEqual(destination, selected.destination)) fail('restore-destination-binding');
-    const read = await ports.session.read();
+    const read = await measure('session', () => ports.session.read());
     if (read.state !== 'ready' || !read.source || !read.publication || read.provider?.kind !== 'scene-provider' ||
       read.provider.token !== read.source.token) return fail('restore-destination-not-ready');
-    const saved = await new MetadataRepository(ports.fs, factory, limits).read(restored.entry.start.repositoryId, restored.source.proof, read.source.heads);
+    const saved = await measure('repository', () => new MetadataRepository(ports.fs, factory, limits).read(restored.entry.start.repositoryId, restored.source.proof, read.source!.heads));
     if (saved?.token !== read.source.token) return fail('restore-destination-database');
-    for (const ref of restored.description.bodyRefs) {
-      const file = await ports.store.openReadOnly(ref), reader = file.stream().getReader();
-      try { while (!(await reader.read()).done) { /* verified stream, no body accumulation */ } }
-      finally { try { await reader.cancel(); } finally { reader.releaseLock(); } }
-    }
-    await new WorkspaceBaseStore(ports.fs, limits, restored.source.proof).snapshot();
+    await measure('bodies', async () => {
+      for (const ref of restored.description.bodyRefs) {
+        const file = await ports.store.openReadOnly(ref), reader = file.stream().getReader();
+        try { while (!(await reader.read()).done) { /* verified stream, no body accumulation */ } }
+        finally { try { await reader.cancel(); } finally { reader.releaseLock(); } }
+      }
+    });
+    await measure('bases', () => new WorkspaceBaseStore(ports.fs, limits, restored.source.proof).snapshot());
     return { destination, read };
   }
   /** Resolve existing selected data only. Read permission survives a pending restore; ordinary writes do not. */
   static async openSelected(root: ProjectWorkspaceFS, limits: MetadataLimits, databases: RestoreDatabasePorts,
     createPorts: (scope: Awaited<ReturnType<typeof openWorkspaceGeneration>>) => RestoreSourcePorts,
-    observeCatalogRead?: (read: MetadataSessionRead) => void) {
+    diagnostics?: { observeCatalogRead?: (read: MetadataSessionRead) => void; timing?: DestinationTiming }) {
+    const observeCatalogRead = diagnostics?.observeCatalogRead, timing = diagnostics?.timing;
     const state = await reconcileRestoreDatabases(root, limits, () => databases.listGenerations()), selected = state.selection,
       generationId = state.tail?.jobId ?? null;
     const checkSelected = async () => {
@@ -320,7 +330,7 @@ export class BackupRestoreJob {
       if (state.tail) {
         const job = state.jobs.find(j => j.id === generationId)!;
         if (!job.prepared) return fail('restore-destination-job');
-        const verified = await this.verifyDestination(root, ports, scope.factory, job, limits, state.tail);
+        const verified = await this.verifyDestination(root, ports, scope.factory, job, limits, state.tail, timing);
         if (observeCatalogRead) catalogRead = verified.read;
       }
       await scope.check();

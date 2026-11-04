@@ -105,18 +105,18 @@ export class MetadataRepository {
       if (!heads) return ProjectMetadataSource.reopen(parts, proof, this.limits);
       // 3.4.1 getAllChanges(view) ignores the view heads. Select causal ancestors from exact source instead.
       if (!heads.length || json([...heads].sort()) !== json([...new Set(heads)].sort())) fail('read-heads');
-      const byHash = new Map(parts.map(bytes => { const change = A.decodeChange(bytes); return [change.hash, { change, bytes }]; }));
+      const decoded = parts.map(bytes => ({ bytes, change: A.decodeChange(bytes) }));
+      const byHash = new Map(decoded.map(({ change }) => [change.hash, change]));
       const selected = new Set<string>(), pending = [...heads]; let work = 0;
       while (pending.length) {
         if (++work > this.limits.maxWork) fail('read-heads-budget');
         const hash = pending.pop()!; if (selected.has(hash)) continue;
         const found = byHash.get(hash); if (!found) return fail('read-head-missing');
-        selected.add(hash); pending.push(...found.change.deps);
+        selected.add(hash); pending.push(...found.deps);
       }
-      const exact = parts.filter(b => selected.has(A.decodeChange(b).hash));
+      const exact = decoded.filter(({ change }) => selected.has(change.hash)).map(({ bytes }) => bytes);
       const source = ProjectMetadataSource.reopen(exact, proof, this.limits);
-      const [reopened] = A.applyChanges(A.init(), source.originalChanges());
-      if (json(A.getHeads(reopened).sort()) !== json([...heads].sort())) fail('read-heads-mismatch');
+      if (json(source.heads) !== json([...heads].sort())) fail('read-heads-mismatch');
       return source;
     });
   }

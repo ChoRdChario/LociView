@@ -550,6 +550,45 @@ checkpoint1059s, followed by HEIC isolation. No product runtime code changed
 after the paired browser run. Next measure retained ZIP scan, durable DB and
 protected body verification separately within the still-dominant generation
 opening stage, and keep ordinary-PC/device qualification separate.
+Checkpoint `bfb962e` is on `g0-baseline`; [Linux CI41751040247](https://github.com/ChoRdChario/LociView/actions/runs/41751040247)
+passed typecheck, full root tests, build and HEIC isolation in11m53s.
+
+### Current unit —simplify selected-generation verification
+
+Break the selected-generation step into retained archive, journal, provider,
+durable repository, protected bodies and base table spans. Compare the exact
+same cold Ki84 profile on timing-only and candidate builds. Remove repeat work
+inside one owned operation where the same checks can supply the needed result.
+Keep fresh catalog/host observations, archive and body hashes, write/selection
+fences, repair and recovery behavior. Verify with the existing corruption and
+recovery cases, independent review and final checks. Report observed wall time
+and residual cost separately.
+
+Same dedicated Chromium156 and saved Ki84 profile, two clean copies per build.
+Baseline was timing instrumentation only. Caption readiness21.562/19.415s
+to18.993/19.327s (mean20.489→19.160); 3D ready27.173→25.421s mean.
+Combined catalog/host protected-body phase1.696→1.392s mean. Each pass
+checks43 bodies: OPFS receipt/body `readStream` opens172→86 and receipt
+`readBytes`86→43, while stream SHA-256 and byte-length verification remain.
+Archive inspection still runs twice (~2.8s combined). Session projection and
+overall variance are separate from the observed direct savings. Metadata uses
+one decoded change per selected-head lookup and one validated reconstructed
+source; exact ordered bytes, matching heads, fresh durable reads and selection
+boundaries remain. Read-only CAS opens use their one fresh checked file handle;
+the next open still detects missing storage, and current bytes are still hashed.
+Diagnostic and writer paths retain their checks. Independent diff review PASS;
+97 targeted persistence/architecture tests passed, including exact chunk,
+same-size corruption, subsequent missing-body and no diagnostic write checks.
+The normal Desktop Ki84 journey passed first restore, Scene/search/photo and
+Caption navigation, one body edit, external backup and full browser restart.
+Exact identity, 43 retained blobs and three previous changes plus one edit
+passed archive inspection. One observed edit9.355s and export25.288s are
+acceptance observations; the cold comparison above is the paired experiment.
+Windows final checkpoint and HEIC isolation passed on freeze `577bd59f`
+(147 files,3,282 passing,21 existing TODOs; Vitest870.95s, checkpoint947.1s).
+Next examine the record-display boundary separately from full edit readiness
+and profile the remaining Session/ZIP work before proposing any change to
+when verification completes. Preserve existing selection and write authority.
 
 ## Completed boundary —06c bounded restore content inspection
 

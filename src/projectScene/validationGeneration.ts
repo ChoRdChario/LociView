@@ -6,7 +6,7 @@ import { validationProjectService } from '../projectFiles/creation';
 import { validationMetadataLimits as limits } from '../projectFiles/validation';
 import type { MetadataSessionRead, ValidationHostOptions } from './validationHost';
 
-type Options = Pick<ValidationHostOptions, 'run' | 'openStorage' | 'generations' | 'store' | 'fileLimits' | 'filePolicy' | 'decode' | 'jpeg' | 'photo' | 'mediaDecoders'>;
+type Options = Pick<ValidationHostOptions, 'run' | 'openStorage' | 'generations' | 'store' | 'fileLimits' | 'filePolicy' | 'decode' | 'jpeg' | 'photo' | 'mediaDecoders' | 'timing'>;
 export function validationGenerationDatabases(options: Pick<Options, 'run' | 'openStorage' | 'generations'>): RestoreDatabasePorts {
   // Original-only injected hosts cannot activate or invent a dedicated database.
   return options.generations?.(options.run) ?? { listGenerations: async () => [], open: (id, create) => {
@@ -45,7 +45,10 @@ export async function openValidationGeneration(root: ProjectWorkspaceFS, options
     assertSelected: async () => { const current = await readRestoreControls(root, limits);
       if (current.selection) throw Error('プロジェクトの作成先が変わりました。'); },
     assertWritable: async () => { if ((await readRestoreControls(root, limits)).pending) throw Error('バックアップの復元が未完了です。'); } }, databases.open) :
-    await BackupRestoreJob.openSelected(root, limits, databases, selected => service = validationGenerationService(selected, options), options.observeCatalogRead);
+    await BackupRestoreJob.openSelected(root, limits, databases, selected => service = validationGenerationService(selected, options), {
+      observeCatalogRead: options.observeCatalogRead,
+      timing: options.timing && ((stage, ms) => options.timing!(`${options.observeCatalogRead ? 'catalog' : 'host'}.destination.${stage}`, ms)),
+    });
   try {
     service ??= validationGenerationService(scope, options);
     const current = await readRestoreControls(root, limits);
