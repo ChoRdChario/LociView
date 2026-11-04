@@ -1,4 +1,4 @@
-import { closeFileSurface, revealFileSurface } from './workspaceUi';
+import { selectShareOutput,  closeFileSurface, revealFileSurface } from './workspaceUi';
 import { revealModelManagement, lookAlongFront, revealProjectSelection, revealCaptionList } from './workspaceUi';
 import * as THREE from 'three';
 import { serializeGlb } from '../../src/assets/glbOptimize';
@@ -32,10 +32,10 @@ async function edit(page: Page, title: string, body: string) {
 async function download(page: Page, info: TestInfo, name: string, purpose: 'backup' | 'teamWorkspace' | 'contribution' | 'review', base?: string) {
   const menu=page.locator('details.lv-project-files'); if(await menu.count()&&!await menu.evaluate(n=>(n as HTMLDetailsElement).open))await menu.locator(':scope > summary').click();
   const area = files(page),compact=await revealFileSurface(page,purpose==='backup'?'保存':'共有');
-  if(compact){if(purpose!=='backup')await area.getByLabel('渡す内容',{exact:true}).selectOption(purpose);}
+  if(compact){if(purpose!=='backup')await selectShareOutput(area, purpose);}
   else if (purpose === 'review') { await area.locator('summary').filter({hasText:/^その他$/}).click(); await area.getByRole('button',{name:'シーンを共有',exact:true}).click(); } else await area.getByRole('button', { name: purpose === 'backup' ? '保存' : '相手に渡す', exact: true }).click();
   if (purpose === 'backup') await area.getByLabel('名前（任意）', { exact: true }).fill(name);
-  else if (purpose !== 'review') { if(!compact)await area.getByLabel('渡す内容', { exact: true }).selectOption(purpose); if (base) await area.getByLabel('元にする作業一式', { exact: true }).selectOption(base); }
+  else if (purpose !== 'review') { if(!compact)await selectShareOutput(area, purpose); if (base) await area.getByLabel('元にする作業一式', { exact: true }).selectOption(base); }
   if (purpose === 'review') { const scene = area.getByLabel('渡すシーン',{exact:true}); const ids = await scene.locator('option').evaluateAll(nodes=>nodes.map(n=>(n as HTMLOptionElement).value).filter(Boolean)); await scene.selectOption(ids[0]!); await area.getByRole('button',{name:'内容を確認',exact:true}).click(); }
   const primary=area.locator('button.lv-file-primary'); await expect(primary).toHaveText(purpose==='backup'?'ファイルに保存':'ダウンロード',{timeout:180_000}); await expect(primary).toBeEnabled({timeout:180_000});
   const [result] = await Promise.all([page.waitForEvent('download', { timeout: 180_000 }), primary.click()]);

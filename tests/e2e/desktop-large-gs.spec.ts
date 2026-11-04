@@ -1,5 +1,6 @@
+import { writeCleanImportFixture } from './cleanImportFixture';
 import { desktopEntry, desktopOrigin } from './desktopEntry';
-import { closeFileSurface, revealFileSurface, lookAlongFront } from './workspaceUi';
+import { selectShareOutput,  closeFileSurface, revealFileSurface, lookAlongFront } from './workspaceUi';
 import {test,expect,chromium,type Page,type BrowserContext,type TestInfo} from '@playwright/test';
 import {mkdir,mkdtemp} from 'node:fs/promises';
 import {openAsBlob} from 'node:fs';
@@ -19,19 +20,19 @@ const tracing=process.env.LOCIVIEW_E2E_TRACE==='1';
 const files=(p:Page)=>p.getByRole('region',{name:'ファイル',exact:true});
 const models=(p:Page)=>p.getByRole('tabpanel',{name:'モデル',exact:true});
 async function ready(p:Page){await expect(p.getByRole('heading',{name:'プロジェクト名',exact:true})).toHaveText('大容量SH4',{timeout:240_000});await expect(p.locator('.lv-project-viewport-status')).toBeEmpty({timeout:180_000});}
-async function output(p:Page,info:TestInfo,name:string,purpose:'backup'|'teamWorkspace'|'contribution'|'review'|'clean',base?:string){
+async function output(p:Page,info:TestInfo,name:string,purpose:'backup'|'teamWorkspace'|'contribution'|'review',base?:string){
  const menu=p.locator('details.lv-project-files');if(await menu.count()&&!await menu.evaluate(n=>(n as HTMLDetailsElement).open))await menu.locator(':scope > summary').click();
  const area=files(p);
  const compact=await revealFileSurface(p,purpose==='backup'?'保存':'共有');
-  if(compact){if(purpose!=='backup')await area.getByLabel('渡す内容',{exact:true}).selectOption(purpose);}
-  else if(purpose==='review'||purpose==='clean'){
+  if(compact){if(purpose!=='backup')await selectShareOutput(area, purpose);}
+  else if(purpose==='review'){
   const more=area.locator('summary').filter({hasText:/^その他$/});if(!await more.evaluate(n=>(n.parentElement as HTMLDetailsElement).open))await more.click();
-  await area.getByRole('button',{name:purpose==='review'?'シーンを共有':'独立コピーを作る',exact:true}).click();
+  await area.getByRole('button',{name:'シーンを共有',exact:true}).click();
  }else await area.getByRole('button',{name:purpose==='backup'?'保存':'相手に渡す',exact:true}).click();
  if(purpose==='backup')await area.getByLabel('名前（任意）',{exact:true}).fill(name);
- else if(purpose!=='review'&&purpose!=='clean'){if(!compact)await area.getByLabel('渡す内容',{exact:true}).selectOption(purpose);if(base)await area.getByLabel('元にする作業一式',{exact:true}).selectOption(base);}
+ else if(purpose!=='review'){if(!compact)await selectShareOutput(area, purpose);if(base)await area.getByLabel('元にする作業一式',{exact:true}).selectOption(base);}
  if(purpose==='review'){const scenes=area.getByLabel('渡すシーン',{exact:true});await scenes.selectOption((await scenes.locator('option').evaluateAll(nodes=>nodes.map(n=>(n as HTMLOptionElement).value).filter(Boolean)))[0]!);}
- if(purpose==='review'||purpose==='clean')await area.getByRole('button',{name:'内容を確認',exact:true}).click();
+ if(purpose==='review')await area.getByRole('button',{name:'内容を確認',exact:true}).click();
  const primary=area.locator('button.lv-file-primary');await expect(primary).toBeEnabled({timeout:300_000});
  const [download]=await Promise.all([p.waitForEvent('download',{timeout:300_000}),primary.click()]);const path=info.outputPath(name+'.zip');await download.saveAs(path);expect(await download.failure()).toBeNull();
  await expect(area.locator('.lv-operation-status')).toHaveAttribute('data-busy','false',{timeout:300_000});await closeFileSurface(p);return path;
@@ -71,7 +72,7 @@ test('PC入口で50万点SH4の全5用途・返送・Review編集コピー・復
   const peer=await launch(1);await open(peer.p,workspacePath);await ready(peer.p);await peer.p.getByRole('list',{name:'キャプション一覧',exact:true}).locator('.lv-caption-select').first().click();const pd=peer.p.getByRole('region',{name:'キャプションの詳細',exact:true});await pd.getByLabel('本文',{exact:true}).fill('相手から返送');await pd.getByRole('button',{name:'変更を適用',exact:true}).click();await expect(peer.p.getByText('変更を適用しました。',{exact:true})).toBeVisible({timeout:240_000});
   const returned=await output(peer.p,info,'large-return','contribution',workspace.archive.control.manifest.packageId),receive=p.getByRole('region',{name:'更新ファイル',exact:true});await revealFileSurface(p,'受信');await receive.getByLabel('更新ファイルを選択',{exact:true}).setInputFiles(returned);await receive.getByRole('button',{name:'更新を受け取る',exact:true}).click();await expect(receive.getByText('更新を受け取りました。',{exact:true})).toBeVisible({timeout:240_000});await ready(p);await close(peer.context,'peer');await mark('returned',p);
   const receivedPath=await output(p,info,'large-received','backup'),received=await backup(receivedPath);expect(received.records.representationsById[original.gs.id]).toEqual(original.gs);expect(received.records.captionsById[caption.id]).toMatchObject({body:'相手から返送',anchor:caption.anchor});
-  const reviewPath=await output(p,info,'large-review','review'),cleanPath=await output(p,info,'large-clean','clean');expect((await PackageArchive.inspect(await openAsBlob(reviewPath))).control.manifest.purpose).toBe('review');expect((await PackageArchive.inspect(await openAsBlob(cleanPath))).control.manifest.purpose).toBe('clean');await mark('review-clean',p);await close(a.context,'a-received');
+  const reviewPath=await output(p,info,'large-review','review'),cleanPath=await writeCleanImportFixture(receivedPath,info.outputPath('large-clean.zip'));expect((await PackageArchive.inspect(await openAsBlob(reviewPath))).control.manifest.purpose).toBe('review');expect((await PackageArchive.inspect(await openAsBlob(cleanPath))).control.manifest.purpose).toBe('clean');await mark('review-clean',p);await close(a.context,'a-received');
   const review=await launch(2);await open(review.p,reviewPath);await expect(review.p.getByText('閲覧用シーンを開きました。編集プロジェクトは作成していません。',{exact:true})).toBeVisible({timeout:240_000});await expect(review.p.getByRole('main',{name:'閲覧用のシーン',exact:true}).locator(':scope > [role="status"]')).toBeEmpty({timeout:180_000});await mark('review-open',review.p);
   const contender=await review.context.newPage();await contender.goto(entry);await contender.evaluate(()=>new Promise<void>(ready=>{
     (window as any).packageHeld=navigator.locks.request('lociview:package-operation:v1',()=>new Promise<void>(release=>{(window as any).releasePackage=release;ready();}));}));

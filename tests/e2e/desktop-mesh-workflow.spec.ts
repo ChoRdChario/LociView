@@ -1,5 +1,6 @@
+import { writeCleanImportFixture } from './cleanImportFixture';
 import { desktopEntry, desktopOrigin } from './desktopEntry';
-import { closeFileSurface, beginMaterialEditing, revealCaptionList } from './workspaceUi';
+import { selectShareOutput,  closeFileSurface, beginMaterialEditing, revealCaptionList } from './workspaceUi';
 import { revealFileSurface, revealModelManagement, lookAlongFront } from './workspaceUi';
 import {test,expect,chromium,type Page,type BrowserContext,type TestInfo} from '@playwright/test';
 import {mkdir,mkdtemp,writeFile} from 'node:fs/promises';
@@ -24,19 +25,19 @@ async function ready(p:Page,expected=title,notice:'clear'|'smooth'='clear'){awai
 async function open(p:Page,path:string){await p.getByLabel('ファイルを選択',{exact:true}).setInputFiles(path);await p.getByRole('button',{name:'ファイルを開く',exact:true}).click();}
 async function selectCaption(p:Page,label?:string){await revealCaptionList(p);await p.getByRole('tab',{name:'キャプション',exact:true}).click();const rows=p.getByRole('list',{name:'キャプション一覧',exact:true}).locator('.lv-caption-select');await(label?rows.filter({hasText:label}):rows.first()).click();}
 async function edit(p:Page,field:'タイトル'|'本文',text:string){await closeFileSurface(p);await detail(p).getByLabel(field,{exact:true}).fill(text);await detail(p).getByRole('button',{name:'変更を適用',exact:true}).click();await expect(p.getByText('変更を適用しました。',{exact:true})).toBeVisible({timeout:180000});}
-async function output(p:Page,info:TestInfo,name:string,purpose:'backup'|'teamWorkspace'|'contribution'|'review'|'clean',base?:string,reviewScene?:string){
+async function output(p:Page,info:TestInfo,name:string,purpose:'backup'|'teamWorkspace'|'contribution'|'review',base?:string,reviewScene?:string){
   const menu=p.locator('details.lv-project-files');if(await menu.count()&&!await menu.evaluate(n=>(n as HTMLDetailsElement).open))await menu.locator(':scope > summary').click();
   const area=files(p);
   const compact=await revealFileSurface(p,purpose==='backup'?'保存':'共有');
-  if(compact){if(purpose!=='backup')await area.getByLabel('渡す内容',{exact:true}).selectOption(purpose);}
-  else if(purpose==='review'||purpose==='clean'){
+  if(compact){if(purpose!=='backup')await selectShareOutput(area, purpose);}
+  else if(purpose==='review'){
     const more=area.locator('summary').filter({hasText:/^その他$/});if(!await more.evaluate(n=>(n.parentElement as HTMLDetailsElement).open))await more.click();
-    await area.getByRole('button',{name:purpose==='review'?'シーンを共有':'独立コピーを作る',exact:true}).click();
+    await area.getByRole('button',{name:'シーンを共有',exact:true}).click();
   }else await area.getByRole('button',{name:purpose==='backup'?'保存':'相手に渡す',exact:true}).click();
   if(purpose==='backup')await area.getByLabel('名前（任意）',{exact:true}).fill(name);
-  else if(purpose!=='review'&&purpose!=='clean'){if(!compact)await area.getByLabel('渡す内容',{exact:true}).selectOption(purpose);if(base)await area.getByLabel('元にする作業一式',{exact:true}).selectOption(base);}
+  else if(purpose!=='review'){if(!compact)await selectShareOutput(area, purpose);if(base)await area.getByLabel('元にする作業一式',{exact:true}).selectOption(base);}
   if(purpose==='review'){const scenes=area.getByLabel('渡すシーン',{exact:true});await scenes.selectOption(reviewScene?{label:reviewScene}:(await scenes.locator('option').evaluateAll(ns=>ns.map(n=>(n as HTMLOptionElement).value).filter(Boolean)))[0]!);}
-  if(purpose==='review'||purpose==='clean')await area.getByRole('button',{name:'内容を確認',exact:true}).click();
+  if(purpose==='review')await area.getByRole('button',{name:'内容を確認',exact:true}).click();
   const primary=area.locator('button.lv-file-primary');await expect(primary).toBeEnabled({timeout:300000});
   const [download]=await Promise.all([p.waitForEvent('download',{timeout:300000}),primary.click()]);const path=info.outputPath(name+'.zip');await download.saveAs(path);expect(await download.failure()).toBeNull();
   await expect(area.locator('.lv-operation-status')).toHaveAttribute('data-busy','false',{timeout:300000});await closeFileSurface(p);return path;
@@ -154,7 +155,7 @@ for(const opaqueMaterials of [false,true,'standard']as const)test(opaqueMaterial
       if(round===1){workspace=await output(a.p,info,'workspace-2','teamWorkspace');wire=await WorkspaceArchive.inspect(await openAsBlob(workspace),limits);const incoming=b.p.getByRole('region',{name:'更新ファイル',exact:true});await revealFileSurface(b.p,'受信');await incoming.getByLabel('更新ファイルを選択',{exact:true}).setInputFiles(workspace);await incoming.getByRole('button',{name:'更新を受け取る',exact:true}).click();await expect(incoming.getByText('更新を受け取りました。',{exact:true})).toBeVisible({timeout:180000});await ready(b.p,title,standard?'smooth':'clear');}
     }
     await run.close(b.context);await run.mark('two-rounds',a.p);
-    const finalPath=await output(a.p,info,'final','backup'),final=await backup(finalPath),reviewPath=await output(a.p,info,'review','review',undefined,opaqueMaterials?'観察':undefined),cleanPath=await output(a.p,info,'clean','clean');
+    const finalPath=await output(a.p,info,'final','backup'),final=await backup(finalPath),reviewPath=await output(a.p,info,'review','review',undefined,opaqueMaterials?'観察':undefined),cleanPath=await writeCleanImportFixture(finalPath,info.outputPath('clean.zip'));
     if(opaqueMaterials)expect(materialMeaning(final.records)).toEqual(materialMeaning(first.records));
     for(const path of [workspace,finalPath,reviewPath,cleanPath]){const archive=await PackageArchive.inspect(await openAsBlob(path));expect(archive.control.manifest.blobs.some(b=>b.sha256===fixture.originalDigest)).toBe(false);}
     await run.close(a.context);a=await run.launch(0);await ready(a.p,title,standard?'smooth':'clear');expect((await backup(await output(a.p,info,'cold','backup'))).archive.source.token).toBe(final.archive.source.token);await run.close(a.context);

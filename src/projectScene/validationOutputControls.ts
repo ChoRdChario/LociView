@@ -13,11 +13,20 @@ export function createValidationOutputControls(document: Document, host: ReturnT
   select.type = 'file'; select.setAttribute('aria-label', '保存したファイルを選択'); select.hidden = true;
   const nameField = document.createElement('label'), nameInput = document.createElement('input');
   nameField.textContent = '名前（任意）'; nameInput.type = 'text'; nameInput.setAttribute('aria-label', '名前（任意）'); nameField.append(nameInput);
+  const shareOptions = document.createElement('div'), partialLabel = document.createElement('label'), partial = document.createElement('input'), partialText = document.createElement('span');
+  const scopeLabel = document.createElement('label'), scope = document.createElement('select');
+  shareOptions.className = 'lv-share-scope'; partialLabel.className = 'lv-share-partial';
+  partial.type = 'checkbox'; partialText.textContent = '一部だけ出力'; partial.setAttribute('aria-label', partialText.textContent); partialLabel.append(partial, partialText);
+  scopeLabel.textContent = '出力する内容'; scope.setAttribute('aria-label', '出力する内容'); scopeLabel.append(scope);
+  for (const [value, text] of [['review', 'シーン'], ['contribution', '共有後の変更']] as const) {
+    const option = document.createElement('option'); option.value = value; option.textContent = text; scope.append(option);
+  }
+  shareOptions.append(partialLabel, scopeLabel);
   const history = document.createElement('details'), historyTitle = document.createElement('summary'), completedFiles = document.createElement('div');
   const primary = document.createElement('button'); primary.type = 'button'; primary.className = 'lv-file-primary'; editOnly(primary); commands.append(primary);
   historyTitle.textContent = '作成したファイル'; history.append(historyTitle, completedFiles);
-  root.append(heading, actions, nameField, commands, status, list, history, select);
-  editOnly(actions, nameField, commands, select);
+  root.append(heading, shareOptions, actions, nameField, commands, status, list, history, select);
+  editOnly(shareOptions, actions, nameField, commands, select);
   let busy = false, disposed = false, feedback = '', selected: string | null = null, cancellation: string | null = null;
   let completedFeedback = false;
   let primaryAction = () => {};
@@ -28,10 +37,15 @@ export function createValidationOutputControls(document: Document, host: ReturnT
   let reviewPreview: Awaited<ReturnType<typeof host.workspaceOutput.previewReview>> | null = null, sceneId = '', omitEntry = false;
   const resetChoice = () => { purpose = presentation === 'share' ? 'teamWorkspace' : 'backup'; baseId = ''; checkpointName = ''; choicePending = false; cleanPreview = null; reviewPreview = null; sceneId = ''; omitEntry = false; };
   const choosePurpose = (next: typeof purpose, pending = true) => {
-    if (!pending && (busy || composing || choicePending || selected || cancellation)) return;
+    if (busy || composing || selected || cancellation) return;
     if (purpose === next) return;
-    if (completedFeedback) { feedback = ''; completedFeedback = false; }
+    feedback = ''; completedFeedback = false;
     purpose = next; baseId = ''; cleanPreview = null; reviewPreview = null; sceneId = ''; omitEntry = false; choicePending = pending; render(); changed();
+  };
+  const refreshChoice = (control: HTMLElement) => {
+    const label = document.activeElement === control && control.getAttribute('aria-label');
+    choicePending = true; feedback = ''; completedFeedback = false; render(); changed();
+    if (label) actions.querySelector?.<HTMLElement>(`[aria-label="${label}"]`)?.focus({ preventScroll: true });
   };
   const urls: string[] = [];
   const handedOff = new Set<string>();
@@ -111,6 +125,10 @@ export function createValidationOutputControls(document: Document, host: ReturnT
     list.replaceChildren(); completedFiles.replaceChildren();
     const viewing=host.mode?.current === 'view' || host.authority.readOnly;
     root.dataset.presentation = presentation; heading.hidden=!!viewing;heading.textContent=viewing?'':presentation === 'save' ? '保存' : presentation === 'share' ? '共有' : 'ファイル';
+    const choicesDisabled = busy || composing || otherBusy() || !!host.authority.readOnly || !!selected || !!cancellation;
+    shareOptions.hidden = presentation !== 'share';
+    partial.checked = purpose === 'review' || purpose === 'contribution'; partial.disabled = choicesDisabled;
+    scopeLabel.hidden = !partial.checked; scope.value = purpose === 'contribution' ? 'contribution' : 'review'; scope.disabled = choicesDisabled;
     if (presentation === 'all') {
     const save = button(actions, '保存', () => choosePurpose('backup'));
     save.setAttribute('aria-pressed', String(purpose === 'backup'));
@@ -121,20 +139,23 @@ export function createValidationOutputControls(document: Document, host: ReturnT
     button(more, 'シーンを共有', () => choosePurpose('review')).setAttribute('aria-pressed', String(purpose === 'review'));
     button(more, '独立コピーを作る', () => choosePurpose('clean')).setAttribute('aria-pressed', String(purpose === 'clean'));
     }
-    const label = document.createElement('label'), kind = document.createElement('select'); label.textContent = '渡す内容';
-    kind.setAttribute('aria-label', '渡す内容');
-    for (const [value, text] of (presentation === 'share' ? [['teamWorkspace', '作業一式'], ['contribution', '変更分'], ['review', 'シーン（閲覧用）'], ['clean', '独立コピー']] : [['teamWorkspace', '作業一式'], ['contribution', '変更分']])) {
-      const option = document.createElement('option'); option.value = value!; option.textContent = text!; kind.append(option);
+    if (presentation === 'all' && (purpose === 'teamWorkspace' || purpose === 'contribution')) {
+      const label = document.createElement('label'), kind = document.createElement('select'); label.textContent = '渡す内容';
+      kind.setAttribute('aria-label', '渡す内容');
+      for (const [value, text] of [['teamWorkspace', '作業一式'], ['contribution', '変更分']] as const) {
+        const option = document.createElement('option'); option.value = value; option.textContent = text; kind.append(option);
+      }
+      kind.value = purpose; kind.disabled = choicesDisabled; label.append(kind); actions.append(label);
+      kind.addEventListener('change', () => {
+        if (!kind.disabled && (kind.value === 'teamWorkspace' || kind.value === 'contribution')) choosePurpose(kind.value);
+      });
     }
-    kind.value = purpose; kind.disabled = busy || composing || otherBusy() || !!host.authority.readOnly; label.append(kind);
-    if (presentation === 'share' || purpose === 'teamWorkspace' || purpose === 'contribution') actions.append(label);
     nameField.hidden = purpose !== 'backup'; nameInput.disabled = busy || otherBusy() || !!host.authority.readOnly;
     if(purpose==='backup'){const scope=document.createElement('p');scope.textContent='モデル・メディアと履歴を含む作業全体を、バックアップに書き出します。';actions.append(scope);}
+    if (presentation === 'share' && purpose === 'teamWorkspace') {
+      const note = document.createElement('p'); note.textContent = '全シーンと編集履歴を含みます。'; actions.append(note);
+    }
     if (!composing && nameInput.value !== checkpointName) nameInput.value = checkpointName;
-    kind.addEventListener('change', () => {
-      if (kind.disabled || !(presentation === 'share' ? ['teamWorkspace', 'contribution', 'review', 'clean'] : ['teamWorkspace', 'contribution']).includes(kind.value)) return;
-      choosePurpose(kind.value as typeof purpose);
-    });
     const chosen = host.workspaceOutput.bases.find(b => b.selection.workspacePackageId === baseId);
     const disclosure = privacyNotice(currentDisclosure());
     if (disclosure) { const privacy = document.createElement('p'); privacy.textContent = disclosure; actions.append(privacy); }
@@ -148,13 +169,14 @@ export function createValidationOutputControls(document: Document, host: ReturnT
         if (scene.lifecycle.kind !== 'value' || scene.lifecycle.value.state !== 'active' || scene.name.kind !== 'value') continue;
         const option = document.createElement('option'); option.value = scene.id; option.textContent = scene.name.value; scenes.append(option);
       }
-      scenes.value = sceneId; scenes.disabled = kind.disabled; label.append(scenes); actions.append(label);
-      scenes.addEventListener('change', () => { if (!scenes.disabled) { sceneId = scenes.value; omitEntry = false; reviewPreview = null; choicePending = true; render(); changed(); } });
+      scenes.value = sceneId; scenes.disabled = choicesDisabled; label.append(scenes); actions.append(label);
+      scenes.addEventListener('change', () => { if (!scenes.disabled) { sceneId = scenes.value; omitEntry = false; reviewPreview = null; refreshChoice(scenes); } });
       const scene = sceneRecords[sceneId];
       if (scene?.defaultViewId.kind === 'unresolved' && scene.defaultViewId.reason === 'conflict') {
         const label = document.createElement('label'), omit = document.createElement('input'); omit.type = 'checkbox'; omit.checked = omitEntry;
-        omit.disabled = kind.disabled; label.append(omit, '開始視点なしで渡す'); actions.append(label);
-        omit.addEventListener('change', () => { if (!omit.disabled) { omitEntry = omit.checked; reviewPreview = null; choicePending = true; render(); changed(); } });
+        label.textContent = '開始視点なしで渡す'; omit.setAttribute('aria-label', label.textContent);
+        omit.disabled = choicesDisabled; label.append(omit); actions.append(label);
+        omit.addEventListener('change', () => { if (!omit.disabled) { omitEntry = omit.checked; reviewPreview = null; refreshChoice(omit); } });
       }
       const help = document.createElement('p'); help.textContent = '選んだシーンのモデル・記録だけを渡します。検索や色の絞り込みは反映しません。元のプロジェクトへ変更分は返せません。'; actions.append(help);
       if (reviewPreview) {
@@ -182,8 +204,8 @@ export function createValidationOutputControls(document: Document, host: ReturnT
       for (const choice of host.workspaceOutput.bases) {
         const option = document.createElement('option'); option.value = choice.selection.workspacePackageId; option.textContent = choice.label; base.append(option);
       }
-      base.value = chosen ? baseId : ''; base.disabled = kind.disabled; label.append(base); actions.append(label);
-      base.addEventListener('change', () => { if (!base.disabled) { baseId = base.value; choicePending = true; render(); changed(); } });
+      base.value = chosen ? baseId : ''; base.disabled = choicesDisabled; label.append(base); actions.append(label);
+      base.addEventListener('change', () => { if (!base.disabled) { baseId = base.value; refreshChoice(base); } });
       const help = document.createElement('p'); help.textContent = host.workspaceOutput.bases.length ?
         '相手と共有した作業一式を選択してください。' : '先に作業一式を受け取るか、作成してください。'; actions.append(help);
     }
@@ -209,7 +231,9 @@ export function createValidationOutputControls(document: Document, host: ReturnT
     };
     create.disabled ||= purpose === 'contribution' && !chosen || purpose === 'review' && !sceneId || !!selected || !!cancellation;
     create.className = 'lv-file-primary';
-    if (choicePending) button(commands, '選択を取り消す', () => { resetChoice(); render(); changed(); });
+    if (choicePending) button(commands, '選択を取り消す', () => {
+      resetChoice(); feedback = ''; completedFeedback = false; render(); changed(); if (presentation === 'share') partial.focus();
+    });
     status.dataset.busy = String(busy);
     status.textContent = busy ? feedback : host.workspaceOutput.error || feedback;
     const currentToken = host.read().source?.token;
@@ -252,6 +276,12 @@ export function createValidationOutputControls(document: Document, host: ReturnT
     selected = null; select.value = ''; render(); changed();
   }
   select.addEventListener('cancel', cancelFileSelection);
+  partial.addEventListener('change', () => {
+    if (presentation === 'share' && !partial.disabled) choosePurpose(partial.checked ? 'review' : 'teamWorkspace', partial.checked);
+  });
+  scope.addEventListener('change', () => {
+    if (presentation === 'share' && partial.checked && !scope.disabled && (scope.value === 'review' || scope.value === 'contribution')) choosePurpose(scope.value);
+  });
   select.addEventListener('change', () => {
     const id = selected, file = select.files?.[0];
     if (!file) { cancelFileSelection(); return; }

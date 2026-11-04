@@ -1115,9 +1115,12 @@ under the software keyboard. It is not a reduced contributor mode.
 Revision/base/head/internal hashes remain hidden in ordinary idle UI. Model
 replacement, `needsReview`, conflict, package preflight and recovery reveal only
 the concise consequence/action first, with technical evidence under details.
-Team-file preflight distinguishes all five purposes, the current whole-Project
-or one-Scene scope, the selected exchange base when required, every unsent change
-class and newly required byte total. A generated-Workspace base is labelled as
+Team-file preflight discloses the current whole-Project or one-Scene scope,
+the selected exchange base when required, every unsent change class and newly
+required byte total. The product Share sheet offers whole output and a checkbox
+for selected output (one Scene or changes since an explicitly selected base).
+Backup remains under Save. Clean-copy input and previous jobs remain readable.
+A generated-Workspace base is labelled as
 valid only for a recipient of that exact Workspace; the UI never claims receipt
 or advances it merely because export completed.
 

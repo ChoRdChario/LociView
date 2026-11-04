@@ -1,5 +1,6 @@
+import { writeCleanImportFixture } from './cleanImportFixture';
 import { desktopOrigin, desktopEntry } from './desktopEntry';
-import { closeFileSurface, revealCoordinateAdd, revealFileSurface } from './workspaceUi';
+import { selectShareOutput,  closeFileSurface, revealCoordinateAdd, revealFileSurface } from './workspaceUi';
 import { test, expect, chromium, type Page, type BrowserContext, type TestInfo } from '@playwright/test';
 import { mkdir, mkdtemp, readFile } from 'node:fs/promises';
 import { resolve, sep } from 'node:path';
@@ -35,19 +36,19 @@ async function edit(p: Page, field: 'タイトル' | '本文', value: string) {a
   await detail(p).getByRole('button', { name: '変更を適用', exact: true }).click();
   await expect(p.getByText('変更を適用しました。', { exact: true })).toBeVisible({ timeout: 90_000 }); await settled(p);
 }
-async function output(p: Page, info: TestInfo, label: string, purpose: 'backup' | 'teamWorkspace' | 'contribution' | 'clean' | 'review', base?: string) {
+async function output(p: Page, info: TestInfo, label: string, purpose: 'backup' | 'teamWorkspace' | 'contribution' | 'review', base?: string) {
   const menu = p.locator('details.lv-project-files'); if (!await menu.evaluate(n => (n as HTMLDetailsElement).open)) await menu.locator(':scope > summary').click();
   const area = files(p),compact=await revealFileSurface(p,purpose==='backup'?'保存':'共有'); if(!compact)await area.getByRole('button', { name: purpose === 'backup' ? '保存' : '相手に渡す', exact: true }).click();
   if (purpose === 'backup') await area.getByLabel('名前（任意）', { exact: true }).fill(label);
-  else if (compact) await area.getByLabel('渡す内容',{exact:true}).selectOption(purpose);
-  else if (purpose === 'clean' || purpose === 'review') {
+  else if (compact) await selectShareOutput(area, purpose);
+  else if (purpose === 'review') {
     const more = area.locator('.lv-file-intents > details'); if (!await more.evaluate(n => (n as HTMLDetailsElement).open)) await more.locator('summary').click();
-    await more.getByRole('button', { name: purpose === 'clean' ? '独立コピーを作る' : 'シーンを共有', exact: true }).click();
-  } else await area.getByLabel('渡す内容', { exact: true }).selectOption(purpose);
+    await more.getByRole('button', { name: 'シーンを共有', exact: true }).click();
+  } else await selectShareOutput(area, purpose);
   if (purpose === 'contribution') await area.getByLabel('元にする作業一式', { exact: true }).selectOption(base!);
   if (purpose === 'review') { const scene = area.getByLabel('渡すシーン', { exact: true }); await scene.selectOption((await scene.locator('option').evaluateAll(ns => ns.map(n => (n as HTMLOptionElement).value).filter(Boolean)))[0]!); }
   const primary = area.locator('button.lv-file-primary');
-  if (purpose === 'clean' || purpose === 'review') { await primary.click(); await expect(primary).toHaveText('ダウンロード'); }
+  if (purpose === 'review') { await primary.click(); await expect(primary).toHaveText('ダウンロード'); }
   if (purpose === 'backup' || purpose === 'teamWorkspace') await expect(area.locator('.lv-file-intents')).toContainText('記録された編集者名を含みます。');
   if (purpose === 'contribution') await expect(area.locator('.lv-file-intents')).toContainText('今回の変更分に編集者名は含みません。');
   const [download] = await Promise.all([p.waitForEvent('download', { timeout: 120_000 }), primary.click()]);
@@ -150,7 +151,7 @@ test('08b editor names remain exact through collaboration, purpose privacy, rest
     const saved = await output(a.p, info, 'named-backup', 'backup'), before = await records(saved);
     console.log('08b: anonymous delta received and full history backed up');
     expect(new Set(before.backup.source.editorDeclarations().map(v => v.declaration.editor.name))).toEqual(new Set([nameA, nameB]));
-    const clean = await PackageArchive.inspect(await blob(await output(a.p, info, 'clean', 'clean'))), review = await PackageArchive.inspect(await blob(await output(a.p, info, 'review', 'review')));
+    const clean = await PackageArchive.inspect(await blob(await writeCleanImportFixture(saved, info.outputPath('clean.zip')))), review = await PackageArchive.inspect(await blob(await output(a.p, info, 'review', 'review')));
     expect(clean.control.manifest.requiredCapabilities).toBeUndefined(); expect(review.control.manifest.requiredCapabilities).toBeUndefined();
     const cm = clean.control.manifest; if (cm.purpose !== 'clean') throw Error('Clean');
     const copied = ProjectMetadataSource.fromFullSource(await clean.entryBytes('metadata.am', limits.maxTotalBytes), { identity: cm.identity, envelope: cm.metadataEnvelope }, limits);

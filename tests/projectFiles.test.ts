@@ -7535,9 +7535,20 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const buttons = () => all(output()).filter(n => n.tag === 'button');
     expect(tools.showSurface('save')).toBe(true); expect(buttons().some(n => n.textContent === '保存' || n.textContent === '相手に渡す')).toBe(false);
     expect(tools.showSurface('share')).toBe(true); expect(tools.hasChanges()).toBe(false); expect(tools.closeReason()).toBeNull();
-    const kind = () => all(output()).find(n => n.getAttribute('aria-label') === '渡す内容')!;
-    expect(kind().children).toHaveLength(4); kind().value='review';kind().fire('change');expect(tools.hasChanges()).toBe(true);expect(tools.showSurface('save')).toBe(false);buttons().find(n => n.textContent === '選択を取り消す')!.fire('click');
-    expect(tools.hasChanges()).toBe(false); expect(kind().value).toBe('teamWorkspace'); expect(buttons().some(n => n.textContent === 'ファイルに保存')).toBe(false);
+    const named = (name: string) => all(output()).find(n => n.getAttribute('aria-label') === name)!;
+    const partial = named('一部だけ出力'), scope = named('出力する内容');
+    expect(partial.checked).toBe(false); expect(scope.parent!.hidden).toBe(true);
+    expect(scope.children.map(n => n.value)).toEqual(['review', 'contribution']);
+    expect(buttons().some(n => n.textContent === '独立コピーを作る')).toBe(false);
+    partial.checked = true; partial.fire('change');
+    expect(named('一部だけ出力')).toBe(partial); expect(scope.parent!.hidden).toBe(false); expect(scope.value).toBe('review');
+    expect(buttons().find(n => n.className === 'lv-file-primary')?.disabled).toBe(true);
+    scope.value = 'contribution'; scope.fire('change');
+    expect(named('元にする作業一式')).toBeDefined(); expect(tools.showSurface('save')).toBe(false);
+    partial.checked = false; partial.fire('change');
+    expect(tools.hasChanges()).toBe(false); expect(scope.parent!.hidden).toBe(true);
+    partial.checked = true; partial.fire('change'); buttons().find(n => n.textContent === '選択を取り消す')!.fire('click');
+    expect(tools.hasChanges()).toBe(false); expect(partial.checked).toBe(false); expect(buttons().some(n => n.textContent === 'ファイルに保存')).toBe(false);
     expect(tools.showSurface('receive')).toBe(true); expect(tools.hasChanges()).toBe(false); expect(tools.closeReason()).toBeNull();
     expect(tools.showSurface('restore')).toBe(true); expect(tools.hasChanges()).toBe(false); expect(tools.closeReason()).toBeNull();
     tools.dispose(); await host.dispose();
@@ -8288,8 +8299,11 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     await vi.waitFor(() => expect(all(root).some(n => n.textContent === 'renderer unavailable')).toBe(true));
     const retry = all(root).find(n => n.tag === 'button' && n.textContent === '生成を再開')!;
     expect(retry.disabled).toBe(false); retry.fire('click');
-    await vi.waitFor(() => expect(all(root).some(n => n.textContent.includes('生成済み・ファイルへの保存は未確認'))).toBe(true), { timeout: 10000 });
-    await vi.waitFor(() => expect(workspace.hasChanges()).toBe(false)); await workspace.dispose();
+    await vi.waitFor(() => {
+      expect(workspace.hasChanges()).toBe(false);
+      expect(all(root).some(n => n.textContent.includes('ダウンロード開始・保存先未確認'))).toBe(true);
+    }, { timeout: 10000 });
+    await workspace.dispose();
   });
   it('counts retained output artifact sizes against receive capacity before writing new input', async () => {
     const f = await workspaceFileFixture(), path = `v2/packages/output/${newId()}/artifacts/${newId()}.zip`;

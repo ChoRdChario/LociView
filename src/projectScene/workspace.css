@@ -325,6 +325,10 @@
 .lv-file-sheet .lv-file-commands > button { margin: 0; }
 .lv-file-output[data-presentation="save"] .lv-file-intents > p { margin: 0; }
 .lv-file-output[data-presentation="share"] .lv-file-intents > label { width: 100%; }
+.lv-share-scope { display: grid; gap: 8px; }
+.lv-file-output .lv-share-scope > .lv-share-partial { display: flex; align-items: center; gap: 8px; min-height: 44px; cursor: pointer; }
+.lv-share-partial > input { width: 18px; height: 18px; margin: 0; }
+.lv-file-output[data-presentation="share"] .lv-file-intents > p { margin: 0; }
 .lv-caption-window { border-radius: 6px; }
 .lv-caption-window-text { max-height: 5em; overflow: auto; line-height: 1.65; }
 .lv-caption-window-text:focus-visible { outline: 2px solid #5d6657; outline-offset: 1px; }

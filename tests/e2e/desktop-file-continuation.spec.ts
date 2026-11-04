@@ -1,4 +1,4 @@
-import { revealCoordinateAdd, revealFileSurface, revealCaptionList, revealProjectSelection } from './workspaceUi';
+import { selectShareOutput,  revealCoordinateAdd, revealFileSurface, revealCaptionList, revealProjectSelection } from './workspaceUi';
 import { test, expect, type Page, type TestInfo } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import * as A from '@automerge/automerge';
@@ -39,7 +39,7 @@ async function output(p: Page, info: TestInfo, name: string, purpose: 'backup' |
   await fileMenu(p); const area = files(p);
   if(!await revealFileSurface(p,purpose==='backup'?'保存':'共有')) await area.getByRole('button', { name: purpose === 'backup' ? '保存' : '相手に渡す', exact: true }).click();
   if (purpose === 'backup') await area.getByLabel('名前（任意）', { exact: true }).fill(name);
-  else await area.getByLabel('渡す内容', { exact: true }).selectOption(purpose);
+  else await selectShareOutput(area, purpose);
   const [download] = await Promise.all([p.waitForEvent('download', { timeout: 90_000 }), area.locator('button.lv-file-primary').click()]);
   const path = info.outputPath(name + '.zip'); await download.saveAs(path); expect(await download.failure()).toBeNull();
   await expect(area.locator('.lv-operation-status')).toHaveAttribute('data-busy', 'false', { timeout: 90_000 }); await workspaceFits(p); return path;

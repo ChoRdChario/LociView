@@ -1,4 +1,5 @@
-import { closeFileSurface, revealFileSurface, revealModelManagement, lookAlongFront } from './workspaceUi';
+import { writeCleanImportFixture } from './cleanImportFixture';
+import { selectShareOutput,  closeFileSurface, revealFileSurface, revealModelManagement, lookAlongFront } from './workspaceUi';
 import { test,expect,chromium,type Page,type BrowserContext,type TestInfo } from '@playwright/test';
 import { mkdir,mkdtemp,readFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -65,16 +66,16 @@ async function addProxy(p:Page,name='面.glb',z=0){
   const chooser=p.waitForEvent('filechooser');await area.getByRole('button',{name:/^位置指定用の面を(?:追加|変更)$/,exact:true}).click();await(await chooser).setFiles({name,mimeType:'model/gltf-binary',buffer:triangleGlb(z)});
   const confirm=area.getByRole('button',{name:/^(?:このモデルに面を追加|面の変更を確定)$/,exact:true});await expect(confirm).toBeVisible();await confirm.click();await expect(p.getByText('位置指定用の面を登録しました。',{exact:true})).toBeVisible();await gsReady(p);
 }
-async function download(p:Page,info:TestInfo,name:string,purpose:'backup'|'teamWorkspace'|'contribution'|'review'|'clean',base?:string){
+async function download(p:Page,info:TestInfo,name:string,purpose:'backup'|'teamWorkspace'|'contribution'|'review',base?:string){
  const menu=p.locator('details.lv-project-files');if(await menu.count()&&!await menu.evaluate(n=>(n as HTMLDetailsElement).open))await menu.locator(':scope > summary').click();
   const area=files(p);
   const compact=await revealFileSurface(p,purpose==='backup'?'保存':'共有');
-  if(compact){if(purpose!=='backup')await area.getByLabel('渡す内容',{exact:true}).selectOption(purpose);}
-  else if(purpose==='review'||purpose==='clean'){const more=area.locator('summary').filter({hasText:/^その他$/});if(!await more.evaluate(n=>(n.parentElement as HTMLDetailsElement).open))await more.click();await area.getByRole('button',{name:purpose==='review'?'シーンを共有':'独立コピーを作る',exact:true}).click();}
+  if(compact){if(purpose!=='backup')await selectShareOutput(area, purpose);}
+  else if(purpose==='review'){const more=area.locator('summary').filter({hasText:/^その他$/});if(!await more.evaluate(n=>(n.parentElement as HTMLDetailsElement).open))await more.click();await area.getByRole('button',{name:'シーンを共有',exact:true}).click();}
   else await area.getByRole('button',{name:purpose==='backup'?'保存':'相手に渡す',exact:true}).click();
   if(purpose==='backup')await area.getByLabel('名前（任意）',{exact:true}).fill(name);
-  else if(purpose!=='review'&&purpose!=='clean'){if(!compact)await area.getByLabel('渡す内容',{exact:true}).selectOption(purpose);if(base)await area.getByLabel('元にする作業一式',{exact:true}).selectOption(base);}
-  if(purpose==='clean')await area.getByRole('button',{name:'内容を確認',exact:true}).click();
+  else if(purpose!=='review'){if(!compact)await selectShareOutput(area, purpose);if(base)await area.getByLabel('元にする作業一式',{exact:true}).selectOption(base);}
+
   if(purpose==='review'){const scenes=area.getByLabel('渡すシーン',{exact:true});await scenes.selectOption((await scenes.locator('option').evaluateAll(nodes=>nodes.map(n=>(n as HTMLOptionElement).value).filter(Boolean)))[0]!);await area.getByRole('button',{name:'内容を確認',exact:true}).click();}
   const primary=area.locator('button.lv-file-primary');await expect(primary).toBeEnabled({timeout:180_000});const [file]=await Promise.all([p.waitForEvent('download',{timeout:180_000}),primary.click()]);const path=info.outputPath(`${name}.zip`);await file.saveAs(path);expect(await file.failure()).toBeNull();await expect(area.locator('.lv-operation-status')).toHaveAttribute('data-busy','false',{timeout:180_000});await closeFileSurface(p);return path;
 }
@@ -135,7 +136,7 @@ test('SH4本体の差し替えと面の再設定・受信側編集・返送・�
 
     const returned=await download(b.page,info,'gs-return','contribution',workspace.archive.control.manifest.packageId);await revealFileSurface(p,'受信');const receive=p.getByRole('region',{name:'更新ファイル',exact:true});await receive.getByLabel('更新ファイルを選択',{exact:true}).setInputFiles(returned);await receive.getByRole('button',{name:'更新を受け取る',exact:true}).click();await expect(receive.getByText('更新を受け取りました。',{exact:true})).toBeVisible({timeout:90_000});await gsReady(p);
     const receivedPath=await download(p,info,'gs-received','backup'),received=await inspectBackup(receivedPath);expect(received.records.representationsById[gs.id]).toEqual(gs);expect(received.records.captionsById[caption.id]).toMatchObject({body:'相手が追記',anchor:correctedAnchor});expect(activeGs(received.records).gs).toEqual(newActive.gs);expect(activeGs(received.records).proxy).toBeTruthy();
-    const reviewPath=await download(p,info,'gs-review','review'),cleanPath=await download(p,info,'gs-clean','clean');
+    const reviewPath=await download(p,info,'gs-review','review'),cleanPath=await writeCleanImportFixture(receivedPath,info.outputPath('gs-clean.zip'));
     await close(b.context,'b');await close(a.context,'a-returned');const review=await launch(3);await review.page.getByLabel('ファイルを選択',{exact:true}).setInputFiles(reviewPath);await review.page.getByRole('button',{name:'ファイルを開く',exact:true}).click();await expect(review.page.getByText('閲覧用シーンを開きました。編集プロジェクトは作成していません。',{exact:true})).toBeVisible({timeout:90_000});
     await expect(review.page.getByLabel('3Dモデルの表示',{exact:true})).toBeVisible();await expect(review.page.getByRole('main',{name:'閲覧用のシーン',exact:true}).locator(':scope > [role="status"]')).toBeEmpty({timeout:90_000});
     await gsPainted(review.page);

@@ -1,5 +1,5 @@
 import { desktopOrigin, desktopEntry } from './desktopEntry';
-import { closeFileSurface, beginMaterialEditing } from './workspaceUi';
+import { selectShareOutput,  closeFileSurface, beginMaterialEditing } from './workspaceUi';
 import { revealFileSurface, lookAlongFront } from './workspaceUi';
 import {test,expect,chromium,type Page,type BrowserContext,type TestInfo} from '@playwright/test';
 import {mkdir,mkdtemp,readFile} from 'node:fs/promises';
@@ -26,8 +26,8 @@ async function smoothTexel(p:Page){
 function sameMappings(next:Record<string,any>,original:Record<string,any>){for(const key of ['captionsById','materialOverridesById','representationsById','assetBindingsById'])expect(next[key],key).toEqual(original[key]);}
 async function output(p:Page,info:TestInfo,name:string,purpose:'backup'|'teamWorkspace'|'review'){
   const menu=p.locator('details.lv-project-files');if(await menu.count()&&!await menu.evaluate(n=>(n as HTMLDetailsElement).open))await menu.locator(':scope > summary').click();const area=files(p),compact=await revealFileSurface(p,purpose==='backup'?'保存':'共有');
-  if(purpose==='review'){if(compact)await area.getByLabel('渡す内容',{exact:true}).selectOption('review');else{const more=area.locator('summary').filter({hasText:/^その他$/});if(!await more.evaluate(n=>(n.parentElement as HTMLDetailsElement).open))await more.click();await area.getByRole('button',{name:'シーンを共有',exact:true}).click();}const scenes=area.getByLabel('渡すシーン',{exact:true});await scenes.selectOption((await scenes.locator('option').evaluateAll(ns=>ns.map(n=>(n as HTMLOptionElement).value).filter(Boolean)))[0]!);await area.getByRole('button',{name:'内容を確認',exact:true}).click();}
-  else{if(!compact)await area.getByRole('button',{name:purpose==='backup'?'保存':'相手に渡す',exact:true}).click();if(purpose==='backup')await area.getByLabel('名前（任意）',{exact:true}).fill(name);else await area.getByLabel('渡す内容',{exact:true}).selectOption(purpose);}
+  if(purpose==='review'){if(compact)await selectShareOutput(area, 'review');else{const more=area.locator('summary').filter({hasText:/^その他$/});if(!await more.evaluate(n=>(n.parentElement as HTMLDetailsElement).open))await more.click();await area.getByRole('button',{name:'シーンを共有',exact:true}).click();}const scenes=area.getByLabel('渡すシーン',{exact:true});await scenes.selectOption((await scenes.locator('option').evaluateAll(ns=>ns.map(n=>(n as HTMLOptionElement).value).filter(Boolean)))[0]!);await area.getByRole('button',{name:'内容を確認',exact:true}).click();}
+  else{if(!compact)await area.getByRole('button',{name:purpose==='backup'?'保存':'相手に渡す',exact:true}).click();if(purpose==='backup')await area.getByLabel('名前（任意）',{exact:true}).fill(name);else await selectShareOutput(area, purpose);}
   const primary=area.locator('button.lv-file-primary');await expect(primary).toBeEnabled({timeout:180000});const[file]=await Promise.all([p.waitForEvent('download',{timeout:180000}),primary.click()]),path=info.outputPath(name+'.zip');await file.saveAs(path);expect(await file.failure()).toBeNull();await expect(area.locator('.lv-operation-status')).toHaveAttribute('data-busy','false',{timeout:180000});await closeFileSurface(p);return path;
 }
 async function inspect(path:string){const bytes=Uint8Array.from(await readFile(path)),archive=await BackupArchive.inspect(new Blob([bytes.buffer]),limits),c=await inspectProjectCandidates(archive.source.read(),limits);if(c.kind!=='project-candidate-inspection')throw Error('metadata');

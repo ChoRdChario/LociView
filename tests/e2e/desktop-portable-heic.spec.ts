@@ -1,14 +1,17 @@
-import { closeFileSurface } from './workspaceUi';
+import { writeCleanImportFixture } from './cleanImportFixture';
+import { selectShareOutput,  closeFileSurface } from './workspaceUi';
 import { desktopOrigin, desktopEntry } from './desktopEntry';
 import { revealCoordinateAdd, revealFileSurface, revealProjectSelection } from './workspaceUi';
 import { test, expect, chromium, type Page, type BrowserContext, type TestInfo } from '@playwright/test';
 import { mkdir, mkdtemp, readFile } from 'node:fs/promises';
+import { openAsBlob } from 'node:fs';
 import { resolve, sep } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import * as A from '@automerge/automerge';
 import { triangleGlb } from './fixtures';
 import { portablePng } from '../helpers/portableHeicFixtures';
 import { WorkspaceArchive } from '../../src/projectPackage/workspaceArchive';
+import { CleanArchive } from '../../src/projectPackage/cleanArchive';
 import { validationMetadataLimits as limits } from '../../src/projectFiles/validation';
 
 const title = 'HEICのオフライン閲覧';
@@ -16,17 +19,17 @@ async function ready(p: Page, text: string) {
   await expect(p.getByText(text, { exact: true })).toBeVisible({ timeout: 90_000 });
   await expect(p.locator('main.lv-project-workspace > header > p.lv-operation-status')).toHaveAttribute('data-busy', 'false');
 }
-async function output(p: Page, info: TestInfo, name: string, purpose: 'backup' | 'teamWorkspace' | 'clean', portable = true) {
+async function output(p: Page, info: TestInfo, name: string, purpose: 'backup' | 'teamWorkspace', portable = true) {
   const menu = p.locator('details.lv-project-files'); if (!await menu.evaluate(n => (n as HTMLDetailsElement).open)) await menu.locator(':scope > summary').click();
   const area = p.getByRole('region', { name: 'ファイル', exact: true }),compact=await revealFileSurface(p,purpose==='backup'?'保存':'共有'); if(!compact)await area.getByRole('button', { name: purpose === 'backup' ? '保存' : '相手に渡す', exact: true }).click();
-  if (purpose === 'backup') await area.getByLabel('名前（任意）', { exact: true }).fill(name); else if(compact)await area.getByLabel('渡す内容',{exact:true}).selectOption(purpose);else if(purpose==='clean'){const more=area.locator('.lv-file-intents > details');if(!await more.evaluate(n=>(n as HTMLDetailsElement).open))await more.locator('summary').click();await more.getByRole('button',{name:'独立コピーを作る',exact:true}).click();}else await area.getByLabel('渡す内容', { exact: true }).selectOption(purpose);
-  if(purpose==='clean'){await area.locator('button.lv-file-primary').click();await expect(area.locator('button.lv-file-primary')).toHaveText('ダウンロード');}
+  if (purpose === 'backup') await area.getByLabel('名前（任意）', { exact: true }).fill(name); else await selectShareOutput(area, purpose);
+
   await area.locator('button.lv-file-primary').click();
   await expect(area.locator('.lv-operation-status')).toHaveAttribute('data-busy', 'false', { timeout: 90_000 });
   const history = area.locator('details').filter({ has: p.locator('summary', { hasText: '作成したファイル' }) });
   if (!await history.evaluate(n => (n as HTMLDetailsElement).open)) await history.locator(':scope > summary').click();
   if(portable)await expect(history).toContainText('HEIC原本と表示用PNGの組');
-  const row=history.locator('section').filter({hasText:purpose==='backup'?'バックアップ':purpose==='clean'?'独立コピー':'作業一式'}).filter({hasText:portable?'HEIC原本と表示用PNGの組':'記録された編集者名'});
+  const row=history.locator('section').filter({hasText:purpose==='backup'?'バックアップ':'作業一式'}).filter({hasText:portable?'HEIC原本と表示用PNGの組':'記録された編集者名'});
   const [download] = await Promise.all([p.waitForEvent('download', { timeout: 90_000 }), row.getByRole('button', { name: 'ダウンロード', exact: true }).click()]);
   const path = info.outputPath(name + '.zip'); await download.saveAs(path); expect(await download.failure()).toBeNull(); await closeFileSurface(p);return path;
 }
@@ -90,7 +93,9 @@ test('08c uses native canvas generation, portable offline display/save/reopen an
     await revealProjectSelection(b.p); await b.p.getByRole('button', { name: /^(?:ファイルを開く|別のプロジェクトを開く)$/, exact: true }).click(); await b.p.getByRole('button', { name: '編集で開く', exact: true }).first().click(); await gallery(b.p); expect(await b.p.evaluate(() => (window as any).__heicDecodes)).toBe(0);
     await b.context.setOffline(false); await b.context.close(); contexts.delete(b.context); const cold = await launch(1); await expect(cold.p.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText(title, { timeout: 90_000 }); await gallery(cold.p); expect(await cold.p.evaluate(() => (window as any).__heicDecodes)).toBe(0);
     await open(old.p, workspace); await expect(old.p.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveCount(0); await expect(old.p.getByRole('status').filter({ hasText: /対応|機能|確認/ }).first()).toBeVisible();
-    const portableOnly=await output(p,info,'portable-only-copy','clean');await open(old.p,portableOnly);await expect(old.p.getByRole('heading',{name:'プロジェクト名',exact:true})).toHaveCount(0);
+    const portableOnly=await writeCleanImportFixture(backup,info.outputPath('portable-only-copy.zip'));
+    expect((await CleanArchive.inspect(await openAsBlob(portableOnly), limits)).archive.control.manifest.requiredCapabilities).toEqual(['portable-heic-display-v1']);
+    await open(old.p,portableOnly);await expect(old.p.getByRole('heading',{name:'プロジェクト名',exact:true})).toHaveCount(0);
     const before=await journalSnapshot(p);await a.context.close();contexts.delete(a.context);const oldLocal=await launch(0,true);await expect(oldLocal.p.getByText(/最後のプロジェクトを再開できません/)).toBeVisible({timeout:90_000});await expect(oldLocal.p.locator('main.lv-project-workspace')).toHaveCount(0);expect(await journalSnapshot(oldLocal.p)).toEqual(before);
     await cold.p.screenshot({ path: info.outputPath('portable-heic-recipient.png'), fullPage: true }); expect((await readFile(backup)).length).toBeGreaterThan(0); expect(errors).toEqual([]); expect(remote).toEqual([]);
   } finally { for (const context of contexts) { for (const [i,p] of context.pages().entries()) await p.screenshot({ path: info.outputPath(`last-${[...contexts].indexOf(context)}-${i}.png`), fullPage: true }).catch(() => {}); await context.close(); } }

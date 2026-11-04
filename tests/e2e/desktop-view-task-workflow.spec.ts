@@ -1,4 +1,4 @@
-import { revealCameraPositions, revealWorkPanel, revealFileSurface } from './workspaceUi';
+import { selectShareOutput,  revealCameraPositions, revealWorkPanel, revealFileSurface } from './workspaceUi';
 import { test, expect, type Page, type BrowserContext, type TestInfo } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import * as A from '@automerge/automerge';
@@ -36,7 +36,7 @@ async function scrollTask(p: Page) {
 }
 async function save(p: Page, info: TestInfo, name: string) {
   const menu = p.locator('details.lv-project-files'); if (!await menu.evaluate(n => (n as HTMLDetailsElement).open)) await menu.locator(':scope > summary').click();
-  const area = p.getByRole('region', { name: 'ファイル', exact: true }); if(!await revealFileSurface(p,'共有')) await area.getByRole('button', { name: '相手に渡す', exact: true }).click(); await area.getByLabel('渡す内容', { exact: true }).selectOption('teamWorkspace');
+  const area = p.getByRole('region', { name: 'ファイル', exact: true }); if(!await revealFileSurface(p,'共有')) await area.getByRole('button', { name: '相手に渡す', exact: true }).click(); await selectShareOutput(area, 'teamWorkspace');
   const [download] = await Promise.all([p.waitForEvent('download', { timeout: 90_000 }), area.locator('button.lv-file-primary').click()]);
   const path = info.outputPath(name + '.zip'); await download.saveAs(path); expect(await download.failure()).toBeNull();
   await expect(area.locator('.lv-operation-status')).toHaveAttribute('data-busy', 'false', { timeout: 90_000 }); return path;

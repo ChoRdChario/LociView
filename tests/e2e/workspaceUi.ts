@@ -74,6 +74,19 @@ export async function revealFileSurface(page: Page, surface: '保存' | '共有'
   return true;
 }
 
+/** Current share checkbox and the retained fixed-build selector. */
+export async function selectShareOutput(area: Locator, purpose: 'teamWorkspace' | 'contribution' | 'review') {
+  const partial = area.getByRole('checkbox', { name: '一部だけ出力', exact: true });
+  if (!await partial.isVisible()) {
+    await area.getByLabel('渡す内容', { exact: true }).selectOption(purpose);
+  } else if (purpose === 'teamWorkspace') {
+    await partial.uncheck();
+  } else {
+    await partial.check();
+    await area.getByLabel('出力する内容', { exact: true }).selectOption(purpose);
+  }
+}
+
 export async function revealProjectSelection(page: Page) {
   const menu = page.locator('details.lv-project-files');
   if (await menu.getByRole('button', { name: /^(?:ファイルを開く|別のプロジェクトを開く)$/, includeHidden: true }).count()) {

@@ -709,12 +709,46 @@ PC file continuation/receive/restore, PC camera and phone short-editor cases
 passed. A separate touch cold restart with the server stopped, an offline
 edit and a second cold restart passed in Chromium. Physical iOS remains open.
 
-Next, make Share start from the recipient's task. On both PC and touch today,
-the menu preselects a complete editable workspace and enables Download before
-the user chooses a purpose. Distinguish joint editing, returning a change,
-viewing and an independent copy. Keep explicit origin selection and disclosure,
-and verify sending and receiving on both screen classes. Revisit the105px touch
-reader shift alongside work-panel placement, and retain native iOS acceptance.
+### Completed unit —whole or selected export checkbox
+
+PO approved two export scopes and a checkbox for selected output. Use the same
+surface on PC and touch. Reveal Scene or changes only for selected output, keep
+the existing selection, contents/privacy confirmation and download guards, and
+remove the ordinary clean-copy writer entry. Preserve existing ZIP compatibility.
+Use the accepted same-Project receive and standalone View/edit-copy routes.
+Adding an imported Scene into a different Project requires a separate import
+design covering identity, coordinates and recovery. Verify real export packages,
+selection/reset and keyboard/touch, receiving and old Clean import, and review
+the connected difference before a checkpoint. Revisit the105px touch reader
+shift separately and retain native iOS acceptance.
+
+Product Share uses an unchecked native checkbox for whole output. Checking it
+shows Scene or changes. Choose an exact Scene or retained shared base before
+generation. Cancel or uncheck returns to whole output, with no pending choice.
+Keyboard focus survives scope and target selection. Existing outputs and Clean
+reading remain available. No manifest, source, receipt or recovery changes.
+
+Chromium verified PC workspace flow and keyboard/cancel, real whole Workspace,
+two file exchange rounds with local edits, Review→edit, old Clean input with
+original model digest, restore and cold resume. Touch 390×844 opened File →
+Share, tapped the checkbox, and downloaded and inspected a real Review ZIP.
+Pinned old-reader cases passed for named histories and portable HEIC. The first
+combined rendered run's phone selector targeted the PC-only shortcut; the
+actual compact File menu passed in the corrected dedicated run. The first
+Windows checkpoint exposed a stale test that could observe transient generated
+status during recovery. Its updated settled-state check and focused cases passed.
+Final freeze `ceb84759` passed the Windows checkpoint:147 files,3283 passes,
+21 existing TODOs, all five builds, offline isolation and HEIC isolation.
+
+Next import boundary: one file selection, classify by validated contents and
+show only available actions. A standalone file may open on its own. For a
+recognized Project and an eligible local destination, show the exact destination
+before using the existing update receipt and base/lineage checks. A catalog row
+is a routing hint, and the destination and input must be checked again under the
+actual edit lease. Missing base uses the existing full-workspace path. A Scene
+snapshot opens in View or makes the existing independent editable Project;
+appending it to an existing Project requires a separate coordinate, ID and
+atomic-recovery specification.
 
 ## Completed boundary —06c bounded restore content inspection
 
