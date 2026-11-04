@@ -10,6 +10,7 @@ import { technicalId, newId, metadataPath, json } from '../projectMetadata/persi
 import { TransactionJournal } from '../projectMetadata/journal';
 import type { MetadataStorageFactory } from '../projectMetadata/repository';
 import type { OriginBlobStore } from '../projectMetadata/blobStore';
+import { BlobStoreError } from '../projectMetadata/blobStream';
 import { unreceivedWeakMedia, type MetadataSessionRead } from '../projectMetadata/session';
 import type { MetadataEdit } from '../projectMetadata/commands';
 import { captionDeletionImpact } from '../projectMetadata/captionDeletion';
@@ -323,7 +324,11 @@ async function openNormalValidationHost(options: ValidationHostOptions, inherite
       catch (error) {
         if (!restoreRetired) { try { last = await session.read(); } catch { /* Preserve the operation's failure; do not replace selected data with old state. */ } }
         if (inputCommand && last.state === 'ready' && last.source?.token === before) throw error;
-        failure = error instanceof Error ? error.message : '保存できません。入力は保持しています。'; throw error; }
+        failure = error instanceof BlobStoreError && error.code === 'mismatch' ?
+          '保存するデータを照合できません。再試行してください。元のファイルは変更していません。' :
+          error instanceof Error ? error.message : '保存できません。入力は保持しています。';
+        throw error;
+      }
       finally { busy = false; if (operation === work) operation = undefined; }
     };
     let gsProxy:ReturnType<typeof createGsProxyWorkflow>|undefined;

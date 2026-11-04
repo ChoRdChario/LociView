@@ -36,7 +36,7 @@ type SceneEdit = { kind: 'create' | 'rename' | 'default'; token: string; sceneId
 /** Product composition: provider reads and typed commands; owns no storage or fixture adapter. */
 export function createProjectWorkspace(document: Document, ports: ProjectWorkspacePorts) {
   const make = <K extends keyof HTMLElementTagNameMap>(tag: K, text = '') => { const node = document.createElement(tag); node.textContent = text; return node; };
-  const button = (text: string, action: () => void) => { const b = make('button', text); b.type = 'button'; b.addEventListener('click', () => { if (!b.disabled && !disposed) action(); }); return b; };
+  const button = (text: string, action: (event: MouseEvent) => void) => { const b = make('button', text); b.type = 'button'; b.addEventListener('click', event => { if (!b.disabled && !disposed) action(event); }); return b; };
   const root = make('main'); root.className = 'lv-project-workspace';
   const stopHelp = mountContextHelp(document, root);
   const header = make('header'), introduction = make('p', 'LociViewは3Dモデルと記録を編集できるアプリです。');
@@ -87,7 +87,9 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   const body = make('div'); body.className = 'lv-project-body';
   const compactNavigation = make('nav'); compactNavigation.className = 'lv-compact-navigation'; compactNavigation.setAttribute('aria-label', '表示領域');
   let compactSurface: 'stage' | 'panel' = 'panel', captionSurface: 'list' | 'detail' = 'list';
-  const stageVisible=()=>compactSurface==='stage'||!document.defaultView?.matchMedia?.('(max-width: 760px)').matches;
+  const mobileLayout = document.defaultView?.matchMedia?.('(pointer: coarse) and (max-width: 760px), (pointer: coarse) and (max-width: 950px) and (max-height: 480px)');
+  const compactLayout = () => !!mobileLayout?.matches || !!document.defaultView?.matchMedia?.('(max-width: 760px)').matches;
+  const stageVisible=()=>compactSurface==='stage'||!compactLayout();
   const showStage = button('3D・比較', () => { if(!viewBlocked()){compactSurface = 'stage'; render();} }), showPanel = button('作業パネル', () => { if(!viewBlocked()){compactSurface = 'panel'; render();} });
   compactNavigation.append(showStage, showPanel);
   const stage = make('section'), canvas = make('canvas'), markers = make('div');
@@ -253,7 +255,12 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       resetDraft(); feedback = 'プロジェクトから削除しました。';queueMicrotask(()=>{if(!disposed)list.focusSearch();});
     });
   });
-  const cancelDelete = button('取り消す', () => { if (!busy && !pending && ports.status().kind === 'idle' && !ports.otherPending() && !composing) { deletion = null; render();list.focusSearch(); } });
+  const cancelDelete = button('取り消す', () => {
+    if (busy || pending || ports.status().kind !== 'idle' || ports.otherPending() || composing) return;
+    deletion = null; render();
+    if (mobileLayout?.matches) detailHeading.focus({ preventScroll: true });
+    else list.focusSearch();
+  });
   deletionBox.append(deletionTitle, deletionEffects, deletionNote, deletionDiagnostics, confirmDelete, cancelDelete); deletionArea.append(beginDelete, deletionBox, referenceIssues);
   const media = make('section'), mediaLabel = make('label', 'メディアを追加'), mediaInput = make('input');
   media.setAttribute('aria-label', 'メディア'); mediaInput.type = 'file'; mediaInput.accept = 'image/png,image/jpeg,image/webp,image/gif,image/heic,image/heif,.heic,.heif,video/mp4,audio/mp4,audio/mpeg,.m4a,.mp3'; mediaInput.setAttribute('aria-label', 'メディアを追加'); mediaLabel.className = 'lv-media-add'; mediaLabel.append(mediaInput);
@@ -369,8 +376,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   });
   const captionNavigation = make('nav'); captionNavigation.setAttribute('aria-label', '記録の前後移動');
   const detailHeading = make('h2'); detailHeading.tabIndex = -1;
-  const captionBack = button('一覧へ戻る', () => { captionSurface = 'list'; render(); list.focusSearch(); });
-  const openDetail = button('選択したキャプション', () => { captionSurface = 'detail'; render(); detailHeading.focus?.({ preventScroll: true }); });
+  const captionBack = button('一覧へ戻る', () => { captionSurface = 'list'; render(); list.focusSelection(); });
   const detailPane = make('section'); detailPane.className = 'lv-caption-reading';
   function stepCaption(direction: 'previous' | 'next') {
     if (disposed || busy || pending || windowMoving || ports.otherPending()) return;
@@ -461,7 +467,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   for(const child of Array.from(detail.root.children))if(child!==detail.actions&&child!==detail.confirmation)captionContent.append(child);
   captionContent.append(conflicts);detail.root.append(captionContent,detail.actions,detail.confirmation);detailPane.append(detail.root);
   const sidebarToolbar=make('div');sidebarToolbar.className='lv-sidebar-toolbar';sidebarToolbar.append(sceneArea,taskTabs);
-  captionPanel.append(list.root,openDetail,detailPane);sidebar.append(sidebarToolbar,sceneContext,retainedEdit,captionPanel);
+  captionPanel.append(list.root,detailPane);sidebar.append(sidebarToolbar,sceneContext,retainedEdit,captionPanel);
   const stageOverlay=make('div');stageOverlay.className='lv-stage-overlay';stageOverlay.append(viewportTools,pinTask);
   stageDisplay.append(stageOverlay); stage.append(stageDisplay); body.append(stage, sidebar); root.append(header, compactNavigation, body, mediaViewer.root);
   let feedbackTimer: number | undefined, passiveFeedback: string | null = null;
@@ -535,6 +541,29 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   }
   document.defaultView?.addEventListener('resize',positionHeaderSheets);
   document.defaultView?.addEventListener('resize',render);
+  const visualViewport = document.defaultView?.visualViewport;
+  function positionMobileEditor() {
+    const focused = document.activeElement;
+    const editing = mobileLayout?.matches && focused && (
+      detailPane.contains(focused) && focused.matches('textarea:not([readonly]), input[type="text"]:not([readonly])') ||
+      list.root.contains(focused) && focused.matches('input[type="search"]'));
+    const height = visualViewport?.height ?? 0;
+    const covered = (document.defaultView?.innerHeight ?? 0) - height;
+    if ((editing || root.dataset.keyboard) && visualViewport?.scale === 1 && height > 0 && covered > 80) {
+      root.style.setProperty('--lv-visible-bottom', `${Math.floor(height + visualViewport.offsetTop)}px`);
+      root.dataset.keyboard = 'true';
+    } else {
+      root.style.removeProperty('--lv-visible-bottom');
+      delete root.dataset.keyboard;
+    }
+    if (editing && (root.dataset.keyboard || (document.defaultView?.innerHeight ?? 0) <= 480))
+      focused?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
+  }
+  function mobileFocusChanged() { queueMicrotask(() => { if (!disposed) positionMobileEditor(); }); }
+  document.defaultView?.addEventListener('resize', positionMobileEditor);
+  visualViewport?.addEventListener('resize', positionMobileEditor);
+  root.addEventListener('focusin', mobileFocusChanged);
+  root.addEventListener('focusout', mobileFocusChanged);
   for(const disclosure of [help,organization.settingsRoot]){
     disclosure.addEventListener('toggle',()=>{if(disclosure.open){for(const other of [help,organization!.settingsRoot])if(other!==disclosure)other.open=false;}});
     disclosure.addEventListener('click',event=>{if((event.target as Element)?.closest?.('summary') && (ports.otherPending()||ports.disclosureOpening?.()===false)){event.preventDefault();feedback='ファイルの操作を完了してください。';render();}});
@@ -781,7 +810,9 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   const invalidateGesture = () => { gesture = null; gestureGeneration++; };
   canvas.addEventListener('pointerdown', event => {
     if (disposed) return;
-    const hadMarkerNavigation = !!markerNavigation; finishMarkerNavigation();
+    const hadMarkerNavigation = !!markerNavigation;
+    if (markerNavigation) skipMarkerClick = markerNavigation.node;
+    finishMarkerNavigation();
     pressedPointers.add(event.pointerId); invalidateGesture();
     try { canvas.setPointerCapture?.(event.pointerId); }
     catch { pressedPointers.delete(event.pointerId); if (!pressedPointers.size) viewport.reservePointer(false); return; }
@@ -847,8 +878,8 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     node.addEventListener('pointerdown', event => {
       skipMarkerClick = null;
       const blocked = cameraNavigationBlocked(), wasHeld = !!markerNavigation;
-      if (wasHeld) { finishMarkerNavigation(); return; }
-      if (blocked || !viewport.navigateCamera || !event.isPrimary || event.pointerType === 'touch' ||
+      if (wasHeld) { skipMarkerClick = markerNavigation!.node; finishMarkerNavigation(); return; }
+      if (blocked || !viewport.navigateCamera || !event.isPrimary ||
         event.button !== 0 && event.button !== 2 || event.altKey || event.metaKey || event.ctrlKey ||
         event.button === 0 && (choosing || event.shiftKey) || ![event.clientX,event.clientY].every(Number.isFinite)) return;
       const current = viewport.read(); if (!(current.cameraReady ?? current.ready) || current.dragging) return;
@@ -865,10 +896,10 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
         pressedPointers.size !== 1 || held.token !== installedViewportInput?.token || held.scene !== sceneId ||
         ![event.clientX,event.clientY].every(Number.isFinite) || event.buttons === 0) { finishMarkerNavigation(); return; }
       if (!held.started) {
-        if (Math.hypot(event.clientX-held.startX,event.clientY-held.startY) <= 4) return;
+        if (Math.hypot(event.clientX-held.startX,event.clientY-held.startY) <= (event.pointerType === 'touch' ? 8 : 4)) return;
+        skipMarkerClick = node;
         held.started = viewport.navigateCamera?.({ phase: 'begin', id: held.id, kind: held.kind }) === true;
         if (!held.started) { finishMarkerNavigation(); return; }
-        skipMarkerClick = node;
       }
       const dx = event.clientX-held.x, dy = event.clientY-held.y; held.x = event.clientX; held.y = event.clientY;
       event.preventDefault();
@@ -916,6 +947,12 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       const p = provider(), blocked = mutationBlock(), selected = memory().selectedCaptionId;
       if (markerNavigation && (markerNavigation.token !== p.token || markerNavigation.scene !== sceneId)) finishMarkerNavigation();
       captionPanel.dataset.selected = String(!!selected);
+      root.dataset.mobileLayout = String(!!mobileLayout?.matches);
+      const mobileDetail = !!mobileLayout?.matches && !!selected && captionSurface === 'detail';
+      if (mobileLayout?.matches) captionPanel.dataset.mobileSurface = mobileDetail ? 'detail' : 'list';
+      else delete captionPanel.dataset.mobileSurface;
+      detailPane.hidden = !!mobileLayout?.matches && !mobileDetail;
+      list.root.hidden = mobileDetail;
       // Explicit drafts/operations own the layout; focus alone cannot move native activation targets.
       captionPanel.dataset.editing = String(hasCaptionDraft(draft) || !!draft?.composing || composing || positionInput() ||
         !!deletion || !!pickerScope || !!mediaManager?.hasChanges());
@@ -964,7 +1001,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       const pinActive = !!pinAction || !!pin || !!numericTarget || choosing;
       if (pinTask.hidden && pinActive) {
         compactSurface = 'stage'; const opening = pinAction;
-        queueMicrotask(() => { if (!disposed && pinAction === opening && !pinTask.hidden && document.defaultView?.matchMedia?.('(max-width:760px)').matches) {
+        queueMicrotask(() => { if (!disposed && pinAction === opening && !pinTask.hidden && compactLayout()) {
           const target = !coords.hidden && !coordinateInputs[0]!.disabled ? coordinateInputs[0]! : pinTask; target.tabIndex = target === pinTask ? -1 : 0; target.focus?.({preventScroll:true});
         } });
       }
@@ -1018,8 +1055,9 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       retainedEdit.hidden = retainedOwner === task && !organization!.hasChanges();
       retainedNote.textContent = `${settingsInput?'設定':retainedOwner==='views'?'カメラ位置':tabButtons.get(retainedOwner)?.textContent ?? 'キャプション'}に未適用の変更があります。`;
       detailHeading.textContent = selected ? fieldValue(p.resources.captions[selected]?.title) || '名称なし' : 'キャプション';
-      detailPane.hidden = false;list.root.hidden = false;sceneArea.hidden = false;captionBack.hidden = true;openDetail.hidden = true;
-      captionBack.disabled = openDetail.disabled = returnToEdit.disabled = showStage.disabled = showPanel.disabled = viewBlocked();
+      sceneArea.hidden = false;captionBack.hidden = !mobileDetail;
+      returnToEdit.disabled = showStage.disabled = showPanel.disabled = viewBlocked();
+      captionBack.disabled = viewBlocked() || hasCaptionInput || !!deletion;
       body.dataset.surface = compactSurface; showStage.setAttribute('aria-pressed', String(compactSurface === 'stage')); showPanel.setAttribute('aria-pressed', String(compactSurface === 'panel'));
       const seen = viewport.read();
       const extent = canvas.getBoundingClientRect?.() ?? { width: 0, height: 0 };
@@ -1039,8 +1077,22 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
         const caption = p.resources.captions[projected.id]; if (!caption) continue;
         const key = `${sceneId}:${projected.id}`; activeMarkers.add(key);
         let marker = markerById.get(key);
-        if (!marker) { marker = button('', () => { if (skipMarkerClick === marker) { skipMarkerClick = null; return; }
-          if (!dirty() && !busy && !ports.otherPending()) { selectCaption(projected.id); render(); list.revealSelected(); } });
+        if (!marker) { marker = button('', event => { if (skipMarkerClick === marker) { skipMarkerClick = null; return; }
+          if (!dirty() && !busy && !ports.otherPending()) {
+            let captionId = projected.id;
+            if ('pointerType' in event && event.pointerType === 'touch') {
+              let closest = Infinity;
+              for (const pin of viewport.read().pins) {
+                const candidate = markerById.get(`${sceneId}:${pin.id}`);
+                if (!pin.visible || !candidate || !candidate.isConnected) continue;
+                const rect = candidate.getBoundingClientRect();
+                if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) continue;
+                const distance = Math.hypot(event.clientX - rect.left - rect.width / 2, event.clientY - rect.top - rect.height / 2);
+                if (distance < closest) { closest = distance; captionId = pin.id; }
+              }
+            }
+            selectCaption(captionId); render(); list.revealSelected();
+          } });
           bindMarkerNavigation(marker); markerById.set(key, marker); markerNodes.add(marker); }
         const markerName = fieldValue(caption.title) || '名称なし';
         marker.textContent = markerName; marker.setAttribute('aria-label', markerName);
@@ -1076,5 +1128,5 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   });
   return { root, headerActions, projectNavigation: otherProject, utilityArea: settingsSheet, clearNotice(){if(!pending&&ports.status().kind==='idle')feedback='';}, dismissDisclosures(){help.open=false;organization!.settingsRoot.open=false;}, setExternalBusy: (active:boolean) => { body.inert=busy||active; }, render, session: interaction, activeScene: () => sceneId, inputPending: () => dirty() || busy,
     hasChanges: () => dirty() || busy || !!pending,
-    unmount() { if (disposed) return; disposed = true;finishMarkerNavigation();document.removeEventListener?.('pointerdown',closeRecordSheets,true);document.removeEventListener?.('focusin',closeRecordSheets);document.removeEventListener?.('pointerdown',dismissHeaderSheets,true);document.removeEventListener?.('focusin',dismissHeaderSheets);otherProject.remove();document.defaultView?.clearTimeout(feedbackTimer);document.defaultView?.removeEventListener('resize',positionHeaderSheets);document.defaultView?.removeEventListener('resize',render);cameraGizmo.dispose();stopHelp();stopPresentation?.();overlayBaseline=undefined;cancelObservation();storageEpoch++; gesture = null; gestureGeneration++; pressedPointers.clear(); viewport.reservePointer(false); recovery?.dispose(); organization?.dispose(); windows.dispose(); mediaManager?.dispose(); mediaViewer.dispose(); viewport.dispose(); list.dispose(); inclusion.dispose(); detail.dispose(); for (const panel of panels.values()) panel.dispose(); root.remove(); } };
+    unmount() { if (disposed) return; disposed = true;finishMarkerNavigation();document.removeEventListener?.('pointerdown',closeRecordSheets,true);document.removeEventListener?.('focusin',closeRecordSheets);document.removeEventListener?.('pointerdown',dismissHeaderSheets,true);document.removeEventListener?.('focusin',dismissHeaderSheets);otherProject.remove();document.defaultView?.clearTimeout(feedbackTimer);document.defaultView?.removeEventListener('resize',positionHeaderSheets);document.defaultView?.removeEventListener('resize',render);document.defaultView?.removeEventListener('resize',positionMobileEditor);visualViewport?.removeEventListener('resize',positionMobileEditor);root.removeEventListener('focusin',mobileFocusChanged);root.removeEventListener('focusout',mobileFocusChanged);cameraGizmo.dispose();stopHelp();stopPresentation?.();overlayBaseline=undefined;cancelObservation();storageEpoch++; gesture = null; gestureGeneration++; pressedPointers.clear(); viewport.reservePointer(false); recovery?.dispose(); organization?.dispose(); windows.dispose(); mediaManager?.dispose(); mediaViewer.dispose(); viewport.dispose(); list.dispose(); inclusion.dispose(); detail.dispose(); for (const panel of panels.values()) panel.dispose(); root.remove(); } };
 }

@@ -442,6 +442,7 @@ export const projectSceneApplicationImports:Readonly<Record<string,readonly stri
     "../projectFiles/validation",
     "../projectMetadata/assetDeletion",
     "../projectMetadata/blobStore",
+    "../projectMetadata/blobStream",
     "../projectMetadata/captionDeletion",
     "../projectMetadata/commands",
     "../projectMetadata/journal",

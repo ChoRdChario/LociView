@@ -283,5 +283,11 @@ export function createCaptionListControls(document: Document, onPlan: (plan: Cap
     for (const entry of colors.values()) entry.cleanup(); for (const entry of rows.values()) entry.cleanup();
     colors.clear(); rows.clear(); root.remove(); if (composing) onComposition(false); composing = false;
   }
-  return { root, tools, render, revealSelected, focusSearch: () => search.focus?.({ preventScroll: true }), dispose, isComposing: () => composing };
+  function focusSelection() {
+    revealSelected();
+    const selected = context?.memory.selectedCaptionId;
+    const target = selected ? rows.get(selected)?.select : undefined;
+    (target ?? search).focus?.({ preventScroll: true });
+  }
+  return { root, tools, render, revealSelected, focusSelection, focusSearch: () => search.focus?.({ preventScroll: true }), dispose, isComposing: () => composing };
 }

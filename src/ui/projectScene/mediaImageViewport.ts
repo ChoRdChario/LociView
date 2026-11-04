@@ -7,6 +7,11 @@ export function createMediaImageViewport(document: Document, viewport: HTMLEleme
     button.addEventListener('click', () => { if (!disposed && !button.disabled) run(); }); return button; };
   let image: HTMLImageElement | null = null, scale = 1, fitting = true, disposed = false;
   let dragging: { id: number; x: number; y: number; left: number; top: number } | null = null;
+  const touches = new Map<number, { x: number; y: number }>();
+  const releaseTouches = () => {
+    const ids = [...touches.keys()]; touches.clear();
+    for (const id of ids) if (viewport.hasPointerCapture?.(id)) viewport.releasePointerCapture?.(id);
+  };
   const stopDrag = () => { const held = dragging; dragging = null; viewport.dataset.panning = 'false';
     if (held && viewport.hasPointerCapture?.(held.id)) viewport.releasePointerCapture?.(held.id); };
   const dimensions = () => image && image.naturalWidth > 0 && image.naturalHeight > 0 ? { width: image.naturalWidth, height: image.naturalHeight } : null;
@@ -15,7 +20,7 @@ export function createMediaImageViewport(document: Document, viewport: HTMLEleme
   const movable = () => { const data = dimensions(), box = size(); return !!data && (data.width * scale > box.width + 1 || data.height * scale > box.height + 1); };
   const layout = () => {
     const data = dimensions(), box = size(); toolbar.hidden = !image; viewport.tabIndex = image ? 0 : -1;
-    if(image){viewport.setAttribute('role','region');viewport.setAttribute('aria-label','画像の表示領域');viewport.setAttribute('aria-description','拡大後はドラッグ、スクロールバー、Shiftと矢印キーで移動できます。');}
+    if(image){viewport.setAttribute('role','region');viewport.setAttribute('aria-label','画像の表示領域');viewport.setAttribute('aria-description','2本指で拡大・縮小できます。拡大後はドラッグ、スクロールバー、Shiftと矢印キーで移動できます。');}
     else{viewport.removeAttribute('role');viewport.removeAttribute('aria-label');viewport.removeAttribute('aria-description');}
     for (const button of [fit, original, smaller, larger]) button.disabled = !data;
     percentage.textContent = data ? `${Math.round(scale * 1000) / 10}%` : '';
@@ -44,12 +49,40 @@ export function createMediaImageViewport(document: Document, viewport: HTMLEleme
   toolbar.append(fit, original, smaller, larger, percentage);
   const wheel = (event: WheelEvent) => { if (!dimensions() || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey || !event.deltaY) return;
     const rect = viewport.getBoundingClientRect(); event.preventDefault(); zoom(scale * (event.deltaY < 0 ? 1.25 : 1 / 1.25), { x: event.clientX - rect.left, y: event.clientY - rect.top }); };
-  const down = (event: PointerEvent) => { if (event.button !== 0 || !movable() || event.altKey || event.ctrlKey || event.metaKey) return;
+  const down = (event: PointerEvent) => {
+    if (event.pointerType === 'touch') {
+      if (!dimensions() || touches.size >= 2) return;
+      touches.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      viewport.setPointerCapture?.(event.pointerId);
+      return;
+    }
+    if (event.button !== 0 || !movable() || event.altKey || event.ctrlKey || event.metaKey) return;
     event.preventDefault(); viewport.focus({ preventScroll: true }); dragging = { id: event.pointerId, x: event.clientX, y: event.clientY, left: viewport.scrollLeft || 0, top: viewport.scrollTop || 0 };
     viewport.setPointerCapture?.(event.pointerId); viewport.dataset.panning = 'true'; };
-  const move = (event: PointerEvent) => { if (!dragging || event.pointerId !== dragging.id) return;
+  const move = (event: PointerEvent) => {
+    const touch = touches.get(event.pointerId);
+    if (touch) {
+      const other = [...touches.entries()].find(([id]) => id !== event.pointerId)?.[1];
+      const dx = event.clientX - touch.x, dy = event.clientY - touch.y;
+      if (other) {
+        const before = Math.hypot(touch.x - other.x, touch.y - other.y);
+        const after = Math.hypot(event.clientX - other.x, event.clientY - other.y);
+        if (before > 1 && after > 1) {
+          const rect = viewport.getBoundingClientRect();
+          zoom(scale * after / before, { x: (touch.x + other.x) / 2 - rect.left, y: (touch.y + other.y) / 2 - rect.top });
+          viewport.scrollLeft -= dx / 2; viewport.scrollTop -= dy / 2;
+        }
+      } else if (movable()) {
+        viewport.scrollLeft -= dx; viewport.scrollTop -= dy;
+      }
+      touch.x = event.clientX; touch.y = event.clientY;
+      return;
+    }
+    if (!dragging || event.pointerId !== dragging.id) return;
     event.preventDefault(); viewport.scrollLeft = dragging.left - (event.clientX - dragging.x); viewport.scrollTop = dragging.top - (event.clientY - dragging.y); };
-  const up = (event: PointerEvent) => { if (!dragging || event.pointerId !== dragging.id) return;
+  const up = (event: PointerEvent) => {
+    if (touches.delete(event.pointerId)) return;
+    if (!dragging || event.pointerId !== dragging.id) return;
     stopDrag(); };
   const key = (event: KeyboardEvent) => {
     if (!dimensions() || event.isComposing || event.altKey || event.ctrlKey || event.metaKey) return;
@@ -65,9 +98,9 @@ export function createMediaImageViewport(document: Document, viewport: HTMLEleme
   const resize = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => { if (!disposed) layout(); }) : null;
   resize?.observe(viewport); document.defaultView?.addEventListener('resize', layout); layout();
   return { toolbar, imageHost, setImage(next: HTMLImageElement | null) {
-    if (disposed) return; if (image !== next) { stopDrag();image = next; fitting = true; scale = 1; viewport.scrollLeft = viewport.scrollTop = 0; }
+    if (disposed) return; if (image !== next) { stopDrag();releaseTouches();image = next; fitting = true; scale = 1; viewport.scrollLeft = viewport.scrollTop = 0; }
     layout();
-  }, render: layout, dispose() { stopDrag();disposed = true; image = null; resize?.disconnect(); document.defaultView?.removeEventListener('resize', layout);
+  }, render: layout, dispose() { stopDrag();releaseTouches();disposed = true; image = null; resize?.disconnect(); document.defaultView?.removeEventListener('resize', layout);
     viewport.removeEventListener('wheel', wheel); viewport.removeEventListener('pointerdown', down); viewport.removeEventListener('pointermove', move);
     viewport.removeEventListener('pointerup', up); viewport.removeEventListener('pointercancel', up); viewport.removeEventListener('lostpointercapture', up); viewport.removeEventListener('keydown', key); } };
 }

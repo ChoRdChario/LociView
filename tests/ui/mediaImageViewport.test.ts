@@ -41,4 +41,24 @@ describe('existing media dialog image inspection', () => {
     f.zoom.dispose(); expect(f.viewport.listeners.get('keydown')?.size).toBe(0); expect(f.viewport.listeners.get('wheel')?.size).toBe(0);
     f.zoom.setImage(f.image(800, 400)); expect(f.zoom.toolbar.hidden).toBe(true);
   });
+  it('pinches from fit, pans with the remaining touch and clears capture when the image changes', () => {
+    const f = fixture(), release = vi.fn();
+    Object.assign(f.viewport, { getBoundingClientRect: () => ({ left: 0, top: 0 }), hasPointerCapture: () => true, releasePointerCapture: release });
+    f.zoom.setImage(f.image(800, 400));
+    const send = (event: string, pointerId: number, clientX: number) =>
+      f.viewport.fire(event, { pointerType: 'touch', pointerId, clientX, clientY: 100 });
+    send('pointerdown', 1, 100);
+    send('pointerdown', 2, 300);
+    send('pointermove', 2, 400);
+    expect(f.percent()).toBe('75%');
+    send('pointercancel', 2, 400);
+    const left = f.viewport.scrollLeft;
+    send('pointermove', 1, 80);
+    expect(f.viewport.scrollLeft).toBe(left + 20);
+    f.zoom.setImage(f.image(400, 200));
+    expect(release).toHaveBeenCalledWith(1);
+    expect(f.percent()).toBe('100%');
+    expect(f.viewport.scrollLeft).toBe(0);
+    f.zoom.dispose();
+  });
 });

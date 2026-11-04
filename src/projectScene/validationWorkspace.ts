@@ -1,4 +1,4 @@
-import { inspectZipContainerMetadata } from '../assets/zipio';
+import { inspectZipContainerMetadata, isUnrecognizedZip } from '../assets/zipio';
 import type {DesktopOfflinePort} from '../platform/desktopOfflinePorts';
 import {createOfflineControls,createOfflineSettings} from '../ui/projectScene/offlineControls';
 import { mountContextHelp } from '../ui/projectScene/contextHelp';
@@ -585,7 +585,12 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     }
     if (packages.length !== 1 || models.length || media.length) throw Error('作業ファイルは1つずつ開いてください。モデルや画像と一緒には開けません。');
     const file = packages[0]!;
-    const hint=await inspectZipContainerMetadata(file); if(!guardSelection(generation,context))return;
+    const hint = await inspectZipContainerMetadata(file).catch((error: unknown) => {
+      if (isUnrecognizedZip(error))
+        throw new Error('ZIPの内容を確認できません。元のファイルを選び直してください。', { cause: error });
+      throw error;
+    });
+    if(!guardSelection(generation,context))return;
     if(ports.openLegacy&&hint.identity!=='foreign'){legacyFile=file;fallback.hidden=false;}
     const legacy = hint.identity==='v1' ? await prepareFrozenV1Conversion(file, ports.fileLimits, ports.decode, ports.jpeg, ports.photo) : null; if (!guardSelection(generation, context)) return;
     let loci: Awaited<ReturnType<typeof prepareLociMyuConversion>> = null;

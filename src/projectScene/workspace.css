@@ -185,7 +185,8 @@
 .lv-media-zoom-viewport .lv-media-image { max-height: none; }
 .lv-media-zoom-canvas { position: relative; }
 .lv-media-zoom-viewport .lv-media-zoom-canvas img { position: absolute; display: block; max-width: none; max-height: none; object-fit: fill; user-select: none; }
-.lv-media-zoom-viewport[data-zoomed="true"] { cursor: grab; touch-action: none; }
+.lv-media-zoom-viewport { touch-action: none; }
+.lv-media-zoom-viewport[data-zoomed="true"] { cursor: grab; }
 .lv-media-zoom-viewport[data-panning="true"] { cursor: grabbing; }
 .lv-media-viewer-content video { display: block; width: 100%; max-height: min(52dvh, 540px); object-fit: contain; }
 .lv-media-viewer-content audio { display: block; width: 100%; min-width: 0; }

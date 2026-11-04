@@ -4,6 +4,7 @@
 import {
   BlobReader,
   configure,
+  ERR_BAD_FORMAT,
   Uint8ArrayReader,
   Uint8ArrayWriter,
   ZipReader,
@@ -26,6 +27,10 @@ export const DEFAULT_ZIP_LIMITS: ZipLimits = {
   maxTotalBytes: 2 * 1024 * 1024 * 1024, // 2GB (docs/06 §6)
   maxEntryBytes: 1024 * 1024 * 1024, // 1GB
 };
+
+export function isUnrecognizedZip(error: unknown): boolean {
+  return error instanceof Error && error.message === ERR_BAD_FORMAT;
+}
 
 export class ZipGuardError extends Error {
   constructor(

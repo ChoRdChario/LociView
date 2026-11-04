@@ -592,7 +592,7 @@ when verification completes. Preserve existing selection and write authority.
 Checkpoint `456e2d3` is on `g0-baseline`; [Linux CI41805636144](https://github.com/ChoRdChario/LociView/actions/runs/41805636144)
 passed typecheck, full root tests, build and HEIC isolation in13m45s.
 
-### Current unit —read saved Captions while automatic resume verifies
+### Completed unit —read saved Captions while automatic resume verifies
 
 Expose text/search for the remembered restored Project from the catalog's
 already fully verified selected-generation read. Measure first readable text,
@@ -626,6 +626,57 @@ Caption edit. Final Windows checkpoint and HEIC isolation pass on freeze
 checkpoint1050.7s). Next profile the independently verified host preparation
 and 3D build between first text and edit-ready; qualify on an ordinary PC.
 The existing connected-to-cold-offline PC restart browser case also passed.
+
+### Current unit —mobile recording and touch fixes
+
+Keep the desktop panel and storage contracts. In the phone layout, give list
+and selected record usable space, preserve selection and draft through size
+changes, make the active input and completion reachable above a keyboard, and
+separate pin taps from touch orbit. Align photo pinch with the 3D interaction
+and localize unrecognized input at the existing UI boundary. Re-run the
+record/phone layouts and Ki84 save/reopen, review the final diff independently,
+then run the checkpoint. Physical iOS and any changed storage behavior need
+separate evidence; retain all write/readback checks.
+
+Touch mobile now uses one reading surface at a time, restores the selected row
+and search, keeps retry/revise above the keyboard, and uses the same coarse
+short-landscape predicate for UI and canvas. 320×568/100 rows: 44px baseline,
+125px initial and114px after returning to the selection. At320×365 and
+390×420 body and Apply had real center hits; no native keyboard claim.
+Ki84 on the final Desktop artifact: drag from pin orbits, photo pinch125→347.2%,
+tap/close/focus works, 51,271,139-byte backup with five changes, all43 input
+bodies SHA-256 matched, cold reopen retained the edit. Small mobile context
+import→surface pin→Caption→PNG→download→independent restore passed. Same
+geometry and PC direct-camera regression passed in the standard Desktop
+browser lane. A genuine overlapping Ki84 marker tap selected the nearer
+center despite another marker intercepting the event. Windows WebKit refusal preserves a retriable
+creation and reports the mismatch in Japanese, with no ready Project.
+Independent reviewers' layout/failed-edit, focus and dependency findings
+were resolved and rechecked. No persisted formats, write or recovery
+inspection rules were changed.
+Short 320px fault check: a one-shot failure before creating the next
+receipt left the draft intact, showed a hittable Retry and then applied.
+An injection after creating an empty receipt retained the draft and
+remained blocked by receipt-invalid on retry. Do not conflate a recoverable
+transient write failure with a torn persisted receipt.
+The sandboxed checkpoint was interrupted after a focused confirmation that
+the temporary fixture Git repository could not write .git/config. Retain
+the failed log and run the unchanged checkpoint under managed approval.
+The first approved run passed3281 tests and found two stale RecordedDOM
+assumptions. Keep keyboard/mouse/secondary-touch guards, assert primary
+touch threshold/orbit/cancellation, and distinguish coarse-pointer
+queries from a narrow fine-pointer layout. The six affected cases passed.
+The tested browser product artifact did not change after these test edits.
+Final freeze `d8a85381` passed the serial Windows checkpoint:147 files,
+3283 tests passed and21 existing TODOs. Normal/harness/validation/Desktop/
+offline builds and offline/HEIC isolation passed. No actual smartphone or
+iOS acceptance credit. Next, verify native Japanese input, safe-area,
+file pickup/download/restore and network-off cold restart on physical
+iPhone Safari and its Home Screen app, beginning with the OPFS write/read
+probe. Retain failed writes and all verification boundaries.
+The exact final offline artifact also passed the Chromium mobile
+server-off/cold-reopen/edit/cold-reopen route. The tracked phone layout
+and desktop record/camera cases both passed on that same build.
 
 ## Completed boundary —06c bounded restore content inspection
 

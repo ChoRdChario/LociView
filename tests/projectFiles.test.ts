@@ -4787,7 +4787,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const capture=new Set<number>();Object.assign(marker,{setPointerCapture:(id:number)=>capture.add(id),hasPointerCapture:(id:number)=>capture.has(id),releasePointerCapture:(id:number)=>capture.delete(id)});
     const down={pointerId:31,isPrimary:true,pointerType:'mouse',button:0,buttons:1,clientX:30,clientY:40,preventDefault(){}};
     const before=h.host.read().source!.token;
-    for(const extra of [{altKey:true},{ctrlKey:true},{pointerType:'touch'}]){marker.fire('pointerdown',{...down,...extra});expect(capture.size).toBe(0);}
+    for(const extra of [{altKey:true},{ctrlKey:true},{isPrimary:false,pointerType:'touch'}]){marker.fire('pointerdown',{...down,...extra});expect(capture.size).toBe(0);}
     marker.fire('pointerdown',down);marker.fire('pointermove',{...down,clientX:50});
     expect(h.navigateCamera.mock.calls).toMatchObject([[{phase:'begin',kind:'orbit'}],[{phase:'move',dx:20,dy:0}]]);
     h.pinPoint({x:60,y:70});h.button('モデル',h.editor).fire('click');expect(h.all(h.editor)).toContain(marker);expect(capture.size).toBe(1);
@@ -4796,7 +4796,14 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     marker.fire('pointerdown',{...down,pointerId:32,button:2,buttons:2});marker.fire('pointermove',{...down,pointerId:32,button:2,buttons:2,clientY:60});marker.fire('pointercancel',{...down,pointerId:32});
     expect(h.navigateCamera.mock.calls.some(c=>(c[0] as any).kind==='pan')).toBe(true);
     const calls=h.navigateCamera.mock.calls.length;marker.fire('pointermove',{...down,pointerId:32,clientX:70});expect(h.navigateCamera).toHaveBeenCalledTimes(calls);
-    marker.fire('pointerdown',{...down,pointerId:33});await h.ui.dispose();expect(capture.size).toBe(0);marker.fire('pointermove',{...down,pointerId:33,clientX:90});expect(h.navigateCamera).toHaveBeenCalledTimes(calls);expect(h.host.read().source!.token).toBe(before);
+    const touch={...down,pointerId:33,pointerType:'touch'};
+    marker.fire('pointerdown',touch);marker.fire('pointermove',{...touch,clientX:35});expect(h.navigateCamera).toHaveBeenCalledTimes(calls);
+    marker.fire('pointermove',{...touch,clientX:52});
+    marker.fire('pointercancel',touch);marker.fire('click');
+    expect(h.navigateCamera.mock.calls.slice(calls)).toMatchObject([[{phase:'begin',kind:'orbit'}],[{phase:'move',dx:22,dy:0}],[{phase:'end'}]]);
+    expect(capture.size).toBe(0);expect(h.named('本文',h.editor).value).toBe('');expect(h.dispatch).not.toHaveBeenCalled();
+    marker.fire('pointerdown',{...down,pointerId:34});await h.ui.dispose();expect(capture.size).toBe(0);
+    marker.fire('pointermove',{...down,pointerId:34,clientX:90});expect(h.navigateCamera).toHaveBeenCalledTimes(calls+3);expect(h.host.read().source!.token).toBe(before);
   });
   it('keeps material preview local, preserves Scene precedence and restores canonical display on cancel or stale input', async () => {
     const h=await productWorkspaceFixture(true,false,false,'map2'),{host,editor,named,button}=h;
@@ -8612,7 +8619,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
   });
   it('releases an initially hidden product viewport, edits Captions, and reveals a current surface only after preparation',async()=>{
     const f=await openFileCaption(),document=new RecordedDocument().asDocument();let narrow=true,active=false,ready=true,notify=()=>{};
-    Object.assign(document,{defaultView:{innerWidth:720,innerHeight:500,matchMedia:()=>({matches:narrow}),addEventListener(){},removeEventListener(){},setTimeout,clearTimeout}});
+    Object.assign(document,{defaultView:{innerWidth:720,innerHeight:500,matchMedia:(query:string)=>({matches:narrow&&!query.includes('pointer: coarse')}),addEventListener(){},removeEventListener(){},setTimeout,clearTimeout}});
     const mode=createValidationModeHost(f.host,async()=>{throw Error('unexpected mode change');},()=>{}),activation=vi.fn((next:boolean)=>{active=next;});
     let display:Parameters<ReturnType<ViewportFactory>['update']>[0]|undefined;
     const factory:ViewportFactory=(_canvas,changed)=>{notify=changed;return{update(next){display=next;},setActive:activation,camera(){},retry(){},dispose(){},read:()=>({ready:active&&ready,display,token:'hidden-camera',issue:null,dragging:false,pins:[],projection:'perspective',axis:null})};};
@@ -8640,7 +8647,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
   });
   it.each(['task','cancel','search','closed']as const)('keeps the owned waiting-position focus through preparation without stealing %s focus',async destination=>{
     const f=await openFileCaption(),document=new RecordedDocument().asDocument();let active=false,ready=false,notify=()=>{};
-    Object.assign(document,{defaultView:{innerWidth:720,innerHeight:500,matchMedia:()=>({matches:true}),addEventListener(){},removeEventListener(){},setTimeout,clearTimeout}});
+    Object.assign(document,{defaultView:{innerWidth:720,innerHeight:500,matchMedia:(query:string)=>({matches:!query.includes('pointer: coarse')}),addEventListener(){},removeEventListener(){},setTimeout,clearTimeout}});
     const mode=createValidationModeHost(f.host,async()=>{throw Error('unexpected mode change');},()=>{});
     let display:Parameters<ReturnType<ViewportFactory>['update']>[0]|undefined;
     const factory:ViewportFactory=(_canvas,changed)=>{notify=changed;return{update(next){display=next;},setActive(next){active=next;},camera(){},retry(){},dispose(){},read:()=>({ready:active&&ready,display,token:'waiting-focus',issue:null,dragging:false,pins:[],projection:'perspective',axis:null})};};
