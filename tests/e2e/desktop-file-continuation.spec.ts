@@ -122,7 +122,9 @@ test('PC Caption work continues after empty tag focus and cancelled file checks,
     await tags.getByLabel('タグ名', { exact: true }).focus(); await page.keyboard.press('Tab');
     const backup = await output(page, info, '現地確認', 'backup');
     const before = await BackupArchive.inspect(new Blob([Uint8Array.from(await readFile(backup)).buffer]), limits);
-    await expect(page.getByLabel('保存ファイルの状態', { exact: true })).toHaveText('外部ファイル未照合');
+    const fileState = page.getByLabel('保存ファイルの状態', { exact: true });
+    await expect(fileState).toBeVisible();
+    await expect(fileState).toHaveText('ダウンロード開始・保存先未確認');
     const fileBody = page.locator('details.lv-project-files > section');
     const sheet=await fileBody.boundingBox();expect(sheet!.y).toBeGreaterThanOrEqual(0);expect(sheet!.y+sheet!.height).toBeLessThanOrEqual(page.viewportSize()!.height);
     await fileBody.evaluate(n => { n.scrollTop = n.scrollHeight; }); await workspaceFits(page);

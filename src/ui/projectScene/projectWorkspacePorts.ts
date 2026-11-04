@@ -112,7 +112,8 @@ export interface WorkspaceReadingSelection {
   readonly sceneId: string;
   readonly query: string;
   readonly captionId: string | null;
-  readonly focus: 'search' | 'detail' | null;
+  readonly focus: 'search' | 'row' | 'detail' | null;
+  readonly surface?: 'list' | 'detail';
 }
 export interface ProjectWorkspacePorts {
   readonly initialReading?: WorkspaceReadingSelection;
@@ -127,7 +128,7 @@ export interface ProjectWorkspacePorts {
     sceneOrderChoices(token: string, sceneId: string): readonly { operationId: string; orderKey: string }[];
   };
   read(): WorkspaceProvider;
-  projectStatus(): { readonly title: string | null; readonly resumable: boolean; readonly backup: 'verified' | 'unconfirmed' | 'unavailable' };
+  projectStatus(): { readonly title: string | null; readonly resumable: boolean; readonly backup: 'verified' | 'download-started' | 'unconfirmed' | 'unavailable' };
   openProject?(): void;
   projectNavigationBlocked?(): boolean;
   /** Coordinate presentation surfaces only; false retains the current file input. */

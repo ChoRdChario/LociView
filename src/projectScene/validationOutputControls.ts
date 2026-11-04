@@ -34,6 +34,7 @@ export function createValidationOutputControls(document: Document, host: ReturnT
     purpose = next; baseId = ''; cleanPreview = null; reviewPreview = null; sceneId = ''; omitEntry = false; choicePending = pending; render(); changed();
   };
   const urls: string[] = [];
+  const handedOff = new Set<string>();
   const download = async (id: string) => {
     const job = host.workspaceOutput.jobs.find(job => job.id === id);
     if (!job) throw Error('作成したファイルを確認できません。');
@@ -100,7 +101,7 @@ export function createValidationOutputControls(document: Document, host: ReturnT
   }, handoffMessage, true, false, () => { if (needsDisclosure) { feedback = '作成したファイルの内容を確認し、ダウンロードしてください。'; completedFeedback = false; } }, 'ファイルを作成しています。'); };
   const handoff = async (id: string) => {
     feedback = 'ダウンロードを準備しています。'; render();
-    try { await download(id); }
+    try { await download(id); if (!disposed) handedOff.add(id); }
     catch (error) { history.open = true; throw Error(`${error instanceof Error ? error.message : 'ダウンロードを開始できません。'} 作成したファイルから再試行してください。`); }
   };
   const render = () => {
@@ -211,17 +212,19 @@ export function createValidationOutputControls(document: Document, host: ReturnT
     if (choicePending) button(commands, '選択を取り消す', () => { resetChoice(); render(); changed(); });
     status.dataset.busy = String(busy);
     status.textContent = busy ? feedback : host.workspaceOutput.error || feedback;
+    const currentToken = host.read().source?.token;
     for (const [i, job] of host.workspaceOutput.jobs.entries()) {
       if (['cancelled', 'abandoned'].includes(job.state)) continue;
       const row = document.createElement('section'), text = document.createElement('p');
       const complete = job.state === 'generated' || job.state === 'file-verified';
       const name = job.purpose === 'contribution' ? '変更分' : job.purpose === 'backup' ? 'バックアップ' : job.purpose === 'clean' ? '独立コピー' : job.purpose === 'review' ? '閲覧用のシーン' : '作業一式';
-      text.textContent = `${name} ${job.label || i + 1} — ${job.state === 'file-verified' ? '選択したファイルの内容を確認済み' : complete ? '生成済み・ファイルへの保存は未確認' :
+      text.textContent = `${name} ${job.label || i + 1} — ${job.state === 'file-verified' ? '選び直したファイルを照合済み' :
+        complete && handedOff.has(job.id) ? 'ダウンロード開始・保存先未確認' : complete ? '生成済み・ファイルへの保存は未確認' :
         job.state === 'repair-required' ? '生成データを確認できません。元データは保持しています。' : 'ファイル生成が未完了です。'}`;
       row.append(text); (complete ? completedFiles : list).append(row);
       const disclosure = privacyNotice(job);
       if (disclosure) { const privacy = document.createElement('p'); privacy.textContent = disclosure; row.append(privacy); }
-      if (job.stale || job.token && job.token !== host.read().source?.token) {
+      if (job.stale || job.token && job.token !== currentToken) {
         const older = document.createElement('p'); older.textContent = '作成後の変更はこのファイルに含まれません。'; row.append(older);
       }
       if (complete) {
@@ -259,7 +262,7 @@ export function createValidationOutputControls(document: Document, host: ReturnT
   nameInput.addEventListener('input', () => { if (!nameInput.disabled) { checkpointName = nameInput.value; choicePending = true; changed(); } });
   nameInput.addEventListener('compositionstart', () => { composing = true; choicePending = true; changed(); });
   nameInput.addEventListener('compositionend', () => { checkpointName = nameInput.value; composing = false; choicePending = true; changed(); });
-  render(); return { root, render, choosePurpose, setPresentation(value: typeof presentation) { presentation = value; if (completedFeedback) { feedback = ''; completedFeedback = false; } },
+  render(); return { root, render, choosePurpose, hasHandedOff: (jobId: string) => handedOff.has(jobId), setPresentation(value: typeof presentation) { presentation = value; if (completedFeedback) { feedback = ''; completedFeedback = false; } },
     closeReason: () => busy ? 'ファイルを処理中です。完了をお待ちください。' : composing ? '名前の入力を確定してください。' : selected ? '照合するファイルを選ぶか、「ファイル確認を取り消す」を選択してください。' : cancellation ? '取りやめの確認を完了するか、「戻る」を選択してください。' : choicePending ? '選択が未完了です。下の「選択を取り消す」で戻れます。' : null, busy: () => busy, hasChanges: () => busy || composing || choicePending || !!selected || !!cancellation,
     dispose: () => { disposed = true; for (const url of urls) URL.revokeObjectURL(url); root.remove(); } };
 }

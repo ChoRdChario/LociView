@@ -1,10 +1,28 @@
 /* Shared ProjectScene shell and viewport styles. Legacy/Native roots keep their own styles. */
-.lv-resume-reading { max-width: 960px; margin: 0 auto; padding: 16px; }
-.lv-resume-reading > label { display: flex; gap: 8px; align-items: center; }
-.lv-resume-reading ul { max-height: 36dvh; overflow: auto; padding: 0; list-style: none; }
-.lv-resume-reading button { width: 100%; min-height: 44px; text-align: start; }
+.lv-validation-host:has(> .lv-validation-content > .lv-resume-reading) { height: 100dvh; padding-top: 0; }
+.lv-validation-host:has(> .lv-validation-content > .lv-resume-reading) > .lv-home-settings,
+.lv-validation-host:has(> .lv-validation-content > .lv-resume-reading) > .lv-validation-status:empty { display: none; }
+.lv-resume-reading { display: flex; flex-direction: column; height: 100dvh; }
+.lv-resume-reading > header { flex-shrink: 0; }
+.lv-resume-reading > .lv-project-body { flex: 1; min-height: 0; height: auto; }
+.lv-resume-reading .lv-project-stage { min-width: 0; min-height: 0; background: #e6e4e1; }
+.lv-resume-reading aside > h2 { margin: 0; }
+.lv-resume-index { display: flex; flex: 1; flex-direction: column; min-height: 0; }
+.lv-resume-index > label { grid-template-columns: auto minmax(0, 1fr); align-items: center; white-space: nowrap; }
+.lv-resume-index input { width: 100%; min-width: 0; padding-inline: 10px; font-size: 16px; color: inherit; border: 1px solid #aaa99f; border-radius: 6px; }
+.lv-resume-reading ul { flex: 1 1 auto; min-height: 44px; overflow: auto; margin: 6px 0 0; padding: 0; list-style: none; }
+.lv-resume-reading li { border-bottom: 1px solid #d9d6cf; }
+.lv-resume-reading li > button { width: 100%; text-align: start; border-color: transparent; background: transparent; overflow-wrap: anywhere; }
 .lv-resume-reading button[aria-pressed="true"] { background: #d9dfd1; }
-.lv-resume-reading p { white-space: pre-wrap; overflow-wrap: anywhere; }
+.lv-resume-detail { flex: 1 1 auto; min-height: 0; overflow: auto; border-top: 1px solid #ccc9c1; }
+.lv-resume-detail p { white-space: pre-wrap; overflow-wrap: anywhere; }
+.lv-resume-back { display: none; }
+@media (pointer: coarse) and (max-width: 760px), (pointer: coarse) and (max-width: 950px) and (max-height: 480px) {
+  .lv-resume-reading[data-surface="detail"] .lv-resume-index,
+  .lv-resume-reading[data-surface="list"] .lv-resume-detail { display: none; }
+  .lv-resume-reading .lv-resume-back { display: inline-block; }
+  .lv-resume-reading .lv-resume-detail { border-top: 0; }
+}
 .lv-offline-controls { position: relative; z-index: 3; flex: 0 0 auto; display: flex; align-items: center; flex-wrap: wrap; gap: 4px 12px; padding: 6px 12px; background: #f2f0ee; border-bottom: 1px solid #b7b1aa; font: 400 13px/1.5 system-ui, sans-serif; }
 .lv-offline-controls [hidden] { display: none !important; }
 .lv-offline-controls > p { margin: 0; flex: 1 1 240px; }
@@ -205,7 +223,7 @@
 .lv-home-settings .lv-offline-controls > p { margin-bottom: 8px; }
 .lv-home-settings .lv-offline-controls details > div { position: static; width: 100%; max-height: none; padding: 8px 0; border: 0; box-shadow: none; }
 .lv-home-settings :focus-visible { outline: 2px solid #312f2d; outline-offset: 2px; }
-.lv-validation-host:has(> .lv-home-settings):has(> .lv-validation-home[hidden]) { padding-top: 64px; box-sizing: border-box; }
+.lv-validation-host:has(> .lv-home-settings):has(> .lv-validation-home[hidden]):not(:has(> .lv-validation-content > .lv-resume-reading)) { padding-top: 64px; box-sizing: border-box; }
 .lv-startup-failure { padding: 24px; box-sizing: border-box; }
 .lv-startup-failure > h1 { margin: 0 80px 24px 0; font-size: 22px; font-weight: 500; }
 .lv-startup-failure > :is(p,button) { margin: 12px 0; }

@@ -304,7 +304,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     memories.set(sceneId, { ...emptyMemory(), search: reading.query, selectedCaptionId: captionId });
     if (captionId) {
       windowMemories.set(sceneId, { ...newCaptionWindowMemory(sceneId), dismissed: [captionId] });
-      if (reading.focus !== 'search') captionSurface = 'detail';
+      if (reading.surface === 'detail' || reading.surface === undefined && reading.focus !== 'search') captionSurface = 'detail';
     }
   }
   const memory = () => { if (!memories.has(sceneId)) memories.set(sceneId, emptyMemory()); return memories.get(sceneId)!; };
@@ -963,9 +963,14 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       resumeNotice.textContent = ports.resumedLastProject?.() && summary.resumable && summary.title ? `最後のプロジェクトを再開しました：${summary.title}` : '';
       resumeNotice.hidden = !resumeNotice.textContent; otherProject.hidden = !ports.openProject;
       otherProject.disabled = busy || dirty() || ports.otherPending() || !!ports.presentation?.() || !!ports.projectNavigationBlocked?.();
-      resumeStatus.textContent = busy || ports.status().kind === 'checking' ? '変更を適用中' : pending || ports.status().kind === 'failed' ? '更新が未完了です。入力を保持しています。再試行してください。' :
-        draftInput() || panelInput() || recovery?.hasChanges() || mediaManager?.hasChanges() ? '未適用の変更' : summary.resumable ? '再開データあり' : '再開データを確認してください。';
-      fileStatus.textContent = summary.backup === 'verified' ? '保存ファイルと一致' : summary.backup === 'unavailable' ? '保存ファイルを確認してください。' : '外部ファイル未照合';
+      const hasDraft = draftInput() || panelInput() || recovery?.hasChanges() || mediaManager?.hasChanges();
+      const saving = busy || ports.status().kind === 'checking';
+      const failed = pending || ports.status().kind === 'failed';
+      resumeStatus.textContent = saving ? '変更を適用中' : failed ? '更新が未完了です。入力を保持しています。再試行してください。' :
+        hasDraft ? '未適用の変更' : summary.resumable ? 'このブラウザで再開できます' : '再開データを確認してください。';
+      fileStatus.hidden = !!(hasDraft || saving || failed || summary.backup === 'unconfirmed');
+      fileStatus.textContent = summary.backup === 'verified' ? '保存ファイルと一致' : summary.backup === 'download-started' ? 'ダウンロード開始・保存先未確認' :
+        summary.backup === 'unavailable' ? '保存ファイルを確認してください。' : '外部ファイル未照合';
       const nextGestureContext = JSON.stringify([p.token, sceneId, ports.readOnly, ports.imageScope(), ports.otherPending(), models?.hidden(), memory().pinColors]);
       if (gestureContext !== nextGestureContext) { gestureContext = nextGestureContext; gesture = null; gestureGeneration++; }
       status.dataset.busy = String(busy); status.textContent = ports.status().kind === 'failed' ? ports.status().error || feedback : feedback;
@@ -1123,7 +1128,8 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   mounted = true; render();
   if (reading?.focus) queueMicrotask(() => {
     if (disposed || !root.isConnected) return;
-    if (reading.focus === 'detail' && memory().selectedCaptionId) detailHeading.focus({ preventScroll: true });
+    if (reading.focus === 'row' && memory().selectedCaptionId) list.focusSelection();
+    else if (reading.focus === 'detail' && memory().selectedCaptionId) detailHeading.focus({ preventScroll: true });
     else list.focusSearch();
   });
   return { root, headerActions, projectNavigation: otherProject, utilityArea: settingsSheet, clearNotice(){if(!pending&&ports.status().kind==='idle')feedback='';}, dismissDisclosures(){help.open=false;organization!.settingsRoot.open=false;}, setExternalBusy: (active:boolean) => { body.inert=busy||active; }, render, session: interaction, activeScene: () => sceneId, inputPending: () => dirty() || busy,

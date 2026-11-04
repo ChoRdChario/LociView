@@ -6327,8 +6327,9 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const { f, host, ui, editor, root, all, named, button, edited, failed, status, downloads, legacy, dispatch, pick, moveCamera, display } = await productWorkspaceFixture();
     const initialCaptionIds = new Set(Object.keys(host.authority.read().resources.captions));
     expect(named('プロジェクト名', editor).textContent).toBe('統合画面の検証');
-    expect(named('再開データの状態', editor).textContent).toBe('再開データあり');
+    expect(named('再開データの状態', editor).textContent).toBe('このブラウザで再開できます');
     expect(named('保存ファイルの状態', editor).textContent).toBe('外部ファイル未照合');
+    expect(named('保存ファイルの状態', editor).hidden).toBe(true);
     const initialSceneCount = Object.keys(host.authority.read().state.scenes).length;
     button('ピンを追加', editor).fire('click'); const canvas = named('3Dモデルの表示', editor);
     const down = { pointerId: 7, button: 0, isPrimary: true, clientX: 80, clientY: 90 };
@@ -6382,10 +6383,18 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const backup = host.workspaceOutput.jobs.find(j => j.purpose === 'backup')!;
     expect((await BackupArchive.inspect(await host.workspaceOutput.download(backup.id), metadata)).source.originalChanges()).toEqual(host.read().source!.originalChanges());
     await vi.waitFor(() => expect(output.children.find(n => n.attributes.get('role') === 'status')!.dataset.busy).toBe('false'));
-    expect(named('保存ファイルの状態', editor).textContent).toBe('外部ファイル未照合');
+    expect(named('保存ファイルの状態', editor).textContent).toBe('ダウンロード開始・保存先未確認');
+    expect(named('保存ファイルの状態', editor).hidden).toBe(false);
     button('ファイルを選択', output).fire('click');
     const verify = named('保存したファイルを選択', output); Object.assign(verify, { files: [await host.workspaceOutput.download(backup.id)] }); verify.fire('change');
     await vi.waitFor(() => expect(named('保存ファイルの状態', editor).textContent).toBe('保存ファイルと一致'), { timeout: 10000 });
+    body.value = '照合後の未適用入力'; body.fire('input');
+    expect(named('再開データの状態', editor).textContent).toBe('未適用の変更');
+    expect(named('保存ファイルの状態', editor).hidden).toBe(true);
+    const detail = named('キャプションの詳細', editor);
+    button('取り消す', detail).fire('click'); button('変更を取り消す', detail).fire('click');
+    expect(body.value).toBe('最初の本文');
+    expect(named('保存ファイルの状態', editor).hidden).toBe(false);
     const verifiedToken = host.read().source!.token;
     button('相手に渡す', output).fire('click'); button('ダウンロード', output).fire('click');
     await vi.waitFor(() => expect(downloads).toHaveBeenCalledTimes(2), { timeout: 10000 });
@@ -7445,7 +7454,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     await vi.waitFor(() => expect(tools.busy()).toBe(false));
     expect(click).toHaveBeenCalledTimes(1); expect(host.read().source!.token).toBe(token);
     expect(workspace.session).toBe(s); expect(s.memory).toBe(memory); expect(s.windowMemory).toBe(windows);
-    expect(all(root).some(n => n.textContent.includes('ファイルへの保存は未確認'))).toBe(true);
+    expect(all(root).some(n => n.textContent.includes('ダウンロード開始・保存先未確認'))).toBe(true);
     button('ダウンロード').fire('click'); await vi.waitFor(() => expect(click).toHaveBeenCalledTimes(2));
     await vi.waitFor(() => expect(tools.busy()).toBe(false));
     expect(host.workspaceOutput.jobs[0]!.state).toBe('generated');
@@ -7455,6 +7464,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     Object.assign(selected, { files: [file] }); selected.fire('change');
     await vi.waitFor(() => expect(host.workspaceOutput.jobs[0]!.state).toBe('file-verified'), { timeout: 10000 });
     await vi.waitFor(() => expect(tools.hasChanges()).toBe(false));
+    expect(all(root).some(n => n.textContent.includes('選び直したファイルを照合済み'))).toBe(true);
     expect(host.read().source!.token).toBe(token);
     await host.mode!.change('view', token, () => {}); tools.render(); expect(button('ファイルに保存').disabled).toBe(true);
     expect(button('ダウンロード').disabled).toBe(false);

@@ -627,7 +627,7 @@ checkpoint1050.7s). Next profile the independently verified host preparation
 and 3D build between first text and edit-ready; qualify on an ordinary PC.
 The existing connected-to-cold-offline PC restart browser case also passed.
 
-### Current unit —mobile recording and touch fixes
+### Completed unit —mobile recording and touch fixes
 
 Keep the desktop panel and storage contracts. In the phone layout, give list
 and selected record usable space, preserve selection and draft through size
@@ -677,6 +677,44 @@ probe. Retain failed writes and all verification boundaries.
 The exact final offline artifact also passed the Chromium mobile
 server-off/cold-reopen/edit/cold-reopen route. The tracked phone layout
 and desktop record/camera cases both passed on that same build.
+
+### Completed unit —PC and phone daily edit, save and reopen
+
+Evaluate both PC and phone for each connected product change. First align the
+read-only resume layout and normal Caption workflow, and identify the exact
+edition and stage of a save without claiming an OS download completed.
+Use the existing selected-restore, command, output and recovery boundaries.
+Compare Ki84 in both layouts and verify unreadable restore, IME, draft,
+browser resume, download and external verification separately. Keep device,
+offline and publication evidence scoped to their actual environments.
+
+Ki-84 in isolated Chromium profiles passed PC 1280×720 and touch390×844:
+read during verification, preserve search/selection/focus, apply one Caption
+edit, download and select the ZIP for verification, cancel an unapplied
+draft, and retain the applied edit after a cold browser restart. Both ZIPs
+contain five changes and match all43 original asset hashes. The PC panel
+kept its position and size. The touch panel retained its width and surface;
+the active workspace controls moved its top down105px. An injected corruption
+at the later archive check removed the phone preview and left editing closed.
+Independent review found and addressed short-window sizing, offline home
+padding and the stale rendered assertion. Save/restore integrity review had
+no blocking findings. The first full run found one more stale text assertion
+after successful handoff, with the other3282 tests passing. The updated test
+checks both download and confirmation states. All three focused cases passed.
+Final freeze `26b7811e`: the Windows checkpoint passed with147 test files,
+3283 passes and21 existing TODOs, all five builds and offline isolation.
+HEIC isolation passed. The final offline candidate passed the Ki-84 reader
+at1024×360 PC,844×390 landscape touch and390×844 portrait touch. Its tracked
+PC file continuation/receive/restore, PC camera and phone short-editor cases
+passed. A separate touch cold restart with the server stopped, an offline
+edit and a second cold restart passed in Chromium. Physical iOS remains open.
+
+Next, make Share start from the recipient's task. On both PC and touch today,
+the menu preselects a complete editable workspace and enables Download before
+the user chooses a purpose. Distinguish joint editing, returning a change,
+viewing and an independent copy. Keep explicit origin selection and disclosure,
+and verify sending and receiving on both screen classes. Revisit the105px touch
+reader shift alongside work-panel placement, and retain native iOS acceptance.
 
 ## Completed boundary —06c bounded restore content inspection
 

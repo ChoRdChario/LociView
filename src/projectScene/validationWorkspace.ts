@@ -720,7 +720,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
         const next = reading ? createResumeReading(document, reading) : undefined;
         clearResumeReading(); resumeReading = next; navigation.hidden = !!next;
         if (next) {
-          status.textContent = '再開を確認しています。記録は閲覧・検索できます。';
+          status.textContent = '';
           content.append(next.root);
         }
         controls();
