@@ -59,7 +59,7 @@ export interface ValidationWorkspacePorts {
   lastProject?: { read(): ProjectResumeReference | null; remember(reference: ProjectResumeReference): void };
   list(reading?: ResumeReadingRequest): Promise<ValidationProjectEntry[]>;
   open(run: string, initial?: ReturnType<typeof prepareValidationCreation>, mode?: LocalOpenMode, workspaceFile?: Blob, reviewEdit?: PreparedReviewEdit,
-    firstBackup?: ValidationHostOptions['firstBackup']): Promise<ValidationNormalHost | FirstBackupRecovery>;
+    firstBackup?: ValidationHostOptions['firstBackup'], standaloneWorkspace?: boolean): Promise<ValidationNormalHost | FirstBackupRecovery>;
   render(host: ValidationDisplayHost): Promise<{ factory: ViewportFactory; readonly ready?:Promise<void>; detachPreparation?():void; dispose(): void }>;
   renderReview?(view: ReviewView): Promise<{ factory: ViewportFactory; dispose(): void }>;
   renderModelCandidate?(host: ValidationDisplayHost, display: Parameters<ModelCandidateRenderer>[0]): ReturnType<ModelCandidateRenderer>;
@@ -88,6 +88,12 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   const workspaceForm = document.createElement('form'), workspaceLabel = document.createElement('label'), workspaceInput = document.createElement('input'), openFile = document.createElement('button');
   workspaceLabel.textContent = 'ファイルを選択'; workspaceInput.type = 'file'; workspaceInput.multiple = true; workspaceInput.setAttribute('aria-label', 'ファイルを選択'); workspaceLabel.append(workspaceInput);
   openFile.type = 'submit'; openFile.textContent = 'ファイルを開く'; workspaceForm.append(workspaceLabel, openFile,fallback);
+  const updatePanel = document.createElement('section'), updateNote = document.createElement('p');
+  const updateConfirm = document.createElement('button'), updateCancel = document.createElement('button');
+  updatePanel.className = 'lv-update-destination'; updatePanel.setAttribute('aria-label', '取り込み先'); updatePanel.hidden = true;
+  updateNote.id = 'lv-home-update-destination'; updateConfirm.setAttribute('aria-describedby', updateNote.id);
+  updateConfirm.type = updateCancel.type = 'button'; updateConfirm.textContent = '既存に取り込む'; updateCancel.textContent = '選択を取り消す';
+  updatePanel.append(updateNote, updateConfirm, updateCancel);
   const conversionPanel = document.createElement('section'), conversionNote = document.createElement('p'), conversionHelp = document.createElement('p');
   const imageOmissions=document.createElement('details'),imageOmissionsSummary=document.createElement('summary'),imageOmissionsList=document.createElement('ul');
   imageOmissions.className='lv-conversion-images';imageOmissions.hidden=true;imageOmissions.append(imageOmissionsSummary,imageOmissionsList);
@@ -96,7 +102,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   const convert = document.createElement('button'), cancelConversion = document.createElement('button');
   convert.type = cancelConversion.type = 'button'; convert.textContent = '新しいプロジェクトに変換'; cancelConversion.textContent = '選択を取り消す';
   conversionHelp.textContent = '元ファイルは変更しません。チームでは変換後のファイルを使ってください。変換元のZIPと変換の説明は、別に保管してください。';
-  conversionPanel.append(conversionNote, conversionHelp, convert, cancelConversion); conversionPanel.hidden = true; workspaceForm.append(conversionPanel);
+  conversionPanel.append(conversionNote, conversionHelp, convert, cancelConversion); conversionPanel.hidden = true; workspaceForm.append(conversionPanel, updatePanel);
   const lociChoices = document.createElement('div'), workbookLabel = document.createElement('label'), workbook = document.createElement('select'),
     conversionTitleLabel = document.createElement('label'), conversionTitle = document.createElement('input'), relationLabel = document.createElement('label'), relation = document.createElement('input'),
     relationNote = document.createElement('p'), previewAgain = document.createElement('button'), saveReport = document.createElement('button');
@@ -132,6 +138,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   let lociEvaluation: Awaited<ReturnType<NonNullable<Awaited<ReturnType<typeof prepareLociMyuConversion>>>['evaluate']>> | null = null;
   let lociDraft = 0, lociDecision: string | undefined;
   let selectionGeneration = 0, creationDraft = 0, selectionPending = false;
+  let pendingUpdate: { file: File; run: string; generation: number; context: ReturnType<typeof selectionContext> } | undefined;
   let nativeSelectionChecking = false, selectionAbort: AbortController | undefined;
   let rawSelection: { models: ValidationModelFile[]; media: ValidationFile[] } | undefined;
   let creationAttempt: { run: string; initial: ReturnType<typeof prepareValidationCreation>; opened?: true; candidate?: ValidationNormalHost } | undefined;
@@ -141,6 +148,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   let reportUrl: string | undefined;
   let mounted = false, resumedLast = false, confirmingResume = false, lastRemembered: string | undefined;
   let catalog: readonly ValidationProjectEntry[] = [];
+  let catalogLoaded = false;
   const projectOpenButtons=new Set<HTMLButtonElement>();
   const changed = () => !!workspace?.hasChanges() || !!reviewWorkspace?.hasChanges() || !!receiveTools?.hasChanges() || !!host?.hasPending() || !!firstRecovery;
   const openNormal = async (...args: Parameters<ValidationWorkspacePorts['open']>): Promise<ValidationNormalHost> => {
@@ -160,8 +168,9 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     for (const button of firstRecoveryButtons) button.disabled = busy;
     workspaceInput.disabled = title.disabled = busy || !!creationAttempt;
     cancelSelection.disabled = busy && !nativeSelectionChecking || composing || !!creationAttempt;
-    cancelSelection.hidden = !selectionPending || !conversionPanel.hidden;
-    openFile.hidden = !form.hidden || !conversionPanel.hidden;
+    cancelSelection.hidden = !selectionPending || !conversionPanel.hidden || !!pendingUpdate;
+    openFile.hidden = !form.hidden || !conversionPanel.hidden || !!pendingUpdate;
+    updatePanel.hidden = !pendingUpdate; updateConfirm.disabled = updateCancel.disabled = busy || composing;
     create.textContent = creationAttempt ? '作成を再試行' : 'プロジェクトを作成';
     convert.disabled = busy || composing || !!lociPreview && (!lociCurrent() || lociEvaluation!.blocked);
     saveReport.hidden = !lociPreview && !(conversion && 'report' in conversion && conversion.report);
@@ -176,10 +185,16 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   conversionTitle.addEventListener('compositionstart', () => { composing = true; invalidateLoci(); controls(); });
   conversionTitle.addEventListener('compositionend', () => { composing = false; invalidateLoci(); controls(); });
   const execute = (action: () => Promise<void>) => {
-    if (busy || disposed) return; busy = true; controls(); workspace?.render();
+    if (busy || disposed) return;
+    const previousUpdate = pendingUpdate;
+    const confirmFocused = document.activeElement === updateConfirm;
+    busy = true; controls(); workspace?.render();
     const work = action(); operation = work;
     return work.catch(error => { if (!disposed) status.textContent = error instanceof Error ? error.message : '処理できません。入力と再開用データは保持しています。'; })
-      .finally(() => { busy = false; if (operation === work) operation = undefined; if (!disposed) { controls(); workspace?.render(); } });
+      .finally(() => { busy = false; if (operation === work) operation = undefined; if (!disposed) {
+        controls(); workspace?.render();
+        if (pendingUpdate && (pendingUpdate !== previousUpdate || confirmFocused)) updateConfirm.focus?.();
+      } });
   };
   const closeCurrent = async () => {
     clearResumeReading();
@@ -225,6 +240,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   const updateList = async (reading?: ResumeReadingRequest) => {
     const entries = await ports.list(reading); if (disposed) return;
     catalog = entries;
+    catalogLoaded = true;
     projectOpenButtons.clear();list.replaceChildren();
     if (!entries.length) { list.textContent = 'このブラウザの再開用データはありません。'; return; }
     for (const item of entries) {
@@ -440,7 +456,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   const clearConversion = () => { const old = lociPreview; legacyFile=undefined;fallback.hidden=true; lociDraft++; lociDecision = undefined; conversion = null; lociPreview = null; lociEvaluation = null; lociChoices.hidden = true; conversionPanel.hidden = true;materialNotice.render();clearImageOmissions(true); void old?.dispose().catch(() => {}); };
   const clearSelection = () => {
     selectionAbort?.abort(); selectionAbort = undefined; nativeSelectionChecking = false;
-    selectionGeneration++; creationDraft++; selectionPending = false; rawSelection = undefined; creationAttempt = undefined; selectionHost = undefined;
+    selectionGeneration++; creationDraft++; selectionPending = false; pendingUpdate = undefined; rawSelection = undefined; creationAttempt = undefined; selectionHost = undefined;
     form.hidden = true; title.value = '新しいプロジェクト'; workspaceInput.value = ''; clearConversion(); controls();
   };
   const selectionContext = () => ({ host, workspace, reviewWorkspace, token: host?.read().source?.token });
@@ -454,7 +470,8 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   const replaceSelection = async (run: string, opened: ValidationNormalHost, generation: number, context: ReturnType<typeof selectionContext>) => {
     try { if (!guardSelection(generation, context)) { await opened.dispose(); return; } }
     catch (error) { await opened.dispose(); throw error; }
-    await closeCurrent(); await adoptProject(run, opened);
+    try { await closeCurrent(); } catch (error) { await opened.dispose(); throw error; }
+    await adoptProject(run, opened);
   };
   const exportReport = (blob: Blob, fromFile=false) => { if (disposed) return; if (reportUrl) URL.revokeObjectURL(reportUrl); reportUrl = URL.createObjectURL(blob);
     const a = document.createElement('a'); a.href = reportUrl; a.download = 'LociView-conversion-report.json'; a.hidden = true; root.append(a);
@@ -504,10 +521,34 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   }));
   workspaceInput.addEventListener('change', () => {
     if (creationAttempt) return;
-    selectionGeneration++; creationDraft++; selectionPending = !!workspaceInput.files?.length; rawSelection = undefined;
+    selectionGeneration++; creationDraft++; selectionPending = !!workspaceInput.files?.length; pendingUpdate = undefined; rawSelection = undefined;
     form.hidden = true; title.value = '新しいプロジェクト'; clearConversion(); controls();
   });
   cancelSelection.addEventListener('click', () => { if ((!busy || nativeSelectionChecking) && !composing && !creationAttempt) { clearSelection(); status.textContent = ''; } });
+  updateCancel.addEventListener('click', () => {
+    if (!busy && !composing && pendingUpdate) { clearSelection(); status.textContent = ''; workspaceInput.focus?.(); }
+  });
+  updateConfirm.addEventListener('click', () => execute(async () => {
+    const target = pendingUpdate;
+    if (!target || !guardSelection(target.generation, target.context)) return;
+    status.textContent = '更新を確認しています。';
+    const opened = await openNormal(target.run, undefined, 'edit');
+    let transferred = false;
+    try {
+      if (!guardSelection(target.generation, target.context)) return;
+      const current = opened.read();
+      if (opened.authority.readOnly) throw Error('取り込み先を編集用に開けません。別のタブで編集中の場合は閉じてから再試行してください。');
+      const output = opened.workspaceOutput;
+      if (current.state !== 'ready' || !current.publication || current.source?.proof.identity.projectId !== `prj_${target.run}` || opened.hasPending() ||
+        output.error || output.jobs.some(job => !['generated', 'file-verified', 'cancelled', 'abandoned'].includes(job.state)))
+        throw Error('取り込み先を確認できません。一覧からプロジェクトを開き、未完了の処理を確認してください。');
+      try { await opened.workspaceFiles.receive(current.source.token, target.file); }
+      catch (error) { if (!opened.hasPending()) throw error; }
+      transferred = true;
+      await replaceSelection(target.run, opened, target.generation, target.context);
+      if (!disposed && selected === target.run && !opened.hasPending()) status.textContent = '更新を取り込みました。';
+    } finally { if (!transferred) await opened.dispose(); }
+  }));
   cancelConversion.addEventListener('click', () => { if (!busy && !composing) { clearSelection(); status.textContent = ''; } });
   convert.addEventListener('click', () => execute(async () => {
     ensureMaySwitch(); if (composing || lociPreview && (!lociCurrent() || lociEvaluation!.blocked) || !lociPreview && !conversion) throw Error('変換する内容を確認してください。');
@@ -529,7 +570,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
       selection.some(item => !Number.isSafeInteger(item.file.size) || item.file.size < 0)) throw Error('選択したファイルが読み込みの上限を超えています。');
     const generation = ++selectionGeneration, draft = creationDraft, context = selectionContext(); selectionPending = true;
     status.textContent = 'ファイルを確認しています。';
-    clearConversion(); rawSelection = undefined; form.hidden = true;
+    clearConversion(); pendingUpdate = undefined; rawSelection = undefined; form.hidden = true;
     const models: ValidationModelFile[] = [], media: ValidationFile[] = [], packages: File[] = []; let actualTotal = 0, bufferedBytes=0;
     let unitlessMesh=false, unavailableObjMaterials=false;
     for (const item of selection) {
@@ -638,7 +679,21 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
       lociChoices.hidden = false; conversionPanel.hidden = false; await evaluateLoci(); status.textContent = ''; return;
     }
     const selectedArchive = await PackageArchive.inspect(file); if (!guardSelection(generation, context)) return;
-    const purpose = selectedArchive.control.manifest.purpose;
+    const manifest = selectedArchive.control.manifest, { purpose } = manifest;
+    fallback.hidden = true; legacyFile = undefined;
+    if (purpose === 'contribution' || purpose === 'teamWorkspace') {
+      if (!catalogLoaded) await updateList();
+      if (!guardSelection(generation, context)) return;
+      const run = manifest.identity.projectId.slice(4), destination = catalog.find(item => item.run === run);
+      if (destination?.state === 'ready') {
+        pendingUpdate = { file, run, generation, context };
+        updateNote.textContent = `「${destination.title}」に更新を取り込みます。`;
+        status.textContent = '';
+        return;
+      }
+      if (destination) throw Error('取り込み先に確認が必要なデータがあります。一覧から開いてください。');
+      if (purpose === 'contribution') throw Error('この変更分の元になった作業一式を先に開いてください。');
+    }
     if (purpose === 'backup') {
       const archive = await BackupArchive.fromSelectedArchive(selectedArchive, validationMetadataLimits); if (!guardSelection(generation, context)) return;
       const run = (archive.source.proof.identity.projectId as string).slice(4), opened = await ports.open(run, undefined, 'edit', undefined, undefined,
@@ -647,7 +702,6 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
       if (!('kind' in opened)) { await opened.dispose(); throw Error('バックアップの復元用の入口に接続できません。'); }
       await closeCurrent(); firstRecovery = opened; selected = run; navigation.hidden = true; renderFirstRecovery(); return;
     }
-    if (purpose === 'contribution') throw Error('更新用ファイルです。対応するプロジェクトを開き、更新を受け取ってください。');
     if (purpose === 'review') {
       const view = await prepareReviewView(selectedArchive, policy, ports.decode, ports.jpeg, ports.photo,ports.mediaDecoders);
       if (!ports.renderReview) throw Error('閲覧用シーンの表示が未接続です。');
@@ -674,7 +728,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     const inspected = purpose === 'clean' ? await CleanArchive.inspect(file, validationMetadataLimits) : await WorkspaceArchive.inspect(file, validationMetadataLimits);
     if (!guardSelection(generation, context)) return;
     const run = (inspected.source.proof.identity.projectId as string).slice(4);
-    const opened = await openNormal(run, undefined, 'edit', file);
+    const opened = await openNormal(run, undefined, 'edit', file, undefined, undefined, purpose === 'teamWorkspace');
     await replaceSelection(run, opened, generation, context);
   };
   workspaceForm.addEventListener('submit',event=>{event.preventDefault();void execute(()=>openSelection(Array.from(workspaceInput.files??[])));});

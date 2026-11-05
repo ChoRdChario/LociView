@@ -76,6 +76,7 @@ export interface ValidationHostOptions {
   run: string; base: WorkspaceFS; coordinator: ProjectMutationCoordinator; store: OriginBlobStore;
   fileLimits: FileValidationLimits; filePolicy?: ProjectFilePolicy; decode?: PngDecoder; jpeg?: JpegDecoder; photo?: PhotoDecoder; mediaDecoders?:MediaDecoders; initial?: ReturnType<typeof prepareValidationCreation>;
   workspaceFile?: Blob;
+  standaloneWorkspace?: boolean;
   reviewEdit?: PreparedReviewEdit;
   firstBackup?: Readonly<{ file: Blob; archive: EvidenceRef }>;
   packageLocks?: LockManager | null;
@@ -245,6 +246,8 @@ async function openNormalValidationHost(options: ValidationHostOptions, inherite
   try {
     if (await measure('host.open.first-restore', () => inspectValidationFirstBackup(lease.workspace, options))) throw Error('バックアップの初回復元を専用の入口から再開してください。');
     const fresh = !(await options.base.list(`${root}/`)).length;
+    if (options.standaloneWorkspace && !fresh)
+      throw Error('同じプロジェクトのデータがあります。一覧を更新し、ファイルを選び直してください。');
     if (fresh && (!(options.initial || incoming || options.reviewEdit) || !lease.holdsWriteLock)) throw Error('保存データがありません。プロジェクトを選び直してください。');
     if (!fresh && options.initial) throw Error('作成先に保存データがあります。既存データは変更していません。');
     if (fresh) lease.activateNewProject();

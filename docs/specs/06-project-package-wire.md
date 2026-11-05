@@ -43,6 +43,17 @@ One ordinary file selection precedes content inspection and the purpose-specific
 action. Filename, extension, model similarity, digest equality and human memo
 never select purpose, establish a relation or select a conflict winner.
 
+In the PC and touch selector, a whole Workspace without a local destination
+uses the existing standalone import. A local candidate for a Workspace or
+Contribution is shown by title, with an explicit `既存に取り込む` action.
+Catalog observations route only. Standalone Workspace import refuses an existing
+destination under the write lease. A confirmed update opens its existing target
+without initialization and uses the regular receiver for exact identity, base,
+dependency, body, publication and retry checks. A failure before durable work
+keeps the selected file available. Started work uses existing receive recovery.
+An absent Contribution destination directs the user to its original Workspace.
+Review still opens in View with the existing separate editable-copy action.
+
 ## 3. Candidate manifest and canonical control bytes
 
 The notation is a closed candidate shape, not exported TypeScript. `Entry` means

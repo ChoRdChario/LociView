@@ -7299,13 +7299,13 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const cold = await openValidationHost(nextOptions); expect(cold.read().source!.token).toBe(token);
     expect(cold.workspaceOutput.bases).toEqual([]); await cold.dispose();
   }, 60000);
-  it('opens a first Workspace from the existing selector and receives later selection by identity (recorded DOM)', async () => {
-    const { f, options, run } = await initialWorkspaceHostFixture();
+  it('opens a first Workspace and confirms the existing destination before receiving from the selector (recorded DOM)', async () => {
+    const { f, fs, options, run } = await initialWorkspaceHostFixture();
     let host: Awaited<ReturnType<typeof openValidationHost>> | undefined;
     const render = vi.fn(async () => ({ factory: (() => { throw Error('Recorded DOM has no GPU'); }) as ViewportFactory, dispose() {} }));
     const ports: ValidationWorkspacePorts = { fileLimits: budget, decode, selected: vi.fn(), render,
       list: () => listValidationProjects(options, options.openStorage),
-      open: async (_run, initial, mode, workspaceFile) => host = await openValidationHost({ ...options, run: _run, initial, mode, workspaceFile }) };
+      open: async (_run, initial, mode, workspaceFile, _review, _backup, standaloneWorkspace) => host = await openValidationHost({ ...options, run: _run, initial, mode, workspaceFile, standaloneWorkspace }) };
     const u = createValidationWorkspace(new RecordedDocument().asDocument(), ports), root = record(u.root);
     const all = (n: RecordedNode): RecordedNode[] => [n, ...n.children.flatMap(all)];
     const button = (text: string) => all(root).find(n => n.tag === 'button' && n.textContent === text)!;
@@ -7323,9 +7323,73 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const originals = host!.read().source!.originalChanges();
     button('別のプロジェクトを開く').fire('click'); await vi.waitFor(() => expect(u.selected).toBeNull());
     await vi.waitFor(() => expect(button('ファイルを開く').disabled).toBe(false));
-    Object.assign(input, { files: [f.file] }); form.fire('submit', { preventDefault() {} });
+    const paths = await fs.list(''), bytes = await Promise.all(paths.map(path => fs.readBytes(path)));
+    await expect(openValidationHost({ ...options, workspaceFile: f.file, standaloneWorkspace: true })).rejects.toThrow('同じプロジェクトのデータがあります');
+    const preview = all(root).find(n => n.attributes.get('aria-label') === '取り込み先')!;
+    const selectUpdate = async () => {
+      Object.assign(input, { files: [f.file] }); form.fire('submit', { preventDefault() {} });
+      await vi.waitFor(() => { expect(preview.hidden).toBe(false); expect(button('既存に取り込む').disabled).toBe(false); });
+    };
+    await selectUpdate(); expect(render).toHaveBeenCalledOnce(); expect(u.selected).toBeNull();
+    expect(await fs.list('')).toEqual(paths); expect(await Promise.all(paths.map(path => fs.readBytes(path)))).toEqual(bytes);
+    preview.children.find(n => n.textContent === '選択を取り消す')!.fire('click');
+    expect(preview.hidden).toBe(true);
+    await selectUpdate();
+    const other = await openValidationHost(options);
+    button('既存に取り込む').fire('click');
+    await vi.waitFor(() => expect(all(root).some(n => n.textContent.includes('取り込み先を編集用に開けません'))).toBe(true));
+    expect(preview.hidden).toBe(false); expect(other.read().source!.originalChanges()).toEqual(originals); await other.dispose();
+    await vi.waitFor(() => expect(button('既存に取り込む').disabled).toBe(false));
+    button('既存に取り込む').fire('click');
     await vi.waitFor(() => expect(render).toHaveBeenCalledTimes(2), { timeout: 10000 });
     expect(host!.read().source!.originalChanges()).toEqual(originals); await u.dispose();
+  });
+  it('resumes a confirmed selector Contribution only with the exact original file', async () => {
+    const { f, fs, options, run } = await initialWorkspaceHostFixture();
+    const first = await openValidationHost({ ...options, workspaceFile: f.file });
+    const before = first.read().source!.token; await first.dispose();
+    await f.receiverService.receive(f.local.source!.token, f.file);
+    const sender = (await f.receiver.session.read()).source!;
+    await f.receiver.session.editCaption(sender.token, f.captionId, 'title', '受信した記録');
+    const sent = await contributionFile(f.receiver.session, f.fs, f.store);
+    const otherFile = (await contributionFile(f.receiver.session, f.fs, f.store)).file;
+    let host: Awaited<ReturnType<typeof openValidationHost>> | undefined;
+    let destinationAvailable = false;
+    const render = vi.fn(async () => ({ factory: (() => { throw Error('Recorded DOM has no GPU'); }) as ViewportFactory, dispose() {} }));
+    const ui = createValidationWorkspace(new RecordedDocument().asDocument(), { fileLimits: budget, decode, selected() {}, render,
+      list: () => destinationAvailable ? listValidationProjects(options, options.openStorage) : Promise.resolve([]),
+      open: async (_run, _initial, mode) => host = await openValidationHost({ ...options, mode }) });
+    const root = record(ui.root), all = (n: RecordedNode): RecordedNode[] => [n, ...n.children.flatMap(all)];
+    const button = (text: string) => all(root).find(n => n.tag === 'button' && n.textContent === text)!;
+    try {
+      await ui.ready;
+      const selection = all(root).find(n => n.attributes.get('aria-label') === 'ファイルを選択')!;
+      const select = () => { Object.assign(selection, { files: [sent.file] }); selection.parent!.parent!.fire('submit', { preventDefault() {} }); };
+      select();
+      await vi.waitFor(() => expect(all(root).some(n => n.textContent === 'この変更分の元になった作業一式を先に開いてください。')).toBe(true));
+      expect(host).toBeUndefined(); expect(button('既存に取り込む').parent!.hidden).toBe(true);
+      await vi.waitFor(() => expect(button('一覧を更新').disabled).toBe(false));
+      button('選択を取り消す').fire('click'); destinationAvailable = true; button('一覧を更新').fire('click');
+      await vi.waitFor(() => expect(button('一覧を更新').disabled).toBe(false));
+      select();
+      await vi.waitFor(() => { expect(button('既存に取り込む').parent!.hidden).toBe(false); expect(button('既存に取り込む').disabled).toBe(false); });
+      fs.reject = path => path.includes('/contribution-receive/') && path.endsWith('/input.zip');
+      button('既存に取り込む').fire('click');
+      await vi.waitFor(() => expect(ui.selected).toBe(run), { timeout: 10000 });
+      expect(host!.workspaceFiles.jobs.some(job => job.state === 'input-required')).toBe(true);
+      expect(host!.read().source!.token).toBe(before); expect(render).not.toHaveBeenCalled(); fs.reject = () => false;
+      const input = all(root).find(n => n.attributes.get('aria-label') === '更新ファイルを選択')!;
+      Object.assign(input, { click: vi.fn() }); button('元のファイルを選び直す').fire('click');
+      const receive = (file: Blob) => { Object.assign(input, { files: [file] }); input.fire('change'); input.parent!.parent!.fire('submit', { preventDefault() {} }); };
+      receive(otherFile);
+      await vi.waitFor(() => expect(all(root).some(n => n.textContent.includes('中断前と異なるファイルです'))).toBe(true), { timeout: 10000 });
+      expect(host!.read().source!.token).toBe(before);
+      receive(sent.file);
+      await vi.waitFor(() => expect(render).toHaveBeenCalledOnce(), { timeout: 10000 });
+      expect(host!.workspaceFiles.jobs.every(job => job.state === 'completed')).toBe(true);
+      const current = host!.read(); expect(current.source?.token).not.toBe(before);
+      expect(current.provider?.kind === 'scene-provider' && current.provider.resources.captions[f.captionId]?.title).toMatchObject({ kind: 'value', value: '受信した記録' });
+    } finally { fs.reject = () => false; await ui.dispose(); }
   });
   it('recovers source-less initial input through the same file controls after View-to-Edit, before renderer preparation', async () => {
     const { f, fs, options, run } = await initialWorkspaceHostFixture(), originalWrite = fs.writeStream.bind(fs);

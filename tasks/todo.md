@@ -740,7 +740,9 @@ status during recovery. Its updated settled-state check and focused cases passed
 Final freeze `ceb84759` passed the Windows checkpoint:147 files,3283 passes,
 21 existing TODOs, all five builds, offline isolation and HEIC isolation.
 
-Next import boundary: one file selection, classify by validated contents and
+### Completed unit —confirm the destination of an update from Open File
+
+Use one file selection, classify by validated contents and
 show only available actions. A standalone file may open on its own. For a
 recognized Project and an eligible local destination, show the exact destination
 before using the existing update receipt and base/lineage checks. A catalog row
@@ -749,6 +751,35 @@ actual edit lease. Missing base uses the existing full-workspace path. A Scene
 snapshot opens in View or makes the existing independent editable Project;
 appending it to an existing Project requires a separate coordinate, ID and
 atomic-recovery specification.
+
+Keep standalone first import and explicit existing-project receive distinct
+under the actual edit lease. Preserve the selection on a refusal before
+durable receive state, and use the existing recovery surface after staging.
+Verify cancel, PC/touch, a missing or changed destination, and the exact-file
+retry, then run the full checkpoint. No change to input profiles or storage.
+
+Independent review closed a live-vs-catalog eligibility gap for unfinished
+output, and the focused tests passed for cancel with no persisted changes,
+standalone refusing a live destination, locked destination, absent destination guidance,
+and exact Contribution ZIP recovery after a write fault. Four Chromium cases
+passed, covering confirmed PC Contribution/conflict/reopen, confirmed touch
+Workspace import, Review opening and existing receive/restore. In a separate
+private Ki-84 run a51,265,332-byte Workspace produced a2,230-byte Caption
+Contribution with no asset entries. The phone-sized receiver confirmed its
+destination, kept its local body and received the peer title. Its backup
+matched all43 original asset entries and reopened with both edits. These are
+Chromium touch results. The independent PC and mobile device gates stay separate.
+The first full run exposed six conversion-cancel checks that selected the
+hidden update Cancel in recorded DOM order. Preserve conversion control order
+and keep the update decision visually distinct. All eight affected focused
+cases and both final PC/touch rendered cases passed.
+Final freeze `57ed8aa6` passed the Windows checkpoint with147 test files,
+3284 passes,21 existing TODOs, all five builds and offline/HEIC isolation.
+
+The Scene addition product decision is drafted in
+[06d](../docs/specs/06d-scene-append-proposal.md). Decide the initial unit/profile
+boundary and repeated deliberate addition before designing the target-bound
+transaction. Approved same-Project receive remains the available merge path.
 
 ## Completed boundary —06c bounded restore content inspection
 

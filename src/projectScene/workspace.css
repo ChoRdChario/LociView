@@ -247,6 +247,9 @@
   border-radius: 2px; color: #312f2d; background: #faf9f8; font: inherit;
 }
 .lv-validation-home form > button { justify-self: start; background: #413d39; color: #faf9f8; }
+.lv-update-destination { display: flex; flex-wrap: wrap; gap: 8px; }
+.lv-update-destination > p { flex-basis: 100%; margin: 0; overflow-wrap: anywhere; }
+.lv-validation-home .lv-update-destination > button:first-of-type { background: #413d39; color: #faf9f8; }
 .lv-validation-host button:active:not(:disabled) { box-shadow: inset 0 1px 3px #817c78; }
 .lv-validation-home button:disabled { border-style: dashed; }
 

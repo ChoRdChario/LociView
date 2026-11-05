@@ -1,5 +1,5 @@
 import {beginMaterialEditing} from './workspaceUi';
-import { revealCameraPositions, revealWorkPanel, revealCoordinateAdd, revealFileSurface, beginSceneCreation, revealModelManagement, selectShareOutput } from './workspaceUi';
+import { revealCameraPositions, revealWorkPanel, revealCoordinateAdd, revealProjectSelection, beginSceneCreation, revealModelManagement, selectShareOutput } from './workspaceUi';
 import { test, expect, chromium } from '@playwright/test';
 import { ownedServer } from '../offline-e2e/server';
 import { triangleGlb, smallPng } from './fixtures';
@@ -113,8 +113,18 @@ test('content-first workspace keeps editing, pin completion and file exits coher
     await peer.getByRole('button', { name: '共有', exact: true }).click(); const peerFiles = peer.getByRole('region', { name: 'ファイル', exact: true }); await selectShareOutput(peerFiles, 'contribution');
     const base = peerFiles.getByLabel('元にする作業一式', { exact: true }), baseId = await base.locator('option').evaluateAll(ns => ns.map(n => (n as HTMLOptionElement).value).find(Boolean)); expect(baseId).toBeTruthy(); await base.selectOption(baseId!);
     const [update] = await Promise.all([peer.waitForEvent('download'), peerFiles.locator('.lv-file-primary').click()]), updatePath = info.outputPath('returned-update.zip'); await update.saveAs(updatePath); expect(await update.failure()).toBeNull(); await peerContext.close();
-    await revealFileSurface(p,'受信'); const incoming = p.getByRole('region', { name: '更新ファイル', exact: true });
-    await incoming.getByLabel('更新ファイルを選択', { exact: true }).setInputFiles(updatePath); await incoming.getByRole('button', { name: '更新を受け取る', exact: true }).click(); await expect(incoming.getByText('更新を受け取りました。', { exact: true })).toBeVisible({ timeout: 90_000 }); await menu.getByRole('button', { name: '閉じる', exact: true }).click();
+    await revealProjectSelection(p); await p.getByRole('button', { name: 'ファイルを開く', exact: true }).click();
+    const preview = p.getByRole('region', { name: '取り込み先', exact: true });
+    const selectUpdate = async () => {
+      await p.getByLabel('ファイルを選択', { exact: true }).setInputFiles(updatePath);
+      await p.getByRole('button', { name: 'ファイルを開く', exact: true }).click();
+      await expect(preview).toContainText('「現地調査」に更新を取り込みます。');
+    };
+    await selectUpdate(); await expect(p.locator('main.lv-project-workspace')).toHaveCount(0);
+    await preview.getByRole('button', { name: '選択を取り消す', exact: true }).click(); await expect(preview).toBeHidden();
+    await selectUpdate(); const confirm = preview.getByRole('button', { name: '既存に取り込む', exact: true }); await expect(confirm).toBeFocused();
+    await confirm.click(); await expect(p.getByText('更新を取り込みました。', { exact: true })).toBeVisible({ timeout: 90_000 });
+    await p.getByRole('region', { name: 'シーン', exact: true }).getByRole('button', { name: '接合部', exact: true }).click(); await p.locator('.lv-caption-select').filter({ hasText: '柱の接合部' }).click();
     const bodyGroup=detail.getByLabel('本文',{exact:true}).locator('..').locator('..');await bodyGroup.getByRole('button',{name:'状態を確認',exact:true}).click();
     const conflict=p.getByRole('region',{name:'記録の競合',exact:true}).locator(':scope > ul > li').filter({hasText:receivedBody});await expect(conflict).toBeFocused();
     const keep=conflict.getByRole('combobox'), choices=await keep.locator('option').evaluateAll((nodes,text)=>nodes.map(n=>n as HTMLOptionElement).filter(n=>n.textContent?.includes(text)).map(n=>n.value),receivedBody);expect(choices).toHaveLength(1);await keep.selectOption(choices[0]!);

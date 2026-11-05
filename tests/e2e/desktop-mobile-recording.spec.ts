@@ -61,6 +61,16 @@ test('phone record list, body and completion stay usable when the viewport shrin
     const path = info.outputPath('phone-scene.zip'); await (await download).saveAs(path);
     expect((await PackageArchive.inspect(await openAsBlob(path))).control.manifest.purpose).toBe('review');
     await expect(partial).not.toBeChecked();
+    const whole = page.waitForEvent('download'); await files.locator('.lv-file-primary').tap();
+    const workspace = info.outputPath('phone-workspace.zip'); await (await whole).saveAs(workspace);
+    await page.locator('details.lv-project-files').getByRole('button', { name: 'ファイルを開く', exact: true }).tap();
+    await page.getByLabel('ファイルを選択', { exact: true }).setInputFiles(workspace);
+    await page.getByRole('button', { name: 'ファイルを開く', exact: true }).tap();
+    const destination = page.getByRole('region', { name: '取り込み先', exact: true });
+    await expect(destination).toContainText('「Nativeから引き継ぐ記録」に更新を取り込みます。');
+    await destination.getByRole('button', { name: '既存に取り込む', exact: true }).tap();
+    await expect(page.getByText('更新を取り込みました。', { exact: true })).toBeVisible({ timeout: 90_000 });
+    await record.tap(); await expect(body).toHaveValue('狭い画面から本文を編集');
   } finally {
     await context.close(); await browser.close(); await server.stop();
   }
