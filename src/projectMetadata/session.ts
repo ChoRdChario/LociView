@@ -43,6 +43,10 @@ import { WorkspaceSourceCapture } from '../projectPackage/workspaceSource';
 import { protectedWorkspaceInventory } from '../projectPackage/protectedInventory';
 import { PACKAGE_LIMITS } from '../projectPackage/contract';
 import type { BackupRestoreJob } from '../projectPackage/backupRestoreJob';
+import { ReviewArchive } from '../projectPackage/reviewArchive';
+import { PackageArchive } from '../projectPackage/zipArchive';
+import { abandonSceneAppend, planSceneAppend, readSceneAppend, sceneAppendIds, validatePreparedSceneAppend, writeSceneAppend,
+  type SceneAppendInput, type SceneAppendState } from '../projectPackage/sceneAppend';
 
 /** Owned finite content boundary. Stage may introduce bytes; recovery may only verify saved bytes. */
 export interface MetadataMediaPort {
@@ -146,7 +150,7 @@ export class MetadataProjectSession {
     try {
       const entries = await this.journal.entries(), published = entries.filter(e => e.publication).at(-1);
       await this.journal.readRestoredBases(entries);
-      const pending = entries.some(e => !e.publication) || !!this.retained;
+      const pending = entries.some(e => !e.publication) || !!this.retained || (await this.sceneAppendStates(entries)).length > 0;
       if (!published) return this.last = Object.freeze({ state: pending ? 'pending' : 'empty', source: null, provider: null, publication: null });
       const source = await this.repository.read(published.start.repositoryId, published.start.proof, published.publication!.heads);
       if (!source) fail('published-source-missing');
@@ -164,7 +168,7 @@ export class MetadataProjectSession {
           partHashes.add(hash);
           const included = originals.get(hash);
           if (!included || !equalBytes(included, bytes)) fail('published-transaction-missing');
-          if (['initialize', 'localCommand', 'importClean'].includes(entry.start.purpose)) localChanges.add(hash);
+          if (['initialize', 'localCommand', 'importClean', 'appendScene'].includes(entry.start.purpose)) localChanges.add(hash);
         }
         if (entry.start.purpose === 'importWorkspace') await this.journal.validateImport(entry.prepared!);
         else if (entry.start.purpose === 'importClean') await CleanInputJob.validateJournalFresh(this.fs, entry.start.transactionId, this.limits, entry.prepared!);
@@ -326,7 +330,112 @@ export class MetadataProjectSession {
     });
   }
 
-  async retry(): Promise<MetadataSessionRead> { return underWriteLease(this.fs, async () => { await assertReviewEditSlot(this.fs, this.limits); return this.resume(); }); }
+  async retry(): Promise<MetadataSessionRead> { return underWriteLease(this.fs, async () => {
+    await assertReviewEditSlot(this.fs, this.limits);
+    if ((await this.sceneAppendStates()).length) return fail('scene-append-recovery-required');
+    return this.resume();
+  }); }
+
+  async sceneAppendStates(entries?: Awaited<ReturnType<TransactionJournal['entries']>>): Promise<SceneAppendState[]> {
+    const ids = await sceneAppendIds(this.fs, this.limits);
+    if (!ids.length) return [];
+    try { entries ??= await this.journal.entries(); }
+    catch { return ids.map(id => ({ id, state: 'repair-required' })); }
+    const result: SceneAppendState[] = [];
+    for (const id of ids) {
+      const entry = entries.find(e => e.start.transactionId === id);
+      if (entry?.publication && entry.start.purpose === 'appendScene') continue;
+      try {
+        const read = await readSceneAppend(this.fs, id, this.limits);
+        if (!read.abandoned) result.push({ id, state: entry?.prepared ? 'prepared' : read.binding ? 'input-required' : 'unbound', cancellable: !entry });
+      } catch { result.push({ id, state: 'repair-required' }); }
+    }
+    return result;
+  }
+
+  async appendScene(id: string, expectedPublication: string, expectedToken: string, review: ReviewArchive, editor?: LocalEditorContext) {
+    editor = captureEditor(editor);
+    return underWriteLease(this.fs, async () => {
+      await this.assertReceiveSlot(id);
+      await this.assertOutputSlot();
+      const current = await this.read();
+      if (current.state !== 'ready' || current.publication !== expectedPublication || current.source?.token !== expectedToken)
+        throw Error('追加先が更新されました。選び直して内容を確認してください。');
+      const entries = await this.journal.entries(), prior = entries.at(-1)!;
+      const base = await this.repository.read(prior.start.repositoryId, prior.start.proof);
+      if (!base || base.token !== expectedToken) return fail('scene-append-base');
+      const plan = await planSceneAppend(base, review, this.limits, id, editor);
+      const facts = await this.sceneAppendFacts(base, plan.next, review);
+      const input: SceneAppendInput = { schema: 'lociview-scene-append-1', id, archive: plan.archive, snapshot: plan.snapshot,
+        proof: base.proof, predecessor: prior.start.transactionId, baseHeads: base.heads, sceneId: plan.sceneId, recipe: plan.reconstruction, records: plan.records,
+        change: { sha256: await digest(plan.bytes), byteLength: plan.bytes.length }, blobs: plan.blobs, stagedBlobs: [...(facts.stagedBlobs ?? [])] };
+      const job = await writeSceneAppend(this.fs, input, plan.bytes, this.limits);
+      const start = this.sceneAppendStart(input, job.binding!, prior.start, plan.next);
+      this.retained = { start, parts: [plan.bytes], stagedBlobs: input.stagedBlobs, modelFacts: { plan: facts, next: plan.next } };
+      return { read: await this.resume(), sceneId: input.sceneId };
+    });
+  }
+
+  async completedSceneAppend(id: string) {
+    const entry = (await this.journal.entries()).find(item => item.start.transactionId === id);
+    if (!entry?.publication || entry.start.purpose !== 'appendScene') return undefined;
+    const { input } = await readSceneAppend(this.fs, id, this.limits);
+    const read = await this.read();
+    if (!read.source || read.state === 'repair-required') return fail('scene-append-publication');
+    return { read, sceneId: input.sceneId };
+  }
+
+  private async sceneAppendFacts(base: ProjectMetadataSource, next: ProjectMetadataSource, review: ReviewArchive) {
+    if (!this.modelFacts?.planReceived || !this.media) return fail('scene-append-unconnected');
+    const facts = await this.modelFacts.planReceived(base, next, ref => review.archive.entryBlob(`blobs/sha256/${ref.digest}`),
+      incomingBlobs(review.archive.control.manifest.blobs));
+    if (facts.baseToken !== base.token || facts.finalToken !== next.token) return fail('scene-append-facts');
+    return facts;
+  }
+
+  private sceneAppendStart(input: SceneAppendInput, binding: NonNullable<JournalStart['sceneAppend']>, prior: JournalStart, next: ProjectMetadataSource): JournalStart {
+    return { transactionId: input.id, predecessor: prior.transactionId, repositoryId: prior.repositoryId, purpose: 'appendScene',
+      sceneAppend: binding, proof: input.proof, baseHeads: [...input.baseHeads],
+      ...capabilityFields(capabilityUnion(readRequiredCapabilities(prior.requiredCapabilities), next.requiredCapabilities)) };
+  }
+
+  async retrySceneAppend(id: string, file?: Blob) {
+    return underWriteLease(this.fs, async () => {
+      const entries = await this.journal.entries(), own = entries.find(e => e.start.transactionId === id);
+      const job = await readSceneAppend(this.fs, id, this.limits), { input, bytes, binding } = job;
+      if (job.abandoned || !bytes || !binding || own && own.start.purpose !== 'appendScene') return fail('scene-append-unbound');
+      if (own?.publication) return (await this.completedSceneAppend(id)) ?? fail('scene-append-publication');
+      await this.assertReceiveSlot(id);
+      if (own?.prepared) {
+        this.retained = null;
+        return { read: await this.resume(), sceneId: input.sceneId };
+      }
+      if (!file) throw Error('続けるには元のシーンZIPを選んでください。');
+      const prior = entries.filter(e => e.publication).at(-1);
+      if (!prior || input.predecessor !== prior.start.transactionId || json(input.proof) !== json(prior.start.proof) ||
+        json(input.baseHeads) !== json(prior.publication!.heads)) throw Error('追加先が更新されました。この追加を取りやめてから選び直してください。');
+      const base = await this.repository.read(prior.start.repositoryId, prior.start.proof);
+      if (!base || json(base.heads) !== json(input.baseHeads)) return fail('scene-append-base');
+      const selected = await PackageArchive.inspect(file).catch(() => { throw Error('元のシーンZIPを確認できません。選び直してください。'); });
+      if (selected.sha256 !== input.archive.sha256 || selected.byteLength !== input.archive.byteLength)
+        throw Error('選んだファイルは元のシーンZIPと異なります。');
+      const review = await ReviewArchive.fromSelectedArchive(selected, this.limits);
+      const plan = await planSceneAppend(base, review, this.limits, id, undefined, { input, bytes });
+      const facts = await this.sceneAppendFacts(base, plan.next, review);
+      const start = this.sceneAppendStart(input, binding, prior.start, plan.next);
+      this.retained = { start, parts: [bytes], stagedBlobs: input.stagedBlobs, modelFacts: { plan: facts, next: plan.next } };
+      return { read: await this.resume(), sceneId: input.sceneId };
+    });
+  }
+
+  async cancelSceneAppend(id: string) {
+    return underWriteLease(this.fs, async () => {
+      if ((await this.journal.entries()).some(entry => entry.start.transactionId === id)) return fail('scene-append-started');
+      await abandonSceneAppend(this.fs, id, this.limits);
+      if (this.retained?.start.transactionId === id) this.retained = null;
+      return this.read();
+    });
+  }
 
   private async outputReady() {
     await assertReviewEditSlot(this.fs, this.limits);
@@ -778,6 +887,7 @@ export class MetadataProjectSession {
   }
   private async assertReceiveSlot(ownId: string) {
     await assertReviewEditSlot(this.fs, this.limits, ownId);
+    if ((await this.sceneAppendStates()).some(state => state.id !== ownId)) return fail('scene-append-recovery-required');
     for (const key of await receiveJobKeys(this.fs, this.limits)) {
       if (key.id === ownId) continue;
       const state = await receiveInputState(this.fs, key, this.limits);
@@ -972,7 +1082,15 @@ export class MetadataProjectSession {
       if (start.purpose === 'localCommand') localBase = base;
     }
     let next: ProjectMetadataSource;
-    if (start.purpose === 'remotePackageMerge') {
+    if (start.purpose === 'appendScene') {
+      const base = await this.repository.read(start.repositoryId, start.proof, start.baseHeads);
+      if (!stored || !base) return fail('scene-append-base');
+      next = base.appendOriginal(parts);
+      checkRemoteStored(stored, base, next, !!pending?.durable);
+      const { input } = await readSceneAppend(this.fs, start.transactionId, this.limits);
+      validatePreparedSceneAppend(base, parts[0]!, input, this.limits);
+      await this.verifyDelta(input.blobs, next.mediaRecords());
+    } else if (start.purpose === 'remotePackageMerge') {
       const base = await this.repository.read(start.repositoryId, start.proof, start.baseHeads);
       if (!stored || !base) return fail('remote-base-missing');
       next = await this.journal.validateRemote(prepared, base);
@@ -997,7 +1115,7 @@ export class MetadataProjectSession {
     const predecessor = entries.find(e => e.start.transactionId === start.predecessor);
     checkRequiredCapabilities(start.requiredCapabilities, capabilityUnion(readRequiredCapabilities(predecessor?.start.requiredCapabilities), next.requiredCapabilities, incoming.requiredCapabilities));
     for (const ref of incoming.blobs) { witness(); this.acknowledgedMedia.add(`${ref.sha256}:${ref.byteLength}`); }
-    if (['initialize', 'localCommand', 'importClean'].includes(start.purpose))
+    if (['initialize', 'localCommand', 'importClean', 'appendScene'].includes(start.purpose))
       for (const part of prepared.changes) { witness(); this.acknowledgedLocalChanges.add(part.expectedChangeHash); }
     // Exact pending changes can coexist with legitimate extra local heads; never rebase or choose a winner.
     await this.checked(next, false);
@@ -1017,7 +1135,7 @@ export class MetadataProjectSession {
       if (!saved || !equalBytes(saved, bytes)) fail('durable-change-missing');
     }
     await this.checked(stored!, false);
-    if (start.purpose === 'importClean' && stored!.token !== next.token) fail('clean-import-final-heads');
+    if ((start.purpose === 'importClean' || start.purpose === 'appendScene') && stored!.token !== next.token) fail('journal-final-heads');
     if (prepared.remote && json(stored!.heads) !== json(prepared.remote.expectedFinalHeads)) fail('remote-final-heads');
     this.fs.mutationAuthority.assertWorkspaceWriteAuthorized();
     await this.journal.publish(prepared, stored!);

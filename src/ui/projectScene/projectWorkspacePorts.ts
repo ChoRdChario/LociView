@@ -117,6 +117,7 @@ export interface WorkspaceReadingSelection {
 }
 export interface ProjectWorkspacePorts {
   readonly initialReading?: WorkspaceReadingSelection;
+  readonly initialSceneId?: string;
   readonly rasterResources?: RasterResources;
   readonly imageDimensions?:(bytes:Uint8Array,mime:string)=>{readonly width:number;readonly height:number}|null;
   authoring?: {

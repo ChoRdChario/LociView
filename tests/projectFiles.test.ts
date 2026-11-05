@@ -7080,6 +7080,33 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       expect(inspect).toHaveBeenCalledTimes(2); expect(inspect.mock.calls[0]![0].size).toBe(file.size); // Default input inspection stays fresh.
     } finally { inspect.mockRestore(); await scratch.dispose(); await source.workspace.dispose(); }
   }, 60000);
+  it('replays a bound Scene append after publication interruption without replacing the target or applying the change twice', async () => {
+    const source = await openFileCaption(glb(j => { j.materials[0].name = '別モデル'; }), 'map2');
+    const target = await openFileCaption(glb(), 'map2'), id = newId();
+    let cold: Awaited<ReturnType<typeof openValidationHost>> | undefined;
+    try {
+      const output = await source.host.workspaceOutput.generateReview(source.host.read().source!.token, { sceneId: source.s.sceneId });
+      const file = await source.host.workspaceOutput.download(output), review = await ReviewArchive.inspect(file, metadata);
+      const before = target.host.read();
+      target.fs.reject = path => path.endsWith(`/journal/${id}/published.json`);
+      await expect(target.host.sceneAppend.start(id, before.publication!, before.source!.token, review)).rejects.toThrow('injected quota');
+      expect(target.host.read().source!.token).toBe(before.source!.token);
+      expect(target.host.sceneAppend.jobs).toEqual([{ id, state: 'prepared', cancellable: false }]);
+      await target.workspace.dispose();
+      target.fs.reject = () => false;
+      cold = await openValidationHost(target.options);
+      const sceneId = (await cold.sceneAppend.retry(id))!;
+      const completed = cold.read();
+      expect(completed.source!.originalChanges()).toHaveLength(before.source!.originalChanges().length + 1);
+      expect(cold.authority.read().state.scenes[sceneId]?.id).toBe(sceneId);
+      expect(cold.authority.read().state.defaultSceneId).toEqual({ kind: 'value', value: target.s.sceneId });
+      await cold.authority.authorScene!(completed.source!.token, { kind: 'renameScene', sceneId, name: '追加した後の編集' });
+      const after = cold.read().source!.token;
+      expect(await cold.sceneAppend.retry(id)).toBe(sceneId);
+      expect(cold.read().source!.token).toBe(after);
+      expect(cold.sceneAppend.jobs).toEqual([]);
+    } finally { await cold?.dispose(); await target.workspace.dispose(); await source.workspace.dispose(); }
+  }, 60000);
   it('audits a fresh review-copy slot at entry and close and refuses closing failure or missing parent evidence',async()=>{
     const source=await openFileCaption(),id=await source.host.workspaceOutput.generateReview(source.host.read().source!.token,{sceneId:source.s.sceneId});
     const prepared=await PreparedReviewEdit.prepare(await source.host.workspaceOutput.download(id),metadata),r=firstWorkspaceRecipient();await new ReviewEditJob(r.fs,r.session,metadata).start(prepared);

@@ -271,7 +271,9 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   mediaDraftNotice.append(make('p','メディアを追加する前に、本文の変更を適用してください。'),returnToBody);
   editOnly(mediaDraftNotice); media.append(make('h2', 'メディア'), mediaDraftNotice, mediaLabel, cancelMedia, heicHelp);
   const conflicts = make('section');
-  let sceneId = chooseStartupScene(ports.read().state).sceneId ?? '', disposed = false, busy = false, composing = false, feedback = '';
+  const startup = ports.read().state, preferred = ports.initialSceneId;
+  let sceneId = (preferred && fieldValue(startup.scenes[preferred]?.lifecycle)?.state === 'active' ? preferred : chooseStartupScene(startup).sceneId) ?? '',
+    disposed = false, busy = false, composing = false, feedback = '';
   let draft: CaptionDraft | null = null, pin: WorkspacePinProposal | null = null, choosing = false, placingCaption: string | null = null;
   let sceneEdit: SceneEdit | null = null, sceneInputScope: { token: string; sceneId: string } | null = null;
   let pinAction: PinAction | null = null;

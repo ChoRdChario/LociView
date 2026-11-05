@@ -12,8 +12,13 @@ import { mountContextHelp } from '../ui/projectScene/contextHelp';
 import { displayBlobRef } from '../domain/portableMedia';
 import type { JsonObject } from '../domain/values';
 
+export interface ReviewAppendPort {
+  projects(): Promise<readonly { run: string; title: string }[]>;
+  inspect(run: string): Promise<{ reason: string; confirm(): Promise<void> }>;
+}
+
 /** Standalone snapshot viewing. Only an explicitly confirmed handoff may create an editing Project. */
-export function createReviewWorkspace(document: Document, view: ReviewView, factory: ViewportFactory, editCopy?: () => void | Promise<void>) {
+export function createReviewWorkspace(document: Document, view: ReviewView, factory: ViewportFactory, editCopy?: () => void | Promise<void>, append?: ReviewAppendPort) {
   const make = <K extends keyof HTMLElementTagNameMap>(tag: K, text = '') => { const node = document.createElement(tag); node.textContent = text; return node; };
   const root = make('main'); root.className = 'lv-development lv-review-workspace'; root.setAttribute('aria-label', '閲覧用のシーン');
   const stopHelp = mountContextHelp(document, root);
@@ -24,7 +29,7 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
   const overlay = make('div'); overlay.className = 'lv-development-pin-layer';
   const sidebar = make('aside'); sidebar.className = 'lv-development-sidebar'; sidebar.setAttribute('aria-label', '閲覧パネル');
   const sceneName = make('h2', view.sceneName), emptyCaptions=make('p','このシーンにキャプションはありません。'),status = make('p'), retry = make('button', '3D表示を再試行'); status.setAttribute('role', 'status'); retry.type = 'button';
-  const footer = make('p', '閲覧用ファイルです。元ファイルとブラウザのプロジェクトは変更しません。');
+  const footer = make('p', '閲覧用ファイルです。');
   viewport.append(canvas, overlay); stage.append(viewport); content.append(stage, sidebar); root.append(header, status, retry, content, footer);
   const mediaViewer = createMediaViewer(document, view.rasterResources,view.imageDimensions); root.append(mediaViewer.root);
   let memory: SceneUiMemory = { selectedCaptionId: null, search: '', pinColors: null, listScrollTop: 0, ownerFilter: { kind: 'all' } };
@@ -46,6 +51,67 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
     void Promise.resolve().then(() => editCopy?.()).catch(error => { if (!disposed) { failure = (error as Error).message; paint(); } })
       .finally(() => { if (!disposed) confirmCopy.disabled = cancelCopy.disabled = copy.disabled = false; });
   });
+  if (append) {
+    const open = make('button', '既存に追加'), panel = make('section'), select = make('select'), label = make('label', '追加先'),
+      note = make('p'), confirm = make('button', 'シーンを追加'), cancel = make('button', 'キャンセル');
+    panel.className = 'lv-review-append'; panel.hidden = true; panel.setAttribute('aria-label', 'シーンの追加');
+    open.type = confirm.type = cancel.type = 'button'; confirm.disabled = true;
+    note.setAttribute('role', 'status'); select.setAttribute('aria-label', '追加先'); label.append(select);
+    const count = (name: string) => view.inspection.review.summary.entityClasses.find(entry => entry.class === name)?.count ?? 0;
+    const models = Object.values(view.inspection.review.snapshot.assetsById as JsonObject).filter(asset => (asset as JsonObject).kind === 'visual').length;
+    panel.append(make('h2', view.sceneName), make('p', `モデル ${models}・キャプション ${count('captionsById')}・メディア ${count('mediaResourcesById')}`),
+      label, note, confirm, cancel);
+    header.append(open); root.insertBefore(panel, content);
+    let revision = 0, pending: (() => Promise<void>) | undefined;
+    const selectProject = async () => {
+      const current = ++revision, run = select.value;
+      confirm.disabled = true; pending = undefined; note.textContent = '';
+      if (!run) return;
+      note.textContent = '追加先を確認しています。';
+      try {
+        const checked = await append.inspect(run);
+        if (disposed || current !== revision) return;
+        note.textContent = checked.reason ? `${checked.reason} 単独で作業するには「編集コピーを作る」を選べます。` : '';
+        if (!checked.reason) { pending = checked.confirm; confirm.disabled = false; }
+      } catch (error) { if (!disposed && current === revision) note.textContent = (error as Error).message; }
+    };
+    open.addEventListener('click', () => {
+      if (disposed || composing || moving || open.disabled) return;
+      const current = ++revision;
+      confirmation.hidden = true; panel.hidden = false; select.disabled = open.disabled = confirm.disabled = true; pending = undefined;
+      select.replaceChildren(); note.textContent = 'プロジェクトを確認しています。';
+      void append.projects().then(projects => {
+        if (disposed || current !== revision) return;
+        const placeholder = make('option', 'プロジェクトを選ぶ'); placeholder.value = ''; select.append(placeholder);
+        const names = new Map<string, number>();
+        for (const project of projects) names.set(project.title, (names.get(project.title) ?? 0) + 1);
+        for (const project of projects) {
+          const title = names.get(project.title) === 1 ? project.title : `${project.title}（${project.run.slice(-8)}）`;
+          const option = make('option', title); option.value = project.run; select.append(option);
+        }
+        select.disabled = !projects.length;
+        note.textContent = projects.length ? '' : '追加できるプロジェクトがありません。';
+        if (projects.length) select.focus();
+      }).catch(error => { if (!disposed && current === revision) note.textContent = (error as Error).message; })
+        .finally(() => { if (!disposed && current === revision) open.disabled = false; });
+    });
+    select.addEventListener('change', () => { void selectProject(); });
+    cancel.addEventListener('click', () => { revision++; panel.hidden = true; open.disabled = false; open.focus(); });
+    copy.addEventListener('click', () => { if (!copy.disabled) { revision++; panel.hidden = true; open.disabled = false; } });
+    confirm.addEventListener('click', () => {
+      if (!pending || confirm.disabled || disposed || composing || moving) return;
+      const apply = pending;
+      confirm.disabled = cancel.disabled = select.disabled = copy.disabled = open.disabled = true;
+      content.inert = true;
+      note.textContent = 'シーンを追加しています。';
+      void apply().catch(error => { if (!disposed) note.textContent = (error as Error).message; }).finally(() => {
+        if (disposed) return;
+        // A stale preview cannot be used again. Re-selecting refreshes it.
+        pending = undefined; select.value = ''; cancel.disabled = select.disabled = copy.disabled = open.disabled = false;
+        content.inert = false;
+      });
+    });
+  }
   const pins = new Map<string, HTMLButtonElement>();
   const context = (): CaptionListContext => ({ source: view.source, memory, pending: composing ? 'composition' : null, mutationBlock: '閲覧用ファイルです。' });
   function windowPlan(plan: CaptionWindowPlan) {

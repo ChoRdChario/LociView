@@ -18,7 +18,7 @@ type Host = ReturnType<typeof createValidationModeHost>;
 type Tools = ReturnType<typeof createValidationReceiveControls>;
 /** Validation-only adapter. No synthetic Session or string-map writes enter product UI. */
 export function createProductWorkspace(document: Document, host: Host, factory: ViewportFactory, tools?: Tools, renderCandidate?: ModelCandidateRenderer,
-  navigation?: { utilitiesRoot?:HTMLElement;fileActionsRoot?:HTMLElement;compactFiles?:boolean;smoothDisplay?:boolean;presentation?():{busy:boolean;reason:string}|null;projectNavigationBlocked?():boolean;openProject(): void; resumedLastProject(): boolean; changed(): void; storageEstimate?(): Promise<Readonly<{ usage?: number; quota?: number }>>;localSettings?:{read():string;save(displayName:string):boolean}; initialReading?: WorkspaceReadingSelection }) {
+  navigation?: { utilitiesRoot?:HTMLElement;fileActionsRoot?:HTMLElement;compactFiles?:boolean;smoothDisplay?:boolean;presentation?():{busy:boolean;reason:string}|null;projectNavigationBlocked?():boolean;openProject(): void; resumedLastProject(): boolean; changed(): void; storageEstimate?(): Promise<Readonly<{ usage?: number; quota?: number }>>;localSettings?:{read():string;save(displayName:string):boolean}; initialReading?: WorkspaceReadingSelection; initialSceneId?: string }) {
   const root = document.createElement('section'), mode = document.createElement('button'), status = document.createElement('p');
   root.className = 'lv-project-shell';
   const utilitiesParent=navigation?.utilitiesRoot?.parentElement;
@@ -120,6 +120,7 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
     ...productSources(host,navigation?.smoothDisplay),
     openProject: navigation?.openProject, projectNavigationBlocked: navigation?.projectNavigationBlocked, resumedLastProject: navigation?.resumedLastProject, storageEstimate: navigation?.storageEstimate,
     initialReading: navigation?.initialReading,
+    initialSceneId: navigation?.initialSceneId,
     localSettings: navigation?.localSettings,
     editorSettings: host.editorSettings,
     disclosureOpening(){if(tools?.hasChanges())return false;if(fileMenu)fileMenu.open=false;return true;},

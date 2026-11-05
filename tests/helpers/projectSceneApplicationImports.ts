@@ -418,6 +418,8 @@ export const projectSceneApplicationImports:Readonly<Record<string,readonly stri
     "./validationHost"
   ],
   "src/projectScene/validationHost.ts": [
+    "../projectPackage/reviewArchive",
+    "../projectPackage/sceneAppend",
     "../domain/portableMedia",
     "../projectFiles/media",
     "../projectFiles/meshSource",
@@ -554,6 +556,7 @@ export const projectSceneApplicationImports:Readonly<Record<string,readonly stri
     "three/addons/loaders/GLTFLoader.js"
   ],
   "src/projectScene/validationWorkspace.ts": [
+    "../projectPackage/sceneAppend",
     "../ui/projectScene/contextHelp",
     "../platform/desktopOfflinePorts", "../ui/projectScene/offlineControls",
     "../projectFiles/media",

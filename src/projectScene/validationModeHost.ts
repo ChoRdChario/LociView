@@ -40,7 +40,7 @@ export function createValidationModeHost(initial: Host, open: (mode: LocalOpenMo
     get busy() { return switching; }, get detail() { return current.accessDetail ?? ''; },
     get recoveryAvailable() { return current.authority.readOnly && !current.workspaceFiles.error && current.read().state !== 'repair-required' &&
       !current.workspaceFiles.jobs.some(j => j.state === 'repair-required') &&
-      (current.backupRestore.pending || current.workspaceFiles.reviewCopies.some(j => ['incomplete', 'input-required', 'unbound-input'].includes(j.state)) ||
+      (current.backupRestore.pending || current.sceneAppend.jobs.some(j => j.state !== 'repair-required') || current.workspaceFiles.reviewCopies.some(j => ['incomplete', 'input-required', 'unbound-input'].includes(j.state)) ||
         current.workspaceFiles.jobs.some(j => ['incomplete', 'input-required', 'unbound-input', 'stale'].includes(j.state))); },
     async change(target, token, publish) {
       admit();
@@ -75,10 +75,16 @@ export function createValidationModeHost(initial: Host, open: (mode: LocalOpenMo
       try { await work; } finally { switching = false; if (operation === work) operation = undefined; }
     },
   };
-  const host: SavedWorkspaceHost & ValidationDisplayHost & Pick<Host, 'editorSettings' | 'workspaceFiles' | 'workspaceOutput' | 'backupRestore' | 'dispatch' | 'conversionReport' | 'conversionReportAvailable'> & { content: Pick<Host['content'], 'model' | 'modelContent' | 'image' | 'displayImage' | 'displayDimensions' | 'modelSelectionNotice' | 'rasterResources'>; imageScope(): string } = {
+  const host: SavedWorkspaceHost & ValidationDisplayHost & Pick<Host, 'editorSettings' | 'workspaceFiles' | 'workspaceOutput' | 'backupRestore' | 'sceneAppend' | 'dispatch' | 'conversionReport' | 'conversionReportAvailable'> & { content: Pick<Host['content'], 'model' | 'modelContent' | 'image' | 'displayImage' | 'displayDimensions' | 'modelSelectionNotice' | 'rasterResources'>; imageScope(): string } = {
     authority, mode, limits: initial.limits, read: () => current.read(),
     hasPending: () => switching || current.hasPending(),
     refresh: () => run(() => current.refresh()), resolve: (...a) => run(() => current.resolve(...a)),
+    sceneAppend: {
+      get jobs() { return current.sceneAppend.jobs; }, get error() { return current.sceneAppend.error; },
+      start: (...args) => run(() => current.sceneAppend.start(...args)),
+      retry: (...args) => run(() => current.sceneAppend.retry(...args)),
+      cancel: (...args) => run(() => current.sceneAppend.cancel(...args)),
+    },
     workspaceFiles: {
       get jobs() { return current.workspaceFiles.jobs; }, get error() { return current.workspaceFiles.error; },
       get initialImport() { return current.workspaceFiles.initialImport; },

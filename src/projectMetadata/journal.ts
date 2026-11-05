@@ -13,13 +13,16 @@ import { captureJournalRemote, checkJournalRemote, isPackageRemote, isContributi
   type JournalRemoteProof, type JournalRemoteInput, type BackupRestoreInput } from './packageRemote';
 import { assertContributionBaseInReceiver, frozenBaseSource } from '../projectPackage/contributionEvidence';
 import { readManifestControl } from '../projectPackage/manifest';
+import type { EvidenceRef } from '../projectPackage/contract';
+import { readSceneAppend } from '../projectPackage/sceneAppend';
 
 export interface JournalStart {
   requiredCapabilities?: ReaderCapabilities;
   transactionId: string;
   predecessor: string | null;
   repositoryId: string;
-  purpose: 'initialize' | 'localCommand' | 'remotePackageMerge' | 'importWorkspace' | 'restoreBackup' | 'importClean';
+  purpose: 'initialize' | 'localCommand' | 'remotePackageMerge' | 'importWorkspace' | 'restoreBackup' | 'importClean' | 'appendScene';
+  sceneAppend?: EvidenceRef;
   proof: MetadataProof;
   baseHeads: string[];
 }
@@ -39,7 +42,7 @@ async function seal(start: JournalStart, changes: Part[], stagedBlobs: readonly 
   // Exact 02 §8 local-command digest. Old receipts retain the empty-list digest.
   const value = { transactionId: start.transactionId,
     target: { identity: start.proof.identity, metadataEnvelope: start.proof.envelope }, purpose: start.purpose, stagedBlobs,
-    metadataBatch: { kind: start.purpose, baseHeads: start.baseHeads, changes, ...(remote ?? {}) } };
+    metadataBatch: { kind: start.purpose, baseHeads: start.baseHeads, changes, ...(start.sceneAppend ? { sceneAppend: start.sceneAppend } : {}), ...(remote ?? {}) } };
   const version = remote && isPackageRemote(remote) ? 'v2' : 'v1';
   if (start.purpose === 'restoreBackup') return digest(new TextEncoder().encode(`lociview:v2:backup-restore:jcs-v1\n${json(value)}`));
   if (start.purpose === 'importClean') return digest(new TextEncoder().encode(`lociview:v2:clean-import:jcs-v1\n${json(value)}`));
@@ -50,13 +53,17 @@ function heads(value: unknown): asserts value is string[] {
     json(value) !== json(sorted([...new Set(value)]))) fail('journal-heads');
 }
 function validateStart(s: JournalStart, limits: MetadataLimits): void {
-  if (!s || Object.keys(s).filter(k => k !== 'requiredCapabilities').sort().join(',') !== 'baseHeads,predecessor,proof,purpose,repositoryId,transactionId') fail('journal-start');
+  if (!s || Object.keys(s).filter(k => k !== 'requiredCapabilities').sort().join(',') !==
+    `baseHeads,predecessor,proof,purpose,repositoryId,${s.purpose === 'appendScene' ? 'sceneAppend,' : ''}transactionId`) fail('journal-start');
+  if (s.purpose === 'appendScene' && (!s.sceneAppend || Object.keys(s.sceneAppend).sort().join(',') !== 'byteLength,sha256' ||
+    !Number.isSafeInteger(s.sceneAppend.byteLength) || s.sceneAppend.byteLength <= 0 || s.sceneAppend.byteLength > limits.maxTotalBytes ||
+    !/^[0-9a-f]{64}$/.test(s.sceneAppend.sha256))) fail('journal-scene-append');
   readRequiredCapabilities(s.requiredCapabilities);
   technicalId(s.transactionId); technicalId(s.repositoryId); if (s.predecessor !== null) technicalId(s.predecessor);
   checkedProof(s.proof, limits); heads(s.baseHeads);
   if (s.purpose === 'initialize' || s.purpose === 'importWorkspace' || s.purpose === 'restoreBackup' || s.purpose === 'importClean') {
     if (s.predecessor !== null || s.baseHeads.length || s.repositoryId !== s.transactionId) fail('journal-initialize');
-  } else if (!['localCommand', 'remotePackageMerge'].includes(s.purpose) || s.predecessor === null || !s.baseHeads.length) fail('journal-purpose');
+  } else if (!['localCommand', 'remotePackageMerge', 'appendScene'].includes(s.purpose) || s.predecessor === null || !s.baseHeads.length) fail('journal-purpose');
 }
 
 /** Append-only private receipts. Incomplete receipt bytes are repair state, never rewritten silently. */
@@ -83,6 +90,7 @@ export class TransactionJournal {
       validateStart(start!, this.limits);
       const prepared = await readReceipt<PreparedJournal>(this.fs, this.path(id, 'blobsVerified.json'), this.limits);
       if (prepared) await this.validatePrepared(start!, prepared);
+      if (start!.purpose === 'appendScene') await this.validateSceneAppend(start!, prepared);
       if (prepared && (!prepared.remote || !isPackageRemote(prepared.remote)) &&
         paths.some(path => path.startsWith(this.path(id, 'source-manifest.')))) fail('journal-source-kind');
       if (prepared) {
@@ -119,6 +127,7 @@ export class TransactionJournal {
 
   async begin(start: JournalStart): Promise<void> {
     validateStart(start, this.limits);
+    if (start.purpose === 'appendScene') await this.validateSceneAppend(start, null);
     await writeReceipt(this.fs, this.path(start.transactionId, 'staging.json'), start, this.limits);
   }
   async stage(start: JournalStart, parts: readonly Uint8Array[], stagedBlobs: readonly JsonObject[] = [],
@@ -135,6 +144,7 @@ export class TransactionJournal {
     const prepared = { start, changes, ...(stagedBlobs.length ? { stagedBlobs: [...stagedBlobs] } : {}),
       ...(remote ? { remote: remote.proof } : {}), exactChangeSetDigest: await seal(start, changes, stagedBlobs, remote?.proof) };
     await this.validatePrepared(start, prepared);
+    if (start.purpose === 'appendScene') await this.validateSceneAppend(start, prepared);
     const acknowledged = await readReceipt<PreparedJournal>(this.fs, this.path(start.transactionId, 'blobsVerified.json'), this.limits);
     if (acknowledged) {
       if (json(acknowledged) !== json(prepared)) fail('journal-prepared-exists');
@@ -183,13 +193,14 @@ export class TransactionJournal {
     if (restored ? !p.remote || !isBackupRestore(p.remote) : p.remote && isBackupRestore(p.remote)) fail('restore-source-purpose');
     if (p.exactChangeSetDigest !== await seal(start, p.changes, p.stagedBlobs, p.remote)) fail('journal-descriptors');
     if (p.stagedBlobs !== undefined) {
-      if (!Array.isArray(p.stagedBlobs) || (packageSource || start.purpose === 'importClean' ? !p.stagedBlobs.length || p.stagedBlobs.length > this.limits.maxNodes :
+      const batch = packageSource || start.purpose === 'importClean' || start.purpose === 'appendScene';
+      if (!Array.isArray(p.stagedBlobs) || (batch ? !p.stagedBlobs.length || p.stagedBlobs.length > this.limits.maxNodes :
         start.purpose !== 'localCommand' || !(p.stagedBlobs.length === 1 || hasPortableMediaCapability(start.requiredCapabilities) && p.stagedBlobs.length === 2))) fail('journal-blob-delta');
       const lengths = new Map<string, number>(); let previous = '';
       for (const blob of p.stagedBlobs) {
         const check = new ProjectRecordFields(); check.blob(blob, []);
         if (check.unknown) fail('journal-blob-delta');
-        if (packageSource || start.purpose === 'importClean') {
+        if (batch) {
           const key = json(blob), before = lengths.get(blob.digest as string);
           if (key <= previous || before !== undefined && before !== blob.byteLength) fail('journal-blob-delta');
           previous = key; lengths.set(blob.digest as string, blob.byteLength as number);
@@ -203,10 +214,18 @@ export class TransactionJournal {
         part.byteLength > this.limits.maxChangeBytes || !/^[0-9a-f]{64}$/.test(part.bytesSha256) ||
         !/^[0-9a-f]{64}$/.test(part.expectedChangeHash) || seen.has(part.expectedChangeHash)) fail('journal-descriptor');
       seen.add(part.expectedChangeHash); total += part.byteLength; heads(part.dependencies);
-      const expected = start.purpose === 'localCommand' ? start.baseHeads : ordinal === 0 ? [] : [p.changes[0]!.expectedChangeHash];
+      const expected = start.purpose === 'localCommand' || start.purpose === 'appendScene' ? start.baseHeads : ordinal === 0 ? [] : [p.changes[0]!.expectedChangeHash];
       if (!remote && json(part.dependencies) !== json(expected)) fail('journal-dependencies');
     }
     if (total > this.limits.maxTotalBytes) fail('journal-budget');
+  }
+
+  private async validateSceneAppend(start: JournalStart, prepared: PreparedJournal | null) {
+    const { input, binding, abandoned } = await readSceneAppend(this.fs, start.transactionId, this.limits);
+    if (!binding || abandoned || json(binding) !== json(start.sceneAppend) || input.predecessor !== start.predecessor ||
+      json(input.proof) !== json(start.proof) || json(input.baseHeads) !== json(start.baseHeads)) fail('journal-scene-append');
+    if (prepared && (json(input.stagedBlobs) !== json(prepared.stagedBlobs ?? []) ||
+      prepared.changes[0]!.bytesSha256 !== input.change.sha256 || prepared.changes[0]!.byteLength !== input.change.byteLength)) fail('journal-scene-append-part');
   }
 
   async validateParts(p: PreparedJournal): Promise<Uint8Array[]> {
@@ -225,7 +244,7 @@ export class TransactionJournal {
       if (!bytes || bytes.length !== part.byteLength || await digest(bytes) !== part.bytesSha256) fail('journal-part-digest');
       const decoded = A.decodeChange(bytes!);
       if (decoded.hash !== part.expectedChangeHash || json(sorted(decoded.deps)) !== json(part.dependencies) ||
-        (p.start.purpose === 'localCommand' && !localEditorMessageMatches(decoded.message, p.start.transactionId, this.limits))) fail('journal-part-source');
+        ((p.start.purpose === 'localCommand' || p.start.purpose === 'appendScene') && !localEditorMessageMatches(decoded.message, p.start.transactionId, this.limits))) fail('journal-part-source');
       if (inspectEditorMessage(decoded.message, this.limits)) checkRequiredCapabilities(p.start.requiredCapabilities,
         capabilityUnion(readRequiredCapabilities(p.start.requiredCapabilities), [EDITOR_CAPABILITY]));
       parts.push(bytes!);

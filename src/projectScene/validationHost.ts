@@ -43,6 +43,8 @@ import type { MaterialIntent } from '../domain/materialIntent';
 import { selectedMaterialResolution } from '../projectMetadata/materialResolution';
 import { WorkspaceReceiver, workspaceFileOperation, type WorkspaceReceiveState } from '../projectFiles/receiveWorkspace';
 import type { PreparedReviewEdit } from '../projectPackage/reviewEdit';
+import type { ReviewArchive } from '../projectPackage/reviewArchive';
+import type { SceneAppendState } from '../projectPackage/sceneAppend';
 import { ReviewEditJob } from '../projectPackage/reviewEditJob';
 import { reviewEditChildBinding, type ReviewEditState, type ReviewEditBinding } from '../projectPackage/reviewEditControls';
 import { WorkspaceSender, type WorkspaceOutputState, type ContributionBaseChoice } from '../projectFiles/sendWorkspace';
@@ -281,9 +283,13 @@ async function openNormalValidationHost(options: ValidationHostOptions, inherite
     const unfinishedOutput = () => outputJobs.some(j => ['unstarted', 'incomplete', 'repair-required'].includes(j.state));
     let receiveJobs: WorkspaceReceiveState[] = [], receiveFailure = '', receiveDisplayPending = false;
     let reviewCopies: ReviewEditState[] = [], reviewCopyError = '';
+    let sceneAppends: SceneAppendState[] = [], sceneAppendError = '';
     const reviewPending = () => !!reviewCopyError || reviewCopies.some(j => !['completed', 'abandoned'].includes(j.state));
-    const unfinishedReceive = () => reviewPending() || receiveJobs.some(j => !['completed', 'cancelled', 'abandoned'].includes(j.state));
+    const sceneAppendPending = () => !!sceneAppendError || sceneAppends.length > 0;
+    const unfinishedReceive = () => sceneAppendPending() || reviewPending() || receiveJobs.some(j => !['completed', 'cancelled', 'abandoned'].includes(j.state));
     const reloadReceive = async (current?: MetadataSessionRead) => {
+      try { sceneAppends = await session.sceneAppendStates(); sceneAppendError = ''; }
+      catch { sceneAppendError = 'シーン追加の再開用データを確認できません。'; }
       const completed = new Map<string, Readonly<ReviewEditBinding>>();
       try { reviewCopies = await measure('host.receive.review-copies', () => new ReviewEditJob(fs, session, limits).states(child => completed.set(child.childId, child.binding))); reviewCopyError = ''; }
       catch { completed.clear(); reviewCopyError = '編集コピーの元データを確認できません。修復が必要です。'; }
@@ -586,6 +592,30 @@ async function openNormalValidationHost(options: ValidationHostOptions, inherite
     } : undefined;
     const captureLocalEditor = () => { const preference = editorSettings?.read();
       return captureEditor(preference?.enabled ? { kind: 'self-declared', name: preference.name } : { kind: 'none' }); };
+    const runSceneAppend = (action: () => Promise<{ read: MetadataSessionRead; sceneId?: string }>, recovery: boolean, id?: string) => execute(async () => {
+      if (closed || fs.mutationAuthority.accessState !== 'editable') throw Error('このプロジェクトの編集を開始できません。別のタブで開いている場合は閉じてください。');
+      if (connection?.restorePending || restoreRetired || restoreDisplayPending || unfinishedOutput() || outputDiscoveryFailure || !recovery && unfinishedReceive())
+        throw Error('追加先で中断した作業を先に確認してください。');
+      const result = await workspaceFileOperation(options.packageLocks ?? null, action).catch(async error => {
+        const completed = id ? await session.completedSceneAppend(id).catch(() => undefined) : undefined;
+        if (completed) return completed;
+        await reloadReceive(); throw error;
+      });
+      last = result.read;
+      await reloadReceive(last);
+      if (last.state === 'ready') {
+        try { await ready(last); }
+        catch (error) { receiveDisplayPending = true; receiveFailure = error instanceof Error ? error.message : '追加したシーンの表示を再試行してください。'; }
+      }
+      return result.sceneId;
+    }, true);
+    const sceneAppend = {
+      get jobs() { return sceneAppends; }, get error() { return sceneAppendError; },
+      start: (id: string, publication: string, token: string, archive: ReviewArchive) =>
+        runSceneAppend(() => session.appendScene(id, publication, token, archive, captureLocalEditor()), false, id),
+      retry: (id: string, file?: Blob) => runSceneAppend(() => session.retrySceneAppend(id, file), true, id),
+      cancel: (id: string) => runSceneAppend(async () => ({ read: await session.cancelSceneAppend(id) }), true),
+    };
     const addMediaFile = (token: string, input: MediaFileAddition) => {
       const selected = input.file, target = { sceneId: input.sceneId, captionId: input.captionId, attachmentId: input.attachmentId,
         orderKey: input.orderKey, eventId: input.eventId };
@@ -746,7 +776,7 @@ async function openNormalValidationHost(options: ValidationHostOptions, inherite
       resolve: async (token, command) => (await commitCommand(token, command)).display,
       dispose: async () => { await dispose(); content.releasePreparedImages(); content.releasePreparedModels(); prepareDisplay = undefined; } };
     ownsLease = true;
-    return { ...host, dispatch, editorSettings, get content() { return content; }, workspaceFiles, workspaceOutput, backupRestore, display: () => restoreRetired ? undefined : project,
+    return { ...host, dispatch, editorSettings, get content() { return content; }, workspaceFiles, workspaceOutput, backupRestore, sceneAppend, display: () => restoreRetired ? undefined : project,
       conversionReportAvailable: async () => await hasLociMyuConversion(fs, false) || await hasFrozenV1MaterialReport(fs),
       conversionReport: () => execute(async () => await readLociMyuConversionReport(fs, options.fileLimits, `prj_${run}`, options.decode, options.jpeg, options.photo) ??
         await readFrozenV1MaterialReport(fs, options.fileLimits, `prj_${run}`, options.decode, options.jpeg, options.photo), true),

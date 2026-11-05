@@ -35,6 +35,7 @@ import { createValidationReceiveControls } from './validationReceiveControls';
 import { prepareReviewView, type ReviewView } from './reviewView';
 import { createReviewWorkspace } from './reviewWorkspace';
 import { PreparedReviewEdit, type ReviewEditArchivePort } from '../projectPackage/reviewEdit';
+import { sceneAppendCompatibility } from '../projectPackage/sceneAppend';
 import { createDeferredViewport } from './deferredViewport';
 
 type Host = ReturnType<typeof createValidationModeHost>;
@@ -257,7 +258,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
       list.append(row);
     }
   };
-  const mount = async (prepared?: Awaited<ReturnType<ValidationWorkspacePorts['render']>>) => {
+  const mount = async (prepared?: Awaited<ReturnType<ValidationWorkspacePorts['render']>>, initialSceneId?: string) => {
     mounted = false;
     if (!host || disposed) { prepared?.dispose(); return; }
     const composition = resumeReading?.composition();
@@ -275,6 +276,33 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
       retry.hidden = host.mode?.current === 'view' || host.workspaceFiles.initialImport && host.read().state === 'empty' ||
         !!host.workspaceFiles.reviewCopyError || host.workspaceFiles.reviewCopies.some(j => !['completed', 'abandoned'].includes(j.state)) ||
         host.backupRestore.pending || !!host.workspaceFiles.jobs.some(j => !['completed', 'cancelled', 'abandoned'].includes(j.state));
+      if (host.sceneAppend.jobs.length || host.sceneAppend.error) {
+        retry.hidden = true;
+        note.textContent = host.sceneAppend.error || 'シーンの追加が中断しました。';
+        const target = host;
+        for (const job of host.sceneAppend.jobs) {
+          if (job.state === 'repair-required') { note.textContent = 'シーン追加の再開用データに修復が必要です。'; continue; }
+          if (target.authority.readOnly) continue;
+          const input = document.createElement('input');
+          const button = (text: string, action: () => Promise<void>) => {
+            const control = document.createElement('button'); control.type = 'button'; control.textContent = text;
+            control.addEventListener('click', () => { void execute(async () => { if (host === target) await action(); }); });
+            content.append(control); return control;
+          };
+          if (job.state === 'input-required') {
+            const label = document.createElement('label'); label.textContent = '元のシーンZIP'; input.type = 'file'; input.accept = '.zip';
+            label.append(input); content.append(label);
+          }
+          if (job.state === 'input-required' || job.state === 'prepared') {
+            const resume = button('シーン追加を再開', async () => {
+              const id = await target.sceneAppend.retry(job.id, input.files?.[0]);
+              await mount(undefined, id);
+            });
+            if (job.state === 'input-required') { resume.disabled = true; input.addEventListener('change', () => { resume.disabled = !input.files?.length; }); }
+          }
+          if (job.cancellable) button('シーン追加を取りやめる', async () => { await target.sceneAppend.cancel(job.id); await mount(); });
+        }
+      }
       const recoveryHost = host, recovery = recoveryHost.authority.nativeConversionRecovery;
       if (!recoveryHost.authority.readOnly && recovery && await recovery.sourceRequired()) {
         if (disposed || host !== recoveryHost) return;
@@ -307,7 +335,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
       const refresh=()=>{if(!current())return;mounted=checked&&!state();if(mounted&&selectionHost===target&&!target.hasPending())clearSelection();rememberCurrent();controls();};
       presentation={busy:true,reason:'モデルを読み込んでいます。記録は閲覧・検索できます。'};
       workspace=ports.mountEditor(target,bridge.factory,receiveTools,ports.renderModelCandidate?display=>ports.renderModelCandidate!(target,display):undefined,
-        {utilitiesRoot:offline?.root,fileActionsRoot:coldReportActions,smoothDisplay:ports.smoothDisplay,presentation:state,projectNavigationBlocked:()=>busy,openProject:()=>{void selectProject();},resumedLastProject:()=>resumedLast,storageEstimate:ports.storageEstimate,localSettings:ports.localSettings,initialReading,changed:refresh});
+        {utilitiesRoot:offline?.root,fileActionsRoot:coldReportActions,smoothDisplay:ports.smoothDisplay,presentation:state,projectNavigationBlocked:()=>busy,openProject:()=>{void selectProject();},resumedLastProject:()=>resumedLast,storageEstimate:ports.storageEstimate,localSettings:ports.localSettings,initialReading,initialSceneId,changed:refresh});
       content.replaceChildren(workspace.root,retry);workspace.render();
       const load=async()=>{
         checked=false;mounted=false;presentation={busy:true,reason:'モデルを読み込んでいます。記録は閲覧・検索できます。'};retry.hidden=true;resident?.detachPreparation?.();workspace?.render();
@@ -334,7 +362,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     try { workspace=ports.mountEditor(target,next.factory,fileTools,
       ports.renderModelCandidate ? display=>ports.renderModelCandidate!(target,display) : undefined,
       {utilitiesRoot:offline?.root,fileActionsRoot:coldReportActions,smoothDisplay:ports.smoothDisplay,projectNavigationBlocked:()=>busy,openProject:()=>{void selectProject();},resumedLastProject:()=>resumedLast,storageEstimate:ports.storageEstimate,localSettings:ports.localSettings,
-        changed:()=>{rememberCurrent();controls();}});
+        initialSceneId,changed:()=>{rememberCurrent();controls();}});
       content.replaceChildren(workspace.root); workspace.render();
       if (target.backupRestore.needsDisplay) { target.backupRestore.displayReady(target.read().source!.token); workspace.render(); } }
     catch (error) { workspace?.unmount(); workspace = undefined; next.dispose(); resident = undefined; throw error; }
@@ -376,7 +404,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     }
   };
   const adoptProject = async (run: string, opened: Awaited<ReturnType<typeof openValidationHost>>, rememberedMode?: LocalOpenMode,
-    prepared?: Awaited<ReturnType<ValidationWorkspacePorts['render']>>, preparation?: Parameters<ValidationDisplayHost['setDisplayPreparation']>[0]) => {
+    prepared?: Awaited<ReturnType<ValidationWorkspacePorts['render']>>, preparation?: Parameters<ValidationDisplayHost['setDisplayPreparation']>[0], initialSceneId?: string) => {
     if (disposed) { await opened.dispose(); return; }
     host = createValidationModeHost(opened, nextMode => openNormal(run, undefined, nextMode), nextMode => ports.selected(run, nextMode));
     if (selectionPending) selectionHost = host;
@@ -387,7 +415,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     const openingHost = host, openingToken = host.read().source?.token;
     confirmingResume = rememberedMode !== undefined;
     const detach = preparation ? host.setDisplayPreparation(preparation) : undefined;
-    await mount(prepared ? { factory: prepared.factory, dispose: () => { detach?.(); prepared.dispose(); } } : undefined);
+    await mount(prepared ? { factory: prepared.factory, dispose: () => { detach?.(); prepared.dispose(); } } : undefined, initialSceneId);
     if (disposed) return;
     const current = currentResume();
     // A failed initial presentation can retain its readable metadata, but never
@@ -467,11 +495,11 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     if (!selectionCurrent(generation, context)) return false;
     ensureMaySwitch(); return true;
   };
-  const replaceSelection = async (run: string, opened: ValidationNormalHost, generation: number, context: ReturnType<typeof selectionContext>) => {
+  const replaceSelection = async (run: string, opened: ValidationNormalHost, generation: number, context: ReturnType<typeof selectionContext>, initialSceneId?: string) => {
     try { if (!guardSelection(generation, context)) { await opened.dispose(); return; } }
     catch (error) { await opened.dispose(); throw error; }
     try { await closeCurrent(); } catch (error) { await opened.dispose(); throw error; }
-    await adoptProject(run, opened);
+    await adoptProject(run, opened, undefined, undefined, undefined, initialSceneId);
   };
   const exportReport = (blob: Blob, fromFile=false) => { if (disposed) return; if (reportUrl) URL.revokeObjectURL(reportUrl); reportUrl = URL.createObjectURL(blob);
     const a = document.createElement('a'); a.href = reportUrl; a.download = 'LociView-conversion-report.json'; a.hidden = true; root.append(a);
@@ -718,7 +746,41 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
           const opened = await openNormal(reviewEditAttempt.run, undefined, 'edit', undefined, reviewEditAttempt);
           // Preserve the View, its windows and the exact attempt until an actual recovery-capable Host exists.
           await replaceSelection(reviewEditAttempt.run, opened, editGeneration, editContext);
-        })); reviewWorkspace = currentReview; content.append(reviewWorkspace.root); reviewWorkspace.render();
+        }), {
+          projects: async () => (await ports.list()).filter(project => project.state === 'ready'),
+          inspect: async run => {
+            const captured = selectionContext(), editGeneration = selectionGeneration;
+            const opened = await openNormal(run, undefined, 'view');
+            try {
+              const read = opened.read();
+              if (!selectionCurrent(editGeneration, captured) || read.state !== 'ready' || !read.source || !read.publication || opened.hasPending())
+                throw Error('追加先のプロジェクトを確認できません。選び直してください。');
+              const publication = read.publication, token = read.source.token;
+              return { reason: sceneAppendCompatibility(read.source, view.inspection), confirm: async () => {
+                let failure: unknown;
+                await execute(async () => {
+                  try {
+                    if (!guardSelection(editGeneration, captured)) return;
+                    const target = await openNormal(run, undefined, 'edit');
+                    const attemptId = newId();
+                    let sceneId: string | undefined;
+                    try {
+                      sceneId = await target.sceneAppend.start(attemptId, publication, token, view.inspection);
+                    } catch (error) {
+                      if (target.sceneAppend.jobs.some(job => job.id === attemptId)) {
+                        await replaceSelection(run, target, editGeneration, captured);
+                        throw error;
+                      }
+                      await target.dispose(); throw error;
+                    }
+                    await replaceSelection(run, target, editGeneration, captured, sceneId);
+                  } catch (error) { failure = error; }
+                });
+                if (failure) throw failure;
+              } };
+            } finally { await opened.dispose(); }
+          },
+        }); reviewWorkspace = currentReview; content.append(reviewWorkspace.root); reviewWorkspace.render();
         selected = null; ports.selected(null); navigation.hidden = true; clearSelection();
         status.textContent = '閲覧用シーンを開きました。編集プロジェクトは作成していません。';
       } catch (error) { if (resident === prepared) resident = undefined; throw error; }

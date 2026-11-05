@@ -84,6 +84,7 @@ export class ProjectMetadataSource {
   get token(): string { return this.snapshot.history.token; }
   get heads(): string[] { return A.getHeads(this.doc).sort(); }
   originalChanges(): Uint8Array[] { return A.getAllChanges(this.doc).map(b => b.slice()); }
+  projectFrame(): JsonObject { return object(JSON.parse(String(this.doc.project.frame))); }
   /** Owned immutable header projection; never joins by actor, name or transaction ID. */
   editorDeclarations() {
     return this.declarations ??= Object.freeze(A.getAllChanges(this.doc).flatMap(bytes => {

@@ -273,6 +273,18 @@
 .lv-file-sheet > [role="tabpanel"] > section > :is(form,details) { margin-block: 12px; }
 .lv-review-workspace .lv-caption-windows:focus-within { z-index: 4; }
 .lv-review-workspace .lv-development-sidebar { min-height: 0; }
+.lv-review-append {
+  align-self: start;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.5rem 0.75rem;
+  padding: 0.75rem 1rem;
+  border-block: 1px solid var(--lv-rule, #cbc9c1);
+}
+.lv-review-append[hidden] { display: none; }
+.lv-review-append :is(h2, p, label) { grid-column: 1 / -1; margin: 0; }
+.lv-review-append p:empty { display: none; }
+.lv-review-append select { display: block; width: 100%; max-width: 28rem; }
 .lv-file-sheet label { display: grid; gap: 6px; margin: 8px 0; }
 .lv-file-sheet button { margin: 3px; padding: 8px 12px; }
 .lv-file-sheet .lv-file-primary { background: #3c4637; color: #fff; }

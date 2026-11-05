@@ -778,6 +778,13 @@ Final freeze `57ed8aa6` passed the Windows checkpoint with147 test files,
 
 ### Current unit —define and verify the 06d Scene append transaction
 
+PO approved the local journal boundary and excluded downgrading to pre-release
+builds from acceptance. Implement additive planning, bound retry and single
+publication, then connect destination confirmation and recovery to PC and touch.
+Verify exact-file refusal, write interruption, duplicate prevention and export /
+reopen using the current build. Audit downgrade-only code separately from real
+data import and recovery. Stop on unsafe publication or an unresolved contract.
+
 PO approved the [06d product behavior](../docs/specs/06d-scene-append-proposal.md).
 At fd17c3c, specify and review the exact
 additive batch, source binding and recovery before implementation. Reuse the
@@ -795,8 +802,46 @@ current-format Automerge change (5840 bytes), preserving the target header,
 existing records and history. A generated Review with Project and asset pins,
 an unplaced pin, entry view, material and media also passed (7772 bytes).
 The phone Review sample declares unknown units and remains a standalone case.
-Four existing Review package tests and three design probes passed. No product
-code or local journal is changed in this checkpoint.
+Four existing Review package tests and three design probes passed at the
+design-only checkpoint `8bae2d5`.
+
+06d implementation connects Review → destination confirmation → one additive
+change → save / reopen. It uses the selected generation's existing locks and
+publication authority. Both model and media originals survive, and the target
+header, default Scene and prior history are preserved. The operation validates
+saved change operations against the frozen record mapping and source, and after
+preparation can verify and publish without the original ZIP. A completed job
+is recognized by the exact local transaction even after later edits.
+
+Chromium 06d cases passed on fresh Desktop and offline candidate builds, with
+the Service Worker blocked in this lane. Desktop covered confirmation, cancel,
+other-tab lock and stale preview, plus an interrupted write before preparation
+requiring exact-file reselection. The 320 × 568 touch case interrupted publication
+after preparation and recovered after closing and reopening the page without
+the ZIP. All three verified a single added Scene, external backup, original
+GLB and PNG hashes, and browser reopen. The focused service replay confirmed
+no duplicate or rollback after a later local edit. Physical iOS is a separate
+evidence lane. Browser logs and screenshots are local development evidence.
+
+Final verification was split. The sandbox run hit temporary Git/symlink write
+restrictions. The Windows rerun passed typecheck and 3228 tests, with four
+existing timeouts and two fixture suites stopped at source provenance. All four
+timed-out cases passed with the original assertions and deadlines in isolation.
+The fixture provenance binds the original storage specification as an exact Git
+blob. Reverted the companion link there and retained the 06d contract in its own
+file. The two registry suites then passed all 53 cases. Aggregate coverage is
+3285 passed, 21 existing TODOs. The combined checkpoint command exited nonzero.
+All five builds and offline/HEIC isolation passed separately. Two rendered
+regressions passed for Review camera/standalone edit copy and mobile recording /
+update receipt. Independent reviews closed the exact-write validation, verified
+completion, and the confirmation-to-recovery handoff findings.
+
+Pre-release cleanup audit: old-development-build rebuilds used by the 08b/08c
+reader rejection checks are the first removable duplication. Keep current-reader
+privacy, unknown-capability, sharing and restore checks. Map1 and old conversion
+recipes also serve actual saved candidate Projects. Inventory them before any
+retirement. Native/v1/LociMyu imports, exact material matching and current-build
+offline write protection serve existing data and remain in scope.
 
 ## Completed boundary —06c bounded restore content inspection
 

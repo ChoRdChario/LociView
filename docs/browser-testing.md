@@ -136,7 +136,12 @@ npm run test:e2e -- --config playwright.desktop.config.ts desktop-gs-replacement
 npm run test:e2e -- --config playwright.desktop.config.ts desktop-smooth.spec.ts desktop-smooth-team.spec.ts
 npm run test:e2e -- --config playwright.desktop.config.ts desktop-smooth-capacity.spec.ts
 npm run test:e2e -- --config playwright.desktop.config.ts desktop-editor-attribution.spec.ts
+npm run test:e2e -- --config playwright.desktop.config.ts desktop-scene-append.spec.ts
 ```
+
+The 06d lane uses current Desktop and offline candidate artifacts. It covers
+addition and recovery on desktop and a touch viewport. Service Workers are
+blocked in this lane. The tests compare the saved history and model/media hashes.
 
 The08b editor-name lane connects two dedicated profiles through named edits,
 conflict resolution, anonymous delta against a named base, all five file purposes,
@@ -149,6 +154,9 @@ browser is used. That Git object must be available locally; a shallow checkout m
 obtain the fixed source before this lane can run. The old reader refusing input is
 separate evidence from the current reader's corruption checks. It is not a guarantee
 about arbitrary ancient readers or hand-edited raw storage. Todo owns actual results.
+The fixed-build checks for 08b and 08c remain as historical diagnostics. They
+are outside current pre-release acceptance. The current-reader file, privacy
+and integrity checks remain part of acceptance.
 
 The01g smooth lane uses actual Desktop source-alpha/chroma pixels, fallback and
 edit/Workspace/Review/restore/cold continuation. Its separate capacity case uses
