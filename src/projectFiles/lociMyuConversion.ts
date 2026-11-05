@@ -4,9 +4,8 @@ import type { OriginBlobStore } from '../projectMetadata/blobStore';
 import { ProjectMetadataSource, type MetadataProof } from '../projectMetadata/source';
 import { metadataProviderReady, type MetadataProjectSession } from '../projectMetadata/session';
 import { digest, json, metadataPath, newId, readReceipt, underWriteLease, writeReceipt } from '../projectMetadata/persistence';
-import { same } from '../domain/projectGraphSupport';
 import { DomainValidationError, type JsonObject } from '../domain/values';
-import { checkContentFacts } from '../domain/projectContentChecks';
+import { conversionContentVerifier } from './conversionContent';
 import { readProjectScene } from '../scene/projectProvider';
 import { sourceBlob, sourceStreamProof, equalSourceStreams } from './streamSource';
 import { readValidationInitialRecord, writeValidationInitial, validationInitialOrigin } from './creation';
@@ -118,21 +117,8 @@ export async function prepareLociMyuConversion(input: Blob, limits: FileValidati
         const plan = evaluated.plan; if (!plan || !mappedPreview) return fileError('変換の問題を確認してください。');
         const conversionId = newId(), mapped = await mapLociMyuProject(plan, conversionId, originalProof.digest);
         const source = ProjectMetadataSource.bootstrap(mapped.records.schema, mapped.records.identity, metadata, { semanticProfile: 'map2' }).initialize(mapped.records);
-        const media = mapped.records.mediaResourcesById as JsonObject;
-        const provider = await readProjectScene(source.read(), metadata, { scope: 'development-validation', verify: async request => {
-          const response = (outcome: string, facts?: JsonObject) => ({ request, scope: 'development-validation', outcome, ...(facts ? { facts } : {}) });
-          if (request.records.length !== 1) return response('unsupported');
-          const record = request.records[0]!; let facts: JsonObject;
-          if (request.fact === 'media' && same(media[record.id as string], record)) facts = { mediaKind: 'image', mediaType: (record.blob as JsonObject).mediaType! };
-          else {
-            const known = mapped.targetModels.get(record.id as string); if (!known || !same(known.record, record)) return response('unsupported'); const model = known.model;
-            if (request.fact === 'representation') facts = { contentKind: 'mesh', staticPose: true, contentBoundsAsset: model.bounds, materials: [...model.materials], surfaceRanges: [...model.surfaceRanges] };
-            else if (request.fact === 'family-envelope') facts = { logicalBoundsAsset: model.bounds, authority: { kind: 'source', representationId: record.id!, payloadDigest: record.payloadDigest! } };
-            else if (request.fact === 'family-contribution') facts = { verifiedMembers: [{ id: record.id!, payloadDigest: record.payloadDigest! }] };
-            else return response('unsupported');
-          }
-          checkContentFacts(request, facts); return response('verified', facts);
-        } }, { verifyRetainedMedia: true });
+        const provider = await readProjectScene(source.read(), metadata,
+          conversionContentVerifier(mapped.targetModels, mapped.records.mediaResourcesById as JsonObject), { verifyRetainedMedia: true });
         if (provider.kind !== 'scene-provider' || !metadataProviderReady(provider, metadata)) return fileError('元のモデル・記録の関係をそのまま変換できません。');
         const receipt: ConversionReceipt = { recipe: plan.recipe, conversionId, projectId: `prj_${conversionId}`, original: originalProof,
           initial: { ...await lociMyuByteProof(source.encodeFullSource()), proof: source.proof }, selection, workbook: plan.workbook, confirmation: plan.confirmation, title,
@@ -183,15 +169,15 @@ async function retained(fs: ProjectWorkspaceFS, limits: FileValidationLimits, pr
 export async function resumeLociMyuConversion(fs: ProjectWorkspaceFS, store: OriginBlobStore, session: MetadataProjectSession, limits: FileValidationLimits, projectId: string, decode?: PngDecoder, jpeg?: JpegDecoder, photo?: PhotoDecoder) {
   const retainedSource = await retained(fs, limits, projectId, decode, jpeg, photo);
   try {
-  const { initial, mapped } = retainedSource, before = await session.read();
-  if (before.state === 'ready') { if (json(before.source!.proof) !== json(initial.source.proof)) return fail(); return before; }
-  if (before.state !== 'pending' && before.state !== 'empty') return fail();
-  for (const body of mapped.blobs) {
-    const presence = await store.inspect(body.ref);
-    if (presence === 'unverified') await body.withStream(stream => store.put(stream, body.ref.mediaType, body.ref));
-    else if (presence !== 'verified-present') return fileError('保存済みのモデルまたは画像に修復が必要です。');
-  }
-  return before.state === 'pending' ? session.recoverInitialization(initial.source) : session.createFromSource(initial.source);
+    const { initial, mapped } = retainedSource, before = await session.read();
+    if (before.state === 'ready') { if (json(before.source!.proof) !== json(initial.source.proof)) return fail(); return before; }
+    if (before.state !== 'pending' && before.state !== 'empty') return fail();
+    for (const body of mapped.blobs) {
+      const presence = await store.inspect(body.ref);
+      if (presence === 'unverified') await body.withStream(stream => store.put(stream, body.ref.mediaType, body.ref));
+      else if (presence !== 'verified-present') return fileError('保存済みのモデルまたは画像に修復が必要です。');
+    }
+    return await (before.state === 'pending' ? session.recoverInitialization(initial.source) : session.createFromSource(initial.source));
   } finally { await retainedSource.dispose(); }
 }
 /** Explicit private report export only; never part of any package output purpose. */

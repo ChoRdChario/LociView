@@ -4,13 +4,12 @@ import type { OriginBlobStore } from '../projectMetadata/blobStore';
 import { ProjectMetadataSource, type MetadataProof } from '../projectMetadata/source';
 import { metadataProviderReady, type MetadataProjectSession } from '../projectMetadata/session';
 import { digest, equalBytes, json, metadataPath, newId, readReceipt, underWriteLease, writeReceipt } from '../projectMetadata/persistence';
-import { same } from '../domain/projectGraphSupport';
 import { cloneCanonicalValue, type JsonObject } from '../domain/values';
-import { checkContentFacts } from '../domain/projectContentChecks';
+import { conversionContentVerifier } from './conversionContent';
 import { readProjectScene } from '../scene/projectProvider';
 import { readValidationBody } from './content';
 import { readValidationInitialRecord, writeValidationInitial, validationInitialOrigin } from './creation';
-import { frozenV1Recipe, frozenV1JpegRecipe, frozenV1PhotoRecipe, frozenV1DefaultViewRecipe, frozenV1PlacementRecipe, frozenV1MaterialRecipe, frozenV1OpaqueMaterialRecipe, frozenV1StandardMaterialRecipe, type FrozenV1Recipe, inspectFrozenV1Source, byteProof, type FrozenV1Plan } from './frozenV1Source';
+import { frozenV1Recipe, frozenV1JpegRecipe, frozenV1PhotoRecipe, frozenV1DefaultViewRecipe, frozenV1PlacementRecipe, frozenV1MaterialRecipe, frozenV1OpaqueMaterialRecipe, frozenV1StandardMaterialRecipe, frozenV1RecipeHasMaterials, frozenV1PlanHasMaterials, type FrozenV1Recipe, inspectFrozenV1Source, byteProof, type FrozenV1Plan } from './frozenV1Source';
 import { mapFrozenV1Project, frozenV1SourceKey, type FrozenV1MappingEntry } from './frozenV1Mapping';
 import type { PngDecoder } from './png';
 import type { JpegDecoder } from './jpeg';
@@ -28,7 +27,7 @@ const sourcePath = (fs: ProjectWorkspaceFS) => metadataPath(fs, 'frozen-v1-conve
 export const hasFrozenV1Conversion = async (fs: ProjectWorkspaceFS, checkBoundInitial = true) => !!await fs.readStream(receiptPath(fs)) || !!await fs.readStream(sourcePath(fs)) ||
   checkBoundInitial && [frozenV1Recipe, frozenV1JpegRecipe, frozenV1PhotoRecipe, frozenV1DefaultViewRecipe, frozenV1PlacementRecipe, frozenV1MaterialRecipe, frozenV1OpaqueMaterialRecipe,frozenV1StandardMaterialRecipe].includes(await validationInitialOrigin(fs) as FrozenV1Recipe);
 // A small origin marker identifies the optional explanation; no ready-time source/report decode.
-export const hasFrozenV1MaterialReport = async (fs: ProjectWorkspaceFS) => [frozenV1MaterialRecipe,frozenV1OpaqueMaterialRecipe,frozenV1StandardMaterialRecipe].includes(await validationInitialOrigin(fs) as FrozenV1Recipe);
+export const hasFrozenV1MaterialReport = async (fs: ProjectWorkspaceFS) => frozenV1RecipeHasMaterials(await validationInitialOrigin(fs) as FrozenV1Recipe);
 const fail = () => fileError('旧形式の変換記録が不足しているか一致しません。保持した記録は上書きしていません。');
 
 async function checkReceipt(r: ConversionReceipt, projectId: string) {
@@ -48,7 +47,7 @@ async function checkReceipt(r: ConversionReceipt, projectId: string) {
     if (!Array.isArray(tuple) || tuple.length !== 4 || tuple[0] !== r.conversionId || tuple[1] !== r.original.digest ||
       !frozenV1SourceKey(tuple[2], tuple[3], false, r.recipe) || entry.preimage !== prefix + JSON.stringify(tuple) ||
       entry.id !== `${tuple[2]}_${entry.sha256.slice(0, 32)}` || await digest(new TextEncoder().encode(entry.preimage)) !== entry.sha256 ||
-      (r.recipe === frozenV1MaterialRecipe || r.recipe === frozenV1OpaqueMaterialRecipe || r.recipe === frozenV1StandardMaterialRecipe) && hashes.has(entry.sha256) && hashes.get(entry.sha256) !== entry.preimage) return fail();
+      frozenV1RecipeHasMaterials(r.recipe) && hashes.has(entry.sha256) && hashes.get(entry.sha256) !== entry.preimage) return fail();
     ids.add(entry.id); hashes.set(entry.sha256, entry.preimage);
   }
 }
@@ -63,10 +62,10 @@ async function verifyRetained(r: ConversionReceipt, source: ProjectMetadataSourc
   if (source.semanticProfile !== 'map2') return fail();
   await checkReceipt(r, source.proof.identity.projectId as string);
   if (plan.recipe !== r.recipe || json(source.proof) !== json(r.initial.proof) || json(plan.fingerprints) !== json(r.fingerprints) ||
-    json(plan.inventory) !== json(r.inventory) || (plan.recipe !== frozenV1MaterialRecipe && plan.recipe !== frozenV1OpaqueMaterialRecipe && plan.recipe !== frozenV1StandardMaterialRecipe) && json(plan.report) !== json(r.report)) return fail();
+    json(plan.inventory) !== json(r.inventory) || !frozenV1PlanHasMaterials(plan) && json(plan.report) !== json(r.report)) return fail();
   // Derive expected values against captured identity; never bootstrap/regenerate initial history.
   const expected = await mapFrozenV1Project(plan, r.conversionId, r.original.digest, source.proof.identity);
-  if (json(expected.mapping) !== json(r.mapping) || (plan.recipe === frozenV1MaterialRecipe || plan.recipe === frozenV1OpaqueMaterialRecipe || plan.recipe === frozenV1StandardMaterialRecipe) && json(materialReport(plan, expected, source)) !== json(r.report)) return fail();
+  if (json(expected.mapping) !== json(r.mapping) || frozenV1PlanHasMaterials(plan) && json(materialReport(plan, expected, source)) !== json(r.report)) return fail();
   const original = await source.inspectOriginal({ maxNodes: metadata.maxNodes, maxWork: metadata.maxWork });
   if (original.candidates.hasUnknownFields || json(original.candidates.unambiguousRecords) !== json(expected.records)) return fail();
 }
@@ -75,33 +74,19 @@ async function verifyRetained(r: ConversionReceipt, source: ProjectMetadataSourc
 export async function prepareFrozenV1Conversion(input: Blob, limits: FileValidationLimits, decode?: PngDecoder, jpeg?: JpegDecoder, photo?: PhotoDecoder) {
   const opened = await inspectFrozenV1Source(input, limits, decode, jpeg, photo); if (!opened) return null;
   const { plan, original } = opened, originalProof = await byteProof(original);
-  let explanation = (plan.recipe === frozenV1MaterialRecipe || plan.recipe === frozenV1OpaqueMaterialRecipe || plan.recipe === frozenV1StandardMaterialRecipe) ? materialReport(plan) : undefined;
+  let explanation = frozenV1PlanHasMaterials(plan) ? materialReport(plan) : undefined;
   let attempt: Promise<Awaited<ReturnType<typeof create>>> | undefined;
   async function create() {
     const conversionId = newId(), mapped = await mapFrozenV1Project(plan, conversionId, originalProof.digest);
     const source = ProjectMetadataSource.bootstrap(mapped.records.schema, mapped.records.identity, metadata, { semanticProfile: 'map2' }).initialize(mapped.records);
-    const media = mapped.records.mediaResourcesById as JsonObject;
-    const provider = await readProjectScene(source.read(), metadata, { scope: 'development-validation', verify: async request => {
-      const response = (outcome: string, facts?: JsonObject) => ({ request, scope: 'development-validation', outcome, ...(facts ? { facts } : {}) });
-      if (request.records.length !== 1) return response('unsupported');
-      const record = request.records[0]!; let facts: JsonObject;
-      if (request.fact === 'media' && same(media[record.id as string], record)) facts = { mediaKind: 'image', mediaType: (record.blob as JsonObject).mediaType! };
-      else {
-        const known = mapped.targetModels.get(record.id as string); if (!known || !same(known.record, record)) return response('unsupported');
-        const model = known.model;
-        if (request.fact === 'representation') facts = { contentKind: 'mesh', staticPose: true, contentBoundsAsset: model.bounds, materials: [...model.materials], surfaceRanges: [...model.surfaceRanges] };
-        else if (request.fact === 'family-envelope') facts = { logicalBoundsAsset: model.bounds, authority: { kind: 'source', representationId: record.id!, payloadDigest: record.payloadDigest! } };
-        else if (request.fact === 'family-contribution') facts = { verifiedMembers: [{ id: record.id!, payloadDigest: record.payloadDigest! }] };
-        else return response('unsupported');
-      }
-      checkContentFacts(request, facts); return response('verified', facts);
-    } }, { verifyRetainedMedia: true });
+    const provider = await readProjectScene(source.read(), metadata,
+      conversionContentVerifier(mapped.targetModels, mapped.records.mediaResourcesById as JsonObject), { verifyRetainedMedia: true });
     if (provider.kind !== 'scene-provider' || !metadataProviderReady(provider, metadata)) return fileError('元のモデル・記録の関係をそのまま変換できません。');
     const receipt: ConversionReceipt = { recipe: plan.recipe, conversionId, projectId: `prj_${conversionId}`, original: originalProof,
       initial: { ...await byteProof(source.encodeFullSource()), proof: source.proof }, fingerprints: plan.fingerprints, inventory: plan.inventory,
-      mapping: mapped.mapping, report: (plan.recipe === frozenV1MaterialRecipe || plan.recipe === frozenV1OpaqueMaterialRecipe || plan.recipe === frozenV1StandardMaterialRecipe) ? materialReport(plan, mapped, source) : plan.report };
+      mapping: mapped.mapping, report: frozenV1PlanHasMaterials(plan) ? materialReport(plan, mapped, source) : plan.report };
     await verifyRetained(receipt, source, plan);
-    if ((plan.recipe === frozenV1MaterialRecipe || plan.recipe === frozenV1OpaqueMaterialRecipe || plan.recipe === frozenV1StandardMaterialRecipe)) explanation = receipt.report as JsonObject;
+    if (frozenV1PlanHasMaterials(plan)) explanation = receipt.report as JsonObject;
     return { source, async persist(fs: ProjectWorkspaceFS, store: OriginBlobStore, session: MetadataProjectSession) {
       const before = await session.read(), existing = await readReceipt<ConversionReceipt>(fs, receiptPath(fs), metadata);
       if (existing) {
@@ -109,7 +94,7 @@ export async function prepareFrozenV1Conversion(input: Blob, limits: FileValidat
         return resumeFrozenV1Conversion(fs, store, session, limits, receipt.projectId, decode, jpeg, photo);
       }
       if (before.state !== 'empty') return fileError('作成先が空ではありません。既存の記録は変更していません。');
-      if ((plan.recipe === frozenV1MaterialRecipe || plan.recipe === frozenV1OpaqueMaterialRecipe || plan.recipe === frozenV1StandardMaterialRecipe)) {
+      if (frozenV1PlanHasMaterials(plan)) {
         const actual = await inspectFrozenV1Source(new Blob([original.slice().buffer]), limits, decode, jpeg, photo);
         if (!actual) return fail(); await verifyRetained(receipt, source, actual.plan);
       }
@@ -128,7 +113,7 @@ export async function prepareFrozenV1Conversion(input: Blob, limits: FileValidat
     } };
   }
   return { summary: Object.freeze({ ...plan.report,...(plan.materialNotices?.length?{materialNotices:plan.materialNotices}:{}), sourceOnly: Object.freeze({ ...plan.report.sourceOnly }) }), create: () => attempt ??= create(),
-    ...((plan.recipe === frozenV1MaterialRecipe || plan.recipe === frozenV1OpaqueMaterialRecipe || plan.recipe === frozenV1StandardMaterialRecipe) ? { report: () => reportBlob(originalProof, explanation!, plan.recipe) } : {}) };
+    ...(frozenV1PlanHasMaterials(plan) ? { report: () => reportBlob(originalProof, explanation!, plan.recipe) } : {}) };
 }
 
 async function retained(fs: ProjectWorkspaceFS, limits: FileValidationLimits, projectId: string, decode?: PngDecoder, jpeg?: JpegDecoder, photo?: PhotoDecoder) {
@@ -159,6 +144,6 @@ export async function resumeFrozenV1Conversion(fs: ProjectWorkspaceFS, store: Or
 export async function readFrozenV1MaterialReport(fs: ProjectWorkspaceFS, limits: FileValidationLimits, projectId: string, decode?: PngDecoder, jpeg?: JpegDecoder, photo?: PhotoDecoder): Promise<Blob | null> {
   if (!await hasFrozenV1MaterialReport(fs)) return null;
   const { receipt } = await retained(fs, limits, projectId, decode, jpeg, photo);
-  if ((receipt.recipe !== frozenV1MaterialRecipe && receipt.recipe !== frozenV1OpaqueMaterialRecipe && receipt.recipe !== frozenV1StandardMaterialRecipe)) return fail();
+  if (!frozenV1RecipeHasMaterials(receipt.recipe)) return fail();
   return reportBlob(receipt.original, receipt.report as JsonObject, receipt.recipe);
 }

@@ -475,6 +475,15 @@ broader formats/materials, ordinary entry and adoption gates remain open.
 
 ## 6. Acceptance and historical evidence
 
+The ordinary Native, frozen-v1 and LociMyu GLB converters share one verifier for
+already inspected input. It matches the complete model/media record and returns
+the same mesh, family and image facts within that preparation only, with
+`checkContentFacts` and retained-media admission. It creates no durable evidence
+or body cache. Native spatial keeps its separate GS/point/Proxy authority.
+LociMyu recovery owns its source until the Session operation settles, including
+failure. Recipe selection and saved origin/source verification keep their exact
+existing rules.
+
 Reuse the existing source/file/session tests and grouped device acceptance:
 faithful initial Native/v1/LociMyu mapping, original-byte preservation,
 known-owner/ownerless unplaced records, explicit placement, failure/cancel/retry,

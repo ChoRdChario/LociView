@@ -86,6 +86,7 @@ import { materialResolutionContext } from '../src/projectMetadata/materialResolu
 import { identityPlacement, prepareValidationModel, sealValidationRecord } from '../src/projectFiles/initialProject';
 import { validationModelFacts, validationReceivedFacts } from '../src/projectFiles/modelFacts';
 import { ValidationContent } from '../src/projectFiles/content';
+import { conversionContentVerifier } from '../src/projectFiles/conversionContent';
 import { ProjectMetadataSource } from '../src/projectMetadata/source';
 import { fixture } from './helpers/projectRecordsFixture';
 import { planRemoteChanges } from '../src/projectMetadata/remote';
@@ -522,6 +523,31 @@ const lociMyuTestReceiptBytes = (receipt: unknown) => {
 };
 
 describe('limited real-format validation (synthetic GLB bytes, injected PNG decoder, memory storage)', () => {
+  it('conversion preparation accepts only its exact inspected mesh and image records', async () => {
+    const bytes = glb(), model = await inspectValidationGlb(bytes, budget, decode);
+    const project = await prepareValidationProject({ run: newId(), title: '検証済み入力',
+      models: [{ label: 'モデル', bytes }], media: [{ label: '写真', bytes: png }] }, budget, decode);
+    const record = Object.values(project.records.representationsById as Record<string, JsonObject>)[0]!;
+    const media = project.records.mediaResourcesById as JsonObject;
+    const image = Object.values(media)[0] as JsonObject;
+    const models = new Map([[record.id as string, { record, model }]]);
+    const verifier = conversionContentVerifier(models, media);
+    const request: ContentRequest = { token: 'conversion-owner', fact: 'representation', records: [record], context: {} };
+    for (const fact of ['representation', 'family-envelope', 'family-contribution'] as const)
+      expect(await verifier.verify({ ...request, fact })).toMatchObject({ outcome: 'verified', request: { token: request.token, fact } });
+    expect(await verifier.verify({ ...request, fact: 'media', records: [image] })).toMatchObject({ outcome: 'verified' });
+    for (const invalid of [
+      { ...request, records: [record, record] },
+      { ...request, records: [{ ...record, payloadDigest: 'f'.repeat(64) }] },
+      { ...request, records: [{ ...record, formatProfile: { id: 'different-profile' } }] },
+      { ...request, fact: 'media' as const, records: [{ ...image, label: '別の画像' }] },
+      { ...request, fact: 'surface-equivalence' as const },
+    ]) expect(await verifier.verify(invalid)).toMatchObject({ outcome: 'unsupported', request: invalid });
+    const invalidModel = conversionContentVerifier(new Map([[record.id as string, {
+      record, model: { ...model, bounds: { min: [-1000, -1000, -1000], max: [1000, 1000, 1000] } },
+    }]]), media);
+    await expect(invalidModel.verify(request)).rejects.toThrow();
+  });
   it('PC raster policy preflights all image work before native decoding and keeps geometry work independent', async () => {
     const width = new DataView(png.buffer).getUint32(16), height = new DataView(png.buffer).getUint32(20);
     const native = vi.fn(decodeImplementation), input = glb(j => { j.images.push(structuredClone(j.images[0])); }, true);
@@ -1140,6 +1166,44 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       sheets.find(s => s.name === '__LM_MATERIALS')!.rows[1]![0] = 'UnusedMaterial';
     }), budget, decode))!;
     const choice = await preview.evaluate(0, '名前'); expect(choice.blocked).toBe(false); expect(JSON.parse(await choice.report().text()).issues.some((i: any) => i.field === 'material')).toBe(true);
+  });
+  it.each([false, true])('LociMyu recovery releases its source after Session settlement (reject=%s)', async reject => {
+    const preview = (await prepareLociMyuConversion(await lociMyuFile(), budget, decode))!;
+    const initial = await (await preview.evaluate(0, '解放の確認')).create(), receiver = firstWorkspaceRecipient();
+    receiver.fs.reject = path => path.endsWith('/published.json');
+    await expect(initial.persist(receiver.fs, receiver.store, receiver.session)).rejects.toThrow('quota');
+    receiver.fs.reject = () => false;
+    const cold = receiver.reopen().session;
+    const originalOpen = lociMyuSourceModule.openLociMyuSource, originalRecover = cold.recoverInitialization.bind(cold);
+    const dispose = vi.fn();
+    const open = vi.spyOn(lociMyuSourceModule, 'openLociMyuSource').mockImplementation(async (...args) => {
+      const source = await originalOpen(...args);
+      return source && { ...source, dispose: async () => { dispose(); await source.dispose(); } };
+    });
+    let release!: () => void, entered!: () => void;
+    const gate = new Promise<void>(resolve => { release = resolve; }), started = new Promise<void>(resolve => { entered = resolve; });
+    const recoveryFailure = Error('Session publication failed');
+    const recover = vi.spyOn(cold, 'recoverInitialization').mockImplementation(async source => {
+      entered(); await gate;
+      if (reject) throw recoveryFailure;
+      expect(dispose).not.toHaveBeenCalled();
+      return originalRecover(source);
+    });
+    const outcome = resumeLociMyuConversion(receiver.fs, receiver.store, cold, budget, initial.source.proof.identity.projectId as string, decode)
+      .then(value => ({ value, error: null }), error => ({ value: null, error }));
+    try {
+      await started;
+      await Promise.resolve();
+      expect(dispose).not.toHaveBeenCalled();
+      release();
+      const result = await outcome;
+      if (reject) expect(result.error).toBe(recoveryFailure);
+      else expect(result.value?.state).toBe('ready');
+      expect(dispose).toHaveBeenCalledOnce();
+    } finally {
+      release(); await outcome;
+      recover.mockRestore(); open.mockRestore(); await preview.dispose();
+    }
   });
   it.each([false,true,'opaque','standard','extension','standard-extension'] as const)('LociMyu conversion material=%s retains captured initialization/source/report through interrupted publication, cold recovery and completed retry', async material => {
     const extension=material==='extension'||material==='standard-extension',standard=material==='standard'||material==='standard-extension';

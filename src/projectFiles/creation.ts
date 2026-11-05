@@ -14,9 +14,7 @@ import type { PngDecoder } from './png';
 import type { JpegDecoder } from './jpeg';
 import { fileError, validationMetadataLimits as metadataLimits, type ProjectFilePolicyInput } from './validation';
 
-type InitialOriginRecipe = 'locimyu-project-scene-migration-recipe-7' | 'native-project-scene-recipe-10' | 'v1-project-scene-migration-recipe-8' | 'locimyu-project-scene-migration-recipe-6' | 'native-project-scene-recipe-9' | 'v1-project-scene-migration-recipe-7' | 'locimyu-project-scene-migration-recipe-5' | 'native-project-scene-recipe-8' | 'native-project-scene-recipe-7' | 'v1-project-scene-migration-recipe-6' | 'locimyu-project-scene-migration-recipe-4' | 'v1-project-scene-migration-recipe-5' | 'v1-project-scene-migration-recipe-4' | 'native-project-scene-recipe-5' | 'native-project-scene-recipe-6' | 'v1-project-scene-migration-recipe-3' | 'locimyu-project-scene-migration-recipe-3' | 'v1-project-scene-migration-recipe-1' | 'locimyu-project-scene-migration-recipe-1' |
-  'v1-project-scene-migration-recipe-2' | 'locimyu-project-scene-migration-recipe-2' | 'native-project-scene-recipe-3' | 'native-project-scene-recipe-4';
-const originRecipeKnown = (value: unknown): value is InitialOriginRecipe => typeof value === 'string' && [
+const initialOriginRecipes = [
   'locimyu-project-scene-migration-recipe-7',
   'native-project-scene-recipe-10', 'v1-project-scene-migration-recipe-8', 'locimyu-project-scene-migration-recipe-6',
   'native-project-scene-recipe-9', 'v1-project-scene-migration-recipe-7', 'locimyu-project-scene-migration-recipe-5',
@@ -25,7 +23,10 @@ const originRecipeKnown = (value: unknown): value is InitialOriginRecipe => type
   'v1-project-scene-migration-recipe-2', 'locimyu-project-scene-migration-recipe-2', 'native-project-scene-recipe-3', 'native-project-scene-recipe-4',
   'native-project-scene-recipe-5', 'native-project-scene-recipe-6', 'v1-project-scene-migration-recipe-3', 'locimyu-project-scene-migration-recipe-3',
   'locimyu-project-scene-migration-recipe-4', 'v1-project-scene-migration-recipe-6',
-].includes(value);
+] as const;
+type InitialOriginRecipe = typeof initialOriginRecipes[number];
+const originRecipeKnown = (value: unknown): value is InitialOriginRecipe =>
+  typeof value === 'string' && (initialOriginRecipes as readonly string[]).includes(value);
 type InitialReceipt = { proof: MetadataProof; byteLength: number; digest: string } & (
   { version: 'validation-initial-1' } | { version: 'validation-initial-2'; originRecipe: InitialOriginRecipe });
 const initialPath = (fs: ProjectWorkspaceFS) => metadataPath(fs, 'validation-initial.am');
@@ -71,11 +72,11 @@ export async function readValidationInitialRecord(fs: ProjectWorkspaceFS) {
   return { source, receipt: r };
 }
 export async function writeValidationInitial(fs: ProjectWorkspaceFS, source: ProjectMetadataSource, originRecipe?: InitialOriginRecipe): Promise<void> {
-  const bytes = source.encodeFullSource();
-  if (originRecipe) await writeReceipt(fs, originPath(fs), { version: 'validation-origin-1', originRecipe, proof: source.proof, byteLength: bytes.length, digest: await digest(bytes) }, metadataLimits);
+  const bytes = source.encodeFullSource(), sourceDigest = await digest(bytes);
+  if (originRecipe) await writeReceipt(fs, originPath(fs), { version: 'validation-origin-1', originRecipe, proof: source.proof, byteLength: bytes.length, digest: sourceDigest }, metadataLimits);
   // Manifest first binds the exact intended source; partial bytes stay repair state.
   await writeReceipt(fs, receiptPath(fs), { version: originRecipe ? 'validation-initial-2' : 'validation-initial-1',
-    ...(originRecipe ? { originRecipe } : {}), proof: source.proof, byteLength: bytes.length, digest: await digest(bytes) }, metadataLimits);
+    ...(originRecipe ? { originRecipe } : {}), proof: source.proof, byteLength: bytes.length, digest: sourceDigest }, metadataLimits);
   const previous = await fs.readBytes(initialPath(fs));
   if (previous && !equalBytes(previous, bytes)) return fileError('作成途中の記録が一致しません。上書きはしていません。');
   if (!previous) await fs.writeBytes(initialPath(fs), bytes);

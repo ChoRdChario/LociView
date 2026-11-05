@@ -2,7 +2,7 @@ import { admitProjectRecords, projectRecordMaps } from '../domain/projectRecords
 import { cloneCanonicalValue, type JsonObject, type JsonValue } from '../domain/values';
 import { digest, json, newId, technicalId } from '../projectMetadata/persistence';
 import { identityPlacement, sealValidationRecord, type PreparedValidationProject } from './initialProject';
-import { frozenV1Recipe, frozenV1JpegRecipe, frozenV1PhotoRecipe, frozenV1DefaultViewRecipe, frozenV1PlacementRecipe, frozenV1MaterialRecipe, frozenV1OpaqueMaterialRecipe,frozenV1StandardMaterialRecipe, frozenV1Placement, type FrozenV1Recipe, sourceColor, codeOrder, type FrozenV1Plan } from './frozenV1Source';
+import { frozenV1Recipe, frozenV1JpegRecipe, frozenV1PhotoRecipe, frozenV1DefaultViewRecipe, frozenV1PlacementRecipe, frozenV1StandardMaterialRecipe, frozenV1RecipeHasMaterials, frozenV1PlanHasMaterials, frozenV1Placement, type FrozenV1Recipe, sourceColor, codeOrder, type FrozenV1Plan } from './frozenV1Source';
 import { fileError, validationGlbProfile, jpegGlbProfile, validationMetadataLimits as limits } from './validation';
 
 type Key = readonly (string | number | Key)[];
@@ -19,9 +19,9 @@ export function frozenV1SourceKey(prefix: unknown, key: unknown, nested = false,
   if (prefix === 'slot') return key.length === 4 && key[0] === 'material-slot' && typeof key[1] === 'string' &&
     (key[2] === 'gltfMaterial' && index(key[3]) || key[2] === 'representationMaterial' && key[3] === 0);
   if (prefix === 'att') return key.length === 4 && key[0] === 'attachment' && typeof key[1] === 'string' && index(key[2]) && typeof key[3] === 'string';
-  if (prefix === 'ovr') return (recipe === frozenV1MaterialRecipe || recipe === frozenV1OpaqueMaterialRecipe||recipe===frozenV1StandardMaterialRecipe) && key.length === 2 && key[0] === 'material' && typeof key[1] === 'string' && /^mat_[0-7][0123456789ABCDEFGHJKMNPQRSTVWXYZ]{25}$/u.test(key[1]);
+  if (prefix === 'ovr') return frozenV1RecipeHasMaterials(recipe) && key.length === 2 && key[0] === 'material' && typeof key[1] === 'string' && /^mat_[0-7][0123456789ABCDEFGHJKMNPQRSTVWXYZ]{25}$/u.test(key[1]);
   return prefix === 'evt' && !nested && key.length === 3 && key[0] === 'initial-event' &&
-    [...['ast', 'scn', 'sam', 'cap', 'scm', 'att', 'tag', 'tgm', 'view'], ...((recipe === frozenV1MaterialRecipe || recipe === frozenV1OpaqueMaterialRecipe||recipe===frozenV1StandardMaterialRecipe) ? ['ovr'] : [])].includes(key[1]) && frozenV1SourceKey(key[1], key[2], true, recipe);
+    [...['ast', 'scn', 'sam', 'cap', 'scm', 'att', 'tag', 'tgm', 'view'], ...(frozenV1RecipeHasMaterials(recipe) ? ['ovr'] : [])].includes(key[1]) && frozenV1SourceKey(key[1], key[2], true, recipe);
 }
 export function frozenV1ConversionIds(conversionId: string, sourceZipSha256: string, recipe: FrozenV1Recipe = frozenV1Recipe) {
   technicalId(conversionId); if (!/^[0-9a-f]{64}$/.test(sourceZipSha256)) return fileError('変換元の識別情報が不正です。');
@@ -72,7 +72,7 @@ export async function mapFrozenV1Project(plan: FrozenV1Plan, conversionId: strin
       anchorCompatibilityClasses: [{ id: compatibilityId, targetVariantFamilyIds: [familyId] }],
       provenance: { origin: 'import', sourceMediaType: body.ref.mediaType, inputBlobDigests: [body.ref.digest] } }));
     add('assetBindingsById', await sealValidationRecord('asset-binding-revision', { id: bindingId, assetId, assetRevisionId: revisionId,
-      assetToProject: plan.recipe === frozenV1PlacementRecipe || (plan.recipe === frozenV1MaterialRecipe || plan.recipe === frozenV1OpaqueMaterialRecipe||plan.recipe===frozenV1StandardMaterialRecipe) ? frozenV1Placement(body.record.fields.transform) : identityPlacement(), method: 'import' }));
+      assetToProject: plan.recipe === frozenV1PlacementRecipe || frozenV1PlanHasMaterials(plan) ? frozenV1Placement(body.record.fields.transform) : identityPlacement(), method: 'import' }));
     add('assetsById', { id: assetId, label: body.record.fields.originalName as string, assetFrameId, status: { kind: 'ready', activeBindingId: bindingId },
       ...(body.record.fields.pinScale === undefined ? {} : { pinScale: body.record.fields.pinScale as number }), lifecycle: await active('ast', ['asset', s]) });
     models.set(s, { assetId, assetFrameId, revisionId, compatibilityId, representation, slots: new Map(slots.map(slot => [json(slot.sourceLocator), slot])) });
@@ -111,7 +111,7 @@ export async function mapFrozenV1Project(plan: FrozenV1Plan, conversionId: strin
         background: { kind: 'solid', colorSrgb: sourceColor(v.fields.background) } }); }
   }
   const materialMappings: JsonObject[] = [], routes = new Set<string>();
-  if ((plan.recipe === frozenV1MaterialRecipe || plan.recipe === frozenV1OpaqueMaterialRecipe||plan.recipe===frozenV1StandardMaterialRecipe)) for (const material of plan.materials) {
+  if (frozenV1PlanHasMaterials(plan)) for (const material of plan.materials) {
     const model = models.get(material.sourceAssetId), slot = model?.slots.get(json(material.sourceLocator));
     if (!model || !slot) return fileError('材質の元モデル・面の対応を確認できません。');
     const scn = await scene(material.sourceSetId), representation = model.representation, catalog = representation.materialCatalog as JsonObject;

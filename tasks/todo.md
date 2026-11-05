@@ -1,6 +1,6 @@
 # LociView active work
 
-Updated2026-11-04. This is the single current plan and check record.
+Updated2026-11-05. This is the single current plan and check record.
 [Inventory](implementation-inventory.md) owns route-specific coverage;
 [map](../PROJECT_MAP.md) and [document index](../docs/README.md) route contracts/code.
 Git owns checkpoint identity. [Retained checkpoint evidence](../docs/history/development-through-2026-10-29/tasks/todo-before-daily-authoring.md)
@@ -57,7 +57,17 @@ unchanged-feature-classification checks pass; independent review has no findings
 No runtime change or new capacity guarantee; no runtime suite is needed for this
 documentation checkpoint.
 
-## Current boundary —short-PC Caption UX after verified06c
+## Current boundary —conversion preparation and recovery
+
+The verified unit is [conversion preparation and recovery](#current-unit-simplify-conversion-preparation-and-recovery).
+Current inputs still require the existing recipe identities. Consolidate only
+duplicated preparation/decision code, retain exact saved work, and keep the
+LociMyu source alive through Session settlement. Focused checks and independent
+review, current PC/touch file flows and the final checkpoint pass; that record
+retains the first test-prerequisite failure and final evidence.
+No new format, dependency, capacity guarantee or release is part of this unit.
+
+### Retained short-PC workflow evidence
 
 The approved06c restore workflow is complete in the bounded PC candidate and
 pushed to g0. Its Windows checkpoint, real Ki84 file/cold/independent-resume
@@ -871,6 +881,61 @@ current-build setup. No matched old-build timing comparison is claimed.
 Next, inventory old conversion recipes and saved development Projects before
 retiring any data-reading path. Unreleased-build downgrade checks are outside
 acceptance; opening the user's actual source files and saved work remains required.
+
+### Current unit —simplify conversion preparation and recovery
+
+PO authorizes continuing connected refactoring through verification and review.
+The recipe audit finds that current inputs still select Native1–10, frozen-v1
+1–8 and LociMyu1–7; saved recipe identities remain necessary. Consolidate the
+identical inspected GLB/image verifier for the three ordinary converters, keep
+Native spatial's distinct authority, derive the initial-origin type and guard
+from one literal registry, and centralize frozen-v1's material-family checks.
+Keep a LociMyu source open until recovery settles. Preserve original recipes,
+exact bytes, record matching and every write/readback/publication fence.
+Verify focused conversion/mismatch/recovery cases, representative PC/touch and
+Ki84 operation, then the required final checkpoint and independent review.
+Stop the affected change on a real contract discrepancy or a new product choice.
+
+Implementation and readonly independent review are complete. The three GLB/image
+preparation verifiers share one exact-record implementation; Native spatial stays
+separate. The initial-origin registry and frozen-v1 material-family predicates
+now have one definition. One digest of captured initial bytes serves both input
+receipts; durable readback/recovery still rehashes. Recovery now awaits Session
+settlement before releasing the LociMyu source, including failure.
+Focused boundary/content/lifetime checks4pass, then conversion identity/refusal/
+interruption/recovery cases40pass; typecheck passes. Current-build Native phone
+conversion/edit/selected+whole output/receive passes at320px with reduced input
+height (34.3s browser work,1.0m including fresh builds).
+The first real Ki84 PC→touch run stopped on a test prerequisite: compact layout
+defaults to the work panel and intentionally defers its hidden3D renderer. Both
+source inspection and independent review confirm this. Preserve that failure;
+the amended private scenario selects the actual3D surface before checking the
+same canvas-ready assertion. No product guard, assertion or deadline was relaxed.
+Source/test tree is frozen for the remaining browser/final checks.
+
+Final fresh-original Ki84 PC→independent touch case passes in3.4m on current
+offline-desktop-dist with SW blocked. Preview9.783s, conversion-to-visible3D
+28.368s, PC save+Node archive inspection15.839s, touch restore-to-visible3D76.255s,
+and touch reload-to-visible3D21.548s. These are current-path measurements, not a
+matched before/after speed claim. Verified4Scenes/103Captions/42images, real image
+decode/original-size view, PC body edit, external backup, independent touch
+restore/body edit/reload and second output. All43 model/image digest records and
+Project identity match after both outputs; source ZIP hash stays unchanged;
+browser errors/external requests are empty. Screenshots and failed/final logs are
+private in `.artifacts/e2e/conversion-refactor`; no private source fixture ships.
+This is Chromium PC/touch emulation evidence; physical iOS/native-HEIC and actual
+offline cold boot are not inferred from this SW-blocked scenario.
+Final checks PASS on the unchanged reviewed source/test tree:147files/3288passed,
+21existing TODOs; full Vitest948.32s, typecheck, all five builds, Desktop offline
+isolation and HEIC public-path isolation. No automatic test retry or exclusion.
+Owned product preview restored at http://127.0.0.1:4191/; HTTP200 and all15served
+non-map files match the final offline candidate (private `preview.json`).
+Standing g0 push authority applies; stage only this unit and leave the existing
+private165-line evaluation block, design-review draft and source artifacts local.
+Next user-visible performance work should split time-to-records from visible3D
+and profile the76s restore/22s reopen path before further optimization. Reuse the
+accepted operation lifetimes and write/readback/recovery fences; no broader cache
+or verification-timing contract is authorized by this cleanup.
 
 ## Completed boundary —06c bounded restore content inspection
 

@@ -27,6 +27,9 @@ export const frozenV1MaterialRecipe = 'v1-project-scene-migration-recipe-6';
 export const frozenV1OpaqueMaterialRecipe = 'v1-project-scene-migration-recipe-7';
 export const frozenV1StandardMaterialRecipe = 'v1-project-scene-migration-recipe-8';
 export type FrozenV1Recipe = typeof frozenV1StandardMaterialRecipe | typeof frozenV1OpaqueMaterialRecipe | typeof frozenV1MaterialRecipe | typeof frozenV1PlacementRecipe | typeof frozenV1DefaultViewRecipe | typeof frozenV1PhotoRecipe | typeof frozenV1Recipe | typeof frozenV1JpegRecipe;
+type FrozenV1MaterialRecipe = typeof frozenV1MaterialRecipe | typeof frozenV1OpaqueMaterialRecipe | typeof frozenV1StandardMaterialRecipe;
+export const frozenV1RecipeHasMaterials = (recipe: FrozenV1Recipe): recipe is FrozenV1MaterialRecipe =>
+  recipe === frozenV1MaterialRecipe || recipe === frozenV1OpaqueMaterialRecipe || recipe === frozenV1StandardMaterialRecipe;
 export const codeOrder = (a: string, b: string) => a < b ? -1 : a > b ? 1 : 0;
 export const byteProof = async (bytes: Uint8Array) => ({ byteLength: bytes.length, digest: await digest(bytes) });
 const fail = () => fileError('この旧形式ファイルの設定は、まだそのまま変換できません。');
@@ -175,9 +178,11 @@ interface FrozenV1PlanBase {
 }
 interface FrozenV1Report { models: number; scenes: number; captions: number; media: number; originalExcludedFromExports: true;
   sourceOnly: { profiles: number; deletedRecords: number; caches: number; deletedPayloads: number; unlinkedPayloads: number; anchorNormals: number } }
-export type FrozenV1Plan = FrozenV1PlanBase & ({ recipe: typeof frozenV1MaterialRecipe | typeof frozenV1OpaqueMaterialRecipe | typeof frozenV1StandardMaterialRecipe; materials: readonly FrozenV1Material[]; report: FrozenV1Report & FrozenV1MaterialReport } |
+export type FrozenV1Plan = FrozenV1PlanBase & ({ recipe: FrozenV1MaterialRecipe; materials: readonly FrozenV1Material[]; report: FrozenV1Report & FrozenV1MaterialReport } |
   { recipe: typeof frozenV1PlacementRecipe; report: FrozenV1Report & { appliedModelOffsets: number } } |
-  { recipe: Exclude<FrozenV1Recipe, typeof frozenV1PlacementRecipe | typeof frozenV1MaterialRecipe | typeof frozenV1OpaqueMaterialRecipe | typeof frozenV1StandardMaterialRecipe>; report: FrozenV1Report });
+  { recipe: Exclude<FrozenV1Recipe, typeof frozenV1PlacementRecipe | FrozenV1MaterialRecipe>; report: FrozenV1Report });
+export const frozenV1PlanHasMaterials = (plan: FrozenV1Plan): plan is Extract<FrozenV1Plan, { recipe: FrozenV1MaterialRecipe }> =>
+  frozenV1RecipeHasMaterials(plan.recipe);
 
 /** Temporary decoder provenance only; the caller retains each model's original base catalog. */
 async function materialProof(rows: readonly EntityRecord[], models: readonly FrozenV1Body[], sceneIds: ReadonlySet<string>, limits: FileValidationLimits, png?: PngDecoder, jpeg?: JpegDecoder) {

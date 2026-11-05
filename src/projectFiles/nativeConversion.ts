@@ -13,7 +13,7 @@ import { ProjectMetadataSource, type MetadataProof } from '../projectMetadata/so
 import { metadataProviderReady, type MetadataProjectSession } from '../projectMetadata/session';
 import { digest, equalBytes, json, metadataPath, newId, readReceipt, underWriteLease, writeReceipt } from '../projectMetadata/persistence';
 import { readProjectScene } from '../scene/projectProvider';
-import { checkContentFacts } from '../domain/projectContentChecks';
+import { conversionContentVerifier } from './conversionContent';
 import { same } from '../domain/projectGraphSupport';
 import { cloneCanonicalValue, type JsonObject, type JsonValue } from '../domain/values';
 import { mapNativeProject, nativeConversionRecipe, nativeAppearanceRecipe, nativeJpegRecipe, nativeAppearanceJpegRecipe, nativeRecipeHasAppearance, nativePhotoRecipe, nativeAppearancePhotoRecipe, nativeRecipeHasPhoto, nativeRecipeHasOrigin, nativeAppearanceIntent, type NativeConversionRecipe, type NativeMappingEntry, type NativeMaterialWitness, type NativeOccurrence } from './nativeMapping';
@@ -238,24 +238,8 @@ export async function prepareNativeConversion(input: Blob, budget: ProjectFilePo
     const conversionId = newId(), mapped = await mapNativeProject(snapshot, models, conversionId, original.digest, appearance ? sourceWitness : undefined);
     const source = ProjectMetadataSource.bootstrap(mapped.records.schema, mapped.records.identity, metadata, { semanticProfile: 'map2' }).initialize(mapped.records);
     // Full target graph admission with owned, already inspected input. No second decode per content fact.
-    const targetModels = mapped.targetModels;
-    const targetMedia = mapped.records.mediaResourcesById as JsonObject;
-    const provider = await readProjectScene(source.read(), metadata, { scope: 'development-validation', verify: async request => {
-      const response = (outcome: string, facts?: JsonObject) => ({ request, scope: 'development-validation', outcome, ...(facts ? { facts } : {}) });
-      if (request.records.length !== 1) return response('unsupported');
-      const record = request.records[0]!; let facts: JsonObject;
-      if (request.fact === 'media' && same(targetMedia[record.id as string], record)) facts = { mediaKind: 'image', mediaType: (record.blob as JsonObject).mediaType! };
-      else {
-        const known = targetModels.get(record.id as string);
-        if (!known || !same(known.record, record)) return response('unsupported');
-        const model = known.model;
-        if (request.fact === 'representation') facts = { contentKind: 'mesh', staticPose: true, contentBoundsAsset: model.bounds, materials: [...model.materials], surfaceRanges: [...model.surfaceRanges] };
-        else if (request.fact === 'family-envelope') facts = { logicalBoundsAsset: model.bounds, authority: { kind: 'source', representationId: record.id!, payloadDigest: record.payloadDigest! } };
-        else if (request.fact === 'family-contribution') facts = { verifiedMembers: [{ id: record.id!, payloadDigest: record.payloadDigest! }] };
-        else return response('unsupported');
-      }
-      checkContentFacts(request, facts); return response('verified', facts);
-    } }, { verifyRetainedMedia: true });
+    const provider = await readProjectScene(source.read(), metadata,
+      conversionContentVerifier(mapped.targetModels, mapped.records.mediaResourcesById as JsonObject), { verifyRetainedMedia: true });
     if (provider.kind !== 'scene-provider' || !metadataProviderReady(provider, metadata)) return fileError('モデルや記録の対応関係をそのまま変換できません。');
     for (const [id, expected] of mapped.reviewStates) {
       const anchor = provider.resources.captions[id]?.anchor;
