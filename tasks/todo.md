@@ -776,10 +776,27 @@ cases and both final PC/touch rendered cases passed.
 Final freeze `57ed8aa6` passed the Windows checkpoint with147 test files,
 3284 passes,21 existing TODOs, all five builds and offline/HEIC isolation.
 
-The Scene addition product decision is drafted in
-[06d](../docs/specs/06d-scene-append-proposal.md). Decide the initial unit/profile
-boundary and repeated deliberate addition before designing the target-bound
-transaction. Approved same-Project receive remains the available merge path.
+### Current unit —define and verify the 06d Scene append transaction
+
+PO approved the [06d product behavior](../docs/specs/06d-scene-append-proposal.md).
+At fd17c3c, specify and review the exact
+additive batch, source binding and recovery before implementation. Reuse the
+Review reconstruction and prove the destination-frame remap on existing ZIP
+fixtures. Keep the wire unchanged. The current local journal accepts one
+ordinary body (or a portable media pair), so explicitly decide old-local-reader
+behavior before adding a journal kind. Preserve the present Review and update
+routes while that decision is pending.
+
+The independent read-only reviews confirmed the existing mapping and the
+new local journal compatibility boundary. §5 binds the exact ZIP, ID recipe,
+single change, base and all included bodies without retaining a second ZIP.
+An isolated Node probe applied a meter-unit exported material Scene as one
+current-format Automerge change (5840 bytes), preserving the target header,
+existing records and history. A generated Review with Project and asset pins,
+an unplaced pin, entry view, material and media also passed (7772 bytes).
+The phone Review sample declares unknown units and remains a standalone case.
+Four existing Review package tests and three design probes passed. No product
+code or local journal is changed in this checkpoint.
 
 ## Completed boundary —06c bounded restore content inspection
 
