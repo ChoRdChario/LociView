@@ -1,6 +1,7 @@
 import { displayBlobRef } from '../domain/portableMedia';
 import { createGsProxyWorkflow } from './gsProxyWorkflow';
 import { captureEditor } from '../projectMetadata/editorAttribution';
+import { PORTABLE_MEDIA_CAPABILITY } from '../projectMetadata/requiredCapabilities';
 import { assertValidationBodyAllocation } from '../projectFiles/bodyBudget';
 import type { PhotoDecoder } from '../projectFiles/photo';
 import type { MediaDecoders } from '../projectFiles/media';
@@ -103,7 +104,7 @@ export async function openValidationEntry(options: ValidationHostOptions): Promi
   if (options.firstBackup && (options.initial || options.workspaceFile || options.reviewEdit || options.mode === 'view'))
     throw Error('バックアップを一つ選択し、編集で復元してください。');
   const input = options.firstBackup ? { file: options.firstBackup.file.slice(0), archive: { ...options.firstBackup.archive } } : undefined;
-  const archive = input ? await BackupArchive.inspect(input.file, limits) : undefined;
+  const archive = input ? await measureValidation(options.timing, 'restore.first.inspect-input', () => BackupArchive.inspect(input.file, limits)) : undefined;
   const inputName = options.firstBackup && 'name' in options.firstBackup.file && typeof options.firstBackup.file.name === 'string' ? options.firstBackup.file.name.slice(0, 256) : null;
   if (archive && (archive.source.proof.identity.projectId !== `prj_${run}` || archive.archive.sha256 !== input!.archive.sha256 || archive.archive.byteLength !== input!.archive.byteLength))
     throw Error('バックアップと開く場所が一致しません。');
@@ -366,7 +367,7 @@ async function openNormalValidationHost(options: ValidationHostOptions, inherite
     const receiveAction = (action: () => Promise<MetadataSessionRead | void>) => execute(async () => {
       editable(true); receiveFailure = '';
       try {
-        const result = await action(); await reloadReceive();
+        const result = await action(); await reloadReceive(result || undefined);
         if (!result && !last.source) { last = await session.read(); receiveDisplayPending = false; return; }
         receiveDisplayPending = true;
         const project = await ready(result ?? await session.read()); receiveDisplayPending = false; return project;
@@ -457,7 +458,9 @@ async function openNormalValidationHost(options: ValidationHostOptions, inherite
     };
     const workspaceOutput = {
       get privacy() { const sourceIncludesNames = last.source?.includesDeclaredEditorNames ?? false;
-        return { sourceIncludesNames, backupIncludesNames: sourceIncludesNames || outputBases.some(b => b.includesDeclaredEditorNames) }; },
+        const sourceRequiresPortableMediaReader = !!last.source?.requiredCapabilities.includes(PORTABLE_MEDIA_CAPABILITY);
+        return { sourceIncludesNames, backupIncludesNames: sourceIncludesNames || outputBases.some(b => b.includesDeclaredEditorNames),
+          sourceRequiresPortableMediaReader, backupRequiresPortableMediaReader: sourceRequiresPortableMediaReader || outputBases.some(b => b.requiresPortableMediaReader) }; },
       get jobs() { return outputJobs; }, get error() { return outputFailure || outputDiscoveryFailure; },
       get bases() { return outputBases; },
       generate: (token: string) => {
@@ -494,10 +497,10 @@ async function openNormalValidationHost(options: ValidationHostOptions, inherite
       retry: (id: string) => outputAction(() => sender.retry(id), true),
       cancel: (id: string) => outputAction(() => sender.cancel(id), true),
       verifyFile: (id: string, file: Blob) => measure('host.file.verify.total', () => outputAction(() => measure('host.file.verify', () => sender.verifyFile(id, file)), true)),
-      download: (id: string) => measure('host.download', () => execute(() => {
+      download: (id: string, observeArtifact?: (archive: Readonly<EvidenceRef>) => void) => measure('host.download', () => execute(() => {
         if (reviewPending()) throw Error('編集コピーの作成を完了してください。');
         if (connection?.restorePending || restoreRetired || restoreDisplayPending) throw Error('復元を完了してからファイルを渡してください。');
-        return sender.download(id);
+        return sender.download(id, observeArtifact);
       }, true)),
     };
     type PrepareRestoreDisplay = (next: ProjectDisplay, source: typeof content) => Promise<void>;
@@ -513,7 +516,7 @@ async function openNormalValidationHost(options: ValidationHostOptions, inherite
       try {
         last = await session.read(); project = await projectFrom(last);
         if (last.state !== 'ready' || !project) throw Error('復元先の表示を再開してください。');
-        await reloadReceive(); await reloadRestore(); receiveDisplayPending = false; receiveFailure = ''; restoreRetired = false;
+        await reloadReceive(last); await reloadRestore(); receiveDisplayPending = false; receiveFailure = ''; restoreRetired = false;
       } finally {
         previous.service.content.releasePreparedImages(); previous.service.content.releasePreparedModels(); await previous.dispose();
       }
@@ -772,7 +775,7 @@ async function openNormalValidationHost(options: ValidationHostOptions, inherite
     const emptyImport = () => !localInitial && last.state === 'empty' && !outputDiscoveryFailure && !unfinishedReceive() && !unfinishedOutput();
     const host: SavedWorkspaceHost = { authority, limits, read: () => last, hasPending: () => busy || !!connection?.restorePending || restoreRetired || restoreDisplayPending || receiveDisplayPending || unfinishedReceive() ||
       !emptyImport() && (!!failure || last.state !== 'ready'),
-      refresh: () => execute(async () => { await reloadReceive(); last = await session.read(); await projectView(last); return last; }),
+      refresh: () => execute(async () => { last = await session.read(); await reloadReceive(last); await projectView(last); return last; }),
       resolve: async (token, command) => (await commitCommand(token, command)).display,
       dispose: async () => { await dispose(); content.releasePreparedImages(); content.releasePreparedModels(); prepareDisplay = undefined; } };
     ownsLease = true;

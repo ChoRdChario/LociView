@@ -13,6 +13,8 @@ export interface CaptionDetailProps extends DetailContext {
   readonly editorFields?: readonly { label: string; names: readonly (string | null)[] }[];
   /** Host capability boundary, not a failed command or a change to the Caption. */
   readonly windowBlock?: string | null;
+  /** Temporary saved-text presentation; command guards remain unchanged. */
+  readonly textOnly?: boolean;
 }
 let nextDetail = 0;
 
@@ -91,7 +93,7 @@ export function createCaptionDetailControls(document: Document, onEvent: (event:
   });
   const actions = make('div'); actions.className = 'lv-caption-detail-actions';
   actions.setAttribute('data-caption-completion', '');
-  const apply = button('変更を適用'), cancel = button('取り消す'), showWindow = button('比較に表示');
+  const apply = button('変更を適用'), cancel = button('取り消す'), showWindow = button('3D上に表示');
   const windowActions = make('div'); windowActions.className = 'lv-caption-detail-actions';
   windowActions.setAttribute('aria-label', 'キャプションの表示');
   actions.append(apply, cancel); windowActions.append(showWindow); root.append(windowActions, properties, actions);
@@ -134,7 +136,7 @@ export function createCaptionDetailControls(document: Document, onEvent: (event:
     const source = next.source, owned = next.draft?.captionId === nextId ? next.draft : null;
     const empty = source.kind === 'unavailable' && source.captionId === null && !hasCaptionDraft(owned);
     for (const control of fields.values()) control.input.parentElement!.parentElement!.hidden = empty;
-    properties.hidden = empty; mediaSlot.hidden = empty; windowActions.hidden = empty;
+    properties.hidden = empty; mediaSlot.hidden = empty; windowActions.hidden = empty || !!next.textOnly;
     editors.hidden = source.kind !== 'ready' || !next.editorFields;
     editorRows.replaceChildren();
     for (const field of next.editorFields ?? []) for (const [i, name] of field.names.entries()) {
@@ -174,12 +176,12 @@ export function createCaptionDetailControls(document: Document, onEvent: (event:
     const applyIssue = captionApplyIssue(next);
     status.textContent = [next.feedback.kind === 'failed' && `適用できませんでした。${next.feedback.message} 入力は保持しています。`,
       inFlight && '変更を適用中です。', hasCaptionDraft(owned) && !inFlight && '未適用の入力があります。',
-      !inFlight && next.mutationBlock !== '閲覧中です。編集を開始してください。' && next.mutationBlock, source.kind !== 'ready' && (source.reason || 'キャプションを選択してください。'),
+      !inFlight && !next.textOnly && next.mutationBlock !== '閲覧中です。編集を開始してください。' && next.mutationBlock, source.kind !== 'ready' && (source.reason || 'キャプションを選択してください。'),
       hasCaptionDraft(owned) && applyIssue && !inFlight && applyIssue].filter(Boolean).join(' ');
     apply.disabled = applyIssue !== null;
     actions.hidden = !hasCaptionDraft(owned);
     cancel.disabled = !hasCaptionDraft(owned) || Boolean(owned?.composing) || inFlight;
-    windowNote.textContent = next.windowBlock ?? ''; windowNote.hidden = next.windowBlock == null;
+    windowNote.textContent = next.windowBlock ?? ''; windowNote.hidden = !!next.textOnly || next.windowBlock == null;
     showWindow.disabled = source.kind !== 'ready' || next.windowBlock != null;
     const focus = returnFocus;
     if (focus && (source.kind !== 'ready' || source.caption.id !== focus.captionId || source.sceneId !== focus.sceneId || next.feedback.kind === 'failed')) returnFocus = null;

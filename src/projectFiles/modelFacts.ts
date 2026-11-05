@@ -6,7 +6,7 @@ import { same } from '../domain/projectGraphSupport';
 import { recordBlobRefs } from '../domain/portableMedia';
 import type { Anchor } from '../scene/types';
 import { readProjectScene, type ProjectProviderRead } from '../scene/projectProvider';
-import { metadataProviderReady, type MetadataModelFactPort, type MetadataModelFactPlan } from '../projectMetadata/session';
+import { metadataProviderReady, measureMetadata, type MetadataTiming, type MetadataModelFactPort, type MetadataModelFactPlan } from '../projectMetadata/session';
 import type { ProjectMetadataSource } from '../projectMetadata/source';
 import { json } from '../projectMetadata/persistence';
 import type { ContentRequest } from '../domain/projectContentChecks';
@@ -51,7 +51,7 @@ export function assertValidationModelClosures(provider:Extract<ProjectProviderRe
 }
 
 /** Owned new GLB or fresh records reusing exact known bodies. Old evidence is never repaired. */
-export function validationModelFacts(content: ValidationContent): MetadataModelFactPort {
+export function validationModelFacts(content: ValidationContent, timing?: MetadataTiming): MetadataModelFactPort {
   return { assertProvider:provider=>{assertValidationModelClosures(provider);validationDeclaredBodyBytes(provider,content.policy);}, async preparePointAnchor(source, provider, command): Promise<Anchor> {
     if (source.token !== provider.token || command.anchor.kind !== 'asset') return fileError('点の記録対象が更新されています。');
     const anchor = command.anchor, evidence = anchor.hitEvidence, reference = evidence?.source, index = reference?.surfaceRef;
@@ -71,7 +71,7 @@ export function validationModelFacts(content: ValidationContent): MetadataModelF
       authoredAssetRevisionId: projection.revisionId, authoredAnchorCompatibilityId: anchor.authoredAnchorCompatibilityId,
       hitEvidence: { method: 'point-cloud', source: { representationId: record.id as string, surfaceRef: { kind: 'pointSample', nodeIndex: 0, primitiveIndex: 0, pointIndex: index.pointIndex } } } };
   }, planReceived: (base, next, bodyFor, hasIncoming) => validationReceivedFacts(content, base, next, bodyFor, hasIncoming),
-    planRestored: (next, bodyFor, refs) => restoredFacts(content, next, bodyFor, refs),
+    planRestored: (next, bodyFor, refs) => restoredFacts(content, next, bodyFor, refs, timing),
     planImported: (next, bodyFor, hasIncoming) => content.withImportedGsInspection(inspect =>
       receivedFacts(content, null, next, bodyFor, hasIncoming, inspect)), async plan(base, next) {
     const used = new Set<string>(), introduced = new Set<string>(), revisions=new Set<string>(), newRevisions=new Set<string>(); let work = 0;
@@ -139,7 +139,7 @@ export function validationModelFacts(content: ValidationContent): MetadataModelF
 
 /** Also retain bodies needed only by historical exchange bases; never repair an acknowledged CAS entry. */
 async function restoredFacts(content: ValidationContent, next: ProjectMetadataSource, bodyFor: (ref: JsonObject) => Blob,
-  input: readonly JsonObject[]): Promise<MetadataModelFactPlan> {
+  input: readonly JsonObject[], timing?: MetadataTiming): Promise<MetadataModelFactPlan> {
   const refs = cloneCanonicalValue(input, limits) as JsonObject[];
   const sizes = new Map<string, number>(), bodies = new Map<string, { ref: JsonObject; file: Blob }>();
   let total = 0;
@@ -151,22 +151,22 @@ async function restoredFacts(content: ValidationContent, next: ProjectMetadataSo
     if (previous === undefined) { total += size; sizes.set(ref.digest as string, size); }
     if (total > content.policy.projectBodyBytes || bodies.has(key)) return fileError('復元する本体が検証の範囲を超えています。');
     const file = bodyFor(ref); if (!(file instanceof Blob) || file.size !== size) return fileError('復元する本体が不足しています。');
-    await content.assertBodySize(ref,file);
+    await measureMetadata(timing, 'metadata.restore.body-size', () => content.assertBodySize(ref,file));
     bodies.set(key, { ref, file });
   }
   const introduced = new Set<string>();
   for (const [key, body] of bodies) {
-    const state = await content.store.inspect(body.ref);
+    const state = await measureMetadata(timing, 'metadata.restore.body-presence', () => content.store.inspect(body.ref));
     if (state === 'unverified') introduced.add(key);
     else if (state !== 'verified-present') return fileError('記録済みの本体に修復が必要です。');
   }
-  const facts = await receivedFacts(content, null, next, bodyFor, ref => bodies.has(json(ref))), handled = new Set((facts.stagedBlobs ?? []).map(json));
+  const facts = await measureMetadata(timing, 'metadata.restore.inspect-input', () => receivedFacts(content, null, next, bodyFor, ref => bodies.has(json(ref)), undefined, timing)), handled = new Set((facts.stagedBlobs ?? []).map(json));
   if ([...handled].some(key => !bodies.has(key))) return fileError('復元する本体の一覧が一致しません。');
   const completed = new Set<string>();
   return { baseToken: null, finalToken: next.token, stagedBlobs: [...introduced].sort().map(key => bodies.get(key)!.ref), async stage() {
     await facts.stage();
     for (const [key, body] of bodies) {
-      if (introduced.has(key) && !handled.has(key) && !completed.has(key)) { await content.stageReceived(body.file, body.ref); completed.add(key); }
+      if (introduced.has(key) && !handled.has(key) && !completed.has(key)) { await measureMetadata(timing, 'metadata.restore.historical-body-save', () => content.stageReceived(body.file, body.ref)); completed.add(key); }
       else if (await content.store.inspect(body.ref) !== 'verified-present') return fileError('記録済みの本体を確認できません。');
     }
     // Session consumes/verifies the complete inventory again immediately before publication.
@@ -181,7 +181,7 @@ export async function validationReceivedFacts(content: ValidationContent, base: 
 }
 async function receivedFacts(content: ValidationContent, base: ProjectMetadataSource | null, next: ProjectMetadataSource,
   bodyFor: (ref: JsonObject) => Blob, hasIncoming?: (ref: JsonObject) => boolean,
-  inspectImported?: (request: ContentRequest, file: Blob, displayFile?: Blob) => Promise<unknown>): Promise<MetadataModelFactPlan> {
+  inspectImported?: (request: ContentRequest, file: Blob, displayFile?: Blob) => Promise<unknown>, timing?: MetadataTiming): Promise<MetadataModelFactPlan> {
   const oldIds = new Set<string>(), oldDigests = new Map<string, number>(), sizes = new Map<string, number>();
   const inspectionBudget = { maxNodes: limits.maxNodes, maxWork: limits.maxWork };
   const before = base ? await base.inspectOriginal(inspectionBudget) : null, after = await next.inspectOriginal(inspectionBudget);
@@ -261,7 +261,7 @@ async function receivedFacts(content: ValidationContent, base: ProjectMetadataSo
   }
   return { baseToken: base?.token ?? null, finalToken: next.token, stagedBlobs: staged.map(b => b.ref), async stage() {
     for (const [key, body] of bodies) {
-      if (!completedBodies.has(key)) { await content.stageReceived(body.file, body.ref); completedBodies.add(key); }
+      if (!completedBodies.has(key)) { await measureMetadata(timing, 'metadata.models.body-save', () => content.stageReceived(body.file, body.ref)); completedBodies.add(key); }
       else if (await content.store.inspect(body.ref) !== 'verified-present') return fileError('記録済みの本体を確認できません。');
     }
     for (const [key, request] of requests) {
@@ -269,7 +269,7 @@ async function receivedFacts(content: ValidationContent, base: ProjectMetadataSo
       const record=validationGsEquivalenceSource(request) ?? request.records[0]!;
       for (const ref of recordBlobRefs(record)) if (oldDigests.has(ref.digest as string) &&
         await content.store.inspect(ref) !== 'verified-present') return fileError('既存の本体を確認できません。');
-      const result = await content.verifier(!completedFacts.has(key)).verify(request) as { outcome?: string };
+      const result = await measureMetadata(timing, 'metadata.models.fact-save', () => content.verifier(!completedFacts.has(key)).verify(request)) as { outcome?: string };
       if (result.outcome !== 'verified') return fileError('受信した本体の検証情報を記録できません。');
       completedFacts.add(key);
     }

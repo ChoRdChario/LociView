@@ -42,14 +42,18 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
   if (effects.missingModelCaptions || effects.newlyNeedsReviewCaptions) confirmation.append(make('p',
     `対応モデルなし：${effects.missingModelCaptions}件。要確認になるピン：${effects.newlyNeedsReviewCaptions}件。位置が分かるピンは残します。`));
   const confirmCopy = make('button', 'コピーを作成'), cancelCopy = make('button', '戻る'); confirmCopy.type = cancelCopy.type = 'button';
+  let handoffBusy = false, refreshAppend = () => {};
+  const setHandoffBusy = (active: boolean) => {
+    handoffBusy = active; confirmCopy.disabled = cancelCopy.disabled = copy.disabled = active; refreshAppend();
+  };
   confirmation.append(confirmCopy, cancelCopy); header.append(copy); root.append(confirmation);
-  copy.addEventListener('click', () => { if (!disposed && !composing && !moving) confirmation.hidden = false; });
-  cancelCopy.addEventListener('click', () => { confirmation.hidden = true; });
+  copy.addEventListener('click', () => { if (!disposed && !handoffBusy && !copy.disabled && !composing && !moving) confirmation.hidden = false; });
+  cancelCopy.addEventListener('click', () => { if (!handoffBusy && !cancelCopy.disabled) confirmation.hidden = true; });
   confirmCopy.addEventListener('click', () => {
-    if (disposed || composing || moving || confirmation.hidden || confirmCopy.disabled) return;
-    confirmCopy.disabled = cancelCopy.disabled = copy.disabled = true;
+    if (disposed || handoffBusy || composing || moving || confirmation.hidden || confirmCopy.disabled) return;
+    setHandoffBusy(true);
     void Promise.resolve().then(() => editCopy?.()).catch(error => { if (!disposed) { failure = (error as Error).message; paint(); } })
-      .finally(() => { if (!disposed) confirmCopy.disabled = cancelCopy.disabled = copy.disabled = false; });
+      .finally(() => { if (!disposed) setHandoffBusy(false); });
   });
   if (append) {
     const open = make('button', '既存に追加'), panel = make('section'), select = make('select'), label = make('label', '追加先'),
@@ -62,23 +66,30 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
     panel.append(make('h2', view.sceneName), make('p', `モデル ${models}・キャプション ${count('captionsById')}・メディア ${count('mediaResourcesById')}`),
       label, note, confirm, cancel);
     header.append(open); root.insertBefore(panel, content);
-    let revision = 0, pending: (() => Promise<void>) | undefined;
+    let revision = 0, pending: (() => Promise<void>) | undefined, loading = false, hasProjects = false;
+    refreshAppend = () => {
+      open.disabled = handoffBusy || loading; select.disabled = handoffBusy || loading || !hasProjects;
+      confirm.disabled = handoffBusy || !pending; cancel.disabled = handoffBusy;
+    };
+    refreshAppend();
     const selectProject = async () => {
+      if (disposed || handoffBusy || select.disabled) return;
       const current = ++revision, run = select.value;
-      confirm.disabled = true; pending = undefined; note.textContent = '';
+      pending = undefined; note.textContent = ''; refreshAppend();
       if (!run) return;
       note.textContent = '追加先を確認しています。';
       try {
         const checked = await append.inspect(run);
         if (disposed || current !== revision) return;
         note.textContent = checked.reason ? `${checked.reason} 単独で作業するには「編集コピーを作る」を選べます。` : '';
-        if (!checked.reason) { pending = checked.confirm; confirm.disabled = false; }
+        if (!checked.reason) pending = checked.confirm;
       } catch (error) { if (!disposed && current === revision) note.textContent = (error as Error).message; }
+      finally { if (!disposed && current === revision) refreshAppend(); }
     };
     open.addEventListener('click', () => {
-      if (disposed || composing || moving || open.disabled) return;
+      if (disposed || handoffBusy || composing || moving || open.disabled) return;
       const current = ++revision;
-      confirmation.hidden = true; panel.hidden = false; select.disabled = open.disabled = confirm.disabled = true; pending = undefined;
+      confirmation.hidden = true; panel.hidden = false; loading = true; hasProjects = false; pending = undefined; refreshAppend();
       select.replaceChildren(); note.textContent = 'プロジェクトを確認しています。';
       void append.projects().then(projects => {
         if (disposed || current !== revision) return;
@@ -89,25 +100,25 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
           const title = names.get(project.title) === 1 ? project.title : `${project.title}（${project.run.slice(-8)}）`;
           const option = make('option', title); option.value = project.run; select.append(option);
         }
-        select.disabled = !projects.length;
+        hasProjects = !!projects.length; loading = false; refreshAppend();
         note.textContent = projects.length ? '' : '追加できるプロジェクトがありません。';
-        if (projects.length) select.focus();
+        if (projects.length && !handoffBusy) select.focus();
       }).catch(error => { if (!disposed && current === revision) note.textContent = (error as Error).message; })
-        .finally(() => { if (!disposed && current === revision) open.disabled = false; });
+        .finally(() => { if (!disposed && current === revision) { loading = false; refreshAppend(); } });
     });
     select.addEventListener('change', () => { void selectProject(); });
-    cancel.addEventListener('click', () => { revision++; panel.hidden = true; open.disabled = false; open.focus(); });
-    copy.addEventListener('click', () => { if (!copy.disabled) { revision++; panel.hidden = true; open.disabled = false; } });
+    cancel.addEventListener('click', () => { if(handoffBusy || cancel.disabled)return; revision++; loading = false; pending = undefined; panel.hidden = true; refreshAppend(); open.focus(); });
+    copy.addEventListener('click', () => { if (!copy.disabled && !handoffBusy) { revision++; loading = false; pending = undefined; panel.hidden = true; refreshAppend(); } });
     confirm.addEventListener('click', () => {
-      if (!pending || confirm.disabled || disposed || composing || moving) return;
+      if (!pending || handoffBusy || confirm.disabled || disposed || composing || moving) return;
       const apply = pending;
-      confirm.disabled = cancel.disabled = select.disabled = copy.disabled = open.disabled = true;
+      setHandoffBusy(true);
       content.inert = true;
       note.textContent = 'シーンを追加しています。';
       void apply().catch(error => { if (!disposed) note.textContent = (error as Error).message; }).finally(() => {
         if (disposed) return;
         // A stale preview cannot be used again. Re-selecting refreshes it.
-        pending = undefined; select.value = ''; cancel.disabled = select.disabled = copy.disabled = open.disabled = false;
+        pending = undefined; select.value = ''; setHandoffBusy(false);
         content.inert = false;
       });
     });

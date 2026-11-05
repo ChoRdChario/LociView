@@ -714,6 +714,93 @@ only when its authority code/report/receipt output remain exact; no duplicate
 large file roundtrip is needed solely for this presentation addition.
 
 
+### Integrated PC/phone quality refinement —PO-approved2026-11-05
+
+Implementation/check evidence is in todo; the following is the approved design,
+not a rendered/device acceptance claim. Preserve all existing command, draft,
+IME, output disclosure and recovery boundaries.
+
+On a compact workspace, selecting Drawing in the work panel keeps the existing
+single3D stage above the existing Drawing controls. Derive this presentation from
+the current task/surface; do not add persisted mode or second renderer. Both the
+CSS visibility and viewport demand use this same condition. Full3D navigation
+remains available. Use bounded rows without summing fixed minimum heights;
+controls scroll inside their existing content and Apply/Cancel stay reachable.
+Mobile numeric/color text inputs use the existing keyboard/IME handling and16px
+text. A real covered viewport may prioritize input/completion over the preview;
+closing the keyboard restores the same task/values/camera, without losing drafts.
+In a short preview, keep direct orbit but leave the camera toolkit to the existing
+full3D view rather than clipping focusable controls. Very narrow headers wrap
+whole existing actions, never individual Japanese characters; no new menu.
+While a material draft is active, hide the already-disabled setting-removal
+action; Apply/Cancel own completion. After either operation, an existing saved
+override still exposes the ordinary removal action.
+
+Use `3D` and `3D上に表示` for the existing stage and record-window actions. Keep
+the visible/accessibility label `検索`; its placeholder and empty-result message
+state that the scope is the current Scene. Pan uses the existing glyph/44px target
+with a contrasting outline on both light and dark backgrounds. No search or
+window-opening behavior changes during ordinary use.
+
+Portable-media output requirements are disclosed before generation when they
+can be calculated from the checked source, retained backup bases, selected
+contribution base or the checked Review preview. These values are display-only.
+Compare the captured disclosure against the completed fixed output job; any
+new/changed or unknown requirement keeps the existing history/reconfirmation
+path. Do not infer requirements only from currently visible media or strip
+capability/privacy warnings. Download initiation is not external-file completion.
+
+Repeated file handoff resources have explicit workspace ownership. Never revoke
+a URL before the browser can acquire its file. An unchanged saved output can be
+downloaded again through its existing verified job; display resources do not
+become storage or integrity evidence. Browser evidence must qualify any lifetime
+change, including delayed save and a repeated download.
+For this pass, reuse a URL only for the same workspace, job and freshly verified
+artifact SHA-256/length. Every handoff still validates the saved output. Return
+that optional read-only archive reference alongside the existing download call;
+do not rehash in UI, revoke at an invented timeout or reuse it after a failed read.
+Workspace disposal releases each owned URL once. New distinct output jobs can
+still retain distinct URLs; this is not a general total-memory bound.
+
+While generating an output, the same mounted workspace may keep saved Caption
+text readable. Capture the existing provider token only after the normal output
+guards pass; clear it on completion/failure/disposal. The display-only token must
+still equal the mounted provider. Receive, restore, verification, selection and
+incomplete operations grant no such exception. Keep all Session, file-action,
+Project/Scene switching and mutation guards unchanged.
+Allow closing/reopening the existing File sheet, saved-list search/scroll/record
+selection and previous/next navigation, plus returning to that Caption panel.
+Show read-only content and the ongoing output status outside the closed sheet;
+do not open new3D windows, initiate new commands or steal the reader's focus when
+generation/download completes. This is UI permission on the existing checked
+display projection, not concurrent editing or a background Session service.
+Use the existing local dismissal rule for unretained automatic windows when
+reading another saved Caption; explicitly retained windows stay retained. Defer
+new attachment preparation and show its temporary waiting explanation. Progress
+tracks the output operation even when token mismatch withdraws read permission.
+Reopening File consumes a seen terminal notice, so a later successful handoff
+cannot restore an older failure outside the sheet.
+
+Review file handoffs share one UI owner: while making an editable copy, disable
+both the copy actions and the existing append-to-Project entry/confirmation.
+While append confirmation is executing, the copy entry stays blocked. Explicitly
+choosing copy may cancel an unfinished read-only append preview; its stale result
+cannot re-enable either handoff or replace the new choice.
+Async preview or completion must not re-enable the sibling handoff prematurely.
+Retain ordinary reading, failure recovery and input cancellation; keep the
+existing package/Session guards as the storage authority.
+Default whole-Project sharing states that the recipient can edit and return it,
+beside the existing Scene-only return restriction. Avoid sending a view-only
+Scene when collaborative editing is the intent; do not create another file type
+or change any package behavior to explain this distinction.
+
+Pending recovery controls use the same native busy boundary as their existing
+execute guard. Register each newly mounted recovery button/input immediately,
+derive its disabled state from busy plus file/owner/readonly requirements, and
+discard registrations when that recovery surface is replaced. A visible recovery
+action must not silently ignore activation while its opening operation finishes.
+Do not queue/replay activation or relax the storage/recovery checks.
+
 ### Home Project action readiness —2026-11-02
 
 Keep the existing list inert and execute fence, and make each current Project-row

@@ -32,10 +32,11 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
   const fileContent = document.createElement('div'); fileContent.setAttribute('role', 'tabpanel'); fileContent.id = `lv-file-content-${crypto.randomUUID()}`;
   const fileCloseNote=document.createElement('p');fileCloseNote.textContent='入力・確認を完了するか、取り消してください。';
   fileClose.type = 'button'; fileClose.textContent = '閉じる'; fileNotice.setAttribute('role', 'status');
+  fileNotice.className = 'lv-operation-status';
   if(fileMenu){fileMenu.className='lv-project-files';const summary=document.createElement('summary');fileSummary=summary;summary.textContent='ファイル';
     fileContent.append(tools!.root); filePanel.append(fileHeader,fileCloseNote,fileContent); fileMenu.append(summary,filePanel);
     if (navigation?.fileActionsRoot) filePanel.append(navigation.fileActionsRoot);
-    summary.addEventListener('click', event => { if(fileMenu.open && tools!.hasChanges()) event.preventDefault();
+    summary.addEventListener('click', event => { if(fileMenu.open && tools!.hasChanges() && !readingOutput()) event.preventDefault();
       else if(!fileMenu.open) { fileOrigin=summary;core?.dismissDisclosures(); } });
   }
   let fileOrigin: HTMLElement | undefined;
@@ -46,7 +47,7 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
     filePanel.style.top=`${top}px`;filePanel.style.maxHeight=`${Math.max(120,win.innerHeight-top-12)}px`;
   };
   document.defaultView?.addEventListener('resize',positionFiles);
-  const closeFiles = () => { if (!fileMenu || tools!.hasChanges()) return; fileMenu.open = false;
+  const closeFiles = () => { if (!fileMenu || tools!.hasChanges() && !readingOutput()) return; fileMenu.open = false;
     (fileOrigin?.getClientRects?.().length && !(fileOrigin as HTMLButtonElement).disabled ? fileOrigin : fileSummary)?.focus?.({preventScroll:true}); };
   fileClose.addEventListener('click', closeFiles);
   filePanel.addEventListener('keydown', event => { if(event.key==='Escape' && !event.isComposing && !event.defaultPrevented){event.preventDefault();event.stopPropagation();closeFiles();} });
@@ -77,6 +78,12 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
   let startup: ReturnType<typeof createMetadataStartupControls> | undefined;
   const read = () => { const p = host.read().provider; if (p?.kind !== 'scene-provider') throw Error('プロジェクトの内容を確認してください。'); return p; };
   const external = () => switching || !!tools?.hasChanges();
+  const readingOutput = () => {
+    if (disposed || !core || switching || startup?.hasChanges() || navigation?.presentation?.()) return null;
+    const output = tools?.readingOutput();
+    return output && output.token === read().token ? output : null;
+  };
+  let outputNotice = '', wasReadingOutput = false;
   const changed = () => {
     if (disposed) return;
     root.setAttribute('data-lv-mode', host.mode!.current);
@@ -92,9 +99,14 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
       if(needsFiles||host.hasPending())fileMenu.open=true;
     }
     if(fileMenu && host.mode!.current==='view' && tools!.currentSurface()!=='save' && !tools!.hasChanges())tools!.showSurface('save');
-    fileNotice.textContent=needsFiles?['未完了のファイル操作があります。',host.mode!.current==='view'?'編集を開始して「ファイル」から再開してください。':'「ファイル」から再開できます。',host.workspaceOutput.error,host.workspaceFiles.error,host.workspaceFiles.reviewCopyError,host.backupRestore.error].filter(Boolean).join(' '):''; fileNotice.hidden=!needsFiles;
-    fileClose.disabled=!!tools?.hasChanges();
-    fileCloseNote.textContent=tools?.closeReason() ?? ''; fileCloseNote.hidden=!fileCloseNote.textContent;
+    const output = readingOutput(), outputOperation = tools?.readingOutput();
+    if (outputOperation) outputNotice = outputOperation.message;
+    else if (wasReadingOutput) outputNotice = tools?.outputFeedback() ?? '';
+    wasReadingOutput = !!outputOperation;
+    fileNotice.textContent=outputOperation ? outputOperation.message : needsFiles?['未完了のファイル操作があります。',host.mode!.current==='view'?'編集を開始して「ファイル」から再開してください。':'「ファイル」から再開できます。',host.workspaceOutput.error,host.workspaceFiles.error,host.workspaceFiles.reviewCopyError,host.backupRestore.error].filter(Boolean).join(' '):outputNotice;
+    fileNotice.hidden=!fileNotice.textContent || !!fileMenu?.open; fileNotice.dataset.busy=String(!!outputOperation);
+    fileClose.disabled=!!tools?.hasChanges() && !output;
+    fileCloseNote.textContent=output ? '作成中も記録を読めます。' : tools?.closeReason() ?? ''; fileCloseNote.hidden=!fileCloseNote.textContent;
     restoreEntry.hidden=!host.backupRestore.enabled;
     const selectedSurface=tools?.currentSurface(); fileNavigation.hidden=host.mode!.current==='view';
     for(const b of [saveEntry,shareEntry,...fileTabs.values()])b.disabled=switching||!!navigation?.presentation?.()||!!core?.inputPending()||!!tools?.hasChanges()||!!startup?.hasChanges();
@@ -111,6 +123,7 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
     positionFiles();
   };
   const retryStartup = document.createElement('button'); retryStartup.type = 'button'; retryStartup.textContent = '更新を再試行';
+  fileMenu?.addEventListener('toggle', () => { if(fileMenu.open && !tools?.readingOutput())outputNotice=''; changed(); });
   retryStartup.setAttribute('data-lv-edit-only', '');
   retryStartup.addEventListener('click', () => { if (!retryStartup.disabled && !disposed) startup?.retry(); });
   root.append(mode, status, retryStartup, fileNotice); if (tools) root.append(fileMenu??tools.root);
@@ -158,7 +171,7 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
     imageScope: () => host.imageScope(),
     rasterResources: host.content.rasterResources,
     imageDimensions:(bytes,mime)=>host.content.displayDimensions(bytes,mime),
-    changed, otherPending: () => external() || !!startup?.hasChanges(),
+    changed, otherPending: () => external() || !!startup?.hasChanges(), readDuringOutput: () => !!readingOutput(),
     createViewport(canvas, update, propose, proposeModel): WorkspaceViewport {
       let state: WorkspaceViewportState | undefined, closed = false, rendered: EditableDisplay | undefined, pointerHeld = false;
       let renderedInput = '';

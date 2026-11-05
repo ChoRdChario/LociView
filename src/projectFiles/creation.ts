@@ -85,9 +85,10 @@ export async function writeValidationInitial(fs: ProjectWorkspaceFS, source: Pro
     return fileError('初期記録の保存を確認できません。');
 }
 export function validationProjectService(fs: ProjectWorkspaceFS, storage: MetadataStorageFactory, store: OriginBlobStore,
-  limits: ProjectFilePolicyInput, decode?: PngDecoder, checkContentRead?: () => Promise<void>, jpeg?: JpegDecoder, photo?: PhotoDecoder, mediaDecoders?:MediaDecoders) {
+  limits: ProjectFilePolicyInput, decode?: PngDecoder, checkContentRead?: () => Promise<void>, jpeg?: JpegDecoder, photo?: PhotoDecoder, mediaDecoders?:MediaDecoders,
+  timing?: import('../projectMetadata/session').MetadataTiming) {
   const content = new ValidationContent(fs, store, limits, decode, checkContentRead, jpeg, photo,mediaDecoders);
-  return { content, session: new MetadataProjectSession(fs, storage, metadataLimits, allow => content.verifier(allow), content, validationModelFacts(content)) };
+  return { content, session: new MetadataProjectSession(fs, storage, metadataLimits, allow => content.verifier(allow), content, validationModelFacts(content, timing), timing) };
 }
 /** Capture once; repeated execution uses identical source/IDs/bytes after a failed attempt. */
 export function prepareValidationCreation(input: PreparedValidationProject<ValidationBody>, semanticProfile: 'map1' | 'map2' = 'map1') {

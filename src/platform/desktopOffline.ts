@@ -56,9 +56,13 @@ export function createDesktopOffline(base: string, build: string, browser: Windo
     removed=false;publish({...state,registered:true});
     watch(reg);
     const waitingWorker=reg.waiting,activeWorker=reg.active,controller=sw.controller;
-    const waiting = waitingWorker ? await report(waitingWorker) : undefined;
-    const active = activeWorker ? await report(activeWorker) : undefined;
-    const controlled = controller ? await report(controller) : undefined;
+    // One observation, one full integrity report per actual worker. Roles may
+    // refer to the same object; no result survives this inspection or a repair.
+    const reports = new Map<ServiceWorker, Promise<DesktopOfflineReport>>();
+    const once = (worker: ServiceWorker) => { let value = reports.get(worker); if (!value) { value = report(worker); reports.set(worker, value); } return value; };
+    const waiting = waitingWorker ? await once(waitingWorker) : undefined;
+    const active = activeWorker ? await once(activeWorker) : undefined;
+    const controlled = controller ? await once(controller) : undefined;
     const current=await registrations();
     if (disposed || ticket !== generation) return;
     if(!current||current.waiting!==waitingWorker||current.active!==activeWorker||sw.controller!==controller)throw Error('アプリの準備状態が変わりました。もう一度確認してください。');

@@ -131,10 +131,13 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   let reviewEditAttempt:PreparedReviewEdit|undefined;
   let reviewWorkspace: ReturnType<typeof createReviewWorkspace> | undefined;
   let firstRecovery: FirstBackupRecovery | undefined;
-  const firstRecoveryButtons = new Set<HTMLButtonElement>();
+  const recoveryControls = new Map<HTMLButtonElement | HTMLInputElement, () => boolean>();
   let receiveTools: ReturnType<typeof createValidationReceiveControls> | undefined;
   let resident: Awaited<ReturnType<ValidationWorkspacePorts['render']>> | undefined;
   let busy = false, disposed = false, composing = false, selected: string | null = null, operation: Promise<void> | undefined;
+  function registerRecoveryControl<T extends HTMLButtonElement | HTMLInputElement>(control: T, blocked: () => boolean = () => false): T {
+    recoveryControls.set(control, blocked); control.disabled = busy || blocked(); return control;
+  }
   let conversion: Awaited<ReturnType<typeof prepareNativeConversion>> | Awaited<ReturnType<typeof prepareFrozenV1Conversion>> = null;
   let lociPreview: Awaited<ReturnType<typeof prepareLociMyuConversion>> = null;
   let lociEvaluation: Awaited<ReturnType<NonNullable<Awaited<ReturnType<typeof prepareLociMyuConversion>>>['evaluate']>> | null = null;
@@ -167,7 +170,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     if(offline&&homeSettings){if(offline.root.parentElement===homeSettings.body){if(!homeSettings.root.parentElement)root.insertBefore(homeSettings.root,navigation);}
       else{homeSettings.root.open=false;homeSettings.root.remove();}}
     status.setAttribute('data-busy',String(busy)); status.setAttribute('aria-busy',String(busy));
-    for (const button of firstRecoveryButtons) button.disabled = busy;
+    for (const [control, blocked] of recoveryControls) control.disabled = busy || blocked();
     workspaceInput.disabled = title.disabled = busy || !!creationAttempt;
     cancelSelection.disabled = busy && !nativeSelectionChecking || composing || !!creationAttempt;
     cancelSelection.hidden = !selectionPending || !conversionPanel.hidden || !!pendingUpdate || !!firstRecovery;
@@ -202,7 +205,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     clearResumeReading();
     const oldWorkspace=workspace,oldHost=host,oldResident=resident,oldReview=reviewWorkspace,oldAttempt=reviewEditAttempt,oldTools=receiveTools,oldRecovery=firstRecovery;
     mounted=false;presentation=null;presentationState=()=>presentation;resumedLast=false;confirmingResume=false;workspace=undefined;host=undefined;resident=undefined;reviewWorkspace=undefined;reviewEditAttempt=undefined;receiveTools=undefined;firstRecovery=undefined;
-    showColdReport(false);coldReportStatus.textContent='';if(reportUrl)URL.revokeObjectURL(reportUrl);reportUrl=undefined;firstRecoveryButtons.clear();
+    showColdReport(false);coldReportStatus.textContent='';if(reportUrl)URL.revokeObjectURL(reportUrl);reportUrl=undefined;recoveryControls.clear();
     const errors:unknown[]=[],attempt=async(action:()=>unknown)=>{try{await action();return true;}catch(error){errors.push(error);return false;}};
     await attempt(()=>oldReview?.dispose());await attempt(()=>oldAttempt?.releaseScratch());
     const workspaceClosed=await attempt(()=>oldWorkspace?.dispose());if(!oldWorkspace||!workspaceClosed)await attempt(()=>oldHost?.dispose());
@@ -266,13 +269,14 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     if (composition) await untilOpen(composition);
     if (!host || disposed) { prepared?.dispose(); return; }
     const initialReading = resumeReading?.selection(); clearResumeReading();
-    content.replaceChildren();
+    recoveryControls.clear(); content.replaceChildren();
     if (host.read().state !== 'ready' || host.hasPending() && !(host.backupRestore.needsDisplay && !host.backupRestore.pending)) {
       prepared?.dispose();
       const note = document.createElement('p'), retry = document.createElement('button');
       note.textContent = host.authority.status?.().error || '更新が未完了です。元の変更から再試行してください。';
-      retry.type = 'button'; retry.textContent = '更新を再試行'; retry.disabled = !!host.authority.readOnly;
-      retry.addEventListener('click', () => execute(async () => { await host!.authority.retry!(); await mount(); }));
+      const owner = host;
+      retry.type = 'button'; retry.textContent = '更新を再試行'; registerRecoveryControl(retry, () => host !== owner || !!owner.authority.readOnly);
+      retry.addEventListener('click', () => { if (!retry.disabled) execute(async () => { if(host!==owner)return; await owner.authority.retry!(); await mount(); }); });
       content.append(note, retry); if (receiveTools) { receiveTools.render(); content.append(receiveTools.root); }
       retry.hidden = host.mode?.current === 'view' || host.workspaceFiles.initialImport && host.read().state === 'empty' ||
         !!host.workspaceFiles.reviewCopyError || host.workspaceFiles.reviewCopies.some(j => !['completed', 'abandoned'].includes(j.state)) ||
@@ -284,10 +288,11 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
         for (const job of host.sceneAppend.jobs) {
           if (job.state === 'repair-required') { note.textContent = 'シーン追加の再開用データに修復が必要です。'; continue; }
           if (target.authority.readOnly) continue;
-          const input = document.createElement('input');
-          const button = (text: string, action: () => Promise<void>) => {
+          const input = registerRecoveryControl(document.createElement('input'), () => host !== target);
+          const button = (text: string, action: () => Promise<void>, blocked: () => boolean = () => false) => {
             const control = document.createElement('button'); control.type = 'button'; control.textContent = text;
-            control.addEventListener('click', () => { void execute(async () => { if (host === target) await action(); }); });
+            registerRecoveryControl(control, () => host !== target || blocked());
+            control.addEventListener('click', () => { if (!control.disabled) void execute(async () => { if (host === target) await action(); }); });
             content.append(control); return control;
           };
           if (job.state === 'input-required') {
@@ -298,8 +303,8 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
             const resume = button('シーン追加を再開', async () => {
               const id = await target.sceneAppend.retry(job.id, input.files?.[0]);
               await mount(undefined, id);
-            });
-            if (job.state === 'input-required') { resume.disabled = true; input.addEventListener('change', () => { resume.disabled = !input.files?.length; }); }
+            }, () => job.state === 'input-required' && !input.files?.length);
+            if (job.state === 'input-required') input.addEventListener('change', controls);
           }
           if (job.cancellable) button('シーン追加を取りやめる', async () => { await target.sceneAppend.cancel(job.id); await mount(); });
         }
@@ -309,18 +314,21 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
         if (disposed || host !== recoveryHost) return;
         const label = document.createElement('label'), input = document.createElement('input'), resume = document.createElement('button');
         label.textContent = '変換元のファイル'; input.type = 'file'; input.accept = '.zip'; input.setAttribute('aria-label','変換元のファイル'); label.append(input);
-        resume.type = 'button'; resume.textContent = '変換を再開'; resume.disabled = true;
-        input.addEventListener('change', () => {resume.disabled = !input.files?.length;});
-        resume.addEventListener('click', () => execute(async () => {const file = input.files?.[0]; if (!file || host !== recoveryHost) return; await recovery.reselect(file); await mount();}));
+        resume.type = 'button'; resume.textContent = '変換を再開';
+        registerRecoveryControl(input, () => host !== recoveryHost); registerRecoveryControl(resume, () => host !== recoveryHost || !input.files?.length);
+        input.addEventListener('change', controls);
+        resume.addEventListener('click', () => { if(!resume.disabled)execute(async () => {const file = input.files?.[0]; if (!file || host !== recoveryHost) return; await recovery.reselect(file); await mount();}); });
         note.textContent = '変換元の保存が完了していません。同じファイルを選択すると、途中から再開できます。'; retry.hidden = true; content.append(label,resume);
       }
       if (host.mode?.current === 'view') {
         const edit = document.createElement('button'); edit.type = 'button'; edit.textContent = '編集する';
-        edit.addEventListener('click', () => execute(async () => {
+        registerRecoveryControl(edit, () => host !== recoveryHost);
+        edit.addEventListener('click', () => { if(!edit.disabled)execute(async () => {
           await host!.mode!.change('edit', host!.read().source?.token, () => {}); await mount();
-        }));
+        }); });
         note.textContent = `更新が未完了です。編集を開始して復旧してください。${host.mode.detail}`; content.append(edit);
       }
+      if(host.sceneAppend.jobs.length || host.sceneAppend.error)status.textContent='';
       return;
     }
     // File recovery must remain available even if renderer preparation fails or stalls.
@@ -441,7 +449,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   };
   const renderFirstRecovery = () => {
     const target = firstRecovery; if (!target || disposed) return;
-    firstRecoveryButtons.clear();
+    recoveryControls.clear();
     const state = target.state(), panel = document.createElement('section'), note = document.createElement('p'), commands = document.createElement('div');
     note.textContent = state.error || (state.phase === 'preview' ? state.replacing
       ? 'バックアップの時点に切り替えます。現在の作業と元ファイルは残ります。' : 'このプロジェクトの再開用データはありません。バックアップから元のプロジェクトを復元します。元ファイルは変更しません。'
@@ -449,7 +457,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
         ? '復元はまだ始まっていません。「復元を取りやめる」で一覧に戻り、元のバックアップを選び直してください。' : 'バックアップの初回復元が未完了です。記録を使って再開するか、取りやめてください。');
     const summary = document.createElement('p'); summary.textContent = `${state.title}${state.fileName ? ` — ${state.fileName}` : ''}${state.memo ? ` — ${state.memo}` : ''}`;
     const button = (label: string, action: () => Promise<void>) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = label;
-      firstRecoveryButtons.add(b); b.addEventListener('click', () => { if (!b.disabled) execute(action); }); commands.append(b); };
+      registerRecoveryControl(b); b.addEventListener('click', () => { if (!b.disabled) execute(action); }); commands.append(b); };
     const leave = async (cancel: boolean) => { if (cancel) await (state.phase === 'beforeStart' ? target.abandon() : target.cancel());
       await closeCurrent(); clearSelection(); selected = null; ports.selected(null); navigation.hidden = false; await updateList(); status.textContent = ''; };
     if (target.readOnly) button('編集する', async () => {

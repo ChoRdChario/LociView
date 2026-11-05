@@ -182,6 +182,8 @@ export interface ProjectWorkspacePorts {
     proposeModel?: (proposal: WorkspaceModelProposal) => boolean): WorkspaceViewport;
   changed(): void;
   otherPending(): boolean;
+  /** Same mounted output owner/token only. Saved Caption reading, never mutation authority. */
+  readDuringOutput?(): boolean;
 }
 export const surfaceAnchor = (proposal: WorkspacePinProposal): Anchor => ({ kind: 'asset',
   assetId: proposal.target.assetId, assetFrameId: proposal.target.assetFrameId, positionAsset: proposal.position,

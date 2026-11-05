@@ -15,7 +15,7 @@ export async function revealWorkPanel(page:Page){
 export async function revealCameraPositions(page:Page){
   const camera=page.locator('.lv-camera-positions');
   if(await camera.count()){
-    const stage=page.getByRole('button',{name:'3D・比較',exact:true});if(await stage.isVisible()&&await stage.getAttribute('aria-pressed')!=='true')await stage.click();
+    const stage=page.getByRole('button',{name:'3D',exact:true});if(await stage.isVisible()&&await stage.getAttribute('aria-pressed')!=='true')await stage.click();
     if(!await camera.evaluate(n=>(n as HTMLDetailsElement).open))await camera.locator(':scope > summary').click();
   }else await page.getByRole('tab',{name:'保存した視点',exact:true}).click();
 }

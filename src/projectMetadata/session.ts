@@ -36,6 +36,7 @@ import { selectCleanRecords } from '../projectPackage/cleanRecords';
 import { ReviewOutputJob } from '../projectPackage/reviewOutputJob';
 import { ReviewSourceCapture } from '../projectPackage/reviewSource';
 import { prepareReviewSnapshot, type ReviewSelectionOptions } from '../projectPackage/reviewSelection';
+import { reviewCapabilities } from '../projectPackage/reviewSnapshot';
 import { ContributionSourceCapture, VerifiedContributionBase, type ContributionBaseSelection } from '../projectPackage/contributionSource';
 import { outputJobKeys, outputJobClass, openOutputJob, outputTerminal, validateOutputProtection } from '../projectPackage/outputJobs';
 import { WorkspaceBaseStore } from '../projectPackage/workspaceBases';
@@ -76,6 +77,14 @@ export type MetadataSessionRead = Readonly<{
 }>;
 /** Synchronous presentation observation; never grants output/recovery authority. */
 export type BackupPresentationObserver = (read: MetadataSessionRead) => void;
+
+/** Local elapsed-time diagnostics only; no source values, evidence or authority. */
+export type MetadataTiming = (stage: string, milliseconds: number) => void;
+export function measureMetadata<T>(timing: MetadataTiming | undefined, stage: string, action: () => Promise<T>): Promise<T> {
+  if (!timing) return action();
+  const started = performance.now();
+  return action().finally(() => { try { timing(stage, performance.now() - started); } catch { /* Observers cannot change the result. */ } });
+}
 
 function weakContent(provider: Extract<ProjectProviderRead, { kind: 'scene-provider' }>, limits: MetadataLimits) {
   const candidates = provider.inspection.candidates, active = new Set(candidates.knownActiveRoots), queue = [...active];
@@ -141,10 +150,12 @@ export class MetadataProjectSession {
   constructor(private readonly fs: ProjectWorkspaceFS, private readonly storage: MetadataStorageFactory, limits: MetadataLimits,
     /** Owned verifier, fresh durable inventory/evidence per request. Boolean permits initial fact creation only. */
     private readonly verifier: (allowNewEvidence: boolean) => ProjectContentVerifier,
-    private readonly media?: MetadataMediaPort, private readonly modelFacts?: MetadataModelFactPort) {
+    private readonly media?: MetadataMediaPort, private readonly modelFacts?: MetadataModelFactPort, private readonly timing?: MetadataTiming) {
     this.limits = checkLimits(limits); this.repository = new MetadataRepository(fs, storage, this.limits);
     this.journal = new TransactionJournal(fs, this.limits);
   }
+
+  private measure<T>(stage: string, action: () => Promise<T>): Promise<T> { return measureMetadata(this.timing, `metadata.${stage}`, action); }
 
   async read(): Promise<MetadataSessionRead> {
     try {
@@ -644,7 +655,8 @@ export class MetadataProjectSession {
     const count = (name: string) => Object.keys(review.snapshot[name] as JsonObject).length;
     return { token: expectedToken, sceneId: selection.sceneId, name: (review.snapshot.scene as JsonObject).name as string,
       models: Object.values(review.snapshot.assetsById as JsonObject).filter(a => (a as JsonObject).kind === 'visual').length,
-      captions: count('captionsById'), media: count('mediaResourcesById'), ...review.editEffect, omittedEntryView };
+      captions: count('captionsById'), media: count('mediaResourcesById'), ...review.editEffect, omittedEntryView,
+      ...(reviewCapabilities(review).includes(PORTABLE_MEDIA_CAPABILITY) ? { requiresPortableMediaReader: true } : {}) };
   }
   async createReviewOutput(expectedToken: string, selection: ReviewSelectionOptions, store: OriginBlobStore, version: string, signal?: AbortSignal) {
     const owned = structuredClone(selection);
@@ -722,13 +734,13 @@ export class MetadataProjectSession {
     await job.assertStaging(this.fs, this.storage);
     return underWriteLease(this.fs, async () => {
       if (!this.modelFacts?.planRestored || !this.media) return fail('backup-restore-unconnected');
-      const { inspection, input } = await job.initialization(this.fs, this.storage), source = inspection.source;
+      const { inspection, input } = await this.measure('restore.input', () => job.initialization(this.fs, this.storage)), source = inspection.source;
       const inventory = inspection.description.bodyRefs.map(r => ({ ...r }));
-      const entries = await this.journal.entries(), own = entries.find(e => e.start.transactionId === job.id);
+      const entries = await this.measure('restore.journal', () => this.journal.entries()), own = entries.find(e => e.start.transactionId === job.id);
       if (own && (own.start.purpose !== 'restoreBackup' || json(own.start.proof) !== json(source.proof)) ||
         entries.length && !own || this.retained && this.retained.start.transactionId !== job.id) return fail('restore-not-empty');
       if (!own && (await this.fs.list(metadataPath(this.fs, ''))).length) return fail('restore-not-empty');
-      await this.repository.assertImportNamespace(own?.start.repositoryId);
+      await this.measure('restore.namespace', () => this.repository.assertImportNamespace(own?.start.repositoryId));
       if (own?.prepared && json(own.prepared.remote) !== json(input.proof)) return fail('restore-journal-originals');
       if (own?.publication) {
         await this.journal.validateRestore(own.prepared!); await this.media.verify(inventory, inspection.description.mediaRecords);
@@ -739,14 +751,14 @@ export class MetadataProjectSession {
       }
       if (entries.some(e => e !== own)) return fail('restore-other-transaction');
       if (!own?.prepared) {
-        const facts = await this.modelFacts.planRestored(source, ref => inspection.archive.entryBlob(`blobs/sha256/${ref.digest}`), inventory);
+        const facts = await this.measure('restore.model-plan', () => this.modelFacts!.planRestored!(source, ref => inspection.archive.entryBlob(`blobs/sha256/${ref.digest}`), inventory));
         if (facts.baseToken !== null || facts.finalToken !== source.token) return fail('model-facts-token');
         this.retained = { start: own?.start ?? { transactionId: job.id, repositoryId: job.id, predecessor: null,
           purpose: 'restoreBackup', proof: source.proof, baseHeads: [], ...capabilityFields(readRequiredCapabilities(inspection.archive.control.manifest.requiredCapabilities)) }, parts: initialWorkspaceChanges(source, this.limits), remote: input,
           ...(facts.stagedBlobs?.length ? { stagedBlobs: [...facts.stagedBlobs] } : {}), modelFacts: { next: source, plan: facts } };
       } else this.retained = null;
       // resume returns its fresh post-publication readback under this same lease.
-      const current = await this.resume(undefined, job);
+      const current = await this.measure('restore.resume', () => this.resume(undefined, job));
       if (current.state !== 'ready' || current.publication !== job.id || current.source?.token !== source.token) return fail('restore-publication-readback');
       return current;
     });
@@ -1034,7 +1046,7 @@ export class MetadataProjectSession {
           const base = await this.repository.read(this.retained.start.repositoryId, this.retained.start.proof, this.retained.start.baseHeads);
           if (!base || base.token !== plan.baseToken || next.token !== plan.finalToken) fail('model-facts-base');
         }
-        await plan.stage(); await this.checked(next, false);
+        await this.measure('resume.model-stage', () => plan.stage()); await this.measure('resume.staged-content', () => this.checked(next, false));
         delete this.retained.modelFacts; // Prepared/cold recovery can only verify already stored facts.
       }
       if (this.retained.introduction) {
@@ -1048,7 +1060,7 @@ export class MetadataProjectSession {
         this.retained.parts = next.originalChanges().filter(b => !known.has(A.decodeChange(b).hash));
         delete this.retained.introduction; // From here, retry can only replay these originals.
       }
-      await this.verifyDelta(this.retained.stagedBlobs, this.retained.stagedBlobs?.length ? await this.mediaVerificationContext(this.retained.start, this.retained.parts, restoreJob?.inspection.description.mediaRecords) : undefined);
+      await this.measure('resume.before-journal-bodies', async () => this.verifyDelta(this.retained!.stagedBlobs, this.retained!.stagedBlobs?.length ? await this.mediaVerificationContext(this.retained!.start, this.retained!.parts, restoreJob?.inspection.description.mediaRecords) : undefined));
       if (this.retained.stagedBlobs?.length) {
         if (this.retained.start.purpose === 'importWorkspace' || this.retained.start.purpose === 'restoreBackup' || this.retained.start.purpose === 'importClean') {
           await this.checked(ProjectMetadataSource.reopen(this.retained.parts, this.retained.start.proof, this.limits), false);
@@ -1061,7 +1073,7 @@ export class MetadataProjectSession {
       // Once prepared, disk is the recovery source. Never conceal loss of an
       // acknowledged source/part by recreating it from this writer's memory.
       prepared = pending?.prepared ??
-        await this.journal.stage(this.retained.start, this.retained.parts, this.retained.stagedBlobs, this.retained.remote);
+        await this.measure('resume.journal-stage', () => this.journal.stage(this.retained!.start, this.retained!.parts, this.retained!.stagedBlobs, this.retained!.remote));
     } else if (pending?.prepared) prepared = pending.prepared;
     else if (pending) return fail('incomplete-staging-repair');
     else return this.read(); // Already published: no mutation or second publication.
@@ -1070,7 +1082,7 @@ export class MetadataProjectSession {
     // Legacy transactions keep the original early ref-only check.
     const portable = !!prepared.stagedBlobs?.length && hasPortableMediaCapability(prepared.start.requiredCapabilities);
     const checkedParts = portable ? await this.journal.validateParts(prepared) : undefined;
-    await this.verifyDelta(prepared.stagedBlobs, checkedParts ? await this.mediaVerificationContext(prepared.start, checkedParts, restoreJob?.inspection.description.mediaRecords) : undefined);
+    await this.measure('resume.prepared-bodies', async () => this.verifyDelta(prepared.stagedBlobs, checkedParts ? await this.mediaVerificationContext(prepared.start, checkedParts, restoreJob?.inspection.description.mediaRecords) : undefined));
     const parts = checkedParts ?? await this.journal.validateParts(prepared), start = prepared.start;
     const initial = start.purpose === 'initialize' || start.purpose === 'importWorkspace' || start.purpose === 'restoreBackup' || start.purpose === 'importClean';
     let stored = await this.repository.read(start.repositoryId, start.proof, undefined, initial);
@@ -1098,7 +1110,7 @@ export class MetadataProjectSession {
     } else if (start.purpose === 'importWorkspace' || start.purpose === 'restoreBackup' || start.purpose === 'importClean') {
       if (start.purpose === 'importClean' && !(receiveJob instanceof CleanInputJob)) return fail('clean-input-recovery-required');
       next = start.purpose === 'importClean' ? await (receiveJob as CleanInputJob).validateJournal(prepared) :
-        start.purpose === 'restoreBackup' ? await this.journal.validateRestore(prepared) : await this.journal.validateImport(prepared);
+        start.purpose === 'restoreBackup' ? await this.measure('resume.restore-journal', () => this.journal.validateRestore(prepared)) : await this.journal.validateImport(prepared);
       const allowed = new Map(next.originalChanges().map(b => [A.decodeChange(b).hash, b]));
       for (const bytes of stored?.originalChanges() ?? []) {
         const original = allowed.get(A.decodeChange(bytes).hash);
@@ -1118,14 +1130,14 @@ export class MetadataProjectSession {
     if (['initialize', 'localCommand', 'importClean', 'appendScene'].includes(start.purpose))
       for (const part of prepared.changes) { witness(); this.acknowledgedLocalChanges.add(part.expectedChangeHash); }
     // Exact pending changes can coexist with legitimate extra local heads; never rebase or choose a winner.
-    await this.checked(next, false);
+    await this.measure('resume.final-content', () => this.checked(next, false));
     if (localBase) {
       const restored = localBase.appendOriginal(parts);
       await this.verifyDelta(await reactivatedCaptionMedia(localBase, restored, this.limits), restored.requiredCapabilities.includes(PORTABLE_MEDIA_CAPABILITY) ? restored.mediaRecords() : undefined);
     }
     if (receiveJob) await this.media!.inventory!(await receiveJob.inventory());
-    if (restoreJob) await this.media!.verify(restoreJob.inventory(), restoreJob.inspection.description.mediaRecords);
-    stored = await this.repository.persist(start.repositoryId, next);
+    if (restoreJob) await this.measure('resume.restore-bodies', () => this.media!.verify(restoreJob.inventory(), restoreJob.inspection.description.mediaRecords));
+    stored = await this.measure('resume.persist-readback', () => this.repository.persist(start.repositoryId, next));
     if (!stored) fail('durable-source-missing');
     checkRequiredCapabilities(start.requiredCapabilities, capabilityUnion(readRequiredCapabilities(predecessor?.start.requiredCapabilities), stored!.requiredCapabilities, incoming.requiredCapabilities));
     const actual = new Map(stored!.originalChanges().map(b => [A.decodeChange(b).hash, b]));
@@ -1133,14 +1145,14 @@ export class MetadataProjectSession {
       const saved = actual.get(A.decodeChange(bytes).hash);
       if (!saved || !equalBytes(saved, bytes)) fail('durable-change-missing');
     }
-    await this.checked(stored!, false);
+    await this.measure('resume.saved-content', () => this.checked(stored!, false));
     if ((start.purpose === 'importClean' || start.purpose === 'appendScene') && stored!.token !== next.token) fail('journal-final-heads');
     if (prepared.remote && json(stored!.heads) !== json(prepared.remote.expectedFinalHeads)) fail('remote-final-heads');
     this.fs.mutationAuthority.assertWorkspaceWriteAuthorized();
-    await this.journal.publish(prepared, stored!);
+    await this.measure('resume.publish', () => this.journal.publish(prepared, stored!));
     this.fs.mutationAuthority.assertWorkspaceWriteAuthorized();
     this.retained = null;
-    const read = await this.read();
+    const read = await this.measure('resume.published-readback', () => this.read());
     if (read.state !== 'ready' || read.source?.token !== stored!.token) fail('publication-readback');
     return read;
   }

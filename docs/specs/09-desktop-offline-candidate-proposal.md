@@ -186,6 +186,11 @@ MessageChannelで応答元worker・実際のbuild・全件存在を確認する�
 install時に生成資源のSHA-384 SRIを要求し、状態の確認でも同じdigestを検査する。
 HTTP200で別版の内容を返された場合を準備成功としない。worker応答後に登録と
 active／waiting／controllerの同一性を再確認し、別窓での解除を見逃さない。
+
+同じ状態確認の中でactiveとcontroller等が同一のServiceWorkerオブジェクトなら、
+そのWorkerへの読取専用reportを一度だけ実行して役割間で結果を共有できる。
+確認の終了時のregistration・各Worker参照・generationの再照合は残す。別の確認、
+修復要求、起動やWorker交代へ結果を持ち越さない。全資源SRI検査は省略しない。
 登録の存在と資源確認の成功は分け、確認失敗でも候補自身を解除できる表示を残す。
 Project保存領域の初期化失敗でも、storageに依存しない準備／解除UIを保持する。
 
@@ -244,3 +249,23 @@ utilitiesRootポートで移し、元のホームSettings所有先へ戻す。�
 SKIP_WAITING・clients.claim・強制reload・OS installの自動実行は追加しない。
 未訪問端末、取得中断、cache削除・容量不足時のオフライン起動は保証せず、
 アプリ資源の準備とProjectバックアップも区別する。他の保存・更新契約は維持する。
+
+## 10. 起動資源を失った場合の限定修復案（PROPOSED・未承認・未実装）
+
+現行fetchはcache欠損で拒否する。起動HTML／入口JSが欠けると、通信可能でも
+画面内の修復へ届かない。§8のnetwork fallback禁止を維持したままでは解消できないため、
+この部分だけPO判断が必要であり、通常の品質修正の承認から実装を推論しない。
+
+判断案は、現在のWorkerの既知manifestにある同buildのアプリ資源だけを、元URLと
+固定SRIで検査して復旧する限定例外。別buildへの切替、一般URLへのfallback、Project・
+原本・履歴への書込み、foreign worker/cacheの変更は行わない。準備解除後の自動再登録、
+SKIP_WAITING、clients.claim、強制reloadも追加しない。
+
+同一資源への並行要求は一つにまとめ、同じ処理での自動取得は一度までとする。
+失敗Promiseや検査結果を別起動へ持ち越さず、通信不能・異版・取得／SRI／cache保存失敗は
+拒否して既存データを保持する。実装前にfetchの検査順序・取消・所有期間と、既存修復の
+同時実行を定義し、独立レビューする。
+
+受入れは、index／入口JSの個別欠損・破損、通信可能なcold起動からの同build復旧、
+wrong200／異版拒否、完全offline時の拒否、並行二窓、取得／保存失敗、通常のcold offline
+再開とProject原本／履歴保持。現在の§§1–9の合格へ、この未実装経路を含めない。

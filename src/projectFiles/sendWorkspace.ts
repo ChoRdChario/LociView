@@ -1,5 +1,5 @@
 import type { ProjectWorkspaceFS } from '../platform/fs';
-import { hasEditorCapability, hasPortableMediaCapability } from '../projectMetadata/requiredCapabilities';
+import { hasEditorCapability, hasPortableMediaCapability, PORTABLE_MEDIA_CAPABILITY } from '../projectMetadata/requiredCapabilities';
 import type { MetadataProjectSession, MetadataSessionRead, BackupPresentationObserver } from '../projectMetadata/session';
 import type { OriginBlobStore } from '../projectMetadata/blobStore';
 import type { MetadataLimits, MetadataProof } from '../projectMetadata/format';
@@ -11,7 +11,7 @@ import { CleanOutputJob } from '../projectPackage/cleanOutputJob';
 import { ReviewOutputJob } from '../projectPackage/reviewOutputJob';
 import type { ReviewSelectionOptions } from '../projectPackage/reviewSelection';
 import { protectedWorkspaceInventory } from '../projectPackage/protectedInventory';
-import { PACKAGE_LIMITS as L } from '../projectPackage/contract';
+import { PACKAGE_LIMITS as L, type EvidenceRef } from '../projectPackage/contract';
 import { outputJobKeys, outputJobClass, openOutputJob, validateOutputProtection } from '../projectPackage/outputJobs';
 import { VerifiedContributionBase, type ContributionBaseSelection } from '../projectPackage/contributionSource';
 import { WorkspaceBaseStore } from '../projectPackage/workspaceBases';
@@ -19,10 +19,11 @@ import { workspaceFileOperation } from './receiveWorkspace';
 import { fileError } from './validation';
 
 export interface WorkspaceOutputState { id: string; purpose: 'teamWorkspace' | 'contribution' | 'backup' | 'clean' | 'review'; includesDeclaredEditorNames?: boolean; requiresEditorAttributionReader?: boolean; requiresPortableMediaReader?: boolean; label?: string; stale?: boolean; token?: string; cancellable?: boolean; state: 'unstarted' | 'incomplete' | 'generated' | 'file-verified' | 'abandoned' | 'cancelled' | 'repair-required' }
-export interface ContributionBaseChoice { selection: ContributionBaseSelection; label: string; includesDeclaredEditorNames?: boolean; deltaIncludesDeclaredEditorNames?: boolean }
+export interface ContributionBaseChoice { selection: ContributionBaseSelection; label: string; includesDeclaredEditorNames?: boolean; deltaIncludesDeclaredEditorNames?: boolean; requiresPortableMediaReader?: boolean }
 const settledOutputDisplay = (rows: readonly WorkspaceOutputState[]) =>
   rows.every(row => ['generated', 'file-verified', 'abandoned', 'cancelled'].includes(row.state));
 interface BackupDisplaySource { readonly source: NonNullable<MetadataSessionRead['source']>; readonly proof: MetadataProof; readonly token: string }
+type ArtifactObserver = (archive: Readonly<EvidenceRef>) => void;
 /** Explicit same-Project output commands. Download handoff has no completion receipt. */
 export class WorkspaceSender {
   constructor(private readonly fs: ProjectWorkspaceFS, private readonly session: MetadataProjectSession,
@@ -110,26 +111,30 @@ export class WorkspaceSender {
       const baseHashes = new Set(base.source.read().history.changes.map(c => c.id));
       choices.push({ selection, label: `作業一式 ${i + 1}（${r.completions.some(c => c.observation === 'imported') ? '受信' : '作成'}・変更 ${base.source.originalChanges().length} 件）`,
         ...(base.source.includesDeclaredEditorNames ? { includesDeclaredEditorNames: true } : {}),
+        ...(base.source.requiredCapabilities.includes(PORTABLE_MEDIA_CAPABILITY) ? { requiresPortableMediaReader: true } : {}),
         ...(currentSource && json(currentSource.proof) === json(proof) && currentSource.editorDeclarations().some(d => !baseHashes.has(d.changeId)) ? { deltaIncludesDeclaredEditorNames: true } : {}) });
     }
     return choices;
   }
-  download(id: string) {
-    return workspaceFileOperation(this.locks, () => withMetadataRead(this.fs, undefined, ({ fs }) =>
-      new WorkspaceSender(fs, this.session, this.store, this.limits, this.locks).downloadDirect(id)));
+  download(id: string, observeArtifact?: ArtifactObserver) {
+    let archive: Readonly<EvidenceRef> | undefined;
+    const output = workspaceFileOperation(this.locks, () => withMetadataRead(this.fs, undefined, ({ fs }) =>
+      new WorkspaceSender(fs, this.session, this.store, this.limits, this.locks).downloadDirect(id, observeArtifact ? next => { archive = next; } : undefined)));
+    if (!observeArtifact) return output;
+    return output.then(blob => { if (archive) { try { observeArtifact(archive); } catch { /* Presentation has no download authority. */ } } return blob; });
   }
-  private async downloadDirect(id: string) {
+  private async downloadDirect(id: string, observeArtifact?: ArtifactObserver) {
       const job = await openOutputJob(this.fs, await this.key(id), this.limits);
-      if (job instanceof BackupOutputJob || job instanceof CleanOutputJob || job instanceof ReviewOutputJob) {
-        await validateOutputProtection(this.fs, job, this.store, this.limits); return (await job.artifact()).blob;
+      if (job instanceof BackupOutputJob || job instanceof CleanOutputJob || job instanceof ReviewOutputJob || job instanceof ContributionOutputJob) {
+        await validateOutputProtection(this.fs, job, this.store, this.limits);
+      } else {
+        if (!(await job.steps()).some(s => s.detail.kind === 'baseRecorded')) return fileError('ファイル生成の続きを実行してください。');
+        const records = await new WorkspaceBaseStore(this.fs, this.limits, job.source.proof).read();
+        if (!records.some(r => json(r) === json(job.baseRecord()))) return fileError('受け渡しの記録を確認できません。');
       }
-      if (job instanceof ContributionOutputJob) {
-        await validateOutputProtection(this.fs, job, this.store, this.limits); return (await job.artifact(this.store)).blob;
-      }
-      if (!(await job.steps()).some(s => s.detail.kind === 'baseRecorded')) return fileError('ファイル生成の続きを実行してください。');
-      const records = await new WorkspaceBaseStore(this.fs, this.limits, job.source.proof).read();
-      if (!records.some(r => json(r) === json(job.baseRecord()))) return fileError('受け渡しの記録を確認できません。');
-      return (await job.artifact()).blob;
+      const artifact = job instanceof ContributionOutputJob ? await job.artifact(this.store) : await job.artifact();
+      if (artifact.step.detail.kind === 'artifactVerified') observeArtifact?.(Object.freeze({ ...artifact.step.detail.archive }));
+      return artifact.blob;
   }
   async jobs(): Promise<WorkspaceOutputState[]> {
     return withMetadataRead(this.fs, undefined, ({ fs }) =>

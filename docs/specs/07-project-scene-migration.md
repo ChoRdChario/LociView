@@ -490,6 +490,18 @@ existing output-overview display port; it is not a backup-display shortcut or
 command authority. Catalog, recovery, publication and durable readback checks
 remain independent. Verify cold opening and pending-receive fallback.
 
+The same settled-display rule applies to the fresh read returned by a successful
+receive, the read just obtained from the selected restored generation, and an
+explicit Host refresh. Obtain the actual Session read before display discovery;
+never reuse a prior generation or supply a backup-display receipt. Failure,
+void-result and unfinished-job paths retain independent reads and recovery.
+
+Optional local diagnostics split initialization, model-fact planning/staging,
+Journal preparation, prepared-body verification, durable persistence/content
+readback, publication and post-publication reading. The observer has no authority,
+contains only fixed stage names and elapsed times, and cannot reject an operation.
+Nested durations are not additive. No validation lifetime changes are implied.
+
 Repository persistence returns its own fully read-back and exact-byte-verified
 durable source to the immediately adjacent Session resume step. That step keeps
 capability, original-part, content, publication and post-publication readback

@@ -74,6 +74,15 @@ test('record list, pin actions and direct camera navigation remain coherent thro
       for(const name of ['変更を適用','取り消す'])await expect(drawing.getByRole('button',{name,exact:true})).toBeInViewport({ratio:1});
     };
     await drawingLayout('drawing-normal-draft',2);await p.setViewportSize({width:390,height:844});await revealWorkPanel(p);await drawingLayout('drawing-narrow-draft',1);
+    await expect(canvas).toBeVisible(); await expect(canvas).toHaveAttribute('aria-busy','false');
+    const previewBox=(await canvas.boundingBox())!,panelBox=(await drawing.boundingBox())!;
+    expect(previewBox.width).toBeGreaterThan(300); expect(previewBox.height).toBeGreaterThan(120);
+    expect(panelBox.y).toBeGreaterThanOrEqual(previewBox.y+previewBox.height);
+    await p.evaluate(()=>new Promise<void>(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve()))));
+    const narrowOriginal=await captureCanvas('narrow-original-canvas.png'); await opacity.fill('45');
+    await p.evaluate(()=>new Promise<void>(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve()))));
+    expect(await canvas.boundingBox()).toEqual(previewBox); expect(Buffer.compare(narrowOriginal,await captureCanvas('narrow-drawing-preview-canvas.png'))).not.toBe(0);
+    await opacity.fill('100'); await expect(p.locator('.lv-project-stage canvas')).toHaveCount(1);
     await drawing.getByRole('button',{name:'取り消す',exact:true}).click();await drawing.getByRole('region',{name:'操作の確認',exact:true}).getByRole('button',{name:'変更を取り消す',exact:true}).click();await expect(drawing.getByLabel('照明',{exact:true})).toHaveValue('inherit');await expect(opacity).toHaveValue('100');
     await p.setViewportSize({width:1440,height:1000});await task('モデル');const modelPanel=p.getByRole('tabpanel',{name:'モデル',exact:true});
     await modelPanel.locator('.lv-model-select').filter({hasText:'模型A.glb'}).click();await modelPanel.getByRole('button',{name:'このモデルだけ表示',exact:true}).click();
@@ -84,7 +93,7 @@ test('record list, pin actions and direct camera navigation remain coherent thro
     await drag(opacity,-60,0);await expect(opacity).toHaveValue('70');await expect(drawing.getByRole('button',{name:'変更を適用',exact:true})).toBeEnabled();
     await p.setViewportSize({width:1280,height:600});const apply=drawing.getByRole('button',{name:'変更を適用',exact:true});await expect(apply).toBeInViewport({ratio:1});await drawing.locator('.lv-material-content').evaluate(n=>{n.scrollTop=n.scrollHeight;});await expect(apply).toBeInViewport({ratio:1});await apply.click();await ready('材質の設定を適用しました。');await backup('drawing-applied');
     await p.setViewportSize({width:720,height:500});await task('キャプション');await tools.getByRole('button',{name:'位置を調整',exact:true}).click();
-    if(!await canvas.isVisible())await p.getByRole('button',{name:'3D・比較',exact:true}).click();
+    if(!await canvas.isVisible())await p.getByRole('button',{name:'3D',exact:true}).click();
     await expect(pin).toBeVisible();const pinExtent=await canvas.boundingBox(),retry=p.getByRole('button',{name:'3D表示を再試行',exact:true});
     await canvas.evaluate(c=>new Promise<void>(resolve=>{const gl=(c as HTMLCanvasElement).getContext('webgl2')!,ext=gl.getExtension('WEBGL_lose_context');if(!ext)throw Error('Context-loss extension unavailable');(c as any).__testContextLoss=ext;c.addEventListener('webglcontextlost',()=>resolve(),{once:true});ext.loseContext();}));
     await expect(p.locator('.lv-project-viewport-status')).toContainText('3D表示を停止しました。');await expect(retry).toBeVisible();expect(await canvas.boundingBox()).toEqual(pinExtent);

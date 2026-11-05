@@ -29,6 +29,7 @@ export function createValidationOutputControls(document: Document, host: ReturnT
   editOnly(shareOptions, actions, nameField, commands, select);
   let busy = false, disposed = false, feedback = '', selected: string | null = null, cancellation: string | null = null;
   let completedFeedback = false;
+  let readingToken: string | null = null;
   let primaryAction = () => {};
   primary.addEventListener('click', () => { if (!disposed && !primary.disabled) primaryAction(); });
   let presentation: 'all' | 'save' | 'share' = 'all';
@@ -47,13 +48,17 @@ export function createValidationOutputControls(document: Document, host: ReturnT
     choicePending = true; feedback = ''; completedFeedback = false; render(); changed();
     if (label) actions.querySelector?.<HTMLElement>(`[aria-label="${label}"]`)?.focus({ preventScroll: true });
   };
-  const urls: string[] = [];
+  const urls = new Map<string, string>();
   const handedOff = new Set<string>();
   const download = async (id: string) => {
     const job = host.workspaceOutput.jobs.find(job => job.id === id);
     if (!job) throw Error('作成したファイルを確認できません。');
-    const blob = await host.workspaceOutput.download(id); if (disposed) return;
-    const url = URL.createObjectURL(blob), a = document.createElement('a'); urls.push(url);
+    const handoff: { archive?: Readonly<{ sha256: string; byteLength: number }> } = {};
+    const blob = await host.workspaceOutput.download(id, archive => { handoff.archive = archive; }); if (disposed) return;
+    const key = handoff.archive ? JSON.stringify([id, handoff.archive.sha256, handoff.archive.byteLength]) : undefined;
+    let url = key && urls.get(key);
+    if (!url) { url = URL.createObjectURL(blob); urls.set(key ?? url, url); }
+    const a = document.createElement('a');
     a.href = url; a.download = job.purpose === 'contribution' ? 'LociView-contribution.zip' : job.purpose === 'backup' ? 'LociView-backup.zip' : job.purpose === 'clean' ? 'LociView-copy.zip' : job.purpose === 'review' ? 'LociView-review.zip' : 'LociView-workspace.zip';
     const label = Array.from((job.label ?? '').replace(/[<>:"/\\|?*\u0000-\u001f]/g, '_').trim()).slice(0, 80).join('').replace(/[. ]+$/, '');
     if (job.purpose === 'backup' && label) a.download = `LociView-${label}.zip`;
@@ -62,7 +67,7 @@ export function createValidationOutputControls(document: Document, host: ReturnT
   };
   const handoffMessage = 'ダウンロードを開始しました。保存先で完了を確認してください。';
   const perform = (action: () => Promise<unknown>, message: string, writes = true, consumeChoice = false, completed?: () => void,
-    workingMessage = 'ファイルを確認しています。') => {
+    workingMessage = 'ファイルを確認しています。', allowReading = false) => {
     if (disposed || busy || composing || otherBusy()) return;
     const s = session();
     if (writes && host.authority.readOnly) { completedFeedback = false; feedback = '編集を開始してから実行してください。'; render(); return; }
@@ -74,11 +79,11 @@ export function createValidationOutputControls(document: Document, host: ReturnT
     const moved = (event: Event) => { if (event.target !== origin && event.target !== document.body) returnPrimary = false; };
     document.addEventListener?.('focusin', moved);
     let succeeded = false;
-    completedFeedback = false; busy = true; feedback = workingMessage; render(); changed();
+    completedFeedback = false; busy = true; readingToken = allowReading ? host.read().source?.token ?? null : null; feedback = workingMessage; render(); changed();
     void (async () => {
       try { await action(); if (!disposed) { feedback = message; completedFeedback = true; if (consumeChoice) resetChoice(); completed?.(); succeeded = completedFeedback; } }
       catch (error) { completedFeedback = false; if (!disposed) feedback = error instanceof Error ? error.message : 'ファイル処理を完了できません。'; }
-      finally { busy = false; if (!disposed) { render(); changed(); }
+      finally { busy = false; readingToken = null; if (!disposed) { render(); changed(); }
         document.removeEventListener?.('focusin', moved);
         const target = root.querySelector?.<HTMLButtonElement>('.lv-file-primary');
         if (!disposed && succeeded && returnPrimary && target && !target.disabled &&
@@ -99,7 +104,11 @@ export function createValidationOutputControls(document: Document, host: ReturnT
   const currentDisclosure = () => {
     const current = host.workspaceOutput.privacy, base = host.workspaceOutput.bases.find(b => b.selection.workspacePackageId === baseId);
     const requires = purpose === 'backup' ? current.backupIncludesNames : purpose === 'contribution' ? current.sourceIncludesNames || !!base?.includesDeclaredEditorNames : purpose === 'teamWorkspace' ? current.sourceIncludesNames : false;
-    return { includesDeclaredEditorNames: purpose === 'contribution' ? !!base?.deltaIncludesDeclaredEditorNames : requires, requiresEditorAttributionReader: requires };
+    const preview = reviewPreview?.token === host.read().source?.token && reviewPreview?.sceneId === sceneId && reviewPreview?.omittedEntryView === omitEntry ? reviewPreview : null;
+    const portable = purpose === 'backup' ? current.backupRequiresPortableMediaReader : purpose === 'contribution' ? current.sourceRequiresPortableMediaReader || !!base?.requiresPortableMediaReader :
+      purpose === 'teamWorkspace' ? current.sourceRequiresPortableMediaReader : purpose === 'review' ? preview?.requiresPortableMediaReader : undefined;
+    return { includesDeclaredEditorNames: purpose === 'contribution' ? !!base?.deltaIncludesDeclaredEditorNames : requires, requiresEditorAttributionReader: requires,
+      requiresPortableMediaReader: portable };
   };
   const generateAndDownload = (generate: () => Promise<string>) => {
     const expected = currentDisclosure(); let needsDisclosure = false;
@@ -108,11 +117,11 @@ export function createValidationOutputControls(document: Document, host: ReturnT
     // Generation is already durable even if the browser handoff then fails.
     // Keep that exact result available; retry must not silently create another job.
     resetChoice();
-    if (job && (!!job.includesDeclaredEditorNames !== !!expected.includesDeclaredEditorNames || !!job.requiresEditorAttributionReader !== !!expected.requiresEditorAttributionReader || job.requiresPortableMediaReader)) {
+    if (job && (!!job.includesDeclaredEditorNames !== !!expected.includesDeclaredEditorNames || !!job.requiresEditorAttributionReader !== !!expected.requiresEditorAttributionReader || !!job.requiresPortableMediaReader !== !!expected.requiresPortableMediaReader)) {
       needsDisclosure = true; history.open = true; return;
     }
     await handoff(id);
-  }, handoffMessage, true, false, () => { if (needsDisclosure) { feedback = '作成したファイルの内容を確認し、ダウンロードしてください。'; completedFeedback = false; } }, 'ファイルを作成しています。'); };
+  }, handoffMessage, true, false, () => { if (needsDisclosure) { feedback = '作成したファイルの内容を確認し、ダウンロードしてください。'; completedFeedback = false; } }, 'ファイルを作成しています。', true); };
   const handoff = async (id: string) => {
     feedback = 'ダウンロードを準備しています。'; render();
     try { await download(id); if (!disposed) handedOff.add(id); }
@@ -153,7 +162,7 @@ export function createValidationOutputControls(document: Document, host: ReturnT
     nameField.hidden = purpose !== 'backup'; nameInput.disabled = busy || otherBusy() || !!host.authority.readOnly;
     if(purpose==='backup'){const scope=document.createElement('p');scope.textContent='モデル・メディアと履歴を含む作業全体を、バックアップに書き出します。';actions.append(scope);}
     if (presentation === 'share' && purpose === 'teamWorkspace') {
-      const note = document.createElement('p'); note.textContent = '全シーンと編集履歴を含みます。'; actions.append(note);
+      const note = document.createElement('p'); note.textContent = '編集・返送できます。全シーンと編集履歴を含みます。'; actions.append(note);
     }
     if (!composing && nameInput.value !== checkpointName) nameInput.value = checkpointName;
     const chosen = host.workspaceOutput.bases.find(b => b.selection.workspacePackageId === baseId);
@@ -293,6 +302,8 @@ export function createValidationOutputControls(document: Document, host: ReturnT
   nameInput.addEventListener('compositionstart', () => { composing = true; choicePending = true; changed(); });
   nameInput.addEventListener('compositionend', () => { checkpointName = nameInput.value; composing = false; choicePending = true; changed(); });
   render(); return { root, render, choosePurpose, hasHandedOff: (jobId: string) => handedOff.has(jobId), setPresentation(value: typeof presentation) { presentation = value; if (completedFeedback) { feedback = ''; completedFeedback = false; } },
+    readingOutput: () => !disposed && busy && readingToken ? { token: readingToken, message: feedback } : null,
+    outputFeedback: () => feedback,
     closeReason: () => busy ? 'ファイルを処理中です。完了をお待ちください。' : composing ? '名前の入力を確定してください。' : selected ? '照合するファイルを選ぶか、「ファイル確認を取り消す」を選択してください。' : cancellation ? '取りやめの確認を完了するか、「戻る」を選択してください。' : choicePending ? '選択が未完了です。下の「選択を取り消す」で戻れます。' : null, busy: () => busy, hasChanges: () => busy || composing || choicePending || !!selected || !!cancellation,
-    dispose: () => { disposed = true; for (const url of urls) URL.revokeObjectURL(url); root.remove(); } };
+    dispose: () => { disposed = true; readingToken = null; for (const url of urls.values()) URL.revokeObjectURL(url); urls.clear(); root.remove(); } };
 }

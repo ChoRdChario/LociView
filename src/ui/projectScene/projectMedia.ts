@@ -11,6 +11,7 @@ export function createProjectMedia(document: Document, host: ProjectPanelHost, c
   root.setAttribute('aria-label', 'メディアの整理'); galleryHost.setAttribute('aria-label', '添付メディア');
   stored.setAttribute('aria-label', '既存のメディアを添付'); stored.append(make('summary', '既存のメディアを添付'));
   const status = make('p'); status.setAttribute('role', 'status');
+  const waiting = make('p', '添付はファイル作成後に表示します。'); waiting.hidden = true;
   type Scope = { token: string; sceneId: string; captionId: string };
   type Choice = Scope & { id: string; record: JsonObject };
   type Draft = Scope & { attachmentId: string; raw: string; composing: boolean };
@@ -89,16 +90,17 @@ export function createProjectMedia(document: Document, host: ProjectPanelHost, c
     });
   });
   confirmation.append(question, detach, button('戻る', () => { if (!host.block('captions', false)) { removal = null; host.changed(); } }));
-  root.append(galleryHost, stored, form, confirmation, status);
+  root.append(galleryHost, waiting, stored, form, confirmation, status);
   editOnly(stored, form, confirmation);
-  function render() {
+  function render(active = true) {
     if (disposed) return; const s = source(), block = host.block('captions'), local = host.block('captions', false), uncertain = uncertainty(), currentScope = scope();
     if (registeredScope !== currentScope) { registeredScope = currentScope; registeredReader = reader(null); picker.dispose(); picker = newPicker();
       picker.root.setAttribute('aria-label', 'メディアを選択'); stored.insertBefore(picker.root, attach); }
     const nextGallery = JSON.stringify([currentScope, s.captionId]);
     if (galleryKey !== nextGallery) { galleryKey = nextGallery; gallery?.dispose(); actionCards.clear();gallery = s.captionId ? createMediaThumbnails(document, reader(s.captionId), viewer, undefined, attachmentTools) : undefined;
       galleryHost.replaceChildren(); if (gallery) galleryHost.append(gallery.root); }
-    gallery?.render(); picker.render(stored.open); viewer.render();
+    gallery?.render(active); picker.render(active && stored.open); viewer.render();
+    waiting.hidden = active || !s.captionId || !rows(s.captionId).length;
     root.hidden = !s.captionId && !owned(); stored.hidden = !projectMediaResources(s.provider).length;
     attach.disabled = !!block || !!draft || !!removal || !selected || !isCurrent(selected) || !!uncertain;
     cancelSelection.hidden = !selected; cancelSelection.disabled = !!local;

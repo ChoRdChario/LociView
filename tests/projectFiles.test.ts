@@ -112,6 +112,7 @@ import { PreparedReviewEdit, createReviewEditScratch } from '../src/projectPacka
 import { ReviewEditJob } from '../src/projectPackage/reviewEditJob';
 import { assertReviewEditSlot, readReviewEdit, reviewEditRoot, type ReviewEditBinding } from '../src/projectPackage/reviewEditControls';
 import { prepareReviewView } from '../src/harness/projectScene/reviewView';
+import { createReviewWorkspace } from '../src/projectScene/reviewWorkspace';
 import { inspectReviewSnapshot, prepareReviewEdit } from '../src/projectPackage/reviewSnapshot';
 import { BackupArchive, writeBackupArchive } from '../src/projectPackage/backupArchive';
 import { BackupSourceCapture } from '../src/projectPackage/backupSource';
@@ -3416,6 +3417,14 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     f.audit.before=async()=>{if(inspected)throw Error('slot closing audit');};const writes=vi.spyOn(f.fs,'writeBytes');
     await expect(sender.generateBackup(token,'拒否')).rejects.toThrow('slot closing audit');expect(inspected).toBe(true);expect(writes).not.toHaveBeenCalled();expect((await f.fs.list('')).sort()).toEqual(before);
     reading.mockRestore();f.audit.before=async()=>{};
+    const notify = vi.fn(() => { throw Error('handoff observer failure'); }), originalArtifact = BackupOutputJob.prototype.artifact;
+    const inspectedArtifact = vi.spyOn(BackupOutputJob.prototype, 'artifact').mockImplementation(async function(this: BackupOutputJob) {
+      const value = await originalArtifact.call(this); f.audit.before = async () => { throw Error('handoff closing audit'); }; return value;
+    });
+    try { await expect(sender.download(id, notify)).rejects.toThrow('handoff closing audit'); expect(notify).not.toHaveBeenCalled(); }
+    finally { inspectedArtifact.mockRestore(); f.audit.before = async () => {}; }
+    const accepted = await sender.download(id, notify), inspectedArchive = await PackageArchive.inspect(accepted);
+    expect(notify).toHaveBeenCalledOnce(); expect(notify).toHaveBeenCalledWith({ sha256: inspectedArchive.sha256, byteLength: inspectedArchive.byteLength });
     const second=await sender.generateBackup(token,'次');expect(second).not.toBe(id);expect((await sender.jobs()).filter(j=>j.purpose==='backup').map(j=>j.state)).toEqual(['generated','generated']);
     const artifact=(await f.fs.list(job.path('artifacts/')))[0]!;await f.fs.remove(artifact);writes.mockClear();
     await expect(sender.generateBackup(token,'欠落後')).rejects.toThrow();expect(writes).not.toHaveBeenCalled();expect((await session.read()).source!.token).toBe(token);
@@ -5004,6 +5013,71 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     if (result === 'handoff') expect(origin.document.activeElement === primary()).toBe(true);
     await h.ui.dispose();
   });
+  it.each(['success','failure','changed-token'] as const)('keeps saved Caption reading during output without granting commands (%s)', async outcome => {
+    const h=await productWorkspaceFixture(true), output=h.all(h.root).find(n=>n.className==='lv-file-output')!;
+    const area=h.all(h.editor).find(n=>n.className==='lv-project-body')!, browser=h.all(h.editor).find(n=>n.className.startsWith('lv-caption-browser'))!, search=h.named('検索',browser);
+    const row=()=>h.all(h.editor).find(n=>n.className==='lv-caption-select')!;
+    const primary=h.all(output).find(n=>n.className==='lv-file-primary')!, generate=h.host.workspaceOutput.generateBackup;
+    let release!:()=>void;const gate=new Promise<void>(resolve=>{release=resolve;});
+    const generating=vi.spyOn(h.host.workspaceOutput,'generateBackup').mockImplementation(async(...args)=>{await gate;if(outcome!=='success')throw Error('held output failure');return generate(...args);});
+    try{
+      primary.click();expect(generating).toHaveBeenCalledOnce();expect((area as unknown as {inert:boolean}).inert).toBe(false);
+      expect(h.editor.attributes.get('data-lv-mode')).toBe('view');
+      const windows=h.all(h.editor).filter(n=>n.className==='lv-caption-window').length;
+      search.focus();search.fire('compositionstart');search.value='最初';search.fire('input');
+      expect((area as unknown as {inert:boolean}).inert).toBe(false);expect(search.document.activeElement===search).toBe(true);
+      search.fire('compositionend');expect(search.value).toBe('最初');const imageReads=h.imageReads.reduce((count,read)=>count+read.mock.calls.length,0);row().click();row().click();
+      expect(h.all(h.editor).filter(n=>n.className==='lv-caption-window').length).toBe(windows);
+      expect(h.imageReads.reduce((count,read)=>count+read.mock.calls.length,0)).toBe(imageReads);
+      const body=h.named('本文',h.editor);expect(body.readOnly).toBe(true);body.value='must not write';body.fire('input');
+      h.button('変更を適用',h.named('キャプションの詳細',h.editor)).click();
+      expect(h.dispatch).not.toHaveBeenCalled();expect(h.button('ファイルを開く',h.editor).disabled).toBe(true);
+      expect(h.button('モデル',h.editor).disabled).toBe(true);expect(h.button('描画',h.editor).disabled).toBe(true);
+      if(outcome==='changed-token'){
+        const captionId=Object.keys(h.host.authority.read().resources.captions)[0]!;
+        await h.host.dispatch(h.host.read().source!.token,{kind:'editCaption',captionId,edits:{body:'external update'}});h.refresh();
+        expect((area as unknown as {inert:boolean}).inert).toBe(true);expect(h.editor.attributes.get('data-lv-mode')).toBe('edit');
+      }
+      search.focus();release();
+      await vi.waitFor(()=>expect(h.all(output).find(n=>n.attributes.get('role')==='status')!.dataset.busy).toBe('false'),{timeout:10000});
+      expect(generating).toHaveBeenCalledOnce();expect(search.document.activeElement===search).toBe(true);expect(search.value).toBe('最初');
+      expect(h.downloads).toHaveBeenCalledTimes(outcome==='success'?1:0);expect(h.editor.attributes.get('data-lv-mode')).toBe('edit');
+      expect((area as unknown as {inert:boolean}).inert).toBe(false);
+      const notice=h.all(h.root).find(n=>n.className==='lv-project-shell')!.children.find(n=>n.className==='lv-operation-status')!;
+      expect(notice.dataset.busy).toBe('false');expect(notice.textContent).toContain(outcome==='success'?'ダウンロードを開始しました':'held output failure');
+      expect(h.all(h.editor).filter(n=>n.className==='lv-caption-window').length).toBe(windows);
+    }finally{release();await h.ui.dispose();}
+  });
+  it('discloses known portable output before handoff and reuses only its freshly verified download URL', async () => {
+    const raw = imageFor('heic'), raster = portablePng();
+    const h = await productWorkspaceFixture(true, false, false, 'map2', undefined, { mediaDecoders: {
+      heic: async () => ({ width: 96, height: 64, close() {} }), raster: async () => new Blob([raster.slice().buffer], { type: 'image/png' }) } });
+    const host = h.host, output = h.all(h.root).find(n => n.className === 'lv-file-output')!;
+    const status = () => h.all(output).find(n => n.attributes.get('role') === 'status')!;
+    const primary = () => h.all(output).find(n => n.className === 'lv-file-primary')!;
+    const downloadButton = () => h.all(output).find(n => n.tag === 'button' && n.textContent === 'ダウンロード')!;
+    let downloaded: Blob | undefined;
+    const original = host.workspaceOutput.download;
+    const fresh = vi.spyOn(host.workspaceOutput, 'download').mockImplementation(async (...args) => { downloaded = await original(...args); return downloaded; });
+    const create = vi.spyOn(URL, 'createObjectURL'), revoke = vi.spyOn(URL, 'revokeObjectURL');
+    try {
+      const captionId = Object.keys(host.authority.read().resources.captions)[0]!, sceneId = h.display()!.sceneId;
+      await host.authority.addMediaFile!(host.read().source!.token, { sceneId, captionId, attachmentId: `att_${newId()}`, eventId: `evt_${newId()}`, orderKey: 'B',
+        file: { name: '原本.heic', size: raw.length, arrayBuffer: async () => raw.slice().buffer } });
+      h.refresh(); expect(host.workspaceOutput.privacy).toMatchObject({ sourceRequiresPortableMediaReader: true, backupRequiresPortableMediaReader: true });
+      expect(h.all(output).some(n => n.textContent === 'HEIC原本と表示用PNGの組に対応したLociViewで開いてください。')).toBe(true);
+      primary().click(); await vi.waitFor(() => expect(status().dataset.busy).toBe('false'), { timeout: 10000 });
+      expect(h.downloads).toHaveBeenCalledTimes(1); expect(status().textContent).toBe('ダウンロードを開始しました。保存先で完了を確認してください。');
+      const index = create.mock.calls.findIndex(args => args[0] === downloaded); expect(index).toBeGreaterThanOrEqual(0);
+      const url = create.mock.results[index]!.value, count = create.mock.calls.length;
+      downloadButton().click(); await vi.waitFor(() => expect(status().dataset.busy).toBe('false'), { timeout: 10000 });
+      expect(h.downloads).toHaveBeenCalledTimes(2); expect(fresh).toHaveBeenCalledTimes(2); expect(create).toHaveBeenCalledTimes(count);
+      fresh.mockRejectedValueOnce(Error('saved artifact refused'));
+      downloadButton().click(); await vi.waitFor(() => expect(status().dataset.busy).toBe('false'), { timeout: 10000 });
+      expect(status().textContent).toContain('saved artifact refused'); expect(h.downloads).toHaveBeenCalledTimes(2); expect(create).toHaveBeenCalledTimes(count);
+      await h.ui.dispose(); await h.ui.dispose(); expect(revoke.mock.calls.filter(args => args[0] === url)).toHaveLength(1);
+    } finally { await h.ui.dispose(); fresh.mockRestore(); create.mockRestore(); revoke.mockRestore(); }
+  });
   it('reselects the exact interrupted update from the mounted product without losing local work', async () => {
     const h = await productWorkspaceFixture(true, false, false, 'map2', undefined, { initialWorkspace: true });
     const { host, editor, root, all, button, named } = h, incoming = h.f.f.file!;
@@ -5888,7 +5962,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     scroll.scrollTop = 70; body.value = '未適用の本文'; body.fire('input'); body.fire('compositionstart');
     button('最初の記録', a).fire('click'); expect(body.value).toBe('未適用の本文'); expect(title.value).toBe('比較する記録');
     bClose.fire('click'); expect(cards()).toEqual([a]); expect(body.value).toBe('未適用の本文');
-    button('比較に表示', detail).fire('click'); expect(cards()).toHaveLength(2); expect(body.value).toBe('未適用の本文');
+    button('3D上に表示', detail).fire('click'); expect(cards()).toHaveLength(2); expect(body.value).toBe('未適用の本文');
     button('×', named('比較する記録', windows)).fire('click');
     named('キャプション一覧', editor).children.find(row => all(row).some(n => n.textContent === '比較する記録'))!.children[0]!.fire('click');
     expect(cards()).toHaveLength(2); expect(body.value).toBe('未適用の本文');
@@ -6932,7 +7006,12 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       expect(host.read().source!.token).toBe(before); expect(next.state.token).toBe(token);
       expect(host.backupRestore.pending).toBe(true);
     });
-    await host.backupRestore.confirm(prepare); expect(prepare).toHaveBeenCalledOnce();
+    const overview = vi.spyOn(WorkspaceSender.prototype, 'outputOverview');
+    try {
+      await host.backupRestore.confirm(prepare); expect(prepare).toHaveBeenCalledOnce();
+      expect(overview).toHaveBeenCalledOnce(); expect(overview.mock.calls[0]![0]).toBe(host.read());
+      expect(overview.mock.calls[0]![1]).toBeUndefined();
+    } finally { overview.mockRestore(); }
     await expect(oldContent.model(oldModel.closure.representation)).rejects.toThrow();
     await expect(stagedContent!.model(oldModel.closure.representation)).rejects.toThrow();
     expect(host.read().source!.token).toBe(token); expect(host.hasPending()).toBe(true);
@@ -7102,6 +7181,33 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect(prepared.models[0]!.representation).not.toHaveProperty('payloadDigest'); expect(prepared.display(null, null).pins).toHaveLength(2);
     expect(prepared.images.size).toBe(1); expect(host.read().source!.token).toBe(token);
     expect(Object.values(prepared.display(null, null).savedMaterials![prepared.models[0]!.assetId]!)).toEqual([intent]);
+    // The same Review owns both handoffs; deferred callbacks must not unlock the other one.
+    {
+      let resolveCopy!:()=>void,rejectCopy!:(error:Error)=>void,resolveProjects!:(value:{run:string;title:string}[])=>void,rejectAppend!:(error:Error)=>void;
+      const edit=vi.fn(()=>new Promise<void>((resolve,reject)=>{resolveCopy=resolve;rejectCopy=reject;}));
+      const start=vi.fn(()=>new Promise<void>((_resolve,reject)=>{rejectAppend=reject;}));
+      const projects=vi.fn(async()=>[{run:'target',title:'追加先'}]),inspect=vi.fn(async()=>({reason:'',confirm:start}));
+      let localDisplay:Parameters<ReturnType<ViewportFactory>['update']>[0];
+      const controller=createReviewWorkspace(new RecordedDocument().asDocument(),prepared,()=>({update(next){localDisplay=next;},setActive(){},camera(){},retry(){},dispose(){},read:()=>({display:localDisplay,token:'handoff-review',ready:true,issue:null,dragging:false,pins:[],projection:'perspective',axis:null})}),edit,{projects,inspect});
+      const local=record(controller.root),find=(label:string)=>all(local).find(n=>n.tag==='button'&&n.textContent===label)!;
+      const append=find('既存に追加'),copy=find('編集コピーを作る'),confirmCopy=find('コピーを作成'),confirmAppend=find('シーンを追加');
+      const selector=all(local).find(n=>n.attributes.get('aria-label')==='追加先')!;
+      try{
+        copy.click();confirmCopy.click();await vi.waitFor(()=>expect(edit).toHaveBeenCalledOnce());
+        expect(append.disabled).toBe(true);append.fire('click');confirmCopy.fire('click');expect(projects).not.toHaveBeenCalled();expect(inspect).not.toHaveBeenCalled();expect(start).not.toHaveBeenCalled();expect(edit).toHaveBeenCalledOnce();
+        rejectCopy(Error('held copy refusal'));await vi.waitFor(()=>expect(copy.disabled).toBe(false));expect(append.disabled).toBe(false);
+        projects.mockImplementationOnce(()=>new Promise(resolve=>{resolveProjects=resolve;}));append.click();expect(selector.disabled).toBe(true);
+        find('キャンセル').click();copy.click();confirmCopy.click();await vi.waitFor(()=>expect(edit).toHaveBeenCalledTimes(2));
+        resolveProjects([{run:'stale',title:'古い追加先'}]);await Promise.resolve();await Promise.resolve();
+        expect(append.disabled).toBe(true);expect(copy.disabled).toBe(true);expect(confirmAppend.disabled).toBe(true);expect(inspect).not.toHaveBeenCalled();
+        resolveCopy();await vi.waitFor(()=>expect(append.disabled).toBe(false));
+        append.click();await vi.waitFor(()=>expect(selector.disabled).toBe(false));expect(selector.document.activeElement===selector).toBe(true);
+        selector.value='target';selector.fire('change');await vi.waitFor(()=>expect(confirmAppend.disabled).toBe(false));
+        confirmAppend.click();await vi.waitFor(()=>expect(start).toHaveBeenCalledOnce());expect(copy.disabled).toBe(true);copy.fire('click');confirmCopy.fire('click');append.fire('click');expect(edit).toHaveBeenCalledTimes(2);expect(projects).toHaveBeenCalledTimes(2);
+        rejectAppend(Error('held append refusal'));await vi.waitFor(()=>expect(copy.disabled).toBe(false));expect(append.disabled).toBe(false);expect(confirmAppend.disabled).toBe(true);expect(selector.value).toBe('');
+        confirmAppend.fire('click');expect(start).toHaveBeenCalledOnce();
+      }finally{resolveCopy?.();controller.dispose();}
+    }
     // Inject an independently admitted optional-field omission at the pure View projection boundary.
     const noColor = structuredClone(prepared.inspection.review.snapshot), firstCaption = Object.values(noColor.captionsById as JsonObject)[0] as Record<string, JsonObject[string]>;
     delete firstCaption.colorSrgb;
@@ -7216,6 +7322,8 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const source = await openFileCaption(glb(j => { j.materials[0].name = '別モデル'; }), 'map2');
     const target = await openFileCaption(glb(), 'map2'), id = newId();
     let cold: Awaited<ReturnType<typeof openValidationHost>> | undefined;
+    let ui: ReturnType<typeof createValidationWorkspace> | undefined;
+    let finishMount: (() => void) | undefined;
     try {
       const output = await source.host.workspaceOutput.generateReview(source.host.read().source!.token, { sceneId: source.s.sceneId });
       const file = await source.host.workspaceOutput.download(output), review = await ReviewArchive.inspect(file, metadata);
@@ -7227,7 +7335,23 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       await target.workspace.dispose();
       target.fs.reject = () => false;
       cold = await openValidationHost(target.options);
-      const sceneId = (await cold.sceneAppend.retry(id))!;
+      const mountGate = new Promise<void>(resolve => { finishMount = resolve; });
+      const recovery = vi.spyOn(cold.authority.nativeConversionRecovery!, 'sourceRequired').mockImplementation(async () => { await mountGate; return false; });
+      const retry = vi.spyOn(cold.sceneAppend, 'retry');
+      let display: Parameters<ReturnType<ViewportFactory>['update']>[0] | undefined;
+      const factory: ViewportFactory = () => ({ update(next) { display = next; }, setActive() {}, camera() {}, retry() {}, dispose() {},
+        read: () => ({ ready: !!display, display, token: '1', pickToken: '1', pins: [], issue: null, dragging: false, projection: 'perspective', axis: null }) });
+      ui = createValidationWorkspace(new RecordedDocument().asDocument(), { fileLimits: budget, decode, productEditor: true,
+        selected() {}, list: async () => [], open: async () => cold!, render: async () => ({ factory, dispose() {} }) }, target.options.run);
+      const root = record(ui.root), all = (n: RecordedNode): RecordedNode[] => [n, ...n.children.flatMap(all)];
+      const resume = () => all(root).find(n => n.tag === 'button' && n.textContent === 'シーン追加を再開')!;
+      await vi.waitFor(() => expect(recovery).toHaveBeenCalledOnce());
+      expect(resume().disabled).toBe(true); resume().fire('click'); expect(retry).not.toHaveBeenCalled();
+      finishMount!(); await ui.ready;
+      expect(resume().disabled).toBe(false); resume().fire('click');
+      await vi.waitFor(() => expect(retry).toHaveBeenCalledOnce());
+      const sceneId = (await retry.mock.results[0]!.value)!;
+      await vi.waitFor(() => expect(all(root).some(n => n.className === 'lv-project-workspace')).toBe(true));
       const completed = cold.read();
       expect(completed.source!.originalChanges()).toHaveLength(before.source!.originalChanges().length + 1);
       expect(cold.authority.read().state.scenes[sceneId]?.id).toBe(sceneId);
@@ -7237,7 +7361,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       expect(await cold.sceneAppend.retry(id)).toBe(sceneId);
       expect(cold.read().source!.token).toBe(after);
       expect(cold.sceneAppend.jobs).toEqual([]);
-    } finally { await cold?.dispose(); await target.workspace.dispose(); await source.workspace.dispose(); }
+    } finally { finishMount?.(); await ui?.dispose(); await cold?.dispose(); await target.workspace.dispose(); await source.workspace.dispose(); }
   }, 60000);
   it('audits a fresh review-copy slot at entry and close and refuses closing failure or missing parent evidence',async()=>{
     const source=await openFileCaption(),id=await source.host.workspaceOutput.generateReview(source.host.read().source!.token,{sceneId:source.s.sceneId});
@@ -7879,6 +8003,11 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       expect(cold.read().source!.token).toBe(token);
       expect(seen).toEqual([{ ready: true, backup: false, reads: 0 }]);
       expect(cold.hasPending()).toBe(false);
+      seen.length = 0; await cold.refresh();
+      expect(seen).toEqual([{ ready: true, backup: false, reads: 0 }]);
+      seen.length = 0; await cold.workspaceFiles.receive(token, f.file);
+      expect(cold.read().source!.token).toBe(token); expect(cold.hasPending()).toBe(false);
+      expect(seen).toEqual([{ ready: true, backup: false, reads: 0 }]);
     } finally { spy.mockRestore(); await cold?.dispose(); }
   });
   it('keeps successful readonly preview history without rediscovery and owns the requested Review selection', async () => {
@@ -8910,6 +9039,26 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       body.value='未確定の入力';body.fire('input');body.fire('compositionstart');button('位置を調整').fire('click');expect(activation).toHaveBeenLastCalledWith(false);expect(body.value).toBe('未確定の入力');body.fire('compositionend');
       narrow=false;ui.render();expect(activation).toHaveBeenLastCalledWith(true);expect(display?.pinEdit).toBeUndefined();
     }finally{await ui.dispose();await mode.dispose();await f.workspace.dispose();}
+  });
+  it('keeps the existing viewport visible for compact drawing and releases it on returning to records', async () => {
+    const f = await openFileCaption(), document = new RecordedDocument().asDocument(); let active = false;
+    Object.assign(document, { defaultView: { innerWidth: 390, innerHeight: 844, matchMedia: () => ({ matches: true }), addEventListener() {}, removeEventListener() {}, setTimeout, clearTimeout } });
+    const mode = createValidationModeHost(f.host, async () => { throw Error('unexpected mode change'); }, () => {});
+    let display: Parameters<ReturnType<ViewportFactory>['update']>[0] | undefined;
+    const activation = vi.fn((next: boolean) => { active = next; });
+    const factory = vi.fn<ViewportFactory>(() => ({ update(next) { display = next; }, setActive: activation, camera() {}, retry() {}, dispose() {},
+      read: () => ({ ready: active, display, token: 'drawing-preview', issue: null, dragging: false, pins: [], projection: 'perspective', axis: null }) }));
+    const ui = createProductWorkspace(document, mode, factory), all = (n: RecordedNode): RecordedNode[] => [n, ...n.children.flatMap(all)];
+    const nodes = () => all(record(ui.root)), button = (text: string) => nodes().find(n => n.tag === 'button' && n.textContent === text)!;
+    const body = nodes().find(n => n.className === 'lv-project-body')!, token = f.host.read().source!.token;
+    try {
+      expect(activation).toHaveBeenLastCalledWith(false); expect(factory).toHaveBeenCalledOnce();
+      button('描画').fire('click'); expect(body.dataset.drawingPreview).toBe('true'); expect(activation).toHaveBeenLastCalledWith(true);
+      button('3D').fire('click'); expect(body.dataset.drawingPreview).toBe('false'); expect(activation).toHaveBeenLastCalledWith(true);
+      button('作業パネル').fire('click'); expect(body.dataset.drawingPreview).toBe('true'); expect(activation).toHaveBeenLastCalledWith(true);
+      button('キャプション').fire('click'); expect(body.dataset.drawingPreview).toBe('false'); expect(activation).toHaveBeenLastCalledWith(false);
+      expect(factory).toHaveBeenCalledOnce(); expect(nodes().filter(n => n.tag === 'canvas')).toHaveLength(1); expect(f.host.read().source!.token).toBe(token);
+    } finally { await ui.dispose(); await mode.dispose(); await f.workspace.dispose(); }
   });
   it.each(['task','cancel','search','closed']as const)('keeps the owned waiting-position focus through preparation without stealing %s focus',async destination=>{
     const f=await openFileCaption(),document=new RecordedDocument().asDocument();let active=false,ready=false,notify=()=>{};
@@ -10046,13 +10195,17 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const placement={translation:[0,0,0],rotationXYZW:[0,0,0,1],uniformScale:1},models=[0,1,2].map(i=>({shape:'render-glb',key:`r${i}`,assetId:`a${i}`,assetToProject:placement,
       representation:{id:`rep${i}`,contentKind:'mesh',role:'meshPrimary',blob:{byteLength:bytes.length},representationToAsset:{...placement,reflection:'none'},logicalBoundsAsset:source.bounds}} as unknown as ReadonlyRenderModel));
     const reads=vi.fn(async()=>source),decoder=vi.fn(async()=>({root:new THREE.Group(),materialLocators:new Map(),dispose:vi.fn()}));
-    const resources=createRasterResources({cpuBytes:12000+5*bytes.length,gpuBytes:0}),cache=await prepareReadonlyResidents(models,{modelContent:reads},decoder,true,resources);
+    const measured: [string, number][] = [];
+    const resources=createRasterResources({cpuBytes:12000+5*bytes.length,gpuBytes:0}),cache=await prepareReadonlyResidents(models,{modelContent:reads},decoder,true,resources,
+      (stage, ms) => { measured.push([stage, ms]); throw Error('renderer timing observer failure'); });
     await cache.ready;expect(reads).toHaveBeenCalledTimes(3);expect(resources.snapshot().cpuBytes).toBe(0);
     cache.demand!(models);await vi.waitFor(()=>expect(cache.state(models[2]!).phase).toBe('failed'));
     expect(cache.state(models[0]!).phase).toBe('ready');expect(cache.state(models[1]!).phase).toBe('ready');
     const count=reads.mock.calls.length;await cache.prepare(models);cache.demand!(models);await Promise.resolve();expect(reads).toHaveBeenCalledTimes(count);
     cache.demand!([models[2]!]);cache.retry!();await vi.waitFor(()=>expect(cache.state(models[2]!).phase).toBe('ready'));
     cache.dispose();await resources.dispose();expect(resources.snapshot().cpuBytes).toBe(0);
+    expect(new Set(measured.map(([stage]) => stage))).toEqual(new Set(['render.model.content', 'render.model.decode', 'render.model.load']));
+    expect(measured.every(([, ms]) => Number.isFinite(ms) && ms >= 0)).toBe(true);
     const one=createRasterResources({cpuBytes:12000+5*bytes.length,gpuBytes:0});let finish!:()=>void;
     const held=new Promise<void>(resolve=>{finish=resolve;}),startRead=vi.fn(async()=>source),single=await prepareReadonlyResidents([models[0]!],{modelContent:startRead},async()=>{await held;return decoder();},true,one);
     single.demand!([models[0]!]);finish();await single.ready;single.create(models[0]!).dispose!();

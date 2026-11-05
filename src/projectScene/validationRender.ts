@@ -25,6 +25,13 @@ import { trackGltfImages, snapshotTargets, assertTargetTables } from '../viewer/
 import { createRasterLoadScope, retainRasterModelReadStage } from '../viewer/rasterLoadScope';
 import type { RasterResources, ModelRasterFacts } from '../viewer/rasterResources';
 
+type ResidentTiming = (stage: string, milliseconds: number) => void;
+function measureResident<T>(timing: ResidentTiming | undefined, stage: string, action: () => Promise<T>): Promise<T> {
+  if (!timing) return action();
+  const started = performance.now();
+  return action().finally(() => { try { timing(stage, performance.now() - started); } catch { /* Diagnostics cannot change readiness or resource ownership. */ } });
+}
+
 export interface SavedModelResidentPort {
   readonly rasterResources?: RasterResources;
   demand?(models: readonly (ValidationModelClosure | ReadonlyRenderModel)[]): void;
@@ -117,15 +124,15 @@ export async function decodeValidationModel(source: ValidatedGlb, signal?: Abort
 
 /** Reusable resident cache, scoped to one opened validation Project; never shared metadata. */
 export async function prepareValidationResidents(versions: readonly DisplayModelVersion[], content: { modelContent?(record: JsonObject): Promise<ValidatedModel>; model?(record: JsonObject): Promise<ValidatedGlb> },
-  decode: (source: ValidatedGlb, signal?: AbortSignal) => Promise<DecodedValidationModel> = decodeValidationModel, progressive = false, resources?: RasterResources): Promise<ValidationResidentCache> {
+  decode: (source: ValidatedGlb, signal?: AbortSignal) => Promise<DecodedValidationModel> = decodeValidationModel, progressive = false, resources?: RasterResources, timing?: ResidentTiming): Promise<ValidationResidentCache> {
   const models = (rows: readonly DisplayModelVersion[]) => rows.map(v => {
     if (!isSavedModel(v.closure)) throw Error('実モデルの保存本体を選択してください。'); return renderModel(v.closure);
   });
-  const core = await prepareReadonlyResidents(models(versions), content, decode, progressive, resources);
+  const core = await prepareReadonlyResidents(models(versions), content, decode, progressive, resources, timing);
   return { ...core, label: c => versions.find(v=>v.assetId===renderModel(c).assetId)?.label??'3Dモデル', prepare: next => core.prepare(models(next)) };
 }
 export async function prepareReadonlyResidents(initial: readonly ReadonlyRenderModel[], content: { modelContent?(record: JsonObject): Promise<ValidatedModel>; model?(record: JsonObject): Promise<ValidatedGlb> },
-  decode: (source: ValidatedGlb, signal?: AbortSignal) => Promise<DecodedValidationModel> = decodeValidationModel, progressive = false, resources?: RasterResources) {
+  decode: (source: ValidatedGlb, signal?: AbortSignal) => Promise<DecodedValidationModel> = decodeValidationModel, progressive = false, resources?: RasterResources, timing?: ResidentTiming) {
   const lifetime = new AbortController();
   const templates = new Map<string, { record: string; model: DecodedValidationModel }>();
   type Checked = { record: string; point: boolean; classes: { locator: JsonObject; kind: 'basic' | 'standard' | 'phong' | 'unsupported' }[] };
@@ -143,16 +150,16 @@ export async function prepareReadonlyResidents(initial: readonly ReadonlyRenderM
   const loadSingle = (record: JsonObject, proxy = false) => {
     const blob = record.blob as JsonObject | undefined, count = blob?.byteLength;
     if (resources && (typeof count !== 'number' || !Number.isSafeInteger(count) || count < 0)) throw Error('保存したモデルの容量を確認してください。');
-    return retainRasterModelReadStage<ValidatedModel, DecodedValidationModel>(typeof count === 'number' ? count : 0, record.contentKind === 'gaussianSplat' ? undefined : resources,
-      () => content.modelContent ? content.modelContent(record) : content.model!(record), async source => {
+    return measureResident(timing, 'render.model.load', () => retainRasterModelReadStage<ValidatedModel, DecodedValidationModel>(typeof count === 'number' ? count : 0, record.contentKind === 'gaussianSplat' ? undefined : resources,
+      () => measureResident(timing, 'render.model.content', () => content.modelContent ? content.modelContent(record) : content.model!(record)), async source => {
         if (!same(nativeSpatialModelBounds(record, source), record.logicalBoundsAsset)) throw Error('保存したモデルの範囲が一致しません。');
         if (proxy && (isPointModel(source) || isGsModel(source))) throw Error('位置指定用の面を確認してください。');
         if (isGsModel(source)) return { gs: source, root: new THREE.Group(), materialLocators: new Map(), dispose() {} } as DecodedValidationModel;
         if (isPointModel(source)) return { point: source, root: new THREE.Group(), materialLocators: new Map(), dispose() {} } as DecodedValidationModel;
-        const model = await (isMeshSourceModel(source) ? decodeMeshSource(source, lifetime.signal, resources) :
+        const model = await measureResident<DecodedValidationModel>(timing, 'render.model.decode', () => isMeshSourceModel(source) ? decodeMeshSource(source, lifetime.signal, resources) :
           decode === decodeValidationModel ? decodeValidationModel(source, lifetime.signal, resources) : decode(source, lifetime.signal));
         return source.raster ? { ...model, raster: source.raster } : model;
-      });
+      }));
   };
   const load = async (c: ReadonlyRenderModel): Promise<DecodedValidationModel> => {
     const model = await loadSingle(c.representation);

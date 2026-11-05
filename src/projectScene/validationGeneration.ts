@@ -16,9 +16,9 @@ export function validationGenerationDatabases(options: Pick<Options, 'run' | 'op
 }
 
 export function validationGenerationService(scope: Pick<Awaited<ReturnType<typeof openWorkspaceGeneration>>, 'fs' | 'factory' | 'check'>,
-  options: Pick<Options, 'store' | 'fileLimits' | 'filePolicy' | 'decode' | 'jpeg' | 'photo' | 'mediaDecoders'>) {
+  options: Pick<Options, 'store' | 'fileLimits' | 'filePolicy' | 'decode' | 'jpeg' | 'photo' | 'mediaDecoders' | 'timing'>) {
   return { fs: scope.fs, factory: scope.factory, store: options.store,
-    ...validationProjectService(scope.fs, scope.factory, options.store, options.filePolicy ?? options.fileLimits, options.decode, scope.check, options.jpeg, options.photo,options.mediaDecoders) };
+    ...validationProjectService(scope.fs, scope.factory, options.store, options.filePolicy ?? options.fileLimits, options.decode, scope.check, options.jpeg, options.photo,options.mediaDecoders, options.timing) };
 }
 
 /** Inspect first-only controls before an original DB opener can be reached. No Session is fabricated. */

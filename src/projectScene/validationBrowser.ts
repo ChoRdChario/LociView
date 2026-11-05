@@ -78,11 +78,11 @@ export async function createValidationBrowserWorkspace(document: Document, compo
     list: reading => measureValidation(timing, 'catalog.total', () => listValidationProjects(options, storage, composition.progressivePresentation ? reading : undefined)),
     open: (id, initial, mode, workspaceFile, reviewEdit, firstBackup, standaloneWorkspace) => openValidationEntry({ ...options, run: id, initial, mode, workspaceFile, reviewEdit, firstBackup, standaloneWorkspace, openStorage: create => storage(id, create) }),
     renderModelCandidate: async (host, display) => {
-      const resident = await prepareReadonlyResidents(display.models, { modelContent: record => host.content.modelContent(record, true) }, undefined, false, raster);
+      const resident = await prepareReadonlyResidents(display.models, { modelContent: record => host.content.modelContent(record, true) }, undefined, false, raster, timing);
       return { factory: sceneViewportFactory(resident,composition.residency,undefined,composition.smoothDisplay), dispose: () => resident.dispose() };
     },
     renderReview: async view => {
-      const resident = await prepareReadonlyResidents(view.models, view.content, undefined, false, raster);
+      const resident = await prepareReadonlyResidents(view.models, view.content, undefined, false, raster, timing);
       try {
         const display = view.display(null, null);
         for (const model of view.models) resident.validate(model, display.savedMaterials?.[model.assetId]);
@@ -90,7 +90,7 @@ export async function createValidationBrowserWorkspace(document: Document, compo
       } catch (error) { resident.dispose(); throw error; }
     },
     render: async host => {
-      const resident = await prepareValidationResidents(host.authority.read().modelVersions!, host.content,undefined,composition.progressivePresentation,raster);
+      const resident = await prepareValidationResidents(host.authority.read().modelVersions!, host.content,undefined,composition.progressivePresentation,raster,timing);
       try {
         const prepare = async (next: ProjectDisplay) => {
           await resident.prepare(next.modelVersions!);

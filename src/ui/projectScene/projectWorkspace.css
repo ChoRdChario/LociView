@@ -312,7 +312,8 @@
 .lv-drawing-task > [aria-label="材質の更新候補"] { max-height: 35%; overflow: auto; }
 .lv-project-workspace .lv-project-marker[data-review="true"]::after { right: -1px; }
 .lv-camera-positions { position: absolute; top: 8px; right: 132px; z-index: 5; }
-.lv-camera-positions > summary { min-height: 44px; padding: 10px 8px; box-sizing: border-box; cursor: pointer; font-size: 13px; color: #fff; text-shadow: 0 1px 2px #111, 0 0 3px #111; }
+.lv-camera-positions > summary { min-height: 44px; padding: 10px 8px; box-sizing: border-box; cursor: pointer; font-size: 13px; color: #171c25; text-shadow: -1px 0 #fff, 1px 0 #fff, 0 -1px #fff, 0 1px #fff; }
+.lv-camera-positions > summary:focus-visible { outline: 2px solid #fff; outline-offset: -2px; box-shadow: 0 0 0 2px #202833; }
 .lv-camera-sheet { position: absolute; top: 100%; right: 0; box-sizing: border-box; width: min(360px, calc(100vw - 24px)); max-height: min(560px, calc(100dvh - 180px)); display: flex; flex-direction: column; overflow: hidden; padding: 12px; border: 1px solid #aaa99f; border-radius: 8px; background: #fbfaf6; box-shadow: 0 8px 24px #25282033; }
 .lv-camera-sheet [role="group"] { position: static; flex: 0 0 auto; background: #fbfaf6; }
 .lv-project-camera > .lv-camera-projection { position: absolute; top: 156px; right: 0; width: 112px; pointer-events: auto; font-size: 12px; }
@@ -371,4 +372,38 @@
   .lv-project-shell .lv-project-body [aria-label="シーン"] { padding-bottom: 0; }
   .lv-project-body > aside > .lv-caption-task[data-selected="true"]:not([data-editing="true"]):not([data-mobile-surface]) { grid-template-rows: minmax(0, 1fr) minmax(0, 1fr); }
   .lv-project-body > aside > .lv-caption-task[data-selected="true"]:not([data-editing="true"]):has(> .lv-caption-browser[data-few-rows="true"]):not([data-mobile-surface]) { grid-template-rows: fit-content(50%) minmax(0, 1fr); }
+}
+
+/* The existing canvas stays visible while compact Drawing controls preview it. */
+@media (max-width: 760px), (pointer: coarse) and (max-width: 950px) and (max-height: 480px) {
+  .lv-project-shell .lv-project-body[data-drawing-preview="true"] { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 40fr) minmax(0, 60fr); min-height: 0; }
+  .lv-project-shell .lv-project-body[data-drawing-preview="true"] > :is(.lv-project-stage,aside) { display: flex; height: auto; min-height: 0; }
+  .lv-project-shell .lv-project-body[data-drawing-preview="true"] > aside { border-top: 1px solid #c9c5bd; }
+  .lv-project-workspace[data-mobile-layout="true"] .lv-material-editor input { font-size: 16px; }
+  .lv-project-shell .lv-project-workspace[data-keyboard="true"] .lv-project-body[data-drawing-preview="true"] { grid-template-rows: minmax(0, 20fr) minmax(0, 80fr); }
+  .lv-project-workspace[data-keyboard="true"] .lv-project-body[data-drawing-preview="true"] :is(.lv-project-camera,.lv-camera-positions) { display: none; }
+}
+@media (max-width: 760px) and (max-height: 640px), (pointer: coarse) and (max-width: 950px) and (max-height: 480px) {
+  .lv-project-shell .lv-project-body[data-drawing-preview="true"] { grid-template-rows: minmax(0, 28fr) minmax(0, 72fr); }
+  /* The small preview retains direct orbit; all camera tools remain in full3D. */
+  .lv-project-body[data-drawing-preview="true"] :is(.lv-project-camera,.lv-camera-positions) { display: none; }
+}
+@media (max-width: 400px) {
+  .lv-project-shell .lv-project-workspace > header { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; }
+  .lv-project-shell .lv-project-workspace > header > .lv-project-identity { grid-row: 1; grid-column: 1; }
+  .lv-project-shell .lv-header-tools { display: contents; }
+  .lv-project-shell .lv-header-tools > details { grid-row: 1; }
+  .lv-project-shell .lv-header-tools > .lv-workspace-actions { grid-row: 2; grid-column: 1 / -1; flex-wrap: wrap; }
+  .lv-project-shell .lv-header-tools > details > summary,
+  .lv-project-shell .lv-header-tools > .lv-workspace-actions > button,
+  .lv-project-shell .lv-header-tools > .lv-workspace-actions > .lv-project-files > summary { white-space: nowrap; }
+  .lv-project-shell .lv-workspace-actions > :is(button,.lv-project-files) { flex: 0 0 auto; }
+}
+.lv-camera-pan { filter: drop-shadow(0 0 1px #fff); }
+@media (max-height: 480px) {
+  .lv-project-workspace:has(.lv-project-body[data-drawing-editing="true"]) > header > :is(.lv-project-identity,.lv-header-tools),
+  .lv-project-workspace:has(.lv-project-body[data-drawing-editing="true"]) > .lv-compact-navigation,
+  .lv-project-workspace:has(.lv-project-body[data-drawing-editing="true"]) .lv-sidebar-toolbar { display: none; }
+  .lv-project-workspace:has(.lv-project-body[data-drawing-editing="true"]) > header { padding-block: 0; }
+  .lv-project-workspace:has(.lv-project-body[data-drawing-editing="true"]) > header > .lv-operation-status:not(:empty) { position: static; max-width: none; flex: 1 1 100%; margin: 0; }
 }

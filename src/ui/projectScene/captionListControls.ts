@@ -13,7 +13,7 @@ export function createCaptionListControls(document: Document, onPlan: (plan: Cap
   const root = make('section'); root.className = 'lv-caption-browser'; root.setAttribute('aria-label', 'キャプション');
   const filters = make('div'); filters.className = 'lv-caption-search';
   const searchLabel = make('label', '検索'), search = make('input');
-  search.type = 'search'; search.placeholder = 'タイトル・本文'; search.setAttribute('aria-label', '検索');
+  search.type = 'search'; search.placeholder = 'このシーンのタイトル・本文'; search.setAttribute('aria-label', '検索');
   searchLabel.append(search);
   filters.append(searchLabel);
   const status = make('p'); status.className = 'lv-caption-status'; status.setAttribute('role', 'status');
@@ -165,7 +165,7 @@ export function createCaptionListControls(document: Document, onPlan: (plan: Cap
       }
       if (virtual) space(end, view.rows.length);
       if (!view.rows.length) { empty.textContent = view.issue ? '一覧を表示できません。' : view.total
-        ? '条件に一致するキャプションはありません。' : 'このシーンにキャプションはありません。'; nodes.push(empty); }
+        ? 'このシーンに条件に合うキャプションはありません。' : 'このシーンにキャプションはありません。'; nodes.push(empty); }
       orderChildren(list, nodes);
       if (virtual) {
         const anchor = layout.anchor(top); measureRows(); top = layout.restore(anchor, top);

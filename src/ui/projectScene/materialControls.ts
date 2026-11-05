@@ -240,7 +240,7 @@ export function createMaterialControls(document: Document, onPlan: (plan: Materi
     }
     const applyIssue = materialApplyIssue(next); apply.disabled = applyIssue !== null || !!scrub; apply.hidden = !d;
     cancel.hidden = !d; cancel.disabled = !d || Boolean(composing || d.composing) || inFlight;
-    remove.disabled = planMaterial(next, { kind: 'remove' }).kind !== 'remove'; remove.hidden = !view.record && !d;
+    remove.disabled = planMaterial(next, { kind: 'remove' }).kind !== 'remove'; remove.hidden = !view.record || !!d;
     retry.hidden = next.feedback.kind !== 'failed'; retry.disabled = next.feedback.kind !== 'failed' || !materialPlanIsCurrent(next.feedback.plan, next);
     let displayNotice:string|null=null;try{if(base)displayNotice=view.surface?.displayNotice?.(d?editMaterialIntent(base,d.edits,next.source.semanticProfile):base)??null;}catch{/* Invalid draft retains its normal field/apply error. */}
     const statusText = [emptyCatalog && !d ? null : view.targetIssue, ...view.issues, displayNotice, presentation?.viewing ? presentation.readBlock : next.mutationBlock, next.pending && 'ほかの操作を完了するか取り消してください。',

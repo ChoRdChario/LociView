@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import * as A from '@automerge/automerge'; // Node-only local Wasm initialization.
 import { MemoryFS, type ProjectMutationAuthority, type ProjectWorkspaceFS } from '../src/platform/fs';
-import { MetadataProjectSession, type MetadataSessionRead } from '../src/projectMetadata/session';
+import { MetadataProjectSession, measureMetadata, type MetadataSessionRead } from '../src/projectMetadata/session';
 import { MetadataRepository, type MetadataStorageFactory, type MetadataStoragePort } from '../src/projectMetadata/repository';
 import { PersistentContentVerifier, type VerifiedInventoryPort } from '../src/projectMetadata/contentEvidence';
 import { TransactionJournal } from '../src/projectMetadata/journal';
@@ -77,6 +77,22 @@ function textCandidates(source: NonNullable<Awaited<ReturnType<MetadataProjectSe
 }
 const fullSource = (source: ProjectMetadataSource): FullMetadataSource => ({
   packageId: id('pkg'), metadataBytes: source.encodeFullSource(), proof: source.proof, remoteHeads: source.heads,
+});
+
+describe('local metadata timing has no operation authority', () => {
+  it.each(['success', 'failure'] as const)('preserves the exact %s when its observer throws', async outcome => {
+    const value = Object.freeze({ checked: true }), error = Error('original operation failure'), seen: unknown[] = [];
+    const result = measureMetadata((stage, ms) => { seen.push([stage, ms]); throw Error('observer failure'); }, 'metadata.restore.test',
+      () => outcome === 'success' ? Promise.resolve(value) : Promise.reject(error));
+    if (outcome === 'success') expect(await result).toBe(value);
+    else await expect(result).rejects.toBe(error);
+    expect(seen).toHaveLength(1); expect(seen[0]).toEqual(['metadata.restore.test', expect.any(Number)]);
+    expect((seen[0] as [string, number])[1]).toBeGreaterThanOrEqual(0);
+  });
+  it('adds no promise wrapper without diagnostics', async () => {
+    const pending = Promise.resolve(Object.freeze({ checked: true }));
+    expect(measureMetadata(undefined, 'metadata.restore.test', () => pending)).toBe(pending);
+  });
 });
 
 describe('08b editor declaration transaction continuity', () => {

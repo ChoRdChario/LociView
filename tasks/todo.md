@@ -1,6 +1,6 @@
 # LociView active work
 
-Updated2026-11-05. This is the single current plan and check record.
+Updated2026-11-06. This is the single current plan and check record.
 [Inventory](implementation-inventory.md) owns route-specific coverage;
 [map](../PROJECT_MAP.md) and [document index](../docs/README.md) route contracts/code.
 Git owns checkpoint identity. [Retained checkpoint evidence](../docs/history/development-through-2026-10-29/tasks/todo-before-daily-authoring.md)
@@ -57,7 +57,161 @@ unchanged-feature-classification checks pass; independent review has no findings
 No runtime change or new capacity guarantee; no runtime suite is needed for this
 documentation checkpoint.
 
-## Current boundary —restore and reopen latency
+## Current boundary —PC and phone integrated quality pass
+
+PO2026-11-05 approved open/search/record/save/share/resume improvements against
+939d8a6, through independent review, automated verification and suitable g0 push.
+Root is the sole implementation writer. Preserve originals, history, typed
+Session commands and every write/readback/publication/recovery fence. No new
+dependency/schema/recipe, decoded cache beyond its owner,10k qualification,
+ordinary-public activation or release. Existing private audit drafts stay local.
+
+Implemented as one connected workflow:
+
+- Reuse the fresh settled Host result for receive/adoption/refresh display reads;
+  pending, failed, void-result and changed-owner paths remain fresh.
+- Add optional fixed-stage initialization/resume/model diagnostics without giving
+  the observer authority. Nested durations are not additive.
+- Share one readonly report for the exact same Worker within one offline inspect;
+  retain final registration/Worker/generation checks and fresh later inspections.
+- Keep one visible3D stage above phone Drawing, with bounded rows, narrow-header
+  layout and real draft/IME priority. Caption hides still release their resources.
+- Clarify3D/search/whole-sharing copy and camera contrast; pre-disclose checked
+  portable-media requirements and recheck the completed job. Reuse download URLs
+  only for the same job and freshly verified artifact hash/length; every download
+  still validates. Distinct jobs may retain distinct URLs until workspace close.
+- Allow same-owner/token saved Caption reading/search during output, retaining
+  all mutation/switch/receive/restore guards. File close/reopen keeps its job and
+  progress; new windows/attachments do not start while reading that saved text.
+- Give Review copy/append one handoff owner. Recovery controls register native
+  disabled state immediately, so a visible Scene-resume action cannot be ignored
+  while opening still awaits its source check. File/owner/readonly guards remain.
+
+Evidence and current checks (private artifacts: `.artifacts/e2e/quality-pass-20261105/`):
+
+| Lane | Executed result and qualification |
+|---|---|
+| Baseline | Immutable939 artifacts; initial Desktop7-case tour stopped deliberately before the full cohort, not a matrix PASS. Ki84 PC/touch daily3 trials each complete, streamed43-body hashes and closed-browser continuation. Point/500kSH4+Proxy tour4PASS. Phone Drawing cycles13.667/11.512/11.136s,9 new bitmaps each |
+| Independent review | UI, resources/performance, safety and later substantive UI/test corrections reviewed read-only; resolved inherited layout, closing-observer and progress-lifetime findings |
+| Final Desktop cohort |48 executed:46PASS/2FAIL, no retries/flaky/skips,1.8h. One failure was premature GS fit/pick; the other was one stale exact-copy assertion. All production-file hashes stayed identical for their repair |
+| Repaired original cases |2PASS10.4min: full Native07n conversion/edit/2-rounds/all outputs/restore/cold and workspace completion/receive/conflict flow. This is46 cohort PASS plus2 repaired cases, not one all-green48-case command. New assertions were not retrospectively executed in the other Native fixtures |
+| GS failure analysis | Retained small source: GS selected/fit/pick all occurred during public loading; rectangle/buffer stayed fixed. Same artifact/input with ready-before-fit, then one pick and visible coordinates, passes59.8s. Fix test preconditions/visibility only; no target/global-ready/renderer-math change. Independent review agrees |
+| Phone recovery | Held-mount unit and original browser prepared-Scene resume pass; native disabled state, single explicit resume, saved output/cold and no double addition. Also passes in the full cohort |
+| Offline |5PASS9.8min, including browser/server full shutdown, Mesh/Point/500kSH4/Proxy/media, edit/save/cold, initial conversion, update/removal/ownership and retained Project data. Same-source root/A/B/directory-base test builds; not physical-iOS evidence |
+| Final checkpoint | PASS17.0min: typecheck;147 files/3304 tests PASS and21 pre-existing TODO; ordinary/harness/validation/Desktop/offline builds; offline isolation14SRI resources. Earlier incomplete checkpoint is not substituted |
+| Final additional lanes | HEIC isolation PASS; Drawing cycles0.886/0.788/0.748s with0 new bitmaps, one visible canvas; Ki84 after3PC+3touch PASS; installed Edge and Chrome each actual restore/edit/output/body hashes/closed-browser continuation PASS. Small ordinary create/Caption/PNG/save/reload PASS, create-ready1.437s. Real Ki84390×844 Drawing footer initial/Tab full44px and hit/cancel-selection PASS; no new layout defect reproduced |
+
+All earlier failures/stops remain in the private logs, including corrected
+diagnostic ZIP buffering/locator mistakes, a sandbox socket setup that never
+started browser acceptance and an overlong diagnostic profile that failed before
+GS. Do not count those as product passes or erase their evidence.
+
+Measured limits already known:
+
+- The identical178MB Review pair reaches editor167.051→165.599s and
+  display178.464→178.118s (one pair; no demonstrated speed gain). Candidate
+  backup155.480s; its existing saved output's3 bodies and cold body29.423s pass.
+  An invalid anonymous-Review identity assumption in the private driver failed
+  after download; finish that saved profile instead of rerunning the long copy.
+- In that backup, separate ready-before/final/finish take39.121/38.227/37.042s.
+  Their114.390s sum is not the nested finish/generation sum or promised savings.
+  The full-cohort500k copy does pass its unchanged240s condition at162.314s;
+  this does not make its waiting time comfortable or a general PC guarantee.
+- Small whole output varies:12.619s in one focused run,9.922s in the full cohort.
+  Do not declare the10s development target stably met from the faster run.
+
+Remaining judgment boundaries are isolated and **unimplemented**:
+1. [06b§6.2](../docs/specs/06b-staging-read-operations-proposal.md): first prove
+   actual repeated artifacts, then share ZIP integrity evidence inside one
+   outputReady only. Keep3fresh ready fences, capture, write/readback and recovery
+   separate. Same-read external corruption detection may move to the next fresh
+   check; existing§6.1 does not authorize this lifetime. Reviewed proposal only.
+2. [09§10](../docs/specs/09-desktop-offline-candidate-proposal.md): same-build/SRI
+   boot-resource repair needs an exception to§8's network-fallback prohibition.
+   Missing HTML/entry JS currently cannot reach in-app repair even online. No
+   fallback, force activation/reload, Project change or adoption credit is added.
+
+Performance interpretation and next boundary:
+
+- Same Ki84 input/history, dedicated Chromium,1280×720 PC and390×844/DPR2 touch,
+  three trials each before/after. Original backup SHA256 and all43 output bodies
+  checked; streamed body validation retained. OS chooser waiting is excluded.
+  Trial1 contains the same extra Drawing inspection before/after. These are
+  observed local timings, not an ordinary-PC/iPhone guarantee or proof of one
+  optimization's isolated effect. Preparation measures are nested/non-additive.
+- Top resume first text is distinct from ready record controls and ready3D.
+  Apply/download remain slower than100ms/1s targets; small output10s is variable.
+  Drawing↔3D median11.512→0.788s with9→0 new bitmaps is bounded to keeping the
+  existing visible stage; Caption hides still release/reprepare it.
+- Installed Edge/Chrome actual backup chain passes, including saved-text reading
+  during output135/121ms. No remote request or page error was recorded. This is
+  not iOS/native IME/file/thermal, actual browser200% zoom or low-spec-PC evidence.
+- Existing21TODOs remain unexecuted: legacy typed evidence/admission policy,
+  future envelope/optimized cleanup and real-lock evidence API qualifications.
+  They were neither added nor counted as PASS. Current ProjectScene fault and
+  two-window browser coverage does not retrospectively satisfy those legacy TODOs.
+- Initial restore stages (PCtrial1 seconds): input1.247, model-plan3.547,
+  model-stage15.635, journal-stage2.531, prepared-bodies2.406, restore-bodies2.312,
+  persist/readback0.643, saved-content0.374, publish1.297, published-readback1.080.
+  Model-stage includes actual body work; restore.resume31.045 is a parent, not
+  an additional cost. Normal small create has resume stages, not restore-input.
+- Top PCtrial1 still spends catalog5.009s, generation-open3.970s and Session-open
+  1.152s before model load5.311s(content1.960/decode3.349). Cross-owner reuse is
+  not silently added. The next performance work is the reviewed06b§6.2 decision;
+  boot repair09§10 is a separate reliability decision. Neither is implemented.
+
+### Matched Ki84 timings
+
+Seconds; entries show trial1/2/3 and median in parentheses. File generation is the
+action→browser download event; transfer adds saving that generated file in the
+test environment, not a guarantee that every user's chosen disk has persisted it.
+
+
+PC:
+
+| Action | Before | After |
+|---|---|---|
+| File preview | 7.512/6.778/8.597 (7.512) | 4.223/4.314/4.157 (4.223) |
+| Initial restore: text | 88.304/114.046/97.550 (97.550) | 43.642/46.237/47.443 (46.237) |
+| Initial restore: records ready | 127.436/160.538/139.527 (139.527) | 62.776/65.308/67.000 (65.308) |
+| Initial restore:3D ready | 127.656/160.795/139.761 (139.761) | 62.871/65.408/67.093 (65.408) |
+| Top resume: text | 14.635/15.756/13.386 (14.635) | 5.237/5.380/5.136 (5.237) |
+| Top resume: records ready | 34.613/38.104/28.435 (34.613) | 12.386/12.567/12.001 (12.386) |
+| Top resume:3D ready | 46.600/52.467/38.424 (46.600) | 18.631/19.409/18.068 (18.631) |
+| Apply body | 14.249/35.833/10.786 (14.249) | 7.642/8.053/7.606 (7.642) |
+| Generate→download event | 46.010/74.173/59.144 (59.144) | 23.523/24.129/23.691 (23.691) |
+| Generate→file transfer | 48.597/77.963/62.704 (62.704) | 24.494/25.762/24.671 (24.671) |
+| Direct resume: records | 27.876/36.284/25.562 (27.876) | 10.508/11.732/10.522 (10.522) |
+| Direct resume:3D | 40.763/51.048/37.428 (40.763) | 16.846/18.462/16.587 (16.846) |
+| Direct resume: edited body verified | 41.343/51.768/38.432 (41.343) | 17.122/18.759/16.914 (17.122) |
+
+TOUCH:
+
+| Action | Before | After |
+|---|---|---|
+| File preview | 8.583/7.078/7.966 (7.966) | 4.255/4.266/4.358 (4.266) |
+| Initial restore: text | 135.238/95.356/117.083 (117.083) | 43.632/43.848/45.303 (43.848) |
+| Initial restore: records ready | 179.061/129.066/164.579 (164.579) | 61.665/62.118/64.681 (62.118) |
+| Initial restore:3D ready | 193.386/140.523/179.961 (179.961) | 67.483/67.975/71.087 (67.975) |
+| Top resume: text | 19.634/12.714/19.849 (19.634) | 5.231/5.296/5.270 (5.270) |
+| Top resume: records ready | 42.223/27.828/43.006 (42.223) | 12.031/12.139/12.131 (12.131) |
+| Top resume:3D ready | 67.227/51.225/69.960 (67.227) | 23.756/23.360/23.417 (23.417) |
+| Apply body | 20.858/17.815/20.513 (20.513) | 7.563/7.487/7.396 (7.487) |
+| Generate→download event | 50.459/56.053/59.562 (56.053) | 22.465/22.607/22.465 (22.465) |
+| Generate→file transfer | 53.482/61.182/60.985 (60.985) | 23.401/23.585/23.360 (23.401) |
+| Direct resume: records | 25.433/28.203/32.905 (28.203) | 11.115/10.825/11.168 (11.115) |
+| Direct resume:3D | 46.548/51.025/56.418 (51.025) | 21.740/21.677/21.862 (21.740) |
+| Direct resume: edited body verified | 47.391/51.806/57.390 (51.806) | 22.107/22.012/22.195 (22.107) |
+
+Source/test final hashes673 remain fixed after verification. The4191 preview
+serves an immutable final artifact; all20 served files match SHA256/size.
+The checked synthetic sample is kept locally. Deliver this suitable checkpoint
+to g0; exact-head CI status belongs to GitHub Actions and the delivery report.
+No private ZIP/audit/fixture is staged; no main/deploy/release.
+The local checked sample is synthetic, not the private Ki84 source. Device and
+unapproved-contract qualifications above remain open rather than being passed.
+
+## Completed boundary —restore and reopen latency
 
 PO2026-11-05 authorizes this integrated implementation, automatic verification,
 independent review and suitable g0 checkpoint. No per-control/Todo approval or

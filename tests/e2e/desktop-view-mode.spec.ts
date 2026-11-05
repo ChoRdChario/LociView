@@ -193,7 +193,7 @@ test('view mode hides editing while preserving reading, local display, existing 
     await expect(p.getByRole('region',{name:'キャプション',exact:true})).toBeVisible();
     const captions = p.getByRole('region', { name: 'キャプション', exact: true }); await captions.locator('.lv-caption-search').getByLabel('検索', { exact: true }).fill('現地'); await expect(p.locator('.lv-caption-select')).toHaveCount(1);
     await p.locator('.lv-caption-select').click(); await expect(detail).toBeVisible();
-    await detail.getByRole('button', { name: '比較に表示', exact: true }).click(); await expect(p.locator('.lv-caption-window')).toBeVisible();
+    await detail.getByRole('button', { name: '3D上に表示', exact: true }).click(); await expect(p.locator('.lv-caption-window')).toBeVisible();
     await expect(p.getByRole('region', { name: 'メディア', exact: true }).locator('img').first()).toBeVisible();
     if (await menu.evaluate(n => (n as HTMLDetailsElement).open)) await menu.locator(':scope > summary').click();
     await p.screenshot({ path: info.outputPath('view-caption.png'), fullPage: false });
@@ -214,13 +214,13 @@ test('view mode hides editing while preserving reading, local display, existing 
     await expect(p.getByRole('button', { name: '更新を受け取る', exact: true })).toHaveCount(0);
     await files.getByText('作成したファイル', { exact: true }).click(); const [existing] = await Promise.all([p.waitForEvent('download'), files.getByRole('button', { name: 'ダウンロード', exact: true }).click()]); expect(await existing.failure()).toBeNull(); await menu.locator(':scope > summary').click();
     await revealWorkPanel(p); await tab('キャプション').click(); await p.setViewportSize({ width: 390, height: 844 }); await p.screenshot({ path: info.outputPath('view-narrow.png'), fullPage: false });
-    await p.getByRole('button',{name:'3D・比較',exact:true}).click(); await expect(p.getByLabel('3Dモデルの表示',{exact:true})).toBeVisible();if(await p.locator('.lv-camera-sheet-header').getByRole('button',{name:'閉じる',exact:true}).isVisible())await p.locator('.lv-camera-sheet-header').getByRole('button',{name:'閉じる',exact:true}).click();
-    const compass=p.locator('.lv-project-camera');await compass.getByRole('button',{name:'Y',exact:true}).press('Enter');await expect(compass.getByRole('button',{name:'Y',exact:true})).toHaveAttribute('aria-pressed','true');await p.getByRole('button',{name:'3D・比較',exact:true}).focus();
+    await p.getByRole('button',{name:'3D',exact:true}).click(); await expect(p.getByLabel('3Dモデルの表示',{exact:true})).toBeVisible();if(await p.locator('.lv-camera-sheet-header').getByRole('button',{name:'閉じる',exact:true}).isVisible())await p.locator('.lv-camera-sheet-header').getByRole('button',{name:'閉じる',exact:true}).click();
+    const compass=p.locator('.lv-project-camera');await compass.getByRole('button',{name:'Y',exact:true}).press('Enter');await expect(compass.getByRole('button',{name:'Y',exact:true})).toHaveAttribute('aria-pressed','true');await p.getByRole('button',{name:'3D',exact:true}).focus();
     await expect(p.getByRole('tooltip')).toBeHidden();
     await expect(p.locator('.lv-caption-window').getByRole('button',{name:'閉じる',exact:true})).toBeInViewport();
     await p.screenshot({path:info.outputPath('narrow-stage.png'),fullPage:false});
     await p.locator('.lv-caption-window').getByRole('button',{name:'閉じる',exact:true}).click();await expect(p.locator('.lv-caption-window')).toHaveCount(0);
-    await p.getByRole('button',{name:'作業パネル',exact:true}).click();await expect(detail).toBeVisible();await detail.getByRole('button',{name:'比較に表示',exact:true}).click();await p.setViewportSize({ width: 1440, height: 1000 });
+    await p.getByRole('button',{name:'作業パネル',exact:true}).click();await expect(detail).toBeVisible();await detail.getByRole('button',{name:'3D上に表示',exact:true}).click();await p.setViewportSize({ width: 1440, height: 1000 });
     await p.getByRole('button', { name: '編集する', exact: true }).click(); await expect(p.getByRole('button', { name: '閲覧する', exact: true })).toBeEnabled();
     await expect(p.getByRole('list',{name:'キャプション一覧',exact:true})).toBeVisible();await expect(captions.locator('.lv-caption-search').getByLabel('検索', { exact: true })).toHaveValue('現地');await p.locator('.lv-caption-select').click(); await expect(detail.getByLabel('本文', { exact: true })).toHaveValue('確認する本文\n二行目');
     await detail.getByLabel('本文', { exact: true }).fill('閲覧から戻って編集'); await expect(p.getByRole('button', { name: '閲覧する', exact: true })).toBeDisabled();

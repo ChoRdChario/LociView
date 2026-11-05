@@ -451,6 +451,7 @@ export const projectSceneApplicationImports:Readonly<Record<string,readonly stri
     "../projectMetadata/materialResolution",
     "../projectMetadata/persistence",
     "../projectMetadata/repository",
+    "../projectMetadata/requiredCapabilities",
     "../projectMetadata/session",
     "../projectPackage/backupArchive",
     "../projectPackage/backupRestoreJob",

@@ -21,14 +21,12 @@ async function output(p: Page, info: TestInfo, name: string, purpose: 'backup' |
   const area = p.getByRole('region', { name: 'ファイル', exact: true }),compact=await revealFileSurface(p,purpose==='backup'?'保存':'共有'); if(!compact)await area.getByRole('button', { name: purpose === 'backup' ? '保存' : '相手に渡す', exact: true }).click();
   if (purpose === 'backup') await area.getByLabel('名前（任意）', { exact: true }).fill(name); else await selectShareOutput(area, purpose);
 
-  await area.locator('button.lv-file-primary').click();
+  await expect(area.locator('.lv-file-intents')).toContainText('HEIC原本と表示用PNGの組');
+  const [download] = await Promise.all([p.waitForEvent('download', { timeout: 90_000 }), area.locator('button.lv-file-primary').click()]);
   await expect(area.locator('.lv-operation-status')).toHaveAttribute('data-busy', 'false', { timeout: 90_000 });
   const history = area.locator('details').filter({ has: p.locator('summary', { hasText: '作成したファイル' }) });
   if (!await history.evaluate(n => (n as HTMLDetailsElement).open)) await history.locator(':scope > summary').click();
   await expect(history).toContainText('HEIC原本と表示用PNGの組');
-  const row = history.locator('section').filter({ hasText: purpose === 'backup' ? 'バックアップ' : '作業一式' })
-    .filter({ hasText: 'HEIC原本と表示用PNGの組' });
-  const [download] = await Promise.all([p.waitForEvent('download', { timeout: 90_000 }), row.getByRole('button', { name: 'ダウンロード', exact: true }).click()]);
   const path = info.outputPath(name + '.zip'); await download.saveAs(path); expect(await download.failure()).toBeNull(); await closeFileSurface(p);return path;
 }
 async function open(p: Page, path: string) { await p.getByLabel('ファイルを選択', { exact: true }).setInputFiles(path); await p.getByRole('button', { name: 'ファイルを開く', exact: true }).click(); }

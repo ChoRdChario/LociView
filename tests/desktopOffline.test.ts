@@ -34,6 +34,14 @@ describe('dedicated offline app shell ownership (no Project/storage authority)',
     await f.port.prepare();expect(f.port.read().phase).toBe('reopen');expect(f.sw.register).toHaveBeenCalledWith(script,{scope:origin,updateViaCache:'none'});expect(f.reg.update).not.toHaveBeenCalled();
     f.sw.controller=f.reg.active;await f.port.recheck();expect(f.port.read().phase).toBe('ready');expect(f.browser.location.reload).not.toHaveBeenCalled();
   });
+  it('checks a shared active/controller worker once per inspection and checks it afresh next time', async () => {
+    const f = fixture(), active = new Worker(); f.reg.active = active; f.sw.controller = active; f.all = [f.reg];
+    const query = vi.spyOn(active, 'postMessage');
+    await f.port.recheck(); expect(f.port.read().phase).toBe('ready'); expect(query).toHaveBeenCalledTimes(1);
+    active.complete = false;
+    await f.port.recheck(); expect(f.port.read().phase).toBe('error'); expect(query).toHaveBeenCalledTimes(2);
+    expect(f.sw.register).not.toHaveBeenCalled(); expect(f.reg.unregister).not.toHaveBeenCalled();
+  });
   it('binds completeness to the controlling/current build and reports a waiting update without activating it',async()=>{
     const f=fixture(),old=new Worker('old');f.reg.active=old;f.sw.controller=old;f.all=[f.reg];
     await f.port.recheck();expect(f.port.read().phase).toBe('error');
