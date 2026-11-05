@@ -1394,11 +1394,12 @@ describe('new-workspace metadata persistence service (memory ports, not device/a
     const repositoryId = (await new TransactionJournal(h.fs, limits).entries())[0]!.start.repositoryId;
     const originals = (source: ProjectMetadataSource) => source.originalChanges().map(bytes => [A.decodeChange(bytes).hash, [...bytes]]).sort(([a], [b]) => String(a).localeCompare(String(b)));
     for (const target of [rightFirst ? right : left, joined, local, expected]) {
-      let failure: unknown;
-      try { await underWriteLease(h.fs, () => repository.persist(repositoryId, target)); } catch (error) { failure = error; }
+      let failure: unknown, verified: ProjectMetadataSource | undefined;
+      try { verified = await underWriteLease(h.fs, () => repository.persist(repositoryId, target)); } catch (error) { failure = error; }
       const stored = (await new MetadataRepository(h.fs, storage, limits).read(repositoryId, first.proof))!;
       expect(stored.token).toBe(target.token); expect(originals(stored)).toEqual(originals(target));
       expect(failure).toBeUndefined();
+      expect(verified?.token).toBe(target.token); expect(originals(verified!)).toEqual(originals(stored));
     }
     const actual = (await new MetadataRepository(h.fs, storage, limits).read(repositoryId, first.proof))!;
     expect(textCandidates(actual, 'title')).toEqual([{ kind: 'value', value: '二巡目の題名' }]);
@@ -1461,6 +1462,22 @@ describe('new-workspace metadata persistence service (memory ports, not device/a
     expect(after.at(-1)!.start).toEqual(entries.at(-1)!.start);
     expect((await repository.read(start.repositoryId, start.proof))!.includesDeclaredEditorNames).toBe(true);
     expect((await h.session().read()).state).toBe('pending');
+  });
+  it.each(['missing', 'corrupt'] as const)('returns no durable source when adapter readback is %s', async fault => {
+    const h = setup(), first = await h.session().create(h.records);
+    const start = (await new TransactionJournal(h.fs, limits).entries())[0]!.start;
+    const repository = new MetadataRepository(h.fs, h.storage, limits);
+    const doc = A.change(A.load<Record<string, any>>(first.source!.encodeFullSource()), { time: 0 }, draft => {
+      draft.captionsById[id('cap')].body = new A.ImmutableString(json('保存後照合の故障試験'));
+    });
+    const target = ProjectMetadataSource.reopen(A.getAllChanges(doc), first.source!.proof, limits);
+    h.fault.afterSave = () => {
+      if (fault === 'missing') h.rows.clear();
+      else for (const key of h.rows.keys()) h.rows.set(key, new Uint8Array([1, 2, 3]));
+    };
+    let returned: ProjectMetadataSource | undefined;
+    await expect(underWriteLease(h.fs, async () => { returned = await repository.persist(start.repositoryId, target); })).rejects.toThrow();
+    expect(returned).toBeUndefined();
   });
   it('fails closed on lost authority after an adapter write; the next retry may use the already stored exact changes', async () => {
     const h = setup(), writer = h.session(), first = await writer.create(h.records);

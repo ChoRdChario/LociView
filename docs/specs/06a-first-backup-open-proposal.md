@@ -297,3 +297,19 @@ Independent contract/security and source reviews PASS2026-10-29: this uses the
 existing fresh-read boundary, not a new PO policy. Focused11 cases PASS. Exact
 browser measurement, integrated acceptance and final-check results belong in todo;
 this paragraph does not supply unexecuted runtime or adoption evidence.
+
+### Read-only text during first restoration
+
+After initialization returns its verified ProjectDisplay, the existing display
+callback may resolve its actual startup Scene and show plain title/body values
+in the transient text reader during display preparation, Selection and adoption.
+This is labelled as restoration in progress. It mounts no ordinary workspace,
+provider authority, edit/save command, image, pin or camera before Selection.
+Only valid resolved value fields are included; no raw archive candidates or
+guessed Scene/token are used. Search/selection are UI-only and may transfer only
+through the existing actual-token-checked reader handoff after adoption. Finish
+IME composition before replacing the reader; disposal/stale ownership/failure
+clears it. All initialization, display, Selection and recovery checks remain.
+Verify reading while preparation is held, failed/disposed cleanup and ordinary
+PC/touch edit/save/reopen after completion. This adds no renderer cache or
+initialization-time validation exception.

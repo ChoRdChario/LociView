@@ -2840,9 +2840,13 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     await f.receiver.session.editCaption(before.source!.token, f.captionId, 'title', '変更分の記録');
     return { f, r, sent: await contributionFile(f.receiver.session, f.fs, f.store) };
   }
-  async function restoreFileFixture() {
+  async function restoreFileFixture(withSceneCaption = false) {
     const f = await workspaceFileFixture(); await f.receiverService.receive(f.local.source!.token, f.file);
-    const session = f.reopen().session, current = await session.read(), sender = new WorkspaceSender(f.fs, session, f.store, metadata, f.locks);
+    const session = f.reopen().session, sender = new WorkspaceSender(f.fs, session, f.store, metadata, f.locks);
+    let current = await session.read();
+    if (withSceneCaption) current = await session.edit(current.source!.token, { kind: 'include',
+      sceneId: (f.prepared.records.project as JsonObject).defaultSceneId as string, resourceKind: 'caption', resourceId: f.captionId,
+      membershipId: `scm_${newId()}`, orderKey: 'A', eventId: `evt_${newId()}` });
     const backupId = await sender.generateBackup(current.source!.token), file = await sender.download(backupId);
     const factories = new Map<string, MetadataStorageFactory>();
     const databases: RestoreDatabasePorts = {
@@ -2918,14 +2922,19 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect(vi.mocked(r.databases.open).mock.calls.filter(([, create]) => create)).toHaveLength(1);
   }, 60_000);
   it('confirms and cancels first backup opening from the unified picker, then edits, saves and cold-reopens the selected Project', async () => {
-    const f = await restoreFileFixture(), r = await firstBackupHostFixture(f.backupFile); let current: Awaited<ReturnType<typeof openValidationHost>> | undefined;
+    const f = await restoreFileFixture(true), r = await firstBackupHostFixture(f.backupFile); let current: Awaited<ReturnType<typeof openValidationHost>> | undefined;
+    let previewSearch: RecordedNode | undefined;
+    const document = new RecordedDocument();
     let release!:()=>void;const ready=new Promise<void>(resolve=>{release=resolve;});
     const factory: ViewportFactory = () => ({ update() {}, setActive() {}, camera() {}, retry() {}, dispose() {}, read: () => ({ ready: true, display: undefined, token: '1', pickToken: '1', pins: [], issue: null, dragging: false, projection: 'perspective', axis: null }) });
     const render=vi.fn(async()=>({factory,ready,dispose(){}}));
-    const ui = owned(createValidationWorkspace(new RecordedDocument().asDocument(), { ...r.options, productEditor: true,
+    const ui = owned(createValidationWorkspace(document.asDocument(), { ...r.options, productEditor: true, progressivePresentation: true,
       list: () => listValidationProjects(r.options, r.openStorage), selected() {}, render,
       open: async (run, initial, mode, workspaceFile, reviewEdit, firstBackup) => { const opened = await openValidationEntry({ ...r.options, run, initial, mode, workspaceFile, reviewEdit, firstBackup });
-        if (!('kind' in opened)) current = opened; else { const confirm = opened.confirm.bind(opened); opened.confirm = async prepare => current = await confirm(prepare); } return opened; } }));
+        if (!('kind' in opened)) current = opened; else { const confirm = opened.confirm.bind(opened), dispose = opened.dispose.bind(opened);
+          opened.confirm = async prepare => current = await confirm(prepare);
+          opened.dispose = async () => { document.activeElement = null; await dispose(); };
+        } return opened; } }));
     const root = record(ui.root), all = (n: RecordedNode): RecordedNode[] => [n, ...n.children.flatMap(all)], input = all(root).find(n => n.attributes.get('aria-label') === 'ファイルを選択')!,
       button = (label: string) => all(root).filter(n => n.tag === 'button' && n.textContent === label).at(-1)!;
     await vi.waitFor(() => expect(button('ファイルを開く').disabled).toBe(false));
@@ -2937,8 +2946,25 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     choose(); await vi.waitFor(() => expect(button('バックアップから復元')?.disabled).toBe(false)); button('バックアップから復元').fire('click');
     expect(button('バックアップから復元').disabled).toBe(true); expect(button('キャンセル').disabled).toBe(true);
     expect(all(root).some(n => n.textContent === 'バックアップから復元しています。')).toBe(true);
-    try{await vi.waitFor(()=>expect(render).toHaveBeenCalledOnce(),{timeout:20000});expect(current).toBeUndefined();expect(all(root).some(n=>n.className==='lv-project-workspace')).toBe(false);}finally{release();}
+    try{await vi.waitFor(()=>expect(render).toHaveBeenCalledOnce(),{timeout:20000});expect(current).toBeUndefined();expect(all(root).some(n=>n.className==='lv-project-workspace')).toBe(false);
+      const reader=all(root).find(n=>n.attributes.get('aria-label')==='復元中のキャプション')!;expect(reader).toBeDefined();
+      expect(all(root).find(n=>n.parent===root&&n.tag==='button'&&n.textContent==='選択を取り消す')!.hidden).toBe(true);
+      const find=(n:RecordedNode):RecordedNode[]=>[n,...n.children.flatMap(find)];
+      expect(find(reader).some(n=>n.textContent==='復元しています。完了後に編集できます。')).toBe(true);
+      const search=find(reader).find(n=>n.tag==='input')!;search.value='';search.fire('input');
+      const rows=find(reader).find(n=>n.tag==='ul')!.children;expect(rows.length).toBeGreaterThan(0);
+      rows[0]!.children[0]!.fire('click');expect(find(reader).find(n=>n.attributes.get('aria-label')==='キャプションの詳細')!.hidden).toBe(false);
+      expect(find(reader).some(n=>n.tag==='input'&&n.attributes.get('type')==='file'||n.tag==='textarea')).toBe(false);
+      previewSearch=search;search.focus();search.fire('compositionstart');search.value='最初';search.fire('input');
+    }finally{release();}
+    await vi.waitFor(()=>expect(current).toBeDefined(),{timeout:20000});
+    expect(all(root).some(n=>n.className==='lv-project-workspace')).toBe(false);
+    previewSearch!.fire('compositionend');
     await vi.waitFor(() => expect(all(root).some(n => n.className === 'lv-project-workspace')).toBe(true), { timeout: 20000 });
+    const editor=all(root).find(n=>n.className==='lv-project-workspace')!;
+    const captionBrowser=all(editor).find(n=>n.className.split(' ').includes('lv-caption-browser'))!;
+    expect(all(captionBrowser).find(n=>n.attributes.get('aria-label')==='検索')!.value).toBe('最初');
+    await vi.waitFor(()=>expect(document.activeElement).toBe(all(captionBrowser).find(n=>n.attributes.get('aria-label')==='検索')));
     expect(current!.read().source!.originalChanges()).toEqual(r.inspection.source.originalChanges());
     await current!.dispatch(current!.read().source!.token, { kind: 'editCaption', captionId: f.captionId, edits: { body: '復元した端末での記録' } });
     const edited = current!.read().source!, saved = await current!.workspaceOutput.download(await current!.workspaceOutput.generateBackup(edited.token, '初回復元後の保存'));
@@ -2946,6 +2972,48 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     await ui.dispose(); const cold = owned(await openValidationEntry(r.options)); if ('kind' in cold) throw Error('selected Host');
     expect(cold.read().source!.originalChanges()).toEqual(edited.originalChanges()); expect(r.openStorage).not.toHaveBeenCalled();
   }, 60_000);
+  it.each(['failure', 'dispose', 'render-dispose', 'composition-dispose'] as const)('clears first-restore text without exposing commands after %s', async outcome => {
+    const f = await restoreFileFixture(true), r = await firstBackupHostFixture(f.backupFile);
+    let reject!: (error: Error) => void, finish!: () => void, confirmed: Awaited<ReturnType<typeof openValidationHost>> | undefined;
+    const ready = new Promise<void>((resolve, fail) => { finish = resolve; reject = fail; }), release = vi.fn();
+    let finishRender!: () => void; const renderGate = new Promise<void>(resolve => { finishRender = resolve; });
+    const factory: ViewportFactory = () => ({ update() {}, setActive() {}, camera() {}, retry() {}, dispose() {},
+      read: () => ({ ready: true, display: undefined, token: '1', pickToken: '1', pins: [], issue: null, dragging: false, projection: 'perspective', axis: null }) });
+    const ui = owned(createValidationWorkspace(new RecordedDocument().asDocument(), { ...r.options, productEditor: true, progressivePresentation: true,
+      list: () => listValidationProjects(r.options, r.openStorage), selected() {}, render: async () => {
+        if(outcome==='render-dispose')await renderGate;return { factory, ready, dispose: release };
+      },
+      open: async (run, initial, mode, workspaceFile, reviewEdit, firstBackup) => {
+        const opened = await openValidationEntry({ ...r.options, run, initial, mode, workspaceFile, reviewEdit, firstBackup });
+        if ('kind' in opened) { const confirm = opened.confirm.bind(opened); opened.confirm = async prepare => confirmed = await confirm(prepare); }
+        return opened;
+      } }));
+    const root = record(ui.root), all = (n: RecordedNode): RecordedNode[] => [n, ...n.children.flatMap(all)];
+    const button = (label: string) => all(root).find(n => n.tag === 'button' && n.textContent === label);
+    await ui.ready;
+    const input = all(root).find(n => n.attributes.get('aria-label') === 'ファイルを選択')!;
+    Object.assign(input, { files: [new File([f.backupFile], '復元する記録.zip')] });
+    input.fire('change'); input.parent!.parent!.fire('submit', { preventDefault() {} });
+    await vi.waitFor(() => expect(button('バックアップから復元')?.disabled).toBe(false)); button('バックアップから復元')!.fire('click');
+    await vi.waitFor(() => expect(all(root).some(n => n.attributes.get('aria-label') === '復元中のキャプション')).toBe(true), { timeout: 20000 });
+    expect(all(root).some(n => n.className === 'lv-project-workspace')).toBe(false);
+    if (outcome === 'composition-dispose') {
+      const reader=all(root).find(n=>n.attributes.get('aria-label')==='復元中のキャプション')!;
+      all(reader).find(n=>n.tag==='input')!.fire('compositionstart'); finish();
+      await vi.waitFor(()=>expect(confirmed).toBeDefined(),{timeout:20000});
+      const close=vi.spyOn(confirmed!,'dispose'); await ui.dispose(); expect(close).toHaveBeenCalledOnce();close.mockRestore();
+    } else if (outcome === 'dispose' || outcome === 'render-dispose') {
+      await ui.dispose(); if(outcome==='render-dispose'){finishRender();await vi.waitFor(()=>expect(release).toHaveBeenCalledOnce());}
+    }
+    else {
+      reject(Error('表示準備に失敗した試験'));
+      await vi.waitFor(() => expect(all(root).some(n => n.textContent.includes('表示準備に失敗した試験'))).toBe(true));
+      await vi.waitFor(() => expect(ui.hasChanges()).toBe(true));
+    }
+    expect(all(root).some(n => n.attributes.get('aria-label') === '復元中のキャプション')).toBe(false);
+    expect(all(root).some(n => n.className === 'lv-project-workspace')).toBe(false); expect(release).toHaveBeenCalledOnce();
+    await ui.dispose();
+  }, 60000);
   it('keeps a read-only first-backup preview cancellable and retains its exact file through lock retry', async () => {
     const f = await restoreFileFixture(), file = new File([f.backupFile], '選んだ保存点.backup'), r = await firstBackupHostFixture(file),
       holder = await r.options.coordinator.tryAcquire(r.base, `${validationArea}/${r.run}`, `${validationArea}:${r.run}`);
@@ -7794,6 +7862,25 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect(button('保存').disabled).toBe(true); expect(name.disabled).toBe(true); expect(button('ファイルに保存').disabled).toBe(true);
     await workspace.dispose();
   }, 20000);
+  it('reuses only the actual cold Host read for settled output discovery', async () => {
+    const { f, options } = await initialWorkspaceHostFixture();
+    const initial = await openValidationHost({ ...options, workspaceFile: f.file });
+    const token = initial.read().source!.token; await initial.dispose();
+    const overview = WorkspaceSender.prototype.outputOverview, seen: { ready: boolean; backup: boolean; reads: number }[] = [];
+    const spy = vi.spyOn(WorkspaceSender.prototype, 'outputOverview').mockImplementation(async function(this: WorkspaceSender, current, backup) {
+      const session = (this as unknown as { session: ReturnType<typeof validationProjectService>['session'] }).session;
+      const reads = vi.spyOn(session, 'read');
+      try { return await overview.call(this, current, backup); }
+      finally { seen.push({ ready: current?.state === 'ready', backup: !!backup, reads: reads.mock.calls.length }); reads.mockRestore(); }
+    });
+    let cold: Awaited<ReturnType<typeof openValidationHost>> | undefined;
+    try {
+      cold = await openValidationHost(options);
+      expect(cold.read().source!.token).toBe(token);
+      expect(seen).toEqual([{ ready: true, backup: false, reads: 0 }]);
+      expect(cold.hasPending()).toBe(false);
+    } finally { spy.mockRestore(); await cold?.dispose(); }
+  });
   it('keeps successful readonly preview history without rediscovery and owns the requested Review selection', async () => {
     const { f, fs, options } = await initialWorkspaceHostFixture(), host = owned(await openValidationHost({ ...options, workspaceFile: f.file }));
     const before = structuredClone(host.workspaceOutput.jobs), token = host.read().source!.token, overview = vi.spyOn(WorkspaceSender.prototype, 'outputOverview');

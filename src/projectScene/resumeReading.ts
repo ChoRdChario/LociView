@@ -1,7 +1,7 @@
 import type { ResumeReading } from './validationCatalog';
 
 /** Transient text reader. It owns no Project or file commands. */
-export function createResumeReading(document: Document, reading: ResumeReading) {
+export function createResumeReading(document: Document, reading: ResumeReading, context: 'resume' | 'restore' = 'resume') {
   const root = document.createElement('section'), header = document.createElement('header'), heading = document.createElement('h1');
   const identity = document.createElement('div'), status = document.createElement('p'), layout = document.createElement('div');
   const stage = document.createElement('div'), panel = document.createElement('aside'), panelHeading = document.createElement('h2');
@@ -9,14 +9,14 @@ export function createResumeReading(document: Document, reading: ResumeReading) 
   const label = document.createElement('label'), search = document.createElement('input');
   const list = document.createElement('ul'), detail = document.createElement('section');
   const title = document.createElement('h3'), body = document.createElement('p'), empty = document.createElement('p');
-  root.className = 'lv-project-workspace lv-resume-reading'; root.setAttribute('aria-label', '再開中のキャプション');
+  root.className = 'lv-project-workspace lv-resume-reading'; root.setAttribute('aria-label', context === 'restore' ? '復元中のキャプション' : '再開中のキャプション');
   identity.className = 'lv-project-identity'; heading.textContent = reading.title;
   status.className = 'lv-operation-status'; status.dataset.busy = 'true';
-  status.setAttribute('role', 'status'); status.textContent = '再開を確認しています。';
+  status.setAttribute('role', 'status'); status.textContent = context === 'restore' ? '復元しています。完了後に編集できます。' : '再開を確認しています。';
   identity.append(heading, status); header.append(identity);
   layout.className = 'lv-project-body'; layout.dataset.surface = 'panel';
   stage.className = 'lv-project-stage'; stage.setAttribute('aria-hidden', 'true');
-  panelHeading.textContent = 'キャプション';
+  panelHeading.textContent = reading.sceneName ? `キャプション（${reading.sceneName}）` : 'キャプション';
   index.className = 'lv-resume-index';
   back.type = 'button'; back.className = 'lv-resume-back'; back.textContent = '一覧へ戻る';
   title.tabIndex = -1;

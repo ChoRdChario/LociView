@@ -122,7 +122,7 @@ export class MetadataRepository {
   }
 
   /** Caller holds project lease and has already retained/verified the complete journal. */
-  async persist(id: string, expected: ProjectMetadataSource): Promise<void> {
+  async persist(id: string, expected: ProjectMetadataSource): Promise<ProjectMetadataSource> {
     const parts = expected.originalChanges(), byHash = new Map(parts.map(b => [A.decodeChange(b).hash, b]));
     if (byHash.size !== parts.length) fail('stored-original-bytes');
     await this.use(true, async storage => {
@@ -146,5 +146,6 @@ export class MetadataRepository {
     }
     if (remaining.size) fail('stored-original-bytes');
     this.fs.mutationAuthority.assertWorkspaceWriteAuthorized();
+    return fresh!;
   }
 }

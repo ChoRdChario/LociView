@@ -10,6 +10,7 @@ import { chooseStartupScene, resolveScene } from '../scene/resolve';
 export interface ValidationProjectEntry { run: string; title: string; state: 'ready' | 'incomplete' | 'unavailable'; firstRestore?: 'pending' | 'terminal' }
 export type ValidationStorage = (run: string, create: boolean) => ReturnType<ValidationHostOptions['openStorage']>;
 export interface ResumeReading {
+  sceneName?: string;
   token: string;
   sceneId: string;
   title: string;

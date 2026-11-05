@@ -301,8 +301,8 @@ async function openNormalValidationHost(options: ValidationHostOptions, inherite
       }
       await reloadOutput(!unfinishedReceive() && current?.state === 'ready' ? current : undefined);
     };
-    await reloadReceive();
     let last = await measure('host.open.session', () => session.read()), project: ProjectDisplay | undefined;
+    await reloadReceive(last);
     if (incoming instanceof CleanArchive && last.source) throw Error('この独立コピーの再開用データがあります。ファイルを取り込まず、プロジェクト一覧から再開してください。');
     if (last.source && (last.source.proof.identity.projectId !== `prj_${run}` || incoming && json(last.source.proof) !== json(incoming.source.proof)))
       throw Error('ファイルと再開用データのプロジェクトが一致しません。既存データは変更していません。');

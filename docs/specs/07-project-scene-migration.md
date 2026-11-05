@@ -484,6 +484,18 @@ LociMyu recovery owns its source until the Session operation settles, including
 failure. Recipe selection and saved origin/source verification keep their exact
 existing rules.
 
+On actual Host opening, obtain its fresh Session read before receive/output
+display discovery. Only a ready read with no unfinished receive may enter the
+existing output-overview display port; it is not a backup-display shortcut or
+command authority. Catalog, recovery, publication and durable readback checks
+remain independent. Verify cold opening and pending-receive fallback.
+
+Repository persistence returns its own fully read-back and exact-byte-verified
+durable source to the immediately adjacent Session resume step. That step keeps
+capability, original-part, content, publication and post-publication readback
+checks. Reuse ends within this write operation; recovery independently rereads.
+Missing or altered stored changes must reject before a result is returned.
+
 Reuse the existing source/file/session tests and grouped device acceptance:
 faithful initial Native/v1/LociMyu mapping, original-byte preservation,
 known-owner/ownerless unplaced records, explicit placement, failure/cancel/retry,

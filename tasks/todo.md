@@ -57,7 +57,68 @@ unchanged-feature-classification checks pass; independent review has no findings
 No runtime change or new capacity guarantee; no runtime suite is needed for this
 documentation checkpoint.
 
-## Current boundary —conversion preparation and recovery
+## Current boundary —restore and reopen latency
+
+PO2026-11-05 authorizes this integrated implementation, automatic verification,
+independent review and suitable g0 checkpoint. No per-control/Todo approval or
+human-test dependency. Preserve originals/history and all write/readback/recovery
+fences; stop only a genuinely new policy/architecture/release decision.
+
+Implemented within existing ownership: actual Host passes its fresh ready read
+only to settled output discovery; persist returns its own exact-byte-verified
+saved source to adjacent resume, retaining content/capability/publication checks
+and independent post-publication readback. Specifications07§6 and06a's text-reader
+clause constrain these lifetimes; no general Session/ZIP/body cache is inferred.
+
+First restore also exposes checked startup-Scene title/body text after initial
+verification while display/Selection/adoption continue. No raw archive candidates,
+ordinary workspace, edit/file/image/pin/camera authority or guessed Scene enter
+that preview. Scene scope and restore status are explicit; redundant global
+selection-cancel chrome is hidden. Existing actual-token/Scene checks gate the
+query/selection/focus handoff. IME, stalled render return/ready, failures, late
+residents and pre-handoff Host disposal are covered and independently reviewed.
+
+Ki84 Windows Chromium measurements (one local run per fixed procedure, no speed
+promise):
+| Stage | Baseline | Final integrated candidate |
+|---|---:|---:|
+| Touch first readable records/text |74.856s|48.211s|
+| Touch ordinary records |74.856s|68.858s|
+| Touch visible3D after restore |81.792s|75.524s|
+| Touch records after explicit-run reload |10.959s|9.342s|
+| Touch visible3D after reload |24.923s|20.660s|
+Independent PC first text49.975s/ordinary records70.168s/3D70.404s. Separate matched
+metadata-only run measured initialization44.936→41.189s and reload overview
+2.084→0.396s. Instrumented results are not paired with the earlier uninstrumented
+76s/22s. All43 body digests/identity/original bytes and further edits/save/reopen
+match; no page errors/external requests. Current-source PC→touch→independent-PC
+case passes4.9m; screenshots reviewed. Physical iOS/native-HEIC and actual offline
+cold boot are not inferred from these SW-blocked PC/touch runs.
+
+Evidence stays private under .artifacts/e2e/restore-reopen-profile: results is
+baseline, results-after is metadata-only, results-text-complete is final UI flow.
+Earlier driver/fixture failures and the stopped hidden-search-focus case remain
+separate; no automatic retry, deadline relaxation or skipped assertion. Six new
+metadata/fault checks and six UI/boundary/lifecycle checks pass; typecheck passes.
+The metadata-only full boundary passed147files/3291tests (21existing TODOs), all
+five builds and both isolation checks. Subsequent substantive UI changes were
+checked at the final fixed nine-input source/test manifest.
+Final workflow checks PASS:147files/3295tests,21existing TODOs; Vitest1018.07s,
+typecheck, all five builds, Desktop offline isolation and HEIC public-path
+isolation. Independent final reviews have no blockers; no source change followed
+the final PC/touch flow except documentation/result updates.
+The4191 preview serves all15 final non-map resources with exact hashes; receipt
+is private `preview-final.json`. Git's current TLS/ALPN issue is avoided with a
+per-command HTTP/1.1 setting; certificate verification and user settings stay on.
+
+Remaining: initialization still~41s; canonical model validation followed by later
+visible decode is required by current zero-hidden-residency rules. Do not claim
+that decoder cost removed or extend06b/06c to model/body caches. Next isolate that
+cost and design a safe separation of validation/display work before changing its
+contract. Direct-run reopen remains distinct from catalog-only text preview;
+catalog results never become actual Host authority. Ordinary release/device and
+aggregate adoption gates remain separate. Preserve the private165-line evaluation,
+design-review draft and source artifacts outside the checkpoint.
 
 The verified unit is [conversion preparation and recovery](#current-unit-simplify-conversion-preparation-and-recovery).
 Current inputs still require the existing recipe identities. Consolidate only

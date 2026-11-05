@@ -29,6 +29,7 @@ import { createValidationModeHost, type ValidationDisplayHost } from './validati
 import type { LocalOpenMode } from './hostPorts';
 import type { ResumeReadingRequest, ValidationProjectEntry } from './validationCatalog';
 import { createResumeReading } from './resumeReading';
+import { chooseStartupScene, resolveScene } from '../scene/resolve';
 import type { ModelCandidateRenderer } from './modelCandidatePreview';
 import type { ViewportFactory } from './viewportPorts';
 import { createValidationReceiveControls } from './validationReceiveControls';
@@ -169,7 +170,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     for (const button of firstRecoveryButtons) button.disabled = busy;
     workspaceInput.disabled = title.disabled = busy || !!creationAttempt;
     cancelSelection.disabled = busy && !nativeSelectionChecking || composing || !!creationAttempt;
-    cancelSelection.hidden = !selectionPending || !conversionPanel.hidden || !!pendingUpdate;
+    cancelSelection.hidden = !selectionPending || !conversionPanel.hidden || !!pendingUpdate || !!firstRecovery;
     openFile.hidden = !form.hidden || !conversionPanel.hidden || !!pendingUpdate;
     updatePanel.hidden = !pendingUpdate; updateConfirm.disabled = updateCancel.disabled = busy || composing;
     create.textContent = creationAttempt ? '作成を再試行' : 'プロジェクトを作成';
@@ -362,7 +363,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     try { workspace=ports.mountEditor(target,next.factory,fileTools,
       ports.renderModelCandidate ? display=>ports.renderModelCandidate!(target,display) : undefined,
       {utilitiesRoot:offline?.root,fileActionsRoot:coldReportActions,smoothDisplay:ports.smoothDisplay,projectNavigationBlocked:()=>busy,openProject:()=>{void selectProject();},resumedLastProject:()=>resumedLast,storageEstimate:ports.storageEstimate,localSettings:ports.localSettings,
-        initialSceneId,changed:()=>{rememberCurrent();controls();}});
+        initialReading,initialSceneId,changed:()=>{rememberCurrent();controls();}});
       content.replaceChildren(workspace.root); workspace.render();
       if (target.backupRestore.needsDisplay) { target.backupRestore.displayReady(target.read().source!.token); workspace.render(); } }
     catch (error) { workspace?.unmount(); workspace = undefined; next.dispose(); resident = undefined; throw error; }
@@ -460,20 +461,44 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     else if (state.phase === 'preview' || state.phase === 'pending' && state.retryable) button(state.phase === 'preview' ? 'バックアップから復元' : '復元を再開', async () => {
       status.textContent = 'バックアップから復元しています。';
       let staged: Awaited<ReturnType<ValidationWorkspacePorts['render']>> | undefined,
-        preparation: Parameters<ValidationDisplayHost['setDisplayPreparation']>[0] | undefined, sourceContent: ValidationNormalHost['content'] | undefined;
+        preparation: Parameters<ValidationDisplayHost['setDisplayPreparation']>[0] | undefined, sourceContent: ValidationNormalHost['content'] | undefined,
+        reading: ReturnType<typeof createResumeReading> | undefined, opened: ValidationNormalHost | undefined;
       try {
-        const opened = await target[state.phase === 'preview' ? 'confirm' : 'retry'](async (next, content) => {
+        opened = await target[state.phase === 'preview' ? 'confirm' : 'retry'](async (next, preparedContent) => {
           if (disposed || firstRecovery !== target) throw Error('画面を閉じました。復元記録は保持しています。');
-          sourceContent = content; staged = await ports.render({ authority: { readOnly: true, read: () => next,  },
+          if (ports.progressivePresentation) {
+            const { sceneId } = chooseStartupScene(next.state);
+            const scene = sceneId ? resolveScene(next.state, next.resources, sceneId) : undefined;
+            if (scene?.kind === 'ready') {
+              const records = scene.composition.captions.flatMap(c => c.title.kind === 'value' && c.body.kind === 'value'
+                ? [{ id: c.captionId, title: c.title.value, body: c.body.value }] : []);
+              if (records.length) {
+                reading?.dispose(); reading = createResumeReading(document, { token: next.state.token, sceneId: scene.composition.sceneId,
+                  title: state.title, records, ...(scene.composition.name.kind === 'value' ? { sceneName: scene.composition.name.value } : {}) }, 'restore');
+                content.replaceChildren(reading.root); status.textContent = '';
+              }
+            }
+          }
+          sourceContent = preparedContent; const candidate = await untilOpen(ports.render({ authority: { readOnly: true, read: () => next,  },
             content: { model: record => sourceContent!.model(record), modelContent: record => sourceContent!.modelContent(record) },
-            setDisplayPreparation(callback) { preparation = callback; return () => { if (preparation === callback) preparation = undefined; }; } });
-          await staged.ready;
+            setDisplayPreparation(callback) { preparation = callback; return () => { if (preparation === callback) preparation = undefined; }; } }).then(value => {
+              if (disposed || firstRecovery !== target) { value.dispose(); throw Error('画面を閉じました。復元記録は保持しています。'); }
+              return value;
+            }));
+          staged = candidate;
+          if (candidate.ready) await untilOpen(candidate.ready);
           if (disposed || firstRecovery !== target) throw Error('画面を閉じました。復元記録は保持しています。');
         });
-        if (disposed || firstRecovery !== target) { await opened.dispose(); return; }
+        if (disposed || firstRecovery !== target) return;
+        const composition = reading?.composition(); if (composition) await untilOpen(composition);
+        if (disposed || firstRecovery !== target) return;
+        const selection = reading?.selection(); if (reading) reading.root.inert = true;
         sourceContent = opened.content; await closeCurrent();
-        const prepared = staged; staged = undefined; await adoptProject(target.run, opened, undefined, prepared, preparation);
-      } catch (error) { renderFirstRecovery(); throw error; } finally { staged?.dispose(); }
+        if (disposed) return;
+        resumeReading = reading && selection ? { ...reading, selection: () => selection } : reading; reading = undefined;
+        const prepared = staged, nextHost = opened; staged = undefined; opened = undefined;
+        await adoptProject(target.run, nextHost, undefined, prepared, preparation);
+      } catch (error) { clearResumeReading(); renderFirstRecovery(); throw error; } finally { reading?.dispose(); staged?.dispose(); await opened?.dispose(); }
     });
     if ((!target.readOnly || state.phase === 'preview') && state.cancellable) button(state.phase === 'preview' ? 'キャンセル' : '復元を取りやめる', () => leave(true));
     if (state.phase === 'terminal') button('一覧に戻る', () => leave(false));

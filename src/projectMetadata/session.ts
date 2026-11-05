@@ -1125,8 +1125,7 @@ export class MetadataProjectSession {
     }
     if (receiveJob) await this.media!.inventory!(await receiveJob.inventory());
     if (restoreJob) await this.media!.verify(restoreJob.inventory(), restoreJob.inspection.description.mediaRecords);
-    await this.repository.persist(start.repositoryId, next);
-    stored = await this.repository.read(start.repositoryId, start.proof);
+    stored = await this.repository.persist(start.repositoryId, next);
     if (!stored) fail('durable-source-missing');
     checkRequiredCapabilities(start.requiredCapabilities, capabilityUnion(readRequiredCapabilities(predecessor?.start.requiredCapabilities), stored!.requiredCapabilities, incoming.requiredCapabilities));
     const actual = new Map(stored!.originalChanges().map(b => [A.decodeChange(b).hash, b]));
