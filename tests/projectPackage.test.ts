@@ -461,6 +461,9 @@ describe('Contribution originals and actual ZIP (injected base/CAS ports, no dur
     expect(workspace.source.editorDeclarations()).toEqual(f.source.editorDeclarations());
     expect(workspace.archive.control.manifest.requiredCapabilities).toEqual(['editor-attribution-v1']);
     await expect(WorkspaceArchive.inspect(await rewrite(f.file, m => { delete m.requiredCapabilities; }), metadataLimits)).rejects.toThrow();
+    // Manifest control wraps an unsupported capability in its shape error.
+    await expect(WorkspaceArchive.inspect(await rewrite(f.file, m => { m.requiredCapabilities = ['editor-attribution-v1', 'future-feature-v1']; }),
+      metadataLimits)).rejects.toMatchObject({ code: 'manifest-shape' });
     const target = body(f.source, 'Anonymous delta'), capture = await ContributionSourceCapture.prepare(await session(target), target.token, b.base, b.bodies, metadataLimits);
     const built = await output(capture, b.bodies), inspected = await ContributionArchive.inspect(built.file, b.base, b.bodies, metadataLimits);
     expect(inspected.target.editorDeclarations()).toEqual(f.source.editorDeclarations());

@@ -159,9 +159,8 @@ core/platform/viewerからUIへのimport、viewerからProject/packageへのimpo
 3. map1/map2、無要件・名前のみ・portableのみ・両方、欠落／余剰／未知／非正規要件、
    raw既存＋PNG新規、base-onlyの組、片方の欠損／改ざんを既存service testsで確認する。
 4. HEIC decoderを呼ぶと失敗する受信者で、Caption内PNG表示・編集・5目的・往復・復元・coldを確認する。
-   実際の固定旧readerのpackage／local journal拒否も検証する。旧readerは08b対応済みの直前版
-   `fe20109`（製品コード`135359f`）を固定し、名前のみは開け、portableのみ／両方は拒否することを確認する。
-   既存08bの`6c3788e`証拠は置き換えない。
+   現行版で、編集者名とHEICを含む作業一式、およびHEICだけを必須機能とするコピーを開けることを確認する。
+   固定した旧開発版の実行結果は初回実装の証拠として作業記録に残す。
 5. Chromiumで生成入口を通す場合、HEICだけ既知PNGの実ImageBitmapへ置換する狭いテスト注入を使える。
    これはcanvasから保存への接続証拠であり、Chromiumのnative HEIC対応の証拠ではない。
    製品側にテスト専用の許可portや検査迂回を公開しない。

@@ -135,7 +135,7 @@ npm run test:e2e -- --config playwright.desktop.config.ts desktop-large-gs.spec.
 npm run test:e2e -- --config playwright.desktop.config.ts desktop-gs-replacement.spec.ts
 npm run test:e2e -- --config playwright.desktop.config.ts desktop-smooth.spec.ts desktop-smooth-team.spec.ts
 npm run test:e2e -- --config playwright.desktop.config.ts desktop-smooth-capacity.spec.ts
-npm run test:e2e -- --config playwright.desktop.config.ts desktop-editor-attribution.spec.ts
+npm run test:e2e -- --config playwright.desktop.config.ts desktop-editor-attribution.spec.ts desktop-portable-heic.spec.ts
 npm run test:e2e -- --config playwright.desktop.config.ts desktop-scene-append.spec.ts
 ```
 
@@ -143,20 +143,15 @@ The 06d lane uses current Desktop and offline candidate artifacts. It covers
 addition and recovery on desktop and a touch viewport. Service Workers are
 blocked in this lane. The tests compare the saved history and model/media hashes.
 
-The08b editor-name lane connects two dedicated profiles through named edits,
-conflict resolution, anonymous delta against a named base, all five file purposes,
-first-backup restore and cold continuation. It also opens the named Project and
-Workspace with an actual fixed prefeature reader at the same local origin.
-`scripts/prepare-editor-attribution-old-reader.mjs` builds Git checkpoint6c3788e
-inside ignored artifacts, verifies the unchanged dependency lock, reuses installed
-dependencies and hashes its runtime files. No checkout, network, install or personal
-browser is used. That Git object must be available locally; a shallow checkout must
-obtain the fixed source before this lane can run. The old reader refusing input is
-separate evidence from the current reader's corruption checks. It is not a guarantee
-about arbitrary ancient readers or hand-edited raw storage. Todo owns actual results.
-The fixed-build checks for 08b and 08c remain as historical diagnostics. They
-are outside current pre-release acceptance. The current-reader file, privacy
-and integrity checks remain part of acceptance.
+The 08b lane uses the current Desktop build for named edits, conflict resolution,
+anonymous delta against a named base, export privacy, first-backup restore and
+cold continuation. The 08c lane checks portable HEIC display in a recipient
+without a decoder, offline edits in an already open app, save, cold reopen and
+portable-only copy import. Its creation path uses a controlled decoder fixture.
+The existing package, journal and media service tests cover unsupported or
+inconsistent capability declarations and corrupt input. Historical evidence for
+the fixed development readers remains in todo. Neither current lane needs an
+older checkout or a second dependency set.
 
 The01g smooth lane uses actual Desktop source-alpha/chroma pixels, fallback and
 edit/Workspace/Review/restore/cold continuation. Its separate capacity case uses

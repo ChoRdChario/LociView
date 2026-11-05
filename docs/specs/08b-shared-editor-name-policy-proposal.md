@@ -218,9 +218,9 @@ UIは元changeやpackageをparseせずstorageへ直接書かない。viewerはPr
 4. 旧base→名前付き編集→Workspace受信→手元編集を保った匿名delta受信→Contribution返送→
    Backup復元→再開で原bytesを照合する。base evidenceだけに名前があるBackupの復元後、
    無記名のローカル編集でもjournal要件が残ることと、出力要件を§6の各範囲で再計算することを確認する。
-5. 必須機能の欠落・余剰・未知・改ざんを公開前に拒否。固定した現行旧readerの閉じた検査でも
-   manifestと全journalの拒否・古いpublicationへの非fallbackを検証する。新readerの拒否を
-   旧reader証拠としない。新readerで旧base/履歴を扱うことも確認する。
+5. 必須機能の欠落・余剰・未知・改ざんを、現行版のmanifestとjournalで公開前に拒否する。
+   現行版で既存のbaseと履歴を扱えることも確認する。固定した旧開発版の実行結果は初回実装の
+   証拠として作業記録に残し、現在の受入れは現行版で行う。
 6. Review/Cleanの展開済みJSON・全初期change・manifestから名前sentinel/要件/設定を除外する。
    本文や素材に意図的に入れた同名は保持し、匿名化と誤認させない。出力前の実内容の説明と
    中断・完成job再取得の説明も確認する。

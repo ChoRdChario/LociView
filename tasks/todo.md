@@ -843,6 +843,35 @@ recipes also serve actual saved candidate Projects. Inventory them before any
 retirement. Native/v1/LociMyu imports, exact material matching and current-build
 offline write protection serve existing data and remain in scope.
 
+### Current unit —test attribution and portable HEIC on the current build
+
+PO approved removing the two fixed development-reader builds from regular
+verification. Preserve connected current-browser sharing, export privacy, restore
+and reopen, and exercise unsupported package capability refusal in the existing
+package suite. Keep local journal / wire validation and real legacy import in
+scope as existing contracts. Review the test diff independently and run the
+affected desktop and focused service cases. Stop if coverage depends on changing
+product behavior.
+
+Removed the two fixed-reader rebuild and route substitution branches and their
+shared build helper. Current Desktop coverage retains 08b exchange, conflict,
+export privacy, Backup restore, cold reopen and GS confirmation attribution.
+08c covers a decoder-incapable recipient, offline editing and saving in an
+open app, cold reopen, and importing the portable-only Clean copy without using
+the decoder. All three Chromium cases passed in one run. The 08c creation uses
+the controlled decode fixture. Independent test/contract review found no blocker.
+Eight focused cases passed across the corrected package assertions and the
+portable media tests. Both supported metadata profiles reject a Workspace with
+a valid checksum and an unknown required capability at manifest admission.
+The final Windows checkpoint passed in one invocation with all 147 test files,
+3285 tests and 21 existing TODOs, typecheck, all five builds and offline isolation.
+HEIC isolation also passed. This completes the full-run confirmation pending
+after the prior 06d split check. The Chromium cases took 6.8 minutes including
+current-build setup. No matched old-build timing comparison is claimed.
+Next, inventory old conversion recipes and saved development Projects before
+retiring any data-reading path. Unreleased-build downgrade checks are outside
+acceptance; opening the user's actual source files and saved work remains required.
+
 ## Completed boundary —06c bounded restore content inspection
 
 PO explicitly approves06c on2026-11-03. Starting checkpoint85fe474 on g0-baseline;

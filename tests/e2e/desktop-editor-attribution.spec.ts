@@ -3,9 +3,6 @@ import { desktopOrigin, desktopEntry } from './desktopEntry';
 import { selectShareOutput,  closeFileSurface, revealCoordinateAdd, revealFileSurface } from './workspaceUi';
 import { test, expect, chromium, type Page, type BrowserContext, type TestInfo } from '@playwright/test';
 import { mkdir, mkdtemp, readFile } from 'node:fs/promises';
-import { resolve, sep } from 'node:path';
-import { createHash } from 'node:crypto';
-import { execFileSync } from 'node:child_process';
 import * as A from '@automerge/automerge';
 import { triangleGlb } from './fixtures';
 import { gsFixture } from '../helpers/gsFixture';
@@ -69,45 +66,37 @@ async function records(path: string) {
   if (inspected.kind !== 'project-candidate-inspection') throw Error('Backup inspection');
   return { backup, records: inspected.unambiguousRecords };
 }
-async function receipts(p: Page) {
+async function journalRequirements(p: Page) {
   return p.evaluate(async () => {
-    const result: Record<string, { sha256: string; value?: unknown }> = {}, root = await navigator.storage.getDirectory();
+    const requirements: unknown[] = [];
     const walk = async (dir: FileSystemDirectoryHandle, prefix: string) => {
       for await (const [name, handle] of (dir as any).entries()) {
         const path = prefix + name;
         if (handle.kind === 'directory') await walk(handle, path + '/');
-        else if (path.includes('/v2/metadata/') && /(?:\.json|\.amchange)$/.test(path)) {
-          const bytes = await (await handle.getFile()).arrayBuffer(), hash = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes));
-          result[path] = { sha256: [...hash].map(v => v.toString(16).padStart(2, '0')).join(''),
-            ...(path.endsWith('/staging.json') ? { value: JSON.parse(new TextDecoder().decode(bytes)) } : {}) };
+        else if (path.includes('/v2/metadata/journal/') && name === 'staging.json') {
+          requirements.push(JSON.parse(await (await handle.getFile()).text()).requiredCapabilities);
         }
       }
-    }; await walk(root, ''); return result;
+    };
+    await walk(await navigator.storage.getDirectory(), '');
+    return requirements;
   });
 }
 
-test('08b editor names remain exact through collaboration, purpose privacy, restore, cold resume and the fixed old reader', async ({}, info) => {
+test('08b editor names remain exact through collaboration, purpose privacy, restore and cold resume', async ({}, info) => {
   test.setTimeout(900_000); A.getHeads(A.init());
-  execFileSync(process.execPath, ['scripts/prepare-editor-attribution-old-reader.mjs'], { windowsHide: true });
   await mkdir('.artifacts/e2e/profiles', { recursive: true });
-  const profiles = await Promise.all(['a', 'b', 'restore', 'old-file'].map(n => mkdtemp('.artifacts/e2e/profiles/editor-' + n + '-')));
-  const contexts = new Set<BrowserContext>(), errors: string[] = [], oldErrors: string[] = [], servedOld = new Map<string, string>();
-  const launch = async (profile: string, old = false) => {
+  const profiles = await Promise.all(['a', 'b', 'restore'].map(n => mkdtemp('.artifacts/e2e/profiles/editor-' + n + '-')));
+  const contexts = new Set<BrowserContext>(), errors: string[] = [];
+  const launch = async (profile: string) => {
     const context = await chromium.launchPersistentContext(profile, { channel: 'chromium', headless: true, viewport: { width: 1440, height: 1000 }, serviceWorkers: 'block', acceptDownloads: true }); contexts.add(context);
-    const oldRoot = resolve('.artifacts/e2e/editor-attribution-old-reader/6c3788e06fa004f4c1f13ba2091f47f183695c2d/desktop-dist');
-    await context.route('**/*', async route => {
-      const u = new URL(route.request().url()); if (['blob:', 'data:'].includes(u.protocol)) return route.continue();
-      if (u.origin !== desktopOrigin) { errors.push('unexpected network origin'); return route.abort('blockedbyclient'); }
-      if (!old) return route.continue();
-      const path = resolve(oldRoot, u.pathname === '/' ? 'index.html' : '.' + u.pathname);
-      if (!path.startsWith(oldRoot + sep)) throw Error('Old build path');
-      let bytes: Buffer;
-      try { bytes = await readFile(path); } catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return route.fulfill({ status: 404, body: '' }); throw error; }
-      servedOld.set(path, createHash('sha256').update(bytes).digest('hex'));
-      return route.fulfill({ path });
+    await context.route('**/*', route => {
+      const u = new URL(route.request().url());
+      if (u.origin === desktopOrigin || ['blob:', 'data:'].includes(u.protocol)) return route.continue();
+      errors.push('unexpected network origin'); return route.abort('blockedbyclient');
     });
     const p = context.pages()[0] ?? await context.newPage(); p.setDefaultTimeout(15_000);
-    p.on('pageerror', e => (old ? oldErrors : errors).push(e.message));
+    p.on('pageerror', e => errors.push(e.message));
     await p.goto(desktopEntry); return { context, p };
   };
   const close = async (context: BrowserContext) => { await context.close(); contexts.delete(context); };
@@ -166,19 +155,10 @@ test('08b editor names remain exact through collaboration, purpose privacy, rest
     await edit(cold.p, '本文', '復元して再開した追記');
     const resumed = await records(await output(cold.p, info, 'resumed', 'backup')); expect(resumed.backup.source.editorDeclarations()).toEqual(before.backup.source.editorDeclarations());
     console.log('08b: restore, cold reopen and new anonymous edit verified');
-    for (const r of Object.values(await receipts(cold.p))) if (r.value) expect((r.value as any).requiredCapabilities).toEqual(['editor-attribution-v1']);
-    const priorReceipts = await receipts(a.p); await close(a.context);
-    const old = await launch(profiles[0]!, true); await expect(old.p.getByText(/最後のプロジェクトを再開できません/)).toBeVisible({ timeout: 90_000 });
-    await expect(old.p.locator('main.lv-project-workspace')).toHaveCount(0); expect(await receipts(old.p)).toEqual(priorReceipts); await old.p.screenshot({ path: info.outputPath('old-reader-refused-resume.png'), fullPage: true }); await close(old.context);
-    const oldFile = await launch(profiles[3]!, true); const open = oldFile.p.getByRole('button', { name: 'ファイルを開く', exact: true });
-    await oldFile.p.getByLabel('ファイルを選択', { exact: true }).setInputFiles(initial); await open.click(); await expect(open).toBeEnabled({ timeout: 90_000 });
-    await expect(oldFile.p.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveCount(0); await expect(oldFile.p.getByRole('status').first()).not.toBeEmpty();
-    await oldFile.p.screenshot({ path: info.outputPath('old-reader-refused-file.png'), fullPage: true });
-    console.log('08b: fixed old reader refused same-profile resume and Workspace input');
-    const current = await launch(profiles[0]!); await expect(current.p.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText(title, { timeout: 90_000 });
-    const unchanged = await records(await output(current.p, info, 'after-old-reader', 'backup')); expect(unchanged.backup.source.originalChanges()).toEqual(before.backup.source.originalChanges());
-    expect(errors).toEqual([]); expect(servedOld.size).toBeGreaterThan(3);
-    await info.attach('editor-attribution-evidence', { body: JSON.stringify({ profiles, oldBuildSourceCheckpoint: '6c3788e (source unchanged from90b0e82)', servedOld: [...servedOld], oldErrors, errors }), contentType: 'application/json' });
+    const requirements = await journalRequirements(cold.p);
+    expect(requirements.length).toBeGreaterThan(0);
+    for (const capability of requirements) expect(capability).toEqual(['editor-attribution-v1']);
+    expect(errors).toEqual([]);
   } finally { for (const context of contexts) { await context.pages()[0]?.screenshot({ path: info.outputPath('failure-' + [...contexts].indexOf(context) + '.png'), fullPage: true }).catch(() => {}); await context.close(); } }
 });
 
