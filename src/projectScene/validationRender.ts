@@ -102,7 +102,8 @@ export async function decodeValidationModel(source: ValidatedGlb, signal?: Abort
       });
       return mesh;
     } }; });
-    const gltf = await loader.parseAsync(source.bytes.slice().buffer as ArrayBuffer, '');
+    // The pre-await capture above already owns an exact, private buffer.
+    const gltf = await loader.parseAsync(source.bytes.buffer as ArrayBuffer, '');
     all.add(...gltf.scenes); const root = gltf.scene;
     signal?.throwIfAborted();
     assertTargetTables(legacy.table, snapshotTargets(root, legacy.table.rows));

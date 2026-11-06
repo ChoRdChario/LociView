@@ -33,6 +33,7 @@ const registrySchemaSource = resolve(repositoryRoot, 'fixtures', 'registry.schem
 const createdRoots: string[] = [];
 let templateRoot: string | undefined;
 let templateWorkspace: SyntheticWorkspace;
+let templatePreparation: Promise<void> | undefined;
 const SYNTHETIC_NOTE = 'SYNTHETIC TEST FIXTURE ONLY; this is not measured G0 evidence.';
 const EXTERNAL_FIXTURE_LOCATOR = 'https://github.com/ChoRdChario/LociView/releases/download/fixtures-v1.0.0/synthetic-g0-mesh-v1.glb';
 const EXTERNAL_ACQUISITION_WARNING = 'External transport identity requires separate acquisition verification.';
@@ -98,10 +99,11 @@ async function writeJson(path: string, value: unknown): Promise<void> {
 function runFile(
   executable: string,
   args: string[],
-  options: { cwd?: string; env?: NodeJS.ProcessEnv } = {},
+  options: { cwd?: string; env?: NodeJS.ProcessEnv; input?: Buffer } = {},
 ): Promise<CliResult> {
   return new Promise((resolveResult) => {
-    execFile(
+    let inputError: Error | undefined;
+    const child = execFile(
       executable,
       args,
       {
@@ -112,10 +114,14 @@ function runFile(
         windowsHide: true,
       },
       (error, stdout, stderr) => {
-        const exitCode = error === null ? 0 : typeof error.code === 'number' ? error.code : 1;
-        resolveResult({ exitCode, stdout, stderr });
+        const exitCode = error === null && !inputError ? 0 : error && typeof error.code === 'number' ? error.code : 1;
+        resolveResult({ exitCode, stdout, stderr: inputError ? `${stderr}\n${inputError.message}` : stderr });
       },
     );
+    if (options.input !== undefined) {
+      child.stdin?.on('error', error => { inputError = error; });
+      child.stdin?.end(options.input);
+    }
   });
 }
 
@@ -448,27 +454,32 @@ async function initialiseGit(root: string): Promise<{ buildCommit: string; evide
     GIT_COMMITTER_NAME: 'LociView synthetic verifier test',
     GIT_COMMITTER_EMAIL: 'synthetic-test@invalid.example',
   };
-  for (const args of [
-    ['init', '--quiet'],
-    ['add', '--', 'package-lock.json'],
-    ['commit', '--quiet', '-m', 'synthetic application build'],
-  ]) {
-    const result = await runFile('git', args, { cwd: root, env });
-    if (result.exitCode !== 0) throw new Error(`git ${args[0]} failed: ${result.stderr}`);
-  }
-  const buildResult = await runFile('git', ['rev-parse', 'HEAD'], { cwd: root, env });
-  if (buildResult.exitCode !== 0) throw new Error(`git rev-parse failed: ${buildResult.stderr}`);
-
-  for (const args of [
-    ['add', '--', 'fixtures/registry.json', 'fixtures/data/synthetic-g0-mesh.glb', 'fixtures/traces/synthetic-camera-input.trace'],
-    ['commit', '--quiet', '-m', 'synthetic evidence inputs'],
-  ]) {
-    const result = await runFile('git', args, { cwd: root, env });
-    if (result.exitCode !== 0) throw new Error(`git ${args[0]} failed: ${result.stderr}`);
-  }
-  const evidenceResult = await runFile('git', ['rev-parse', 'HEAD'], { cwd: root, env });
-  if (evidenceResult.exitCode !== 0) throw new Error(`git rev-parse failed: ${evidenceResult.stderr}`);
-  return { buildCommit: buildResult.stdout.trim(), evidenceCommit: evidenceResult.stdout.trim() };
+  const initialized = await runFile('git', ['init', '--quiet', '--template=', '--initial-branch=synthetic'], { cwd: root, env });
+  if (initialized.exitCode !== 0) throw new Error(`git init failed: ${initialized.stderr}`);
+  const chunks: Buffer[] = [], text = (value: string) => chunks.push(Buffer.from(value)),
+    data = (bytes: Buffer) => { text(`data ${bytes.length}\n`); chunks.push(bytes); text('\n'); };
+  const committer = `committer LociView synthetic verifier test <synthetic-test@invalid.example> ${Math.floor(Date.now() / 1000)} +0000\n`;
+  const commit = (mark: number, message: string, parent?: number) => {
+    text(`commit refs/heads/synthetic\nmark :${mark}\n${committer}`); data(Buffer.from(message + '\n'));
+    if (parent !== undefined) text(`from :${parent}\n`);
+  };
+  const add = async (path: string) => { text(`M 100644 inline ${path}\n`); data(await readFile(resolve(root, path))); };
+  // Import real history in one process; no verifier or Git-object mocks.
+  commit(1, 'synthetic application build'); await add('package-lock.json'); text('\n');
+  commit(2, 'synthetic evidence inputs', 1);
+  for (const path of ['fixtures/registry.json', 'fixtures/data/synthetic-g0-mesh.glb', 'fixtures/traces/synthetic-camera-input.trace']) await add(path);
+  text('\ndone\n');
+  const imported = await runFile('git', ['fast-import', '--quiet', '--done', '--export-marks=.git/synthetic-import-marks'],
+    { cwd: root, env, input: Buffer.concat(chunks) });
+  if (imported.exitCode !== 0) throw new Error(`git fast-import failed: ${imported.stderr}`);
+  // fast-import updates refs/objects; synchronize the index before later case-local commits.
+  const indexed = await runFile('git', ['reset', '--mixed', '--quiet', 'HEAD'], { cwd: root, env });
+  if (indexed.exitCode !== 0) throw new Error(`git index preparation failed: ${indexed.stderr}`);
+  const marks = (await readFile(resolve(root, '.git/synthetic-import-marks'), 'utf8')).trim().split(/\r?\n/);
+  if (marks.length !== 2 || marks.some(line => !/^:[12] (?:[0-9a-f]{40}|[0-9a-f]{64})$/.test(line))) throw new Error('Unexpected synthetic commit marks');
+  const ids = new Map(marks.map(line => line.split(' ') as [string, string]));
+  if (ids.size !== 2 || !ids.has(':1') || !ids.has(':2')) throw new Error('Missing synthetic commit marks');
+  return { buildCommit: ids.get(':1')!, evidenceCommit: ids.get(':2')! };
 }
 
 async function commitFiles(root: string, paths: string[], message: string): Promise<string> {
@@ -545,9 +556,12 @@ async function createDanglingCommit(root: string): Promise<string> {
   return commitResult.stdout.trim();
 }
 
-beforeAll(async () => {
-  templateRoot = await mkdtemp(join(tmpdir(), 'lociview-g0-verifier-template-'));
-  templateWorkspace = await buildWorkspace(templateRoot);
+beforeAll(() => {
+  templatePreparation = (async () => {
+    templateRoot = await mkdtemp(join(tmpdir(), 'lociview-g0-verifier-template-'));
+    templateWorkspace = await buildWorkspace(templateRoot);
+  })();
+  return templatePreparation;
 });
 
 afterEach(async () => {
@@ -555,12 +569,20 @@ afterEach(async () => {
 });
 
 afterAll(async () => {
+  // A timed-out hook does not cancel native Git; never remove its directory mid-write.
+  await templatePreparation?.catch(() => {});
   if (templateRoot) await rm(templateRoot, { recursive: true, force: true });
 });
 
 describe('G0 evidence verifier CLI', () => {
   it('isolates copied Git history, fixture bytes and metadata from peers and the immutable template', async () => {
     const first = await makeWorkspace(), second = await makeWorkspace(), original = clone(templateWorkspace);
+    const history = await runFile('git', ['log', '--reverse', '-2', '--format=%H %P', '--name-status', '--no-renames'], { cwd: templateWorkspace.root });
+    expect(history.exitCode).toBe(0);
+    expect(history.stdout.split(/\r?\n/).map(line => line.trimEnd()).filter(Boolean)).toEqual([
+      original.buildCommit, 'A\tpackage-lock.json', `${original.evidenceCommit} ${original.buildCommit}`,
+      'A\tfixtures/data/synthetic-g0-mesh.glb', 'A\tfixtures/registry.json', 'A\tfixtures/traces/synthetic-camera-input.trace',
+    ]);
     const snapshot = async (workspace: SyntheticWorkspace) => {
       const head = await runFile('git', ['rev-parse', 'HEAD'], { cwd: workspace.root });
       const gitDirectory = await runFile('git', ['rev-parse', '--absolute-git-dir'], { cwd: workspace.root });

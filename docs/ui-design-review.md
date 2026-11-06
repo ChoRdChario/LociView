@@ -19,6 +19,45 @@
 ここでのAAAは、ゲーム制作における完成度というPOの目標を指す。
 アクセシビリティの既存のWCAG 2.2 AA検証方針を変更するものではない。
 
+## 2026-11-06 保存準備・起動修復とSafari資源の見直し
+
+PO承認06b§6.2／09§10の実装範囲。書込後の照合・中断復旧・3回のfresh readyは維持し、
+同じ準備確認内のZIP整合性だけを共有する。起動修復は同build manifest／SRI／保存後の再照合に
+限定し、Projectや別cacheへ接続しない。実行結果・時間・残件はtodoに集約する。
+
+最終回帰の720×500では、GPU停止の案内とピン調整が同時に現れると取消ボタンが
+一部隠れた。説明・座標欄をスクロール内容へまとめ、確定・取消の44px操作列を残す。
+同じcanvasの寸法、停止案内・再試行、対象更新時の確定拒否は維持し、元の実画面試験で
+GPU停止から取消・復帰・保存・再開まで通過した。スマホの連続書出しの時間切れは
+別の性能観測として保持し、配置修正で解消したクリック競合とは扱わない。
+
+Safari向けの資源安全性は未合格。現行の高画素経路はPC既定のCPU/GPU予約値を使用し、
+GSもDesktopのresident条件を共有する。予約は実RAMの測定ではなく、スマホChromiumの合格を
+iPhoneへ転記できない。[WebKitのメモリ分類](https://webkit.org/blog/6425/memory-debugging-with-web-inspector/)に
+沿いJS・decoded image・描画layer・その他を分けて考える。
+[storage quota](https://webkit.org/blog/14403/updates-to-storage-policy/)は保存領域でRAMとは別である。
+
+画像／GSの直列化、単一原寸modal、thumbnail cache、非表示解放はある。一方thumbnail生成にも
+原寸decodeの一時負荷があり、modal背面の3D、背景化後のGPU保持、異なる出力jobのURL保持は
+残るコード上の懸念。実機のピーク／反復後残留量の証拠なしに数値を安全上限としない。
+非occurrence GLBの二重captureだけは所有期間内の余分なコピーとして除き、padded subarrayと
+直後の入力改変でも形状・材質・bitmap解放が保たれることを確認する。
+照会／修復のSRI確認も、返す必要のないResponse bodyを直接消費して未消費の複製を残さない。
+
+Windows Playwright WebKit r2370では、小規模モデルの作成が保存後の照合で停止した。
+別の最小診断でも5種類のpayloadすべてでOPFSのwrite／closeが成功扱いなのに、getFileは0Bだった。
+入力Blobのサイズ・streamは正常であり、画像表示前の停止をメモリ不足とは判断しない。
+照合は維持する。[固定WebKitのclose実装](https://github.com/WebKit/WebKit/blob/56453fdfe0b0ca6258c23e6453b34f70b885d13f/Source/WebKit/NetworkProcess/storage/FileSystemStorageHandle.cpp#L247)と
+[Windowsの排他open](https://github.com/WebKit/WebKit/blob/56453fdfe0b0ca6258c23e6453b34f70b885d13f/Source/WTF/wtf/win/FileSystemWin.cpp#L181)は
+この症状と整合するが、nativeエラーの直接観測による根因確定ではない。
+
+[Playwrightの説明](https://playwright.dev/docs/browsers#webkit)どおり、この結果はSafari本体や
+iOSのRAM・codec・PWAとは異なる。Windows WebKitの写真・保存・cold再開は未達であり、
+iPhone実機のIME・保存・発熱・背景復帰・オフラインとメモリpressureも別の受入れとして残す。
+原寸8K画像はRGBA8換算だけで256MiBになる。PCのCPU2.5GiB／GPU2GiBという算術予算を
+Safariの利用可能RAMや保証値とは扱わず、画像・3D・Worker／Wasm・ブラウザ内部資源の重なりを
+実機で測る。新しい数値予算・画質／同時表示方針だけを判断対象とし、ファイル容量の一律制限へ置換しない。
+
 ## 2026-11-05 PC・スマホ統合品質巡回
 
 比較元は939d8a6。実装前の独立UI・性能／資源・安全性レビューを集約した。

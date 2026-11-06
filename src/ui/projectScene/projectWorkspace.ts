@@ -230,8 +230,9 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   const addSettings=make('details');addSettings.className='lv-caption-add-settings';addSettings.append(make('summary','追加の設定'),addColorLabel,numericAdd);
   const pinAddRow = make('div'); pinAddRow.className = 'lv-pin-add-row'; pinAddRow.append(addPin, addSettings);
   pinArea.append(pinAddRow, movePin, parent);
-  const pinTask = make('section'), pinTaskActions = make('div'); pinTask.className = 'lv-pin-task'; pinTask.setAttribute('aria-label', '位置の調整');
-  pinTaskActions.className = 'lv-pin-task-actions'; pinTaskActions.append(repick, finishPin, cancelPin); pinTask.append(pinStatus, coords, addSurface, pinTaskActions);
+  const pinTask = make('section'), pinTaskContent = make('div'), pinTaskActions = make('div'); pinTask.className = 'lv-pin-task'; pinTask.setAttribute('aria-label', '位置の調整');
+  pinTaskContent.className = 'lv-pin-task-content'; pinTaskContent.append(pinStatus, coords, addSurface);
+  pinTaskActions.className = 'lv-pin-task-actions'; pinTaskActions.append(repick, finishPin, cancelPin); pinTask.append(pinTaskContent, pinTaskActions);
   const deletionArea = make('section'), deletionBox = make('section'), deletionTitle = make('p'), deletionEffects = make('ul'), deletionNote = make('p'), referenceIssues = make('section');
   deletionArea.setAttribute('aria-label', 'キャプションの削除'); deletionBox.setAttribute('aria-label', '削除の確認'); deletionNote.setAttribute('role', 'status');
   referenceIssues.setAttribute('aria-label', '記録の状態');

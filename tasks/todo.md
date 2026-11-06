@@ -57,7 +57,158 @@ unchanged-feature-classification checks pass; independent review has no findings
 No runtime change or new capacity guarantee; no runtime suite is needed for this
 documentation checkpoint.
 
-## Current boundary —PC and phone integrated quality pass
+## Current boundary —bounded output integrity and boot recovery
+
+PO2026-11-06 approves06b§6.2 and09§10, through implementation, independent review,
+automated safety/elapsed-time evidence and a suitable g0 checkpoint. Compare
+againstc9a0940. One implementation writer; bounded read-only design/security/
+Safari reviews. Keep private audit drafts and source samples local.
+
+Outcome: save a completed Review editing copy without repeating the same archive
+scan inside one ready check; reopen the same offline app after a boot resource is
+missing/corrupt when the exact original build can be fetched and verified.
+
+1. Record approval and precise ports/lifetimes before implementation. Measure the
+   existing Review backup workflow on the same500kSH4 artifact/history; distinguish
+   whole scans from nested stage durations. Keep3fresh ready fences and all capture,
+   write/readback, artifact verification and retry/cold checks independent.
+2. Share only PackageArchive integrity for exact artifacts inside one outputReady;
+   repeat metadata/recipe/binding/Start/Journal/publication/CAS checks. No global
+   cache, Session-wide read operation or retained archive evidence. Preserve failure
+   state and closing/owner checks; verify stale/foreign scopes and tampering.
+3. Implement same-build manifest/SRI boot repair with per-resource single-flight,
+   independent cancellation and cache readback. Read-only checks never fetch;
+   no unknown-URL fallback, foreign cache/Project writes or forced activation.
+4. Audit Safari RAM separately from storage quotas and Desktop admission budgets.
+   Fix proven redundant ownership/copies within accepted01i lifetimes; use local
+   WebKit representative evidence without claiming iPhone/Safari/jetsam acceptance.
+   New mobile capacity policy/numeric guarantees remain a genuine decision gate.
+5. Focused service/fault and real browser tests; root/subpath cold boot repair,
+   offline failure, ordinary cold edit/save/resume, same-file timed backup and
+   body/history checks. Then final independent diff review, full checkpoint and
+   offline/HEIC isolation, relevant Desktop integration, served artifact and
+   suitableg0 push/exact-head CI. Heavy runs are serial; no retries/deadline relief.
+
+Stop only the affected path for a specification conflict, genuinely new product/
+capacity/compatibility policy or environment denial. No new dependencies, formats,
+recipes, release or public source fixtures. Complete other authorized improvements.
+Evidence stays private under `.artifacts/e2e/quality-followup-20261106/`; executed
+results and next actions are maintained here, not in a second task matrix.
+
+Completed regression follow-up: keep pin-task actions visible while its content scrolls
+on short screens, including context loss. Preserve warnings, eligibility and44px
+targets. Diagnose the phone's consecutive scene/whole download failure using passive
+click/phase evidence; no deadline relief or automatic retries. Recheck these routes
+before final delivery and review the substantive follow-up diff independently.
+
+Implemented and automatically verified at candidatev3. Independent final review has
+no mandatory finding. Safari/iPhone acceptance and general release remain pending:
+
+- Each outputReady scans3distinct artifacts once and rebuilds current semantics;
+  next ready scans again. Keep3fresh ready fences, capture, write/readback and
+  recovery independent. Tampering/changed controls/foreign or expired owner/
+  cancellation/closing audit/unawaited reads are rejected in focused checks.
+- Boot repair focused46PASS and full offline8PASS, including enhanced
+  SW-response/cache-hash assertions for root/subpath/parallel repair.
+  Read-only inspection never fetches. No foreign cache/Project writes or activation.
+- Same178,011,532B/500kSH4 Review, matching initial closed profiles/history,
+  dedicated Chromium1440x1000, one timed output each; OS chooser excluded:
+
+  | Observation (seconds) | c9 before | after |
+  |---|---:|---:|
+  | Page open to3D ready | 62.454 | 92.525 |
+  | Save action to download event | 185.147 | 100.393 |
+  | Save action to actual file obtained | 190.231 | 117.476 |
+  | Three separate ready checks combined | 135.912 | 44.836 |
+  | Source capture | 25.446 | 34.238 |
+  | Generated ZIP inspection after writing | 4.477 | 3.550 |
+  | Closed browser to cold body displayed | 41.003 | 41.425 |
+
+  Stages can nest; do not add this table. After has9actual fresh archive scans,
+ 3per ready. Both actual ZIPs inspected; proof/token/all2original changes and
+ 3body refs match, each bodySHA256 checked. Save improves; startup/capture remain
+  heavy and these single observations are not a capacity or timing guarantee.
+  Preserve the first after startup240s failure and c9/current bounded diagnosis;
+  no deadline was raised. Before driver failed after download on missing Node
+  Automerge initialization; its retained output was validated in a separate cold
+  continuation, without rerunning output. Helper failures remain in private logs.
+- First full checkpoint stopped at6FAIL/3242PASS/83skip/21todo in1805.10s.
+  Replace obsolete public-read call counting with primed cold Session + stale
+  token/missing-publication refusals and unchanged output files/job IDs. Existing
+  display/base checks remain. DOM2/07m2 failures pass focused under unchanged
+  waits; sceneCore12PASS. No hidden retry/exclusion/deadline relief.
+- Verifier preparation was12.640s, of which7Git startups cost12.60s. Use actual
+ 2commit fast-import plus index synchronization in3startups:2.870s forSHA1 and
+ 3.084s forSHA256. Exact root tree/parent/3added files and per-case independent
+  copies are checked;83cases PASS in511.18s under original10s/30s conditions.
+  Marks retain40/64-digit compatibility. Cleanup awaits owned setup before removal;
+  it cannot turn a timed-out preparation into PASS. No FS parallelism added.
+- Windows WebKit r2370 refused small-project creation on saved-content mismatch;
+  native5payload diagnostic returned0B after successful write/close, with correct
+  input Blob bytes/stream. Keep rejection; this is not a proven RAM or Safari bug.
+  Photo/save/cold acceptance remains pending beyond creation. Removed only the
+  second private nonoccurrence GLB copy; padded/caller-mutation/bitmap cleanup
+  checks pass. PC raster budgets remain on phone; iPhone peak/residual/background
+  acceptance is pending, separate from disk quota and mobile Chromium evidence.
+- Independent reviewers resolved lifetime, timeout, unused-body and fixture marks
+  findings; no mandatory final production finding remains. The complete native-Git checkpoint passes148files/3331tests/21knownTODOs
+  in1108.13s, plus typecheck/all5builds/offline isolation. Offline8PASS in968.998s
+  with stronger SW-response/cache-hash assertions, full shutdown, mixed500k and
+  preserved history. Integrated Desktop7 has5PASS/2FAIL: the full500k all-output/
+  return/Review-copy/restore/cold flow passed26.1min and Native10 material flow
+  passed17.2min. Retain the phone's15s consecutive-download timeout and the
+  short720x500 context-loss pin Cancel clipping failure. No full7-case PASS claimed.
+- Pin content now scrolls separately while44px actions remain visible, with
+  warnings/eligibility/canvas extent unchanged. Independent review has no finding.
+  The original phone and record/camera cases then2PASS in2.5min. Phone scene/whole
+  download handoff4.811/7.261s under unchanged15s; a passive diagnostic before the
+  layout fix passed7.387/11.169s. Its whole path measured generation7.612s,
+  overview2.476s, download1.028s. No silent-click race reproduced or proven fixed;
+  host timing varies and neither input-deadline relief nor automatic retry is used.
+  Empty-scope audit cost is not isolated; retain the reviewed integrity path rather
+  than introduce a second authority lifetime for an unmeasured gain.
+  Candidatev3 differsv2 only in pin-task DOM/CSS. Final checkpoint PASS in1000.575s:
+  typecheck,148files/3331PASS/21knownTODO in906.42s, all5builds,14-resource offline
+  isolation. Pages-path build and HEIC isolation also PASS. No test exclusion,
+  automatic retry, wait extension or weaker safety assertion.
+- Healthy empty-home cold offline startup, same owned browser/profile/build per
+  phase, closed browser/server,3trials including browser launch. Before home:
+ 871/974/829ms (median871), readiness919/1023/880ms (median919); after home:
+ 980/990/998ms (median990), readiness1040/1086/1054ms (median1054). Do not claim
+  startup speedup or Ki84/device evidence. Missing boot assets formerly refused
+  even online; current root/subpath HTML/entry repair reaches checked Project in
+ 2.622–3.750s. Fully offline missing assets, wrong200 and redirects still refuse.
+- Installed Edge156.0.4314.58 and Chrome156.0.8078.80 each PASS representative
+  missing-HTML repair, offline/wrong200/redirect refusal, actual save/full close/
+  resume and exact original changes/body inventory. Restore2.849/2.159s; these are
+  small owned profiles, not the full four-damage cohort or physical mobile tests.
+- Verification/source hashes and actual failures remain private. Candidate4191
+  serves an immutable root-base copy; all20HTTP file hashes match. Fresh synthetic
+  sample restoration is checked separately from SW/offline acceptance. No forced
+  activation, Project migration, user4182 changes or general publication.
+
+- The second unfilteredv2 run has3330PASS/1FAIL/21todo in2285.39s: only the
+  external-fixture-locator CLI exceeded30s. All product/fault/DOM/material cases
+  pass. Same Git2.53.0 core/version/effective config were compared without logging
+  config values; using its native executable before the launcher in this process's
+  PATH makes that exact case PASS in4.12s. No machine setting, assertion, timeout,
+  retry or exclusion changed. The complete final checkpoint passes with that
+  recorded driver condition (same source/tests, no exclusions or auto retries). Previous failures are retained, not called full PASS.
+  Installed Vitest also overwrites file durations after focused runs; cached
+ 59.905s placed projectFiles behind longer files. This explains a possible late
+  start, not a confirmed dispatch trace; no sequencer/config change was introduced.
+
+
+Next: measure the still-heavy source capture and cold Review reopening before
+choosing further work; no new lifetime extension is authorized by these results.
+Qualify physical iPhone Safari/PWA peak/residual RAM, original-photo decode with3D,
+background return, IME/save/offline. Windows WebKit's0B write reproduction blocks
+that runner before media, not evidence about iPhone RAM. Consider narrower
+simultaneous resource residency from those measurements, not blanket file caps.
+Keep mobile performance and the phone15s output variability as explicit remaining
+risks; do not turn this bounded checkpoint into universal-device/AAA acceptance.
+
+## Completed boundary —PC and phone integrated quality pass
 
 PO2026-11-05 approved open/search/record/save/share/resume improvements against
 939d8a6, through independent review, automated verification and suitable g0 push.

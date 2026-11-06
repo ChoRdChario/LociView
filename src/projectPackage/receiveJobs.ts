@@ -6,6 +6,7 @@ import { isContributionRemote } from '../projectMetadata/packageRemote';
 import { WorkspaceReceiveJob } from './receiveJob';
 import { ContributionReceiveJob } from './contributionReceiveJob';
 import { CleanInputJob } from './cleanInputJob';
+import type { OutputIntegrityRead } from './outputIntegrityRead';
 
 export type ReceiveJob = WorkspaceReceiveJob | ContributionReceiveJob | CleanInputJob;
 export type ReceiveJobKey = { id: string; kind: 'workspace' | 'contribution' | 'clean' };
@@ -24,8 +25,8 @@ export async function receiveJobKeys(fs: ProjectWorkspaceFS, limits: MetadataLim
 export function receiveInputState(fs: ProjectWorkspaceFS, key: ReceiveJobKey, limits: MetadataLimits) {
   return key.kind === 'clean' ? CleanInputJob.inputState(fs, key.id, limits) : key.kind === 'workspace' ? WorkspaceReceiveJob.inputState(fs, key.id, limits) : ContributionReceiveJob.inputState(fs, key.id, limits);
 }
-export function openReceiveJob(fs: ProjectWorkspaceFS, key: ReceiveJobKey, store: Pick<OriginBlobStore, 'inspect'>, limits: MetadataLimits): Promise<ReceiveJob> {
-  return key.kind === 'clean' ? CleanInputJob.open(fs, key.id, limits) : key.kind === 'workspace' ? WorkspaceReceiveJob.open(fs, key.id, limits) : ContributionReceiveJob.open(fs, key.id, store, limits);
+export function openReceiveJob(fs: ProjectWorkspaceFS, key: ReceiveJobKey, store: Pick<OriginBlobStore, 'inspect'>, limits: MetadataLimits, integrity?: OutputIntegrityRead): Promise<ReceiveJob> {
+  return key.kind === 'clean' ? CleanInputJob.open(fs, key.id, limits, integrity) : key.kind === 'workspace' ? WorkspaceReceiveJob.open(fs, key.id, limits) : ContributionReceiveJob.open(fs, key.id, store, limits);
 }
 export async function receiveTerminal(job: ReceiveJob) {
   const steps = await job.steps();

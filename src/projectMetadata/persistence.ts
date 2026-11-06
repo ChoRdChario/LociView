@@ -72,6 +72,14 @@ export function withMetadataRead<T>(fs: ProjectWorkspaceFS, factory: MetadataSto
   if (factory && operation.factory !== factory) return Promise.reject(Error('generation-storage-binding'));
   return operation.run(action);
 }
+/** Fresh selected-generation boundaries only; no fast FS escapes and no staging extension. */
+export async function auditMetadataReadBoundary(fs: ProjectWorkspaceFS): Promise<void> {
+  fs.mutationAuthority.assertEditable();
+  const operation = readOperations.get(fs);
+  if (operation?.staging) fail('output-integrity-staging');
+  if (operation) await operation.run(async () => undefined);
+  fs.mutationAuthority.assertEditable();
+}
 /** Internal scoped-capability hook; does not grant or replace the root lease. */
 export function registerWriteFence(fs: ProjectWorkspaceFS, fence: () => Promise<void>): void {
   if (writeFences.has(fs)) fail('write-fence-already-bound');

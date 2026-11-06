@@ -7,6 +7,7 @@ import { PACKAGE_LIMITS as L } from './contract';
 import { cleanInputDescriptor, packageReference as reference } from './cleanInputDescriptor';
 import { reviewCleanMarker, reviewEditChildBinding, reviewEditPublication, validateReviewEditChild, type ReviewEditBinding } from './reviewEditControls';
 import { workspacePackageRoot } from './workspaceBases';
+import type { OutputIntegrityRead } from './outputIntegrityRead';
 
 const root = (fs: ProjectWorkspaceFS, id: string) => `${workspacePackageRoot(fs)}clean-input/${technicalId(id)}/`;
 const index = (fs: ProjectWorkspaceFS, id: string) => `${workspacePackageRoot(fs)}clean-input-index/${technicalId(id)}.json`;
@@ -15,7 +16,7 @@ const index = (fs: ProjectWorkspaceFS, id: string) => `${workspacePackageRoot(fs
 export class CleanInputJob {
   private constructor(private readonly fs: ProjectWorkspaceFS, readonly id: string, private readonly limits: MetadataLimits,
     readonly inspection: CleanArchive, private readonly input: Blob, readonly start: { operation: 'importClean' } | null, private readonly reselected = false,
-    private readonly reviewEdit?: ReviewEditBinding) {}
+    private readonly reviewEdit?: ReviewEditBinding, private readonly integrity?: OutputIntegrityRead) {}
   assertOwner(fs: ProjectWorkspaceFS) { if (fs !== this.fs) fail('clean-input-owner'); }
   path(name: string) { return `${root(this.fs, this.id)}${name}`; }
   private descriptor() { return cleanInputDescriptor(this.id, this.inspection); }
@@ -67,16 +68,27 @@ export class CleanInputJob {
   private async checkBinding() {
     if (json(await readReceipt(this.fs, this.path('input.json'), this.limits)) !== json(this.descriptor()) ||
       json(await readReceipt(this.fs, index(this.fs, this.id), this.limits)) !== json(this.marker('index'))) fail('clean-input-binding');
-    if (this.reviewEdit) return validateReviewEditChild(this.fs, this.id, this.descriptor(), this.reviewEdit, this.limits);
+    if (this.reviewEdit) return validateReviewEditChild(this.fs, this.id, this.descriptor(), this.reviewEdit, this.limits, this.integrity);
   }
-  static async open(fs: ProjectWorkspaceFS, id: string, limits: MetadataLimits) {
-    return (await this.openVerified(fs, id, limits)).job;
+  static async open(fs: ProjectWorkspaceFS, id: string, limits: MetadataLimits, integrity?: OutputIntegrityRead) {
+    return (await this.openVerified(fs, id, limits, integrity)).job;
   }
-  private static async openVerified(fs: ProjectWorkspaceFS, id: string, limits: MetadataLimits) {
+  private static async openVerified(fs: ProjectWorkspaceFS, id: string, limits: MetadataLimits, integrity?: OutputIntegrityRead) {
     if (await this.inputState(fs, id, limits) !== 'started') return fail('clean-input-incomplete');
-    const f = await fs.readStream(`${root(fs, id)}input.zip`); if (!f?.blob || f.size > L.archiveBytes) return fail('clean-input-missing');
-    const blob = await f.blob(); if (blob.size !== f.size) fail('clean-input-size');
-    const job = new CleanInputJob(fs, id, limits, await CleanArchive.inspect(blob, limits), blob, { operation: 'importClean' }, false, await reviewEditChildBinding(fs, id, limits));
+    const binding = await reviewEditChildBinding(fs, id, limits);
+    let blob: Blob, inspection: CleanArchive;
+    if (binding && integrity) {
+      const input = await readReceipt<ReturnType<typeof cleanInputDescriptor>>(fs, `${root(fs, id)}input.json`, limits);
+      if (!input) return fail('clean-input-binding');
+      const start = await readReceipt(fs, `${root(fs, id)}start.json`, limits);
+      const archive = await integrity.archive(fs, `${root(fs, id)}input.zip`, input.archive, { input, binding, start }, limits);
+      blob = archive.sourceSnapshot(); inspection = await CleanArchive.fromSelectedArchive(archive, limits);
+    } else {
+      const f = await fs.readStream(`${root(fs, id)}input.zip`); if (!f?.blob || f.size > L.archiveBytes) return fail('clean-input-missing');
+      blob = await f.blob(); if (blob.size !== f.size) fail('clean-input-size');
+      inspection = await CleanArchive.inspect(blob, limits);
+    }
+    const job = new CleanInputJob(fs, id, limits, inspection, blob, { operation: 'importClean' }, false, binding, integrity);
     const parent = await job.checkBinding();
     if (json(await readReceipt(fs, job.path('start.json'), limits)) !== json(job.startRecord())) fail('clean-input-start');
     return { job, parent };
@@ -103,11 +115,11 @@ export class CleanInputJob {
   }
   async inventory() { return this.inspection.description.closure.semanticRefs.map(r => ({ ...r })); }
   async validateJournal(prepared: PreparedJournal) {
-    return CleanInputJob.validateJournalFresh(this.fs, this.id, this.limits, prepared);
+    return CleanInputJob.validateJournalFresh(this.fs, this.id, this.limits, prepared, this.integrity);
   }
   /** Opens current acknowledged bytes itself; a retained Job never supplies validation evidence. */
-  static async validateJournalFresh(fs: ProjectWorkspaceFS, id: string, limits: MetadataLimits, prepared: PreparedJournal) {
-    const saved = await CleanInputJob.open(fs, id, limits);
+  static async validateJournalFresh(fs: ProjectWorkspaceFS, id: string, limits: MetadataLimits, prepared: PreparedJournal, integrity?: OutputIntegrityRead) {
+    const saved = await CleanInputJob.open(fs, id, limits, integrity);
     return saved.validateOpenedJournal(prepared);
   }
   private async validateOpenedJournal(prepared: PreparedJournal) {

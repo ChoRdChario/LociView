@@ -43,7 +43,15 @@ export class CleanArchive {
   private constructor(readonly archive: PackageArchive, readonly source: ProjectMetadataSource,
     readonly description: Awaited<ReturnType<typeof inspectCleanSource>>) {}
   static async inspect(file: Blob, limits: MetadataLimits, signal?: AbortSignal) {
-    const archive = await PackageArchive.inspect(file, signal), manifest = archive.control.manifest;
+    return CleanArchive.fromArchive(await PackageArchive.inspect(file, signal), limits, signal);
+  }
+  /** Rebuild current metadata/closure; the caller owns this exact captured ZIP integrity. */
+  static async fromSelectedArchive(selected: PackageArchive, limits: MetadataLimits, signal?: AbortSignal) {
+    if (!(selected instanceof PackageArchive)) return fail('selected-archive-owner');
+    return CleanArchive.fromArchive(await selected.reopenCapturedControl(), limits, signal);
+  }
+  private static async fromArchive(archive: PackageArchive, limits: MetadataLimits, signal?: AbortSignal) {
+    const manifest = archive.control.manifest;
     if (manifest.purpose !== 'clean') return fail('purpose');
     const bytes = await archive.entryBytes('metadata.am', L.sourceBytes, signal);
     const source = ProjectMetadataSource.fromFullSource(bytes, { identity: manifest.identity, envelope: manifest.metadataEnvelope }, packageSourceLimits(limits));

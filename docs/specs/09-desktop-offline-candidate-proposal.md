@@ -250,11 +250,11 @@ SKIP_WAITING・clients.claim・強制reload・OS installの自動実行は追加
 未訪問端末、取得中断、cache削除・容量不足時のオフライン起動は保証せず、
 アプリ資源の準備とProjectバックアップも区別する。他の保存・更新契約は維持する。
 
-## 10. 起動資源を失った場合の限定修復案（PROPOSED・未承認・未実装）
+## 10. 起動資源を失った場合の限定修復（PO承認2026-11-06・限定実装／自動検証済み）
 
-現行fetchはcache欠損で拒否する。起動HTML／入口JSが欠けると、通信可能でも
+従来のfetchはcache欠損で拒否していた。起動HTML／入口JSが欠けると、通信可能でも
 画面内の修復へ届かない。§8のnetwork fallback禁止を維持したままでは解消できないため、
-この部分だけPO判断が必要であり、通常の品質修正の承認から実装を推論しない。
+この限定例外はPO承認2026-11-06。§8の禁止を全般的に解除するものではない。
 
 判断案は、現在のWorkerの既知manifestにある同buildのアプリ資源だけを、元URLと
 固定SRIで検査して復旧する限定例外。別buildへの切替、一般URLへのfallback、Project・
@@ -268,4 +268,22 @@ SKIP_WAITING、clients.claim、強制reloadも追加しない。
 
 受入れは、index／入口JSの個別欠損・破損、通信可能なcold起動からの同build復旧、
 wrong200／異版拒否、完全offline時の拒否、並行二窓、取得／保存失敗、通常のcold offline
-再開とProject原本／履歴保持。現在の§§1–9の合格へ、この未実装経路を含めない。
+再開とProject原本／履歴保持。実装と検証の結果はtodoに置き、§§1–9の過去の合格を本経路へ転記しない。
+
+### 10.1 内部port・検査順序・所有
+
+`desktopOfflineResources`は固定manifest、正確なcache名／revisionキー、CacheStorage、
+fetch、SubtleCryptoだけを受ける。ProjectFSやUIをimportしない。Workerは既存のGET／
+同scope navigation解決を維持し、既知entryだけを渡す。未知URLは修復対象にしない。
+
+各呼出しは現在cacheのbodyをSHA384で検査する。欠損／不一致に限り、entry単位の
+修復完了Promiseを共有する。元URLへSRI、same-origin credentials/mode、redirect:error、
+cache:reloadで一度取得し、手動digest、正確なkeyへのput、実cacheの再取得／digest後に返す。
+Response bodyは共有せず、各呼出しが別の検査済みResponseを受け取る。
+
+各待機者の取消は独立し、最後の利用者が離れたときだけ共有AbortControllerを止める。
+共有修復は既存と同じ45秒上限を持ち、明示全件修復の既存45秒上限も維持する。
+put前の取消は拒否する。put中に取消されても正当な同build bytesを削除せず結果を不採用にする。
+成功・失敗ともfinallyでin-flightを失効し、別要求の失敗結果／Promiseを保持しない。
+状態照会は読取だけとし、明示修復とfetchの同じentryは同じ修復処理を使う。
+取消・取得／SRI／put／readback失敗は拒否し、別版、他cache、Projectを補完／変更しない。

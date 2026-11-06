@@ -15,13 +15,15 @@ function name(bytes: Uint8Array): string {
 /** One sequential inspector's bounded native Blob ranges; never whole-archive arrayBuffer. */
 class Ranges {
   reads = 0; headerBytes = 0; private buffering = false;
-  constructor(readonly file: Blob, readonly signal?: AbortSignal) {}
+  constructor(readonly file: Blob, readonly signal?: AbortSignal, private readonly owner?: () => void,
+    readonly track?: (read: Promise<unknown>) => void) {}
+  assertLive() { this.owner?.(); checkAbort(this.signal); }
   async read(at: number, count: number, header = false): Promise<Uint8Array> {
-    checkAbort(this.signal);
+    this.assertLive();
     if (![at, count].every(n => Number.isSafeInteger(n) && n >= 0) || count > chunkBytes || at > this.file.size - count) return fail('zip-range');
     if (++this.reads > L.packageChunks) return fail('zip-read-budget');
     if (header && (this.headerBytes += count) > L.containerMetadataBytes) return fail('zip-header-budget');
-    const bytes = new Uint8Array(await this.file.slice(at, at + count).arrayBuffer()); checkAbort(this.signal);
+    const bytes = new Uint8Array(await this.file.slice(at, at + count).arrayBuffer()); this.assertLive();
     if (bytes.length !== count) return fail('zip-short-read');
     return bytes;
   }
@@ -30,14 +32,14 @@ class Ranges {
     const nativeBlockBytes = entry.path === 'manifest.json' || entry.path === 'manifest.sha256' ? chunkBytes : 1_048_576;
     let reads = 0;
     for (let at = 0; at < entry.byteLength; at += nativeBlockBytes) {
-      checkAbort(this.signal);
+      this.assertLive();
       const count = Math.min(nativeBlockBytes, entry.byteLength - at), logicalReads = Math.ceil(count / chunkBytes);
       if (reads + logicalReads > L.streamChunks) return fail('zip-stream-budget');
       if (this.reads + logicalReads > L.packageChunks) return fail('zip-read-budget');
       if (entry.offset + at > this.file.size - count) return fail('zip-range');
       reads += logicalReads; this.reads += logicalReads;
       const block = new Uint8Array(await this.file.slice(entry.offset + at, entry.offset + at + count).arrayBuffer());
-      checkAbort(this.signal); if (block.length !== count) return fail('zip-short-read');
+      this.assertLive(); if (block.length !== count) return fail('zip-short-read');
       for (let offset = 0; offset < count; offset += chunkBytes) {
         checkAbort(this.signal); consume(block.subarray(offset, Math.min(offset + chunkBytes, count)), at === 0 && offset === 0);
       }
@@ -46,7 +48,7 @@ class Ranges {
   }
   async bytes(entry: ZipEntry, max: number, signal?: AbortSignal): Promise<Uint8Array> {
     if (!Number.isSafeInteger(max) || max < 0 || entry.byteLength > max || max > L.sourceBytes) return fail('zip-buffer-budget');
-    checkAbort(this.signal); checkAbort(signal);
+    this.assertLive(); checkAbort(signal);
     if (this.buffering) return fail('zip-buffer-busy');
     this.buffering = true;
     try {
@@ -69,12 +71,13 @@ export class PackageArchive {
 
   /** Immutable native range view; downstream decoders/staging retain their own admission limits. */
   entryBlob(path: string): Blob {
+    this.ranges.assertLive();
     const entry = this.entries.find(e => e.path === path); if (!entry) return fail('zip-entry-missing');
     return this.ranges.file.slice(entry.offset, entry.offset + entry.byteLength);
   }
   /** The same immutable native input whose whole-container proof this owns. */
   sourceSnapshot(): Blob {
-    checkAbort(this.ranges.signal);
+    this.ranges.assertLive();
     return Blob.prototype.slice.call(this.ranges.file, 0, this.byteLength);
   }
   /** Reparse captured controls; reuse only this captured input's payload proof. */
@@ -84,9 +87,18 @@ export class PackageArchive {
       this.entries.some((entry, i) => entry.path !== control.entries[i]!.path || entry.byteLength !== control.entries[i]!.byteLength)) return fail('entry-table');
     return new PackageArchive(this.ranges, this.entries, control, this.byteLength, this.sha256);
   }
+  /** Internal operation-owned payload proof; independent bounded reads, never a disk/path cache. */
+  async scopedCapturedRead(assertOwner: () => void, track?: (read: Promise<unknown>) => void): Promise<PackageArchive> {
+    this.ranges.assertLive(); assertOwner();
+    // A derived view may narrow its owner; it cannot erase its parent's lifetime or drain.
+    const ranges = new Ranges(this.ranges.file, this.ranges.signal, () => { this.ranges.assertLive(); assertOwner(); }, read => {
+      this.ranges.track?.(read); if (track && track !== this.ranges.track) track(read);
+    });
+    return new PackageArchive(ranges, this.entries, this.control, this.byteLength, this.sha256).reopenCapturedControl();
+  }
   async entryBytes(path: string, max: number, signal?: AbortSignal): Promise<Uint8Array> {
     const entry = this.entries.find(e => e.path === path); if (!entry) return fail('zip-entry-missing');
-    return this.ranges.bytes(entry, max, signal);
+    const read = this.ranges.bytes(entry, max, signal); this.ranges.track?.(read); return read;
   }
 
   static async inspect(input: Blob, signal?: AbortSignal): Promise<PackageArchive> {

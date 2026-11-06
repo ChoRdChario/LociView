@@ -121,6 +121,8 @@ import { BackupRestoreJob, type RestoreDatabasePorts } from '../src/projectPacka
 import { readRestoreControls, reserveRestoreControls, restoreRef, writeRestoreControl } from '../src/projectPackage/restoreControls';
 import { PACKAGE_LIMITS } from '../src/projectPackage/contract';
 import { PackageArchive } from '../src/projectPackage/zipArchive';
+import { OutputIntegrityRead } from '../src/projectPackage/outputIntegrityRead';
+import * as metadataPersistence from '../src/projectMetadata/persistence';
 import { WorkspaceBaseStore, workspacePackageRoot } from '../src/projectPackage/workspaceBases';
 import { WorkspaceReceiveJob } from '../src/projectPackage/receiveJob';
 import { WorkspaceSourceCapture } from '../src/projectPackage/workspaceSource';
@@ -4151,8 +4153,25 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       const overview = sender.outputOverview({ ...current, source: displaySource });
       (proof.identity as { projectId: string }).projectId = `prj_${newId()}`;
       expect((await overview).bases).toEqual(expected); expect(reads).not.toHaveBeenCalled();
-      await session.editCaption(sent.current.source!.token, f.captionId, 'body', '次の編集'); reads.mockClear();
-      await expect(sender.generateContribution(sent.current.source!.token, expected[0]!.selection)).rejects.toThrow(); expect(reads).toHaveBeenCalled();
+      const cold = f.reopen().session, coldSender = new WorkspaceSender(f.fs, cold, f.store, metadata, f.locks);
+      expect((await cold.read()).source!.token).toBe(sent.current.source!.token);
+      const edited = await session.editCaption(sent.current.source!.token, f.captionId, 'body', '次の編集'); reads.mockClear();
+      expect(edited.source!.token).not.toBe(sent.current.source!.token);
+      const outputs = await f.fs.list('v2/packages/contribution-output/'), outputIds = await ContributionOutputJob.ids(f.fs);
+      // A separately primed Session must not approve its cached token after a durable edit.
+      await expect(coldSender.generateContribution(sent.current.source!.token, expected[0]!.selection)).rejects.toThrow('output-stale');
+      expect(await f.fs.list('v2/packages/contribution-output/')).toEqual(outputs);
+      expect(await ContributionOutputJob.ids(f.fs)).toEqual(outputIds);
+      // Nor may its newly observed proof conceal a missing durable publication.
+      const journal = new TransactionJournal(f.fs, metadata), latest = (await journal.entries()).at(-1)!,
+        publishedPath = journal.path(latest.start.transactionId, 'published.json'), published = (await f.fs.readBytes(publishedPath))!;
+      try {
+        await f.fs.remove(publishedPath);
+        await expect(coldSender.generateContribution(edited.source!.token, expected[0]!.selection)).rejects.toThrow('output-not-ready');
+        expect(await f.fs.list('v2/packages/contribution-output/')).toEqual(outputs);
+        expect(await ContributionOutputJob.ids(f.fs)).toEqual(outputIds);
+      } finally { await f.fs.writeBytes(publishedPath, published); }
+      expect((await cold.read()).source!.token).toBe(edited.source!.token);
       for (const path of await f.fs.list('v2/packages/evidence/')) await f.fs.remove(path);
       await expect(sender.availableBases(current)).rejects.toThrow();
     } finally { reads.mockRestore(); }
@@ -7374,6 +7393,129 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       await r.fs.remove(`${reviewEditRoot(r.fs,prepared.id)}original.zip`);writes.mockClear();await expect(assertReviewEditSlot(scope.fs,metadata)).rejects.toThrow('review-edit-pending');expect(writes).not.toHaveBeenCalled();
     }finally{await source.workspace.dispose();}
   },60000);
+  it('scopes completed Review output integrity to three distinct artifacts per ready and keeps semantic reconstruction fresh', async () => {
+    const source = await openFileCaption(), id = await source.host.workspaceOutput.generateReview(source.host.read().source!.token, { sceneId: source.s.sceneId });
+    try {
+      const prepared = await PreparedReviewEdit.prepare(await source.host.workspaceOutput.download(id), metadata), r = firstWorkspaceRecipient();
+      await new ReviewEditJob(r.fs, r.session, metadata).start(prepared);
+      const read = await r.session.read(), scans = vi.spyOn(PackageArchive, 'inspect'), reconstruction = vi.spyOn(PreparedReviewEdit, 'restore');
+      try {
+        await r.session.previewCleanOutput(read.source!.token);
+        expect(scans).toHaveBeenCalledTimes(3); expect(reconstruction).toHaveBeenCalledTimes(4);
+        await r.session.previewCleanOutput(read.source!.token);
+        expect(scans).toHaveBeenCalledTimes(6); expect(reconstruction).toHaveBeenCalledTimes(8);
+      } finally { scans.mockRestore(); reconstruction.mockRestore(); }
+    } finally { await source.workspace.dispose(); }
+  }, 60000);
+  it.each(['original', 'copy', 'input'])('rechecks same-length Review %s corruption at the next output-ready call', async target => {
+    const source = await openFileCaption(), id = await source.host.workspaceOutput.generateReview(source.host.read().source!.token, { sceneId: source.s.sceneId });
+    try {
+      const prepared = await PreparedReviewEdit.prepare(await source.host.workspaceOutput.download(id), metadata), r = firstWorkspaceRecipient();
+      await new ReviewEditJob(r.fs, r.session, metadata).start(prepared); const read = await r.session.read();
+      await r.session.previewCleanOutput(read.source!.token);
+      const path = target === 'input' ? `${workspacePackageRoot(r.fs)}clean-input/${prepared.childId}/input.zip` : `${reviewEditRoot(r.fs, prepared.id)}${target}.zip`;
+      const bytes = (await r.fs.readBytes(path))!, bad = bytes.slice(); bad[Math.floor(bad.length / 2)]! ^= 1;
+      await r.fs.writeBytes(path, bad);
+      await expect(r.session.previewCleanOutput(read.source!.token)).rejects.toThrow();
+      await expect(r.session.previewCleanOutput(read.source!.token)).rejects.toThrow();
+      await r.fs.writeBytes(path, bytes); await r.session.previewCleanOutput(read.source!.token);
+    } finally { await source.workspace.dispose(); }
+  }, 60000);
+  it.each(['recipe.json', 'start.json', 'published.json'])('does not share Review %s control validation with captured ZIP integrity', async name => {
+    const source = await openFileCaption(), id = await source.host.workspaceOutput.generateReview(source.host.read().source!.token, { sceneId: source.s.sceneId });
+    try {
+      const prepared = await PreparedReviewEdit.prepare(await source.host.workspaceOutput.download(id), metadata), r = firstWorkspaceRecipient();
+      await new ReviewEditJob(r.fs, r.session, metadata).start(prepared);
+      const path = `${reviewEditRoot(r.fs, prepared.id)}${name}`, saved = (await r.fs.readBytes(path))!;
+      try {
+        await expect(OutputIntegrityRead.run(r.fs, metadata, undefined, async scope => {
+          await assertReviewEditSlot(r.fs, metadata, undefined, scope);
+          await r.fs.writeText(path, '{}');
+          await assertReviewEditSlot(r.fs, metadata, undefined, scope);
+        })).rejects.toThrow();
+      } finally { await r.fs.writeBytes(path, saved); }
+      expect((await r.session.read()).state).toBe('ready');
+    } finally { await source.workspace.dispose(); }
+  }, 60000);
+  it('does not adopt output read or acknowledgments when the closing integrity audit rejects', async () => {
+    const source = await openFileCaption(), id = await source.host.workspaceOutput.generateReview(source.host.read().source!.token, { sceneId: source.s.sceneId });
+    try {
+      const prepared = await PreparedReviewEdit.prepare(await source.host.workspaceOutput.download(id), metadata), r = firstWorkspaceRecipient();
+      await new ReviewEditJob(r.fs, r.session, metadata).start(prepared); const read = await r.session.read();
+      const state = r.session as unknown as { last: unknown; acknowledgedMedia: Set<string>; acknowledgedLocalChanges: Set<string> };
+      const prior = { read: state.last, media: state.acknowledgedMedia, local: state.acknowledgedLocalChanges };
+      const original = metadataPersistence.auditMetadataReadBoundary; let audits = 0;
+      const audit = vi.spyOn(metadataPersistence, 'auditMetadataReadBoundary').mockImplementation(async fs => { await original(fs); if (++audits === 2) throw Error('output closing audit'); });
+      try {
+        await expect(r.session.previewCleanOutput(read.source!.token)).rejects.toThrow('output closing audit');
+        expect(state.last).toBe(prior.read); expect(state.acknowledgedMedia).toBe(prior.media); expect(state.acknowledgedLocalChanges).toBe(prior.local);
+      } finally { audit.mockRestore(); }
+      expect((await r.session.read()).source!.token).toBe(read.source!.token);
+    } finally { await source.workspace.dispose(); }
+  }, 60000);
+  it('expires captured output proof, binds exact owners and detects an allowed same-read mutation at the next fresh boundary', async () => {
+    const source = await openFileCaption(), id = await source.host.workspaceOutput.generateReview(source.host.read().source!.token, { sceneId: source.s.sceneId });
+    try {
+      const prepared = await PreparedReviewEdit.prepare(await source.host.workspaceOutput.download(id), metadata), r = firstWorkspaceRecipient();
+      await new ReviewEditJob(r.fs, r.session, metadata).start(prepared);
+      const path = `${reviewEditRoot(r.fs, prepared.id)}original.zip`, bytes = (await r.fs.readBytes(path))!, bad = bytes.slice(); bad[Math.floor(bad.length / 2)]! ^= 1;
+      let escaped!: OutputIntegrityRead, archive!: PackageArchive, derived!: PackageArchive;
+      try {
+        await OutputIntegrityRead.run(r.fs, metadata, undefined, async scope => {
+          escaped = scope; archive = await scope.archive(r.fs, path, prepared.descriptor().original, { parent: prepared.id }, metadata);
+          derived = await archive.scopedCapturedRead(() => {});
+          await expect(scope.archive(new MemoryFS(), path, prepared.descriptor().original, { parent: prepared.id }, metadata)).rejects.toThrow('output-integrity-owner');
+          await expect(scope.archive(r.fs, path, prepared.descriptor().original, { parent: newId() }, metadata)).rejects.toThrow('output-integrity-binding-changed');
+          await r.fs.writeBytes(path, bad);
+          expect((await scope.archive(r.fs, path, prepared.descriptor().original, { parent: prepared.id }, metadata)).sha256).toBe(archive.sha256);
+        });
+        await expect(escaped.archive(r.fs, path, prepared.descriptor().original, { parent: prepared.id }, metadata)).rejects.toThrow('output-integrity-owner');
+        await expect(archive.entryBytes('manifest.json', 65_536)).rejects.toThrow('output-integrity-owner');
+        await expect(derived.entryBytes('manifest.json', 65_536)).rejects.toThrow('output-integrity-owner');
+        expect(() => archive.sourceSnapshot()).toThrow('output-integrity-owner');
+        await expect(OutputIntegrityRead.run(r.fs, metadata, undefined, async scope => {
+          await scope.archive(r.fs, path, prepared.descriptor().original, { parent: prepared.id }, metadata);
+        })).rejects.toThrow();
+      } finally { await r.fs.writeBytes(path, bytes); }
+      const abort = new AbortController();
+      await expect(OutputIntegrityRead.run(r.fs, metadata, abort.signal, async scope => {
+        await scope.archive(r.fs, path, prepared.descriptor().original, { parent: prepared.id }, metadata); abort.abort();
+        await scope.archive(r.fs, path, prepared.descriptor().original, { parent: prepared.id }, metadata);
+      })).rejects.toMatchObject({ name: 'AbortError' });
+      const scans = vi.spyOn(PackageArchive, 'inspect');
+      try {
+        await Promise.all([1, 2].map(() => OutputIntegrityRead.run(r.fs, metadata, undefined, async scope => {
+          await scope.archive(r.fs, path, prepared.descriptor().original, { parent: prepared.id }, metadata);
+        })));
+        expect(scans).toHaveBeenCalledTimes(2);
+      } finally { scans.mockRestore(); }
+    } finally { await source.workspace.dispose(); }
+  }, 60000);
+  it('drains and refuses an unawaited owned ZIP range before closing the output scope', async () => {
+    const source = await openFileCaption(), id = await source.host.workspaceOutput.generateReview(source.host.read().source!.token, { sceneId: source.s.sceneId });
+    try {
+      const prepared = await PreparedReviewEdit.prepare(await source.host.workspaceOutput.download(id), metadata), r = firstWorkspaceRecipient();
+      await new ReviewEditJob(r.fs, r.session, metadata).start(prepared);
+      let enter!: () => void, release!: () => void, settled = false, held!: Promise<Uint8Array>;
+      const entered = new Promise<void>(yes => { enter = yes; }), gate = new Promise<void>(yes => { release = yes; });
+      const native = Blob.prototype.arrayBuffer; let spy: ReturnType<typeof vi.spyOn> | undefined;
+      const run = OutputIntegrityRead.run(r.fs, metadata, undefined, async scope => {
+        const archive = await scope.archive(r.fs, `${reviewEditRoot(r.fs, prepared.id)}original.zip`, prepared.descriptor().original, { parent: prepared.id }, metadata);
+        spy = vi.spyOn(Blob.prototype, 'arrayBuffer').mockImplementationOnce(async function(this: Blob) { enter(); await gate; return native.call(this); });
+        held = archive.entryBytes('manifest.json', 65_536); void held.catch(() => {}); await entered;
+      });
+      void run.then(() => { settled = true; }, () => { settled = true; });
+      try {
+        await entered; await new Promise<void>(yes => setTimeout(yes, 0)); expect(settled).toBe(false);
+        release(); await expect(run).rejects.toThrow('output-integrity-unfinished'); await held;
+      } finally { release(); await Promise.allSettled([run, held]); spy?.mockRestore(); }
+    } finally { await source.workspace.dispose(); }
+  }, 60000);
+  it('refuses forged Clean archive integrity objects before invoking their methods', async () => {
+    const reopen = vi.fn();
+    await expect(CleanArchive.fromSelectedArchive({ reopenCapturedControl: reopen } as unknown as PackageArchive, metadata)).rejects.toThrow('selected-archive-owner');
+    expect(reopen).not.toHaveBeenCalled();
+  });
   it('omits only the same-read completed private Review child and retains strict discovery by default', async () => {
     const source = await openFileCaption(), id = await source.host.workspaceOutput.generateReview(source.host.read().source!.token, { sceneId: source.s.sceneId });
     const prepared = await PreparedReviewEdit.prepare(await source.host.workspaceOutput.download(id), metadata), r = firstWorkspaceRecipient();
@@ -10756,7 +10898,12 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
         j.materials.push({ ...j.materials[0], alphaMode: 'MASK', alphaCutoff: 0.4, doubleSided: true, extensions: { KHR_materials_unlit: {} } });
         j.meshes[0].primitives.push({ ...j.meshes[0].primitives[0], material: 1 });
       }, true);
-      const inspected = await inspectValidationGlb(bytes, budget, decode), result = await decodeValidationModel(inspected);
+      const inspected = await inspectValidationGlb(bytes, budget, decode);
+      const padded = new Uint8Array(inspected.bytes.length + 29); padded.set(inspected.bytes, 11);
+      const caller = { ...inspected, bytes: padded.subarray(11, 11 + inspected.bytes.length) };
+      const decoding = decodeValidationModel(caller);
+      caller.bytes.fill(0); // Mutation after admission must not alter the decoder's private capture.
+      const result = await decoding;
       const meshes: THREE.Mesh[] = []; result.root.traverse(n => { if (n instanceof THREE.Mesh) meshes.push(n); });
       expect(meshes).toHaveLength(4);
       const materials = meshes.map(n => n.material as THREE.MeshStandardMaterial | THREE.MeshBasicMaterial);

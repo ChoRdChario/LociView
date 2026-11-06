@@ -1,11 +1,11 @@
 # 復元準備中の、操作に閉じた読み取り監査
 
-Status: **§§1–5 ACCEPTED —PO承認2026-11-01、限定実装・検証済み。§6.1の2箇所は2026-11-04承認済み。§6本文の一般案はPROPOSED・未採択。**
+Status: **§§1–5 ACCEPTED —PO承認2026-11-01、限定実装・検証済み。§6.1の2箇所は2026-11-04、§6.2の1回のoutputReady内は2026-11-06承認済み。§6本文の一般案はPROPOSED・未採択。**
 安全境界・実差分・実行証拠の独立レビュー済み。正確な実行範囲・時間・残件はtodoを参照し、
 一般の容量・速度保証や採用／公開合格へ拡張しない。
 対象は[06](06-project-package-wire.md)の「Bounded read-operation audits」と
 [06a](06a-first-backup-open-proposal.md)の復元準備。§§1–5だけが明示された純readの例外を認め、
-それ以外のstagingの各I/O監査は維持する。§6.1は別の承認で、stagingの監査例外を追加しない。
+それ以外のstagingの各I/O監査は維持する。§6.1／§6.2は別の承認で、stagingの監査例外を追加しない。
 作業・実行結果は[todo](../../tasks/todo.md)を正本とする。
 
 ## 1. 利用者の結果と実測
@@ -130,7 +130,7 @@ restore.first各段階、IO回数、native準備回数、実ファイル出力�
 
 ## 6. 別の検討事項：同じpure読取内のZIP整合性証拠
 
-**本節の一般案はPROPOSED・未採択。承認は§6.1の2箇所に限る。**
+**本節の一般案はPROPOSED・未採択。個別承認は§6.1の2箇所と、§6.2の1回のoutputReady内に限る。**
 本節はstaging監査の例外ではなく、別の検査寿命判断を必要とする。
 上の§1–5を承認しても、payload検査の共有を許可したことにはならない。
 
@@ -204,7 +204,7 @@ ZIP全検査は41回→40回、SHA入力は16.91GB→16.56GBだった。削減�
 保存済みの記録を保持して、再開時に同じ記録を照合する。いずれも子の履歴と後続編集を保持する。
 同じ実ファイルで中断からの再開、バックアップの原本照合と編集再開まで確認してから採用判断に回す。
 
-### 6.2 完了済みReviewコピーの出力準備内部（PROPOSED・未承認・未実装）
+### 6.2 完了済みReviewコピーの出力準備内部（PO承認2026-11-06・限定実装／自動検証済み）
 
 2026-11-06の同じ178MB Reviewの診断では、編集画面167.051→165.599秒、表示178.464→178.118秒で、
 1組から速度改善とは判定できなかった。候補のbackup取得155.480秒のうち、独立した
@@ -229,9 +229,26 @@ read-operationへ包まず、共有flag、永続cache、外へ逃げる証拠／
 
 **判断点は、同じ1回の読取中に起きた外部の同サイズ改変を、次のfresh検査まで検出しない場合が
 生じること。** §6.1や表示用readの承認では、この新しい寿命は認められていない。
-独立設計レビューとPO承認後にのみ実装する。効果は未測定で、114.390秒の全量削減は約束しない。
+独立設計レビュー済み・PO承認2026-11-06。実装と検証の結果はtodoに置く。
+効果はtodoの同一入力による実測で評価し、114.390秒の全量削減は約束しない。
 
 受入れでは、同一artifactの検査重複だけが減ること、各ready／capture／書込後／再試行・coldで
 fresh検査が残ることを計測する。親・子の同長改変、欠損、別参照、owner／終了監査失敗を拒否し、
 保存・中断復旧・全原本hash・履歴・識別情報・本文を照合する。同じファイルで実時間も比較し、
 既存240秒条件や小規模保存10秒の開発目標を緩めない。
+
+#### 6.2.1 内部port・終了監査（独立設計レビュー済み）
+
+`OutputIntegrityRead`は1回のoutputReadyの正確なFS／authority／root／limitsとsignalに束縛し、
+親original、親copy、Reviewに結ばれた子inputのpathごとにdescriptor／Start／bindingを固定する。
+任意loaderやglobal flagは受け取らない。既存withMetadataReadの本物のderived FSを使う場合は、
+capability自身がそのcallbackを所有して期限付きviewを作る。別FSの登録APIは設けない。
+
+PackageArchiveだけを保持し、captured control・metadata・closure・recipeを毎回再構築する。
+返すZIP読取viewは独立した既存予算のreaderと期限／owner検査を持ち、scope終了後は使えない。
+callbackはvoidであり、非同期の未完了読取も待って拒否する。証拠・Job・streamは外へ返さない。
+
+開始／終了では既存selected-generation読取operationを空callbackで実行し、前後のeditable
+authorityを確認する。staging登録は拒否しwhitelistを増やさない。各readerの元の監査間隔は
+変更せず、Session全体をread-operationへ包まない。Sessionのread／ackはlocal candidateとして
+作り、終了監査とreceive完了確認の成功後だけ採用する。失敗時に並行readを巻き戻さない。

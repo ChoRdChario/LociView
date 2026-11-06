@@ -12,6 +12,7 @@ import { PACKAGE_LIMITS as L } from './contract';
 import { packageByteHash } from './manifest';
 import { ReviewArchive } from './reviewArchive';
 import { prepareReviewEdit } from './reviewSnapshot';
+import type { PackageArchive } from './zipArchive';
 
 export interface ReviewEditArchiveLease { readonly file:Blob; release():Promise<void> }
 export interface ReviewEditArchivePort { write(produce:(destination:WritableStream<Uint8Array>,signal?:AbortSignal)=>Promise<unknown>):Promise<ReviewEditArchiveLease> }
@@ -92,13 +93,16 @@ export class PreparedReviewEdit {
   }
   /** Cold verification reconstructs records, never an Automerge actor or initialization. */
   static async restore(input: { id: string; childId: string; original: Blob; recipe: CleanReconstruction;
-    metadata: Uint8Array; destination: MetadataProof; copy: Blob }, limits: MetadataLimits) {
+    metadata: Uint8Array; destination: MetadataProof; copy: Blob }, limits: MetadataLimits,
+    captured?: { original: PackageArchive; copy: PackageArchive }) {
     technicalId(input.id); technicalId(input.childId);
-    const review = await ReviewArchive.inspect(input.original, limits), clean = await CleanArchive.inspect(input.copy, limits);
+    const review = captured ? await ReviewArchive.fromSelectedArchive(captured.original, limits) : await ReviewArchive.inspect(input.original, limits);
+    const clean = captured ? await CleanArchive.fromSelectedArchive(captured.copy, limits) : await CleanArchive.inspect(input.copy, limits);
     const source = ProjectMetadataSource.fromFullSource(input.metadata, input.destination, packageSourceLimits(limits));
     const prepared = await prepareReviewEdit(review.review, limits, input.recipe), description = await inspectCleanSource(source, limits);
     if (!same(prepared.records, description.records) || source.token !== clean.source.token ||
       packageByteHash(input.metadata) !== packageByteHash(clean.source.encodeFullSource())) fail('review-edit-reconstruction');
-    return new PreparedReviewEdit(input.id, input.childId, input.original.slice(), review, prepared.reconstruction, input.copy.slice(), clean);
+    return new PreparedReviewEdit(input.id, input.childId, captured ? captured.original.sourceSnapshot() : input.original.slice(), review,
+      prepared.reconstruction, captured ? captured.copy.sourceSnapshot() : input.copy.slice(), clean);
   }
 }

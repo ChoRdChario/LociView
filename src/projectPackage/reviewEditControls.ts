@@ -9,6 +9,7 @@ import { packageByteHash } from './manifest';
 import { PreparedReviewEdit } from './reviewEdit';
 import { CleanArchive } from './cleanArchive';
 import { workspacePackageRoot } from './workspaceBases';
+import type { OutputIntegrityRead } from './outputIntegrityRead';
 
 export interface ReviewEditBinding { jobId: string; prepared: EvidenceRef }
 export interface CompletedReviewChild { readonly childId: string; readonly binding: Readonly<ReviewEditBinding> }
@@ -71,7 +72,7 @@ async function blob(fs: ProjectWorkspaceFS, path: string, expected: EvidenceRef)
   const f = await fs.readStream(path); if (!f?.blob || f.size !== expected.byteLength) return fail('review-edit-missing');
   const b = await f.blob(); if (b.size !== expected.byteLength) fail('review-edit-size'); return b;
 }
-export async function readReviewEdit(fs: ProjectWorkspaceFS, id: string, limits: MetadataLimits, replacement?: Blob) {
+export async function readReviewEdit(fs: ProjectWorkspaceFS, id: string, limits: MetadataLimits, replacement?: Blob, integrity?: OutputIntegrityRead) {
   const path = reviewEditRoot(fs, id), descriptor = await readReceipt<ReviewEditDescriptor>(fs, `${path}prepared.json`, limits);
   if (!descriptor || descriptor.jobId !== id || descriptor.schema !== 'lociview-review-edit-1') return fail('review-edit-prepared');
   technicalId(descriptor.childId);
@@ -83,16 +84,22 @@ export async function readReviewEdit(fs: ProjectWorkspaceFS, id: string, limits:
   if (replacement && (started || await fs.exists(`${path}original.zip`))) fail('review-edit-reselect-denied');
   const recipe = await readReceipt<PreparedReviewEdit['reconstruction']>(fs, `${path}recipe.json`, limits), metadata = await fs.readBytes(`${path}metadata.am`);
   if (!recipe || !metadata || json(reference(recipe)) !== json(descriptor.recipe) || metadata.length !== descriptor.metadata.byteLength || packageByteHash(metadata) !== descriptor.metadata.sha256) fail('review-edit-evidence');
-  const copy = await blob(fs, `${path}copy.zip`, descriptor.copy);
-  const original = replacement ?? await blob(fs, `${path}original.zip`, descriptor.original);
-  const prepared = await PreparedReviewEdit.restore({ id, childId: descriptor.childId, original, recipe: recipe!, metadata: metadata!, destination: descriptor.destination, copy }, limits);
+  if (integrity && replacement) fail('output-integrity-replacement');
+  const context = { descriptor, started, binding: { jobId: id, prepared: ref } };
+  const captured = integrity ? {
+    copy: await integrity.archive(fs, `${path}copy.zip`, descriptor.copy, context, limits),
+    original: await integrity.archive(fs, `${path}original.zip`, descriptor.original, context, limits),
+  } : undefined;
+  const copy = captured ? captured.copy.sourceSnapshot() : await blob(fs, `${path}copy.zip`, descriptor.copy);
+  const original = captured ? captured.original.sourceSnapshot() : replacement ?? await blob(fs, `${path}original.zip`, descriptor.original);
+  const prepared = await PreparedReviewEdit.restore({ id, childId: descriptor.childId, original, recipe: recipe!, metadata: metadata!, destination: descriptor.destination, copy }, limits, captured);
   if (json(prepared.descriptor()) !== json(descriptor)) fail('review-edit-binding');
   return { prepared, descriptor, started: !!started, binding: { jobId: id, prepared: ref } };
 }
 
 /** Child admission requires a completed parent Start and all bound original evidence. No child recursion. */
-export async function validateReviewEditChild(fs: ProjectWorkspaceFS, childId: string, input: unknown, binding: ReviewEditBinding, limits: MetadataLimits) {
-  const parent = await readReviewEdit(fs, binding.jobId, limits);
+export async function validateReviewEditChild(fs: ProjectWorkspaceFS, childId: string, input: unknown, binding: ReviewEditBinding, limits: MetadataLimits, integrity?: OutputIntegrityRead) {
+  const parent = await readReviewEdit(fs, binding.jobId, limits, undefined, integrity);
   if (!parent.started || parent.descriptor.childId !== childId || json(parent.binding) !== json(binding) ||
     json(reference(input)) !== json(parent.descriptor.childInput)) fail('review-edit-child-binding');
   return parent;
@@ -117,7 +124,8 @@ export async function reviewEditPublication(fs: ProjectWorkspaceFS, parent: Awai
 }
 
 async function readReviewEditStates(fs: ProjectWorkspaceFS, limits: MetadataLimits,
-  completedChild?: (observation: CompletedReviewChild) => void, startedIncomplete?: (id: string, childId: string) => void): Promise<ReviewEditState[]> {
+  completedChild?: (observation: CompletedReviewChild) => void, startedIncomplete?: (id: string, childId: string) => void,
+  integrity?: OutputIntegrityRead): Promise<ReviewEditState[]> {
   const result: ReviewEditState[] = [];
   const children = await reviewEditChildren(fs, limits);
   for (const id of await reviewEditIds(fs, limits)) {
@@ -139,7 +147,7 @@ async function readReviewEditStates(fs: ProjectWorkspaceFS, limits: MetadataLimi
         }
         if (!await fs.exists(`${path}original.zip`)) { result.push({ id, childId, state: 'input-required' }); continue; }
       }
-      const parent = await readReviewEdit(fs, id, limits), receipt = await readReceipt(fs, `${path}published.json`, limits);
+      const parent = await readReviewEdit(fs, id, limits, undefined, integrity), receipt = await readReceipt(fs, `${path}published.json`, limits);
       const childRoot = `${workspacePackageRoot(fs)}clean-input/${parent.descriptor.childId}/`, childStart = await readReceipt(fs, `${childRoot}start.json`, limits);
       const childJournal = (await new TransactionJournal(fs, limits).entries()).some(e => e.start.transactionId === parent.descriptor.childId);
       if (!childStart && (childJournal || await fs.exists(`${childRoot}published.json`))) fail('review-edit-child-start-missing');
@@ -148,7 +156,8 @@ async function readReviewEditStates(fs: ProjectWorkspaceFS, limits: MetadataLimi
         if (json(childStart) !== json(reviewCleanMarker('start', parent.descriptor.childId, inputRef, parent.binding)) ||
           json(await readReceipt(fs, `${childRoot}input.json`, limits)) !== json(input) ||
           json(await readReceipt(fs, `${workspacePackageRoot(fs)}clean-input-index/${parent.descriptor.childId}.json`, limits)) !== json(reviewCleanMarker('index', parent.descriptor.childId, inputRef, parent.binding))) fail('review-edit-child-evidence');
-        const copy = await CleanArchive.inspect(await blob(fs, `${childRoot}input.zip`, parent.descriptor.copy), limits);
+        const copy = integrity ? await CleanArchive.fromSelectedArchive(await integrity.archive(fs, `${childRoot}input.zip`, parent.descriptor.copy,
+          { input, binding: parent.binding, start: childStart }, limits), limits) : await CleanArchive.inspect(await blob(fs, `${childRoot}input.zip`, parent.descriptor.copy), limits);
         if (copy.archive.sha256 !== parent.descriptor.copy.sha256) fail('review-edit-child-evidence');
       }
       if (receipt && json(receipt) !== json(await reviewEditPublication(fs, parent, limits))) fail('review-edit-completion');
@@ -164,18 +173,20 @@ export function reviewEditStates(fs: ProjectWorkspaceFS, limits: MetadataLimits,
   return readReviewEditStates(fs, limits, completedChild);
 }
 
-export async function assertReviewEditSlot(fs: ProjectWorkspaceFS, limits: MetadataLimits, ownChild?: string) {
+export async function assertReviewEditSlot(fs: ProjectWorkspaceFS, limits: MetadataLimits, ownChild?: string, integrity?: OutputIntegrityRead) {
   const child = ownChild, ownedLimits = { ...limits };
-  return withMetadataRead(fs, undefined, async ({ fs }) => {
+  const inspect = async (fs: ProjectWorkspaceFS, scope?: OutputIntegrityRead) => {
     const eligible = new Set<string>();
     const states = await readReviewEditStates(fs, ownedLimits, undefined, (id, childId) => {
       if (childId === child) eligible.add(id);
-    });
+    }, scope);
     for (const state of states) {
       if (state.state === 'abandoned' || state.state === 'completed') continue;
       if (state.state !== 'incomplete' || !eligible.has(state.id)) fail('review-edit-pending');
     }
-  });
+  };
+  if (integrity) return integrity.withMetadataRead(fs, ownedLimits, inspect);
+  return withMetadataRead(fs, undefined, ({ fs }) => inspect(fs));
 }
 
 export async function abandonReviewEdit(fs: ProjectWorkspaceFS, id: string, limits: MetadataLimits) {

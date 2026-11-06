@@ -193,6 +193,12 @@ Threeの暗黙resizeやresize helperを原寸成功の代用にしない。通�
 
 ## 7. 実thumbnailと原寸modal
 
+2026-11-06の所有範囲内の整理：非occurrence GLBは最初のawait前にbytesとmetadataを
+私有captureし、固定Three186 loaderへそのcaptureのArrayBufferを渡す。既に分離した
+captureを再度丸ごとsliceしない。180側の証明・解放、186側の形状／材質照合、入力改変防御、
+表示owner終了時の解放は維持する。別owner・非表示期間へdecode結果を保持するcacheではない。
+これはSafariのRAM上限やiPhone合格の追加ではない。
+
 MediaPreviewResourcesをworkspaceに1個置く。keyはProject/resource scopeとimmutable
 表示Blobのalgorithm/digest/byteLength/MIME。HEICはportableDisplay側を含める。attachment IDや
 毎renderのload closure identityだけをkeyにしない。同じ写真の多窓は共有し、本文・説明・
