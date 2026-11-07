@@ -67,7 +67,8 @@ const releaseDigest = (p: Page) => p.evaluate(() => { const w = window as any; w
 
 test('PC Caption work continues after empty tag focus and cancelled file checks, with local receive/restore feedback', async ({ page, context, browser }, info) => {
   test.setTimeout(420_000); A.getHeads(A.init()); await page.setViewportSize({ width: 1280, height: 800 });
-  const server=await ownedServer('offline-desktop-dist');
+  const server=await ownedServer(process.env.LOCIVIEW_E2E_ARTIFACT??'offline-desktop-dist');
+  const entry=server.url+(process.env.LOCIVIEW_E2E_TIMINGS==='1'?'?timings=1':'');
   const errors: string[] = [], remote: string[] = [];
   const localOnly = (c: typeof context) => c.route('**/*', route => {
     const u = new URL(route.request().url()); if (u.origin === new URL(server.url).origin || ['blob:', 'data:'].includes(u.protocol)) return route.continue();
@@ -77,7 +78,7 @@ test('PC Caption work continues after empty tag focus and cancelled file checks,
   const peer = await browser.newContext({ viewport: { width: 1440, height: 900 }, serviceWorkers: 'block', acceptDownloads: true }); await localOnly(peer);
   const b = await peer.newPage(); b.on('pageerror', error => errors.push(error.message));
   try {
-    await page.goto(server.url); await page.getByLabel('ファイルを選択', { exact: true }).setInputFiles({ name: '現地モデル.glb', mimeType: 'model/gltf-binary', buffer: triangleGlb() });
+    await page.goto(entry); await page.getByLabel('ファイルを選択', { exact: true }).setInputFiles({ name: '現地モデル.glb', mimeType: 'model/gltf-binary', buffer: triangleGlb() });
     await page.getByRole('button', { name: 'ファイルを開く', exact: true }).click(); await page.getByRole('textbox', { name: 'プロジェクト名', exact: true }).fill('PCで記録を続ける'); await page.getByRole('button', { name: 'プロジェクトを作成', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText('PCで記録を続ける', { timeout: 90_000 });
     await expect(page.getByLabel('3Dモデルの表示', { exact: true })).toHaveAttribute('aria-busy', 'false');
@@ -139,7 +140,7 @@ test('PC Caption work continues after empty tag focus and cancelled file checks,
     await page.getByRole('button', { name: 'ファイルを開く', exact: true }).click(); await page.getByRole('button', { name: '編集で開く', exact: true }).first().click();
     await expect(page.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText('PCで記録を続ける', { timeout: 90_000 }); await chooseCaption(page, '確認する場所');
     const workspace = await output(page, info, '作業一式', 'teamWorkspace');await page.locator('details.lv-project-files').getByRole('button',{name:'閉じる',exact:true}).click();
-    await b.goto(server.url); await b.getByLabel('ファイルを選択', { exact: true }).setInputFiles(workspace); await b.getByRole('button', { name: 'ファイルを開く', exact: true }).click();
+    await b.goto(entry); await b.getByLabel('ファイルを選択', { exact: true }).setInputFiles(workspace); await b.getByRole('button', { name: 'ファイルを開く', exact: true }).click();
     await expect(b.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText('PCで記録を続ける', { timeout: 90_000 }); await chooseCaption(b, '確認する場所');
     await edit(b, 'タイトル', '相手のタイトル'); const returned = await output(b, info, '相手の更新', 'teamWorkspace'); await edit(page, '本文', '手元の本文');
     await fileMenu(page); const incoming = receive(page), incomingStatus = incoming.locator(':scope > p[role="status"]');
@@ -157,7 +158,9 @@ test('PC Caption work continues after empty tag focus and cancelled file checks,
     const restoreStatus = restore.locator(':scope > p[role="status"]'); await expect(restoreStatus).toHaveAttribute('data-busy', 'true'); await expect(restoreStatus).toHaveText('復元を確認しています。'); await expect(incomingStatus).toBeEmpty();
     await expect.poll(() => page.evaluate(() => !!(window as any).__continuationDigestHeld)).toBe(true);
     expect(await restoreStatus.evaluate(n => getComputedStyle(n, '::before').animationName)).toBe('none'); await page.screenshot({ path: info.outputPath('restore-working-reduced-motion.png'), fullPage: true });
-    await releaseDigest(page); await expect(restoreStatus).toHaveText('バックアップから復元しました。ファイルへの反映はしていません。', { timeout: 90_000 }); await expect(restoreStatus).toHaveAttribute('data-busy', 'false');
+    await releaseDigest(page); await expect(restoreStatus).toHaveText('バックアップから復元しました。ファイルへの反映はしていません。', { timeout: 90_000 }).catch(async error=>{
+      await info.attach('restore-stage-diagnostic',{body:JSON.stringify({status:await restoreStatus.innerText(),errors,remote,timings:await page.evaluate(()=>{document.dispatchEvent(new Event('lociview-timing-snapshot'));return performance.getEntriesByType('measure').filter(entry=>entry.name.startsWith('lociview.')).map(entry=>({...entry.toJSON(),detail:(entry as PerformanceMeasure).detail}));})}),contentType:'application/json'});throw error;
+    }); await expect(restoreStatus).toHaveAttribute('data-busy', 'false');
     await expect(page.locator('details.lv-project-files [role="tab"][aria-selected="true"]')).toHaveCount(1);await expect(page.locator('details.lv-project-files .lv-file-intents > button:visible')).toHaveCount(0);
     await page.locator('details.lv-project-files').getByRole('button',{name:'閉じる',exact:true}).click();
     await chooseCaption(page, '確認する場所'); await expect(detail(page).getByLabel('タイトル', { exact: true })).toHaveValue('確認する場所'); await expect(detail(page).getByLabel('本文', { exact: true })).toHaveValue('');

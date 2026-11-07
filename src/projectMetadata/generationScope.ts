@@ -142,7 +142,7 @@ export async function openWorkspaceGeneration(root: ProjectWorkspaceFS,
         return paths.filter(item => !isReserved(item));
       });
     },
-    writeText: (path: string, text: string) => { ownPath(path); return write(() => root.writeText(path, text)); },
+    writeText: (path: string, text: string, creation?:import('../platform/fs').WorkspaceTextCreation) => { ownPath(path); return write(() => root.writeText(path, text, creation)); },
     appendText: (path: string, text: string) => { ownPath(path); return write(() => root.appendText(path, text)); },
     writeBytes: (path: string, bytes: Uint8Array) => {
       ownPath(path); const owned = bytes.slice(); return write(() => root.writeBytes(path, owned));

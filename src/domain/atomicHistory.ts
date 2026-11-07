@@ -96,6 +96,9 @@ function inspectCanonicalAtomicHistory(raw: JsonValue | undefined, limits: Histo
       const key = canonical(write.path), group = versions.get(key) ?? []; group.push(Object.freeze({ ...write, changeId: change.id })); versions.set(key, group);
     }
     const fields = [...versions].sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0).map(([, versions]) => {
+      // All writes and the DAG are already checked. before(id, id) charges no
+      // work, and this private array is complete before candidate selection.
+      if (versions.length === 1) return Object.freeze({ path: versions[0]!.path, candidates: Object.freeze(versions) });
       const candidates = versions.filter(v => !versions.some(other => index.before(v.changeId, other.changeId)))
         .sort((a, b) => a.operationId < b.operationId ? -1 : a.operationId > b.operationId ? 1 : 0);
       return Object.freeze({ path: versions[0]!.path, candidates: Object.freeze(candidates) });

@@ -101,6 +101,7 @@ function runFile(
   args: string[],
   options: { cwd?: string; env?: NodeJS.ProcessEnv; input?: Buffer } = {},
 ): Promise<CliResult> {
+  const started = performance.now();
   return new Promise((resolveResult) => {
     let inputError: Error | undefined;
     const child = execFile(
@@ -114,6 +115,9 @@ function runFile(
         windowsHide: true,
       },
       (error, stdout, stderr) => {
+        if (process.env.LOCIVIEW_G0_TIMINGS === '1') console.info('[g0-child-timing]', JSON.stringify({
+          stage: args[0] === verifierPath ? 'verifier' : args[0], milliseconds: performance.now() - started,
+        }));
         const exitCode = error === null && !inputError ? 0 : error && typeof error.code === 'number' ? error.code : 1;
         resolveResult({ exitCode, stdout, stderr: inputError ? `${stderr}\n${inputError.message}` : stderr });
       },
@@ -231,10 +235,12 @@ async function buildWorkspace(root: string): Promise<SyntheticWorkspace> {
 
 /** Only immutable preparation is shared; every case gets its own files and Git repository. */
 async function makeWorkspace(): Promise<SyntheticWorkspace> {
+  const started = performance.now();
   const parent = await mkdtemp(join(tmpdir(), 'lociview-g0-verifier-'));
   createdRoots.push(parent);
   const root = join(parent, 'workspace');
   await cp(templateWorkspace.root, root, { recursive: true, force: false, errorOnExist: true });
+  if (process.env.LOCIVIEW_G0_TIMINGS === '1') console.info('[g0-workspace-timing]', JSON.stringify({ milliseconds: performance.now() - started }));
   return { ...clone(templateWorkspace), root };
 }
 
@@ -564,8 +570,12 @@ beforeAll(() => {
   return templatePreparation;
 });
 
-afterEach(async () => {
-  await Promise.all(createdRoots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
+afterEach(async ({ task }) => {
+  const roots = createdRoots.splice(0);
+  // A timeout does not cancel native Git/verifier work. Retain that case's
+  // synthetic inputs instead of deleting them while its child may still read.
+  if (task.result?.state === 'fail') { console.warn('Failed G0 test fixtures retained:', roots); return; }
+  await Promise.all(roots.map((root) => rm(root, { recursive: true, force: true })));
 });
 
 afterAll(async () => {
@@ -1190,7 +1200,7 @@ describe('G0 evidence verifier CLI', () => {
     expectRelativeDiagnostic(result, workspace.root, 'E_TRACE');
   });
 
-  it('accepts historical external fixture metadata with an exact manifest after the worktree registry returns to Git-only', async () => {
+  it('selects the exact external fixture locator past a same-byte decoy after the worktree registry returns to Git-only', async () => {
     const workspace = await makeWorkspace();
     const registryPath = resolve(workspace.root, 'fixtures', 'registry.json');
     const registry = await readJson(registryPath);
@@ -1225,6 +1235,17 @@ describe('G0 evidence verifier CLI', () => {
       storageLocator: EXTERNAL_FIXTURE_LOCATOR,
     });
     manifest.artifacts = [
+      {
+        artifactId: 'blob_synthetic-wrong-fixture-locator',
+        kind: 'large-fixture',
+        sha256: (run.fixture as JsonObject).sha256,
+        bytes: (run.fixture as JsonObject).sourceBytes,
+        storageLocator: 'external-store/wrong-but-same-bytes.glb',
+        restoreInstructions: SYNTHETIC_NOTE,
+        capturedAtUtc: '2026-08-19T00:00:00Z',
+        containsSensitiveData: false,
+        retentionNote: SYNTHETIC_NOTE,
+      },
       ...(manifest.artifacts as JsonObject[]),
       {
         artifactId: 'blob_synthetic-external-trace',
@@ -1316,7 +1337,7 @@ describe('G0 evidence verifier CLI', () => {
     expectRelativeDiagnostic(await runVerifier(workspace.root), workspace.root, 'E_FIXTURE');
   });
 
-  it('selects an external fixture artifact by locator as well as kind, hash and size', async () => {
+  it('rejects a wrong external fixture locator despite matching kind, hash and size', async () => {
     const workspace = await makeWorkspace();
     const registryPath = resolve(workspace.root, 'fixtures', 'registry.json');
     const registry = await readJson(registryPath);
@@ -1343,24 +1364,6 @@ describe('G0 evidence verifier CLI', () => {
     await writeRun(workspace.root, 'synthetic.json', run);
     await writeManifest(workspace.root, 'synthetic.json', manifest);
     expectRelativeDiagnostic(await runVerifier(workspace.root), workspace.root, 'E_FIXTURE');
-
-    (manifest.artifacts as JsonObject[]).push({
-      artifactId: 'blob_synthetic-correct-fixture-locator',
-      kind: 'large-fixture',
-      sha256: (run.fixture as JsonObject).sha256,
-      bytes: (run.fixture as JsonObject).sourceBytes,
-      storageLocator: EXTERNAL_FIXTURE_LOCATOR,
-      restoreInstructions: SYNTHETIC_NOTE,
-      capturedAtUtc: '2026-08-19T00:00:00Z',
-      containsSensitiveData: false,
-      retentionNote: SYNTHETIC_NOTE,
-    });
-
-    await writeManifest(workspace.root, 'synthetic.json', manifest);
-    const result = await runVerifier(workspace.root);
-    expect(result.exitCode).toBe(0);
-    expect(result.stderr).toBe('');
-    expect(result.stdout).toContain('1 external fixture transport pending separate acquisition verification (no G0 credit)');
   });
 
   it('accepts a complete local run with a verified generated fixture', async () => {

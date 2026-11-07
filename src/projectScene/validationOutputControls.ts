@@ -1,6 +1,7 @@
 import type { createValidationModeHost } from './validationModeHost';
 import { editOnly, displayMode } from '../ui/projectScene/modePresentation';
 import type { WorkspaceFileInteraction } from '../ui/projectScene/projectWorkspacePorts';
+import {storageFailureText} from '../ui/projectScene/storageFeedback';
 
 /** Same editor, deliberate file handoff. No receipt follows a browser download click. */
 export function createValidationOutputControls(document: Document, host: ReturnType<typeof createValidationModeHost>,
@@ -29,6 +30,7 @@ export function createValidationOutputControls(document: Document, host: ReturnT
   editOnly(shareOptions, actions, nameField, commands, select);
   let busy = false, disposed = false, feedback = '', selected: string | null = null, cancellation: string | null = null;
   let completedFeedback = false;
+  let storageFailure:{diagnostic:string|null|undefined;text:string}|undefined;
   let readingToken: string | null = null;
   let primaryAction = () => {};
   primary.addEventListener('click', () => { if (!disposed && !primary.disabled) primaryAction(); });
@@ -79,10 +81,10 @@ export function createValidationOutputControls(document: Document, host: ReturnT
     const moved = (event: Event) => { if (event.target !== origin && event.target !== document.body) returnPrimary = false; };
     document.addEventListener?.('focusin', moved);
     let succeeded = false;
-    completedFeedback = false; busy = true; readingToken = allowReading ? host.read().source?.token ?? null : null; feedback = workingMessage; render(); changed();
+    completedFeedback = false; storageFailure=undefined; busy = true; readingToken = allowReading ? host.read().source?.token ?? null : null; feedback = workingMessage; render(); changed();
     void (async () => {
       try { await action(); if (!disposed) { feedback = message; completedFeedback = true; if (consumeChoice) resetChoice(); completed?.(); succeeded = completedFeedback; } }
-      catch (error) { completedFeedback = false; if (!disposed) feedback = error instanceof Error ? error.message : 'ファイル処理を完了できません。'; }
+      catch (error) { completedFeedback = false; if (!disposed) {const text=storageFailureText(error);storageFailure=text?{diagnostic:host.workspaceOutput.error,text}:undefined;feedback=text??(error instanceof Error ? error.message : 'ファイル処理を完了できません。');} }
       finally { busy = false; readingToken = null; if (!disposed) { render(); changed(); }
         document.removeEventListener?.('focusin', moved);
         const target = root.querySelector?.<HTMLButtonElement>('.lv-file-primary');
@@ -244,7 +246,8 @@ export function createValidationOutputControls(document: Document, host: ReturnT
       resetChoice(); feedback = ''; completedFeedback = false; render(); changed(); if (presentation === 'share') partial.focus();
     });
     status.dataset.busy = String(busy);
-    status.textContent = busy ? feedback : host.workspaceOutput.error || feedback;
+    const diagnostic=host.workspaceOutput.error;
+    status.textContent = busy ? feedback : storageFailure&&storageFailure.diagnostic===diagnostic ? storageFailure.text : diagnostic || feedback;
     const currentToken = host.read().source?.token;
     for (const [i, job] of host.workspaceOutput.jobs.entries()) {
       if (['cancelled', 'abandoned'].includes(job.state)) continue;

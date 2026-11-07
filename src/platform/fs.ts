@@ -2,9 +2,12 @@
 // 上位層はブラウザ差（OPFS / メモリfallback）を知らない。
 // パスは 'projects/<projectId>/ops/a_xxx.jsonl' のようなスラッシュ区切りの論理キー。
 
+/** Caller holds the exclusive lease for a path proven absent until acquisition ends. */
+export interface WorkspaceTextCreation { assertOwned():void }
+
 export interface WorkspaceFS {
   readText(path: string): Promise<string | null>;
-  writeText(path: string, text: string): Promise<void>;
+  writeText(path: string, text: string, creation?:WorkspaceTextCreation): Promise<void>;
   appendText(path: string, text: string): Promise<void>;
   appendBytes(path: string, data: Uint8Array): Promise<void>;
   readBytes(path: string): Promise<Uint8Array | null>;

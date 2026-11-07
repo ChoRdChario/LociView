@@ -17,7 +17,7 @@ const receiptPath = (hash: string) => `${root}/sha256/${hash.slice(0, 2)}/${hash
 const objectPath = (id: string) => `${root}/objects/${id}.bin`;
 const suspectPath = (hash: string) => `${root}/suspect/${hash}.json`;
 
-/** Disconnected S1 body service. Fixed origin-wide namespace/lock, never a Project's writer. */
+/** Origin-scoped body service. Fixed namespace/lock, never a Project's writer. */
 export class OriginBlobStore {
   private readonly limits: BlobStoreLimits;
   private readonly coordinator: ProjectMutationCoordinator;

@@ -42,7 +42,7 @@ export async function writeReceipt(fs: ProjectWorkspaceFS, path: string, value: 
   const previous = await readReceipt(fs, path, limits);
   if (previous !== null) { if (json(previous) !== text) fail('receipt-exists'); return; }
   fs.mutationAuthority.assertWorkspaceWriteAuthorized();
-  await fs.writeText(path, text);
+  await fs.writeText(path, text, {assertOwned:()=>fs.mutationAuthority.assertWorkspaceWriteAuthorized()});
   fs.mutationAuthority.assertWorkspaceWriteAuthorized();
   if (json(await readReceipt(fs, path, limits)) !== text) fail('receipt-readback');
 }

@@ -18,12 +18,21 @@ export interface ReviewEditArchiveLease { readonly file:Blob; release():Promise<
 export interface ReviewEditArchivePort { write(produce:(destination:WritableStream<Uint8Array>,signal?:AbortSignal)=>Promise<unknown>):Promise<ReviewEditArchiveLease> }
 /** Owned temporary output only; not a Project, publication or recovery authority. */
 export function createReviewEditScratch(fs:WorkspaceFS):ReviewEditArchivePort & {cancel():void;dispose():Promise<void>} {
-  const owned=new Set<string>(),pending=new Set<Promise<unknown>>(),active=new Set<()=>void>();let closed=false;
-  const cancel=()=>{for(const stop of active)stop();};
-  const remove=async(path:string)=>{await fs.remove(path);owned.delete(path);};
+  const owned=new Set<string>(),failed=new Set<string>(),removing=new Map<string,Promise<void>>(),pending=new Set<Promise<unknown>>(),active=new Set<()=>void>();let closed=false,ending:Promise<void>|undefined;
+  const cancel=()=>{const errors:unknown[]=[];for(const stop of [...active])try{stop();}catch(error){errors.push(error);}if(errors.length)throw new AggregateError(errors,'一時ファイルの作成を停止できません。');};
+  const remove=(path:string):Promise<void>=>{
+    if(!owned.has(path))return Promise.resolve();const previous=removing.get(path);if(previous)return previous;
+    const work=Promise.resolve().then(()=>fs.remove(path)).then(()=>{owned.delete(path);failed.delete(path);},error=>{failed.add(path);throw error;});
+    removing.set(path,work);void work.finally(()=>removing.delete(path)).catch(()=>{});return work;
+  };
+  const cleanup=async(paths:readonly string[])=>{
+    const errors:unknown[]=[];for(const path of paths)try{await remove(path);}catch(error){errors.push(error);}
+    if(errors.length)throw new AggregateError(errors,'一時ファイルを解放できません。新しいファイルは作成していません。同じ操作を再試行してください。');
+  };
   return {write(produce){
     const work=(async()=>{
       if(closed)throw Error('画面を閉じました。');
+      await cleanup([...failed]);if(closed)throw Error('画面を閉じました。');
       const path=`v2/transient-review-copy/${newId()}.zip`;let controller!:TransformStreamDefaultController<Uint8Array>;
       const abort=new AbortController(),stop=()=>{const reason=new DOMException('編集コピーの作成を取り消しました。','AbortError');abort.abort(reason);controller.error(reason);};
       const channel=new TransformStream<Uint8Array,Uint8Array>({start(value){controller=value;}});owned.add(path);active.add(stop);
@@ -38,7 +47,12 @@ export function createReviewEditScratch(fs:WorkspaceFS):ReviewEditArchivePort & 
         try{await remove(path);}catch(cleanup){throw new AggregateError([error,cleanup],'編集コピーの作成と一時ファイルの解放に失敗しました。');}throw error;
       }finally{active.delete(stop);}
     })();pending.add(work);void work.finally(()=>pending.delete(work)).catch(()=>{});return work;
-  },cancel,async dispose(){closed=true;cancel();await Promise.allSettled([...pending]);for(const path of [...owned])await remove(path);}};
+  },cancel,dispose(){
+    closed=true;if(ending)return ending;
+    ending=Promise.resolve().then(async()=>{const errors:unknown[]=[];try{cancel();}catch(error){errors.push(error);}await Promise.allSettled([...pending]);
+      try{await cleanup([...owned]);}catch(error){errors.push(error);}if(errors.length)throw new AggregateError(errors,'一時ファイルの解放を完了できません。同じ操作を再試行してください。');});
+    const work=ending;void work.finally(()=>{if(ending===work)ending=undefined;}).catch(()=>{});return work;
+  }};
 }
 
 /** Pure explicit preparation. IDs, original bytes, metadata actor/root and private ZIP are frozen once. */

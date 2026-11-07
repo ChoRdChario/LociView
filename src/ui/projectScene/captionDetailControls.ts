@@ -174,10 +174,10 @@ export function createCaptionDetailControls(document: Document, onEvent: (event:
       ? `${sceneCount}シーンで共有されています。変更はすべてに反映されます。` : sceneCount === 1 ? '' : '影響するシーンを確認してください。';
     impact.hidden = empty || !impact.textContent;
     const applyIssue = captionApplyIssue(next);
-    status.textContent = [next.feedback.kind === 'failed' && `適用できませんでした。${next.feedback.message} 入力は保持しています。`,
+    status.textContent = [...new Set([next.feedback.kind === 'failed' && `適用できませんでした。${next.feedback.message} 入力は保持しています。`,
       inFlight && '変更を適用中です。', hasCaptionDraft(owned) && !inFlight && '未適用の入力があります。',
       !inFlight && !next.textOnly && next.mutationBlock !== '閲覧中です。編集を開始してください。' && next.mutationBlock, source.kind !== 'ready' && (source.reason || 'キャプションを選択してください。'),
-      hasCaptionDraft(owned) && applyIssue && !inFlight && applyIssue].filter(Boolean).join(' ');
+      hasCaptionDraft(owned) && applyIssue && !inFlight && applyIssue].filter(Boolean))].join(' ');
     apply.disabled = applyIssue !== null;
     actions.hidden = !hasCaptionDraft(owned);
     cancel.disabled = !hasCaptionDraft(owned) || Boolean(owned?.composing) || inFlight;

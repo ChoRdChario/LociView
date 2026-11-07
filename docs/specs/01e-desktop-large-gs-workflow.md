@@ -387,6 +387,28 @@ generation before waiting for UI disposal. Cleanup failures retain the original
 error and never skip Host/renderer/lease disposal. Scratch remains non-authoritative
 after a crash; cold recovery uses only the existing durable evidence.
 
+2026-11-07 ownership repair within this same scratch boundary: drain producers
+and sinks before cleanup, attempt every exact current-owner path independently,
+and retain failed removals for an explicit retry. Concurrent release calls join
+the same removal. A new write first retries that owner's failed cleanup and
+starts no new temporary archive while it still fails. Successful live leases
+are not cleanup candidates. Repeated disposal may retry retained failures after
+storage access recovers; no new write is allowed after disposal. This adds no
+prefix sweep, cross-tab/cold reclamation, Project/CAS/job-artifact deletion or
+change to durable recovery authority.
+The browser composition stores one shared disposal Promise before synchronous
+cancellation, detaches listeners, then independently awaits workspace, scratch
+and raster shutdown in that order. A scratch/cancellation error never skips the
+other owners or replaces an earlier error. Failed retirement stays a failed close;
+it is not permission to activate another renderer or delete another owner's files.
+
+Acceptance: real QuotaExceededError plus independent cleanup failure preserves
+both errors and the old Project; later owned paths still receive cleanup; retry
+does not accumulate fresh files or remove another live lease; a recovered retry
+produces and verifies the same copy workflow. Existing UI distinguishes native
+quota from output inspection-budget refusal and corruption, preserves input and
+the frozen job, and explains that clearing site data removes restart data.
+
 The500k copy diagnostic completes in277,981ms after the240s acceptance failure;
 fresh scans inspect14GB, with SHA/GS inspection dominating CPU. A disposable
 eight-round SHA prototype gives no reliable gain and is not adopted. Keep the
@@ -558,3 +580,21 @@ Check full-target GS admission and cleanup, local spinner/reduced-motion, one ac
 Desktop delayed-mixed-model browser flow and the repository's serial final checks.
 Measure first readable and fully editable milestones separately; this does not
 turn the known240s Review copy failure into a pass or change any numeric guarantee.
+
+### Automatic reopen discovery
+
+For a valid remembered32-hex run, startup may enumerate only that Project's exact
+namespace and perform its unchanged catalog session, recovery, receive, output
+and review-copy checks before the existing fresh Host open. An advisory hint is
+not authority and cannot bypass any selected-Project inspection or command fence.
+Unrelated Projects are fully inspected when the user opens/refetches the selector,
+when import needs destination discovery, or when automatic reopening falls back.
+The targeted result is local to startup: it must never mark the complete catalog
+loaded, populate a partial selector, or suppress import destination detection.
+Progressive reading and pending/unavailable/missing/stale/disposed handling remain.
+No verified-proof reuse, persistence, renderer or file format changes are involved.
+Acceptance: unrelated storage is not opened on a valid automatic reopen; target
+checks still execute; selector/fallback/import retain full enumeration; preserve
+existing reading, readonly, race, teardown and failed-open recovery cases. Measure
+the retained mixed500k/Native profile at the same origin and retain the20s ordinary
+return assertion; no deadline relaxation or retry credit.

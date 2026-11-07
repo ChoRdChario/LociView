@@ -3,7 +3,7 @@
 // 注意: appendText は read-modify-write で実装している。op追記は逐次化されるため
 // （ProjectStore側で書き込みキューを直列化）、これで整合する。
 
-import type { WorkspaceFS, WorkspaceReadableFile } from './fs';
+import type { WorkspaceFS, WorkspaceReadableFile, WorkspaceTextCreation } from './fs';
 
 function isNotFoundError(error: unknown): boolean {
   return error instanceof DOMException && error.name === 'NotFoundError';
@@ -57,10 +57,37 @@ export class OpfsFS implements WorkspaceFS {
     return (await h.getFile()).text();
   }
 
-  async writeText(path: string, text: string): Promise<void> {
+  async writeText(path: string, text: string, creation?:WorkspaceTextCreation): Promise<void> {
+    if (creation) {
+      creation.assertOwned();
+      const previous = await this.fileHandle(path, false);
+      creation.assertOwned();
+      if (previous) throw Error('opfs: fresh text entry already exists');
+    }
     const h = await this.fileHandle(path, true);
     if (!h) throw new Error(`opfs: cannot open ${path}`);
-    const w = await h.createWritable();
+    creation?.assertOwned();
+    let w: FileSystemWritableFileStream;
+    try { w = await h.createWritable(); }
+    catch (error) {
+      if (creation) try {
+        creation.assertOwned();
+        const current = await this.fileHandle(path, false);
+        creation.assertOwned();
+        if (current) {
+          const same = await h.isSameEntry(current);
+          creation.assertOwned();
+          const file = await current.getFile();
+          creation.assertOwned();
+          if (!same || file.size !== 0) throw Error('opfs: fresh text entry changed; cleanup refused');
+          await this.remove(path);
+          creation.assertOwned();
+        }
+      } catch (cleanup) {
+        throw new AggregateError([error, cleanup], '管理ファイルの作成と後片付けに失敗しました。再開用データを保持しています。');
+      }
+      throw error;
+    }
     await w.write(text);
     await w.close();
   }

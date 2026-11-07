@@ -1,3 +1,4 @@
+import {glb,TestFS,lockManager,storageFactory,acknowledge} from './helpers/projectFileFixtures';
 import { portablePng, fixturePngDecoder } from './helpers/portableHeicFixtures';
 import { portableDisplay, recordBlobRefs } from '../src/domain/portableMedia';
 import { PORTABLE_MEDIA_CAPABILITY, EDITOR_CAPABILITY } from '../src/projectMetadata/requiredCapabilities';
@@ -207,59 +208,6 @@ afterEach(async () => {
   }
   if (errors.length) throw new AggregateError(errors, 'fixture disposal');
 });
-// Wait for the operation owner's confirmation/render, not a storage-publication
-// snapshot or vi.waitFor's incidental 1s polling deadline.
-async function acknowledge(ack: WorkingAcknowledgment | readonly WorkingAcknowledgment[], action: () => void,
-  expected: 'idle' | 'failed' = 'idle', requireChecking = true) {
-  const owners = ack instanceof WorkingAcknowledgment ? [ack] : ack;
-  const unsubscribes: (() => void)[] = [];
-  try {
-    await new Promise<void>(resolve => {
-      const settled = () => { if (owners.every(owner => owner.state !== 'checking')) resolve(); };
-      for (const owner of owners) unsubscribes.push(owner.subscribe(settled));
-      action();
-      if (requireChecking) expect(owners.some(owner => owner.state === 'checking')).toBe(true);
-      settled();
-    });
-  } finally { for (const unsubscribe of unsubscribes) unsubscribe(); }
-  for (const owner of owners) expect(owner.state).toBe(expected);
-}
-function glb(mutate: (json: any, bin: Uint8Array) => void = () => {}, textured = false, imageBytes = png) {
-  const bin = new Uint8Array(36 + (textured ? 24 + imageBytes.length : 0));
-  new Float32Array(bin.buffer, 0, 9).set([-1, 0, 0, 1, 0, 0, 0, 2, 0]);
-  const json: any = { asset: { version: '2.0' }, scene: 0, scenes: [{ nodes: [0] }], nodes: [{ mesh: 0, translation: [3, 0, 0] }],
-    meshes: [{ primitives: [{ attributes: { POSITION: 0 }, material: 0 }] }], buffers: [{ byteLength: bin.length }],
-    bufferViews: [{ buffer: 0, byteLength: 36 }], accessors: [{ bufferView: 0, componentType: 5126, count: 3, type: 'VEC3', min: [-1, 0, 0], max: [1, 2, 0] }],
-    materials: [{ pbrMetallicRoughness: { baseColorFactor: [0.2, 0.5, 0.8, 1], roughnessFactor: 0.7 } }] };
-  if (textured) {
-    new Float32Array(bin.buffer, 36, 6).set([0, 0, 1, 0, 0.5, 1]); bin.set(imageBytes, 60);
-    json.bufferViews.push({ buffer: 0, byteOffset: 36, byteLength: 24 }, { buffer: 0, byteOffset: 60, byteLength: imageBytes.length });
-    json.accessors.push({ bufferView: 1, componentType: 5126, count: 3, type: 'VEC2' });
-    json.meshes[0].primitives[0].attributes.TEXCOORD_0 = 1;
-    json.images = [{ bufferView: 2, mimeType: 'image/png' }]; json.textures = [{ source: 0 }];
-    json.materials[0].pbrMetallicRoughness.baseColorTexture = { index: 0 };
-  }
-  mutate(json, bin); return serializeGlb(json, bin);
-}
-function lockManager() {
-  const held = new Set<string>();
-  return { async request(name: string, _options: LockOptions, callback: (lock: Lock | null) => Promise<unknown>) {
-    if (held.has(name)) return callback(null); held.add(name);
-    try { return await callback({ name, mode: 'exclusive' }); } finally { held.delete(name); }
-  } } as unknown as LockManager;
-}
-function storageFactory() {
-  const rows = new Map<string, Uint8Array>();
-  const matches = (key: string, prefix: string[]) => prefix.every((p, i) => JSON.parse(key)[i] === p);
-  const factory: MetadataStorageFactory = () => ({
-    load: async key => rows.get(JSON.stringify(key))?.slice(),
-    save: async (key, bytes) => { rows.set(JSON.stringify(key), bytes.slice()); },
-    remove: async key => { rows.delete(JSON.stringify(key)); },
-    loadRange: async prefix => [...rows].filter(([key]) => matches(key, prefix)).map(([key, data]) => ({ key: JSON.parse(key), data: data.slice() })),
-    removeRange: async prefix => { for (const key of rows.keys()) if (matches(key, prefix)) rows.delete(key); },
-  });
-  return factory;
-}
 /** Native source bytes built here only; no private files or external sample distribution. */
 async function nativeConversionFile(change: (snapshot: any) => void = () => {}, badBody = false, modelBytes = glb(), imageBytes = png, bodies?: ReadonlyMap<string, Uint8Array>) {
   const id = (prefix: string, n: number) => `${prefix}_${n.toString().padStart(26, '0')}`;
@@ -464,17 +412,6 @@ function standardNativeFile(lane:'plain'|'spatial'|'mesh'){
 }
 function standardV1File(){return frozenV1File(ops=>{exactV1Materials(ops);const rows=ops.filter(o=>o.e==='material');rows[0].v.opacity=.5;delete rows[0].v.doubleSided;rows[1].v.chroma={enable:true,tol:.9};delete rows[2].v.opacity;rows[3].v.chroma.enable=true;},png,exactV1MaterialModel(j=>{expandedOpaqueMaterials(j);j.materials[0].alphaMode='MASK';j.materials[1].alphaMode='BLEND';}));}
 function standardLociMaterials(s:XlsxSheetSpec[],e:{path:string;data:Uint8Array}[]){opaqueLociMaterials(s,e);const rows=s.find(t=>t.name==='__LM_MATERIALS')!.rows;rows[1]![1]='0.5';rows[1]![4]='true';rows[1]![6]='';rows[1]![7]='0';rows[2]![4]='true';const body=e.find(x=>x.path==='models/model.glb')!,parts=validationGlbParts(body.data,budget),j:any=structuredClone(parts.json);j.materials[0].alphaMode='MASK';j.materials[1].alphaMode='BLEND';body.data=serializeGlb(j,parts.bin);}
-class TestFS extends MemoryFS {
-  reject = (_: string) => false; reads = 0;
-  override async writeText(path: string, text: string) { if (this.reject(path)) throw Error('injected quota'); return super.writeText(path, text); }
-  override async writeBytes(path: string, bytes: Uint8Array) { if (this.reject(path)) throw Error('injected quota'); return super.writeBytes(path, bytes); }
-  override async writeStream(path: string, stream: ReadableStream<Uint8Array>) {
-    if (this.reject(path)) { await stream.cancel(); throw Error('injected quota'); } return super.writeStream(path, stream);
-  }
-  override async readStream(path: string) { const file = await super.readStream(path); if (!file || !path.startsWith('v2/cas/objects/')) return file;
-    return { size: file.size, stream: () => { this.reads++; return file.stream(); } }; }
-}
-
 async function openFileCaption(modelBytes = glb(),profile:'map1'|'map2'='map1', editorSettings?: Parameters<typeof openValidationHost>[0]['editorSettings']) {
   const fs = new TestFS(), locks = lockManager(), run = newId(), factory = storageFactory();
   const coordinator = ProjectMutationCoordinator.browser(locks);
@@ -2620,21 +2557,21 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const receiver = new WorkspaceReceiver(f.fs, f.fs, f.receiver.session, metadata, f.locks);
     return { ...f, source, file, receiverService: receiver, reopen, capture, senderStore };
   }
-  async function exerciseOpaqueFileReturns(workspace:Blob,existingOrigin?:ReturnType<typeof firstWorkspaceRecipient>){
+  async function exerciseOpaqueFileReturns(workspace:Blob,existingOrigin?:ReturnType<typeof firstWorkspaceRecipient>,roundCount:1|2=2){
     const a=existingOrigin??firstWorkspaceRecipient(),b=firstWorkspaceRecipient();
     let currentA = existingOrigin ? await a.session.read() : await a.receiver.importWorkspace(workspace);
     let currentB = await b.receiver.importWorkspace(workspace);
     const senderA=new WorkspaceSender(a.fs,a.session,a.store,metadata,a.locks),senderB=new WorkspaceSender(b.fs,b.session,b.store,metadata,b.locks);
     if(currentA.provider?.kind!=='scene-provider')throw Error('provider');
     const caption=Object.keys(currentA.provider.resources.captions)[0]!,originalMaterials=currentA.provider.inspection.candidates.unambiguousRecords.materialOverridesById;
-    for(let round=1;round<=2;round++){
+    for(let round=1;round<=roundCount;round++){
       currentA = await a.session.editCaption(currentA.source!.token,caption,'body',`手元の編集${round}`);
       currentB = await b.session.editCaption(currentB.source!.token,caption,'title',`返送${round}`);
       const base=(await senderB.availableBases()).at(-1)!.selection,file=await senderB.download(await senderB.generateContribution(currentB.source!.token,base));
       currentA = await a.receiver.receive(currentA.source!.token,file);
       expect(currentA.provider?.kind==='scene-provider'&&currentA.provider.resources.captions[caption]).toMatchObject({title:{kind:'value',value:`返送${round}`},body:{kind:'value',value:`手元の編集${round}`}});
       if(currentA.provider?.kind!=='scene-provider')throw Error('provider');expect(currentA.provider.inspection.candidates.unambiguousRecords.materialOverridesById).toEqual(originalMaterials);
-      if(round===1){
+      if(round<roundCount){
         const next=await senderA.download(await senderA.generate(currentA.source!.token));
         currentB = await b.receiver.receive(currentB.source!.token,next);
       }
@@ -2660,14 +2597,14 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
   function resumeWorkspaceFixture() {
     const r = firstWorkspaceRecipient(), factories = new Map<string, MetadataStorageFactory>();
     const options = { base: r.fs, coordinator: ProjectMutationCoordinator.browser(r.locks), store: r.store, fileLimits: budget, decode, packageLocks: r.locks };
-    const storage = async (run: string, create: boolean) => {
+    const storage = vi.fn(async (run: string, create: boolean) => {
       if (!factories.has(run) && create) factories.set(run, storageFactory()); const factory = factories.get(run); if (!factory) throw Error('missing');
       return { factory, dispose: async () => {} };
-    };
+    });
     let reference: ProjectResumeReference | null = null, current: Awaited<ReturnType<typeof openValidationHost>> | undefined;
     const remember = vi.fn((next: ProjectResumeReference) => { reference = { ...next }; });
     const ports: ValidationWorkspacePorts = { ...options, productEditor: true, selected: vi.fn(), lastProject: { read: vi.fn(() => reference), remember },
-      list: () => listValidationProjects(options, storage),
+      list: vi.fn((reading,onlyRun) => listValidationProjects(options, storage,reading,onlyRun)),
       open: vi.fn(async (run, initial, mode, workspaceFile) => current = owned(await openValidationHost({ ...options, run, initial, mode, workspaceFile, openStorage: create => storage(run, create) }))),
       render: async () => { let display: Parameters<ReturnType<ViewportFactory>['update']>[0] | undefined;
         const factory: ViewportFactory = () => ({ update(next) { display = next; }, setActive() {}, camera() {}, retry() {}, dispose() {},
@@ -2708,8 +2645,47 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       };
       return { ui, root, all, named, button, navigation, idle, edit, editor: () => all(root).find(n => n.className === 'lv-project-workspace')! };
     };
-    return { ...r, ports, seed, mount, remember, host: () => current!, reference: (next: ProjectResumeReference | null) => { reference = next; } };
+    return { ...r, ports, storage, seed, mount, remember, host: () => current!, reference: (next: ProjectResumeReference | null) => { reference = next; } };
   }
+  it('named resume scopes startup without hiding an existing import destination or the full selector', async () => {
+    const f=resumeWorkspaceFixture(),a=await f.seed('再開する記録'),b=await f.seed('別の記録');
+    const other=await f.ports.open(b.run);if('kind' in other)throw Error('normal host');
+    const file=await other.workspaceOutput.download(await other.workspaceOutput.generate(other.read().source!.token));await other.dispose();
+    f.reference({run:a.run,mode:'edit'});f.storage.mockClear();vi.mocked(f.ports.open).mockClear();
+    const listing=vi.spyOn(f.fs,'list'),h=f.mount();await h.idle();
+    expect(f.ports.list).toHaveBeenCalledExactlyOnceWith(undefined,a.run);
+    expect(listing.mock.calls[0]).toEqual([`${validationArea}/${a.run}/`]);
+    expect(f.storage.mock.calls.length).toBeGreaterThan(0);expect(f.storage.mock.calls.every(([run])=>run===a.run)).toBe(true);
+    expect(h.ui.selected).toBe(a.run);expect(vi.mocked(f.ports.open).mock.calls.every(([run])=>run===a.run)).toBe(true);
+    vi.mocked(f.ports.list).mockClear();vi.mocked(f.ports.open).mockClear();
+    const input=h.named('ファイルを選択');Object.assign(input,{files:[new File([file],'existing-work.zip')]});
+    input.parent!.parent!.fire('submit',{preventDefault(){}});await h.idle();
+    expect(vi.mocked(f.ports.list).mock.calls).toEqual([[undefined]]);
+    expect(f.storage.mock.calls.some(([run])=>run===b.run)).toBe(true);
+    const destination=h.named('取り込み先');expect(destination.hidden).toBe(false);
+    expect(h.all(destination).some(n=>n.textContent==='「別の記録」に更新を取り込みます。')).toBe(true);
+    expect(f.ports.open).not.toHaveBeenCalled();expect(h.ui.selected).toBe(a.run);
+    h.button('選択を取り消す',destination).fire('click');await h.idle();
+    h.button('ファイルを開く',h.editor()).fire('click');await h.idle();
+    expect(h.navigation.hidden).toBe(false);
+    for(const title of ['再開する記録','別の記録'])expect(h.all(h.navigation).some(n=>n.textContent.startsWith(title+' —'))).toBe(true);
+    listing.mockClear();f.storage.mockClear();
+    await expect(f.ports.list(undefined,'../other')).rejects.toThrow('discovery scope');
+    const coerce=vi.fn(()=>a.run);
+    for(const invalid of [null,32,{toString:coerce},new String(a.run)])await expect(f.ports.list(undefined,invalid as string)).rejects.toThrow('discovery scope');
+    expect(coerce).not.toHaveBeenCalled();
+    expect(listing).not.toHaveBeenCalled();expect(f.storage).not.toHaveBeenCalled();
+  });
+  it.each(['rejected','unavailable'] as const)('named resume ignores disposed %s full-list fallback results',async kind=>{
+    const f=resumeWorkspaceFixture(),a=await f.seed('再開候補');f.reference({run:a.run,mode:'edit'});vi.mocked(f.ports.open).mockClear();
+    let release!:(entries:Awaited<ReturnType<ValidationWorkspacePorts['list']>>)=>void;
+    const held=new Promise<Awaited<ReturnType<ValidationWorkspacePorts['list']>>>(resolve=>{release=resolve;}),entered=vi.fn();
+    const h=f.mount(undefined,{list:async(_reading,onlyRun)=>{if(onlyRun){if(kind==='rejected')throw Error('target unavailable');return[];}entered();return held;}});
+    caseDisposals.push(()=>release([]));
+    await vi.waitFor(()=>expect(entered).toHaveBeenCalledOnce());const status=h.all(h.root).find(n=>n.className==='lv-operation-status lv-validation-status')!,before=status.textContent;
+    const closing=h.ui.dispose();release([{run:a.run,title:'再開候補',state:'ready'}]);await closing;await h.ui.ready;
+    expect(status.textContent).toBe(before);expect(f.ports.open).not.toHaveBeenCalled();expect(f.remember).not.toHaveBeenCalled();
+  });
   it('named resume keeps a closed advisory UI slice and ignores unavailable/malformed settings', () => {
     const entries = new Map<string,string>(), writes = vi.fn((key: string,value: string) => { entries.set(key,value); });
     const first = createValidationUiState(() => ({ getItem: key => entries.get(key) ?? null, setItem: writes })), reference = { run: newId(), mode: 'view' as const };
@@ -2783,9 +2759,11 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
   it.each(['missing','incomplete','unavailable','malformed'] as const)('named resume keeps %s advice at the selector without creating or repairing data', async kind => {
     const f = resumeWorkspaceFixture(), a = await f.seed('元の記録'); f.reference({run:a.run,mode:'edit'}); vi.mocked(f.ports.open).mockClear();
     const files = await f.fs.list(''), bytes = await Promise.all(files.map(p => f.fs.readBytes(p)));
-    const h = f.mount(undefined,{ list: async () => kind === 'missing' ? [] : [{run:a.run,title:'元の記録',state:kind === 'unavailable' ? 'unavailable' : 'incomplete'}],
+    const list=vi.fn<ValidationWorkspacePorts['list']>(async () => kind === 'missing' ? [] : [{run:a.run,title:'元の記録',state:kind === 'unavailable' ? 'unavailable' : 'incomplete'}]);
+    const h = f.mount(undefined,{ list,
       ...(kind === 'malformed' ? {lastProject:{read:()=>({run:'bad',mode:'edit'}),remember:f.remember}} : {}) });
     await h.idle(); expect(f.ports.open).not.toHaveBeenCalled(); expect(f.remember).not.toHaveBeenCalled(); expect(h.navigation.hidden).toBe(false);
+    expect(list.mock.calls).toEqual(kind==='malformed'?[[undefined]]:[[undefined,a.run],[undefined]]);
     expect(h.all(h.root).some(n=>n.textContent==='最後のプロジェクトを再開できません。一覧またはファイルから開いてください。')).toBe(kind!=='malformed');
     expect(h.button('ファイルを開く').disabled).toBe(false);
     expect(await f.fs.list('')).toEqual(files); expect(await Promise.all(files.map(p=>f.fs.readBytes(p)))).toEqual(bytes);
@@ -4785,7 +4763,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
   }
   async function productWorkspaceFixture(includeInitial = false, duplicateModels = false, withTag = false, profile: 'map1' | 'map2' = 'map1',
     initial?: NonNullable<Parameters<typeof openValidationHost>[0]['initial']>,
-    setup: { jpeg?: JpegDecoder; photo?: PhotoDecoder; mediaDecoders?:MediaDecoders; editorSettings?:Parameters<typeof openValidationHost>[0]['editorSettings']; storageEstimate?: ValidationWorkspacePorts['storageEstimate']; restoreGenerations?: boolean; initialWorkspace?: boolean; visualFrames?:boolean; scenes?: readonly { id: string; name: string; orderKey: string }[]; rasterResources?:ReturnType<typeof createRasterResources>; nativeImageDecode?:()=>Promise<void>; mountEditor?:typeof createProductWorkspace } = {}) {
+    setup: { jpeg?: JpegDecoder; photo?: PhotoDecoder; mediaDecoders?:MediaDecoders; editorSettings?:Parameters<typeof openValidationHost>[0]['editorSettings']; storageEstimate?: ValidationWorkspacePorts['storageEstimate']; restoreGenerations?: boolean; initialWorkspace?: boolean; visualFrames?:boolean; scenes?: readonly { id: string; name: string; orderKey: string; includeModel?: boolean }[]; rasterResources?:ReturnType<typeof createRasterResources>; nativeImageDecode?:()=>Promise<void>; mountEditor?:typeof createProductWorkspace } = {}) {
     const r = firstWorkspaceRecipient(setup.jpeg, setup.photo,setup.mediaDecoders), run = initial ? (initial.source.proof.identity.projectId as string).slice(4) : newId(), captionId = `cap_${newId()}`;
     const generationFactories = new Map<string, MetadataStorageFactory>(), databases: RestoreDatabasePorts = {
       listGenerations: async () => [...generationFactories.keys()], open: async (id, create) => {
@@ -4819,9 +4797,9 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     if (setup.scenes?.length && prepared) {
       const scenes = prepared.records.scenesById as Record<string, JsonObject>, edges = prepared.records.sceneAssetMembershipsById as Record<string, JsonObject>;
       const originalEdges = Object.values(edges);
-      for (const scene of setup.scenes) {
+      for (const { includeModel = true, ...scene } of setup.scenes) {
         scenes[scene.id] = { ...scene, lifecycle: { state: 'active', reason: 'initial', eventId: `evt_${newId()}` } };
-        for (const edge of originalEdges) { const id = `sam_${newId()}`; edges[id] = { ...edge, id, sceneId: scene.id,
+        if (includeModel) for (const edge of originalEdges) { const id = `sam_${newId()}`; edges[id] = { ...edge, id, sceneId: scene.id,
           lifecycle: { state: 'active', reason: 'initial', eventId: `evt_${newId()}` } }; }
       }
     }
@@ -5299,7 +5277,10 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     button('この範囲の設定を解除',panel).fire('click');await edited(()=>button('設定を解除する',panel).fire('click'));await checkDisplay(host.authority.read(),host.content,true);await mask();
     const output=named('ファイル'),label=named('名前（任意）',output);label.value='材質変更後';label.fire('input');button('ファイルに保存',output).fire('click');await vi.waitFor(()=>expect(h.downloads).toHaveBeenCalledOnce(),{timeout:10000});
     const source=host.read().source!,backup=await host.workspaceOutput.download(host.workspaceOutput.jobs.find(j=>j.purpose==='backup')!.id),workspace=await host.workspaceOutput.download(await host.workspaceOutput.generate(source.token));
-    await exerciseOpaqueFileReturns(workspace);
+    // Both imports are normalized map2 here. Keep v1's complete material/slot,
+    // local/remote merge and Clean checks; repeat transport rounds in LociMyu
+    // and both 07m cases, where the common sender/receiver boundary is identical.
+    await exerciseOpaqueFileReturns(workspace,undefined,family==='v1'?1:2);
     const review=await prepareReviewView(await host.workspaceOutput.download(await host.workspaceOutput.generateReview(source.token,{sceneId})),budget,decode);
     expect(Object.values(review.display(null,null).savedMaterials![review.models[0]!.assetId]!).some(e=>!('issue'in e)&&e.compositing.coverage.policy==='mask')).toBe(true);
     for(const archive of [(await BackupArchive.inspect(backup,metadata)).archive,(await WorkspaceArchive.inspect(workspace,metadata)).archive,review.inspection.archive])expect(archive.control.entries.some(e=>/conversion|source\.zip|^ops\//.test(e.path))).toBe(false);
@@ -5311,12 +5292,21 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
   },60000);
   it.each(['v1','locimyu']as const)('07m %s opaque materials survive independent typed editing, two returns, Clean and cold',async family=>{
     meshNodeResources();try{
-      const initial=family==='v1'?await(await prepareFrozenV1Conversion(await opaqueV1File(true),budget,decode))!.create():await(await(await prepareLociMyuConversion(await lociMyuFile(opaqueLociMaterials),budget,decode))!.evaluate(0,'不透明材質の受け渡し')).create();
+      const file=family==='v1'?await opaqueV1File(true):await lociMyuFile((sheets,entries)=>{
+        opaqueLociMaterials(sheets,entries);
+        // Keep both Scenes, Views and every material address. Extra Captions and
+        // photos belong to the separate full LociMyu product/restore workflow.
+        const first=sheets.find(s=>s.name==='全体')!;first.rows.splice(2);first.rows[1]![7]='';
+        sheets.find(s=>s.name==='観察')!.rows.splice(1);
+        for(let i=entries.length-1;i>=0;i--)if(['media/a.png','media/b.png','media/unlinked.png'].includes(entries[i]!.path))entries.splice(i,1);
+        entries.find(e=>e.path==='file_ids.csv')!.data=new TextEncoder().encode('fileId,filename\n');
+      });
+      const initial=family==='v1'?await(await prepareFrozenV1Conversion(file,budget,decode))!.create():await(await(await prepareLociMyuConversion(file,budget,decode))!.evaluate(0,'不透明材質の受け渡し')).create();
       const r=firstWorkspaceRecipient();await initial.persist(r.fs,r.store,r.session);let read=await r.session.read();if(read.provider?.kind!=='scene-provider')throw Error('provider');
       const scene=read.provider.state.defaultSceneId;if(scene.kind!=='value')throw Error('scene');
       const records=(await initial.source.inspectOriginal(metadata)).candidates.unambiguousRecords,rows=Object.values(records.materialOverridesById as Record<string,any>).filter(o=>o.routing.scope.sceneId===scene.value);
       expect(rows).toHaveLength(2);
-      if(family==='v1'){expect(Object.keys(records.materialOverridesById as JsonObject)).toHaveLength(4);expect(Object.keys(records.scenesById as JsonObject)).toHaveLength(2);expect(Object.keys(records.captionsById as JsonObject)).toHaveLength(1);expect(Object.keys(records.mediaResourcesById as JsonObject)).toHaveLength(0);}
+      expect(Object.keys(records.materialOverridesById as JsonObject)).toHaveLength(4);expect(Object.keys(records.scenesById as JsonObject)).toHaveLength(2);expect(Object.keys(records.captionsById as JsonObject)).toHaveLength(1);expect(Object.keys(records.mediaResourcesById as JsonObject)).toHaveLength(0);
       const sourceIndex=(row:any)=>{const rep=Object.values(records.representationsById as Record<string,any>).find(r=>r.materialCatalog?.layoutId===row.routing.target.materialLayoutId)!;return rep.materialCatalog.slots.find((s:any)=>s.logicalMaterialSlotId===row.routing.target.logicalMaterialSlotId).sourceLocator.materialIndex as number;};rows.sort((a,b)=>sourceIndex(a)-sourceIndex(b));
       for(const [i,row]of rows.entries())read=await r.session.edit(read.source!.token,{kind:'editMaterial',sceneId:scene.value,overrideId:row.id,appearance:{...row.appearance,lighting:i===0?'lit':'unlit',doubleSided:i!==0}});
       const sender=new WorkspaceSender(r.fs,r.session,r.store,metadata,r.locks),workspace=await sender.download(await sender.generate(read.source!.token));
@@ -5735,7 +5725,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
   it('recovers product Scene names with retained text and resolves cold startup only after exact saved acknowledgement', async () => {
     const b = `scn_${newId()}`, c = `scn_${newId()}`;
     const h = await productWorkspaceFixture(true, false, false, 'map1', undefined, { scenes: [
-      { id: b, name: '調査', orderKey: 'B' }, { id: c, name: '別の入口', orderKey: 'C' }] }),
+      { id: b, name: '調査', orderKey: 'B', includeModel: false }, { id: c, name: '別の入口', orderKey: 'C', includeModel: false }] }),
       { host, editor, edited, button, named, all } = h, captionId = h.f.f.captionId;
     const a = h.display()!.sceneId;
     h.refresh(); const shared = host.read().source!, seed = await host.workspaceOutput.download(await host.workspaceOutput.generate(shared.token));
@@ -6733,6 +6723,28 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const cold = await openValidationHost(f.options);
     expect(cold.read().source!.originalChanges()).toEqual(exact); expect(cold.authority.read().resources.captions[captionId]!.body).toEqual({ kind: 'value', value: '相手の本文2' });
     expect(captionAttachments(cold.authority.read().mediaData, captionId).ready).toHaveLength(1); await cold.dispose();
+  });
+  it('keeps a Caption draft and exact output job through native quota recovery, without hiding a newer integrity failure',async()=>{
+    const h=await productWorkspaceFixture(true),{host,editor,named,button,all}=h,captionId=h.f.f.captionId;
+    named('キャプション一覧',editor).children[0]!.children[0]!.fire('click');const body=named('本文',named('キャプションの詳細',editor)),before=host.read().source!;
+    const quota=new DOMException('native storage full','QuotaExceededError');body.value='容量不足から復帰した本文';body.fire('input');
+    h.f.fs.reject=path=>{if(path.endsWith('/published.json'))throw quota;return false;};await h.failed(()=>button('変更を適用',editor).fire('click'));
+    expect(h.status.textContent).toContain('保存容量が不足');expect(h.status.textContent).toContain('再開用データも消えます');expect(body.value).toBe('容量不足から復帰した本文');expect(host.read().source!.token).toBe(before.token);
+    const detailNote=all(named('キャプションの詳細',editor)).find(n=>n.attributes.get('role')==='status'&&n.textContent.includes('未適用の入力'))!;
+    expect(detailNote.textContent.split('保存容量が不足しています。')).toHaveLength(2);expect(detailNote.textContent).not.toContain('native storage full');
+    h.f.fs.reject=()=>false;await h.edited(()=>button('更新を再試行',editor).fire('click'));const edited=host.read().source!;
+    expect(host.authority.read().resources.captions[captionId]!.body).toEqual({kind:'value',value:'容量不足から復帰した本文'});
+    const output=named('ファイル'),name=named('名前（任意）',output),status=output.children.find(n=>n.attributes.get('role')==='status')!;
+    name.value='容量不足の作業';name.fire('input');const write=h.f.fs.writeStream.bind(h.f.fs);
+    const sink=vi.spyOn(h.f.fs,'writeStream').mockImplementation(async(path,stream)=>{if(path.includes('/artifacts/')&&path.endsWith('.zip')){await stream.cancel(quota);throw quota;}await write(path,stream);});
+    button('ファイルに保存',output).fire('click');await vi.waitFor(()=>{expect(status.dataset.busy).toBe('false');expect(status.textContent).toContain('保存容量が不足');},{timeout:10000});
+    expect(name.value).toBe('容量不足の作業');expect(h.downloads).not.toHaveBeenCalled();const jobs=host.workspaceOutput.jobs;expect(jobs).toHaveLength(1);expect(jobs[0]!.state).toBe('incomplete');const id=jobs[0]!.id;
+    const newer=vi.spyOn(host.workspaceOutput,'error','get').mockReturnValue('新しい照合の失敗');h.refresh();expect(status.textContent).toBe('新しい照合の失敗');newer.mockRestore();h.refresh();
+    expect(status.textContent).toContain('保存容量が不足');sink.mockRestore();button('生成を再開',output).fire('click');
+    await vi.waitFor(()=>{expect(h.downloads).toHaveBeenCalledOnce();expect(status.dataset.busy).toBe('false');},{timeout:10000});
+    expect(host.workspaceOutput.jobs).toHaveLength(1);expect(host.workspaceOutput.jobs[0]!.id).toBe(id);expect(all(output).some(n=>n.textContent.includes('ダウンロードを開始'))).toBe(true);
+    const saved=await BackupArchive.inspect(await host.workspaceOutput.download(id),metadata);expect(saved.source.originalChanges()).toEqual(edited.originalChanges());expect(saved.source.proof.identity).toEqual(edited.proof.identity);
+    await h.ui.dispose();const cold=await openValidationHost(h.f.options);try{expect(cold.read().source!.originalChanges()).toEqual(edited.originalChanges());}finally{await cold.dispose();}
   });
   it('recovers fresh photo selection and checks storage without discarding a durable retry, then saves and cold reopens exact JPEG bytes', async () => {
     const estimate = vi.fn(async () => ({usage:1_200_000,quota:4_000_000_000}));
@@ -8617,157 +8629,6 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect(reopened.authority.read().viewData!.records[viewId]!.camera).toEqual({ kind: 'value', value: remoteCamera });
     expect(assetId).toBe(reopened.authority.read().modelVersions![0]!.assetId); await reopened.dispose();
   }, 60000);
-  it('restores a received Caption parent, explicitly reattaches, keeps independent duplicates and returns their edits through real files (recorded DOM)', async () => {
-    const f = await initialWorkspaceHostFixture(source => {
-      const doc = A.change(A.load<Record<string, any>>(source.encodeFullSource()), d => {
-        const captionId = Object.keys(d.captionsById)[0]!, sceneId = Object.keys(d.scenesById)[0]!, id = `scm_${newId()}`;
-        d.sceneCaptionMembershipsById[id] = Object.fromEntries(Object.entries({ id, sceneId, captionId, orderKey: 'A',
-          lifecycle: { state: 'active', reason: 'initial', eventId: `evt_${newId()}` } }).map(([k, v]) => [k, new A.ImmutableString(json(v))]));
-      });
-      return ProjectMetadataSource.fromFullSource(A.save(doc), source.proof, metadata);
-    });
-    const host = owned(await openValidationHost({ ...f.options, workspaceFile: f.f.file })), peer = firstWorkspaceRecipient();
-    const seed = await peer.receiver.importWorkspace(f.f.file), captionId = f.f.captionId, sceneId = Object.keys(host.authority.read().state.scenes)[0]!;
-    const originalAttachment = captionAttachments(host.authority.read().mediaData, captionId).ready[0]!.id;
-    const oldEdge = Object.keys(host.authority.read().state.captionMemberships)[0]!;
-    const provider = () => { const p = host.read().provider; if (p?.kind !== 'scene-provider') throw Error('provider'); return p; };
-    const children = () => [provider().details.mutable.sceneCaptionMembershipsById[oldEdge], provider().details.mutable.captionAttachmentsById[originalAttachment]];
-    const ports: ValidationWorkspacePorts = { fileLimits: budget, decode, list: async () => [], selected: vi.fn(), open: async () => host,
-      render: async () => ({ factory: () => { throw Error('Recorded DOM has no GPU'); }, dispose() {} }) };
-    // The navigation root does not expose its mounted session. Observe its normal
-    // subscription once, without adding a product port or altering acknowledgment.
-    const acknowledgments = new Set<WorkingAcknowledgment>(), subscribe = WorkingAcknowledgment.prototype.subscribe;
-    const captureAcknowledgment = vi.spyOn(WorkingAcknowledgment.prototype, 'subscribe').mockImplementation(function (this: WorkingAcknowledgment, listener) {
-      acknowledgments.add(this); return subscribe.call(this, listener);
-    });
-    let u!: ReturnType<typeof createValidationWorkspace>, root!: RecordedNode;
-    const all = (n: RecordedNode): RecordedNode[] => [n, ...n.children.flatMap(all)];
-    const named = (label: string, parent = root) => all(parent).find(n => n.attributes.get('aria-label') === label)!;
-    const button = (text: string, parent = root) => all(parent).find(n => n.tag === 'button' && n.textContent === text)!;
-    const choose = (node: RecordedNode, value: string) => { node.value = value; node.fire(node.tag === 'select' ? 'change' : 'input'); };
-    try {
-      u = owned(createValidationWorkspace(new RecordedDocument().asDocument(), ports, f.run)); root = record(u.root);
-      await vi.waitFor(() => expect(all(root).some(n => n.textContent.startsWith('検証用プロジェクト。'))).toBe(true));
-    }
-    finally { captureAcknowledgment.mockRestore(); }
-    // Startup recovery and the mounted editor each own an acknowledgment.
-    expect(acknowledgments.size).toBeGreaterThan(0); const ack = [...acknowledgments];
-    const clickWrite = async (control: RecordedNode) => {
-      expect(control.disabled).toBe(false);
-      // The harness translates strings before the real Session command boundary.
-      const command = vi.spyOn(host, 'dispatch');
-      try {
-        await acknowledge(ack, () => {
-          control.fire('click');
-          expect(command).toHaveBeenCalledTimes(1);
-          expect(command.mock.results[0]!.type).toBe('return');
-        });
-        await command.mock.results[0]!.value;
-      } finally { command.mockRestore(); }
-    };
-    const fileInput = named('更新ファイルを選択'), receive = fileInput.parent!.parent!;
-    const receiveFile = async (file: Blob) => {
-      Object.assign(fileInput, { files: [file] }); fileInput.fire('change'); receive.fire('submit', { preventDefault() {} });
-      await vi.waitFor(() => expect(button('更新を受け取る').disabled).toBe(false), { timeout: 10000 });
-      Object.assign(fileInput, { files: [] }); button('選択を取り消す', receive).fire('click');
-    };
-    const returnFile = async () => host.workspaceOutput.download(await host.workspaceOutput.generateContribution(
-      host.read().source!.token, host.workspaceOutput.bases[0]!.selection));
-    const selectCaption = (id: string) => {
-      const snapshot = host.authority.read(), scene = resolveScene(snapshot.state, snapshot.resources, sceneId);
-      if (scene.kind === 'blocked') throw Error('scene');
-      const index = scene.composition.captions.findIndex(c => c.captionId === id); expect(index).toBeGreaterThanOrEqual(0);
-      all(root).filter(n => n.className === 'lv-caption-select')[index]!.fire('click');
-    };
-    selectCaption(captionId); button('プロジェクトから削除').fire('click');
-    let commandAck!: WorkingAcknowledgment;
-    await acknowledge(ack, () => {
-      button('削除する', named('削除の確認')).fire('click');
-      const checking = ack.filter(owner => owner.state === 'checking'); expect(checking).toHaveLength(1); commandAck = checking[0]!;
-    });
-    await vi.waitFor(() => expect(host.authority.read().resources.captions[captionId]!.lifecycle).toMatchObject({ kind: 'value', value: { state: 'deleted' } }));
-    const tombstones = children(); expect(tombstones.every(c => {
-      const life = c?.lifecycle; return life?.kind === 'value' && (life.value as JsonObject).state === 'deleted';
-    })).toBe(true);
-    await peer.session.editCaption(seed.source!.token, captionId, 'body', '削除と同時の追記');
-    await receiveFile((await contributionFile(peer.session, peer.fs, peer.store)).file);
-    expect(provider().issues.some(i => i.code === 'concurrent-delete-edit')).toBe(true);
-    const lifecycle = named('キャプションの削除・復元'), lifeChoice = all(lifecycle).find(n => n.tag === 'select')!, restoreButton = button('選択を確定', lifecycle);
-    expect(lifeChoice.value).toBe(''); expect(button('選択を確定', lifecycle).disabled).toBe(true);
-    expect(all(lifecycle).some(n => n.textContent.includes('削除済み・復元しません'))).toBe(true);
-    const unchangedFields = () => provider().inspection.candidates.fields.filter(v => v.path.join('/') !== `captionsById/${captionId}/lifecycle`).map(v => ({ path: v.path, candidates: v.candidates }));
-    const beforeRestore = unchangedFields(); choose(lifeChoice, 'active');
-    await acknowledge(ack, () => button('選択を確定', lifecycle).fire('click'));
-    await vi.waitFor(() => expect(host.authority.read().resources.captions[captionId]!.lifecycle).toMatchObject({ kind: 'value', value: { state: 'active', reason: 'restore' } }));
-    expect(unchangedFields()).toEqual(beforeRestore); expect(children()).toEqual(tombstones);
-    expect(captionAttachments(host.authority.read().mediaData, captionId).ready).toHaveLength(0);
-    const restored = await peer.receiver.receive((await peer.session.read()).source!.token, await returnFile());
-    // Both parties see the restored parent, but neither sees the other's new registration yet.
-    const include = all(root).find(n => n.className === 'lv-caption-include')!;
-    choose(named('キャプション', include), captionId); await clickWrite(button('このシーンに追加', include));
-    await vi.waitFor(() => expect(button('このシーンから外す', include)?.disabled).toBe(false));
-    selectCaption(captionId); const media = named('メディア');
-    button(f.f.image.label as string, named('メディアを選択', media)).fire('click'); await clickWrite(button('選択したメディアを添付', media));
-    await vi.waitFor(() => expect(captionAttachments(host.authority.read().mediaData, captionId).ready).toHaveLength(1));
-    const attachment = captionAttachments(host.authority.read().mediaData, captionId).ready[0]!; expect(attachment.id).not.toBe(originalAttachment);
-    await peer.session.edit(restored.source!.token, { kind: 'include', sceneId, resourceKind: 'caption', resourceId: captionId,
-      membershipId: `scm_${newId()}`, orderKey: 'B', eventId: `evt_${newId()}` });
-    await receiveFile((await contributionFile(peer.session, peer.fs, peer.store)).file);
-    const duplicates = named('重複した登録'), original = named('元として残す登録', duplicates), choice = named('重複の解消方法', duplicates), copyButton = button('登録の重複を解消', duplicates);
-    expect(original.value).toBe(''); expect(choice.value).toBe(''); expect(button('登録の重複を解消', duplicates).disabled).toBe(true);
-    choose(original, original.children[1]!.value); choose(choice, 'both');
-    const sourceCaption = host.authority.read().resources.captions[captionId], token = host.read().source!.token;
-    button('別のプロジェクトを開く').fire('click');
-    await vi.waitFor(() => expect(all(root).some(n => n.textContent.includes('プロジェクトを切り替えて'))).toBe(true)); expect(u.selected).toBe(f.run);
-    Object.assign(fileInput, { files: [f.f.file] }); fileInput.fire('change'); receive.fire('submit', { preventDefault() {} });
-    expect(host.read().source!.token).toBe(token); expect(button('登録の重複を解消', duplicates).disabled).toBe(true);
-    Object.assign(fileInput, { files: [] }); button('選択を取り消す', receive).fire('click');
-    f.fs.reject = path => path.endsWith('/published.json');
-    await acknowledge(commandAck, () => button('登録の重複を解消', duplicates).fire('click'), 'failed');
-    expect(host.authority.status!().kind).toBe('failed');
-    expect(Object.keys(host.authority.read().resources.captions)).toEqual([captionId]); expect(choice.value).toBe('both');
-    const paths = (await f.fs.list(`${validationArea}/${f.run}/`)).filter(p => p.endsWith('.amchange')), bytes = await Promise.all(paths.map(p => f.fs.readBytes(p)));
-    f.fs.reject = () => false;
-    await acknowledge(commandAck, () => button('更新を再試行', named('更新の確認')).fire('click'));
-    expect(duplicates.children).toHaveLength(0);
-    expect(await Promise.all(paths.map(p => f.fs.readBytes(p)))).toEqual(bytes);
-    const copyId = Object.keys(host.authority.read().resources.captions).find(id => id !== captionId)!; expect(copyId).toBeTruthy();
-    expect(Object.keys(host.authority.read().resources.captions)).toHaveLength(2);
-    const copiedAttachment = captionAttachments(host.authority.read().mediaData, copyId).ready[0]!;
-    expect(copiedAttachment.id).not.toBe(attachment.id); expect(copiedAttachment.mediaResourceId).toEqual(attachment.mediaResourceId);
-    selectCaption(copyId); const detail = named('キャプションの詳細');
-    expect(named('本文', detail).readOnly, 'independent copy body must be editable').toBe(false);
-    choose(named('本文', detail), 'コピーだけの追記');
-    expect(button('変更を適用', detail).disabled, 'independent copy edit must be actionable').toBe(false);
-    await clickWrite(button('変更を適用', detail));
-    await vi.waitFor(() => expect(host.authority.read().resources.captions[copyId]!.body, JSON.stringify({
-      status: host.authority.status?.(), originalBody: host.authority.read().resources.captions[captionId]!.body,
-      selected: all(root).filter(n => n.className === 'lv-caption-select').map(n => n.attributes.get('aria-current')),
-    })).toEqual({ kind: 'value', value: 'コピーだけの追記' }));
-    // Host publication precedes UI acknowledgment; do not click through its busy state.
-    await vi.waitFor(() => expect(button('説明を編集', media).disabled).toBe(false));
-    button('説明を編集', media).fire('click'); choose(named('メディアの説明', media), 'コピーだけの添付説明');
-    await clickWrite(button('説明を適用', media));
-    await vi.waitFor(() => expect(captionAttachments(host.authority.read().mediaData, copyId).ready[0]!.altText).toEqual({ kind: 'value', value: 'コピーだけの添付説明' }));
-    expect(host.authority.read().resources.captions[captionId]).toEqual(sourceCaption);
-    expect(captionAttachments(host.authority.read().mediaData, captionId).ready).toEqual([attachment]); expect(children()).toEqual(tombstones);
-    const final = host.read().source!, file = await returnFile(), received = await peer.receiver.receive((await peer.session.read()).source!.token, file);
-    expect(received.source!.token).toBe(final.token);
-    // Concurrent branches admit multiple topological orders; identity is exact bytes by change hash.
-    const changeMap = (source: ProjectMetadataSource) => new Map(source.originalChanges().map(b => [A.decodeChange(b).hash, b]));
-    expect(changeMap(received.source!)).toEqual(changeMap(final));
-    expect((await peer.receiver.receive(received.source!.token, file)).source!.originalChanges()).toEqual(received.source!.originalChanges());
-    const resolve = vi.spyOn(host, 'resolve'); await u.dispose(); restoreButton.fire('click'); copyButton.fire('click');
-    expect(resolve).not.toHaveBeenCalled(); resolve.mockRestore();
-    const cold = owned(await openValidationHost(f.options));
-    expect(cold.read().source!.token).toBe(final.token); expect(changeMap(cold.read().source!)).toEqual(changeMap(final));
-    expect(cold.authority.read().resources.captions[copyId]!.body).toEqual({ kind: 'value', value: 'コピーだけの追記' });
-    expect(captionAttachments(cold.authority.read().mediaData, copyId).ready[0]).toMatchObject({ id: copiedAttachment.id,
-      altText: { kind: 'value', value: 'コピーだけの添付説明' } });
-    const originals = new Map(final.originalChanges().map(b => [A.decodeChange(b).hash, b]));
-    for (const b of seed.source!.originalChanges()) expect(originals.get(A.decodeChange(b).hash)).toEqual(b);
-    await cold.dispose();
-  }, 30000);
   it('shows cold input recovery before mounting the real-file editor and blocks readonly receive', async () => {
     const f = await receivedHostFixture(), writeStream = f.fs.writeStream.bind(f.fs);
     const interrupted = vi.spyOn(f.fs, 'writeStream').mockImplementation(async (path, stream) => {

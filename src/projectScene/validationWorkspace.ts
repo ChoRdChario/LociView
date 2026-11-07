@@ -2,6 +2,7 @@ import { inspectZipContainerMetadata, isUnrecognizedZip } from '../assets/zipio'
 import type {DesktopOfflinePort} from '../platform/desktopOfflinePorts';
 import {createOfflineControls,createOfflineSettings} from '../ui/projectScene/offlineControls';
 import { mountContextHelp } from '../ui/projectScene/contextHelp';
+import {storageFailureText} from '../ui/projectScene/storageFeedback';
 import { PACKAGE_LIMITS } from '../projectPackage/contract';
 import type {WorkspaceFileInteraction} from '../ui/projectScene/projectWorkspacePorts';
 import type {createProductWorkspace} from './productWorkspace';
@@ -62,7 +63,7 @@ export interface ValidationWorkspacePorts {
   storageEstimate?(): Promise<Readonly<{ usage?: number; quota?: number }>>;
   localSettings?: { read(): string; save(displayName: string): boolean };
   lastProject?: { read(): ProjectResumeReference | null; remember(reference: ProjectResumeReference): void };
-  list(reading?: ResumeReadingRequest): Promise<ValidationProjectEntry[]>;
+  list(reading?: ResumeReadingRequest, onlyRun?: string): Promise<ValidationProjectEntry[]>;
   open(run: string, initial?: ReturnType<typeof prepareValidationCreation>, mode?: LocalOpenMode, workspaceFile?: Blob, reviewEdit?: PreparedReviewEdit,
     firstBackup?: ValidationHostOptions['firstBackup'], standaloneWorkspace?: boolean): Promise<ValidationNormalHost | FirstBackupRecovery>;
   render(host: ValidationDisplayHost): Promise<{ factory: ViewportFactory; readonly ready?:Promise<void>; detachPreparation?():void; dispose(): void; idle?():Promise<void> }>;
@@ -212,7 +213,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     const confirmFocused = document.activeElement === updateConfirm;
     busy = true; controls(); workspace?.render();
     const work = action(); operation = work;
-    return work.catch(error => { if (!disposed) status.textContent = error instanceof Error ? error.message : '処理できません。入力と再開用データは保持しています。'; })
+    return work.catch(error => { if (!disposed) status.textContent = storageFailureText(error)??(error instanceof Error ? error.message : '処理できません。入力と再開用データは保持しています。'); })
       .finally(() => { busy = false; if (operation === work) operation = undefined; if (!disposed) {
         controls(); workspace?.render();
         if (pendingUpdate && (pendingUpdate !== previousUpdate || confirmFocused)) updateConfirm.focus?.();
@@ -909,8 +910,9 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     }
     let reference: ProjectResumeReference | null = null;
     try { reference = projectResumeReference(ports.lastProject?.read()); } catch { /* No advisory hint is a normal selector start. */ }
+    let reopening: readonly ValidationProjectEntry[] = [];
     try {
-      await updateList(reference && ports.progressivePresentation ? { run: reference.run, show(reading) {
+      if (reference) reopening = await ports.list(ports.progressivePresentation ? { run: reference.run, show(reading) {
         if (disposed) return;
         const next = reading ? createResumeReading(document, reading) : undefined;
         clearResumeReading(); resumeReading = next; navigation.hidden = !!next;
@@ -919,13 +921,20 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
           content.append(next.root);
         }
         controls();
-      } } : undefined);
-    } catch (error) { clearResumeReading(); navigation.hidden = false; throw error; }
+      } } : undefined, reference.run);
+      else await updateList();
+    } catch (error) {
+      if (disposed) return;
+      clearResumeReading(); navigation.hidden = false;
+      if (!reference) throw error;
+      await updateList(); if (!disposed) status.textContent = '最後のプロジェクトを再開できません。一覧またはファイルから開いてください。'; return;
+    }
     if (disposed) return;
     if (!reference) return;
-    if (!catalog.some(entry => entry.run === reference.run && entry.state === 'ready')) {
+    if (!reopening.some(entry => entry.run === reference.run && entry.state === 'ready')) {
       clearResumeReading(); navigation.hidden = false;
-      status.textContent = '最後のプロジェクトを再開できません。一覧またはファイルから開いてください。'; return;
+      await updateList();
+      if (!disposed) status.textContent = '最後のプロジェクトを再開できません。一覧またはファイルから開いてください。'; return;
     }
     try { await openProject(reference.run, undefined, reference.mode, undefined, true); }
     catch {

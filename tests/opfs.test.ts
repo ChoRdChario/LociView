@@ -112,3 +112,41 @@ describe('OPFS bounded stream writes', () => {
     expect(source.reader.releaseLock).toHaveBeenCalledOnce(); expect(f.sink.close).toHaveBeenCalledTimes(phase === 'close' ? 1 : 0);
   });
 });
+
+// Creating a native handle materializes a zero-byte entry before writer acquisition.
+// A MemoryFS write rejection alone cannot model this failure.
+async function textAcquisition(seed?:string){
+  let present=seed!==undefined,bytes=seed??'',next='',opening:(()=>Promise<void>)|undefined;
+  const handle={kind:'file',isSameEntry:vi.fn(async(other:unknown)=>other===handle),getFile:vi.fn(async()=>new File([bytes],'receipt.json')),
+    createWritable:vi.fn(async()=>{await opening?.();return sink;})};
+  const sink={write:vi.fn(async(text:string)=>{next=text;}),close:vi.fn(async()=>{bytes=next;}),abort:vi.fn(async()=>{})};
+  const directory={getFileHandle:vi.fn(async(_name:string,options?:{create?:boolean})=>{if(!present&&!options?.create)throw new DOMException('missing','NotFoundError');present=true;return handle;}),
+    removeEntry:vi.fn(async()=>{present=false;bytes='';})};
+  vi.stubGlobal('navigator',{storage:{getDirectory:async()=>directory}});
+  return {fs:await OpfsFS.open(),handle,sink,directory,owned:{assertOwned:vi.fn(()=>{})},setOpening(value:typeof opening){opening=value;},setBytes(text:string){bytes=text;},get bytes(){return bytes;},get present(){return present;}};
+}
+describe('exclusive never-written receipt acquisition',()=>{
+  it('removes only its new empty entry after native open quota, then retries exact bytes',async()=>{
+    const f=await textAcquisition(),quota=new DOMException('full','QuotaExceededError');f.setOpening(async()=>{throw quota;});
+    await expect(f.fs.writeText('receipt.json','{"ready":true}',f.owned)).rejects.toBe(quota);expect(f.present).toBe(false);expect(f.sink.write).not.toHaveBeenCalled();expect(f.directory.removeEntry).toHaveBeenCalledOnce();
+    f.setOpening(undefined);await f.fs.writeText('receipt.json','{"ready":true}',f.owned);expect(f.bytes).toBe('{"ready":true}');expect(f.sink.close).toHaveBeenCalledOnce();
+  });
+  it.each(['','{"retained":true}'])('preserves an existing entry %j without opening or deleting it',async original=>{
+    const f=await textAcquisition(original);await expect(f.fs.writeText('receipt.json','{}',f.owned)).rejects.toThrow('already exists');expect(f.bytes).toBe(original);expect(f.handle.createWritable).not.toHaveBeenCalled();expect(f.directory.removeEntry).not.toHaveBeenCalled();
+  });
+  it('leaves raw/default acquisition failures unchanged',async()=>{
+    const f=await textAcquisition(),quota=new DOMException('full','QuotaExceededError');f.setOpening(async()=>{throw quota;});await expect(f.fs.writeText('receipt.json','{}')).rejects.toBe(quota);expect(f.present).toBe(true);expect(f.directory.removeEntry).not.toHaveBeenCalled();
+  });
+  it.each(['nonempty','different','unreadable','ownership'] as const)('refuses cleanup when %s makes ownership uncertain',async fault=>{
+    const f=await textAcquisition(),quota=new DOMException('full','QuotaExceededError'),secondary=Error(fault);
+    f.setOpening(async()=>{if(fault==='nonempty')f.setBytes('changed');if(fault==='different')f.handle.isSameEntry.mockResolvedValue(false);if(fault==='unreadable')f.handle.getFile.mockRejectedValue(secondary);if(fault==='ownership')f.owned.assertOwned.mockImplementation(()=>{throw secondary;});throw quota;});
+    const error=await f.fs.writeText('receipt.json','{}',f.owned).catch(e=>e);expect(error).toBeInstanceOf(AggregateError);expect(error.errors[0]).toBe(quota);expect(f.directory.removeEntry).not.toHaveBeenCalled();expect(f.present).toBe(true);
+  });
+  it('retains quota and denied removal together',async()=>{
+    const f=await textAcquisition(),quota=new DOMException('full','QuotaExceededError'),denied=new DOMException('denied','NotAllowedError');f.setOpening(async()=>{throw quota;});f.directory.removeEntry.mockRejectedValue(denied);
+    const error=await f.fs.writeText('receipt.json','{}',f.owned).catch(e=>e);expect(error.errors).toEqual([quota,denied]);expect(f.present).toBe(true);
+  });
+  it.each(['write','close'] as const)('retains an acquired writer %s failure for ordinary strict recovery',async phase=>{
+    const f=await textAcquisition(),error=Error(phase);f.sink[phase].mockRejectedValue(error);await expect(f.fs.writeText('receipt.json','{}',f.owned)).rejects.toBe(error);expect(f.present).toBe(true);expect(f.directory.removeEntry).not.toHaveBeenCalled();
+  });
+});

@@ -31,6 +31,19 @@ a failed retirement is retained for that selector lifetime until reload.
 
 ## Verification and delivery
 
+Current capacity/cleanup work uses [02 §7.0.1](../docs/specs/02-storage-package-migration.md)
+only for writer-acquisition failure of an explicitly owned fresh receipt. Existing
+empty/torn or postwriter/write/close failures remain strict repair; no cold cleanup
+or general GC is authorized. Project and generation WorkspaceFS must forward the
+optional exclusive text-creation ownership callback. Todo owns current evidence;
+the earlier411 full Desktop qualification is not this changed tree's full run.
+
+Automatic reopening may inspect only the exact remembered Project before the
+fresh Host open ([01e §9](../docs/specs/01e-desktop-large-gs-workflow.md)). A scoped
+catalog result never means the complete catalog is loaded. Selector, import
+destination detection and failed-reopen fallback still fully enumerate Projects;
+selected session, output and recovery inspections remain unchanged.
+
 [AGENTS.md](../AGENTS.md) owns working rules and required checks. Reuse passed
 checks only at the exact relevant source/settings; repeat for substantive changes,
 failures or unresolved concerns, not for staging or result-text updates.

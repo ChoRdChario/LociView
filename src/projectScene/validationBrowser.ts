@@ -26,6 +26,20 @@ import { chooseStartupScene } from '../scene/resolve';
 export const validationBrowserLimits: FileValidationLimits = { maxFileBytes: 64 * 1024 * 1024,
   maxJsonBytes: 4 * 1024 * 1024, maxItems: 100_000, maxValues: 8_000_000, maxPixels: 16_777_216 };
 export interface BrowserWorkspaceComposition { readonly offline?:DesktopOfflinePort;readonly mountEditor:MountedEditorFactory;readonly smoothDisplay?:SmoothPresentation;readonly progressivePresentation?:boolean;readonly filePolicy?:ProjectFilePolicy;readonly residency?:GsResidency;readonly introduction?:string;readonly initialFiles?:readonly File[];openLegacy?(file?:File):Promise<void> }
+/** Own only this browser composition; preserve all teardown errors and ordering. */
+export function createValidationBrowserDisposal(owners:{detach():void;cancel():void;workspace():Promise<void>;scratch():Promise<void>;raster():void|Promise<void>}) {
+  let pending:Promise<void>|undefined;
+  return()=>{
+    if(pending)return pending;let resolve!:()=>void,reject!:(error:unknown)=>void;
+    const work=new Promise<void>((yes,no)=>{resolve=yes;reject=no;});pending=work;
+    // pagehide cannot await; explicit callers still receive this rejecting work.
+    void work.catch(()=>{});
+    const errors:unknown[]=[];for(const action of [()=>owners.detach(),()=>owners.cancel()])try{action();}catch(error){errors.push(error);}
+    void(async()=>{for(const action of [()=>owners.workspace(),()=>owners.scratch(),()=>owners.raster()])try{await action();}catch(error){errors.push(error);}
+      if(errors.length)throw new AggregateError(errors,'画面の終了処理を完了できませんでした。保存済みの記録は保持しています。');
+    })().then(resolve,reject);return work;
+  };
+}
 async function failedDisplay(resident:{dispose():void;idle?():Promise<void>},error:unknown):Promise<never>{
   const errors:unknown[]=[];try{resident.dispose();}catch(failure){errors.push(failure);}
   try{await resident.idle?.();}catch(failure){errors.push(failure);}
@@ -80,7 +94,7 @@ export async function createValidationBrowserWorkspace(document: Document, compo
   const scratch=createReviewEditScratch(base);
   const workspace = createValidationWorkspace(document, { ...options,offline:composition.offline,smoothDisplay:!!composition.smoothDisplay,progressivePresentation:composition.progressivePresentation,reviewEditArchive:{write:produce=>workspaceFileOperation(locks,()=>scratch.write(produce))},initialFiles:composition.initialFiles,openLegacy:composition.openLegacy,mountEditor:composition.mountEditor,introduction:composition.introduction,lastProject: uiState.lastProject,
     storageEstimate: typeof navigator.storage?.estimate === 'function' ? () => navigator.storage.estimate() : undefined, localSettings: uiState.localSettings,
-    list: reading => measureValidation(timing, 'catalog.total', () => listValidationProjects(options, storage, composition.progressivePresentation ? reading : undefined)),
+    list: (reading,onlyRun) => measureValidation(timing, 'catalog.total', () => listValidationProjects(options, storage, composition.progressivePresentation ? reading : undefined,onlyRun)),
     open: (id, initial, mode, workspaceFile, reviewEdit, firstBackup, standaloneWorkspace) => openValidationEntry({ ...options, run: id, initial, mode, workspaceFile, reviewEdit, firstBackup, standaloneWorkspace, openStorage: create => storage(id, create) }),
     renderModelCandidate: async (host, display) => {
       const resident = await prepareReadonlyResidents(display.models, { modelContent: record => host.content.modelContent(record, true) }, undefined, false, raster, timing);
@@ -124,7 +138,7 @@ export async function createValidationBrowserWorkspace(document: Document, compo
       history.replaceState(null, '', url);
     },
   }, run, new URL(location.href).searchParams.get('access') === 'view' ? 'view' : 'edit');
-  const dispose = async () => { window.removeEventListener('pagehide', dispose);document.removeEventListener('lociview-timing-snapshot',snapshot); scratch.cancel();try{await workspace.dispose();}finally{await scratch.dispose();await raster?.dispose();} };
+  const dispose = createValidationBrowserDisposal({detach(){window.removeEventListener('pagehide',dispose);document.removeEventListener('lociview-timing-snapshot',snapshot);},cancel:()=>scratch.cancel(),workspace:()=>workspace.dispose(),scratch:()=>scratch.dispose(),raster:()=>raster?.dispose()});
   window.addEventListener('pagehide', dispose);
   return { root: workspace.root,ready:workspace.ready, hasChanges: workspace.hasChanges, dispose };
 }

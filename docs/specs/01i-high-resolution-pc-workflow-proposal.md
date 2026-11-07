@@ -317,6 +317,21 @@ copyの保守的上界をparse前に予約する。重複extentを入力size一�
 native成功を注入した旧unpaired HEICのthumbnail／原寸／close／取消とWebP/GIFの共有所有を
 focusedで確認する。これを実HEIC対応端末での表示合格と混同しない。
 
+### 7.1 2026-11-07 容量不足からの再試行
+
+POの大容量・保存容量管理の方向に沿う通常補修。01eの現在ownerが持つ一時ZIPだけを
+解放対象にし、失敗した解放を再試行してから次の生成へ進む。生成済み出力・CAS・
+履歴・原本の削除やcold掃除は、別の具体的な保持契約なしに導入しない。
+
+UI-onlyの`storageFeedback`はエラーの表示だけを行う。nativeのQuotaExceededError、
+既存の`output-space-budget`、それ以外の破損／照合失敗を混同しない。元の例外・
+復旧record・typed commandは変えず、入力・同一jobの再試行を保持する。容量不足時に
+サイトデータの削除を勧めず、再開用データも消えることをその場で説明する。
+ProjectSceneの選択・出力controllerと既存workspaceのcommand失敗表示だけへ接続する。
+保持量の推定を保存成功や実RAM保証へ使わず、新しい容量上限・管理画面を追加しない。
+同じ既知の失敗はheaderとCaption内の操作不可理由で同じ案内を使う。詳細欄では完全に同じ
+状態文だけを重複排除し、異なる問題・入力保持・復旧条件を省略しない。後の異なる診断が優先する。
+
 ## 8. 受入れと実行順
 
 - 旧／新小規模LociMyuでreport、receipt、ID、fingerprints、diagnostics、選択順をexact比較。

@@ -841,6 +841,32 @@ v2/journal/<transaction-id>/changes/<8-digit-ordinal>.amchange
 
 The path is internal; only `BlobRef` is portable.
 
+### 7.0.1 Native text-entry acquisition failure (2026-11-07 implementation repair)
+
+`writeReceipt` already owns a fresh path under the existing exclusive Project/CAS
+write lease after its strict absence check. It may pass an optional internal
+`WorkspaceTextCreation.assertOwned` callback through the scoped and generation
+WorkspaceFS wrappers to OPFS. This option is not storage/publication authority and
+does not change receipt decoding, persisted records, close/readback or recovery.
+Default/raw text writes do not request this compensation.
+
+For this opt-in only, OPFS rechecks absence before native file creation. If native
+`createWritable` rejects before returning a writer, compensate that acquisition by
+removing only the exact still-empty entry while the same exclusive lease is valid.
+Recheck ownership after awaited observations and before/after removal. Native
+`isSameEntry` plus zero size is a consistency check, not independent proof of
+exclusive creation; the caller's uninterrupted lease is required. Keep any
+pre-existing entry, nonempty/replaced entry, lost-authority case or uncertain state.
+Preserve the original error and any compensation failure together. A successful
+compensation still reports the original failure; it never acknowledges a write.
+
+There is no compensation after a writer has been returned, including write or
+close rejection, no empty-receipt acceptance or overwrite, and no restart sweep.
+Cold/torn/ambiguous receipts retain existing repair behavior. Acceptance covers
+native open quota → same transaction retry → downloaded backup → cold reopen on
+PC/touch, and unit faults for existing/changed entries, ownership loss and cleanup
+failure. Successful close and subsequent readback remain separate fences.
+
 BlobStore requirements:
 
 - accept `ReadableStream<Uint8Array>` or an equivalent bounded source;

@@ -109,7 +109,10 @@ export function frozenBaseSource(proof: ContributionBaseProof, manifestBytes: Ui
   return { source, manifest: m, blobs: m.blobs };
 }
 export async function verifyFrozenBase(proof: ContributionBaseProof, manifestBytes: Uint8Array, metadataBytes: Uint8Array, limits: MetadataLimits) {
-  const base = frozenBaseSource(proof, manifestBytes, metadataBytes, limits);
+  return verifyParsedFrozenBase(frozenBaseSource(proof, manifestBytes, metadataBytes, limits));
+}
+/** Owned result only; no exported bypass for raw/unverified base evidence. */
+async function verifyParsedFrozenBase(base: ReturnType<typeof frozenBaseSource>) {
   const inspection = await base.source.inspectOriginal({ maxNodes: L.inspectionNodes, maxWork: L.inspectionWork });
   const counts = summarizeFullHistory(inspection), closure = planWorkspaceClosure(inspection.candidates), m = base.manifest;
   if (counts.hasOpaque || counts.workUsed + closure.workUsed > L.inspectionWork || !same(closure.entries, m.blobs) ||
@@ -150,7 +153,7 @@ export function contributionOriginals(input: ContributionEvidenceInput, limits: 
 }
 export async function verifyContributionEvidence(input: ContributionEvidenceInput, limits: MetadataLimits) {
   const verified = contributionOriginals(input, limits);
-  await verifyFrozenBase(input.base, input.baseManifestBytes, input.baseMetadataBytes, limits);
+  await verifyParsedFrozenBase(verified.base);
   const description = await describeContributionTarget(verified.base, verified.target, verified.manifest.changes);
   if (!same(description.blobs, verified.manifest.blobs) || !same(description.summary, verified.manifest.summary)) fail('contribution-summary-closure');
   return { ...verified, bodyRefs: description.bodyRefs };

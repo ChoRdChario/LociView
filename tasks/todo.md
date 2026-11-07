@@ -1,6 +1,6 @@
 # LociView active work
 
-Updated2026-11-07. This is the single current plan and check record.
+Updated2026-11-08. This is the single current plan and check record.
 [Inventory](implementation-inventory.md) owns route-specific coverage;
 [map](../PROJECT_MAP.md) and [document index](../docs/README.md) route contracts/code.
 Git owns checkpoint identity. [Retained checkpoint evidence](../docs/history/development-through-2026-10-29/tasks/todo-before-daily-authoring.md)
@@ -57,7 +57,129 @@ unchanged-feature-classification checks pass; independent review has no findings
 No runtime change or new capacity guarantee; no runtime suite is needed for this
 documentation checkpoint.
 
-## Current boundary —Safari image and3D residency
+## Current boundary —mobile large-data work and storage capacity
+
+Status2026-11-08: implemented and independently reviewed; final V8 local checks
+PASS at fixed source/test/contract inputs. Git owns the g0 checkpoint identity;
+GitHub Actions owns its exact-commit CI status. Confirm that status when reporting
+Push completion. The remaining engineering scope below is not release acceptance.
+
+PO accepts mobile large-data handling/storage capacity, practical latency, then
+candidate delivery. Compare against411710c. One writer, bounded read-only reviews.
+Preserve originals/full quality/full SH, offline, typed Session commands, identity
+and every existing write/readback/publication/recovery fence. No new dependency,
+wire/source format, capacity guarantee, canonical-data GC or main/Pages/release.
+
+Outcome: retain drafts and the same output job through native capacity failure;
+release owned temporary resources; remove measured unnecessary startup/pure work;
+verify actual file/cold/offline continuation and deliver the exact tested build.
+
+Implemented:
+- Scratch cleanup attempts every owned path, joins concurrent release, retains
+  failed debt and retries it before allocation. Successful live leases are safe.
+  Browser teardown attempts all owners independently and preserves their errors.
+- Native testing found a fresh0B receipt after createWritable quota rejection.
+  [02 §7.0.1](../docs/specs/02-storage-package-migration.md) compensates only before
+  acquiring a writer, under exclusive fresh ownership and same-entry/empty checks.
+  Existing/torn/nonempty/unreadable/lost-owner/postwriter/write/close ambiguity
+  remains strict repair. Project/generation wrappers forward the ownership port.
+- Header/detail show one matched capacity explanation, keep input/the same job,
+  distinguish inspection budget and later integrity errors, and warn that deleting
+  site data also loses browser resume data. No uncertain file becomes accepted.
+- Automatic reopen inspects only the exact strict-string remembered namespace,
+  retaining all selected catalog/recovery/job checks and fresh Host opening.
+  Full selector/import/fallback discovery remains; targeted results never mark
+  the complete catalog loaded. Invalid coercion and post-disposal updates refuse.
+- Contribution verification parses its owned base once inside one invocation.
+  New/exported calls still verify anew, retaining summary/closure/opaque/budget
+  and hostile mutation checks ([06 §8.2](../docs/specs/06-project-package-wire.md)).
+  No cross-operation cache or caller-supplied trusted proof was introduced.
+- History selection skips self-comparison for one already validated candidate;
+  clone/shape/identity/DAG/head and multiversion work stay intact
+  ([05 §3.4](../docs/specs/05-project-scene-team-workflow.md)). Broader source/original
+  audit merging was rejected because raw overwritten values must remain checked.
+
+Executed final verification:
+- All3395 executable root cases PASS/21existing TODO (3416declared),151files.
+  Standard npm test, verbose+JSON/fail-fast, local Windows1worker, existing30s
+  default and existing case overrides; no retries/exclusions/deadline increases.
+  Internal concurrency cases remain. CI's existing2worker lane is separate evidence.
+- Required checkpoint commands ran serially: typecheck, complete root, normal/
+  harness/validation/Desktop/offline builds, offline isolation. HEIC isolation PASS.
+  Root2693.17s; checkpoint2806.581s. This is the required command sequence, not a
+  literal invocation of the opaque check:checkpoint wrapper. Do not equate the
+  longer whole-suite duration with an app action or compare unequal load as speedup.
+- All8 normal-SW offline cases PASS13.8min: boot/base repair, two-window update,
+  missing/wrong/interrupted resources, bootstrap/foreign-worker refusal, mixed
+  Mesh/Point/500k SH4/Proxy/photos, edit/save/full-close/cold and ordinary return.
+  Mixed flow11.2min is the whole many-output scenario, not one action's latency.
+- Current immutable offline artifact: selected Desktop4 PASS3.2min, no retries:
+  native quota recovery PC18.0s/touch16.9s, Review→editable-copy/save/cold26.5s,
+  receive-interruption/reselection/local edit/restore continuation1.7min.
+  These are whole-case times. Prior411 Desktop48 is prior, not current full50 credit.
+- Fresh4191 delivery2 PASS43.3s: small backup and8192²-original image backup;
+  actual received HTML/JS hashes and all20 served files match the frozen candidate.
+  Original image decodes8192² and renders8192CSSpx at native view; closing returns
+  focus. These SW-blocked delivery checks do not replace the normal-SW offline lane.
+- Focused metadata/package/atomic/lifecycle/OPFS/input and25 named-resume cases
+  support the final full-root. Independent review findings, including deferred
+  fallback cleanup/disposal and strict scope validation, are closed.
+- Post-check documentation formatting removes exactly one terminal blank line from
+  01e; the tested hash plus that exact-byte difference is retained separately.
+  Runtime source/tests/config/artifacts are unchanged; no runtime rerun is needed.
+- Private evidence: `.artifacts/e2e/mobile-capacity-20261107/final-v8/`,
+  run1794082419601-51660, source/candidate/served hashes and delivery screenshots.
+  Earlier V2–V7 failures remain retained, never relabelled PASS. V7 was7/8 offline:
+  final ordinary return exceeded20s. V8 retains that assertion and now passes.
+  Fixture02 provenance stayed bound to its reviewed Git-index bytes. Test fixture
+  consolidation retains07m's two actual returns and all original fault assertions.
+
+Action measurements (individual observations; variable load, not guarantees):
+
+| Browser action | Earlier | Final |
+|---|---:|---:|
+| Same retained-profile ordinary reopening, navigation→global idle |24.783s|15.649s|
+| Its catalog discovery |12.797s|5.169s|
+| Small original output, enabled primary→download event |4.638s|1.956s|
+| Small Review edit-copy output, same endpoint |9.808s|4.245s|
+| Its reopened output, same endpoint |8.910s|4.749s|
+
+The retained source profile is copied independently at its original loopback
+origin; preliminary targeted measurement19.107s is also retained. Only the final
+reviewed build supplies15.649s. Small-output comparisons use the same synthetic
+fixture/operations, not identical random actor/file identities; archive audit and
+OS picker time are excluded. Actual saved-file plus idle endpoints are separately
+recorded2.236/4.405/4.935s. The observed small cases fit10s; this is not general
+large-file acceptance. Whole-suite load was not controlled; a late sample was71%
+CPU/free30.5GiB. Earlier synthetic recovery26.21→21.28s and private comparison
+counts are diagnostic, not browser/Safari evidence or isolated causal estimates.
+
+Candidate: `http://127.0.0.1:4191/` serves immutable
+`final-v8/candidate/offline-desktop-dist`; rollback V9 remains local. No forced SW
+activation or personal4182 access. Small and8K synthetic samples stay local under
+`.artifacts/fixtures/quality-pass/` and `.artifacts/fixtures/safari-residency/`.
+Keep251 pre-existing private draft lines and all original/audit/profile files local.
+
+Next / genuine boundaries:
+1. Advance SH4 loading ownership/full-quality/scale/disposal evidence. The public
+   API proof ([01b §9](../docs/specs/01b-gs-proxy-project-scene-proposal.md)) passed
+   two1-point pages vs full2-point PLY: exact rows/all24RGB coefficients and zero
+   image differences in two512×256 views; SH3 negative control differs. Cancellation
+   transfers0/disposes1/owns0 pending. Partial SDK counters do not prove total RAM
+   or native idle. This is not500k/mobile/LOD/paging/adoption acceptance; the pinned
+   standard page generator drops SH4 and cannot be adopted unchanged.
+2. Large-data output/initial preparation still need comfortable-action measurement
+   and optimization. Retained-output cleanup needs precise live-reader and durable
+   recovery authority: acknowledged ZIPs remain return/recovery proof; URL revoke
+   is not download completion. No prefix sweep, canonical deletion or new durable
+   job rule is authorized by this cleanup repair.
+3. Physical iPhone Safari/PWA memory/thermal/jetsam, IME/codec/native save/offline
+   acceptance is pending, distinct from Windows touch/WebKit. Runtime audit reports
+   zero known vulnerabilities with unchanged dependencies; it is not a full security
+   or device acceptance. Ask only for genuine new product/architecture/compatibility/
+   destructive/release authority; device absence does not block other in-scope work.
+
+## Completed boundary —Safari image and3D residency
 
 PO2026-11-06 authorizes thumbnails, on-demand reads and simultaneous-residency
 control while preserving original bytes, full-quality explicit originals, offline

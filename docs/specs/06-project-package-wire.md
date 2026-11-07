@@ -555,6 +555,20 @@ boundary must prove:
 Full-source preparation proves the same receiver difference/final union directly
 from the retained original metadata, without a derived-source claim.
 
+Within one pure `verifyContributionEvidence` call, synchronous
+`contributionOriginals` captures and verifies the base manifest/metadata, wire
+originals and derived target before the first asynchronous inspection. A private
+helper may use that owned parsed base for the existing full-history summary,
+closure, opaque and inspection-budget checks. Do not parse the same base again
+inside that call, accept a caller-supplied trusted base, or reread mutable input
+after an await. Exported `verifyFrozenBase` still freshly parses every invocation.
+This does not share evidence across calls or change any Session, CAS, ZIP,
+write/readback, publication or recovery fence; it is not a 06b scope extension.
+Acceptance binds the result to the captured input despite subsequent caller
+mutation, rejects changed input in a new call, preserves exact originals and
+summary/closure/budget failures, and measures the duplicate parse separately
+from the surrounding file action.
+
 The proposed remote-journal digest uses a new domain separator
 `lociview:v2:metadata-change-set:jcs-v2\n`, not 02 §8's v1 domain. Its canonical
 preimage is exactly `{transactionId, target, purpose, stagedBlobs, metadataBatch}`,

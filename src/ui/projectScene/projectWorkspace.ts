@@ -11,6 +11,7 @@ import { createCaptionWindowControls } from './captionWindowControls';
 import { captionWindowPlanIsCurrent, newCaptionWindowMemory, planCaptionWindow, type CaptionWindowMemory, type CaptionWindowPlan } from './captionWindowState';
 import { createMediaViewer } from './mediaPreview';
 import { createMediaResidencyGate } from './mediaPreviewResources';
+import {storageFailureText} from './storageFeedback';
 import type { SceneUiMemory } from './navigationState';
 import { fieldValue, projectAttachments, projectCaptions, projectCaptionSceneCount, projectCaptionInventory, projectModels, projectIdentity } from './projectRead';
 import { surfaceAnchor, type ProjectWorkspacePorts, type WorkspaceFileInteraction, type WorkspacePinProposal, type WorkspaceSurface, type WorkspaceViewportState, type WorkspaceViewportPresentation, type Point3 } from './projectWorkspacePorts';
@@ -52,6 +53,8 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     ['困ったとき', '更新に失敗したら入力を保持したまま「更新を再試行」を選択します。競合は「状態を確認」から残す内容を選択します。3D表示だけに問題がある場合は「3D表示を再試行」を選択してください。'],
   ]) help.append(make('h3', title), make('p', text));
   const storageHelp = make('details'), storageStatus = make('p'); let storageChecking = false, storageEpoch = 0;
+  let storageFailure:{diagnostic:string|undefined;text:string}|undefined;
+  const failureMessage=(state=ports.status())=>storageFailure&&storageFailure.diagnostic===state.error?storageFailure.text:state.error;
   storageHelp.setAttribute('aria-label', 'このサイトの保存容量'); storageStatus.setAttribute('role', 'status');
   const storageCheck = button('保存容量を確認', () => { void queryStorage(); });
   storageHelp.append(make('summary', 'このサイトの保存容量'),
@@ -324,7 +327,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   const dirty = (includeSearchComposition = true) => draftInput(includeSearchComposition) || !!recovery?.hasChanges() || !!pending || panelInput() || !!mediaManager?.hasChanges() || windowMoving || viewport.read().dragging;
   const readDuringOutput = () => !!ports.readDuringOutput?.() && !busy && !dirty(false);
   let externalBusy = false, outputReading = false;
-  const mutationBlock = () => windowMoving ? 'ウィンドウの操作を完了してください。' : busy ? '変更を適用しています。' : ports.status().kind === 'failed' ? ports.status().error || '更新を再試行してください。' :
+  const mutationBlock = () => windowMoving ? 'ウィンドウの操作を完了してください。' : busy ? '変更を適用しています。' : ports.status().kind === 'failed' ? failureMessage() || '更新を再試行してください。' :
     ports.presentation?.()?.reason ?? (ports.readOnly ? '閲覧中です。編集を開始してください。' : ports.otherPending() ? 'ファイルの操作を完了してください。' : pending ? '再試行するか、入力を修正してください。' : null);
   const listContext = (): CaptionListContext => ({ source: { kind: 'ready', token: provider().token, sceneId,
     captions: projectCaptions(provider(), sceneId, models?.hidden()) }, memory: memory(), pending: dirty() ? 'text' : busy ? 'update' : null,
@@ -739,13 +742,13 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   }
   function positionValid() { return rawPosition.every(v => /^[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?$/i.test(v.trim()) && Number.isFinite(Number(v))); }
   async function perform(action: () => Promise<unknown>, complete: () => void, owner?: 'media') {
-    document.defaultView?.clearTimeout(feedbackTimer); passiveFeedback = null; busy = true; feedback = '変更を適用しています。'; pending = { action, complete, owner };
+    document.defaultView?.clearTimeout(feedbackTimer); passiveFeedback = null; storageFailure=undefined; busy = true; feedback = '変更を適用しています。'; pending = { action, complete, owner };
     let residency: { release(): void } | undefined;
     try { render(); if (owner === 'media') residency = await mediaWork.acquire(new AbortController().signal); await action(); if (!disposed) { complete(); pending = null; const completed = feedback;
       passiveFeedback = completed;
       feedbackTimer = document.defaultView?.setTimeout(() => { if (!disposed && !busy && !pending && feedback === completed) { feedback = ''; passiveFeedback = null; render(); } }, 6000);
     } }
-    catch (error) { passiveFeedback = null; if (!disposed) feedback = error instanceof Error ? error.message : '変更を適用できません。入力を保持しています。'; }
+    catch (error) { passiveFeedback = null; if (!disposed) {const text=storageFailureText(error),state=ports.status();storageFailure=text?{diagnostic:state.kind==='failed'?state.error:undefined,text}:undefined;feedback=text??(error instanceof Error ? error.message : '変更を適用できません。入力を保持しています。');} }
     finally { residency?.release(); busy = false; if (!disposed) render(); }
   }
   async function run(command: MetadataEdit, complete: () => void) {
@@ -991,7 +994,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
         summary.backup === 'unavailable' ? '保存ファイルを確認してください。' : '外部ファイル未照合';
       const nextGestureContext = JSON.stringify([p.token, sceneId, ports.readOnly, ports.imageScope(), ports.otherPending(), models?.hidden(), memory().pinColors]);
       if (gestureContext !== nextGestureContext) { gestureContext = nextGestureContext; gesture = null; gestureGeneration++; }
-      status.dataset.busy = String(busy); status.textContent = ports.status().kind === 'failed' ? ports.status().error || feedback : feedback;
+      const operationStatus=ports.status();status.dataset.busy = String(busy); status.textContent = operationStatus.kind === 'failed' ? failureMessage(operationStatus) || feedback : feedback;
       // The detail is visually primary during apply; its inert parent cannot own live announcements.
       status.dataset.captionApplying = String(busy && !!applyingCaption && ports.status().kind !== 'failed');
       status.dataset.passive = String(!busy && !pending && ports.status().kind === 'idle' && feedback === passiveFeedback);

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import * as A from '@automerge/automerge'; // Node-only local Wasm initialization.
-import { MemoryFS, type ProjectMutationAuthority, type ProjectWorkspaceFS } from '../src/platform/fs';
+import { MemoryFS, type ProjectMutationAuthority, type ProjectWorkspaceFS, type WorkspaceFS, type WorkspaceTextCreation } from '../src/platform/fs';
 import { MetadataProjectSession, measureMetadata, type MetadataSessionRead } from '../src/projectMetadata/session';
 import { MetadataRepository, type MetadataStorageFactory, type MetadataStoragePort } from '../src/projectMetadata/repository';
 import { PersistentContentVerifier, type VerifiedInventoryPort } from '../src/projectMetadata/contentEvidence';
@@ -474,6 +474,19 @@ describe('local generation capabilities (ports only, not backup restore/selectio
     await expect(scope.factory().save(['doc'], bytes)).rejects.toThrow();
     expect(await f.fs.readBytes(path)).toEqual(bytes);
     await scope.dispose();
+  });
+
+  it.each([null,'c'.repeat(32)])('forwards exclusive receipt acquisition through the root and generation %s without accepting a torn receipt',async generationId=>{
+    const f=local(),coordinator=ProjectMutationCoordinator.local(),root=`receipt-test/${nextId}`,lease=await coordinator.tryAcquire(f.fs,root,nextId);lease.activateNewProject();
+    const scope=await openWorkspaceGeneration(lease.workspace,{generationId,allowCreate:true,assertSelected:async()=>{}},async()=>({factory:f.original.storage,dispose:async()=>{}}));
+    const write=f.fs.writeText.bind(f.fs),seen:WorkspaceTextCreation[]=[];
+    const spy=vi.spyOn(f.fs as WorkspaceFS,'writeText').mockImplementation(async(path,text,creation)=>{expect(creation).toBeDefined();creation!.assertOwned();seen.push(creation!);await write(path,text);});
+    const path=`${scope.fs.projectRoot}/receipt.json`,torn=`${scope.fs.projectRoot}/torn.json`;
+    try{
+      await underWriteLease(scope.fs,()=>writeReceipt(scope.fs,path,{complete:true},limits));expect(seen).toHaveLength(1);expect(await scope.fs.readText(path)).toBe('{"complete":true}');
+      await write(torn,'');await expect(underWriteLease(scope.fs,()=>writeReceipt(scope.fs,torn,{complete:true},limits))).rejects.toThrow('receipt-invalid');expect(seen).toHaveLength(1);expect(await scope.fs.readText(torn)).toBe('');
+      lease.release();expect(()=>seen[0]!.assertOwned()).toThrow();await expect(underWriteLease(scope.fs,()=>writeReceipt(scope.fs,path+'-later',{complete:true},limits))).rejects.toThrow();expect(spy).toHaveBeenCalledOnce();
+    }finally{spy.mockRestore();lease.release();await scope.dispose();}
   });
 
   it('runs one fresh combined audit at each selected write fence and refuses stale success', async () => {

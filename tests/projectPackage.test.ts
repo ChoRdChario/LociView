@@ -15,6 +15,7 @@ import { WorkspaceSourceCapture } from '../src/projectPackage/workspaceSource';
 import { WorkspaceArchive, writeWorkspaceArchive, workspaceInputChunks, prepareWorkspaceManifest, writeCausalArchive } from '../src/projectPackage/workspaceArchive';
 import { VerifiedContributionBase, ContributionSourceCapture, ContributionArchive } from '../src/projectPackage/contributionSource';
 import { prepareContributionManifest, writeContributionArchive } from '../src/projectPackage/contributionArchive';
+import { CONTRIBUTION_RECONSTRUCTION, verifyContributionEvidence, verifyFrozenBase, type ContributionEvidenceInput } from '../src/projectPackage/contributionEvidence';
 import { planRemoteChanges } from '../src/projectMetadata/remote';
 import { PackageArchive } from '../src/projectPackage/zipArchive';
 import { ZipCrc32 } from '../src/projectPackage/zipChecks';
@@ -455,6 +456,64 @@ describe('Contribution originals and actual ZIP (injected base/CAS ports, no dur
     return fixedZip(entries);
   }
 
+  it.each(['map1', 'map2'] as const)('binds one pure %s contribution inspection to its owned base without a cross-call cache', async profile => {
+    const f = await workspaceFixture(profile), b = await baseFor(f.source, f.store), target = body(f.source, 'Captured target');
+    const capture = await ContributionSourceCapture.prepare(await session(target), target.token, b.base, b.bodies, metadataLimits);
+    const controls = prepareContributionManifest(capture, { packageId: id('pkg', 2), createdByVersion: '0.0.1' });
+    const inputFor = (): ContributionEvidenceInput => {
+      const derivedTargetBytes = target.encodeFullSource();
+      return { manifestBytes: controls.manifest.slice(), checksumBytes: controls.checksum.slice(),
+        base: structuredClone(b.base.proof()), baseManifestBytes: b.base.manifestBytes(), baseMetadataBytes: b.base.metadataBytes(),
+        wireParts: capture.changes.map(c => capture.changeBytes(c.ordinal)), derivedTargetBytes,
+        reconstruction: { kind: 'derivedTargetView', adapterId: CONTRIBUTION_RECONSTRUCTION,
+          targetMetadata: { sha256: packageByteHash(derivedTargetBytes), byteLength: derivedTargetBytes.length } } };
+    };
+    const input = inputFor(), parse = vi.spyOn(ProjectMetadataSource, 'fromFullSource');
+    try {
+      const verified = await verifyContributionEvidence(input, metadataLimits);
+      expect(parse.mock.calls.filter(([bytes]) => bytes === input.baseMetadataBytes)).toHaveLength(1);
+      expect(parse.mock.calls.filter(([bytes]) => bytes === input.derivedTargetBytes)).toHaveLength(1);
+      expect(verified.base.source.originalChanges()).toEqual(f.source.originalChanges());
+      expect(verified.target.originalChanges()).toEqual(target.originalChanges()); expect(verified.bodyRefs).toEqual([]);
+      await verifyFrozenBase(input.base, input.baseManifestBytes, input.baseMetadataBytes, metadataLimits);
+      expect(parse.mock.calls.filter(([bytes]) => bytes === input.baseMetadataBytes)).toHaveLength(2);
+
+      const inspect = ProjectMetadataSource.prototype.inspectOriginal;
+      let entered!: () => void, release!: () => void;
+      const started = new Promise<void>(resolve => { entered = resolve; }), gate = new Promise<void>(resolve => { release = resolve; });
+      const delayed = vi.spyOn(ProjectMetadataSource.prototype, 'inspectOriginal').mockImplementationOnce(function (this: ProjectMetadataSource, budget) {
+        entered(); return gate.then(() => inspect.call(this, budget));
+      });
+      try {
+        const captured = inputFor(), limits = { ...metadataLimits }, pending = verifyContributionEvidence(captured, limits);
+        await started;
+        try {
+          for (const bytes of [captured.manifestBytes, captured.checksumBytes, captured.baseManifestBytes,
+            captured.baseMetadataBytes, ...captured.wireParts, captured.derivedTargetBytes]) bytes.fill(0);
+          Object.assign(captured.base, { workspacePackageId: id('pkg', 9), declaredHeads: [hash(9)] });
+          Object.assign(captured.base.identity, { unexpected: true }); Object.assign(captured.base.metadataEnvelope, { unexpected: true });
+          Object.assign(captured.reconstruction.targetMetadata, { sha256: hash(9) }); limits.maxWork = 0;
+        } finally { release(); }
+        const result = await pending;
+        expect(result.base.source.originalChanges()).toEqual(verified.base.source.originalChanges());
+        expect(result.target.originalChanges()).toEqual(verified.target.originalChanges()); expect(result.bodyRefs).toEqual(verified.bodyRefs);
+        await expect(verifyContributionEvidence(captured, metadataLimits)).rejects.toThrow();
+        await expect(verifyFrozenBase(captured.base, captured.baseManifestBytes, captured.baseMetadataBytes, metadataLimits)).rejects.toThrow();
+      } finally { release(); delayed.mockRestore(); }
+
+      const forged = inputFor(), baseManifest = JSON.parse(new TextDecoder().decode(forged.baseManifestBytes));
+      baseManifest.summary.entityClasses = []; baseManifest.summary.fieldClasses = [];
+      forged.baseManifestBytes = encode(canonical(baseManifest)); const baseHash = packageByteHash(forged.baseManifestBytes);
+      Object.assign(forged.base, { workspaceManifestSha256: baseHash });
+      Object.assign(forged.base.evidence, { manifest: { sha256: baseHash, byteLength: forged.baseManifestBytes.length } });
+      const manifest = JSON.parse(new TextDecoder().decode(forged.manifestBytes)); manifest.base.workspaceManifestSha256 = baseHash;
+      forged.manifestBytes = encode(canonical(manifest)); forged.checksumBytes = encode(packageByteHash(forged.manifestBytes));
+      await expect(verifyContributionEvidence(forged, metadataLimits)).rejects.toThrow('contribution-base-source');
+      await expect(verifyFrozenBase(forged.base, forged.baseManifestBytes, forged.baseMetadataBytes, metadataLimits)).rejects.toThrow('contribution-base-source');
+      await expect(verifyContributionEvidence(inputFor(), { ...metadataLimits, maxWork: 1 })).rejects.toThrow();
+    } finally { parse.mockRestore(); }
+  });
+
   it.each(['map1', 'map2'] as const)('08b retains %s named originals and distinguishes anonymous delta from its named base', async profile => {
     const name = 'PRIVATE_EDITOR_SENTINEL', f = await workspaceFixture(profile, undefined, name), b = await baseFor(f.source, f.store);
     const workspace = await WorkspaceArchive.inspect(f.file, metadataLimits);
@@ -563,6 +622,9 @@ describe('Contribution originals and actual ZIP (injected base/CAS ports, no dur
     expect(capture.summary.entityClasses).toEqual([]);
     const built = await output(capture, b.bodies), restored = await ContributionArchive.inspect(built.file, b.base, b.bodies, metadataLimits);
     expect(restored.target.originalChanges()).toEqual(f.source.originalChanges());
+    const replay = await ContributionArchive.restore(built.file, b.base, restored.derivedTargetBytes(), restored.reconstruction(), b.bodies, metadataLimits);
+    expect(replay.target.originalChanges()).toEqual(f.source.originalChanges());
+    expect(replay.bodyRefs).toEqual([fixture().mediaResourcesById[id('med')].blob]);
     const current = await ContributionSourceCapture.prepare(await session(removed), removed.token, b.base, b.bodies, metadataLimits);
     expect(current.changes).toHaveLength(0); expect(current.blobs).toHaveLength(0);
     const empty = await output(current, b.bodies); expect((await unpackFixture(empty.file))).toHaveLength(2);

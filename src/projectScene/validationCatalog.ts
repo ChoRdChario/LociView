@@ -19,10 +19,11 @@ export interface ResumeReading {
 export interface ResumeReadingRequest { run: string; show(reading: ResumeReading | null): void }
 /** Read-only enumeration of this opt-in namespace, never an old Project or a mutable ready flag. */
 export async function listValidationProjects(options: Omit<ValidationHostOptions, 'run' | 'initial' | 'openStorage'>,
-  openStorage: ValidationStorage, reading?: ResumeReadingRequest): Promise<ValidationProjectEntry[]> {
+  openStorage: ValidationStorage, reading?: ResumeReadingRequest, onlyRun?: string): Promise<ValidationProjectEntry[]> {
+  if (onlyRun !== undefined && (typeof onlyRun !== 'string' || !/^[0-9a-f]{32}$/.test(onlyRun))) throw Error('Invalid Project discovery scope');
   const measure = <T>(stage: string, action: () => Promise<T>) => measureValidation(options.timing, `catalog.${stage}`, action);
-  const prefix = `${validationArea}/`, runs = [...new Set((await options.base.list(prefix))
-    .map(path => path.slice(prefix.length).split('/')[0]!).filter(id => /^[0-9a-f]{32}$/.test(id)))];
+  const prefix = `${validationArea}/`, runs = [...new Set((await options.base.list(onlyRun === undefined ? prefix : `${prefix}${onlyRun}/`))
+    .map(path => path.slice(prefix.length).split('/')[0]!).filter(id => /^[0-9a-f]{32}$/.test(id) && (onlyRun === undefined || id === onlyRun)))];
   const result: ValidationProjectEntry[] = [];
   for (const run of runs) {
     const lease = options.coordinator.openView(options.base, `${prefix}${run}`, `${validationArea}:${run}`);

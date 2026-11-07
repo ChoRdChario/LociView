@@ -312,6 +312,15 @@ through active Caption memberships and active CaptionAttachment records.
 
 ### 3.4 Atomic fields, references and retention
 
+After the whole decoded history passes cloning, shape, identity, DAG and head
+checks, a field with exactly one write already has its sole candidate. Its owned
+candidate array may be frozen and returned directly; self-comparison consumes no
+ancestor work. This is a computation/allocation fast path, not an omitted audit:
+raw-original checks and per-occurrence budgets remain, and multi-write candidate
+selection and work accounting are unchanged. Acceptance covers frozen independent
+values, exact zero ancestor work at the smallest valid budget, and malformed
+singleton DAG refusal as well as the existing concurrent/absence/history cases.
+
 The ProjectScene amendment replaces the affected DisplaySet rows in the general
 v2 mutable-field/reference tables as follows:
 

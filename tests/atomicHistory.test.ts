@@ -47,6 +47,23 @@ describe('neutral original atomic history inspection, not Project/provider adopt
     expect(() => withClonedAtomicHistoryRoot({ history: expected }, limits, (_root, inspectHistory) => { failed = inspectHistory; throw Error('consumer failed'); })).toThrow('consumer failed');
     expect(failed).toThrow('expired');
   });
+  it('owns a frozen singleton candidate at zero ancestor work without bypassing malformed DAG checks', () => {
+    const path = ['captionsById', id('cap'), 'body'], value = { nested: [{ label: 'original' }] };
+    const input = history(['only'], change('only', [], write('single', path, value)));
+    const result = inspectAtomicHistory(input, { ...limits, maxWork: 1 });
+    expect(result.kind).toBe('atomic-history-inspection'); if (result.kind === 'rejected') throw Error('history');
+    expect(result.workUsed).toBe(0); expect(result.fields).toHaveLength(1);
+    const field = result.fields[0]!, candidate = field.candidates[0]!;
+    expect(candidate).toEqual({ operationId: 'single', path, changeId: 'only', value: { kind: 'value', value } });
+    expect(Object.isFrozen(field)).toBe(true); expect(Object.isFrozen(field.candidates)).toBe(true); expect(Object.isFrozen(candidate)).toBe(true);
+    expect(candidate.value.kind).toBe('value'); if (candidate.value.kind !== 'value') throw Error('value');
+    const owned = candidate.value.value as { nested: { label: string }[] };
+    expect(Object.isFrozen(candidate.value)).toBe(true); expect(Object.isFrozen(owned)).toBe(true);
+    expect(Object.isFrozen(owned.nested)).toBe(true); expect(Object.isFrozen(owned.nested[0])).toBe(true);
+    path[2] = 'title'; value.nested[0]!.label = 'caller mutation';
+    expect(field.path).toEqual(['captionsById', id('cap'), 'body']); expect(owned).toEqual({ nested: [{ label: 'original' }] });
+    expect(inspectAtomicHistory(history(['only'], change('only', ['missing'], write('single', path, value))), { ...limits, maxWork: 1 }).kind).toBe('rejected');
+  });
   it('retains equal and unequal concurrent candidates, independent fields and the exact original DAG', () => {
     const a = change('a', ['root'], write('oa', title, '同じ')), b = change('b', ['root'], write('ob', title, '同じ'));
     const input = history(['a', 'b'], base, a, b), r = inspect(input);

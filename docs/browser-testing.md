@@ -66,6 +66,13 @@ cancel/explicit independent-copy confirmation, distinct Project identity and
 save/reload. `desktop-file-continuation.spec.ts` now owns its offline-artifact
 server, including its peer context; receive/restore and retained editing use the
 actual unified menus. These cases do not access the personal4182 origin.
+`desktop-capacity-recovery.spec.ts` injects native `createWritable` quota refusal
+for a fresh publication receipt and output ZIP. PC and390px touch cases retain
+the draft/name, retry the same command/output job, inspect the downloaded Backup
+and close/reopen the owned browser with unchanged content. Other I/O remains real
+OPFS. It covers a materialized empty entry before writer acquisition; existing
+empty/torn or postwriter failures remain strict service-test cases. This is
+simulated quota failure, not physical disk-full or iPhone Safari acceptance.
 `workspaceUi.ts` navigates actual File tabs without forced DOM changes and retains
 the older reader/noncompact fallback. Run results and earlier failures belong in
 todo, not an inferred matrix pass. Service Workers remain blocked in these cases.

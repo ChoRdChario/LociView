@@ -86,8 +86,8 @@ class ScopedProjectWorkspace implements ProjectWorkspaceFS {
     return this.base.readText(path);
   }
 
-  async writeText(path: string, text: string): Promise<void> {
-    await this.mutate(path, () => this.base.writeText(path, text));
+  async writeText(path: string, text: string, creation?:import('./fs').WorkspaceTextCreation): Promise<void> {
+    await this.mutate(path, () => this.base.writeText(path, text, creation));
   }
 
   async appendText(path: string, text: string): Promise<void> {

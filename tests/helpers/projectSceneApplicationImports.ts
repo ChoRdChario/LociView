@@ -495,6 +495,7 @@ export const projectSceneApplicationImports:Readonly<Record<string,readonly stri
     "./validationHost"
   ],
   "src/projectScene/validationOutputControls.ts": [
+    "../ui/projectScene/storageFeedback",
     "../ui/projectScene/modePresentation",
     "../ui/projectScene/projectWorkspacePorts",
     "./validationModeHost"
@@ -558,6 +559,7 @@ export const projectSceneApplicationImports:Readonly<Record<string,readonly stri
     "three/addons/loaders/GLTFLoader.js"
   ],
   "src/projectScene/validationWorkspace.ts": [
+    "../ui/projectScene/storageFeedback",
     "../scene/resolve",
     "../projectPackage/sceneAppend",
     "../ui/projectScene/contextHelp",
