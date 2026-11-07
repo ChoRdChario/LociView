@@ -30,6 +30,8 @@ export interface ViewportPresentationFrame {
   readonly pins: readonly { readonly id: string; readonly x: number; readonly y: number; readonly visible: boolean }[];
 }
 export interface ProjectViewport {
+  /** Owned display preparation/retirement only; no storage or readiness authority. */
+  idle?(): Promise<void>;
   observePresentation?(listener: (frame: ViewportPresentationFrame) => boolean): () => void;
   setPointDiameter?(assetId: string, diameter: number): void; pointDiameter?(assetId: string): number;
   update(display: RenderDisplay): void; setActive(active: boolean): void;

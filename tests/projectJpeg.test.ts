@@ -2,9 +2,15 @@ import { describe, it, expect, vi } from 'vitest';
 import { inspectValidationJpeg, jpegStructure, browserJpegDecoder } from '../src/projectFiles/jpeg';
 import { digest } from '../src/projectMetadata/persistence';
 import { jpegBytes, jpegFixtures } from './helpers/jpegFixtures';
+import { mediaDisplayDimensions } from '../src/projectFiles/media';
 
 const limits = { maxFileBytes: 1_000_000, maxJsonBytes: 100_000, maxItems: 10_000, maxValues: 1_000_000, maxPixels: 10_000 };
 describe('bounded JPEG admission', () => {
+  it('provides oriented photo dimensions for bounded thumbnails without changing source metadata', () => {
+    expect(mediaDisplayDimensions(jpegBytes('rgb-baseline'),'image/jpeg',limits)).toEqual({width:8,height:4});
+    expect(mediaDisplayDimensions(jpegBytes('rgb-exif-6'),'image/jpeg',limits)).toEqual({width:4,height:8});
+    expect(jpegStructure(jpegBytes('rgb-exif-6'),limits,'photo')).toMatchObject({width:8,height:4,orientation:6});
+  });
   for (const name of Object.keys(jpegFixtures) as (keyof typeof jpegFixtures)[]) it(`validates real compressed ${name} with owned temporary decode`, async () => {
     const bytes = jpegBytes(name), fixture = jpegFixtures[name], close = vi.fn();
     expect(await digest(bytes)).toBe(fixture.sha256);

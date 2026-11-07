@@ -33,6 +33,7 @@ function measureResident<T>(timing: ResidentTiming | undefined, stage: string, a
 }
 
 export interface SavedModelResidentPort {
+  idle?(): Promise<void>;
   readonly rasterResources?: RasterResources;
   demand?(models: readonly (ValidationModelClosure | ReadonlyRenderModel)[]): void;
   retry?(): void;
@@ -139,15 +140,18 @@ export async function prepareReadonlyResidents(initial: readonly ReadonlyRenderM
   type Checked = { record: string; point: boolean; classes: { locator: JsonObject; kind: 'basic' | 'standard' | 'phong' | 'unsupported' }[] };
   const checked = new Map<string, Checked>();
   const failures=new Map<string,string>(),listeners=new Set<()=>void>();
+  let cleanupFailure: unknown;
+  const retire = (model: DecodedValidationModel) => { try { model.dispose(); } catch (error) { cleanupFailure ??= error; throw error; } };
   const notify=()=>{for(const changed of listeners)changed();};
   const uses=new Map<string,number>();let wanted=new Set<string>();
-  const collect=()=>{if(closed)return;for(const [key,item]of templates)if(!wanted.has(key)&&!uses.get(key)){item.model.dispose();templates.delete(key);}};
+  const collect=()=>{if(closed)return;for(const [key,item]of templates)if(!wanted.has(key)&&!uses.get(key)){retire(item.model);templates.delete(key);}};
   const live = new Set<() => void>(); let closed = false, preparing = false;
   let demandTask: Promise<void> | null = null, demandQueued = false;
+  const preparations = new Set<Promise<void>>();
   let demanded = new Map<string, ReadonlyRenderModel>();
   const keyFor=(c:ValidationModelClosure|ReadonlyRenderModel)=>`${c.representation.id}/${c.proxy?.id??''}`;
   const dispose = () => { if (closed) return; closed = true; lifetime.abort(); for (const release of [...live]) release();
-    for (const item of templates.values()) item.model.dispose(); templates.clear();checked.clear();demanded.clear();listeners.clear(); };
+    for (const item of templates.values()) retire(item.model); templates.clear();checked.clear();demanded.clear();listeners.clear(); };
   const loadSingle = (record: JsonObject, proxy = false) => {
     const blob = record.blob as JsonObject | undefined, count = blob?.byteLength;
     if (resources && (typeof count !== 'number' || !Number.isSafeInteger(count) || count < 0)) throw Error('保存したモデルの容量を確認してください。');
@@ -166,9 +170,9 @@ export async function prepareReadonlyResidents(initial: readonly ReadonlyRenderM
     const model = await loadSingle(c.representation);
     if (model.gs && c.proxy) try {
       model.proxy = await loadSingle(c.proxy, true);
-      const original = model.dispose; model.dispose = () => { model.proxy?.dispose(); original(); };
+      const original = model.dispose; model.dispose = () => { try { model.proxy?.dispose(); } finally { original(); } };
     } catch (error) { model.proxyIssue = error instanceof Error ? error.message : '位置指定用の面を読み込めません。'; }
-    if (closed) { model.dispose(); throw Error('画面を閉じました。'); } return model;
+    if (closed) { retire(model); throw Error('画面を閉じました。'); } return model;
   };
   const remember = (c: ReadonlyRenderModel, model: DecodedValidationModel) => {
     checked.set(keyFor(c), { record: canonical(c.representation), point: !!model.point,
@@ -182,14 +186,14 @@ export async function prepareReadonlyResidents(initial: readonly ReadonlyRenderM
       demandTask = (async () => {
         for (const [key, model] of demanded) {
           if (closed || !wanted.has(key) || templates.has(key) || failures.has(key) || !checked.has(key)) continue;
-          try { const decoded = await load(model); if (closed || !wanted.has(key)) { decoded.dispose(); continue; }
+          try { const decoded = await load(model); if (closed || !wanted.has(key)) { retire(decoded); continue; }
             remember(model, decoded); templates.set(key, { record: canonical(model.representation), model: decoded }); failures.delete(key); notify();
           } catch (error) { if (!closed) { failures.set(key, error instanceof Error ? error.message : 'モデルを読み込めません。'); notify(); } }
         }
       })().finally(() => { demandTask = null; if (!closed && [...demanded.keys()].some(key => checked.has(key) && !templates.has(key) && !failures.has(key))) scheduleDemand(); });
     });
   };
-  const prepare = async (next: readonly ReadonlyRenderModel[], publish = false) => {
+  const prepareOwned = async (next: readonly ReadonlyRenderModel[], publish = false) => {
     if (demandTask) await demandTask;
     if (closed || preparing) throw Error('モデルの表示準備を完了してください。');
     preparing = true; const staged = new Map<string, { record: string; model: DecodedValidationModel }>(),errors:unknown[]=[];
@@ -201,7 +205,7 @@ export async function prepareReadonlyResidents(initial: readonly ReadonlyRenderM
       if (previous) { if (previous.record !== record) throw Error('モデルの本体が一致しません。'); continue; }
       const decoded = await load(c); remember(c, decoded);
       const laterCanonical = resources && (decoded.raster?.cpuBytes || decoded.proxy?.raster?.cpuBytes) && next.some(other => !checked.has(keyFor(other)));
-      if (resources && (!wanted.has(key) || laterCanonical)) { decoded.dispose(); failures.delete(key); continue; }
+      if (resources && (!wanted.has(key) || laterCanonical)) { retire(decoded); failures.delete(key); continue; }
       staged.set(key, { record, model:decoded });
       if (closed) throw Error('画面を閉じました。');
       if(publish){templates.set(key,staged.get(key)!);staged.delete(key);failures.delete(key);notify();}
@@ -211,8 +215,12 @@ export async function prepareReadonlyResidents(initial: readonly ReadonlyRenderM
       if (!resources) wanted=new Set(next.map(keyFor));
       collect();
       if(errors.length)throw new AggregateError(errors,'一部のモデルを読み込めません。記録と原本は保持しています。');
-    } catch (error) { for (const item of staged.values()) item.model.dispose(); throw error; }
+    } catch (error) { for (const item of staged.values()) retire(item.model); throw error; }
     finally { preparing = false; scheduleDemand(); }
+  };
+  const prepare = (next: readonly ReadonlyRenderModel[], publish = false) => {
+    const work = prepareOwned(next, publish); preparations.add(work);
+    return work.finally(() => preparations.delete(work));
   };
   const supportedClass=(material:THREE.Material,source:MeshMaterialSource|undefined|null,c:ValidationModelClosure|ReadonlyRenderModel)=>
     source?.lighting==='unlit'?material instanceof THREE.MeshBasicMaterial:
@@ -238,7 +246,11 @@ export async function prepareReadonlyResidents(initial: readonly ReadonlyRenderM
     const bytes=(model:ReadonlyRenderModel)=>{const blob=model.representation.blob;if(blob&&typeof blob==='object'&&!Array.isArray(blob)){const count=(blob as JsonObject).byteLength;if(typeof count==='number')return count;}return Number.MAX_SAFE_INTEGER;};
     const ready=prepare(progressive?[...initial].sort((a,b)=>bytes(a)-bytes(b)):initial,progressive);void ready.catch(()=>{});
     if(!progressive)await ready;
-    return { dispose, prepare, validate, ready, ...(resources ? { rasterResources: resources } : {}),
+    return { dispose, prepare, validate, ready, async idle() {
+      if (cleanupFailure) throw cleanupFailure;
+      while (preparations.size || demandTask || demandQueued) { await Promise.allSettled([...preparations, ...(demandTask ? [demandTask] : [])]); await Promise.resolve(); }
+      if (cleanupFailure) throw cleanupFailure;
+    }, ...(resources ? { rasterResources: resources } : {}),
       ...(resources ? { demand(models: readonly (ValidationModelClosure | ReadonlyRenderModel)[]) {
         demanded = new Map(models.map(input => { const model = renderModel(input); return [keyFor(model), model]; })); wanted = new Set(demanded.keys()); collect(); scheduleDemand();
       }, retry() { for (const key of demanded.keys()) failures.delete(key); scheduleDemand(); } } : {}),

@@ -10,6 +10,7 @@ import { beginCaptionDraft, captionApplyIsCurrent, hasCaptionDraft, type Caption
 import { createCaptionWindowControls } from './captionWindowControls';
 import { captionWindowPlanIsCurrent, newCaptionWindowMemory, planCaptionWindow, type CaptionWindowMemory, type CaptionWindowPlan } from './captionWindowState';
 import { createMediaViewer } from './mediaPreview';
+import { createMediaResidencyGate } from './mediaPreviewResources';
 import type { SceneUiMemory } from './navigationState';
 import { fieldValue, projectAttachments, projectCaptions, projectCaptionSceneCount, projectCaptionInventory, projectModels, projectIdentity } from './projectRead';
 import { surfaceAnchor, type ProjectWorkspacePorts, type WorkspaceFileInteraction, type WorkspacePinProposal, type WorkspaceSurface, type WorkspaceViewportState, type WorkspaceViewportPresentation, type Point3 } from './projectWorkspacePorts';
@@ -102,7 +103,9 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   const markerById = new Map<string, HTMLButtonElement>(), markerNodes = new Set<HTMLButtonElement>();
   const viewportTools = make('section'); viewportTools.className = 'lv-project-viewport-tools'; viewportTools.setAttribute('aria-label', '3D表示の操作');
   viewportTools.append(viewportStatus, retryViewport);
-  const mediaViewer = createMediaViewer(document, ports.rasterResources,ports.imageDimensions);
+  const mediaWork = createMediaResidencyGate(document, render, () => viewport.idle?.() ?? Promise.resolve(), () => !disposed);
+  const mediaViewer = createMediaViewer(document, ports.rasterResources,ports.imageDimensions, mediaWork.acquire);
+  let retirement: Promise<void> | undefined;
   const sidebar = make('aside'); sidebar.setAttribute('aria-label', '作業パネル');
   const sceneContext = make('p'); sceneContext.className = 'lv-current-scene';
   const retainedEdit = make('section'), retainedNote = make('p'); retainedEdit.className = 'lv-retained-edit';
@@ -552,6 +555,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   }
   document.defaultView?.addEventListener('resize',positionHeaderSheets);
   document.defaultView?.addEventListener('resize',render);
+  document.addEventListener?.('visibilitychange', render);
   const visualViewport = document.defaultView?.visualViewport;
   function positionMobileEditor() {
     const focused = document.activeElement;
@@ -736,12 +740,13 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   function positionValid() { return rawPosition.every(v => /^[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?$/i.test(v.trim()) && Number.isFinite(Number(v))); }
   async function perform(action: () => Promise<unknown>, complete: () => void, owner?: 'media') {
     document.defaultView?.clearTimeout(feedbackTimer); passiveFeedback = null; busy = true; feedback = '変更を適用しています。'; pending = { action, complete, owner };
-    try { render(); await action(); if (!disposed) { complete(); pending = null; const completed = feedback;
+    let residency: { release(): void } | undefined;
+    try { render(); if (owner === 'media') residency = await mediaWork.acquire(new AbortController().signal); await action(); if (!disposed) { complete(); pending = null; const completed = feedback;
       passiveFeedback = completed;
       feedbackTimer = document.defaultView?.setTimeout(() => { if (!disposed && !busy && !pending && feedback === completed) { feedback = ''; passiveFeedback = null; render(); } }, 6000);
     } }
     catch (error) { passiveFeedback = null; if (!disposed) feedback = error instanceof Error ? error.message : '変更を適用できません。入力を保持しています。'; }
-    finally { busy = false; if (!disposed) render(); }
+    finally { residency?.release(); busy = false; if (!disposed) render(); }
   }
   async function run(command: MetadataEdit, complete: () => void) {
     if (mutationBlock()) return;
@@ -1060,7 +1065,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       const resolved = sceneId ? resolveScene(p.state, p.resources, sceneId) : null;
       const viewportInput:WorkspaceViewportState={ token: p.token, sceneId, selectedId: selected, pin, choosing,
         pinColors: memory().pinColors, hiddenAssetIds: models!.hidden(), model: models!.proposal(), windowMoving,
-        available: resolved?.kind === 'ready', visible: stageVisible(), readOnly: !!blocked || resolved?.kind !== 'ready', comparison: recovery!.comparison(), material: materials.proposal() };
+        available: resolved?.kind === 'ready', visible: stageVisible() && document.hidden !== true && !mediaWork.active, readOnly: !!blocked || resolved?.kind !== 'ready', comparison: recovery!.comparison(), material: materials.proposal() };
       installedViewportInput=viewportInput;viewport.update(viewportInput);
       finishSurfaceOpening();
       renderCaptionActions();
@@ -1086,7 +1091,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       windows.project({ ready: seen.ready, sourceToken: seen.token, sceneId: seen.sceneId, width: extent.width, height: extent.height, pins: seen.pins });
       viewportStatus.dataset.busy = String(!!ports.presentation?.()?.busy || !!seen.loading);
       canvas.setAttribute('aria-busy', viewportStatus.dataset.busy);
-      viewportStatus.textContent = [ports.presentation?.()?.reason, viewportFeedback, seen.issue, seen.notice, resolved?.kind !== 'ready' && 'シーンを選択し、表示状態を確認してください。'].filter(Boolean).join(' ');
+      viewportStatus.textContent = [mediaWork.active ? '画像のため3Dを休止しています。' : ports.presentation?.()?.reason, viewportFeedback, seen.issue, seen.notice, resolved?.kind !== 'ready' && 'シーンを選択し、表示状態を確認してください。'].filter(Boolean).join(' ');
       viewportStatus.hidden = !viewportStatus.textContent;
       retryViewport.hidden = !seen.issue && !viewportFeedback&&!seen.retryAvailable; retryViewport.disabled = viewBlocked();
       let camera: unknown=seen.camera; try { camera ??= viewport.capture().camera; } catch { /* Preparation has no camera yet. */ }
@@ -1151,5 +1156,26 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   });
   return { root, headerActions, projectNavigation: otherProject, utilityArea: settingsSheet, clearNotice(){if(!pending&&ports.status().kind==='idle')feedback='';}, dismissDisclosures(){help.open=false;organization!.settingsRoot.open=false;}, setExternalBusy: (active:boolean) => { const reading=readDuringOutput(), changed=externalBusy!==active||outputReading!==reading; externalBusy=active;outputReading=reading;if(changed)render();body.inert=busy||active&&!readDuringOutput(); }, render, session: interaction, activeScene: () => sceneId, inputPending: () => dirty() || busy,
     hasChanges: () => dirty() || busy || !!pending,
-    unmount() { if (disposed) return; disposed = true;finishMarkerNavigation();document.removeEventListener?.('pointerdown',closeRecordSheets,true);document.removeEventListener?.('focusin',closeRecordSheets);document.removeEventListener?.('pointerdown',dismissHeaderSheets,true);document.removeEventListener?.('focusin',dismissHeaderSheets);otherProject.remove();document.defaultView?.clearTimeout(feedbackTimer);document.defaultView?.removeEventListener('resize',positionHeaderSheets);document.defaultView?.removeEventListener('resize',render);document.defaultView?.removeEventListener('resize',positionMobileEditor);visualViewport?.removeEventListener('resize',positionMobileEditor);root.removeEventListener('focusin',mobileFocusChanged);root.removeEventListener('focusout',mobileFocusChanged);cameraGizmo.dispose();stopHelp();stopPresentation?.();overlayBaseline=undefined;cancelObservation();storageEpoch++; gesture = null; gestureGeneration++; pressedPointers.clear(); viewport.reservePointer(false); recovery?.dispose(); organization?.dispose(); windows.dispose(); mediaManager?.dispose(); mediaViewer.dispose(); viewport.dispose(); list.dispose(); inclusion.dispose(); detail.dispose(); for (const panel of panels.values()) panel.dispose(); root.remove(); } };
+    unmount() {
+      if (retirement) return retirement;
+      let finish!: () => void, fail!: (error: unknown) => void;
+      retirement = new Promise<void>((resolve, reject) => { finish = resolve; fail = reject; });
+      void retirement.catch(() => {}); disposed = true;
+      const errors: unknown[] = [], attempt = <T>(action: () => T): T | undefined => { try { return action(); } catch (error) { errors.push(error); } };
+      attempt(() => {
+        document.removeEventListener?.('visibilitychange',render);document.removeEventListener?.('pointerdown',closeRecordSheets,true);document.removeEventListener?.('focusin',closeRecordSheets);document.removeEventListener?.('pointerdown',dismissHeaderSheets,true);document.removeEventListener?.('focusin',dismissHeaderSheets);
+        otherProject.remove();document.defaultView?.clearTimeout(feedbackTimer);document.defaultView?.removeEventListener('resize',positionHeaderSheets);document.defaultView?.removeEventListener('resize',render);document.defaultView?.removeEventListener('resize',positionMobileEditor);visualViewport?.removeEventListener('resize',positionMobileEditor);root.removeEventListener('focusin',mobileFocusChanged);root.removeEventListener('focusout',mobileFocusChanged);
+      });
+      for (const stop of [finishMarkerNavigation, () => cameraGizmo.dispose(), stopHelp, () => stopPresentation?.(), cancelObservation]) attempt(stop);
+      overlayBaseline=undefined;storageEpoch++;gesture=null;gestureGeneration++;pressedPointers.clear();attempt(() => viewport.reservePointer(false));
+      for (const stop of [() => recovery?.dispose(), () => organization?.dispose(), () => windows.dispose(), () => mediaManager?.dispose(), () => list.dispose(), () => inclusion.dispose(), () => detail.dispose()]) attempt(stop);
+      for (const panel of panels.values()) attempt(() => panel.dispose());
+      const media = attempt(() => mediaViewer.dispose()); attempt(() => viewport.dispose()); attempt(() => root.remove());
+      const idle = attempt(() => viewport.idle?.());
+      void Promise.allSettled([media, idle]).then(results => {
+        errors.push(...results.flatMap(result => result.status === 'rejected' ? [result.reason] : []));
+        if (errors.length) throw new AggregateError(errors, '表示の終了処理を完了できませんでした。再読み込みしてください。');
+      }).then(finish, fail);
+      return retirement;
+    } };
 }

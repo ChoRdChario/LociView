@@ -1,10 +1,11 @@
+import {test, createBrowserProfile} from '../helpers/browserProfile';
 import { writeCleanImportFixture } from './cleanImportFixture';
 import { desktopEntry, desktopOrigin } from './desktopEntry';
 import { selectShareOutput,  closeFileSurface, revealFileSurface, lookAlongFront } from './workspaceUi';
-import {test,expect,chromium,type Page,type BrowserContext,type TestInfo} from '@playwright/test';
-import {mkdir,mkdtemp} from 'node:fs/promises';
+import {expect,chromium,type Page,type BrowserContext,type TestInfo} from '@playwright/test';
+
 import {openAsBlob} from 'node:fs';
-import {join} from 'node:path';
+
 import * as A from '@automerge/automerge';
 import * as THREE from 'three';
 import {largeGsFixture,largeGsDigest,largeGsBytes} from '../helpers/largeGsFixture';
@@ -48,7 +49,7 @@ async function open(p:Page,path:string){await p.getByLabel('ファイルを選�
 
 test('PC入口で50万点SH4の全5用途・返送・Review編集コピー・復元・cold再開を完走する',async({},info)=>{
  test.setTimeout(3_600_000);A.getHeads(A.init());const source=await largeGsFixture(),started=Date.now(),stages:any[]=[],errors:string[]=[],contexts=new Set<BrowserContext>();
- await mkdir('.artifacts/e2e/profiles',{recursive:true});const profiles=await Promise.all(['a','b','review','clean','restore'].map(label=>mkdtemp('.artifacts/e2e/profiles/desktop500k-'+label+'-')));
+ const profiles=await Promise.all(['a','b','review','clean','restore'].map(label=>createBrowserProfile('desktop500k-'+label)));
  const mark=async(stage:string,p:Page)=>{await p.evaluate(()=>document.dispatchEvent(new Event('lociview-timing-snapshot')));stages.push({stage,wallMs:Date.now()-started,timing:await p.evaluate(()=>performance.getEntriesByType('measure').map(e=>({name:e.name,ms:e.duration,detail:(e as PerformanceMeasure).detail})))});console.log(stage,Date.now()-started);};
  const launch=async(index:number)=>{const context=await chromium.launchPersistentContext(profiles[index]!,{channel:'chromium',headless:true,viewport:{width:1440,height:1000},serviceWorkers:'block',acceptDownloads:true});contexts.add(context);context.setDefaultTimeout(15_000);
   await context.route('**/*',route=>{const u=new URL(route.request().url());return u.origin===desktopOrigin||['blob:','data:'].includes(u.protocol)?route.continue():route.abort('blockedbyclient');});

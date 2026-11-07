@@ -78,6 +78,7 @@ import { editCaptionDraft, planCaptionApply } from '../src/ui/projectScene/capti
 import { RecordedDocument } from './ui/domRecorder';
 import { record, type RecordedNode } from './ui/domRecorder';
 import { createValidationWorkspace, type ValidationWorkspacePorts } from '../src/harness/projectScene/validationWorkspace';
+import { createValidationWorkspace as createApplicationWorkspace, DisplayRetirementError } from '../src/projectScene/validationWorkspace';
 import { createMediaControls } from '../src/harness/projectScene/mediaControls';
 import { createModelAdditionControls } from '../src/harness/projectScene/modelAdditionControls';
 import { createModelUpdateControls } from '../src/harness/projectScene/developmentControls';
@@ -844,6 +845,21 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     title.value='遅い入力';title.fire('input');Object.assign(input,{files:[]});input.fire('change');button('選択を取り消す').fire('click');
     button('作成を再試行').parent!.fire('submit',{preventDefault(){}});await vi.waitFor(()=>expect(open).toHaveBeenCalledTimes(2));
     expect(open.mock.calls[1]![0]).toBe(attempt[0]);expect(open.mock.calls[1]![1]).toBe(attempt[1]);expect(ui.hasChanges()).toBe(true);expect(await r.fs.list('')).toEqual([]);
+  });
+  it('unified opening permits cancellation during the first read and keeps execution owned until it settles',async()=>{
+    let release!:()=>void,entered!:()=>void;const held=new Promise<void>(resolve=>{release=resolve;}),started=new Promise<void>(resolve=>{entered=resolve;});
+    const open=vi.fn<ValidationWorkspacePorts['open']>(async()=>{throw Error('unused');});
+    const ui=owned(createValidationWorkspace(new RecordedDocument().asDocument(),{fileLimits:budget,decode,list:async()=>[],open,selected:vi.fn(),render:async()=>{throw Error('unused');}}));
+    caseDisposals.push(release);
+    const root=record(ui.root),all=(n:RecordedNode):RecordedNode[]=>[n,...n.children.flatMap(all)],button=(text:string)=>all(root).find(n=>n.tag==='button'&&n.textContent===text)!;
+    const input=all(root).find(n=>n.attributes.get('aria-label')==='ファイルを選択')!,create=button('プロジェクトを作成'),execute=button('ファイルを開く'),cancel=button('選択を取り消す');
+    await vi.waitFor(()=>expect(execute.disabled).toBe(false));
+    const bytes=glb();Object.assign(input,{files:[{name:'pending.glb',size:bytes.length,arrayBuffer:async()=>{entered();await held;return bytes.slice().buffer;}}]});input.fire('change');input.parent!.parent!.fire('submit',{preventDefault(){}});await started;
+    expect(cancel.disabled).toBe(false);expect(execute.disabled).toBe(true);cancel.fire('click');
+    expect(execute.disabled).toBe(true);expect(input.disabled).toBe(true);expect(create.parent!.hidden).toBe(true);
+    release();await vi.waitFor(()=>expect(execute.disabled).toBe(false));expect(open).not.toHaveBeenCalled();expect(create.parent!.hidden).toBe(true);expect(ui.hasChanges()).toBe(false);
+    Object.assign(input,{files:[new File([glb().slice().buffer],'next.glb')]});input.fire('change');input.parent!.parent!.fire('submit',{preventDefault(){}});
+    await vi.waitFor(()=>expect(!create.parent!.hidden&&!create.disabled).toBe(true));expect(open).not.toHaveBeenCalled();
   });
   it.each(['reselection','IME','dispose'] as const)('unified opening drops a late %s completion before creating a Project',async kind=>{
     let release!:()=>void,entered!:()=>void;const gate=new Promise<void>(r=>{release=r;}),waiting=new Promise<void>(r=>{entered=r;});let hold=true;
@@ -3006,7 +3022,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       await vi.waitFor(()=>expect(confirmed).toBeDefined(),{timeout:20000});
       const close=vi.spyOn(confirmed!,'dispose'); await ui.dispose(); expect(close).toHaveBeenCalledOnce();close.mockRestore();
     } else if (outcome === 'dispose' || outcome === 'render-dispose') {
-      await ui.dispose(); if(outcome==='render-dispose'){finishRender();await vi.waitFor(()=>expect(release).toHaveBeenCalledOnce());}
+      const closing=ui.dispose();if(outcome==='render-dispose'){let closed=false;void closing.then(()=>{closed=true;});await Promise.resolve();expect(closed).toBe(false);finishRender();}await closing;
     }
     else {
       reject(Error('表示準備に失敗した試験'));
@@ -4769,7 +4785,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
   }
   async function productWorkspaceFixture(includeInitial = false, duplicateModels = false, withTag = false, profile: 'map1' | 'map2' = 'map1',
     initial?: NonNullable<Parameters<typeof openValidationHost>[0]['initial']>,
-    setup: { jpeg?: JpegDecoder; photo?: PhotoDecoder; mediaDecoders?:MediaDecoders; editorSettings?:Parameters<typeof openValidationHost>[0]['editorSettings']; storageEstimate?: ValidationWorkspacePorts['storageEstimate']; restoreGenerations?: boolean; initialWorkspace?: boolean; visualFrames?:boolean; scenes?: readonly { id: string; name: string; orderKey: string }[] } = {}) {
+    setup: { jpeg?: JpegDecoder; photo?: PhotoDecoder; mediaDecoders?:MediaDecoders; editorSettings?:Parameters<typeof openValidationHost>[0]['editorSettings']; storageEstimate?: ValidationWorkspacePorts['storageEstimate']; restoreGenerations?: boolean; initialWorkspace?: boolean; visualFrames?:boolean; scenes?: readonly { id: string; name: string; orderKey: string }[]; rasterResources?:ReturnType<typeof createRasterResources>; nativeImageDecode?:()=>Promise<void>; mountEditor?:typeof createProductWorkspace } = {}) {
     const r = firstWorkspaceRecipient(setup.jpeg, setup.photo,setup.mediaDecoders), run = initial ? (initial.source.proof.identity.projectId as string).slice(4) : newId(), captionId = `cap_${newId()}`;
     const generationFactories = new Map<string, MetadataStorageFactory>(), databases: RestoreDatabasePorts = {
       listGenerations: async () => [...generationFactories.keys()], open: async (id, create) => {
@@ -4778,8 +4794,9 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
         if (!factory) throw Error('missing generation'); return { factory, dispose: async () => {} };
       },
     };
+    const fixtureDecode=setup.rasterResources?Object.assign((bytes:Uint8Array)=>decode(bytes),{rasterResources:setup.rasterResources}):decode;
     const options = { run, base: r.fs, coordinator: ProjectMutationCoordinator.browser(r.locks), store: r.store,
-      fileLimits: budget, decode, jpeg: setup.jpeg, photo: setup.photo, mediaDecoders:setup.mediaDecoders, editorSettings:setup.editorSettings, generations: setup.restoreGenerations ? () => databases : undefined, packageLocks: r.locks, openStorage: async () => ({ factory: r.factory, dispose: async () => {} }) };
+      fileLimits: budget, decode:fixtureDecode, jpeg: setup.jpeg, photo: setup.photo, mediaDecoders:setup.mediaDecoders, editorSettings:setup.editorSettings, generations: setup.restoreGenerations ? () => databases : undefined, packageLocks: r.locks, openStorage: async () => ({ factory: r.factory, dispose: async () => {} }) };
     // Use an admitted conversion or one fresh GLB, without unrelated receive/replacement histories.
     const prepared = initial ? undefined : structuredClone(await prepareValidationProject({ run, title: '統合画面の検証', models: [{ label: 'モデル', bytes: glb() }],
       media: includeInitial ? [{ label: '受信画像', bytes: png }] : [] }, budget, decode));
@@ -4814,7 +4831,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const legacy = vi.spyOn(host.authority, 'write').mockImplementation(() => { throw Error('product UI must dispatch typed commands'); });
     const dispatch = vi.spyOn(host, 'dispatch'), document = new RecordedDocument().asDocument(), create = document.createElement.bind(document), downloads = vi.fn();
     Object.assign(document, { createElement: (tag: string) => {
-      const node = create(tag); if (tag === 'a') Object.assign(node, { click: downloads }); return node;
+      const node = create(tag); if (tag === 'a') Object.assign(node, { click: downloads }); if(tag==='img'&&setup.nativeImageDecode)Object.assign(node,{decode:setup.nativeImageDecode,naturalWidth:1,naturalHeight:1});return node;
     } });
     let cameraEpoch = 1, display: Parameters<ReturnType<ViewportFactory>['update']>[0] | undefined, issue: string | null = null;
     let projected: typeof display, holdFrame = false, viewportDragging = false, notifyViewport = () => {}, pinPoint = { x: 30, y: 40 };
@@ -4842,9 +4859,10 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
           issue, notice: '検証用の表示通知', dragging: viewportDragging, projection: payload.camera.projection.kind, axis: null };} };
     };
     let opened = false, liveHost = host; const imageReads = [vi.spyOn(host.content, 'image')];
-    const ui = owned(createValidationWorkspace(document, { productEditor: true, progressivePresentation:setup.visualFrames, fileLimits: budget, decode, jpeg: setup.jpeg, photo: setup.photo, storageEstimate: setup.storageEstimate, list: async () => [], selected() {},
-      open: async (_run, _initial, mode) => { if (!opened) { opened = true; return host; } liveHost = await openValidationHost({ ...options, mode }); imageReads.push(vi.spyOn(liveHost.content, 'image')); return liveHost; },
-      render: async () => ({ factory, dispose() {} }) }, f.run));
+    const workspacePorts = { productEditor: true, progressivePresentation:setup.visualFrames, fileLimits: budget, decode:fixtureDecode, jpeg: setup.jpeg, photo: setup.photo, storageEstimate: setup.storageEstimate, list: async () => [], selected() {},
+      open: (async (_run, _initial, mode) => { if (!opened) { opened = true; return host; } liveHost = await openValidationHost({ ...options, mode }); imageReads.push(vi.spyOn(liveHost.content, 'image')); return liveHost; }) as ValidationWorkspacePorts['open'],
+      render: async () => ({ factory, dispose() {} }) };
+    const ui = owned(setup.mountEditor ? createApplicationWorkspace(document,{...workspacePorts,mountEditor:(...args)=>setup.mountEditor!(document,...args)},f.run) : createValidationWorkspace(document,workspacePorts,f.run));
     const root = record(ui.root), all = (n: RecordedNode): RecordedNode[] => [n, ...n.children.flatMap(all)];
     const named = (label: string, parent = root) => all(parent).find(n => n.attributes.get('aria-label') === label)!;
     const button = (text: string, parent = root) => {
@@ -4865,13 +4883,16 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       if (key === 'busy' && value !== previous) for (const observer of observers) observer('product', value === 'true');
       return result;
     } });
-    const receiveButton = button('更新を受け取る'); let receiveDisabled = receiveButton.disabled;
-    Object.defineProperty(receiveButton, 'disabled', { configurable: true, get: () => receiveDisabled, set(value: boolean) {
-      const previous = receiveDisabled; receiveDisabled = value;
-      if (value !== previous) for (const observer of observers) observer('receive', value);
+    const receiveButton = button('更新を受け取る'), receiveStatus = receiveButton.parent!.parent!.children.find(n=>n.attributes.get('role')==='status'&&n.dataset.busy!==undefined)!;
+    expect(receiveStatus).toBeDefined();
+    receiveStatus.dataset = new Proxy(receiveStatus.dataset, { set(target,key,value) {
+      const previous=target[String(key)],result=Reflect.set(target,key,value);
+      if(key==='busy'&&value!==previous)for(const observer of observers)observer('receive',value==='true');
+      return result;
     } });
     const completed = async (action: () => void) => {
       expect(all(root).includes(status)).toBe(true); // Reject an owner from an old mount.
+      expect(status.dataset.busy).toBe('false');expect(receiveStatus.dataset.busy).toBe('false');
       const active = new Set<'product' | 'receive'>(); let started = false;
       let observe!: (owner: 'product' | 'receive', busy: boolean) => void;
       try {
@@ -4884,6 +4905,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
         });
       } finally { observers.delete(observe); }
       expect(status.dataset.busy).toBe('false');
+      expect(receiveStatus.dataset.busy).toBe('false');
     };
     const failed = async (action: () => void) => { await completed(action); expect(liveHost.authority.status!().kind).toBe('failed'); };
     const edited = async (action: () => void) => {
@@ -4910,6 +4932,60 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       proposePin: (...args: Parameters<NonNullable<Parameters<ViewportFactory>[2]>>) => proposePin?.(...args),
       proposeModel: (...args: Parameters<NonNullable<Parameters<ViewportFactory>[3]>>) => proposeModel?.(...args) };
   }
+  it.each(['Project','Scene','Restore'] as const)('joins closed-photo native retirement through %s navigation and owner disposal',async kind=>{
+    const raster=createRasterResources({cpuBytes:1_000_000,gpuBytes:0}),nextScene=`scn_${newId()}`;
+    let release!:()=>void,entered!:()=>void,nativePending=false,starts=0,shell!:ReturnType<typeof createProductWorkspace>;
+    const held=new Promise<void>(resolve=>{release=resolve;}),started=new Promise<void>(resolve=>{entered=resolve;});caseDisposals.push(release);
+    const h=await productWorkspaceFixture(true,false,false,'map2',undefined,{
+      visualFrames:true,restoreGenerations:kind==='Restore',rasterResources:raster,scenes:[{id:nextScene,name:'次のシーン',orderKey:'Z'}],
+      nativeImageDecode:async()=>{nativePending=true;entered();await held;nativePending=false;},
+      mountEditor:(document,host,factory,...rest)=>shell=createProductWorkspace(document,host,(...args)=>{expect(nativePending).toBe(false);starts++;return factory(...args);},...rest),
+    });
+    try{
+      await vi.waitFor(()=>expect(h.display()).toBeDefined());
+      const oldScene=h.display()!.sceneId;
+      const backup=kind==='Restore'?await h.host.workspaceOutput.download(await h.host.workspaceOutput.generateBackup(h.host.read().source!.token)):undefined,backupToken=h.host.read().source!.token;
+      if(kind==='Restore'){await h.host.dispatch(backupToken,{kind:'editCaption',captionId:h.f.f.captionId,edits:{body:'復元前の変更'}});shell.render();}
+      if(kind==='Scene'){await h.host.dispatch(h.host.read().source!.token,{kind:'setDefaultScene',sceneId:nextScene});shell.render();expect(h.display()!.sceneId).toBe(oldScene);}
+      h.named('キャプション一覧',h.editor).children[0]!.children[0]!.fire('click');h.button('画像を表示',h.editor).fire('click');await started;
+      h.all(h.named('メディアビューア')).find(n=>n.attributes.get('aria-label')==='閉じる')!.fire('click');
+      const before=starts,hostClose=vi.spyOn(h.host,'dispose');
+      if(kind==='Project')h.button('ファイルを開く').fire('click');
+      else if(kind==='Scene'){
+        const source=h.host.read().source!,provider=h.host.read().provider!;if(provider.kind!=='scene-provider')throw Error('provider');
+        const rows=organizationSceneSource(provider,oldScene,metadata);
+        await h.host.dispatch(source.token,{kind:'deleteSceneContents',sceneId:oldScene,observedIds:[...rows.assets,...rows.captions,...rows.views,...rows.materials].map(r=>r.id as string),eventId:`evt_${newId()}`});shell.render();
+        h.button('次のシーン',h.editor).fire('click');
+      }else{
+        const area=h.all(h.root).find(n=>n.tag==='details'&&n.children.some(c=>c.tag==='summary'&&c.textContent==='バックアップから復元'))!,input=h.all(area).find(n=>n.attributes.get('aria-label')==='バックアップを選択')!;
+        Object.assign(input,{files:[backup]});input.fire('change');h.button('内容を確認',area).fire('click');
+        await vi.waitFor(()=>expect(h.button('このバックアップから復元',area)?.disabled).toBe(false),{timeout:10000});h.button('このバックアップから復元',area).fire('click');Object.assign(input,{files:[]});
+      }
+      if(kind!=='Scene')await vi.waitFor(()=>expect(h.editor.parent).toBeNull(),{timeout:10000});
+      else{expect(h.editor.parent).not.toBeNull();expect(h.display()!.sceneId).toBe(nextScene);}
+      expect(starts).toBe(before);expect(raster.snapshot().cpuBytes).toBeGreaterThan(0);if(kind!=='Restore')expect(hostClose).not.toHaveBeenCalled();
+      // Ordinary Scene navigation reuses its core; it must retain the pending job.
+      const first=shell.unmount();expect(shell.unmount()).toBe(first);const closing=kind==='Restore'?first:shell.dispose();if(kind!=='Restore')expect(shell.dispose()).toBe(closing);
+      let ended=false;void closing.then(()=>{ended=true;});await Promise.resolve();expect(ended).toBe(false);release();await closing;
+      if(kind==='Project'){await vi.waitFor(()=>expect(h.ui.selected).toBeNull());expect(h.dispatch).not.toHaveBeenCalled();}
+      if(kind==='Restore'){await vi.waitFor(()=>expect(starts).toBe(before+1),{timeout:10000});expect(h.host.read().source!.token).toBe(backupToken);expect(h.host.backupRestore.needsDisplay).toBe(false);}
+      else{expect(hostClose).toHaveBeenCalledOnce();expect(starts).toBe(before);}
+      expect(nativePending).toBe(false);
+    }finally{release();await h.ui.dispose();await raster.dispose();}
+  });
+  it('keeps an old native retirement failure latched across repeated file-open attempts',async()=>{
+    let starts=0;
+    const h=await productWorkspaceFixture(false,false,false,'map2',undefined,{visualFrames:true,mountEditor:(document,host,factory,...rest)=>createProductWorkspace(document,host,(...args)=>{starts++;return{...factory(...args),idle:async()=>{throw Error('native retirement refused');}};},...rest)});
+    await vi.waitFor(()=>expect(h.display()).toBeDefined());
+    h.button('ファイルを開く').fire('click');
+    await vi.waitFor(()=>expect(h.all(h.root).some(n=>n.textContent.includes('画面の終了処理を完了できませんでした'))).toBe(true));
+    const input=h.named('ファイルを選択'),read=vi.fn(async()=>glb().slice().buffer);expect(input.disabled).toBe(true);
+    for(let attempt=0;attempt<2;attempt++){
+      Object.assign(input,{files:[{name:'next.glb',size:glb().length,arrayBuffer:read}]});input.fire('change');input.parent!.parent!.fire('submit',{preventDefault(){}});
+      await Promise.resolve();expect(read).not.toHaveBeenCalled();expect(starts).toBe(1);expect(h.ui.selected).toBeNull();
+    }
+    await expect(h.ui.dispose()).rejects.toThrow('画面の終了処理を完了できませんでした');
+  });
   it('paints only current visual frames without borrowing authority or rebuilding focused pin nodes',async()=>{
     const h=await productWorkspaceFixture(true,false,false,'map1',undefined,{visualFrames:true});
     const before=h.host.authority.read(),marker=h.all(h.editor).find(n=>n.className==='lv-project-marker')!;expect(marker).toBeDefined();marker.focus();
@@ -7206,15 +7282,16 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       const edit=vi.fn(()=>new Promise<void>((resolve,reject)=>{resolveCopy=resolve;rejectCopy=reject;}));
       const start=vi.fn(()=>new Promise<void>((_resolve,reject)=>{rejectAppend=reject;}));
       const projects=vi.fn(async()=>[{run:'target',title:'追加先'}]),inspect=vi.fn(async()=>({reason:'',confirm:start}));
-      let localDisplay:Parameters<ReturnType<ViewportFactory>['update']>[0];
-      const controller=createReviewWorkspace(new RecordedDocument().asDocument(),prepared,()=>({update(next){localDisplay=next;},setActive(){},camera(){},retry(){},dispose(){},read:()=>({display:localDisplay,token:'handoff-review',ready:true,issue:null,dragging:false,pins:[],projection:'perspective',axis:null})}),edit,{projects,inspect});
+      let localDisplay:Parameters<ReturnType<ViewportFactory>['update']>[0],releaseIdle!:()=>void;
+      const idleHeld=new Promise<void>(resolve=>{releaseIdle=resolve;}),active=vi.fn(),idle=vi.fn(()=>idleHeld);caseDisposals.push(releaseIdle);
+      const controller=createReviewWorkspace(new RecordedDocument().asDocument(),prepared,()=>({update(next){localDisplay=next;},setActive:active,idle,camera(){},retry(){},dispose(){},read:()=>({display:localDisplay,token:'handoff-review',ready:true,issue:null,dragging:false,pins:[],projection:'perspective',axis:null})}),edit,{projects,inspect});
       const local=record(controller.root),find=(label:string)=>all(local).find(n=>n.tag==='button'&&n.textContent===label)!;
       const append=find('既存に追加'),copy=find('編集コピーを作る'),confirmCopy=find('コピーを作成'),confirmAppend=find('シーンを追加');
       const selector=all(local).find(n=>n.attributes.get('aria-label')==='追加先')!;
       try{
-        copy.click();confirmCopy.click();await vi.waitFor(()=>expect(edit).toHaveBeenCalledOnce());
+        copy.click();confirmCopy.click();expect(active).toHaveBeenLastCalledWith(false);await vi.waitFor(()=>expect(idle).toHaveBeenCalledOnce());expect(edit).not.toHaveBeenCalled();releaseIdle();await vi.waitFor(()=>expect(edit).toHaveBeenCalledOnce());
         expect(append.disabled).toBe(true);append.fire('click');confirmCopy.fire('click');expect(projects).not.toHaveBeenCalled();expect(inspect).not.toHaveBeenCalled();expect(start).not.toHaveBeenCalled();expect(edit).toHaveBeenCalledOnce();
-        rejectCopy(Error('held copy refusal'));await vi.waitFor(()=>expect(copy.disabled).toBe(false));expect(append.disabled).toBe(false);
+        rejectCopy(Error('held copy refusal'));await vi.waitFor(()=>expect(copy.disabled).toBe(false));expect(append.disabled).toBe(false);expect(active).toHaveBeenLastCalledWith(true);
         projects.mockImplementationOnce(()=>new Promise(resolve=>{resolveProjects=resolve;}));append.click();expect(selector.disabled).toBe(true);
         find('キャンセル').click();copy.click();confirmCopy.click();await vi.waitFor(()=>expect(edit).toHaveBeenCalledTimes(2));
         resolveProjects([{run:'stale',title:'古い追加先'}]);await Promise.resolve();await Promise.resolve();
@@ -7222,9 +7299,13 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
         resolveCopy();await vi.waitFor(()=>expect(append.disabled).toBe(false));
         append.click();await vi.waitFor(()=>expect(selector.disabled).toBe(false));expect(selector.document.activeElement===selector).toBe(true);
         selector.value='target';selector.fire('change');await vi.waitFor(()=>expect(confirmAppend.disabled).toBe(false));
-        confirmAppend.click();await vi.waitFor(()=>expect(start).toHaveBeenCalledOnce());expect(copy.disabled).toBe(true);copy.fire('click');confirmCopy.fire('click');append.fire('click');expect(edit).toHaveBeenCalledTimes(2);expect(projects).toHaveBeenCalledTimes(2);
+        let releaseAppend!:()=>void;const appendIdle=new Promise<void>(resolve=>{releaseAppend=resolve;});caseDisposals.push(releaseAppend);idle.mockImplementationOnce(()=>appendIdle);
+        confirmAppend.click();expect(active).toHaveBeenLastCalledWith(false);await vi.waitFor(()=>expect(idle).toHaveBeenCalledTimes(3));expect(start).not.toHaveBeenCalled();releaseAppend();await vi.waitFor(()=>expect(start).toHaveBeenCalledOnce());expect(copy.disabled).toBe(true);copy.fire('click');confirmCopy.fire('click');append.fire('click');expect(edit).toHaveBeenCalledTimes(2);expect(projects).toHaveBeenCalledTimes(2);
         rejectAppend(Error('held append refusal'));await vi.waitFor(()=>expect(copy.disabled).toBe(false));expect(append.disabled).toBe(false);expect(confirmAppend.disabled).toBe(true);expect(selector.value).toBe('');
-        confirmAppend.fire('click');expect(start).toHaveBeenCalledOnce();
+        confirmAppend.fire('click');expect(start).toHaveBeenCalledOnce();expect(active).toHaveBeenLastCalledWith(true);
+        idle.mockRejectedValueOnce(Error('owned cleanup refusal'));copy.click();confirmCopy.click();await vi.waitFor(()=>expect(copy.disabled).toBe(false));expect(edit).toHaveBeenCalledTimes(2);expect(all(local).some(n=>n.textContent==='owned cleanup refusal')).toBe(true);
+        let releaseDisposed!:()=>void;const disposedIdle=new Promise<void>(resolve=>{releaseDisposed=resolve;});caseDisposals.push(releaseDisposed);idle.mockImplementationOnce(()=>disposedIdle);
+        copy.click();confirmCopy.click();await vi.waitFor(()=>expect(idle).toHaveBeenCalledTimes(5));controller.dispose();const calls=active.mock.calls.length;releaseDisposed();await Promise.resolve();await Promise.resolve();expect(edit).toHaveBeenCalledTimes(2);expect(active).toHaveBeenCalledTimes(calls);
       }finally{resolveCopy?.();controller.dispose();}
     }
     // Inject an independently admitted optional-field omission at the pure View projection boundary.
@@ -8742,17 +8823,21 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       expect(button('保存').disabled).toBe(false);expect(remember).toHaveBeenCalled();expect(dispatch).not.toHaveBeenCalled();
     }finally{ready();await ui.dispose();await f.workspace.dispose();}
   },30000);
-  it('keeps verified Captions on display failure/retry and disposes a late preparation after closing without waiting for it',async()=>{
+  it.each([false,true])('keeps verified Captions and joins late preparation cleanup after closing (factory cleanup failure=%s)',async failed=>{
     const f=await receivedHostFixture(),document=new RecordedDocument().asDocument();let finish!:(value:Awaited<ReturnType<ValidationWorkspacePorts['render']>>)=>void;
     const factory:ViewportFactory=()=>({update(){},setActive(){},camera(){},retry(){},dispose(){},read:()=>({ready:true,token:'test',issue:null,dragging:false,pins:[],projection:'perspective',axis:null})});
     const render=vi.fn<ValidationWorkspacePorts['render']>().mockImplementationOnce(async host=>{const detach=host.setDisplayPreparation(async()=>{}),ready=Promise.reject(Error('model unavailable'));void ready.catch(()=>{});return{factory,ready,detachPreparation:detach,dispose:detach};})
-      .mockImplementationOnce(host=>{const detach=host.setDisplayPreparation(async()=>{});return new Promise(resolve=>{finish=value=>resolve({...value,dispose(){detach();value.dispose();}});});});
+      .mockImplementationOnce(host=>{const detach=host.setDisplayPreparation(async()=>{});return new Promise((resolve,reject)=>{finish=value=>{if(failed){detach();reject(new DisplayRetirementError([Error('late cleanup failed')]));}else resolve({...value,dispose(){detach();value.dispose();}});};});});
     const ui=createValidationWorkspace(document,{productEditor:true,progressivePresentation:true,fileLimits:budget,decode,selected(){},list:async()=>[],open:async()=>f.host,render},f.options.run);
     const root=record(ui.root),all=(n:RecordedNode):RecordedNode[]=>[n,...n.children.flatMap(all)];
     await ui.ready;expect(all(root).some(n=>n.textContent==='model unavailable')).toBe(true);
     const search=all(all(root).find(n=>n.className==='lv-caption-search')!).find(n=>n.attributes.get('aria-label')==='検索')!;expect(search.disabled).toBe(false);
     all(root).find(n=>n.tag==='button'&&n.textContent==='モデルを再読み込み')!.fire('click');await vi.waitFor(()=>expect(render).toHaveBeenCalledTimes(2));
-    await ui.dispose();const dispose=vi.fn(),lateFactory=vi.fn();finish({factory:lateFactory,dispose});await vi.waitFor(()=>expect(dispose).toHaveBeenCalledOnce());expect(lateFactory).not.toHaveBeenCalled();
+    let closed=false;const closing=ui.dispose().then(()=>{closed=true;});void closing.catch(()=>{});await Promise.resolve();expect(closed).toBe(false);
+    const dispose=vi.fn(),lateFactory=vi.fn();let complete!:()=>void;const idle=vi.fn(()=>new Promise<void>(resolve=>{complete=resolve;}));
+    finish({factory:lateFactory,dispose,idle});if(failed){await expect(closing).rejects.toThrow('表示の終了処理');expect(lateFactory).not.toHaveBeenCalled();return;}
+    await vi.waitFor(()=>expect(idle).toHaveBeenCalledOnce());expect(dispose).toHaveBeenCalledOnce();expect(closed).toBe(false);expect(lateFactory).not.toHaveBeenCalled();
+    complete();await closing;expect(closed).toBe(true);
   },30000);
   it('keeps backup recovery available after terminal presentation failure and clears the failed gate only after validated restore',async()=>{
     const f=await receivedHostFixture(),backup=await f.host.workspaceOutput.download(await f.host.workspaceOutput.generateBackup(f.host.read().source!.token));await f.host.dispose();
@@ -9526,8 +9611,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
         Object.fromEntries(Object.entries(fields).map(([key, value]) => [materialKey(id, key), canonicalFixture(value)])), { sceneId });
     };
     await material(0, 'project', { lighting: 'unlit' }); await material(0, 'scene', { doubleSided: true }); await material(1, 'project', { lighting: 'unlit' });
-    s.refreshHistory(); expect(s.acceptModel(planModelList(s.modelContext(), { kind: 'membership', assetId, included: false }))).toBe(false);
-    await vi.waitFor(() => expect(s.acknowledgment.state).toBe('idle'));
+    s.refreshHistory(); await acknowledge(s.acknowledgment,()=>{expect(s.acceptModel(planModelList(s.modelContext(), { kind: 'membership', assetId, included: false }))).toBe(false);});
     const seed = await host.workspaceOutput.download(await host.workspaceOutput.generate(host.read().source!.token));
     const sharedBase = host.workspaceOutput.bases[0]!.selection;
     const peers: Awaited<ReturnType<typeof openValidationHost>>[] = [];
@@ -9539,8 +9623,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     for (const target of [host, ...peers]) {
       const editor = new SyntheticSession(target.authority);
       editor.acceptNavigation(planNavigation(editor.snapshot.state, editor.session, editor.pending, { kind: 'scene', sceneId }));
-      editor.acceptModel(planModelList(editor.modelContext(), { kind: 'membership', assetId, included: true }));
-      await vi.waitFor(() => expect(editor.acknowledgment.state).toBe('idle'));
+      await acknowledge(editor.acknowledgment,()=>{editor.acceptModel(planModelList(editor.modelContext(), { kind: 'membership', assetId, included: true }));});
     }
     const incoming = await peers[0]!.workspaceOutput.download(await peers[0]!.workspaceOutput.generate(peers[0]!.read().source!.token));
     await host.workspaceFiles.receive(host.read().source!.token, await peers[1]!.workspaceOutput.download(await peers[1]!.workspaceOutput.generate(peers[1]!.read().source!.token)));
@@ -10331,6 +10414,20 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       const choices=cold.authority.read().mediaChoices!;expect(choices.length).toBeGreaterThan(0);
       await cold.content.image(choices[0] as unknown as JsonObject,true);expect(image).toHaveBeenCalledOnce();
     }finally{image.mockRestore();await cold?.dispose();}
+  });
+  it('refuses image admission after late prepare or demand disposal cannot prove cleanup',async()=>{
+    const bytes=glb(),source=await inspectValidationGlb(bytes,budget,decode),placement={translation:[0,0,0],rotationXYZW:[0,0,0,1],uniformScale:1};
+    const model={shape:'render-glb',key:'late',assetId:'asset',assetToProject:placement,representation:{id:'rep',contentKind:'mesh',role:'meshPrimary',blob:{byteLength:bytes.length},representationToAsset:{...placement,reflection:'none'},logicalBoundsAsset:source.bounds}} as unknown as ReadonlyRenderModel;
+    for(const mode of ['prepare','demand'] as const){
+      let held=mode==='prepare',begin!:()=>void,finish!:()=>void;const started=new Promise<void>(done=>{begin=done;}),pending=new Promise<void>(done=>{finish=done;});
+      const resources=createRasterResources({cpuBytes:1000000,gpuBytes:0}),dispose=vi.fn(()=>{throw Error('late native cleanup failed');}),photoSource=vi.fn();
+      const decoder=async()=>{if(held){begin();await pending;return{root:new THREE.Group(),materialLocators:new Map(),dispose};}return{root:new THREE.Group(),materialLocators:new Map(),dispose(){}};};
+      const cache=await prepareReadonlyResidents(mode==='prepare'?[model]:[],{modelContent:async()=>source},decoder,true,resources);
+      if(mode==='demand'){await cache.prepare([model]);held=true;cache.demand!([model]);}
+      await started;cache.demand!([]);const photo=cache.idle!().then(photoSource),refused=expect(photo).rejects.toThrow('late native cleanup failed');
+      await Promise.resolve();expect(photoSource).not.toHaveBeenCalled();finish();await refused;expect(dispose).toHaveBeenCalledOnce();expect(photoSource).not.toHaveBeenCalled();
+      cache.dispose();await resources.dispose();
+    }
   });
   it('finishes canonical raster checks before visible ownership can fill the pool, retries locally and avoids Caption-only reloads',async()=>{
     const bytes=glb(),source={...await inspectValidationGlb(bytes,budget,decode),raster:{cpuBytes:6000,gpuBytes:0,images:[{width:30,height:50}],maximumEdge:50}};

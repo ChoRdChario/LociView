@@ -73,11 +73,12 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
   filePanel.insertBefore(fileNavigation,fileCloseNote);
   let initialFiles = true;
   let disposed = false, switching = false, core: ReturnType<typeof createProjectWorkspace> | undefined;
+  let retirement: Promise<void> | undefined, disposal: Promise<void> | undefined, retiringCore = false;
   let previewOpen=false,mainRuntime:ProjectViewport|undefined;
   let viewportScene = '', refreshPreview: (() => void) | undefined, modeFeedback = '';
   let startup: ReturnType<typeof createMetadataStartupControls> | undefined;
   const read = () => { const p = host.read().provider; if (p?.kind !== 'scene-provider') throw Error('プロジェクトの内容を確認してください。'); return p; };
-  const external = () => switching || !!tools?.hasChanges();
+  const external = () => switching || retiringCore || !!tools?.hasChanges();
   const readingOutput = () => {
     if (disposed || !core || switching || startup?.hasChanges() || navigation?.presentation?.()) return null;
     const output = tools?.readingOutput();
@@ -115,11 +116,11 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
     tools?.render(); mode.textContent = switching ? '切替中…' : host.mode!.current === 'view' ? '編集する' : '閲覧する';
     mode.className=[host.mode!.current==='view'?'lv-workspace-primary':'', switching?'lv-mode-switching':''].filter(Boolean).join(' ');
     mode.setAttribute('aria-busy', String(switching));
-    mode.disabled = switching || !!navigation?.presentation?.() || !!core?.inputPending() || !!startup?.hasChanges() || !!tools?.hasChanges();
+    mode.disabled = switching || retiringCore || !!navigation?.presentation?.() || !!core?.inputPending() || !!startup?.hasChanges() || !!tools?.hasChanges();
     if (core) { core.root.inert = switching || !!startup?.busy(); core.setExternalBusy(!!tools?.busy()); }
     startup?.render();
     retryStartup.hidden = !startup?.recoveryPending(); retryStartup.disabled = switching || !!navigation?.presentation?.() || !!host.authority.readOnly || !!tools?.hasChanges() || !!startup?.busy();
-    if (!core) status.textContent = modeFeedback || (host.hasPending() ? '更新が未完了です。元の変更から再試行してください。' : '開始シーンを確認してください。シーンと記録は保持しています。');
+    if (!core) status.textContent = modeFeedback || (retiringCore ? '表示を閉じています。' : host.hasPending() ? '更新が未完了です。元の変更から再試行してください。' : '開始シーンを確認してください。シーンと記録は保持しています。');
     positionFiles();
   };
   const retryStartup = document.createElement('button'); retryStartup.type = 'button'; retryStartup.textContent = '更新を再試行';
@@ -127,8 +128,18 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
   retryStartup.setAttribute('data-lv-edit-only', '');
   retryStartup.addEventListener('click', () => { if (!retryStartup.disabled && !disposed) startup?.retry(); });
   root.append(mode, status, retryStartup, fileNotice); if (tools) root.append(fileMenu??tools.root);
+  const retireCore = () => {
+    const previous = core; core = undefined;
+    if (!previous) return retirement ?? Promise.resolve();
+    retiringCore = true;
+    try { retirement = previous.unmount(); } catch (error) { retirement = Promise.reject(error); }
+    void retirement.then(() => { retiringCore = false; if (!disposed) { try { render(); } catch(error) { modeFeedback=(error as Error).message;status.textContent=modeFeedback;changed(); } } }, error => {
+      if (!disposed) { modeFeedback = (error as Error).message; status.textContent = modeFeedback; changed(); }
+    });
+    return retirement;
+  };
   const mountCore = () => {
-    if (disposed || core || startup?.busy() || startup?.recoveryPending() || host.hasPending() || !chooseStartupScene(read().state).sceneId) return;
+    if (disposed || retiringCore || core || startup?.busy() || startup?.recoveryPending() || host.hasPending() || !chooseStartupScene(read().state).sceneId) return;
     core = createProjectWorkspace(document, {
     ...productSources(host,navigation?.smoothDisplay),
     openProject: navigation?.openProject, projectNavigationBlocked: navigation?.projectNavigationBlocked, resumedLastProject: navigation?.resumedLastProject, storageEstimate: navigation?.storageEstimate,
@@ -303,6 +314,7 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
           const hit = runtime.pickCreation?.(targets, x, y), after = observation();
           return hit && before.pickToken === after.pickToken && before.token === after.token && read().token === before.token ? hit : null;
         },
+        idle: () => runtime.idle?.() ?? Promise.resolve(),
         camera(action) { runtime.camera(action === 'fit' ? { kind: 'fit' } : { kind: 'axis', axis: ({ front: '+z', back: '-z', left: '-x', right: '+x', top: '+y', bottom: '-y' } as const)[action] }); },
         retry() { if (!closed) runtime.retry(); },
         capture() { const payload = runtime.capture?.(); if (!payload) throw Error('現在の表示を記録できません。');
@@ -340,7 +352,7 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
         () => !!navigation?.presentation?.() || external() || !!core?.inputPending()); root.append(startup.root);
     } else if (startup && core && chooseStartupScene(read().state).sceneId && !startup.hasChanges()) {
       const active = read().state.scenes[core.activeScene()]?.lifecycle;
-      if (active?.kind !== 'value' || active.value.state !== 'active') { root.append(mode); if(fileMenu)root.append(fileMenu); core.unmount(); core = undefined; }
+      if (active?.kind !== 'value' || active.value.state !== 'active') { root.append(mode); if(fileMenu)root.append(fileMenu); void retireCore(); }
       else { startup.dispose(); startup.root.remove(); startup = undefined; }
     }
   };
@@ -356,13 +368,26 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
     catch (error) { if (!disposed) { modeFeedback = (error as Error).message; status.textContent = modeFeedback; } }
     finally { switching = false; core?.clearNotice(); render(); }
   })(); });
-  const unmount = () => { if (!disposed) { disposed = true; document.defaultView?.removeEventListener('resize',positionFiles); if(navigation?.utilitiesRoot)utilitiesParent?.append(navigation.utilitiesRoot);if(navigation?.fileActionsRoot)fileActionsParent?.append(navigation.fileActionsRoot); startup?.dispose(); core?.unmount(); root.remove(); } };
+  const unmount = () => { if (!disposed) { disposed = true; document.defaultView?.removeEventListener('resize',positionFiles); if(navigation?.utilitiesRoot)utilitiesParent?.append(navigation.utilitiesRoot);if(navigation?.fileActionsRoot)fileActionsParent?.append(navigation.fileActionsRoot); startup?.dispose(); retirement = retireCore(); root.remove(); } return retirement ?? Promise.resolve(); };
   changed();
   const interaction = { get interactionPending() { return core?.session.interactionPending || !!startup?.hasChanges(); },
     get acknowledgment() { return startup?.busy() || startup?.recoveryPending() ? { state: startup.busy() ? 'checking' as const : 'failed' as const } : core?.session.acknowledgment ?? { state: 'idle' as const }; },
     refreshHistory: render };
   return { root, session: interaction, render, hasProjectHeader: () => !!core,
-    inputPending: (includePresentation=true) => switching || includePresentation && !!navigation?.presentation?.() || !!core?.inputPending() || !!startup?.hasChanges(),
-    hasChanges: (includePresentation=true) => switching || includePresentation && !!navigation?.presentation?.() || host.hasPending() || !!core?.hasChanges() || !!startup?.hasChanges() || !!tools?.hasChanges(), unmount,
-    async dispose() { unmount(); tools?.dispose(); await host.dispose(); } };
+    inputPending: (includePresentation=true) => switching || retiringCore || includePresentation && !!navigation?.presentation?.() || !!core?.inputPending() || !!startup?.hasChanges(),
+    hasChanges: (includePresentation=true) => switching || retiringCore || includePresentation && !!navigation?.presentation?.() || host.hasPending() || !!core?.hasChanges() || !!startup?.hasChanges() || !!tools?.hasChanges(), unmount,
+    dispose() {
+      if (disposal) return disposal;
+      let finish!: () => void, fail!: (error: unknown) => void;
+      disposal = new Promise<void>((resolve, reject) => { finish = resolve; fail = reject; });
+      void disposal.catch(() => {});
+      void (async () => {
+        const errors: unknown[] = [];
+        try { await unmount(); } catch (error) { errors.push(error); }
+        try { tools?.dispose(); } catch (error) { errors.push(error); }
+        try { await host.dispose(); } catch (error) { errors.push(error); }
+        if (errors.length) throw new AggregateError(errors, '画面の終了処理を完了できませんでした。再読み込みしてください。');
+      })().then(finish, fail);
+      return disposal;
+    } };
 }

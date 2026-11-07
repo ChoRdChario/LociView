@@ -1,7 +1,8 @@
+import {test, createBrowserProfile} from '../helpers/browserProfile';
 import { desktopOrigin, desktopEntry } from './desktopEntry';
 import { selectShareOutput,  revealCoordinateAdd, revealFileSurface } from './workspaceUi';
-import { test, expect, chromium, type Page, type BrowserContext, type TestInfo } from '@playwright/test';
-import { mkdir, mkdtemp, readFile } from 'node:fs/promises';
+import { expect, chromium, type Page, type BrowserContext, type TestInfo } from '@playwright/test';
+import { readFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import * as A from '@automerge/automerge';
 import { triangleGlb, smallPng } from './fixtures';
@@ -24,7 +25,7 @@ async function backupRecords(path: string) {
   if (c.kind !== 'project-candidate-inspection') throw Error('metadata'); return { archive, records: c.unambiguousRecords as Record<string, any> };
 }
 test('daily Scene and Caption organization, tags, alignment, settings and files survive a full cold restart', async ({}, info) => {
-  test.setTimeout(600_000); A.getHeads(A.init()); await mkdir('.artifacts/e2e/profiles', { recursive: true }); const profile = await mkdtemp('.artifacts/e2e/profiles/daily-');
+  test.setTimeout(600_000); A.getHeads(A.init()); const profile = await createBrowserProfile('daily');
   const contexts = new Set<BrowserContext>(), errors: string[] = [], remote: string[] = [];
   const launch = async (ownedProfile=profile) => {
     const context = await chromium.launchPersistentContext(ownedProfile, { channel: 'chromium', headless: true, viewport: { width: 1440, height: 1000 }, serviceWorkers: 'block', acceptDownloads: true }); contexts.add(context);
@@ -128,7 +129,7 @@ test('daily Scene and Caption organization, tags, alignment, settings and files 
     const after = await backupRecords(await output(cold.page, info, 'daily-cold', 'backup')); expect(after.records).toEqual(before.records); expect(after.archive.source.token).toBe(before.archive.source.token);
     await cold.page.getByRole('tab',{name:'キャプション',exact:true}).click();await cold.page.getByRole('list',{name:'キャプション一覧',exact:true}).locator('.lv-caption-select').filter({hasText:'複製の記録'}).click();await play(cold.page,'audio','owned-audio.mp3');
     await cold.page.setViewportSize({width:320,height:740});await play(cold.page,'video','owned-video.mp4');await cold.page.screenshot({path:info.outputPath('daily-media-320.png'),fullPage:true});
-    const recipient=await launch(await mkdtemp('.artifacts/e2e/profiles/daily-recipient-'));await recipient.page.getByLabel('ファイルを選択',{exact:true}).setInputFiles(workspace);await recipient.page.getByRole('button',{name:'ファイルを開く',exact:true}).click();await expect(recipient.page.getByRole('heading',{name:'プロジェクト名',exact:true})).toHaveText('日常の編集',{timeout:90000});await recipient.page.getByRole('list',{name:'キャプション一覧',exact:true}).locator('.lv-caption-select').filter({hasText:'複製の記録'}).click();await play(recipient.page,'video','owned-video.mp4');const received=await backupRecords(await output(recipient.page,info,'daily-recipient-backup','backup'));expect(received.records).toEqual(before.records);expect(received.archive.source.originalChanges()).toEqual(before.archive.source.originalChanges());
+    const recipient=await launch(await createBrowserProfile('daily-recipient'));await recipient.page.getByLabel('ファイルを選択',{exact:true}).setInputFiles(workspace);await recipient.page.getByRole('button',{name:'ファイルを開く',exact:true}).click();await expect(recipient.page.getByRole('heading',{name:'プロジェクト名',exact:true})).toHaveText('日常の編集',{timeout:90000});await recipient.page.getByRole('list',{name:'キャプション一覧',exact:true}).locator('.lv-caption-select').filter({hasText:'複製の記録'}).click();await play(recipient.page,'video','owned-video.mp4');const received=await backupRecords(await output(recipient.page,info,'daily-recipient-backup','backup'));expect(received.records).toEqual(before.records);expect(received.archive.source.originalChanges()).toEqual(before.archive.source.originalChanges());
     expect(errors).toEqual([]); expect(remote).toEqual([]);
   } finally { for (const context of contexts) await context.close(); }
 });

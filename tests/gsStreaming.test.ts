@@ -7,6 +7,19 @@ const limits={maxFileBytes:64*1024*1024,maxItems:100_000,maxValues:8_000_000,max
 const partition=(bytes:Uint8Array,step:number,size=bytes.length)=>({size,stream(){let at=0;return new ReadableStream<Uint8Array>({pull(c){if(at===bytes.length){c.close();return;}const end=Math.min(bytes.length,at+step);c.enqueue(bytes.slice(at,end));at=end;}},{highWaterMark:0});}});
 
 describe('01d identical GS inspection over bounded source partitions',()=>{
+  it.each([false,true])('cancels the initial native sniff before buffering or handing off a package (ZIP=%s)',async zip=>{
+    const bytes=new Uint8Array(100000);if(zip)bytes.set([0x50,0x4b,3,4]);
+    const file=new Blob([bytes]),controller=new AbortController(),original=Blob.prototype.arrayBuffer;
+    let release!:()=>void;const held=new Promise<void>(resolve=>{release=resolve;});
+    const reads:number[]=[];
+    const spy=vi.spyOn(Blob.prototype,'arrayBuffer').mockImplementation(async function(this:Blob){reads.push(this.size);await held;return original.call(this);});
+    try{
+      const pending=validationModelFile({label:'input',file},limits,true,undefined,controller.signal);
+      const rejected=expect(pending).rejects.toMatchObject({name:'AbortError'});
+      expect(reads).toEqual([65536]);controller.abort();release();await rejected;
+      expect(reads).toEqual([65536]);
+    }finally{release();spy.mockRestore();}
+  });
   it('08a owns the GS-only preparation transform, recomputes new bounds, and never buffers the source',async()=>{
     const row=[0,0,0,0,0,0,.2,0,0,...Array(72).fill(0),0,0,0,0,1,0,0,0],bytes=gsFixture(4,Array.from({length:256},()=>row)),file=new Blob([bytes.slice().buffer]);
     const context={representationToAsset:{translation:[2,3,4],rotationXYZW:[0,0,1,0],uniformScale:2,reflection:'x'}};

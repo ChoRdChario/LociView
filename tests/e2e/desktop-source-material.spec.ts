@@ -1,9 +1,10 @@
+import {test, createBrowserProfile} from '../helpers/browserProfile';
 import { writeCleanImportFixture } from './cleanImportFixture';
 import { desktopEntry, desktopOrigin } from './desktopEntry';
 import { selectShareOutput,  closeFileSurface, beginMaterialEditing } from './workspaceUi';
 import { revealFileSurface, lookAlongFront, revealCaptionList } from './workspaceUi';
-import {test,expect,chromium,type Page,type TestInfo,type BrowserContext} from '@playwright/test';
-import {mkdir,mkdtemp} from 'node:fs/promises';
+import {expect,chromium,type Page,type TestInfo,type BrowserContext} from '@playwright/test';
+
 import {openAsBlob} from 'node:fs';
 import * as A from '@automerge/automerge';
 import * as THREE from 'three';
@@ -39,8 +40,8 @@ async function backup(path:string){const archive=await BackupArchive.inspect(awa
 async function receive(p:Page,path:string){await revealFileSurface(p,'受信');const r=p.getByRole('region',{name:'更新ファイル',exact:true});await r.getByLabel('更新ファイルを選択',{exact:true}).setInputFiles(path);await r.getByRole('button',{name:'更新を受け取る',exact:true}).click();await expect(r.getByText('更新を受け取りました。',{exact:true})).toBeVisible({timeout:180000});await ready(p);}
 
 test('元の両面・照明なし・切り抜きを編集解除しGPU選択と5用途ファイル2往復と復旧coldを保つ',async({},info)=>{
-  test.setTimeout(1200000);A.getHeads(A.init());await mkdir('.artifacts/e2e/profiles',{recursive:true});
-  const profiles=await Promise.all(['a','b','review','clean','restore'].map(x=>mkdtemp('.artifacts/e2e/profiles/material-'+x+'-'))),contexts=new Set<BrowserContext>(),errors:string[]=[],stages:unknown[]=[];const started=Date.now();
+  test.setTimeout(1200000);A.getHeads(A.init());
+  const profiles=await Promise.all(['a','b','review','clean','restore'].map(x=>createBrowserProfile('material-'+x))),contexts=new Set<BrowserContext>(),errors:string[]=[],stages:unknown[]=[];const started=Date.now();
   const mark=(name:string)=>{stages.push({name,ms:Date.now()-started});console.log(name,Date.now()-started);};
   const launch=async(index:number)=>{const context=await chromium.launchPersistentContext(profiles[index]!,{channel:'chromium',headless:true,viewport:{width:1440,height:1000},deviceScaleFactor:1,serviceWorkers:'block',acceptDownloads:true});contexts.add(context);context.setDefaultTimeout(15_000);await context.route('**/*',r=>{const u=new URL(r.request().url());return u.origin===desktopOrigin||['data:','blob:'].includes(u.protocol)?r.continue():r.abort('blockedbyclient');});const p=context.pages()[0]??await context.newPage();p.on('pageerror',e=>errors.push(e.message));p.on('console',m=>{if(m.type()==='error')errors.push(m.text());});await p.goto(entry);return{context,p};};
   const close=async(c:BrowserContext)=>{await c.close();contexts.delete(c);};

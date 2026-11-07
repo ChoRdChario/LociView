@@ -1,11 +1,12 @@
+import {test, createBrowserProfile} from '../helpers/browserProfile';
 import { selectShareOutput,  closeFileSurface, revealFileSurface } from './workspaceUi';
 import { revealModelManagement, lookAlongFront, revealProjectSelection, revealCaptionList } from './workspaceUi';
 import * as THREE from 'three';
 import { serializeGlb } from '../../src/assets/glbOptimize';
 import { defaultPose, fittedPose } from '../../src/harness/projectScene/viewportModel';
-import { test, expect, chromium, type BrowserContext, type Page, type TestInfo } from '@playwright/test';
-import { mkdir, mkdtemp, readFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { expect, chromium, type BrowserContext, type Page, type TestInfo } from '@playwright/test';
+import { readFile } from 'node:fs/promises';
+
 import { createHash } from 'node:crypto';
 import * as A from '@automerge/automerge';
 import { BackupArchive } from '../../src/projectPackage/backupArchive';
@@ -63,8 +64,8 @@ async function sample(page: Page, dx = 0, dy = 0) {
 
 test('点群の元座標で記録し、画像・調整・受け渡し・閲覧・復元・cold再開までつながる', async ({}, info) => {
   test.setTimeout(900_000); A.getHeads(A.init());
-  const root = info.outputPath('profiles'); await mkdir(root, {recursive:true});
-  const profiles = await Promise.all(['A','B','restore'].map(n=>mkdtemp(join(root,n))));
+
+  const profiles = await Promise.all(['A','B','restore'].map(n=>createBrowserProfile('point-'+n)));
   const contexts = new Set<BrowserContext>(), errors: string[] = [];
   const launch = async (index: number, dpr = 1) => {
     const context = await chromium.launchPersistentContext(profiles[index]!, { channel:'chromium',headless:true,viewport:{width:1440,height:1000},deviceScaleFactor:dpr,acceptDownloads:true,serviceWorkers:'block' });
@@ -142,7 +143,7 @@ test('点群の元座標で記録し、画像・調整・受け渡し・閲覧�
 
 
 test('大座標GLBの実描画に隠れる点を拒否し、非表示にすると元の点を選べる', async ({},info) => {
-  const root=info.outputPath('gpu-profile'); await mkdir(root,{recursive:true}); const profile=await mkdtemp(join(root,'owned-'));
+   const profile=await createBrowserProfile('point-gpu');
   const context=await chromium.launchPersistentContext(profile,{channel:'chromium',headless:true,viewport:{width:1440,height:1000},acceptDownloads:true,serviceWorkers:'block'}), errors:string[]=[];
   context.setDefaultTimeout(15_000); if(tracing)await context.tracing.start({screenshots:true,snapshots:true,sources:true});
   await context.route('**/*',route=>{const url=new URL(route.request().url());return url.origin===new URL(entry).origin||['data:','blob:'].includes(url.protocol)?route.continue():route.abort('blockedbyclient');});

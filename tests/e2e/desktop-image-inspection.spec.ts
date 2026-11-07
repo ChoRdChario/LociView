@@ -7,6 +7,7 @@ import { triangleGlb } from './fixtures';
 import { revealCoordinateAdd, revealFileSurface } from './workspaceUi';
 import { BackupArchive } from '../../src/projectPackage/backupArchive';
 import { validationMetadataLimits } from '../../src/projectFiles/validation';
+import { jpegBytes } from '../helpers/jpegFixtures';
 
 async function backup(page: Page, info: TestInfo, name: string) {
   await revealFileSurface(page, '保存'); const area = page.getByRole('region', { name: 'ファイル', exact: true });
@@ -68,6 +69,46 @@ test('image details, Scene keyboard focus and dismissible header sheets retain P
     await page.screenshot({ path: info.outputPath('inspected-image.png'), fullPage: false }); await dialog.getByRole('button', { name: '閉じる', exact: true }).click(); await expect(show).toBeFocused();
     const after = await backup(page, info, 'after-inspection'); expect(after.source.originalChanges()).toEqual(before.source.originalChanges()); expect(after.source.proof.identity).toEqual(before.source.proof.identity);
     expect(after.archive.control.manifest.blobs).toEqual(before.archive.control.manifest.blobs); expect(after.archive.control.manifest.blobs.some(b => b.sha256 === createHash('sha256').update(png).digest('hex'))).toBe(true);
+    const portrait = Buffer.from(jpegBytes('rgb-exif-6')), choosePortrait = page.waitForEvent('filechooser');
+    await page.getByLabel('メディアを追加', { exact: true }).click();
+    await (await choosePortrait).setFiles({ name: '縦向きの写真.jpg', mimeType: 'image/jpeg', buffer: portrait }); await ready('メディアを追加しました。');
+    const gallery = page.getByRole('region', { name: 'メディアの整理', exact: true }).getByRole('region', { name: '添付メディア', exact: true });
+    await expect.poll(() => gallery.locator('img').nth(1).evaluate(n => [(n as HTMLImageElement).naturalWidth,(n as HTMLImageElement).naturalHeight])).toEqual([4,8]);
+    await gallery.getByRole('button', { name: '画像を表示', exact: true }).nth(1).click();
+    await expect.poll(() => dialog.locator('img').evaluate(n => [(n as HTMLImageElement).naturalWidth,(n as HTMLImageElement).naturalHeight])).toEqual([4,8]);
+    await dialog.getByRole('button', { name: '閉じる', exact: true }).click();
+    const phoneSource = await backup(page, info, 'with-portrait');
+    const phoneContext = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, serviceWorkers: 'block', acceptDownloads: true });
+    await phoneContext.route('**/*', route => { const u = new URL(route.request().url()); if (u.origin === new URL(server.url).origin || ['blob:','data:'].includes(u.protocol)) return route.continue(); remote.push(u.href); return route.abort(); });
+    const phone = await phoneContext.newPage(); phone.setDefaultTimeout(15_000); phone.on('pageerror', e => errors.push(e.message));
+    await phone.goto(server.url); await phone.getByLabel('ファイルを選択', { exact: true }).setInputFiles(info.outputPath('with-portrait.zip'));
+    await phone.getByRole('button', { name: 'ファイルを開く', exact: true }).tap(); await phone.getByRole('button', { name: 'バックアップから復元', exact: true }).tap();
+    await expect(phone.getByRole('button', { name: '3D', exact: true })).toBeEnabled({ timeout: 90_000 }); await phone.getByRole('button', { name: '3D', exact: true }).tap();
+    const phoneCanvas = phone.getByLabel('3Dモデルの表示', { exact: true }), pin = phone.locator('.lv-project-marker').first();
+    await expect(phoneCanvas).toHaveAttribute('aria-busy', 'false', { timeout: 90_000 }); await expect(pin).toBeVisible(); await pin.tap();
+    const windowShow = phone.locator('.lv-caption-window').getByRole('button', { name: '画像を表示', exact: true }).first();
+    await expect(windowShow).toBeVisible(); await windowShow.tap();
+    const phoneDialog = phone.getByRole('dialog', { name: 'メディアビューア', exact: true }), phoneImage = phoneDialog.locator('img');
+    await expect.poll(() => phoneImage.evaluate(n => (n as HTMLImageElement).naturalWidth)).toBe(2048);
+    await expect(phoneCanvas).toHaveAttribute('aria-busy', 'true');
+    await phoneDialog.getByRole('button', { name: '原寸', exact: true }).tap();
+    const photoArea = phoneDialog.getByRole('region', { name: '画像の表示領域', exact: true });
+    await photoArea.evaluate(n => { n.scrollLeft = 120; n.scrollTop = 50; });
+    // Explicit visibility-event simulation exercises native image cleanup; this is not OS/iOS background evidence.
+    await phone.evaluate(() => { Object.defineProperty(document,'hidden',{configurable:true,get:()=>true}); document.dispatchEvent(new Event('visibilitychange')); });
+    await expect(phoneDialog.locator('img')).toHaveCount(0); await expect(phoneDialog).toBeVisible();
+    await phone.evaluate(() => { Object.defineProperty(document,'hidden',{configurable:true,get:()=>false}); document.dispatchEvent(new Event('visibilitychange')); });
+    await expect.poll(() => phoneDialog.locator('img').evaluate(n => (n as HTMLImageElement).naturalWidth)).toBe(2048);
+    await expect(phoneDialog.getByLabel('画像の表示倍率', { exact: true })).toHaveText('100%');
+    expect(await photoArea.evaluate(n => ({x:n.scrollLeft,y:n.scrollTop}))).toEqual({x:120,y:50});
+    await phoneDialog.getByRole('button', { name: '次のメディア', exact: true }).tap();
+    await expect.poll(() => phoneDialog.locator('img').evaluate(n => [(n as HTMLImageElement).naturalWidth,(n as HTMLImageElement).naturalHeight])).toEqual([4,8]);
+    await phoneDialog.getByRole('button', { name: '前のメディア', exact: true }).tap(); await phoneDialog.getByRole('button', { name: '閉じる', exact: true }).tap();
+    await expect(windowShow).toBeFocused(); await expect(phoneCanvas).toHaveAttribute('aria-busy', 'false', { timeout: 90_000 }); await expect(pin).toBeVisible();
+    await phone.screenshot({ path: info.outputPath('phone-photo-returned.png') });
+    const phoneAfter = await backup(phone, info, 'phone-after-inspection');
+    expect(phoneAfter.source.originalChanges()).toEqual(phoneSource.source.originalChanges()); expect(phoneAfter.archive.control.manifest.blobs).toEqual(phoneSource.archive.control.manifest.blobs);
+    await phoneContext.close();
     expect(errors).toEqual([]); expect(remote).toEqual([]);
   } finally { await context.close(); await browser.close(); await server.stop(); }
 });

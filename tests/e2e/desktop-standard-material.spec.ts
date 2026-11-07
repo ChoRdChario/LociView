@@ -1,8 +1,9 @@
+import {test, createBrowserProfile} from '../helpers/browserProfile';
 import { desktopEntry, desktopOrigin } from './desktopEntry';
 import {beginMaterialEditing} from './workspaceUi';
 import { revealModelManagement, lookAlongFront } from './workspaceUi';
-import {test,expect,chromium} from '@playwright/test';
-import {mkdir,mkdtemp} from 'node:fs/promises';
+import {expect,chromium} from '@playwright/test';
+
 import * as THREE from 'three';
 import {defaultPose,fittedPose} from '../../src/projectScene/viewportModel';
 import {sourceMaterialPanelsGlb,nativeMeshBackup} from './fixtures';
@@ -17,7 +18,7 @@ test('01g 変換前に近似表示と環境別の非表示が分かる',async({p
 });
 
 test('01g BLENDと色の透過は実画素と保守的な位置選択が一致する',async({},info)=>{
-  test.setTimeout(360000);await mkdir('.artifacts/e2e/profiles',{recursive:true});const profile=await mkdtemp('.artifacts/e2e/profiles/std-gpu-');
+  test.setTimeout(360000);const profile=await createBrowserProfile('std-gpu');
   const context=await chromium.launchPersistentContext(profile,{channel:'chromium',headless:true,viewport:{width:1440,height:1000},deviceScaleFactor:1,serviceWorkers:'block'}),errors:string[]=[];
   context.setDefaultTimeout(15_000);await context.route('**/*',r=>{const u=new URL(r.request().url());return u.origin===desktopOrigin||['blob:','data:'].includes(u.protocol)?r.continue():r.abort('blockedbyclient');});
   const p=context.pages()[0]??await context.newPage();p.on('pageerror',e=>errors.push(e.message));p.on('console',m=>{if(m.type()==='error')errors.push(m.text());});

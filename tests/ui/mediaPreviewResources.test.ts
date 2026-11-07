@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createMediaPreviewResources } from '../../src/ui/projectScene/mediaPreviewResources';
+import { createMediaPreviewResources, createMediaResidencyGate } from '../../src/ui/projectScene/mediaPreviewResources';
 import { createRasterResources } from '../../src/viewer/rasterResources';
 import { createMediaViewer, createMediaThumbnails, type MediaPreviewGroup } from '../../src/ui/projectScene/mediaPreview';
 import { RecordedDocument, record, type RecordedNode } from './domRecorder';
@@ -15,6 +15,90 @@ const documentStub = (decoding: () => Promise<void> = async () => {}) => {
 const derive = async () => new Blob(['derived'], { type:'image/png' });
 
 describe('UI-only shared image ownership', () => {
+  it('joins the same viewer retirement until a closed original finishes native decoding',async()=>{
+    const doc=new RecordedDocument(),dom=doc.asDocument(),create=dom.createElement.bind(dom),started=gate(),native=gate(),raster=createRasterResources({cpuBytes:100000,gpuBytes:0});
+    vi.spyOn(dom,'createElement').mockImplementation(((tag:string)=>{const node=create(tag);if(tag==='img')Object.assign(node,{decode:async()=>{started.resolve();await native.promise;},naturalWidth:8,naturalHeight:4});return node;}) as Document['createElement']);
+    const viewer=createMediaViewer(dom,raster),group:MediaPreviewGroup={scope:'owner',label:'写真',items:[{id:'a',resourceId:'one',label:'原本',description:'',image:{key:'original',load:async()=>image()}}]};
+    try{
+      viewer.open(()=>group,'a',doc.createElement('button') as unknown as HTMLElement);await started.promise;
+      const all=(n:RecordedNode):RecordedNode[]=>[n,...n.children.flatMap(all)];all(record(viewer.root)).find(n=>n.attributes.get('aria-label')==='閉じる')!.fire('click');
+      const first=viewer.dispose(),second=viewer.dispose();expect(second).toBe(first);expect(raster.snapshot().cpuBytes).toBeGreaterThan(0);
+      const nextOwner=vi.fn();const handoff=first.then(nextOwner);await Promise.resolve();expect(nextOwner).not.toHaveBeenCalled();
+      native.resolve();await handoff;expect(nextOwner).toHaveBeenCalledOnce();expect(raster.snapshot().cpuBytes).toBe(0);
+    }finally{native.resolve();await viewer.dispose();await raster.dispose();}
+  });
+  it('replaces one displayed original once when retiring its residency synchronously repaints the viewer',async()=>{
+    const doc=new RecordedDocument(),dom=doc.asDocument(),create=dom.createElement.bind(dom),raster=createRasterResources({cpuBytes:100000,gpuBytes:0});
+    vi.spyOn(dom,'createElement').mockImplementation(((tag:string)=>{const node=create(tag);if(tag==='img')Object.assign(node,{decode:async()=>{},naturalWidth:8,naturalHeight:4});return node;}) as Document['createElement']);
+    const first=vi.fn(async()=>image()),second=vi.fn(async()=>image());let viewer:ReturnType<typeof createMediaViewer>|undefined;
+    const residency=async()=>({release(){viewer?.render();}});
+    viewer=createMediaViewer(dom,raster,undefined,residency);
+    let group:MediaPreviewGroup={scope:'same',label:'写真',items:[{id:'a',resourceId:'one',label:'写真',description:'',image:{key:'first',load:first}}]};
+    const all=(node:RecordedNode):RecordedNode[]=>[node,...node.children.flatMap(all)],root=record(viewer.root);
+    try{
+      viewer.open(()=>group,'a',doc.createElement('button') as unknown as HTMLElement);
+      await vi.waitFor(()=>expect(all(root).filter(n=>n.tag==='img')).toHaveLength(1));
+      group={...group,items:[{...group.items[0]!,image:{key:'second',load:second}}]};viewer.render();
+      await vi.waitFor(()=>expect(second).toHaveBeenCalledOnce());await vi.waitFor(()=>expect(all(root).filter(n=>n.tag==='img')).toHaveLength(1));
+      expect(first).toHaveBeenCalledOnce();expect(viewer.resources!.snapshot().originals).toBe(1);
+      all(root).find(n=>n.attributes.get('aria-label')==='閉じる')!.click();expect(viewer.resources!.snapshot().originals).toBe(0);
+      expect(raster.snapshot().cpuBytes).toBe(0);
+    }finally{viewer.dispose();await raster.dispose();}
+  });
+  it('keeps another coarse owner paused when an older acquisition is cancelled, without pausing fine-pointer viewing',async()=>{
+    const settled=gate(),changed=vi.fn(),idle=vi.fn(()=>settled.promise),doc={defaultView:{matchMedia:()=>({matches:true})}} as unknown as Document;
+    const residency=createMediaResidencyGate(doc,changed,idle,()=>true),cancel=new AbortController(),first=residency.acquire(cancel.signal),second=residency.acquire(new AbortController().signal);
+    const rejected=expect(first).rejects.toMatchObject({name:'AbortError'});await Promise.resolve();expect(residency.active).toBe(true);cancel.abort();settled.resolve();await rejected;
+    const current=await second;expect(residency.active).toBe(true);current.release();current.release();expect(residency.active).toBe(false);expect(changed).toHaveBeenCalledTimes(4);
+    const fine=createMediaResidencyGate({defaultView:{matchMedia:()=>({matches:false})}} as unknown as Document,changed,idle,()=>true);
+    const calls=changed.mock.calls.length;const lease=await fine.acquire(new AbortController().signal);lease.release();expect(changed).toHaveBeenCalledTimes(calls);expect(fine.active).toBe(false);
+  });
+  it('closes the acquired bitmap when canvas allocation fails',async()=>{
+    const close=vi.fn();vi.stubGlobal('createImageBitmap',vi.fn(async()=>({width:8,height:4,close})));
+    const raster=createRasterResources({cpuBytes:100000,gpuBytes:0}),manager=createMediaPreviewResources({createElement(){throw Error('canvas allocation');}} as unknown as Document,raster);
+    try{const thumb=manager.thumbnail('allocation',async()=>image());await expect(thumb.ready).rejects.toThrow('canvas allocation');expect(close).toHaveBeenCalledOnce();thumb.release();expect(raster.snapshot().cpuBytes).toBe(0);}
+    finally{await manager.dispose();await raster.dispose();vi.unstubAllGlobals();}
+  });
+  it('waits for native residency cleanup before source read and holds it through late original cancellation',async()=>{
+    const drained=gate(),requested=gate(),decoded=gate(),finish=gate(),release=vi.fn(),source=vi.fn(async()=>image());
+    const raster=createRasterResources({cpuBytes:100000,gpuBytes:0}),stub=documentStub(async()=>{decoded.resolve();await finish.promise;});
+    const manager=createMediaPreviewResources(stub.document,raster,{residency:async()=>{requested.resolve();await drained.promise;return{release};}});
+    const original=manager.original(source),rejected=expect(original.ready).rejects.toMatchObject({name:'AbortError'});
+    await requested.promise;expect(source).not.toHaveBeenCalled();drained.resolve();await decoded.promise;expect(source).toHaveBeenCalledOnce();
+    original.release();expect(release).not.toHaveBeenCalled();finish.resolve();await rejected;expect(stub.images[0]!.src).toBe('');expect(release).toHaveBeenCalledOnce();
+    await manager.dispose();await raster.dispose();
+  });
+  it('reuses a tiny cached thumbnail without reacquiring display residency and preserves its action during suspension',async()=>{
+    const raster=createRasterResources({cpuBytes:100000,gpuBytes:0}),doc=new RecordedDocument(),release=vi.fn(),residency=vi.fn(async()=>({release}));
+    const manager=createMediaPreviewResources(doc.asDocument(),raster,{edge:8,derive,residency});
+    const source=vi.fn(async()=>image()),first=manager.thumbnail('same',source);await first.ready;first.release();
+    const again=manager.thumbnail('same',source);await again.ready;expect(source).toHaveBeenCalledOnce();expect(residency).toHaveBeenCalledOnce();expect(release).toHaveBeenCalledOnce();
+    const viewer=createMediaViewer(doc.asDocument()),group:MediaPreviewGroup={scope:'owner',label:'写真',items:[{id:'item',resourceId:'resource',label:'写真',description:'',image:{key:'same',load:source}}]};
+    const cards=createMediaThumbnails(doc.asDocument(),()=>group,{...viewer,resources:manager});cards.render();await Promise.resolve();await Promise.resolve();
+    const all=(node:RecordedNode):RecordedNode[]=>[node,...node.children.flatMap(all)],action=all(record(cards.root)).find(n=>n.tag==='button'&&n.textContent==='画像を表示')!;
+    action.focus();manager.setThumbnailsActive(false);expect(doc.activeElement).toBe(action);expect(all(record(cards.root))).toContain(action);expect(all(record(cards.root)).filter(n=>n.tag==='img')).toHaveLength(0);
+    manager.setThumbnailsActive(true);await Promise.resolve();await Promise.resolve();expect(source).toHaveBeenCalledOnce();expect(residency).toHaveBeenCalledOnce();
+    cards.dispose();viewer.dispose();again.release();await manager.dispose();await raster.dispose();
+  });
+  it('requests a bounded bitmap and reads only PNG headers, then closes a cancelled bitmap without encoding it',async()=>{
+    const began=gate(),bitmapReady=gate<ImageBitmap>(),close=vi.fn(),draw=vi.fn(),encode=vi.fn();
+    const bitmap=vi.fn(async()=>{began.resolve();return bitmapReady.promise;});vi.stubGlobal('createImageBitmap',bitmap);
+    const document={createElement:()=>({width:0,height:0,getContext:()=>({drawImage:draw}),toBlob:encode})} as unknown as Document;
+    const original=image(8192,4096),fullRead=vi.spyOn(original,'arrayBuffer'),raster=createRasterResources({cpuBytes:300000000,gpuBytes:0}),manager=createMediaPreviewResources(document,raster);
+    try{
+      const thumb=manager.thumbnail('8k',async()=>original),rejected=expect(thumb.ready).rejects.toMatchObject({name:'AbortError'});await began.promise;
+      expect(fullRead).not.toHaveBeenCalled();expect(bitmap.mock.calls[0]).toEqual([original,{resizeWidth:320,resizeHeight:160,resizeQuality:'high',imageOrientation:'from-image'}]);
+      thumb.release();bitmapReady.resolve({width:320,height:160,close} as unknown as ImageBitmap);await rejected;
+      expect(close).toHaveBeenCalledOnce();expect(draw).not.toHaveBeenCalled();expect(encode).not.toHaveBeenCalled();expect(raster.snapshot().cpuBytes).toBe(0);
+    }finally{await manager.dispose();await raster.dispose();vi.unstubAllGlobals();}
+  });
+  it('drains a cancelled pre-source residency request on disposal without starting the source',async()=>{
+    const requested=gate(),drained=gate(),release=vi.fn(),source=vi.fn(async()=>image()),raster=createRasterResources({cpuBytes:100000,gpuBytes:0});
+    const manager=createMediaPreviewResources(documentStub().document,raster,{edge:8,derive,residency:async()=>{requested.resolve();await drained.promise;return{release};}});
+    const thumb=manager.thumbnail('closing',source),rejected=expect(thumb.ready).rejects.toMatchObject({name:'AbortError'});await requested.promise;
+    let ended=false;const retirement=manager.dispose();expect(manager.dispose()).toBe(retirement);const closing=retirement.then(()=>{ended=true;});await Promise.resolve();expect(ended).toBe(false);drained.resolve();await rejected;await closing;
+    expect(source).not.toHaveBeenCalled();expect(release).toHaveBeenCalledOnce();await raster.dispose();
+  });
   it('publishes the remaining real UI card after its shared first card closes while queued, and displays retry errors',async()=>{
     const document=new RecordedDocument(),dom=document.asDocument(),raster=createRasterResources({cpuBytes:100000,gpuBytes:0}),finish=gate(),started=gate();
     const manager=createMediaPreviewResources(dom,raster,{edge:8,derive}),viewer=createMediaViewer(dom),sharedViewer={...viewer,resources:manager};

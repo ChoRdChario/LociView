@@ -1,8 +1,9 @@
+import {test, createBrowserProfile} from '../helpers/browserProfile';
 import { writeCleanImportFixture } from './cleanImportFixture';
 import { desktopOrigin, desktopEntry } from './desktopEntry';
 import { selectShareOutput,  closeFileSurface, revealCoordinateAdd, revealFileSurface } from './workspaceUi';
-import { test, expect, chromium, type Page, type BrowserContext, type TestInfo } from '@playwright/test';
-import { mkdir, mkdtemp, readFile } from 'node:fs/promises';
+import { expect, chromium, type Page, type BrowserContext, type TestInfo } from '@playwright/test';
+import { readFile } from 'node:fs/promises';
 import * as A from '@automerge/automerge';
 import { triangleGlb } from './fixtures';
 import { gsFixture } from '../helpers/gsFixture';
@@ -85,8 +86,8 @@ async function journalRequirements(p: Page) {
 
 test('08b editor names remain exact through collaboration, purpose privacy, restore and cold resume', async ({}, info) => {
   test.setTimeout(900_000); A.getHeads(A.init());
-  await mkdir('.artifacts/e2e/profiles', { recursive: true });
-  const profiles = await Promise.all(['a', 'b', 'restore'].map(n => mkdtemp('.artifacts/e2e/profiles/editor-' + n + '-')));
+
+  const profiles = await Promise.all(['a', 'b', 'restore'].map(n => createBrowserProfile('editor-' + n)));
   const contexts = new Set<BrowserContext>(), errors: string[] = [];
   const launch = async (profile: string) => {
     const context = await chromium.launchPersistentContext(profile, { channel: 'chromium', headless: true, viewport: { width: 1440, height: 1000 }, serviceWorkers: 'block', acceptDownloads: true }); contexts.add(context);
@@ -163,8 +164,8 @@ test('08b editor names remain exact through collaboration, purpose privacy, rest
 });
 
 test('08b GS confirmation keeps its editor when another tab changes the local setting during validation', async ({}, info) => {
-  test.setTimeout(240_000); A.getHeads(A.init()); await mkdir('.artifacts/e2e/profiles', { recursive: true });
-  const profile = await mkdtemp('.artifacts/e2e/profiles/editor-gs-'), errors: string[] = [];
+  test.setTimeout(240_000); A.getHeads(A.init());
+  const profile = await createBrowserProfile('editor-gs'), errors: string[] = [];
   const context = await chromium.launchPersistentContext(profile, { channel: 'chromium', headless: true, viewport: { width: 1440, height: 1000 }, serviceWorkers: 'block', acceptDownloads: true });
   const p = context.pages()[0] ?? await context.newPage(); p.setDefaultTimeout(15_000);
   await context.route('**/*', route => { const u = new URL(route.request().url()); if (u.origin === desktopOrigin || ['blob:', 'data:'].includes(u.protocol)) return route.continue(); errors.push('unexpected network origin'); return route.abort(); });

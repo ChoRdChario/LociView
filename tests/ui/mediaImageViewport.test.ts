@@ -12,6 +12,13 @@ function fixture() {
 }
 
 describe('existing media dialog image inspection', () => {
+  it('restores only the explicitly captured view after native image resources are released', () => {
+    const f = fixture(); f.zoom.setImage(f.image(800,400)); f.button('原寸').click();
+    f.viewport.scrollLeft = 123; f.viewport.scrollTop = 57; const saved = f.zoom.capture();
+    f.zoom.setImage(null); f.zoom.setImage(f.image(800,400)); expect(f.percent()).toBe('50%');
+    f.zoom.restore(saved); expect(f.percent()).toBe('100%'); expect(f.viewport.scrollLeft).toBe(123); expect(f.viewport.scrollTop).toBe(57);
+    f.zoom.setImage(f.image(800,400)); expect(f.percent()).toBe('50%'); expect(f.viewport.scrollLeft).toBe(0); f.zoom.dispose();
+  });
   it('fits original pixels, zooms around the centre and preserves inspection through host renders', () => {
     const f = fixture(), image = f.image(800, 400); f.zoom.setImage(image);
     expect(f.percent()).toBe('50%'); expect(image.style.width).toBe('400px'); expect(f.button('縮小').disabled).toBe(true);

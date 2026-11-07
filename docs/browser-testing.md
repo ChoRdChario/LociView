@@ -194,7 +194,17 @@ entry for07j's existing Native/v1 compatibility smoke. Run it with
 are distinct from validation. The Native GS case explicitly prepares the existing
 Spark2.1 cache and allows its Service Worker; other cases block workers. Local
 normal-entry evidence is not physical-device/offline/PWA acceptance or new GS support.
-The GS and initial-conversion/team cases use short unique ASCII profiles under `.artifacts/e2e/profiles`.
+Current Desktop/offline persistent-profile cases allocate short, unique ASCII
+directories in the OS temporary area through the shared test-owned fixture. Each
+participant keeps its allocated path for cold/offline reopen; archives, screenshots
+and logs stay in the run output. Only that case's newly owned root may be removed
+after success, after checking its absolute/canonical parent and identity. Failed
+cases retain their profiles; a cleanup failure is recorded as retained evidence,
+never a reason to delete another root or change the test result's assertions.
+Browser security, encryption, routes, deadlines, retries and save verification stay
+unchanged. This setup is not a product storage migration or Safari acceptance.
+Older compatibility cases retain their existing short profiles under
+`.artifacts/e2e/profiles`; the following earlier observations remain evidence.
 The longer test-title-derived Windows profile produced an actual CacheStorage
 `Unexpected internal error` during Service Worker installation; the short profile
 passed preparation. This is test-environment evidence, not a product PWA fix.

@@ -193,6 +193,73 @@ Threeの暗黙resizeやresize helperを原寸成功の代用にしない。通�
 
 ## 7. 実thumbnailと原寸modal
 
+### 7.0 2026-11-06承認：Safari向け同時保持の縮小
+
+POは原本・原寸画質・offlineを保持し、thumbnail／必要時読取／同時展開量で
+スマホSafariの負荷を抑える実装と自動検証を承認した。新しい端末容量保証、
+原本縮小、永続的な派生画像保存、wire／schema／ID変更は含めない。
+
+- thumbnailは既存320px／16MiB／workspace内cacheを使う。対応する画像の向きと
+  縦横比を確定してresize付きnative bitmapを要求し、原寸bitmapの余分な作成を
+  減らす。ブラウザ内部の原寸decode回避や実RAM上限とは主張しない。未知の向きは
+  既存の正確な表示経路を維持し、失敗時に原寸をthumbnailへ自動代用しない。
+- mobileの資源退避は`pointer:coarse`相当を対象にし、未cache画像のsource読取前に
+  UI-only leaseを取得する。既存の非表示3D解放を呼び、同ownerの準備batch・demand・
+  GSの非abortable decode／late cleanupの終了を待つ。native/input permitの内側で
+  待たず、canonical検査・編集・保存・復旧の条件を変更しない。cache hitは退避しない。
+  PCの通常操作ではこの強制退避を行わず、既存の算術予約と直列化を維持する。
+  新規メディア追加のcanonical検査も同じUI leaseで囲み、画像追加時の検査と既存3Dが
+  重ならないようにする。typed追加command・原本保存・書込後照合は従来どおり実行する。
+- 原寸modal中は背後のthumbnail準備を止め、action DOM／openerは保持する。
+  原寸leaseは表示中と取消後のnative cleanup終了まで保持し、旧処理の終了が新しい
+  photo／Sceneを誤復帰させない。3D復帰時は同じ視点・ピン・入力を保つ。
+- document非表示では3D・画像を解放し、modalの選択・同じsourceの倍率／pan・
+  下書きはUI内に保持する。foregroundで同じsourceだけ再準備し、変更された
+  sourceへ古いzoomや結果を移さない。原本の検査・原寸GIF/WebP再生は維持する。
+- optionalな表示専用`idle()`は所属するモデル準備／GS解放だけを待つ。初期の
+  deferred factory準備も含める。終了待ちを解放成功と同一視せず、cleanup失敗は
+  local retryへ戻し、画像準備を強行しない。別ownerやglobal queue全体は待たない。
+  画面終了で待機表示を解除しても、元のfactory生成はrootが所有し続ける。
+  現表示を中断してから後着factoryの破棄と同ownerのidleまで待つ。IME待機は
+  この資源終了待ちへ含めない。disposeが失敗してもidleは独立して試みる。
+
+内部の接続は既存UI module `mediaPreviewResources.ts` の
+`createMediaResidencyGate(document, changed, idle, live)`を編集workspaceと
+`projectScene/reviewWorkspace.ts`で共有する。後者の追加importはこのUI-only helperへの
+1辺に限定し、保存／package／harnessのauthorityを追加しない。解放失敗時のlocal retryは、
+資源解放を証明できない場合の「画面を閉じて開き直す」案内も含む。
+
+受入れ：同一8K画像＋textureの実bitmap寸法／保持・3D復帰時間を前後比較する。
+Exif縦写真、共有cache、hidden／modal中の準備停止、close→即openとlate cleanup、
+初期／取消中のGS準備、focus・zoom・入力の復帰、原本hash・保存／cold offlineを検証する。
+ledgerは算術intentで、実RAM・GPU・background/jetsamの合格はiPhone実機へ残す。
+
+2026-11-07の接続検証で見つけた既存契約の実装補修：
+
+- ファイルの先頭読取とZIP識別も既存の読取取消に含める。各await後に取消・選択世代・
+  contextを確認し、破棄した結果を次の判定へ渡さない。非取消native処理が終了するまで
+  executeの所有を維持し、通常Projectを開く書込工程へ取消可能範囲を広げない。
+  ZIP安全検査・原本・変換ID・保存先未作成という07k§5の条件を維持する。
+- 閲覧ファイルから編集コピーを作成／既存Projectへ追加する間も、その閲覧画面が
+  所有する3Dを既存の`setActive(false)`で休止し、`idle()`のnative cleanup終了後に
+  handoffを開始する。確認・閲覧・失敗後の再試行は同じ画面で行い、失敗時は視点・
+  記録を保って再表示する。解放失敗時は新しいhandoffを開始しない。保存・照合・
+  公開・復旧の検査を省略／再配置せず、表示資源との同時実行だけを減らす。
+  完了して画面が破棄された場合は古いrendererを再作成しない。
+- owner交代時も、閉じた原寸画像／縮小画像のnative処理が終わるまで旧ownerの終了待ちを
+  引き継ぐ。UIのclose・abort・DOM除去は同期で行い、その最初の終了Promiseを保持する。
+  media viewer、Project UI、product／Reviewの既存dispose境界を通して`closeCurrent()`が
+  待つ。繰り返すdisposeも同じ終了待ちへ合流し、別ownerや全体queueは終了させない。
+  SceneのUIを作り直す場合も旧coreの終了前に新coreの3Dを作らず、解放失敗時は
+  既存の終了失敗案内を表示して新規割当てを止める。UI／表示ownerの終了失敗は
+  現在のselector内に保持し、参照消去後の再試行で忘れず、再読込まで割当てを再開しない。
+  独立した終了処理は失敗後も試みる。保存・原本・host終了検査は維持する。
+- 遅延viewportも、参照を外した具体runtimeの終了待ちを保持する。置換factoryと逐次的な
+  新canvasの割当ては旧runtimeのidle終了後に行い、終了失敗は同じcontroller内で保持する。
+  canvasごとにclosed／世代を持ち、古いdispose・待機中のattach・遅い失敗から新canvasを
+  操作しない。非同期の準備失敗は既存の表示エラー／再試行へ返す。新しい描画方式や
+  別owner・全体queueの終了待ち、永続cacheを追加するものではない。
+
 2026-11-06の所有範囲内の整理：非occurrence GLBは最初のawait前にbytesとmetadataを
 私有captureし、固定Three186 loaderへそのcaptureのArrayBufferを渡す。既に分離した
 captureを再度丸ごとsliceしない。180側の証明・解放、186側の形状／材質照合、入力改変防御、

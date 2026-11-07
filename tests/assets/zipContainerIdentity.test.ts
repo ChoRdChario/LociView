@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   inspectZipContainerIdentity,
   inspectZipContainerMetadata,
@@ -23,6 +23,19 @@ class RootArrayBufferForbiddenBlob extends Blob {
 }
 
 describe('ordinary-entry ZIP container identity', () => {
+  it('cancels during a bounded metadata read without routing a late result', async () => {
+    const source=blob(await archive(['native/package.json'])),controller=new AbortController();
+    let release!:()=>void;const held=new Promise<void>(resolve=>{release=resolve;}),original=Blob.prototype.arrayBuffer;
+    const read=vi.spyOn(Blob.prototype,'arrayBuffer').mockImplementation(async function(this:Blob){await held;return original.call(this);});
+    try{
+      const pending=inspectZipContainerMetadata(source,undefined,controller.signal);
+      const rejected=expect(pending).rejects.toMatchObject({name:'AbortError'});
+      await vi.waitFor(()=>expect(read).toHaveBeenCalled());controller.abort();release();await rejected;
+      const count=read.mock.calls.length;
+      await expect(inspectZipContainerMetadata(source,undefined,controller.signal)).rejects.toMatchObject({name:'AbortError'});
+      expect(read).toHaveBeenCalledTimes(count);
+    }finally{release();read.mockRestore();}
+  });
   it('reports spreadsheet candidates without changing identity or excluding hidden/lock names', async () => {
     for (const path of ['data.CsV', '.hidden.xlsx', 'folder/~$locked.XLSX'])
       await expect(inspectZipContainerMetadata(blob(await archive([path])))).resolves.toEqual({ identity: 'foreign', hasSpreadsheetEntry: true });

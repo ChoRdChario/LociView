@@ -1,6 +1,6 @@
 # LociView active work
 
-Updated2026-11-06. This is the single current plan and check record.
+Updated2026-11-07. This is the single current plan and check record.
 [Inventory](implementation-inventory.md) owns route-specific coverage;
 [map](../PROJECT_MAP.md) and [document index](../docs/README.md) route contracts/code.
 Git owns checkpoint identity. [Retained checkpoint evidence](../docs/history/development-through-2026-10-29/tasks/todo-before-daily-authoring.md)
@@ -57,7 +57,179 @@ unchanged-feature-classification checks pass; independent review has no findings
 No runtime change or new capacity guarantee; no runtime suite is needed for this
 documentation checkpoint.
 
-## Current boundary —bounded output integrity and boot recovery
+## Current boundary —Safari image and3D residency
+
+PO2026-11-06 authorizes thumbnails, on-demand reads and simultaneous-residency
+control while preserving original bytes, full-quality explicit originals, offline
+use and all save/recovery fences. Compare against8c7fc3c; one implementation
+writer with bounded read-only resource/lifecycle/contract reviewers. Retain the
+existing private audit drafts and source samples locally.
+
+Outcome: browse small images and open/close full-quality originals without
+unnecessarily retaining/decompressing photos and3D together, including hidden
+pages, rapid switching, cancellation and resource failure.
+
+1. Review the connected media/viewport lifetime and accepted01i contract before
+   editing. Measure representative actual decode dimensions/concurrency/retention,
+   thumbnail reuse, photo+3D transitions and offline cold reuse using owned profiles.
+2. Record precise resource ports and acceptance before implementation. Reuse the
+   existing queue/ledger, typed commands and binary I/O. Prefer UI-only derivatives
+   and source-bound lifetimes; no new source format/recipe or original alteration.
+   No new dependency, blanket file cap, Safari capacity guarantee or release.
+3. Implement the connected flow, preserve camera/pins/drafts/focus/quality, visible
+   preparation/retry and non-abortable native cleanup. Verify missing/corrupt/stale
+   derivatives never grant source authority or silently replace originals.
+4. Focused fault/lifecycle tests and actual PC/touch/installed-browser image/model
+   flows, offline/save/cold/body hashes. Then independently review the meaningful
+   final diff, run checkpoint/isolation serially, verify preview, suitableg0 push
+   and exact-head CI. Do not mask failures with retries/deadline relief.
+
+Physical iPhone Safari/PWA peak/residual memory, background/jetsam, codec, IME,
+save and offline acceptance stays separate. Installed Windows WebKitr2370 has
+the retained0B OPFS reproduction before media; never bypass saved-byte checks.
+Stop only a genuinely new storage/compatibility/product policy or contract conflict;
+continue other authorized improvements. Evidence is private under
+`.artifacts/e2e/safari-residency-20261106/`.
+
+Automated source/browser qualification completed2026-11-07. V9 freezes687 source/test inputs after the
+renderer-owner correction and independent review. Standard check:checkpoint
+PASS:148files/3362tests/21existing TODO; units1047.32s, complete checkpoint1157.371s.
+All five builds, offline isolation, HEIC isolation and Pages-base build PASS.
+Original Desktop48 PASS with zero retry/failure/skip,6861.818s (about114m).
+Offline8 PASS,738.428s; matched8K/installed-browser lanes PASS. All original
+browser cases pass with no retry/failure/skip. Delivery verification follows below.
+V8 is retained failed evidence, not qualification. V7 is supporting evidence only.
+
+Delivery PASS: immutable V9 offline candidate at `http://127.0.0.1:4191/`, all20
+served files match its recorded hashes. Two fresh owned profiles actually restore
+the small sample and the3150979B synthetic8K backup; editable record/model and
+8192px original/zoom/focus PASS,44.1s total. The latter is locally available at
+`.artifacts/fixtures/safari-residency/high-resolution-8k-backup.zip`. No remote
+request/error; this delivery check blocks SW and is not offline evidence. The
+separate offline8 above owns that evidence. Private originals,251 draft lines,
+source archives/profiles/netlogs and.artifacts stay out of public staging.
+Git owns the suitableg0 checkpoint identity; its exact-head CI result lives in
+GitHub Actions. No ordinary-entry/adoption/release or physical-device gate is
+inferred from this checkpoint.
+
+V9 matched8K six conditions PASS: same PNG input in the model and attachment,
+Chromium before/after fine pointer and touch, independent installed Chrome/Edge.
+Touch original display held model ImageBitmaps1→0; observed peak bitmap pixels
+134,217,728→67,108,864. These are instrumented bitmap observations, not total RAM
+or GPU bytes. Original-ready2711→2462ms;3D-return45→1789ms (one observation per
+condition, no speed guarantee). PC2266→2590ms/return88→44ms; Chrome2521/44ms,
+Edge2717/46ms. Actual original decode,100%/pan, source hashes and saved history
+pass. No background thumbnails remain during the original modal. Full Desktop48
+and offline8 also pass. This qualifies the tested Windows/browser conditions;
+physical iPhone/Safari and broader adoption remain pending.
+V6's185m/43PASS+5FAIL is retained; changed runtime/profile/source conditions mean
+this114m complete run is regression throughput evidence, not a product latency
+or isolated cause guarantee. Assertions/deadlines/workers/retries stay unchanged.
+The main media/retirement implementation, Review handoff and readonly preflight
+cancellation are independently reviewed. V7 standard check:checkpoint PASS:148
+files,3349 tests,21 existing TODO, unit912.11s; five builds/offline isolation plus
+HEIC isolation and Pages-base build PASS. Existing Node24.22.1 is explicit for this
+condition; no assertion/timeout/retry/config relaxation. The original Desktop
+runner freshly rebuilt both artifacts inside its unchanged120s preparation fence.
+Its first9 cases pass, including500k SH4 replacement/two original generations/
+cold restart and PC/touch photo detail/source hashes. V7 was subsequently
+interrupted as explained below and has no aggregate browser PASS of its own.
+
+V7 browser qualification is deliberately INTERRUPTED after9passes, while case10
+was in progress; no case10 assertion failure or aggregate PASS is inferred.
+Independent lifecycle follow-up found a concrete owner-handoff gap: after closing
+an original with native decode pending, synchronous UI disposal discarded the
+media retirement Promise and a new workspace could allocate GS first. Image and
+GS queues are separate. The correction joins exact old media/viewport retirement
+through UI/product/Review disposal and awaited closeCurrent, retaining synchronous
+abort/DOM removal, idempotent joins, safe failure and all storage fences. V7 and
+its evidence are retained. A held small native decode verifies Project/Scene
+handoff and repeated disposal, without another giant fault-combination roundtrip.
+The owner-handoff correction is now implemented and independently reviewed:
+shared retirement through viewer/core/product/Review, awaited restore/mount-failure
+replacement, abort-before-wait, persistent selector failure and independent host
+closure. DeferredViewport also retains retired concrete runtime idle promises,
+serializes replacements/new canvases, rejects stale attachment and sticky cleanup
+failure, and keeps an error/retry port after a failed pre-attached construction.
+Normal Scene navigation reuses its core and retains the pending photo job.
+Focused real application-port Project/Scene/Restore +failure/retry checks:7PASS;
+UI/GS/import regression:99PASS; subsequent bridge/viewport/media/import:83PASS.
+V8 standard checkpoint stopped in units:3359PASS/2FAIL/21existing TODO,
+148 files,1380.39s. Caption-parent/duplicate recovery exceeded its unchanged30s
+whole-case fence; GLB-copy UI acknowledgment exceeded incidental1s polling.
+The exact two pass alone in15.426s/19.122s; this does not erase the mixed-run failure.
+Fixture completion now observes actual receive status, not a button disabled
+for several unrelated reasons; the two GLB operations use existing acknowledgment
+notifications. No timeout, retry, worker or assertion relaxation.
+
+Follow-up review found that stopping a presentation race could discard the
+underlying factory Promise. Root now owns render-only jobs through late disposal
+and exact resident idle, forwards that capability across restore wrappers, and
+keeps construction cleanup failures distinct from retryable load failures. Abort
+current owners before joining; IME composition is not a resource teardown job.
+Focused first-restore/late factory/native idle/failure and the two retained failure
+flows PASS9 before V9's completed standard checks, original Desktop/offline and
+matched8K/Chrome/Edge lanes. Earlier PASS is supporting evidence only for the
+source it actually tested.
+
+V9's500k flow now completes all five purposes, return, Review editing, restoration
+and cold restart (23.2m for the whole automated scenario). Its actual Review-copy
+step takes169,738ms to edit and183,260ms to3D. This remains a latency weakness;
+whole-scenario duration is not a single user-action time. The interrupted V7
+observed197,717/214,046ms; differing runs are not a controlled improvement claim.
+Neither number is the small-input12,515ms diagnostic.
+
+Retained failed conditions: the original globalNode24.12 unit runs include CLI30s
+and worker/RPC failures; the Vitest scheduling experiment was reverted. A direct
+same-CLI probe hangs with that executable but exits as expected in2.48s using the
+already installed Node24.22.1. This does not isolate version from executable/cache
+conditions. Final standard unfiltered check uses that explicit runtime with only
+its children's PATH prefix changed; global settings, assertions and timeouts stay.
+
+The complete V6 Desktop run1794005165709-12468 was43PASS/5FAIL, zero retries/skips,
+3h5m. Native10 Review-copy exceeded240s; Native selection exposed a disabled cancel
+before its first64KiB/ZIP classification; two body-input actions and one create
+button timed out before their downstream assertions. These are retained failures,
+not82 separate feature defects or proof of failed downstream package semantics.
+Read-only input diagnostics passed at their original15s limits; complete affected
+workflows still require final candidate execution.
+
+Native10's92,846B input was measured using the same artifact/runtime and original
+240s limit: active Review copy exceeded240s, existing full3D retirement yielded
+an editor in12,515ms and restored3D. SHA work was59ms; native filesystem callbacks
+were the dominant wait. Bare-profile listing was already fast, so no OPFS prefix
+optimization/cache or validation-fence change was adopted. Review copy/Scene-add
+now retire their owned3D and await idle before handoff, restore on failure and
+refuse handoff after cleanup failure/disposal. Focused tests cover both held
+handoffs, mutual exclusion, failure and disposal. Initial readonly sniff/ZIP
+classification now shares the existing cancellation owner; execution remains
+owned until pending native work settles, with source/generation/draft checks and
+all durable-opening boundaries unchanged.
+
+The owned Temp browser fixture replaces only newly allocated synthetic profiles;
+paths persist through cold reopen, checked success removes its owner and failure
+preserves evidence. No user's browser/4182/profile/settings were touched. Original
+startup traces include107.7s before one app request; fresh synthetic profiles
+reached controls in327/531ms. This does not identify disk/encryption/AV causality.
+V6 large500k and photo PC/touch source-hash workflows passed, but those passes do
+not erase the five failed scenarios or substitute for the changed final source.
+
+Final required checks ran serially on V9. Retain prior failed logs/configs/profiles
+under the private evidence directory. Reuse immutable artifacts only with exact
+source/build-input/file-hash proof; do not count collection or a stale preview as
+execution. Preserve the user's251 private draft lines locally and exclude them,
+source ZIPs, netlogs and artifacts from public staging. Physical iPhone acceptance
+and release remain separate.
+
+Next engineering step: measure the remaining large Review-copy source capture,
+initialization and publication waits, and3D reconstruction after original viewing.
+Retain source-only/no-decoded-cache lifetimes and all write/readback/recovery
+fences; stop only a genuinely new contract or product decision. Group physical
+iPhone Safari/PWA checks for8K/multiple images/GS, background/foreground and OS
+memory termination, IME, real file save, and fully cold offline launch. Current
+bitmap observations are not actual Safari RAM/capacity acceptance.
+
+## Completed boundary —bounded output integrity and boot recovery
 
 PO2026-11-06 approves06b§6.2 and09§10, through implementation, independent review,
 automated safety/elapsed-time evidence and a suitable g0 checkpoint. Compare

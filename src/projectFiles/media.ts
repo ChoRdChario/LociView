@@ -1,6 +1,6 @@
 import { inspectProjectImage, projectImageMime, type PhotoDecoder } from './photo';
 import type { PngDecoder } from './png';
-import type { JpegDecoder } from './jpeg';
+import { jpegStructure, type JpegDecoder } from './jpeg';
 import { heicStructure, heicGuidance, isHeic } from './heic';
 export { isHeic };
 import { timedMediaStructure, type TimedMediaShape } from './mediaContainer';
@@ -32,8 +32,11 @@ export const browserTimedMediaDecoder:TimedMediaDecoder=async(bytes,shape)=>{
   });}finally{if(timer)clearTimeout(timer);node.pause();node.removeAttribute('src');node.load();URL.revokeObjectURL(url);}
 };
 export const browserHeicDecoder:HeicDecoder=async bytes=>{if(typeof createImageBitmap!=='function')return fileError(heicGuidance);return createImageBitmap(new Blob([bytes.slice().buffer],{type:'image/heic'}),{imageOrientation:'from-image',colorSpaceConversion:'default',premultiplyAlpha:'none'});};
-export const mediaDisplayDimensions=(bytes:Uint8Array,mime:string,limits:FileValidationLimits,resources?:RasterResources)=>
-  mime==='image/heic'||mime==='image/heif'?heicStructure(bytes,limits,resources):null;
+export const mediaDisplayDimensions=(bytes:Uint8Array,mime:string,limits:FileValidationLimits,resources?:RasterResources)=>{
+  if(mime==='image/heic'||mime==='image/heif')return heicStructure(bytes,limits,resources);
+  if(mime==='image/jpeg'){const shape=jpegStructure(bytes,limits,'photo');return shape.orientation>=5?{width:shape.height,height:shape.width}:{width:shape.width,height:shape.height};}
+  return null;
+};
 /** Preparation alone creates a portable image; legacy standalone validation remains unchanged. */
 export async function prepareProjectMedia(bytes:Uint8Array,limits:FileValidationLimits,png?:PngDecoder,jpeg?:JpegDecoder,photo?:PhotoDecoder,decoders:MediaDecoders={},signal?:AbortSignal){
   if(isHeic(bytes))return{mediaKind:'image' as const,mediaType:'image/heic' as const,

@@ -1,8 +1,9 @@
+import {test, createBrowserProfile} from '../helpers/browserProfile';
 import { desktopOrigin, desktopEntry } from './desktopEntry';
 import { selectShareOutput,  closeFileSurface, beginMaterialEditing } from './workspaceUi';
 import { revealFileSurface, lookAlongFront } from './workspaceUi';
-import {test,expect,chromium,type Page,type BrowserContext,type TestInfo} from '@playwright/test';
-import {mkdir,mkdtemp,readFile} from 'node:fs/promises';
+import {expect,chromium,type Page,type BrowserContext,type TestInfo} from '@playwright/test';
+import {readFile} from 'node:fs/promises';
 import {createHash} from 'node:crypto';
 import * as A from '@automerge/automerge';
 import * as THREE from 'three';
@@ -35,7 +36,7 @@ async function inspect(path:string){const bytes=Uint8Array.from(await readFile(p
   return {archive,records:c.unambiguousRecords as Record<string,any>};}
 
 test('01g GS/Proxy and points retain smooth appearance through edit, workspace, GPU recovery, backup restore and cold reopen',async({},info)=>{
-  test.setTimeout(900000);A.getHeads(A.init());await mkdir('.artifacts/e2e/profiles',{recursive:true});const profiles=await Promise.all(['a','b','r','v'].map(x=>mkdtemp('.artifacts/e2e/profiles/sm-'+x+'-'))),contexts=new Set<BrowserContext>(),errors:string[]=[];
+  test.setTimeout(900000);A.getHeads(A.init());const profiles=await Promise.all(['a','b','r','v'].map(x=>createBrowserProfile('sm-'+x))),contexts=new Set<BrowserContext>(),errors:string[]=[];
   const launch=async(index:number)=>{const context=await chromium.launchPersistentContext(profiles[index]!,{channel:'chromium',headless:true,viewport:{width:2560,height:1440},deviceScaleFactor:index===1?2:1,serviceWorkers:'block',acceptDownloads:true});contexts.add(context);context.setDefaultTimeout(15_000);await context.route('**/*',r=>{const u=new URL(r.request().url());return u.origin===desktopOrigin||['blob:','data:'].includes(u.protocol)?r.continue():r.abort('blockedbyclient');});
     const p=context.pages()[0]??await context.newPage();p.on('pageerror',e=>errors.push(e.message));p.on('console',m=>{if(m.type()==='error')errors.push(m.text());});await p.goto(desktopEntry);return{p,context};};
   const close=async(context:BrowserContext)=>{await context.close();contexts.delete(context);};

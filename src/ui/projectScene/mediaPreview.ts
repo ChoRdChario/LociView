@@ -1,5 +1,5 @@
 import { createMediaImageViewport } from './mediaImageViewport';
-import { createMediaPreviewResources, type MediaPreviewResources, type MediaDimensions } from './mediaPreviewResources';
+import { createMediaPreviewResources, type MediaPreviewResources, type MediaDimensions, type MediaResidency } from './mediaPreviewResources';
 import type { RasterResources, RasterPriority } from '../../viewer/rasterResources';
 
 /** Host-verified image bodies only. Imported labels/URLs are never image sources. */
@@ -24,12 +24,18 @@ function createPngPreview(document: Document, read: () => MediaPreviewItem | nul
   const root = document.createElement('div'), error = document.createElement('p'), retry = document.createElement('button');
   root.className = 'lv-media-image'; error.className='lv-operation-status';error.setAttribute('role', 'status'); retry.type = 'button'; retry.textContent = '画像を再試行';
   const loading=(value:boolean)=>{error.dataset.busy=String(value);root.setAttribute('aria-busy',String(value));};
-  let body: PreviewPng | null = null, image: HTMLImageElement | null = null, player:HTMLVideoElement|HTMLAudioElement|null=null, release: (() => void) | null = null, disposed = false, epoch = 0;
+  let body: PreviewPng | null = null, image: HTMLImageElement | null = null, player:HTMLVideoElement|HTMLAudioElement|null=null, release: (() => void) | null = null, disposed = false, replacing = false, epoch = 0;
   const localKey = ++previewKey;
   let visible = !resources || !lazy || typeof IntersectionObserver === 'undefined';
-  function clear() { image?.remove(); image = null; changedImage?.(null); if(player){player.pause();player.removeAttribute('src');player.load();player.remove();player=null;} release?.(); release = null; }
+  function clear() { const retiring = release; release = null; image?.remove(); image = null; changedImage?.(null); if(player){player.pause();player.removeAttribute('src');player.load();player.remove();player=null;} retiring?.(); }
   function load(item: MediaPreviewItem | null, priority: RasterPriority = 'thumbnail') {
-    const attempt = ++epoch; clear();loading(false); body = item?.image ?? null;
+    if (disposed || replacing || lazy && resources?.thumbnailsActive === false) return;
+    replacing = true;
+    try { loadOwned(item, priority); } finally { replacing = false; }
+  }
+  function loadOwned(item: MediaPreviewItem | null, priority: RasterPriority) {
+    const attempt = ++epoch; clear(); if (disposed || epoch !== attempt) return;
+    loading(false); body = item?.image ?? null;
     const subject=item?.kind&&item.kind!=='image'?'メディア':'画像';retry.textContent=`${subject}を再試行`;
     if(lazy&&item?.kind&&item.kind!=='image'){error.textContent=item.kind==='video'?'動画':'音声';retry.hidden=true;return;}
     if (!item || !body) { error.textContent = `${subject}を読み込めません。添付情報は変更していません。`; retry.hidden = false; return; }
@@ -86,16 +92,22 @@ function createPngPreview(document: Document, read: () => MediaPreviewItem | nul
     const showing = entries.some(entry => entry.isIntersecting); if (disposed || showing === visible) return; visible = showing;
     if (showing) load(read()); else { epoch++; clear(); body = null; loading(false); error.textContent = ''; retry.hidden = true; }
   }) : null; observer?.observe(root);
-  return { root, render() { if (disposed) return; const item = read();
-    if (!visible) return;
+  function render() { if (disposed || replacing) return; const item = read();
+    if (!visible || lazy && resources?.thumbnailsActive === false) return;
     if (!sameBody(body, item?.image ?? null) || !image && !player && !error.textContent) load(item);
     if (image && item) image.alt = item.description || item.label;
-  }, dispose() { disposed = true; observer?.disconnect(); clear(); root.remove(); } };
+  }
+  const unsubscribe = lazy ? resources?.subscribe(() => {
+    if (disposed) return;
+    if (resources?.thumbnailsActive) render();
+    else { epoch++; clear(); body = null; loading(false); error.textContent = ''; retry.hidden = true; }
+  }) : undefined;
+  return { root, render, dispose() { disposed = true; unsubscribe?.(); observer?.disconnect(); clear(); root.remove(); } };
 }
 
 /** One modal per workspace; navigation is local and never edits selection/history. */
-export function createMediaViewer(document: Document, raster?: RasterResources,dimensions?:MediaDimensions) {
-  const resources = raster ? createMediaPreviewResources(document, raster,{dimensions}) : undefined;
+export function createMediaViewer(document: Document, raster?: RasterResources,dimensions?:MediaDimensions, residency?: MediaResidency) {
+  const resources = raster ? createMediaPreviewResources(document, raster,{dimensions,residency}) : undefined;
   const root = document.createElement('dialog'); root.className = 'lv-media-viewer'; root.setAttribute('aria-label', 'メディアビューア');
   const header = document.createElement('header'), title = document.createElement('h2'), closeButton = document.createElement('button');
   closeButton.type = 'button'; closeButton.textContent = '×'; closeButton.setAttribute('aria-label', '閉じる');
@@ -107,15 +119,27 @@ export function createMediaViewer(document: Document, raster?: RasterResources,d
   previous.setAttribute('aria-label', '前のメディア'); next.setAttribute('aria-label', '次のメディア'); count.setAttribute('aria-live', 'polite');
   header.append(title, closeButton); footer.append(previous, count, next); root.append(header, imageViewport.toolbar, content, description, status, footer);
   let reader: MediaPreviewReader | null = null, scope = '', id = '', resourceId = '', opener: HTMLElement | null = null, disposed = false;
-  let preview: ReturnType<typeof createPngPreview> | null = null;
+  let preview: ReturnType<typeof createPngPreview> | null = null, presentedImage: PreviewPng | null = null;
+  let retirement: Promise<void> | undefined;
+  let resumeImage: { image: PreviewPng | null; view: ReturnType<typeof imageViewport.capture> } | undefined;
   const selected = () => { const group = reader?.(); return group?.scope === scope ? group.items.find(i => i.id === id && i.resourceId === resourceId) ?? null : null; };
+  const pauseThumbnails = () => resources?.setThumbnailsActive(!disposed && !reader && document.hidden !== true);
   function close(restore = true) {
-    reader = null; preview?.dispose(); preview = null; content.replaceChildren(); root.close();
+    reader = null; resumeImage = undefined; preview?.dispose(); preview = null; presentedImage = null; content.replaceChildren(); root.close(); pauseThumbnails();
     if (restore && opener?.isConnected && !(opener as HTMLButtonElement).disabled) opener.focus({ preventScroll: true }); opener = null;
   }
   function render(active = true) {
     if (!reader || disposed) return; if (!active) { close(false); return; }
     const group = reader(); if (!group || group.scope !== scope) { close(false); return; }
+    if (document.hidden === true && (!selected()?.kind || selected()?.kind === 'image')) {
+      if (preview) {
+        resumeImage = { image: presentedImage, view: imageViewport.capture() };
+        // Releasing residency can render the workspace synchronously. Detach the owner
+        // first so that render cannot replace the saved view with the cleared image.
+        const retiring = preview; preview = null; retiring.dispose(); content.replaceChildren();
+      }
+      status.textContent = '画面に戻ると表示します。'; return;
+    }
     const index = group.items.findIndex(i => i.id === id && i.resourceId === resourceId), item = group.items[index];
     root.setAttribute('data-media-kind', item?.kind ?? 'image');
     title.textContent = item ? `${group.label} — ${item.label}` : group.label;
@@ -124,24 +148,41 @@ export function createMediaViewer(document: Document, raster?: RasterResources,d
     count.textContent = item ? `${index + 1} / ${group.items.length}` : '';
     previous.disabled = index <= 0; next.disabled = index < 0 || index === group.items.length - 1;
     if (!item) { preview?.dispose(); preview = null; content.replaceChildren(); }
-    else { if (!preview) { preview = createPngPreview(document, selected, false, imageViewport.imageHost, imageViewport.setImage, resources); content.append(preview.root); } preview.render(); imageViewport.render(); }
+    else { if (!preview) { preview = createPngPreview(document, selected, false, imageViewport.imageHost, image => {
+      presentedImage = image ? selected()?.image ?? null : null; imageViewport.setImage(image);
+      if (image && resumeImage) { if (sameBody(resumeImage.image, selected()?.image ?? null)) imageViewport.restore(resumeImage.view); resumeImage = undefined; }
+    }, resources); content.append(preview.root); } preview.render(); imageViewport.render(); }
   }
   function step(offset: number) {
     if (disposed || !reader) return; const group = reader(); if (!group || group.scope !== scope) { close(false); return; }
     const at = group.items.findIndex(i => i.id === id && i.resourceId === resourceId), item = at < 0 ? undefined : group.items[at + offset];
-    if (!item) { render(); return; } id = item.id; resourceId = item.resourceId;
+    if (!item) { render(); return; } id = item.id; resourceId = item.resourceId; resumeImage = undefined;
     preview?.dispose(); preview = null; render();
   }
   closeButton.addEventListener('click', () => close()); previous.addEventListener('click', () => step(-1)); next.addEventListener('click', () => step(1));
   root.addEventListener('cancel', event => { event.preventDefault(); close(); });
+  const visibility = () => { if (!disposed) { pauseThumbnails(); render(); } };
+  document.addEventListener?.('visibilitychange', visibility); pauseThumbnails();
   root.addEventListener('keydown', event => { if (event.isComposing || event.altKey || event.ctrlKey || event.metaKey) return;
     if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); close(); }
     else if ((event.key === 'ArrowLeft' || event.key === 'ArrowRight') && !(event.target as Element|null)?.closest?.('video,audio')) { event.preventDefault(); event.stopPropagation(); step(event.key === 'ArrowLeft' ? -1 : 1); } });
   return { root, render, resources, open(read: MediaPreviewReader, itemId: string, from: HTMLElement) {
     if (disposed) return; const group = read(), item = group?.items.find(i => i.id === itemId); if (!group || !item) return;
-    reader = read; scope = group.scope; id = item.id; resourceId = item.resourceId; opener = from;
+    reader = read; scope = group.scope; id = item.id; resourceId = item.resourceId; opener = from; resumeImage = undefined; pauseThumbnails();
     preview?.dispose(); preview = null; render(); if (!root.open) root.showModal(); closeButton.focus();
-  }, dispose() { if (disposed) return; close(false); disposed = true; imageViewport.dispose(); root.remove(); void resources?.dispose(); } };
+  }, dispose() {
+    if (retirement) return retirement;
+    let finish!: () => void, fail!: (error: unknown) => void;
+    retirement = new Promise<void>((resolve, reject) => { finish = resolve; fail = reject; });
+    void retirement.catch(() => {}); disposed = true;
+    const errors: unknown[] = [], attempt = (action: () => void) => { try { action(); } catch (error) { errors.push(error); } };
+    attempt(() => document.removeEventListener?.('visibilitychange', visibility)); attempt(() => close(false)); attempt(() => imageViewport.dispose()); attempt(() => root.remove());
+    void (async () => {
+      try { await resources?.dispose(); } catch (error) { errors.push(error); }
+      if (errors.length) throw new AggregateError(errors, '画像の終了処理を完了できませんでした。再読み込みしてください。');
+    })().then(finish, fail);
+    return retirement;
+  } };
 }
 export type MediaViewer = ReturnType<typeof createMediaViewer>;
 

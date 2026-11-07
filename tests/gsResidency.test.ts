@@ -36,10 +36,10 @@ describe('document GS instance ownership',()=>{
   it('keeps failed cleanup and uncertain constructors charged, but releases a failed initialized candidate after cleanup',async()=>{
     const pool=createGsResidency(10,890),owner={};
     const failed=queueGsDecode({},()=>({initialized:Promise.reject(Error('initialize')),value:1,dispose(){}}),()=>pool.reserve(owner,demand()));
-    await expect(failed.promise).rejects.toThrow('initialize');expect(()=>pool.assertFits([demand()])).not.toThrow();
+    await expect(failed.promise).rejects.toThrow('initialize');expect(failed.cleanupFailed).toBe(false);expect(()=>pool.assertFits([demand()])).not.toThrow();
     const retained=queueGsDecode({},()=>({initialized:Promise.resolve(),value:2,dispose(){throw Error('cleanup');}}),()=>pool.reserve(owner,demand()));
-    await retained.promise;expect(()=>retained.cancel()).toThrow('cleanup');expect(()=>pool.assertFits([demand(1)],owner)).toThrow('上限');
+    await retained.promise;expect(()=>retained.cancel()).toThrow('cleanup');expect(retained.cleanupFailed).toBe(true);expect(()=>pool.assertFits([demand(1)],owner)).toThrow('上限');
     const other=createGsResidency(10,890),constructor=queueGsDecode({},()=>{throw Error('constructor');},()=>other.reserve(owner,demand()));
-    await expect(constructor.promise).rejects.toThrow('constructor');expect(()=>other.assertFits([demand(1)],owner)).toThrow('上限');
+    await expect(constructor.promise).rejects.toThrow('constructor');expect(constructor.cleanupFailed).toBe(true);expect(()=>other.assertFits([demand(1)],owner)).toThrow('上限');
   });
 });

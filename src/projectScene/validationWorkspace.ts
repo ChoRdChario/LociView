@@ -40,9 +40,12 @@ import { sceneAppendCompatibility } from '../projectPackage/sceneAppend';
 import { createDeferredViewport } from './deferredViewport';
 
 type Host = ReturnType<typeof createValidationModeHost>;
+export class DisplayRetirementError extends AggregateError {
+  constructor(errors:readonly unknown[]){super(errors,'表示の終了処理を完了できません。再読み込みしてから再開してください。保存済みの記録は保持しています。');}
+}
 export interface MountedEditor {
  readonly root:HTMLElement;readonly session:WorkspaceFileInteraction|undefined;
- render():void;hasProjectHeader?():boolean;inputPending(includePresentation?:boolean):boolean;hasChanges(includePresentation?:boolean):boolean;unmount():void;dispose():Promise<void>;
+ render():void;hasProjectHeader?():boolean;inputPending(includePresentation?:boolean):boolean;hasChanges(includePresentation?:boolean):boolean;unmount():void|Promise<void>;dispose():Promise<void>;
 }
 export type MountedEditorFactory=(host:Host,factory:ViewportFactory,tools:ReturnType<typeof createValidationReceiveControls>|undefined,
  renderCandidate:ModelCandidateRenderer|undefined,navigation:NonNullable<Parameters<typeof createProductWorkspace>[5]>)=>MountedEditor;
@@ -62,8 +65,8 @@ export interface ValidationWorkspacePorts {
   list(reading?: ResumeReadingRequest): Promise<ValidationProjectEntry[]>;
   open(run: string, initial?: ReturnType<typeof prepareValidationCreation>, mode?: LocalOpenMode, workspaceFile?: Blob, reviewEdit?: PreparedReviewEdit,
     firstBackup?: ValidationHostOptions['firstBackup'], standaloneWorkspace?: boolean): Promise<ValidationNormalHost | FirstBackupRecovery>;
-  render(host: ValidationDisplayHost): Promise<{ factory: ViewportFactory; readonly ready?:Promise<void>; detachPreparation?():void; dispose(): void }>;
-  renderReview?(view: ReviewView): Promise<{ factory: ViewportFactory; dispose(): void }>;
+  render(host: ValidationDisplayHost): Promise<{ factory: ViewportFactory; readonly ready?:Promise<void>; detachPreparation?():void; dispose(): void; idle?():Promise<void> }>;
+  renderReview?(view: ReviewView): Promise<{ factory: ViewportFactory; dispose(): void; idle?():Promise<void> }>;
   renderModelCandidate?(host: ValidationDisplayHost, display: Parameters<ModelCandidateRenderer>[0]): ReturnType<ModelCandidateRenderer>;
   selected(run: string | null, mode?: LocalOpenMode): void;
 }
@@ -135,6 +138,18 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   let receiveTools: ReturnType<typeof createValidationReceiveControls> | undefined;
   let resident: Awaited<ReturnType<ValidationWorkspacePorts['render']>> | undefined;
   let busy = false, disposed = false, composing = false, selected: string | null = null, operation: Promise<void> | undefined;
+  const renderJobs=new Set<Promise<unknown>>();
+  const releaseRender=async(owner:{dispose():void;idle?():Promise<void>}|undefined)=>{
+    const errors:unknown[]=[];try{owner?.dispose();}catch(error){errors.push(error);}
+    try{await owner?.idle?.();}catch(error){errors.push(error);}
+    if(errors.length){retirementFailure??=new AggregateError(errors,'表示の終了処理を完了できません。');throw retirementFailure;}
+  };
+  const ownRender=<T extends {dispose():void;idle?():Promise<void>}>(work:Promise<T>):Promise<T>=>{
+    const job=work.then(async owner=>{if(disposed){await releaseRender(owner);throw new DOMException('画面を閉じました。','AbortError');}return owner;},error=>{
+      if(error instanceof DisplayRetirementError)retirementFailure??=error;throw error;
+    });
+    renderJobs.add(job);void job.finally(()=>renderJobs.delete(job)).catch(()=>{});return job;
+  };
   function registerRecoveryControl<T extends HTMLButtonElement | HTMLInputElement>(control: T, blocked: () => boolean = () => false): T {
     recoveryControls.set(control, blocked); control.disabled = busy || blocked(); return control;
   }
@@ -145,6 +160,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   let selectionGeneration = 0, creationDraft = 0, selectionPending = false;
   let pendingUpdate: { file: File; run: string; generation: number; context: ReturnType<typeof selectionContext> } | undefined;
   let nativeSelectionChecking = false, selectionAbort: AbortController | undefined;
+  let retirementFailure: AggregateError | undefined;
   let rawSelection: { models: ValidationModelFile[]; media: ValidationFile[] } | undefined;
   let creationAttempt: { run: string; initial: ReturnType<typeof prepareValidationCreation>; opened?: true; candidate?: ValidationNormalHost } | undefined;
   let selectionHost: Host | undefined;
@@ -160,29 +176,30 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     const opened = await ports.open(...args); if ('kind' in opened) { await opened.dispose(); throw Error('バックアップの初回復元を一覧から再開してください。'); } return opened;
   };
   const controls = () => {
+    const inactive = busy || !!retirementFailure;
     // Keep progress/errors readable beside the current decision, outside the
     // temporarily inert forms. The existing execute fence still owns actions.
-    navigation.inert = false; workspaceForm.inert = form.inert = list.inert = busy; refresh.disabled = busy;
-    for(const button of projectOpenButtons)button.disabled=busy||composing;
+    navigation.inert = false; workspaceForm.inert = form.inert = list.inert = inactive; refresh.disabled = inactive;
+    for(const button of projectOpenButtons)button.disabled=inactive||composing;
     if(navigation.hidden){if(status.parentElement!==root)root.insertBefore(status,navigation);}
     else navigation.insertBefore(status,form.hidden?form:listHeading);
-    openFile.disabled = create.disabled = cancelConversion.disabled = busy || composing;
+    openFile.disabled = create.disabled = cancelConversion.disabled = inactive || composing;
     if(offline&&homeSettings){if(offline.root.parentElement===homeSettings.body){if(!homeSettings.root.parentElement)root.insertBefore(homeSettings.root,navigation);}
       else{homeSettings.root.open=false;homeSettings.root.remove();}}
     status.setAttribute('data-busy',String(busy)); status.setAttribute('aria-busy',String(busy));
-    for (const [control, blocked] of recoveryControls) control.disabled = busy || blocked();
-    workspaceInput.disabled = title.disabled = busy || !!creationAttempt;
-    cancelSelection.disabled = busy && !nativeSelectionChecking || composing || !!creationAttempt;
+    for (const [control, blocked] of recoveryControls) control.disabled = inactive || blocked();
+    workspaceInput.disabled = title.disabled = inactive || !!creationAttempt;
+    cancelSelection.disabled = !!retirementFailure || busy && !nativeSelectionChecking || composing || !!creationAttempt;
     cancelSelection.hidden = !selectionPending || !conversionPanel.hidden || !!pendingUpdate || !!firstRecovery;
     openFile.hidden = !form.hidden || !conversionPanel.hidden || !!pendingUpdate;
-    updatePanel.hidden = !pendingUpdate; updateConfirm.disabled = updateCancel.disabled = busy || composing;
+    updatePanel.hidden = !pendingUpdate; updateConfirm.disabled = updateCancel.disabled = inactive || composing;
     create.textContent = creationAttempt ? '作成を再試行' : 'プロジェクトを作成';
-    convert.disabled = busy || composing || !!lociPreview && (!lociCurrent() || lociEvaluation!.blocked);
+    convert.disabled = inactive || composing || !!lociPreview && (!lociCurrent() || lociEvaluation!.blocked);
     saveReport.hidden = !lociPreview && !(conversion && 'report' in conversion && conversion.report);
-    saveReport.disabled = busy || composing || (!!lociPreview ? !lociCurrent() : !conversion || !('report' in conversion) || !conversion.report); previewAgain.disabled = busy || composing;
-    legacy.disabled=fallback.disabled=busy||composing;
-    workbook.disabled = conversionTitle.disabled = relation.disabled = busy;
-    coldReport.disabled = busy || composing || !!workspace?.hasChanges() || !!reviewWorkspace?.hasChanges() || !!receiveTools?.hasChanges(); back.disabled = busy;
+    saveReport.disabled = inactive || composing || (!!lociPreview ? !lociCurrent() : !conversion || !('report' in conversion) || !conversion.report); previewAgain.disabled = inactive || composing;
+    legacy.disabled=fallback.disabled=inactive||composing;
+    workbook.disabled = conversionTitle.disabled = relation.disabled = inactive;
+    coldReport.disabled = inactive || composing || !!workspace?.hasChanges() || !!reviewWorkspace?.hasChanges() || !!receiveTools?.hasChanges(); back.disabled = inactive;
     back.hidden = !host && !reviewWorkspace || !!workspace && !!workspace.hasProjectHeader?.(); };
   title.addEventListener('compositionstart', () => { composing = true; creationDraft++; controls(); });
   title.addEventListener('compositionend', () => { composing = false; creationDraft++; controls(); });
@@ -190,7 +207,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   conversionTitle.addEventListener('compositionstart', () => { composing = true; invalidateLoci(); controls(); });
   conversionTitle.addEventListener('compositionend', () => { composing = false; invalidateLoci(); controls(); });
   const execute = (action: () => Promise<void>) => {
-    if (busy || disposed) return;
+    if (busy || disposed || retirementFailure) return;
     const previousUpdate = pendingUpdate;
     const confirmFocused = document.activeElement === updateConfirm;
     busy = true; controls(); workspace?.render();
@@ -207,12 +224,30 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     mounted=false;presentation=null;presentationState=()=>presentation;resumedLast=false;confirmingResume=false;workspace=undefined;host=undefined;resident=undefined;reviewWorkspace=undefined;reviewEditAttempt=undefined;receiveTools=undefined;firstRecovery=undefined;
     showColdReport(false);coldReportStatus.textContent='';if(reportUrl)URL.revokeObjectURL(reportUrl);reportUrl=undefined;recoveryControls.clear();
     const errors:unknown[]=[],attempt=async(action:()=>unknown)=>{try{await action();return true;}catch(error){errors.push(error);return false;}};
-    await attempt(()=>oldReview?.dispose());await attempt(()=>oldAttempt?.releaseScratch());
-    const workspaceClosed=await attempt(()=>oldWorkspace?.dispose());if(!oldWorkspace||!workspaceClosed)await attempt(()=>oldHost?.dispose());
-    await attempt(()=>oldResident?.dispose());await attempt(()=>oldTools?.dispose());await attempt(()=>oldRecovery?.dispose());content.replaceChildren();
-    if(errors.length){navigation.hidden=false;selected=null;ports.selected(null);throw new AggregateError(errors,'画面の終了処理を完了できませんでした。再読み込みしてから再開してください。保存済みの記録は保持しています。');}
+    const reviewEnd=attempt(()=>oldReview?.dispose()),workspaceEnd=attempt(()=>oldWorkspace?.dispose()),residentEnd=attempt(()=>releaseRender(oldResident));
+    const reviewClosed=await reviewEnd;await attempt(()=>oldAttempt?.releaseScratch());
+    const workspaceClosed=await workspaceEnd;if(!oldWorkspace||!workspaceClosed)await attempt(()=>oldHost?.dispose());
+    const residentClosed=await residentEnd;await attempt(()=>oldTools?.dispose());await attempt(()=>oldRecovery?.dispose());content.replaceChildren();
+    if(errors.length){
+      const failure=new AggregateError(errors,'画面の終了処理を完了できませんでした。再読み込みしてから再開してください。保存済みの記録は保持しています。');
+      if(!reviewClosed||!workspaceClosed||!residentClosed)retirementFailure??=failure;
+      navigation.hidden=false;selected=null;ports.selected(null);throw retirementFailure??failure;
+    }
+    if(retirementFailure){navigation.hidden=false;selected=null;ports.selected(null);throw retirementFailure;}
+  };
+  const unmountCurrentDisplay = async () => {
+    const previous=workspace,previousResident=resident;workspace=undefined;resident=undefined;
+    const errors:unknown[]=[];let retirement:void|Promise<void>=undefined;
+    try { retirement=previous?.unmount(); } catch(error) { errors.push(error); }
+    // Abort the display owner before awaiting native jobs that it owns.
+    try { previousResident?.dispose(); } catch(error) { errors.push(error); }
+    try { await retirement; } catch(error) { errors.push(error); }
+    try { await previousResident?.idle?.(); } catch(error) { errors.push(error); }
+    if(errors.length)retirementFailure??=new AggregateError(errors,'画面の終了処理を完了できませんでした。再読み込みしてから再開してください。保存済みの記録は保持しています。');
+    if(retirementFailure)throw retirementFailure;
   };
   const ensureMaySwitch = () => {
+    if(retirementFailure)throw retirementFailure;
     if (composing || changed()) throw Error('入力・更新を確定するか、取り消してからプロジェクトを切り替えてください。');
   };
   const ensureMayLeaveSelection = () => {
@@ -263,6 +298,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     }
   };
   const mount = async (prepared?: Awaited<ReturnType<ValidationWorkspacePorts['render']>>, initialSceneId?: string) => {
+    if(retirementFailure)throw retirementFailure;
     mounted = false;
     if (!host || disposed) { prepared?.dispose(); return; }
     const composition = resumeReading?.composition();
@@ -346,26 +382,27 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
       workspace=ports.mountEditor(target,bridge.factory,receiveTools,ports.renderModelCandidate?display=>ports.renderModelCandidate!(target,display):undefined,
         {utilitiesRoot:offline?.root,fileActionsRoot:coldReportActions,smoothDisplay:ports.smoothDisplay,presentation:state,projectNavigationBlocked:()=>busy,openProject:()=>{void selectProject();},resumedLastProject:()=>resumedLast,storageEstimate:ports.storageEstimate,localSettings:ports.localSettings,initialReading,initialSceneId,changed:refresh});
       content.replaceChildren(workspace.root,retry);workspace.render();
-      const load=async()=>{
+      const prepare=async()=>{
         checked=false;mounted=false;presentation={busy:true,reason:'モデルを読み込んでいます。記録は閲覧・検索できます。'};retry.hidden=true;resident?.detachPreparation?.();workspace?.render();
         try{
-          const next=await untilOpen(ports.render(target).then(value=>{if(!current()){value.dispose();throw Error('表示先が変わりました。');}return value;}));
+          const next=await untilOpen(ownRender(ports.render(target).then(async value=>{if(!current()){await releaseRender(value);throw Error('表示先が変わりました。');}return value;})));
           if(!next)throw Error('表示の準備を確認できません。');
-          if(!current()){next.dispose();return;}
-          const previous=resident;resident=next;try{bridge.attach(next.factory);}finally{previous?.dispose();}
+          if(!current()){await releaseRender(next);return;}
+          const previous=resident;resident=next;try{bridge.attach(next.factory);}finally{await releaseRender(previous);}
           await untilOpen(next.ready??Promise.resolve());if(!current())return;
           checked=true;presentation=null;workspace?.render();refresh();
           if(target.backupRestore.needsDisplay){target.backupRestore.displayReady(token!);workspace?.render();}
         }catch(error){if(!current())return;presentation={busy:false,reason:error instanceof Error?error.message:'モデルを読み込めません。記録と原本は保持しています。'};retry.hidden=false;workspace?.render();controls();}
       };
+      const load=()=>bridge.preparing(prepare());
       retry.addEventListener('click',()=>{void execute(load);});
       await load();status.textContent='';return;
     }
     presentation=null;presentationState=()=>presentation;
     status.textContent = 'モデルを読み込んでいます。';
-    const target = host, token = target.read().source?.token, next = prepared ?? await ports.render(target);
+    const target = host, token = target.read().source?.token, next = prepared ?? await ownRender(ports.render(target));
     await next.ready;
-    if (disposed || host !== target) { next.dispose(); return; }
+    if (disposed || host !== target) { await releaseRender(next); return; }
     resident = next;
     const fileTools = receiveTools;
     try { workspace=ports.mountEditor(target,next.factory,fileTools,
@@ -374,38 +411,38 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
         initialReading,initialSceneId,changed:()=>{rememberCurrent();controls();}});
       content.replaceChildren(workspace.root); workspace.render();
       if (target.backupRestore.needsDisplay) { target.backupRestore.displayReady(target.read().source!.token); workspace.render(); } }
-    catch (error) { workspace?.unmount(); workspace = undefined; next.dispose(); resident = undefined; throw error; }
+    catch (error) { await unmountCurrentDisplay(); throw error; }
     mounted = token === target.read().source?.token;
     if (mounted && selectionHost === target && target.read().state === 'ready' && !target.hasPending()) clearSelection();
     status.textContent = '';
   };
   const restoreDisplay = async (retry: boolean) => {
+    if(retirementFailure)throw retirementFailure;
     const target = host; if (!target || disposed) throw Error('プロジェクトを開いてください。');
     const epoch = target.backupRestore.epoch;
     let staged: Awaited<ReturnType<ValidationWorkspacePorts['render']>> | undefined;
     let stagedPrepare: Parameters<ValidationDisplayHost['setDisplayPreparation']>[0] | undefined;
     let readContent: ValidationDisplayHost['content'] | undefined;
-    const removeOldDisplay = () => { workspace?.unmount(); workspace = undefined; resident?.dispose(); resident = undefined; };
     try {
       await target.backupRestore[retry ? 'retry' : 'confirm'](async (next, sourceContent) => {
         readContent = sourceContent;
-        staged = await ports.render({ authority: { ...target.authority, read: () => next },
+        staged = await ownRender(ports.render({ authority: { ...target.authority, read: () => next },
           content: { model: record => readContent!.model(record), modelContent: record => readContent!.modelContent(record) },
-          setDisplayPreparation(callback) { stagedPrepare = callback; return () => { if (stagedPrepare === callback) stagedPrepare = undefined; }; } });
+          setDisplayPreparation(callback) { stagedPrepare = callback; return () => { if (stagedPrepare === callback) stagedPrepare = undefined; }; } }));
         await staged.ready;
       });
       if (disposed || host !== target) throw Error('画面を閉じました。復元先は再度開いて確認してください。');
       if (!staged) throw Error('復元先の表示を準備できません。');
       // Only the selected runtime supplies future model reads; staging capabilities have expired.
       readContent = target.content; const next = staged, prepare = stagedPrepare;
-      removeOldDisplay();
+      await unmountCurrentDisplay();
       const detach = prepare ? target.setDisplayPreparation(prepare) : () => {};
       staged = undefined; // mount now owns this resident, including failure/closed paths.
-      await mount({ factory: next.factory, dispose: () => { detach(); next.dispose(); } });
+      await mount({ factory: next.factory, idle:next.idle, dispose: () => { detach(); next.dispose(); } });
     } catch (error) {
-      staged?.dispose();
+      await releaseRender(staged);
       if (target.backupRestore.epoch !== epoch) {
-        removeOldDisplay(); content.replaceChildren();
+        await unmountCurrentDisplay(); content.replaceChildren();
         const note = document.createElement('p'); note.textContent = '復元先に切り替わりました。未完了の確認・表示を再開してください。';
         content.append(note); if (receiveTools) content.append(receiveTools.root);
       }
@@ -414,7 +451,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   };
   const adoptProject = async (run: string, opened: Awaited<ReturnType<typeof openValidationHost>>, rememberedMode?: LocalOpenMode,
     prepared?: Awaited<ReturnType<ValidationWorkspacePorts['render']>>, preparation?: Parameters<ValidationDisplayHost['setDisplayPreparation']>[0], initialSceneId?: string) => {
-    if (disposed) { await opened.dispose(); return; }
+    if (disposed || retirementFailure) { await opened.dispose(); if(retirementFailure)throw retirementFailure; return; }
     host = createValidationModeHost(opened, nextMode => openNormal(run, undefined, nextMode), nextMode => ports.selected(run, nextMode));
     if (selectionPending) selectionHost = host;
     receiveTools = createValidationReceiveControls(document, host, () => workspace?.session,
@@ -424,7 +461,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     const openingHost = host, openingToken = host.read().source?.token;
     confirmingResume = rememberedMode !== undefined;
     const detach = preparation ? host.setDisplayPreparation(preparation) : undefined;
-    await mount(prepared ? { factory: prepared.factory, dispose: () => { detach?.(); prepared.dispose(); } } : undefined, initialSceneId);
+    await mount(prepared ? { factory: prepared.factory, idle:prepared.idle, dispose: () => { detach?.(); prepared.dispose(); } } : undefined, initialSceneId);
     if (disposed) return;
     const current = currentResume();
     // A failed initial presentation can retain its readable metadata, but never
@@ -487,12 +524,12 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
               }
             }
           }
-          sourceContent = preparedContent; const candidate = await untilOpen(ports.render({ authority: { readOnly: true, read: () => next,  },
+          sourceContent = preparedContent; const candidate = await untilOpen(ownRender(ports.render({ authority: { readOnly: true, read: () => next,  },
             content: { model: record => sourceContent!.model(record), modelContent: record => sourceContent!.modelContent(record) },
-            setDisplayPreparation(callback) { preparation = callback; return () => { if (preparation === callback) preparation = undefined; }; } }).then(value => {
-              if (disposed || firstRecovery !== target) { value.dispose(); throw Error('画面を閉じました。復元記録は保持しています。'); }
+            setDisplayPreparation(callback) { preparation = callback; return () => { if (preparation === callback) preparation = undefined; }; } }).then(async value => {
+              if (disposed || firstRecovery !== target) { await releaseRender(value); throw Error('画面を閉じました。復元記録は保持しています。'); }
               return value;
-            }));
+            })));
           staged = candidate;
           if (candidate.ready) await untilOpen(candidate.ready);
           if (disposed || firstRecovery !== target) throw Error('画面を閉じました。復元記録は保持しています。');
@@ -506,7 +543,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
         resumeReading = reading && selection ? { ...reading, selection: () => selection } : reading; reading = undefined;
         const prepared = staged, nextHost = opened; staged = undefined; opened = undefined;
         await adoptProject(target.run, nextHost, undefined, prepared, preparation);
-      } catch (error) { clearResumeReading(); renderFirstRecovery(); throw error; } finally { reading?.dispose(); staged?.dispose(); await opened?.dispose(); }
+      } catch (error) { clearResumeReading(); renderFirstRecovery(); throw error; } finally { reading?.dispose(); try{await releaseRender(staged);}finally{await opened?.dispose();} }
     });
     if ((!target.readOnly || state.phase === 'preview') && state.cancellable) button(state.phase === 'preview' ? 'キャンセル' : '復元を取りやめる', () => leave(true));
     if (state.phase === 'terminal') button('一覧に戻る', () => leave(false));
@@ -527,6 +564,12 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   const guardSelection = (generation: number, context: ReturnType<typeof selectionContext>) => {
     if (!selectionCurrent(generation, context)) return false;
     ensureMaySwitch(); return true;
+  };
+  const selectionRead = async <T>(generation: number, context: ReturnType<typeof selectionContext>, read: (signal: AbortSignal) => Promise<T>): Promise<T | undefined> => {
+    const controller = new AbortController(); selectionAbort = controller; nativeSelectionChecking = true; controls();
+    try { const result = await read(controller.signal); controller.signal.throwIfAborted(); return result; }
+    catch (error) { if (controller.signal.aborted && !selectionCurrent(generation, context)) return; throw error; }
+    finally { if (selectionAbort === controller) { selectionAbort = undefined; nativeSelectionChecking = false; controls(); } }
   };
   const replaceSelection = async (run: string, opened: ValidationNormalHost, generation: number, context: ReturnType<typeof selectionContext>, initialSceneId?: string) => {
     try { if (!guardSelection(generation, context)) { await opened.dispose(); return; } }
@@ -582,6 +625,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   }));
   workspaceInput.addEventListener('change', () => {
     if (creationAttempt) return;
+    selectionAbort?.abort(); selectionAbort = undefined; nativeSelectionChecking = false;
     selectionGeneration++; creationDraft++; selectionPending = !!workspaceInput.files?.length; pendingUpdate = undefined; rawSelection = undefined;
     form.hidden = true; title.value = '新しいプロジェクト'; clearConversion(); controls();
   });
@@ -637,8 +681,10 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     for (const item of selection) {
       const selectedFile:{readonly size:number;arrayBuffer():Promise<ArrayBuffer>}=item.file;
       if(!(selectedFile instanceof Blob)&&selectedFile.size>ports.fileLimits.maxFileBytes-bufferedBytes)throw Error('一度に選択するファイルの合計を減らしてください。');
-      const selected = selectedFile instanceof Blob ? await validationModelFile({label:item.label,file:selectedFile},policy,true,ports.fileLimits.maxFileBytes-bufferedBytes) : {label:item.label,bytes:new Uint8Array(await selectedFile.arrayBuffer())};
-      if (!guardSelection(generation, context) || draft !== creationDraft) return;
+      const selected = await selectionRead(generation,context,async signal => selectedFile instanceof Blob
+        ? validationModelFile({label:item.label,file:selectedFile},policy,true,ports.fileLimits.maxFileBytes-bufferedBytes,signal)
+        : {label:item.label,bytes:new Uint8Array(await selectedFile.arrayBuffer())});
+      if (!selected || !guardSelection(generation, context) || draft !== creationDraft) return;
       if('package' in selected){
         actualTotal+=selected.package.size;
         if(!Number.isSafeInteger(actualTotal)||actualTotal>PACKAGE_LIMITS.archiveBytes)throw Error('選択したファイルが読み込みの上限を超えています。');
@@ -687,12 +733,12 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     }
     if (packages.length !== 1 || models.length || media.length) throw Error('作業ファイルは1つずつ開いてください。モデルや画像と一緒には開けません。');
     const file = packages[0]!;
-    const hint = await inspectZipContainerMetadata(file).catch((error: unknown) => {
+    const hint = await selectionRead(generation,context,signal=>inspectZipContainerMetadata(file,undefined,signal)).catch((error: unknown) => {
       if (isUnrecognizedZip(error))
         throw new Error('ZIPの内容を確認できません。元のファイルを選び直してください。', { cause: error });
       throw error;
     });
-    if(!guardSelection(generation,context))return;
+    if(!hint||!guardSelection(generation,context))return;
     if(ports.openLegacy&&hint.identity!=='foreign'){legacyFile=file;fallback.hidden=false;}
     const legacy = hint.identity==='v1' ? await prepareFrozenV1Conversion(file, ports.fileLimits, ports.decode, ports.jpeg, ports.photo) : null; if (!guardSelection(generation, context)) return;
     let loci: Awaited<ReturnType<typeof prepareLociMyuConversion>> = null;
@@ -766,7 +812,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     if (purpose === 'review') {
       const view = await prepareReviewView(selectedArchive, policy, ports.decode, ports.jpeg, ports.photo,ports.mediaDecoders);
       if (!ports.renderReview) throw Error('閲覧用シーンの表示が未接続です。');
-      const prepared = await ports.renderReview(view);
+      const prepared = await ownRender(ports.renderReview(view));
       try {
         if (!guardSelection(generation, context)) return;
         await closeCurrent(); resident = prepared;
@@ -817,7 +863,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
         selected = null; ports.selected(null); navigation.hidden = true; clearSelection();
         status.textContent = '閲覧用シーンを開きました。編集プロジェクトは作成していません。';
       } catch (error) { if (resident === prepared) resident = undefined; throw error; }
-      finally { if (resident !== prepared) prepared.dispose(); }
+      finally { if (resident !== prepared) await releaseRender(prepared); }
       return;
     }
     const inspected = purpose === 'clean' ? await CleanArchive.inspect(file, validationMetadataLimits) : await WorkspaceArchive.inspect(file, validationMetadataLimits);
@@ -899,5 +945,8 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
       stopPresentation();
       try { await operation; } catch { /* Original input and saved failure are never acknowledged here. */ }
       try { await creationAttempt?.candidate?.dispose(); }
-      finally { await lociPreview?.dispose(); lociPreview = null; await closeCurrent(); offline?.dispose(); projectOpenButtons.clear();root.remove(); } }, get selected() { return selected; } };
+      finally { await lociPreview?.dispose(); lociPreview = null; try { await closeCurrent(); } finally {
+        try { while(renderJobs.size)await Promise.allSettled([...renderJobs]);if(retirementFailure)throw retirementFailure; }
+        finally { offline?.dispose(); projectOpenButtons.clear();root.remove(); }
+      } } }, get selected() { return selected; } };
 }

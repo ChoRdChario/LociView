@@ -1,8 +1,9 @@
+import {test, createBrowserProfile} from '../helpers/browserProfile';
 import { writeCleanImportFixture } from './cleanImportFixture';
 import { selectShareOutput,  closeFileSurface, revealFileSurface, revealModelManagement, lookAlongFront } from './workspaceUi';
-import { test,expect,chromium,type Page,type BrowserContext,type TestInfo } from '@playwright/test';
-import { mkdir,mkdtemp,readFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import {expect,chromium,type Page,type BrowserContext,type TestInfo } from '@playwright/test';
+import {readFile } from 'node:fs/promises';
+
 import { createHash } from 'node:crypto';
 import * as A from '@automerge/automerge';
 import * as THREE from 'three';
@@ -89,7 +90,7 @@ function activeGs(records:Record<string,any>){
 async function pixels(p:Page){return (await presentedCanvas(p.getByLabel('3Dモデルの表示',{exact:true}))).sample;}
 async function gsPainted(p:Page){await expect.poll(async()=>(await presentedCanvas(p.getByLabel('3Dモデルの表示',{exact:true}))).red,{timeout:90_000}).toBeGreaterThan(20);}
 test('SH4本体の差し替えと面の再設定・受信側編集・返送・復元・cold再開を接続する',async({},info)=>{
-  test.setTimeout(900_000);A.getHeads(A.init());const dir='.artifacts/e2e/profiles';await mkdir(dir,{recursive:true});const profiles=await Promise.all(['a','b','r','v','c'].map(n=>mkdtemp(join(dir,`gs-${n}-`)))),contexts=new Set<BrowserContext>(),errors:string[]=[];
+  test.setTimeout(900_000);A.getHeads(A.init());const profiles=await Promise.all(['a','b','r','v','c'].map(n=>createBrowserProfile(`gs-${n}`))),contexts=new Set<BrowserContext>(),errors:string[]=[];
   const launch=async(index:number)=>{const context=await chromium.launchPersistentContext(profiles[index]!,{channel:'chromium',headless:true,viewport:{width:1440,height:1000},acceptDownloads:true,serviceWorkers:'block'});contexts.add(context);context.setDefaultTimeout(15_000);if(tracing)await context.tracing.start({screenshots:true,snapshots:true,sources:true});
     await guardWholeGsReads(context);
     await context.route('**/*',route=>{const u=new URL(route.request().url());return u.origin===new URL(entry).origin||['blob:','data:'].includes(u.protocol)?route.continue():route.abort('blockedbyclient');});
@@ -151,7 +152,7 @@ test('SH4本体の差し替えと面の再設定・受信側編集・返送・�
 });
 
 test('既存のモデルへファイルとしてGSを追加し、面と保存を保ってcold再開する',async({},info)=>{
-  await mkdir('.artifacts/e2e/profiles',{recursive:true});const profile=await mkdtemp('.artifacts/e2e/profiles/gs-file-');
+  const profile=await createBrowserProfile('gs-file');
   const launch=async()=>{const c=await chromium.launchPersistentContext(profile,{channel:'chromium',headless:true,viewport:{width:1440,height:1000},acceptDownloads:true,serviceWorkers:'block'});c.setDefaultTimeout(15_000);await guardWholeGsReads(c);return c;};
   let context=await launch();
   try{
@@ -166,7 +167,7 @@ test('既存のモデルへファイルとしてGSを追加し、面と保存を
 });
 
 test('混在画面で前面の面を選び、GSと重なる点は保留して非表示後に選ぶ',async({},info)=>{
-  test.setTimeout(180_000);await mkdir('.artifacts/e2e/profiles',{recursive:true});const profile=await mkdtemp('.artifacts/e2e/profiles/gs-mix-');
+  test.setTimeout(180_000);const profile=await createBrowserProfile('gs-mix');
   const context=await chromium.launchPersistentContext(profile,{channel:'chromium',headless:true,viewport:{width:1440,height:1000},serviceWorkers:'block'}),page=context.pages()[0]??await context.newPage(),errors:string[]=[];context.setDefaultTimeout(15_000);page.on('pageerror',e=>errors.push(e.message));
   const point=Buffer.from('ply\nformat ascii 1.0\nelement vertex 1\nproperty float x\nproperty float y\nproperty float z\nproperty uchar red\nproperty uchar green\nproperty uchar blue\nend_header\n0 0 0 255 0 0\n');if(tracing)await context.tracing.start({screenshots:true,snapshots:true,sources:true});
   try{
@@ -182,7 +183,7 @@ test('混在画面で前面の面を選び、GSと重なる点は保留して非
 });
 
 test('GSの表示失敗を隔離し、点の選択とGPU復旧を同じ画面で継続する',async({},info)=>{
-  test.setTimeout(180_000);await mkdir('.artifacts/e2e/profiles',{recursive:true});const profile=await mkdtemp('.artifacts/e2e/profiles/gs-fault-');
+  test.setTimeout(180_000);const profile=await createBrowserProfile('gs-fault');
   const context=await chromium.launchPersistentContext(profile,{channel:'chromium',headless:true,viewport:{width:1440,height:1000},acceptDownloads:true,serviceWorkers:'block'}),errors:string[]=[];
   await context.addInitScript(()=>{(window as any).gsProbeFault=true;const read=WebGL2RenderingContext.prototype.readPixels;
     WebGL2RenderingContext.prototype.readPixels=function(...args:any[]){if((window as any).gsProbeFault&&args[2]===1&&args[3]===1&&args[5]===this.FLOAT)throw Error('initial GS probe failure');return Reflect.apply(read,this,args);};

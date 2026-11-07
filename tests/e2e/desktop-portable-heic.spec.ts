@@ -1,8 +1,9 @@
+import {test, createBrowserProfile} from '../helpers/browserProfile';
 import { writeCleanImportFixture } from './cleanImportFixture';
 import { selectShareOutput, closeFileSurface, revealCoordinateAdd, revealFileSurface, revealProjectSelection } from './workspaceUi';
 import { desktopOrigin, desktopEntry } from './desktopEntry';
-import { test, expect, chromium, type Page, type BrowserContext, type TestInfo } from '@playwright/test';
-import { mkdir, mkdtemp, readFile } from 'node:fs/promises';
+import { expect, chromium, type Page, type BrowserContext, type TestInfo } from '@playwright/test';
+import { readFile } from 'node:fs/promises';
 import { openAsBlob } from 'node:fs';
 import * as A from '@automerge/automerge';
 import { triangleGlb } from './fixtures';
@@ -39,7 +40,7 @@ async function gallery(p: Page) {
 }
 test('08c uses canvas generation, portable offline display/save/reopen and a portable-only copy on the current build', async ({}, info) => {
   test.setTimeout(600_000); A.getHeads(A.init());
-  await mkdir('.artifacts/e2e/profiles', { recursive: true }); const profiles = await Promise.all(['creator','receiver'].map(n => mkdtemp('.artifacts/e2e/profiles/heic-' + n + '-')));
+  const profiles = await Promise.all(['creator','receiver'].map(n => createBrowserProfile('heic-' + n)));
   const contexts = new Set<BrowserContext>(), errors: string[] = [], remote: string[] = [];
   const launch = async (index: number) => {
     const context = await chromium.launchPersistentContext(profiles[index]!, { channel: 'chromium', headless: true, viewport: { width: 1440, height: 1000 }, serviceWorkers: 'block', acceptDownloads: true }); contexts.add(context);

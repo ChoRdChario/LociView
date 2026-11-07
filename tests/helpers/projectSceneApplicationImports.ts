@@ -356,6 +356,7 @@ export const projectSceneApplicationImports:Readonly<Record<string,readonly stri
     "../ui/projectScene/captionWindowControls",
     "../ui/projectScene/captionWindowState",
     "../ui/projectScene/mediaPreview",
+    "../ui/projectScene/mediaPreviewResources",
     "../ui/projectScene/navigationState",
     "../ui/projectScene/viewState",
     "./reviewView",

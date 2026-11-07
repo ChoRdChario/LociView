@@ -100,6 +100,10 @@ export function createMediaImageViewport(document: Document, viewport: HTMLEleme
   return { toolbar, imageHost, setImage(next: HTMLImageElement | null) {
     if (disposed) return; if (image !== next) { stopDrag();releaseTouches();image = next; fitting = true; scale = 1; viewport.scrollLeft = viewport.scrollTop = 0; }
     layout();
+  }, capture() { return { fitting, scale, left: viewport.scrollLeft || 0, top: viewport.scrollTop || 0 }; },
+  restore(saved: { fitting: boolean; scale: number; left: number; top: number }) {
+    if (disposed || !image) return; fitting = saved.fitting; scale = Math.max(fitScale(), Math.min(8, saved.scale)); layout();
+    viewport.scrollLeft = fitting ? 0 : saved.left; viewport.scrollTop = fitting ? 0 : saved.top;
   }, render: layout, dispose() { stopDrag();releaseTouches();disposed = true; image = null; resize?.disconnect(); document.defaultView?.removeEventListener('resize', layout);
     viewport.removeEventListener('wheel', wheel); viewport.removeEventListener('pointerdown', down); viewport.removeEventListener('pointermove', move);
     viewport.removeEventListener('pointerup', up); viewport.removeEventListener('pointercancel', up); viewport.removeEventListener('lostpointercapture', up); viewport.removeEventListener('keydown', key); } };

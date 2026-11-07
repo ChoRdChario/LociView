@@ -19,6 +19,21 @@ const count = (s: SyntheticSession, id = f.shared) => {
   return source.captions.find(c => c.id === id)!.mediaCount;
 };
 describe('same-host known PNG media connection; not decoder adoption, raster, IME or persistence', () => {
+  it('restores background inspection only for the image actually displayed, not a replacement source',()=>{
+    const document=new RecordedDocument(),dom=document.asDocument();Object.assign(document,{hidden:false});
+    const viewer=createMediaViewer(dom),root=record(viewer.root),contentNode=nodes(root).find(n=>n.className==='lv-media-viewer-content')!;
+    const content=Object.assign(contentNode,{clientWidth:400,clientHeight:200,scrollLeft:0,scrollTop:0});
+    let group:MediaPreviewGroup={scope:'same-owner',label:'記録',items:[{id:'photo',resourceId:'media',label:'写真',description:'',image:{blob:new Blob(['a'],{type:'image/png'})}}]};
+    const show=()=>{viewer.render();const img=nodes(root).find(n=>n.tag==='img')!;Object.assign(img,{naturalWidth:800,naturalHeight:400});img.fire('load');return img;};
+    viewer.open(()=>group,'photo',document.createElement('button') as unknown as HTMLElement);show();button(root,'原寸').click();content.scrollLeft=123;content.scrollTop=57;
+    // Releasing the original can synchronously repaint the owning workspace.
+    const revoke=vi.spyOn(URL,'revokeObjectURL').mockImplementation(()=>{if((document as unknown as Document).hidden)viewer.render();});
+    Object.assign(document,{hidden:true});viewer.render();expect(nodes(root).filter(n=>n.tag==='img')).toHaveLength(0);expect(root.open).toBe(true);
+    Object.assign(document,{hidden:false});show();expect(named(root,'画像の表示倍率').textContent).toBe('100%');expect(content.scrollLeft).toBe(123);
+    group={...group,items:[{...group.items[0]!,image:{blob:new Blob(['b'],{type:'image/png'})}}]};
+    Object.assign(document,{hidden:true});viewer.render();Object.assign(document,{hidden:false});show();expect(named(root,'画像の表示倍率').textContent).toBe('50%');expect(content.scrollLeft).toBe(0);
+    viewer.dispose();revoke.mockRestore();
+  });
   it('mounts only one selected native player, preserving pause/source/URL and stale-event cleanup',()=>{
     const document=new RecordedDocument(),dom=document.asDocument(),createElement=dom.createElement.bind(dom),players:RecordedNode[]=[],pause=vi.fn(),load=vi.fn();
     vi.spyOn(dom,'createElement').mockImplementation(((tag:string)=>{const node=createElement(tag);if(tag==='video'||tag==='audio'){Object.assign(node,{pause,load,removeAttribute:(name:string)=>record(node).attributes.delete(name)});players.push(record(node));}return node;}) as Document['createElement']);
@@ -27,6 +42,7 @@ describe('same-host known PNG media connection; not decoder adoption, raster, IM
     const viewer=createMediaViewer(dom),thumbnails=createMediaThumbnails(dom,()=>group,viewer),root=record(viewer.root);expect(players).toHaveLength(0);thumbnails.render();expect(players).toHaveLength(0);
     viewer.open(()=>group,'a',document.createElement('button') as unknown as HTMLElement);expect(players).toHaveLength(1);expect((players[0] as unknown as HTMLVideoElement).autoplay).toBe(false);expect((players[0] as unknown as HTMLVideoElement).controls).toBe(true);
     named(root,'次のメディア').fire('click');expect(players).toHaveLength(2);expect(pause).toHaveBeenCalledOnce();expect(revoke).toHaveBeenCalledOnce();
+    Object.assign(document,{hidden:true});viewer.render();expect(players).toHaveLength(2);expect(pause).toHaveBeenCalledOnce();Object.assign(document,{hidden:false});
     const previousText=nodes(root).map(n=>n.textContent).join();players[0]!.fire('error');expect(nodes(root).map(n=>n.textContent).join()).toBe(previousText);
     group={...group,scope:'other'};viewer.render();expect(root.open).toBe(false);expect(pause).toHaveBeenCalledTimes(2);expect(revoke).toHaveBeenCalledTimes(2);viewer.dispose();thumbnails.dispose();create.mockRestore();revoke.mockRestore();
   });

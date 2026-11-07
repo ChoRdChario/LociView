@@ -135,6 +135,17 @@ describe('synthetic Scene display; GPU mocked, not rendered/browser acceptance',
     const [id,fn]=[...tracker.raf][0]!;tracker.raf.delete(id);fn();
     expect(listener).not.toHaveBeenCalled();expect(changed).toHaveBeenCalled();expect(v.read().display).toBe(replacement);v.dispose();
   });
+  it.each(['sync','late'] as const)('finishes independent teardown and stays inactive after a %s resident cleanup failure',async mode=>{
+    const base=syntheticDisplay(createSyntheticProject(),f.overview,null,null),source=base.models[0]!,canvas=fakeCanvas(),demand=vi.fn(),asset=new THREE.Group(),mesh=new THREE.Mesh(new THREE.PlaneGeometry(),new THREE.MeshStandardMaterial());asset.add(mesh);
+    const model:ReadonlyRenderModel={shape:'render-glb',key:'failing-cleanup',assetId:source.binding.assetId,assetToProject:source.binding.assetToProject,representation:source.representation as ReadonlyRenderModel['representation']};
+    let rejectIdle!:(reason:Error)=>void;const late=new Promise<void>((_resolve,reject)=>{rejectIdle=reject;});void late.catch(()=>{});
+    const create=vi.fn(()=>({asset,mesh,dispose(){if(mode==='sync')throw Error('uncertain native cleanup');}})),v=sceneViewportFactory({demand,create,dispose(){},idle:()=>mode==='late'?late:Promise.resolve()})(canvas.canvas as unknown as HTMLCanvasElement,()=>{});
+    v.update({...base,models:[model],readOnly:true,pinEdit:undefined,modelEdit:undefined,preview:undefined});v.setActive(true);canvas.show();const renderer=tracker.renderers.at(-1);
+    expect(()=>v.setActive(false)).not.toThrow();expect(renderer.disposed).toBe(true);
+    const rejected=expect(v.idle!()).rejects.toThrow('解放を確認');if(mode==='late')rejectIdle(Error('解放を確認できません。画面を閉じて開き直してください。'));await rejected;
+    const count=tracker.renderers.length;v.setActive(true);expect(tracker.renderers).toHaveLength(count);expect(v.read().ready).toBe(false);expect(v.read().issue).toContain('開き直してください');
+    expect(demand).toHaveBeenLastCalledWith([]);v.dispose();mesh.geometry.dispose();(mesh.material as THREE.Material).dispose();
+  });
   it('does not evict a staged startup template before first activation; real deactivation releases demand',()=>{
     const base=syntheticDisplay(createSyntheticProject(),f.overview,null,null),source=base.models[0]!,canvas=fakeCanvas(),demand=vi.fn(),asset=new THREE.Group(),mesh=new THREE.Mesh(new THREE.PlaneGeometry(),new THREE.MeshStandardMaterial());asset.add(mesh);
     const model:ReadonlyRenderModel={shape:'render-glb',key:'staged',assetId:source.binding.assetId,assetToProject:source.binding.assetToProject,representation:source.representation as ReadonlyRenderModel['representation']};

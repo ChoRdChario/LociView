@@ -79,6 +79,8 @@ export interface WorkspaceViewport {
   /** Visual output of the exact installed state; contains no command/capture proof. */
   observePresentation?(listener: (frame: WorkspaceViewportPresentation) => boolean): () => void;
   update(state: WorkspaceViewportState): void;
+  /** Wait for this hidden viewport's prior native work and cleanup. */
+  idle?(): Promise<void>;
   pick(xCss: number, yCss: number, assetId?: string, directCreation?: boolean): { target: WorkspaceSurface; position: Point3; point?: { readonly pointIndex: number } } | null;
   setPointDiameter?(assetId: string, diameter: number): void;
   pointDiameter?(assetId: string): number;

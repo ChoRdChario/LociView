@@ -1,5 +1,6 @@
-import { chromium, expect, test, type BrowserContext, type Page, type TestInfo } from '@playwright/test';
-import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
+import {test, createBrowserProfile} from '../helpers/browserProfile';
+import { chromium, expect, type BrowserContext, type Page, type TestInfo } from '@playwright/test';
+import { writeFile } from 'node:fs/promises';
 import { openAsBlob } from 'node:fs';
 import * as A from '@automerge/automerge';
 import { ownedServer } from './server';
@@ -32,7 +33,7 @@ for (const base of ['/', '/LociView/']) test(`same-build cold boot repairs missi
   A.getHeads(A.init());
   const artifact = `${process.env.LOCIVIEW_OFFLINE_BUILDS}/${base === '/' ? 'a' : 'subpath'}`;
   const server = await ownedServer(artifact, base), errors: string[] = [], stages: unknown[] = [];
-  await mkdir('.artifacts/e2e/profiles', { recursive: true }); const profile = await mkdtemp('.artifacts/e2e/profiles/br-');
+  const profile = await createBrowserProfile('br');
   let context: BrowserContext | undefined;
   async function launch(disconnected = false) {
     context = await chromium.launchPersistentContext(profile, { channel: 'chromium', headless: true,
@@ -126,7 +127,7 @@ for (const base of ['/', '/LociView/']) test(`same-build cold boot repairs missi
 
 test('two controlled windows share one exact resource repair while state inspection stays readonly', async ({}, info) => {
   const server = await ownedServer(`${process.env.LOCIVIEW_OFFLINE_BUILDS}/a`);
-  await mkdir('.artifacts/e2e/profiles', { recursive: true }); const profile = await mkdtemp('.artifacts/e2e/profiles/br-');
+  const profile = await createBrowserProfile('br');
   let context: BrowserContext | undefined, release: (() => void) | undefined;
   let first: Promise<string> | undefined, second: Promise<string> | undefined;
   const requests: string[] = [];

@@ -7,6 +7,7 @@ import type { ViewCameraIntent } from '../ui/projectScene/viewState';
 import type { ReviewView } from './reviewView';
 import type { ViewportFactory, ProjectViewport } from './viewportPorts';
 import { createMediaViewer, createMediaThumbnails, mediaDisplayDescription, type MediaPreviewGroup } from '../ui/projectScene/mediaPreview';
+import { createMediaResidencyGate } from '../ui/projectScene/mediaPreviewResources';
 import { createCameraGizmo } from '../ui/projectScene/cameraGizmo';
 import { mountContextHelp } from '../ui/projectScene/contextHelp';
 import { displayBlobRef } from '../domain/portableMedia';
@@ -31,10 +32,12 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
   const sceneName = make('h2', view.sceneName), emptyCaptions=make('p','このシーンにキャプションはありません。'),status = make('p'), retry = make('button', '3D表示を再試行'); status.setAttribute('role', 'status'); retry.type = 'button';
   const footer = make('p', '閲覧用ファイルです。');
   viewport.append(canvas, overlay); stage.append(viewport); content.append(stage, sidebar); root.append(header, status, retry, content, footer);
-  const mediaViewer = createMediaViewer(document, view.rasterResources,view.imageDimensions); root.append(mediaViewer.root);
+  const mediaWork = createMediaResidencyGate(document, render, () => runtime?.idle?.() ?? Promise.resolve(), () => !disposed);
+  const mediaViewer = createMediaViewer(document, view.rasterResources,view.imageDimensions,mediaWork.acquire); root.append(mediaViewer.root);
   let memory: SceneUiMemory = { selectedCaptionId: null, search: '', pinColors: null, listScrollTop: 0, ownerFilter: { kind: 'all' } };
   let windowsMemory = newCaptionWindowMemory(view.source.sceneId), composing = false, moving = false, disposed = false, rendering = false;
   let runtime: ProjectViewport | undefined, display = view.display(null, null), failure = '', rendererFailure = '';
+  let retirement: Promise<void> | undefined;
   const copy = make('button', '編集コピーを作る'), confirmation = make('section'); copy.type = 'button'; copy.hidden = !editCopy;
   confirmation.hidden = true; confirmation.setAttribute('aria-label', '編集コピーの確認');
   confirmation.append(make('p', '独立したプロジェクトを作成します。元ファイルは変更しません。元のプロジェクトへの変更分の返送には使えません。'));
@@ -44,7 +47,7 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
   const confirmCopy = make('button', 'コピーを作成'), cancelCopy = make('button', '戻る'); confirmCopy.type = cancelCopy.type = 'button';
   let handoffBusy = false, refreshAppend = () => {};
   const setHandoffBusy = (active: boolean) => {
-    handoffBusy = active; confirmCopy.disabled = cancelCopy.disabled = copy.disabled = active; refreshAppend();
+    handoffBusy = active; confirmCopy.disabled = cancelCopy.disabled = copy.disabled = active; refreshAppend(); render();
   };
   confirmation.append(confirmCopy, cancelCopy); header.append(copy); root.append(confirmation);
   copy.addEventListener('click', () => { if (!disposed && !handoffBusy && !copy.disabled && !composing && !moving) confirmation.hidden = false; });
@@ -52,7 +55,7 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
   confirmCopy.addEventListener('click', () => {
     if (disposed || handoffBusy || composing || moving || confirmation.hidden || confirmCopy.disabled) return;
     setHandoffBusy(true);
-    void Promise.resolve().then(() => editCopy?.()).catch(error => { if (!disposed) { failure = (error as Error).message; paint(); } })
+    void Promise.resolve().then(async () => { await runtime?.idle?.(); if (!disposed) await editCopy?.(); }).catch(error => { if (!disposed) { failure = (error as Error).message; paint(); } })
       .finally(() => { if (!disposed) setHandoffBusy(false); });
   });
   if (append) {
@@ -115,7 +118,7 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
       setHandoffBusy(true);
       content.inert = true;
       note.textContent = 'シーンを追加しています。';
-      void apply().catch(error => { if (!disposed) note.textContent = (error as Error).message; }).finally(() => {
+      void Promise.resolve().then(async () => { await runtime?.idle?.(); if (!disposed) await apply(); }).catch(error => { if (!disposed) note.textContent = (error as Error).message; }).finally(() => {
         if (disposed) return;
         // A stale preview cannot be used again. Re-selecting refreshes it.
         pending = undefined; select.value = ''; setHandoffBusy(false);
@@ -220,12 +223,12 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
       windows.render({ source: view.source, memory: windowsMemory, selectedId: memory.selectedCaptionId,
       moveBlock: composing ? '文字の入力を確定してください。' : null });
       const empty=view.source.captions.length===0;emptyCaptions.hidden=!empty;list.root.hidden=selectedMedia.hidden=windows.tools.hidden=empty;
-      display = view.display(memory.pinColors, memory.selectedCaptionId); runtime?.update(display); paint(); }
+      display = view.display(memory.pinColors, memory.selectedCaptionId); runtime?.setActive(!handoffBusy && !mediaWork.active && document.hidden !== true); runtime?.update(display); paint(); }
     catch (error) { failure = (error as Error).message; paint(); } finally { rendering = false; }
   }
   function startRenderer() {
     let candidate: ProjectViewport | undefined;
-    try { candidate = factory(canvas, paint); candidate.update(display); candidate.setActive(true); runtime = candidate; rendererFailure = ''; }
+    try { candidate = factory(canvas, paint); candidate.update(display); candidate.setActive(!handoffBusy && !mediaWork.active && document.hidden !== true); runtime = candidate; rendererFailure = ''; }
     catch (error) { candidate?.dispose(); rendererFailure = (error as Error).message; }
   }
   retry.addEventListener('click', () => {
@@ -233,8 +236,23 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
     try { if (runtime) runtime.retry(); else startRenderer(); failure = ''; }
     catch (error) { failure = (error as Error).message; } paint();
   });
+  document.addEventListener?.('visibilitychange',render);
   render();
   startRenderer(); paint();
-  return { root, render, hasChanges: () => composing || moving, dispose() { if (disposed) return; disposed = true;
-    cameraGizmo.dispose(); stopHelp(); list.dispose(); panelGallery?.dispose(); windows.dispose(); mediaViewer.dispose(); runtime?.dispose(); pins.clear(); root.remove(); } };
+  return { root, render, hasChanges: () => composing || moving, dispose() {
+    if (retirement) return retirement;
+    let finish!: () => void, fail!: (error: unknown) => void;
+    retirement = new Promise<void>((resolve, reject) => { finish = resolve; fail = reject; });
+    void retirement.catch(() => {}); disposed = true;
+    const errors: unknown[] = [], attempt = <T>(action: () => T): T | undefined => { try { return action(); } catch (error) { errors.push(error); } };
+    attempt(() => document.removeEventListener?.('visibilitychange',render));
+    for (const stop of [() => cameraGizmo.dispose(), stopHelp, () => list.dispose(), () => panelGallery?.dispose(), () => windows.dispose()]) attempt(stop);
+    const media = attempt(() => mediaViewer.dispose()); attempt(() => runtime?.dispose()); pins.clear(); attempt(() => root.remove());
+    const viewport = attempt(() => runtime?.idle?.());
+    void Promise.allSettled([media, viewport]).then(results => {
+      errors.push(...results.flatMap(result => result.status === 'rejected' ? [result.reason] : []));
+      if (errors.length) throw new AggregateError(errors, '表示の終了処理を完了できませんでした。再読み込みしてください。');
+    }).then(finish, fail);
+    return retirement;
+  } };
 }

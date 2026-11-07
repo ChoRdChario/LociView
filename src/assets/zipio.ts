@@ -75,11 +75,12 @@ const V1_MANIFEST_ENTRY = 'lociview.json';
 const NATIVE_PORTABLE_MANIFEST_ENTRY = 'native/package.json';
 
 class BoundedIdentityBlobReader extends BlobReader {
-  constructor(private readonly sourceBlob: Blob) {
+  constructor(private readonly sourceBlob: Blob, private readonly signal?: AbortSignal) {
     super(sourceBlob);
   }
 
   override async readUint8Array(index: number, length: number): Promise<Uint8Array> {
+    this.signal?.throwIfAborted();
     if (length > MAX_ZIP_IDENTITY_READ_BYTES) {
       throw new ZipGuardError(
         'entry-too-large',
@@ -90,7 +91,8 @@ class BoundedIdentityBlobReader extends BlobReader {
     // arrayBuffer() when a read spans the whole Blob, which defeats the
     // ordinary-entry guarantee for small archives and makes it hard to prove
     // that package-wide materialization is not part of dispatch.
-    return new Uint8Array(await this.sourceBlob.slice(index, index + length).arrayBuffer());
+    const bytes = new Uint8Array(await this.sourceBlob.slice(index, index + length).arrayBuffer());
+    this.signal?.throwIfAborted(); return bytes;
   }
 }
 
@@ -184,13 +186,16 @@ export async function inspectZipContainerIdentity(
 export async function inspectZipContainerMetadata(
   blob: Blob,
   limits: ZipLimits = DEFAULT_ZIP_LIMITS,
+  signal?: AbortSignal,
 ): Promise<ZipContainerMetadata> {
+  signal?.throwIfAborted();
   if (!Number.isSafeInteger(blob.size) || blob.size < 1) {
     throw new Error('ZIP identity: file is empty or too large');
   }
-  const reader = new ZipReader(new BoundedIdentityBlobReader(blob), { strictness: 'strict' });
+  const reader = new ZipReader(new BoundedIdentityBlobReader(blob, signal), { strictness: 'strict' });
   try {
     const entries = await reader.getEntries({ strictness: 'strict', checkAmbiguity: true });
+    signal?.throwIfAborted();
     if (entries.length > limits.maxEntries) {
       throw new ZipGuardError('too-many-entries', `entries: ${entries.length} > ${limits.maxEntries}`);
     }
@@ -198,6 +203,7 @@ export async function inspectZipContainerMetadata(
     let declaredTotal = 0;
     const normalizedEntries: { path: string; directory: boolean }[] = [];
     for (const entry of entries) {
+      signal?.throwIfAborted();
       if (entry.bitFlag?.languageEncodingFlag === true) fatalUtf8Decoder.decode(entry.rawFilename);
       const path = normalizedEntryPath(entry.filename, entry.directory);
       if (path === null) {

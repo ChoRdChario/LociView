@@ -1,7 +1,8 @@
+import {test, createBrowserProfile} from '../helpers/browserProfile';
 import { desktopEntry, desktopOrigin } from './desktopEntry';
 import { selectShareOutput,  closeFileSurface, revealFileSurface, revealModelManagement, lookAlongFront } from './workspaceUi';
-import {test,expect,chromium,type Page,type BrowserContext,type TestInfo} from '@playwright/test';
-import {mkdir,mkdtemp} from 'node:fs/promises';
+import {expect,chromium,type Page,type BrowserContext,type TestInfo} from '@playwright/test';
+
 import {openAsBlob} from 'node:fs';
 import {createHash} from 'node:crypto';
 import * as A from '@automerge/automerge';
@@ -32,7 +33,7 @@ async function verifyBody(b:BackupArchive,digest:string){const file=b.archive.en
 
 test('50万点SH4を新しい本体へ差し替え、旧資源の解放・2世代原本・保存・cold再開を確認する',async({},info)=>{
  test.setTimeout(3_600_000);A.getHeads(A.init());const original=await largeGsFixture(),updated=await largeGsFixture(2),errors:string[]=[],stages:any[]=[],started=Date.now();
- await mkdir('.artifacts/e2e/profiles',{recursive:true});const profile=await mkdtemp('.artifacts/e2e/profiles/gs-replacement-');let context:BrowserContext|undefined;
+ const profile=await createBrowserProfile('gs-replacement');let context:BrowserContext|undefined;
  const mark=async(stage:string,p:Page)=>{await p.evaluate(()=>document.dispatchEvent(new Event('lociview-timing-snapshot')));stages.push({stage,wallMs:Date.now()-started,timing:await p.evaluate(()=>performance.getEntriesByType('measure').map(e=>({name:e.name,ms:e.duration,detail:(e as PerformanceMeasure).detail})))});console.log(stage,Date.now()-started);};
  const launch=async()=>{context=await chromium.launchPersistentContext(profile,{channel:'chromium',headless:true,viewport:{width:1440,height:1000},serviceWorkers:'block',acceptDownloads:true});context.setDefaultTimeout(15_000);
   await context.route('**/*',route=>{const url=new URL(route.request().url());return url.origin===desktopOrigin||['blob:','data:'].includes(url.protocol)?route.continue():route.abort('blockedbyclient');});

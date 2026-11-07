@@ -64,12 +64,14 @@ export const identityPlacement = () => ({ translation: [0, 0, 0], rotationXYZW: 
 
 /** Own native input before awaits; GS and opted-in packages retain native views. */
 export function validationModelFile(input: {label:string;file:Blob}, budget: ProjectFilePolicyInput): Promise<ValidationModelFile>;
-export function validationModelFile(input: {label:string;file:Blob}, budget: ProjectFilePolicyInput, keepPackage: true, maxBufferedBytes?:number): Promise<ValidationModelFile | ValidationPackageFile>;
-export async function validationModelFile(input: {label:string;file:Blob}, budget: ProjectFilePolicyInput, keepPackage=false, maxBufferedBytes?:number): Promise<ValidationModelFile | ValidationPackageFile> {
+export function validationModelFile(input: {label:string;file:Blob}, budget: ProjectFilePolicyInput, keepPackage: true, maxBufferedBytes?:number, signal?:AbortSignal): Promise<ValidationModelFile | ValidationPackageFile>;
+export async function validationModelFile(input: {label:string;file:Blob}, budget: ProjectFilePolicyInput, keepPackage=false, maxBufferedBytes?:number, signal?:AbortSignal): Promise<ValidationModelFile | ValidationPackageFile> {
+  signal?.throwIfAborted();
   const policy=projectFilePolicy(budget), limits=policy.nonGs;
   const name=input.label,file=captureGsBlob(input.file);
   if(!Number.isSafeInteger(file.size)||file.size<=0||file.size>Math.max(policy.gs.maxFileBytes, keepPackage && policy.projectBodyBytes>limits.maxFileBytes ? PACKAGE_LIMITS.archiveBytes : limits.maxFileBytes))return fileError('選択したファイルがこの検証の上限を超えています。');
   const prefix=new Uint8Array(await file.slice(0,65536).arrayBuffer());
+  signal?.throwIfAborted();
   if(isPointPly(prefix)&&hasGsPlySignature(prefix)){
     if(file.size>policy.gs.maxFileBytes)return fileError('GSが容量の上限を超えています。');
     return {label:name,file};
@@ -78,7 +80,8 @@ export async function validationModelFile(input: {label:string;file:Blob}, budge
   if(keepPackage&&prefix[0]===0x50&&prefix[1]===0x4b&&
     (prefix[2]===3&&prefix[3]===4||prefix[2]===5&&prefix[3]===6||prefix[2]===7&&prefix[3]===8))return {label:name,package:file};
   if(file.size>Math.min(limits.maxFileBytes,maxBufferedBytes ?? limits.maxFileBytes))return fileError('選択したファイルが容量の上限を超えています。');
-  return {label:name,bytes:new Uint8Array(await file.arrayBuffer())};
+  const bytes=new Uint8Array(await file.arrayBuffer());signal?.throwIfAborted();
+  return {label:name,bytes};
 }
 
 export function prepareValidationModel(input: ValidationFile, budget: ProjectFilePolicyInput, decode?: PngDecoder, assetId?: string, jpeg?: JpegDecoder, gsContext?: GsModelPreparation): Promise<PreparedValidationModel>;

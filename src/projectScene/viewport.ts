@@ -136,41 +136,48 @@ export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: 
     poses.set(display.sceneId, pose); backgrounds.set(display.sceneId, background); entryPending = false; axis = null;
   }
   function clearSmooth(){if(!presentation)return;smoothGeneration++;smoothAbort?.abort();smoothAbort=null;composite?.dispose();composite=null;smoothPending=false;smoothLayout=null;smoothIssue=null;smoothPresented=false;waitingBudget=false;delete canvas.dataset.compositionBytes;delete canvas.dataset.renderScale;}
+  const retiring = new Set<Promise<void>>(); let cleanupFailure: unknown;
+  function trackRetirement(work: Promise<void>) {
+    const owned = work.catch(error => { cleanupFailure ??= error; }).finally(() => retiring.delete(owned)); retiring.add(owned);
+  }
+  function retireGs(port: GsRenderPort) {
+    try { port.dispose(); } catch (error) { cleanupFailure ??= error; throw error; }
+    finally { trackRetirement(port.idle?.() ?? Promise.resolve()); }
+  }
+  function cleanup(steps: readonly (() => void)[]) {
+    const errors: unknown[] = []; for (const step of steps) try { step(); } catch (error) { errors.push(error); }
+    if (errors.length) { const failure = new AggregateError(errors, '表示資源の解放を確認できません。画面を閉じて開き直してください。'); cleanupFailure ??= failure; throw failure; }
+  }
   function clearGs(preserve?:GsViewIntent|null) {
-    clearSmooth();
-    if(gsIntent!==preserve)gsIntent?.cancel();gsIntent=preserve??null;if(!preserve)gsIntentKey='';
+    const oldIntent=gsIntent,previous=gsRender;gsRender=null;
+    gsIntent=preserve??null;if(!preserve)gsIntentKey='';
     coverageIssue=null;
-    gsGeneration++;gsPreparationAbort?.abort();gsPreparationAbort=null;gsRender?.dispose();gsRender=null;gsPreparing=false;gsIssue=null;
+    gsGeneration++;gsPreparationAbort?.abort();gsPreparationAbort=null;gsPreparing=false;gsIssue=null;
     for(const surface of resident.values())if(surface.gs){surface.gs.ready=false;surface.gs.issue=null;}
+    cleanup([clearSmooth,()=>{if(oldIntent!==preserve)oldIntent?.cancel();},()=>{if(previous)retireGs(previous);}]);
   }
   function clearModels(preserve?:GsViewIntent|null) {
-    clearGs(preserve);
-    coverageProbe?.dispose(); coverageProbe = null; coverageIssue = null;
-    for (const surface of resident.values()) surface.dispose?.();
+    const surfaces=[...resident.values()],children=[...models.children],probe=coverageProbe;coverageProbe=null;coverageIssue=null;
     resident.clear();residentKeys.clear();residentModelKeys.clear();modelStructureKey='';
-    for (const child of [...models.children]) {
-      child.traverse(node => { if (node instanceof THREE.Mesh) { node.geometry.dispose(); (node.material as THREE.Material).dispose(); } });
-      models.remove(child);
-    }
+    cleanup([()=>clearGs(preserve),()=>probe?.dispose(),...surfaces.map(surface=>()=>surface.dispose?.()),...children.map(child=>()=>{
+      try { child.traverse(node => { if (node instanceof THREE.Mesh) cleanup([()=>node.geometry.dispose(),()=>{for(const material of Array.isArray(node.material)?node.material:[node.material])material.dispose();}]); }); }
+      finally { models.remove(child); }
+    })]);
   }
   function release() {
     frameGeneration++;
-    saved.demand?.([]);
-    endNavigation(undefined,false);
     pickEpoch++;
     pinPointerActive = false;
-    gizmo?.dispose(); gizmo = null;
-    observePose(); cancelAnimationFrame(raf); raf = 0; controls?.dispose(); controls = null; camera = null;
-    clearModels();
+    const oldGizmo=gizmo,oldControls=controls,oldRenderer=renderer,oldTarget=rendererTarget;
+    observePose();cancelAnimationFrame(raf);raf=0;gizmo=null;controls=null;camera=null;renderer=null;rendererTarget=undefined;modelKey='';dragging=false;modelFailures.clear();
     // Three clears renderer properties during dispose. Release its source-map
     // uploads first, retaining template CPU images for the next renderer.
-    for(const texture of rendererTextures)texture.dispose();rendererTextures.clear();
-    for (const lease of textureLeases.values()) lease.release(); textureLeases.clear();
-    renderer?.dispose(); renderer = null; modelKey = ''; dragging = false;
-    modelFailures.clear();
-    rendererTarget?.release(); rendererTarget = undefined;
+    const textures=[...rendererTextures],leases=[...textureLeases.values()];rendererTextures.clear();textureLeases.clear();
+    cleanup([()=>saved.demand?.([]),()=>endNavigation(undefined,false),()=>oldGizmo?.dispose(),()=>oldControls?.dispose(),clearModels,
+      ...textures.map(texture=>()=>texture.dispose()),...leases.map(lease=>()=>lease.release()),()=>oldRenderer?.dispose(),()=>oldTarget?.release()]);
   }
-  function fail(e: unknown) { issue = `3D表示を停止しました。${errorText(e)} 編集内容は保持しています。`; release(); serial++; notify(); }
+  function fail(e: unknown) { issue = `3D表示を停止しました。${errorText(e)} 編集内容は保持しています。`;
+    try { release(); } catch (cleanup) { active=false;issue+=` ${errorText(cleanup)}`; } serial++; notify(); }
   function buildModels() {
     if (!display || !renderer) return;
     const structure=JSON.stringify([display.sceneId,display.readOnly,display.models.map(m=>[residentModelKey(m),loadState(m)]),display.hiddenAssetIds]);
@@ -354,13 +361,13 @@ export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: 
     const smooth=presentation?smoothMeshes():[];syncSmoothLayout(smooth);
     const sources=[...resident.values()].filter(s=>s.gs&&s.asset.visible).map(s=>s.gs!);
     if((import.meta.env.DEV||import.meta.env.MODE==='project-scene-validation'||import.meta.env.MODE==='project-scene-desktop'||import.meta.env.MODE==='project-scene-offline')&&sources.length&&!gsRender&&!gsPreparing&&!gsIssue){gsPreparing=true;const generation=gsGeneration,currentRenderer=renderer,intent=gsIntent,abort=new AbortController();gsPreparationAbort=abort;
-      void import('../viewer/gsRender').then(m=>{abort.signal.throwIfAborted();if(generation!==gsGeneration||renderer!==currentRenderer)throw new DOMException('表示準備を取り消しました。','AbortError');
+      trackRetirement(import('../viewer/gsRender').then(m=>{abort.signal.throwIfAborted();if(generation!==gsGeneration||renderer!==currentRenderer)throw new DOMException('表示準備を取り消しました。','AbortError');
         return m.createGsRender(currentRenderer,sources,()=>{if(abort.signal.aborted||generation!==gsGeneration)return;pickEpoch++;serial++;notify();},abort.signal,residency,intent??undefined,presentation?.budget);}).then(port=>{
-        if(generation!==gsGeneration||renderer!==currentRenderer){port.dispose();return;}clearSmooth();gsRender=port;gsPreparing=false;serial++;notify();
-      },e=>{if(generation===gsGeneration){gsIssue=errorText(e);gsPreparing=false;for(const source of sources){source.ready=false;source.issue=gsIssue;}serial++;notify();}});}
+        if(generation!==gsGeneration||renderer!==currentRenderer){retireGs(port);return;}clearSmooth();gsRender=port;gsPreparing=false;serial++;notify();
+      },e=>{if(generation===gsGeneration){gsIssue=errorText(e);gsPreparing=false;for(const source of sources){source.ready=false;source.issue=gsIssue;}serial++;notify();}}));}
     // Upload new projected attributes before Three traverses/uploads geometry, never in onBeforeRender.
     const before=()=>{for (const surface of resident.values()) if (surface.points) { const gl=renderer!.getContext(); surface.points.project(camera!,gsRender?.depthBits??gl.getParameter(gl.DEPTH_BITS) as number); }};
-    if(gsRender){try{if(presentation&&smooth.length&&smoothLayout&&!smoothIssue)gsRender.render(scene,camera,before,frame=>drawSmooth(smooth,before,frame));else hideSmooth(smooth,()=>gsRender!.render(scene,camera!,before));}catch(e){gsIssue=errorText(e);clearSmooth();const failed=gsRender;gsRender=null;try{failed.dispose();}catch(cleanup){gsIssue+=` ${errorText(cleanup)}`;}for(const s of sources){s.ready=false;s.issue=gsIssue;}pickEpoch++;serial++;notify();hideSmooth(smooth,()=>{before();renderer!.render(scene,camera!);});}}
+    if(gsRender){try{if(presentation&&smooth.length&&smoothLayout&&!smoothIssue)gsRender.render(scene,camera,before,frame=>drawSmooth(smooth,before,frame));else hideSmooth(smooth,()=>gsRender!.render(scene,camera!,before));}catch(e){gsIssue=errorText(e);clearSmooth();const failed=gsRender;gsRender=null;try{retireGs(failed);}catch(cleanup){gsIssue+=` ${errorText(cleanup)}`;}for(const s of sources){s.ready=false;s.issue=gsIssue;}pickEpoch++;serial++;notify();hideSmooth(smooth,()=>{before();renderer!.render(scene,camera!);});}}
     else if(presentation&&smooth.length)drawSmooth(smooth,before);else{before();renderer.render(scene,camera);}
     if(presentation)canvas.dataset.compositionDocumentBytes=String(presentation.budget.used);
     // New draw owners have acquired their program refs before the old source table retires.
@@ -500,13 +507,20 @@ export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: 
       else if (boundsChanged) { observePose(); installPose(); }
       buildModels(); previewModels(); gizmo?.update(next.modelEdit ?? next.pinEdit); serial++;
     },
+    async idle() {
+      if (cleanupFailure) throw cleanupFailure;
+      try { await saved.idle?.(); } catch (error) { cleanupFailure ??= error; throw error; }
+      while (retiring.size) await Promise.all([...retiring]); if (cleanupFailure) throw cleanupFailure;
+    },
     pointDiameter(assetId) { return pointDiameters.get(assetId) ?? 3; },
     setPointDiameter(assetId, input) { const resolved = resolvePointPresentation(pointRegistrySnapshot, defaultPointProfile, input), diameter = resolved.diameterCssPixels; pointDiameterNotice = resolved.diagnosedDefault ? '点の大きさを既定の3pxに戻しました。' : null;
       if (diameter === (pointDiameters.get(assetId) ?? 3)) return;
       pointDiameters.set(assetId, diameter); configurePoints(); pickEpoch++; serial++; notify(); },
     setActive(next) {
+      if (cleanupFailure) { active=false;issue=errorText(cleanupFailure);return; }
       const activating=next&&!active,retained=Boolean(next&&active&&renderer&&camera&&!issue);
-      if (!next) release(); active = next;
+      active = next;
+      if (!next) try { release(); } catch(error) { cleanupFailure??=error;issue=errorText(error);return; }
       requestModels(blockedNext ?? display);
       if(activating&&blockedNext)viewport.update(blockedNext);
       // Unchanged active state is common after camera/sort observations. Actual
@@ -605,8 +619,9 @@ export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: 
       poses.set(display.sceneId, pose); backgrounds.set(display.sceneId, background); notice = null; serial++; notify();
     },
     retry() { saved.retry?.(); if(blockedNext){this.update(blockedNext);ensure();return;} if (contextLost) throw new Error('描画環境の復旧を待って再試行してください。'); release(); issue = null; requestModels(display); ensure(); },
-    dispose() { disposed = true;presentationListeners.clear();unsubscribeTargets?.();unsubscribeResidents?.();unsubscribeAdmission?.(); release(); resize.disconnect(); canvas.removeEventListener('pointerdown', mouseNavigation, true);
-      canvas.removeEventListener('webglcontextlost', lost); canvas.removeEventListener('webglcontextrestored', restored); },
+    dispose() { disposed = true;presentationListeners.clear();unsubscribeTargets?.();unsubscribeResidents?.();unsubscribeAdmission?.(); try { release(); }
+      finally { resize.disconnect(); canvas.removeEventListener('pointerdown', mouseNavigation, true);
+      canvas.removeEventListener('webglcontextlost', lost); canvas.removeEventListener('webglcontextrestored', restored); } },
   };
   const unsubscribeResidents=saved.subscribe?.(()=>{if(disposed||!display&&!blockedNext)return;
     if(!active){modelKey='';serial++;notify();return;}

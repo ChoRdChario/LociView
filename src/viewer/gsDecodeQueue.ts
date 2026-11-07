@@ -54,21 +54,22 @@ interface Job { start():Promise<void>; cancel():void }
 const waiting=new Map<object,Job>();let running=false;
 async function drain(){if(running)return;running=true;try{while(waiting.size){const [owner,job]=waiting.entries().next().value!;waiting.delete(owner);await job.start();}}finally{running=false;}}
 export function queueGsDecode<T>(owner:object,create:()=>{initialized:Promise<unknown>;value:T;dispose():void},acquire?:()=>GsReservation) {
-  let cancelled=false,adopted=false,release:(()=>void)|undefined,reservation:GsReservation|undefined;
+  let cancelled=false,adopted=false,cleanupFailed=false,release:(()=>void)|undefined,reservation:GsReservation|undefined;
   let resolve!:(value:T)=>void,reject!:(error:unknown)=>void;
   const promise=new Promise<T>((yes,no)=>{resolve=yes;reject=no;});
   const abort=()=>new DOMException('表示準備を取り消しました。','AbortError');
   const job:Job={cancel(){cancelled=true;reservation?.retire();if(waiting.get(owner)===job){waiting.delete(owner);reject(abort());}if(adopted){try{release?.();}finally{release=undefined;}}},async start(){
-    if(cancelled){reject(abort());return;}let candidate:ReturnType<typeof create>|undefined,attempted=false;
+    if(cancelled){reject(abort());return;}let candidate:ReturnType<typeof create>|undefined,attempted=false,creating=false;
     const dispose=()=>{if(attempted)return;attempted=true;reservation?.retire();
       // A throwing constructor/cleanup cannot prove that the vendor released its resources.
-      if(candidate){candidate.dispose();reservation?.release();}
+      if(candidate){try{candidate.dispose();reservation?.release();}catch(error){cleanupFailed=true;throw error;}}
+      else if(creating)cleanupFailed=true;
     };
-    try{reservation=acquire?.();candidate=create();await candidate.initialized;
+    try{reservation=acquire?.();creating=true;candidate=create();await candidate.initialized;
       if(cancelled){dispose();reject(abort());return;}
       adopted=true;release=dispose;resolve(candidate.value);
     }catch(e){try{dispose();reject(e);}catch(cleanup){reject(new AggregateError([e,cleanup],'GSの表示資源を解放できません。'));}}
   }};
   waiting.get(owner)?.cancel();waiting.set(owner,job);void drain();
-  return {promise,cancel:job.cancel};
+  return {promise,cancel:job.cancel,get cleanupFailed(){return cleanupFailed;}};
 }

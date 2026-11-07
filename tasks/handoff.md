@@ -17,6 +17,18 @@ same-build/SRI boot-resource repair; it does not permit arbitrary network fallba
 foreign cache/Project writes or forced activation. Follow their recorded contracts
 and todo rather than renewing an approval from historical prose.
 
+[01i §7.0](../docs/specs/01i-high-resolution-pc-workflow-proposal.md) authorizes
+transient thumbnails and coarse-pointer image/3D residency, including canonical
+media-add/retry preparation. Original bytes, native-quality explicit originals,
+offline use and save/recovery fences stay unchanged. Owned idle must drain native
+cleanup successfully; a finished task alone is not proof of released resources.
+Review copy/Scene-add also retire their owned3D and await idle before handoff;
+initial readonly sniff/ZIP classification retains cancel ownership through pending
+native reads. This does not change storage/publication/recovery checks or introduce
+a Safari RAM guarantee or persistent derivative cache. UI/display retirement now
+propagates through Project changes, restoration and delayed renderer replacement;
+a failed retirement is retained for that selector lifetime until reload.
+
 ## Verification and delivery
 
 [AGENTS.md](../AGENTS.md) owns working rules and required checks. Reuse passed

@@ -10,7 +10,7 @@ import { validationMetadataLimits, projectFilePolicy, type FileValidationLimits,
 import { initializeBrowserMetadata, openBrowserMetadataStorage, browserMetadataDatabaseNames, browserOriginalDatabasePresent } from './browserMetadataStorage';
 import { openValidationEntry, validationArea, measureValidation, type ValidationTiming } from './validationHost';
 import { listValidationProjects } from './validationCatalog';
-import { createValidationWorkspace, type MountedEditorFactory } from './validationWorkspace';
+import { createValidationWorkspace, DisplayRetirementError, type MountedEditorFactory } from './validationWorkspace';
 import { prepareValidationResidents, prepareReadonlyResidents } from './validationRender';
 import { sceneViewportFactory } from './viewport';
 import { projectDisplay } from './viewportModel';
@@ -26,6 +26,11 @@ import { chooseStartupScene } from '../scene/resolve';
 export const validationBrowserLimits: FileValidationLimits = { maxFileBytes: 64 * 1024 * 1024,
   maxJsonBytes: 4 * 1024 * 1024, maxItems: 100_000, maxValues: 8_000_000, maxPixels: 16_777_216 };
 export interface BrowserWorkspaceComposition { readonly offline?:DesktopOfflinePort;readonly mountEditor:MountedEditorFactory;readonly smoothDisplay?:SmoothPresentation;readonly progressivePresentation?:boolean;readonly filePolicy?:ProjectFilePolicy;readonly residency?:GsResidency;readonly introduction?:string;readonly initialFiles?:readonly File[];openLegacy?(file?:File):Promise<void> }
+async function failedDisplay(resident:{dispose():void;idle?():Promise<void>},error:unknown):Promise<never>{
+  const errors:unknown[]=[];try{resident.dispose();}catch(failure){errors.push(failure);}
+  try{await resident.idle?.();}catch(failure){errors.push(failure);}
+  if(errors.length)throw new DisplayRetirementError([error,...errors]);throw error;
+}
 export async function createValidationBrowserWorkspace(document: Document, composition:BrowserWorkspaceComposition, run?: string) {
   if(composition.smoothDisplay&&import.meta.env.MODE!=='project-scene-desktop'&&import.meta.env.MODE!=='project-scene-offline')throw Error('専用のPC候補ビルドで開いてください。');
   if (!import.meta.env.DEV && import.meta.env.MODE !== 'project-scene-validation' && import.meta.env.MODE !== 'project-scene-desktop' && import.meta.env.MODE !== 'project-scene-offline')
@@ -86,8 +91,8 @@ export async function createValidationBrowserWorkspace(document: Document, compo
       try {
         const display = view.display(null, null);
         for (const model of view.models) resident.validate(model, display.savedMaterials?.[model.assetId]);
-        return { factory: sceneViewportFactory(resident,composition.residency,undefined,composition.smoothDisplay), dispose: () => resident.dispose() };
-      } catch (error) { resident.dispose(); throw error; }
+        return { factory: sceneViewportFactory(resident,composition.residency,undefined,composition.smoothDisplay), idle:()=>resident.idle(), dispose: () => resident.dispose() };
+      } catch (error) { return failedDisplay(resident,error); }
     },
     render: async host => {
       const resident = await prepareValidationResidents(host.authority.read().modelVersions!, host.content,undefined,composition.progressivePresentation,raster,timing);
@@ -109,8 +114,8 @@ export async function createValidationBrowserWorkspace(document: Document, compo
         }});void ready.catch(()=>{});
         if(!composition.progressivePresentation)await ready;
         const detach = host.setDisplayPreparation(prepare);
-        return { factory: sceneViewportFactory(resident,composition.residency,undefined,composition.smoothDisplay), ready, detachPreparation:detach, dispose: () => { detach(); resident.dispose(); } };
-      } catch (error) { resident.dispose(); throw error; }
+        return { factory: sceneViewportFactory(resident,composition.residency,undefined,composition.smoothDisplay), ready, idle:async()=>{await resident.idle?.();}, detachPreparation:detach, dispose: () => { detach(); resident.dispose(); } };
+      } catch (error) { return failedDisplay(resident,error); }
     },
     selected: (id, mode) => {
       const url = new URL(location.href); url.searchParams.delete('create');

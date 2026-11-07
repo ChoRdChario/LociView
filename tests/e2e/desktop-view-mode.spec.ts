@@ -1,7 +1,8 @@
+import {test, createBrowserProfile} from '../helpers/browserProfile';
 import { revealCameraPositions, revealWorkPanel, revealCoordinateAdd, revealFileSurface, revealProjectSelection, lookAlongFront, revealOfflineUtilities } from './workspaceUi';
-import { test, expect, chromium, type Locator } from '@playwright/test';
-import { readFile, mkdir, mkdtemp } from 'node:fs/promises';
-import { join } from 'node:path';
+import { expect, chromium, type Locator } from '@playwright/test';
+import { readFile} from 'node:fs/promises';
+
 import * as A from '@automerge/automerge';
 import { triangleGlb, smallPng, nativeConversionBackup } from './fixtures';
 import { ownedServer } from '../offline-e2e/server';
@@ -254,8 +255,8 @@ test('view mode hides editing while preserving reading, local display, existing 
 test('one PC app keeps the same Project through connected, cold offline and preparation removal starts', async ({}, info) => {
   test.setTimeout(180_000);
   const server = await ownedServer('offline-desktop-dist'), errors: string[] = [], diagnostics: string[] = [];
-  const directory = join(process.cwd(), '.artifacts/e2e/profiles'); await mkdir(directory, { recursive: true });
-  const profile = await mkdtemp(join(directory, 'wu-'));
+
+  const profile = await createBrowserProfile('wu');
   let context: Awaited<ReturnType<typeof chromium.launchPersistentContext>> | undefined;
   const open = async (disconnected = false) => {
     context = await chromium.launchPersistentContext(profile, { channel: 'chromium', headless: true, viewport: { width: 1280, height: 800 }, serviceWorkers: 'allow', offline: disconnected, acceptDownloads: true });

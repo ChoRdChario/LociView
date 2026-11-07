@@ -1,9 +1,10 @@
+import {test, createBrowserProfile} from '../helpers/browserProfile';
 import { writeCleanImportFixture } from './cleanImportFixture';
 import { desktopEntry, desktopOrigin } from './desktopEntry';
 import { selectShareOutput,  closeFileSurface, beginMaterialEditing, revealCaptionList } from './workspaceUi';
 import { revealFileSurface, revealModelManagement, lookAlongFront } from './workspaceUi';
-import {test,expect,chromium,type Page,type BrowserContext,type TestInfo} from '@playwright/test';
-import {mkdir,mkdtemp,writeFile} from 'node:fs/promises';
+import {expect,chromium,type Page,type BrowserContext,type TestInfo} from '@playwright/test';
+import {writeFile} from 'node:fs/promises';
 import {openAsBlob} from 'node:fs';
 import * as A from '@automerge/automerge';
 import * as THREE from 'three';
@@ -44,7 +45,7 @@ async function output(p:Page,info:TestInfo,name:string,purpose:'backup'|'teamWor
 }
 async function backup(path:string){const archive=await BackupArchive.inspect(await openAsBlob(path),limits),c=await inspectProjectCandidates(archive.source.read(),limits);if(c.kind!=='project-candidate-inspection')throw Error('metadata');return{archive,records:c.unambiguousRecords as Record<string,any>};}
 async function setup(info:TestInfo,bodyRanges:readonly {start:number;end:number}[]){
-  A.getHeads(A.init());await mkdir('.artifacts/e2e/profiles',{recursive:true});const profiles=await Promise.all(['a','b','review','clean','restore'].map(x=>mkdtemp('.artifacts/e2e/profiles/n7-'+x+'-')));
+  A.getHeads(A.init());const profiles=await Promise.all(['a','b','review','clean','restore'].map(x=>createBrowserProfile('n7-'+x)));
   const contexts=new Set<BrowserContext>(),errors:string[]=[],stages:unknown[]=[],started=Date.now();
   const launch=async(index:number)=>{
     const context=await chromium.launchPersistentContext(profiles[index]!,{channel:'chromium',headless:true,viewport:{width:1440,height:1000},deviceScaleFactor:1,serviceWorkers:'block',acceptDownloads:true});contexts.add(context);context.setDefaultTimeout(15000);

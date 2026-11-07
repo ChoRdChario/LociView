@@ -1,6 +1,7 @@
+import {test, createBrowserProfile} from '../helpers/browserProfile';
 import { selectShareOutput,  revealCoordinateAdd, revealFileSurface, revealProjectSelection, revealOfflineUtilities } from '../e2e/workspaceUi';
-import {test,expect,chromium,type BrowserContext,type Page,type TestInfo} from '@playwright/test';
-import {mkdir,mkdtemp,readFile,writeFile} from 'node:fs/promises';
+import {expect,chromium,type BrowserContext,type Page,type TestInfo} from '@playwright/test';
+import {readFile,writeFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
 import * as A from '@automerge/automerge';
 import {ownedServer} from './server';
@@ -22,13 +23,13 @@ async function output(p:Page,info:TestInfo,name:string){
   const [download]=await Promise.all([p.waitForEvent('download',{timeout:180_000}),area.locator('button.lv-file-primary').click()]);const path=info.outputPath(name+'.zip');await download.saveAs(path);expect(await download.failure()).toBeNull();await expect(area.locator('.lv-operation-status')).toHaveAttribute('data-busy','false',{timeout:180_000});await menu.getByRole('button',{name:'閉じる',exact:true}).click();return path;
 }
 async function changes(path:string){return(await WorkspaceArchive.inspect(new Blob([Uint8Array.from(await readFile(path)).buffer]),limits)).source.originalChanges();}
-async function launch(profile:string,url:string,disconnected=false,errors:string[]=[]){
-  const context=await chromium.launchPersistentContext(profile,{channel:'chromium',headless:true,viewport:{width:1440,height:1000},serviceWorkers:'allow',acceptDownloads:true,offline:disconnected});context.setDefaultTimeout(20_000);
+async function launch(profile:string,url:string,disconnected=false,errors:string[]=[],touch=false){
+  const context=await chromium.launchPersistentContext(profile,{channel:'chromium',headless:true,viewport:{width:1440,height:1000},...(touch?{hasTouch:true,isMobile:true,deviceScaleFactor:2}:{}),serviceWorkers:'allow',acceptDownloads:true,offline:disconnected});context.setDefaultTimeout(20_000);
   await context.route('**/*',route=>{const u=new URL(route.request().url());return u.origin===new URL(url).origin||['blob:','data:'].includes(u.protocol)?route.continue():route.abort('blockedbyclient');});
   context.on('page',page=>page.on('pageerror',error=>errors.push(error.message)));for(const page of context.pages())page.on('pageerror',error=>errors.push(error.message));
   const page=context.pages()[0]??await context.newPage();return{context,page};
 }
-async function profile(){await mkdir('.artifacts/e2e/profiles',{recursive:true});return await mkdtemp('.artifacts/e2e/profiles/of-');}
+async function profile(){return await createBrowserProfile('of');}
 const offlineStatus=(p:Page)=>offline(p).locator('[role="status"]');
 async function prepare(p:Page){await revealOfflineUtilities(p);await expect(offlineStatus(p)).toContainText('アプリを保存しました。',{timeout:90_000});await expect(offline(p).getByRole('button',{name:'オフラインで使う準備',exact:true})).toHaveCount(0);}
 async function utilities(p:Page){await revealOfflineUtilities(p);const settings=offline(p).locator(':scope > details');if(!await settings.evaluate(n=>(n as HTMLDetailsElement).open))await settings.locator(':scope > summary').click();return settings;}
@@ -40,7 +41,7 @@ async function controllerBuild(p:Page){return p.evaluate(async()=>{const worker=
 
 test('static data survives prepared cold offline Mesh/Point/500k SH4/Proxy/media work, initial conversion and same-address static return',async({},info)=>{
   test.setTimeout(1_200_000);A.getHeads(A.init());const server=await ownedServer('desktop-dist'),owned=await profile(),errors:string[]=[],stages:string[]=[];let context:BrowserContext|undefined;
-  const open=async(disconnected=false)=>{const result=await launch(owned,server.url,disconnected,errors);context=result.context;const response=await result.page.goto(server.url);if(disconnected)expect(response?.fromServiceWorker()).toBe(true);return result.page;};
+  const open=async(disconnected=false)=>{const result=await launch(owned,server.url,disconnected,errors,true);context=result.context;const response=await result.page.goto(server.url);if(disconnected)expect(response?.fromServiceWorker()).toBe(true);return result.page;};
   const close=async()=>{await context?.close();context=undefined;};
   const mark=(text:string)=>{stages.push(text);console.log(text);};
   try{
@@ -56,6 +57,9 @@ test('static data survives prepared cold offline Mesh/Point/500k SH4/Proxy/media
     await p.evaluate(async()=>{await(await caches.open('unrelated-retain')).put('/sentinel',new Response('untouched'));await navigator.serviceWorker.register('/foreign/worker.js',{scope:'/foreign/'});const base=await navigator.storage.getDirectory(),dir=await base.getDirectoryHandle('legacy-retain',{create:true}),handle=await dir.getFileHandle('original.zip',{create:true}),writer=await handle.createWritable();await writer.write('owned legacy source sentinel');await writer.close();});
     const prepared=await cacheInventory(p);await close();await server.stop();p=await open(true);await selected(p,'オフライン現地作業');await revealOfflineUtilities(p);await expect(offlineStatus(p)).toContainText('オフラインで起動できます');expect(await controllerBuild(p)).toMatch(/^offline-test-a-/);expect(await changes(await output(p,info,'cold-before'))).toEqual(before);mark('cold offline: server stopped; Mesh/Point/500k SH4/Proxy loaded');
     await p.locator('.lv-caption-select').filter({hasText:'現地の記録'}).click();await detail(p).getByLabel('本文',{exact:true}).fill('通信なしで更新');await detail(p).getByRole('button',{name:'変更を適用',exact:true}).click();await ready(p,'変更を適用しました。');await expect(p.getByRole('region',{name:'現地の記録',exact:true}).getByRole('region',{name:'添付メディア',exact:true}).locator('img')).toBeVisible();
+    const showPhoto=p.getByRole('region',{name:'現地の記録',exact:true}).getByRole('region',{name:'添付メディア',exact:true}).getByRole('button',{name:'画像を表示',exact:true});
+    await showPhoto.click();const photoDialog=p.getByRole('dialog',{name:'メディアビューア',exact:true});await expect.poll(()=>photoDialog.locator('img').evaluate(n=>(n as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
+    await expect(p.getByLabel('3Dモデルの表示',{exact:true})).toHaveAttribute('aria-busy','true');await photoDialog.getByRole('button',{name:'閉じる',exact:true}).click();await expect(showPhoto).toBeFocused();await selected(p,'オフライン現地作業');mark('cold offline touch: photo/native-GS release and same-view reconstruction');
     const edited=await changes(await output(p,info,'cold-edited'));await p.screenshot({path:info.outputPath('cold-offline.png'),fullPage:true});await close();p=await open(true);await selected(p,'オフライン現地作業');expect(await changes(await output(p,info,'cold-reopened'))).toEqual(edited);mark('cold offline: edit/save/full-close reopen exact history');
     await home(p);const native=info.outputPath('admitted-native.zip');await writeFile(native,await nativeConversionBackup(triangleGlb(),smallPng()));await file(p,native);await p.getByRole('button',{name:'新しいプロジェクトに変換',exact:true}).click();await selected(p,'Nativeから引き継ぐ記録');await p.locator('.lv-caption-select').filter({hasText:'既存のピン'}).click();await detail(p).getByLabel('本文',{exact:true}).fill('オフライン変換後');await detail(p).getByRole('button',{name:'変更を適用',exact:true}).click();await ready(p,'変更を適用しました。');const converted=await changes(await output(p,info,'converted-offline'));await close();p=await open(true);await selected(p,'Nativeから引き継ぐ記録');expect(await changes(await output(p,info,'converted-reopened'))).toEqual(converted);mark('cold offline: admitted initial conversion/edit/save/reopen');
     await home(p);const count=await p.getByRole('button',{name:'編集で開く',exact:true}).count(),bad=info.outputPath('unsupported-native.zip');await writeFile(bad,await nativeConversionBackup(Buffer.from('invalid model'),smallPng()));await file(p,bad);await expect(p.locator('.lv-validation-status')).toHaveAttribute('data-busy','false');await expect(p.locator('.lv-validation-status')).not.toHaveText('');await expect(p.getByRole('button',{name:'新しいプロジェクトに変換',exact:true})).toBeHidden();expect(await p.getByRole('button',{name:'編集で開く',exact:true}).count()).toBe(count);mark('unsupported original: no partial Project');
