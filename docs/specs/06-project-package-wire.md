@@ -2878,6 +2878,15 @@ Initial consumers are journal discovery/parts, repository reads and pure output
 discovery/download. Job owner checks remain exact-object checks: a read job is
 opened and inspected with the same operation facade and does not escape it.
 
+PO2026-11-08 separately accepts [06e](06e-selected-generation-output-read-proposal.md):
+one outputReady, one Backup capture's pure source/base/inventory read and one
+outputOverview may consistently use their exact operation-owned fs/factory.
+Successful observations require fresh opening/closing audits; failed observations
+reject without adopting state, retaining normal selected-generation error semantics.
+Public Session.read, constructor-bound content/CAS observers, separate ready calls,
+writes/readbacks, Journal writes, publication, Selection, recovery and06b ZIP-proof
+lifetimes keep their existing boundaries. This adds no staging consumer or wire field.
+
 2026-10-26 bounded consumer clarification: the published-history reader
 `TransactionJournal.readRestoredBases` may use the same pure bulk-read capability.
 Capture any supplied journal-entry array deeply before the opening audit, read

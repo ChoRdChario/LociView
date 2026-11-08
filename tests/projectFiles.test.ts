@@ -20,6 +20,7 @@ import { MemoryFS, type ProjectWorkspaceFS } from '../src/platform/fs';
 import { ProjectMutationCoordinator } from '../src/platform/projectLock';
 import { OriginBlobStore } from '../src/projectMetadata/blobStore';
 import type { MetadataStorageFactory } from '../src/projectMetadata/repository';
+import type { MetadataSessionRead } from '../src/projectMetadata/session';
 import { MetadataRepository } from '../src/projectMetadata/repository';
 import { openWorkspaceGeneration } from '../src/projectMetadata/generationScope';
 import { digest, newId, json, readReceipt, underWriteLease, withMetadataRead, registerWriteFence } from '../src/projectMetadata/persistence';
@@ -3198,6 +3199,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     audit.count = 0;
     return { ...f, job, expected, selected, scope, audit, journal: new TransactionJournal(scope.fs, metadata) };
   }
+  type CandidateSession = { readCandidate(integrity?: OutputIntegrityRead, ports?: metadataPersistence.MetadataReadPorts): Promise<{ read: MetadataSessionRead }> };
   async function auditedStagingJournal() {
     const f = await restoreFileFixture(), job = await (await f.prepare()).persist(f.ports, f.databases), scope = owned(await job.openStaging(f.databases));
     const service = validationProjectService(scope.fs, scope.factory, f.store, budget, decode);
@@ -3385,9 +3387,9 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect((await f.selected.ports.session.read()).state).toBe('repair-required'); expect(await f.fs.exists(control)).toBe(false);
   }, 60_000);
   it('keeps backup readers owner-bound and refuses closing-audit failure or later missing state', async () => {
-    const f = await auditedRestoredJournal(), session = validationProjectService(f.selected.fs, f.selected.factory, f.store, budget, decode).session,
+    const f = await auditedRestoredJournal(), session = validationProjectService(f.scope.fs, f.scope.factory, f.store, budget, decode).session,
       current = await session.read();
-    const sender = new WorkspaceSender(f.selected.fs, session, f.store, metadata, f.locks);
+    const sender = new WorkspaceSender(f.scope.fs, session, f.store, metadata, f.locks);
     const id = await sender.generateBackup(current.source!.token), job = await BackupOutputJob.open(f.scope.fs, id, metadata);
     job.assertOwner(f.scope.fs);
     await withMetadataRead(f.scope.fs, undefined, async ({ fs }) => { expect(() => job.assertOwner(fs)).toThrow('output-owner'); });
@@ -3395,8 +3397,17 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     for (const read of [() => BackupOutputJob.ids(f.scope.fs), () => BackupOutputJob.state(f.scope.fs, id, metadata), () => job.steps(),
       () => new WorkspaceSender(f.scope.fs, session, f.store, metadata, f.locks).jobs(),
       () => new WorkspaceSender(f.scope.fs, session, f.store, metadata, f.locks).outputOverview()]) {
-      f.audit.count = 0; f.audit.before = async () => { if (f.audit.count === 2) throw Error('backup closing audit'); };
-      await expect(read()).rejects.toThrow('backup closing audit'); expect(f.audit.count).toBe(2);
+      let depth = 0, closing = false, beforeClosing = 0;
+      const operation = metadataPersistence.withMetadataRead, boundary: typeof withMetadataRead = (fs, factory, action, consumer) => {
+        if (fs !== f.scope.fs) return operation(fs, factory, action, consumer);
+        const outer = depth++ === 0;
+        return operation(fs, factory, async ports => { const result = await action(ports); if (outer) { closing = true; beforeClosing = f.audit.count; } return result; }, consumer).finally(() => { depth--; });
+      };
+      const scoped = vi.spyOn(metadataPersistence, 'withMetadataRead').mockImplementation(boundary);
+      f.audit.count = 0; f.audit.before = async () => { if (closing) throw Error('backup closing audit'); };
+      try { await expect(read()).rejects.toThrow('backup closing audit'); }
+      finally { scoped.mockRestore(); }
+      expect(closing).toBe(true); expect(beforeClosing).toBeGreaterThanOrEqual(1); expect(f.audit.count).toBe(beforeClosing + 1);
       job.assertOwner(f.scope.fs);
     }
     expect(writes).not.toHaveBeenCalled(); expect(await f.fs.list('')).toEqual(paths);
@@ -3405,6 +3416,81 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const index = `${workspacePackageRoot(f.scope.fs)}backup-output-index/${id}.json`; await f.fs.remove(index);
     await expect(BackupOutputJob.state(f.scope.fs, id, metadata)).rejects.toThrow('output-state'); expect(await f.fs.exists(index)).toBe(false);
   }, 60_000);
+  it('binds06e overview projections to the exact readonly fs/factory without adopting or lending expired readers', async () => {
+    const f = await auditedRestoredJournal(), session = validationProjectService(f.scope.fs, f.scope.factory, f.store, budget, decode).session;
+    const current = await session.read(), state = session as unknown as { last: MetadataSessionRead; acknowledgedMedia: Set<string>; acknowledgedLocalChanges: Set<string> };
+    const prior = { last: state.last, media: state.acknowledgedMedia, local: state.acknowledgedLocalChanges }, paths = await f.fs.list('');
+    let escaped!: metadataPersistence.MetadataReadPorts & { read(): Promise<MetadataSessionRead> };
+    await underWriteLease(f.scope.fs, () => session.withOutputOverview(f.scope.fs, async ports => {
+      escaped = ports; expect(ports.fs).not.toBe(f.scope.fs); expect(ports.factory).not.toBe(f.scope.factory);
+      expect((await ports.read()).source!.token).toBe(current.source!.token);
+      await expect(ports.fs.writeText(new TransactionJournal(ports.fs, metadata).path(newId(), 'forbidden'), 'no')).rejects.toThrow('generation-read-only');
+      await expect(ports.factory!().save(['forbidden'], new Uint8Array([1]))).rejects.toThrow('generation-read-only');
+      expect(state.last).toBe(prior.last); expect(state.acknowledgedMedia).toBe(prior.media); expect(state.acknowledgedLocalChanges).toBe(prior.local);
+    }));
+    await expect(escaped.read()).rejects.toThrow('output-read-expired');
+    await expect(escaped.fs.readBytes(f.journal.path(f.job.id, 'start.json'))).rejects.toThrow('generation-read-expired'); expect(escaped.factory).toThrow('generation-read-expired');
+    expect(state.last).toBe(prior.last); expect(state.acknowledgedMedia).toBe(prior.media); expect(state.acknowledgedLocalChanges).toBe(prior.local);
+    const action = vi.fn(async () => undefined);
+    await expect(session.withOutputOverview(f.selected.fs, action)).rejects.toThrow('output-read-owner');
+    const foreign = validationProjectService(f.scope.fs, f.selected.factory, f.store, budget, decode).session;
+    await expect(foreign.withOutputOverview(f.scope.fs, action)).rejects.toThrow('generation-storage-binding');
+    expect(action).not.toHaveBeenCalled(); expect(await f.fs.list('')).toEqual(paths);
+  }, 60000);
+  it.each(['return', 'throw'] as const)('drains06e unfinished projections and rejects their late results on callback %s', async outcome => {
+    const f = await auditedRestoredJournal(), session = validationProjectService(f.scope.fs, f.scope.factory, f.store, budget, decode).session;
+    await session.read(); const prior = (session as unknown as { last: MetadataSessionRead }).last;
+    const port = session as unknown as CandidateSession, original = port.readCandidate.bind(session);
+    let release!: () => void, enter!: () => void, late!: Promise<void>;
+    const held = new Promise<void>(resolve => { release = resolve; }), started = new Promise<void>(resolve => { enter = resolve; }); caseDisposals.push(release);
+    const reading = vi.spyOn(port, 'readCandidate').mockImplementation(async (...args) => { const result = await original(...args); enter(); await held; return result; });
+    try {
+      const pending = session.withOutputOverview(f.scope.fs, async ports => {
+        late = expect(ports.read()).rejects.toThrow('output-read-expired'); await started;
+        if (outcome === 'throw') throw Error('callback failure'); return 'must not escape';
+      });
+      const refused = expect(pending).rejects.toThrow(outcome === 'throw' ? 'callback failure' : 'output-read-unfinished');
+      await started; await Promise.resolve(); release(); await refused; await late;
+      expect((session as unknown as { last: MetadataSessionRead }).last).toBe(prior);
+    } finally { reading.mockRestore(); release(); }
+  }, 60000);
+  it('rejects06e overview closing tamper even after its projection succeeded', async () => {
+    const f = await auditedRestoredJournal(), session = validationProjectService(f.scope.fs, f.scope.factory, f.store, budget, decode).session;
+    await session.read(); const prior = (session as unknown as { last: MetadataSessionRead }).last, control = f.job.path('start.json'), saved = (await f.fs.readBytes(control))!;
+    let ready = false; f.audit.before = async () => { if (ready) { const bad = saved.slice(); bad[0]! ^= 1; await f.fs.writeBytes(control, bad); } };
+    try { await expect(session.withOutputOverview(f.scope.fs, async ports => { expect((await ports.read()).state).toBe('ready'); ready = true; return 'rejected'; })).rejects.toThrow();
+      expect((session as unknown as { last: MetadataSessionRead }).last).toBe(prior);
+    } finally { f.audit.before = async () => {}; await f.fs.writeBytes(control, saved); }
+    expect((await session.read()).state).toBe('ready');
+  }, 60000);
+  it.each(['ready-abort', 'ready-lease', 'capture-abort', 'capture-lease'] as const)('does not adopt06e state when %s occurs just after the outer closing audit', async point => {
+    const f = await restoreFileFixture(), r = await firstBackupRecipient(), prepared = await BackupRestoreJob.prepareFirstOpen(r.fs, f.backupFile, metadata, r.databases);
+    r.lease.activateNewProject(); const job = await prepared.persist(null, r.databases), staging = await job.openStaging(r.databases), destination = r.ports(staging);
+    await destination.session.initializeBackup(job); await job.select(null, destination, r.databases, r.ports); await staging.dispose();
+    const selected = owned(await BackupRestoreJob.openSelected(r.fs, metadata, r.databases, r.ports)),
+      session = validationProjectService(selected.fs, selected.factory, r.store, budget, decode).session, current = await session.read();
+    const state = session as unknown as { last: MetadataSessionRead; acknowledgedMedia: Set<string>; acknowledgedLocalChanges: Set<string> }, port = session as unknown as CandidateSession;
+    const originalCandidate = port.readCandidate.bind(session), originalRead = metadataPersistence.withMetadataRead, controller = new AbortController();
+    let captureReads = 0, armed = false, tripped = false, prior: { last: MetadataSessionRead; media: Set<string>; local: Set<string> } | undefined;
+    const candidate = vi.spyOn(port, 'readCandidate').mockImplementation(async (integrity, ports) => {
+      const result = await originalCandidate(integrity, ports);
+      if (ports && (point.startsWith('ready') ? !!integrity : !integrity && ++captureReads === 2)) armed = true; return result;
+    });
+    const boundary: typeof withMetadataRead = async (fs, factory, action, consumer) => {
+      const result = await originalRead(fs, factory, action, consumer);
+      if (fs === selected.fs && armed && !tripped) {
+        tripped = true; prior = { last: state.last, media: state.acknowledgedMedia, local: state.acknowledgedLocalChanges };
+        if (point.endsWith('abort')) controller.abort(); else r.lease.beginClose();
+      }
+      return result;
+    };
+    const closing = vi.spyOn(metadataPersistence, 'withMetadataRead').mockImplementation(boundary), before = await r.base.list('');
+    try {
+      await expect(new WorkspaceSender(selected.fs, session, r.store, metadata, lockManager()).generateBackup(current.source!.token, '拒否', controller.signal)).rejects.toThrow();
+      expect(tripped).toBe(true); expect(prior).toBeDefined(); expect(state.last).toBe(prior!.last); expect(state.acknowledgedMedia).toBe(prior!.media); expect(state.acknowledgedLocalChanges).toBe(prior!.local);
+      expect(await r.base.list('')).toEqual(before);
+    } finally { candidate.mockRestore(); closing.mockRestore(); }
+  }, 60000);
   it('refuses a prior-output slot closing audit and later artifact loss before new output writes',async()=>{
     const f=await auditedRestoredJournal(),service=validationProjectService(f.scope.fs,f.scope.factory,f.store,budget,decode),session=service.session;
     const token=(await session.read()).source!.token,sender=new WorkspaceSender(f.scope.fs,session,f.store,metadata,f.locks);
@@ -4110,12 +4196,12 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const sender = new WorkspaceSender(f.fs, session, f.store, metadata, f.locks);
     await sender.generateBackup(sent.current.source!.token);
     const expectedJobs = await sender.jobs(), expectedBases = await sender.availableBases(), current = await session.read();
-    const originalRead = session.read.bind(session), reads = vi.spyOn(session, 'read');
+    const projection = session as unknown as CandidateSession, originalRead = projection.readCandidate.bind(session), reads = vi.spyOn(projection, 'readCandidate');
     try {
       expect(await sender.outputOverview()).toEqual({ jobs: expectedJobs, bases: expectedBases }); expect(reads).toHaveBeenCalledTimes(1);
       await sender.outputOverview(); expect(reads).toHaveBeenCalledTimes(2);
       reads.mockClear(); await sender.jobs(); await sender.availableBases(); expect(reads).toHaveBeenCalledTimes(2);
-      reads.mockClear(); reads.mockResolvedValueOnce({ ...current, state: 'pending' });
+      reads.mockClear(); reads.mockResolvedValueOnce({ read: { ...current, state: 'pending' } });
       expect((await sender.outputOverview(current)).bases).toEqual(expectedBases); expect(reads).toHaveBeenCalledTimes(2);
       // A later invalid row must discard an earlier successful backup observation.
       const broken = 'f'.repeat(32), path = `v2/packages/backup-output-index/${broken}.json`;
@@ -4132,7 +4218,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
   it('uses a captured command proof only for base display, retaining fresh defaults, evidence and command checks', async () => {
     const { f, sent } = await contributionTeam(), session = f.receiver.session;
     const sender = new WorkspaceSender(f.fs, session, f.store, metadata, f.locks), current = await session.read(), expected = await sender.availableBases();
-    const reads = vi.spyOn(session, 'read');
+    const reads = vi.spyOn(session as unknown as CandidateSession, 'readCandidate');
     try {
       expect(await sender.availableBases(current)).toEqual(expected); expect(reads).not.toHaveBeenCalled();
       expect((await sender.outputOverview(current)).bases).toEqual(expected); expect(reads).not.toHaveBeenCalled();
@@ -4171,11 +4257,12 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     } finally { reads.mockRestore(); }
   }, 20000);
   it('observes the actual final ready backup read only after the successful command while preserving all three ready fences', async () => {
-    const { f, sent } = await contributionTeam(), session = f.receiver.session, stages: string[] = [], observed = vi.fn(), reads = vi.spyOn(session, 'read');
+    const { f, sent } = await contributionTeam(), session = f.receiver.session, stages: string[] = [], observed = vi.fn();
     const sender = new WorkspaceSender(f.fs, session, f.store, metadata, f.locks, stage => { stages.push(stage); });
     const id = await sender.generateBackup(sent.current.source!.token, '表示に引き継ぐ', undefined, observed);
     expect(stages.filter(s => s.startsWith('ready-'))).toEqual(['ready-before', 'ready-final', 'ready-finish']);
-    const finalRead = await reads.mock.results.at(-1)!.value;
+    const finalRead = (session as unknown as { last: MetadataSessionRead }).last;
+    expect(observed.mock.calls[0]![0]).toBe(finalRead);
     expect(observed).toHaveBeenCalledExactlyOnceWith(finalRead); expect(finalRead.state).toBe('ready'); expect(finalRead.source!.token).toBe(sent.current.source!.token);
     const inspected = await BackupArchive.inspect(await sender.download(id), metadata); expect(inspected.source.originalChanges()).toEqual(finalRead.source!.originalChanges());
     await expect(sender.generateBackup(finalRead.source!.token, undefined, undefined, () => { throw Error('display observer'); })).resolves.toEqual(expect.any(String));
@@ -4243,7 +4330,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const { f, sent } = await contributionTeam(), session = f.receiver.session, sender = new WorkspaceSender(f.fs, session, f.store, metadata, f.locks);
     let current!: Awaited<ReturnType<typeof session.read>>;
     const id = await sender.generateBackup(sent.current.source!.token, undefined, undefined, read => { current = read; });
-    const expected = await sender.outputOverview(), reads = vi.spyOn(session, 'read'), completions = vi.spyOn(BackupOutputJob.prototype, 'displayStepKinds');
+    const expected = await sender.outputOverview(), reads = vi.spyOn(session as unknown as CandidateSession, 'readCandidate'), completions = vi.spyOn(BackupOutputJob.prototype, 'displayStepKinds');
     expect(await sender.outputOverview(current, current)).toEqual(expected); expect(reads).not.toHaveBeenCalled(); expect(completions).toHaveBeenCalledOnce();
     const display = { ...current }; reads.mockClear();
     const owned = sender.outputOverview(display, display); display.state = 'pending'; display.source = null; display.publication = null;
@@ -8240,7 +8327,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const overview = WorkspaceSender.prototype.outputOverview, seen: { ready: boolean; backup: boolean; reads: number }[] = [];
     const spy = vi.spyOn(WorkspaceSender.prototype, 'outputOverview').mockImplementation(async function(this: WorkspaceSender, current, backup) {
       const session = (this as unknown as { session: ReturnType<typeof validationProjectService>['session'] }).session;
-      const reads = vi.spyOn(session, 'read');
+      const reads = vi.spyOn(session as unknown as CandidateSession, 'readCandidate');
       try { return await overview.call(this, current, backup); }
       finally { seen.push({ ready: current?.state === 'ready', backup: !!backup, reads: reads.mock.calls.length }); reads.mockRestore(); }
     });
@@ -8302,7 +8389,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       return generate.call(this, token, signal, variant === 'missing' ? undefined : observer);
     });
     const discovery = vi.spyOn(WorkspaceSender.prototype, 'outputOverview').mockImplementation(async function(this: WorkspaceSender, current, display) {
-      const session = (this as unknown as { session: ReturnType<typeof validationProjectService>['session'] }).session, reads = vi.spyOn(session, 'read');
+      const session = (this as unknown as { session: ReturnType<typeof validationProjectService>['session'] }).session, reads = vi.spyOn(session as unknown as CandidateSession, 'readCandidate');
       try { return await overview.call(this, current, display); }
       finally { seen.push({ supplied: !!display, reads: reads.mock.calls.length }); reads.mockRestore(); }
     });
@@ -8334,7 +8421,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       });
     });
     const overviewSpy = vi.spyOn(WorkspaceSender.prototype, 'outputOverview').mockImplementation(async function(this: WorkspaceSender, current, display) {
-      const session = (this as unknown as { session: ReturnType<typeof validationProjectService>['session'] }).session, reads = vi.spyOn(session, 'read');
+      const session = (this as unknown as { session: ReturnType<typeof validationProjectService>['session'] }).session, reads = vi.spyOn(session as unknown as CandidateSession, 'readCandidate');
       try { return await overview.call(this, current, display); }
       finally { observations.push({ supplied: !!display, same: current === display, reads: reads.mock.calls.length, token: display?.source?.token }); reads.mockRestore(); }
     });

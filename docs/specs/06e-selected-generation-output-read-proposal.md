@@ -1,6 +1,7 @@
 # 復元後の出力準備における読み取り単位
 
-Status: **PROPOSED・未承認・未実装**。仕様06b §6.2の承認範囲を拡大しない。
+Status: **ACCEPTED —PO承認2026-11-08・限定実装とWindows自動検証完了**。
+仕様06b §6.2のZIP証拠共有範囲を拡大しない。実行証拠と残件は[todo](../../tasks/todo.md)。
 今回のGS協調検査・未確認ZIP整理は[仕様10](10-gs-loading-and-output-attempt-cleanup.md)。
 
 ## 1. 利用者の結果と確認した問題
@@ -59,11 +60,22 @@ portsを明示的に渡す。内部projectionはacknowledgments／lastなどのS
 必要なSession状態へ採用する。UIは従来どおりtyped Session／Senderを呼ぶだけとする。
 viewer、保存形式、公開API、変換ID、新しい依存には変更を加えない。
 
+実装ではSession内部のJournal／repository／scene-append／receive読取へportsを渡す。
+overviewはSessionが所有する内部callback portから同じportsと非採用projectionを得る。
+任意の外部FSへpublic `read`を付け替えるAPIは設けない。overviewはSession状態を採用せず、
+outputReadyとcaptureは必要なcandidateだけを終了監査後に採用する。
+constructorに結び付いた既存のcontent検査・CAS／media observerは厳しい検査を維持し、
+その所有者を偽って付け替えない。これらが残す待ち時間は工程別に報告する。
+
 FS・factory・ProjectRoot・mutation authority・selected generationを一致させ、
-開始／終了とも新しい復元管理情報で監査する。内部FSのwriteは拒否し、stream、
+成功結果は開始／終了とも新しい復元管理情報で監査してから受理する。失敗した観測は
+所有する処理をdrainして拒否し、結果を採用しない。normal selectedの既存の例外処理を
+維持し、stagingの「失敗時にも終了監査」の契約を変更・拡張しない。内部FSのwriteは拒否し、stream、
 factory、readonly capabilityを外へ逃がさない。返すものは確定したdata-onlyの
 読取結果に限り、終了検査に成功するまでSession／画面の結果へ採用しない。
-取消、lease喪失、closing、owner／selection変更では失効する。
+取消、lease喪失、closing、owner／selection変更では失効する。未完了のprojectionは
+待ち合わせて結果を拒否し、期限切れreadはawait後にも確認する。state採用直前にも
+取消・editable authorityを再確認し、その確認と採用の間にはawaitを置かない。
 
 `outputReady`内の純粋なJournal読取では、選択generationの管理情報監査を開始／終了へ
 集約する。Journal内容・bindingの検証は維持するが、その内部の管理情報監査回数を
@@ -90,6 +102,6 @@ stagingで許可するconsumerの追加ではなく、normal selected generation
   PC・タッチ相当・二窓と、ブラウザ／サーバー完全終了後のオフライン継続を再確認。
 - 独立レビューと必要な最終チェック後にのみ開発候補へ接続。一般公開・iPhone実機合格は含めない。
 
-停止点：現行契約はpublic I/Oごとの監査と個別承認された例外を保持している。
-この読取単位の追加はPO判断が必要。承認まではこの最適化だけを保留し、仕様10の
-実装・他の資格確認は継続する。
+承認境界：PO2026-11-08が上記3経路の限定実装・自動検証を承認した。
+これ以外はpublic I/Oごとの監査と個別承認された例外を保持する。新しい検査寿命・
+書込／復旧境界の集約・製品方針・公開判断が必要になった場合だけ該当部分を止める。

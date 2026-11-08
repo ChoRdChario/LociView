@@ -94,17 +94,17 @@ export class WorkspaceSender {
     const backupSource: BackupDisplaySource | undefined = current && backupDisplayRead === current && current.state === 'ready' && current.source && current.publication &&
       current.provider?.kind === 'scene-provider' && current.provider.token === current.source.token ?
       { source: current.source, proof: structuredClone(current.source.proof), token: current.source.token } : undefined;
-    return readOutputArtifacts(this.locks, () => withMetadataRead(this.fs, undefined, async ({ fs }) => {
+    return readOutputArtifacts(this.locks, () => this.session.withOutputOverview(this.fs, async ({ fs, read }) => {
       const sender = new WorkspaceSender(fs, this.session, this.store, this.limits, this.locks);
       let observed: MetadataProof | null | undefined;
-      const jobs = await sender.jobsDirect(proof => { observed = proof; }, backupSource);
-      const bases = await sender.availableBasesDirect(settledOutputDisplay(jobs) && observed !== null ? observed ?? commandProof : undefined, currentSource);
+      const jobs = await sender.jobsDirect(proof => { observed = proof; }, backupSource, read);
+      const bases = await sender.availableBasesDirect(settledOutputDisplay(jobs) && observed !== null ? observed ?? commandProof : undefined, currentSource, read);
       return { jobs, bases };
     }));
   }
-  private async availableBasesDirect(observed?: MetadataProof, currentSource?: NonNullable<MetadataSessionRead['source']>): Promise<ContributionBaseChoice[]> {
+  private async availableBasesDirect(observed?: MetadataProof, currentSource?: NonNullable<MetadataSessionRead['source']>, readCurrent = () => this.session.read()): Promise<ContributionBaseChoice[]> {
     let proof = observed;
-    if (!proof) { const read = await this.session.read(); if (read.state !== 'ready' || !read.source) return []; proof = read.source.proof; currentSource = read.source; }
+    if (!proof) { const read = await readCurrent(); if (read.state !== 'ready' || !read.source) return []; proof = read.source.proof; currentSource = read.source; }
     const bases = new WorkspaceBaseStore(this.fs, this.limits, proof), rows = await bases.read();
     const choices: ContributionBaseChoice[] = [];
     for (const [i, r] of rows.entries()) {
@@ -142,12 +142,12 @@ export class WorkspaceSender {
     return readOutputArtifacts(this.locks, () => withMetadataRead(this.fs, undefined, ({ fs }) =>
       new WorkspaceSender(fs, this.session, this.store, this.limits, this.locks).jobsDirect()));
   }
-  private async jobsDirect(observe?: (proof: MetadataProof | null) => void, backupSource?: BackupDisplaySource): Promise<WorkspaceOutputState[]> {
+  private async jobsDirect(observe?: (proof: MetadataProof | null) => void, backupSource?: BackupDisplaySource, readCurrent = () => this.session.read()): Promise<WorkspaceOutputState[]> {
     const result: WorkspaceOutputState[] = [];
     let bases: ReturnType<WorkspaceBaseStore['read']> | undefined;
     const readCurrentBackup = async (protection: Awaited<ReturnType<typeof validateOutputProtection>>) => {
       const supplied = backupSource && json(backupSource.proof) === json(protection.proof) ? backupSource : undefined;
-      const fresh = supplied ? undefined : await this.session.read(), source = supplied?.source ?? fresh?.source;
+      const fresh = supplied ? undefined : await readCurrent(), source = supplied?.source ?? fresh?.source;
       if (!source) throw Error('output-source-missing');
       const proof = supplied?.proof ?? structuredClone(source.proof), currentBases = new WorkspaceBaseStore(this.fs, this.limits, proof);
       const snapshot = json(proof) === json(protection.proof) ? protection.snapshot : await currentBases.snapshot();

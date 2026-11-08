@@ -14,7 +14,7 @@ import { checkLimits, fail, type MetadataLimits } from './format';
 import { ProjectMetadataSource } from './source';
 import { MetadataRepository, type MetadataStorageFactory } from './repository';
 import { TransactionJournal, type JournalStart, type PreparedJournal } from './journal';
-import { digest, equalBytes, json, newId, underWriteLease, withMetadataRead, metadataPath } from './persistence';
+import { digest, equalBytes, json, newId, underWriteLease, withMetadataRead, metadataPath, type MetadataReadPorts } from './persistence';
 import { canonicalMetadataEdit, planMetadataEdit, type MetadataEdit } from './commands';
 import { checkRemoteStored, copyFullSource, initialWorkspaceChanges, planRemoteChanges, type FullMetadataSource, type RemoteBatchProof } from './remote';
 import { WorkspaceReceiveJob, type ReceiverProof } from '../projectPackage/receiveJob';
@@ -171,13 +171,38 @@ export class MetadataProjectSession {
     }
     return this.last = candidate.read;
   }
-  private async readCandidate(integrity?: OutputIntegrityRead): Promise<{ read: MetadataSessionRead; acknowledged?: Set<string>; localChanges?: Set<string> }> {
+  /** Internal06e display port. It cannot rebind a public Session read or adopt state. */
+  withOutputOverview<T>(owner: ProjectWorkspaceFS, action: (ports: MetadataReadPorts & { read(): Promise<MetadataSessionRead> }) => Promise<T>): Promise<T> {
+    if (owner !== this.fs) return Promise.reject(Error('output-read-owner'));
+    return withMetadataRead(this.fs, this.storage, async ports => {
+      let active = true;
+      const pending = new Set<Promise<MetadataSessionRead>>();
+      const read = () => {
+        if (!active) return Promise.reject(Error('output-read-expired'));
+        const work = (async () => {
+          const candidate = await this.readCandidate(undefined, ports);
+          if (!active) return fail('output-read-expired');
+          return candidate.read;
+        })();
+        pending.add(work); void work.then(() => pending.delete(work), () => pending.delete(work)); return work;
+      };
+      try {
+        const result = await action({ ...ports, read });
+        if (pending.size) { active = false; await Promise.allSettled([...pending]); return fail('output-read-unfinished'); }
+        return result;
+      } finally { active = false; await Promise.allSettled([...pending]); }
+    });
+  }
+  private async readCandidate(integrity?: OutputIntegrityRead, ports?: MetadataReadPorts): Promise<{ read: MetadataSessionRead; acknowledged?: Set<string>; localChanges?: Set<string> }> {
     try {
-      const entries = await this.journal.entries(), published = entries.filter(e => e.publication).at(-1);
-      await this.journal.readRestoredBases(entries);
-      const pending = entries.some(e => !e.publication) || !!this.retained || (await this.sceneAppendStates(entries)).length > 0;
+      if (ports && !ports.factory) return fail('generation-storage-binding');
+      const fs = ports?.fs ?? this.fs, journal = ports ? new TransactionJournal(fs, this.limits) : this.journal;
+      const repository = ports ? new MetadataRepository(fs, ports.factory!, this.limits) : this.repository;
+      const entries = await journal.entries(), published = entries.filter(e => e.publication).at(-1);
+      await journal.readRestoredBases(entries);
+      const pending = entries.some(e => !e.publication) || !!this.retained || (await this.readSceneAppendStates(fs, journal, entries)).length > 0;
       if (!published) return { read: Object.freeze({ state: pending ? 'pending' : 'empty', source: null, provider: null, publication: null }) };
-      const source = await this.repository.read(published.start.repositoryId, published.start.proof, published.publication!.heads);
+      const source = await repository.read(published.start.repositoryId, published.start.proof, published.publication!.heads);
       if (!source) fail('published-source-missing');
       const originals = new Map(source!.originalChanges().map(b => [A.decodeChange(b).hash, b]));
       const acknowledged = new Set<string>(), localChanges = new Set<string>();
@@ -188,23 +213,23 @@ export class MetadataProjectSession {
         const partHashes = new Set<string>();
         witness();
         for (const head of entry.publication!.heads) if (!originals.has(head)) fail('published-history-missing');
-        for (const bytes of await this.journal.validateParts(entry.prepared!)) {
+        for (const bytes of await journal.validateParts(entry.prepared!)) {
           const hash = A.decodeChange(bytes).hash;
           partHashes.add(hash);
           const included = originals.get(hash);
           if (!included || !equalBytes(included, bytes)) fail('published-transaction-missing');
           if (['initialize', 'localCommand', 'importClean', 'appendScene'].includes(entry.start.purpose)) localChanges.add(hash);
         }
-        if (entry.start.purpose === 'importWorkspace') await this.journal.validateImport(entry.prepared!);
-        else if (entry.start.purpose === 'importClean') await CleanInputJob.validateJournalFresh(this.fs, entry.start.transactionId, this.limits, entry.prepared!, integrity);
+        if (entry.start.purpose === 'importWorkspace') await journal.validateImport(entry.prepared!);
+        else if (entry.start.purpose === 'importClean') await CleanInputJob.validateJournalFresh(fs, entry.start.transactionId, this.limits, entry.prepared!, integrity);
         else if (entry.start.purpose === 'restoreBackup') { /* Original history and binding checked together above. */ }
         else if (entry.prepared!.remote) {
-          const base = await this.repository.read(entry.start.repositoryId, entry.start.proof, entry.start.baseHeads);
+          const base = await repository.read(entry.start.repositoryId, entry.start.proof, entry.start.baseHeads);
           if (!base) fail('remote-base-missing');
-          await this.journal.validateRemote(entry.prepared!, base!);
+          await journal.validateRemote(entry.prepared!, base!);
         }
         for (const ref of entry.prepared!.stagedBlobs ?? []) { witness(); acknowledged.add(blobKey(ref)); }
-        const incoming = await this.journal.receivedInfo(entry.prepared!);
+        const incoming = await journal.receivedInfo(entry.prepared!);
         checkRequiredCapabilities(entry.start.requiredCapabilities, capabilityUnion(inheritedCapabilities, source!.requiredCapabilitiesForChanges(partHashes), incoming.requiredCapabilities));
         inheritedCapabilities = readRequiredCapabilities(entry.start.requiredCapabilities);
         for (const ref of incoming.blobs) { witness(); acknowledged.add(`${ref.sha256}:${ref.byteLength}`); }
@@ -359,16 +384,19 @@ export class MetadataProjectSession {
   }); }
 
   async sceneAppendStates(entries?: Awaited<ReturnType<TransactionJournal['entries']>>): Promise<SceneAppendState[]> {
-    const ids = await sceneAppendIds(this.fs, this.limits);
+    return this.readSceneAppendStates(this.fs, this.journal, entries);
+  }
+  private async readSceneAppendStates(fs: ProjectWorkspaceFS, journal: TransactionJournal, entries?: Awaited<ReturnType<TransactionJournal['entries']>>): Promise<SceneAppendState[]> {
+    const ids = await sceneAppendIds(fs, this.limits);
     if (!ids.length) return [];
-    try { entries ??= await this.journal.entries(); }
+    try { entries ??= await journal.entries(); }
     catch { return ids.map(id => ({ id, state: 'repair-required' })); }
     const result: SceneAppendState[] = [];
     for (const id of ids) {
       const entry = entries.find(e => e.start.transactionId === id);
       if (entry?.publication && entry.start.purpose === 'appendScene') continue;
       try {
-        const read = await readSceneAppend(this.fs, id, this.limits);
+        const read = await readSceneAppend(fs, id, this.limits);
         if (!read.abandoned) result.push({ id, state: entry?.prepared ? 'prepared' : read.binding ? 'input-required' : 'unbound', cancellable: !entry });
       } catch { result.push({ id, state: 'repair-required' }); }
     }
@@ -472,26 +500,42 @@ export class MetadataProjectSession {
   }
   private async outputReady(signal?: AbortSignal) {
     let candidate: Awaited<ReturnType<MetadataProjectSession['readCandidate']>> | undefined;
-    await OutputIntegrityRead.run(this.fs, this.limits, signal, async integrity => {
-      await assertReviewEditSlot(this.fs, this.limits, undefined, integrity);
-      candidate = await this.readCandidate(integrity); integrity.assertOwner(this.fs, this.limits);
-      const read = candidate.read; if (read.state !== 'ready' || !read.source || !read.publication) return fail('output-not-ready');
-      for (const key of await receiveJobKeys(this.fs, this.limits)) {
-        const state = await receiveInputState(this.fs, key, this.limits);
-        if (state === 'abandoned') continue;
-        if (state !== 'started') return fail('output-receive-pending');
-        const job = await openReceiveJob(this.fs, key, this.receiveStore(), this.limits, integrity);
-        if (job instanceof CleanInputJob) {
-          if (!await job.validateTerminalCompletion()) return fail('output-receive-pending');
-        } else {
-          if (!await receiveTerminal(job)) return fail('output-receive-pending');
-          await job.validateCompletion();
+    await withMetadataRead(this.fs, this.storage, async ports => {
+      const { fs } = ports;
+      await OutputIntegrityRead.run(fs, this.limits, signal, async integrity => {
+        await assertReviewEditSlot(fs, this.limits, undefined, integrity);
+        candidate = await this.readCandidate(integrity, ports); integrity.assertOwner(fs, this.limits);
+        const read = candidate.read; if (read.state !== 'ready' || !read.source || !read.publication) return fail('output-not-ready');
+        for (const key of await receiveJobKeys(fs, this.limits)) {
+          const state = await receiveInputState(fs, key, this.limits);
+          if (state === 'abandoned') continue;
+          if (state !== 'started') return fail('output-receive-pending');
+          const job = await openReceiveJob(fs, key, this.receiveStore(), this.limits, integrity);
+          if (job instanceof CleanInputJob) {
+            if (!await job.validateTerminalCompletion()) return fail('output-receive-pending');
+          } else {
+            if (!await receiveTerminal(job)) return fail('output-receive-pending');
+            await job.validateCompletion();
+          }
+          integrity.assertOwner(fs, this.limits);
         }
-        integrity.assertOwner(this.fs, this.limits);
-      }
-    }, this.timing && (milliseconds => { try { this.timing?.('metadata.output.archive-inspect', milliseconds); } catch { /* Diagnostics have no authority. */ } }));
+      }, this.timing && (milliseconds => { try { this.timing?.('metadata.output.archive-inspect', milliseconds); } catch { /* Diagnostics have no authority. */ } }));
+    });
     if (!candidate) return fail('output-not-ready');
+    signal?.throwIfAborted(); this.fs.mutationAuthority.assertEditable();
     return this.adoptRead(candidate);
+  }
+  private async captureBackup(source: ProjectMetadataSource, expectedToken: string, store: OriginBlobStore, signal?: AbortSignal) {
+    const observed = await withMetadataRead(this.fs, this.storage, async ports => {
+      let candidate: Awaited<ReturnType<MetadataProjectSession['readCandidate']>> | undefined;
+      const capture = await BackupSourceCapture.prepare({ read: async () => {
+        candidate = await this.readCandidate(undefined, ports); return candidate.read;
+      } }, expectedToken, new WorkspaceBaseStore(ports.fs, this.limits, source.proof), store, this.limits, signal);
+      if (!candidate) return fail('output-not-ready');
+      return { capture, candidate };
+    });
+    signal?.throwIfAborted(); this.fs.mutationAuthority.assertEditable();
+    this.adoptRead(observed.candidate); return observed.capture;
   }
   private async finishWorkspaceOutput(job: WorkspaceOutputJob, store: OriginBlobStore, signal?: AbortSignal) {
     job.assertOwner(this.fs); const current = await this.outputReady(signal);
@@ -599,7 +643,7 @@ export class MetadataProjectSession {
       const read = await measureBackupOutput(timing, 'ready-before', () => this.outputReady(signal)); if (read.source!.token !== expectedToken) return fail('output-stale');
       await measureBackupOutput(timing, 'slot-before', () => this.assertOutputSlot());
       const bases = new WorkspaceBaseStore(this.fs, this.limits, read.source!.proof);
-      const capture = await measureBackupOutput(timing, 'capture', () => BackupSourceCapture.prepare(this, expectedToken, bases, store, this.limits, signal));
+      const capture = await measureBackupOutput(timing, 'capture', () => this.captureBackup(read.source!, expectedToken, store, signal));
       const job = BackupOutputJob.prepare(this.fs, capture, this.limits, version, label);
       await measureBackupOutput(timing, 'protection-before', () => validateOutputProtection(this.fs, job, store, this.limits));
       const current = await measureBackupOutput(timing, 'ready-final', () => this.outputReady(signal));

@@ -57,7 +57,143 @@ unchanged-feature-classification checks pass; independent review has no findings
 No runtime change or new capacity guarantee; no runtime suite is needed for this
 documentation checkpoint.
 
-## Current boundary —progressive full-quality GS and safe output retention
+## Current boundary —restored-generation output read scopes06e
+
+PO2026-11-08 approves [06e](../docs/specs/06e-selected-generation-output-read-proposal.md)
+implementation and automated before/after qualification. Baselineea347db; one writer
+and bounded read-only cause/contract/final reviewers. Preserve the251 private draft
+lines and all existing source/evaluation material locally.
+
+Outcome: reduce restored-project save/recovery waiting by grouping only each
+outputReady, Backup capture's pure source/base/inventory reads and outputOverview's
+remaining original-Session escapes. Use the SAME operation-owned readonly fs/factory;
+return plain results and adopt no Session state until the closing audit succeeds.
+Keep all raw/source/model/image/SHA checks and the exact06b ZIP-proof lifetime.
+No aggregation across ready calls, capture→persist, writes/readbacks, Journal writes,
+publication, Selection, recovery, retry or cold resume. No dependency/wire/profile/
+capacity change, acknowledged-output deletion, main/Pages or release activation.
+
+1. Bind acceptance and measurement to the approved scope; measure three baseline
+   runs of identical small restored-project output, cleanup/retry and cold reopen,
+   separating user latency, phase time and selected-control I/O. Preserve original
+   deadlines/failures; diagnostics never relabel a failed performance run PASS.
+2. Implement private non-adopting projections and same-fs/factory read plumbing.
+   Test closing tamper/selection/lease/ownership/expired reader/illegal write and
+   preserved write/readback/recovery faults, including no preclosing state adoption.
+3. Re-measure the same workflow three times. Confirm original/body/metadata/history,
+   same output ID, file download/inspection, PC/touch/two-window recovery and full
+   cold/offline continuity. Use existing services for hostile combinations.
+4. Independently review final meaningful diff; run focused checks while editing and
+   the required final serial checkpoint/HEIC/connected/offline checks at completion.
+   Deliver exact tested candidate and suitableg0 checkpoint/Push with exact CI.
+
+Stop only for a new genuine contract/policy/authority beyond06e. Opening/closing
+audit timing and the documented raw-external ABA limitation are now approved; do not
+ask again per helper. Physical Safari acceptance remains pending and separate.
+
+Implemented the three scoped paths; early independent source review findings fixed.
+- outputReady uses one readonly fs/factory for Journal/repository/append/receive
+  readers and one nested06b integrity lifetime. Each ready call remains separate.
+- Backup capture owns its own pure scope and frozen data; persist/write/readback
+  and recovery continue through their original fresh public ports.
+- Overview keeps one Session-owned exact-owner scope, passes the same non-adopting
+  projection into only its two former original-Session escapes, and never mutates
+  last/acknowledgments. Standalone jobs/availableBases contracts are unchanged.
+- Owned unfinished projections are drained on callback return/error and rejected;
+  active is checked after await too. Ready/capture recheck signal and authority
+  immediately before adopting, after both relevant closing audits.
+- Constructor-bound content/CAS observers intentionally remain strict. No generic
+  generationScope failure semantics or staging-consumer policy was changed.
+- Focused12PASS (8new lifecycle/owner/fault cases plus existing closing/proof/
+  presentation cases);688 unselected cases are not execution credit. Typecheck and
+  SceneCore12PASS. Failed fixture/measurement setup evidence stays local.
+- Fixed backup7840B SHA256765eca3add9cefd03c12193ec1f43025b68f31026421ea2c7627c62475e49b8d
+  completed three isolated baseline browser recovery/cold runs. Original-root
+  control uses a separately fixed Workspace with identical source/original history;
+  it additionally records an exchange base, so absolute route-to-route time is not
+  a causal improvement comparison. Compare each route only with its own input.
+  The copied measurement candidate binds the production source; later changes only
+  move existing display test spies to the real candidate-read boundary. Independent
+  delta review and10 affected focused casesPASS, preserving all freshness oracles.
+
+Measured Windows dedicated Chromium156,1440×1000 DPR1, separate fresh profiles,
+same fixed input per route; no concurrent heavy tests/builds. Three-run milliseconds,
+median followed by each run. Input/archive, original-history and post-download
+inspection/cold continuation assertions completed, including the performance failure.
+
+| Restored route | Beforeea347db |06e |
+| --- | --- | --- |
+| Normal fresh output → download |13721 [13613,13721,22052]|12639 [10690,13821,12639]|
+| Native capacity error visible |14311 [14311,14344,13360]|7665 [7665,7733,7602]|
+| Temporary cleanup after shared reader released |6771 [6771,7140,6484]|2908 [2908,2908,2388]|
+| Same frozen output retry → download |7151 [7151,7085,7445]|5570 [5570,5622,5367]|
+
+The normal baseline's third run exceeds the original15s window and remains FAIL;
+all three changed-code runs satisfy15s, but ALL still miss the10s small-save goal.
+Do not present the capacity-error improvement as successful fresh-save time. Mobile
+touch emulation normal save10107ms also misses10s; functional file/cold checksPASS.
+Node archive inspection and OS file-picker waiting are outside the handoff endpoint.
+
+In the capacity case, phase medians ready-before1569.6→358.1ms,
+capture1944.8→724.6ms, ready-final1508.3→327.9ms, ready-finish1582.5→354.4ms,
+overview2311.4→918.2ms confirm useful work in all three approved read scopes.
+Owning-page cumulative-counter DIFFERENCES for the normal action: restore-control
+readStream3562→1742, list274→134 (medians); these are I/O counts, not elapsed time
+or physical disk-read guarantees. Nested phase times are not summed.
+
+Original-root control (fixed Workspace, same source/history, different retained
+exchange base): capacity error6039→4518ms, cleanup3423→2892ms, retry3108→2646ms
+medians. Compare this route only against itself; do not infer causality from the
+absolute root-versus-restored gap. All6 route-control runsPASS. Restored quota
+comparison6PASS, changed touch quota1PASS and the unchanged old strict15s selected
+recovery flow1PASS; old failure evidence stays retained. Normal output baseline
+2PASS/1performanceFAIL, changed3PASS and touch1PASS, with originals/history intact.
+
+Remaining: genuine normal save10s remains unmet. Its unmodified persist phase is
+variable (before median2751.5ms, after3779.1ms); no write optimization or causal
+speedup/regression is claimed for that interval. Existing ZIP1MiB and OPFS64KiB
+buffering are ALREADY implemented. Next measure each persisted file's handle/
+writer/write/close/readback plus control-audit time before choosing a change;
+keep original→prepared→index→start order and every write/readback/recovery fence.
+Do not add another buffer or collapse receipt checks without supporting evidence.
+Final qualification retained the first root failure:3421PASS/1FAIL/21TODO,
+153files,2228.97s. The sole failure was the existing Git trace-hash rejection
+CLI case timing out at30s; all product cases passed. The complete83-case CLI
+file alone then passed55.65s (versus607.99s under full contention), with original
+assertions/deadlines and existing child/workspace phase diagnostics. This does
+not relabel the failed root run PASS. The exact failed case alone took1.73s;
+its failed workspace and all logs are retained privately.
+
+Short meta-audit: production scope and the next persistence measurement remain
+unchanged. Address final qualification execution conditions first: built-in Vitest
+projects run152 product files before the one Git-heavy CLI file, retaining all
+153unique files,3443declared cases, two workers and30s deadlines; no retries or
+test exclusions. Independent review confirms the scheduling boundary and focused/
+related selection semantics. Final serial checkpointPASS:153files,3422executed
+casesPASS/21existingTODO unexecuted,888.87s root-suite wall time; typecheck, all
+five builds and offline-isolationPASS. This is test scheduling, not a claimed
+product-speed improvement or runtime guarantee. No timing limit/retry was relaxed.
+
+HEIC production isolationPASS. Fixed final Desktop/offline candidates match the
+reviewed production/test/config tree (aggregateSHA256
+8101a00670a2728cf508c87e9fb9d255fe92df3cdbbf5b3ef88e4c2d304b000b).
+The measured two production files are byte-identical after LF normalization;
+only test-spy/config scheduling changes followed browser measurement. Existing
+connected PC/touch native-quota/retry/download/cold-reopen and Review-copy/save/
+reopen flows3PASS, unchanged deadlines. Complete offline8PASS (11.9m): corrupt/
+missing exact-resource repair, two-window repair/update, full browser/server close,
+Mesh/Point/500k SH4/Proxy/media editing/save/history reopen, initial conversion,
+unsupported-source refusal, exact subpath ownership and scoped removal/foreign
+worker rejection. No dev-server observation substitutes for this evidence.
+
+Implementation and Windows automated qualification are complete. Deliver the fixed
+candidate at4191 and suitable verifiedg0 checkpoint; Git/Actions own commit and
+exact pushed-CI identity. No public deployment. Normal small save10s remains unmet;
+physical iPhone Safari memory/IME/file saving/thermal/offline acceptance remains
+unexecuted. Next is per-file persistence measurement described above, preserving
+every write/readback/recovery fence; no new buffer or durability policy is assumed.
+
+## Completed boundary —progressive full-quality GS and safe output retention
 
 PO2026-11-08 explicitly authorizes implementation and automated verification of
 large-GS progressive loading and safe accumulated-output cleanup. Baselineacdfd89;
@@ -142,11 +278,13 @@ acknowledged-output retirement,06e and physical iPhone acceptance remain distinc
   The spinner includes generation plus post-error output discovery. Generation took
   10.070s, total13.739s; repeated selected-generation audits are the code-backed
   candidate, not a proven artifact-lock deadlock. OPFS list is already prefix-pruned.
-- [06e](../docs/specs/06e-selected-generation-output-read-proposal.md) is PROPOSED:
+- At the GS checkpoint [06e](../docs/specs/06e-selected-generation-output-read-proposal.md) was PROPOSED:
   three pure output observations with per-observation opening/closing audits. Current
   06b exceptions do not ratify this extension. No write/readback/Journal-write/publication/
   restore fence is consolidated. Stop only that new timing contract pending PO
-  decision; the existing safe implementation receives its own delivery qualification.
+  decision; the existing safe implementation received its own delivery qualification.
+  PO's subsequent approval and implementation are the current boundary above;
+  this retained checkpoint description does not renew that approval requirement.
   Independent proposal review clarified the already-existing outputOverview wrapper,
   non-adopting same-fs/factory Session projections, no adoption before closing, and
   the external-control ABA detection limit; all findings addressed. No06e code added.
