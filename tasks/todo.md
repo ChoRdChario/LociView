@@ -57,7 +57,106 @@ unchanged-feature-classification checks pass; independent review has no findings
 No runtime change or new capacity guarantee; no runtime suite is needed for this
 documentation checkpoint.
 
-## Current boundary —restored-generation output read scopes06e
+## Current boundary —normal-save per-file persistence
+
+PO2026-11-08 authorizes measurement and implementation through automated
+qualification. Baseline53d36f4. One writer; bounded read-only cause/contract/final
+reviewers. Preserve private draft blocks and all original/evaluation evidence.
+
+Outcome: shorten normal restored-project save→download, not just error/retry.
+Measure native handle lookup, writer creation, write, close and readback by file,
+and selected-control audits separately, using the same fixed source/history and
+three isolated browser runs before/after. Retain original deadlines/failures.
+Then implement only demonstrated redundant work, document relevant invariants
+before storage changes, and verify tamper/failure/cancellation/recovery plus
+connected PC/touch, cold/offline continuation. Existing ZIP1MiB/OPFS64KiB buffers
+are not missing features. Do not merge writes/readbacks/Journal/publication/recovery
+fences, change formats/IDs/dependencies/capacity, delete acknowledged files or
+release/deploy. Stop only the affected change if a new contract/policy is needed;
+continue unaffected measurement and improvements. Final meaningful diff receives
+independent review, serial checkpoint/HEIC checks, suitableg0 Push and exact CI.
+
+Measured and implemented2026-11-08: normal save→download under Windows dedicated
+Chromium156, PC1440×1000 DPR1, fresh isolated profiles, same7840B backup/source/
+history as06e. No concurrent heavy runs; original15s criterion and cold file/history
+inspection retained. Native probes are private, bounded aggregates, record no body
+contents and preserve original failures; File.stream/backpressure is untouched.
+
+Short meta-audit: detailed native timing shows tiny writes, expensive repeated
+lookups/enumeration. No larger buffer, receipt batching, writer cache or extra
+format branch is justified. First direct-directory candidate reduced iterator
+calls but added native directory opens; instrumented action7840→7907ms and
+uninstrumented7365→7330ms medians do not show a useful gain. Removed it; retained
+all comparison evidence. The adopted candidate overlaps independent native
+directory waits within ONE fresh list, max4workers globally per call, serial
+fallback without a handle queue, complete drain/iterator cleanup on failure,
+original first error and sorted-only complete success. No audit cadence, semantic
+receipt-read order, write/readback/Journal/publication/recovery fence changed.
+Specification06e§5 preceded implementation; independent contract/source review
+has no findings. No new PO policy/gate is needed for raw-list scheduling.
+
+Uninstrumented action milliseconds (median [each run]):
+- Baseline53d36f4:7365 [7323,7365,7489].
+- Rejected direct-lookup candidate:7330 [7287,7435,7330].
+- Bounded-list candidate:6508 [6574,6508,6499], all3PASS (~11.6% shorter).
+These are this turn's matched runs; do not use the earlier12.64s as its baseline.
+Native-probed action:7840.1 [7879.1,7840.1,7400.9]→6669.5 [6663.9,6802.9,6669.5].
+Full persist including all original/control/index/Start writes, fresh readbacks
+and their guards:2033.2 [2283.3,2033.2,1987.7]→1750 [1722.4,1750,1754.1]ms.
+Probe itself adds overhead; cumulative native waits overlap and are not wall time.
+
+Per-file native timings, medians in milliseconds. W/C/R are write/close/first
+native byte-read; final column is native writer acquisition→first native read
+completion, including intervening guard/path work. It EXCLUDES the final
+post-read audit and in-memory reference comparison; the persist wall interval
+above includes those. No base-evidence originals exist in this small fixture;
+production still persists/verifies ALL declared originals, not a fixed4.
+
+| File | W/C/R before | W/C/R after | Writer→first read before→after |
+| --- | --- | --- | --- |
+| manifest.json |1.2/1.5/0.8|1.0/1.4/0.8|75.7→64.2|
+| metadata.am |0.9/1.5/0.8|0.9/1.4/0.8|74.2→64.4|
+| protected-inventory.json |0.9/1.9/0.9|0.9/1.5/0.8|81.5→66.1|
+| exchange-bases.json |0.8/1.5/1.0|0.8/1.5/0.8|77.4→65.0|
+| capture.json |1.1/1.7/0.9|1.1/1.5/0.7|153.3→131.5|
+| prepared.json |1.0/1.5/1.1|0.9/1.5/0.8|146.6→129.2|
+| index.json |1.1/1.4/0.8|0.8/1.4/0.7|157.2→130.9|
+| start.json |1.3/1.8/0.8|0.8/1.4/0.7|149.3→130.0|
+
+Focused OPFS47PASS covers lexical prefixes/empty/missing/file ancestors, fresh
+new/deleted/replaced directories, deep/wide global bounds and same-iterator
+serialization, held-sibling drain and secondary-close primary-error preservation,
+plus existing stream/receipt safety. Initial separator bug and optional iterator
+test-type failure retained, fixed without changing assertions/deadlines. Typecheck
+PASS. Final source/test tree independently reviewed: no findings. Serial checkpoint
+PASS:153files,3435executed casesPASS/21existingTODO unexecuted,867.02s root-suite
+wall time; typecheck, all five builds, offline-isolation and HEIC isolationPASS.
+Fixed final Desktop/offline candidate source/testSHA256
+3c418a7f89cbbc4f114dfac4cc695a8d01ea9771db896e4fce8cad515fdcd1a9
+matches the measured source/test tree. Connected PC/touch native quota→retained
+draft/retry/cleanup/same output/download/cold reopen and Review-copy/save/reopen
+3PASS (59.4s). Additional normal-save touch emulation1PASS,7053ms; one observation,
+not a physical iPhone performance claim. Complete offline8PASS: exact-resource
+repair, two-window update/input retention, Mesh/Point/500k SH4/Proxy/media edit/
+save/full browser-server close/history reopen, initial conversion/unsupported
+refusal, subpath/foreign-worker and scoped removal protections. No runtime checks
+repeated solely for result prose/staging. Actual iPhone Safari resource/IME/file/
+thermal/offline acceptance remains unexecuted.
+
+Remaining native acquired-writer cleanup concern is code-only and pre-existing:
+do not infer a native lock leak from a JS stub. Reproduce a genuine native
+write/close failure plus same-path reopen before selecting any awaited abort fix;
+never delete partial receipts or replenish acknowledged loss. Next normal-save
+optimization must be selected from elapsed stage time, preserving fresh fences.
+This unit's implementation and Windows automated qualification are complete;
+deliver the fixed4191 candidate and suitableg0 checkpoint, with exact CI tracked
+by Git/Actions. Existing251 private draft lines and evaluation material stay local.
+Next apply the same measurements to Ki-84's edit→save→cold-resume flow before
+choosing larger-data changes; current small-fixture results are no large-data or
+device speed guarantee. Saving still takes several seconds and remains a target
+for improvement; no new validation lifetime or write/recovery policy is assumed.
+
+## Completed boundary —restored-generation output read scopes06e
 
 PO2026-11-08 approves [06e](../docs/specs/06e-selected-generation-output-read-proposal.md)
 implementation and automated before/after qualification. Baselineea347db; one writer

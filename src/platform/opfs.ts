@@ -198,26 +198,45 @@ export class OpfsFS implements WorkspaceFS {
 
   async list(prefix: string): Promise<string[]> {
     const out: string[] = [];
+    const pending = new Set<Promise<void>>();
+    let workers = 0, failed = false, failure: unknown;
+    const refuse = (error: unknown) => { if (!failed) { failed = true; failure = error; } };
     const walk = async (dir: FileSystemDirectoryHandle, base: string): Promise<void> => {
-      // entries() はDOM型定義に未収載だが全実装ブラウザに存在する
-      const iter = (dir as unknown as {
-        entries(): AsyncIterableIterator<[string, FileSystemHandle]>;
-      }).entries();
-      for await (const [name, handle] of iter) {
-        const p = base === '' ? name : `${base}/${name}`;
-        if (handle.kind === 'directory') {
-          // list() uses a lexical prefix (also partial names), not just a
-          // directory path. Only these branches can contain matching files.
-          // Never enumerate other projects/old runs for a scoped receipt read.
-          const branch = `${p}/`;
-          if (prefix.startsWith(branch) || branch.startsWith(prefix))
-            await walk(handle as FileSystemDirectoryHandle, p);
-        } else if (p.startsWith(prefix)) {
-          out.push(p);
+      let iter: AsyncIterableIterator<[string, FileSystemHandle]> | undefined, done = false;
+      try {
+        iter = (dir as unknown as { entries(): AsyncIterableIterator<[string, FileSystemHandle]> }).entries();
+        while (!failed) {
+          const entry = await iter.next();
+          if (entry.done) { done = true; break; }
+          if (failed) break;
+          const [name, handle] = entry.value, p = base === '' ? name : `${base}/${name}`;
+          if (handle.kind === 'directory') {
+            // Retain lexical prefix pruning, including partial names.
+            const branch = `${p}/`;
+            if (prefix.startsWith(branch) || branch.startsWith(prefix)) {
+              if (workers < 4) start(handle as FileSystemDirectoryHandle, p);
+              else await walk(handle as FileSystemDirectoryHandle, p);
+            }
+          } else if (p.startsWith(prefix)) out.push(p);
         }
+      } catch (error) { refuse(error); }
+      finally {
+        // Drain an owned iterator on a sibling failure too; preserve the first
+        // native failure if closing another iterator also fails.
+        try { if (!done && iter?.return) await iter.return(); }
+        catch (error) { refuse(error); }
       }
     };
-    await walk(this.root, '');
+    const start = (dir: FileSystemDirectoryHandle, base: string) => {
+      workers++;
+      const task = walk(dir, base).catch(refuse).finally(() => { workers--; pending.delete(task); });
+      pending.add(task);
+    };
+    // No directory queue/cache: at capacity the current worker descends
+    // serially. The bound is shared by this entire list, not each recursion.
+    start(this.root, '');
+    while (pending.size) await Promise.all([...pending]);
+    if (failed) throw failure;
     return out.sort();
   }
 

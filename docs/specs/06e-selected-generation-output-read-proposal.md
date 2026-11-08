@@ -1,6 +1,6 @@
 # 復元後の出力準備における読み取り単位
 
-Status: **ACCEPTED —PO承認2026-11-08・限定実装とWindows自動検証完了**。
+Status: **ACCEPTED —PO承認2026-11-08・§5を含む限定実装とWindows自動検証完了**。
 仕様06b §6.2のZIP証拠共有範囲を拡大しない。実行証拠と残件は[todo](../../tasks/todo.md)。
 今回のGS協調検査・未確認ZIP整理は[仕様10](10-gs-loading-and-output-attempt-cleanup.md)。
 
@@ -105,3 +105,33 @@ stagingで許可するconsumerの追加ではなく、normal selected generation
 承認境界：PO2026-11-08が上記3経路の限定実装・自動検証を承認した。
 これ以外はpublic I/Oごとの監査と個別承認された例外を保持する。新しい検査寿命・
 書込／復旧境界の集約・製品方針・公開判断が必要になった場合だけ該当部分を止める。
+
+## 5. 通常保存の低層I/O改善（2026-11-08）
+
+POはファイル別のwrite／close／再照合計測と、保存・復旧の安全性を維持する改善を指示した。
+これは§2の読取寿命を広げる承認ではない。すべての原本とcapture／prepared／index／Startの
+個別保存・fresh readback、生成前後とcold復旧の照合、全write／Journal／公開fenceは維持する。
+
+実装前のネイティブ計測ではwrite／closeは各数msであり、その前後には多数のnative lookupと
+ancestor entries反復がある。正確な計測値・入力・比較条件はtodoへ記録する。非同期iteratorは
+next待機まで測り、累積時間を実時間として合算しない。原本・本文や実パスは製品UIに追加しない。
+
+対象prefixへ直接到達する最初の候補では、entries回数は減ったがdirectory lookupが増え、
+実時間の改善を確認できなかった。これは採用根拠にせず比較証拠を保持する。
+
+次の候補は、1回のfreshな`OpfsFS.list`の内部だけで、独立したdirectory iteratorの待機を
+最大4workerまで重ねる。呼出し全体で上限を共有し、空きがなければ同じworkerで直列巡回する。
+全directoryをqueueへ保持したり、再帰ごとに4並列へ増幅したりしない。同じiteratorのnextは
+直列とし、失敗が分かったら新規処理を止め、開始済みの操作とiteratorの終了を待ってから拒否する。
+最初の失敗を保持し、終了時の二次エラーで置き換えない。成功は全worker終了後のsort済み完全一覧だけ。
+
+handle・entry・検証結果を別listやwrite/readbackへ保持しない。既存の字句prefixと枝刈りを保ち、
+存在しない／fileで塞がれた経路の空結果、新規・削除・置換の反映と、権限／読取エラーの拒否を維持する。
+callerの検証は従来どおりsort済み一覧から同じ順で行う。監査回数、管理記録のfreshな逐次読取、
+正規writerの排他・書込照合・復旧順は変更しない。数値4は内部実行上限で、製品の容量保証ではない。
+
+受入れは既存のprefix／freshness／失敗伝播試験、書込・再照合・改変拒否・中断復旧と、同一入力の
+通常保存3回の前後比較（詳細probeを外した対照も含む）、PC／touch／完全終了offlineの接続試験。
+深い木でもnative nextの同時数が4以下、held siblingの進行と失敗時drain／一次エラー保持を検証する。
+実時間の効果を確認できた経路だけを採用する。
+新しい容量／速度保証、schema、変換ID、依存、一般公開を含めない。

@@ -31,7 +31,9 @@ describe('OPFS scoped fresh listing', () => {
   const paths = ['root.json', 'projects/a/file.json', 'projects/a/logs/one.json', 'projects/a/logs/two.json',
     'projects/ab/other.json', 'projects/a-file.json', 'other/deep/file.json'];
   it.each(['', 'projects', 'projects/a', 'projects/a/', 'projects/a/log', 'projects/a/logs/',
-    'projects/a/file.json', 'root', 'absent/', 'projects//', '/projects', 'projects/../'])('matches MemoryFS lexical prefix %j', async prefix => {
+    'projects/a/file.json', 'root', 'absent/', 'projects//', '/projects', 'projects/../', '/',
+    'root.json/', 'root.json/nested/', 'projects/a/file.json/', 'projects/a/file.json/deep/',
+    'projects/absent/deep/', 'projects/a/logs//', './projects/', 'projects\\a/'])('matches MemoryFS lexical prefix %j', async prefix => {
     const f = await setup(paths);
     expect(await f.fs.list(prefix)).toEqual(await f.memory.list(prefix));
   });
@@ -48,12 +50,58 @@ describe('OPFS scoped fresh listing', () => {
     expect(await f.fs.list('projects/a/logs/')).toEqual(['projects/a/logs/new.json', 'projects/a/logs/two.json']);
     expect(f.visited).toHaveLength(4);
   });
+  it('resolves a replaced directory afresh rather than retaining a previous handle', async () => {
+    const f = await setup(['projects/a/old.json']);
+    expect(await f.fs.list('projects/a/')).toEqual(['projects/a/old.json']);
+    const projects = f.root.children.get('projects') as Directory;
+    projects.children.delete('a');
+    expect(await f.fs.list('projects/a/')).toEqual([]);
+    f.root.add('projects/a/new.json');
+    expect(await f.fs.list('projects/a/')).toEqual(['projects/a/new.json']);
+  });
   it('propagates relevant storage failures instead of reporting an empty or cached result', async () => {
     const f = await setup(paths), other = f.root.children.get('other') as Directory;
     const error = new DOMException('Storage unavailable', 'NotReadableError'); other.error = error;
     expect(await f.fs.list('projects/a/')).toEqual(await f.memory.list('projects/a/'));
     await expect(f.fs.list('other/')).rejects.toBe(error);
     await expect(f.fs.list('')).rejects.toBe(error);
+  });
+  it('overlaps independent native waits with one bound across wide and deep branches', async () => {
+    const keys = Array.from({ length: 12 }, (_, i) => `branch-${i}/nested/deep/one.json`);
+    const f = await setup(keys); let active = 0, maximum = 0;
+    const wrap = (dir: Directory) => {
+      const entries = dir.entries.bind(dir);
+      dir.entries = () => {
+        const iterator = entries(); let ownActive = false;
+        return { [Symbol.asyncIterator]() { return this; },
+          async next() {
+            expect(ownActive).toBe(false); ownActive = true; active++; maximum = Math.max(maximum, active);
+            try { await new Promise(resolve => setTimeout(resolve, 0)); return await iterator.next(); }
+            finally { active--; ownActive = false; }
+          }, return: () => iterator.return?.(undefined) ?? Promise.resolve({ done: true as const, value: undefined }),
+        };
+      };
+      for (const child of dir.children.values()) if (child instanceof Directory) wrap(child);
+    };
+    wrap(f.root);
+    expect(await f.fs.list('')).toEqual(await f.memory.list(''));
+    expect(maximum).toBeGreaterThan(1); expect(maximum).toBeLessThanOrEqual(4); expect(active).toBe(0);
+  });
+  it.each([false, true])('drains a held sibling and preserves the native failure (closing failure: %s)', async closeFails => {
+    const f = await setup(['held/file.json', 'broken/file.json', 'later/file.json']);
+    const held = f.root.children.get('held') as Directory, broken = f.root.children.get('broken') as Directory;
+    let release!: () => void, noticed!: () => void;
+    const hold = new Promise<void>(resolve => { release = resolve; }), observed = new Promise<void>(resolve => { noticed = resolve; });
+    const primary = new DOMException('Cannot enumerate', 'NotReadableError'), secondary = Error('Cannot close');
+    const close = vi.fn(async () => { if (closeFails) throw secondary; return { done: true as const, value: undefined }; });
+    held.entries = () => ({ [Symbol.asyncIterator]() { return this; }, async next() { await hold; return { done: false as const, value: ['file.json', { kind: 'file' }] as [string, FileSystemHandle] }; }, return: close });
+    broken.entries = () => ({ [Symbol.asyncIterator]() { return this; }, async next() { noticed(); throw primary; } });
+    let settled = false;
+    const result = f.fs.list('').then(value => { settled = true; return value; }, error => { settled = true; return error; });
+    await observed; await Promise.resolve(); await Promise.resolve();
+    expect(settled).toBe(false); expect(close).not.toHaveBeenCalled();
+    release(); expect(await result).toBe(primary); expect(close).toHaveBeenCalledOnce();
+    expect(f.visited).not.toContain('later/');
   });
 });
 
