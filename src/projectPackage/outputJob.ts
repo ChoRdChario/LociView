@@ -10,6 +10,7 @@ import { WorkspaceSourceCapture } from './workspaceSource';
 import { WorkspaceArchive, prepareWorkspaceManifest, writeWorkspaceArchive } from './workspaceArchive';
 import type { WorkspaceBaseRecord } from './workspaceBases';
 import { protectedWorkspaceInventory } from './protectedInventory';
+import type { OutputCleanupRead } from './outputCleanupRead';
 
 const encode = (v: unknown) => new TextEncoder().encode(json(v));
 const ref = (b: Uint8Array): EvidenceRef => ({ sha256: packageByteHash(b), byteLength: b.length });
@@ -62,7 +63,8 @@ export class WorkspaceOutputJob {
     return new WorkspaceOutputJob(fs, newId(), limits, { metadata: capture.metadataBytes(), manifest,
       inventory: structuredClone(inventory), bases: structuredClone(bases) });
   }
-  static async ids(fs: ProjectWorkspaceFS) {
+  static async ids(fs: ProjectWorkspaceFS, cleanup?: OutputCleanupRead) {
+    cleanup?.assertOwner(fs);
     const prefix = `${root(fs)}output/`, paths = await fs.list(prefix);
     if (paths.length > L.entryCount) return fail('output-job-budget');
     let controls = 0;
@@ -74,8 +76,8 @@ export class WorkspaceOutputJob {
     }
     return [...new Set(paths.map(p => p.slice(prefix.length).split('/')[0]!))];
   }
-  static async state(fs: ProjectWorkspaceFS, id: string, limits: MetadataLimits) {
-    technicalId(id); if (!(await this.ids(fs)).includes(id)) return fail('output-missing');
+  static async state(fs: ProjectWorkspaceFS, id: string, limits: MetadataLimits, cleanup?: OutputCleanupRead) {
+    technicalId(id); if (!(await this.ids(fs, cleanup)).includes(id)) return fail('output-missing');
     const path = `${root(fs)}output/${id}/`, start = await fs.readStream(`${path}start.json`), abandoned = await fs.readStream(`${path}abandoned.json`);
     if (start) { if (abandoned) return fail('output-state'); return 'started' as const; }
     if ((await fs.list(`${path}steps/`)).length) return fail('output-state');
@@ -91,8 +93,8 @@ export class WorkspaceOutputJob {
     if (await this.state(fs, id, limits) === 'started') return fail('output-abandon-denied');
     await writeReceipt(fs, `${root(fs)}output/${id}/abandoned.json`, this.abandonment(id), limits);
   }
-  static async open(fs: ProjectWorkspaceFS, id: string, limits: MetadataLimits) {
-    if (await this.state(fs, id, limits) !== 'started') return fail('output-unstarted');
+  static async open(fs: ProjectWorkspaceFS, id: string, limits: MetadataLimits, cleanup?: OutputCleanupRead) {
+    if (await this.state(fs, id, limits, cleanup) !== 'started') return fail('output-unstarted');
     const path = `${root(fs)}output/${id}/`;
     const bytes = async (name: string, max: number) => {
       const file = await fs.readStream(`${path}${name}`); if (!file || file.size > max) return fail('output-input-missing');

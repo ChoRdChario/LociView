@@ -102,6 +102,7 @@ export function createValidationModeHost(initial: Host, open: (mode: LocalOpenMo
       cancelStale: (...a) => run(() => current.workspaceFiles.cancelStale(...a)),
     },
     workspaceOutput: {
+      cleanup: (...a) => run(() => current.workspaceOutput.cleanup(...a)),
       get privacy() { return current.workspaceOutput.privacy; },
       get jobs() { return current.workspaceOutput.jobs; }, get error() { return current.workspaceOutput.error; },
       get bases() { return current.workspaceOutput.bases; },

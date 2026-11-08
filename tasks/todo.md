@@ -57,7 +57,161 @@ unchanged-feature-classification checks pass; independent review has no findings
 No runtime change or new capacity guarantee; no runtime suite is needed for this
 documentation checkpoint.
 
-## Current boundary —mobile large-data work and storage capacity
+## Current boundary —progressive full-quality GS and safe output retention
+
+PO2026-11-08 explicitly authorizes implementation and automated verification of
+large-GS progressive loading and safe accumulated-output cleanup. Baselineacdfd89;
+one writer with bounded readonly renderer/retention reviewers. Preserve original
+bytes/all SH/full quality/offline and every save/readback/recovery/lineage fence.
+Retain the251 private draft lines and all original/evaluation material locally.
+
+Outcome: keep captions and ready residents responsive through GS preparation;
+measure actual worker/packed/sort stages before selecting progressive display.
+Pinned SDK already streams Blob input; do not claim a new raw-copy saving. Remove
+strictly regenerable attempt ZIPs while retaining every acknowledged artifact. No new visible file-type choice,
+management screen, codec dependency, blanket file cap, silent SH/quality reduction,
+canonical/history/base deletion, main/Pages or release activation is authorized.
+
+Implementation supplement: [GS loading/output attempts](../docs/specs/10-gs-loading-and-output-attempt-cleanup.md).
+True partial drawing remains subject to global-order/pixel evidence. The first
+owned measurement found a4259.9ms synchronous packed check; the fixed-condition
+three-run comparison below is the comparison evidence, not that single run.
+
+1. Review pinned public APIs, source/display ownership and exact output/read/base/
+   recovery dependencies; record the ports and acceptance before implementation.
+   Measure full vs bounded loading and storage before/after using owned data/profiles.
+2. Implement the largest safe connected workflow through existing decode/admission,
+   WorkspaceFS and Session/package boundaries. Latest cleanup authorization covers
+   redundant output data, not indiscriminate GC. Determine terminal eligibility and
+   live-reader/cross-tab/recovery fences before any removal.
+3. Verify SH0–4 complete coefficients/final rendering, first usable stage, bounded
+   transient input, cancellation/stale/context/teardown and no new source identity.
+   Verify output history/base/return/hash integrity, no concurrent download loss,
+   exact cancellation/retry/interruption, independent PC/touch and cold/offline.
+4. Independently review the meaningful final diff, run required checks serially at
+   the connected boundary, deliver an exact artifact, then suitableg0 Push/CI.
+
+Implemented and independently reviewed. A connected retry-form defect found after
+qualificationV1 was reproduced and fixed; qualificationV2 is the final source/test
+tree. V2 root checkpoint/HEIC/native PC/touch and all8 dedicated cold/offline cases
+PASS. This is a verified development checkpoint; actual partial GS drawing,
+acknowledged-output retirement,06e and physical iPhone acceptance remain distinct:
+- Preserve the already-streamed Blob transport, one complete mesh per source/global Morton order and
+  every packed predicate. Cooperative packed checking reduces checker-owned
+  allocation, returns to input/render tasks and reports its own checking stage.
+  Native settlement plus checking remains one queue lifetime; cancellation and
+  idle cannot release/adopt early. Independent renderer review findings resolved.
+- Five output kinds use the same cleanup-only, exact-owner read capability and
+  typed Session/WorkspaceSender command. Delete only canonical unacknowledged
+  attempt ZIPs; retain acknowledged ZIPs/all controls/bodies/bases/history. Ordinary
+  admission remains strict. Malformed namespace inventory stops cleanup before
+  any deletion; invalid bindings remain untouched; lost authority stops removals.
+  Project/publication checks and package/Project/artifact reader fences retained.
+- One contextual cleanup action remains beside failed output, including when older
+  successful history exists, otherwise inside existing history. It retains the
+  typed output name and the exact frozen job; no forced draft cancellation or new
+  storage-management screen. Fresh normal discovery follows the exclusive lifetime.
+- Focused GS/output/import-boundary30PASS; adjacent UI/host/residency121PASS.
+  PC/390px touch native preflight bothPASS: real8MiB failed ZIP, separate-page shared
+  Web Lock, cleanup, same backup retry/download and browser cold reopening. Final
+  mixed acknowledged-history scenario is also covered by the final V2 runs below.
+- V1 root checkpoint:3413PASS/21 existing TODO in153files,994.59s root suite;
+  typecheck/all five serial builds/offline isolation/HEIC isolationPASS. Source/test
+  and copied artifacts are bound by the local candidate manifest. No source-control
+  staging or prose change alone requires repeating this evidence.
+- Additional connected UX finding: a failed named backup's matching form remained
+  choicePending even after successful retry/download, blocking drawer close. The
+  existing connected test reproduced it. After retry, only the exact generated
+  backup matching the current token and normalized name consumes its form; a new
+  different name remains. Both focused regressionsPASS. PC/touch final assertions
+  now include closing the drawer. Independent read-only UI review has no findings.
+  This substantive fix receivedV2 final qualification; it is not merely a prose retry.
+- V2 root checkpointPASS:3414PASS/21 existing TODO in153files;1187.03s root suite;
+  typecheck/all five serial builds/offline isolation/HEIC isolationPASS. V2 native
+  PC/touch2PASS includes prior acknowledged output, real8MiB orphan cleanup, shared
+  observer, same job retry/download, matching-form consumption, drawer close and cold.
+  V1 Desktop5PASS includes the500k whole five-purpose/return/copy/restore/cold flow
+  and PC/phone reading during output. Source hashes prove V1→V2 changed only retry UI
+  and its two tests; renderer/storage qualification is unchanged, not silently rerun.
+- Extra selected-generation driver initially exceeded its original15s quota-display
+  condition after restore; preserve that failure. A separate timings-enabled diagnostic
+  kept every original15s comparison, recorded zero breaches, and completed restore →
+  shared-reader-preserved8MiB file → cleanup → retry/download/close/cold. One observation:
+  quota display14.193s, cleanup7.052s, retry-to-download6.872s. This demonstrates the
+  functional path, not stable performance acceptance. Small-save10s remains unmet.
+  The spinner includes generation plus post-error output discovery. Generation took
+  10.070s, total13.739s; repeated selected-generation audits are the code-backed
+  candidate, not a proven artifact-lock deadlock. OPFS list is already prefix-pruned.
+- [06e](../docs/specs/06e-selected-generation-output-read-proposal.md) is PROPOSED:
+  three pure output observations with per-observation opening/closing audits. Current
+  06b exceptions do not ratify this extension. No write/readback/Journal-write/publication/
+  restore fence is consolidated. Stop only that new timing contract pending PO
+  decision; the existing safe implementation receives its own delivery qualification.
+  Independent proposal review clarified the already-existing outputOverview wrapper,
+  non-adopting same-fs/factory Session projections, no adoption before closing, and
+  the external-control ABA detection limit; all findings addressed. No06e code added.
+- Exact tested V2 immutable offline candidate is served at http://127.0.0.1:4191/.
+  All20 served file hashes match the candidate manifest, and all25 changed source/test
+  files still match its source/test digest. Sample remains local at
+  `.artifacts/fixtures/quality-pass/sample-project.zip`. No private source/evaluation
+  material is included in tracked delivery. Source/test equality, rather than unchanged
+  prose or staging, controls the need for repeated runtime checks.
+- Dedicated cold/offline8PASS in12.1min (run1794108386311-34748): browser/server fully
+  stopped; Mesh/Point/500k SH4/Proxy/media edits, file output, same history and initial
+  conversion; root/subpath same-build cache repair; two-window update with draft
+  preservation and wrong/missing/interrupted resources; scope/foreign-cache protection;
+  Project-storage startup failure and safe own removal. Original static return retains
+  source/history and unrelated cache. This is separate runtime evidence from builds.
+- Checkpoint scope: source/test staged content must matchV2 manifest; filtered public
+  todo/review exclude the pre-existing165/86 private lines, retained unchanged locally.
+  No fixture/profile/original/evaluation file is staged. Push onlyg0-baseline, whose
+  verified workflow triggers CI rather than Pages; Git owns checkpoint identity and
+  Actions the exact-commit CI result. No main/Pages/release activation.
+
+The500k full workflow also shows pre-existing high-impact latency: create-to-ready
+59.6s, Review-copy editor188.4s/display200.1s; its copy command169.2s and later backup
+70.5s. These are single connected-workflow observations, not controlled before/after
+comparisons. Renderer-only readiness improvements must not be sold as end-to-end
+file-import/copy improvements. Next performance work follows these larger user waits.
+
+Owned500k SH4,178002206B, Windows dedicated Chromium156,800×600 DPR1,
+same source/browser/instrumentation; each sequence uses three isolated profiles.
+Values milliseconds; median followed by all runs:
+
+| Stage | acdfd89 baseline | Cooperative checking |
+| --- | --- | --- |
+| Complete 3D readiness |5376.2 [4950.9,5376.2,6434.8]|2920.4 [3007.0,2778.9,2920.4]|
+| Packed verification including yields |3643.8 [3189.5,3643.8,4412.9]|1037.1 [1037.1,1033.3,1097.0]|
+| Native decode plus setup before first checked row |1141.9 [1141.4,1141.9,1402.5]|1222.0 [1265.4,1122.6,1222.0]|
+| Sort/display after last checked row |619.4 [620.0,590.5,619.4]|623.0 [704.5,623.0,601.4]|
+| Longest observed frame gap |3649.2 [3195.0,3649.2,4420.5]|597.7 [683.3,597.7,581.7]|
+
+All six final800×600 RGBA hashes match; every run checked500000 rows/full SH4.
+The inspection source is unchanged. This is one Windows synthetic-source sample,
+not Safari/RAM/throughput qualification. Remaining initial sort/upload frame gaps
+are visible, not relabelled as100ms compliance. Raw records remain local under
+`.artifacts/e2e/gs-output-lifetime-20261108/gs-proof/results/`.
+
+Meta-audit: rejected the stale full-raw-copy premise after inspecting pinned worker
+streaming. A four-point equal-depth SH4 probe shows full global order vs raw2+2
+pages changes15230 RGBA components (maximum15/255). Thus a partial-render profile
+is not activated or described as implemented. Preserve the accepted full-quality
+renderer while improving the measured synchronous stage. A later paging connection
+needs an ordering/quality solution and its actual profile gate. Likewise acknowledged
+output ZIP retirement remains separate: current download/base/recovery depends on
+those bytes. This unit makes no wire/schema/capacity/adoption/release change.
+
+Stop only the affected genuine profile/quality, substantial architecture/schema/
+compatibility, new dependency or destructive-authority decision. Do not merely
+repeat old 'cleanup unapproved' now that the user requested it. If an existing
+binding contract conflicts with the necessary deletion/rendering semantics, make
+that precise rule and concrete safe alternative reviewable before asking.
+Physical iPhone Safari memory/thermal/IME/native-save/offline evidence stays pending,
+not inferred from Windows touch, SDK counters or two-point proof. Continue other
+in-scope work while physical evidence is unavailable. No retries, dropped safety
+checks or longer deadlines to relabel failures.
+
+## Completed boundary —mobile large-data work and storage capacity
 
 Status2026-11-08: implemented and independently reviewed; final V8 local checks
 PASS at fixed source/test/contract inputs. Git owns the g0 checkpoint identity;

@@ -5,8 +5,9 @@ import { readRestoreControls, restoreEqual } from '../projectPackage/restoreCont
 import { validationProjectService } from '../projectFiles/creation';
 import { validationMetadataLimits as limits } from '../projectFiles/validation';
 import type { MetadataSessionRead, ValidationHostOptions } from './validationHost';
+import { readOutputArtifacts } from '../platform/outputArtifactLock';
 
-type Options = Pick<ValidationHostOptions, 'run' | 'openStorage' | 'generations' | 'store' | 'fileLimits' | 'filePolicy' | 'decode' | 'jpeg' | 'photo' | 'mediaDecoders' | 'timing'>;
+type Options = Pick<ValidationHostOptions, 'run' | 'openStorage' | 'generations' | 'store' | 'fileLimits' | 'filePolicy' | 'decode' | 'jpeg' | 'photo' | 'mediaDecoders' | 'timing' | 'packageLocks'>;
 export function validationGenerationDatabases(options: Pick<Options, 'run' | 'openStorage' | 'generations'>): RestoreDatabasePorts {
   // Original-only injected hosts cannot activate or invent a dedicated database.
   return options.generations?.(options.run) ?? { listGenerations: async () => [], open: (id, create) => {
@@ -16,8 +17,9 @@ export function validationGenerationDatabases(options: Pick<Options, 'run' | 'op
 }
 
 export function validationGenerationService(scope: Pick<Awaited<ReturnType<typeof openWorkspaceGeneration>>, 'fs' | 'factory' | 'check'>,
-  options: Pick<Options, 'store' | 'fileLimits' | 'filePolicy' | 'decode' | 'jpeg' | 'photo' | 'mediaDecoders' | 'timing'>) {
+  options: Pick<Options, 'store' | 'fileLimits' | 'filePolicy' | 'decode' | 'jpeg' | 'photo' | 'mediaDecoders' | 'timing' | 'packageLocks'>) {
   return { fs: scope.fs, factory: scope.factory, store: options.store,
+    readOutputArtifacts: <T>(action: () => Promise<T>) => readOutputArtifacts(options.packageLocks ?? null, action),
     ...validationProjectService(scope.fs, scope.factory, options.store, options.filePolicy ?? options.fileLimits, options.decode, scope.check, options.jpeg, options.photo,options.mediaDecoders, options.timing) };
 }
 

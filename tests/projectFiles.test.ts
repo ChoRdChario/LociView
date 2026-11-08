@@ -6743,8 +6743,20 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect(status.textContent).toContain('保存容量が不足');sink.mockRestore();button('生成を再開',output).fire('click');
     await vi.waitFor(()=>{expect(h.downloads).toHaveBeenCalledOnce();expect(status.dataset.busy).toBe('false');},{timeout:10000});
     expect(host.workspaceOutput.jobs).toHaveLength(1);expect(host.workspaceOutput.jobs[0]!.id).toBe(id);expect(all(output).some(n=>n.textContent.includes('ダウンロードを開始'))).toBe(true);
+    expect(name.value).toBe('');expect(h.ui.hasChanges()).toBe(false);
     const saved=await BackupArchive.inspect(await host.workspaceOutput.download(id),metadata);expect(saved.source.originalChanges()).toEqual(edited.originalChanges());expect(saved.source.proof.identity).toEqual(edited.proof.identity);
     await h.ui.dispose();const cold=await openValidationHost(h.f.options);try{expect(cold.read().source!.originalChanges()).toEqual(edited.originalChanges());}finally{await cold.dispose();}
+  });
+  it('preserves a newer backup name after retrying a differently named frozen job', async () => {
+    const h=await productWorkspaceFixture(true),{host,named,button}=h,output=named('ファイル'),name=named('名前（任意）',output),status=output.children.find(n=>n.attributes.get('role')==='status')!;
+    name.value='元の保存名';name.fire('input');const write=h.f.fs.writeStream.bind(h.f.fs);
+    const failure=vi.spyOn(h.f.fs,'writeStream').mockImplementation(async(path,stream)=>{if(path.includes('/artifacts/')&&path.endsWith('.zip')){await stream.cancel();throw Error('partial output');}return write(path,stream);});
+    button('ファイルに保存',output).fire('click');await vi.waitFor(()=>{expect(status.dataset.busy).toBe('false');expect(host.workspaceOutput.jobs[0]?.state).toBe('incomplete');},{timeout:10000});failure.mockRestore();
+    const id=host.workspaceOutput.jobs[0]!.id;name.value='別の新しい保存名';name.fire('input');button('生成を再開',output).fire('click');
+    await vi.waitFor(()=>{expect(h.downloads).toHaveBeenCalledOnce();expect(status.dataset.busy).toBe('false');},{timeout:10000});
+    expect(name.value).toBe('別の新しい保存名');expect(h.ui.hasChanges()).toBe(true);
+    expect(host.workspaceOutput.jobs).toEqual([expect.objectContaining({id,label:'元の保存名',state:'generated'})]);
+    await h.ui.dispose();
   });
   it('recovers fresh photo selection and checks storage without discarding a durable retry, then saves and cold reopens exact JPEG bytes', async () => {
     const estimate = vi.fn(async () => ({usage:1_200_000,quota:4_000_000_000}));

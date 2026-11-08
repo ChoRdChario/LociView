@@ -3,13 +3,13 @@ import { GaussianSplatRenderer, SplatMesh, SplatFileType } from 'gaussian-splat-
 import displayText from '../../docs/specs/profiles/gs-gsl-webgl2-packed-linear-1.profile.json?raw';
 import goldenText from '../../docs/specs/profiles/gs-gsl-webgl2-packed-linear-1.goldens.json?raw';
 import { queueGsDecode, type GsResidency, type GsViewIntent } from './gsDecodeQueue';
-import { gsLinear } from '../domain/gsSource';
+import { checkGsPacked } from './gsPacked';
 import type {TargetBudget,TargetLease} from './targetBudget';
 
 /** Neutral checked source. No Project, format records, filesystem or package access. */
 export type GsDisplaySource = {readonly count:number;readonly degree:number;readonly displayIssue:string|null} &
   ({readonly file:Blob;readonly bytes?:never}|{readonly bytes:Uint8Array;readonly file?:never});
-export interface GsDisplayResident {readonly source:GsDisplaySource;readonly object:THREE.Group;issue:string|null;ready:boolean}
+export interface GsDisplayResident {readonly source:GsDisplaySource;readonly object:THREE.Group;issue:string|null;ready:boolean;preparing?:boolean}
 export interface GsFrame {readonly object:THREE.Mesh;readonly sourceMaterial:THREE.ShaderMaterial;readonly baseTarget:THREE.WebGLRenderTarget;
   readonly baseBytes:number;claimBase():void;withMaterial(material:THREE.ShaderMaterial,draw:()=>void):void;renderBase():void}
 export interface GsRenderPort {render(scene:THREE.Scene,camera:THREE.Camera,before:()=>void,present?:(frame:GsFrame)=>void):void;dispose():void;idle?():Promise<void>;readonly depthBits:number;readonly healthyOwner?:object;readonly targetBytes?:number}
@@ -18,20 +18,6 @@ async function verifyPolicy(){return policy??=(async()=>{
   const hash=async(s:string)=>[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s)))].map(n=>n.toString(16).padStart(2,'0')).join('');
   if(await hash(displayText)!=='e71f81ab372669f087ba7c1fde5ce56526ee0e2ac1179d33582f4905cf0e28cd'||await hash(goldenText)!=='4c72c058724af1330c3fb4e2b90f3dcffabd4ffdb21af3af6d81b04a8ba093cf')throw Error('GSの表示仕様を確認できません。');
 })();}
-/** Source-side range proof complements checking every publicly decoded packed row. */
-function checkPacked(mesh:SplatMesh,source:GsDisplaySource){
-  if(!mesh.isInitialized||mesh.numSplats!==source.count||!mesh.splats||mesh.splats.getNumSplats()!==source.count||mesh.splats.getNumSh()!==source.degree)throw Error('GSの全係数を表示できません。');
-  for(let i=0;i<source.count;i++){
-    const s=mesh.splats.getSplat(i,true);
-    const values=[...s.center.toArray(),...s.scales.toArray(),...s.quaternion.toArray(),s.opacity,...s.color.toArray(),...s.sh.flatMap(c=>c.toArray())];
-    if(values.some(v=>!Number.isFinite(v))||s.scales.toArray().some(v=>v<=0||!Number.isFinite(Math.fround(v))||Math.fround(v)<=0)||s.quaternion.lengthSq()<=0||s.opacity<0||s.opacity>1||s.sh.length!==source.degree*(source.degree+2))throw Error('GSの描画データを確認できません。');
-    for(let channel=0;channel<3;channel++){
-      let bound=Math.abs(s.color.toArray()[channel]!);
-      for(let k=0;k<s.sh.length;k++)bound+=Math.abs(s.sh[k]!.toArray()[channel]!)*Math.sqrt((2*Math.floor(Math.sqrt(k+1))+1)/(4*Math.PI));
-      if(!Number.isFinite(gsLinear(bound))||gsLinear(bound)>65504)throw Error('GSの色を正しく合成できる範囲を超えています。');
-    }
-  }
-}
 function outputPass(target:THREE.WebGLRenderTarget){
   const scene=new THREE.Scene(),camera=new THREE.OrthographicCamera(-1,1,1,-1,0,1),geometry=new THREE.PlaneGeometry(2,2);
   const material=new THREE.ShaderMaterial({uniforms:{image:{value:target.texture}},depthTest:false,depthWrite:false,toneMapped:false,
@@ -66,15 +52,20 @@ export async function createGsRender(renderer:THREE.WebGLRenderer,residents:read
   const owner=intent?.owner??{};let slotIndex=0,coordinatorDisposed=false,targetGeneration=0,baseLease:TargetLease|undefined;
   let closed=false,sorting=false,lastSort='',attached:THREE.Scene|undefined,fatal:unknown,cleanupFailed=false,sortTask:Promise<void>|undefined;const decoded=new Set<GsDisplayResident>(),pendingDisplay=new Set<GsDisplayResident>();
   const leases=residents.map(resident=>{
-    resident.ready=false;resident.issue='GSの表示を準備しています。';
-    if(resident.source.displayIssue){resident.issue=resident.source.displayIssue;return {cancel(){}};}
+    const checking=new AbortController();let reported=-1;
+    resident.ready=false;resident.preparing=true;resident.issue='GSの表示を準備しています。';
+    if(resident.source.displayIssue){resident.preparing=false;resident.issue=resident.source.displayIssue;return {cancel(){}};}
     const slot=slotIndex++;
     const lease=queueGsDecode(resident,()=>{
       const mesh=new SplatMesh({...resident.source.file?{file:resident.source.file}:{fileBytes:resident.source.bytes.slice()},fileType:SplatFileType.PLY,fileName:'source.ply',editable:false,raycastable:false});mesh.maxSh=resident.source.degree;mesh.frustumCulled=false;
-      return {initialized:mesh.initialized,value:mesh,dispose:()=>{mesh.removeFromParent();mesh.dispose();if(closed&&!coordinatorDisposed)throw Error('GSの描画資源の解放を確認できません。');}};
+      const initialized=mesh.initialized.then(()=>checkGsPacked(mesh,resident.source,checking.signal,count=>{
+        if(closed||checking.signal.aborted)return;const percent=Math.floor(count/resident.source.count*100);
+        if(percent!==reported){reported=percent;resident.issue=`GSを確認しています（${percent}%）。`;changed();}
+      }));
+      return {initialized,value:mesh,dispose:()=>{mesh.removeFromParent();mesh.dispose();if(closed&&!coordinatorDisposed)throw Error('GSの描画資源の解放を確認できません。');}};
     },intent?()=>intent.reserve(slot,resident.source):residency?()=>residency.reserve(owner,resident.source):undefined);
-    void lease.promise.then(mesh=>{if(closed){lease.cancel();return;}try{checkPacked(mesh,resident.source);resident.object.add(mesh);decoded.add(resident);lastSort='';changed();}catch(e){lease.cancel();resident.issue=(e as Error).message;changed();}},e=>{if(!closed){resident.issue=e instanceof Error?e.message:'GSを表示できません。';changed();}});
-    return lease;
+    void lease.promise.then(mesh=>{if(closed){lease.cancel();return;}try{resident.issue='GSの表示を準備しています。';resident.object.add(mesh);decoded.add(resident);lastSort='';changed();}catch(e){decoded.delete(resident);lease.cancel();resident.preparing=false;resident.issue=e instanceof Error?e.message:'GSを表示できません。';changed();}},e=>{if(!closed){resident.preparing=false;resident.issue=e instanceof Error?e.message:'GSを表示できません。';changed();}});
+    return {promise:lease.promise,get cleanupFailed(){return lease.cleanupFailed;},cancel(){checking.abort();lease.cancel();}};
   });
   const assertCleanup=()=>{if(cleanupFailed||leases.some(lease=>'cleanupFailed'in lease&&lease.cleanupFailed))throw Error('GSの表示資源の解放を確認できません。画面を閉じて開き直してください。');};
   return {depthBits,async idle(){assertCleanup();await Promise.allSettled([...leases.flatMap(lease=>'promise'in lease?[lease.promise]:[]),...(sortTask?[sortTask]:[])]);assertCleanup();},get targetBytes(){return baseLease?.bytes??0;},get healthyOwner(){return !closed&&!fatal?owner:undefined;},render(scene,camera,before,present){
@@ -101,8 +92,8 @@ export async function createGsRender(renderer:THREE.WebGLRenderer,residents:read
         const sourceMaterial=coordinator.material;
         present({object:coordinator,sourceMaterial,baseTarget:target,get baseBytes(){assertFrame();return baseLease?.bytes??0;},claimBase(){assertFrame();if(!targetBudget)throw Error('GSの透過表示は未接続です。');baseLease??=targetBudget.reserve(target.width*target.height*12);},renderBase,withMaterial(material,draw){assertFrame();const previous=coordinator.material;try{coordinator.material=material;draw();}finally{coordinator.material=previous;}}});
       }else renderBase();
-      for(const r of pendingDisplay){becameReady||=!r.ready;r.ready=true;r.issue=null;}pendingDisplay.clear();
+      for(const r of pendingDisplay){becameReady||=!r.ready;r.ready=true;r.preparing=false;r.issue=null;}pendingDisplay.clear();
     }finally{renderer.setRenderTarget(old);}if(becameReady)changed();
-  },dispose(){if(closed)return;closed=true;intent?.cancel();const errors:unknown[]=[];coordinator.removeFromParent();try{coordinator.dispose();coordinatorDisposed=true;}catch(e){errors.push(e);}for(const lease of leases)try{lease.cancel();}catch(e){errors.push(e);}for(const r of residents)r.ready=false;
+  },dispose(){if(closed)return;closed=true;intent?.cancel();const errors:unknown[]=[];coordinator.removeFromParent();try{coordinator.dispose();coordinatorDisposed=true;}catch(e){errors.push(e);}for(const lease of leases)try{lease.cancel();}catch(e){errors.push(e);}for(const r of residents){r.ready=false;r.preparing=false;}
     try{target.dispose();baseLease?.release();baseLease=undefined;}catch(e){errors.push(e);}try{output!.dispose();}catch(e){errors.push(e);}if(errors.length){cleanupFailed=true;throw new AggregateError(errors,'GSの表示資源を解放できません。');}}};
 }

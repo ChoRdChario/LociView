@@ -49,6 +49,7 @@ import type { SceneAppendState } from '../projectPackage/sceneAppend';
 import { ReviewEditJob } from '../projectPackage/reviewEditJob';
 import { reviewEditChildBinding, type ReviewEditState, type ReviewEditBinding } from '../projectPackage/reviewEditControls';
 import { WorkspaceSender, type WorkspaceOutputState, type ContributionBaseChoice } from '../projectFiles/sendWorkspace';
+import { readOutputArtifacts } from '../platform/outputArtifactLock';
 import { WorkspaceArchive } from '../projectPackage/workspaceArchive';
 import { CleanArchive } from '../projectPackage/cleanArchive';
 import { PackageArchive } from '../projectPackage/zipArchive';
@@ -457,6 +458,7 @@ async function openNormalValidationHost(options: ValidationHostOptions, inherite
       });
     };
     const workspaceOutput = {
+      cleanup: (token: string) => outputAction(() => sender.cleanup(token), true),
       get privacy() { const sourceIncludesNames = last.source?.includesDeclaredEditorNames ?? false;
         const sourceRequiresPortableMediaReader = !!last.source?.requiredCapabilities.includes(PORTABLE_MEDIA_CAPABILITY);
         return { sourceIncludesNames, backupIncludesNames: sourceIncludesNames || outputBases.some(b => b.includesDeclaredEditorNames),
@@ -504,7 +506,8 @@ async function openNormalValidationHost(options: ValidationHostOptions, inherite
       }, true)),
     };
     type PrepareRestoreDisplay = (next: ProjectDisplay, source: typeof content) => Promise<void>;
-    const restorePorts = () => ({ fs, factory: connection!.factory, session, store: options.store });
+    const restorePorts = () => ({ fs, factory: connection!.factory, session, store: options.store,
+      readOutputArtifacts: <T>(action: () => Promise<T>) => readOutputArtifacts(options.packageLocks ?? null, action) });
     const adoptSelected = async () => {
       // From this point even an opening/display failure must never expose the retired editor as editable.
       restoreRetired = true; restoreDisplayPending = true; restoreEpoch++;

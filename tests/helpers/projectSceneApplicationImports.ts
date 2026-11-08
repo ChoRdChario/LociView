@@ -410,6 +410,7 @@ export const projectSceneApplicationImports:Readonly<Record<string,readonly stri
     "three"
   ],
   "src/projectScene/validationGeneration.ts": [
+    "../platform/outputArtifactLock",
     "../platform/fs",
     "../projectFiles/creation",
     "../projectFiles/validation",
@@ -419,6 +420,7 @@ export const projectSceneApplicationImports:Readonly<Record<string,readonly stri
     "./validationHost"
   ],
   "src/projectScene/validationHost.ts": [
+    "../platform/outputArtifactLock",
     "../projectPackage/reviewArchive",
     "../projectPackage/sceneAppend",
     "../domain/portableMedia",

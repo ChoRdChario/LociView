@@ -40,6 +40,8 @@ import { prepareReviewSnapshot, type ReviewSelectionOptions } from '../projectPa
 import { reviewCapabilities } from '../projectPackage/reviewSnapshot';
 import { ContributionSourceCapture, VerifiedContributionBase, type ContributionBaseSelection } from '../projectPackage/contributionSource';
 import { outputJobKeys, outputJobClass, openOutputJob, outputTerminal, validateOutputProtection } from '../projectPackage/outputJobs';
+import { removeOutputAttempts } from '../projectPackage/outputAttempts';
+import { cleanOutputArtifacts } from '../platform/outputArtifactLock';
 import { WorkspaceBaseStore } from '../projectPackage/workspaceBases';
 import { WorkspaceSourceCapture } from '../projectPackage/workspaceSource';
 import { protectedWorkspaceInventory } from '../projectPackage/protectedInventory';
@@ -457,6 +459,17 @@ export class MetadataProjectSession {
     });
   }
 
+  cleanupOutputAttempts(expectedToken: string, store: OriginBlobStore, locks: LockManager) {
+    return underWriteLease(this.fs, () => cleanOutputArtifacts(locks, async () => {
+      const before = await this.outputReady();
+      if (before.source!.token !== expectedToken) return fail('output-stale');
+      const result = await removeOutputAttempts(this.fs, store, this.limits);
+      const after = await this.outputReady();
+      if (after.source!.token !== before.source!.token || after.publication !== before.publication ||
+          json(after.source!.proof) !== json(before.source!.proof)) return fail('output-cleanup-changed');
+      return result;
+    }));
+  }
   private async outputReady(signal?: AbortSignal) {
     let candidate: Awaited<ReturnType<MetadataProjectSession['readCandidate']>> | undefined;
     await OutputIntegrityRead.run(this.fs, this.limits, signal, async integrity => {

@@ -17,6 +17,7 @@ import { VerifiedContributionBase, type ContributionBaseSelection } from '../pro
 import { WorkspaceBaseStore } from '../projectPackage/workspaceBases';
 import { workspaceFileOperation } from './receiveWorkspace';
 import { fileError } from './validation';
+import { readOutputArtifacts } from '../platform/outputArtifactLock';
 
 export interface WorkspaceOutputState { id: string; purpose: 'teamWorkspace' | 'contribution' | 'backup' | 'clean' | 'review'; includesDeclaredEditorNames?: boolean; requiresEditorAttributionReader?: boolean; requiresPortableMediaReader?: boolean; label?: string; stale?: boolean; token?: string; cancellable?: boolean; state: 'unstarted' | 'incomplete' | 'generated' | 'file-verified' | 'abandoned' | 'cancelled' | 'repair-required' }
 export interface ContributionBaseChoice { selection: ContributionBaseSelection; label: string; includesDeclaredEditorNames?: boolean; deltaIncludesDeclaredEditorNames?: boolean; requiresPortableMediaReader?: boolean }
@@ -28,6 +29,7 @@ type ArtifactObserver = (archive: Readonly<EvidenceRef>) => void;
 export class WorkspaceSender {
   constructor(private readonly fs: ProjectWorkspaceFS, private readonly session: MetadataProjectSession,
     private readonly store: OriginBlobStore, private readonly limits: MetadataLimits, private readonly locks: LockManager | null, private readonly backupTiming?: BackupOutputTiming) {}
+  cleanup(token: string) { return workspaceFileOperation(this.locks, () => this.session.cleanupOutputAttempts(token, this.store, this.locks!)); }
   generate(token: string, signal?: AbortSignal, observePresentation?: BackupPresentationObserver) {
     let read: MetadataSessionRead | undefined;
     const output = workspaceFileOperation(this.locks, () => this.session.createWorkspaceOutput(token, this.store, '0.0.1', signal,
@@ -92,13 +94,13 @@ export class WorkspaceSender {
     const backupSource: BackupDisplaySource | undefined = current && backupDisplayRead === current && current.state === 'ready' && current.source && current.publication &&
       current.provider?.kind === 'scene-provider' && current.provider.token === current.source.token ?
       { source: current.source, proof: structuredClone(current.source.proof), token: current.source.token } : undefined;
-    return withMetadataRead(this.fs, undefined, async ({ fs }) => {
+    return readOutputArtifacts(this.locks, () => withMetadataRead(this.fs, undefined, async ({ fs }) => {
       const sender = new WorkspaceSender(fs, this.session, this.store, this.limits, this.locks);
       let observed: MetadataProof | null | undefined;
       const jobs = await sender.jobsDirect(proof => { observed = proof; }, backupSource);
       const bases = await sender.availableBasesDirect(settledOutputDisplay(jobs) && observed !== null ? observed ?? commandProof : undefined, currentSource);
       return { jobs, bases };
-    });
+    }));
   }
   private async availableBasesDirect(observed?: MetadataProof, currentSource?: NonNullable<MetadataSessionRead['source']>): Promise<ContributionBaseChoice[]> {
     let proof = observed;
@@ -137,8 +139,8 @@ export class WorkspaceSender {
       return artifact.blob;
   }
   async jobs(): Promise<WorkspaceOutputState[]> {
-    return withMetadataRead(this.fs, undefined, ({ fs }) =>
-      new WorkspaceSender(fs, this.session, this.store, this.limits, this.locks).jobsDirect());
+    return readOutputArtifacts(this.locks, () => withMetadataRead(this.fs, undefined, ({ fs }) =>
+      new WorkspaceSender(fs, this.session, this.store, this.limits, this.locks).jobsDirect()));
   }
   private async jobsDirect(observe?: (proof: MetadataProof | null) => void, backupSource?: BackupDisplaySource): Promise<WorkspaceOutputState[]> {
     const result: WorkspaceOutputState[] = [];

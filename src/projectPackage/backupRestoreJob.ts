@@ -24,6 +24,7 @@ export interface RestoreSourcePorts {
   readonly session: Pick<MetadataProjectSession, 'read'>;
   readonly store: Pick<OriginBlobStore, 'inspect' | 'openReadOnly'>;
   readonly factory?: MetadataStorageFactory;
+  readonly readOutputArtifacts?: <T>(action: () => Promise<T>) => Promise<T>;
 }
 export interface RestoreDatabasePorts {
   /** Enumerate only this logical Project's dedicated generation DB IDs; failure must reject. */
@@ -82,14 +83,14 @@ export class BackupRestoreJob {
       if (!await receiveTerminal(job)) return fail('restore-receive-pending');
       await job.validateCompletion();
     }
-    for (const key of await outputJobKeys(ports.fs)) {
+    await (ports.readOutputArtifacts ?? (action => action()))(async () => { for (const key of await outputJobKeys(ports.fs)) {
       const outputState = await outputJobClass(key).state(ports.fs, key.id, limits);
       if (outputState === 'abandoned') continue;
       if (outputState !== 'started') return fail('restore-output-pending');
       const job = await openOutputJob(ports.fs, key, limits);
       if (!await outputTerminal(job)) return fail('restore-output-pending');
       await job.validateCompletion();
-    }
+    } });
     const journal = new TransactionJournal(ports.fs, limits), publication = (await journal.entries()).find(e => e.start.transactionId === before.publication)?.publication;
     if (!publication || !restoreEqual(publication.heads, before.source.heads)) return fail('restore-current-publication');
     const bases = await new WorkspaceBaseStore(ports.fs, limits, before.source.proof).snapshot();

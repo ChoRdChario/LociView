@@ -62,7 +62,7 @@ export async function listValidationProjects(options: Omit<ValidationHostOptions
         }
       }
       const jobs = await measure('receive', () => new WorkspaceReceiver(options.base, fs, session, validationMetadataLimits, null).jobs());
-      const outputs = await measure('output', () => new WorkspaceSender(fs, session, options.store, validationMetadataLimits, null).jobs());
+      const outputs = await measure('output', () => new WorkspaceSender(fs, session, options.store, validationMetadataLimits, options.packageLocks ?? null).jobs());
       const copies = await measure('review-copies', () => reviewEditStates(fs, validationMetadataLimits));
       const entry: ValidationProjectEntry = { run, title: label,
         state: read.state === 'repair-required' || [...jobs, ...outputs, ...copies].some(j => j.state === 'repair-required') ? 'unavailable' :

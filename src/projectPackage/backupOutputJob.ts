@@ -1,4 +1,5 @@
 import type { ProjectWorkspaceFS } from '../platform/fs';
+import type { OutputCleanupRead } from './outputCleanupRead';
 import type { OriginBlobStore } from '../projectMetadata/blobStore';
 import { checkRequiredCapabilities } from '../projectMetadata/requiredCapabilities';
 import { fail, type MetadataLimits } from '../projectMetadata/format';
@@ -74,17 +75,18 @@ export class BackupOutputJob {
     return new BackupOutputJob(fs, newId(), limits, { manifest, originals: capture.originals().map(e => ({ path: e.path, bytes: e.read() })),
       description: capture.description }, label);
   }
-  static async ids(fs: ProjectWorkspaceFS) {
-    return withMetadataRead(fs, undefined, ({ fs }) => this.idsDirect(fs));
+  static async ids(fs: ProjectWorkspaceFS, cleanup?: OutputCleanupRead) {
+    return withMetadataRead(fs, undefined, ({ fs }) => this.idsDirect(fs, cleanup));
   }
-  private static async idsDirect(fs: ProjectWorkspaceFS) {
+  private static async idsDirect(fs: ProjectWorkspaceFS, cleanup?: OutputCleanupRead) {
+    cleanup?.assertOwner(fs);
     const prefix = `${workspacePackageRoot(fs)}backup-output/`, ix = `${workspacePackageRoot(fs)}backup-output-index/`;
     const paths = [...await fs.list(prefix), ...await fs.list(ix)]; if (paths.length > L.entryCount) return fail('output-job-budget');
     const ids = new Set<string>(); let controls = 0;
     for (const path of paths) {
       const indexed = path.startsWith(ix), tail = path.slice((indexed ? ix : prefix).length);
       if (!(indexed ? /^[0-9a-f]{32}\.json$/ : /^[0-9a-f]{32}\/(metadata\.am|manifest\.json|protected-inventory\.json|exchange-bases\.json|base-evidence\/sha256\/[0-9a-f]{64}|capture\.json|prepared\.json|start\.json|abandoned\.json|steps\/[0-9a-f]{64}\.json|artifacts\/[0-9a-f]{32}\.zip)$/).test(tail)) fail('output-path');
-      ids.add(tail.slice(0, 32)); const f = await fs.readStream(path);
+      ids.add(tail.slice(0, 32)); if (cleanup?.skipAttemptSize(fs, path)) continue; const f = await fs.readStream(path);
       if (!f || !Number.isSafeInteger(f.size) || f.size < 0) return fail('output-input-missing');
       if (path.endsWith('.zip')) { if (f.size > L.archiveBytes) fail('output-space-budget'); }
       else if (path.endsWith('.am') || path.includes('/base-evidence/')) { if (f.size > L.sourceBytes) fail('output-space-budget'); }
@@ -92,12 +94,12 @@ export class BackupOutputJob {
     }
     return [...ids];
   }
-  static async state(fs: ProjectWorkspaceFS, id: string, limits: MetadataLimits) {
+  static async state(fs: ProjectWorkspaceFS, id: string, limits: MetadataLimits, cleanup?: OutputCleanupRead) {
     const ownedId = technicalId(id), ownedLimits = { ...limits };
-    return withMetadataRead(fs, undefined, ({ fs }) => this.stateDirect(fs, ownedId, ownedLimits));
+    return withMetadataRead(fs, undefined, ({ fs }) => this.stateDirect(fs, ownedId, ownedLimits, cleanup));
   }
-  private static async stateDirect(fs: ProjectWorkspaceFS, id: string, limits: MetadataLimits) {
-    if (!(await this.ids(fs)).includes(technicalId(id))) return fail('output-missing');
+  private static async stateDirect(fs: ProjectWorkspaceFS, id: string, limits: MetadataLimits, cleanup?: OutputCleanupRead) {
+    if (!(await this.ids(fs, cleanup)).includes(technicalId(id))) return fail('output-missing');
     const path = root(fs, id), start = await fs.readStream(`${path}start.json`), abandoned = await fs.readStream(`${path}abandoned.json`);
     const ix = await readReceipt(fs, indexPath(fs, id), limits);
     if (ix) {
@@ -118,8 +120,8 @@ export class BackupOutputJob {
     if (await this.state(fs, id, limits) === 'started') return fail('output-abandon-denied');
     await writeReceipt(fs, `${root(fs, id)}abandoned.json`, this.abandonment(id), limits);
   }
-  static async open(fs: ProjectWorkspaceFS, id: string, limits: MetadataLimits) {
-    if (await this.state(fs, id, limits) !== 'started') return fail('output-unstarted');
+  static async open(fs: ProjectWorkspaceFS, id: string, limits: MetadataLimits, cleanup?: OutputCleanupRead) {
+    if (await this.state(fs, id, limits, cleanup) !== 'started') return fail('output-unstarted');
     const path = root(fs, id), bytes = async (name: string, max: number) => {
       const f = await fs.readStream(`${path}${name}`); if (!f || f.size > max) return fail('output-input-missing');
       const b = await fs.readBytes(`${path}${name}`); if (!b || b.length !== f.size) return fail('output-input-missing'); return b.slice();

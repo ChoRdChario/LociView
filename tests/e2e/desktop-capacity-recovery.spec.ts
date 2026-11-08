@@ -58,14 +58,51 @@ for(const touch of [false,true])test(`native capacity recovery retains drafts an
     measurements.editFailureMs=Date.now()-started;await expect(detail.getByLabel('本文',{exact:true})).toHaveValue('容量不足でも失わない本文');await p.screenshot({path:info.outputPath('quota-edit.png'),fullPage:true});
     await fault(p,'');started=Date.now();await retry.click();
     await expect(retry).toBeHidden().catch(async error=>{await info.attach('edit-retry-diagnostic',{body:JSON.stringify({text:await p.locator('body').innerText(),fault:await p.evaluate(()=>(window as any).__capacityFault),errors}),contentType:'application/json'});throw error;});measurements.editRecoveryMs=Date.now()-started;
-    await revealFileSurface(p,'保存');const files=p.getByRole('region',{name:'ファイル',exact:true});await files.getByLabel('名前（任意）',{exact:true}).fill('保持する保存名');await fault(p,'output');
+    await revealFileSurface(p,'保存');const files=p.getByRole('region',{name:'ファイル',exact:true});
+    const [previous]=await Promise.all([p.waitForEvent('download'),files.locator('.lv-file-primary').click()]);
+    await previous.saveAs(info.outputPath('retained-before-cleanup.zip'));
+    await files.getByLabel('名前（任意）',{exact:true}).fill('保持する保存名');await fault(p,'output');
     started=Date.now();await files.locator('.lv-file-primary').click();await expect(files.locator('.lv-operation-status')).toContainText('保存容量が不足');await expect(files.getByRole('button',{name:'生成を再開',exact:true})).toBeEnabled();measurements.outputFailureMs=Date.now()-started;
     await expect(files.getByLabel('名前（任意）',{exact:true})).toHaveValue('保持する保存名');await p.screenshot({path:info.outputPath('quota-output.png'),fullPage:true});
-    await fault(p,'');started=Date.now();const [download]=await Promise.all([p.waitForEvent('download'),files.getByRole('button',{name:'生成を再開',exact:true}).click()]);measurements.outputRecoveryToDownloadMs=Date.now()-started;
+    await fault(p,'');
+    // Owned unacknowledged output only: represent a drained partial native write.
+    await p.evaluate(async()=>{
+      const path=((window as any).__capacityFault.hits as string[]).find(value=>/\/artifacts\/[^/]+\.zip$/.test(value))!;
+      if(!/^\/lociview-development-validation-1\/[0-9a-f]{32}\/v2\/packages\/backup-output\/[0-9a-f]{32}\/artifacts\/[0-9a-f]{32}\.zip$/.test(path))throw Error('Unexpected owned output path');
+      const parts=path.split('/').filter(Boolean),name=parts.pop()!;let directory=await navigator.storage.getDirectory();
+      for(const part of parts)directory=await directory.getDirectoryHandle(part);
+      const file=await directory.getFileHandle(name),writer=await file.createWritable(),chunk=new Uint8Array(4*1024*1024);
+      await writer.write(chunk);await writer.write(chunk);await writer.close();
+      (window as any).__cleanupAttempt={path,size:(await file.getFile()).size};
+    });
+    // A real shared Web Lock protects an observing tab; cleanup cannot pass it.
+    const reader=await context!.newPage();await reader.goto(server.url);
+    await reader.evaluate(()=>new Promise<void>(ready=>{
+      (window as any).__outputReader=navigator.locks.request('lociview:output-artifacts:v1',{mode:'shared'},()=>new Promise<void>(release=>{(window as any).__releaseOutputReader=release;ready();}));
+    }));
+    await files.getByRole('button',{name:'一時ファイルを整理',exact:true}).click();
+    await expect(files.locator('.lv-operation-status')).toHaveText('一時ファイルを確認しています。');
+    await expect.poll(()=>p.evaluate(async()=> (await navigator.locks.query()).pending?.some(lock=>lock.name==='lociview:output-artifacts:v1'&&lock.mode==='exclusive'))).toBe(true);
+    await reader.evaluate(()=>{(window as any).__releaseOutputReader();return(window as any).__outputReader;});await reader.close();
+    await expect(files.locator('.lv-operation-status')).toContainText('1ファイル');
+    await expect(files.locator('.lv-operation-status')).toContainText('8.4 MB');
+    expect(await p.evaluate(async()=>{
+      const {path,size}=(window as any).__cleanupAttempt,parts=path.split('/').filter(Boolean),name=parts.pop();let directory=await navigator.storage.getDirectory();
+      for(const part of parts)directory=await directory.getDirectoryHandle(part);
+      try{await directory.getFileHandle(name);return false;}catch(error){return error instanceof DOMException&&error.name==='NotFoundError'&&size===8*1024*1024;}
+    })).toBe(true);
+    await expect(files.getByRole('button',{name:'一時ファイルを整理',exact:true})).toBeEnabled();
+    await p.screenshot({path:info.outputPath('temporary-output-cleaned.png'),fullPage:true});
+    await expect(files.getByLabel('名前（任意）',{exact:true})).toHaveValue('保持する保存名');
+    started=Date.now();const [download]=await Promise.all([p.waitForEvent('download'),files.getByRole('button',{name:'生成を再開',exact:true}).click()]);measurements.outputRecoveryToDownloadMs=Date.now()-started;
     const saved=info.outputPath('capacity-recovered.zip');await download.saveAs(saved);expect(await download.failure()).toBeNull();const archive=await BackupArchive.inspect(new Blob([Uint8Array.from(await readFile(saved)).buffer]),validationMetadataLimits);
     const inspected=await inspectProjectCandidates(archive.source.read(),validationMetadataLimits);expect(inspected.kind).toBe('project-candidate-inspection');if(inspected.kind!=='project-candidate-inspection')throw Error('Saved records');
     const captions=inspected.unambiguousRecords?.captionsById;if(!captions||typeof captions!=='object'||Array.isArray(captions))throw Error('Saved Caption map');
     expect(Object.values(captions)).toEqual([expect.objectContaining({title:'保持する記録',body:'容量不足でも失わない本文'})]);
+    await expect(files.getByLabel('名前（任意）',{exact:true})).toHaveValue('');
+    const close=p.locator('details.lv-project-files').getByRole('button',{name:'閉じる',exact:true});await expect(close).toBeEnabled();await close.click();
+    await expect(p.locator('details.lv-project-files')).toHaveJSProperty('open',false);
+    await expect(p.getByRole('region',{name:'ファイル操作',exact:true})).toBeHidden();
     const hits=await p.evaluate(()=>(window as any).__capacityFault.hits as string[]);expect(hits.some(path=>path.endsWith('/published.json'))).toBe(true);expect(hits.some(path=>path.includes('/artifacts/'))).toBe(true);
     await context!.close();context=undefined;const cold=await launch();await expect(cold.getByRole('heading',{name:'プロジェクト名',exact:true})).toHaveText('容量から復旧',{timeout:90_000});await revealWorkPanel(cold);
     await cold.locator('.lv-caption-select').filter({hasText:'保持する記録'}).click();await expect(cold.getByRole('region',{name:'キャプションの詳細',exact:true}).getByLabel('本文',{exact:true})).toHaveValue('容量不足でも失わない本文');

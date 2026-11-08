@@ -1,5 +1,6 @@
 import { checkRequiredCapabilities } from '../projectMetadata/requiredCapabilities';
 import type { ProjectWorkspaceFS } from '../platform/fs';
+import type { OutputCleanupRead } from './outputCleanupRead';
 import type { OriginBlobStore } from '../projectMetadata/blobStore';
 import type { ProjectContentVerifier } from '../domain/projectContentChecks';
 import { fail, type MetadataLimits, type MetadataProof } from '../projectMetadata/format';
@@ -66,14 +67,15 @@ export class CleanOutputJob {
     return new CleanOutputJob(fs, newId(), limits, { original: capture.sourceBytes(), sourceProof: capture.source.proof, metadata: capture.metadataBytes(), manifest,
       reconstruction: structuredClone(capture.reconstruction), inventory: structuredClone(inventory), bases: structuredClone(bases) });
   }
-  static async ids(fs: ProjectWorkspaceFS) {
+  static async ids(fs: ProjectWorkspaceFS, cleanup?: OutputCleanupRead) {
+    cleanup?.assertOwner(fs);
     const prefix = `${workspacePackageRoot(fs)}clean-output/`, ix = `${workspacePackageRoot(fs)}clean-output-index/`;
     const paths = [...await fs.list(prefix), ...await fs.list(ix)], ids = new Set<string>(); let controls = 0;
     if (paths.length > L.entryCount) fail('output-job-budget');
     for (const path of paths) {
       const indexed = path.startsWith(ix), tail = path.slice((indexed ? ix : prefix).length);
       if (!(indexed ? /^[0-9a-f]{32}\.json$/ : /^[0-9a-f]{32}\/(source\.am|metadata\.am|manifest\.json|clean-reconstruction\.json|inventory\.json|bases\.json|capture\.json|prepared\.json|start\.json|abandoned\.json|steps\/[0-9a-f]{64}\.json|artifacts\/[0-9a-f]{32}\.zip)$/).test(tail)) fail('output-path');
-      ids.add(tail.slice(0, 32));
+      ids.add(tail.slice(0, 32)); if (cleanup?.skipAttemptSize(fs, path)) continue;
       const f = await fs.readStream(path); if (!f || !Number.isSafeInteger(f.size) || f.size < 0) return fail('output-input-missing');
       if (path.endsWith('.zip')) { if (f.size > L.archiveBytes) fail('output-space-budget'); }
       else if (path.endsWith('.am')) { if (f.size > L.sourceBytes) fail('output-space-budget'); }
@@ -81,8 +83,8 @@ export class CleanOutputJob {
     }
     return [...ids];
   }
-  static async state(fs: ProjectWorkspaceFS, id: string, limits: MetadataLimits) {
-    if (!(await this.ids(fs)).includes(technicalId(id))) return fail('output-missing');
+  static async state(fs: ProjectWorkspaceFS, id: string, limits: MetadataLimits, cleanup?: OutputCleanupRead) {
+    if (!(await this.ids(fs, cleanup)).includes(technicalId(id))) return fail('output-missing');
     const path = root(fs, id), start = await fs.readStream(`${path}start.json`), abandoned = await fs.readStream(`${path}abandoned.json`);
     const ix = await readReceipt(fs, indexPath(fs, id), limits);
     if (ix) {
@@ -99,8 +101,8 @@ export class CleanOutputJob {
     if (await this.state(fs, id, limits) === 'started') return fail('output-abandon-denied');
     await writeReceipt(fs, `${root(fs, id)}abandoned.json`, this.abandonment(id), limits);
   }
-  static async open(fs: ProjectWorkspaceFS, id: string, limits: MetadataLimits) {
-    if (await this.state(fs, id, limits) !== 'started') return fail('output-unstarted');
+  static async open(fs: ProjectWorkspaceFS, id: string, limits: MetadataLimits, cleanup?: OutputCleanupRead) {
+    if (await this.state(fs, id, limits, cleanup) !== 'started') return fail('output-unstarted');
     const path = root(fs, id), bytes = async (name: string, max: number) => {
       const f = await fs.readStream(`${path}${name}`); if (!f || f.size > max) return fail('output-input-missing');
       const b = await fs.readBytes(`${path}${name}`); if (!b || b.length !== f.size) return fail('output-input-missing'); return b;

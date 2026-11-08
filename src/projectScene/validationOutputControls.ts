@@ -270,9 +270,29 @@ export function createValidationOutputControls(document: Document, host: ReturnT
         details.append(summary); row.append(details);
         button(details, 'ファイルを選択', () => { selected = job.id; select.value = ''; select.click(); changed(); });
       } else if (job.state === 'incomplete') button(row, '生成を再開', () => perform(async () => {
-        await host.workspaceOutput.retry(job.id); await handoff(job.id);
+        await host.workspaceOutput.retry(job.id);
+        const confirmed = host.workspaceOutput.jobs.find(current => current.id === job.id);
+        if (purpose === 'backup' && confirmed?.purpose === 'backup' &&
+            (confirmed.state === 'generated' || confirmed.state === 'file-verified') &&
+            confirmed.token !== undefined && confirmed.token === host.read().source?.token &&
+            confirmed.label === (checkpointName.trim().normalize('NFC') || undefined)) resetChoice();
+        await handoff(job.id);
       }, handoffMessage));
       if (job.cancellable) button(row, '生成を取りやめる', () => { cancellation = job.id; render(); changed(); });
+    }
+    if (host.workspaceOutput.jobs.length || host.workspaceOutput.error) {
+      const recovering = !!host.workspaceOutput.error || host.workspaceOutput.jobs.some(job => ['unstarted', 'incomplete', 'repair-required'].includes(job.state));
+      const cleanup = button(!recovering && completedFiles.children.length ? completedFiles : list, '一時ファイルを整理', () => {
+        let message = '';
+        perform(async () => {
+          const token = host.read().source?.token; if (!token) throw Error('再開用データを確認してください。');
+          const result = await host.workspaceOutput.cleanup(token), amount = (result.removedBytes / 1_000_000).toLocaleString('ja-JP', { maximumFractionDigits: 1 });
+          message = result.removedFiles ? `${result.removedFiles}ファイル（${amount} MB）を整理しました。` : '整理できる一時ファイルはありません。';
+          if (result.failedFiles) message += ' 一部を削除できませんでした。再試行できます。';
+          if (result.retainedUncertain) message += ' 確認できないデータは残しました。';
+        }, '', true, false, () => { feedback = message; }, '一時ファイルを確認しています。');
+      });
+      cleanup.title = 'このプロジェクトの失敗した書き出しを整理します。原本・記録・保存済みファイル・復旧データは残します。';
     }
     history.hidden = !completedFiles.children.length;
     if (cancellation) {
