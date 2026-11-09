@@ -1,4 +1,5 @@
 import { displayBlobRef } from '../domain/portableMedia';
+import type { ResumeReading, ResumeReadingRequest } from './validationCatalog';
 import { createGsProxyWorkflow } from './gsProxyWorkflow';
 import { captureEditor } from '../projectMetadata/editorAttribution';
 import { PORTABLE_MEDIA_CAPABILITY } from '../projectMetadata/requiredCapabilities';
@@ -37,7 +38,7 @@ import type { ModelPlacementCommand, ModelFileAddition, ModelFileReplacement } f
 import { isSavedModel, isSavedMesh, isOrdinaryPoint, isOrdinaryGs } from './modelTypes';
 import { classifyMeshSource } from '../projectFiles/meshSource';
 import { orderBetween } from './viewDisplay';
-import { resolveScene } from '../scene/resolve';
+import { chooseStartupScene, resolveScene } from '../scene/resolve';
 import { validationMaterialSlots, validationMaterialIssue } from './validationMaterials';
 import { same } from '../domain/projectGraphSupport';
 import type { MaterialIntent } from '../domain/materialIntent';
@@ -68,12 +69,28 @@ export function measureValidation<T>(observer: ValidationTiming | undefined, sta
   const started = performance.now();
   return action().finally(() => { try { observer(stage, performance.now() - started); } catch { /* Diagnostics have no authority. */ } });
 }
+/** Owned text only, after the caller's saved-content checks; never command authority. */
+export function validatedResumeReading(read: MetadataSessionRead, run: string, title?: string): ResumeReading | null {
+  const provider = read.provider;
+  if (read.state !== 'ready' || read.source?.proof.identity.projectId !== `prj_${run}` || provider?.kind !== 'scene-provider') return null;
+  if (provider.token !== read.source.token) return null;
+  const { sceneId } = chooseStartupScene(provider.state); if (!sceneId) return null;
+  const scene = resolveScene(provider.state, provider.resources, sceneId); if (scene.kind !== 'ready') return null;
+  const records = scene.composition.captions.flatMap(c => c.title.kind === 'value' && c.body.kind === 'value'
+    ? [Object.freeze({ id: c.captionId, title: c.title.value, body: c.body.value })] : []);
+  if (!records.length) return null;
+  const field = provider.inspection.candidates.fields.find(f => f.path.length === 2 && f.path[0] === 'project' && f.path[1] === 'title');
+  const candidate = field?.valid && field.candidates.length === 1 ? field.candidates[0]?.value : undefined;
+  return Object.freeze({ token: provider.token, sceneId, title: title ?? (candidate?.kind === 'value' && typeof candidate.value === 'string' ? candidate.value : '名前を確認できないプロジェクト'),
+    records: Object.freeze(records), ...(scene.composition.name.kind === 'value' ? { sceneName: scene.composition.name.value } : {}) });
+}
 export interface ValidationHostOptions {
   editorSettings?: {
     read(proof: import('../projectMetadata/source').MetadataProof): Readonly<{ enabled: boolean; name: string }>;
     save(proof: import('../projectMetadata/source').MetadataProof, value: Readonly<{ enabled: boolean; name: string }>): boolean;
   };
   timing?: ValidationTiming;
+  reading?: ResumeReadingRequest;
   /** Typed UI reads images through its scoped per-resource port. Legacy projection stays eager. */
   lazyImages?: boolean;
   mode?: LocalOpenMode;
@@ -304,10 +321,14 @@ async function openNormalValidationHost(options: ValidationHostOptions, inherite
       await reloadOutput(!unfinishedReceive() && current?.state === 'ready' ? current : undefined);
     };
     let last = await measure('host.open.session', () => session.read()), project: ProjectDisplay | undefined;
-    await reloadReceive(last);
     if (incoming instanceof CleanArchive && last.source) throw Error('この独立コピーの再開用データがあります。ファイルを取り込まず、プロジェクト一覧から再開してください。');
     if (last.source && (last.source.proof.identity.projectId !== `prj_${run}` || incoming && json(last.source.proof) !== json(incoming.source.proof)))
       throw Error('ファイルと再開用データのプロジェクトが一致しません。既存データは変更していません。');
+    if (options.reading?.run === run && !options.initial && !options.workspaceFile && !options.reviewEdit && !options.firstBackup && !connection?.restorePending) {
+      const reading = validatedResumeReading(last, run);
+      if (reading) try { options.reading.show(reading); } catch { /* Reading never decides Host or recovery readiness. */ }
+    }
+    await reloadReceive(last);
     let localInitial = !!options.initial || await hasNativeConversion(fs, false) || await hasLociMyuConversion(fs, false) || await hasFrozenV1Conversion(fs, false) || !!await fs.readStream(metadataPath(fs, 'validation-initial.json')) ||
       (await new TransactionJournal(fs, limits).entries()).some(e => e.start.purpose === 'initialize');
     let prepareDisplay: ((next: ProjectDisplay) => Promise<void>) | undefined;

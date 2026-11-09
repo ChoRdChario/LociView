@@ -19,6 +19,10 @@ restore-pending reads. A fresh successful Backup may display its actual new row
 after both outer fences while retaining old rows/bases until full discovery.
 Failure/retry/cold discovery and fresh download checks stay strict; old history
 damage may be detected at the next full inquiry. No staging consumer is added.
+[06e §9](../docs/specs/06e-selected-generation-output-read-proposal.md) records
+ordinary read-only presentation, UI completion and cooperative-check cleanup;
+it grants no new inspection lifetime. Preserve full Host preparation, owned-byte
+SHA/CRC and write/recovery fences. Todo owns measurements and final qualification.
 [09 §10](../docs/specs/09-desktop-offline-candidate-proposal.md) permits exact
 same-build/SRI boot-resource repair; it does not permit arbitrary network fallback,
 foreign cache/Project writes or forced activation. Follow their recorded contracts
@@ -38,12 +42,12 @@ a failed retirement is retained for that selector lifetime until reload.
 
 ## Verification and delivery
 
-Current capacity/cleanup work uses [02 §7.0.1](../docs/specs/02-storage-package-migration.md)
+[02 §7.0.1](../docs/specs/02-storage-package-migration.md) permits compensation
 only for writer-acquisition failure of an explicitly owned fresh receipt. Existing
 empty/torn or postwriter/write/close failures remain strict repair; no cold cleanup
 or general GC is authorized. Project and generation WorkspaceFS must forward the
 optional exclusive text-creation ownership callback. Todo owns current evidence;
-the earlier411 full Desktop qualification is not this changed tree's full run.
+an earlier full Desktop qualification is not a changed tree's full run.
 
 Automatic reopening may inspect only the exact remembered Project before the
 fresh Host open ([01e §9](../docs/specs/01e-desktop-large-gs-workflow.md)). A scoped

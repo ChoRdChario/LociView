@@ -420,6 +420,7 @@ export const projectSceneApplicationImports:Readonly<Record<string,readonly stri
     "./validationHost"
   ],
   "src/projectScene/validationHost.ts": [
+    "./validationCatalog",
     "../platform/outputArtifactLock",
     "../projectPackage/reviewArchive",
     "../projectPackage/sceneAppend",

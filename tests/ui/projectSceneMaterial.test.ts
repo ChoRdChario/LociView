@@ -1,9 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { value, type Field, type MaterialTarget } from '../../src/scene/types';
 import { materialFields, materialFieldLabels, materialInput, validateMaterialIntent, type MaterialIntent, type MaterialEditField } from '../../src/domain/materialIntent';
 import { acceptMaterialApply, editMaterialDraft, materialApplyIssue, materialPlanIsCurrent, materialTargetKey, materialView,
   newMaterialSelection, planMaterial, type MaterialContext, type MaterialEffect, type MaterialPlan, type MaterialSurfacePort } from '../../src/ui/projectScene/materialState';
 import { createMaterialControls } from '../../src/ui/projectScene/materialControls';
+import { createProjectMaterials } from '../../src/ui/projectScene/projectMaterials';
+import type { ProjectPanelHost } from '../../src/ui/projectScene/projectPanel';
 import {createMaterialConversionNotice} from '../../src/ui/projectScene/conversionNotice';
 import { RecordedDocument, record } from './domRecorder';
 
@@ -61,6 +63,71 @@ function host(initial = fixture(),direct=false, frames?: Map<number, FrameReques
 it('shows product material inputs directly without a focus-only draft, beginning the retained edit on first actual input',()=>{
  const h=host(fixture(),true),opacity=h.fields.get('opacity')!;expect(h.begin.hidden).toBe(true);expect(h.content.children.find(n=>n.className==='lv-material-fields')!.hidden).toBe(false);
  opacity.fire('focus');expect(h.context.draft).toBeNull();expect(h.plans).toHaveLength(0);opacity.value='55';opacity.fire('input');expect(h.context.draft?.edits.opacity).toBe('55');expect(h.apply.disabled).toBe(false);h.controls.dispose();
+});
+
+it('returns Drawing completion to the edited field or edit entry and preserves later focus, failure and disposal', async () => {
+  for (const direct of [true, false]) {
+    const h = host(fixture(), direct); if (!direct) h.begin.click();
+    const opacity = h.fields.get('opacity')!; opacity.focus(); opacity.value = '55'; opacity.fire('input');
+    h.apply.focus(); h.apply.click(); const plan = h.plans.at(-1)!; expect(plan.kind).toBe('apply');
+    h.render({ ...h.context, draft: null, source: { ...h.context.source, token: 'saved' } }); await Promise.resolve();
+    expect(h.document.activeElement).toBe(direct ? opacity : h.begin); h.controls.dispose();
+  }
+  for (const condition of ['other-focus', 'failed', 'disposed', 'other-scene'] as const) {
+    const h = host(fixture(), true), opacity = h.fields.get('opacity')!;
+    opacity.value = '55'; opacity.fire('input'); h.apply.focus(); h.apply.click(); const plan = h.plans.at(-1)!;
+    if (plan.kind !== 'apply') throw Error('apply');
+    if (condition === 'failed') h.render({ ...h.context, feedback: { kind: 'failed', plan, message: 'write failed' } });
+    else h.render({ ...h.context, draft: null, source: { ...h.context.source, sceneId: condition === 'other-scene' ? 'other' : scene } });
+    if (condition === 'other-focus') h.scope.focus();
+    if (condition === 'disposed') h.controls.dispose();
+    await Promise.resolve(); expect(h.document.activeElement).toBe(condition === 'other-focus' ? h.scope : h.apply); h.controls.dispose();
+  }
+});
+
+it('returns confirmed Drawing cancellation to the last edited field without changing its saved value', async () => {
+  const h = host(fixture(), true), opacity = h.fields.get('opacity')!, original = opacity.value;
+  opacity.value = '55'; opacity.fire('input'); h.cancel.focus(); h.cancel.click(); h.confirm.click(); await Promise.resolve();
+  expect(h.context.draft).toBeNull(); expect(opacity.value).toBe(original); expect(h.document.activeElement).toBe(opacity); h.controls.dispose();
+});
+
+it('returns a completed review operation to Drawing only after its successful completion signal', async () => {
+  const h = host(fixture(), true), origin = h.document.createElement('button'); origin.focus();
+  const complete = h.controls.beginCompletion(origin as unknown as HTMLElement);
+  h.render(h.context); await Promise.resolve(); expect(h.document.activeElement).toBe(origin);
+  complete(); h.render(h.context); await Promise.resolve(); expect(h.document.activeElement).toBe(h.fields.get('opacity'));
+  origin.focus(); const ignored = h.controls.beginCompletion(origin as unknown as HTMLElement); h.scope.focus(); ignored();
+  h.render(h.context); await Promise.resolve(); expect(h.document.activeElement).toBe(h.scope); h.controls.dispose();
+});
+
+it('retains actual product material choices and focus through selection/busy updates while refusing detached and stale controls', () => {
+  const document = new RecordedDocument(), dispatch = vi.fn(); let token = 'review-1', busy = false;
+  const group = () => ({ key: 'one', token, sceneId: scene, overrideId: 'override', label: '描画の更新候補',
+    appearance: [{ operationId: 'a', label: '見え方A' }, { operationId: 'b', label: '見え方B' }],
+    compositing: [{ operationId: 'c', label: '被覆C' }, { operationId: 'd', label: '被覆D' }], owners: [{ id: 'one', label: '設定1' }, { id: 'two', label: '設定2' }] });
+  const panelHost = { ports: { mode: 'edit', materials: () => ({ source: { ...fixture().source, token }, review: [group()] }) },
+    source: () => ({ provider: { token, details: { mutable: { materialOverridesById: {} } } }, sceneId: scene }),
+    block: () => busy ? '処理中' : null, changed: () => panel.render(), message() {}, dispatch } as unknown as ProjectPanelHost;
+  const panel = createProjectMaterials(document.asDocument(), panelHost), root = record(panel.root);
+  const all = (node: ReturnType<typeof record>): ReturnType<typeof record>[] => [node, ...node.children.flatMap(all)];
+  const named = (label: string) => all(root).find(node => node.attributes.get('aria-label') === label)!;
+  const action = (text: string) => all(root).find(node => node.tag === 'button' && node.textContent === text)!;
+  panel.render(); const appearance = named('残す見え方'), compositing = named('残す被覆・光学'), owner = named('残す設定');
+  appearance.focus(); appearance.value = 'b'; appearance.fire('change');
+  expect(named('残す見え方')).toBe(appearance); expect(document.activeElement).toBe(appearance);
+  compositing.value = 'd'; compositing.fire('change'); expect(appearance.value).toBe('b'); expect(named('残す設定')).toBe(owner);
+  action('選択を確定').click(); expect(dispatch).toHaveBeenLastCalledWith('materials', token,
+    { kind: 'resolveMaterialIntent', sceneId: scene, overrideId: 'override', appearanceOperationId: 'b', compositingOperationId: 'd' }, expect.any(Function));
+  busy = true; panel.render(); expect(named('残す見え方')).toBe(appearance); expect(appearance.disabled).toBe(true);
+  busy = false; panel.render(); expect(appearance.disabled).toBe(false); expect(appearance.value).toBe('b');
+  action('選択を取り消す').focus(); action('選択を取り消す').click(); expect(document.activeElement).toBe(appearance);
+  owner.value = 'two'; owner.fire('change'); action('選んだ設定を残す').click();
+  expect(dispatch.mock.calls.at(-1)![2]).toMatchObject({ kind: 'resolveMaterialDuplicates', overrideId: 'two', observedOverrideIds: ['one', 'two'] });
+  const calls = dispatch.mock.calls.length; token = 'review-2'; panel.render();
+  expect(named('残す見え方')).not.toBe(appearance); expect(named('残す設定').disabled).toBe(true);
+  appearance.value = 'a'; appearance.fire('change'); action('選択を確定').click(); expect(dispatch).toHaveBeenCalledTimes(calls);
+  action('選択を取り消す').click(); const fresh = named('残す見え方'); expect(fresh.disabled).toBe(false);
+  panel.dispose(); fresh.value = 'a'; fresh.fire('change'); expect(dispatch).toHaveBeenCalledTimes(calls);
 });
 
 it('previews coalesced numeric drags locally, retains explicit apply, and restores only the scrubbed field on Escape', () => {

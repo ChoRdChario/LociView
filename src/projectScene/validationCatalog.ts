@@ -1,11 +1,10 @@
 import type { MetadataSessionRead, ValidationHostOptions } from './validationHost';
-import { measureValidation, validationArea } from './validationHost';
+import { measureValidation, validationArea, validatedResumeReading } from './validationHost';
 import { openValidationGeneration, inspectValidationFirstBackup } from './validationGeneration';
 import { WorkspaceReceiver } from '../projectFiles/receiveWorkspace';
 import { WorkspaceSender } from '../projectFiles/sendWorkspace';
 import { validationMetadataLimits } from '../projectFiles/validation';
 import { reviewEditStates } from '../projectPackage/reviewEditControls';
-import { chooseStartupScene, resolveScene } from '../scene/resolve';
 
 export interface ValidationProjectEntry { run: string; title: string; state: 'ready' | 'incomplete' | 'unavailable'; firstRestore?: 'pending' | 'terminal' }
 export type ValidationStorage = (run: string, create: boolean) => ReturnType<ValidationHostOptions['openStorage']>;
@@ -48,18 +47,8 @@ export async function listValidationProjects(options: Omit<ValidationHostOptions
       const label = candidate?.kind === 'value' && typeof candidate.value === 'string' ? candidate.value : '名前を確認できないプロジェクト';
       if (reading?.run === run && observation.selected && !storage.restorePending && read.state === 'ready' &&
         read.source?.proof.identity.projectId === `prj_${run}` && provider?.kind === 'scene-provider') {
-        const { sceneId } = chooseStartupScene(provider.state);
-        if (sceneId) {
-          const scene = resolveScene(provider.state, provider.resources, sceneId);
-          if (scene.kind === 'ready') {
-            const records = scene.composition.captions.flatMap(c => c.title.kind === 'value' && c.body.kind === 'value'
-              ? [{ id: c.captionId, title: c.title.value, body: c.body.value }] : []);
-            if (records.length) {
-              await storage.check();
-              show({ token: provider.token, sceneId, title: label, records });
-            }
-          }
-        }
+        const text = validatedResumeReading(read, run, label);
+        if (text) { await storage.check(); show(text); }
       }
       const jobs = await measure('receive', () => new WorkspaceReceiver(options.base, fs, session, validationMetadataLimits, null).jobs());
       const outputs = await measure('output', () => new WorkspaceSender(fs, session, options.store, validationMetadataLimits, options.packageLocks ?? null).jobs());

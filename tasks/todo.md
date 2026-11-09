@@ -1,6 +1,6 @@
 # LociView active work
 
-Updated2026-11-09. This is the single current plan and check record.
+Updated2026-11-10. This is the single current plan and check record.
 [Inventory](implementation-inventory.md) owns route-specific coverage;
 [map](../PROJECT_MAP.md) and [document index](../docs/README.md) route contracts/code.
 Git owns checkpoint identity. [Retained checkpoint evidence](../docs/history/development-through-2026-10-29/tasks/todo-before-daily-authoring.md)
@@ -57,7 +57,153 @@ unchanged-feature-classification checks pass; independent review has no findings
 No runtime change or new capacity guarantee; no runtime suite is needed for this
 documentation checkpoint.
 
-## Current boundary —Ki-84 practical edit, save and cold resume
+## Current boundary —comfortable PC/touch workflows (2026-11-09)
+
+PO authorizes repeated comfort review, implementation and verification without
+small human-test/approval waits. Baseline70c9d9f was pushed with exact-head CI PASS.
+Preserve originals/full quality/offline, typed Session authority, every accepted
+write/readback/publication/recovery fence and private drafts. One writer; bounded
+independent cause/contract/UI reviewers are read-only. No new formats, dependencies,
+limits, numeric guarantees,10k qualification, adoption or release.
+
+Outcome: open/read/edit/export/cold resume with less blocked reading and stable
+input/focus. Fixed implementation: normal direct opening reuses the existing
+verified-text reader; full Host/receive/output preparation still completes before
+commands. Stable attachment/review DOM, guarded completion focus and automatic
+reveal of its live control preserve the next input. Same-note label geometry keeps
+numeric help off its own field name/?/value. Completion-only focus now suppresses
+automatic help during that synchronous focus event; intentional keyboard/help/hover
+activation remains available. Same-observation pin Map and per-update
+immutable display signature avoid repeated lookup/RAF serialization. Owned SHA/CRC
+pieces yield through per-call released MessageChannels; raw budgets/full checks and
+outer ZIP yields remain. Archive open/add/close/pipeline diagnostics are data-only.
+
+Final source is frozen in the immutable final-v4 candidate, source/test fingerprint
+9b68eff35e8864ee6c1f84472ca40d85bd93eec31b3d1bb78e422eb373bc8462.
+The final checkpoint passes3474 tests/155files with21existing TODO, all five builds
+and offline/HEIC isolation. Desktop52PASS/5634.5s, offline8PASS/730.5s and independent
+installed Edge/Chrome2PASS/43.7s are complete, with0skip/0unexpected/0flaky and retry0.
+The installed-browser check also verifies quiet Drawing completion/focus and records
+actual browser versions. The retained final-v3 full scan was49PASS/3FAIL:
+automatic numeric help opened on completion focus and covered the model. The
+renderer assertions and screenshot helper remain unchanged. The narrow synchronous
+focus correction passes all five focused browser cases5.0min, including the three
+original failures, PC/touch completion and source-material5uses/2rounds/restore/cold.
+Collection or earlier interrupted scans are NOT aggregate passes. The owned4191
+preview now serves final-v4; all20 HTTP file hashes/lengths match its manifest.
+The327052-byte synthetic sample is copied from the passed image-inspection Backup
+with SHA-256 checked after copy; no source/private material is distributed. Next:
+filter private draft blocks from staging, save/Push suitableg0 checkpoint and check
+its CI, then evaluate the separate development-tool security maintenance below.
+Do not repeat unchanged passed boundaries just for docs/staging or commit identity.
+
+Focused browser evidence reproduced and fixed lost attachment focus, offscreen
+Drawing completion and overlapping numeric help. Latest PC/touch connected flow
+2PASS51.8s before the final quiet-focus correction includes13attachments/detached-page rejection, scrolled Apply/Cancel,
+Tab/Escape and label nonoverlap. Existing help/draft/file/reopen1PASS12.1s;
+help/material43PASS, final typecheck. Independent meaningful source/after-image
+reviews have no findings. Retained setup/type failures, earlier passing builds,
+slower timer prototype and deliberately interrupted5-case scans remain private
+evidence, not relabelled passes. Optional DTO production logging was auto-review
+rejected before execution, immediately removed and replaced with fixture-only
+boolean assertions; no built candidate contains it.
+
+Matched Ki-84 milliseconds, baseline70c9d9f plus diagnostic spans versus current
+candidate-v4 (timing-cohort label, predating final-v4); same converted Backup,103Captions/43asset hashes/3original changes,
+Chromium156,1280x720/DPR1,serial dedicated profile per trial. Three runs each;
+machine load uncontrolled, no retries/limit changes or I/O-ratio correction.
+The native/CPU probes are separate from these elapsed cohorts using timings=1
+only, without native hooks or CPU profiling.
+
+| User endpoint | Before three runs | After three runs | Median before → after |
+|---|---|---|---|
+| First-Backup restore: full Caption controls | 79882 / 79270 / 79050 | 77429 / 76000 / 75359 | 79270 → 76000 |
+| Cold resume: verified text searchable | 11975 / 12004 / 11889 | 7176 / 6665 / 6745 | 11975 → 6745 |
+| Cold resume: full Caption controls | 12062 / 12009 / 11893 | 11520 / 11613 / 11258 | 12009 → 11520 |
+| Cold resume: edit enabled | 17629 / 17565 / 17587 | 16919 / 16996 / 16503 | 17587 → 16919 |
+| Cold resume: 3D ready | 18045 / 17996 / 18095 | 17334 / 17375 / 16840 | 18045 → 17334 |
+| One body edit applied | 11121 / 10200 / 10153 | 9663 / 9631 / 9529 | 10200 → 9631 |
+| Save primary to download event | 26418 / 25702 / 26075 | 24792 / 24558 / 24705 | 26075 → 24705 |
+| Save primary to actual downloaded file | 27779 / 27205 / 26973 | 25638 / 25425 / 25754 | 27205 → 25638 |
+
+All six flows retain input, original history, Project identity, exact old+one new
+change and every asset digest/length; saved body survives full browser close.
+The restore endpoint waits for .lv-caption-select, not the earlier readonly
+.lv-resume-reading;76s must not be called its first readable text. The existing
+restore callback already presents that reader after staging initialize/projection.
+Its first visible-text latency was not separately measured in these trials.
+Separate output probe: Long Tasks37/5349ms/max508ms →34/4715ms/max338ms;
+maximum RAF gap503.3→333.6ms. Each probe is one observation, not a bound/guarantee.
+Native getFile count5221 unchanged; writes58/165.7→161.4ms, closes10/17.1→15.4ms.
+Both total latency and stopped-frame observations support adopting the cooperative
+check. Do not attribute all elapsed difference to one change or native write time.
+The later UI corrections reveal the completed Drawing input, align its help and
+keep completion focus quiet; the measured Ki-84 body-edit/Backup/reopen path does
+not use that completion. These timings
+remain v4 observations, not fabricated reruns of the later build.
+
+Remaining measured work and stop boundary: first-restore initialize median47.782s
+contains model-stage22.466s and44fact-save spans20.444s. Their adjacent snapshots
+show616control lists/5544control reads, not native elapsed times. No large unwired
+readonly restore callback or safe existing-scope shortcut was found. The
+allowNewEvidence=true path is expressly outside06c's named readonly scope; do not
+reuse planning results across CAS/executor/receipt writes as stored evidence.
+The investigated receipt Blob shortcut also loses the existing post-body closing
+audit and remains rejected. The roughly0.7s initial-hint scan stays fresh rather
+than introducing another mutable initialization cache. No inspection skip or
+cross-operation SHA proof cache was adopted.
+
+Next performance evidence is per-fact receipt/inventory/executor/write/readback
+latency before choosing any further optimization. A preview before fully checked
+ready provider/publication would be a new policy. Stop only an affected genuine
+policy/inspection-lifetime/compatibility/dependency/release decision; continue
+other authorized fixes. The inspected workflows have no further concrete safe
+source change identified. Physical iPhone/Safari IME, memory/heat, save and offline
+acceptance remain pending, separate from Windows touch-layout evidence. Do not
+claim universal comfort, a release gate or a speed guarantee.
+
+2026-11-10 meta-audit: fresh npm audit reports16 aggregated package findings
+(2critical/5high), all17 affected lock nodes marked dev:true. The separate
+omit=dev audit exits0 with no findings. Independent read-only triage found no
+path from imported Project files to these Node build/test worker options or
+editor middleware; this is not proof of general security and dev dependencies
+still need maintenance. Critical counts include tinypool and its Vitest parent,
+not two demonstrated application RCEs. Official prerequisites are retained in
+[Tinypool worker](https://github.com/advisories/GHSA-5gmw-xhrv-c9v3),
+[Tinypool run](https://github.com/advisories/GHSA-85c8-ppgw-ccpr),
+[mocker](https://github.com/advisories/GHSA-82fw-gwwq-j7x9) and
+[Vite editor](https://github.com/advisories/GHSA-698v-4r3x-3vcv).
+The frozen candidate's checks are complete. Next separate ordinary compatible
+development-tool patches from comfort changes; inspect the patched Vitest
+chain's actual API/Node/config conditions before deciding whether a substantial
+architecture choice is needed. Do not install while current tests use node_modules,
+blindly force audit fixes, downgrade PWA or override tinypool across incompatible
+majors. No dependency change has been made. No public release is authorized.
+
+Independent maintenance design review and official fixed-tag/registry metadata
+identify existing Vite6.4.4 + Vitest4.1.12 as the bounded next candidate. The latter
+removes tinypool; no incompatible tinypool override or new direct/runtime dependency
+is needed. Node22/24 and Vite6 remain supported. Preserve five Node project groups,
+isolation, group order,2workers, exact collection/21TODO/deadlines/assertions and
+fault cases. Document acceptance in the existing browser-testing contract before
+changing the lock; inspect lock/runtime-tree/actual bundle differences and audit,
+then run relevant checks and independent review/CI. A version-major label alone
+does not create a PO decision. Stop only if real authority/isolation/product
+contracts or an unapproved direct dependency must change. Keep proposed11 separate.
+
+The next authority-dependent option is [proposed evaluation11](../docs/specs/11-streaming-sha256-evaluation-proposal.md):
+fixed hash-wasm4.13.0 for only two streaming SHA callers, retaining all checks and
+Native fallback under closed API-absence conditions. Independent proposal reviews
+have no remaining findings; no dependency is installed/implemented. AGENTS.md:37
+requires PO dependency approval. Ask once with the completed current candidate,
+sample and evidence; do not stop the unaffected final qualification or treat this
+proposal as adoption. Total SHA CPU is not the target callers' reducible time.
+
+Task-owned evidence is under.artifacts/e2e/comfort-cycle-20261109; original/private
+material is never staged or distributed. Current CI identity/result belongs to
+Git/Actions and the final report rather than duplicated per-commit logs here.
+
+## Previous boundary —Ki-84 practical edit, save and cold resume
 
 PO2026-11-09 authorizes measurement, implementation and automated qualification,
 including a fresh review of needless complexity/repeated checks. Baseline23cc1ac;

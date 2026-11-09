@@ -63,6 +63,7 @@ export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: 
   let entryPending = false, notice: string | null = null;
   let pose = defaultPose(), display: RenderDisplay | null = null, modelKey = '', modelStructureKey = '', active = false, disposed = false, applying = false;
   let issue: string | null = null, contextLost = false, dragging = false, axis: ViewportObservation['axis'] = null, serial = 0, raf = 0, lastObservation = '';
+  let displayObservation = '', lastDisplayObservation = '';
   let lastDrawSerial = -1, visualDirty = true;
   let semanticRevision = 0, observedSemanticRevision = -1, frameGeneration = 0;
   const presentationListeners = new Set<(frame: ViewportPresentationFrame) => boolean>();
@@ -386,9 +387,9 @@ export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: 
         visualDirty = false; lastDrawSerial = serial;
         renderFrame(); drew = true;
       }
-      const fingerprint = JSON.stringify([serial, width, height, display?.token, display?.pins, display?.preview, pose, background]);
-      if (fingerprint !== lastObservation) {
-        lastObservation = fingerprint;
+      const fingerprint = JSON.stringify([serial, width, height, pose, background]);
+      if (fingerprint !== lastObservation || displayObservation !== lastDisplayObservation) {
+        lastObservation = fingerprint; lastDisplayObservation = displayObservation;
         const semanticChange = observedSemanticRevision !== semanticRevision;
         observedSemanticRevision = semanticRevision;
         const current = active && !disposed && !issue && !contextLost && display === owner.display && frameGeneration === owner.generation &&
@@ -502,7 +503,9 @@ export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: 
       const visibilityChanged = JSON.stringify(display?.hiddenAssetIds) !== JSON.stringify(next.hiddenAssetIds);
       if (Boolean(display?.materialPreview) !== Boolean(next.materialPreview)) pickEpoch++;
       if (visibilityChanged) {pickEpoch++;if([...resident.values()].some(s=>s.gs))clearGs(gsIntent);}
-      if (sceneChanged) observePose(); display = next;
+      if (sceneChanged) observePose();
+      const observation = JSON.stringify([next.token, next.pins, next.preview]);
+      display = next; displayObservation = observation;
       if (sceneChanged) { entryPending = true; if (renderer) { enterScene(); installPose(); } }
       else if (boundsChanged) { observePose(); installPose(); }
       buildModels(); previewModels(); gizmo?.update(next.modelEdit ?? next.pinEdit); serial++;

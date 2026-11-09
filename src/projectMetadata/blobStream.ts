@@ -1,4 +1,5 @@
 import { NativeSha256 } from '../nativeGs/sha256';
+import { yieldTask } from '../core/taskYield';
 
 export interface BlobStreamLimits { readonly maxBlobBytes: number; readonly maxChunkBytes: number; readonly maxChunks: number }
 export interface BlobDigest { readonly digest: string; readonly byteLength: number }
@@ -31,7 +32,18 @@ export function checkedBlobStream(input: ReadableStream<Uint8Array>, limits: Blo
         if (expected && r.value.byteLength > expected.byteLength - byteLength) throw new BlobStoreError('mismatch');
         if (++chunks > limits.maxChunks || r.value.byteLength > limits.maxChunkBytes || r.value.byteLength > limits.maxBlobBytes - byteLength)
           throw new BlobStoreError('limit');
-        const chunk = new Uint8Array(r.value); hash.update(chunk); byteLength += chunk.byteLength; controller.enqueue(chunk);
+        // Own the whole raw chunk before any yield. Keep input budgets and the
+        // consumer's chunk unchanged while giving large digests task boundaries.
+        const chunk = new Uint8Array(r.value); let started = performance.now();
+        for (let at = 0; at < chunk.length; at += 65_536) {
+          hash.update(chunk.subarray(at, Math.min(at + 65_536, chunk.length)));
+          if (at + 65_536 < chunk.length && performance.now() - started >= 8) {
+            abort(); if (cancelled) return;
+            await yieldTask();
+            abort(); if (cancelled) return; started = performance.now();
+          }
+        }
+        byteLength += chunk.byteLength; controller.enqueue(chunk);
       } catch (error) {
         try { await reader.cancel(error); } catch { /* Preserve original failure. */ }
         release(); try { await failed?.(error); } catch { /* Original failure still rejects the stream. */ }

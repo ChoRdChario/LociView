@@ -29,7 +29,7 @@ export function prepareBackupManifest(capture: BackupSourceCapture, options: Wor
 }
 export async function writeBackupArchive(capture: BackupSourceCapture, store: Pick<OriginBlobStore, 'openReadOnly'>,
   destination: WritableStream<Uint8Array>, options: WorkspaceArchiveOptions) {
-  const owned = { packageId: options.packageId, createdByVersion: options.createdByVersion, memo: options.memo, signal: options.signal };
+  const owned = { packageId: options.packageId, createdByVersion: options.createdByVersion, memo: options.memo, signal: options.signal, timing: options.timing };
   let started = false;
   try {
     const controls = prepareBackupManifest(capture, owned); started = true;

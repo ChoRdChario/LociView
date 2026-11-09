@@ -17,7 +17,17 @@ import { PackageArchive } from './zipArchive';
 const fail = (code: string): never => { throw new PackageControlError(code); };
 const encode = (value: JsonValue) => new TextEncoder().encode(canonical(value));
 const same = (a: unknown, b: unknown) => canonical(a as JsonValue) === canonical(b as JsonValue);
-export interface WorkspaceArchiveOptions { readonly packageId: string; readonly createdByVersion: string; readonly memo?: string; readonly signal?: AbortSignal }
+export type WorkspaceArchiveTiming = (stage: 'archive-control-add' | 'archive-original-add' | 'archive-body-open' |
+  'archive-body-add' | 'archive-zip-close' | 'archive-pipeline-wait', milliseconds: number) => void;
+export interface WorkspaceArchiveOptions { readonly packageId: string; readonly createdByVersion: string; readonly memo?: string;
+  readonly signal?: AbortSignal; readonly timing?: WorkspaceArchiveTiming }
+/** Data-only elapsed observations never authorize or change archive work. */
+async function measureArchive<T>(timing: WorkspaceArchiveTiming | undefined, stage: Parameters<WorkspaceArchiveTiming>[0], action: () => Promise<T>) {
+  if (!timing) return action();
+  const started = performance.now();
+  try { return await action(); }
+  finally { try { timing(stage, performance.now() - started); } catch { /* Keep the original result or failure. */ } }
+}
 /** One exact builder for pre-write binding and ZIP generation; no durable completion. */
 export function prepareWorkspaceManifest(capture: WorkspaceSourceCapture, options: WorkspaceArchiveOptions) {
   const payloads = [capture.metadata, ...capture.blobs];
@@ -133,20 +143,20 @@ export async function writePackageArchive(capture: Pick<WorkspaceSourceCapture, 
     void pipeline.catch(error => { cancel.abort(error); });
     const writer = new ZipWriter(bridge.writable, zipOptions(cancel.signal));
     for (const { path, bytes } of [{ path: 'manifest.json', bytes: manifest }, { path: 'manifest.sha256', bytes: checksum }]) {
-      checkAbort(cancel.signal); await writer.add(path, new Uint8ArrayReader(bytes), zipOptions(cancel.signal)); checkAbort(cancel.signal);
+      checkAbort(cancel.signal); await measureArchive(options.timing, 'archive-control-add', () => writer.add(path, new Uint8ArrayReader(bytes), zipOptions(cancel.signal))); checkAbort(cancel.signal);
     }
     // Backup loaders provide one owned entry copy at a time, not another aggregate.
     for (const entry of source) {
       checkAbort(cancel.signal); const bytes = entry.read();
       if (bytes.length !== entry.byteLength || packageByteHash(bytes) !== entry.sha256) fail('zip-source-bytes');
-      await writer.add(entry.path, new Uint8ArrayReader(bytes), zipOptions(cancel.signal)); checkAbort(cancel.signal);
+      await measureArchive(options.timing, 'archive-original-add', () => writer.add(entry.path, new Uint8ArrayReader(bytes), zipOptions(cancel.signal))); checkAbort(cancel.signal);
     }
     const refs = new Map(capture.bodyRefs.map(ref => [ref.digest, ref]));
     const limits = { maxBlobBytes: L.blobBytes, maxChunkBytes: L.chunkBytes, maxChunks: L.streamChunks };
     const charge = () => { if (++bodyReads + chunks > L.packageChunks) fail('zip-read-budget'); };
     for (const entry of capture.blobs) {
       checkAbort(cancel.signal); const ref = refs.get(entry.sha256); if (!ref) fail('workspace-body-ref');
-      const file = await store.openReadOnly(ref!, limits); checkAbort(cancel.signal);
+      const file = await measureArchive(options.timing, 'archive-body-open', () => store.openReadOnly(ref!, limits)); checkAbort(cancel.signal);
       if (file.size !== entry.byteLength) fail('workspace-body-size');
       let verified = false, prefixAt = 0; const prefix = new Uint8Array(4);
       const guard = new TransformStream<Uint8Array, Uint8Array>({ transform(bytes, controller) {
@@ -157,11 +167,12 @@ export async function writePackageArchive(capture: Pick<WorkspaceSourceCapture, 
       const divided = workspaceInputChunks(file.stream(), cancel.signal, charge);
       const stream = checkedBlobStream(divided, { ...limits, maxChunkBytes: 65_536 }, () => { verified = true; },
         { digest: entry.sha256, byteLength: entry.byteLength }, cancel.signal).pipeThrough(guard);
-      try { await writer.add(entry.path, { readable: stream, size: entry.byteLength } as ReadableReader & { size: number }, zipOptions(cancel.signal)); }
+      try { await measureArchive(options.timing, 'archive-body-add', () => writer.add(entry.path, { readable: stream, size: entry.byteLength } as ReadableReader & { size: number }, zipOptions(cancel.signal))); }
       finally { try { await stream.cancel(); } catch { /* Entry codec may still own the stream. */ } }
       if (!verified) fail('workspace-body-incomplete'); checkAbort(cancel.signal);
     }
-    checkAbort(cancel.signal); await writer.close(undefined, { zip64: false }); await pipeline; checkAbort(cancel.signal);
+    checkAbort(cancel.signal); await measureArchive(options.timing, 'archive-zip-close', () => writer.close(undefined, { zip64: false }));
+    await measureArchive(options.timing, 'archive-pipeline-wait', () => pipeline!); checkAbort(cancel.signal);
     if (!finished) fail('zip-output-incomplete');
     return Object.freeze({ kind: control.manifest.purpose === 'teamWorkspace' ? 'generated-workspace-archive' as const :
       control.manifest.purpose === 'backup' ? 'generated-backup-archive' as const : control.manifest.purpose === 'clean' ? 'generated-clean-archive' as const :

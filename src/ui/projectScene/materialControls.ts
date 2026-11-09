@@ -2,7 +2,7 @@ import { materialFields, materialFieldLabels, materialInput,editMaterialIntent, 
 import { editMaterialDraft, materialApplyIssue, materialPlanIsCurrent, materialScopeLabel, materialSelectionKey, materialTargetKey,
   materialView, planMaterial, type MaterialContext, type MaterialDraft, type MaterialEffect, type MaterialIntentRequest, type MaterialPlan, type MaterialSelection } from './materialState';
 
-import { contextHelp, mountContextHelp } from './contextHelp';
+import { contextHelp, mountContextHelp, focusWithoutContextHelp } from './contextHelp';
 import { editOnly, viewOnly } from './modePresentation';
 
 let nextMaterialControl = 0;
@@ -33,6 +33,14 @@ export function createMaterialControls(document: Document, onPlan: (plan: Materi
   cleanups.push(mountContextHelp(document, root));
   let confirmation: { kind: 'cancel'; draft: MaterialDraft } | { kind: 'remove'; plan: Extract<MaterialEffect, { kind: 'remove' }> } | null = null;
   const listen = (node: HTMLElement, event: string, handler: () => void) => { node.addEventListener(event, handler); cleanups.push(() => node.removeEventListener(event, handler)); };
+  let lastField: MaterialEditField = 'opacity';
+  let returnFocus: { origin: HTMLElement; field: MaterialEditField; project: string; scene: string; selection: string; waiting?: boolean } | null = null;
+  const rememberFocus = (origin: HTMLElement) => {
+    if (context && document.activeElement === origin) returnFocus = { origin, field: lastField,
+      project: context.source.projectId, scene: context.source.sceneId, selection: materialSelectionKey(context.selection) };
+  };
+  const movedFocus = (event: Event) => { if (returnFocus && event.target !== returnFocus.origin && event.target !== document.body) returnFocus = null; };
+  document.addEventListener?.('focusin', movedFocus); cleanups.push(() => document.removeEventListener?.('focusin', movedFocus));
   const send = (plan: MaterialPlan) => { if (disposed || !context) return; if (plan.kind === 'blocked') { status.textContent = plan.reason; status.hidden = false; } else onPlan(plan); };
   const request = (intent: MaterialIntentRequest) => {
     if (!context) return; const plan = planMaterial(context, intent);
@@ -51,6 +59,7 @@ export function createMaterialControls(document: Document, onPlan: (plan: Materi
   };
   function updateDraft(field: MaterialEditField, input: HTMLInputElement | HTMLSelectElement) {
     if (disposed || input.disabled || ('readOnly' in input && input.readOnly)) return;
+    lastField = field;
     if(!context?.draft&&presentationOptions?.direct){const value=input.value;request({kind:'begin'});input.value=value;}
     if(!context?.draft)return;
     send({ kind: 'draft', baseDraft: context.draft, draft: editMaterialDraft(context.draft, field, input.value, composing) });
@@ -129,6 +138,7 @@ export function createMaterialControls(document: Document, onPlan: (plan: Materi
     if (enums[field]) options(input as HTMLSelectElement, enums[field]!, '');
     else { (input as HTMLInputElement).type = 'text'; input.setAttribute('inputmode', field === 'keyColor' ? 'text' : 'decimal'); }
     group.append(heading,input, note); editor.append(group); controls.set(field, { group, heading, input, note });
+    listen(input, 'focus', () => { lastField = field; });
     if (numeric.has(field)) bindScrub(field, group, input as HTMLInputElement,heading);
     const row = make('div'), value = make('dd'), warning = make('p'); row.setAttribute('data-material-field', field);
     row.append(make('dt', materialFieldLabels[field]), value, warning); reading.append(row); values.set(field, { group: row, value, note: warning });
@@ -153,8 +163,8 @@ export function createMaterialControls(document: Document, onPlan: (plan: Materi
   const content=make('div');content.className='lv-material-content';content.append(choices,status,observed,unavailable,begin,editor,reading);
   root.append(content,actions,confirmBox);
   editOnly(begin, editor, apply, cancel, remove, retry, review, confirmBox);
-  listen(apply, 'click', () => { if (!apply.disabled) request({ kind: 'apply' }); });
-  listen(retry, 'click', () => { if (!retry.disabled) request({ kind: 'retry' }); });
+  listen(apply, 'click', () => { if (!apply.disabled) { rememberFocus(apply); request({ kind: 'apply' }); } });
+  listen(retry, 'click', () => { if (!retry.disabled) { rememberFocus(retry); request({ kind: 'retry' }); } });
   listen(review, 'click', () => {
     if (!context) return;
     if (context.feedback.kind === 'failed') send({ kind: 'review', token: context.source.token, projectId: context.source.projectId, sceneId: context.source.sceneId, selection: context.feedback.plan.selection });
@@ -175,7 +185,7 @@ export function createMaterialControls(document: Document, onPlan: (plan: Materi
     if (!context || !confirmation || composing) return;
     const plan: MaterialPlan = confirmation.kind === 'remove' ? confirmation.plan : { kind: 'cancel', draft: confirmation.draft };
     if (!materialPlanIsCurrent(plan, context)) { status.textContent = '状態が変わっています。操作を確認してください。'; return; }
-    confirmation = null; confirmBox.hidden = true; send(plan);
+    rememberFocus(confirm); confirmation = null; confirmBox.hidden = true; send(plan);
   });
   function describe(selection: MaterialSelection, view: ReturnType<typeof materialView>) {
     const model = view.models.find(item => item.assetId === selection.assetId), surfaces = model?.surfaces.kind === 'value' ? model.surfaces.value : [];
@@ -247,7 +257,25 @@ export function createMaterialControls(document: Document, onPlan: (plan: Materi
       inFlight && '設定を適用中です。', d && !inFlight && (applyIssue || '未適用の入力があります。'),
       next.feedback.kind === 'failed' && `${describe(next.feedback.plan.selection, view)}：${next.feedback.plan.kind === 'remove' ? '設定を解除' : '変更を適用'}できませんでした。${next.feedback.message} 入力と操作対象を保持しています。`].filter(Boolean).join(' ');
     if(status.textContent!==statusText)status.textContent=statusText;
-    status.hidden = !statusText; return true;
+    status.hidden = !statusText;
+    const focus = returnFocus;
+    if (focus && (focus.project !== next.source.projectId || focus.scene !== next.source.sceneId ||
+      focus.selection !== materialSelectionKey(next.selection) || next.feedback.kind === 'failed')) returnFocus = null;
+    else if (focus && !focus.waiting && !d && !inFlight && !next.mutationBlock && !next.pending) queueMicrotask(() => {
+      if (disposed || returnFocus !== focus) return;
+      returnFocus = null;
+      if (!context || context.draft || context.pending || context.mutationBlock || context.feedback.kind === 'applying' || context.feedback.kind === 'failed' ||
+        context.source.projectId !== focus.project || context.source.sceneId !== focus.scene || materialSelectionKey(context.selection) !== focus.selection ||
+        document.activeElement !== focus.origin && document.activeElement !== document.body) return;
+      const field = controls.get(focus.field)!;
+      const target = editor.hidden ? (!begin.hidden && !begin.disabled ? begin : model) : field.group.hidden ? controls.get('opacity')!.input : field.input;
+      if (!target.hidden && !target.disabled && !('readOnly' in target && target.readOnly)) focusWithoutContextHelp(target, { preventScroll: false });
+    });
+    return true;
   }
-  return { root, review, render, isComposing: () => composing !== null, dispose: () => { disposed = true; endScrub(false); cleanups.forEach(fn => fn()); root.remove(); } };
+  return { root, review, render, beginCompletion(origin: HTMLElement) {
+    if (document.activeElement !== origin) return () => {};
+    rememberFocus(origin); const focus = returnFocus; if (focus) focus.waiting = true;
+    return () => { if (focus && returnFocus === focus) focus.waiting = false; };
+  }, isComposing: () => composing !== null, dispose: () => { disposed = true; endScrub(false); cleanups.forEach(fn => fn()); root.remove(); } };
 }

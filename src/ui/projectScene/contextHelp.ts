@@ -2,6 +2,13 @@ let nextHelp = 0;
 const pointerAnchors = new WeakMap<HTMLElement, (event: PointerEvent) => HTMLElement | null>();
 type Placement = { bounds(): DOMRect | null; side: 'left' };
 const placements = new WeakMap<HTMLElement, Placement>();
+const quietFocus = new WeakSet<HTMLElement>();
+
+/** Return to an input after an action without covering its result with help. */
+export function focusWithoutContextHelp(target: HTMLElement, options?: FocusOptions): void {
+  quietFocus.add(target);
+  try { target.focus(options); } finally { quietFocus.delete(target); }
+}
 
 /** Overlapping visual controls can share the same pointer target as their action. */
 export function registerContextHelpPointer(root: HTMLElement, resolve: (event: PointerEvent) => HTMLElement | null): () => void {
@@ -89,7 +96,9 @@ export function mountContextHelp(document: Document, root: HTMLElement): () => v
     if (shown) { shown.note.hidden = true; shown.holder.append(shown.note); }
   };
   const position = (next: Source) => {
-    const rect = next.anchor.getBoundingClientRect(), margin = 8;
+    const label = next.anchor.closest('label');
+    const placementAnchor = label?.getAttribute('data-lv-help-for') === next.note.id ? label : next.anchor;
+    const rect = placementAnchor.getBoundingClientRect(), margin = 8;
     const placement = placements.get(next.holder), bounds = placement?.bounds();
     const minX = bounds ? Math.max(margin, bounds.left + margin) : margin,
       maxX = bounds ? Math.min(browser.innerWidth - margin, bounds.right - margin) : browser.innerWidth - margin,
@@ -156,7 +165,11 @@ export function mountContextHelp(document: Document, root: HTMLElement): () => v
     if (next?.anchor.contains(related) || active?.note.contains(related)) { hovered = related; return; }
     if (next || active?.note.contains(target)) { hovered = null; leave(); }
   };
-  const focus = (event: Event) => { const next = source(event.target); if (next && next.note.id !== pointerFocus) show(next,true); };
+  const focus = (event: Event) => {
+    const target = element(event.target);
+    if (target && quietFocus.has(target)) { hide(); return; }
+    const next = source(target); if (next && next.note.id !== pointerFocus) show(next,true);
+  };
   const blur = (event: Event) => {
     const related = element((event as FocusEvent).relatedTarget);
     if (active && (source(related)?.note === active.note || active.note.contains(related))) return;

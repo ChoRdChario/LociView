@@ -19,6 +19,7 @@ import { CONTRIBUTION_RECONSTRUCTION, verifyContributionEvidence, verifyFrozenBa
 import { planRemoteChanges } from '../src/projectMetadata/remote';
 import { PackageArchive } from '../src/projectPackage/zipArchive';
 import { ZipCrc32 } from '../src/projectPackage/zipChecks';
+import * as taskYield from '../src/core/taskYield';
 import type { JsonObject } from '../src/domain/values';
 import type { OriginBlobStore } from '../src/projectMetadata/blobStore';
 import { protectedWorkspaceInventory } from '../src/projectPackage/protectedInventory';
@@ -1013,6 +1014,28 @@ describe('connected Workspace ZIP generation and integrity (not admission or ext
       const changed = bytes.slice(); changed[payloadAt + offset] = changed[payloadAt + offset]! ^ 1;
       await expect(PackageArchive.inspect(new Blob([changed]))).rejects.toThrow(/zip-crc/);
     }
+  });
+
+  it('observes cancellation at the first internal task boundary before consuming another logical piece', async () => {
+    const f = await blockScanFixture(), controller = new AbortController(), originalRead = Blob.prototype.arrayBuffer, originalCrc = ZipCrc32.prototype.update;
+    let nativeBlocks = 0, pieces = 0, elapsed = 0, entered!: () => void, release!: () => void;
+    const held = new Promise<void>(resolve => { entered = resolve; }), gate = new Promise<void>(resolve => { release = resolve; });
+    const yielding = vi.spyOn(taskYield, 'yieldTask').mockImplementation(() => { entered(); return gate; });
+    const clock = vi.spyOn(performance, 'now').mockImplementation(() => elapsed += 9);
+    const crc = vi.spyOn(ZipCrc32.prototype, 'update').mockImplementation(function(this: ZipCrc32, bytes) {
+      if (nativeBlocks) pieces++; return originalCrc.call(this, bytes);
+    });
+    const reads = vi.spyOn(Blob.prototype, 'arrayBuffer').mockImplementation(async function(this: Blob) {
+      const bytes = await originalRead.call(this);
+      if (this.size === 1_048_576) nativeBlocks++;
+      return bytes;
+    });
+    try {
+      const checking = PackageArchive.inspect(f.file, controller.signal); void checking.catch(() => {});
+      await Promise.race([held, checking.then(() => { throw Error('Expected internal task boundary'); })]); controller.abort(); release();
+      await expect(checking).rejects.toMatchObject({ name: 'AbortError' });
+      expect(nativeBlocks).toBe(1); expect(pieces).toBe(1);
+    } finally { release(); reads.mockRestore(); crc.mockRestore(); clock.mockRestore(); yielding.mockRestore(); }
   });
 
   it('matches an independently encoded ZIP, reads with zip.js, and retains complete original metadata', async () => {

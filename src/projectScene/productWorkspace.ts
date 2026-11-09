@@ -219,10 +219,11 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
         const current = !!state?.available && state.visible !== false && rendered === seen.display && state.token === seen.display?.token && state.sceneId === seen.display.sceneId && state.token === read().token;
         const available = current && seen.ready && !seen.issue;
         const cameraAvailable=current&&(seen.cameraReady??seen.ready)&&!seen.issue;
-        const pinIds = new Set(available ? rendered!.pins.map(p => p.id) : []);
+        const pins = new Map<string, NonNullable<typeof rendered>['pins'][number]>();
+        if (available) for (const pin of rendered!.pins) if (!pins.has(pin.id)) pins.set(pin.id, pin);
         return { token: seen.display?.token ?? '', sceneId: seen.display?.sceneId ?? '', pickToken: available ? receipt : '', ready: available,
-          dragging: seen.dragging || !!seen.manipulating,navigating:seen.navigating,camera:seen.camera,cameraReady:cameraAvailable,retryAvailable:seen.retryAvailable, pins: available ? seen.pins.filter(p => pinIds.has(p.id) && Number.isFinite(p.x) && Number.isFinite(p.y)).map(p => {
-            const source = rendered!.pins.find(pin => pin.id === p.id)!; return { ...p, scale: source.scale ?? 1, color: source.color, status: source.status, notice: source.notice };
+          dragging: seen.dragging || !!seen.manipulating,navigating:seen.navigating,camera:seen.camera,cameraReady:cameraAvailable,retryAvailable:seen.retryAvailable, pins: available ? seen.pins.filter(p => pins.has(p.id) && Number.isFinite(p.x) && Number.isFinite(p.y)).map(p => {
+            const source = pins.get(p.id)!; return { ...p, scale: source.scale ?? 1, color: source.color, status: source.status, notice: source.notice };
           }) : [], issue: seen.issue, notice: seen.notice ?? null, placementNotice: seen.placementNotice, loading: seen.loading,
           assetIds: available ? seen.display!.models.map(m => m.binding.assetId) : [],
           view: cameraAvailable && !seen.dragging && !seen.manipulating ? { kind: 'ready' as const, token: seen.token, sceneId: state!.sceneId, projectFrameId: read().resources.projectFrameId,

@@ -58,6 +58,8 @@ import { assetCopySource, prepareAssetMembershipCopy } from '../src/projectMetad
 import { pickResidentSurface } from '../src/harness/projectScene/viewportPicking';
 import { fixtureModelIds } from '../src/harness/projectScene/modelClosure';
 import { openValidationHost, openValidationEntry, validationArea } from '../src/harness/projectScene/validationHost';
+import { validatedResumeReading } from '../src/projectScene/validationHost';
+import * as resumeReadingModule from '../src/projectScene/resumeReading';
 import { browserMetadataDatabaseNames, browserOriginalDatabasePresent } from '../src/harness/projectScene/browserMetadataStorage';
 import { createValidationModeHost } from '../src/harness/projectScene/validationModeHost';
 import { productSources } from '../src/harness/projectScene/productSources';
@@ -2607,7 +2609,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const remember = vi.fn((next: ProjectResumeReference) => { reference = { ...next }; });
     const ports: ValidationWorkspacePorts = { ...options, productEditor: true, selected: vi.fn(), lastProject: { read: vi.fn(() => reference), remember },
       list: vi.fn((reading,onlyRun) => listValidationProjects(options, storage,reading,onlyRun)),
-      open: vi.fn(async (run, initial, mode, workspaceFile) => current = owned(await openValidationHost({ ...options, run, initial, mode, workspaceFile, openStorage: create => storage(run, create) }))),
+      open: vi.fn(async (run, initial, mode, workspaceFile, _review, _backup, _standalone, reading) => current = owned(await openValidationHost({ ...options, run, initial, mode, workspaceFile, reading, openStorage: create => storage(run, create) }))),
       render: async () => { let display: Parameters<ReturnType<ViewportFactory>['update']>[0] | undefined;
         const factory: ViewportFactory = () => ({ update(next) { display = next; }, setActive() {}, camera() {}, retry() {}, dispose() {},
           read: () => ({ ready: !!display, display, token: '1', pickToken: '1', pins: [], issue: null, dragging: false, projection: 'perspective', axis: null }) });
@@ -2649,6 +2651,71 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     };
     return { ...r, ports, storage, seed, mount, remember, host: () => current!, reference: (next: ProjectResumeReference | null) => { reference = next; } };
   }
+  it('direct resume exposes verified text before history discovery and transfers reading only after IME completes', async () => {
+    const f = resumeWorkspaceFixture(), a = await f.seed('直接再開');
+    const original = await f.ports.open(a.run); if ('kind' in original) throw Error('normal host');
+    await original.dispatch(original.read().source!.token, { kind: 'editCaption', captionId: a.captionId, edits: { body: '保存済みの編集本文' } });
+    const exact = original.read().source!.originalChanges(); await original.dispose();
+    let announced = false, release!: () => void, entered!: () => void, opened!: () => void;
+    const gate = new Promise<void>(resolve => { release = resolve; }), held = new Promise<void>(resolve => { entered = resolve; }), returned = new Promise<void>(resolve => { opened = resolve; });
+    const list = f.fs.list.bind(f.fs), listing = vi.spyOn(f.fs, 'list').mockImplementation(async prefix => { if (announced) { entered(); await gate; } return list(prefix); });
+    const calls: Parameters<NonNullable<Parameters<ValidationWorkspacePorts['open']>[7]>['show']>[0][] = [];
+    const open = f.ports.open.bind(f.ports); let notice: Parameters<ValidationWorkspacePorts['open']>[7];
+    let handoff: ReturnType<ReturnType<typeof resumeReadingModule.createResumeReading>['selection']> | undefined;
+    const createReading = resumeReadingModule.createResumeReading, preview = vi.spyOn(resumeReadingModule, 'createResumeReading').mockImplementation((...args) => {
+      const reader = createReading(...args); return { ...reader, selection() { handoff = reader.selection(); return handoff; } };
+    });
+    const h = f.mount(a.run, { progressivePresentation: true, open: async (...args) => {
+      notice = args[7]; if (notice) args[7] = { run: notice.run, show(value) { calls.push(value); notice!.show(value); announced = true; } };
+      const result = await open(...args); opened(); return result;
+    } });
+    try {
+      await held; expect(calls).toHaveLength(1); expect(Object.isFrozen(calls[0])).toBe(true); expect(Object.isFrozen(calls[0]!.records[0])).toBe(true);
+      const reading = h.all(h.root).find(node => node.className.includes('lv-resume-reading'))!; expect(reading).toBeDefined();
+      expect(h.all(reading).some(node => node.textContent === '変更を適用' || node.textContent === 'ファイルに保存')).toBe(false);
+      const search = h.all(reading).find(node => node.tag === 'input' && node.type === 'search')!;
+      search.focus(); search.fire('compositionstart'); search.value = '記'; search.fire('input'); h.button('記録', reading).fire('click');
+      expect(h.all(reading).some(node => node.textContent === '保存済みの編集本文')).toBe(true);
+      release(); await returned; await Promise.resolve(); expect(h.all(h.root)).toContain(reading);
+      search.fire('compositionend'); await h.idle(); expect(h.all(h.root)).not.toContain(reading);
+      expect({ exists: !!handoff, query: handoff?.query === '記', token: handoff?.token === f.host().read().source!.token,
+        scene: handoff?.sceneId === calls[0]?.sceneId, selected: handoff?.captionId === a.captionId }).toEqual({ exists: true, query: true, token: true, scene: true, selected: true });
+      const filters = h.all(h.editor()).find(node => node.className === 'lv-caption-search')!;
+      expect(h.named('検索', filters).value).toBe('記'); expect(h.named('本文', h.named('キャプションの詳細', h.editor())).value).toBe('保存済みの編集本文');
+      expect(f.host().read().source!.originalChanges()).toEqual(exact);
+      notice!.show(calls[0]!); expect(h.all(h.root).some(node => node.className.includes('lv-resume-reading'))).toBe(false);
+    } finally { release(); listing.mockRestore(); preview.mockRestore(); await h.ui.dispose(); }
+  });
+  it('rejects pending/foreign reading data and keeps opening independent of observer failure or a foreign request', async () => {
+    const f = resumeWorkspaceFixture(), a = await f.seed('通知の検証'), read = f.host().read(), provider = read.provider!;
+    if (provider.kind !== 'scene-provider') throw Error('provider');
+    expect(validatedResumeReading(read, a.run)).toMatchObject({ records: [{ id: a.captionId, title: '記録', body: '' }] });
+    for (const state of ['pending', 'repair-required', 'empty'] as const) expect(validatedResumeReading({ ...read, state }, a.run)).toBeNull();
+    expect(validatedResumeReading(read, 'f'.repeat(32))).toBeNull(); expect(validatedResumeReading({ ...read, source: null }, a.run)).toBeNull();
+    expect(validatedResumeReading({ ...read, provider: { ...provider, token: 'foreign' } }, a.run)).toBeNull();
+    const show = vi.fn(() => { throw Error('observer failed'); });
+    for (const run of [a.run, 'f'.repeat(32)]) {
+      const host = await f.ports.open(a.run, undefined, 'edit', undefined, undefined, undefined, undefined, { run, show });
+      if ('kind' in host) throw Error('normal host');
+      try { expect(host.read().state).toBe('ready'); expect(host.read().source!.originalChanges()).toEqual(a.source.originalChanges()); }
+      finally { await host.dispose(); }
+    }
+    expect(show).toHaveBeenCalledOnce();
+  });
+  it.each(['failure', 'dispose'] as const)('expires direct-opening text callbacks after %s', async kind => {
+    const f = resumeWorkspaceFixture(), a = await f.seed('通知の所有期間'), source = f.host().read(), provider = source.provider!;
+    if (provider.kind !== 'scene-provider') throw Error('provider');
+    const snapshot = validatedResumeReading(source, a.run)!;
+    let release!: () => void, entered!: () => void, notice: Parameters<ValidationWorkspacePorts['open']>[7];
+    const gate = new Promise<void>(resolve => { release = resolve; }), shown = new Promise<void>(resolve => { entered = resolve; });
+    const h = f.mount(a.run, { progressivePresentation: true, open: async (...args) => { notice = args[7]; notice!.show(snapshot); entered(); await gate; throw Error('opening failed'); } });
+    let closing: Promise<void> | undefined;
+    try {
+      await shown; expect(h.all(h.root).some(node => node.className.includes('lv-resume-reading'))).toBe(true);
+      if (kind === 'dispose') { closing = h.ui.dispose(); notice!.show(snapshot); expect(h.all(h.root).some(node => node.className.includes('lv-resume-reading'))).toBe(false); release(); await closing; }
+      else { release(); await h.idle(); notice!.show(snapshot); expect(h.all(h.root).some(node => node.className.includes('lv-resume-reading'))).toBe(false); }
+    } finally { release(); await (closing ?? h.ui.dispose()); }
+  });
   it('named resume scopes startup without hiding an existing import destination or the full selector', async () => {
     const f=resumeWorkspaceFixture(),a=await f.seed('再開する記録'),b=await f.seed('別の記録');
     const other=await f.ports.open(b.run);if('kind' in other)throw Error('normal host');
@@ -4033,7 +4100,8 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect(selected.archive).toBe(inspected.archive);
     expect(selected.source.originalChanges()).toEqual(inspected.source.originalChanges());
     expect(selected.description.inventory).toEqual(inspected.description.inventory);
-    expect([...new Set(timings.map(t => t.stage))].sort()).toEqual(['ready-before', 'slot-before', 'protection-before', 'ready-final', 'ready-finish', 'slot-finish', 'protection-finish', 'capture', 'persist', 'finish', 'job', 'inputs-before', 'space', 'stream-close', 'artifact-inspect', 'inputs-after', 'receipt'].sort());
+    expect([...new Set(timings.map(t => t.stage))].sort()).toEqual(['ready-before', 'slot-before', 'protection-before', 'ready-final', 'ready-finish', 'slot-finish', 'protection-finish', 'capture', 'persist', 'finish', 'job', 'inputs-before', 'space', 'stream-close', 'artifact-inspect', 'inputs-after', 'receipt',
+      'archive-control-add', 'archive-original-add', 'archive-body-open', 'archive-body-add', 'archive-zip-close', 'archive-pipeline-wait'].sort());
     expect(timings.every(t => Number.isFinite(t.milliseconds) && t.milliseconds >= 0)).toBe(true);
     expect(inspected.source.encodeFullSource()).toEqual(before.source!.encodeFullSource());
     expect(inspected.description.table).toEqual(sent.snapshot);

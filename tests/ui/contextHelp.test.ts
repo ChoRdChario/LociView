@@ -1,11 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { contextHelp, mountContextHelp } from '../../src/ui/projectScene/contextHelp';
+import { contextHelp, mountContextHelp, focusWithoutContextHelp } from '../../src/ui/projectScene/contextHelp';
 import { RecordedDocument, RecordedNode, record } from './domRecorder';
 
 class HelpNode extends RecordedNode {
   override getAttribute(name: string) { return this.attributes.get(name) ?? null; }
   closest(selector: string): HelpNode | null {
-    const matches = selector === '[data-lv-help-for]' ? this.attributes.has('data-lv-help-for') : this.className.split(' ').includes(selector.slice(1));
+    const matches = selector === '[data-lv-help-for]' ? this.attributes.has('data-lv-help-for') : selector === 'label' ? this.tag === 'label' : this.className.split(' ').includes(selector.slice(1));
     return matches ? this : (this.parent as HelpNode | null)?.closest(selector) ?? null;
   }
   getBoundingClientRect() { return { left: 20, top: 20, right:64, bottom: 64, width: 44, height: 44 }; }
@@ -43,6 +43,41 @@ function setup() {
   return { document, root, input, help, trigger: help.children[0]!, note: help.children[1]!, stop };
 }
 describe('optional contextual explanations', () => {
+  it('returns focus silently after an action, while the next intentional focus or hover still opens help', () => {
+    const h = setup();
+    h.input.focus = () => { h.document.activeElement = h.input; h.document.event('focusin', h.input); };
+    h.document.event('pointerover', h.input); vi.advanceTimersByTime(1000);
+    focusWithoutContextHelp(h.input as unknown as HTMLElement, { preventScroll: false });
+    vi.advanceTimersByTime(3000); expect(h.note.hidden).toBe(true); expect(h.document.activeElement).toBe(h.input); expect(h.input.value).toBe('入力を保持');
+    h.document.event('keydown', h.input, { key: 'Tab' }); h.input.focus(); expect(h.note.hidden).toBe(false);
+    focusWithoutContextHelp(h.input as unknown as HTMLElement); expect(h.note.hidden).toBe(true);
+    h.document.event('pointerout', h.input); h.document.event('pointerover', h.input); vi.advanceTimersByTime(2000); expect(h.note.hidden).toBe(false);
+    h.stop();
+  });
+  it('does not leave later focus suppressed if restoration throws', () => {
+    const h = setup(); h.input.focus = () => { throw Error('focus refused'); };
+    expect(() => focusWithoutContextHelp(h.input as unknown as HTMLElement)).toThrow('focus refused');
+    h.document.event('focusin', h.input); expect(h.note.hidden).toBe(false); h.stop();
+  });
+  it.each([true, false])('keeps a field name readable without adopting an unrelated label (%s)', sameHelp => {
+    const document = new HelpDocument(), root = document.createElement('section'), label = document.createElement('label'), input = document.createElement('input');
+    label.getBoundingClientRect = () => ({ left: 20, right: 300, top: 180, bottom: 300, width: 280, height: 120 });
+    input.getBoundingClientRect = () => ({ left: 20, right: 300, top: 240, bottom: 284, width: 280, height: 44 });
+    input.value = '63'; label.append(input);
+    const help = record(contextHelp(document.asDocument(), '数値を調整できます。', [input as unknown as HTMLElement])), note = help.children[1]! as HelpNode;
+    note.getBoundingClientRect = () => ({ left: 0, right: 200, top: 0, bottom: 80, width: 200, height: 80 });
+    if (!sameHelp) label.setAttribute('data-lv-help-for', 'unrelated-help');
+    label.append(help); root.append(label); document.body.append(root);
+    const stop = mountContextHelp(document.asDocument(), root as unknown as HTMLElement);
+    try {
+      document.activeElement = input; document.event('focusin', input);
+      const top = Number.parseFloat(note.style.top ?? '');
+      expect(top + 80).toBeLessThanOrEqual(sameHelp ? 180 : 240);
+      if (!sameHelp) expect(top + 80).toBeGreaterThan(180);
+      expect(document.activeElement).toBe(input); expect(input.value).toBe('63');
+      document.event('keydown', input, { key: 'Escape' }); expect(note.hidden).toBe(true); expect(document.activeElement).toBe(input);
+    } finally { stop(); }
+  });
   it('retains pointer-transparent text by geometry and lets an underlying action dismiss it without consuming the action',()=>{
     const h=setup();h.document.activeElement=h.trigger;h.document.event('focusin',h.trigger);
     expect(h.note.style.pointerEvents).toBe('none');

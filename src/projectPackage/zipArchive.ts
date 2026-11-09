@@ -1,4 +1,5 @@
 import { NativeSha256 } from '../nativeGs/sha256';
+import { yieldTask } from '../core/taskYield';
 import { PACKAGE_LIMITS as L, type Entry } from './contract';
 import { checkPackageEntryTable, readManifestControl, PackageControlError, type ManifestControl } from './manifest';
 import { ZipCrc32, rejectNestedZip, checkAbort } from './zipChecks';
@@ -40,8 +41,12 @@ class Ranges {
       reads += logicalReads; this.reads += logicalReads;
       const block = new Uint8Array(await this.file.slice(entry.offset + at, entry.offset + at + count).arrayBuffer());
       this.assertLive(); if (block.length !== count) return fail('zip-short-read');
+      let started = performance.now();
       for (let offset = 0; offset < count; offset += chunkBytes) {
         checkAbort(this.signal); consume(block.subarray(offset, Math.min(offset + chunkBytes, count)), at === 0 && offset === 0);
+        if (offset + chunkBytes < count && performance.now() - started >= 8) {
+          this.assertLive(); await yieldTask(); this.assertLive(); started = performance.now();
+        }
       }
       if (at + count < entry.byteLength) await new Promise<void>(resolve => setTimeout(resolve, 0));
     }

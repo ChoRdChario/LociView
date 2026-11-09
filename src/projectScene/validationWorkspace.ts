@@ -65,7 +65,7 @@ export interface ValidationWorkspacePorts {
   lastProject?: { read(): ProjectResumeReference | null; remember(reference: ProjectResumeReference): void };
   list(reading?: ResumeReadingRequest, onlyRun?: string): Promise<ValidationProjectEntry[]>;
   open(run: string, initial?: ReturnType<typeof prepareValidationCreation>, mode?: LocalOpenMode, workspaceFile?: Blob, reviewEdit?: PreparedReviewEdit,
-    firstBackup?: ValidationHostOptions['firstBackup'], standaloneWorkspace?: boolean): Promise<ValidationNormalHost | FirstBackupRecovery>;
+    firstBackup?: ValidationHostOptions['firstBackup'], standaloneWorkspace?: boolean, reading?: ResumeReadingRequest): Promise<ValidationNormalHost | FirstBackupRecovery>;
   render(host: ValidationDisplayHost): Promise<{ factory: ViewportFactory; readonly ready?:Promise<void>; detachPreparation?():void; dispose(): void; idle?():Promise<void> }>;
   renderReview?(view: ReviewView): Promise<{ factory: ViewportFactory; dispose(): void; idle?():Promise<void> }>;
   renderModelCandidate?(host: ValidationDisplayHost, display: Parameters<ModelCandidateRenderer>[0]): ReturnType<ModelCandidateRenderer>;
@@ -127,6 +127,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   navigation.append(heading, help, workspaceForm, form, listHeading, refresh, list,legacy); root.append(back, status, cancelSelection, navigation, content);
   let host: Host | undefined, workspace: MountedEditor | undefined;
   let resumeReading: ReturnType<typeof createResumeReading> | undefined;
+  let openingReading: object | undefined;
   const clearResumeReading = () => { resumeReading?.dispose(); resumeReading = undefined; };
   let presentation:{busy:boolean;reason:string}|null=null;
   let presentationState=()=>presentation;
@@ -220,6 +221,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
       } });
   };
   const closeCurrent = async () => {
+    openingReading = undefined;
     clearResumeReading();
     const oldWorkspace=workspace,oldHost=host,oldResident=resident,oldReview=reviewWorkspace,oldAttempt=reviewEditAttempt,oldTools=receiveTools,oldRecovery=firstRecovery;
     mounted=false;presentation=null;presentationState=()=>presentation;resumedLast=false;confirmingResume=false;workspace=undefined;host=undefined;resident=undefined;reviewWorkspace=undefined;reviewEditAttempt=undefined;receiveTools=undefined;firstRecovery=undefined;
@@ -481,7 +483,19 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   };
   const openProject = async (run: string, initial?: ReturnType<typeof prepareValidationCreation>, mode: LocalOpenMode = 'edit', workspaceFile?: Blob, remembered = false) => {
     if (!resumeReading) status.textContent = initial ? 'プロジェクトを作成しています。' : '再開用データを確認しています。';
-    const opened = await ports.open(run, initial, mode, workspaceFile);
+    const owner = {}; openingReading = owner;
+    const reading: ResumeReadingRequest | undefined = ports.progressivePresentation && !initial && !workspaceFile ? { run, show(value) {
+      if (disposed || retirementFailure || openingReading !== owner || resumeReading || !value) return;
+      const next = createResumeReading(document, value); resumeReading = next; navigation.hidden = true; status.textContent = ''; content.append(next.root); controls();
+    } } : undefined;
+    let opened: ValidationNormalHost | FirstBackupRecovery;
+    try {
+      opened = await (reading ? ports.open(run, initial, mode, workspaceFile, undefined, undefined, undefined, reading) : ports.open(run, initial, mode, workspaceFile));
+      if (disposed || openingReading !== owner) { await opened.dispose(); return; }
+    } catch (error) {
+      if (openingReading === owner) { clearResumeReading(); navigation.hidden = false; }
+      throw error;
+    } finally { if (openingReading === owner) openingReading = undefined; }
     if ('kind' in opened) { clearResumeReading(); if (disposed) { await opened.dispose(); return; } firstRecovery = opened; selected = run; navigation.hidden = true; renderFirstRecovery(); return; }
     await adoptProject(run, opened, remembered ? mode : undefined);
   };
@@ -948,7 +962,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     }
   });
   return { root,ready:ready??Promise.resolve(), hasChanges: () => busy || composing || changed() || !navigation.hidden && (selectionPending || !!rawSelection || !!creationAttempt || !form.hidden && title.value !== '新しいプロジェクト'),
-    async dispose() { if (disposed) return; disposed = true; clearResumeReading(); stopHelp();
+    async dispose() { if (disposed) return; disposed = true; openingReading = undefined; clearResumeReading(); stopHelp();
       homeSettings?.dispose();
       selectionAbort?.abort();
       stopPresentation();

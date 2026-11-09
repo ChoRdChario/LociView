@@ -220,3 +220,68 @@ readonly／pending表示、別FS/factory、期限外／未完了reader、書込�
 事前説明との差、owner切替・期限外callback・各段階失敗・retry／coldの復旧を検証する。過去履歴を改変した
 場合、新fileを渡す検査は維持され、次の全照会で過去の破損を検出することを確認する。同じKi-84で3回測り、
 生成・履歴照会・downloadを分けて効果を確認できた場合だけ採用する。保存形式・ID・依存・公開は変更しない。
+
+## 9. 残る待ち時間の観測と操作の整理（2026-11-09）
+
+POはPC／スマホの快適化を継続し、具体的な改善点がなくなるまで実装・検証するよう指示した。
+本節は既存契約内の実行・表示の整理であり、追加の検査例外や新しい製品方針ではない。
+
+- 任意のdata-only診断callbackで、素材ごとのopen／ZIP add、control／original add、ZIP close、
+  close後のpipeline待機を分ける。固定の工程名と経過時間だけを通知し、原本path・digest・本文を渡さない。
+  callbackの例外は成功／失敗・取消・返却内容に影響させず、消費順・SHA／CRC・所有copy・予算・backpressure・
+  write／readback／復旧fenceは変えない。native write／closeとLong Taskは私的ブラウザprobeで分離する。
+  body-addは読取／SHA／CRCとsink待機を含み、pipeline-waitはZIP close後の残りだけである。
+  並行区間を合算してI/O時間と呼ばず、probeなしの操作時間と区別する。
+- 通常再開で不要な初期化案内の探索は、必要性を実測したうえでsource-lessの案内を決める場面へ限定できる。
+  unknownをfalseと扱わず、その案内の前には従来のfresh探索を行う。原本／Session／内容／復旧検査は省略しない。
+  今回は未採用。先行閲覧の接続で記録を読める待ちを先に減らし、初期化案内のfresh探索は保持する。
+- 同じ描画観測内のピン対応付けは同じidと検査条件のままMapへ整理できる。別frameやownerへ証拠を保持しない。
+  添付・描画調整のDOMとfocusは、同じ対象の操作の続きを保ち、別対象・失敗・dispose・利用者のfocus移動を奪わない。
+  多数添付で説明編集を終えたときや描画設定の内容をスクロールして適用／取消したときは、
+  復帰先を画面内へ戻すことまで確認する。固定フッターが見えるだけでは完了としない。
+  同じ説明IDを持つ親labelがある場合、説明の位置だけをlabel全体の矩形で決め、欄名・説明入口・値を覆わない。
+  実際のfocus／所有者／IME／表示・取消条件や、カメラの明示配置を変更しない。
+- immutableな描画入力のtoken／pins／previewの署名は、admitDisplay成功後の各updateで（同じobjectでも）
+  display代入と同じ位置に確定する。idleを含む各RAFでは保存した署名と既存serial／pose／size／backgroundを
+  別々に比較し、pins全体の反復JSON化を省く。blockedNextで現署名を変えず、非表示時の保持とframe／pick／
+  再入／非同期resident／camera-only通知は維持する。renderer loop、profile、描画品質、adoption gateは変更しない。
+
+通常の直接再開にも既存01e§9のreadonly先行閲覧を接続する。freshなSession.readの終了監査成功後、Project/runと
+incoming proofの一致を確認し、restore-pendingでないreadyなsource/providerから既存ResumeReading DTOの所有済み
+文字列だけを任意observerへ渡す。新規作成・ファイル取込・初回復元・review-copy・repair/pending/source-lessは
+この通知に含めない。source/provider/FS/command portは渡さず、受信・出力履歴・初期化案内の探索と検査は従来どおり
+完了まで続ける。Hostの完成・編集・保存・復旧判断を早めない。診断通知と同様、observer失敗はHost成否を変えない。
+
+通知先は同じopening/run/disposeの所有期間だけで既存createResumeReadingを表示し、完成後の既存IME待機と
+検索・選択移送を使う。自動再開で既にreaderがある場合は通知で作り直さない。失敗・owner切替・disposeで通知を
+失効させ、未完了の復旧／失敗導線へ戻す。直接再開中の閲覧・検索・本文、編集／保存port不在、遅延callback拒否、
+失敗とdispose、IME／選択移送を検証する。Catalog／Hostの各独立検査やsaved編集内容の確認は省略しない。
+
+専用ChromiumのKi-84診断では、出力中のSHA圧縮に自己CPU約2.47秒、Long Taskの最大508msを観測した
+（診断1回であり速度保証ではない）。次の内部スケジューリングを評価する。raw入力chunkを検査し全量を所有copy
+にしてから、同じSHAへ64KiBずつ順に渡す。内部目安8msを超え、同じchunkの残りがある場合だけ既存の
+task-yield方式を用い、前後でabort／cancelを確認する。借用bytesのままawaitせず、取消後はchunkや完了通知を
+返さない。raw chunk数／サイズ／全量の予算と外側へ返すchunkは変えない。
+
+ZIP検査でも既存1MiB native読取／64KiB論理検査／block後yieldを保持し、block内の論理piece間で同じ
+時間条件のtask-yieldを許す。yield後にはowner／abortを新しく確認する。CRCと各SHAに渡す全bytes・順序・
+native／logical読取予算・完全検査後の採用は保持する。8msは内部の協調実行目安で、停止上限や性能保証ではない。
+最初のawait前にcopyを完了し、yield中の借用元buffer改変、取消／abort／正常完了、lock解放と既存の改変拒否・中断復旧を検証する。
+同じKi-84で操作全体の時間と停止を比較し、効果を確認できた範囲だけ採用する。
+
+追加のtask境界は`core/taskYield`の純粋な内部関数へまとめ、blobStream／zipArchiveだけから参照する。
+各呼出しで一対のMessageChannelを所有し、null通知後に両portとhandlerを解放してから戻る。
+未対応・初期化／送信失敗・messageerrorでは作成済み資源を解放して既存timerへ戻す。
+片方のclose失敗でも他方の解放を試み、解放失敗は拒否して保存や検査を成功扱いしない。
+遅延／二重通知を無視し、永続queue・port共有・worker・bytesの送信は導入しない。
+既存ZIPのblock後timerとすべてのowner／abort確認は維持する。task sourceの優先順やpaintを保証せず、
+旧timerとの実時間・停止比較と、両port解放／失敗／fallback・保持したtask中の取消で採否を判断する。
+
+受入れは同一Ki-84／small fixtureの実操作・処理別計測、既存の改変拒否・保存照合・中断復旧、PC／touchの
+keyboard／focus／IME／切替を用いる。実測で効果のない高速化案は採用しない。新しい検査寿命の集約や弱参照の
+fallback変更は本節に含めず、必要になれば独立した仕様判断を行う。一般公開・実機Safari合格を含まない。
+
+描画の適用・取消・設定解除後は、既存の所有対象・完了条件・利用者のフォーカス移動の確認を通過した場合だけ
+入力位置へ戻す。この同期focusイベントでは任意の説明を自動表示せず、結果の3D表示を覆わないようにする。
+入力欄の自動スクロールとaria-describedbyは保持し、次のTab移動・説明入口・2秒hoverでは従来どおり説明を読める。
+抑制は対象要素と同期呼出しの間だけとし、永続フラグ・タイマー・保存状態を追加しない。

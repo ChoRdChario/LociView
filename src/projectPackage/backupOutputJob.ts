@@ -11,7 +11,7 @@ import { BackupArchive, prepareBackupManifest } from './backupArchive';
 import { BackupSourceCapture } from './backupSource';
 import { backupEncode, inspectBackupOriginals } from './backupEvidence';
 import { packageSourceLimits } from './contributionEvidence';
-import { writeCausalArchive } from './workspaceArchive';
+import { writeCausalArchive, type WorkspaceArchiveTiming } from './workspaceArchive';
 import { ProjectRecordFields } from '../domain/projectRecordFields';
 import { workspacePackageRoot, encodePackageValue, evidenceReference } from './workspaceBases';
 import { checkAbort } from './zipChecks';
@@ -31,7 +31,7 @@ const checkRef = (r: EvidenceRef) => {
     !Number.isSafeInteger(r.byteLength) || r.byteLength <= 0 || r.byteLength > L.archiveBytes) fail('output-reference');
 };
 
-export type BackupOutputTiming = (stage: 'ready-before' | 'slot-before' | 'protection-before' | 'ready-final' | 'ready-finish' | 'slot-finish' | 'protection-finish' | 'capture' | 'persist' | 'finish' | 'job' | 'inputs-before' | 'space' | 'stream-close' | 'artifact-inspect' | 'inputs-after' | 'receipt', milliseconds: number) => void;
+export type BackupOutputTiming = (stage: Parameters<WorkspaceArchiveTiming>[0] | 'ready-before' | 'slot-before' | 'protection-before' | 'ready-final' | 'ready-finish' | 'slot-finish' | 'protection-finish' | 'capture' | 'persist' | 'finish' | 'job' | 'inputs-before' | 'space' | 'stream-close' | 'artifact-inspect' | 'inputs-after' | 'receipt', milliseconds: number) => void;
 /** Optional local observations have no authority over output or recovery. */
 export function measureBackupOutput<T>(observer: BackupOutputTiming | undefined, stage: Parameters<BackupOutputTiming>[0], action: () => Promise<T>): Promise<T> {
   if (!observer) return action();
@@ -274,7 +274,7 @@ export class BackupOutputJob {
     const generated = await measure('stream-close', async () => {
       const writing = this.fs.writeStream(path, bridge.readable); void writing.catch(e => cancel.abort(e));
       const originals = this.inputs.originals.map(e => ({ path: e.path, ...ref(e.bytes), read: () => e.bytes.slice() }));
-      const generating = writeCausalArchive({ blobs: m.blobs, bodyRefs: this.inputs.description.bodyRefs }, controls, originals, store, bridge.writable, { ...options, signal: cancel.signal });
+      const generating = writeCausalArchive({ blobs: m.blobs, bodyRefs: this.inputs.description.bodyRefs }, controls, originals, store, bridge.writable, { ...options, signal: cancel.signal, timing });
       try { const [, result] = await Promise.all([writing, generating]); return result; }
       catch (error) { cancel.abort(error); await Promise.allSettled([writing, generating]); throw error; }
       finally { signal?.removeEventListener('abort', abort); }

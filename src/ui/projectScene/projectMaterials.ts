@@ -11,6 +11,7 @@ export function createProjectMaterials(document: Document, host: ProjectPanelHos
   const states = new Map<string, { selection: MaterialSelection; draft: MaterialDraft | null; followedModel?: string | null }>();
   const choices = new Map<string, { token: string; appearance?: string; compositing?: string; owner?: string }>();
   const reviewNodes = new Map<string, HTMLElement>();
+  const reviewCards = new Map<string, { signature: string; root: HTMLElement; update(): void }>();
   let disposed = false;
   const state = () => { const key = host.source().sceneId; if (!states.has(key)) states.set(key, { selection: newMaterialSelection(), draft: null }); return states.get(key)!; };
   const context = (): MaterialContext => ({ source: host.ports.materials(host.source().sceneId).source, ...state(),
@@ -52,6 +53,53 @@ export function createProjectMaterials(document: Document, host: ProjectPanelHos
     }));
   }
   root.append(controls.root, review);
+  type ReviewGroup = ReturnType<ProjectPanelHost['ports']['materials']>['review'][number];
+  function reviewCard(group: ReviewGroup, sceneId: string, token: string) {
+    const key = `${sceneId}/${group.key}`, box = make('fieldset'); box.tabIndex = -1; box.append(make('legend', group.label));
+    const updates: (() => void)[] = [], selects: HTMLSelectElement[] = [];
+    const current = () => !disposed && reviewCards.get(key)?.root === box && host.source().sceneId === sceneId && host.source().provider.token === token;
+    const blocked = () => !!host.block('materials') || !!state().draft || !!choices.get(key) && choices.get(key)!.token !== token;
+    const choose = (name: 'appearance' | 'compositing' | 'owner', label: string, values: readonly { id: string; label: string }[]) => {
+      const row = make('label', label), select = make('select'), empty = make('option', '選択してください'); empty.value = ''; select.append(empty);
+      selects.push(select);
+      select.setAttribute('aria-label', label);
+      for (const item of values) { const option = make('option', item.label); option.value = item.id; select.append(option); }
+      select.addEventListener('change', () => {
+        if (!current() || select.disabled || blocked()) return;
+        choices.set(key, { ...choices.get(key), token, [name]: select.value }); host.changed();
+      });
+      updates.push(() => { select.value = choices.get(key)?.[name] ?? (name !== 'owner' && values.length === 1 ? values[0]!.id : ''); select.disabled = blocked(); });
+      row.append(select); editOnly(row); box.append(row, viewChoices(document, label, values.map(item => item.label))); return select;
+    };
+    if (group.appearance.length > 1 || group.compositing.length > 1) {
+      const appearance = choose('appearance', '残す見え方', group.appearance.map(a => ({ id: a.operationId, label: a.label })));
+      const compositing = choose('compositing', '残す被覆・光学', group.compositing.map(a => ({ id: a.operationId, label: a.label })));
+      const apply = button('選択を確定', () => {
+        if (!current() || blocked() || !appearance.value || !compositing.value) return;
+        const completion = controls.beginCompletion(apply);
+        host.dispatch('materials', group.token, { kind: 'resolveMaterialIntent', sceneId, overrideId: group.overrideId,
+          appearanceOperationId: appearance.value, compositingOperationId: compositing.value }, () => { completion(); choices.delete(key); host.message('材質の更新候補を確定しました。'); });
+      });
+      updates.push(() => { apply.disabled = blocked() || !appearance.value || !compositing.value; }); editOnly(apply); box.append(apply);
+    }
+    if (group.owners.length > 1) {
+      const owner = choose('owner', '残す設定', group.owners); box.append(make('p', '選ばなかった重複設定は解除され、履歴に残ります。'));
+      const keep = button('選んだ設定を残す', () => {
+        if (!current() || blocked() || !owner.value) return;
+        const completion = controls.beginCompletion(keep);
+        host.dispatch('materials', group.token, { kind: 'resolveMaterialDuplicates', sceneId, overrideId: owner.value,
+          observedOverrideIds: group.owners.map(o => o.id), eventId: newProjectId('evt') }, () => { completion(); choices.delete(key); host.message('重複する設定を整理しました。'); });
+      });
+      updates.push(() => { keep.disabled = blocked() || !owner.value; }); editOnly(keep); box.append(keep);
+    }
+    const cancel = button('選択を取り消す', () => { if (current() && !host.block('materials', false)) {
+      const focused = document.activeElement === cancel; choices.delete(key); host.changed();
+      if (focused && current() && (document.activeElement === cancel || document.activeElement === document.body))
+        selects.find(select => !select.disabled)?.focus({ preventScroll: true });
+    } });
+    updates.push(() => { cancel.hidden = !choices.has(key); cancel.disabled = !!host.block('materials', false); }); editOnly(cancel); box.append(cancel);
+    return { root: box, update: () => updates.forEach(update => update()) };
+  }
   function render() {
     if (disposed) return;
     const s=state(), selected=host.selectedModel?.(), source=context().source;
@@ -62,43 +110,17 @@ export function createProjectMaterials(document: Document, host: ProjectPanelHos
         s.selection={assetId:follow.assetId,target:surfaces.length===1?surfaces[0]!.target:null,scope:s.selection.scope};}
       s.followedModel=selected;
     }
-    controls.render(context(), { viewing: host.ports.mode === 'view', readBlock: host.block('materials', false) }); controls.review.hidden=!matchingReview().length; review.replaceChildren(); reviewNodes.clear();
+    controls.render(context(), { viewing: host.ports.mode === 'view', readBlock: host.block('materials', false) }); controls.review.hidden=!matchingReview().length; reviewNodes.clear();
     const { provider, sceneId } = host.source(), groups = host.ports.materials(sceneId).review;
-    for (const group of groups) {
-      const box = make('fieldset'), label = make('legend', group.label); box.tabIndex=-1;reviewNodes.set(group.key,box);box.append(label);
-      const key = `${sceneId}/${group.key}`, owned = choices.get(key), blocked = host.block('materials') || (state().draft ? '材質の入力を確定してください。' : null);
-      const choose = (name: 'appearance' | 'compositing' | 'owner', label: string, values: readonly { id: string; label: string }[]) => {
-        const row = make('label', label), select = make('select'), empty = make('option', '選択してください'); empty.value = ''; select.append(empty);
-        select.setAttribute('aria-label', label);
-        for (const item of values) { const option = make('option', item.label); option.value = item.id; select.append(option); }
-        select.value = owned?.[name] ?? (name !== 'owner' && values.length === 1 ? values[0]!.id : '');
-        select.disabled = !!blocked || !!owned && owned.token !== provider.token;
-        select.addEventListener('change', () => {
-          if (select.disabled || provider.token !== host.source().provider.token) return;
-          choices.set(key, { ...owned, token: provider.token, [name]: select.value }); host.changed();
-        }); row.append(select); editOnly(row); box.append(row, viewChoices(document, label, values.map(item => item.label))); return select.value;
-      };
-      if (group.appearance.length > 1 || group.compositing.length > 1) {
-        const appearance = choose('appearance', '残す見え方', group.appearance.map(a => ({ id: a.operationId, label: a.label })));
-        const compositing = choose('compositing', '残す被覆・光学', group.compositing.map(a => ({ id: a.operationId, label: a.label })));
-        const apply = button('選択を確定', () => {
-          if (host.block('materials') || state().draft || provider.token !== host.source().provider.token || !appearance || !compositing) return;
-          host.dispatch('materials', group.token, { kind: 'resolveMaterialIntent', sceneId, overrideId: group.overrideId,
-            appearanceOperationId: appearance, compositingOperationId: compositing }, () => { choices.delete(key); host.message('材質の更新候補を確定しました。'); });
-        }); editOnly(apply); apply.disabled = !!blocked || !appearance || !compositing || !!owned && owned.token !== provider.token; box.append(apply);
-      }
-      if (group.owners.length > 1) {
-        const owner = choose('owner', '残す設定', group.owners);
-        box.append(make('p', '選ばなかった重複設定は解除され、履歴に残ります。'));
-        const keep = button('選んだ設定を残す', () => {
-          if (host.block('materials') || state().draft || provider.token !== host.source().provider.token || !owner) return;
-          host.dispatch('materials', group.token, { kind: 'resolveMaterialDuplicates', sceneId, overrideId: owner,
-            observedOverrideIds: group.owners.map(o => o.id), eventId: newProjectId('evt') }, () => { choices.delete(key); host.message('重複する設定を整理しました。'); });
-        }); editOnly(keep); keep.disabled = !!blocked || !owner || !!owned && owned.token !== provider.token; box.append(keep);
-      }
-      const cancel = button('選択を取り消す', () => { if (!host.block('materials', false)) { choices.delete(key); host.changed(); } });
-      editOnly(cancel); cancel.hidden = !owned; cancel.disabled = !!host.block('materials', false); box.append(cancel); review.append(box);
+    const active = new Set<string>();
+    for (const [index, group] of groups.entries()) {
+      const key = `${sceneId}/${group.key}`, signature = JSON.stringify([provider.token, group]); active.add(key);
+      let card = reviewCards.get(key);
+      if (!card || card.signature !== signature) { card?.root.remove(); card = { signature, ...reviewCard(group, sceneId, provider.token) }; reviewCards.set(key, card); }
+      card.update(); reviewNodes.set(group.key, card.root);
+      if (review.children[index] !== card.root) review.insertBefore(card.root, review.children[index] ?? null);
     }
+    for (const [key, card] of reviewCards) if (!active.has(key)) { card.root.remove(); reviewCards.delete(key); }
   }
   return { root, render, hasChanges: () => !!state().draft || choices.size > 0,
     proposal() {
@@ -108,5 +130,5 @@ export function createProjectMaterials(document: Document, host: ProjectPanelHos
         target: plan.selection.target!, scope: plan.selection.scope, recordId: plan.recordId, intent: plan.intent } : null;
     },
     composing: () => !!state().draft?.composing || controls.isComposing(),
-    dispose() { disposed = true; controls.dispose(); root.remove(); } };
+    dispose() { disposed = true; reviewCards.clear(); reviewNodes.clear(); controls.dispose(); root.remove(); } };
 }
