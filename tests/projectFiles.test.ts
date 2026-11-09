@@ -208,7 +208,9 @@ afterEach(async () => {
   } finally {
     // Public APIs release call/result/context graphs and restore global spies.
     // Their pinned registries may still retain target closures; do not alter them.
-    vi.unstubAllGlobals(); vi.restoreAllMocks(); decode.mockImplementation(decodeImplementation);
+    vi.unstubAllGlobals(); vi.restoreAllMocks();
+    // Vitest4 restores spies separately from standalone mock history/overrides.
+    decode.mockReset().mockImplementation(decodeImplementation);
   }
   if (errors.length) throw new AggregateError(errors, 'fixture disposal');
 });
@@ -7389,7 +7391,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     await host.authority.write(backupToken, { [`caption/${f.f.captionId}/body`]: '復元前の作業' });
     const before = host.read().source!.token, disposals: ReturnType<typeof vi.fn>[] = [];
     let failRender = false;
-    const render: ValidationWorkspacePorts['render'] = vi.fn(async target => {
+    const render: ValidationWorkspacePorts['render'] = vi.fn<ValidationWorkspacePorts['render']>(async target => {
       if (failRender) throw Error('restore renderer unavailable');
       const detach = target.setDisplayPreparation(async () => {}), dispose = vi.fn(detach); disposals.push(dispose);
       return { factory: (() => { throw Error('Recorded DOM has no GPU'); }) as ViewportFactory, dispose };

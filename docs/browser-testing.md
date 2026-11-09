@@ -530,3 +530,48 @@ count and timeout. The full checkpoint's Vitest duration is a separate end-to-en
 reference: file durations overlap under two workers, and runs at different times
 do not constitute a controlled hardware benchmark. Test count reduction is not an
 acceptance target. No retries, exclusions or timeout increases are implied.
+
+## Existing development-tool security maintenance (2026-11-10)
+
+Separate maintenance after the verified comfort checkpoint; not a new
+application dependency or a product/storage change. Keep Vite on6.x with the
+6.4.6 security patch and evaluate Vitest4.1.12 in place of3.2.7. Official metadata
+supports the existing Node22 CI and Node24 local runtime and Vite6; Vitest4 removes
+tinypool. Do not override tinypool1 with2 or accept an automatic PWA downgrade.
+The [Vite advisory](https://github.com/advisories/GHSA-698v-4r3x-3vcv),
+[mocker advisory](https://github.com/advisories/GHSA-qxg6-89mg-rqv8) and
+[Vitest migration guide](https://v4.vitest.dev/guide/migration.html) explain the
+fixed versions and compatibility work. Pre-install audit of the first6.4.4 plan
+found its [query-deny regression](https://github.com/advisories/GHSA-8g5g-mxqh-grgj);
+6.4.4 was not installed. Use6.4.6, and review compatible patches for affected
+development-only children rather than forcing new major versions. Findings and executed evidence belong in
+[todo](../tasks/todo.md).
+
+Before installing, review the exact package/lock diff, resolved integrity,
+licenses and npm audit. Change only existing development declarations and their
+necessary compatible tree; keep direct runtime dependencies, runtime code
+versions/integrities, product version/license, formats, IDs and all application
+write/readback/recovery contracts. No new direct dependency, runtime library,
+browser-mode plugin, custom runner, CDN or network path is authorized by this unit.
+Proposed streaming-hash11 remains a separate unapproved dependency decision.
+
+Keep the same five Node project groups, file-to-project collection, group order,
+per-file isolation, two-worker checkpoint execution,21existing TODO, deadlines,
+assertions and injected faults. Check collection before/after and execute the
+complete root suite. Adapt only demonstrably changed test-harness APIs such as
+mock cleanup/constructors; retain the intended reset/isolation and original
+assertions. Record failures before fixing them; never add retries, exclusions or
+longer limits. Actual authority/isolation changes require a separate decision;
+a version-major number alone does not establish such a change.
+
+Run focused checks during adaptation, then the required checkpoint, HEIC isolation
+and exact-head CI once at the final dependency/test tree. Compare actual built
+Desktop files with the already qualified immutable candidate. Reuse executed
+browser evidence only for identical application bytes; if output changes, inspect
+the change and run affected rendered paths, broadening if equivalence is unresolved.
+Offline build identities are intentionally fresh: run all offline cases on the
+new build, retain exact SRI/ownership/update checks and representative installed
+browsers. Collection is not execution, and none of this verifies physical Safari.
+Independent review covers lock/runtime-tree/bundle differences and executed
+evidence before the separate checkpoint is pushed. Do not install while owned
+tests/builds still use node_modules or stop unrelated processes to force an update.

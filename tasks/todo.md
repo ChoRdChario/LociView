@@ -57,7 +57,7 @@ unchanged-feature-classification checks pass; independent review has no findings
 No runtime change or new capacity guarantee; no runtime suite is needed for this
 documentation checkpoint.
 
-## Current boundary —comfortable PC/touch workflows (2026-11-09)
+## Current boundary —comfortable use and verification maintenance (2026-11-10)
 
 PO authorizes repeated comfort review, implementation and verification without
 small human-test/approval waits. Baseline70c9d9f was pushed with exact-head CI PASS.
@@ -65,6 +65,17 @@ Preserve originals/full quality/offline, typed Session authority, every accepted
 write/readback/publication/recovery fence and private drafts. One writer; bounded
 independent cause/contract/UI reviewers are read-only. No new formats, dependencies,
 limits, numeric guarantees,10k qualification, adoption or release.
+
+The comfort implementation below is qualified and pushed as the current development
+checkpoint; its exact-head CI passed in Actions. The separate unit is
+existing-development-tool security maintenance under
+[the browser-testing contract](../docs/browser-testing.md#existing-development-tool-security-maintenance-2026-11-10).
+Only existing Vite/Vitest declarations and necessary reviewed development-tree
+versions may change; no new direct/runtime dependency or application contract.
+Baseline collection remains155 files across the same five Node project groups.
+Its local qualification is complete, preserving tests/isolation/limits/faults and
+comparing actual bundles; the separate checkpoint's exact CI is still to be run.
+Keep proposed11 separate.
 
 Outcome: open/read/edit/export/cold resume with less blocked reading and stable
 input/focus. Fixed implementation: normal direct opening reuses the existing
@@ -78,7 +89,7 @@ immutable display signature avoid repeated lookup/RAF serialization. Owned SHA/C
 pieces yield through per-call released MessageChannels; raw budgets/full checks and
 outer ZIP yields remain. Archive open/add/close/pipeline diagnostics are data-only.
 
-Final source is frozen in the immutable final-v4 candidate, source/test fingerprint
+The comfort checkpoint is preserved in immutable final-v4, source/test fingerprint
 9b68eff35e8864ee6c1f84472ca40d85bd93eec31b3d1bb78e422eb373bc8462.
 The final checkpoint passes3474 tests/155files with21existing TODO, all five builds
 and offline/HEIC isolation. Desktop52PASS/5634.5s, offline8PASS/730.5s and independent
@@ -92,9 +103,9 @@ original failures, PC/touch completion and source-material5uses/2rounds/restore/
 Collection or earlier interrupted scans are NOT aggregate passes. The owned4191
 preview now serves final-v4; all20 HTTP file hashes/lengths match its manifest.
 The327052-byte synthetic sample is copied from the passed image-inspection Backup
-with SHA-256 checked after copy; no source/private material is distributed. Next:
-filter private draft blocks from staging, save/Push suitableg0 checkpoint and check
-its CI, then evaluate the separate development-tool security maintenance below.
+with SHA-256 checked after copy; no source/private material is distributed.
+The private draft blocks stayed local; the verified checkpoint is pushed to g0.
+Follow its CI and continue the separate development-tool security maintenance below.
 Do not repeat unchanged passed boundaries just for docs/staging or commit identity.
 
 Focused browser evidence reproduced and fixed lost attachment focus, offscreen
@@ -178,10 +189,59 @@ development-tool patches from comfort changes; inspect the patched Vitest
 chain's actual API/Node/config conditions before deciding whether a substantial
 architecture choice is needed. Do not install while current tests use node_modules,
 blindly force audit fixes, downgrade PWA or override tinypool across incompatible
-majors. No dependency change has been made. No public release is authorized.
+majors. The independently reviewed Vite6.4.6/Vitest4.1.12 tree is installed without
+install scripts. Runtime29 versions/URLs/integrities, direct runtime declarations,
+product version/license/overrides and all test commands remain identical. Tinypool
+is removed. File/project collection remains exactly155 across the same five groups.
+Initial typecheck found one changed mock inference: the recovery render mock now
+names its existing port type explicitly, retaining every assertion/fault/deadline.
+Typecheck,77 focused core/UI checks and the original recovery case pass. The final
+full checkpoint passes155 files:3458 ordinary PASS/16existing expected failures/
+21TODO,1035.63s, with all five builds and offline/HEIC isolation. Application source
+is unchanged. Immutable security-final-v1 records the exact three changed package/
+test paths with fingerprint c30dc438a45659160b829612df787e6d553ce813896b3738174c819cf6526271.
+All30 Desktop output files match final-v4 byte-for-byte; its executed52-case
+evidence is retained for those identical bytes. Offline has14 changed resources
+from fresh generation, with no normalization/inferred equivalence. New-build
+offline8PASS/708.2s, PC/touch continuation2PASS/57.0s and installed-browser2PASS/43.6s
+are complete with0skip/0unexpected/0flaky, retry0. The same4191 preview now serves
+security-final-v1; all20 HTTP files match its manifest. The synthetic sample remains
+unchanged. Only the separate checkpoint Push/exact-head CI remains; Git/Actions
+own its identity/result, without repeating unchanged runtime checks for result prose.
+No public release is authorized.
+
+The first Vitest4 full run found one genuine test-harness isolation failure: the
+shared decoder retained previous call history. The unchanged valid-PNG→capacity
+rejection pair reproduces it; explicit standalone-mock reset in afterEach restores
+the old cleanup intent and the pair passes without changing the rejection assertion.
+The second full run passes. Vitest4 separately reports16 pre-existing it.fails
+that Vitest3 included in its pass total:4 old publication cases,4 old migration
+expectations,6 writable-ProjectStore ingress checks and2 old merge collision reports.
+Independent static reachability review finds the current Desktop old-format path
+opens read-only (dispatch rejects), offline excludes that old app, and current
+ProjectScene uses its separate validated conversion/Session/package services.
+These are not16 new regressions or16 ordinary assertions proved true. The older
+__last expectation also differs from the accepted07c mapping; do not redefine it.
+One old-readonly weakness remains: a missing referenced blob may be detected only
+when displaying the model; the new conversion rejects it. No current-edit loss
+path was found. Keep that late warning and the original legacy gates as residual
+scope, without widening this development-dependency unit into old writer repair.
+
+Final reviewed-lock audit is critical0/high0/low2/moderate4. Remaining6 are package
+aggregation of development-only deepmerge/minimatch and their build parents.
+[deepmerge](https://github.com/advisories/GHSA-gcqx-w48m-w2h4) has no fixed release;
+[glob14.0.2](https://github.com/advisories/GHSA-3g3m-2fjr-6pw4) and
+[minimatch11.0.1](https://github.com/advisories/GHSA-g3hv-75wg-m249) are outside the
+current Workbox ranges. Independent review confirms no compatible upstream fix
+identified and no imported-Project path to this Node build configuration. Keep
+these as residual developer/build findings, not a security PASS or release waiver;
+do not downgrade PWA or force major overrides merely to clear audit counts.
 
 Independent maintenance design review and official fixed-tag/registry metadata
-identify existing Vite6.4.4 + Vitest4.1.12 as the bounded next candidate. The latter
+identify existing Vite6.x + Vitest4.1.12 as the bounded next candidate. Pre-install
+audit found a query-deny regression in6.4.4; it was never installed. The reviewed
+same-major patch candidate is now6.4.6, with compatible development-only child
+patches checked against the protected runtime tree. The latter Vitest update
 removes tinypool; no incompatible tinypool override or new direct/runtime dependency
 is needed. Node22/24 and Vite6 remain supported. Preserve five Node project groups,
 isolation, group order,2workers, exact collection/21TODO/deadlines/assertions and
