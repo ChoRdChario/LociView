@@ -111,9 +111,13 @@ test('Native07kの点群GSと面を変換し共有返送Review編集コピー独
       const ndc=new THREE.Vector3(...position).project(camera);await canvas.click({position:{x:(ndc.x+1)*box.width/2,y:(1-ndc.y)*box.height/2}});
     };
     for(const kind of ['点群','GS']){
-      await a.p.getByRole('tab',{name:'モデル',exact:true}).click();const panel=a.p.getByRole('tabpanel',{name:'モデル',exact:true});await panel.locator('.lv-model-select').filter({hasText:kind}).click();await panel.getByRole('button',{name:'このモデルだけ表示',exact:true}).click();await lookAlongFront(a.p);
+      await a.p.getByRole('tab',{name:'モデル',exact:true}).click();const panel=a.p.getByRole('tabpanel',{name:'モデル',exact:true});await panel.locator('.lv-model-select').filter({hasText:kind}).click();await panel.getByRole('button',{name:'このモデルだけ表示',exact:true}).click();
+      // Hidden models release their resources; fitting needs the newly prepared
+      // model bounds, not merely an enabled camera gizmo.
+      await expect(canvas).toHaveAttribute('aria-busy','false');await lookAlongFront(a.p);
       await a.p.getByRole('tab',{name:'キャプション',exact:true}).click();await a.p.getByRole('button',{name:'キャプションを追加',exact:true}).click();
       await hit(kind,kind==='点群'?[.5,0,0]:[-1.4,.3,.05]);
+      await expect(a.p.getByLabel('位置 X',{exact:true})).toBeVisible();
       if(kind==='GS'){await expect(a.p.getByLabel('位置 X',{exact:true})).toBeEnabled();await a.p.getByLabel('位置 X',{exact:true}).fill('.2');}
       await a.p.getByRole('button',{name:'位置を確定',exact:true}).click();await expect(a.p.getByText('ピンの位置を確定しました。',{exact:true})).toBeVisible({timeout:180000});await edit(a.p,'タイトル',kind==='点群'?'引き継いだ点の指定':'引き継いだ面の指定');
     }

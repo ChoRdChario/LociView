@@ -1,6 +1,6 @@
 # LociView active work
 
-Updated2026-11-08. This is the single current plan and check record.
+Updated2026-11-09. This is the single current plan and check record.
 [Inventory](implementation-inventory.md) owns route-specific coverage;
 [map](../PROJECT_MAP.md) and [document index](../docs/README.md) route contracts/code.
 Git owns checkpoint identity. [Retained checkpoint evidence](../docs/history/development-through-2026-10-29/tasks/todo-before-daily-authoring.md)
@@ -57,7 +57,241 @@ unchanged-feature-classification checks pass; independent review has no findings
 No runtime change or new capacity guarantee; no runtime suite is needed for this
 documentation checkpoint.
 
-## Current boundary —normal-save per-file persistence
+## Current boundary —Ki-84 practical edit, save and cold resume
+
+PO2026-11-09 authorizes measurement, implementation and automated qualification,
+including a fresh review of needless complexity/repeated checks. Baseline23cc1ac;
+one writer and bounded read-only cause/contract/final reviewers. Preserve all
+private draft blocks and source/evaluation evidence; no human helper-test wait.
+
+Final local status2026-11-09: approved06e §§7–8 implemented and independently
+reviewed. Fixed-input Ki-84 three-run file/hash/history/cold flow PASS; core3446
+PASS with21existing TODO, all five builds and both isolation checks PASS.
+Desktop: full49PASS/1FAIL plus repaired Native workflow1PASS (all50 covered, no
+single50PASS scan claimed). Edge/Chrome2PASS; full-offline8PASS. Delivery4191
+serves all20 frozen files exactly; final source/test fingerprint81037ee9… with
+unchanged measured product bytes. No further product changes for staging.
+Stage only public filtered docs and reviewed/tested source; retain165/86private
+draft lines and all artifacts locally. Save/Push suitableg0 checkpoint and check
+the resulting exact head in Actions; Git/Actions own that identity/result.
+Remaining: large-file waits and physical iPhone Safari acceptance. Next engineering
+target is per-body/ZIP/write pipeline timing and records-first startup; don't
+extend inspection lifetimes or add caches from counts alone. No release/Pages.
+
+Outcome: same fixed Ki-84 input/history, one body edit→real external backup→full
+browser-close/cold reopen with exact edited text, original model/image digests,
+Project identity and original history retained. Reuse existing private journey
+and native/high-level timers; measure apply, package/receipt/overview/handoff,
+records-first display and edit-ready/3D-ready separately. Compare three isolated
+before/after runs under the same browser/viewport/data, heavy work serially.
+Separate diagnostic setup failures from product/performance failures; preserve
+existing timeouts/rejections and cold/independent-file checks.
+
+Choose fixes from observed elapsed time and a connected user workflow, not I/O
+counts or helper count. Remove demonstrated duplicate work/branches inside
+accepted lifetimes; retain original/full quality/offline, all write/readback/
+Journal/publication/recovery fences and06b ZIP proof lifetime. No new dependency,
+format/ID/capacity guarantee, acknowledged-data deletion, main/Pages or release.
+Before storage/security change update the relevant spec/acceptance and review;
+stop only an affected genuine new policy/contract/authority decision. Final
+meaningful source diff independently reviewed; final serial checkpoint/HEIC,
+PC/touch and full-offline qualification, exact candidate delivery, suitableg0
+commit/Push and exact CI. Next work follows measured remaining critical path.
+
+### Measurement and simplicity decision (2026-11-09)
+
+Measured seconds; each cell lists all3runs then its median. Same fixed private
+input/history, Chromium156,1280×720,DPR1; no retries. External system load was not
+controlled. These are observations, not a causal speed claim or a new guarantee.
+
+| Tree/cohort | Body apply | Download start | Cold records text |
+|---|---|---|---|
+| Initial old | 16.317/15.721/16.983; median16.317 | 35.972/40.550/36.523; median36.523 | 19.347/21.251/22.489; median21.251 |
+| SHA prototype —not adopted | 38.107/24.434/32.281; median32.281 | 68.900/51.003/62.498; median62.498 | 35.107/25.524/30.232; median30.232 |
+| Unchanged old control | 30.223/23.886/34.712; median30.223 | 48.109/55.625/66.747; median55.625 | 27.341/28.908/31.610; median28.908 |
+
+All9completed flows preserved the input backup, all43body hashes, Project
+identity and the3original changes plus exactly1newedit, with an actual downloaded
+file and complete-browser-close continuation. They do not qualify the later
+minimal final tree; that requires its own connected flow. The three default-
+sandbox connection failures never reached the product and remain in the private
+failure record. No claim that every attempted run passed.
+
+Initial fixed-input three-run baseline PASS. The same-consumption SHA fast-path
+prototype also passed three full file/hash/history/cold journeys, but the native
+I/O stages varied broadly with competing system load; do not infer elapsed benefit
+from hash counts or adjust wall time by an I/O ratio. The unchanged old-build
+three-run control also passed, with no elapsed benefit established for the prototype.
+Retain all three cohorts and failure evidence. No deadline,
+retry, input, original quality or acceptance assertion is relaxed.
+
+The WeakMap/SHA fast path is not adopted: it did not demonstrate a workflow benefit.
+Retain its source/tests/build privately, and keep the final source small: intrinsic
+owned Uint8Array copies, no completion after cancelled EOF, and same-owned-source
+sorted heads without rebuilding its history. Original capture/writer SHA paths
+remain. Final qualifying Ki-84 journey must use the new final artifact, not borrow
+prototype PASS. Later PO-approved §§7–8 add their own three-run qualification;
+do not use the rejected prototype to qualify those changes or force a positive result.
+
+PO2026-11-09 approves spec06e §§7–8 after independent design review: scope each
+normal selected Session read until its closing audit, then adopt; publish only
+the actual new Backup display row after successful Session and Sender fences.
+Keep readonly/pending reads, distinct write/publication/recovery checks, actual
+manifest disclosure, full fresh download and failure/retry/cold discovery. Old
+history damage may be detected at next full discovery. Implement with focused
+failure/ownership tests, then compare three fixed Ki-84 flows and qualify the final
+tree. These new substantive improvements supersede the minimal-tree single-flow
+qualification above; do not use prototype results as their evidence.
+
+Qualification replan: the first final checkpoint failed after2449.69s with
+3437passed/3timeouts/21todo (154files). Builds did not run. The07n LociMyu
+five-purpose case exceeded60s, Scene-name cold acknowledgement exceeded30s,
+and fixture-acquisition success exceeded15s. All three passed focused diagnostics
+under those same original deadlines (product two73.19s combined; acquisition7.21s).
+This does not replace the failed whole run. Preserve its log and retained evidence.
+
+Separate ordinary product tests, the700-case connected-file suite, other fixture
+scripts, native acquisition restore and evidence CLI in existing Vitest projects.
+The known heavy files each have their own phase; the other files retain2workers
+and fresh per-file forks. Independent review rejected a singleFork draft because
+it would batch14files into one environment lifetime despite isolate:true; it was
+never executed as qualification. No case/assertion/deadline/retry changes. Compare
+the collected file union before/after, review this meaningful orchestration diff,
+then execute the whole checkpoint again at the final tree. Do not claim an elapsed
+gain from different background load or from collection-only results.
+
+The grouped second checkpoint also failed:3007.38s,3435passed/5timeouts/21todo,
+153/154files passed; builds did not run. Acquisition and evidence CLI passed.
+The remaining timeouts are all connected-file cases (07n, two07m, Scene names,
+Caption parents). Preserve both failed full runs. Fixture inspection found
+stubGlobal is not undone by restoreAllMocks, and late timed-out case-finally
+unstub can erase the next case's decoder. Centralize cleanup after owned case
+disposals; preserve all cases/assertions/deadlines. This fixes a real harness
+leak but is not by itself proof of the primary timeout's cause or resolution.
+
+Implementation checkpoint2026-11-09: §§7–8 source and focused tests implemented;
+independent final/contract reviews have no remaining findings. Public read adopts
+only after closing audit; failed A cannot roll back successful B. Completed Backup
+display uses actual manifest flags (including named base evidence with anonymous
+current source), both outer-success fences and exact Host ownership guards. Old
+rows/bases are retained; strict download and explicit refresh detect damaged old
+history. Missing/late/nonready observations and failures keep fresh discovery.
+No new authority, body cache, schema, IDs or dependencies.
+
+Focused checks:113persistence/stream/boundary tests PASS33.67s;8output/Host/portable
+tests PASS28.88s;9previous-timeout/restore-pending/outer-fence tests PASS108.42s
+under original deadlines; named-base disclosure test PASS3.59s. Selection overlap
+is not a unique-test tally. Deferred-test cleanup and full old observer replay
+were reviewed; final whole-tree checks still pending. Dedicated Chromium fixed
+Ki-84 three-run measurement uses the immutable approved candidate. Do not infer
+full-suite or device acceptance from these focused passes.
+
+Final candidate's fixed Ki-84 three-run flow PASS8.1min, source/test/config
+hash7ff434fa…; includes actual save-status/handoff assertion after the UI fixes
+below. Prior ce6e6d8f three-run evidence remains private, not final qualification.
+Same43body hashes,103Captions,3unchanged original changes plus1edit,
+actual file bytes and full-browser-close continuation; no page errors/external
+requests. Compare seconds below (three runs, median). Initial old and later
+unchanged-old control remain distinct because external machine load varied.
+
+| Action | Initial old | Unchanged old control | Approved candidate |
+|---|---|---|---|
+| Body apply |16.317/15.721/16.983;16.317 |30.223/23.886/34.712;30.223 |13.271/12.325/9.896;12.325 |
+| Download start |35.972/40.550/36.523;36.523 |48.109/55.625/66.747;55.625 |32.011/32.700/24.856;32.011 |
+| Actual file handoff complete |37.392/42.039/37.589;37.589 |49.255/57.059/68.210;57.059 |33.592/33.785/25.809;33.592 |
+| Cold records text |19.347/21.251/22.489;21.251 |27.341/28.908/31.610;28.908 |13.784/13.789/11.488;13.784 |
+| Cold edit-ready |27.404/30.131/30.203;30.131 |35.409/40.148/42.166;40.148 |20.210/19.529/16.818;19.529 |
+| Cold3D-ready |28.003/30.976/30.817;30.817 |36.145/41.204/43.155;41.204 |20.882/19.944/17.190;19.944 |
+
+Fresh restore-to-records median108.115→91.392s; this is distinct from normal cold
+reopen. No wall-time correction by I/O ratios and no fixed speed guarantee.
+All three approved saves have no post-success whole-history overview span, as
+intended; generation median28.714s and fresh download2.986s remain. Generation
+includes capture5.917s,persist2.880s,finish13.935s/job11.243s (nested spans; do not
+add parent/child). All three fresh ready fences remain, roughly1.5–1.7s each.
+The workflow is faster in these observations but still misses comfortable-use
+targets. Bounded independent tracing identifies stream-close7.728s as the whole
+concurrent ZIP/write pipeline (final measurement7.779s; CAS opens/body SHA/copies, CRC, archive SHA,1MiB
+coalescing/backpressure, native write/close and closing guard), not disk-close
+time. Next split per-body open/add, ZIP close/pipeline completion and native
+write/chunk/close waits; do not sum overlapping branches. Existing1MiB batching
+and ownership copies serve a purpose. Tiny repeated prefix checks are not a
+workflow-priority optimization. Continue generation and records-first startup
+from these measurements; do not re-add body caches/inspection exceptions without
+a measured need.
+The subsequent full checkpoint-v3 failed in1262.30s (3444passed/2assertions/21todo,
+153/154files); all original timeouts resolved, but builds did not run. Preserve
+this failure: disclosure's synthetic flag update found a frozen DTO exposed as
+the Host's ordinary mutable display row; project status required stale:false and
+therefore hid an observed handoff for the intentionally freshness-unknown new row.
+Fixed Host-owned copy and separate observed handoff from verified-file claims.
+Do not guess stale:false; actual file verification still requires fresh matching
+discovery. New assertion rejects a verified claim from unknown-freshness state.
+Eight focused cases PASS31.65s; independent bounded review has no findings.
+The final-source Ki-84 repetition and checkpoint below supersede that provisional
+qualification. Prior browser PASS remains distinct evidence, not qualification
+of the changed tree.
+
+Final-source Ki-84 repetition above is complete. Full checkpoint-v4 PASS1089.383s:
+typecheck,154files/3446passed/21existing TODO, all five builds and offline isolation;
+no timeout/retry/exclusion. Unit-test phase1015.56s; previous failed runs retained,
+not equivalent successful baseline runs or a controlled speed guarantee. HEIC
+isolation PASS. Frozen final Desktop30files and offline20files share source/test
+hash7ff434fa…; every Desktop file is byte-identical to the three measured runs.
+No further product edits during qualification.
+For large-GS/installed-browser/full-offline acceptance, use a task-ownedG-drive
+TEMP/TMP directory (C: had9.7GiB free). This is a process-local test-environment
+choice, not a storage policy or new capacity claim; do not touch personal browser
+profiles or delete prior failure evidence. The before/after Ki-84 trials retained
+their originalC-drive profile conditions. Full Desktop uses the same test set,
+workers/retries/deadlines with immutable checkpoint artifacts, avoiding identical
+rebuilds merely to start another owned preview; verify collected-case equality.
+Canonical/frozen Desktop collection equality PASS50cases with identical limits;
+this is not execution credit. The initial private-driver run stopped before any
+test because WebServer cwd resolved beside that private config. Explicit root cwd
+fix only; retain v1 failure and execute all50 in v2. Its result follows.
+
+Full Desktop v2 finished49PASS/1FAIL, no retries or skips (all50 executed).
+Native07k small-spatial failed because the one-shot GS ray left placement in
+choosing, then positionX remained hidden. The Native loop omitted the existing
+Mesh counterpart's prepared-canvas-before-fit condition. Bounded independent
+review confirms cameraReady differs from model/picking ready; it is a plausible
+cause, not yet a runtime proof. Repair only that test's readiness and proposal
+visibility preconditions, preserving all original deadlines, one-shot ray and
+file/hash/history assertions; run the complete affected workflow. Product source
+and all compiled artifacts remain unchanged. Reuse the unchanged49cases and
+core/build evidence rather than repeat them for a test-navigation-only change.
+
+Native focused workflow after that exact repair PASS5.0min: same one-shot point/GS
+selection, coordinate expectations, two returns, five outputs, restore and cold
+resume; no extra clicks/deadline change/assertion removal. Typecheck PASS and
+bounded independent test-diff review clear. Desktop evidence is explicitly the
+full49PASS/1FAIL scan plus this changed-case PASS, not a single50PASS scan.
+The no-test-selected first focus driver (bad start-anchor against qualified
+titles) is retained separately and gives no product credit.
+
+Final artifact/test record81037ee9… adds only that E2E file to the earlier
+7ff434fa… source/test list. Every prior source/test/config hash and all30Desktop/
+20offline artifact hashes match; no product code changed after the measured
+three-run candidate or the passing core/build/HEIC checks. Installed Edge and
+Chrome independent-context representative flow2PASS41.7s (create, actual backup,
+Review controls, explicit edit-copy confirmation, independent save). Full offline
+8PASS722.794s including test builds: actual browser/server-close mixed500k SH4/
+Mesh/Point/Proxy/media, edit/save/cold, initial conversion, safe update/repair/
+removal, unchanged Project/history and foreign-worker refusal. No retry/skip/flaky;
+not physical iOS acceptance. Test-only a/b/subpath builds did not replace the
+frozen root candidate. Delivery4191 replaces only the identity-checked old owned
+preview; all20 served file hashes and final source/test files match81037ee9… .
+
+Remaining large-data weakness: the full500k SH4 flow logs edit-copy editor-ready
+163.911s and3D-ready172.466s after confirmation. These are current G-profile
+functional observations, not a matched performance comparison or capacity/speed
+guarantee. Keep large-GS and91.392s first Ki-84 restore distinct from the12.325s
+body apply/32.011s ordinary download/13.784s cold-records median. Physical iPhone
+Safari IME/save/memory/heat/offline acceptance remains pending; touch Chromium,
+Edge and Chrome do not replace it.
+
+## Completed boundary —normal-save per-file persistence
 
 PO2026-11-08 authorizes measurement and implementation through automated
 qualification. Baseline53d36f4. One writer; bounded read-only cause/contract/final

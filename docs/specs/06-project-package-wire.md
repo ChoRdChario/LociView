@@ -2983,7 +2983,16 @@ view, and the owning connection/FS/Session/Sender must be unchanged. The extra
 read carries no FS, Job, new metadata field or authority. An observer exception
 is ignored as presentation-only; it cannot turn a completed save into failure.
 
-This extra channel feeds only the current-source part of backup **stale-display**
+The later PO-approved2026-11-09 [06e§8](06e-selected-generation-output-read-proposal.md#8-保存成功直後の新しい履歴1件の反映po承認2026-11-09)
+adds one exception: a fresh successful Backup may carry its actual completed-job
+display row after both outer fences, retaining old history/base display until
+the next full discovery. It does not authorize commands or download, or apply to
+retry, failure, verification, startup or other output kinds. All fresh download,
+write/readback and recovery checks remain. Section06e§7 separately permits one
+normal selected-generation Session read to share readonly ports until its closing
+audit; adoption happens only afterward and separate calls keep separate audits.
+
+The original extra channel feeds only the current-source part of backup **stale-display**
 calculation inside one overview. Every job state/step, original/artifact/completion,
 protection, current bases/payloads and inventory check still executes freshly.
 No command authority, persisted receipt, global/source cache, delayed body check,
@@ -3035,7 +3044,8 @@ its actual page-response hashes were not recorded in that attempt.
    rejects stale DTO adoption. The decision is Host-owned, never a UI boolean.
    Successful previews create no file/job/base and lend no authority to actual
    generation: createClean/createReview revalidate independently as before.
-   Other output actions keep unconditional recovery discovery. Test success
+   Other output actions keep unconditional recovery discovery, except the later
+   PO-approved06e§8 fresh-Backup success display exception above. Test success
    without overview, failure/closing/stale fallback, owned selection capture,
    preserved history and subsequent fresh generation after evidence loss.
 3. Successful Workspace presentation: add a final optional synchronous observer

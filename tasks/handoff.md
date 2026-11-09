@@ -12,6 +12,13 @@ The exact [06b](../docs/specs/06b-staging-read-operations-proposal.md) exception
 include §6.1 Review-copy inspection and §6.2 integrity sharing inside one
 outputReady. General §6 payload sharing is not approved. Do not extend these
 lifetimes to a whole Session, source capture, write/readback or recovery.
+[06e §§7–8](../docs/specs/06e-selected-generation-output-read-proposal.md) were
+approved2026-11-09: one normal selected-generation public read may share readonly
+ports until its closing audit; it adopts only afterward, including readonly and
+restore-pending reads. A fresh successful Backup may display its actual new row
+after both outer fences while retaining old rows/bases until full discovery.
+Failure/retry/cold discovery and fresh download checks stay strict; old history
+damage may be detected at the next full inquiry. No staging consumer is added.
 [09 §10](../docs/specs/09-desktop-offline-candidate-proposal.md) permits exact
 same-build/SRI boot-resource repair; it does not permit arbitrary network fallback,
 foreign cache/Project writes or forced activation. Follow their recorded contracts

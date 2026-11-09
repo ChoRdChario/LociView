@@ -13,7 +13,7 @@ export function checkedBlobStream(input: ReadableStream<Uint8Array>, limits: Blo
   complete: (digest: BlobDigest) => void, expected?: BlobDigest, signal?: AbortSignal,
   failed?: (error: unknown) => Promise<void>): ReadableStream<Uint8Array> {
   const reader = input.getReader(), hash = new NativeSha256();
-  let byteLength = 0, chunks = 0, released = false;
+  let byteLength = 0, chunks = 0, released = false, cancelled = false;
   const abort = () => { if (signal?.aborted) throw signal.reason ?? new DOMException('Operation aborted', 'AbortError'); };
   const onAbort = () => { void reader.cancel(signal?.reason).catch(() => {}); };
   const release = () => { if (!released) { released = true; signal?.removeEventListener('abort', onAbort); reader.releaseLock(); } };
@@ -21,7 +21,7 @@ export function checkedBlobStream(input: ReadableStream<Uint8Array>, limits: Blo
   return new ReadableStream<Uint8Array>({
     async pull(controller) {
       try {
-        abort(); const r = await reader.read(); abort();
+        abort(); if (cancelled) return; const r = await reader.read(); abort(); if (cancelled) return;
         if (r.done) {
           const digest = { digest: hash.digestHex(), byteLength };
           if (expected && (digest.digest !== expected.digest || byteLength !== expected.byteLength)) throw new BlobStoreError('mismatch');
@@ -31,14 +31,14 @@ export function checkedBlobStream(input: ReadableStream<Uint8Array>, limits: Blo
         if (expected && r.value.byteLength > expected.byteLength - byteLength) throw new BlobStoreError('mismatch');
         if (++chunks > limits.maxChunks || r.value.byteLength > limits.maxChunkBytes || r.value.byteLength > limits.maxBlobBytes - byteLength)
           throw new BlobStoreError('limit');
-        const chunk = r.value.slice(); hash.update(chunk); byteLength += chunk.byteLength; controller.enqueue(chunk);
+        const chunk = new Uint8Array(r.value); hash.update(chunk); byteLength += chunk.byteLength; controller.enqueue(chunk);
       } catch (error) {
         try { await reader.cancel(error); } catch { /* Preserve original failure. */ }
         release(); try { await failed?.(error); } catch { /* Original failure still rejects the stream. */ }
         controller.error(error);
       }
     },
-    async cancel(reason) { try { await reader.cancel(reason); } finally { release(); } },
+    async cancel(reason) { cancelled = true; try { await reader.cancel(reason); } finally { release(); } },
   }, { highWaterMark: 0 });
 }
 

@@ -1,7 +1,7 @@
 import { issuePointAnchorProof } from './pointAnchorProof';
 import { recordBlobRefs } from '../domain/portableMedia';
 import { captureEditor, type LocalEditorContext } from './editorAttribution';
-import { capabilityFields, capabilityUnion, readRequiredCapabilities, checkRequiredCapabilities, EDITOR_CAPABILITY, PORTABLE_MEDIA_CAPABILITY, hasPortableMediaCapability, type ReaderCapabilities } from './requiredCapabilities';
+import { capabilityFields, capabilityUnion, readRequiredCapabilities, checkRequiredCapabilities, EDITOR_CAPABILITY, PORTABLE_MEDIA_CAPABILITY, hasEditorCapability, hasPortableMediaCapability, type ReaderCapabilities } from './requiredCapabilities';
 import { reactivatedCaptionMedia } from './captionReactivation';
 import type { Anchor } from '../scene/types';
 import * as A from '@automerge/automerge/slim';
@@ -79,7 +79,12 @@ export type MetadataSessionRead = Readonly<{
   publication: string | null;
 }>;
 /** Synchronous presentation observation; never grants output/recovery authority. */
-export type BackupPresentationObserver = (read: MetadataSessionRead) => void;
+export type BackupPresentationObserver = (read: MetadataSessionRead, output?: CompletedBackupDisplay) => void;
+/** One actual completed Backup, for same-command display only. No persisted capability. */
+export interface CompletedBackupDisplay {
+  readonly id: string; readonly purpose: 'backup'; readonly state: 'generated'; readonly token: string; readonly label?: string;
+  readonly includesDeclaredEditorNames?: boolean; readonly requiresEditorAttributionReader?: boolean; readonly requiresPortableMediaReader?: boolean;
+}
 
 /** Local elapsed-time diagnostics only; no source values, evidence or authority. */
 export type MetadataTiming = (stage: string, milliseconds: number) => void;
@@ -161,7 +166,14 @@ export class MetadataProjectSession {
   private measure<T>(stage: string, action: () => Promise<T>): Promise<T> { return measureMetadata(this.timing, `metadata.${stage}`, action); }
 
   async read(): Promise<MetadataSessionRead> {
-    return this.adoptRead(await this.readCandidate());
+    try {
+      const candidate = await withMetadataRead(this.fs, this.storage, ports => this.readCandidate(undefined, ports));
+      return this.adoptRead(candidate);
+    } catch {
+      // Closing failure must not publish an unaudited candidate or roll back a
+      // concurrent successful read's source/acknowledgments.
+      return Object.freeze({ ...this.last, state: 'repair-required' });
+    }
   }
   private adoptRead(candidate: { read: MetadataSessionRead; acknowledged?: Set<string>; localChanges?: Set<string> }) {
     if (candidate.acknowledged && candidate.localChanges) {
@@ -318,9 +330,8 @@ export class MetadataProjectSession {
         if (!this.media || provider.kind !== 'scene-provider') fail('media-unconnected');
         planMetadataEdit(provider as Extract<ProjectProviderRead, { kind: 'scene-provider' }>, command, this.limits);
         this.media!.assertIntroduction?.(provider as Extract<ProjectProviderRead,{kind:'scene-provider'}>,command.media);
-        const [doc] = A.applyChanges(A.init(), durable.originalChanges());
         this.retained = { start: { transactionId, repositoryId: prior.start.repositoryId, predecessor: prior.start.transactionId,
-          purpose: 'localCommand', proof: durable.proof, baseHeads: A.getHeads(doc).sort(),
+          purpose: 'localCommand', proof: durable.proof, baseHeads: durable.heads,
           ...capabilityFields(capabilityUnion(readRequiredCapabilities(prior.start.requiredCapabilities), editor.kind === 'self-declared' ? [EDITOR_CAPABILITY] : [], command.media.portableDisplay ? [PORTABLE_MEDIA_CAPABILITY] : [])) }, parts: [],
           stagedBlobs: [...recordBlobRefs(command.media)], introduction: { source: durable, command, editor } };
         return this.resume();
@@ -339,9 +350,8 @@ export class MetadataProjectSession {
       const facts = await this.prepareModelFacts(durable, prepared);
       if (!facts) await this.checked(prepared, false); // Refused preparation must not become a pending save.
       await this.verifyDelta(await reactivatedCaptionMedia(durable, prepared, this.limits), prepared.requiredCapabilities.includes(PORTABLE_MEDIA_CAPABILITY) ? prepared.mediaRecords() : undefined);
-      const [doc] = A.applyChanges(A.init(), durable.originalChanges());
       this.retained = { start: { transactionId, repositoryId: prior.start.repositoryId, predecessor: prior.start.transactionId,
-        purpose: 'localCommand', proof: durable.proof, baseHeads: A.getHeads(doc).sort(),
+        purpose: 'localCommand', proof: durable.proof, baseHeads: durable.heads,
         ...capabilityFields(capabilityUnion(readRequiredCapabilities(prior.start.requiredCapabilities), prepared.requiredCapabilities)) }, parts,
         ...(facts ? { modelFacts: { plan: facts, next: prepared }, stagedBlobs: facts.stagedBlobs?.map(b => JSON.parse(json(b)) as JsonObject) } : {}) };
       return this.resume();
@@ -634,7 +644,15 @@ export class MetadataProjectSession {
     job.assertOwner(this.fs); const current = await measureBackupOutput(timing, 'ready-finish', () => this.outputReady(signal));
     if (json(current.source!.proof) !== json(job.source.proof)) return fail('output-lineage');
     await measureBackupOutput(timing, 'slot-finish', () => this.assertOutputSlot(job.id)); await measureBackupOutput(timing, 'protection-finish', () => validateOutputProtection(this.fs, job, store, this.limits));
-    await measureBackupOutput(timing, 'job', () => job.generate(store, signal, timing)); return { id: job.id, read: current };
+    await measureBackupOutput(timing, 'job', () => job.generate(store, signal, timing));
+    // The manifest includes retained base evidence; source flags alone are not
+    // enough to describe the actual file's reader/privacy requirements.
+    const manifest = job.manifest(), names = hasEditorCapability(manifest.requiredCapabilities);
+    const output: CompletedBackupDisplay = Object.freeze({ id: job.id, purpose: 'backup', state: 'generated', token: job.source.token,
+      ...(job.label !== undefined ? { label: job.label } : {}),
+      ...(names ? { includesDeclaredEditorNames: true, requiresEditorAttributionReader: true } : {}),
+      ...(hasPortableMediaCapability(manifest.requiredCapabilities) ? { requiresPortableMediaReader: true } : {}) });
+    return { id: job.id, read: current, output };
   }
   async createManualCheckpoint(expectedToken: string, label: string | undefined, store: OriginBlobStore, version: string, signal?: AbortSignal, timing?: BackupOutputTiming,
     observePresentation?: BackupPresentationObserver) {
@@ -652,7 +670,7 @@ export class MetadataProjectSession {
     });
     // The actual final ready read is observed only after the outer write fence
     // succeeds. A failed/closing command cannot seed its display successor.
-    if (!signal?.aborted) { try { observePresentation?.(result.read); } catch { /* Presentation has no authority over the completed output. */ } }
+    if (!signal?.aborted) { try { observePresentation?.(result.read, result.output); } catch { /* Presentation has no authority over the completed output. */ } }
     return result.id;
   }
   async resumeBackupOutput(id: string, store: OriginBlobStore, signal?: AbortSignal, timing?: BackupOutputTiming) {

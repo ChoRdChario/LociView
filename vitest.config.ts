@@ -1,5 +1,8 @@
 import { configDefaults, defineConfig } from 'vitest/config';
 
+const connectedFiles = 'tests/projectFiles.test.ts';
+const fixtureCli = 'tests/scripts/**/*.test.ts';
+const acquisitionRestore = 'tests/scripts/fixtureAcquisitionRestore.test.ts';
 const evidenceCli = 'tests/scripts/g0EvidenceVerifier.test.ts';
 
 export default defineConfig({
@@ -10,8 +13,34 @@ export default defineConfig({
           name: 'product',
           environment: 'node',
           include: ['tests/**/*.test.ts'],
-          exclude: [...configDefaults.exclude, evidenceCli],
+          exclude: [...configDefaults.exclude, connectedFiles, fixtureCli],
           sequence: { groupOrder: 0 },
+        },
+      },
+      {
+        test: {
+          name: 'connected-files',
+          environment: 'node',
+          include: [connectedFiles],
+          // Full file exchanges keep their deadlines without concurrent suites.
+          sequence: { groupOrder: 1 },
+        },
+      },
+      {
+        test: {
+          name: 'fixture-scripts',
+          environment: 'node',
+          include: [fixtureCli],
+          exclude: [...configDefaults.exclude, acquisitionRestore, evidenceCli],
+          sequence: { groupOrder: 2 },
+        },
+      },
+      {
+        test: {
+          name: 'fixture-restore-cli',
+          environment: 'node',
+          include: [acquisitionRestore],
+          sequence: { groupOrder: 3 },
         },
       },
       {
@@ -19,9 +48,8 @@ export default defineConfig({
           name: 'evidence-cli',
           environment: 'node',
           include: [evidenceCli],
-          // Git-heavy subprocess checks keep their deadlines without competing
-          // with the product suite's hashing and package reconstruction.
-          sequence: { groupOrder: 1 },
+          // Native/Git-heavy files retain fresh forks and their own deadlines.
+          sequence: { groupOrder: 4 },
         },
       },
     ],

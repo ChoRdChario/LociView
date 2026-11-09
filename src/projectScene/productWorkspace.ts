@@ -163,11 +163,15 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
       const title = provider.inspection.candidates.fields.find(f => f.path.length === 2 && f.path[0] === 'project' && f.path[1] === 'title');
       const candidate = title?.valid && title.candidates.length === 1 ? title.candidates[0]?.value : undefined;
       const matching = jobs.filter(job => job.purpose === 'backup' && job.token === provider.token && job.stale === false);
+      // A same-command generated row deliberately has no stale assertion. Its
+      // observed browser handoff is still reportable, never file verification.
+      const downloadStarted = jobs.some(job => job.purpose === 'backup' && job.token === provider.token && job.state === 'generated' &&
+        (job.stale === false || job.stale === undefined) && tools?.hasHandedOff(job.id));
       return { title: candidate?.kind === 'value' && typeof candidate.value === 'string' ? candidate.value : null,
         resumable: current.state === 'ready' && !!current.publication && current.source?.token === provider.token && !host.hasPending(),
         backup: host.workspaceOutput.error || jobs.some(j => j.state === 'repair-required') ? 'unavailable' :
           matching.some(job => job.state === 'file-verified') ? 'verified' :
-            matching.some(job => job.state === 'generated' && tools?.hasHandedOff(job.id)) ? 'download-started' : 'unconfirmed' };
+            downloadStarted ? 'download-started' : 'unconfirmed' };
     },
     dispatch: (token, command) => host.dispatch(token, command), retry: async () => host.authority.retry!(),
     addMedia: async (token, input) => host.authority.addMediaFile!(token, input),

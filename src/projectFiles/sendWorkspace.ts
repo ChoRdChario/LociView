@@ -1,6 +1,6 @@
 import type { ProjectWorkspaceFS } from '../platform/fs';
 import { hasEditorCapability, hasPortableMediaCapability, PORTABLE_MEDIA_CAPABILITY } from '../projectMetadata/requiredCapabilities';
-import type { MetadataProjectSession, MetadataSessionRead, BackupPresentationObserver } from '../projectMetadata/session';
+import type { MetadataProjectSession, MetadataSessionRead, BackupPresentationObserver, CompletedBackupDisplay } from '../projectMetadata/session';
 import type { OriginBlobStore } from '../projectMetadata/blobStore';
 import type { MetadataLimits, MetadataProof } from '../projectMetadata/format';
 import { json, withMetadataRead } from '../projectMetadata/persistence';
@@ -46,12 +46,13 @@ export class WorkspaceSender {
   previewReview(token: string, selection: ReviewSelectionOptions) { return this.session.previewReviewOutput(token, selection); }
   generateBackup(token: string, label?: string, signal?: AbortSignal, observePresentation?: BackupPresentationObserver) {
     let read: MetadataSessionRead | undefined;
-    const capture = observePresentation ? (next: MetadataSessionRead) => { read = next; } : undefined;
+    let completed: CompletedBackupDisplay | undefined;
+    const capture: BackupPresentationObserver | undefined = observePresentation ? (next, output) => { read = next; completed = output; } : undefined;
     const output = workspaceFileOperation(this.locks, () => this.session.createManualCheckpoint(token, label, this.store, '0.0.1', signal, this.backupTiming, capture));
     if (!observePresentation) return output;
     return output.then(id => {
       // Package-operation success is a second boundary after the Session fence.
-      if (read && !signal?.aborted) { try { observePresentation(read); } catch { /* Display observers cannot reject a saved file. */ } }
+      if (read && !signal?.aborted) { try { observePresentation(read, completed); } catch { /* Display observers cannot reject a saved file. */ } }
       return id;
     });
   }

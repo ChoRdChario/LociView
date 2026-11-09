@@ -140,6 +140,65 @@ describe('local generation capabilities (ports only, not backup restore/selectio
   const deferred = () => { let release!: () => void;
     const promise = new Promise<void>(resolve => { release = resolve; }); return { promise, release }; };
 
+  const adopted = (session: MetadataProjectSession) => {
+    const state = session as unknown as { last: MetadataSessionRead; acknowledgedMedia: Set<string>; acknowledgedLocalChanges: Set<string>; acknowledgmentsLoaded: boolean };
+    return { read: state.last, media: state.acknowledgedMedia, local: state.acknowledgedLocalChanges, loaded: state.acknowledgmentsLoaded };
+  };
+  it('adopts a public Session read and its acknowledgments only after the closing audit', async () => {
+    const f = local(); await f.original.session().create(f.original.records);
+    const entered = deferred(), release = deferred(); let checks = 0, armed = false;
+    const scope = await f.bind(null, false, async () => { if (armed && ++checks === 2) { entered.release(); await release.promise; } }, true);
+    const session = new MetadataProjectSession(scope.fs, scope.factory, limits, f.original.verifier);
+    await session.read(); const before = adopted(session); armed = true;
+    const reading = session.read();
+    try { await entered.promise;
+    expect(adopted(session)).toEqual(before); expect(adopted(session).read).toBe(before.read);
+    expect(adopted(session).media).toBe(before.media); expect(adopted(session).local).toBe(before.local);
+    release.release(); const result = await reading;
+    expect(result.state).toBe('ready'); expect(checks).toBe(2); expect(adopted(session).read).toBe(result);
+    expect(adopted(session).media).not.toBe(before.media); expect(adopted(session).local).not.toBe(before.local);
+    } finally { release.release(); await reading; await scope.dispose(); }
+  });
+  it('refuses an opening audit and a late failed closing audit without rolling back a successful concurrent read', async () => {
+    const f = local(); await f.original.session().create(f.original.records);
+    const entered = deferred(), release = deferred(); let checks = 0, armed = false, refuseOpening = false;
+    const scope = await f.bind(null, false, async () => {
+      if (refuseOpening) throw Error('opening refusal');
+      if (armed && ++checks === 2) { entered.release(); await release.promise; throw Error('closing A refusal'); }
+    }, true);
+    const session = new MetadataProjectSession(scope.fs, scope.factory, limits, f.original.verifier);
+    const first = await session.read(), before = adopted(session); refuseOpening = true;
+    expect(await session.read()).toEqual({ ...first, state: 'repair-required' });
+    expect(adopted(session)).toEqual(before); expect(adopted(session).read).toBe(first);
+    refuseOpening = false; armed = true;
+    const a = session.read();
+    try { await entered.promise;
+    const b = await session.read(), afterB = adopted(session); expect(b.state).toBe('ready');
+    release.release(); expect(await a).toEqual({ ...b, state: 'repair-required' });
+    expect(adopted(session).read).toBe(b); expect(adopted(session).media).toBe(afterB.media);
+    expect(adopted(session).local).toBe(afterB.local); expect(checks).toBe(4);
+    } finally { release.release(); await a; await scope.dispose(); }
+  });
+  it.each(['ready', 'pending'] as const)('retains readonly public Session access to %s data without writes or edit authority', async state => {
+    const f = local(), writer = f.original.session(), first = await writer.create(f.original.records);
+    if (state === 'pending') {
+      f.fs.reject = path => path.endsWith('/published.json');
+      await expect(writer.editCaption(first.source!.token, id('cap'), 'body', '公開前の本文')).rejects.toThrow();
+      f.fs.reject = () => false;
+    }
+    const denied = vi.fn(() => { throw Error('readonly edit denied'); });
+    Object.defineProperty(f.fs, 'mutationAuthority', { value: {
+      sessionMode: 'view', accessState: 'read-only', accessDetail: 'test', assertEditable: denied,
+      assertSourceSnapshotProtected() {}, assertWorkspaceWriteAuthorized: denied,
+      beginWorkspaceWrite: denied, subscribeAccess: () => () => {},
+    } satisfies ProjectMutationAuthority });
+    const scope = await f.bind(null, false, async () => {}, true), writes = f.fs.writes, dbWrites = f.original.fault.writes;
+    const read = await new MetadataProjectSession(scope.fs, scope.factory, limits, f.original.verifier).read();
+    expect(read.state).toBe(state); expect(read.source!.token).toBe(first.source!.token);
+    expect(denied).not.toHaveBeenCalled(); expect(f.fs.writes).toBe(writes); expect(f.original.fault.writes).toBe(dbWrites);
+    await scope.dispose();
+  });
+
   async function evidence(fs: ProjectWorkspaceFS, root: FaultFS) {
     const record = Object.values(fixture().mediaResourcesById)[0]! as JsonObject;
     const request: ContentRequest = { token: 'owned-evidence', fact: 'media', records: [record], context: {} };

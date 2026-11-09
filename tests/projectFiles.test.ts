@@ -129,6 +129,7 @@ import * as metadataPersistence from '../src/projectMetadata/persistence';
 import { WorkspaceBaseStore, workspacePackageRoot } from '../src/projectPackage/workspaceBases';
 import { WorkspaceReceiveJob } from '../src/projectPackage/receiveJob';
 import { WorkspaceSourceCapture } from '../src/projectPackage/workspaceSource';
+import { protectedWorkspaceInventory } from '../src/projectPackage/protectedInventory';
 import { WorkspaceArchive, writeWorkspaceArchive } from '../src/projectPackage/workspaceArchive';
 import { VerifiedContributionBase, ContributionSourceCapture, ContributionArchive } from '../src/projectPackage/contributionSource';
 import { writeContributionArchive } from '../src/projectPackage/contributionArchive';
@@ -205,7 +206,7 @@ afterEach(async () => {
   } finally {
     // Public APIs release call/result/context graphs and restore global spies.
     // Their pinned registries may still retain target closures; do not alter them.
-    vi.restoreAllMocks(); decode.mockImplementation(decodeImplementation);
+    vi.unstubAllGlobals(); vi.restoreAllMocks(); decode.mockImplementation(decodeImplementation);
   }
   if (errors.length) throw new AggregateError(errors, 'fixture disposal');
 });
@@ -1495,7 +1496,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
   it.each(['png','jpeg','webp','gif','embedded-jpeg'] as const)('frozen v1 material keeps %s actual media and base profile independent of recipe-6',async format=>{
     const closes: ReturnType<typeof vi.fn>[]=[];
     if(format==='embedded-jpeg'){vi.stubGlobal('self',{URL});vi.stubGlobal('createImageBitmap',async()=>{const close=vi.fn();closes.push(close);return {width:8,height:4,close};});}
-    try{
+    {
       const image=format==='png'||format==='embedded-jpeg'?png:imageFor(format),model=exactV1MaterialModel(undefined,format==='embedded-jpeg'?jpegBytes('rgb-baseline'):undefined);
       const file=await frozenV1File(exactV1Materials,image,model),prepared=(await prepareFrozenV1Conversion(file,budget,decode,decodeJpeg,decodePhoto))!,initial=await prepared.create();
       expect(prepared.summary).toHaveProperty('materialEffects.overrides',4);
@@ -1504,7 +1505,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       expect((Object.values(records.representationsById as JsonObject)[0] as JsonObject).formatProfile).toEqual(format==='embedded-jpeg'?await jpegGlbProfile():await validationGlbProfile());
       expect(JSON.parse(await prepared.report!().text()).materialMappings.every((m:any)=>m.targetProfile.id===(format==='embedded-jpeg'?'development-validation-glb-jpeg-1':'development-validation-glb-1'))).toBe(true);
       if(format==='embedded-jpeg'){expect(closes.length).toBeGreaterThan(0);expect(closes.every(c=>c.mock.calls.length===1)).toBe(true);}
-    }finally{vi.unstubAllGlobals();}
+    }
   });
   it.each(['route','intent','witness','latent','offset-count'] as const)('frozen v1 material refuses fully rebound %s evidence against retained source',async kind=>{
     const file=await frozenV1File(exactV1Materials,png,exactV1MaterialModel()),initial=await(await prepareFrozenV1Conversion(file,budget,decode))!.create(),r=firstWorkspaceRecipient();
@@ -2202,7 +2203,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
   });
   it('Native07k retains mixed textured Mesh appearances and dormant Point revisions and anchor classes',async()=>{
     const closes:ReturnType<typeof vi.fn>[]=[];vi.stubGlobal('self',{URL});vi.stubGlobal('createImageBitmap',async()=>{const close=vi.fn();closes.push(close);return {width:8,height:4,close};});
-    try{
+    {
     const id=(prefix:string,n:number)=>`${prefix}_${String(n).padStart(26,'0')}`,mesh=glb(()=>{},true);
     const meshBlob={algorithm:'sha256',digest:await digest(mesh),byteLength:mesh.length,mediaType:'model/gltf-binary'};
     const golden=JSON.parse(readFileSync('docs/specs/profiles/native-spatial-conversion-7.goldens.json','utf8'));
@@ -2238,7 +2239,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect(receipt.materialWitness).toHaveLength(1);expect(receipt.materialWitness[0].targetRepresentationId).toBe(mappedMesh.id);
     expect((await resumeNativeConversion(r.fs,r.store,r.reopen().session,budget,initial.source.proof.identity.projectId as string,decode)).source!.token).toBe(ready.source!.token);
     expect(closes.length).toBeGreaterThan(0);expect(closes.every(close=>close.mock.calls.length===1)).toBe(true);
-    }finally{vi.unstubAllGlobals();}
+    }
   });
   it('Native07k refuses a schema-valid dormant same-Asset multimodal revision instead of dropping a primary',async()=>{
     const id=(prefix:string,n:number)=>`${prefix}_${String(n).padStart(26,'0')}`,file=await nativeSpatialFile(s=>{
@@ -4263,9 +4264,32 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect(stages.filter(s => s.startsWith('ready-'))).toEqual(['ready-before', 'ready-final', 'ready-finish']);
     const finalRead = (session as unknown as { last: MetadataSessionRead }).last;
     expect(observed.mock.calls[0]![0]).toBe(finalRead);
-    expect(observed).toHaveBeenCalledExactlyOnceWith(finalRead); expect(finalRead.state).toBe('ready'); expect(finalRead.source!.token).toBe(sent.current.source!.token);
+    expect(observed).toHaveBeenCalledExactlyOnceWith(finalRead, { id, purpose: 'backup', state: 'generated', token: finalRead.source!.token, label: '表示に引き継ぐ' });
+    expect(Object.isFrozen(observed.mock.calls[0]![1])).toBe(true); expect(finalRead.state).toBe('ready'); expect(finalRead.source!.token).toBe(sent.current.source!.token);
     const inspected = await BackupArchive.inspect(await sender.download(id), metadata); expect(inspected.source.originalChanges()).toEqual(finalRead.source!.originalChanges());
     await expect(sender.generateBackup(finalRead.source!.token, undefined, undefined, () => { throw Error('display observer'); })).resolves.toEqual(expect.any(String));
+  }, 20000);
+  it('describes names retained only in backup base evidence from the actual completed manifest', async () => {
+    const { f, sent } = await contributionTeam(), current = sent.current;
+    expect(current.source!.includesDeclaredEditorNames).toBe(false);
+    if (current.provider?.kind !== 'scene-provider') throw Error('provider');
+    const named = current.source!.prepareEdit(current.source!.token, { kind: 'editCaption', captionId: f.captionId, edits: { title: 'Named historical branch' } },
+      current.provider, newId(), undefined, { kind: 'self-declared', name: 'BASE_ONLY_EDITOR' });
+    const provider = await readProjectScene(named.read(), metadata, f.receiver.content.verifier(false));
+    const capture = await WorkspaceSourceCapture.prepare({ read: async () => ({ ...current, source: named, provider }) }, named.token, f.store, metadata);
+    await underWriteLease(f.fs, async () => {
+      const bases = new WorkspaceBaseStore(f.fs, metadata, named.proof), snapshot = await bases.snapshot();
+      const inspection = await named.inspectOriginal({ maxWork: PACKAGE_LIMITS.inspectionWork, maxNodes: PACKAGE_LIMITS.inspectionNodes });
+      const inventory = protectedWorkspaceInventory(inspection.candidates, await bases.payloads(snapshot.records));
+      const job = WorkspaceOutputJob.prepare(f.fs, capture, inventory, snapshot, metadata, '0.0.1');
+      await job.persist(); await job.generate(f.store); await job.baseRecorded(await bases.recordGenerated(job));
+    });
+    const observed = vi.fn(), sender = new WorkspaceSender(f.fs, f.receiver.session, f.store, metadata, f.locks);
+    const id = await sender.generateBackup(current.source!.token, undefined, undefined, observed);
+    expect(observed.mock.calls[0]![0].source.includesDeclaredEditorNames).toBe(false);
+    expect(observed.mock.calls[0]![1]).toMatchObject({ id, includesDeclaredEditorNames: true, requiresEditorAttributionReader: true });
+    const archive = await BackupArchive.inspect(await sender.download(id), metadata);
+    expect(archive.source.includesDeclaredEditorNames).toBe(false); expect(archive.archive.control.manifest.requiredCapabilities).toEqual([EDITOR_CAPABILITY]);
   }, 20000);
   it('observes Workspace metadata only after success and freshly marks an unchanged-token backup stale when the new base is recorded', async () => {
     const { f, sent } = await contributionTeam(), session = f.receiver.session, sender = new WorkspaceSender(f.fs, session, f.store, metadata, f.locks);
@@ -5081,7 +5105,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       h.button('キャプション',h.editor).fire('click');expect(h.button('ピンを追加',h.editor).disabled).toBe(false);h.dragging(true);expect(frames.size).toBe(1);h.button('ピンを追加',h.editor).fire('click');expect(h.pick).not.toHaveBeenCalled();expect(h.dispatch).not.toHaveBeenCalled();expect(frames.size).toBe(0);h.dragging(false);flush();
       h.named('カメラ位置',h.editor).open=true;h.named('カメラ位置',h.editor).fire('toggle');const views=h.named('視点の作業',h.editor);h.moveCamera();h.refresh();const captured=h.payload();await h.edited(()=>h.button('開始視点を記録',views).fire('click'));flush();const command=h.dispatch.mock.calls.map(c=>c[1]).find(c=>c.kind==='createView')!;expect(command).toMatchObject({kind:'createView',makeEntry:true,camera:captured.camera,background:captured.background});
       h.refresh();const late=[...frames.values()][0]!;await h.ui.dispose();expect(frames.size).toBe(0);const stopped=rebuild.mock.calls.length;late(0);h.refresh();expect(rebuild).toHaveBeenCalledTimes(stopped);expect(frames.size).toBe(0);
-    }finally{await h.ui.dispose();vi.unstubAllGlobals();}
+    }finally{await h.ui.dispose();}
   });
   it('owns marker camera drags without selecting, retaining ignored input or accepting late pointer work', async () => {
     const h=await productWorkspaceFixture(true), marker=h.all(h.editor).find(n=>n.className==='lv-project-marker')!;
@@ -5170,7 +5194,14 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect(status().textContent).toBe(result === 'handoff' ? 'ダウンロードを開始しました。保存先で完了を確認してください。' : '作成したファイルの内容を確認し、ダウンロードしてください。');
     expect(primary().focusCalls.length - focused).toBe(result === 'handoff' ? 1 : 0); expect(h.downloads).toHaveBeenCalledTimes(result === 'handoff' ? 1 : 0);
     h.refresh(); h.refresh(); await Promise.resolve(); expect(primary() === origin).toBe(true);
-    if (result === 'handoff') expect(origin.document.activeElement === primary()).toBe(true);
+    if (result === 'handoff') {
+      expect(origin.document.activeElement === primary()).toBe(true);
+      const row = h.host.workspaceOutput.jobs.find(j => j.purpose === 'backup')!, fileStatus = () => h.named('保存ファイルの状態', h.editor).textContent;
+      expect(row.stale).toBeUndefined(); expect(fileStatus()).toBe('ダウンロード開始・保存先未確認');
+      // Unknown freshness must never be promoted into a verified-file claim.
+      row.state = 'file-verified'; h.refresh(); expect(fileStatus()).toBe('外部ファイル未照合');
+      row.state = 'generated'; h.refresh(); expect(fileStatus()).toBe('ダウンロード開始・保存先未確認');
+    }
     await h.ui.dispose();
   });
   it.each(['success','failure','changed-token'] as const)('keeps saved Caption reading during output without granting commands (%s)', async outcome => {
@@ -5336,12 +5367,12 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       const final = cold.read().source!.originalChanges(); await cold.dispose(); const restored = owned(await openValidationHost(h.f.options));
       expect(restored.read().source!.originalChanges()).toEqual(final); expect(restored.authority.read().resources.captions[unplaced.id]!.body).toEqual({ kind: 'value', value: '写真の復元後の追記' });
       for (const record of restored.authority.read().mediaChoices!) expect(await restored.content.image(record as unknown as JsonObject, true)).toEqual(photo);
-    } finally { await h?.ui.dispose(); vi.unstubAllGlobals(); }
+    } finally { await h?.ui.dispose();  }
   });
   it.each(['v1','locimyu']as const)('07n %s standard material product editing/reset, five-purpose returns and selected restore/cold retain semantic intent',async family=>{
     // Node bitmap dimensions only. Actual texture pixels/coverage are a separate Chromium lane.
     vi.stubGlobal('self',{URL});vi.stubGlobal('createImageBitmap',async(blob:Blob)=>{const data=await blob.arrayBuffer(),view=new DataView(data);return{width:view.getUint32(16),height:view.getUint32(20),close(){}};});
-    try{
+    {
     const file=family==='v1'?await standardV1File():await lociMyuFile(standardLociMaterials),original=await file.arrayBuffer();
     const prepared=family==='v1'?(await prepareFrozenV1Conversion(file,budget,decode))!:await(await prepareLociMyuConversion(file,budget,decode))!.evaluate(0,'標準材質の検証'),initial=await prepared.create();
     const h=await productWorkspaceFixture(false,false,false,'map2',initial,{restoreGenerations:true}),{host,editor,button,named,edited}=h;
@@ -5375,10 +5406,10 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     await cold.dispatch(cold.read().source!.token,{kind:'editCaption',captionId:caption,edits:{body:'復元前の作業'}});await cold.backupRestore.prepare(backup);let checked=false;
     await cold.backupRestore.confirm(async(next,content)=>{await checkDisplay(next,content,true);checked=true;});expect(checked).toBe(true);cold.backupRestore.displayReady(cold.read().source!.token);expect(cold.read().source!.originalChanges()).toEqual(source.originalChanges());
     await cold.dispatch(cold.read().source!.token,{kind:'editCaption',captionId:caption,edits:{body:'復元後の追記'}});const final=cold.read().source!.originalChanges();await cold.dispose();const reopened=owned(await openValidationHost(h.f.options));expect(reopened.read().source!.originalChanges()).toEqual(final);expect(reopened.authority.read().resources.captions[caption]!.body).toEqual({kind:'value',value:'復元後の追記'});expect(await file.arrayBuffer()).toEqual(original);await reopened.dispose();
-    }finally{vi.unstubAllGlobals();}
+    }
   },60000);
   it.each(['v1','locimyu']as const)('07m %s opaque materials survive independent typed editing, two returns, Clean and cold',async family=>{
-    meshNodeResources();try{
+    meshNodeResources();{
       const file=family==='v1'?await opaqueV1File(true):await lociMyuFile((sheets,entries)=>{
         opaqueLociMaterials(sheets,entries);
         // Keep both Scenes, Views and every material address. Extra Captions and
@@ -5398,10 +5429,10 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       for(const [i,row]of rows.entries())read=await r.session.edit(read.source!.token,{kind:'editMaterial',sceneId:scene.value,overrideId:row.id,appearance:{...row.appearance,lighting:i===0?'lit':'unlit',doubleSided:i!==0}});
       const sender=new WorkspaceSender(r.fs,r.session,r.store,metadata,r.locks),workspace=await sender.download(await sender.generate(read.source!.token));
       await exerciseOpaqueFileReturns(workspace,r);
-    }finally{vi.unstubAllGlobals();}
+    }
   });
   it.each([false,true,'opaque'] as const)('LociMyu conversion material=%s connects product editing/first placement, named backup, independent Workspace/review, cold report and exact reopen', async material => {
-    if(material)meshNodeResources();try{
+    if(material)meshNodeResources();{
     const file = await lociMyuFile(material==='opaque'?opaqueLociMaterials:material?lociMyuMaterials:undefined), input = await file.arrayBuffer(), initial = await (await (await prepareLociMyuConversion(file, budget, decode))!.evaluate(0, 'LociMyuからの記録')).create();
     const h = await productWorkspaceFixture(false, false, false, 'map2', initial,{restoreGenerations:!!material}), { host, editor, button, named, edited } = h;
     const provider = host.read().provider!; if (provider.kind !== 'scene-provider') throw Error('provider');
@@ -5482,11 +5513,11 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       await restored.dispatch(restored.read().source!.token,{kind:'editCaption',captionId:placed.id,edits:{body:'材質を保った復元後の追記'}});const final=restored.read().source!.originalChanges();await restored.dispose();
       const reopened=owned(await openValidationHost(h.f.options));expect(reopened.read().source!.originalChanges()).toEqual(final);expect(reopened.authority.read().resources.captions[placed.id]!.body).toEqual({kind:'value',value:'材質を保った復元後の追記'});checkMaterials(reopened.authority.read());await reopened.dispose();
     }
-    }finally{if(material)vi.unstubAllGlobals();}
+    }
   });
   it.each([false, true, 'placement', 'material', 'opaque'] as const)('frozen v1 conversion explicit=%s connects product editing/first placement to named backup, independent Workspace/review and exact cold reopen', async variant => {
     const explicit = variant !== false, material=variant==='material'||variant==='opaque',placement = variant === 'placement'||material,expectedModel=material?exactV1MaterialModel(variant==='opaque'?expandedOpaqueMaterials:undefined):glb();
-    if(material)meshNodeResources();try{
+    if(material)meshNodeResources();{
     const file = await frozenV1File(material?exactV1Materials:placement ? placedV1Model : explicit ? explicitV1Default : undefined,png,expectedModel), bytes = await file.arrayBuffer(), prepared=(await prepareFrozenV1Conversion(file,budget,decode))!,initial = await prepared.create();
     const h = await productWorkspaceFixture(false, false, false, 'map2', initial, { restoreGenerations: explicit }), { host, editor, named, button, edited } = h;
     const original = host.read().provider!; if (original.kind !== 'scene-provider') throw Error('provider');
@@ -5610,7 +5641,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       if(material){checkMaterials(reopened.authority.read());expect(await reopened.conversionReportAvailable()).toBe(false);}
     }
     await cold.dispose();
-    }finally{if(material)vi.unstubAllGlobals();}
+    }
   });
   it('Native appearance conversion connects product editing, occurrence clones, named backup, independent Workspace/review and exact cold reopen', async () => {
     const input = await nativeAppearanceFile(), inputBytes = await input.arrayBuffer();
@@ -6560,7 +6591,9 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const source=cold.read().source!,records=source.mediaRecords(),media=records.find(r=>r.portableDisplay)!;expect(media).toBeTruthy();
     expect(await cold.content.image(media,true)).toEqual(raw);expect(await cold.content.displayImage(media,true)).toEqual(raster);
     expect(cold.authority.read().mediaData!.images![media.id as string]).toMatchObject({record:media,displayMediaType:'image/png'});
-    const workspace=await cold.workspaceOutput.download(await cold.workspaceOutput.generate(source.token)),backup=await cold.workspaceOutput.download(await cold.workspaceOutput.generateBackup(source.token)),
+    const backupId=await cold.workspaceOutput.generateBackup(source.token);
+    expect(cold.workspaceOutput.jobs.find(j=>j.id===backupId)).toMatchObject({state:'generated',includesDeclaredEditorNames:true,requiresEditorAttributionReader:true,requiresPortableMediaReader:true});
+    const workspace=await cold.workspaceOutput.download(await cold.workspaceOutput.generate(source.token)),backup=await cold.workspaceOutput.download(backupId),
       reviewFile=await cold.workspaceOutput.download(await cold.workspaceOutput.generateReview(source.token,{sceneId})),clean=await cold.workspaceOutput.download(await cold.workspaceOutput.generateClean(source.token));
     const workspaceInspection=await WorkspaceArchive.inspect(workspace,metadata),backupInspection=await BackupArchive.inspect(backup,metadata),cleanInspection=await CleanArchive.inspect(clean,metadata);
     const denied=vi.fn(async()=>{throw Error('HEIC unavailable');}),decoders={heic:denied},review=await prepareReviewView(reviewFile,budget,decode,undefined,undefined,decoders);
@@ -8407,17 +8440,18 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const overview = WorkspaceSender.prototype.outputOverview, generate = WorkspaceSender.prototype.generateBackup;
     type Read = ReturnType<typeof host.read>;
     const observations: { supplied: boolean; same: boolean; reads: number; token?: string }[] = [];
-    let priorObserver: ((read: Read) => void) | undefined, firstRead: Read | undefined, generation = 0;
+    let priorObserver: ((read: Read, output?: import('../src/projectMetadata/session').CompletedBackupDisplay) => void) | undefined,
+      firstRead: Read | undefined, firstOutput: import('../src/projectMetadata/session').CompletedBackupDisplay | undefined, generation = 0;
     const generateSpy = vi.spyOn(WorkspaceSender.prototype, 'generateBackup').mockImplementation(function(this: WorkspaceSender, token, label, signal, observe) {
       generation++;
       if (generation === 1) {
         priorObserver = observe;
-        return generate.call(this, token, label, signal, read => { firstRead = read; observe?.(read); });
+        return generate.call(this, token, label, signal, (read, output) => { firstRead = read; firstOutput = output; observe?.(read, output); });
       }
       // A delayed old notification cannot lend authority to this new command.
-      priorObserver?.(firstRead!);
-      return generate.call(this, token, label, signal, variant === 'missing' ? undefined : read => {
-        observe?.(variant === 'nonready' ? { ...read, state: 'pending' } : { ...read, publication: newId() });
+      priorObserver?.(firstRead!, firstOutput);
+      return generate.call(this, token, label, signal, variant === 'missing' ? undefined : (read, output) => {
+        observe?.(variant === 'nonready' ? { ...read, state: 'pending' } : { ...read, publication: newId() }, output);
       });
     });
     const overviewSpy = vi.spyOn(WorkspaceSender.prototype, 'outputOverview').mockImplementation(async function(this: WorkspaceSender, current, display) {
@@ -8427,18 +8461,43 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     });
     try {
       const token = host.read().source!.token, first = await host.workspaceOutput.generateBackup(token);
-      expect(observations).toEqual([{ supplied: true, same: true, reads: 0, token }]);
+      expect(observations).toEqual([]);
+      expect(host.workspaceOutput.jobs.find(j => j.id === first)).toMatchObject({ state: 'generated', token });
+      expect(host.workspaceOutput.jobs.find(j => j.id === first)).not.toHaveProperty('stale');
       expect((await BackupArchive.inspect(await host.workspaceOutput.download(first), metadata)).source.token).toBe(token);
       await host.dispatch(token, { kind: 'editCaption', captionId: f.captionId, edits: { body: '保存後も編集を続ける' } });
       const nextToken = host.read().source!.token; expect(nextToken).not.toBe(token);
       const second = await host.workspaceOutput.generateBackup(nextToken);
-      expect(observations[1]).toEqual({ supplied: false, same: true, reads: 1, token: undefined });
+      expect(observations).toEqual([{ supplied: false, same: true, reads: 1, token: undefined }]);
       expect(host.workspaceOutput.jobs.find(j => j.id === first)).toMatchObject({ state: 'generated', stale: true });
       expect(host.workspaceOutput.jobs.find(j => j.id === second)).toMatchObject({ state: 'generated', stale: false });
       const inspected = await BackupArchive.inspect(await host.workspaceOutput.download(second), metadata);
       expect(inspected.source.token).toBe(nextToken); expect(inspected.source.originalChanges()).toEqual(host.read().source!.originalChanges());
     } finally { overviewSpy.mockRestore(); generateSpy.mockRestore(); }
   }, 30000);
+  it('retains prior backup rows after a fresh success, checks downloads independently and rediscovers damaged history on refresh', async () => {
+    const { f, fs, options } = await initialWorkspaceHostFixture(), host = owned(await openValidationHost({ ...options, workspaceFile: f.file }));
+    const token = host.read().source!.token, first = await host.workspaceOutput.generateBackup(token), bases = host.workspaceOutput.bases;
+    const oldRow = host.workspaceOutput.jobs.find(j => j.id === first)!, generate = WorkspaceSender.prototype.generateBackup;
+    const command = vi.spyOn(WorkspaceSender.prototype, 'generateBackup').mockImplementation(async function(this: WorkspaceSender, ...args) {
+      const id = await generate.apply(this, args);
+      const path = (await fs.list('')).find(p => p.includes(`/backup-output/${first}/artifacts/`) && p.endsWith('.zip'));
+      expect(path).toBeDefined(); await fs.remove(path!); return id;
+    });
+    const overview = vi.spyOn(WorkspaceSender.prototype, 'outputOverview');
+    let second: string;
+    try { second = await host.workspaceOutput.generateBackup(token); }
+    finally { command.mockRestore(); }
+    expect(overview).not.toHaveBeenCalled(); expect(host.workspaceOutput.jobs).toHaveLength(2);
+    expect(host.workspaceOutput.jobs.find(j => j.id === first)).toBe(oldRow); expect(host.workspaceOutput.bases).toBe(bases);
+    expect(host.workspaceOutput.jobs.find(j => j.id === second!)).toMatchObject({ state: 'generated', token });
+    expect((await BackupArchive.inspect(await host.workspaceOutput.download(second!), metadata)).source.token).toBe(token);
+    await expect(host.workspaceOutput.download(first)).rejects.toThrow();
+    await host.refresh(); expect(overview).toHaveBeenCalled();
+    expect(host.workspaceOutput.jobs.find(j => j.id === first)).toMatchObject({ state: 'repair-required' });
+    expect(host.workspaceOutput.jobs.find(j => j.id === second!)).toMatchObject({ state: 'generated' });
+    overview.mockRestore();
+  }, 20000);
   it('refreshes warm output recovery and catalog state for both kinds without replacing the saved editor', async () => {
     const { f, fs, options } = await initialWorkspaceHostFixture(), initial = await openValidationHost({ ...options, workspaceFile: f.file });
     await initial.dispose();
@@ -9938,7 +9997,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     vi.stubGlobal('createImageBitmap', vi.fn(async () => {
       const bitmap = { width: 64, height: 48, close: vi.fn() }; bitmaps.push(bitmap); return bitmap;
     }));
-    try {
+    {
       const bytes = glb(j => {
         j.materials[0].pbrMetallicRoughness.baseColorFactor[3] = 0.25; // OPAQUE still ignores source alpha.
         j.materials.push({ pbrMetallicRoughness: { baseColorFactor: [0.7, 0.4, 0.1, 1] } }, {}); // Includes an unused declared slot.
@@ -9983,7 +10042,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       expect(hasBinaryCoverage(restored)).toBe(false); expect(hasBinaryCoverage(originals[1]!)).toBe(false);
       expect(inspected.bytes).toEqual(bytes); expect(originals[1]!.color.r).toBe(0.2);
       reset.dispose!(); untouched.dispose!(); residents.dispose(); expect(bitmap.close).toHaveBeenCalledOnce(); expect(bitmaps[0]!.close).toHaveBeenCalledOnce(); await workspace.dispose();
-    } finally { vi.unstubAllGlobals(); }
+    }
   });
   it('edits admitted lit/double, authored unlit and source MASK clones without changing factor/texture/vertex alpha or originals', async () => {
     vi.stubGlobal('self',globalThis);vi.stubGlobal('ProgressEvent',class extends Event{});
@@ -10412,8 +10471,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
   });
   it('refuses a full legacy texture proof when its injected native runtime is closed instead of accepting a missing texture',async()=>{
     const resources=createRasterResources(),bitmap=vi.fn();await resources.dispose();vi.stubGlobal('self',globalThis);vi.stubGlobal('createImageBitmap',bitmap);
-    try {await expect(readLegacyModelProof('glb',glb(()=>{},true),{rasterResources:resources})).rejects.toBeInstanceOf(RasterResourceError);expect(bitmap).not.toHaveBeenCalled();}
-    finally {vi.unstubAllGlobals();}
+    {await expect(readLegacyModelProof('glb',glb(()=>{},true),{rasterResources:resources})).rejects.toBeInstanceOf(RasterResourceError);expect(bitmap).not.toHaveBeenCalled();}
   });
   it('prepares added residents atomically, retains old geometry after partial decode failure and disposes late completion', async () => {
     const prepared = await prepareValidationProject({ run: newId(), title: '表示準備', models: [0, 1, 2].map(i => ({ label: `${i}`, bytes: glb() })) }, budget, decode);
@@ -10948,7 +11006,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const bitmaps: { width: number; height: number; close: ReturnType<typeof vi.fn> }[] = [];
     vi.stubGlobal('self', globalThis);
     vi.stubGlobal('createImageBitmap', vi.fn(async () => { const bitmap = { width: 64, height: 48, close: vi.fn() }; bitmaps.push(bitmap); return bitmap; }));
-    try {
+    {
       const bytes = glb(j => {
         j.nodes.push({ mesh: 0, translation: [-3, 0, 0] }); j.scenes[0].nodes.push(1);
         j.extensionsUsed = ['KHR_materials_unlit'];
@@ -10995,7 +11053,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       vi.stubGlobal('createImageBitmap', async () => { throw Error('injected decoder failure'); });
       await expect(decodeValidationModel(inspected)).rejects.toThrow('テクスチャ');
       await expect(decodeValidationModel({ ...await inspectValidationGlb(glb(), budget, decode), surfaceRanges: [] })).rejects.toThrow('一致');
-    } finally { vi.unstubAllGlobals(); }
+    }
   });
   it.each(['map1', 'map2'] as const)('retains %s initialization originals across interrupted publication; cold retry never reseeds or duplicates', async profile => {
     const fs = new TestFS(), store = new OriginBlobStore(fs, { maxBlobBytes: budget.maxFileBytes, maxChunkBytes: 1_000_000, maxChunks: 10000, metadata }, lockManager());

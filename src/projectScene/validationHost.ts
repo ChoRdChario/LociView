@@ -12,7 +12,7 @@ import { TransactionJournal } from '../projectMetadata/journal';
 import type { MetadataStorageFactory } from '../projectMetadata/repository';
 import type { OriginBlobStore } from '../projectMetadata/blobStore';
 import { BlobStoreError } from '../projectMetadata/blobStream';
-import { unreceivedWeakMedia, type MetadataSessionRead } from '../projectMetadata/session';
+import { unreceivedWeakMedia, type MetadataSessionRead, type CompletedBackupDisplay } from '../projectMetadata/session';
 import type { MetadataEdit } from '../projectMetadata/commands';
 import { captionDeletionImpact } from '../projectMetadata/captionDeletion';
 import { assetDeletionImpact } from '../projectMetadata/assetDeletion';
@@ -425,13 +425,13 @@ async function openNormalValidationHost(options: ValidationHostOptions, inherite
       catch { /* File and incomplete originals stay available through the same recovery controls. */ }
     }
     const outputAction = <T>(action: () => Promise<T>, recovery = false, presentation?: () => MetadataSessionRead | undefined,
-      retainReadonlyHistory?: (result: T) => void) => execute(async () => {
+      retainReadonlyHistory?: (result: T) => void | boolean) => execute(async () => {
       editable(); if (!recovery && (outputDiscoveryFailure || unfinishedOutput() || last.state !== 'ready')) throw Error('中断したファイル生成を確認してください。');
       outputFailure = '';
       let succeeded = false, retainedHistory = false;
       try {
         const result = await action();
-        if (retainReadonlyHistory) { retainReadonlyHistory(result); retainedHistory = true; }
+        if (retainReadonlyHistory) retainedHistory = retainReadonlyHistory(result) !== false;
         succeeded = true; return result;
       }
       catch (error) { outputFailure = error instanceof Error ? error.message : 'ファイル処理を完了できません。'; throw error; }
@@ -485,14 +485,32 @@ async function openNormalValidationHost(options: ValidationHostOptions, inherite
       previewReview: (token: string, selection: Parameters<typeof sender.previewReview>[1]) => previewOutput(token, (owned, choice) => owned.previewReview(token, choice!), selection),
       generateReview: (token: string, selection: Parameters<typeof sender.generateReview>[1]) => outputAction(() => sender.generateReview(token, selection)),
       generateBackup: (token: string, label?: string) => {
-        const owner = connection, ownedFs = fs, ownedSession = session, ownedSender = sender, publication = last.publication;
+        const owner = connection, ownedFs = fs, ownedSession = session, ownedSender = sender, view = last;
+        const source = view.source, provider = view.provider, publication = view.publication, proof = source && json(source.proof);
         let read: MetadataSessionRead | undefined;
-        return measure('host.backup.total', () => outputAction(() => measure('host.backup.generate', () => ownedSender.generateBackup(token, label, undefined, next => { read = next; })), false, () => {
-          if (closed || restoreRetired || connection !== owner || fs !== ownedFs || session !== ownedSession || sender !== ownedSender ||
-            last.state !== 'ready' || last.source?.token !== token || last.publication !== publication || read?.state !== 'ready' ||
+        let completed: CompletedBackupDisplay | undefined;
+        const presentation = () => {
+          if (closed || restoreRetired || connection?.restorePending || restoreDisplayPending || receiveDisplayPending || unfinishedReceive() ||
+            connection !== owner || fs !== ownedFs || session !== ownedSession || sender !== ownedSender ||
+            fs.mutationAuthority.accessState !== 'editable' || last !== view || last.source !== source || last.provider !== provider ||
+            last.state !== 'ready' || last.source?.token !== token || last.publication !== publication ||
+            provider?.kind !== 'scene-provider' || provider.token !== token || !publication || read?.state !== 'ready' ||
             read.source?.token !== token || read.publication !== publication || read.provider?.kind !== 'scene-provider' || read.provider.token !== token ||
-            json(read.source.proof) !== json(last.source.proof)) return undefined;
+            json(read.source.proof) !== proof || json(last.source.proof) !== proof || outputDiscoveryFailure || unfinishedOutput()) return undefined;
+          try { ownedFs.mutationAuthority.assertEditable(); } catch { return undefined; }
           return read;
+        };
+        return measure('host.backup.total', () => outputAction(() => measure('host.backup.generate', () =>
+          ownedSender.generateBackup(token, label, undefined, (next, output) => { read = next; completed = output; })), false, presentation, id => {
+          // Display-only exceptions cannot turn a durable success into failure.
+          try {
+            if (!presentation() || !completed || completed.id !== id || completed.token !== token ||
+              completed.purpose !== 'backup' || completed.state !== 'generated' || outputJobs.some(j => j.id === id)) return false;
+            const row = { ...completed }, next = [...outputJobs];
+            const index = next.findIndex(j => j.purpose === 'clean' || j.purpose === 'review' || j.purpose === 'backup' && j.id > id);
+            next.splice(index < 0 ? next.length : index, 0, row); outputJobs = next;
+            return true;
+          } catch { return false; }
         }));
       },
       generateContribution: (token: string, selection: ContributionBaseChoice['selection']) => measure('host.contribution.total', () => outputAction(() => measure('host.contribution.generate', () => sender.generateContribution(token, selection)))),
