@@ -57,7 +57,124 @@ unchanged-feature-classification checks pass; independent review has no findings
 No runtime change or new capacity guarantee; no runtime suite is needed for this
 documentation checkpoint.
 
-## Current boundary —SHA evaluation closed; Native retained (2026-11-10)
+## Current boundary —ordinary I/O evaluation closed; receipt phase proposed (2026-11-10)
+
+PO authorizes end-to-end latency improvement through implementation and automated
+verification, without small confirmation waits. Baselineb211347, same product
+source as2f98fe9. Preserve private drafts, originals/full quality, Native SHA,
+Session commands, complete write/readback/publication/recovery fences and the
+qualified preview. No new dependencies, formats, input policies or release.
+Root is the sole writer; bounded cause/contract/final reviewers are read-only.
+
+Plan: use existing per-stage/per-file browser evidence to choose the actual
+edit→save→cold-resume bottleneck; inspect its code/tests and already rejected
+trials before adding another experiment. Measure native stream writes/close,
+receipt persistence and readback separately where current evidence cannot decide.
+Implement a small reversible internal fix under the current contracts, then
+verify the same original reproduction and adjacent corruption/cancellation/
+write failure/recovery paths. Compare a fixed Ki-84 input in fresh matched trials;
+include500k SH4 when the changed path handles large binary bodies. Keep diagnostics
+separate from primary elapsed endpoints. Require independent final review,
+appropriate complete Desktop/touch/offline/checkpoint/HEIC qualification and
+exact-head CI before a suitable g0 checkpoint. Stop only the affected genuine
+contract/authority/product-policy change. Do not weaken tests, repeat until PASS,
+skip full checks or revive rejected SHA/proof-cache trials. Current state:
+both ordinary candidates are NOT ADOPTED; source/tests/dependencies and the
+qualified Desktop artifact are restored to baseline. No product speedup is claimed.
+The exact next receipt-read exception is proposed below, not implemented.
+
+Closing cause audit: native write/close is a small part of current save latency;
+root-control path traversal and repeated fresh reads dominate native call counts.
+These overlapping native totals are not elapsed acceptance. Direct-directory seek
+and duplicate-SHA proof reuse already failed earlier practical gates and are not
+revived. Under [06e §9.1](../docs/specs/06e-selected-generation-output-read-proposal.md#91-同じfreshな管理情報と出力streamの内部整理2026-11-10),
+evaluate same-fresh-native-control byte materialization plus removal of an internal
+identity stream and empty flush await. Exact-view descriptors keep custom/lazy
+guards on the unchanged stream path; no earlier inventory view or proof is reused.
+Independent contract review confirms ordinary internal scope, requiring descriptor
+checks before/after copy. Existing corruption/cleanup cases remain unchanged.
+Candidate implementation review has no findings. Existing package/OPFS/import
+checks124PASS; Native/root-control/guarded-view tests plus imports40PASS; targeted
+existing recovery/readback/generation checks45PASS (757 intentionally unselected
+by the editing filter, not final-suite acceptance). Typecheck passes after fixing
+a test-only Blob subclass return signature; retain its first failed check. Freeze
+source/test candidate26f071cef9b25f76cf4c99cba6dfca6490f05908dc3b7559555b216fc7548f2c
+and compare the same Ki-84 and500k SH4 in new uninstrumented3+3 cohorts before
+adoption. The current user flow, not native call totals, decides the next action.
+V1 Ki-84 completes6 safe flows but does not qualify: body apply13.510→19.664s,
+actual file37.143→45.392s, cold edit29.374→38.555s medians. Observed host CPU63%
+includes40.6% from other applications; load also varies later. Do not normalize,
+attribute causation or count the last fast trial alone as a benefit. Preserve
+all values; do not extend this failed candidate to SH4. Its source/tests and
+Native read module are retained privately and removed from production. V2
+isolates only the remaining small stream-chain cleanup, retaining the original
+JSON stream reader and all fences. This was the last ordinary ablation, not a
+new tolerance or an indefinite search for passing timing values.
+
+### Completed ordinary evaluation and next decision
+
+V2 has only the identity ZIP bridge removal and empty OPFS flush-await removal.
+Existing package sink/cancel/backpressure tests2PASS, Desktop buildPASS; an
+independent final review finds no ownership/abort/close/drain issue. The added
+late sink-close refusal test also passes. Candidate source/test fingerprint:
+497250d8f4171a7a8d36811d212248da610ec499d411396478325ca033bc398e.
+All candidate code/tests are retained privately after non-adoption, not shipped.
+
+Use the same existing Ki-84 converted backup,51,270,879 bytes, SHA-256
+c714c6cd04f99ac7aa0b84e9e2ca82a0147bbbc0eeb029be475d94e68ccf501c.
+This is the converted backup, not a new evaluation of the raw94MB LociMyu ZIP.
+Each side has3 new dedicated-Chromium profiles,1280×720, one worker, no retries,
+ABBAAB order; primary measurements have only timings=1, no native/CPU/heap/trace
+probe. No original file or other application is changed. V2 values in seconds:
+
+| User endpoint | Baseline3 trials | V2 candidate3 trials | Median before→after |
+|---|---|---|---|
+| Body applied |7.116 /7.608 /7.594|7.095 /7.541 /7.636|7.594→7.541|
+| Save→download event |19.870 /20.110 /19.322|19.534 /19.059 /19.335|19.870→19.335|
+| Save→actual external file |20.891 /21.059 /20.570|21.362 /20.037 /20.277|20.891→20.277|
+| Cold readonly text |6.028 /6.394 /6.277|5.999 /6.289 /6.436|6.277→6.289|
+| Cold edit-ready |15.485 /15.631 /16.345|16.343 /15.818 /15.885|15.631→15.885|
+| Cold3D |15.782 /15.980 /16.742|16.733 /16.216 /16.260|15.980→16.260|
+
+Save endpoints start at generation confirmation; cold endpoints include launching
+the completely restarted browser. OS file-picker waiting is excluded.
+
+V2 does not establish a useful whole-workflow benefit; do not count the small
+output decrease as a completed comfort improvement. Stop before SH4 and broader
+candidate qualification rather than add a tolerance or repeat until PASS.
+V1 andV2 together complete12 primary browser journeys: all103 records equal
+except the intended body, all43 model/media blobs retain SHA/length, original
+history is retained with exactly1 new change, Project identity is preserved,
+the external file passes complete inspection, and full browser restart reopens
+the edited body/3D. Page errors and remote requests are empty. The2 separately
+instrumented diagnostic journeys are PASS but are not primary timing evidence.
+
+Private evidence: `.artifacts/e2e/comfort-io-20261110/` owns the immutable V1/V2
+artifacts, raw reports/screenshots,3+3 comparisons, retained candidate sources,
+failure history and exact qualified-artifact restoration. The qualified preview
+remains http://127.0.0.1:4191/; no unqualified candidate is served to the PO.
+No new Desktop52/offline8/installed-browser/physical-iOS acceptance is claimed.
+The final source/test/dependency tree is byte-identical to baseline, so this is
+a documentation-only checkpoint; validate diff/links/privacy and exact-head CI
+without rerunning unchanged whole-workspace runtime checks merely to commit.
+
+Next decision: [06e §10](../docs/specs/06e-selected-generation-output-read-proposal.md#10-提案管理記録1件の読取を独立した単位にする)
+proposes one ordinary `readReceipt` size-open/fresh-byte/decode phase using the
+existing readonly ports. Each successful phase has full opening/closing audits;
+separate prewrite and postwrite reads, actual write, Journal/publication,
+saved-file inspection and recovery remain distinct. Include the already
+registered original-generation creation scope, not staging or new registrations.
+Detection of intermediate restore-control changes can move to closing; external
+ABA remains explicitly unguaranteed. This changes the exact §4 audit contract,
+so it is PROPOSED and unimplemented pending PO judgment. Independent design
+review findings about target-receipt semantics, exception closing and readonly
+permissions are resolved. Do not introduce a thin-selection guard/cache framework.
+After approval, implement this single connected phase, prove fault/readback/
+recovery safety, compare Ki-84/500k SH4, then run complete final PC/touch/offline/
+checkpoint/HEIC qualification and review before adoption. Existing physical-iOS
+IME/save/memory/heat/offline acceptance and general release remain pending.
+
+## Previous boundary —SHA evaluation closed; Native retained (2026-11-10)
 
 PO2026-11-10 approved [specification11](../docs/specs/11-streaming-sha256-evaluation-proposal.md):
 evaluate fixed hash-wasm4.13.0 and conditionally connect only checkedBlobStream /

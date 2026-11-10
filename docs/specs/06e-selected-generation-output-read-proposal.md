@@ -5,6 +5,7 @@ Status: **ACCEPTED —PO承認2026-11-08・§5を含む限定実装とWindows自
 対象は通常selected generationの読取と新しいBackupの成功表示。実機iPhone・一般公開の合格ではない。
 仕様06b §6.2のZIP証拠共有範囲を拡大しない。実行証拠と残件は[todo](../../tasks/todo.md)。
 今回のGS協調検査・未確認ZIP整理は[仕様10](10-gs-loading-and-output-attempt-cleanup.md)。
+§10は**PROPOSED —未承認・未実装**。上記の承認・実装状態には含まない。
 
 ## 1. 利用者の結果と確認した問題
 
@@ -285,3 +286,110 @@ fallback変更は本節に含めず、必要になれば独立した仕様判断
 入力位置へ戻す。この同期focusイベントでは任意の説明を自動表示せず、結果の3D表示を覆わないようにする。
 入力欄の自動スクロールとaria-describedbyは保持し、次のTab移動・説明入口・2秒hoverでは従来どおり説明を読める。
 抑制は対象要素と同期呼出しの間だけとし、永続フラグ・タイマー・保存状態を追加しない。
+
+### 9.1. 同じfreshな管理情報と出力streamの内部整理（2026-11-10）
+
+POの本文編集→保存→再開の改善指示に基づく内部実装候補であり、実時間の採否はtodoに記録する。
+§5の非採用direct-directory探索や§6の非採用SHA証拠再利用を再接続しない。
+新しい検査寿命・読取省略・保存形式・依存・速度保証は追加しない。
+
+**Native管理情報のbyte読取候補は不採用。** 下記の限定設計・故障試験は確認したが、
+最初のKi-84比較では編集・保存の改善条件を確認できず、factory／WeakMap／fast readerは製品から外した。
+負荷変動を補正して効果を主張しない。実測と候補ソースは私的評価領域へ保持する。
+管理情報は従来のstreamで消費する。別に切り分けたZIP転送／空flushの整理も、
+Ki-84の操作全体で実用的な改善を確認できず不採用とした。両候補の製品コード・依存は残さない。
+以下は再接続を認める仕様ではなく、不採用候補の設計記録である。
+
+- `platform/nativeFileSnapshot`は、`OpfsFS.readStream`がその呼出しで取得したFileと、
+  既存と同形の返却viewだけを結ぶprivate WeakMapを持つ。size/stream/blobのown data descriptorを
+  登録し、正確な同一view・同一descriptorのときだけ、既存上限内の全量Native byte読取を使える。
+  保持するのはFile参照とview識別情報だけで、bytes・digest・検査結果・FS・権限・pathは保持しない。
+  Native readerの呼出しごとに全bytesを所有bufferへ読み、結果を再利用しない。
+- `restoreControls.freshControlReceipt`だけがこのreaderを使う。独立したinventoryのsize-only openと
+  その後のfresh `readStream`、receiptの意味検査順・累積budget・上位の開始／終了監査は従来どおり。
+  Materialize前にBlob intrinsic sizeと登録size・view sizeの全一致／既存上限を確認し、全長と
+  終了時のdescriptor一致を確認してから既存のfatal UTF-8／canonical JSON／shape照合へ渡す。
+  超過／不一致／読取失敗は拒否し、stream成功へfallbackしない。
+- 未登録・clone・Proxy・事前にsize/stream/blobを差し替えたviewは従来streamへ残す。
+  読取中にviewが変われば結果を拒否する。generationScopeのviewは常に別objectなので未登録であり、
+  body／EOF前後のowner確認を省略しない。MemoryFSとcustom viewも従来の全stream検査・取消・解放を使う。
+  `WorkspaceFS`の公開interfaceは変えず、factoryの製品importはOpfsFS、readerの製品importは
+  restoreControlsだけへ限定する。UI・viewer・保存権限への依存は加えない。
+- ZIP生成の内部identity bridgeを省いて、既存のSHA／1MiB集約transformへwriterを直接接続できる。
+  外側BackupOutputJobのFS bridge、raw chunk予算・消費順・所有copy・backpressure・全量SHA/CRC・
+  EOF/close/pipeline待機・失敗時のcancel/drainは維持する。OPFS writerもpending bytesが無い場合の
+  空flush awaitだけを省ける。実際のwrite/flush/close/abortとその失敗は従来どおり扱う。
+
+受入れは既存のfresh-open／inventory非消費・改変／欠損／stream読取／cleanup失敗を変更せず再利用する。
+Native経路にはfull size／上限・arrayBuffer拒否・非canonical／invalid UTF-8／長さ不一致、同一viewの
+差替え／getter・読取中変更の拒否、wrapper／generation viewの非適用を追加する。
+借用buffer・sink失敗・取消・pipeline drain・保存後照合・中断復旧を維持し、probe無しの同一Ki-84と
+大容量SH4の操作全体で効果を確認できた範囲だけ残す。物理I/O件数の削減やSafari実機合格とは扱わない。
+
+## 10. 提案：管理記録1件の読取を独立した単位にする
+
+Status: **PROPOSED —PO判断前。実装・性能評価・接続は行わない**。
+
+### 利用者の結果と根拠
+
+本文1件の編集、ファイル保存、再開の待ちを減らす。2026-11-10のKi-84診断では、
+編集中のnative write5回が合計約8ms、close5回が約5msなのに対し、getFileは2707回、
+directory取得は16305回だった。保存中はwrite58回が約299ms、close10回が約22ms、
+getFile5221回、directory取得31722回だった。重複する非同期処理の合計であり、
+これらを足して操作時間や改善見込みとはしない。診断と通常計測はtodoで区別する。
+
+`readReceipt`は1件の小さいJSONを、size確認用の`readStream`と別のfresh `readBytes`で読む。
+通常generationのpublic portでは、それぞれの前後に復元管理情報の全監査が入り、
+1件の読取で最大4回になる。提案は、この**1件の純粋読取の開始と終了に各1回**を行うこと。
+Native管理情報のbyte読取候補やSHA証拠再利用を復活させず、既存のreadonly portを使う。
+速度目標・対応容量・保存形式・依存は追加しない。
+
+### 厳密な範囲と検出時期
+
+- 対象は既存のnormal登録を持つgenerationの`readReceipt`1回だけ。`BackupRestoreJob.openSelected`の
+  接続に加え、`openValidationGeneration(create=true)`が既に登録している元世代
+  （`generationId:null`／`allowCreate:true`）も含む。登録対象を増やさず、stagingは含めない。
+  既存`withMetadataRead`へ渡す
+  callback内で、derived fsを使ってsize-only open、別のfresh全量読取、長さ確認、fatal UTF-8、
+  duplicate member拒否、予算・canonical JSON検査をすべて実行する。成功結果は終了時の
+  全監査が成功してから返す。内容・digest・File・FS・監査済み証拠をキャッシュしない。
+  callback自身が失敗した場合は、成功結果を返さずnormal `readOperation`の既存の例外処理を保つ。
+  この場合の終了監査を新しく保証しない。stagingの失敗時closing契約も変更しない。
+- 既存の読取権限を維持し、readonlyの閲覧へ`assertEditable`条件を加えない。
+  読取owner・selected generation・scopeの失効は既存の確認で拒否する。mutation lease喪失に
+  対する書込拒否は、既存のwrite／`underWriteLease` fenceで維持する。
+- public/default portのper-I/O監査は変更しない。root/custom FSは従来動作、stagingは
+  未承認consumerとして従来のstrict fallbackへ残す。既存のnamed読取に渡されたderived fsは
+  登録対象でないため、既存の外側closing監査を使い、新しい入れ子の監査や登録を追加しない。
+- `writeReceipt`全体を囲まない。前値の読取、実際のwrite、書込後のfresh読戻しは別々の段階。
+  前値と読戻しの各`readReceipt`の内部だけが対象であり、両者を共有・統合しない。
+  **書込後の読戻しの成功結果も、全bytes検査と独立した開始／終了の全監査を通過してから受け入れる。**
+  `underWriteLease`、個々のwrite前後、Journal、publication、Selection、保存後の実ファイル照合、
+  ダウンロード直前の新しい照合、中断復旧の外側境界は維持する。
+- 変更点は管理情報の検出時期。size確認と内容読取の間の管理情報改変は終了時に検出する場合がある。
+  終了監査まで残る復元管理controlの同じ長さの破損・Selection変更は拒否して結果を返さない。一時的な外部改変が
+  終了前に元へ戻るABAは、この単位の監査では検出しない場合がある。snapshot保証は追加しない。
+  読取対象のreceipt自身がcanonicalとして有効な別値へ変わった場合は、`readReceipt`単独で
+  意味の正誤を保証せず、従来のcallerによるJournal・参照・期待値照合で判断する。
+  `writeReceipt`の書込後比較も従来の`json`全値一致を維持する。
+  これは§4の「これ以外はpublic I/Oごとの監査」への新しい限定例外であり、PO判断を要する。
+
+### 受入れと採否
+
+既存のgeneration／persistence／Journal／output／復旧試験を再利用し、次を追加・確認する。
+
+- size用openと内容のfresh再読取を維持する。対象receiptの欠損・過大size・読取失敗・非canonical・
+  invalid UTF-8、復元管理controlの同サイズ破損、終了時Selection変更、読取owner失効・disposeで
+  成功結果を採用しない。有効な別値への差替えは既存callerの期待値照合で拒否する経路を確認する。
+- 既存のreadonly facadeへwriteできず、callback由来portが期限後に使えない。並行する別の
+  public読取を軽量化しない。既存named読取は余分な入れ子監査を増やさない。
+- write失敗、torn receipt、書込後の読戻し改変、読戻し終了監査失敗を拒否する。次のJournal／
+  publicationへ進まない。書込権限喪失も従来どおり拒否する。改変した既存記録を上書きして修復扱いにしない。
+- staging／未登録FS／原本の読取、書込・確定・復旧の監査を変更しない。改変拒否、受信中断、
+  元ファイル再選択、手元編集保持、返送、cold再開を既存の代表経路で確認する。
+- 同一Ki-84・50万点SH4を独立した専用Chromiumで各3回比較する。本文適用、ファイル生成、
+  実ファイル取得、記録の先行表示、編集可能、3D表示を分ける。機能試験合格だけで採用せず、
+  操作全体で効果と安全性を確認できた範囲だけ残す。新しい許容遅延や再試行で合格させない。
+
+実装時はrootのcheckpoint、PC／touch、専用offline、HEIC隔離、独立最終レビューを行う。
+実機iPhone／Safariの合格・一般公開は含めない。効果がない場合は内部変更を取り下げ、測定を保持する。
