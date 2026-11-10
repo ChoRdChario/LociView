@@ -1,6 +1,6 @@
 # LociView active work
 
-Updated2026-11-10. This is the single current plan and check record.
+Updated2026-11-11. This is the single current plan and check record.
 [Inventory](implementation-inventory.md) owns route-specific coverage;
 [map](../PROJECT_MAP.md) and [document index](../docs/README.md) route contracts/code.
 Git owns checkpoint identity. [Retained checkpoint evidence](../docs/history/development-through-2026-10-29/tasks/todo-before-daily-authoring.md)
@@ -57,7 +57,279 @@ unchanged-feature-classification checks pass; independent review has no findings
 No runtime change or new capacity guarantee; no runtime suite is needed for this
 documentation checkpoint.
 
-## Current boundary —ordinary I/O evaluation closed; receipt phase proposed (2026-11-10)
+## Current boundary —verified native parent lookup (2026-11-11)
+
+[06f](../docs/specs/06f-opfs-parent-lookup-proposal.md) is implemented and qualified
+for the bounded Windows candidate. Original quality, fresh file/full integrity
+and write/readback/publication/recovery fences remain. The measurements and
+qualification record below distinguish adopted06f from unadopted06e§10; Git owns
+the checkpoint identity and exact post-push CI result. Physical Safari and release
+remain pending; no new capacity/speed guarantee is made.
+
+Next connected outcome: make cold-resumed saved text readable sooner using only
+plain-string display data from an already completed opening read. First verify
+06e§9 contract/owner/failure/IME handoff and elapsed benefit; retain the independent
+Host read and edit/save gates, with no source/provider or inspection cache.
+Current mapping found an additional798/812/882ms Host read; this is a candidate,
+not implemented or a promised saving. Stop only a genuine new contract/policy
+decision; ordinary in-scope investigation/fixes do not need renewed PO approval.
+
+## Verification record —06f (2026-11-10–11)
+
+PO explicitly approves [06f](../docs/specs/06f-opfs-parent-lookup-proposal.md).
+Baseline12a5f78; preserve private drafts, original quality, all fresh file/content
+and full write/readback/publication/recovery/Selection fences. Root sole writer,
+read-only independent reviews. Implement one private parent hint in OpfsFS four
+readonly methods, bounded to one handle and invalidated on native mutations with
+pending-read ownership checked. Keep writes/list/exists/exclusive cleanup on
+old lookup. resolve checks locator/path only, never existence or ABA; every
+file handle/File remains fresh and content errors never trigger re-open.
+
+Executed plan: implement/test owner/concurrency/freshness/missing/permission/unsupported
+and mutation isolation in existing OPFS suite; native isolated observations
+already retained, add integration on the implemented path. Freeze, compare both
+fixed Ki-84 and500k SH4 with matched3+3 profiles, no retry/tolerance change.
+Only adopt after elapsed benefit+safety; meaningful diff review and required
+checkpoint/HEIC/fullPC+touch/offline/installed-browser checks serially, then
+verified g0 checkpoint/push/exact CI. No new API/dependency/cache framework,
+schema/ID/route, numeric guarantee or release. Physical Safari stays pending.
+Keep the rejected06e§10 source/tests and all measurements private, never
+restore its rejected per-receipt audit grouping into this next candidate.
+
+Implementation is limited to OpfsFS plus its existing tests. Root files and
+unsupported API use original lookup; path/root mismatches discard the hint;
+mutations invalidate pending-read publication. Optional resolve NotSupported
+falls back once to the original implementation, while file-handle/content
+failures remain refusals. Independent source review and focused follow-ups find
+no remaining issue. V1 review caught a hint-discard lifetime mismatch: stop its
+partial measurement, retain baseline0PASS/candidate0 interruption, and fix it
+with2 regressions. No elapsed claim/retry is made from that incomplete cohort.
+The sandboxed broad process query was unavailable; the narrower known-worker
+check confirms the interrupted owned worker exited; no other process is stopped.
+
+V2: OPFS71PASS, prior connected4files240PASS, typecheckPASS, Desktop buildPASS.
+The implemented source in a separate private Native build matches fresh lookup
+in8 actual Chromium156 states including ancestor replacement without an
+intermediate missing read and parent becoming a file. One browser testPASS;
+no source-only/mock/device claim. Candidate source/test fingerprint
+adb8e97d9145c9dbe22d6e810f726cc88d93c3d259b8217384cbf5ecc076d7da.
+Same-input primary Ki-84/SH4 comparisons each complete3+3 in ABBAAB order with
+no retries, no Native/CPU/heap/trace probe and unchanged source/test fingerprint.
+All12 external-file and cold-resume journeys pass original input SHA, all asset
+hashes/lengths, all records except one body, all original changes plus exactly1,
+Project identity and error/remote-request emptiness. No schema/ID or image/SH4
+coefficient changes. Seconds, all3 trials and medians:
+
+| Input / endpoint | Baseline3 | Parent hint3 | Median before→after |
+|---|---|---|---|
+| Ki-84 initial restore edit-ready |64.834/68.435/67.475|61.248/60.940/61.746|67.475→61.248|
+| Ki-84 body apply |7.658/7.642/7.464|6.617/6.530/6.548|7.642→6.548|
+| Ki-84 download event |20.290/19.713/20.048|18.976/18.117/18.752|20.048→18.752|
+| Ki-84 actual file |21.245/20.674/21.501|19.963/19.120/19.766|21.245→19.766|
+| Ki-84 cold readonly text |6.312/7.023/6.447|6.866/6.609/6.289|6.447→6.609|
+| Ki-84 cold edit-ready |16.423/16.744/16.432|16.138/16.253/16.320|16.432→16.253|
+| Ki-84 cold3D |16.780/17.178/16.829|16.567/16.636/16.710|16.829→16.636|
+| SH4 initial restore edit-ready |112.511/112.441/125.373|110.325/110.793/113.353|112.511→110.793|
+| SH4 body apply |2.975/2.955/3.519|2.963/2.450/2.481|2.975→2.481|
+| SH4 download event |27.242/27.332/30.534|25.495/25.723/26.473|27.332→25.723|
+| SH4 actual file |29.713/29.678/33.353|29.680/28.027/28.902|29.713→28.902|
+| SH4 cold readonly text |6.687/8.122/7.286|6.684/6.647/6.237|7.286→6.647|
+| SH4 cold edit-ready |17.179/18.618/17.865|16.668/16.674/16.345|17.865→16.668|
+| SH4 cold3D |19.285/21.195/19.916|19.235/19.274/18.939|19.916→19.235|
+
+Measurements start at body apply/save generation confirmation and include full
+browser launch for cold endpoints; OS picker wait is excluded. Bounded elapsed
+benefit is established for body/save, with Ki-84 cold text not improved and
+edit-ready largely unchanged. Do not infer a general-PC/phone speed guarantee
+or normalize results for host load. Existing100ms/1s/10s development targets
+remain unmet in these large workflows. Final qualification completed serially
+as recorded below. Private evidence: `.artifacts/e2e/opfs-parent-20261110/`.
+No general-PC/device/release acceptance is inferred.
+
+Initial checkpoint on the Opfs-only source: PASS typecheck, root155files with3482PASS,
+16 existing expected-fail and21 existing TODO (not feature/adoption credit),
+all five builds and offline isolation; root suite1079.12s, checkpoint1155.40s.
+HEIC isolationPASS. Final immutable Desktop30/offline20 files retain the same
+adb8 source/test fingerprint. The complete Desktop run then exposed the
+comparison-preparation issue below; the final repaired tree/checks follow it.
+
+Final Desktop case31 stopped before rendering: the smooth comparison preparer
+requires its historical5e5bb9e full lock to equal today's lock, while approved
+2f98fe9 changed Vite/Vitest development tooling. Runtime dependency roots and
+all29 non-dev lock records remain identical. Preserve this failure and let the
+other cases finish against unchanged source; do not lower the120s/1.30 camera
+criterion or substitute an old prebuilt artifact. Test-only repair criteria: retain
+the fixed product source and runtime dependency closure, explicitly pin the
+approved shared toolchain, use a distinct immutable artifact/stamp, and verify
+the changed comparison independently. No dependency install or product change.
+Stop this repair if runtime equality or the approved toolchain identity fails.
+
+Initial Desktop run:51PASS/1pre-render preparation failure, no skip/flaky,
+5105.45s. Changed only the comparison preparer, its existing case and9 focused
+guard cases (9PASS); independent read-only review has no findings. Both the
+historical full lock and explicitly approved2f lock require identical runtime
+roots/full closure; unknown tools, direct/transitive/integrity/flag drift refuse.
+Every comparison gets a fresh private build and success-only manifest; no cache
+reuse, dependency install or old artifact overwrite.120s/1.30/dimensions/GPU
+and lifecycle assertions remain unchanged; result labels name shared tooling.
+Qualify the fixed case separately and the final source/test checkpoint; retain
+the51 unchanged passes only after proving exact app build bytes and unchanged
+remaining test sources, followed by dedicated offline8 and installed Edge/Chrome2.
+Do not rerun the unchanged51-case journeys or unchanged-byte HEIC merely for a
+new record. V1 logs/failure remain separate from the repaired result.
+
+Repaired comparison1PASS,378.65s. Both120s/1792×1008 traces, validGPU samples,
+20resize cycles, existing1.30/64MiB/counter criteria pass. Independent review
+confirms fixed source,29runtime records, identical installed Node24.22.1/Vite6.4.6
+and installation metadata; the51 unchanged passes can be retained. This RTX5080
+test does not establish ordinary-PC/iOS performance or attribute renderer changes
+to06f. Before completing checkpoint-v2, removed the root guard unit's unnecessary
+historical-Git dependency; actual fixed-history equality is already exercised
+by the passed browser preparer. Interrupted and retained the partial checkpoint,
+verified no newly started node worker remained, and replaced only that unit with
+missing/extra-runtime rejection. The interrupted suite is not PASS; the unchanged
+browser comparison was retained, not rerun.
+
+Final qualification: typecheckPASS;156root files,3491PASS/16existing expected-fail/
+21existingTODO (not feature credit); root1108.15s; full checkpoint1176.69s, all
+five builds and offline isolationPASS. Final9guard casesPASS without historical
+Git dependence. Source/test/preparer5-file fingerprint:
+e2c1849222d0531568b57632d87c04a07c13285e601612d5b6604d4486191a2e.
+Desktop coverage is51 unchanged passes from the complete run plus the repaired
+comparison1PASS, not a rewritten52PASS initial report. Independent review and
+hash checks confirm unchanged other definitions/helpers, original Opfs code/test
+hashes, and all30Desktop/20frozen-offline files. Live Node/Vite/installed-lock
+identity also matches the captured candidate and comparison installation.
+
+Dedicated offline8PASS730.40s: root/subpath cold repair, two-window repair/update,
+Mesh/Point/500k SH4/Proxy/media edit/save/full-close resume, conversion, safe
+removal, storage failure and foreign-worker refusal. Installed Edge/Chrome2PASS
+52.75s use independent profiles and the frozen root offline build. Full-close
+offline evidence comes from the dedicated suite, not a dev server. Each freshly
+rebuilt root offline has its own random build UUID; its static isolation and
+inventory are recorded separately, never passed off as frozen-byte identity.
+HEIC isolation v1 remains valid on unchanged app source/bytes. All final frozen
+inventories/source/install checksPASS; no retry/deadline/assertion relaxation.
+
+Preview at http://127.0.0.1:4191/ now serves the qualified frozen candidate;
+all20HTTP bodies match. The owned server was replaced only after exact process,
+listener, executable, start-time and old served-byte checks. An initial guard
+refusal exposed JSON date conversion losing fractional seconds; exact ticks
+were retained with a direct typed conversion, without weakening the guard.
+Project storage/forced SW activation were not changed. Normal update prompts
+may still need accepting in an existing browser. The synthetic sample remains
+`.artifacts/samples/comfort-20261110.zip`; originals and audit material stay local.
+
+Remaining: Ki-84 early text6.447→6.609s did not improve; large output is still
+about20–30s and cold editable readiness about16s on this PC. The next readonly
+display candidate is described at the current boundary. Physical Safari memory,
+IME/save/heat/offline acceptance and ordinary-PC guarantees remain unverified.
+Git owns the suitable g0 checkpoint and its actual CI check; private qualification
+records preserve the complete failed/interrupted/completed attempts.
+
+## Previous boundary —receipt evaluation closed (2026-11-10)
+
+PO2026-11-10 approves [06e §10](../docs/specs/06e-selected-generation-output-read-proposal.md#10-管理記録1件の読取を独立した単位にする).
+Baseline12a5f78 retains the same qualified product source asb211347. Root writes;
+independent reviewers remain read-only. Outcome: shorten body edit→checked file
+save→cold resume with one existing readonly callback around one receipt read.
+Keep fresh size/open and separate bytes, canonical/length/content checks, distinct
+prewrite and postwrite phases, write/publication/recovery/download fences, original
+quality and offline use. No dependency, format, UI route or policy expansion.
+
+Plan: record approval before code; add focused opening/closing, raw/staging/nested,
+concurrent, torn/write/readback/owner/readonly regressions to the existing suite;
+implement centrally without adding a new capability/cache framework. Compare the
+same Ki-84 and500k SH4 with independent profiles3+3, unchanged primary timings
+and no new tolerance/retry. If beneficial and safe, freeze final diff, review,
+run checkpoint/HEIC plus complete Desktop/touch/offline and installed-browser
+representatives serially, then qualified g0 checkpoint/push/exact CI. Stop only
+new contract/authority conflicts; reject ineffective candidates. Preserve private
+drafts and prior failure evidence. Physical Safari acceptance remains pending.
+
+Implementation: only `persistence.readReceipt` wraps the unchanged size-open,
+fresh bytes, length and decode in existing `withMetadataRead`, without a staging
+consumer or new registry. Existing outer/write/readback logic is unchanged.
+Independent security/contract/final source review: no findings. Existing fixture
+tests cover normal original/create/restored, nested/concurrent/readonly access,
+closing retirement/dispose, invalid content, independent write phases, held
+pre-read closing with no write and held post-read closing with no success.
+Focused3files192PASS; typecheck and Desktop buildPASS. First test invocation
+ran zero tests because managed C TEMP rename was denied; retain that log, switch
+only task TEMP/TMP to its writable G directory, then execute the real checks.
+Freeze candidatefaadd44df5a6681b216ca7cb0cb4d0916c0bb5a39aa3da4f3ce5c3d1627d428a;
+new primary3+3 Ki-84/SH4 cohorts are complete below. Final candidate qualification
+was not started because the elapsed gate failed.
+Private evidence is `.artifacts/e2e/receipt-phase-20261110/`; prior failure and
+rejected-candidate directories remain intact. Preview remains qualified baseline.
+
+### Outcome and next boundary
+
+**Not adopted.** Same input/history/browser conditions, one worker, no retries,
+no extra CPU/native/heap/trace probe, new3+3 profiles in ABBAAB order per dataset.
+No tolerance change or timing normalization. All12 primary flows complete actual
+external files and full browser close/reopen, retaining every original change
+with exactly1 new body edit, all records except that body, Project identity and
+all blob hashes/lengths. Ki-84 has103 records/43 assets; SH4 has1/3, with all
+500k SH4 coefficients and Proxy/image originals retained. The original fixed
+Ki-84 backup SHA is c714c6cd04f99ac7aa0b84e9e2ca82a0147bbbc0eeb029be475d94e68ccf501c;
+the178,012,280B SH4 input SHA is214dbbbdab3525f37d507b47bce136bf9a4e250b229267943cd7b8b2d028da0c.
+No page errors/remote requests. Seconds, all3 trials and medians:
+
+| Input / endpoint | Baseline3 | Receipt candidate3 | Median before→after |
+|---|---|---|---|
+| Ki-84 body apply |10.440/7.513/7.733|9.059/8.750/8.418|7.733→8.750|
+| Ki-84 download event |22.100/19.812/20.085|26.745/25.033/21.397|20.085→25.033|
+| Ki-84 actual file |23.002/21.009/21.004|28.335/26.047/22.440|21.009→26.047|
+| Ki-84 cold text |6.403/7.443/7.990|8.218/6.612/6.683|7.443→6.683|
+| Ki-84 cold edit-ready |17.058/17.631/18.190|18.578/17.910/16.594|17.631→17.910|
+| Ki-84 cold3D |17.641/18.022/18.578|18.958/18.289/17.002|18.022→18.289|
+| SH4 body apply |3.491/2.976/2.965|2.981/3.546/2.984|2.976→2.984|
+| SH4 download event |31.262/28.539/27.522|28.855/29.657/27.262|28.539→28.855|
+| SH4 actual file |33.725/30.908/29.863|31.905/32.801/29.587|30.908→31.905|
+| SH4 cold text |6.738/7.288/6.606|8.495/7.296/7.193|6.738→7.296|
+| SH4 cold edit-ready |17.295/18.808/17.115|20.501/18.876/17.728|17.295→18.876|
+| SH4 cold3D |19.829/21.365/19.650|23.160/22.079/19.745|19.829→22.079|
+
+Save endpoints start at generation confirmation; cold includes full browser
+launch. OS picker time is excluded. Do not infer causality from these medians.
+The completed first-pair diagnostic snapshots show apply control lists97→87,
+output220→210, cold71→71. Reducing only this receipt unit removes a small part
+of total control audits; call counts alone do not satisfy the elapsed gate.
+An independent baseline audit finds source/build configs unchanged095f→12a,
+both package/lock/fixture manifest hashes equal2f/HEAD,17 installed direct versions
+matching lock and fixed facts matching both drivers. No baseline defect or
+justification to repeat the same cohort until a favorable median is found.
+
+Candidate source/tests are retained privately then restored byte-for-byte to
+HEAD; Desktop30 files are restored to qualified baseline too. Dependencies and
+preview are unchanged. No new full checkpoint/Desktop52/offline8/installed2/
+physical-iOS acceptance is claimed. This final tree is documentation-only;
+check public diff/links/private exclusion, independently review, then suitable
+g0 checkpoint/push and exact-head CI. Do not rerun unchanged runtime suites only
+to stage or commit. Existing physical Safari acceptance remains pending.
+
+Meta-audit: the receipt exception failed its practical gate; do not keep a
+parallel read mode or continue tiny wrapper variants. Next investigate the
+dominant native parent-path lookup, retaining all fresh file/byte/metadata
+audits. The isolated native probe (one test, five compared states) confirms
+Windows Chromium156 uses current bytes after same-name parent/ancestor rebuild;
+resolve still returns the same path while deleted, so it is NOT freshness proof.
+Directory move is unavailable/unverified. Its first URL typo failed before any
+native operation; fixed script writes to a separate retained output and passes.
+No original/user browser storage is used and this is not performance evidence.
+
+[06f](../docs/specs/06f-opfs-parent-lookup-proposal.md) is the concrete next
+proposal: keep just one parent-location hint inside OpfsFS readonly methods,
+while every getFileHandle/getFile and full integrity/fence remains fresh.
+Write/list/exclusive cleanup keep original lookup. Directory-handle lifetime
+would span multiple read calls, beyond the previously bounded low-level path,
+so its implementation was stopped pending independent review and PO decision;
+PO subsequently approves it in the current boundary above.
+No new cache/port framework, feature, dependency, file format or release is
+authorized. Native observations do not grant whole-browser/device acceptance.
+
+## Previous boundary —ordinary I/O evaluation closed (2026-11-10)
 
 PO authorizes end-to-end latency improvement through implementation and automated
 verification, without small confirmation waits. Baselineb211347, same product
@@ -158,7 +430,7 @@ The final source/test/dependency tree is byte-identical to baseline, so this is
 a documentation-only checkpoint; validate diff/links/privacy and exact-head CI
 without rerunning unchanged whole-workspace runtime checks merely to commit.
 
-Next decision: [06e §10](../docs/specs/06e-selected-generation-output-read-proposal.md#10-提案管理記録1件の読取を独立した単位にする)
+Next decision at closure: [06e §10](../docs/specs/06e-selected-generation-output-read-proposal.md#10-管理記録1件の読取を独立した単位にする)
 proposes one ordinary `readReceipt` size-open/fresh-byte/decode phase using the
 existing readonly ports. Each successful phase has full opening/closing audits;
 separate prewrite and postwrite reads, actual write, Journal/publication,
@@ -166,7 +438,8 @@ saved-file inspection and recovery remain distinct. Include the already
 registered original-generation creation scope, not staging or new registrations.
 Detection of intermediate restore-control changes can move to closing; external
 ABA remains explicitly unguaranteed. This changes the exact §4 audit contract,
-so it is PROPOSED and unimplemented pending PO judgment. Independent design
+and was PROPOSED and unimplemented at this closure. PO subsequently approves it
+in the current boundary above. Independent design
 review findings about target-receipt semantics, exception closing and readonly
 permissions are resolved. Do not introduce a thin-selection guard/cache framework.
 After approval, implement this single connected phase, prove fault/readback/

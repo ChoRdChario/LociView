@@ -23,6 +23,13 @@ damage may be detected at the next full inquiry. No staging consumer is added.
 ordinary read-only presentation, UI completion and cooperative-check cleanup;
 it grants no new inspection lifetime. Preserve full Host preparation, owned-byte
 SHA/CRC and write/recovery fences. Todo owns measurements and final qualification.
+[06f](../docs/specs/06f-opfs-parent-lookup-proposal.md) is approved2026-11-10 for
+one native parent-location hint in OpfsFS readonly methods. Each file handle/File
+and integrity/fence remains fresh; writes/list/exists/exclusive cleanup keep the
+original lookup. Resolve is locator matching, not existence/ABA proof. Follow
+its ownership/error rules; bounded Windows qualification completed2026-11-11,
+with exact measurements/device exclusions in todo. The06e §9.1/§10 evaluations
+were not adopted; do not reconnect their code or inspection exceptions.
 [09 §10](../docs/specs/09-desktop-offline-candidate-proposal.md) permits exact
 same-build/SRI boot-resource repair; it does not permit arbitrary network fallback,
 foreign cache/Project writes or forced activation. Follow their recorded contracts

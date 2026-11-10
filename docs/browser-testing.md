@@ -162,10 +162,17 @@ older checkout or a second dependency set.
 
 The01g smooth lane uses actual Desktop source-alpha/chroma pixels, fallback and
 edit/Workspace/Review/restore/cold continuation. Its separate capacity case uses
-the fixed500k SH4 source and prepares an exact5e5bb9e comparison Desktop build via
-`scripts/prepare-smooth-baseline.mjs`, reusing installed dependencies inside ignored
-artifacts. It does not checkout files, install dependencies or change the product
-entry. Matched actual buffer dimensions and120-second middle-button camera traces
+the fixed500k SH4 source and prepares a fresh5e5bb9e product-source comparison via
+`scripts/prepare-smooth-baseline.mjs --manifest <private result path>`. It accepts
+only the historical lock or approved2f98fe9 toolchain lock, independently requiring
+identical runtime roots and every runtime lock record. Both builds use the same
+installed tools; the result is not a historical byte-identical build. A new private
+manifest records source/output inventories, both locks, Node/Vite and installation
+identity. Prior builds/stamps are never reused or overwritten. No checkout,
+dependency install or product-entry change occurs.
+This capacity lane needs both fixed Git objects locally and never fetches them;
+the ordinary guard unit tests use synthetic inputs and do not need Git history.
+Matched actual buffer dimensions and120-second middle-button camera traces
 separate rAF scheduling intervals, rendered callback CPU, valid sampled GPU queries
 and `sortCenters32` public Worker RPC roundtrips. These are different measurements;
 rAF is not proof every frame was presented, and Worker roundtrip is not pure sort.

@@ -25,7 +25,43 @@ async function getDir(root: FileSystemDirectoryHandle, path: string, create: boo
 }
 
 export class OpfsFS implements WorkspaceFS {
+  private readParentOwner = {};
+  private readParentUnsupported = false;
+  private readParentHint?: { root: FileSystemDirectoryHandle; path: string; dir: FileSystemDirectoryHandle };
   private constructor(private readonly root: FileSystemDirectoryHandle) {}
+
+  private discardReadParent(): void { this.readParentHint = undefined; this.readParentOwner = {}; }
+
+  private async readFileHandle(path: string): Promise<FileSystemFileHandle | null> {
+    const root = this.root, parts = path.split('/').filter(p => p.length > 0);
+    if (parts.length < 2 || this.readParentUnsupported || typeof root.resolve !== 'function') { this.discardReadParent(); return this.fileHandle(path, false); }
+    const parent = parts.slice(0, -1), key = parent.join('/');
+    if (this.readParentHint && (this.readParentHint.root !== root || this.readParentHint.path !== key)) this.discardReadParent();
+    const owner = this.readParentOwner, hint = this.readParentHint;
+    if (hint?.root === root && hint.path === key) {
+      let resolved = false;
+      try {
+        // resolve compares locators only; getFileHandle still locates/checks the entry afresh.
+        const relative = await root.resolve(hint.dir);
+        resolved = true;
+        if (Array.isArray(relative) && relative.length === parent.length && relative.every((p, i) => p === parent[i]))
+          return await hint.dir.getFileHandle(parts[parts.length - 1]!, { create: false });
+      } catch (error) {
+        if (!resolved && error instanceof DOMException && error.name === 'NotSupportedError') {
+          this.readParentUnsupported = true; this.discardReadParent(); return this.fileHandle(path, false);
+        }
+        if (!isNotFoundError(error)) { this.discardReadParent(); throw error; }
+      }
+      this.discardReadParent();
+    }
+    const loc = await getDir(root, path, false);
+    if (!loc) return null;
+    try {
+      const file = await loc.dir.getFileHandle(loc.name, { create: false });
+      if (owner === this.readParentOwner && root === this.root) this.readParentHint = { root, path: key, dir: loc.dir };
+      return file;
+    } catch (error) { this.discardReadParent(); if (isNotFoundError(error)) return null; throw error; }
+  }
 
   static async isAvailable(): Promise<boolean> {
     try {
@@ -41,6 +77,7 @@ export class OpfsFS implements WorkspaceFS {
   }
 
   private async fileHandle(path: string, create: boolean): Promise<FileSystemFileHandle | null> {
+    if (create) this.discardReadParent();
     const loc = await getDir(this.root, path, create);
     if (!loc) return null;
     try {
@@ -52,12 +89,13 @@ export class OpfsFS implements WorkspaceFS {
   }
 
   async readText(path: string): Promise<string | null> {
-    const h = await this.fileHandle(path, false);
+    const h = await this.readFileHandle(path);
     if (!h) return null;
     return (await h.getFile()).text();
   }
 
   async writeText(path: string, text: string, creation?:WorkspaceTextCreation): Promise<void> {
+    this.discardReadParent();
     if (creation) {
       creation.assertOwned();
       const previous = await this.fileHandle(path, false);
@@ -118,14 +156,14 @@ export class OpfsFS implements WorkspaceFS {
   }
 
   async readBytes(path: string): Promise<Uint8Array | null> {
-    const h = await this.fileHandle(path, false);
+    const h = await this.readFileHandle(path);
     if (!h) return null;
     return new Uint8Array(await (await h.getFile()).arrayBuffer());
   }
 
   async readBytesFrom(path: string, offset: number): Promise<{ size: number; data: Uint8Array } | null> {
     if (!Number.isSafeInteger(offset) || offset < 0) throw new Error('opfs: invalid byte offset');
-    const h = await this.fileHandle(path, false);
+    const h = await this.readFileHandle(path);
     if (!h) return null;
     const file = await h.getFile();
     return {
@@ -144,7 +182,7 @@ export class OpfsFS implements WorkspaceFS {
   }
 
   async readStream(path: string): Promise<WorkspaceReadableFile | null> {
-    const h = await this.fileHandle(path, false);
+    const h = await this.readFileHandle(path);
     if (!h) return null;
     const file = await h.getFile();
     return {
@@ -245,6 +283,7 @@ export class OpfsFS implements WorkspaceFS {
   }
 
   async remove(path: string): Promise<void> {
+    this.discardReadParent();
     const loc = await getDir(this.root, path, false);
     if (!loc) return;
     try {

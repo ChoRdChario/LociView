@@ -9,8 +9,8 @@ import {sourceMaterialPanelsGlb} from './fixtures';
 import {installSmoothObservation} from './smoothObservation';
 
 test('01g production500k SH4 matched120s camera cost and target lifecycle',async({browser},info)=>{
-  test.setTimeout(900000);execFileSync(process.execPath,['scripts/prepare-smooth-baseline.mjs'],{stdio:'inherit',windowsHide:true});const source=await largeGsFixture(),mesh=info.outputPath('smooth-panels.glb');await writeFile(mesh,sourceMaterialPanelsGlb(j=>{j.materials[2].alphaMode='BLEND';}));
-  const errors:string[]=[],results:Record<string,any>={},baseline=resolve('.artifacts/e2e/smooth01g-baseline-5e5bb9e/desktop-dist');
+  test.setTimeout(900000);const manifestPath=info.outputPath('comparison-build.json');execFileSync(process.execPath,['scripts/prepare-smooth-baseline.mjs','--manifest',manifestPath],{stdio:'inherit',windowsHide:true});const comparison=JSON.parse(await readFile(manifestPath,'utf8'));const source=await largeGsFixture(),mesh=info.outputPath('smooth-panels.glb');await writeFile(mesh,sourceMaterialPanelsGlb(j=>{j.materials[2].alphaMode='BLEND';}));
+  const errors:string[]=[],results:Record<string,any>={},baseline=resolve(comparison.output);
   for(const mode of ['baseline','candidate']){
     const context=await browser.newContext({viewport:{width:2200,height:1300},deviceScaleFactor:1,serviceWorkers:'block'});await context.addInitScript(installSmoothObservation);
     await context.route('**/*',async route=>{const u=new URL(route.request().url());if(['blob:','data:'].includes(u.protocol))return route.continue();if(u.origin!==desktopOrigin)return route.abort();if(mode==='candidate')return route.continue();
@@ -34,6 +34,6 @@ test('01g production500k SH4 matched120s camera cost and target lifecycle',async
       results[mode]={layout,trace,cycles,resources:await p.evaluate(()=>(window as any).smoothObservation.snapshot())};await p.screenshot({path:info.outputPath(mode+'-500k.png'),fullPage:true});
     }finally{await context.close();}
   }
-  await info.attach('matched-production-cost',{body:JSON.stringify({baseline:'5e5bb9e exact isolated Desktop build',source:largeGsDigest,results,errors,method:'rAF intervals are scheduling proxies; CPU actual rendered callback span; GPU sampled non-disjoint query; sortCenters32 worker RPC roundtrip, not pure sort time'}),contentType:'application/json'});
+  await info.attach('matched-production-cost',{body:JSON.stringify({baseline:'5e5bb9e fixed product source with approved shared installed tools',comparison,source:largeGsDigest,results,errors,method:'rAF intervals are scheduling proxies; CPU actual rendered callback span; GPU sampled non-disjoint query; sortCenters32 worker RPC roundtrip, not pure sort time'}),contentType:'application/json'});
   expect(results.candidate.layout.width).toBe(results.baseline.layout.width);expect(results.candidate.layout.height).toBe(results.baseline.layout.height);expect(results.candidate.trace.frameP95/results.baseline.trace.frameP95,'existing +30% camera interval criterion').toBeLessThanOrEqual(1.30);expect(errors).toEqual([]);
 });

@@ -198,3 +198,151 @@ describe('exclusive never-written receipt acquisition',()=>{
     const f=await textAcquisition(),error=Error(phase);f.sink[phase].mockRejectedValue(error);await expect(f.fs.writeText('receipt.json','{}',f.owned)).rejects.toBe(error);expect(f.present).toBe(true);expect(f.directory.removeEntry).not.toHaveBeenCalled();
   });
 });
+
+// Locator-style doubles reopen the current entry on every getFileHandle/getFile.
+async function readParentFixture() {
+  const directories = new Set(['', 'deep', 'deep/parent', 'other', 'other/parent']);
+  const files = new Map<string, Uint8Array<ArrayBuffer>>();
+  const bytes = (value: string | ArrayBuffer | Uint8Array) => typeof value === 'string' ? new TextEncoder().encode(value) : new Uint8Array(value instanceof ArrayBuffer ? value.slice(0) : value);
+  const put = (path: string, value: string | Uint8Array) => { files.set(path, bytes(value)); };
+  put('deep/parent/a', '1234'); put('other/parent/a', 'other'); put('scratch', 'start');
+  const missing = () => new DOMException('missing', 'NotFoundError');
+  const file = vi.fn(async (path: string) => { const data = files.get(path); if (!data) throw missing(); return new File([new Uint8Array(data)], 'data'); });
+  const fileHandle = vi.fn(async (parent: string, name: string, create: boolean) => {
+    if (!directories.has(parent)) throw missing();
+    const path = parent ? `${parent}/${name}` : name;
+    if (!files.has(path)) { if (!create) throw missing(); put(path, ''); }
+    return { kind: 'file', getFile: () => file(path), createWritable: async () => {
+      let pending = files.get(path)!.slice();
+      return { write: async (value: string | Uint8Array | ArrayBuffer | { type: string; position: number; data: string | ArrayBuffer }) => {
+        if (typeof value === 'object' && 'type' in value) {
+          const data = bytes(value.data), next = new Uint8Array(Math.max(pending.length, value.position + data.length)); next.set(pending); next.set(data, value.position); pending = next;
+        } else pending = bytes(value);
+      }, close: async () => { files.set(path, pending); }, abort: async () => {} };
+    } };
+  });
+  const directory = vi.fn(async (parent: string, name: string, create: boolean): Promise<ReturnType<typeof handle>> => {
+    if (!directories.has(parent)) throw missing();
+    const path = parent ? `${parent}/${name}` : name;
+    if (!directories.has(path)) { if (!create) throw missing(); directories.add(path); }
+    return handle(path);
+  });
+  function handle(path: string) {
+    return { path, kind: 'directory', getDirectoryHandle: (name: string, options?: { create?: boolean }) => directory(path, name, !!options?.create),
+      getFileHandle: (name: string, options?: { create?: boolean }) => fileHandle(path, name, !!options?.create),
+      removeEntry: async (name: string) => { files.delete(path ? `${path}/${name}` : name); } };
+  }
+  const root = { ...handle(''), resolve: vi.fn(async (dir: unknown): Promise<string[] | null> => (dir as { path: string }).path.split('/').filter(Boolean)) };
+  vi.stubGlobal('navigator', { storage: { getDirectory: async () => root } });
+  return { fs: await OpfsFS.open(), root, put, files, directories, directory, fileHandle, file };
+}
+
+describe('OPFS one readonly parent hint with fresh file lookup', () => {
+  it('gets fresh handles and Files for all four reads while shortening repeated parent lookup', async () => {
+    const f = await readParentFixture();
+    expect(await f.fs.readText('deep/parent/a')).toBe('1234');
+    f.put('deep/parent/a', '5678');
+    expect(await f.fs.readBytes('deep/parent/a')).toEqual(new TextEncoder().encode('5678'));
+    expect(await f.fs.readBytesFrom('deep/parent/a', 2)).toEqual({ size: 4, data: new TextEncoder().encode('78') });
+    const view = await f.fs.readStream('deep/parent/a');
+    expect(await new Response(view!.stream()).text()).toBe('5678');
+    expect(f.fileHandle).toHaveBeenCalledTimes(4); expect(f.file).toHaveBeenCalledTimes(4);
+    expect(f.directory).toHaveBeenCalledTimes(2); expect(f.root.resolve).toHaveBeenCalledTimes(3);
+  });
+  it('keeps root files and unsupported resolve on the original path', async () => {
+    const f = await readParentFixture();
+    await f.fs.readText('scratch'); await f.fs.readText('scratch'); expect(f.root.resolve).not.toHaveBeenCalled();
+    Object.defineProperty(f.root, 'resolve', { value: undefined });
+    await f.fs.readText('deep/parent/a'); await f.fs.readText('deep/parent/a');
+    expect(f.directory).toHaveBeenCalledTimes(4); expect(f.file).toHaveBeenCalledTimes(4);
+  });
+  it.each([{ relative: null }, { relative: ['wrong', 'parent'] }])('discards a mismatched locator $relative and traverses the requested path', async ({ relative }) => {
+    const f = await readParentFixture(); await f.fs.readText('deep/parent/a');
+    f.root.resolve.mockResolvedValueOnce(relative); f.put('deep/parent/a', 'current');
+    expect(await f.fs.readText('deep/parent/a')).toBe('current'); expect(f.directory).toHaveBeenCalledTimes(4);
+  });
+  it('observes removed and same-name recreated parents without retaining old bytes', async () => {
+    const f = await readParentFixture(); await f.fs.readText('deep/parent/a');
+    f.directories.delete('deep/parent'); f.files.delete('deep/parent/a');
+    expect(await f.fs.readText('deep/parent/a')).toBeNull();
+    f.directories.add('deep/parent'); f.put('deep/parent/a', 'recreated');
+    expect(await f.fs.readText('deep/parent/a')).toBe('recreated');
+  });
+  it('discards the old parent when a different requested parent is missing', async () => {
+    const f = await readParentFixture(); await f.fs.readText('deep/parent/a');
+    expect(await f.fs.readText('other/missing/a')).toBeNull(); const before = f.directory.mock.calls.length;
+    await f.fs.readText('deep/parent/a'); expect(f.directory.mock.calls.length - before).toBe(2); expect(f.root.resolve).not.toHaveBeenCalled();
+  });
+  it('discards a warm hint when resolve becomes unavailable instead of reviving it later', async () => {
+    const f = await readParentFixture(); await f.fs.readText('deep/parent/a'); const resolve = f.root.resolve;
+    Object.defineProperty(f.root, 'resolve', { configurable: true, value: undefined });
+    await f.fs.readText('deep/parent/a'); Object.defineProperty(f.root, 'resolve', { value: resolve });
+    const before = f.directory.mock.calls.length; await f.fs.readText('deep/parent/a');
+    expect(f.directory.mock.calls.length - before).toBe(2); expect(resolve).not.toHaveBeenCalled();
+  });
+  it('retains the original path when the optional resolve API reports unsupported', async () => {
+    const f = await readParentFixture(); await f.fs.readText('deep/parent/a');
+    f.root.resolve.mockRejectedValue(new DOMException('unsupported', 'NotSupportedError'));
+    expect(await f.fs.readText('deep/parent/a')).toBe('1234'); expect(await f.fs.readText('deep/parent/a')).toBe('1234');
+    expect(f.root.resolve).toHaveBeenCalledOnce(); expect(f.directory).toHaveBeenCalledTimes(6);
+  });
+  it('refuses unsupported file-handle access instead of treating it as an optional resolve failure', async () => {
+    const f = await readParentFixture(), failure = new DOMException('unsupported file operation', 'NotSupportedError');
+    await f.fs.readText('deep/parent/a'); f.fileHandle.mockRejectedValueOnce(failure);
+    await expect(f.fs.readText('deep/parent/a')).rejects.toBe(failure); expect(f.fileHandle).toHaveBeenCalledTimes(2); expect(f.directory).toHaveBeenCalledTimes(2);
+  });
+  it.each(['resolve', 'file-handle'] as const)('refuses %s permission failures without falling back', async phase => {
+    const f = await readParentFixture(), failure = new DOMException('denied', 'NotAllowedError');
+    await f.fs.readText('deep/parent/a');
+    if (phase === 'resolve') f.root.resolve.mockRejectedValueOnce(failure); else f.fileHandle.mockRejectedValueOnce(failure);
+    await expect(f.fs.readText('deep/parent/a')).rejects.toBe(failure); expect(f.directory).toHaveBeenCalledTimes(2);
+  });
+  it('invalidates a missing hinted file handle and performs only one original-path lookup', async () => {
+    const f = await readParentFixture(); await f.fs.readText('deep/parent/a');
+    f.fileHandle.mockRejectedValueOnce(new DOMException('stale locator', 'NotFoundError'));
+    expect(await f.fs.readText('deep/parent/a')).toBe('1234'); expect(f.fileHandle).toHaveBeenCalledTimes(3); expect(f.directory).toHaveBeenCalledTimes(4);
+  });
+  it.each(['file', 'text', 'bytes', 'stream'] as const)('never reopens after %s acquisition/consumption fails', async phase => {
+    const f = await readParentFixture(), failure = new DOMException('disappeared', 'NotFoundError');
+    await f.fs.readText('deep/parent/a');
+    if (phase === 'file') f.file.mockRejectedValueOnce(failure);
+    else {
+      const value = new File(['bad'], 'data');
+      const method = phase === 'bytes' ? 'arrayBuffer' : phase === 'stream' ? 'stream' : 'text';
+      Object.defineProperty(value, method, { value: phase === 'stream' ? () => new ReadableStream({ start(controller) { controller.error(failure); } }) : async () => { throw failure; } });
+      f.file.mockResolvedValueOnce(value);
+    }
+    const read = phase === 'bytes' ? f.fs.readBytes('deep/parent/a') : phase === 'stream' ? f.fs.readStream('deep/parent/a').then(view => new Response(view!.stream()).text()) : f.fs.readText('deep/parent/a');
+    await expect(read).rejects.toBe(failure); expect(f.fileHandle).toHaveBeenCalledTimes(2); expect(f.directory).toHaveBeenCalledTimes(2);
+  });
+  it.each(['text', 'bytes', 'stream', 'append-text', 'append-bytes', 'remove'] as const)('discards the hint before native %s mutations', async kind => {
+    const f = await readParentFixture(); await f.fs.readText('deep/parent/a');
+    if (kind === 'text') await f.fs.writeText('scratch', 'new');
+    else if (kind === 'bytes') await f.fs.writeBytes('scratch', new Uint8Array([1]));
+    else if (kind === 'stream') await f.fs.writeStream('scratch', new ReadableStream({ start(c) { c.enqueue(new Uint8Array([1])); c.close(); } }));
+    else if (kind === 'append-text') await f.fs.appendText('scratch', 'new');
+    else if (kind === 'append-bytes') await f.fs.appendBytes('scratch', new Uint8Array([1]));
+    else await f.fs.remove('scratch');
+    const before = f.directory.mock.calls.length;
+    await f.fs.readText('deep/parent/a'); expect(f.directory.mock.calls.length - before).toBe(2); expect(f.root.resolve).not.toHaveBeenCalled();
+  });
+  it('does not republish a pending old read after a native mutation invalidates its owner', async () => {
+    const f = await readParentFixture(); let entered!: () => void, release!: () => void;
+    const started = new Promise<void>(r => { entered = r; }), held = new Promise<void>(r => { release = r; });
+    const original = f.directory.getMockImplementation()!;
+    f.directory.mockImplementationOnce(async (...args) => { entered(); await held; return original(...args); });
+    const reading = f.fs.readText('deep/parent/a');
+    try {
+      await started; await f.fs.writeBytes('scratch', new Uint8Array([1])); release(); expect(await reading).toBe('1234');
+      const before = f.directory.mock.calls.length; await f.fs.readText('deep/parent/a');
+      expect(f.directory.mock.calls.length - before).toBe(2); expect(f.root.resolve).not.toHaveBeenCalled();
+    } finally { release(); await reading.catch(() => {}); }
+  });
+  it('keeps path and root ownership separate instead of reusing another project or instance', async () => {
+    const a = await readParentFixture(); expect(await a.fs.readText('deep/parent/a')).toBe('1234');
+    expect(await a.fs.readText('other/parent/a')).toBe('other'); expect(a.root.resolve).not.toHaveBeenCalled();
+    const b = await readParentFixture(); b.put('other/parent/a', 'other-root');
+    expect(await b.fs.readText('other/parent/a')).toBe('other-root'); expect(await a.fs.readText('other/parent/a')).toBe('other');
+    expect(b.directory).toHaveBeenCalledTimes(2); expect(a.root.resolve).toHaveBeenCalledOnce();
+  });
+});
