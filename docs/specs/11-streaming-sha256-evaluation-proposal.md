@@ -1,7 +1,11 @@
 # 照合計算の高速化 —分割SHA-256の評価案
 
-Status: **PROPOSED。新依存の導入・実装・製品接続は未承認／未実施。**
-契約・技術の独立レビューで指摘を解消した評価案であり、ライブラリの安全性・性能合格ではない。
+Status: **EVALUATED — NOT CONNECTED（2026-11-10）。**
+PO2026-11-10は固定依存の評価導入と、効果・安全性を実証した2経路だけの条件付き接続を承認した。
+両経路・ZIP検査のみ・Blobストリームのみを比較したが、Ki-84と50万点SH4の両方で
+通常操作を悪化させない採用条件は立証できなかった。今回は接続せず、両経路のNative実装と
+既存の依存・保存・復旧契約を維持する。実測・判定・残件は[todo](../../tasks/todo.md)に集約する。
+以下は承認済みの評価範囲・受入条件であり、実装済みや採用済みの説明ではない。
 
 ## 1. 利用者の結果と根拠
 
@@ -24,8 +28,9 @@ Ki-84の出力CPU診断1回では、Native SHA圧縮の自己CPU約2.47秒とrot
   現在の`NativeSha256`は残し、他のNative/GS用途を無条件に置換しない。CRC32は変更しない。
 - 技術評価・独立レビュー・実操作の効果・受入れがすべて合格した場合だけ、この2経路への
   接続まで同じ単位で進める。効果がなければ現行実装を維持する。一般公開は含まない。
-- [AGENTS.md](../../AGENTS.md)の新依存承認が必要。仕様06b/06c/06eの検査例外を広げる承認は
-  求めない。新しいpartial preview、検査延期、write/readback/復旧fenceの集約は対象外。
+- [AGENTS.md](../../AGENTS.md)の新依存承認はPO2026-11-10で取得済み。
+  仕様06b/06c/06eの検査例外は広げない。新しいpartial preview、検査延期、
+  write/readback/復旧fenceの集約は対象外。
 
 ## 3. 実装境界と不変条件
 
@@ -35,6 +40,13 @@ factoryだけで実装を選ぶ。`core`/`viewer`からUI・Project保存・pack
 呼出し元の既存のlive/abort/cancel確認を使い、factoryへProjectや保存の権限を渡さない。
 依存方向は対象2caller→純粋hash adapter→固定依存／既存Native classに閉じる。
 既存のpure hash付近を使い、移設や新しいディレクトリcycleを同時に加えない。
+
+配布入口は同じ固定版のSHA専用`dist/sha256.umd.min.js`に限定し、狭い内部型で
+`createSHA256()`を使う。UMD/defaultの相互運用を実ビルドと試験で確認する。
+汎用ESM入口は実行JSから未使用kernelを除去しても、source mapに全22種類の原本を
+含むため使わない。専用版とESM版のSHA binaryは完全一致することを確認済み。
+MIT全文・SHA C実装の許諾・配布helperのMicrosoft許諾を、最終配布物に保持する。
+source map全体の無効化や他のビルド方式変更は行わない。
 
 - `createSHA256()`の独立instanceをhashごとに所有する。共有状態を持つone-shot helperは使わない。
   entry全体／archive全体の別状態を保持し、別operation・owner・FS・入力へ状態や結果を貸さない。
@@ -82,7 +94,9 @@ factoryだけで実装を選ぶ。`core`/`viewer`からUI・Project保存・pack
 
 ## 5. 読み取り調査の一次資料（2026-11-10）
 
-まだインストールも性能評価も行っていない。バージョン・API・配布形態を確認した段階である。
+以下は承認前のバージョン・API・配布形態の読み取り調査である。
+承認後の導入・実装・実測の現在地は[todo](../../tasks/todo.md)に集約する。
+ここに一次資料があること自体は、性能・安全性・製品接続の合格を意味しない。
 
 - [npmの配布情報](https://www.npmjs.com/package/hash-wasm?activeTab=versions)：4.13.0。
 - [固定tagのpackage情報](https://github.com/Daninet/hash-wasm/blob/v4.13.0/package.json)、

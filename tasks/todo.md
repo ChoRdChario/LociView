@@ -57,7 +57,101 @@ unchanged-feature-classification checks pass; independent review has no findings
 No runtime change or new capacity guarantee; no runtime suite is needed for this
 documentation checkpoint.
 
-## Current boundary —comfortable use and verification maintenance (2026-11-10)
+## Current boundary —SHA evaluation closed; Native retained (2026-11-10)
+
+PO2026-11-10 approved [specification11](../docs/specs/11-streaming-sha256-evaluation-proposal.md):
+evaluate fixed hash-wasm4.13.0 and conditionally connect only checkedBlobStream /
+PackageArchive.inspect after demonstrated safety and practical benefit. The
+connected unit is closed without adoption: keep both Native implementations.
+Baseline2f98fe9, original quality, all write/readback/publication/recovery fences,
+private drafts and the previously qualified preview are preserved. One writer;
+bounded independent source, contract, UI and evidence reviewers are read-only.
+
+Completed evaluation: reviewed package integrity, lock and all three notices
+(one evaluation node;449 prior entries unchanged). Audit reported6 pre-existing
+development findings, none for hash-wasm; this is not an overall security PASS.
+The generic ESM V1 distribution keeps22 kernels in maps and is not adopted.
+V2's SHA-only UMD distribution has the identical SHA binary, one bundled kernel
+and all notices. V1's observed external load and all negative/failure logs remain
+private evidence, not speed credit. No private source or audit material is pushed.
+
+Both-caller V2 and Archive-only V3 complete their12 safe file workflows but fail
+the SH4 ordinary-output gate:30.087→33.302s and31.528→33.731s respectively. The
+last allowed combination, BlobStream-only V4, completes12 safe workflows. SH4
+restore/output improves; Ki-84 does not establish a clear overall benefit and
+its download-event median is worse. Independent evidence review agrees that
+actual-file transfer alone cannot waive this. Overlapping ranges do not prove
+WASM caused a regression, but also do not establish11 §4.6. Do not add a new
+tolerance, GS-only choice, pooling/proof cache or repeated trials until PASS.
+
+Final V4 matched comparison, seconds. Each side uses3 fresh dedicated Chromium
+profiles, the same converted Ki-84 backup (51,270,879bytes;103Captions/43assets)
+or edited500k full-SH4/Proxy backup (178,012,280bytes;1Caption/3assets), full input
+SHA identity,1280×720/DPR1 and the same ABBAAB order. No retry, CPU/native/heap
+probe or trace is active during these primary endpoints. OS file-picker wait is
+excluded. Restored full controls are not the earlier read-only text endpoint.
+Cold timing includes complete browser close/relaunch. These are local samples,
+not new speed, capacity, memory or device guarantees.
+
+| Input / endpoint | Native3 trials (s) | Blob-only3 trials (s) | Median (s) |
+|---|---|---|---|
+| Ki-84 preview | 4.628 / 4.613 / 4.100 | 5.040 / 4.638 / 4.659 | 4.613 → 4.659 |
+| Ki-84 restore full controls | 67.871 / 66.381 / 63.462 | 66.508 / 67.270 / 62.438 | 66.381 → 66.508 |
+| Ki-84 restore editable | 67.944 / 66.447 / 63.528 | 66.577 / 67.337 / 62.509 | 66.447 → 66.577 |
+| Ki-84 restore3D | 67.954 / 66.459 / 63.540 | 66.587 / 67.350 / 62.522 | 66.459 → 66.587 |
+| Ki-84 body apply | 8.197 / 7.515 / 6.990 | 8.208 / 7.522 / 7.623 | 7.515 → 7.623 |
+| Ki-84 download event | 22.119 / 19.046 / 18.641 | 20.854 / 19.989 / 19.139 | 19.046 → 19.989 |
+| Ki-84 actual file | 23.170 / 21.216 / 19.580 | 21.801 / 20.954 / 20.146 | 21.216 → 20.954 |
+| Ki-84 cold text | 7.323 / 6.396 / 6.492 | 6.429 / 5.770 / 6.060 | 6.492 → 6.060 |
+| Ki-84 cold editable | 17.277 / 15.428 / 15.665 | 15.599 / 15.109 / 15.418 | 15.665 → 15.418 |
+| Ki-84 cold3D | 17.665 / 15.741 / 16.069 | 15.957 / 15.518 / 15.774 | 16.069 → 15.774 |
+| 500k SH4 preview | 10.283 / 9.711 / 9.705 | 10.199 / 9.732 / 9.713 | 9.711 → 9.732 |
+| 500k SH4 restore full controls | 118.581 / 120.719 / 121.037 | 112.300 / 112.313 / 110.120 | 120.719 → 112.300 |
+| 500k SH4 restore editable | 118.634 / 120.737 / 121.052 | 112.317 / 112.355 / 110.164 | 120.737 → 112.317 |
+| 500k SH4 restore3D | 121.342 / 124.385 / 124.069 | 115.483 / 115.638 / 113.518 | 124.069 → 115.483 |
+| 500k SH4 body apply | 3.482 / 3.486 / 3.485 | 2.964 / 4.001 / 2.964 | 3.485 → 2.964 |
+| 500k SH4 download event | 28.844 / 30.674 / 28.624 | 27.257 / 27.294 / 26.811 | 28.844 → 27.257 |
+| 500k SH4 actual file | 31.066 / 33.072 / 31.601 | 29.604 / 29.810 / 29.100 | 31.601 → 29.604 |
+| 500k SH4 cold text | 7.280 / 7.260 / 6.677 | 6.482 / 7.642 / 6.363 | 7.260 → 6.482 |
+| 500k SH4 cold editable | 17.876 / 18.815 / 17.172 | 16.455 / 18.263 / 17.427 | 17.876 → 17.427 |
+| 500k SH4 cold3D | 20.471 / 21.377 / 19.815 | 19.035 / 21.350 / 20.069 | 20.471 → 20.069 |
+
+All12 V4 file workflows preserve all records except the intended body edit,
+Project identity, original change bytes plus exactly1 new change, every asset's
+SHA/length and the unchanged input SHA; actual download and cold reopened body/3D
+are checked. Page errors and external requests remain empty. Targeted
+import/digest/chunk/ownership/fault checks pass: V2=121, V3=114, V4=115 cases in
+four files. The first adapter mock setup failure and V4's no-test C: cache EPERM
+are retained; fixing mock ownership / using task-owned G: TEMP does not relax
+assertions or limits. V2's real compile-failure/cache/reload/reselection browser
+case passes. The later V4 retained-recovery UI case has read review only and was
+not executed; do not count it as browser or recovery acceptance. Scalar SHA,
+initialization, forced-GC and secondary warm CPU/heap diagnostics are separate
+from primary latency; faster sampled SHA cannot establish user-flow benefit.
+
+Closing audit: the evaluation source/tests and installed module are retained
+privately. All tracked src/tests, package declarations/lock and build configs
+equal2f98fe9 again, and no evaluation file remains in src/tests. Neither caller
+is connected and no dependency is adopted. Generated Desktop/offline outputs are
+restored byte-for-byte to the qualified Native artifacts (30/20files); the live
+4191 preview's20 HTTP files also match that qualified frozen candidate. Full
+new-candidate Desktop/offline /
+installed-browser/checkpoint qualification is not run after the performance gate
+fails; previous candidate evidence is not relabelled as Spec11 qualification.
+This final change is documentation only: verify the diff, local links, private
+draft preservation and independent review; source identity is explicit evidence.
+Git owns checkpoint identity and Actions owns exact-head CI. No release or
+physical iPhone/Safari acceptance is implied; device memory/IME/save/heat/offline
+and the6 existing development advisories remain outside this evaluation result.
+
+Next connected workflow: improve the same ordinary edit→save→cold-resume path
+at its actual I/O bottleneck. Measure large-body-add, stream close and finish /
+readback separately and inspect avoidable waits outside mandatory safety fences.
+Keep Native and the existing ports/contracts; do not expand SHA scope or weaken
+inspection/publication/recovery timing to rescue this experiment. Make another
+candidate only for a concrete measured cause, not to accumulate comparisons.
+
+## Previous verified boundary —comfortable use and verification maintenance
 
 PO authorizes repeated comfort review, implementation and verification without
 small human-test/approval waits. Baseline70c9d9f was pushed with exact-head CI PASS.
@@ -74,8 +168,10 @@ Only existing Vite/Vitest declarations and necessary reviewed development-tree
 versions may change; no new direct/runtime dependency or application contract.
 Baseline collection remains155 files across the same five Node project groups.
 Its local qualification is complete, preserving tests/isolation/limits/faults and
-comparing actual bundles; the separate checkpoint's exact CI is still to be run.
-Keep proposed11 separate.
+comparing actual bundles. Both checkpoints are pushed to g0-baseline; exact-head
+CI passes, including the maintenance checkpoint2f98fe9 in
+[Actions42699817604](https://github.com/ChoRdChario/LociView/actions/runs/42699817604).
+The specification11 decision above supersedes the earlier dependency wait.
 
 Outcome: open/read/edit/export/cold resume with less blocked reading and stable
 input/focus. Fixed implementation: normal direct opening reuses the existing
@@ -206,8 +302,10 @@ from fresh generation, with no normalization/inferred equivalence. New-build
 offline8PASS/708.2s, PC/touch continuation2PASS/57.0s and installed-browser2PASS/43.6s
 are complete with0skip/0unexpected/0flaky, retry0. The same4191 preview now serves
 security-final-v1; all20 HTTP files match its manifest. The synthetic sample remains
-unchanged. Only the separate checkpoint Push/exact-head CI remains; Git/Actions
-own its identity/result, without repeating unchanged runtime checks for result prose.
+unchanged. The separate checkpoint is pushed and exact-head CI passes: typecheck,
+the full Node suite, build and HEIC isolation. Git/Actions own its identity/result,
+without repeating unchanged runtime checks for result prose. Retain this result
+with the connected work rather than create a separate status-only commit.
 No public release is authorized.
 
 The first Vitest4 full run found one genuine test-harness isolation failure: the
@@ -249,15 +347,14 @@ fault cases. Document acceptance in the existing browser-testing contract before
 changing the lock; inspect lock/runtime-tree/actual bundle differences and audit,
 then run relevant checks and independent review/CI. A version-major label alone
 does not create a PO decision. Stop only if real authority/isolation/product
-contracts or an unapproved direct dependency must change. Keep proposed11 separate.
+contracts or an unapproved direct dependency must change. Specification11 remains
+a separate evaluation, with its final non-adoption outcome recorded above.
 
-The next authority-dependent option is [proposed evaluation11](../docs/specs/11-streaming-sha256-evaluation-proposal.md):
-fixed hash-wasm4.13.0 for only two streaming SHA callers, retaining all checks and
-Native fallback under closed API-absence conditions. Independent proposal reviews
-have no remaining findings; no dependency is installed/implemented. AGENTS.md:37
-requires PO dependency approval. Ask once with the completed current candidate,
-sample and evidence; do not stop the unaffected final qualification or treat this
-proposal as adoption. Total SHA CPU is not the target callers' reducible time.
+The earlier proposed [evaluation11](../docs/specs/11-streaming-sha256-evaluation-proposal.md)
+was subsequently approved, evaluated and closed without adoption. Its current
+result and all required conditions are recorded above; this retained maintenance
+record is not another dependency wait or an active evaluation queue. Total SHA
+CPU is not the target callers' reducible time.
 
 Task-owned evidence is under.artifacts/e2e/comfort-cycle-20261109; original/private
 material is never staged or distributed. Current CI identity/result belongs to
