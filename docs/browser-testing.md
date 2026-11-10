@@ -17,6 +17,23 @@ Service Workers are blocked unless a case explicitly owns an offline profile.
 It neither activates the normal PWA nor connects to a personal Chrome profile.
 Normal/validation and Desktop evidence remain separate; builds/heavy runs are serial.
 
+`desktop-input-continuity.spec.ts` also restores a small real Backup in an isolated
+recipient, saves a new body and reloads. After the completed opening read, it holds
+fresh native file reads while checking the readonly body, search and absent editing/
+file controls. Releasing the real reads during composition must complete the Host
+without replacing the reader; composition end transfers query, selection and focus.
+The PC and320px touch cases retain their ordinary UI limits and overall budget.
+First-backup setup uses the existing first-restore budget and records its elapsed
+time separately. This proves input continuity with controlled I/O, not large-file
+latency or physical Safari acceptance. Todo owns the matched Ki-84 measurements.
+
+Windows native fixture safety tests also exercise hard links and directory
+junctions in owned temporary repositories. A managed execution sandbox can reject
+their setup with EPERM, causing dependent publication/race assertions to fail.
+Retain that failed run, check the native capability with generated files and obtain
+the required environment approval for a native run. Keep the source, assertions,
+case selection and deadlines unchanged; an unavailable setup is not a passing case.
+
 The contextual-explanation regression can be selected with:
 
 ```powershell

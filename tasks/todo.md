@@ -57,22 +57,137 @@ unchanged-feature-classification checks pass; independent review has no findings
 No runtime change or new capacity guarantee; no runtime suite is needed for this
 documentation checkpoint.
 
-## Current boundary —verified native parent lookup (2026-11-11)
+## Current boundary —earlier readable saved body (2026-11-11)
 
-[06f](../docs/specs/06f-opfs-parent-lookup-proposal.md) is implemented and qualified
-for the bounded Windows candidate. Original quality, fresh file/full integrity
-and write/readback/publication/recovery fences remain. The measurements and
-qualification record below distinguish adopted06f from unadopted06e§10; Git owns
-the checkpoint identity and exact post-push CI result. Physical Safari and release
-remain pending; no new capacity/speed guarantee is made.
+PO authorizes implementation and automated Ki-84 comparison, retaining edit/save/
+recovery safety. Baseline8713e52; preserve private165todo/86design lines and source
+originals. One writer; independent contract/UI/measurement reviewers are read-only.
+[06e§9](../docs/specs/06e-selected-generation-output-read-proposal.md#9-残る待ち時間の観測と操作の整理2026-11-09)
+and01e§9 permit data-only early reading. Capture only owned frozen strings from
+the completed opening read; after successful nonpending connection and fresh
+selection check, notify once. Keep the later independent Host read and every
+edit/save/publication/recovery fence. No source/provider/cache/authority reuse.
 
-Next connected outcome: make cold-resumed saved text readable sooner using only
-plain-string display data from an already completed opening read. First verify
-06e§9 contract/owner/failure/IME handoff and elapsed benefit; retain the independent
-Host read and edit/save gates, with no source/provider or inspection cache.
-Current mapping found an additional798/812/882ms Host read; this is a candidate,
-not implemented or a promised saving. Stop only a genuine new contract/policy
-decision; ordinary in-scope investigation/fixes do not need renewed PO approval.
+Implementation, fault/input checks and matched3+3 Ki-84 journeys are complete.
+The final tree has executed checkpoint/HEIC, all Desktop, all offline and installed
+Edge/Chrome checks. Desktop has one retained01g performance failure; the record
+below separates it from this unit's successful PC/touch reading workflow and data
+checks. This is a bounded development checkpoint, not full Desktop/01g or release
+qualification. No threshold is waived. Git owns checkpoint identity and exact
+pushed-commit CI; inspect that CI before final reporting. Preserve private records.
+
+Next: identify owners of the measured non-drawing RAF work, then fix demonstrated
+redundancy and repeat the unchanged120s/1.30 comparison after a substantive change.
+For the read/edit/save workflow, target first-generation preparation and output
+history inquiry using the existing phase measurements. Keep all save/readback/
+recovery fences; do not turn an unverified snapshot into editing authority. No new
+dependency, format, capacity guarantee or release. Physical Safari stays pending.
+Stop only a genuine new policy/contract decision; ordinary fixes do not wait for PO.
+
+## Verification record —earlier readable saved body (2026-11-11)
+
+Completed opening-read text now reaches the existing readonly reader after a
+fresh selection check and before the later independent Host read. Keep only owned
+frozen strings; no Session/source/provider authority is reused. Host/catalog timing
+purpose is explicit, first-backup recovery remains excluded and the old-generation
+fallback stays. Optional observer/formatting failures do not alter Host authority;
+selection-check failure still rejects. Independent contract/source review has no
+findings. Existing typed commands, writes, all content checks and recovery remain.
+
+Executed focused service tests10PASS; typecheck passes. The extended real Backup
+PC/touch input workflow holds fresh native reads after opening, checks saved body/
+search and absent edit/save controls, releases actual I/O during composition and
+checks Host completion before IME handoff. Touch320px passed input-v5; PC passed
+input-v6, including selection before the final user selection. Source-context
+cleanup and the existing90s first-backup setup budget are used; ordinary UI15s and
+whole-case180s are unchanged. Actual PC setup12.913s is recorded, not a new SLA.
+All initial typecheck/config/fault-injection/setup failures are retained privately
+in failure-history.md; these focused passes are not the final full Desktop result.
+Independent rendered UI review found no additional issue in the PC/touch images.
+
+Matched Ki-84 B,C,C,B,B,C, all6PASS, retries0, fresh independent profiles, frozen
+Desktop artifacts, Chromium1280×720/DPR1 and timings-only instrumentation. Input
+is the same converted51,270,879-byte Backup, not the raw original ZIP. Cold direct
+reopening fully closes the browser first. Actual body time includes launch,
+navigation, title search and target selection, ending at exact visible saved body
+before waiting for editing. No OS picker wait or extra CPU/native/heap probe.
+
+| Observed endpoint | Baseline trials (s) | Candidate trials (s) | Median before→after (s) |
+|---|---|---|---|
+| First readable saved body |6.886 /12.175 /12.120|11.107 /10.192 /12.014|12.120→11.107|
+| First list/title |6.789 /12.076 /11.967|10.739 /9.788 /11.602|11.967→10.739|
+| Editing available |17.078 /28.952 /28.398|33.512 /26.900 /25.722|28.398→26.900|
+| Body apply acknowledgement |12.317 /17.409 /14.094|11.451 /18.066 /14.155|14.094→14.155|
+| Save action→download event |18.555 /33.021 /42.963|33.354 /37.951 /32.470|33.021→33.354|
+| Save action→actual file acquired |19.500 /34.259 /44.141|34.777 /39.448 /33.526|34.259→34.777|
+
+Body median improves1.013s (8.36%) in this cohort; large variation, including the
+faster first baseline, is retained without correction/discard. This is a modest
+direct-resume result, not a general speed guarantee or top/catalog improvement.
+Body mean10.394→11.104s does not improve; consistent speedup is not established.
+Editing/save are not optimized here; their remaining waits stay open. Initial
+restore normal-editor list median109.157→107.599s is setup context, not an adoption
+claim or a measurement of first-backup's earlier readonly display.
+Later normal records/body/3D endpoints are sequential observation barriers, not
+independently observed earliest event timestamps. Prior06f6.609s was first title/
+list, not actual readable body. Raw old numbers are unchanged.
+
+All6 journeys compare exact103 Caption records except the one intended body edit,
+identity, original history plus exactly one change, all43 asset sizes/fullSHA-256,
+downloaded Backup inspection and cold saved body. Original input hash unchanged;
+all pageerror/remote arrays empty. First checkpoint-v1 passed151 files but failed
+5 native fixture-script files (62 cases,4 cascading errors): sandbox hard-link/
+junction creation is denied with EPERM before their intended assertions. A small
+owned preflight reproduces that denial and succeeds under authorized native
+execution. Checkpoint-v2 passes with identical source/tests/deadlines and the
+required native permissions:156 files,3496PASS,16 expected-fail and21todo retained;
+typecheck, all five builds and offline isolation pass. HEIC isolation passes.
+No case is skipped or weakened to address the initial permission failure.
+
+Full Desktop executes all52 cases:51PASS,1FAIL,0retry/flaky/skipped/global errors.
+The current PC/touch resume cases both pass. Case31's matched120s camera P95 is
+baseline18.4ms/candidate24.2ms, ratio1.315217 above unchanged1.30. Both modes reach
+frame/sort/GPU-query checks; candidate reaches all20 target/resource cycles.
+The final errors-array assertion follows the failed ratio and did not execute;
+its retained raw array was independently inspected and is empty. This does not
+turn the case or the whole Desktop run into PASS. Keep the failed run; no threshold
+relaxation, unchanged retry or environment-cause claim. Renderer code is unchanged
+and this fresh-creation case excludes the new direct-resume notification.
+
+Independent raw-trace review finds the same baseline bytes/toolchain/inputs as
+the earlier passing comparison. Three of four candidate30s windows are similarly
+slow, so no startup portion is discarded. Measured RAF callback work without
+WebGL draws totals49.139s/120s; the earlier passing run already had49.731s. This is
+instrumented callback time, not process CPU, and does not identify an owner or
+prove new-reader overhead. GPU p95 changes little; investigate callback stacks
+and demonstrated redundant work before changing code. Preserve the original120s
+and1.30 requirement for the next substantive change.
+
+Short meta-audit: close this data-only reading unit, keeping its independent Host
+read and source fingerprint. [03§7](../docs/specs/03-gates-and-delivery.md) says this
+render-performance failure does not block the MVP; [01g](../docs/specs/01g-desktop-smooth-display-proposal.md)
+and the existing g0 authority permit a bounded development checkpoint after the
+remaining checks/review. No full Desktop/01g qualification or release credit is
+granted. Offline8 and installed Edge/Chrome2 pass, with no retry, skipped/flaky
+case or global error. Root/frozen files match before offline's intentional new
+build UUIDs; afterward the50 frozen files, all6 source/test hashes and installation
+still match. The measured Desktop bytes match the final Desktop bytes exactly.
+Source/test fingerprint:6fa25e2e0c3155a14dc7c8e40c1af059633cc1b9a10e69179c9305f99872d8ee.
+The local4191 development preview serves all20 exact frozen root-offline files;
+only the identified previous owned preview was replaced, with no Project storage
+or user browser operation and no forced Worker activation. Public-doc filtering,
+staging and exact-commit CI are the final delivery checks; Git records their commit.
+
+Remaining comfort debt: Ki-84 body apply14.155s, editing readiness26.900s and actual
+file acquisition34.777s medians in this cohort. First-generation preparation and
+output overview cost7.925s and3.483s medians in the candidate cold phase; these are
+nested stage observations, not additive independent totals. During the separate
+full regression,500k SH4 Review-copy editor/display took199.846/211.579s once; this
+is unmatched diagnostic context, not a new speedup/regression or capacity claim.
+The01g failure/cause remains open. Physical Safari IME/storage/memory/offline is
+unverified. Evidence stays private under
+`.artifacts/e2e/resume-reading-20261111/`; source/test fingerprint and final frozen
+HTTP artifact must match before delivery. Do not distribute originals/audits.
 
 ## Verification record —06f (2026-11-10–11)
 
@@ -126,14 +241,14 @@ coefficient changes. Seconds, all3 trials and medians:
 | Ki-84 body apply |7.658/7.642/7.464|6.617/6.530/6.548|7.642→6.548|
 | Ki-84 download event |20.290/19.713/20.048|18.976/18.117/18.752|20.048→18.752|
 | Ki-84 actual file |21.245/20.674/21.501|19.963/19.120/19.766|21.245→19.766|
-| Ki-84 cold readonly text |6.312/7.023/6.447|6.866/6.609/6.289|6.447→6.609|
+| Ki-84 cold readonly list/title |6.312/7.023/6.447|6.866/6.609/6.289|6.447→6.609|
 | Ki-84 cold edit-ready |16.423/16.744/16.432|16.138/16.253/16.320|16.432→16.253|
 | Ki-84 cold3D |16.780/17.178/16.829|16.567/16.636/16.710|16.829→16.636|
 | SH4 initial restore edit-ready |112.511/112.441/125.373|110.325/110.793/113.353|112.511→110.793|
 | SH4 body apply |2.975/2.955/3.519|2.963/2.450/2.481|2.975→2.481|
 | SH4 download event |27.242/27.332/30.534|25.495/25.723/26.473|27.332→25.723|
 | SH4 actual file |29.713/29.678/33.353|29.680/28.027/28.902|29.713→28.902|
-| SH4 cold readonly text |6.687/8.122/7.286|6.684/6.647/6.237|7.286→6.647|
+| SH4 cold readonly list/title |6.687/8.122/7.286|6.684/6.647/6.237|7.286→6.647|
 | SH4 cold edit-ready |17.179/18.618/17.865|16.668/16.674/16.345|17.865→16.668|
 | SH4 cold3D |19.285/21.195/19.916|19.235/19.274/18.939|19.916→19.235|
 
@@ -220,7 +335,8 @@ Project storage/forced SW activation were not changed. Normal update prompts
 may still need accepting in an existing browser. The synthetic sample remains
 `.artifacts/samples/comfort-20261110.zip`; originals and audit material stay local.
 
-Remaining: Ki-84 early text6.447→6.609s did not improve; large output is still
+Remaining: Ki-84 early list/title6.447→6.609s did not improve; earliest readable
+body was not measured by that endpoint. Large output is still
 about20–30s and cold editable readiness about16s on this PC. The next readonly
 display candidate is described at the current boundary. Physical Safari memory,
 IME/save/heat/offline acceptance and ordinary-PC guarantees remain unverified.

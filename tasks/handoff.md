@@ -23,6 +23,12 @@ damage may be detected at the next full inquiry. No staging consumer is added.
 ordinary read-only presentation, UI completion and cooperative-check cleanup;
 it grants no new inspection lifetime. Preserve full Host preparation, owned-byte
 SHA/CRC and write/recovery fences. Todo owns measurements and final qualification.
+Its §9.0 continuation makes owned text from the completed restored-generation
+opening read available after a fresh selection check. It never shares that read's
+source/provider with the later independent Host read or editing. Pending restoration
+and purpose-specific imports/recovery retain their exclusions; preserve the existing
+fallback and IME/search/selection handoff. Todo distinguishes actual visible body
+timing from the earlier first-list/title endpoint.
 [06f](../docs/specs/06f-opfs-parent-lookup-proposal.md) is approved2026-11-10 for
 one native parent-location hint in OpfsFS readonly methods. Each file handle/File
 and integrity/fence remains fresh; writes/list/exists/exclusive cleanup keep the

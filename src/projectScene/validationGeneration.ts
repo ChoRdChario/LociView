@@ -36,7 +36,8 @@ export async function inspectValidationFirstBackup(root: ProjectWorkspaceFS, opt
 }
 
 /** Host and catalog resolve exactly the same FS/DB generation. Never recreate an existing database. */
-export async function openValidationGeneration(root: ProjectWorkspaceFS, options: Options & { observeCatalogRead?: (read: MetadataSessionRead) => void }, create = false) {
+export async function openValidationGeneration(root: ProjectWorkspaceFS, options: Options, create = false,
+  diagnostics?: { observeRead?: (read: MetadataSessionRead) => void; context?: 'catalog' | 'host' }) {
   const databases = validationGenerationDatabases(options);
   let service: ReturnType<typeof validationGenerationService> | undefined;
   const controls = await readRestoreControls(root, limits);
@@ -48,8 +49,8 @@ export async function openValidationGeneration(root: ProjectWorkspaceFS, options
       if (current.selection) throw Error('プロジェクトの作成先が変わりました。'); },
     assertWritable: async () => { if ((await readRestoreControls(root, limits)).pending) throw Error('バックアップの復元が未完了です。'); } }, databases.open) :
     await BackupRestoreJob.openSelected(root, limits, databases, selected => service = validationGenerationService(selected, options), {
-      observeCatalogRead: options.observeCatalogRead,
-      timing: options.timing && ((stage, ms) => options.timing!(`${options.observeCatalogRead ? 'catalog' : 'host'}.destination.${stage}`, ms)),
+      observeCatalogRead: diagnostics?.observeRead,
+      timing: options.timing && ((stage, ms) => options.timing!(`${diagnostics?.context ?? 'host'}.destination.${stage}`, ms)),
     });
   try {
     service ??= validationGenerationService(scope, options);

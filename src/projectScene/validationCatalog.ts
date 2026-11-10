@@ -36,8 +36,8 @@ export async function listValidationProjects(options: Omit<ValidationHostOptions
       if (first) { result.push({ run, title: first.controls.pending ? 'バックアップの初回復元が未完了' : 'プロジェクトなし・復元記録を保持',
         state: first.controls.pending ? 'incomplete' : 'unavailable', firstRestore: first.controls.pending ? 'pending' : 'terminal' }); continue; }
       const observation: { selected?: MetadataSessionRead } = {};
-      storage = await measure('generation', () => openValidationGeneration(lease.workspace,
-        { ...project, observeCatalogRead: read => { observation.selected = read; } }));
+      storage = await measure('generation', () => openValidationGeneration(lease.workspace, project, false,
+        { observeRead: read => { observation.selected = read; }, context: 'catalog' }));
       const { session, fs } = storage.service;
       const read = observation.selected ?? await measure('session', () => session.read()), provider = read.provider;
       if (read.source && read.source.proof.identity.projectId !== `prj_${run}`) throw Error('Project mismatch');

@@ -141,6 +141,8 @@ export async function openValidationEntry(options: ValidationHostOptions): Promi
   try {
     control = await inspectValidationFirstBackup(lease.workspace, options);
     if (!input && !control) { const opened = await openNormalValidationHost(ordinary, lease); handedOff = true; return opened; }
+    // Recovery owns its dedicated reader; stripping firstBackup must not enable normal-resume notices.
+    ordinary.reading = undefined;
     if (input && !control) {
       const controls = await readRestoreControls(lease.workspace, limits);
       const rootPaths = await lease.workspace.list(`${root}/`);
@@ -272,7 +274,22 @@ async function openNormalValidationHost(options: ValidationHostOptions, inherite
     if (fresh && (!(options.initial || incoming || options.reviewEdit) || !lease.holdsWriteLock)) throw Error('保存データがありません。プロジェクトを選び直してください。');
     if (!fresh && options.initial) throw Error('作成先に保存データがあります。既存データは変更していません。');
     if (fresh) lease.activateNewProject();
-    connection = await measure('host.open.generation', () => openValidationGeneration(lease.workspace, options, fresh && !!(options.initial || incoming || options.reviewEdit) && lease.holdsWriteLock));
+    const reading = options.reading?.run === run && !options.initial && !options.workspaceFile && !options.reviewEdit && !options.firstBackup ? options.reading : undefined;
+    let openingText: ResumeReading | null = null, readingShown = false;
+    const showReading = (value: ResumeReading | null) => {
+      if (!reading || !value || readingShown || closed) return;
+      readingShown = true;
+      try { reading.show(value); } catch { /* Reading never decides Host or recovery readiness. */ }
+    };
+    connection = await measure('host.open.generation', () => openValidationGeneration(lease.workspace, options,
+      fresh && !!(options.initial || incoming || options.reviewEdit) && lease.holdsWriteLock,
+      reading ? { observeRead: read => {
+        try { openingText = validatedResumeReading(read, run); } catch { /* Keep only optional owned display text. */ }
+      } } : undefined));
+    if (openingText && !connection.restorePending) await measure('host.open.reading', async () => {
+      await connection!.check(); showReading(openingText);
+    });
+    openingText = null;
     let { fs, content, session } = connection.service;
     let receiver = new WorkspaceReceiver(options.base, fs, session, limits, options.packageLocks ?? null);
     let sender = new WorkspaceSender(fs, session, options.store, limits, options.packageLocks ?? null, options.timing ? (stage, ms) => options.timing!(`host.backup.${stage}`, ms) : undefined);
@@ -324,9 +341,8 @@ async function openNormalValidationHost(options: ValidationHostOptions, inherite
     if (incoming instanceof CleanArchive && last.source) throw Error('この独立コピーの再開用データがあります。ファイルを取り込まず、プロジェクト一覧から再開してください。');
     if (last.source && (last.source.proof.identity.projectId !== `prj_${run}` || incoming && json(last.source.proof) !== json(incoming.source.proof)))
       throw Error('ファイルと再開用データのプロジェクトが一致しません。既存データは変更していません。');
-    if (options.reading?.run === run && !options.initial && !options.workspaceFile && !options.reviewEdit && !options.firstBackup && !connection?.restorePending) {
-      const reading = validatedResumeReading(last, run);
-      if (reading) try { options.reading.show(reading); } catch { /* Reading never decides Host or recovery readiness. */ }
+    if (reading && !readingShown && !connection?.restorePending) {
+      try { showReading(validatedResumeReading(last, run)); } catch { /* Optional display formatting has no authority. */ }
     }
     await reloadReceive(last);
     let localInitial = !!options.initial || await hasNativeConversion(fs, false) || await hasLociMyuConversion(fs, false) || await hasFrozenV1Conversion(fs, false) || !!await fs.readStream(metadataPath(fs, 'validation-initial.json')) ||

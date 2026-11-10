@@ -291,6 +291,32 @@ fallback変更は本節に含めず、必要になれば独立した仕様判断
 入力欄の自動スクロールとaria-describedbyは保持し、次のTab移動・説明入口・2秒hoverでは従来どおり説明を読める。
 抑制は対象要素と同期呼出しの間だけとし、永続フラグ・タイマー・保存状態を追加しない。
 
+### 9.0. 復元済みgenerationの完了readから本文を先に渡す（PO継続指示2026-11-11）
+
+既存のdata-only先行閲覧を、openingで既に完了したfresh Session.readにも接続する。
+検査結果・source/providerを後続のHostへ採用する変更ではない。実装前の境界を次に固定する。
+
+- `BackupRestoreJob.openSelected`のarchive／Journal／Session／repository／全body／bases検査と
+  closing scope.checkが成功した既存callback内で、`validatedResumeReading`から所有済み文字列DTOだけを
+  同期的に作る。後で変換するためのMetadataSessionRead／source／providerは保持しない。
+- generation接続が成功し、最新controlsからrestorePendingでないと確認できた通常再開だけを対象とする。
+  run／proofのProject／provider tokenの一致とreadyを確認し、通知前に既存connection.checkをfreshに行う。
+  新規・incoming・review-copy・first-backup復旧／失敗・source-lessは除外する。
+  first-backupの目的は通常Hostへの引継ぎ前にも保持し、除去済みのflagから通常再開と推測しない。
+- 外部observerをopeningの下層callback内から呼ばない。接続成功後に一度だけ通知し、observer例外は
+  Hostの成否に影響させない。openingの完了readがない元generation等は、従来のHost read後へfallbackする。
+  後続の独立Host Session.read、incoming照合、受信／出力／初期化の探索・検査をすべて残す。
+- 既存readerとopening/run/disposeのowner、失敗時の撤去、IME完了待機、token／Scene一致時だけの
+  検索・選択・focus移送を使う。既存readerを作り直さず、readonly表示から命令・保存portを渡さない。
+- `validationGeneration`の任意の内部診断callbackは、完了readの通知と呼出し目的を明示する。
+  Catalogはcatalog.destination、Hostはhost.destinationの既存計測名を保つ。通知の有無で目的を推測しない。
+
+受入れは、復元済みの保存本文を持つfixtureで後続Host readを保持し、その間の本文閲覧・検索、
+命令／保存port不在とIME／選択移送を確認する。opening検査／終了確認／selection失効・pendingでは通知せず、
+後続失敗・dispose／owner交代・別tokenを従来の失効／handoff照合で扱う。元generationのfallbackと
+各目的の除外も保持する。Ki-84の3+3比較では、一覧の出現と実際に本文を開いて読めた時点を別に測り、
+保存ファイル・履歴・全素材の照合とcold編集／3Dの結果を維持する。実時間の効果がなければ採用しない。
+
 ### 9.1. 同じfreshな管理情報と出力streamの内部整理（2026-11-10）
 
 POの本文編集→保存→再開の改善指示に基づく内部実装候補であり、実時間の採否はtodoに記録する。

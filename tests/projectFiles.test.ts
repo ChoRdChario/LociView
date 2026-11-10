@@ -60,6 +60,7 @@ import { fixtureModelIds } from '../src/harness/projectScene/modelClosure';
 import { openValidationHost, openValidationEntry, validationArea } from '../src/harness/projectScene/validationHost';
 import { validatedResumeReading } from '../src/projectScene/validationHost';
 import * as resumeReadingModule from '../src/projectScene/resumeReading';
+import * as validationGenerationModule from '../src/projectScene/validationGeneration';
 import { browserMetadataDatabaseNames, browserOriginalDatabasePresent } from '../src/harness/projectScene/browserMetadataStorage';
 import { createValidationModeHost } from '../src/harness/projectScene/validationModeHost';
 import { productSources } from '../src/harness/projectScene/productSources';
@@ -2718,6 +2719,65 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       else { release(); await h.idle(); notice!.show(snapshot); expect(h.all(h.root).some(node => node.className.includes('lv-resume-reading'))).toBe(false); }
     } finally { release(); await (closing ?? h.ui.dispose()); }
   });
+  it('restored resume shows saved body before its independent Host read and retains IME handoff', async () => {
+    const f = await restoredBodyFixture(), document = new RecordedDocument(), all = (n: RecordedNode): RecordedNode[] => [n, ...n.children.flatMap(all)];
+    let release!: () => void, entered!: () => void, returned!: () => void, current: Awaited<ReturnType<typeof openValidationHost>> | undefined;
+    const gate = new Promise<void>(resolve => { release = resolve; }), held = new Promise<void>(resolve => { entered = resolve; }), opened = new Promise<void>(resolve => { returned = resolve; });
+    const original = validationGenerationModule.openValidationGeneration, notices: unknown[] = [], timings: string[] = [];
+    const generation = vi.spyOn(validationGenerationModule, 'openValidationGeneration').mockImplementation(async (...args) => {
+      const connection = await original(...args), read = connection.service.session.read.bind(connection.service.session);
+      connection.service.session.read = async () => { entered(); await gate; return read(); }; return connection;
+    });
+    const factory: ViewportFactory = () => ({ update() {}, setActive() {}, camera() {}, retry() {}, dispose() {},
+      read: () => ({ ready: true, display: undefined, token: '1', pickToken: '1', pins: [], issue: null, dragging: false, projection: 'perspective', axis: null }) });
+    const ui = owned(createValidationWorkspace(document.asDocument(), { ...f.options, productEditor: true, progressivePresentation: true,
+      selected() {}, list: () => listValidationProjects(f.options, f.openStorage), render: async () => ({ factory, dispose() {} }),
+      open: async (run, initial, mode, workspaceFile, reviewEdit, firstBackup, _standalone, reading) => {
+        const host = await openValidationEntry({ ...f.options, run, initial, mode, workspaceFile, reviewEdit, firstBackup,
+          timing: stage => { timings.push(stage); }, reading: reading && { run: reading.run, show(value) { notices.push(value); reading.show(value); } } });
+        if ('kind' in host) throw Error('selected Host expected'); current = host; returned(); return host;
+      } }, f.run));
+    const root = record(ui.root);
+    try {
+      await held; expect(current).toBeUndefined(); expect(notices).toHaveLength(1);
+      const reader = all(root).find(n => n.className.includes('lv-resume-reading'))!; expect(reader).toBeDefined();
+      expect(all(reader).some(n => n.tag === 'textarea' || n.tag === 'input' && n.type === 'file' || n.textContent === '変更を適用')).toBe(false);
+      expect(timings).toContain('host.destination.session'); expect(timings).toContain('host.open.reading');
+      expect(timings.some(stage => stage.startsWith('catalog.destination.'))).toBe(false);
+      const search = all(reader).find(n => n.tag === 'input' && n.type === 'search')!, row = all(reader).find(n => n.tag === 'button' && n.textContent === f.reading.records.find(c => c.id === f.captionId)!.title)!;
+      search.focus(); search.fire('compositionstart'); search.value = row.textContent.slice(0, 1); search.fire('input'); row.fire('click');
+      expect(all(reader).some(n => n.tag === 'p' && n.textContent === f.body)).toBe(true);
+      release(); await opened; await Promise.resolve(); expect(all(root)).toContain(reader);
+      search.fire('compositionend'); await ui.ready; expect(all(root)).not.toContain(reader);
+      const editor = all(root).find(n => n.className === 'lv-project-workspace')!, filters = all(editor).find(n => n.className === 'lv-caption-search')!;
+      const field = all(filters).find(n => n.attributes.get('aria-label') === '検索')!;
+      expect(field.value).toBe(search.value); expect(document.activeElement).toBe(field);
+      expect(all(editor).find(n => n.tag === 'textarea' && n.attributes.get('aria-label') === '本文')?.value).toBe(f.body);
+      expect(current!.read().source!.originalChanges()).toEqual(f.changes); expect(notices).toHaveLength(1);
+    } finally { release(); generation.mockRestore(); await ui.dispose(); }
+  });
+  it.each(['selection-check', 'pending', 'later-read', 'observer'] as const)('restored early body preserves opening safety at %s', async failure => {
+    const f = await restoredBodyFixture(), original = validationGenerationModule.openValidationGeneration, show = vi.fn(() => { if (failure === 'observer') throw Error('observer failure'); });
+    let independentReads = 0;
+    const generation = vi.spyOn(validationGenerationModule, 'openValidationGeneration').mockImplementation(async (...args) => {
+      const connection = await original(...args), read = connection.service.session.read.bind(connection.service.session);
+      connection.service.session.read = async () => { independentReads++; if (failure === 'later-read') throw Error('independent read failed'); return read(); };
+      if (failure === 'selection-check') connection.check = async () => { throw Error('selection retired'); };
+      if (failure === 'pending') connection.restorePending = true;
+      return connection;
+    });
+    try {
+      const opening = openValidationHost({ ...f.options, reading: { run: f.run, show } });
+      if (failure === 'selection-check' || failure === 'later-read') {
+        await expect(opening).rejects.toThrow(failure === 'selection-check' ? 'selection retired' : 'independent read failed');
+        expect(show).toHaveBeenCalledTimes(failure === 'selection-check' ? 0 : 1);
+      } else {
+        const host = owned(await opening); expect(host.read().source!.originalChanges()).toEqual(f.changes);
+        expect(show).toHaveBeenCalledTimes(failure === 'pending' ? 0 : 1); await host.dispose();
+      }
+      expect(independentReads).toBe(failure === 'selection-check' ? 0 : 1);
+    } finally { generation.mockRestore(); }
+  });
   it('named resume scopes startup without hiding an existing import destination or the full selector', async () => {
     const f=resumeWorkspaceFixture(),a=await f.seed('再開する記録'),b=await f.seed('別の記録');
     const other=await f.ports.open(b.run);if('kind' in other)throw Error('normal host');
@@ -2967,8 +3027,18 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const options = { run, base, store, fileLimits: budget, decode, coordinator: ProjectMutationCoordinator.browser(locks), packageLocks: locks, generations: () => databases, openStorage };
     return { options, databases, base, inspection, run, openStorage, firstBackup: { file, archive: { sha256: inspection.archive.sha256, byteLength: inspection.archive.byteLength } } };
   }
+  async function restoredBodyFixture() {
+    const file = await restoreFileFixture(true), restored = await firstBackupHostFixture(file.backupFile);
+    const preview = owned(await openValidationEntry({ ...restored.options, firstBackup: restored.firstBackup }));
+    if (!('kind' in preview)) throw Error('first recovery');
+    const host = owned(await preview.confirm(async () => {})), body = '復元後に保存した本文';
+    await host.dispatch(host.read().source!.token, { kind: 'editCaption', captionId: file.captionId, edits: { body } });
+    const reading = validatedResumeReading(host.read(), restored.run)!, changes = host.read().source!.originalChanges();
+    expect(reading.records.find(c => c.id === file.captionId)?.body).toBe(body); await host.dispose();
+    return { ...restored, captionId: file.captionId, body, reading, changes };
+  }
   it('opens first-backup recovery without a normal Session, cold-retries its acknowledged generation and hands the same lease to real editing', async () => {
-    const f = await restoreFileFixture(), r = await firstBackupHostFixture(f.backupFile), preview = owned(await openValidationEntry({ ...r.options, firstBackup: r.firstBackup }));
+    const f = await restoreFileFixture(), r = await firstBackupHostFixture(f.backupFile), show = vi.fn(), preview = owned(await openValidationEntry({ ...r.options, firstBackup: r.firstBackup, reading: { run: r.run, show } }));
     if (!('kind' in preview)) throw Error('first recovery'); expect('authority' in preview).toBe(false); expect(preview.state().phase).toBe('preview');
     expect(await r.base.list('')).toEqual([]); expect(r.openStorage).not.toHaveBeenCalled();
     r.base.reject = path => path.endsWith('/published.json'); await expect(preview.confirm(async () => {})).rejects.toThrow('injected quota');
@@ -2978,10 +3048,10 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect(view.readOnly).toBe(true); const files = await r.base.list(''), bytes = await Promise.all(files.map(path => r.base.readBytes(path)));
     await expect(view.retry(async () => {})).rejects.toThrow('編集'); expect(await Promise.all(files.map(path => r.base.readBytes(path)))).toEqual(bytes); await view.dispose();
     const images=vi.spyOn(ValidationContent.prototype,'displayImage'),projectionReads:number[]=[];let beforeProjection=0;
-    const cold = owned(await openValidationEntry({...r.options,lazyImages:true,timing(stage){if(stage==='restore.first.projection.start')beforeProjection=images.mock.calls.length;else if(stage==='restore.first.projection')projectionReads.push(images.mock.calls.length-beforeProjection);}})); if (!('kind' in cold)) throw Error('cold recovery');
+    const cold = owned(await openValidationEntry({...r.options,lazyImages:true,reading:{run:r.run,show},timing(stage){if(stage==='restore.first.projection.start')beforeProjection=images.mock.calls.length;else if(stage==='restore.first.projection')projectionReads.push(images.mock.calls.length-beforeProjection);}})); if (!('kind' in cold)) throw Error('cold recovery');
     const prepared = vi.fn(async (next, content) => { expect(next.validationFiles).toBe(true); expect(next.modelVersions).toHaveLength(2);expect(next.mediaChoices?.length).toBeGreaterThan(0);
       for (const version of next.modelVersions!) expect((await content.model(version.closure.representation)).bytes).toEqual((await f.reopen().content.model(version.closure.representation)).bytes); });
-    const host = owned(await cold.retry(prepared)); expect(prepared).toHaveBeenCalledOnce();expect(projectionReads).toEqual([0]);images.mockRestore(); expect(host.read().source!.originalChanges()).toEqual(r.inspection.source.originalChanges());
+    const host = owned(await cold.retry(prepared)); expect(prepared).toHaveBeenCalledOnce();expect(projectionReads).toEqual([0]);images.mockRestore(); expect(host.read().source!.originalChanges()).toEqual(r.inspection.source.originalChanges()); expect(show).not.toHaveBeenCalled();
     expect(host.authority.readOnly).toBe(false); await host.dispatch(host.read().source!.token, { kind: 'editCaption', captionId: f.captionId, edits: { body: '初回復元の実編集' } });
     const edited = host.read().source!, sent = await host.workspaceOutput.download(await host.workspaceOutput.generateContribution(edited.token, host.workspaceOutput.bases[0]!.selection));
     const accepted = await f.receiverService.receive((await f.receiver.session.read()).source!.token, sent); expect(accepted.state).toBe('ready');
