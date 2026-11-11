@@ -9496,8 +9496,8 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     }finally{await ui.dispose();await mode.dispose();await f.workspace.dispose();}
   });
   it('keeps the existing viewport visible for compact drawing and releases it on returning to records', async () => {
-    const f = await openFileCaption(), document = new RecordedDocument().asDocument(); let active = false;
-    Object.assign(document, { defaultView: { innerWidth: 390, innerHeight: 844, matchMedia: () => ({ matches: true }), addEventListener() {}, removeEventListener() {}, setTimeout, clearTimeout } });
+    const f = await openFileCaption(), document = new RecordedDocument().asDocument(); let active = false, compact = true;
+    Object.assign(document, { defaultView: { innerWidth: 390, innerHeight: 844, matchMedia: () => ({ get matches() { return compact; } }), addEventListener() {}, removeEventListener() {}, setTimeout, clearTimeout } });
     const mode = createValidationModeHost(f.host, async () => { throw Error('unexpected mode change'); }, () => {});
     let display: Parameters<ReturnType<ViewportFactory>['update']>[0] | undefined;
     const activation = vi.fn((next: boolean) => { active = next; });
@@ -9508,10 +9508,28 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const body = nodes().find(n => n.className === 'lv-project-body')!, token = f.host.read().source!.token;
     try {
       expect(activation).toHaveBeenLastCalledWith(false); expect(factory).toHaveBeenCalledOnce();
+      const tabs = nodes().find(n => n.attributes.get('role') === 'tablist' && n.attributes.get('aria-label') === '作業')!;
+      expect(tabs.parent!.className).toBe('lv-compact-navigation');
+      button('3D').fire('click'); expect(activation).toHaveBeenLastCalledWith(true);
+      expect(tabs.children.every(n => n.attributes.get('aria-selected') === 'false')).toBe(true);
+      const before = activation.mock.calls.length;
       button('描画').fire('click'); expect(body.dataset.drawingPreview).toBe('true'); expect(activation).toHaveBeenLastCalledWith(true);
+      expect(body.dataset.surface).toBe('panel'); expect(activation.mock.calls.slice(before).some(([value]) => !value)).toBe(false);
       button('3D').fire('click'); expect(body.dataset.drawingPreview).toBe('false'); expect(activation).toHaveBeenLastCalledWith(true);
       button('作業パネル').fire('click'); expect(body.dataset.drawingPreview).toBe('true'); expect(activation).toHaveBeenLastCalledWith(true);
       button('キャプション').fire('click'); expect(body.dataset.drawingPreview).toBe('false'); expect(activation).toHaveBeenLastCalledWith(false);
+      nodes().find(n => n.className === 'lv-caption-select')!.fire('click'); button('位置を調整').fire('click');
+      expect(body.dataset.surface).toBe('stage'); expect(button('描画').disabled).toBe(true);
+      button('描画').fire('click'); expect(body.dataset.surface).toBe('stage');
+      const pin = nodes().find(n => n.attributes.get('aria-label') === '位置の調整')!;
+      expect(pin.hidden).toBe(false); all(pin).find(n => n.tag === 'button' && n.textContent === '取り消す')!.fire('click');
+      button('描画').fire('click'); const drawing = button('描画'); drawing.focus();
+      compact = false; ui.render(); expect(tabs.parent!.className).toBe('lv-sidebar-toolbar');
+      expect(document.activeElement).toBe(drawing as unknown as Element); const focusCalls = drawing.focusCalls.length;
+      ui.render(); ui.render(); expect(drawing.focusCalls).toHaveLength(focusCalls);
+      compact = true; ui.render(); expect(tabs.parent!.className).toBe('lv-compact-navigation');
+      expect(document.activeElement).toBe(drawing as unknown as Element);
+      expect(nodes().filter(n => n.attributes.get('role') === 'tablist' && n.attributes.get('aria-label') === '作業')).toHaveLength(1);
       expect(factory).toHaveBeenCalledOnce(); expect(nodes().filter(n => n.tag === 'canvas')).toHaveLength(1); expect(f.host.read().source!.token).toBe(token);
     } finally { await ui.dispose(); await mode.dispose(); await f.workspace.dispose(); }
   });

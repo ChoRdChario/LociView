@@ -111,8 +111,12 @@
   .lv-project-identity { flex-basis: calc(100% - 150px); }
   .lv-workspace-actions { flex: 1 1 auto; }
   .lv-project-workspace > header > details { margin-left: auto; }
-  .lv-compact-navigation { display: flex; gap: 6px; padding: 6px 12px; border-bottom: 1px solid #c9c5bd; }
-  .lv-compact-navigation > button { flex: 1; }
+  .lv-compact-navigation { display: flex; flex-wrap: wrap; gap: 6px; padding: 6px 12px; border-bottom: 1px solid #c9c5bd; }
+  .lv-compact-navigation > button { flex: 1 0 auto; white-space: nowrap; }
+  .lv-compact-navigation > [role="tablist"] { display: flex; flex: 1 0 max-content; flex-wrap: wrap; min-width: 0; max-width: 100%; gap: 4px; }
+  .lv-compact-navigation > [role="tablist"] > [role="tab"] { flex: 1 0 auto; min-width: 44px; min-height: 44px; padding: 6px 4px; white-space: nowrap; }
+  .lv-project-shell .lv-compact-navigation [role="tab"] { border: 0; border-radius: 0; border-bottom: 3px solid transparent; background: transparent; }
+  .lv-project-shell .lv-compact-navigation [role="tab"][aria-selected="true"] { border-bottom-color: #59654f; font-weight: 600; }
   .lv-project-body { display: block; height: calc(100dvh - 200px); min-height: 280px; }
   .lv-project-stage, .lv-project-body > aside { height: 100%; box-sizing: border-box; min-height: 0; }
   .lv-project-body[data-surface="panel"] > .lv-project-stage, .lv-project-body[data-surface="stage"] > aside { display: none; }
@@ -305,7 +309,7 @@
 .lv-caption-reading .lv-caption-detail > [data-caption-completion] + div { flex: 0 0 auto; max-height: 35%; overflow: auto; }
 .lv-project-body > aside > .lv-drawing-task { display: flex; flex-direction: column; overflow: hidden; }
 .lv-drawing-task > .lv-material-editor { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
-.lv-material-content { flex: 1 1 0; min-height: 0; overflow: auto; }
+.lv-material-content { flex: 1 1 0; min-height: 0; overflow: auto; scroll-padding-block: 12px; }
 .lv-drawing-task .lv-material-actions { position: static; flex: 0 0 auto; padding: 10px 0 0; }
 .lv-project-shell .lv-project-workspace .lv-material-primary { background: #3c4637; border-color: #3c4637; color: #fff; }
 .lv-project-shell .lv-project-workspace .lv-material-primary:hover:not(:disabled) { background: #303b2c; }

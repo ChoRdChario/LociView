@@ -126,6 +126,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     else { target.tabIndex=-1;target.focus?.({preventScroll:false}); } });
   retainedEdit.append(retainedNote, returnToEdit);
   const taskTabs = make('div'), captionPanel = make('section'); taskTabs.setAttribute('role', 'tablist'); taskTabs.setAttribute('aria-label', '作業');
+  let taskTabsInNavigation = false;
   const panels = new Map<ProjectTask, ProjectPanel>(); let task: ProjectTask = 'captions', models: ProjectModelPanel | undefined, mediaManager: ReturnType<typeof createProjectMedia> | undefined;
   let pinScale: ReturnType<typeof createProjectPinScale> | undefined;
   const sceneArea = make('section'), scenes = make('div'), sceneButtons = new Map<string, HTMLButtonElement>(); sceneArea.setAttribute('aria-label', 'シーン'); sceneArea.append(make('h2', 'シーン'), scenes);
@@ -659,8 +660,16 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   cameraPositions.addEventListener('click',event=>{if((event.target as Element)?.closest?.('summary')&&viewBlocked())event.preventDefault();});
   cameraPositions.addEventListener('keydown',event=>{if(event.key==='Escape'&&!event.isComposing&&!views.composing()&&!viewBlocked()){event.preventDefault();cameraPositions.open=false;render();(cameraPositions.children[0] as HTMLElement).focus?.({preventScroll:true});}});
   const tabButtons = new Map<ProjectTask, HTMLButtonElement>();
+  let hiddenTaskFocus: HTMLButtonElement | undefined;
+  taskTabs.addEventListener('focusout', event => {
+    // A breakpoint can hide the old parent before its resize handler runs.
+    if (!event.relatedTarget && taskTabsInNavigation !== compactLayout())
+      hiddenTaskFocus = [...tabButtons.values()].find(tab => tab === event.target);
+  });
+  const taskEntryBlocked = (key: ProjectTask) => compactLayout() && compactSurface === 'stage' &&
+    (positionInput() || viewBlocked() && !(key === 'captions' && readDuringOutput()));
   for (const [key, label] of [['captions', 'キャプション'], ['models', 'モデル'], ['materials', '描画']] as const) {
-    const tab = button(label, () => { if (!busy && !pending && !windowMoving && (!ports.otherPending() || key==='captions'&&readDuringOutput()) && !composing && !sceneEdit?.composing && !includeMemory().composing && !draft?.composing && !mediaManager?.composing() && ![...panels.values()].some(p => p.composing())) { task = key; feedback=''; render(); } });
+    const tab = button(label, () => { if (!taskEntryBlocked(key) && !busy && !pending && !windowMoving && (!ports.otherPending() || key==='captions'&&readDuringOutput()) && !composing && !sceneEdit?.composing && !includeMemory().composing && !draft?.composing && !mediaManager?.composing() && ![...panels.values()].some(p => p.composing())) { task = key; if(compactLayout())compactSurface = 'panel'; feedback=''; render(); } });
     tab.setAttribute('role', 'tab'); tab.setAttribute('aria-controls', `lv-project-${key}`); tab.id = `lv-project-tab-${key}`; tabButtons.set(key, tab); taskTabs.append(tab);
     tab.addEventListener('keydown', event => {
       if (tab.disabled || !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
@@ -1024,6 +1033,14 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   function render() {
     if (disposed || rendering) return;cancelObservation();rendering = true;
     try {
+      const compact = compactLayout();
+      let movedTaskFocus = hiddenTaskFocus;
+      hiddenTaskFocus = undefined;
+      if (taskTabsInNavigation !== compact) {
+        movedTaskFocus = [...tabButtons.values()].find(tab => tab === document.activeElement) ?? movedTaskFocus;
+        taskTabsInNavigation = compact;
+        (compact ? compactNavigation : sidebarToolbar).append(taskTabs);
+      }
       const p = provider(), blocked = mutationBlock(), selected = memory().selectedCaptionId;
       if (markerNavigation && (markerNavigation.token !== p.token || markerNavigation.scene !== sceneId)) finishMarkerNavigation();
       captionPanel.dataset.selected = String(!!selected);
@@ -1140,8 +1157,8 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       installedViewportInput=viewportInput;viewport.update(viewportInput);
       finishSurfaceOpening();
       renderCaptionActions();
-      for (const [key, tab] of tabButtons) { tab.setAttribute('aria-selected', String(task === key)); tab.tabIndex = task === key ? 0 : -1;
-        tab.disabled = busy || !!pending || windowMoving || ports.otherPending() && !(key==='captions'&&readDuringOutput()) || composingInput(); }
+      for (const [key, tab] of tabButtons) { tab.setAttribute('aria-selected', String(task === key && (!compact || compactSurface === 'panel'))); tab.tabIndex = task === key ? 0 : -1;
+        tab.disabled = taskEntryBlocked(key) || busy || !!pending || windowMoving || ports.otherPending() && !(key==='captions'&&readDuringOutput()) || composingInput(); }
       captionPanel.hidden = task !== 'captions'; for (const [key, panel] of panels) { panel.root.hidden = key==='views'?!cameraPositions.open:key !== task; if (key === task||key==='views') panel.render(); }
       sidebar.dataset.task=task;closeCamera.disabled=viewBlocked()||views.composing();
       sceneContext.textContent = `シーン：${fieldValue(p.state.scenes[sceneId]?.name) ?? '名称を確認'}`; sceneContext.hidden = true;
@@ -1216,6 +1233,8 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       if (focusedMarker && markerNodes.has(focusedMarker) && document.activeElement !== focusedMarker) focusedMarker.focus({ preventScroll: true });
       overlayBaseline={input:viewportInput,ready:seen.ready&&seen.token===p.token&&seen.sceneId===sceneId,cameraReady:seen.cameraReady??seen.ready,gizmo:cameraState};
       positionRecordSheets();ports.changed();
+      // Restore after layout attributes and panel visibility match the new parent.
+      if (!disposed && document.activeElement === document.body) movedTaskFocus?.focus({ preventScroll: true });
     } finally { rendering = false; if (renderAgain) { renderAgain = false; render(); } }
   }
   mounted = true; render();

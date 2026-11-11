@@ -5,7 +5,7 @@ import { ownedServer } from '../offline-e2e/server';
 import { nativeConversionBackup, smallPng, triangleGlb } from './fixtures';
 
 test('phone record list, body and completion stay usable when the viewport shrinks', async ({}, info) => {
-  const server = await ownedServer('offline-desktop-dist');
+  const server = await ownedServer(process.env.LOCIVIEW_E2E_ARTIFACT ?? 'offline-desktop-dist');
   const browser = await chromium.launch({ channel: 'chromium' });
   const context = await browser.newContext({
     viewport: { width: 320, height: 568 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, serviceWorkers: 'block',
@@ -60,6 +60,12 @@ test('phone record list, body and completion stay usable when the viewport shrin
     await page.screenshot({ path:info.outputPath('drawing-preview-uncovered.png') });
     const preview = (await canvas.boundingBox())!, panel = (await drawing.boundingBox())!;
     expect(preview.width).toBeGreaterThan(300); expect(panel.y).toBeGreaterThanOrEqual(preview.y + preview.height);
+    await page.setViewportSize({ width: 844, height: 390 });
+    await expect(canvas).toBeVisible();await expect(page.getByRole('tab', { name: '描画', exact: true })).toBeInViewport();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+    expect((await canvas.boundingBox())!.height).toBeGreaterThan(0);await expect(page.locator('.lv-project-stage canvas')).toHaveCount(1);
+    await page.screenshot({ path:info.outputPath('landscape-phone-drawing.png') });
+    await page.setViewportSize({ width: 390, height: 844 });
     await opacity.tap(); await opacity.fill('55'); await opacity.dispatchEvent('compositionstart');
     await expect(drawing.getByRole('button', { name: '変更を適用', exact: true })).toBeDisabled();
     await page.setViewportSize({ width: 320, height: 365 }); await opacity.dispatchEvent('compositionend');

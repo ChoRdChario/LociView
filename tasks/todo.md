@@ -1,6 +1,6 @@
 # LociView active work
 
-Updated2026-11-11. This is the single current plan and check record.
+Updated2026-11-12. This is the single current plan and check record.
 [Inventory](implementation-inventory.md) owns route-specific coverage;
 [map](../PROJECT_MAP.md) and [document index](../docs/README.md) route contracts/code.
 Git owns checkpoint identity. [Retained checkpoint evidence](../docs/history/development-through-2026-10-29/tasks/todo-before-daily-authoring.md)
@@ -57,7 +57,140 @@ unchanged-feature-classification checks pass; independent review has no findings
 No runtime change or new capacity guarantee; no runtime suite is needed for this
 documentation checkpoint.
 
-## Current work —complete one record, save and resume (2026-11-11)
+## Current work —complete regression and reduce large-data waits (2026-11-12)
+
+Outcome: finish Desktop/offline regression and reduce real Ki-84/500k SH4 waits
+on PC and touch. Compare with61c5f9a, fixed converted backups, isolated profiles
+and repeated elapsed observations. Root is the sole writer; independent UI,
+contract and test reviewers are read-only. Preserve originals/quality, all
+write/readback/recovery fences and existing frame limits. No dependency, format,
+numeric guarantee, publication or physical-Safari acceptance is added.
+
+Baseline: frozen61 application completes Desktop51 PASS/1 diagnostic failure;
+the repaired image diagnostic then passes the complete affected case separately.
+Its actual image assertion/deadline is unchanged. Offline8 and installed
+Edge/Chrome2 pass. Keep original failed/full and corrected evidence distinct.
+Host memory headroom recovered; old pressured measurements are not a baseline.
+Evidence and fixed input identities remain private under
+`.artifacts/e2e/comfort-regression-20261111/`.
+
+Chosen change: compact3D exposes the same task tab list; Drawing opens directly
+without hiding/reloading the single viewport. Caption/model navigation still
+releases hidden resources. Move only that tab list at compact/PC boundary;
+consume resize focus fallback once, preserve explicit blur and other focus.
+Keep intrinsic wrapping and44px targets without forcing an extra navigation row.
+Drawing's scrolling content gets the same12px scroll padding as Caption content;
+measured input bottom292.40625 versus scrollport bottom292.0 explains the short
+phone clipping. No input/footer size or visibility assertion is relaxed.
+
+Independent product/contract/test reviews have no remaining source findings.
+The public change is UI2 plus five relevant test files; storage/package/Session,
+dependencies and renderer are unchanged. Corrected focus-v3 passes all8 connected
+cases. Final2 checkpoint passes156 files/3510 tests, all builds and offline/HEIC
+isolation; frozen final-v2 source/test fingerprint is6ecc51e7b284. Native compact
+continuity passes in31.1s. No product source/test changes follow that freeze.
+
+Retain failed candidates: final-v1 checkpoint passes156 files/3510 tests
+(existing16 expected-fail/21 todo remain separate), all builds and offline/HEIC
+isolation. Its whole Desktop completes49 PASS/3 FAIL: two compact CSS regressions
+(short list and enlarged-text wrapping), and an existing random membership-order
+assumption in the record-window test. Follow the actual list's direction and
+assert destinations/end boundaries; do not change product ordering. Focus-v1
+then exposes squeezed narrow navigation buttons; focus-v2 fixes those but finds
+the fractional Drawing input clip. Original screenshots/logs and source snapshots
+remain available. Verify the connected workflows after the final padding fix,
+then run the final source checkpoint and whole native/offline/installed lanes.
+
+Performance evaluation: readonly discovery (§06e9.2) is rejected before coding
+because its measured upper bound is small. ZIP task-source candidate (§06e9.3)
+passes safety checks but gives no useful save improvement and worsens GS resume;
+restore its three source/test files exactly toHEAD, keeping the experiment
+privately. Do not keep its candidate-only tests as product complexity.
+
+Visual meta-audit invalidates the old phone navigation timing credit: final-v1
+Ki-84 Drawing PNGs0/2 are black during transparent compositor preparation.
+Busy=false plus2RAF is not actual current-size presentation acceptance. Keep PC
+file/body timings separately; no PC save improvement is established. Re-measure
+both artifacts with the same post-edit backup, actual model pixels, current
+buffer extent and selected pin, masking DOM overlays. Use the existing model
+readiness ceiling; no fixed sleep, camera adjustment or relaxed assertion.
+Run three fully closed observations per input/artifact without extra large output
+roundtrips; preserve hidden-resource reconstruction and saved-body checks.
+
+Final2 fixed-input PC workflows pass3 Ki-84 plus3 GS cases, with all file/body/
+identity/history/asset checks and no remote/page errors. Median seconds below;
+raw three observations remain in private `final2-after-comparison.json`. Phone
+busy/2RAF values in that artifact are explicitly unqualified; use actual pixels.
+These small PC differences are observations, not an attributed optimization.
+
+| PC action | Ki-84 before→final2 | 500k SH4 before→final2 |
+|---|---:|---:|
+| Initial backup restoration→records | 58.999→59.872 | 112.375→108.751 |
+| Apply one body edit | 6.071→6.327 | 2.455→2.434 |
+| Output→actual file obtained | 18.412→18.948 | 28.896→29.571 |
+| Fully closed resume→visible saved body | 5.393→5.417 | 6.298→6.718 |
+| Fully closed resume→3D ready | 15.609→15.862 | 18.300→18.815 |
+
+A private orchestration call selected Windows PowerShell5 and treated a normal
+native stderr warning as an error before the first pixel case completed. Retain
+that failed evidence, verify unchanged frozen source/artifact bytes and all6
+passed primary cases, and resume remaining lanes under actual PowerShell7.6.9.
+Do not rerun or relabel the passed checkpoint/primary measurements.
+
+Actual-pixel phone preflight passes all4 cases, with3 fully closed observations
+per input/artifact. Ki-84 before[6532,6482,7009]→after[354,368,332]ms; median
+6532→354ms. GS before[10635,10624,10620]→after[160,141,155]ms; median10624→155ms.
+Model pixels/current extent/selected pin, same canvas, no additional context/source/
+splat load, and hidden-resource reconstruction all pass. This includes screenshot
+observation overhead and is not a physical-device or general performance guarantee.
+The separate pixel status qualifies only that lane; whole-workflow status stays
+pending until Desktop/offline/installed cases actually complete.
+
+Milestone audit: g0/61 remains the base; frozen6ecc product code and all write/
+readback/recovery boundaries are unchanged. One writer, independent review and
+real navigation/save workflows have closed. Continue the existing whole-regression
+gate; no new helper or optimization workstream is needed before that result.
+
+Final qualification completes on frozen6ecc source: Desktop52 PASS in86.9min,
+offline8 PASS in11.3min, installed Edge/Chrome2 PASS in40.7s. No skip, unexpected
+failure, flaky result or automatic retry. Offline covers fully closed browser/server
+Mesh/Point/500k SH4/Proxy/media work, editing/output/cold resume, initial conversion,
+updates, exact boot-resource repair and same-address return without Project changes.
+The matched120s camera pair and20 resize/target retirement cycles preserve existing
+1.30/64MiB criteria; functional and performance checks remain separate.
+Final aggregate evidence re-verifies the four actual-pixel lanes without rerunning
+them. All final source/test and artifact bytes match the reviewed/tested candidate.
+
+Prepare only the verified13-file source/test/document checkpoint for g0. Preserve
+251 original private draft lines locally while excluding them, originals and all
+.artifacts from the index. GitHub Pages is workflow-based frommain; the intended
+g0 push runs CI, not deployment. Git and the exact pushed CI run own identity/status;
+keep the CI result with this checkpoint's local evidence and report it separately.
+Do not repeat passed runtime checks for staging, commit or result prose alone.
+
+Remaining critical path: baseline first restoration exposes records after~59s
+(Ki-84)/112s(GS); normal cold saved-body viewing is~5.4/6.3s. These are distinct
+operations. Independent mapping finds no discarded successful Session read in
+body apply. Further large read reduction or showing text before first-restore
+initialization requires an explicit contract design:06a currently excludes raw
+archive candidates, and normal early-resume observers exclude first restore.
+Do not invent a ready Session/Scene token or weaken publication/readback fences.
+The independently reviewed [06g proposal](../docs/specs/06g-first-restore-caption-preview-proposal.md)
+defines that next decision; it is unapproved/unimplemented and does not stop
+the current final qualification. Only initial-Scene plain text would advance;
+all editing, saving, write/readback, Selection and recovery acceptance remains.
+Large-GS whole-flow case passes in22.0min, including all5 internal wire purposes,
+return, Review copy, restoration and cold resume. Its single Review-copy command
+endpoint is165.039s to editor and175.244s to3D; this is a remaining comfort issue,
+not a three-run performance improvement. Independent read-only mapping finds no
+high-impact read reusable under current authority: child and parent completion
+receipts intervene between the apparently discarded reads. Parent retry→admission
+sharing would expand06b's explicitly limited inspection lifetime; do not adopt
+it as a UI cache or combine older stage timings with this run's endpoints.
+
+Physical iOS/Safari memory, IME, saving and fully closed offline use remain pending.
+
+## Previous checkpoint —complete one record, save and resume (2026-11-11)
 
 PO authorized the grouped review repairs and restrained motion. Root is the only
 writer; independent contract/UI/test mapping is read-only. Implement honest file
@@ -113,6 +246,21 @@ run own commit/CI identity. Next: resume full Desktop/offline/installed-browser
 and Ki-84/500k elapsed qualification
 when host resources permit. Preserve the unchanged120s/1.30/64MiB conditions and
 all write/readback/recovery checks. Physical iOS acceptance and release stay pending.
+
+Post-checkpoint local evidence: source61c5f9a's exact CI completed successfully.
+On the same fixed source/build, converted Ki-84 backup → one body edit → actual
+external backup → all blob hashes/history/records → full-browser-close resume
+passes, with unchanged input and no remote/page errors. The shared-load single
+observation was apply35.836s, output handoff48.901s, cold readable body12.435s;
+it is not a paired performance result. Full GS/offline/installed-browser and
+matched-performance requalification remain pending; evidence is local under
+`record-completion-20261111/ki84-current-ui-v1` and `ki84-functional-proof.json`.
+The additional same-build Ki-84 photo check passes real JPEG decode,1:1 original
+width, close/focus return and3D continuation; displayed506x390/61029-byte JPEG
+SHA-256 also matches the existing independently derived source oracle. Retain
+v1's incorrect region-locator and v2's browser-cache setup failures separately;
+v3 uses the existing dedicated runner without assertion/deadline relaxation.
+See local `ki84-photo-proof.json`; no broader qualification or source change.
 
 ## Completed review —third-party product evaluation (2026-11-11)
 

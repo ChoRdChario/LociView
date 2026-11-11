@@ -21,6 +21,23 @@ for (const touch of [false, true]) test(`attachment ordering and Drawing complet
     const stage = page.getByRole('button', { name: '3D', exact: true });
     if (touch) { await expect(stage).toBeVisible(); if (await stage.getAttribute('aria-pressed') !== 'true') await stage.click(); }
     await expect(page.getByLabel('3Dモデルの表示', { exact: true })).toHaveAttribute('aria-busy', 'false', { timeout: 90_000 });
+    if (touch) {
+      const tasks = page.getByRole('tablist', { name: '作業', exact: true }), drawing = tasks.getByRole('tab', { name: '描画', exact: true });
+      await expect(tasks).toBeVisible(); await expect(tasks.locator('[aria-selected="true"]')).toHaveCount(0);
+      const canvas = await page.getByLabel('3Dモデルの表示', { exact: true }).elementHandle();
+      await drawing.click(); await expect(page.getByRole('tabpanel', { name: '描画', exact: true })).toBeVisible();
+      await expect(page.getByLabel('3Dモデルの表示', { exact: true })).toBeVisible();
+      expect(await canvas!.evaluate(node => node === document.querySelector('canvas[aria-label="3Dモデルの表示"]'))).toBe(true);
+      await drawing.focus(); await page.setViewportSize({ width: 1440, height: 900 });
+      await expect(page.locator('.lv-sidebar-toolbar > [role="tablist"]')).toHaveCount(1); await expect(drawing).toBeFocused();
+      await drawing.evaluate(node => (node as HTMLElement).blur());
+      await page.setViewportSize({ width: 390, height: 844 });
+      await expect(page.locator('.lv-compact-navigation > [role="tablist"]')).toHaveCount(1);await expect(page.locator('body')).toBeFocused();
+      await drawing.focus();await page.setViewportSize({ width: 1440, height: 900 });await expect(drawing).toBeFocused();
+      await page.setViewportSize({ width: 390, height: 844 });
+      await expect(page.locator('.lv-compact-navigation > [role="tablist"]')).toHaveCount(1); await expect(drawing).toBeFocused();
+      await expect(tasks).toHaveCount(1);
+    }
     await revealCaptionList(page); await revealCoordinateAdd(page); await page.getByLabel('追加先モデル', { exact: true }).focus();
     await page.getByLabel('追加先モデル', { exact: true }).selectOption({ label: 'continuity.glb' });
     await page.getByRole('button', { name: 'このモデルに追加', exact: true }).click();

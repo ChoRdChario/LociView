@@ -838,3 +838,37 @@ owner idle. Verify held list refresh preserves nodes and disables both open
 modes, newly inserted busy rows start disabled, composition toggles them, and
 actual home keyboard opening succeeds after idle. Preserve the real Ki84 home
 attempt failure evidence; a deep-link data check is not a home-input PASS.
+
+### Compact Drawing navigation evaluation —2026-11-11
+
+Within the approved PC/touch comfort workflow, expose the single existing task
+tab list during compact3D viewing as well as panel viewing. Move only that list,
+only when its compact/PC layout owner changes; keep Scene forms and input nodes
+in place. Selecting Drawing changes task and panel surface in one render, so the
+existing single canvas remains visible. Caption/model navigation still releases
+hidden resources; no decoded cache, second viewport, setting or new authority.
+
+Keep PC placement, current draft/IME/native-picker guards, short-input hiding,
+keyboard traversal and focus on the same tab when layout moves it. A fullscreen
+3D surface does not announce a hidden task panel as selected. Check390px,320px,
+landscape and short input heights. Measure real Ki-84/500k3D-to-Drawing waits and
+preparation counts; adopt only with useful elapsed evidence and preserved resource
+retirement, saved content and recovery. This is an evaluation until todo records
+its executed outcome, not physical Safari acceptance.
+
+The resize handoff retains a tab blurred only by the changed layout, consumes
+that reference once, and restores it after panel/layout updates only if focus
+has fallen to the document body. Update the placement flag before moving the
+node, so that move cannot create a stale fallback. Explicit blur and focus on
+another control must survive later layout changes without stealing focus.
+
+Compact navigation must share a row when the available width permits it, rather
+than add a mandatory second row above a short reading pane. Allow the existing
+task list and its individual tabs to wrap intrinsically, preserving44px targets
+and complete labels at200% text size. Check720×500 list/detail visibility and
+320px enlarged keyboard traversal alongside portrait/landscape touch layouts.
+
+Keep Drawing's existing scrolling content clear of its fixed completion footer:
+use the same12px scroll padding as Caption content so focused inputs and their
+outlines remain fully visible even when the short preview has a fractional height.
+Preserve the actual input/footer visibility checks without rounding layout sizes.

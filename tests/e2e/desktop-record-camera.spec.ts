@@ -41,9 +41,11 @@ test('record list, pin actions and direct camera navigation remain coherent thro
     const rows=list.locator('li');await expect(rows.first().getByRole('button',{name:'編集',exact:true})).toBeVisible();await expect(rows.first().getByRole('button',{name:'削除',exact:true})).toBeVisible();
     await rows.filter({hasText:'確認点A'}).getByRole('button',{name:'編集',exact:true}).click();await expect(detail.getByLabel('本文',{exact:true})).toBeFocused();
     const windows=p.locator('.lv-caption-window');await expect(windows).toHaveCount(1);
+    const order=(await rows.locator('.lv-caption-title').allTextContents()).map(value=>value.trim());expect([...order].sort()).toEqual(['確認点A','確認点B']);
+    const towardB=order[0]==='確認点A'?'次の記録':'前の記録',towardA=towardB==='次の記録'?'前の記録':'次の記録';
     await detail.getByRole('button',{name:'窓を残す',exact:true}).click();
-    await detail.getByRole('button',{name:'次の記録',exact:true}).click();await expect(windows).toHaveCount(2);
-    await detail.getByRole('button',{name:'前の記録',exact:true}).click();await expect(windows).toHaveCount(1);
+    await detail.getByRole('button',{name:towardB,exact:true}).click();await expect(windows).toHaveCount(2);await expect(detail.getByLabel('タイトル',{exact:true})).toHaveValue('確認点B');await expect(detail.getByRole('button',{name:towardB,exact:true})).toBeDisabled();
+    await detail.getByRole('button',{name:towardA,exact:true}).click();await expect(windows).toHaveCount(1);await expect(detail.getByLabel('タイトル',{exact:true})).toHaveValue('確認点A');await expect(detail.getByRole('button',{name:towardA,exact:true})).toBeDisabled();
     await rows.filter({hasText:'確認点B'}).locator('.lv-caption-select').click();await detail.getByRole('button',{name:'窓を残す',exact:true}).click();
     await rows.filter({hasText:'確認点A'}).locator('.lv-caption-select').click();await expect(windows).toHaveCount(2);
     await windows.filter({hasText:'確認点B'}).getByRole('button',{name:'閉じる',exact:true}).focus();await expect(windows.filter({hasText:'確認点B'})).toHaveAttribute('data-active','true');await expect(detail.getByLabel('タイトル',{exact:true})).toHaveValue('確認点A');

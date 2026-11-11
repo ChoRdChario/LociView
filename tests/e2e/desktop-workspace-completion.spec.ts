@@ -142,7 +142,7 @@ test('content-first workspace keeps editing, pin completion and file exits coher
     const photo = detail.getByRole('region', { name: 'メディア', exact: true }).locator('img').first();
     await info.attach('narrow-read-layout',{body:JSON.stringify(await p.evaluate(()=>{
       const selectors=['.lv-caption-task','.lv-caption-browser','.lv-caption-reading','.lv-caption-detail','.lv-caption-content','.lv-caption-detail img'];
-      return{viewport:{width:innerWidth,height:innerHeight},active:{tag:document.activeElement?.tagName,className:document.activeElement?.className},nodes:selectors.map(selector=>{const n=document.querySelector(selector)!,r=n.getBoundingClientRect(),s=getComputedStyle(n);return{selector,rect:{x:r.x,y:r.y,width:r.width,height:r.height},scrollTop:n.scrollTop,scrollHeight:n.scrollHeight,clientHeight:n.clientHeight,overflow:s.overflow,rows:s.gridTemplateRows};})};
+      return{viewport:{width:innerWidth,height:innerHeight},active:{tag:document.activeElement?.tagName,className:document.activeElement?.className},nodes:selectors.map(selector=>{const n=document.querySelector(selector);if(!n)return{selector,present:false};const r=n.getBoundingClientRect(),s=getComputedStyle(n);return{selector,rect:{x:r.x,y:r.y,width:r.width,height:r.height},scrollTop:n.scrollTop,scrollHeight:n.scrollHeight,clientHeight:n.clientHeight,overflow:s.overflow,rows:s.gridTemplateRows};})};
     })),contentType:'application/json'});
     await expect(photo).toBeInViewport(); await p.screenshot({ path: info.outputPath('reading-narrow.png'), fullPage: false });
     await mode.click(); await expect(mode).toHaveText('閲覧する', { timeout: 15_000 }); await expect(mode).toBeEnabled(); await p.getByRole('button', { name: '位置を調整', exact: true }).click();
