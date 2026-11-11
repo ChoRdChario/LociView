@@ -22,6 +22,10 @@ import { createRasterResources, rasterBytes } from '../../src/viewer/rasterResou
 import {sceneViewportFactory as applicationViewportFactory} from '../../src/projectScene/viewport';
 import {patchSmoothCoverage} from '../../src/viewer/smoothMaterial';
 import {createTargetBudget,targetLayout} from '../../src/viewer/targetBudget';
+import {createGsRender} from '../../src/viewer/gsRender';
+import type {GsDisplayResident,GsRenderPort} from '../../src/viewer/gsRender';
+
+vi.mock('../../src/viewer/gsRender',()=>({createGsRender:vi.fn()}));
 
 const tracker = vi.hoisted(() => ({ renderers: [] as any[], controls: [] as any[], resize: [] as (() => void)[],
   raf: new Map<number, () => void>(), nextRaf: 0, fail: false, gizmos: [] as any[], realOrbit: false }));
@@ -100,6 +104,7 @@ function controlEventTarget(canvas: HTMLCanvasElement) {
 }
 
 beforeEach(() => {
+  vi.mocked(createGsRender).mockReset();
   tracker.renderers.length = tracker.controls.length = tracker.resize.length = tracker.gizmos.length = 0; tracker.raf.clear(); tracker.fail = false;
   tracker.realOrbit = false;
   vi.stubGlobal('ResizeObserver', class { constructor(fn: () => void) { tracker.resize.push(fn); } observe() {} disconnect() {} });
@@ -109,6 +114,29 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('synthetic Scene display; GPU mocked, not rendered/browser acceptance', () => {
+  it('keeps GS sort frames and pick generations current during a gesture without rebuilding panels; state and fallback still notify',async()=>{
+    const base=syntheticDisplay(createSyntheticProject(),f.overview,null,null),source=base.models[0]!,canvas=fakeCanvas(),changed=vi.fn();
+    const model:ReadonlyRenderModel={shape:'render-gs',key:'sort-owner',assetId:source.binding.assetId,assetToProject:source.binding.assetToProject,representation:{...source.representation,contentKind:'gaussianSplat'} as ReadonlyRenderModel['representation']};
+    const asset=new THREE.Group(),mesh=new THREE.Mesh(new THREE.PlaneGeometry(),new THREE.MeshBasicMaterial());asset.add(mesh);
+    const gs:GsDisplayResident={source:{count:1,degree:0,bytes:new Uint8Array(),displayIssue:null},object:asset,ready:false,preparing:true,issue:'準備中'};
+    let state!:()=>void,visual!:()=>void;const dispose=vi.fn();
+    vi.mocked(createGsRender).mockImplementation(async(renderer,_sources,notify,_signal,_residency,_intent,_budget,draw)=>{
+      state=notify;visual=draw!;return{depthBits:24,render:(scene,camera,before)=>{before();renderer.render(scene,camera);},dispose} satisfies GsRenderPort;
+    });
+    const v=applicationViewportFactory({create:()=>({asset,mesh,gs,dispose(){}}),dispose(){}})(canvas.canvas as unknown as HTMLCanvasElement,changed);
+    const display={...base,models:[model],readOnly:true as const,pinEdit:undefined,modelEdit:undefined,preview:undefined};
+    const listener=vi.fn((_frame:import('../../src/projectScene/viewportPorts').ViewportPresentationFrame)=>true),stop=v.observePresentation!(listener),tick=()=>{const [id,fn]=[...tracker.raf][0]!;tracker.raf.delete(id);fn();};
+    v.update(display);v.setActive(true);canvas.show();tick();await vi.waitFor(()=>expect(createGsRender).toHaveBeenCalled());await Promise.resolve();tick();
+    gs.ready=true;gs.preparing=false;gs.issue=null;state();tick();expect(v.read().loading).toBe(false);
+    const orbit=tracker.controls.at(-1);orbit.dispatchEvent({type:'start'});tick();changed.mockClear();listener.mockClear();
+    const before=v.read().pickToken,frames=tracker.renderers.at(-1).frames;visual();tick();
+    expect(v.read().pickToken).not.toBe(before);expect(tracker.renderers.at(-1).frames).toBeGreaterThan(frames);expect(listener).toHaveBeenCalledOnce();expect(listener.mock.calls[0]![0]).not.toHaveProperty('pickToken');expect(changed).not.toHaveBeenCalled();
+    gs.issue='失敗';state();expect(changed).toHaveBeenCalledOnce();tick();changed.mockClear();gs.issue=null;
+    const reject=v.observePresentation!(()=>false);visual();tick();expect(changed).toHaveBeenCalledOnce();reject();changed.mockClear();
+    orbit.dispatchEvent({type:'end'});expect(changed).toHaveBeenCalledOnce();tick();changed.mockClear();visual();expect(changed).toHaveBeenCalledOnce();
+    stop();orbit.dispatchEvent({type:'start'});tick();changed.mockClear();visual();tick();expect(changed).toHaveBeenCalledOnce();
+    v.dispose();changed.mockClear();visual();state();expect(changed).not.toHaveBeenCalled();expect(dispose).toHaveBeenCalledOnce();
+  });
   it('hands camera-only draw frames to every visual listener while retaining semantic and failure fallback',()=>{
     const canvas=fakeCanvas(),changed=vi.fn(),v=createSyntheticViewport(canvas.canvas as unknown as HTMLCanvasElement,changed),display=syntheticDisplay(createSyntheticProject(),f.overview,null,null);
     const observed:{frame:import('../../src/projectScene/viewportPorts').ViewportPresentationFrame;draws:number}[]=[];

@@ -57,32 +57,121 @@ unchanged-feature-classification checks pass; independent review has no findings
 No runtime change or new capacity guarantee; no runtime suite is needed for this
 documentation checkpoint.
 
-## Current boundary —earlier readable saved body (2026-11-11)
+## Current boundary —frame CPU cleanup verified; resume waits remain (2026-11-11)
 
-PO authorizes implementation and automated Ki-84 comparison, retaining edit/save/
-recovery safety. Baseline8713e52; preserve private165todo/86design lines and source
-originals. One writer; independent contract/UI/measurement reviewers are read-only.
-[06e§9](../docs/specs/06e-selected-generation-output-read-proposal.md#9-残る待ち時間の観測と操作の整理2026-11-09)
-and01e§9 permit data-only early reading. Capture only owned frozen strings from
-the completed opening read; after successful nonpending connection and fresh
-selection check, notify once. Keep the later independent Host read and every
-edit/save/publication/recovery fence. No source/provider/cache/authority reuse.
+Completed bounded frame notification cleanup againstabd59b7. Only GS sort/draw
+invalidation during an active gesture uses the existing presentation path;
+ready/progress/error/end notifications, pick generations and fallback remain.
+Known-invalid capture attempts are skipped. No storage/package/model/profile/
+ID/dependency change or persistent cache/authority extension remains.
 
-Implementation, fault/input checks and matched3+3 Ki-84 journeys are complete.
-The final tree has executed checkpoint/HEIC, all Desktop, all offline and installed
-Edge/Chrome checks. Desktop has one retained01g performance failure; the record
-below separates it from this unit's successful PC/touch reading workflow and data
-checks. This is a bounded development checkpoint, not full Desktop/01g or release
-qualification. No threshold is waived. Git owns checkpoint identity and exact
-pushed-commit CI; inspect that CI before final reporting. Preserve private records.
+The same-read Backup state/open/step candidate passed safety flows but did not
+improve elapsed waits, so both product files and its test changes were restored
+exactly to the baseline. Rejected source fingerprints and all observations stay
+private; no output-read exception is adopted. Preserve private165todo/86design
+lines, originals and the earlier performance failure evidence.
 
-Next: identify owners of the measured non-drawing RAF work, then fix demonstrated
-redundancy and repeat the unchanged120s/1.30 comparison after a substantive change.
-For the read/edit/save workflow, target first-generation preparation and output
-history inquiry using the existing phase measurements. Keep all save/readback/
-recovery fences; do not turn an unverified snapshot into editing authority. No new
-dependency, format, capacity guarantee or release. Physical Safari stays pending.
-Stop only a genuine new policy/contract decision; ordinary fixes do not wait for PO.
+Independent source/contract/frame/evidence reviews have no findings. Final serial
+checkpoint, HEIC isolation, Desktop52, offline8 and Edge/Chrome2 pass; final
+source/test and frozen artifacts are fixed as recorded below. The unchanged
+120s/1.30/64MiB frame criterion passes. This is a suitable g0 development
+checkpoint; Git owns commit/Push/exactCI identity. No release/adoption or physical
+iPhone/Safari/weak-PC qualification is implied.
+
+Next outcome: reduce time to usable3D/editing by evaluating overlap of owned
+model preparation with the existing readonly history inquiry. First specify
+staged ownership/handoff/abort/drain and review; retain every current Host,
+selection, write/readback/publication/recovery fence and existing memory budget.
+Do not reconnect withdrawn candidates or infer a new inspection lifetime.
+Ki-84 resume/save, large-GS copy and the small-save target remain measured gaps.
+No fine PO testing waits; ask only for a genuine new policy/architecture authority.
+
+## Measurement record —frame CPU and resume inquiry (2026-11-11)
+
+Final candidate-v2 has4 source/test files, fingerprint
+`da1b2358f55f3019bc2afb35de5040e3debe45dfe52c0c1b285058c10fbbd017`.
+The frozen baseline is actualabd59b7 (its retained commit proof binds the earlier
+dirty-build manifest to the committed source). No output/metadata/package code
+change remains. Diagnostic-only30s profiles show the full UI observation callback
+at projectWorkspace:503 taking12.823s→0.008s (inclusive sampling);
+no repeated capture exception is sampled in the final trace. Native driver/FBO
+waiting remains; the two per-pass framebuffer checks concern different targets,
+not a duplicated same-target check. Sampling is not process CPU or120s acceptance.
+
+Final Ki-84 B,C,C,B,B,C, fresh profiles, retries0, timings-only, all6 save/reopen/
+103-Caption/43-asset/hash/identity/history checks PASS. Same converted Backup and
+original input hash are retained. Values below are ms, each3 runs then median;
+browser launch/navigation/search/select are included in cold visible body.
+OS file-picker wait is excluded. Initial restore and normal cold reopen differ.
+
+| Endpoint | Before3 | Final3 | Median before→after |
+|---|---|---|---|
+| Visible saved body |11800 /6665 /6830|12043 /7145 /7181|6830→7181|
+| Editable |28705 /18166 /19585|31270 /20244 /20548|19585→20548|
+| 3D ready |29147 /18699 /20021|32191 /20695 /20966|20021→20966|
+| Body apply |18082 /8940 /8474|24820 /8779 /10513|8940→10513|
+| Download handoff |42387 /21912 /29863|39002 /25935 /29673|29863→29673|
+| Actual file acquired |43860 /23272 /32663|40318 /27360 /31046|32663→31046|
+
+Final cold overview median2.772s→2.997s, generation4.821s→5.166s, independent
+Host read1.072s→1.383s, model load6.486s→6.444s. These nested medians must not
+be summed. Do not claim a Ki-84 resume/save speedup from the frame-only change;
+the wide variations and actual remaining waits stay visible. V1's rejected
+Backup-only observations are separate, not final-source performance credit.
+No hash/write/readback/publication/recovery inspection was removed.
+
+Next user-flow candidate: overlap owned offscreen resident preparation with the
+existing readonly output inquiry, then adopt only after every current Host fence.
+Simply moving projectView earlier is ineffective: actual binary preparation starts
+in Browser after Host return. Reuse staged-render ownership/retirement, specify
+handoff/abort/drain first and independently review; no early Host/edit/save, extra
+memory budget or persistent cache is accepted by this note.
+
+Final serial checkpoint1271.372s PASS: typecheck,156 files/3497PASS,
+16 expected-fail and21todo retained, all5 builds and offline isolation. HEIC
+isolation PASS. Frozen final Desktop30files/40,472,664bytes equals the measured
+Desktop bytes. Offline20files/27,493,619bytes was built independently at the same
+fixed source. Source fingerprint/install stay unchanged; all50 frozen files are
+verified. The Desktop timing cohort did not measure offline boot-resource checks.
+The separately executed final browser outcomes follow; build success alone
+is not their qualification.
+
+During the final full Desktop lane, the connected500k SH4 all-five-purpose/
+return/Review-copy/restore/cold case PASS(26.5min), including original preservation.
+Its unmatched single observation is187.063s to copy editor and199.835s to3D;
+these are remaining waits, not a paired speedup or a new capacity/latency promise.
+The separate partial-loading Caption/ready-Point/save invariant also PASS.
+The final phone viewport-shrink/record-list/body/completion case PASS, with an
+unmatched small whole-output handoff11.426s (previous-output availability7ms).
+Retain the10s small-save development-target miss; do not infer a timing guarantee
+or physical Safari acceptance from this functional pass.
+
+Milestone audit: same g0/abd59b7 and final4-file source; no scope/dependency/
+contract expansion. The exact500k SH4 matched120s camera/20-resize case31 now
+PASS(6.1min), including unchanged<=1.30 interval ratio, actual rendering/GPU/sort
+checks, stable target counts and<64MiB budget. Retain the prior Q ratio failure;
+no unchanged rerun or filter was used to obtain this result.
+
+Full Desktop52PASS,0retry/0flaky/0skip/global errors[],7783.978s. All50 frozen
+files, measured Desktop/source fingerprint and installed toolchain still match.
+Actual passed-case31 results against fixed5e5bb9e with approved shared tools:
+120s each,1792×1008,DPR1; frame interval p95=18.2→6.2ms, ratio0.340659<=1.30;
+draw callback p95=7.0→4.1ms; all instrumented RAF p95=7.0→4.1ms;
+GPU query p95=0.596352→0.676736ms(+13.5% against the historical comparator);
+sort RPC p95=14.0→9.9ms. RPC includes
+scheduling/dispatch, RAF intervals are scheduling proxies and callback times
+are not whole-process CPU. Actual draws/500k instances and GPU validity checks
+PASS; all20 target-resize cycles PASS with stable counts and max67,099,032bytes
+(<64MiB),27 textures/7 FBO stable. Both traces use NVIDIA RTX5080 via D3D11
+and dedicated Chromium. Do not turn this scope into a weaker-PC/iOS/FPS guarantee
+or claim reduced GPU cost; the comparator predates the additional compositor.
+Offline8PASS(788.057s) and installed Edge/Chrome2PASS(50.424s), each0retry/
+0flaky/0skip/global errors[]. Full-close/server-stop offline continuation includes
+Mesh/Point/500k SH4/Proxy/media, update/repair and exact history. Frozen50 files,
+source4 and installed tools still match after every lane. The earlier ratio1.315
+failure stays retained separately. No physical iOS, weak-PC or release credit.
+Git owns the qualified checkpoint/Push/CI identity; final local verdict and exact
+CI response are retained with the private frame/resume execution evidence.
 
 ## Verification record —earlier readable saved body (2026-11-11)
 

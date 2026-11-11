@@ -40,14 +40,14 @@ function probeLinearTarget(renderer:THREE.WebGLRenderer,target:THREE.WebGLRender
   }finally{renderer.setRenderTarget(previous);g.dispose();base.dispose();blend.dispose();}
 }
 /** One viewport coordinator. Source changes dispose it; camera-only sorts retain the last order. */
-export async function createGsRender(renderer:THREE.WebGLRenderer,residents:readonly GsDisplayResident[],changed:()=>void,signal?:AbortSignal,residency?:GsResidency,intent?:GsViewIntent,targetBudget?:TargetBudget):Promise<GsRenderPort>{
+export async function createGsRender(renderer:THREE.WebGLRenderer,residents:readonly GsDisplayResident[],changed:()=>void,signal?:AbortSignal,residency?:GsResidency,intent?:GsViewIntent,targetBudget?:TargetBudget,visualChanged:()=>void=changed):Promise<GsRenderPort>{
   signal?.throwIfAborted();await verifyPolicy();signal?.throwIfAborted();
   const target=new THREE.WebGLRenderTarget(1,1,{type:THREE.HalfFloatType,format:THREE.RGBAFormat,depthBuffer:true,samples:0});target.texture.colorSpace=THREE.LinearSRGBColorSpace;
   if(targetBudget)target.depthTexture=new THREE.DepthTexture(1,1,THREE.UnsignedIntType);
   let depthBits:number;try{depthBits=probeLinearTarget(renderer,target);}catch(e){target.dispose();throw e;}
   let output:ReturnType<typeof outputPass>|undefined,coordinator:GaussianSplatRenderer;
   try{output=outputPass(target);coordinator=new GaussianSplatRenderer({renderer,autoUpdate:false,encodeLinear:true,premultipliedAlpha:true,transparent:true,depthTest:true,depthWrite:false,
-    maxStdDev:Math.sqrt(8),minPixelRadius:0,minAlpha:.5/255,preBlurAmount:.3,blurAmount:0,clipXY:4,focalAdjustment:2,sortRadial:false,fastSort:true,minSortIntervalMs:0,stochastic:false,onDirty:changed});}
+    maxStdDev:Math.sqrt(8),minPixelRadius:0,minAlpha:.5/255,preBlurAmount:.3,blurAmount:0,clipXY:4,focalAdjustment:2,sortRadial:false,fastSort:true,minSortIntervalMs:0,stochastic:false,onDirty:visualChanged});}
   catch(e){output?.dispose();target.dispose();throw e;}
   const owner=intent?.owner??{};let slotIndex=0,coordinatorDisposed=false,targetGeneration=0,baseLease:TargetLease|undefined;
   let closed=false,sorting=false,lastSort='',attached:THREE.Scene|undefined,fatal:unknown,cleanupFailed=false,sortTask:Promise<void>|undefined;const decoded=new Set<GsDisplayResident>(),pendingDisplay=new Set<GsDisplayResident>();
@@ -80,7 +80,7 @@ export async function createGsRender(renderer:THREE.WebGLRenderer,residents:read
       target.setSize(size.x,size.y);targetGeneration++;
     }
     const key=JSON.stringify([camera.matrixWorld.elements,camera.projectionMatrix.elements,residents.map(r=>[decoded.has(r),r.object.matrixWorld.elements,r.object.visible])]);
-    if(!sorting&&key!==lastSort){sorting=true;lastSort=key;scene.updateMatrixWorld(true);const readySet=[...decoded];const work:Promise<void>=coordinator.update({scene,camera}).then(()=>{if(!closed){for(const r of readySet)pendingDisplay.add(r);changed();}},e=>{if(!closed){fatal=e;changed();}}).finally(()=>{sorting=false;if(sortTask===work)sortTask=undefined;});sortTask=work;void work.catch(()=>{});}
+    if(!sorting&&key!==lastSort){sorting=true;lastSort=key;scene.updateMatrixWorld(true);const readySet=[...decoded];const work:Promise<void>=coordinator.update({scene,camera}).then(()=>{if(!closed){for(const r of readySet)pendingDisplay.add(r);visualChanged();}},e=>{if(!closed){fatal=e;changed();}}).finally(()=>{sorting=false;if(sortTask===work)sortTask=undefined;});sortTask=work;void work.catch(()=>{});}
     // Public pinned API refreshes geometry in unchanged ranges while a sort is in flight.
     scene.updateMatrixWorld(true);coordinator.display.refreshTransforms(renderer);
     let becameReady=false;const old=renderer.getRenderTarget();try{

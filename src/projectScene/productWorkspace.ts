@@ -215,7 +215,7 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
       };
       const observation = () => {
         const seen = runtime.read(); let receipt = '';
-        try { if (seen.pickToken && runtime.capture) receipt = JSON.stringify([seen.pickToken, runtime.capture()]); } catch { /* No receipt, no pick. */ }
+        try { if (seen.pickToken && !seen.dragging && !seen.manipulating && runtime.capture) receipt = JSON.stringify([seen.pickToken, runtime.capture()]); } catch { /* No receipt, no pick. */ }
         const current = !!state?.available && state.visible !== false && rendered === seen.display && state.token === seen.display?.token && state.sceneId === seen.display.sceneId && state.token === read().token;
         const available = current && seen.ready && !seen.issue;
         const cameraAvailable=current&&(seen.cameraReady??seen.ready)&&!seen.issue;

@@ -363,7 +363,11 @@ export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: 
     const sources=[...resident.values()].filter(s=>s.gs&&s.asset.visible).map(s=>s.gs!);
     if((import.meta.env.DEV||import.meta.env.MODE==='project-scene-validation'||import.meta.env.MODE==='project-scene-desktop'||import.meta.env.MODE==='project-scene-offline')&&sources.length&&!gsRender&&!gsPreparing&&!gsIssue){gsPreparing=true;const generation=gsGeneration,currentRenderer=renderer,intent=gsIntent,abort=new AbortController();gsPreparationAbort=abort;
       trackRetirement(import('../viewer/gsRender').then(m=>{abort.signal.throwIfAborted();if(generation!==gsGeneration||renderer!==currentRenderer)throw new DOMException('表示準備を取り消しました。','AbortError');
-        return m.createGsRender(currentRenderer,sources,()=>{if(abort.signal.aborted||generation!==gsGeneration)return;pickEpoch++;serial++;notify();},abort.signal,residency,intent??undefined,presentation?.budget);}).then(port=>{
+        const invalidate=(visualOnly=false)=>{if(abort.signal.aborted||generation!==gsGeneration)return;pickEpoch++;serial++;
+          // Gesture start already disabled capture/picking. Keep draw-owned pin
+          // projection current; gesture end publishes a fresh full observation.
+          if(!visualOnly||!dragging&&!navigation&&!gizmo?.dragging)notify();};
+        return m.createGsRender(currentRenderer,sources,()=>invalidate(),abort.signal,residency,intent??undefined,presentation?.budget,()=>invalidate(true));}).then(port=>{
         if(generation!==gsGeneration||renderer!==currentRenderer){retireGs(port);return;}clearSmooth();gsRender=port;gsPreparing=false;serial++;notify();
       },e=>{if(generation===gsGeneration){gsIssue=errorText(e);gsPreparing=false;for(const source of sources){source.ready=false;source.issue=gsIssue;}serial++;notify();}}));}
     // Upload new projected attributes before Three traverses/uploads geometry, never in onBeforeRender.
