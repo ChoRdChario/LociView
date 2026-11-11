@@ -134,7 +134,7 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
   }
   function openWindow(captionId: string) {
     memory = { ...memory, selectedCaptionId: captionId };
-    const plan = planCaptionWindow(view.source, windowsMemory, captionId, { kind: 'open', captionId });
+    const plan = planCaptionWindow(view.source, windowsMemory, captionId, { kind: 'follow', captionId });
     if (plan.kind === 'change') windowsMemory = plan.memory;
   }
   function accept(plan: CaptionListPlan) {
@@ -168,8 +168,15 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
   };
   const windows = createCaptionWindowControls(document, windowPlan, active => { moving = active; paint(); }, gallery);
   const selectedMedia = make('section'); selectedMedia.setAttribute('aria-label', '選択中のキャプションのメディア');
+  const retainWindow = make('button', '窓を残す'); retainWindow.type = 'button'; retainWindow.className = 'lv-caption-retain';
+  retainWindow.addEventListener('click', () => {
+    const captionId = memory.selectedCaptionId;
+    if (disposed || retainWindow.disabled || !captionId) return;
+    windowPlan(planCaptionWindow(view.source, windowsMemory, captionId,
+      { kind: windowsMemory.retained.includes(captionId) ? 'release' : 'retain', captionId }));
+  });
   let panelGallery: ReturnType<typeof gallery> | null = null, panelCaption: string | null = null;
-  viewport.append(windows.root); sidebar.append(sceneName, emptyCaptions, list.root, selectedMedia);
+  viewport.append(windows.root); sidebar.append(sceneName, emptyCaptions, list.root, retainWindow, selectedMedia);
   const views = make('details'), title = make('summary', '視点'); views.append(title);
   const cameraAction = (action: () => void) => {
     if (disposed || composing || moving) return; try { action(); failure = ''; } catch (error) { failure = (error as Error).message; } paint();
@@ -220,6 +227,9 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
       if (panelCaption !== memory.selectedCaptionId) { panelGallery?.dispose(); panelCaption = memory.selectedCaptionId;
         panelGallery = panelCaption ? gallery(panelCaption) : null; if (panelGallery) selectedMedia.append(panelGallery.root); }
       panelGallery?.render(); mediaViewer.render();
+      retainWindow.hidden = !memory.selectedCaptionId;
+      retainWindow.disabled = composing || moving;
+      retainWindow.setAttribute('aria-pressed', String(!!memory.selectedCaptionId && windowsMemory.retained.includes(memory.selectedCaptionId)));
       windows.render({ source: view.source, memory: windowsMemory, selectedId: memory.selectedCaptionId,
       moveBlock: composing ? '文字の入力を確定してください。' : null });
       const empty=view.source.captions.length===0;emptyCaptions.hidden=!empty;list.root.hidden=selectedMedia.hidden=windows.tools.hidden=empty;

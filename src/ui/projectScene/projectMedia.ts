@@ -16,7 +16,7 @@ export function createProjectMedia(document: Document, host: ProjectPanelHost, c
   type Choice = Scope & { id: string; record: JsonObject };
   type Draft = Scope & { attachmentId: string; raw: string; composing: boolean };
   let selected: Choice | null = null, draft: Draft | null = null, removal: (Scope & { attachmentId: string; label: string }) | null = null;
-  let disposed = false, galleryKey = '', message = '', imageScope = '';
+  let disposed = false, presentationActive = true, galleryKey = '', message = '', imageScope = '';
   const expanded = new Set<string>();
   const actionCards = new Map<string, { root: HTMLElement; edit: HTMLButtonElement; moves: HTMLButtonElement[]; update(): void }>();
   type FocusReturn = { origin: HTMLButtonElement; attachmentId: string; captionId: string; scope: string; editing: boolean; completed: boolean };
@@ -62,7 +62,7 @@ export function createProjectMedia(document: Document, host: ProjectPanelHost, c
     choose(id) { const s = expected(), record = projectMediaResources(source().provider).find(r => r.id === id)?.record;
       if (s && record && !host.block('captions') && !draft && !removal) { selected = { ...s, id, record }; host.changed(); } } });
   let picker = newPicker();
-  stored.addEventListener('toggle', () => { if (!disposed) picker.render(stored.open); });
+  stored.addEventListener('toggle', () => { if (!disposed) picker.render(presentationActive && stored.open); });
   picker.root.setAttribute('aria-label', 'メディアを選択');
   const attach = button('選択したメディアを添付', () => {
     const choice = selected; if (!choice || host.block('captions') || !isCurrent(choice) || uncertainty()) return;
@@ -104,6 +104,7 @@ export function createProjectMedia(document: Document, host: ProjectPanelHost, c
   root.append(galleryHost, waiting, stored, form, confirmation, status);
   editOnly(stored, form, confirmation);
   function render(active = true) {
+    presentationActive = active;
     if (disposed) return; const s = source(), block = host.block('captions'), local = host.block('captions', false), uncertain = uncertainty(), currentScope = scope();
     if (registeredScope !== currentScope) { registeredScope = currentScope; registeredReader = reader(null); picker.dispose(); picker = newPicker();
       picker.root.setAttribute('aria-label', 'メディアを選択'); stored.insertBefore(picker.root, attach); }

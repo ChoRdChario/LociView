@@ -15,6 +15,50 @@ const documentStub = (decoding: () => Promise<void> = async () => {}) => {
 const derive = async () => new Blob(['derived'], { type:'image/png' });
 
 describe('UI-only shared image ownership', () => {
+  it.each(['gallery', 'picker'] as const)('returns focus to the same live attachment after thumbnail retirement (%s)', async kind => {
+    const doc = new RecordedDocument(), viewer = createMediaViewer(doc.asDocument());
+    const group: MediaPreviewGroup = { scope: 'owned', label: '写真', items: [{ id: 'photo', resourceId: 'original', label: '写真', description: '', image: { blob: image() } }] };
+    const thumbs = createMediaThumbnails(doc.asDocument(), () => group, viewer, kind === 'picker' ? { selected: () => null, choose() {} } : undefined);
+    const all = (n: RecordedNode): RecordedNode[] => [n, ...n.children.flatMap(all)];
+    const show = () => all(record(thumbs.root)).find(n => n.tag === 'button' && n.textContent === '画像を表示')!;
+    const close = all(record(viewer.root)).find(n => n.attributes.get('aria-label') === '閉じる')!;
+    try {
+      thumbs.render(true); const before = show(); before.focus(); before.click();
+      thumbs.render(false); thumbs.render(true); const current = show(); expect(current).not.toBe(before);
+      close.focus(); close.click(); expect(doc.activeElement).toBe(current); expect(current.focusCalls).toEqual([{ preventScroll: true }]);
+    } finally { thumbs.dispose(); await viewer.dispose(); }
+  });
+  it.each(['scope', 'resource', 'disposed'] as const)('does not restore photo focus into a replaced owner (%s)', async changed => {
+    const doc = new RecordedDocument(), viewer = createMediaViewer(doc.asDocument());
+    let group: MediaPreviewGroup = { scope: 'owned', label: '写真', items: [{ id: 'photo', resourceId: 'original', label: '写真', description: '', image: { blob: image() } }] };
+    const thumbs = createMediaThumbnails(doc.asDocument(), () => group, viewer);
+    const all = (n: RecordedNode): RecordedNode[] => [n, ...n.children.flatMap(all)];
+    const show = () => all(record(thumbs.root)).find(n => n.tag === 'button' && n.textContent === '画像を表示')!;
+    const close = all(record(viewer.root)).find(n => n.attributes.get('aria-label') === '閉じる')!;
+    try {
+      thumbs.render(true); show().click(); thumbs.render(false);
+      if (changed === 'disposed') thumbs.dispose();
+      else { group = changed === 'scope' ? { ...group, scope: 'other' } : { ...group, items: [{ ...group.items[0]!, resourceId: 'replacement' }] }; thumbs.render(true); }
+      close.focus(); close.click(); expect(doc.activeElement).toBe(close);
+    } finally { thumbs.dispose(); await viewer.dispose(); }
+  });
+  it('keeps a hidden thumbnail list inactive through late paging until its owner resumes it', async () => {
+    const doc = new RecordedDocument(), viewer = createMediaViewer(doc.asDocument());
+    const read = vi.fn((): MediaPreviewGroup => ({ scope: 'owned', label: '写真', items: Array.from({ length: 13 }, (_, i) => ({
+      id: String(i), resourceId: String(i), label: `写真${i}`, description: '', image: { blob: image() },
+    })) }));
+    const thumbnails = createMediaThumbnails(doc.asDocument(), read, viewer), root = record(thumbnails.root);
+    const all = (n: RecordedNode): RecordedNode[] => [n, ...n.children.flatMap(all)];
+    try {
+      thumbnails.render(true);
+      const next = all(root).find(n => n.textContent === '次の一覧')!;
+      expect(next.disabled).toBe(false);
+      thumbnails.render(false); read.mockClear(); next.click(); thumbnails.render();
+      expect(read).not.toHaveBeenCalled(); expect(root.hidden).toBe(true);
+      expect(all(root).filter(n => n.tag === 'figure')).toHaveLength(0);
+      thumbnails.render(true); expect(read).toHaveBeenCalled(); expect(root.hidden).toBe(false);
+    } finally { thumbnails.dispose(); await viewer.dispose(); }
+  });
   it('joins the same viewer retirement until a closed original finishes native decoding',async()=>{
     const doc=new RecordedDocument(),dom=doc.asDocument(),create=dom.createElement.bind(dom),started=gate(),native=gate(),raster=createRasterResources({cpuBytes:100000,gpuBytes:0});
     vi.spyOn(dom,'createElement').mockImplementation(((tag:string)=>{const node=create(tag);if(tag==='img')Object.assign(node,{decode:async()=>{started.resolve();await native.promise;},naturalWidth:8,naturalHeight:4});return node;}) as Document['createElement']);

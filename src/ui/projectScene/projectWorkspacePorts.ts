@@ -131,7 +131,7 @@ export interface ProjectWorkspacePorts {
     sceneOrderChoices(token: string, sceneId: string): readonly { operationId: string; orderKey: string }[];
   };
   read(): WorkspaceProvider;
-  projectStatus(): { readonly title: string | null; readonly resumable: boolean; readonly backup: 'verified' | 'download-started' | 'unconfirmed' | 'unavailable' };
+  projectStatus(): { readonly title: string | null; readonly resumable: boolean; readonly backup: 'verified' | 'download-started' | 'unconfirmed' | 'unavailable'; readonly backupOutdated?: boolean };
   openProject?(): void;
   projectNavigationBlocked?(): boolean;
   /** Coordinate presentation surfaces only; false retains the current file input. */

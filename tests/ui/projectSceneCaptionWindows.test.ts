@@ -3,6 +3,8 @@ import { value } from '../../src/scene/types';
 import type { CaptionListSource } from '../../src/ui/projectScene/captionListState';
 import { captionWindowPlanIsCurrent, captionWindowView, newCaptionWindowMemory, planCaptionWindow,
   type CaptionWindowIntent, type CaptionWindowMemory } from '../../src/ui/projectScene/captionWindowState';
+import { createCaptionWindowControls } from '../../src/ui/projectScene/captionWindowControls';
+import { RecordedDocument, record } from './domRecorder';
 
 const a = 'cap_' + '1'.repeat(32), b = 'cap_' + '2'.repeat(32), sceneA = 'scn_' + '1'.repeat(32), sceneB = 'scn_' + '2'.repeat(32);
 const source: CaptionListSource = { kind: 'ready', token: 'one', sceneId: sceneA,
@@ -15,6 +17,21 @@ function run(memory: CaptionWindowMemory, selected: string | null, intent: Capti
 }
 
 describe('disconnected comparison window STATE, not a floating renderer', () => {
+  it('follows selection without accumulating windows and retains only explicit choices', () => {
+    let memory = run(newCaptionWindowMemory(sceneA), a, { kind: 'follow', captionId: a });
+    memory = run(memory, b, { kind: 'follow', captionId: b });
+    expect(memory.retained).toEqual([]);
+    expect(captionWindowView(source, memory, b).visibleIds).toEqual([b]);
+    memory = run(memory, b, { kind: 'close', captionId: b });
+    expect(captionWindowView(source, memory, b).visibleIds).toEqual([]);
+    memory = run(memory, b, { kind: 'follow', captionId: b });
+    expect(memory.retained).toEqual([]);
+    memory = run(memory, b, { kind: 'retain', captionId: b });
+    memory = run(memory, a, { kind: 'follow', captionId: a });
+    expect(captionWindowView(source, memory, a).visibleIds).toEqual([b, a]);
+    expect(memory.retained).toEqual([b]);
+    expect(planCaptionWindow(source, memory, a, { kind: 'follow', captionId: b }).kind).toBe('blocked');
+  });
   it('retains multiple exact IDs, deduplicates the selected follower and separates front order from selection', () => {
     let memory = newCaptionWindowMemory(sceneA); const selected = a;
     memory = run(memory, selected, { kind: 'open', captionId: a });
@@ -73,5 +90,28 @@ describe('disconnected comparison window STATE, not a floating renderer', () => 
     if (plan.kind !== 'change') throw Error('missing plan');
     memory = plan.memory; rect.left = 999;
     expect(memory.placements[0]?.rect.left).toBe(8); expect(captionWindowView(source, memory, a).visibleIds).toHaveLength(2);
+  });
+});
+
+describe('window DOM ownership, not rendered GPU acceptance', () => {
+  it('keeps a stable follower slot and suspends hidden preview content without losing retained windows', () => {
+    const document = new RecordedDocument(), activity: boolean[] = [], disposed: string[] = [];
+    const controls = createCaptionWindowControls(document.asDocument(), () => true, () => {}, id => ({
+      root: document.asDocument().createElement('section'), render: active => { activity.push(active !== false); }, dispose: () => { disposed.push(id); },
+    }));
+    controls.project({ ready: true, width: 600, height: 400, sourceToken: source.token, sceneId: sceneA, pins: [] });
+    let memory = run(newCaptionWindowMemory(sceneA), a, { kind: 'follow', captionId: a });
+    controls.render({ source, memory, selectedId: a, moveBlock: null });
+    const first = record(controls.root).children.find(n => n.className === 'lv-caption-window')!;
+    const position = { left: first.style.left, top: first.style.top };
+    memory = run(memory, b, { kind: 'follow', captionId: b }); controls.render({ source, memory, selectedId: b, moveBlock: null });
+    const next = record(controls.root).children.find(n => n.className === 'lv-caption-window')!;
+    expect({ left: next.style.left, top: next.style.top }).toEqual(position); expect(disposed).toEqual([a]);
+    memory = run(memory, b, { kind: 'retain', captionId: b });
+    controls.render({ source, memory, selectedId: b, moveBlock: null, visible: false });
+    expect(record(controls.root).hidden).toBe(true); expect(activity.at(-1)).toBe(false); expect(memory.retained).toEqual([b]);
+    controls.render({ source, memory, selectedId: b, moveBlock: null, visible: true });
+    expect(record(controls.root).hidden).toBe(false); expect(activity.at(-1)).toBe(true); expect(disposed).toEqual([a]);
+    controls.dispose(); expect(disposed).toEqual([a,b]);
   });
 });

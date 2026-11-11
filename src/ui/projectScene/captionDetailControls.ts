@@ -15,6 +15,8 @@ export interface CaptionDetailProps extends DetailContext {
   readonly windowBlock?: string | null;
   /** Temporary saved-text presentation; command guards remain unchanged. */
   readonly textOnly?: boolean;
+  readonly windowRetained?: boolean;
+  readonly cancelBlock?: string | null;
 }
 let nextDetail = 0;
 
@@ -29,6 +31,7 @@ export function createCaptionDetailControls(document: Document, onEvent: (event:
     review: HTMLButtonElement; value: HTMLElement }>();
   const cleanups: (() => void)[] = [];
   let props: CaptionDetailProps | undefined, disposed = false, cancelFor: CaptionDraft | null = null;
+  let cancelSelectionId: string | undefined;
   let returnFocus: { draft: CaptionDraft; captionId: string; sceneId: string; origin: HTMLElement } | null = null;
   const rememberFocus = (origin: HTMLElement) => {
     if (props?.draft && props.source.kind === 'ready' && document.activeElement === origin)
@@ -93,7 +96,8 @@ export function createCaptionDetailControls(document: Document, onEvent: (event:
   });
   const actions = make('div'); actions.className = 'lv-caption-detail-actions';
   actions.setAttribute('data-caption-completion', '');
-  const apply = button('変更を適用'), cancel = button('取り消す'), showWindow = button('3D上に表示');
+  const apply = button('変更を適用'), cancel = button('取り消す'), showWindow = button('窓を残す');
+  showWindow.className = 'lv-caption-retain';
   const windowActions = make('div'); windowActions.className = 'lv-caption-detail-actions';
   windowActions.setAttribute('aria-label', 'キャプションの表示');
   actions.append(apply, cancel); windowActions.append(showWindow); root.append(windowActions, properties, actions);
@@ -111,28 +115,29 @@ export function createCaptionDetailControls(document: Document, onEvent: (event:
   });
   listen(cancel, 'click', () => {
     if (!props?.draft || cancel.disabled) return;
-    cancelFor = props.draft; confirmation.hidden = false; confirm.focus({ preventScroll: true });
+    cancelFor = props.draft; cancelSelectionId = props.mediaDraft?.selectionId; confirmation.hidden = false; confirm.focus({ preventScroll: true });
   });
   listen(keep, 'click', () => { cancelFor = null; confirmation.hidden = true; cancel.focus({ preventScroll: true }); });
   listen(confirm, 'click', () => {
-    if (!props?.draft || props.draft !== cancelFor || props.draft.composing || props.feedback.kind === 'applying') return;
+    if (!props?.draft || props.draft !== cancelFor || cancelSelectionId !== props.mediaDraft?.selectionId ||
+        props.cancelBlock != null || props.draft.composing || props.feedback.kind === 'applying') return;
     const draft = props.draft; rememberFocus(confirm); cancelFor = null; confirmation.hidden = true; onEvent({ kind: 'cancel', draft });
   });
   const windowEvent = (action: 'open' | 'retain' | 'release') => {
     if (props?.source.kind === 'ready' && props.windowBlock == null) onEvent({ kind: 'window', captionId: props.source.caption.id,
       sceneId: props.source.sceneId, token: props.source.token, action });
   };
-  listen(showWindow, 'click', () => windowEvent('open'));
+  listen(showWindow, 'click', () => windowEvent(props?.windowRetained ? 'release' : 'retain'));
   properties.append(editors);
 
   function render(next: CaptionDetailProps): boolean {
     if (disposed) return false;
     const nextId = next.source.kind === 'ready' ? next.source.caption.id : next.source.captionId;
-    if (props && hasCaptionDraft(props.draft) && (props.draft!.captionId !== nextId || props.source.sceneId !== next.source.sceneId)) {
+    if (props && (hasCaptionDraft(props.draft) || props.mediaDraft) && ((props.draft?.captionId ?? props.mediaDraft?.captionId) !== nextId || props.source.sceneId !== next.source.sceneId)) {
       status.textContent = '入力中の変更を適用するか、取り消してください。'; return false;
     }
     props = next;
-    if (cancelFor !== next.draft) { cancelFor = null; confirmation.hidden = true; }
+    if (cancelFor !== next.draft || cancelSelectionId !== next.mediaDraft?.selectionId) { cancelFor = null; cancelSelectionId = undefined; confirmation.hidden = true; }
     const source = next.source, owned = next.draft?.captionId === nextId ? next.draft : null;
     const empty = source.kind === 'unavailable' && source.captionId === null && !hasCaptionDraft(owned);
     for (const control of fields.values()) control.input.parentElement!.parentElement!.hidden = empty;
@@ -175,23 +180,25 @@ export function createCaptionDetailControls(document: Document, onEvent: (event:
     impact.hidden = empty || !impact.textContent;
     const applyIssue = captionApplyIssue(next);
     status.textContent = [...new Set([next.feedback.kind === 'failed' && `適用できませんでした。${next.feedback.message} 入力は保持しています。`,
-      inFlight && '変更を適用中です。', hasCaptionDraft(owned) && !inFlight && '未適用の入力があります。',
+      inFlight && '変更を適用中です。', (hasCaptionDraft(owned) || next.mediaDraft) && !inFlight && '未適用の入力があります。',
       !inFlight && !next.textOnly && next.mutationBlock !== '閲覧中です。編集を開始してください。' && next.mutationBlock, source.kind !== 'ready' && (source.reason || 'キャプションを選択してください。'),
-      hasCaptionDraft(owned) && applyIssue && !inFlight && applyIssue].filter(Boolean))].join(' ');
+      (hasCaptionDraft(owned) || next.mediaDraft) && applyIssue && !inFlight && applyIssue].filter(Boolean))].join(' ');
     apply.disabled = applyIssue !== null;
-    actions.hidden = !hasCaptionDraft(owned);
-    cancel.disabled = !hasCaptionDraft(owned) || Boolean(owned?.composing) || inFlight;
+    actions.hidden = !hasCaptionDraft(owned) && !next.mediaDraft;
+    cancel.disabled = !hasCaptionDraft(owned) && !next.mediaDraft || Boolean(owned?.composing) || inFlight || next.cancelBlock != null;
+    confirm.disabled = cancel.disabled;
+    showWindow.setAttribute('aria-pressed', String(!!next.windowRetained));
     windowNote.textContent = next.windowBlock ?? ''; windowNote.hidden = !!next.textOnly || next.windowBlock == null;
     showWindow.disabled = source.kind !== 'ready' || next.windowBlock != null;
     const focus = returnFocus;
     if (focus && (source.kind !== 'ready' || source.caption.id !== focus.captionId || source.sceneId !== focus.sceneId || next.feedback.kind === 'failed')) returnFocus = null;
-    else if (focus && !hasCaptionDraft(owned) && !inFlight && !next.mutationBlock) {
+    else if (focus && !hasCaptionDraft(owned) && !next.mediaDraft && !inFlight && !next.mutationBlock) {
       queueMicrotask(() => {
         if (disposed || returnFocus !== focus) return;
         returnFocus = null;
         const current = props;
         if (current?.source.kind === 'ready' && current.source.caption.id === focus.captionId && current.source.sceneId === focus.sceneId &&
-          !hasCaptionDraft(current.draft) && !current.draft?.composing && !current.mutationBlock &&
+          !hasCaptionDraft(current.draft) && !current.mediaDraft && !current.draft?.composing && !current.mutationBlock &&
           (document.activeElement === focus.origin || document.activeElement === document.body)) fields.get('body')!.input.focus({ preventScroll: false });
       });
     }

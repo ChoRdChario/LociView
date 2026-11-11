@@ -57,7 +57,80 @@ unchanged-feature-classification checks pass; independent review has no findings
 No runtime change or new capacity guarantee; no runtime suite is needed for this
 documentation checkpoint.
 
-## Current boundary —frame CPU cleanup verified; resume waits remain (2026-11-11)
+## Current work —complete one record, save and resume (2026-11-11)
+
+PO authorized the grouped review repairs and restrained motion. Root is the only
+writer; independent contract/UI/test mapping is read-only. Implement honest file
+freshness, nonblocking unexecuted export preferences, consistent transient versus
+retained windows and compact Drawing visibility, then explicit text+one selected
+media completion through the existing serial commands. Keep partial success and
+retry ownership visible; no automatic apply, new atomicity, durable queued Files,
+grouped Undo, dependency/schema/ID change or weakened validation/recovery fence.
+Also simplify filenames/unique verified bases and stale open-state copy within the
+same file workflow. Motion is brief state feedback, with reduced-motion fallback.
+Update08/UI design before code; focused state/product/service tests during edits,
+then PC/touch existing connected save/restore tests, final independent review,
+serial checkpoint/HEIC/Desktop/offline/installed-browser evidence. Preserve the
+existing120s/1.30/64MiB frame guard. Only a genuine new contract/product authority
+or unsafe data outcome stops the affected work. Suitable verified g0 checkpoints
+may be committed/Pushed; no publication. Physical Safari acceptance remains pending.
+
+Milestone audit: branch/HEAD remain g0/040a462, one writer, UI/file orchestration
+only; storage/schema/renderer checks and old private changes are preserved.
+Independent final contract/UI/file-operation reviews have no unresolved findings.
+Focused ownership, partial-success/retry, disposal and hidden-gallery checks pass.
+Final checkpoint passes typecheck, full root suite (3505 passed; the pre-existing
+16 expected-fail/21 todo remain separate), all candidate builds and offline/HEIC
+isolation. Frozen candidate and source/test fingerprints are recorded locally.
+The first Desktop full execution passed51/52, offline8 and installed Edge/Chrome2
+passed. Named-card image inspection corrected an unstable global img index while
+retaining dimensions/hash/time conditions. That exposed a genuine focus-return
+defect after phone background/foreground: released thumbnail cards had replaced
+the modal's old opener. Keep resource release, resolve only the same live scope/
+attachment/resource button, and reject stale/disposed owners. Update UI design,
+focused lifecycle/browser checks and independent review before final-v2 source
+qualification. Preserve all failed evidence; no new policy or authority needed.
+The native image workflow now passes unchanged original-byte/dimension/focus
+assertions after the opener fix; gallery/picker replacement and stale owner cases
+pass38 focused media tests. Independent UI lifecycle review has no findings.
+Final-v2 checkpoint passes all156 files/3510 tests (16 existing expected-fail and
+21 todo remain separate), all builds and offline/HEIC isolation. Its exact source/
+test and50 build-file fingerprints match the fixed focused candidate. The native
+PC/phone image workflow and small PC/touch body+photo/save/restore/window flows
+pass. Final file-exit/IME/partial-output choice retention also passes on the same
+frozen source. Independent contract, UI lifecycle and file/test-delta reviews are clear.
+
+Shared-host commit remained about97% and ordinary test/build operations slowed.
+Only the owned full-validation process tree was stopped before the large-GS
+cases; source/failed evidence and unrelated applications were preserved. This
+is an interrupted run, not a current-source Desktop52/offline8/performance pass.
+The older final-v1 Desktop51/52, offline8, installed2 and frame observations retain
+their own source fingerprint. Do not relabel them as final-v2 or compare elapsed
+times collected under these different host conditions.
+
+Checkpoint scope: bounded verified UI development only; Git and its exact GitHub
+run own commit/CI identity. Next: resume full Desktop/offline/installed-browser
+and Ki-84/500k elapsed qualification
+when host resources permit. Preserve the unchanged120s/1.30/64MiB conditions and
+all write/readback/recovery checks. Physical iOS acceptance and release stay pending.
+
+## Completed review —third-party product evaluation (2026-11-11)
+
+Completed read-only review of040a462 with3 independent AI reviews and fresh owned
+Chromium profiles: converted Ki-84 backup and small sample on1440x900 PC; small
+sample on390x844 touch and320x365 input. Confirmed selection/window inconsistency,
+phone preview occlusion, file-freshness visibility, serial body/media entry,
+unexecuted export-choice close guard and stale checking text at restore confirmation.
+Ki-84 search/photo real decode/drawing and sample body edit/actual backup/normal
+reopen were exercised. Source-only concerns and physical Safari/screen-reader
+unknowns are separated in the current [design review](../docs/ui-design-review.md).
+Existing source/checkpoint/performance evidence stays unchanged; product source,
+contracts/dependencies, user profiles/data and release state were not modified.
+Next: group normal-flow status/exit/selection fixes, then measure one note+photo
+through apply/save/reopen; retain all durability fences. This review does not
+authorize implementation of a new policy or turn untested device acceptance into PASS.
+
+## Previous verified boundary —frame CPU cleanup; resume waits remain (2026-11-11)
 
 Completed bounded frame notification cleanup againstabd59b7. Only GS sort/draw
 invalidation during an active gesture uses the existing presentation path;

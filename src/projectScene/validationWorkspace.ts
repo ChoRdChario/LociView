@@ -93,7 +93,8 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   titleLabel.append(title); form.append(creationNote, titleLabel, create); form.hidden = true;
   const workspaceForm = document.createElement('form'), workspaceLabel = document.createElement('label'), workspaceInput = document.createElement('input'), openFile = document.createElement('button');
   workspaceLabel.textContent = 'ファイルを選択'; workspaceInput.type = 'file'; workspaceInput.multiple = true; workspaceInput.setAttribute('aria-label', 'ファイルを選択'); workspaceLabel.append(workspaceInput);
-  openFile.type = 'submit'; openFile.textContent = 'ファイルを開く'; workspaceForm.append(workspaceLabel, openFile,fallback);
+  const fileHelp = document.createElement('p'); fileHelp.textContent = '3Dモデル・点群・作業ファイルを開けます。';
+  openFile.type = 'submit'; openFile.textContent = 'ファイルを開く'; workspaceForm.append(workspaceLabel, fileHelp, openFile,fallback);
   const updatePanel = document.createElement('section'), updateNote = document.createElement('p');
   const updateConfirm = document.createElement('button'), updateCancel = document.createElement('button');
   updatePanel.className = 'lv-update-destination'; updatePanel.setAttribute('aria-label', '取り込み先'); updatePanel.hidden = true;
@@ -503,6 +504,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     const target = firstRecovery; if (!target || disposed) return;
     recoveryControls.clear();
     const state = target.state(), panel = document.createElement('section'), note = document.createElement('p'), commands = document.createElement('div');
+    if (state.phase === 'preview') status.textContent = 'このバックアップから作業を再開できます。';
     note.textContent = state.error || (state.phase === 'preview' ? state.replacing
       ? 'バックアップの時点に切り替えます。現在の作業と元ファイルは残ります。' : 'このプロジェクトの再開用データはありません。バックアップから元のプロジェクトを復元します。元ファイルは変更しません。'
       : state.phase === 'terminal' ? 'プロジェクトはまだありません。復元の記録は保持しています。ファイルを選択して開き直せます。' : state.phase === 'beforeStart'

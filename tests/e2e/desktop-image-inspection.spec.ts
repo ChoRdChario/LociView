@@ -19,7 +19,7 @@ async function backup(page: Page, info: TestInfo, name: string) {
 }
 
 test('image details, Scene keyboard focus and dismissible header sheets retain Project data through actual backup', async ({}, info) => {
-  A.getHeads(A.init()); const server = await ownedServer('offline-desktop-dist'), browser = await chromium.launch({ channel: 'chromium', headless: true });
+  A.getHeads(A.init()); const server = await ownedServer(process.env.LOCIVIEW_E2E_ARTIFACT ?? 'offline-desktop-dist'), browser = await chromium.launch({ channel: 'chromium', headless: true });
   const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, serviceWorkers: 'block', acceptDownloads: true }), errors: string[] = [], remote: string[] = [];
   const page = await context.newPage(); page.setDefaultTimeout(15_000); page.on('pageerror', e => errors.push(e.message));
   await context.route('**/*', route => { const u = new URL(route.request().url()); if (u.origin === new URL(server.url).origin || ['blob:', 'data:'].includes(u.protocol)) return route.continue(); remote.push(u.href); return route.abort(); });
@@ -43,7 +43,7 @@ test('image details, Scene keyboard focus and dismissible header sheets retain P
     for (const axis of ['X', 'Y', 'Z']) await page.getByLabel('位置 ' + axis, { exact: true }).fill(axis === 'Y' ? '.5' : '0');
     await page.getByRole('button', { name: '位置を確定', exact: true }).click(); await ready('ピンの位置を確定しました。');
     const detail = page.getByRole('region', { name: 'キャプションの詳細', exact: true }); await detail.getByLabel('タイトル', { exact: true }).fill('細部の記録'); await detail.getByRole('button', { name: '変更を適用', exact: true }).click(); await ready('変更を適用しました。');
-    const choose = page.waitForEvent('filechooser'); await page.getByLabel('メディアを追加', { exact: true }).click(); await (await choose).setFiles({ name: '細部の写真.png', mimeType: 'image/png', buffer: png }); await ready('メディアを追加しました。');
+    const choose = page.waitForEvent('filechooser'); await page.getByLabel('メディアを追加', { exact: true }).click(); await (await choose).setFiles({ name: '細部の写真.png', mimeType: 'image/png', buffer: png }); await page.getByRole('region',{name:'キャプションの詳細',exact:true}).getByRole('button',{name:'変更を適用',exact:true}).click(); await ready('メディアを追加しました。');
     const notice=page.locator('main.lv-project-workspace > header > .lv-operation-status'),help = page.locator('details[aria-label="ヘルプ"]'), helpSummary = help.locator(':scope > summary');
     await expect(notice).toHaveAttribute('data-passive','true');await helpSummary.click();
     const stage=page.getByLabel('3Dモデルの表示', { exact: true }), stageBounds=(await stage.boundingBox())!; await stage.click({ position: { x: stageBounds.width-20, y: stageBounds.height-20 } }); await expect(help).not.toHaveAttribute('open');
@@ -71,10 +71,18 @@ test('image details, Scene keyboard focus and dismissible header sheets retain P
     expect(after.archive.control.manifest.blobs).toEqual(before.archive.control.manifest.blobs); expect(after.archive.control.manifest.blobs.some(b => b.sha256 === createHash('sha256').update(png).digest('hex'))).toBe(true);
     const portrait = Buffer.from(jpegBytes('rgb-exif-6')), choosePortrait = page.waitForEvent('filechooser');
     await page.getByLabel('メディアを追加', { exact: true }).click();
-    await (await choosePortrait).setFiles({ name: '縦向きの写真.jpg', mimeType: 'image/jpeg', buffer: portrait }); await ready('メディアを追加しました。');
+    await (await choosePortrait).setFiles({ name: '縦向きの写真.jpg', mimeType: 'image/jpeg', buffer: portrait }); await page.getByRole('region',{name:'キャプションの詳細',exact:true}).getByRole('button',{name:'変更を適用',exact:true}).click(); await ready('メディアを追加しました。');
     const gallery = page.getByRole('region', { name: 'メディアの整理', exact: true }).getByRole('region', { name: '添付メディア', exact: true });
-    await expect.poll(() => gallery.locator('img').nth(1).evaluate(n => [(n as HTMLImageElement).naturalWidth,(n as HTMLImageElement).naturalHeight])).toEqual([4,8]);
-    await gallery.getByRole('button', { name: '画像を表示', exact: true }).nth(1).click();
+    const portraitCard = gallery.locator('figure').filter({ hasText: '縦向きの写真.jpg' });
+    await expect(portraitCard).toHaveCount(1);
+    await info.attach('portrait-thumbnail-before-scroll', { body: JSON.stringify(await portraitCard.evaluate(node => {
+      const card = node.getBoundingClientRect(), pane = node.closest('.lv-caption-reading'), bounds = pane?.getBoundingClientRect();
+      return { card: { top: card.top, bottom: card.bottom }, pane: bounds && { top: bounds.top, bottom: bounds.bottom, scrollTop: pane!.scrollTop },
+        images: [...node.querySelectorAll('img')].map(img => ({ width: img.naturalWidth, height: img.naturalHeight })) };
+    })), contentType: 'application/json' });
+    await portraitCard.getByRole('button', { name: '画像を表示', exact: true }).scrollIntoViewIfNeeded();
+    await expect.poll(() => portraitCard.locator('img').evaluate(n => [(n as HTMLImageElement).naturalWidth,(n as HTMLImageElement).naturalHeight])).toEqual([4,8]);
+    await portraitCard.getByRole('button', { name: '画像を表示', exact: true }).click();
     await expect.poll(() => dialog.locator('img').evaluate(n => [(n as HTMLImageElement).naturalWidth,(n as HTMLImageElement).naturalHeight])).toEqual([4,8]);
     await dialog.getByRole('button', { name: '閉じる', exact: true }).click();
     const phoneSource = await backup(page, info, 'with-portrait');

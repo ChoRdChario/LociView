@@ -52,7 +52,7 @@ test('daily Scene and Caption organization, tags, alignment, settings and files 
     await p.getByRole('button', { name: '記録の変更を元に戻す', exact: true }).click(); await ready(p, '記録の変更を元に戻しました。'); await expect(p.locator('.lv-caption-select')).toHaveCount(0);
     await p.getByRole('button', { name: '記録の変更をやり直す', exact: true }).click(); await ready(p, '記録の変更をやり直しました。'); await expect(p.locator('.lv-caption-select')).toHaveCount(1);
     await p.getByLabel('タイトル', { exact: true }).fill('元の記録'); await p.getByLabel('本文', { exact: true }).fill('元の本文'); await p.getByRole('button', { name: '変更を適用', exact: true }).click(); await ready(p, '変更を適用しました。');
-    const chooser = p.waitForEvent('filechooser'); await p.getByLabel('メディアを追加', { exact: true }).click(); await (await chooser).setFiles({ name: '現地.png', mimeType: 'image/png', buffer: smallPng() }); await ready(p, 'メディアを追加しました。');
+    const chooser = p.waitForEvent('filechooser'); await p.getByLabel('メディアを追加', { exact: true }).click(); await (await chooser).setFiles({ name: '現地.png', mimeType: 'image/png', buffer: smallPng() }); await p.getByRole('region',{name:'キャプションの詳細',exact:true}).getByRole('button',{name:'変更を適用',exact:true}).click(); await ready(p, 'メディアを追加しました。');
     const editedMedia=p.getByRole('region',{name:'メディアの整理',exact:true}).getByRole('region',{name:'添付メディア',exact:true});
     await p.getByRole('button', { name: '記録の変更を元に戻す', exact: true }).click(); await ready(p, '記録の変更を元に戻しました。'); await expect(editedMedia.getByRole('figure')).toHaveCount(0);
     await p.getByRole('button', { name: '記録の変更をやり直す', exact: true }).click(); await ready(p, '記録の変更をやり直しました。'); await expect(editedMedia.getByRole('figure')).toHaveCount(1);
@@ -66,9 +66,10 @@ test('daily Scene and Caption organization, tags, alignment, settings and files 
       const playerBox=await node.boundingBox(),dialogBox=await dialog.boundingBox();expect(playerBox!.width).toBeLessThanOrEqual(dialogBox!.width);
       const url=await node.getAttribute('src'),handle=await node.elementHandle();await dialog.getByRole('button',{name:'閉じる',exact:true}).click();await expect(dialog).not.toBeVisible();expect(await handle!.evaluate(n=>(n as HTMLMediaElement).paused&&!n.isConnected&&!n.getAttribute('src'))).toBe(true);expect(await page.evaluate(url=>(window as any).__releasedMediaUrls.includes(url),url)).toBe(true);
     };
-    for(const file of timedFiles){const pick=p.waitForEvent('filechooser');await p.getByLabel('メディアを追加',{exact:true}).click();await(await pick).setFiles(file);await ready(p,'メディアを追加しました。');await play(p,file.mimeType==='video/mp4'?'video':'audio',file.name);}
+    for(const file of timedFiles){const pick=p.waitForEvent('filechooser');await p.getByLabel('メディアを追加',{exact:true}).click();await(await pick).setFiles(file);await p.getByRole('region',{name:'キャプションの詳細',exact:true}).getByRole('button',{name:'変更を適用',exact:true}).click(); await ready(p,'メディアを追加しました。');await play(p,file.mimeType==='video/mp4'?'video':'audio',file.name);}
     await expect(p.locator('.lv-media-grid video,.lv-media-grid audio')).toHaveCount(0);
     const heicPick=p.waitForEvent('filechooser');await p.getByLabel('メディアを追加',{exact:true}).click();await(await heicPick).setFiles({name:'owned-still.heic',mimeType:'image/heic',buffer:heicBytes});
+    await p.getByRole('region',{name:'キャプションの詳細',exact:true}).getByRole('button',{name:'変更を適用',exact:true}).click();
     if(nativeHeic)await ready(p,'メディアを追加しました。');else{await expect(p.locator('main.lv-project-workspace > header > p.lv-operation-status')).toContainText('端末で別のJPEG');await p.getByRole('region',{name:'メディア',exact:true}).getByRole('button',{name:'選択を取り消す',exact:true}).click();await expect(p.locator('main.lv-project-workspace > header > p.lv-operation-status')).toHaveText('');}
     await info.attach('native-media-environment',{body:JSON.stringify({browser:first.context.browser()?.version()??await p.evaluate(()=>navigator.userAgent),nativeHeic,avcAacMp3:'actual initial decode and play time/frame progression passed'},null,2),contentType:'application/json'});
     console.log('daily: original media playback and HEIC capability verified');

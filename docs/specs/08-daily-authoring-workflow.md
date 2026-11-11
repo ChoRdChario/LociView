@@ -18,6 +18,33 @@ reopen using the existing ProjectScene PC candidate. UI sends finite typed
 MetadataEdit commands through MetadataProjectSession. The provider owns complete
 candidate reads and command preparation. No UI storage writes or generic patch API.
 
+## Authorized continuation —one record completion,2026-11-11
+
+PO authorized the grouped third-party review repairs and motion as directional
+feedback. A selected native File may be held in UI memory with the current text
+draft, owned by this workspace, Scene, Caption and exact observed token. Choosing
+it performs no body read/decode/write. One explicit Apply may execute the existing
+editCaption command and then the existing media addition, serially, with separate
+validation, durable acknowledgment, Undo receipts and recovery fences. This is
+not an atomic transaction, automatic application or a new Session/storage API.
+
+Advance to the media phase only after the text operation fully settles. Capture
+its acknowledged token once; refuse later token/target/owner changes rather than
+rebasing. Retry a failed text operation before advancing; after text success and
+media failure, retain the selected File/stable attachment/event IDs and retry only
+media. Explain the partial result. Native chooser cancellation retains an earlier
+selection. Explicit draft cancellation discards only unapplied input; after text
+acknowledgment it cannot imply that text was rolled back. IME still fences Apply.
+Selected UI Files block navigation/file operations and are released on successful
+media acknowledgment, cancel or workspace disposal; browser termination may lose
+unapplied UI input. Existing
+pending/published Session commands retain their established recovery semantics.
+
+Acceptance includes text+media/media-only Apply, separate failures/retries without
+duplicate attachment/Undo, native chooser cancellation, stale ownership, IME,
+disposal between phases, exact original media bytes and PC/touch save/restore.
+This changes no codec, metadata format, numeric guarantee or device/release gate.
+
 ## Scene and Caption operations
 
 - Scene duplication copies its resolved model memberships, independent Captions

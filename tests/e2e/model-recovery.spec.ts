@@ -38,7 +38,7 @@ async function edit(page: Page, body: string) {
 async function image(page: Page, name: string, buffer: Buffer) {
   const picker = page.waitForEvent('filechooser'); await page.getByLabel('メディアを追加', { exact: true }).click();
   await (await picker).setFiles({ name, mimeType: 'image/png', buffer });
-  await expect(page.getByText('メディアを追加しました。', { exact: true })).toBeVisible({ timeout: actionTimeout });
+  await page.getByRole('region',{name:'キャプションの詳細',exact:true}).getByRole('button',{name:'変更を適用',exact:true}).click(); await expect(page.getByText('メディアを追加しました。', { exact: true })).toBeVisible({ timeout: actionTimeout });
 }
 async function checkImages(page: Page, count: number) {
   const images = page.getByRole('region', { name: '画像の整理', exact: true }).locator('img');

@@ -169,6 +169,7 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
         (job.stale === false || job.stale === undefined) && tools?.hasHandedOff(job.id));
       return { title: candidate?.kind === 'value' && typeof candidate.value === 'string' ? candidate.value : null,
         resumable: current.state === 'ready' && !!current.publication && current.source?.token === provider.token && !host.hasPending(),
+        backupOutdated: jobs.some(job => job.purpose === 'backup' && (job.token !== provider.token || job.stale === true) && ['generated', 'file-verified'].includes(job.state)),
         backup: host.workspaceOutput.error || jobs.some(j => j.state === 'repair-required') ? 'unavailable' :
           matching.some(job => job.state === 'file-verified') ? 'verified' :
             downloadStarted ? 'download-started' : 'unconfirmed' };

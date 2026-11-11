@@ -43,7 +43,7 @@ async function addImage(page: Page, name: string, buffer: Buffer) {
   const choosing = page.waitForEvent('filechooser');
   await page.getByLabel('メディアを追加', { exact: true }).click();
   await (await choosing).setFiles({ name, mimeType: 'image/png', buffer });
-  await expect(page.getByText('メディアを追加しました。', { exact: true })).toBeVisible({ timeout: 90_000 });
+  await page.getByRole('region',{name:'キャプションの詳細',exact:true}).getByRole('button',{name:'変更を適用',exact:true}).click(); await expect(page.getByText('メディアを追加しました。', { exact: true })).toBeVisible({ timeout: 90_000 });
 }
 async function checkImages(page: Page, count: number) {
   const images = page.getByRole('region', { name: 'メディアの整理', exact: true }).locator('img');

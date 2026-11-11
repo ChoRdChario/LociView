@@ -12,6 +12,7 @@ export interface MediaPreviewItem {
 export interface MediaPreviewGroup {
   readonly scope: string; readonly label: string; readonly items: readonly MediaPreviewItem[];
 }
+type MediaOpener = HTMLElement | (() => HTMLElement | null);
 export type MediaPreviewReader = () => MediaPreviewGroup | null;
 export const mediaDisplayDescription = (description: string, portable: boolean) => portable ?
   [description, 'HEIC原本から作った表示用画像です。HDRなどの見え方が変わる場合があります。'].filter(Boolean).join(' ') : description;
@@ -118,15 +119,17 @@ export function createMediaViewer(document: Document, raster?: RasterResources,d
   previous.type = next.type = 'button'; previous.textContent = '←'; next.textContent = '→';
   previous.setAttribute('aria-label', '前のメディア'); next.setAttribute('aria-label', '次のメディア'); count.setAttribute('aria-live', 'polite');
   header.append(title, closeButton); footer.append(previous, count, next); root.append(header, imageViewport.toolbar, content, description, status, footer);
-  let reader: MediaPreviewReader | null = null, scope = '', id = '', resourceId = '', opener: HTMLElement | null = null, disposed = false;
+  let reader: MediaPreviewReader | null = null, scope = '', id = '', resourceId = '', opener: MediaOpener | null = null, disposed = false;
   let preview: ReturnType<typeof createPngPreview> | null = null, presentedImage: PreviewPng | null = null;
   let retirement: Promise<void> | undefined;
   let resumeImage: { image: PreviewPng | null; view: ReturnType<typeof imageViewport.capture> } | undefined;
   const selected = () => { const group = reader?.(); return group?.scope === scope ? group.items.find(i => i.id === id && i.resourceId === resourceId) ?? null : null; };
   const pauseThumbnails = () => resources?.setThumbnailsActive(!disposed && !reader && document.hidden !== true);
   function close(restore = true) {
+    const from = opener; opener = null;
     reader = null; resumeImage = undefined; preview?.dispose(); preview = null; presentedImage = null; content.replaceChildren(); root.close(); pauseThumbnails();
-    if (restore && opener?.isConnected && !(opener as HTMLButtonElement).disabled) opener.focus({ preventScroll: true }); opener = null;
+    const target = restore && !disposed ? typeof from === 'function' ? from() : from : null;
+    if (target?.isConnected && !(target as HTMLButtonElement).disabled) target.focus({ preventScroll: true });
   }
   function render(active = true) {
     if (!reader || disposed) return; if (!active) { close(false); return; }
@@ -166,7 +169,7 @@ export function createMediaViewer(document: Document, raster?: RasterResources,d
   root.addEventListener('keydown', event => { if (event.isComposing || event.altKey || event.ctrlKey || event.metaKey) return;
     if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); close(); }
     else if ((event.key === 'ArrowLeft' || event.key === 'ArrowRight') && !(event.target as Element|null)?.closest?.('video,audio')) { event.preventDefault(); event.stopPropagation(); step(event.key === 'ArrowLeft' ? -1 : 1); } });
-  return { root, render, resources, open(read: MediaPreviewReader, itemId: string, from: HTMLElement) {
+  return { root, render, resources, open(read: MediaPreviewReader, itemId: string, from: MediaOpener) {
     if (disposed) return; const group = read(), item = group?.items.find(i => i.id === itemId); if (!group || !item) return;
     reader = read; scope = group.scope; id = item.id; resourceId = item.resourceId; opener = from; resumeImage = undefined; pauseThumbnails();
     preview?.dispose(); preview = null; render(); if (!root.open) root.showModal(); closeButton.focus();
@@ -194,9 +197,10 @@ export function createMediaThumbnails(document: Document, read: MediaPreviewRead
   const grid = document.createElement('div'), pages = document.createElement('nav'), back = document.createElement('button'), forward = document.createElement('button'), count = document.createElement('span');
   grid.className = 'lv-media-grid'; back.type = forward.type = 'button'; back.textContent = '前の一覧'; forward.textContent = '次の一覧';
   pages.setAttribute('aria-label', 'メディア一覧のページ'); pages.append(back, count, forward); root.append(grid, pages);
-  type Card = { root: HTMLElement; label: HTMLElement; action: HTMLButtonElement; preview: ReturnType<typeof createPngPreview>; resourceId: string; tools?: HTMLElement };
-  const cards = new Map<string, Card>(); let page = 0, scope = '', order = '', disposed = false;
-  function render(active = true) {
+  type Card = { root: HTMLElement; label: HTMLElement; action: HTMLButtonElement; show?: HTMLButtonElement; preview: ReturnType<typeof createPngPreview>; resourceId: string; tools?: HTMLElement };
+  const cards = new Map<string, Card>(); let page = 0, scope = '', order = '', disposed = false, presentationActive = true;
+  function render(active = presentationActive) {
+    presentationActive = active;
     if (!active) { for (const card of cards.values()) { card.preview.dispose(); card.root.remove(); } cards.clear(); order = ''; root.hidden = true; return; }
     if (disposed) return; const group = read(); if (scope !== group?.scope) {
       for (const card of cards.values()) { card.preview.dispose(); card.root.remove(); } cards.clear();
@@ -212,17 +216,23 @@ export function createMediaThumbnails(document: Document, read: MediaPreviewRead
       if (!card) {
         const heldScope = scope, resourceId = item.resourceId;
         const live = () => { const current = read(); return current?.scope === heldScope ? current.items.find(i => i.id === item.id && i.resourceId === resourceId) ?? null : null; };
+        const returnTo = (secondary = false) => () => {
+          const current = cards.get(item.id);
+          return !disposed && !root.hidden && live() && current?.resourceId === resourceId ?
+            (secondary ? current.show : current.action) ?? null : null;
+        };
         const figure = document.createElement('figure'), label = document.createElement('figcaption'), action = document.createElement('button');
         action.type = 'button'; action.className = 'lv-media-thumbnail-action';
         action.textContent = selection ? item.label : item.kind==='video'?'動画を再生':item.kind==='audio'?'音声を再生':'画像を表示';
         action.setAttribute('aria-label', action.textContent);
         const preview = createPngPreview(document, live, true, action, undefined, viewer.resources);
-        action.addEventListener('click', () => { if (disposed || !live()) return; if (selection) { selection.choose(item.id); render(); } else viewer.open(read, item.id, action); });
+        action.addEventListener('click', () => { if (disposed || !live()) return; if (selection) { selection.choose(item.id); render(); } else viewer.open(read, item.id, returnTo()); });
         figure.append(preview.root, label);
-        if (selection) { const show = document.createElement('button'); show.type = 'button'; show.textContent = item.kind==='video'?'動画を再生':item.kind==='audio'?'音声を再生':'画像を表示';
-          show.addEventListener('click', () => { if (!disposed && live()) viewer.open(read, item.id, show); }); figure.append(show); }
+        let show: HTMLButtonElement | undefined;
+        if (selection) { show = document.createElement('button'); show.type = 'button'; show.textContent = item.kind==='video'?'動画を再生':item.kind==='audio'?'音声を再生':'画像を表示';
+          show.addEventListener('click', () => { if (!disposed && live()) viewer.open(read, item.id, returnTo(true)); }); figure.append(show); }
         const tools = cardTools ? document.createElement('div') : undefined; if (tools) figure.append(tools);
-        card = { root: figure, label, action, preview, resourceId, tools }; cards.set(item.id, card);
+        card = { root: figure, label, action, show, preview, resourceId, tools }; cards.set(item.id, card);
       }
       card.label.textContent = selection ? '' : `${item.label}${item.description ? ` — ${item.description}` : ''}`; card.label.hidden = !!selection;
       if (selection) card.action.setAttribute('aria-pressed', String(selection.selected() === item.id));

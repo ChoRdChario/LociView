@@ -185,7 +185,7 @@ test('GLBと画像の編集を保存し、ブラウザ再起動と別端末相�
     const choosing = page.waitForEvent('filechooser');
     await page.getByLabel('メディアを追加', { exact: true }).click();
     await (await choosing).setFiles({ name: 'evidence.png', mimeType: 'image/png', buffer: png });
-    await expect(page.getByText('メディアを追加しました。', { exact: true })).toBeVisible();
+    await page.getByRole('region',{name:'キャプションの詳細',exact:true}).getByRole('button',{name:'変更を適用',exact:true}).click(); await expect(page.getByText('メディアを追加しました。', { exact: true })).toBeVisible();
     await checkCaption(page);
     await measure('切り抜きの描画とピン配置の一致', async () => {
       await page.getByRole('tab', { name: '材質', exact: true }).click();

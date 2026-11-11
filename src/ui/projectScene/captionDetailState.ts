@@ -24,6 +24,10 @@ export interface CaptionApplyPlan {
   readonly draft: CaptionDraft;
   readonly changes: Readonly<Partial<Record<CaptionEditField, string>>>;
   readonly affectedSceneCount: number;
+  readonly mediaDraft?: CaptionMediaDraft;
+}
+export interface CaptionMediaDraft {
+  readonly token: string; readonly sceneId: string; readonly captionId: string; readonly selectionId: string;
 }
 export type DetailFeedback = Readonly<{ kind: 'idle' }> |
   Readonly<{ kind: 'applying'; plan: CaptionApplyPlan }> |
@@ -34,6 +38,8 @@ export interface DetailContext {
   readonly mutationBlock: string | null;
   readonly readonlyFields?: readonly CaptionEditField[];
   readonly feedback: DetailFeedback;
+  /** UI-only selected media; no bytes, writes or durable transaction implied. */
+  readonly mediaDraft?: CaptionMediaDraft;
 }
 export const hasCaptionDraft = (draft: CaptionDraft | null): boolean =>
   draft !== null && (draft.composing !== null || draft.bodyInputIssue !== null || Object.keys(draft.edits).length > 0);
@@ -94,6 +100,9 @@ export function captionApplyIssue(context: DetailContext): string | null {
   if (!context.draft || context.draft.captionId !== context.source.caption.id) return '編集中のキャプションを確認してください。';
   if (context.draft.composing) return '文字の入力を確定してください。';
   if (context.draft.bodyInputIssue) return context.draft.bodyInputIssue;
+  if (context.mediaDraft && (context.mediaDraft.token !== context.source.token ||
+      context.mediaDraft.sceneId !== context.source.sceneId || context.mediaDraft.captionId !== context.source.caption.id))
+    return 'メディアの対象が更新されています。選択を取り消して選び直してください。';
   const count = context.source.sceneCount;
   if (count.kind !== 'value' || !Number.isSafeInteger(count.value) || count.value < 1)
     return '影響するシーンを確認してください。';
@@ -101,7 +110,7 @@ export function captionApplyIssue(context: DetailContext): string | null {
     if (context.readonlyFields?.includes(field)) return 'この項目の編集は未接続です。';
     const issue = captionDraftFieldIssue(context, field); if (issue) return issue;
   }
-  return Object.keys(context.draft.edits).length ? null : '変更はありません。';
+  return Object.keys(context.draft.edits).length || context.mediaDraft ? null : '変更はありません。';
 }
 export function planCaptionApply(context: DetailContext): CaptionApplyPlan | Readonly<{ kind: 'blocked'; reason: string }> {
   const issue = captionApplyIssue(context);
@@ -110,12 +119,14 @@ export function planCaptionApply(context: DetailContext): CaptionApplyPlan | Rea
   const changes: Partial<Record<CaptionEditField, string>> = {};
   for (const field of Object.keys(context.draft.edits) as CaptionEditField[]) changes[field] = normalized(field, context.draft.edits[field]!);
   return Object.freeze({ kind: 'apply', token: context.source.token, sceneId: context.source.sceneId,
-    captionId: context.source.caption.id, draft: context.draft, changes: Object.freeze(changes), affectedSceneCount: context.source.sceneCount.value });
+    captionId: context.source.caption.id, draft: context.draft, changes: Object.freeze(changes), affectedSceneCount: context.source.sceneCount.value,
+    ...(context.mediaDraft ? { mediaDraft: Object.freeze({ ...context.mediaDraft }) } : {}) });
 }
 export function captionApplyIsCurrent(plan: CaptionApplyPlan, context: DetailContext): boolean {
   // The host may already show this exact in-flight plan; that is not a new apply.
   return context.source.kind === 'ready' && context.source.token === plan.token &&
     context.source.sceneId === plan.sceneId && context.source.caption.id === plan.captionId && context.draft === plan.draft &&
+    plan.mediaDraft?.selectionId === context.mediaDraft?.selectionId &&
     captionApplyIssue({ ...context, feedback: { kind: 'idle' } }) === null;
 }
 /** Host-confirmed working-state acceptance only, NEVER a durable-save acknowledgement. */

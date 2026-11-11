@@ -5,6 +5,8 @@ import { captionWindowView, planCaptionWindow, type CaptionWindowIntent, type Ca
 export interface WindowContext {
   readonly source: CaptionListSource; readonly memory: CaptionWindowMemory;
   readonly selectedId: string | null; readonly moveBlock: string | null;
+  /** Suspend owned galleries with hidden previews; keep window memory intact. */
+  readonly visible?: boolean;
 }
 export interface WindowProjection {
   readonly ready: boolean; readonly width: number; readonly height: number;
@@ -66,7 +68,9 @@ export function createCaptionWindowControls(document: Document, onPlan: (plan: C
   function removeCard(card: Card) { for (const cleanup of card.cleanups) cleanup(); card.content?.dispose(); card.root.remove(); card.line.remove(); }
   function createCard(id: string): Card {
     let positions = initialPositions.get(scope); if (!positions) { positions = new Map(); initialPositions.set(scope, positions); }
-    const initial = positions.get(id) ?? { left: 16 + positions.size * 32, top: 16 + positions.size * 28, width: 280, height: 200 };
+    const retained = context?.memory.retained ?? [], slot = retained.includes(id) ? retained.indexOf(id) : retained.length;
+    const initial = (retained.includes(id) ? positions.get(id) : undefined) ??
+      { left: 16 + slot * 32, top: 16 + slot * 28, width: 280, height: 200 };
     positions.set(id, initial);
     const node = make('section'), header = make('header'), footer = make('footer'), title = button(''), close = button('×'), resize = button('↘');
     node.className = 'lv-caption-window'; close.setAttribute('aria-label', '閉じる');
@@ -136,7 +140,7 @@ export function createCaptionWindowControls(document: Document, onPlan: (plan: C
   function paint() {
     if (disposed || !context) return;
     const view = captionWindowView(context.source, context.memory, context.selectedId);
-    root.hidden = projection.width <= 0 || projection.height <= 0;
+    root.hidden = context.visible === false || projection.width <= 0 || projection.height <= 0;
     for (const [id, card] of cards) {
       const index = view.visibleIds.indexOf(id);card.root.dataset.active=String(index===view.visibleIds.length-1);
       const preferred = context.memory.placements.find(p => p.captionId === id)?.rect ?? card.initial;
@@ -157,7 +161,7 @@ export function createCaptionWindowControls(document: Document, onPlan: (plan: C
   }
   function render(next: WindowContext) {
     if (disposed) return;
-    if (drag && (drag.context.source.token !== next.source.token || drag.context.memory !== next.memory || drag.context.selectedId !== next.selectedId ||
+    if (drag && (next.visible === false || drag.context.source.token !== next.source.token || drag.context.memory !== next.memory || drag.context.selectedId !== next.selectedId ||
       !captionWindowView(next.source, next.memory, next.selectedId).visibleIds.includes(drag.id)))
       endDrag(false);
     if (scope !== next.source.sceneId) { for (const card of cards.values()) removeCard(card); cards.clear(); scope = next.source.sceneId; }
@@ -173,7 +177,7 @@ export function createCaptionWindowControls(document: Document, onPlan: (plan: C
       card.root.setAttribute('aria-label', title);
       const body = item.body.kind === 'value' ? item.body.value : '本文の更新候補を確認してください。';
       if (card.body.textContent !== body) card.body.textContent = body;
-      card.content?.render(projection.width > 0 && projection.height > 0);
+      card.content?.render(next.visible !== false && projection.width > 0 && projection.height > 0);
       card.note.textContent = [item.needsReview || item.pin === 'needsReview' ? '要確認：ピン位置を確認してください。' : '',
         item.pin === 'unplaced' ? '未配置' : item.pin === 'ownerMissing' ? '対応モデルなし。記録は保持しています。' : item.pin === 'ownerHidden' ? 'モデルは非表示です。' : item.pin === 'unavailable' ? 'ピンを表示できません。' : ''].filter(Boolean).join(' ');
       card.note.hidden = !card.note.textContent;

@@ -34,16 +34,21 @@ export function createValidationOutputControls(document: Document, host: ReturnT
   let readingToken: string | null = null;
   let primaryAction = () => {};
   primary.addEventListener('click', () => { if (!disposed && !primary.disabled) primaryAction(); });
-  let presentation: 'all' | 'save' | 'share' = 'all';
-  let purpose: 'teamWorkspace' | 'contribution' | 'backup' | 'clean' | 'review' = 'backup', baseId = '', choicePending = false, checkpointName = '', composing = false;
+  type Presentation = 'all' | 'save' | 'share';
+  let presentation: Presentation = 'all';
+  type OutputPurpose = 'teamWorkspace' | 'contribution' | 'backup' | 'clean' | 'review';
+  let purpose: OutputPurpose = 'backup', baseId = '', choicePending = false, checkpointName = '', composing = false;
   let cleanPreview: Awaited<ReturnType<typeof host.workspaceOutput.previewClean>> | null = null;
   let reviewPreview: Awaited<ReturnType<typeof host.workspaceOutput.previewReview>> | null = null, sceneId = '', omitEntry = false;
-  const resetChoice = () => { purpose = presentation === 'share' ? 'teamWorkspace' : 'backup'; baseId = ''; checkpointName = ''; choicePending = false; cleanPreview = null; reviewPreview = null; sceneId = ''; omitEntry = false; };
+  let autoBase = true;
+  type Choice = { purpose: OutputPurpose; baseId: string; checkpointName: string; choicePending: boolean; sceneId: string; omitEntry: boolean; autoBase: boolean };
+  const choices = new Map<Presentation, Choice>();
+  const resetChoice = () => { purpose = presentation === 'share' ? 'teamWorkspace' : 'backup'; baseId = ''; checkpointName = ''; choicePending = false; cleanPreview = null; reviewPreview = null; sceneId = ''; omitEntry = false; autoBase = true; };
   const choosePurpose = (next: typeof purpose, pending = true) => {
     if (busy || composing || selected || cancellation) return;
     if (purpose === next) return;
     feedback = ''; completedFeedback = false;
-    purpose = next; baseId = ''; cleanPreview = null; reviewPreview = null; sceneId = ''; omitEntry = false; choicePending = pending; render(); changed();
+    purpose = next; baseId = ''; autoBase = true; cleanPreview = null; reviewPreview = null; sceneId = ''; omitEntry = false; choicePending = pending; render(); changed();
   };
   const refreshChoice = (control: HTMLElement) => {
     const label = document.activeElement === control && control.getAttribute('aria-label');
@@ -61,8 +66,18 @@ export function createValidationOutputControls(document: Document, host: ReturnT
     let url = key && urls.get(key);
     if (!url) { url = URL.createObjectURL(blob); urls.set(key ?? url, url); }
     const a = document.createElement('a');
-    a.href = url; a.download = job.purpose === 'contribution' ? 'LociView-contribution.zip' : job.purpose === 'backup' ? 'LociView-backup.zip' : job.purpose === 'clean' ? 'LociView-copy.zip' : job.purpose === 'review' ? 'LociView-review.zip' : 'LociView-workspace.zip';
-    const label = Array.from((job.label ?? '').replace(/[<>:"/\\|?*\u0000-\u001f]/g, '_').trim()).slice(0, 80).join('').replace(/[. ]+$/, '');
+    const safeName = (name: string) => Array.from(name.replace(/[<>:"/\\|?*\u0000-\u001f\u202a-\u202e\u2066-\u2069]/g, '_').trim()).slice(0, 80).join('').replace(/[. ]+$/, '');
+    const provider = host.read().provider;
+    const title = provider?.kind === 'scene-provider' ? provider.inspection.candidates.fields.find(field =>
+      field.path.length === 2 && field.path[0] === 'project' && field.path[1] === 'title') : undefined;
+    const candidate = title?.valid && title.candidates.length === 1 ? title.candidates[0]?.value : undefined;
+    const project = candidate?.kind === 'value' && typeof candidate.value === 'string' ? safeName(candidate.value) : '';
+    const kind = { contribution: '変更分', backup: '保存', clean: 'コピー', review: 'シーン', teamWorkspace: '作業一式' }[job.purpose];
+    const now = new Date(), pair = (n: number) => String(n).padStart(2, '0');
+    const stamp = String(now.getFullYear()) + [now.getMonth() + 1, now.getDate()].map(pair).join('') + '-' +
+      [now.getHours(), now.getMinutes(), now.getSeconds()].map(pair).join('');
+    a.href = url; a.download = ['LociView', project, kind, stamp].filter(Boolean).join('-') + '.zip';
+    const label = safeName(job.label ?? '');
     if (job.purpose === 'backup' && label) a.download = `LociView-${label}.zip`;
     a.hidden = true; root.append(a);
     try { a.click(); } finally { a.remove(); }
@@ -167,6 +182,8 @@ export function createValidationOutputControls(document: Document, host: ReturnT
       const note = document.createElement('p'); note.textContent = '編集・返送できます。全シーンと編集履歴を含みます。'; actions.append(note);
     }
     if (!composing && nameInput.value !== checkpointName) nameInput.value = checkpointName;
+    if (purpose === 'contribution' && autoBase && !baseId && host.workspaceOutput.bases.length === 1)
+      baseId = host.workspaceOutput.bases[0]!.selection.workspacePackageId;
     const chosen = host.workspaceOutput.bases.find(b => b.selection.workspacePackageId === baseId);
     const disclosure = privacyNotice(currentDisclosure());
     if (disclosure) { const privacy = document.createElement('p'); privacy.textContent = disclosure; actions.append(privacy); }
@@ -216,7 +233,7 @@ export function createValidationOutputControls(document: Document, host: ReturnT
         const option = document.createElement('option'); option.value = choice.selection.workspacePackageId; option.textContent = choice.label; base.append(option);
       }
       base.value = chosen ? baseId : ''; base.disabled = choicesDisabled; label.append(base); actions.append(label);
-      base.addEventListener('change', () => { if (!base.disabled) { baseId = base.value; refreshChoice(base); } });
+      base.addEventListener('change', () => { if (!base.disabled) { baseId = base.value; autoBase = false; refreshChoice(base); } });
       const help = document.createElement('p'); help.textContent = host.workspaceOutput.bases.length ?
         '相手と共有した作業一式を選択してください。' : '先に作業一式を受け取るか、作成してください。'; actions.append(help);
     }
@@ -324,9 +341,19 @@ export function createValidationOutputControls(document: Document, host: ReturnT
   nameInput.addEventListener('input', () => { if (!nameInput.disabled) { checkpointName = nameInput.value; choicePending = true; changed(); } });
   nameInput.addEventListener('compositionstart', () => { composing = true; choicePending = true; changed(); });
   nameInput.addEventListener('compositionend', () => { checkpointName = nameInput.value; composing = false; choicePending = true; changed(); });
-  render(); return { root, render, choosePurpose, hasHandedOff: (jobId: string) => handedOff.has(jobId), setPresentation(value: typeof presentation) { presentation = value; if (completedFeedback) { feedback = ''; completedFeedback = false; } },
+  render(); return { root, render, choosePurpose, hasHandedOff: (jobId: string) => handedOff.has(jobId), setPresentation(value: typeof presentation) {
+      if (value !== presentation) {
+        choices.set(presentation, { purpose, baseId, checkpointName, choicePending, sceneId, omitEntry, autoBase });
+        presentation = value;
+        const saved = choices.get(value);
+        if (saved) ({ purpose, baseId, checkpointName, choicePending, sceneId, omitEntry, autoBase } = saved);
+        else resetChoice();
+        cleanPreview = null; reviewPreview = null;
+      }
+      if (completedFeedback) { feedback = ''; completedFeedback = false; }
+    },
     readingOutput: () => !disposed && busy && readingToken ? { token: readingToken, message: feedback } : null,
     outputFeedback: () => feedback,
-    closeReason: () => busy ? 'ファイルを処理中です。完了をお待ちください。' : composing ? '名前の入力を確定してください。' : selected ? '照合するファイルを選ぶか、「ファイル確認を取り消す」を選択してください。' : cancellation ? '取りやめの確認を完了するか、「戻る」を選択してください。' : choicePending ? '選択が未完了です。下の「選択を取り消す」で戻れます。' : null, busy: () => busy, hasChanges: () => busy || composing || choicePending || !!selected || !!cancellation,
+    closeReason: () => busy ? 'ファイルを処理中です。完了をお待ちください。' : composing ? '名前の入力を確定してください。' : selected ? '照合するファイルを選ぶか、「ファイル確認を取り消す」を選択してください。' : cancellation ? '取りやめの確認を完了するか、「戻る」を選択してください。' : null, busy: () => busy, hasChanges: () => busy || composing || !!selected || !!cancellation,
     dispose: () => { disposed = true; readingToken = null; for (const url of urls.values()) URL.revokeObjectURL(url); urls.clear(); root.remove(); } };
 }

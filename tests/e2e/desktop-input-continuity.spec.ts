@@ -27,15 +27,36 @@ for (const touch of [false, true]) test(`attachment ordering and Drawing complet
     for (const axis of ['X', 'Y', 'Z']) await page.getByRole('region', { name: '位置の調整', exact: true }).getByLabel(`位置 ${axis}`, { exact: true }).fill(axis === 'Y' ? '.5' : '0');
     await page.getByRole('button', { name: '位置を確定', exact: true }).click(); await ready('ピンの位置を確定しました。');
     await revealCaptionList(page); await page.locator('.lv-caption-select').first().click();
-    // Keep the resume fixture small; later attachment/drawing history is a separate concern.
+    // One tiny photo follows the same explicit text completion and survives the existing restore.
     await detail.getByLabel('タイトル', { exact: true }).fill('再開時の記録'); await detail.getByLabel('本文', { exact: true }).fill('元のバックアップ本文');
+    const firstPhoto = page.waitForEvent('filechooser'); await page.getByLabel('メディアを追加', { exact: true }).click();
+    await (await firstPhoto).setFiles({ name: 'A.png', mimeType: 'image/png', buffer: smallPng() });
+    await expect(detail.locator('.lv-record-media-draft')).toContainText('A.png');
+    await detail.getByRole('button', { name:'取り消す', exact:true }).click();
+    const staleConfirmation = await detail.getByRole('button', { name:'変更を取り消す', exact:true }).elementHandle();
+    const replacement = page.waitForEvent('filechooser'); await page.getByLabel('メディアを追加', { exact:true }).click();
+    await (await replacement).setFiles({ name:'新しく選んだ写真.png', mimeType:'image/png', buffer:smallPng() });
+    await expect(detail.getByRole('button', { name:'変更を取り消す', exact:true })).toBeHidden();
+    await staleConfirmation!.evaluate(node => (node as HTMLButtonElement).click());
+    await expect(detail.locator('.lv-record-media-draft')).toContainText('新しく選んだ写真.png');
+    const finalPhoto = page.waitForEvent('filechooser'); await page.getByLabel('メディアを追加', { exact:true }).click();
+    await (await finalPhoto).setFiles({ name:'A.png', mimeType:'image/png', buffer:smallPng() });
+    await page.emulateMedia({ reducedMotion:'reduce' });
+    expect(await detail.locator('.lv-record-media-draft').evaluate(node => getComputedStyle(node).animationName)).toBe('none');
+    await page.emulateMedia({ reducedMotion:'no-preference' });
+    await detail.getByLabel('本文', { exact: true }).dispatchEvent('compositionstart');
+    await expect(detail.getByRole('button', { name: '変更を適用', exact: true })).toBeDisabled();
+    await detail.getByLabel('本文', { exact: true }).dispatchEvent('compositionend');
+    await page.screenshot({ path: info.outputPath('text-and-selected-photo.png') });
     await detail.getByRole('button', { name: '変更を適用', exact: true }).click(); await ready('変更を適用しました。');
+    await expect(page.getByLabel('保存ファイルの状態', { exact: true })).toHaveText('ファイル保存は未確認');
     await revealFileSurface(page, '保存'); const files = page.getByRole('region', { name: 'ファイル', exact: true });
     const [download] = await Promise.all([page.waitForEvent('download'), files.locator('.lv-file-primary').click()]);
     const backup = info.outputPath('resume-fixture.zip'); await download.saveAs(backup); expect(await download.failure()).toBeNull(); await closeFileSurface(page);
-    for (const name of ['A.png', 'B.png', 'C.png']) {
+    for (const name of ['B.png', 'C.png']) {
       const chooser = page.waitForEvent('filechooser'); await page.getByLabel('メディアを追加', { exact: true }).click();
-      await (await chooser).setFiles({ name, mimeType: 'image/png', buffer: smallPng() }); await ready('メディアを追加しました。');
+      await (await chooser).setFiles({ name, mimeType: 'image/png', buffer: smallPng() });
+      await detail.getByRole('button', { name: '変更を適用', exact: true }).click(); await ready('メディアを追加しました。');
     }
     const media = detail.getByRole('region', { name: 'メディアの整理', exact: true }), gallery = media.getByRole('region', { name: '添付メディア', exact: true });
     const figures = gallery.locator('figure'), first = figures.filter({ hasText: 'A.png' }); await expect(figures).toHaveCount(3);
@@ -102,6 +123,8 @@ for (const touch of [false, true]) test(`attachment ordering and Drawing complet
     resumePhase = 'saved-body-edit'; await revealCaptionList(resumed);
     await resumed.locator('.lv-caption-select').filter({ hasText: '再開時の記録' }).click();
     const resumedDetail = resumed.getByRole('region', { name: 'キャプションの詳細', exact: true }), body = '復元した端末で保存した本文';
+    await expect(resumedDetail.getByRole('region', { name: '添付メディア', exact: true }).locator('figure')).toHaveCount(1);
+    await expect(resumedDetail).toContainText('A.png');
     await resumedDetail.getByLabel('本文', { exact: true }).fill(body); await resumedDetail.getByRole('button', { name: '変更を適用', exact: true }).click();
     await expect(resumed.getByText('変更を適用しました。', { exact: true })).toBeVisible();
     await recipient.addInitScript(() => {

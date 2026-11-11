@@ -101,7 +101,7 @@ test('二人の重複登録を両方残し、元と独立コピーを別々に�
       const values = await target.locator('option').evaluateAll(nodes => nodes.map(n => (n as HTMLOptionElement).value).filter(Boolean)); expect(values).toHaveLength(1); await target.selectOption(values[0]!);
       await a.getByRole('button', { name: 'このモデルに追加', exact: true }).click(); for (const [axis, value] of [['X', '0.2'], ['Y', '0.2'], ['Z', '0']]) await a.getByLabel(`位置 ${axis}`, { exact: true }).fill(value!);
       await a.getByRole('button', { name: '位置を確定', exact: true }).click(); await done(a, 'ピンの位置を確定しました。'); await editCaption(a, initialTitle, '配布した本文');
-      const picker = a.waitForEvent('filechooser'); await a.getByLabel('メディアを追加', { exact: true }).click(); await (await picker).setFiles({ name: '共有画像.png', mimeType: 'image/png', buffer: png }); await done(a, 'メディアを追加しました。');
+      const picker = a.waitForEvent('filechooser'); await a.getByLabel('メディアを追加', { exact: true }).click(); await (await picker).setFiles({ name: '共有画像.png', mimeType: 'image/png', buffer: png }); await a.getByRole('region',{name:'キャプションの詳細',exact:true}).getByRole('button',{name:'変更を適用',exact:true}).click(); await done(a, 'メディアを追加しました。');
       await a.getByRole('tab', { name: 'モデル', exact: true }).click(); await modelRows(a).first().click(); await modelPanel(a).getByRole('button', { name: '配置を調整', exact: true }).click();
       await modelPanel(a).getByLabel('モデル位置 X', { exact: true }).fill('0.75'); await modelPanel(a).getByLabel('モデル倍率', { exact: true }).fill('1.25');
       await modelPanel(a).getByRole('button', { name: '配置を確定', exact: true }).click(); await done(a, 'モデルの配置を確定しました。');

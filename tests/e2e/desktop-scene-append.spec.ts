@@ -62,7 +62,7 @@ for (const scenario of [
     const photo = smallPng();
     const chooser = source.waitForEvent('filechooser'); await source.getByLabel('メディアを追加', { exact: true }).click();
     await (await chooser).setFiles({ name: '点検写真.png', mimeType: 'image/png', buffer: photo });
-    await expect(source.getByText('メディアを追加しました。', { exact: true })).toBeVisible();
+    await source.getByRole('region',{name:'キャプションの詳細',exact:true}).getByRole('button',{name:'変更を適用',exact:true}).click(); await expect(source.getByText('メディアを追加しました。', { exact: true })).toBeVisible();
     await revealFileSurface(source, '共有'); await selectShareOutput(files(source), 'review');
     await files(source).getByLabel('渡すシーン', { exact: true }).selectOption({ label: '点検シーン' });
     await files(source).getByRole('button', { name: '内容を確認', exact: true }).click();

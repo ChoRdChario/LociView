@@ -186,7 +186,6 @@ export function createValidationReceiveControls(document: Document, host: Return
     showSurface(next: Exclude<typeof surface,'all'>) {
       if(hasChanges())return false;
       surface=next; output.setPresentation(next === 'save' || next === 'share' ? next : 'all');
-      if(next==='share'||next==='save')output.choosePurpose(next==='share'?'teamWorkspace':'backup', false);
       render(); if(next==='restore' && host.backupRestore.enabled)restoreArea.open=true;
       return true;
     },

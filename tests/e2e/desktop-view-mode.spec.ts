@@ -168,7 +168,7 @@ test('view mode hides editing while preserving reading, local display, existing 
     await p.getByRole('button', { name: '位置を確定', exact: true }).click(); await ready('ピンの位置を確定しました。');
     await detail.getByLabel('タイトル', { exact: true }).fill('現地の写真'); await detail.getByLabel('本文', { exact: true }).fill('確認する本文\n二行目');
     await detail.getByRole('button', { name: '変更を適用', exact: true }).click(); await ready('変更を適用しました。');
-    const pick = p.waitForEvent('filechooser'); await p.getByLabel('メディアを追加', { exact: true }).click(); await (await pick).setFiles({ name: '現地.png', mimeType: 'image/png', buffer: smallPng() }); await ready('メディアを追加しました。');
+    const pick = p.waitForEvent('filechooser'); await p.getByLabel('メディアを追加', { exact: true }).click(); await (await pick).setFiles({ name: '現地.png', mimeType: 'image/png', buffer: smallPng() }); await p.getByRole('region',{name:'キャプションの詳細',exact:true}).getByRole('button',{name:'変更を適用',exact:true}).click(); await ready('メディアを追加しました。');
     await revealCameraPositions(p); const author = p.getByRole('region', { name: '視点の作成と管理', exact: true });
     await p.getByRole('button',{name:'開始視点を記録',exact:true}).click();await ready('開始視点を記録しました。');
     await revealWorkPanel(p); await tab('キャプション').click(); await save('before-view');
@@ -194,7 +194,7 @@ test('view mode hides editing while preserving reading, local display, existing 
     await expect(p.getByRole('region',{name:'キャプション',exact:true})).toBeVisible();
     const captions = p.getByRole('region', { name: 'キャプション', exact: true }); await captions.locator('.lv-caption-search').getByLabel('検索', { exact: true }).fill('現地'); await expect(p.locator('.lv-caption-select')).toHaveCount(1);
     await p.locator('.lv-caption-select').click(); await expect(detail).toBeVisible();
-    await detail.getByRole('button', { name: '3D上に表示', exact: true }).click(); await expect(p.locator('.lv-caption-window')).toBeVisible();
+    await detail.getByRole('button', { name: '窓を残す', exact: true }).click(); await expect(p.locator('.lv-caption-window')).toBeVisible();
     await expect(p.getByRole('region', { name: 'メディア', exact: true }).locator('img').first()).toBeVisible();
     if (await menu.evaluate(n => (n as HTMLDetailsElement).open)) await menu.locator(':scope > summary').click();
     await p.screenshot({ path: info.outputPath('view-caption.png'), fullPage: false });
@@ -221,7 +221,7 @@ test('view mode hides editing while preserving reading, local display, existing 
     await expect(p.locator('.lv-caption-window').getByRole('button',{name:'閉じる',exact:true})).toBeInViewport();
     await p.screenshot({path:info.outputPath('narrow-stage.png'),fullPage:false});
     await p.locator('.lv-caption-window').getByRole('button',{name:'閉じる',exact:true}).click();await expect(p.locator('.lv-caption-window')).toHaveCount(0);
-    await p.getByRole('button',{name:'作業パネル',exact:true}).click();await expect(detail).toBeVisible();await detail.getByRole('button',{name:'3D上に表示',exact:true}).click();await p.setViewportSize({ width: 1440, height: 1000 });
+    await p.getByRole('button',{name:'作業パネル',exact:true}).click();await expect(detail).toBeVisible();await detail.getByRole('button',{name:'窓を残す',exact:true}).click();await p.setViewportSize({ width: 1440, height: 1000 });
     await p.getByRole('button', { name: '編集する', exact: true }).click(); await expect(p.getByRole('button', { name: '閲覧する', exact: true })).toBeEnabled();
     await expect(p.getByRole('list',{name:'キャプション一覧',exact:true})).toBeVisible();await expect(captions.locator('.lv-caption-search').getByLabel('検索', { exact: true })).toHaveValue('現地');await p.locator('.lv-caption-select').click(); await expect(detail.getByLabel('本文', { exact: true })).toHaveValue('確認する本文\n二行目');
     await detail.getByLabel('本文', { exact: true }).fill('閲覧から戻って編集'); await expect(p.getByRole('button', { name: '閲覧する', exact: true })).toBeDisabled();
@@ -294,7 +294,7 @@ test('one PC app keeps the same Project through connected, cold offline and prep
     const detail = () => p.getByRole('region', { name: 'キャプションの詳細', exact: true });
     await detail().getByLabel('タイトル', { exact: true }).fill('同じ記録'); await detail().getByLabel('本文', { exact: true }).fill('接続中に記録した本文'); await detail().getByRole('button', { name: '変更を適用', exact: true }).click();
     await expect(p.getByText('変更を適用しました。', { exact: true })).toBeVisible();
-    const chooser = p.waitForEvent('filechooser'); await p.getByLabel('メディアを追加', { exact: true }).click(); await (await chooser).setFiles({ name: '現場.png', mimeType: 'image/png', buffer: smallPng() }); await expect(p.getByText('メディアを追加しました。', { exact: true })).toBeVisible();
+    const chooser = p.waitForEvent('filechooser'); await p.getByLabel('メディアを追加', { exact: true }).click(); await (await chooser).setFiles({ name: '現場.png', mimeType: 'image/png', buffer: smallPng() }); await p.getByRole('region',{name:'キャプションの詳細',exact:true}).getByRole('button',{name:'変更を適用',exact:true}).click(); await expect(p.getByText('メディアを追加しました。', { exact: true })).toBeVisible();
     const save = async (name: string) => {
       await p.locator('.lv-workspace-actions').getByRole('button', {name:'ファイルに保存',exact:true}).click(); const files = p.getByRole('region', { name: 'ファイル', exact: true }); await files.getByLabel('名前（任意）', { exact: true }).fill(name);
       const [download] = await Promise.all([p.waitForEvent('download'), files.locator('.lv-file-primary').click()]); const path = info.outputPath(name + '.zip'); await download.saveAs(path); expect(await download.failure()).toBeNull();

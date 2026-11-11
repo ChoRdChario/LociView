@@ -89,7 +89,7 @@ test('点群の元座標で記録し、画像・調整・受け渡し・閲覧�
     await page.getByRole('tab',{name:'キャプション',exact:true}).click(); await page.getByRole('button',{name:'キャプションを追加',exact:true}).click();
     const canvas = page.getByLabel('3Dモデルの表示',{exact:true}), box = await canvas.boundingBox(); await canvas.click({position:{x:box!.width/2,y:box!.height/2}});
     await page.getByRole('button',{name:'位置を確定',exact:true}).click(); await expect(page.getByText('ピンの位置を確定しました。',{exact:true})).toBeVisible(); expect((await sample(page)).slice(0,3)).toEqual([255,0,0]); await edit(page,'元の点の記録','点群の本文');
-    const chooser = page.waitForEvent('filechooser'); await page.getByLabel('メディアを追加',{exact:true}).click(); await (await chooser).setFiles({name:'写真.png',mimeType:'image/png',buffer:smallPng()}); await expect(page.getByText('メディアを追加しました。',{exact:true})).toBeVisible();
+    const chooser = page.waitForEvent('filechooser'); await page.getByLabel('メディアを追加',{exact:true}).click(); await (await chooser).setFiles({name:'写真.png',mimeType:'image/png',buffer:smallPng()}); await page.getByRole('region',{name:'キャプションの詳細',exact:true}).getByRole('button',{name:'変更を適用',exact:true}).click(); await expect(page.getByText('メディアを追加しました。',{exact:true})).toBeVisible();
     const first = await download(page,info,'point-first','backup'), initial = await backupRecords(first);
     const original = Object.values(initial.records.captionsById)[0] as any;
     expect(original.anchor).toMatchObject({positionAsset:[0,0,0],hitEvidence:{method:'point-cloud',source:{surfaceRef:{kind:'pointSample',nodeIndex:0,primitiveIndex:0,pointIndex:0}}}}); expect(original.anchor.normalAsset).toBeUndefined();

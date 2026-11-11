@@ -55,6 +55,9 @@ test('phone record list, body and completion stay usable when the viewport shrin
     await surface.selectOption((await surface.locator('option').evaluateAll(nodes => nodes.map(n => (n as HTMLOptionElement).value).find(Boolean)))!);
     const canvas = page.getByLabel('3Dモデルの表示', { exact: true }), opacity = drawing.getByLabel('不透明度（%）', { exact: true });
     await expect(canvas).toBeVisible(); await expect(canvas).toHaveAttribute('aria-busy', 'false', { timeout: 90_000 });
+    await expect(page.locator('.lv-caption-windows')).toBeHidden();
+    expect(await canvas.evaluate(node => { const r=node.getBoundingClientRect();return !document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)?.closest('.lv-caption-window'); })).toBe(true);
+    await page.screenshot({ path:info.outputPath('drawing-preview-uncovered.png') });
     const preview = (await canvas.boundingBox())!, panel = (await drawing.boundingBox())!;
     expect(preview.width).toBeGreaterThan(300); expect(panel.y).toBeGreaterThanOrEqual(preview.y + preview.height);
     await opacity.tap(); await opacity.fill('55'); await opacity.dispatchEvent('compositionstart');
@@ -70,6 +73,9 @@ test('phone record list, body and completion stay usable when the viewport shrin
     await drawing.getByRole('button', { name: '取り消す', exact: true }).tap();
     await drawing.getByRole('region', { name: '操作の確認', exact: true }).getByRole('button', { name: '変更を取り消す', exact: true }).tap();
     await page.setViewportSize({ width: 390, height: 844 }); await page.getByRole('tab', { name: 'キャプション', exact: true }).tap();
+    await page.getByRole('button', { name:'3D', exact:true }).tap();
+    await expect(page.locator('.lv-caption-windows')).toBeVisible();
+    await page.getByRole('button', { name:'作業パネル', exact:true }).tap();
     await page.locator('details.lv-project-files > summary').tap();
     await page.getByRole('tab', { name: '共有', exact: true }).tap();
     const files = page.getByRole('region', { name: 'ファイル', exact: true });

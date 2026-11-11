@@ -89,7 +89,8 @@ test('PC Caption work continues after empty tag focus and cancelled file checks,
     await workspaceFits(page); await chooseCaption(page, '確認する場所');
     await page.getByRole('button', { name: '記録を複製', exact: true }).click(); await ready(page, '記録を複製しました。元の記録は変わりません。');
     await edit(page, 'タイトル', '見比べる記録・長い日本語の見出しと現地で確認した内容');
-    await chooseCaption(page, '確認する場所'); await chooseCaption(page, '見比べる記録・長い日本語の見出しと現地で確認した内容');
+    await chooseCaption(page, '確認する場所'); await detail(page).getByRole('button',{name:'窓を残す',exact:true}).click();
+    await chooseCaption(page, '見比べる記録・長い日本語の見出しと現地で確認した内容'); await detail(page).getByRole('button',{name:'窓を残す',exact:true}).click();
     const windows = page.locator('.lv-caption-window'); await expect(windows).toHaveCount(2);
     await page.evaluate(() => { const w = window as any; w.__layoutCanvas = document.querySelector('.lv-project-stage canvas'); w.__layoutWindows = [...document.querySelectorAll('.lv-caption-window')]; });
     const draft = detail(page).getByLabel('タイトル', { exact: true }); await draft.fill('入力中の記録を保つ');

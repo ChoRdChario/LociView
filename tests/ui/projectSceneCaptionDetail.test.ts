@@ -46,6 +46,35 @@ function host(initial = context(), document = new RecordedDocument()) {
 }
 
 describe('Caption detail: local draft/intents, not durable editor acceptance', () => {
+  it('invalidates a cancellation confirmation when a newer photo replaces the same text draft', () => {
+    const ctx: DetailContext = { ...context(), mediaDraft: { token:'one', sceneId:scn, captionId:cap, selectionId:'att_a' } };
+    const h=host(ctx); h.cancel.click(); expect(h.confirmation.hidden).toBe(false);
+    h.render({...ctx,mediaDraft:{...ctx.mediaDraft!,selectionId:'att_b'}});
+    expect(h.confirmation.hidden).toBe(true); h.confirmation.children[1]!.click();
+    expect(h.events.some(event=>event.kind==='cancel')).toBe(false);
+    expect(h.props.mediaDraft?.selectionId).toBe('att_b'); h.controls.dispose();
+  });
+  it('makes retained-window intent explicit independently of record editing', () => {
+    const h = host(), retain = record(h.controls.windowActions).children[0]!;
+    expect(retain.textContent).toBe('窓を残す'); expect(retain.attributes.get('aria-pressed')).toBe('false');
+    retain.click(); expect(h.events.at(-1)).toMatchObject({ kind:'window', action:'retain', captionId:cap });
+    h.render({...h.props,windowRetained:true}); expect(retain.attributes.get('aria-pressed')).toBe('true');
+    retain.click(); expect(h.events.at(-1)).toMatchObject({ kind:'window', action:'release', captionId:cap }); h.controls.dispose();
+  });
+  it('admits an owned media-only completion while retaining token, selection, IME and authority guards', () => {
+    const ctx: DetailContext = { ...context(), mediaDraft: { token: 'one', sceneId: scn, captionId: cap, selectionId: 'att_one' } };
+    const plan = apply(ctx), h = host(ctx);
+    expect(plan.changes).toEqual({}); expect(hasCaptionDraft(ctx.draft)).toBe(false);
+    expect(h.apply.disabled).toBe(false); expect(record(h.controls.actions).hidden).toBe(false);
+    h.apply.click(); expect(h.events.at(-1)).toMatchObject({ kind: 'apply', mediaDraft: { selectionId: 'att_one' } });
+    expect(captionApplyIsCurrent(plan, { ...ctx, mediaDraft: { ...ctx.mediaDraft!, selectionId: 'att_two' } })).toBe(false);
+    expect(planCaptionApply({ ...ctx, source: { ...source(), token: 'two' } }).kind).toBe('blocked');
+    expect(planCaptionApply({ ...ctx, source: { ...source(), sceneCount: unresolved<number>() } }).kind).toBe('blocked');
+    expect(planCaptionApply({ ...ctx, mutationBlock: '閲覧中' }).kind).toBe('blocked');
+    const composing = composeCaptionDraft(ctx.draft!, ctx.source, 'body');
+    h.render({ ...ctx, draft: composing }); expect(h.apply.disabled).toBe(true); expect(h.cancel.disabled).toBe(true);
+    h.controls.dispose();
+  });
   it('shows one empty-state prompt while keeping unavailable selected records and drafts explicit', () => {
     const h = host({ ...context(), source: { kind: 'unavailable', captionId: null, sceneId: scn, token: 'empty', reason: '記録を選択してください。' }, draft: null });
     expect(h.status.textContent).toBe('記録を選択してください。'); expect(h.titleGroup.hidden).toBe(true); expect(h.impact.hidden).toBe(true);

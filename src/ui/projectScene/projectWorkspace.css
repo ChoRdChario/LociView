@@ -401,6 +401,16 @@
   .lv-project-shell .lv-workspace-actions > :is(button,.lv-project-files) { flex: 0 0 auto; }
 }
 .lv-camera-pan { filter: drop-shadow(0 0 1px #fff); }
+.lv-caption-select { transition: background-color 140ms ease-out; }
+.lv-caption-retain[aria-pressed="true"] { background: #e3e8dc; box-shadow: inset 0 0 0 2px #68735c; }
+.lv-caption-window { animation: lv-record-reveal 140ms ease-out; transition: box-shadow 140ms ease-out; }
+.lv-record-media-draft:not([hidden]) { border-inline-start: 3px solid #68735c; padding-inline-start: 10px; animation: lv-record-reveal 140ms ease-out; }
+.lv-project-workspace > header > .lv-operation-status[data-passive="true"]:not(:empty) { animation: lv-record-reveal 140ms ease-out; }
+@keyframes lv-record-reveal { from { opacity: .72; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .lv-caption-select, .lv-caption-window, .lv-record-media-draft:not([hidden]),
+  .lv-project-workspace > header > .lv-operation-status[data-passive="true"]:not(:empty) { animation: none; transition: none; }
+}
 @media (max-height: 480px) {
   .lv-project-workspace:has(.lv-project-body[data-drawing-editing="true"]) > header > :is(.lv-project-identity,.lv-header-tools),
   .lv-project-workspace:has(.lv-project-body[data-drawing-editing="true"]) > .lv-compact-navigation,

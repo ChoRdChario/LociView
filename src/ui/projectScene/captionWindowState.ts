@@ -13,7 +13,7 @@ export function newCaptionWindowMemory(sceneId: string): CaptionWindowMemory {
   return Object.freeze({ sceneId, retained: Object.freeze([]), dismissed: Object.freeze([]), order: Object.freeze([]), placements: Object.freeze([]) });
 }
 export type CaptionWindowIntent =
-  Readonly<{ kind: 'open' | 'retain' | 'release' | 'close' | 'front'; captionId: string }> |
+  Readonly<{ kind: 'open' | 'follow' | 'retain' | 'release' | 'close' | 'front'; captionId: string }> |
   Readonly<{ kind: 'place'; captionId: string; rect: WindowRect }> |
   Readonly<{ kind: 'arrange'; placements: readonly CaptionPlacement[] }>;
 export type CaptionWindowPlan = Readonly<{ kind: 'blocked'; reason: string }> |
@@ -57,7 +57,7 @@ export function planCaptionWindow(source: CaptionListSource, memory: CaptionWind
   }
   if (view.issue || source.kind !== 'ready' || !source.captions.some(item => item.id === id))
     return block(view.issue || 'このシーンのキャプションを選択してください。');
-  if (intent.kind === 'open' && id !== selectedCaptionId) return block('選択したキャプションのウィンドウを開いてください。');
+  if ((intent.kind === 'open' || intent.kind === 'follow') && id !== selectedCaptionId) return block('選択したキャプションのウィンドウを開いてください。');
   if ((intent.kind === 'front' || intent.kind === 'place') && !view.visibleIds.includes(id))
     return block('ウィンドウを開いてください。');
   if (intent.kind === 'place') {

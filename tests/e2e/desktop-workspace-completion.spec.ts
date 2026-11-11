@@ -26,8 +26,10 @@ test('content-first workspace keeps editing, pin completion and file exits coher
     await revealCoordinateAdd(p); await p.getByLabel('追加先モデル', { exact: true }).focus(); await p.getByLabel('追加先モデル', { exact: true }).selectOption({ label: '建物.glb' }); await p.getByRole('button', { name: 'このモデルに追加', exact: true }).click();
     await expect(pin).toBeVisible(); for (const name of ['X', 'Y', 'Z']) await pin.getByLabel('位置 ' + name, { exact: true }).fill(name === 'Y' ? '.5' : '0');
     await pin.getByRole('button', { name: '位置を確定', exact: true }).click(); await ready('ピンの位置を確定しました。');
-    await detail.getByLabel('タイトル', { exact: true }).fill('柱の接合部'); await detail.getByLabel('本文', { exact: true }).fill('梁との隙間を確認する。'); await detail.getByRole('button', { name: '変更を適用', exact: true }).click(); await ready('変更を適用しました。');
-    const chooseImage = p.waitForEvent('filechooser'); await p.getByLabel('メディアを追加', { exact: true }).click(); await (await chooseImage).setFiles({ name: '現場写真.png', mimeType: 'image/png', buffer: smallPng() }); await ready('メディアを追加しました。');
+    await detail.getByLabel('タイトル', { exact: true }).fill('柱の接合部'); await detail.getByLabel('本文', { exact: true }).fill('梁との隙間を確認する。');
+    const chooseImage = p.waitForEvent('filechooser'); await p.getByLabel('メディアを追加', { exact: true }).click(); await (await chooseImage).setFiles({ name: '現場写真.png', mimeType: 'image/png', buffer: smallPng() });
+    await expect(detail.locator('.lv-record-media-draft')).toContainText('現場写真.png');
+    await detail.getByRole('button', { name: '変更を適用', exact: true }).click(); await ready('変更を適用しました。');
     await expect(detail.locator('.lv-caption-properties')).not.toHaveAttribute('open');
     expect(await detail.evaluate(root => {
       const body = root.querySelector('[data-caption-field="body"]')!.parentElement!, media = root.querySelector('.lv-caption-media-slot')!, props = root.querySelector('.lv-caption-properties')!;
@@ -101,7 +103,10 @@ test('content-first workspace keeps editing, pin completion and file exits coher
     await expect(partial).not.toBeChecked(); await expect(files.locator('.lv-file-primary')).toHaveText('ダウンロード'); await expect(name).toBeHidden();
     await partial.focus(); await p.keyboard.press('Space'); await expect(partial).toBeFocused(); await expect(partial).toBeChecked();
     await expect(scope.locator('option')).toHaveText(['シーン', '共有後の変更']); await expect(files.locator('.lv-file-primary')).toBeDisabled();
-    await expect(menu.getByRole('button', { name: '閉じる', exact: true })).toBeDisabled(); await files.getByRole('button', { name: '選択を取り消す', exact: true }).click();
+    await expect(menu.getByRole('button', { name: '閉じる', exact: true })).toBeEnabled();
+    await menu.getByRole('button', { name: '閉じる', exact: true }).click(); await expect(menu).not.toHaveAttribute('open');
+    await p.getByRole('button', { name: '共有', exact: true }).click(); await expect(partial).toBeChecked();
+    await files.getByRole('button', { name: '選択を取り消す', exact: true }).click();
     await expect(partial).not.toBeChecked(); await expect(partial).toBeFocused(); await expect(scope).toBeHidden();
     await menu.getByRole('button', { name: '閉じる', exact: true }).click(); await expect(p.getByRole('button', { name: '共有', exact: true })).toBeFocused();
     await detail.getByLabel('本文',{exact:true}).fill('手元でも同じ本文を更新しました。');await detail.getByRole('button',{name:'変更を適用',exact:true}).click();await ready('変更を適用しました。');

@@ -72,7 +72,7 @@ test('08c uses canvas generation, portable offline display/save/reopen and a por
     await p.getByRole('button', { name: '位置を確定', exact: true }).click(); await ready(p, 'ピンの位置を確定しました。');
     const settings=p.getByLabel('設定',{exact:true});await settings.locator('summary').click();await settings.getByLabel('編集者名',{exact:true}).fill('HEIC担当');await settings.getByLabel('このプロジェクトの今後の編集にこの名前を残す',{exact:true}).check();await settings.getByRole('button',{name:'編集者名を設定',exact:true}).click();
     await p.getByLabel('本文',{exact:true}).fill('名前のみの履歴');await p.getByRole('button',{name:'変更を適用',exact:true}).click();await ready(p,'変更を適用しました。');
-    const chooser = p.waitForEvent('filechooser'); await p.getByLabel('メディアを追加', { exact: true }).click(); await (await chooser).setFiles('tests/fixtures/daily-media/owned-still.heic'); await ready(p, 'メディアを追加しました。');
+    const chooser = p.waitForEvent('filechooser'); await p.getByLabel('メディアを追加', { exact: true }).click(); await (await chooser).setFiles('tests/fixtures/daily-media/owned-still.heic'); await p.getByRole('region',{name:'キャプションの詳細',exact:true}).getByRole('button',{name:'変更を適用',exact:true}).click(); await ready(p, 'メディアを追加しました。');
     await gallery(p); expect(await p.evaluate(() => (window as any).__heicDecodes)).toBe(1);
     const workspace = await output(p, info, 'portable-workspace', 'teamWorkspace');
     const inspected = await WorkspaceArchive.inspect(new Blob([Uint8Array.from(await readFile(workspace)).buffer]), limits); expect(inspected.archive.control.manifest.requiredCapabilities).toEqual(['editor-attribution-v1','portable-heic-display-v1']);
