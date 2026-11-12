@@ -93,7 +93,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   titleLabel.append(title); form.append(creationNote, titleLabel, create); form.hidden = true;
   const workspaceForm = document.createElement('form'), workspaceLabel = document.createElement('label'), workspaceInput = document.createElement('input'), openFile = document.createElement('button');
   workspaceLabel.textContent = 'ファイルを選択'; workspaceInput.type = 'file'; workspaceInput.multiple = true; workspaceInput.setAttribute('aria-label', 'ファイルを選択'); workspaceLabel.append(workspaceInput);
-  const fileHelp = document.createElement('p'); fileHelp.textContent = '3Dモデル・点群から新規作成、作業ファイルから再開できます。';
+  const fileHelp = document.createElement('p'); fileHelp.textContent = '3Dモデル・点群から新規作成、保存したファイルから再開できます。';
   openFile.type = 'submit'; openFile.textContent = 'ファイルを開く'; workspaceForm.append(workspaceLabel, fileHelp, openFile,fallback);
   const updatePanel = document.createElement('section'), updateNote = document.createElement('p');
   const updateConfirm = document.createElement('button'), updateCancel = document.createElement('button');
@@ -124,7 +124,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   const status = document.createElement('p'); status.setAttribute('role', 'status'); status.className = 'lv-operation-status lv-validation-status';
   const list = document.createElement('section'), refresh = document.createElement('button'), back = document.createElement('button');
   refresh.type = back.type = 'button'; refresh.textContent = '一覧を更新'; back.textContent = '別のプロジェクトを開く';
-  const listHeading = document.createElement('h2'); listHeading.textContent = 'このブラウザの再開用データ';
+  const listHeading = document.createElement('h2'); listHeading.textContent = 'このブラウザから再開'; list.setAttribute('aria-label', 'このブラウザから再開');
   navigation.append(heading, help, workspaceForm, form, listHeading, refresh, list,legacy); root.append(back, status, cancelSelection, navigation, content);
   let host: Host | undefined, workspace: MountedEditor | undefined;
   let resumeReading: ReturnType<typeof createResumeReading> | undefined;
@@ -282,11 +282,18 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     try { ports.lastProject.remember(reference); } catch { /* Advisory settings never change a successful Project acknowledgment. */ }
   };
   const updateList = async (reading?: ResumeReadingRequest) => {
-    const entries = await ports.list(reading); if (disposed) return;
+    const previousStatus = status.textContent, loadingMessage = '保存した作業を確認しています。', showProgress = !navigation.hidden;
+    list.setAttribute('aria-busy', 'true');
+    if (!list.children.length) list.textContent = '';
+    if (showProgress) status.textContent = loadingMessage;
+    let entries: ValidationProjectEntry[];
+    try { entries = await ports.list(reading); }
+    finally { list.setAttribute('aria-busy', 'false'); if (!disposed && showProgress && status.textContent === loadingMessage) status.textContent = previousStatus; }
+    if (disposed) return;
     catalog = entries;
     catalogLoaded = true;
     projectOpenButtons.clear();list.replaceChildren();
-    if (!entries.length) { list.textContent = 'このブラウザの再開用データはありません。'; return; }
+    if (!entries.length) { list.textContent = 'このブラウザに保存した作業はありません。'; return; }
     for (const item of entries) {
       const row = document.createElement('div'), name = document.createElement('span'), state = document.createElement('span'), actions = document.createElement('div');
       row.className = 'lv-recent-project'; name.className = 'lv-recent-title'; state.className = 'lv-recent-state'; actions.className = 'lv-recent-actions';
@@ -507,13 +514,14 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     const target = firstRecovery; if (!target || disposed) return;
     recoveryControls.clear();
     const state = target.state(), panel = document.createElement('section'), readerSlot = document.createElement('div'), note = document.createElement('p'), commands = document.createElement('div');
-    panel.className = 'lv-first-restore-panel'; readerSlot.className = 'lv-first-restore-reading';
-    if (state.phase === 'preview') status.textContent = 'このバックアップから作業を再開できます。';
+    panel.className = 'lv-first-restore-panel'; panel.setAttribute('aria-label', '保存ファイルから再開'); readerSlot.className = 'lv-first-restore-reading'; commands.className = 'lv-first-restore-actions';
+    if (state.phase === 'preview') status.textContent = state.replacing ? 'このバックアップから作業を再開できます。' : '保存ファイルから作業を再開します。';
     note.textContent = state.error || (state.phase === 'preview' ? state.replacing
-      ? 'バックアップの時点に切り替えます。現在の作業と元ファイルは残ります。' : 'このプロジェクトの再開用データはありません。バックアップから元のプロジェクトを復元します。元ファイルは変更しません。'
+      ? 'バックアップの時点に切り替えます。現在の作業と元ファイルは残ります。' : 'このブラウザで編集できるようにします。元ファイルは変更しません。'
       : state.phase === 'terminal' ? 'プロジェクトはまだありません。復元の記録は保持しています。ファイルを選択して開き直せます。' : state.phase === 'beforeStart'
         ? '復元はまだ始まっていません。「復元を取りやめる」で一覧に戻り、元のバックアップを選び直してください。' : 'バックアップの初回復元が未完了です。記録を使って再開するか、取りやめてください。');
-    const summary = document.createElement('p'); summary.textContent = `${state.title}${state.fileName ? ` — ${state.fileName}` : ''}${state.memo ? ` — ${state.memo}` : ''}`;
+    const summary = document.createElement('h2'); summary.textContent = state.title;
+    const fileSummary = document.createElement('p'); fileSummary.textContent = [state.fileName, state.memo].filter(Boolean).join(' — '); fileSummary.hidden = !fileSummary.textContent;
     const button = (label: string, action: () => Promise<void>) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = label;
       registerRecoveryControl(b); b.addEventListener('click', () => { if (!b.disabled) execute(action); }); commands.append(b); };
     const leave = async (cancel: boolean) => { if (cancel) await (state.phase === 'beforeStart' ? target.abandon() : target.cancel());
@@ -524,7 +532,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
         if ('kind' in candidate) { firstRecovery = candidate; renderFirstRecovery(); } else await adoptProject(target.run, candidate);
       } catch (error) { renderFirstRecovery(); throw error; }
     });
-    else if (state.phase === 'preview' || state.phase === 'pending' && state.retryable) button(state.phase === 'preview' ? 'バックアップから復元' : '復元を再開', async () => {
+    else if (state.phase === 'preview' || state.phase === 'pending' && state.retryable) button(state.phase === 'preview' ? state.replacing ? 'バックアップから復元' : 'このファイルから再開' : '復元を再開', async () => {
       status.textContent = 'バックアップから復元しています。';
       let staged: Awaited<ReturnType<ValidationWorkspacePorts['render']>> | undefined,
         preparation: Parameters<ValidationDisplayHost['setDisplayPreparation']>[0] | undefined, sourceContent: ValidationNormalHost['content'] | undefined,
@@ -585,7 +593,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     });
     if ((!target.readOnly || state.phase === 'preview') && state.cancellable) button(state.phase === 'preview' ? 'キャンセル' : '復元を取りやめる', () => leave(true));
     if (state.phase === 'terminal') button('一覧に戻る', () => leave(false));
-    panel.append(summary, note, commands, readerSlot); content.replaceChildren(panel); controls();
+    panel.append(summary, fileSummary, note, commands, readerSlot); content.replaceChildren(panel); controls();
   };
   const invalidateLoci = () => { lociDraft++; lociEvaluation = null; lociDecision = undefined; conversion = null;materialNotice.render();clearImageOmissions();
     if (lociPreview) conversionNote.textContent = '入力が変わりました。「変換内容を確認」で確認し直してください。'; controls(); };
@@ -910,7 +918,15 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     const opened = await openNormal(run, undefined, 'edit', file, undefined, undefined, purpose === 'teamWorkspace');
     await replaceSelection(run, opened, generation, context);
   };
-  workspaceForm.addEventListener('submit',event=>{event.preventDefault();void execute(()=>openSelection(Array.from(workspaceInput.files??[])));});
+  workspaceForm.addEventListener('submit',event=>{
+    event.preventDefault();
+    const files = Array.from(workspaceInput.files ?? []);
+    if (!files.length) {
+      if (disposed || openFile.disabled || workspaceForm.inert || navigation.hidden) return;
+      workspaceInput.click(); return;
+    }
+    void execute(()=>openSelection(files));
+  });
   const leaveForLegacy=(file?:File)=>{if(busy||composing||disposed||changed()||creationAttempt)return;clearSelection();void ports.openLegacy?.(file).catch(error=>{if(!disposed)status.textContent=error instanceof Error?error.message:'ファイルを開けません。';});};
   legacy.addEventListener('click',()=>leaveForLegacy());fallback.addEventListener('click',()=>{const file=legacyFile;if(file)leaveForLegacy(file);});
   form.addEventListener('submit', event => { event.preventDefault(); execute(async () => {

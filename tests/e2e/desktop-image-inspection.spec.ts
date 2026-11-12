@@ -90,7 +90,7 @@ test('image details, Scene keyboard focus and dismissible header sheets retain P
     await phoneContext.route('**/*', route => { const u = new URL(route.request().url()); if (u.origin === new URL(server.url).origin || ['blob:','data:'].includes(u.protocol)) return route.continue(); remote.push(u.href); return route.abort(); });
     const phone = await phoneContext.newPage(); phone.setDefaultTimeout(15_000); phone.on('pageerror', e => errors.push(e.message));
     await phone.goto(server.url); await phone.getByLabel('ファイルを選択', { exact: true }).setInputFiles(info.outputPath('with-portrait.zip'));
-    await phone.getByRole('button', { name: 'ファイルを開く', exact: true }).tap(); await phone.getByRole('button', { name: 'バックアップから復元', exact: true }).tap();
+    await phone.getByRole('button', { name: 'ファイルを開く', exact: true }).tap(); await phone.getByRole('button', { name: 'このファイルから再開', exact: true }).tap();
     await expect(phone.getByRole('button', { name: '3D', exact: true })).toBeEnabled({ timeout: 90_000 }); await phone.getByRole('button', { name: '3D', exact: true }).tap();
     const phoneCanvas = phone.getByLabel('3Dモデルの表示', { exact: true }), pin = phone.locator('.lv-project-marker').first();
     await expect(phoneCanvas).toHaveAttribute('aria-busy', 'false', { timeout: 90_000 }); await expect(pin).toBeVisible(); await pin.tap();

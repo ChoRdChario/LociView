@@ -46,6 +46,21 @@ function host(initial = context(), document = new RecordedDocument()) {
 }
 
 describe('Caption detail: local draft/intents, not durable editor acceptance', () => {
+  it('guides an empty editable record and an applicable draft without masking failure, IME or readonly state', () => {
+    const initial=source(),blank={...initial,caption:{...initial.caption,title:value(''),body:value('')}};
+    const h=host({...context(),source:blank,draft:beginCaptionDraft(blank)});
+    expect(h.status.textContent).toBe('タイトル・本文や写真を追加できます。');
+    h.body.value='最初の本文';h.body.fire('input');expect(h.apply.disabled).toBe(false);
+    expect(h.status.textContent).toBe('「変更を適用」の後、「ファイルに保存」できます。');
+    const plan=apply(h.props);h.body.fire('compositionstart');expect(h.apply.disabled).toBe(true);
+    expect(h.status.textContent).not.toContain('ファイルに保存');h.body.fire('compositionend');
+    h.render({...h.props,feedback:{kind:'failed',plan,message:'書込を再試行してください。'}});
+    expect(h.status.textContent).toContain('入力は保持しています');expect(h.status.textContent).not.toContain('ファイルに保存');
+    h.render({...h.props,feedback:{kind:'idle'},mutationBlock:'閲覧中です。編集を開始してください。'});
+    expect(h.apply.disabled).toBe(true);expect(h.status.textContent).not.toContain('ファイルに保存');h.controls.dispose();
+    const reading=host({...context(),source:blank,draft:beginCaptionDraft(blank)});reading.render({...reading.props,textOnly:true});
+    expect(reading.status.textContent).not.toContain('追加できます');reading.controls.dispose();
+  });
   it('invalidates a cancellation confirmation when a newer photo replaces the same text draft', () => {
     const ctx: DetailContext = { ...context(), mediaDraft: { token:'one', sceneId:scn, captionId:cap, selectionId:'att_a' } };
     const h=host(ctx); h.cancel.click(); expect(h.confirmation.hidden).toBe(false);

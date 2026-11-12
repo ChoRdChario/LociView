@@ -91,7 +91,7 @@ test('static data survives prepared cold offline Mesh/Point/500k SH4/Proxy/media
       FileSystemFileHandle.prototype.createWritable=async function(...args){if(blocked){state.held++;await gate;}return Reflect.apply(createWritable,this,args);};
     });
     let receiver=recipient.page;expect((await receiver.goto(server.url+'?timings=1'))?.fromServiceWorker()).toBe(true);await receiver.setViewportSize({width:390,height:844});
-    await file(receiver,firstFile);await receiver.getByRole('button',{name:'バックアップから復元',exact:true}).click();
+    await file(receiver,firstFile);await receiver.getByRole('button',{name:'このファイルから再開',exact:true}).click();
     const reading=receiver.getByRole('region',{name:'復元中のキャプション',exact:true});await expect(reading).toBeVisible();
     await expect.poll(()=>receiver.evaluate(()=>(window as any).firstRestoreGate.held)).toBeGreaterThan(0);
     await expect(receiver.locator('main.lv-project-workspace')).toHaveCount(0);await expect(reading.locator('textarea,input[type=file],canvas,img')).toHaveCount(0);

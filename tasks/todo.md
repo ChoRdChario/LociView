@@ -1,6 +1,6 @@
 # LociView active work
 
-Updated2026-11-12. This is the single current plan and check record.
+Updated2026-11-13. This is the single current plan and check record.
 [Inventory](implementation-inventory.md) owns route-specific coverage;
 [map](../PROJECT_MAP.md) and [document index](../docs/README.md) route contracts/code.
 Git owns checkpoint identity. [Retained checkpoint evidence](../docs/history/development-through-2026-10-29/tasks/todo-before-daily-authoring.md)
@@ -57,7 +57,86 @@ unchanged-feature-classification checks pass; independent review has no findings
 No runtime change or new capacity guarantee; no runtime suite is needed for this
 documentation checkpoint.
 
-## Current work —clear save state and coherent first-record workflow
+## Current work —first-use open, record, save and resume
+
+PO authorizes continuing the novice-path review from g0/9add3d3. Root is the only
+writer; bounded practical-UX and test/contract reviewers are read-only. First
+finish a PC/touch walkthrough and consolidate actionable problems in the existing
+design review, then repair that connected workflow through existing UI commands.
+Preserve originals, drafts/IME/focus, multiple windows/active Next, file readback,
+recovery/publication fences and current UI ownership. No rendering/performance
+work, new dependency, format, onboarding manager or release. Physical iPhone-only
+checks become grouped residual acceptance; they do not block ordinary fixes.
+
+Review first file selection/creation, first surface pin to text+photo, apply versus
+file save, and warm/cold or file-based continuation. Reuse existing small PC/touch
+tests and service fault coverage; collect before/after screens and check adjacent
+cancel, readonly, failure and small-screen input. At final source run independent
+review, required checkpoint/HEIC checks and affected browser/offline flows serially;
+commit/Push a suitable g0 checkpoint and confirm exact CI. Preserve private251
+draft lines and unrelated EOL changes. Evidence: .artifacts/e2e/first-use-20261113/.
+Stop only affected work for an actual new policy/contract decision or unsafe result.
+
+Before inventory complete: actual first surface selection (no XYZ rewrite), direct
+new detail, text+photo, real Backup, explicit recent-row edit and separate-context
+file restart PASS on PC/touch2. Preview geometry probe PASS at320/390/1280: no
+horizontal overflow; missing insets/hierarchy are the rendered issue. Existing
+readiness/input fences survive this baseline. Independent practical/test reviews
+plus images consolidated FU1–6 before product edits. Implement this same workflow;
+leave physical-device and display/performance acceptance pending.
+
+Grouped repairs are implemented in4 UI files only: no-file picker without
+auto-creation, ordinary empty-record/apply-to-file guidance, stable list progress,
+consistent saved-file names and absent-Project restart presentation. Existing
+Project time-switch/recovery warnings and all command/I/O fences remain.
+Focused detail24 and connected6 PASS; a test-only textOnly argument type error
+was corrected by using the existing render props (retained failing log), then
+that case/typecheck/builds PASS. Existing PC/touch input flows2 PASS through
+surface pick without XYZ rewriting, direct details, header save, explicit recent
+row and retained separate-context/cold/IME cases. Same source's rendered after2
+PASS, including cancel/reselect,320px long file name and CSS zoom2 layout only.
+Independent source/test reviews have no unresolved findings. Final serial
+checkpoint, affected browser/offline checks and Push/CI follow at this boundary.
+
+First required checkpoint stopped at full Vitest:155 files PASS,5 failures/3518
+PASS. Two assertions still bound old preview/history copy; align the same consent
+and named generated job to current wording. Three cases (stale-open2 and named
+startup scope1) exposed an unintended source change: the picker-only early guard
+also swallowed already-selected file events before the existing async boundary.
+Limit that new guard to the empty-selection picker branch; selected files must
+use the original execute/openSelection path. Preserve all stale Host ownership,
+changed-work refusal, full-catalog lookup and output-job identity assertions.
+Retain failed log/source identity; run the exact failures and adjacent guards,
+then a clean final checkpoint. No retries or wait/assertion relaxation.
+
+Corrected exact failures plus adjacent guards7 PASS; independent limited review
+has no findings. Final corrected source/test tree: check:checkpoint PASS
+(156 files/3523 PASS,16 expected-fail and21 todo retained, all five builds and
+offline isolation), HEIC isolation PASS. Frozen final candidate: connected
+Desktop6 PASS, first-use/rendered2 PASS (including picker cancellation, direct
+detail, save and recent-row/file continuation,320px/long name/CSS zoom2), installed
+Edge/Chrome2 PASS and two-window offline update1 PASS. Original model/record/photo
+continuation checks, output-time reading and real downloads remain. No retry,
+exclusion or timeout relaxation. Do not claim all Desktop/offline cases, physical
+Safari, real novice participants or performance acceptance from this scope.
+
+Review/source/test and rendered findings are closed for this connected unit.
+Prepare the verified g0 checkpoint after public-doc filtering and staged identity
+checks, Push and confirm exact CI; serve the final frozen candidate on the owned
+loopback preview. Model and saved-file samples are generated from the same tested
+small fixture in final-visual/results. Git and the local checkpoint.json retain
+identity; private originals/drafts and generated evidence stay out of the Push.
+Next UI review: format-specific first record for Point/GS/Proxy and recovery from
+failed opening within existing contracts. Keep display-lightening paused.
+
+Physical iPhone residual acceptance (not a wait dependency): Safari's real IME,
+software keyboard/dynamic toolbars and native zoom; Files download completion,
+cancel/reselection and reopening the actual saved ZIP; app switch, memory-pressure
+recovery/Safari full termination and offline restart. Touch Chromium/CSS zoom is not this evidence.
+First-use human observation and assistive-technology acceptance also remain;
+automated walkthroughs do not certify novice comprehension or AAA quality.
+
+## Verified checkpoint —clear save state and coherent first-record workflow
 
 PO2026-11-12 authorizes grouped UI/UX repairs after the progress review. Base
 g0/ff9b3cd, root sole writer; bounded independent reviews are read-only. First
@@ -132,9 +211,10 @@ large-data speed, physical Safari, screen-reader, novice-user or release pass is
 claimed. Screenshots/sample and exact manifests remain local under the evidence
 root; never add source data, private drafts or generated artifacts to the Push.
 
-Connected workflow is verified locally; prepare a suitable g0 checkpoint, inspect
-privacy/staged identity and Push, then confirm its exact CI. Refresh only the
-owned4191 preview to the frozen candidate. Next: grouped physical iPhone/Safari
+Connected workflow is verified locally; suitable g0 checkpoint Push and exact CI
+PASS after privacy/staged identity checks. The owned4191 preview serves the frozen
+candidate (HTTP200 and exact index); final identity/CI live in the local evidence
+root's checkpoint.json and Git rather than duplicated commit logs. Next: grouped physical iPhone/Safari
 IME, file save/reopen and offline acceptance plus first-use observation on this
 integrated candidate; continue any evidenced UI repair within existing contracts.
 Display-lightening and large-data performance work stay parked until resumed.

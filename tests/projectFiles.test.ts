@@ -737,7 +737,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       await vi.waitFor(()=>expect(all(page).find(n=>n.tag==='button'&&n.textContent==='ファイルを開く')!.disabled).toBe(false));
       // First-backup confirmation remains read-only until the user explicitly accepts it.
       Object.assign(input2,{files:[backup]});input2.fire('change');input2.parent!.parent!.fire('submit',{preventDefault(){}});
-      await vi.waitFor(()=>expect(all(page).some(n=>n.textContent.startsWith('このプロジェクトの再開用データはありません。バックアップから'))).toBe(true));
+      await vi.waitFor(()=>expect(all(page).some(n=>n.textContent==='このブラウザで編集できるようにします。元ファイルは変更しません。')).toBe(true));
       expect(opening).toHaveBeenCalledOnce();expect(await peer.fs.list('')).toEqual([]);expect(databases.size).toBe(0);
       all(page).filter(n=>n.tag==='button'&&n.textContent==='キャンセル').at(-1)!.fire('click');await vi.waitFor(()=>expect(next.hasChanges()).toBe(false));
       Object.assign(input2,{files:[handoff]});input2.fire('change');input2.parent!.parent!.fire('submit',{preventDefault(){}});
@@ -755,6 +755,8 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const root=record(ui.root),all=(n:RecordedNode):RecordedNode[]=>[n,...n.children.flatMap(all)],button=(text:string)=>all(root).find(n=>n.tag==='button'&&n.textContent===text)!,input=all(root).find(n=>n.attributes.get('aria-label')==='ファイルを選択')!,title=all(root).find(n=>n.attributes.get('aria-label')==='プロジェクト名')!;
     const submit=()=>input.parent!.parent!.fire('submit',{preventDefault(){}}),cancel=()=>button('選択を取り消す').fire('click'),create=button('プロジェクトを作成');
     await vi.waitFor(()=>expect(button('ファイルを開く').disabled).toBe(false));
+    const picker=vi.spyOn(input,'click');submit();expect(picker).toHaveBeenCalledOnce();expect(ui.hasChanges()).toBe(false);expect(open).not.toHaveBeenCalled();
+    title.fire('compositionstart');submit();expect(picker).toHaveBeenCalledOnce();title.fire('compositionend');
     expect(all(root).filter(n=>n.type==='file')).toHaveLength(1); expect(all(root).some(n=>n.attributes.get('aria-label')==='3Dモデルとメディアを選択')).toBe(false);
     expect(create.parent!.hidden).toBe(true); expect(all(root).some(n=>n.tag==='p'&&n.textContent.startsWith('LociViewは'))).toBe(true);
     const packageFile=await nativeConversionFile(), read=vi.fn(async()=>glb().buffer);
@@ -3095,12 +3097,13 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       button = (label: string) => all(root).filter(n => n.tag === 'button' && n.textContent === label).at(-1)!;
     await vi.waitFor(() => expect(button('ファイルを開く').disabled).toBe(false));
     const choose = () => { Object.assign(input, { files: [new File([f.backupFile], '現地の保存.backup')] }); input.fire('change'); input.parent!.parent!.fire('submit', { preventDefault() {} }); };
-    choose(); await vi.waitFor(() => expect(button('バックアップから復元')?.disabled).toBe(false)); expect(await r.base.list('')).toEqual([]);
+    choose(); await vi.waitFor(() => expect(button('このファイルから再開')?.disabled).toBe(false)); expect(await r.base.list('')).toEqual([]);
     const original = await r.inspection.source.inspectOriginal(metadata), project = original.candidates.unambiguousRecords.project as JsonObject;
-    expect(all(root).some(n => n.textContent === `${project.title} — 現地の保存.backup`)).toBe(true);
+    expect(all(root).some(n => n.tag === 'h2' && n.textContent === project.title)).toBe(true);
+    expect(all(root).some(n => n.tag === 'p' && n.textContent === '現地の保存.backup')).toBe(true);
     button('キャンセル').fire('click'); await vi.waitFor(() => expect(ui.hasChanges()).toBe(false)); expect(await r.base.list('')).toEqual([]);
-    choose(); await vi.waitFor(() => expect(button('バックアップから復元')?.disabled).toBe(false)); button('バックアップから復元').fire('click');
-    expect(button('バックアップから復元').disabled).toBe(true); expect(button('キャンセル').disabled).toBe(true);
+    choose(); await vi.waitFor(() => expect(button('このファイルから再開')?.disabled).toBe(false)); button('このファイルから再開').fire('click');
+    expect(button('このファイルから再開').disabled).toBe(true); expect(button('キャンセル').disabled).toBe(true);
     expect(all(root).find(n => n.className.split(' ').includes('lv-validation-status'))!.textContent).toBe('');
     try{await initializeEntered;expect(render).not.toHaveBeenCalled();expect(current).toBeUndefined();expect(all(root).some(n=>n.className==='lv-project-workspace')).toBe(false);
       const reader=all(root).find(n=>n.attributes.get('aria-label')==='復元中のキャプション')!;expect(reader).toBeDefined();
@@ -3154,7 +3157,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const input = all(root).find(n => n.attributes.get('aria-label') === 'ファイルを選択')!;
     Object.assign(input, { files: [new File([f.backupFile], '復元する記録.zip')] });
     input.fire('change'); input.parent!.parent!.fire('submit', { preventDefault() {} });
-    await vi.waitFor(() => expect(button('バックアップから復元')?.disabled).toBe(false)); button('バックアップから復元')!.fire('click');
+    await vi.waitFor(() => expect(button('このファイルから再開')?.disabled).toBe(false)); button('このファイルから再開')!.fire('click');
     await vi.waitFor(() => expect(all(root).some(n => n.attributes.get('aria-label') === '復元中のキャプション')).toBe(true), { timeout: 20000 });
     expect(all(root).some(n => n.className === 'lv-project-workspace')).toBe(false);
     await renderEntered;
@@ -8620,14 +8623,14 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect(output.children.find(n => n.attributes.get('role') === 'status')!.textContent).toContain('作成したファイルから再試行');
     const history = all(output).find(n => n.tag === 'summary' && n.textContent === '作成したファイル')!.parent!;
     expect(history.open).toBe(true); expect(download).toHaveBeenCalledTimes(2);
-    const savedRow = all(history).find(n => n.textContent.startsWith('バックアップ 調査前'))!.parent!;
+    const savedRow = all(history).find(n => n.textContent.startsWith('保存ファイル 調査前'))!.parent!;
     await outputCompletion(() => all(savedRow).find(n => n.tag === 'button' && n.textContent === 'ダウンロード')!.fire('click'));
     expect(tools.busy()).toBe(false);
     expect(host.workspaceOutput.jobs.filter(j => j.purpose === 'backup').map(j => j.id)).toEqual([result.id]);
     expect(output.children.find(n => n.attributes.get('role') === 'status')!.textContent).toBe('ダウンロードを開始しました。保存先で完了を確認してください。');
     expect(download).toHaveBeenCalledTimes(3);
     expect((download.mock.contexts[2] as unknown as HTMLAnchorElement).download).toBe('LociView-調査前.zip');
-    expect(all(output).some(n => n.textContent.includes('バックアップ 調査前'))).toBe(true);
+    expect(all(output).some(n => n.textContent.includes('保存ファイル 調査前'))).toBe(true);
     const archive = await BackupArchive.inspect(await host.workspaceOutput.download(result.id), metadata);
     expect(archive.archive.control.manifest.purpose).toBe('backup'); expect(host.read().source!.token).toBe(before); expect(workspace.session).toBe(session);
     all(root).find(n => n.tag === 'button' && n.textContent === '閲覧する')!.fire('click');
@@ -11014,7 +11017,10 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const title=all(root).find(n=>n.attributes.get('aria-label')==='プロジェクト名')!;title.fire('compositionstart');expect(buttons()).toEqual(first);expect(first.every(n=>n.disabled)).toBe(true);
     title.fire('compositionend');expect(first.every(n=>!n.disabled)).toBe(true);
     hold=true;all(root).find(n=>n.tag==='button'&&n.textContent==='一覧を更新')!.fire('click');expect(buttons()).toEqual(first);expect(first.every(n=>n.disabled)).toBe(true);
+    const list=all(root).find(n=>n.attributes.get('aria-label')==='このブラウザから再開')!,status=all(root).find(n=>n.className.includes('lv-validation-status'))!;
+    expect(list.attributes.get('aria-busy')).toBe('true');expect(status.textContent).toBe('保存した作業を確認しています。');
     first[1]!.fire('click');expect(open).not.toHaveBeenCalled();release();await vi.waitFor(()=>expect(buttons().every(n=>!n.disabled)).toBe(true));
+    expect(list.attributes.get('aria-busy')).toBe('false');expect(status.textContent).not.toContain('確認しています');
     expect(insertedDisabled).toEqual([true,true,true,true]);expect(buttons()[0]).not.toBe(first[0]);buttons()[1]!.fire('click');await vi.waitFor(()=>expect(open).toHaveBeenCalledOnce());await ui.dispose();
   });
   it('connects file selection/create/list/reopen, guards composition/pending save and disposes a late renderer (recorded DOM only)', async () => {

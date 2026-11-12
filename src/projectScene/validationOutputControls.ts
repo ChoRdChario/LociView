@@ -177,7 +177,7 @@ export function createValidationOutputControls(document: Document, host: ReturnT
       });
     }
     nameField.hidden = purpose !== 'backup'; nameInput.disabled = busy || otherBusy() || !!host.authority.readOnly;
-    if(purpose==='backup'){const scope=document.createElement('p');scope.textContent='モデル・メディアと履歴を含む作業全体を、バックアップに書き出します。';actions.append(scope);}
+    if(purpose==='backup'){const scope=document.createElement('p');scope.textContent='モデル・メディア・履歴を含む作業全体を保存します。保存したファイルは「ファイルを開く」から再開できます。';actions.append(scope);}
     if (presentation === 'share' && purpose === 'teamWorkspace') {
       const note = document.createElement('p'); note.textContent = '編集・返送できます。全シーンと編集履歴を含みます。'; actions.append(note);
     }
@@ -270,7 +270,7 @@ export function createValidationOutputControls(document: Document, host: ReturnT
       if (['cancelled', 'abandoned'].includes(job.state)) continue;
       const row = document.createElement('section'), text = document.createElement('p');
       const complete = job.state === 'generated' || job.state === 'file-verified';
-      const name = job.purpose === 'contribution' ? '変更分' : job.purpose === 'backup' ? 'バックアップ' : job.purpose === 'clean' ? '独立コピー' : job.purpose === 'review' ? '閲覧用のシーン' : '作業一式';
+      const name = job.purpose === 'contribution' ? '変更分' : job.purpose === 'backup' ? '保存ファイル' : job.purpose === 'clean' ? '独立コピー' : job.purpose === 'review' ? '閲覧用のシーン' : '作業一式';
       text.textContent = `${name} ${job.label || i + 1} — ${job.state === 'file-verified' ? '選び直したファイルを照合済み' :
         complete && handedOff.has(job.id) ? 'ダウンロード開始・保存先未確認' : complete ? '生成済み・ファイルへの保存は未確認' :
         job.state === 'repair-required' ? '生成データを確認できません。元データは保持しています。' : 'ファイル生成が未完了です。'}`;

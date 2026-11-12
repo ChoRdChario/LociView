@@ -164,8 +164,13 @@ export function createCaptionDetailControls(document: Document, onEvent: (event:
       ? `${sceneCount}シーンで共有されています。変更はすべてに反映されます。` : sceneCount === 1 ? '' : '影響するシーンを確認してください。';
     impact.hidden = empty || !impact.textContent;
     const applyIssue = captionApplyIssue(next);
+    const unapplied = hasCaptionDraft(owned) || !!next.mediaDraft;
+    const emptyRecord = source.kind === 'ready' && source.caption.title.kind === 'value' && !source.caption.title.value.trim() &&
+      source.caption.body.kind === 'value' && !source.caption.body.value.trim();
     status.textContent = [...new Set([next.feedback.kind === 'failed' && `適用できませんでした。${next.feedback.message} 入力は保持しています。`,
-      inFlight && '変更を適用中です。', (hasCaptionDraft(owned) || next.mediaDraft) && !inFlight && '未適用の入力があります。',
+      inFlight && '変更を適用中です。', unapplied && !inFlight && (applyIssue === null && next.feedback.kind !== 'failed' && !next.textOnly
+        ? '「変更を適用」の後、「ファイルに保存」できます。' : '未適用の入力があります。'),
+      emptyRecord && !unapplied && !inFlight && next.feedback.kind === 'idle' && !next.mutationBlock && !next.textOnly && 'タイトル・本文や写真を追加できます。',
       !inFlight && !next.textOnly && next.mutationBlock !== '閲覧中です。編集を開始してください。' && next.mutationBlock, source.kind !== 'ready' && (source.reason || 'キャプションを選択してください。'),
       (hasCaptionDraft(owned) || next.mediaDraft) && applyIssue && !inFlight && applyIssue].filter(Boolean))].join(' ');
     apply.disabled = applyIssue !== null;

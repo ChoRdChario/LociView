@@ -252,9 +252,9 @@ test('GLBと画像の編集を保存し、ブラウザ再起動と別端末相�
     await page.getByLabel('ファイルを選択', { exact: true }).setInputFiles(backup);
     await page.getByRole('button', { name: 'ファイルを開く', exact: true }).click();
     await measure('空の保存領域への初回復元', async () => {
-      await page.getByRole('button', { name: 'バックアップから復元', exact: true }).click();
+      await page.getByRole('button', { name: 'このファイルから再開', exact: true }).click();
       await expect(page.getByText('バックアップから復元しています。', { exact: true })).toBeVisible();
-      await expect(page.getByRole('button', { name: 'バックアップから復元', exact: true })).toBeDisabled();
+      await expect(page.getByRole('button', { name: 'このファイルから再開', exact: true })).toBeDisabled();
       await expect(page.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText(projectName, { timeout: 90_000 });
     });
     await selectCaption(page); await checkCaption(page);

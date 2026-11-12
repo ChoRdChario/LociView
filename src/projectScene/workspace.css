@@ -280,6 +280,19 @@
 .lv-validation-host button:active:not(:disabled) { box-shadow: inset 0 1px 3px #817c78; }
 .lv-validation-home button:disabled { border-style: dashed; }
 
+/* The same saved-file confirmation also starts a new browser's first session. */
+.lv-first-restore-panel { min-width: 0; overflow-wrap: anywhere; }
+.lv-first-restore-panel:not(:has(.lv-resume-reading)) { box-sizing: border-box; max-width: 948px; margin: 16px auto; padding: 16px 20px; background: #f5f3ef; border: 1px solid #c9c5bd; border-radius: 6px; }
+.lv-first-restore-panel > h2 { margin: 0 0 12px; font-size: 18px; line-height: 1.5; }
+.lv-first-restore-panel:has(.lv-resume-reading) > h2 { margin: 4px 12px; font-size: 16px; }
+.lv-first-restore-panel:has(.lv-resume-reading) > .lv-first-restore-actions { padding-inline: 12px; }
+.lv-first-restore-panel > p { margin: 12px 0; }
+.lv-first-restore-actions { display: flex; flex-wrap: wrap; gap: 8px; padding-block: 4px; }
+.lv-first-restore-actions > button { box-sizing: border-box; min-height: 44px; min-width: 44px; max-width: 100%; padding: 8px 12px; border: 1px solid #817c78; border-radius: 6px; background: #faf9f8; color: #292b27; font: inherit; white-space: normal; }
+.lv-first-restore-actions > button:first-child { background: #3c4637; border-color: #3c4637; color: #fff; }
+.lv-first-restore-actions > button:focus-visible { outline: 2px solid #312f2d; outline-offset: 2px; }
+.lv-first-restore-actions > button:disabled { border-style: dashed; }
+
 /* The product composition's file/recovery controls are siblings of its editor. */
 .lv-project-shell { font: 400 14px/1.5 system-ui, sans-serif; color: #312f2d; overflow-wrap: anywhere; }
 .lv-project-shell :is(button, input, select, textarea) { max-width: 100%; min-width: 0; white-space: normal; }

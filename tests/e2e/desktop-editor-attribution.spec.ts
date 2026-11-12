@@ -149,7 +149,7 @@ test('08b editor names remain exact through collaboration, purpose privacy, rest
     const snapshot = new TextDecoder().decode(await review.entryBytes('review.json', 8_000_000)); expect(snapshot).not.toContain(nameA); expect(snapshot).not.toContain(nameB);
     console.log('08b: Review and Clean exclude editor declarations');
     const restored = await launch(profiles[2]!); await restored.p.getByLabel('ファイルを選択', { exact: true }).setInputFiles(saved); await restored.p.getByRole('button', { name: 'ファイルを開く', exact: true }).click();
-    await restored.p.getByRole('button', { name: 'バックアップから復元', exact: true }).click(); await expect(restored.p.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText(title, { timeout: 120_000 });
+    await restored.p.getByRole('button', { name: 'このファイルから再開', exact: true }).click(); await expect(restored.p.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText(title, { timeout: 120_000 });
     const after = await records(await output(restored.p, info, 'restored', 'backup')); expect(after.records).toEqual(before.records); expect(after.backup.source.originalChanges()).toEqual(before.backup.source.originalChanges());
     await close(restored.context); const cold = await launch(profiles[2]!); await expect(cold.p.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText(title, { timeout: 90_000 }); await selected(cold.p);
     await cold.p.getByLabel('設定', { exact: true }).locator('summary').click(); await expect(cold.p.getByLabel('このプロジェクトの今後の編集にこの名前を残す', { exact: true })).not.toBeChecked();
