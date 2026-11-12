@@ -11,7 +11,7 @@ import { canonical, same, immutableDigest } from '../domain/projectGraphSupport'
 import { checkProjectRecord } from '../domain/projectRecords';
 import { cloneCanonicalValue, type JsonObject } from '../domain/values';
 import { ProjectRecordFields } from '../domain/projectRecordFields';
-import { PersistentContentVerifier } from '../projectMetadata/contentEvidence';
+import { PersistentContentVerifier, type ContentEvidenceTiming } from '../projectMetadata/contentEvidence';
 import { blobInventory } from '../projectMetadata/blobInventory';
 import type { OriginBlobStore } from '../projectMetadata/blobStore';
 import type { MetadataMediaPort } from '../projectMetadata/session';
@@ -281,10 +281,10 @@ export class ValidationContent implements MetadataMediaPort {
   async retained(record: JsonObject): Promise<boolean> {
     return this.verifier(false).hasEvidence({ token: 'retained-media', fact: 'media', records: [record], context: {} });
   }
-  verifier(allowNewEvidence: boolean): PersistentContentVerifier {
+  verifier(allowNewEvidence: boolean, timing?: ContentEvidenceTiming): PersistentContentVerifier {
     const executor: ProjectContentVerifier = { scope: 'development-validation', verify: q => this.execute(q) };
     return new PersistentContentVerifier(this.fs, validationMetadataLimits, executor, 'validation-glb-png-executor-1',
-      blobInventory(this.store, validationMetadataLimits), allowNewEvidence);
+      blobInventory(this.store, validationMetadataLimits), allowNewEvidence, timing);
   }
   private async execute(input: ContentRequest, prepared?: { model?: ValidatedModel; image?: Uint8Array }, readOnly = false) {
     const request = cloneCanonicalValue(input, validationMetadataLimits) as unknown as ContentRequest;

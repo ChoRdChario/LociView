@@ -93,6 +93,32 @@ describe('local metadata timing has no operation authority', () => {
     const pending = Promise.resolve(Object.freeze({ checked: true }));
     expect(measureMetadata(undefined, 'metadata.restore.test', () => pending)).toBe(pending);
   });
+  it.each(['success', 'write-failure'] as const)('fact timing preserves inventory, executor and receipt checks on %s', async outcome => {
+    const h = setup(), record = Object.values(fixture().mediaResourcesById)[0]! as JsonObject;
+    const request: ContentRequest = { token: 'fact-timing', fact: 'media', records: [record], context: {} };
+    const facts = { mediaKind: record.mediaKind!, mediaType: (record.blob as JsonObject).mediaType! };
+    const execute = vi.fn(async (input: ContentRequest) => ({ request: input, scope: 'development-fixture', outcome: 'verified', facts }));
+    const inspect = vi.fn(async () => 'verified-present' as const), seen: [string, number][] = [];
+    const verifier = new PersistentContentVerifier(h.fs, limits, { scope: 'development-fixture', verify: execute },
+      'timed-facts-1', { inspect }, true, (stage, ms) => { seen.push([stage, ms]); throw Error('observer failure'); });
+    if (outcome === 'write-failure') h.fs.reject = path => path.includes('/evidence/');
+    const writing = underWriteLease(h.fs, () => verifier.verify(request));
+    if (outcome === 'success') {
+      expect(await writing).toEqual({ request, scope: 'development-fixture', outcome: 'verified', facts });
+      expect(await verifier.hasEvidence(request)).toBe(true);
+      const stages = seen.map(([stage]) => stage);
+      expect(await underWriteLease(h.fs, () => verifier.verify(request))).toEqual({ request, scope: 'development-fixture', outcome: 'verified', facts });
+      expect(seen.slice(stages.length).map(([stage]) => stage)).toEqual(['receipt-read', 'inventory-before']);
+      expect(execute).toHaveBeenCalledOnce(); expect(inspect).toHaveBeenCalledTimes(3);
+      seen.splice(stages.length);
+    } else {
+      await expect(writing).rejects.toMatchObject({ name: 'QuotaExceededError', message: 'synthetic quota' });
+      expect(await verifier.hasEvidence(request)).toBe(false);
+      expect(execute).toHaveBeenCalledOnce(); expect(inspect).toHaveBeenCalledTimes(2);
+    }
+    expect(seen.map(([stage]) => stage)).toEqual(['receipt-read', 'inventory-before', 'executor', 'inventory-after', 'receipt-write']);
+    expect(seen.every(([, ms]) => Number.isFinite(ms) && ms >= 0)).toBe(true);
+  });
 });
 
 describe('08b editor declaration transaction continuity', () => {

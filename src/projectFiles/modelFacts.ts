@@ -269,7 +269,8 @@ async function receivedFacts(content: ValidationContent, base: ProjectMetadataSo
       const record=validationGsEquivalenceSource(request) ?? request.records[0]!;
       for (const ref of recordBlobRefs(record)) if (oldDigests.has(ref.digest as string) &&
         await content.store.inspect(ref) !== 'verified-present') return fileError('既存の本体を確認できません。');
-      const result = await measureMetadata(timing, 'metadata.models.fact-save', () => content.verifier(!completedFacts.has(key)).verify(request)) as { outcome?: string };
+      const observe = timing && ((stage: string, milliseconds: number) => timing(`metadata.models.fact.${request.fact}.${stage}`, milliseconds));
+      const result = await measureMetadata(timing, 'metadata.models.fact-save', () => content.verifier(!completedFacts.has(key), observe).verify(request)) as { outcome?: string };
       if (result.outcome !== 'verified') return fileError('受信した本体の検証情報を記録できません。');
       completedFacts.add(key);
     }

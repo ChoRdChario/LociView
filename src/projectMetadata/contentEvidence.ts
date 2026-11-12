@@ -10,6 +10,7 @@ export interface VerifiedInventoryPort {
 }
 interface Evidence { key: JsonObject; facts: JsonObject; digest: string }
 interface CapturedEvidence { request: ContentRequest; key: JsonObject }
+export type ContentEvidenceTiming = (stage: string, milliseconds: number) => void;
 
 function captureEvidence(input: ContentRequest, limits: MetadataLimits, version: string, scope: ProjectContentVerifier['scope']): CapturedEvidence {
   const request = cloneCanonicalValue(input, limits) as unknown as ContentRequest;
@@ -32,7 +33,8 @@ export class PersistentContentVerifier implements ProjectContentVerifier {
   private readonly limits: MetadataLimits;
   constructor(private readonly fs: ProjectWorkspaceFS, limits: MetadataLimits,
     private readonly executor: ProjectContentVerifier, private readonly version: string,
-    private readonly inventory: VerifiedInventoryPort, private readonly allowNewEvidence = false) {
+    private readonly inventory: VerifiedInventoryPort, private readonly allowNewEvidence = false,
+    private readonly timing?: ContentEvidenceTiming) {
     this.scope = executor.scope; this.limits = checkLimits(limits);
     if (!version || version.length > 128) fail('verifier-version');
     if (!allowNewEvidence) {
@@ -53,6 +55,14 @@ export class PersistentContentVerifier implements ProjectContentVerifier {
   private receipt(input: ContentRequest) {
     return readCapturedEvidence(this.fs, this.limits, captureEvidence(input, this.limits, this.version, this.scope));
   }
+  private measure<T>(stage: string, action: () => Promise<T>): Promise<T> {
+    const timing = this.timing;
+    if (!timing) return action();
+    const started = performance.now();
+    const finished = () => { try { timing(stage, performance.now() - started); } catch { /* Diagnostics have no authority. */ } };
+    try { return action().finally(finished); }
+    catch (error) { finished(); throw error; }
+  }
   /** Presence of an owned exact receipt, even if its acknowledged CAS receipt was lost. */
   async hasEvidence(input: ContentRequest): Promise<boolean> {
     const { request, receipt } = await this.receipt(input);
@@ -67,8 +77,8 @@ export class PersistentContentVerifier implements ProjectContentVerifier {
         return verifyReadonlyEvidence(fs, limits, captured, scope, inventory);
       });
     }
-    const { request, key, path, receipt } = await this.receipt(input);
-    const presence = await this.inventory.inspect(request);
+    const { request, key, path, receipt } = await this.measure('receipt-read', () => this.receipt(input));
+    const presence = await this.measure('inventory-before', () => this.inventory.inspect(request));
     if (receipt && presence === 'verified-present') {
       checkContentFacts(request, receipt.facts);
       return { request, scope: this.scope, outcome: 'verified', facts: receipt.facts };
@@ -76,13 +86,14 @@ export class PersistentContentVerifier implements ProjectContentVerifier {
     if (!this.allowNewEvidence || presence === 'missing') return { request, scope: this.scope,
       outcome: presence === 'missing' ? 'missing' : 'failed' };
     this.fs.mutationAuthority.assertWorkspaceWriteAuthorized();
-    const result = cloneCanonicalValue(await this.executor.verify(request), this.limits) as JsonObject;
+    const result = cloneCanonicalValue(await this.measure('executor', () => this.executor.verify(request)), this.limits) as JsonObject;
     if (result.outcome !== 'verified') return result;
     if (Object.keys(result).sort().join(',') !== 'facts,outcome,request,scope' ||
       json(result.request) !== json(request) || result.scope !== this.scope) fail('content-executor');
     const facts = result.facts as JsonObject; checkContentFacts(request, facts);
-    if (await this.inventory.inspect(request) !== 'verified-present') fail('content-inventory');
-    await writeReceipt(this.fs, path, { key, facts, digest: await jsonDigest({ key, facts }) }, this.limits);
+    if (await this.measure('inventory-after', () => this.inventory.inspect(request)) !== 'verified-present') fail('content-inventory');
+    const receiptValue = { key, facts, digest: await jsonDigest({ key, facts }) };
+    await this.measure('receipt-write', () => writeReceipt(this.fs, path, receiptValue, this.limits));
     return { request, scope: this.scope, outcome: 'verified', facts };
   }
 }

@@ -248,6 +248,14 @@ POはPC／スマホの快適化を継続し、具体的な改善点がなくな�
   write／readback／復旧fenceは変えない。native write／closeとLong Taskは私的ブラウザprobeで分離する。
   body-addは読取／SHA／CRCとsink待機を含み、pipeline-waitはZIP close後の残りだけである。
   並行区間を合算してI/O時間と呼ばず、probeなしの操作時間と区別する。
+  初回復元のfact-saveも、固定のfact種別ごとにreceipt読取・inventory前後・executor・receipt保存を
+  同じ任意callbackで分離できる。通知にrecord・path・digestは含めず、保存後照合・順序・証拠の
+  寿命は変更しない。receipt保存の合計を純粋なwrite時間と呼ばない。
+  2026-11-12の純計算評価（GSのSH重み・行scratch、GLBの頂点scratch、復元controlの
+  canonical UTF-8サイズだけを使う箇所の不要SHA）は撤回・未接続。同じ式・走査・検査境界を保った
+  候補だったが、固定した実データ比較で無劣化と効果を確定できなかった。変更前にもGS復元の
+  待機上限到達があり、環境負荷を原因と断定せず、失敗状態と全観測を保持する。診断追加だけを残し、
+  デコード結果の共有、SHA／CRC・abort・I/O境界の省略や検査寿命の拡張は採用しない。
 - 通常再開で不要な初期化案内の探索は、必要性を実測したうえでsource-lessの案内を決める場面へ限定できる。
   unknownをfalseと扱わず、その案内の前には従来のfresh探索を行う。原本／Session／内容／復旧検査は省略しない。
   今回は未採用。先行閲覧の接続で記録を読める待ちを先に減らし、初期化案内のfresh探索は保持する。

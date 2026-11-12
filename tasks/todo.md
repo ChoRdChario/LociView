@@ -57,7 +57,89 @@ unchanged-feature-classification checks pass; independent review has no findings
 No runtime change or new capacity guarantee; no runtime suite is needed for this
 documentation checkpoint.
 
-## Current work —open multiple Caption windows without retention controls
+## Current work —first-restoration diagnosis and recovery
+
+PO2026-11-12 resumes large-data comfort work after g0/61507a7. Root is the sole
+writer; independent contract/source/evidence reviews are read-only. Preserve251
+private draft lines and semantic-zero dirt. No dependency, format, profile,
+capacity, validation lifetime, recovery/publication fence or release change.
+
+Outcome: isolate Ki-84/500k SH4 first-restoration waits, then retain only changes
+with useful elapsed benefit and no reproduced regression. Measure receipt read,
+fresh inventory, executor and receipt write/readback within fact-save; never sum
+parent and child totals. Normal source/body/history checks, real Backup and cold
+continuation remain the acceptance boundary. Physical Safari remains unqualified.
+
+Implemented only optional data-only fact-stage timing, with observer exceptions
+unable to alter success/failure. No callback means no added promise wrapper.
+Existing fact checks, full body validation, write/readback and ordering remain.
+First baseline Ki-84: model-stage22.220s, body-save1.772s, fact-save20.260s;
+executor6.608s and receipt-write11.444s are child totals. Receipt-write includes
+its required control audits and readback; it is not pure storage-write time.
+
+Evaluated invocation-local GS/GLB scratch and unused size-only SHA removal.
+Independent source reviews found no blocking issue, but these candidates were
+WITHDRAWN: the performance/no-regression gate was not established. Their exact
+patch, immutable before/after artifacts and every result remain local under
+.artifacts/e2e/first-restore-facts-20261112/. No parser/control optimization is
+in the final product diff. No further cohort was added to seek a favourable result.
+
+Primary before/after each ran3 complete journeys per dataset, including exact
+records/history/all-body hashes, real Backup and cold/touch continuation:12 PASS.
+Median seconds (before → evaluated candidate; not adopted):
+
+| Dataset | Restore editable | Apply body | Download begins | File acquired | Cold body readable |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Ki-84 |120.287 →135.187|10.518 →17.850|29.957 →37.028|31.435 →38.696|10.778 →14.051|
+|500k SH4|185.317 →149.694|9.006 →7.915|63.202 →57.604|67.043 →61.070|13.724 →10.876|
+
+The predeclared one ABBAAB control retains those primary observations. Ki-84
+6 PASS, mixed endpoints and one142.958s host-generation/137.021s archive stage;
+SH4 1 PASS/5 FAIL at the unchanged240s normal-record readiness wait after the
+early text preview. Both frozen versions fail; this does not prove the cause or
+qualify either version. No retry, wait extension, assertion relaxation or failure
+exclusion. Host memory pressure was observed but is only a cause hypothesis.
+
+The initial retained failed BEFORE3 snapshot has all3 CAS receipts/bodies and5
+content evidence receipts, but staging only: no blobsVerified/durable/publication
+or Selection. Read-only OPFS snapshot captured without running application code.
+The original failed Project state is retained. A separate owned copy, same BEFORE
+artifact/origin and normal explicit retry reached editing-ready. Independent
+post-recovery reading checks the original ZIP/all3 CAS SHA-256, original identity
+and heads, matching journal/durable/publication and exactly1 Selection. This is
+one successful recovery, not qualification of the other4 failures, stall cause,
+post-recovery output or performance improvement. Recovery initialization34.511s
+is not a new initial-restoration timing comparison.
+
+Next smallest investigation: retain existing completed measures/IO snapshot in
+the journey failure-finally before closing its browser. The original5 failures
+cannot be reconstructed afterward. In session.resume, the stagedBlobs branch
+between before-journal-bodies and journal-stage reopens metadata and performs a
+second readonly checked() without a separate timing name. Absence of a completed
+journal-stage measure does not distinguish that interval from an in-progress
+journal write. Do not infer model re-decoding or remove either check from this
+gap alone. No further performance cohort or repeated recovery attempt was added
+to explain this measurement gap.
+
+Focused diagnostic baseline11 PASS. Candidate GS/stream/persistence113 PASS;
+file faults25 PASS/1 author-written expected-value error (triangle minimum-6,
+not-5), corrected exact case1 PASS. Those withdrawn-candidate tests are not
+claimed as final-tree regression. Diagnostic-only final checkpoint, HEIC
+isolation and small PC/touch restore/save/cold validation are complete:
+check:checkpoint PASS (156 files,3522 PASS,16 expected failures,21 existing todo;
+all5 builds and offline isolation), HEIC isolation PASS, small input/first-backup
+restore/save/cold PC+touch2 PASS, installed Edge+Chrome2 PASS. Final source/test
+fingerprint6a04ebacebed. Independent final source/contract/evidence review has no
+unresolved findings. No new full Desktop/offline-browser or physical iOS claim.
+
+Meta-audit: still g0/61507a7, no release/deploy; private inputs/profiles and
+failed evidence stay local. Prioritize the unresolved prepublication stall and
+recovery state over more numerical micro-optimization. Changes to evidence
+reuse across CAS writes or check timing require a concrete reviewed decision;
+they are not authorized by diagnostic scope. Finish unaffected verification and
+push the verified diagnostic development checkpoint, without claiming speedup.
+
+## Previous checkpoint —open multiple Caption windows without retention controls
 
 PO2026-11-12 explicitly restores normal multiple-window opening. Base g0/fba9960;
 root is the sole writer, with bounded read-only state/contract and test mapping
