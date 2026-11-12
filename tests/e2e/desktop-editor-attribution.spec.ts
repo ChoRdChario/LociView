@@ -37,7 +37,7 @@ async function edit(p: Page, field: 'タイトル' | '本文', value: string) {a
 async function output(p: Page, info: TestInfo, label: string, purpose: 'backup' | 'teamWorkspace' | 'contribution' | 'review', base?: string) {
   const menu = p.locator('details.lv-project-files'); if (!await menu.evaluate(n => (n as HTMLDetailsElement).open)) await menu.locator(':scope > summary').click();
   const area = files(p),compact=await revealFileSurface(p,purpose==='backup'?'保存':'共有'); if(!compact)await area.getByRole('button', { name: purpose === 'backup' ? '保存' : '相手に渡す', exact: true }).click();
-  if (purpose === 'backup') await area.getByLabel('名前（任意）', { exact: true }).fill(label);
+  if (purpose === 'backup') await area.getByLabel('保存名（任意）', { exact: true }).fill(label);
   else if (compact) await selectShareOutput(area, purpose);
   else if (purpose === 'review') {
     const more = area.locator('.lv-file-intents > details'); if (!await more.evaluate(n => (n as HTMLDetailsElement).open)) await more.locator('summary').click();

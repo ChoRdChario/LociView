@@ -37,7 +37,7 @@ test('狭い画面とno-hover touchで100記録をキーボード移動し、編
     expect(await chosen.evaluate(fill)).not.toBe(await other.evaluate(fill));
   };
   const save = async (page: Page, name: string, verify: boolean) => {
-    const files = page.getByRole('region', { name: 'ファイル', exact: true }); await files.getByRole('button', { name: '保存', exact: true }).tap(); await files.getByLabel('名前（任意）', { exact: true }).fill(name);
+    const files = page.getByRole('region', { name: 'ファイル', exact: true }); await files.getByRole('button', { name: '保存', exact: true }).tap(); await files.getByLabel('保存名（任意）', { exact: true }).fill(name);
     await expect(files.getByRole('button', { name: 'ファイルに保存', exact: true })).toBeEnabled();
     await distinctFill(files.getByRole('button', { name: 'ファイルに保存', exact: true }), files.getByRole('button', { name: '保存', exact: true })); await layout(page, 'save');
     const [download] = await Promise.all([page.waitForEvent('download', { timeout: 90_000 }), files.getByRole('button', { name: 'ファイルに保存', exact: true }).tap()]);
@@ -48,7 +48,7 @@ test('狭い画面とno-hover touchで100記録をキーボード移動し、編
       const row = rows.locator('section').filter({ hasText: `バックアップ ${name} —` }); await row.getByText('保存したファイルを確認', { exact: true }).tap();
       const picker = page.waitForEvent('filechooser'); await row.getByRole('button', { name: 'ファイルを選択', exact: true }).tap(); await (await picker).setFiles(path);
       await expect(files.getByText('選択したファイルの内容を確認しました。', { exact: true })).toBeVisible({ timeout: 90_000 });
-      await expect(page.getByLabel('保存ファイルの状態', { exact: true })).toHaveText('保存ファイルと一致');
+      await expect(page.getByLabel('保存ファイルの状態', { exact: true })).toHaveText('選択ファイルと一致');
     }
     const backup = await BackupArchive.inspect(new Blob([new Uint8Array(await readFile(path)).buffer]), validationMetadataLimits), parsed = await inspectProjectCandidates(backup.source.read(), validationMetadataLimits);
     if (parsed.kind !== 'project-candidate-inspection') throw Error('metadata'); const records = parsed.unambiguousRecords as Record<string, any>;

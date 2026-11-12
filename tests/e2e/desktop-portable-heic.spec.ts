@@ -20,7 +20,7 @@ async function ready(p: Page, text: string) {
 async function output(p: Page, info: TestInfo, name: string, purpose: 'backup' | 'teamWorkspace') {
   const menu = p.locator('details.lv-project-files'); if (!await menu.evaluate(n => (n as HTMLDetailsElement).open)) await menu.locator(':scope > summary').click();
   const area = p.getByRole('region', { name: 'ファイル', exact: true }),compact=await revealFileSurface(p,purpose==='backup'?'保存':'共有'); if(!compact)await area.getByRole('button', { name: purpose === 'backup' ? '保存' : '相手に渡す', exact: true }).click();
-  if (purpose === 'backup') await area.getByLabel('名前（任意）', { exact: true }).fill(name); else await selectShareOutput(area, purpose);
+  if (purpose === 'backup') await area.getByLabel('保存名（任意）', { exact: true }).fill(name); else await selectShareOutput(area, purpose);
 
   await expect(area.locator('.lv-file-intents')).toContainText('HEIC原本と表示用PNGの組');
   const [download] = await Promise.all([p.waitForEvent('download', { timeout: 90_000 }), area.locator('button.lv-file-primary').click()]);

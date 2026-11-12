@@ -47,7 +47,10 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
     filePanel.style.top=`${top}px`;filePanel.style.maxHeight=`${Math.max(120,win.innerHeight-top-12)}px`;
   };
   document.defaultView?.addEventListener('resize',positionFiles);
-  const closeFiles = () => { if (!fileMenu || tools!.hasChanges() && !readingOutput()) return; fileMenu.open = false;
+  const closeFiles = () => { if (!fileMenu || tools!.hasChanges() && !readingOutput()) return;
+    if (tools!.dismissCompletedOutputFeedback()) outputNotice = '';
+    else if (!tools!.busy() && tools!.outputFeedback()) outputNotice = tools!.outputFeedback();
+    fileMenu.open = false;
     (fileOrigin?.getClientRects?.().length && !(fileOrigin as HTMLButtonElement).disabled ? fileOrigin : fileSummary)?.focus?.({preventScroll:true}); };
   fileClose.addEventListener('click', closeFiles);
   filePanel.addEventListener('keydown', event => { if(event.key==='Escape' && !event.isComposing && !event.defaultPrevented){event.preventDefault();event.stopPropagation();closeFiles();} });

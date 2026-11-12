@@ -180,6 +180,7 @@ export function createValidationReceiveControls(document: Document, host: Return
   return { root, render, busy: () => busy || output.busy(), hasChanges, hasHandedOff: output.hasHandedOff,
     readingOutput: () => busy || restoreChanges() || input.files?.length || selectedJob || selectedCopy || cancel ? null : output.readingOutput(),
     outputFeedback: output.outputFeedback,
+    dismissCompletedOutputFeedback: output.dismissCompletedFeedback,
     closeReason: () => busy ? 'ファイルを処理中です。完了をお待ちください。' : output.closeReason() ?? (restoreChanges() ? '復元の確認を完了するか、復元欄の取消操作を選択してください。' : input.files?.length || selectedJob || selectedCopy || cancel ? '受信欄の入力・確認を完了するか、取り消してください。' : null),
     showAll(){if(hasChanges())return false;surface='all';output.setPresentation('all');render();return true;},
     currentSurface: () => surface,

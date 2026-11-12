@@ -74,7 +74,7 @@ async function download(p:Page,info:TestInfo,name:string,purpose:'backup'|'teamW
   if(compact){if(purpose!=='backup')await selectShareOutput(area, purpose);}
   else if(purpose==='review'){const more=area.locator('summary').filter({hasText:/^その他$/});if(!await more.evaluate(n=>(n.parentElement as HTMLDetailsElement).open))await more.click();await area.getByRole('button',{name:'シーンを共有',exact:true}).click();}
   else await area.getByRole('button',{name:purpose==='backup'?'保存':'相手に渡す',exact:true}).click();
-  if(purpose==='backup')await area.getByLabel('名前（任意）',{exact:true}).fill(name);
+  if(purpose==='backup')await area.getByLabel('保存名（任意）',{exact:true}).fill(name);
   else if(purpose!=='review'){if(!compact)await selectShareOutput(area, purpose);if(base)await area.getByLabel('元にする作業一式',{exact:true}).selectOption(base);}
 
   if(purpose==='review'){const scenes=area.getByLabel('渡すシーン',{exact:true});await scenes.selectOption((await scenes.locator('option').evaluateAll(nodes=>nodes.map(n=>(n as HTMLOptionElement).value).filter(Boolean)))[0]!);await area.getByRole('button',{name:'内容を確認',exact:true}).click();}

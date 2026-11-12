@@ -48,7 +48,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   help.setAttribute('aria-label', 'ヘルプ'); help.append(make('summary', 'ヘルプ'), introduction);
   for (const [title, text] of [
     ['はじめる', 'プロジェクトを選び、変更するときは「編集する」を選択します。シーンを切り替えても「開始シーン」は変わりません。'],
-    ['記録する', '一覧の「＋」でモデルの面を選択し、位置を確定します。Shiftを押しながら面を選択しても追加できます。「座標で追加」では追加先モデルとX・Y・Zを指定します。'],
+    ['記録する', '「キャプションを追加」からモデルの面を選択し、位置を確定します。Shiftを押しながら面を選択しても追加できます。「座標で追加」では追加先モデルとX・Y・Zを指定します。'],
     ['保存と共有', 'ブラウザのデータを削除すると、再開データも失われます。「ファイルに保存」でバックアップを作れます。「共有」では全体か一部を選んで書き出せます。更新ファイルは同じプロジェクトへ取り込めます。保存先のファイルは、必要に応じてファイル欄から照合できます。'],
     ['困ったとき', '更新に失敗したら入力を保持したまま「更新を再試行」を選択します。競合は「状態を確認」から残す内容を選択します。3D表示だけに問題がある場合は「3D表示を再試行」を選択してください。'],
   ]) help.append(make('h3', title), make('p', text));
@@ -78,7 +78,14 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     } catch { if (!disposed && epoch === storageEpoch) storageStatus.textContent = '保存容量を確認できませんでした。もう一度確認できます。'; }
     finally { if (!disposed && epoch === storageEpoch) { storageChecking = false; storageCheck.disabled = false; } }
   }
-  const identity = make('div'); identity.className = 'lv-project-identity'; identity.append(projectTitle, resumeStatus, fileStatus);
+  const identity = make('div'); identity.className = 'lv-project-identity';
+  const saveSummary = make('div'), browserState = make('div'), savedFileState = make('div');
+  saveSummary.className = 'lv-save-summary'; saveSummary.setAttribute('role', 'group'); saveSummary.setAttribute('aria-label', '保存状況');
+  browserState.className = savedFileState.className = 'lv-save-state';
+  const browserLabel = make('span', 'ブラウザ内'), fileLabel = make('span', 'ファイル');
+  browserLabel.className = fileLabel.className = 'lv-save-location';
+  browserState.append(browserLabel, resumeStatus); savedFileState.append(fileLabel, fileStatus);
+  saveSummary.append(browserState, savedFileState); identity.append(projectTitle, saveSummary);
   const headerTools = make('div'); headerTools.className = 'lv-header-tools'; headerTools.append(headerActions, help); header.append(identity, headerTools);
   const resumeNotice = make('p'); resumeNotice.setAttribute('role', 'status');
   const otherProject = button('ファイルを開く', () => {
@@ -154,7 +161,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   sceneForm.append(sceneLabel, sceneNote, createScene, cancelScene); sceneArea.append(sceneManagement, sceneForm);
   const pinArea = make('section'), pinStatus = make('p'), coords = make('div'); pinStatus.setAttribute('role', 'status');
   pinArea.setAttribute('aria-label', 'ピンの操作');
-  const addPin = button('ピンを追加', () => { if (guardInput()) { pinAction = { kind: 'add', token: provider().token, sceneId, captionId: null, assetId: models?.selectedSurface() ?? undefined, color: addColorValue() }; choosing = true; placingCaption = null; render(); } });
+  const addPin = button('キャプションを追加', () => { if (guardInput()) { pinAction = { kind: 'add', token: provider().token, sceneId, captionId: null, assetId: models?.selectedSurface() ?? undefined, color: addColorValue() }; choosing = true; placingCaption = null; render(); } });
   const addColorLabel = make('label', '追加色'), addColor = make('input'); addColor.type = 'color'; addColor.setAttribute('aria-label', '追加色'); addColorLabel.append(addColor);
   const numericAdd = make('details'), numericLabel = make('label', '追加先モデル'), numericModel = make('select'), beginNumeric = button('このモデルに追加', () => {
     if (!guardInput() || numericScope !== numericKey) return;
@@ -336,11 +343,20 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     captions: projectCaptions(provider(), sceneId, models?.hidden()) }, memory: memory(), pending: dirty() ? 'text' : busy ? 'update' : null,
     showModelPending: composingInput() || pressedPointers.size || pin || numericTarget || surfaceOpening || choosing || deletion || pickerScope || sceneEdit || recovery?.hasChanges() || panelInput() || mediaManager?.hasChanges() || windowMoving || viewport.read().dragging ? 'text' : null,
     mutationBlock: busy || pending || windowMoving || ports.status().kind !== 'idle' || ports.otherPending() ? '現在の操作を完了してください。' : null });
+  const emptyCaptionReason = () => {
+    if (ports.readOnly) return 'このシーンにキャプションはありません。';
+    const p = provider(), source = projectModels(p, sceneId, projectIdentity(p), models?.hidden() ?? [], viewport.read());
+    if (source.kind !== 'ready') return source.reason;
+    if (source.items.some(item => item.membership.kind !== 'value' || item.lifecycle.kind !== 'value')) return 'モデルの所属・状態を確認してください。';
+    return source.items.some(item => item.lifecycle.kind === 'value' && item.lifecycle.value === 'active' && item.membership.kind === 'value' && item.membership.value.kind === 'included')
+      ? '「キャプションを追加」で、モデル上に最初の記録を作れます。' : 'モデルを追加すると、記録を作れます。';
+  };
   const detailContext = (): DetailContext => {
     const item = projectCaptions(provider(), sceneId, models?.hidden()).find(c => c.id === memory().selectedCaptionId);
     return { source: item ? { kind: 'ready', token: provider().token, sceneId, caption: item, sceneCount: projectCaptionSceneCount(provider(), item.id) } :
       { kind: 'unavailable', token: provider().token, sceneId, captionId: memory().selectedCaptionId,
-        reason: memory().selectedCaptionId ? 'この記録は削除されたか、所属・更新の状態を確認する必要があります。未適用の入力は保持しています。' : '記録を選択してください。' },
+        reason: memory().selectedCaptionId ? 'この記録は削除されたか、所属・更新の状態を確認する必要があります。未適用の入力は保持しています。' :
+          projectCaptions(provider(), sceneId).length ? '記録を選択してください。' : emptyCaptionReason() },
       draft, mediaDraft: selectedMedia ? { token: selectedMedia.token, sceneId: selectedMedia.sceneId,
         captionId: selectedMedia.captionId, selectionId: selectedMedia.attachmentId } : undefined,
       mutationBlock: mutationBlock() || (pin || !!numericTarget || surfaceOpening || choosing || deletion || sceneEdit || includeMemory().composing || pickerScope || recovery?.hasChanges() || panelInput() || mediaManager?.hasChanges() ? '現在の操作を完了してください。' : null), feedback: busy && applyingCaption ? { kind: 'applying', plan: applyingCaption } : { kind: 'idle' } };
@@ -1061,11 +1077,15 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       const saving = busy || ports.status().kind === 'checking';
       const failed = pending || ports.status().kind === 'failed';
       resumeStatus.textContent = saving ? '変更を適用中' : failed ? '更新が未完了です。入力を保持しています。再試行してください。' :
-        hasDraft ? '未適用の変更' : summary.resumable ? 'このブラウザで再開できます' : '再開データを確認してください。';
+        hasDraft ? '未適用の変更' : summary.resumable ? '再開できます' : '再開データを確認してください。';
       resumeStatus.hidden = readDuringOutput();
+      browserState.hidden = resumeStatus.hidden;
       fileStatus.hidden = !!(hasDraft || saving || failed);
-      fileStatus.textContent = summary.backup === 'verified' ? '保存ファイルと一致' : summary.backup === 'download-started' ? 'ダウンロード開始・保存先未確認' :
-        summary.backup === 'unavailable' ? '保存ファイルを確認してください。' : summary.backupOutdated ? '保存用ファイルは要更新' : 'ファイル保存は未確認';
+      savedFileState.hidden = fileStatus.hidden;
+      resumeStatus.dataset.state = saving ? 'busy' : failed ? 'error' : hasDraft ? 'draft' : summary.resumable ? 'ready' : 'attention';
+      fileStatus.textContent = summary.backup === 'verified' ? '選択ファイルと一致' : summary.backup === 'download-started' ? 'ダウンロード開始・保存先未確認' :
+        summary.backup === 'unavailable' ? '保存ファイルを確認してください。' : summary.backupOutdated ? '更新が必要' : '保存未確認';
+      fileStatus.dataset.state = summary.backup === 'verified' ? 'verified' : summary.backup === 'unavailable' || summary.backupOutdated ? 'attention' : 'unconfirmed';
       const nextGestureContext = JSON.stringify([p.token, sceneId, ports.readOnly, ports.imageScope(), ports.otherPending(), models?.hidden(), memory().pinColors]);
       if (gestureContext !== nextGestureContext) { gestureContext = nextGestureContext; gesture = null; gestureGeneration++; }
       const operationStatus=ports.status();status.dataset.busy = String(busy); status.textContent = operationStatus.kind === 'failed' ? failureMessage(operationStatus) || feedback : feedback;
@@ -1089,6 +1109,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       const sceneStripShape = JSON.stringify([...activeScenes].map(key => [key, sceneButtons.get(key)!.textContent]));
       queueMicrotask(() => revealSceneChoice(sceneStripShape));
       if (!draft) draft = beginCaptionDraft(detailContext().source);
+      captionPanel.dataset.empty = String(!projectCaptions(p, sceneId).length && !ports.readOnly);
       list.render(listContext()); inclusion.render(includeContext()); detail.render({ ...detailContext(),
         textOnly: readDuringOutput(),
         cancelBlock: pending?.owner === 'media' && canCancelMedia() ? null :

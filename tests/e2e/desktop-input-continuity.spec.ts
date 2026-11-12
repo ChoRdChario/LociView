@@ -1,7 +1,7 @@
 import { test, expect, chromium, type Page } from '@playwright/test';
 import { ownedServer } from '../offline-e2e/server';
 import { triangleGlb, smallPng } from './fixtures';
-import { revealCoordinateAdd, revealWorkPanel, revealCaptionList, beginMaterialEditing, revealFileSurface, closeFileSurface } from './workspaceUi';
+import { revealWorkPanel, revealCaptionList, beginMaterialEditing, revealFileSurface, closeFileSurface } from './workspaceUi';
 
 for (const touch of [false, true]) test(`attachment ordering and Drawing completion retain the next input (${touch ? 'touch' : 'PC'})`, async ({}, info) => {
   test.setTimeout(180_000);
@@ -16,6 +16,7 @@ for (const touch of [false, true]) test(`attachment ordering and Drawing complet
   const detail = page.getByRole('region', { name: 'キャプションの詳細', exact: true });
   try {
     await page.goto(server.url); await page.getByLabel('ファイルを選択', { exact: true }).setInputFiles({ name: 'continuity.glb', mimeType: 'model/gltf-binary', buffer: triangleGlb() });
+    await expect(page.getByText('3Dモデル・点群から新規作成、作業ファイルから再開できます。', { exact: true })).toBeVisible();
     await page.getByRole('button', { name: 'ファイルを開く', exact: true }).click();
     await page.getByRole('textbox', { name: 'プロジェクト名', exact: true }).fill('操作の継続'); await page.getByRole('button', { name: 'プロジェクトを作成', exact: true }).click();
     const stage = page.getByRole('button', { name: '3D', exact: true });
@@ -38,9 +39,19 @@ for (const touch of [false, true]) test(`attachment ordering and Drawing complet
       await expect(page.locator('.lv-compact-navigation > [role="tablist"]')).toHaveCount(1); await expect(drawing).toBeFocused();
       await expect(tasks).toHaveCount(1);
     }
-    await revealCaptionList(page); await revealCoordinateAdd(page); await page.getByLabel('追加先モデル', { exact: true }).focus();
-    await page.getByLabel('追加先モデル', { exact: true }).selectOption({ label: 'continuity.glb' });
-    await page.getByRole('button', { name: 'このモデルに追加', exact: true }).click();
+    await revealCaptionList(page);
+    const firstAdd = page.getByRole('button', { name: 'キャプションを追加', exact: true });
+    await expect(firstAdd).toHaveText('キャプションを追加');
+    expect(await firstAdd.evaluate(node => Number.parseFloat(getComputedStyle(node).fontSize))).toBeGreaterThanOrEqual(14);
+    expect((await firstAdd.boundingBox())!.y).toBeLessThan((await page.locator('.lv-caption-browser input[type="search"]').boundingBox())!.y);
+    await expect(page.getByRole('group', { name: '保存状況', exact: true })).toContainText('ブラウザ内');
+    await page.screenshot({ path: info.outputPath('first-record-entry.png') });
+    await firstAdd.click();
+    const firstCanvas = page.getByLabel('3Dモデルの表示', { exact: true });
+    await expect(firstCanvas).toHaveAttribute('aria-busy', 'false', { timeout: 90_000 });
+    const firstCanvasBox = (await firstCanvas.boundingBox())!;
+    const firstPosition = { x: firstCanvasBox.width / 2, y: firstCanvasBox.height / 2 };
+    if (touch) await firstCanvas.tap({ position: firstPosition }); else await firstCanvas.click({ position: firstPosition });
     for (const axis of ['X', 'Y', 'Z']) await page.getByRole('region', { name: '位置の調整', exact: true }).getByLabel(`位置 ${axis}`, { exact: true }).fill(axis === 'Y' ? '.5' : '0');
     await page.getByRole('button', { name: '位置を確定', exact: true }).click(); await ready('ピンの位置を確定しました。');
     await revealCaptionList(page); await page.locator('.lv-caption-select').first().click();
@@ -63,13 +74,25 @@ for (const touch of [false, true]) test(`attachment ordering and Drawing complet
     await page.emulateMedia({ reducedMotion:'no-preference' });
     await detail.getByLabel('本文', { exact: true }).dispatchEvent('compositionstart');
     await expect(detail.getByRole('button', { name: '変更を適用', exact: true })).toBeDisabled();
+    await expect(page.getByLabel('保存ファイルの状態', { exact: true })).toBeHidden();
     await detail.getByLabel('本文', { exact: true }).dispatchEvent('compositionend');
     await page.screenshot({ path: info.outputPath('text-and-selected-photo.png') });
     await detail.getByRole('button', { name: '変更を適用', exact: true }).click(); await ready('変更を適用しました。');
-    await expect(page.getByLabel('保存ファイルの状態', { exact: true })).toHaveText('ファイル保存は未確認');
+    await expect(page.getByLabel('保存ファイルの状態', { exact: true })).toHaveText('保存未確認');
+    const rowEdit = page.locator('.lv-caption-row').first().getByRole('button', { name: '編集', exact: true, includeHidden: true });
+    const rowDescription = await rowEdit.getAttribute('aria-describedby'); expect(rowDescription).toBeTruthy();
+    await expect(page.locator('#' + rowDescription)).toHaveText('再開時の記録');
+    const headerBeforeSave = await page.locator('main.lv-project-workspace > header').boundingBox();
     await revealFileSurface(page, '保存'); const files = page.getByRole('region', { name: 'ファイル', exact: true });
+    await expect(files.getByLabel('保存名（任意）', { exact: true })).toBeVisible();
     const [download] = await Promise.all([page.waitForEvent('download'), files.locator('.lv-file-primary').click()]);
-    const backup = info.outputPath('resume-fixture.zip'); await download.saveAs(backup); expect(await download.failure()).toBeNull(); await closeFileSurface(page);
+    const backup = info.outputPath('resume-fixture.zip'); await download.saveAs(backup); expect(await download.failure()).toBeNull();
+    await expect(files.locator('.lv-operation-status')).toHaveAttribute('data-busy', 'false');
+    await closeFileSurface(page);
+    await expect(page.getByLabel('保存ファイルの状態', { exact: true })).toHaveText('ダウンロード開始・保存先未確認');
+    expect((await page.locator('.lv-project-shell > .lv-operation-status').allTextContents()).join('')).not.toContain('ダウンロードを開始しました。');
+    expect((await page.locator('main.lv-project-workspace > header').boundingBox())!.y).toBe(headerBeforeSave!.y);
+    await page.screenshot({ path: info.outputPath('save-status-after-close.png') });
     for (const name of ['B.png', 'C.png']) {
       const chooser = page.waitForEvent('filechooser'); await page.getByLabel('メディアを追加', { exact: true }).click();
       await (await chooser).setFiles({ name, mimeType: 'image/png', buffer: smallPng() });

@@ -48,7 +48,7 @@ async function checkImages(page: Page, count: number) {
 async function download(page: Page, info: TestInfo, name: string, purpose: 'backup' | 'teamWorkspace' | 'contribution', base?: string) {
   const files = page.getByRole('region', { name: 'ファイル', exact: true });
   await files.getByRole('button', { name: purpose === 'backup' ? '保存' : '相手に渡す', exact: true }).click();
-  if (purpose === 'backup') await files.getByLabel('名前（任意）', { exact: true }).fill(name);
+  if (purpose === 'backup') await files.getByLabel('保存名（任意）', { exact: true }).fill(name);
   else {
     await files.getByLabel('渡す内容', { exact: true }).selectOption(purpose);
     if (purpose === 'contribution') {

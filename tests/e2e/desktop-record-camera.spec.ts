@@ -17,7 +17,7 @@ test('record list, pin actions and direct camera navigation remain coherent thro
   const ready=async(text:string)=>{await expect(p.getByText(text,{exact:true})).toBeVisible({timeout:90_000});await expect(p.locator('main.lv-project-workspace > header > .lv-operation-status')).toHaveAttribute('data-busy','false');};
   const task=async(name:string)=>{await revealWorkPanel(p);await p.getByRole('tab',{name,exact:true}).click();};
   const backup=async(name:string)=>{
-    await revealFileSurface(p,'保存');const files=p.getByRole('region',{name:'ファイル',exact:true});await files.getByLabel('名前（任意）',{exact:true}).fill(name);
+    await revealFileSurface(p,'保存');const files=p.getByRole('region',{name:'ファイル',exact:true});await files.getByLabel('保存名（任意）',{exact:true}).fill(name);
     // File generation uses the existing file-action budget, not the generic 15s input deadline.
     const[download]=await Promise.all([p.waitForEvent('download',{timeout:90_000}),files.locator('.lv-file-primary').click()]),path=info.outputPath(name+'.zip');await download.saveAs(path);expect(await download.failure()).toBeNull();
     await expect(files.locator('.lv-operation-status')).toHaveAttribute('data-busy','false');await p.locator('details.lv-project-files').getByRole('button',{name:'閉じる',exact:true}).click();

@@ -38,7 +38,7 @@ async function workspaceFits(p: Page) {
 async function output(p: Page, info: TestInfo, name: string, purpose: 'backup' | 'teamWorkspace') {
   await fileMenu(p); const area = files(p);
   if(!await revealFileSurface(p,purpose==='backup'?'保存':'共有')) await area.getByRole('button', { name: purpose === 'backup' ? '保存' : '相手に渡す', exact: true }).click();
-  if (purpose === 'backup') await area.getByLabel('名前（任意）', { exact: true }).fill(name);
+  if (purpose === 'backup') await area.getByLabel('保存名（任意）', { exact: true }).fill(name);
   else await selectShareOutput(area, purpose);
   const [download] = await Promise.all([p.waitForEvent('download', { timeout: 90_000 }), area.locator('button.lv-file-primary').click()]);
   const path = info.outputPath(name + '.zip'); await download.saveAs(path); expect(await download.failure()).toBeNull();
@@ -65,6 +65,8 @@ async function holdDigest(p: Page) {
 }
 const releaseDigest = (p: Page) => p.evaluate(() => { const w = window as any; w.__holdContinuationDigest = false; w.__releaseContinuationDigest?.(); w.__releaseContinuationDigest = undefined; w.__continuationDigestHeld = false; });
 
+const projectTitle = '現地調査の記録 — 機体外板と内部構造の確認・写真付き作業をチームで継続するプロジェクト';
+
 test('PC Caption work continues after empty tag focus and cancelled file checks, with local receive/restore feedback', async ({ page, context, browser }, info) => {
   test.setTimeout(420_000); A.getHeads(A.init()); await page.setViewportSize({ width: 1280, height: 800 });
   const server=await ownedServer(process.env.LOCIVIEW_E2E_ARTIFACT??'offline-desktop-dist');
@@ -79,8 +81,8 @@ test('PC Caption work continues after empty tag focus and cancelled file checks,
   const b = await peer.newPage(); b.on('pageerror', error => errors.push(error.message));
   try {
     await page.goto(entry); await page.getByLabel('ファイルを選択', { exact: true }).setInputFiles({ name: '現地モデル.glb', mimeType: 'model/gltf-binary', buffer: triangleGlb() });
-    await page.getByRole('button', { name: 'ファイルを開く', exact: true }).click(); await page.getByRole('textbox', { name: 'プロジェクト名', exact: true }).fill('PCで記録を続ける'); await page.getByRole('button', { name: 'プロジェクトを作成', exact: true }).click();
-    await expect(page.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText('PCで記録を続ける', { timeout: 90_000 });
+    await page.getByRole('button', { name: 'ファイルを開く', exact: true }).click(); await page.getByRole('textbox', { name: 'プロジェクト名', exact: true }).fill(projectTitle); await page.getByRole('button', { name: 'プロジェクトを作成', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText(projectTitle, { timeout: 90_000 });
     await expect(page.getByLabel('3Dモデルの表示', { exact: true })).toHaveAttribute('aria-busy', 'false');
     await revealCoordinateAdd(page); const owner = page.getByLabel('追加先モデル', { exact: true }); await owner.focus(); await owner.selectOption({ label: '現地モデル.glb' });
     await page.getByRole('button', { name: 'このモデルに追加', exact: true }).click();
@@ -139,10 +141,10 @@ test('PC Caption work continues after empty tag focus and cancelled file checks,
     await expect(page.locator('details.lv-project-files').getByRole('button', { name: 'ファイルを開く', exact: true, includeHidden: true })).toBeEnabled(); await chooser.setFiles([]);
     await page.locator('details.lv-project-files').getByRole('button',{name:'閉じる',exact:true}).click();await revealProjectSelection(page);
     await page.getByRole('button', { name: 'ファイルを開く', exact: true }).click(); await page.getByRole('button', { name: '編集で開く', exact: true }).first().click();
-    await expect(page.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText('PCで記録を続ける', { timeout: 90_000 }); await chooseCaption(page, '確認する場所');
+    await expect(page.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText(projectTitle, { timeout: 90_000 }); await chooseCaption(page, '確認する場所');
     const workspace = await output(page, info, '作業一式', 'teamWorkspace');await page.locator('details.lv-project-files').getByRole('button',{name:'閉じる',exact:true}).click();
     await b.goto(entry); await b.getByLabel('ファイルを選択', { exact: true }).setInputFiles(workspace); await b.getByRole('button', { name: 'ファイルを開く', exact: true }).click();
-    await expect(b.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText('PCで記録を続ける', { timeout: 90_000 }); await chooseCaption(b, '確認する場所');
+    await expect(b.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText(projectTitle, { timeout: 90_000 }); await chooseCaption(b, '確認する場所');
     await edit(b, 'タイトル', '相手のタイトル'); const returned = await output(b, info, '相手の更新', 'teamWorkspace'); await edit(page, '本文', '手元の本文');
     await fileMenu(page); const incoming = receive(page), incomingStatus = incoming.locator(':scope > p[role="status"]');
     await revealFileSurface(page,'受信');await incoming.getByLabel('更新ファイルを選択', { exact: true }).setInputFiles(returned); await holdDigest(page); await incoming.getByRole('button', { name: '更新を受け取る', exact: true }).click();
@@ -166,7 +168,7 @@ test('PC Caption work continues after empty tag focus and cancelled file checks,
     await page.locator('details.lv-project-files').getByRole('button',{name:'閉じる',exact:true}).click();
     await chooseCaption(page, '確認する場所'); await expect(detail(page).getByLabel('タイトル', { exact: true })).toHaveValue('確認する場所'); await expect(detail(page).getByLabel('本文', { exact: true })).toHaveValue('');
     const saved = await output(page, info, '復元して継続', 'backup'), after = await BackupArchive.inspect(new Blob([Uint8Array.from(await readFile(saved)).buffer]), limits); expect(after.source.originalChanges()).toEqual(before.source.originalChanges());
-    await page.reload(); await expect(page.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText('PCで記録を続ける', { timeout: 90_000 }); await chooseCaption(page, '確認する場所');
+    await page.reload(); await expect(page.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText(projectTitle, { timeout: 90_000 }); await chooseCaption(page, '確認する場所');
     await expect(detail(page).getByLabel('タイトル', { exact: true })).toHaveValue('確認する場所'); await workspaceFits(page); await page.screenshot({ path: info.outputPath('continued-workspace.png'), fullPage: true });
     for (const size of [{ width: 640, height: 400 }, { width: 1280, height: 600 }, { width: 320, height: 740 }]) {
       await page.setViewportSize(size); await fileMenu(page);
@@ -175,6 +177,17 @@ test('PC Caption work continues after empty tag focus and cancelled file checks,
       const dimensions = await page.evaluate(() => ({ page: document.documentElement.scrollWidth, window: innerWidth })); expect(dimensions.page).toBeLessThanOrEqual(dimensions.window + 1);
       await page.screenshot({ path: info.outputPath(`reflow-${size.width}-${size.height}.png`), fullPage: true });
     }
+    await page.getByRole('button', { name: 'ファイルを開く', exact: true }).click();
+    const recent = page.getByRole('group', { name: projectTitle, exact: true });
+    await expect(recent).toBeVisible();
+    const resumeEdit = recent.getByRole('button', { name: '編集で開く', exact: true });
+    const description = await resumeEdit.getAttribute('aria-describedby'); expect(description).toBeTruthy();
+    await expect(page.locator('#' + description)).toHaveText(projectTitle);
+    await expect(resumeEdit).toBeInViewport();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+    await page.screenshot({ path: info.outputPath('recent-long-title-phone.png'), fullPage: true });
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await page.screenshot({ path: info.outputPath('recent-long-title-PC.png'), fullPage: true });
     expect(errors).toEqual([]); expect(remote).toEqual([]);
   } finally { await releaseDigest(page).catch(() => {}); await peer.close(); await server.stop(); }
 });

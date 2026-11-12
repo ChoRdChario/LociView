@@ -15,7 +15,7 @@ async function ready(page: Page, text: string) { await expect(page.getByText(tex
 async function output(page: Page, info: TestInfo, name: string, purpose: 'backup' | 'teamWorkspace') {
   const menu = page.locator('details.lv-project-files'); if (!await menu.evaluate(n => (n as HTMLDetailsElement).open)) await menu.locator(':scope > summary').click();
   const area = page.getByRole('region', { name: 'ファイル', exact: true }); if(!await revealFileSurface(page,purpose==='backup'?'保存':'共有')) await area.getByRole('button', { name: purpose === 'backup' ? '保存' : '相手に渡す', exact: true }).click();
-  if (purpose === 'backup') await area.getByLabel('名前（任意）', { exact: true }).fill(name); else await selectShareOutput(area, purpose);
+  if (purpose === 'backup') await area.getByLabel('保存名（任意）', { exact: true }).fill(name); else await selectShareOutput(area, purpose);
   const primary = area.locator('button.lv-file-primary'); await expect(primary).toBeEnabled();
   const [download] = await Promise.all([page.waitForEvent('download', { timeout: 90_000 }), primary.click()]), path = info.outputPath(name + '.zip'); await download.saveAs(path);
   expect(await download.failure()).toBeNull(); await expect(area.locator('.lv-operation-status')).toHaveAttribute('data-busy', 'false', { timeout: 90_000 }); await menu.getByRole('button',{name:'閉じる',exact:true}).click(); return path;

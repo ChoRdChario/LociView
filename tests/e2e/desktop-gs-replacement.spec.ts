@@ -22,7 +22,7 @@ async function ready(p:Page){await expect(p.getByRole('heading',{name:'プロジ
 async function output(p:Page,info:TestInfo,name:string,workspace=false){
  const menu=p.locator('details.lv-project-files');if(!await menu.evaluate(n=>(n as HTMLDetailsElement).open))await menu.locator(':scope > summary').click();
  const area=p.getByRole('region',{name:'ファイル',exact:true});if(!await revealFileSurface(p,workspace?'共有':'保存')) await area.getByRole('button',{name:workspace?'相手に渡す':'保存',exact:true}).click();
- if(workspace)await selectShareOutput(area, 'teamWorkspace');else await area.getByLabel('名前（任意）',{exact:true}).fill(name);
+ if(workspace)await selectShareOutput(area, 'teamWorkspace');else await area.getByLabel('保存名（任意）',{exact:true}).fill(name);
  const primary=area.locator('button.lv-file-primary');await expect(primary).toBeEnabled({timeout:600_000});
  const [download]=await Promise.all([p.waitForEvent('download',{timeout:600_000}),primary.click()]);const path=info.outputPath(name+'.zip');await download.saveAs(path);expect(await download.failure()).toBeNull();
  await expect(area.locator('.lv-operation-status')).toHaveAttribute('data-busy','false',{timeout:600_000});await closeFileSurface(p);return path;

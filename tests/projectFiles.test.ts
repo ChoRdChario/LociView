@@ -2800,7 +2800,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     h.button('選択を取り消す',destination).fire('click');await h.idle();
     h.button('ファイルを開く',h.editor()).fire('click');await h.idle();
     expect(h.navigation.hidden).toBe(false);
-    for(const title of ['再開する記録','別の記録'])expect(h.all(h.navigation).some(n=>n.textContent.startsWith(title+' —'))).toBe(true);
+    for(const title of ['再開する記録','別の記録'])expect(h.all(h.navigation).some(n=>n.className==='lv-recent-title'&&n.textContent===title)).toBe(true);
     listing.mockClear();f.storage.mockClear();
     await expect(f.ports.list(undefined,'../other')).rejects.toThrow('discovery scope');
     const coerce=vi.fn(()=>a.run);
@@ -2869,7 +2869,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const source = f.host().read().source!, backup = await f.host().workspaceOutput.download(await f.host().workspaceOutput.generateBackup(source.token,'再開の保存'));
     expect((await BackupArchive.inspect(backup,metadata)).source.originalChanges()).toEqual(source.originalChanges());
     change.fire('click'); await h.idle(); expect(h.ui.selected).toBeNull(); expect(h.navigation.hidden).toBe(false); Object.assign(fileInput,{files:[]});
-    const row = h.all(h.root).find(n => n.tag === 'p' && n.children.some(c => c.textContent.startsWith('調査B —')))!;
+    const row = h.all(h.root).find(n => n.className === 'lv-recent-project' && n.children.some(c => c.className === 'lv-recent-title' && c.textContent === '調査B'))!;
     h.button('編集で開く',row).fire('click'); await h.idle(); expect(h.ui.selected).toBe(b.run); expect(h.named('プロジェクト名',h.editor()).textContent).toBe('調査B');
     expect(h.all(h.editor()).some(n => n.textContent.startsWith('最後のプロジェクトを再開しました'))).toBe(false);
     expect(f.host().read().source!.originalChanges()).toEqual(b.source.originalChanges()); await h.ui.dispose();
@@ -5301,7 +5301,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       for(let i=0;i<20;i++)h.pinPoint({x:30+i,y:40+i});expect(frames.size).toBe(1);expect(rebuild).not.toHaveBeenCalled();expect(markers.children[0]!.style.left).toBe('30px');flush();expect(rebuild).toHaveBeenCalledOnce();expect(markers.children[0]!.style.left).toBe('49px');expect(markers.children[0]!.style.top).toBe('59px');expect(markers.children[0]).toBe(marker);expect(scene.children).toEqual(choices);expect(scene.document.activeElement).toBe(choices[0]);expect(h.host.read().source!.token).toBe(before);expect(h.dispatch).not.toHaveBeenCalled();
       h.setIssue('最初の表示エラー');h.refresh();h.setIssue('最新の表示エラー');h.refresh();expect(frames.size).toBe(1);flush();expect(h.all(h.editor).find(n=>n.className==='lv-project-viewport-status')!.textContent).toContain('最新の表示エラー');
       h.setIssue('');h.refresh();const cancelled=[...frames.values()][0]!;const count=rebuild.mock.calls.length;h.button('モデル',h.editor).fire('click');expect(frames.size).toBe(0);expect(rebuild).toHaveBeenCalledTimes(count+1);cancelled(0);expect(rebuild).toHaveBeenCalledTimes(count+1);
-      h.button('キャプション',h.editor).fire('click');expect(h.button('ピンを追加',h.editor).disabled).toBe(false);h.dragging(true);expect(frames.size).toBe(1);h.button('ピンを追加',h.editor).fire('click');expect(h.pick).not.toHaveBeenCalled();expect(h.dispatch).not.toHaveBeenCalled();expect(frames.size).toBe(0);h.dragging(false);flush();
+      h.button('キャプション',h.editor).fire('click');expect(h.button('キャプションを追加',h.editor).disabled).toBe(false);h.dragging(true);expect(frames.size).toBe(1);h.button('キャプションを追加',h.editor).fire('click');expect(h.pick).not.toHaveBeenCalled();expect(h.dispatch).not.toHaveBeenCalled();expect(frames.size).toBe(0);h.dragging(false);flush();
       h.named('カメラ位置',h.editor).open=true;h.named('カメラ位置',h.editor).fire('toggle');const views=h.named('視点の作業',h.editor);h.moveCamera();h.refresh();const captured=h.payload();await h.edited(()=>h.button('開始視点を記録',views).fire('click'));flush();const command=h.dispatch.mock.calls.map(c=>c[1]).find(c=>c.kind==='createView')!;expect(command).toMatchObject({kind:'createView',makeEntry:true,camera:captured.camera,background:captured.background});
       h.refresh();const late=[...frames.values()][0]!;await h.ui.dispose();expect(frames.size).toBe(0);const stopped=rebuild.mock.calls.length;late(0);h.refresh();expect(rebuild).toHaveBeenCalledTimes(stopped);expect(frames.size).toBe(0);
     }finally{await h.ui.dispose();}
@@ -5398,7 +5398,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       const row = h.host.workspaceOutput.jobs.find(j => j.purpose === 'backup')!, fileStatus = () => h.named('保存ファイルの状態', h.editor).textContent;
       expect(row.stale).toBeUndefined(); expect(fileStatus()).toBe('ダウンロード開始・保存先未確認');
       // Unknown freshness must never be promoted into a verified-file claim.
-      row.state = 'file-verified'; h.refresh(); expect(fileStatus()).toBe('ファイル保存は未確認');
+      row.state = 'file-verified'; h.refresh(); expect(fileStatus()).toBe('保存未確認');
       row.state = 'generated'; h.refresh(); expect(fileStatus()).toBe('ダウンロード開始・保存先未確認');
     }
     await h.ui.dispose();
@@ -5541,7 +5541,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       expect(captionAttachments(host.authority.read().mediaData, unplaced.id).ready[0]!.altText).toEqual({ kind: 'value', value: '向きを保持した写真' });
       const originalUrl = URL.createObjectURL, imageTypes: string[] = [], urls = vi.spyOn(URL, 'createObjectURL').mockImplementation(blob => { if (blob instanceof Blob) imageTypes.push(blob.type); return originalUrl(blob); });
       try { button('画像を表示', named('添付メディア', media)).fire('click'); await vi.waitFor(() => expect(imageTypes).toContain(photoMime(photo))); named('閉じる', named('メディアビューア', editor)).fire('click'); } finally { urls.mockRestore(); }
-      const output = named('ファイル'), label = named('名前（任意）', output); label.value = '写真を含む保存'; label.fire('input'); button('ファイルに保存', output).fire('click');
+      const output = named('ファイル'), label = named('保存名（任意）', output); label.value = '写真を含む保存'; label.fire('input'); button('ファイルに保存', output).fire('click');
       await vi.waitFor(() => expect(h!.downloads).toHaveBeenCalledOnce(), { timeout: 10000 }); const source = host.read().source!, job = host.workspaceOutput.jobs.find(j => j.purpose === 'backup')!;
       const backupFile = await host.workspaceOutput.download(job.id), backup = await BackupArchive.inspect(backupFile, metadata); expect(job.label).toBe('写真を含む保存'); expect(backup.source.originalChanges()).toEqual(source.originalChanges());
       const workspace = await host.workspaceOutput.download(await host.workspaceOutput.generate(source.token)), peer = firstWorkspaceRecipient(decodeJpeg, decodePhoto);
@@ -5592,7 +5592,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const mask=async()=>{button('設定を編集',panel).fire('click');named('透過の表示方法',panel).value='mask';named('透過の表示方法',panel).fire('change');named('切り抜きのしきい値',panel).value='0.2';named('切り抜きのしきい値',panel).fire('input');named('不透明度（%）',panel).value='40';named('不透明度（%）',panel).fire('input');await edited(()=>button('変更を適用',panel).fire('click'));};
     await mask();await checkDisplay(host.authority.read(),host.content,true);
     button('この範囲の設定を解除',panel).fire('click');await edited(()=>button('設定を解除する',panel).fire('click'));await checkDisplay(host.authority.read(),host.content,true);await mask();
-    const output=named('ファイル'),label=named('名前（任意）',output);label.value='材質変更後';label.fire('input');button('ファイルに保存',output).fire('click');await vi.waitFor(()=>expect(h.downloads).toHaveBeenCalledOnce(),{timeout:10000});
+    const output=named('ファイル'),label=named('保存名（任意）',output);label.value='材質変更後';label.fire('input');button('ファイルに保存',output).fire('click');await vi.waitFor(()=>expect(h.downloads).toHaveBeenCalledOnce(),{timeout:10000});
     const source=host.read().source!,backup=await host.workspaceOutput.download(host.workspaceOutput.jobs.find(j=>j.purpose==='backup')!.id),workspace=await host.workspaceOutput.download(await host.workspaceOutput.generate(source.token));
     // Both imports are normalized map2 here. Keep v1's complete material/slot,
     // local/remote merge and Clean checks; repeat transport rounds in LociMyu
@@ -5677,7 +5677,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     canvas.fire('pointerdown', pointer); canvas.fire('pointerup', pointer); await Promise.resolve(); await edited(() => button('位置を確定', editor).fire('click'));
     expect(host.authority.read().resources.captions[unplaced.id]!.anchor).toMatchObject({ kind: 'value', value: { kind: 'asset', positionAsset: [0.25, 0.5, 0] } });
     expect(Object.keys(host.authority.read().resources.captions)).toHaveLength(3); expect(h.legacy).not.toHaveBeenCalled();
-    const output = named('ファイル'), name = named('名前（任意）', output); name.value = 'LociMyuからの保存'; name.fire('input'); button('ファイルに保存', output).fire('click');
+    const output = named('ファイル'), name = named('保存名（任意）', output); name.value = 'LociMyuからの保存'; name.fire('input'); button('ファイルに保存', output).fire('click');
     await vi.waitFor(() => expect(h.downloads).toHaveBeenCalledOnce(), { timeout: 10000 }); const source = host.read().source!, job = host.workspaceOutput.jobs.find(j => j.purpose === 'backup')!;
     const backupFile=await host.workspaceOutput.download(job.id),backup = await BackupArchive.inspect(backupFile, metadata); expect(job.label).toBe('LociMyuからの保存'); expect(backup.source.originalChanges()).toEqual(source.originalChanges());
     const workspace = await host.workspaceOutput.download(await host.workspaceOutput.generate(source.token)), peer = firstWorkspaceRecipient();
@@ -5791,7 +5791,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     canvas.fire('pointerdown', pointer); canvas.fire('pointerup', pointer); await Promise.resolve(); await edited(() => button('位置を確定', editor).fire('click'));
     expect(host.authority.read().resources.captions[empty.id]!.anchor).toMatchObject({ kind: 'value', value: { kind: 'asset', positionAsset: [0.25, 0.5, 0] } });
     expect(Object.keys(host.authority.read().resources.captions)).toHaveLength(3); expect(h.legacy).not.toHaveBeenCalled();
-    const output = named('ファイル'), name = named('名前（任意）', output); name.value = '旧形式からの保存'; name.fire('input'); button('ファイルに保存', output).fire('click');
+    const output = named('ファイル'), name = named('保存名（任意）', output); name.value = '旧形式からの保存'; name.fire('input'); button('ファイルに保存', output).fire('click');
     await vi.waitFor(() => expect(h.downloads).toHaveBeenCalledOnce(), { timeout: 10000 }); const source = host.read().source!;
     const backupJob = host.workspaceOutput.jobs.find(j => j.purpose === 'backup')!, backupFile = await host.workspaceOutput.download(backupJob.id), backup = await BackupArchive.inspect(backupFile, metadata);
     expect(backupJob.label).toBe('旧形式からの保存'); expect(backup.source.originalChanges()).toEqual(source.originalChanges());
@@ -5908,7 +5908,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     button('モデル',editor).fire('click'); const rows=named('プロジェクトのモデル一覧',editor); rows.children.find(row=>row.children[0]?.textContent==='モデル')!.children[0]!.fire('click'); button('キャプション',editor).fire('click');
     h.pick.mockImplementation(targets=>{const target=targets.find(t=>t.assetId===secondId);return target?{target,position:[.25,.5,0] as const}:null;});
     const canvas=named('3Dモデルの表示',editor),pointer={pointerId:83,button:0,isPrimary:true,clientX:80,clientY:90};
-    button('ピンを追加',editor).fire('click'); canvas.fire('pointerdown',pointer);canvas.fire('pointerup',pointer);await Promise.resolve();
+    button('キャプションを追加',editor).fire('click'); canvas.fire('pointerdown',pointer);canvas.fire('pointerup',pointer);await Promise.resolve();
     expect(h.pick.mock.lastCall![0]).toHaveLength(2);expect(h.display()!.pinEdit!.target.assetId).toBe(secondId);button('取り消す',named('位置の調整',editor)).fire('click');
     const shifted={...pointer,shiftKey:true};canvas.fire('pointerdown',shifted);canvas.fire('pointerup',shifted);await Promise.resolve();expect(h.pick.mock.lastCall![0]).toHaveLength(2);expect(h.display()!.pinEdit!.target.assetId).toBe(secondId);
     button('取り消す',named('位置の調整',editor)).fire('click');expect(h.legacy).not.toHaveBeenCalled();await h.ui.dispose();
@@ -6187,7 +6187,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const camera = h.payload(); await edited(() => button('競合を解消', bodyForm).fire('click')); expect(host.authority.read().resources.captions[captionId]!.body).toEqual({ kind: 'value', value: '統合した本文\n<img src=x>' });
     let anchorForm = form('：ピン位置'), anchorChoice = all(anchorForm).find(n => n.tag === 'select')!; const option = anchorChoice.children.find(n => n.textContent.includes('4 / 2 / 1'))!;
     anchorChoice.value = option.value; anchorChoice.fire('change'); expect(h.display()!.preview).toBeUndefined(); expect(h.display()!.hiddenAssetIds).toEqual([assetId]); button('選択を取り消す', anchorForm).fire('click');
-    button('モデル', editor).fire('click'); button('表示', models).fire('click'); button('キャプション', editor).fire('click'); button('ピンを追加', editor).fire('click');
+    button('モデル', editor).fire('click'); button('表示', models).fire('click'); button('キャプション', editor).fire('click'); button('キャプションを追加', editor).fire('click');
     anchorForm = form('：ピン位置'); anchorChoice = all(anchorForm).find(n => n.tag === 'select')!; expect(anchorChoice.disabled).toBe(true); expect(h.display()!.preview).toBeUndefined(); button('取り消す', named('位置の調整', editor)).fire('click');
     anchorChoice.value = option.value; anchorChoice.fire('change'); expect(h.display()!.preview).toEqual(pointInProject([4, 2, 1], host.authority.read().modelVersions![0]!.closure.binding.assetToProject)); expect(h.display()!.pinEdit).toBeUndefined();
     h.f.fs.reject = path => path.endsWith('/published.json'); await h.failed(() => button('競合を解消', anchorForm).fire('click'));
@@ -6355,7 +6355,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
   it('compares product Captions in stable Scene-local windows with guarded gestures and one shared image viewer (recorded DOM)', async () => {
     const h = await productWorkspaceFixture(true), { host, editor, all, button, named, edited } = h;
     named('キャプション一覧', editor).children[0]!.children[0]!.fire('click');
-    button('ピンを追加', editor).fire('click'); const canvas = named('3Dモデルの表示', editor), pointer = { pointerId: 7, button: 0, isPrimary: true, clientX: 80, clientY: 90 };
+    button('キャプションを追加', editor).fire('click'); const canvas = named('3Dモデルの表示', editor), pointer = { pointerId: 7, button: 0, isPrimary: true, clientX: 80, clientY: 90 };
     canvas.fire('pointerdown', pointer); canvas.fire('pointerup', pointer); await Promise.resolve(); await edited(() => button('位置を確定', editor).fire('click'));
     const title = named('タイトル', editor); title.value = '比較する記録'; title.fire('input'); await edited(() => button('変更を適用', named('キャプションの詳細', editor)).fire('click'));
     const source = host.read().source!, windows = named('キャプションのウィンドウ', editor), cards = () => all(windows).filter(n => n.className === 'lv-caption-window');
@@ -6937,11 +6937,12 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const { f, host, ui, editor, root, all, named, button, edited, failed, status, downloads, legacy, dispatch, pick, moveCamera, display } = await productWorkspaceFixture();
     const initialCaptionIds = new Set(Object.keys(host.authority.read().resources.captions));
     expect(named('プロジェクト名', editor).textContent).toBe('統合画面の検証');
-    expect(named('再開データの状態', editor).textContent).toBe('このブラウザで再開できます');
-    expect(named('保存ファイルの状態', editor).textContent).toBe('ファイル保存は未確認');
+    expect(named('再開データの状態', editor).textContent).toBe('再開できます');
+    expect(named('保存ファイルの状態', editor).textContent).toBe('保存未確認');
     expect(named('保存ファイルの状態', editor).hidden).toBe(false);
+    expect(all(named('保存状況', editor)).filter(n => n.tag === 'span').map(n => n.textContent)).toEqual(['ブラウザ内', 'ファイル']);
     const initialSceneCount = Object.keys(host.authority.read().state.scenes).length;
-    button('ピンを追加', editor).fire('click'); const canvas = named('3Dモデルの表示', editor);
+    button('キャプションを追加', editor).fire('click'); const canvas = named('3Dモデルの表示', editor);
     const down = { pointerId: 7, button: 0, isPrimary: true, clientX: 80, clientY: 90 };
     canvas.fire('pointerdown', down); moveCamera(); canvas.fire('pointerup', down); await Promise.resolve(); expect(pick).not.toHaveBeenCalled();
     canvas.fire('pointerdown', down); canvas.fire('pointermove', { ...down, clientX: 100 }); canvas.fire('pointermove', down); canvas.fire('pointerup', down); await Promise.resolve(); expect(pick).not.toHaveBeenCalled();
@@ -6992,7 +6993,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     button(firstName.value, named('シーン', editor)).fire('click');
     const selectedPin = all(editor).find(n => n.tag === 'button' && n.className === 'lv-project-marker' && n.textContent === '新しい記録')!;
     selectedPin.fire('click');
-    const name = named('名前（任意）', output); name.value = '作業の保存'; name.fire('input');
+    const name = named('保存名（任意）', output); name.value = '作業の保存'; name.fire('input');
     button('ファイルに保存', output).fire('click'); await vi.waitFor(() => expect(downloads).toHaveBeenCalledTimes(1), { timeout: 10000 });
     const backup = host.workspaceOutput.jobs.find(j => j.purpose === 'backup')!;
     expect((await BackupArchive.inspect(await host.workspaceOutput.download(backup.id), metadata)).source.originalChanges()).toEqual(host.read().source!.originalChanges());
@@ -7001,7 +7002,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect(named('保存ファイルの状態', editor).hidden).toBe(false);
     button('ファイルを選択', output).fire('click');
     const verify = named('保存したファイルを選択', output); Object.assign(verify, { files: [await host.workspaceOutput.download(backup.id)] }); verify.fire('change');
-    await vi.waitFor(() => expect(named('保存ファイルの状態', editor).textContent).toBe('保存ファイルと一致'), { timeout: 10000 });
+    await vi.waitFor(() => expect(named('保存ファイルの状態', editor).textContent).toBe('選択ファイルと一致'), { timeout: 10000 });
     body.value = '照合後の未適用入力'; body.fire('input');
     expect(named('再開データの状態', editor).textContent).toBe('未適用の変更');
     expect(named('保存ファイルの状態', editor).hidden).toBe(true);
@@ -7014,7 +7015,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     await vi.waitFor(() => expect(downloads).toHaveBeenCalledTimes(2), { timeout: 10000 });
     const workspaceJob = host.workspaceOutput.jobs.find(j => j.purpose === 'teamWorkspace')!;
     expect(host.read().source!.token).toBe(verifiedToken); expect(host.workspaceOutput.jobs.find(j => j.id === backup.id)!.stale).toBe(true);
-    expect(named('保存ファイルの状態', editor).textContent).toBe('保存用ファイルは要更新');
+    expect(named('保存ファイルの状態', editor).textContent).toBe('更新が必要');
     const workspaceFile = await host.workspaceOutput.download(workspaceJob.id), peer = firstWorkspaceRecipient();
     const sharedBaseId = (await WorkspaceArchive.inspect(workspaceFile, metadata)).archive.control.manifest.packageId;
     await peer.receiver.importWorkspace(workspaceFile);
@@ -7057,7 +7058,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect(detailNote.textContent.split('保存容量が不足しています。')).toHaveLength(2);expect(detailNote.textContent).not.toContain('native storage full');
     h.f.fs.reject=()=>false;await h.edited(()=>button('更新を再試行',editor).fire('click'));const edited=host.read().source!;
     expect(host.authority.read().resources.captions[captionId]!.body).toEqual({kind:'value',value:'容量不足から復帰した本文'});
-    const output=named('ファイル'),name=named('名前（任意）',output),status=output.children.find(n=>n.attributes.get('role')==='status')!;
+    const output=named('ファイル'),name=named('保存名（任意）',output),status=output.children.find(n=>n.attributes.get('role')==='status')!;
     name.value='容量不足の作業';name.fire('input');const write=h.f.fs.writeStream.bind(h.f.fs);
     const sink=vi.spyOn(h.f.fs,'writeStream').mockImplementation(async(path,stream)=>{if(path.includes('/artifacts/')&&path.endsWith('.zip')){await stream.cancel(quota);throw quota;}await write(path,stream);});
     button('ファイルに保存',output).fire('click');await vi.waitFor(()=>{expect(status.dataset.busy).toBe('false');expect(status.textContent).toContain('保存容量が不足');},{timeout:10000});
@@ -7071,7 +7072,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     await h.ui.dispose();const cold=await openValidationHost(h.f.options);try{expect(cold.read().source!.originalChanges()).toEqual(edited.originalChanges());}finally{await cold.dispose();}
   });
   it('preserves a newer backup name after retrying a differently named frozen job', async () => {
-    const h=await productWorkspaceFixture(true),{host,named,button}=h,output=named('ファイル'),name=named('名前（任意）',output),status=output.children.find(n=>n.attributes.get('role')==='status')!;
+    const h=await productWorkspaceFixture(true),{host,named,button}=h,output=named('ファイル'),name=named('保存名（任意）',output),status=output.children.find(n=>n.attributes.get('role')==='status')!;
     name.value='元の保存名';name.fire('input');const write=h.f.fs.writeStream.bind(h.f.fs);
     const failure=vi.spyOn(h.f.fs,'writeStream').mockImplementation(async(path,stream)=>{if(path.includes('/artifacts/')&&path.endsWith('.zip')){await stream.cancel();throw Error('partial output');}return write(path,stream);});
     button('ファイルに保存',output).fire('click');await vi.waitFor(()=>{expect(status.dataset.busy).toBe('false');expect(host.workspaceOutput.jobs[0]?.state).toBe('incomplete');},{timeout:10000});failure.mockRestore();
@@ -7125,7 +7126,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect(attachments).toHaveLength(count+1); const jpegRows = host.authority.read().mediaChoices!.filter(m => m.blob.mediaType === 'image/jpeg'); expect(jpegRows).toHaveLength(1);
     expect(await host.content.image(jpegRows[0] as unknown as JsonObject,true)).toEqual(photo);
     expect(input.value).toBe(''); expect(h.ui.hasChanges()).toBe(false); expect(h.legacy).not.toHaveBeenCalled();
-    const output = named('ファイル'), name = named('名前（任意）',output); name.value = '写真の作業'; name.fire('input'); button('ファイルに保存',output).fire('click');
+    const output = named('ファイル'), name = named('保存名（任意）',output); name.value = '写真の作業'; name.fire('input'); button('ファイルに保存',output).fire('click');
     await vi.waitFor(() => expect(h.downloads).toHaveBeenCalledOnce(),{timeout:10000});
     const source = host.read().source!, job = host.workspaceOutput.jobs.find(j => j.purpose === 'backup')!;
     expect(job.label).toBe('写真の作業'); const backup = await BackupArchive.inspect(await host.workspaceOutput.download(job.id),metadata);
@@ -7286,7 +7287,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const provider = host.read().provider!; if (provider.kind !== 'scene-provider') throw Error('provider');
     const resources = Object.values(provider.details.immutable.mediaResourcesById);
     if (resources[0]?.kind !== 'value') throw Error('media'); const mediaRecord = resources[0].value;
-    button('ピンを追加', editor).fire('click'); const canvas = named('3Dモデルの表示', editor), pointer = { pointerId: 8, isPrimary: true, button: 0, clientX: 70, clientY: 80 };
+    button('キャプションを追加', editor).fire('click'); const canvas = named('3Dモデルの表示', editor), pointer = { pointerId: 8, isPrimary: true, button: 0, clientX: 70, clientY: 80 };
     canvas.fire('pointerdown', pointer); canvas.fire('pointerup', pointer); await Promise.resolve(); await edited(() => button('位置を確定', editor).fire('click'));
     const captionId = Object.keys(host.authority.read().resources.captions).find(id => id !== firstCaption)!;
     const media = named('メディアの整理', editor), stored = named('既存のメディアを添付', media); stored.open = true; stored.fire('toggle');
@@ -7746,7 +7747,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect(retry.hidden).toBe(false); expect(all(page).some(n => n.textContent === 'injected renderer startup refusal')).toBe(true);
     retry.fire('click'); expect(starts).toBe(2); expect(retry.hidden).toBe(true);
     expect(all(page).filter(n => n.className === 'lv-caption-window')).toHaveLength(2);
-    expect(all(page).some(n => n.tag === 'button' && n.textContent === 'ピンを追加')).toBe(false);
+    expect(all(page).some(n => n.tag === 'button' && n.textContent === 'キャプションを追加')).toBe(false);
     expect(display!.readOnly).toBe(true); expect(u.selected).toBeNull();
     const mediaCaption = prepared.source.captions.findIndex(c => c.mediaCount.kind === 'value' && c.mediaCount.value > 0);
     rows[mediaCaption]!.fire('click');
@@ -8436,6 +8437,22 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     await vi.waitFor(() => expect(tools.hasChanges()).toBe(false));
     expect(all(root).some(n => n.textContent.includes('選び直したファイルを照合済み'))).toBe(true);
     expect(host.read().source!.token).toBe(token);
+    expect(tools.dismissCompletedOutputFeedback()).toBe(true);
+    expect(tools.outputFeedback()).toBe('');
+    for (const result of [
+      { removedFiles: 0, removedBytes: 0, failedFiles: 1, retainedUncertain: false },
+      { removedFiles: 0, removedBytes: 0, failedFiles: 0, retainedUncertain: true },
+    ]) {
+      const cleanup = vi.spyOn(host.workspaceOutput, 'cleanup').mockResolvedValueOnce(result);
+      button('一時ファイルを整理').fire('click');
+      expect(tools.dismissCompletedOutputFeedback()).toBe(false);
+      await vi.waitFor(() => expect(tools.busy()).toBe(false));
+      const warning = tools.outputFeedback();
+      expect(warning).toContain(result.failedFiles ? '一部を削除できませんでした。' : '確認できないデータは残しました。');
+      expect(tools.dismissCompletedOutputFeedback()).toBe(false);
+      expect(tools.outputFeedback()).toBe(warning);
+      expect(host.read().source!.token).toBe(token); cleanup.mockRestore();
+    }
     await host.mode!.change('view', token, () => {}); tools.render(); expect(button('ファイルに保存').disabled).toBe(true);
     expect(button('ダウンロード').disabled).toBe(false);
     workspace.dispose(); await host.dispose();
@@ -8520,7 +8537,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect(named('元にする作業一式').value).toBe(host.workspaceOutput.bases[0]!.selection.workspacePackageId);
     expect(tools.hasChanges()).toBe(false); expect(tools.closeReason()).toBeNull();
     expect(tools.showSurface('save')).toBe(true);
-    const backupName = named('名前（任意）'); backupName.value = '後で保存する名前'; backupName.fire('input');
+    const backupName = named('保存名（任意）'); backupName.value = '後で保存する名前'; backupName.fire('input');
     expect(tools.showSurface('share')).toBe(true);
     expect(partial.checked).toBe(true); expect(scope.value).toBe('contribution');
     partial.checked = false; partial.fire('change');
@@ -8557,10 +8574,10 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const status = output.children.find(n => n.attributes.get('role') === 'status')!;
     expect(status.className).toBe('lv-operation-status'); expect(status.dataset.busy).toBe('false');
     expect(input('渡す内容')).toBeUndefined(); expect(button('保存').attributes.get('aria-pressed')).toBe('true');
-    const name = input('名前（任意）'); name.fire('compositionstart'); name.value = '調査前'; name.fire('input');
+    const name = input('保存名（任意）'); name.fire('compositionstart'); name.value = '調査前'; name.fire('input');
     expect(button('ファイルに保存').disabled).toBe(true); button('ファイルに保存').fire('click');
     expect(host.workspaceOutput.jobs.some(j => j.purpose === 'backup')).toBe(false);
-    workspace.render(); expect(input('名前（任意）')).toBe(name); expect(name.value).toBe('調査前');
+    workspace.render(); expect(input('保存名（任意）')).toBe(name); expect(name.value).toBe('調査前');
     expect(tools.hasChanges()).toBe(true); // Native IME remains an active interaction.
     name.fire('compositionend'); expect(tools.hasChanges()).toBe(false);
     expect((all(root).find(n => n.tag === 'form') as unknown as HTMLElement).inert).toBe(false);
@@ -9098,15 +9115,15 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       const search=all(all(root).find(n=>n.className==='lv-caption-search')!).find(n=>n.attributes.get('aria-label')==='検索')!,rows=()=>all(root).filter(n=>n.className==='lv-caption-select');
       const initial=rows().length;expect(initial).toBeGreaterThan(0);search.value='見つからない検索語';search.fire('input');expect(rows()).toHaveLength(0);
       search.value='';search.fire('input');rows()[0]!.fire('click');
-      expect(button('ピンを追加').disabled).toBe(true);expect(button('保存').disabled).toBe(true);expect(remember).not.toHaveBeenCalled();
-      button('ピンを追加').fire('click');expect(dispatch).not.toHaveBeenCalled();
+      expect(button('キャプションを追加').disabled).toBe(true);expect(button('保存').disabled).toBe(true);expect(remember).not.toHaveBeenCalled();
+      button('キャプションを追加').fire('click');expect(dispatch).not.toHaveBeenCalled();
       finish({factory,ready:complete,dispose(){}});await vi.waitFor(()=>expect(display).toBeDefined());
       const gizmo=all(root).find(n=>n.className==='lv-project-camera')!;all(gizmo).find(n=>n.tag==='button'&&n.attributes.get('aria-label')==='Z')!.fire('click');expect(camera).toHaveBeenCalledOnce();
       all(gizmo).find(n=>n.className==='lv-camera-pan')!.fire('keydown',{key:'ArrowRight',preventDefault(){}});expect(navigation.mock.calls.map(c=>(c[0]as any).phase)).toEqual(['begin','move','end']);
       const status=all(root).find(n=>n.className==='lv-project-viewport-status')!;expect(status.dataset.busy).toBe('true');expect(button('保存').disabled).toBe(true);
       ready();await ui.ready;expect(status.dataset.busy).toBe('false');expect(rows()).toHaveLength(initial);expect(search.value).toBe('');
       expect(button('保存').disabled).toBe(false);expect(remember).toHaveBeenCalled();expect(dispatch).not.toHaveBeenCalled();
-    }finally{ready();await ui.dispose();await f.workspace.dispose();}
+    }finally{ready();finish?.({factory,ready:complete,dispose(){}});await ui.dispose();await f.workspace.dispose();}
   },30000);
   it.each([false,true])('keeps verified Captions and joins late preparation cleanup after closing (factory cleanup failure=%s)',async failed=>{
     const f=await receivedHostFixture(),document=new RecordedDocument().asDocument();let finish!:(value:Awaited<ReturnType<ValidationWorkspacePorts['render']>>)=>void;
@@ -10987,9 +11004,9 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
   }, 15_000);
   it('home Project row buttons reflect operation readiness through held refresh and IME (recorded DOM only)',async()=>{
     const document=new RecordedDocument(),create=document.createElement.bind(document),insertedDisabled:boolean[]=[];
-    document.createElement=tag=>{const node=create(tag);if(tag==='p'){const append=node.append.bind(node);node.append=(...children)=>{
+    document.createElement=tag=>{const node=create(tag);const append=node.append.bind(node);node.append=(...children)=>{
       for(const child of children)if(child.tag==='button'&&['編集で開く','閲覧で開く'].includes(child.textContent))insertedDisabled.push(child.disabled);append(...children);
-    };}return node;};
+    };return node;};
     let hold=false,release=()=>{};const gate=new Promise<void>(resolve=>{release=resolve;}),open=vi.fn<ValidationWorkspacePorts['open']>(async()=>{throw Error('injected opening refusal');});
     const ui=owned(createValidationWorkspace(document.asDocument(),{fileLimits:budget,decode,selected(){},list:async()=>{if(hold)await gate;return[{run:'1'.repeat(32),title:'保持するProject',state:'ready'}];},open,render:async()=>{throw Error('no render');}}));
     caseDisposals.push(()=>{hold=false;release();});const root=record(ui.root),all=(n:RecordedNode):RecordedNode[]=>[n,...n.children.flatMap(all)],buttons=()=>all(root).filter(n=>n.tag==='button'&&['編集で開く','閲覧で開く'].includes(n.textContent));
@@ -11066,7 +11083,10 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     await selectorAction(() => button('別のプロジェクトを開く').fire('click'));
     await vi.waitFor(() => expect(u.selected).toBeNull());
     expect(released).toHaveBeenCalledOnce();
-    await vi.waitFor(() => expect(all(root).some(n => n.textContent === '選択から作成 — 再開用データ ')).toBe(true));
+    await vi.waitFor(() => {
+      const row=all(root).find(n=>n.className==='lv-recent-project'&&n.children.some(c=>c.className==='lv-recent-title'&&c.textContent==='選択から作成'));
+      expect(row).toBeDefined();expect(row!.children.find(n=>n.className==='lv-recent-state')!.textContent).toBe('再開できます');
+    });
     await selectorAction(() => button('閲覧で開く').fire('click')); await vi.waitFor(() => expect(u.selected).toBe(id));
     await vi.waitFor(() => expect(all(root).some(n => n.textContent.startsWith('検証用プロジェクト。'))).toBe(true));
     expect(host!.authority.readOnly).toBe(true); expect(ports.selected).toHaveBeenLastCalledWith(id, 'view');

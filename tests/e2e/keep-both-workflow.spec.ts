@@ -46,7 +46,7 @@ async function checkImage(page: Page) {
 async function download(page: Page, info: TestInfo, name: string, purpose: 'backup' | 'teamWorkspace' | 'contribution', base?: string) {
   const area = page.getByRole('region', { name: 'ファイル', exact: true });
   await area.getByRole('button', { name: purpose === 'backup' ? '保存' : '相手に渡す', exact: true }).click();
-  if (purpose === 'backup') await area.getByLabel('名前（任意）', { exact: true }).fill(name);
+  if (purpose === 'backup') await area.getByLabel('保存名（任意）', { exact: true }).fill(name);
   else { await area.getByLabel('渡す内容', { exact: true }).selectOption(purpose);
     if (purpose === 'contribution') { expect(base).toBeTruthy(); await area.getByLabel('元にする作業一式', { exact: true }).selectOption(base!); await expect(area.getByLabel('元にする作業一式', { exact: true })).toHaveValue(base!); } }
   const [file] = await Promise.all([page.waitForEvent('download', { timeout: fileTimeout }), area.getByRole('button', { name: purpose === 'backup' ? 'ファイルに保存' : 'ダウンロード', exact: true }).click()]);

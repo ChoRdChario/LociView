@@ -13,7 +13,7 @@ export function createValidationOutputControls(document: Document, host: ReturnT
   root.className = 'lv-file-output'; actions.className = 'lv-file-intents'; commands.className = 'lv-file-commands';
   select.type = 'file'; select.setAttribute('aria-label', '保存したファイルを選択'); select.hidden = true;
   const nameField = document.createElement('label'), nameInput = document.createElement('input');
-  nameField.textContent = '名前（任意）'; nameInput.type = 'text'; nameInput.setAttribute('aria-label', '名前（任意）'); nameField.append(nameInput);
+  nameField.textContent = '保存名（任意）'; nameInput.type = 'text'; nameInput.setAttribute('aria-label', '保存名（任意）'); nameField.append(nameInput);
   const shareOptions = document.createElement('div'), partialLabel = document.createElement('label'), partial = document.createElement('input'), partialText = document.createElement('span');
   const scopeLabel = document.createElement('label'), scope = document.createElement('select');
   shareOptions.className = 'lv-share-scope'; partialLabel.className = 'lv-share-partial';
@@ -300,14 +300,15 @@ export function createValidationOutputControls(document: Document, host: ReturnT
     if (host.workspaceOutput.jobs.length || host.workspaceOutput.error) {
       const recovering = !!host.workspaceOutput.error || host.workspaceOutput.jobs.some(job => ['unstarted', 'incomplete', 'repair-required'].includes(job.state));
       const cleanup = button(!recovering && completedFiles.children.length ? completedFiles : list, '一時ファイルを整理', () => {
-        let message = '';
+        let message = '', needsAttention = false;
         perform(async () => {
           const token = host.read().source?.token; if (!token) throw Error('再開用データを確認してください。');
           const result = await host.workspaceOutput.cleanup(token), amount = (result.removedBytes / 1_000_000).toLocaleString('ja-JP', { maximumFractionDigits: 1 });
           message = result.removedFiles ? `${result.removedFiles}ファイル（${amount} MB）を整理しました。` : '整理できる一時ファイルはありません。';
           if (result.failedFiles) message += ' 一部を削除できませんでした。再試行できます。';
           if (result.retainedUncertain) message += ' 確認できないデータは残しました。';
-        }, '', true, false, () => { feedback = message; }, '一時ファイルを確認しています。');
+          needsAttention = !!result.failedFiles || !!result.retainedUncertain;
+        }, '', true, false, () => { feedback = message; if (needsAttention) completedFeedback = false; }, '一時ファイルを確認しています。');
       });
       cleanup.title = 'このプロジェクトの失敗した書き出しを整理します。原本・記録・保存済みファイル・復旧データは残します。';
     }
@@ -354,6 +355,10 @@ export function createValidationOutputControls(document: Document, host: ReturnT
     },
     readingOutput: () => !disposed && busy && readingToken ? { token: readingToken, message: feedback } : null,
     outputFeedback: () => feedback,
+    dismissCompletedFeedback: () => {
+      if (disposed || busy || !completedFeedback) return false;
+      feedback = ''; completedFeedback = false; return true;
+    },
     closeReason: () => busy ? 'ファイルを処理中です。完了をお待ちください。' : composing ? '名前の入力を確定してください。' : selected ? '照合するファイルを選ぶか、「ファイル確認を取り消す」を選択してください。' : cancellation ? '取りやめの確認を完了するか、「戻る」を選択してください。' : null, busy: () => busy, hasChanges: () => busy || composing || !!selected || !!cancellation,
     dispose: () => { disposed = true; readingToken = null; for (const url of urls.values()) URL.revokeObjectURL(url); urls.clear(); root.remove(); } };
 }

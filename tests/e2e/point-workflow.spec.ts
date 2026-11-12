@@ -35,7 +35,7 @@ async function download(page: Page, info: TestInfo, name: string, purpose: 'back
   const area = files(page),compact=await revealFileSurface(page,purpose==='backup'?'保存':'共有');
   if(compact){if(purpose!=='backup')await selectShareOutput(area, purpose);}
   else if (purpose === 'review') { await area.locator('summary').filter({hasText:/^その他$/}).click(); await area.getByRole('button',{name:'シーンを共有',exact:true}).click(); } else await area.getByRole('button', { name: purpose === 'backup' ? '保存' : '相手に渡す', exact: true }).click();
-  if (purpose === 'backup') await area.getByLabel('名前（任意）', { exact: true }).fill(name);
+  if (purpose === 'backup') await area.getByLabel('保存名（任意）', { exact: true }).fill(name);
   else if (purpose !== 'review') { if(!compact)await selectShareOutput(area, purpose); if (base) await area.getByLabel('元にする作業一式', { exact: true }).selectOption(base); }
   if (purpose === 'review') { const scene = area.getByLabel('渡すシーン',{exact:true}); const ids = await scene.locator('option').evaluateAll(nodes=>nodes.map(n=>(n as HTMLOptionElement).value).filter(Boolean)); await scene.selectOption(ids[0]!); await area.getByRole('button',{name:'内容を確認',exact:true}).click(); }
   const primary=area.locator('button.lv-file-primary'); await expect(primary).toHaveText(purpose==='backup'?'ファイルに保存':'ダウンロード',{timeout:180_000}); await expect(primary).toBeEnabled({timeout:180_000});
@@ -47,7 +47,7 @@ async function download(page: Page, info: TestInfo, name: string, purpose: 'back
     const row = history.locator('section').filter({hasText:`バックアップ ${name} —`}); await row.getByText('保存したファイルを確認',{exact:true}).click();
     const choosing=page.waitForEvent('filechooser'); await row.getByRole('button',{name:'ファイルを選択',exact:true}).click(); await (await choosing).setFiles(path);
     await expect(area.getByText('選択したファイルの内容を確認しました。',{exact:true})).toBeVisible({timeout:90_000});
-    await expect(page.getByLabel('保存ファイルの状態',{exact:true})).toHaveText('保存ファイルと一致');
+    await expect(page.getByLabel('保存ファイルの状態',{exact:true})).toHaveText('選択ファイルと一致');
   }
   await closeFileSurface(page);return path;
 }

@@ -90,7 +90,9 @@ export function createCaptionListControls(document: Document, onPlan: (plan: Cap
       const node = make('li'), select = button(''), title = make('span'), ownerText = make('span');
       const note = make('span'), swatch = make('span'), action = button(''), edit=button('編集'),remove=button('削除');edit.setAttribute('data-lv-edit-only','');remove.setAttribute('data-lv-edit-only','');
       node.className = 'lv-caption-row'; select.className = 'lv-caption-select';
-      title.className = 'lv-caption-title'; ownerText.className = 'lv-caption-owner'; note.className = 'lv-caption-note';
+      title.className = 'lv-caption-title'; title.id = `lv-caption-title-${crypto.randomUUID()}`;
+      edit.setAttribute('aria-describedby', title.id); remove.setAttribute('aria-describedby', title.id);
+      ownerText.className = 'lv-caption-owner'; note.className = 'lv-caption-note';
       swatch.className = 'lv-caption-swatch'; swatch.setAttribute('aria-hidden', 'true');
       select.append(swatch, title, ownerText, note); node.append(select, action,edit,remove);
       const selectClick = () => request({ kind: 'select', captionId: item.id });

@@ -57,7 +57,89 @@ unchanged-feature-classification checks pass; independent review has no findings
 No runtime change or new capacity guarantee; no runtime suite is needed for this
 documentation checkpoint.
 
-## Current work —first-restoration diagnosis and recovery
+## Current work —clear save state and coherent first-record workflow
+
+PO2026-11-12 authorizes grouped UI/UX repairs after the progress review. Base
+g0/ff9b3cd, root sole writer; bounded independent reviews are read-only. First
+complete a PC/touch walkthrough and record source/rendered issues together in
+ui-design-review; do not patch controls before that inventory is complete.
+Then improve saving-state clarity, hierarchy/spacing and first-use
+open → record text+photo → apply → real file → cold reopen through existing UI.
+
+Preserve ordinary multiple windows/active Next, drafts/IME/focus, readonly and
+failure/recovery gates; no new manager screens, schema, dependencies, renderer,
+validation lifetime or publication. Display-lightening/performance remains
+parked, including the diagnostic checkpoint below and its proposed next work.
+Preserve251 private draft lines and semantic-zero dirt. Stop only affected work
+for a genuine new policy/contract decision or unsafe result; no small PO waits.
+
+Use existing small connected PC/touch and service fault tests, plus screenshots
+before/after, original-byte/record checks and cold continuation. Final source:
+independent diff review, serial check:checkpoint/HEIC isolation and relevant
+Desktop/file/offline checks; suitable g0 checkpoint Push and exact CI. Actual
+iPhone/Safari/assistive-technology acceptance stays separate. Evidence under
+.artifacts/e2e/ux-journey-20261112/; refresh only the owned4191 preview after
+verification. Outcome and remaining work, not per-control counts, govern exit.
+
+Inventory UX1–6 completed before product edits: fixed ff9 PC1280×720/touch390×844
+walkthrough through one text+photo and actual file, plus independent source,
+visual/contract and test-mapping reviews. Preserve initial focus/setup failures;
+corrected baseline2 PASS. Implemented browser/file status groups (generic unknown
+means save unconfirmed, not missing destination), existing empty-scene CTA,
+consistent home/recent rows and save-name label, target descriptions, and explicit
+close of completed output feedback. Cleanup partial/uncertain warnings remain
+nondismissible and propagate when closing. No Session/FS/renderer changes.
+
+Editing checks: UI/import46 PASS; existing connected file cases4 PASS including
+busy dismissal, partial cleanup/uncertain retention and unchanged token; matching
+editing screenshots2 PASS. Existing PC/touch input workflows2 PASS include actual
+surface selection, text+photo one apply, IME, real file, restore and cold reopen.
+Visual review found first-CTA/search crowding and an ambiguous generic
+save-destination phrase; refined toolbar order/primary styling and copy before
+final qualification. All original guards and limits retained.
+
+First final root run:155 files PASS, connected-files5 FAIL/3517 PASS overall.
+Four failures depended on the previous paragraph/combined-title/direct-button
+home markup. Bind the same exact Project/title/ready state and buttons through
+the new row semantics, retaining readiness/IME checks. The held-render product
+case still used the old add-button label; correct it and release the held mock
+renderer in finally so a selector error is not masked by disposal timeout.
+No production change or timeout/assertion relaxation: exact corrected5 PASS.
+Preserve the failed full log. Check adjacent browser paths before a clean final
+checkpoint run; do not relabel the failed invocation as passing.
+
+Final unchanged source/test tree: check:checkpoint PASS (typecheck,156 Vitest
+files/3522 PASS,16 expected-fail and21 todo retained, all five builds and offline
+isolation); HEIC isolation PASS. Preflight adjacent4 PASS. Final frozen artifact
+bytes differed despite the same source/test fingerprint, so reran all6 connected
+Desktop cases rather than reuse preflight: PC/touch first-record→text+photo→apply
+→real file→restore/cold reopen; small/short mobile and output-time reading;
+cancelled file/receive/restore continuity, long Japanese Project title and320px
+recent rows. All6 PASS; matched before/after visual2, installed Edge/Chrome2 and
+two-window offline update1 PASS. Offline covers retained unapplied input, wrong200/
+missing resources, retry and full close; it is not the entire offline suite.
+Independent final visual review closes CTA/search crowding, generic save copy
+and long-title clipping. Contract/test reviews have no unresolved findings.
+
+UX outcome: distinguish browser resumability, file freshness, download handoff
+and actual selected-file comparison; retain draft/failure gates. The one existing
+empty-scene add action is visible before search; home/recent rows/save naming
+share the work area's language. Explicitly closing completed output removes the
+duplicate top notice, while busy/error/partial-cleanup warnings remain visible.
+No source changes after the tested freeze. Required checks were serial, without
+retries, exclusions or relaxed assertions/timeouts. No full Desktop, full offline,
+large-data speed, physical Safari, screen-reader, novice-user or release pass is
+claimed. Screenshots/sample and exact manifests remain local under the evidence
+root; never add source data, private drafts or generated artifacts to the Push.
+
+Connected workflow is verified locally; prepare a suitable g0 checkpoint, inspect
+privacy/staged identity and Push, then confirm its exact CI. Refresh only the
+owned4191 preview to the frozen candidate. Next: grouped physical iPhone/Safari
+IME, file save/reopen and offline acceptance plus first-use observation on this
+integrated candidate; continue any evidenced UI repair within existing contracts.
+Display-lightening and large-data performance work stay parked until resumed.
+
+## Parked checkpoint —first-restoration diagnosis and recovery
 
 PO2026-11-12 resumes large-data comfort work after g0/61507a7. Root is the sole
 writer; independent contract/source/evidence reviews are read-only. Preserve251

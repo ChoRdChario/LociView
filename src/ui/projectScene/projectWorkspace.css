@@ -1,7 +1,19 @@
 .lv-project-workspace { position: relative; font: 400 15px/1.6 system-ui, sans-serif; color: #292b27; background: #f5f3ef; }
 .lv-project-workspace > header { display: flex; align-items: center; gap: 8px; padding: 8px 16px; border-bottom: 1px solid #c9c5bd; }
 .lv-project-identity { flex: 1; min-width: 0; }
-.lv-project-identity > p { display: inline; margin: 0 10px 0 0; font-size: 12px; color: #5b5e56; }
+.lv-save-summary { display: flex; flex-wrap: wrap; gap: 2px 16px; margin-top: 3px; }
+.lv-save-state { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 6px; min-width: 0; }
+.lv-save-location { font-size: 12px; color: #62675b; }
+.lv-save-location::after { content: ':'; }
+.lv-save-state > p { margin: 0; font-size: 13px; line-height: 1.45; color: #454a40; overflow-wrap: anywhere; }
+.lv-save-state > p:is([data-state="ready"],[data-state="verified"]) { color: #35482f; }
+.lv-save-state > p:is([data-state="draft"],[data-state="error"],[data-state="attention"]) { color: #74401f; font-weight: 600; }
+.lv-caption-task[data-empty="true"] .lv-caption-add { width: auto; font-size: 14px !important; padding: 8px 12px; white-space: nowrap; }
+.lv-caption-task[data-empty="true"] .lv-caption-add::before { content: none; }
+.lv-caption-task[data-empty="true"] .lv-caption-add:not(:disabled) { background: #3c4637; border: 1px solid #3c4637; border-radius: 6px; color: #fff; }
+.lv-caption-task[data-empty="true"] .lv-caption-toolbar { flex-wrap: wrap; }
+.lv-caption-task[data-empty="true"] .lv-caption-toolbar > [aria-label="ピンの操作"] { flex: 1 0 100%; order: -2; }
+.lv-caption-task[data-empty="true"] .lv-caption-toolbar > .lv-caption-search { flex: 1 0 100%; }
 .lv-project-workspace h1 { font-size: 19px; line-height: 1.35; font-weight: 600; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lv-project-workspace h2 { font-size: 18px; font-weight: 600; }
 .lv-workspace-actions { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; }

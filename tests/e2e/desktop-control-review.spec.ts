@@ -16,7 +16,7 @@ test('review files use the same camera controls and create an independent editab
     const page=await context.newPage();page.setDefaultTimeout(15_000);page.on('pageerror',e=>errors.push(e.message));await page.goto(server.url+(process.env.LOCIVIEW_E2E_TIMINGS==='1'?'?timings=1':''));return page;
   };
   const backup=async(page:Page,name:string)=>{
-    await revealFileSurface(page,'保存');const files=page.getByRole('region',{name:'ファイル',exact:true});await files.getByLabel('名前（任意）',{exact:true}).fill(name);
+    await revealFileSurface(page,'保存');const files=page.getByRole('region',{name:'ファイル',exact:true});await files.getByLabel('保存名（任意）',{exact:true}).fill(name);
     await page.evaluate(()=>document.dispatchEvent(new Event('lociview-timing-snapshot')));
     const primary=files.locator('.lv-file-primary');await expect(primary).toBeEnabled({timeout:90_000});
     const started=Date.now();

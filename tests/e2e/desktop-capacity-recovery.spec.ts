@@ -61,9 +61,9 @@ for(const touch of [false,true])test(`native capacity recovery retains drafts an
     await revealFileSurface(p,'保存');const files=p.getByRole('region',{name:'ファイル',exact:true});
     const [previous]=await Promise.all([p.waitForEvent('download'),files.locator('.lv-file-primary').click()]);
     await previous.saveAs(info.outputPath('retained-before-cleanup.zip'));
-    await files.getByLabel('名前（任意）',{exact:true}).fill('保持する保存名');await fault(p,'output');
+    await files.getByLabel('保存名（任意）',{exact:true}).fill('保持する保存名');await fault(p,'output');
     started=Date.now();await files.locator('.lv-file-primary').click();await expect(files.locator('.lv-operation-status')).toContainText('保存容量が不足');await expect(files.getByRole('button',{name:'生成を再開',exact:true})).toBeEnabled();measurements.outputFailureMs=Date.now()-started;
-    await expect(files.getByLabel('名前（任意）',{exact:true})).toHaveValue('保持する保存名');await p.screenshot({path:info.outputPath('quota-output.png'),fullPage:true});
+    await expect(files.getByLabel('保存名（任意）',{exact:true})).toHaveValue('保持する保存名');await p.screenshot({path:info.outputPath('quota-output.png'),fullPage:true});
     await fault(p,'');
     // Owned unacknowledged output only: represent a drained partial native write.
     await p.evaluate(async()=>{
@@ -93,13 +93,13 @@ for(const touch of [false,true])test(`native capacity recovery retains drafts an
     })).toBe(true);
     await expect(files.getByRole('button',{name:'一時ファイルを整理',exact:true})).toBeEnabled();
     await p.screenshot({path:info.outputPath('temporary-output-cleaned.png'),fullPage:true});
-    await expect(files.getByLabel('名前（任意）',{exact:true})).toHaveValue('保持する保存名');
+    await expect(files.getByLabel('保存名（任意）',{exact:true})).toHaveValue('保持する保存名');
     started=Date.now();const [download]=await Promise.all([p.waitForEvent('download'),files.getByRole('button',{name:'生成を再開',exact:true}).click()]);measurements.outputRecoveryToDownloadMs=Date.now()-started;
     const saved=info.outputPath('capacity-recovered.zip');await download.saveAs(saved);expect(await download.failure()).toBeNull();const archive=await BackupArchive.inspect(new Blob([Uint8Array.from(await readFile(saved)).buffer]),validationMetadataLimits);
     const inspected=await inspectProjectCandidates(archive.source.read(),validationMetadataLimits);expect(inspected.kind).toBe('project-candidate-inspection');if(inspected.kind!=='project-candidate-inspection')throw Error('Saved records');
     const captions=inspected.unambiguousRecords?.captionsById;if(!captions||typeof captions!=='object'||Array.isArray(captions))throw Error('Saved Caption map');
     expect(Object.values(captions)).toEqual([expect.objectContaining({title:'保持する記録',body:'容量不足でも失わない本文'})]);
-    await expect(files.getByLabel('名前（任意）',{exact:true})).toHaveValue('');
+    await expect(files.getByLabel('保存名（任意）',{exact:true})).toHaveValue('');
     const close=p.locator('details.lv-project-files').getByRole('button',{name:'閉じる',exact:true});await expect(close).toBeEnabled();await close.click();
     await expect(p.locator('details.lv-project-files')).toHaveJSProperty('open',false);
     await expect(p.getByRole('region',{name:'ファイル操作',exact:true})).toBeHidden();

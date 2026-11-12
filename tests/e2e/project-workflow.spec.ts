@@ -60,7 +60,7 @@ async function inspectBackup(path: string, glb: Buffer, png: Buffer, expectedBod
 async function saveBackup(page: Page, path: string, name: string, boundaries?: Record<string, number>) {
   const files = page.getByRole('region', { name: 'ファイル', exact: true });
   await files.getByRole('button', { name: '保存', exact: true }).click();
-  await files.getByLabel('名前（任意）', { exact: true }).fill(name);
+  await files.getByLabel('保存名（任意）', { exact: true }).fill(name);
   const saveStarted = performance.now();
   const [download] = await Promise.all([
     page.waitForEvent('download', { timeout: 90_000 }),
@@ -77,7 +77,7 @@ async function saveBackup(page: Page, path: string, name: string, boundaries?: R
   const chooser = await choosing, verifyStarted = performance.now(); await chooser.setFiles(path);
   await expect(files.getByText('選択したファイルの内容を確認しました。', { exact: true })).toBeVisible({ timeout: 90_000 });
   await expect(page.getByLabel('保存ファイルの状態', { exact: true }))
-    .toHaveText('保存ファイルと一致');
+    .toHaveText('選択ファイルと一致');
   if (boundaries) boundaries[`${name}.selected-file-to-ack-ms`] = performance.now() - verifyStarted;
 }
 

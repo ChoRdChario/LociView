@@ -167,6 +167,8 @@ export function createProjectOrganization(document: Document, host: Organization
       } catch { orderChoices.append(make('p', 'シーンの順序を確認してください。')); }
     }
     const h = history(); copyCaption.disabled = blocked || owned || !s.captionId;
+    copyCaption.hidden = !s.captionId;
+    undo.hidden = !h?.past.length; redo.hidden = !h?.future.length;
     undo.disabled = blocked || owned || !h?.past.length || !currentMatches(h.past.at(-1)!.after);
     redo.disabled = blocked || owned || !h?.future.length || !currentMatches(h.future.at(-1)!.before);
     undoHelp.hidden = !h?.past.length && !h?.future.length;

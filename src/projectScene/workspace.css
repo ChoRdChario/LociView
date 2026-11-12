@@ -258,9 +258,22 @@
 .lv-validation-host > button, .lv-validation-host > p { margin: 12px 20px; }
 .lv-validation-home :is(input, button), .lv-validation-host > button {
   box-sizing: border-box; min-height: 44px; padding: 8px 12px; border: 1px solid #817c78;
-  border-radius: 2px; color: #312f2d; background: #faf9f8; font: inherit;
+  border-radius: 6px; color: #292b27; background: #faf9f8; font: inherit;
 }
-.lv-validation-home form > button { justify-self: start; background: #413d39; color: #faf9f8; }
+.lv-validation-home form > button { justify-self: start; background: #3c4637; color: #fff; border-color: #3c4637; }
+.lv-validation-home { color: #292b27; }
+.lv-validation-home button:hover:not(:disabled) { background: #e9e9df; border-color: #8b9284; }
+.lv-validation-home form > button:hover:not(:disabled) { background: #4b5944; color: #fff; }
+.lv-validation-home :is(button,input):focus-visible { outline: 2px solid #312f2d; outline-offset: 2px; }
+.lv-recent-project { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 16px; padding: 16px 0; border-bottom: 1px solid #d6d3ca; }
+.lv-recent-title { font-size: 16px; font-weight: 600; overflow-wrap: anywhere; }
+.lv-recent-state { grid-column: 1; font-size: 13px; color: #5b5e56; }
+.lv-recent-actions { grid-column: 2; grid-row: 1 / span 2; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+@media (max-width: 600px) {
+  .lv-recent-project { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .lv-recent-actions { grid-column: 1; grid-row: auto; }
+  .lv-save-summary { column-gap: 12px; }
+}
 .lv-update-destination { display: flex; flex-wrap: wrap; gap: 8px; }
 .lv-update-destination > p { flex-basis: 100%; margin: 0; overflow-wrap: anywhere; }
 .lv-validation-home .lv-update-destination > button:first-of-type { background: #413d39; color: #faf9f8; }

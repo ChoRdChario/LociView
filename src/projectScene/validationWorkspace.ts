@@ -93,7 +93,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   titleLabel.append(title); form.append(creationNote, titleLabel, create); form.hidden = true;
   const workspaceForm = document.createElement('form'), workspaceLabel = document.createElement('label'), workspaceInput = document.createElement('input'), openFile = document.createElement('button');
   workspaceLabel.textContent = 'ファイルを選択'; workspaceInput.type = 'file'; workspaceInput.multiple = true; workspaceInput.setAttribute('aria-label', 'ファイルを選択'); workspaceLabel.append(workspaceInput);
-  const fileHelp = document.createElement('p'); fileHelp.textContent = '3Dモデル・点群・作業ファイルを開けます。';
+  const fileHelp = document.createElement('p'); fileHelp.textContent = '3Dモデル・点群から新規作成、作業ファイルから再開できます。';
   openFile.type = 'submit'; openFile.textContent = 'ファイルを開く'; workspaceForm.append(workspaceLabel, fileHelp, openFile,fallback);
   const updatePanel = document.createElement('section'), updateNote = document.createElement('p');
   const updateConfirm = document.createElement('button'), updateCancel = document.createElement('button');
@@ -288,15 +288,18 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     projectOpenButtons.clear();list.replaceChildren();
     if (!entries.length) { list.textContent = 'このブラウザの再開用データはありません。'; return; }
     for (const item of entries) {
-      const row = document.createElement('p'), name = document.createElement('span');
-      name.textContent = `${item.title} — ${item.state === 'ready' ? '再開用データ' : item.state === 'incomplete' ? '更新が未完了' : '要確認'} `;
-      row.append(name);
+      const row = document.createElement('div'), name = document.createElement('span'), state = document.createElement('span'), actions = document.createElement('div');
+      row.className = 'lv-recent-project'; name.className = 'lv-recent-title'; state.className = 'lv-recent-state'; actions.className = 'lv-recent-actions';
+      name.id = `lv-recent-title-${crypto.randomUUID()}`; row.setAttribute('role', 'group'); row.setAttribute('aria-labelledby', name.id);
+      name.textContent = item.title; state.textContent = item.state === 'ready' ? '再開できます' : item.state === 'incomplete' ? '更新が未完了' : '要確認';
+      row.append(name, state, actions);
       for (const mode of item.firstRestore === 'terminal' ? [] : item.firstRestore === 'pending' ? ['edit'] as const : ['view', 'edit'] as const) {
         const open = document.createElement('button'); open.type = 'button';
         open.disabled=busy||composing;projectOpenButtons.add(open);
         open.textContent = item.firstRestore === 'pending' ? '復元を再開' : mode === 'view' ? '閲覧で開く' : '編集で開く';
+        open.setAttribute('aria-describedby', name.id);
         open.addEventListener('click', () => execute(async () => { ensureMayLeaveSelection(); await closeCurrent(); await openProject(item.run, undefined, mode); }));
-        row.append(open);
+        actions.append(open);
       }
       list.append(row);
     }
