@@ -1,3 +1,17 @@
+/* First-backup reading shares the existing preparation panel and its progress. */
+.lv-validation-host:has(> .lv-validation-content > .lv-first-restore-panel .lv-resume-reading) { display: flex; flex-direction: column; height: 100dvh; min-height: 0; padding-top: 0; }
+.lv-validation-content:has(> .lv-first-restore-panel .lv-resume-reading) { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.lv-validation-host:has(> .lv-validation-content > .lv-first-restore-panel .lv-resume-reading) > .lv-home-settings,
+.lv-validation-host:has(> .lv-validation-content > .lv-first-restore-panel .lv-resume-reading) > .lv-validation-status:empty { display: none; }
+.lv-first-restore-reading .lv-project-identity > h1 { display: none; }
+.lv-first-restore-panel:has(.lv-resume-reading) { display: flex; flex: 1 1 0; min-height: 0; flex-direction: column; }
+.lv-first-restore-panel:has(.lv-resume-reading) > :not(.lv-first-restore-reading) { flex: 0 0 auto; }
+.lv-first-restore-panel:has(.lv-resume-reading) > p { margin: 4px 12px; overflow-wrap: anywhere; }
+.lv-first-restore-reading:has(.lv-resume-reading) { flex: 1 1 0; min-height: 0; display: flex; }
+.lv-first-restore-reading > .lv-resume-reading { flex: 1 1 0; min-height: 0; height: auto; }
+.lv-first-restore-reading .lv-project-stage { display: none; }
+.lv-first-restore-reading .lv-project-body { display: flex; }
+.lv-first-restore-reading aside { flex: 1; height: 100%; }
 /* Shared ProjectScene shell and viewport styles. Legacy/Native roots keep their own styles. */
 .lv-validation-host:has(> .lv-validation-content > .lv-resume-reading) { height: 100dvh; padding-top: 0; }
 .lv-validation-host:has(> .lv-validation-content > .lv-resume-reading) > .lv-home-settings,
@@ -223,7 +237,7 @@
 .lv-home-settings .lv-offline-controls > p { margin-bottom: 8px; }
 .lv-home-settings .lv-offline-controls details > div { position: static; width: 100%; max-height: none; padding: 8px 0; border: 0; box-shadow: none; }
 .lv-home-settings :focus-visible { outline: 2px solid #312f2d; outline-offset: 2px; }
-.lv-validation-host:has(> .lv-home-settings):has(> .lv-validation-home[hidden]):not(:has(> .lv-validation-content > .lv-resume-reading)) { padding-top: 64px; box-sizing: border-box; }
+.lv-validation-host:has(> .lv-home-settings):has(> .lv-validation-home[hidden]):not(:has(> .lv-validation-content > .lv-resume-reading, > .lv-validation-content > .lv-first-restore-panel .lv-resume-reading)) { padding-top: 64px; box-sizing: border-box; }
 .lv-startup-failure { padding: 24px; box-sizing: border-box; }
 .lv-startup-failure > h1 { margin: 0 80px 24px 0; font-size: 22px; font-weight: 500; }
 .lv-startup-failure > :is(p,button) { margin: 12px 0; }

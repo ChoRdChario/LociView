@@ -1,6 +1,8 @@
 # 06g 初回復元中の記録先行表示
 
-Status: **PROPOSED — PO未承認・未実装**。現在の製品契約は変更しない。
+Status: **PO承認済み（2026-11-12）— 限定PC候補に実装・自動検証済み**。
+承認は以下の限定設計と受入れ。専用ChromiumのPC／touch・実データ・保存／復旧・offlineと
+独立レビューの実行範囲は[todo](../../tasks/todo.md)へ集約する。実機Safari・一般採用・公開は未合格。
 
 ## 1. 利用者が先にできること
 
@@ -13,15 +15,15 @@ Ki-84約59秒、50万点GS約112秒だった。通常再開の本文表示約5.4
 編集・保存・画像・3Dの利用開始を前倒しする案ではない。原本・画質・オフライン利用と、
 書込後の全量照合・Selection・公開・中断復旧を維持する。新しい容量・速度保証は作らない。
 
-## 2. 今回必要な判断
+## 2. 承認済みの契約追加
 
 [06aの「Read-only text during first restoration」](06a-first-backup-open-proposal.md)は、
 初期化後の検証済みProjectDisplayからの表示に限定し、未初期化archiveの候補や推測したScene/tokenを除外する。
 [06e §9](06e-selected-generation-output-read-proposal.md)の通常再開通知も初回復元を対象にしない。
 現Hostの順序はinitialize→projection→display callback→Selection→adoptionである。
 
-これに「入力検査済み・復元未完了」という読み取り専用表示の根拠と所有期間を追加する判断が必要。
-既存callbackの接続変更だけとは扱わない。PO承認と独立した契約・安全性レビューを経てから実装する。
+PO2026-11-12は「入力検査済み・復元未完了」という読み取り専用表示の根拠と所有期間を承認した。
+既存callbackの接続変更だけとは扱わない。原本解決・寿命の具体化を独立レビューしてから実装する。
 通常のSessionやProjectDisplayを偽装せず、初期化完了・保存完了の検査結果へ流用しない。
 
 ## 3. 対象と境界
@@ -101,3 +103,62 @@ IME入力中は勝手に置換せず、準備完了を示して入力を終え�
 
 現行版の合格結果は本提案の検証へ読み替えない。実装後の最終diffの独立レビュー、
 checkpoint・隔離・PC/touch・offlineの必要な試験を経て、todoへ正確な実行範囲を記録する。
+
+## 7. 実装する内部境界（実装前レビュー対象）
+
+### 7.1 原本の文字列投影
+
+`scene/projectProvider.ts`の候補フィールド読取を小さい内部関数へ分離し、
+通常providerと新しい文字列専用投影で共用する。通常providerの入力・検査・charge回数・
+戻り値は変えない。文字列投影は`inspectOriginal()`の候補結果と消費済みworkから始め、
+既存のoriginal inspection work上限までで追加の走査を数える。
+
+通常のSceneState/SceneResources/providerは作らない。起動Sceneの選択関数は必要な
+`defaultSceneId/scenes`だけを受ける型へ狭める。所属の純粋選択部分を既存`memberships()`
+から共用し、通常呼出しの結果を変えない。文字列投影が渡すのは候補から得た実際の
+Scene/CaptionのID・lifecycleと所属であり、anchor・model・mediaの仮値を補わない。
+
+フィールドは有効な単一candidateだけ（mutableの同値競合も未解決）。関連する親子pathの
+問題、semantic-key予約、削除・競合・未解決order/endpointを通常規則どおり扱う。
+起動Sceneは一意のdefaultかつID一致/activeを要求しfallbackしない。所属は唯一のactive
+edge/CaptionだけをorderKey/IDのASCII順に並べ、title/bodyとも解決済みの行だけ表示する。
+不完全な名称・行は補完せず、必要時は一部情報が未確認である旨を短く示す。
+投影なし・予算超過・投影固有例外はpreviewだけを不成立にする。
+
+### 7.2 Hostの所有と実結果への照合
+
+`FirstBackupRecovery.confirm/retry`の任意のpreview通知は、通常resume通知と別にする。
+初回confirmは既存タイトル取得に使う同じowned original inspectionから得た文字列を使う。
+復元試行の開始後・persistの前に通知できるが、既存のabsence/書込/再読戻し検査を前倒し成功
+扱いにはしない。retryはその試行でfreshに開いたJobの入力を再投影し、古いpreviewを再利用しない。
+既存Projectへの置換分岐では新通知を使わない。
+
+Host privateにはarchive SHA/長さ、完全proof、原本履歴token/heads、Job IDと試行参照を保持し、
+UIには別kindの一時参照と文字列だけを渡す。producerは成功時に停止するが、Host privateの照合witnessは同じ試行・返却Hostだけに束縛して
+IME後のhandoffまで残し、handoff消費・失敗・所有者終了で解放する。失敗・取消・dispose・
+所有権喪失・別試行で旧通知を撤回する。同期/非同期の通知例外を復元の失敗へ変えない。遅延rejectは現在のticket/ownerとproducerの
+有効性を確認し、そのpreviewだけを撤回する。成功後の画面や別試行は消さない。
+
+通常Hostをadoptした後、同じ試行/返却Host/所有者、実際のready source/provider、完全proof、
+原本履歴token/heads、Project/Scene/Captionの一致をHost境界で確認する。成功時にだけ実際の
+provider tokenを持つ読取情報を返し、一時参照をSession tokenへcastしない。IME待機後も
+実tokenと所有者を再確認し、不一致なら検索/選択の引継ぎだけを取りやめる。初期化後の
+既存display callback、Selection、adoption、書込/保存後照合/中断復旧はそのまま実行する。
+
+### 7.3 UIの所有と引継ぎ
+
+`resumeReading.ts`の本文・検索DOMをtoken非依存の内部readerへ分け、既存resume wrapperは
+実token付きselectionを返すままとする。06g readerは通常tokenを持たない。
+既存復元panel内のslotへ配置し、外側の進捗・原本/失敗説明・既存commandsを保持する。
+同じ試行の後続prepareでreaderを作り直さず、文字列/検索/選択/IMEだけを保持する。
+失敗/取消/dispose/所有者終了時は即破棄し、成功producer停止時はUI文字列を保って
+IMEを終えられる準備完了表示を出す。
+
+正規Hostへの一致確認後にだけactual token付きselectionへ変換し、既存mount/initialReadingの
+最終token/Scene/Caption検査も残す。選択CaptionのIDと本文/題名が実結果に無ければ転送しない。
+以前の初期化後のverified-display readerは独立した既存fallbackとして残せるが、早期previewの
+状態をそのtokenへ付け替えない。埋込みの高さは既存panelとreaderのflex/min-heightで確保し、
+新しい画面・表示用3D・モデル/画像cacheを作らない。
+
+実装前の独立契約レビュー（2026-11-12）は上記の寿命区別・Entityだけの型を条件に指摘なし。
+これはコード/実行結果の合格ではない。追加PO判断は不要。

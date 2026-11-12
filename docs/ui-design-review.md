@@ -936,3 +936,20 @@ PCQ-25の追修正として、未選択時だけcontentのintrinsic高さを外t
 選択中の配分は保持した。修正後は実hit／全域表示と元のUndo／本文assertを確認し、
 日常編集の元caseは保存・cold再開まで通過。ほかの初回失敗と最終候補の全体結果は
 todoで区別し、旧sourceの画面確認を新source全体PASSへ拡張しない。
+
+## 初回復元中の本文閲覧（06g、2026-11-12）
+
+既存の復元確認panel内に、検査済み入力の本文だけを表示する。原本保持の案内と
+既存commandsを残し、進捗表示はreaderの一か所へまとめる。画像・3D・編集・保存を
+早期表示へ混ぜない。復元完了時にIME入力中なら、同じreaderを保持して入力後に
+正規画面へ移る。検索・選択は実際の履歴・Scene・本文との一致確認後だけ引き継ぐ。
+
+独立レビューで、compactの高さ制約不足と確認前の長文・重複進捗を指摘し修正した。
+host/content/panel/readerのflexとmin-heightをつなぎ、320×365でも本文と戻る操作が
+画面内に収まることを実画像で確認した。専用ChromiumのPC/touch2件は、初期化hold中の
+閲覧、320×365/844×390、IMEとフォーカスの引継ぎ、実ファイル保存・cold再開を通過。
+Desktop52、offlineの旧7件＋修正対象1件、installed Edge／Chrome2と、Ki-84／50万点SH4の
+実データ比較を通過。失敗した試験側の非表示3D待ちは、表示操作を明示して修正した。
+最終全体回帰と実測の条件・残る待ち時間はtodoに集約し、iPhone実機の証拠へ読み替えない。
+比較画像は非公開証拠root`first-restore-reading-20261112`の`before-ki84`／`after-ki84`内
+`first-restore-readable-body.png`に保持する（各版で最初に本文を読めた時点）。

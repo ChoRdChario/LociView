@@ -12,15 +12,18 @@ export function legacyValidationHost<T extends {authority:{read():Parameters<typ
 export async function openValidationHost(options:ValidationHostOptions){return legacyValidationHost(await openTypedHost(options));}
 export type ValidationNormalHost=Awaited<ReturnType<typeof openValidationHost>>;
 export type FirstBackupRecovery=Omit<TypedFirstBackup,'confirm'|'retry'|'edit'> & {
-  confirm(prepare:Parameters<TypedFirstBackup['confirm']>[0]):Promise<ValidationNormalHost>;
-  retry(prepare:Parameters<TypedFirstBackup['retry']>[0]):Promise<ValidationNormalHost>;
+  confirm(...args:Parameters<TypedFirstBackup['confirm']>):Promise<ValidationNormalHost>;
+  retry(...args:Parameters<TypedFirstBackup['retry']>):Promise<ValidationNormalHost>;
   edit():Promise<ValidationNormalHost|FirstBackupRecovery>;
 };
 function legacyEntry(opened:Awaited<ReturnType<typeof openTypedEntry>>):ValidationNormalHost|FirstBackupRecovery {
   if(!('kind' in opened))return legacyValidationHost(opened);
+  const actualHosts=new WeakMap<ValidationNormalHost,Awaited<ReturnType<typeof openTypedHost>>>();
+  const wrap=(host:Awaited<ReturnType<typeof openTypedHost>>)=>{const result=legacyValidationHost(host);actualHosts.set(result,host);return result;};
   return Object.assign(Object.create(opened) as TypedFirstBackup,{
-    confirm:async(prepare:Parameters<TypedFirstBackup['confirm']>[0])=>legacyValidationHost(await opened.confirm(prepare)),
-    retry:async(prepare:Parameters<TypedFirstBackup['retry']>[0])=>legacyValidationHost(await opened.retry(prepare)),
+    confirm:async(...args:Parameters<TypedFirstBackup['confirm']>)=>wrap(await opened.confirm(...args)),
+    retry:async(...args:Parameters<TypedFirstBackup['retry']>)=>wrap(await opened.retry(...args)),
+    takePreview:(value:Parameters<TypedFirstBackup['takePreview']>[0],host:ValidationNormalHost)=>opened.takePreview(value,actualHosts.get(host)??host),
     edit:async()=>legacyEntry(await opened.edit())});
 }
 export async function openValidationEntry(options:ValidationHostOptions){return legacyEntry(await openTypedEntry(options));}

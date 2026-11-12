@@ -129,14 +129,45 @@ for (const touch of [false, true]) test(`attachment ordering and Drawing complet
     await page.screenshot({ path: info.outputPath('continued-input.png') });
     await context.close(); resumePhase = 'restore-setup';
     const recipient = await browser.newContext({ viewport: touch ? { width: 390, height: 844 } : { width: 1440, height: 900 }, hasTouch: touch, serviceWorkers: 'block' });
+    await recipient.addInitScript(() => {
+      let blocked = false, release!: () => void; const gate = new Promise<void>(resolve => { release = resolve; });
+      const state = { held: 0, release() { blocked = false; release(); } }; (window as any).firstRestoreGate = state;
+      const measure = Performance.prototype.measure, createWritable = FileSystemFileHandle.prototype.createWritable;
+      Performance.prototype.measure = function(name: string, ...args: any[]) {
+        const entry = Reflect.apply(measure, this, [name, ...args]); if (name === 'lociview.restore.first.initialize.start') blocked = true; return entry;
+      };
+      FileSystemFileHandle.prototype.createWritable = async function(...args) { if (blocked) { state.held++; await gate; } return Reflect.apply(createWritable, this, args); };
+    });
     await recipient.route('**/*', route => { const url = new URL(route.request().url());
       if (url.origin === new URL(server.url).origin || ['blob:', 'data:'].includes(url.protocol)) return route.continue(); remote.push(url.origin); return route.abort(); });
     const resumed = resumedPage = await recipient.newPage(); resumed.setDefaultTimeout(15_000); resumed.on('pageerror', error => errors.push(error.message));
     await resumed.goto(server.url + '?timings=1'); await resumed.getByLabel('ファイルを選択', { exact: true }).setInputFiles(backup);
     await resumed.getByRole('button', { name: 'ファイルを開く', exact: true }).click(); restoreStarted = Date.now(); await resumed.getByRole('button', { name: 'バックアップから復元', exact: true }).click();
+    const restoreTimeLeft = () => Math.max(1, restoreStarted! + 90_000 - Date.now());
+    const firstReader = resumed.getByRole('region', { name: '復元中のキャプション', exact: true });
+    await expect(firstReader).toBeVisible(); await expect.poll(() => resumed.evaluate(() => (window as any).firstRestoreGate.held)).toBeGreaterThan(0);
+    await expect(resumed.locator('main.lv-project-workspace')).toHaveCount(0); await expect(firstReader.locator('textarea,input[type=file],canvas,img,video,audio')).toHaveCount(0);
+    await expect(resumed.getByRole('button', { name: 'キャンセル', exact: true })).toBeDisabled();
+    if (touch) await resumed.setViewportSize({ width: 320, height: 365 });
+    await firstReader.getByRole('button', { name: '再開時の記録', exact: true }).click();
+    await expect(firstReader.getByText('元のバックアップ本文', { exact: true })).toBeVisible();
+    expect(await resumed.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+    await resumed.screenshot({ path: info.outputPath('first-restore-before-initialize.png') });
+    if (touch) { await resumed.setViewportSize({ width: 844, height: 390 }); await firstReader.getByRole('button', { name: '一覧へ戻る', exact: true }).click(); }
+    const firstSearch = firstReader.getByRole('searchbox', { name: '検索', exact: true });
+    await firstSearch.focus(); await firstSearch.dispatchEvent('compositionstart'); await firstSearch.fill('再開');
+    const firstReaderNode = await firstReader.elementHandle(); await resumed.evaluate(() => (window as any).firstRestoreGate.release());
+    await expect.poll(() => resumed.evaluate(() => performance.getEntriesByName('lociview.restore.first.adopt').length), { timeout: restoreTimeLeft() }).toBeGreaterThan(0);
+    expect(await firstReaderNode!.evaluate(node => node.isConnected)).toBe(true); await expect(firstSearch).toBeFocused();
+    await expect(firstReader.getByText('復元が完了しました。入力を終えると編集画面に移ります。', { exact: true })).toBeVisible();
+    await firstSearch.dispatchEvent('compositionend'); await expect(firstReader).toHaveCount(0);
     // Existing first-backup operation budget, separate from the 15s UI/180s overall limits.
-    await expect(resumed.getByRole('button', { name: '閲覧する', exact: true })).toBeEnabled({ timeout: 90_000 });
+    await expect(resumed.getByRole('button', { name: '閲覧する', exact: true })).toBeEnabled({ timeout: restoreTimeLeft() });
     restoreElapsed = Date.now() - restoreStarted; await info.attach('resume-setup', { body: JSON.stringify({ restoreMilliseconds: restoreElapsed, phaseBudget: 'existing first-backup 90s, not a performance guarantee' }), contentType: 'application/json' });
+    if (touch) await resumed.setViewportSize({ width: 390, height: 844 });
+    const restoredSearch = resumed.locator('.lv-caption-browser').getByRole('searchbox', { name: '検索', exact: true });
+    await expect(restoredSearch).toHaveValue('再開'); await expect(restoredSearch).toBeFocused();
+    await expect(resumed.locator('.lv-caption-select').filter({ hasText: '再開時の記録' })).toHaveAttribute('aria-current', 'true');
     resumePhase = 'saved-body-edit'; await revealCaptionList(resumed);
     await resumed.locator('.lv-caption-select').filter({ hasText: '再開時の記録' }).click();
     const resumedDetail = resumed.getByRole('region', { name: 'キャプションの詳細', exact: true }), body = '復元した端末で保存した本文';

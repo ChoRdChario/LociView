@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { readProjectScene } from '../src/scene/projectProvider';
+import { readProjectScene, projectCaptionText } from '../src/scene/projectProvider';
+import { inspectProjectCandidates } from '../src/domain/projectCandidates';
 import { resolveScene, chooseStartupScene } from '../src/scene/resolve';
 import { immutableDigest } from '../src/domain/projectGraphSupport';
 import { inspectProjectContent } from '../src/domain/projectContent';
@@ -175,5 +176,50 @@ describe('scope-labelled same-token Scene provider; not current-app/source-adapt
     const source = candidateFixture(), content = await inspectProjectContent(source, limits, verifier()); if (content.kind === 'rejected') throw Error();
     expect(await readProjectScene(source, { ...limits, maxWork: content.workUsed + 1 }, verifier())).toMatchObject({ kind: 'rejected', issue: { path: ['projectionWork'] } });
     expect((await readProjectScene(content, limits, verifier())).kind).toBe('rejected');
+  });
+});
+
+describe('06g input-verified text without a Scene provider or resource authority', () => {
+  const text = async (source = candidateFixture()) => {
+    const inspected = await inspectProjectCandidates(source, limits);
+    if (inspected.kind !== 'project-candidate-inspection') throw Error(JSON.stringify(inspected));
+    return projectCaptionText(inspected, inspected.workUsed, limits);
+  };
+  const two = () => {
+    const r = fixture();
+    r.captionsById[id('cap', 2)] = { ...r.captionsById[id('cap')], id: id('cap', 2), title: 'second', body: 'second body' };
+    r.sceneCaptionMembershipsById[id('scm', 2)] = { ...r.sceneCaptionMembershipsById[id('scm')], id: id('scm', 2), captionId: id('cap', 2), orderKey: 'B' };
+    return r;
+  };
+  it('matches canonical membership/order/text without inspecting models or inventing a token', async () => {
+    const r = two(), input = candidateFixture(r), before = structuredClone(input), actual = await text(input), normal = scene(await read(r, input));
+    expect(actual?.records).toEqual(normal.captions.map(c => ({ id: c.captionId,
+      title: c.title.kind === 'value' ? c.title.value : undefined, body: c.body.kind === 'value' ? c.body.value : undefined })));
+    expect(actual).not.toHaveProperty('token'); expect(actual).not.toHaveProperty('resources'); expect(input).toEqual(before);
+  });
+  it('has no startup fallback and does not pick equal mutable conflict winners', async () => {
+    const r = fixture(), source = candidateFixture(r);
+    for (const [path, a, b] of [
+      [['project', 'defaultSceneId'], id('scn'), id('scn')],
+      [['captionsById', id('cap'), 'body'], 'same', 'same'],
+      [['scenesById', id('scn'), 'lifecycle'], lifecycle(), lifecycle()],
+    ] as const) expect(await text(conflicts(source, [...path], a, b))).toBeNull();
+    const deleted = fixture(); deleted.scenesById[id('scn')].lifecycle = { state: 'deleted', eventId: id('evt', 2), reason: 'userDelete' };
+    expect(await text(candidateFixture(deleted))).toBeNull();
+  });
+  it('keeps uncertain/duplicate membership reservations and omits unresolved bodies', async () => {
+    for (const key of ['lifecycle', 'orderKey'] as const) {
+      const r = two(); r.sceneCaptionMembershipsById[id('scm', 3)] = { ...r.sceneCaptionMembershipsById[id('scm')], id: id('scm', 3) };
+      const source = conflicts(candidateFixture(r), ['sceneCaptionMembershipsById', id('scm', 3), key],
+        r.sceneCaptionMembershipsById[id('scm', 3)][key], r.sceneCaptionMembershipsById[id('scm', 3)][key]);
+      const actual = await text(source); expect(actual?.records.map(c => c.id)).toEqual([id('cap', 2)]); expect(actual?.incomplete).toBe(true);
+    }
+    const r = two(), actual = await text(conflicts(candidateFixture(r), ['captionsById', id('cap'), 'title'], 'a', 'b'));
+    expect(actual?.records.map(c => c.id)).toEqual([id('cap', 2)]); expect(actual?.incomplete).toBe(true);
+  });
+  it('charges optional text projection within the existing budget', async () => {
+    const inspected = await inspectProjectCandidates(candidateFixture(), limits);
+    if (inspected.kind !== 'project-candidate-inspection') throw Error();
+    expect(() => projectCaptionText(inspected, inspected.workUsed, { maxWork: inspected.workUsed })).toThrow();
   });
 });

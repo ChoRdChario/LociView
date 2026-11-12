@@ -57,7 +57,143 @@ unchanged-feature-classification checks pass; independent review has no findings
 No runtime change or new capacity guarantee; no runtime suite is needed for this
 documentation checkpoint.
 
-## Current work —complete regression and reduce large-data waits (2026-11-12)
+## Current work —read verified text during first backup restoration (06g)
+
+PO2026-11-12 approved06g. Base g0/baaca7e; prior frozen6ecc checkpoint, Desktop52,
+offline8, installed Edge/Chrome2 and exact pushed CI43079185587 all pass. Root is
+sole implementation writer; bounded contract/UI/test reviewers remain read-only.
+Preserve the251 private draft lines and semantic-zero source dirt; use the existing
+public-document filter for a verified checkpoint, not a broad add.
+
+Outcome: input-verified startup-Scene Caption titles/body can be searched/read while
+first restoration writes. Keep progress/recovery visible; edit/save/media/3D and
+normal Session authority wait for canonical initialization/Selection/adoption.
+No new wire/schema/ID/dependency/renderer/limit or public release. Preview is not
+save success and is never reused as validation evidence for retry or final Session.
+
+First map canonical Scene/lifecycle/membership resolution and exact input-proof
+lifetime, and independently review them before code. Then add operation-owned
+Host notification/plain text UI, guarded handoff and invalidation; reuse normal
+reader and existing commands/ports. UI never reads package/storage directly.
+Focused tests cover hold-write, malformed input/fault/owner/stale/IME/handoff;
+reuse service faults and one connected PC/touch save→separate restore path.
+Measure fixed Ki-84/500k GS3 runs each, input inspection→text→editable→3D separately,
+with saved source/history/assets checks. Keep existing write/readback/recovery
+fences, unchanged performance criteria and offscreen-resource release.
+
+At final meaningful source/test boundary: independent diff review, serial
+check:checkpoint and HEIC isolation, Desktop/offline/installed-browser relevant
+whole lanes. Freeze the verified candidate, commit/Push suitable g0 scope, check
+exact CI and update the owned4191 preview. Physical Safari acceptance remains
+pending. Stop only affected work for a genuine unresolved spec conflict or new
+policy; ordinary implementation/tests/fixes are authorized without another PO ask.
+
+Implementation2026-11-12: canonical candidate field/membership selection is shared
+with the full provider. The optional Host text DTO has no Session token or asset
+authority. Each attempt owns its preview; success rechecks the real Host/proof/
+history before consuming selection after IME. Producer failure, owner end and
+restore failure withdraw text. A second confirm after a first-write failure
+derives fresh text. The existing initialized-display callback remains fallback.
+Read-only contract/UI reviews found and closed preview-seed reuse, an unnecessary
+normal-route subscription, compact flex sizing and duplicated progress. Focused
+PC/touch2 browser cases pass, including pre-initialize hold,320x365/844x390,
+composition handoff, actual save and cold continuation. Focused service tests
+cover delayed callback rejection, changed history and failed-first-write retry.
+Final execution and its qualifications are recorded below; focused results alone
+are not final qualification. Evidence: `.artifacts/e2e/first-restore-reading-20261112/`.
+
+First final checkpoint:3518 PASS/1 stale UI-test expectation (outer progress was
+intentionally replaced by the single reader status);16 expected-fail/21todo are
+separate. Corrected the expectation to require empty outer status while retaining
+the exact inner status and all write-hold/IME/save/cold checks. Exact case passes;
+final checkpoint restarted as v2. No product-code change or timeout relaxation.
+Read-only next-bottleneck mapping found3 full ZIP inspections before confirmation
+(selector→Host→first Job preparation). Existing06a explicitly requires the Host
+recheck; Job reuse is outside06b/e/f/g lifetimes. This is call-count evidence only,
+not an elapsed-time saving or authority to skip input/persist/readback checks.
+
+Initial frozen source/test fingerprint is1c59cd200d3a91237e9502b3e56c45e26edb51c2554e9a7a4776d2372851e268.
+Checkpoint-v2: typecheck,3519 PASS/16 expected-fail/21todo, all5 builds and offline
+isolation PASS; HEIC public isolation PASS. Candidate is frozen under the evidence
+root `final/candidate/`. The later offline-test-only correction below changes no
+product source or frozen artifact; `test-revision.json` retains both fingerprints.
+Fixed-input primary n3 per artifact/dataset all PASS, including real output and
+all retained-body hashes/original changes/records checks. Milliseconds below are
+before→after triplets in repeat order; they are not new guarantees:
+
+| Endpoint | Ki-84 |500k SH4 |
+|---|---|---|
+| Confirm→visible body |61844/59959/56559→236/237/170 |98046/105096/104036→193/150/141 |
+| Confirm→editable |83636/82048/78373→82140/81024/79779 |125899/134979/135883→133651/136279/134354 |
+| Apply body |9374/10393/10521→8324/10084/10860 |4078/3549/4593→3571/4097/3630 |
+| Save→download event |24400/28779/25785→25259/27417/27861 |34257/32777/35752→34913/33741/30350 |
+| Save→actual file |25529/29820/26901→26596/28586/29339 |37132/35359/38376→37606/36309/33165 |
+| Cold→visible saved body |7747/8443/6777→10312/9224/6879 |7229/7658/8272→7550/7002/8049 |
+
+Input-open→confirmation is separate (median5063→4959ms Ki-84,10396→10337ms GS).
+Primary cold/3D barriers include sequential waits; no new actual-frame/pixel or
+physical-device credit follows. The phone Drawing navigation retained the same
+context with no additional source reads and released hidden resources as before;
+its busy/2RAF timings are diagnostic only.
+
+Ki-84 primary cold and output medians increased; do not waive them as noise.
+Additional same-closed-profile control warmed both builds, cloned fresh owned
+profiles and alternated A B B A A B: cold-readable before10583/7969/8264ms,
+after8887/10178/8058ms; ready med20755→20872ms. All6 continuations PASS and IO-call
+counts/source inspection show no new ordinary-route read, but this is not proof
+of universal non-regression. Preserve both cohorts. The additional same-data
+normal-Backup control below includes actual-file/all-hash/history verification
+and cold continuation per clone. No product-source change, numeric tolerance
+or retry waiver was used.
+Full Desktop52 PASS (104min). Offline initially7 PASS/1 failed test: the new
+recipient continuation waited for a hidden phone3D canvas while the Caption
+panel intentionally released it. The failure image retains the correct restored
+body. Corrected only this test's explicit3D navigation, with the same readiness
+assertion/deadline, then reran the affected case; preserved the seven unchanged
+passing cases and original failure. Revised source/test fingerprint is
+87583685c14e5e5f40e8ea8d195efe4801962edced550041353799efc1cc5be8.
+The corrected offline case passes17.4min, including empty-recipient pre-initialize
+text, subsequent edit/save/full browser close, exact history and own-unregister
+preservation. Together with the original seven unchanged passes this covers all
+eight cases; it is not a second clean whole-suite run. Installed Edge/Chrome2
+PASS51.6s. Controlled save/continuation PASS10.3min: each of six fresh clones
+keeps all43 body hashes, all4 prior changes, exactly1 added change, full proof
+and every semantic record except the intended body edit. No page/remote errors.
+Same closed data, warmed artifacts, A B B A A B; each column below lists its three
+runs in phase order. File audit is outside output/cold timing intervals:
+
+| Controlled Ki-84 endpoint (ms) | Before | After | Median before→after |
+|---|---|---|---|
+| Apply body |8375/10180/7857 |11256/8326/7597 |8375→8326 |
+| Save→download event |20852/20436/21806 |28725/20031/20177 |20852→20177 |
+| Save→actual file |22755/21525/23334 |29799/21954/21183 |22755→21954 |
+| Cold→saved body |7722/6040/7567 |7723/7108/5914 |7567→7108 |
+| Cold→ready |21953/18842/21096 |20425/20566/16593 |21096→20425 |
+
+The additional control does not reproduce a consistent ordinary-save/cold
+slowdown. It supports this bounded connection together with unchanged ordinary
+I/O counts/source and the full functional regression; it does not replace the
+slower primary observations or establish a universal no-regression guarantee.
+Controlled actual-file mean is22.538→24.312s, with after-first29.799s despite the
+lower median. Do not present this as an ordinary-save optimization or suppress
+the slower observation. The independent evidence reviewer has no blocking06g
+finding and accepts a bounded development checkpoint after byte/scope checks.
+The early-text improvement is confirmed in both real datasets; no speedup of
+complete initialization or ordinary saving is claimed. Physical Safari remains
+unexecuted. Required source/artifact/index and exact CI/served-byte checks belong
+to this checkpoint; Git owns its identity, with final proofs under the evidence
+root. No aggregate adoption, general publication or physical-device credit.
+
+Next: isolate validation/CAS/receipt write/readback within first-restoration
+fact-save and remove only measured, authorized duplicate work. Keep all current
+write/publication/recovery fences. A new evidence lifetime or validation timing
+would need a concrete reviewed proposal, not a call-count-only optimization.
+First initialization still dominates: Ki-84 first model-stage25.394s
+(fact-save21.470s), GS25.582s (fact-save22.148s) plus separate full-body fences.
+Fact-save includes validation/CAS/receipt I/O; those totals are not duplicate-only
+or pure-write time. Next performance diagnostics should isolate these stages.
+
+## Previous checkpoint —complete regression and reduce large-data waits (2026-11-12)
 
 Outcome: finish Desktop/offline regression and reduce real Ki-84/500k SH4 waits
 on PC and touch. Compare with61c5f9a, fixed converted backups, isolated profiles

@@ -26,6 +26,11 @@ const isDeleted = (entity: Entity) => entity.lifecycle.kind === 'value' && entit
 /** Unresolved lifecycle/order entries reserve their semantic key, never allow a peer winner. */
 export function memberships(state: SceneState, table: Table<Membership>, sceneId: string,
   targets: Table<Asset> | Table<Caption>, issues: Issue[]): Membership[] {
+  return selectMemberships(table, sceneId, targets, issues);
+}
+/** Pure membership selection shared by full Scenes and input-verified text. */
+export function selectMemberships(table: Table<Membership>, sceneId: string,
+  targets: Table<Entity>, issues: Issue[]): Membership[] {
   const groups = new Map<string, Membership[]>();
   for (const [id, edge] of Object.entries(table).sort(([a], [b]) => compare(a, b))) {
     if (edge.sceneId !== sceneId || isDeleted(edge)) continue;
@@ -52,7 +57,7 @@ export function memberships(state: SceneState, table: Table<Membership>, sceneId
   return selected.sort((a, b) => compare(a.order, b.order) || compare(a.edge.id, b.edge.id)).map(x => x.edge);
 }
 
-export function chooseStartupScene(state: SceneState, retainedId?: string):
+export function chooseStartupScene(state: Readonly<{ defaultSceneId: Field<string>; scenes: Table<Entity> }>, retainedId?: string):
   { sceneId?: string; issues: readonly Issue[] } {
   if (retainedId && active(state.scenes[retainedId], retainedId, [])) return { sceneId: retainedId, issues: [] };
   const issues: Issue[] = [];

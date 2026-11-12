@@ -479,7 +479,8 @@ export const projectSceneApplicationImports:Readonly<Record<string,readonly stri
     "./validationProjection",
     "./viewDisplay",
     "../projectMetadata/editorAttribution",
-    "../projectMetadata/source"
+    "../projectMetadata/source",
+    "../scene/projectProvider"
   ],
   "src/projectScene/validationMaterials.ts": [
     "../domain/materialCoverage",

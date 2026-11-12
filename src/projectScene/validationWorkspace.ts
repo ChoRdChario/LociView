@@ -25,11 +25,11 @@ import { PackageArchive } from '../projectPackage/zipArchive';
 import { BackupArchive } from '../projectPackage/backupArchive';
 import type { PngDecoder } from '../projectFiles/png';
 import { isJpeg, type JpegDecoder } from '../projectFiles/jpeg';
-import type { openValidationHost, ValidationHostOptions, ValidationNormalHost, FirstBackupRecovery } from './validationHost';
+import type { openValidationHost, ValidationHostOptions, ValidationNormalHost, FirstBackupRecovery, FirstRestoreCaptionPreview } from './validationHost';
 import { createValidationModeHost, type ValidationDisplayHost } from './validationModeHost';
 import type { LocalOpenMode } from './hostPorts';
 import type { ResumeReadingRequest, ValidationProjectEntry } from './validationCatalog';
-import { createResumeReading } from './resumeReading';
+import { createResumeReading, createCaptionTextReading } from './resumeReading';
 import { chooseStartupScene, resolveScene } from '../scene/resolve';
 import type { ModelCandidateRenderer } from './modelCandidatePreview';
 import type { ViewportFactory } from './viewportPorts';
@@ -503,7 +503,8 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   const renderFirstRecovery = () => {
     const target = firstRecovery; if (!target || disposed) return;
     recoveryControls.clear();
-    const state = target.state(), panel = document.createElement('section'), note = document.createElement('p'), commands = document.createElement('div');
+    const state = target.state(), panel = document.createElement('section'), readerSlot = document.createElement('div'), note = document.createElement('p'), commands = document.createElement('div');
+    panel.className = 'lv-first-restore-panel'; readerSlot.className = 'lv-first-restore-reading';
     if (state.phase === 'preview') status.textContent = 'このバックアップから作業を再開できます。';
     note.textContent = state.error || (state.phase === 'preview' ? state.replacing
       ? 'バックアップの時点に切り替えます。現在の作業と元ファイルは残ります。' : 'このプロジェクトの再開用データはありません。バックアップから元のプロジェクトを復元します。元ファイルは変更しません。'
@@ -524,23 +525,25 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
       status.textContent = 'バックアップから復元しています。';
       let staged: Awaited<ReturnType<ValidationWorkspacePorts['render']>> | undefined,
         preparation: Parameters<ValidationDisplayHost['setDisplayPreparation']>[0] | undefined, sourceContent: ValidationNormalHost['content'] | undefined,
-        reading: ReturnType<typeof createResumeReading> | undefined, opened: ValidationNormalHost | undefined;
+        reading: ReturnType<typeof createCaptionTextReading> | undefined, fallback: ReturnType<typeof createResumeReading> | undefined, preview: FirstRestoreCaptionPreview | undefined, opened: ValidationNormalHost | undefined;
+      let accepting = true;
+      const withdraw = () => { reading?.dispose(); reading = undefined; preview = undefined; };
       try {
         opened = await target[state.phase === 'preview' ? 'confirm' : 'retry'](async (next, preparedContent) => {
           if (disposed || firstRecovery !== target) throw Error('画面を閉じました。復元記録は保持しています。');
-          if (ports.progressivePresentation) {
+          if (ports.progressivePresentation && !reading) try {
             const { sceneId } = chooseStartupScene(next.state);
             const scene = sceneId ? resolveScene(next.state, next.resources, sceneId) : undefined;
             if (scene?.kind === 'ready') {
               const records = scene.composition.captions.flatMap(c => c.title.kind === 'value' && c.body.kind === 'value'
                 ? [{ id: c.captionId, title: c.title.value, body: c.body.value }] : []);
               if (records.length) {
-                reading?.dispose(); reading = createResumeReading(document, { token: next.state.token, sceneId: scene.composition.sceneId,
+                fallback?.dispose(); fallback = createResumeReading(document, { token: next.state.token, sceneId: scene.composition.sceneId,
                   title: state.title, records, ...(scene.composition.name.kind === 'value' ? { sceneName: scene.composition.name.value } : {}) }, 'restore');
-                content.replaceChildren(reading.root); status.textContent = '';
+                readerSlot.replaceChildren(fallback.root); status.textContent = '';
               }
             }
-          }
+          } catch { fallback?.dispose(); fallback = undefined; }
           sourceContent = preparedContent; const candidate = await untilOpen(ownRender(ports.render({ authority: { readOnly: true, read: () => next,  },
             content: { model: record => sourceContent!.model(record), modelContent: record => sourceContent!.modelContent(record) },
             setDisplayPreparation(callback) { preparation = callback; return () => { if (preparation === callback) preparation = undefined; }; } }).then(async value => {
@@ -550,21 +553,36 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
           staged = candidate;
           if (candidate.ready) await untilOpen(candidate.ready);
           if (disposed || firstRecovery !== target) throw Error('画面を閉じました。復元記録は保持しています。');
-        });
+        }, ports.progressivePresentation ? value => {
+          if (disposed || firstRecovery !== target) return;
+          if (!value) { withdraw(); return; }
+          if (!accepting) return;
+          if (preview || fallback) return;
+          const view = createCaptionTextReading(document, value, 'first-restore');
+          status.textContent = ''; summary.textContent = state.title; note.textContent = '元のファイルは変更しません。';
+          preview = value; reading = view; readerSlot.replaceChildren(view.root);
+        } : undefined);
+        accepting = false;
         if (disposed || firstRecovery !== target) return;
-        const composition = reading?.composition(); if (composition) await untilOpen(composition);
+        const view = reading ?? fallback; if (view?.composition()) view.setReady();
+        const composition = view?.composition(); if (composition) await untilOpen(composition);
         if (disposed || firstRecovery !== target) return;
-        const selection = reading?.selection(); if (reading) reading.root.inert = true;
+        const actual = preview ? target.takePreview(preview, opened) : undefined, selectedText = reading?.selection();
+        const matching = selectedText?.captionId ? actual?.records.find(c => c.id === selectedText.captionId &&
+          preview?.records.some(p => p.id === c.id && p.title === c.title && p.body === c.body)) : actual;
+        const selection = actual && matching && selectedText ? { ...selectedText, token: actual.token, sceneId: actual.sceneId } : fallback?.selection();
+        if (view) view.root.inert = true;
         sourceContent = opened.content; await closeCurrent();
         if (disposed) return;
-        resumeReading = reading && selection ? { ...reading, selection: () => selection } : reading; reading = undefined;
+        resumeReading = view && selection ? { ...view, selection: () => selection } : undefined;
+        if (!selection) view?.dispose(); reading = undefined; fallback = undefined; preview = undefined;
         const prepared = staged, nextHost = opened; staged = undefined; opened = undefined;
         await adoptProject(target.run, nextHost, undefined, prepared, preparation);
-      } catch (error) { clearResumeReading(); renderFirstRecovery(); throw error; } finally { reading?.dispose(); try{await releaseRender(staged);}finally{await opened?.dispose();} }
+      } catch (error) { clearResumeReading(); renderFirstRecovery(); throw error; } finally { accepting = false; withdraw(); fallback?.dispose(); try{await releaseRender(staged);}finally{await opened?.dispose();} }
     });
     if ((!target.readOnly || state.phase === 'preview') && state.cancellable) button(state.phase === 'preview' ? 'キャンセル' : '復元を取りやめる', () => leave(true));
     if (state.phase === 'terminal') button('一覧に戻る', () => leave(false));
-    panel.append(summary, note, commands); content.replaceChildren(panel); controls();
+    panel.append(summary, note, commands, readerSlot); content.replaceChildren(panel); controls();
   };
   const invalidateLoci = () => { lociDraft++; lociEvaluation = null; lociDecision = undefined; conversion = null;materialNotice.render();clearImageOmissions();
     if (lociPreview) conversionNote.textContent = '入力が変わりました。「変換内容を確認」で確認し直してください。'; controls(); };

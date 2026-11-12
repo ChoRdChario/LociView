@@ -1,5 +1,5 @@
 import {test, createBrowserProfile} from '../helpers/browserProfile';
-import { selectShareOutput,  revealCoordinateAdd, revealFileSurface, revealProjectSelection, revealOfflineUtilities } from '../e2e/workspaceUi';
+import { selectShareOutput, revealCaptionList, revealCoordinateAdd, revealFileSurface, revealProjectSelection, revealOfflineUtilities } from '../e2e/workspaceUi';
 import {expect,chromium,type BrowserContext,type Page,type TestInfo} from '@playwright/test';
 import {readFile,writeFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
@@ -8,12 +8,19 @@ import {ownedServer} from './server';
 import {triangleGlb,smallPng,nativeConversionBackup} from '../e2e/fixtures';
 import {largeGsFixture} from '../helpers/largeGsFixture';
 import {WorkspaceArchive} from '../../src/projectPackage/workspaceArchive';
+import {BackupArchive} from '../../src/projectPackage/backupArchive';
 import {validationMetadataLimits as limits} from '../../src/projectFiles/validation';
 
 const builds=()=>process.env.LOCIVIEW_OFFLINE_BUILDS!;
 const offline=(p:Page)=>p.getByRole('region',{name:'オフライン利用',exact:true});
 const detail=(p:Page)=>p.getByRole('region',{name:'キャプションの詳細',exact:true});
 async function selected(p:Page,title:string){await expect(p.getByRole('heading',{name:'プロジェクト名',exact:true})).toHaveText(title,{timeout:180_000});await expect(p.getByLabel('3Dモデルの表示',{exact:true})).toHaveAttribute('aria-busy','false',{timeout:180_000});await expect(p.locator('.lv-project-viewport-status')).toBeEmpty({timeout:180_000});}
+async function selectedWithStage(p:Page,title:string){
+  await expect(p.getByRole('heading',{name:'プロジェクト名',exact:true})).toHaveText(title,{timeout:180_000});
+  const stage=p.getByRole('button',{name:'3D',exact:true});
+  if(await stage.isVisible()&&await stage.getAttribute('aria-pressed')!=='true')await stage.click();
+  await selected(p,title);
+}
 async function ready(p:Page,text:string){await expect(p.getByText(text,{exact:true})).toBeVisible({timeout:180_000});await expect(p.locator('main.lv-project-workspace > header > p.lv-operation-status')).toHaveAttribute('data-busy','false');}
 async function file(p:Page,path:string){await expect(p.getByLabel('ファイルを選択',{exact:true})).toBeEnabled();await p.getByLabel('ファイルを選択',{exact:true}).setInputFiles(path);await p.getByRole('button',{name:'ファイルを開く',exact:true}).click();}
 async function home(p:Page){await revealProjectSelection(p);await p.getByRole('button',{name:/^(?:ファイルを開く|別のプロジェクトを開く)$/}).click();await expect(p.getByLabel('ファイルを選択',{exact:true})).toBeVisible();await expect(p.locator('.lv-validation-status')).toHaveAttribute('data-busy','false');}
@@ -23,6 +30,13 @@ async function output(p:Page,info:TestInfo,name:string){
   const [download]=await Promise.all([p.waitForEvent('download',{timeout:180_000}),area.locator('button.lv-file-primary').click()]);const path=info.outputPath(name+'.zip');await download.saveAs(path);expect(await download.failure()).toBeNull();await expect(area.locator('.lv-operation-status')).toHaveAttribute('data-busy','false',{timeout:180_000});await menu.getByRole('button',{name:'閉じる',exact:true}).click();return path;
 }
 async function changes(path:string){return(await WorkspaceArchive.inspect(new Blob([Uint8Array.from(await readFile(path)).buffer]),limits)).source.originalChanges();}
+async function backup(p:Page,info:TestInfo,name:string){
+  await revealFileSurface(p,'保存');const area=p.getByRole('region',{name:'ファイル',exact:true});
+  const [download]=await Promise.all([p.waitForEvent('download',{timeout:180_000}),area.locator('button.lv-file-primary').click()]);
+  const path=info.outputPath(name+'.zip');await download.saveAs(path);expect(await download.failure()).toBeNull();
+  await expect(area.locator('.lv-operation-status')).toHaveAttribute('data-busy','false',{timeout:180_000});
+  await p.locator('details.lv-project-files').getByRole('button',{name:'閉じる',exact:true}).click();return path;
+}
 async function launch(profile:string,url:string,disconnected=false,errors:string[]=[],touch=false){
   const context=await chromium.launchPersistentContext(profile,{channel:'chromium',headless:true,viewport:{width:1440,height:1000},...(touch?{hasTouch:true,isMobile:true,deviceScaleFactor:2}:{}),serviceWorkers:'allow',acceptDownloads:true,offline:disconnected});context.setDefaultTimeout(20_000);
   await context.route('**/*',route=>{const u=new URL(route.request().url());return u.origin===new URL(url).origin||['blob:','data:'].includes(u.protocol)?route.continue():route.abort('blockedbyclient');});
@@ -40,7 +54,7 @@ async function cacheInventory(p:Page){return p.evaluate(async()=>{const result:R
 async function controllerBuild(p:Page){return p.evaluate(async()=>{const worker=navigator.serviceWorker.controller;if(!worker)return null;return await new Promise<string>(resolve=>{const c=new MessageChannel();c.port1.onmessage=e=>{c.port1.close();resolve(e.data.build);};worker.postMessage('lociview-desktop-offline-state-1',[c.port2]);});});}
 
 test('static data survives prepared cold offline Mesh/Point/500k SH4/Proxy/media work, initial conversion and same-address static return',async({},info)=>{
-  test.setTimeout(1_200_000);A.getHeads(A.init());const server=await ownedServer('desktop-dist'),owned=await profile(),errors:string[]=[],stages:string[]=[];let context:BrowserContext|undefined;
+  test.setTimeout(1_200_000);A.getHeads(A.init());const server=await ownedServer('desktop-dist'),owned=await profile(),firstRecipient=await profile(),errors:string[]=[],stages:string[]=[];let context:BrowserContext|undefined,recipientContext:BrowserContext|undefined;
   const open=async(disconnected=false)=>{const result=await launch(owned,server.url,disconnected,errors,true);context=result.context;const response=await result.page.goto(server.url);if(disconnected)expect(response?.fromServiceWorker()).toBe(true);return result.page;};
   const close=async()=>{await context?.close();context=undefined;};
   const mark=(text:string)=>{stages.push(text);console.log(text);};
@@ -52,7 +66,10 @@ test('static data survives prepared cold offline Mesh/Point/500k SH4/Proxy/media
     const chooser=p.waitForEvent('filechooser');await models.getByRole('button',{name:'位置指定用の面を追加',exact:true}).click();await(await chooser).setFiles(mesh);await models.getByRole('button',{name:'このモデルに面を追加',exact:true}).click();await ready(p,'位置指定用の面を登録しました。');
     await p.getByRole('tab',{name:'キャプション',exact:true}).click();await revealCoordinateAdd(p);await p.getByLabel('追加先モデル',{exact:true}).focus();await p.getByLabel('追加先モデル',{exact:true}).selectOption({label:'基準.glb'});await p.getByRole('button',{name:'このモデルに追加',exact:true}).click();for(const[axis,value]of [['X','0'],['Y','.5'],['Z','0']])await p.getByLabel(`位置 ${axis}`,{exact:true}).fill(value!);await p.getByRole('button',{name:'位置を確定',exact:true}).click();await ready(p,'ピンの位置を確定しました。');
     await p.getByLabel('タイトル',{exact:true}).fill('現地の記録');await p.getByLabel('本文',{exact:true}).fill('通信前の本文');await p.getByRole('button',{name:'変更を適用',exact:true}).click();await ready(p,'変更を適用しました。');const media=p.waitForEvent('filechooser');await p.getByLabel('メディアを追加',{exact:true}).click();await(await media).setFiles(photo);await p.getByRole('region',{name:'キャプションの詳細',exact:true}).getByRole('button',{name:'変更を適用',exact:true}).click(); await ready(p,'メディアを追加しました。');
-    const before=await changes(await output(p,info,'static-before'));await close();server.setRoot(resolve(builds(),'a'));p=await open();await selected(p,'オフライン現地作業');expect(await changes(await output(p,info,'offline-build-before'))).toEqual(before);await prepare(p);expect(await controllerBuild(p)).toBeNull();mark('prepared: same namespace/history; first page uncontrolled');
+    const before=await changes(await output(p,info,'static-before'));await close();server.setRoot(resolve(builds(),'a'));
+    const preparedRecipient=await launch(firstRecipient,server.url,false,errors,true);recipientContext=preparedRecipient.context;
+    await preparedRecipient.page.goto(server.url);await prepare(preparedRecipient.page);await recipientContext.close();recipientContext=undefined;
+    p=await open();await selected(p,'オフライン現地作業');expect(await changes(await output(p,info,'offline-build-before'))).toEqual(before);await prepare(p);expect(await controllerBuild(p)).toBeNull();mark('prepared: same namespace/history; first page uncontrolled');
     // Preserve unrelated cache/registration and an original-route local body as exact bytes.
     await p.evaluate(async()=>{await(await caches.open('unrelated-retain')).put('/sentinel',new Response('untouched'));await navigator.serviceWorker.register('/foreign/worker.js',{scope:'/foreign/'});const base=await navigator.storage.getDirectory(),dir=await base.getDirectoryHandle('legacy-retain',{create:true}),handle=await dir.getFileHandle('original.zip',{create:true}),writer=await handle.createWritable();await writer.write('owned legacy source sentinel');await writer.close();});
     const prepared=await cacheInventory(p);await close();await server.stop();p=await open(true);await selected(p,'オフライン現地作業');await revealOfflineUtilities(p);await expect(offlineStatus(p)).toContainText('オフラインで起動できます');expect(await controllerBuild(p)).toMatch(/^offline-test-a-/);expect(await changes(await output(p,info,'cold-before'))).toEqual(before);mark('cold offline: server stopped; Mesh/Point/500k SH4/Proxy loaded');
@@ -61,7 +78,36 @@ test('static data survives prepared cold offline Mesh/Point/500k SH4/Proxy/media
     await showPhoto.click();const photoDialog=p.getByRole('dialog',{name:'メディアビューア',exact:true});await expect.poll(()=>photoDialog.locator('img').evaluate(n=>(n as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
     await expect(p.getByLabel('3Dモデルの表示',{exact:true})).toHaveAttribute('aria-busy','true');await photoDialog.getByRole('button',{name:'閉じる',exact:true}).click();await expect(showPhoto).toBeFocused();await selected(p,'オフライン現地作業');mark('cold offline touch: photo/native-GS release and same-view reconstruction');
     const edited=await changes(await output(p,info,'cold-edited'));await p.screenshot({path:info.outputPath('cold-offline.png'),fullPage:true});await close();p=await open(true);await selected(p,'オフライン現地作業');expect(await changes(await output(p,info,'cold-reopened'))).toEqual(edited);mark('cold offline: edit/save/full-close reopen exact history');
-    await home(p);const native=info.outputPath('admitted-native.zip');await writeFile(native,await nativeConversionBackup(triangleGlb(),smallPng()));await file(p,native);await p.getByRole('button',{name:'新しいプロジェクトに変換',exact:true}).click();await selected(p,'Nativeから引き継ぐ記録');await p.locator('.lv-caption-select').filter({hasText:'既存のピン'}).click();await detail(p).getByLabel('本文',{exact:true}).fill('オフライン変換後');await detail(p).getByRole('button',{name:'変更を適用',exact:true}).click();await ready(p,'変更を適用しました。');const converted=await changes(await output(p,info,'converted-offline'));await close();p=await open(true);await selected(p,'Nativeから引き継ぐ記録');expect(await changes(await output(p,info,'converted-reopened'))).toEqual(converted);mark('cold offline: admitted initial conversion/edit/save/reopen');
+    await home(p);const native=info.outputPath('admitted-native.zip');await writeFile(native,await nativeConversionBackup(triangleGlb(),smallPng()));await file(p,native);await p.getByRole('button',{name:'新しいプロジェクトに変換',exact:true}).click();await selected(p,'Nativeから引き継ぐ記録');await p.locator('.lv-caption-select').filter({hasText:'既存のピン'}).click();await detail(p).getByLabel('本文',{exact:true}).fill('オフライン変換後');await detail(p).getByRole('button',{name:'変更を適用',exact:true}).click();await ready(p,'変更を適用しました。');const converted=await changes(await output(p,info,'converted-offline'));
+    const firstFile=await backup(p,info,'first-offline-backup');
+    expect((await BackupArchive.inspect(new Blob([Uint8Array.from(await readFile(firstFile)).buffer]),limits)).source.originalChanges()).toEqual(converted);
+    await close();
+    let recipient=await launch(firstRecipient,server.url,true,errors,true);recipientContext=recipient.context;
+    await recipientContext.addInitScript(()=>{
+      let blocked=false,release!:()=>void;const gate=new Promise<void>(resolve=>{release=resolve;});
+      const state={held:0,release(){blocked=false;release();}};(window as any).firstRestoreGate=state;
+      const measure=Performance.prototype.measure,createWritable=FileSystemFileHandle.prototype.createWritable;
+      Performance.prototype.measure=function(name:string,...args:any[]){const result=Reflect.apply(measure,this,[name,...args]);if(name==='lociview.restore.first.initialize.start')blocked=true;return result;};
+      FileSystemFileHandle.prototype.createWritable=async function(...args){if(blocked){state.held++;await gate;}return Reflect.apply(createWritable,this,args);};
+    });
+    let receiver=recipient.page;expect((await receiver.goto(server.url+'?timings=1'))?.fromServiceWorker()).toBe(true);await receiver.setViewportSize({width:390,height:844});
+    await file(receiver,firstFile);await receiver.getByRole('button',{name:'バックアップから復元',exact:true}).click();
+    const reading=receiver.getByRole('region',{name:'復元中のキャプション',exact:true});await expect(reading).toBeVisible();
+    await expect.poll(()=>receiver.evaluate(()=>(window as any).firstRestoreGate.held)).toBeGreaterThan(0);
+    await expect(receiver.locator('main.lv-project-workspace')).toHaveCount(0);await expect(reading.locator('textarea,input[type=file],canvas,img')).toHaveCount(0);
+    await reading.getByRole('searchbox',{name:'検索',exact:true}).fill('既存');await reading.getByRole('button',{name:'既存のピン',exact:true}).click();
+    await expect(reading.getByText('オフライン変換後',{exact:true})).toBeVisible();await receiver.screenshot({path:info.outputPath('offline-first-restore-reading.png')});
+    await receiver.evaluate(()=>(window as any).firstRestoreGate.release());await selectedWithStage(receiver,'Nativeから引き継ぐ記録');
+    await revealCaptionList(receiver);
+    await receiver.locator('.lv-caption-select').filter({hasText:'既存のピン'}).click();await detail(receiver).getByLabel('本文',{exact:true}).fill('別端末のオフライン復元後');
+    await detail(receiver).getByRole('button',{name:'変更を適用',exact:true}).click();await ready(receiver,'変更を適用しました。');
+    const received=await changes(await output(receiver,info,'first-offline-edited'));await recipientContext.close();recipientContext=undefined;
+    recipient=await launch(firstRecipient,server.url,true,errors,true);recipientContext=recipient.context;receiver=recipient.page;
+    await receiver.setViewportSize({width:390,height:844});
+    expect((await receiver.goto(server.url))?.fromServiceWorker()).toBe(true);await selectedWithStage(receiver,'Nativeから引き継ぐ記録');
+    expect(await changes(await output(receiver,info,'first-offline-reopened'))).toEqual(received);await recipientContext.close();recipientContext=undefined;
+    mark('cold offline first backup: pre-initialize text, edit/save/full-close reopen in empty recipient');
+    p=await open(true);await selected(p,'Nativeから引き継ぐ記録');expect(await changes(await output(p,info,'converted-reopened'))).toEqual(converted);mark('cold offline: admitted initial conversion/edit/save/reopen');
     await home(p);const count=await p.getByRole('button',{name:'編集で開く',exact:true}).count(),bad=info.outputPath('unsupported-native.zip');await writeFile(bad,await nativeConversionBackup(Buffer.from('invalid model'),smallPng()));await file(p,bad);await expect(p.locator('.lv-validation-status')).toHaveAttribute('data-busy','false');await expect(p.locator('.lv-validation-status')).not.toHaveText('');await expect(p.getByRole('button',{name:'新しいプロジェクトに変換',exact:true})).toBeHidden();expect(await p.getByRole('button',{name:'編集で開く',exact:true}).count()).toBe(count);mark('unsupported original: no partial Project');
     await context!.setOffline(false);await server.start();await revealOfflineUtilities(p);await utilities(p);await offline(p).getByRole('button',{name:'オフライン準備を解除',exact:true}).click();await expect(offline(p).getByText(/解除すると、すべての画面/)).toBeVisible();await offline(p).getByRole('button',{name:'準備を解除',exact:true}).click();await expect(offlineStatus(p)).toContainText('準備を解除しました。');
     expect(await cacheInventory(p)).toEqual(prepared);expect(await p.evaluate(async()=>(await navigator.serviceWorker.getRegistrations()).map(r=>new URL(r.scope).pathname))).toEqual(['/foreign/']);
@@ -70,7 +116,7 @@ test('static data survives prepared cold offline Mesh/Point/500k SH4/Proxy/media
     await home(p);await p.locator('.lv-validation-home p').filter({hasText:'Nativeから引き継ぐ記録 —'}).getByRole('button',{name:'編集で開く',exact:true}).click();await selected(p,'Nativeから引き継ぐ記録');expect(await changes(await output(p,info,'static-native-return'))).toEqual(converted);
     expect(await p.evaluate(async()=>{const dir=await(await navigator.storage.getDirectory()).getDirectoryHandle('legacy-retain');return(await(await dir.getFileHandle('original.zip')).getFile()).text();})).toBe('owned legacy source sentinel');mark('own unregister: all windows closed; reachable static same address; source/history/foreign cache retained');
     await home(p);await p.getByRole('button',{name:'以前のプロジェクトを開く',exact:true}).click();await expect(p.getByRole('button',{name:'プロジェクトを選ぶ',exact:true})).toBeVisible();await expect.poll(()=>p.evaluate(()=>document.documentElement.classList.contains('lv-project-page'))).toBe(false);expect(errors).toEqual([]);
-  }finally{if(context)await context.pages()[0]?.screenshot({path:info.outputPath('last-state.png'),fullPage:true}).catch(()=>{});await close();await server.stop();await info.attach('stages',{body:JSON.stringify({owned,url:server.url,stages,errors}),contentType:'application/json'});}
+  }finally{if(context)await context.pages()[0]?.screenshot({path:info.outputPath('last-state.png'),fullPage:true}).catch(()=>{});if(recipientContext)await recipientContext.pages()[0]?.screenshot({path:info.outputPath('first-recipient-last-state.png'),fullPage:true}).catch(()=>{});await recipientContext?.close();await close();await server.stop();await info.attach('stages',{body:JSON.stringify({owned,url:server.url,stages,errors}),contentType:'application/json'});}
 });
 
 test('two-window update preserves unapplied input, rejects wrong200/missing resources, retries, and waits for full close',async({},info)=>{

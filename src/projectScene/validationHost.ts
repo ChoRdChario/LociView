@@ -39,6 +39,7 @@ import { isSavedModel, isSavedMesh, isOrdinaryPoint, isOrdinaryGs } from './mode
 import { classifyMeshSource } from '../projectFiles/meshSource';
 import { orderBetween } from './viewDisplay';
 import { chooseStartupScene, resolveScene } from '../scene/resolve';
+import { projectCaptionText, type ProjectCaptionText } from '../scene/projectProvider';
 import { validationMaterialSlots, validationMaterialIssue } from './validationMaterials';
 import { same } from '../domain/projectGraphSupport';
 import type { MaterialIntent } from '../domain/materialIntent';
@@ -107,11 +108,17 @@ export interface ValidationHostOptions {
 
 export type ValidationNormalHost = Awaited<ReturnType<typeof openValidationHost>>;
 type FirstRestoreDisplay = (next: ProjectDisplay, content: ValidationNormalHost['content']) => Promise<void>;
+/** Text only: this reference is never a Session token or storage authority. */
+export interface FirstRestoreCaptionPreview extends ProjectCaptionText {
+  readonly kind: 'first-restore-caption-preview'; readonly reference: object;
+}
+export type FirstRestorePreviewObserver = (value: FirstRestoreCaptionPreview | null) => void | Promise<void>;
 export interface FirstBackupRecovery {
   readonly kind: 'first-backup-recovery'; readonly run: string; readonly readOnly: boolean;
   state(): Readonly<{ phase: 'preview' | 'beforeStart' | 'pending' | 'terminal'; title: string; fileName: string | null; memo: string | null; error: string; replacing: boolean; cancellable: boolean; retryable: boolean }>;
-  confirm(prepare: FirstRestoreDisplay): Promise<ValidationNormalHost>;
-  retry(prepare: FirstRestoreDisplay): Promise<ValidationNormalHost>;
+  confirm(prepare: FirstRestoreDisplay, preview?: FirstRestorePreviewObserver): Promise<ValidationNormalHost>;
+  retry(prepare: FirstRestoreDisplay, preview?: FirstRestorePreviewObserver): Promise<ValidationNormalHost>;
+  takePreview(preview: FirstRestoreCaptionPreview, host: ValidationNormalHost): ResumeReading | null;
   edit(): Promise<ValidationNormalHost | FirstBackupRecovery>;
   cancel(): Promise<void>; abandon(): Promise<void>; dispose(): Promise<void>;
 }
@@ -137,10 +144,40 @@ export async function openValidationEntry(options: ValidationHostOptions): Promi
   let prepared: BackupRestoreJob | undefined, existing: ValidationNormalHost | undefined;
   let title = '名前を確認できないプロジェクト', memo: string | null = null;
   let control: Awaited<ReturnType<typeof inspectValidationFirstBackup>>;
-  const release = async () => { lease.beginClose(); await lease.waitForWorkspaceIdle(); lease.sealWorkspaceWritesForRelease(); lease.release(); };
+  type PreviewSeed = { text: ProjectCaptionText; proof: BackupArchive['source']['proof']; sourceToken: string; heads: readonly string[]; archive: EvidenceRef; job: string };
+  let previewSeed: PreviewSeed | undefined;
+  let witness: (PreviewSeed & { value: FirstRestoreCaptionPreview; producing: boolean; notify?: FirstRestorePreviewObserver;
+    ready?: { host: ValidationNormalHost; token: string } }) | undefined;
+  const revokePreview = () => {
+    const previous = witness; witness = undefined;
+    if (previous?.notify) {
+      try { void Promise.resolve(previous.notify(null)).catch(() => {}); } catch { /* Optional display only. */ }
+    }
+  };
+  const seedPreview = (archive: BackupArchive, inspected: Awaited<ReturnType<BackupArchive['source']['inspectOriginal']>>, job: string): PreviewSeed | undefined => {
+    const text = projectCaptionText(inspected.candidates, inspected.workUsed, { maxWork: PACKAGE_LIMITS.inspectionWork });
+    return text ? { text, proof: cloneCanonicalValue(archive.source.proof, limits) as unknown as BackupArchive['source']['proof'],
+      sourceToken: archive.source.token, heads: [...archive.source.heads], archive: { sha256: archive.archive.sha256, byteLength: archive.archive.byteLength }, job } : undefined;
+  };
+  const publishPreview = (seed: PreviewSeed | undefined, notify: FirstRestorePreviewObserver | undefined) => {
+    if (!seed || !notify || closed || !busy || existing || !lease.holdsWriteLock) return;
+    const current = { ...seed, value: Object.freeze({ ...seed.text, kind: 'first-restore-caption-preview' as const, reference: Object.freeze({}) }), producing: true, notify };
+    witness = current;
+    const failed = () => { if (witness === current && current.producing) revokePreview(); };
+    try { void Promise.resolve(notify(current.value)).catch(failed); } catch { failed(); }
+  };
+  const matchesPreview = (current: NonNullable<typeof witness>, opened: ValidationNormalHost) => {
+    const read = opened.read();
+    return !closed && lease.holdsWriteLock && read.state === 'ready' && read.source && read.provider?.kind === 'scene-provider' &&
+      read.provider.token === read.source.token && read.source.token === current.sourceToken &&
+      same({ ...read.source.proof }, { ...current.proof }) && same([...read.source.heads], current.heads);
+  };
+
+  const stopPreviewAccess = lease.subscribeAccess(state => { if (state !== 'editable') revokePreview(); });
+  const release = async () => { stopPreviewAccess(); lease.beginClose(); await lease.waitForWorkspaceIdle(); lease.sealWorkspaceWritesForRelease(); lease.release(); };
   try {
     control = await inspectValidationFirstBackup(lease.workspace, options);
-    if (!input && !control) { const opened = await openNormalValidationHost(ordinary, lease); handedOff = true; return opened; }
+    if (!input && !control) { stopPreviewAccess(); const opened = await openNormalValidationHost(ordinary, lease); handedOff = true; return opened; }
     // Recovery owns its dedicated reader; stripping firstBackup must not enable normal-resume notices.
     ordinary.reading = undefined;
     if (input && !control) {
@@ -155,26 +192,37 @@ export async function openValidationEntry(options: ValidationHostOptions): Promi
     }
     const knownArchive = archive ?? (control?.controls.pending?.start ? (await BackupRestoreJob.open(lease.workspace, control.owner.id, limits, databases)).inspection : undefined);
     if (knownArchive) {
-      const fields = (await knownArchive.source.inspectOriginal({ maxNodes: PACKAGE_LIMITS.inspectionNodes, maxWork: PACKAGE_LIMITS.inspectionWork })).candidates.fields,
+      const inspected = await knownArchive.source.inspectOriginal({ maxNodes: PACKAGE_LIMITS.inspectionNodes, maxWork: PACKAGE_LIMITS.inspectionWork });
+      if (prepared && !existing && knownArchive.archive.sha256 === prepared.inspection.archive.sha256 &&
+        knownArchive.source.token === prepared.inspection.source.token && same({ ...knownArchive.source.proof }, { ...prepared.inspection.source.proof })) {
+        try { previewSeed = seedPreview(knownArchive, inspected, prepared.id); } catch { /* Optional text cannot reject restoration. */ }
+      }
+      const fields = inspected.candidates.fields,
         field = fields.find(f => f.path.length === 2 && f.path[0] === 'project' && f.path[1] === 'title'), candidate = field?.valid && field.candidates.length === 1 ? field.candidates[0]?.value : undefined;
       if (candidate?.kind === 'value' && typeof candidate.value === 'string' && candidate.value.trim()) title = candidate.value;
       memo = knownArchive.archive.control.manifest.memo ?? null;
     }
-  } catch (error) { if (existing) await existing.dispose(); else if (!handedOff) await release(); throw error; }
+  } catch (error) { stopPreviewAccess(); if (existing) await existing.dispose(); else if (!handedOff) await release(); throw error; }
   const reload = async () => { const records = await readRestoreControls(lease.workspace, limits); selectedRecovery = !!records.selection;
     control = await inspectValidationFirstBackup(lease.workspace, options); if (control?.controls.pending || selectedRecovery) prepared = undefined; };
   const activate = () => { if (!lease.holdsWriteLock || options.mode === 'view') throw Error('編集を開始して復元してください。');
     if (lease.accessState !== 'editable') lease.activateNewProject(); };
   const execute = async <T>(action: () => Promise<T>): Promise<T> => {
-    if (closed || busy || handedOff) throw Error('復元の処理を確認してください。'); busy = true; failure = '';
+    if (closed || busy || handedOff) throw Error('復元の処理を確認してください。'); revokePreview(); busy = true; failure = '';
     const work = action(); operation = work;
-    try { return await work; } catch (error) { failure = error instanceof Error ? error.message : '復元を完了できません。';
+    try { return await work; } catch (error) { revokePreview(); failure = error instanceof Error ? error.message : '復元を完了できません。';
       try { await reload(); } catch { /* Keep the first failure and retained bytes. */ } throw error;
     } finally { busy = false; if (operation === work) operation = undefined; }
   };
   const adopt = async () => {
     if (closed) throw Error('画面を閉じました。復元先は再度開いて確認してください。');
-    const opened = await measure('adopt', () => openNormalValidationHost(ordinary, lease)); handedOff = true; return opened;
+    const opened = await measure('adopt', () => openNormalValidationHost(ordinary, lease)); handedOff = true;
+    if (witness) {
+      witness.producing = false;
+      if (matchesPreview(witness, opened)) witness.ready = { host: opened, token: opened.read().source!.token };
+      else revokePreview();
+    }
+    return opened;
   };
   const runJob = async (job: BackupRestoreJob, prepare: FirstRestoreDisplay) => {
     const staging = await measure('open-staging', () => job.openStaging(databases)), service = validationGenerationService(staging, options);
@@ -193,19 +241,41 @@ export async function openValidationEntry(options: ValidationHostOptions): Promi
       title, fileName: inputName, memo, error: failure, replacing: !!existing,
       cancellable: !selectedRecovery && (existing ? existing.backupRestore.cancellable || !existing.backupRestore.pending : !!prepared || !!control?.controls.pending),
       retryable: !!existing?.backupRestore.retryable || selectedRecovery || !!control?.controls.pending?.indexed }),
-    confirm: prepare => execute(async () => {
+    confirm: (prepare, preview) => execute(async () => {
       if (existing) { await existing.backupRestore.confirm(prepare); handedOff = true; return existing; }
       if (!prepared) throw Error('復元するファイルを確認してください。');
-      activate(); const job = await measure('persist', () => prepared!.persist(null, databases)); prepared = undefined; return runJob(job, prepare);
+      activate();
+      let seed = previewSeed?.job === prepared.id ? previewSeed : undefined; previewSeed = undefined;
+      if (!seed && preview) try {
+        const inspected = await prepared.inspection.source.inspectOriginal({ maxNodes: PACKAGE_LIMITS.inspectionNodes, maxWork: PACKAGE_LIMITS.inspectionWork });
+        seed = seedPreview(prepared.inspection, inspected, prepared.id);
+      } catch { /* A second attempt derives fresh optional text. */ }
+      publishPreview(seed, preview);
+      const job = await measure('persist', () => prepared!.persist(null, databases)); prepared = undefined; return runJob(job, prepare);
     }),
-    retry: prepare => execute(async () => {
+    retry: (prepare, preview) => execute(async () => {
       if (existing) { await existing.backupRestore.retry(prepare); handedOff = true; return existing; }
       activate(); await reload();
       const controls = await readRestoreControls(lease.workspace, limits);
       if (controls.selection) { await BackupRestoreJob.resumeSelection(lease.workspace, limits, databases, scope => validationGenerationService(scope, options)); return adopt(); }
       if (!control?.controls.pending?.start) throw Error('開始前の復元記録を取りやめ、ファイルを選び直してください。');
-      return runJob(await BackupRestoreJob.open(lease.workspace, control.owner.id, limits, databases), prepare);
+      const job = await BackupRestoreJob.open(lease.workspace, control.owner.id, limits, databases);
+      if (preview) try {
+        const inspected = await job.inspection.source.inspectOriginal({ maxNodes: PACKAGE_LIMITS.inspectionNodes, maxWork: PACKAGE_LIMITS.inspectionWork });
+        publishPreview(seedPreview(job.inspection, inspected, job.id), preview);
+      } catch { /* Fresh optional text only; all restore checks still run. */ }
+      return runJob(job, prepare);
     }),
+    takePreview(value, opened) {
+      const current = witness;
+      if (!current || current.value !== value || current.producing || current.ready?.host !== opened) return null;
+      witness = undefined; stopPreviewAccess();
+      try {
+        if (!matchesPreview(current, opened) || opened.read().source?.token !== current.ready.token) return null;
+        const actual = validatedResumeReading(opened.read(), run);
+        return actual?.sceneId === value.sceneId ? actual : null;
+      } catch { return null; }
+    },
     edit: () => execute(async () => {
       if (lease.holdsWriteLock && options.mode !== 'view') throw Error('すでに編集用の復元を開いています。');
       lease.release();
@@ -215,13 +285,13 @@ export async function openValidationEntry(options: ValidationHostOptions): Promi
     }),
     cancel: () => execute(async () => {
       if (existing) { if (existing.backupRestore.pending) await existing.backupRestore.cancel(); else existing.backupRestore.clearPreparation(); return; }
-      if (prepared) { prepared = undefined; return; }
+      if (prepared) { prepared = undefined; previewSeed = undefined; return; }
       activate(); await reload(); if (!control?.controls.pending?.start) throw Error('取りやめる復元を確認してください。');
       await BackupRestoreJob.cancel(lease.workspace, control.owner.id, limits, databases); await reload();
     }),
     abandon: () => execute(async () => { activate(); await reload(); if (!control?.controls.pending || control.owner.start) throw Error('開始前の復元記録を確認してください。');
       await BackupRestoreJob.abandon(lease.workspace, control.owner.id, limits, databases); await reload(); }),
-    async dispose() { if (closed) return; closed = true; try { await operation; } catch { /* Retain failed input. */ }
+    async dispose() { if (closed) return; closed = true; stopPreviewAccess(); revokePreview(); previewSeed = undefined; try { await operation; } catch { /* Retain failed input. */ }
       if (!handedOff) { if (existing) await existing.dispose(); else await release(); } },
   };
 }

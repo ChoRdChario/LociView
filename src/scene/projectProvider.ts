@@ -6,7 +6,8 @@ import type { CandidateIssue } from '../domain/projectCandidates';
 import type { HistoryReadLimits } from '../domain/atomicHistory';
 import type { ProjectContentVerifier } from '../domain/projectContentChecks';
 import { DomainValidationError, reject, type JsonObject, type JsonValue } from '../domain/values';
-import { value, type Field, type SceneState, type SceneResources, type Scene, type Membership, type Asset,
+import { chooseStartupScene, selectMemberships } from './resolve';
+import { value, type Entity, type Issue, type Field, type SceneState, type SceneResources, type Scene, type Membership, type Asset,
   type Caption, type View, type Material, type AssetProjection, type Table, type Lifecycle } from './types';
 
 type Content = Extract<ProjectContentInspection, { kind: 'project-content-inspection' }>;
@@ -44,18 +45,18 @@ export async function readProjectScene(input: unknown, limits: HistoryReadLimits
   try { return project(inspection, limits); }
   catch (error) { if (error instanceof DomainValidationError) return Object.freeze({ kind: 'rejected', issue: error.issue }); throw error; }
 }
-function project(inspection: Content, limits: HistoryReadLimits): ProjectProviderRead {
-  const { candidates } = inspection, fields = new Map(candidates.fields.map(f => [pathKey(f.path), f]));
+function candidateFields(candidates: Content['candidates'], issues: readonly CandidateIssue[], workUsed: number, limits: Pick<HistoryReadLimits, 'maxWork'>) {
+  const fields = new Map(candidates.fields.map(f => [pathKey(f.path), f]));
   const semanticProfile = projectSemanticProfile(candidates.source.semanticProfile), mutableRecordFields = mutableFieldsFor(semanticProfile);
   const optional = (map: string, name: string) => Object.hasOwn(mutableRecordFields, map) &&
     !!(mutableRecordFields[map as MutableRecordMap] as Record<string, { optional?: true }>)[name]?.optional;
   const projectionIssues: CandidateIssue[] = [];
-  let work = inspection.workUsed;
+  let work = workUsed;
   const charge = (n = 1) => { work += n; if (work > limits.maxWork) reject('limit', ['projectionWork']); };
-  charge(candidates.fields.length + inspection.issues.length + candidates.knownReferences.length);
+  charge(candidates.fields.length + issues.length + candidates.knownReferences.length);
   const issuesByEntity = new Map<string, CandidateIssue[]>();
-  const overCounts = new Set(inspection.issues.filter(i => i.code === 'candidate-child-count-exceeded').map(i => pathKey(i.path.slice(0, 2))));
-  for (const i of inspection.issues) {
+  const overCounts = new Set(issues.filter(i => i.code === 'candidate-child-count-exceeded').map(i => pathKey(i.path.slice(0, 2))));
+  for (const i of issues) {
     const key = pathKey(i.path.slice(0, i.path[0] === 'project' || i.path[0] === 'identity' ? 1 : 2));
     const group = issuesByEntity.get(key) ?? []; group.push(i); issuesByEntity.set(key, group);
   }
@@ -83,6 +84,12 @@ function project(inspection: Content, limits: HistoryReadLimits): ProjectProvide
     const v = f.candidates[0]!.value;
     return v.kind === 'value' ? value(v.value) : optional(path[0]!, path[2]!) ? value(undefined) : absent('missing');
   };
+  return { fields, read, charge, blocking, overCounts, projectionIssues, semanticProfile, mutableRecordFields };
+}
+function project(inspection: Content, limits: HistoryReadLimits): ProjectProviderRead {
+  const { candidates } = inspection;
+  const { fields, read, charge, overCounts, projectionIssues, semanticProfile, mutableRecordFields } =
+    candidateFields(candidates, inspection.issues, inspection.workUsed, limits);
   const frame = read(['project', 'frame']), identity = read(['identity']);
   if (frame.kind !== 'value' || identity.kind !== 'value') return freeze({ kind: 'blocked-project', inspection });
   const projectFrameId = string(object(frame.value).id);
@@ -211,4 +218,56 @@ function project(inspection: Content, limits: HistoryReadLimits): ProjectProvide
     state: { token, defaultSceneId: read(['project', 'defaultSceneId']) as Field<string>, scenes, assetMemberships, captionMemberships },
     resources: { token, projectFrameId, assets, captions, views, materials }, details: { mutable, immutable, attachments, tags, tagMemberships },
     pending: ['same-host-source-adapter-and-integration'] as const });
+}
+
+/** Plain text only. It is not a provider, Session, resource check or save receipt. */
+export interface ProjectCaptionText {
+  readonly title: string; readonly sceneId: string; readonly sceneName?: string;
+  readonly records: readonly Readonly<{ id: string; title: string; body: string }>[];
+  readonly incomplete?: boolean;
+}
+export function projectCaptionText(candidates: Content['candidates'], workUsed: number,
+  limits: Pick<HistoryReadLimits, 'maxWork'>): ProjectCaptionText | null {
+  const { read, charge, blocking } = candidateFields(candidates, candidates.issues, workUsed, limits);
+  const field = <T>(path: readonly string[]) => read(path) as Field<T>;
+  const life = (map: string, id: string): Field<Lifecycle> => {
+    const identity = field<string>([map, id, 'id']);
+    return identity.kind === 'value' && identity.value === id ? field([map, id, 'lifecycle']) : absent('invalid');
+  };
+  const ids = new Map<string, Set<string>>();
+  for (const f of candidates.fields) {
+    const [map, id] = f.path;
+    if (id && ['scenesById', 'captionsById', 'sceneCaptionMembershipsById'].includes(map!)) {
+      const group = ids.get(map!) ?? new Set<string>(); group.add(id); ids.set(map!, group);
+    }
+  }
+  const scenes: Record<string, Entity & { name: Field<string> }> = Object.create(null);
+  for (const id of ids.get('scenesById') ?? []) scenes[id] = { id, lifecycle: life('scenesById', id), name: field(['scenesById', id, 'name']) };
+  const startup = chooseStartupScene({ defaultSceneId: field(['project', 'defaultSceneId']), scenes });
+  if (!startup.sceneId) return null;
+  const sceneId = startup.sceneId, memberships: Record<string, Membership> = Object.create(null);
+  const captions: Record<string, Entity & { title: Field<string>; body: Field<string> }> = Object.create(null);
+  for (const id of ids.get('captionsById') ?? []) captions[id] = { id, lifecycle: life('captionsById', id),
+    title: field(['captionsById', id, 'title']), body: field(['captionsById', id, 'body']) };
+  for (const id of ids.get('sceneCaptionMembershipsById') ?? []) {
+    const scene = field<string>(['sceneCaptionMembershipsById', id, 'sceneId']), caption = field<string>(['sceneCaptionMembershipsById', id, 'captionId']);
+    if (scene.kind !== 'value' || caption.kind !== 'value') continue;
+    memberships[id] = { id, lifecycle: life('sceneCaptionMembershipsById', id), sceneId: scene.value, resourceId: caption.value,
+      orderKey: field(['sceneCaptionMembershipsById', id, 'orderKey']) };
+  }
+  const edges = Object.keys(memberships).length;
+  charge(edges * Math.ceil(Math.log2(edges + 1)) + Object.keys(captions).length + Object.keys(scenes).length);
+  const issues: Issue[] = [], selected = selectMemberships(memberships, sceneId, captions, issues), records: { id: string; title: string; body: string }[] = [];
+  let incomplete = issues.length > 0 || candidates.issues.some(i => blocking(i) &&
+    ['project', 'scenesById', 'captionsById', 'sceneCaptionMembershipsById'].includes(i.path[0]!));
+  for (const edge of selected) {
+    const c = captions[edge.resourceId]!;
+    if (c.title.kind === 'value' && c.body.kind === 'value') records.push(Object.freeze({ id: c.id, title: c.title.value, body: c.body.value }));
+    else incomplete = true;
+  }
+  if (!records.length) return null;
+  const title = field<string>(['project', 'title']), name = scenes[sceneId]!.name;
+  return Object.freeze({ sceneId, title: title.kind === 'value' ? title.value : '名前を確認できないプロジェクト',
+    ...(name.kind === 'value' ? { sceneName: name.value } : {}), records: Object.freeze(records),
+    incomplete: incomplete || title.kind !== 'value' || name.kind !== 'value' });
 }

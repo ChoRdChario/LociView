@@ -313,3 +313,10 @@ clears it. All initialization, display, Selection and recovery checks remain.
 Verify reading while preparation is held, failed/disposed cleanup and ordinary
 PC/touch edit/save/reopen after completion. This adds no renderer cache or
 initialization-time validation exception.
+
+PO-approved2026-11-12 [06g](06g-first-restore-caption-preview-proposal.md) adds
+the separate input-verified text-only preview before initialization. That scoped
+exception does not supply a ProjectDisplay, Session token or initialization/save
+receipt. The verified-display reader above remains a fallback; its actual token
+is never attached to the earlier preview. All Selection/write/readback/recovery
+requirements above remain unchanged. Executed qualification belongs in todo.
