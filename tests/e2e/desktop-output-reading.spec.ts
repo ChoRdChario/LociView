@@ -19,6 +19,10 @@ for (const phone of [false, true]) test(`saved records remain readable during ou
     await page.getByRole('button',{name:'新しいプロジェクトに変換',exact:true}).click();
     await expect(page.getByRole('button',{name:'閲覧する',exact:true})).toBeEnabled({timeout:90_000});
     await expect(page.getByLabel('キャプション一覧',{exact:true}).locator('li')).toHaveCount(100);
+    const detail=page.getByRole('region',{name:'キャプションの詳細',exact:true});
+    const firstTitles=(await page.getByLabel('キャプション一覧',{exact:true}).locator('.lv-caption-title').allTextContents()).slice(0,3).map(t=>t.trim());
+    await page.locator('.lv-caption-select').filter({hasText:firstTitles[0]!}).click();
+    await expect(page.locator('.lv-caption-window')).toHaveCount(1);
     // Hold a real output hash, then run the original digest after release. No fake artifact or weakened inspection.
     await page.evaluate(()=>{
       const digest=crypto.subtle.digest.bind(crypto.subtle);let release!:()=>void;
@@ -32,9 +36,15 @@ for (const phone of [false, true]) test(`saved records remain readable during ou
     await panel.getByRole('button',{name:'閉じる',exact:true}).click();
     await expect(panel).toBeHidden();await expect(page.locator('.lv-project-shell > .lv-operation-status')).toContainText('ファイルを作成しています。');
     const search=page.getByRole('searchbox',{name:'検索',exact:true}), list=page.getByLabel('キャプション一覧',{exact:true});
+    for(const title of firstTitles.slice(1)){
+      await detail.getByRole('button',{name:'次の記録',exact:true}).click();
+      await expect(detail.locator('[data-caption-field="title"] > p')).toHaveText(title);
+      await expect(page.locator('.lv-caption-window')).toHaveCount(1);
+      await expect(page.locator('.lv-caption-window')).toHaveAttribute('aria-label',firstTitles[0]!);
+    }
+    if(phone)await detail.getByRole('button',{name:'一覧へ戻る',exact:true}).click();
     await search.fill('既存のピン');const windows=await page.locator('.lv-caption-window').count();
     await list.locator('.lv-caption-select').filter({hasText:'既存のピン'}).click();
-    const detail=page.getByRole('region',{name:'キャプションの詳細',exact:true});
     await expect(detail.locator('[data-caption-field="title"] > p')).toHaveText('既存のピン');
     await expect(detail.getByLabel('本文',{exact:true})).toBeHidden();
     expect(await page.locator('.lv-caption-window').count()).toBe(windows);

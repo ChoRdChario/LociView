@@ -123,6 +123,9 @@ Read only the relevant topic, not every historical incident.
   knowledge. Follow UI guidelines §§2.1/4.4–4.5/6.1/9.2: meaningful choices,
   contextual detail and no routine internal inspection, without deleting useful
   viewing functions or weakening explicit decisions and recovery guarantees.
+  Ordinary Caption selection opens independent windows without a retention step;
+  bound previous/next navigation to the active window instead of changing all
+  opening behavior to solve unwanted accumulation.
 - Internal resume/autosave is not a confirmed external file save. A latest resume
   slot is not permission to discard continuing causal history or protected bodies.
 - Team-workflow labels describe actions, not fixed distributor/participant roles.

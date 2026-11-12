@@ -69,8 +69,6 @@
 .lv-project-workspace .lv-project-marker[data-review="true"]::after { content: "!"; position: absolute; right: 6px; top: 50%; transform: translateY(-50%); width: 16px; height: 16px; border: 1px solid #413d39; border-radius: 50%; background: #faf9f8; color: #413d39; font-size: 12px; font-weight: 700; line-height: 16px; text-align: center; }
 .lv-project-camera { position: absolute; top: 8px; right: 8px; z-index: 3; width: 112px; height: 156px; pointer-events: none; }
 .lv-project-camera > .lv-context-help { position: absolute; width: 0; height: 0; }
-.lv-stage-display > .lv-caption-windows:focus-within { z-index: 4; }
-.lv-project-camera:focus-within { z-index: 5; }
 .lv-camera-axes { position: relative; width: 112px; height: 112px; pointer-events: auto; touch-action: none; }
 .lv-camera-axes [data-axis="0"] { --lv-axis: #ee6378; }
 .lv-camera-axes [data-axis="1"] { --lv-axis: #92cf65; }
@@ -316,7 +314,8 @@
 .lv-project-shell .lv-project-workspace .lv-material-primary:disabled { background: #e4e4da; border-color: #c3c3b8; color: #62675b; }
 .lv-drawing-task > [aria-label="材質の更新候補"] { max-height: 35%; overflow: auto; }
 .lv-project-workspace .lv-project-marker[data-review="true"]::after { right: -1px; }
-.lv-camera-positions { position: absolute; top: 8px; right: 132px; z-index: 5; }
+.lv-camera-positions { position: absolute; top: 8px; right: 132px; z-index: 3; }
+.lv-camera-positions[open] { z-index: 5; }
 .lv-camera-positions > summary { min-height: 44px; padding: 10px 8px; box-sizing: border-box; cursor: pointer; font-size: 13px; color: #171c25; text-shadow: -1px 0 #fff, 1px 0 #fff, 0 -1px #fff, 0 1px #fff; }
 .lv-camera-positions > summary:focus-visible { outline: 2px solid #fff; outline-offset: -2px; box-shadow: 0 0 0 2px #202833; }
 .lv-camera-sheet { position: absolute; top: 100%; right: 0; box-sizing: border-box; width: min(360px, calc(100vw - 24px)); max-height: min(560px, calc(100dvh - 180px)); display: flex; flex-direction: column; overflow: hidden; padding: 12px; border: 1px solid #aaa99f; border-radius: 8px; background: #fbfaf6; box-shadow: 0 8px 24px #25282033; }
@@ -406,7 +405,6 @@
 }
 .lv-camera-pan { filter: drop-shadow(0 0 1px #fff); }
 .lv-caption-select { transition: background-color 140ms ease-out; }
-.lv-caption-retain[aria-pressed="true"] { background: #e3e8dc; box-shadow: inset 0 0 0 2px #68735c; }
 .lv-caption-window { animation: lv-record-reveal 140ms ease-out; transition: box-shadow 140ms ease-out; }
 .lv-record-media-draft:not([hidden]) { border-inline-start: 3px solid #68735c; padding-inline-start: 10px; animation: lv-record-reveal 140ms ease-out; }
 .lv-project-workspace > header > .lv-operation-status[data-passive="true"]:not(:empty) { animation: lv-record-reveal 140ms ease-out; }

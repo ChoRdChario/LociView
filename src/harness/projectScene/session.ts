@@ -948,12 +948,6 @@ export class SyntheticSession {
   acceptDetail(event: CaptionDetailEvent): boolean {
     if (this.workingBlock) return this.refuse(this.workingBlock);
     const context = this.detailContext();
-    if (event.kind === 'window') {
-      if (context.source.kind !== 'ready' || event.token !== context.source.token || event.sceneId !== this.sceneId ||
-        event.captionId !== this.memory.selectedCaptionId) return this.refuse('キャプションを選び直してください。');
-      return this.acceptWindow(planCaptionWindow(this.captionContext().source, this.windowMemory, this.memory.selectedCaptionId,
-        { kind: event.action, captionId: event.captionId }));
-    }
     if (event.kind === 'draft') {
       if (context.draft !== event.baseDraft) return this.refuse('入力の状態が変わっています。');
       this.drafts.set(event.draft.captionId, event.draft); this.message = ''; return true;

@@ -54,12 +54,11 @@ describe('Caption detail: local draft/intents, not durable editor acceptance', (
     expect(h.events.some(event=>event.kind==='cancel')).toBe(false);
     expect(h.props.mediaDraft?.selectionId).toBe('att_b'); h.controls.dispose();
   });
-  it('makes retained-window intent explicit independently of record editing', () => {
-    const h = host(), retain = record(h.controls.windowActions).children[0]!;
-    expect(retain.textContent).toBe('窓を残す'); expect(retain.attributes.get('aria-pressed')).toBe('false');
-    retain.click(); expect(h.events.at(-1)).toMatchObject({ kind:'window', action:'retain', captionId:cap });
-    h.render({...h.props,windowRetained:true}); expect(retain.attributes.get('aria-pressed')).toBe('true');
-    retain.click(); expect(h.events.at(-1)).toMatchObject({ kind:'window', action:'release', captionId:cap }); h.controls.dispose();
+  it('does not require a separate retention control in caption details', () => {
+    const h = host();
+    const all = (node: typeof h.root): typeof h.root[] => [node, ...node.children.flatMap(all)];
+    expect(all(h.root).some(n => n.tag === 'button' && n.textContent === '窓を残す')).toBe(false);
+    h.controls.dispose();
   });
   it('admits an owned media-only completion while retaining token, selection, IME and authority guards', () => {
     const ctx: DetailContext = { ...context(), mediaDraft: { token: 'one', sceneId: scn, captionId: cap, selectionId: 'att_one' } };
@@ -123,7 +122,6 @@ describe('Caption detail: local draft/intents, not durable editor acceptance', (
     expect(reading.attributes.has('data-lv-view-only')).toBe(true);
     expect(reading.children[1]!.textContent).toBe('本文\r\n二行目'); expect(h.body.value).toBe('未適用の本文');
     expect(h.titleGroup.children[0]!.attributes.has('data-lv-edit-only')).toBe(true);
-    expect(record(h.controls.windowActions).attributes.has('data-lv-edit-only')).toBe(false);
     const current = source(), conflicted = { ...current, caption: { ...current.caption, title: unresolved<string>() } };
     h.render({ ...h.props, source: conflicted, mutationBlock: '閲覧中です。' });
     expect(h.titleGroup.children[3]!.children[1]!.textContent).toBe('');

@@ -13,7 +13,8 @@ export function newCaptionWindowMemory(sceneId: string): CaptionWindowMemory {
   return Object.freeze({ sceneId, retained: Object.freeze([]), dismissed: Object.freeze([]), order: Object.freeze([]), placements: Object.freeze([]) });
 }
 export type CaptionWindowIntent =
-  Readonly<{ kind: 'open' | 'follow' | 'retain' | 'release' | 'close' | 'front'; captionId: string }> |
+  Readonly<{ kind: 'open' | 'close' | 'front'; captionId: string }> |
+  Readonly<{ kind: 'replace'; captionId: string; fromCaptionId: string; rect?: WindowRect }> |
   Readonly<{ kind: 'place'; captionId: string; rect: WindowRect }> |
   Readonly<{ kind: 'arrange'; placements: readonly CaptionPlacement[] }>;
 export type CaptionWindowPlan = Readonly<{ kind: 'blocked'; reason: string }> |
@@ -24,8 +25,8 @@ export type CaptionWindowPlan = Readonly<{ kind: 'blocked'; reason: string }> |
 export function captionWindowView(source: CaptionListSource, memory: CaptionWindowMemory, selectedCaptionId: string | null) {
   const issue = source.sceneId !== memory.sceneId ? 'シーンを確認してください。' : captionSourceIssue(source);
   const available = new Set(source.kind === 'ready' && !issue ? source.captions.map(item => item.id) : []);
+  // Open windows are independent of the detail's editing selection.
   const wanted = new Set(memory.retained);
-  if (selectedCaptionId && !memory.dismissed.includes(selectedCaptionId)) wanted.add(selectedCaptionId);
   const order = [...new Set([...memory.order, ...wanted])].filter(id => wanted.has(id));
   return { issue, visibleIds: order.filter(id => available.has(id)), suppressedIds: order.filter(id => !available.has(id)),
     placements: memory.placements };
@@ -50,14 +51,26 @@ export function planCaptionWindow(source: CaptionListSource, memory: CaptionWind
     return change({ placements: Object.freeze([...memory.placements.filter(item => !ids.includes(item.captionId)), ...replacements]) });
   }
   const id = intent.captionId;
-  if (intent.kind === 'close' || intent.kind === 'release') {
+  if (intent.kind === 'close') {
     if (![...memory.retained, ...view.visibleIds, ...view.suppressedIds].includes(id)) return block('ウィンドウを選び直してください。');
     return change({ retained: Object.freeze(memory.retained.filter(item => item !== id)),
-      dismissed: intent.kind === 'close' ? Object.freeze([...new Set([...memory.dismissed, id])]) : memory.dismissed });
+      dismissed: Object.freeze([...new Set([...memory.dismissed, id])]) });
   }
   if (view.issue || source.kind !== 'ready' || !source.captions.some(item => item.id === id))
     return block(view.issue || 'このシーンのキャプションを選択してください。');
-  if ((intent.kind === 'open' || intent.kind === 'follow') && id !== selectedCaptionId) return block('選択したキャプションのウィンドウを開いてください。');
+  if ((intent.kind === 'open' || intent.kind === 'replace') && id !== selectedCaptionId) return block('選択したキャプションのウィンドウを開いてください。');
+  if (intent.kind === 'replace') {
+    const from = intent.fromCaptionId;
+    if (from !== view.visibleIds.at(-1) || intent.rect && !validRect(intent.rect)) return block('アクティブなウィンドウを確認してください。');
+    // A record already on screen keeps its own window and placement.
+    if (view.visibleIds.includes(id)) return change({ order: Object.freeze(atFront(memory.order, id)) });
+    const rect = intent.rect ?? memory.placements.find(p => p.captionId === from)?.rect;
+    return change({ retained: Object.freeze(memory.retained.map(item => item === from ? id : item)),
+      dismissed: Object.freeze([...new Set([...memory.dismissed.filter(item => item !== id), from])]),
+      order: Object.freeze(atFront(memory.order.filter(item => item !== from), id)),
+      placements: rect ? Object.freeze([...memory.placements.filter(p => p.captionId !== id),
+        Object.freeze({ captionId: id, rect: Object.freeze({ ...rect }) })]) : memory.placements });
+  }
   if ((intent.kind === 'front' || intent.kind === 'place') && !view.visibleIds.includes(id))
     return block('ウィンドウを開いてください。');
   if (intent.kind === 'place') {
@@ -66,7 +79,7 @@ export function planCaptionWindow(source: CaptionListSource, memory: CaptionWind
       Object.freeze({ captionId: id, rect: Object.freeze({ ...intent.rect }) })]) });
   }
   return change({ order: Object.freeze(atFront(memory.order, id)),
-    retained: intent.kind === 'retain' || intent.kind === 'open' ? Object.freeze([...new Set([...memory.retained, id])]) : memory.retained,
+    retained: intent.kind === 'open' ? Object.freeze([...new Set([...memory.retained, id])]) : memory.retained,
     dismissed: intent.kind === 'front' ? memory.dismissed : Object.freeze(memory.dismissed.filter(item => item !== id)) });
 }
 export function captionWindowPlanIsCurrent(plan: CaptionWindowPlan, source: CaptionListSource,

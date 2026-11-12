@@ -165,7 +165,7 @@
 .lv-development-stage { overflow-y: auto; }
 .lv-development-sidebar > .lv-development-pending-panel { overflow-y: auto; min-height: 0; }
 .lv-caption-windows { position: absolute; inset: 0; pointer-events: none; }
-.lv-stage-display > .lv-caption-windows { z-index: 1; }
+.lv-stage-display > .lv-caption-windows { z-index: 4; }
 .lv-caption-window { position: absolute; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; box-sizing: border-box; pointer-events: auto; background: #f2f0ee; border: 1px solid #817c78; box-shadow: 0 2px 6px #312f2d26; }
 .lv-caption-window > header { display: flex; min-width: 0; border-bottom: 1px solid #b7b1aa; }
 .lv-caption-window > header > button { border: 0; background: transparent; }
@@ -285,7 +285,7 @@
 .lv-file-sheet [role="tab"][aria-selected="true"] { background: #e0e5d7; border-bottom: 3px solid #525f46; }
 .lv-file-sheet > [role="tabpanel"] { clear: both; padding-top: 12px; }
 .lv-file-sheet > [role="tabpanel"] > section > :is(form,details) { margin-block: 12px; }
-.lv-review-workspace .lv-caption-windows:focus-within { z-index: 4; }
+.lv-review-workspace .lv-caption-windows { z-index: 4; }
 .lv-review-workspace .lv-development-sidebar { min-height: 0; }
 .lv-review-append {
   align-self: start;

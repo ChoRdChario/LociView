@@ -8,7 +8,7 @@ import { createCaptionIncludeControls } from './captionIncludeControls';
 import { captionIncludePlanIsCurrent, newCaptionIncludeMemory, planCaptionInclude, type CaptionIncludeMemory, type CaptionIncludeContext } from './captionIncludeState';
 import { beginCaptionDraft, captionApplyIsCurrent, hasCaptionDraft, type CaptionDraft, type CaptionApplyPlan, type DetailContext } from './captionDetailState';
 import { createCaptionWindowControls } from './captionWindowControls';
-import { captionWindowPlanIsCurrent, newCaptionWindowMemory, planCaptionWindow, type CaptionWindowMemory, type CaptionWindowPlan } from './captionWindowState';
+import { captionWindowPlanIsCurrent, captionWindowView, newCaptionWindowMemory, planCaptionWindow, type CaptionWindowMemory, type CaptionWindowPlan } from './captionWindowState';
 import { createMediaViewer } from './mediaPreview';
 import { createMediaResidencyGate } from './mediaPreviewResources';
 import {storageFailureText} from './storageFeedback';
@@ -351,8 +351,8 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     if (reading && !(plan.kind === 'change' && ['search','scroll','select','step','revealSelection'].includes(plan.intent) || plan.kind === 'unchanged')) return;
     if (plan.kind === 'blocked') { feedback = plan.reason; render(); return; }
     if (!captionListPlanIsCurrent(plan, listContext())) return;
-    if (plan.kind === 'change') { memories.set(sceneId, plan.memory); if (plan.intent === 'select') { resetDraft(); if(reading)suppressAutomaticWindow(memory().selectedCaptionId!);else{if(organizeCaptions.open)alignOrganization();followWindow(memory().selectedCaptionId!);} captionSurface = 'detail'; } }
-    if (plan.kind === 'unchanged' && plan.explicitSelection) { if(reading)suppressAutomaticWindow(plan.explicitSelection.captionId);else followWindow(plan.explicitSelection.captionId); captionSurface = 'detail'; }
+    if (plan.kind === 'change') { memories.set(sceneId, plan.memory); if (plan.intent === 'select') { resetDraft(); if(!reading){if(organizeCaptions.open)alignOrganization();openCaptionWindow(memory().selectedCaptionId!);} captionSurface = 'detail'; } }
+    if (plan.kind === 'unchanged' && plan.explicitSelection) { if(!reading)openCaptionWindow(plan.explicitSelection.captionId); captionSurface = 'detail'; }
     if (plan.kind === 'effect' && plan.action === 'review') {
       selectCaption(plan.captionId); feedback = '記録の競合・配置先・メディアの状態を確認してください。';
     }
@@ -371,15 +371,6 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     if (plan.kind === 'change' && plan.intent === 'select' || plan.kind === 'unchanged' && plan.explicitSelection) detailHeading.focus?.({ preventScroll: true });
   }, active => { composing = active; render(); }, {compact:true,recordActions:{available:()=>!ports.readOnly&&ports.mode!=='view',invoke:(action,captionId,token,ownerScene)=>{if(disposed||sceneId!==ownerScene||provider().token!==token||memory().selectedCaptionId!==captionId)return;if(action==='edit')detail.focusBody();else beginDelete.click();}}});
   const detail = createCaptionDetailControls(document, event => {
-    if (event.kind === 'window') {
-      if (!disposed && !busy && !pending && !windowMoving && !ports.otherPending() && event.token === provider().token &&
-        event.sceneId === sceneId && event.captionId === memory().selectedCaptionId) {
-          const plan = planCaptionWindow(listContext().source, windowMemory(), memory().selectedCaptionId,
-            { kind: event.action, captionId: event.captionId });
-          acceptWindow(plan);
-        }
-      return;
-    }
     if (event.kind === 'review') {
       if (disposed || busy || pending || windowMoving || viewport.read().dragging || composingInput() || ports.otherPending() || event.token !== provider().token || event.captionId !== memory().selectedCaptionId) return;
       render(); recovery?.reveal(group => (group.target.kind === 'text' || group.target.kind === 'field') && group.target.captionId === event.captionId && group.target.field === (event.field === 'color' ? 'colorSrgb' : event.field)); return;
@@ -414,23 +405,29 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   const detailHeading = make('h2'); detailHeading.tabIndex = -1;
   const captionBack = button('一覧へ戻る', () => { captionSurface = 'list'; render(); list.focusSelection(); });
   const detailPane = make('section'); detailPane.className = 'lv-caption-reading';
+  function captionNavigationContext(context = listContext(), windowState = windowMemory()): CaptionListContext {
+    if (readDuringOutput()) return context;
+    const active = captionWindowView(context.source, windowState, context.memory.selectedCaptionId).visibleIds.at(-1);
+    return active && active !== context.memory.selectedCaptionId
+      ? { ...context, memory: { ...context.memory, selectedCaptionId: active } } : context;
+  }
   function stepCaption(direction: 'previous' | 'next') {
     if (disposed || busy || pending || windowMoving || ports.otherPending() && !readDuringOutput()) return;
-    const context = listContext(), plan = planCaptionList(context, { kind: 'step', direction });
-    if (plan.kind !== 'change' || !captionListPlanIsCurrent(plan, listContext())) return;
-    memories.set(sceneId, plan.memory); resetDraft();if(organizeCaptions.open)alignOrganization();
-    followWindow(plan.memory.selectedCaptionId!);
+    const base = listContext(), windowState = windowMemory(), context = captionNavigationContext(base, windowState);
+    const plan = planCaptionList(context, { kind: 'step', direction });
+    if (plan.kind !== 'change' || !captionListPlanIsCurrent(plan, context) ||
+        base.memory !== memory() || windowState !== windowMemory() || base.source.token !== provider().token) return;
+    const selected = plan.memory.selectedCaptionId!, active = captionWindowView(base.source, windowState, base.memory.selectedCaptionId).visibleIds.at(-1);
+    const replacement = !readDuringOutput() && active ? planCaptionWindow(base.source, windowState, selected,
+      { kind: 'replace', fromCaptionId: active, captionId: selected, rect: windows.placement(active) }) : undefined;
+    if (replacement?.kind === 'blocked') return;
+    memories.set(sceneId, plan.memory); resetDraft(); if(organizeCaptions.open)alignOrganization();
+    if (replacement?.kind === 'change' && captionWindowPlanIsCurrent(replacement, listContext().source, windowMemory(), memory().selectedCaptionId))
+      windowMemories.set(sceneId, replacement.memory);
     render(); list.revealSelected();
   }
-  function suppressAutomaticWindow(selected: string) {
-    const windows = windowMemory();
-    if (!windows.retained.includes(selected) && !windows.dismissed.includes(selected)) {
-      const suppress = planCaptionWindow(listContext().source, windows, selected, { kind: 'close', captionId: selected });
-      if (suppress.kind === 'change') windowMemories.set(sceneId, suppress.memory);
-    }
-  }
-  function followWindow(captionId: string) {
-    const plan = planCaptionWindow(listContext().source, windowMemory(), memory().selectedCaptionId, { kind: 'follow', captionId });
+  function openCaptionWindow(captionId: string) {
+    const plan = planCaptionWindow(listContext().source, windowMemory(), memory().selectedCaptionId, { kind: 'open', captionId });
     if (plan.kind === 'change') windowMemories.set(sceneId, plan.memory);
   }
   const previousCaption = button('前の記録', () => stepCaption('previous')), nextCaption = button('次の記録', () => stepCaption('next'));
@@ -691,7 +688,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     return true;
   }
   function resetDraft() { draft = null; draft = beginCaptionDraft(detailContext().source); }
-  function selectCaption(captionId: string) { memories.set(sceneId, { ...memory(), selectedCaptionId: captionId }); resetDraft();if(organizeCaptions.open)alignOrganization(); followWindow(captionId); captionSurface = 'detail'; }
+  function selectCaption(captionId: string) { memories.set(sceneId, { ...memory(), selectedCaptionId: captionId }); resetDraft();if(organizeCaptions.open)alignOrganization(); openCaptionWindow(captionId); captionSurface = 'detail'; }
   function setPin(next: WorkspacePinProposal) { pin = next; numericTarget = null; choosing = false; rawPosition = next.position.map(String);parent.open=false;numericAdd.open=false;addSettings.open=false; }
   function clearPin() { compactSurface = 'panel'; gesture = null; gestureGeneration++; pin = null; numericTarget = null; pinAction = null; surfaceOpening = null; surfaceFocus = null; choosing = false; placingCaption = null; rawPosition = ['', '', '']; }
   function candidateAssets() {
@@ -1094,13 +1091,12 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       if (!draft) draft = beginCaptionDraft(detailContext().source);
       list.render(listContext()); inclusion.render(includeContext()); detail.render({ ...detailContext(),
         textOnly: readDuringOutput(),
-        windowRetained: !!selected && windowMemory().retained.includes(selected),
         cancelBlock: pending?.owner === 'media' && canCancelMedia() ? null :
           mutationBlock() || (pickerScope || panelInput() || mediaManager?.hasChanges() ? '現在の入力・操作を完了してください。' : null),
         editorFields: memory().selectedCaptionId ? ports.captionEditors?.(memory().selectedCaptionId!) : undefined,
-        windowBlock: busy || pending || windowMoving || ports.otherPending() ? '現在の操作を完了してください。' : null });
-      previousCaption.disabled = busy || ports.otherPending() && !readDuringOutput() || planCaptionList(listContext(), { kind: 'step', direction: 'previous' }).kind !== 'change';
-      nextCaption.disabled = busy || ports.otherPending() && !readDuringOutput() || planCaptionList(listContext(), { kind: 'step', direction: 'next' }).kind !== 'change';
+      });
+      previousCaption.disabled = busy || ports.otherPending() && !readDuringOutput() || planCaptionList(captionNavigationContext(), { kind: 'step', direction: 'previous' }).kind !== 'change';
+      nextCaption.disabled = busy || ports.otherPending() && !readDuringOutput() || planCaptionList(captionNavigationContext(), { kind: 'step', direction: 'next' }).kind !== 'change';
       windows.render({ source: listContext().source, memory: windowMemory(), selectedId: selected, moveBlock: windowBlock(),
         visible: stageVisible() && !drawingPreview() && document.hidden !== true });
       addPin.disabled = !!blocked || dirty() || !sceneId;

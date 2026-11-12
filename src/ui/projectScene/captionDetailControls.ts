@@ -7,15 +7,11 @@ import { editOnly, viewOnly } from './modePresentation';
 export type CaptionDetailEvent = CaptionApplyPlan |
   Readonly<{ kind: 'draft'; baseDraft: CaptionDraft; draft: CaptionDraft }> |
   Readonly<{ kind: 'cancel'; draft: CaptionDraft }> |
-  Readonly<{ kind: 'review'; captionId: string; field: CaptionEditField; token: string }> |
-  Readonly<{ kind: 'window'; captionId: string; sceneId: string; token: string; action: 'open' | 'retain' | 'release' }>;
+  Readonly<{ kind: 'review'; captionId: string; field: CaptionEditField; token: string }>;
 export interface CaptionDetailProps extends DetailContext {
   readonly editorFields?: readonly { label: string; names: readonly (string | null)[] }[];
-  /** Host capability boundary, not a failed command or a change to the Caption. */
-  readonly windowBlock?: string | null;
   /** Temporary saved-text presentation; command guards remain unchanged. */
   readonly textOnly?: boolean;
-  readonly windowRetained?: boolean;
   readonly cancelBlock?: string | null;
 }
 let nextDetail = 0;
@@ -96,18 +92,12 @@ export function createCaptionDetailControls(document: Document, onEvent: (event:
   });
   const actions = make('div'); actions.className = 'lv-caption-detail-actions';
   actions.setAttribute('data-caption-completion', '');
-  const apply = button('変更を適用'), cancel = button('取り消す'), showWindow = button('窓を残す');
-  showWindow.className = 'lv-caption-retain';
-  const windowActions = make('div'); windowActions.className = 'lv-caption-detail-actions';
-  windowActions.setAttribute('aria-label', 'キャプションの表示');
-  actions.append(apply, cancel); windowActions.append(showWindow); root.append(windowActions, properties, actions);
-  const windowNote = make('p'); windowNote.id = `lv-caption-windows-${++nextDetail}`;
-  showWindow.setAttribute('aria-describedby', windowNote.id);
+  const apply = button('変更を適用'), cancel = button('取り消す');
+  actions.append(apply, cancel); root.append(properties, actions);
   const confirmation = make('div'); confirmation.hidden = true;
   editOnly(actions, picker, confirmation);
   const confirm = button('変更を取り消す'), keep = button('編集を続ける');
   confirmation.append(make('p', '入力中の変更を取り消しますか？'), confirm, keep); root.append(confirmation);
-  windowActions.append(windowNote);
   listen(apply, 'click', () => {
     if (!props || apply.disabled) return;
     const plan = planCaptionApply(props);
@@ -123,11 +113,6 @@ export function createCaptionDetailControls(document: Document, onEvent: (event:
         props.cancelBlock != null || props.draft.composing || props.feedback.kind === 'applying') return;
     const draft = props.draft; rememberFocus(confirm); cancelFor = null; confirmation.hidden = true; onEvent({ kind: 'cancel', draft });
   });
-  const windowEvent = (action: 'open' | 'retain' | 'release') => {
-    if (props?.source.kind === 'ready' && props.windowBlock == null) onEvent({ kind: 'window', captionId: props.source.caption.id,
-      sceneId: props.source.sceneId, token: props.source.token, action });
-  };
-  listen(showWindow, 'click', () => windowEvent(props?.windowRetained ? 'release' : 'retain'));
   properties.append(editors);
 
   function render(next: CaptionDetailProps): boolean {
@@ -141,7 +126,7 @@ export function createCaptionDetailControls(document: Document, onEvent: (event:
     const source = next.source, owned = next.draft?.captionId === nextId ? next.draft : null;
     const empty = source.kind === 'unavailable' && source.captionId === null && !hasCaptionDraft(owned);
     for (const control of fields.values()) control.input.parentElement!.parentElement!.hidden = empty;
-    properties.hidden = empty; mediaSlot.hidden = empty; windowActions.hidden = empty || !!next.textOnly;
+    properties.hidden = empty; mediaSlot.hidden = empty;
     editors.hidden = source.kind !== 'ready' || !next.editorFields;
     editorRows.replaceChildren();
     for (const field of next.editorFields ?? []) for (const [i, name] of field.names.entries()) {
@@ -187,9 +172,6 @@ export function createCaptionDetailControls(document: Document, onEvent: (event:
     actions.hidden = !hasCaptionDraft(owned) && !next.mediaDraft;
     cancel.disabled = !hasCaptionDraft(owned) && !next.mediaDraft || Boolean(owned?.composing) || inFlight || next.cancelBlock != null;
     confirm.disabled = cancel.disabled;
-    showWindow.setAttribute('aria-pressed', String(!!next.windowRetained));
-    windowNote.textContent = next.windowBlock ?? ''; windowNote.hidden = !!next.textOnly || next.windowBlock == null;
-    showWindow.disabled = source.kind !== 'ready' || next.windowBlock != null;
     const focus = returnFocus;
     if (focus && (source.kind !== 'ready' || source.caption.id !== focus.captionId || source.sceneId !== focus.sceneId || next.feedback.kind === 'failed')) returnFocus = null;
     else if (focus && !hasCaptionDraft(owned) && !next.mediaDraft && !inFlight && !next.mutationBlock) {
@@ -205,5 +187,5 @@ export function createCaptionDetailControls(document: Document, onEvent: (event:
     return true;
   }
   function dispose(): void { disposed = true; for (const cleanup of cleanups) cleanup(); root.remove(); }
-  return { root, mediaSlot, actions, confirmation, windowActions, focusBody: () => fields.get('body')!.input.focus?.({preventScroll:false}), render, dispose };
+  return { root, mediaSlot, actions, confirmation, focusBody: () => fields.get('body')!.input.focus?.({preventScroll:false}), render, dispose };
 }

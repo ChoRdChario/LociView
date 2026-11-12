@@ -25,6 +25,42 @@ test('phone record list, body and completion stay usable when the viewport shrin
     await expect(page.getByRole('button', { name: '閲覧する', exact: true })).toBeEnabled({ timeout: 90_000 });
     await expect(list.locator('li')).toHaveCount(100);
     expect((await list.boundingBox())?.height).toBeGreaterThanOrEqual(88);
+    const windows=page.locator('.lv-caption-window'),titles=(await list.locator('.lv-caption-title').allTextContents()).slice(0,3).map(t=>t.trim());
+    const card=(name:string)=>windows.filter({has:page.locator('.lv-caption-window-title').filter({hasText:name})});
+    await expect(page.getByRole('button',{name:'窓を残す',exact:true})).toHaveCount(0);
+    await list.locator('.lv-caption-select').filter({hasText:titles[0]!}).tap();
+    await detail.getByRole('button',{name:'一覧へ戻る',exact:true}).tap();
+    await list.locator('.lv-caption-select').filter({hasText:titles[2]!}).tap();await expect(windows).toHaveCount(2);
+    const otherNode=await card(titles[2]!).elementHandle();
+    await page.getByRole('button',{name:'3D',exact:true}).tap();
+    await card(titles[0]!).locator('.lv-caption-window-title').tap({position:{x:20,y:12}});
+    await expect(card(titles[0]!)).toHaveAttribute('data-active','true');const firstRect=await card(titles[0]!).boundingBox();
+    await page.getByRole('button',{name:'作業パネル',exact:true}).tap();
+    await expect(detail.getByLabel('タイトル',{exact:true})).toHaveValue(titles[2]!);
+    await detail.getByRole('button',{name:'次の記録',exact:true}).tap();
+    await expect(detail.getByLabel('タイトル',{exact:true})).toHaveValue(titles[1]!);await expect(windows).toHaveCount(2);
+    await expect(card(titles[0]!)).toHaveCount(0);expect(await otherNode!.evaluate(n=>n.isConnected)).toBe(true);
+    await page.getByRole('button',{name:'3D',exact:true}).tap();
+    await expect(card(titles[1]!)).toHaveAttribute('data-active','true');expect(await card(titles[1]!).boundingBox()).toEqual(firstRect);
+    await page.screenshot({path:info.outputPath('phone-multiple-caption-windows.png')});
+    // A camera focus must not put its 44px hit areas above window controls.
+    await page.locator('.lv-project-camera').getByRole('button',{name:'−X',exact:true}).focus();
+    await page.keyboard.press('Tab');
+    await expect(page.locator('.lv-project-camera').getByRole('button',{name:'Y',exact:true})).toBeFocused();
+    const keyboardHelp=page.getByRole('tooltip').filter({hasText:'Y：上から表示'});
+    await expect(keyboardHelp).toBeVisible();await expect(keyboardHelp).toBeInViewport({ratio:1});
+    expect(await keyboardHelp.evaluate(node=>getComputedStyle(node).pointerEvents)).toBe('none');
+    await page.screenshot({path:info.outputPath('phone-camera-keyboard-focus.png')});
+    const close=card(titles[1]!).getByRole('button',{name:'閉じる',exact:true});
+    await expect(close).toBeInViewport({ratio:1});
+    expect(await close.evaluate(node=>{const r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return hit===node||!!hit&&node.contains(hit);})).toBe(true);
+    await close.tap();await expect(windows).toHaveCount(1);await expect(card(titles[2]!)).toHaveAttribute('data-active','true');
+    await page.getByRole('button',{name:'作業パネル',exact:true}).tap();
+    await detail.getByRole('button',{name:'一覧へ戻る',exact:true}).tap();
+    await list.locator('.lv-caption-select').filter({hasText:titles[1]!}).tap();await expect(windows).toHaveCount(2);
+    await detail.getByRole('button',{name:'次の記録',exact:true}).tap();await expect(windows).toHaveCount(2);
+    await expect(card(titles[2]!)).toHaveAttribute('data-active','true');
+    await detail.getByRole('button',{name:'一覧へ戻る',exact:true}).tap();
     await page.getByRole('searchbox', { name: '検索', exact: true }).fill('既存のピン');
     await record.tap();
     await expect(detail).toBeVisible();
@@ -35,6 +71,8 @@ test('phone record list, body and completion stay usable when the viewport shrin
     await record.tap();
     await body.tap();
     await body.fill('狭い画面から本文を編集');
+    await body.dispatchEvent('compositionstart');await expect(detail.getByRole('button',{name:'次の記録',exact:true})).toBeDisabled();
+    await body.dispatchEvent('compositionend');
     await page.setViewportSize({ width: 320, height: 365 });
     for (const control of [body, apply, detail.getByRole('button', { name: '取り消す', exact: true })]) {
       await expect.poll(() => control.evaluate(node => {

@@ -12,8 +12,8 @@ supplies two Scenes and shared Caption content. Exact-token actions update only
 page memory; no imported/raw Project is validated by this fixture. A/B/A retains
 selection/search/colors, shared text and unrelated draft input. The same host now
 connects exact fixture triangle/pin rendering through existing Three.js and
-retained read-only comparison windows. `windowBlock` still lets other hosts
-disable unavailable window actions honestly. Other effects remain
+multiple read-only comparison windows through ordinary record selection. The
+window layer keeps its owned move/resize guards. Other effects remain
 pending, not replaced with fake success. Host/DOM tests are not browser/IME or
 device evidence. Full Project admission, renderer, durable storage and ordinary
 app activation retain their prerequisites. Do not create a competing mock UI.

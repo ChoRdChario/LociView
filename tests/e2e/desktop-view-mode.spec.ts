@@ -1,5 +1,5 @@
 import {test, createBrowserProfile} from '../helpers/browserProfile';
-import { revealCameraPositions, revealWorkPanel, revealCoordinateAdd, revealFileSurface, revealProjectSelection, lookAlongFront, revealOfflineUtilities } from './workspaceUi';
+import { revealCaptionList, revealCameraPositions, revealWorkPanel, revealCoordinateAdd, revealFileSurface, revealProjectSelection, lookAlongFront, revealOfflineUtilities } from './workspaceUi';
 import { expect, chromium, type Locator } from '@playwright/test';
 import { readFile} from 'node:fs/promises';
 
@@ -194,7 +194,7 @@ test('view mode hides editing while preserving reading, local display, existing 
     await expect(p.getByRole('region',{name:'キャプション',exact:true})).toBeVisible();
     const captions = p.getByRole('region', { name: 'キャプション', exact: true }); await captions.locator('.lv-caption-search').getByLabel('検索', { exact: true }).fill('現地'); await expect(p.locator('.lv-caption-select')).toHaveCount(1);
     await p.locator('.lv-caption-select').click(); await expect(detail).toBeVisible();
-    await detail.getByRole('button', { name: '窓を残す', exact: true }).click(); await expect(p.locator('.lv-caption-window')).toBeVisible();
+    await expect(p.getByRole('button', { name: '窓を残す', exact: true })).toHaveCount(0); await expect(p.locator('.lv-caption-window')).toBeVisible();
     await expect(p.getByRole('region', { name: 'メディア', exact: true }).locator('img').first()).toBeVisible();
     if (await menu.evaluate(n => (n as HTMLDetailsElement).open)) await menu.locator(':scope > summary').click();
     await p.screenshot({ path: info.outputPath('view-caption.png'), fullPage: false });
@@ -221,7 +221,7 @@ test('view mode hides editing while preserving reading, local display, existing 
     await expect(p.locator('.lv-caption-window').getByRole('button',{name:'閉じる',exact:true})).toBeInViewport();
     await p.screenshot({path:info.outputPath('narrow-stage.png'),fullPage:false});
     await p.locator('.lv-caption-window').getByRole('button',{name:'閉じる',exact:true}).click();await expect(p.locator('.lv-caption-window')).toHaveCount(0);
-    await p.getByRole('button',{name:'作業パネル',exact:true}).click();await expect(detail).toBeVisible();await detail.getByRole('button',{name:'窓を残す',exact:true}).click();await p.setViewportSize({ width: 1440, height: 1000 });
+    await p.getByRole('button',{name:'作業パネル',exact:true}).click();await expect(detail).toBeVisible();await revealCaptionList(p);await p.locator('.lv-caption-select').click();await p.setViewportSize({ width: 1440, height: 1000 });
     await p.getByRole('button', { name: '編集する', exact: true }).click(); await expect(p.getByRole('button', { name: '閲覧する', exact: true })).toBeEnabled();
     await expect(p.getByRole('list',{name:'キャプション一覧',exact:true})).toBeVisible();await expect(captions.locator('.lv-caption-search').getByLabel('検索', { exact: true })).toHaveValue('現地');await p.locator('.lv-caption-select').click(); await expect(detail.getByLabel('本文', { exact: true })).toHaveValue('確認する本文\n二行目');
     await detail.getByLabel('本文', { exact: true }).fill('閲覧から戻って編集'); await expect(p.getByRole('button', { name: '閲覧する', exact: true })).toBeDisabled();

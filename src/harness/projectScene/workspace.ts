@@ -97,7 +97,7 @@ export function createDevelopmentWorkspace(document: Document, session = new Syn
   information.className = 'lv-development-information'; information.append(informationLabel, composition);
   editor.append(editorHeading, detail.root, media.root, captionDeletion.root);
   const windowActions = make('section'); windowActions.className = 'lv-development-window-actions';
-  windowActions.append(detail.windowActions, viewport.windowTools);
+  windowActions.append(viewport.windowTools);
   stage.append(viewport.stageTools, pin.modeStrip, viewport.root, numeric, placement.modeStrip, information);
   viewPanel.replaceChildren(viewport.view);
   materialPanel.replaceChildren(material.root);
@@ -130,7 +130,7 @@ export function createDevelopmentWorkspace(document: Document, session = new Syn
     // Refresh every mounted recipient even while hidden; never unmount an editor to change tabs.
     const captionContext = session.captionContext();
     const detailOkay = detail.render({ ...session.detailContext(),
-      windowBlock: null });
+    });
     const listOkay = list.render(captionContext);
     const modelsOkay = modelList.render(session.modelContext());
     const materialOkay = material.render(session.materialContext());

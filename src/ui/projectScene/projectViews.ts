@@ -5,6 +5,7 @@ import { createViewBackgroundControls } from './viewAuthoringControls';
 import { newViewMemory, savedViewChoices, savedViewIssue, viewRuntimeMatches, type ViewContext, type ViewMemory } from './viewState';
 import { acceptViewBackground, solidViewBackgroundSource, viewBackgroundPlanIsCurrent, type ViewBackgroundContext, type ViewBackgroundDraft } from './viewBackgroundState';
 import { newProjectId, panelNodes, sameProjectValue, type ProjectPanelHost, type ProjectPanel } from './projectPanel';
+import { contextHelp } from './contextHelp';
 
 /** Scene entry recording only. Existing views remain in source/history without a management picker. */
 export function createProjectViews(document: Document, host: ProjectPanelHost): ProjectPanel & { cameraControls: HTMLElement } {
@@ -32,7 +33,9 @@ export function createProjectViews(document: Document, host: ProjectPanelHost): 
   }catch(error){host.message((error as Error).message);}host.changed();});
   editOnly(recordEntry);const entryNote=make('p');entryNote.setAttribute('role','status');
   const cameraControls=make('section'),projection=make('select');cameraControls.className='lv-camera-projection';projection.setAttribute('aria-label','投影方式');
-  for(const [value,text]of[['perspective','透視投影'],['orthographic','平行投影']]){const option=make('option',text);option.value=value!;projection.append(option);}cameraControls.append(projection);
+  const projectionHelp=contextHelp(document,'投影方式：透視投影・平行投影を切り替えます。',[projection]);
+  (projectionHelp.children[0] as HTMLElement).hidden=true;
+  for(const [value,text]of[['perspective','透視投影'],['orthographic','平行投影']]){const option=make('option',text);option.value=value!;projection.append(option);}cameraControls.append(projection,projectionHelp);
   projection.addEventListener('change',()=>{if(disposed||projection.disabled)return;const view=context();if(view.cameraBlock||state().background||view.runtime.kind!=='ready'||!viewRuntimeMatches(view))return;try{host.viewport().viewCamera({kind:'projection',projection:projection.value==='orthographic'?'orthographic':'perspective'});}catch(error){host.message((error as Error).message);}host.changed();});
   const background = createViewBackgroundControls(document, event => {
     const s = state(); if (disposed || host.block('views', false)) return;

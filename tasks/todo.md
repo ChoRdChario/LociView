@@ -57,7 +57,96 @@ unchanged-feature-classification checks pass; independent review has no findings
 No runtime change or new capacity guarantee; no runtime suite is needed for this
 documentation checkpoint.
 
-## Current work —read verified text during first backup restoration (06g)
+## Current work —open multiple Caption windows without retention controls
+
+PO2026-11-12 explicitly restores normal multiple-window opening. Base g0/fba9960;
+root is the sole writer, with bounded read-only state/contract and test mapping
+reviews. Preserve the251 private draft lines and semantic-zero dirt in
+sendWorkspace/backupOutputJob. No new format, dependency, Session/storage,
+renderer, recovery fence, device guarantee or release change.
+
+Outcome: explicit list/pin selection opens that Caption or brings its existing
+window forward without closing others. Previous/next uses the active window as
+its starting record and replaces only that window; opening an already visible
+target focuses it without duplicating or closing other windows. Remove the
+retention button and its extra required step from product and Review paths.
+Keep per-Scene ownership, window move/resize/order/close, plain-text/media safety,
+draft/IME/fault guards and hidden-mobile resource suspension. Pure UI memory is
+not persisted as Project edits. With no active window, navigation changes the
+detail selection without opening windows implicitly.
+
+Before implementation, update the accepted workspace interaction description and
+review active-versus-selected identity, duplicate targets and placement handoff.
+Implement through existing window plans and host boundaries. Reuse pure state,
+DOM/connection tests and existing Desktop PC/touch workflows for multiple open,
+active switching, duplicate/closed target, close/reopen, Scene changes, IME,
+photo suspension and normal save/cold continuation. No new giant roundtrip.
+At the final tree run independent diff review, serial check:checkpoint and
+appropriate Desktop/browser/isolation checks; freeze verified artifacts, Push
+suitable g0 scope and check exact CI. Refresh only the owned4191 preview.
+Stop only affected work for a new genuine contract conflict; no small PO waits.
+Physical Safari/IME/memory acceptance remains separate.
+
+Milestone audit: window state/Controls own only page-local open/order/placement;
+Session, storage/package and renderer code are unchanged. Independent diff review
+found and closed the output-reading Next origin bug: while windows are frozen,
+sequential detail reading uses detail selection, not the unchanged active window.
+Focused state/DOM/connection/import tests69 PASS, selected file-service cases4
+PASS (other714 filtered, not executed), and focused-v3 phone/output PC+phone3
+PASS. Initial browser startup used the config directory as cwd and ran no cases;
+v2's hidden role lookup and fixture setup were corrected. V3's PC case passed
+window/frame/media/cold behavior but retained the old two-record deletion count
+after adding a third fixture; the final expectation now matches the three inputs.
+Keep all failed logs/images; no timeout/assertion relaxation or automatic retry.
+
+Read-only test mapping selects13 relevant Desktop cases: direct PC+phone window
+and output-reading4, plus daily-authoring/file-continuation/view-mode2/input-
+continuity2/image-inspection/portable-HEIC/workspace-completion9. A subsequent
+touch-image/CSS review found that camera hit areas could cover window controls.
+Set windows always above ordinary camera controls, closed camera-position UI below
+windows and its open sheet above, keeping pin completion above both. Add an actual
+touch close/reopen with camera focused and center-hit verification. This is a CSS-
+only product follow-up, then existing help text/description nodes were reused to
+identify keyboard-focused camera/projection controls without lifting their hit
+areas above windows. No mutation/navigation/renderer behavior changes in this
+follow-up. The final camera/help/views/import unit files48 PASS on that final
+presentation code; the full unit run also completes3520 PASS/16 expected-fail/
+21todo in1934.62s. Final builds/rendered checks cover final styling and descriptions;
+final typecheck passes for the additional browser-test code. V3 phone/output
+passes remain earlier-candidate evidence. The final13 affected/adjacent cases,
+one navigation-only Ki-84 check, mandatory checkpoint and installed2 completed
+as detailed below. No new giant file roundtrip is added.
+No all-Desktop52 or giant GS/receive roundtrip credit is inferred for this tree.
+
+Final2026-11-12: required checkpoint, all5 builds, offline/HEIC isolation and final
+test typecheck PASS. Final rendered Desktop scope is13 selected cases: the first
+adjacent run has9 PASS/1 test-only responsive-navigation failure; use the existing
+revealCaptionList helper rather than requiring a touch-only Back button on narrow
+mouse PC. The corrected case passes32.4s; the three direct final cases pass1.0min,
+including actual Tab/tooltip/close/reopen and uninterrupted readonly output reading.
+Original failures remain retained. No test limit, retry or product code changed
+after freeze; `test-revision.json` records this one browser-test-file change.
+Final source/test fingerprint is21e3cfea29b1996bfa07b0ac89947e2ea2e6648394a7ea2e1c56cdc716944ff2;
+frozen runtime bytes are unchanged from the mandatory builds.
+
+Ki-84 navigation-only PASS1.3min: checked original input SHA, restored in an empty
+owned browser, opened two normal windows, stepped from an active window different
+from the detail selection, kept the other DOM/frame intact, deduplicated an already
+open target, reopened a third normal window and retained input SHA. It is not a
+new Ki-84 save/phone/offline/performance qualification. Installed Edge/Chrome2
+PASS59.8s. Window operations retain existing typed command, save, recovery and
+hidden-resource authority; no renderer/storage/format change or latency guarantee.
+Independent source/contract, final executed-evidence and settled touch-image reviews
+have no remaining findings; exact staged source/artifact/privacy checks remain
+the checkpoint condition. Git owns checkpoint/CI identity, with local proofs in
+`.artifacts/e2e/multi-caption-windows-20261112/`.
+
+Next: return to the existing large-data comfort work—measure validation/CAS/receipt
+write/readback inside first-restoration fact-save, preserve every save/recovery
+fence, and remove only demonstrated authorized duplicate work. Physical iPhone/
+Safari memory, IME and file handling remain pending; no release or general adoption.
+
+## Previous checkpoint —read verified text during first backup restoration (06g)
 
 PO2026-11-12 approved06g. Base g0/baaca7e; prior frozen6ecc checkpoint, Desktop52,
 offline8, installed Edge/Chrome2 and exact pushed CI43079185587 all pass. Root is

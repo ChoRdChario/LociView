@@ -202,7 +202,11 @@ export function createCaptionWindowControls(document: Document, onPlan: (plan: C
       rect: displayedWindowRect({ left: (i % columns) * 296, top: Math.floor(i / columns) * 216, width: 280, height: 200 }, projection.width, projection.height) })) });
   };
   front.addEventListener('change', changeFront); arrange.addEventListener('click', arrangeAll);
-  return { root, tools, render, project(next: WindowProjection) {
+  return { root, tools, render, placement(captionId: string): WindowRect | undefined {
+      if (disposed || !context || !captionWindowView(context.source, context.memory, context.selectedId).visibleIds.includes(captionId)) return;
+      const rect = context.memory.placements.find(p => p.captionId === captionId)?.rect ?? cards.get(captionId)?.initial;
+      return rect && Object.freeze({ ...rect });
+    }, project(next: WindowProjection) {
       const extentChanged = projection.width !== next.width || projection.height !== next.height;
       projection = [next.width, next.height].every(n => Number.isFinite(n) && n >= 0) ? next : { ...next, ready: false, width: 0, height: 0 };
       if (extentChanged) extentVersion++;

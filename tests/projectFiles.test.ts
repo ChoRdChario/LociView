@@ -6355,7 +6355,6 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
   it('compares product Captions in stable Scene-local windows with guarded gestures and one shared image viewer (recorded DOM)', async () => {
     const h = await productWorkspaceFixture(true), { host, editor, all, button, named, edited } = h;
     named('キャプション一覧', editor).children[0]!.children[0]!.fire('click');
-    button('窓を残す', named('キャプションの詳細', editor)).fire('click');
     button('ピンを追加', editor).fire('click'); const canvas = named('3Dモデルの表示', editor), pointer = { pointerId: 7, button: 0, isPrimary: true, clientX: 80, clientY: 90 };
     canvas.fire('pointerdown', pointer); canvas.fire('pointerup', pointer); await Promise.resolve(); await edited(() => button('位置を確定', editor).fire('click'));
     const title = named('タイトル', editor); title.value = '比較する記録'; title.fire('input'); await edited(() => button('変更を適用', named('キャプションの詳細', editor)).fire('click'));
@@ -6365,7 +6364,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     scroll.scrollTop = 70; body.value = '未適用の本文'; body.fire('input'); body.fire('compositionstart');
     button('最初の記録', a).fire('click'); expect(body.value).toBe('未適用の本文'); expect(title.value).toBe('比較する記録');
     bClose.fire('click'); expect(cards()).toEqual([a]); expect(body.value).toBe('未適用の本文');
-    button('窓を残す', detail).fire('click'); expect(cards()).toHaveLength(2); expect(body.value).toBe('未適用の本文');
+    named('キャプション一覧', editor).children.find(row => all(row).some(n => n.textContent === '比較する記録'))!.children[0]!.fire('click'); expect(cards()).toHaveLength(2); expect(body.value).toBe('未適用の本文');
     button('×', named('比較する記録', windows)).fire('click');
     named('キャプション一覧', editor).children.find(row => all(row).some(n => n.textContent === '比較する記録'))!.children[0]!.fire('click');
     expect(cards()).toHaveLength(2); expect(body.value).toBe('未適用の本文');
@@ -7740,8 +7739,8 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect(open).not.toHaveBeenCalled(); expect(render).not.toHaveBeenCalled(); expect(renderReview).toHaveBeenCalledOnce();
     const rows = all(page).filter(n => n.className === 'lv-caption-select'); expect(rows).toHaveLength(2);
     const pageButton = (text: string) => all(page).find(n => n.tag === 'button' && n.textContent === text)!;
-    rows[0]!.fire('click'); pageButton('窓を残す').fire('click');
-    rows[1]!.fire('click'); pageButton('窓を残す').fire('click');
+    rows[0]!.fire('click');
+    rows[1]!.fire('click');
     expect(all(page).filter(n => n.className === 'lv-caption-window')).toHaveLength(2);
     const retry = all(page).find(n => n.tag === 'button' && n.textContent === '3D表示を再試行')!;
     expect(retry.hidden).toBe(false); expect(all(page).some(n => n.textContent === 'injected renderer startup refusal')).toBe(true);
