@@ -270,7 +270,7 @@ export class BackupRestoreJob {
   }
   inventory(): JsonObject[] { return this.inspection.description.bodyRefs.map(r => ({ ...r })); }
   private static async verifyDestination(root: ProjectWorkspaceFS, ports: RestoreSourcePorts, factory: MetadataStorageFactory, job: RestoreControlJob,
-    limits: MetadataLimits, selected?: GenerationSelection, timing?: DestinationTiming) {
+    limits: MetadataLimits, selected?: GenerationSelection, timing?: DestinationTiming, reopenSelected = false) {
     const measure = async <T>(stage: string, action: () => Promise<T>): Promise<T> => {
       if (!timing) return action();
       const started = performance.now();
@@ -291,9 +291,27 @@ export class BackupRestoreJob {
       if (!restoreEqual(original[key], job.prepared[key])) fail('restore-destination-originals');
     const destination = { journal: restoreRef(restored.entry.prepared), publication: restoreRef(restored.entry.publication), baseBinding: restoreRef(restored.binding) };
     if (selected && !restoreEqual(destination, selected.destination)) fail('restore-destination-binding');
-    const read = await measure('session', () => ports.session.read());
-    if (read.state !== 'ready' || !read.source || !read.publication || read.provider?.kind !== 'scene-provider' ||
+    const read = await measure('session', () => ports.session.read(reopenSelected));
+    const recovery = reopenSelected && !!selected && job.result?.detail.kind === 'selected' && read.state === 'pending';
+    if ((!recovery && read.state !== 'ready') || !read.source || !read.publication || read.provider?.kind !== 'scene-provider' ||
       read.provider.token !== read.source.token) return fail('restore-destination-not-ready');
+    if (recovery) {
+      // The restore itself already finished. Permit strict recovery of one later
+      // documented text edit, never a new selection or a partially restored base.
+      const journal = new TransactionJournal(ports.fs, limits), tail = (await journal.entries()).at(-1);
+      if (!tail?.prepared || tail.publication || tail.start.purpose !== 'localCommand' ||
+        tail.start.predecessor !== read.publication || !restoreEqual(tail.start.baseHeads, read.source.heads) ||
+        tail.prepared.remote || tail.prepared.stagedBlobs?.length || tail.prepared.changes.length !== 1)
+        return fail('restore-destination-not-ready');
+      const parts = await journal.validateParts(tail.prepared), next = read.source.appendOriginal(parts);
+      const change = next.read().history.changes.find(entry => entry.id === tail.prepared!.changes[0]!.expectedChangeHash);
+      const path = change?.writes[0]?.path;
+      if (path?.[0] !== 'captionsById' || !path[1]) return fail('restore-destination-not-ready');
+      read.source.assertCaptionTextChange(parts[0]!, path[1], read.provider);
+      const current = await new MetadataRepository(ports.fs, factory, limits).read(tail.start.repositoryId, tail.start.proof);
+      if (!current || current.token !== next.token && (tail.durable || current.token !== read.source.token))
+        return fail('restore-destination-database');
+    }
     const saved = await measure('repository', () => new MetadataRepository(ports.fs, factory, limits).read(restored.entry.start.repositoryId, restored.source.proof, read.source!.heads));
     if (saved?.token !== read.source.token) return fail('restore-destination-database');
     await measure('bodies', async () => {
@@ -309,34 +327,48 @@ export class BackupRestoreJob {
   /** Resolve existing selected data only. Read permission survives a pending restore; ordinary writes do not. */
   static async openSelected(root: ProjectWorkspaceFS, limits: MetadataLimits, databases: RestoreDatabasePorts,
     createPorts: (scope: Awaited<ReturnType<typeof openWorkspaceGeneration>>) => RestoreSourcePorts,
-    diagnostics?: { observeCatalogRead?: (read: MetadataSessionRead) => void; timing?: DestinationTiming }) {
+    diagnostics?: { observeCatalogRead?: (read: MetadataSessionRead) => void; timing?: DestinationTiming; ordinarySession?: boolean; reopenTextRecovery?: boolean }) {
     const observeCatalogRead = diagnostics?.observeCatalogRead, timing = diagnostics?.timing;
     const state = await reconcileRestoreDatabases(root, limits, () => databases.listGenerations()), selected = state.selection,
       generationId = state.tail?.jobId ?? null;
-    const checkSelected = async () => {
-      const next = await readRestoreControls(root, limits);
+    let ordinary = false;
+    const checkSelected = async (writing = false) => {
+      const singleOpen = ordinary;
+      let next = await readRestoreControls(root, limits, false, singleOpen ? 'ordinary-selected' : 'strict');
+      if (!restoreEqual(next.selection, selected)) fail('restore-generation-retired');
+      if (singleOpen && (next.pending || !next.jobs.find(j => j.id === generationId)?.result)) {
+        ordinary = false;
+        if (writing) fail('restore-pending');
+      }
+      if (singleOpen && !ordinary) {
+        next = await readRestoreControls(root, limits);
+      }
       if (!restoreEqual(next.selection, selected)) fail('restore-generation-retired'); return next;
     };
     const checkWritable = async () => {
-      const next = await checkSelected();
+      const next = await checkSelected(true);
       if (next.pending || next.tail && !next.jobs.find(j => j.id === next.tail!.jobId)?.result) fail('restore-pending');
     };
     const scope = await openWorkspaceGeneration(root, { generationId, allowCreate: false, auditReadOperations: true,
       assertSelected: async () => { await checkSelected(); },
-      ...(generationId === null ? { assertWritable: checkWritable } : { assertSelectedWritable: checkWritable }) }, databases.open);
+      ...(generationId === null ? { assertWritable: checkWritable } : { assertSelectedWritable: checkWritable,
+        ordinaryTextCommit: () => ordinary }) }, databases.open);
     try {
       const ports = createPorts(scope);
       if (ports.fs !== scope.fs || ports.factory !== scope.factory) fail('restore-selected-scope');
-      let catalogRead: MetadataSessionRead | undefined;
+      let catalogRead: MetadataSessionRead | undefined, fullyReady = false;
       if (state.tail) {
         const job = state.jobs.find(j => j.id === generationId)!;
         if (!job.prepared) return fail('restore-destination-job');
-        const verified = await this.verifyDestination(root, ports, scope.factory, job, limits, state.tail, timing);
+        const verified = await this.verifyDestination(root, ports, scope.factory, job, limits, state.tail, timing, diagnostics?.reopenTextRecovery);
+        fullyReady = verified.read.state === 'ready';
         if (observeCatalogRead) catalogRead = verified.read;
       }
       await scope.check();
+      ordinary = fullyReady && diagnostics?.ordinarySession === true && generationId !== null && !state.pending &&
+        state.jobs.some(j => j.id === generationId && j.result?.detail.kind === 'selected');
       if (catalogRead) observeCatalogRead?.(catalogRead);
-      return { ...scope, ports, selection: selected, pending: state.pending };
+      return { ...scope, ports, selection: selected, pending: state.pending, requireStrictChecks() { ordinary = false; } };
     } catch (error) { await scope.dispose().catch(() => {}); throw error; }
   }
   /** One authoritative switch. An already retained switch is completed, never rewritten or rolled back. */

@@ -86,7 +86,7 @@ export class MetadataRepository {
     }
   }
 
-  private documentId(id: string): DocumentId {
+  documentId(id: string): DocumentId {
     const bytes = Uint8Array.from(technicalId(id).match(/../g)!, v => parseInt(v, 16));
     return parseAutomergeUrl(stringifyAutomergeUrl(bytes as BinaryDocumentId)).documentId;
   }

@@ -563,6 +563,8 @@ export const projectSceneApplicationImports:Readonly<Record<string,readonly stri
     "three/addons/loaders/GLTFLoader.js"
   ],
   "src/projectScene/validationWorkspace.ts": [
+    "../projectPackage/reviewArchive",
+    "../domain/values",
     "../ui/projectScene/storageFeedback",
     "../scene/resolve",
     "../projectPackage/sceneAppend",

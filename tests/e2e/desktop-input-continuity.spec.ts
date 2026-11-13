@@ -48,7 +48,8 @@ for (const touch of [false, true]) test(`attachment ordering and Drawing complet
     const firstAdd = page.getByRole('button', { name: 'キャプションを追加', exact: true });
     await expect(firstAdd).toHaveText('キャプションを追加');
     expect(await firstAdd.evaluate(node => Number.parseFloat(getComputedStyle(node).fontSize))).toBeGreaterThanOrEqual(14);
-    expect((await firstAdd.boundingBox())!.y).toBeLessThan((await page.locator('.lv-caption-browser input[type="search"]').boundingBox())!.y);
+    const sceneSearch = page.getByRole('searchbox', { name: '検索', exact: true });
+    expect((await firstAdd.boundingBox())!.y).toBeLessThan((await sceneSearch.boundingBox())!.y);
     await expect(page.getByRole('group', { name: '保存状況', exact: true })).toContainText('ブラウザ内');
     await page.screenshot({ path: info.outputPath('first-record-entry.png') });
     await firstAdd.click();

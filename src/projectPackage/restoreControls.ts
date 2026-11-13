@@ -1,4 +1,4 @@
-import type { ProjectWorkspaceFS } from '../platform/fs';
+import type { ProjectWorkspaceFS, WorkspaceReadableFile } from '../platform/fs';
 import { checkedProof, fail, type MetadataLimits, type MetadataProof } from '../projectMetadata/format';
 import { json, readReceipt, decodeReceipt, technicalId, writeReceipt } from '../projectMetadata/persistence';
 import { checkRemoteHeads } from '../projectMetadata/remote';
@@ -120,10 +120,8 @@ function prepared(value: RestorePrepared, id: string, limits: MetadataLimits) {
   }
 }
 
-/** Structural control inspection only: never grants a selected destination capability. */
-/** A new receipt snapshot, never the inventory-only handle or a previous audit. */
-async function freshControlReceipt<T>(fs: ProjectWorkspaceFS, path: string, limits: MetadataLimits): Promise<T | null> {
-  const file = await fs.readStream(path);
+/** Consume exactly the declared bytes of the receipt opened for this inspection. */
+async function readControlReceipt<T>(file: WorkspaceReadableFile | null, limits: MetadataLimits): Promise<T | null> {
   if (!file) return null;
   if (file.size > limits.maxTotalBytes) fail('receipt-budget');
   if (!Number.isSafeInteger(file.size) || file.size < 0) fail('receipt-read');
@@ -146,13 +144,15 @@ async function freshControlReceipt<T>(fs: ProjectWorkspaceFS, path: string, limi
   return value;
 }
 
-export async function readRestoreControls(fs: ProjectWorkspaceFS, limits: MetadataLimits, readFirstPrepared: boolean | 'detect' = false) {
+export async function readRestoreControls(fs: ProjectWorkspaceFS, limits: MetadataLimits, readFirstPrepared: boolean | 'detect' = false,
+  mode: 'strict' | 'ordinary-selected' = 'strict') {
   const prefix = `${restoreRoot(fs)}v2/local-restore/`, paths = await fs.list(prefix), readLimits = restoreLimits(limits);
   if (paths.length > L.entryCount || new Set(paths).size !== paths.length) fail('restore-control-budget');
   const byJob = new Map<string, Map<string, string>>(), selectionPaths: string[] = [], sizes = new Map<string, number>();
+  const openedControls = mode === 'ordinary-selected' ? new Map<string, WorkspaceReadableFile>() : undefined;
   let controlBytes = 0, nodes = 0, work = 0;
-  // Overlap size-only native opens within this audit; receipt bytes below are
-  // still freshly reopened, streamed, parsed and checked in the original order.
+  // Check the aggregate sizes before consuming any JSON, even when a normal
+  // fence reads the same file snapshot. Never consume input.zip here.
   for (let at = 0; at < paths.length; at += 4) {
     const opened = await Promise.allSettled(paths.slice(at, at + 4).map(async path => {
       if (!path.startsWith(prefix)) return fail('restore-control-path');
@@ -170,11 +170,15 @@ export async function readRestoreControls(fs: ProjectWorkspaceFS, limits: Metada
       } else selectionPaths.push(path); // Namespace was checked before the open.
       if (!file || !Number.isSafeInteger(file.size) || file.size < 0 || file.size > (job?.[2] === 'input.zip' ? L.archiveBytes : readLimits.maxTotalBytes)) return fail('restore-control-size');
       sizes.set(path, file.size);
-      if (job?.[2] !== 'input.zip') { controlBytes += file.size; if (controlBytes > L.controlsBytes) fail('restore-control-budget'); }
+      if (job?.[2] !== 'input.zip') {
+        controlBytes += file.size; if (controlBytes > L.controlsBytes) fail('restore-control-budget');
+        openedControls?.set(path, file);
+      }
     }
   }
   const read = async <T>(path: string): Promise<T> => {
-    const value = await freshControlReceipt<T>(fs, path, readLimits); if (!value) return fail('restore-control-missing');
+    const file = openedControls ? openedControls.get(path) ?? null : await fs.readStream(path);
+    const value = await readControlReceipt<T>(file, readLimits); if (!value) return fail('restore-control-missing');
     if (restoreRef(value).byteLength !== sizes.get(path)) fail('restore-control-changed');
     // Cumulative parsing/inspection budget, including all retained jobs.
     const pending: unknown[] = [value];

@@ -94,8 +94,9 @@ test('image details, Scene keyboard focus and dismissible header sheets retain P
     await expect(phone.getByRole('button', { name: '3D', exact: true })).toBeEnabled({ timeout: 90_000 }); await phone.getByRole('button', { name: '3D', exact: true }).tap();
     const phoneCanvas = phone.getByLabel('3Dモデルの表示', { exact: true }), pin = phone.locator('.lv-project-marker').first();
     await expect(phoneCanvas).toHaveAttribute('aria-busy', 'false', { timeout: 90_000 }); await expect(pin).toBeVisible(); await pin.tap();
-    const windowShow = phone.locator('.lv-caption-window').getByRole('button', { name: '画像を表示', exact: true }).first();
-    await expect(windowShow).toBeVisible(); await windowShow.tap();
+    const showPhoto = phone.getByRole('region', { name: 'キャプションの詳細', exact: true }).getByRole('button', { name: '画像を表示', exact: true }).first();
+    await expect(phone.locator('.lv-caption-window')).toHaveCount(0);
+    await expect(showPhoto).toBeVisible(); await showPhoto.tap();
     const phoneDialog = phone.getByRole('dialog', { name: 'メディアビューア', exact: true }), phoneImage = phoneDialog.locator('img');
     await expect.poll(() => phoneImage.evaluate(n => (n as HTMLImageElement).naturalWidth)).toBe(2048);
     await expect(phoneCanvas).toHaveAttribute('aria-busy', 'true');
@@ -112,7 +113,8 @@ test('image details, Scene keyboard focus and dismissible header sheets retain P
     await phoneDialog.getByRole('button', { name: '次のメディア', exact: true }).tap();
     await expect.poll(() => phoneDialog.locator('img').evaluate(n => [(n as HTMLImageElement).naturalWidth,(n as HTMLImageElement).naturalHeight])).toEqual([4,8]);
     await phoneDialog.getByRole('button', { name: '前のメディア', exact: true }).tap(); await phoneDialog.getByRole('button', { name: '閉じる', exact: true }).tap();
-    await expect(windowShow).toBeFocused(); await expect(phoneCanvas).toHaveAttribute('aria-busy', 'false', { timeout: 90_000 }); await expect(pin).toBeVisible();
+    await expect(showPhoto).toBeFocused(); await phone.getByRole('button', { name:'3D',exact:true }).tap();
+    await expect(phoneCanvas).toHaveAttribute('aria-busy', 'false', { timeout: 90_000 }); await expect(pin).toBeVisible();
     await phone.screenshot({ path: info.outputPath('phone-photo-returned.png') });
     const phoneAfter = await backup(phone, info, 'phone-after-inspection');
     expect(phoneAfter.source.originalChanges()).toEqual(phoneSource.source.originalChanges()); expect(phoneAfter.archive.control.manifest.blobs).toEqual(phoneSource.archive.control.manifest.blobs);

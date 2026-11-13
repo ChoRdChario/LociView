@@ -50,7 +50,34 @@ export async function writeReceipt(fs: ProjectWorkspaceFS, path: string, value: 
 // Serialize all service instances sharing the same project lease, not just one UI instance.
 const queues = new WeakMap<ProjectMutationAuthority, Promise<unknown>>();
 const writeFences = new WeakMap<ProjectWorkspaceFS, () => Promise<void>>();
+const activeLeases = new WeakMap<ProjectWorkspaceFS, object>();
 export interface MetadataReadPorts { readonly fs: ProjectWorkspaceFS; readonly factory?: MetadataStorageFactory }
+export type TextCommitPhase = 'journal' | 'repository' | 'publication' | 'readback';
+export interface TextCommitPorts extends MetadataReadPorts {
+  readonly factory: MetadataStorageFactory;
+  advance(phase: Exclude<TextCommitPhase, 'journal'>): Promise<void>;
+  assertCanAcknowledge(): void;
+}
+type TextCommitOperation = <T>(transaction: string, documentKey: string, action: (ports: TextCommitPorts) => Promise<T>) => Promise<T>;
+type BoundTextCommit = <T>(transaction: string, documentKey: string, action: (ports: TextCommitPorts) => Promise<T>, assertLease: () => void) => Promise<T>;
+const textCommits = new WeakMap<ProjectWorkspaceFS, { factory: MetadataStorageFactory; enabled(): boolean; run: BoundTextCommit }>();
+export function registerTextCommit(fs: ProjectWorkspaceFS, factory: MetadataStorageFactory,
+  enabled: () => boolean, run: BoundTextCommit): void {
+  if (textCommits.has(fs)) fail('text-commit-binding');
+  textCommits.set(fs, { factory, enabled, run });
+}
+export function selectedTextCommit(fs: ProjectWorkspaceFS, factory: MetadataStorageFactory, lease: object): TextCommitOperation | undefined {
+  const entry = textCommits.get(fs);
+  if (entry && entry.factory !== factory) return fail('generation-storage-binding');
+  if (!entry?.enabled()) return;
+  if (!lease || activeLeases.get(fs) !== lease) return fail('text-commit-lease');
+  return (transaction, key, action) => {
+    if (activeLeases.get(fs) !== lease) return fail('text-commit-lease');
+    return entry.run(transaction, key, action, () => {
+      if (activeLeases.get(fs) !== lease) fail('text-commit-lease');
+    });
+  };
+}
 type ReadOperation = <T>(action: (ports: MetadataReadPorts) => Promise<T>) => Promise<T>;
 export type StagingReadConsumer = 'journal.entries' | 'journal.validateParts' | 'journal.readRestoredBases' | 'repository.read' | 'content.readonlyInspection';
 const stagingConsumers: ReadonlySet<StagingReadConsumer> = new Set(['journal.entries', 'journal.validateParts', 'journal.readRestoredBases', 'repository.read', 'content.readonlyInspection']);
@@ -85,7 +112,7 @@ export function registerWriteFence(fs: ProjectWorkspaceFS, fence: () => Promise<
   if (writeFences.has(fs)) fail('write-fence-already-bound');
   writeFences.set(fs, fence);
 }
-export async function underWriteLease<T>(fs: ProjectWorkspaceFS, action: () => Promise<T>): Promise<T> {
+export async function underWriteLease<T>(fs: ProjectWorkspaceFS, action: (lease: object) => Promise<T>, afterVerification?: () => void): Promise<T> {
   const authority = fs.mutationAuthority;
   const prior = queues.get(authority) ?? Promise.resolve();
   const run = prior.catch(() => undefined).then(async () => {
@@ -93,11 +120,14 @@ export async function underWriteLease<T>(fs: ProjectWorkspaceFS, action: () => P
     const fence = writeFences.get(fs);
     try {
       if (fence) await fence();
-      const result = await action();
+      const lease = {};
+      activeLeases.set(fs, lease);
+      const result = await action(lease);
       if (fence) await fence();
-      authority.assertWorkspaceWriteAuthorized(); return result;
+      authority.assertWorkspaceWriteAuthorized();
+      afterVerification?.(); return result;
     }
-    finally { finish(); }
+    finally { activeLeases.delete(fs); finish(); }
   });
   queues.set(authority, run);
   try { return await run; } finally { if (queues.get(authority) === run) queues.delete(authority); }

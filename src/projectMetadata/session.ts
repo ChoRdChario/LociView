@@ -10,11 +10,11 @@ import { cloneCanonicalValue, type JsonObject } from '../domain/values';
 import type { ProjectContentVerifier } from '../domain/projectContentChecks';
 import { normalizeCaptionText } from '../domain/captionText';
 import { readProjectScene, type ProjectProviderRead } from '../scene/projectProvider';
-import { checkLimits, fail, type MetadataLimits } from './format';
+import { checkLimits, fail, MetadataSourceError, type MetadataLimits } from './format';
 import { ProjectMetadataSource } from './source';
 import { MetadataRepository, type MetadataStorageFactory } from './repository';
 import { TransactionJournal, type JournalStart, type PreparedJournal } from './journal';
-import { digest, equalBytes, json, newId, underWriteLease, withMetadataRead, metadataPath, type MetadataReadPorts } from './persistence';
+import { digest, equalBytes, json, newId, underWriteLease, withMetadataRead, metadataPath, selectedTextCommit, type MetadataReadPorts, type TextCommitPorts } from './persistence';
 import { canonicalMetadataEdit, planMetadataEdit, type MetadataEdit } from './commands';
 import { checkRemoteStored, copyFullSource, initialWorkspaceChanges, planRemoteChanges, type FullMetadataSource, type RemoteBatchProof } from './remote';
 import { WorkspaceReceiveJob, type ReceiverProof } from '../projectPackage/receiveJob';
@@ -37,7 +37,7 @@ import { selectCleanRecords } from '../projectPackage/cleanRecords';
 import { ReviewOutputJob } from '../projectPackage/reviewOutputJob';
 import { ReviewSourceCapture } from '../projectPackage/reviewSource';
 import { prepareReviewSnapshot, type ReviewSelectionOptions } from '../projectPackage/reviewSelection';
-import { reviewCapabilities } from '../projectPackage/reviewSnapshot';
+import { reviewCapabilities, reviewScenes } from '../projectPackage/reviewSnapshot';
 import { ContributionSourceCapture, VerifiedContributionBase, type ContributionBaseSelection } from '../projectPackage/contributionSource';
 import { outputJobKeys, outputJobClass, openOutputJob, outputTerminal, validateOutputProtection } from '../projectPackage/outputJobs';
 import { removeOutputAttempts } from '../projectPackage/outputAttempts';
@@ -165,9 +165,9 @@ export class MetadataProjectSession {
 
   private measure<T>(stage: string, action: () => Promise<T>): Promise<T> { return measureMetadata(this.timing, `metadata.${stage}`, action); }
 
-  async read(): Promise<MetadataSessionRead> {
+  async read(requireReadyPublished = false): Promise<MetadataSessionRead> {
     try {
-      const candidate = await withMetadataRead(this.fs, this.storage, ports => this.readCandidate(undefined, ports));
+      const candidate = await withMetadataRead(this.fs, this.storage, ports => this.readCandidate(undefined, ports, false, undefined, requireReadyPublished));
       return this.adoptRead(candidate);
     } catch {
       // Closing failure must not publish an unaudited candidate or roll back a
@@ -205,17 +205,23 @@ export class MetadataProjectSession {
       } finally { active = false; await Promise.allSettled([...pending]); }
     });
   }
-  private async readCandidate(integrity?: OutputIntegrityRead, ports?: MetadataReadPorts): Promise<{ read: MetadataSessionRead; acknowledged?: Set<string>; localChanges?: Set<string> }> {
+  private async readCandidate(integrity?: OutputIntegrityRead, ports?: MetadataReadPorts, editingText = false, completedText?: string, requireReadyPublished = false): Promise<{
+    read: MetadataSessionRead; acknowledged?: Set<string>; localChanges?: Set<string>; publishedStart?: JournalStart
+  }> {
     try {
       if (ports && !ports.factory) return fail('generation-storage-binding');
       const fs = ports?.fs ?? this.fs, journal = ports ? new TransactionJournal(fs, this.limits) : this.journal;
       const repository = ports ? new MetadataRepository(fs, ports.factory!, this.limits) : this.repository;
       const entries = await journal.entries(), published = entries.filter(e => e.publication).at(-1);
       await journal.readRestoredBases(entries);
-      const pending = entries.some(e => !e.publication) || !!this.retained || (await this.readSceneAppendStates(fs, journal, entries)).length > 0;
+      const retainedPending = this.retained && !(completedText && this.retained.start.transactionId === completedText && published?.start.transactionId === completedText);
+      const pending = entries.some(e => !e.publication) || !!retainedPending || (await this.readSceneAppendStates(fs, journal, entries)).length > 0;
       if (!published) return { read: Object.freeze({ state: pending ? 'pending' : 'empty', source: null, provider: null, publication: null }) };
-      const source = await repository.read(published.start.repositoryId, published.start.proof, published.publication!.heads);
+      const heads = published.publication!.heads;
+      const checkAllHeads = editingText && !pending;
+      const source = await repository.read(published.start.repositoryId, published.start.proof, checkAllHeads ? undefined : heads);
       if (!source) fail('published-source-missing');
+      if (checkAllHeads && json(source!.heads) !== json(heads)) fail('command-base-changed');
       const originals = new Map(source!.originalChanges().map(b => [A.decodeChange(b).hash, b]));
       const acknowledged = new Set<string>(), localChanges = new Set<string>();
       let witnessWork = 0;
@@ -248,9 +254,11 @@ export class MetadataProjectSession {
       }
       checkRequiredCapabilities(published.start.requiredCapabilities, capabilityUnion(inheritedCapabilities, source!.requiredCapabilities));
       const provider = await readProjectScene(source!.read(), this.limits, this.verifier(false), { verifyRetainedMedia: this.retainedSelection(source!, acknowledged, localChanges) });
+      if (pending && requireReadyPublished && !this.providerReady(provider)) fail('provider-not-ready');
       return { read: Object.freeze({ state: pending ? 'pending' : this.providerReady(provider) ? 'ready' : 'repair-required',
-        source: source!, provider, publication: published.start.transactionId }), acknowledged, localChanges };
-    } catch {
+        source: source!, provider, publication: published.start.transactionId }), acknowledged, localChanges, publishedStart: published.start };
+    } catch (error) {
+      if (editingText && error instanceof MetadataSourceError && error.code === 'command-base-changed') throw error;
       return { read: Object.freeze({ ...this.last, state: 'repair-required' }) };
     }
   }
@@ -317,22 +325,27 @@ export class MetadataProjectSession {
   async edit(expectedToken: string, command: MetadataEdit, editor?: LocalEditorContext): Promise<MetadataSessionRead> {
     editor = captureEditor(editor);
     command = canonicalMetadataEdit(command, this.limits);
-    return underWriteLease(this.fs, async () => {
+    let acceptText: (() => void) | undefined;
+    return underWriteLease(this.fs, async lease => {
       await assertReviewEditSlot(this.fs, this.limits);
-      const read = await this.read();
-      if (read.state !== 'ready' || !read.source || read.source.token !== expectedToken) return fail('command-not-ready');
-      const entries = await this.journal.entries(), prior = entries.at(-1)!;
-      const durable = await this.repository.read(prior.start.repositoryId, prior.start.proof);
+      const candidate = command.kind === 'editCaption' && Object.keys(command.edits).every(name => name === 'title' || name === 'body')
+        ? await withMetadataRead(this.fs, this.storage, ports => this.readCandidate(undefined, ports, true))
+        : undefined;
+      const read = candidate ? this.adoptRead(candidate) : await this.read();
+      if (read.state !== 'ready' || !read.source || !read.provider || read.source.token !== expectedToken) return fail('command-not-ready');
+      const prior = candidate?.publishedStart ?? (await this.journal.entries()).at(-1)!.start;
+      const durable = candidate ? read.source : await this.repository.read(prior.repositoryId, prior.proof);
       if (!durable || durable.token !== read.source.token) return fail('command-base-changed');
-      const provider = await this.checked(durable, false);
+      const provider = candidate ? read.provider : await this.checked(durable, false);
+      if (candidate && (provider.kind !== 'scene-provider' || provider.token !== durable.token)) fail('provider-not-ready');
       const transactionId = newId();
       if (command.kind === 'createAttachment') {
         if (!this.media || provider.kind !== 'scene-provider') fail('media-unconnected');
         planMetadataEdit(provider as Extract<ProjectProviderRead, { kind: 'scene-provider' }>, command, this.limits);
         this.media!.assertIntroduction?.(provider as Extract<ProjectProviderRead,{kind:'scene-provider'}>,command.media);
-        this.retained = { start: { transactionId, repositoryId: prior.start.repositoryId, predecessor: prior.start.transactionId,
+        this.retained = { start: { transactionId, repositoryId: prior.repositoryId, predecessor: prior.transactionId,
           purpose: 'localCommand', proof: durable.proof, baseHeads: durable.heads,
-          ...capabilityFields(capabilityUnion(readRequiredCapabilities(prior.start.requiredCapabilities), editor.kind === 'self-declared' ? [EDITOR_CAPABILITY] : [], command.media.portableDisplay ? [PORTABLE_MEDIA_CAPABILITY] : [])) }, parts: [],
+          ...capabilityFields(capabilityUnion(readRequiredCapabilities(prior.requiredCapabilities), editor.kind === 'self-declared' ? [EDITOR_CAPABILITY] : [], command.media.portableDisplay ? [PORTABLE_MEDIA_CAPABILITY] : [])) }, parts: [],
           stagedBlobs: [...recordBlobRefs(command.media)], introduction: { source: durable, command, editor } };
         return this.resume();
       }
@@ -350,12 +363,15 @@ export class MetadataProjectSession {
       const facts = await this.prepareModelFacts(durable, prepared);
       if (!facts) await this.checked(prepared, false); // Refused preparation must not become a pending save.
       await this.verifyDelta(await reactivatedCaptionMedia(durable, prepared, this.limits), prepared.requiredCapabilities.includes(PORTABLE_MEDIA_CAPABILITY) ? prepared.mediaRecords() : undefined);
-      this.retained = { start: { transactionId, repositoryId: prior.start.repositoryId, predecessor: prior.start.transactionId,
+      this.retained = { start: { transactionId, repositoryId: prior.repositoryId, predecessor: prior.transactionId,
         purpose: 'localCommand', proof: durable.proof, baseHeads: durable.heads,
-        ...capabilityFields(capabilityUnion(readRequiredCapabilities(prior.start.requiredCapabilities), prepared.requiredCapabilities)) }, parts,
+        ...capabilityFields(capabilityUnion(readRequiredCapabilities(prior.requiredCapabilities), prepared.requiredCapabilities)) }, parts,
         ...(facts ? { modelFacts: { plan: facts, next: prepared }, stagedBlobs: facts.stagedBlobs?.map(b => JSON.parse(json(b)) as JsonObject) } : {}) };
+      const commit = candidate && !facts && parts.length === 1 && selectedTextCommit(this.fs, this.storage, lease);
+      if (commit) return commit(transactionId, this.repository.documentId(prior.repositoryId), ports =>
+        this.resume(undefined, undefined, { ports, transactionId, ready: accept => { acceptText = accept; } }));
       return this.resume();
-    });
+    }, () => acceptText?.());
   }
 
   /** Accepted full-source receive only. No package wire, new body staging or exchange-base update. */
@@ -426,7 +442,8 @@ export class MetadataProjectSession {
       if (!base || base.token !== expectedToken) return fail('scene-append-base');
       const plan = await planSceneAppend(base, review, this.limits, id, editor);
       const facts = await this.sceneAppendFacts(base, plan.next, review);
-      const input: SceneAppendInput = { schema: 'lociview-scene-append-1', id, archive: plan.archive, snapshot: plan.snapshot,
+      const input: SceneAppendInput = { ...(plan.sceneIds.length === 1 ? { schema: 'lociview-scene-append-1' as const } :
+        { schema: 'lociview-scene-append-2' as const, sceneIds: plan.sceneIds }), id, archive: plan.archive, snapshot: plan.snapshot,
         proof: base.proof, predecessor: prior.start.transactionId, baseHeads: base.heads, sceneId: plan.sceneId, recipe: plan.reconstruction, records: plan.records,
         change: { sha256: await digest(plan.bytes), byteLength: plan.bytes.length }, blobs: plan.blobs, stagedBlobs: [...(facts.stagedBlobs ?? [])] };
       const job = await writeSceneAppend(this.fs, input, plan.bytes, this.limits);
@@ -740,10 +757,12 @@ export class MetadataProjectSession {
     await job.generate(store, this.verifier(false), signal); return job.id;
   }
   async previewReviewOutput(expectedToken: string, selection: ReviewSelectionOptions) {
+    selection = structuredClone(selection);
     const read = await this.outputReady(); if (read.source!.token !== expectedToken) return fail('output-stale');
     const { review, omittedEntryView } = await prepareReviewSnapshot(read.source!, this.limits, selection);
     const count = (name: string) => Object.keys(review.snapshot[name] as JsonObject).length;
-    return { token: expectedToken, sceneId: selection.sceneId, name: (review.snapshot.scene as JsonObject).name as string,
+    const scenes = reviewScenes(review.snapshot);
+    return { token: expectedToken, sceneId: selection.sceneId, selectionKey: json(selection), name: scenes.length === 1 ? scenes[0]!.name as string : `シーン ${scenes.length}件`,
       models: Object.values(review.snapshot.assetsById as JsonObject).filter(a => (a as JsonObject).kind === 'visual').length,
       captions: count('captionsById'), media: count('mediaResourcesById'), ...review.editEffect, omittedEntryView,
       ...(reviewCapabilities(review).includes(PORTABLE_MEDIA_CAPABILITY) ? { requiresPortableMediaReader: true } : {}) };
@@ -1098,8 +1117,17 @@ export class MetadataProjectSession {
     });
   }
 
-  private async resume(receiveJob?: ReceiveJob, restoreJob?: BackupRestoreJob): Promise<MetadataSessionRead> {
-    const entries = await this.journal.entries(), pending = entries.find(e => !e.publication);
+  private async resume(receiveJob?: ReceiveJob, restoreJob?: BackupRestoreJob, text?: {
+    ports: TextCommitPorts; transactionId: string; ready(accept: () => void): void
+  }): Promise<MetadataSessionRead> {
+    const fs = text?.ports.fs ?? this.fs;
+    const journal = text ? new TransactionJournal(fs, this.limits) : this.journal;
+    const repository = text ? new MetadataRepository(fs, text.ports.factory, this.limits) : this.repository;
+    const entries = await journal.entries(), pending = entries.find(e => !e.publication);
+    if (text && (pending || !this.retained || this.retained.start.purpose !== 'localCommand' ||
+      this.retained.start.transactionId !== text.transactionId || this.retained.parts.length !== 1 ||
+      this.retained.remote || this.retained.stagedBlobs || this.retained.introduction || this.retained.modelFacts))
+      return fail('text-commit-state');
     if (!this.acknowledgmentsLoaded && entries.some(e => e.publication)) {
       await this.read();
       if (!this.acknowledgmentsLoaded) return fail('retained-media-witness');
@@ -1113,8 +1141,8 @@ export class MetadataProjectSession {
       (pending?.start ?? this.retained?.start)?.purpose === 'importClean' ||
       !!pending?.prepared?.remote && isContributionRemote(pending.prepared.remote) ||
       !!this.retained?.remote && isContributionRemote(this.retained.remote.proof) ||
-      (await ContributionReceiveJob.ids(this.fs)).includes(transactionId) ||
-      (await WorkspaceReceiveJob.ids(this.fs)).includes(transactionId))) {
+      (await ContributionReceiveJob.ids(fs)).includes(transactionId) ||
+      (await WorkspaceReceiveJob.ids(fs)).includes(transactionId))) {
       if (!receiveJob || receiveJob.id !== transactionId || !this.media?.inventory) return fail('receive-job-recovery-required');
       receiveJob.assertOwner(this.fs);
     }
@@ -1163,7 +1191,7 @@ export class MetadataProjectSession {
       // Once prepared, disk is the recovery source. Never conceal loss of an
       // acknowledged source/part by recreating it from this writer's memory.
       prepared = pending?.prepared ??
-        await this.measure('resume.journal-stage', () => this.journal.stage(this.retained!.start, this.retained!.parts, this.retained!.stagedBlobs, this.retained!.remote));
+        await this.measure('resume.journal-stage', () => journal.stage(this.retained!.start, this.retained!.parts, this.retained!.stagedBlobs, this.retained!.remote));
     } else if (pending?.prepared) prepared = pending.prepared;
     else if (pending) return fail('incomplete-staging-repair');
     else return this.read(); // Already published: no mutation or second publication.
@@ -1173,19 +1201,18 @@ export class MetadataProjectSession {
     const portable = !!prepared.stagedBlobs?.length && hasPortableMediaCapability(prepared.start.requiredCapabilities);
     const checkedParts = portable ? await this.journal.validateParts(prepared) : undefined;
     await this.measure('resume.prepared-bodies', async () => this.verifyDelta(prepared.stagedBlobs, checkedParts ? await this.mediaVerificationContext(prepared.start, checkedParts, restoreJob?.inspection.description.mediaRecords) : undefined));
-    const parts = checkedParts ?? await this.journal.validateParts(prepared), start = prepared.start;
+    const parts = checkedParts ?? await journal.validateParts(prepared), start = prepared.start;
     const initial = start.purpose === 'initialize' || start.purpose === 'importWorkspace' || start.purpose === 'restoreBackup' || start.purpose === 'importClean';
-    let stored = await this.repository.read(start.repositoryId, start.proof, undefined, initial);
-    let localBase: ProjectMetadataSource | null = null;
+    let stored = await repository.read(start.repositoryId, start.proof, undefined, initial);
+    let base: ProjectMetadataSource | null = null;
     if (!initial) {
       if (!stored) fail('journal-base-missing');
-      const base = await this.repository.read(start.repositoryId, start.proof, start.baseHeads);
+      if (text && json(stored!.heads) !== json(start.baseHeads)) return fail('command-base-changed');
+      base = json(stored!.heads) === json(start.baseHeads) ? stored : await repository.read(start.repositoryId, start.proof, start.baseHeads);
       if (!base) fail('journal-base-missing');
-      if (start.purpose === 'localCommand') localBase = base;
     }
     let next: ProjectMetadataSource;
     if (start.purpose === 'appendScene') {
-      const base = await this.repository.read(start.repositoryId, start.proof, start.baseHeads);
       if (!stored || !base) return fail('scene-append-base');
       next = base.appendOriginal(parts);
       checkRemoteStored(stored, base, next, !!pending?.durable);
@@ -1193,7 +1220,6 @@ export class MetadataProjectSession {
       validatePreparedSceneAppend(base, parts[0]!, input, this.limits);
       await this.verifyDelta(input.blobs, next.mediaRecords());
     } else if (start.purpose === 'remotePackageMerge') {
-      const base = await this.repository.read(start.repositoryId, start.proof, start.baseHeads);
       if (!stored || !base) return fail('remote-base-missing');
       next = await this.journal.validateRemote(prepared, base);
       checkRemoteStored(stored, base, next, !!pending?.durable);
@@ -1213,21 +1239,22 @@ export class MetadataProjectSession {
     let witnessWork = 0;
     const witness = () => { if (++witnessWork > this.limits.maxWork) fail('retained-media-limit'); };
     for (const ref of prepared.stagedBlobs ?? []) { witness(); this.acknowledgedMedia.add(blobKey(ref)); }
-    const incoming = await this.journal.receivedInfo(prepared);
+    const incoming = await journal.receivedInfo(prepared);
     const predecessor = entries.find(e => e.start.transactionId === start.predecessor);
     checkRequiredCapabilities(start.requiredCapabilities, capabilityUnion(readRequiredCapabilities(predecessor?.start.requiredCapabilities), next.requiredCapabilities, incoming.requiredCapabilities));
     for (const ref of incoming.blobs) { witness(); this.acknowledgedMedia.add(`${ref.sha256}:${ref.byteLength}`); }
-    if (['initialize', 'localCommand', 'importClean', 'appendScene'].includes(start.purpose))
+    if (!text && ['initialize', 'localCommand', 'importClean', 'appendScene'].includes(start.purpose))
       for (const part of prepared.changes) { witness(); this.acknowledgedLocalChanges.add(part.expectedChangeHash); }
     // Exact pending changes can coexist with legitimate extra local heads; never rebase or choose a winner.
     await this.measure('resume.final-content', () => this.checked(next, false));
-    if (localBase) {
-      const restored = localBase.appendOriginal(parts);
-      await this.verifyDelta(await reactivatedCaptionMedia(localBase, restored, this.limits), restored.requiredCapabilities.includes(PORTABLE_MEDIA_CAPABILITY) ? restored.mediaRecords() : undefined);
+    if (base && start.purpose === 'localCommand') {
+      const restored = base.appendOriginal(parts);
+      await this.verifyDelta(await reactivatedCaptionMedia(base, restored, this.limits), restored.requiredCapabilities.includes(PORTABLE_MEDIA_CAPABILITY) ? restored.mediaRecords() : undefined);
     }
     if (receiveJob) await this.media!.inventory!(await receiveJob.inventory());
     if (restoreJob) await this.measure('resume.restore-bodies', () => this.media!.verify(restoreJob.inventory(), restoreJob.inspection.description.mediaRecords));
-    stored = await this.measure('resume.persist-readback', () => this.repository.persist(start.repositoryId, next));
+    if (text) await text.ports.advance('repository');
+    stored = await this.measure('resume.persist-readback', () => repository.persist(start.repositoryId, next));
     if (!stored) fail('durable-source-missing');
     checkRequiredCapabilities(start.requiredCapabilities, capabilityUnion(readRequiredCapabilities(predecessor?.start.requiredCapabilities), stored!.requiredCapabilities, incoming.requiredCapabilities));
     const actual = new Map(stored!.originalChanges().map(b => [A.decodeChange(b).hash, b]));
@@ -1239,8 +1266,17 @@ export class MetadataProjectSession {
     if ((start.purpose === 'importClean' || start.purpose === 'appendScene') && stored!.token !== next.token) fail('journal-final-heads');
     if (prepared.remote && json(stored!.heads) !== json(prepared.remote.expectedFinalHeads)) fail('remote-final-heads');
     this.fs.mutationAuthority.assertWorkspaceWriteAuthorized();
-    await this.measure('resume.publish', () => this.journal.publish(prepared, stored!));
+    if (text) await text.ports.advance('publication');
+    await this.measure('resume.publish', () => journal.publish(prepared, stored!));
     this.fs.mutationAuthority.assertWorkspaceWriteAuthorized();
+    if (text) {
+      await text.ports.advance('readback');
+      const checked = await this.measure('resume.published-readback', () => this.readCandidate(undefined, text.ports, true, text.transactionId));
+      if (checked.read.state !== 'ready' || checked.read.source?.token !== stored!.token ||
+        checked.read.publication !== text.transactionId) return fail('publication-readback');
+      text.ready(() => { text.ports.assertCanAcknowledge(); this.retained = null; this.adoptRead(checked); });
+      return checked.read;
+    }
     this.retained = null;
     const read = await this.measure('resume.published-readback', () => this.read());
     if (read.state !== 'ready' || read.source?.token !== stored!.token) fail('publication-readback');

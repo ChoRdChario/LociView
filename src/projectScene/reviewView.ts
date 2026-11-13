@@ -23,21 +23,28 @@ import { validationMaterialIssue, validationMaterialSlots, type ValidationMateri
 import { sourceStreamProof } from '../projectFiles/streamSource';
 
 const table = (r: JsonObject, name: string) => object(r[name]) as Record<string, JsonObject>;
-const ordered = (rows: JsonObject[]) => rows.sort((a, b) => string(a.orderKey).localeCompare(string(b.orderKey)) || string(a.id).localeCompare(string(b.id)));
+const compare = (a: string, b: string) => a < b ? -1 : a > b ? 1 : 0;
+const ordered = (rows: JsonObject[]) => rows.sort((a, b) => compare(string(a.orderKey), string(b.orderKey)) || compare(string(a.id), string(b.id)));
+export const reviewSceneChoices = (snapshot: JsonObject) => ordered(snapshot.scene ? [object(snapshot.scene)] : Object.values(table(snapshot, 'scenesById')));
 
 /** Inspected read-only file content. No storage, history, synthetic Project or commands. */
-export async function prepareReviewView(file: Blob | PackageArchive, budget: ProjectFilePolicyInput, decode?: PngDecoder, jpeg?: JpegDecoder, photo?: PhotoDecoder, mediaDecoders?:MediaDecoders) {
+export async function prepareReviewView(file: Blob | PackageArchive | ReviewArchive, budget: ProjectFilePolicyInput, decode?: PngDecoder, jpeg?: JpegDecoder, photo?: PhotoDecoder, mediaDecoders?:MediaDecoders, selectedScene?: string) {
   const policy=projectFilePolicy(budget), limits=policy.nonGs;
-  const inspection = file instanceof Blob ? await ReviewArchive.inspect(file, validationMetadataLimits) :
+  const inspection = file instanceof ReviewArchive ? file : file instanceof Blob ? await ReviewArchive.inspect(file, validationMetadataLimits) :
     await ReviewArchive.fromSelectedArchive(file, validationMetadataLimits);
   const original = inspection.archive.sourceSnapshot(), review = inspection.review;
-  const snapshot = review.snapshot, scene = object(snapshot.scene), sceneId = string(scene.id), project = object(snapshot.project);
+  const snapshot = review.snapshot, project = object(snapshot.project), sceneId = selectedScene ?? string(project.defaultSceneId);
+  const scenes = reviewSceneChoices(snapshot);
+  const scene = scenes.find(row => row.id === sceneId);
+  if (!scene) throw Error('シーンを選び直してください。');
+  const membership = (map: string) => Object.values(table(snapshot, map)).filter(row => row.sceneId === sceneId);
+  const visibleAssets = new Set(membership('sceneAssetMembershipsById').map(row => row.assetId));
   if (review.closure.entries.reduce((n, b) => n + b.byteLength, 0) > policy.projectBodyBytes)
     throw Error('この検証画面の容量上限を超えています。元のファイルは変更していません。');
   const models: ReadonlyRenderModel[] = [], decoded = new Map<string, ValidatedModel>(), images = new Map<string, Blob>();
   const assets = table(snapshot, 'assetsById'), representations = table(snapshot, 'representationsById');
   for (const asset of Object.values(assets)) {
-    if (asset.kind !== 'visual') continue;
+    if (asset.kind !== 'visual' || !visibleAssets.has(asset.id)) continue;
     const ids = list(asset.representationIds), reps=ids.map(id=>representations[string(id)]!),visuals=reps.filter(r=>r.role!=='interactionProxy'),proxies=reps.filter(r=>r.role==='interactionProxy');
     if(visuals.length!==1||proxies.length>1||proxies.length&&(visuals[0]!.role!=='gsPrimary'||proxies[0]!.proxyForGsVariantFamilyId!==visuals[0]!.variantFamilyId))throw Error('モデルと位置指定用の面の対応を確認できません。');
     for(const record of reps){const blob = object(record.blob);
@@ -69,13 +76,15 @@ export async function prepareReviewView(file: Blob | PackageArchive, budget: Pro
     // Native Blob slices retain the immutable archive, not another materialized body copy.
     return view.slice(0, view.size, string(shownRef.mediaType));
   };
-  for (const record of Object.values(mediaRecords)) images.set(string(record.id), await verifyMedia(record));
+  const edges = ordered(membership('sceneCaptionMembershipsById')), captionIds = new Set(edges.map(edge => edge.captionId));
+  const attachments = ordered(Object.values(table(snapshot, 'captionAttachmentsById')).filter(edge => captionIds.has(edge.captionId)));
+  for (const id of new Set(attachments.map(edge => string(edge.mediaResourceId)))) images.set(id, await verifyMedia(mediaRecords[id]!));
   const savedMaterials: Record<string, ValidationMaterialEffects> = {};
   for (const model of models) {
     const effects: Record<string, MaterialIntent | { issue: string }> = {};
     for (const slot of validationMaterialSlots(model)) {
       const matches = Object.values(table(snapshot, 'materialOverridesById')).filter(r => same(object(r.routing).target, slot.target as unknown as JsonObject));
-      const local = matches.filter(r => object(object(r.routing).scope).kind === 'scene'), global = matches.filter(r => object(object(r.routing).scope).kind === 'project');
+      const local = matches.filter(r => object(object(r.routing).scope).sceneId === sceneId), global = matches.filter(r => object(object(r.routing).scope).kind === 'project');
       if (local.length > 1 || global.length > 1) throw Error('材質の適用先を確認してください。');
       const selected = local[0] ?? global[0]; if (!selected) continue;
       const intent: MaterialIntent = { appearance: selected.appearance as unknown as MaterialIntent['appearance'],
@@ -84,8 +93,8 @@ export async function prepareReviewView(file: Blob | PackageArchive, budget: Pro
     }
     savedMaterials[model.assetId] = effects;
   }
-  const attachments = ordered(Object.values(table(snapshot, 'captionAttachmentsById'))), captions = table(snapshot, 'captionsById');
-  const items: CaptionListItem[] = ordered(Object.values(table(snapshot, 'sceneCaptionMembershipsById'))).map(edge => {
+  const captions = table(snapshot, 'captionsById');
+  const items: CaptionListItem[] = edges.map(edge => {
     const caption = captions[string(edge.captionId)]!, anchor = object(caption.anchor);
     const ownerId = anchor.kind === 'asset' ? anchor.assetId : anchor.kind === 'unplaced' ? anchor.ownerAssetId : undefined;
     const owner = ownerId === undefined ? null : assets[string(ownerId)]!;
@@ -96,17 +105,17 @@ export async function prepareReviewView(file: Blob | PackageArchive, budget: Pro
       owner: value(owner ? { kind: 'asset' as const, assetId: string(owner.id), name: value(missing ? '対応モデルなし' : string(owner.label)) }
         : { kind: anchor.kind === 'unplaced' ? 'none' as const : 'project' as const }),
       mediaCount: value(attachments.filter(a => a.captionId === caption.id).length), needsReview,
-      pin: anchor.kind === 'unplaced' ? 'unplaced' : missing ? 'ownerMissing' : needsReview ? 'needsReview' : 'visible' };
+      pin: anchor.kind === 'unplaced' ? 'unplaced' : missing ? 'ownerMissing' : owner && !visibleAssets.has(owner.id) ? 'ownerHidden' : needsReview ? 'needsReview' : 'visible' };
   });
   const source: CaptionListSource = { kind: 'ready', token: review.token, sceneId, captions: items };
-  const frameId = string(object(project.frame).id), views = ordered(Object.values(table(snapshot, 'viewsById')));
-  const capture = (viewId: string) => { const view = table(snapshot, 'viewsById')[viewId]; if (!view) throw Error('視点を選び直してください。');
+  const frameId = string(object(project.frame).id), views = ordered(membership('viewsById'));
+  const capture = (viewId: string) => { const view = table(snapshot, 'viewsById')[viewId]; if (view?.sceneId !== sceneId) throw Error('視点を選び直してください。');
     return { camera: readProjectCamera(view.camera), background: readSolidBackground(view.background) }; };
   const box = new THREE.Box3();
   for (const model of models) { const bounds = projectBounds(model.representation.logicalBoundsAsset, model.assetToProject);
     box.union(new THREE.Box3(new THREE.Vector3(...bounds.min), new THREE.Vector3(...bounds.max))); }
   const basePins = items.flatMap(item => {
-    if (item.pin === 'ownerMissing' || item.pin === 'unplaced') return [];
+    if (item.pin === 'ownerMissing' || item.pin === 'ownerHidden' || item.pin === 'unplaced') return [];
     const anchor = object(captions[item.id]!.anchor), owner = anchor.kind === 'asset' ? models.find(m => m.assetId === anchor.assetId) : undefined;
     const position = owner ? pointInProject(anchor.positionAsset as V3, owner.assetToProject) : anchor.positionProject as V3;
     return [{ id: item.id, title: item.title.kind === 'value' ? item.title.value : '', color: item.color.kind === 'value' ? item.color.value : '',
@@ -118,7 +127,8 @@ export async function prepareReviewView(file: Blob | PackageArchive, budget: Pro
     pins: basePins.filter(p => colors === null || colors.includes(p.color)),
     bounds: box.isEmpty() ? null : { min: box.min.toArray() as [number, number, number], max: box.max.toArray() as [number, number, number] },
     entry: scene.defaultViewId ? { kind: 'ready', payload: capture(string(scene.defaultViewId)) } : { kind: 'none' } });
-  return { original, inspection, source, models, images, attachments, views, entryViewId: scene.defaultViewId ? string(scene.defaultViewId) : null, capture, display, rasterResources: decode?.rasterResources,
+  return { original, inspection, source, models, images, attachments, scenes, views, entryViewId: scene.defaultViewId ? string(scene.defaultViewId) : null, capture, display, rasterResources: decode?.rasterResources,
+    releaseDisplayData() { decoded.clear(); images.clear(); },
     imageDimensions:(bytes:Uint8Array,mime:string)=>mediaDisplayDimensions(bytes,mime,limits,decode?.rasterResources),
     title: string(project.title), sceneName: string(scene.name),
     content: { async image(record: JsonObject) { const expected = mediaRecords[string(record.id)];

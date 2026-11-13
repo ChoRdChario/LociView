@@ -8,6 +8,67 @@ and [earlier working records](../docs/history/development-through-2026-10-28/tas
 retain qualifications and failures. Their Current/Next headings are not an active
 queue or renewed approval requirements.
 
+## Current — editing one record and sharing selected scenes
+
+- Use the restored Ki-84 daily edit as the baseline. Count restore-control opens
+  and measure the visible edit, external backup and cold reopening. Preserve fresh
+  authority at every write, durable readback, publication and recovery decision.
+- Collect the selected scenes' memberships before resolving their sources. Keep
+  each physical original once, scene-specific records and camera choices intact,
+  and a repeated download within the user's last chosen scope. Check both ends
+  with a shared asset, a shared photo and a third scene outside the selection.
+- Record and isolate any change to an existing recovery or file contract before
+  connecting it. Use independent review and exercise the actual recipient file.
+- Start Share with the scene choice. On touch-sized phones select a pin into
+  the record detail, read its photo there and return to 3D with the same selection.
+- The practical comparison used the same Ki-84 backup (103 records, 43 original
+  bodies) and clean, isolated Chromium profiles. On one PC we alternated the
+  fixed `800bc2c` build and candidate in three pairs (old/new, new/old, old/new).
+  Old → new medians in seconds: apply 16.015 → 12.356, file generation through
+  download handoff 40.541 → 32.717, cold launch through edited text 37.424 →
+  34.434. First list 7.817 → 8.542; no first-list speedup. Individual runs
+  in pair order: apply 16.015/18.021/15.881 → 12.356/12.663/12.270,
+  handoff 37.118/42.281/40.541 → 32.707/32.717/36.172, cold edited text
+  37.124/37.424/38.929 → 34.434/40.574/32.885. All six actual backups retained
+  the starting identity, all original changes and bytes, and exactly one new
+  change. An earlier separated three-before/three-after series ran slower on
+  the candidate (9.464 → 12.409, 23.174 → 32.794, 24.262 → 36.685 s).
+  Its median restore-control opens fell from 1,277 to 623 on edit, 2,860 to
+  1,540 on export. Text edits issued no original model or photo writes.
+- Rechecked when saving actually starts. Three interleaved candidate edits each
+  issued four metadata text writes, one change-body write and one DB save.
+  Input, navigation and previews do not start that commit. The design review
+  compares command-scoped checks, a single-store text commit, and reopening
+  the UI after the existing recovery record becomes durable, with separate
+  acceptance for crashes, stale drafts and outbound content. These changes
+  are not in the measured build. The PO subsequently authorized the first
+  candidate only, conditional on measured benefit and crash/recovery checks.
+  [Save timing review](../docs/specs/06e-selected-generation-output-read-proposal.md#本文編集の保存タイミング再検討2026-11-13設計案).
+- Repeated that journey against the frozen immediately preceding 623-open
+  candidate and the transaction-scoped title/body candidate, alternating three
+  fresh Chromium profiles per build. Median visible Apply 8.494 → 6.108 s
+  (9.052/7.995/8.494 → 6.278/5.594/6.108). Restore-control lists
+  89/90/90 → 24/25/24; file opens 623/630/630 → 174/179/175. Each edit
+  still wrote four journal receipts, one change and one document save; no
+  model/photo write. Actual external file handoff 22.942 → 23.159 s;
+  cold edited text 26.254 → 25.450 s. No export speedup. All six downloads
+  and cold opens retained the original identity, all 43 original bodies,
+  all three original changes and exactly one new edit. Keep preparation before
+  a complete durable change distinct from retrying the exact prepared change.
+- Adopted the scoped text commit after the comparison and independent review.
+  An actual Chromium renderer crash immediately before publication, followed by
+  a fresh browser on the same profile, recovered one edit. Its real backup and
+  second cold restart preserved model/photo bytes and the exact original history.
+  All 58 distinct Desktop scenarios passed across the regression and targeted
+  corrections, including PC/touch. All eight offline scenarios passed. The
+  156-suite checkpoint passed (3,535 passing tests, 16 expected failures,
+  21 marked todo), plus HEIC isolation across all five outputs. On the short
+  1280×720 dense workspace, the independent layout correction increased list
+  height from 116.5 to 155.8 px; short-detail, filtered, draft/IME, phone
+  and cancellation paths were exercised. Physical iPhone remains unverified.
+  Next: attribute the edit preflight and model/media evidence reads before
+  proposing any further change to when the application can declare a save.
+
 ## Outcome and authority
 
 Complete open → Project/Scene/model/Caption/media work → save/send → receive/resolve

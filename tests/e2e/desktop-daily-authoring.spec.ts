@@ -125,7 +125,11 @@ test('daily Scene and Caption organization, tags, alignment, settings and files 
     }
     expect(Object.values(before.records.captionAttachmentsById)).toHaveLength(nativeHeic?20:16); expect(Object.values(before.records.mediaResourcesById)).toHaveLength(nativeHeic?5:4);
     await first.context.close(); contexts.delete(first.context); const cold = await launch(); await expect(cold.page.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText('日常の編集', { timeout: 90_000 });
-    await expect(cold.page.getByRole('button',{name:'記録の変更を元に戻す',exact:true})).toBeDisabled(); await expect(cold.page.getByRole('button',{name:'記録の変更をやり直す',exact:true})).toBeDisabled();
+    for (const name of ['記録の変更を元に戻す', '記録の変更をやり直す']) {
+      const control = cold.page.locator('button').filter({hasText: new RegExp(`^${name}$`)});
+      await expect(control).toBeDisabled();
+      await expect(control).toBeHidden();
+    }
     await cold.page.getByLabel('設定', { exact: true }).locator('summary').click(); await expect(cold.page.getByLabel('このブラウザの表示名', { exact: true })).toHaveValue('現地担当');
     const after = await backupRecords(await output(cold.page, info, 'daily-cold', 'backup')); expect(after.records).toEqual(before.records); expect(after.archive.source.token).toBe(before.archive.source.token);
     await cold.page.getByRole('tab',{name:'キャプション',exact:true}).click();await cold.page.getByRole('list',{name:'キャプション一覧',exact:true}).locator('.lv-caption-select').filter({hasText:'複製の記録'}).click();await play(cold.page,'audio','owned-audio.mp3');

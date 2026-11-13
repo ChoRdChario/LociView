@@ -457,7 +457,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   const captionBack = button('一覧へ戻る', () => { captionSurface = 'list'; render(); list.focusSelection(); });
   const detailPane = make('section'); detailPane.className = 'lv-caption-reading';
   function captionNavigationContext(context = listContext(), windowState = windowMemory()): CaptionListContext {
-    if (readDuringOutput()) return context;
+    if (mobileLayout?.matches || readDuringOutput()) return context;
     const active = captionWindowView(context.source, windowState, context.memory.selectedCaptionId).visibleIds.at(-1);
     return active && active !== context.memory.selectedCaptionId
       ? { ...context, memory: { ...context.memory, selectedCaptionId: active } } : context;
@@ -469,7 +469,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     if (plan.kind !== 'change' || !captionListPlanIsCurrent(plan, context) ||
         base.memory !== memory() || windowState !== windowMemory() || base.source.token !== provider().token) return;
     const selected = plan.memory.selectedCaptionId!, active = captionWindowView(base.source, windowState, base.memory.selectedCaptionId).visibleIds.at(-1);
-    const replacement = !readDuringOutput() && active ? planCaptionWindow(base.source, windowState, selected,
+    const replacement = !mobileLayout?.matches && !readDuringOutput() && active ? planCaptionWindow(base.source, windowState, selected,
       { kind: 'replace', fromCaptionId: active, captionId: selected, rect: windows.placement(active) }) : undefined;
     if (replacement?.kind === 'blocked') return;
     memories.set(sceneId, plan.memory); resetDraft();
@@ -478,6 +478,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     render(); list.revealSelected();
   }
   function openCaptionWindow(captionId: string) {
+    if (mobileLayout?.matches) return;
     const plan = planCaptionWindow(listContext().source, windowMemory(), memory().selectedCaptionId, { kind: 'open', captionId });
     if (plan.kind === 'change') windowMemories.set(sceneId, plan.memory);
   }
@@ -1164,7 +1165,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       previousCaption.disabled = busy || ports.otherPending() && !readDuringOutput() || planCaptionList(captionNavigationContext(), { kind: 'step', direction: 'previous' }).kind !== 'change';
       nextCaption.disabled = busy || ports.otherPending() && !readDuringOutput() || planCaptionList(captionNavigationContext(), { kind: 'step', direction: 'next' }).kind !== 'change';
       windows.render({ source: listContext().source, memory: windowMemory(), selectedId: selected, moveBlock: windowBlock(),
-        visible: stageVisible() && !drawingPreview() && document.hidden !== true });
+        visible: !mobileLayout?.matches && stageVisible() && !drawingPreview() && document.hidden !== true });
       addPin.disabled = !!blocked || dirty() || !sceneId;
       movePin.disabled = !!blocked || dirty() || !selected;movePin.hidden=!selected;
       excludeSelected.hidden = !selected; excludeSelected.disabled = !!blocked || dirty();
@@ -1291,7 +1292,11 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
                 if (distance < closest) { closest = distance; captionId = pin.id; }
               }
             }
-            selectCaption(captionId); render(); list.revealSelected();
+            selectCaption(captionId);
+            if (mobileLayout?.matches) { task = 'captions'; compactSurface = 'panel'; }
+            render();
+            if (mobileLayout?.matches) detailHeading.focus({ preventScroll: true });
+            else list.revealSelected();
           } });
           bindMarkerNavigation(marker); markerById.set(key, marker); markerNodes.add(marker); }
         const markerName = fieldValue(caption.title) || '名称なし';

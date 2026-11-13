@@ -19,7 +19,8 @@ export interface ReviewAppendPort {
 }
 
 /** Standalone snapshot viewing. Only an explicitly confirmed handoff may create an editing Project. */
-export function createReviewWorkspace(document: Document, view: ReviewView, factory: ViewportFactory, editCopy?: () => void | Promise<void>, append?: ReviewAppendPort) {
+export function createReviewWorkspace(document: Document, view: ReviewView, factory: ViewportFactory, editCopy?: () => void | Promise<void>, append?: ReviewAppendPort,
+  switchScene?: (id: string) => Promise<void> | void) {
   const make = <K extends keyof HTMLElementTagNameMap>(tag: K, text = '') => { const node = document.createElement(tag); node.textContent = text; return node; };
   const root = make('main'); root.className = 'lv-development lv-review-workspace'; root.setAttribute('aria-label', '閲覧用のシーン');
   const stopHelp = mountContextHelp(document, root);
@@ -35,6 +36,7 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
   const mediaWork = createMediaResidencyGate(document, render, () => runtime?.idle?.() ?? Promise.resolve(), () => !disposed);
   const mediaViewer = createMediaViewer(document, view.rasterResources,view.imageDimensions,mediaWork.acquire); root.append(mediaViewer.root);
   let memory: SceneUiMemory = { selectedCaptionId: null, search: '', pinColors: null, listScrollTop: 0, ownerFilter: { kind: 'all' } };
+  const phone = document.defaultView?.matchMedia?.('(pointer: coarse) and (max-width: 760px), (pointer: coarse) and (max-width: 950px) and (max-height: 480px)');
   let windowsMemory = newCaptionWindowMemory(view.source.sceneId), composing = false, moving = false, disposed = false, rendering = false;
   let runtime: ProjectViewport | undefined, display = view.display(null, null), failure = '', rendererFailure = '';
   let retirement: Promise<void> | undefined;
@@ -66,7 +68,7 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
     note.setAttribute('role', 'status'); select.setAttribute('aria-label', '追加先'); label.append(select);
     const count = (name: string) => view.inspection.review.summary.entityClasses.find(entry => entry.class === name)?.count ?? 0;
     const models = Object.values(view.inspection.review.snapshot.assetsById as JsonObject).filter(asset => (asset as JsonObject).kind === 'visual').length;
-    panel.append(make('h2', view.sceneName), make('p', `モデル ${models}・キャプション ${count('captionsById')}・メディア ${count('mediaResourcesById')}`),
+    panel.append(make('h2', count('scenesById') > 1 ? `${count('scenesById')}シーンを追加` : view.sceneName), make('p', `モデル ${models}・キャプション ${count('captionsById')}・メディア ${count('mediaResourcesById')}`),
       label, note, confirm, cancel);
     header.append(open); root.insertBefore(panel, content);
     let revision = 0, pending: (() => Promise<void>) | undefined, loading = false, hasProjects = false;
@@ -134,6 +136,7 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
   }
   function openWindow(captionId: string) {
     memory = { ...memory, selectedCaptionId: captionId };
+    if (phone?.matches) return;
     const plan = planCaptionWindow(view.source, windowsMemory, captionId, { kind: 'open', captionId });
     if (plan.kind === 'change') windowsMemory = plan.memory;
   }
@@ -168,9 +171,27 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
   };
   const windows = createCaptionWindowControls(document, windowPlan, active => { moving = active; paint(); }, gallery);
   const selectedMedia = make('section'); selectedMedia.setAttribute('aria-label', '選択中のキャプションのメディア');
+  const selectedText = make('section'), recordTitle = make('h3'), recordBody = make('p');
+  selectedText.setAttribute('aria-label', 'キャプションの詳細'); selectedText.tabIndex = -1; selectedText.className = 'lv-caption-value';
+  selectedText.append(recordTitle, recordBody);
   let panelGallery: ReturnType<typeof gallery> | null = null, panelCaption: string | null = null;
   const sceneHeader = make('div'); sceneHeader.className = 'lv-review-scene-header'; sceneHeader.append(sceneName);
-  viewport.append(windows.root); sidebar.append(sceneHeader, emptyCaptions, list.root, selectedMedia);
+  if (switchScene && view.scenes.length > 1) {
+    const select = make('select'); select.setAttribute('aria-label', '表示するシーン');
+    for (const scene of view.scenes) {
+      const option = make('option', String(scene.name)); option.value = String(scene.id); select.append(option);
+    }
+    select.value = view.source.sceneId;
+    select.addEventListener('change', async () => {
+      const id = select.value; select.value = view.source.sceneId;
+      if (disposed || handoffBusy || composing || moving || select.disabled) return;
+      select.disabled = true; content.inert = true;
+      try { await switchScene(id); }
+      finally { if (!disposed) { select.disabled = false; content.inert = false; } }
+    });
+    sceneHeader.append(select);
+  }
+  viewport.append(windows.root); sidebar.append(sceneHeader, emptyCaptions, list.root, selectedText, selectedMedia);
   const views = make('details'); views.append(make('summary', 'その他の視点'));
   const cameraAction = (action: () => void) => {
     if (disposed || composing || moving) return; try { action(); failure = ''; } catch (error) { failure = (error as Error).message; } paint();
@@ -221,7 +242,10 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
     for (const pin of display.pins) {
       let button = pins.get(pin.id);
       if (!button) { button = make('button'); button.type = 'button'; button.className = 'lv-development-pin';
-        button.addEventListener('click', () => accept(planCaptionList(context(), { kind: 'select', captionId: pin.id }))); pins.set(pin.id, button); overlay.append(button); }
+        button.addEventListener('click', () => {
+          accept(planCaptionList(context(), { kind: 'select', captionId: pin.id }));
+          if (phone?.matches && memory.selectedCaptionId === pin.id) selectedText.focus();
+        }); pins.set(pin.id, button); overlay.append(button); }
       button.textContent = pin.title || 'キャプション'; button.style.backgroundColor = pin.color; button.setAttribute('aria-current', String(memory.selectedCaptionId === pin.id));
       button.style.transform = `translate(-50%, -50%) scale(${pin.scale ?? 1})`;
       button.dataset.status = pin.status;
@@ -234,11 +258,15 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
   function render() {
     if (disposed || rendering) return; rendering = true;
     try { list.render(context());
+      const item = phone?.matches ? view.source.captions.find(row => row.id === memory.selectedCaptionId) : undefined;
+      selectedText.hidden = !item;
+      recordTitle.textContent = item?.title.kind === 'value' ? item.title.value : '';
+      recordBody.textContent = item?.body.kind === 'value' ? item.body.value : '';
       if (panelCaption !== memory.selectedCaptionId) { panelGallery?.dispose(); panelCaption = memory.selectedCaptionId;
         panelGallery = panelCaption ? gallery(panelCaption) : null; if (panelGallery) selectedMedia.append(panelGallery.root); }
       panelGallery?.render(); mediaViewer.render();
       windows.render({ source: view.source, memory: windowsMemory, selectedId: memory.selectedCaptionId,
-      moveBlock: composing ? '文字の入力を確定してください。' : null });
+      visible: !phone?.matches, moveBlock: composing ? '文字の入力を確定してください。' : null });
       const empty=view.source.captions.length===0;emptyCaptions.hidden=!empty;list.root.hidden=selectedMedia.hidden=windows.tools.hidden=empty;
       display = view.display(memory.pinColors, memory.selectedCaptionId); runtime?.setActive(!handoffBusy && !mediaWork.active && document.hidden !== true); runtime?.update(display); paint(); }
     catch (error) { failure = (error as Error).message; paint(); } finally { rendering = false; }
@@ -254,6 +282,7 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
     catch (error) { failure = (error as Error).message; } paint();
   });
   document.addEventListener?.('visibilitychange',render);
+  phone?.addEventListener?.('change',render);
   render();
   startRenderer(); paint();
   return { root, render, hasChanges: () => composing || moving, dispose() {
@@ -263,6 +292,7 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
     void retirement.catch(() => {}); disposed = true;
     const errors: unknown[] = [], attempt = <T>(action: () => T): T | undefined => { try { return action(); } catch (error) { errors.push(error); } };
     attempt(() => document.removeEventListener?.('visibilitychange',render));
+    attempt(() => phone?.removeEventListener?.('change',render));
     for (const stop of [() => cameraGizmo.dispose(), stopHelp, () => list.dispose(), () => panelGallery?.dispose(), () => windows.dispose()]) attempt(stop);
     const media = attempt(() => mediaViewer.dispose()); attempt(() => runtime?.dispose()); pins.clear(); attempt(() => root.remove());
     const viewport = attempt(() => runtime?.idle?.());

@@ -39,21 +39,28 @@ export function createValidationOutputControls(document: Document, host: ReturnT
   type OutputPurpose = 'teamWorkspace' | 'contribution' | 'backup' | 'clean' | 'review';
   let purpose: OutputPurpose = 'backup', baseId = '', choicePending = false, checkpointName = '', composing = false;
   let cleanPreview: Awaited<ReturnType<typeof host.workspaceOutput.previewClean>> | null = null;
-  let reviewPreview: Awaited<ReturnType<typeof host.workspaceOutput.previewReview>> | null = null, sceneId = '', omitEntry = false;
-  let autoBase = true;
-  type Choice = { purpose: OutputPurpose; baseId: string; checkpointName: string; choicePending: boolean; sceneId: string; omitEntry: boolean; autoBase: boolean };
+  let reviewPreview: Awaited<ReturnType<typeof host.workspaceOutput.previewReview>> | null = null;
+  let autoBase = true, sceneIds: string[] = [], omitted: string[] = [], previewKey = '';
+  const selection = () => ({
+    sceneId: sceneIds[0] ?? '',
+    ...(sceneIds.length > 1 ? { additionalSceneIds: sceneIds.slice(1) } : {}),
+    ...(omitted.includes(sceneIds[0] ?? '') ? { omitConflictedEntryView: true } : {}),
+    ...(omitted.some(id => id !== sceneIds[0]) ? { omitAdditionalEntryViews: omitted.filter(id => id !== sceneIds[0]) } : {}),
+  });
+  type Choice = { purpose: OutputPurpose; baseId: string; checkpointName: string; choicePending: boolean; sceneIds: string[]; omitted: string[]; autoBase: boolean };
   const choices = new Map<Presentation, Choice>();
-  const resetChoice = () => { purpose = presentation === 'share' ? 'teamWorkspace' : 'backup'; baseId = ''; checkpointName = ''; choicePending = false; cleanPreview = null; reviewPreview = null; sceneId = ''; omitEntry = false; autoBase = true; };
+  const resetChoice = () => { purpose = presentation === 'share' ? 'review' : 'backup'; baseId = ''; checkpointName = ''; choicePending = false; cleanPreview = null; reviewPreview = null; sceneIds = []; omitted = []; autoBase = true; };
   const choosePurpose = (next: typeof purpose, pending = true) => {
     if (busy || composing || selected || cancellation) return;
     if (purpose === next) return;
     feedback = ''; completedFeedback = false;
-    purpose = next; baseId = ''; autoBase = true; cleanPreview = null; reviewPreview = null; sceneId = ''; omitEntry = false; choicePending = pending; render(); changed();
+    purpose = next; baseId = ''; autoBase = true; cleanPreview = null; reviewPreview = null; sceneIds = []; omitted = []; choicePending = pending; render(); changed();
   };
   const refreshChoice = (control: HTMLElement) => {
-    const label = document.activeElement === control && control.getAttribute('aria-label');
+    const focused = document.activeElement === control, key = control.dataset.choiceId, label = control.getAttribute('aria-label');
     choicePending = true; feedback = ''; completedFeedback = false; render(); changed();
-    if (label) actions.querySelector?.<HTMLElement>(`[aria-label="${label}"]`)?.focus({ preventScroll: true });
+    if (focused) Array.from(actions.querySelectorAll?.<HTMLElement>('input, select') ?? []).find(node =>
+      key ? node.dataset.choiceId === key : node.getAttribute('aria-label') === label)?.focus({ preventScroll: true });
   };
   const urls = new Map<string, string>();
   const handedOff = new Set<string>();
@@ -121,7 +128,7 @@ export function createValidationOutputControls(document: Document, host: ReturnT
   const currentDisclosure = () => {
     const current = host.workspaceOutput.privacy, base = host.workspaceOutput.bases.find(b => b.selection.workspacePackageId === baseId);
     const requires = purpose === 'backup' ? current.backupIncludesNames : purpose === 'contribution' ? current.sourceIncludesNames || !!base?.includesDeclaredEditorNames : purpose === 'teamWorkspace' ? current.sourceIncludesNames : false;
-    const preview = reviewPreview?.token === host.read().source?.token && reviewPreview?.sceneId === sceneId && reviewPreview?.omittedEntryView === omitEntry ? reviewPreview : null;
+    const preview = reviewPreview?.token === host.read().source?.token && previewKey === JSON.stringify(selection()) ? reviewPreview : null;
     const portable = purpose === 'backup' ? current.backupRequiresPortableMediaReader : purpose === 'contribution' ? current.sourceRequiresPortableMediaReader || !!base?.requiresPortableMediaReader :
       purpose === 'teamWorkspace' ? current.sourceRequiresPortableMediaReader : purpose === 'review' ? preview?.requiresPortableMediaReader : undefined;
     return { includesDeclaredEditorNames: purpose === 'contribution' ? !!base?.deltaIncludesDeclaredEditorNames : requires, requiresEditorAttributionReader: requires,
@@ -133,7 +140,8 @@ export function createValidationOutputControls(document: Document, host: ReturnT
     const id = await generate(), job = host.workspaceOutput.jobs.find(j => j.id === id);
     // Generation is already durable even if the browser handoff then fails.
     // Keep that exact result available; retry must not silently create another job.
-    resetChoice();
+    if (presentation === 'share') choicePending = false;
+    else resetChoice();
     if (job && (!!job.includesDeclaredEditorNames !== !!expected.includesDeclaredEditorNames || !!job.requiresEditorAttributionReader !== !!expected.requiresEditorAttributionReader || !!job.requiresPortableMediaReader !== !!expected.requiresPortableMediaReader)) {
       needsDisclosure = true; history.open = true; return;
     }
@@ -191,32 +199,38 @@ export function createValidationOutputControls(document: Document, host: ReturnT
     let reviewConfirmed = false;
     if (purpose === 'review') {
       const provider = host.read().provider, sceneRecords = provider?.kind === 'scene-provider' ? provider.state.scenes : {};
-      const label = document.createElement('label'), scenes = document.createElement('select'), empty = document.createElement('option');
-      label.textContent = '渡すシーン'; scenes.setAttribute('aria-label', '渡すシーン'); empty.value = ''; empty.textContent = '選択してください'; scenes.append(empty);
-      for (const scene of Object.values(sceneRecords)) {
-        if (scene.lifecycle.kind !== 'value' || scene.lifecycle.value.state !== 'active' || scene.name.kind !== 'value') continue;
-        const option = document.createElement('option'); option.value = scene.id; option.textContent = scene.name.value; scenes.append(option);
-      }
-      if (sceneId && !Array.from(scenes.children).some(node => (node as HTMLOptionElement).value === sceneId)) {
-        sceneId = ''; omitEntry = false; reviewPreview = null;
-      }
-      const soleScene = presentation === 'share' && scenes.children.length === 2 ? scenes.children[1] as HTMLOptionElement : undefined;
-      if (soleScene) {
-        sceneId = soleScene.value;
+      const available = Object.values(sceneRecords).flatMap(scene => {
+        if (scene.lifecycle.kind !== 'value' || scene.lifecycle.value.state !== 'active' || scene.name.kind !== 'value') return [];
+        return [{ id: scene.id, name: scene.name.value, order: scene.orderKey.kind === 'value' ? scene.orderKey.value : '',
+          conflict: scene.defaultViewId.kind === 'unresolved' && scene.defaultViewId.reason === 'conflict' }];
+      }).sort((a, b) => a.order < b.order ? -1 : a.order > b.order ? 1 : a.id.localeCompare(b.id));
+      const selectedIds = new Set(sceneIds);
+      sceneIds = available.filter(scene => selectedIds.has(scene.id)).map(scene => scene.id);
+      const sole = available.length === 1 && presentation === 'share' ? available[0] : undefined;
+      if (sole) {
+        sceneIds = [sole.id];
         const target = document.createElement('p'); target.setAttribute('aria-label', '渡すシーン');
-        target.textContent = `渡すシーン：${soleScene.textContent}`; actions.append(target);
-      } else {
-        scenes.value = sceneId; scenes.disabled = choicesDisabled; label.append(scenes); actions.append(label);
+        target.textContent = `渡すシーン：${sole.name}`; actions.append(target);
       }
-      reviewConfirmed = !!reviewPreview && reviewPreview.token === host.read().source?.token && reviewPreview.sceneId === sceneId && reviewPreview.omittedEntryView === omitEntry;
-      scenes.addEventListener('change', () => { if (!scenes.disabled) { sceneId = scenes.value; omitEntry = false; reviewPreview = null; refreshChoice(scenes); } });
-      const scene = sceneRecords[sceneId];
-      if (scene?.defaultViewId.kind === 'unresolved' && scene.defaultViewId.reason === 'conflict') {
-        const label = document.createElement('label'), omit = document.createElement('input'); omit.type = 'checkbox'; omit.checked = omitEntry;
-        label.textContent = '開始視点なしで渡す'; omit.setAttribute('aria-label', label.textContent);
-        omit.disabled = choicesDisabled; label.append(omit); actions.append(label);
-        omit.addEventListener('change', () => { if (!omit.disabled) { omitEntry = omit.checked; reviewPreview = null; refreshChoice(omit); } });
+      omitted = available.filter(s => s.conflict && sceneIds.includes(s.id) && omitted.includes(s.id)).map(s => s.id);
+      const group = document.createElement('fieldset'), legend = document.createElement('legend');
+      legend.textContent = '渡すシーン'; group.append(legend); group.setAttribute('aria-label', legend.textContent);
+      group.className = 'lv-share-scenes'; if (!sole) actions.append(group);
+      const check = (parent: HTMLElement, text: string, key: string, checked: boolean, change: (on: boolean) => void) => {
+        const label = document.createElement('label'), input = document.createElement('input');
+        input.type = 'checkbox'; input.dataset.choiceId = key; input.setAttribute('aria-label', text); input.checked = checked; input.disabled = choicesDisabled;
+        const title = document.createElement('span'); title.textContent = text; label.append(input, title); parent.append(label);
+        input.addEventListener('change', () => { if (input.disabled) return; change(input.checked); reviewPreview = null; refreshChoice(input); });
+      };
+      for (const scene of available) {
+        if (!sole) check(group, scene.name, scene.id, selectedIds.has(scene.id), on => {
+          sceneIds = on ? [...sceneIds, scene.id] : sceneIds.filter(id => id !== scene.id);
+        });
+        if (sceneIds.includes(scene.id) && scene.conflict) check(sole ? actions : group,
+          available.length === 1 ? '開始視点なしで渡す' : `${scene.name}を開始視点なしで渡す`, 'omit-' + scene.id,
+          omitted.includes(scene.id), on => { omitted = on ? [...omitted, scene.id] : omitted.filter(id => id !== scene.id); });
       }
+      reviewConfirmed = !!reviewPreview && reviewPreview.token === host.read().source?.token && previewKey === JSON.stringify(selection());
       const help = document.createElement('p'); help.textContent = '選んだシーンのモデル・記録だけを渡します。検索や色の絞り込みは反映しません。元のプロジェクトへ変更分は返せません。'; actions.append(help);
       if (reviewPreview) {
         const counts = document.createElement('p'); counts.textContent = reviewConfirmed ? `${reviewPreview.name} — モデル ${reviewPreview.models}・キャプション ${reviewPreview.captions}・メディア ${reviewPreview.media}` : '内容が変わりました。もう一度確認してください。'; actions.append(counts);
@@ -260,15 +274,15 @@ export function createValidationOutputControls(document: Document, host: ReturnT
         if (!cleanConfirmed) perform(async () => { cleanPreview = await host.workspaceOutput.previewClean(token); }, 'コピーに含める内容を確認してください。');
         else generateAndDownload(() => host.workspaceOutput.generateClean(token));
       } else if (purpose === 'review') {
-        const selection = { sceneId, ...(omitEntry ? { omitConflictedEntryView: true } : {}) };
-        if (!reviewConfirmed) perform(async () => { reviewPreview = await host.workspaceOutput.previewReview(token, selection); }, '渡す内容を確認してください。');
-        else generateAndDownload(() => host.workspaceOutput.generateReview(token, selection));
+        const selected = selection();
+        if (!reviewConfirmed) perform(async () => { reviewPreview = await host.workspaceOutput.previewReview(token, selected); previewKey = JSON.stringify(selected); }, '渡す内容を確認してください。');
+        else generateAndDownload(() => host.workspaceOutput.generateReview(token, selected));
       } else if (purpose === 'backup') {
         const name = checkpointName.trim().normalize('NFC') || undefined;
         generateAndDownload(() => host.workspaceOutput.generateBackup(token, name));
       } else generateAndDownload(() => host.workspaceOutput.generate(token));
     };
-    create.disabled ||= purpose === 'contribution' && !chosen || purpose === 'review' && !sceneId || !!selected || !!cancellation;
+    create.disabled ||= purpose === 'contribution' && !chosen || purpose === 'review' && !sceneIds.length || !!selected || !!cancellation;
     create.className = 'lv-file-primary';
     if (choicePending) button(commands, '選択を取り消す', () => {
       resetChoice(); feedback = ''; completedFeedback = false; render(); changed(); if (presentation === 'share') partial.focus();
@@ -355,10 +369,10 @@ export function createValidationOutputControls(document: Document, host: ReturnT
   nameInput.addEventListener('compositionend', () => { checkpointName = nameInput.value; composing = false; choicePending = true; changed(); });
   render(); return { root, render, choosePurpose, hasHandedOff: (jobId: string) => handedOff.has(jobId), setPresentation(value: typeof presentation) {
       if (value !== presentation) {
-        choices.set(presentation, { purpose, baseId, checkpointName, choicePending, sceneId, omitEntry, autoBase });
+        choices.set(presentation, { purpose, baseId, checkpointName, choicePending, sceneIds, omitted, autoBase });
         presentation = value;
         const saved = choices.get(value);
-        if (saved) ({ purpose, baseId, checkpointName, choicePending, sceneId, omitEntry, autoBase } = saved);
+        if (saved) ({ purpose, baseId, checkpointName, choicePending, sceneIds, omitted, autoBase } = saved);
         else resetChoice();
         cleanPreview = null; reviewPreview = null;
       }

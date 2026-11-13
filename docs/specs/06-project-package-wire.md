@@ -17,7 +17,7 @@ existing-file/job retention, normal new-format history and five-purpose closure 
 privacy remain required; do not drop existing protected bytes or opaque records.
 
 The accepted outcomes are in [specification 05 §§6–7](05-project-scene-team-workflow.md).
-The five purposes, original causal history, explicit conflict choices, one-Scene
+The five purposes, original causal history, explicit conflict choices, selected-Scene
 review and whole-Project clean copy are not new decisions here. Canonical domain
 values, nominal IDs, reference strength, corruption handling and streaming safety
 continue to follow [specification 02 §§3–4, 7–10](02-storage-package-migration.md),
@@ -289,7 +289,7 @@ parent revision/binding links, exchange records and contributor identity are
 excluded. Included semantic conflicts or unknown unclassified fields block
 generation. No sender identity or source head set is added to its manifest.
 
-### 5.1 Proposed one-Scene review snapshot
+### 5.1 Review snapshot of the selected scenes
 
 This is a separate immutable snapshot, not `ProjectDocV2` with most maps emptied.
 Candidate root members are exactly `schema`, `snapshotId`, `project`, `scene`,
@@ -363,7 +363,7 @@ absence from its own visual Asset's active list is valid `needsReview`, not a
 reason to select another class. Suppression for a nonvisual owner is structural,
 not a fabricated compatibility result.
 
-Exactly one active source Scene is chosen explicitly. Include all its active
+Versions 1 and 2 select exactly one active source Scene. Include all its active
 memberships, included Caption media/tag closure, active views and applicable
 material intent. No search, pin-color filter, temporary hide/isolate, free camera
 or window state changes export scope. A nonvisual owner exists only to preserve
@@ -384,6 +384,22 @@ is a conflicted optional entry view after explicit `開始視点なし` prefligh
 confirmation. Do not omit another conflicted Saved View, material, membership or
 Caption, and do not turn a required conflict into a placeholder in the exported
 bytes. Unrelated Project/Scene conflicts do not block the selected closure.
+
+**Selection of several scenes (2026-11-13).** A review created from multiple
+checked scenes uses snapshot version 3 (map1) or 4 (map2). The only root
+shape change is replacing `scene` with `scenesById`, containing two or more
+active scene descriptions keyed by their re-keyed ID. Select memberships first,
+resolve their union once, then re-key once. Preserve both memberships of a
+shared record, but emit its body only once by SHA-256. Equal hashes with
+different lengths are invalid. Scenes outside the selection, their own views
+and overrides, history and original IDs stay out of the file. A scene-scoped
+material applies only to an asset displayed in that scene. Each included scene
+keeps its own entry camera. The first selected scene in displayed order opens
+initially. A conflicted entry view requires explicit omission for its own scene.
+Verify membership, scene IDs, initial scene, summary, semantic references and
+exact physical closure on input. One-scene output retains its original schema.
+A repeated download retains the user's selection. Multi-scene import into an
+existing project is atomic under the approved 06d recovery boundary.
 
 Proposed review-to-clean mapping for either nonvisual branch is an independently
 re-keyed ordinary Asset with its mapped `assetFrameId`, neutral generated label
@@ -1151,7 +1167,7 @@ delegation again. Complete §11.3's tables and review remain necessary before co
 | Send the Project to someone | `teamWorkspace` | A self-contained starting point without the sender's local exchange-base table. Generation establishes only the exact retained Workspace base, not delivery, acceptance or a manual checkpoint. |
 | Send changes using a selected base | `contribution` | Exact original changes/new required bodies relative to that base; not a complete save point and never advances the base. |
 | Browse the current Project | Local View mode | No file creation or new lineage is required merely to disable editing. A URL mode switch does not transfer data or exclude private Scenes. |
-| Share only one Scene / start an independent Project | Existing `review` / `clean` purposes respectively | Contextual secondary actions with their existing scope/privacy/lineage preflight, not alternatives the user must decide between on every save. |
+| Share selected Scenes / start an independent Project | Existing `review` / `clean` purposes respectively | Scene sharing starts with the scene choice and discloses its scope and privacy effects. |
 
 Normal Save and automatic checkpointing therefore do not create new Workspace
 exchange bases or put them into the ProjectDoc. A backup retains already available
@@ -1995,8 +2011,10 @@ is not reused. This is accepted review reconstruction, not a new GLB profile.
 
 The local reconstruction object is closed to
 `{schema:'lociview-review-reconstruction-1',snapshotId,selection,rekey}`.
-`selection` is exactly `{sceneId,omitConflictedEntryView?}` with a boolean optional
-confirmation for the conflicted entry pointer only. `rekey` is the frozen typed
+`selection` contains the initial `sceneId` and optional `omitConflictedEntryView`.
+For multiple scenes it also records the distinct `additionalSceneIds` and an
+optional subset `omitAdditionalEntryViews` with a confirmed entry conflict.
+The exact selection is bound to preview, generation and recovery. `rekey` is the frozen typed
 §12.1 clean reconstruction used for the admitted scoped record subset; its fresh
 Project scaffolding is private and absent from the flattened review. The source
 bytes, reconstruction and source proof stay separate from `review.json` and the
@@ -3179,9 +3197,39 @@ publication. Read fences, original and staging bindings, complete audit order,
 and every archive/body/durable readback and cold recovery check are unchanged.
 This removes repeated scans inside one fence without promising atomic root
 observation or identical detection timing for out-of-band changes mid-audit.
+
+2026-11-13 ordinary selected-generation refinement. After strict opening and
+complete destination verification of a finished restore, each ordinary fence
+may inspect each control's size and bytes from the same newly opened file in
+that audit. Keep path grammar, cumulative budgets, exact stream length, canonical
+bytes, cross-references, current selection and result checks. No handle, bytes
+or authority carry across audits. In-flight replacement after a snapshot opens
+may be seen at the next fence. Cold verification, staging, pending restore,
+selection, cancellation and recovery keep independent opens. Write, readback,
+publication and lease entry/exit retain their separate fresh observations.
 Acceptance checks pre-fence refusal with no mutation, post-fence refusal before
 success, disposed scope during audit, existing selected restore recovery, and
 the paired Ki84 edit/export/close/reopen workflow with original-byte checks.
+
+For the approved ordinary Caption title/body evaluation in [06e](06e-selected-generation-output-read-proposal.md),
+the edit lease may hand a private transaction port to its own command after the
+published base has been checked. The port checks selection at entry, before the
+document commit, before publication, before reading the published edit back,
+and at exit. The surrounding lease also checks at entry and exit. Inside each
+stage the port can write only that transaction's existing journal records or the
+single bound document in its corresponding stage. Every write retains authority
+checks and its existing readback. A successful UI acknowledgment follows the
+closing lease check. A separate operation cannot borrow these ports.
+
+On ordinary host/catalog reopening of an already selected, completed restore,
+a later prepared local text edit may be handed to strict recovery. The last
+published provider, original restore evidence, protected bodies and exact
+change bytes must verify. The pending change must be one ordinary scalar edit
+on the active Caption's title/body with the expected field predecessors and
+no other changes. Verify the actual document at the published or prepared heads
+(prepared heads required after the durable marker). Return pending until strict
+retry publishes and rereads the same change; never select a new restore
+destination on this exception. Incomplete preparation remains repair state.
 
 The shared selected-generation resolver reads root controls and the actual DB
 list, captures the exact Selection (or original-generation absence), opens only

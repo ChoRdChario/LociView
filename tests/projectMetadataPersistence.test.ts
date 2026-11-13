@@ -5,7 +5,7 @@ import { MetadataProjectSession, measureMetadata, type MetadataSessionRead } fro
 import { MetadataRepository, type MetadataStorageFactory, type MetadataStoragePort } from '../src/projectMetadata/repository';
 import { PersistentContentVerifier, type VerifiedInventoryPort } from '../src/projectMetadata/contentEvidence';
 import { TransactionJournal } from '../src/projectMetadata/journal';
-import { digest, json, jsonDigest, metadataPath, underWriteLease, withMetadataRead, writeReceipt } from '../src/projectMetadata/persistence';
+import { digest, json, jsonDigest, metadataPath, selectedTextCommit, underWriteLease, withMetadataRead, writeReceipt, type TextCommitPorts } from '../src/projectMetadata/persistence';
 import type { ContentRequest, ProjectContentVerifier } from '../src/domain/projectContentChecks';
 import { ProjectMetadataSource, type MetadataLimits } from '../src/projectMetadata/source';
 import { planRemoteChanges, type FullMetadataSource } from '../src/projectMetadata/remote';
@@ -604,6 +604,57 @@ describe('local generation capabilities (ports only, not backup restore/selectio
     await expect(late).rejects.toThrow('generation-closed');
     expect(forbidden).not.toHaveBeenCalled();
     expect(await f.fs.readText(path)).toBe('saved');
+  });
+
+  it('restricts text-commit writes to one transaction and document, and expires them with the edit lease', async () => {
+    const f = local(), chosen = setup(f.fs), audit = vi.fn(async () => {});
+    let ordinary = true, escaped: TextCommitPorts | undefined;
+    const scope = await openWorkspaceGeneration(f.fs, { generationId: nextId, allowCreate: false, auditReadOperations: true,
+      assertSelected: audit, assertSelectedWritable: audit, ordinaryTextCommit: () => ordinary },
+      async () => ({ factory: chosen.storage, dispose: async () => {} }));
+    try {
+      const tx = 'c'.repeat(32), documentKey = 'owned-document', root = metadataPath(scope.fs, `journal/${tx}/`);
+      let retiredLease: object;
+      await underWriteLease(scope.fs, async lease => {
+        retiredLease = lease;
+        expect(() => selectedTextCommit(scope.fs, scope.factory, {})).toThrow('text-commit-lease');
+        const commit = selectedTextCommit(scope.fs, scope.factory, lease)!;
+        await expect(commit(tx, documentKey, async () => {})).rejects.toThrow('text-commit-phase');
+        await commit(tx, documentKey, async ports => {
+          escaped = ports;
+          await expect(async () => ports.fs.writeText(metadataPath(scope.fs, 'restored-bases.json'), '{}')).rejects.toThrow('text-commit-path');
+          await expect(async () => ports.fs.writeText(root+'published.json', '{}')).rejects.toThrow('text-commit-path');
+          await ports.fs.writeText(root+'staging.json', '{}');
+          const count = audit.mock.calls.length;
+          await scope.fs.readText(root+'staging.json'); expect(audit.mock.calls.length).toBe(count + 2);
+          await ports.advance('repository');
+          const db = ports.factory();
+          for (const key of [[], ['storage-adapter-id'], ['other-document', 'chunk']])
+            await expect(async () => db.removeRange(key)).rejects.toThrow('text-commit-document');
+          await expect(async () => ports.fs.writeText(root+'staging.json', '{}')).rejects.toThrow('text-commit-path');
+          await ports.advance('publication'); await ports.advance('readback');
+          await expect(async () => db.save([documentKey, 'chunk'], new Uint8Array(1))).rejects.toThrow('text-commit-document');
+        });
+      });
+      await expect(escaped!.fs.readBytes(root+'staging.json')).rejects.toThrow('generation-read-expired');
+      const accepted = vi.fn();
+      await expect(underWriteLease(scope.fs, async lease => {
+        await selectedTextCommit(scope.fs, scope.factory, lease)!(tx, documentKey, async ports => {
+          escaped = ports;
+          await ports.advance('repository'); await ports.advance('publication'); await ports.advance('readback');
+        });
+        // The outer lease's final selection check completes after the scoped readback.
+        audit.mockImplementationOnce(async () => { ordinary = false; });
+      }, () => { escaped!.assertCanAcknowledge(); accepted(); })).rejects.toThrow('text-commit-expired');
+      expect(accepted).not.toHaveBeenCalled(); ordinary = true;
+      await underWriteLease(scope.fs, async lease => {
+        expect(() => selectedTextCommit(scope.fs, scope.factory, retiredLease)).toThrow('text-commit-lease');
+        await expect(selectedTextCommit(scope.fs, scope.factory, lease)!(tx, documentKey, async ports => {
+          ordinary = false; await ports.fs.readText(root+'staging.json');
+        })).rejects.toThrow('text-commit-expired');
+        expect(selectedTextCommit(scope.fs, scope.factory, lease)).toBeUndefined();
+      });
+    } finally { await scope.dispose(); }
   });
 
   it('owns a streamed chunk before the asynchronous post-read fence', async () => {
@@ -1412,6 +1463,15 @@ describe('new-workspace metadata persistence service (memory ports, not device/a
     expect(done.source!.originalChanges()).toEqual(await new TransactionJournal(h.fs, limits).validateParts(prepared));
   });
 
+  it('refuses text editing across unpublished database heads without creating a journal entry', async () => {
+    const h = setup(), session = h.session(), initial = await session.create(h.records);
+    const concurrent = await initial.source!.prepareCaptionText(initial.source!.token, id('cap'), 'title', '並行編集');
+    const journal = new TransactionJournal(h.fs, limits), start = (await journal.entries())[0]!.start;
+    await underWriteLease(h.fs, () => new MetadataRepository(h.fs, h.storage, limits).persist(start.repositoryId, concurrent));
+    await expect(session.editCaption(initial.source!.token, id('cap'), 'body', '本文')).rejects.toThrow('command-base-changed');
+    expect(await journal.entries()).toHaveLength(1);
+    expect((await session.read()).source!.token).toBe(initial.source!.token);
+  });
   it('retains staged pre-apply failures for same-session retry but refuses incomplete cold staging', async () => {
     const h = setup(), writer = h.session(), initial = await writer.create(h.records);
     h.fs.reject = path => path.endsWith('/blobsVerified.json');

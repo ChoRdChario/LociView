@@ -206,6 +206,39 @@ describe('selected-Scene review snapshot (not View activation or external saving
     await expect(inspectReviewSnapshot({ ...snapshot, schema: { kind: 'lociview-project-scene-review', version: '1' } }, metadataLimits)).rejects.toThrow();
     expect(f.source.encodeFullSource()).toEqual(original);
   });
+  it('exports two checked scenes with one shared record, model and photo, excluding the third scene and private photo', async () => {
+    const records = fixture();
+    for (const n of [2, 3]) {
+      records.scenesById[id('scn', n)] = { ...records.scenesById[id('scn')], id: id('scn', n), orderKey: String(n), name: n === 2 ? '第二' : 'PRIVATE_SCENE' };
+      delete records.scenesById[id('scn', n)].defaultViewId;
+    }
+    records.sceneAssetMembershipsById[id('sam', 2)] = { ...records.sceneAssetMembershipsById[id('sam')], id: id('sam', 2), sceneId: id('scn', 2) };
+    for (const n of [2, 3]) records.sceneCaptionMembershipsById[id('scm', n)] = { ...records.sceneCaptionMembershipsById[id('scm')],
+      id: id('scm', n), sceneId: id('scn', n), captionId: n === 2 ? id('cap') : id('cap', 3) };
+    records.captionsById[id('cap', 3)] = { ...records.captionsById[id('cap')], id: id('cap', 3), body: 'PRIVATE_NOTE' };
+    const extra = fixtureMedia[1]!.record;
+    records.mediaResourcesById[String(extra.id)] = extra;
+    records.captionAttachmentsById[id('att', 3)] = { ...records.captionAttachmentsById[id('att')], id: id('att', 3), captionId: id('cap', 3), mediaResourceId: extra.id };
+    const source = make(records), options = { sceneId: id('scn'), additionalSceneIds: [id('scn', 2)] };
+    const out = await prepareReviewSnapshot(source, metadataLimits, options), snapshot = out.review.snapshot as Record<string, any>;
+    expect(Object.values(snapshot.scenesById)).toHaveLength(2);
+    for (const name of ['assetsById','captionsById','captionAttachmentsById','mediaResourcesById']) expect(Object.values(snapshot[name])).toHaveLength(1);
+    for (const name of ['sceneCaptionMembershipsById','sceneAssetMembershipsById']) expect(Object.values(snapshot[name])).toHaveLength(2);
+    expect(out.review.closure.entries).toHaveLength(2);
+    for (const excluded of ['PRIVATE_NOTE','PRIVATE_SCENE',String((extra.blob as JsonObject).digest)]) expect(canonical(snapshot)).not.toContain(excluded);
+    expect((await prepareReviewSnapshot(source, metadataLimits, options, out.reconstruction)).review).toEqual(out.review);
+    const rep = records.representationsById[id('rep')];
+    const provider = await readProjectScene(source.read(), metadataLimits, developmentContentVerifier([
+      { variantFamilyId: rep.variantFamilyId, representationId: rep.id, payloadDigest: rep.payloadDigest },
+    ]));
+    const { store, options: packageOptions } = await workspaceFixture('map1', records);
+    const capture = await ReviewSourceCapture.prepare({ read: async () => ({state:'ready', source, provider, publication:'checked'}) }, source.token, options, store, metadataLimits);
+    const parts: BlobPart[] = [];
+    await writeReviewArchive(capture, store, new WritableStream({write(bytes) { parts.push(bytes.slice() as BlobPart); }}), packageOptions);
+    const reopened = await ReviewArchive.inspect(new Blob(parts), metadataLimits);
+    expect(reopened.archive.control.manifest.blobs.map(blob => blob.sha256).sort()).toEqual([rep.blob.digest, fixtureMedia[0]!.record.blob.digest].sort());
+    expect(Object.values(reopened.review.snapshot.scenesById as JsonObject)).toHaveLength(2);
+  });
   it('cuts exactly one Scene, omits old/other data, preserves missing-model owners and freezes rekeying', async () => {
     const records = fixture();
     records.scenesById[id('scn', 2)] = { ...structuredClone(records.scenesById[id('scn')]), id: id('scn', 2), name: 'PRIVATE_OTHER_SCENE' };

@@ -3045,6 +3045,74 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect(reading.records.find(c => c.id === file.captionId)?.body).toBe(body); await host.dispose();
     return { ...restored, captionId: file.captionId, body, reading, changes };
   }
+  it.each(['prepared', 'before publication', 'published'] as const)('cold reopens a restored project after an interrupted text publication (%s) and commits the exact edit once', async cut => {
+    const f = await restoredBodyFixture(), host = owned(await openValidationHost(f.options));
+    const before = host.read().source!, originalProvider = host.read().provider, body = '中断しても一度だけ反映';
+    const marker = cut === 'prepared' ? '/blobsVerified.json' : '/published.json', write = f.base.writeText.bind(f.base);
+    const fault = vi.spyOn(f.base, 'writeText').mockImplementation(async (path, value) => {
+      if (path.endsWith(marker) && cut === 'before publication') throw Error('interrupted');
+      await write(path, value);
+      if (path.endsWith(marker)) throw Error('interrupted');
+    });
+    try {
+      await expect(host.dispatch(before.token, { kind: 'editCaption', captionId: f.captionId, edits: { body } })).rejects.toThrow();
+    } finally { fault.mockRestore(); }
+    await host.dispose();
+    const cold = owned(await openValidationHost(f.options));
+    if (cut === 'published') expect(cold.read().state).toBe('ready');
+    else {
+      expect(cold.read().source?.token).toBe(before.token);
+      expect(cold.read().state).toBe('pending');
+      await expect(cold.dispatch(before.token, { kind: 'editCaption', captionId: f.captionId, edits: { body: '別の編集' } })).rejects.toThrow();
+      await cold.authority.retry!();
+    }
+    const saved = cold.read(), changes = saved.source!.originalChanges();
+    expect(validatedResumeReading(saved, f.run)?.records.find(c => c.id === f.captionId)?.body).toBe(body);
+    expect(changes).toHaveLength(f.changes.length + 1);
+    expect(changes).toEqual(expect.arrayContaining(f.changes));
+    const priorHashes = new Set(f.changes.map(bytes => A.decodeChange(bytes).hash));
+    const change = changes.map(bytes => A.decodeChange(bytes)).find(entry => !priorHashes.has(entry.hash))!;
+    if (originalProvider?.kind !== 'scene-provider') throw Error('Expected original provider');
+    const wrongPredecessor = A.encodeChange({ ...change, ops: change.ops.map(op => ({ ...op, pred: [] })) });
+    expect(() => before.assertCaptionTextChange(wrongPredecessor, f.captionId, originalProvider)).toThrow('restore-destination-not-ready');
+    await cold.dispose();
+    const again = owned(await openValidationHost(f.options)); expect(again.read().source!.originalChanges()).toEqual(changes);
+  });
+  it.each(['nontext', 'missing evidence', 'unprepared'] as const)('refuses cold text recovery for %s', async fault => {
+    const f = await restoredBodyFixture(), host = owned(await openValidationHost(f.options));
+    const before = host.read().source!, edits = fault === 'nontext' ? { body: '本文と色', colorSrgb: [0.1, 0.2, 0.3] } : { body: '未確定の本文' };
+    f.base.reject = path => path.endsWith(fault === 'unprepared' ? '/blobsVerified.json' : '/published.json');
+    await expect(host.dispatch(before.token, { kind: 'editCaption', captionId: f.captionId, edits })).rejects.toThrow();
+    await host.dispose(); f.base.reject = () => false;
+    if (fault === 'missing evidence') {
+      const evidence = (await f.base.list('')).filter(p => p.includes('/v2/metadata/evidence/'));
+      expect(evidence.length).toBeGreaterThan(0);
+      for (const path of evidence) await f.base.remove(path);
+    }
+    const publications = (await f.base.list('')).filter(p => p.endsWith('/published.json'));
+    await expect(openValidationHost(f.options)).rejects.toThrow();
+    expect((await f.base.list('')).filter(p => p.endsWith('/published.json'))).toEqual(publications);
+  });
+  it('refuses a restored text commit when a same-length restore receipt changes after staging', async () => {
+    const f = await restoredBodyFixture(), host = owned(await openValidationHost(f.options)), original = host.read().source!;
+    const paths = await f.base.list(''), result = paths.find(path => path.includes('/local-restore/') && path.endsWith('/result.json'))!;
+    const raw = (await f.base.readText(result))!;
+    const receipt = JSON.parse(raw);
+    const hash = receipt.detail.selection.sha256;
+    receipt.detail.selection.sha256 = (hash[0] === '0' ? '1' : '0') + hash.slice(1);
+    const altered = json(receipt); expect(altered.length).toBe(raw.length);
+    const write = f.base.writeText.bind(f.base);
+    const spy = vi.spyOn(f.base, 'writeText').mockImplementation(async (path, value) => {
+      await write(path, value);
+      if (path.endsWith('/blobsVerified.json')) await write(result, altered);
+    });
+    try {
+      await expect(host.dispatch(original.token, { kind: 'editCaption', captionId: f.captionId, edits: { body: '拒否される本文' } })).rejects.toThrow();
+      expect(host.read().source?.token).toBe(original.token);
+      expect((await f.base.list('')).filter(path => path.endsWith('/published.json'))).toEqual(paths.filter(path => path.endsWith('/published.json')));
+    } finally { spy.mockRestore(); await host.dispose(); }
+    await expect(openValidationHost(f.options)).rejects.toThrow();
+  });
   it('opens first-backup recovery without a normal Session, cold-retries its acknowledged generation and hands the same lease to real editing', async () => {
     const f = await restoreFileFixture(true), r = await firstBackupHostFixture(f.backupFile), show = vi.fn(), preview = owned(await openValidationEntry({ ...r.options, firstBackup: r.firstBackup, reading: { run: r.run, show } }));
     const original = await r.inspection.source.inspectOriginal({ maxNodes: 1_000_000, maxWork: 5_000_000 });
@@ -3875,7 +3943,15 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     await unfinished.dispose();
     const selection = await BackupRestoreJob.resumeSelection(f.fs, metadata, f.databases, ports);
     expect(await BackupRestoreJob.resumeSelection(f.fs, metadata, f.databases, ports)).toEqual(selection);
-    const selected = await BackupRestoreJob.openSelected(f.fs, metadata, f.databases, ports), selectedPorts = ports(selected);
+    const selected = await BackupRestoreJob.openSelected(f.fs, metadata, f.databases, ports, { ordinarySession: true }), selectedPorts = ports(selected);
+    const opens = vi.spyOn(f.fs, 'readStream');
+    try {
+      await selected.check();
+      const resultOpens = () => opens.mock.calls.filter(([path]) => path === job.path('result.json')).length;
+      expect(resultOpens()).toBe(1);
+      selected.requireStrictChecks(); opens.mockClear();
+      await selected.check(); expect(resultOpens()).toBe(2);
+    } finally { opens.mockRestore(); }
     const edited = await selectedPorts.session.editCaption(initialized.source!.token, f.captionId, 'body', '切替後の編集');
     expect((await selectedPorts.session.read()).source!.token).toBe(edited.source!.token);
     await f.fs.writeBytes(job.path('input.zip'), corruptInput);
@@ -3916,6 +3992,23 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     await expect(reserveRestoreControls(fs, [{ stage: 'db-opened-and-terminal-result' }], 2)).rejects.toThrow('restore-space-budget');
     await expect(writeRestoreControl(fs, `v2/local-restore/jobs/${newId()}/abandoned.json`, { retained: 'no room for terminal record' }, metadata)).rejects.toThrow('restore-space-budget');
     expect(await fs.list('v2/local-restore/')).toEqual([]); opened.mockRestore();
+  });
+  it('opens each control once in normal use and observes replacements on the next fence', async () => {
+    const fs = new TestFS(), id = newId(), path = `v2/local-restore/jobs/${id}/abandoned.json`;
+    const record = { schema: 'lociview-local-restore-abandoned-1', jobId: id, stage: 'beforeStart' };
+    await fs.writeText(path, json(record));
+    const original = fs.readStream.bind(fs);
+    const open = vi.spyOn(fs, 'readStream').mockImplementationOnce(async key => {
+      const snapshot = await original(key);
+      await fs.writeText(path, json({ ...record, jobId: newId() }));
+      return snapshot;
+    });
+    expect((await readRestoreControls(fs, metadata, false, 'ordinary-selected')).jobs.map(job => job.id)).toEqual([id]);
+    expect(open).toHaveBeenCalledTimes(1);
+    await expect(readRestoreControls(fs, metadata, false, 'ordinary-selected')).rejects.toThrow();
+    expect(open).toHaveBeenCalledTimes(2);
+    await expect(readRestoreControls(fs, metadata)).rejects.toThrow();
+    expect(open).toHaveBeenCalledTimes(4);
   });
   it('bounds restore size opens, drains failures in path order and freshly reopens receipts without reading stat bodies',async()=>{
     for(const mode of ['success','failure','size'] as const){
@@ -7673,7 +7766,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const all = (n: RecordedNode): RecordedNode[] => [n, ...n.children.flatMap(all)], root = record(tools.root);
     const button = (label: string) => all(root).find(n => n.tag === 'button' && n.textContent === label)!;
     button('シーンを共有').fire('click');
-    const scenes = all(root).find(n => n.attributes.get('aria-label') === '渡すシーン')!; scenes.value = s.sceneId; scenes.fire('change');
+    const scene = all(root).find(n => n.dataset.choiceId === s.sceneId)!; scene.checked = true; scene.fire('change');
     button('内容を確認').fire('click'); await vi.waitFor(() => expect(button('ダウンロード')?.disabled).toBe(false));
     expect(all(root).some(n => n.textContent.includes('キャプション 2・メディア 1'))).toBe(true);
     button('ダウンロード').fire('click'); await vi.waitFor(() => {
@@ -7828,14 +7921,49 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       expect(inspect).toHaveBeenCalledTimes(2); expect(inspect.mock.calls[0]![0].size).toBe(file.size); // Default input inspection stays fresh.
     } finally { inspect.mockRestore(); await scratch.dispose(); await source.workspace.dispose(); }
   }, 60000);
-  it('replays a bound Scene append after publication interruption without replacing the target or applying the change twice', async () => {
+  it('lets a reader choose another scene after a display failure and leave after a failed switch', async () => {
+    const source = await openFileCaption(), second = `scn_${newId()}`, first = source.s.sceneId;
+    let reader: ReturnType<typeof createValidationWorkspace> | undefined;
+    try {
+      await source.host.dispatch(source.host.read().source!.token, { kind: 'createScene', sceneId: second, activeSceneId: first, sourceSceneId: first,
+        name: '別の角度', orderKey: 'B', membershipIds: [`sam_${newId()}`], eventId: `evt_${newId()}` });
+      const job = await source.host.workspaceOutput.generateReview(source.host.read().source!.token, { sceneId: first, additionalSceneIds: [second] });
+      const file = new File([await source.host.workspaceOutput.download(job)], 'angles.zip');
+      const dispose = vi.fn(), factory: ViewportFactory = () => ({ update() {}, setActive() {}, camera() {}, retry() {}, dispose() {},
+        read: () => ({ ready: false, token: '', pins: [], issue: null, dragging: false, projection: 'perspective', axis: null }) });
+      const renderReview = vi.fn(async (view: Awaited<ReturnType<typeof prepareReviewView>>) => {
+        if (view.sceneName !== '別の角度') throw Error('シーンの表示を準備できません');
+        return { factory, dispose };
+      });
+      reader = createValidationWorkspace(new RecordedDocument().asDocument(), { fileLimits: budget, decode, selected() {}, list: async () => [],
+        open: vi.fn(), render: vi.fn(), renderReview });
+      await reader.ready;
+      const page = record(reader.root), all = (n: RecordedNode): RecordedNode[] => [n, ...n.children.flatMap(all)];
+      const find = (label: string) => all(page).find(n => n.getAttribute('aria-label') === label || n.tag === 'button' && n.textContent === label && !n.hidden)!;
+      const input = find('ファイルを選択'); Object.assign(input, { files: [file] }); input.parent!.parent!.fire('submit', { preventDefault() {} });
+      await vi.waitFor(() => expect(find('シーンを開く')?.disabled).toBe(false));
+      const choose = find('表示するシーン'), other = choose.children.find(n => n.textContent === '別の角度')!, initialId = choose.value;
+      choose.value = other.value; find('シーンを開く').click();
+      await vi.waitFor(() => expect(all(page).some(n => n.className.includes('lv-review-workspace'))).toBe(true));
+      const switcher = find('表示するシーン'); switcher.value = initialId; switcher.fire('change');
+      await vi.waitFor(() => expect(find('シーンを開く')?.disabled).toBe(false));
+      expect(dispose).toHaveBeenCalledOnce(); expect(renderReview).toHaveBeenCalledTimes(3);
+      find('別のプロジェクトを開く').click();
+      await vi.waitFor(() => expect(find('表示するシーン')).toBeUndefined());
+      expect(find('ファイルを開く').disabled).toBe(false);
+    } finally { await reader?.dispose(); await source.workspace.dispose(); }
+  });
+  it('replays a bound multi-scene append after publication interruption without replacing the target or applying the change twice', async () => {
     const source = await openFileCaption(glb(j => { j.materials[0].name = '別モデル'; }), 'map2');
     const target = await openFileCaption(glb(), 'map2'), id = newId();
     let cold: Awaited<ReturnType<typeof openValidationHost>> | undefined;
     let ui: ReturnType<typeof createValidationWorkspace> | undefined;
     let finishMount: (() => void) | undefined;
     try {
-      const output = await source.host.workspaceOutput.generateReview(source.host.read().source!.token, { sceneId: source.s.sceneId });
+      const second = `scn_${newId()}`, first = source.s.sceneId;
+      await source.host.dispatch(source.host.read().source!.token, { kind: 'createScene', sceneId: second, activeSceneId: first, sourceSceneId: first,
+        name: '共有する別のシーン', orderKey: 'B', membershipIds: [`sam_${newId()}`], eventId: `evt_${newId()}` });
+      const output = await source.host.workspaceOutput.generateReview(source.host.read().source!.token, { sceneId: first, additionalSceneIds: [second] });
       const file = await source.host.workspaceOutput.download(output), review = await ReviewArchive.inspect(file, metadata);
       const before = target.host.read();
       target.fs.reject = path => path.endsWith(`/journal/${id}/published.json`);
@@ -7865,6 +7993,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       const completed = cold.read();
       expect(completed.source!.originalChanges()).toHaveLength(before.source!.originalChanges().length + 1);
       expect(cold.authority.read().state.scenes[sceneId]?.id).toBe(sceneId);
+      expect(Object.keys(cold.authority.read().state.scenes)).toHaveLength(3);
       expect(cold.authority.read().state.defaultSceneId).toEqual({ kind: 'value', value: target.s.sceneId });
       await cold.authority.authorScene!(completed.source!.token, { kind: 'renameScene', sceneId, name: '追加した後の編集' });
       const after = cold.read().source!.token;
@@ -8535,7 +8664,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect(tools.showSurface('share')).toBe(true); expect(tools.hasChanges()).toBe(false); expect(tools.closeReason()).toBeNull();
     const named = (name: string) => all(output()).find(n => n.getAttribute('aria-label') === name)!;
     const partial = named('一部だけ出力'), scope = named('出力する内容');
-    expect(partial.checked).toBe(false); expect(scope.parent!.hidden).toBe(true);
+    expect(partial.checked).toBe(true); expect(scope.parent!.hidden).toBe(false);
     expect(scope.children.map(n => n.value)).toEqual(['review', 'contribution']);
     expect(buttons().some(n => n.textContent === '独立コピーを作る')).toBe(false);
     partial.checked = true; partial.fire('change');
@@ -8553,7 +8682,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     partial.checked = false; partial.fire('change');
     expect(tools.hasChanges()).toBe(false); expect(scope.parent!.hidden).toBe(true);
     partial.checked = true; partial.fire('change'); buttons().find(n => n.textContent === '選択を取り消す')!.fire('click');
-    expect(tools.hasChanges()).toBe(false); expect(partial.checked).toBe(false); expect(buttons().some(n => n.textContent === 'ファイルに保存')).toBe(false);
+    expect(tools.hasChanges()).toBe(false); expect(partial.checked).toBe(true); expect(buttons().some(n => n.textContent === 'ファイルに保存')).toBe(false);
     expect(tools.showSurface('receive')).toBe(true); expect(tools.hasChanges()).toBe(false); expect(tools.closeReason()).toBeNull();
     expect(tools.showSurface('restore')).toBe(true); expect(tools.hasChanges()).toBe(false); expect(tools.closeReason()).toBeNull();
     expect(tools.showSurface('save')).toBe(true); expect(backupName.value).toBe('後で保存する名前');

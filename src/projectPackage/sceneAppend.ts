@@ -23,9 +23,9 @@ const path = (fs: ProjectWorkspaceFS, id: string) => `${root(fs)}${technicalId(i
 const table = (record: JsonObject, map: string) => object(record[map]);
 
 export interface SceneAppendInput {
-  schema: 'lociview-scene-append-1'; id: string; archive: EvidenceRef; snapshot: EvidenceRef;
+  schema: 'lociview-scene-append-1' | 'lociview-scene-append-2'; id: string; archive: EvidenceRef; snapshot: EvidenceRef;
   proof: MetadataProof; predecessor: string; baseHeads: readonly string[];
-  sceneId: string; recipe: CleanReconstruction; change: EvidenceRef; records: EvidenceRef;
+  sceneId: string; sceneIds?: string[]; recipe: CleanReconstruction; change: EvidenceRef; records: EvidenceRef;
   blobs: JsonObject[]; stagedBlobs: JsonObject[];
 }
 export type SceneAppendState = { id: string; state: 'unbound' | 'input-required' | 'prepared' | 'repair-required'; cancellable?: boolean };
@@ -87,7 +87,7 @@ function addedRecords(doc: A.Doc<PhysicalDoc>, bytes: Uint8Array, id: string, li
 
 export function validatePreparedSceneAppend(base: ProjectMetadataSource, bytes: Uint8Array, input: SceneAppendInput, limits: MetadataLimits) {
   const records = addedRecords(native(base), bytes, input.id, limits);
-  if (json(packageReference(records)) !== json(input.records) || Object.keys(records.scenesById!).join(',') !== input.sceneId ||
+  if (json(packageReference(records)) !== json(input.records) || json(Object.keys(records.scenesById!).sort()) !== json(input.sceneIds ?? [input.sceneId]) ||
     json(blobInventory(records)) !== json(input.blobs))
     return fail('scene-append-records');
 }
@@ -106,8 +106,9 @@ export async function planSceneAppend(base: ProjectMetadataSource, review: Revie
   const { records, reconstruction } = await prepareReviewEdit(review.review, limits, saved?.input.recipe);
   const targetFrame = base.projectFrame(), doc = native(base);
   const scenes = Object.values(table(records, 'scenesById')).map(object);
-  if (scenes.length !== 1) return fail('scene-append-count');
-  const scene = scenes[0]!, sceneId = scene.id as string;
+  const sceneId = object(records.project).defaultSceneId as string;
+  const sceneIds = scenes.map(s => s.id as string).sort();
+  if (!sceneIds.includes(sceneId)) return fail('scene-append-count');
   const existingIds = new Set<string>();
   for (const map of maps) for (const id of Object.keys(doc[map])) existingIds.add(id);
   for (const scalar of (await base.inspectOriginal({ maxNodes: limits.maxNodes, maxWork: limits.maxWork })).scalars) {
@@ -127,11 +128,15 @@ export async function planSceneAppend(base: ProjectMetadataSource, review: Revie
     return [JSON.parse(String(value.orderKey)) as string];
   }).sort().at(-1);
   if (order !== undefined && (typeof order !== 'string' || !/^[0-9A-Za-z]{1,64}$/.test(order))) return fail('scene-append-order');
-  const tail = order ?? '';
-  const position = tail.length < 64 ? tail.length : [...tail].findLastIndex(letter => letter !== 'z');
-  if (position < 0) return fail('scene-append-order');
+  let tail = order ?? '';
   const alphabet = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
-  Object.assign(scene, { orderKey: tail.slice(0, position) + alphabet[tail.length < 64 ? 30 : alphabet.indexOf(tail[position]!) + 1] });
+  const compare = (a: string, b: string) => a < b ? -1 : a > b ? 1 : 0;
+  for (const scene of scenes.sort((a,b) => compare(String(a.orderKey), String(b.orderKey)) || compare(String(a.id), String(b.id)))) {
+    const position = tail.length < 64 ? tail.length : [...tail].findLastIndex(letter => letter !== 'z');
+    if (position < 0) return fail('scene-append-order');
+    tail = tail.slice(0, position) + alphabet[tail.length < 64 ? 30 : alphabet.indexOf(tail[position]!) + 1];
+    Object.assign(scene, { orderKey: tail });
+  }
   for (const value of Object.values(table(records, 'captionsById'))) {
     const anchor = object(object(value).anchor);
     if (anchor.kind === 'project') Object.assign(anchor, { projectFrameId: targetFrame.id });
@@ -144,11 +149,11 @@ export async function planSceneAppend(base: ProjectMetadataSource, review: Revie
   const recordsRef = packageReference(Object.fromEntries(maps.map(map => [map, records[map]])));
   const bytes = saved?.bytes ?? addition(doc, records, limits, editorMessage(id, editor));
   if (saved) {
-    if (saved.input.sceneId !== sceneId || json(saved.input.blobs) !== json(inventory) || json(saved.input.records) !== json(recordsRef) ||
+    if (saved.input.sceneId !== sceneId || json(saved.input.sceneIds ?? [sceneId]) !== json(sceneIds) || json(saved.input.blobs) !== json(inventory) || json(saved.input.records) !== json(recordsRef) ||
       json(saved.input.snapshot) !== json(snapshotRef) || json(saved.input.archive) !== json(archive)) return fail('scene-append-originals');
     validatePreparedSceneAppend(base, bytes, saved.input, limits);
   }
-  return { next: base.appendOriginal([bytes]), bytes, sceneId, reconstruction, blobs: inventory, archive, snapshot: snapshotRef, records: recordsRef };
+  return { next: base.appendOriginal([bytes]), bytes, sceneId, sceneIds, reconstruction, blobs: inventory, archive, snapshot: snapshotRef, records: recordsRef };
 }
 
 export async function readSceneAppend(fs: ProjectWorkspaceFS, id: string, limits: MetadataLimits) {
@@ -156,8 +161,11 @@ export async function readSceneAppend(fs: ProjectWorkspaceFS, id: string, limits
   const input = await readReceipt<SceneAppendInput>(fs, `${dir}input.json`, limits);
   const bound = await readReceipt(fs, `${dir}bound.json`, limits);
   const abandoned = await readReceipt(fs, `${dir}abandoned.json`, limits);
-  if (!input || Object.keys(input).sort().join(',') !== 'archive,baseHeads,blobs,change,id,predecessor,proof,recipe,records,sceneId,schema,snapshot,stagedBlobs' ||
-    input.schema !== 'lociview-scene-append-1' || input.id !== id || !/^scn_[0-9a-f]{32}$/.test(input.sceneId) ||
+  const multiple = input?.schema === 'lociview-scene-append-2';
+  if (!input || Object.keys(input).sort().join(',') !== `archive,baseHeads,blobs,change,id,predecessor,proof,recipe,records,sceneId,${multiple ? 'sceneIds,' : ''}schema,snapshot,stagedBlobs` ||
+    !multiple && input.schema !== 'lociview-scene-append-1' || input.id !== id || !/^scn_[0-9a-f]{32}$/.test(input.sceneId) ||
+    multiple && (!Array.isArray(input.sceneIds) || input.sceneIds.length < 2 || !input.sceneIds.includes(input.sceneId) ||
+      input.sceneIds.some(id => typeof id !== 'string' || !/^scn_[0-9a-f]{32}$/.test(id)) || json([...new Set(input.sceneIds)].sort()) !== json(input.sceneIds)) ||
     !Array.isArray(input.baseHeads) || !input.baseHeads.length || input.baseHeads.some(head => !/^[0-9a-f]{64}$/.test(head)) ||
     json([...new Set(input.baseHeads)].sort()) !== json(input.baseHeads) || input.recipe?.schema !== 'lociview-clean-reconstruction-1' ||
     !Array.isArray(input.recipe.idMap) || !Array.isArray(input.recipe.lifecycles)) return fail('scene-append-input');

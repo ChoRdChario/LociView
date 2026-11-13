@@ -82,6 +82,27 @@ export class ProjectMetadataSource {
   /** Complete original scalar evidence, not a package or a storage acknowledgment. */
   inspectOriginal(budget: OriginalInspectionBudget) { return inspectOriginalSource(this.doc, this.proof, this.limits, budget); }
   get token(): string { return this.snapshot.history.token; }
+  /** A later pending local edit can reopen a completed restore only for this exact command shape. */
+  assertCaptionTextChange(bytes: Uint8Array, captionId: string, provider: Extract<ProjectProviderRead, {kind: 'scene-provider'}>): void {
+    const record = this.doc.captionsById[captionId];
+    if (!record || provider.token !== this.token) fail('restore-destination-not-ready');
+    const target = A.getObjectId(record), edits: { title?: string; body?: string } = {};
+    const { ops } = A.decodeChange(bytes);
+    if (!target || !ops.length || ops.length > 2) fail('restore-destination-not-ready');
+    for (const op of ops) {
+      if (op.action !== 'set' || op.obj !== target || ('insert' in op && op.insert) || op.datatype !== undefined ||
+        (op.key !== 'title' && op.key !== 'body') || Object.hasOwn(edits, op.key) || typeof op.value !== 'string')
+        return fail('restore-destination-not-ready');
+      const value: unknown = JSON.parse(op.value);
+      if (typeof value !== 'string' || String(scalar(value, this.limits)) !== op.value) return fail('restore-destination-not-ready');
+      const prior = provider.inspection.candidates.fields.find(f => f.path.length === 3 &&
+        f.path[0] === 'captionsById' && f.path[1] === captionId && f.path[2] === op.key);
+      if (!prior?.valid || prior.hasUnknownFields || prior.candidates.length !== 1 ||
+        op.pred.length !== 1 || op.pred[0] !== prior.candidates[0]!.operationId) return fail('restore-destination-not-ready');
+      edits[op.key] = value;
+    }
+    planMetadataEdit(provider, { kind: 'editCaption', captionId, edits }, this.limits);
+  }
   get heads(): string[] { return A.getHeads(this.doc).sort(); }
   originalChanges(): Uint8Array[] { return A.getAllChanges(this.doc).map(b => b.slice()); }
   projectFrame(): JsonObject { return object(JSON.parse(String(this.doc.project.frame))); }

@@ -57,7 +57,9 @@ export class ReviewOutputJob {
   private records() {
     const m = this.manifest(), capture = { schema: 'lociview-package-capture-1',
       source: { identity: this.source.proof.identity, metadataEnvelope: this.source.proof.envelope, heads: this.source.heads }, sourceMetadata: ref(this.inputs.original),
-      purpose: 'review', scope: { kind: 'scene', sceneId: this.inputs.reconstruction.selection.sceneId }, protectedInventory: reference(this.inputs.inventory), exchangeBases: reference(this.inputs.bases) };
+      purpose: 'review', scope: this.inputs.reconstruction.selection.additionalSceneIds
+        ? { kind: 'scenes', sceneIds: [this.inputs.reconstruction.selection.sceneId, ...this.inputs.reconstruction.selection.additionalSceneIds] }
+        : { kind: 'scene', sceneId: this.inputs.reconstruction.selection.sceneId }, protectedInventory: reference(this.inputs.inventory), exchangeBases: reference(this.inputs.bases) };
     const prepared = { schema: 'lociview-package-output-1', capture: reference(capture), packageId: m.packageId,
       manifest: ref(this.inputs.manifest), payloads: [m.snapshot, ...m.blobs], roots: {
         blobs: this.inputs.inventory.blobs.map(b => ({ sha256: b.sha256, byteLength: b.byteLength })),

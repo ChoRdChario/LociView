@@ -1,6 +1,6 @@
-import type { ProjectWorkspaceFS, WorkspaceReadableFile } from '../platform/fs';
+import type { ProjectWorkspaceFS, WorkspaceReadableFile, WorkspaceTextCreation } from '../platform/fs';
 import { fail } from './format';
-import { registerReadOperation, registerStagingReadOperation, registerWriteFence, technicalId, type MetadataReadPorts } from './persistence';
+import { metadataPath, registerReadOperation, registerStagingReadOperation, registerTextCommit, registerWriteFence, technicalId, type MetadataReadPorts, type TextCommitPhase, type TextCommitPorts } from './persistence';
 import type { MetadataStorageFactory, MetadataStoragePort } from './repository';
 
 /** Local storage identity only; Project identity and its logical-root lease do not change. */
@@ -71,7 +71,7 @@ function fencedStream(open: () => ReadableStream<Uint8Array>, check: () => Promi
 export async function openWorkspaceGeneration(root: ProjectWorkspaceFS,
   input: Readonly<{ generationId: WorkspaceGenerationId; allowCreate: boolean; assertSelected: () => Promise<void>;
     assertWritable?: () => Promise<void>; assertSelectedWritable?: () => Promise<void>;
-    auditReadOperations?: boolean; stagingReadOwner?: StagingReadOwner }>,
+    auditReadOperations?: boolean; stagingReadOwner?: StagingReadOwner; ordinaryTextCommit?: () => boolean }>,
   openStorage: GenerationStorageOpener) {
   const generationId = checkedId(input.generationId), allowCreate = input.allowCreate,
     assertSelected = input.assertSelected, assertWritable = input.assertWritable, assertSelectedWritable = input.assertSelectedWritable,
@@ -185,19 +185,47 @@ export async function openWorkspaceGeneration(root: ProjectWorkspaceFS,
   };
   // Public ports always retain per-I/O audits. The exact restore controller can
   // bind named pure readers only; no shared active-operation switch is used.
-  const readOperation = async <T>(action: (ports: MetadataReadPorts) => Promise<T>): Promise<T> => {
+  const scopedOperation = async <T>(action: (ports: TextCommitPorts) => Promise<T>, text?: {
+    transaction: string; documentKey: string; assertLease(): void
+  }): Promise<T> => {
     let active = true;
+    let phase: TextCommitPhase = 'journal';
+    const reachedReadback = () => phase === 'readback';
+    const journalRoot = text && metadataPath(fs, `journal/${technicalId(text.transaction)}/`);
+    if (text && (!text.documentKey || text.documentKey === 'storage-adapter-id')) return fail('text-commit-document');
+    const audit = text ? checkWrite : check;
+    const assertTextOwner = () => {
+      if (!text || disposed || !input.ordinaryTextCommit?.()) fail('text-commit-expired');
+      text!.assertLease();
+      root.mutationAuthority.assertEditable();
+      root.mutationAuthority.assertWorkspaceWriteAuthorized();
+    };
     const assertLive = () => {
       if (!active || disposed) fail('generation-read-expired');
       if (stagingReadOwner) { root.mutationAuthority.assertEditable(); stagingReadOwner(fs, factory); }
+      if (text) assertTextOwner();
     };
     const live = async () => { assertLive(); };
     const perform = async <T>(work: () => Promise<T>): Promise<T> => {
-      await live(); const result = await work(); await live(); return result;
+      assertLive(); const result = await work(); assertLive(); return result;
     };
     const denied = async () => fail('generation-read-only');
-    // These ports close over THIS read only. The public ports never take a fast
-    // path based on a shared flag, even while this callback is awaiting I/O.
+    const writes = new Set<Promise<void>>();
+    let writeError: { error: unknown } | undefined;
+    let advancing = false;
+    const mutate = (work: () => Promise<void>) => {
+      assertLive();
+      if (advancing) return fail('text-commit-phase');
+      const task = perform(work);
+      writes.add(task);
+      void task.then(() => writes.delete(task), error => { writeError ??= { error }; writes.delete(task); });
+      return task;
+    };
+    const checkFile = (path: string, names: string[], expectedPhase: TextCommitPhase) => {
+      ownPath(path);
+      if (!journalRoot || phase !== expectedPhase || !names.some(name => path === journalRoot + name)) fail('text-commit-path');
+    };
+    // Public ports remain independently fenced while this operation owns its ports.
     const readFs: ProjectWorkspaceFS = Object.freeze({
       projectRoot, mutationAuthority: root.mutationAuthority,
       readText: (path: string) => { ownPath(path); return perform(() => root.readText(path)); },
@@ -225,7 +253,16 @@ export async function openWorkspaceGeneration(root: ProjectWorkspaceFS,
           return paths.filter(item => !isReserved(item));
         });
       },
-      writeText: denied, appendText: denied, writeBytes: denied, appendBytes: denied, remove: denied,
+      writeText: text ? (path: string, value: string, creation?: WorkspaceTextCreation) => {
+        if (phase === 'journal') checkFile(path, ['staging.json', 'blobsVerified.json'], 'journal');
+        else checkFile(path, ['metadataDurable.json', 'published.json'], 'publication');
+        return mutate(() => root.writeText(path, value, creation && { assertOwned() { assertLive(); creation.assertOwned(); } }));
+      } : denied,
+      writeBytes: text ? (path: string, bytes: Uint8Array) => {
+        checkFile(path, ['changes/00000000.amchange'], 'journal');
+        const copy = bytes.slice(); return mutate(() => root.writeBytes(path, copy));
+      } : denied,
+      appendText: denied, appendBytes: denied, remove: denied,
       writeStream: async (_path: string, stream: ReadableStream<Uint8Array>) => {
         await stream.cancel().catch(() => undefined); return denied();
       },
@@ -233,6 +270,11 @@ export async function openWorkspaceGeneration(root: ProjectWorkspaceFS,
     const readFactory: MetadataStorageFactory = () => {
       assertLive();
       const base = connection.factory();
+      const documentWrite = (key: string[], work: (owned: string[]) => Promise<void>) => {
+        const owned = keyCopy(key);
+        if (!text || phase !== 'repository' || owned[0] !== text.documentKey) return fail('text-commit-document');
+        return mutate(() => work(owned));
+      };
       return {
         load: key => { const owned = keyCopy(key); return perform(async () => (await base.load(owned))?.slice()); },
         loadRange: key => {
@@ -242,27 +284,53 @@ export async function openWorkspaceGeneration(root: ProjectWorkspaceFS,
             return { key, data: row.data?.slice() };
           }));
         },
-        save: denied, remove: denied, removeRange: denied,
+        save: text ? (key, bytes) => { const copy = bytes.slice(); return documentWrite(key, owned => base.save(owned, copy)); } : denied,
+        remove: text ? key => documentWrite(key, owned => base.remove(owned)) : denied,
+        removeRange: text ? key => documentWrite(key, owned => base.removeRange(owned)) : denied,
       };
     };
+    const advance: TextCommitPorts['advance'] = async next => {
+      const phases = ['journal', 'repository', 'publication', 'readback'];
+      if (!text || advancing || writes.size || phases.indexOf(next) !== phases.indexOf(phase) + 1) return fail('text-commit-phase');
+      advancing = true;
+      try {
+        assertLive(); await audit(); assertLive();
+        if (writeError) throw writeError.error;
+        phase = next;
+      } finally { advancing = false; }
+    };
+    const ports = { fs: readFs, factory: readFactory, advance, assertCanAcknowledge: assertTextOwner };
     try {
-      if (stagingReadOwner) await live();
-      await check();
-      if (stagingReadOwner) await live();
-      if (!stagingReadOwner) { const result = await action({ fs: readFs, factory: readFactory }); await check(); await live(); return result; }
+      if (stagingReadOwner || text) assertLive();
+      await audit();
+      if (stagingReadOwner || text) assertLive();
+      if (!stagingReadOwner && !text) { const result = await action(ports); await check(); await live(); return result; }
       let result: T | undefined, failure: unknown, failed = false;
-      try { result = await action({ fs: readFs, factory: readFactory }); }
+      try { result = await action(ports); }
       catch (error) { failed = true; failure = error; }
+      if (text) {
+        active = false;
+        await Promise.allSettled([...writes]);
+        if (writeError && !failed) { failed = true; failure = writeError.error; }
+      }
       // Closing refusal takes precedence even when the reader itself failed.
       // No owned result is accepted before this root-backed audit completes.
-      await check(); await live();
+      await audit();
+      if (text) {
+        assertTextOwner();
+        if (!failed && (advancing || !reachedReadback())) fail('text-commit-phase');
+      }
+      else await live();
       if (failed) throw failure;
       return result as T;
     }
     finally { active = false; }
   };
-  if (auditReadOperations) registerReadOperation(fs, factory, readOperation);
-  else if (stagingReadOwner) registerStagingReadOperation(fs, factory, readOperation);
+  if (auditReadOperations) registerReadOperation(fs, factory, scopedOperation);
+  else if (stagingReadOwner) registerStagingReadOperation(fs, factory, scopedOperation);
+  if (input.ordinaryTextCommit && assertSelectedWritable && generationId !== null)
+    registerTextCommit(fs, factory, input.ordinaryTextCommit, (transaction, documentKey, action, assertLease) =>
+      scopedOperation(action, { transaction, documentKey, assertLease }));
   return Object.freeze({ generationId, fs, factory, check,
     async dispose() { if (disposed) return; disposed = true; await connection.dispose(); },
   });

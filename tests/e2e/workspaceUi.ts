@@ -93,7 +93,10 @@ export async function selectShareOutput(area: Locator, purpose: 'teamWorkspace' 
 
 export async function chooseSharedScene(area: Locator, name?: string) {
   const target = area.getByLabel('渡すシーン', {exact:true});
-  if (await target.evaluate(node => node.tagName === 'SELECT')) {
+  const element = await target.evaluate(node => node.tagName);
+  if (element === 'FIELDSET') {
+    await (name ? target.getByRole('checkbox', { name, exact: true }) : target.getByRole('checkbox').first()).check();
+  } else if (element === 'SELECT') {
     await target.selectOption(name ? {label:name} : {index:1});
   } else if (name) {
     await expect(target).toHaveText(`渡すシーン：${name}`);

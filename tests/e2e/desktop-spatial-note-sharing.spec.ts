@@ -152,8 +152,9 @@ for (const touch of [false, true])
 
         await revealFileSurface(page, '共有');
         await selectShareOutput(files, 'review');
-        await expect(files.getByLabel('渡すシーン', exact)).toHaveValue('');
-        await files.getByLabel('渡すシーン', exact).selectOption({ label: '監修用' });
+        const sharedScenes = files.getByRole('group', { name: '渡すシーン', ...exact });
+        await sharedScenes.getByRole('checkbox', { name: 'シーン 1', ...exact }).check();
+        await sharedScenes.getByRole('checkbox', { name: '監修用', ...exact }).check();
         await files.getByRole('button', { name: '内容を確認', ...exact }).click();
         const [download] = await Promise.all([page.waitForEvent('download'), files.getByRole('button', { name: 'ダウンロード', ...exact }).click()]);
         const path = info.outputPath('shared-scene.zip');
@@ -164,6 +165,11 @@ for (const touch of [false, true])
         await other.goto(baseURL!);
         await other.getByLabel('ファイルを選択', exact).setInputFiles(path);
         await action(other, 'ファイルを開く').click();
+        const scenes = other.getByLabel('表示するシーン', exact);
+        await expect(scenes.locator('option:checked')).toHaveText('シーン 1');
+        await expect(other.locator('.lv-caption-select').filter({ hasText: '塗装の確認' })).toHaveCount(1);
+        await scenes.selectOption({ label: '監修用' });
+        await expect(scenes.locator('option:checked')).toHaveText('監修用');
         const back = action(other, '開始視点に戻る'), receivingProjection = other.getByLabel('投影方式', exact);
         await expect(back).toBeEnabled();
         await expect(back).toBeInViewport();
@@ -186,7 +192,11 @@ for (const touch of [false, true])
         await back.click();
         await expect(receivingProjection).toHaveValue('orthographic');
         await expect(axis).toHaveAttribute('style', orientation!);
-        await other.locator('.lv-caption-select').filter({ hasText: '塗装の確認' }).click();
+        if (touch) {
+          await other.locator('.lv-development-pin').first().tap();
+          await expect(other.getByRole('region', { name: 'キャプションの詳細', ...exact })).toBeFocused();
+          await expect(other.locator('.lv-caption-window')).toHaveCount(0);
+        } else await other.locator('.lv-caption-select').filter({ hasText: '塗装の確認' }).click();
         await expect(other.getByText('監修用シーンでも同じ記録を確認。', exact).first()).toBeVisible();
         await expect(other.locator('.lv-development-pin[aria-current="true"]')).toBeVisible();
         await other.getByLabel('選択中のキャプションのメディア', exact).getByRole('button', { name: '画像を表示', ...exact }).click();

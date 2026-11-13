@@ -49,6 +49,8 @@ export async function openValidationGeneration(root: ProjectWorkspaceFS, options
       if (current.selection) throw Error('プロジェクトの作成先が変わりました。'); },
     assertWritable: async () => { if ((await readRestoreControls(root, limits)).pending) throw Error('バックアップの復元が未完了です。'); } }, databases.open) :
     await BackupRestoreJob.openSelected(root, limits, databases, selected => service = validationGenerationService(selected, options), {
+      ordinarySession: diagnostics?.context !== 'catalog',
+      reopenTextRecovery: true,
       observeCatalogRead: diagnostics?.observeRead,
       timing: options.timing && ((stage, ms) => options.timing!(`${diagnostics?.context ?? 'host'}.destination.${stage}`, ms)),
     });
@@ -56,6 +58,8 @@ export async function openValidationGeneration(root: ProjectWorkspaceFS, options
     service ??= validationGenerationService(scope, options);
     const current = await readRestoreControls(root, limits);
     const handoff = current.tail && !current.jobs.find(j => j.id === current.tail!.jobId)?.result;
-    return { ...scope, service, restorePending: !!current.pending || !!handoff };
+    const requireStrictChecks = 'requireStrictChecks' in scope ? scope.requireStrictChecks as () => void : undefined;
+    if (current.pending || handoff) requireStrictChecks?.();
+    return { ...scope, service, requireStrictChecks, restorePending: !!current.pending || !!handoff };
   } catch (error) { await scope.dispose(); throw error; }
 }

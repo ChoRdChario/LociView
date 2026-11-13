@@ -3,6 +3,7 @@ import { openAsBlob } from 'node:fs';
 import * as A from '@automerge/automerge';
 import { chromium, expect, test, type Page } from '@playwright/test';
 import { BackupArchive } from '../../src/projectPackage/backupArchive';
+import { ReviewArchive } from '../../src/projectPackage/reviewArchive';
 import { selectCleanRecords } from '../../src/projectPackage/cleanRecords';
 import { validationMetadataLimits } from '../../src/projectFiles/validation';
 import { ownedServer } from '../offline-e2e/server';
@@ -63,10 +64,23 @@ for (const scenario of [
     const chooser = source.waitForEvent('filechooser'); await source.getByLabel('メディアを追加', { exact: true }).click();
     await (await chooser).setFiles({ name: '点検写真.png', mimeType: 'image/png', buffer: photo });
     await source.getByRole('region',{name:'キャプションの詳細',exact:true}).getByRole('button',{name:'変更を適用',exact:true}).click(); await expect(source.getByText('メディアを追加しました。', { exact: true })).toBeVisible();
+    if (scenario.interrupt) {
+      await button(source, 'シーン 1').click();
+      const existing = source.getByLabel('既存の記録を追加', { exact: true });
+      await existing.locator(':scope > summary').click();
+      await existing.getByRole('listbox').selectOption({ label: '継承したピン — 共通名.glb' });
+      await existing.getByRole('button', { name: 'このシーンに追加', exact: true }).click();
+      await expect(source.getByText('このシーンに追加しました。', { exact: true })).toBeVisible();
+    }
     await revealFileSurface(source, '共有'); await selectShareOutput(files(source), 'review');
     await chooseSharedScene(files(source),'点検シーン');
+    if (scenario.interrupt) await chooseSharedScene(files(source), 'シーン 1');
     await files(source).getByRole('button', { name: '内容を確認', exact: true }).click();
     const zip = info.outputPath('scene.zip'); await downloadTo(source, zip);
+    const shared = await ReviewArchive.inspect(await openAsBlob(zip), validationMetadataLimits);
+    expect(shared.archive.control.manifest.blobs.map(entry => entry.sha256).sort()).toEqual(
+      [triangleGlb(2), photo].map(bytes => createHash('sha256').update(bytes).digest('hex')).sort());
+    expect(shared.review.summary.entityClasses.find(entry => entry.class === 'scenesById')?.count).toBe(scenario.interrupt ? 2 : 1);
     await sender.close();
 
     const receiver = await browser.newContext({ viewport: scenario.touch ? { width: 320, height: 568 } : { width: 1440, height: 1000 },
@@ -134,6 +148,7 @@ for (const scenario of [
       await (scenario.touch ? resume.tap() : resume.click());
     }
     await ready(page);
+    if (scenario.interrupt) await button(page, '点検シーン').click();
     await expect(page.getByRole('button', { name: '点検シーン', exact: true })).toHaveAttribute('aria-pressed', 'true');
     await expect(page.getByRole('list', { name: 'キャプション一覧', exact: true })).toContainText('継承したピン');
     await page.screenshot({ path: info.outputPath('appended.png') });
@@ -142,9 +157,10 @@ for (const scenario of [
     expect(after.source.proof).toEqual(before.source.proof);
     expect(current.project).toEqual(previous.project);
     const otherEdit = !scenario.touch && !scenario.interrupt ? 1 : 0;
-    expect(Object.values(current.scenesById!)).toHaveLength(2 + otherEdit);
+    expect(Object.values(current.scenesById!)).toHaveLength(2 + otherEdit + (scenario.interrupt ? 1 : 0));
     expect(Object.values(current.assetsById!)).toHaveLength(2);
     expect(Object.values(current.captionsById!)).toHaveLength(1);
+    expect(Object.values(current.sceneCaptionMembershipsById!)).toHaveLength(scenario.interrupt ? 2 : 1);
     expect(Object.values(current.captionAttachmentsById!)).toHaveLength(1);
     expect(after.source.originalChanges()).toHaveLength(before.source.originalChanges().length + 1 + otherEdit);
     const hashes = after.archive.control.manifest.blobs.map(entry => entry.sha256);

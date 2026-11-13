@@ -408,6 +408,7 @@ async function openNormalValidationHost(options: ValidationHostOptions, inherite
       await reloadOutput(!unfinishedReceive() && current?.state === 'ready' ? current : undefined);
     };
     let last = await measure('host.open.session', () => session.read()), project: ProjectDisplay | undefined;
+    if (last.state === 'pending' || last.state === 'repair-required') connection?.requireStrictChecks?.();
     if (incoming instanceof CleanArchive && last.source) throw Error('この独立コピーの再開用データがあります。ファイルを取り込まず、プロジェクト一覧から再開してください。');
     if (last.source && (last.source.proof.identity.projectId !== `prj_${run}` || incoming && json(last.source.proof) !== json(incoming.source.proof)))
       throw Error('ファイルと再開用データのプロジェクトが一致しません。既存データは変更していません。');
@@ -451,6 +452,7 @@ async function openNormalValidationHost(options: ValidationHostOptions, inherite
     };
     let gsProxy:ReturnType<typeof createGsProxyWorkflow>|undefined;
     const resume = async (reselected?: Blob) => {
+      connection?.requireStrictChecks?.();
       if (unfinishedReceive()) throw Error('「更新ファイル」の中断した受信を確認してください。');
       if (receiveDisplayPending && last.state === 'ready') {
         const result = await ready(await session.read()); receiveFailure = ''; receiveDisplayPending = false; return result;
@@ -474,6 +476,7 @@ async function openNormalValidationHost(options: ValidationHostOptions, inherite
     };
     const receiveAction = (action: () => Promise<MetadataSessionRead | void>) => execute(async () => {
       editable(true); receiveFailure = '';
+      if (unfinishedReceive()) connection?.requireStrictChecks?.();
       try {
         const result = await action(); await reloadReceive(result || undefined);
         if (!result && !last.source) { last = await session.read(); receiveDisplayPending = false; return; }
@@ -487,6 +490,7 @@ async function openNormalValidationHost(options: ValidationHostOptions, inherite
     const reviewAction = (action: (job: ReviewEditJob) => Promise<MetadataSessionRead | void>) => execute(async () => {
       if (closed || fs.mutationAuthority.accessState !== 'editable' || connection?.restorePending || restoreRetired || restoreDisplayPending)
         throw Error('編集を開始してからコピー作成を再開してください。');
+      connection?.requireStrictChecks?.();
       try {
         const result = await measure('host.review-copy.command', () => workspaceFileOperation(options.packageLocks ?? null, () => action(new ReviewEditJob(fs, session, limits))));
         await reloadReceive(result || undefined); last = result ?? await session.read();
@@ -534,6 +538,7 @@ async function openNormalValidationHost(options: ValidationHostOptions, inherite
     const outputAction = <T>(action: () => Promise<T>, recovery = false, presentation?: () => MetadataSessionRead | undefined,
       retainReadonlyHistory?: (result: T) => void | boolean) => execute(async () => {
       editable(); if (!recovery && (outputDiscoveryFailure || unfinishedOutput() || last.state !== 'ready')) throw Error('中断したファイル生成を確認してください。');
+      if (recovery && (outputDiscoveryFailure || unfinishedOutput())) connection?.requireStrictChecks?.();
       outputFailure = '';
       let succeeded = false, retainedHistory = false;
       try {
@@ -548,7 +553,7 @@ async function openNormalValidationHost(options: ValidationHostOptions, inherite
         if (!retainedHistory) await reloadOutput(read, read);
       }
     }, true);
-    const previewOutput = <T extends { token: string; sceneId?: string; omittedEntryView?: boolean }>(token: string,
+    const previewOutput = <T extends { token: string; sceneId?: string; omittedEntryView?: boolean; selectionKey?: string }>(token: string,
       action: (sender: WorkspaceSender, selection?: Parameters<typeof sender.previewReview>[1]) => Promise<T>,
       selection?: Parameters<typeof sender.previewReview>[1]) => {
       const owner = connection, ownedFs = fs, ownedSession = session, ownedSender = sender, read = last;
@@ -560,7 +565,7 @@ async function openNormalValidationHost(options: ValidationHostOptions, inherite
         if (connection !== owner || fs !== ownedFs || session !== ownedSession || sender !== ownedSender || last !== read ||
           last.state !== 'ready' || last.source !== source || last.provider !== provider || last.publication !== publication ||
           !source || source.token !== token || json(source.proof) !== proof || provider?.kind !== 'scene-provider' || provider.token !== token ||
-          !publication || result.token !== token || selection && (result.sceneId !== sceneId || result.omittedEntryView !== omittedEntryView) ||
+          !publication || result.token !== token || selection && (result.sceneId !== sceneId || result.omittedEntryView !== omittedEntryView || result.selectionKey !== json(ownedSelection)) ||
           outputDiscoveryFailure || unfinishedOutput()) throw Error('表示内容が変わりました。内容を確認し直してください。');
       });
     };
@@ -631,8 +636,11 @@ async function openNormalValidationHost(options: ValidationHostOptions, inherite
       }, true)),
     };
     type PrepareRestoreDisplay = (next: ProjectDisplay, source: typeof content) => Promise<void>;
-    const restorePorts = () => ({ fs, factory: connection!.factory, session, store: options.store,
-      readOutputArtifacts: <T>(action: () => Promise<T>) => readOutputArtifacts(options.packageLocks ?? null, action) });
+    const restorePorts = () => {
+      connection!.requireStrictChecks?.();
+      return { fs, factory: connection!.factory, session, store: options.store,
+        readOutputArtifacts: <T>(action: () => Promise<T>) => readOutputArtifacts(options.packageLocks ?? null, action) };
+    };
     const adoptSelected = async () => {
       // From this point even an opening/display failure must never expose the retired editor as editable.
       restoreRetired = true; restoreDisplayPending = true; restoreEpoch++;
@@ -650,6 +658,7 @@ async function openNormalValidationHost(options: ValidationHostOptions, inherite
       }
     };
     const restoreAction = <T>(action: () => Promise<T>) => execute(async () => {
+      connection?.requireStrictChecks?.();
       if (reviewPending()) throw Error('編集コピーの作成を完了してください。');
       if (!options.generations) throw Error('この画面では復元用の保存領域に接続できません。');
       if (closed || !lease.holdsWriteLock) throw Error('復元するには編集を開始してください。');
@@ -724,6 +733,7 @@ async function openNormalValidationHost(options: ValidationHostOptions, inherite
     const captureLocalEditor = () => { const preference = editorSettings?.read();
       return captureEditor(preference?.enabled ? { kind: 'self-declared', name: preference.name } : { kind: 'none' }); };
     const runSceneAppend = (action: () => Promise<{ read: MetadataSessionRead; sceneId?: string }>, recovery: boolean, id?: string) => execute(async () => {
+      if (recovery) connection?.requireStrictChecks?.();
       if (closed || fs.mutationAuthority.accessState !== 'editable') throw Error('このプロジェクトの編集を開始できません。別のタブで開いている場合は閉じてください。');
       if (connection?.restorePending || restoreRetired || restoreDisplayPending || unfinishedOutput() || outputDiscoveryFailure || !recovery && unfinishedReceive())
         throw Error('追加先で中断した作業を先に確認してください。');

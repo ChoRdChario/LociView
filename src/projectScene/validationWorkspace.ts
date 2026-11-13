@@ -34,7 +34,9 @@ import { chooseStartupScene, resolveScene } from '../scene/resolve';
 import type { ModelCandidateRenderer } from './modelCandidatePreview';
 import type { ViewportFactory } from './viewportPorts';
 import { createValidationReceiveControls } from './validationReceiveControls';
-import { prepareReviewView, type ReviewView } from './reviewView';
+import { prepareReviewView, reviewSceneChoices, type ReviewView } from './reviewView';
+import { ReviewArchive } from '../projectPackage/reviewArchive';
+import type { JsonObject } from '../domain/values';
 import { createReviewWorkspace } from './reviewWorkspace';
 import { PreparedReviewEdit, type ReviewEditArchivePort } from '../projectPackage/reviewEdit';
 import { sceneAppendCompatibility } from '../projectPackage/sceneAppend';
@@ -866,60 +868,96 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
       await closeCurrent(); firstRecovery = opened; selected = run; navigation.hidden = true; renderFirstRecovery(); return;
     }
     if (purpose === 'review') {
-      const view = await prepareReviewView(selectedArchive, policy, ports.decode, ports.jpeg, ports.photo,ports.mediaDecoders);
       if (!ports.renderReview) throw Error('閲覧用シーンの表示が未接続です。');
-      const prepared = await ownRender(ports.renderReview(view));
-      try {
-        if (!guardSelection(generation, context)) return;
-        await closeCurrent(); resident = prepared;
-        const currentReview = createReviewWorkspace(document, view, prepared.factory, () => execute(async () => {
-          if (reviewWorkspace !== currentReview || resident !== prepared) return;
-          ensureMaySwitch(); const editGeneration = selectionGeneration, editContext = selectionContext();
-          status.textContent = '編集コピーを作成しています。';
-          reviewEditAttempt ??= await PreparedReviewEdit.fromInspectedReview(view.inspection, validationMetadataLimits,ports.reviewEditArchive);
-          if (!guardSelection(editGeneration, editContext)) {await reviewEditAttempt.releaseScratch();reviewEditAttempt=undefined;return;}
-          const opened = await openNormal(reviewEditAttempt.run, undefined, 'edit', undefined, reviewEditAttempt);
-          // Preserve the View, its windows and the exact attempt until an actual recovery-capable Host exists.
-          await replaceSelection(reviewEditAttempt.run, opened, editGeneration, editContext);
-        }), {
-          projects: async () => (await ports.list()).filter(project => project.state === 'ready'),
-          inspect: async run => {
-            const captured = selectionContext(), editGeneration = selectionGeneration;
-            const opened = await openNormal(run, undefined, 'view');
-            try {
-              const read = opened.read();
-              if (!selectionCurrent(editGeneration, captured) || read.state !== 'ready' || !read.source || !read.publication || opened.hasPending())
-                throw Error('追加先のプロジェクトを確認できません。選び直してください。');
-              const publication = read.publication, token = read.source.token;
-              return { reason: sceneAppendCompatibility(read.source, view.inspection), confirm: async () => {
-                let failure: unknown;
-                await execute(async () => {
-                  try {
-                    if (!guardSelection(editGeneration, captured)) return;
-                    const target = await openNormal(run, undefined, 'edit');
-                    const attemptId = newId();
-                    let sceneId: string | undefined;
+      const renderReview = ports.renderReview;
+      const archive = await ReviewArchive.fromSelectedArchive(selectedArchive, validationMetadataLimits);
+      if (!guardSelection(generation, context)) return;
+      const scenes = reviewSceneChoices(archive.review.snapshot);
+      const loadScene = async (id: string, previous?: ReviewView) => {
+        ensureMaySwitch(); await closeCurrent();
+        previous?.releaseDisplayData();
+        if (disposed) return;
+        selected = null; ports.selected(null); clearSelection(); navigation.hidden = true;
+        const attempt = selectionGeneration, expected = selectionContext();
+        const choose = document.createElement('select'), retry = document.createElement('button'), leave = document.createElement('button');
+        choose.setAttribute('aria-label', '表示するシーン'); retry.type = 'button'; retry.textContent = 'シーンを開く';
+        leave.type = 'button'; leave.textContent = '別のプロジェクトを開く'; leave.addEventListener('click', () => selectProject());
+        for (const scene of scenes) { const option = document.createElement('option'); option.value = String(scene.id); option.textContent = String(scene.name); choose.append(option); }
+        choose.value = id; content.append(choose, retry, leave);
+        const load = async () => {
+          if (!guardSelection(attempt, expected)) return;
+          choose.disabled = retry.disabled = leave.disabled = true;
+          status.textContent = 'シーンを開いています。';
+          try {
+            const next = await prepareReviewView(archive, policy, ports.decode, ports.jpeg, ports.photo, ports.mediaDecoders, choose.value);
+            if (guardSelection(attempt, expected)) await showScene(next, attempt, expected);
+          } finally { choose.disabled = retry.disabled = leave.disabled = false; }
+        };
+        retry.addEventListener('click', () => execute(load));
+        await load();
+      };
+      const showScene = async (view: ReviewView, generation: number, context: ReturnType<typeof selectionContext>) => {
+        const prepared = await ownRender(renderReview(view));
+        try {
+          if (!guardSelection(generation, context)) return;
+          await closeCurrent(); resident = prepared;
+          const currentReview = createReviewWorkspace(document, view, prepared.factory, () => execute(async () => {
+            if (reviewWorkspace !== currentReview || resident !== prepared) return;
+            ensureMaySwitch(); const editGeneration = selectionGeneration, editContext = selectionContext();
+            status.textContent = '編集コピーを作成しています。';
+            reviewEditAttempt ??= await PreparedReviewEdit.fromInspectedReview(view.inspection, validationMetadataLimits,ports.reviewEditArchive);
+            if (!guardSelection(editGeneration, editContext)) {await reviewEditAttempt.releaseScratch();reviewEditAttempt=undefined;return;}
+            const opened = await openNormal(reviewEditAttempt.run, undefined, 'edit', undefined, reviewEditAttempt);
+            // Preserve the View, its windows and the exact attempt until an actual recovery-capable Host exists.
+            await replaceSelection(reviewEditAttempt.run, opened, editGeneration, editContext);
+          }), {
+            projects: async () => (await ports.list()).filter(project => project.state === 'ready'),
+            inspect: async run => {
+              const captured = selectionContext(), editGeneration = selectionGeneration;
+              const opened = await openNormal(run, undefined, 'view');
+              try {
+                const read = opened.read();
+                if (!selectionCurrent(editGeneration, captured) || read.state !== 'ready' || !read.source || !read.publication || opened.hasPending())
+                  throw Error('追加先のプロジェクトを確認できません。選び直してください。');
+                const publication = read.publication, token = read.source.token;
+                return { reason: sceneAppendCompatibility(read.source, view.inspection), confirm: async () => {
+                  let failure: unknown;
+                  await execute(async () => {
                     try {
-                      sceneId = await target.sceneAppend.start(attemptId, publication, token, view.inspection);
-                    } catch (error) {
-                      if (target.sceneAppend.jobs.some(job => job.id === attemptId)) {
-                        await replaceSelection(run, target, editGeneration, captured);
-                        throw error;
+                      if (!guardSelection(editGeneration, captured)) return;
+                      const target = await openNormal(run, undefined, 'edit');
+                      const attemptId = newId();
+                      let sceneId: string | undefined;
+                      try {
+                        sceneId = await target.sceneAppend.start(attemptId, publication, token, view.inspection);
+                      } catch (error) {
+                        if (target.sceneAppend.jobs.some(job => job.id === attemptId)) {
+                          await replaceSelection(run, target, editGeneration, captured);
+                          throw error;
+                        }
+                        await target.dispose(); throw error;
                       }
-                      await target.dispose(); throw error;
-                    }
-                    await replaceSelection(run, target, editGeneration, captured, sceneId);
-                  } catch (error) { failure = error; }
-                });
-                if (failure) throw failure;
-              } };
-            } finally { await opened.dispose(); }
-          },
-        }); reviewWorkspace = currentReview; content.append(reviewWorkspace.root); reviewWorkspace.render();
-        selected = null; ports.selected(null); navigation.hidden = true; clearSelection();
-        status.textContent = '閲覧用シーンを開きました。編集プロジェクトは作成していません。';
-      } catch (error) { if (resident === prepared) resident = undefined; throw error; }
-      finally { if (resident !== prepared) await releaseRender(prepared); }
+                      await replaceSelection(run, target, editGeneration, captured, sceneId);
+                    } catch (error) { failure = error; }
+                  });
+                  if (failure) throw failure;
+                } };
+              } finally { await opened.dispose(); }
+            },
+          }, id => execute(async () => {
+            if (reviewWorkspace !== currentReview || resident !== prepared) return;
+            await loadScene(id, view);
+          })); reviewWorkspace = currentReview; content.append(reviewWorkspace.root); reviewWorkspace.render();
+          selected = null; ports.selected(null); navigation.hidden = true; clearSelection();
+          status.textContent = '閲覧用シーンを開きました。編集プロジェクトは作成していません。';
+        } catch (error) { if (resident === prepared) resident = undefined; throw error; }
+        finally { if (resident !== prepared) await releaseRender(prepared); }
+      };
+      if (scenes.length > 1) await loadScene(String((archive.review.snapshot.project as JsonObject).defaultSceneId));
+      else {
+        const view = await prepareReviewView(archive, policy, ports.decode, ports.jpeg, ports.photo, ports.mediaDecoders);
+        await showScene(view, generation, context);
+      }
       return;
     }
     const inspected = purpose === 'clean' ? await CleanArchive.inspect(file, validationMetadataLimits) : await WorkspaceArchive.inspect(file, validationMetadataLimits);

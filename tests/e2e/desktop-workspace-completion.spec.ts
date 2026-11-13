@@ -87,7 +87,8 @@ test('content-first workspace keeps editing, pin completion and file exits coher
     const [download] = await Promise.all([p.waitForEvent('download'), files.locator('.lv-file-primary').click()]); await download.saveAs(info.outputPath('completed-backup.zip')); expect(await download.failure()).toBeNull(); await expect(files.locator('.lv-operation-status')).toHaveAttribute('data-busy', 'false'); await expect(files.locator('.lv-file-primary')).toBeFocused(); await menu.getByRole('button', { name: '閉じる', exact: true }).click();
     await p.getByRole('button', { name: '共有', exact: true }).click();
     const partial = files.getByRole('checkbox', { name: '一部だけ出力', exact: true }), scope = files.getByLabel('出力する内容', { exact: true });
-    await expect(partial).not.toBeChecked(); await expect(scope).toBeHidden(); await expect(files.getByText('編集・返送できます。全シーンと編集履歴を含みます。', { exact: true })).toBeVisible();
+    await expect(partial).toBeChecked(); await expect(scope).toBeVisible();
+    await partial.uncheck(); await expect(files.getByText('編集・返送できます。全シーンと編集履歴を含みます。', { exact: true })).toBeVisible();
     await expect(files.getByRole('button', { name: '相手に渡す', exact: true })).toHaveCount(0);
     const fileTabs=menu.getByRole('tablist',{name:'ファイルの操作',exact:true}),shareTab=fileTabs.getByRole('tab',{name:'共有',exact:true});await expect(menu.getByRole('button',{name:'閉じる',exact:true})).toBeEnabled();
     await shareTab.focus();await p.keyboard.press('ArrowLeft');await expect(fileTabs.getByRole('tab',{name:'保存',exact:true})).toBeFocused();await p.keyboard.press('ArrowRight');await expect(shareTab).toBeFocused();await expect(shareTab).toHaveAttribute('aria-selected','true');
@@ -107,7 +108,7 @@ test('content-first workspace keeps editing, pin completion and file exits coher
     await menu.getByRole('button', { name: '閉じる', exact: true }).click(); await expect(menu).not.toHaveAttribute('open');
     await p.getByRole('button', { name: '共有', exact: true }).click(); await expect(partial).toBeChecked();
     await files.getByRole('button', { name: '選択を取り消す', exact: true }).click();
-    await expect(partial).not.toBeChecked(); await expect(partial).toBeFocused(); await expect(scope).toBeHidden();
+    await expect(partial).toBeChecked(); await expect(partial).toBeFocused(); await expect(scope).toBeVisible();
     await menu.getByRole('button', { name: '閉じる', exact: true }).click(); await expect(p.getByRole('button', { name: '共有', exact: true })).toBeFocused();
     await detail.getByLabel('本文',{exact:true}).fill('手元でも同じ本文を更新しました。');await detail.getByRole('button',{name:'変更を適用',exact:true}).click();await ready('変更を適用しました。');
     const peerContext = await browser.newContext({ viewport: { width: 1440, height: 1000 }, serviceWorkers: 'block', acceptDownloads: true }), peer = await peerContext.newPage(); peer.on('pageerror', e => errors.push(e.message));
@@ -147,7 +148,13 @@ test('content-first workspace keeps editing, pin completion and file exits coher
     await expect(photo).toBeInViewport(); await p.screenshot({ path: info.outputPath('reading-narrow.png'), fullPage: false });
     await mode.click(); await expect(mode).toHaveText('閲覧する', { timeout: 15_000 }); await expect(mode).toBeEnabled(); await p.getByRole('button', { name: '位置を調整', exact: true }).click();
     await expect(pin).toBeVisible(); await expect(pin.getByRole('button', { name: '位置を確定', exact: true })).toBeInViewport({ ratio: 1 }); await expect(pin.getByRole('button', { name: '取り消す', exact: true })).toBeInViewport({ ratio: 1 });
-    await expect(pin).toBeFocused(); await pin.getByText('座標で微調整',{exact:true}).click(); const x = pin.getByLabel('位置 X', { exact: true }); await x.focus(); await expect(x).toBeFocused(); await x.dispatchEvent('compositionstart'); await expect(pin.getByRole('button', { name: '位置を確定', exact: true })).toBeDisabled(); await x.dispatchEvent('compositionend');
+    // While the model is preparing, focus starts on the task. Once ready, the
+    // existing focus moves to its confirm action without requiring another key.
+    await expect.poll(() => pin.evaluate(task => {
+      const active = task.ownerDocument.activeElement;
+      return active === task || task.contains(active) && active?.textContent === '位置を確定';
+    })).toBe(true);
+    await pin.getByText('座標で微調整',{exact:true}).click(); const x = pin.getByLabel('位置 X', { exact: true }); await x.focus(); await expect(x).toBeFocused(); await x.dispatchEvent('compositionstart'); await expect(pin.getByRole('button', { name: '位置を確定', exact: true })).toBeDisabled(); await x.dispatchEvent('compositionend');
     await p.screenshot({ path: info.outputPath('pin-narrow.png'), fullPage: false }); await pin.getByRole('button', { name: '取り消す', exact: true }).click(); await expect(detail.getByLabel('本文', { exact: true })).toHaveValue(receivedBody);
     await p.setViewportSize({ width: 1440, height: 1000 }); await p.reload(); await expect(p.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText('現地調査', { timeout: 90_000 });
     await p.getByRole('region', { name: 'シーン', exact: true }).getByRole('button', { name: '接合部', exact: true }).click(); await p.locator('.lv-caption-select').filter({ hasText: '柱の接合部' }).click(); await expect(detail.getByLabel('本文', { exact: true })).toHaveValue(receivedBody);

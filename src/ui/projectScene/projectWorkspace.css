@@ -274,6 +274,11 @@
 .lv-project-body > aside > [role="tabpanel"] { flex: 1 1 0; min-height: 0; overflow: auto; }
 .lv-project-body > aside > .lv-caption-task { display: grid; grid-template-rows: minmax(0, 62fr) minmax(0, 38fr); gap: 8px; overflow: hidden; }
 .lv-project-body > aside > .lv-caption-task[data-editing="true"] { grid-template-rows: minmax(0, 35fr) minmax(0, 65fr); }
+@media (min-width: 761px) and (min-height: 641px) {
+  .lv-project-body > aside > .lv-caption-task[data-selected="true"][data-editing="false"]:not([data-mobile-surface]):has(> .lv-caption-browser[data-few-rows="false"]) {
+    grid-template-rows: minmax(0, 7fr) minmax(0, 3fr);
+  }
+}
 .lv-project-body > aside > .lv-caption-task[data-selected="false"] { grid-template-rows: minmax(min-content, 1fr) auto; overflow: auto; }
 .lv-caption-task[data-selected="false"] > .lv-caption-reading,
 .lv-caption-task[data-selected="false"] .lv-caption-detail { min-height: auto; overflow: visible; }

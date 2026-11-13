@@ -3,8 +3,8 @@ import {expect,chromium,type BrowserContext,type Page} from '@playwright/test';
 import {readFile} from 'node:fs/promises';
 import * as A from '@automerge/automerge';
 import {ownedServer} from '../offline-e2e/server';
-import {triangleGlb} from './fixtures';
-import {revealCoordinateAdd,revealWorkPanel,revealFileSurface} from './workspaceUi';
+import {nativeConversionBackup,smallPng,triangleGlb} from './fixtures';
+import {revealCaptionList,revealCoordinateAdd,revealWorkPanel,revealFileSurface} from './workspaceUi';
 import {BackupArchive} from '../../src/projectPackage/backupArchive';
 import {inspectProjectCandidates} from '../../src/domain/projectCandidates';
 import {validationMetadataLimits} from '../../src/projectFiles/validation';
@@ -108,4 +108,91 @@ for(const touch of [false,true])test(`native capacity recovery retains drafts an
     await cold.locator('.lv-caption-select').filter({hasText:'保持する記録'}).click();await expect(cold.getByRole('region',{name:'キャプションの詳細',exact:true}).getByLabel('本文',{exact:true})).toHaveValue('容量不足でも失わない本文');
     expect(errors).toEqual([]);expect(remote).toEqual([]);await info.attach('capacity-measurements',{body:JSON.stringify({measurements,hits,browser:await cold.evaluate(()=>navigator.userAgent),touchEmulated:touch,physicalDevice:false}),contentType:'application/json'});
   }finally{await context?.close();await server.stop();}
+});
+
+test('a renderer crash before text publication resumes the same edit exactly once', async ({}, info) => {
+  A.getHeads(A.init());
+  const server = await ownedServer(process.env.LOCIVIEW_E2E_ARTIFACT ?? 'desktop-dist');
+  const receiver = await createBrowserProfile('restored-text');
+  let context: BrowserContext | undefined;
+  const open = async (profile: string, suffix = '') => {
+    context = await chromium.launchPersistentContext(profile, { channel: 'chromium', serviceWorkers: 'block', acceptDownloads: true });
+    const page = context.pages()[0]!;
+    await page.goto(server.url + suffix);
+    return page;
+  };
+  const backup = async (page: Page, name: string) => {
+    await revealFileSurface(page, '保存');
+    const [file] = await Promise.all([page.waitForEvent('download'),
+      page.getByRole('region', { name: 'ファイル', exact: true }).locator('.lv-file-primary').click()]);
+    const path = info.outputPath(name + '.zip');
+    await file.saveAs(path); expect(await file.failure()).toBeNull();
+    return BackupArchive.inspect(new Blob([Uint8Array.from(await readFile(path)).buffer]), validationMetadataLimits);
+  };
+  const text = '強制終了しても一度だけ残る本文', detail = (page: Page) => page.getByRole('region', { name: 'キャプションの詳細', exact: true });
+  const record = async (page: Page) => {
+    await revealCaptionList(page);
+    await page.locator('.lv-caption-select').filter({ hasText: '既存のピン' }).click();
+    return detail(page).getByLabel('本文', { exact: true });
+  };
+  try {
+    const author = await open(await createBrowserProfile('author'));
+    await author.getByLabel('ファイルを選択', { exact: true }).setInputFiles({
+      name: '記録.zip', mimeType: 'application/zip', buffer: await nativeConversionBackup(triangleGlb(), smallPng()) });
+    await author.getByRole('button', { name: 'ファイルを開く', exact: true }).click();
+    await author.getByRole('button', { name: '新しいプロジェクトに変換', exact: true }).click();
+    await expect(author.getByRole('button', { name: '閲覧する', exact: true })).toBeEnabled();
+    const before = await backup(author, 'before');
+    await context!.close();
+    const page = await open(receiver);
+    await page.getByLabel('ファイルを選択', { exact: true }).setInputFiles(info.outputPath('before.zip'));
+    await page.getByRole('button', { name: 'ファイルを開く', exact: true }).click();
+    await page.getByRole('button', { name: 'このファイルから再開', exact: true }).click();
+    await expect(page.getByRole('button', { name: '閲覧する', exact: true })).toBeEnabled();
+    const field = await record(page);
+    await expect(field).toHaveValue('本文を保持');
+    await field.fill(text);
+    const signal = page.waitForEvent('console', msg => msg.text() === 'publication paused');
+    await page.evaluate(() => {
+      const openFile = FileSystemDirectoryHandle.prototype.getFileHandle;
+      FileSystemDirectoryHandle.prototype.getFileHandle = async function(name, options) {
+        if (options?.create && name === 'published.json') {
+          console.info('publication paused');
+          await new Promise<void>(() => {});
+        }
+        return openFile.call(this, name, options);
+      };
+    });
+    await detail(page).getByRole('button', { name: '変更を適用', exact: true }).click();
+    await signal;
+    const protocol = await context!.newCDPSession(page), crashed = page.waitForEvent('crash');
+    void protocol.send('Page.crash').catch(() => {});
+    await crashed;
+    await context!.close();
+    const run = (before.source.proof.identity.projectId as string).slice(4);
+    const resume = await open(receiver, '?run=' + run);
+    const retry = resume.getByRole('button', { name: '更新を再試行', exact: true });
+    const edit = resume.getByRole('button', { name: '編集する', exact: true });
+    await expect(retry.or(edit).filter({visible:true}).first()).toBeVisible();
+    if (await edit.isVisible()) await edit.click();
+    await retry.click();
+    await expect(await record(resume)).toHaveValue(text);
+    const after = await backup(resume, 'after');
+    expect(after.source.proof).toEqual(before.source.proof);
+    const originals = before.source.originalChanges(), changes = after.source.originalChanges();
+    expect(changes).toHaveLength(originals.length + 1);
+    expect(changes).toEqual(expect.arrayContaining(originals));
+    expect(after.archive.control.manifest.blobs).toEqual(before.archive.control.manifest.blobs);
+    for (const entry of before.archive.control.entries.filter(e => e.path.startsWith('blobs/'))) {
+      expect(await after.archive.entryBlob(entry.path).arrayBuffer()).toEqual(await before.archive.entryBlob(entry.path).arrayBuffer());
+    }
+    await context!.close();
+    const cold = await open(receiver, '?run=' + run);
+    const row = cold.locator('.lv-caption-select').filter({hasText: '既存のピン'});
+    await expect(row).toBeVisible();
+    const enterEdit = cold.getByRole('button',{name:'編集する',exact:true});
+    if (await enterEdit.isVisible()) await enterEdit.click();
+    await expect(await record(cold)).toHaveValue(text);
+    expect((await backup(cold, 'reopened')).source.originalChanges()).toEqual(changes);
+  } finally { await context?.close(); await server.stop(); }
 });

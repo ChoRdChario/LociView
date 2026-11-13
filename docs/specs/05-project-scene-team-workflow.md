@@ -675,12 +675,12 @@ activation and requests a Team Workspace or exact repair.
 
 ### 7.3 Review/share
 
-The user explicitly selects one durable Scene. The preflight names that Scene and
+The user selects the durable Scenes to share. The preflight identifies the selection and
 shows included model, Caption and transitive media counts plus original metadata/
 label disclosure. Search text, pin colors, temporary windows, free camera,
 selection and local isolate never change closure.
 
-The builder includes the selected Scene, its active Asset/Caption memberships,
+The builder includes each selected Scene, its active Asset/Caption memberships,
 required active Asset bindings/Representations, applicable material intent, the
 Scene's active Saved Views and media reached through included Captions. It re-keys
 every included nominal ID and omits source lineage, history, migration support,
@@ -708,7 +708,7 @@ requires its own allowlist and disclosure acceptance.
 
 The review wire remains an immutable, nonmergeable snapshot and opens in View.
 If its recipient later chooses to edit, LociView explicitly creates a new clean
-Project/lineage from that one-Scene closure before the first edit. It never turns
+Project/lineage from the selected closure before the first edit. It never turns
 the review package into a branch of, or Contribution to, the source Project.
 
 ### 7.4 Complete backup and clean copy
@@ -747,7 +747,7 @@ Before S2 writes or accepts one byte, a versioned package companion must ratify:
 - the fresh-CSPRNG package ID, mandatory verified automatic summary and optional
   bounded memo fields without treating either label as merge authority;
 - a self-contained Team Workspace/backup metadata envelope, a base-dependent
-  Contribution envelope, a fresh-lineage clean envelope and the exact one-Scene
+  Contribution envelope, a fresh-lineage clean envelope and the selected-Scene
   review snapshot schema;
 - resource budgets, stream order, container-signature/content inspection,
   privacy roots, interruption recovery and golden valid/invalid vectors.
@@ -1124,7 +1124,7 @@ under the software keyboard. It is not a reduced contributor mode.
 Revision/base/head/internal hashes remain hidden in ordinary idle UI. Model
 replacement, `needsReview`, conflict, package preflight and recovery reveal only
 the concise consequence/action first, with technical evidence under details.
-Team-file preflight discloses the current whole-Project or one-Scene scope,
+Team-file preflight discloses the current whole-Project or selected-Scene scope,
 the selected exchange base when required, every unsent change class and newly
 required byte total. The product Share sheet offers whole output and a checkbox
 for selected output (one Scene or changes since an explicitly selected base).
@@ -1290,7 +1290,7 @@ touch, rendered contrast or iPhone evidence; keep those in the existing batch.
   heads preserve exact causal dependencies in both arrival orders.
 - `TEAM-PKG-05`: cancel, quota, corruption, crash and second-tab observation at
   every journal boundary expose only the complete old or complete new heads.
-- `TEAM-PKG-06`: review contains exactly one selected Scene closure and no source
+- `TEAM-PKG-06`: review contains exactly the selected Scene closures and no source
   identity/history; complete backup restores the same Project; clean copy has a
   fresh lineage and all active Project Scenes/resources.
 - `TEAM-PKG-07`: human memo is non-authoritative; the mandatory automatic
@@ -4010,7 +4010,7 @@ no new input profile, schema, dependency, capacity promise or release is granted
 - new ProjectAnchor authoring; existing/imported ProjectAnchor read, Scene
   membership and explicit re-anchoring remain required;
 - Scene duplicate/delete/reorder UI in the first bounded candidate;
-- multiple-Scene review export or automatic privacy sanitization;
+- automatic privacy sanitization (multi-Scene review selection follows specification 06);
 - HEIC/video/audio expansion beyond the bounded PO-approved specification08 PC path, animation, renderer/material research or new format support;
 - automatic conflict winners or automatic duplicate alternatives;
 - license/version/release selection, `main`, Pages, Service Worker or deployment.

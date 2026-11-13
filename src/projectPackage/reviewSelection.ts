@@ -14,16 +14,29 @@ const fail = (code: string): never => { throw new PackageControlError(`review-${
 const table = (r: JsonObject, map: string) => object(r[map]) as Record<string, JsonObject>;
 const copy = (r: JsonObject, fields: readonly string[]): JsonObject => Object.fromEntries(fields.filter(k => r[k] !== undefined).map(k => [k, r[k]!]));
 const visualRoles = new Set(['meshPrimary', 'pointPrimary', 'gsPrimary', 'visualPatch']);
-export interface ReviewSelectionOptions { readonly sceneId: string; readonly omitConflictedEntryView?: boolean }
+export interface ReviewSelectionOptions {
+  readonly sceneId: string;
+  readonly additionalSceneIds?: readonly string[];
+  readonly omitConflictedEntryView?: boolean;
+  readonly omitAdditionalEntryViews?: readonly string[];
+}
 const checkSelection = (options: ReviewSelectionOptions) => {
+  const id = (v: unknown) => typeof v === 'string' && /^scn_[0-9a-f]{32}$/.test(v);
   if (!options || typeof options !== 'object' || Array.isArray(options) ||
-    Object.keys(options).some(k => k !== 'sceneId' && k !== 'omitConflictedEntryView') ||
-    typeof options.sceneId !== 'string' || !/^scn_[0-9a-f]{32}$/.test(options.sceneId) ||
+    Object.keys(options).some(k => !['sceneId', 'additionalSceneIds', 'omitConflictedEntryView', 'omitAdditionalEntryViews'].includes(k)) ||
+    !id(options.sceneId) ||
     options.omitConflictedEntryView !== undefined && typeof options.omitConflictedEntryView !== 'boolean') fail('selection');
+  for (const ids of [options.additionalSceneIds, options.omitAdditionalEntryViews]) {
+    if (ids !== undefined && (!Array.isArray(ids) || !ids.length || ids.length >= L.closureRecords ||
+      !Array.from(ids).every(id) || new Set(ids).size !== ids.length || ids.includes(options.sceneId))) fail('selection');
+  }
+  const additional = new Set(options.additionalSceneIds);
+  if (options.omitAdditionalEntryViews?.some(id => !additional.has(id))) fail('selection');
 };
 
 /** Resolve only the explicit Scene closure. An uncertain endpoint never proves exclusion. */
 export async function selectReviewRecords(source: ProjectMetadataSource, limits: MetadataLimits, options: ReviewSelectionOptions) {
+  options = structuredClone(options);
   checkSelection(options);
   const profile = source.semanticProfile, mutableRecordFields = mutableFieldsFor(profile);
   const c = await inspectProjectCandidates(source.read(), limits);
@@ -78,11 +91,14 @@ export async function selectReviewRecords(source: ProjectMetadataSource, limits:
   const records: JsonObject = { schema: c.source.schema, identity: read(fields.get(canonical(['identity'])))!,
     project: { title: read(fields.get(canonical(['project', 'title'])))!, frame: read(fields.get(canonical(['project', 'frame'])))!, defaultSceneId: options.sceneId },
     ...Object.fromEntries(Object.keys(projectRecordMaps).map(m => [m, {}])) };
-  const entry = field('scenesById', options.sceneId, 'defaultViewId');
-  const entryConflict = !!entry && entry.valid && !entry.hasUnknownFields && entry.candidates.length > 1;
-  if (options.omitConflictedEntryView && !entryConflict) fail('entry-confirmation-stale');
-  const scene = current('scenesById', options.sceneId, options.omitConflictedEntryView ? ['defaultViewId'] : []);
-  table(records, 'scenesById')[options.sceneId] = scene;
+  const scenes = new Set([options.sceneId, ...options.additionalSceneIds ?? []]);
+  const omissions = new Set(options.omitAdditionalEntryViews);
+  if (options.omitConflictedEntryView) omissions.add(options.sceneId);
+  for (const id of scenes) {
+    const entry = field('scenesById', id, 'defaultViewId');
+    if (omissions.has(id) && !(entry?.valid && !entry.hasUnknownFields && entry.candidates.length > 1)) fail('entry-confirmation-stale');
+    table(records, 'scenesById')[id] = current('scenesById', id, omissions.has(id) ? ['defaultViewId'] : []);
+  }
   const includeChildren = (map: ProjectRecordMap, parentField: string, parents: Set<string>) => {
     for (const id of recordIds[map]) {
       charge(); const parent = field(map, id, parentField);
@@ -91,19 +107,19 @@ export async function selectReviewRecords(source: ProjectMetadataSource, limits:
       const r = current(map, id); if (!parents.has(string(r[parentField]))) fail('scope'); table(records, map)[id] = r;
     }
   };
-  includeChildren('sceneAssetMembershipsById', 'sceneId', new Set([options.sceneId]));
-  includeChildren('sceneCaptionMembershipsById', 'sceneId', new Set([options.sceneId]));
+  includeChildren('sceneAssetMembershipsById', 'sceneId', scenes);
+  includeChildren('sceneCaptionMembershipsById', 'sceneId', scenes);
   const captionIds = new Set(Object.values(table(records, 'sceneCaptionMembershipsById')).map(r => string(r.captionId)));
   for (const id of captionIds) table(records, 'captionsById')[id] = current('captionsById', id);
   includeChildren('captionAttachmentsById', 'captionId', captionIds); includeChildren('captionTagMembershipsById', 'captionId', captionIds);
-  includeChildren('viewsById', 'sceneId', new Set([options.sceneId]));
-  for (const edge of Object.values(table(records, 'captionAttachmentsById'))) {
-    const id = string(edge.mediaResourceId); table(records, 'mediaResourcesById')[id] = current('mediaResourcesById', id);
-  }
-  for (const edge of Object.values(table(records, 'captionTagMembershipsById'))) {
-    const id = string(edge.tagId); table(records, 'captionTagsById')[id] = current('captionTagsById', id);
-  }
-  const visualAssets = new Set(Object.values(table(records, 'sceneAssetMembershipsById')).map(r => string(r.assetId)));
+  includeChildren('viewsById', 'sceneId', scenes);
+  const media = new Set(Object.values(table(records, 'captionAttachmentsById')).map(r => string(r.mediaResourceId)));
+  for (const id of media) table(records, 'mediaResourcesById')[id] = current('mediaResourcesById', id);
+  const tags = new Set(Object.values(table(records, 'captionTagMembershipsById')).map(r => string(r.tagId)));
+  for (const id of tags) table(records, 'captionTagsById')[id] = current('captionTagsById', id);
+  const memberships = Object.values(table(records, 'sceneAssetMembershipsById'));
+  const visualAssets = new Set(memberships.map(r => string(r.assetId)));
+  const sceneAssets = new Set(memberships.map(r => canonical([r.sceneId!, r.assetId!])));
   const anchors = Object.values(table(records, 'captionsById')).map(r => object(r.anchor));
   const owners = new Set([...visualAssets, ...anchors.flatMap(a => a.kind === 'asset' ? [string(a.assetId)] : a.kind === 'unplaced' && a.ownerAssetId !== undefined ? [string(a.ownerAssetId)] : [])]);
   const compatible = new Map<string, readonly string[]>(), transformOnlyBindings = new Set<string>(), ownerClasses = new Map<string, Set<string>>();
@@ -155,7 +171,8 @@ export async function selectReviewRecords(source: ProjectMetadataSource, limits:
   }
   const applies = (value: JsonValue) => {
     const route = object(value), scope = object(route.scope), target = object(route.target);
-    return (scope.kind === 'project' || scope.kind === 'scene' && scope.sceneId === options.sceneId) && materialTargets.has(canonical([target.assetId!, target.variantFamilyId!, target.materialLayoutId!, target.logicalMaterialSlotId!]));
+    return (scope.kind === 'project' || scope.kind === 'scene' && sceneAssets.has(canonical([scope.sceneId!, target.assetId!]))) &&
+      materialTargets.has(canonical([target.assetId!, target.variantFamilyId!, target.materialLayoutId!, target.logicalMaterialSlotId!]));
   };
   for (const id of recordIds.materialOverridesById) {
     charge(); const route = field('materialOverridesById', id, 'routing'); if (!canInclude(route, applies) || !active('materialOverridesById', id)) continue;
@@ -187,13 +204,15 @@ export interface ReviewReconstruction {
 
 /** Fresh flattened snapshot, with the typed reconstruction retained only as local retry evidence. */
 export async function prepareReviewSnapshot(source: ProjectMetadataSource, limits: MetadataLimits, options: ReviewSelectionOptions, frozen?: ReviewReconstruction) {
-  checkSelection(options);
+  options = structuredClone(options);
   if (frozen && (Object.keys(frozen).sort().join(',') !== 'rekey,schema,selection,snapshotId' || frozen.schema !== 'lociview-review-reconstruction-1' ||
     !/^snp_[0-9a-f]{32}$/.test(frozen.snapshotId) || !same(frozen.selection as unknown as JsonValue, options as unknown as JsonValue))) fail('recipe');
   const selected = await selectReviewRecords(source, limits, options), rebuilt = await prepareCleanRecords(selected.records, limits, () => false, frozen?.rekey, source.semanticProfile);
   const records = rebuilt.records, mapping = new Map(rebuilt.reconstruction.idMap.map(r => [r.from, r.to])), reverse = new Map(rebuilt.reconstruction.idMap.map(r => [r.to, r.from]));
-  const snapshot: JsonObject = { schema: reviewSchema(source.semanticProfile), snapshotId: frozen?.snapshotId ?? `snp_${newId()}`, project: records.project!,
-    scene: copy(Object.values(table(records, 'scenesById'))[0]!, ['id', 'name', 'orderKey', 'defaultViewId']), ...Object.fromEntries(reviewMaps.map(m => [m, {}])) };
+  const scenes = Object.values(table(records, 'scenesById')).map(scene => copy(scene, ['id', 'name', 'orderKey', 'defaultViewId']));
+  const snapshot: JsonObject = { schema: reviewSchema(source.semanticProfile, scenes.length > 1), snapshotId: frozen?.snapshotId ?? `snp_${newId()}`, project: records.project!,
+    ...(scenes.length === 1 ? { scene: scenes[0]! } : { scenesById: Object.fromEntries(scenes.map(scene => [string(scene.id), scene])) }),
+    ...Object.fromEntries(reviewMaps.map(m => [m, {}])) };
   for (const map of reviewMaps) for (const r of Object.values(table(records, map))) {
     if (map === 'assetsById') {
       const status = object(r.status);

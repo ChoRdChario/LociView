@@ -383,6 +383,10 @@
 .lv-file-output[data-presentation="save"] .lv-file-intents > p { margin: 0; }
 .lv-file-output[data-presentation="share"] .lv-file-intents > label { width: 100%; }
 .lv-share-scope { display: grid; gap: 8px; }
+.lv-share-scenes { min-width: 0; width: 100%; margin: 0; padding: 0; border: 0; }
+.lv-file-output .lv-share-scenes label { display: flex; align-items: center; gap: 8px; min-height: 44px; cursor: pointer; }
+.lv-share-scenes input[type="checkbox"] { flex: none; width: 18px; height: 18px; margin: 0; }
+.lv-share-scenes span { overflow-wrap: anywhere; }
 .lv-file-output .lv-share-scope > .lv-share-partial { display: flex; align-items: center; gap: 8px; min-height: 44px; cursor: pointer; }
 .lv-share-partial > input { width: 18px; height: 18px; margin: 0; }
 .lv-file-output[data-presentation="share"] .lv-file-intents > p { margin: 0; }

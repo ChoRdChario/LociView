@@ -16,10 +16,13 @@ import { packageByteHash, PackageControlError } from './manifest';
 
 export const REVIEW_SCHEMA = Object.freeze({ kind: 'lociview-project-scene-review', version: '1' });
 const REVIEW_SCHEMA2 = Object.freeze({ kind: 'lociview-project-scene-review', version: '2' });
-export const reviewSchema = (profile: ProjectSemanticProfile) => profile === 'map2' ? REVIEW_SCHEMA2 : REVIEW_SCHEMA;
+const MULTI_SCHEMA1 = Object.freeze({ kind: REVIEW_SCHEMA.kind, version: '3' });
+const MULTI_SCHEMA2 = Object.freeze({ kind: REVIEW_SCHEMA.kind, version: '4' });
+export const reviewSchema = (profile: ProjectSemanticProfile, multiple = false) =>
+  multiple ? (profile === 'map2' ? MULTI_SCHEMA2 : MULTI_SCHEMA1) : (profile === 'map2' ? REVIEW_SCHEMA2 : REVIEW_SCHEMA);
 export function reviewSemanticProfile(schema: JsonValue | undefined): ProjectSemanticProfile {
-  if (same(schema, REVIEW_SCHEMA)) return 'map1';
-  if (same(schema, REVIEW_SCHEMA2)) return 'map2';
+  if (same(schema, REVIEW_SCHEMA) || same(schema, MULTI_SCHEMA1)) return 'map1';
+  if (same(schema, REVIEW_SCHEMA2) || same(schema, MULTI_SCHEMA2)) return 'map2';
   return fail('schema');
 }
 export const reviewMaps = ['assetsById', 'representationsById', 'captionsById', 'mediaResourcesById', 'captionAttachmentsById',
@@ -30,6 +33,8 @@ export function reviewCapabilities(review: ReviewSnapshot): ReaderCapabilities {
 }
 const fail = (code: string): never => { throw new PackageControlError(`review-${code}`); };
 const table = (r: JsonObject, map: string) => object(r[map]) as Record<string, JsonObject>;
+export const reviewScenes = (snapshot: JsonObject): JsonObject[] =>
+  snapshot.scene ? [object(snapshot.scene)] : Object.values(table(snapshot, 'scenesById'));
 const encode = (r: JsonObject) => new TextEncoder().encode(canonical(r));
 const setsEqual = (a: Iterable<string>, b: Iterable<string>) => same([...new Set(a)].sort(), [...new Set(b)].sort());
 class ClosedFields extends ProjectRecordFields {
@@ -91,15 +96,22 @@ export async function readReviewSnapshot(bytes: Uint8Array, limits: MetadataLimi
 export async function inspectReviewSnapshot(input: unknown, limits: MetadataLimits): Promise<ReviewSnapshot> {
   const bounds = reviewLimits(limits), cloned = cloneCanonicalValue(input, bounds) as JsonObject, charge = snapshotBudget(cloned, bounds);
   const profile = reviewSemanticProfile(cloned?.schema), mutableRecordFields = mutableFieldsFor(profile);
-  const c = new ClosedFields(charge, profile), root = c.shape(cloned, ['schema', 'snapshotId', 'project', 'scene', ...reviewMaps], []);
+  const multiple = same(cloned.schema, reviewSchema(profile, true));
+  const c = new ClosedFields(charge, profile), root = c.shape(cloned, ['schema', 'snapshotId', 'project', multiple ? 'scenesById' : 'scene', ...reviewMaps], []);
   c.id(c.required(root, 'snapshotId', []), 'snp', ['snapshotId']);
   const project = c.shape(c.required(root, 'project', []), ['title', 'frame', 'defaultSceneId'], ['project']);
   for (const k of ['title', 'frame', 'defaultSceneId']) checkProjectHeader(c, k, c.required(project, k, ['project']));
-  const scene = c.shape(c.required(root, 'scene', []), ['id', 'name', 'orderKey', 'defaultViewId'], ['scene']);
   const life = { state: 'active', reason: 'initial', eventId: `evt_${'0'.repeat(32)}` };
-  checkProjectRecord(c, 'scenesById', { ...scene, lifecycle: life }); c.id(scene.id!, 'scn', ['scene', 'id']);
-  if (project.defaultSceneId !== scene.id) fail('default-scene');
-  let count = 1;
+  const scenes = multiple ? Object.entries(c.object(c.required(root, 'scenesById', []), ['scenesById'])) :
+    [[string(project.defaultSceneId), c.required(root, 'scene', [])] as const];
+  if (multiple && (scenes.length < 2 || scenes.length > L.closureRecords)) fail('scene-count');
+  for (const [id, row] of scenes) {
+    const scene = c.shape(row, ['id', 'name', 'orderKey', 'defaultViewId'], ['scenesById', id]);
+    checkProjectRecord(c, 'scenesById', { ...scene, lifecycle: life });
+    if (c.id(scene.id!, 'scn', ['scenesById', id]) !== id) fail('scene-id');
+  }
+  if (!scenes.some(([id]) => id === project.defaultSceneId)) fail('default-scene');
+  let count = scenes.length;
   for (const map of reviewMaps) {
     const records = c.object(c.required(root, map, []), [map]); count += Object.keys(records).length;
     if (count > L.closureRecords) fail('record-budget');
@@ -164,6 +176,13 @@ export async function inspectReviewSnapshot(input: unknown, limits: MetadataLimi
     graph.issues.some(i => i.kind !== 'unverified' && i.code !== 'anchor-class-not-current')) fail('graph');
   const assets = table(root, 'assetsById'), captions = table(root, 'captionsById');
   const sceneAssets = new Set(Object.values(table(root, 'sceneAssetMembershipsById')).map(r => string(r.assetId)));
+  if (multiple) {
+    const memberships = new Set(Object.values(table(root, 'sceneAssetMembershipsById')).map(r => canonical([r.sceneId!, r.assetId!])));
+    for (const material of Object.values(table(root, 'materialOverridesById'))) {
+      const route = object(material.routing), scope = object(route.scope);
+      if (scope.kind === 'scene' && !memberships.has(canonical([scope.sceneId!, object(route.target).assetId!]))) fail('material-scope');
+    }
+  }
   const ownerCaptions = new Map<string, JsonObject[]>();
   for (const caption of Object.values(captions)) {
     const a = object(caption.anchor), owner = a.kind === 'asset' ? a.assetId : a.kind === 'unplaced' ? a.ownerAssetId : undefined;
@@ -213,7 +232,7 @@ async function validationGraph(snapshot: JsonObject, charge: (n?: number) => voi
   const profile = reviewSemanticProfile(snapshot.schema);
   const out: JsonObject = { schema: { major: 2, minor: profile === 'map2' ? 1 : 0 }, identity: { projectId: placeholder('prj', 0), historyEpoch: placeholder('hep', 0), lineageSeed: '0'.repeat(64) },
     project: snapshot.project!, ...Object.fromEntries(Object.keys(projectRecordMaps).map(m => [m, {}])) };
-  const scene = object(snapshot.scene); table(out, 'scenesById')[string(scene.id)] = { ...scene, lifecycle: lifecycle() };
+  for (const scene of reviewScenes(snapshot)) table(out, 'scenesById')[string(scene.id)] = { ...scene, lifecycle: lifecycle() };
   for (const map of reviewMaps) {
     if (map === 'assetsById') continue;
     for (const r of Object.values(table(snapshot, map))) {
@@ -252,9 +271,12 @@ export async function prepareReviewEdit(review: ReviewSnapshot, limits: Metadata
 }
 
 export function reviewSummary(snapshot: JsonObject, blobs: readonly Entry[]): AutomaticSummary {
-  const entities = new Map<string, number>([['project', 1], ['scenesById', 1]]), fields = new Map<string, number>();
+  const scenes = reviewScenes(snapshot);
+  const entities = new Map<string, number>([['project', 1], ['scenesById', scenes.length]]), fields = new Map<string, number>();
   for (const name of Object.keys(object(snapshot.project))) fields.set(`project.${name}`, 1);
-  for (const name of Object.keys(object(snapshot.scene))) fields.set(`scenesById.${name}`, 1);
+  for (const scene of scenes) for (const name of Object.keys(scene)) {
+    const key = `scenesById.${name}`; fields.set(key, (fields.get(key) ?? 0) + 1);
+  }
   for (const map of reviewMaps) for (const r of Object.values(table(snapshot, map))) {
     entities.set(map, (entities.get(map) ?? 0) + 1);
     for (const name of ['assetsById', 'representationsById', 'mediaResourcesById'].includes(map) ? ['record'] : Object.keys(r)) {
