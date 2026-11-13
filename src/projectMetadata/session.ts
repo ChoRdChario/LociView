@@ -213,7 +213,10 @@ export class MetadataProjectSession {
       const fs = ports?.fs ?? this.fs, journal = ports ? new TransactionJournal(fs, this.limits) : this.journal;
       const repository = ports ? new MetadataRepository(fs, ports.factory!, this.limits) : this.repository;
       const entries = await journal.entries(), published = entries.filter(e => e.publication).at(-1);
-      await journal.readRestoredBases(entries);
+      const restored = await journal.readRestoredBases(entries).then(result => preparation && result ? {
+        id: result.entry.start.transactionId, parts: result.source.originalChanges(),
+        blobs: result.description.blobs, requiredCapabilities: result.description.requiredCapabilities,
+      } : null);
       const retainedPending = this.retained && !(completedText && this.retained.start.transactionId === completedText && published?.start.transactionId === completedText);
       const pending = entries.some(e => !e.publication) || !!retainedPending || (await this.readSceneAppendStates(fs, journal, entries)).length > 0;
       if (!published) return { read: Object.freeze({ state: pending ? 'pending' : 'empty', source: null, provider: null, publication: null }) };
@@ -231,7 +234,10 @@ export class MetadataProjectSession {
         const partHashes = new Set<string>();
         witness();
         for (const head of entry.publication!.heads) if (!originals.has(head)) fail('published-history-missing');
-        for (const bytes of await journal.validateParts(entry.prepared!)) {
+        // readRestoredBases already matched every restored part byte-for-byte
+        // and validated this manifest against its independently derived inventory.
+        const checkedRestore = restored?.id === entry.start.transactionId ? restored : null;
+        for (const bytes of checkedRestore?.parts ?? await journal.validateParts(entry.prepared!)) {
           const hash = A.decodeChange(bytes).hash;
           partHashes.add(hash);
           const included = originals.get(hash);
@@ -247,7 +253,7 @@ export class MetadataProjectSession {
           await journal.validateRemote(entry.prepared!, base!);
         }
         for (const ref of entry.prepared!.stagedBlobs ?? []) { witness(); acknowledged.add(blobKey(ref)); }
-        const incoming = await journal.receivedInfo(entry.prepared!);
+        const incoming = checkedRestore ?? await journal.receivedInfo(entry.prepared!);
         checkRequiredCapabilities(entry.start.requiredCapabilities, capabilityUnion(inheritedCapabilities, source!.requiredCapabilitiesForChanges(partHashes), incoming.requiredCapabilities));
         inheritedCapabilities = readRequiredCapabilities(entry.start.requiredCapabilities);
         for (const ref of incoming.blobs) { witness(); acknowledged.add(`${ref.sha256}:${ref.byteLength}`); }
@@ -395,8 +401,7 @@ export class MetadataProjectSession {
     command: MetadataEdit, expectedToken: string, transactionId: string, editor: LocalEditorContext | undefined, pointProof?: PointAnchorProof,
     preparation?: MetadataReadPorts, witnesses?: { acknowledged?: Set<string>; localChanges?: Set<string> }): Promise<MetadataProjectSession['retained']> {
     const prepared = durable.prepareEdit(expectedToken, command, provider, transactionId, pointProof, editor);
-    const known = new Set(durable.originalChanges().map(b => A.decodeChange(b).hash));
-    const parts = prepared.originalChanges().filter(b => !known.has(A.decodeChange(b).hash));
+    const parts = durable.changesForPreparedEdit(prepared);
     if (!parts.length) return null;
     const facts = await this.prepareModelFacts(durable, prepared);
     if (!facts) await this.checked(prepared, false, preparation, witnesses);
@@ -1281,7 +1286,9 @@ export class MetadataProjectSession {
     // Exact pending changes can coexist with legitimate extra local heads; never rebase or choose a winner.
     await this.measure('resume.final-content', () => this.checked(next, false));
     if (base && start.purpose === 'localCommand') {
-      const restored = base.appendOriginal(parts);
+      // With the checked base as the loaded document, next is exactly this
+      // append. A recovery with other loaded heads still needs its own base.
+      const restored = base === stored ? next : base.appendOriginal(parts);
       await this.verifyDelta(await reactivatedCaptionMedia(base, restored, this.limits), restored.requiredCapabilities.includes(PORTABLE_MEDIA_CAPABILITY) ? restored.mediaRecords() : undefined);
     }
     if (receiveJob) await this.media!.inventory!(await receiveJob.inventory());

@@ -48,6 +48,8 @@ describe('08b editor declarations in original change headers', () => {
     const nextProvider = await readProjectScene(next.read(), limits, developmentContentVerifier([]));
     const unchanged = next.prepareEdit(next.token, { kind: 'editCaption', captionId: id('cap'), edits: { title: 'shared edit' } }, nextProvider, 'b'.repeat(32), undefined, context);
     expect(unchanged.originalChanges()).toEqual(next.originalChanges());
+    expect(next.changesForPreparedEdit(unchanged)).toEqual([]);
+    expect(source.changesForPreparedEdit(next)).toEqual(next.originalChanges().filter(bytes => A.decodeChange(bytes).hash === declaration.changeId));
     expect(ProjectMetadataSource.fromFullSource(next.encodeFullSource(), next.proof, limits).editorDeclarations()).toEqual(next.editorDeclarations());
     expect(next.originalChanges().filter(b => source.originalChanges().some(old => A.decodeChange(old).hash === A.decodeChange(b).hash))).toEqual(source.originalChanges());
   });

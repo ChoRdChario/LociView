@@ -3096,16 +3096,51 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
   it('checks the selected restore at lease entry and again before the first text write', async () => {
     const f = await restoredBodyFixture(), host = owned(await openValidationHost(f.options));
     const list = vi.spyOn(f.base, 'list'), write = f.base.writeText.bind(f.base);
+    const stream = vi.spyOn(f.base, 'readStream');
+    const families = ['/metadata/evidence/', '/cas/sha256/', '/cas/objects/'];
+    let preparationReads: string[][] = [];
     let checksBeforeFirstWrite: number | undefined;
     const writer = vi.spyOn(f.base, 'writeText').mockImplementation(async (path, value) => {
-      if (path.endsWith('/staging.json') && checksBeforeFirstWrite === undefined)
+      if (path.endsWith('/staging.json') && checksBeforeFirstWrite === undefined) {
         checksBeforeFirstWrite = list.mock.calls.filter(([prefix]) => prefix.endsWith('/v2/local-restore/')).length;
+        preparationReads = families.map(family => stream.mock.calls.map(([name]) => name).filter(name => name.includes(family)));
+      }
       await write(path, value);
     });
     try {
       await host.dispatch(host.read().source!.token, { kind: 'editCaption', captionId: f.captionId, edits: { body: '一度の準備で確定する本文' } });
       expect(checksBeforeFirstWrite).toBe(2);
-    } finally { writer.mockRestore(); list.mockRestore(); }
+      for (const paths of preparationReads) {
+        expect(paths.length).toBeGreaterThan(0);
+        expect(new Set(paths).size).toBe(paths.length);
+        for (const path of paths) expect(stream.mock.calls.filter(([name]) => name === path).length).toBeGreaterThan(1);
+      }
+    } finally { writer.mockRestore(); stream.mockRestore(); list.mockRestore(); }
+  });
+  it.each(['evidence', 'original'] as const)('refuses publication after losing pre-checked %s, then cold-recovers the edit once', async missing => {
+    const f = await restoredBodyFixture(), host = owned(await openValidationHost(f.options));
+    const paths = await f.base.list(''), original = host.read().source!;
+    const target = paths.find(p => p.includes(missing === 'evidence' ? '/metadata/evidence/' : '/cas/objects/'))!;
+    const bytes = (await f.base.readBytes(target))!;
+    expect(bytes.length).toBeGreaterThan(0);
+    const write = f.base.writeText.bind(f.base);
+    const cut = vi.spyOn(f.base, 'writeText').mockImplementation(async (path, value) => {
+      await write(path, value);
+      if (path.endsWith('/blobsVerified.json')) await f.base.remove(target);
+    });
+    const body = '原本と検査記録を戻したあとで一度だけ確定';
+    try {
+      await expect(host.dispatch(original.token, { kind: 'editCaption', captionId: f.captionId, edits: { body } })).rejects.toThrow();
+      expect(host.read().source?.token).toBe(original.token);
+      expect((await f.base.list('')).filter(p => p.endsWith('/published.json')).sort()).toEqual(paths.filter(p => p.endsWith('/published.json')).sort());
+    } finally { cut.mockRestore(); await host.dispose(); }
+    await f.base.writeBytes(target, bytes);
+    const reopened = owned(await openValidationHost(f.options));
+    expect(reopened.read().state).toBe('pending');
+    await reopened.authority.retry!();
+    const result = reopened.read();
+    expect(result.source!.originalChanges()).toHaveLength(f.changes.length + 1);
+    expect(validatedResumeReading(result, f.run)?.records.find(c => c.id === f.captionId)?.body).toBe(body);
   });
   it.each(['changed', 'unchanged'] as const)('refuses %s text if the restore receipt changes during preparation, then permits a fresh edit', async mode => {
     const f = await restoredBodyFixture(), host = owned(await openValidationHost(f.options));

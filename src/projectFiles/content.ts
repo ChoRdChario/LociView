@@ -49,6 +49,7 @@ export class ValidationContent implements MetadataMediaPort {
   displayDimensions(bytes:Uint8Array,mime:string){return mediaDisplayDimensions(bytes,mime,this.limits,this.rasterResources);}
   private readonly preparedImages = new Map<string, Awaited<ReturnType<typeof prepareValidationMedia>>>();
   private readonly preparedModels = new Map<string, Awaited<ReturnType<typeof prepareValidationModel>>>();
+  private readonly textVerifiers = new WeakMap<MetadataReadPorts, PersistentContentVerifier>();
   readonly limits: FileValidationLimits;
   readonly policy: ProjectFilePolicy;
   constructor(private readonly fs: ProjectWorkspaceFS, readonly store: OriginBlobStore,
@@ -284,9 +285,13 @@ export class ValidationContent implements MetadataMediaPort {
   verifier(allowNewEvidence: boolean, timing?: ContentEvidenceTiming, preparation?: MetadataReadPorts): PersistentContentVerifier {
     if (preparation && allowNewEvidence) throw Error('text-preparation-read-only');
     const fs = preparation ? textPreparationFS(this.fs, preparation) : this.fs;
+    const existing = preparation && this.textVerifiers.get(preparation);
+    if (existing) return existing;
     const executor: ProjectContentVerifier = { scope: 'development-validation', verify: q => this.execute(q) };
-    return new PersistentContentVerifier(fs, validationMetadataLimits, executor, 'validation-glb-png-executor-1',
-      blobInventory(this.store, validationMetadataLimits), allowNewEvidence, timing);
+    const verifier = new PersistentContentVerifier(fs, validationMetadataLimits, executor, 'validation-glb-png-executor-1',
+      blobInventory(this.store, validationMetadataLimits, preparation), allowNewEvidence, timing, preparation);
+    if (preparation) this.textVerifiers.set(preparation, verifier);
+    return verifier;
   }
   private async execute(input: ContentRequest, prepared?: { model?: ValidatedModel; image?: Uint8Array }, readOnly = false) {
     const request = cloneCanonicalValue(input, validationMetadataLimits) as unknown as ContentRequest;

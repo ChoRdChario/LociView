@@ -89,7 +89,9 @@ export function validationProjectService(fs: ProjectWorkspaceFS, storage: Metada
   timing?: import('../projectMetadata/session').MetadataTiming) {
   const content = new ValidationContent(fs, store, limits, decode, checkContentRead, jpeg, photo,mediaDecoders);
   return { content, session: new MetadataProjectSession(fs, storage, metadataLimits,
-    (allow, preparation) => content.verifier(allow, undefined, preparation), content, validationModelFacts(content, timing), timing) };
+    (allow, preparation) => content.verifier(allow, preparation && timing
+      ? (stage, ms) => timing(`io.text-preparation.${stage}`, ms) : undefined, preparation),
+    content, validationModelFacts(content, timing), timing) };
 }
 /** Capture once; repeated execution uses identical source/IDs/bytes after a failed attempt. */
 export function prepareValidationCreation(input: PreparedValidationProject<ValidationBody>, semanticProfile: 'map1' | 'map2' = 'map1') {

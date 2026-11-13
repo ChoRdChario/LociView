@@ -616,6 +616,8 @@ describe('local generation capabilities (ports only, not backup restore/selectio
       const tx = 'c'.repeat(32), documentKey = 'owned-document', root = metadataPath(scope.fs, `journal/${tx}/`);
       let retiredLease: object;
       let preparation: MetadataReadPorts;
+      let keptVerifier: PersistentContentVerifier;
+      const savedEvidence = await evidence(scope.fs, f.fs);
       await underWriteLease(scope.fs, async lease => {
         retiredLease = lease;
         expect(() => selectedTextCommit(scope.fs, scope.factory, {})).toThrow('text-commit-lease');
@@ -625,10 +627,21 @@ describe('local generation capabilities (ports only, not backup restore/selectio
           expect(textPreparationFS(scope.fs, ports)).toBe(ports.fs);
           expect(() => textPreparationFS(f.fs, ports)).toThrow('text-preparation-owner');
           expect(() => textPreparationFS(scope.fs, { ...ports })).toThrow('text-preparation-owner');
+          const makeVerifier = (p: MetadataReadPorts) => new PersistentContentVerifier(ports.fs, limits,
+            { scope: 'development-fixture', verify: savedEvidence.execute }, 'readonly-evidence-fixture-1',
+            { inspect: savedEvidence.inspect }, false, undefined, p);
+          expect(() => makeVerifier({ ...ports })).toThrow('text-preparation-owner');
+          keptVerifier = makeVerifier(ports);
+          expect(await keptVerifier.hasEvidence(savedEvidence.request)).toBe(true);
+          const next = { ...savedEvidence.request, token: 'edited-source' };
+          expect(await keptVerifier.verify(next)).toMatchObject({ request: next, outcome: 'verified' });
+          expect(await keptVerifier.hasEvidence({ ...next, context: { different: true } })).toBe(false);
           await expect(ports.fs.writeText(root+'staging.json', '{}')).rejects.toThrow('generation-read-only');
           await expect(ports.factory!().save([documentKey], new Uint8Array())).rejects.toThrow('generation-read-only');
         });
         expect(() => textPreparationFS(scope.fs, preparation!)).toThrow('text-preparation-owner');
+        await expect(keptVerifier!.hasEvidence(savedEvidence.request)).rejects.toThrow('text-preparation-owner');
+        await expect(keptVerifier!.verify(savedEvidence.request)).rejects.toThrow('text-preparation-owner');
         await expect(preparation!.fs.readStream(root+'staging.json')).rejects.toThrow('generation-read-expired');
         await expect(commit(tx, documentKey, async () => {})).rejects.toThrow('text-commit-phase');
         await commit(tx, documentKey, async ports => {

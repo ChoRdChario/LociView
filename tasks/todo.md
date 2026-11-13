@@ -1,6 +1,6 @@
 # LociView active work
 
-Updated2026-11-13. This is the single current plan and check record.
+Updated2026-11-14. This is the single current plan and check record.
 [Inventory](implementation-inventory.md) owns route-specific coverage;
 [map](../PROJECT_MAP.md) and [document index](../docs/README.md) route contracts/code.
 Git owns checkpoint identity. [Retained checkpoint evidence](../docs/history/development-through-2026-10-29/tasks/todo-before-daily-authoring.md)
@@ -9,6 +9,47 @@ retain qualifications and failures. Their Current/Next headings are not an activ
 queue or renewed approval requirements.
 
 ## Current — editing one record and sharing selected scenes
+
+- Ki-84 body edit, baseline `ac5102d`. Each of 44 distinct content receipts,
+  43 Origin receipts and 43 originals is now opened once during preparation.
+  The source/edited providers validate their own token, records, facts and
+  original presence. The edit also reuses its freshly checked restore parts and
+  manifest inventory. Each post-write phase and cold recovery uses fresh reads.
+- Dedicated Chromium 156 on Windows, 1280×720, isolated restored profiles, same
+  source and history, alternating builds, three runs each. Apply to the first
+  staging write (seconds): 3.561/3.509/3.435 → 1.957/2.154/2.126. Apply to
+  visible acknowledgment: 8.619/8.004/7.548 → 5.938/6.933/6.002.
+  Content-receipt elapsed totals (ms): 748/731/807 → 236/224/262.
+  Original-presence elapsed totals, including suspect-marker, receipt and size:
+  854/762/873 → 280/256/310. Stage times are not additive with wall time.
+- Before the first write, non-control metadata/Origin readStream calls:
+  290 → 151 (291 in the earlier measurement, including an overlapping UI read).
+  Corresponding readBytes calls: 198 → 17. Successful native file snapshots
+  for content receipts, Origin receipts and originals: 176+176+88 → 44+43+43.
+  These counts exclude unrelated control reads. All six external files preserved
+  43 original body hashes and three original changes plus the one text edit;
+  the edited text reopened in a newly launched browser. Median download handoff
+  30.636 → 29.082 s and cold launch to the chosen text 32.902 → 32.932 s.
+- A first cache-only pilot still opened each receipt twice. The next iteration
+  consumed the same bounded snapshot for size and content and removed repeat
+  restore evidence reads. The final local edit extracts its exact delta and
+  reuses an identical in-memory history reconstruction only when the base is
+  the same object. Missing inputs fail before staging; losing evidence or an
+  original after staging prevents publication and a cold retry applies once.
+- Verification: the six Ki-84 journeys and five PC/touch browser checks passed,
+  including an actual renderer crash before staging and another before
+  publication. The first full run found two diagnostic-order assertions and
+  one file-specific import-boundary mismatch. After correction all three
+  passed. Final checkpoint: 156 suites, 3,542 passing, 16 expected failures,
+  21 todo, five builds and offline isolation passed. HEIC isolation passed for
+  all five artifacts. The final diagnostic/import correction preserves the
+  measured edit path. Physical iPhone testing was outside this measurement.
+- Next: six seconds still interrupts ordinary writing. Profile the confirmed
+  edit after staging: final-content, saved-content and published readback took
+  0.836, 0.733 and 1.234 s (candidate medians). Evaluate how much of each
+  independent inspection must traverse unchanged records for a scalar text
+  change; keep the durable edited bytes, publication and recovery independent.
+  Physical iPhone Safari timings remain open.
 
 - Measure a restored Ki-84 body edit from the Apply click to its first journal
   write. Attribute selection checks to the edit and independent readers. Group
@@ -41,9 +82,7 @@ queue or renewed approval requirements.
   hit the 20-minute aggregate limit after verifying offline restoration and
   editing. The isolated browser run of that exact scenario, under the same
   limit, completed the return to static and exact histories in 10.3 minutes.
-  Next: attribute the other 291 pre-write file opens and separate the time
-  spent rereading content receipts, checking original presence, and validating
-  the edited document. The phone's native Safari timing remains unmeasured.
+  The subsequent breakdown of those pre-write reads is recorded above.
 
 - Use the restored Ki-84 daily edit as the baseline. Count restore-control opens
   and measure the visible edit, external backup and cold reopening. Preserve fresh

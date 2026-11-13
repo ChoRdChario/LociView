@@ -1,7 +1,7 @@
 import { parseJsonWithoutDuplicateMembers } from '../core/json';
 import { canonical } from '../domain/projectGraphSupport';
 import { cloneCanonicalValue, type JsonValue } from '../domain/values';
-import type { ProjectWorkspaceFS, ProjectMutationAuthority } from '../platform/fs';
+import type { ProjectWorkspaceFS, ProjectMutationAuthority, WorkspaceReadableFile } from '../platform/fs';
 import type { MetadataStorageFactory } from './repository';
 import { fail, type MetadataLimits } from './format';
 
@@ -23,6 +23,30 @@ export async function readReceipt<T>(fs: ProjectWorkspaceFS, path: string, limit
   const bytes = await fs.readBytes(path);
   if (!bytes || bytes.length !== file.size) return fail('receipt-read');
   return decodeReceipt<T>(bytes, limits);
+}
+
+/** Consume exactly the declared bytes of the receipt opened for this inspection. */
+export async function readReceiptSnapshot<T>(file: WorkspaceReadableFile | null, limits: MetadataLimits): Promise<T | null> {
+  if (!file) return null;
+  if (file.size > limits.maxTotalBytes) fail('receipt-budget');
+  if (!Number.isSafeInteger(file.size) || file.size < 0) fail('receipt-read');
+  const bytes = new Uint8Array(file.size), reader = file.stream().getReader();
+  let offset = 0, failed = false, failure: unknown, value!: T;
+  try {
+    for (;;) {
+      const part = await reader.read(); if (part.done) break;
+      if (!(part.value instanceof Uint8Array) || !part.value.length || part.value.length > bytes.length - offset) fail('receipt-read');
+      bytes.set(part.value, offset); offset += part.value.length;
+    }
+    if (offset !== file.size) fail('receipt-read');
+    value = decodeReceipt<T>(bytes, limits);
+  } catch (error) { failed = true; failure = error; }
+  finally {
+    try { await reader.cancel(); } catch (error) { if (!failed) { failed = true; failure = error; } }
+    try { reader.releaseLock(); } catch (error) { if (!failed) { failed = true; failure = error; } }
+  }
+  if (failed) throw failure;
+  return value;
 }
 
 /** Pure local-receipt decoding; callers retain ownership of fresh, bounded I/O. */
@@ -59,12 +83,20 @@ export interface TextCommitPorts extends MetadataReadPorts {
   assertCanAcknowledge(): void;
 }
 type TextCommitOperation = <T>(transaction: string, documentKey: string, action: (ports: TextCommitPorts) => Promise<T>) => Promise<T>;
-const preparationOwners = new WeakMap<MetadataReadPorts, ProjectWorkspaceFS>();
+const preparationOwners = new WeakMap<MetadataReadPorts, { fs: ProjectWorkspaceFS; assertLive(): void }>();
 export function textPreparationFS(owner: ProjectWorkspaceFS, ports: MetadataReadPorts) {
-  if (preparationOwners.get(ports) !== owner) return fail('text-preparation-owner');
+  const binding = preparationOwners.get(ports);
+  if (!binding || binding.fs !== owner) return fail('text-preparation-owner');
+  binding.assertLive();
   return ports.fs;
 }
-type TextPreparation = <T>(action: (ports: MetadataReadPorts) => Promise<T>, assertLease: () => void) => Promise<T>;
+/** An Origin reader has its own filesystem; only a live edit can request its single-snapshot check. */
+export function assertTextPreparation(ports: MetadataReadPorts) {
+  const binding = preparationOwners.get(ports);
+  if (!binding) return fail('text-preparation-owner');
+  binding.assertLive();
+}
+type TextPreparation = <T>(action: (ports: MetadataReadPorts & Pick<TextCommitPorts, 'assertCanAcknowledge'>) => Promise<T>, assertLease: () => void) => Promise<T>;
 type BoundTextCommit = <T>(transaction: string, documentKey: string, action: (ports: TextCommitPorts) => Promise<T>, assertLease: () => void) => Promise<T>;
 const textCommits = new WeakMap<ProjectWorkspaceFS, { factory: MetadataStorageFactory; enabled(): boolean; prepare: TextPreparation; run: BoundTextCommit }>();
 export function registerTextCommit(fs: ProjectWorkspaceFS, factory: MetadataStorageFactory,
@@ -83,7 +115,7 @@ export function selectedTextCommit(fs: ProjectWorkspaceFS, factory: MetadataStor
   const write: TextCommitOperation = (transaction, key, action) => entry.run(transaction, key, action, assertLease);
   const prepare = <T>(action: (ports: MetadataReadPorts) => Promise<T>) => entry.prepare(async ports => {
     const reader = Object.freeze({ fs: ports.fs, factory: ports.factory });
-    preparationOwners.set(reader, fs);
+    preparationOwners.set(reader, { fs, assertLive: ports.assertCanAcknowledge });
     try { return await action(reader); } finally { preparationOwners.delete(reader); }
   }, assertLease);
   return { prepare, write };

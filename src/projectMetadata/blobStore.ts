@@ -3,7 +3,7 @@ import { ProjectMutationCoordinator } from '../platform/projectLock';
 import { ProjectRecordFields } from '../domain/projectRecordFields';
 import { cloneCanonicalValue, type JsonObject } from '../domain/values';
 import { checkLimits, type MetadataLimits } from './format';
-import { newId, readReceipt, underWriteLease, writeReceipt } from './persistence';
+import { assertTextPreparation, newId, readReceipt, readReceiptSnapshot, underWriteLease, writeReceipt, type MetadataReadPorts } from './persistence';
 import { BlobStoreError, checkedBlobStream, storedBlobStream, type BlobDigest, type BlobStreamLimits } from './blobStream';
 
 export interface StoredBlobRef extends BlobDigest { readonly algorithm: 'sha256'; readonly mediaType: string }
@@ -36,8 +36,10 @@ export class OriginBlobStore {
     if (c.unknown) throw new BlobStoreError('invalid');
     return Object.freeze(value as unknown as StoredBlobRef);
   }
-  private async receipt(fs: ProjectWorkspaceFS, ref: StoredBlobRef): Promise<Receipt | null> {
-    const r = await readReceipt<Receipt>(fs, receiptPath(ref.digest), this.limits.metadata);
+  private async receipt(fs: ProjectWorkspaceFS, ref: StoredBlobRef, singleSnapshot = false): Promise<Receipt | null> {
+    const path = receiptPath(ref.digest);
+    const r = singleSnapshot ? await readReceiptSnapshot<Receipt>(await fs.readStream(path), this.limits.metadata)
+      : await readReceipt<Receipt>(fs, path, this.limits.metadata);
     if (r && (Object.keys(r).sort().join(',') !== 'byteLength,digest,objectId,version' || r.version !== 'cas-object-1' ||
       r.digest !== ref.digest || r.byteLength !== ref.byteLength || typeof r.objectId !== 'string' || !/^[0-9a-f]{32}$/.test(r.objectId))) throw new BlobStoreError('corrupt');
     return r;
@@ -101,13 +103,16 @@ export class OriginBlobStore {
       return ref;
     });
   }
-  async inspect(input: JsonObject | StoredBlobRef): Promise<BlobPresence> {
-    return (await this.observe(this.ref(input))).presence;
+  async inspect(input: JsonObject | StoredBlobRef, preparation?: MetadataReadPorts): Promise<BlobPresence> {
+    if (preparation) assertTextPreparation(preparation);
+    const { presence } = await this.observe(this.ref(input), !!preparation);
+    if (preparation) assertTextPreparation(preparation);
+    return presence;
   }
-  private async observe(ref: StoredBlobRef): Promise<BlobObservation> {
+  private async observe(ref: StoredBlobRef, singleSnapshot = false): Promise<BlobObservation> {
     try {
       if (this.suspect.has(ref.digest) || await this.readFS.exists(suspectPath(ref.digest))) return { presence: 'suspect' };
-      const r = await this.receipt(this.readFS, ref); if (!r) return { presence: 'unverified' };
+      const r = await this.receipt(this.readFS, ref, singleSnapshot); if (!r) return { presence: 'unverified' };
       const file = await this.readFS.readStream(objectPath(r.objectId));
       if (!file) return { presence: 'missing' };
       if (file.size !== ref.byteLength) return { presence: 'suspect' };

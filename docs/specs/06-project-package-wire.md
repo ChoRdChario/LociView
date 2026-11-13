@@ -3225,6 +3225,12 @@ For a title/body edit on this same completed generation, the lease's entry
 check also opens the read-only preparation interval. The review-copy slot,
 published base, current provider and prepared provider use its confined reader.
 Original changes, evidence receipts and Origin inventory are still inspected.
+Within this single pre-write interval, identical content evidence (executor
+version, scope, fact, records and context) and identical full Origin BlobRefs
+may each be checked once. Rebind evidence to the current request and validate
+its facts. Receipt presence alone never establishes original-file presence.
+An observation expires with this edit's preparation. A file changed after its
+observation is sampled again by the independent post-write checks.
 Only a single local change without a model-fact plan can enter the text writer.
 The fresh write-entry fence closes preparation before the Session retains a
 transaction. An unchanged edit is accepted only after the fresh lease exit.
