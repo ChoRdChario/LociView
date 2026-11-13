@@ -3221,6 +3221,16 @@ single bound document in its corresponding stage. Every write retains authority
 checks and its existing readback. A successful UI acknowledgment follows the
 closing lease check. A separate operation cannot borrow these ports.
 
+For a title/body edit on this same completed generation, the lease's entry
+check also opens the read-only preparation interval. The review-copy slot,
+published base, current provider and prepared provider use its confined reader.
+Original changes, evidence receipts and Origin inventory are still inspected.
+Only a single local change without a model-fact plan can enter the text writer.
+The fresh write-entry fence closes preparation before the Session retains a
+transaction. An unchanged edit is accepted only after the fresh lease exit.
+Preparation has no journal or storage writer and expires when its callback exits.
+Cold recovery and all post-write checks retain the preceding contract.
+
 On ordinary host/catalog reopening of an already selected, completed restore,
 a later prepared local text edit may be handed to strict recovery. The last
 published provider, original restore evidence, protected bodies and exact

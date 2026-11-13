@@ -1,4 +1,4 @@
-import { issuePointAnchorProof } from './pointAnchorProof';
+import { issuePointAnchorProof, type PointAnchorProof } from './pointAnchorProof';
 import { recordBlobRefs } from '../domain/portableMedia';
 import { captureEditor, type LocalEditorContext } from './editorAttribution';
 import { capabilityFields, capabilityUnion, readRequiredCapabilities, checkRequiredCapabilities, EDITOR_CAPABILITY, PORTABLE_MEDIA_CAPABILITY, hasEditorCapability, hasPortableMediaCapability, type ReaderCapabilities } from './requiredCapabilities';
@@ -60,7 +60,7 @@ export interface MetadataMediaPort {
   verify(blobs: readonly JsonObject[], mediaRecords?: readonly JsonObject[]): Promise<void>;
   inventory?(blobs: readonly JsonObject[]): Promise<void>;
   /** Owned evidence/presence witness; never accepts an incoming verified bit. */
-  retained?(record: JsonObject): Promise<boolean>;
+  retained?(record: JsonObject, preparation?: MetadataReadPorts): Promise<boolean>;
 }
 export interface MetadataModelFactPlan { readonly baseToken: string | null; readonly finalToken: string; readonly stagedBlobs?: readonly JsonObject[]; stage(): Promise<void> }
 export interface MetadataModelFactPort { preparePointAnchor?(source: ProjectMetadataSource, provider: Extract<ProjectProviderRead, { kind: 'scene-provider' }>, command: Extract<MetadataEdit, { kind: 'addPin' | 'movePin' }>): Promise<Anchor>;
@@ -157,7 +157,7 @@ export class MetadataProjectSession {
   private last: MetadataSessionRead = { state: 'empty', source: null, provider: null, publication: null };
   constructor(private readonly fs: ProjectWorkspaceFS, private readonly storage: MetadataStorageFactory, limits: MetadataLimits,
     /** Owned verifier, fresh durable inventory/evidence per request. Boolean permits initial fact creation only. */
-    private readonly verifier: (allowNewEvidence: boolean) => ProjectContentVerifier,
+    private readonly verifier: (allowNewEvidence: boolean, preparation?: MetadataReadPorts) => ProjectContentVerifier,
     private readonly media?: MetadataMediaPort, private readonly modelFacts?: MetadataModelFactPort, private readonly timing?: MetadataTiming) {
     this.limits = checkLimits(limits); this.repository = new MetadataRepository(fs, storage, this.limits);
     this.journal = new TransactionJournal(fs, this.limits);
@@ -205,7 +205,7 @@ export class MetadataProjectSession {
       } finally { active = false; await Promise.allSettled([...pending]); }
     });
   }
-  private async readCandidate(integrity?: OutputIntegrityRead, ports?: MetadataReadPorts, editingText = false, completedText?: string, requireReadyPublished = false): Promise<{
+  private async readCandidate(integrity?: OutputIntegrityRead, ports?: MetadataReadPorts, editingText = false, completedText?: string, requireReadyPublished = false, preparation?: MetadataReadPorts): Promise<{
     read: MetadataSessionRead; acknowledged?: Set<string>; localChanges?: Set<string>; publishedStart?: JournalStart
   }> {
     try {
@@ -253,7 +253,7 @@ export class MetadataProjectSession {
         for (const ref of incoming.blobs) { witness(); acknowledged.add(`${ref.sha256}:${ref.byteLength}`); }
       }
       checkRequiredCapabilities(published.start.requiredCapabilities, capabilityUnion(inheritedCapabilities, source!.requiredCapabilities));
-      const provider = await readProjectScene(source!.read(), this.limits, this.verifier(false), { verifyRetainedMedia: this.retainedSelection(source!, acknowledged, localChanges) });
+      const provider = await readProjectScene(source!.read(), this.limits, this.verifier(false, preparation), { verifyRetainedMedia: this.retainedSelection(source!, acknowledged, localChanges, preparation) });
       if (pending && requireReadyPublished && !this.providerReady(provider)) fail('provider-not-ready');
       return { read: Object.freeze({ state: pending ? 'pending' : this.providerReady(provider) ? 'ready' : 'repair-required',
         source: source!, provider, publication: published.start.transactionId }), acknowledged, localChanges, publishedStart: published.start };
@@ -264,13 +264,14 @@ export class MetadataProjectSession {
   }
 
   /** Full current provider/content closure, never only a materialized Caption record. */
-  private async checked(source: ProjectMetadataSource, allowNewEvidence: boolean): Promise<ProjectProviderRead> {
-    const provider = await readProjectScene(source.read(), this.limits, this.verifier(allowNewEvidence), {
-      verifyRetainedMedia: allowNewEvidence && !!this.media ? true : this.retainedSelection(source) });
+  private async checked(source: ProjectMetadataSource, allowNewEvidence: boolean, preparation?: MetadataReadPorts,
+    witnesses?: { acknowledged?: Set<string>; localChanges?: Set<string> }): Promise<ProjectProviderRead> {
+    const provider = await readProjectScene(source.read(), this.limits, this.verifier(allowNewEvidence, preparation), {
+      verifyRetainedMedia: allowNewEvidence && !!this.media ? true : this.retainedSelection(source, witnesses?.acknowledged, witnesses?.localChanges, preparation) });
     if (!this.providerReady(provider) || provider.kind !== 'scene-provider' || provider.token !== source.token) fail('provider-not-ready');
     return provider;
   }
-  private retainedSelection(source: ProjectMetadataSource, media = this.acknowledgedMedia, local = this.acknowledgedLocalChanges) {
+  private retainedSelection(source: ProjectMetadataSource, media = this.acknowledgedMedia, local = this.acknowledgedLocalChanges, preparation?: MetadataReadPorts) {
     const acknowledged = new Set(media); let work = 0;
     for (const change of source.read().history.changes) {
       if (++work > this.limits.maxWork) fail('retained-media-limit');
@@ -285,7 +286,7 @@ export class MetadataProjectSession {
       }
     }
     return async (record: JsonObject): Promise<boolean> => !!this.media &&
-      (recordBlobRefs(record).every(ref=>acknowledged.has(blobKey(ref))) || (this.media.retained ? await this.media.retained(record) : true));
+      (recordBlobRefs(record).every(ref=>acknowledged.has(blobKey(ref))) || (this.media.retained ? await this.media.retained(record, preparation) : true));
   }
   private providerReady(provider: ProjectProviderRead): boolean {
     if(!metadataProviderReady(provider,this.limits))return false;
@@ -327,8 +328,35 @@ export class MetadataProjectSession {
     command = canonicalMetadataEdit(command, this.limits);
     let acceptText: (() => void) | undefined;
     return underWriteLease(this.fs, async lease => {
+      const isText = command.kind === 'editCaption' && Object.keys(command.edits).every(name => name === 'title' || name === 'body');
+      const commit = isText ? selectedTextCommit(this.fs, this.storage, lease) : undefined;
+      if (commit) {
+        const { candidate, transaction } = await commit.prepare(async ports => {
+          await assertReviewEditSlot(ports.fs, this.limits);
+          const candidate = await this.readCandidate(undefined, ports, true, undefined, false, ports);
+          const { state, source, provider } = candidate.read;
+          if (state !== 'ready' || !source || !provider || source.token !== expectedToken || !candidate.publishedStart) return fail('command-not-ready');
+          if (provider.kind !== 'scene-provider' || provider.token !== source.token) return fail('provider-not-ready');
+          const transaction = await this.prepareEditTransaction(source, provider, candidate.publishedStart, command,
+            expectedToken, newId(), editor, undefined, ports, candidate);
+          return { candidate, transaction };
+        });
+        if (!transaction) {
+          acceptText = () => { this.adoptRead(candidate); };
+          return candidate.read;
+        }
+        if (transaction.modelFacts || transaction.parts.length !== 1) return fail('text-commit-state');
+        const { transactionId, repositoryId } = transaction.start;
+        return commit.write(transactionId, this.repository.documentId(repositoryId), ports => {
+          // The write scope freshly checked the selection. A refused preparation
+          // must leave neither a pending transaction nor an accepted new read.
+          this.adoptRead(candidate);
+          this.retained = transaction;
+          return this.resume(undefined, undefined, { ports, transactionId, ready: accept => { acceptText = accept; } });
+        });
+      }
       await assertReviewEditSlot(this.fs, this.limits);
-      const candidate = command.kind === 'editCaption' && Object.keys(command.edits).every(name => name === 'title' || name === 'body')
+      const candidate = isText
         ? await withMetadataRead(this.fs, this.storage, ports => this.readCandidate(undefined, ports, true))
         : undefined;
       const read = candidate ? this.adoptRead(candidate) : await this.read();
@@ -356,22 +384,27 @@ export class MetadataProjectSession {
         if (json(owned) !== json(command.anchor)) fail('point-anchor-position');
         pointProof = issuePointAnchorProof(durable, command, transactionId);
       }
-      const prepared = durable.prepareEdit(expectedToken, command, provider, transactionId, pointProof, editor);
-      const known = new Set(durable.originalChanges().map(b => A.decodeChange(b).hash));
-      const parts = prepared.originalChanges().filter(b => !known.has(A.decodeChange(b).hash));
-      if (!parts.length) return read; // An unchanged value has no storage transaction.
-      const facts = await this.prepareModelFacts(durable, prepared);
-      if (!facts) await this.checked(prepared, false); // Refused preparation must not become a pending save.
-      await this.verifyDelta(await reactivatedCaptionMedia(durable, prepared, this.limits), prepared.requiredCapabilities.includes(PORTABLE_MEDIA_CAPABILITY) ? prepared.mediaRecords() : undefined);
-      this.retained = { start: { transactionId, repositoryId: prior.repositoryId, predecessor: prior.transactionId,
-        purpose: 'localCommand', proof: durable.proof, baseHeads: durable.heads,
-        ...capabilityFields(capabilityUnion(readRequiredCapabilities(prior.requiredCapabilities), prepared.requiredCapabilities)) }, parts,
-        ...(facts ? { modelFacts: { plan: facts, next: prepared }, stagedBlobs: facts.stagedBlobs?.map(b => JSON.parse(json(b)) as JsonObject) } : {}) };
-      const commit = candidate && !facts && parts.length === 1 && selectedTextCommit(this.fs, this.storage, lease);
-      if (commit) return commit(transactionId, this.repository.documentId(prior.repositoryId), ports =>
-        this.resume(undefined, undefined, { ports, transactionId, ready: accept => { acceptText = accept; } }));
+      const transaction = await this.prepareEditTransaction(durable, provider, prior, command, expectedToken, transactionId, editor, pointProof);
+      if (!transaction) return read;
+      this.retained = transaction;
       return this.resume();
     }, () => acceptText?.());
+  }
+
+  private async prepareEditTransaction(durable: ProjectMetadataSource, provider: ProjectProviderRead, prior: JournalStart,
+    command: MetadataEdit, expectedToken: string, transactionId: string, editor: LocalEditorContext | undefined, pointProof?: PointAnchorProof,
+    preparation?: MetadataReadPorts, witnesses?: { acknowledged?: Set<string>; localChanges?: Set<string> }): Promise<MetadataProjectSession['retained']> {
+    const prepared = durable.prepareEdit(expectedToken, command, provider, transactionId, pointProof, editor);
+    const known = new Set(durable.originalChanges().map(b => A.decodeChange(b).hash));
+    const parts = prepared.originalChanges().filter(b => !known.has(A.decodeChange(b).hash));
+    if (!parts.length) return null;
+    const facts = await this.prepareModelFacts(durable, prepared);
+    if (!facts) await this.checked(prepared, false, preparation, witnesses);
+    await this.verifyDelta(await reactivatedCaptionMedia(durable, prepared, this.limits), prepared.requiredCapabilities.includes(PORTABLE_MEDIA_CAPABILITY) ? prepared.mediaRecords() : undefined);
+    return { start: { transactionId, repositoryId: prior.repositoryId, predecessor: prior.transactionId,
+      purpose: 'localCommand', proof: durable.proof, baseHeads: durable.heads,
+      ...capabilityFields(capabilityUnion(readRequiredCapabilities(prior.requiredCapabilities), prepared.requiredCapabilities)) }, parts,
+      ...(facts ? { modelFacts: { plan: facts, next: prepared }, stagedBlobs: facts.stagedBlobs?.map(b => JSON.parse(json(b)) as JsonObject) } : {}) };
   }
 
   /** Accepted full-source receive only. No package wire, new body staging or exchange-base update. */

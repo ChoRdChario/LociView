@@ -10,6 +10,41 @@ queue or renewed approval requirements.
 
 ## Current — editing one record and sharing selected scenes
 
+- Measure a restored Ki-84 body edit from the Apply click to its first journal
+  write. Attribute selection checks to the edit and independent readers. Group
+  the edit's read-only preparation while holding its writer lease, then test
+  refusal before staging, durable readback, interrupted recovery, external backup
+  and cold reopening. Compare with the same input on `12c6c52`.
+- The traced edit owned ten selection checks before writing: one lease entry,
+  two for the review-copy slot, two for reading the published state, two each
+  for the original and edited provider, and one write entry. Four more came
+  from a concurrently finishing conversion-report availability read after open.
+  The edited route now checks selection at lease entry and write entry. The
+  report reader keeps its independent boundary.
+- Isolated Chromium, same restored Ki-84 and interleaved builds, three runs
+  per version. Click to first staging write in seconds: 3.807/3.634/3.610 →
+  3.180/3.048/3.055. All concurrent selection scans: 15/16/15 → 7/7/7;
+  management-file opens: 105/112/105 → 56/55/52. Edit completion in seconds:
+  8.874/8.153/8.088 → 9.074/7.514/7.580. After the first write both builds
+  made eleven selection checks and opened 77 control files on every run.
+  No model/photo rewrites. All six actual ZIPs and independent cold starts
+  preserved the exact edited body, all 43 originals and three original
+  changes plus one edit. External download handoff medians were 34.440 →
+  34.529 s. Cold launch through edited text varied from 74.8 to 92.3 s.
+- Five Desktop browser scenarios passed, including PC/touch capacity and
+  input continuity and actual renderer crashes before staging and publication.
+  The recovery test now waits for the restored project's own title using the
+  existing first-restore completion budget. Two earlier runs stopped during
+  setup at the 15-second control wait. The final build's checkpoint passed
+  (3,540 passing tests, 16 expected failures and 21 todo), plus HEIC isolation.
+  The first offline suite passed seven of eight. Its mixed 500k workflow
+  hit the 20-minute aggregate limit after verifying offline restoration and
+  editing. The isolated browser run of that exact scenario, under the same
+  limit, completed the return to static and exact histories in 10.3 minutes.
+  Next: attribute the other 291 pre-write file opens and separate the time
+  spent rereading content receipts, checking original presence, and validating
+  the edited document. The phone's native Safari timing remains unmeasured.
+
 - Use the restored Ki-84 daily edit as the baseline. Count restore-control opens
   and measure the visible edit, external backup and cold reopening. Preserve fresh
   authority at every write, durable readback, publication and recovery decision.

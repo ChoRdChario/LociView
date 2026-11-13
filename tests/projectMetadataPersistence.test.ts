@@ -5,7 +5,7 @@ import { MetadataProjectSession, measureMetadata, type MetadataSessionRead } fro
 import { MetadataRepository, type MetadataStorageFactory, type MetadataStoragePort } from '../src/projectMetadata/repository';
 import { PersistentContentVerifier, type VerifiedInventoryPort } from '../src/projectMetadata/contentEvidence';
 import { TransactionJournal } from '../src/projectMetadata/journal';
-import { digest, json, jsonDigest, metadataPath, selectedTextCommit, underWriteLease, withMetadataRead, writeReceipt, type TextCommitPorts } from '../src/projectMetadata/persistence';
+import { digest, json, jsonDigest, metadataPath, selectedTextCommit, textPreparationFS, underWriteLease, withMetadataRead, writeReceipt, type MetadataReadPorts, type TextCommitPorts } from '../src/projectMetadata/persistence';
 import type { ContentRequest, ProjectContentVerifier } from '../src/domain/projectContentChecks';
 import { ProjectMetadataSource, type MetadataLimits } from '../src/projectMetadata/source';
 import { planRemoteChanges, type FullMetadataSource } from '../src/projectMetadata/remote';
@@ -615,10 +615,21 @@ describe('local generation capabilities (ports only, not backup restore/selectio
     try {
       const tx = 'c'.repeat(32), documentKey = 'owned-document', root = metadataPath(scope.fs, `journal/${tx}/`);
       let retiredLease: object;
+      let preparation: MetadataReadPorts;
       await underWriteLease(scope.fs, async lease => {
         retiredLease = lease;
         expect(() => selectedTextCommit(scope.fs, scope.factory, {})).toThrow('text-commit-lease');
-        const commit = selectedTextCommit(scope.fs, scope.factory, lease)!;
+        const { prepare, write: commit } = selectedTextCommit(scope.fs, scope.factory, lease)!;
+        await prepare(async ports => {
+          preparation = ports;
+          expect(textPreparationFS(scope.fs, ports)).toBe(ports.fs);
+          expect(() => textPreparationFS(f.fs, ports)).toThrow('text-preparation-owner');
+          expect(() => textPreparationFS(scope.fs, { ...ports })).toThrow('text-preparation-owner');
+          await expect(ports.fs.writeText(root+'staging.json', '{}')).rejects.toThrow('generation-read-only');
+          await expect(ports.factory!().save([documentKey], new Uint8Array())).rejects.toThrow('generation-read-only');
+        });
+        expect(() => textPreparationFS(scope.fs, preparation!)).toThrow('text-preparation-owner');
+        await expect(preparation!.fs.readStream(root+'staging.json')).rejects.toThrow('generation-read-expired');
         await expect(commit(tx, documentKey, async () => {})).rejects.toThrow('text-commit-phase');
         await commit(tx, documentKey, async ports => {
           escaped = ports;
@@ -639,7 +650,7 @@ describe('local generation capabilities (ports only, not backup restore/selectio
       await expect(escaped!.fs.readBytes(root+'staging.json')).rejects.toThrow('generation-read-expired');
       const accepted = vi.fn();
       await expect(underWriteLease(scope.fs, async lease => {
-        await selectedTextCommit(scope.fs, scope.factory, lease)!(tx, documentKey, async ports => {
+        await selectedTextCommit(scope.fs, scope.factory, lease)!.write(tx, documentKey, async ports => {
           escaped = ports;
           await ports.advance('repository'); await ports.advance('publication'); await ports.advance('readback');
         });
@@ -649,7 +660,7 @@ describe('local generation capabilities (ports only, not backup restore/selectio
       expect(accepted).not.toHaveBeenCalled(); ordinary = true;
       await underWriteLease(scope.fs, async lease => {
         expect(() => selectedTextCommit(scope.fs, scope.factory, retiredLease)).toThrow('text-commit-lease');
-        await expect(selectedTextCommit(scope.fs, scope.factory, lease)!(tx, documentKey, async ports => {
+        await expect(selectedTextCommit(scope.fs, scope.factory, lease)!.write(tx, documentKey, async ports => {
           ordinary = false; await ports.fs.readText(root+'staging.json');
         })).rejects.toThrow('text-commit-expired');
         expect(selectedTextCommit(scope.fs, scope.factory, lease)).toBeUndefined();

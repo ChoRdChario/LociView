@@ -3093,6 +3093,62 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     await expect(openValidationHost(f.options)).rejects.toThrow();
     expect((await f.base.list('')).filter(p => p.endsWith('/published.json'))).toEqual(publications);
   });
+  it('checks the selected restore at lease entry and again before the first text write', async () => {
+    const f = await restoredBodyFixture(), host = owned(await openValidationHost(f.options));
+    const list = vi.spyOn(f.base, 'list'), write = f.base.writeText.bind(f.base);
+    let checksBeforeFirstWrite: number | undefined;
+    const writer = vi.spyOn(f.base, 'writeText').mockImplementation(async (path, value) => {
+      if (path.endsWith('/staging.json') && checksBeforeFirstWrite === undefined)
+        checksBeforeFirstWrite = list.mock.calls.filter(([prefix]) => prefix.endsWith('/v2/local-restore/')).length;
+      await write(path, value);
+    });
+    try {
+      await host.dispatch(host.read().source!.token, { kind: 'editCaption', captionId: f.captionId, edits: { body: '一度の準備で確定する本文' } });
+      expect(checksBeforeFirstWrite).toBe(2);
+    } finally { writer.mockRestore(); list.mockRestore(); }
+  });
+  it.each(['changed', 'unchanged'] as const)('refuses %s text if the restore receipt changes during preparation, then permits a fresh edit', async mode => {
+    const f = await restoredBodyFixture(), host = owned(await openValidationHost(f.options));
+    const before = host.read().source!, paths = await f.base.list('');
+    const result = paths.find(path => path.includes('/local-restore/') && path.endsWith('/result.json'))!;
+    const raw = (await f.base.readText(result))!, receipt = JSON.parse(raw);
+    const hash = receipt.detail.selection.sha256;
+    receipt.detail.selection.sha256 = (hash[0] === '0' ? '1' : '0') + hash.slice(1);
+    const altered = json(receipt); expect(altered.length).toBe(raw.length);
+    const read = f.base.readStream.bind(f.base);
+    let changed = false;
+    const spy = vi.spyOn(f.base, 'readStream').mockImplementation(async path => {
+      const file = await read(path);
+      if (!changed && path.includes('/metadata/evidence/')) {
+        changed = true; await f.base.writeText(result, altered);
+      }
+      return file;
+    });
+    const edit = (body: string) => host.dispatch(before.token, { kind: 'editCaption', captionId: f.captionId, edits: { body } });
+    try {
+      await expect(edit(mode === 'unchanged' ? f.body : '準備中の本文')).rejects.toThrow();
+      expect(changed).toBe(true);
+      expect((await f.base.list('')).filter(p => p.includes('/journal/')).sort()).toEqual(paths.filter(p => p.includes('/journal/')).sort());
+    } finally { spy.mockRestore(); await f.base.writeText(result, raw); }
+    const saved = await edit('正しい保存先に一度だけ適用');
+    expect(saved.source!.originalChanges()).toHaveLength(f.changes.length + 1);
+    expect(validatedResumeReading(saved, f.run)?.records.find(c => c.id === f.captionId)?.body).toBe('正しい保存先に一度だけ適用');
+  });
+  it.each(['original', 'evidence'] as const)('refuses a restored body edit before writing when its %s is missing', async missing => {
+    const f = await restoredBodyFixture(), host = owned(await openValidationHost(f.options));
+    const token = host.read().source!.token, paths = await f.base.list('');
+    const journal = () => f.base.list('').then(all => all.filter(p => p.includes('/journal/')).sort());
+    const published = await journal();
+    const command = { kind: 'editCaption', captionId: f.captionId, edits: { body: f.body } } as const;
+    await expect(host.dispatch('outdated', command)).rejects.toThrow();
+    expect((await host.dispatch(token, command)).source!.token).toBe(token);
+    expect(await journal()).toEqual(published);
+    const bodies = paths.filter(path => missing === 'evidence' ? path.includes('/metadata/evidence/') : path.startsWith('v2/cas/objects/'));
+    expect(bodies.length).toBeGreaterThan(0);
+    for (const path of bodies) await f.base.remove(path);
+    await expect(host.dispatch(token, { ...command, edits: { body: 'この変更は保存されない' } })).rejects.toThrow();
+    expect(await journal()).toEqual(published);
+  });
   it('refuses a restored text commit when a same-length restore receipt changes after staging', async () => {
     const f = await restoredBodyFixture(), host = owned(await openValidationHost(f.options)), original = host.read().source!;
     const paths = await f.base.list(''), result = paths.find(path => path.includes('/local-restore/') && path.endsWith('/result.json'))!;

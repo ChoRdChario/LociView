@@ -110,7 +110,7 @@ for(const touch of [false,true])test(`native capacity recovery retains drafts an
   }finally{await context?.close();await server.stop();}
 });
 
-test('a renderer crash before text publication resumes the same edit exactly once', async ({}, info) => {
+test('a renderer crash before the first text write keeps the old body and a crash before publication resumes the edit exactly once', async ({}, info) => {
   A.getHeads(A.init());
   const server = await ownedServer(process.env.LOCIVIEW_E2E_ARTIFACT ?? 'desktop-dist');
   const receiver = await createBrowserProfile('restored-text');
@@ -135,6 +135,25 @@ test('a renderer crash before text publication resumes the same edit exactly onc
     await page.locator('.lv-caption-select').filter({ hasText: '既存のピン' }).click();
     return detail(page).getByLabel('本文', { exact: true });
   };
+  const crashAt = async (page: Page, fileName: string) => {
+    const signal = page.waitForEvent('console', msg => msg.text() === 'text write paused');
+    await page.evaluate(fileName => {
+      const openFile = FileSystemDirectoryHandle.prototype.getFileHandle;
+      FileSystemDirectoryHandle.prototype.getFileHandle = async function(name, options) {
+        if (options?.create && name === fileName) {
+          console.info('text write paused');
+          await new Promise<void>(() => {});
+        }
+        return openFile.call(this, name, options);
+      };
+    }, fileName);
+    await detail(page).getByRole('button', { name: '変更を適用', exact: true }).click();
+    await signal;
+    const protocol = await context!.newCDPSession(page), crashed = page.waitForEvent('crash');
+    void protocol.send('Page.crash').catch(() => {});
+    await crashed;
+    await context!.close();
+  };
   try {
     const author = await open(await createBrowserProfile('author'));
     await author.getByLabel('ファイルを選択', { exact: true }).setInputFiles({
@@ -148,28 +167,24 @@ test('a renderer crash before text publication resumes the same edit exactly onc
     await page.getByLabel('ファイルを選択', { exact: true }).setInputFiles(info.outputPath('before.zip'));
     await page.getByRole('button', { name: 'ファイルを開く', exact: true }).click();
     await page.getByRole('button', { name: 'このファイルから再開', exact: true }).click();
+    // Restore can already offer read-only captions while the editor is being
+    // prepared. Exercise the crash only after this specific operation closes.
+    const restoredProject = page.getByRole('heading', { name: 'プロジェクト名', exact: true });
+    await expect(restoredProject).toHaveText('Nativeから引き継ぐ記録', { timeout: 120_000 });
     await expect(page.getByRole('button', { name: '閲覧する', exact: true })).toBeEnabled();
     const field = await record(page);
     await expect(field).toHaveValue('本文を保持');
-    await field.fill(text);
-    const signal = page.waitForEvent('console', msg => msg.text() === 'publication paused');
-    await page.evaluate(() => {
-      const openFile = FileSystemDirectoryHandle.prototype.getFileHandle;
-      FileSystemDirectoryHandle.prototype.getFileHandle = async function(name, options) {
-        if (options?.create && name === 'published.json') {
-          console.info('publication paused');
-          await new Promise<void>(() => {});
-        }
-        return openFile.call(this, name, options);
-      };
-    });
-    await detail(page).getByRole('button', { name: '変更を適用', exact: true }).click();
-    await signal;
-    const protocol = await context!.newCDPSession(page), crashed = page.waitForEvent('crash');
-    void protocol.send('Page.crash').catch(() => {});
-    await crashed;
-    await context!.close();
+    await field.fill('最初の書き込み前に終了する文章');
+    await crashAt(page, 'staging.json');
     const run = (before.source.proof.identity.projectId as string).slice(4);
+    const afterPreparation = await open(receiver, '?run=' + run);
+    const enter = afterPreparation.getByRole('button', { name: '編集する', exact: true });
+    await expect(afterPreparation.locator('.lv-caption-select').filter({ hasText: '既存のピン' })).toBeVisible();
+    if (await enter.isVisible()) await enter.click();
+    const previous = await record(afterPreparation);
+    await expect(previous).toHaveValue('本文を保持');
+    await previous.fill(text);
+    await crashAt(afterPreparation, 'published.json');
     const resume = await open(receiver, '?run=' + run);
     const retry = resume.getByRole('button', { name: '更新を再試行', exact: true });
     const edit = resume.getByRole('button', { name: '編集する', exact: true });

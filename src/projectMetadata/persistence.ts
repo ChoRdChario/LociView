@@ -59,24 +59,34 @@ export interface TextCommitPorts extends MetadataReadPorts {
   assertCanAcknowledge(): void;
 }
 type TextCommitOperation = <T>(transaction: string, documentKey: string, action: (ports: TextCommitPorts) => Promise<T>) => Promise<T>;
-type BoundTextCommit = <T>(transaction: string, documentKey: string, action: (ports: TextCommitPorts) => Promise<T>, assertLease: () => void) => Promise<T>;
-const textCommits = new WeakMap<ProjectWorkspaceFS, { factory: MetadataStorageFactory; enabled(): boolean; run: BoundTextCommit }>();
-export function registerTextCommit(fs: ProjectWorkspaceFS, factory: MetadataStorageFactory,
-  enabled: () => boolean, run: BoundTextCommit): void {
-  if (textCommits.has(fs)) fail('text-commit-binding');
-  textCommits.set(fs, { factory, enabled, run });
+const preparationOwners = new WeakMap<MetadataReadPorts, ProjectWorkspaceFS>();
+export function textPreparationFS(owner: ProjectWorkspaceFS, ports: MetadataReadPorts) {
+  if (preparationOwners.get(ports) !== owner) return fail('text-preparation-owner');
+  return ports.fs;
 }
-export function selectedTextCommit(fs: ProjectWorkspaceFS, factory: MetadataStorageFactory, lease: object): TextCommitOperation | undefined {
+type TextPreparation = <T>(action: (ports: MetadataReadPorts) => Promise<T>, assertLease: () => void) => Promise<T>;
+type BoundTextCommit = <T>(transaction: string, documentKey: string, action: (ports: TextCommitPorts) => Promise<T>, assertLease: () => void) => Promise<T>;
+const textCommits = new WeakMap<ProjectWorkspaceFS, { factory: MetadataStorageFactory; enabled(): boolean; prepare: TextPreparation; run: BoundTextCommit }>();
+export function registerTextCommit(fs: ProjectWorkspaceFS, factory: MetadataStorageFactory,
+  enabled: () => boolean, prepare: TextPreparation, run: BoundTextCommit): void {
+  if (textCommits.has(fs)) fail('text-commit-binding');
+  textCommits.set(fs, { factory, enabled, prepare, run });
+}
+export function selectedTextCommit(fs: ProjectWorkspaceFS, factory: MetadataStorageFactory, lease: object) {
   const entry = textCommits.get(fs);
   if (entry && entry.factory !== factory) return fail('generation-storage-binding');
   if (!entry?.enabled()) return;
   if (!lease || activeLeases.get(fs) !== lease) return fail('text-commit-lease');
-  return (transaction, key, action) => {
-    if (activeLeases.get(fs) !== lease) return fail('text-commit-lease');
-    return entry.run(transaction, key, action, () => {
-      if (activeLeases.get(fs) !== lease) fail('text-commit-lease');
-    });
+  const assertLease = () => {
+    if (activeLeases.get(fs) !== lease) fail('text-commit-lease');
   };
+  const write: TextCommitOperation = (transaction, key, action) => entry.run(transaction, key, action, assertLease);
+  const prepare = <T>(action: (ports: MetadataReadPorts) => Promise<T>) => entry.prepare(async ports => {
+    const reader = Object.freeze({ fs: ports.fs, factory: ports.factory });
+    preparationOwners.set(reader, fs);
+    try { return await action(reader); } finally { preparationOwners.delete(reader); }
+  }, assertLease);
+  return { prepare, write };
 }
 type ReadOperation = <T>(action: (ports: MetadataReadPorts) => Promise<T>) => Promise<T>;
 export type StagingReadConsumer = 'journal.entries' | 'journal.validateParts' | 'journal.readRestoredBases' | 'repository.read' | 'content.readonlyInspection';

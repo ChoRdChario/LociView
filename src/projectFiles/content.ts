@@ -15,7 +15,7 @@ import { PersistentContentVerifier, type ContentEvidenceTiming } from '../projec
 import { blobInventory } from '../projectMetadata/blobInventory';
 import type { OriginBlobStore } from '../projectMetadata/blobStore';
 import type { MetadataMediaPort } from '../projectMetadata/session';
-import { digest, newId } from '../projectMetadata/persistence';
+import { digest, newId, textPreparationFS, type MetadataReadPorts } from '../projectMetadata/persistence';
 import type { StoredBlobRef } from '../projectMetadata/blobStore';
 import { inspectValidationGlb, inspectValidationJpegGlb, inspectFreshValidationGlb, type ValidatedGlb } from './glb';
 import { inspectOccurrenceGlb, inspectOccurrenceJpegGlb } from './glbOccurrences';
@@ -278,12 +278,14 @@ export class ValidationContent implements MetadataMediaPort {
     for (const blob of blobs) if (await this.store.inspect(blob) !== 'verified-present') return fileError('受信ファイルの本体を確認できません。');
   }
   /** Project-owned fact witness. An unrelated origin's CAS body grants no media admission. */
-  async retained(record: JsonObject): Promise<boolean> {
-    return this.verifier(false).hasEvidence({ token: 'retained-media', fact: 'media', records: [record], context: {} });
+  async retained(record: JsonObject, preparation?: MetadataReadPorts): Promise<boolean> {
+    return this.verifier(false, undefined, preparation).hasEvidence({ token: 'retained-media', fact: 'media', records: [record], context: {} });
   }
-  verifier(allowNewEvidence: boolean, timing?: ContentEvidenceTiming): PersistentContentVerifier {
+  verifier(allowNewEvidence: boolean, timing?: ContentEvidenceTiming, preparation?: MetadataReadPorts): PersistentContentVerifier {
+    if (preparation && allowNewEvidence) throw Error('text-preparation-read-only');
+    const fs = preparation ? textPreparationFS(this.fs, preparation) : this.fs;
     const executor: ProjectContentVerifier = { scope: 'development-validation', verify: q => this.execute(q) };
-    return new PersistentContentVerifier(this.fs, validationMetadataLimits, executor, 'validation-glb-png-executor-1',
+    return new PersistentContentVerifier(fs, validationMetadataLimits, executor, 'validation-glb-png-executor-1',
       blobInventory(this.store, validationMetadataLimits), allowNewEvidence, timing);
   }
   private async execute(input: ContentRequest, prepared?: { model?: ValidatedModel; image?: Uint8Array }, readOnly = false) {

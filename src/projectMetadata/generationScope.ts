@@ -187,7 +187,7 @@ export async function openWorkspaceGeneration(root: ProjectWorkspaceFS,
   // bind named pure readers only; no shared active-operation switch is used.
   const scopedOperation = async <T>(action: (ports: TextCommitPorts) => Promise<T>, text?: {
     transaction: string; documentKey: string; assertLease(): void
-  }): Promise<T> => {
+  }, preparing?: () => void): Promise<T> => {
     let active = true;
     let phase: TextCommitPhase = 'journal';
     const reachedReadback = () => phase === 'readback';
@@ -195,15 +195,16 @@ export async function openWorkspaceGeneration(root: ProjectWorkspaceFS,
     if (text && (!text.documentKey || text.documentKey === 'storage-adapter-id')) return fail('text-commit-document');
     const audit = text ? checkWrite : check;
     const assertTextOwner = () => {
-      if (!text || disposed || !input.ordinaryTextCommit?.()) fail('text-commit-expired');
-      text!.assertLease();
+      const assertLease = text?.assertLease ?? preparing;
+      if (!assertLease || disposed || !input.ordinaryTextCommit?.()) return fail('text-commit-expired');
+      assertLease();
       root.mutationAuthority.assertEditable();
       root.mutationAuthority.assertWorkspaceWriteAuthorized();
     };
     const assertLive = () => {
       if (!active || disposed) fail('generation-read-expired');
       if (stagingReadOwner) { root.mutationAuthority.assertEditable(); stagingReadOwner(fs, factory); }
-      if (text) assertTextOwner();
+      if (text || preparing) assertTextOwner();
     };
     const live = async () => { assertLive(); };
     const perform = async <T>(work: () => Promise<T>): Promise<T> => {
@@ -301,6 +302,14 @@ export async function openWorkspaceGeneration(root: ProjectWorkspaceFS,
     };
     const ports = { fs: readFs, factory: readFactory, advance, assertCanAcknowledge: assertTextOwner };
     try {
+      if (preparing) {
+        // The lease checked the selection at entry. Only the subsequent write
+        // or no-change lease exit may accept this private read result.
+        assertLive();
+        const result = await action(ports);
+        assertLive();
+        return result;
+      }
       if (stagingReadOwner || text) assertLive();
       await audit();
       if (stagingReadOwner || text) assertLive();
@@ -329,7 +338,8 @@ export async function openWorkspaceGeneration(root: ProjectWorkspaceFS,
   if (auditReadOperations) registerReadOperation(fs, factory, scopedOperation);
   else if (stagingReadOwner) registerStagingReadOperation(fs, factory, scopedOperation);
   if (input.ordinaryTextCommit && assertSelectedWritable && generationId !== null)
-    registerTextCommit(fs, factory, input.ordinaryTextCommit, (transaction, documentKey, action, assertLease) =>
+    registerTextCommit(fs, factory, input.ordinaryTextCommit, (action, assertLease) =>
+      scopedOperation(action, undefined, assertLease), (transaction, documentKey, action, assertLease) =>
       scopedOperation(action, { transaction, documentKey, assertLease }));
   return Object.freeze({ generationId, fs, factory, check,
     async dispose() { if (disposed) return; disposed = true; await connection.dispose(); },
