@@ -57,7 +57,31 @@ unchanged-feature-classification checks pass; independent review has no findings
 No runtime change or new capacity guarantee; no runtime suite is needed for this
 documentation checkpoint.
 
-## Current work —first-use open, record, save and resume
+## Verified workflow —photo-linked records shared across scenes
+
+One record now connects point/GS placement, a photo, and any scenes that use it.
+Returning from the image viewer keeps the current record. A received scene recalls
+its saved entry by ID; other saved views remain usable even when their names match.
+PC and touch browser testing uses separate sending and receiving profiles and a
+downloaded scene file. Track physical iPhone file selection, touch and Safari memory
+as device acceptance, plus unaided first use. Display-lightening remains paused.
+
+The four PC/touch × Point/GS browser paths verify actual image decoding, same-record
+editing from two scenes, keyboard focus, camera orientation and projection. Additional
+checks cover GS coordinate placement without a Proxy, narrow-screen windows, invalid
+file reselection, Point roundtrip/restore and SH4 replacement/return. Regression
+checks distinguish scene search from the existing-record picker and exercise read-only
+search during output, initial recovery and a changed source. See
+[workspace design](../docs/ui-workspace-design.md) and the executable cases in
+[desktop-spatial-note-sharing.spec.ts](../tests/e2e/desktop-spatial-note-sharing.spec.ts).
+
+Final local checks: six PC/touch browser cases passed. The 156-file regression
+suite passed with 3,523 passing cases, 16 expected failures and 21 TODOs.
+All five builds, offline isolation and HEIC isolation passed. All eight offline
+browser scenarios passed, including the 500k SH4 cold edit/save/reopen and
+same-address return after correcting the recent-project selector in that test.
+
+## Verified checkpoint —first-use open, record, save and resume
 
 PO authorizes continuing the novice-path review from g0/9add3d3. Root is the only
 writer; bounded practical-UX and test/contract reviewers are read-only. First

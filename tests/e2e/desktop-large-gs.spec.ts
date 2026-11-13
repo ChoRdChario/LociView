@@ -1,7 +1,7 @@
 import {test, createBrowserProfile} from '../helpers/browserProfile';
 import { writeCleanImportFixture } from './cleanImportFixture';
 import { desktopEntry, desktopOrigin } from './desktopEntry';
-import { selectShareOutput,  closeFileSurface, revealFileSurface, lookAlongFront } from './workspaceUi';
+import {chooseSharedScene, selectShareOutput,  closeFileSurface, revealFileSurface, lookAlongFront } from './workspaceUi';
 import {expect,chromium,type Page,type BrowserContext,type TestInfo} from '@playwright/test';
 
 import {openAsBlob} from 'node:fs';
@@ -32,7 +32,7 @@ async function output(p:Page,info:TestInfo,name:string,purpose:'backup'|'teamWor
  }else await area.getByRole('button',{name:purpose==='backup'?'保存':'相手に渡す',exact:true}).click();
  if(purpose==='backup')await area.getByLabel('保存名（任意）',{exact:true}).fill(name);
  else if(purpose!=='review'){if(!compact)await selectShareOutput(area, purpose);if(base)await area.getByLabel('元にする作業一式',{exact:true}).selectOption(base);}
- if(purpose==='review'){const scenes=area.getByLabel('渡すシーン',{exact:true});await scenes.selectOption((await scenes.locator('option').evaluateAll(nodes=>nodes.map(n=>(n as HTMLOptionElement).value).filter(Boolean)))[0]!);}
+ if(purpose==='review'){await chooseSharedScene(area);}
  if(purpose==='review')await area.getByRole('button',{name:'内容を確認',exact:true}).click();
  const primary=area.locator('button.lv-file-primary');await expect(primary).toBeEnabled({timeout:300_000});
  const [download]=await Promise.all([p.waitForEvent('download',{timeout:300_000}),primary.click()]);const path=info.outputPath(name+'.zip');await download.saveAs(path);expect(await download.failure()).toBeNull();
@@ -64,7 +64,7 @@ test('PC入口で50万点SH4の全5用途・返送・Review編集コピー・復
   await lookAlongFront(p);await p.getByRole('tab',{name:'キャプション',exact:true}).click();await p.getByRole('button',{name:'キャプションを追加',exact:true}).click();
   const canvas=p.getByLabel('3Dモデルの表示',{exact:true}),box=(await canvas.boundingBox())!,extent=4*Math.exp(Math.fround(Math.log(.0007))),bounds={min:[-500/300-extent,-250/300-extent,-extent] as const,max:[499/300+extent,249/300+extent,.0006+extent] as const},pose=fittedPose(bounds,defaultPose(),box.width/box.height,'+z');
   if(pose.projection.kind!=='perspective')throw Error('Expected perspective');const camera=new THREE.PerspectiveCamera(pose.projection.verticalFov*180/Math.PI,box.width/box.height,.000001,1e9);camera.position.set(...pose.position);camera.up.set(...pose.up);camera.lookAt(new THREE.Vector3(...pose.target));camera.updateMatrixWorld(true);const hit=new THREE.Vector3(.1,.2,0).project(camera);await canvas.click({position:{x:(hit.x+1)*box.width/2,y:(1-hit.y)*box.height/2}});
-  await p.getByLabel('位置 X',{exact:true}).fill('0.2');await p.getByRole('button',{name:'位置を確定',exact:true}).click();await expect(p.getByText('ピンの位置を確定しました。',{exact:true})).toBeVisible({timeout:240_000});
+  await p.getByText('座標で微調整',{exact:true}).click(); await p.getByLabel('位置 X',{exact:true}).fill('0.2');await p.getByRole('button',{name:'ここに記録を作る',exact:true}).click();await expect(p.getByText('ピンの位置を確定しました。',{exact:true})).toBeVisible({timeout:240_000});
   const detail=p.getByRole('region',{name:'キャプションの詳細',exact:true});await detail.getByLabel('タイトル',{exact:true}).fill('50万点の記録');await detail.getByLabel('本文',{exact:true}).fill('SH4原本を保持');await detail.getByRole('button',{name:'変更を適用',exact:true}).click();await expect(p.getByText('変更を適用しました。',{exact:true})).toBeVisible({timeout:240_000});
   const photo=p.waitForEvent('filechooser');await p.getByLabel('メディアを追加',{exact:true}).click();await(await photo).setFiles({name:'写真.png',mimeType:'image/png',buffer:smallPng()});await p.getByRole('region',{name:'キャプションの詳細',exact:true}).getByRole('button',{name:'変更を適用',exact:true}).click(); await expect(p.getByText('メディアを追加しました。',{exact:true})).toBeVisible({timeout:240_000});await mark('proxy-note-photo',p);
   const original=await backup(await output(p,info,'large-backup','backup')),caption=Object.values(original.records.captionsById)[0] as any;expect(caption.anchor.hitEvidence.method).toBe('manual');expect(Object.keys(original.records.captionAttachmentsById)).toHaveLength(1);await mark('backup',p);await close(a.context,'a-initial');

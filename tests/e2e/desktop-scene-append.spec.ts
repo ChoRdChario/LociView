@@ -7,7 +7,7 @@ import { selectCleanRecords } from '../../src/projectPackage/cleanRecords';
 import { validationMetadataLimits } from '../../src/projectFiles/validation';
 import { ownedServer } from '../offline-e2e/server';
 import { smallPng, triangleGlb } from './fixtures';
-import { beginSceneCreation, revealCoordinateAdd, revealFileSurface, selectShareOutput } from './workspaceUi';
+import {chooseSharedScene, beginSceneCreation, revealCoordinateAdd, revealFileSurface, selectShareOutput } from './workspaceUi';
 
 const button = (page: Page, name: string) => page.getByRole('button', { name, exact: true });
 const files = (page: Page) => page.getByRole('region', { name: 'ファイル', exact: true });
@@ -53,7 +53,7 @@ for (const scenario of [
     await button(source, 'このモデルに追加').click();
     const pin = source.getByRole('region', { name: '位置の調整', exact: true });
     for (const axis of ['X', 'Y', 'Z']) await pin.getByLabel(`位置 ${axis}`, { exact: true }).fill(axis === 'Y' ? '.5' : '0');
-    await button(source, '位置を確定').click(); await expect(source.getByText('ピンの位置を確定しました。', { exact: true })).toBeVisible();
+    await button(source, 'ここに記録を作る').click(); await expect(source.getByText('ピンの位置を確定しました。', { exact: true })).toBeVisible();
     const detail = source.getByRole('region', { name: 'キャプションの詳細', exact: true });
     await detail.getByLabel('タイトル', { exact: true }).fill('継承したピン');
     await detail.getByLabel('本文', { exact: true }).fill('継承した本文');
@@ -64,7 +64,7 @@ for (const scenario of [
     await (await chooser).setFiles({ name: '点検写真.png', mimeType: 'image/png', buffer: photo });
     await source.getByRole('region',{name:'キャプションの詳細',exact:true}).getByRole('button',{name:'変更を適用',exact:true}).click(); await expect(source.getByText('メディアを追加しました。', { exact: true })).toBeVisible();
     await revealFileSurface(source, '共有'); await selectShareOutput(files(source), 'review');
-    await files(source).getByLabel('渡すシーン', { exact: true }).selectOption({ label: '点検シーン' });
+    await chooseSharedScene(files(source),'点検シーン');
     await files(source).getByRole('button', { name: '内容を確認', exact: true }).click();
     const zip = info.outputPath('scene.zip'); await downloadTo(source, zip);
     await sender.close();

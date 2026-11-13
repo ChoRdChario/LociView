@@ -18,7 +18,7 @@ export function createProjectModels(document: Document, host: ProjectPanelHost):
   type PlacementStep = { before: WorkspacePlacement; after: WorkspacePlacement; bindingId: string };
   const placementHistory = new Map<string, { past: PlacementStep[]; future: PlacementStep[] }>();
   const setProposal = (proposal: WorkspaceModelProposal) => { edit = proposal; raw = [...proposal.placement.translation.map(String), ...host.ports.modelAngles(proposal.placement.rotationXYZW), String(proposal.placement.uniformScale)]; };
-  let proxyScope: {token:string;target:NonNullable<ReturnType<typeof host.ports.modelDetails>>['gsProxyTarget'];removing:boolean;prepared?:{id:string;label:string;externalMaterialsUnavailable?:boolean}} | null=null;
+  let proxyScope: {token:string;target:NonNullable<ReturnType<typeof host.ports.modelDetails>>['gsProxyTarget'];removing:boolean;prepared?:{id:string;label:string;externalMaterialsUnavailable?:boolean};resumePlacement?:(registered:boolean)=>void} | null=null;
   let fileScope: { kind: 'add' | 'replace'; token: string; sceneId: string; assetId: string; expectedBindingId?: string; file?: WorkspaceFile; externalMaterialsUnavailable?:boolean } | null = null;
   let deletion: { token: string; assetId: string } | null = null;
   const choices = new Map<string, { token: string; value: string }>();
@@ -89,10 +89,10 @@ export function createProjectModels(document: Document, host: ProjectPanelHost):
     });
   }
   const proxyArea=make('section'),proxyNote=make('p'),proxyInput=input('位置指定用の面を選択');proxyArea.setAttribute('aria-label','位置指定用の面');proxyNote.setAttribute('role','status');
-  const beginProxy=(removing:boolean)=>{
+  const beginProxy=(removing:boolean,resumePlacement?:(registered:boolean)=>void)=>{
     if(host.block('models')||ownInput()||memory().composing)return;
     const target=memory().assetId?host.ports.modelDetails(host.source().sceneId,memory().assetId!)?.gsProxyTarget:undefined;
-    if(!target||!host.ports.prepareGsProxy)return;proxyScope={token:host.source().provider.token,target,removing};
+    if(!target||!host.ports.prepareGsProxy)return;proxyScope={token:host.source().provider.token,target,removing,resumePlacement};
     if(removing)prepareProxy();else{proxyInput.value='';host.changed();proxyInput.click();}
   };
   const proxyAdd=button('位置指定用の面を追加',()=>beginProxy(false)),proxyRemove=button('位置指定用の面を外す',()=>beginProxy(true));
@@ -102,12 +102,22 @@ export function createProjectModels(document: Document, host: ProjectPanelHost):
     host.execute('models',captured.token,async()=>{const result=await host.ports.prepareGsProxy!(captured.token,captured.target!,file);if(proxyScope===captured)captured.prepared=result;},()=>host.changed());
   }
   proxyInput.addEventListener('change',()=>{const file=proxyInput.files?.[0];if(file&&proxyScope)prepareProxy({name:file.name,size:file.size,arrayBuffer:file.arrayBuffer.bind(file)});});
-  proxyInput.addEventListener('cancel',()=>{if(!host.block('models',false)){proxyScope=null;host.ports.cancelGsProxy?.();host.changed();}});
+  function cancelProxy() {
+    if (host.block('models', false)) return;
+    const captured = proxyScope;
+    proxyScope = null; proxyInput.value = ''; host.ports.cancelGsProxy?.();
+    captured?.resumePlacement?.(false); host.changed();
+  }
+  proxyInput.addEventListener('cancel',cancelProxy);
   const proxyConfirm=button('このモデルに面を追加',()=>{
     const captured=proxyScope;if(!captured?.prepared||host.block('models')||!host.ports.commitGsProxy)return;
-    host.execute('models',captured.token,()=>host.ports.commitGsProxy!(captured.token,captured.prepared!.id),()=>{proxyScope=null;host.message(captured.removing?'位置指定用の面を外しました。':'位置指定用の面を登録しました。');});
+    host.execute('models',captured.token,()=>host.ports.commitGsProxy!(captured.token,captured.prepared!.id),()=>{
+      if (proxyScope !== captured) return;
+      proxyScope=null; captured.resumePlacement?.(true);
+      host.message(captured.removing?'位置指定用の面を外しました。':'位置指定用の面を登録しました。');
+    });
   });
-  const proxyCancel=button('面の選択を取り消す',()=>{if(!host.block('models',false)){host.ports.cancelGsProxy?.();proxyScope=null;proxyInput.value='';host.changed();}});
+  const proxyCancel=button('面の選択を取り消す',cancelProxy);
   proxyArea.append(proxyAdd,proxyRemove,proxyNote,proxyConfirm,proxyCancel);
   const begin = button('配置を調整', () => {
     if (host.block('models') || ownInput() || memory().composing) return;
@@ -209,7 +219,7 @@ export function createProjectModels(document: Document, host: ProjectPanelHost):
     proxyAdd.textContent=details?.gsProxyTarget?.expectedProxyId?'位置指定用の面を変更':'位置指定用の面を追加';
     proxyAdd.disabled=!!block||ownInput()||!details?.gsProxyTarget;proxyRemove.hidden=!details?.gsProxyTarget?.expectedProxyId;
     proxyRemove.disabled=!!block||ownInput();proxyConfirm.hidden=!proxyScope?.prepared;proxyCancel.hidden=!proxyScope;
-    proxyConfirm.textContent=proxyScope?.removing?'面を外す':proxyScope?.target?.expectedProxyId?'面の変更を確定':'このモデルに面を追加';
+    proxyConfirm.textContent=proxyScope?.resumePlacement?'このモデルでピンを配置する':proxyScope?.removing?'面を外す':proxyScope?.target?.expectedProxyId?'面の変更を確定':'このモデルに面を追加';
     proxyConfirm.disabled=!!block||!proxyScope?.prepared||proxyScope.token!==provider.token;proxyCancel.disabled=!!host.block('models',false);
     proxyNote.textContent=proxyScope?.token&&proxyScope.token!==provider.token?'モデルが更新されています。入力は保持しています。取り消して選び直してください。':proxyScope?.removing?'モデル上を選んで位置を指定するには、位置指定用の面が必要です。保存済みの記録位置は変わりません。':proxyScope?.prepared?`${proxyScope.prepared.label} を選択中のモデルに関連付けます。同じ原点・向き・倍率で用意した面であることを確認してください。面は通常表示されず、保存済みの記録位置は変わりません。`:'このモデルと同じ座標で用意した面のデータを選択してください。';
     if(proxyScope?.prepared?.externalMaterialsUnavailable)proxyNote.textContent+=' OBJの外部材質・画像は読み込まず、既定の材質で表示します。';
@@ -290,6 +300,11 @@ export function createProjectModels(document: Document, host: ProjectPanelHost):
   }
   return { root, render, hasChanges: () => ownInput() || memory().composing || composing, composing: () => composing || memory().composing,
     selectedAsset: () => memory().assetId,
+    chooseProxy(assetId, resumePlacement) {
+      if (host.block('models') || ownInput() || memory().composing ||
+          host.ports.modelDetails(host.source().sceneId, assetId)?.gsProxyTarget?.expectedProxyId !== null) return;
+      setMemory({ ...memory(), assetId }); host.changed(); beginProxy(false, resumePlacement);
+    },
     selectedSurface: () => { const assetId=memory().assetId,details=assetId?host.ports.modelDetails(host.source().sceneId,assetId):null; return assetId && (details?.pointCloud||details?.gsProxyTarget) ? assetId : null; }, hidden: () => memory().hiddenAssetIds, proposal: () => edit,
     show(assetId) { setMemory({ ...memory(), hiddenAssetIds: memory().hiddenAssetIds.filter(id => id !== assetId) }); },
     propose(next) { if (!edit || composing || memory().composing || next.mode !== edit.mode || host.block('models', true, true) || !sameProjectValue(next.target, edit.target)) return false;

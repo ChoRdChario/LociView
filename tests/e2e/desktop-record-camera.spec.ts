@@ -30,7 +30,7 @@ test('record list, pin actions and direct camera navigation remain coherent thro
     await task('モデル');await revealModelManagement(p);const choose=p.waitForEvent('filechooser');await p.getByRole('button',{name:'3Dモデルを追加',exact:true}).click();await(await choose).setFiles({name:'模型B.glb',mimeType:'model/gltf-binary',buffer:triangleGlb()});await ready('モデルを追加しました。');await task('キャプション');
     for(const [name,x] of [['確認点A','0'],['確認点B','.2'],['確認点C','-.2']]){
       await revealCoordinateAdd(p);const owner=p.getByLabel('追加先モデル',{exact:true});await owner.focus();await owner.selectOption({label:'模型A.glb'});await p.getByRole('button',{name:'このモデルに追加',exact:true}).click();
-      for(const axis of ['X','Y','Z'])await pin.getByLabel('位置 '+axis,{exact:true}).fill(axis==='X'?x!:axis==='Y'?'.5':'0');await pin.getByRole('button',{name:'位置を確定',exact:true}).click();await ready('ピンの位置を確定しました。');
+      for(const axis of ['X','Y','Z'])await pin.getByLabel('位置 '+axis,{exact:true}).fill(axis==='X'?x!:axis==='Y'?'.5':'0');await pin.getByRole('button',{name:'ここに記録を作る',exact:true}).click();await ready('ピンの位置を確定しました。');
       await detail.getByLabel('タイトル',{exact:true}).fill(name!);await detail.getByLabel('本文',{exact:true}).fill('一覧を見ながら確認する本文');await expect(list).toBeInViewport();await expect(detail.getByRole('button',{name:'変更を適用',exact:true})).toBeInViewport({ratio:1});await detail.getByRole('button',{name:'変更を適用',exact:true}).click();await ready('変更を適用しました。');
     }
     await gizmo.getByRole('button',{name:'Z',exact:true}).press('Enter');await expect(p.locator('.lv-project-marker')).toHaveCount(3);

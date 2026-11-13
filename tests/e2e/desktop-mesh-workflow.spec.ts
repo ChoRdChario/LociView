@@ -1,7 +1,7 @@
 import {test, createBrowserProfile} from '../helpers/browserProfile';
 import { writeCleanImportFixture } from './cleanImportFixture';
 import { desktopEntry, desktopOrigin } from './desktopEntry';
-import { selectShareOutput,  closeFileSurface, beginMaterialEditing, revealCaptionList } from './workspaceUi';
+import {chooseSharedScene, selectShareOutput,  closeFileSurface, beginMaterialEditing, revealCaptionList } from './workspaceUi';
 import { revealFileSurface, revealModelManagement, lookAlongFront } from './workspaceUi';
 import {expect,chromium,type Page,type BrowserContext,type TestInfo} from '@playwright/test';
 import {writeFile} from 'node:fs/promises';
@@ -37,7 +37,7 @@ async function output(p:Page,info:TestInfo,name:string,purpose:'backup'|'teamWor
   }else await area.getByRole('button',{name:purpose==='backup'?'保存':'相手に渡す',exact:true}).click();
   if(purpose==='backup')await area.getByLabel('保存名（任意）',{exact:true}).fill(name);
   else if(purpose!=='review'){if(!compact)await selectShareOutput(area, purpose);if(base)await area.getByLabel('元にする作業一式',{exact:true}).selectOption(base);}
-  if(purpose==='review'){const scenes=area.getByLabel('渡すシーン',{exact:true});await scenes.selectOption(reviewScene?{label:reviewScene}:(await scenes.locator('option').evaluateAll(ns=>ns.map(n=>(n as HTMLOptionElement).value).filter(Boolean)))[0]!);}
+  if(purpose==='review'){await chooseSharedScene(area,reviewScene);}
   if(purpose==='review')await area.getByRole('button',{name:'内容を確認',exact:true}).click();
   const primary=area.locator('button.lv-file-primary');await expect(primary).toBeEnabled({timeout:300000});
   const [download]=await Promise.all([p.waitForEvent('download',{timeout:300000}),primary.click()]);const path=info.outputPath(name+'.zip');await download.saveAs(path);expect(await download.failure()).toBeNull();
@@ -141,9 +141,9 @@ for(const opaqueMaterials of [false,true,'standard']as const)test(opaqueMaterial
       await expect(canvas).toHaveAttribute('aria-busy','false');await lookAlongFront(a.p);
       await a.p.getByRole('tab',{name:'キャプション',exact:true}).click();await a.p.getByRole('button',{name:'キャプションを追加',exact:true}).click();
       await hit(kind,kind==='点群'?[.5,0,0]:[-1.4,.3,.05]);
-      await expect(a.p.getByLabel('位置 X',{exact:true})).toBeVisible();
+      await a.p.getByText('座標で微調整',{exact:true}).click(); await expect(a.p.getByLabel('位置 X',{exact:true})).toBeVisible();
       if(kind==='GS'){await expect(a.p.getByLabel('位置 X',{exact:true})).toBeEnabled();await a.p.getByLabel('位置 X',{exact:true}).fill('.2');}
-      await a.p.getByRole('button',{name:'位置を確定',exact:true}).click();await expect(a.p.getByText('ピンの位置を確定しました。',{exact:true})).toBeVisible({timeout:180000});await edit(a.p,'タイトル',kind==='点群'?'引き継いだ点の指定':'引き継いだ面の指定');
+      await a.p.getByRole('button',{name:'ここに記録を作る',exact:true}).click();await expect(a.p.getByText('ピンの位置を確定しました。',{exact:true})).toBeVisible({timeout:180000});await edit(a.p,'タイトル',kind==='点群'?'引き継いだ点の指定':'引き継いだ面の指定');
     }
     await a.p.getByRole('tab',{name:'モデル',exact:true}).click();await a.p.getByRole('tabpanel',{name:'モデル',exact:true}).getByRole('button',{name:'すべて表示',exact:true}).click();
     const placed=await backup(await output(a.p,info,'placed','backup')),captions=Object.values(placed.records.captionsById) as any[];
@@ -196,7 +196,7 @@ test('Mesh07lは通常のファイル選択から4形式を追加し材質と位
    await p.getByRole('tab',{name:'描画',exact:true}).click();const materials=p.getByRole('region',{name:'材質',exact:true});await materials.getByLabel('モデル',{exact:true}).selectOption({label:'obj.obj'});const surface=materials.getByLabel('マテリアル',{exact:true});const choices=await surface.locator('option').evaluateAll(ns=>ns.map(n=>(n as HTMLOptionElement).value).filter(Boolean));expect(choices).toHaveLength(2);await surface.selectOption({label:'マテリアル 1'});await beginMaterialEditing(materials);
    await materials.getByLabel('照明',{exact:true}).selectOption('lit');await materials.getByLabel('透過の表示方法',{exact:true}).selectOption('mask');await materials.getByRole('button',{name:'変更を適用',exact:true}).click();await expect(p.getByText('材質の設定を適用しました。',{exact:true})).toBeVisible({timeout:180000});await ready(p,projectTitle);
    const lit=await presentedCanvas(canvas,30,30);await beginMaterialEditing(materials);await materials.getByLabel('指定した色を透過',{exact:true}).selectOption('on');await materials.getByLabel('透過する色',{exact:true}).fill('#ffffff');await materials.getByRole('button',{name:'変更を適用',exact:true}).click();await expect(p.getByText('材質の設定を適用しました。',{exact:true})).toBeVisible({timeout:180000});await ready(p,projectTitle);await expect.poll(async()=>(await presentedCanvas(canvas,30,30)).sample).not.toEqual(lit.sample);await p.screenshot({path:info.outputPath('obj-phong-chroma-mask.png'),fullPage:true});
-   await p.getByRole('tab',{name:'キャプション',exact:true}).click();await p.getByRole('button',{name:'キャプションを追加',exact:true}).click();const box=await canvas.boundingBox();if(!box)throw Error('canvas');await canvas.click({position:{x:box.width*.53,y:box.height*.55}});await expect(p.getByText('配置する面を特定できません。視点を変えて選び直してください。',{exact:true})).toBeVisible();await expect(p.getByRole('button',{name:'位置を確定',exact:true})).toBeHidden();await expect(p.locator('.lv-project-viewport-status')).toBeEmpty();await canvas.click({position:{x:box.width*.45,y:box.height*.45}});await expect(p.getByLabel('位置 X',{exact:true})).toBeEnabled();await p.getByRole('button',{name:'位置を確定',exact:true}).click();await expect(p.getByText('ピンの位置を確定しました。',{exact:true})).toBeVisible({timeout:180000});await edit(p,'タイトル','面上の記録');
+   await p.getByRole('tab',{name:'キャプション',exact:true}).click();await p.getByRole('button',{name:'キャプションを追加',exact:true}).click();const box=await canvas.boundingBox();if(!box)throw Error('canvas');await canvas.click({position:{x:box.width*.53,y:box.height*.55}});await expect(p.getByText('この場所にはピンを置けません。別の場所を選んでください。',{exact:true})).toBeVisible();await expect(p.getByRole('button',{name:'ここに記録を作る',exact:true})).toBeHidden();await expect(p.locator('.lv-project-viewport-status')).toBeEmpty();await canvas.click({position:{x:box.width*.45,y:box.height*.45}});await expect(p.getByLabel('位置 X',{exact:true})).toBeEnabled();await p.getByRole('button',{name:'ここに記録を作る',exact:true}).click();await expect(p.getByText('ピンの位置を確定しました。',{exact:true})).toBeVisible({timeout:180000});await edit(p,'タイトル','面上の記録');
    await p.getByRole('tab',{name:'描画',exact:true}).click();await materials.getByRole('button',{name:'この範囲の設定を解除',exact:true}).click();await materials.getByRole('button',{name:'設定を解除する',exact:true}).click();await expect(p.getByText('材質の設定を解除しました。',{exact:true})).toBeVisible({timeout:180000});await ready(p,projectTitle);await expect.poll(async()=>(await presentedCanvas(canvas,30,30)).sample).toEqual(lit.sample);
    await beginMaterialEditing(materials);await materials.getByLabel('照明',{exact:true}).selectOption('unlit');await materials.getByRole('button',{name:'変更を適用',exact:true}).click();await expect(p.getByText('材質の設定を適用しました。',{exact:true})).toBeVisible({timeout:180000});await ready(p,projectTitle);await p.screenshot({path:info.outputPath('obj-unlit-reset.png'),fullPage:true});
    const path=await output(p,info,'fresh-four-formats','backup'),saved=await backup(path);expect(saved.records.project.frame.unit).toEqual({kind:'unknown'});expect(Object.keys(saved.records.representationsById)).toHaveLength(7);expect((Object.values(saved.records.captionsById) as any[]).find(c=>c.title==='面上の記録').anchor.kind).toBe('asset');

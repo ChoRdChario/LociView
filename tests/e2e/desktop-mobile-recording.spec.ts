@@ -2,6 +2,7 @@ import { chromium, expect, test } from '@playwright/test';
 import { openAsBlob } from 'node:fs';
 import { PackageArchive } from '../../src/projectPackage/zipArchive';
 import { ownedServer } from '../offline-e2e/server';
+import { chooseSharedScene } from './workspaceUi';
 import { nativeConversionBackup, smallPng, triangleGlb } from './fixtures';
 
 test('phone record list, body and completion stay usable when the viewport shrinks', async ({}, info) => {
@@ -35,7 +36,7 @@ test('phone record list, body and completion stay usable when the viewport shrin
     await page.getByRole('button',{name:'3D',exact:true}).tap();
     await card(titles[0]!).locator('.lv-caption-window-title').tap({position:{x:20,y:12}});
     await expect(card(titles[0]!)).toHaveAttribute('data-active','true');const firstRect=await card(titles[0]!).boundingBox();
-    await page.getByRole('button',{name:'作業パネル',exact:true}).tap();
+    await page.getByRole('tab',{name:'キャプション',exact:true}).tap();
     await expect(detail.getByLabel('タイトル',{exact:true})).toHaveValue(titles[2]!);
     await detail.getByRole('button',{name:'次の記録',exact:true}).tap();
     await expect(detail.getByLabel('タイトル',{exact:true})).toHaveValue(titles[1]!);await expect(windows).toHaveCount(2);
@@ -55,7 +56,7 @@ test('phone record list, body and completion stay usable when the viewport shrin
     await expect(close).toBeInViewport({ratio:1});
     expect(await close.evaluate(node=>{const r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return hit===node||!!hit&&node.contains(hit);})).toBe(true);
     await close.tap();await expect(windows).toHaveCount(1);await expect(card(titles[2]!)).toHaveAttribute('data-active','true');
-    await page.getByRole('button',{name:'作業パネル',exact:true}).tap();
+    await page.getByRole('tab',{name:'キャプション',exact:true}).tap();
     await detail.getByRole('button',{name:'一覧へ戻る',exact:true}).tap();
     await list.locator('.lv-caption-select').filter({hasText:titles[1]!}).tap();await expect(windows).toHaveCount(2);
     await detail.getByRole('button',{name:'次の記録',exact:true}).tap();await expect(windows).toHaveCount(2);
@@ -119,7 +120,7 @@ test('phone record list, body and completion stay usable when the viewport shrin
     await page.setViewportSize({ width: 390, height: 844 }); await page.getByRole('tab', { name: 'キャプション', exact: true }).tap();
     await page.getByRole('button', { name:'3D', exact:true }).tap();
     await expect(page.locator('.lv-caption-windows')).toBeVisible();
-    await page.getByRole('button', { name:'作業パネル', exact:true }).tap();
+    await page.getByRole('tab', { name:'キャプション', exact:true }).tap();
     await page.locator('details.lv-project-files > summary').tap();
     await page.getByRole('tab', { name: '共有', exact: true }).tap();
     const files = page.getByRole('region', { name: 'ファイル', exact: true });
@@ -127,8 +128,7 @@ test('phone record list, body and completion stay usable when the viewport shrin
     await expect(partial).not.toBeChecked();
     await expect(files.getByText('編集・返送できます。全シーンと編集履歴を含みます。', { exact: true })).toBeVisible();
     await files.getByText('一部だけ出力', { exact: true }).tap(); await expect(partial).toBeChecked();
-    const scenes = files.getByLabel('渡すシーン', { exact: true });
-    await scenes.selectOption(await scenes.locator('option').nth(1).getAttribute('value') ?? '');
+    await chooseSharedScene(files);
     await files.getByRole('button', { name: '内容を確認', exact: true }).tap();
     const primary = files.locator('.lv-file-primary'), previewStarted = Date.now();
     await expect(primary).toBeEnabled(); const sceneStarted = Date.now();

@@ -1,7 +1,7 @@
 import {test, createBrowserProfile} from '../helpers/browserProfile';
 import { writeCleanImportFixture } from './cleanImportFixture';
 import { desktopEntry, desktopOrigin } from './desktopEntry';
-import { selectShareOutput,  closeFileSurface, revealFileSurface, lookAlongFront, revealCaptionList } from './workspaceUi';
+import {chooseSharedScene, selectShareOutput,  closeFileSurface, revealFileSurface, lookAlongFront, revealCaptionList } from './workspaceUi';
 import {expect,chromium,type Page,type BrowserContext,type TestInfo} from '@playwright/test';
 import {writeFile} from 'node:fs/promises';
 import {openAsBlob} from 'node:fs';
@@ -35,7 +35,7 @@ async function output(p:Page,info:TestInfo,name:string,purpose:'backup'|'teamWor
   }else await area.getByRole('button',{name:purpose==='backup'?'保存':'相手に渡す',exact:true}).click();
   if(purpose==='backup')await area.getByLabel('保存名（任意）',{exact:true}).fill(name);
   else if(purpose!=='review'){if(!compact)await selectShareOutput(area, purpose);if(base)await area.getByLabel('元にする作業一式',{exact:true}).selectOption(base);}
-  if(purpose==='review'){const scenes=area.getByLabel('渡すシーン',{exact:true});await scenes.selectOption((await scenes.locator('option').evaluateAll(ns=>ns.map(n=>(n as HTMLOptionElement).value).filter(Boolean)))[0]!);}
+  if(purpose==='review'){await chooseSharedScene(area);}
   if(purpose==='review')await area.getByRole('button',{name:'内容を確認',exact:true}).click();
   const primary=area.locator('button.lv-file-primary');await expect(primary).toBeEnabled({timeout:300000});
   const [download]=await Promise.all([p.waitForEvent('download',{timeout:300000}),primary.click()]);const path=info.outputPath(name+'.zip');await download.saveAs(path);expect(await download.failure()).toBeNull();
@@ -117,9 +117,9 @@ test('Native07kの点群GSと面を変換し共有返送Review編集コピー独
       await expect(canvas).toHaveAttribute('aria-busy','false');await lookAlongFront(a.p);
       await a.p.getByRole('tab',{name:'キャプション',exact:true}).click();await a.p.getByRole('button',{name:'キャプションを追加',exact:true}).click();
       await hit(kind,kind==='点群'?[.5,0,0]:[-1.4,.3,.05]);
-      await expect(a.p.getByLabel('位置 X',{exact:true})).toBeVisible();
+      await a.p.getByText('座標で微調整',{exact:true}).click(); await expect(a.p.getByLabel('位置 X',{exact:true})).toBeVisible();
       if(kind==='GS'){await expect(a.p.getByLabel('位置 X',{exact:true})).toBeEnabled();await a.p.getByLabel('位置 X',{exact:true}).fill('.2');}
-      await a.p.getByRole('button',{name:'位置を確定',exact:true}).click();await expect(a.p.getByText('ピンの位置を確定しました。',{exact:true})).toBeVisible({timeout:180000});await edit(a.p,'タイトル',kind==='点群'?'引き継いだ点の指定':'引き継いだ面の指定');
+      await a.p.getByRole('button',{name:'ここに記録を作る',exact:true}).click();await expect(a.p.getByText('ピンの位置を確定しました。',{exact:true})).toBeVisible({timeout:180000});await edit(a.p,'タイトル',kind==='点群'?'引き継いだ点の指定':'引き継いだ面の指定');
     }
     await a.p.getByRole('tab',{name:'モデル',exact:true}).click();await a.p.getByRole('tabpanel',{name:'モデル',exact:true}).getByRole('button',{name:'すべて表示',exact:true}).click();
     const placed=await backup(await output(a.p,info,'placed','backup')),captions=Object.values(placed.records.captionsById) as any[];

@@ -169,13 +169,21 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
   const windows = createCaptionWindowControls(document, windowPlan, active => { moving = active; paint(); }, gallery);
   const selectedMedia = make('section'); selectedMedia.setAttribute('aria-label', '選択中のキャプションのメディア');
   let panelGallery: ReturnType<typeof gallery> | null = null, panelCaption: string | null = null;
-  viewport.append(windows.root); sidebar.append(sceneName, emptyCaptions, list.root, selectedMedia);
-  const views = make('details'), title = make('summary', '視点'); views.append(title);
+  const sceneHeader = make('div'); sceneHeader.className = 'lv-review-scene-header'; sceneHeader.append(sceneName);
+  viewport.append(windows.root); sidebar.append(sceneHeader, emptyCaptions, list.root, selectedMedia);
+  const views = make('details'); views.append(make('summary', 'その他の視点'));
   const cameraAction = (action: () => void) => {
     if (disposed || composing || moving) return; try { action(); failure = ''; } catch (error) { failure = (error as Error).message; } paint();
   };
   const cameraButtons: HTMLButtonElement[] = [];
-  const cameraButton = (text: string, action: () => void) => { const button = make('button', text); button.type = 'button'; button.addEventListener('click', () => { if (!button.disabled) cameraAction(action); }); cameraButtons.push(button); views.append(button); };
+  const cameraButton = (container: HTMLElement, text: string, viewId: string) => {
+    const button = make('button', text); button.type = 'button';
+    button.addEventListener('click', () => { if (!button.disabled) cameraAction(() => {
+      if (!runtime?.recall) throw Error('視点を呼び出せません。');
+      runtime.recall(view.capture(viewId));
+    }); });
+    cameraButtons.push(button); container.append(button);
+  };
   const camera = (intent: ViewCameraIntent) => { if (!runtime) throw Error('3D表示を確認してください。'); runtime.camera(intent); };
   const axes = { right: '+x', left: '-x', top: '+y', bottom: '-y', front: '+z', back: '-z' } as const;
   const cameraGizmo = createCameraGizmo(document, axis => cameraAction(() => camera({ kind: 'axis', axis: axes[axis] })), () => cameraAction(() => camera({ kind: 'fit' })),event=>{
@@ -184,14 +192,21 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
     return runtime?.navigateCamera?.(event)??false;
   });
   viewport.append(cameraGizmo.root);
-  const projectionLabel = make('label', '投影方式'), projection = make('select'); projection.setAttribute('aria-label', '投影方式');
+  const projection = make('select'); projection.setAttribute('aria-label', '投影方式');
   for (const [value, text] of [['perspective', '透視投影'], ['orthographic', '平行投影']]) { const option = make('option', text); option.value = value!; projection.append(option); }
-  const projectionArea=make('section');projectionArea.className='lv-camera-projection';projectionLabel.append(projection);projectionArea.append(projectionLabel);cameraGizmo.root.append(projectionArea);
+  const projectionArea=make('section');projectionArea.className='lv-camera-projection';projectionArea.append(projection);cameraGizmo.root.append(projectionArea);
   const projectionHelp=contextHelp(document,'投影方式：透視投影・平行投影を切り替えます。',[projection]);
   (projectionHelp.children[0] as HTMLElement).hidden=true;projectionArea.append(projectionHelp);
   projection.addEventListener('change', () => { if (!projection.disabled) cameraAction(() => camera({ kind: 'projection', projection: projection.value === 'orthographic' ? 'orthographic' : 'perspective' })); });
-  for (const saved of view.views) cameraButton(String(saved.name), () => { if (!runtime?.recall) throw Error('視点を呼び出せません。'); runtime.recall(view.capture(String(saved.id))); });
-  views.hidden=view.views.length===0;sidebar.append(views);
+  if (view.entryViewId) cameraButton(sceneHeader, '開始視点に戻る', view.entryViewId);
+  const alternatives = view.views.filter(saved => saved.id !== view.entryViewId);
+  const names = new Map<string, number>();
+  for (const saved of view.views) names.set(String(saved.name), (names.get(String(saved.name)) ?? 0) + 1);
+  alternatives.forEach((saved, index) => {
+    const name = String(saved.name);
+    cameraButton(views, (names.get(name) ?? 0) > 1 ? `${index + 1} · ${name}` : name, String(saved.id));
+  });
+  views.hidden = !alternatives.length; sidebar.append(views);
   function paint() {
     if (disposed) return; const observation = runtime?.read(), ready = !!observation?.ready && observation.display === display;
     const cameraReady=!!(observation?.cameraReady??observation?.ready)&&observation?.display===display;

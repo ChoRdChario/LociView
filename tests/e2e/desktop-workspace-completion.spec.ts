@@ -25,7 +25,7 @@ test('content-first workspace keeps editing, pin completion and file exits coher
     await expect(p.getByRole('form', { name: 'シーンの変更', exact: true })).toBeHidden();
     await revealCoordinateAdd(p); await p.getByLabel('追加先モデル', { exact: true }).focus(); await p.getByLabel('追加先モデル', { exact: true }).selectOption({ label: '建物.glb' }); await p.getByRole('button', { name: 'このモデルに追加', exact: true }).click();
     await expect(pin).toBeVisible(); for (const name of ['X', 'Y', 'Z']) await pin.getByLabel('位置 ' + name, { exact: true }).fill(name === 'Y' ? '.5' : '0');
-    await pin.getByRole('button', { name: '位置を確定', exact: true }).click(); await ready('ピンの位置を確定しました。');
+    await pin.getByRole('button', { name: 'ここに記録を作る', exact: true }).click(); await ready('ピンの位置を確定しました。');
     await detail.getByLabel('タイトル', { exact: true }).fill('柱の接合部'); await detail.getByLabel('本文', { exact: true }).fill('梁との隙間を確認する。');
     const chooseImage = p.waitForEvent('filechooser'); await p.getByLabel('メディアを追加', { exact: true }).click(); await (await chooseImage).setFiles({ name: '現場写真.png', mimeType: 'image/png', buffer: smallPng() });
     await expect(detail.locator('.lv-record-media-draft')).toContainText('現場写真.png');
@@ -147,7 +147,7 @@ test('content-first workspace keeps editing, pin completion and file exits coher
     await expect(photo).toBeInViewport(); await p.screenshot({ path: info.outputPath('reading-narrow.png'), fullPage: false });
     await mode.click(); await expect(mode).toHaveText('閲覧する', { timeout: 15_000 }); await expect(mode).toBeEnabled(); await p.getByRole('button', { name: '位置を調整', exact: true }).click();
     await expect(pin).toBeVisible(); await expect(pin.getByRole('button', { name: '位置を確定', exact: true })).toBeInViewport({ ratio: 1 }); await expect(pin.getByRole('button', { name: '取り消す', exact: true })).toBeInViewport({ ratio: 1 });
-    const x = pin.getByLabel('位置 X', { exact: true }); await expect(x).toBeFocused(); await x.dispatchEvent('compositionstart'); await expect(pin.getByRole('button', { name: '位置を確定', exact: true })).toBeDisabled(); await x.dispatchEvent('compositionend');
+    await expect(pin).toBeFocused(); await pin.getByText('座標で微調整',{exact:true}).click(); const x = pin.getByLabel('位置 X', { exact: true }); await x.focus(); await expect(x).toBeFocused(); await x.dispatchEvent('compositionstart'); await expect(pin.getByRole('button', { name: '位置を確定', exact: true })).toBeDisabled(); await x.dispatchEvent('compositionend');
     await p.screenshot({ path: info.outputPath('pin-narrow.png'), fullPage: false }); await pin.getByRole('button', { name: '取り消す', exact: true }).click(); await expect(detail.getByLabel('本文', { exact: true })).toHaveValue(receivedBody);
     await p.setViewportSize({ width: 1440, height: 1000 }); await p.reload(); await expect(p.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText('現地調査', { timeout: 90_000 });
     await p.getByRole('region', { name: 'シーン', exact: true }).getByRole('button', { name: '接合部', exact: true }).click(); await p.locator('.lv-caption-select').filter({ hasText: '柱の接合部' }).click(); await expect(detail.getByLabel('本文', { exact: true })).toHaveValue(receivedBody);

@@ -22,7 +22,7 @@ const blob = async (path: string) => new Blob([new Uint8Array(await readFile(pat
 const originals = (source: { originalChanges(): Uint8Array[] }) => source.originalChanges().map(bytes => [sha(bytes), Buffer.from(bytes).toString('hex')]).sort((a, b) => a[0]!.localeCompare(b[0]!));
 const detail = (page: Page) => page.getByRole('region', { name: 'キャプションの詳細', exact: true });
 const models = (page: Page) => page.getByRole('tabpanel', { name: 'モデル', exact: true });
-const pinArea = (page: Page) => page.getByRole('region', { name: 'ピンの操作', exact: true });
+const pinArea = (page: Page) => page.getByRole('region', { name: '位置の調整', exact: true });
 const marker = (page: Page) => page.locator('.lv-project-marker');
 
 async function chooseCaption(page: Page, name = captionTitle) {
@@ -125,7 +125,7 @@ test('差し替えと受信の中断を元のファイルから復旧し、手�
       const ids = await target.locator('option').evaluateAll(nodes => nodes.map(n => (n as HTMLOptionElement).value).filter(Boolean)); expect(ids).toHaveLength(1);
       await target.selectOption(ids[0]!); await a.getByRole('button', { name: 'このモデルに追加', exact: true }).click();
       for (const [axis, value] of [['X', '0.2'], ['Y', '0.2'], ['Z', '0']]) await a.getByLabel(`位置 ${axis}`, { exact: true }).fill(value!);
-      await a.getByRole('button', { name: '位置を確定', exact: true }).click(); await expect(a.getByText('ピンの位置を確定しました。', { exact: true })).toBeVisible({ timeout: actionTimeout });
+      await a.getByRole('button', { name: 'ここに記録を作る', exact: true }).click(); await expect(a.getByText('ピンの位置を確定しました。', { exact: true })).toBeVisible({ timeout: actionTimeout });
       await detail(a).getByLabel('タイトル', { exact: true }).fill(captionTitle); await edit(a, '配布した本文'); await image(a, '共有画像.png', png);
       await a.getByRole('tab', { name: 'モデル', exact: true }).click(); await models(a).locator('.lv-model-select').first().click();
       await models(a).getByRole('button', { name: '配置を調整', exact: true }).click();
@@ -312,16 +312,17 @@ test('差し替えと受信の中断を元のファイルから復旧し、手�
       expect(await marker(b).evaluate(node => getComputedStyle(node).backgroundColor)).toBe(originalColor);
       const row = b.getByRole('list', { name: 'キャプション一覧', exact: true }).getByRole('listitem'); await expect(row).toContainText('要確認');
       await b.screenshot({ path: info.outputPath('要確認のピン.png'), fullPage: true });
-      await pinArea(b).getByRole('button', { name: '位置を調整', exact: true }).click();
+      await b.getByRole('button', { name: '位置を調整', exact: true }).click();
       await expect(pinArea(b).getByLabel('位置 X', { exact: true })).toBeHidden();
       await expect(pinArea(b).getByRole('button', { name: '位置を確定', exact: true })).toBeHidden();
-      await expect(pinArea(b)).toContainText('モデルの面を選択'); await pinArea(b).getByRole('button', { name: '取り消す', exact: true }).click();
+      await expect(pinArea(b)).toContainText('ピンを置きたい場所'); await pinArea(b).getByRole('button', { name: '取り消す', exact: true }).click();
       await expect(marker(b)).toHaveAttribute('data-review', 'true');
       await lookAlongFront(b); await b.getByRole('button', { name: '全体表示', exact: true }).click();
-      await pinArea(b).getByRole('button', { name: '位置を調整', exact: true }).click();
+      await b.getByRole('button', { name: '位置を調整', exact: true }).click();
       const canvas = b.getByLabel('3Dモデルの表示', { exact: true }), box = await canvas.boundingBox(); expect(box).toBeTruthy();
       await canvas.click({ position: { x: box!.width / 2, y: box!.height / 2 } });
       await expect(pinArea(b).getByRole('button', { name: '位置を確定', exact: true })).toBeVisible();
+      await b.getByText('座標で微調整', {exact:true}).click();
       expect(Number(await pinArea(b).getByLabel('位置 Z', { exact: true }).inputValue())).toBeCloseTo(0.5, 5);
       for (const [axis, value] of [['X', '0.1'], ['Y', '0.4'], ['Z', '0.5']]) await pinArea(b).getByLabel(`位置 ${axis}`, { exact: true }).fill(value!);
       await pinArea(b).getByRole('button', { name: '位置を確定', exact: true }).click(); await expect(b.getByText('ピンの位置を確定しました。', { exact: true })).toBeVisible({ timeout: actionTimeout });
@@ -346,7 +347,7 @@ test('差し替えと受信の中断を元のファイルから復旧し、手�
       await chooseCaption(a); await edit(a, aBody); await chooseCaption(b); await edit(b, bBody);
       for (const page of [a, b]) {
         const scenes = page.getByRole('region', { name: 'シーン', exact: true }); await scenes.getByRole('button', { name: secondScene, exact: true }).click();
-        const include = page.locator('details.lv-caption-include'); await include.getByText('キャプションの追加・除外', { exact: true }).click();
+        const include = page.locator('details.lv-caption-include'); await include.getByText('既存の記録を追加', { exact: true }).click();
         await include.getByLabel('キャプション', { exact: true }).selectOption(originalId); await include.getByRole('button', { name: 'このシーンに追加', exact: true }).click();
         await expect(page.getByText('このシーンに追加しました。', { exact: true })).toBeVisible({ timeout: actionTimeout });
         await scenes.getByRole('button', { name: primaryScene, exact: true }).click();

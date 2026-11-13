@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 import * as A from '@automerge/automerge';
 import { ownedServer } from '../offline-e2e/server';
 import { triangleGlb } from './fixtures';
-import { selectShareOutput,  revealFileSurface } from './workspaceUi';
+import {chooseSharedScene, selectShareOutput,  revealFileSurface } from './workspaceUi';
 import { BackupArchive } from '../../src/projectPackage/backupArchive';
 import { validationMetadataLimits } from '../../src/projectFiles/validation';
 
@@ -32,10 +32,11 @@ test('review files use the same camera controls and create an independent editab
   try {
     const source=await launch();await source.getByLabel('ファイルを選択',{exact:true}).setInputFiles({name:'比較用モデル.glb',mimeType:'model/gltf-binary',buffer:triangleGlb()});await source.getByRole('button',{name:'ファイルを開く',exact:true}).click();await source.getByRole('textbox',{name:'プロジェクト名',exact:true}).fill('操作の確認');await source.getByRole('button',{name:'プロジェクトを作成',exact:true}).click();
     await expect(source.getByLabel('3Dモデルの表示',{exact:true})).toHaveAttribute('aria-busy','false',{timeout:90_000});const original=await backup(source,'original');
-    await revealFileSurface(source,'共有');const files=source.getByRole('region',{name:'ファイル',exact:true});await selectShareOutput(files, 'review');const scenes=files.getByLabel('渡すシーン',{exact:true});await scenes.selectOption((await scenes.locator('option').evaluateAll(nodes=>nodes.map(n=>(n as HTMLOptionElement).value).find(Boolean)))!);await files.getByRole('button',{name:'内容を確認',exact:true}).click();await expect(files.locator('.lv-file-primary')).toHaveText('ダウンロード');
+    await revealFileSurface(source,'共有');const files=source.getByRole('region',{name:'ファイル',exact:true});await selectShareOutput(files, 'review');await chooseSharedScene(files);await files.getByRole('button',{name:'内容を確認',exact:true}).click();await expect(files.locator('.lv-file-primary')).toHaveText('ダウンロード');
     const [download]=await Promise.all([source.waitForEvent('download'),files.locator('.lv-file-primary').click()]),path=info.outputPath('review.zip');await download.saveAs(path);expect(await download.failure()).toBeNull();
     const page=await launch();await page.getByLabel('ファイルを選択',{exact:true}).setInputFiles(path);await page.getByRole('button',{name:'ファイルを開く',exact:true}).click();const review=page.getByRole('main',{name:'閲覧用のシーン',exact:true}),gizmo=review.locator('.lv-project-camera');await expect(gizmo.getByRole('button',{name:'Z',exact:true})).toBeEnabled({timeout:90_000});
     await expect(review.getByRole('button',{name:'正面',exact:true})).toHaveCount(0);await expect(page.getByRole('heading',{name:'プロジェクト名',exact:true})).toHaveCount(0);
+    await expect(review.getByRole('button',{name:'開始視点に戻る',exact:true})).toHaveCount(0);
     for(const name of ['X','−X','Y','−Y','Z','−Z']){const axis=gizmo.getByRole('button',{name,exact:true});await axis.press('Enter');await expect(axis).toHaveAttribute('aria-pressed','true');}
     const canvas=review.getByLabel('3Dモデルの表示',{exact:true}),drag=async(button:'left'|'right',dx:number,dy:number)=>{const r=(await canvas.boundingBox())!;await page.mouse.move(r.x+r.width/2,r.y+r.height/2);await page.mouse.down({button});await page.mouse.move(r.x+r.width/2+dx,r.y+r.height/2+dy,{steps:8});await page.mouse.up({button});await page.evaluate(()=>new Promise<void>(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve()))));};
     await gizmo.getByRole('button',{name:'Z',exact:true}).press('Enter');await drag('left',40,20);await expect(gizmo.getByRole('button',{name:'Z',exact:true})).toHaveAttribute('aria-pressed','false');

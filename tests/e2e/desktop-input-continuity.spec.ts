@@ -57,7 +57,7 @@ for (const touch of [false, true]) test(`attachment ordering and Drawing complet
     const firstCanvasBox = (await firstCanvas.boundingBox())!;
     const firstPosition = { x: firstCanvasBox.width / 2, y: firstCanvasBox.height / 2 };
     if (touch) await firstCanvas.tap({ position: firstPosition }); else await firstCanvas.click({ position: firstPosition });
-    await page.getByRole('button', { name: '位置を確定', exact: true }).click(); await ready('ピンの位置を確定しました。');
+    await page.getByRole('button', { name: 'ここに記録を作る', exact: true }).click(); await ready('ピンの位置を確定しました。');
     await expect(detail).toBeVisible();await expect(detail.getByText('タイトル・本文や写真を追加できます。',{exact:true})).toBeVisible();
     await expect(detail.getByRole('heading',{name:'名称なし',exact:true})).toBeFocused();
     // One tiny photo follows the same explicit text completion and survives the existing restore.

@@ -188,7 +188,7 @@ export function createValidationOutputControls(document: Document, host: ReturnT
     const disclosure = privacyNotice(currentDisclosure());
     if (disclosure) { const privacy = document.createElement('p'); privacy.textContent = disclosure; actions.append(privacy); }
     const cleanConfirmed = !!cleanPreview && cleanPreview.token === host.read().source?.token;
-    const reviewConfirmed = !!reviewPreview && reviewPreview.token === host.read().source?.token && reviewPreview.sceneId === sceneId && reviewPreview.omittedEntryView === omitEntry;
+    let reviewConfirmed = false;
     if (purpose === 'review') {
       const provider = host.read().provider, sceneRecords = provider?.kind === 'scene-provider' ? provider.state.scenes : {};
       const label = document.createElement('label'), scenes = document.createElement('select'), empty = document.createElement('option');
@@ -197,7 +197,18 @@ export function createValidationOutputControls(document: Document, host: ReturnT
         if (scene.lifecycle.kind !== 'value' || scene.lifecycle.value.state !== 'active' || scene.name.kind !== 'value') continue;
         const option = document.createElement('option'); option.value = scene.id; option.textContent = scene.name.value; scenes.append(option);
       }
-      scenes.value = sceneId; scenes.disabled = choicesDisabled; label.append(scenes); actions.append(label);
+      if (sceneId && !Array.from(scenes.children).some(node => (node as HTMLOptionElement).value === sceneId)) {
+        sceneId = ''; omitEntry = false; reviewPreview = null;
+      }
+      const soleScene = presentation === 'share' && scenes.children.length === 2 ? scenes.children[1] as HTMLOptionElement : undefined;
+      if (soleScene) {
+        sceneId = soleScene.value;
+        const target = document.createElement('p'); target.setAttribute('aria-label', '渡すシーン');
+        target.textContent = `渡すシーン：${soleScene.textContent}`; actions.append(target);
+      } else {
+        scenes.value = sceneId; scenes.disabled = choicesDisabled; label.append(scenes); actions.append(label);
+      }
+      reviewConfirmed = !!reviewPreview && reviewPreview.token === host.read().source?.token && reviewPreview.sceneId === sceneId && reviewPreview.omittedEntryView === omitEntry;
       scenes.addEventListener('change', () => { if (!scenes.disabled) { sceneId = scenes.value; omitEntry = false; reviewPreview = null; refreshChoice(scenes); } });
       const scene = sceneRecords[sceneId];
       if (scene?.defaultViewId.kind === 'unresolved' && scene.defaultViewId.reason === 'conflict') {

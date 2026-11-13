@@ -174,7 +174,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   let catalog: readonly ValidationProjectEntry[] = [];
   let catalogLoaded = false;
   const projectOpenButtons=new Set<HTMLButtonElement>();
-  const changed = () => !!workspace?.hasChanges() || !!reviewWorkspace?.hasChanges() || !!receiveTools?.hasChanges() || !!host?.hasPending() || !!firstRecovery;
+  const changed = (includePresentation = true) => !!workspace?.hasChanges(includePresentation) || !!reviewWorkspace?.hasChanges() || !!receiveTools?.hasChanges() || !!host?.hasPending() || !!firstRecovery;
   const openNormal = async (...args: Parameters<ValidationWorkspacePorts['open']>): Promise<ValidationNormalHost> => {
     const opened = await ports.open(...args); if ('kind' in opened) { await opened.dispose(); throw Error('バックアップの初回復元を一覧から再開してください。'); } return opened;
   };
@@ -209,13 +209,18 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   title.addEventListener('input', () => { creationDraft++; });
   conversionTitle.addEventListener('compositionstart', () => { composing = true; invalidateLoci(); controls(); });
   conversionTitle.addEventListener('compositionend', () => { composing = false; invalidateLoci(); controls(); });
-  const execute = (action: () => Promise<void>) => {
+  let selectedFileError: string | undefined;
+  const execute = (action: () => Promise<void>, fileInspection?: {generation?: number}) => {
     if (busy || disposed || retirementFailure) return;
     const previousUpdate = pendingUpdate;
     const confirmFocused = document.activeElement === updateConfirm;
     busy = true; controls(); workspace?.render();
     const work = action(); operation = work;
-    return work.catch(error => { if (!disposed) status.textContent = storageFailureText(error)??(error instanceof Error ? error.message : '処理できません。入力と再開用データは保持しています。'); })
+    return work.catch(error => { if (!disposed) {
+      const storageError = storageFailureText(error);
+      status.textContent = storageError ?? (error instanceof Error ? error.message : '処理できません。入力と再開用データは保持しています。');
+      selectedFileError = fileInspection?.generation === selectionGeneration && !storageError && !host && !creationAttempt && !firstRecovery && !reviewEditAttempt ? status.textContent : undefined;
+    } })
       .finally(() => { busy = false; if (operation === work) operation = undefined; if (!disposed) {
         controls(); workspace?.render();
         if (pendingUpdate && (pendingUpdate !== previousUpdate || confirmFocused)) updateConfirm.focus?.();
@@ -250,12 +255,12 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     if(errors.length)retirementFailure??=new AggregateError(errors,'画面の終了処理を完了できませんでした。再読み込みしてから再開してください。保存済みの記録は保持しています。');
     if(retirementFailure)throw retirementFailure;
   };
-  const ensureMaySwitch = () => {
+  const ensureMaySwitch = (includePresentation = true) => {
     if(retirementFailure)throw retirementFailure;
-    if (composing || changed()) throw Error('入力・更新を確定するか、取り消してからプロジェクトを切り替えてください。');
+    if (composing || changed(includePresentation)) throw Error('入力・更新を確定するか、取り消してからプロジェクトを切り替えてください。');
   };
   const ensureMayLeaveSelection = () => {
-    ensureMaySwitch();
+    ensureMaySwitch(presentationState()?.busy !== false);
     const current = host?.read();
     // Explicit return may leave a saved Project whose renderer failed; it is not a mounted/resume acknowledgment.
     if (selectionHost && selectionHost === host && current?.state === 'ready' && current.publication && current.source && !host!.hasPending()) clearSelection();
@@ -671,6 +676,8 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   }));
   workspaceInput.addEventListener('change', () => {
     if (creationAttempt) return;
+    if (selectedFileError && status.textContent === selectedFileError) status.textContent = '';
+    selectedFileError = undefined;
     selectionAbort?.abort(); selectionAbort = undefined; nativeSelectionChecking = false;
     selectionGeneration++; creationDraft++; selectionPending = !!workspaceInput.files?.length; pendingUpdate = undefined; rawSelection = undefined;
     form.hidden = true; title.value = '新しいプロジェクト'; clearConversion(); controls();
@@ -712,7 +719,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     try { if (!current()) { await opened.dispose(); return; } } catch (error) { await opened.dispose(); throw error; }
     await replaceSelection(run, opened, generation, context);
   }));
-  const openSelection=async(files:readonly File[])=>{
+  const openSelection=async(files:readonly File[], inspection?: {generation?: number})=>{
     ensureMaySwitch(); if (creationAttempt) throw Error('作成を再試行してください。');
     const selection = files.map(file => ({ file: file instanceof Blob ? file.slice() : file, label: file.name }));
     if (!selection.length) throw Error('ファイルを選択してください。');
@@ -720,6 +727,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     if (selection.length > ports.fileLimits.maxItems || !Number.isSafeInteger(total) || !ports.filePolicy&&total>ports.fileLimits.maxFileBytes ||
       selection.some(item => !Number.isSafeInteger(item.file.size) || item.file.size < 0)) throw Error('選択したファイルが読み込みの上限を超えています。');
     const generation = ++selectionGeneration, draft = creationDraft, context = selectionContext(); selectionPending = true;
+    if (inspection) inspection.generation = generation;
     status.textContent = 'ファイルを確認しています。';
     clearConversion(); pendingUpdate = undefined; rawSelection = undefined; form.hidden = true;
     const models: ValidationModelFile[] = [], media: ValidationFile[] = [], packages: File[] = []; let actualTotal = 0, bufferedBytes=0;
@@ -833,6 +841,8 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     }
     const selectedArchive = await PackageArchive.inspect(file); if (!guardSelection(generation, context)) return;
     const manifest = selectedArchive.control.manifest, { purpose } = manifest;
+    // From here the selected package can require local catalog, recovery or renderer work.
+    if (inspection) delete inspection.generation;
     fallback.hidden = true; legacyFile = undefined;
     if (purpose === 'contribution' || purpose === 'teamWorkspace') {
       if (!catalogLoaded) await updateList();
@@ -925,7 +935,8 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
       if (disposed || openFile.disabled || workspaceForm.inert || navigation.hidden) return;
       workspaceInput.click(); return;
     }
-    void execute(()=>openSelection(files));
+    const inspection: {generation?: number} = {};
+    void execute(()=>openSelection(files, inspection), inspection);
   });
   const leaveForLegacy=(file?:File)=>{if(busy||composing||disposed||changed()||creationAttempt)return;clearSelection();void ports.openLegacy?.(file).catch(error=>{if(!disposed)status.textContent=error instanceof Error?error.message:'ファイルを開けません。';});};
   legacy.addEventListener('click',()=>leaveForLegacy());fallback.addEventListener('click',()=>{const file=legacyFile;if(file)leaveForLegacy(file);});

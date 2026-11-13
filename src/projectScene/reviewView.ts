@@ -118,7 +118,7 @@ export async function prepareReviewView(file: Blob | PackageArchive, budget: Pro
     pins: basePins.filter(p => colors === null || colors.includes(p.color)),
     bounds: box.isEmpty() ? null : { min: box.min.toArray() as [number, number, number], max: box.max.toArray() as [number, number, number] },
     entry: scene.defaultViewId ? { kind: 'ready', payload: capture(string(scene.defaultViewId)) } : { kind: 'none' } });
-  return { original, inspection, source, models, images, attachments, views, capture, display, rasterResources: decode?.rasterResources,
+  return { original, inspection, source, models, images, attachments, views, entryViewId: scene.defaultViewId ? string(scene.defaultViewId) : null, capture, display, rasterResources: decode?.rasterResources,
     imageDimensions:(bytes:Uint8Array,mime:string)=>mediaDisplayDimensions(bytes,mime,limits,decode?.rasterResources),
     title: string(project.title), sceneName: string(scene.name),
     content: { async image(record: JsonObject) { const expected = mediaRecords[string(record.id)];

@@ -1,7 +1,7 @@
 import {test, createBrowserProfile} from '../helpers/browserProfile';
 import { writeCleanImportFixture } from './cleanImportFixture';
 import { desktopOrigin, desktopEntry } from './desktopEntry';
-import { selectShareOutput,  closeFileSurface, revealCoordinateAdd, revealFileSurface } from './workspaceUi';
+import {chooseSharedScene, selectShareOutput,  closeFileSurface, revealCoordinateAdd, revealFileSurface } from './workspaceUi';
 import { expect, chromium, type Page, type BrowserContext, type TestInfo } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import * as A from '@automerge/automerge';
@@ -44,7 +44,7 @@ async function output(p: Page, info: TestInfo, label: string, purpose: 'backup' 
     await more.getByRole('button', { name: 'シーンを共有', exact: true }).click();
   } else await selectShareOutput(area, purpose);
   if (purpose === 'contribution') await area.getByLabel('元にする作業一式', { exact: true }).selectOption(base!);
-  if (purpose === 'review') { const scene = area.getByLabel('渡すシーン', { exact: true }); await scene.selectOption((await scene.locator('option').evaluateAll(ns => ns.map(n => (n as HTMLOptionElement).value).filter(Boolean)))[0]!); }
+  if (purpose === 'review') { await chooseSharedScene(area); }
   const primary = area.locator('button.lv-file-primary');
   if (purpose === 'review') { await primary.click(); await expect(primary).toHaveText('ダウンロード'); }
   if (purpose === 'backup' || purpose === 'teamWorkspace') await expect(area.locator('.lv-file-intents')).toContainText('記録された編集者名を含みます。');
@@ -111,7 +111,7 @@ test('08b editor names remain exact through collaboration, purpose privacy, rest
     await expect(a.p.getByRole('button', { name: 'このモデルに追加', exact: true })).toBeEnabled();
     await a.p.getByRole('button', { name: 'このモデルに追加', exact: true }).click();
     for (const [axis, value] of [['X', '0'], ['Y', '.5'], ['Z', '0']]) await a.p.getByLabel(`位置 ${axis}`, { exact: true }).fill(value!);
-    await a.p.getByRole('button', { name: '位置を確定', exact: true }).click(); await expect(a.p.getByText('ピンの位置を確定しました。', { exact: true })).toBeVisible({ timeout: 90_000 });
+    await a.p.getByRole('button', { name: 'ここに記録を作る', exact: true }).click(); await expect(a.p.getByText('ピンの位置を確定しました。', { exact: true })).toBeVisible({ timeout: 90_000 });
     const settings = a.p.getByLabel('設定', { exact: true }); await settings.locator('summary').click();
     await settings.getByLabel('このブラウザの表示名', { exact: true }).fill('私的な名前'); await settings.getByRole('button', { name: '表示名を設定', exact: true }).click();
     await expect(settings.getByLabel('編集者名', { exact: true })).toHaveValue('私的な名前'); await expect(settings.getByRole('checkbox')).not.toBeChecked();

@@ -41,7 +41,7 @@ test('image details, Scene keyboard focus and dismissible header sheets retain P
     const first = scenes.getByRole('button', { name: firstName, exact: true }); await first.focus(); await page.keyboard.press('Enter'); await expect(first).toBeFocused(); await expect(first).toHaveAttribute('aria-pressed', 'true');
     await revealCoordinateAdd(page); const owner = page.getByLabel('追加先モデル', { exact: true }); await owner.focus(); await owner.selectOption({ label: '検査用模型.glb' }); await page.getByRole('button', { name: 'このモデルに追加', exact: true }).click();
     for (const axis of ['X', 'Y', 'Z']) await page.getByLabel('位置 ' + axis, { exact: true }).fill(axis === 'Y' ? '.5' : '0');
-    await page.getByRole('button', { name: '位置を確定', exact: true }).click(); await ready('ピンの位置を確定しました。');
+    await page.getByRole('button', { name: 'ここに記録を作る', exact: true }).click(); await ready('ピンの位置を確定しました。');
     const detail = page.getByRole('region', { name: 'キャプションの詳細', exact: true }); await detail.getByLabel('タイトル', { exact: true }).fill('細部の記録'); await detail.getByRole('button', { name: '変更を適用', exact: true }).click(); await ready('変更を適用しました。');
     const choose = page.waitForEvent('filechooser'); await page.getByLabel('メディアを追加', { exact: true }).click(); await (await choose).setFiles({ name: '細部の写真.png', mimeType: 'image/png', buffer: png }); await page.getByRole('region',{name:'キャプションの詳細',exact:true}).getByRole('button',{name:'変更を適用',exact:true}).click(); await ready('メディアを追加しました。');
     const notice=page.locator('main.lv-project-workspace > header > .lv-operation-status'),help = page.locator('details[aria-label="ヘルプ"]'), helpSummary = help.locator(':scope > summary');

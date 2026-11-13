@@ -168,6 +168,7 @@ export function createProjectMedia(document: Document, host: ProjectPanelHost, c
       organize.append(remove);
       const update = () => {
         const live = current(), blocked = !live || !!host.block('captions') || owned() || !!uncertainty();
+        for (const move of moves) move.hidden = !live || live.items.length < 2;
         if (live) card.setAttribute('aria-label', `添付 ${live.index + 1} ${live.row.label}`);
         edit.disabled = blocked || live?.row.fields.altText?.kind !== 'value'; remove.disabled = blocked;
         moves.forEach((move, index) => { const offset = index ? 1 : -1; move.disabled = blocked || live!.index + offset < 0 || live!.index + offset >= live!.items.length; });

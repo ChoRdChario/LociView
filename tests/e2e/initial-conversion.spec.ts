@@ -116,7 +116,7 @@ for (const lane of lanes) test(`${lane.kind}ファイルを内容確認して変
     });
     if(lane.kind==='Native') await step('変換した面の材質を編集し、別ブラウザへ渡して変更を受け取る',async()=>{
       const chooseMaterial=async(p:Page)=>{
-        await p.getByRole('tab',{name:'材質',exact:true}).click();const controls=p.getByRole('region',{name:'材質',exact:true});
+        await p.getByRole('tab',{name:'描画',exact:true}).click();const controls=p.getByRole('region',{name:'材質',exact:true});
         await controls.getByLabel('モデル',{exact:true}).selectOption({label:'建物'});await controls.getByLabel('マテリアル',{exact:true}).selectOption({index:1});return controls;
       };
       const editMaterial=async(p:Page,field:string,value:string)=>{

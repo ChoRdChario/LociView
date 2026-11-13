@@ -165,7 +165,7 @@ test('view mode hides editing while preserving reading, local display, existing 
     await lookAlongFront(p);
     await revealCoordinateAdd(p); const owner = p.getByLabel('追加先モデル', { exact: true }); await owner.focus(); await owner.selectOption({ label: '閲覧するモデル.glb' }); await p.getByRole('button', { name: 'このモデルに追加', exact: true }).click();
     for (const axis of ['X', 'Y', 'Z']) await p.getByLabel('位置 ' + axis, { exact: true }).fill(axis === 'Y' ? '.5' : '0');
-    await p.getByRole('button', { name: '位置を確定', exact: true }).click(); await ready('ピンの位置を確定しました。');
+    await p.getByRole('button', { name: 'ここに記録を作る', exact: true }).click(); await ready('ピンの位置を確定しました。');
     await detail.getByLabel('タイトル', { exact: true }).fill('現地の写真'); await detail.getByLabel('本文', { exact: true }).fill('確認する本文\n二行目');
     await detail.getByRole('button', { name: '変更を適用', exact: true }).click(); await ready('変更を適用しました。');
     const pick = p.waitForEvent('filechooser'); await p.getByLabel('メディアを追加', { exact: true }).click(); await (await pick).setFiles({ name: '現地.png', mimeType: 'image/png', buffer: smallPng() }); await p.getByRole('region',{name:'キャプションの詳細',exact:true}).getByRole('button',{name:'変更を適用',exact:true}).click(); await ready('メディアを追加しました。');
@@ -221,7 +221,7 @@ test('view mode hides editing while preserving reading, local display, existing 
     await expect(p.locator('.lv-caption-window').getByRole('button',{name:'閉じる',exact:true})).toBeInViewport();
     await p.screenshot({path:info.outputPath('narrow-stage.png'),fullPage:false});
     await p.locator('.lv-caption-window').getByRole('button',{name:'閉じる',exact:true}).click();await expect(p.locator('.lv-caption-window')).toHaveCount(0);
-    await p.getByRole('button',{name:'作業パネル',exact:true}).click();await expect(detail).toBeVisible();await revealCaptionList(p);await p.locator('.lv-caption-select').click();await p.setViewportSize({ width: 1440, height: 1000 });
+    await p.getByRole('tab',{name:'キャプション',exact:true}).click();await expect(detail).toBeVisible();await revealCaptionList(p);await p.locator('.lv-caption-select').click();await p.setViewportSize({ width: 1440, height: 1000 });
     await p.getByRole('button', { name: '編集する', exact: true }).click(); await expect(p.getByRole('button', { name: '閲覧する', exact: true })).toBeEnabled();
     await expect(p.getByRole('list',{name:'キャプション一覧',exact:true})).toBeVisible();await expect(captions.locator('.lv-caption-search').getByLabel('検索', { exact: true })).toHaveValue('現地');await p.locator('.lv-caption-select').click(); await expect(detail.getByLabel('本文', { exact: true })).toHaveValue('確認する本文\n二行目');
     await detail.getByLabel('本文', { exact: true }).fill('閲覧から戻って編集'); await expect(p.getByRole('button', { name: '閲覧する', exact: true })).toBeDisabled();
@@ -290,7 +290,7 @@ test('one PC app keeps the same Project through connected, cold offline and prep
     await selected(); await expect(p.locator('.lv-home-settings')).toHaveCount(0); await expect(p.locator('.lv-offline-controls')).toHaveCount(1);
     await expect(p.getByRole('button', { name: '閲覧する', exact: true })).toBeEnabled();
     await revealCoordinateAdd(p); const owner = p.getByLabel('追加先モデル', { exact: true }); await owner.focus(); await owner.selectOption({ label: '再開するモデル.glb' }); await p.getByRole('button', { name: 'このモデルに追加', exact: true }).click();
-    const pin = p.getByRole('region', { name: '位置の調整', exact: true }); for (const axis of ['X', 'Y', 'Z']) await pin.getByLabel('位置 ' + axis, { exact: true }).fill(axis === 'Y' ? '.5' : '0'); await pin.getByRole('button', { name: '位置を確定', exact: true }).click();
+    const pin = p.getByRole('region', { name: '位置の調整', exact: true }); for (const axis of ['X', 'Y', 'Z']) await pin.getByLabel('位置 ' + axis, { exact: true }).fill(axis === 'Y' ? '.5' : '0'); await pin.getByRole('button', { name: 'ここに記録を作る', exact: true }).click();
     const detail = () => p.getByRole('region', { name: 'キャプションの詳細', exact: true });
     await detail().getByLabel('タイトル', { exact: true }).fill('同じ記録'); await detail().getByLabel('本文', { exact: true }).fill('接続中に記録した本文'); await detail().getByRole('button', { name: '変更を適用', exact: true }).click();
     await expect(p.getByText('変更を適用しました。', { exact: true })).toBeVisible();

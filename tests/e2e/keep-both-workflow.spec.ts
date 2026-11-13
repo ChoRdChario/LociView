@@ -100,7 +100,7 @@ test('二人の重複登録を両方残し、元と独立コピーを別々に�
       await revealCoordinateAdd(a); const target = a.getByLabel('追加先モデル', { exact: true }); await target.focus();
       const values = await target.locator('option').evaluateAll(nodes => nodes.map(n => (n as HTMLOptionElement).value).filter(Boolean)); expect(values).toHaveLength(1); await target.selectOption(values[0]!);
       await a.getByRole('button', { name: 'このモデルに追加', exact: true }).click(); for (const [axis, value] of [['X', '0.2'], ['Y', '0.2'], ['Z', '0']]) await a.getByLabel(`位置 ${axis}`, { exact: true }).fill(value!);
-      await a.getByRole('button', { name: '位置を確定', exact: true }).click(); await done(a, 'ピンの位置を確定しました。'); await editCaption(a, initialTitle, '配布した本文');
+      await a.getByRole('button', { name: 'ここに記録を作る', exact: true }).click(); await done(a, 'ピンの位置を確定しました。'); await editCaption(a, initialTitle, '配布した本文');
       const picker = a.waitForEvent('filechooser'); await a.getByLabel('メディアを追加', { exact: true }).click(); await (await picker).setFiles({ name: '共有画像.png', mimeType: 'image/png', buffer: png }); await a.getByRole('region',{name:'キャプションの詳細',exact:true}).getByRole('button',{name:'変更を適用',exact:true}).click(); await done(a, 'メディアを追加しました。');
       await a.getByRole('tab', { name: 'モデル', exact: true }).click(); await modelRows(a).first().click(); await modelPanel(a).getByRole('button', { name: '配置を調整', exact: true }).click();
       await modelPanel(a).getByLabel('モデル位置 X', { exact: true }).fill('0.75'); await modelPanel(a).getByLabel('モデル倍率', { exact: true }).fill('1.25');
@@ -115,7 +115,7 @@ test('二人の重複登録を両方残し、元と独立コピーを別々に�
       for (const page of [a, b]) {
         await scene(page, targetScene); await page.getByRole('tab', { name: 'モデル', exact: true }).click(); const toggle = modelPanel(page).getByRole('checkbox', { name: 'このシーンに表示', exact: true });
         await expect(toggle).not.toBeChecked(); await toggle.click(); await done(page, 'このシーンにモデルを追加しました。'); await expect(toggle).toBeChecked();
-        await page.getByRole('tab', { name: 'キャプション', exact: true }).click(); const include = page.locator('details.lv-caption-include'); await include.getByText('キャプションの追加・除外', { exact: true }).click();
+        await page.getByRole('tab', { name: 'キャプション', exact: true }).click(); const include = page.locator('details.lv-caption-include'); await include.getByText('既存の記録を追加', { exact: true }).click();
         await include.getByLabel('キャプション', { exact: true }).selectOption(originalCaption); await include.getByRole('button', { name: 'このシーンに追加', exact: true }).click(); await done(page, 'このシーンに追加しました。');
       }
       evidence.initial = { identity: base.source.proof.identity, heads: base.source.heads, originalAsset, originalCaption, originalSceneId, targetSceneId };
@@ -177,7 +177,8 @@ test('二人の重複登録を両方残し、元と独立コピーを別々に�
       await scene(b, targetScene); await caption(b, initialTitle); await editCaption(b, copyTitle, copyBody); await checkImage(b);
       const media = b.getByRole('region', { name: '画像の整理', exact: true }); await media.getByRole('button', { name: '説明を編集', exact: true }).click();
       await media.getByLabel('メディアの説明', { exact: true }).fill(copyAlt); await media.getByRole('button', { name: '説明を適用', exact: true }).click(); await done(b, 'メディアの説明を適用しました。');
-      const pins = b.getByRole('region', { name: 'ピンの操作', exact: true }); await pins.getByRole('button', { name: '位置を調整', exact: true }).click();
+      const pins = b.getByRole('region', { name: '位置の調整', exact: true }); await b.getByRole('button', { name: '位置を調整', exact: true }).click();
+      await b.getByText('座標で微調整', {exact:true}).click();
       for (const [axis, value] of [['X', '0.4'], ['Y', '0.3'], ['Z', '0.1']]) await pins.getByLabel(`位置 ${axis}`, { exact: true }).fill(value!);
       await pins.getByRole('button', { name: '位置を確定', exact: true }).click(); await done(b, 'ピンの位置を確定しました。');
       await b.getByRole('tab', { name: 'モデル', exact: true }).click(); await expect(modelRows(b)).toHaveCount(2); let moved = false;

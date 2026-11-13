@@ -9,6 +9,10 @@ export async function revealCoordinateAdd(page:Page){
 
 export async function revealWorkPanel(page:Page){
   const panel=page.getByRole('button',{name:'作業パネル',exact:true});if(await panel.isVisible()&&await panel.getAttribute('aria-pressed')!=='true')await panel.click();
+  const stage=page.getByRole('button',{name:'3D',exact:true});
+  if(await stage.isVisible()&&await stage.getAttribute('aria-pressed')==='true'){
+    const task=page.getByRole('tablist',{name:'作業',exact:true}).locator('[role=tab][tabindex="0"]');await task.click();
+  }
 }
 
 /** Uses the actual camera drawer; old fixed readers retain their tab. */
@@ -84,6 +88,17 @@ export async function selectShareOutput(area: Locator, purpose: 'teamWorkspace' 
   } else {
     await partial.check();
     await area.getByLabel('出力する内容', { exact: true }).selectOption(purpose);
+  }
+}
+
+export async function chooseSharedScene(area: Locator, name?: string) {
+  const target = area.getByLabel('渡すシーン', {exact:true});
+  if (await target.evaluate(node => node.tagName === 'SELECT')) {
+    await target.selectOption(name ? {label:name} : {index:1});
+  } else if (name) {
+    await expect(target).toHaveText(`渡すシーン：${name}`);
+  } else {
+    await expect(target).toHaveText(/^渡すシーン：.+/);
   }
 }
 

@@ -4,11 +4,12 @@ import { captionIncludeIssue, captionIncludeView, planCaptionInclude,
   type CaptionIncludeContext, type CaptionIncludeIntent, type CaptionIncludePlan } from './captionIncludeState';
 
 /** Membership picker only. Does not select the editor, copy content or show a model. */
-export function createCaptionIncludeControls(document: Document, onPlan: (plan: CaptionIncludePlan) => void) {
+export function createCaptionIncludeControls(document: Document, onPlan: (plan: CaptionIncludePlan) => void, mode: 'manage' | 'add' = 'manage') {
   const make = <K extends keyof HTMLElementTagNameMap>(tag: K, text = '') => { const node = document.createElement(tag); node.textContent = text; return node; };
   const root = make('details'); root.className = 'lv-caption-include';
-  const summary = make('summary', 'キャプションの追加・除外');
-  const searchLabel = make('label', '検索'), search = make('input'); search.type = 'search'; search.setAttribute('aria-label', '検索'); searchLabel.append(search);
+  const summary = make('summary', mode === 'add' ? '既存の記録を追加' : 'キャプションの追加・除外');
+  const searchName = mode === 'add' ? '追加する記録を検索' : '検索';
+  const searchLabel = make('label', searchName), search = make('input'); search.type = 'search'; search.setAttribute('aria-label', searchName); searchLabel.append(search);
   const choiceLabel = make('label', 'キャプション'), choices = make('select'); choices.size = 6;
   choices.setAttribute('aria-label', 'キャプション'); choiceLabel.append(choices);
   const selected = make('p'), status = make('p'); status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
@@ -37,12 +38,13 @@ export function createCaptionIncludeControls(document: Document, onPlan: (plan: 
     }
     context = next;
     const view = captionIncludeView(next), busy = next.feedback.kind === 'applying';
-    action = view.selected?.membership.kind === 'value' && view.selected.membership.value === 'included' ? 'exclude' : 'include';
+    action = mode === 'manage' && view.selected?.membership.kind === 'value' && view.selected.membership.value === 'included' ? 'exclude' : 'include';
     const issue = captionIncludeIssue(next, action);
     include.textContent = action === 'exclude' ? 'このシーンから外す' : 'このシーンに追加';
     if (!next.memory.composing && search.value !== next.memory.query) search.value = next.memory.query;
     search.readOnly = busy && !next.memory.composing; choices.disabled = busy || Boolean(view.issue) || next.memory.composing;
-    const options = view.rows.map(row => ({ id: row.item.id, label: `${captionTitle(row.item)} — ${captionOwnerLabel(row.item)}` +
+    const rows = mode === 'add' ? view.rows.filter(row => row.entry.membership.kind !== 'value' || row.entry.membership.value !== 'included') : view.rows;
+    const options = rows.map(row => ({ id: row.item.id, label: `${captionTitle(row.item)} — ${captionOwnerLabel(row.item)}` +
       (row.item.pin === 'unplaced' ? '（未配置）' : '') +
       (row.entry.membership.kind !== 'value' || row.entry.lifecycle.kind !== 'value' ? '（要確認）' : row.entry.lifecycle.value === 'deleted'
         ? '（削除済み）' : row.entry.membership.value === 'included' ? '（追加済み）' : '') }));
@@ -59,10 +61,11 @@ export function createCaptionIncludeControls(document: Document, onPlan: (plan: 
     selected.textContent = view.selected ? `${captionTitle(view.selected.caption)} — ${captionOwnerLabel(view.selected.caption)}` +
       (view.selected.caption.pin === 'unplaced' ? '（未配置）' : '') +
       (action === 'exclude' ? '。キャプション自体や他のシーンには影響しません。' :
-        view.selected.caption.pin === 'ownerHidden' ? '。モデルは非表示のままです。' : '') : '';
+        (mode === 'add' ? '。本文と添付はシーン間で共用します。' : '') +
+        (view.selected.caption.pin === 'ownerHidden' ? ' モデルは非表示のままです。' : '')) : '';
     selected.hidden = !selected.textContent;
     status.textContent = [next.feedback.kind === 'failed' && `変更できませんでした。${next.feedback.message} 選択は保持しています。`,
-      issue, !view.issue && !view.rows.length && '該当するキャプションはありません。'].filter(Boolean).join(' ');
+      issue, !view.issue && !rows.length && '該当するキャプションはありません。'].filter(Boolean).join(' ');
     include.disabled = issue !== null;
     review.hidden = !view.selected || (view.selected.lifecycle.kind === 'value' && view.selected.lifecycle.value === 'active' && view.selected.membership.kind === 'value');
     review.disabled = busy || Boolean(next.pending) || next.memory.composing;

@@ -87,7 +87,7 @@ test('PC Caption work continues after empty tag focus and cancelled file checks,
     await revealCoordinateAdd(page); const owner = page.getByLabel('追加先モデル', { exact: true }); await owner.focus(); await owner.selectOption({ label: '現地モデル.glb' });
     await page.getByRole('button', { name: 'このモデルに追加', exact: true }).click();
     for (const [axis, value] of [['X', '0'], ['Y', '.5'], ['Z', '0']]) await page.getByLabel(`位置 ${axis}`, { exact: true }).fill(value!);
-    await page.getByRole('button', { name: '位置を確定', exact: true }).click(); await ready(page, 'ピンの位置を確定しました。'); await edit(page, 'タイトル', '確認する場所');
+    await page.getByRole('button', { name: 'ここに記録を作る', exact: true }).click(); await ready(page, 'ピンの位置を確定しました。'); await edit(page, 'タイトル', '確認する場所');
     await workspaceFits(page); await chooseCaption(page, '確認する場所');
     await page.getByRole('button', { name: '記録を複製', exact: true }).click(); await ready(page, '記録を複製しました。元の記録は変わりません。');
     await edit(page, 'タイトル', '見比べる記録・長い日本語の見出しと現地で確認した内容');

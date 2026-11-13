@@ -50,7 +50,7 @@ for(const touch of [false,true])test(`native capacity recovery retains drafts an
     await expect(p.getByLabel('3Dモデルの表示',{exact:true})).toHaveAttribute('aria-busy','false',{timeout:90_000});await revealWorkPanel(p);await revealCoordinateAdd(p);
     const model=p.getByLabel('追加先モデル',{exact:true});await model.focus();await model.selectOption({label:'容量確認.glb'});
     await p.getByRole('button',{name:'このモデルに追加',exact:true}).click();for(const axis of ['X','Y','Z'])await p.getByLabel('位置 '+axis,{exact:true}).fill(axis==='Y'?'.5':'0');
-    await p.getByRole('button',{name:'位置を確定',exact:true}).click();const detail=p.getByRole('region',{name:'キャプションの詳細',exact:true});
+    await p.getByRole('button',{name:'ここに記録を作る',exact:true}).click();const detail=p.getByRole('region',{name:'キャプションの詳細',exact:true});
     await expect(detail.getByLabel('本文',{exact:true})).toBeEnabled();await detail.getByLabel('タイトル',{exact:true}).fill('保持する記録');await detail.getByLabel('本文',{exact:true}).fill('容量不足でも失わない本文');
     await fault(p,'edit');let started=Date.now();await detail.getByRole('button',{name:'変更を適用',exact:true}).click();
     const retry=p.getByRole('button',{name:'更新を再試行',exact:true});await expect(retry).toBeEnabled();await expect(p.locator('.lv-project-workspace > header > .lv-operation-status')).toContainText('保存容量が不足');

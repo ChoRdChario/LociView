@@ -149,6 +149,7 @@ export function createMediaViewer(document: Document, raster?: RasterResources,d
     description.textContent = item?.description ?? ''; description.hidden = !description.textContent;
     status.textContent = item ? '' : 'この添付は変更されています。閉じて、メディアを選び直してください。';
     count.textContent = item ? `${index + 1} / ${group.items.length}` : '';
+    footer.hidden = !item || group.items.length < 2;
     previous.disabled = index <= 0; next.disabled = index < 0 || index === group.items.length - 1;
     if (!item) { preview?.dispose(); preview = null; content.replaceChildren(); }
     else { if (!preview) { preview = createPngPreview(document, selected, false, imageViewport.imageHost, image => {

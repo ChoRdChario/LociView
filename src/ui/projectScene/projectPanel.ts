@@ -24,6 +24,7 @@ export interface ProjectPanel {
 export interface ProjectModelPanel extends ProjectPanel {
   selectedAsset?(): string | null;
   selectedSurface(): string | null;
+  chooseProxy(assetId: string, resumePlacement: (registered: boolean) => void): void;
   hidden(): readonly string[];
   proposal(): WorkspaceModelProposal | null;
   propose(next: WorkspaceModelProposal): boolean;

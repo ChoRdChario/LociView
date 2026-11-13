@@ -72,7 +72,7 @@ test('狭い画面とno-hover touchで100記録をキーボード移動し、編
     await distinctFill(scene.getByRole('button', { name: '観察', exact: true }), scene.getByRole('button', { name: '全体', exact: true }));
     const tabs = page.getByRole('tablist', { name: '作業', exact: true });
     await distinctFill(tabs.getByRole('tab', { name: 'キャプション', exact: true }), tabs.getByRole('tab', { name: 'モデル', exact: true })); await tabs.getByRole('tab', { name: 'キャプション', exact: true }).focus(); await page.keyboard.press('ArrowRight');
-    await expect(tabs.getByRole('tab', { name: 'モデル', exact: true })).toBeFocused(); await page.keyboard.press('End'); await expect(tabs.getByRole('tab', { name: '材質', exact: true })).toBeFocused(); await page.keyboard.press('Home');
+    await expect(tabs.getByRole('tab', { name: 'モデル', exact: true })).toBeFocused(); await page.keyboard.press('End'); await expect(tabs.getByRole('tab', { name: '描画', exact: true })).toBeFocused(); await page.keyboard.press('Home');
     const list = page.getByRole('list', { name: 'キャプション一覧', exact: true }); await expect(list.locator('.lv-caption-select')).toHaveCount(100);
     await list.locator('.lv-caption-select').first().focus();
     // At the accepted 100-row boundary the ordinary DOM tab order remains active.
@@ -83,7 +83,7 @@ test('狭い画面とno-hover touchで100記録をキーボード移動し、編
     const text = detail(page).getByLabel('本文', { exact: true }); await text.dispatchEvent('compositionstart'); await text.fill(body); await page.setViewportSize({ width: 568, height: 320 });
     await expect(page.getByRole('region', { name: 'シーン', exact: true }).getByRole('button', { name: '全体', exact: true })).toBeDisabled();
     await text.dispatchEvent('compositionend'); await expect(text).toHaveValue(body); await detail(page).getByRole('button', { name: '変更を適用', exact: true }).tap(); await expect(page.getByText('変更を適用しました。', { exact: true })).toBeVisible({ timeout: 90_000 });
-    const pins = page.getByRole('region', { name: 'ピンの操作', exact: true }); await pins.getByRole('button', { name: '位置を調整', exact: true }).tap(); await pins.getByLabel('位置 X', { exact: true }).fill('4.25');
+    const pins = page.getByRole('region', { name: '位置の調整', exact: true }); await page.getByRole('button', { name: '位置を調整', exact: true }).tap(); await page.getByText('座標で微調整',{exact:true}).tap(); await pins.getByLabel('位置 X', { exact: true }).fill('4.25');
     await pins.getByRole('button', { name: '取り消す', exact: true }).tap(); await layout(page, 'shortHeight');
     await page.setViewportSize({ width: 320, height: 720 }); await page.getByRole('region', { name: 'キャプション', exact: true }).locator('.lv-caption-search').getByLabel('検索', { exact: true }).fill('既存のピン'); await list.locator('.lv-caption-select').filter({ hasText: '既存のピン' }).tap();
     const gallery = page.getByRole('region', { name: 'メディアの整理', exact: true }), thumb = gallery.getByRole('button').filter({ has: page.locator('img') }).first();
