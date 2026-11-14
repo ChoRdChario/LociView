@@ -10,6 +10,37 @@ queue or renewed approval requirements.
 
 ## Current — editing one record and sharing selected scenes
 
+- Restored project, ordinary title/body edit. After a full read of the
+  written document and its provider, confirm the new exact bytes from both
+  the journal and the current document, predecessor chain, restored binding
+  and selected writer. Adopt the verified read only after the lease closes.
+  Cold recovery, export and a subsequent full read inspect their own inputs.
+  Loss of an unrelated file after the last full check is detected on the
+  next full inspection. A changed or unreadable base before writing leaves
+  no pending edit; a fresh attempt on the same open project can succeed.
+- Ki-84, baseline `db8af2d`, final Windows Chromium 156, 1280×720, same
+  private input, isolated profiles, three interleaved runs per build.
+  Apply → visible success (seconds): 4.903/5.997/7.650 → 3.797/3.957/5.796.
+  The post-publication stage (ms): 1115/1251/2056 → 56/57/85.
+  Browser file snapshots in that stage: 280 → 20 in each pair, including
+  88 content receipts, 88 Origin receipts and 44 originals → zero for all
+  three families. These counts are successful OPFS getFile calls, excluding
+  IndexedDB. Before the first write, distinct receipt/original counts stayed
+  44/43/43. Six downloaded backups kept all 43 original bodies, three exact
+  original changes plus one new edit, 103 captions and cold-reopened text.
+  Download handoff medians 28.719 → 22.126 s, cold launch through edited
+  text 31.558 → 24.069 s; these paths were unchanged and varied across runs.
+- Verification: five PC/touch Chromium tests passed, including renderer
+  termination before staging, before publication and immediately after
+  on-screen success, then cold reopening and backup inspection. Repaired
+  damaged journal, exact edit and restore-binding cases reopened once.
+  Final checkpoint: 156 suites, 3,549 passing, 16 expected failures and
+  21 todo; five builds, offline isolation and HEIC isolation all passed.
+- Next: apply still interrupts writing. Before the first write the new median
+  was 1.636 s; pre-persist and post-persist provider checks were 0.561 and
+  0.568 s. Measure CPU vs storage inside the first interval before changing
+  its checks. Physical iPhone Safari latency is still unmeasured.
+
 - Ki-84 body edit, baseline `ac5102d`. Each of 44 distinct content receipts,
   43 Origin receipts and 43 originals is now opened once during preparation.
   The source/edited providers validate their own token, records, facts and
@@ -44,12 +75,8 @@ queue or renewed approval requirements.
   21 todo, five builds and offline isolation passed. HEIC isolation passed for
   all five artifacts. The final diagnostic/import correction preserves the
   measured edit path. Physical iPhone testing was outside this measurement.
-- Next: six seconds still interrupts ordinary writing. Profile the confirmed
-  edit after staging: final-content, saved-content and published readback took
-  0.836, 0.733 and 1.234 s (candidate medians). Evaluate how much of each
-  independent inspection must traverse unchanged records for a scalar text
-  change; keep the durable edited bytes, publication and recovery independent.
-  Physical iPhone Safari timings remain open.
+- Previous run's post-staging medians for final-content, saved-content and
+  published readback were 0.836, 0.733 and 1.234 s, respectively.
 
 - Measure a restored Ki-84 body edit from the Apply click to its first journal
   write. Attribute selection checks to the edit and independent readers. Group

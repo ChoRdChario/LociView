@@ -3235,7 +3235,14 @@ Only a single local change without a model-fact plan can enter the text writer.
 The fresh write-entry fence closes preparation before the Session retains a
 transaction. An unchanged edit is accepted only after the fresh lease exit.
 Preparation has no journal or storage writer and expires when its callback exits.
-Cold recovery and all post-write checks retain the preceding contract.
+Cold recovery retains the preceding contract. For a live edit only, after the
+persisted document and its provider have been independently verified, the
+post-publication read checks the journal chain against its observed base, the
+new transaction and its exact change bytes, the actual unfiltered document
+heads and the stored edit, pending scene appends and the selected lease. Only
+after the closing check may the Session adopt the saved provider. Later damage
+to an unrelated body or historical part is checked by the next full read.
+See [06e](06e-selected-generation-output-read-proposal.md) for acceptance.
 
 On ordinary host/catalog reopening of an already selected, completed restore,
 a later prepared local text edit may be handed to strict recovery. The last

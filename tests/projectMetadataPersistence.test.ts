@@ -1496,6 +1496,22 @@ describe('new-workspace metadata persistence service (memory ports, not device/a
     expect(await journal.entries()).toHaveLength(1);
     expect((await session.read()).source!.token).toBe(initial.source!.token);
   });
+  it('confirms only the exact edit and current document heads from a fresh storage read', async () => {
+    const h = setup(), session = h.session(), initial = (await session.create(h.records)).source!;
+    const repository = new MetadataRepository(h.fs, h.storage, limits);
+    const repositoryId = (await new TransactionJournal(h.fs, limits).entries())[0]!.start.repositoryId;
+    const next = await initial.prepareCaptionText(initial.token, id('cap'), 'body', '保存した本文');
+    const part = next.originalChanges().find(bytes => next.heads.includes(A.decodeChange(bytes).hash))!;
+    await expect(repository.confirmPublishedEdit(repositoryId, initial.heads, next.heads, part)).rejects.toThrow('publication-readback');
+    await underWriteLease(h.fs, () => repository.persist(repositoryId, next));
+    await expect(repository.confirmPublishedEdit(repositoryId, initial.heads, next.heads, part)).resolves.toBeUndefined();
+    const wrongPart = part.slice();
+    wrongPart[0] = wrongPart[0]! ^ 1;
+    await expect(repository.confirmPublishedEdit(repositoryId, initial.heads, next.heads, wrongPart)).rejects.toThrow('publication-readback');
+    const later = await next.prepareCaptionText(next.token, id('cap'), 'body', '次の変更');
+    await underWriteLease(h.fs, () => repository.persist(repositoryId, later));
+    await expect(repository.confirmPublishedEdit(repositoryId, initial.heads, next.heads, part)).rejects.toThrow('publication-readback');
+  });
   it('retains staged pre-apply failures for same-session retry but refuses incomplete cold staging', async () => {
     const h = setup(), writer = h.session(), initial = await writer.create(h.records);
     h.fs.reject = path => path.endsWith('/blobsVerified.json');

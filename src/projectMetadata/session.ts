@@ -13,7 +13,7 @@ import { readProjectScene, type ProjectProviderRead } from '../scene/projectProv
 import { checkLimits, fail, MetadataSourceError, type MetadataLimits } from './format';
 import { ProjectMetadataSource } from './source';
 import { MetadataRepository, type MetadataStorageFactory } from './repository';
-import { TransactionJournal, type JournalStart, type PreparedJournal } from './journal';
+import { TransactionJournal, type JournalStart, type PreparedJournal, type JournalEntry } from './journal';
 import { digest, equalBytes, json, newId, underWriteLease, withMetadataRead, metadataPath, selectedTextCommit, type MetadataReadPorts, type TextCommitPorts } from './persistence';
 import { canonicalMetadataEdit, planMetadataEdit, type MetadataEdit } from './commands';
 import { checkRemoteStored, copyFullSource, initialWorkspaceChanges, planRemoteChanges, type FullMetadataSource, type RemoteBatchProof } from './remote';
@@ -142,6 +142,11 @@ function incomingBlobs(blobs: readonly { sha256: string; byteLength: number }[])
   return (ref: JsonObject) => ref.algorithm === 'sha256' && available.has(blobKey(ref));
 }
 
+function matchesPublishedBase(chain: readonly JournalEntry[], base: readonly JournalEntry[], added: number): boolean {
+  return chain.length === base.length + added && base.every((entry, i) =>
+    json(chain[i]!.start) === json(entry.start) && json(chain[i]!.publication) === json(entry.publication));
+}
+
 /** New synthetic-workspace service; ordinary ProjectStore/UI and old saved runs do not import it. */
 export class MetadataProjectSession {
   private readonly limits: MetadataLimits;
@@ -167,7 +172,7 @@ export class MetadataProjectSession {
 
   async read(requireReadyPublished = false): Promise<MetadataSessionRead> {
     try {
-      const candidate = await withMetadataRead(this.fs, this.storage, ports => this.readCandidate(undefined, ports, false, undefined, requireReadyPublished));
+      const candidate = await withMetadataRead(this.fs, this.storage, ports => this.readCandidate(undefined, ports, false, requireReadyPublished));
       return this.adoptRead(candidate);
     } catch {
       // Closing failure must not publish an unaudited candidate or roll back a
@@ -205,8 +210,8 @@ export class MetadataProjectSession {
       } finally { active = false; await Promise.allSettled([...pending]); }
     });
   }
-  private async readCandidate(integrity?: OutputIntegrityRead, ports?: MetadataReadPorts, editingText = false, completedText?: string, requireReadyPublished = false, preparation?: MetadataReadPorts): Promise<{
-    read: MetadataSessionRead; acknowledged?: Set<string>; localChanges?: Set<string>; publishedStart?: JournalStart
+  private async readCandidate(integrity?: OutputIntegrityRead, ports?: MetadataReadPorts, editingText = false, requireReadyPublished = false, preparation?: MetadataReadPorts): Promise<{
+    read: MetadataSessionRead; acknowledged?: Set<string>; localChanges?: Set<string>; publishedStart?: JournalStart; priorPublications?: JournalEntry[]; witnessWork?: number
   }> {
     try {
       if (ports && !ports.factory) return fail('generation-storage-binding');
@@ -217,8 +222,7 @@ export class MetadataProjectSession {
         id: result.entry.start.transactionId, parts: result.source.originalChanges(),
         blobs: result.description.blobs, requiredCapabilities: result.description.requiredCapabilities,
       } : null);
-      const retainedPending = this.retained && !(completedText && this.retained.start.transactionId === completedText && published?.start.transactionId === completedText);
-      const pending = entries.some(e => !e.publication) || !!retainedPending || (await this.readSceneAppendStates(fs, journal, entries)).length > 0;
+      const pending = entries.some(e => !e.publication) || !!this.retained || (await this.readSceneAppendStates(fs, journal, entries)).length > 0;
       if (!published) return { read: Object.freeze({ state: pending ? 'pending' : 'empty', source: null, provider: null, publication: null }) };
       const heads = published.publication!.heads;
       const checkAllHeads = editingText && !pending;
@@ -262,7 +266,8 @@ export class MetadataProjectSession {
       const provider = await readProjectScene(source!.read(), this.limits, this.verifier(false, preparation), { verifyRetainedMedia: this.retainedSelection(source!, acknowledged, localChanges, preparation) });
       if (pending && requireReadyPublished && !this.providerReady(provider)) fail('provider-not-ready');
       return { read: Object.freeze({ state: pending ? 'pending' : this.providerReady(provider) ? 'ready' : 'repair-required',
-        source: source!, provider, publication: published.start.transactionId }), acknowledged, localChanges, publishedStart: published.start };
+        source: source!, provider, publication: published.start.transactionId }), acknowledged, localChanges, publishedStart: published.start,
+        priorPublications: preparation && !pending ? entries : undefined, witnessWork };
     } catch (error) {
       if (editingText && error instanceof MetadataSourceError && error.code === 'command-base-changed') throw error;
       return { read: Object.freeze({ ...this.last, state: 'repair-required' }) };
@@ -339,7 +344,7 @@ export class MetadataProjectSession {
       if (commit) {
         const { candidate, transaction } = await commit.prepare(async ports => {
           await assertReviewEditSlot(ports.fs, this.limits);
-          const candidate = await this.readCandidate(undefined, ports, true, undefined, false, ports);
+          const candidate = await this.readCandidate(undefined, ports, true, false, ports);
           const { state, source, provider } = candidate.read;
           if (state !== 'ready' || !source || !provider || source.token !== expectedToken || !candidate.publishedStart) return fail('command-not-ready');
           if (provider.kind !== 'scene-provider' || provider.token !== source.token) return fail('provider-not-ready');
@@ -351,14 +356,17 @@ export class MetadataProjectSession {
           acceptText = () => { this.adoptRead(candidate); };
           return candidate.read;
         }
-        if (transaction.modelFacts || transaction.parts.length !== 1) return fail('text-commit-state');
+        const { priorPublications, localChanges, acknowledged } = candidate;
+        if (transaction.modelFacts || transaction.parts.length !== 1 || !priorPublications || !localChanges || !acknowledged) return fail('text-commit-state');
+        if (candidate.witnessWork === undefined || candidate.witnessWork + 1 > this.limits.maxWork) return fail('retained-media-limit');
         const { transactionId, repositoryId } = transaction.start;
-        return commit.write(transactionId, this.repository.documentId(repositoryId), ports => {
-          // The write scope freshly checked the selection. A refused preparation
-          // must leave neither a pending transaction nor an accepted new read.
+        return commit.write(transactionId, this.repository.documentId(repositoryId), async ports => {
+          const entries = await new TransactionJournal(ports.fs, this.limits).entries();
+          if (this.retained || !matchesPublishedBase(entries, priorPublications, 0)) return fail('command-base-changed');
+          // Claim the edit only after the fresh on-disk base check succeeds.
           this.adoptRead(candidate);
           this.retained = transaction;
-          return this.resume(undefined, undefined, { ports, transactionId, ready: accept => { acceptText = accept; } });
+          return this.resume(undefined, undefined, { ports, transactionId, entries, localChanges, acknowledged, ready: accept => { acceptText = accept; } });
         });
       }
       await assertReviewEditSlot(this.fs, this.limits);
@@ -1156,12 +1164,12 @@ export class MetadataProjectSession {
   }
 
   private async resume(receiveJob?: ReceiveJob, restoreJob?: BackupRestoreJob, text?: {
-    ports: TextCommitPorts; transactionId: string; ready(accept: () => void): void
+    ports: TextCommitPorts; transactionId: string; entries: JournalEntry[]; localChanges: Set<string>; acknowledged: Set<string>; ready(accept: () => void): void
   }): Promise<MetadataSessionRead> {
     const fs = text?.ports.fs ?? this.fs;
     const journal = text ? new TransactionJournal(fs, this.limits) : this.journal;
     const repository = text ? new MetadataRepository(fs, text.ports.factory, this.limits) : this.repository;
-    const entries = await journal.entries(), pending = entries.find(e => !e.publication);
+    const entries = text?.entries ?? await journal.entries(), pending = entries.find(e => !e.publication);
     if (text && (pending || !this.retained || this.retained.start.purpose !== 'localCommand' ||
       this.retained.start.transactionId !== text.transactionId || this.retained.parts.length !== 1 ||
       this.retained.remote || this.retained.stagedBlobs || this.retained.introduction || this.retained.modelFacts))
@@ -1302,7 +1310,9 @@ export class MetadataProjectSession {
       const saved = actual.get(A.decodeChange(bytes).hash);
       if (!saved || !equalBytes(saved, bytes)) fail('durable-change-missing');
     }
-    await this.measure('resume.saved-content', () => this.checked(stored!, false));
+    const savedWitnesses = text ? { acknowledged: text.acknowledged,
+      localChanges: new Set(text.localChanges).add(prepared.changes[0]!.expectedChangeHash) } : undefined;
+    const savedProvider = await this.measure('resume.saved-content', () => this.checked(stored!, false, undefined, savedWitnesses));
     if ((start.purpose === 'importClean' || start.purpose === 'appendScene') && stored!.token !== next.token) fail('journal-final-heads');
     if (prepared.remote && json(stored!.heads) !== json(prepared.remote.expectedFinalHeads)) fail('remote-final-heads');
     this.fs.mutationAuthority.assertWorkspaceWriteAuthorized();
@@ -1311,11 +1321,26 @@ export class MetadataProjectSession {
     this.fs.mutationAuthority.assertWorkspaceWriteAuthorized();
     if (text) {
       await text.ports.advance('readback');
-      const checked = await this.measure('resume.published-readback', () => this.readCandidate(undefined, text.ports, true, text.transactionId));
-      if (checked.read.state !== 'ready' || checked.read.source?.token !== stored!.token ||
-        checked.read.publication !== text.transactionId) return fail('publication-readback');
-      text.ready(() => { text.ports.assertCanAcknowledge(); this.retained = null; this.adoptRead(checked); });
-      return checked.read;
+      const retained = this.retained;
+      await this.measure('resume.published-readback', async () => {
+        const chain = await journal.entries(), tip = chain.at(-1);
+        if (!matchesPublishedBase(chain, entries, 1) ||
+          !tip?.publication || json(tip.start) !== json(start) ||
+          tip.publication.exactChangeSetDigest !== prepared.exactChangeSetDigest || json(tip.publication.heads) !== json(stored!.heads) ||
+          (await this.readSceneAppendStates(fs, journal, chain)).length) return fail('publication-readback');
+        await journal.checkRestoredBinding(chain);
+        const [savedPart] = await journal.validateParts(tip.prepared!);
+        if (!savedPart || !equalBytes(savedPart, parts[0]!)) return fail('publication-readback');
+        await repository.confirmPublishedEdit(start.repositoryId, start.baseHeads, stored!.heads, savedPart);
+      });
+      const read = Object.freeze({ state: 'ready' as const, source: stored!, provider: savedProvider, publication: text.transactionId });
+      text.ready(() => {
+        text.ports.assertCanAcknowledge();
+        if (!retained || this.retained !== retained || retained.start.transactionId !== text.transactionId) return fail('text-commit-state');
+        this.retained = null;
+        this.adoptRead({ read, ...savedWitnesses });
+      });
+      return read;
     }
     this.retained = null;
     const read = await this.measure('resume.published-readback', () => this.read());

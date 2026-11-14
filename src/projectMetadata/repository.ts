@@ -121,6 +121,16 @@ export class MetadataRepository {
     });
   }
 
+  /** Confirm an ordinary text edit against the latest document in the selected store. */
+  async confirmPublishedEdit(id: string, baseHeads: readonly string[], expectedHeads: readonly string[], part: Uint8Array): Promise<void> {
+    await this.use(false, async storage => {
+      const doc = await storage.loadDoc(this.documentId(id));
+      if (!doc || json(A.getHeads(doc).sort()) !== json(expectedHeads)) return fail('publication-readback');
+      const added = A.getChangesSince(doc, [...baseHeads]);
+      if (added.length !== 1 || !equalBytes(added[0]!, part)) fail('publication-readback');
+    });
+  }
+
   /** Caller holds project lease and has already retained/verified the complete journal. */
   async persist(id: string, expected: ProjectMetadataSource): Promise<ProjectMetadataSource> {
     const parts = expected.originalChanges(), byHash = new Map(parts.map(b => [A.decodeChange(b).hash, b]));

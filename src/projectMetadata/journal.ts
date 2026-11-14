@@ -338,13 +338,19 @@ export class TransactionJournal {
   }
 
   private async readRestoredBasesDirect(entries?: readonly JournalEntry[]) {
-    const chain = entries ?? await this.entries(), entry = chain.find(e => e.start.purpose === 'restoreBackup');
+    const root = await this.checkRestoredBinding(entries ?? await this.entries());
+    return root && { ...root, ...await this.restoreOriginals(root.entry.prepared!) };
+  }
+
+  /** Check the root's small binding independently of the original backup contents. */
+  async checkRestoredBinding(chain: readonly JournalEntry[]) {
+    const entry = chain.find(e => e.start.purpose === 'restoreBackup');
     const binding = await readReceipt<RestoredBasesBinding>(this.fs, metadataPath(this.fs, 'restored-bases.json'), this.limits);
     if (!entry) { if (binding) fail('restore-base-orphan'); return null; }
     if (chain[0] !== entry) return fail('restore-base-root');
     if (!entry.publication) return null; // A prepared binding is not a completed base observation.
     if (!entry.prepared || json(binding) !== json(await this.restoredBinding(entry.prepared, entry.publication))) return fail('restore-base-binding');
-    return { binding: binding!, entry, ...await this.restoreOriginals(entry.prepared) };
+    return { binding: binding!, entry };
   }
 
   async publish(p: PreparedJournal, source: ProjectMetadataSource): Promise<void> {

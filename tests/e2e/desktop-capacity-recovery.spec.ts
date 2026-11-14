@@ -110,7 +110,7 @@ for(const touch of [false,true])test(`native capacity recovery retains drafts an
   }finally{await context?.close();await server.stop();}
 });
 
-test('a renderer crash before the first text write keeps the old body and a crash before publication resumes the edit exactly once', async ({}, info) => {
+test('renderer crashes before writing, before publication and immediately after success preserve the confirmed text exactly once', async ({}, info) => {
   A.getHeads(A.init());
   const server = await ownedServer(process.env.LOCIVIEW_E2E_ARTIFACT ?? 'desktop-dist');
   const receiver = await createBrowserProfile('restored-text');
@@ -135,6 +135,12 @@ test('a renderer crash before the first text write keeps the old body and a cras
     await page.locator('.lv-caption-select').filter({ hasText: '既存のピン' }).click();
     return detail(page).getByLabel('本文', { exact: true });
   };
+  const crash = async (page: Page) => {
+    const protocol = await context!.newCDPSession(page), crashed = page.waitForEvent('crash');
+    void protocol.send('Page.crash').catch(() => {});
+    await crashed;
+    await context!.close();
+  };
   const crashAt = async (page: Page, fileName: string) => {
     const signal = page.waitForEvent('console', msg => msg.text() === 'text write paused');
     await page.evaluate(fileName => {
@@ -149,10 +155,7 @@ test('a renderer crash before the first text write keeps the old body and a cras
     }, fileName);
     await detail(page).getByRole('button', { name: '変更を適用', exact: true }).click();
     await signal;
-    const protocol = await context!.newCDPSession(page), crashed = page.waitForEvent('crash');
-    void protocol.send('Page.crash').catch(() => {});
-    await crashed;
-    await context!.close();
+    await crash(page);
   };
   try {
     const author = await open(await createBrowserProfile('author'));
@@ -201,13 +204,20 @@ test('a renderer crash before the first text write keeps the old body and a cras
     for (const entry of before.archive.control.entries.filter(e => e.path.startsWith('blobs/'))) {
       expect(await after.archive.entryBlob(entry.path).arrayBuffer()).toEqual(await before.archive.entryBlob(entry.path).arrayBuffer());
     }
-    await context!.close();
+    const confirmed = '完了表示の直後に終了しても残る本文';
+    await (await record(resume)).fill(confirmed);
+    await detail(resume).getByRole('button', { name: '変更を適用', exact: true }).click();
+    await expect(resume.getByText('変更を適用しました。', { exact: true })).toBeVisible();
+    await crash(resume);
     const cold = await open(receiver, '?run=' + run);
     const row = cold.locator('.lv-caption-select').filter({hasText: '既存のピン'});
     await expect(row).toBeVisible();
     const enterEdit = cold.getByRole('button',{name:'編集する',exact:true});
     if (await enterEdit.isVisible()) await enterEdit.click();
-    await expect(await record(cold)).toHaveValue(text);
-    expect((await backup(cold, 'reopened')).source.originalChanges()).toEqual(changes);
+    await expect(await record(cold)).toHaveValue(confirmed);
+    const reopened = await backup(cold, 'reopened');
+    expect(reopened.source.originalChanges()).toEqual(expect.arrayContaining(changes));
+    expect(reopened.source.originalChanges()).toHaveLength(changes.length + 1);
+    expect(reopened.archive.control.manifest.blobs).toEqual(before.archive.control.manifest.blobs);
   } finally { await context?.close(); await server.stop(); }
 });

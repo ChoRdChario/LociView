@@ -3093,6 +3093,72 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     await expect(openValidationHost(f.options)).rejects.toThrow();
     expect((await f.base.list('')).filter(p => p.endsWith('/published.json'))).toEqual(publications);
   });
+  it.each(['replaced', 'unreadable'])('refuses a %s published base on the last journal read before the first text write', async fault => {
+    const f = await restoredBodyFixture(), host = owned(await openValidationHost(f.options));
+    const before = host.read(), list = f.base.list.bind(f.base), paths = await list('');
+    const last = paths.find(path => path.endsWith('/' + before.publication + '/published.json'))!;
+    const original = (await f.base.readText(last))!;
+    const start = JSON.parse((await f.base.readText(last.replace('published.json', 'staging.json')))!);
+    const receipt = JSON.parse(original); receipt.heads = start.baseHeads;
+    let listings = 0;
+    const changed = vi.spyOn(f.base, 'list').mockImplementation(async prefix => {
+      if (prefix.endsWith('/metadata/journal/') && ++listings === 2) await f.base.writeText(last, fault === 'replaced' ? json(receipt) : '{');
+      return list(prefix);
+    });
+    const edit = () => host.dispatch(before.source!.token, { kind: 'editCaption', captionId: f.captionId, edits: { body: '履歴を確認した本文' } });
+    try {
+      await expect(edit()).rejects.toThrow(fault === 'replaced' ? 'command-base-changed' : 'receipt-invalid');
+      expect((await list('')).sort()).toEqual(paths.sort());
+      expect(host.read().publication).toBe(before.publication);
+    } finally { changed.mockRestore(); await f.base.writeText(last, original); }
+    expect((await edit()).source!.originalChanges()).toHaveLength(f.changes.length + 1);
+  });
+  it.each(['published heads', 'current change', 'restore binding', 'unrelated original'] as const)('checks the live edit after publication and cold-reopens after %s damage', async fault => {
+    const f = await restoredBodyFixture(), host = owned(await openValidationHost(f.options));
+    const before = host.read().source!, edits = { title: '照合済みの見出し', body: '照合済みの本文' };
+    const originalPath = (await f.base.list('')).find(path => path.startsWith('v2/cas/objects/'))!;
+    const write = f.base.writeText.bind(f.base), list = f.base.list.bind(f.base);
+    let published = '', target = '', original: Uint8Array | null = null;
+    const writer = vi.spyOn(f.base, 'writeText').mockImplementation(async (path, value) => {
+      await write(path, value);
+      if (path.endsWith('/published.json')) published = path;
+    });
+    const reader = vi.spyOn(f.base, 'list').mockImplementation(async prefix => {
+      if (published && !target && prefix?.endsWith('/metadata/journal/')) {
+        target = fault === 'restore binding' ? published.replace(/journal\/[^/]+\/published\.json$/, 'restored-bases.json') :
+          fault === 'current change' ? published.replace(/published\.json$/, 'changes/00000000.amchange') :
+          fault === 'published heads' ? published : originalPath;
+        original = (await f.base.readBytes(target))!.slice();
+        if (fault === 'unrelated original') await f.base.remove(target);
+        else if (fault === 'published heads') {
+          const receipt = JSON.parse(new TextDecoder().decode(original));
+          receipt.heads = before.heads;
+          await write(target, json(receipt));
+        } else {
+          const corrupt = original.slice(); corrupt[0] = corrupt[0]! ^ 1;
+          await f.base.writeBytes(target, corrupt);
+        }
+      }
+      return list(prefix);
+    });
+    try {
+      const edit = host.dispatch(before.token, { kind: 'editCaption', captionId: f.captionId, edits });
+      if (fault === 'unrelated original') {
+        const live = await edit;
+        expect(validatedResumeReading(live, f.run)?.records.find(c => c.id === f.captionId)).toMatchObject(edits);
+      } else {
+        await expect(edit).rejects.toThrow();
+        expect(host.read().source?.token).toBe(before.token);
+      }
+      expect(target).toBeTruthy();
+    } finally { reader.mockRestore(); writer.mockRestore(); await host.dispose(); }
+    await expect(openValidationHost(f.options)).rejects.toThrow();
+    await f.base.writeBytes(target, original!);
+    const reopened = owned(await openValidationHost(f.options)), read = reopened.read();
+    expect(validatedResumeReading(read, f.run)?.records.find(c => c.id === f.captionId)).toMatchObject(edits);
+    expect(read.source!.originalChanges()).toHaveLength(f.changes.length + 1);
+    expect(read.source!.originalChanges()).toEqual(expect.arrayContaining(f.changes));
+  });
   it('checks the selected restore at lease entry and again before the first text write', async () => {
     const f = await restoredBodyFixture(), host = owned(await openValidationHost(f.options));
     const list = vi.spyOn(f.base, 'list'), write = f.base.writeText.bind(f.base);
