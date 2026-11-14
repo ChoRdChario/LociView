@@ -52,7 +52,6 @@ export async function createValidationBrowserWorkspace(document: Document, compo
   const policy=projectFilePolicy(composition.filePolicy ?? validationBrowserLimits);
   const raster = policy.nonGs.maxStaticPixels === undefined ? undefined : createRasterResources();
   const rasterDecoders = raster ? createRasterDecoders(policy.nonGs, raster) : undefined;
-  await initializeBrowserMetadata();
   const metrics = new Map<string, { count: number; milliseconds: number }>(); let measures = 0;
   const publish = (stage: string, milliseconds: number) => {
     if (++measures > 2000) return;
@@ -64,6 +63,7 @@ export async function createValidationBrowserWorkspace(document: Document, compo
     const previous = metrics.get(stage) ?? { count: 0, milliseconds: 0 };
     metrics.set(stage, { count: previous.count + 1, milliseconds: previous.milliseconds + milliseconds });
   } : undefined;
+  await measureValidation(timing, 'browser.metadata.initialize', initializeBrowserMetadata);
   const snapshot=()=>publish('snapshot',0);if(timing)document.addEventListener('lociview-timing-snapshot',snapshot);
   const observed = <T extends object>(target: T, label: (method: string, args: unknown[]) => string): T => !timing ? target : new Proxy(target, {
     get(object, key) {

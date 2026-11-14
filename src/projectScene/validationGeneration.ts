@@ -37,7 +37,7 @@ export async function inspectValidationFirstBackup(root: ProjectWorkspaceFS, opt
 
 /** Host and catalog resolve exactly the same FS/DB generation. Never recreate an existing database. */
 export async function openValidationGeneration(root: ProjectWorkspaceFS, options: Options, create = false,
-  diagnostics?: { observeRead?: (read: MetadataSessionRead) => void; context?: 'catalog' | 'host' }) {
+  diagnostics?: { observeRead?: (read: MetadataSessionRead) => void; observeMetadataRead?: (read: MetadataSessionRead) => void; context?: 'catalog' | 'host' }) {
   const databases = validationGenerationDatabases(options);
   let service: ReturnType<typeof validationGenerationService> | undefined;
   const controls = await readRestoreControls(root, limits);
@@ -52,6 +52,7 @@ export async function openValidationGeneration(root: ProjectWorkspaceFS, options
       ordinarySession: diagnostics?.context !== 'catalog',
       reopenTextRecovery: true,
       observeCatalogRead: diagnostics?.observeRead,
+      observeMetadataRead: diagnostics?.context !== 'catalog' ? diagnostics?.observeMetadataRead : undefined,
       timing: options.timing && ((stage, ms) => options.timing!(`${diagnostics?.context ?? 'host'}.destination.${stage}`, ms)),
     });
   try {

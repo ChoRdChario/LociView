@@ -8,7 +8,53 @@ and [earlier working records](../docs/history/development-through-2026-10-28/tas
 retain qualifications and failures. Their Current/Next headings are not an active
 queue or renewed approval requirements.
 
-## Current — editing one record and sharing selected scenes
+## Current — readable saved text during cold reopening
+
+- Active follow-up2026-11-14: reduce cold Ki-84 resume to readable saved text.
+  Freeze `4c34ae6` as the comparison build. Measure browser launch, catalog,
+  selected generation checks, first text, opening Session, recovery/history,
+  editor availability and 3D separately. Verify the actual first readable body,
+  not only the complete-editor milestone. Reuse the accepted read-only reader
+  and owned results only within their present lifetime. Keep all strict reopen,
+  save readback, publication and interrupted recovery fences. Compare three
+  same-input cold launches per build, PC/touch selection/search/IME handoff,
+  corruption refusal, representative output/reopen, independent review and
+  the required final checks. New validation-lifetime policy is a stop condition.
+
+- Implemented the reviewed06e§9.0 scheduling amendment under the current
+  text-first instruction. Advisory startup uses the existing direct Host path
+  instead of opening/closing the same Project for catalog inspection first.
+  A freshly checked selected destination, archive, journal, current Session and
+  independent saved repository can expose owned text while all-body/bases checks
+  continue. Every full check and independent Host read still precedes adoption,
+  editing and saving. Pending or failing checks retract only their owned reader.
+- Same saved Ki-84 backup SHA256
+  `27efe56c7204dde83199154a9f01f46af1323482bce844276373706d92afcde0`,
+  Chromium156/Windows,1280×720,DPR1, isolated profiles, full browser close each
+  round, three rounds per build. Baseline `4c34ae6`:
+  readable actual edited body5905/5314/5935ms →4222/4340/4352ms,
+  median5905→4340ms (26.5% shorter). Editing19480/19330/19665ms →
+  13943/13963/14103ms, median19480→13963ms (28.3% shorter).
+  Complete3D19606/19436/19754ms →14044/14071/14203ms.
+  The earlier25.34s figure awaited complete readiness and later selection;
+  it was not a measurement of the first readable body. Keep this corrected
+  first-body definition for subsequent comparisons.
+- Separate final diagnostic example: initialize20ms; archive1497ms, journal354ms,
+  Session1049ms, repository188ms; remaining body737ms/bases356ms; independent
+  Host Session962ms, receive/review/output1233ms; model content1853ms/decode
+  2563ms. These nested stages are not all additive. The normal three-round
+  results above use no diagnostic instrumentation.
+  A preliminary diagnostic launch inside the managed environment spent42.8s
+  before navigation; it is retained as environmental evidence and excluded from
+  the normal same-environment comparison.
+- Focused stored-text/IME/retraction checks passed. Independent spec and final
+  source review found no actionable issue. PC/touch browser checks both passed
+  with actual material verification held, text/search available, no editor/file
+  ports, and IME/selection/focus retained after completion. Source/test hashes
+  are frozen. Final checkpoint passed:156 suites,3560 passing,16 expected
+  failures,21 TODO, five builds and offline isolation. The59-case Desktop
+  regression and five-case cold-offline verification are running serially.
+  Physical iPhone Safari timings/IME/storage remain unverified.
 
 - Target for the ordinary Ki-84 text edit: about one second from Apply to
   visible durable acknowledgment. Profile preparation, stored document and

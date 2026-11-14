@@ -2722,30 +2722,35 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       else { release(); await h.idle(); notice!.show(snapshot); expect(h.all(h.root).some(node => node.className.includes('lv-resume-reading'))).toBe(false); }
     } finally { release(); await (closing ?? h.ui.dispose()); }
   });
-  it('restored resume shows saved body before its independent Host read and retains IME handoff', async () => {
+  it.each(['direct', 'automatic'] as const)('restored %s resume shows saved body during material checks and retains IME handoff', async route => {
     const f = await restoredBodyFixture(), document = new RecordedDocument(), all = (n: RecordedNode): RecordedNode[] => [n, ...n.children.flatMap(all)];
     let release!: () => void, entered!: () => void, returned!: () => void, current: Awaited<ReturnType<typeof openValidationHost>> | undefined;
     const gate = new Promise<void>(resolve => { release = resolve; }), held = new Promise<void>(resolve => { entered = resolve; }), opened = new Promise<void>(resolve => { returned = resolve; });
-    const original = validationGenerationModule.openValidationGeneration, notices: unknown[] = [], timings: string[] = [];
-    const generation = vi.spyOn(validationGenerationModule, 'openValidationGeneration').mockImplementation(async (...args) => {
-      const connection = await original(...args), read = connection.service.session.read.bind(connection.service.session);
-      connection.service.session.read = async () => { entered(); await gate; return read(); }; return connection;
+    const notices: unknown[] = [], timings: string[] = [];
+    const original = f.options.store.openReadOnly.bind(f.options.store);
+    let holdBodies = false;
+    const bodyRead = vi.spyOn(f.options.store, 'openReadOnly').mockImplementation(async (...args) => {
+      if (holdBodies) { entered(); await gate; holdBodies = false; }
+      return original(...args);
     });
     const factory: ViewportFactory = () => ({ update() {}, setActive() {}, camera() {}, retry() {}, dispose() {},
       read: () => ({ ready: true, display: undefined, token: '1', pickToken: '1', pins: [], issue: null, dragging: false, projection: 'perspective', axis: null }) });
+    const list = vi.fn(() => listValidationProjects(f.options, f.openStorage));
     const ui = owned(createValidationWorkspace(document.asDocument(), { ...f.options, productEditor: true, progressivePresentation: true,
-      selected() {}, list: () => listValidationProjects(f.options, f.openStorage), render: async () => ({ factory, dispose() {} }),
+      lastProject: { read: () => ({run:f.run,mode:'edit'}), remember() {} },
+      selected() {}, list, render: async () => ({ factory, dispose() {} }),
       open: async (run, initial, mode, workspaceFile, reviewEdit, firstBackup, _standalone, reading) => {
         const host = await openValidationEntry({ ...f.options, run, initial, mode, workspaceFile, reviewEdit, firstBackup,
-          timing: stage => { timings.push(stage); }, reading: reading && { run: reading.run, show(value) { notices.push(value); reading.show(value); } } });
+          timing: stage => { timings.push(stage); if (stage === 'host.destination.repository') holdBodies = true; },
+          reading: reading && { run: reading.run, show(value) { notices.push(value); reading.show(value); } } });
         if ('kind' in host) throw Error('selected Host expected'); current = host; returned(); return host;
-      } }, f.run));
+      } }, route === 'direct' ? f.run : undefined));
     const root = record(ui.root);
     try {
       await held; expect(current).toBeUndefined(); expect(notices).toHaveLength(1);
       const reader = all(root).find(n => n.className.includes('lv-resume-reading'))!; expect(reader).toBeDefined();
       expect(all(reader).some(n => n.tag === 'textarea' || n.tag === 'input' && n.type === 'file' || n.textContent === '変更を適用')).toBe(false);
-      expect(timings).toContain('host.destination.session'); expect(timings).toContain('host.open.reading');
+      expect(timings).toContain('host.destination.repository'); expect(timings).not.toContain('host.destination.bodies');
       expect(timings.some(stage => stage.startsWith('catalog.destination.'))).toBe(false);
       const search = all(reader).find(n => n.tag === 'input' && n.type === 'search')!, row = all(reader).find(n => n.tag === 'button' && n.textContent === f.reading.records.find(c => c.id === f.captionId)!.title)!;
       search.focus(); search.fire('compositionstart'); search.value = row.textContent.slice(0, 1); search.fire('input'); row.fire('click');
@@ -2757,7 +2762,8 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       expect(field.value).toBe(search.value); expect(document.activeElement).toBe(field);
       expect(all(editor).find(n => n.tag === 'textarea' && n.attributes.get('aria-label') === '本文')?.value).toBe(f.body);
       expect(current!.read().source!.originalChanges()).toEqual(f.changes); expect(notices).toHaveLength(1);
-    } finally { release(); generation.mockRestore(); await ui.dispose(); }
+      expect(list).not.toHaveBeenCalled();
+    } finally { release(); bodyRead.mockRestore(); await ui.dispose(); }
   });
   it.each(['selection-check', 'pending', 'later-read', 'observer'] as const)('restored early body preserves opening safety at %s', async failure => {
     const f = await restoredBodyFixture(), original = validationGenerationModule.openValidationGeneration, show = vi.fn(() => { if (failure === 'observer') throw Error('observer failure'); });
@@ -2773,13 +2779,41 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       const opening = openValidationHost({ ...f.options, reading: { run: f.run, show } });
       if (failure === 'selection-check' || failure === 'later-read') {
         await expect(opening).rejects.toThrow(failure === 'selection-check' ? 'selection retired' : 'independent read failed');
-        expect(show).toHaveBeenCalledTimes(failure === 'selection-check' ? 0 : 1);
+        expect(show).toHaveBeenCalledTimes(2); expect(show).toHaveBeenLastCalledWith(null);
       } else {
         const host = owned(await opening); expect(host.read().source!.originalChanges()).toEqual(f.changes);
-        expect(show).toHaveBeenCalledTimes(failure === 'pending' ? 0 : 1); await host.dispose();
+        expect(show).toHaveBeenCalledTimes(failure === 'pending' ? 2 : 1);
+        if (failure === 'pending') expect(show).toHaveBeenLastCalledWith(null);
+        await host.dispose();
       }
       expect(independentReads).toBe(failure === 'selection-check' ? 0 : 1);
     } finally { generation.mockRestore(); }
+  });
+  it.each(['before-text', 'body', 'bases'] as const)('restored reading rejects %s verification failure and withdraws provisional text', async failure => {
+    const f = await restoredBodyFixture(), show = vi.fn();
+    let metadataChecked = false;
+    const readStream = f.base.readStream.bind(f.base), openBody = f.options.store.openReadOnly.bind(f.options.store), snapshot = WorkspaceBaseStore.prototype.snapshot;
+    const fsRead = vi.spyOn(f.base, 'readStream').mockImplementation(path => {
+      if (failure === 'before-text' && metadataChecked && path.includes('/v2/local-restore/')) throw Error('restore controls unavailable');
+      return readStream(path);
+    });
+    const bodyRead = vi.spyOn(f.options.store, 'openReadOnly').mockImplementation((...args) => {
+      if (failure === 'body' && metadataChecked) throw Error('body verification failed');
+      return openBody(...args);
+    });
+    const bases = vi.spyOn(WorkspaceBaseStore.prototype, 'snapshot').mockImplementation(function(this: WorkspaceBaseStore) {
+      if (failure === 'bases' && metadataChecked) throw Error('base verification failed');
+      return snapshot.call(this);
+    });
+    try {
+      await expect(openValidationHost({ ...f.options, reading: {run:f.run,show},
+        timing(stage) { if (stage === 'host.destination.repository') metadataChecked = true; } })).rejects.toThrow();
+      if (failure === 'before-text') expect(show).not.toHaveBeenCalled();
+      else { expect(show.mock.calls[0]![0]).toEqual(f.reading); expect(show).toHaveBeenLastCalledWith(null); }
+    } finally { fsRead.mockRestore(); bodyRead.mockRestore(); bases.mockRestore(); }
+    const recovered = owned(await openValidationHost(f.options));
+    expect(recovered.read().source!.originalChanges()).toEqual(f.changes);
+    expect(validatedResumeReading(recovered.read(), f.run)?.records).toEqual(f.reading.records);
   });
   it('named resume scopes startup without hiding an existing import destination or the full selector', async () => {
     const f=resumeWorkspaceFixture(),a=await f.seed('再開する記録'),b=await f.seed('別の記録');
@@ -2787,8 +2821,8 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const file=await other.workspaceOutput.download(await other.workspaceOutput.generate(other.read().source!.token));await other.dispose();
     f.reference({run:a.run,mode:'edit'});f.storage.mockClear();vi.mocked(f.ports.open).mockClear();
     const listing=vi.spyOn(f.fs,'list'),h=f.mount();await h.idle();
-    expect(f.ports.list).toHaveBeenCalledExactlyOnceWith(undefined,a.run);
-    expect(listing.mock.calls[0]).toEqual([`${validationArea}/${a.run}/`]);
+    expect(f.ports.list).not.toHaveBeenCalled();
+    expect(listing.mock.calls.every(([prefix])=>!prefix.startsWith(`${validationArea}/${b.run}/`))).toBe(true);
     expect(f.storage.mock.calls.length).toBeGreaterThan(0);expect(f.storage.mock.calls.every(([run])=>run===a.run)).toBe(true);
     expect(h.ui.selected).toBe(a.run);expect(vi.mocked(f.ports.open).mock.calls.every(([run])=>run===a.run)).toBe(true);
     vi.mocked(f.ports.list).mockClear();vi.mocked(f.ports.open).mockClear();
@@ -2814,11 +2848,15 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const f=resumeWorkspaceFixture(),a=await f.seed('再開候補');f.reference({run:a.run,mode:'edit'});vi.mocked(f.ports.open).mockClear();
     let release!:(entries:Awaited<ReturnType<ValidationWorkspacePorts['list']>>)=>void;
     const held=new Promise<Awaited<ReturnType<ValidationWorkspacePorts['list']>>>(resolve=>{release=resolve;}),entered=vi.fn();
-    const h=f.mount(undefined,{list:async(_reading,onlyRun)=>{if(onlyRun){if(kind==='rejected')throw Error('target unavailable');return[];}entered();return held;}});
+    const h=f.mount(undefined,{open:async(...args)=>{
+      if(kind==='rejected')throw Error('target unavailable');
+      const host=await f.ports.open(...args);if('kind' in host)throw Error('normal host');
+      return {...host,hasPending:()=>true};
+    },list:async()=>{entered();return held;}});
     caseDisposals.push(()=>release([]));
     await vi.waitFor(()=>expect(entered).toHaveBeenCalledOnce());const status=h.all(h.root).find(n=>n.className==='lv-operation-status lv-validation-status')!,before=status.textContent;
     const closing=h.ui.dispose();release([{run:a.run,title:'再開候補',state:'ready'}]);await closing;await h.ui.ready;
-    expect(status.textContent).toBe(before);expect(f.ports.open).not.toHaveBeenCalled();expect(f.remember).not.toHaveBeenCalled();
+    expect(status.textContent).toBe(before);expect(f.ports.open).toHaveBeenCalledTimes(kind==='rejected'?0:1);expect(f.remember).not.toHaveBeenCalled();
   });
   it('named resume keeps a closed advisory UI slice and ignores unavailable/malformed settings', () => {
     const entries = new Map<string,string>(), writes = vi.fn((key: string,value: string) => { entries.set(key,value); });
@@ -2860,6 +2898,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
   it('named resume shows the actual last Project and protects edits/file selection before switching, saving and cold reopen', async () => {
     const f = resumeWorkspaceFixture(), a = await f.seed('調査A'), b = await f.seed('調査B'); f.reference({ run: a.run, mode: 'edit' });
     const h = f.mount(); await h.idle(); const editor = h.editor();
+    expect(f.ports.list).not.toHaveBeenCalled();
     expect(h.named('プロジェクト名',editor).textContent).toBe('調査A'); expect(h.all(editor).some(n => n.textContent === '最後のプロジェクトを再開しました：調査A')).toBe(true);
     expect(f.host().read().source!.originalChanges()).toEqual(a.source.originalChanges()); expect(f.remember).toHaveBeenLastCalledWith({ run: a.run, mode: 'edit' });
     h.named('キャプション一覧',editor).children[0]!.children[0]!.fire('click'); const body = h.named('本文',editor), change = h.button('ファイルを開く',editor);
@@ -2890,31 +2929,37 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const h = f.mount(explicit); await h.idle(); expect(f.ports.open).not.toHaveBeenCalled(); expect(f.ports.lastProject!.read).not.toHaveBeenCalled(); expect(f.remember).not.toHaveBeenCalled();
     expect(h.ui.selected).toBeNull(); expect(h.navigation.hidden).toBe(false); expect(h.button('ファイルを開く').disabled).toBe(false);
   });
-  it.each(['missing','incomplete','unavailable','malformed'] as const)('named resume keeps %s advice at the selector without creating or repairing data', async kind => {
+  it.each(['missing','incomplete','unavailable','malformed','output-error','output-incomplete'] as const)('named resume keeps %s advice at the selector without creating or repairing data', async kind => {
     const f = resumeWorkspaceFixture(), a = await f.seed('元の記録'); f.reference({run:a.run,mode:'edit'}); vi.mocked(f.ports.open).mockClear();
+    if (kind === 'missing') f.reference({run:'f'.repeat(32),mode:'edit'});
     const files = await f.fs.list(''), bytes = await Promise.all(files.map(p => f.fs.readBytes(p)));
     const list=vi.fn<ValidationWorkspacePorts['list']>(async () => kind === 'missing' ? [] : [{run:a.run,title:'元の記録',state:kind === 'unavailable' ? 'unavailable' : 'incomplete'}]);
-    const h = f.mount(undefined,{ list,
+    const dispose = vi.fn();
+    const open: ValidationWorkspacePorts['open'] = async (...args) => {
+      const host = await f.ports.open(...args); if ('kind' in host) throw Error('normal host');
+      return { ...host, read: () => kind === 'unavailable' ? {...host.read(),state:'repair-required'} : host.read(),
+        hasPending: () => kind === 'incomplete' || host.hasPending(),
+        workspaceOutput: { ...host.workspaceOutput,
+          error: kind === 'output-error' ? '出力記録を確認できません。' : host.workspaceOutput.error,
+          jobs: kind === 'output-incomplete' ? [{...host.workspaceOutput.jobs[0]!,state:'incomplete'}] : host.workspaceOutput.jobs },
+        async dispose() { dispose(); await host.dispose(); } };
+    };
+    const h = f.mount(undefined,{ list, open,
       ...(kind === 'malformed' ? {lastProject:{read:()=>({run:'bad',mode:'edit'}),remember:f.remember}} : {}) });
-    await h.idle(); expect(f.ports.open).not.toHaveBeenCalled(); expect(f.remember).not.toHaveBeenCalled(); expect(h.navigation.hidden).toBe(false);
-    expect(list.mock.calls).toEqual(kind==='malformed'?[[undefined]]:[[undefined,a.run],[undefined]]);
+    await h.idle(); expect(f.ports.open).toHaveBeenCalledTimes(kind === 'malformed' ? 0 : 1); expect(f.remember).not.toHaveBeenCalled(); expect(h.navigation.hidden).toBe(false);
+    expect(dispose).toHaveBeenCalledTimes(['missing','malformed'].includes(kind) ? 0 : 1);
+    expect(list.mock.calls).toEqual([[undefined]]);
     expect(h.all(h.root).some(n=>n.textContent==='最後のプロジェクトを再開できません。一覧またはファイルから開いてください。')).toBe(kind!=='malformed');
     expect(h.button('ファイルを開く').disabled).toBe(false);
     expect(await f.fs.list('')).toEqual(files); expect(await Promise.all(files.map(p=>f.fs.readBytes(p)))).toEqual(bytes);
   });
   it.each((['pending','blank-title','renderer','lease','stale'] as const).flatMap(kind =>
-    (kind === 'renderer' ? [false] : [false,true]).map(progressive => ({kind,progressive}))))('named resume returns a catalog-ready/actual-$kind race (progressive=$progressive) to the file/list exit without a success hint', async ({kind,progressive}) => {
+    (kind === 'renderer' ? [false] : [false,true]).map(progressive => ({kind,progressive}))))('named resume returns actual-$kind (progressive=$progressive) to the file/list exit without a success hint', async ({kind,progressive}) => {
     const f = resumeWorkspaceFixture(), a = await f.seed(kind === 'blank-title' ? '  ' : '元の記録'); f.reference({run:a.run,mode:'edit'});
-    let first = true; const list = async () => {
-      const entries = await f.ports.list();
-      if (first) { first = false;
-        if (kind === 'pending') { const host = await f.ports.open(a.run); if ('kind' in host) throw Error('normal resume host'); f.fs.reject = p => p.endsWith('/published.json');
-          await expect(host.dispatch(host.read().source!.token,{kind:'editCaption',captionId:a.captionId,edits:{body:'中断した更新'}})).rejects.toThrow(); f.fs.reject = () => false; await host.dispose(); }
-        if (kind === 'lease') await f.ports.open(a.run);
-      }
-      return entries;
-    };
-    const h = f.mount(undefined,{list,progressivePresentation:progressive,render:async target=>{
+    if (kind === 'pending') { const host = await f.ports.open(a.run); if ('kind' in host) throw Error('normal resume host'); f.fs.reject = p => p.endsWith('/published.json');
+      await expect(host.dispatch(host.read().source!.token,{kind:'editCaption',captionId:a.captionId,edits:{body:'中断した更新'}})).rejects.toThrow(); f.fs.reject = () => false; await host.dispose(); }
+    if (kind === 'lease') await f.ports.open(a.run);
+    const h = f.mount(undefined,{progressivePresentation:progressive,render:async target=>{
       if (kind === 'renderer') throw Error('display failed'); const prepared = await f.ports.render(target);
       if (kind === 'stale') await f.host().dispatch(f.host().read().source!.token,{kind:'editCaption',captionId:a.captionId,edits:{body:'表示準備中の更新'}});
       return prepared;

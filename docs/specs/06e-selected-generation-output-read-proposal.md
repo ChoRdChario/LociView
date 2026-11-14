@@ -336,6 +336,47 @@ fallback変更は本節に含めず、必要になれば独立した仕様判断
 各目的の除外も保持する。Ki-84の3+3比較では、一覧の出現と実際に本文を開いて読めた時点を別に測り、
 保存ファイル・履歴・全素材の照合とcold編集／3Dの結果を維持する。実時間の効果がなければ採用しない。
 
+#### 最後のProjectを開く入口の集約（2026-11-14）
+
+再開の待ち時間改善指示に沿い、UIの最後のProject参照も既存の直接再開と同じHost入口を使う。
+先に一覧のために同じProjectを開いて閉じる処理を省く。Hostの独立した全検査、終了確認、
+Session.read、受信・出力・初期化探索は実行する。一覧由来の検査結果やproviderは渡さない。
+一覧から別Projectを選ぶ操作と、失敗後の一覧の検査は従来どおり行う。
+
+自動再開は読み込んだHostがreadyで中断処理を持たず、出力探索にエラーがなく、出力Jobが
+generated／file-verified／cancelled／abandonedのいずれかの場合だけ採用する。
+初回復元・pending・欠損・不整合・参照不正では取得Hostを解放し、一覧／ファイル選択へ戻す。
+作成・自動修復・retryは行わない。タイトル・実mode・token・描画中の変更については既存の
+採用条件を保つ。先行readerの所有・失敗時撤去・IME完了・選択引継ぎも§9.0と同じとする。
+
+受入れは自動／URL直接再開、pending出力、受信中断、lease喪失、欠損、描画失敗、
+dispose／古い通知、IME・検索・選択引継ぎ。Ki-84で実際に本文が読める時点と編集可能時点を
+それぞれ測り、保存・cold再開と原本／履歴一致を確認する。
+
+#### 保存済み本文の閲覧と素材検査の順序（PO本文先行指示2026-11-14）
+
+§9.0の通知条件に、通常Hostを開く間だけの任意の本文通知を追加する。
+archive／Journal／Session／repositoryを照合したreadyな現在本文を使い、モデル・写真の
+全body照合とbasesの確認を続けている間も、既存readerで閲覧・検索できるようにする。
+今回の計測で残るこの区間は約1秒。成功表示・編集・保存は全検査と既存のHost採用後に限る。
+Catalog、復元先の選択、新規・取り込み・初回復元・pending text recoveryは対象外。
+
+`openSelected`は、この任意通知の直前にstrictなselected controlsを新しく読み、同じselection・
+tail・完了済みselected Jobでpending／handoffがないことを確認する。Sessionのready・実proof・
+provider tokenも満たすときだけ、Hostの内部callbackへ渡す。Hostはその場でrunを照合し、
+所有済みの文字列DTOへ変換して通常readerへ一度通知する。source/providerを後続処理の
+確認済み結果として採用しない。observerの例外は開く処理を失敗に変えない。
+
+残る全body・bases・終了時controls確認、独立したHost readと中断処理探索はすべて行う。
+途中失敗、pendingの出現、owner交代では同じopeningに属するreaderを撤去する。
+`show(null)`は当該openingだけを撤回でき、旧通知で次の画面を消さない。
+既存readerのIME・選択・focusを保ち、採用時の実token／Scene／Caption照合を維持する。
+
+受入れは全body検査をholdしたPC／touchで保存済み本文の閲覧・検索、命令・画像・3Dの不在、
+IMEとその後の引継ぎ。素材／base照合失敗、通知前pending／selection変更、破棄・古い通知で
+readerを残さず、成功・保存を表示しない。正常な全量照合・出力・中断復旧も確認する。
+本文時刻の短縮を同じKi-84で確認できた場合だけ接続する。
+
 ### 9.1. 同じfreshな管理情報と出力streamの内部整理（2026-11-10）
 
 POの本文編集→保存→再開の改善指示に基づく内部実装候補であり、実時間の採否はtodoに記録する。

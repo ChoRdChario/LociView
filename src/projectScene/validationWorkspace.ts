@@ -503,7 +503,9 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     if (!resumeReading) status.textContent = initial ? 'プロジェクトを作成しています。' : '再開用データを確認しています。';
     const owner = {}; openingReading = owner;
     const reading: ResumeReadingRequest | undefined = ports.progressivePresentation && !initial && !workspaceFile ? { run, show(value) {
-      if (disposed || retirementFailure || openingReading !== owner || resumeReading || !value) return;
+      if (disposed || retirementFailure || openingReading !== owner) return;
+      if (!value) { clearResumeReading(); navigation.hidden = false; controls(); return; }
+      if (resumeReading) return;
       const next = createResumeReading(document, value); resumeReading = next; navigation.hidden = true; status.textContent = ''; content.append(next.root); controls();
     } } : undefined;
     let opened: ValidationNormalHost | FirstBackupRecovery;
@@ -514,6 +516,11 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
       if (openingReading === owner) { clearResumeReading(); navigation.hidden = false; }
       throw error;
     } finally { if (openingReading === owner) openingReading = undefined; }
+    if (remembered && ('kind' in opened || opened.read().state !== 'ready' || opened.hasPending() ||
+      opened.workspaceOutput.error || opened.workspaceOutput.jobs.some(job => !['generated', 'file-verified', 'cancelled', 'abandoned'].includes(job.state)))) {
+      await opened.dispose(); clearResumeReading(); navigation.hidden = false;
+      throw Error('最後のプロジェクトの再開用データを確認できません。');
+    }
     if ('kind' in opened) { clearResumeReading(); if (disposed) { await opened.dispose(); return; } firstRecovery = opened; selected = run; navigation.hidden = true; renderFirstRecovery(); return; }
     await adoptProject(run, opened, remembered ? mode : undefined);
   };
@@ -1012,32 +1019,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     }
     let reference: ProjectResumeReference | null = null;
     try { reference = projectResumeReference(ports.lastProject?.read()); } catch { /* No advisory hint is a normal selector start. */ }
-    let reopening: readonly ValidationProjectEntry[] = [];
-    try {
-      if (reference) reopening = await ports.list(ports.progressivePresentation ? { run: reference.run, show(reading) {
-        if (disposed) return;
-        const next = reading ? createResumeReading(document, reading) : undefined;
-        clearResumeReading(); resumeReading = next; navigation.hidden = !!next;
-        if (next) {
-          status.textContent = '';
-          content.append(next.root);
-        }
-        controls();
-      } } : undefined, reference.run);
-      else await updateList();
-    } catch (error) {
-      if (disposed) return;
-      clearResumeReading(); navigation.hidden = false;
-      if (!reference) throw error;
-      await updateList(); if (!disposed) status.textContent = '最後のプロジェクトを再開できません。一覧またはファイルから開いてください。'; return;
-    }
-    if (disposed) return;
-    if (!reference) return;
-    if (!reopening.some(entry => entry.run === reference.run && entry.state === 'ready')) {
-      clearResumeReading(); navigation.hidden = false;
-      await updateList();
-      if (!disposed) status.textContent = '最後のプロジェクトを再開できません。一覧またはファイルから開いてください。'; return;
-    }
+    if (!reference) { await updateList(); return; }
     try { await openProject(reference.run, undefined, reference.mode, undefined, true); }
     catch {
       // Automatic opening never traps the selector behind a pending/recovery guard.

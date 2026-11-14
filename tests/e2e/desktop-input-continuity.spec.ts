@@ -220,13 +220,14 @@ for (const touch of [false, true]) test(`attachment ordering and Drawing complet
       const state = { held: 0, release() { blocked = false; release(); } }; (window as any).resumeReadGate = state;
       const measure = Performance.prototype.measure, getFile = FileSystemFileHandle.prototype.getFile;
       Performance.prototype.measure = function(name: string, ...args: any[]) {
-        const entry = Reflect.apply(measure, this, [name, ...args]); if (name === 'lociview.host.open.reading') blocked = true; return entry;
+        const entry = Reflect.apply(measure, this, [name, ...args]); if (name === 'lociview.host.destination.repository') blocked = true; return entry;
       };
-      FileSystemFileHandle.prototype.getFile = async function() { if (blocked) { state.held++; await gate; } return getFile.call(this); };
+      FileSystemFileHandle.prototype.getFile = async function() { if (blocked && this.name.endsWith('.bin')) { state.held++; await gate; } return getFile.call(this); };
     });
-    resumePhase = 'cold-held-read'; if (touch) await resumed.setViewportSize({ width: 320, height: 568 }); await resumed.reload();
+    resumePhase = 'cold-held-read'; if (touch) await resumed.setViewportSize({ width: 320, height: 568 }); await resumed.goto(server.url + '?timings=1');
     const reader = resumed.getByRole('region', { name: '再開中のキャプション', exact: true }); await expect(reader).toBeVisible();
     await expect.poll(() => resumed.evaluate(() => (window as any).resumeReadGate.held)).toBeGreaterThan(0);
+    expect(await resumed.evaluate(() => performance.getEntriesByName('lociview.host.destination.bodies').length)).toBe(0);
     await expect(resumed.locator('main.lv-project-workspace')).toHaveCount(0); await expect(reader.locator('textarea,input[type=file]')).toHaveCount(0);
     await reader.getByRole('button', { name: '再開時の記録', exact: true }).click(); await expect(reader.getByText(body, { exact: true })).toBeVisible();
     expect(await resumed.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);

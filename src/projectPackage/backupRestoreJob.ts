@@ -270,7 +270,8 @@ export class BackupRestoreJob {
   }
   inventory(): JsonObject[] { return this.inspection.description.bodyRefs.map(r => ({ ...r })); }
   private static async verifyDestination(root: ProjectWorkspaceFS, ports: RestoreSourcePorts, factory: MetadataStorageFactory, job: RestoreControlJob,
-    limits: MetadataLimits, selected?: GenerationSelection, timing?: DestinationTiming, reopenSelected = false) {
+    limits: MetadataLimits, selected?: GenerationSelection, timing?: DestinationTiming, reopenSelected = false,
+    metadataReading?: (read: MetadataSessionRead) => Promise<void>) {
     const measure = async <T>(stage: string, action: () => Promise<T>): Promise<T> => {
       if (!timing) return action();
       const started = performance.now();
@@ -314,6 +315,7 @@ export class BackupRestoreJob {
     }
     const saved = await measure('repository', () => new MetadataRepository(ports.fs, factory, limits).read(restored.entry.start.repositoryId, restored.source.proof, read.source!.heads));
     if (saved?.token !== read.source.token) return fail('restore-destination-database');
+    if (read.state === 'ready') await metadataReading?.(read);
     await measure('bodies', async () => {
       for (const ref of restored.description.bodyRefs) {
         const file = await ports.store.openReadOnly(ref), reader = file.stream().getReader();
@@ -327,7 +329,8 @@ export class BackupRestoreJob {
   /** Resolve existing selected data only. Read permission survives a pending restore; ordinary writes do not. */
   static async openSelected(root: ProjectWorkspaceFS, limits: MetadataLimits, databases: RestoreDatabasePorts,
     createPorts: (scope: Awaited<ReturnType<typeof openWorkspaceGeneration>>) => RestoreSourcePorts,
-    diagnostics?: { observeCatalogRead?: (read: MetadataSessionRead) => void; timing?: DestinationTiming; ordinarySession?: boolean; reopenTextRecovery?: boolean }) {
+    diagnostics?: { observeCatalogRead?: (read: MetadataSessionRead) => void; observeMetadataRead?: (read: MetadataSessionRead) => void;
+      timing?: DestinationTiming; ordinarySession?: boolean; reopenTextRecovery?: boolean }) {
     const observeCatalogRead = diagnostics?.observeCatalogRead, timing = diagnostics?.timing;
     const state = await reconcileRestoreDatabases(root, limits, () => databases.listGenerations()), selected = state.selection,
       generationId = state.tail?.jobId ?? null;
@@ -360,7 +363,13 @@ export class BackupRestoreJob {
       if (state.tail) {
         const job = state.jobs.find(j => j.id === generationId)!;
         if (!job.prepared) return fail('restore-destination-job');
-        const verified = await this.verifyDestination(root, ports, scope.factory, job, limits, state.tail, timing, diagnostics?.reopenTextRecovery);
+        const metadataReading = diagnostics?.ordinarySession && diagnostics.observeMetadataRead ? async (read: MetadataSessionRead) => {
+          const current = await checkSelected();
+          if (current.pending || !restoreEqual(current.tail, state.tail) ||
+            current.jobs.find(next => next.id === generationId)?.result?.detail.kind !== 'selected') return;
+          try { diagnostics.observeMetadataRead!(read); } catch { /* Optional text never decides destination readiness. */ }
+        } : undefined;
+        const verified = await this.verifyDestination(root, ports, scope.factory, job, limits, state.tail, timing, diagnostics?.reopenTextRecovery, metadataReading);
         fullyReady = verified.read.state === 'ready';
         if (observeCatalogRead) catalogRead = verified.read;
       }

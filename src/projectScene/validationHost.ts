@@ -333,6 +333,7 @@ async function openNormalValidationHost(options: ValidationHostOptions, inherite
     await options.coordinator.tryAcquire(options.base, root, `${validationArea}:${run}`));
   let connection: Awaited<ReturnType<typeof openValidationGeneration>> | undefined, operation: Promise<unknown> | undefined;
   let closed = false, busy = false, failure = '', ownsLease = !inheritedLease;
+  let withdrawReading: (() => void) | undefined;
   const dispose = async () => { if (closed) return; closed = true; if (ownsLease) lease.beginClose();
     try { await operation; } catch { /* Stored journal/initial input remain authoritative, never silently discarded. */ }
     await lease.waitForWorkspaceIdle(); if (ownsLease) { lease.sealWorkspaceWritesForRelease(); lease.release(); } await connection?.dispose(); };
@@ -351,11 +352,19 @@ async function openNormalValidationHost(options: ValidationHostOptions, inherite
       readingShown = true;
       try { reading.show(value); } catch { /* Reading never decides Host or recovery readiness. */ }
     };
+    withdrawReading = () => {
+      if (!reading || !readingShown) return;
+      readingShown = false;
+      try { reading.show(null); } catch { /* Withdrawing optional text cannot affect storage. */ }
+    };
     connection = await measure('host.open.generation', () => openValidationGeneration(lease.workspace, options,
       fresh && !!(options.initial || incoming || options.reviewEdit) && lease.holdsWriteLock,
       reading ? { observeRead: read => {
         try { openingText = validatedResumeReading(read, run); } catch { /* Keep only optional owned display text. */ }
+      }, observeMetadataRead: read => {
+        try { showReading(validatedResumeReading(read, run)); } catch { /* Text formatting has no Project authority. */ }
       } } : undefined));
+    if (connection.restorePending) withdrawReading();
     if (openingText && !connection.restorePending) await measure('host.open.reading', async () => {
       await connection!.check(); showReading(openingText);
     });
@@ -931,5 +940,5 @@ async function openNormalValidationHost(options: ValidationHostOptions, inherite
       if (closed || prepareDisplay) throw Error('モデル表示の接続を確認してください。');
       prepareDisplay = callback; return () => { if (prepareDisplay === callback) prepareDisplay = undefined; };
     } };
-  } catch (error) { await dispose(); throw error; }
+  } catch (error) { withdrawReading?.(); await dispose(); throw error; }
 }
