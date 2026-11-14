@@ -46,17 +46,30 @@ Implemented and independently reviewed under specification06e§11:
   inside3D instead; preserve live status, retry and raster/GPU release. Actual
   PC/touch point/GS status mutations now keep content shift below1px; touch requires
   multiple observed samples. No retained-image cache or release-policy change.
+- Final native-stack follow-up found four remaining per-file capacity readers.
+  Under the existing06 pure-bulk-reader rule,06e§11.6 consolidates all five loops
+  through outputSpace, retaining the exact prefix/additional/count/size/headroom/
+  order and Backup's existing behavior. No staging consumer; close before every
+  original raw guarded write. Independent design/final diff review and10 new
+  focused size/closing/fallback tests pass; no new PO policy was needed.
 
 Evidence and final checks:
 
 - Source/test/config freeze: .artifacts/e2e/duplicate-work-20261115/tested-source.json
-  (756 files). Required final checkpoint passes157 files/3570 cases, unchanged16
-  expected failures/21 TODOs, all5 builds and offline isolation; HEIC all5 passes.
+  (758 files). Final capacity-qualified checkpoint passes158 files/3580 cases,
+  unchanged16 expected failures/21 TODOs, all5 builds and offline isolation;
+  HEIC all5 passes. The main source qualified independently before this follow-up.
 - Desktop59: final full run58 passes/one stale test selector (actual Review status
   was correct); exact selector-only corrected case passes its full path. All59
   unique paths covered, no weakened pixel/text/time assertion or automatic retry.
   Former mobile image failure and adjacent GS retry/camera paths pass. Failed
   checkpoints/drivers/runs remain in the private evidence folder.
+- Main source also passes all8 full offline cases, including full browser/server
+  closure with500k SH4/Mesh/Point/Proxy/media, same-address return, update/repair,
+  and two windows. Capacity follow-up retains SW/restore fences and adds the
+  connected source-material all-purpose/two-round/restore/cold flow and mobile
+  short-input/export flow, plus Chrome/Edge actual-file/cold reopening. No whole59
+  replay for a selector-only adaptation or this narrowly reviewed pure reader.
 - Windows dedicated Chromium156,1280×720,DPR1, own origins/profiles; same Ki-84
   Backup SHA c714c6cd04f99ac7aa0b84e9e2ca82a0147bbbc0eeb029be475d94e68ccf501c.
   Alternate before/after3 each; no diagnostic flag or file-picker waiting. Actual
@@ -83,6 +96,13 @@ Evidence and final checks:
   shared-base choices178→131ms. Whole-journey lists831→467,readStream4828→2130,
   readBytes1547→1010; identical21 writeBytes/26 writeText/4 writeStream. These
   cumulative calls are not individual-export physical reads or a speed guarantee.
+- Additional capacity-only comparison, a937122→follow-up, one diagnostic trial
+  each: Workspace1 13.008→10.551s,Workspace2 17.151→14.450s. Per-action controller
+  readStream calls1834→1736 and2380→1918, with exactly identical write counts
+  (4/8/1 and3/8/1 by writeBytes/writeText/writeStream). Backup retains966 calls
+  each; timings vary12.298→10.547s and10.405→12.335s, so no Backup speedup claim.
+  This comparison is distinct from the main3+3 Ki-84 table and the older history
+  trial. Raw snapshot deltas are retained in budget-history-comparison.json.
 - 500k SH4 complete PC flow passes all output purposes/return/Review editing copy/
   restore/cold, plus body replacement and existing120s drawing/target-lifecycle
   criteria. Editing copy remains166.643s to editor,177.827s to3D (not a measured
@@ -91,9 +111,9 @@ Evidence and final checks:
 Remaining closure, continuing autonomously:
 
 - Offline8 tests, installed Chrome157.0.8103.52/Edge157.0.4341.46 actual save+cold
-  reopen and final offline/HEIC artifact isolation pass. Source756-file freeze
-  matches. Save this verified checkpoint, then finish the newly evidenced normal
-  pre-write capacity-reader residual, exact CI and qualified same-origin preview.
+  reopen and final offline/HEIC artifact isolation pass. Source758-file freeze
+  matches. Finish the additional representative Ki-84 native attribution, verified
+  g0 Push/exact CI and qualified same-origin preview/sample verification.
   No public deployment or rerun of unrelated checks for prose/staging changes.
 - Native call-stack diagnostic completed on the small four-export history flow:
   1572/2040/828/828 restore-control opens, summed native getFile time
@@ -102,14 +122,18 @@ Remaining closure, continuing autonomously:
   Backup stream guards account for only24/828 opens (~15ms), and strong bulk
   content is actually used; this does not establish weak/CAS/stream domination
   for Ki-84. Do not treat prior24.8s nested aggregate as removable user wait.
-- Concrete residual: Workspace.space raw per-file size traversal accounts for
-  84/396 restore-control opens (51.3/249.1ms). Contribution/Clean/Review contain
-  the same unscoped pure capacity loop; Backup already scopes it. Specification06
+- Resolved residual: Workspace.space raw per-file size traversal accounted for
+  84/396 restore-control opens (51.3/249.1ms). Contribution/Clean/Review contained
+  the same unscoped pure capacity loop; all now use Backup's scoped pattern. Specification06
   2026-09-20 expressly permits normal pure bulk readers and calls named paths
-  initial consumers; the closed whitelist is staging only. Clarify/review this
-  exact capacity connection before implementation; close the void size read
-  before each fresh guarded write, retain all limits, failure and stream fences.
+  initial consumers; the closed whitelist is staging only.
+  Capacity connection was clarified/reviewed before implementation: close the
+  void size read before each fresh guarded write, retain all limits, failure and
+  stream fences.
   This is existing normal-reader scope, not authority for broader write changes.
+- The fully verified main cleanup is saved locally. Capacity follow-up qualifies
+  with focused/final/service/browser evidence above; no release/Push yet. Keep
+  existing private audit notes/task history out of the public checkpoint.
 - Source counts alone do not justify a speed claim. Trace the residual cumulative
   restore-control reads before proposing more changes. Constructor-bound weak-media
   verification and per-pull stream write fences are explicitly independent in

@@ -719,6 +719,35 @@ namespace走査が行数分に増えないこと、次の操作では改変を�
 実行結果・未確認の実機条件は[todo](../../tasks/todo.md)に集約する。Capture sourceの再利用は
 接続していない。通常公開・実機iPhone・技術全体の採用を意味しない。
 
+### 11.6. 出力前の純粋な容量確認を一まとまりにする
+
+通常世代のpure bulk readerは仕様06「Bounded read-operation audits（PO承認2026-09-20）」の
+承認範囲であり、後続の列挙はInitial consumersである。今回の最終計測ではWorkspaceの
+容量確認だけでも84／396回の復元管理file openが発生し、同じ構造がContribution／Clean／Reviewに
+残っていた。既存Backupと同じ方式へそろえる。これは書込fenceやstagingの限定consumerを広げない。
+
+- 対象は各Jobのpersist／generateが既に呼ぶ、package namespaceのpath数・各fileのsize・
+  合計量を調べる純粋な事前確認だけ。書込・readback・receipt・公開・復旧を囲まない。
+- 内部helper `projectPackage/outputSpace` は型のProjectWorkspaceFS、既存withMetadataRead、
+  fail、package limitsだけへ依存する。各Jobが従来どおり導くprefixと追加bytesを渡し、helperは
+  一度のreadonly callback内で同じ順序の一覧・各size確認・既存のheadroom／上限判定を行う。
+  書込権限・FS・stream・snapshotを返さず、終了監査に成功したvoidだけを受け取る。
+- Backupも同じhelperへ寄せるが、現在のreadonly境界と判定は変えない。新しい上限、
+  source／manifest cache、公開skip引数は設けない。core/platform/viewerからUIへ依存しない。
+- callback終了後に従来のraw FSで書込みへ進み、その直前・直後・各stream pull・close・
+  保存後の全量照合を独立して行う。容量確認中の選択／管理情報変更は終了監査で拒否し、
+  失敗・権限喪失・欠損・不正size・過量では後続の書込へ進まない。
+- staging consumerを指定しない。既存bindingがreadonly集約を許さない場合は現在と同じ
+  strict FSで走査する。通常の容量確認を理由にstagingの許可一覧を増やさない。
+- 既存の容量判定・書込後照合・中断復旧試験を再利用する。helperでは実bodyを消費せず、
+  借用reader利用、終了成功前の非採用、終了失敗、既存size／件数／合計の拒否とstagingの
+  strict fallbackを確認する。代表的な保存・共有の実ファイル経路と履歴増加時の計測、
+  final checkpoint／独立差分レビューを接続条件とする。回数だけから速度保証を作らない。
+
+§11.6の限定実装・独立設計／差分レビューとWindows自動検証は完了。既存Backupの読取境界を
+維持し、他4経路の容量確認だけを同じ方式にした。細かな実行条件・比較値と大容量の追加診断は
+todoへ集約し、書込fenceの変更や実機合格へ読み替えない。
+
 ## 本文編集の保存タイミング再検討（2026-11-13・設計案）
 
 対象は復元済みPC候補でタイトルと本文だけを編集する操作。第一候補の限定評価と、

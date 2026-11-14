@@ -1,3 +1,4 @@
+import { assertOutputSpace } from './outputSpace';
 import { withJobDiscovery, type JobDiscovery, type OutputJobRead } from './jobDiscovery';
 import { checkRequiredCapabilities } from '../projectMetadata/requiredCapabilities';
 import { reviewCapabilities } from './reviewSnapshot';
@@ -151,7 +152,7 @@ export class ReviewOutputJob {
     const { capture, prepared, start } = this.records();
     const receipts = [['review-reconstruction', this.inputs.reconstruction], ['inventory', this.inputs.inventory], ['bases', this.inputs.bases], ['capture', capture], ['prepared', prepared]] as const;
     const ix = { schema: 'lociview-review-output-index-1', jobId: this.id, prepared: reference(prepared) };
-    await this.space(this.inputs.original.length + this.inputs.snapshot.length + this.inputs.manifest.length +
+    await assertOutputSpace(this.fs, workspacePackageRoot(this.fs), this.inputs.original.length + this.inputs.snapshot.length + this.inputs.manifest.length +
       receipts.reduce((n, [, value]) => n + encode(value).length, 0) + encode(ix).length + encode(start).length);
     for (const [name, bytes] of [['source.am', this.inputs.original], ['review.json', this.inputs.snapshot], ['manifest.json', this.inputs.manifest]] as const) {
       await this.fs.writeBytes(this.path(name), bytes);
@@ -162,12 +163,6 @@ export class ReviewOutputJob {
     await writeReceipt(this.fs, indexPath(this.fs, this.id), ix, this.limits);
     await writeReceipt(this.fs, this.path('start.json'), start, this.limits);
     return this;
-  }
-  private async space(additional: number) {
-    const paths = await this.fs.list(workspacePackageRoot(this.fs)); if (paths.length > L.entryCount) fail('output-space-budget');
-    let total = additional + L.baseEvidenceBytes;
-    for (const path of paths) { const f = await this.fs.readStream(path); if (!f || !Number.isSafeInteger(f.size) || f.size < 0) return fail('output-space-read');
-      if ((total += f.size) > 2_147_483_648 - 16_777_216) fail('output-space-budget'); }
   }
   async steps(): Promise<Step[]> {
     const paths = await this.fs.list(this.path('steps/')); if (paths.length > 2) return fail('output-step-budget');
@@ -223,7 +218,7 @@ export class ReviewOutputJob {
     if ((await this.steps()).length) return fail('output-cancelled');
     const m = this.manifest(), controls = { manifest: this.inputs.manifest, checksum: new TextEncoder().encode(packageByteHash(this.inputs.manifest)) };
     if (json(prepareReviewManifest(capture, { packageId: m.packageId, createdByVersion: m.createdByVersion }).control.manifest) !== json(m)) fail('output-prepared-mismatch');
-    await this.space(readManifestControl(controls.manifest, controls.checksum).archiveByteLength);
+    await assertOutputSpace(this.fs, workspacePackageRoot(this.fs), readManifestControl(controls.manifest, controls.checksum).archiveByteLength);
     const sinkId = newId(), path = this.path(`artifacts/${sinkId}.zip`); if (await this.fs.exists(path)) return fail('output-sink-exists');
     const bridge = new TransformStream<Uint8Array, Uint8Array>(), cancel = new AbortController(), abort = () => cancel.abort(signal?.reason);
     signal?.addEventListener('abort', abort, { once: true }); if (signal?.aborted) abort();

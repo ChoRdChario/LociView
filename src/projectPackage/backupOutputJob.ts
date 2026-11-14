@@ -1,3 +1,4 @@
+import { assertOutputSpace } from './outputSpace';
 import { withJobDiscovery, type JobDiscovery, type OutputJobRead } from './jobDiscovery';
 import type { ProjectWorkspaceFS } from '../platform/fs';
 import type { OutputCleanupRead } from './outputCleanupRead';
@@ -181,7 +182,7 @@ export class BackupOutputJob {
   async persist() {
     this.fs.mutationAuthority.assertWorkspaceWriteAuthorized();
     if ((await this.fs.list(this.path(''))).length || await this.fs.exists(indexPath(this.fs, this.id))) fail('output-exists');
-    await this.space(this.inputs.manifest.length + this.inputs.originals.reduce((n, e) => n + e.bytes.length, 0));
+    await assertOutputSpace(this.fs, workspacePackageRoot(this.fs), this.inputs.manifest.length + this.inputs.originals.reduce((n, e) => n + e.bytes.length, 0));
     for (const { path, bytes } of [{ path: 'manifest.json', bytes: this.inputs.manifest }, ...this.inputs.originals]) {
       await this.fs.writeBytes(this.path(path), bytes);
       const stored = await this.fs.readBytes(this.path(path)); if (!stored || json(ref(stored)) !== json(ref(bytes))) fail('output-input-readback');
@@ -193,17 +194,6 @@ export class BackupOutputJob {
     await writeReceipt(this.fs, this.path('start.json'), start, this.limits);
     // No second aggregate original copy; callers reopen independently for cold recovery.
     return this;
-  }
-  private async space(additional: number) {
-    const prefix = workspacePackageRoot(this.fs);
-    return withMetadataRead(this.fs, undefined, async ({ fs }) => {
-      const paths = await fs.list(prefix); if (paths.length > L.entryCount) return fail('output-space-budget');
-      let total = additional + L.baseEvidenceBytes;
-      for (const path of paths) {
-        const f = await fs.readStream(path); if (!f || !Number.isSafeInteger(f.size) || f.size < 0) return fail('output-space-read');
-        total += f.size; if (total > 2_147_483_648 - 16_777_216) fail('output-space-budget');
-      }
-    });
   }
   async steps(): Promise<Step[]> {
     const path = this.path(''), id = this.id, start = reference(this.records().start), limits = { ...this.limits };
@@ -301,7 +291,7 @@ export class BackupOutputJob {
     if ((await this.steps()).length) return fail('output-cancelled');
     const m = this.manifest(), options = { packageId: m.packageId, createdByVersion: m.createdByVersion };
     const controls = { manifest: this.inputs.manifest, checksum: new TextEncoder().encode(packageByteHash(this.inputs.manifest)) };
-    await measure('space', () => this.space(readManifestControl(controls.manifest, controls.checksum).archiveByteLength));
+    await measure('space', () => assertOutputSpace(this.fs, workspacePackageRoot(this.fs), readManifestControl(controls.manifest, controls.checksum).archiveByteLength));
     const sinkId = newId(), path = this.path(`artifacts/${sinkId}.zip`); if (await this.fs.exists(path)) return fail('output-sink-exists');
     const bridge = new TransformStream<Uint8Array, Uint8Array>(), cancel = new AbortController(), abort = () => cancel.abort(signal?.reason);
     signal?.addEventListener('abort', abort, { once: true }); if (signal?.aborted) abort();

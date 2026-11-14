@@ -1,3 +1,4 @@
+import { assertOutputSpace } from './outputSpace';
 import { withJobDiscovery, type JobDiscovery, type OutputJobRead } from './jobDiscovery';
 import type { ProjectWorkspaceFS } from '../platform/fs';
 import { checkRequiredCapabilities } from '../projectMetadata/requiredCapabilities';
@@ -136,7 +137,7 @@ export class WorkspaceOutputJob {
   async persist() {
     this.fs.mutationAuthority.assertWorkspaceWriteAuthorized();
     if ((await this.fs.list(this.path(''))).length) fail('output-exists');
-    await this.space(this.inputs.metadata.length + this.inputs.manifest.length + encode(this.inputs.inventory).length + encode(this.inputs.bases).length);
+    await assertOutputSpace(this.fs, root(this.fs), this.inputs.metadata.length + this.inputs.manifest.length + encode(this.inputs.inventory).length + encode(this.inputs.bases).length);
     for (const [name, bytes] of [['metadata.am', this.inputs.metadata], ['manifest.json', this.inputs.manifest]] as const) {
       await this.fs.writeBytes(this.path(name), bytes);
       const stored = await this.fs.readBytes(this.path(name)); if (!stored || json(ref(stored)) !== json(ref(bytes))) fail('output-input-readback');
@@ -144,14 +145,6 @@ export class WorkspaceOutputJob {
     for (const [name, value] of [['inventory', this.inputs.inventory], ['bases', this.inputs.bases], ...Object.entries(this.records())] as const)
       await writeReceipt(this.fs, this.path(`${name}.json`), value, this.limits);
     return WorkspaceOutputJob.open(this.fs, this.id, this.limits);
-  }
-  private async space(additional: number) {
-    const paths = await this.fs.list(root(this.fs)); if (paths.length > L.entryCount) return fail('output-space-budget');
-    let total = additional + L.baseEvidenceBytes;
-    for (const path of paths) {
-      const file = await this.fs.readStream(path); if (!file || !Number.isSafeInteger(file.size) || file.size < 0) return fail('output-space-read');
-      total += file.size; if (total > 2_147_483_648 - 16_777_216) fail('output-space-budget');
-    }
   }
   async steps(): Promise<Step[]> {
     const paths = await this.fs.list(this.path('steps/')); if (paths.length > 4) return fail('output-step-budget');
@@ -228,7 +221,7 @@ export class WorkspaceOutputJob {
     const m = this.manifest(), options = { packageId: m.packageId, createdByVersion: m.createdByVersion, ...(m.memo !== undefined ? { memo: m.memo } : {}) };
     const prepared = prepareWorkspaceManifest(capture, options);
     if (json(ref(prepared.manifest)) !== json(ref(this.inputs.manifest))) return fail('output-prepared-mismatch');
-    await this.space(prepared.control.archiveByteLength);
+    await assertOutputSpace(this.fs, root(this.fs), prepared.control.archiveByteLength);
     const sinkId = newId(), path = this.path(`artifacts/${sinkId}.zip`); if (await this.fs.exists(path)) return fail('output-sink-exists');
     const bridge = new TransformStream<Uint8Array, Uint8Array>(), cancel = new AbortController(), abort = () => cancel.abort(signal?.reason);
     signal?.addEventListener('abort', abort, { once: true }); if (signal?.aborted) abort();
