@@ -53,6 +53,23 @@ queue or renewed approval requirements.
   failures, 21 TODO), five builds, offline isolation and HEIC isolation passed.
   Independent reviews covered same-window recovery, selected-store writes and
   the PC/touch UI. Browser acceptance above is Chromium; device Safari is open.
+- Follow-up from native stack traces on the same Ki-84: the initial screen
+  was still looking for a device-local conversion report during Apply. Completed
+  backup destinations have no such report. The availability check now uses
+  that fact when already verified and ready. Actual report export, original
+  conversion projects and unfinished restore cases retain their existing checks.
+- Final same-machine paired click → painted durable success (ms):
+  3986/3901/3899 → 1065/1015/1022; median 3901 → 1022 (74% shorter).
+  Click automation wall time 4023 → 1145 ms median. Download handoff
+  23.784 → 23.231 s and cold launch to the edited text 25.636 → 25.342 s.
+  All six downloaded archives and subsequent cold reopens passed with the same
+  43 originals, 103 captions, prior three changes and one new change.
+  This reaches approximately one second on this PC; a strict 1000 ms maximum
+  and physical iPhone performance remain unverified.
+  Diagnostic example: first-write native file snapshots 199 → 32, including
+  44 content receipts, 43 Origin receipts and 43 originals → zero. Final
+  write plus independent document verification took 47 ms. The complete
+  archive still incurs a separate ~23 s handoff and ~25 s cold reopening.
 
 - Restored project, ordinary title/body edit. After a full read of the
   written document and its provider, confirm the new exact bytes from both

@@ -918,7 +918,12 @@ async function openNormalValidationHost(options: ValidationHostOptions, inherite
       dispose: async () => { await dispose(); content.releasePreparedImages(); content.releasePreparedModels(); prepareDisplay = undefined; } };
     ownsLease = true;
     return { ...host, dispatch, editorSettings, get content() { return content; }, workspaceFiles, workspaceOutput, backupRestore, sceneAppend, display: () => restoreRetired ? undefined : project,
-      conversionReportAvailable: async () => await hasLociMyuConversion(fs, false) || await hasFrozenV1MaterialReport(fs),
+      conversionReportAvailable: async () => {
+        // Backup restores do not carry the originating device's conversion report.
+        if (connection?.generationId != null && !localInitial && !connection.restorePending &&
+          !restoreRetired && !restoreDisplayPending && last.state === 'ready') return false;
+        return await hasLociMyuConversion(fs, false) || await hasFrozenV1MaterialReport(fs);
+      },
       conversionReport: () => execute(async () => await readLociMyuConversionReport(fs, options.fileLimits, `prj_${run}`, options.decode, options.jpeg, options.photo) ??
         await readFrozenV1MaterialReport(fs, options.fileLimits, `prj_${run}`, options.decode, options.jpeg, options.photo), true),
       get accessDetail() { return options.mode === 'view' ? '閲覧専用です。' : lease.accessDetail; },

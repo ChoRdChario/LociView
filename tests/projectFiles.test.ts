@@ -6157,7 +6157,14 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       expect(reopened.authority.read().resources.captions[placed.id]!.body).toEqual({ kind: 'value', value: '開始視点を保った復元後の追記' });
       expect(syntheticDisplay(reopened.authority.read(),sceneId,null,null).entry).toEqual(entry);
       if (placement) checkPlacement(reopened.authority.read());
-      if(material){checkMaterials(reopened.authority.read());expect(await reopened.conversionReportAvailable()).toBe(false);}
+      if(material){
+        checkMaterials(reopened.authority.read());
+        const reads = vi.spyOn(h.f.options.base, 'readStream');
+        try {
+          expect(await reopened.conversionReportAvailable()).toBe(false);
+          expect(reads).not.toHaveBeenCalled();
+        } finally { reads.mockRestore(); }
+      }
     }
     await cold.dispose();
     }
