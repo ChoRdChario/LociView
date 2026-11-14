@@ -21,6 +21,11 @@ const root = (fs: ProjectWorkspaceFS, id: string) => `${workspacePackageRoot(fs)
 const indexPath = (fs: ProjectWorkspaceFS, id: string) => `${workspacePackageRoot(fs)}backup-output-index/${technicalId(id)}.json`;
 const unique = (refs: EvidenceRef[]) => [...new Map(refs.map(r => [r.sha256, r])).values()].sort((a, b) => a.sha256.localeCompare(b.sha256));
 type Description = Awaited<ReturnType<typeof inspectBackupOriginals>>;
+/** Operation-owned snapshot from the independent post-write archive inspection. */
+export interface BackupFileHandoff {
+  readonly id: string; readonly token: string; readonly archive: Readonly<EvidenceRef>; readonly blob: Blob;
+}
+export type BackupFileObserver = (file: BackupFileHandoff) => void;
 interface Inputs { manifest: Uint8Array; originals: readonly { path: string; bytes: Uint8Array }[]; description: Description }
 type Artifact = { kind: 'artifactVerified'; archive: EvidenceRef; location: 'opfsArtifact'; sinkId: string };
 type Detail = Artifact | { kind: 'externalFileVerified'; archive: EvidenceRef; sinkId: string; profile: 'reselectedFileV1' } |
@@ -31,7 +36,7 @@ const checkRef = (r: EvidenceRef) => {
     !Number.isSafeInteger(r.byteLength) || r.byteLength <= 0 || r.byteLength > L.archiveBytes) fail('output-reference');
 };
 
-export type BackupOutputTiming = (stage: Parameters<WorkspaceArchiveTiming>[0] | 'ready-before' | 'slot-before' | 'protection-before' | 'ready-final' | 'ready-finish' | 'slot-finish' | 'protection-finish' | 'capture' | 'persist' | 'finish' | 'job' | 'inputs-before' | 'space' | 'stream-close' | 'artifact-inspect' | 'inputs-after' | 'receipt', milliseconds: number) => void;
+export type BackupOutputTiming = (stage: Parameters<WorkspaceArchiveTiming>[0] | 'ready-before' | 'slot-before' | 'protection-before' | 'ready-final' | 'ready-finish' | 'slot-finish' | 'protection-finish' | 'handoff-protection' | 'capture' | 'persist' | 'finish' | 'job' | 'inputs-before' | 'space' | 'stream-close' | 'artifact-inspect' | 'inputs-after' | 'receipt', milliseconds: number) => void;
 /** Optional local observations have no authority over output or recovery. */
 export function measureBackupOutput<T>(observer: BackupOutputTiming | undefined, stage: Parameters<BackupOutputTiming>[0], action: () => Promise<T>): Promise<T> {
   if (!observer) return action();
@@ -260,7 +265,7 @@ export class BackupOutputJob {
     // Cancellation during the closing structural audit also prevents publication.
     checkAbort(signal);
   }
-  async generate(store: OriginBlobStore, signal?: AbortSignal, timing?: BackupOutputTiming) {
+  async generate(store: OriginBlobStore, signal?: AbortSignal, timing?: BackupOutputTiming, captureFile?: BackupFileObserver) {
     const measure = <T>(stage: Parameters<BackupOutputTiming>[0], action: () => Promise<T>) => measureBackupOutput(timing, stage, action);
     await measure('inputs-before', () => this.validateInputs(signal));
     if ((await this.steps()).some(s => s.detail.kind === 'artifactVerified')) { await this.artifact(); return; }
@@ -286,6 +291,8 @@ export class BackupOutputJob {
     if (inspected.archive.sha256 !== generated.sha256 || inspected.archive.byteLength !== generated.byteLength || json(inspected.archive.control.manifest) !== json(m)) return fail('output-readback');
     await measure('inputs-after', () => this.validateInputs(signal));
     await measure('receipt', () => this.append({ kind: 'artifactVerified', archive: { sha256: generated.sha256, byteLength: generated.byteLength }, location: 'opfsArtifact', sinkId }));
+    if (captureFile && !signal?.aborted) captureFile(Object.freeze({ id: this.id, token: this.source.token,
+      archive: Object.freeze({ sha256: inspected.archive.sha256, byteLength: inspected.archive.byteLength }), blob: inspected.archive.sourceSnapshot() }));
   }
 
   async verifySelected(file: Blob) {

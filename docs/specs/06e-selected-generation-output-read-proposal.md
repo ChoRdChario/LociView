@@ -208,6 +208,52 @@ readonly／pending表示、別FS/factory、期限外／未完了reader、書込�
 検証する。PC／touch・完全終了offlineと独立差分レビューを含め、実時間の効果がなければ採用しない。
 新しい保存形式・ID・依存・容量保証・公開は含まない。
 
+### 7.1. 同じ読取内の復元済み履歴の戻り値（2026-11-14）
+
+再開と書き出しの重複削減指示に沿い、通常の`readCandidate`でも、その呼出し内で完了した
+`readRestoredBases(entries)`の戻り値を復元項目の履歴確認に使う。既存の本文編集準備にある
+`checkedRestore`と同じ扱いとし、呼出し元のports・entries・復元transaction IDに限定する。
+この戻り値はbinding、元文書、manifest／inventory、全partの実バイトとheadsを検査済みである。
+後続ループでは同じpartを再度開かず、保存済み現在文書のoriginalsとの全バイト比較、
+公開heads、capabilityと素材参照の確認、provider検査を続ける。他の履歴項目は従来経路を使う。
+
+同じ1回の読取の開始・終了確認を保持し、完了した候補だけを採用する。
+別のread、独立したHost読取、保存準備、書込・確定・保存後照合、download、cold復旧は
+それぞれ新しい検査を行う。永続cache、read間の共有、原本ZIP／body検査の省略は追加しない。
+
+受入れは同一readで復元partsとmanifestを再開しないこと、coldでのpart／binding改変・欠損・
+capability不一致の拒否、正常復旧、異なるFS／factoryと途中終了確認の失敗を既存試験で確認する。
+Ki-84の実書き出し・再開と、独立した保存後照合の実測で効果を確認して採否を決める。
+
+### 7.2. 読取専用の検査記録を1回開いて照合する（2026-11-14）
+
+**評価のみ・未採用。** 独立レビューと改変拒否試験は通過したが、Ki-84診断では本文表示・
+再開全体の短縮を確認できず、未登録／staging読取の監査が増えた。製品コードと該当試験の変更は
+撤回した。以下は評価案の記録であり、現行の検査契約を変更しない。
+
+再開・書き出しの重複読取削減指示に沿い、読取専用のcontent evidenceとOrigin receiptは、
+その確認で新しく開いた同じfile-viewからサイズと全内容を照合する。既存の
+`readReceiptSnapshot`を使い、予算、EOF、長さ、UTF-8、重複member、canonical JSON、
+key／facts digest、CAS digest／長さ／object IDの既存検査とstream解放をすべて行う。
+確認ごとのfresh openを保持し、別の確認へFile・内容・検査結果を持ち越さない。
+
+対象は`ReadonlyEvidence.verify`からのlookupと`OriginBlobStore.inspect/openReadOnly`のreceipt読取。
+`hasEvidence`のprobeは既存の選択を保ち、通常のwritable verifierのreceipt読取も対象外とする。
+`inspect`を呼ぶ作成処理のinventory-before/afterも、その都度の読取専用観測として対象とする。
+通常`open`の`readStored`、writer-ownedなput／verifyReceipt、genericな`readReceipt`／
+`writeReceipt`、Journal／公開、保存後・download直前・復旧時の独立した検査は従来経路を保つ。
+CAS実本体の存在・サイズと全量SHA、各読取のowner／終了監査を保持する。
+
+開いた後で外部からreceiptが消失・置換された場合、同じ開いた内容の検査が成功し、
+次のfresh確認で変更を検出することがある。ストレージ全体のsnapshot保証は追加しない。
+壊れた・短い・長いstream、read／cancel／release失敗を再openで成功扱いせず、
+元の失敗・repair表現へ戻す。allowNewEvidenceの実行・書込前後の別検査を統合しない。
+未登録のstrict fallbackではstreamの各監査も保つ。初回復元も実測し、その追加負荷を確認する。
+
+受入れは各確認で一度だけ開くこと、次の確認での変更／欠損検出、実streamの短縮・超過・
+失敗、key／digest／CAS不一致、writer／通常openの独立読取、保存後改変拒否と中断復旧。
+通常ビルドのKi-84書き出し・cold再開を各3回比較し、効果と安全性を満たした範囲だけ接続する。
+
 ## 8. 保存成功直後の新しい履歴1件の反映（PO承認2026-11-09）
 
 通常の新しいBackup生成に成功した直後は、生成コマンドの同じ所有期間内で確認済みの新job1件だけを
@@ -236,6 +282,40 @@ readonly／pending表示、別FS/factory、期限外／未完了reader、書込�
 事前説明との差、owner切替・期限外callback・各段階失敗・retry／coldの復旧を検証する。過去履歴を改変した
 場合、新fileを渡す検査は維持され、次の全照会で過去の破損を検出することを確認する。同じKi-84で3回測り、
 生成・履歴照会・downloadを分けて効果を確認できた場合だけ採用する。保存形式・ID・依存・公開は変更しない。
+
+### 8.1. 同じ保存操作で検査した完成ファイルの即時引渡し（2026-11-14）
+
+書き出し待ちの改善指示に沿い、通常の「ファイルに保存」が新しいBackupを作った同じ操作内に限り、
+実書込後の`BackupArchive.inspect`が持つ`sourceSnapshot()`を、その操作のdownloadへ渡す。
+現在の約2.5秒の独立download再走査のうち、完成ZIPの再open・再解析を対象とする。
+保存形式、操作項目、原本、画質は同じで、外部保存の照合済みreceiptはanchorから作らない。
+
+`BackupOutputJob.generate`は全量の書込・close後に新しく実ファイルを開き、既存の全量
+SHA／CRC／manifest・payload検査を通す。その検査結果の正確なnative snapshotだけを保持する。
+後段の`validateInputs`、artifactVerified receipt、Session外側write fence、package操作の成功、
+同じHost owner・接続・source token／publicationを確認するまでUIへ通知しない。
+即時引渡しでは生成後のliveな保護素材・baseも新しく確認する。書込前後・公開・復旧を統合しない。
+
+Blobは別の操作所有callback/resultへ入れ、data-onlyの`BackupPresentationObserver`へ混在させない。
+job ID・archive SHA／長さ・source tokenに結び付け、通常のIDを返す既存呼出しも保つ。
+UIは現在の開示と実manifestのprivacy／reader条件が一致する場合だけ、同じ要求で既存の
+ファイル名・Object URL・anchor処理へ渡す。追加確認が必要ならsnapshotを破棄し、後の操作はfresh downloadを使う。
+成功・失敗・取消・画面破棄のいずれでも操作ローカルの参照を終了し、次のclickへ持ち越さない。
+既存のhandoff後Object URL所有・解放は保持する。
+
+通常の履歴download、再試行、別の保存・取り込みではfreshなjob／protection／archive検査を続ける。
+保存後検査から即時引渡しまでにdurable artifactの元パスが外から消失・置換されても、
+検査済みsnapshotを渡し、次のfresh照会で元パスの問題を検出する場合がある。
+返す内容は検査した完成ファイルであり、別bytesを成功扱いしない。引渡し前に検出した取得・
+Object URL／anchor準備の失敗には、生成済みファイルから再試行できる既存案内を使う。
+anchor後は既存の「ダウンロード開始」の意味を保ち、実際の転送失敗はブラウザ側の結果になる。
+保存先の照合は既存の独立した選択ファイル検査を使う。RAM上の全量copyや永続cacheは作らない。
+
+受入れは保存後検査の完了前の改変・短縮・receipt失敗・Session／package外側fence失敗・直前取消／破棄で通知しないこと、
+実manifestとの不一致で自動引渡ししないこと、通常downloadが改変・欠損を新しく拒否すること。
+実Chromiumのnative OPFSで、検査後の同長置換・短縮・削除に対しsnapshotの元bytesまたは
+明示的な読取失敗になることを確認する。Ki-84通常ビルド各3回の実downloadとcold再開、
+PC／touch・既存の中断復旧・offline・独立レビューを通し、効果を確認したこの経路だけ接続する。
 
 ## 9. 残る待ち時間の観測と操作の整理（2026-11-09）
 

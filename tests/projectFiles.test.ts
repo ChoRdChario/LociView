@@ -3738,6 +3738,33 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     audit.count = 0;
     return { ...f, job, expected, selected, scope, audit, journal: new TransactionJournal(scope.fs, metadata) };
   }
+  it('reuses restored parts within each Session read and output projection, then detects later loss on the next read', async () => {
+    const f = await auditedRestoredJournal(), session = f.selected.ports.session;
+    const projection = validationProjectService(f.scope.fs, f.scope.factory, f.store, budget, decode).session;
+    const restored = vi.spyOn(TransactionJournal.prototype, 'readRestoredBases');
+    const parts = vi.spyOn(TransactionJournal.prototype, 'validateParts');
+    const received = vi.spyOn(TransactionJournal.prototype, 'receivedInfo');
+    const firstPart = f.expected.entry.prepared!.changes[0]!;
+    const path = f.journal.path(f.job.id, `changes/${String(firstPart.ordinal).padStart(8, '0')}.amchange`);
+    const original = (await f.fs.readBytes(path))!;
+    try {
+      for (const read of [() => session.read(), () => session.read(),
+        () => projection.withOutputOverview(f.scope.fs, reader => reader.read())]) {
+        restored.mockClear(); parts.mockClear(); received.mockClear();
+        const current = await read();
+        expect(current.state).toBe('ready');
+        expect(current.source!.originalChanges()).toEqual(f.expected.source.originalChanges());
+        expect(restored).toHaveBeenCalledOnce();
+        expect(parts.mock.calls.filter(([entry]) => entry.start.purpose === 'restoreBackup')).toHaveLength(1);
+        expect(received.mock.calls.filter(([entry]) => entry.start.purpose === 'restoreBackup')).toHaveLength(0);
+      }
+      await f.fs.remove(path);
+      expect((await session.read()).state).toBe('repair-required');
+      await f.fs.writeBytes(path, original);
+      expect((await session.read()).state).toBe('ready');
+      expect((await session.read()).source!.originalChanges()).toEqual(f.expected.source.originalChanges());
+    } finally { restored.mockRestore(); parts.mockRestore(); received.mockRestore(); await f.fs.writeBytes(path, original); }
+  });
   type CandidateSession = { readCandidate(integrity?: OutputIntegrityRead, ports?: metadataPersistence.MetadataReadPorts): Promise<{ read: MetadataSessionRead }> };
   async function auditedStagingJournal() {
     const f = await restoreFileFixture(), job = await (await f.prepare()).persist(f.ports, f.databases), scope = owned(await job.openStaging(f.databases));
@@ -4824,12 +4851,18 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
   it('observes the actual final ready backup read only after the successful command while preserving all three ready fences', async () => {
     const { f, sent } = await contributionTeam(), session = f.receiver.session, stages: string[] = [], observed = vi.fn();
     const sender = new WorkspaceSender(f.fs, session, f.store, metadata, f.locks, stage => { stages.push(stage); });
-    const id = await sender.generateBackup(sent.current.source!.token, '表示に引き継ぐ', undefined, observed);
+    const offered = vi.fn(), inspect = vi.spyOn(BackupArchive, 'inspect');
+    const id = await sender.generateBackup(sent.current.source!.token, '表示に引き継ぐ', undefined, observed, offered);
     expect(stages.filter(s => s.startsWith('ready-'))).toEqual(['ready-before', 'ready-final', 'ready-finish']);
     const finalRead = (session as unknown as { last: MetadataSessionRead }).last;
     expect(observed.mock.calls[0]![0]).toBe(finalRead);
     expect(observed).toHaveBeenCalledExactlyOnceWith(finalRead, { id, purpose: 'backup', state: 'generated', token: finalRead.source!.token, label: '表示に引き継ぐ' });
     expect(Object.isFrozen(observed.mock.calls[0]![1])).toBe(true); expect(finalRead.state).toBe('ready'); expect(finalRead.source!.token).toBe(sent.current.source!.token);
+    expect(offered).toHaveBeenCalledOnce(); const file = offered.mock.calls[0]![0];
+    const saved = await inspect.mock.results.at(-1)!.value;
+    expect(file).toMatchObject({ id, token: finalRead.source!.token, archive: { sha256: saved.archive.sha256, byteLength: saved.archive.byteLength } });
+    expect(await file.blob.arrayBuffer()).toEqual(await saved.archive.sourceSnapshot().arrayBuffer());
+    expect(Object.isFrozen(file)).toBe(true); expect(Object.isFrozen(file.archive)).toBe(true); inspect.mockRestore();
     const inspected = await BackupArchive.inspect(await sender.download(id), metadata); expect(inspected.source.originalChanges()).toEqual(finalRead.source!.originalChanges());
     await expect(sender.generateBackup(finalRead.source!.token, undefined, undefined, () => { throw Error('display observer'); })).resolves.toEqual(expect.any(String));
   }, 20000);
@@ -4892,24 +4925,65 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     } finally { record.mockRestore(); }
   }, 20000);
   it('does not observe a backup result rejected by its outer write fence, retaining the exact artifact for strict retry', async () => {
-    const { f, sent } = await contributionTeam(), observed = vi.fn(); let finished = false;
+    const { f, sent } = await contributionTeam(), observed = vi.fn(), offered = vi.fn(); let finished = false;
     registerWriteFence(f.fs, async () => { if (finished) throw Error('backup outer closing fence'); });
     const sender = new WorkspaceSender(f.fs, f.receiver.session, f.store, metadata, f.locks, stage => { if (stage === 'finish') finished = true; });
-    await expect(sender.generateBackup(sent.current.source!.token, undefined, undefined, observed)).rejects.toThrow('backup outer closing fence');
-    expect(observed).not.toHaveBeenCalled();
+    await expect(sender.generateBackup(sent.current.source!.token, undefined, undefined, observed, offered)).rejects.toThrow('backup outer closing fence');
+    expect(observed).not.toHaveBeenCalled(); expect(offered).not.toHaveBeenCalled();
     const [id] = await BackupOutputJob.ids(f.fs); expect(id).toBeTruthy();
     const job = await BackupOutputJob.open(f.fs, id!, metadata), before = await job.artifact(); finished = false;
     await sender.retry(id!); expect((await sender.download(id!)).size).toBe(before.blob.size);
     expect((await BackupArchive.inspect(await sender.download(id!), metadata)).source.originalChanges()).toEqual(sent.current.source!.originalChanges());
   }, 20000);
+  it.each(['artifact', 'receipt', 'cancel'] as const)('offers no immediate backup file after %s failure and preserves strict retry', async failure => {
+    const { f, sent } = await contributionTeam(), offered = vi.fn(), abort = new AbortController();
+    const sender = new WorkspaceSender(f.fs, f.receiver.session, f.store, metadata, f.locks);
+    const write = f.fs.writeStream.bind(f.fs);
+    const writing = vi.spyOn(f.fs, 'writeStream').mockImplementation(async (path, stream) => {
+      await write(path, stream);
+      if (failure === 'artifact' && path.includes('/backup-output/') && path.includes('/artifacts/')) {
+        const bytes = (await f.fs.readBytes(path))!; bytes[bytes.length - 1]! ^= 1; await f.fs.writeBytes(path, bytes);
+      }
+    });
+    const text = f.fs.writeText.bind(f.fs);
+    const receipt = vi.spyOn(f.fs, 'writeText').mockImplementation(async (path, value) => {
+      if (path.includes('/backup-output/') && path.includes('/steps/') && JSON.parse(value).detail?.kind === 'artifactVerified') {
+        if (failure === 'receipt') throw Error('receipt refused');
+        if (failure === 'cancel') abort.abort();
+      }
+      return text(path, value);
+    });
+    try {
+      const result = sender.generateBackup(sent.current.source!.token, undefined, abort.signal, undefined, offered);
+      if (failure === 'cancel') await result.catch(() => undefined); else await expect(result).rejects.toThrow();
+      expect(offered).not.toHaveBeenCalled();
+      writing.mockRestore(); receipt.mockRestore();
+      const [id] = await BackupOutputJob.ids(f.fs); expect(id).toBeTruthy(); await sender.retry(id!);
+      expect((await BackupArchive.inspect(await sender.download(id!), metadata)).source.originalChanges()).toEqual(sent.current.source!.originalChanges());
+    } finally { writing.mockRestore(); receipt.mockRestore(); }
+  }, 20000);
+  it('withholds an immediate file when its Host closes after generation, preserving the durable backup for reopening', async () => {
+    const f = await openFileCaption(), offered = vi.fn(), generate = BackupOutputJob.prototype.generate;
+    let closing: Promise<void> | undefined;
+    const generating = vi.spyOn(BackupOutputJob.prototype, 'generate').mockImplementation(async function(this: BackupOutputJob, ...args) {
+      await generate.apply(this, args); closing = f.host.dispose();
+    });
+    try {
+      await expect(f.host.workspaceOutput.generateBackup(f.host.read().source!.token, undefined, offered)).rejects.toThrow('画面を閉じました');
+      expect(offered).not.toHaveBeenCalled(); await closing;
+      generating.mockRestore();
+      const reopened = owned(await openValidationHost(f.options)), id = reopened.workspaceOutput.jobs.find(j => j.purpose === 'backup')!.id;
+      expect((await BackupArchive.inspect(await reopened.workspaceOutput.download(id), metadata)).source.token).toBe(reopened.read().source!.token);
+    } finally { generating.mockRestore(); await closing; f.workspace.dispose(); await f.host.dispose(); }
+  }, 20000);
   it('forwards no presentation observation if the package operation rejects after the Session completed', async () => {
-    const { f, sent } = await contributionTeam(), observed = vi.fn();
+    const { f, sent } = await contributionTeam(), observed = vi.fn(), offered = vi.fn();
     const locks = { request(name: string, options: LockOptions, action: (lock: Lock | null) => Promise<unknown>) {
       return f.locks.request(name, options, async lock => { await action(lock); throw Error('package completion refused'); });
     } } as unknown as LockManager;
     const sender = new WorkspaceSender(f.fs, f.receiver.session, f.store, metadata, locks);
-    await expect(sender.generateBackup(sent.current.source!.token, undefined, undefined, observed)).rejects.toThrow('package completion refused');
-    expect(observed).not.toHaveBeenCalled();
+    await expect(sender.generateBackup(sent.current.source!.token, undefined, undefined, observed, offered)).rejects.toThrow('package completion refused');
+    expect(observed).not.toHaveBeenCalled(); expect(offered).not.toHaveBeenCalled();
     const [id] = await BackupOutputJob.ids(f.fs), normal = new WorkspaceSender(f.fs, f.receiver.session, f.store, metadata, f.locks);
     expect((await normal.jobs()).find(j => j.id === id)).toMatchObject({ purpose: 'backup', state: 'generated' });
     expect((await BackupArchive.inspect(await normal.download(id!), metadata)).source.originalChanges()).toEqual(sent.current.source!.originalChanges());
@@ -5747,6 +5821,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     // Supply only native selector behavior absent from the DOM recorder.
     Object.assign(output, { querySelector: (selector: string) => selector === '.lv-file-primary' ? primary() : null });
     const generate = h.host.workspaceOutput.generateBackup;
+    const fresh = vi.spyOn(h.host.workspaceOutput, 'download');
     vi.spyOn(h.host.workspaceOutput, 'generateBackup').mockImplementation(async (...args) => {
       const id = await generate(...args);
       if (result === 'disclosure') Object.assign(h.host.workspaceOutput.jobs.find(j => j.id === id)!, { requiresPortableMediaReader: true });
@@ -5757,6 +5832,12 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     await vi.waitFor(() => expect(status().dataset.busy).toBe('false'), { timeout: 10000 });
     expect(status().textContent).toBe(result === 'handoff' ? 'ダウンロードを開始しました。保存先で完了を確認してください。' : '作成したファイルの内容を確認し、ダウンロードしてください。');
     expect(primary().focusCalls.length - focused).toBe(result === 'handoff' ? 1 : 0); expect(h.downloads).toHaveBeenCalledTimes(result === 'handoff' ? 1 : 0);
+    expect(fresh).not.toHaveBeenCalled();
+    if (result === 'disclosure') {
+      h.all(output).find(n => n.tag === 'button' && n.textContent === 'ダウンロード')!.click();
+      await vi.waitFor(() => expect(status().dataset.busy).toBe('false'), { timeout: 10000 });
+      expect(fresh).toHaveBeenCalledOnce(); expect(h.downloads).toHaveBeenCalledOnce();
+    }
     h.refresh(); h.refresh(); await Promise.resolve(); expect(primary() === origin).toBe(true);
     if (result === 'handoff') {
       expect(origin.document.activeElement === primary()).toBe(true);
@@ -5811,9 +5892,8 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const status = () => h.all(output).find(n => n.attributes.get('role') === 'status')!;
     const primary = () => h.all(output).find(n => n.className === 'lv-file-primary')!;
     const downloadButton = () => h.all(output).find(n => n.tag === 'button' && n.textContent === 'ダウンロード')!;
-    let downloaded: Blob | undefined;
     const original = host.workspaceOutput.download;
-    const fresh = vi.spyOn(host.workspaceOutput, 'download').mockImplementation(async (...args) => { downloaded = await original(...args); return downloaded; });
+    const fresh = vi.spyOn(host.workspaceOutput, 'download').mockImplementation((...args) => original(...args));
     const create = vi.spyOn(URL, 'createObjectURL'), revoke = vi.spyOn(URL, 'revokeObjectURL');
     try {
       const captionId = Object.keys(host.authority.read().resources.captions)[0]!, sceneId = h.display()!.sceneId;
@@ -5823,10 +5903,12 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       expect(h.all(output).some(n => n.textContent === 'HEIC原本と表示用PNGの組に対応したLociViewで開いてください。')).toBe(true);
       primary().click(); await vi.waitFor(() => expect(status().dataset.busy).toBe('false'), { timeout: 10000 });
       expect(h.downloads).toHaveBeenCalledTimes(1); expect(status().textContent).toBe('ダウンロードを開始しました。保存先で完了を確認してください。');
-      const index = create.mock.calls.findIndex(args => args[0] === downloaded); expect(index).toBeGreaterThanOrEqual(0);
+      expect(fresh).not.toHaveBeenCalled();
+      const index = create.mock.calls.findLastIndex(args => args[0] instanceof Blob); expect(index).toBeGreaterThanOrEqual(0);
+      expect((await BackupArchive.inspect(create.mock.calls[index]![0] as Blob, metadata)).archive.control.manifest.requiredCapabilities).toContain(PORTABLE_MEDIA_CAPABILITY);
       const url = create.mock.results[index]!.value, count = create.mock.calls.length;
       downloadButton().click(); await vi.waitFor(() => expect(status().dataset.busy).toBe('false'), { timeout: 10000 });
-      expect(h.downloads).toHaveBeenCalledTimes(2); expect(fresh).toHaveBeenCalledTimes(2); expect(create).toHaveBeenCalledTimes(count);
+      expect(h.downloads).toHaveBeenCalledTimes(2); expect(fresh).toHaveBeenCalledOnce(); expect(create).toHaveBeenCalledTimes(count);
       fresh.mockRejectedValueOnce(Error('saved artifact refused'));
       downloadButton().click(); await vi.waitFor(() => expect(status().dataset.busy).toBe('false'), { timeout: 10000 });
       expect(status().textContent).toContain('saved artifact refused'); expect(h.downloads).toHaveBeenCalledTimes(2); expect(create).toHaveBeenCalledTimes(count);

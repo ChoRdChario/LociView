@@ -420,6 +420,7 @@ export const projectSceneApplicationImports:Readonly<Record<string,readonly stri
     "./validationHost"
   ],
   "src/projectScene/validationHost.ts": [
+    "../projectPackage/backupOutputJob",
     "./validationCatalog",
     "../platform/outputArtifactLock",
     "../projectPackage/reviewArchive",
@@ -499,6 +500,7 @@ export const projectSceneApplicationImports:Readonly<Record<string,readonly stri
     "./validationHost"
   ],
   "src/projectScene/validationOutputControls.ts": [
+    "../projectPackage/backupOutputJob",
     "../ui/projectScene/storageFeedback",
     "../ui/projectScene/modePresentation",
     "../ui/projectScene/projectWorkspacePorts",

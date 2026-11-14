@@ -14,6 +14,7 @@ import type { MetadataStorageFactory } from '../projectMetadata/repository';
 import type { OriginBlobStore } from '../projectMetadata/blobStore';
 import { BlobStoreError } from '../projectMetadata/blobStream';
 import { unreceivedWeakMedia, type MetadataSessionRead, type CompletedBackupDisplay } from '../projectMetadata/session';
+import type { BackupFileHandoff, BackupFileObserver } from '../projectPackage/backupOutputJob';
 import type { MetadataEdit } from '../projectMetadata/commands';
 import { captionDeletionImpact } from '../projectMetadata/captionDeletion';
 import { assetDeletionImpact } from '../projectMetadata/assetDeletion';
@@ -605,11 +606,12 @@ async function openNormalValidationHost(options: ValidationHostOptions, inherite
       previewClean: (token: string) => previewOutput(token, owned => owned.previewClean(token)),
       previewReview: (token: string, selection: Parameters<typeof sender.previewReview>[1]) => previewOutput(token, (owned, choice) => owned.previewReview(token, choice!), selection),
       generateReview: (token: string, selection: Parameters<typeof sender.generateReview>[1]) => outputAction(() => sender.generateReview(token, selection)),
-      generateBackup: (token: string, label?: string) => {
+      generateBackup: (token: string, label?: string, observeFile?: BackupFileObserver) => {
         const owner = connection, ownedFs = fs, ownedSession = session, ownedSender = sender, view = last;
         const source = view.source, provider = view.provider, publication = view.publication, proof = source && json(source.proof);
         let read: MetadataSessionRead | undefined;
         let completed: CompletedBackupDisplay | undefined;
+        let file: BackupFileHandoff | undefined;
         const presentation = () => {
           if (closed || restoreRetired || connection?.restorePending || restoreDisplayPending || receiveDisplayPending || unfinishedReceive() ||
             connection !== owner || fs !== ownedFs || session !== ownedSession || sender !== ownedSender ||
@@ -622,7 +624,7 @@ async function openNormalValidationHost(options: ValidationHostOptions, inherite
           return read;
         };
         return measure('host.backup.total', () => outputAction(() => measure('host.backup.generate', () =>
-          ownedSender.generateBackup(token, label, undefined, (next, output) => { read = next; completed = output; })), false, presentation, id => {
+          ownedSender.generateBackup(token, label, undefined, (next, output) => { read = next; completed = output; }, observeFile ? next => { file = next; } : undefined)), false, presentation, id => {
           // Display-only exceptions cannot turn a durable success into failure.
           try {
             if (!presentation() || !completed || completed.id !== id || completed.token !== token ||
@@ -632,7 +634,12 @@ async function openNormalValidationHost(options: ValidationHostOptions, inherite
             next.splice(index < 0 ? next.length : index, 0, row); outputJobs = next;
             return true;
           } catch { return false; }
-        }));
+        })).then(id => {
+          if (file && file.id === id && file.token === token && presentation()) {
+            try { ownedFs.mutationAuthority.assertEditable(); observeFile?.(file); } catch { /* Saved output remains available for explicit download. */ }
+          }
+          return id;
+        });
       },
       generateContribution: (token: string, selection: ContributionBaseChoice['selection']) => measure('host.contribution.total', () => outputAction(() => measure('host.contribution.generate', () => sender.generateContribution(token, selection)))),
       retry: (id: string) => outputAction(() => sender.retry(id), true),

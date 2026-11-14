@@ -26,7 +26,7 @@ import { packageByteHash } from '../projectPackage/manifest';
 import type { OriginBlobStore } from './blobStore';
 import { WorkspaceOutputJob } from '../projectPackage/outputJob';
 import { ContributionOutputJob } from '../projectPackage/contributionOutputJob';
-import { BackupOutputJob, checkedBackupLabel, measureBackupOutput, type BackupOutputTiming } from '../projectPackage/backupOutputJob';
+import { BackupOutputJob, checkedBackupLabel, measureBackupOutput, type BackupOutputTiming, type BackupFileHandoff, type BackupFileObserver } from '../projectPackage/backupOutputJob';
 import { BackupSourceCapture } from '../projectPackage/backupSource';
 import { CleanOutputJob } from '../projectPackage/cleanOutputJob';
 import { CleanInputJob } from '../projectPackage/cleanInputJob';
@@ -224,7 +224,7 @@ export class MetadataProjectSession {
       const fs = ports?.fs ?? this.fs, journal = ports ? new TransactionJournal(fs, this.limits) : this.journal;
       const repository = ports ? new MetadataRepository(fs, ports.factory!, this.limits) : this.repository;
       const entries = await journal.entries(), published = entries.filter(e => e.publication).at(-1);
-      const restored = await journal.readRestoredBases(entries).then(result => preparation && result ? {
+      const restored = await journal.readRestoredBases(entries).then(result => ports && result ? {
         id: result.entry.start.transactionId, parts: result.source.originalChanges(),
         blobs: result.description.blobs, requiredCapabilities: result.description.requiredCapabilities,
       } : null);
@@ -769,11 +769,13 @@ export class MetadataProjectSession {
     });
   }
 
-  private async finishBackupOutput(job: BackupOutputJob, store: OriginBlobStore, signal?: AbortSignal, timing?: BackupOutputTiming) {
+  private async finishBackupOutput(job: BackupOutputJob, store: OriginBlobStore, signal?: AbortSignal, timing?: BackupOutputTiming, immediateFile = false) {
     job.assertOwner(this.fs); const current = await measureBackupOutput(timing, 'ready-finish', () => this.outputReady(signal));
     if (json(current.source!.proof) !== json(job.source.proof)) return fail('output-lineage');
     await measureBackupOutput(timing, 'slot-finish', () => this.assertOutputSlot(job.id)); await measureBackupOutput(timing, 'protection-finish', () => validateOutputProtection(this.fs, job, store, this.limits));
-    await measureBackupOutput(timing, 'job', () => job.generate(store, signal, timing));
+    let file: BackupFileHandoff | undefined;
+    await measureBackupOutput(timing, 'job', () => job.generate(store, signal, timing, immediateFile ? next => { file = next; } : undefined));
+    if (file) await measureBackupOutput(timing, 'handoff-protection', () => validateOutputProtection(this.fs, job, store, this.limits));
     // The manifest includes retained base evidence; source flags alone are not
     // enough to describe the actual file's reader/privacy requirements.
     const manifest = job.manifest(), names = hasEditorCapability(manifest.requiredCapabilities);
@@ -781,10 +783,10 @@ export class MetadataProjectSession {
       ...(job.label !== undefined ? { label: job.label } : {}),
       ...(names ? { includesDeclaredEditorNames: true, requiresEditorAttributionReader: true } : {}),
       ...(hasPortableMediaCapability(manifest.requiredCapabilities) ? { requiresPortableMediaReader: true } : {}) });
-    return { id: job.id, read: current, output };
+    return { id: job.id, read: current, output, file };
   }
   async createManualCheckpoint(expectedToken: string, label: string | undefined, store: OriginBlobStore, version: string, signal?: AbortSignal, timing?: BackupOutputTiming,
-    observePresentation?: BackupPresentationObserver) {
+    observePresentation?: BackupPresentationObserver, observeFile?: BackupFileObserver) {
     checkedBackupLabel(label);
     const result = await underWriteLease(this.fs, async () => {
       const read = await measureBackupOutput(timing, 'ready-before', () => this.outputReady(signal)); if (read.source!.token !== expectedToken) return fail('output-stale');
@@ -795,11 +797,12 @@ export class MetadataProjectSession {
       await measureBackupOutput(timing, 'protection-before', () => validateOutputProtection(this.fs, job, store, this.limits));
       const current = await measureBackupOutput(timing, 'ready-final', () => this.outputReady(signal));
       if (current.source!.token !== expectedToken || current.publication !== capture.publication || json(await bases.snapshot()) !== json(job.frozenBases())) return fail('output-stale');
-      await measureBackupOutput(timing, 'persist', () => job.persist()); return measureBackupOutput(timing, 'finish', () => this.finishBackupOutput(job, store, signal, timing));
+      await measureBackupOutput(timing, 'persist', () => job.persist()); return measureBackupOutput(timing, 'finish', () => this.finishBackupOutput(job, store, signal, timing, !!observeFile));
     });
     // The actual final ready read is observed only after the outer write fence
     // succeeds. A failed/closing command cannot seed its display successor.
     if (!signal?.aborted) { try { observePresentation?.(result.read, result.output); } catch { /* Presentation has no authority over the completed output. */ } }
+    if (result.file && !signal?.aborted) { try { this.fs.mutationAuthority.assertEditable(); observeFile?.(result.file); } catch { /* The durable file remains available for a fresh download. */ } }
     return result.id;
   }
   async resumeBackupOutput(id: string, store: OriginBlobStore, signal?: AbortSignal, timing?: BackupOutputTiming) {

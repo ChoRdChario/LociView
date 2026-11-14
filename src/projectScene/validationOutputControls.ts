@@ -2,6 +2,7 @@ import type { createValidationModeHost } from './validationModeHost';
 import { editOnly, displayMode } from '../ui/projectScene/modePresentation';
 import type { WorkspaceFileInteraction } from '../ui/projectScene/projectWorkspacePorts';
 import {storageFailureText} from '../ui/projectScene/storageFeedback';
+import type { BackupFileHandoff, BackupFileObserver } from '../projectPackage/backupOutputJob';
 
 /** Same editor, deliberate file handoff. No receipt follows a browser download click. */
 export function createValidationOutputControls(document: Document, host: ReturnType<typeof createValidationModeHost>,
@@ -64,11 +65,14 @@ export function createValidationOutputControls(document: Document, host: ReturnT
   };
   const urls = new Map<string, string>();
   const handedOff = new Set<string>();
-  const download = async (id: string) => {
+  const download = async (id: string, offered?: BackupFileHandoff) => {
     const job = host.workspaceOutput.jobs.find(job => job.id === id);
     if (!job) throw Error('作成したファイルを確認できません。');
     const handoff: { archive?: Readonly<{ sha256: string; byteLength: number }> } = {};
-    const blob = await host.workspaceOutput.download(id, archive => { handoff.archive = archive; }); if (disposed) return;
+    if (offered && (offered.id !== id || offered.token !== readingToken || offered.blob.size !== offered.archive.byteLength))
+      throw Error('作成したファイルを確認できません。');
+    if (offered) handoff.archive = offered.archive;
+    const blob = offered?.blob ?? await host.workspaceOutput.download(id, archive => { handoff.archive = archive; }); if (disposed) return;
     const key = handoff.archive ? JSON.stringify([id, handoff.archive.sha256, handoff.archive.byteLength]) : undefined;
     let url = key && urls.get(key);
     if (!url) { url = URL.createObjectURL(blob); urls.set(key ?? url, url); }
@@ -134,10 +138,13 @@ export function createValidationOutputControls(document: Document, host: ReturnT
     return { includesDeclaredEditorNames: purpose === 'contribution' ? !!base?.deltaIncludesDeclaredEditorNames : requires, requiresEditorAttributionReader: requires,
       requiresPortableMediaReader: portable };
   };
-  const generateAndDownload = (generate: () => Promise<string>) => {
+  const generateAndDownload = (generate: (observeFile?: BackupFileObserver) => Promise<string>) => {
     const expected = currentDisclosure(); let needsDisclosure = false;
     return perform(async () => {
-    const id = await generate(), job = host.workspaceOutput.jobs.find(j => j.id === id);
+    let offered: BackupFileHandoff | undefined, accepting = true;
+    try {
+    const id = await generate(file => { if (accepting && !disposed) offered = file; }), job = host.workspaceOutput.jobs.find(j => j.id === id);
+    accepting = false;
     // Generation is already durable even if the browser handoff then fails.
     // Keep that exact result available; retry must not silently create another job.
     if (presentation === 'share') choicePending = false;
@@ -145,11 +152,12 @@ export function createValidationOutputControls(document: Document, host: ReturnT
     if (job && (!!job.includesDeclaredEditorNames !== !!expected.includesDeclaredEditorNames || !!job.requiresEditorAttributionReader !== !!expected.requiresEditorAttributionReader || !!job.requiresPortableMediaReader !== !!expected.requiresPortableMediaReader)) {
       needsDisclosure = true; history.open = true; return;
     }
-    await handoff(id);
+    await handoff(id, offered);
+    } finally { accepting = false; offered = undefined; }
   }, handoffMessage, true, false, () => { if (needsDisclosure) { feedback = '作成したファイルの内容を確認し、ダウンロードしてください。'; completedFeedback = false; } }, 'ファイルを作成しています。', true); };
-  const handoff = async (id: string) => {
+  const handoff = async (id: string, offered?: BackupFileHandoff) => {
     feedback = 'ダウンロードを準備しています。'; render();
-    try { await download(id); if (!disposed) handedOff.add(id); }
+    try { await download(id, offered); if (!disposed) handedOff.add(id); }
     catch (error) { history.open = true; throw Error(`${error instanceof Error ? error.message : 'ダウンロードを開始できません。'} 作成したファイルから再試行してください。`); }
   };
   const render = () => {
@@ -279,7 +287,7 @@ export function createValidationOutputControls(document: Document, host: ReturnT
         else generateAndDownload(() => host.workspaceOutput.generateReview(token, selected));
       } else if (purpose === 'backup') {
         const name = checkpointName.trim().normalize('NFC') || undefined;
-        generateAndDownload(() => host.workspaceOutput.generateBackup(token, name));
+        generateAndDownload(offer => host.workspaceOutput.generateBackup(token, name, offer));
       } else generateAndDownload(() => host.workspaceOutput.generate(token));
     };
     create.disabled ||= purpose === 'contribution' && !chosen || purpose === 'review' && !sceneIds.length || !!selected || !!cancellation;

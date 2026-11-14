@@ -6,7 +6,7 @@ import type { MetadataLimits, MetadataProof } from '../projectMetadata/format';
 import { json, withMetadataRead } from '../projectMetadata/persistence';
 import { WorkspaceOutputJob } from '../projectPackage/outputJob';
 import { ContributionOutputJob } from '../projectPackage/contributionOutputJob';
-import { BackupOutputJob, type BackupOutputTiming } from '../projectPackage/backupOutputJob';
+import { BackupOutputJob, type BackupOutputTiming, type BackupFileHandoff, type BackupFileObserver } from '../projectPackage/backupOutputJob';
 import { CleanOutputJob } from '../projectPackage/cleanOutputJob';
 import { ReviewOutputJob } from '../projectPackage/reviewOutputJob';
 import type { ReviewSelectionOptions } from '../projectPackage/reviewSelection';
@@ -44,15 +44,20 @@ export class WorkspaceSender {
   previewClean(token: string) { return this.session.previewCleanOutput(token); }
   generateReview(token: string, selection: ReviewSelectionOptions, signal?: AbortSignal) { return workspaceFileOperation(this.locks, () => this.session.createReviewOutput(token, selection, this.store, '0.0.1', signal)); }
   previewReview(token: string, selection: ReviewSelectionOptions) { return this.session.previewReviewOutput(token, selection); }
-  generateBackup(token: string, label?: string, signal?: AbortSignal, observePresentation?: BackupPresentationObserver) {
+  generateBackup(token: string, label?: string, signal?: AbortSignal, observePresentation?: BackupPresentationObserver, observeFile?: BackupFileObserver) {
     let read: MetadataSessionRead | undefined;
     let completed: CompletedBackupDisplay | undefined;
+    let file: BackupFileHandoff | undefined;
     const capture: BackupPresentationObserver | undefined = observePresentation ? (next, output) => { read = next; completed = output; } : undefined;
-    const output = workspaceFileOperation(this.locks, () => this.session.createManualCheckpoint(token, label, this.store, '0.0.1', signal, this.backupTiming, capture));
-    if (!observePresentation) return output;
+    const output = workspaceFileOperation(this.locks, () => this.session.createManualCheckpoint(token, label, this.store, '0.0.1', signal, this.backupTiming, capture,
+      observeFile ? next => { file = next; } : undefined));
+    if (!observePresentation && !observeFile) return output;
     return output.then(id => {
       // Package-operation success is a second boundary after the Session fence.
-      if (read && !signal?.aborted) { try { observePresentation(read, completed); } catch { /* Display observers cannot reject a saved file. */ } }
+      if (read && !signal?.aborted) { try { observePresentation?.(read, completed); } catch { /* Display observers cannot reject a saved file. */ } }
+      if (file && file.id === id && file.token === token && !signal?.aborted) {
+        try { this.fs.mutationAuthority.assertEditable(); observeFile?.(file); } catch { /* Fresh history download remains available. */ }
+      }
       return id;
     });
   }

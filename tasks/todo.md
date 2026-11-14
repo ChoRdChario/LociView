@@ -10,7 +10,69 @@ queue or renewed approval requirements.
 
 ## Current — readable saved text during cold reopening
 
-- Active follow-up2026-11-14: reduce cold Ki-84 resume to readable saved text.
+- Active follow-up2026-11-14: optimize remaining cold-open inspection/history
+  and the actual Ki-84 full-file output. Freeze `1a3b3ba` for browser comparison.
+  Measure capture, frozen inputs, ZIP writing, independent artifact readback,
+  history display and download separately. Reuse results only within existing
+  operation/reader ownership; retain independent Host reads, post-write checks,
+  publication, cold recovery and tampering refusal. Implement the useful bounded
+  candidates after specification review, compare three same-input normal runs,
+  verify PC/touch output/reopen and affected fault paths, then required checkpoint,
+  isolation and independent final review. A new validation lifetime or package
+  contract is a stop condition. Use relevant browser paths for this bounded change.
+
+- This slice: reviewed06e§7.1 reuses the already checked restored parts in the
+  same owned read. Each separate Session/Host read and cold corruption rejection
+  remains fresh. No elapsed-time improvement is credited from the diagnostic alone.
+  The readonly receipt snapshot experiment (§7.2) passed integrity tests but did
+  not show a useful cold speedup and increased fallback stream audits; reverted.
+  Preserve its private diagnostic evidence, do not adopt it just for fewer opens.
+- Reviewed06e§8.1: same-click Backup output can hand off the precise native
+  snapshot from the independent post-write full ZIP inspection. Final input checks,
+  artifact receipt, Session and package closing fences, exact Host ownership,
+  post-generation live protection and privacy disclosure remain required. No Blob
+  enters the display DTO; later history/retry downloads retain fresh checks.
+  Focused tests passed for actual inspected bytes, tampering, final receipt failure,
+  cancellation, both outer fences, Host disposal, HEIC disclosure and URL cleanup.
+  Native OPFS snapshot mutation/shortening/deletion probe passed. Normal alternating
+  Ki-84 comparison passed below; final checkpoint and PC/touch/offline checks pending.
+
+- Normal same-input comparison complete: baseline `1a3b3ba`, Windows dedicated
+  Chromium156, i9-10850K/64GiB/RTX5080,1280×720,DPR1, no diagnostic timing mode,
+  isolated fresh profiles, alternating three runs per build. Backup input SHA256
+  `c714c6cd04f99ac7aa0b84e9e2ca82a0147bbbc0eeb029be475d94e68ccf501c`.
+  Save→download-start36936/29756/35200ms →23635/28120/28283ms;
+  median35200→28120ms (20.1% shorter). Cold launch→actual saved body
+  6950/6044/6902ms →5445/6214/6129ms; median6902→6129ms (11.2% shorter).
+  Complete editing/3D28264/21595/25007ms →20644/21485/21947ms;
+  median25007→21485ms. These are combined-path observations with visible variance,
+  not isolated causal credit for each helper or a new device guarantee. The second
+  matched cold-body pair did not improve; remaining startup cost is substantial.
+  Earlier diagnostic values are not mixed into this comparison. Each output was
+  actually downloaded and independently inspected:43 original body hashes,103
+  captions,3 original changes plus exactly one new edit; completely closed-browser
+  reopening retained the edited body. OS save-dialog time is excluded; the elapsed
+  output milestone is download start, not a claim that the user's save is verified.
+  Private traces/archives are retained under `.artifacts/e2e/resume-export-20261114`.
+
+- Verified development checkpoint: independent specification/final source reviews
+  found no remaining blocker. Final required checkpoint passed:156 suites,3565
+  passing,16 expected failures,21 TODO, five builds and offline isolation. The root
+  suite took1547s in this run; it is not a test-runtime optimization claim.
+  Focused Desktop PC/touch10/10 passed, including capacity retry, actual renderer
+  termination before/after commit, input continuity, reading during output and
+  portable HEIC output/reopen. Installed Chrome157.0.8103.52 and Edge157.0.4341.46
+  passed independent-profile edit→actual file→cold-reopen checks (2/2). HEIC
+  isolation passed all five artifacts; source/test identity matches the freeze.
+  Full offline8-case verification is running serially. Commit/Push this verified
+  development checkpoint and confirm exact remote CI while that lane finishes;
+  do not count pending offline/device acceptance as complete.
+  Next: Backup history repeats namespace/state scans before opening the same job;
+  evaluate a single owned state-and-open result, without forgeable checked flags
+  or cross-read reuse. ZIP body writing and first restore remain long. Physical
+  iPhone Safari memory, IME, actual save and offline acceptance remain pending.
+
+- Previous completed boundary2026-11-14: reduce cold Ki-84 resume to readable saved text.
   Freeze `4c34ae6` as the comparison build. Measure browser launch, catalog,
   selected generation checks, first text, opening Session, recovery/history,
   editor availability and 3D separately. Verify the actual first readable body,
@@ -52,8 +114,18 @@ queue or renewed approval requirements.
   with actual material verification held, text/search available, no editor/file
   ports, and IME/selection/focus retained after completion. Source/test hashes
   are frozen. Final checkpoint passed:156 suites,3560 passing,16 expected
-  failures,21 TODO, five builds and offline isolation. The59-case Desktop
-  regression and five-case cold-offline verification are running serially.
+  failures,21 TODO, five builds and offline isolation. Final Desktop59/59
+  passed (1.5h); offline8/8 passed (12.5min), including the five workflows
+  and three boot-repair cases. HEIC isolation passed for all five artifacts.
+  The initial isolation CLI invocation used an unsupported flag; its usage
+  error is retained, followed by the passing documented repeated--artifact run.
+  The exact pushed source checkpoint passed CI43568281049. Original/source
+  hashes matched the frozen evidence. Next: the remaining archive/metadata startup cost,
+  external output and large-GS editable-copy latency. Physical-device evidence
+  remains a separate acceptance lane.
+  The owned4191 preview now serves the frozen qualified offline candidate;
+  all20 HTTP bodies match. Source/test hashes match the reviewed and tested
+  tree. Existing browser updates use the app's normal update flow.
   Physical iPhone Safari timings/IME/storage remain unverified.
 
 - Target for the ordinary Ki-84 text edit: about one second from Apply to
