@@ -1,8 +1,10 @@
+import { withJobDiscovery, type JobDiscovery, type ReceiveJobRead } from './jobDiscovery';
 import type { ProjectWorkspaceFS } from '../platform/fs';
 import { equalBytes, json, newId, readReceipt, technicalId, writeReceipt } from '../projectMetadata/persistence';
 import { fail, type MetadataLimits } from '../projectMetadata/format';
 import { TransactionJournal, type JournalEntry, type PreparedJournal } from '../projectMetadata/journal';
 import { CleanArchive } from './cleanArchive';
+import { PackageArchive } from './zipArchive';
 import { PACKAGE_LIMITS as L } from './contract';
 import { cleanInputDescriptor, packageReference as reference } from './cleanInputDescriptor';
 import { reviewCleanMarker, reviewEditChildBinding, reviewEditPublication, validateReviewEditChild, type ReviewEditBinding } from './reviewEditControls';
@@ -26,6 +28,10 @@ export class CleanInputJob {
   static async prepare(fs: ProjectWorkspaceFS, file: Blob, limits: MetadataLimits) {
     if (!(file instanceof Blob)) return fail('clean-input-file');
     const input = file.slice(); return new CleanInputJob(fs, newId(), limits, await CleanArchive.inspect(input, limits), input, null);
+  }
+  static async fromSelectedArchive(fs: ProjectWorkspaceFS, selected: PackageArchive, limits: MetadataLimits) {
+    const inspection = await CleanArchive.fromSelectedArchive(selected, limits);
+    return new CleanInputJob(fs, newId(), limits, inspection, inspection.archive.sourceSnapshot(), null);
   }
   /** Fixed private child; never expose its ZIP as a file-reselection choice. */
   static async prepareReview(fs: ProjectWorkspaceFS, expected: ReturnType<typeof cleanInputDescriptor>, binding: ReviewEditBinding, limits: MetadataLimits) {
@@ -53,6 +59,9 @@ export class CleanInputJob {
   private static abandonment(id: string) { return { schema: 'lociview-clean-input-abandoned-1', jobId: id, stage: 'beforeStart' }; }
   static async inputState(fs: ProjectWorkspaceFS, id: string, limits: MetadataLimits) {
     if (!(await this.ids(fs)).includes(technicalId(id))) return fail('clean-input-missing');
+    return this.inputStateKnown(fs, id, limits);
+  }
+  private static async inputStateKnown(fs: ProjectWorkspaceFS, id: string, limits: MetadataLimits) {
     const path = root(fs, id), start = await fs.readStream(`${path}start.json`), abandoned = await fs.readStream(`${path}abandoned.json`);
     if (start) { if (abandoned) fail('clean-input-state'); return 'started' as const; }
     if ((await new TransactionJournal(fs, limits).entries()).some(e => e.start.transactionId === id) || await fs.exists(`${path}published.json`)) fail('clean-input-state');
@@ -70,11 +79,34 @@ export class CleanInputJob {
       json(await readReceipt(this.fs, index(this.fs, this.id), this.limits)) !== json(this.marker('index'))) fail('clean-input-binding');
     if (this.reviewEdit) return validateReviewEditChild(this.fs, this.id, this.descriptor(), this.reviewEdit, this.limits, this.integrity);
   }
+  static withDiscovery<Result>(fs: ProjectWorkspaceFS, limits: MetadataLimits, action: (scope: JobDiscovery<ReceiveJobRead<CleanInputJob>>) => Promise<Result>, integrity?: OutputIntegrityRead) {
+    const owned = { ...limits };
+    let entries: ReturnType<TransactionJournal['entries']> | undefined;
+    return withJobDiscovery(() => this.ids(fs), async id => {
+      const state = await this.inputStateKnown(fs, id, owned);
+      if (state !== 'started') return { state };
+      const { job } = await this.openStarted(fs, id, owned, integrity);
+      const receipt = await readReceipt(fs, job.path('published.json'), owned);
+      const kinds: string[] = [];
+      if (receipt) {
+        const found = (await (entries ??= new TransactionJournal(fs, owned).entries())).find(e => e.start.transactionId === id);
+        if (!found?.prepared || !found.publication) return fail('clean-input-unpublished');
+        const entry = { prepared: found.prepared, publication: found.publication };
+        const source = await job.validateOpenedJournal(entry.prepared);
+        if (json(receipt) !== json(job.publicationRecord(entry, source.heads))) fail('clean-input-completion');
+        kinds.push('cleanPublished');
+      }
+      return { state, job, kinds: Object.freeze(kinds) };
+    }, action);
+  }
   static async open(fs: ProjectWorkspaceFS, id: string, limits: MetadataLimits, integrity?: OutputIntegrityRead) {
     return (await this.openVerified(fs, id, limits, integrity)).job;
   }
   private static async openVerified(fs: ProjectWorkspaceFS, id: string, limits: MetadataLimits, integrity?: OutputIntegrityRead) {
     if (await this.inputState(fs, id, limits) !== 'started') return fail('clean-input-incomplete');
+    return this.openStarted(fs, id, limits, integrity);
+  }
+  private static async openStarted(fs: ProjectWorkspaceFS, id: string, limits: MetadataLimits, integrity?: OutputIntegrityRead) {
     const binding = await reviewEditChildBinding(fs, id, limits);
     let blob: Blob, inspection: CleanArchive;
     if (binding && integrity) {

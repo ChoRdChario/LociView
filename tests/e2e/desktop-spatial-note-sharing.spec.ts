@@ -192,6 +192,17 @@ for (const touch of [false, true])
         await back.click();
         await expect(receivingProjection).toHaveValue('orthographic');
         await expect(axis).toHaveAttribute('style', orientation!);
+        const layout = await other.evaluateHandle(() => {
+          const root = document.querySelector('main.lv-review-workspace')!;
+          const content = root.querySelector('.lv-development-content')!;
+          const status = root.querySelector('.lv-review-render-status > [role="status"]')!;
+          const tops: number[] = [];
+          const observe = () => tops.push(content.getBoundingClientRect().top - root.getBoundingClientRect().top);
+          observe();
+          const observer = new MutationObserver(observe);
+          observer.observe(status, { childList: true, subtree: true, characterData: true });
+          return { tops, stop: () => observer.disconnect() };
+        });
         if (touch) {
           await other.locator('.lv-development-pin').first().tap();
           await expect(other.getByRole('region', { name: 'キャプションの詳細', ...exact })).toBeFocused();
@@ -202,7 +213,11 @@ for (const touch of [false, true])
         await other.getByLabel('選択中のキャプションのメディア', exact).getByRole('button', { name: '画像を表示', ...exact }).click();
         await expect(other.getByRole('dialog', { name: 'メディアビューア', ...exact }).locator('img')).toHaveJSProperty('naturalWidth', 2);
         await other.getByRole('dialog', { name: 'メディアビューア', ...exact }).getByRole('button', { name: '閉じる', ...exact }).click();
-        await expect(other.locator('main.lv-review-workspace > [role="status"]')).not.toContainText('準備しています');
+        await expect(other.locator('.lv-review-render-status [role="status"]')).not.toContainText('準備しています');
+        const tops = await layout.evaluate(value => { value.stop(); return value.tops; });
+        await layout.dispose();
+        if (touch) expect(tops.length).toBeGreaterThan(1);
+        expect(Math.max(...tops) - Math.min(...tops)).toBeLessThan(1);
         await other.screenshot({ path: info.outputPath('received-scene.png') });
       }
       finally {

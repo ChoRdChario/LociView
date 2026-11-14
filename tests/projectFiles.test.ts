@@ -23,6 +23,7 @@ import { OriginBlobStore } from '../src/projectMetadata/blobStore';
 import type { MetadataStorageFactory } from '../src/projectMetadata/repository';
 import { MetadataProjectSession, type MetadataSessionRead } from '../src/projectMetadata/session';
 import { MetadataRepository } from '../src/projectMetadata/repository';
+import { withProtectedOutputJobDiscovery } from '../src/projectPackage/outputJobs';
 import { openWorkspaceGeneration } from '../src/projectMetadata/generationScope';
 import { digest, newId, json, readReceipt, underWriteLease, withMetadataRead, registerWriteFence } from '../src/projectMetadata/persistence';
 import { validationMetadataLimits as metadata, validationGlbProfile, occurrenceGlbProfile, occurrenceGlbProfileText, jpegGlbProfile, occurrenceJpegGlbProfile, FileReadError, desktopStaticRasterLimits, projectFilePolicy, type FileValidationLimits } from '../src/projectFiles/validation';
@@ -3765,6 +3766,23 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       expect((await session.read()).source!.originalChanges()).toEqual(f.expected.source.originalChanges());
     } finally { restored.mockRestore(); parts.mockRestore(); received.mockRestore(); await f.fs.writeBytes(path, original); }
   });
+  it('uses one exact first-restore input snapshot per open and checks the physical input again on the next open', async () => {
+    const f = await restoreFileFixture(), r = await firstBackupRecipient();
+    r.lease.activateNewProject();
+    const prepared = await BackupRestoreJob.prepareFirstOpen(r.fs, f.backupFile, metadata, r.databases), started = await prepared.persist(null, r.databases);
+    const path = started.path('input.zip'), original = (await r.fs.readBytes(path))!, altered = original.slice(); altered[altered.length - 1] = altered[altered.length - 1]! ^ 1;
+    const inspect = BackupArchive.inspect.bind(BackupArchive), reads = vi.spyOn(BackupArchive, 'inspect').mockImplementation(async (...args) => {
+      const checked = await inspect(...args); await r.fs.writeBytes(path, altered); return checked;
+    });
+    try {
+      const opened = await BackupRestoreJob.open(r.fs, started.id, metadata, r.databases);
+      expect(reads).toHaveBeenCalledTimes(1); expect(opened.inspection.archive.sha256).toBe(started.inspection.archive.sha256);
+      expect(new Uint8Array(await opened.inspection.archive.sourceSnapshot().arrayBuffer())).toEqual(original);
+    } finally { reads.mockRestore(); }
+    await expect(BackupRestoreJob.open(r.fs, started.id, metadata, r.databases)).rejects.toThrow();
+    await r.fs.writeBytes(path, original);
+    expect((await BackupRestoreJob.open(r.fs, started.id, metadata, r.databases)).inspection.archive.sha256).toBe(started.inspection.archive.sha256);
+  }, 60000);
   type CandidateSession = { readCandidate(integrity?: OutputIntegrityRead, ports?: metadataPersistence.MetadataReadPorts): Promise<{ read: MetadataSessionRead }> };
   async function auditedStagingJournal() {
     const f = await restoreFileFixture(), job = await (await f.prepare()).persist(f.ports, f.databases), scope = owned(await job.openStaging(f.databases));
@@ -4544,10 +4562,10 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     await sender.verifyFile(id, file); expect((await sender.jobs()).find(j => j.id === id)?.state).toBe('file-verified');
     const heldInput = await CleanInputJob.open(r.fs, jobId!, metadata);
     const prepared = (await new TransactionJournal(r.fs, metadata).entries()).find(entry => entry.start.transactionId === jobId)!.prepared!;
-    const completionSteps = vi.spyOn(CleanInputJob.prototype, 'steps');
+    const completionSteps = vi.spyOn(r.fs, 'readBytes');
     try {
       expect((await cold.session.previewCleanOutput(edited.source!.token)).token).toBe(edited.source!.token);
-      expect(completionSteps).toHaveBeenCalledTimes(1);
+      expect(completionSteps.mock.calls.filter(([path]) => path === `v2/packages/clean-input/${jobId}/published.json`)).toHaveLength(1);
     } finally { completionSteps.mockRestore(); }
     const completionPath = `v2/packages/clean-input/${jobId}/published.json`, completion = (await r.fs.readText(completionPath))!;
     await r.fs.remove(completionPath);
@@ -4642,7 +4660,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       snapshotSpy = vi.spyOn(WorkspaceBaseStore.prototype, 'snapshot');
     const rows = (await sender.jobs()).filter(row => row.purpose === 'backup');
     expect(rows).toHaveLength(2); expect(rows.every(row => row.state === 'generated' && row.stale === false)).toBe(true);
-    expect(readSpy).toHaveBeenCalledTimes(1); expect(snapshotSpy).toHaveBeenCalledTimes(2); // Each protection still runs; display does not reread it.
+    expect(readSpy).toHaveBeenCalledTimes(1); expect(snapshotSpy).toHaveBeenCalledTimes(1); // One owned current table; every frozen output and actual body remains checked.
     readSpy.mockRestore(); snapshotSpy.mockRestore();
     const actual = await currentRead(), foreignProof = structuredClone(actual.source!.proof);
     Object.assign(foreignProof.identity, { projectId: `prj_${'f'.repeat(32)}` });
@@ -4992,8 +5010,8 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const { f, sent } = await contributionTeam(), session = f.receiver.session, sender = new WorkspaceSender(f.fs, session, f.store, metadata, f.locks);
     let current!: Awaited<ReturnType<typeof session.read>>;
     const id = await sender.generateBackup(sent.current.source!.token, undefined, undefined, read => { current = read; });
-    const expected = await sender.outputOverview(), reads = vi.spyOn(session as unknown as CandidateSession, 'readCandidate'), completions = vi.spyOn(BackupOutputJob.prototype, 'displayStepKinds');
-    expect(await sender.outputOverview(current, current)).toEqual(expected); expect(reads).not.toHaveBeenCalled(); expect(completions).toHaveBeenCalledOnce();
+    const expected = await sender.outputOverview(), reads = vi.spyOn(session as unknown as CandidateSession, 'readCandidate'), completions = vi.spyOn(f.fs, 'list');
+    expect(await sender.outputOverview(current, current)).toEqual(expected); expect(reads).not.toHaveBeenCalled(); expect(completions.mock.calls.filter(([path]) => path === `v2/packages/backup-output/${id}/steps/`)).toHaveLength(1); expect(completions.mock.calls.filter(([path]) => path === 'v2/packages/backup-output/')).toHaveLength(1);
     const display = { ...current }; reads.mockClear();
     const owned = sender.outputOverview(display, display); display.state = 'pending'; display.source = null; display.publication = null;
     expect(await owned).toEqual(expected); expect(reads).not.toHaveBeenCalled();
@@ -5015,6 +5033,44 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect((await sender.outputOverview(current, current)).jobs).toContainEqual(expect.objectContaining({ id, state: 'repair-required' }));
     await expect(sender.generateBackup(current.source!.token)).rejects.toThrow();
   }, 20000);
+  it('observes growing output and shared-base histories once without changing choices or public manifest ownership', async () => {
+    const { f, sent } = await contributionTeam(), session = f.receiver.session, sender = new WorkspaceSender(f.fs, session, f.store, metadata, f.locks);
+    const token = sent.current.source!.token;
+    await sender.generate(token); await sender.generate(token);
+    const backups = [await sender.generateBackup(token), await sender.generateBackup(token)];
+    const baseStore = new WorkspaceBaseStore(f.fs, metadata, sent.current.source!.proof), rows = await baseStore.read();
+    const expected = [];
+    for (const [i, r] of rows.entries()) {
+      const selection = { workspacePackageId: r.workspacePackageId, workspaceManifestSha256: r.workspaceManifestSha256, heads: [...r.declaredHeads] };
+      const base = await VerifiedContributionBase.select(baseStore, selection, f.store, metadata);
+      expected.push({ selection, label: `作業一式 ${i + 1}（${r.completions.some(c => c.observation === 'imported') ? '受信' : '作成'}・変更 ${base.source.originalChanges().length} 件）` });
+    }
+    const list = vi.spyOn(f.fs, 'list');
+    expect(await sender.availableBases()).toEqual(expected);
+    expect(list.mock.calls.filter(([path]) => path === 'v2/packages/bases/')).toHaveLength(1);
+    list.mockClear(); expect((await sender.jobs()).filter(j => j.purpose === 'backup')).toHaveLength(2);
+    expect(list.mock.calls.filter(([path]) => path === 'v2/packages/backup-output/')).toHaveLength(1);
+    for (const id of backups) expect(list.mock.calls.filter(([path]) => path === `v2/packages/backup-output/${id}/steps/`)).toHaveLength(1);
+    list.mockRestore();
+    let expired!: () => Promise<unknown>;
+    await withProtectedOutputJobDiscovery(f.fs, metadata, f.store, async rows => {
+      const retained = rows.filter(row => row.key.kind === 'backup'), expectedId = retained[0]!.key.id;
+      retained[0]!.key.id = retained[1]!.key.id;
+      const first = await retained[0]!.read();
+      expect(first.observed.state === 'started' && first.observed.job.id).toBe(expectedId);
+      expect(first.protection!.snapshot.records.length).toBeGreaterThan(0);
+      first.protection!.snapshot.records.length = 0;
+      Object.assign(first.protection!.proof.identity, { projectId: `prj_${'f'.repeat(32)}` });
+      const second = await retained[1]!.read(); expect(second.protection!.snapshot.records.length).toBeGreaterThan(0);
+      expect(second.protection!.proof).toEqual(sent.current.source!.proof); expired = retained[1]!.read;
+    });
+    await expect(expired()).rejects.toThrow('expired');
+    const job = await BackupOutputJob.open(f.fs, backups[0]!, metadata), manifest = job.manifest(), original = structuredClone(manifest);
+    Object.assign(manifest.targetHeads, { length: 0 }); Object.assign(manifest.metadata, { sha256: 'f'.repeat(64) });
+    expect(job.manifest()).toEqual(original); await job.validateCompletion();
+    const record = rows[0]!; await f.fs.remove(`v2/packages/evidence/${record.evidence.manifest.sha256}`);
+    await expect(sender.availableBases()).rejects.toThrow();
+  }, 60000);
   it('generates durable Contribution files for two actual rounds without advancing either base or reading old model bodies', async () => {
     const { f, r, sent } = await contributionTeam(), sender = new WorkspaceSender(f.fs, f.receiver.session, f.store, metadata, f.locks);
     const choices = await sender.availableBases(), beforeReads = f.fs.reads;
@@ -8362,6 +8418,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     try{
       const before=(await r.fs.list('')).sort(),writes=vi.spyOn(r.fs,'writeBytes');audits=0;await assertReviewEditSlot(scope.fs,metadata);expect(audits).toBe(2);expect(writes).not.toHaveBeenCalled();
       audits=0;refuseClosing=true;await expect(assertReviewEditSlot(scope.fs,metadata)).rejects.toThrow('review slot closing audit');expect(audits).toBe(2);expect((await r.fs.list('')).sort()).toEqual(before);
+      audits=0;const completed=vi.fn();await expect(new ReviewEditJob(scope.fs,r.session,metadata).states(completed)).rejects.toThrow('review slot closing audit');expect(completed).not.toHaveBeenCalled();expect(audits).toBe(2);
       refuseClosing=false;audits=0;await assertReviewEditSlot(scope.fs,metadata);expect(audits).toBe(2);
       await r.fs.remove(`${reviewEditRoot(r.fs,prepared.id)}original.zip`);writes.mockClear();await expect(assertReviewEditSlot(scope.fs,metadata)).rejects.toThrow('review-edit-pending');expect(writes).not.toHaveBeenCalled();
     }finally{await source.workspace.dispose();}
@@ -8374,9 +8431,9 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       const read = await r.session.read(), scans = vi.spyOn(PackageArchive, 'inspect'), reconstruction = vi.spyOn(PreparedReviewEdit, 'restore');
       try {
         await r.session.previewCleanOutput(read.source!.token);
-        expect(scans).toHaveBeenCalledTimes(3); expect(reconstruction).toHaveBeenCalledTimes(4);
+        expect(scans).toHaveBeenCalledTimes(3); expect(reconstruction).toHaveBeenCalledTimes(3);
         await r.session.previewCleanOutput(read.source!.token);
-        expect(scans).toHaveBeenCalledTimes(6); expect(reconstruction).toHaveBeenCalledTimes(8);
+        expect(scans).toHaveBeenCalledTimes(6); expect(reconstruction).toHaveBeenCalledTimes(6);
       } finally { scans.mockRestore(); reconstruction.mockRestore(); }
     } finally { await source.workspace.dispose(); }
   }, 60000);
@@ -8495,7 +8552,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const job = new ReviewEditJob(r.fs, r.session, metadata), observed = new Map<string, Readonly<ReviewEditBinding>>();
     await job.start(prepared); expect(await job.states(c => observed.set(c.childId, c.binding))).toEqual([
       { id: prepared.id, childId: prepared.childId, state: 'completed' }]);
-    const binding = structuredClone(observed.get(prepared.childId)!), openChild = vi.spyOn(CleanInputJob, 'open');
+    const binding = structuredClone(observed.get(prepared.childId)!), openChild = vi.spyOn(CleanArchive, 'inspect');
     try {
       const pending = r.receiver.jobs({ completedReviewChildren: observed });
       (observed.get(prepared.childId)!.prepared as { sha256: string }).sha256 = 'f'.repeat(64); observed.clear();
@@ -9669,6 +9726,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       { compactFiles: true, openProject() {}, resumedLastProject: () => false, changed() {} });
     const root = record(ui.root), all = (n: RecordedNode): RecordedNode[] => [n, ...n.children.flatMap(all)], menu = all(root).find(n => n.className === 'lv-project-files')!;
     try {
+      const toolsRender=vi.spyOn(tools,'render');ui.render();expect(toolsRender).toHaveBeenCalledTimes(1);toolsRender.mockRestore();
       expect(cold.hasPending()).toBe(false); expect(cold.workspaceOutput.jobs.some(j => j.state === 'incomplete')).toBe(true);
       expect(menu.open).toBe(true); const retry = all(menu).find(n => n.tag === 'button' && n.textContent === '生成を再開')!;
       expect(retry.disabled).toBe(false); retry.fire('click');

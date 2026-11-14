@@ -1,3 +1,4 @@
+import { withJobDiscovery, type JobDiscovery, type ReceiveJobRead } from './jobDiscovery';
 import type { ProjectWorkspaceFS } from '../platform/fs';
 import type { OriginBlobStore } from '../projectMetadata/blobStore';
 import { fail, MetadataSourceError, type MetadataLimits } from '../projectMetadata/format';
@@ -49,10 +50,15 @@ export class ContributionReceiveJob {
   }
   static async prepare(fs: ProjectWorkspaceFS, file: Blob, store: Store, limits: MetadataLimits) {
     if (!(file instanceof Blob)) return fail('receive-file');
-    const input = file.slice(), archive = await PackageArchive.inspect(input), m = archive.control.manifest;
+    return this.fromSelectedArchive(fs, await PackageArchive.inspect(file.slice()), store, limits);
+  }
+  static async fromSelectedArchive(fs: ProjectWorkspaceFS, selected: PackageArchive, store: Store, limits: MetadataLimits) {
+    if (!(selected instanceof PackageArchive)) return fail('receive-file');
+    const archive = await selected.reopenCapturedControl(), m = archive.control.manifest;
     if (m.purpose !== 'contribution') return fail('contribution-purpose');
     const base = await VerifiedContributionBase.select(new WorkspaceBaseStore(fs, limits, { identity: m.identity, envelope: m.metadataEnvelope }), m.base, store, limits);
-    return new ContributionReceiveJob(fs, newId(), store, limits, await ContributionArchive.inspect(input, base, store, limits), input, null);
+    const inspection = await ContributionArchive.fromSelectedArchive(archive, base, store, limits);
+    return new ContributionReceiveJob(fs, newId(), store, limits, inspection, inspection.archive.sourceSnapshot(), null);
   }
   static async ids(fs: ProjectWorkspaceFS): Promise<string[]> {
     const prefix = `${workspacePackageRoot(fs)}contribution-receive/`, ix = `${workspacePackageRoot(fs)}contribution-index/`;
@@ -86,6 +92,9 @@ export class ContributionReceiveJob {
   }
   static async inputState(fs: ProjectWorkspaceFS, id: string, limits: MetadataLimits): Promise<InputState> {
     if (!(await this.ids(fs)).includes(id)) return fail('contribution-job-missing');
+    return this.inputStateKnown(fs, id, limits);
+  }
+  private static async inputStateKnown(fs: ProjectWorkspaceFS, id: string, limits: MetadataLimits): Promise<InputState> {
     const path = root(fs, id), started = await fs.readStream(`${path}start.json`), abandoned = await fs.readStream(`${path}abandoned.json`);
     if (started) { if (abandoned) fail('contribution-input-state'); return 'started'; }
     if ((await new TransactionJournal(fs, limits).entries()).some(e => e.start.transactionId === id) || (await fs.list(`${path}steps/`)).length) fail('contribution-input-state');
@@ -110,8 +119,23 @@ export class ContributionReceiveJob {
       await read('base-metadata.am', p.base.evidence.metadata), limits);
     return { base, derived: await read('derived-target-metadata.am', p.reconstruction.targetMetadata) };
   }
+  static withDiscovery<Result>(fs: ProjectWorkspaceFS, store: Store, limits: MetadataLimits, action: (scope: JobDiscovery<ReceiveJobRead<ContributionReceiveJob>>) => Promise<Result>) {
+    const owned = { ...limits };
+    let entries: ReturnType<TransactionJournal['entries']> | undefined;
+    const readEntries = () => entries ??= new TransactionJournal(fs, owned).entries();
+    return withJobDiscovery(() => this.ids(fs), async id => {
+      const state = await this.inputStateKnown(fs, id, owned);
+      if (state !== 'started') return { state };
+      const { job, steps } = await this.openStarted(fs, id, store, owned);
+      await job.validateCompletionFromSteps(steps, readEntries);
+      return { state, job, kinds: Object.freeze(steps.map(step => step.detail.kind)) };
+    }, action);
+  }
   static async open(fs: ProjectWorkspaceFS, id: string, store: Store, limits: MetadataLimits) {
     if (await this.inputState(fs, id, limits) !== 'started') return fail('contribution-input-incomplete');
+    return (await this.openStarted(fs, id, store, limits)).job;
+  }
+  private static async openStarted(fs: ProjectWorkspaceFS, id: string, store: Store, limits: MetadataLimits) {
     const { prepared, binding, index } = await this.binding(fs, id, limits), path = root(fs, id);
     const start = await readReceipt<Start>(fs, `${path}start.json`, limits);
     if (!start || !index || Object.keys(start).sort().join(',') !== 'jobId,operation,prepared,receiver,schema' ||
@@ -124,7 +148,7 @@ export class ContributionReceiveJob {
     const e = await this.evidence(fs, id, prepared, limits), inspection = await ContributionArchive.restore(input, e.base, e.derived, prepared.reconstruction, store, limits);
     const job = new ContributionReceiveJob(fs, id, store, limits, inspection, input, start!);
     if (inspection.archive.sha256 !== binding.archive.sha256 || json(job.descriptor()) !== json(prepared)) fail('contribution-input-binding');
-    await job.steps(); return job;
+    const steps = await job.steps(); return { job, steps };
   }
   static async reselect(fs: ProjectWorkspaceFS, id: string, file: Blob, store: Store, limits: MetadataLimits) {
     if (await this.inputState(fs, id, limits) !== 'input-required') return fail('contribution-reselect-denied');
@@ -208,16 +232,21 @@ export class ContributionReceiveJob {
   async cancelStale() { await this.append({ kind: 'cancelled', stage: 'beforeContributionJournal' }); }
   async publicationReference() { const d = (await this.steps())[0]?.detail; if (d?.kind === 'cancelled') return fail('receive-cancelled'); return d ?? null; }
   async validateCompletion() {
-    if ((await this.steps())[0]?.detail.kind === 'cancelled') {
-      if ((await new TransactionJournal(this.fs, this.limits).entries()).some(e => e.start.transactionId === this.id)) fail('contribution-cancelled-journal');
+    return this.validateCompletionFromSteps(await this.steps());
+  }
+  private async validateCompletionFromSteps(rows: readonly Step[], readEntries = () => new TransactionJournal(this.fs, this.limits).entries()) {
+    let observed: Awaited<ReturnType<TransactionJournal['entries']>> | undefined;
+    const entries = async () => observed ??= await readEntries();
+    if (rows[0]?.detail.kind === 'cancelled') {
+      if ((await entries()).some(e => e.start.transactionId === this.id)) fail('contribution-cancelled-journal');
       return;
     }
-    const d = await this.publicationReference(); if (!d) return;
-    const entry = (await new TransactionJournal(this.fs, this.limits).entries()).find(e => e.publication && json(reference(e.publication)) === json(d.publication));
+    const d = rows[0]?.detail; if (!d) return;
+    const entry = (await entries()).find(e => e.publication && json(reference(e.publication)) === json(d.publication));
     if (!entry?.publication || json(entry.publication.heads) !== json(d.receiver.heads)) fail('receive-observation-missing');
     if (d.kind === 'contributionPublished' && (entry!.start.transactionId !== this.id || entry!.start.purpose !== 'remotePackageMerge' ||
       json(reference(entry!.prepared)) !== json(d.journal) || json(entry!.prepared?.remote) !== json((await this.journalInput([...d.receiver.heads])).proof))) fail('receive-journal-originals');
-    if (d.kind === 'contributionAlreadyPresent' && (await new TransactionJournal(this.fs, this.limits).entries()).some(e => e.start.transactionId === this.id)) fail('receive-observation-missing');
+    if (d.kind === 'contributionAlreadyPresent' && (await entries()).some(e => e.start.transactionId === this.id)) fail('receive-observation-missing');
   }
   async finish(entry: JournalEntry, receiver: ReceiverProof, zero: boolean) {
     if (!this.start || !entry.publication || !entry.prepared || json(entry.publication.heads) !== json(receiver.heads) ||

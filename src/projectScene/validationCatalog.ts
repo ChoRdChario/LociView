@@ -4,7 +4,7 @@ import { openValidationGeneration, inspectValidationFirstBackup } from './valida
 import { WorkspaceReceiver } from '../projectFiles/receiveWorkspace';
 import { WorkspaceSender } from '../projectFiles/sendWorkspace';
 import { validationMetadataLimits } from '../projectFiles/validation';
-import { reviewEditStates } from '../projectPackage/reviewEditControls';
+import { reviewEditStates, type ReviewEditBinding } from '../projectPackage/reviewEditControls';
 
 export interface ValidationProjectEntry { run: string; title: string; state: 'ready' | 'incomplete' | 'unavailable'; firstRestore?: 'pending' | 'terminal' }
 export type ValidationStorage = (run: string, create: boolean) => ReturnType<ValidationHostOptions['openStorage']>;
@@ -50,9 +50,10 @@ export async function listValidationProjects(options: Omit<ValidationHostOptions
         const text = validatedResumeReading(read, run, label);
         if (text) { await storage.check(); show(text); }
       }
-      const jobs = await measure('receive', () => new WorkspaceReceiver(options.base, fs, session, validationMetadataLimits, null).jobs());
+      const completed = new Map<string, Readonly<ReviewEditBinding>>();
+      const copies = await measure('review-copies', () => reviewEditStates(fs, validationMetadataLimits, child => completed.set(child.childId, child.binding)));
+      const jobs = await measure('receive', () => new WorkspaceReceiver(options.base, fs, session, validationMetadataLimits, null).jobs({ completedReviewChildren: completed }));
       const outputs = await measure('output', () => new WorkspaceSender(fs, session, options.store, validationMetadataLimits, options.packageLocks ?? null).jobs());
-      const copies = await measure('review-copies', () => reviewEditStates(fs, validationMetadataLimits));
       const entry: ValidationProjectEntry = { run, title: label,
         state: read.state === 'repair-required' || [...jobs, ...outputs, ...copies].some(j => j.state === 'repair-required') ? 'unavailable' :
           storage.restorePending || copies.some(j => !['completed', 'abandoned'].includes(j.state)) || read.state !== 'ready' || jobs.some(j => !['completed', 'cancelled', 'abandoned'].includes(j.state)) ||

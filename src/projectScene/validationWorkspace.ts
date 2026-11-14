@@ -66,7 +66,7 @@ export interface ValidationWorkspacePorts {
   localSettings?: { read(): string; save(displayName: string): boolean };
   lastProject?: { read(): ProjectResumeReference | null; remember(reference: ProjectResumeReference): void };
   list(reading?: ResumeReadingRequest, onlyRun?: string): Promise<ValidationProjectEntry[]>;
-  open(run: string, initial?: ReturnType<typeof prepareValidationCreation>, mode?: LocalOpenMode, workspaceFile?: Blob, reviewEdit?: PreparedReviewEdit,
+  open(run: string, initial?: ReturnType<typeof prepareValidationCreation>, mode?: LocalOpenMode, workspaceFile?: Blob | PackageArchive, reviewEdit?: PreparedReviewEdit,
     firstBackup?: ValidationHostOptions['firstBackup'], standaloneWorkspace?: boolean, reading?: ResumeReadingRequest): Promise<ValidationNormalHost | FirstBackupRecovery>;
   render(host: ValidationDisplayHost): Promise<{ factory: ViewportFactory; readonly ready?:Promise<void>; detachPreparation?():void; dispose(): void; idle?():Promise<void> }>;
   renderReview?(view: ReviewView): Promise<{ factory: ViewportFactory; dispose(): void; idle?():Promise<void> }>;
@@ -967,10 +967,10 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
       }
       return;
     }
-    const inspected = purpose === 'clean' ? await CleanArchive.inspect(file, validationMetadataLimits) : await WorkspaceArchive.inspect(file, validationMetadataLimits);
+    const inspected = purpose === 'clean' ? await CleanArchive.fromSelectedArchive(selectedArchive, validationMetadataLimits) : await WorkspaceArchive.fromSelectedArchive(selectedArchive, validationMetadataLimits);
     if (!guardSelection(generation, context)) return;
     const run = (inspected.source.proof.identity.projectId as string).slice(4);
-    const opened = await openNormal(run, undefined, 'edit', file, undefined, undefined, purpose === 'teamWorkspace');
+    const opened = await openNormal(run, undefined, 'edit', inspected.archive, undefined, undefined, purpose === 'teamWorkspace');
     await replaceSelection(run, opened, generation, context);
   };
   workspaceForm.addEventListener('submit',event=>{

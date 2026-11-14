@@ -12,7 +12,7 @@ import { ReviewOutputJob } from '../projectPackage/reviewOutputJob';
 import type { ReviewSelectionOptions } from '../projectPackage/reviewSelection';
 import { protectedWorkspaceInventory } from '../projectPackage/protectedInventory';
 import { PACKAGE_LIMITS as L, type EvidenceRef } from '../projectPackage/contract';
-import { outputJobKeys, outputJobClass, openOutputJob, validateOutputProtection } from '../projectPackage/outputJobs';
+import { outputJobKeys, openOutputJob, validateOutputProtection, withProtectedOutputJobDiscovery } from '../projectPackage/outputJobs';
 import { VerifiedContributionBase, type ContributionBaseSelection } from '../projectPackage/contributionSource';
 import { WorkspaceBaseStore } from '../projectPackage/workspaceBases';
 import { workspaceFileOperation } from './receiveWorkspace';
@@ -111,16 +111,16 @@ export class WorkspaceSender {
   private async availableBasesDirect(observed?: MetadataProof, currentSource?: NonNullable<MetadataSessionRead['source']>, readCurrent = () => this.session.read()): Promise<ContributionBaseChoice[]> {
     let proof = observed;
     if (!proof) { const read = await readCurrent(); if (read.state !== 'ready' || !read.source) return []; proof = read.source.proof; currentSource = read.source; }
-    const bases = new WorkspaceBaseStore(this.fs, this.limits, proof), rows = await bases.read();
+    const bases = new WorkspaceBaseStore(this.fs, this.limits, proof);
+    const rows = await bases.displayFacts(this.store, currentSource && json(currentSource.proof) === json(proof) ? currentSource.editorDeclarations().map(d => d.changeId) : []);
     const choices: ContributionBaseChoice[] = [];
-    for (const [i, r] of rows.entries()) {
+    for (const [i, fact] of rows.entries()) {
+      const r = fact.record;
       const selection = { workspacePackageId: r.workspacePackageId, workspaceManifestSha256: r.workspaceManifestSha256, heads: [...r.declaredHeads] };
-      const base = await VerifiedContributionBase.select(bases, selection, this.store, this.limits);
-      const baseHashes = new Set(base.source.read().history.changes.map(c => c.id));
-      choices.push({ selection, label: `作業一式 ${i + 1}（${r.completions.some(c => c.observation === 'imported') ? '受信' : '作成'}・変更 ${base.source.originalChanges().length} 件）`,
-        ...(base.source.includesDeclaredEditorNames ? { includesDeclaredEditorNames: true } : {}),
-        ...(base.source.requiredCapabilities.includes(PORTABLE_MEDIA_CAPABILITY) ? { requiresPortableMediaReader: true } : {}),
-        ...(currentSource && json(currentSource.proof) === json(proof) && currentSource.editorDeclarations().some(d => !baseHashes.has(d.changeId)) ? { deltaIncludesDeclaredEditorNames: true } : {}) });
+      choices.push({ selection, label: `作業一式 ${i + 1}（${r.completions.some(c => c.observation === 'imported') ? '受信' : '作成'}・変更 ${fact.changes} 件）`,
+        ...(fact.named ? { includesDeclaredEditorNames: true } : {}),
+        ...(fact.portable ? { requiresPortableMediaReader: true } : {}),
+        ...(fact.deltaNamed ? { deltaIncludesDeclaredEditorNames: true } : {}) });
     }
     return choices;
   }
@@ -149,6 +149,7 @@ export class WorkspaceSender {
       new WorkspaceSender(fs, this.session, this.store, this.limits, this.locks).jobsDirect()));
   }
   private async jobsDirect(observe?: (proof: MetadataProof | null) => void, backupSource?: BackupDisplaySource, readCurrent = () => this.session.read()): Promise<WorkspaceOutputState[]> {
+    return withProtectedOutputJobDiscovery(this.fs, this.limits, this.store, async rows => {
     const result: WorkspaceOutputState[] = [];
     let bases: ReturnType<WorkspaceBaseStore['read']> | undefined;
     const readCurrentBackup = async (protection: Awaited<ReturnType<typeof validateOutputProtection>>) => {
@@ -164,24 +165,21 @@ export class WorkspaceSender {
     };
     // Only a complete successful projection lives inside this one read callback.
     let currentBackup: Awaited<ReturnType<typeof readCurrentBackup>> | undefined;
-    for (const key of await outputJobKeys(this.fs)) {
+    for (const row of rows) {
+      const key = row.key;
       const { id } = key, purpose = key.kind === 'workspace' ? 'teamWorkspace' as const : key.kind;
       try {
-        const state = await outputJobClass(key).state(this.fs, id, this.limits);
+        const { observed, protection } = await row.read(), state = observed.state;
         if (state !== 'started') { result.push({ id, purpose, state, cancellable: state === 'unstarted' }); continue; }
-        const job = await openOutputJob(this.fs, key, this.limits);
-        const kinds: string[] = job instanceof BackupOutputJob ? await job.displayStepKinds() : (await job.steps()).map(s => s.detail.kind);
-        if (!(job instanceof BackupOutputJob)) {
-          if (kinds.includes('artifactVerified')) await job.artifactReceipt();
-          await job.validateCompletion();
-        }
+        if (observed.state !== 'started') throw Error('output-state');
+        const job = observed.job, kinds = observed.kinds;
         if (job instanceof WorkspaceOutputJob && kinds.includes('baseRecorded')) {
           const rows = await (bases ??= new WorkspaceBaseStore(this.fs, this.limits, job.source.proof).read());
           if (!rows.some(r => json(r) === json(job.baseRecord()))) throw Error('output-base-missing');
         }
         let extra: { label?: string; stale?: boolean } = {};
         if (job instanceof BackupOutputJob) {
-          const protection = await validateOutputProtection(this.fs, job, this.store, this.limits);
+          if (!protection) throw Error('output-protection-missing');
           const current = currentBackup ??= await readCurrentBackup(protection);
           extra = { label: job.label, stale: current.token !== job.source.token || current.snapshot !== json(job.frozenBases()) || current.inventory !== json(job.frozenInventory()) };
         }
@@ -196,5 +194,6 @@ export class WorkspaceSender {
     }
     if (currentBackup && settledOutputDisplay(result)) observe?.(currentBackup.proof ? structuredClone(currentBackup.proof) : null);
     return result;
+    });
   }
 }

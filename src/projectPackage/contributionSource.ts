@@ -165,7 +165,15 @@ export class ContributionArchive {
     return new ContributionArchive(archive, base, verified.target, parts, verified.bodyRefs, derived.slice());
   }
   static async inspect(file: Blob, base: VerifiedContributionBase, store: Pick<OriginBlobStore, 'inspect'>, limits: MetadataLimits, signal?: AbortSignal) {
-    const archive = await PackageArchive.inspect(file, signal), m = archive.control.manifest;
+    return this.fromArchive(await PackageArchive.inspect(file, signal), base, store, limits, signal);
+  }
+  static async fromSelectedArchive(selected: PackageArchive, base: VerifiedContributionBase, store: Pick<OriginBlobStore, 'inspect'>, limits: MetadataLimits, signal?: AbortSignal) {
+    if (!(selected instanceof PackageArchive)) return fail('contribution-archive');
+    checkAbort(signal);
+    return this.fromArchive(await selected.reopenCapturedControl(), base, store, limits, signal);
+  }
+  private static async fromArchive(archive: PackageArchive, base: VerifiedContributionBase, store: Pick<OriginBlobStore, 'inspect'>, limits: MetadataLimits, signal?: AbortSignal) {
+    const m = archive.control.manifest;
     if (m.purpose !== 'contribution') return fail('contribution-purpose');
     if (!same(m.base, base.selection) || !same(m.identity, base.source.proof.identity) || !same(m.metadataEnvelope, base.source.proof.envelope)) return fail('contribution-base-mismatch');
     await base.verifyInventory(store, signal); const bounded = packageSourceLimits(limits), parts: Uint8Array[] = []; let size = 0;

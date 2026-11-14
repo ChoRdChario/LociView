@@ -313,6 +313,8 @@
 .lv-file-sheet > [role="tabpanel"] > section > :is(form,details) { margin-block: 12px; }
 .lv-review-workspace .lv-caption-windows { z-index: 4; }
 .lv-review-workspace .lv-development-sidebar { min-height: 0; }
+.lv-review-render-status { position: absolute; z-index: 5; top: 8px; left: 8px; display: grid; gap: 4px; box-sizing: border-box; max-width: calc(100% - 136px); max-height: calc(100% - 16px); padding: 6px 8px; overflow: auto; overflow-wrap: anywhere; border: 1px solid #817c78; background: #faf9f8ed; pointer-events: none; }
+.lv-review-render-status :is(p, button) { pointer-events: auto; }
 .lv-review-scene-header { display: flex; align-items: center; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; }
 .lv-review-scene-header h2 { min-width: 0; margin: 0; overflow-wrap: anywhere; }
 .lv-review-append {

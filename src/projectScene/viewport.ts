@@ -41,7 +41,7 @@ export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: 
   let rendererTarget: RasterLease | undefined;
   const fileModels=(rows:readonly RenderDisplay['models'][number][])=>rows.flatMap(m=>isReadonlyModel(m)||isSavedModel(m)?[m]:[]);
   const wantedModels = (next: RenderDisplay) => fileModels(saved.demand ? next.models.filter(m => !next.hiddenAssetIds?.includes(renderOwner(m))) : next.models);
-  const requestModels = (next: RenderDisplay | null) => { if (next && active) saved.demand?.(wantedModels(next)); };
+  const requestModels = (next: RenderDisplay | null) => { if (next && active) { released = false; saved.demand?.(wantedModels(next)); } };
   const trackTexture = (texture: THREE.Texture) => {
     if (!renderer || !saved.rasterResources) { rendererTextures.add(texture); return; }
     if (rendererTextures.has(texture)) return;
@@ -62,6 +62,7 @@ export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: 
   let blockedNext:RenderDisplay|null=null,pendingGsTarget=false,capacityIssue:string|null=null,gsIntent:GsViewIntent|null=null,gsIntentKey='',retryScheduled=false;
   let entryPending = false, notice: string | null = null;
   let pose = defaultPose(), display: RenderDisplay | null = null, modelKey = '', modelStructureKey = '', active = false, disposed = false, applying = false;
+  let released = false;
   let issue: string | null = null, contextLost = false, dragging = false, axis: ViewportObservation['axis'] = null, serial = 0, raf = 0, lastObservation = '';
   let displayObservation = '', lastDisplayObservation = '';
   let lastDrawSerial = -1, visualDirty = true;
@@ -158,14 +159,15 @@ export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: 
     cleanup([clearSmooth,()=>{if(oldIntent!==preserve)oldIntent?.cancel();},()=>{if(previous)retireGs(previous);}]);
   }
   function clearModels(preserve?:GsViewIntent|null) {
-    const surfaces=[...resident.values()],children=[...models.children],probe=coverageProbe;coverageProbe=null;coverageIssue=null;
+    const surfaces=[...resident.values()],children=[...models.children],owned=new Set<THREE.Object3D>(surfaces.filter(surface=>surface.dispose).map(surface=>surface.asset)),probe=coverageProbe;coverageProbe=null;coverageIssue=null;
     resident.clear();residentKeys.clear();residentModelKeys.clear();modelStructureKey='';
     cleanup([()=>clearGs(preserve),()=>probe?.dispose(),...surfaces.map(surface=>()=>surface.dispose?.()),...children.map(child=>()=>{
-      try { child.traverse(node => { if (node instanceof THREE.Mesh) cleanup([()=>node.geometry.dispose(),()=>{for(const material of Array.isArray(node.material)?node.material:[node.material])material.dispose();}]); }); }
+      try { if (!owned.has(child)) child.traverse(node => { if (node instanceof THREE.Mesh) cleanup([()=>node.geometry.dispose(),()=>{for(const material of Array.isArray(node.material)?node.material:[node.material])material.dispose();}]); }); }
       finally { models.remove(child); }
     })]);
   }
   function release() {
+    if (released) return;
     frameGeneration++;
     pickEpoch++;
     pinPointerActive = false;
@@ -176,6 +178,7 @@ export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: 
     const textures=[...rendererTextures],leases=[...textureLeases.values()];rendererTextures.clear();textureLeases.clear();
     cleanup([()=>saved.demand?.([]),()=>endNavigation(undefined,false),()=>oldGizmo?.dispose(),()=>oldControls?.dispose(),clearModels,
       ...textures.map(texture=>()=>texture.dispose()),...leases.map(lease=>()=>lease.release()),()=>oldRenderer?.dispose(),()=>oldTarget?.release()]);
+    released = true;
   }
   function fail(e: unknown) { issue = `3D表示を停止しました。${errorText(e)} 編集内容は保持しています。`;
     try { release(); } catch (cleanup) { active=false;issue+=` ${errorText(cleanup)}`; } serial++; notify(); }
@@ -429,6 +432,7 @@ export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: 
     if (resized) pickEpoch++;
     try {
       if (!renderer) {
+        released = false;
         if (presentation && saved.rasterResources) rendererTarget = saved.rasterResources.reserve({ cpuBytes: 0,
           gpuBytes: presentation.budget.available + presentation.budget.used + 1 }, '透過表示の資源');
         renderer = new THREE.WebGLRenderer({ canvas, antialias: true }); renderer.outputColorSpace = THREE.SRGBColorSpace;renderer.toneMapping=THREE.NoToneMapping;

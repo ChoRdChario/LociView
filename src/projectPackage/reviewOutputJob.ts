@@ -1,3 +1,4 @@
+import { withJobDiscovery, type JobDiscovery, type OutputJobRead } from './jobDiscovery';
 import { checkRequiredCapabilities } from '../projectMetadata/requiredCapabilities';
 import { reviewCapabilities } from './reviewSnapshot';
 import type { ProjectWorkspaceFS } from '../platform/fs';
@@ -50,7 +51,9 @@ export class ReviewOutputJob {
   }
   assertOwner(fs: ProjectWorkspaceFS) { if (fs !== this.fs) fail('output-owner'); }
   path(name: string) { return `${root(this.fs, this.id)}${name}`; }
-  manifest() {
+  private expectedManifest?: ReturnType<ReviewOutputJob['readManifest']>;
+  manifest() { return structuredClone(this.expectedManifest ??= this.readManifest()); }
+  private readManifest() {
     const m = readManifestControl(this.inputs.manifest, new TextEncoder().encode(packageByteHash(this.inputs.manifest))).manifest;
     if (m.purpose !== 'review') return fail('output-purpose'); return m;
   }
@@ -90,6 +93,9 @@ export class ReviewOutputJob {
   }
   static async state(fs: ProjectWorkspaceFS, id: string, limits: MetadataLimits, cleanup?: OutputCleanupRead) {
     if (!(await this.ids(fs, cleanup)).includes(technicalId(id))) return fail('output-missing');
+    return this.stateKnown(fs, id, limits);
+  }
+  private static async stateKnown(fs: ProjectWorkspaceFS, id: string, limits: MetadataLimits) {
     const path = root(fs, id), start = await fs.readStream(`${path}start.json`), abandoned = await fs.readStream(`${path}abandoned.json`);
     const ix = await readReceipt(fs, indexPath(fs, id), limits);
     if (ix) {
@@ -101,6 +107,17 @@ export class ReviewOutputJob {
     if (abandoned) { if (json(await readReceipt(fs, `${path}abandoned.json`, limits)) !== json(this.abandonment(id))) fail('output-state'); return 'abandoned' as const; }
     return 'unstarted' as const;
   }
+  /** Same owned observation only; standalone state/open remain fresh. */
+  static withDiscovery<Result>(fs: ProjectWorkspaceFS, limits: MetadataLimits, action: (observation: JobDiscovery<OutputJobRead<ReviewOutputJob>>) => Promise<Result>) {
+    const owned = { ...limits };
+    return withJobDiscovery<OutputJobRead<ReviewOutputJob>, Result>(() => this.ids(fs), async id => {
+      const state = await this.stateKnown(fs, id, owned);
+      if (state !== 'started') return { state };
+      const { job, steps } = await this.openStarted(fs, id, owned);
+      await job.validateCompletionFromSteps(steps);
+      return { state, job, kinds: Object.freeze(steps.map(step => step.detail.kind)) };
+    }, action);
+  }
   private static abandonment(id: string) { return { schema: 'lociview-review-output-abandoned-1', jobId: id, stage: 'beforeStart' }; }
   static async abandon(fs: ProjectWorkspaceFS, id: string, limits: MetadataLimits) {
     if (await this.state(fs, id, limits) === 'started') return fail('output-abandon-denied');
@@ -108,6 +125,9 @@ export class ReviewOutputJob {
   }
   static async open(fs: ProjectWorkspaceFS, id: string, limits: MetadataLimits, cleanup?: OutputCleanupRead) {
     if (await this.state(fs, id, limits, cleanup) !== 'started') return fail('output-unstarted');
+    return (await this.openStarted(fs, id, limits)).job;
+  }
+  private static async openStarted(fs: ProjectWorkspaceFS, id: string, limits: MetadataLimits) {
     const path = root(fs, id), bytes = async (name: string, max: number) => {
       const f = await fs.readStream(`${path}${name}`); if (!f || f.size > max) return fail('output-input-missing');
       const b = await fs.readBytes(`${path}${name}`); if (!b || b.length !== f.size) return fail('output-input-missing'); return b;
@@ -121,7 +141,7 @@ export class ReviewOutputJob {
     const job = new ReviewOutputJob(fs, id, limits, { original, snapshot, manifest, inventory, bases, reconstruction,
       sourceProof: { identity: capture.source.identity, envelope: capture.source.metadataEnvelope } }, await readReviewSnapshot(snapshot, limits));
     for (const [name, value] of Object.entries(job.records())) if (json(await readReceipt(fs, `${path}${name}.json`, limits)) !== json(value)) fail('output-input-binding');
-    await job.steps(); return job;
+    const steps = await job.steps(); return { job, steps };
   }
   frozenBases() { return structuredClone(this.inputs.bases); }
   frozenInventory() { return structuredClone(this.inputs.inventory); }
@@ -179,8 +199,8 @@ export class ReviewOutputJob {
     const step: Step = { schema: 'lociview-package-job-step-1', jobId: this.id, start: reference(this.records().start), previous: rows.length ? reference(rows.at(-1)) : null, detail };
     await writeReceipt(this.fs, this.path(`steps/${reference(step).sha256}.json`), step, this.limits); await this.steps();
   }
-  async artifactReceipt() {
-    const step = (await this.steps()).find(s => s.detail.kind === 'artifactVerified'); if (!step || step.detail.kind !== 'artifactVerified') return fail('output-unverified');
+  async artifactReceipt() { return this.readArtifactStep((await this.steps()).find(s => s.detail.kind === 'artifactVerified')); }
+  private async readArtifactStep(step: Step | undefined) { if (!step || step.detail.kind !== 'artifactVerified') return fail('output-unverified');
     const d = step.detail, file = await this.fs.readStream(this.path(`artifacts/${d.sinkId}.zip`)); if (!file?.blob || file.size !== d.archive.byteLength) return fail('output-artifact-missing');
     return { file, step, detail: d };
   }
@@ -189,7 +209,10 @@ export class ReviewOutputJob {
     if (json({ sha256: inspected.archive.sha256, byteLength: inspected.archive.byteLength }) !== json(detail.archive) || json(inspected.archive.control.manifest) !== json(this.manifest())) fail('output-artifact-mismatch');
     return { blob, step };
   }
-  async validateCompletion() { if ((await this.steps()).some(s => s.detail.kind === 'artifactVerified')) await this.artifactReceipt(); }
+  async validateCompletion() { return this.validateCompletionFromSteps(await this.steps()); }
+  private async validateCompletionFromSteps(rows: readonly Step[]) {
+    const artifact = rows.find(s => s.detail.kind === 'artifactVerified'); if (artifact) await this.readArtifactStep(artifact);
+  }
   async generate(store: OriginBlobStore, verifier: ProjectContentVerifier, signal?: AbortSignal) {
     // Warm retry reopens durable inputs too. A memory copy cannot conceal loss.
     const saved = await ReviewOutputJob.open(this.fs, this.id, this.limits);

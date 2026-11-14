@@ -98,7 +98,7 @@ export interface ValidationHostOptions {
   mode?: LocalOpenMode;
   run: string; base: WorkspaceFS; coordinator: ProjectMutationCoordinator; store: OriginBlobStore;
   fileLimits: FileValidationLimits; filePolicy?: ProjectFilePolicy; decode?: PngDecoder; jpeg?: JpegDecoder; photo?: PhotoDecoder; mediaDecoders?:MediaDecoders; initial?: ReturnType<typeof prepareValidationCreation>;
-  workspaceFile?: Blob;
+  workspaceFile?: Blob | PackageArchive;
   standaloneWorkspace?: boolean;
   reviewEdit?: PreparedReviewEdit;
   firstBackup?: Readonly<{ file: Blob; archive: EvidenceRef }>;
@@ -326,7 +326,10 @@ async function openNormalValidationHost(options: ValidationHostOptions, inherite
   if (options.mode === 'view' && options.reviewEdit) throw Error('閲覧中は編集コピーを作成できません。');
   if ([options.initial, options.workspaceFile, options.reviewEdit].filter(Boolean).length > 1) throw Error('作成元を一つ選択してください。');
   if (options.reviewEdit && options.reviewEdit.run !== run) throw Error('編集コピーの作成先を確認してください。');
-  const inspectInput = async (file: Blob) => (await PackageArchive.inspect(file)).control.manifest.purpose === 'clean' ? CleanArchive.inspect(file, limits) : WorkspaceArchive.inspect(file, limits);
+  const inspectInput = async (file: Blob | PackageArchive) => {
+    const selected = file instanceof PackageArchive ? await file.reopenCapturedControl() : await PackageArchive.inspect(file);
+    return selected.control.manifest.purpose === 'clean' ? CleanArchive.fromSelectedArchive(selected, limits) : WorkspaceArchive.fromSelectedArchive(selected, limits);
+  };
   const incoming = options.workspaceFile ? await inspectInput(options.workspaceFile) : undefined;
   if (incoming && incoming.source.proof.identity.projectId !== `prj_${run}`) throw Error('ファイルのプロジェクトと開く場所が一致しません。');
   if (options.initial && options.initial.source.proof.identity.projectId !== `prj_${run}`) throw Error('作成先を確認してください。');
@@ -339,7 +342,6 @@ async function openNormalValidationHost(options: ValidationHostOptions, inherite
     try { await operation; } catch { /* Stored journal/initial input remain authoritative, never silently discarded. */ }
     await lease.waitForWorkspaceIdle(); if (ownsLease) { lease.sealWorkspaceWritesForRelease(); lease.release(); } await connection?.dispose(); };
   try {
-    if (await measure('host.open.first-restore', () => inspectValidationFirstBackup(lease.workspace, options))) throw Error('バックアップの初回復元を専用の入口から再開してください。');
     const fresh = !(await options.base.list(`${root}/`)).length;
     if (options.standaloneWorkspace && !fresh)
       throw Error('同じプロジェクトのデータがあります。一覧を更新し、ファイルを選び直してください。');
@@ -515,14 +517,15 @@ async function openNormalValidationHost(options: ValidationHostOptions, inherite
       reselectReviewCopy: (id: string, file: Blob) => reviewAction(job => job.reselect(id, file)),
       abandonReviewCopy: (id: string) => reviewAction(job => job.abandon(id)),
       refresh: () => execute(reloadReceive, true),
-      receive: (token: string, file: Blob) => receiveAction(async () => {
+      receive: (token: string, file: Blob | PackageArchive) => receiveAction(async () => {
         if (last.state !== 'ready' || token !== last.source?.token) throw Error('入力・更新を確定してから受信してください。');
         return receiver.receive(token, file);
       }),
-      importWorkspace: (file: Blob) => receiveAction(async () => {
-        if ((await inspectInput(file)).source.proof.identity.projectId !== `prj_${run}`)
+      importWorkspace: (file: Blob | PackageArchive) => receiveAction(async () => {
+        const inspected = await inspectInput(file);
+        if (inspected.source.proof.identity.projectId !== `prj_${run}`)
           throw Error('別のプロジェクトです。プロジェクト一覧から開いてください。');
-        return receiver.importWorkspace(file);
+        return receiver.importWorkspace(inspected.archive);
       }),
       retry: (id: string) => receiveAction(() => receiver.retry(id)),
       reselectInput: (token: string, id: string, file: Blob) => receiveAction(() => receiver.reselectInput(token, id, file)),
@@ -540,9 +543,9 @@ async function openNormalValidationHost(options: ValidationHostOptions, inherite
         // Otherwise retain the dedicated recovery Host, never silently return to a fresh destination.
       }
     }
-    if (options.workspaceFile) {
-      try { await (last.state === 'ready' && last.source ? workspaceFiles.receive(last.source.token, options.workspaceFile) :
-        workspaceFiles.importWorkspace(options.workspaceFile)); }
+    if (incoming) {
+      try { await (last.state === 'ready' && last.source ? workspaceFiles.receive(last.source.token, incoming.archive) :
+        workspaceFiles.importWorkspace(incoming.archive)); }
       catch { /* File and incomplete originals stay available through the same recovery controls. */ }
     }
     const outputAction = <T>(action: () => Promise<T>, recovery = false, presentation?: () => MetadataSessionRead | undefined,

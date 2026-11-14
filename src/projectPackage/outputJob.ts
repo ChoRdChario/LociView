@@ -1,3 +1,4 @@
+import { withJobDiscovery, type JobDiscovery, type OutputJobRead } from './jobDiscovery';
 import type { ProjectWorkspaceFS } from '../platform/fs';
 import { checkRequiredCapabilities } from '../projectMetadata/requiredCapabilities';
 import type { OriginBlobStore } from '../projectMetadata/blobStore';
@@ -42,7 +43,9 @@ export class WorkspaceOutputJob {
   }
   assertOwner(fs: ProjectWorkspaceFS) { if (fs !== this.fs) fail('output-owner'); }
   path(name: string) { return `${root(this.fs)}output/${this.id}/${name}`; }
-  manifest() {
+  private expectedManifest?: ReturnType<WorkspaceOutputJob['readManifest']>;
+  manifest() { return structuredClone(this.expectedManifest ??= this.readManifest()); }
+  private readManifest() {
     const m = readManifestControl(this.inputs.manifest, new TextEncoder().encode(packageByteHash(this.inputs.manifest))).manifest;
     if (m.purpose !== 'teamWorkspace') return fail('output-purpose'); return m;
   }
@@ -78,6 +81,9 @@ export class WorkspaceOutputJob {
   }
   static async state(fs: ProjectWorkspaceFS, id: string, limits: MetadataLimits, cleanup?: OutputCleanupRead) {
     technicalId(id); if (!(await this.ids(fs, cleanup)).includes(id)) return fail('output-missing');
+    return this.stateKnown(fs, id, limits);
+  }
+  private static async stateKnown(fs: ProjectWorkspaceFS, id: string, limits: MetadataLimits) {
     const path = `${root(fs)}output/${id}/`, start = await fs.readStream(`${path}start.json`), abandoned = await fs.readStream(`${path}abandoned.json`);
     if (start) { if (abandoned) return fail('output-state'); return 'started' as const; }
     if ((await fs.list(`${path}steps/`)).length) return fail('output-state');
@@ -87,6 +93,20 @@ export class WorkspaceOutputJob {
     }
     return 'unstarted' as const;
   }
+  /** Same owned observation only; standalone state/open remain fresh. */
+  static withDiscovery<Result>(fs: ProjectWorkspaceFS, limits: MetadataLimits, action: (observation: JobDiscovery<OutputJobRead<WorkspaceOutputJob>>) => Promise<Result>) {
+    const owned = { ...limits };
+    return withJobDiscovery<OutputJobRead<WorkspaceOutputJob>, Result>(() => this.ids(fs), async id => {
+      const state = await this.stateKnown(fs, id, owned);
+      if (state !== 'started') return { state };
+      const { job, steps } = await this.openStarted(fs, id, owned);
+      await job.validateCompletionFromSteps(steps);
+      if (!steps.some(s => s.detail.kind === 'baseRecorded')) {
+        const artifact = steps.find(s => s.detail.kind === 'artifactVerified'); if (artifact) await job.readArtifactStep(artifact);
+      }
+      return { state, job, kinds: Object.freeze(steps.map(step => step.detail.kind)) };
+    }, action);
+  }
   private static abandonment(id: string) { return { schema: 'lociview-workspace-output-abandoned-1', jobId: id, stage: 'beforeStart' }; }
   static async abandon(fs: ProjectWorkspaceFS, id: string, limits: MetadataLimits) {
     fs.mutationAuthority.assertWorkspaceWriteAuthorized();
@@ -95,6 +115,9 @@ export class WorkspaceOutputJob {
   }
   static async open(fs: ProjectWorkspaceFS, id: string, limits: MetadataLimits, cleanup?: OutputCleanupRead) {
     if (await this.state(fs, id, limits, cleanup) !== 'started') return fail('output-unstarted');
+    return (await this.openStarted(fs, id, limits)).job;
+  }
+  private static async openStarted(fs: ProjectWorkspaceFS, id: string, limits: MetadataLimits) {
     const path = `${root(fs)}output/${id}/`;
     const bytes = async (name: string, max: number) => {
       const file = await fs.readStream(`${path}${name}`); if (!file || file.size > max) return fail('output-input-missing');
@@ -106,7 +129,7 @@ export class WorkspaceOutputJob {
       Object.keys(inventory).sort().join(',') !== 'blobs,schema' || inventory.schema !== 'lociview-protected-inventory-1' || !Array.isArray(inventory.blobs) || inventory.blobs.length > L.blobCount) return fail('output-input');
     const job = new WorkspaceOutputJob(fs, id, limits, { metadata, manifest, inventory, bases }), expected = job.records();
     for (const [name, value] of Object.entries(expected)) if (json(await readReceipt(fs, `${path}${name}.json`, limits)) !== json(value)) fail('output-input-binding');
-    await job.steps(); return job;
+    const steps = await job.steps(); return { job, steps };
   }
   frozenBases() { return structuredClone(this.inputs.bases); }
   frozenInventory() { return structuredClone(this.inputs.inventory); }
@@ -168,8 +191,8 @@ export class WorkspaceOutputJob {
       previous: rows.length ? reference(rows.at(-1)) : null, detail };
     await writeReceipt(this.fs, this.path(`steps/${reference(step).sha256}.json`), step, this.limits); await this.steps(); return step;
   }
-  async artifactReceipt() {
-    const step = (await this.steps()).find(s => s.detail.kind === 'artifactVerified');
+  async artifactReceipt() { return this.readArtifactStep((await this.steps()).find(s => s.detail.kind === 'artifactVerified')); }
+  private async readArtifactStep(step: Step | undefined) {
     if (!step || step.detail.kind !== 'artifactVerified') return fail('output-unverified');
     const d = step.detail, file = await this.fs.readStream(this.path(`artifacts/${d.sinkId}.zip`));
     if (!file?.blob || file.size !== d.archive.byteLength) return fail('output-artifact-missing');
@@ -183,7 +206,10 @@ export class WorkspaceOutputJob {
     return { blob, step };
   }
   async validateCompletion() {
-    const rows = await this.steps(), completed = rows.find(s => s.detail.kind === 'baseRecorded');
+    return this.validateCompletionFromSteps(await this.steps());
+  }
+  private async validateCompletionFromSteps(rows: readonly Step[]) {
+    const completed = rows.find(s => s.detail.kind === 'baseRecorded');
     if (!completed || completed.detail.kind !== 'baseRecorded') return;
     const record = this.baseRecord();
     if (json(completed.detail.baseRecord) !== json(reference(record))) return fail('output-base-binding');
@@ -193,7 +219,7 @@ export class WorkspaceOutputJob {
       if (!file || file.size !== e.byteLength) return fail('output-base-evidence');
       const stored = await this.fs.readBytes(path); if (!stored || json(ref(stored)) !== json(e)) return fail('output-base-evidence');
     }
-    await this.artifactReceipt();
+    await this.readArtifactStep(rows.find(s => s.detail.kind === 'artifactVerified'));
   }
   async generate(store: OriginBlobStore, signal?: AbortSignal) {
     if ((await this.steps()).some(s => s.detail.kind === 'artifactVerified')) { await this.artifact(); return; }

@@ -82,6 +82,7 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
   let startup: ReturnType<typeof createMetadataStartupControls> | undefined;
   const read = () => { const p = host.read().provider; if (p?.kind !== 'scene-provider') throw Error('プロジェクトの内容を確認してください。'); return p; };
   const external = () => switching || retiringCore || !!tools?.hasChanges();
+  let changeVersion = 0;
   const readingOutput = () => {
     if (disposed || !core || switching || startup?.hasChanges() || navigation?.presentation?.()) return null;
     const output = tools?.readingOutput();
@@ -89,6 +90,7 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
   };
   let outputNotice = '', wasReadingOutput = false;
   const changed = () => {
+    changeVersion++;
     if (disposed) return;
     root.setAttribute('data-lv-mode', host.mode!.current);
     root.dataset.layout = fileMenu && core && !startup ? 'workspace' : 'flow';
@@ -365,7 +367,7 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
       else { startup.dispose(); startup.root.remove(); startup = undefined; }
     }
   };
-  const render = () => { if (!disposed) { ensureStartup(); mountCore(); core?.render(); changed(); navigation?.changed(); } };
+  const render = () => { if (!disposed) { ensureStartup(); mountCore(); const before = changeVersion; core?.render(); if (changeVersion === before) changed(); navigation?.changed(); } };
   ensureStartup();
   mountCore();
   mode.addEventListener('click', () => { void (async () => {

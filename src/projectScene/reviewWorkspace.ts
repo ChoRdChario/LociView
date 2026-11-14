@@ -31,8 +31,9 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
   const overlay = make('div'); overlay.className = 'lv-development-pin-layer';
   const sidebar = make('aside'); sidebar.className = 'lv-development-sidebar'; sidebar.setAttribute('aria-label', '閲覧パネル');
   const sceneName = make('h2', view.sceneName), emptyCaptions=make('p','このシーンにキャプションはありません。'),status = make('p'), retry = make('button', '3D表示を再試行'); status.setAttribute('role', 'status'); retry.type = 'button';
+  const renderStatus = make('div'); renderStatus.className = 'lv-review-render-status'; renderStatus.append(status, retry);
   const footer = make('p', '閲覧用ファイルです。');
-  viewport.append(canvas, overlay); stage.append(viewport); content.append(stage, sidebar); root.append(header, status, retry, content, footer);
+  viewport.append(canvas, overlay, renderStatus); stage.append(viewport); content.append(stage, sidebar); root.append(header, content, footer);
   const mediaWork = createMediaResidencyGate(document, render, () => runtime?.idle?.() ?? Promise.resolve(), () => !disposed);
   const mediaViewer = createMediaViewer(document, view.rasterResources,view.imageDimensions,mediaWork.acquire); root.append(mediaViewer.root);
   let memory: SceneUiMemory = { selectedCaptionId: null, search: '', pinColors: null, listScrollTop: 0, ownerFilter: { kind: 'all' } };
@@ -237,6 +238,7 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
     projection.disabled = cameraBlocked; projection.value = observation?.projection ?? 'perspective';
     for (const button of cameraButtons) button.disabled = cameraBlocked || !runtime?.recall;
     status.textContent = rendererFailure || failure || observation?.issue || observation?.notice || ''; retry.hidden = !!runtime && !observation?.issue&&!observation?.retryAvailable;
+    renderStatus.hidden = !status.textContent && retry.hidden;
     const wanted = new Set(display.pins.map(p => p.id));
     for (const [id, pin] of pins) if (!wanted.has(id)) { pin.remove(); pins.delete(id); }
     for (const pin of display.pins) {

@@ -191,7 +191,15 @@ export class WorkspaceArchive {
   readonly kind = 'workspace-archive-inspection';
   private constructor(readonly archive: PackageArchive, readonly source: ProjectMetadataSource, readonly blobs: readonly Entry[]) { Object.freeze(this); }
   static async inspect(file: Blob, limits: MetadataLimits, signal?: AbortSignal): Promise<WorkspaceArchive> {
-    const archive = await PackageArchive.inspect(file, signal), manifest = archive.control.manifest;
+    return this.fromArchive(await PackageArchive.inspect(file, signal), limits, signal);
+  }
+  static async fromSelectedArchive(selected: PackageArchive, limits: MetadataLimits, signal?: AbortSignal): Promise<WorkspaceArchive> {
+    if (!(selected instanceof PackageArchive)) return fail('workspace-archive');
+    checkAbort(signal);
+    return this.fromArchive(await selected.reopenCapturedControl(), limits, signal);
+  }
+  private static async fromArchive(archive: PackageArchive, limits: MetadataLimits, signal?: AbortSignal): Promise<WorkspaceArchive> {
+    const manifest = archive.control.manifest;
     if (manifest.purpose !== 'teamWorkspace') return fail('workspace-purpose');
     const bytes = await archive.entryBytes('metadata.am', L.sourceBytes, signal);
     const source = ProjectMetadataSource.fromFullSource(bytes, { identity: manifest.identity, envelope: manifest.metadataEnvelope }, packageSourceLimits(limits));

@@ -626,6 +626,99 @@ Native管理情報のbyte読取候補やSHA証拠再利用を復活させず、�
 実装時はrootのcheckpoint、PC／touch、専用offline、HEIC隔離、独立最終レビューを行う。
 実機iPhone／Safariの合格・一般公開は含めない。効果がない場合は内部変更を取り下げ、測定を保持する。
 
+## 11. 全体調査で確認した同一操作内の重複（2026-11-15・限定実装）
+
+POの「全体を調査し、明らかに異常な重複を解消する」指示を、一つの操作が所有する読取・
+入力・期待値の整理として実装する。保存形式・ID・原本・画質・対応範囲は変更しない。
+本節は独立した設計レビューと実測・故障試験を接続条件とする。調査・採否・結果はtodoへ集約する。
+
+### 11.1. 選択したZIPの判定と具体的な内容検査
+
+- 種別の判定で得た`PackageArchive`から、同じ選択のWorkspace／Clean／Contributionの具体的検査を
+  行えるようにする。既存Backup／Reviewと同様、検査済みnative snapshotのcontrolを再確認し、
+  metadata・summary・closure・base・capabilityなどの目的別検査は省略しない。
+- UIの選択、Hostの受取操作、Receiverの準備で、同じ入力を判定のためだけに全量走査し直さない。
+  既存のFile/Blob選択所有期間と取消・再選択の失効を保持し、別ファイルや別操作へ証拠を移さない。
+  外部入力のcheckedフラグや、変更可能なcallerのmanifestを検証能力として受け取らない。
+- 書込後のspool全量照合、独立したcold open／staging／初期化／公開／復旧は新しく検査する。
+
+### 11.2. 一覧のための探索と共有元の検査
+
+- 一つの出力／受信一覧読取は、各namespaceの全path・サイズ・合計予算を一度検査し、各項目の
+  stateと開始済みinputを一度読む。kind間ID衝突も全件で確認し、終端control・artifact・baseの
+  完全性を同じ項目内で重ねて読まない。公開`state/open`・command・retryは従来のfresh経路を保つ。
+  privateな列挙／open処理と操作内callbackを使い、publicなskip-validation引数を追加しない。
+  未知path・欠損・過大file・壊れたindexは従来どおり拒否／repairとし、終了監査前に一覧を採用しない。
+  共通の`projectPackage/jobDiscovery`は、class内部のdiscover/load closureだけを受ける。公開する
+  portは不変なID列と期限付き`read(id)`であり、各Job classのprivate state/openへだけ接続する。
+  全namespaceと衝突を確認してからrow consumerを開始し、期限外／未完了読取は拒否・回収する。
+  FS・Jobを画面へ渡さず、core/platform/viewerからUIを参照しない。
+- catalogueは同じProject行のReview親を先に検査し、その完了childだけを既存Receiverの
+  `completedReviewChildren`へ渡す。childのbacklink再検査と既定のstrict経路を保持する。
+- Review状態一覧では、同じ所有読取内のJournalを一度だけ読み、private publication照合でも使う。
+  parent／childの全byte・marker照合と終了監査を保持し、完了通知は監査成功後に限る。
+  standalone publication照合や次の一覧では新しく読む。
+- 共有元一覧で、各行を選ぶたびに表全体を再読しない。同じ操作内で表・観測・sourceを検査し、
+  行ごとの完全性と素材の存在確認を行って、表示用の選択肢だけを返す。commandの選択はfreshなまま。
+- localな共有元のmanifest／metadataを検査して捨て、同じ読取でもう一度開く処理を集約する。
+  local観測には必ずlocalの実bytesを要求し、同一digestの復元済みevidenceで代用しない。
+  全sourceの合計予算と完全性を保ち、全metadataの常駐cacheは作らない。
+- 同じ出力一覧のBackupでは、全namespace探索後のprivate openで照合済みのdescriptionから
+  固定inventoryを得る。同じFS・limits・proofの現在の共有元表は一度検査し、各Backupの固定表が
+  含まれるか・inventoryの一致・各実素材の存在をそれぞれ確認する。外部job／checked値は受け取らず、
+  期限付き読取の中だけで使う。失敗した表の結果は再利用しない。standalone保護照合・download・
+  commandは新しくsource／inventoryを照合する。
+- 共有元manifestをまとめて読むときも、同じ復元観測とlocal参照表・local受信観測を一度調べ、
+  各参照の実bytesとhashを確認する。local消失を同digestの復元copyで隠さず、次のpublic読取では
+  全観測を新しく取得する。全metadata常駐cacheは作らない。
+
+### 11.3. 同じ復元open内の入力とabsence照合
+
+- `BackupRestoreJob.open`が新しく全量検査した入力を、そのopen内の自身のabsence照合にも使う。
+  privateなjob ID・prepared全体・archive SHA／長さ・proof／headsへ結び付け、他のjobや変更された
+  descriptorには使わない。元DB不在・root path・他job・control・bindingの独立した確認は維持する。
+  保持するBlobも、その正確な検査済み`sourceSnapshot()`を使う。
+- 最初の全量検査の完了前の改変・欠損は拒否する。完了後に元パスが変わった場合は、同じopenでは
+  正確な検査済みsnapshotまたは読取失敗となり、次の独立open／stagingで実パスを新しく検査する。
+- この読取だけの再利用を、persist・次のopen・openStaging・初期化・Selectionへ持ち越さない。
+  同長改変・欠損・別jobの入力・途中control変更・終了時監査を試験する。
+- post-write照合→Start/index書込→public openの反復は別の書込境界として維持する。
+  そのwarm例外は今回接続しない。中断復旧や保存後照合を同一操作という理由で統合しない。
+
+### 11.4. 同じprivate入力から作る期待値と起動の振分け
+
+- 出力Jobのprivateな所有bytesから算出するmanifest／receipt期待値は、Job内で一度計算できる。
+  public manifestは独立copyを返し、全physical input・receiptのfresh照合を保持する。
+  Backupの検査済みcaptureが同一bytes／proof／heads／limitsを所有する場合は、準備中だけそのsourceを
+  再利用できる。特にcapture自身の`packageSourceLimits`との一致を要求し、厳しいlimitsへの変更は
+  再検査または拒否する。公開proof・返却bytesの変更を混入させない。所有が証明できない場合は従来の
+  再構築を保持する。cold openは実保存bytesから再構築する。一般的なDoc／body cacheは追加しない。
+- 通常Hostの二度目のfirst-backup振分けはgeneration resolverの既存拒否へ集約できる。
+  UI Entryの専用復旧導線と、resolverのDB列挙／open前の拒否を保つ。作成・direct Host・復元後adopt・
+  generation port不在でも保存領域を先に開いたり、失敗を不存在として扱わない。
+
+### 11.5. 表示資源の解放
+
+同じ解放で、所有surfaceのdisposerとfallback traverseの両方を同じ資源へ実行しない。
+所有disposerのないchildだけをfallbackとし、全childの除去と独立した解放試行・失敗集約を保つ。
+完了した非表示化の反復は冪等にするが、初回activation前の明示false、新しい有効化／demand、
+retry、解放失敗と永久disposeの契約を保つ。非表示GPU／画像の解放自体は維持する。
+画面全体のrenderがcoreから同じ同期通知を受けた場合、追加の通知でファイル操作欄を描画し直さない。
+core不在・入力中・再入・dispose時の更新と通知先は保持する。
+閲覧用シーンでは、画像の準備に伴う3Dの休止・再開の通知が画面全体を押し下げ、
+画像の可視判定と資源準備を循環させない。状態と再試行は同じ3D表示内の限定領域に置く。
+空の表示枠は隠し、状態の読み上げ・再試行・小画面での到達性と資源解放を維持する。
+01iのSafari予算、描画品質、renderer方式、採用gateは変更せず、表示軽量化の再開とは扱わない。
+
+受入れ：既存のsmall package／tamper／absence／spool／source-loss試験を再利用し、複数履歴で
+namespace走査が行数分に増えないこと、次の操作では改変を検出すること、行／manifestの外部変更が
+内部期待値へ混入しないこと、同一解放が一度であることを確認する。Ki-84・共有履歴のある入力・
+大きなGSの実操作を測り、PC／touch・cold offline・保存／復旧・独立最終レビューと必要な全体検証で判断する。
+
+§§11.1–11.5の限定実装・独立レビュー・Windows自動検証は完了。具体的な経路・比較条件・
+実行結果・未確認の実機条件は[todo](../../tasks/todo.md)に集約する。Capture sourceの再利用は
+接続していない。通常公開・実機iPhone・技術全体の採用を意味しない。
+
 ## 本文編集の保存タイミング再検討（2026-11-13・設計案）
 
 対象は復元済みPC候補でタイトルと本文だけを編集する操作。第一候補の限定評価と、

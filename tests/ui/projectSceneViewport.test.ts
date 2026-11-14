@@ -187,6 +187,19 @@ describe('synthetic Scene display; GPU mocked, not rendered/browser acceptance',
     const v=sceneViewportFactory({demand,create(){throw Error('hidden renderer');},dispose(){}})(canvas.canvas as unknown as HTMLCanvasElement,()=>{});
     v.update(base);expect(demand).not.toHaveBeenCalled();v.setActive(false);expect(demand).toHaveBeenLastCalledWith([]);expect(tracker.renderers).toHaveLength(0);v.dispose();
   });
+  it('disposes owned mesh resources once and skips completed hidden teardown until demand resumes',()=>{
+    const base=syntheticDisplay(createSyntheticProject(),f.overview,null,null),source=base.models[0]!,canvas=fakeCanvas(),demand=vi.fn();
+    const model:ReadonlyRenderModel={shape:'render-glb',key:'owned-cleanup',assetId:source.binding.assetId,assetToProject:source.binding.assetToProject,representation:source.representation as ReadonlyRenderModel['representation']};
+    const disposals:ReturnType<typeof vi.fn>[]=[],geometries:ReturnType<typeof vi.spyOn>[]=[],materials:ReturnType<typeof vi.spyOn>[]=[];
+    const v=applicationViewportFactory({demand,create(){const asset=new THREE.Group(),mesh=new THREE.Mesh(new THREE.PlaneGeometry(),new THREE.MeshStandardMaterial());asset.add(mesh);
+      const dispose=vi.fn(()=>{mesh.geometry.dispose();(mesh.material as THREE.Material).dispose();});disposals.push(dispose);
+      geometries.push(vi.spyOn(mesh.geometry,'dispose'));materials.push(vi.spyOn(mesh.material as THREE.Material,'dispose'));return{asset,mesh,dispose};},dispose(){}})(canvas.canvas as unknown as HTMLCanvasElement,()=>{});
+    v.update({...base,models:[model],readOnly:true,pinEdit:undefined,modelEdit:undefined,preview:undefined});v.setActive(true);canvas.show();
+    demand.mockClear();v.setActive(false);v.setActive(false);v.setActive(false);
+    expect(demand).toHaveBeenCalledTimes(1);expect(disposals[0]).toHaveBeenCalledTimes(1);expect(geometries[0]).toHaveBeenCalledTimes(1);expect(materials[0]).toHaveBeenCalledTimes(1);
+    v.setActive(true);expect(disposals).toHaveLength(2);demand.mockClear();v.setActive(false);v.dispose();
+    expect(demand).toHaveBeenCalledTimes(1);expect(disposals[1]).toHaveBeenCalledTimes(1);expect(geometries[1]).toHaveBeenCalledTimes(1);expect(materials[1]).toHaveBeenCalledTimes(1);
+  });
   it('keeps an admitted model usable when another texture exceeds live GPU intent or actual edge, then retries after hiding',()=>{
     const base=syntheticDisplay(createSyntheticProject(),f.overview,null,null),source=base.models[0]!,canvas=fakeCanvas(),raster=createRasterResources({cpuBytes:0,gpuBytes:rasterBytes(8,8,true)});
     const textures=[new THREE.Texture({width:8,height:8} as any),new THREE.Texture({width:8,height:8} as any),new THREE.Texture({width:9000,height:1} as any)],released=vi.fn();

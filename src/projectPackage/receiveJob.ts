@@ -1,3 +1,4 @@
+import { withJobDiscovery, type JobDiscovery, type ReceiveJobRead } from './jobDiscovery';
 import type { ProjectWorkspaceFS } from '../platform/fs';
 import { checkedProof, fail, MetadataSourceError, type MetadataLimits, type MetadataProof } from '../projectMetadata/format';
 import { digest, json, newId, readReceipt, technicalId, writeReceipt } from '../projectMetadata/persistence';
@@ -5,6 +6,7 @@ import { checkRemoteHeads } from '../projectMetadata/remote';
 import { TransactionJournal, type JournalEntry } from '../projectMetadata/journal';
 import { PACKAGE_LIMITS as L, type EvidenceRef } from './contract';
 import { WorkspaceArchive } from './workspaceArchive';
+import { PackageArchive } from './zipArchive';
 import { packageByteHash, readManifestControl } from './manifest';
 import { planWorkspaceClosure } from './closure';
 import { ProjectMetadataSource } from '../projectMetadata/source';
@@ -58,10 +60,17 @@ export class WorkspaceReceiveJob {
     const input = file.slice(0, file.size), inspection = await WorkspaceArchive.inspect(input, limits);
     return new WorkspaceReceiveJob(fs, newId(), limits, inspection, input, null);
   }
+  static async fromSelectedArchive(fs: ProjectWorkspaceFS, selected: PackageArchive, limits: MetadataLimits): Promise<WorkspaceReceiveJob> {
+    const inspection = await WorkspaceArchive.fromSelectedArchive(selected, limits);
+    return new WorkspaceReceiveJob(fs, newId(), limits, inspection, inspection.archive.sourceSnapshot(), null);
+  }
   static ids(fs: ProjectWorkspaceFS) { return receiveJobIds(fs); }
   /** Absence is checked separately from parsing: torn acknowledged starts are never unstarted. */
   static async inputState(fs: ProjectWorkspaceFS, id: string, limits: MetadataLimits): Promise<InputState> {
     technicalId(id); if (!(await this.ids(fs)).includes(id)) return fail('receive-job-missing');
+    return this.inputStateKnown(fs, id, limits);
+  }
+  private static async inputStateKnown(fs: ProjectWorkspaceFS, id: string, limits: MetadataLimits): Promise<InputState> {
     const path = `${root(fs)}receive/${id}/`;
     const started = await fs.readStream(`${path}start.json`), abandoned = await fs.readStream(`${path}abandoned.json`);
     if (started) { if (abandoned) return fail('receive-input-state'); return 'started'; }
@@ -111,8 +120,27 @@ export class WorkspaceReceiveJob {
     await writeReceipt(fs, `${root(fs)}receive/${id}/abandoned.json`, this.abandonment(id), limits);
     if (await this.inputState(fs, id, limits) !== 'abandoned') fail('receive-input-state');
   }
+  static withDiscovery<Result>(fs: ProjectWorkspaceFS, limits: MetadataLimits, action: (scope: JobDiscovery<ReceiveJobRead<WorkspaceReceiveJob>>) => Promise<Result>) {
+    const owned = { ...limits };
+    let entries: ReturnType<TransactionJournal['entries']> | undefined;
+    const readEntries = () => entries ??= new TransactionJournal(fs, owned).entries();
+    const bases = new Map<string, ReturnType<WorkspaceReceiveJob['readBases']>>();
+    return withJobDiscovery(() => this.ids(fs), async id => {
+      const state = await this.inputStateKnown(fs, id, owned);
+      if (state !== 'started') return { state };
+      const { job, steps } = await this.openStarted(fs, id, owned);
+      await job.validateCompletionFromSteps(steps, readEntries, () => {
+        const key = json(job.inspection.source.proof);
+        let rows = bases.get(key); if (!rows) { rows = job.readBases(); bases.set(key, rows); } return rows;
+      });
+      return { state, job, kinds: Object.freeze(steps.map(step => step.detail.kind)) };
+    }, action);
+  }
   static async open(fs: ProjectWorkspaceFS, id: string, limits: MetadataLimits): Promise<WorkspaceReceiveJob> {
     if (await this.inputState(fs, id, limits) !== 'started') return fail('receive-input-incomplete');
+    return (await this.openStarted(fs, id, limits)).job;
+  }
+  private static async openStarted(fs: ProjectWorkspaceFS, id: string, limits: MetadataLimits) {
     const path = `${root(fs)}receive/${id}/`;
     const readLimits = { ...limits, maxTotalBytes: Math.min(limits.maxTotalBytes, L.controlBytes) };
     const start = await readReceipt<Start>(fs, `${path}start.json`, readLimits);
@@ -131,7 +159,7 @@ export class WorkspaceReceiveJob {
     checkedProof({ identity: destination.identity, envelope: destination.metadataEnvelope }, limits);
     if (start.operation === 'receiveWorkspace') checkRemoteHeads(start.receiver.heads);
     if (json(destination.identity) !== json(inspection.source.proof.identity) || json(destination.metadataEnvelope) !== json(inspection.source.proof.envelope)) fail('receive-lineage');
-    await job.steps(); return job;
+    const steps = await job.steps(); return { job, steps };
   }
   async persist(receiver: ReceiverProof | null, additionalBytes: number): Promise<WorkspaceReceiveJob> {
     this.fs.mutationAuthority.assertWorkspaceWriteAuthorized();
@@ -209,17 +237,20 @@ export class WorkspaceReceiveJob {
     return first.detail;
   }
   async validateCompletion(): Promise<void> {
-    const rows = await this.steps(), last = rows.at(-1);
+    return this.validateCompletionFromSteps(await this.steps());
+  }
+  private async validateCompletionFromSteps(rows: readonly Step[], readEntries = () => new TransactionJournal(this.fs, this.limits).entries(), readBases = () => this.readBases()) {
+    const last = rows.at(-1);
     if (last?.detail.kind !== 'baseRecorded') return;
     const first = rows[0]!, d = first.detail;
     if (d.kind !== 'workspaceAlreadyPresent' && d.kind !== 'workspacePublished') return fail('receive-step-detail');
-    const entry = (await new TransactionJournal(this.fs, this.limits).entries()).find(e => e.publication && json(reference(e.publication)) === json(d.publication));
+    const entry = (await readEntries()).find(e => e.publication && json(reference(e.publication)) === json(d.publication));
     if (!entry?.publication || json(entry.publication.heads) !== json(d.receiver.heads)) return fail('receive-observation-missing');
     if (d.kind === 'workspacePublished' && (entry.start.transactionId !== this.id || json(reference(entry.prepared)) !== json(d.journal) ||
       json(entry.prepared?.remote) !== json((await this.journalInput([...d.receiver.heads])).proof))) fail('receive-journal-originals');
     if (d.kind === 'workspacePublished' && entry.start.purpose !== (this.importing ? 'importWorkspace' : 'remotePackageMerge')) fail('receive-publication-purpose');
     if (d.kind === 'workspaceAlreadyPresent' && (this.start?.operation !== 'receiveWorkspace' || json(d.receiver) !== json(this.start.receiver))) fail('receive-stale');
-    const bases = await this.readBases(), expected = this.baseRecord(d.receiver);
+    const bases = await readBases(), expected = this.baseRecord(d.receiver);
     const localPath = `${root(this.fs)}bases/${expected.workspacePackageId}/${reference(expected).sha256}.json`;
     if (json(await readReceipt(this.fs, localPath, this.limits)) !== json(expected) ||
       json(reference(expected)) !== json(last.detail.baseRecord) || !bases.some(b => json(b) === json(expected))) fail('receive-base-missing');

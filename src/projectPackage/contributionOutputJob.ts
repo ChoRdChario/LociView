@@ -1,3 +1,4 @@
+import { withJobDiscovery, type JobDiscovery, type OutputJobRead } from './jobDiscovery';
 import type { ProjectWorkspaceFS } from '../platform/fs';
 import type { OutputCleanupRead } from './outputCleanupRead';
 import { capabilityUnion, checkRequiredCapabilities } from '../projectMetadata/requiredCapabilities';
@@ -40,7 +41,9 @@ export class ContributionOutputJob {
   }
   assertOwner(fs: ProjectWorkspaceFS) { if (fs !== this.fs) fail('output-owner'); }
   path(name: string) { return `${root(this.fs, this.id)}${name}`; }
-  manifest() {
+  private expectedManifest?: ReturnType<ContributionOutputJob['readManifest']>;
+  manifest() { return structuredClone(this.expectedManifest ??= this.readManifest()); }
+  private readManifest() {
     const m = readManifestControl(this.inputs.manifest, new TextEncoder().encode(packageByteHash(this.inputs.manifest))).manifest;
     if (m.purpose !== 'contribution') return fail('output-purpose'); return m;
   }
@@ -82,6 +85,9 @@ export class ContributionOutputJob {
   }
   static async state(fs: ProjectWorkspaceFS, id: string, limits: MetadataLimits, cleanup?: OutputCleanupRead) {
     if (!(await this.ids(fs, cleanup)).includes(technicalId(id))) return fail('output-missing');
+    return this.stateKnown(fs, id, limits);
+  }
+  private static async stateKnown(fs: ProjectWorkspaceFS, id: string, limits: MetadataLimits) {
     const path = root(fs, id), start = await fs.readStream(`${path}start.json`), abandoned = await fs.readStream(`${path}abandoned.json`);
     const ix = await readReceipt(fs, indexPath(fs, id), limits);
     if (ix) {
@@ -96,6 +102,17 @@ export class ContributionOutputJob {
     }
     return 'unstarted' as const;
   }
+  /** Same owned observation only; standalone state/open remain fresh. */
+  static withDiscovery<Result>(fs: ProjectWorkspaceFS, limits: MetadataLimits, action: (observation: JobDiscovery<OutputJobRead<ContributionOutputJob>>) => Promise<Result>) {
+    const owned = { ...limits };
+    return withJobDiscovery<OutputJobRead<ContributionOutputJob>, Result>(() => this.ids(fs), async id => {
+      const state = await this.stateKnown(fs, id, owned);
+      if (state !== 'started') return { state };
+      const { job, steps } = await this.openStarted(fs, id, owned);
+      await job.validateCompletionFromSteps(steps);
+      return { state, job, kinds: Object.freeze(steps.map(step => step.detail.kind)) };
+    }, action);
+  }
   private static abandonment(id: string) { return { schema: 'lociview-contribution-output-abandoned-1', jobId: id, stage: 'beforeStart' }; }
   static async abandon(fs: ProjectWorkspaceFS, id: string, limits: MetadataLimits) {
     fs.mutationAuthority.assertWorkspaceWriteAuthorized();
@@ -104,6 +121,9 @@ export class ContributionOutputJob {
   }
   static async open(fs: ProjectWorkspaceFS, id: string, limits: MetadataLimits, cleanup?: OutputCleanupRead) {
     if (await this.state(fs, id, limits, cleanup) !== 'started') return fail('output-unstarted');
+    return (await this.openStarted(fs, id, limits)).job;
+  }
+  private static async openStarted(fs: ProjectWorkspaceFS, id: string, limits: MetadataLimits) {
     const path = root(fs, id), bytes = async (name: string, max: number) => {
       const f = await fs.readStream(`${path}${name}`); if (!f || f.size > max) return fail('output-input-missing');
       const b = await fs.readBytes(`${path}${name}`); if (!b || b.length !== f.size) return fail('output-input-missing'); return b;
@@ -123,7 +143,7 @@ export class ContributionOutputJob {
     const delta = contributionDelta(base.source, job.source, packageSourceLimits(limits));
     const description = await describeContributionTarget(base, job.source, delta.changes);
     if (json(delta.changes) !== json(m.changes) || json(description.blobs) !== json(m.blobs) || json(description.summary) !== json(m.summary)) fail('output-source');
-    await job.steps(); return job;
+    const steps = await job.steps(); return { job, steps };
   }
   frozenBases() { return structuredClone(this.inputs.bases); }
   frozenInventory() { return structuredClone(this.inputs.inventory); }
@@ -187,8 +207,8 @@ export class ContributionOutputJob {
       previous: rows.length ? reference(rows.at(-1)) : null, detail };
     await writeReceipt(this.fs, this.path(`steps/${reference(step).sha256}.json`), step, this.limits); await this.steps();
   }
-  async artifactReceipt() {
-    const step = (await this.steps()).find(s => s.detail.kind === 'artifactVerified');
+  async artifactReceipt() { return this.readArtifactStep((await this.steps()).find(s => s.detail.kind === 'artifactVerified')); }
+  private async readArtifactStep(step: Step | undefined) {
     if (!step || step.detail.kind !== 'artifactVerified') return fail('output-unverified');
     const d = step.detail, file = await this.fs.readStream(this.path(`artifacts/${d.sinkId}.zip`));
     if (!file?.blob || file.size !== d.archive.byteLength) return fail('output-artifact-missing');
@@ -201,7 +221,10 @@ export class ContributionOutputJob {
       json(inspected.archive.control.manifest) !== json(this.manifest())) fail('output-artifact-mismatch');
     return { blob, step };
   }
-  async validateCompletion() { if ((await this.steps()).some(s => s.detail.kind === 'artifactVerified')) await this.artifactReceipt(); }
+  async validateCompletion() { return this.validateCompletionFromSteps(await this.steps()); }
+  private async validateCompletionFromSteps(rows: readonly Step[]) {
+    const artifact = rows.find(s => s.detail.kind === 'artifactVerified'); if (artifact) await this.readArtifactStep(artifact);
+  }
   async generate(store: OriginBlobStore, signal?: AbortSignal) {
     if ((await this.steps()).some(s => s.detail.kind === 'artifactVerified')) { await this.artifact(store); return; }
     if ((await this.steps()).length) return fail('output-cancelled');

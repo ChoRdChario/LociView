@@ -12,8 +12,8 @@ import { packageByteHash } from './manifest';
 import { BackupArchive } from './backupArchive';
 import { PACKAGE_LIMITS as L, type EvidenceRef } from './contract';
 import { WorkspaceBaseStore } from './workspaceBases';
-import { receiveJobKeys, receiveInputState, openReceiveJob, receiveTerminal } from './receiveJobs';
-import { outputJobKeys, outputJobClass, openOutputJob, outputTerminal } from './outputJobs';
+import { withReceiveJobDiscovery } from './receiveJobs';
+import { withOutputJobDiscovery } from './outputJobs';
 import { checkAbort } from './zipChecks';
 import { checkRestoreCurrent, readRestoreControls, reconcileRestoreDatabases, reserveRestoreControls, writeRestoreControl, restoreEqual, restoreJobPath, restoreRef, restoreRoot, restoreBackupProof,
   type AbsentSnapshot, type RestoreCurrent, type RestorePrepared, type RestoreStart, type RestoreControlJob, type GenerationSelection } from './restoreControls';
@@ -75,22 +75,18 @@ export class BackupRestoreJob {
     const before = await ports.session.read();
     if (before.state !== 'ready' || !before.source || !before.publication || before.provider?.kind !== 'scene-provider' ||
       before.provider.token !== before.source.token) return fail('restore-current-not-ready');
-    for (const key of await receiveJobKeys(ports.fs, limits)) {
-      const input = await receiveInputState(ports.fs, key, limits);
-      if (input === 'abandoned') continue;
-      if (input !== 'started') return fail('restore-receive-pending');
-      const job = await openReceiveJob(ports.fs, key, ports.store, limits);
-      if (!await receiveTerminal(job)) return fail('restore-receive-pending');
-      await job.validateCompletion();
-    }
-    await (ports.readOutputArtifacts ?? (action => action()))(async () => { for (const key of await outputJobKeys(ports.fs)) {
-      const outputState = await outputJobClass(key).state(ports.fs, key.id, limits);
+    await withReceiveJobDiscovery(ports.fs, ports.store, limits, async rows => { for (const row of rows) {
+      const observed = await row.read();
+      if (observed.state === 'abandoned') continue;
+      if (observed.state !== 'started' || !observed.kinds.some(kind => ['baseRecorded', 'contributionPublished', 'contributionAlreadyPresent', 'cleanPublished', 'cancelled'].includes(kind))) return fail('restore-receive-pending');
+    } });
+    await (ports.readOutputArtifacts ?? (action => action()))(() => withOutputJobDiscovery(ports.fs, limits, async rows => { for (const row of rows) {
+      const observation = await row.read(), outputState = observation.state;
       if (outputState === 'abandoned') continue;
       if (outputState !== 'started') return fail('restore-output-pending');
-      const job = await openOutputJob(ports.fs, key, limits);
-      if (!await outputTerminal(job)) return fail('restore-output-pending');
-      await job.validateCompletion();
-    } });
+      if (observation.state !== 'started' || !observation.kinds.some(kind => kind === 'cancelled' ||
+        kind === (row.key.kind === 'workspace' ? 'baseRecorded' : 'artifactVerified'))) return fail('restore-output-pending');
+    } }));
     const journal = new TransactionJournal(ports.fs, limits), publication = (await journal.entries()).find(e => e.start.transactionId === before.publication)?.publication;
     if (!publication || !restoreEqual(publication.heads, before.source.heads)) return fail('restore-current-publication');
     const bases = await new WorkspaceBaseStore(ports.fs, limits, before.source.proof).snapshot();
@@ -119,6 +115,10 @@ export class BackupRestoreJob {
   /** First-only observation. Never opens an original Repo or treats a failed probe as absence. */
   static async observeAbsence(root: ProjectWorkspaceFS, limits: MetadataLimits, databases: RestoreDatabasePorts,
     proof: BackupArchive['source']['proof'], ownJob?: string): Promise<AbsentSnapshot> {
+    return this.observeAbsenceDirect(root, limits, databases, proof, ownJob);
+  }
+  private static async observeAbsenceDirect(root: ProjectWorkspaceFS, limits: MetadataLimits, databases: RestoreDatabasePorts,
+    proof: BackupArchive['source']['proof'], ownJob?: string, opened?: { prepared: RestorePrepared; inspection: BackupArchive }): Promise<AbsentSnapshot> {
     if (!databases.originalDatabasePresent || await databases.originalDatabasePresent() !== false) return fail('restore-original-not-absent');
     const state = await reconcileRestoreDatabases(root, limits, () => databases.listGenerations(), true), prefix = restoreRoot(root), paths = await root.list(prefix);
     if (state.selection || state.pending && state.pending.id !== ownJob || paths.length > L.entryCount) return fail('restore-original-not-absent');
@@ -136,7 +136,7 @@ export class BackupRestoreJob {
       if (job.id === ownJob) {
         if (terminal(job) || job.start && (job.start.schema !== 'lociview-local-restore-start-2' || !restoreEqual(job.start.current.retained, restoreRef(p.absence)))) fail('restore-absence-owner');
         if (job.start) {
-          const inspected = await this.inspectInput(root, job.id, p, limits);
+          const inspected = opened && restoreEqual(opened.prepared, p) ? opened.inspection : await this.inspectInput(root, job.id, p, limits);
           if (!restoreEqual(inspected.source.proof, proof) || !restoreEqual([...inspected.source.heads], p.backup.heads)) fail('restore-project-identity');
         } else if (job.indexed || job.dbOpened || job.destinationFiles.length || state.databaseIds.includes(job.id)) fail('restore-absence-owner');
         continue;
@@ -208,13 +208,12 @@ export class BackupRestoreJob {
     if (!job?.start || !job.prepared || terminal(job) || state.tail?.jobId === id) return fail('restore-not-pending');
     const inspection = await this.inspectInput(root, id, job.prepared, limits, signal);
     if (!restoreEqual(inspection.source.proof, restoreBackupProof(job.start))) fail('restore-project-identity');
-    const file = await root.readStream(restoreJobPath(root, id, 'input.zip'));
-    if (!file?.blob) return fail('restore-input-missing');
-    const owned = await file.blob(), result = new BackupRestoreJob(root, id, checkLimits(limits), inspection, owned,
+    const result = new BackupRestoreJob(root, id, checkLimits(limits), inspection, inspection.archive.sourceSnapshot(),
       job.start.schema === 'lociview-local-restore-start-1' ? job.start.current : null, job.start.previousSelection, job.start,
       job.prepared.schema === 'lociview-local-restore-prepared-2' ? job.prepared.absence : null);
     if (!restoreEqual(result.descriptor(), job.prepared)) fail('restore-input-descriptor');
-    if (result.absence) await result.checkPredecessor(null, databases, state, id);
+    if (result.absence && !restoreEqual(await this.observeAbsenceDirect(root, result.limits, databases, inspection.source.proof, id,
+      { prepared: job.prepared, inspection }), result.absence)) fail('restore-confirmation-stale');
     checkAbort(signal); return result;
   }
   private async pending(requireDb: boolean) {
