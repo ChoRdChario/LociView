@@ -374,8 +374,8 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   let externalBusy = false, outputReading = false;
   const mutationBlock = () => windowMoving ? 'ウィンドウの操作を完了してください。' : busy ? '変更を適用しています。' : ports.status().kind === 'failed' ? failureMessage() || '更新を再試行してください。' :
     ports.presentation?.()?.reason ?? (ports.readOnly ? '閲覧中です。編集を開始してください。' : ports.otherPending() ? 'ファイルの操作を完了してください。' : pending ? '再試行するか、入力を修正してください。' : null);
-  const listContext = (): CaptionListContext => ({ source: { kind: 'ready', token: provider().token, sceneId,
-    captions: projectCaptions(provider(), sceneId, models?.hidden()) }, memory: memory(), pending: dirty() ? 'text' : busy ? 'update' : null,
+  const listContext = (captions = projectCaptions(provider(), sceneId, models?.hidden())): CaptionListContext => ({ source: { kind: 'ready', token: provider().token, sceneId,
+    captions }, memory: memory(), pending: dirty() ? 'text' : busy ? 'update' : null,
     showModelPending: composingInput() || pressedPointers.size || pin || numericTarget || surfaceOpening || choosing || deletion || pickerScope || sceneEdit || recovery?.hasChanges() || panelInput() || mediaManager?.hasChanges() || windowMoving || viewport.read().dragging ? 'text' : null,
     mutationBlock: busy || pending || windowMoving || ports.status().kind !== 'idle' || ports.otherPending() ? '現在の操作を完了してください。' : null });
   const emptyCaptionReason = () => {
@@ -386,12 +386,12 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     return source.items.some(item => item.lifecycle.kind === 'value' && item.lifecycle.value === 'active' && item.membership.kind === 'value' && item.membership.value.kind === 'included')
       ? '「キャプションを追加」で、モデル上に最初の記録を作れます。' : 'モデルを追加すると、記録を作れます。';
   };
-  const detailContext = (): DetailContext => {
-    const item = projectCaptions(provider(), sceneId, models?.hidden()).find(c => c.id === memory().selectedCaptionId);
+  const detailContext = (captions = projectCaptions(provider(), sceneId, models?.hidden())): DetailContext => {
+    const item = captions.find(c => c.id === memory().selectedCaptionId);
     return { source: item ? { kind: 'ready', token: provider().token, sceneId, caption: item, sceneCount: projectCaptionSceneCount(provider(), item.id) } :
       { kind: 'unavailable', token: provider().token, sceneId, captionId: memory().selectedCaptionId,
         reason: memory().selectedCaptionId ? 'この記録は削除されたか、所属・更新の状態を確認する必要があります。未適用の入力は保持しています。' :
-          projectCaptions(provider(), sceneId).length ? '記録を選択してください。' : emptyCaptionReason() },
+          captions.length ? '記録を選択してください。' : emptyCaptionReason() },
       draft, mediaDraft: selectedMedia ? { token: selectedMedia.token, sceneId: selectedMedia.sceneId,
         captionId: selectedMedia.captionId, selectionId: selectedMedia.attachmentId } : undefined,
       mutationBlock: mutationBlock() || (pin || !!numericTarget || surfaceOpening || choosing || deletion || sceneEdit || includeMemory().composing || pickerScope || recovery?.hasChanges() || panelInput() || mediaManager?.hasChanges() ? '現在の操作を完了してください。' : null), feedback: busy && applyingCaption ? { kind: 'applying', plan: applyingCaption } : { kind: 'idle' } };
@@ -445,9 +445,10 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
         applyingCaption = event;
         void run({ kind: 'editCaption', captionId: event.captionId, edits }, () => {
           if (media && selectedMedia === media) { media.token = provider().token; media.recordApplied = true; }
-          resetDraft(); feedback = '変更を適用しました。';
+          draft = null; feedback = '変更を適用しました。';
         }, media ? () => applySelectedMedia(media) : undefined)
-          .finally(() => { applyingCaption = null; if (!disposed) render(); });
+          .finally(() => { applyingCaption = null; });
+        return; // perform renders both the busy state and the confirmed result.
       }
     }
     render();
@@ -1154,17 +1155,20 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       if(focusedScene){const choice=sceneButtons.get(focusedScene);if(choice&&document.activeElement!==choice)choice.focus({preventScroll:true});}
       const sceneStripShape = JSON.stringify([...activeScenes].map(key => [key, sceneButtons.get(key)!.textContent]));
       queueMicrotask(() => revealSceneChoice(sceneStripShape));
-      if (!draft) draft = beginCaptionDraft(detailContext().source);
-      captionPanel.dataset.empty = String(!projectCaptions(p, sceneId).length && !ports.readOnly);
-      list.render(listContext()); inclusion.render(includeContext()); detail.render({ ...detailContext(),
+      const captions = projectCaptions(p, sceneId, models?.hidden());
+      if (!draft) draft = beginCaptionDraft(detailContext(captions).source);
+      const captionList = listContext(captions);
+      captionPanel.dataset.empty = String(!captions.length && !ports.readOnly);
+      list.render(captionList); inclusion.render(includeContext()); detail.render({ ...detailContext(captions),
         textOnly: readDuringOutput(),
         cancelBlock: pending?.owner === 'media' && canCancelMedia() ? null :
           mutationBlock() || (pickerScope || panelInput() || mediaManager?.hasChanges() ? '現在の入力・操作を完了してください。' : null),
         editorFields: memory().selectedCaptionId ? ports.captionEditors?.(memory().selectedCaptionId!) : undefined,
       });
-      previousCaption.disabled = busy || ports.otherPending() && !readDuringOutput() || planCaptionList(captionNavigationContext(), { kind: 'step', direction: 'previous' }).kind !== 'change';
-      nextCaption.disabled = busy || ports.otherPending() && !readDuringOutput() || planCaptionList(captionNavigationContext(), { kind: 'step', direction: 'next' }).kind !== 'change';
-      windows.render({ source: listContext().source, memory: windowMemory(), selectedId: selected, moveBlock: windowBlock(),
+      const navigation = captionNavigationContext(captionList);
+      previousCaption.disabled = busy || ports.otherPending() && !readDuringOutput() || planCaptionList(navigation, { kind: 'step', direction: 'previous' }).kind !== 'change';
+      nextCaption.disabled = busy || ports.otherPending() && !readDuringOutput() || planCaptionList(navigation, { kind: 'step', direction: 'next' }).kind !== 'change';
+      windows.render({ source: captionList.source, memory: windowMemory(), selectedId: selected, moveBlock: windowBlock(),
         visible: !mobileLayout?.matches && stageVisible() && !drawingPreview() && document.hidden !== true });
       addPin.disabled = !!blocked || dirty() || !sceneId;
       movePin.disabled = !!blocked || dirty() || !selected;movePin.hidden=!selected;

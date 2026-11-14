@@ -3176,17 +3176,31 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     try {
       await host.dispatch(host.read().source!.token, { kind: 'editCaption', captionId: f.captionId, edits: { body: '一度の準備で確定する本文' } });
       expect(checksBeforeFirstWrite).toBe(2);
-      for (const paths of preparationReads) {
-        expect(paths.length).toBeGreaterThan(0);
-        expect(new Set(paths).size).toBe(paths.length);
-        for (const path of paths) expect(stream.mock.calls.filter(([name]) => name === path).length).toBeGreaterThan(1);
-      }
+      expect(preparationReads).toEqual([[], [], []]);
+      expect(stream.mock.calls.filter(([path]) => families.some(family => path.includes(family)))).toEqual([]);
+      expect(stream.mock.calls.some(([path]) => path.endsWith('/restored-bases.json'))).toBe(true);
     } finally { writer.mockRestore(); stream.mockRestore(); list.mockRestore(); }
   });
-  it.each(['evidence', 'original'] as const)('refuses publication after losing pre-checked %s, then cold-recovers the edit once', async missing => {
+  it('projects consecutive live text edits exactly like an independent cold inspection', async () => {
+    const f = await restoredBodyFixture(), host = owned(await openValidationHost(f.options));
+    const original = host.read().source!, stream = vi.spyOn(f.base, 'readStream');
+    const first = await host.dispatch(original.token, { kind: 'editCaption', captionId: f.captionId, edits: { body: '最初の本文' } });
+    const final = await host.dispatch(first.source!.token, { kind: 'editCaption', captionId: f.captionId, edits: { title: '次の見出し', body: '次の本文' } });
+    expect(final.source!.originalChanges()).toHaveLength(original.originalChanges().length + 2);
+    expect(stream.mock.calls.filter(([path]) => path.includes('/metadata/evidence/') || path.includes('/cas/'))).toEqual([]);
+    stream.mockRestore();
+    await host.dispose();
+    const reopened = owned(await openValidationHost(f.options));
+    expect(reopened.read().provider).toEqual(final.provider);
+    expect(reopened.read().source!.originalChanges()).toEqual(expect.arrayContaining(final.source!.originalChanges()));
+    expect(reopened.read().source!.originalChanges()).toHaveLength(final.source!.originalChanges().length);
+  });
+  it.each(['evidence', 'original', 'restored source', 'earlier change'] as const)('confirms live text after losing unrelated %s, but refuses output and cold reopen until repaired', async missing => {
     const f = await restoredBodyFixture(), host = owned(await openValidationHost(f.options));
     const paths = await f.base.list(''), original = host.read().source!;
-    const target = paths.find(p => p.includes(missing === 'evidence' ? '/metadata/evidence/' : '/cas/objects/'))!;
+    const target = paths.find(p => missing === 'earlier change' ? p.endsWith('/' + host.read().publication + '/changes/00000000.amchange') :
+      missing === 'restored source' ? p.endsWith('/source-metadata.am') :
+      p.includes(missing === 'evidence' ? '/metadata/evidence/' : '/cas/objects/'))!;
     const bytes = (await f.base.readBytes(target))!;
     expect(bytes.length).toBeGreaterThan(0);
     const write = f.base.writeText.bind(f.base);
@@ -3196,14 +3210,16 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     });
     const body = '原本と検査記録を戻したあとで一度だけ確定';
     try {
-      await expect(host.dispatch(original.token, { kind: 'editCaption', captionId: f.captionId, edits: { body } })).rejects.toThrow();
-      expect(host.read().source?.token).toBe(original.token);
-      expect((await f.base.list('')).filter(p => p.endsWith('/published.json')).sort()).toEqual(paths.filter(p => p.endsWith('/published.json')).sort());
+      const live = await host.dispatch(original.token, { kind: 'editCaption', captionId: f.captionId, edits: { body } });
+      expect(validatedResumeReading(live, f.run)?.records.find(c => c.id === f.captionId)?.body).toBe(body);
+      expect(live.source!.originalChanges()).toHaveLength(f.changes.length + 1);
+      await expect(host.workspaceOutput.generateBackup(live.source!.token)).rejects.toThrow();
+      await expect(host.dispatch(live.source!.token, { kind: 'editCaption', captionId: f.captionId, edits: { body: '欠損確認後は再検査が必要' } })).rejects.toThrow();
     } finally { cut.mockRestore(); await host.dispose(); }
+    await expect(openValidationHost(f.options)).rejects.toThrow();
     await f.base.writeBytes(target, bytes);
     const reopened = owned(await openValidationHost(f.options));
-    expect(reopened.read().state).toBe('pending');
-    await reopened.authority.retry!();
+    expect(reopened.read().state).toBe('ready');
     const result = reopened.read();
     expect(result.source!.originalChanges()).toHaveLength(f.changes.length + 1);
     expect(validatedResumeReading(result, f.run)?.records.find(c => c.id === f.captionId)?.body).toBe(body);
@@ -3220,7 +3236,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     let changed = false;
     const spy = vi.spyOn(f.base, 'readStream').mockImplementation(async path => {
       const file = await read(path);
-      if (!changed && path.includes('/metadata/evidence/')) {
+      if (!changed && path.endsWith('/published.json')) {
         changed = true; await f.base.writeText(result, altered);
       }
       return file;
@@ -3235,7 +3251,49 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect(saved.source!.originalChanges()).toHaveLength(f.changes.length + 1);
     expect(validatedResumeReading(saved, f.run)?.records.find(c => c.id === f.captionId)?.body).toBe('正しい保存先に一度だけ適用');
   });
-  it.each(['original', 'evidence'] as const)('refuses a restored body edit before writing when its %s is missing', async missing => {
+  it('checks the full prior history before retrying an interrupted live text edit in the same window', async () => {
+    const f = await restoredBodyFixture(), host = owned(await openValidationHost(f.options)), before = host.read();
+    const paths = await f.base.list(''), prior = paths.find(path => path.endsWith('/' + before.publication + '/changes/00000000.amchange'))!;
+    const bytes = (await f.base.readBytes(prior))!, body = '中断後に一度だけ確定';
+    await f.base.remove(prior);
+    f.base.reject = path => path.endsWith('/published.json');
+    await expect(host.dispatch(before.source!.token, { kind: 'editCaption', captionId: f.captionId, edits: { body } })).rejects.toThrow();
+    f.base.reject = () => false;
+    const publications = (all: string[]) => all.filter(path => path.endsWith('/published.json')).sort();
+    await expect(host.authority.retry!()).rejects.toThrow();
+    expect(publications(await f.base.list(''))).toEqual(publications(paths));
+    await f.base.writeBytes(prior, bytes);
+    await host.authority.retry!();
+    expect(validatedResumeReading(host.read(), f.run)?.records.find(c => c.id === f.captionId)?.body).toBe(body);
+    expect(host.read().source!.originalChanges()).toHaveLength(f.changes.length + 1);
+  });
+  it('checks the actual document on retry after a live text publication lost its acknowledgment', async () => {
+    const f = await restoredBodyFixture(), host = owned(await openValidationHost(f.options)), before = host.read().source!;
+    const [generation] = await f.databases.listGenerations();
+    const connection = await f.databases.open(generation!, false), storage = connection.factory();
+    const document = (await storage.loadRange([])).find(row => row.key[1] === 'snapshot')!.key[0]!;
+    const unacknowledged = await before.prepareCaptionText(before.token, f.captionId, 'title', '未確定の別の編集');
+    const [part] = before.changesForPreparedEdit(unacknowledged);
+    const extra = [document, 'incremental', A.decodeChange(part!).hash];
+    const body = '保存済みの本文だけを確認する', write = f.base.writeText.bind(f.base);
+    const cut = vi.spyOn(f.base, 'writeText').mockImplementation(async (path, value) => {
+      await write(path, value);
+      if (path.endsWith('/published.json')) await storage.save(extra, part!);
+    });
+    try {
+      await expect(host.dispatch(before.token, { kind: 'editCaption', captionId: f.captionId, edits: { body } })).rejects.toThrow('publication-readback');
+      const paths = (await f.base.list('')).sort();
+      await expect(host.authority.retry!()).rejects.toThrow('publication-readback');
+      expect((await f.base.list('')).sort()).toEqual(paths);
+      await storage.remove(extra);
+      await host.authority.retry!();
+      const read = host.read();
+      expect(validatedResumeReading(read, f.run)?.records.find(c => c.id === f.captionId)?.body).toBe(body);
+      expect(read.source!.originalChanges()).toHaveLength(f.changes.length + 1);
+      expect((await f.base.list('')).sort()).toEqual(paths);
+    } finally { cut.mockRestore(); await connection.dispose(); }
+  });
+  it.each(['original', 'evidence'] as const)('keeps stale and no-op handling while deferring unrelated missing %s in a live text edit', async missing => {
     const f = await restoredBodyFixture(), host = owned(await openValidationHost(f.options));
     const token = host.read().source!.token, paths = await f.base.list('');
     const journal = () => f.base.list('').then(all => all.filter(p => p.includes('/journal/')).sort());
@@ -3247,8 +3305,12 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const bodies = paths.filter(path => missing === 'evidence' ? path.includes('/metadata/evidence/') : path.startsWith('v2/cas/objects/'));
     expect(bodies.length).toBeGreaterThan(0);
     for (const path of bodies) await f.base.remove(path);
-    await expect(host.dispatch(token, { ...command, edits: { body: 'この変更は保存されない' } })).rejects.toThrow();
-    expect(await journal()).toEqual(published);
+    const body = '本文の変更だけを確定';
+    const saved = await host.dispatch(token, { ...command, edits: { body } });
+    expect(saved.source!.originalChanges()).toHaveLength(f.changes.length + 1);
+    expect(validatedResumeReading(saved, f.run)?.records.find(c => c.id === f.captionId)?.body).toBe(body);
+    await expect(host.dispatch(saved.source!.token, { ...command, edits: { body: '本文と色', colorSrgb: [0.1, 0.2, 0.3] } })).rejects.toThrow();
+    await expect(host.workspaceOutput.generateBackup(saved.source!.token)).rejects.toThrow();
   });
   it('refuses a restored text commit when a same-length restore receipt changes after staging', async () => {
     const f = await restoredBodyFixture(), host = owned(await openValidationHost(f.options)), original = host.read().source!;

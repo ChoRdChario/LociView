@@ -49,23 +49,31 @@ export function projectAttachments(provider: WorkspaceProvider, captionId: strin
       order: String(fieldValue(fields.orderKey) ?? ''), alt: String(fieldValue(fields.altText) ?? '') }];
   }).sort((a, b) => a.order < b.order ? -1 : a.order > b.order ? 1 : a.id.localeCompare(b.id));
 }
-/** An unresolved relation may belong to this caption; never turn it into a known zero. */
-export function projectMediaUncertain(provider: WorkspaceProvider, captionId: string): boolean {
-  return Object.entries(provider.details.mutable.captionAttachmentsById).some(([id, fields]) => {
+/** Count once per projection. A relation with no known owner can affect every caption. */
+function captionMediaCounts(provider: WorkspaceProvider) {
+  const counts = new Map<string, number>(), uncertain = new Set<string>();
+  const deleteEdits = new Set(provider.issues.filter(i => i.code === 'concurrent-delete-edit' && i.path[0] === 'captionAttachmentsById').map(i => i.path[1]));
+  let unknownOwner = false;
+  for (const [id, fields] of Object.entries(provider.details.mutable.captionAttachmentsById)) {
     const lifecycle = fieldValue(fields.lifecycle) as JsonObject | undefined;
-    const deleteEdit = provider.issues.some(i => i.code === 'concurrent-delete-edit' && i.path[0] === 'captionAttachmentsById' && i.path[1] === id);
-    if (lifecycle?.state === 'deleted' && !deleteEdit) return false;
+    const deleteEdit = deleteEdits.has(id);
+    if (lifecycle?.state === 'deleted' && !deleteEdit) continue;
     const target = fieldValue(provider.details.attachments[id]);
-    if (target && target.captionId !== captionId) return false;
-    return deleteEdit || !target || lifecycle?.state !== 'active' || fields.orderKey?.kind !== 'value' ||
-      provider.details.immutable.mediaResourcesById[target.mediaResourceId]?.kind !== 'value';
-  });
+    if (!target) { unknownOwner = true; continue; }
+    if (deleteEdit || lifecycle?.state !== 'active' || fields.orderKey?.kind !== 'value' ||
+      provider.details.immutable.mediaResourcesById[target.mediaResourceId]?.kind !== 'value') uncertain.add(target.captionId);
+    else counts.set(target.captionId, (counts.get(target.captionId) ?? 0) + 1);
+  }
+  return (captionId: string) => unknownOwner || uncertain.has(captionId) ? unknown<number>() : value(counts.get(captionId) ?? 0);
+}
+export function projectMediaUncertain(provider: WorkspaceProvider, captionId: string): boolean {
+  return captionMediaCounts(provider)(captionId).kind !== 'value';
 }
 export function projectMediaResources(provider: WorkspaceProvider) {
   return Object.entries(provider.details.immutable.mediaResourcesById).flatMap(([id, field]) => {
     const record = fieldValue(field), blob = record?.blob as JsonObject | undefined;
     const verified = record && provider.inspection.checks.some(c => c.outcome === 'verified' && c.request.token === provider.token &&
-      c.request.fact === 'media' && c.request.records.length === 1 && same(c.request.records[0]!, record));
+      c.request.fact === 'media' && c.request.records.length === 1 && c.request.records[0]!.id === id && same(c.request.records[0]!, record));
       const types = { image: ['image/png','image/jpeg','image/webp','image/gif','image/heic'],video:['video/mp4'],audio:['audio/mp4','audio/mpeg'] };
       return verified && record.id === id && Object.hasOwn(types,String(record.mediaKind)) && types[record.mediaKind as keyof typeof types].includes(String(blob?.mediaType)) && typeof record.label === 'string' ? [{ id, record, label: record.label }] : [];
   });
@@ -87,16 +95,17 @@ export function projectCaptions(provider: WorkspaceProvider, sceneId: string, hi
   const scene = resolveScene(provider.state, provider.resources, sceneId);
   if (scene.kind !== 'ready') return [];
   const models = projectModels(provider, sceneId, projectIdentity(provider), hiddenAssetIds, { ready: false, issue: null });
+  const mediaCount = captionMediaCounts(provider);
   return scene.composition.captions.map(c => { const anchor = fieldValue(c.anchor), item = anchor?.kind === 'asset' && models.kind === 'ready' ? models.items.find(a => a.id === anchor.assetId) : undefined;
     const projection = anchor?.kind === 'asset' ? fieldValue(provider.resources.assets[anchor.assetId]?.projection) : undefined;
     const ownerHidden = anchor?.kind === 'asset' && item?.lifecycle.kind === 'value' && item.lifecycle.value === 'active' && item.membership.kind === 'value' &&
       projection?.assetFrameId === anchor.assetFrameId &&
       !provider.issues.some(i => i.code === 'concurrent-delete-edit' && i.path[0] === 'assetsById' && i.path[1] === anchor.assetId) &&
       (item.membership.value.kind === 'absent' || hiddenAssetIds.includes(anchor.assetId) && scene.composition.assets.some(a => a.assetId === anchor.assetId));
-    return { ...projectCaptionItem(provider, { ...c, id: c.captionId }, c.marker === 'unplaced' ? 'unplaced' : ownerHidden ? 'ownerHidden' : c.marker === 'visible' ? 'visible' : c.marker === 'needsReview' ? 'needsReview' : 'unavailable'),
+    return { ...projectCaptionItem(provider, { ...c, id: c.captionId }, c.marker === 'unplaced' ? 'unplaced' : ownerHidden ? 'ownerHidden' : c.marker === 'visible' ? 'visible' : c.marker === 'needsReview' ? 'needsReview' : 'unavailable', mediaCount(c.captionId)),
       needsReview: c.marker === 'needsReview' || anchor?.kind === 'asset' && !!projection && !projection.anchorCompatibilityIds.includes(anchor.authoredAnchorCompatibilityId) }; });
 }
-function projectCaptionItem(provider: WorkspaceProvider, c: Pick<Caption, 'id' | 'title' | 'body' | 'anchor'>, pin: CaptionListItem['pin']): CaptionListItem {
+function projectCaptionItem(provider: WorkspaceProvider, c: Pick<Caption, 'id' | 'title' | 'body' | 'anchor'>, pin: CaptionListItem['pin'], mediaCount: Field<number>): CaptionListItem {
     const colorField = provider.details.mutable.captionsById[c.id]?.colorSrgb;
     const color = fieldValue(colorField);
     const hex = Array.isArray(color) && color.length === 3 && color.every(n => typeof n === 'number' && Number.isFinite(n) && n >= 0 && n <= 1)
@@ -106,7 +115,7 @@ function projectCaptionItem(provider: WorkspaceProvider, c: Pick<Caption, 'id' |
     return { id: c.id, title: c.title, body: c.body, color: hex ? value(hex) : unknown<string>(),
       owner: c.anchor.kind === 'unresolved' ? c.anchor : assetId ? value({ kind: 'asset' as const, assetId, name: label as Field<string> ?? unknown<string>() }) :
         anchor?.kind === 'project' ? value({ kind: 'project' as const }) : value({ kind: 'none' as const }),
-      mediaCount: projectMediaUncertain(provider, c.id) ? unknown<number>() : value(projectAttachments(provider, c.id).length), pin };
+      mediaCount, pin };
 }
 /** Whole Project inventory; unresolved raw endpoints must never become absence. */
 export function projectCaptionInventory(provider: WorkspaceProvider, sceneId: string, hiddenAssetIds: readonly string[] = []): CaptionIncludeSource {
@@ -127,9 +136,10 @@ export function projectCaptionInventory(provider: WorkspaceProvider, sceneId: st
     else counts.set(owner, (counts.get(owner) ?? 0) + 1);
   }
   const visibleOwners = new Set(scene.composition.assets.map(a => a.assetId).filter(id => !hiddenAssetIds.includes(id)));
+  const mediaCount = captionMediaCounts(provider);
   return { ...scope, kind: 'ready', items: Object.values(provider.resources.captions).map(caption => {
     const anchor = fieldValue(caption.anchor), owner = anchor?.kind === 'asset' ? anchor.assetId : null, count = counts.get(caption.id) ?? 0;
-    return { caption: projectCaptionItem(provider, caption, anchor?.kind === 'unplaced' ? 'unplaced' : owner && !visibleOwners.has(owner) ? 'ownerHidden' : 'unavailable'),
+    return { caption: projectCaptionItem(provider, caption, anchor?.kind === 'unplaced' ? 'unplaced' : owner && !visibleOwners.has(owner) ? 'ownerHidden' : 'unavailable', mediaCount(caption.id)),
       lifecycle: caption.lifecycle.kind === 'value' && !deleteEdits.has(`captionsById/${caption.id}`) ? value(caption.lifecycle.value.state) : unknown(),
       membership: uncertainAll || uncertain.has(caption.id) || count > 1 ? unknown() : value(count ? 'included' : 'absent') };
   }) };

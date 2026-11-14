@@ -354,8 +354,7 @@ export class TransactionJournal {
   }
 
   async publish(p: PreparedJournal, source: ProjectMetadataSource): Promise<void> {
-    const [doc] = A.applyChanges(A.init(), source.originalChanges());
-    const receipt: Publication = { transactionId: p.start.transactionId, exactChangeSetDigest: p.exactChangeSetDigest, heads: sorted(A.getHeads(doc)) };
+    const receipt: Publication = { transactionId: p.start.transactionId, exactChangeSetDigest: p.exactChangeSetDigest, heads: source.heads };
     if (p.remote && json(receipt.heads) !== json(p.remote.expectedFinalHeads)) fail('remote-final-heads');
     if (p.start.purpose === 'restoreBackup') {
       await this.validateRestore(p);

@@ -155,7 +155,10 @@ export class MetadataProjectSession {
   private acknowledgedMedia = new Set<string>();
   private acknowledgedLocalChanges = new Set<string>();
   private acknowledgmentsLoaded = false;
+  private verifiedPublications: readonly JournalEntry[] | undefined;
+  private verifiedWitnessWork: number | undefined;
   private retained: { start: JournalStart; parts: Uint8Array[]; stagedBlobs?: JsonObject[];
+    liveText?: true;
     modelFacts?: { plan: MetadataModelFactPlan; next: ProjectMetadataSource };
     remote?: JournalRemoteInput;
     introduction?: { source: ProjectMetadataSource; command: Extract<MetadataEdit, { kind: 'createAttachment' }>; editor: LocalEditorContext } } | null = null;
@@ -177,15 +180,18 @@ export class MetadataProjectSession {
     } catch {
       // Closing failure must not publish an unaudited candidate or roll back a
       // concurrent successful read's source/acknowledgments.
+      this.verifiedPublications = undefined;
       return Object.freeze({ ...this.last, state: 'repair-required' });
     }
   }
-  private adoptRead(candidate: { read: MetadataSessionRead; acknowledged?: Set<string>; localChanges?: Set<string> }) {
+  private adoptRead(candidate: { read: MetadataSessionRead; acknowledged?: Set<string>; localChanges?: Set<string>; priorPublications?: readonly JournalEntry[]; witnessWork?: number }) {
     if (candidate.acknowledged && candidate.localChanges) {
       this.acknowledgedMedia = candidate.acknowledged;
       this.acknowledgedLocalChanges = candidate.localChanges;
       this.acknowledgmentsLoaded = true;
     }
+    this.verifiedPublications = candidate.read.state === 'ready' ? candidate.priorPublications : undefined;
+    this.verifiedWitnessWork = candidate.witnessWork;
     return this.last = candidate.read;
   }
   /** Internal06e display port. It cannot rebind a public Session read or adopt state. */
@@ -264,21 +270,55 @@ export class MetadataProjectSession {
       }
       checkRequiredCapabilities(published.start.requiredCapabilities, capabilityUnion(inheritedCapabilities, source!.requiredCapabilities));
       const provider = await readProjectScene(source!.read(), this.limits, this.verifier(false, preparation), { verifyRetainedMedia: this.retainedSelection(source!, acknowledged, localChanges, preparation) });
-      if (pending && requireReadyPublished && !this.providerReady(provider)) fail('provider-not-ready');
-      return { read: Object.freeze({ state: pending ? 'pending' : this.providerReady(provider) ? 'ready' : 'repair-required',
+      const ready = this.providerReady(provider);
+      if (pending || !ready) this.verifiedPublications = undefined;
+      if (pending && requireReadyPublished && !ready) fail('provider-not-ready');
+      return { read: Object.freeze({ state: pending ? 'pending' : ready ? 'ready' : 'repair-required',
         source: source!, provider, publication: published.start.transactionId }), acknowledged, localChanges, publishedStart: published.start,
-        priorPublications: preparation && !pending ? entries : undefined, witnessWork };
+        priorPublications: !pending ? entries : undefined, witnessWork };
     } catch (error) {
+      this.verifiedPublications = undefined;
       if (editingText && error instanceof MetadataSourceError && error.code === 'command-base-changed') throw error;
       return { read: Object.freeze({ ...this.last, state: 'repair-required' }) };
     }
   }
 
+  private async readTextCandidate(ports: MetadataReadPorts, captionId: string) {
+    const read = this.last, chain = this.verifiedPublications;
+    if (!chain || read.state !== 'ready' || !read.source || read.provider?.kind !== 'scene-provider' ||
+      !this.acknowledgmentsLoaded || this.retained) return this.readCandidate(undefined, ports, true, false, ports);
+    const journal = new TransactionJournal(ports.fs, this.limits), entries = await journal.entries();
+    if (json(entries) !== json(chain) || entries.some(e => !e.publication) ||
+      (await this.readSceneAppendStates(ports.fs, journal, entries)).length) return fail('command-base-changed');
+    await journal.checkRestoredBinding(entries);
+    const published = entries.at(-1)!;
+    await new MetadataRepository(ports.fs, ports.factory!, this.limits).confirmTextSource(published.start.repositoryId, read.source, captionId);
+    return { read, acknowledged: this.acknowledgedMedia, localChanges: this.acknowledgedLocalChanges,
+      publishedStart: published.start, priorPublications: entries, witnessWork: this.verifiedWitnessWork };
+  }
+
+  /** Same live text edit only. All new metadata and requested facts are checked normally. */
+  private async projectText(source: ProjectMetadataSource, base: Extract<ProjectProviderRead, { kind: 'scene-provider' }>) {
+    const checks = base.inspection.checks;
+    const media = new Set(checks.filter(c => c.outcome === 'verified' && c.request.fact === 'media').flatMap(c => c.request.records.map(json)));
+    let index = 0;
+    const provider = await readProjectScene(source.read(), this.limits, { scope: base.scope, verify: async request => {
+      const prior = checks[index++];
+      if (!prior || prior.outcome !== 'verified' || prior.request.token !== base.token || request.token !== source.token ||
+        prior.request.fact !== request.fact || json(prior.request.records) !== json(request.records) ||
+        json(prior.request.context) !== json(request.context)) return fail('text-content-changed');
+      return { request, scope: base.scope, outcome: 'verified', facts: prior.facts };
+    } }, { verifyRetainedMedia: async record => media.has(json(record)) });
+    if (index !== checks.length || !this.providerReady(provider) || provider.kind !== 'scene-provider' ||
+      provider.token !== source.token || provider.inspection.checks.some((check, i) => json(check.path) !== json(checks[i]!.path)))
+      return fail('provider-not-ready');
+    return provider;
+  }
+
   /** Full current provider/content closure, never only a materialized Caption record. */
-  private async checked(source: ProjectMetadataSource, allowNewEvidence: boolean, preparation?: MetadataReadPorts,
-    witnesses?: { acknowledged?: Set<string>; localChanges?: Set<string> }): Promise<ProjectProviderRead> {
-    const provider = await readProjectScene(source.read(), this.limits, this.verifier(allowNewEvidence, preparation), {
-      verifyRetainedMedia: allowNewEvidence && !!this.media ? true : this.retainedSelection(source, witnesses?.acknowledged, witnesses?.localChanges, preparation) });
+  private async checked(source: ProjectMetadataSource, allowNewEvidence: boolean): Promise<ProjectProviderRead> {
+    const provider = await readProjectScene(source.read(), this.limits, this.verifier(allowNewEvidence), {
+      verifyRetainedMedia: allowNewEvidence && !!this.media ? true : this.retainedSelection(source) });
     if (!this.providerReady(provider) || provider.kind !== 'scene-provider' || provider.token !== source.token) fail('provider-not-ready');
     return provider;
   }
@@ -341,32 +381,49 @@ export class MetadataProjectSession {
     return underWriteLease(this.fs, async lease => {
       const isText = command.kind === 'editCaption' && Object.keys(command.edits).every(name => name === 'title' || name === 'body');
       const commit = isText ? selectedTextCommit(this.fs, this.storage, lease) : undefined;
-      if (commit) {
-        const { candidate, transaction } = await commit.prepare(async ports => {
-          await assertReviewEditSlot(ports.fs, this.limits);
-          const candidate = await this.readCandidate(undefined, ports, true, false, ports);
+      if (commit && command.kind === 'editCaption') {
+        const captionId = command.captionId;
+        const { candidate, transaction, prepared, projected } = await commit.prepare(async ports => {
+          await this.measure('text.slot', () => assertReviewEditSlot(ports.fs, this.limits));
+          const candidate = await this.measure('text.base', () => this.readTextCandidate(ports, captionId));
           const { state, source, provider } = candidate.read;
           if (state !== 'ready' || !source || !provider || source.token !== expectedToken || !candidate.publishedStart) return fail('command-not-ready');
           if (provider.kind !== 'scene-provider' || provider.token !== source.token) return fail('provider-not-ready');
-          const transaction = await this.prepareEditTransaction(source, provider, candidate.publishedStart, command,
-            expectedToken, newId(), editor, undefined, ports, candidate);
-          return { candidate, transaction };
+          const transactionId = newId(), prepared = await this.measure('text.plan', async () =>
+            source.prepareEdit(expectedToken, command, provider, transactionId, undefined, editor));
+          const parts = source.changesForPreparedEdit(prepared);
+          if (!parts.length) return { candidate, transaction: null, prepared, projected: provider };
+          if (parts.length !== 1 || command.kind !== 'editCaption') return fail('text-commit-state');
+          source.assertCaptionTextChange(parts[0]!, command.captionId, provider);
+          const projected = await this.measure('text.project', () => this.projectText(prepared, provider));
+          const transaction = { liveText: true as const, start: { transactionId, repositoryId: candidate.publishedStart.repositoryId,
+            predecessor: candidate.publishedStart.transactionId, purpose: 'localCommand' as const, proof: source.proof, baseHeads: source.heads,
+            ...capabilityFields(capabilityUnion(readRequiredCapabilities(candidate.publishedStart.requiredCapabilities), prepared.requiredCapabilities)) }, parts };
+          return { candidate, transaction, prepared, projected };
         });
         if (!transaction) {
           acceptText = () => { this.adoptRead(candidate); };
           return candidate.read;
         }
         const { priorPublications, localChanges, acknowledged } = candidate;
-        if (transaction.modelFacts || transaction.parts.length !== 1 || !priorPublications || !localChanges || !acknowledged) return fail('text-commit-state');
+        if (transaction.parts.length !== 1 || !priorPublications || !localChanges || !acknowledged) return fail('text-commit-state');
         if (candidate.witnessWork === undefined || candidate.witnessWork + 1 > this.limits.maxWork) return fail('retained-media-limit');
         const { transactionId, repositoryId } = transaction.start;
         return commit.write(transactionId, this.repository.documentId(repositoryId), async ports => {
-          const entries = await new TransactionJournal(ports.fs, this.limits).entries();
+          const entries = await this.measure('text.write-base', () => new TransactionJournal(ports.fs, this.limits).entries());
           if (this.retained || !matchesPublishedBase(entries, priorPublications, 0)) return fail('command-base-changed');
           // Claim the edit only after the fresh on-disk base check succeeds.
           this.adoptRead(candidate);
           this.retained = transaction;
-          return this.resume(undefined, undefined, { ports, transactionId, entries, localChanges, acknowledged, ready: accept => { acceptText = accept; } });
+          const completed = await this.commitLiveText(ports, entries, candidate.read.source!, prepared, projected, captionId, transaction);
+          const nextLocal = new Set(localChanges).add(completed.hash);
+          acceptText = () => {
+            ports.assertCanAcknowledge();
+            if (this.retained !== transaction) return fail('text-commit-state');
+            this.retained = null;
+            this.adoptRead({ read: completed.read, priorPublications: completed.chain, witnessWork: candidate.witnessWork! + 1, acknowledged, localChanges: nextLocal });
+          };
+          return completed.read;
         });
       }
       await assertReviewEditSlot(this.fs, this.limits);
@@ -406,13 +463,12 @@ export class MetadataProjectSession {
   }
 
   private async prepareEditTransaction(durable: ProjectMetadataSource, provider: ProjectProviderRead, prior: JournalStart,
-    command: MetadataEdit, expectedToken: string, transactionId: string, editor: LocalEditorContext | undefined, pointProof?: PointAnchorProof,
-    preparation?: MetadataReadPorts, witnesses?: { acknowledged?: Set<string>; localChanges?: Set<string> }): Promise<MetadataProjectSession['retained']> {
+    command: MetadataEdit, expectedToken: string, transactionId: string, editor: LocalEditorContext | undefined, pointProof?: PointAnchorProof): Promise<MetadataProjectSession['retained']> {
     const prepared = durable.prepareEdit(expectedToken, command, provider, transactionId, pointProof, editor);
     const parts = durable.changesForPreparedEdit(prepared);
     if (!parts.length) return null;
     const facts = await this.prepareModelFacts(durable, prepared);
-    if (!facts) await this.checked(prepared, false, preparation, witnesses);
+    if (!facts) await this.checked(prepared, false);
     await this.verifyDelta(await reactivatedCaptionMedia(durable, prepared, this.limits), prepared.requiredCapabilities.includes(PORTABLE_MEDIA_CAPABILITY) ? prepared.mediaRecords() : undefined);
     return { start: { transactionId, repositoryId: prior.repositoryId, predecessor: prior.transactionId,
       purpose: 'localCommand', proof: durable.proof, baseHeads: durable.heads,
@@ -452,6 +508,16 @@ export class MetadataProjectSession {
   async retry(): Promise<MetadataSessionRead> { return underWriteLease(this.fs, async () => {
     await assertReviewEditSlot(this.fs, this.limits);
     if ((await this.sceneAppendStates()).length) return fail('scene-append-recovery-required');
+    if (this.retained?.liveText) {
+      const { start, parts } = this.retained;
+      const published = await this.read(true);
+      if (published.state !== 'pending' || !published.source || published.provider?.kind !== 'scene-provider')
+        return fail('published-source-missing');
+      if (published.publication === start.transactionId) {
+        // A published view can omit an unexpected head from the actual document.
+        await this.repository.confirmPublishedEdit(start.repositoryId, start.baseHeads, published.source.heads, parts[0]!);
+      }
+    }
     return this.resume();
   }); }
 
@@ -1163,17 +1229,43 @@ export class MetadataProjectSession {
     });
   }
 
-  private async resume(receiveJob?: ReceiveJob, restoreJob?: BackupRestoreJob, text?: {
-    ports: TextCommitPorts; transactionId: string; entries: JournalEntry[]; localChanges: Set<string>; acknowledged: Set<string>; ready(accept: () => void): void
-  }): Promise<MetadataSessionRead> {
-    const fs = text?.ports.fs ?? this.fs;
-    const journal = text ? new TransactionJournal(fs, this.limits) : this.journal;
-    const repository = text ? new MetadataRepository(fs, text.ports.factory, this.limits) : this.repository;
-    const entries = text?.entries ?? await journal.entries(), pending = entries.find(e => !e.publication);
-    if (text && (pending || !this.retained || this.retained.start.purpose !== 'localCommand' ||
-      this.retained.start.transactionId !== text.transactionId || this.retained.parts.length !== 1 ||
-      this.retained.remote || this.retained.stagedBlobs || this.retained.introduction || this.retained.modelFacts))
+  private async commitLiveText(ports: TextCommitPorts, entries: JournalEntry[], base: ProjectMetadataSource,
+    next: ProjectMetadataSource, provider: Extract<ProjectProviderRead, { kind: 'scene-provider' }>,
+    captionId: string, transaction: { start: JournalStart; parts: Uint8Array[] }) {
+    const { fs, factory } = ports, { start, parts } = transaction;
+    const journal = new TransactionJournal(fs, this.limits), repository = new MetadataRepository(fs, factory, this.limits);
+    const prior = entries.at(-1);
+    if (this.retained !== transaction || parts.length !== 1 || !prior?.publication || prior.start.transactionId !== start.predecessor ||
+      start.purpose !== 'localCommand' || json(base.heads) !== json(start.baseHeads) || provider.token !== next.token ||
+      (await ContributionReceiveJob.ids(fs)).includes(start.transactionId) || (await WorkspaceReceiveJob.ids(fs)).includes(start.transactionId))
       return fail('text-commit-state');
+    checkRequiredCapabilities(start.requiredCapabilities, capabilityUnion(readRequiredCapabilities(prior.start.requiredCapabilities), next.requiredCapabilities));
+    const prepared = await this.measure('resume.journal-stage', () => journal.stage(start, parts));
+    const [storedPart] = await journal.validateParts(prepared);
+    if (!storedPart || !equalBytes(storedPart, parts[0]!)) return fail('journal-part-source');
+    await ports.advance('repository');
+    await this.measure('resume.persist-readback', () => repository.persistText(start.repositoryId, base, next, captionId, storedPart));
+    await ports.advance('publication');
+    await this.measure('resume.publish', () => journal.publish(prepared, next));
+    await ports.advance('readback');
+    const chain = await this.measure('resume.published-readback', async () => {
+      const chain = await journal.entries(), tip = chain.at(-1);
+      if (!matchesPublishedBase(chain, entries, 1) || !tip?.publication || json(tip.start) !== json(start) ||
+        tip.publication.exactChangeSetDigest !== prepared.exactChangeSetDigest || json(tip.publication.heads) !== json(next.heads) ||
+        (await this.readSceneAppendStates(fs, journal, chain)).length) return fail('publication-readback');
+      await journal.checkRestoredBinding(chain);
+      const [savedPart] = await journal.validateParts(tip.prepared!);
+      if (!savedPart || !equalBytes(savedPart, storedPart)) return fail('publication-readback');
+      await repository.confirmPublishedEdit(start.repositoryId, start.baseHeads, next.heads, savedPart);
+      return chain;
+    });
+    const read = Object.freeze({ state: 'ready' as const, source: next, provider, publication: start.transactionId });
+    return { read, chain, hash: prepared.changes[0]!.expectedChangeHash };
+  }
+
+  private async resume(receiveJob?: ReceiveJob, restoreJob?: BackupRestoreJob): Promise<MetadataSessionRead> {
+    const fs = this.fs, journal = this.journal, repository = this.repository;
+    const entries = await journal.entries(), pending = entries.find(e => !e.publication);
     if (!this.acknowledgmentsLoaded && entries.some(e => e.publication)) {
       await this.read();
       if (!this.acknowledgmentsLoaded) return fail('retained-media-witness');
@@ -1253,7 +1345,6 @@ export class MetadataProjectSession {
     let base: ProjectMetadataSource | null = null;
     if (!initial) {
       if (!stored) fail('journal-base-missing');
-      if (text && json(stored!.heads) !== json(start.baseHeads)) return fail('command-base-changed');
       base = json(stored!.heads) === json(start.baseHeads) ? stored : await repository.read(start.repositoryId, start.proof, start.baseHeads);
       if (!base) fail('journal-base-missing');
     }
@@ -1289,7 +1380,7 @@ export class MetadataProjectSession {
     const predecessor = entries.find(e => e.start.transactionId === start.predecessor);
     checkRequiredCapabilities(start.requiredCapabilities, capabilityUnion(readRequiredCapabilities(predecessor?.start.requiredCapabilities), next.requiredCapabilities, incoming.requiredCapabilities));
     for (const ref of incoming.blobs) { witness(); this.acknowledgedMedia.add(`${ref.sha256}:${ref.byteLength}`); }
-    if (!text && ['initialize', 'localCommand', 'importClean', 'appendScene'].includes(start.purpose))
+    if (['initialize', 'localCommand', 'importClean', 'appendScene'].includes(start.purpose))
       for (const part of prepared.changes) { witness(); this.acknowledgedLocalChanges.add(part.expectedChangeHash); }
     // Exact pending changes can coexist with legitimate extra local heads; never rebase or choose a winner.
     await this.measure('resume.final-content', () => this.checked(next, false));
@@ -1301,7 +1392,6 @@ export class MetadataProjectSession {
     }
     if (receiveJob) await this.media!.inventory!(await receiveJob.inventory());
     if (restoreJob) await this.measure('resume.restore-bodies', () => this.media!.verify(restoreJob.inventory(), restoreJob.inspection.description.mediaRecords));
-    if (text) await text.ports.advance('repository');
     stored = await this.measure('resume.persist-readback', () => repository.persist(start.repositoryId, next));
     if (!stored) fail('durable-source-missing');
     checkRequiredCapabilities(start.requiredCapabilities, capabilityUnion(readRequiredCapabilities(predecessor?.start.requiredCapabilities), stored!.requiredCapabilities, incoming.requiredCapabilities));
@@ -1310,38 +1400,12 @@ export class MetadataProjectSession {
       const saved = actual.get(A.decodeChange(bytes).hash);
       if (!saved || !equalBytes(saved, bytes)) fail('durable-change-missing');
     }
-    const savedWitnesses = text ? { acknowledged: text.acknowledged,
-      localChanges: new Set(text.localChanges).add(prepared.changes[0]!.expectedChangeHash) } : undefined;
-    const savedProvider = await this.measure('resume.saved-content', () => this.checked(stored!, false, undefined, savedWitnesses));
+    await this.measure('resume.saved-content', () => this.checked(stored!, false));
     if ((start.purpose === 'importClean' || start.purpose === 'appendScene') && stored!.token !== next.token) fail('journal-final-heads');
     if (prepared.remote && json(stored!.heads) !== json(prepared.remote.expectedFinalHeads)) fail('remote-final-heads');
     this.fs.mutationAuthority.assertWorkspaceWriteAuthorized();
-    if (text) await text.ports.advance('publication');
     await this.measure('resume.publish', () => journal.publish(prepared, stored!));
     this.fs.mutationAuthority.assertWorkspaceWriteAuthorized();
-    if (text) {
-      await text.ports.advance('readback');
-      const retained = this.retained;
-      await this.measure('resume.published-readback', async () => {
-        const chain = await journal.entries(), tip = chain.at(-1);
-        if (!matchesPublishedBase(chain, entries, 1) ||
-          !tip?.publication || json(tip.start) !== json(start) ||
-          tip.publication.exactChangeSetDigest !== prepared.exactChangeSetDigest || json(tip.publication.heads) !== json(stored!.heads) ||
-          (await this.readSceneAppendStates(fs, journal, chain)).length) return fail('publication-readback');
-        await journal.checkRestoredBinding(chain);
-        const [savedPart] = await journal.validateParts(tip.prepared!);
-        if (!savedPart || !equalBytes(savedPart, parts[0]!)) return fail('publication-readback');
-        await repository.confirmPublishedEdit(start.repositoryId, start.baseHeads, stored!.heads, savedPart);
-      });
-      const read = Object.freeze({ state: 'ready' as const, source: stored!, provider: savedProvider, publication: text.transactionId });
-      text.ready(() => {
-        text.ports.assertCanAcknowledge();
-        if (!retained || this.retained !== retained || retained.start.transactionId !== text.transactionId) return fail('text-commit-state');
-        this.retained = null;
-        this.adoptRead({ read, ...savedWitnesses });
-      });
-      return read;
-    }
     this.retained = null;
     const read = await this.measure('resume.published-readback', () => this.read());
     if (read.state !== 'ready' || read.source?.token !== stored!.token) fail('publication-readback');

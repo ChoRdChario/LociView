@@ -1,6 +1,6 @@
 import { usePointAnchorProof, type PointAnchorProof } from './pointAnchorProof';
 import { EDITOR_CAPABILITY, PORTABLE_MEDIA_CAPABILITY, type ReaderCapabilities } from './requiredCapabilities';
-import { editorMessage, inspectEditorMessage, EditorAttributionError, type LocalEditorContext, type EditorDeclaration } from './editorAttribution';
+import { editorMessage, EditorAttributionError, type LocalEditorContext, type EditorDeclaration } from './editorAttribution';
 import * as A from '@automerge/automerge/slim';
 import { inspectProjectCandidates } from '../domain/projectCandidates';
 import { admitProjectRecords, checkProjectHeader, projectRecordMaps } from '../domain/projectRecords';
@@ -16,15 +16,20 @@ import { adapterFormatVersion, adapterFormatVersion2, metadataSemanticProfile, c
 
 export type { MetadataLimits, MetadataProof } from './format';
 
+function sameOriginalBytes(left: Uint8Array, right: Uint8Array): boolean {
+  if (left.length !== right.length) return false;
+  for (let i = 0; i < left.length; i++) if (left[i] !== right[i]) return false;
+  return true;
+}
+
 /**
  * Owned source history only. No storage/acknowledgment, user-file importer or
  * interactive session. Callers initialize local Wasm before using this module.
  */
 export class ProjectMetadataSource {
-  private declarations?: readonly Readonly<{ changeId: string; declaration: EditorDeclaration }>[];
   private constructor(private readonly doc: PhysicalDoc, readonly proof: MetadataProof, private readonly limits: MetadataLimits,
     private readonly snapshot: ReturnType<typeof inspectPhysical>, private readonly portableChanges: ReadonlySet<string>,
-    private readonly originalMedia: readonly JsonObject[]) {}
+    private readonly originalMedia: readonly JsonObject[], private readonly declarations: readonly Readonly<{changeId: string; declaration: EditorDeclaration}>[]) {}
 
   static bootstrap(schema: JsonObject, identity: JsonObject, requested: MetadataLimits, options?: { time?: 0; semanticProfile?: ProjectSemanticProfile }): ProjectMetadataSource {
     const profile = projectSemanticProfile(options?.semanticProfile);
@@ -47,11 +52,14 @@ export class ProjectMetadataSource {
     const limits = checkLimits(requested), p = checkedProof(proof, limits), parts = checkedChanges(original, limits);
     try {
       const [doc] = A.applyChanges(A.init<Record<string, any>>(), parts);
-      const integrated = new Map(A.getAllChanges(doc).map(bytes => [A.decodeChange(bytes).hash, bytes]));
-      for (const bytes of parts) {
-        const persisted = integrated.get(A.decodeChange(bytes).hash);
-        if (!persisted) fail('missing-dependencies');
-        if (persisted!.length !== bytes.length || persisted!.some((v, i) => v !== bytes[i])) fail('original-bytes');
+      const integrated = A.getAllChanges(doc);
+      if (parts.length !== integrated.length || parts.some((bytes, i) => !sameOriginalBytes(bytes, integrated[i]!))) {
+        const byHash = new Map(integrated.map(bytes => [A.decodeChange(bytes).hash, bytes]));
+        for (const bytes of parts) {
+          const saved = byHash.get(A.decodeChange(bytes).hash);
+          if (!saved) return fail('missing-dependencies');
+          if (!sameOriginalBytes(bytes, saved)) fail('original-bytes');
+        }
       }
       return ProjectMetadataSource.validated(doc, p, limits);
     } catch (error) { if (error instanceof MetadataSourceError || error instanceof EditorAttributionError) throw error; return fail('reopen'); }
@@ -59,7 +67,7 @@ export class ProjectMetadataSource {
 
   private static validated(doc: PhysicalDoc, proof: MetadataProof, limits: MetadataLimits): ProjectMetadataSource {
     const p = checkedProof(proof, limits), snapshot = inspectPhysicalSource(doc, p, limits);
-    return new ProjectMetadataSource(doc, p, limits, snapshot.input, snapshot.portableChanges, snapshot.mediaRecords);
+    return new ProjectMetadataSource(doc, p, limits, snapshot.input, snapshot.portableChanges, snapshot.mediaRecords, snapshot.declarations);
   }
 
   /** Complete pinned metadata encoding, not a package writer or durable save. */
@@ -104,6 +112,34 @@ export class ProjectMetadataSource {
     planMetadataEdit(provider, { kind: 'editCaption', captionId, edits }, this.limits);
   }
   get heads(): string[] { return A.getHeads(this.doc).sort(); }
+  /** Internal repository comparison against this already inspected source. */
+  matchesStoredCaption(doc: PhysicalDoc, captionId: string, limits: MetadataLimits): boolean {
+    if (Object.entries(this.limits).some(([key, n]) => n !== limits[key as keyof MetadataLimits]) ||
+      A.getMissingDeps(doc, []).length || !same(A.getHeads(doc).sort(), this.heads)) return false;
+    const expected = A.getAllChanges(this.doc), actual = A.getAllChanges(doc);
+    if (actual.length !== expected.length || actual.some(bytes => !bytes.length || bytes.length > limits.maxChangeBytes) ||
+      actual.reduce((sum, bytes) => sum + bytes.length, 0) > limits.maxTotalBytes) return false;
+    if (!expected.every((bytes, i) => sameOriginalBytes(bytes, actual[i]!))) {
+      const remaining = new Map(expected.map(bytes => [A.decodeChange(bytes).hash, bytes]));
+      for (const bytes of actual) {
+        const hash = A.decodeChange(bytes).hash, original = remaining.get(hash);
+        if (!original || !sameOriginalBytes(bytes, original)) return false;
+        remaining.delete(hash);
+      }
+      if (remaining.size) return false;
+    }
+    const before = this.doc.captionsById[captionId], after = doc.captionsById?.[captionId];
+    if (!before || !after || A.getObjectId(before) !== A.getObjectId(after)) return false;
+    return ['title', 'body'].every(field => {
+      const left = before[field], right = after[field];
+      if (left !== undefined || right !== undefined) {
+        if (!(left instanceof A.ImmutableString && right instanceof A.ImmutableString) || left.toString() !== right.toString()) return false;
+      }
+      const prior = A.getConflicts(before, field) ?? {}, saved = A.getConflicts(after, field) ?? {};
+      return Object.keys(prior).length === Object.keys(saved).length &&
+        Object.entries(prior).every(([id, value]) => typeof value === 'string' && Object.hasOwn(saved, id) && saved[id] === value);
+    });
+  }
   originalChanges(): Uint8Array[] { return A.getAllChanges(this.doc).map(b => b.slice()); }
   /** Only for a local edit prepared on this immutable ancestor. */
   changesForPreparedEdit(prepared: ProjectMetadataSource): Uint8Array[] {
@@ -112,10 +148,7 @@ export class ProjectMetadataSource {
   projectFrame(): JsonObject { return object(JSON.parse(String(this.doc.project.frame))); }
   /** Owned immutable header projection; never joins by actor, name or transaction ID. */
   editorDeclarations() {
-    return this.declarations ??= Object.freeze(A.getAllChanges(this.doc).flatMap(bytes => {
-      const change = A.decodeChange(bytes), declaration = inspectEditorMessage(change.message, this.limits);
-      return declaration ? [Object.freeze({ changeId: change.hash, declaration })] : [];
-    }));
+    return this.declarations;
   }
   get includesDeclaredEditorNames(): boolean { return this.editorDeclarations().length > 0; }
   /** Original declarations are context, never reusable evidence of body integrity. */

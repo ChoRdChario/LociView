@@ -1,8 +1,8 @@
 import * as A from '@automerge/automerge/slim';
 import { Repo, stringifyAutomergeUrl, parseAutomergeUrl, type DocumentId, type BinaryDocumentId } from '@automerge/automerge-repo/slim';
 import type { ProjectWorkspaceFS } from '../platform/fs';
-import { checkedChanges, checkedProof, checkLimits, fail, type MetadataLimits, type MetadataProof, type PhysicalDoc } from './format';
-import { equalBytes, json, technicalId, withMetadataRead } from './persistence';
+import { checkedChanges, checkedProof, checkLimits, fail, inspectPhysical, type MetadataLimits, type MetadataProof, type PhysicalDoc } from './format';
+import { assertTextDocumentWriter, equalBytes, json, technicalId, withMetadataRead } from './persistence';
 import { ProjectMetadataSource } from './source';
 
 /** Owned storage factory, bound to one new-workspace namespace; no library objects escape. */
@@ -122,6 +122,28 @@ export class MetadataRepository {
   }
 
   /** Confirm an ordinary text edit against the latest document in the selected store. */
+  async confirmTextSource(id: string, expected: ProjectMetadataSource, captionId: string): Promise<void> {
+    await this.use(false, async storage => {
+      const doc = await storage.loadDoc(this.documentId(id));
+      if (!doc || !expected.matchesStoredCaption(doc, captionId, this.limits)) return fail('command-base-changed');
+    });
+  }
+
+  /** Live selected text command only. Recovery uses persist and a full fresh inspection. */
+  async persistText(id: string, base: ProjectMetadataSource, expected: ProjectMetadataSource, captionId: string, part: Uint8Array) {
+    const owned = part.slice(), key = this.documentId(id);
+    assertTextDocumentWriter(this.fs, this.factory, key);
+    await this.use(true, async storage => {
+      const previous = await storage.loadDoc(key);
+      if (!previous || !base.matchesStoredCaption(previous, captionId, this.limits)) return fail('command-base-changed');
+      const [next] = A.applyChanges(previous, [owned]);
+      if (!expected.matchesStoredCaption(next, captionId, this.limits)) return fail('stored-original-bytes');
+      await storage.saveDoc(key, next);
+    });
+    await this.confirmTextSource(id, expected, captionId);
+    this.fs.mutationAuthority.assertWorkspaceWriteAuthorized();
+  }
+
   async confirmPublishedEdit(id: string, baseHeads: readonly string[], expectedHeads: readonly string[], part: Uint8Array): Promise<void> {
     await this.use(false, async storage => {
       const doc = await storage.loadDoc(this.documentId(id));
@@ -142,7 +164,11 @@ export class MetadataRepository {
         if (!exact || !equalBytes(exact, b)) fail('unobserved-stored-history');
       }
       const [next] = A.applyChanges(existing ?? A.init<Record<string, any>>(), parts);
-      ProjectMetadataSource.reopen(A.getAllChanges(next), expected.proof, this.limits);
+      // Inspect the actual merged document before writing. The independent
+      // read below still reopens the stored originals and checks their bytes.
+      if (A.getMissingDeps(next, []).length) fail('missing-dependencies');
+      if (json(A.getHeads(next).sort()) !== json(expected.heads)) fail('stored-heads');
+      inspectPhysical(next, expected.proof, this.limits);
       await storage.saveDoc(this.documentId(id), next);
     });
     const fresh = await this.read(id, expected.proof);

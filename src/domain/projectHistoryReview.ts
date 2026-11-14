@@ -62,8 +62,9 @@ function reviewAtomicHistory(read: AtomicHistoryInspection, limits: HistoryReadL
       const policy = projectFieldPolicy(f.path, profile), history = allWrites.get(key(f.path))!;
       if (policy === 'unknown') issue(f.path, 'unknown-field-policy', 'unverified');
       else if (policy === 'immutable') {
-        const first = history[0]!.value, expected = first.kind === 'value' ? canonical(first.value) : undefined;
-        const changed = history.some(v => v.value.kind === 'absent' || canonical(v.value.value) !== expected);
+        const first = history[0]!.value;
+        const expected = first.kind === 'value' && history.length > 1 ? canonical(first.value) : undefined;
+        const changed = first.kind === 'absent' || history.some((v, i) => i > 0 && (v.value.kind === 'absent' || canonical(v.value.value) !== expected));
         if (changed) issue(f.path, 'immutable-history-mutation');
         const exactImmutableRecord = f.path.length === 2 && Object.hasOwn(immutableKinds, f.path[0]!);
         if (f.candidates.length > 1 && (!exactImmutableRecord || changed)) issue(f.path, 'immutable-field-conflict');

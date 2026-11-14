@@ -99,6 +99,11 @@ export function assertTextPreparation(ports: MetadataReadPorts) {
 type TextPreparation = <T>(action: (ports: MetadataReadPorts & Pick<TextCommitPorts, 'assertCanAcknowledge'>) => Promise<T>, assertLease: () => void) => Promise<T>;
 type BoundTextCommit = <T>(transaction: string, documentKey: string, action: (ports: TextCommitPorts) => Promise<T>, assertLease: () => void) => Promise<T>;
 const textCommits = new WeakMap<ProjectWorkspaceFS, { factory: MetadataStorageFactory; enabled(): boolean; prepare: TextPreparation; run: BoundTextCommit }>();
+const liveTextDocuments = new WeakMap<ProjectWorkspaceFS, { factory: MetadataStorageFactory; key: string }>();
+export function assertTextDocumentWriter(fs: ProjectWorkspaceFS, factory: MetadataStorageFactory, key: string) {
+  const owner = liveTextDocuments.get(fs);
+  if (!owner || owner.factory !== factory || owner.key !== key) return fail('text-commit-document');
+}
 export function registerTextCommit(fs: ProjectWorkspaceFS, factory: MetadataStorageFactory,
   enabled: () => boolean, prepare: TextPreparation, run: BoundTextCommit): void {
   if (textCommits.has(fs)) fail('text-commit-binding');
@@ -112,7 +117,10 @@ export function selectedTextCommit(fs: ProjectWorkspaceFS, factory: MetadataStor
   const assertLease = () => {
     if (activeLeases.get(fs) !== lease) fail('text-commit-lease');
   };
-  const write: TextCommitOperation = (transaction, key, action) => entry.run(transaction, key, action, assertLease);
+  const write: TextCommitOperation = (transaction, key, action) => entry.run(transaction, key, async ports => {
+    liveTextDocuments.set(ports.fs, { factory: ports.factory, key });
+    try { return await action(ports); } finally { liveTextDocuments.delete(ports.fs); }
+  }, assertLease);
   const prepare = <T>(action: (ports: MetadataReadPorts) => Promise<T>) => entry.prepare(async ports => {
     const reader = Object.freeze({ fs: ports.fs, factory: ports.factory });
     preparationOwners.set(reader, { fs, assertLive: ports.assertCanAcknowledge });

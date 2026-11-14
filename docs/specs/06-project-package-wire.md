@@ -3244,6 +3244,14 @@ after the closing check may the Session adopt the saved provider. Later damage
 to an unrelated body or historical part is checked by the next full read.
 See [06e](06e-selected-generation-output-read-proposal.md) for acceptance.
 
+The PO-approved 2026-11-14 text-only exception in 06e applies on an already
+verified, open restored generation. The Session may check the current publication
+chain, destination and original document bytes, prove the single local text delta,
+and reuse matching verified media/model facts to project that exact new document.
+Each write, post-save byte comparison, publication and closing lease check remains
+independent. An untouched original lost during editing is detected at the next full
+open, output or recovery. A retry after interruption starts from durable evidence.
+
 On ordinary host/catalog reopening of an already selected, completed restore,
 a later prepared local text edit may be handed to strict recovery. The last
 published provider, original restore evidence, protected bodies and exact

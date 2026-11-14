@@ -110,13 +110,14 @@ for(const touch of [false,true])test(`native capacity recovery retains drafts an
   }finally{await context?.close();await server.stop();}
 });
 
-test('renderer crashes before writing, before publication and immediately after success preserve the confirmed text exactly once', async ({}, info) => {
+for (const touch of [false, true]) test(`renderer crashes before writing, before publication and immediately after success preserve the confirmed text exactly once (${touch ? 'touch' : 'desktop'})`, async ({}, info) => {
   A.getHeads(A.init());
   const server = await ownedServer(process.env.LOCIVIEW_E2E_ARTIFACT ?? 'desktop-dist');
   const receiver = await createBrowserProfile('restored-text');
   let context: BrowserContext | undefined;
   const open = async (profile: string, suffix = '') => {
-    context = await chromium.launchPersistentContext(profile, { channel: 'chromium', serviceWorkers: 'block', acceptDownloads: true });
+    context = await chromium.launchPersistentContext(profile, { channel: 'chromium', serviceWorkers: 'block', acceptDownloads: true,
+      viewport: touch ? { width: 390, height: 844 } : { width: 1280, height: 720 }, isMobile: touch, hasTouch: touch });
     const page = context.pages()[0]!;
     await page.goto(server.url + suffix);
     return page;
@@ -182,7 +183,7 @@ test('renderer crashes before writing, before publication and immediately after 
     const run = (before.source.proof.identity.projectId as string).slice(4);
     const afterPreparation = await open(receiver, '?run=' + run);
     const enter = afterPreparation.getByRole('button', { name: '編集する', exact: true });
-    await expect(afterPreparation.locator('.lv-caption-select').filter({ hasText: '既存のピン' })).toBeVisible();
+    await expect(afterPreparation.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText('Nativeから引き継ぐ記録');
     if (await enter.isVisible()) await enter.click();
     const previous = await record(afterPreparation);
     await expect(previous).toHaveValue('本文を保持');
@@ -210,8 +211,7 @@ test('renderer crashes before writing, before publication and immediately after 
     await expect(resume.getByText('変更を適用しました。', { exact: true })).toBeVisible();
     await crash(resume);
     const cold = await open(receiver, '?run=' + run);
-    const row = cold.locator('.lv-caption-select').filter({hasText: '既存のピン'});
-    await expect(row).toBeVisible();
+    await expect(cold.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText('Nativeから引き継ぐ記録');
     const enterEdit = cold.getByRole('button',{name:'編集する',exact:true});
     if (await enterEdit.isVisible()) await enterEdit.click();
     await expect(await record(cold)).toHaveValue(confirmed);

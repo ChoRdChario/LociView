@@ -1502,6 +1502,7 @@ describe('new-workspace metadata persistence service (memory ports, not device/a
     const repositoryId = (await new TransactionJournal(h.fs, limits).entries())[0]!.start.repositoryId;
     const next = await initial.prepareCaptionText(initial.token, id('cap'), 'body', '保存した本文');
     const part = next.originalChanges().find(bytes => next.heads.includes(A.decodeChange(bytes).hash))!;
+    await expect(underWriteLease(h.fs, () => repository.persistText(repositoryId, initial, next, id('cap'), part))).rejects.toThrow('text-commit-document');
     await expect(repository.confirmPublishedEdit(repositoryId, initial.heads, next.heads, part)).rejects.toThrow('publication-readback');
     await underWriteLease(h.fs, () => repository.persist(repositoryId, next));
     await expect(repository.confirmPublishedEdit(repositoryId, initial.heads, next.heads, part)).resolves.toBeUndefined();

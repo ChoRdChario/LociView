@@ -10,7 +10,8 @@ export const canonical = (v: JsonValue): string => v !== null && typeof v === 'o
   ? Array.isArray(v) ? `[${v.map(canonical).join(',')}]`
     : `{${Object.keys(v).sort().map(k => `${JSON.stringify(k)}:${canonical(object(v)[k]!)}`).join(',')}}`
   : JSON.stringify(v);
-export const same = (a: JsonValue | undefined, b: JsonValue | undefined) => a === undefined || b === undefined ? a === b : canonical(a) === canonical(b);
+export const same = (a: JsonValue | undefined, b: JsonValue | undefined) => a === b ||
+  (a !== undefined && b !== undefined && canonical(a) === canonical(b));
 export type GraphIssue = Readonly<{ map: ProjectRecordMap | 'project' | 'identity'; id?: string; field: string;
   kind: 'invalid' | 'orphan' | 'needs-review' | 'unverified'; code: string }>;
 export type GraphEdge = Readonly<{ from: string; to: string; field: string; strength: 'strong' | 'weak' }>;

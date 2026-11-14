@@ -83,6 +83,9 @@ export function createCaptionListControls(document: Document, onPlan: (plan: Cap
     for (const child of [...parent.children]) if (!wanted.has(child as HTMLElement)) child.remove();
     children.forEach((child, index) => { if (parent.children[index] !== child) parent.insertBefore(child, parent.children[index] ?? null); });
   };
+  const label = (node: HTMLElement, value: string) => {
+    if (node.textContent !== value) node.textContent = value;
+  };
   function updateRow(row: CaptionListRow) {
     const { item } = row;
     let entry = rows.get(item.id);
@@ -106,8 +109,12 @@ export function createCaptionListControls(document: Document, onPlan: (plan: Cap
       rows.set(item.id, entry);
       observer?.observe(node);
     }
-    for(const button of[entry.edit,entry.remove]){button.hidden=!presentation?.recordActions?.available();button.disabled=!!context!.pending||!!context!.mutationBlock;}
-    entry.title.textContent = captionTitle(item); entry.owner.textContent = captionOwnerLabel(item);
+    const actionsHidden = !presentation?.recordActions?.available(), disabled = !!context!.pending || !!context!.mutationBlock;
+    for (const button of [entry.edit, entry.remove]) {
+      if (button.hidden !== actionsHidden) button.hidden = actionsHidden;
+      if (button.disabled !== disabled) button.disabled = disabled;
+    }
+    label(entry.title, captionTitle(item)); label(entry.owner, captionOwnerLabel(item));
     entry.owner.hidden = item.pin === 'visible' && item.owner.kind === 'value';
     entry.select.setAttribute('aria-current', String(item.id === context!.memory.selectedCaptionId));
     entry.swatch.style.backgroundColor = row.color ?? ''; entry.swatch.hidden = row.color === null;
@@ -127,11 +134,11 @@ export function createCaptionListControls(document: Document, onPlan: (plan: Cap
       (item.owner.kind === 'value' && item.owner.value.kind === 'asset' && item.owner.value.name.kind !== 'value') ||
       item.mediaCount.kind !== 'value' || !row.color || row.uncertainMatch || item.needsReview || item.pin === 'needsReview' || item.pin === 'unavailable';
     const showModel = item.pin === 'ownerHidden' && item.owner.kind === 'value' && item.owner.value.kind === 'asset';
-    entry.effect = showModel ? 'showModel' : 'review'; entry.action.textContent = showModel ? 'モデルを表示' : '状態を確認';
+    entry.effect = showModel ? 'showModel' : 'review'; label(entry.action, showModel ? 'モデルを表示' : '状態を確認');
     entry.action.hidden = !showModel && !needsReview;
     entry.action.disabled = (showModel && context!.showModelPending !== undefined ? context!.showModelPending : context!.pending) !== null || (showModel && context!.mutationBlock !== null);
     if (showModel && context!.mutationBlock) notes.push(context!.mutationBlock);
-    entry.note.textContent = notes.join(' · ');
+    label(entry.note, notes.join(' · '));
     return entry.node;
   }
   function focusedRow() { return [...rows.entries()].find(([, row]) => row.node.contains(document.activeElement))?.[0]; }

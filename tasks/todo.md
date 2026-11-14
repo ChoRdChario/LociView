@@ -10,6 +10,50 @@ queue or renewed approval requirements.
 
 ## Current — editing one record and sharing selected scenes
 
+- Target for the ordinary Ki-84 text edit: about one second from Apply to
+  visible durable acknowledgment. Profile preparation, stored document and
+  content checks separately; remove duplicate work within existing verification
+  fences. Compare the same real edit on the baseline and final builds, inspect
+  the actual backup and cold reopen, and retain rejection and crash recovery.
+  A cheaper acknowledgment with weaker storage evidence is outside this target.
+- PO accepted checking untouched material loss at open/reopen/output. A ready
+  restored Session now proves the exact text-only delta and matches its prior
+  journal controls, restore binding and current document before writing. Existing
+  source facts project the new version through the normal domain checks.
+  Actual written document bytes, current change, publication and lease closure
+  remain independently checked. Failed full inspection invalidates reuse.
+  Verify consecutive edits against a cold provider, older-source loss, altered
+  controls and real renderer termination on PC and touch layouts. Compare normal
+  builds separately from the diagnostic/profiler lane; retain failed evidence.
+
+- Ordinary Ki-84 edit, Windows Chromium 156, 1280×720, new isolated profiles.
+  Alternating the previous checkpoint `1e6fad2` and this candidate on the same
+  backup, actual click → painted durable success (ms, three runs each):
+  3869/3945/3891 → 1433/1406/1255. Median 3891 → 1406 ms (64% shorter);
+  each run remains above the 1000 ms target. External file handoff median
+  23.826 → 25.663 s; browser relaunch through edited body 26.030 → 27.526 s.
+  All six downloaded files retained the same 43 original hashes, 103 captions
+  and three original changes plus exactly one new edit. No private input
+  or output file belongs in the repository.
+- PC/touch Chromium: six checks passed, including renderer termination
+  before writing, before publication and immediately after visible success,
+  quota recovery, cold reopening, input continuity and output. Repaired
+  missing earlier history and an unexpected database head separately: same-window
+  retry refused while evidence was bad, then recovered exactly once.
+- Separate instrumented candidate click: 739 ms to first journal write,
+  1055 ms in the edit command, 1164 ms to success in the DOM and 1211 ms
+  through paint. First write: 39 successful file snapshots, none for an
+  original, its Origin receipt or its content evidence. The document write
+  and independent reopen/compare took 46 ms. The outer storage owner,
+  pending edit-copy checks and stage boundaries dominate the remaining delay.
+  Retain PC measurements separately from touch correctness; iPhone Safari
+  timing is pending. Next measure the first lease check and edit-copy lookup
+  separately on projects with different lengths of editing history.
+- Final local checkpoint: typecheck, 156 test files (3554 passing, 16 expected
+  failures, 21 TODO), five builds, offline isolation and HEIC isolation passed.
+  Independent reviews covered same-window recovery, selected-store writes and
+  the PC/touch UI. Browser acceptance above is Chromium; device Safari is open.
+
 - Restored project, ordinary title/body edit. After a full read of the
   written document and its provider, confirm the new exact bytes from both
   the journal and the current document, predecessor chain, restored binding

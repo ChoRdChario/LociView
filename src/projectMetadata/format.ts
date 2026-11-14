@@ -1,6 +1,6 @@
 import * as A from '@automerge/automerge/slim';
 import { parseJsonWithoutDuplicateMembers } from '../core/json';
-import { inspectEditorMessage } from './editorAttribution';
+import { inspectEditorMessage, type EditorDeclaration } from './editorAttribution';
 import { inspectAtomicHistory, type AtomicChange, type AtomicWrite, type HistoryReadLimits } from '../domain/atomicHistory';
 import { canonical, immutableKinds, same } from '../domain/projectGraphSupport';
 import { projectRecordMaps, checkProjectHeader } from '../domain/projectRecords';
@@ -93,7 +93,7 @@ export function inspectPhysical(doc: PhysicalDoc, inputProof: MetadataProof, lim
 /** Capability use belongs to original physical scalars, including overwritten writes. */
 export function inspectPhysicalSource(doc: PhysicalDoc, inputProof: MetadataProof, limits: MetadataLimits) {
   const result = inspectPhysicalDetail(doc, inputProof, limits);
-  return { input: result.input, portableChanges: result.portableChanges, mediaRecords: result.mediaRecords };
+  return { input: result.input, portableChanges: result.portableChanges, mediaRecords: result.mediaRecords, declarations: result.declarations };
 }
 /** Encoding witness only, never a selected/default View. Include overwritten original scalars. */
 export function originalEntryWitness(doc: PhysicalDoc, proof: MetadataProof, limits: MetadataLimits, sceneId: string): string {
@@ -113,7 +113,11 @@ function inspectPhysicalDetail(doc: PhysicalDoc, inputProof: MetadataProof, limi
   const bytes = checkedChanges(A.getAllChanges(doc), limits);
   if (!bytes.length) fail('empty-history');
   const decoded = bytes.map(b => A.decodeChange(b));
-  for (const change of decoded) inspectEditorMessage(change.message, limits);
+  const declarations: Readonly<{ changeId: string; declaration: EditorDeclaration }>[] = [];
+  for (const change of decoded) {
+    const declaration = inspectEditorMessage(change.message, limits);
+    if (declaration) declarations.push(Object.freeze({ changeId: change.hash, declaration }));
+  }
   const byHash = new Map(decoded.map(c => [c.hash, c]));
   if (byHash.size !== decoded.length) fail('duplicate-change');
   const roots = decoded.filter(c => !c.deps.length);
@@ -212,12 +216,17 @@ function inspectPhysicalDetail(doc: PhysicalDoc, inputProof: MetadataProof, limi
   const read = inspectAtomicHistory({ token, heads, changes }, { ...limits, maxWork: limits.maxWork - work });
   if (read.kind !== 'atomic-history-inspection') return fail('atomic-history');
   // Check the complete live field candidates against the library, not its winner.
+  const parents = new Map<string, PhysicalDoc>();
   for (const field of read.fields) {
     charge(); const item = scalars.get(canonical(field.path))!;
-    const parentPath = containers.get(item.objectId)!.path;
-    let object: any = doc;
-    for (const key of parentPath) object = object[key];
-    if (A.getObjectId(object) !== item.objectId) fail('container-identity');
+    let object = parents.get(item.objectId);
+    if (!object) {
+      let parent = doc;
+      for (const key of containers.get(item.objectId)!.path) parent = parent[key];
+      if (A.getObjectId(parent) !== item.objectId) fail('container-identity');
+      parents.set(item.objectId, parent);
+      object = parent;
+    }
     const present = field.candidates.filter(c => c.value.kind === 'value');
     const actual = Object.entries(A.getConflicts(object, item.key) ?? {});
     if (actual.length && (actual.length !== present.length || actual.some(([id, value]) => {
@@ -233,5 +242,5 @@ function inspectPhysicalDetail(doc: PhysicalDoc, inputProof: MetadataProof, limi
     }
   }
   const input = Object.freeze({ ...(map2 ? { semanticProfile: profile } : {}), schema: schema!, recordMaps: Object.freeze(Object.keys(projectRecordMaps)), history: read.history });
-  return { input, portableChanges, mediaRecords, scalars: Object.freeze(originals), nodesUsed, workUsed: work + nodesUsed + read.workUsed };
+  return { input, portableChanges, mediaRecords, declarations: Object.freeze(declarations), scalars: Object.freeze(originals), nodesUsed, workUsed: work + nodesUsed + read.workUsed };
 }
