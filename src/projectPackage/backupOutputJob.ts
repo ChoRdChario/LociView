@@ -287,8 +287,9 @@ export class BackupOutputJob {
   async generate(store: OriginBlobStore, signal?: AbortSignal, timing?: BackupOutputTiming, captureFile?: BackupFileObserver) {
     const measure = <T>(stage: Parameters<BackupOutputTiming>[0], action: () => Promise<T>) => measureBackupOutput(timing, stage, action);
     await measure('inputs-before', () => this.validateInputs(signal));
-    if ((await this.steps()).some(s => s.detail.kind === 'artifactVerified')) { await this.artifact(); return; }
-    if ((await this.steps()).length) return fail('output-cancelled');
+    const currentSteps = await this.steps();
+    if (currentSteps.some(s => s.detail.kind === 'artifactVerified')) { await this.artifact(); return; }
+    if (currentSteps.length) return fail('output-cancelled');
     const m = this.manifest(), options = { packageId: m.packageId, createdByVersion: m.createdByVersion };
     const controls = { manifest: this.inputs.manifest, checksum: new TextEncoder().encode(packageByteHash(this.inputs.manifest)) };
     await measure('space', () => assertOutputSpace(this.fs, workspacePackageRoot(this.fs), readManifestControl(controls.manifest, controls.checksum).archiveByteLength));

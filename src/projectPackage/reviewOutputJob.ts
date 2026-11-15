@@ -214,8 +214,9 @@ export class ReviewOutputJob {
     if (json(saved.records()) !== json(this.records())) fail('output-input-binding');
     const capture = await ReviewSourceCapture.restore({ source: saved.inputs.original, sourceProof: saved.source.proof, snapshot: saved.inputs.snapshot,
       reconstruction: saved.inputs.reconstruction }, store, verifier, this.limits, signal);
-    if ((await this.steps()).some(s => s.detail.kind === 'artifactVerified')) { await this.artifact(); return; }
-    if ((await this.steps()).length) return fail('output-cancelled');
+    const currentSteps = await this.steps();
+    if (currentSteps.some(s => s.detail.kind === 'artifactVerified')) { await this.artifact(); return; }
+    if (currentSteps.length) return fail('output-cancelled');
     const m = this.manifest(), controls = { manifest: this.inputs.manifest, checksum: new TextEncoder().encode(packageByteHash(this.inputs.manifest)) };
     if (json(prepareReviewManifest(capture, { packageId: m.packageId, createdByVersion: m.createdByVersion }).control.manifest) !== json(m)) fail('output-prepared-mismatch');
     await assertOutputSpace(this.fs, workspacePackageRoot(this.fs), readManifestControl(controls.manifest, controls.checksum).archiveByteLength);

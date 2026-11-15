@@ -219,8 +219,9 @@ export class ContributionOutputJob {
     const artifact = rows.find(s => s.detail.kind === 'artifactVerified'); if (artifact) await this.readArtifactStep(artifact);
   }
   async generate(store: OriginBlobStore, signal?: AbortSignal) {
-    if ((await this.steps()).some(s => s.detail.kind === 'artifactVerified')) { await this.artifact(store); return; }
-    if ((await this.steps()).length) return fail('output-cancelled');
+    const currentSteps = await this.steps();
+    if (currentSteps.some(s => s.detail.kind === 'artifactVerified')) { await this.artifact(store); return; }
+    if (currentSteps.length) return fail('output-cancelled');
     const capture = await ContributionSourceCapture.restore(this.inputs.metadata, this.source.proof, this.source.token, this.base, store, this.limits, signal);
     const m = this.manifest(), options = { packageId: m.packageId, createdByVersion: m.createdByVersion, ...(m.memo !== undefined ? { memo: m.memo } : {}) };
     const prepared = prepareContributionManifest(capture, options);

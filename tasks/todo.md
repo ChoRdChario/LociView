@@ -19,6 +19,13 @@ queue or renewed approval requirements.
   dependency, capacity, release or adoption change. Renderer lightening stays
   paused. Stop only a candidate that requires a genuinely new contract/policy.
 
+Final closure: the last adjacent duplicate steps() read in all5 generate methods
+is removed under06e§11.7 with independent design/final diff review. First read
+position, Backup inputs-before and all public artifact/write/readback/recovery
+inspections remain. Required final checkpoint and affected PC/touch output flows
+pass, including two-round all-purpose sharing/restore/cold reopen and actual
+Chrome/Edge downloads. No unrelated full-suite browser replay.
+
 Implemented and independently reviewed under specification06e§11:
 
 - Reuse the exact selected archive for purpose routing, preserving specific
@@ -56,7 +63,7 @@ Implemented and independently reviewed under specification06e§11:
 Evidence and final checks:
 
 - Source/test/config freeze: .artifacts/e2e/duplicate-work-20261115/tested-source.json
-  (758 files). Final capacity-qualified checkpoint passes158 files/3580 cases,
+  (758 files). Final steps-qualified checkpoint passes158 files/3580 cases,
   unchanged16 expected failures/21 TODOs, all5 builds and offline isolation;
   HEIC all5 passes. The main source qualified independently before this follow-up.
 - Desktop59: final full run58 passes/one stale test selector (actual Review status
@@ -70,6 +77,9 @@ Evidence and final checks:
   connected source-material all-purpose/two-round/restore/cold flow and mobile
   short-input/export flow, plus Chrome/Edge actual-file/cold reopening. No whole59
   replay for a selector-only adaptation or this narrowly reviewed pure reader.
+- Main cleanup3+3 comparison is the a937122 tree; the capacity-only follow-up is
+  measured separately below, and§11.7 makes no independent speed claim. Do not
+  relabel those earlier medians as freshly remeasured latest-source timings.
 - Windows dedicated Chromium156,1280×720,DPR1, own origins/profiles; same Ki-84
   Backup SHA c714c6cd04f99ac7aa0b84e9e2ca82a0147bbbc0eeb029be475d94e68ccf501c.
   Alternate before/after3 each; no diagnostic flag or file-picker waiting. Actual
@@ -108,20 +118,24 @@ Evidence and final checks:
   criteria. Editing copy remains166.643s to editor,177.827s to3D (not a measured
   before/after win). Mobile-sized point/GS flows are not500k mobile/iPhone proof.
 
-Remaining closure, continuing autonomously:
+Final attribution and remaining closure:
 
 - Offline8 tests, installed Chrome157.0.8103.52/Edge157.0.4341.46 actual save+cold
-  reopen and final offline/HEIC artifact isolation pass. Source758-file freeze
-  matches. Finish the additional representative Ki-84 native attribution, verified
-  g0 Push/exact CI and qualified same-origin preview/sample verification.
+  reopen and final offline/HEIC artifact isolation pass. Main and capacity changes
+  are committed and pushed to g0-baseline; capacity checkpoint CI passes. The final
+  tiny steps cleanup also passes the final checkpoint, all5 HEIC artifacts, two
+  connected PC/touch workflows and Chrome/Edge actual-file/cold tests. Finish its
+  verified Push/exact CI and same-origin preview/sample verification.
   No public deployment or rerun of unrelated checks for prose/staging changes.
-- Native call-stack diagnostic completed on the small four-export history flow:
-  1572/2040/828/828 restore-control opens, summed native getFile time
-  982.4/1279.8/526.8/525.3ms. Instrumented elapsed times are not comparisons.
-  Workspace has414/486 calls unclassified due the500-stack cap (26.3%/23.8%).
-  Backup stream guards account for only24/828 opens (~15ms), and strong bulk
-  content is actually used; this does not establish weak/CAS/stream domination
-  for Ki-84. Do not treat prior24.8s nested aggregate as removable user wait.
+- Native call-stack diagnostics covered both the small history sample and actual
+  Ki-84 four-output flow. The later Ki-84 trace maps every control open (zero
+  unknown stacks), resolving the small sample's500-stack-cap limitation.
+  Workspace capacity opens108→24 and420→24, native getFile time69.2→14.6ms and
+  275.3→14.2ms. Before§11.7, Backup has1404 per output:600 stream-pull,324 public reads,
+  312 scoped entry/close,156 strict writes and12 outer-lease opens. Those are
+  independent fences, not evidence that weak/CAS work dominates. The final adjacent
+  steps reuse removes one redundant public read; it is a small cleanup, not a new
+  speed claim. Instrumented end-to-end times are not ordinary performance evidence.
 - Resolved residual: Workspace.space raw per-file size traversal accounted for
   84/396 restore-control opens (51.3/249.1ms). Contribution/Clean/Review contained
   the same unscoped pure capacity loop; all now use Backup's scoped pattern. Specification06
@@ -131,11 +145,11 @@ Remaining closure, continuing autonomously:
   void size read before each fresh guarded write, retain all limits, failure and
   stream fences.
   This is existing normal-reader scope, not authority for broader write changes.
-- The fully verified main cleanup is saved locally. Capacity follow-up qualifies
-  with focused/final/service/browser evidence above; no release/Push yet. Keep
-  existing private audit notes/task history out of the public checkpoint.
-- Source counts alone do not justify a speed claim. Trace the residual cumulative
-  restore-control reads before proposing more changes. Constructor-bound weak-media
+- Independent closeout review finds no known clearly abnormal duplicated workflow
+  left open in the surveyed lanes after the last steps cleanup. This is not a claim
+  that all possible optimization is exhausted. Keep private originals/audits/task
+  history out of public checkpoints; Git owns the exact commit identities.
+- Source counts alone do not justify a speed claim. Constructor-bound weak-media
   verification and per-pull stream write fences are explicitly independent in
   specification06/06e§§2–3; origin CAS is a different namespace. No silent rebinding
   or batching of these paths. A useful change there needs one concrete contract
