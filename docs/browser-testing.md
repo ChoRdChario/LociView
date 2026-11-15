@@ -262,6 +262,18 @@ runner does not terminate or reuse an unknown server. Browser page requests are
 limited to this origin and generated Blob/data resources. Package/browser downloads
 and browser process execution remain subject to the host's managed permissions.
 
+When a cold-browser case times out, separate owned-profile allocation,
+`launchPersistentContext`, local navigation, browser close and profile cleanup
+before attributing the delay to Project storage or package generation. Repeated
+fixed launch delays accumulate in crash/reopen scenarios. Compare the same
+artifact, browser, profile helper and limits under permitted execution conditions;
+an ordinary Windows execution requires its actual tool/environment approval.
+Never bypass a denial, change user browser settings or loosen deadlines to hide
+the delay. Retain the failing run and report any execution-condition difference.
+Qualify performance only after observing ordinary CPU/GPU load, verifying frozen
+artifact hashes before/after, and keeping stage diagnostics separate from normal
+elapsed comparisons. A successful isolated launch is not a passed recovery flow.
+
 For latency diagnosis with the same functional assertions:
 
 ```powershell

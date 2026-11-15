@@ -668,7 +668,7 @@ export class MetadataProjectSession {
   private async captureBackup(source: ProjectMetadataSource, expectedToken: string, store: OriginBlobStore, signal?: AbortSignal) {
     const observed = await withMetadataRead(this.fs, this.storage, async ports => {
       let candidate: Awaited<ReturnType<MetadataProjectSession['readCandidate']>> | undefined;
-      const capture = await BackupSourceCapture.prepare({ read: async () => {
+      const capture = await BackupSourceCapture.prepareManualOutput({ read: async () => {
         candidate = await this.readCandidate(undefined, ports); return candidate.read;
       } }, expectedToken, new WorkspaceBaseStore(ports.fs, this.limits, source.proof), store, this.limits, signal);
       if (!candidate) return fail('output-not-ready');

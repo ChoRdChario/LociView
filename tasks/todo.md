@@ -8,7 +8,88 @@ and [earlier working records](../docs/history/development-through-2026-10-28/tas
 retain qualifications and failures. Their Current/Next headings are not an active
 queue or renewed approval requirements.
 
-## Current — verified direct Review copies; ordinary-save decision next
+## Current — finalize06i ordinary manual-save verification
+
+- PO-approved [06i](../docs/specs/06i-manual-backup-body-verification-proposal.md)
+  passes its bounded effect/safety condition. Independent source/security and
+  elapsed-evidence reviews accept the exact narrow change. Only ordinary manual
+  Backup uses named presence/receipt/size preparation; full expected-byte checking
+  remains in generation and independent saved-file inspection. Default capture,
+  restore, other purposes, original bytes/quality and recovery fences stay strict.
+  Same-size corruption can reject after Start, leaving an unacknowledged artifact;
+  never substitute its digest or issue completion/download. No format/ID/dependency,
+  capacity, renderer, aggregate adoption or release change.
+
+### Actual ordinary-load comparison
+
+Compare d89ba0d against the unchanged reviewed/tested06i source, same fixed Ki
+and500k SH4 inputs, Chromium156.0.8078.4, i9-10850K/20logical CPUs/64GiB/RTX5080,
+DPR1. Ki1280x720; SH41440x1000. Six interleaved ABBAAB flows per dataset, unique
+profiles, diagnostics off and no own concurrent heavy checks/builds. Frozen
+source/test and all artifact hashes match before/after. CPU/GPU observations
+support ordinary background load, not a perfectly idle PC or hardware guarantees.
+
+Seconds list all three values and median; save endpoint is primary action to
+download handoff, with actual saved-file/full-content audit afterward. OS dialog
+time is excluded. All12 actual-file/cold flows pass, errors/network empty.
+
+|Manual Backup|d89ba0d:3 runs|06i:3 runs|Median before→after|
+|---|---|---|---|
+|Ki-84|22.100 /22.246 /22.213|21.383 /21.239 /21.255|22.213→21.255 (-4.3%)|
+|500k SH4|30.845 /30.866 /31.296|28.240 /28.513 /28.273|30.866→28.273 (-8.4%)|
+
+Every candidate save is faster than every control save in these cohorts. The
+benefit is real but limited. All103 Ki captions/43 bodies/3 original changes and
+the added edit survive; all3 SH4/Proxy/photo bodies and178,002,206-byte full GS
+digest survive. Preserve complete raw measurements privately, including unchanged
+endpoints: Ki full initial-restore editor-ready78.060→77.569s (NOT earliest readonly
+text), cold readable body4.798→4.747s, full cold16.872→16.847s; third candidate cold
+is18.492s. Visible Apply medians.954→.970s (all raw values retained). SH4 editing
+copy60.069→58.934s and cold21.673→21.615s are not attributable to06i; do not claim
+whole-tool speedup or overall performance non-regression.
+
+### Verification and timeout cause
+
+- Exact source/test binding: required checkpoint passes159 files/3611 tests,
+  unchanged16 expected failures/21TODO, all5 builds and offline isolation. HEIC
+  isolation passes all5 artifacts. No source/test change since those checks;
+  do not repeat for result prose/staging. Focused faults include current/conflict/
+  base-only same-size corruption, early missing/size/suspect rejection, unchanged
+  strict defaults, no completion/handoff, and exact frozen cold retry.
+- Normal Windows PC/touch recovery/file cases8/8 pass, including native quota and
+  crash-before-write/before-publication/after-success in original/restored roots.
+  Full browser/server shutdown offline mixed-copy/save/reopen passes29.139s.
+  Same immutable offline artifact as the prior failed restored-desktop case also
+  passes61.681s under the unchanged360s limit.
+- Retain failures: wrong browser-cache setup ran no app; corrected to the existing
+  installed runner. Restricted execution then timed out with completed intermediate
+  files; external high load overlapped but was not the sole established cause.
+  Even after it ended, a same-baseline lifecycle probe measured launch56.834s
+  restricted versus.537s in permitted ordinary Windows execution; home/close were
+  nearly unchanged. Corrective original/restored crash cases pass61.323/62.009s
+  for desktop/touch. Artifact override alone does not explain failure. Underlying
+  Windows delay mechanism is not diagnosed; no product fix, assertion/deadline
+  relaxation or automatic retry was needed. Stopped/incomplete runs remain such.
+- Separate stage diagnostics are in progress and must finish before whole-plan
+  completion. An initial anchored selector collected zero tests; retain that log,
+  correct collection to two real flows per dataset and count only actual runs.
+
+### Finalization / next
+
+- Save/Push the qualified source/docs to existing g0-baseline and confirm exact CI.
+  Only CI is triggered; main/Pages/release stay excluded. Preserve pre-existing
+  private UI/task audit material and all private inputs/artifacts outside staging.
+- Complete separate stage breakdown and installed Chrome/Edge representative
+  file/cold checks. Refresh owned4191 only from the exact frozen qualified build,
+  preserving Project data, safe Worker lifecycle and the user's4182.
+- Remaining wait: ordinary saves still~21/28s; Ki initial editor-ready~78s and
+  SH4 editing-copy~59s. Use stage evidence to select the next meaningful workflow
+  improvement; do not extend validation lifetimes across writes/recovery without
+  the required contract review. Renderer lightening remains paused. Physical
+  iPhone/Safari memory/IME/save/heat/offline acceptance remains unverified.
+
+
+## Previous checkpoint — verified06h direct Review copies
 
 - Outcome: [06h](../docs/specs/06h-direct-review-copy-proposal.md) is implemented
   and qualified for the bounded PC candidate. One retained Review original plus
@@ -99,11 +180,13 @@ remain intermediate and are not substituted for these final numbers.
 
 ### Next and genuine boundaries
 
-- Save/Push this verified scope to existing g0-baseline and check its actual-tip
-  CI; Git/Actions own commit/run identity. Refresh4191 only from its qualified
-  immutable artifact; do not touch the user's4182 or force Worker activation.
-- [06i](../docs/specs/06i-manual-backup-body-verification-proposal.md) is PROPOSED,
-  PO-unapproved and UNIMPLEMENTED. One explicit timing decision is pending: keep
+- Verified scope is saved/Pushed to existing g0-baseline; actual-tip CI passes.
+  Git/Actions own commit/run identity.4191 now serves the qualified immutable
+  artifact:20 served files match, and the supplied327052-byte comfort sample
+  opens successfully. The user's4182 and Project data are untouched; no forced
+  Worker activation. Local links are checked; private originals/audits excluded.
+- [06i](../docs/specs/06i-manual-backup-body-verification-proposal.md) was proposed
+  at this checkpoint and subsequently PO-approved; the current section owns its outcome: keep
   receipt/existence/size/metadata preflight, move ordinary Backup's duplicate
   full-body pass to existing generation verification and independent saved-file
   inspection. Same-size damage may be detected after output starts, leaving a

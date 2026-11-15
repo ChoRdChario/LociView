@@ -31,6 +31,9 @@ services receive split host policies and a shared whole-view/instance GS ledger.
 initialization from one retained original and fixed metadata; old jobs retain
 their recovery. Public source/schema formats are unchanged; todo owns executed
 evidence. Existing harness paths retain the old editor adapters.
+[06i](docs/specs/06i-manual-backup-body-verification-proposal.md) connects ordinary
+Backup's named presence/size preflight, keeping full generation and saved-file
+verification. Default capture/restore stay strict; todo owns measured qualification.
 The typed loading path mounts verified Caption UI before binary display preparation.
 `deferredViewport.ts` retains the canvas/camera handoff; `validationRender.ts` reports
 per-model preparation to `viewport.ts` without dropping full GS admission. The

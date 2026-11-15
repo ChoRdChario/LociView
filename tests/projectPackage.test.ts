@@ -826,6 +826,61 @@ describe('complete backup originals and ZIP (not durable checkpoint or restore)'
     for (const e of f.capture.blobs) expect(await reopened.archive.entryBytes(e.path, L.sourceBytes)).toEqual(f.bodies.get(e.sha256));
     expect(store.openReadOnly).toHaveBeenCalledTimes(f.capture.blobs.length * 2);
   });
+  it('06i owns identical manual backup inputs without touching body stream/blob getters', async () => {
+    const f = await backupFixture(), host = await session(f.source);
+    const strict = await BackupSourceCapture.prepare(host, f.source.token, f.bases, f.store, metadataLimits);
+    const streams = vi.fn(() => { throw Error('manual preflight must not access streams'); });
+    const store = { openReadOnly: vi.fn(async (ref: { byteLength: number }) => ({ size: ref.byteLength,
+      get stream(): () => ReadableStream<Uint8Array> { return streams(); },
+      get blob(): () => Promise<Blob> { return streams(); } })) };
+    const manual = await BackupSourceCapture.prepareManualOutput(host, f.source.token, f.bases, store, metadataLimits);
+    expect(streams).not.toHaveBeenCalled();
+    expect(store.openReadOnly.mock.calls.map(c => c[0])).toEqual(strict.blobs.map(b => strict.bodyRefs.find(r => r.digest === b.sha256)));
+    expect(manual.description).toEqual(strict.description); expect(manual.source.encodeFullSource()).toEqual(strict.source.encodeFullSource());
+    expect(await Promise.all(manual.originals().map(e => e.read()))).toEqual(await Promise.all(strict.originals().map(e => e.read())));
+    const abort = new AbortController();
+    const interrupted = { openReadOnly: async (ref: { byteLength: number }) => { abort.abort(); return { size: ref.byteLength, get stream() { return streams(); } }; } };
+    await expect(BackupSourceCapture.prepareManualOutput(host, f.source.token, f.bases, interrupted, metadataLimits, abort.signal)).rejects.toThrow();
+    expect(streams).not.toHaveBeenCalled();
+    for (const failure of ['missing', 'suspect', 'size']) {
+      const unavailable = { openReadOnly: async (ref: { byteLength: number }) => {
+        if (failure !== 'size') throw Error(failure);
+        return { size: ref.byteLength + 1, get stream() { return streams(); } };
+      } };
+      await expect(BackupSourceCapture.prepareManualOutput(host, f.source.token, f.bases, unavailable, metadataLimits)).rejects.toThrow(failure === 'size' ? 'backup-body-size' : failure);
+    }
+    expect(streams).not.toHaveBeenCalled();
+    const read = await host.read(), changed = { read: vi.fn().mockResolvedValueOnce(read).mockResolvedValue({ ...read, publication: 'changed' }) };
+    await expect(BackupSourceCapture.prepareManualOutput(changed, f.source.token, f.bases, store, metadataLimits)).rejects.toThrow('publication-changed');
+    const bases = { ...f.bases, snapshot: vi.fn().mockResolvedValueOnce({ records: f.rows }).mockResolvedValue({ records: [] }) };
+    await expect(BackupSourceCapture.prepareManualOutput(host, f.source.token, bases, store, metadataLimits)).rejects.toThrow('bases-changed');
+  });
+  it.each(['current', 'conflict', 'exchangeBase'] as const)('06i rejects same-size %s corruption during generation without changing expected bodies', async role => {
+    const f = await backupFixture(role !== 'exchangeBase'); let source = f.source;
+    if (role === 'exchangeBase') source = change(source, d => {
+      for (const key of ['assetsById', 'captionsById', 'captionAttachmentsById', 'sceneAssetMembershipsById', 'sceneCaptionMembershipsById', 'materialOverridesById', 'captionTagMembershipsById'])
+        for (const row of Object.values(d[key]) as Record<string, any>[]) row.lifecycle = new A.ImmutableString(canonical({ state: 'deleted', reason: 'userDelete', eventId: id('evt', 99) }));
+    });
+    if (role === 'conflict') {
+      const branch = (n: number) => change(source, d => { d.assetsById[id('ast')].lifecycle = new A.ImmutableString(canonical({ state: 'active', reason: 'initial', eventId: id('evt', n) })); });
+      source = branch(90).appendOriginal(branch(91).originalChanges());
+    }
+    const host = await session(source), strict = await BackupSourceCapture.prepare(host, source.token, f.bases, f.store, metadataLimits);
+    const inventory = strict.description.inventory as unknown as ReturnType<typeof protectedWorkspaceInventory>;
+    const protectedBody = inventory.blobs.find(b => b.reasons.includes(role))!;
+    expect(protectedBody).toBeDefined(); const bytes = f.bodies.get(protectedBody.sha256)!, corrupt = bytes.slice(); corrupt[0] = corrupt[0]! ^ 255;
+    f.bodies.set(protectedBody.sha256, corrupt);
+    const manual = await BackupSourceCapture.prepareManualOutput(host, source.token, f.bases, f.store, metadataLimits);
+    expect(manual.blobs).toEqual(strict.blobs); expect(manual.description.inventory).toEqual(strict.description.inventory);
+    await expect(output(manual, f.store)).rejects.toThrow();
+    await expect(BackupSourceCapture.prepare(host, source.token, f.bases, f.store, metadataLimits)).rejects.toThrow();
+    const originals = manual.originals(), table = await originals.find(e => e.path === 'exchange-bases.json')!.read();
+    const evidence = await Promise.all(originals.filter(e => e.path.startsWith('base-evidence/')).map(async e => ({ reference: { sha256: e.sha256, byteLength: e.byteLength }, bytes: await e.read() })));
+    await expect(BackupSourceCapture.restore(source.encodeFullSource(), source.proof, source.token, table, evidence, f.store, metadataLimits)).rejects.toThrow();
+    f.bodies.set(protectedBody.sha256, bytes);
+    const reopened = await BackupArchive.inspect((await output(manual, f.store)).file, metadataLimits);
+    expect(reopened.description.blobs).toEqual(strict.blobs); expect(reopened.source.originalChanges()).toEqual(source.originalChanges());
+  });
   it('supports empty bases and retains concurrent choices and edit/revert originals', async () => {
     const f = await backupFixture(true);
     const title = (s: ProjectMetadataSource, value: string) => change(s, d => { d.captionsById[id('cap')].title = new A.ImmutableString(canonical(value)); });

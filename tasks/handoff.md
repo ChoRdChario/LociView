@@ -8,6 +8,12 @@ Check actual branch/HEAD/worktree and preserve existing changes.
 
 ## Accepted boundary
 
+[06i](../docs/specs/06i-manual-backup-body-verification-proposal.md) connects the
+bounded optimization after matched elapsed/fault evidence and independent review.
+Only ordinary manual Backup defers duplicate body streaming to generation;
+default prepare/restore, saved-file inspection and recovery remain strict. Todo
+owns current qualification; a new entry is not itself completion authority.
+
 The exact [06b](../docs/specs/06b-staging-read-operations-proposal.md) exceptions
 include §6.1 Review-copy inspection and §6.2 integrity sharing inside one
 outputReady. General §6 payload sharing is not approved. Do not extend these

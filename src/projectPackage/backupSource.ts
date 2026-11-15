@@ -13,7 +13,8 @@ import { checkAbort } from './zipChecks';
 const fail = (code: string): never => { throw new PackageControlError(code); };
 const equal = (a: Uint8Array, b: Uint8Array) => a.length === b.length && a.every((v, i) => v === b[i]);
 type Description = Awaited<ReturnType<typeof inspectBackupOriginals>>;
-/** Owned original backup. No live-job authority, file save or replacement receipt. */
+/** Owned original backup inputs, not proof of complete bodies or a saved file.
+ * Body verification timing belongs to each factory; writers verify independently. */
 export class BackupSourceCapture {
   readonly kind = 'backup-source-capture';
   private constructor(private readonly bytes: Uint8Array, private readonly tableBytes: Uint8Array,
@@ -36,6 +37,18 @@ export class BackupSourceCapture {
   static async prepare(session: Pick<MetadataProjectSession, 'read'>, expectedToken: string,
     bases: Pick<WorkspaceBaseStore, 'snapshot' | 'readEvidence'>, store: Pick<OriginBlobStore, 'openReadOnly'>,
     limits: MetadataLimits, signal?: AbortSignal) {
+    return this.prepareOwned(session, expectedToken, bases, store, limits, 'full', signal);
+  }
+  /** Ordinary manual output only: observe receipts/existence/size here, then let
+   * the output writer verify every fixed expected body before file completion. */
+  static async prepareManualOutput(session: Pick<MetadataProjectSession, 'read'>, expectedToken: string,
+    bases: Pick<WorkspaceBaseStore, 'snapshot' | 'readEvidence'>, store: Pick<OriginBlobStore, 'openReadOnly'>,
+    limits: MetadataLimits, signal?: AbortSignal) {
+    return this.prepareOwned(session, expectedToken, bases, store, limits, 'manual-output-preflight', signal);
+  }
+  private static async prepareOwned(session: Pick<MetadataProjectSession, 'read'>, expectedToken: string,
+    bases: Pick<WorkspaceBaseStore, 'snapshot' | 'readEvidence'>, store: Pick<OriginBlobStore, 'openReadOnly'>,
+    limits: MetadataLimits, bodyCheck: 'full' | 'manual-output-preflight', signal?: AbortSignal) {
     const ready = (read: MetadataSessionRead) => {
       if (read.state !== 'ready' || !read.source || !read.publication || read.source.token !== expectedToken ||
         read.provider?.kind !== 'scene-provider' || read.provider.token !== expectedToken) return fail('backup-not-ready');
@@ -48,7 +61,7 @@ export class BackupSourceCapture {
     for (const reference of backupEvidenceRefs(table)) {
       evidence.push({ reference, bytes: (await bases.readEvidence(reference)).slice() }); checkAbort(signal);
     }
-    const result = await this.collect(bytes, source, tableBytes, evidence, before.publication, store, limits, signal);
+    const result = await this.collect(bytes, source, tableBytes, evidence, before.publication, store, limits, bodyCheck, signal);
     if (!equal(tableBytes, backupEncode(await bases.snapshot()))) fail('backup-bases-changed');
     const after = ready(await session.read()); checkAbort(signal);
     if (before.publication !== after.publication) fail('backup-publication-changed'); return result;
@@ -68,10 +81,11 @@ export class BackupSourceCapture {
     if (!equal(backupEncode(evidence.map(e => e.reference)), backupEncode(refs))) return fail('backup-evidence-union');
     const copies = evidence.map((e, i) => { if (!(e.bytes instanceof Uint8Array) || e.bytes.length !== refs[i]!.byteLength) return fail('backup-evidence-size');
       return { reference: refs[i]!, bytes: e.bytes.slice() }; });
-    return this.collect(owned, source, table, copies, null, store, limits, signal);
+    return this.collect(owned, source, table, copies, null, store, limits, 'full', signal);
   }
   private static async collect(bytes: Uint8Array, source: ProjectMetadataSource, table: Uint8Array, evidence: readonly BackupEvidenceBytes[],
-    publication: string | null, store: Pick<OriginBlobStore, 'openReadOnly'>, limits: MetadataLimits, signal?: AbortSignal) {
+    publication: string | null, store: Pick<OriginBlobStore, 'openReadOnly'>, limits: MetadataLimits,
+    bodyCheck: 'full' | 'manual-output-preflight', signal?: AbortSignal) {
     const description = await inspectBackupOriginals(source, table, evidence, limits, signal);
     const refs = new Map(description.bodyRefs.map(r => [r.digest, r]));
     const streamLimits = { maxBlobBytes: L.blobBytes, maxChunkBytes: 65_536, maxChunks: L.streamChunks };
@@ -79,7 +93,9 @@ export class BackupSourceCapture {
     const charge = () => { if (++reads > L.packageChunks) fail('backup-stream-budget'); };
     for (const entry of description.blobs) {
       checkAbort(signal); const file = await store.openReadOnly(refs.get(entry.sha256)!, { ...streamLimits, maxChunkBytes: L.chunkBytes }); checkAbort(signal);
-      if (file.size !== entry.byteLength) fail('backup-body-size'); let verified = false;
+      if (file.size !== entry.byteLength) fail('backup-body-size');
+      if (bodyCheck === 'manual-output-preflight') continue;
+      let verified = false;
       const reader = checkedBlobStream(workspaceInputChunks(file.stream(), cancellation, charge), streamLimits, () => { verified = true; },
         { digest: entry.sha256, byteLength: entry.byteLength }, signal).getReader();
       try { for (;;) { checkAbort(signal); charge(); const r = await reader.read(); checkAbort(signal); if (r.done) break; }

@@ -4687,6 +4687,40 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect(f.fs.reads).toBe(listReads); expect((await f.receiver.session.read()).source!.token).toBe(token);
     expect((await BackupArchive.inspect(await sender.download(id), metadata)).description.table).toEqual(sent.snapshot);
   }, 20000);
+  it('06i refuses a same-size corrupt manual backup after Start without completion, then cold-retries frozen inputs', async () => {
+    const { f, sent } = await contributionTeam(), sender = new WorkspaceSender(f.fs, f.receiver.session, f.store, metadata, f.locks);
+    const writing = vi.spyOn(f.fs, 'writeStream'), presentation = vi.fn(), handoff = vi.fn();
+    const ref = f.model.body.ref, receipt = JSON.parse((await f.fs.readText(`v2/cas/sha256/${ref.digest.slice(0, 2)}/${ref.digest.slice(2)}.json`))!);
+    const path = `v2/cas/objects/${receipt.objectId}.bin`, bytes = (await f.fs.readBytes(path))!, corrupt = bytes.slice(); corrupt[0] = corrupt[0]! ^ 255;
+    await f.fs.writeBytes(path, corrupt);
+    await expect(sender.generateBackup(sent.current.source!.token, '破損の検出', undefined, presentation, handoff)).rejects.toThrow();
+    expect(presentation).not.toHaveBeenCalled(); expect(handoff).not.toHaveBeenCalled();
+    const [id] = await BackupOutputJob.ids(f.fs); expect(id).toBeDefined();
+    const job = await BackupOutputJob.open(f.fs, id!, metadata), manifest = job.manifest();
+    expect(await f.fs.exists(job.path('start.json'))).toBe(true); expect(await job.steps()).toEqual([]);
+    expect(writing.mock.calls.some(([path]) => path.startsWith(job.path('artifacts/')))).toBe(true);
+    expect(manifest.blobs.find(b => b.sha256 === ref.digest)!.byteLength).toBe(bytes.length);
+    await expect(sender.download(id!)).rejects.toThrow();
+    expect(await f.fs.readBytes(path)).toEqual(corrupt);
+    await f.fs.writeBytes(path, bytes);
+    const cold = f.reopen(), retry = new WorkspaceSender(f.fs, cold.session, f.store, metadata, f.locks);
+    await retry.retry(id!);
+    const saved = await BackupArchive.inspect(await retry.download(id!), metadata);
+    expect(saved.archive.control.manifest).toEqual(manifest); expect(saved.source.encodeFullSource()).toEqual(sent.current.source!.encodeFullSource());
+    expect((await BackupOutputJob.open(f.fs, id!, metadata)).manifest()).toEqual(manifest);
+    expect((await job.steps()).map(s => s.detail.kind)).toEqual(['artifactVerified']);
+    expect(await BackupOutputJob.ids(f.fs)).toEqual([id]);
+  }, 20_000);
+  it.each(['missing', 'size', 'suspect'] as const)('06i refuses %s manual backup bodies before output persistence', async failure => {
+    const { f, sent } = await contributionTeam(), sender = new WorkspaceSender(f.fs, f.receiver.session, f.store, metadata, f.locks);
+    const ref = f.model.body.ref, receipt = JSON.parse((await f.fs.readText(`v2/cas/sha256/${ref.digest.slice(0, 2)}/${ref.digest.slice(2)}.json`))!);
+    const path = `v2/cas/objects/${receipt.objectId}.bin`;
+    if (failure === 'missing') await f.fs.remove(path);
+    else if (failure === 'size') await f.fs.writeBytes(path, new Uint8Array(1));
+    else await f.fs.writeText(`v2/cas/suspect/${ref.digest}.json`, JSON.stringify({ version: 'cas-suspect-1' }));
+    await expect(sender.generateBackup(sent.current.source!.token)).rejects.toThrow();
+    expect(await f.fs.list('v2/packages/backup-output/')).toEqual([]); expect(await BackupOutputJob.ids(f.fs)).toEqual([]);
+  });
   it('owns fresh backup-open originals across later reads without a second source decode',async()=>{
     const {f,sent}=await contributionTeam(),sender=new WorkspaceSender(f.fs,f.receiver.session,f.store,metadata,f.locks),id=await sender.generateBackup(sent.current.source!.token),job=await BackupOutputJob.open(f.fs,id,metadata);
     const bytes=(await f.fs.readBytes(job.path('metadata.am')))!,expected=bytes.slice(),read=f.fs.readBytes.bind(f.fs);

@@ -1487,6 +1487,17 @@ returning. A frozen-original reconstruction entry makes no live-readiness claim.
 The future Session output boundary must additionally hold the lease and refuse
 unfinished input/output/storage jobs; source capture is not that authority.
 
+PO2026-11-15 approved the bounded [06i evaluation](06i-manual-backup-body-verification-proposal.md).
+Only ordinary manual Backup may use `prepareManualOutput`: retain the same owned
+metadata/evidence and before/after checks, and observe every body's receipt,
+suspect state, existence and actual size without consuming its stream. The fixed
+expected body union is fully verified during generation, then independently in
+the saved archive. Same-size corruption can reject after Start and leave partial
+output, with no completion receipt/handoff. Default `prepare`/`restore` and other
+purposes retain full preflight. Existing recovery, generation and saved-file
+inspection checks remain unchanged. Connect only after measured elapsed
+benefit and safety; todo records whether this conditional gate has passed.
+
 For both capture and independent archive inspection:
 
 - Preserve exact full metadata/history/identity/heads, not projected winners.
