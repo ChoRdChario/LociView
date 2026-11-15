@@ -6,6 +6,7 @@ import { isContributionRemote } from '../projectMetadata/packageRemote';
 import { WorkspaceReceiveJob } from './receiveJob';
 import { ContributionReceiveJob } from './contributionReceiveJob';
 import { CleanInputJob } from './cleanInputJob';
+import { ReviewCopyInputJob } from './reviewCopyInput';
 import type { OutputIntegrityRead } from './outputIntegrityRead';
 import type { ReceiveJobRead } from './jobDiscovery';
 
@@ -15,6 +16,7 @@ export function withReceiveJobDiscovery<Result>(fs: ProjectWorkspaceFS, store: P
   return WorkspaceReceiveJob.withDiscovery(fs, limits, workspace => ContributionReceiveJob.withDiscovery(fs, store, limits, contribution =>
     CleanInputJob.withDiscovery(fs, limits, async clean => {
       const entries = await new TransactionJournal(fs, limits).entries();
+      await ReviewCopyInputJob.ids(fs, limits, entries);
       const physical = { workspace: new Set(workspace.ids), contribution: new Set(contribution.ids), clean: new Set(clean.ids) };
       const ids = { workspace: new Set(physical.workspace), contribution: new Set(physical.contribution), clean: new Set(physical.clean) };
       for (const e of entries) {
@@ -44,7 +46,9 @@ export type ReceiveJobKey = { id: string; kind: 'workspace' | 'contribution' | '
 export async function receiveJobKeys(fs: ProjectWorkspaceFS, limits: MetadataLimits): Promise<ReceiveJobKey[]> {
   const workspace = new Set(await WorkspaceReceiveJob.ids(fs)), contribution = new Set(await ContributionReceiveJob.ids(fs));
   const clean = new Set(await CleanInputJob.ids(fs));
-  for (const e of await new TransactionJournal(fs, limits).entries()) {
+  const entries = await new TransactionJournal(fs, limits).entries();
+  await ReviewCopyInputJob.ids(fs, limits, entries);
+  for (const e of entries) {
     if (e.prepared?.remote && isContributionRemote(e.prepared.remote)) contribution.add(e.start.transactionId);
     else if (e.start.purpose === 'importWorkspace') workspace.add(e.start.transactionId);
     else if (e.start.purpose === 'importClean') clean.add(e.start.transactionId);

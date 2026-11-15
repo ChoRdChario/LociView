@@ -1,7 +1,7 @@
 import type { ProjectWorkspaceFS } from '../platform/fs';
 import { openWorkspaceGeneration } from '../projectMetadata/generationScope';
 import { BackupRestoreJob, type RestoreDatabasePorts } from '../projectPackage/backupRestoreJob';
-import { readRestoreControls, restoreEqual } from '../projectPackage/restoreControls';
+import { readRestoreControls, restoreEqual, assertOriginalTextWorkspace } from '../projectPackage/restoreControls';
 import { validationProjectService } from '../projectFiles/creation';
 import { validationMetadataLimits as limits } from '../projectFiles/validation';
 import type { MetadataSessionRead, ValidationHostOptions } from './validationHost';
@@ -45,9 +45,11 @@ export async function openValidationGeneration(root: ProjectWorkspaceFS, options
     throw Error('バックアップの初回復元を再開してください。');
   if (!options.generations && controls.jobs.length) throw Error('復元用の保存領域に接続できません。');
   const scope = create ? await openWorkspaceGeneration(root, { generationId: null, allowCreate: true, auditReadOperations: true,
+    ...(diagnostics?.context !== 'catalog' ? { ordinaryTextCommit: () => true,
+      assertOriginalTextWritable: () => assertOriginalTextWorkspace(root, limits) } : {}),
     assertSelected: async () => { const current = await readRestoreControls(root, limits);
       if (current.selection) throw Error('プロジェクトの作成先が変わりました。'); },
-    assertWritable: async () => { if ((await readRestoreControls(root, limits)).pending) throw Error('バックアップの復元が未完了です。'); } }, databases.open) :
+    assertWritable: () => assertOriginalTextWorkspace(root, limits) }, databases.open) :
     await BackupRestoreJob.openSelected(root, limits, databases, selected => service = validationGenerationService(selected, options), {
       ordinarySession: diagnostics?.context !== 'catalog',
       reopenTextRecovery: true,

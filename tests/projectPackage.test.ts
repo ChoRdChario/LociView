@@ -927,7 +927,7 @@ describe('connected Workspace ZIP generation and integrity (not admission or ext
         ...data.blobs.map(e => ({ path: e.path, bytes: e.sha256 === data.entry.sha256 ? data.bytes : f.bodies.get(e.sha256)! })),
       ]).arrayBuffer());
       try {
-        for (const chunkSize of [65_536, 2 * block]) {
+        for (const chunkSize of [65_536, block - 1, block, block + 1, 2 * block]) {
           configure({ chunkSize });
           const parts: Uint8Array[] = [];
           const result = await writeCausalArchive(capture, data, [{ path: 'metadata.am', bytes: f.capture.metadataBytes() }], {
@@ -941,7 +941,7 @@ describe('connected Workspace ZIP generation and integrity (not admission or ext
           const actual = Buffer.concat(parts);
           expect(Buffer.compare(actual, Buffer.from(expected))).toBe(0); expect(result.sha256).toBe(packageByteHash(expected));
           expect((await PackageArchive.inspect(new Blob(parts as BlobPart[]))).byteLength).toBe(expected.length);
-          if (chunkSize === 65_536) {
+          if (chunkSize < block) {
             expect(parts).toHaveLength(Math.ceil(expected.length / block));
             expect(parts.slice(0, -1).every(p => p.length === block)).toBe(true);
             expect(parts.at(-1)!.length).toBe(exact ? block : expected.length % block);

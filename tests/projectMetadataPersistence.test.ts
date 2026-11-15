@@ -606,11 +606,38 @@ describe('local generation capabilities (ports only, not backup restore/selectio
     expect(await f.fs.readText(path)).toBe('saved');
   });
 
-  it('restricts text-commit writes to one transaction and document, and expires them with the edit lease', async () => {
+  it.each(['preparation', 'lease-close'] as const)('rejects an original no-op when strict root eligibility changes at %s', async cut => {
+    const f = local(), chosen = setup(f.fs); let allowed = true, prepared = false;
+    const strict = async () => { if (!allowed) throw Error('original root changed'); };
+    const scope = await openWorkspaceGeneration(f.fs, { generationId: null, allowCreate: false, auditReadOperations: true,
+      assertSelected: async () => {}, assertWritable: strict, assertOriginalTextWritable: strict, ordinaryTextCommit: () => true },
+      async () => ({ factory: chosen.storage, dispose: async () => {} }));
+    const accepted = vi.fn(), write = vi.spyOn(f.fs, 'writeText');
+    try {
+      await expect(underWriteLease(scope.fs, async lease => {
+        await selectedTextCommit(scope.fs, scope.factory, lease)!.prepare(async () => { prepared = true; if (cut === 'preparation') allowed = false; });
+        allowed = false;
+      }, accepted)).rejects.toThrow('original root changed');
+      expect(prepared).toBe(true); expect(accepted).not.toHaveBeenCalled(); expect(write).not.toHaveBeenCalled();
+    } finally { write.mockRestore(); await scope.dispose(); }
+  });
+
+  it('requires an explicit original-root text binding and rejects staging/named/read-only mixtures', async () => {
+    const f = local(), chosen = setup(f.fs), audit = async () => {}, ordinaryTextCommit = () => true;
+    const base = { generationId: null, allowCreate: false, auditReadOperations: true, assertSelected: audit, assertWritable: audit, ordinaryTextCommit };
+    for (const variant of [{ generationId: nextId }, { auditReadOperations: false }, { assertWritable: undefined },
+      { ordinaryTextCommit: undefined }, { stagingReadOwner: { assertOwner() {} } }, { assertSelectedWritable: audit }])
+      await expect(openWorkspaceGeneration(f.fs, { ...base, ...variant, assertOriginalTextWritable: audit }, async () => ({ factory: chosen.storage, dispose: async () => {} }))).rejects.toThrow('generation-');
+    const scope = await openWorkspaceGeneration(f.fs, base, async () => ({ factory: chosen.storage, dispose: async () => {} }));
+    try { await underWriteLease(scope.fs, async lease => { expect(selectedTextCommit(scope.fs, scope.factory, lease)).toBeUndefined(); }); }
+    finally { await scope.dispose(); }
+  });
+
+  it.each(['selected', 'original-open', 'original-create'] as const)('restricts %s text-commit writes to one transaction and document, and expires them with the edit lease', async route => {
     const f = local(), chosen = setup(f.fs), audit = vi.fn(async () => {});
     let ordinary = true, escaped: TextCommitPorts | undefined;
-    const scope = await openWorkspaceGeneration(f.fs, { generationId: nextId, allowCreate: false, auditReadOperations: true,
-      assertSelected: audit, assertSelectedWritable: audit, ordinaryTextCommit: () => ordinary },
+    const scope = await openWorkspaceGeneration(f.fs, { generationId: route === 'selected' ? nextId : null, allowCreate: route === 'original-create', auditReadOperations: true,
+      assertSelected: audit, ...(route === 'selected' ? { assertSelectedWritable: audit } : { assertWritable: audit, assertOriginalTextWritable: audit }), ordinaryTextCommit: () => ordinary },
       async () => ({ factory: chosen.storage, dispose: async () => {} }));
     try {
       const tx = 'c'.repeat(32), documentKey = 'owned-document', root = metadataPath(scope.fs, `journal/${tx}/`);

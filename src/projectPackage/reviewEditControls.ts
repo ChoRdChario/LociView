@@ -1,7 +1,7 @@
 import type { ProjectWorkspaceFS } from '../platform/fs';
 import { fail, type MetadataLimits } from '../projectMetadata/format';
 import { equalBytes, json, readReceipt, technicalId, writeReceipt, withMetadataRead } from '../projectMetadata/persistence';
-import { TransactionJournal } from '../projectMetadata/journal';
+import { TransactionJournal, type JournalEntry } from '../projectMetadata/journal';
 import type { EvidenceRef } from './contract';
 import { PACKAGE_LIMITS as L } from './contract';
 import { cleanInputDescriptor, packageReference as reference } from './cleanInputDescriptor';
@@ -10,6 +10,7 @@ import { PreparedReviewEdit } from './reviewEdit';
 import { CleanArchive } from './cleanArchive';
 import { workspacePackageRoot } from './workspaceBases';
 import type { OutputIntegrityRead } from './outputIntegrityRead';
+import { ReviewCopyInputJob } from './reviewCopyInput';
 
 export interface ReviewEditBinding { jobId: string; prepared: EvidenceRef }
 export interface CompletedReviewChild { readonly childId: string; readonly binding: Readonly<ReviewEditBinding> }
@@ -191,9 +192,12 @@ export async function reviewEditStates(fs: ProjectWorkspaceFS, limits: MetadataL
   return states;
 }
 
-export async function assertReviewEditSlot(fs: ProjectWorkspaceFS, limits: MetadataLimits, ownChild?: string, integrity?: OutputIntegrityRead) {
+export async function assertReviewEditSlot(fs: ProjectWorkspaceFS, limits: MetadataLimits, ownChild?: string, integrity?: OutputIntegrityRead, textChain?: readonly JournalEntry[], outputJournal?: readonly JournalEntry[]) {
+  if (outputJournal) { if (!integrity || textChain) fail('output-journal-owner'); integrity!.assertOwner(fs, limits); }
   const child = ownChild, ownedLimits = { ...limits };
   const inspect = async (fs: ProjectWorkspaceFS, scope?: OutputIntegrityRead) => {
+    if (textChain) await ReviewCopyInputJob.assertTextSlot(fs, ownedLimits, textChain);
+    else await ReviewCopyInputJob.assertSlot(fs, ownedLimits, child, scope, outputJournal);
     const eligible = new Set<string>();
     const states = await readReviewEditStates(fs, ownedLimits, undefined, (id, childId) => {
       if (childId === child) eligible.add(id);

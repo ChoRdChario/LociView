@@ -30,6 +30,7 @@ import { BackupOutputJob, checkedBackupLabel, measureBackupOutput, type BackupOu
 import { BackupSourceCapture } from '../projectPackage/backupSource';
 import { CleanOutputJob } from '../projectPackage/cleanOutputJob';
 import { CleanInputJob } from '../projectPackage/cleanInputJob';
+import { ReviewCopyInputJob } from '../projectPackage/reviewCopyInput';
 import { assertReviewEditSlot } from '../projectPackage/reviewEditControls';
 import { OutputIntegrityRead } from '../projectPackage/outputIntegrityRead';
 import { CleanSourceCapture, cleanProtectedInventory } from '../projectPackage/cleanSource';
@@ -216,14 +217,15 @@ export class MetadataProjectSession {
       } finally { active = false; await Promise.allSettled([...pending]); }
     });
   }
-  private async readCandidate(integrity?: OutputIntegrityRead, ports?: MetadataReadPorts, editingText = false, requireReadyPublished = false, preparation?: MetadataReadPorts): Promise<{
+  private async readCandidate(integrity?: OutputIntegrityRead, ports?: MetadataReadPorts, editingText = false, requireReadyPublished = false, preparation?: MetadataReadPorts, observedJournal?: readonly JournalEntry[]): Promise<{
     read: MetadataSessionRead; acknowledged?: Set<string>; localChanges?: Set<string>; publishedStart?: JournalStart; priorPublications?: JournalEntry[]; witnessWork?: number
   }> {
     try {
       if (ports && !ports.factory) return fail('generation-storage-binding');
       const fs = ports?.fs ?? this.fs, journal = ports ? new TransactionJournal(fs, this.limits) : this.journal;
       const repository = ports ? new MetadataRepository(fs, ports.factory!, this.limits) : this.repository;
-      const entries = await journal.entries(), published = entries.filter(e => e.publication).at(-1);
+      if (observedJournal) { if (!integrity) return fail('output-journal-owner'); integrity.assertOwner(fs, this.limits); }
+      const entries = observedJournal ?? await journal.entries(), published = entries.filter(e => e.publication).at(-1);
       const restored = await journal.readRestoredBases(entries).then(result => ports && result ? {
         id: result.entry.start.transactionId, parts: result.source.originalChanges(),
         blobs: result.description.blobs, requiredCapabilities: result.description.requiredCapabilities,
@@ -252,10 +254,11 @@ export class MetadataProjectSession {
           partHashes.add(hash);
           const included = originals.get(hash);
           if (!included || !equalBytes(included, bytes)) fail('published-transaction-missing');
-          if (['initialize', 'localCommand', 'importClean', 'appendScene'].includes(entry.start.purpose)) localChanges.add(hash);
+          if (['initialize', 'localCommand', 'importClean', 'copyReview', 'appendScene'].includes(entry.start.purpose)) localChanges.add(hash);
         }
         if (entry.start.purpose === 'importWorkspace') await journal.validateImport(entry.prepared!);
         else if (entry.start.purpose === 'importClean') await CleanInputJob.validateJournalFresh(fs, entry.start.transactionId, this.limits, entry.prepared!, integrity);
+        else if (entry.start.purpose === 'copyReview') await ReviewCopyInputJob.validateJournalFresh(fs, entry.start.transactionId, this.limits, entry.prepared!, integrity, observedJournal);
         else if (entry.start.purpose === 'restoreBackup') { /* Original history and binding checked together above. */ }
         else if (entry.prepared!.remote) {
           const base = await repository.read(entry.start.repositoryId, entry.start.proof, entry.start.baseHeads);
@@ -275,7 +278,7 @@ export class MetadataProjectSession {
       if (pending && requireReadyPublished && !ready) fail('provider-not-ready');
       return { read: Object.freeze({ state: pending ? 'pending' : ready ? 'ready' : 'repair-required',
         source: source!, provider, publication: published.start.transactionId }), acknowledged, localChanges, publishedStart: published.start,
-        priorPublications: !pending ? entries : undefined, witnessWork };
+        priorPublications: !pending ? [...entries] : undefined, witnessWork };
     } catch (error) {
       this.verifiedPublications = undefined;
       if (editingText && error instanceof MetadataSourceError && error.code === 'command-base-changed') throw error;
@@ -381,11 +384,13 @@ export class MetadataProjectSession {
     let acceptText: (() => void) | undefined;
     return underWriteLease(this.fs, async lease => {
       const isText = command.kind === 'editCaption' && Object.keys(command.edits).every(name => name === 'title' || name === 'body');
-      const commit = isText ? selectedTextCommit(this.fs, this.storage, lease) : undefined;
+      const textReady = this.last.state === 'ready' && this.acknowledgmentsLoaded && !!this.verifiedPublications && !this.retained;
+      const commit = isText && textReady ? selectedTextCommit(this.fs, this.storage, lease) : undefined;
       if (commit && command.kind === 'editCaption') {
         const captionId = command.captionId;
         const { candidate, transaction, prepared, projected } = await commit.prepare(async ports => {
-          await this.measure('text.slot', () => assertReviewEditSlot(ports.fs, this.limits));
+          const textChain = this.last.state === 'ready' && this.acknowledgmentsLoaded && !this.retained ? this.verifiedPublications : undefined;
+          await this.measure('text.slot', () => assertReviewEditSlot(ports.fs, this.limits, undefined, undefined, textChain));
           const candidate = await this.measure('text.base', () => this.readTextCandidate(ports, captionId));
           const { state, source, provider } = candidate.read;
           if (state !== 'ready' || !source || !provider || source.token !== expectedToken || !candidate.publishedStart) return fail('command-not-ready');
@@ -525,7 +530,7 @@ export class MetadataProjectSession {
   async sceneAppendStates(entries?: Awaited<ReturnType<TransactionJournal['entries']>>): Promise<SceneAppendState[]> {
     return this.readSceneAppendStates(this.fs, this.journal, entries);
   }
-  private async readSceneAppendStates(fs: ProjectWorkspaceFS, journal: TransactionJournal, entries?: Awaited<ReturnType<TransactionJournal['entries']>>): Promise<SceneAppendState[]> {
+  private async readSceneAppendStates(fs: ProjectWorkspaceFS, journal: TransactionJournal, entries?: readonly JournalEntry[]): Promise<SceneAppendState[]> {
     const ids = await sceneAppendIds(fs, this.limits);
     if (!ids.length) return [];
     try { entries ??= await journal.entries(); }
@@ -643,15 +648,17 @@ export class MetadataProjectSession {
     await withMetadataRead(this.fs, this.storage, async ports => {
       const { fs } = ports;
       await OutputIntegrityRead.run(fs, this.limits, signal, async integrity => {
-        await assertReviewEditSlot(fs, this.limits, undefined, integrity);
-        candidate = await this.readCandidate(integrity, ports); integrity.assertOwner(fs, this.limits);
-        const read = candidate.read; if (read.state !== 'ready' || !read.source || !read.publication) return fail('output-not-ready');
-        await withReceiveJobDiscovery(fs, this.receiveStore(), this.limits, async rows => { for (const row of rows) {
-          const observed = await row.read();
-          if (observed.state === 'abandoned') continue;
-          if (observed.state !== 'started' || !observed.kinds.some(kind => ['baseRecorded', 'contributionPublished', 'contributionAlreadyPresent', 'cleanPublished', 'cancelled'].includes(kind))) return fail('output-receive-pending');
-          integrity.assertOwner(fs, this.limits);
-        } }, integrity);
+        await withReceiveJobDiscovery(fs, this.receiveStore(), this.limits, async (rows, entries) => {
+          await assertReviewEditSlot(fs, this.limits, undefined, integrity, undefined, entries);
+          candidate = await this.readCandidate(integrity, ports, false, false, undefined, entries); integrity.assertOwner(fs, this.limits);
+          const read = candidate.read; if (read.state !== 'ready' || !read.source || !read.publication) return fail('output-not-ready');
+          for (const row of rows) {
+            const observed = await row.read();
+            if (observed.state === 'abandoned') continue;
+            if (observed.state !== 'started' || !observed.kinds.some(kind => ['baseRecorded', 'contributionPublished', 'contributionAlreadyPresent', 'cleanPublished', 'cancelled'].includes(kind))) return fail('output-receive-pending');
+            integrity.assertOwner(fs, this.limits);
+          }
+        }, integrity);
       }, this.timing && (milliseconds => { try { this.timing?.('metadata.output.archive-inspect', milliseconds); } catch { /* Diagnostics have no authority. */ } }));
     });
     if (!candidate) return fail('output-not-ready');
@@ -909,14 +916,22 @@ export class MetadataProjectSession {
 
   /** Exact history-free input, admitted as a new independent Project only. */
   async initializeClean(input: CleanInputJob): Promise<MetadataSessionRead> {
+    return this.initializeIndependent(input);
+  }
+  /** Fixed Review originals and metadata, without a generated intermediate container. */
+  async initializeReviewCopy(input: ReviewCopyInputJob): Promise<MetadataSessionRead> {
+    return this.initializeIndependent(input);
+  }
+  private async initializeIndependent(input: CleanInputJob | ReviewCopyInputJob): Promise<MetadataSessionRead> {
     input.assertOwner(this.fs);
     return underWriteLease(this.fs, async () => {
       await this.assertReceiveSlot(input.id);
       if (!this.modelFacts?.planImported || !this.media?.inventory) return fail('clean-import-unconnected');
-      let job = input.start ? await CleanInputJob.open(this.fs, input.id, this.limits) : input;
-      const entries = await this.journal.entries(), own = entries.find(e => e.start.transactionId === job.id), source = job.inspection.source;
-      if (own && (own.start.purpose !== 'importClean' || json(own.start.proof) !== json(source.proof)) || entries.length && !own ||
+      let job = input.start ? input instanceof ReviewCopyInputJob ? await ReviewCopyInputJob.open(this.fs, input.id, this.limits) : await CleanInputJob.open(this.fs, input.id, this.limits) : input;
+      const entries = await this.journal.entries(), own = entries.find(e => e.start.transactionId === job.id), source = job.source;
+      if (own && (own.start.purpose !== job.purpose || json(own.start.proof) !== json(source.proof)) || entries.length && !own ||
         this.retained && this.retained.start.transactionId !== job.id) return fail('clean-import-not-empty');
+      if (own && job instanceof ReviewCopyInputJob) job.assertJournalStart(own.start);
       if (!own && (await this.fs.list(metadataPath(this.fs, ''))).length) return fail('clean-import-not-empty');
       await this.repository.assertImportNamespace(own?.start.repositoryId);
       const inventory = await job.inventory();
@@ -928,18 +943,20 @@ export class MetadataProjectSession {
       }
       if (entries.some(e => e !== own)) return fail('clean-import-other-transaction');
       if (!own?.prepared) {
-        const facts = await this.modelFacts.planImported(source, ref => job.inspection.archive.entryBlob(`blobs/sha256/${ref.digest}`), incomingBlobs(job.inspection.archive.control.manifest.blobs));
+        const facts = await this.modelFacts.planImported(source, ref => job.bodyBlob(ref), incomingBlobs(job.blobEntries));
         if (facts.baseToken !== null || facts.finalToken !== source.token) return fail('model-facts-token');
         const introduced = new Set((facts.stagedBlobs ?? []).map(b => b.digest));
         await this.media.inventory(inventory.filter(b => !introduced.has(b.digest)));
         const parts = source.originalChanges();
         if (!job.start) job = await job.persist((facts.stagedBlobs ?? []).reduce((n, b) => n + (b.byteLength as number), 0) + parts.reduce((n, b) => n + b.length * 4, 0));
         this.retained = { start: own?.start ?? { transactionId: job.id, repositoryId: job.id, predecessor: null,
-          purpose: 'importClean', proof: source.proof, baseHeads: [], ...capabilityFields(source.requiredCapabilities) }, parts,
+          purpose: job.purpose, proof: source.proof, baseHeads: [], ...capabilityFields(source.requiredCapabilities),
+          ...(job instanceof ReviewCopyInputJob ? { reviewCopy: job.binding() } : {}) }, parts,
           ...(facts.stagedBlobs?.length ? { stagedBlobs: [...facts.stagedBlobs] } : {}),
           modelFacts: { next: source, plan: { ...facts, stage: async () => { await facts.stage(); await this.media!.inventory!(inventory); } } } };
       } else { this.retained = null; await job.validateJournal(own.prepared); await this.media.inventory(inventory); }
-      await this.resume(job); await job.complete(); return this.read();
+      const current = await this.resume(job instanceof CleanInputJob ? job : undefined, undefined, job instanceof ReviewCopyInputJob ? job : undefined);
+      await job.complete(); return current;
     });
   }
   async abandonCleanInput(id: string) {
@@ -1257,7 +1274,7 @@ export class MetadataProjectSession {
     return { read, chain, hash: prepared.changes[0]!.expectedChangeHash };
   }
 
-  private async resume(receiveJob?: ReceiveJob, restoreJob?: BackupRestoreJob): Promise<MetadataSessionRead> {
+  private async resume(receiveJob?: ReceiveJob, restoreJob?: BackupRestoreJob, reviewCopy?: ReviewCopyInputJob): Promise<MetadataSessionRead> {
     const fs = this.fs, journal = this.journal, repository = this.repository;
     const entries = await journal.entries(), pending = entries.find(e => !e.publication);
     if (!this.acknowledgmentsLoaded && entries.some(e => e.publication)) {
@@ -1265,6 +1282,11 @@ export class MetadataProjectSession {
       if (!this.acknowledgmentsLoaded) return fail('retained-media-witness');
     }
     const transactionId = pending?.start.transactionId ?? this.retained?.start.transactionId;
+    if ((pending?.start ?? this.retained?.start)?.purpose === 'copyReview') {
+      if (!reviewCopy || reviewCopy.id !== transactionId || !this.media?.inventory) return fail('review-copy-recovery-required');
+      reviewCopy.assertOwner(this.fs);
+      reviewCopy.assertJournalStart((pending?.start ?? this.retained!.start));
+    }
     if ((pending?.start ?? this.retained?.start)?.purpose === 'restoreBackup') {
       if (!restoreJob || restoreJob.id !== transactionId || !this.media) return fail('restore-job-recovery-required');
       await restoreJob.assertStaging(this.fs, this.storage);
@@ -1290,7 +1312,7 @@ export class MetadataProjectSession {
         const { plan, next } = this.retained.modelFacts;
         await this.journal.begin(this.retained.start);
         if (pending?.prepared) fail('model-facts-after-prepared');
-        if (this.retained.start.purpose === 'importWorkspace' || this.retained.start.purpose === 'restoreBackup' || this.retained.start.purpose === 'importClean') {
+        if (['importWorkspace', 'restoreBackup', 'importClean', 'copyReview'].includes(this.retained.start.purpose)) {
           if (plan.baseToken !== null || next.token !== plan.finalToken) fail('model-facts-base');
         } else {
           const base = await this.repository.read(this.retained.start.repositoryId, this.retained.start.proof, this.retained.start.baseHeads);
@@ -1312,7 +1334,7 @@ export class MetadataProjectSession {
       }
       await this.measure('resume.before-journal-bodies', async () => this.verifyDelta(this.retained!.stagedBlobs, this.retained!.stagedBlobs?.length ? await this.mediaVerificationContext(this.retained!.start, this.retained!.parts, restoreJob?.inspection.description.mediaRecords) : undefined));
       if (this.retained.stagedBlobs?.length) {
-        if (this.retained.start.purpose === 'importWorkspace' || this.retained.start.purpose === 'restoreBackup' || this.retained.start.purpose === 'importClean') {
+        if (['importWorkspace', 'restoreBackup', 'importClean', 'copyReview'].includes(this.retained.start.purpose)) {
           await this.checked(ProjectMetadataSource.reopen(this.retained.parts, this.retained.start.proof, this.limits), false);
         } else {
           const stored = await this.repository.read(this.retained.start.repositoryId, this.retained.start.proof);
@@ -1334,7 +1356,7 @@ export class MetadataProjectSession {
     const checkedParts = portable ? await this.journal.validateParts(prepared) : undefined;
     await this.measure('resume.prepared-bodies', async () => this.verifyDelta(prepared.stagedBlobs, checkedParts ? await this.mediaVerificationContext(prepared.start, checkedParts, restoreJob?.inspection.description.mediaRecords) : undefined));
     const parts = checkedParts ?? await journal.validateParts(prepared), start = prepared.start;
-    const initial = start.purpose === 'initialize' || start.purpose === 'importWorkspace' || start.purpose === 'restoreBackup' || start.purpose === 'importClean';
+    const initial = ['initialize', 'importWorkspace', 'restoreBackup', 'importClean', 'copyReview'].includes(start.purpose);
     let stored = await repository.read(start.repositoryId, start.proof, undefined, initial);
     let base: ProjectMetadataSource | null = null;
     if (!initial) {
@@ -1354,9 +1376,9 @@ export class MetadataProjectSession {
       if (!stored || !base) return fail('remote-base-missing');
       next = await this.journal.validateRemote(prepared, base);
       checkRemoteStored(stored, base, next, !!pending?.durable);
-    } else if (start.purpose === 'importWorkspace' || start.purpose === 'restoreBackup' || start.purpose === 'importClean') {
+    } else if (['importWorkspace', 'restoreBackup', 'importClean', 'copyReview'].includes(start.purpose)) {
       if (start.purpose === 'importClean' && !(receiveJob instanceof CleanInputJob)) return fail('clean-input-recovery-required');
-      next = start.purpose === 'importClean' ? await (receiveJob as CleanInputJob).validateJournal(prepared) :
+      next = start.purpose === 'copyReview' ? await reviewCopy!.validateJournal(prepared) : start.purpose === 'importClean' ? await (receiveJob as CleanInputJob).validateJournal(prepared) :
         start.purpose === 'restoreBackup' ? await this.measure('resume.restore-journal', () => this.journal.validateRestore(prepared)) : await this.journal.validateImport(prepared);
       const allowed = new Map(next.originalChanges().map(b => [A.decodeChange(b).hash, b]));
       for (const bytes of stored?.originalChanges() ?? []) {
@@ -1374,7 +1396,7 @@ export class MetadataProjectSession {
     const predecessor = entries.find(e => e.start.transactionId === start.predecessor);
     checkRequiredCapabilities(start.requiredCapabilities, capabilityUnion(readRequiredCapabilities(predecessor?.start.requiredCapabilities), next.requiredCapabilities, incoming.requiredCapabilities));
     for (const ref of incoming.blobs) { witness(); this.acknowledgedMedia.add(`${ref.sha256}:${ref.byteLength}`); }
-    if (['initialize', 'localCommand', 'importClean', 'appendScene'].includes(start.purpose))
+    if (['initialize', 'localCommand', 'importClean', 'copyReview', 'appendScene'].includes(start.purpose))
       for (const part of prepared.changes) { witness(); this.acknowledgedLocalChanges.add(part.expectedChangeHash); }
     // Exact pending changes can coexist with legitimate extra local heads; never rebase or choose a winner.
     await this.measure('resume.final-content', () => this.checked(next, false));
@@ -1385,6 +1407,7 @@ export class MetadataProjectSession {
       await this.verifyDelta(await reactivatedCaptionMedia(base, restored, this.limits), restored.requiredCapabilities.includes(PORTABLE_MEDIA_CAPABILITY) ? restored.mediaRecords() : undefined);
     }
     if (receiveJob) await this.media!.inventory!(await receiveJob.inventory());
+    if (reviewCopy) await this.media!.inventory!(await reviewCopy.inventory());
     if (restoreJob) await this.measure('resume.restore-bodies', () => this.media!.verify(restoreJob.inventory(), restoreJob.inspection.description.mediaRecords));
     stored = await this.measure('resume.persist-readback', () => repository.persist(start.repositoryId, next));
     if (!stored) fail('durable-source-missing');
@@ -1395,7 +1418,7 @@ export class MetadataProjectSession {
       if (!saved || !equalBytes(saved, bytes)) fail('durable-change-missing');
     }
     await this.measure('resume.saved-content', () => this.checked(stored!, false));
-    if ((start.purpose === 'importClean' || start.purpose === 'appendScene') && stored!.token !== next.token) fail('journal-final-heads');
+    if (['importClean', 'copyReview', 'appendScene'].includes(start.purpose) && stored!.token !== next.token) fail('journal-final-heads');
     if (prepared.remote && json(stored!.heads) !== json(prepared.remote.expectedFinalHeads)) fail('remote-final-heads');
     this.fs.mutationAuthority.assertWorkspaceWriteAuthorized();
     await this.measure('resume.publish', () => journal.publish(prepared, stored!));
@@ -1407,7 +1430,7 @@ export class MetadataProjectSession {
   }
   private async mediaVerificationContext(start: JournalStart, parts: readonly Uint8Array[], archived: readonly JsonObject[] = []) {
     if (!hasPortableMediaCapability(start.requiredCapabilities)) return undefined;
-    const initial = ['initialize', 'importWorkspace', 'restoreBackup', 'importClean'].includes(start.purpose);
+    const initial = ['initialize', 'importWorkspace', 'restoreBackup', 'importClean', 'copyReview'].includes(start.purpose);
     const base = initial ? null : await this.repository.read(start.repositoryId, start.proof, start.baseHeads);
     if (!initial && !base) return fail('journal-base-missing');
     const candidate = initial ? ProjectMetadataSource.reopen(parts, start.proof, this.limits) : base!.appendOriginal(parts);

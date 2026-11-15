@@ -60,7 +60,7 @@ import { assetCopySource, prepareAssetMembershipCopy } from '../src/projectMetad
 import { pickResidentSurface } from '../src/harness/projectScene/viewportPicking';
 import { fixtureModelIds } from '../src/harness/projectScene/modelClosure';
 import { openValidationHost, openValidationEntry, validationArea } from '../src/harness/projectScene/validationHost';
-import { openValidationEntry as openTypedValidationEntry, validatedResumeReading } from '../src/projectScene/validationHost';
+import { openValidationHost as openTypedValidationHost, openValidationEntry as openTypedValidationEntry, validatedResumeReading } from '../src/projectScene/validationHost';
 import * as resumeReadingModule from '../src/projectScene/resumeReading';
 import * as validationGenerationModule from '../src/projectScene/validationGeneration';
 import { browserMetadataDatabaseNames, browserOriginalDatabasePresent } from '../src/harness/projectScene/browserMetadataStorage';
@@ -118,6 +118,7 @@ import { ReviewArchive } from '../src/projectPackage/reviewArchive';
 import { ReviewOutputJob } from '../src/projectPackage/reviewOutputJob';
 import { PreparedReviewEdit, createReviewEditScratch } from '../src/projectPackage/reviewEdit';
 import { ReviewEditJob } from '../src/projectPackage/reviewEditJob';
+import { PreparedReviewCopy, ReviewCopyInputJob } from '../src/projectPackage/reviewCopyInput';
 import { assertReviewEditSlot, readReviewEdit, reviewEditRoot, type ReviewEditBinding } from '../src/projectPackage/reviewEditControls';
 import { prepareReviewView } from '../src/harness/projectScene/reviewView';
 import { createReviewWorkspace } from '../src/projectScene/reviewWorkspace';
@@ -8283,7 +8284,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect(copied!.workspaceFiles.reviewCopies[0]!.state).toBe('completed'); expect(copied!.workspaceFiles.jobs).toEqual([]);
     expect(copied!.read().source!.proof).not.toEqual(host.read().source!.proof); expect(copied!.workspaceOutput.bases).toEqual([]);
     const discovery = vi.spyOn(ReviewEditJob.prototype, 'states').mockImplementationOnce(async observe => {
-      observe?.({ childId: attempt.childId, binding: { jobId: attempt.id, prepared: { sha256: '0'.repeat(64), byteLength: 1 } } });
+      observe?.({ childId: newId(), binding: { jobId: attempt.id, prepared: { sha256: '0'.repeat(64), byteLength: 1 } } });
       throw Error('injected current discovery failure');
     }), jobs = vi.spyOn(WorkspaceReceiver.prototype, 'jobs'), baseChoices = vi.spyOn(WorkspaceSender.prototype, 'availableBases');
     try {
@@ -8302,6 +8303,266 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect(cold.authority.read().modelVersions).toHaveLength(1); expect(cold.workspaceOutput.bases).toEqual([]);
     expect(host.read().source!.token).toBe(token); expect(await digest(new Uint8Array(await file.arrayBuffer()))).toBe(attempt.descriptor().original.sha256);
     await cold.dispose(); tools.dispose(); await workspace.dispose();
+  }, 60000);
+  it.each(['host', 'entry'] as const)('direct Review copy %s admits one package lease before creating storage and reacquires on retry', async entry => {
+    const source = await openFileCaption(), output = await source.host.workspaceOutput.generateReview(source.host.read().source!.token, { sceneId: source.s.sceneId });
+    const prepared = await PreparedReviewCopy.fromInspectedReview(await ReviewArchive.inspect(await source.host.workspaceOutput.download(output), metadata), metadata);
+    const fs = new TestFS(), raw = lockManager(), factory = storageFactory(), creates: boolean[] = [], requests: string[] = [];
+    const packageKey = 'lociview:package-operation:v1'; let packageHeld = false, host: { dispose(): Promise<void> } | undefined;
+    const locks = { request(name: string, options: LockOptions, action: (lock: Lock | null) => Promise<unknown>) {
+      requests.push(name);
+      return raw.request(name, options, async lock => {
+        const owns = name === packageKey && !!lock; if (owns) packageHeld = true;
+        try { return await action(lock); } finally { if (owns) packageHeld = false; }
+      });
+    } } as unknown as LockManager;
+    const store = new OriginBlobStore(fs, { maxBlobBytes: budget.maxFileBytes, maxChunkBytes: 1_000_000, maxChunks: 10000, metadata }, locks);
+    const options = { base: fs, coordinator: ProjectMutationCoordinator.browser(locks), store, fileLimits: budget, decode,
+      run: prepared.run, packageLocks: locks, reviewEdit: prepared, openStorage: async (create: boolean) => {
+        if (create) expect(packageHeld).toBe(true); creates.push(create); return { factory, dispose: async () => {} };
+      } };
+    const open = entry === 'entry' ? openTypedValidationEntry : openTypedValidationHost;
+    const before = await fs.list(''), text = vi.spyOn(fs, 'writeText'), bytes = vi.spyOn(fs, 'writeBytes'), stream = vi.spyOn(fs, 'writeStream');
+    try {
+      await expect(open({ ...options, packageLocks: null })).rejects.toThrow('排他的');
+      await locks.request(packageKey, { mode: 'exclusive' }, async () => {
+        await expect(open(options)).rejects.toThrow('別のファイル処理');
+      });
+      expect(creates).toEqual([]); expect(await fs.list('')).toEqual(before);
+      expect(text).not.toHaveBeenCalled(); expect(bytes).not.toHaveBeenCalled(); expect(stream).not.toHaveBeenCalled();
+      requests.length = 0;
+      const opened = await open(options); if ('kind' in opened) throw Error('Unexpected first-backup recovery'); host = opened;
+      expect(opened.read().state).toBe('ready'); expect(creates).toEqual([true]); expect(packageHeld).toBe(false);
+      expect(requests.filter(name => name === packageKey)).toHaveLength(1);
+      const token = opened.read().source!.token;
+      await locks.request(packageKey, { mode: 'exclusive' }, async () => {
+        await expect(opened.workspaceFiles.retryReviewCopy(prepared.id)).rejects.toThrow('別のファイル処理');
+      });
+      expect(opened.read().source!.token).toBe(token); requests.length = 0;
+      await opened.workspaceFiles.retryReviewCopy(prepared.id);
+      expect(requests.filter(name => name === packageKey)).toHaveLength(1); expect(opened.read().source!.token).toBe(token);
+    } finally { text.mockRestore(); bytes.mockRestore(); stream.mockRestore(); await host?.dispose(); await source.workspace.dispose(); }
+  }, 60000);
+  it.each(['original', 'staging', 'completion'] as const)('direct Review copy cold-recovers %s without intermediate ZIPs or a second Project', async stage => {
+    const source = await openFileCaption(), output = await source.host.workspaceOutput.generateReview(source.host.read().source!.token, { sceneId: source.s.sceneId });
+    const file = await source.host.workspaceOutput.download(output), prepared = await PreparedReviewCopy.fromInspectedReview(await ReviewArchive.inspect(file, metadata), metadata);
+    const fs = new TestFS(), locks = lockManager(), factory = storageFactory(), creates: boolean[] = [];
+    const store = new OriginBlobStore(fs, { maxBlobBytes: budget.maxFileBytes, maxChunkBytes: 1_000_000, maxChunks: 10000, metadata }, locks);
+    const options = { base: fs, coordinator: ProjectMutationCoordinator.browser(locks), store, fileLimits: budget, decode,
+      run: prepared.run, packageLocks: locks, openStorage: async (create: boolean) => { creates.push(create); return { factory, dispose: async () => {} }; } };
+    fs.reject = path => stage === 'original' ? path.includes('/review-copy/') && path.endsWith('/original.zip') :
+      stage === 'staging' ? path.includes('/journal/') && path.endsWith('/blobsVerified.json') : path.includes('/review-copy/') && path.endsWith('/published.json');
+    const first = await openValidationHost({ ...options, reviewEdit: prepared });
+    expect(first.hasPending()).toBe(true); expect(first.workspaceFiles.jobs).toEqual([]);
+    expect(first.workspaceFiles.reviewCopies).toEqual([{ id: prepared.id, state: stage === 'original' ? 'input-required' : 'incomplete' }]);
+    await first.dispose(); fs.reject = () => false;
+    expect(await listValidationProjects(options, (_run, create) => options.openStorage(create))).toEqual([expect.objectContaining({ run: prepared.run, state: 'incomplete' })]);
+    const cold = await openValidationHost(options);
+    if (stage === 'original') {
+      await expect(cold.workspaceFiles.reselectReviewCopy(prepared.id, new Blob(['bad input']))).rejects.toThrow();
+      await cold.workspaceFiles.reselectReviewCopy(prepared.id, file);
+    } else await cold.workspaceFiles.retryReviewCopy(prepared.id);
+    expect(cold.hasPending()).toBe(false); expect(cold.read().source!.originalChanges()).toEqual(prepared.source.originalChanges());
+    const sceneId = Object.keys(cold.authority.read().state.scenes)[0]!;
+    await cold.authority.authorScene!(cold.read().source!.token, { kind: 'renameScene', sceneId, name: '直接コピーで後続編集' });
+    const token = cold.read().source!.token;
+    await cold.workspaceFiles.retryReviewCopy(prepared.id); expect(cold.read().source!.token).toBe(token);
+    const paths = await fs.list('');
+    expect(paths.filter(p => p.endsWith('/original.zip'))).toHaveLength(1);
+    expect(paths.some(p => /copy\.zip|clean-input|transient-review-copy/.test(p))).toBe(false);
+    expect(cold.workspaceOutput.bases).toEqual([]); await cold.dispose();
+    const reopened = await openValidationHost(options); expect(reopened.read().source!.token).toBe(token); expect(reopened.hasPending()).toBe(false);
+    expect(creates.slice(1).every(create => !create)).toBe(true); await reopened.dispose(); await source.workspace.dispose();
+  }, 60000);
+  it('direct Review copy retains fixed originals, rejects acknowledged loss, and refuses generic recovery', async () => {
+    const source = await openFileCaption(), output = await source.host.workspaceOutput.generateReview(source.host.read().source!.token, { sceneId: source.s.sceneId });
+    const file = await source.host.workspaceOutput.download(output), prepared = await PreparedReviewCopy.fromInspectedReview(await ReviewArchive.inspect(file, metadata), metadata);
+    try {
+      for (const loss of ['original.zip', 'metadata.am', 'recipe.json', 'start.json', 'parts', 'entire-directory'] as const) {
+        const r = firstWorkspaceRecipient(), facade = new ReviewEditJob(r.fs, r.session, metadata), root = `v2/packages/review-copy/${prepared.id}/`;
+        r.fs.reject = p => p.includes('/journal/') && p.endsWith('/metadataDurable.json');
+        await expect(facade.start(prepared)).rejects.toThrow(); r.fs.reject = () => false;
+        const journal = new TransactionJournal(r.fs, metadata), entries = await journal.entries();
+        expect(entries[0]!.start).toMatchObject({ purpose: 'copyReview', reviewCopy: { sha256: expect.any(String) } }); expect(entries[0]!.prepared).not.toBeNull();
+        if (loss === 'entire-directory') {
+          for (const p of await r.fs.list(root)) await r.fs.remove(p);
+          await r.fs.remove(`v2/packages/review-copy-index/${prepared.id}.json`);
+        } else if (loss === 'parts') await r.fs.remove(journal.path(prepared.id, 'changes/00000000.amchange'));
+        else await r.fs.remove(`${root}${loss}`);
+        const paths = await r.fs.list(''), write = vi.spyOn(r.fs, 'writeStream'), cold = r.reopen(), retry = new ReviewEditJob(r.fs, cold.session, metadata);
+        try {
+          await expect(retry.retry(prepared.id)).rejects.toThrow(); await expect(retry.reselect(prepared.id, file)).rejects.toThrow();
+          await expect(retry.abandon(prepared.id)).rejects.toThrow(); await expect(cold.session.retry()).rejects.toThrow();
+          expect(await retry.states()).toEqual([{ id: prepared.id, state: 'repair-required' }]);
+          expect(write).not.toHaveBeenCalled(); expect(await r.fs.list('')).toEqual(paths);
+        } finally { write.mockRestore(); }
+      }
+    } finally { await source.workspace.dispose(); }
+  }, 60000);
+  it('direct Review copy rejects changed metadata, recipe, original, bindings and namespace collisions before mutation', async () => {
+    const source = await openFileCaption(), output = await source.host.workspaceOutput.generateReview(source.host.read().source!.token, { sceneId: source.s.sceneId });
+    const file = await source.host.workspaceOutput.download(output), prepared = await PreparedReviewCopy.fromInspectedReview(await ReviewArchive.inspect(file, metadata), metadata);
+    try {
+      const r = firstWorkspaceRecipient(), facade = new ReviewEditJob(r.fs, r.session, metadata), root = `v2/packages/review-copy/${prepared.id}/`;
+      await facade.start(prepared);
+      for (const leaf of ['original.zip', 'metadata.am', 'recipe.json', 'prepared.json', 'start.json', 'published.json'] as const) {
+        const path = `${root}${leaf}`, original = (await r.fs.readBytes(path))!, altered = original.slice(); altered[0] = altered[0]! ^ 1;
+        await r.fs.writeBytes(path, altered); const write = vi.spyOn(r.fs, 'writeStream');
+        try { await expect(facade.retry(prepared.id)).rejects.toThrow(); expect(write).not.toHaveBeenCalled(); }
+        finally { write.mockRestore(); await r.fs.writeBytes(path, original); }
+      }
+      const canonicalCases: [string, (value: any) => void][] = [
+        ['prepared.json', d => { d.destination.identity.projectId = `prj_${newId()}`; }],
+        ['prepared.json', d => { d.roots.blobs[0].sha256 = 'f'.repeat(64); }],
+        ['prepared.json', d => { d.initialChanges.reverse(); }],
+        ['recipe.json', recipe => { recipe.identity.projectId = `prj_${newId()}`; }],
+        ['index', marker => { marker.prepared.sha256 = 'f'.repeat(64); }],
+      ];
+      for (const [leaf, mutate] of canonicalCases) {
+        const path = leaf === 'index' ? `v2/packages/review-copy-index/${prepared.id}.json` : `${root}${leaf}`;
+        const exact = (await r.fs.readBytes(path))!, value = JSON.parse(new TextDecoder().decode(exact)); mutate(value);
+        await r.fs.writeText(path, json(value)); const bytes = vi.spyOn(r.fs, 'writeBytes'), streams = vi.spyOn(r.fs, 'writeStream'), texts = vi.spyOn(r.fs, 'writeText');
+        try { await expect(facade.retry(prepared.id)).rejects.toThrow(); expect(bytes).not.toHaveBeenCalled(); expect(streams).not.toHaveBeenCalled(); expect(texts).not.toHaveBeenCalled(); }
+        finally { bytes.mockRestore(); streams.mockRestore(); texts.mockRestore(); await r.fs.writeBytes(path, exact); }
+      }
+      const journal = new TransactionJournal(r.fs, metadata), staging = journal.path(prepared.id, 'staging.json'), exact = (await r.fs.readBytes(staging))!;
+      const alteredStart = JSON.parse(new TextDecoder().decode(exact)); alteredStart.reviewCopy.sha256 = 'e'.repeat(64); await r.fs.writeText(staging, json(alteredStart));
+      await expect(facade.retry(prepared.id)).rejects.toThrow(); expect((await r.reopen().session.read()).state).toBe('repair-required'); await r.fs.writeBytes(staging, exact);
+      const validToken = (await r.session.read()).source!.token;
+      const collision = `v2/packages/receive/${prepared.id}/prepared.json`; await r.fs.writeText(collision, '{}');
+      expect((await r.reopen().session.read()).state).toBe('repair-required');
+      await expect(new WorkspaceSender(r.fs, r.session, r.store, metadata, r.locks).generateBackup(validToken)).rejects.toThrow();
+      await r.fs.remove(collision); expect((await r.reopen().session.read()).state).toBe('ready');
+      for (const namespace of ['receive', 'contribution-index', 'clean-input', 'review-edit', 'scene-append', 'backup-output-index']) {
+        const r = firstWorkspaceRecipient(), job = ReviewCopyInputJob.prepare(r.fs, prepared, metadata);
+        const path = `v2/packages/${namespace}/${prepared.id}${namespace.endsWith('index') ? '.json' : '/prepared.json'}`;
+        await r.fs.writeText(path, '{}'); const before = await r.fs.list('');
+        await expect(underWriteLease(r.fs, () => job.persist(0))).rejects.toThrow('collision'); expect(await r.fs.list('')).toEqual(before);
+      }
+    } finally { await source.workspace.dispose(); }
+  }, 60000);
+  it.each(['index', 'metadata'] as const)('direct Review copy can abandon unacknowledged %s preparation without deleting evidence', async cut => {
+    const source = await openFileCaption(), output = await source.host.workspaceOutput.generateReview(source.host.read().source!.token, { sceneId: source.s.sceneId });
+    const prepared = await PreparedReviewCopy.fromInspectedReview(await ReviewArchive.inspect(await source.host.workspaceOutput.download(output), metadata), metadata), r = firstWorkspaceRecipient();
+    try {
+      r.fs.reject = p => cut === 'index' ? p.includes('/review-copy-index/') : p.includes('/review-copy/') && p.endsWith('/metadata.am');
+      await expect(new ReviewEditJob(r.fs, r.session, metadata).start(prepared)).rejects.toThrow('injected quota'); r.fs.reject = () => false;
+      const cold = new ReviewEditJob(r.fs, r.reopen().session, metadata); expect(await cold.states()).toEqual([{ id: prepared.id, state: 'unbound-input' }]);
+      const paths = await r.fs.list(''); await cold.abandon(prepared.id);
+      expect(await cold.states()).toEqual([{ id: prepared.id, state: 'abandoned' }]);
+      for (const p of paths) expect(await r.fs.exists(p)).toBe(true);
+      expect(await new TransactionJournal(r.fs, metadata).entries()).toEqual([]);
+    } finally { await source.workspace.dispose(); }
+  }, 60000);
+  it.each([false, true])('strict output observes Journal once per owned call, never text-only (%s direct)', async direct => {
+    const source = await openFileCaption(), r = firstWorkspaceRecipient();
+    try {
+      if (direct) {
+        const id = await source.host.workspaceOutput.generateReview(source.host.read().source!.token, { sceneId: source.s.sceneId });
+        const prepared = await PreparedReviewCopy.fromInspectedReview(await ReviewArchive.inspect(await source.host.workspaceOutput.download(id), metadata), metadata);
+        await new ReviewEditJob(r.fs, r.session, metadata).start(prepared);
+      } else {
+        const input = await prepareValidationProject({ run: newId(), title: '通常出力', models: [{ label: 'モデル', bytes: glb() }] }, budget, decode);
+        await prepareValidationCreation(input).persist(r.fs, r.store, r.session);
+      }
+      const read = await r.session.read(), entries = vi.spyOn(TransactionJournal.prototype, 'entries'), text = vi.spyOn(ReviewCopyInputJob, 'assertTextSlot');
+      try {
+        await r.session.previewCleanOutput(read.source!.token); expect(entries).toHaveBeenCalledTimes(1);
+        await r.session.previewCleanOutput(read.source!.token); expect(entries).toHaveBeenCalledTimes(2); expect(text).not.toHaveBeenCalled();
+        const current = await new TransactionJournal(r.fs, metadata).entries(), first = current[0]!, path = new TransactionJournal(r.fs, metadata).path(first.start.transactionId, 'staging.json');
+        const saved = (await r.fs.readBytes(path))!, changed = JSON.parse(new TextDecoder().decode(saved)); changed.proof.identity.projectId = `prj_${newId()}`;
+        await r.fs.writeText(path, json(changed));
+        await expect(r.session.previewCleanOutput(read.source!.token)).rejects.toThrow(); expect(entries.mock.calls.length).toBeGreaterThan(3);
+        await r.fs.writeBytes(path, saved);
+      } finally { entries.mockRestore(); text.mockRestore(); }
+    } finally { await source.workspace.dispose(); }
+  }, 60000);
+  it('strict output rejects direct orphan, missing original and collisions with an owned observation', async () => {
+    const source = await openFileCaption(), r = firstWorkspaceRecipient();
+    try {
+      const id = await source.host.workspaceOutput.generateReview(source.host.read().source!.token, { sceneId: source.s.sceneId });
+      const prepared = await PreparedReviewCopy.fromInspectedReview(await ReviewArchive.inspect(await source.host.workspaceOutput.download(id), metadata), metadata);
+      const read = await new ReviewEditJob(r.fs, r.session, metadata).start(prepared), path = `v2/packages/review-copy/${prepared.id}/`, index = `v2/packages/review-copy-index/${prepared.id}.json`;
+      const original = (await r.fs.readBytes(path + 'original.zip'))!;
+      await r.fs.remove(path + 'original.zip'); await expect(r.session.previewCleanOutput(read.source!.token)).rejects.toThrow(); await r.fs.writeBytes(path + 'original.zip', original);
+      const collision = `v2/packages/receive/${prepared.id}/prepared.json`; await r.fs.writeText(collision, '{}');
+      await expect(r.session.previewCleanOutput(read.source!.token)).rejects.toThrow('collision'); await r.fs.remove(collision);
+      const stored = new Map(await Promise.all([...await r.fs.list(path), index].map(async name => [name, (await r.fs.readBytes(name))!] as const)));
+      for (const name of stored.keys()) await r.fs.remove(name);
+      await expect(r.session.previewCleanOutput(read.source!.token)).rejects.toThrow();
+      for (const [name, bytes] of stored) await r.fs.writeBytes(name, bytes);
+      await expect(r.session.previewCleanOutput(read.source!.token)).resolves.toMatchObject({ token: read.source!.token });
+      const observed = await new TransactionJournal(r.fs, metadata).entries(); let expired!: OutputIntegrityRead;
+      await OutputIntegrityRead.run(r.fs, metadata, undefined, async scope => { expired = scope; });
+      const reads = vi.spyOn(r.fs, 'readStream');
+      try {
+        await expect(ReviewCopyInputJob.assertSlot(r.fs, metadata, undefined, expired, observed)).rejects.toThrow('output-integrity-owner');
+        await expect(ReviewCopyInputJob.validateJournalFresh(r.fs, prepared.id, metadata, observed[0]!.prepared!, expired, observed)).rejects.toThrow('output-integrity-owner');
+        expect(reads).not.toHaveBeenCalled();
+      } finally { reads.mockRestore(); }
+    } finally { await source.workspace.dispose(); }
+  }, 60000);
+  it('strict output with shared Journal refuses its closing audit without returning a preview', async () => {
+    const r = firstWorkspaceRecipient(), input = await prepareValidationProject({ run: newId(), title: '閉じる検査', models: [{ label: 'モデル', bytes: glb() }] }, budget, decode);
+    await prepareValidationCreation(input).persist(r.fs, r.store, r.session);
+    let closing = false;
+    const scope = await openWorkspaceGeneration(r.fs, { generationId: null, allowCreate: false, auditReadOperations: true,
+      assertSelected: async () => { if (closing) throw Error('output closing refusal'); } }, async () => ({ factory: r.factory, dispose: async () => {} }));
+    try {
+      const service = validationProjectService(scope.fs, scope.factory, r.store, budget, decode), read = await service.session.read();
+      const run = OutputIntegrityRead.run.bind(OutputIntegrityRead), inspection = vi.spyOn(OutputIntegrityRead, 'run').mockImplementation((fs, limits, signal, action, timing) =>
+        run(fs, limits, signal, async owner => { await action(owner); closing = true; }, timing));
+      try { await expect(service.session.previewCleanOutput(read.source!.token)).rejects.toThrow('output closing refusal'); expect(closing).toBe(true); }
+      finally { inspection.mockRestore(); closing = false; }
+      await expect(service.session.previewCleanOutput(read.source!.token)).resolves.toMatchObject({ token: read.source!.token });
+    } finally { await scope.dispose(); }
+  });
+  it('original Review-copy text Apply uses the existing light transaction while output/cold reads remain strict', async () => {
+    const source = await openFileCaption(), id = await source.host.workspaceOutput.generateReview(source.host.read().source!.token, { sceneId: source.s.sceneId });
+    const review = await ReviewArchive.inspect(await source.host.workspaceOutput.download(id), metadata), prepared = await PreparedReviewCopy.fromInspectedReview(review, metadata), r = firstWorkspaceRecipient();
+    const options = { base: r.fs, coordinator: ProjectMutationCoordinator.browser(r.locks), store: r.store, run: prepared.run,
+      fileLimits: budget, decode, packageLocks: r.locks, openStorage: async () => ({ factory: r.factory, dispose: async () => {} }) };
+    const host = await openValidationHost({ ...options, reviewEdit: prepared });
+    try {
+      const before = host.read(), provider = before.provider; if (provider?.kind !== 'scene-provider') throw Error('provider');
+      const captionId = Object.keys(provider.resources.captions)[0]!, inspect = vi.spyOn(ReviewArchive, 'inspect');
+      const originalPath = `${validationArea}/${prepared.run}/v2/packages/review-copy/${prepared.id}/original.zip`, bytes = (await r.fs.readBytes(originalPath))!;
+      try {
+        await host.dispatch(before.source!.token, { kind: 'editCaption', captionId, edits: { body: '元領域で本文だけ確定' } });
+        expect(inspect).not.toHaveBeenCalled();
+        await r.fs.remove(originalPath);
+        await host.dispatch(host.read().source!.token, { kind: 'editCaption', captionId, edits: { body: '原本の再検査は出力で行う' } });
+        expect(inspect).not.toHaveBeenCalled();
+      } finally { inspect.mockRestore(); }
+      const token = host.read().source!.token;
+      await expect(host.workspaceOutput.generateBackup(token)).rejects.toThrow();
+      await r.fs.writeBytes(originalPath, bytes); await host.refresh();
+      const output = await host.workspaceOutput.generateBackup(token), file = await host.workspaceOutput.download(output), backup = await BackupArchive.inspect(file, metadata);
+      expect(backup.source.originalChanges()).toHaveLength(before.source!.originalChanges().length + 2);
+      for (const blob of review.archive.control.manifest.blobs) expect(backup.archive.control.manifest.blobs).toContainEqual(blob);
+      await host.dispose(); const cold = await openValidationHost(options);
+      expect(cold.read().source!.token).toBe(token); expect(cold.hasPending()).toBe(false); await cold.dispose();
+    } finally { await host.dispose(); await source.workspace.dispose(); }
+  }, 60000);
+  it('direct Review copy text-slot checks do not rescan unchanged originals; strict reopen/output reject missing evidence', async () => {
+    const source = await openFileCaption(), output = await source.host.workspaceOutput.generateReview(source.host.read().source!.token, { sceneId: source.s.sceneId });
+    const prepared = await PreparedReviewCopy.fromInspectedReview(await ReviewArchive.inspect(await source.host.workspaceOutput.download(output), metadata), metadata), r = firstWorkspaceRecipient();
+    try {
+      const ready = await new ReviewEditJob(r.fs, r.session, metadata).start(prepared), provider = ready.provider;
+      if (provider?.kind !== 'scene-provider') throw Error('provider');
+      const captionId = Object.keys(provider.resources.captions)[0]!, admitted = await new TransactionJournal(r.fs, metadata).entries(), inspect = vi.spyOn(ReviewArchive, 'inspect');
+      try {
+        await ReviewCopyInputJob.assertTextSlot(r.fs, metadata, admitted); expect(inspect).not.toHaveBeenCalled();
+        const path = `v2/packages/review-copy/${prepared.id}/published.json`, saved = (await r.fs.readBytes(path))!;
+        await r.fs.remove(path); await expect(ReviewCopyInputJob.assertTextSlot(r.fs, metadata, admitted)).rejects.toThrow('review-copy-pending');
+        await r.fs.writeBytes(path, saved);
+      } finally { inspect.mockRestore(); }
+      const edited = await r.session.editCaption(ready.source!.token, captionId, 'body', '本文だけを変更');
+      expect(edited.state).toBe('ready');
+      await r.fs.remove(`v2/packages/review-copy/${prepared.id}/original.zip`);
+      expect((await r.reopen().session.read()).state).toBe('repair-required');
+      await expect(new WorkspaceSender(r.fs, r.session, r.store, metadata, r.locks).generateBackup(edited.source!.token)).rejects.toThrow();
+    } finally { await source.workspace.dispose(); }
   }, 60000);
   it('prepares a warm Review copy only from its frozen capture, rejecting DTO mutation and rechecking current limits', async () => {
     const source = await openFileCaption(), id = await source.host.workspaceOutput.generateReview(source.host.read().source!.token, { sceneId: source.s.sceneId });
@@ -8659,6 +8920,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const creates: boolean[] = [], options = { base: fs, coordinator: ProjectMutationCoordinator.browser(locks), store,
       fileLimits: budget, decode, run: prepared.run, packageLocks: locks, openStorage: async (create: boolean) => { creates.push(create); return { factory, dispose: async () => {} }; } };
     await expect(openValidationHost({ ...options, reviewEdit: prepared, packageLocks: null })).rejects.toThrow('排他的');
+    expect(creates).toEqual([]);
     expect(await fs.list(`${validationArea}/${prepared.run}/v2/packages/review-edit/`)).toEqual([]);
     fs.reject = path => stage === 'original' ? path.includes('/review-edit/') && path.endsWith('/original.zip') :
       stage === 'child' ? path.includes('/clean-input/') && path.endsWith('/input.zip') : path.includes('/review-edit/') && path.endsWith('/published.json');
@@ -8686,7 +8948,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const token = cold.read().source!.token; await cold.workspaceFiles.retryReviewCopy(prepared.id); expect(cold.read().source!.token).toBe(token);
     expect(cold.workspaceOutput.bases).toEqual([]); tools.dispose(); await mode.dispose();
     const reopened = await openValidationHost(options); expect(reopened.read().source!.token).toBe(token); expect(reopened.hasPending()).toBe(false);
-    expect(creates.slice(2).every(create => !create)).toBe(true); await reopened.dispose(); await source.workspace.dispose();
+    expect(creates.slice(1).every(create => !create)).toBe(true); await reopened.dispose(); await source.workspace.dispose();
   }, 60000);
   it('refuses acknowledged review parent/child evidence loss and preserves independent edits', async () => {
     const source = await openFileCaption(), id = await source.host.workspaceOutput.generateReview(source.host.read().source!.token, { sceneId: source.s.sceneId });

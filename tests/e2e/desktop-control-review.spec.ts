@@ -1,11 +1,15 @@
-import { test, expect, chromium, type Page } from '@playwright/test';
-import { readFile } from 'node:fs/promises';
+import { test, createBrowserProfile } from '../helpers/browserProfile';
+import { expect, chromium, type Page, type BrowserContext } from '@playwright/test';
+import { readFile, writeFile } from 'node:fs/promises';
+import { openAsBlob } from 'node:fs';
 import * as A from '@automerge/automerge';
 import { ownedServer } from '../offline-e2e/server';
-import { triangleGlb } from './fixtures';
-import {chooseSharedScene, selectShareOutput,  revealFileSurface } from './workspaceUi';
+import { triangleGlb, nativeSpatialBackup } from './fixtures';
+import {chooseSharedScene, selectShareOutput, revealFileSurface, revealCaptionList, closeFileSurface } from './workspaceUi';
 import { BackupArchive } from '../../src/projectPackage/backupArchive';
 import { validationMetadataLimits } from '../../src/projectFiles/validation';
+import { ReviewArchive } from '../../src/projectPackage/reviewArchive';
+import { inspectProjectCandidates } from '../../src/domain/projectCandidates';
 
 test('review files use the same camera controls and create an independent editable copy only after confirmation', async ({}, info) => {
   test.setTimeout(180_000); A.getHeads(A.init());
@@ -48,4 +52,48 @@ test('review files use the same camera controls and create an independent editab
     await review.getByRole('button',{name:'編集コピーを作る',exact:true}).click();await confirmation.getByRole('button',{name:'コピーを作成',exact:true}).click();await expect(page.getByRole('heading',{name:'プロジェクト名',exact:true})).toBeVisible({timeout:90_000});await expect(review).toHaveCount(0);
     const independent=await backup(page,'independent');expect(independent).not.toBe(original);await page.reload();await expect(page.getByRole('heading',{name:'プロジェクト名',exact:true})).toBeVisible({timeout:90_000});expect(await backup(page,'reopened')).toBe(independent);expect(errors).toEqual([]);expect(remote).toEqual([]);
   } finally { await browser.close();await server.stop(); }
+});
+
+test('touch Review copy preserves Mesh, Point, GS, Proxy and photos through actual output and cold reopen', async ({}, info) => {
+  A.getHeads(A.init()); const fixture = await nativeSpatialBackup(), input = info.outputPath('mixed.zip'); await writeFile(input, fixture.file);
+  const server = await ownedServer(process.env.LOCIVIEW_E2E_ARTIFACT ?? 'offline-desktop-dist'), contexts = new Set<BrowserContext>();
+  const sourceProfile = await createBrowserProfile('mixed-source'), touchProfile = await createBrowserProfile('mixed-touch');
+  const errors: string[] = [], remote: string[] = [];
+  const launch = async (touch = false) => {
+    const context = await chromium.launchPersistentContext(touch ? touchProfile : sourceProfile, { channel: 'chromium', headless: true, viewport: touch ? { width: 390, height: 844 } : { width: 1440, height: 1000 },
+      hasTouch: touch, isMobile: touch, deviceScaleFactor: touch ? 2 : 1, serviceWorkers: 'block', acceptDownloads: true });
+    await context.route('**/*', route => { const u = new URL(route.request().url()); if (u.origin === new URL(server.url).origin || ['blob:', 'data:'].includes(u.protocol)) return route.continue(); remote.push(u.href); return route.abort(); });
+    contexts.add(context); const p = context.pages()[0] ?? await context.newPage(); p.on('pageerror', e => errors.push(e.message)); await p.goto(server.url); return p;
+  };
+  const ready = async (p: Page) => { await expect(p.getByRole('heading', { name: 'プロジェクト名', exact: true })).toBeVisible({ timeout: 90_000 });
+    const stage = p.getByRole('button', { name: '3D', exact: true }); if (await stage.isVisible() && await stage.getAttribute('aria-pressed') !== 'true') await stage.click();
+    await expect(p.locator('.lv-project-viewport-status')).toBeEmpty({ timeout: 90_000 }); };
+  try {
+    const source = await launch(); await source.getByLabel('ファイルを選択', { exact: true }).setInputFiles(input); await source.getByRole('button', { name: 'ファイルを開く', exact: true }).click();
+    await source.getByRole('button', { name: '新しいプロジェクトに変換', exact: true }).click(); await ready(source);
+    await revealFileSurface(source, '共有'); const files = source.getByRole('region', { name: 'ファイル', exact: true }); await selectShareOutput(files, 'review');
+    const choices = files.getByLabel('渡すシーン', { exact: true }).getByRole('checkbox'); for (const choice of await choices.all()) await choice.check();
+    await files.getByRole('button', { name: '内容を確認', exact: true }).click(); const [download] = await Promise.all([source.waitForEvent('download'), files.locator('.lv-file-primary').click()]);
+    const reviewPath = info.outputPath('mixed-review.zip'); await download.saveAs(reviewPath); expect(await download.failure()).toBeNull();
+    await source.context().close(); contexts.delete(source.context());
+    const original = await ReviewArchive.inspect(await openAsBlob(reviewPath), validationMetadataLimits);
+    let p = await launch(true); await p.getByLabel('ファイルを選択', { exact: true }).setInputFiles(reviewPath); await p.getByRole('button', { name: 'ファイルを開く', exact: true }).click();
+    await expect(p.getByRole('main', { name: '閲覧用のシーン', exact: true })).toBeVisible(); await p.getByRole('button', { name: '編集コピーを作る', exact: true }).click();
+    await p.getByRole('button', { name: 'コピーを作成', exact: true }).click(); await ready(p); await revealCaptionList(p);
+    await p.locator('.lv-caption-select').first().click(); const detail = p.getByRole('region', { name: 'キャプションの詳細', exact: true });
+    await detail.getByLabel('本文', { exact: true }).fill('スマホで直接コピーを編集'); await detail.getByRole('button', { name: '変更を適用', exact: true }).click();
+    await expect(p.getByText('変更を適用しました。', { exact: true })).toBeVisible(); await p.screenshot({ path: info.outputPath('touch-edited.png') });
+    await revealFileSurface(p, '保存'); const area = p.getByRole('region', { name: 'ファイル', exact: true }); const [saved] = await Promise.all([p.waitForEvent('download'), area.locator('.lv-file-primary').click()]);
+    const path = info.outputPath('mixed-saved.zip'); await saved.saveAs(path); expect(await saved.failure()).toBeNull();
+    const backup = await BackupArchive.inspect(await openAsBlob(path), validationMetadataLimits), inspected = await inspectProjectCandidates(backup.source.read(), validationMetadataLimits);
+    if (inspected.kind !== 'project-candidate-inspection') throw Error('Invalid copied records');
+    const records = inspected.unambiguousRecords as Record<string, any>, reps = Object.values(records.representationsById) as any[];
+    for (const role of ['pointPrimary', 'gsPrimary', 'interactionProxy']) expect(reps.some(r => r.role === role)).toBe(true);
+    expect(reps.some(r => r.contentKind === 'mesh')).toBe(true); expect(Object.keys(records.captionAttachmentsById).length).toBeGreaterThan(0);
+    for (const body of original.archive.control.manifest.blobs) expect(backup.archive.control.manifest.blobs).toContainEqual(body);
+    await closeFileSurface(p); const context = p.context(); await context.close(); contexts.delete(context); p = await launch(true);
+    await ready(p); await revealCaptionList(p); await p.locator('.lv-caption-select').first().click();
+    await expect(p.getByRole('region', { name: 'キャプションの詳細', exact: true }).getByLabel('本文', { exact: true })).toHaveValue('スマホで直接コピーを編集');
+    expect(errors).toEqual([]); expect(remote).toEqual([]);
+  } finally { for (const context of contexts) await context.close(); await server.stop(); }
 });

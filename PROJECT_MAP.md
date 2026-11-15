@@ -26,9 +26,11 @@ owns feature coverage. Read [document authority](docs/README.md) for contracts.
 
 Production application ports and composition live in `src/projectScene`; the ordinary
 Desktop graph imports no harness authority or fixtures. The same inspected file
-services receive split host policies, a shared whole-view/instance GS ledger and
-owned native Review-copy output. Source/schema/receipts are unchanged; todo owns
-executed evidence. Existing harness paths retain the old editor adapters.
+services receive split host policies and a shared whole-view/instance GS ledger.
+[06h](docs/specs/06h-direct-review-copy-proposal.md) defines direct Review-copy
+initialization from one retained original and fixed metadata; old jobs retain
+their recovery. Public source/schema formats are unchanged; todo owns executed
+evidence. Existing harness paths retain the old editor adapters.
 The typed loading path mounts verified Caption UI before binary display preparation.
 `deferredViewport.ts` retains the canvas/camera handoff; `validationRender.ts` reports
 per-model preparation to `viewport.ts` without dropping full GS admission. The

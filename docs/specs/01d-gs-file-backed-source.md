@@ -75,6 +75,31 @@ boundary. It introduces no hash dependency. Bound input chunk processing, releas
 reader locks on success/failure/cancel and reject late results after cancellation.
 No new product numeric guarantee is derived from these internal buffer bounds.
 
+### Exact row processing refinement2026-11-15
+
+The source inspector may remove row-local copies, short-lived arrays and resolved
+Promises without reducing any inspection or extending a result's lifetime. A
+complete record may be decoded directly from the already owned at-most64KiB
+pending chunk; a split record still fills the bounded one-record scratch buffer.
+Respect the pending view's byte offset and length; no view escapes the row.
+
+Compute degree-dependent SH band weights once per inspection as JavaScript
+Numbers, retaining exactly the existing expression, coefficient order and sum
+order. Reuse only the inspector's scalar work array and pure per-row results.
+Never round weights toFloat32, skip ignored normal/SH scalars, or skip geometry
+validation for low-opacity points. Preserve quaternion/transform checks, color
+thresholds and warning order, bounds/padding/retained-bound comparison, all source
+bytes and SHA, count/chunk/EOF limits, and cancellation/reader cleanup. Check abort
+per row and around input awaits outside the semantic-error catch.
+
+Acceptance: existing all-degree/golden, arbitrary split, owned-source, transform,
+budget, I/O and abort tests; exact full-record versus split-record results across
+real chunk boundaries and nonzero producer offsets; invalid ignored scalars and
+coefficient thresholds on both paths. Measure the same500k SH4 editing-copy
+workflow before/after and preserve its actual saved-file/cold-reopen proof. A
+parser-only microbenchmark cannot establish whole-copy improvement. This is an
+internal implementation refinement, not renderer/adoption or recovery authority.
+
 ## Publication, retry and compatibility
 
 Complete the selected-input inspection before durable creation. Preparation writes

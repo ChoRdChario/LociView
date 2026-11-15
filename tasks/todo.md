@@ -8,155 +8,122 @@ and [earlier working records](../docs/history/development-through-2026-10-28/tas
 retain qualifications and failures. Their Current/Next headings are not an active
 queue or renewed approval requirements.
 
-## Current — remove redundant work across the complete user workflow
+## Current — verified direct Review copies; ordinary-save decision next
 
-- Outcome: PO2026-11-15 requests a whole-tool survey, then removal of clearly
-  abnormal repeated work. Compare from 2dbbb49. Root is the only writer;
-  independent reviewers are read-only. Survey finished before product edits.
-  Close open/read/search → edit → save/share → reopen/recover on PC/touch.
-- Preserve originals, quality, offline use, input/IME/focus, full post-write
-  readback, command admission, publication and cold recovery. No schema/ID,
-  dependency, capacity, release or adoption change. Renderer lightening stays
-  paused. Stop only a candidate that requires a genuinely new contract/policy.
+- Outcome: [06h](../docs/specs/06h-direct-review-copy-proposal.md) is implemented
+  and qualified for the bounded PC candidate. One retained Review original plus
+  fixed recipe/actual metadata initialize a typed Session directly. Remove the
+  intermediate Clean ZIP, parent/child duplicate ZIP and transient spool. Preserve
+  old pending jobs' strict read/recovery, original bytes/all SH coefficients,
+  quality/offline use, independent saved-file inspection and interrupted recovery.
+  No public format/profile/ID/capacity/dependency, release or deployment change.
+- Exact GS row processing follows01d; flat slicing-by8 CRC follows06e§11.9.
+  Existing NativeSHA and1MiB grouping stay; signed SHA, larger grouping and earlier
+  bridge/stream-proof experiments are not adopted.06e§12 connects the approved
+  text-only transaction to strict original roots, including fresh/copied Projects.
+  Write/readback/publication/recovery fences and named-generation guards remain.
+  §11.10 shares one Journal only inside the same owned outputReady, not across
+  source capture, other outputReady calls, writes or recovery.
+- A real full-regression defect was fixed: initial copy refused by the global
+  package lock still created an empty metadata DB. The shared private Host opener
+  now holds ONE package lease before activation/DB creation through initial copy.
+  Its private bootstrap closure expires; later retry/reselect acquire afresh.
+  No preflight/reacquire gap or DB-deletion workaround. Keep case19's exact zero-DB
+  assertion. Independent design and meaningful final-diff reviews pass, including
+  this correction; final evidence review finds no blocker to this bounded checkpoint.
 
-Final closure: the last adjacent duplicate steps() read in all5 generate methods
-is removed under06e§11.7 with independent design/final diff review. First read
-position, Backup inputs-before and all public artifact/write/readback/recovery
-inspections remain. Required final checkpoint and affected PC/touch output flows
-pass, including two-round all-purpose sharing/restore/cold reopen and actual
-Chrome/Edge downloads. No unrelated full-suite browser replay.
+### Final measured workflow
 
-Implemented and independently reviewed under specification06e§11:
+Final source/test freeze: AA1D5546 (full hashes in private evidence). Same fixed
+b4c1521 control, Chromium156.0.8078.4, i9-10850K/20logical CPUs/64GiB/RTX5080,
+DPR1, dedicated fresh profiles. Ki viewport1280×720; SH4 viewport1440×1000.
+No diagnostics or local checks/builds alongside the interleaved3+3 per dataset.
+Ordinary-load observations are recorded; these are measured results on this PC,
+not hardware-wide guarantees. All12 flows pass with no browser/network errors.
 
-- Reuse the exact selected archive for purpose routing, preserving specific
-  semantic/profile/closure validation and independent spool/public/cold checks.
-- Discover each job namespace once per owned history read; admit collisions
-  before rows, read state/steps/completion once and expire/drain borrowed readers.
-  Public open/state/commands stay fresh. Missing Journal-only inputs retain their
-  established domain error, without masking expiry/physical failures.
-- Read base tables/evidence once instead of N+1 full-table selection. Stream
-  display facts, verify every local body and source/budget/inventory, require local
-  bytes even if restored same-digest evidence exists. Share one current-base
-  observation across Backup rows with copied public facts and constant row IDs.
-- Validate Review parents before reusing completed-child backlinks; share owned
-  Journal observations and publish callbacks only after closing audit succeeds.
-- Reuse only same-open first-restore input inspection and its exact snapshot;
-  keep other jobs, absence/public open/staging/init/publication/recovery fresh.
-- Cache private immutable expected manifests/Backup records, clone public results,
-  read original changes once during initialization, remove duplicate Host routing.
-  Capture-source reuse and the generated-base early-return experiment are not adopted.
-- Dispose owned surfaces once; preserve fallback/independent cleanup and sticky
-  failures. Skip only already completed hidden teardown; reset for new activation,
-  allocation and retry. Avoid duplicate synchronous shell/core tool rendering.
-- Fix measured mobile Review thumbnail/3D feedback: a flow loading notice moved
-  content21px, toggling visibility and repeated preparation. Bound status/retry
-  inside3D instead; preserve live status, retry and raster/GPU release. Actual
-  PC/touch point/GS status mutations now keep content shift below1px; touch requires
-  multiple observed samples. No retained-image cache or release-policy change.
-- Final native-stack follow-up found four remaining per-file capacity readers.
-  Under the existing06 pure-bulk-reader rule,06e§11.6 consolidates all five loops
-  through outputSpace, retaining the exact prefix/additional/count/size/headroom/
-  order and Backup's existing behavior. No staging consumer; close before every
-  original raw guarded write. Independent design/final diff review and10 new
-  focused size/closing/fallback tests pass; no new PO policy was needed.
+Seconds below list all3 values and the median. SH4 uses the SAME fixed Review
+archive and178,002,206-byte GS digest in all6 flows; original Proxy/photo/records
+and actual exported files/cold reopening are checked.
 
-Evidence and final checks:
+|500k SH4 action|b4c1521:3 runs|Candidate:3 runs|Median before→after|
+|---|---|---|---|
+|Editable copy ready|169.209 /167.240 /167.175|56.844 /57.739 /56.387|167.240→56.844|
+|Copied3D ready|181.429 /178.938 /178.345|65.945 /66.335 /65.499|178.938→65.945|
+|Text Apply completes|29.787 /29.665 /29.792|0.525 /0.460 /0.479|29.787→0.479|
+|Backup generation/handoff|65.059 /61.857 /62.294|30.282 /29.754 /29.945|62.294→29.945|
+|Full-browser-cold ready|43.393 /41.212 /41.208|20.520 /20.482 /21.070|41.212→20.520|
 
-- Source/test/config freeze: .artifacts/e2e/duplicate-work-20261115/tested-source.json
-  (758 files). Final steps-qualified checkpoint passes158 files/3580 cases,
-  unchanged16 expected failures/21 TODOs, all5 builds and offline isolation;
-  HEIC all5 passes. The main source qualified independently before this follow-up.
-- Desktop59: final full run58 passes/one stale test selector (actual Review status
-  was correct); exact selector-only corrected case passes its full path. All59
-  unique paths covered, no weakened pixel/text/time assertion or automatic retry.
-  Former mobile image failure and adjacent GS retry/camera paths pass. Failed
-  checkpoints/drivers/runs remain in the private evidence folder.
-- Main source also passes all8 full offline cases, including full browser/server
-  closure with500k SH4/Mesh/Point/Proxy/media, same-address return, update/repair,
-  and two windows. Capacity follow-up retains SW/restore fences and adds the
-  connected source-material all-purpose/two-round/restore/cold flow and mobile
-  short-input/export flow, plus Chrome/Edge actual-file/cold reopening. No whole59
-  replay for a selector-only adaptation or this narrowly reviewed pure reader.
-- Main cleanup3+3 comparison is the a937122 tree; the capacity-only follow-up is
-  measured separately below, and§11.7 makes no independent speed claim. Do not
-  relabel those earlier medians as freshly remeasured latest-source timings.
-- Windows dedicated Chromium156,1280×720,DPR1, own origins/profiles; same Ki-84
-  Backup SHA c714c6cd04f99ac7aa0b84e9e2ca82a0147bbbc0eeb029be475d94e68ccf501c.
-  Alternate before/after3 each; no diagnostic flag or file-picker waiting. Actual
-  file download/saveAs, full archive/body inspection and cold browser relaunch.
-  All43 original bodies,103 captions,old3 changes+one edit and actual text exact.
-  Times below are seconds; export stops at download handoff (saved file inspected
-  separately). Initial restore is editor+3D readiness, not the first read preview.
+Ki preserves all103 captions/43 bodies/3 original changes, and the actual edited
+file and cold-readable text. Its changes do NOT establish an improvement:
 
-| Stage | Baseline3 runs | Candidate3 runs | Median before → after |
-| --- | --- | --- | --- |
-| Input inspection | 4.072 / 4.139 / 4.251 | 4.252 / 4.279 / 4.258 | 4.139 → 4.258 |
-| Initial restore + 3D ready | 79.181 / 75.336 / 75.425 | 71.856 / 72.314 / 71.773 | 75.425 → 71.856 |
-| Apply → visible acknowledgement | 0.832 / 0.952 / 0.922 | 0.940 / 0.918 / 0.961 | 0.922 → 0.940 |
-| Export → download handoff | 20.201 / 20.401 / 20.400 | 21.454 / 20.292 / 20.142 | 20.400 → 20.292 |
-| Cold launch → actual saved text | 4.542 / 4.270 / 4.329 | 4.271 / 4.564 / 4.248 | 4.329 → 4.271 |
-| Cold launch → editor + 3D | 16.719 / 16.606 / 16.243 | 15.594 / 15.649 / 15.682 | 16.606 → 15.649 |
+|Ki action|b4c1521:3 runs|Candidate:3 runs|Median before→after|
+|---|---|---|---|
+|Full initial-restore editor list|74.102 /77.237 /75.560|79.892 /79.613 /72.727|75.560→79.613|
+|Visible text completion|1.025 /0.881 /1.119|1.001 /1.103 /0.891|1.025→1.001|
+|Backup generation/handoff|21.288 /21.414 /22.046|22.471 /23.342 /20.443|21.414→22.471|
+|Cold readable body|4.590 /5.123 /4.951|4.965 /4.777 /4.931|4.951→4.931|
+|Cold3D ready|16.627 /16.156 /15.765|17.640 /17.363 /16.188|16.156→17.363|
 
-- Search median44→43ms. Driver Apply wall median0.956→1.052s is distinct from
-  painted acknowledgement above. Ordinary Apply/body/export ranges show no material
-  improvement; do not claim all waits were shortened. Full cold and initial restore
-  improved on this machine; no new device/performance guarantee.
-- Accumulated-history diagnostic, one trial each, small sample restore→2 Workspaces
-  →2 Backups: second Workspace18.838→15.507s,second Backup12.281→10.196s,
-  shared-base choices178→131ms. Whole-journey lists831→467,readStream4828→2130,
-  readBytes1547→1010; identical21 writeBytes/26 writeText/4 writeStream. These
-  cumulative calls are not individual-export physical reads or a speed guarantee.
-- Additional capacity-only comparison, a937122→follow-up, one diagnostic trial
-  each: Workspace1 13.008→10.551s,Workspace2 17.151→14.450s. Per-action controller
-  readStream calls1834→1736 and2380→1918, with exactly identical write counts
-  (4/8/1 and3/8/1 by writeBytes/writeText/writeStream). Backup retains966 calls
-  each; timings vary12.298→10.547s and10.405→12.335s, so no Backup speedup claim.
-  This comparison is distinct from the main3+3 Ki-84 table and the older history
-  trial. Raw snapshot deltas are retained in budget-history-comparison.json.
-- 500k SH4 complete PC flow passes all output purposes/return/Review editing copy/
-  restore/cold, plus body replacement and existing120s drawing/target-lifecycle
-  criteria. Editing copy remains166.643s to editor,177.827s to3D (not a measured
-  before/after win). Mobile-sized point/GS flows are not500k mobile/iPhone proof.
+The initial-restore editor endpoint is NOT earliest readonly text. Ranges overlap;
+Ki output/full-restore/cold3D medians are slower. Do not claim whole-tool speedup
+or overall performance non-regression. OS save-dialog time is excluded; actual
+files were saved and independently inspected. Earlier freezes/contended cohorts
+remain intermediate and are not substituted for these final numbers.
 
-Final attribution and remaining closure:
+### Verification and retained failures
 
-- Offline8 tests, installed Chrome157.0.8103.52/Edge157.0.4341.46 actual save+cold
-  reopen and final offline/HEIC artifact isolation pass. Main and capacity changes
-  are committed and pushed to g0-baseline; capacity checkpoint CI passes. The final
-  tiny steps cleanup also passes the final checkpoint, all5 HEIC artifacts, two
-  connected PC/touch workflows and Chrome/Edge actual-file/cold tests. Finish its
-  verified Push/exact CI and same-origin preview/sample verification.
-  No public deployment or rerun of unrelated checks for prose/staging changes.
-- Native call-stack diagnostics covered both the small history sample and actual
-  Ki-84 four-output flow. The later Ki-84 trace maps every control open (zero
-  unknown stacks), resolving the small sample's500-stack-cap limitation.
-  Workspace capacity opens108→24 and420→24, native getFile time69.2→14.6ms and
-  275.3→14.2ms. Before§11.7, Backup has1404 per output:600 stream-pull,324 public reads,
-  312 scoped entry/close,156 strict writes and12 outer-lease opens. Those are
-  independent fences, not evidence that weak/CAS work dominates. The final adjacent
-  steps reuse removes one redundant public read; it is a small cleanup, not a new
-  speed claim. Instrumented end-to-end times are not ordinary performance evidence.
-- Resolved residual: Workspace.space raw per-file size traversal accounted for
-  84/396 restore-control opens (51.3/249.1ms). Contribution/Clean/Review contained
-  the same unscoped pure capacity loop; all now use Backup's scoped pattern. Specification06
-  2026-09-20 expressly permits normal pure bulk readers and calls named paths
-  initial consumers; the closed whitelist is staging only.
-  Capacity connection was clarified/reviewed before implementation: close the
-  void size read before each fresh guarded write, retain all limits, failure and
-  stream fences.
-  This is existing normal-reader scope, not authority for broader write changes.
-- Independent closeout review finds no known clearly abnormal duplicated workflow
-  left open in the surveyed lanes after the last steps cleanup. This is not a claim
-  that all possible optimization is exhausted. Keep private originals/audits/task
-  history out of public checkpoints; Git owns the exact commit identities.
-- Source counts alone do not justify a speed claim. Constructor-bound weak-media
-  verification and per-pull stream write fences are explicitly independent in
-  specification06/06e§§2–3; origin CAS is a different namespace. No silent rebinding
-  or batching of these paths. A useful change there needs one concrete contract
-  proposal, independent review and the genuinely necessary PO decision.
-- Ordinary Ki-84 export~20s/initial restore~72s,large editing-copy waits, and physical
-  iPhone Safari IME/save/quota/heat/offline acceptance remain. Browser emulation
-  does not pass those device gates; raw originals/quality remain intact.
+- Required final checkpoint passes159 files/3603 tests,16 expected failures and
+  21 TODOs unchanged, all5 builds, exact offline isolation. HEIC isolation passes
+  all5 artifacts. No assertion/deadline relaxation, automatic retry or new limits.
+- Full Desktop inventory:61/62 pass on its retained pre-ordering-fix artifact;
+  one real case19 failure. After the bounded correction, the unchanged complete
+  case19 passes13.1min, plus fresh PC/touch mixed-copy actual-file/cold flows.
+  8 focused Host/Entry/global-denial/recovery cases pass. This is scoped corrective
+  regression evidence, NOT a claim of an all62 final-artifact rerun. Unchanged
+  drawing/source tests include the existing120s camera criterion and GPU cases.
+- All9 offline paths were executed. Earlier8 pass; the new touch case first
+  omitted closing Settings. Adding the actual visible dismissal fixes that setup;
+  its full path passes and passes again on the final ordering-fixed source.
+  Final touch: offline Review→copy→edit→real Backup→browser/server shutdown→cold.
+- Chrome157.0.8103.52 and Edge157.0.4341.60 dedicated profiles pass real-file
+  editing/save/full-browser-cold continuation. Their non-Review path is unchanged
+  by the ordering correction. Chromium touch is not physical iPhone/Safari proof.
+- Preserve earlier two failed checkpoints:3590 passes/one duplicate slot audit,
+  then3596 passes/one wrong pending-restore error classification. Source fixes
+  retain the original2-boundary and error assertions. Final checkpoint above
+  supersedes their status, not their failure evidence.
+- Evidence lives under .artifacts/e2e/output-copy-20261115: final source freeze,
+  phase exits, stable comparison/all timings, actual outputs and failed attempts.
+  Private originals/audits stay out of Git. Existing private ui-design-review and
+  post-marker task material are preserved; stage only the sanitized public prefix.
+
+### Next and genuine boundaries
+
+- Save/Push this verified scope to existing g0-baseline and check its actual-tip
+  CI; Git/Actions own commit/run identity. Refresh4191 only from its qualified
+  immutable artifact; do not touch the user's4182 or force Worker activation.
+- [06i](../docs/specs/06i-manual-backup-body-verification-proposal.md) is PROPOSED,
+  PO-unapproved and UNIMPLEMENTED. One explicit timing decision is pending: keep
+  receipt/existence/size/metadata preflight, move ordinary Backup's duplicate
+  full-body pass to existing generation verification and independent saved-file
+  inspection. Same-size damage may be detected after output starts, leaving a
+  partial artifact. Restore/other capture/full readback/recovery remain strict.
+  Independent design review supports evaluation only; no speed benefit promised.
+  Do not silently change the body-validation contract or add a reuse framework.
+- Remaining waits: Ki normal output≈22s, full initial restore≈80s; even improved
+  SH4 copy≈57s/3D≈66s and Backup≈30s. Physical iPhone Safari memory/IME/file save,
+  device heat and offline acceptance remain grouped device work. General adoption,
+  current00 release gates and publication remain open. Renderer lightening stays
+  paused. No unapproved production connection or public/private fixture release.
+
+## Previous checkpoint — remove redundant work across the complete workflow
+
+The verified b4c1521 checkpoint removed repeated archive/history/base-table and
+output-capacity discovery within existing ownership, and duplicate display
+preparation/disposal. It retained write/readback/recovery fences, source hashes,
+input state and mobile resource retirement. Its complete evidence, qualifications
+and failed attempts remain in Git's version of this record. The unchanged4191
+preview still serves that immutable checkpoint until the new candidate qualifies.
 
 ## Previous checkpoint — readable saved text during cold reopening
 

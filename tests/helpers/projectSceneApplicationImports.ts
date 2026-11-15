@@ -402,7 +402,8 @@ export const projectSceneApplicationImports:Readonly<Record<string,readonly stri
     "../projectPackage/reviewEditControls",
     "../scene/resolve",
     "./validationGeneration",
-    "./validationHost"
+    "./validationHost",
+    "../projectPackage/reviewEditJob"
   ],
   "src/projectScene/validationCoverage.ts": [
     "../viewer/hardChroma",
@@ -481,7 +482,8 @@ export const projectSceneApplicationImports:Readonly<Record<string,readonly stri
     "./viewDisplay",
     "../projectMetadata/editorAttribution",
     "../projectMetadata/source",
-    "../scene/projectProvider"
+    "../scene/projectProvider",
+    "../projectPackage/reviewCopyInput"
   ],
   "src/projectScene/validationMaterials.ts": [
     "../domain/materialCoverage",
@@ -606,7 +608,8 @@ export const projectSceneApplicationImports:Readonly<Record<string,readonly stri
     "./validationHost",
     "./validationModeHost",
     "./validationReceiveControls",
-    "./viewportPorts"
+    "./viewportPorts",
+    "../projectPackage/reviewCopyInput"
   ],
   "src/projectScene/viewCandidateLabels.ts": [
     "../scene/projectProvider"

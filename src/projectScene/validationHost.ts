@@ -47,6 +47,7 @@ import type { MaterialIntent } from '../domain/materialIntent';
 import { selectedMaterialResolution } from '../projectMetadata/materialResolution';
 import { WorkspaceReceiver, workspaceFileOperation, type WorkspaceReceiveState } from '../projectFiles/receiveWorkspace';
 import type { PreparedReviewEdit } from '../projectPackage/reviewEdit';
+import type { PreparedReviewCopy } from '../projectPackage/reviewCopyInput';
 import type { ReviewArchive } from '../projectPackage/reviewArchive';
 import type { SceneAppendState } from '../projectPackage/sceneAppend';
 import { ReviewEditJob } from '../projectPackage/reviewEditJob';
@@ -100,7 +101,7 @@ export interface ValidationHostOptions {
   fileLimits: FileValidationLimits; filePolicy?: ProjectFilePolicy; decode?: PngDecoder; jpeg?: JpegDecoder; photo?: PhotoDecoder; mediaDecoders?:MediaDecoders; initial?: ReturnType<typeof prepareValidationCreation>;
   workspaceFile?: Blob | PackageArchive;
   standaloneWorkspace?: boolean;
-  reviewEdit?: PreparedReviewEdit;
+  reviewEdit?: PreparedReviewEdit | PreparedReviewCopy;
   firstBackup?: Readonly<{ file: Blob; archive: EvidenceRef }>;
   packageLocks?: LockManager | null;
   generations?: (run: string) => RestoreDatabasePorts;
@@ -319,13 +320,31 @@ export async function openValidationHost(options: ValidationHostOptions) {
   return openNormalValidationHost(options);
 }
 async function openNormalValidationHost(options: ValidationHostOptions, inheritedLease?: ProjectMutationSession) {
-  const measure = <T>(stage: string, action: () => Promise<T>) => measureValidation(options.timing, stage, action);
   const run = technicalId(options.run), root = `${validationArea}/${run}`;
   if (options.mode === 'view' && options.initial) throw Error('閲覧ではプロジェクトを作成できません。');
   if (options.mode === 'view' && options.workspaceFile) throw Error('閲覧では作業一式を取り込めません。');
   if (options.mode === 'view' && options.reviewEdit) throw Error('閲覧中は編集コピーを作成できません。');
   if ([options.initial, options.workspaceFile, options.reviewEdit].filter(Boolean).length > 1) throw Error('作成元を一つ選択してください。');
   if (options.reviewEdit && options.reviewEdit.run !== run) throw Error('編集コピーの作成先を確認してください。');
+  const open = (reviewBootstrap?: ReviewBootstrapOperation) => openValidationHostOwned(options, run, root, inheritedLease, reviewBootstrap);
+  if (!options.reviewEdit) return open();
+  // Admit the complete initial copy before activating its Project or creating a DB.
+  // Only this immediate bootstrap borrows the lease; later Host actions acquire anew.
+  return workspaceFileOperation(options.packageLocks ?? null, async () => {
+    let active = true;
+    const bootstrap: ReviewBootstrapOperation = async action => {
+      if (!active) throw Error('編集コピーの開始処理は終了しています。');
+      const result = await action();
+      if (!active) throw Error('編集コピーの開始処理は終了しています。');
+      return result;
+    };
+    try { return await open(bootstrap); } finally { active = false; }
+  });
+}
+type ReviewBootstrapOperation = <T>(action: () => Promise<T>) => Promise<T>;
+async function openValidationHostOwned(options: ValidationHostOptions, run: string, root: string,
+  inheritedLease?: ProjectMutationSession, reviewBootstrap?: ReviewBootstrapOperation) {
+  const measure = <T>(stage: string, action: () => Promise<T>) => measureValidation(options.timing, stage, action);
   const inspectInput = async (file: Blob | PackageArchive) => {
     const selected = file instanceof PackageArchive ? await file.reopenCapturedControl() : await PackageArchive.inspect(file);
     return selected.control.manifest.purpose === 'clean' ? CleanArchive.fromSelectedArchive(selected, limits) : WorkspaceArchive.fromSelectedArchive(selected, limits);
@@ -499,12 +518,13 @@ async function openNormalValidationHost(options: ValidationHostOptions, inherite
         await reloadReceive(); throw error;
       }
     }, true);
-    const reviewAction = (action: (job: ReviewEditJob) => Promise<MetadataSessionRead | void>) => execute(async () => {
+    const reviewAction = (action: (job: ReviewEditJob) => Promise<MetadataSessionRead | void>, bootstrap?: ReviewBootstrapOperation) => execute(async () => {
       if (closed || fs.mutationAuthority.accessState !== 'editable' || connection?.restorePending || restoreRetired || restoreDisplayPending)
         throw Error('編集を開始してからコピー作成を再開してください。');
       connection?.requireStrictChecks?.();
       try {
-        const result = await measure('host.review-copy.command', () => workspaceFileOperation(options.packageLocks ?? null, () => action(new ReviewEditJob(fs, session, limits))));
+        const perform = () => action(new ReviewEditJob(fs, session, limits));
+        const result = await measure('host.review-copy.command', () => bootstrap ? bootstrap(perform) : workspaceFileOperation(options.packageLocks ?? null, perform));
         await reloadReceive(result || undefined); last = result ?? await session.read();
         if (last.state === 'ready' && !reviewPending()) { receiveDisplayPending = true; await ready(last); receiveDisplayPending = false; }
       } catch (error) { await reloadReceive(); throw error; }
@@ -536,7 +556,7 @@ async function openNormalValidationHost(options: ValidationHostOptions, inherite
     if (options.reviewEdit) {
       try {
         const existing = reviewCopies.find(j => j.id === options.reviewEdit!.id);
-        await reviewAction(job => existing ? job.retry(existing.id) : job.start(options.reviewEdit!));
+        await reviewAction(job => existing ? job.retry(existing.id) : job.start(options.reviewEdit!), reviewBootstrap);
       } catch (error) {
         // Before any parent evidence exists, only the caller still owns the exact attempt and View.
         if (!reviewCopies.some(j => j.id === options.reviewEdit!.id) && !reviewCopyError) throw error;

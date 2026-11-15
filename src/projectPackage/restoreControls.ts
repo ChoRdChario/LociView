@@ -283,6 +283,14 @@ export async function readRestoreControls(fs: ProjectWorkspaceFS, limits: Metada
   return { jobs, selections: chain, tail: chain.at(-1) ?? null, selection: previous, pending: pending[0] ?? null };
 }
 
+/** Exact original-root text transaction only; never ordinary-selected observation. */
+export async function assertOriginalTextWorkspace(fs: ProjectWorkspaceFS, limits: MetadataLimits) {
+  const state = await readRestoreControls(fs, limits, 'detect');
+  if (state.selection || state.tail) fail('restore-generation-retired');
+  if (state.pending) fail('restore-pending');
+  if (state.jobs.some(job => job.prepared?.schema === 'lociview-local-restore-prepared-2')) fail('restore-original-text-unavailable');
+}
+
 /** Host supplies successfully enumerated IDs for this logical Project's DB family. */
 export async function reconcileRestoreDatabases(fs: ProjectWorkspaceFS, limits: MetadataLimits, listGenerations: () => Promise<string[]>, readFirstPrepared = false) {
   const state = await readRestoreControls(fs, limits, readFirstPrepared), ids = [...await listGenerations()];

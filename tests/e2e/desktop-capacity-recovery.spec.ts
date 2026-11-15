@@ -110,7 +110,7 @@ for(const touch of [false,true])test(`native capacity recovery retains drafts an
   }finally{await context?.close();await server.stop();}
 });
 
-for (const touch of [false, true]) test(`renderer crashes before writing, before publication and immediately after success preserve the confirmed text exactly once (${touch ? 'touch' : 'desktop'})`, async ({}, info) => {
+for (const restored of [true, false]) for (const touch of [false, true]) test(`renderer crashes before writing, before publication and immediately after success preserve the confirmed text exactly once (${touch ? 'touch' : 'desktop'}, ${restored ? 'restored' : 'original'})`, async ({}, info) => {
   A.getHeads(A.init());
   const server = await ownedServer(process.env.LOCIVIEW_E2E_ARTIFACT ?? 'desktop-dist');
   const receiver = await createBrowserProfile('restored-text');
@@ -159,7 +159,7 @@ for (const touch of [false, true]) test(`renderer crashes before writing, before
     await crash(page);
   };
   try {
-    const author = await open(await createBrowserProfile('author'));
+    const author = await open(restored ? await createBrowserProfile('author') : receiver);
     await author.getByLabel('ファイルを選択', { exact: true }).setInputFiles({
       name: '記録.zip', mimeType: 'application/zip', buffer: await nativeConversionBackup(triangleGlb(), smallPng()) });
     await author.getByRole('button', { name: 'ファイルを開く', exact: true }).click();
@@ -168,9 +168,11 @@ for (const touch of [false, true]) test(`renderer crashes before writing, before
     const before = await backup(author, 'before');
     await context!.close();
     const page = await open(receiver);
-    await page.getByLabel('ファイルを選択', { exact: true }).setInputFiles(info.outputPath('before.zip'));
-    await page.getByRole('button', { name: 'ファイルを開く', exact: true }).click();
-    await page.getByRole('button', { name: 'このファイルから再開', exact: true }).click();
+    if (restored) {
+      await page.getByLabel('ファイルを選択', { exact: true }).setInputFiles(info.outputPath('before.zip'));
+      await page.getByRole('button', { name: 'ファイルを開く', exact: true }).click();
+      await page.getByRole('button', { name: 'このファイルから再開', exact: true }).click();
+    }
     // Restore can already offer read-only captions while the editor is being
     // prepared. Exercise the crash only after this specific operation closes.
     const restoredProject = page.getByRole('heading', { name: 'プロジェクト名', exact: true });

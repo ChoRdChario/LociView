@@ -759,6 +759,44 @@ captureの順序は保つ。完成済み分岐のpublic artifact検査、append�
 空履歴からの生成、取消済み／部分出力の拒否、完成済み再試行、改変拒否と実ファイルの
 往復を既存試験で確認する。小さい重複の除去であり、これ単独の速度改善は保証しない。
 
+### 11.8. 手動出力の小さい書込ブロックを既存予算内でまとめる
+
+**EVALUATED — NOT ADOPTED。** 下記1.5MiB案は既存予算内だが、初回の通常Ki-84比較は
+中央値23.137→22.807秒で範囲が重なり、単独の効果を立証できなかった。追加3MiBを
+保持する根拠としては不十分とし、生成側は従来1MiB／6MiBへ戻す。試験と診断を保持する。
+以下は評価時の案であり、現在の生成側の契約ではない。
+
+Ki-84の現行b4c1521診断では、手動出力26.446秒のうちstream-closeが7.950秒。
+通常の操作時間は診断なしで別に比較する。入力の検査・chunk数・SHAを数えた後の小さい
+ZIP出力だけ、所有する1.5MiBブロックへまとめる。既存1MiB以上のvendor chunkは、
+先行するpartialを流してから従来どおりそのまま渡す。identity bridgeやhash実装は変えない。
+
+既存01e§2.2の保守的な53.75MiBと、集約・queue・copy用の6×1.5MiBを合わせても
+62.75MiBで、既存64MiB I/O枠内。原本の同時保持量・受入容量や新しい実機保証は追加しない。
+各出力chunkの前後、write/close、独立した実ファイル全量照合、publication、中断復旧は保つ。
+独立設計レビュー済みの内部partition変更として、関連する01e／06の内部値も揃える。
+
+同じ入力の診断なし3回ずつの実時間と、保存ファイル・再開を採用条件にする。既存の
+exact/tail/mixed/backpressureと取消／書込／close失敗試験を使い、1MiBのpassthrough境界と
+1.5MiBの集約境界、後続書込後も保持したsink bytesが一致することを確認する。
+効果がなければ従来partitionへ戻し、回数だけを高速化の根拠にしない。
+
+### 11.9. 同じCRC-32を8byteずつ計算する
+
+現行b4c1521の50万点GSコピーCPU診断では、ZIPのCRC計算の自己CPUを約11.4秒観測した。
+これは約202.8秒の診断走行内の値で、通常操作の短縮量ではない。CRCのpolynomial、初期値、
+反転、全入力byteと順序は変えず、既存のbyte tableから導いた8つの固定tableで同じ計算を行う。
+非整列／非ゼロoffsetのUint8Arrayもbyte参照から扱い、端数0〜7byteは従来のbyte処理を使う。
+8tableは一つのUint32Arrayに連続配置し、offset + (masked byte)で読む。多重array参照は
+隔離した専用Chromium16MiB評価で従来byte処理より遅かったため採用せず、flat配置だけを評価する。
+追加tableは7,168byte。入力chunk数・予算・abort・SHA・ZIP構造・書込後照合・復旧は変えない。
+独立した数式／安全性レビュー済みの内部計算変更で、新しい依存や検査済み結果のcacheは作らない。
+
+独立したNode zlib、標準vector、空入力、全byte値、7/8/9および複数blockの境界、分割・非ゼロ
+offset、途中digest後の継続を比較する。既存のZIP実ファイルとCRC／SHA改変拒否も確認する。
+同じKi-84・50万点GSの診断なし実操作3回ずつで効果・資源を確認し、保存・再開まで通った
+場合だけ採用する。計算結果・故障の拒否や検査回数を弱める変更ではない。
+
 ## 本文編集の保存タイミング再検討（2026-11-13・設計案）
 
 対象は復元済みPC候補でタイトルと本文だけを編集する操作。第一候補の限定評価と、
@@ -892,3 +930,91 @@ DBへの保存1回。モデル・写真を書き戻すストリームは0回だ�
 この一致が取れた文書について、各照合で表示や素材の検査を組み立て直す必要はない。
 中断した処理の再試行では新たに全検査する。変更対象の取り違えの拒否、確定直後の強制終了、
 原本欠損を検出する次の全検査、編集・書き出し・再開までの実測を接続条件にする。
+
+
+### 11.10. One Journal observation inside one strict outputReady
+
+Status: technical refinement under the existing same-operation readonly direction;
+independent design review before code. Not yet qualified. No new PO policy, save
+format, source capture reuse or write/recovery exception is introduced.
+
+The06h connection adds direct-copy slot discovery. In a Project without legacy
+copy jobs, one outputReady currently reads the same full Journal for direct-job
+admission, candidate reading and receive discovery. Use the EXISTING receive-job
+discovery callback's fresh validated entries for these internal strict readers,
+inside the SAME OutputIntegrityRead and outer metadata-read callback only.
+
+- Move strict slot admission, readCandidate and terminal-row checks inside that
+  existing callback. Discover all physical/index AND Journal-backed direct jobs;
+  preserve foreign namespace collision and orphan detection before returning ready.
+- The observation is output-only and paired with the exact live integrity owner.
+  Never use the text-only slot branch. Keep full descriptor, recipe, actual
+  metadata/original bytes, parts and initial publication validation. The direct
+  published validator uses ids with these observed entries, private openKnown and
+  unchanged exact-parts validation, without public open recursively reading a new
+  Journal. Public open, standalone states, retry and recovery remain fresh.
+- Keep legacy readers unchanged. No observation is used in a separate outputReady,
+  source capture, write, close/readback, publication or recovery. Ports/inspection
+  ownership and closing audits remain; adopt only after all callbacks close.
+- Supplied observations require the matching live OutputIntegrityRead before and
+  after awaited work. Readonly values are not an independent capability or a
+  checked flag. Default/internal callers without an observation still read fresh.
+
+Acceptance: one fresh Journal observation per public previewCleanOutput for a
+normal and completed direct-copy Project; another call reads again. Verify missing
+original, directory+index loss with orphan Journal, foreign-ID collision, changed
+Journal, closing refusal and expired owner; output must never call the text-only
+slot method. Reuse actual save/restore/cold and phase failure tests. Compare the
+same Ki-84 and500k SH4 cohorts without diagnostics before final adoption; no speed
+claim is derived from the reduced call count alone.
+
+
+## 12. Original-generation title/body transaction connection
+
+Status: implementation refinement of the PO-approved2026-11-14 same-Session
+text-only policy and06h. Independently review this exact binding before code;
+qualification/measurements belong in todo. This does not create another save mode,
+background saving, dependency, cache, public format or durability promise.
+
+Fresh Projects and direct Review copies use the original generation. The existing
+text transaction was connected only to selected restored generations, so a tiny
+Apply could re-open the complete unchanged Review three times. That route mismatch
+is a code observation, not an elapsed-time measurement.
+
+- Add one explicit original-text writable audit binding to openWorkspaceGeneration.
+  It is legal only for generationId:null, audited ordinary reads, an existing
+  original assertWritable fence, no named assertSelectedWritable and no staging
+  owner. Keep the named-generation guard unchanged. allowCreate:true may register
+  the port; registration itself grants no initialization/import or ready authority.
+- Only an ordinary Host binds it. Catalog, readonly preparers and restore staging
+  do not. Both fresh creation and original reopen use a fresh STRICT root-controls
+  read at preparation, each existing text phase boundary and closing audit. Reject
+  selected/tail replacement, pending restoration and any first-backup-only record.
+  Do not enable ordinary-selected/single-open mode for an original root. The
+  BackupRestoreJob ordinary flag continues to mean a checked selected generation.
+  Strengthen the existing original assertWritable predicate to this same strict
+  condition; retain selection→writability→selection at the outer lease and public
+  I/O boundaries. Original text preparation also runs its audit at entry/exit,
+  including no-change commands. Do not batch or replace the generic write fence.
+- Session chooses the text transaction only for title/body-only commands after a
+  verified ready read, loaded acknowledgments, an admitted publication chain and
+  no retained transaction. The live Journal and current text document must still
+  match before the first write. Scope token, conflicts, lease, phase paths and
+  exact one-document writer remain independent checks; readiness alone is no proof.
+- Reuse the existing Journal/repository/publication/readback implementation. Read
+  actual new parts and the saved document back, compare exact originals/heads and
+  close the root-backed audit before completion. Lost ownership/selection or a
+  pending restoration rejects adoption. Ports expire on completion/disposal.
+- Other edits, media changes, creation/import commands, cold open and interrupted
+  retry retain their strict paths. Unchanged original/recipe/initial metadata may
+  be checked at the next strict open/recovery/output under the already approved
+  text policy. Nothing acknowledged is recreated from a live source on recovery.
+
+Acceptance: original fresh and Review-copy text edits, exact file output and cold
+reopen; malformed/tampered Journal/current document; pending restoration, retired
+selection and ownership loss; failures and forced termination at existing phases,
+exactly-once recovery and preserved prior text/photos/models. Reuse existing port
+lifetime and crash tests; add small original-root cases rather than another fault
+framework. Measure Ki-84 and500k SH4 normal same-input3+3, including Apply-to-visible
+completion. The existing approx1s goal is not a new numeric guarantee. Adopt only
+with effect/no regression and final independent review and automated checks.

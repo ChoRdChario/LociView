@@ -71,14 +71,16 @@ function fencedStream(open: () => ReadableStream<Uint8Array>, check: () => Promi
 export async function openWorkspaceGeneration(root: ProjectWorkspaceFS,
   input: Readonly<{ generationId: WorkspaceGenerationId; allowCreate: boolean; assertSelected: () => Promise<void>;
     assertWritable?: () => Promise<void>; assertSelectedWritable?: () => Promise<void>;
-    auditReadOperations?: boolean; stagingReadOwner?: StagingReadOwner; ordinaryTextCommit?: () => boolean }>,
+    auditReadOperations?: boolean; stagingReadOwner?: StagingReadOwner; ordinaryTextCommit?: () => boolean;
+    assertOriginalTextWritable?: () => Promise<void> }>,
   openStorage: GenerationStorageOpener) {
   const generationId = checkedId(input.generationId), allowCreate = input.allowCreate,
     assertSelected = input.assertSelected, assertWritable = input.assertWritable, assertSelectedWritable = input.assertSelectedWritable,
     auditReadOperations = input.auditReadOperations === true,
-    stagingReadOwner = input.stagingReadOwner?.assertOwner.bind(input.stagingReadOwner);
+    stagingReadOwner = input.stagingReadOwner?.assertOwner.bind(input.stagingReadOwner), originalTextWritable = input.assertOriginalTextWritable;
   if (auditReadOperations && stagingReadOwner || stagingReadOwner && generationId === null) fail('generation-read-binding');
   if (assertSelectedWritable && (!auditReadOperations || stagingReadOwner || assertWritable || allowCreate || generationId === null)) fail('generation-write-binding');
+  if (originalTextWritable && (generationId !== null || !auditReadOperations || stagingReadOwner || !assertWritable || assertSelectedWritable || !input.ordinaryTextCommit)) fail('generation-text-binding');
   const logicalRoot = root.projectRoot === null ? '' : canonicalPath(root.projectRoot, false);
   const prefix = logicalRoot ? `${logicalRoot}/` : '';
   const projectRoot = generationId === null ? root.projectRoot : `${prefix}v2/generations/${generationId}`;
@@ -193,7 +195,7 @@ export async function openWorkspaceGeneration(root: ProjectWorkspaceFS,
     const reachedReadback = () => phase === 'readback';
     const journalRoot = text && metadataPath(fs, `journal/${technicalId(text.transaction)}/`);
     if (text && (!text.documentKey || text.documentKey === 'storage-adapter-id')) return fail('text-commit-document');
-    const audit = text ? checkWrite : check;
+    const audit = (text || preparing) && originalTextWritable ? () => checkState(originalTextWritable) : text ? checkWrite : check;
     const assertTextOwner = () => {
       const assertLease = text?.assertLease ?? preparing;
       if (!assertLease || disposed || !input.ordinaryTextCommit?.()) return fail('text-commit-expired');
@@ -306,8 +308,10 @@ export async function openWorkspaceGeneration(root: ProjectWorkspaceFS,
         // The lease checked the selection at entry. Only the subsequent write
         // or no-change lease exit may accept this private read result.
         assertLive();
+        if (originalTextWritable) { await audit(); assertLive(); }
         const result = await action(ports);
         assertLive();
+        if (originalTextWritable) { await audit(); assertLive(); }
         return result;
       }
       if (stagingReadOwner || text) assertLive();
@@ -337,7 +341,7 @@ export async function openWorkspaceGeneration(root: ProjectWorkspaceFS,
   };
   if (auditReadOperations) registerReadOperation(fs, factory, scopedOperation);
   else if (stagingReadOwner) registerStagingReadOperation(fs, factory, scopedOperation);
-  if (input.ordinaryTextCommit && assertSelectedWritable && generationId !== null)
+  if (input.ordinaryTextCommit && (originalTextWritable || assertSelectedWritable && generationId !== null))
     registerTextCommit(fs, factory, input.ordinaryTextCommit, (action, assertLease) =>
       scopedOperation(action, undefined, assertLease), (transaction, documentKey, action, assertLease) =>
       scopedOperation(action, { transaction, documentKey, assertLease }));

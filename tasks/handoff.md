@@ -12,6 +12,20 @@ The exact [06b](../docs/specs/06b-staging-read-operations-proposal.md) exception
 include §6.1 Review-copy inspection and §6.2 integrity sharing inside one
 outputReady. General §6 payload sharing is not approved. Do not extend these
 lifetimes to a whole Session, source capture, write/readback or recovery.
+[06h](../docs/specs/06h-direct-review-copy-proposal.md) is PO approved2026-11-15:
+new Review editing copies use one retained original and fixed actual metadata,
+through the dedicated Session command and bound local Journal purpose. Existing
+parent/child jobs retain their strict recovery. New copies do not generate a Clean
+ZIP or a transient spool. Todo owns qualification and elapsed comparisons.
+Initial-copy admission holds one package-operation lease before Project activation
+or DB creation through the shared private Host opener. Only immediate bootstrap
+borrows that expiring private scope; returned recovery actions acquire anew.
+Keep the real500k test's zero-DB-on-denial assertion unchanged.
+[06e§12](../docs/specs/06e-selected-generation-output-read-proposal.md#12-original-generation-titlebody-transaction-connection)
+connects the existing text-only transaction to verified original-generation
+Sessions. Preserve its explicit strict original-root binding, existing generic
+write-fence sequence, readiness/Journal/document proof and cold/recovery checks.
+This does not enable ordinary-selected observation for an original root.
 [06e §§7–8](../docs/specs/06e-selected-generation-output-read-proposal.md) were
 approved2026-11-09: one normal selected-generation public read may share readonly
 ports until its closing audit; it adopts only afterward, including readonly and

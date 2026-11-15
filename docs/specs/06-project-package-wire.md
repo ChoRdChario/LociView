@@ -2039,6 +2039,12 @@ separate. These are bounded local controls, not a new public wire or capacity pr
 
 #### Isolated review-to-edit handoff (implementation contract)
 
+PO2026-11-15 approved[06h](06h-direct-review-copy-proposal.md) for new attempts:
+one direct initialization job replaces the private Clean container and parent/child
+bridge below. The following bridge contract remains authoritative for existing
+unfinished/completed jobs and their strict reading/recovery/protection. Do not
+fabricate a CleanArchive for the new direct path or discard old acknowledged work.
+
 Explicit confirmation creates a fresh independent Project from the admitted review;
 opening View alone never creates metadata or a copy job. Reuse the existing clean
 container mechanics and `CleanInputJob` / `initializeClean` for initialization. A

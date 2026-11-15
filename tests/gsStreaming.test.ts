@@ -54,6 +54,39 @@ describe('01d identical GS inspection over bounded source partitions',()=>{
       const selected=await validationModelFile({label:'original.ply',file},limits);expect(selected.file).toBeInstanceOf(Blob);expect(reads.length).toBeGreaterThan(1);expect(Math.max(...reads)).toBeLessThanOrEqual(65536);
     }finally{spy.mockRestore();}
   });
+  it.each([0,4])('keeps complete and split rows identical across owned chunks and producer offsets (SH%s)',async degree=>{
+    const sample=gsFixture(degree),source=await inspectGsPly(sample,limits),template=new DataView(sample.buffer,sample.byteOffset+source.headerBytes,source.stride);
+    const base=Array.from({length:source.stride/4},(_,i)=>template.getFloat32(i*4,true));
+    const rows=Array.from({length:1025},(_,i)=>{const row=[...base];row[0]=(i%7)/8;row[1]=-(i%11)/16;row[2]=(i%13)/32;row[6]=i%2?.25:-.125;if(degree===4)row[9+i%72]=i%2?.05:-.075;return row;});
+    const bytes=gsFixture(degree,rows),{bytes:owned,...expected}=await inspectGsPly(bytes,limits);
+    expect(expected.digest).toBe(await digest(owned));expect(expected.count).toBe(rows.length);
+    for(const step of [17,source.stride-1,source.stride,65536]){
+      let at=0;
+      const offsetSource={size:bytes.length,stream:()=>new ReadableStream<Uint8Array>({pull(controller){
+        if(at===bytes.length){controller.close();return;}const end=Math.min(bytes.length,at+step),storage=new Uint8Array(end-at+14);
+        storage.set(bytes.subarray(at,end),7);at=end;controller.enqueue(storage.subarray(7,storage.length-7));
+      }},{highWaterMark:0})};
+      expect(await inspectGsPlyStream(offsetSource,limits)).toEqual(expected);
+    }
+  });
+  it('checks ignored values and invisible geometry on both complete and split records',async()=>{
+    const bytes=gsFixture(4),source=await inspectGsPly(bytes,limits);
+    for(const step of [17,65536])for(const [index,value] of [[3,NaN],[80,Infinity],[85,0]]){
+      const invalid=bytes.slice(),view=new DataView(invalid.buffer);view.setFloat32(source.headerBytes+81*4,-1000,true);view.setFloat32(source.headerBytes+index!*4,value!,true);
+      await expect(inspectGsPlyStream(partition(invalid,step),limits)).rejects.toThrow('読み込めません');
+    }
+    for(const value of [65536,-65536,65536.0078125,-65536.0078125]){
+      const changed=bytes.slice();new DataView(changed.buffer).setFloat32(source.headerBytes+9*4,value,true);
+      const complete=await inspectGsPlyStream(partition(changed,65536),limits),split=await inspectGsPlyStream(partition(changed,17),limits);
+      expect(complete).toEqual(split);expect(complete.displayIssue).toBe('このGSの色は表示できる範囲を超えています。原本は保持しています。');
+    }
+    const threshold=new DataView(new ArrayBuffer(4));threshold.setFloat32(0,(1.055*65504**(1/2.4)-.055-.5)/Math.sqrt(1/(4*Math.PI)),true);
+    const nearest=threshold.getUint32(0,true);
+    for(const delta of [-2,2]){
+      threshold.setUint32(0,nearest+delta,true);const changed=bytes.slice();new DataView(changed.buffer).setFloat32(source.headerBytes+6*4,threshold.getFloat32(0,true),true);
+      for(const step of [17,65536])expect((await inspectGsPlyStream(partition(changed,step),limits)).displayIssue).toBe(delta<0?null:'このGSの色は表示できる範囲を超えています。原本は保持しています。');
+    }
+  });
   it('passes a captured native ZIP to existing inspectors without whole-body arrayBuffer or filename normalization',async()=>{
     const bytes=new Uint8Array(100000);bytes.set([0x50,0x4b,3,4]);for(let i=4;i<bytes.length;i++)bytes[i]=i%251;
     const expected=bytes.slice(),file=new Blob([bytes.slice().buffer]),original=Blob.prototype.arrayBuffer,reads:number[]=[];

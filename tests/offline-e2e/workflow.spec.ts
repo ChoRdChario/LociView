@@ -1,14 +1,15 @@
 import {test, createBrowserProfile} from '../helpers/browserProfile';
-import { selectShareOutput, revealCaptionList, revealCoordinateAdd, revealFileSurface, revealProjectSelection, revealOfflineUtilities } from '../e2e/workspaceUi';
+import { chooseSharedScene, selectShareOutput, revealCaptionList, revealCoordinateAdd, revealFileSurface, revealProjectSelection, revealOfflineUtilities } from '../e2e/workspaceUi';
 import {expect,chromium,type BrowserContext,type Page,type TestInfo} from '@playwright/test';
 import {readFile,writeFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
 import * as A from '@automerge/automerge';
 import {ownedServer} from './server';
-import {triangleGlb,smallPng,nativeConversionBackup} from '../e2e/fixtures';
+import {triangleGlb,smallPng,nativeConversionBackup,nativeSpatialBackup} from '../e2e/fixtures';
 import {largeGsFixture} from '../helpers/largeGsFixture';
 import {WorkspaceArchive} from '../../src/projectPackage/workspaceArchive';
 import {BackupArchive} from '../../src/projectPackage/backupArchive';
+import {ReviewArchive} from '../../src/projectPackage/reviewArchive';
 import {validationMetadataLimits as limits} from '../../src/projectFiles/validation';
 
 const builds=()=>process.env.LOCIVIEW_OFFLINE_BUILDS!;
@@ -175,4 +176,35 @@ test('foreign controlling worker is refused; original-viewer query cannot activa
     await p.reload();await expect.poll(()=>p.evaluate(()=>navigator.serviceWorker.controller?.scriptURL)).toContain('foreign-worker.js');await revealOfflineUtilities(p);
     await expect(offlineStatus(p)).toContainText('別のアプリ');expect(await p.evaluate(async()=>(await navigator.serviceWorker.getRegistrations()).map(r=>r.active?.scriptURL))).toEqual([server.url+'foreign-worker.js']);expect(await p.evaluate(async()=>(await(await caches.open('foreign-retain')).match('/sentinel'))?.text())).toBe('unchanged');
   }finally{await context?.close();await server.stop();}
+});
+
+
+// Small mixed bodies exercise the direct initialization boundary; the existing
+// large scenario owns 500k/offline residency. Do not multiply huge roundtrips.
+test('touch can create a direct mixed Review copy offline, save and cold reopen it after browser/server shutdown', async ({}, info) => {
+  A.getHeads(A.init()); const server = await ownedServer(resolve(builds(), 'a')), owned = await profile(), errors: string[] = [];
+  let context: BrowserContext | undefined;
+  const open = async (disconnected = false) => { const next = await launch(owned, server.url, disconnected, errors, true); context = next.context;
+    await next.page.setViewportSize({ width: 390, height: 844 }); expect((await next.page.goto(server.url))?.fromServiceWorker()).toBe(disconnected); return next.page; };
+  try {
+    let p = await open(); const fixture = await nativeSpatialBackup(), input = info.outputPath('mixed-native.zip'); await writeFile(input, fixture.file);
+    await file(p, input); await p.getByRole('button', { name: '新しいプロジェクトに変換', exact: true }).click(); await selectedWithStage(p, 'Native点群とGS');
+    await prepare(p); await dismissHeader(p); await revealFileSurface(p, '共有'); const area = p.getByRole('region', { name: 'ファイル', exact: true }); await selectShareOutput(area, 'review');
+    await chooseSharedScene(area); const choices = area.getByLabel('渡すシーン', { exact: true }).getByRole('checkbox'); for (const choice of await choices.all()) await choice.check();
+    await area.getByRole('button', { name: '内容を確認', exact: true }).click(); const [shared] = await Promise.all([p.waitForEvent('download'), area.locator('.lv-file-primary').click()]);
+    const reviewPath = info.outputPath('mixed-review.zip'); await shared.saveAs(reviewPath); expect(await shared.failure()).toBeNull();
+    const review = await ReviewArchive.inspect(new Blob([Uint8Array.from(await readFile(reviewPath)).buffer]), limits);
+    await context!.close(); context = undefined; await server.stop(); p = await open(true); await selectedWithStage(p, 'Native点群とGS');
+    await home(p); await file(p, reviewPath); await expect(p.getByRole('main', { name: '閲覧用のシーン', exact: true })).toBeVisible();
+    await p.getByRole('button', { name: '編集コピーを作る', exact: true }).click(); await p.getByRole('button', { name: 'コピーを作成', exact: true }).click(); await selectedWithStage(p, 'Native点群とGS');
+    await revealCaptionList(p); await p.locator('.lv-caption-select').first().click(); await detail(p).getByLabel('本文', { exact: true }).fill('通信なしの直接コピー');
+    await detail(p).getByRole('button', { name: '変更を適用', exact: true }).click(); await ready(p, '変更を適用しました。');
+    const saved = await BackupArchive.inspect(new Blob([Uint8Array.from(await readFile(await backup(p, info, 'direct-offline'))).buffer]), limits);
+    for (const body of review.archive.control.manifest.blobs) expect(saved.archive.control.manifest.blobs).toContainEqual(body);
+    await context!.close(); context = undefined; p = await open(true); await selectedWithStage(p, 'Native点群とGS');
+    await revealCaptionList(p); await p.locator('.lv-caption-select').first().click(); await expect(detail(p).getByLabel('本文', { exact: true })).toHaveValue('通信なしの直接コピー');
+    const reopened = await BackupArchive.inspect(new Blob([Uint8Array.from(await readFile(await backup(p, info, 'direct-offline-reopened'))).buffer]), limits);
+    expect(reopened.source.proof).toEqual(saved.source.proof); expect(reopened.source.originalChanges()).toEqual(saved.source.originalChanges());
+    expect(reopened.archive.control.manifest.blobs).toEqual(saved.archive.control.manifest.blobs); expect(errors).toEqual([]);
+  } finally { await context?.close(); await server.stop(); }
 });

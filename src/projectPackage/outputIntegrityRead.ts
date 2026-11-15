@@ -46,7 +46,7 @@ export class OutputIntegrityRead {
   private async open(fs: ProjectWorkspaceFS, path: string, expected: EvidenceRef, binding: unknown, limits: MetadataLimits) {
     this.assertOwner(fs, limits);
     const prefix = workspacePackageRoot(fs), local = path.startsWith(prefix) ? path.slice(prefix.length) : '';
-    if (!/^(review-edit\/[0-9a-f]{32}\/(original|copy)\.zip|clean-input\/[0-9a-f]{32}\/input\.zip)$/.test(local)) fail('output-integrity-artifact');
+    if (!/^(review-copy\/[0-9a-f]{32}\/original\.zip|review-edit\/[0-9a-f]{32}\/(original|copy)\.zip|clean-input\/[0-9a-f]{32}\/input\.zip)$/.test(local)) fail('output-integrity-artifact');
     const ref = structuredClone(expected);
     if (!ref || !/^[0-9a-f]{64}$/.test(ref.sha256) || !Number.isSafeInteger(ref.byteLength) || ref.byteLength < 22 || ref.byteLength > L.archiveBytes)
       fail('output-integrity-reference');

@@ -20,6 +20,10 @@ export class CleanInputJob {
     readonly inspection: CleanArchive, private readonly input: Blob, readonly start: { operation: 'importClean' } | null, private readonly reselected = false,
     private readonly reviewEdit?: ReviewEditBinding, private readonly integrity?: OutputIntegrityRead) {}
   assertOwner(fs: ProjectWorkspaceFS) { if (fs !== this.fs) fail('clean-input-owner'); }
+  readonly purpose = 'importClean' as const;
+  get source() { return this.inspection.source; }
+  get blobEntries() { return this.inspection.archive.control.manifest.blobs; }
+  bodyBlob(ref: { digest?: unknown }) { return this.inspection.archive.entryBlob(`blobs/sha256/${ref.digest}`); }
   path(name: string) { return `${root(this.fs, this.id)}${name}`; }
   private descriptor() { return cleanInputDescriptor(this.id, this.inspection); }
   private marker(kind: 'index' | 'start') { return this.reviewEdit ? reviewCleanMarker(kind, this.id, reference(this.descriptor()), this.reviewEdit) :

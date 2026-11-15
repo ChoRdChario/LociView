@@ -120,7 +120,7 @@ export async function inspectGsPlyStream(input: {readonly size:number;stream():R
   if(!Number.isSafeInteger(byteLength)||byteLength<=0||byteLength>limits.maxFileBytes)return fileError('GSがこの検証の上限を超えています。');
   context=ownContext(context);signal?.throwIfAborted();
   const reader=input.stream().getReader(),hash=new NativeSha256();
-  let pending=new Uint8Array(0),at=0,observed=0,reads=0;
+  let pending=new Uint8Array(0),pendingView=new DataView(pending.buffer),at=0,observed=0,reads=0;
   const abort=()=>signal?.throwIfAborted();
   const onAbort=()=>{void reader.cancel(signal?.reason).catch(()=>{});};
   signal?.addEventListener('abort',onAbort,{once:true});
@@ -130,7 +130,7 @@ export async function inspectGsPlyStream(input: {readonly size:number;stream():R
       if(++reads>byteLength+1)return fail(); // Includes empty chunks and final EOF.
       if(next.done){if(observed!==byteLength)return fail();return false;}
       if(!(next.value instanceof Uint8Array)||next.value.length>GS_CHUNK_BYTES||next.value.length>byteLength-observed)return fail();
-      pending=next.value.slice();at=0;observed+=pending.length;hash.update(pending);
+      pending=next.value.slice();pendingView=new DataView(pending.buffer,pending.byteOffset,pending.byteLength);at=0;observed+=pending.length;hash.update(pending);
     }
     return true;
   };
@@ -147,7 +147,7 @@ export async function inspectGsPlyStream(input: {readonly size:number;stream():R
       }
     }
     const {offset,degree,count,stride,properties}=parseGsHeader(header.subarray(0,length),byteLength,limits);
-    const record=new Uint8Array(stride),view=new DataView(record.buffer);
+    const record=new Uint8Array(stride),recordView=new DataView(record.buffer);
     const readRecord=async(target:Uint8Array)=>{
       let copied=0;
       while(copied<target.length){
@@ -161,17 +161,21 @@ export async function inspectGsPlyStream(input: {readonly size:number;stream():R
   const q=transform.rotationXYZW as number[], rotation=gsRotation([q[3]!,q[0]!,q[1]!,q[2]!]), scale=transform.uniformScale as number;
   const linear=rotation.map(r=>r.map((v,k)=>(scale*v)*(transform.reflection==='x' && k===0?-1:1)));
   const min=[Infinity,Infinity,Infinity], max=[-Infinity,-Infinity,-Infinity], sizes=[1,1,1];
-  let nonempty=false,displayIssue:string|null=null; const rest=3*((degree+1)**2-1), end=9+rest;
+  const bands=(degree+1)**2,weights=Array.from({length:bands},(_,k)=>Math.sqrt((2*Math.floor(Math.sqrt(k))+1)/(4*Math.PI)));
+  const v=new Array<number>(properties.length);
+  let nonempty=false,displayIssue:string|null=null; const rest=3*(bands-1), end=9+rest;
   for(let row=0;row<count;row++) {
-    await readRecord(record);
+    abort();let view:DataView,base:number;
+    if(pending.length-at>=stride){view=pendingView;base=at;at+=stride;}
+    else{await readRecord(record);abort();view=recordView;base=0;}
     try {
-      const v=Array.from({length:properties.length},(_,k)=>view.getFloat32(k*4,true));
-      if(v.some(n=>!Number.isFinite(n))) return fail();
+      for(let k=0;k<properties.length;k++){const value=view.getFloat32(base+k*4,true);if(!Number.isFinite(value))return fail();v[k]=value;}
       for(let channel=0;channel<3;channel++){
-        let bound=.5;const bands=(degree+1)**2;
-        for(let k=0;k<bands;k++){const coefficient=v[k===0?6+channel:9+channel*(bands-1)+k-1]!,l=Math.floor(Math.sqrt(k));
-          bound+=Math.abs(coefficient)*Math.sqrt((2*l+1)/(4*Math.PI));if(k>0&&Math.abs(coefficient)>65536)displayIssue='このGSの係数は表示できる範囲を超えています。原本は保持しています。';}
-        if(!Number.isFinite(gsLinear(bound))||gsLinear(bound)>65504)displayIssue='このGSの色は表示できる範囲を超えています。原本は保持しています。';
+        let bound=.5;
+        for(let k=0;k<bands;k++){const coefficient=v[k===0?6+channel:9+channel*(bands-1)+k-1]!;
+          bound+=Math.abs(coefficient)*weights[k]!;if(k>0&&Math.abs(coefficient)>65536)displayIssue='このGSの係数は表示できる範囲を超えています。原本は保持しています。';}
+        const linearBound=gsLinear(bound);
+        if(!Number.isFinite(linearBound)||linearBound>65504)displayIssue='このGSの色は表示できる範囲を超えています。原本は保持しています。';
       }
       const geometry=gsActivatedGeometry(v.slice(end+1,end+4),v.slice(end+4,end+8));
       const transformed=gsTransformGeometry(v.slice(0,3),geometry.covariance,linear,transform.translation as number[]);

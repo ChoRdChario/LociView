@@ -38,7 +38,8 @@ import { prepareReviewView, reviewSceneChoices, type ReviewView } from './review
 import { ReviewArchive } from '../projectPackage/reviewArchive';
 import type { JsonObject } from '../domain/values';
 import { createReviewWorkspace } from './reviewWorkspace';
-import { PreparedReviewEdit, type ReviewEditArchivePort } from '../projectPackage/reviewEdit';
+import type { PreparedReviewEdit } from '../projectPackage/reviewEdit';
+import { PreparedReviewCopy } from '../projectPackage/reviewCopyInput';
 import { sceneAppendCompatibility } from '../projectPackage/sceneAppend';
 import { createDeferredViewport } from './deferredViewport';
 
@@ -61,12 +62,11 @@ export interface ValidationWorkspacePorts {
   introduction?:string;
   initialFiles?:readonly File[];
   openLegacy?(file?:File):Promise<void>;
-  reviewEditArchive?:ReviewEditArchivePort;
   storageEstimate?(): Promise<Readonly<{ usage?: number; quota?: number }>>;
   localSettings?: { read(): string; save(displayName: string): boolean };
   lastProject?: { read(): ProjectResumeReference | null; remember(reference: ProjectResumeReference): void };
   list(reading?: ResumeReadingRequest, onlyRun?: string): Promise<ValidationProjectEntry[]>;
-  open(run: string, initial?: ReturnType<typeof prepareValidationCreation>, mode?: LocalOpenMode, workspaceFile?: Blob | PackageArchive, reviewEdit?: PreparedReviewEdit,
+  open(run: string, initial?: ReturnType<typeof prepareValidationCreation>, mode?: LocalOpenMode, workspaceFile?: Blob | PackageArchive, reviewEdit?: PreparedReviewEdit | PreparedReviewCopy,
     firstBackup?: ValidationHostOptions['firstBackup'], standaloneWorkspace?: boolean, reading?: ResumeReadingRequest): Promise<ValidationNormalHost | FirstBackupRecovery>;
   render(host: ValidationDisplayHost): Promise<{ factory: ViewportFactory; readonly ready?:Promise<void>; detachPreparation?():void; dispose(): void; idle?():Promise<void> }>;
   renderReview?(view: ReviewView): Promise<{ factory: ViewportFactory; dispose(): void; idle?():Promise<void> }>;
@@ -136,7 +136,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   let presentationState=()=>presentation;
   let stopPresentation!:()=>void;const presentationStopped=new Promise<void>(resolve=>{stopPresentation=resolve;});
   const untilOpen=<T>(work:Promise<T>)=>Promise.race([work,presentationStopped.then(()=>{throw new DOMException('画面を閉じました。','AbortError');})]);
-  let reviewEditAttempt:PreparedReviewEdit|undefined;
+  let reviewEditAttempt:PreparedReviewCopy|undefined;
   let reviewWorkspace: ReturnType<typeof createReviewWorkspace> | undefined;
   let firstRecovery: FirstBackupRecovery | undefined;
   const recoveryControls = new Map<HTMLButtonElement | HTMLInputElement, () => boolean>();
@@ -231,12 +231,12 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   const closeCurrent = async () => {
     openingReading = undefined;
     clearResumeReading();
-    const oldWorkspace=workspace,oldHost=host,oldResident=resident,oldReview=reviewWorkspace,oldAttempt=reviewEditAttempt,oldTools=receiveTools,oldRecovery=firstRecovery;
+    const oldWorkspace=workspace,oldHost=host,oldResident=resident,oldReview=reviewWorkspace,oldTools=receiveTools,oldRecovery=firstRecovery;
     mounted=false;presentation=null;presentationState=()=>presentation;resumedLast=false;confirmingResume=false;workspace=undefined;host=undefined;resident=undefined;reviewWorkspace=undefined;reviewEditAttempt=undefined;receiveTools=undefined;firstRecovery=undefined;
     showColdReport(false);coldReportStatus.textContent='';if(reportUrl)URL.revokeObjectURL(reportUrl);reportUrl=undefined;recoveryControls.clear();
     const errors:unknown[]=[],attempt=async(action:()=>unknown)=>{try{await action();return true;}catch(error){errors.push(error);return false;}};
     const reviewEnd=attempt(()=>oldReview?.dispose()),workspaceEnd=attempt(()=>oldWorkspace?.dispose()),residentEnd=attempt(()=>releaseRender(oldResident));
-    const reviewClosed=await reviewEnd;await attempt(()=>oldAttempt?.releaseScratch());
+    const reviewClosed=await reviewEnd;
     const workspaceClosed=await workspaceEnd;if(!oldWorkspace||!workspaceClosed)await attempt(()=>oldHost?.dispose());
     const residentClosed=await residentEnd;await attempt(()=>oldTools?.dispose());await attempt(()=>oldRecovery?.dispose());content.replaceChildren();
     if(errors.length){
@@ -912,8 +912,8 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
             if (reviewWorkspace !== currentReview || resident !== prepared) return;
             ensureMaySwitch(); const editGeneration = selectionGeneration, editContext = selectionContext();
             status.textContent = '編集コピーを作成しています。';
-            reviewEditAttempt ??= await PreparedReviewEdit.fromInspectedReview(view.inspection, validationMetadataLimits,ports.reviewEditArchive);
-            if (!guardSelection(editGeneration, editContext)) {await reviewEditAttempt.releaseScratch();reviewEditAttempt=undefined;return;}
+            reviewEditAttempt ??= await PreparedReviewCopy.fromInspectedReview(view.inspection, validationMetadataLimits);
+            if (!guardSelection(editGeneration, editContext)) {reviewEditAttempt=undefined;return;}
             const opened = await openNormal(reviewEditAttempt.run, undefined, 'edit', undefined, reviewEditAttempt);
             // Preserve the View, its windows and the exact attempt until an actual recovery-capable Host exists.
             await replaceSelection(reviewEditAttempt.run, opened, editGeneration, editContext);

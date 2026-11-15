@@ -4,7 +4,8 @@ import { openValidationGeneration, inspectValidationFirstBackup } from './valida
 import { WorkspaceReceiver } from '../projectFiles/receiveWorkspace';
 import { WorkspaceSender } from '../projectFiles/sendWorkspace';
 import { validationMetadataLimits } from '../projectFiles/validation';
-import { reviewEditStates, type ReviewEditBinding } from '../projectPackage/reviewEditControls';
+import type { ReviewEditBinding } from '../projectPackage/reviewEditControls';
+import { ReviewEditJob } from '../projectPackage/reviewEditJob';
 
 export interface ValidationProjectEntry { run: string; title: string; state: 'ready' | 'incomplete' | 'unavailable'; firstRestore?: 'pending' | 'terminal' }
 export type ValidationStorage = (run: string, create: boolean) => ReturnType<ValidationHostOptions['openStorage']>;
@@ -51,7 +52,7 @@ export async function listValidationProjects(options: Omit<ValidationHostOptions
         if (text) { await storage.check(); show(text); }
       }
       const completed = new Map<string, Readonly<ReviewEditBinding>>();
-      const copies = await measure('review-copies', () => reviewEditStates(fs, validationMetadataLimits, child => completed.set(child.childId, child.binding)));
+      const copies = await measure('review-copies', () => new ReviewEditJob(fs, session, validationMetadataLimits).states(child => completed.set(child.childId, child.binding)));
       const jobs = await measure('receive', () => new WorkspaceReceiver(options.base, fs, session, validationMetadataLimits, null).jobs({ completedReviewChildren: completed }));
       const outputs = await measure('output', () => new WorkspaceSender(fs, session, options.store, validationMetadataLimits, options.packageLocks ?? null).jobs());
       const entry: ValidationProjectEntry = { run, title: label,

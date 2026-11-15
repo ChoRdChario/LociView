@@ -15,7 +15,7 @@ import { WorkspaceBaseStore } from './workspaceBases';
 import { withReceiveJobDiscovery } from './receiveJobs';
 import { withOutputJobDiscovery } from './outputJobs';
 import { checkAbort } from './zipChecks';
-import { checkRestoreCurrent, readRestoreControls, reconcileRestoreDatabases, reserveRestoreControls, writeRestoreControl, restoreEqual, restoreJobPath, restoreRef, restoreRoot, restoreBackupProof,
+import { checkRestoreCurrent, readRestoreControls, assertOriginalTextWorkspace, reconcileRestoreDatabases, reserveRestoreControls, writeRestoreControl, restoreEqual, restoreJobPath, restoreRef, restoreRoot, restoreBackupProof,
   type AbsentSnapshot, type RestoreCurrent, type RestorePrepared, type RestoreStart, type RestoreControlJob, type GenerationSelection } from './restoreControls';
 
 /** Existing ready service, not UI-supplied heads or a filename-based Project identity. */
@@ -353,7 +353,9 @@ export class BackupRestoreJob {
     };
     const scope = await openWorkspaceGeneration(root, { generationId, allowCreate: false, auditReadOperations: true,
       assertSelected: async () => { await checkSelected(); },
-      ...(generationId === null ? { assertWritable: checkWritable } : { assertSelectedWritable: checkWritable,
+      ...(generationId === null ? { assertWritable: () => assertOriginalTextWorkspace(root, limits),
+        ...(diagnostics?.ordinarySession === true ? { ordinaryTextCommit: () => true,
+          assertOriginalTextWritable: () => assertOriginalTextWorkspace(root, limits) } : {}) } : { assertSelectedWritable: checkWritable,
         ordinaryTextCommit: () => ordinary }) }, databases.open);
     try {
       const ports = createPorts(scope);

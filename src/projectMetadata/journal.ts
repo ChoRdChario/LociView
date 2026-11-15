@@ -21,8 +21,9 @@ export interface JournalStart {
   transactionId: string;
   predecessor: string | null;
   repositoryId: string;
-  purpose: 'initialize' | 'localCommand' | 'remotePackageMerge' | 'importWorkspace' | 'restoreBackup' | 'importClean' | 'appendScene';
+  purpose: 'initialize' | 'localCommand' | 'remotePackageMerge' | 'importWorkspace' | 'restoreBackup' | 'importClean' | 'copyReview' | 'appendScene';
   sceneAppend?: EvidenceRef;
+  reviewCopy?: EvidenceRef;
   proof: MetadataProof;
   baseHeads: string[];
 }
@@ -42,10 +43,12 @@ async function seal(start: JournalStart, changes: Part[], stagedBlobs: readonly 
   // Exact 02 §8 local-command digest. Old receipts retain the empty-list digest.
   const value = { transactionId: start.transactionId,
     target: { identity: start.proof.identity, metadataEnvelope: start.proof.envelope }, purpose: start.purpose, stagedBlobs,
-    metadataBatch: { kind: start.purpose, baseHeads: start.baseHeads, changes, ...(start.sceneAppend ? { sceneAppend: start.sceneAppend } : {}), ...(remote ?? {}) } };
+    metadataBatch: { kind: start.purpose, baseHeads: start.baseHeads, changes, ...(start.sceneAppend ? { sceneAppend: start.sceneAppend } : {}),
+      ...(start.reviewCopy ? { reviewCopy: start.reviewCopy } : {}), ...(remote ?? {}) } };
   const version = remote && isPackageRemote(remote) ? 'v2' : 'v1';
   if (start.purpose === 'restoreBackup') return digest(new TextEncoder().encode(`lociview:v2:backup-restore:jcs-v1\n${json(value)}`));
   if (start.purpose === 'importClean') return digest(new TextEncoder().encode(`lociview:v2:clean-import:jcs-v1\n${json(value)}`));
+  if (start.purpose === 'copyReview') return digest(new TextEncoder().encode(`lociview:v2:review-copy:jcs-v1\n${json(value)}`));
   return digest(new TextEncoder().encode(`lociview:v2:metadata-change-set:jcs-${version}\n${json(value)}`));
 }
 function heads(value: unknown): asserts value is string[] {
@@ -54,14 +57,17 @@ function heads(value: unknown): asserts value is string[] {
 }
 function validateStart(s: JournalStart, limits: MetadataLimits): void {
   if (!s || Object.keys(s).filter(k => k !== 'requiredCapabilities').sort().join(',') !==
-    `baseHeads,predecessor,proof,purpose,repositoryId,${s.purpose === 'appendScene' ? 'sceneAppend,' : ''}transactionId`) fail('journal-start');
+    `baseHeads,predecessor,proof,purpose,repositoryId,${s.purpose === 'copyReview' ? 'reviewCopy,' : ''}${s.purpose === 'appendScene' ? 'sceneAppend,' : ''}transactionId`) fail('journal-start');
   if (s.purpose === 'appendScene' && (!s.sceneAppend || Object.keys(s.sceneAppend).sort().join(',') !== 'byteLength,sha256' ||
     !Number.isSafeInteger(s.sceneAppend.byteLength) || s.sceneAppend.byteLength <= 0 || s.sceneAppend.byteLength > limits.maxTotalBytes ||
     !/^[0-9a-f]{64}$/.test(s.sceneAppend.sha256))) fail('journal-scene-append');
   readRequiredCapabilities(s.requiredCapabilities);
+  if (s.purpose === 'copyReview' && (!s.reviewCopy || Object.keys(s.reviewCopy).sort().join(',') !== 'byteLength,sha256' ||
+    !Number.isSafeInteger(s.reviewCopy.byteLength) || s.reviewCopy.byteLength <= 0 || s.reviewCopy.byteLength > limits.maxTotalBytes ||
+    !/^[0-9a-f]{64}$/.test(s.reviewCopy.sha256))) fail('journal-review-copy');
   technicalId(s.transactionId); technicalId(s.repositoryId); if (s.predecessor !== null) technicalId(s.predecessor);
   checkedProof(s.proof, limits); heads(s.baseHeads);
-  if (s.purpose === 'initialize' || s.purpose === 'importWorkspace' || s.purpose === 'restoreBackup' || s.purpose === 'importClean') {
+  if (s.purpose === 'initialize' || s.purpose === 'importWorkspace' || s.purpose === 'restoreBackup' || s.purpose === 'importClean' || s.purpose === 'copyReview') {
     if (s.predecessor !== null || s.baseHeads.length || s.repositoryId !== s.transactionId) fail('journal-initialize');
   } else if (!['localCommand', 'remotePackageMerge', 'appendScene'].includes(s.purpose) || s.predecessor === null || !s.baseHeads.length) fail('journal-purpose');
 }
@@ -187,13 +193,13 @@ export class TransactionJournal {
     const keys = remote ? ['changes,exactChangeSetDigest,remote,start', ...(packageSource ? ['changes,exactChangeSetDigest,remote,stagedBlobs,start'] : [])]
       : ['changes,exactChangeSetDigest,start', 'changes,exactChangeSetDigest,stagedBlobs,start'];
     if (!p || !keys.includes(Object.keys(p).sort().join(',')) || json(start) !== json(p.start) ||
-      !Array.isArray(p.changes) || (remote ? !p.changes.length || p.changes.length > this.limits.maxChanges : p.changes.length !== (start.purpose === 'initialize' || start.purpose === 'importClean' ? 2 : 1))) fail('journal-descriptors');
+      !Array.isArray(p.changes) || (remote ? !p.changes.length || p.changes.length > this.limits.maxChanges : p.changes.length !== (start.purpose === 'initialize' || start.purpose === 'importClean' || start.purpose === 'copyReview' ? 2 : 1))) fail('journal-descriptors');
     if (remote) checkJournalRemote(p.remote!, start.proof, this.limits);
     if (imported && (!packageSource || isContributionRemote(p.remote!) || isBackupRestore(p.remote!) || json(p.remote!.source.remoteHeads) !== json(p.remote!.expectedFinalHeads))) fail('import-source');
     if (restored ? !p.remote || !isBackupRestore(p.remote) : p.remote && isBackupRestore(p.remote)) fail('restore-source-purpose');
     if (p.exactChangeSetDigest !== await seal(start, p.changes, p.stagedBlobs, p.remote)) fail('journal-descriptors');
     if (p.stagedBlobs !== undefined) {
-      const batch = packageSource || start.purpose === 'importClean' || start.purpose === 'appendScene';
+      const batch = packageSource || start.purpose === 'importClean' || start.purpose === 'copyReview' || start.purpose === 'appendScene';
       if (!Array.isArray(p.stagedBlobs) || (batch ? !p.stagedBlobs.length || p.stagedBlobs.length > this.limits.maxNodes :
         start.purpose !== 'localCommand' || !(p.stagedBlobs.length === 1 || hasPortableMediaCapability(start.requiredCapabilities) && p.stagedBlobs.length === 2))) fail('journal-blob-delta');
       const lengths = new Map<string, number>(); let previous = '';
@@ -250,7 +256,7 @@ export class TransactionJournal {
       parts.push(bytes!);
     }
     if (p.start.purpose === 'initialize') ProjectMetadataSource.reopen(parts, p.start.proof, this.limits);
-    if (p.start.purpose === 'importClean') ProjectMetadataSource.reopen(parts, p.start.proof, this.limits).assertFreshInitialization();
+    if (p.start.purpose === 'importClean' || p.start.purpose === 'copyReview') ProjectMetadataSource.reopen(parts, p.start.proof, this.limits).assertFreshInitialization();
     return parts;
   }
 
