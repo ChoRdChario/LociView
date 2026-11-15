@@ -73,7 +73,7 @@ test('daily Scene and Caption organization, tags, alignment, settings and files 
     if(nativeHeic)await ready(p,'メディアを追加しました。');else{await expect(p.locator('main.lv-project-workspace > header > p.lv-operation-status')).toContainText('端末で別のJPEG');await p.getByRole('region',{name:'メディア',exact:true}).getByRole('button',{name:'選択を取り消す',exact:true}).click();await expect(p.locator('main.lv-project-workspace > header > p.lv-operation-status')).toHaveText('');}
     await info.attach('native-media-environment',{body:JSON.stringify({browser:first.context.browser()?.version()??await p.evaluate(()=>navigator.userAgent),nativeHeic,avcAacMp3:'actual initial decode and play time/frame progression passed'},null,2),contentType:'application/json'});
     console.log('daily: original media playback and HEIC capability verified');
-    const tags = p.getByLabel('タグの管理', { exact: true }); await tags.locator('summary').click(); await tags.getByLabel('タグ名', { exact: true }).fill('現地'); await tags.getByRole('button', { name: 'タグを追加', exact: true }).click(); await ready(p, 'タグを保存しました。');
+    const tags = p.getByLabel('分類タグ', { exact: true }); await tags.locator(':scope > summary').click(); await tags.locator('.lv-tag-settings > summary').click(); await tags.getByLabel('タグ名', { exact: true }).fill('現地'); await tags.getByRole('button', { name: 'タグを追加', exact: true }).click(); await ready(p, 'タグを保存しました。');
     await tags.getByRole('button', { name: 'この記録にタグを付ける', exact: true }).click(); await ready(p, '記録のタグを変更しました。');
     await p.getByRole('button', { name: '記録を複製', exact: true }).click(); await ready(p, '記録を複製しました。元の記録は変わりません。');
     await p.getByLabel('タイトル', { exact: true }).fill('複製の記録'); await p.getByLabel('本文', { exact: true }).fill('独立した本文'); await p.getByRole('button', { name: '変更を適用', exact: true }).click(); await ready(p, '変更を適用しました。');
@@ -115,7 +115,7 @@ test('daily Scene and Caption organization, tags, alignment, settings and files 
     await models.getByLabel('回転・拡縮の基準', { exact: true }).selectOption('centre'); await models.getByRole('button', { name: '配置を調整', exact: true }).click(); await models.getByLabel('モデル回転 Z', { exact: true }).fill('90'); await models.getByRole('button', { name: '配置を確定', exact: true }).click(); await ready(p, 'モデルの配置を確定しました。');
     await models.getByRole('button', { name: '読み込み時の配置に戻す', exact: true }).click(); await models.getByRole('button', { name: '配置を取り消す', exact: true }).click();
     console.log('daily: alignment verified');
-    const settings = p.getByLabel('設定', { exact: true }); await settings.locator('summary').click(); await settings.getByLabel('このブラウザの表示名', { exact: true }).fill('現地担当'); await settings.getByRole('button', { name: '表示名を設定', exact: true }).click(); await expect(settings.getByRole('status')).toHaveText('このブラウザの表示名を設定しました。'); await expect(p.getByLabel('このブラウザの利用者', { exact: true })).toHaveText('現地担当');
+    const settings = p.getByLabel('設定', { exact: true }); await settings.locator(':scope > summary').click(); await settings.locator('.lv-local-name > summary').click(); await settings.getByLabel('このブラウザの表示名', { exact: true }).fill('現地担当'); await settings.getByRole('button', { name: '表示名を設定', exact: true }).click(); await expect(settings.getByRole('status')).toHaveText('このブラウザの表示名を設定しました。'); await expect(p.getByLabel('このブラウザの利用者', { exact: true })).toHaveText('現地担当');
     await p.screenshot({ path: info.outputPath('daily-authoring.png'), fullPage: true });
     const saved = await output(p, info, 'daily-backup', 'backup'), before = await backupRecords(saved), workspace = await output(p, info, 'daily-workspace', 'teamWorkspace');
     const sent = await WorkspaceArchive.inspect(new Blob([Uint8Array.from(await readFile(workspace)).buffer]), limits); expect(sent.source.originalChanges()).toEqual(before.archive.source.originalChanges());
@@ -130,7 +130,7 @@ test('daily Scene and Caption organization, tags, alignment, settings and files 
       await expect(control).toBeDisabled();
       await expect(control).toBeHidden();
     }
-    await cold.page.getByLabel('設定', { exact: true }).locator('summary').click(); await expect(cold.page.getByLabel('このブラウザの表示名', { exact: true })).toHaveValue('現地担当');
+    await cold.page.getByLabel('設定', { exact: true }).locator(':scope > summary').click(); await expect(cold.page.getByLabel('このブラウザの表示名', { exact: true })).toHaveValue('現地担当');
     const after = await backupRecords(await output(cold.page, info, 'daily-cold', 'backup')); expect(after.records).toEqual(before.records); expect(after.archive.source.token).toBe(before.archive.source.token);
     await cold.page.getByRole('tab',{name:'キャプション',exact:true}).click();await cold.page.getByRole('list',{name:'キャプション一覧',exact:true}).locator('.lv-caption-select').filter({hasText:'複製の記録'}).click();await play(cold.page,'audio','owned-audio.mp3');
     await cold.page.setViewportSize({width:320,height:740});await play(cold.page,'video','owned-video.mp4');await cold.page.screenshot({path:info.outputPath('daily-media-320.png'),fullPage:true});

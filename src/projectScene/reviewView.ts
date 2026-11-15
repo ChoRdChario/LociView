@@ -46,7 +46,7 @@ export async function prepareReviewView(file: Blob | PackageArchive | ReviewArch
   for (const asset of Object.values(assets)) {
     if (asset.kind !== 'visual' || !visibleAssets.has(asset.id)) continue;
     const ids = list(asset.representationIds), reps=ids.map(id=>representations[string(id)]!),visuals=reps.filter(r=>r.role!=='interactionProxy'),proxies=reps.filter(r=>r.role==='interactionProxy');
-    if(visuals.length!==1||proxies.length>1||proxies.length&&(visuals[0]!.role!=='gsPrimary'||proxies[0]!.proxyForGsVariantFamilyId!==visuals[0]!.variantFamilyId))throw Error('モデルと位置指定用の面の対応を確認できません。');
+    if(visuals.length!==1||proxies.length>1||proxies.length&&(visuals[0]!.role!=='gsPrimary'||proxies[0]!.proxyForGsVariantFamilyId!==visuals[0]!.variantFamilyId))throw Error('モデルとピン配置用モデルの対応を確認できません。');
     for(const record of reps){const blob = object(record.blob);
     const file=inspection.archive.entryBlob(`blobs/sha256/${string(blob.digest)}`);
     const source = record.contentKind==='gaussianSplat' ? await inspectDeclaredValidationBlob(record,file,policy,decode,jpeg,'review') :

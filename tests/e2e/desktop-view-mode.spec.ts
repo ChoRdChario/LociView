@@ -175,7 +175,7 @@ test('view mode hides editing while preserving reading, local display, existing 
     const help=p.locator('details[aria-label="ヘルプ"]'),settings=p.locator('details[aria-label="設定"]');
     await menu.locator(':scope > summary').click();await help.locator(':scope > summary').click();await expect(menu).not.toHaveAttribute('open');
     await settings.locator(':scope > summary').click();await expect(help).not.toHaveAttribute('open');
-    await settings.getByLabel('このブラウザの表示名',{exact:true}).fill('保持する入力');await help.locator(':scope > summary').click();
+    await settings.locator('.lv-local-name > summary').click(); await settings.getByLabel('このブラウザの表示名',{exact:true}).fill('保持する入力');await help.locator(':scope > summary').click();
     await expect(settings).not.toHaveAttribute('open');await help.locator(':scope > summary').click();await revealWorkPanel(p); await tab('モデル').click();await p.getByRole('button',{name:'編集に戻る',exact:true}).click();
     await expect(settings).toBeFocused();await expect(tab('モデル')).toHaveAttribute('aria-selected','true');
     await expect(settings.getByLabel('このブラウザの表示名',{exact:true})).toHaveValue('保持する入力');
@@ -316,7 +316,7 @@ test('one PC app keeps the same Project through connected, cold offline and prep
     await context!.close(); context = undefined; p = await open(); await selected();
     await expect.poll(()=>p.evaluate(async()=>!!(await navigator.serviceWorker.getRegistration('/'))?.active),{timeout:90_000}).toBe(true);expect(await p.evaluate(() => navigator.serviceWorker.controller)).toBeNull();
     await p.locator('.lv-caption-select').filter({ hasText: '同じ記録' }).click(); await expect(detail().getByLabel('本文', { exact: true })).toHaveValue('通信なしで追記した本文'); expect(await save('after-removal')).toEqual(saved);
-    await revealProjectSelection(p); await p.getByRole('button', { name: 'ファイルを開く', exact: true }).click(); await expect(p.locator('.lv-home-settings')).not.toHaveAttribute('open');
+    await revealProjectSelection(p); await p.getByRole('button', { name: 'プロジェクトを選ぶ', exact: true }).click(); await expect(p.locator('.lv-home-settings')).not.toHaveAttribute('open');
     await revealOfflineUtilities(p); await expect(offline().getByRole('status')).toContainText('アプリを保存しました。');await expect(offline().getByText('アプリの更新・修復',{exact:true})).toBeVisible();
     expect(await p.evaluate(async () => (await (await caches.open('foreign-retain')).match('/sentinel'))?.text())).toBe('unchanged');
     await p.screenshot({ path: info.outputPath('same-home-after-removal.png'), fullPage: false }); expect(errors).toEqual([]);

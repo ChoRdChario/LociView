@@ -129,7 +129,7 @@ test('phone record list, body and completion stay usable when the viewport shrin
     const [whole] = await Promise.all([page.waitForEvent('download'), primary.tap()]);
     console.log('phone whole output', { previousReadyMs: wholeStarted - continuationStarted, handoffMs: Date.now() - wholeStarted });
     const workspace = info.outputPath('phone-workspace.zip'); await whole.saveAs(workspace);
-    await page.locator('details.lv-project-files').getByRole('button', { name: 'ファイルを開く', exact: true }).tap();
+    await page.locator('details.lv-project-files').getByRole('button', { name: 'プロジェクトを選ぶ', exact: true }).tap();
     await page.getByLabel('ファイルを選択', { exact: true }).setInputFiles(workspace);
     await page.getByRole('button', { name: 'ファイルを開く', exact: true }).tap();
     const destination = page.getByRole('region', { name: '取り込み先', exact: true });

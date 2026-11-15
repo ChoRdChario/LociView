@@ -28,12 +28,13 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
   const content = make('div'); content.className = 'lv-development-content';
   const stage = make('section'); stage.className = 'lv-development-stage'; const viewport = make('section'); viewport.className = 'lv-development-viewport'; viewport.setAttribute('aria-label', '3D表示');
   const canvas = make('canvas'); canvas.tabIndex = 0; canvas.setAttribute('aria-label', '3Dモデルの表示');
+  const searchRecords = make('button', '記録を検索'); searchRecords.type = 'button'; searchRecords.className = 'lv-stage-search';
   const overlay = make('div'); overlay.className = 'lv-development-pin-layer';
   const sidebar = make('aside'); sidebar.className = 'lv-development-sidebar'; sidebar.setAttribute('aria-label', '閲覧パネル');
   const sceneName = make('h2', view.sceneName), emptyCaptions=make('p','このシーンにキャプションはありません。'),status = make('p'), retry = make('button', '3D表示を再試行'); status.setAttribute('role', 'status'); retry.type = 'button';
   const renderStatus = make('div'); renderStatus.className = 'lv-review-render-status'; renderStatus.append(status, retry);
   const footer = make('p', '閲覧用ファイルです。');
-  viewport.append(canvas, overlay, renderStatus); stage.append(viewport); content.append(stage, sidebar); root.append(header, content, footer);
+  viewport.append(canvas, searchRecords, overlay, renderStatus); stage.append(viewport); content.append(stage, sidebar); root.append(header, content, footer);
   const mediaWork = createMediaResidencyGate(document, render, () => runtime?.idle?.() ?? Promise.resolve(), () => !disposed);
   const mediaViewer = createMediaViewer(document, view.rasterResources,view.imageDimensions,mediaWork.acquire); root.append(mediaViewer.root);
   let memory: SceneUiMemory = { selectedCaptionId: null, search: '', pinColors: null, listScrollTop: 0, ownerFilter: { kind: 'all' } };
@@ -156,6 +157,11 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
       plan.kind === 'unchanged' && plan.explicitSelection || plan.kind === 'effect') list.revealSelected();
   }
   const list = createCaptionListControls(document, accept, active => { composing = active; paint(); });
+  const searchBlocked = () => disposed || composing || moving || handoffBusy || !!runtime?.read().dragging;
+  searchRecords.addEventListener('click', () => {
+    if (searchBlocked() || content.inert || !view.source.captions.length) return;
+    list.focusSearch(); list.root.scrollIntoView?.({ block: 'nearest', behavior: 'auto' });
+  });
   const mediaGroup = (captionId: string): MediaPreviewGroup => {
     const caption = view.source.captions.find(c => c.id === captionId);
     return { scope: JSON.stringify([view.source.token, captionId]), label: caption?.title.kind === 'value' ? caption.title.value || 'キャプション' : 'キャプション',
@@ -231,6 +237,7 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
   views.hidden = !alternatives.length; sidebar.append(views);
   function paint() {
     if (disposed) return; const observation = runtime?.read(), ready = !!observation?.ready && observation.display === display;
+    searchRecords.hidden = !view.source.captions.length; searchRecords.disabled = searchBlocked();
     const cameraReady=!!(observation?.cameraReady??observation?.ready)&&observation?.display===display;
     const cameraBlocked = !cameraReady || composing || moving || !!observation?.dragging;
     let captured: unknown=observation?.camera; try { captured ??= runtime?.capture?.().camera; } catch { /* Camera preparation remains local. */ }

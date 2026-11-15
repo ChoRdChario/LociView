@@ -72,10 +72,19 @@ for (const scenario of [
       await existing.getByRole('button', { name: 'このシーンに追加', exact: true }).click();
       await expect(source.getByText('このシーンに追加しました。', { exact: true })).toBeVisible();
     }
+    await source.getByRole('tab', { name: 'モデル', exact: true }).click();
+    const models = source.getByRole('tabpanel', { name: 'モデル', exact: true });
+    await models.locator('.lv-model-select').filter({hasText: '共通名.glb'}).click();
+    await models.getByRole('button', { name: '隠す', exact: true }).click();
+    await expect(models.getByRole('button', { name: '表示', exact: true })).toBeVisible();
     await revealFileSurface(source, '共有'); await selectShareOutput(files(source), 'review');
     await chooseSharedScene(files(source),'点検シーン');
     if (scenario.interrupt) await chooseSharedScene(files(source), 'シーン 1');
     await files(source).getByRole('button', { name: '内容を確認', exact: true }).click();
+    const contents = files(source).locator('.lv-share-contents'); await expect(contents).toBeVisible();
+    await contents.locator(':scope > summary').click();
+    await expect(contents.getByRole('listitem').filter({hasText: /^共通名\.glb$/})).toHaveCount(1);
+    await expect(contents.getByRole('listitem').filter({hasText: /^点検写真\.png$/})).toHaveCount(1);
     const zip = info.outputPath('scene.zip'); await downloadTo(source, zip);
     const shared = await ReviewArchive.inspect(await openAsBlob(zip), validationMetadataLimits);
     expect(shared.archive.control.manifest.blobs.map(entry => entry.sha256).sort()).toEqual(
@@ -102,7 +111,7 @@ for (const scenario of [
     await page.goto(server.url); await createProject(page, '追加先プロジェクト', 0);
     const before = await backup(page, info.outputPath('before.zip'));
     const previous = await selectCleanRecords(before.source, validationMetadataLimits);
-    await page.locator('details.lv-project-files').getByRole('button', { name: 'ファイルを開く', exact: true }).click(); await selectFile(page, zip);
+    await page.locator('details.lv-project-files').getByRole('button', { name: 'プロジェクトを選ぶ', exact: true }).click(); await selectFile(page, zip);
     const review = page.getByRole('main', { name: '閲覧用のシーン' });
     const panel = review.getByRole('region', { name: 'シーンの追加' });
     const open = review.getByRole('button', { name: '既存に追加', exact: true });

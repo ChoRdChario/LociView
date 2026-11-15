@@ -16,8 +16,11 @@ interface OrganizationHost {
 /** Task controls only; complete reads and typed command preparation belong to the Host. */
 export function createProjectOrganization(document: Document, host: OrganizationHost) {
   const { make, button } = panelNodes(document), sceneRoot = make('div'), captionRoot = make('div'), tagsRoot = make('details');
-  sceneRoot.setAttribute('aria-label', 'シーンの整理'); captionRoot.setAttribute('aria-label', '記録の編集操作'); tagsRoot.setAttribute('aria-label', 'タグの管理');
-  const tagsSummary = make('summary', '分類タグ'); tagsRoot.append(tagsSummary);
+  sceneRoot.setAttribute('aria-label', 'シーンの整理'); captionRoot.setAttribute('aria-label', '記録の編集操作'); tagsRoot.setAttribute('aria-label', '分類タグ');
+  const tagsSummary = make('summary', '分類タグ'), tagSettings = make('details'), definitions = make('div'), tagWarning = make('p');
+  tagSettings.className = 'lv-tag-settings'; tagSettings.append(make('summary', 'タグの設定'),
+    make('p', '名前・色の変更と削除は、すべての記録に反映されます。'), definitions);
+  tagWarning.setAttribute('role', 'status'); tagsRoot.append(tagsSummary, tagWarning);
   let disposed = false, composing = false, form: { kind: 'sceneCopy' | 'sceneDelete' | 'tagEdit' | 'tagDelete'; token: string; id: string } | null = null;
   let captured: { token: string; tagId: string | null } | null = null;
   let settingsDraft: { before: string; value: string } | null = null;
@@ -37,7 +40,7 @@ export function createProjectOrganization(document: Document, host: Organization
     else settingsStatus.textContent = '設定できませんでした。入力は保持しています。';
   });
   const cancelSettings = button('表示名の入力を取り消す', () => { if (!composing && !host.localBlocked()) { settingsDraft = null; settingsStatus.textContent = ''; host.changed(); } });
-  const localSettingsArea = make('section'); localSettingsArea.className = 'lv-settings-group'; localSettingsArea.append(make('h2', 'このブラウザの表示'), displayNameLabel, contextHelp(document, 'このブラウザだけの設定です。共有ファイルや過去の編集者名は変わりません。', [displayName]), applySettings, cancelSettings); settingsRoot.append(settingsSummary, localSettingsArea, settingsStatus);
+  const localSettingsArea = make('details'); localSettingsArea.className = 'lv-settings-group lv-local-name'; localSettingsArea.append(make('summary', 'このブラウザの表示名'), displayNameLabel, contextHelp(document, 'このブラウザだけの設定です。共有ファイルや過去の編集者名は変わりません。', [displayName]), applySettings, cancelSettings); settingsRoot.append(settingsSummary, localSettingsArea, settingsStatus);
   const editorForm = make('section'), editorLabel = make('label', '編集者名'), editorInput = make('input'), editorToggleLabel = make('label'), editorToggle = make('input'), editorStatus = settingsStatus;
   editorInput.maxLength = 256; editorLabel.append(editorInput); editorToggle.type = 'checkbox';
   editorToggleLabel.append(editorToggle, make('span', 'このプロジェクトの今後の編集にこの名前を残す')); editorStatus.setAttribute('role', 'status');
@@ -59,7 +62,7 @@ export function createProjectOrganization(document: Document, host: Organization
   editorForm.append(make('h2', '共有する編集者名'), editorLabel, editorToggleLabel,
     make('p', '自己申告の名前です。作業一式・変更分・バックアップに含まれます。停止しても過去の記録は残ります。'),
     make('p', '名前を残した編集を含むプロジェクトや共有ファイルは、対応版のLociViewで開く必要があります。'), applyEditor, cancelEditor);
-  settingsRoot.append(editorForm, settingsStatus);
+  settingsRoot.append(editorForm, localSettingsArea, settingsStatus);
   const actionHistory: { past: CaptionUndoReceipt[]; future: CaptionUndoReceipt[] } = { past: [], future: [] };
   const recorded = new WeakSet<CaptionUndoCapture>();
   let undoWarning = '';
@@ -135,12 +138,15 @@ export function createProjectOrganization(document: Document, host: Organization
   });
   const tagCancel = button('タグの入力を取り消す', () => { if (!host.localBlocked() && !composing) { captured = null; form = null; tagName.value = ''; host.changed(); } });
   const tagConfirm = button('タグを削除する', () => { const f = form; if (f?.kind === 'tagDelete' && f.token === host.source().provider.token) perform({ kind: 'deleteTag', tagId: f.id }, () => { form = null; host.message('タグを削除しました。記録は残っています。'); }); });
-  const tagNote = make('p'); tagForm.append(tagNameLabel, tagColor, saveTag, tagCancel, tagNote, tagConfirm); tagsRoot.append(tagList, tagForm);
+  const tagNote = make('p'); tagForm.append(tagNameLabel, tagColor, saveTag, tagCancel, tagNote, tagConfirm); tagSettings.append(tagForm); tagsRoot.append(tagList, tagSettings);
   editOnly(copyScene, up, down, removeScene, sceneForm, copyCaption, undo, redo, undoHelp,
     tagNameLabel, tagColor, saveTag, tagCancel, tagConfirm);
   function render() {
     if (disposed) return; const s = host.source(), enabled = !!host.ports.authoring, blocked = !!host.blocked(), owned = !!form || !!captured || !!settingsDraft || !!editorDraft;
     settingsRoot.hidden = !host.ports.localSettings && !host.ports.editorSettings;
+    localSettingsArea.hidden = !host.ports.localSettings;
+    if (settingsDraft) localSettingsArea.open = true;
+    if (captured || form?.kind.startsWith('tag')) tagSettings.open = true;
     const savedName = host.ports.localSettings?.read() ?? ''; displayNameBadge.textContent = savedName; displayNameBadge.hidden = !savedName;
     if (!composing && displayName.value !== (settingsDraft?.value ?? host.ports.localSettings?.read() ?? '')) displayName.value = settingsDraft?.value ?? host.ports.localSettings?.read() ?? '';
     const localBlocked = host.localBlocked() || !!form || !!captured;
@@ -178,12 +184,12 @@ export function createProjectOrganization(document: Document, host: Organization
     tagConfirm.hidden = form?.kind !== 'tagDelete'; tagConfirm.disabled = blocked || composing || !!stale;
     tagNote.textContent = stale ? '内容が更新されています。入力は保持しています。取り消して選び直してください。' : form?.kind === 'tagDelete' ? 'すべての記録からこのタグを外します。記録や添付は残ります。' : '';
     tagName.disabled = tagColor.disabled = blocked || !!form && form.kind !== 'tagEdit';
-    tagList.replaceChildren();
-    const viewing = host.ports.mode === 'view'; tagsSummary.textContent = '分類タグ';
+    tagList.replaceChildren(); definitions.replaceChildren();
+    const viewing = host.ports.mode === 'view'; tagSettings.hidden = viewing; tagsSummary.textContent = '分類タグ';
     const tagLinks = Object.values(s.provider.details.mutable.captionTagMembershipsById);
     const uncertainLinks = tagLinks.some(f => (f.captionId?.kind !== 'value' || fieldValue(f.captionId) === s.captionId) &&
       (fieldValue(f.lifecycle) as {state?:string}|undefined)?.state !== 'deleted' && !['captionId','tagId', 'lifecycle'].every(key => f[key]?.kind === 'value'));
-    if (uncertainLinks) tagNote.textContent += ' このプロジェクトに所属を確認できないタグ登録があります。元の記録は保持しています。';
+    tagWarning.textContent = uncertainLinks ? '所属を確認できないタグ登録があります。元の記録は保持しています。' : ''; tagWarning.hidden = !uncertainLinks;
     for (const [tagId, fields] of Object.entries(s.provider.details.mutable.captionTagsById)) {
       const lifecycle = fieldValue(fields.lifecycle) as { state?: string } | undefined;
       const retainedLink = Object.values(s.provider.details.mutable.captionTagMembershipsById).some(f => fieldValue(f.tagId) === tagId &&
@@ -193,6 +199,7 @@ export function createProjectOrganization(document: Document, host: Organization
       const related = Object.entries(s.provider.details.mutable.captionTagMembershipsById).filter(([, f]) => activeRecord(f) && fieldValue(f.tagId) === tagId && fieldValue(f.captionId) === s.captionId);
       const uncertain = tagLinks.some(f => fieldValue(f.tagId) === tagId && fieldValue(f.captionId) === s.captionId && f.lifecycle?.kind !== 'value');
       if (viewing && !related.length && !uncertain) continue;
+      const definition = make('div'); definition.className = 'lv-tag-definition'; definition.append(make('span', typeof label === 'string' ? label : '名前を確認するタグ'));
       row.className = 'lv-caption-tag'; row.dataset.included = String(related.length > 0);
       const name = make('span', typeof label === 'string' ? label : '名前を確認するタグ'), swatch = make('i'); swatch.setAttribute('aria-hidden', 'true');
       if (Array.isArray(color) && color.length === 3 && color.every(v => typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 1))
@@ -203,24 +210,24 @@ export function createProjectOrganization(document: Document, host: Organization
       editOnly(toggle); toggle.disabled = blocked || owned || !s.captionId || !activeRecord(fields); row.append(toggle);
       const edit = button('タグを編集', () => { if (blocked || owned) return; form = { kind: 'tagEdit', token: s.provider.token, id: tagId }; captured = { token: s.provider.token, tagId }; tagName.value = typeof label === 'string' ? label : ''; if (Array.isArray(color)) tagColor.value = '#' + color.map(v => Math.round(Number(v) * 255).toString(16).padStart(2, '0')).join(''); host.changed(); });
       const remove = button('タグを削除', () => { if (!blocked && !owned) { form = { kind: 'tagDelete', token: s.provider.token, id: tagId }; host.changed(); } });
-      editOnly(edit, remove); edit.disabled = remove.disabled = blocked || owned || !activeRecord(fields); row.append(edit, remove);
+      editOnly(edit, remove); edit.disabled = remove.disabled = blocked || owned || !activeRecord(fields); definition.append(edit, remove);
       for (const field of ['label', 'colorSrgb', 'orderKey'] as const) {
         const raw = s.provider.inspection.candidates.fields.find(f => f.path.join('/') === `captionTagsById/${tagId}/${field}`);
         if (!raw || raw.candidates.length < 2) continue;
         for (const [i, c] of raw.candidates.entries()) { const choose = button(`${field === 'label' ? '名前' : field === 'colorSrgb' ? '色' : '順序'}の候補 ${i + 1} を使う`, () => { if (host.source().provider.token === s.provider.token) host.run({ kind: 'resolveTagField', tagId, field, operationId: c.operationId }, () => host.message('タグの内容を確定しました。')); });
           const description = c.value.kind !== 'value' ? '未設定' : field === 'label' ? String(c.value.value) : field === 'colorSrgb' && Array.isArray(c.value.value) ? '#' + c.value.value.map(v => Math.round(Number(v) * 255).toString(16).padStart(2, '0')).join('') : `並び順の候補 ${i + 1}`;
-          editOnly(choose); choose.disabled = blocked || owned; row.append(make('span', description), choose); }
+          editOnly(choose); choose.disabled = blocked || owned; definition.append(make('span', description), choose); }
       }
       if (!activeRecord(fields) || s.provider.issues.some(i => i.code === 'concurrent-delete-edit' && i.path[1] === tagId)) {
-        row.append(make('p', '削除として確定すると、すべての記録からこのタグを外します。記録や添付は残ります。'));
+        definition.append(make('p', '削除として確定すると、すべての記録からこのタグを外します。記録や添付は残ります。'));
         const chooseLifecycle = (state: 'active' | 'deleted') => { if (host.source().provider.token !== s.provider.token) return; const raw = s.provider.inspection.candidates.fields.find(f => f.path.join('/') === `captionTagsById/${tagId}/lifecycle`);
           if (!raw) return; const ids = Object.entries(s.provider.details.mutable.captionTagMembershipsById).filter(([, f]) => activeRecord(f) && fieldValue(f.tagId) === tagId).map(([id]) => id);
           host.run({ kind: 'resolveTagLifecycle', tagId, state, observedOperationIds: raw.candidates.map(c => c.operationId), observedIds: ids, eventId: newProjectId('evt') }, () => host.message(state === 'active' ? 'タグを残しました。解除済みの所属は戻しません。' : 'タグの削除を確定しました。記録は残っています。'));
         };
         const restore = button('このタグを残す', () => chooseLifecycle('active')), discard = button('タグの削除として確定', () => chooseLifecycle('deleted'));
-        editOnly(restore, discard); restore.disabled = discard.disabled = blocked || owned; row.append(restore, discard);
+        editOnly(restore, discard); restore.disabled = discard.disabled = blocked || owned; definition.append(restore, discard);
       }
-      tagList.append(row);
+      tagList.append(row); definitions.append(definition);
     }
     tagsRoot.hidden = viewing && !tagList.children.length && !uncertainLinks && !form && !captured;
   }

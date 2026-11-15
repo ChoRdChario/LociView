@@ -70,7 +70,7 @@ test('08c uses canvas generation, portable offline display/save/reopen and a por
     await revealCoordinateAdd(p); const owner = p.getByLabel('追加先モデル', { exact: true }); await owner.focus(); await owner.selectOption({ label: 'model.glb' }); await p.getByRole('button', { name: 'このモデルに追加', exact: true }).click();
     for (const [axis,value] of [['X','0'],['Y','.5'],['Z','0']]) await p.getByLabel(`位置 ${axis}`, { exact: true }).fill(value!);
     await p.getByRole('button', { name: 'ここに記録を作る', exact: true }).click(); await ready(p, 'ピンの位置を確定しました。');
-    const settings=p.getByLabel('設定',{exact:true});await settings.locator('summary').click();await settings.getByLabel('編集者名',{exact:true}).fill('HEIC担当');await settings.getByLabel('このプロジェクトの今後の編集にこの名前を残す',{exact:true}).check();await settings.getByRole('button',{name:'編集者名を設定',exact:true}).click();
+    const settings=p.getByLabel('設定',{exact:true});await settings.locator(':scope > summary').click();await settings.getByLabel('編集者名',{exact:true}).fill('HEIC担当');await settings.getByLabel('このプロジェクトの今後の編集にこの名前を残す',{exact:true}).check();await settings.getByRole('button',{name:'編集者名を設定',exact:true}).click();
     await p.getByLabel('本文',{exact:true}).fill('名前のみの履歴');await p.getByRole('button',{name:'変更を適用',exact:true}).click();await ready(p,'変更を適用しました。');
     const chooser = p.waitForEvent('filechooser'); await p.getByLabel('メディアを追加', { exact: true }).click(); await (await chooser).setFiles('tests/fixtures/daily-media/owned-still.heic'); await p.getByRole('region',{name:'キャプションの詳細',exact:true}).getByRole('button',{name:'変更を適用',exact:true}).click(); await ready(p, 'メディアを追加しました。');
     await gallery(p); expect(await p.evaluate(() => (window as any).__heicDecodes)).toBe(1);
@@ -80,7 +80,7 @@ test('08c uses canvas generation, portable offline display/save/reopen and a por
     // Already-loaded shell only: no claim of offline app cold startup/PWA caching.
     await b.context.setOffline(true); await b.p.getByLabel('本文', { exact: true }).fill('オフラインの追記'); await b.p.getByRole('button', { name: '変更を適用', exact: true }).click(); await ready(b.p, '変更を適用しました。');
     const backup = await output(b.p, info, 'offline-backup', 'backup'); await gallery(b.p);
-    await revealProjectSelection(b.p); await b.p.getByRole('button', { name: /^(?:ファイルを開く|別のプロジェクトを開く)$/, exact: true }).click(); await b.p.getByRole('button', { name: '編集で開く', exact: true }).first().click(); await gallery(b.p); expect(await b.p.evaluate(() => (window as any).__heicDecodes)).toBe(0);
+    await revealProjectSelection(b.p); await b.p.getByRole('button', { name: /^(?:プロジェクトを選ぶ|ファイルを開く|別のプロジェクトを開く)$/, exact: true }).click(); await b.p.getByRole('button', { name: '編集で開く', exact: true }).first().click(); await gallery(b.p); expect(await b.p.evaluate(() => (window as any).__heicDecodes)).toBe(0);
     await b.context.setOffline(false); await b.context.close(); contexts.delete(b.context);
     const cold = await launch(1);
     await expect(cold.p.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText(title, { timeout: 90_000 }); await gallery(cold.p);
@@ -92,7 +92,7 @@ test('08c uses canvas generation, portable offline display/save/reopen and a por
     const copyRun = String(clean.source.proof.identity.projectId).slice(4);
     expect(copyRun).not.toBe(new URL(cold.p.url()).searchParams.get('run'));
     await revealProjectSelection(cold.p);
-    await cold.p.locator('details.lv-project-files').getByRole('button', { name: 'ファイルを開く', exact: true }).click();
+    await cold.p.locator('details.lv-project-files').getByRole('button', { name: 'プロジェクトを選ぶ', exact: true }).click();
     await open(cold.p, portableOnly);
     await expect.poll(() => new URL(cold.p.url()).searchParams.get('run')).toBe(copyRun);
     await gallery(cold.p);

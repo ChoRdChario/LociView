@@ -107,7 +107,7 @@ export async function chooseSharedScene(area: Locator, name?: string) {
 
 export async function revealProjectSelection(page: Page) {
   const menu = page.locator('details.lv-project-files');
-  if (await menu.getByRole('button', { name: /^(?:ファイルを開く|別のプロジェクトを開く)$/, includeHidden: true }).count()) {
+  if (await menu.getByRole('button', { name: /^(?:プロジェクトを選ぶ|ファイルを開く|別のプロジェクトを開く)$/, includeHidden: true }).count()) {
     if (!await menu.evaluate(node => (node as HTMLDetailsElement).open)) await menu.locator(':scope > summary').click();
   } else await revealProjectHelp(page);
 }

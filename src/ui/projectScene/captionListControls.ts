@@ -18,7 +18,7 @@ export function createCaptionListControls(document: Document, onPlan: (plan: Cap
   filters.append(searchLabel);
   const status = make('p'); status.className = 'lv-caption-status'; status.setAttribute('role', 'status');
   status.setAttribute('aria-live', 'polite');
-  const reveal = button('選択した項目を表示'); reveal.hidden = true;
+  const reveal = button('絞り込みを解除'); reveal.hidden = true;
   const count = make('p'); count.className = 'lv-caption-count';
   const colorBar = make('div'); colorBar.className = 'lv-caption-colors';
   colorBar.setAttribute('role', 'group'); colorBar.setAttribute('aria-label', 'ピンの色');

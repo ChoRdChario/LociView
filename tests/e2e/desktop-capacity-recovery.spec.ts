@@ -80,6 +80,7 @@ for(const touch of [false,true])test(`native capacity recovery retains drafts an
     await reader.evaluate(()=>new Promise<void>(ready=>{
       (window as any).__outputReader=navigator.locks.request('lociview:output-artifacts:v1',{mode:'shared'},()=>new Promise<void>(release=>{(window as any).__releaseOutputReader=release;ready();}));
     }));
+    await files.locator('details').filter({has: p.getByText('メンテナンス',{exact:true})}).locator(':scope > summary').click();
     await files.getByRole('button',{name:'一時ファイルを整理',exact:true}).click();
     await expect(files.locator('.lv-operation-status')).toHaveText('一時ファイルを確認しています。');
     await expect.poll(()=>p.evaluate(async()=> (await navigator.locks.query()).pending?.some(lock=>lock.name==='lociview:output-artifacts:v1'&&lock.mode==='exclusive'))).toBe(true);

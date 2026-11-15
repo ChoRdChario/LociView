@@ -60,7 +60,7 @@ for (const touch of [false, true]) test(`attachment ordering and Drawing complet
     if (touch) await firstCanvas.tap({ position: firstPosition }); else await firstCanvas.click({ position: firstPosition });
     await page.getByRole('button', { name: 'ここに記録を作る', exact: true }).click(); await ready('ピンの位置を確定しました。');
     await expect(detail).toBeVisible();await expect(detail.getByText('タイトル・本文や写真を追加できます。',{exact:true})).toBeVisible();
-    await expect(detail.getByRole('heading',{name:'名称なし',exact:true})).toBeFocused();
+    await expect(detail.getByRole('heading',{name:'無題',exact:true})).toBeFocused();
     // One tiny photo follows the same explicit text completion and survives the existing restore.
     await detail.getByLabel('タイトル', { exact: true }).fill('再開時の記録'); await detail.getByLabel('本文', { exact: true }).fill('元のバックアップ本文');
     const firstPhoto = page.waitForEvent('filechooser'); await page.getByLabel('メディアを追加', { exact: true }).click();
@@ -103,7 +103,7 @@ for (const touch of [false, true]) test(`attachment ordering and Drawing complet
     expect((await page.locator('main.lv-project-workspace > header').boundingBox())!.y).toBe(headerBeforeSave!.y);
     await page.screenshot({ path: info.outputPath('save-status-after-close.png') });
     const menu=page.locator('details.lv-project-files');await menu.locator(':scope > summary').click();
-    await menu.getByRole('button',{name:'ファイルを開く',exact:true}).click();
+    await menu.getByRole('button',{name:'プロジェクトを選ぶ',exact:true}).click();
     const recent=page.getByRole('region',{name:'このブラウザから再開',exact:true});await expect(recent).toHaveAttribute('aria-busy','false');
     await recent.getByRole('group',{name:'操作の継続',exact:true}).getByRole('button',{name:'編集で開く',exact:true}).click();
     await expect(page.getByRole('button',{name:'閲覧する',exact:true})).toBeEnabled({timeout:90_000});

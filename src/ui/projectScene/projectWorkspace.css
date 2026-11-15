@@ -435,3 +435,11 @@
   .lv-project-workspace:has(.lv-project-body[data-drawing-editing="true"]) > header { padding-block: 0; }
   .lv-project-workspace:has(.lv-project-body[data-drawing-editing="true"]) > header > .lv-operation-status:not(:empty) { position: static; max-width: none; flex: 1 1 100%; margin: 0; }
 }
+
+/* Search precedes the pin buttons in both visual and keyboard order. */
+:is(.lv-project-workspace, .lv-review-workspace) button.lv-stage-search { position: absolute; bottom: 12px; left: 12px; z-index: 5; background: #f7f6f1; color: #292d25; box-shadow: 0 1px 5px #0005; }
+:is(.lv-project-workspace, .lv-review-workspace) button.lv-stage-search:focus-visible { outline: 3px solid #638aab; outline-offset: 3px; }
+.lv-tag-settings { margin-top: 12px; border-top: 1px solid #ddded5; padding-top: 8px; }
+.lv-tag-definition { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding-block: 8px; }
+.lv-tag-definition > span:first-child { flex: 1 0 100%; overflow-wrap: anywhere; }
+:is(.lv-project-workspace, .lv-review-workspace) button.lv-stage-search:disabled { opacity: 1; background: #e3e5df; color: #66695f; }

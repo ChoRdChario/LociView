@@ -27,8 +27,10 @@ export function createValidationOutputControls(document: Document, host: ReturnT
   const history = document.createElement('details'), historyTitle = document.createElement('summary'), completedFiles = document.createElement('div');
   const primary = document.createElement('button'); primary.type = 'button'; primary.className = 'lv-file-primary'; editOnly(primary); commands.append(primary);
   historyTitle.textContent = '作成したファイル'; history.append(historyTitle, completedFiles);
-  root.append(heading, shareOptions, actions, nameField, commands, status, list, history, select);
-  editOnly(shareOptions, actions, nameField, commands, select);
+  const maintenance = document.createElement('details'), maintenanceTitle = document.createElement('summary'), maintenanceActions = document.createElement('div');
+  maintenanceTitle.textContent = 'メンテナンス'; maintenance.append(maintenanceTitle, maintenanceActions);
+  root.append(heading, shareOptions, actions, nameField, commands, status, list, history, maintenance, select);
+  editOnly(shareOptions, actions, nameField, commands, select, maintenance);
   let busy = false, disposed = false, feedback = '', selected: string | null = null, cancellation: string | null = null;
   let completedFeedback = false;
   let storageFailure:{diagnostic:string|null|undefined;text:string}|undefined;
@@ -195,7 +197,7 @@ export function createValidationOutputControls(document: Document, host: ReturnT
     nameField.hidden = purpose !== 'backup'; nameInput.disabled = busy || otherBusy() || !!host.authority.readOnly;
     if(purpose==='backup'){const scope=document.createElement('p');scope.textContent='モデル・メディア・履歴を含む作業全体を保存します。保存したファイルは「ファイルを開く」から再開できます。';actions.append(scope);}
     if (presentation === 'share' && purpose === 'teamWorkspace') {
-      const note = document.createElement('p'); note.textContent = '編集・返送できます。全シーンと編集履歴を含みます。'; actions.append(note);
+      const note = document.createElement('p'); note.textContent = '編集・返送できます。全シーン・原本・編集履歴を含みます。一時的に隠したモデルや、素材内の撮影情報・位置情報も渡ります。'; actions.append(note);
     }
     if (!composing && nameInput.value !== checkpointName) nameInput.value = checkpointName;
     if (purpose === 'contribution' && autoBase && !baseId && host.workspaceOutput.bases.length === 1)
@@ -239,13 +241,24 @@ export function createValidationOutputControls(document: Document, host: ReturnT
           omitted.includes(scene.id), on => { omitted = on ? [...omitted, scene.id] : omitted.filter(id => id !== scene.id); });
       }
       reviewConfirmed = !!reviewPreview && reviewPreview.token === host.read().source?.token && previewKey === JSON.stringify(selection());
-      const help = document.createElement('p'); help.textContent = '選んだシーンのモデル・記録だけを渡します。検索や色の絞り込みは反映しません。元のプロジェクトへ変更分は返せません。'; actions.append(help);
-      if (reviewPreview) {
-        const counts = document.createElement('p'); counts.textContent = reviewConfirmed ? `${reviewPreview.name} — モデル ${reviewPreview.models}・キャプション ${reviewPreview.captions}・メディア ${reviewPreview.media}` : '内容が変わりました。もう一度確認してください。'; actions.append(counts);
+      const help = document.createElement('p'); help.textContent = '一時的に隠したモデルも含みます。検索や色の絞り込みは反映しません。'; actions.append(help);
+      const editing = document.createElement('p'); editing.textContent = '相手は編集用コピーを作れます。元のプロジェクトへ変更分は返せません。'; actions.append(editing);
+      const privacy = document.createElement('p'); privacy.textContent = '過去の変更履歴は含みません。文章・名前と、写真の撮影情報・位置情報なども残ります。'; actions.append(privacy);
+      if (reviewPreview && reviewConfirmed) {
+        const contents = document.createElement('details'), title = document.createElement('summary');
+        contents.className = 'lv-share-contents'; title.textContent = '含める素材'; contents.append(title);
+        for (const [heading, items] of [['モデル', reviewPreview.contents.models], ['メディア', reviewPreview.contents.media]] as const) {
+          const group = document.createElement('section'), label = document.createElement('h3'), names = document.createElement('ul');
+          label.textContent = `${heading} ${items.length}`; group.append(label, names);
+          for (const item of items) { const name = document.createElement('li'); name.textContent = item.label.trim() || '名称未設定'; names.append(name); }
+          contents.append(group);
+        }
+        const counts = document.createElement('p'); counts.textContent = `${reviewPreview.name} — モデル ${reviewPreview.models}・キャプション ${reviewPreview.captions}・メディア ${reviewPreview.media}`; actions.append(counts);
         if (reviewPreview.missingModelCaptions) { const note = document.createElement('p'); note.textContent = `モデルを含まない記録 ${reviewPreview.missingModelCaptions} 件は一覧だけに表示されます。`; actions.append(note); }
         if (reviewPreview.newlyNeedsReviewCaptions) { const note = document.createElement('p'); note.textContent = `受け手が編集コピーを作ると、${reviewPreview.newlyNeedsReviewCaptions} 件のピンが要確認になります。`; actions.append(note); }
+        actions.append(contents);
       }
-      const privacy = document.createElement('p'); privacy.textContent = '過去の変更履歴は含みません。文章・名前・素材に埋め込まれた情報は残ります。'; actions.append(privacy);
+      else if (reviewPreview) { const stale = document.createElement('p'); stale.textContent = '内容が変わりました。もう一度確認してください。'; actions.append(stale); }
     }
     if (purpose === 'clean') {
       const help = document.createElement('p');
@@ -330,9 +343,10 @@ export function createValidationOutputControls(document: Document, host: ReturnT
       }, handoffMessage));
       if (job.cancellable) button(row, '生成を取りやめる', () => { cancellation = job.id; render(); changed(); });
     }
+    maintenanceActions.replaceChildren();
+    maintenance.hidden = !(host.workspaceOutput.jobs.length || host.workspaceOutput.error);
     if (host.workspaceOutput.jobs.length || host.workspaceOutput.error) {
-      const recovering = !!host.workspaceOutput.error || host.workspaceOutput.jobs.some(job => ['unstarted', 'incomplete', 'repair-required'].includes(job.state));
-      const cleanup = button(!recovering && completedFiles.children.length ? completedFiles : list, '一時ファイルを整理', () => {
+      const cleanup = button(maintenanceActions, '一時ファイルを整理', () => {
         let message = '', needsAttention = false;
         perform(async () => {
           const token = host.read().source?.token; if (!token) throw Error('再開用データを確認してください。');

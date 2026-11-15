@@ -877,7 +877,18 @@ export class MetadataProjectSession {
     const { review, omittedEntryView } = await prepareReviewSnapshot(read.source!, this.limits, selection);
     const count = (name: string) => Object.keys(review.snapshot[name] as JsonObject).length;
     const scenes = reviewScenes(review.snapshot);
-    return { token: expectedToken, sceneId: selection.sceneId, selectionKey: json(selection), name: scenes.length === 1 ? scenes[0]!.name as string : `シーン ${scenes.length}件`,
+    // Display names come from this exact validated selection, never a second UI read.
+    const contents = {
+      models: Object.entries(review.snapshot.assetsById as JsonObject).flatMap(([id, raw]) => {
+        const asset = raw as JsonObject;
+        return asset.kind === 'visual' ? [{ id, label: asset.label as string }] : [];
+      }),
+      media: Object.entries(review.snapshot.mediaResourcesById as JsonObject).map(([id, raw]) => {
+        const media = raw as JsonObject;
+        return { id, label: typeof media.label === 'string' ? media.label : '', kind: media.mediaKind as string };
+      }),
+    };
+    return { contents, token: expectedToken, sceneId: selection.sceneId, selectionKey: json(selection), name: scenes.length === 1 ? scenes[0]!.name as string : `シーン ${scenes.length}件`,
       models: Object.values(review.snapshot.assetsById as JsonObject).filter(a => (a as JsonObject).kind === 'visual').length,
       captions: count('captionsById'), media: count('mediaResourcesById'), ...review.editEffect, omittedEntryView,
       ...(reviewCapabilities(review).includes(PORTABLE_MEDIA_CAPABILITY) ? { requiresPortableMediaReader: true } : {}) };

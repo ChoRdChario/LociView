@@ -828,7 +828,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
       if (native?.summary.nativeSpatial) {
         conversionNote.textContent += '。元の単位・座標・記録を引き継ぎます。';
         if (native.summary.nativeSpatial.gs) conversionNote.textContent += 'GSの見え方や全体を収める範囲は変わる場合があります。';
-        if (native.summary.nativeSpatial.proxies) conversionNote.textContent += '位置指定用の面は両面から選択できます。';
+        if (native.summary.nativeSpatial.proxies) conversionNote.textContent += 'ピン配置用モデルは両面から選択できます。';
       }
       if(native?.summary.objExternalMaterialsUnavailable)conversionNote.textContent+='。OBJの外部材質・画像は読み込まず、既定の材質で表示します。';
       if (legacy) { const s = legacy.summary.sourceOnly;

@@ -1,6 +1,6 @@
 # LociView active work
 
-Updated2026-11-15. This is the single current plan and check record.
+Updated2026-11-16. This is the single current plan and check record.
 [Inventory](implementation-inventory.md) owns route-specific coverage;
 [map](../PROJECT_MAP.md) and [document index](../docs/README.md) route contracts/code.
 Git owns checkpoint identity. [Retained checkpoint evidence](../docs/history/development-through-2026-10-29/tasks/todo-before-daily-authoring.md)
@@ -8,7 +8,75 @@ and [earlier working records](../docs/history/development-through-2026-10-28/tas
 retain qualifications and failures. Their Current/Next headings are not an active
 queue or renewed approval requirements.
 
-## Current — finalize06i ordinary manual-save verification
+## Current — qualified sharing, search and everyday organization
+
+- Outcome implemented: selected-Scene preview lists actual models/media from the
+  same validated snapshot, preserving shared-resource union and distinct same-name
+  resources. Explain hidden models, original photo metadata, editable copies and
+  full-project/history scope before generation. Changed selection/token hides old
+  names and impact. No extra storage read or public package/ID/schema change.
+- Working and shared-reader3D search use the existing current-Scene query; Canvas→Tab reaches it
+  before pins. Hide empty-Scene search; keep reader text search usable after3D failure. Preserve selection/windows/query/IME and show an explicit return to
+  an unapplied mobile edit even when search hides its row. Rendered review moved
+  search to bottom-left above the windows layer, keeping default titles readable.
+- Ordinary Proxy copy says pin-placement model; record parent says placement target.
+  Filter reset and project-selection actions describe their actual result. Untitled
+  Caption headings match the existing list. Daily tag assignment stays outside
+  project-wide tag definitions. Browser-only names and temporary output maintenance
+  use existing secondary disclosures; explicit name opt-in/cleanup targets remain.
+- Boundaries: one writer, two independent readonly reviewers; final source reviews
+  have no unresolved finding. Existing typed Session/Host commands, original bytes,
+  saved-file verification, publication and recovery fences remain. No dependencies,
+  capacity, renderer, adoption, ordinary activation or release change. Further export
+  optimization and renderer lightening are deferred.
+
+### Verification / closeout
+
+- Focused existing service/UI checks pass, including31 selected file cases and29
+  scene/list checks. Preview label multisets/counts match the actual frozen Review;
+  generation intentionally rekeys IDs, so tests never force preview IDs to persist.
+- Actual PC/touch×Point/SH4-Proxy record/photo/search/share/start-view
+  flows and coordinate-only GS/cold copy pass, including sender/recipient one-Tab
+  search and unchanged queries. The final reader/view-mode group passes8/8. Input/IME,320px separation, hidden
+  selection with dirty-body return, explicit cancel and stale preview are included.
+- Actual selected-Scene addition passes3/3 with a temporarily hidden source model,
+  exact names/shared-source union, byte/hash inspection, PC/touch interruption,
+  preserved local edits and no duplicate addition. Adjacent daily authoring, name
+  opt-in/privacy/collaboration, file continuation, input, view/offline entry and6
+  quota/crash-boundary cases pass in their recorded bounded runs. Source/test
+  binding and exact case/artifact qualifications are retained privately.
+- Preserve failures: early browser assertions still used old labels/hidden controls
+  or omitted the first cancellation step; fixed against actual UI without retries,
+  deadlines or assertion relaxation. A real window-layer pointer obstruction was
+  reproduced and fixed. Preliminary checkpoints were stopped as incomplete after
+  independent review found a test comparing independently rekeyed IDs, and later to include the same recipient-reader search in the connected outcome. Preliminary
+  image capture omitted explicit Scene selection; it is not workflow acceptance.
+- Required checkpoint passes159 files/3611 tests, unchanged16 expected failures/
+  21TODO, all5 builds and offline isolation. HEIC isolation passes all5 artifacts.
+  Frozen candidate artifacts and source hashes match. Before/after PC/touch image
+  capture passes4/4; rendered review fixed transparent search backgrounds and
+  title overlap. Tests do not imply physical Safari or general AAA acceptance.
+- Offline qualification covers all9 distinct cases:7 pass in the complete run,
+  then2 pass against the same retained builds after correcting ONLY the E2E home
+  selector to the actual project-selection label. Typecheck passes again. Runtime,
+  root Vitest files and builds are unchanged; no full-suite/build repetition for
+  this test-only correction. Full browser/server shutdown, mixed500k SH4/Proxy/
+  Mesh/Point/photo, first-backup preview/edit/save/reopen, initial conversion,
+  static return and touch direct-copy/cold-save all pass. Preserve both failed
+  selectors and corrected results; no automatic retry or deadline change.
+- Closeout: installed-browser representatives, exact public staging/index privacy,
+  g0 checkpoint/Push and current-commit CI verification. Git owns checkpoint
+  identity and GitHub owns the actual CI result. Keep original/private audit data
+  and all generated artifacts outside the commit. No deployment.
+- Meta-audit: g0/fbe48a3 is the comparison checkpoint. Connected sender/recipient UI workflow now
+  closes the PO's selected priority; stop growing auxiliary helpers, finish the
+  established qualification boundary and report. No additional performance slice.
+  Physical iPhone/Safari/IME/Files/VoiceOver/memory/heat acceptance remains pending;
+  Chromium touch evidence does not establish it. Release and general AAA usability
+  acceptance remain separate. Next: integrated candidate/device acceptance and
+  remaining observed everyday-flow issues; export work follows this UI boundary.
+
+## Previous checkpoint — qualified06i ordinary manual-save verification
 
 - PO-approved [06i](../docs/specs/06i-manual-backup-body-verification-proposal.md)
   passes its bounded effect/safety condition. Independent source/security and
@@ -70,18 +138,30 @@ whole-tool speedup or overall performance non-regression.
   for desktop/touch. Artifact override alone does not explain failure. Underlying
   Windows delay mechanism is not diagnosed; no product fix, assertion/deadline
   relaxation or automatic retry was needed. Stopped/incomplete runs remain such.
-- Separate stage diagnostics are in progress and must finish before whole-plan
-  completion. An initial anchored selector collected zero tests; retain that log,
-  correct collection to two real flows per dataset and count only actual runs.
+- Separate stage diagnostics pass all4 actual flows. Capture Ki4.011→3.082s,
+  GS10.583→7.945s. Persist Ki2.218→2.211s/GS.285→.314s, streamed generation/write
+  Ki6.175→6.363s/GS7.947→8.852s, independent archive inspection Ki1.909→1.785s/
+  GS3.306→3.768s. The single diagnostic GS total is SLOWER33.880→34.137s;
+  retain it, do not substitute it for the normal3+3 cohort or claim every phase
+  improved. Parent timings include children and must not be summed. Stream-close
+  includes body/hash/ZIP/backpressure/guarded write, not OS close alone. Initial
+  anchored selector collected zero tests; its error is retained separately and
+  is not execution credit. Corrected two-per-dataset actual runs are the evidence.
 
 ### Finalization / next
 
-- Save/Push the qualified source/docs to existing g0-baseline and confirm exact CI.
-  Only CI is triggered; main/Pages/release stay excluded. Preserve pre-existing
-  private UI/task audit material and all private inputs/artifacts outside staging.
-- Complete separate stage breakdown and installed Chrome/Edge representative
-  file/cold checks. Refresh owned4191 only from the exact frozen qualified build,
-  preserving Project data, safe Worker lifecycle and the user's4182.
+- Qualified source/docs are saved/Pushed to existing g0-baseline; actual-tip
+  CI43710991607 passes typecheck/full tests/build/HEIC. Git owns commit identity.
+  Independent actual-index privacy review confirms exactly11 allowed files, tested
+  source and public task prefix plus HEAD's retained tail; private UI/task audit
+  changes and all original/sample/artifact data remain unstaged. No deployment.
+- Chrome157.0.8103.52 and Edge157.0.4341.60 dedicated-profile actual-file/cold flows
+  pass. Owned4191 now serves the immutable qualified06i build:20 served files
+  match, and the unchanged327052-byte comfort sample opens in a fresh dedicated
+  browser (17.3s actual case). Old process birth/command/artifact were checked
+  before replacement. Project storage, safe Worker lifecycle and4182 are retained;
+  no forced browser navigation/activation. Extra pre-refresh sample check belongs
+  to the previous preview, not new-build acceptance. Source/test hashes unchanged.
 - Remaining wait: ordinary saves still~21/28s; Ki initial editor-ready~78s and
   SH4 editing-copy~59s. Use stage evidence to select the next meaningful workflow
   improvement; do not extend validation lifetimes across writes/recovery without

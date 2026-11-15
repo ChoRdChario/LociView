@@ -83,7 +83,7 @@ for (const touch of [false, true])
           await action(page, 'ピン配置用モデルを選ぶ').click();
           await (await pick).setFiles({ name: '部位.glb', mimeType: 'model/gltf-binary', buffer: triangleGlb() });
           await action(page, 'このモデルでピンを配置する').click();
-          await status(page, '位置指定用の面を登録しました。');
+          await status(page, 'ピン配置用モデルを登録しました。');
           await expect(task).toContainText('ピンを置きたい場所');
         }
         else
@@ -106,6 +106,50 @@ for (const touch of [false, true])
         await (await picker).setFiles({ name: '外板.png', mimeType: 'image/png', buffer: smallPng() });
         await detail(page).getByRole('button', { name: '変更を適用', ...exact }).click();
         await checkPhoto(page);
+        const tags = page.getByLabel('分類タグ', exact); await tags.locator(':scope > summary').click();
+        const tagSettings = tags.locator('.lv-tag-settings'); await expect(tagSettings).not.toHaveAttribute('open');
+        await tagSettings.locator(':scope > summary').click();
+        await tagSettings.getByLabel('タグ名', exact).fill('監修');
+        await tagSettings.getByRole('button', { name: 'タグを追加', ...exact }).click(); await status(page, 'タグを保存しました。');
+        await tagSettings.locator(':scope > summary').click();
+        await tags.getByRole('button', { name: 'この記録にタグを付ける', ...exact }).click(); await status(page, '記録のタグを変更しました。');
+        await expect(tags.getByRole('button', { name: 'タグを削除', ...exact })).toBeHidden();
+        await tags.locator(':scope > summary').click();
+        const search = page.getByRole('searchbox', { name: '検索', ...exact });
+        await revealCaptionList(page); await search.fill('塗装'); await selectRecord(page);
+        const title = detail(page).getByLabel('タイトル', exact);
+        await title.dispatchEvent('compositionstart');
+        await expect(page.getByRole('button', { name: '記録を検索', exact: true, includeHidden: true })).toBeDisabled();
+        await title.dispatchEvent('compositionend');
+        if (touch) {
+          await action(page, '3D').click(); await page.setViewportSize({ width: 320, height: 568 });
+          const a = (await action(page, '記録を検索').boundingBox())!;
+          const b = (await page.locator('.lv-camera-positions > summary').boundingBox())!;
+          expect(a.x >= b.x + b.width || a.x + a.width <= b.x || a.y >= b.y + b.height || a.y + a.height <= b.y).toBe(true);
+        }
+        const searchPaint = await action(page, '記録を検索').evaluate(node => {
+          const style = getComputedStyle(node); return { background: style.backgroundColor, opacity: Number(style.opacity) };
+        });
+        expect(searchPaint.background).not.toBe('rgba(0, 0, 0, 0)'); expect(searchPaint.opacity).toBe(1);
+        // One Tab from the canvas reaches search before dozens of individual pins.
+        await canvas.focus(); await page.keyboard.press('Tab');
+        await expect(action(page, '記録を検索')).toBeFocused(); await page.keyboard.press('Enter');
+        await expect(search).toBeFocused(); await expect(search).toHaveValue('塗装');
+        if (touch) await page.setViewportSize({ width: 390, height: 844 });
+        await expect(page.locator('.lv-caption-select')).toHaveCount(1);
+        await search.fill(''); await selectRecord(page);
+        const bodyInput = detail(page).getByLabel('本文', exact);
+        await bodyInput.fill('未適用の本文を保持。');
+        if (touch) await action(page, '3D').click();
+        await action(page, '記録を検索').click(); await search.fill('見つからない条件');
+        if (touch) {
+          await expect(page.locator('.lv-retained-edit')).toBeVisible();
+          await page.locator('.lv-retained-edit').getByRole('button', { name: '編集に戻る', ...exact }).click();
+        }
+        await expect(bodyInput).toBeVisible(); await expect(bodyInput).toHaveValue('未適用の本文を保持。');
+        await detail(page).getByRole('button', { name: '取り消す', ...exact }).click();
+        await detail(page).getByRole('button', { name: '変更を取り消す', ...exact }).click();
+        await revealCaptionList(page); await search.fill(''); await selectRecord(page);
         if (touch) {
           await action(page, '3D').click();
           await expect(page.locator('.lv-project-marker[aria-pressed="true"]')).toBeVisible();
@@ -156,6 +200,18 @@ for (const touch of [false, true])
         await sharedScenes.getByRole('checkbox', { name: 'シーン 1', ...exact }).check();
         await sharedScenes.getByRole('checkbox', { name: '監修用', ...exact }).check();
         await files.getByRole('button', { name: '内容を確認', ...exact }).click();
+        const contents = files.locator('.lv-share-contents');
+        await expect(contents).toBeVisible(); await contents.locator(':scope > summary').click();
+        await expect(contents.locator('li').filter({ hasText: /^外板\.ply$/ })).toHaveCount(1);
+        await expect(contents.locator('li').filter({ hasText: /^外板\.png$/ })).toHaveCount(1);
+        await expect(files).toContainText('写真の撮影情報・位置情報');
+        await expect(files).toContainText('相手は編集用コピーを作れます');
+        await page.screenshot({ path: info.outputPath('share-contents.png'), fullPage: false });
+        // A changed selection cannot keep a formerly checked list/impact visible.
+        await sharedScenes.getByRole('checkbox', { name: '監修用', ...exact }).uncheck();
+        await expect(contents).toHaveCount(0);
+        await sharedScenes.getByRole('checkbox', { name: '監修用', ...exact }).check();
+        await files.getByRole('button', { name: '内容を確認', ...exact }).click();
         const [download] = await Promise.all([page.waitForEvent('download'), files.getByRole('button', { name: 'ダウンロード', ...exact }).click()]);
         const path = info.outputPath('shared-scene.zip');
         await download.saveAs(path);
@@ -170,6 +226,14 @@ for (const touch of [false, true])
         await expect(other.locator('.lv-caption-select').filter({ hasText: '塗装の確認' })).toHaveCount(1);
         await scenes.selectOption({ label: '監修用' });
         await expect(scenes.locator('option:checked')).toHaveText('監修用');
+        const readingCanvas = other.getByLabel('3Dモデルの表示', exact);
+        await readingCanvas.focus(); await other.keyboard.press('Tab');
+        await expect(action(other, '記録を検索')).toBeFocused(); await other.keyboard.press('Enter');
+        const readerSearch = other.getByRole('searchbox', { name: '検索', ...exact });
+        await expect(readerSearch).toBeFocused(); await expect(readerSearch).toBeInViewport();
+        await readerSearch.fill('塗装'); await expect(other.locator('.lv-caption-select')).toHaveCount(1);
+        await action(other, '記録を検索').press('Enter'); await expect(readerSearch).toHaveValue('塗装');
+        await readingCanvas.scrollIntoViewIfNeeded();
         const back = action(other, '開始視点に戻る'), receivingProjection = other.getByLabel('投影方式', exact);
         await expect(back).toBeEnabled();
         await expect(back).toBeInViewport();

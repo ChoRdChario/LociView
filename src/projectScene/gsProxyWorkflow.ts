@@ -40,7 +40,7 @@ export function createGsProxyWorkflow(content: ValidationContent, current: ()=>P
       } finally {if(!adopted&&proxy)content.releasePreparedModel(proxy.id as string);}
     },
     async commit(token:string,id:string){
-      const selected=prepared;if(!selected||selected.id!==id||selected.token!==token)throw Error('位置指定用の面を選び直してください。');
+      const selected=prepared;if(!selected||selected.id!==id||selected.token!==token)throw Error('ピン配置用モデルを選び直してください。');
       const editor=capture?.();
       const {revision:oldRevision,binding:oldBinding,gs}=await check(token,selected.target), {proxy}=selected;
       const revision=await sealValidationRecord('asset-revision',{id:`rev_${newId()}`,assetId:selected.target.assetId,parentRevisionId:oldRevision.id!,

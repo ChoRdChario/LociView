@@ -88,7 +88,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   saveSummary.append(browserState, savedFileState); identity.append(projectTitle, saveSummary);
   const headerTools = make('div'); headerTools.className = 'lv-header-tools'; headerTools.append(headerActions, help); header.append(identity, headerTools);
   const resumeNotice = make('p'); resumeNotice.setAttribute('role', 'status');
-  const otherProject = button('ファイルを開く', () => {
+  const otherProject = button('プロジェクトを選ぶ', () => {
     if (!disposed && !busy && !dirty() && !ports.otherPending() && !ports.projectNavigationBlocked?.()) ports.openProject?.();
   });
   help.append(resumeNotice, otherProject);
@@ -109,7 +109,15 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   const viewportStatus = make('p'); viewportStatus.setAttribute('role', 'status'); viewportStatus.className = 'lv-project-viewport-status';
   const retryViewport = button('3D表示を再試行', () => viewAction(() => viewport.retry()));
   const stageDisplay = make('div'); stageDisplay.className = 'lv-stage-display';
-  markers.className = 'lv-project-markers'; stageDisplay.append(canvas, markers);
+  const searchRecords = button('記録を検索', () => {
+    const tab = tabButtons.get('captions'); if (!tab || tab.disabled || composingInput()) return;
+    tab.click();
+    if (task === 'captions' && (!compactLayout() || compactSurface === 'panel')) {
+      captionSurface = 'list'; render(); list.focusSearch();
+    }
+  });
+  searchRecords.className = 'lv-stage-search';
+  markers.className = 'lv-project-markers'; stageDisplay.append(canvas, searchRecords, markers);
   const markerById = new Map<string, HTMLButtonElement>(), markerNodes = new Set<HTMLButtonElement>();
   const viewportTools = make('section'); viewportTools.className = 'lv-project-viewport-tools'; viewportTools.setAttribute('aria-label', '3D表示の操作');
   viewportTools.append(viewportStatus, retryViewport);
@@ -183,7 +191,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     });
   });
   numericModel.setAttribute('aria-label', '追加先モデル'); numericLabel.append(numericModel); numericAdd.append(make('summary', '座標で追加'), numericLabel, beginNumeric,
-    contextHelp(document,'モデルを選び、モデル内のX・Y・Z座標を指定してピンを追加します。面がない場合も使えます。',[beginNumeric]));
+    contextHelp(document,'モデルを選び、モデル内のX・Y・Z座標を指定してピンを追加します。ピン配置用モデルがない場合も使えます。',[beginNumeric]));
   const captureNumeric = () => { numericScope = numericKey; };
   numericModel.addEventListener('focus', captureNumeric); numericModel.addEventListener('pointerdown', captureNumeric);
   numericModel.addEventListener('change', () => { if (numericModel.disabled || numericScope !== numericKey) numericModel.value = ''; render(); });
@@ -206,7 +214,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       setPin({ target, position: anchor.positionAsset, captionId: caption.id, ...(anchor.hitEvidence?.method === 'point-cloud' && anchor.hitEvidence.source?.representationId === target.representationId ? { point: {pointIndex:anchor.hitEvidence.source.surfaceRef.pointIndex} } : {}) });
     });
   });
-  const parent = make('details'), parentTitle = make('summary', '親モデルを変更'), parentLabel = make('label', '変更先モデル'), parentTarget = make('select'), parentNote = make('p');
+  const parent = make('details'), parentTitle = make('summary', '配置先モデルを変更'), parentLabel = make('label', '変更先モデル'), parentTarget = make('select'), parentNote = make('p');
   parentTarget.setAttribute('aria-label', '変更先モデル'); parentLabel.append(parentTarget);
   const startParent = button('位置を確認', () => {
     if (!guardInput() || parentScope !== parentKey) return;
@@ -786,7 +794,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     const p = provider(), selected = memory().selectedCaptionId, caption = selected ? p.resources.captions[selected] : undefined, anchor = fieldValue(caption?.anchor);
     if (!caption || !anchor || fieldValue(caption.lifecycle)?.state !== 'active' || anchor.kind === 'unplaced') return 'ピンの状態を確認してください。';
     if (projectCaptionSceneCount(p, caption.id).kind !== 'value') return '影響するシーンを確認してください。';
-    if (anchor.kind === 'asset' && anchor.assetId === assetId) return '別の親モデルを選択してください。';
+    if (anchor.kind === 'asset' && anchor.assetId === assetId) return '別の配置先モデルを選択してください。';
     if (!assetId) return '変更先モデルを選択してください。';
     return candidateAssets().has(assetId) ? null : '変更先モデルをこのシーンに表示し、状態を確認してください。';
   }
@@ -1185,7 +1193,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       adjustment.hidden = choosing || !pin && !numericTarget;
       if (numericTarget) adjustment.open = true;
       finishPin.hidden = choosing || !pin && !numericTarget; cancelPin.hidden = !pinActive;
-      finishPin.textContent = pinAction?.kind === 'add' ? 'ここに記録を作る' : pinAction?.kind === 'reparent' ? '親モデルと位置を確定' : '位置を確定';
+      finishPin.textContent = pinAction?.kind === 'add' ? 'ここに記録を作る' : pinAction?.kind === 'reparent' ? '配置先と位置を確定' : '位置を確定';
       finishPin.disabled = !!blocked || composingInput() || choosing || viewport.read().dragging || !positionValid() || !pinCurrent(); cancelPin.disabled = busy || !!pending || ports.status().kind !== 'idle' || ports.otherPending() || composingInput();
       repick.hidden = !pin || choosing; repick.disabled = !!blocked || composingInput() || !pinCurrent();
       const count = selected ? projectCaptionSceneCount(p, selected) : undefined;
@@ -1249,6 +1257,8 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       renderCaptionActions();
       for (const [key, tab] of tabButtons) { tab.setAttribute('aria-selected', String(task === key && (!compact || compactSurface === 'panel'))); tab.tabIndex = task === key ? 0 : -1;
         tab.disabled = taskEntryBlocked(key) || busy || !!pending || windowMoving || ports.otherPending() && !(key==='captions'&&readDuringOutput()) || composingInput(); }
+      searchRecords.disabled = !!tabButtons.get('captions')?.disabled || composingInput();
+      searchRecords.hidden = captionList.source.kind !== 'ready' || !captionList.source.captions.length;
       captionPanel.hidden = task !== 'captions'; for (const [key, panel] of panels) { panel.root.hidden = key==='views'?!cameraPositions.open:key !== task; if (key === task||key==='views') panel.render(); }
       sidebar.dataset.task=task;closeCamera.disabled=viewBlocked()||views.composing();
       sceneContext.textContent = `シーン：${fieldValue(p.state.scenes[sceneId]?.name) ?? '名称を確認'}`; sceneContext.hidden = true;
@@ -1256,9 +1266,10 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       const settingsInput=organization!.hasChanges() && organization!.inputOwner()==='settings';
       const other = [...panels].find(([key, panel]) => key !== task && !(key==='views'&&cameraPositions.open&&stageVisible()) && panel.hasChanges());
       retainedOwner = settingsInput ? task : hasCaptionInput && task !== 'captions' ? 'captions' : other?.[0] ?? task;
-      retainedEdit.hidden = retainedOwner === task && !organization!.hasChanges();
+      const hiddenCaptionDraft = compactLayout() && retainedOwner === 'captions' && captionSurface === 'list' && hasCaptionInput;
+      retainedEdit.hidden = retainedOwner === task && !organization!.hasChanges() && !hiddenCaptionDraft;
       retainedNote.textContent = `${settingsInput?'設定':retainedOwner==='views'?'カメラ位置':tabButtons.get(retainedOwner)?.textContent ?? 'キャプション'}に未適用の変更があります。`;
-      detailHeading.textContent = selected ? fieldValue(p.resources.captions[selected]?.title) || '名称なし' : 'キャプション';
+      detailHeading.textContent = selected ? fieldValue(p.resources.captions[selected]?.title) || '無題' : 'キャプション';
       sceneArea.hidden = false;captionBack.hidden = !mobileDetail;
       returnToEdit.disabled = showStage.disabled = viewBlocked();
       captionBack.disabled = viewBlocked() || hasCaptionInput || !!deletion;
@@ -1303,7 +1314,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
             else list.revealSelected();
           } });
           bindMarkerNavigation(marker); markerById.set(key, marker); markerNodes.add(marker); }
-        const markerName = fieldValue(caption.title) || '名称なし';
+        const markerName = fieldValue(caption.title) || '無題';
         marker.textContent = markerName; marker.setAttribute('aria-label', markerName);
         marker.hidden=false;marker.className = 'lv-project-marker'; marker.style.left = `${projected.x}px`; marker.style.top = `${projected.y}px`;
         marker.style.opacity = projected.visible ? '' : '0';

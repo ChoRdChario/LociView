@@ -216,7 +216,7 @@ export function productSources(host: ReturnType<typeof createValidationModeHost>
           target: { kind: 'membership', sceneId: g.sceneId, captionId: g.captionId, edgeIds: g.edgeIds },
           choices: g.edgeIds.map((id, i) => ({ id, label: `${captionLabel(g.captionId)}：登録 ${i + 1}` })),
           details: otherSceneReferences(p, 'caption', g.captionId, g.sceneId),
-          note: copyReady ? `同じキャプションへの登録が${g.edgeIds.length}件あります。選んだ登録が元の記録を引き継ぎます。「両方残す」では、他方をこのシーンだけの独立した記録にします。本文・ピン位置・メディアの説明を別々に編集でき、ピンの親モデルとメディア本体は引き継ぎます。` : '本文・添付などが未解決のため、両方残す操作はできません。一つにまとめる操作は内容を変更しません。' });
+          note: copyReady ? `同じキャプションへの登録が${g.edgeIds.length}件あります。選んだ登録が元の記録を引き継ぎます。「両方残す」では、他方をこのシーンだけの独立した記録にします。本文・ピン位置・メディアの説明を別々に編集でき、ピンの配置先モデルとメディア本体は引き継ぎます。` : '本文・添付などが未解決のため、両方残す操作はできません。一つにまとめる操作は内容を変更しません。' });
       }
       return groups;
     },

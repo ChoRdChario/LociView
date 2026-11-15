@@ -6,6 +6,16 @@ source/test evidence, failed attempts, measurements, remaining work and stop
 conditions. [Inventory](implementation-inventory.md) owns route-specific coverage.
 Check actual branch/HEAD/worktree and preserve existing changes.
 
+## Current workflow
+
+PO prioritizes sharing visibility, direct record search and everyday organization.
+Follow [todo](todo.md) for the verified boundary and remaining checks. The exact
+selected-Scene preview supplies readonly asset/media names from its validated
+snapshot; original data, typed edits and file/recovery fences retain their existing
+authorities. Management controls stay inside existing disclosures. Additional
+export optimization and renderer lightening are deferred; physical iPhone/Safari
+acceptance and release remain separate.
+
 ## Accepted boundary
 
 [06i](../docs/specs/06i-manual-backup-body-verification-proposal.md) connects the

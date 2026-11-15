@@ -922,3 +922,24 @@ Keep Drawing's existing scrolling content clear of its fixed completion footer:
 use the same12px scroll padding as Caption content so focused inputs and their
 outlines remain fully visible even when the short preview has a fractional height.
 Preserve the actual input/footer visibility checks without rounding layout sizes.
+
+
+## 2026-11-15 — 共有前の見通しと検索・管理操作（承認済みUI整理）
+
+- 選択シーンの共有確認は、既存の検証済みReview snapshotからモデルと
+  メディアのID・表示名だけを返す。Session→Sender→Hostの既存previewポートを
+  通し、UIから保存領域を読まない。同じIDは1件、同名の別素材は別件として表示する。
+  token・選択キーが一致する間だけ一覧・件数・影響を表示し、変更後は再確認する。
+- 一時非表示のモデル、素材内の撮影情報／位置情報が保持されること、受け手が
+  編集用コピーを作れることを生成前に示す。全体共有に選択シーンの一覧を流用しない。
+- 作業画面と共有相手の閲覧画面の3Dに「記録を検索」を置き、既存のシーン内検索へフォーカスする。検索・選択・
+  下書き・複数窓を保持し、IME・位置指定・処理中の既存ガードを通す。
+  ブラウザの検索キーや文字入力を横取りしない。
+- Proxyの利用者向け名称は「ピン配置用モデル」、記録の親は「配置先モデル」とする。
+  実際の材質の片面／両面や内部型・保存値は変えない。
+- タグの付け外しと全記録に影響する「タグの設定」を分ける。ブラウザだけの表示名は
+  設定内の補助項目へ置き、編集者名共有の明示的な有効化を保持する。
+  出力の一時ファイル整理は履歴から独立した「メンテナンス」に収める。
+- 受入れ：PC・タッチで素材一覧と実出力の一致、共有変更時の無効化、検索への移動と
+  入力保持、タグの付け外し／設定／取消、保存・冷間再開を検証する。
+  保存形式・I/O・復旧・削除対象・名前の共有範囲を変更しない。

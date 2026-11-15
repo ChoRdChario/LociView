@@ -22,7 +22,7 @@ async function settled(p: Page) { await expect(p.locator('main.lv-project-worksp
 async function selected(p: Page) { await p.getByRole('list', { name: 'キャプション一覧', exact: true }).locator('.lv-caption-select').first().click(); }
 async function editor(p: Page, name: string, enabled = true) {
   const settings = p.getByLabel('設定', { exact: true });
-  if (!await settings.evaluate(n => (n as HTMLDetailsElement).open)) await settings.locator('summary').click();
+  if (!await settings.evaluate(n => (n as HTMLDetailsElement).open)) await settings.locator(':scope > summary').click();
   await settings.getByLabel('編集者名', { exact: true }).fill(name);
   await settings.getByLabel('このプロジェクトの今後の編集にこの名前を残す', { exact: true }).setChecked(enabled);
   await settings.getByRole('button', { name: '編集者名を設定', exact: true }).click();
@@ -112,8 +112,8 @@ test('08b editor names remain exact through collaboration, purpose privacy, rest
     await a.p.getByRole('button', { name: 'このモデルに追加', exact: true }).click();
     for (const [axis, value] of [['X', '0'], ['Y', '.5'], ['Z', '0']]) await a.p.getByLabel(`位置 ${axis}`, { exact: true }).fill(value!);
     await a.p.getByRole('button', { name: 'ここに記録を作る', exact: true }).click(); await expect(a.p.getByText('ピンの位置を確定しました。', { exact: true })).toBeVisible({ timeout: 90_000 });
-    const settings = a.p.getByLabel('設定', { exact: true }); await settings.locator('summary').click();
-    await settings.getByLabel('このブラウザの表示名', { exact: true }).fill('私的な名前'); await settings.getByRole('button', { name: '表示名を設定', exact: true }).click();
+    const settings = a.p.getByLabel('設定', { exact: true }); await settings.locator(':scope > summary').click();
+    await settings.locator('.lv-local-name > summary').click(); await settings.getByLabel('このブラウザの表示名', { exact: true }).fill('私的な名前'); await settings.getByRole('button', { name: '表示名を設定', exact: true }).click();
     await expect(settings.getByLabel('編集者名', { exact: true })).toHaveValue('私的な名前'); await expect(settings.getByRole('checkbox')).not.toBeChecked();
     await editor(a.p, nameA); await edit(a.p, 'タイトル', caption); await edit(a.p, '本文', '配布時の本文');
     await detail(a.p).getByText('属性', { exact: true }).click();
@@ -122,7 +122,7 @@ test('08b editor names remain exact through collaboration, purpose privacy, rest
     console.log('08b: initial named Workspace downloaded');
     await b.p.getByLabel('ファイルを選択', { exact: true }).setInputFiles(initial); await b.p.getByRole('button', { name: 'ファイルを開く', exact: true }).click();
     await expect(b.p.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText(title, { timeout: 90_000 }); await selected(b.p);
-    const bs = b.p.getByLabel('設定', { exact: true }); await bs.locator('summary').click(); await expect(bs.getByRole('checkbox')).not.toBeChecked();
+    const bs = b.p.getByLabel('設定', { exact: true }); await bs.locator(':scope > summary').click(); await expect(bs.getByRole('checkbox')).not.toBeChecked();
     await editor(b.p, nameB); await edit(b.p, '本文', 'Bの手元編集'); await edit(a.p, '本文', 'Aの変更');
     await receive(b.p, await output(a.p, info, 'A-update', 'teamWorkspace')); await selected(b.p);
     const group = b.p.getByRole('region', { name: '記録の競合', exact: true }).getByRole('listitem', { name: `${caption}：本文`, exact: true });
@@ -152,7 +152,7 @@ test('08b editor names remain exact through collaboration, purpose privacy, rest
     await restored.p.getByRole('button', { name: 'このファイルから再開', exact: true }).click(); await expect(restored.p.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText(title, { timeout: 120_000 });
     const after = await records(await output(restored.p, info, 'restored', 'backup')); expect(after.records).toEqual(before.records); expect(after.backup.source.originalChanges()).toEqual(before.backup.source.originalChanges());
     await close(restored.context); const cold = await launch(profiles[2]!); await expect(cold.p.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText(title, { timeout: 90_000 }); await selected(cold.p);
-    await cold.p.getByLabel('設定', { exact: true }).locator('summary').click(); await expect(cold.p.getByLabel('このプロジェクトの今後の編集にこの名前を残す', { exact: true })).not.toBeChecked();
+    await cold.p.getByLabel('設定', { exact: true }).locator(':scope > summary').click(); await expect(cold.p.getByLabel('このプロジェクトの今後の編集にこの名前を残す', { exact: true })).not.toBeChecked();
     await edit(cold.p, '本文', '復元して再開した追記');
     const resumed = await records(await output(cold.p, info, 'resumed', 'backup')); expect(resumed.backup.source.editorDeclarations()).toEqual(before.backup.source.editorDeclarations());
     console.log('08b: restore, cold reopen and new anonymous edit verified');
@@ -176,9 +176,9 @@ test('08b GS confirmation keeps its editor when another tab changes the local se
     await p.getByRole('button', { name: 'プロジェクトを作成', exact: true }).click(); await expect(p.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText(title, { timeout: 90_000 });
     await expect(p.getByLabel('3Dモデルの表示', { exact: true })).toHaveAttribute('aria-busy', 'false', { timeout: 90_000 }); await editor(p, nameA);
     await p.getByRole('tab', { name: 'モデル', exact: true }).click(); const panel = p.getByRole('tabpanel', { name: 'モデル', exact: true }); await panel.locator('.lv-model-select').first().click();
-    const choose = p.waitForEvent('filechooser'); await panel.getByRole('button', { name: '位置指定用の面を追加', exact: true }).click();
+    const choose = p.waitForEvent('filechooser'); await panel.getByRole('button', { name: 'ピン配置用モデルを追加', exact: true }).click();
     await (await choose).setFiles({ name: 'surface.glb', mimeType: 'model/gltf-binary', buffer: triangleGlb() });
-    const confirm = panel.getByRole('button', { name: 'このモデルに面を追加', exact: true }); await expect(confirm).toBeEnabled();
+    const confirm = panel.getByRole('button', { name: 'ピン配置用モデルを設定', exact: true }); await expect(confirm).toBeEnabled();
     // A second same-origin tab injects an advisory UI-preference change. Project
     // writes still go through the real Proxy confirmation and Session command.
     const other = await context.newPage(); other.setDefaultTimeout(15_000); await other.goto(desktopEntry);
@@ -199,7 +199,7 @@ test('08b GS confirmation keeps its editor when another tab changes the local se
       localStorage.setItem(keys[0]!, JSON.stringify({ enabled: true, name: after }));
     }, [nameA, nameB]);
     await p.evaluate(() => (window as any).__releaseGsEditorDigest());
-    await expect(p.getByText('位置指定用の面を登録しました。', { exact: true })).toBeVisible({ timeout: 90_000 }); await settled(p);
+    await expect(p.getByText('ピン配置用モデルを登録しました。', { exact: true })).toBeVisible({ timeout: 90_000 }); await settled(p);
     const saved = await records(await output(p, info, 'gs-confirmation', 'backup'));
     expect(saved.backup.source.editorDeclarations().map(d => d.declaration.editor.name)).toEqual([nameA]);
     await expect(p.getByLabel('編集者名', { exact: true })).toHaveValue(nameB);

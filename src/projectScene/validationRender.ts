@@ -158,7 +158,7 @@ export async function prepareReadonlyResidents(initial: readonly ReadonlyRenderM
     return measureResident(timing, 'render.model.load', () => retainRasterModelReadStage<ValidatedModel, DecodedValidationModel>(typeof count === 'number' ? count : 0, record.contentKind === 'gaussianSplat' ? undefined : resources,
       () => measureResident(timing, 'render.model.content', () => content.modelContent ? content.modelContent(record) : content.model!(record)), async source => {
         if (!same(nativeSpatialModelBounds(record, source), record.logicalBoundsAsset)) throw Error('保存したモデルの範囲が一致しません。');
-        if (proxy && (isPointModel(source) || isGsModel(source))) throw Error('位置指定用の面を確認してください。');
+        if (proxy && (isPointModel(source) || isGsModel(source))) throw Error('ピン配置用モデルを確認してください。');
         if (isGsModel(source)) return { gs: source, root: new THREE.Group(), materialLocators: new Map(), dispose() {} } as DecodedValidationModel;
         if (isPointModel(source)) return { point: source, root: new THREE.Group(), materialLocators: new Map(), dispose() {} } as DecodedValidationModel;
         const model = await measureResident<DecodedValidationModel>(timing, 'render.model.decode', () => isMeshSourceModel(source) ? decodeMeshSource(source, lifetime.signal, resources) :
@@ -171,7 +171,7 @@ export async function prepareReadonlyResidents(initial: readonly ReadonlyRenderM
     if (model.gs && c.proxy) try {
       model.proxy = await loadSingle(c.proxy, true);
       const original = model.dispose; model.dispose = () => { try { model.proxy?.dispose(); } finally { original(); } };
-    } catch (error) { model.proxyIssue = error instanceof Error ? error.message : '位置指定用の面を読み込めません。'; }
+    } catch (error) { model.proxyIssue = error instanceof Error ? error.message : 'ピン配置用モデルを読み込めません。'; }
     if (closed) { retire(model); throw Error('画面を閉じました。'); } return model;
   };
   const remember = (c: ReadonlyRenderModel, model: DecodedValidationModel) => {
@@ -272,7 +272,7 @@ export async function prepareReadonlyResidents(initial: readonly ReadonlyRenderM
         if(proxy){proxy.traverse(node=>{if(node instanceof THREE.Mesh){node.geometry=node.geometry.clone();geometries.push(node.geometry);const material=new THREE.MeshBasicMaterial({side:THREE.DoubleSide,colorWrite:false,depthWrite:false});materials.push(material);node.material=material;node.layers.set(31);}});const placement=new THREE.Group();placement.matrix.copy(placementMatrix(c.proxy!.representationToAsset));placement.matrixAutoUpdate=false;placement.add(proxy);asset.add(placement);}
         asset.updateMatrixWorld(true);
         const release=()=>{if(!live.delete(release))return;asset.removeFromParent();for(const g of geometries)g.dispose();for(const m of materials)m.dispose();drop();};retain();live.add(release);
-        return {mesh:object,asset,gs:{source:item.model.gs,object,issue:null,ready:false},...(proxy?{interaction:proxy}:{}),interactionIssue:item.model.proxyIssue??(!c.proxy?'位置指定用の面を追加してください。':null),dispose:release};
+        return {mesh:object,asset,gs:{source:item.model.gs,object,issue:null,ready:false},...(proxy?{interaction:proxy}:{}),interactionIssue:item.model.proxyIssue??(!c.proxy?'ピン配置用モデルを追加してください。':null),dispose:release};
       }
       if (item.model.point) {
         const source = item.model.point, point = createPointSurface(source.positions, source.colors), asset = new THREE.Group(), representation = new THREE.Group();

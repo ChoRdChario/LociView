@@ -405,3 +405,9 @@
 [data-lv-mode="view"] [data-lv-view-only] { display: block; }
 .lv-caption-value > span { font-size: .875rem; color: #5a5b55; }
 .lv-caption-value > p { margin: .35rem 0 .75rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+
+.lv-share-contents { width: 100%; min-width: 0; }
+.lv-share-contents > section { margin-block: 10px; }
+.lv-share-contents h3 { margin: 4px 0; font-size: 14px; }
+.lv-share-contents ul { margin: 0; padding-inline-start: 22px; max-height: 28dvh; overflow: auto; scrollbar-width: auto; }
+.lv-share-contents li { overflow-wrap: anywhere; padding-block: 3px; }

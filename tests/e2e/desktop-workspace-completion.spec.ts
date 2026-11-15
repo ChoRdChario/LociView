@@ -40,7 +40,7 @@ test('content-first workspace keeps editing, pin completion and file exits coher
     await attached.getByText('添付を整理',{exact:true}).click();await attached.getByRole('button',{name:'説明を編集',exact:true}).click();
     const description=attached.getByLabel('メディアの説明',{exact:true});await expect(description).toBeFocused();await description.fill('柱と梁の写真');await description.dispatchEvent('compositionstart');
     await expect(attached.getByRole('button',{name:'説明を適用',exact:true})).toBeDisabled();await description.dispatchEvent('compositionend');await attached.getByRole('button',{name:'説明を適用',exact:true}).click();await ready('メディアの説明を適用しました。');
-    const tags=p.getByLabel('タグの管理',{exact:true});await tags.locator(':scope > summary').click();
+    const tags=p.getByLabel('分類タグ',{exact:true});await tags.locator(':scope > summary').click(); await tags.locator('.lv-tag-settings > summary').click();
     await tags.getByLabel('タグ名',{exact:true}).fill('選択中の記録');await tags.getByLabel('タグの色',{exact:true}).fill('#37a24b');await tags.getByRole('button',{name:'タグを追加',exact:true}).click();await ready('タグを保存しました。');
     await tags.getByRole('button',{name:'この記録にタグを付ける',exact:true}).click();await ready('記録のタグを変更しました。');
     await tags.getByLabel('タグ名',{exact:true}).fill('保持する分類入力');await tab('モデル').click();await expect(p.locator('.lv-retained-edit')).toBeVisible();await p.locator('.lv-retained-edit').getByRole('button',{name:'編集に戻る',exact:true}).click();await expect(tags).toHaveAttribute('open');await expect(tags).toBeFocused();await expect(tags.getByLabel('タグ名',{exact:true})).toHaveValue('保持する分類入力');await expect(tags.getByRole('button',{name:'タグを追加',exact:true})).toBeEnabled();
@@ -78,7 +78,7 @@ test('content-first workspace keeps editing, pin completion and file exits coher
     const finishView = author.getByRole('button', { name: '開始視点を記録', exact: true });
     await p.setViewportSize({ width: 1280, height: 600 }); await expect(finishView).toBeInViewport(); await finishView.click(); await ready('開始視点を記録しました。');
     await expect(author.getByRole('button', { name: '開始視点を更新', exact: true })).toBeEnabled(); await expect(p.getByLabel('記録した視点',{exact:true})).toHaveCount(0); await p.setViewportSize({ width: 1440, height: 1000 });
-    const settings = p.locator('details[aria-label="設定"]'); await settings.locator(':scope > summary').click(); await expect(settings.getByRole('heading', { name: 'このブラウザの表示', exact: true })).toBeVisible(); await expect(settings.getByRole('heading', { name: '共有する編集者名', exact: true })).toBeVisible();
+    const settings = p.locator('details[aria-label="設定"]'); await settings.locator(':scope > summary').click(); await expect(settings.locator('.lv-local-name > summary')).toBeVisible(); await expect(settings.getByRole('heading', { name: '共有する編集者名', exact: true })).toBeVisible();
     await p.screenshot({ path: info.outputPath('settings.png'), fullPage: false }); await settings.locator(':scope > summary').click();
     await revealWorkPanel(p); await tab('キャプション').click(); const menu = p.locator('details.lv-project-files'), files = p.getByRole('region', { name: 'ファイル', exact: true });
     await p.locator('.lv-workspace-actions').getByRole('button', {name:'ファイルに保存',exact:true}).click(); await expect(files.getByRole('button', { name: '保存', exact: true })).toHaveCount(0); await expect(files.getByRole('button', { name: '相手に渡す', exact: true })).toHaveCount(0);
@@ -88,7 +88,7 @@ test('content-first workspace keeps editing, pin completion and file exits coher
     await p.getByRole('button', { name: '共有', exact: true }).click();
     const partial = files.getByRole('checkbox', { name: '一部だけ出力', exact: true }), scope = files.getByLabel('出力する内容', { exact: true });
     await expect(partial).toBeChecked(); await expect(scope).toBeVisible();
-    await partial.uncheck(); await expect(files.getByText('編集・返送できます。全シーンと編集履歴を含みます。', { exact: true })).toBeVisible();
+    await partial.uncheck(); await expect(files.getByText('編集・返送できます。全シーン・原本・編集履歴を含みます。一時的に隠したモデルや、素材内の撮影情報・位置情報も渡ります。', { exact: true })).toBeVisible();
     await expect(files.getByRole('button', { name: '相手に渡す', exact: true })).toHaveCount(0);
     const fileTabs=menu.getByRole('tablist',{name:'ファイルの操作',exact:true}),shareTab=fileTabs.getByRole('tab',{name:'共有',exact:true});await expect(menu.getByRole('button',{name:'閉じる',exact:true})).toBeEnabled();
     await shareTab.focus();await p.keyboard.press('ArrowLeft');await expect(fileTabs.getByRole('tab',{name:'保存',exact:true})).toBeFocused();await p.keyboard.press('ArrowRight');await expect(shareTab).toBeFocused();await expect(shareTab).toHaveAttribute('aria-selected','true');
@@ -119,7 +119,7 @@ test('content-first workspace keeps editing, pin completion and file exits coher
     await peer.getByRole('button', { name: '共有', exact: true }).click(); const peerFiles = peer.getByRole('region', { name: 'ファイル', exact: true }); await selectShareOutput(peerFiles, 'contribution');
     const base = peerFiles.getByLabel('元にする作業一式', { exact: true }), baseId = await base.locator('option').evaluateAll(ns => ns.map(n => (n as HTMLOptionElement).value).find(Boolean)); expect(baseId).toBeTruthy(); await base.selectOption(baseId!);
     const [update] = await Promise.all([peer.waitForEvent('download'), peerFiles.locator('.lv-file-primary').click()]), updatePath = info.outputPath('returned-update.zip'); await update.saveAs(updatePath); expect(await update.failure()).toBeNull(); await peerContext.close();
-    await revealProjectSelection(p); await p.getByRole('button', { name: 'ファイルを開く', exact: true }).click();
+    await revealProjectSelection(p); await p.getByRole('button', { name: 'プロジェクトを選ぶ', exact: true }).click();
     const preview = p.getByRole('region', { name: '取り込み先', exact: true });
     const selectUpdate = async () => {
       await p.getByLabel('ファイルを選択', { exact: true }).setInputFiles(updatePath);

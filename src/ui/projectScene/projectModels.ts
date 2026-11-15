@@ -88,14 +88,14 @@ export function createProjectModels(document: Document, host: ProjectPanelHost):
       }else if (fileScope.kind === 'add') applyFile(); host.changed();
     });
   }
-  const proxyArea=make('section'),proxyNote=make('p'),proxyInput=input('位置指定用の面を選択');proxyArea.setAttribute('aria-label','位置指定用の面');proxyNote.setAttribute('role','status');
+  const proxyArea=make('section'),proxyNote=make('p'),proxyInput=input('ピン配置用モデルを選択');proxyArea.setAttribute('aria-label','ピン配置用モデル');proxyNote.setAttribute('role','status');
   const beginProxy=(removing:boolean,resumePlacement?:(registered:boolean)=>void)=>{
     if(host.block('models')||ownInput()||memory().composing)return;
     const target=memory().assetId?host.ports.modelDetails(host.source().sceneId,memory().assetId!)?.gsProxyTarget:undefined;
     if(!target||!host.ports.prepareGsProxy)return;proxyScope={token:host.source().provider.token,target,removing,resumePlacement};
     if(removing)prepareProxy();else{proxyInput.value='';host.changed();proxyInput.click();}
   };
-  const proxyAdd=button('位置指定用の面を追加',()=>beginProxy(false)),proxyRemove=button('位置指定用の面を外す',()=>beginProxy(true));
+  const proxyAdd=button('ピン配置用モデルを追加',()=>beginProxy(false)),proxyRemove=button('ピン配置用モデルを外す',()=>beginProxy(true));
   function prepareProxy(file?:WorkspaceFile){
     const captured=proxyScope;if(!captured?.target||host.block('models')||!host.ports.prepareGsProxy)return;
     captured.prepared=undefined;
@@ -109,15 +109,15 @@ export function createProjectModels(document: Document, host: ProjectPanelHost):
     captured?.resumePlacement?.(false); host.changed();
   }
   proxyInput.addEventListener('cancel',cancelProxy);
-  const proxyConfirm=button('このモデルに面を追加',()=>{
+  const proxyConfirm=button('ピン配置用モデルを設定',()=>{
     const captured=proxyScope;if(!captured?.prepared||host.block('models')||!host.ports.commitGsProxy)return;
     host.execute('models',captured.token,()=>host.ports.commitGsProxy!(captured.token,captured.prepared!.id),()=>{
       if (proxyScope !== captured) return;
       proxyScope=null; captured.resumePlacement?.(true);
-      host.message(captured.removing?'位置指定用の面を外しました。':'位置指定用の面を登録しました。');
+      host.message(captured.removing?'ピン配置用モデルを外しました。':'ピン配置用モデルを登録しました。');
     });
   });
-  const proxyCancel=button('面の選択を取り消す',cancelProxy);
+  const proxyCancel=button('選択を取り消す',cancelProxy);
   proxyArea.append(proxyAdd,proxyRemove,proxyNote,proxyConfirm,proxyCancel);
   const begin = button('配置を調整', () => {
     if (host.block('models') || ownInput() || memory().composing) return;
@@ -216,12 +216,12 @@ export function createProjectModels(document: Document, host: ProjectPanelHost):
     if (disposed) return; placementActions.hidden = !edit; if (fileScope || deletion) manage.open = true; list.render(context()); const block = host.block('models'), selected = memory().assetId, { provider, sceneId } = host.source();
     const details = selected ? host.ports.modelDetails(sceneId, selected) : null;
     proxyArea.hidden=!details?.gsProxyTarget&&!proxyScope;
-    proxyAdd.textContent=details?.gsProxyTarget?.expectedProxyId?'位置指定用の面を変更':'位置指定用の面を追加';
+    proxyAdd.textContent=details?.gsProxyTarget?.expectedProxyId?'ピン配置用モデルを変更':'ピン配置用モデルを追加';
     proxyAdd.disabled=!!block||ownInput()||!details?.gsProxyTarget;proxyRemove.hidden=!details?.gsProxyTarget?.expectedProxyId;
     proxyRemove.disabled=!!block||ownInput();proxyConfirm.hidden=!proxyScope?.prepared;proxyCancel.hidden=!proxyScope;
-    proxyConfirm.textContent=proxyScope?.resumePlacement?'このモデルでピンを配置する':proxyScope?.removing?'面を外す':proxyScope?.target?.expectedProxyId?'面の変更を確定':'このモデルに面を追加';
+    proxyConfirm.textContent=proxyScope?.resumePlacement?'このモデルでピンを配置する':proxyScope?.removing?'取り外しを確定':proxyScope?.target?.expectedProxyId?'変更を確定':'ピン配置用モデルを設定';
     proxyConfirm.disabled=!!block||!proxyScope?.prepared||proxyScope.token!==provider.token;proxyCancel.disabled=!!host.block('models',false);
-    proxyNote.textContent=proxyScope?.token&&proxyScope.token!==provider.token?'モデルが更新されています。入力は保持しています。取り消して選び直してください。':proxyScope?.removing?'モデル上を選んで位置を指定するには、位置指定用の面が必要です。保存済みの記録位置は変わりません。':proxyScope?.prepared?`${proxyScope.prepared.label} を選択中のモデルに関連付けます。同じ原点・向き・倍率で用意した面であることを確認してください。面は通常表示されず、保存済みの記録位置は変わりません。`:'このモデルと同じ座標で用意した面のデータを選択してください。';
+    proxyNote.textContent=proxyScope?.token&&proxyScope.token!==provider.token?'モデルが更新されています。入力は保持しています。取り消して選び直してください。':proxyScope?.removing?'モデル上を選んで位置を指定するには、ピン配置用モデルが必要です。保存済みの記録位置は変わりません。':proxyScope?.prepared?`${proxyScope.prepared.label} を選択中のモデルに関連付けます。同じ原点・向き・倍率で用意したモデルであることを確認してください。ピン配置用モデルは通常表示されず、保存済みの記録位置は変わりません。`:'このモデルと同じ座標で用意したモデルのデータを選択してください。';
     if(proxyScope?.prepared?.externalMaterialsUnavailable)proxyNote.textContent+=' OBJの外部材質・画像は読み込まず、既定の材質で表示します。';
     const source = context().source, selectedItem = source.kind === 'ready' ? source.items.find(i => i.id === selected) : undefined;
     placement.hidden = !selected && !edit && !reference; fields.hidden = modes.hidden = !edit;
@@ -234,7 +234,7 @@ export function createProjectModels(document: Document, host: ProjectPanelHost):
     confirmAddition.hidden=fileScope?.kind!=='add'||!fileScope.file||!fileScope.externalMaterialsUnavailable;confirmAddition.disabled=!!block||fileScope?.token!==provider.token;
     confirmReplacement.hidden = fileScope?.kind !== 'replace' || !fileScope.file; confirmReplacement.disabled = !!block || fileScope?.token !== provider.token || !!host.ports.modelSelectionNotice&&fileScope?.externalMaterialsUnavailable===undefined;
     cancelFile.hidden = !fileScope; cancelFile.disabled = !!host.block('models', false);
-    fileNote.textContent = fileScope?.kind === 'replace' ? `${fileScope.file?.name ?? 'ファイルを選択してください。'} ${details?.sceneCount.kind === 'value' ? `${details.sceneCount.value}シーンのモデルを差し替えます。` : ''} 配置と記録は保持され、ピンは要確認になります。${details?.gsProxyTarget ? details.gsProxyTarget.expectedProxyId ? '位置指定用の面は未設定になります。必要な場合は設定し直してください。' : '' : details?.pointCloud ? '同じ形式のXYZ・RGB点群を選択してください。' : '材質の調整は引き継ぎません。'}` : fileScope ? '追加するモデルを選択してください。' : '';
+    fileNote.textContent = fileScope?.kind === 'replace' ? `${fileScope.file?.name ?? 'ファイルを選択してください。'} ${details?.sceneCount.kind === 'value' ? `${details.sceneCount.value}シーンのモデルを差し替えます。` : ''} 配置と記録は保持され、ピンは要確認になります。${details?.gsProxyTarget ? details.gsProxyTarget.expectedProxyId ? 'ピン配置用モデルは未設定になります。必要な場合は設定し直してください。' : '' : details?.pointCloud ? '同じ形式のXYZ・RGB点群を選択してください。' : '材質の調整は引き継ぎません。'}` : fileScope ? '追加するモデルを選択してください。' : '';
     if(fileScope?.externalMaterialsUnavailable)fileNote.textContent+=' OBJの外部材質・画像は読み込まず、既定の材質で表示します。';
     const referenceDetails = reference ? host.ports.modelDetails(sceneId, reference.assetId) : null;
     const referenceChanged = !!reference && (!referenceDetails || referenceDetails.target.bindingId !== reference.bindingId);
