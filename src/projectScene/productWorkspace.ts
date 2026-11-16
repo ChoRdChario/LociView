@@ -30,17 +30,19 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
   const filePanel = document.createElement('section'); filePanel.className = 'lv-file-sheet'; filePanel.setAttribute('aria-label', 'ファイル操作');
   const fileHeader = document.createElement('div'); fileHeader.className='lv-file-sheet-header';fileHeader.append(fileClose);
   const fileContent = document.createElement('div'); fileContent.setAttribute('role', 'tabpanel'); fileContent.id = `lv-file-content-${crypto.randomUUID()}`;
+  const fileNavigation=document.createElement('div'); fileNavigation.setAttribute('role','tablist'); fileNavigation.setAttribute('aria-label','ファイルの操作');
   const fileCloseNote=document.createElement('p');fileCloseNote.textContent='入力・確認を完了するか、取り消してください。';
   fileClose.type = 'button'; fileClose.textContent = '閉じる'; fileNotice.setAttribute('role', 'status');
   fileNotice.className = 'lv-operation-status';
   if(fileMenu){fileMenu.className='lv-project-files';const summary=document.createElement('summary');fileSummary=summary;summary.textContent='ファイル';
-    fileContent.append(tools!.root); filePanel.append(fileHeader,fileCloseNote,fileContent); fileMenu.append(summary,filePanel);
+    fileContent.append(tools!.root); filePanel.append(fileHeader,fileNavigation,fileCloseNote,fileContent); fileMenu.append(summary,filePanel);
     if (navigation?.fileActionsRoot) filePanel.append(navigation.fileActionsRoot);
     summary.addEventListener('click', event => { if(fileMenu.open && tools!.hasChanges() && !readingOutput()) event.preventDefault();
       else if(!fileMenu.open) { fileOrigin=summary;core?.dismissDisclosures(); } });
   }
   let fileOrigin: HTMLElement | undefined;
   const positionFiles = () => {
+    if (!fileMenu?.open) return;
     const rect=fileSummary?.getBoundingClientRect?.(), win=document.defaultView;
     if(!rect||!win)return;
     const top=Math.min(rect.bottom+8,Math.max(12,win.innerHeight-180));
@@ -62,7 +64,6 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
   const saveEntry=fileEntry('ファイルに保存','save'), shareEntry=fileEntry('共有','share'), receiveEntry=fileEntry('更新を読み込む','receive'), restoreEntry=fileEntry('復元','restore');
   saveEntry.className='lv-workspace-primary'; shareEntry.className='lv-workspace-share';
   filePanel.tabIndex=-1;
-  const fileNavigation=document.createElement('div'); fileNavigation.setAttribute('role','tablist'); fileNavigation.setAttribute('aria-label','ファイルの操作');
   const fileTabs = new Map([['save',fileEntry('保存','save')],['share',fileEntry('共有','share')],['receive',receiveEntry],['restore',restoreEntry]] as const);
   for (const [surface, tab] of fileTabs) {
     tab.setAttribute('role','tab'); tab.id=`${fileContent.id}-${surface}`; tab.setAttribute('aria-controls',fileContent.id); fileNavigation.append(tab);
@@ -73,7 +74,6 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
       tabs[next]!.focus(); tabs[next]!.click();
     });
   }
-  filePanel.insertBefore(fileNavigation,fileCloseNote);
   let initialFiles = true;
   let disposed = false, switching = false, core: ReturnType<typeof createProjectWorkspace> | undefined;
   let retirement: Promise<void> | undefined, disposal: Promise<void> | undefined, retiringCore = false;

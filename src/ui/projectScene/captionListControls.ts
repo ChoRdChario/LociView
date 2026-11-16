@@ -13,7 +13,7 @@ export function createCaptionListControls(document: Document, onPlan: (plan: Cap
   const root = make('section'); root.className = 'lv-caption-browser'; root.setAttribute('aria-label', 'キャプション');
   const filters = make('div'); filters.className = 'lv-caption-search';
   const searchLabel = make('label', '検索'), search = make('input');
-  search.type = 'search'; search.placeholder = 'このシーンのタイトル・本文'; search.setAttribute('aria-label', '検索');
+  search.type = 'search'; search.placeholder = 'シーン内を検索'; search.title = 'タイトル・本文を検索'; search.setAttribute('aria-label', '検索');
   searchLabel.append(search);
   filters.append(searchLabel);
   const status = make('p'); status.className = 'lv-caption-status'; status.setAttribute('role', 'status');
@@ -298,5 +298,15 @@ export function createCaptionListControls(document: Document, onPlan: (plan: Cap
     const target = selected ? rows.get(selected)?.select : undefined;
     (target ?? search).focus?.({ preventScroll: true });
   }
-  return { root, tools, render, revealSelected, focusSelection, focusSearch: () => search.focus?.({ preventScroll: true }), dispose, isComposing: () => composing };
+  // A native scroll already moved the mounted rows. Only a virtual list needs
+  // to replace rows at the new position. Keep the next intent's base memory current.
+  function acceptScroll(next: CaptionListContext) {
+    if (virtual) render(next);
+    else context = next;
+  }
+  function neighbors(captionId: string | null) {
+    const index = captionId === null ? undefined : layout.index(captionId);
+    return { previous: index !== undefined && index > 0, next: index !== undefined && index + 1 < (currentView?.rows.length ?? 0) };
+  }
+  return { root, tools, render, acceptScroll, neighbors, revealSelected, focusSelection, focusSearch: () => search.focus?.({ preventScroll: true }), dispose, isComposing: () => composing };
 }

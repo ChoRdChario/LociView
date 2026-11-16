@@ -160,7 +160,9 @@
 .lv-development-pin-layer { position: absolute; inset: 0; pointer-events: none; }
 .lv-development-pin-preview { position: absolute; pointer-events: none; transform: translate(-50%, -50%); border: 2px dashed #413d39; outline: 2px solid #faf9f8; background: #f2f0ee; color: #312f2d; padding: 3px 7px; font-size: 12px; }
 .lv-development .lv-development-pin { position: absolute; pointer-events: auto; transform: translate(-50%, -50%); width: 32px; height: 32px; min-height: 32px; border-radius: 50%; border: 3px solid #faf9f8; box-shadow: 0 0 0 1px #413d39; font-size: 0; }
+.lv-review-workspace .lv-development-pin[aria-current="true"],
 .lv-development .lv-development-pin[aria-pressed="true"] { box-shadow: 0 0 0 3px #413d39; }
+.lv-review-workspace .lv-development-pin[data-status="needsReview"]::after,
 .lv-development .lv-development-pin[data-review="true"]::after { content: "!"; position: absolute; right: -7px; top: -7px; width: 16px; height: 16px; border: 1px solid #413d39; border-radius: 50%; background: #faf9f8; color: #413d39; font-size: 12px; font-weight: 700; line-height: 14px; }
 .lv-development-stage { overflow-y: auto; }
 .lv-development-sidebar > .lv-development-pending-panel { overflow-y: auto; min-height: 0; }
@@ -311,13 +313,15 @@
 .lv-file-sheet [role="tab"][aria-selected="true"] { background: #e0e5d7; border-bottom: 3px solid #525f46; }
 .lv-file-sheet > [role="tabpanel"] { clear: both; padding-top: 12px; }
 .lv-file-sheet > [role="tabpanel"] > section > :is(form,details) { margin-block: 12px; }
+.lv-review-workspace .lv-development-stage { padding: 0; }
+.lv-review-workspace .lv-development-viewport { border: 0; }
 .lv-review-workspace .lv-caption-windows { z-index: 4; }
 .lv-review-workspace .lv-development-sidebar { min-height: 0; }
 .lv-review-render-status { position: absolute; z-index: 5; top: 8px; left: 8px; display: grid; gap: 4px; box-sizing: border-box; max-width: calc(100% - 136px); max-height: calc(100% - 16px); padding: 6px 8px; overflow: auto; overflow-wrap: anywhere; border: 1px solid #817c78; background: #faf9f8ed; pointer-events: none; }
 .lv-review-render-status :is(p, button) { pointer-events: auto; }
 .lv-review-scene-header { display: flex; align-items: center; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; }
 .lv-review-scene-header h2 { min-width: 0; margin: 0; overflow-wrap: anywhere; }
-.lv-review-append {
+.lv-review-handoff {
   align-self: start;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -325,10 +329,10 @@
   padding: 0.75rem 1rem;
   border-block: 1px solid var(--lv-rule, #cbc9c1);
 }
-.lv-review-append[hidden] { display: none; }
-.lv-review-append :is(h2, p, label) { grid-column: 1 / -1; margin: 0; }
-.lv-review-append p:empty { display: none; }
-.lv-review-append select { display: block; width: 100%; max-width: 28rem; }
+.lv-review-handoff[hidden] { display: none; }
+.lv-review-handoff :is(h2, p, label) { grid-column: 1 / -1; margin: 0; }
+.lv-review-handoff p:empty { display: none; }
+.lv-review-handoff select { display: block; width: 100%; max-width: 28rem; }
 .lv-file-sheet label { display: grid; gap: 6px; margin: 8px 0; }
 .lv-file-sheet button { margin: 3px; padding: 8px 12px; }
 .lv-file-sheet .lv-file-primary { background: #3c4637; color: #fff; }

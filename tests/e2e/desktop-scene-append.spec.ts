@@ -8,7 +8,7 @@ import { selectCleanRecords } from '../../src/projectPackage/cleanRecords';
 import { validationMetadataLimits } from '../../src/projectFiles/validation';
 import { ownedServer } from '../offline-e2e/server';
 import { smallPng, triangleGlb } from './fixtures';
-import {chooseSharedScene, beginSceneCreation, revealCoordinateAdd, revealFileSurface, selectShareOutput } from './workspaceUi';
+import { openAddOptions,chooseSharedScene, beginSceneCreation, revealCoordinateAdd, revealFileSurface, selectShareOutput } from './workspaceUi';
 
 const button = (page: Page, name: string) => page.getByRole('button', { name, exact: true });
 const files = (page: Page) => page.getByRole('region', { name: 'ファイル', exact: true });
@@ -66,6 +66,7 @@ for (const scenario of [
     await source.getByRole('region',{name:'キャプションの詳細',exact:true}).getByRole('button',{name:'変更を適用',exact:true}).click(); await expect(source.getByText('メディアを追加しました。', { exact: true })).toBeVisible();
     if (scenario.interrupt) {
       await button(source, 'シーン 1').click();
+      await openAddOptions(source);
       const existing = source.getByLabel('既存の記録を追加', { exact: true });
       await existing.locator(':scope > summary').click();
       await existing.getByRole('listbox').selectOption({ label: '継承したピン — 共通名.glb' });
@@ -145,7 +146,7 @@ for (const scenario of [
       page = await receiver.newPage(); page.on('pageerror', error => errors.push(error.message));
       await page.goto(resumeUrl);
       const resume = button(page, 'シーン追加を再開');
-      const reopen = page.locator('p').filter({ hasText: '追加先プロジェクト — 更新が未完了' }).getByRole('button', { name: '編集で開く', exact: true });
+      const reopen = page.getByRole('group', { name: '追加先プロジェクト', exact: true }).filter({ hasText: '更新が未完了' }).getByRole('button', { name: '編集で開く', exact: true });
       await expect(resume.or(reopen).first()).toBeVisible({ timeout: 90_000 });
       if (await reopen.isVisible()) await reopen.click();
       const original = page.getByLabel('元のシーンZIP', { exact: true });

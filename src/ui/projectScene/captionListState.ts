@@ -107,23 +107,24 @@ export function captionListView(source: CaptionListSource, memory: SceneUiMemory
 export function planCaptionList(context: CaptionListContext, intent: CaptionListIntent): CaptionListPlan {
   const { source, memory } = context, issue = captionSourceIssue(source);
   if (issue) return { kind: 'blocked', reason: issue };
-  const view = captionListView(source, memory);
   const base = { token: source.token, sceneId: source.sceneId, baseMemory: memory };
   const change = (patch: Partial<SceneUiMemory>): CaptionListPlan => ({ ...base, kind: 'change',
     memory: Object.freeze({ ...memory, ...patch }), intent: intent.kind });
   switch (intent.kind) {
     case 'step': {
       if (context.pending) return { kind: 'blocked', reason: sceneSwitchReason(context.pending) };
+      const view = captionListView(source, memory);
       const index = view.rows.findIndex(row => row.item.id === memory.selectedCaptionId);
       const row = index < 0 ? undefined : view.rows[index + (intent.direction === 'previous' ? -1 : 1)];
       return row ? change({ selectedCaptionId: row.item.id }) : { kind: 'blocked', reason: 'この方向に記録はありません。' };
     }
     case 'search': return intent.query === memory.search ? { kind: 'unchanged' } : change({ search: intent.query });
     case 'owner': return ownerFilterKey(intent.filter) === ownerFilterKey(memory.ownerFilter) ? { kind: 'unchanged' }
-      : intent.filter.kind === 'all' || view.owners.some(owner => ownerFilterKey(owner.filter) === ownerFilterKey(intent.filter))
+      : intent.filter.kind === 'all' || captionListView(source, memory).owners.some(owner => ownerFilterKey(owner.filter) === ownerFilterKey(intent.filter))
         ? change({ ownerFilter: Object.freeze({ ...intent.filter }) }) : { kind: 'blocked', reason: 'モデルを選び直してください。' };
     case 'allColors': return memory.pinColors === null ? { kind: 'unchanged' } : change({ pinColors: null });
     case 'color': {
+      const view = captionListView(source, memory);
       if (!view.colors.includes(intent.color)) return { kind: 'blocked', reason: '色を選び直してください。' };
       const colors = new Set(memory.pinColors ?? view.colors);
       if (colors.has(intent.color)) colors.delete(intent.color); else colors.add(intent.color);
@@ -132,7 +133,7 @@ export function planCaptionList(context: CaptionListContext, intent: CaptionList
     case 'scroll': return Number.isFinite(intent.top) && intent.top >= 0
       ? intent.top === memory.listScrollTop ? { kind: 'unchanged' } : change({ listScrollTop: intent.top })
       : { kind: 'blocked', reason: '一覧の位置を確認してください。' };
-    case 'revealSelection': return !view.selected ? { kind: 'blocked', reason: '選択したキャプションの状態を確認してください。' }
+    case 'revealSelection': return !(source.kind === 'ready' && source.captions.some(item => item.id === memory.selectedCaptionId)) ? { kind: 'blocked', reason: '選択したキャプションの状態を確認してください。' }
       : change({ search: '', ownerFilter: { kind: 'all' }, pinColors: null });
     default: {
       const item = source.kind === 'ready' ? source.captions.find(item => item.id === intent.captionId) : undefined;

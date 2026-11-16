@@ -1,4 +1,4 @@
-import { revealCoordinateAdd, beginSceneCreation, revealModelManagement, lookAlongFront, revealCaptionList } from './workspaceUi';
+import { expectResumedProject, openAddOptions, revealCoordinateAdd, beginSceneCreation, revealModelManagement, lookAlongFront, revealCaptionList } from './workspaceUi';
 import { test, expect, chromium, type BrowserContext, type Page, type TestInfo } from '@playwright/test';
 import { createHash } from 'node:crypto';
 import { mkdir, mkdtemp, readFile, readdir } from 'node:fs/promises';
@@ -41,7 +41,7 @@ async function image(page: Page, name: string, buffer: Buffer) {
   await page.getByRole('region',{name:'キャプションの詳細',exact:true}).getByRole('button',{name:'変更を適用',exact:true}).click(); await expect(page.getByText('メディアを追加しました。', { exact: true })).toBeVisible({ timeout: actionTimeout });
 }
 async function checkImages(page: Page, count: number) {
-  const images = page.getByRole('region', { name: '画像の整理', exact: true }).locator('img');
+  const images = page.getByRole('region', { name: 'メディアの整理', exact: true }).locator('img');
   await expect(images).toHaveCount(count);
   for (const item of await images.all()) await expect.poll(() => item.evaluate((node: HTMLImageElement) => node.complete && node.naturalWidth)).toBe(2);
 }
@@ -185,9 +185,9 @@ test('差し替えと受信の中断を元のファイルから復旧し、手�
       expect(fault.durable).toEqual({ transactionId: fault.prepared.start.transactionId, exactChangeSetDigest: fault.prepared.exactChangeSetDigest });
       fault.changes.forEach((hex, i) => expect(sha(Buffer.from(hex, 'hex'))).toBe(fault.prepared.changes[i]!.bytesSha256));
       await a.screenshot({ path: info.outputPath('中断時の再試行.png'), fullPage: true }); await close('A'); a = await launch('A');
-      const incomplete = a.locator('p').filter({ hasText: title }).filter({ hasText: '更新が未完了' });
+      const incomplete = a.getByRole('group', { name: title, exact: true }).filter({ hasText: '更新が未完了' });
       await expect(incomplete).toBeVisible({ timeout: actionTimeout });
-      await expect(a.getByText(`最後のプロジェクトを再開しました：${title}`, { exact: true })).toBeHidden();
+      await expect(a.getByRole('heading', { name: 'プロジェクト名', exact: true })).toBeHidden();
       await a.screenshot({ path: info.outputPath('復旧するプロジェクトの選択.png'), fullPage: true });
       await incomplete.getByRole('button', { name: '編集で開く', exact: true }).click();
       await expect(a.getByRole('button', { name: '更新を再試行', exact: true })).toBeVisible({ timeout: actionTimeout });
@@ -286,7 +286,7 @@ test('差し替えと受信の中断を元のファイルから復旧し、手�
       await expect(area.getByRole('button', { name: '受信を再開', exact: true })).toBeEnabled(); expect(await snapshot(b)).toEqual(pending);
       await area.scrollIntoViewIfNeeded(); await b.screenshot({ path: info.outputPath('別のファイルを拒否して受信を保持.png'), fullPage: true });
       await close('B'); b = await launch('B');
-      const incomplete = b.locator('p').filter({ hasText: title }).filter({ hasText: '更新が未完了' }); await expect(incomplete).toBeVisible({ timeout: actionTimeout });
+      const incomplete = b.getByRole('group', { name: title, exact: true }).filter({ hasText: '更新が未完了' }); await expect(incomplete).toBeVisible({ timeout: actionTimeout });
       await incomplete.getByRole('button', { name: '編集で開く', exact: true }).click(); area = b.getByRole('region', { name: '更新ファイル', exact: true });
       await expect(area.getByRole('button', { name: '元のファイルを選び直す', exact: true })).toBeEnabled({ timeout: actionTimeout });
       await expect(b.getByRole('button', { name: '更新を再試行', exact: true })).toBeHidden(); expect(await snapshot(b)).toEqual(pending);
@@ -347,6 +347,7 @@ test('差し替えと受信の中断を元のファイルから復旧し、手�
       await chooseCaption(a); await edit(a, aBody); await chooseCaption(b); await edit(b, bBody);
       for (const page of [a, b]) {
         const scenes = page.getByRole('region', { name: 'シーン', exact: true }); await scenes.getByRole('button', { name: secondScene, exact: true }).click();
+        await openAddOptions(page);
         const include = page.locator('details.lv-caption-include'); await include.getByText('既存の記録を追加', { exact: true }).click();
         await include.getByLabel('キャプション', { exact: true }).selectOption(originalId); await include.getByRole('button', { name: 'このシーンに追加', exact: true }).click();
         await expect(page.getByText('このシーンに追加しました。', { exact: true })).toBeVisible({ timeout: actionTimeout });
@@ -368,7 +369,9 @@ test('差し替えと受信の中断を元のファイルから復旧し、手�
       await chooseCaption(b); await detail(b).getByLabel('タイトル', { exact: true }).fill(originalTitle); await edit(b, finalBody);
       await b.getByRole('region', { name: 'シーン', exact: true }).getByRole('button', { name: secondScene, exact: true }).click();
       await chooseCaption(b); await detail(b).getByLabel('タイトル', { exact: true }).fill(copyTitle); await edit(b, copyBody); await checkImages(b, 2);
-      const gallery = b.getByRole('region', { name: '画像の整理', exact: true }); await gallery.getByRole('button', { name: '説明を編集', exact: true }).first().click();
+      const gallery = b.getByRole('region', { name: 'メディアの整理', exact: true });
+      const attachment = gallery.locator('figure').first(); await attachment.getByText('添付を整理', { exact: true }).click();
+      await attachment.getByRole('button', { name: '説明を編集', exact: true }).click();
       await gallery.getByLabel('メディアの説明', { exact: true }).fill(copyAlt); await gallery.getByRole('button', { name: '説明を適用', exact: true }).click();
       await expect(b.getByText('メディアの説明を適用しました。', { exact: true })).toBeVisible({ timeout: actionTimeout });
       const reply = await download(b, info, 'B-二巡目の返送', 'contribution', base.archive.control.manifest.packageId); await checkContribution(reply);
@@ -389,12 +392,12 @@ test('差し替えと受信の中断を元のファイルから復旧し、手�
     await step('両ブラウザの再開と実バックアップが補正済みモデルと記録を保持する', async () => {
       await close('A'); await close('B'); a = await launch('A'); b = await launch('B');
       for (const [who, page] of [['A', a], ['B', b]] as const) {
-        await expect(page.getByText(`最後のプロジェクトを再開しました：${title}`, { exact: true })).toBeVisible({ timeout: actionTimeout }); await chooseCaption(page, originalTitle);
+        await expectResumedProject(page, title, actionTimeout); await chooseCaption(page, originalTitle);
         await expect(marker(page)).toHaveAttribute('data-review', 'false'); await expect(detail(page).getByLabel('本文', { exact: true })).toHaveValue(finalBody); await checkImages(page, 2);
         await page.getByRole('region', { name: 'シーン', exact: true }).getByRole('button', { name: '共有した別シーン', exact: true }).click();
         await expect(page.getByRole('list', { name: 'キャプション一覧', exact: true }).locator('.lv-caption-select')).toHaveCount(2); await chooseCaption(page, copyTitle);
         await expect(detail(page).getByLabel('本文', { exact: true })).toHaveValue(copyBody); await checkImages(page, 2);
-        await expect(page.getByRole('region', { name: '画像の整理', exact: true })).toContainText(copyAlt);
+        await expect(page.getByRole('region', { name: 'メディアの整理', exact: true })).toContainText(copyAlt);
         await expect(marker(page)).toHaveCount(2); for (const pin of await marker(page).all()) await expect(pin).toHaveAttribute('data-review', 'false');
         await expect(page.getByRole('region', { name: '記録の競合', exact: true })).toBeHidden();
         await expect(page.locator('.lv-project-viewport-status')).toBeEmpty(); await page.screenshot({ path: info.outputPath(`${who}-補正後の再開.png`), fullPage: true });

@@ -47,8 +47,12 @@ test('review files use the same camera controls and create an independent editab
     const orbitPixels=await canvas.screenshot({path:info.outputPath('review-left-orbit.png')});await drag('right',30,15);const panPixels=await canvas.screenshot({path:info.outputPath('review-right-pan.png')});expect(Buffer.compare(orbitPixels,panPixels)).not.toBe(0);
     await gizmo.getByRole('button',{name:'全体表示',exact:true}).click();const projection=review.getByLabel('投影方式',{exact:true});await projection.selectOption('orthographic');await expect(projection).toHaveValue('orthographic');await projection.selectOption('perspective');await expect(projection).toHaveValue('perspective');
     await gizmo.getByRole('button',{name:'Z',exact:true}).press('Enter');await expect(review.getByRole('textbox',{name:'検索',exact:true})).toHaveCount(0);const empty=review.locator('.lv-development-sidebar > p');await expect(empty).toHaveText('このシーンにキャプションはありません。');await expect(empty).toBeVisible();
-    await page.screenshot({path:info.outputPath('review-wide.png'),fullPage:false});await page.setViewportSize({width:390,height:844});await expect(gizmo).toBeInViewport();await page.screenshot({path:info.outputPath('review-narrow.png'),fullPage:true});await page.setViewportSize({width:1440,height:1000});
-    await review.getByRole('button',{name:'編集コピーを作る',exact:true}).click();const confirmation=page.getByRole('region',{name:'編集コピーの確認',exact:true});await expect(confirmation).toContainText('変更分の返送には使えません');await confirmation.getByRole('button',{name:'戻る',exact:true}).click();await expect(confirmation).toBeHidden();await expect(review).toBeVisible();
+    await page.screenshot({path:info.outputPath('review-wide.png'),fullPage:false});await page.setViewportSize({width:390,height:844});await expect(gizmo).toBeInViewport();
+    const narrowCanvas = (await canvas.boundingBox())!, pan = (await gizmo.getByRole('button', {name:'平行移動',exact:true}).boundingBox())!;
+    expect(pan.y).toBeGreaterThanOrEqual(narrowCanvas.y);
+    expect(pan.y + pan.height).toBeLessThanOrEqual(narrowCanvas.y + narrowCanvas.height);
+    await page.screenshot({path:info.outputPath('review-narrow.png'),fullPage:true});await page.setViewportSize({width:1440,height:1000});
+    await review.getByRole('button',{name:'編集コピーを作る',exact:true}).click();const confirmation=page.getByRole('region',{name:'編集コピーの確認',exact:true});await expect(confirmation).toBeFocused();await expect(confirmation).toBeInViewport();await expect(confirmation).toContainText('変更分の返送には使えません');await confirmation.getByRole('button',{name:'戻る',exact:true}).click();await expect(confirmation).toBeHidden();await expect(review.getByRole('button',{name:'編集コピーを作る',exact:true})).toBeFocused();await expect(review).toBeVisible();
     await review.getByRole('button',{name:'編集コピーを作る',exact:true}).click();await confirmation.getByRole('button',{name:'コピーを作成',exact:true}).click();await expect(page.getByRole('heading',{name:'プロジェクト名',exact:true})).toBeVisible({timeout:90_000});await expect(review).toHaveCount(0);
     const independent=await backup(page,'independent');expect(independent).not.toBe(original);await page.reload();await expect(page.getByRole('heading',{name:'プロジェクト名',exact:true})).toBeVisible({timeout:90_000});expect(await backup(page,'reopened')).toBe(independent);expect(errors).toEqual([]);expect(remote).toEqual([]);
   } finally { await browser.close();await server.stop(); }
@@ -79,6 +83,8 @@ test('touch Review copy preserves Mesh, Point, GS, Proxy and photos through actu
     const original = await ReviewArchive.inspect(await openAsBlob(reviewPath), validationMetadataLimits);
     let p = await launch(true); await p.getByLabel('ファイルを選択', { exact: true }).setInputFiles(reviewPath); await p.getByRole('button', { name: 'ファイルを開く', exact: true }).click();
     await expect(p.getByRole('main', { name: '閲覧用のシーン', exact: true })).toBeVisible(); await p.getByRole('button', { name: '編集コピーを作る', exact: true }).click();
+    const confirmation = p.getByRole('region', { name: '編集コピーの確認', exact: true });
+    await expect(confirmation).toBeFocused(); await expect(confirmation).toBeInViewport();
     await p.getByRole('button', { name: 'コピーを作成', exact: true }).click(); await ready(p); await revealCaptionList(p);
     await p.locator('.lv-caption-select').first().click(); const detail = p.getByRole('region', { name: 'キャプションの詳細', exact: true });
     await detail.getByLabel('本文', { exact: true }).fill('スマホで直接コピーを編集'); await detail.getByRole('button', { name: '変更を適用', exact: true }).click();

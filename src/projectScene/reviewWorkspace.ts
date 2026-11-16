@@ -33,8 +33,7 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
   const sidebar = make('aside'); sidebar.className = 'lv-development-sidebar'; sidebar.setAttribute('aria-label', '閲覧パネル');
   const sceneName = make('h2', view.sceneName), emptyCaptions=make('p','このシーンにキャプションはありません。'),status = make('p'), retry = make('button', '3D表示を再試行'); status.setAttribute('role', 'status'); retry.type = 'button';
   const renderStatus = make('div'); renderStatus.className = 'lv-review-render-status'; renderStatus.append(status, retry);
-  const footer = make('p', '閲覧用ファイルです。');
-  viewport.append(canvas, searchRecords, overlay, renderStatus); stage.append(viewport); content.append(stage, sidebar); root.append(header, content, footer);
+  viewport.append(canvas, searchRecords, overlay, renderStatus); stage.append(viewport); content.append(stage, sidebar); root.append(header, content);
   const mediaWork = createMediaResidencyGate(document, render, () => runtime?.idle?.() ?? Promise.resolve(), () => !disposed);
   const mediaViewer = createMediaViewer(document, view.rasterResources,view.imageDimensions,mediaWork.acquire); root.append(mediaViewer.root);
   let memory: SceneUiMemory = { selectedCaptionId: null, search: '', pinColors: null, listScrollTop: 0, ownerFilter: { kind: 'all' } };
@@ -43,8 +42,9 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
   let runtime: ProjectViewport | undefined, display = view.display(null, null), failure = '', rendererFailure = '';
   let retirement: Promise<void> | undefined;
   const copy = make('button', '編集コピーを作る'), confirmation = make('section'); copy.type = 'button'; copy.hidden = !editCopy;
-  confirmation.hidden = true; confirmation.setAttribute('aria-label', '編集コピーの確認');
-  confirmation.append(make('p', '独立したプロジェクトを作成します。元ファイルは変更しません。元のプロジェクトへの変更分の返送には使えません。'));
+  confirmation.hidden = true; confirmation.tabIndex = -1; confirmation.className = 'lv-review-handoff';
+  confirmation.setAttribute('aria-label', '編集コピーの確認');
+  confirmation.append(make('h2', '編集コピーを作成'), make('p', '独立したプロジェクトを作成します。元ファイルは変更しません。元のプロジェクトへの変更分の返送には使えません。'));
   const effects = view.inspection.review.editEffect;
   if (effects.missingModelCaptions || effects.newlyNeedsReviewCaptions) confirmation.append(make('p',
     `対応モデルなし：${effects.missingModelCaptions}件。要確認になるピン：${effects.newlyNeedsReviewCaptions}件。位置が分かるピンは残します。`));
@@ -53,9 +53,15 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
   const setHandoffBusy = (active: boolean) => {
     handoffBusy = active; confirmCopy.disabled = cancelCopy.disabled = copy.disabled = active; refreshAppend(); render();
   };
-  confirmation.append(confirmCopy, cancelCopy); header.append(copy); root.append(confirmation);
-  copy.addEventListener('click', () => { if (!disposed && !handoffBusy && !copy.disabled && !composing && !moving) confirmation.hidden = false; });
-  cancelCopy.addEventListener('click', () => { if (!handoffBusy && !cancelCopy.disabled) confirmation.hidden = true; });
+  confirmation.append(confirmCopy, cancelCopy); header.append(copy); root.insertBefore(confirmation, content);
+  copy.addEventListener('click', () => {
+    if (disposed || handoffBusy || copy.disabled || composing || moving) return;
+    confirmation.hidden = false; confirmation.focus();
+  });
+  cancelCopy.addEventListener('click', () => {
+    if (handoffBusy || cancelCopy.disabled) return;
+    confirmation.hidden = true; copy.focus();
+  });
   confirmCopy.addEventListener('click', () => {
     if (disposed || handoffBusy || composing || moving || confirmation.hidden || confirmCopy.disabled) return;
     setHandoffBusy(true);
@@ -65,7 +71,7 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
   if (append) {
     const open = make('button', '既存に追加'), panel = make('section'), select = make('select'), label = make('label', '追加先'),
       note = make('p'), confirm = make('button', 'シーンを追加'), cancel = make('button', 'キャンセル');
-    panel.className = 'lv-review-append'; panel.hidden = true; panel.setAttribute('aria-label', 'シーンの追加');
+    panel.className = 'lv-review-handoff'; panel.hidden = true; panel.setAttribute('aria-label', 'シーンの追加');
     open.type = confirm.type = cancel.type = 'button'; confirm.disabled = true;
     note.setAttribute('role', 'status'); select.setAttribute('aria-label', '追加先'); label.append(select);
     const count = (name: string) => view.inspection.review.summary.entityClasses.find(entry => entry.class === name)?.count ?? 0;
@@ -145,8 +151,11 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
   function accept(plan: CaptionListPlan) {
     if (disposed || !captionListPlanIsCurrent(plan, context())) return;
     if (plan.kind === 'blocked') { failure = plan.reason; paint(); return; }
-    if (plan.kind === 'change' && plan.intent === 'scroll') {
-      memory = plan.memory; list.render(context()); return;
+    if (plan.kind === 'change' && (plan.intent === 'scroll' || plan.intent === 'search')) {
+      memory = plan.memory;
+      if (plan.intent === 'scroll') list.acceptScroll(context());
+      else list.render(context());
+      return;
     }
     if (plan.kind === 'change') { memory = plan.memory; if (plan.intent === 'select' && memory.selectedCaptionId) openWindow(memory.selectedCaptionId); }
     else if (plan.kind === 'unchanged' && plan.explicitSelection) openWindow(plan.explicitSelection.captionId);
@@ -255,9 +264,13 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
           accept(planCaptionList(context(), { kind: 'select', captionId: pin.id }));
           if (phone?.matches && memory.selectedCaptionId === pin.id) selectedText.focus();
         }); pins.set(pin.id, button); overlay.append(button); }
-      button.textContent = pin.title || 'キャプション'; button.style.backgroundColor = pin.color; button.setAttribute('aria-current', String(memory.selectedCaptionId === pin.id));
+      const title = pin.title || '無題';
+      button.textContent = title; button.setAttribute('aria-label', title);
+      button.style.backgroundColor = pin.color; button.setAttribute('aria-current', String(memory.selectedCaptionId === pin.id));
       button.style.transform = `translate(-50%, -50%) scale(${pin.scale ?? 1})`;
       button.dataset.status = pin.status;
+      if (pin.status === 'needsReview') button.setAttribute('aria-description', '位置を要確認');
+      else button.removeAttribute('aria-description');
       const point = observation?.pins.find(p => p.id === pin.id); button.hidden = !ready || !point?.visible;
       if (point) { button.style.left = `${point.x}px`; button.style.top = `${point.y}px`; }
     }

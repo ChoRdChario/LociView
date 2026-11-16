@@ -27,7 +27,11 @@ function host(initial = fixture(), document = new RecordedDocument(),presentatio
   let context = initial;
   const controls = createCaptionListControls(document.asDocument(), plan => {
     plans.push(plan);
-    if (plan.kind === 'change' && captionListPlanIsCurrent(plan, context)) { context = { ...context, memory: plan.memory }; controls.render(context); }
+    if (plan.kind === 'change' && captionListPlanIsCurrent(plan, context)) {
+      context = { ...context, memory: plan.memory };
+      if (plan.intent === 'scroll') controls.acceptScroll(context);
+      else controls.render(context);
+    }
   }, active => compositions.push(active),presentation);
   controls.render(context);
   const root = record(controls.root), filters = root.children[0]!, search = filters.children[0]!.children[0]!;

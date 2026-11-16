@@ -6559,10 +6559,13 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const visible = named('このシーンに表示', models); visible.checked = false; await edited(() => visible.fire('change'));
     button('キャプション', editor).fire('click'); expect(h.display()!.models).toHaveLength(0);
     const picker = named('既存の記録を追加', editor), choices = named('キャプション', picker), query = named('追加する記録を検索', picker);
+    const addOptions = all(editor).find(n => n.className === 'lv-caption-add-settings')!;
+    addOptions.open = picker.open = true; picker.fire('toggle');
     choices.value = captionId; choices.fire('change'); expect(all(picker).some(n => n.textContent.includes('モデルは非表示のまま'))).toBe(true);
     const resources = host.authority.read().resources.captions;
     await edited(() => button('このシーンに追加', picker).fire('click')); expect(h.display()!.models).toHaveLength(0); expect(h.display()!.selectedId).toBeNull();
     named('キャプション一覧', editor).children[0]!.children[0]!.fire('click'); expect(h.display()!.selectedId).toBe(captionId);
+    addOptions.open = picker.open = true; picker.fire('toggle');
     query.fire('compositionstart'); query.value = '検索中'; query.fire('input'); expect(button('このシーンから外す', editor).disabled).toBe(true); expect(button('モデル', editor).disabled).toBe(true);
     expect(button('ファイルに保存', named('ファイル')).disabled).toBe(true); query.fire('compositionend'); expect(choices.value).toBe('');
     const beforeExclude = host.read().source!, edge = Object.values(host.authority.read().state.captionMemberships).find(e => e.sceneId === secondScene && e.resourceId === captionId)!;
@@ -6684,7 +6687,10 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect([p().details.mutable.sceneCaptionMembershipsById, p().details.mutable.captionAttachmentsById, p().details.mutable.captionTagMembershipsById]).toEqual(beforeChildren);
     expect(projectCaptions(p(), sceneId)).toHaveLength(0); expect(captionAttachments(host.authority.read().mediaData, captionId).ready).toHaveLength(0);
     await peer.receiver.receive((await peer.session.read()).source!.token, await returnFile());
-    const picker = named('既存の記録を追加', editor), choose = named('キャプション', picker); choose.value = captionId; choose.fire('change'); await edited(() => button('このシーンに追加', picker).fire('click'));
+    const picker = named('既存の記録を追加', editor), choose = named('キャプション', picker);
+    const addOptions = all(editor).find(n => n.className === 'lv-caption-add-settings')!;
+    addOptions.open = picker.open = true; picker.fire('toggle');
+    choose.value = captionId; choose.fire('change'); await edited(() => button('このシーンに追加', picker).fire('click'));
     selectCaption(captionId); const media = named('メディアの整理', editor), stored = named('既存のメディアを添付', media); stored.open = true; stored.fire('toggle');
     button('受信画像', named('メディアを選択', media)).fire('click'); await edited(() => button('選択したメディアを添付', media).fire('click'));
     const attachment = captionAttachments(host.authority.read().mediaData, captionId).ready[0]!;
@@ -6761,7 +6767,10 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect(button('開始シーンを設定', form).disabled).toBe(true); button('取り消す', form).fire('click');
     button('閲覧する').fire('click'); await vi.waitFor(() => expect(button('編集する')?.disabled).toBe(false), { timeout: 10000 });
     expect(name.disabled).toBe(true); expect(button('名前を変更', editor).disabled).toBe(true); expect(button('開始シーンにする', editor).disabled).toBe(true);
-    const picker = named('既存の記録を追加', editor), choices = named('キャプション', picker), query = named('追加する記録を検索', picker); choices.value = captionId; choices.fire('change');
+    const picker = named('既存の記録を追加', editor), choices = named('キャプション', picker), query = named('追加する記録を検索', picker);
+    const addOptions = all(editor).find(n => n.className === 'lv-caption-add-settings')!;
+    addOptions.open = picker.open = true; picker.fire('toggle');
+    choices.value = captionId; choices.fire('change');
     expect(button('このシーンに追加', picker).disabled).toBe(true); expect(query.readOnly).toBe(false);
     query.fire('compositionstart'); query.value = '最初'; query.fire('input'); expect(button('編集する').disabled).toBe(true);
     const current = h.liveHost(), base = current.read(); if (base.provider?.kind !== 'scene-provider') throw Error('provider');
@@ -6967,7 +6976,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect(host.read().source!.token).toBe(token); expect(line.hidden).toBe(true); expect(all(windows)).toContain(card);
     h.holdFrame(false); expect(line.hidden).toBe(true); button('表示', editor).fire('click'); expect(line.hidden).toBe(false);
     h.pinPoint({ x: Number.NaN, y: 300 }); expect(line.hidden).toBe(true); h.pinPoint({ x: 500, y: 300 }); expect(line.hidden).toBe(false);
-    h.setIssue('描画の再開が必要です。'); named('検索', editor).fire('input'); expect(line.hidden).toBe(true);
+    h.setIssue('描画の再開が必要です。'); h.refresh(); expect(line.hidden).toBe(true);
     const retry = button('3D表示を再試行', editor), canvas = named('3Dモデルの表示', editor);
     const stage = all(editor).find(n => n.className === 'lv-project-stage')!;
     const overlay = all(stage).find(n => n.className === 'lv-stage-overlay')!;
@@ -7766,7 +7775,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect(host.authority.status!().kind).toBe('idle');
     expect(host.read().source!.originalChanges()).toEqual(original); expect(h.display()!.token).toBe(host.read().source!.token);
     expect(prepare).toHaveBeenCalledTimes(2); detach();
-    h.setIssue('表示を再開してください。'); named('検索', editor).fire('input');
+    h.setIssue('表示を再開してください。'); h.refresh();
     expect(h.all(editor).some(n => n.textContent?.includes('表示を再開してください。'))).toBe(true);
     expect(h.all(editor).some(n => n.textContent?.includes('検証用の表示通知'))).toBe(true);
     h.retryViewport.mockImplementationOnce(() => { throw Error('描画環境の復旧を待って再試行してください。'); });

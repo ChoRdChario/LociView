@@ -1,4 +1,4 @@
-import { revealCoordinateAdd, beginSceneCreation, revealCaptionList } from './workspaceUi';
+import { expectResumedProject, openAddOptions, revealCoordinateAdd, beginSceneCreation, revealCaptionList } from './workspaceUi';
 import { test, expect, chromium, type BrowserContext, type Page, type TestInfo } from '@playwright/test';
 import { createHash } from 'node:crypto';
 import { mkdir, mkdtemp, readFile, readdir } from 'node:fs/promises';
@@ -40,7 +40,7 @@ async function editCaption(page: Page, title: string, body: string) {
   await detail(page).getByRole('button', { name: '変更を適用', exact: true }).click(); await done(page, '変更を適用しました。');
 }
 async function checkImage(page: Page) {
-  const image = page.getByRole('region', { name: '画像の整理', exact: true }).locator('img'); await expect(image).toHaveCount(1);
+  const image = page.getByRole('region', { name: 'メディアの整理', exact: true }).locator('img'); await expect(image).toHaveCount(1);
   await expect.poll(() => image.evaluate((node: HTMLImageElement) => node.complete && node.naturalWidth)).toBe(2);
 }
 async function download(page: Page, info: TestInfo, name: string, purpose: 'backup' | 'teamWorkspace' | 'contribution', base?: string) {
@@ -115,7 +115,8 @@ test('二人の重複登録を両方残し、元と独立コピーを別々に�
       for (const page of [a, b]) {
         await scene(page, targetScene); await page.getByRole('tab', { name: 'モデル', exact: true }).click(); const toggle = modelPanel(page).getByRole('checkbox', { name: 'このシーンに表示', exact: true });
         await expect(toggle).not.toBeChecked(); await toggle.click(); await done(page, 'このシーンにモデルを追加しました。'); await expect(toggle).toBeChecked();
-        await page.getByRole('tab', { name: 'キャプション', exact: true }).click(); const include = page.locator('details.lv-caption-include'); await include.getByText('既存の記録を追加', { exact: true }).click();
+        await page.getByRole('tab', { name: 'キャプション', exact: true }).click(); await openAddOptions(page);
+        const include = page.locator('details.lv-caption-include'); await include.getByText('既存の記録を追加', { exact: true }).click();
         await include.getByLabel('キャプション', { exact: true }).selectOption(originalCaption); await include.getByRole('button', { name: 'このシーンに追加', exact: true }).click(); await done(page, 'このシーンに追加しました。');
       }
       evidence.initial = { identity: base.source.proof.identity, heads: base.source.heads, originalAsset, originalCaption, originalSceneId, targetSceneId };
@@ -175,7 +176,8 @@ test('二人の重複登録を両方残し、元と独立コピーを別々に�
       await modelPanel(a).getByLabel('モデル位置 X', { exact: true }).fill('-2'); await modelPanel(a).getByRole('button', { name: '配置を確定', exact: true }).click(); await done(a, 'モデルの配置を確定しました。');
       await receive(b, await contribution(a, 'A1-元の記録とモデルの変更'));
       await scene(b, targetScene); await caption(b, initialTitle); await editCaption(b, copyTitle, copyBody); await checkImage(b);
-      const media = b.getByRole('region', { name: '画像の整理', exact: true }); await media.getByRole('button', { name: '説明を編集', exact: true }).click();
+      const media = b.getByRole('region', { name: 'メディアの整理', exact: true });
+      await media.getByText('添付を整理', { exact: true }).click(); await media.getByRole('button', { name: '説明を編集', exact: true }).click();
       await media.getByLabel('メディアの説明', { exact: true }).fill(copyAlt); await media.getByRole('button', { name: '説明を適用', exact: true }).click(); await done(b, 'メディアの説明を適用しました。');
       const pins = b.getByRole('region', { name: '位置の調整', exact: true }); await b.getByRole('button', { name: '位置を調整', exact: true }).click();
       await b.getByText('座標で微調整', {exact:true}).click();
@@ -185,7 +187,7 @@ test('二人の重複登録を両方残し、元と独立コピーを別々に�
       for (let index = 0; index < 2; index++) {
         await modelRows(b).nth(index).click(); await modelPanel(b).getByRole('button', { name: '配置を調整', exact: true }).click(); const x = Number(await modelPanel(b).getByLabel('モデル位置 X', { exact: true }).inputValue());
         if (x === -2) { await modelPanel(b).getByRole('button', { name: '配置を取り消す', exact: true }).click(); continue; }
-        expect(x).toBe(0.75); await expect(modelPanel(b).getByRole('region', { name: 'モデルの配置', exact: true })).toContainText('1シーン');
+        expect(x).toBe(0.75); await expect(modelPanel(b).getByRole('region', { name: '配置の終了操作', exact: true })).toContainText('1シーン');
         expect(await modelPanel(b).getByLabel('モデル倍率', { exact: true }).inputValue()).toBe('1.25'); await modelPanel(b).getByLabel('モデル位置 X', { exact: true }).fill('3.5');
         await modelPanel(b).getByRole('button', { name: '配置を確定', exact: true }).click(); await done(b, 'モデルの配置を確定しました。'); moved = true; break;
       } expect(moved).toBe(true);
@@ -203,10 +205,10 @@ test('二人の重複登録を両方残し、元と独立コピーを別々に�
     await step('両ブラウザを完全終了して元とコピーを別々に再開する', async () => {
       await close('A'); await close('B'); a = await launch('A'); b = await launch('B');
       for (const [who, page] of [['A', a], ['B', b]] as const) {
-        await expect(page.getByText(`最後のプロジェクトを再開しました：${projectName}`, { exact: true })).toBeVisible({ timeout: actionTimeout }); await scene(page, firstScene);
+        await expectResumedProject(page, projectName, actionTimeout); await scene(page, firstScene);
         await expect(page.getByRole('list', { name: 'キャプション一覧', exact: true }).locator('.lv-caption-select')).toHaveCount(1); await caption(page, originalTitle); await expect(detail(page).getByLabel('本文', { exact: true })).toHaveValue(originalBody); await checkImage(page);
         await scene(page, targetScene); await expect(page.getByRole('list', { name: 'キャプション一覧', exact: true }).locator('.lv-caption-select')).toHaveCount(2); await caption(page, copyTitle); await expect(detail(page).getByLabel('本文', { exact: true })).toHaveValue(copyBody); await checkImage(page);
-        await expect(page.getByRole('region', { name: '画像の整理', exact: true })).toContainText(copyAlt); await expect(page.getByRole('region', { name: '記録の競合', exact: true })).toBeHidden();
+        await expect(page.getByRole('region', { name: 'メディアの整理', exact: true })).toContainText(copyAlt); await expect(page.getByRole('region', { name: '記録の競合', exact: true })).toBeHidden();
         await page.getByRole('tab', { name: 'モデル', exact: true }).click(); await expect(modelRows(page)).toHaveCount(2); const xs: number[] = [];
         for (let i = 0; i < 2; i++) { await modelRows(page).nth(i).click(); await modelPanel(page).getByRole('button', { name: '配置を調整', exact: true }).click(); xs.push(Number(await modelPanel(page).getByLabel('モデル位置 X', { exact: true }).inputValue())); await modelPanel(page).getByRole('button', { name: '配置を取り消す', exact: true }).click(); }
         expect(xs.sort((x, y) => x - y)).toEqual([-2, 3.5]); await caption(page, copyTitle); await expect(page.locator('.lv-project-viewport-status')).toBeEmpty(); await page.screenshot({ path: info.outputPath(`${who}-別々の編集を再開.png`), fullPage: true });

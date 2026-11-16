@@ -40,8 +40,7 @@ export function captionIncludeView(context: CaptionIncludeContext) {
   return { issue, items, rows: visible.map(row => ({ ...row, entry: byId.get(row.item.id)! })),
     selected: items.find(item => item.caption.id === memory.captionId) };
 }
-export function captionIncludeIssue(context: CaptionIncludeContext, action: 'include' | 'exclude' = 'include'): string | null {
-  const view = captionIncludeView(context);
+export function captionIncludeIssue(context: CaptionIncludeContext, action: 'include' | 'exclude' = 'include', view = captionIncludeView(context)): string | null {
   if (context.feedback.kind === 'applying') return '変更中です。';
   if (context.mutationBlock !== null) return context.mutationBlock || '現在は変更できません。';
   if (context.memory.composing) return '文字の入力を確定してください。';
@@ -55,19 +54,20 @@ export function captionIncludeIssue(context: CaptionIncludeContext, action: 'inc
     item.membership.value === 'included' ? 'このシーンに追加済みです。' : null;
 }
 export function planCaptionInclude(context: CaptionIncludeContext, intent: CaptionIncludeIntent): CaptionIncludePlan {
-  const { source, memory } = context, view = captionIncludeView(context);
+  const { source, memory } = context;
   const base = { token: source.token, sceneId: memory.sceneId, baseMemory: memory };
   const change = (patch: Partial<CaptionIncludeMemory>): CaptionIncludePlan => Object.freeze({ ...base,
     kind: 'change', memory: Object.freeze({ ...memory, ...patch }) });
   // Search/composition are local input, retained even when the inventory is unavailable.
   if (intent.kind === 'search') return change({ query: intent.query });
   if (intent.kind === 'compose') return change({ composing: intent.active });
+  const view = captionIncludeView(context);
   if (view.issue) return { kind: 'blocked', reason: view.issue };
   if (context.feedback.kind === 'applying') return { kind: 'blocked', reason: '変更中です。' };
   if (intent.kind === 'select') return intent.captionId === null || view.items.some(item => item.caption.id === intent.captionId)
     ? change({ captionId: intent.captionId }) : { kind: 'blocked', reason: 'キャプションを選び直してください。' };
   if (intent.kind === 'include' || intent.kind === 'exclude') {
-    const issue = captionIncludeIssue(context, intent.kind); if (issue) return { kind: 'blocked', reason: issue };
+    const issue = captionIncludeIssue(context, intent.kind, view); if (issue) return { kind: 'blocked', reason: issue };
   } else if (!view.selected || context.pending || memory.composing) {
     return { kind: 'blocked', reason: sceneSwitchReason(context.pending) || '入力を確定し、キャプションを選択してください。' };
   }

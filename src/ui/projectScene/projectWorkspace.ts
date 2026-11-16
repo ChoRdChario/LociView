@@ -125,7 +125,6 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   const mediaViewer = createMediaViewer(document, ports.rasterResources,ports.imageDimensions, mediaWork.acquire);
   let retirement: Promise<void> | undefined;
   const sidebar = make('aside'); sidebar.setAttribute('aria-label', '作業パネル');
-  const sceneContext = make('p'); sceneContext.className = 'lv-current-scene';
   const retainedEdit = make('section'), retainedNote = make('p'); retainedEdit.className = 'lv-retained-edit';
   let retainedOwner: ProjectTask = 'captions';
   const returnToEdit = button('編集に戻る', () => { if(retainedOwner==='views')cameraPositions.open=true;else task = retainedOwner;
@@ -284,7 +283,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       task = 'captions'; compactSurface = 'stage';
     });
   });
-  const addSettings=make('details');addSettings.className='lv-caption-add-settings';addSettings.append(make('summary','追加の設定'),addColorLabel,numericAdd);
+  const addSettings=make('details');addSettings.className='lv-caption-add-settings';addSettings.append(make('summary','追加方法'),addColorLabel,numericAdd);
   const pinAddRow = make('div'); pinAddRow.className = 'lv-pin-add-row'; pinAddRow.append(addPin, addSettings);
   pinArea.append(pinAddRow, movePin, parent);
   const pinTask = make('section'), pinTaskContent = make('div'), pinTaskActions = make('div'); pinTask.className = 'lv-pin-task'; pinTask.setAttribute('aria-label', '位置の調整');
@@ -409,7 +408,16 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     if (disposed || busy || pending || windowMoving || ports.otherPending() && !reading) return;
     if (reading && !(plan.kind === 'change' && ['search','scroll','select','step','revealSelection'].includes(plan.intent) || plan.kind === 'unchanged')) return;
     if (plan.kind === 'blocked') { feedback = plan.reason; render(); return; }
-    if (!captionListPlanIsCurrent(plan, listContext())) return;
+    const current = listContext();
+    if (!captionListPlanIsCurrent(plan, current)) return;
+    if (plan.kind === 'unchanged' && !plan.explicitSelection) return;
+    if (plan.kind === 'change' && (plan.intent === 'search' || plan.intent === 'scroll')) {
+      memories.set(sceneId, plan.memory);
+      const next = { ...current, memory: plan.memory };
+      if (plan.intent === 'scroll') list.acceptScroll(next);
+      else { list.render(next); updateCaptionNavigation(next); }
+      return;
+    }
     if (plan.kind === 'change') { memories.set(sceneId, plan.memory); if (plan.intent === 'select') { resetDraft(); if(!reading)openCaptionWindow(memory().selectedCaptionId!); captionSurface = 'detail'; } }
     if (plan.kind === 'unchanged' && plan.explicitSelection) { if(!reading)openCaptionWindow(plan.explicitSelection.captionId); captionSurface = 'detail'; }
     if (plan.kind === 'effect' && plan.action === 'review') {
@@ -495,6 +503,13 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   previousCaption.className = 'lv-caption-previous'; nextCaption.className = 'lv-caption-next';
   previousCaption.setAttribute('aria-label', '前の記録'); nextCaption.setAttribute('aria-label', '次の記録');
   captionNavigation.append(captionBack, previousCaption, nextCaption);
+  function updateCaptionNavigation(context: CaptionListContext) {
+    const navigation = captionNavigationContext(context);
+    const blocked = busy || !!navigation.pending || ports.otherPending() && !readDuringOutput();
+    const neighbors = list.neighbors(navigation.memory.selectedCaptionId);
+    previousCaption.disabled = blocked || !neighbors.previous;
+    nextCaption.disabled = blocked || !neighbors.next;
+  }
   const includeContext = (): CaptionIncludeContext => ({ source: projectCaptionInventory(provider(), sceneId, models?.hidden()), memory: includeMemory(),
     pending: dirty() ? 'text' : null, mutationBlock: mutationBlock(), feedback: { kind: busy ? 'applying' : 'idle' } });
   function changeInclusion(plan: CaptionIncludePlan, fromSelectedRow = false) {
@@ -521,7 +536,8 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       if (plan.kind === 'include') {
         includeMemories.set(sceneId, newCaptionIncludeMemory(sceneId));
         inclusion.root.open = false;
-        (inclusion.root.children[0] as HTMLElement).focus?.({preventScroll:true});
+        addSettings.open = false;
+        queueMicrotask(() => { if (!disposed) (addSettings.children[0] as HTMLElement).focus?.({preventScroll:true}); });
       } else if (fromSelectedRow) queueMicrotask(() => { if (!disposed) list.focusSearch(); });
       feedback = plan.kind === 'include' ? 'このシーンに追加しました。' : 'このシーンから外しました。キャプションは残っています。';
     });
@@ -538,7 +554,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     changeInclusion(planCaptionInclude(includeContext(), { kind: 'exclude' }), true);
   });
   const recordTools=make('div');recordTools.className='lv-record-tools';recordTools.setAttribute('aria-label','選択した記録の操作');recordTools.append(movePin,parent,excludeSelected);
-  pinArea.append(inclusion.root);
+  addSettings.insertBefore(inclusion.root, addColorLabel);
   editOnly(excludeSelected, inclusion.root);
   const captionToolbar=make('div');captionToolbar.className='lv-caption-toolbar';
   captionToolbar.append(pinArea,list.root.children[0]!);list.root.insertBefore(captionToolbar,list.root.children[0]??null);
@@ -551,7 +567,13 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     disclosure.addEventListener('click',event=>{if((event.target as Element)?.closest?.('summary')&&composingInput())event.preventDefault();});
     disclosure.addEventListener('keydown',event=>{if(event.key==='Escape'&&!event.isComposing&&!composingInput()&&!busy&&!pending&&!ports.otherPending()){event.preventDefault();disclosure.open=false;(disclosure.children[0] as HTMLElement).focus?.({preventScroll:true});}});
   }
-  for(const disclosure of [addSettings,numericAdd,parent,inclusion.root])registerRecordSheet(disclosure);
+  for (const disclosure of [addSettings, parent]) registerRecordSheet(disclosure);
+  const refreshPicker = () => {
+    if (addSettings.open && inclusion.root.open && !disposed) inclusion.render(includeContext());
+  };
+  // Native disclosure events can coalesce. Always read the current open state.
+  inclusion.root.addEventListener('toggle', refreshPicker);
+  addSettings.addEventListener('toggle', refreshPicker);
   function positionRecordSheets(){
     const win=document.defaultView;if(!win)return;
     for(const [owner,sheet] of recordSheets){if(!owner.open)continue;const rect=owner.getBoundingClientRect?.();if(!rect)continue;
@@ -574,7 +596,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   for(const child of Array.from(detail.root.children))if(child!==detail.actions&&child!==detail.confirmation)captionContent.append(child);
   captionContent.append(conflicts);detail.root.append(captionContent,detail.actions,detail.confirmation);detailPane.append(detail.root);
   const sidebarToolbar=make('div');sidebarToolbar.className='lv-sidebar-toolbar';sidebarToolbar.append(sceneArea,taskTabs);
-  captionPanel.append(list.root,detailPane);sidebar.append(sidebarToolbar,sceneContext,retainedEdit,captionPanel);
+  captionPanel.append(list.root,detailPane);sidebar.append(sidebarToolbar,retainedEdit,captionPanel);
   const stageOverlay=make('div');stageOverlay.className='lv-stage-overlay';stageOverlay.append(viewportTools,pinTask);
   stageDisplay.append(stageOverlay); stage.append(stageDisplay); body.append(stage, sidebar); root.append(header, compactNavigation, body, mediaViewer.root);
   let feedbackTimer: number | undefined, passiveFeedback: string | null = null;
@@ -642,6 +664,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   function positionHeaderSheets(){
     const win=document.defaultView;if(!win)return;
     for(const [entry,panel] of [[help,helpSheet],[organization!.settingsRoot,settingsSheet]] as const){
+      if (!entry.open) continue;
       const rect=entry.getBoundingClientRect?.();if(!rect)continue;
       const top=Math.min(rect.bottom+8,Math.max(12,win.innerHeight-180));panel.style.top=`${top}px`;panel.style.maxHeight=`${Math.max(120,win.innerHeight-top-12)}px`;
     }
@@ -674,7 +697,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   root.addEventListener('focusin', mobileFocusChanged);
   root.addEventListener('focusout', mobileFocusChanged);
   for(const disclosure of [help,organization.settingsRoot]){
-    disclosure.addEventListener('toggle',()=>{if(disclosure.open){for(const other of [help,organization!.settingsRoot])if(other!==disclosure)other.open=false;}});
+    disclosure.addEventListener('toggle',()=>{if(disclosure.open){for(const other of [help,organization!.settingsRoot])if(other!==disclosure)other.open=false;positionHeaderSheets();}});
     disclosure.addEventListener('click',event=>{if((event.target as Element)?.closest?.('summary') && (ports.otherPending()||ports.disclosureOpening?.()===false)){event.preventDefault();feedback='ファイルの操作を完了してください。';render();}});
     disclosure.addEventListener('keydown',event=>{if(event.key!=='Escape'||!disclosure.open||event.defaultPrevented||event.isComposing||composingInput())return;
       event.preventDefault();event.stopPropagation();disclosure.open=false;(disclosure.children[0] as HTMLElement|undefined)?.focus?.({preventScroll:true});});
@@ -1167,15 +1190,13 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       if (!draft) draft = beginCaptionDraft(detailContext(captions).source);
       const captionList = listContext(captions);
       captionPanel.dataset.empty = String(!captions.length && !ports.readOnly);
-      list.render(captionList); inclusion.render(includeContext()); detail.render({ ...detailContext(captions),
+      list.render(captionList); refreshPicker(); detail.render({ ...detailContext(captions),
         textOnly: readDuringOutput(),
         cancelBlock: pending?.owner === 'media' && canCancelMedia() ? null :
           mutationBlock() || (pickerScope || panelInput() || mediaManager?.hasChanges() ? '現在の入力・操作を完了してください。' : null),
         editorFields: memory().selectedCaptionId ? ports.captionEditors?.(memory().selectedCaptionId!) : undefined,
       });
-      const navigation = captionNavigationContext(captionList);
-      previousCaption.disabled = busy || ports.otherPending() && !readDuringOutput() || planCaptionList(navigation, { kind: 'step', direction: 'previous' }).kind !== 'change';
-      nextCaption.disabled = busy || ports.otherPending() && !readDuringOutput() || planCaptionList(navigation, { kind: 'step', direction: 'next' }).kind !== 'change';
+      updateCaptionNavigation(captionList);
       windows.render({ source: captionList.source, memory: windowMemory(), selectedId: selected, moveBlock: windowBlock(),
         visible: !mobileLayout?.matches && stageVisible() && !drawingPreview() && document.hidden !== true });
       addPin.disabled = !!blocked || dirty() || !sceneId;
@@ -1261,7 +1282,6 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       searchRecords.hidden = captionList.source.kind !== 'ready' || !captionList.source.captions.length;
       captionPanel.hidden = task !== 'captions'; for (const [key, panel] of panels) { panel.root.hidden = key==='views'?!cameraPositions.open:key !== task; if (key === task||key==='views') panel.render(); }
       sidebar.dataset.task=task;closeCamera.disabled=viewBlocked()||views.composing();
-      sceneContext.textContent = `シーン：${fieldValue(p.state.scenes[sceneId]?.name) ?? '名称を確認'}`; sceneContext.hidden = true;
       const hasCaptionInput = draftInput() || !!mediaManager?.hasChanges() || !!recovery?.hasChanges() || !!organization?.hasChanges();
       const settingsInput=organization!.hasChanges() && organization!.inputOwner()==='settings';
       const other = [...panels].find(([key, panel]) => key !== task && !(key==='views'&&cameraPositions.open&&stageVisible()) && panel.hasChanges());

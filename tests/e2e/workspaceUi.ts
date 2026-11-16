@@ -1,8 +1,22 @@
 import { expect, type Page, type Locator } from '@playwright/test';
 
+export async function expectResumedProject(page: Page, title: string, timeout: number) {
+  await expect(page.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText(title, { timeout });
+  const help = page.getByRole('group', { name: 'ヘルプ', exact: true });
+  const toggle = help.locator(':scope > summary');
+  await toggle.click();
+  await expect(help.getByText(`最後のプロジェクトを再開しました：${title}`, { exact: true })).toBeVisible();
+  await toggle.click();
+}
+
 /** Same pin-add intent; retained readers can still use their earlier wording. */
+export async function openAddOptions(page: Page) {
+  const menu = page.locator('.lv-caption-add-settings');
+  if (!await menu.evaluate(node => (node as HTMLDetailsElement).open)) await menu.locator(':scope > summary').click();
+}
+
 export async function revealCoordinateAdd(page:Page){
-  const settings=page.locator('.lv-caption-add-settings');if(await settings.count()&&!await settings.evaluate(n=>(n as HTMLDetailsElement).open))await settings.locator(':scope > summary').click();
+  if (await page.locator('.lv-caption-add-settings').count()) await openAddOptions(page);
   const current=page.getByText('座標で追加',{exact:true}),summary=await current.count()?current:page.getByText('数値で配置',{exact:true});
   if(!await summary.locator('..').evaluate(n=>(n as HTMLDetailsElement).open))await summary.click();
 }

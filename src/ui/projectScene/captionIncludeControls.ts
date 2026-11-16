@@ -39,7 +39,7 @@ export function createCaptionIncludeControls(document: Document, onPlan: (plan: 
     context = next;
     const view = captionIncludeView(next), busy = next.feedback.kind === 'applying';
     action = mode === 'manage' && view.selected?.membership.kind === 'value' && view.selected.membership.value === 'included' ? 'exclude' : 'include';
-    const issue = captionIncludeIssue(next, action);
+    const issue = captionIncludeIssue(next, action, view);
     include.textContent = action === 'exclude' ? 'このシーンから外す' : 'このシーンに追加';
     if (!next.memory.composing && search.value !== next.memory.query) search.value = next.memory.query;
     search.readOnly = busy && !next.memory.composing; choices.disabled = busy || Boolean(view.issue) || next.memory.composing;
@@ -64,8 +64,13 @@ export function createCaptionIncludeControls(document: Document, onPlan: (plan: 
         (mode === 'add' ? '。本文と添付はシーン間で共用します。' : '') +
         (view.selected.caption.pin === 'ownerHidden' ? ' モデルは非表示のままです。' : '')) : '';
     selected.hidden = !selected.textContent;
+    const emptyAdd = mode === 'add' && !view.issue && !next.memory.captionId && !rows.length;
+    if (emptyAdd && (document.activeElement === choices || document.activeElement === include)) search.focus();
+    choiceLabel.hidden = include.hidden = emptyAdd;
+    const actionableIssue = !emptyAdd || busy || next.mutationBlock !== null || next.pending || next.memory.composing;
+    const emptyNote = emptyAdd && !next.memory.query.trim() ? '追加できる記録はありません。' : '該当するキャプションはありません。';
     status.textContent = [next.feedback.kind === 'failed' && `変更できませんでした。${next.feedback.message} 選択は保持しています。`,
-      issue, !view.issue && !rows.length && '該当するキャプションはありません。'].filter(Boolean).join(' ');
+      actionableIssue && issue, !view.issue && !rows.length && emptyNote].filter(Boolean).join(' ');
     include.disabled = issue !== null;
     review.hidden = !view.selected || (view.selected.lifecycle.kind === 'value' && view.selected.lifecycle.value === 'active' && view.selected.membership.kind === 'value');
     review.disabled = busy || Boolean(next.pending) || next.memory.composing;

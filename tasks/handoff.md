@@ -8,13 +8,11 @@ Check actual branch/HEAD/worktree and preserve existing changes.
 
 ## Current workflow
 
-PO prioritizes sharing visibility, direct record search and everyday organization.
-Follow [todo](todo.md) for the verified boundary and remaining checks. The exact
-selected-Scene preview supplies readonly asset/media names from its validated
-snapshot; original data, typed edits and file/recovery fences retain their existing
-authorities. Management controls stay inside existing disclosures. Additional
-export optimization and renderer lightening are deferred; physical iPhone/Safari
-acceptance and release remain separate.
+The current review follows finding and adding a record through the shared
+reader. Text filtering, scrolling and add options are local presentation work.
+The typed edit, original files, save verification and interruption recovery retain
+their existing authorities. [Todo](todo.md) owns the measured outcome and the
+remaining first-use, physical iPhone and large-file checks.
 
 ## Accepted boundary
 

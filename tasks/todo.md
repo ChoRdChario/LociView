@@ -8,7 +8,68 @@ and [earlier working records](../docs/history/development-through-2026-10-28/tas
 retain qualifications and failures. Their Current/Next headings are not an active
 queue or renewed approval requirements.
 
-## Current — qualified sharing, search and everyday organization
+## Current — find and add a record, then read the shared scene
+
+- Three independent reviews covered entry, search, daily edits, selection, sharing
+  and recipient navigation. Reproduced two-line add controls on PC, a confirmation
+  below the viewport, and whole-workspace refresh during text filtering. Existing
+  records, tags, multiple windows and the geometry-free pin workflow still have
+  distinct uses. A later simplification is the second Open action on home:
+  auto-inspection may precede the explicit decision to import or restore.
+- Search refreshes the current list and its previous/next buttons. Native scroll
+  stores its position; a virtual list also reconciles rows. Color changes, explicit
+  selection, IME and typed edits keep their host guards. The closed membership
+  menu does not build an inventory. File, Help and Settings measure visible sheets.
+- The add toolbar retains direct creation and moves reuse and coordinate input
+  under Add options. The shared reader uses its full stage and places copy
+  confirmation under the header, returning focus on cancel. The selected pin and
+  review warning have visible feedback. Narrow-reader image inspection also caught
+  the separately positioned pan button clipping against the bottom of the canvas.
+  An empty reuse menu now explains the absence of candidates and hides the
+  unusable selection/submit while keeping search available.
+- Actual Ki-84, same restored backup and first Scene (64 records), 1280×720
+  dedicated Chromium. Three runs of four synchronous input events (写, 写真,
+  写真8, empty) took 193.8/187.2/187.9 ms before and 46.9/42.8/44.5 ms after
+  (medians 187.9→44.5 ms). Scene selector DOM changes were 84→0 in each run.
+  Search results stayed 30/30/1/64. These times cover the input handler, not
+  presentation-to-screen or storage throughput.
+- On the small authoring sample the toolbar height fell from 88 to 44 px
+  on PC and 136 to 92 px on touch. A separate shared sample gained 42 px of canvas width on
+  PC and 26 px on touch (390 px wide). Copy confirmation opens in the viewport;
+  cancel and successful membership addition return keyboard focus. Source,
+  saved-file checks and crash recovery contracts are unchanged.
+- Desktop browser flows covered record/photo creation on Point and GS, reuse
+  across Scenes, reopening the shared start view, selecting multiple Scenes and
+  interrupted import. The offline touch workflow stopped both server and browser,
+  then copied, saved and reopened Mesh/Point/GS/Proxy data. In Desktop testing,
+  both PC/touch copy flows and both rendered layout inspections passed, including
+  the whole pan button inside the viewport and keyboard focus after cancel.
+- Two root-suite tests previously triggered their simulated 3D failure by typing
+  in search. The real viewport notifies the workspace directly. Corrected just
+  the simulated notification; the same failure, retry and retention assertions
+  passed on the focused rerun.
+- The two isolated validation-browser workflows then both exposed a pre-existing
+  project-creation mount error: the compact file menu tried to insert a tab bar
+  before a DOM node absent on this route. Assemble the tab bar with its owning
+  panel when that panel is mounted. The full Desktop menu keeps the same order.
+- The two validation-browser workflows passed in 7.4 minutes after fixing the
+  mount and updating their paths to the current attachment controls, placement
+  footer, recent-project group and Help notice. Two isolated profiles kept
+  duplicate records separately editable through actual return files, resolved
+  conflicts, reselected the original input after interrupted receipt, and
+  reopened after full shutdown. Both flows verified the final backup contents.
+- Final-source checkpoint passed type checking, 159 suites (3,611 passed, 16
+  expected failures, 21 todo), all five builds, offline resource integrity and
+  separate public-build HEIC isolation. Independent reviews found no outstanding
+  issue within the changed paths. Final copies of the PC candidate passed both
+  editing-copy cases, three Scene-addition/interruption cases and both rendered
+  layout checks (1280×720 and touch 390×844).
+- Physical iPhone/Safari and first-time human comprehension remain separate.
+  The shared reader still spends two header areas on project selection and
+  viewing status. Combine those when reviewing file entry and return. Large
+  file output timings were not compared in this user-interface change.
+
+## Previous — qualified sharing, search and everyday organization
 
 - Outcome implemented: selected-Scene preview lists actual models/media from the
   same validated snapshot, preserving shared-resource union and distinct same-name

@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { gsFixture } from '../helpers/gsFixture';
 import { smallPng, triangleGlb } from './fixtures';
-import { beginSceneCreation, closeFileSurface, lookAlongFront, revealCameraPositions, revealCaptionList, revealFileSurface, selectShareOutput } from './workspaceUi';
+import { openAddOptions, beginSceneCreation, closeFileSurface, lookAlongFront, revealCameraPositions, revealCaptionList, revealFileSurface, selectShareOutput } from './workspaceUi';
 
 const points = Buffer.from([
   'ply', 'format ascii 1.0', 'element vertex 5', 'property float x', 'property float y', 'property float z',
@@ -168,6 +168,7 @@ for (const touch of [false, true])
         await action(page, 'シーンを追加').click();
         await status(page, 'シーンを追加しました。');
         await revealCaptionList(page);
+        await openAddOptions(page);
         const existing = page.getByLabel('既存の記録を追加', exact);
         await existing.locator(':scope > summary').click();
         const choices = existing.getByRole('listbox');
@@ -175,6 +176,7 @@ for (const touch of [false, true])
         await existing.getByRole('button', { name: 'このシーンに追加', ...exact }).click();
         await status(page, 'このシーンに追加しました。');
         await expect(existing).toHaveJSProperty('open', false);
+        await expect(page.locator('.lv-caption-add-settings > summary')).toBeFocused();
         await selectRecord(page);
         await detail(page).getByLabel('本文', exact).fill('監修用シーンでも同じ記録を確認。');
         await detail(page).getByRole('button', { name: '変更を適用', ...exact }).click();
@@ -273,7 +275,10 @@ for (const touch of [false, true])
           await expect(other.locator('.lv-caption-window')).toHaveCount(0);
         } else await other.locator('.lv-caption-select').filter({ hasText: '塗装の確認' }).click();
         await expect(other.getByText('監修用シーンでも同じ記録を確認。', exact).first()).toBeVisible();
-        await expect(other.locator('.lv-development-pin[aria-current="true"]')).toBeVisible();
+        const selectedPin = other.locator('.lv-development-pin[aria-current="true"]');
+        await expect(selectedPin).toBeVisible();
+        await expect(selectedPin).toHaveAccessibleName('塗装の確認');
+        await expect(selectedPin).toHaveCSS('box-shadow', /3px/);
         await other.getByLabel('選択中のキャプションのメディア', exact).getByRole('button', { name: '画像を表示', ...exact }).click();
         await expect(other.getByRole('dialog', { name: 'メディアビューア', ...exact }).locator('img')).toHaveJSProperty('naturalWidth', 2);
         await other.getByRole('dialog', { name: 'メディアビューア', ...exact }).getByRole('button', { name: '閉じる', ...exact }).click();
