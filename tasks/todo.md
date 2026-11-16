@@ -8,7 +8,30 @@ and [earlier working records](../docs/history/development-through-2026-10-28/tas
 retain qualifications and failures. Their Current/Next headings are not an active
 queue or renewed approval requirements.
 
-## Current — choose a file once and read the shared scene
+## Current — simplify the recent file-selection and shared-reader changes
+
+- Scope the code-simplifier pass to `c2be6b0` and its direct dependencies. Flatten
+  operation completion, make settings placement readable, and use consistent
+  import-control names. Preserve event order, selection ownership, explicit
+  confirmations, focus, file formats and compatibility.
+- Use existing selection/fault tests and PC/touch workflows, then the required
+  final checkpoint and read-only diff review. Stop once this bounded cleanup is
+  verified. Record minor follow-ups here without implementing them in this pass.
+- Implementation is limited to two existing composition modules: flattened
+  `execute` completion/error handling, readable settings placement, consistent
+  `import*` control names, and explicit reader-menu/focus steps. DOM identifiers,
+  copy, event order, ownership and confirmation guards are preserved.
+- Existing focused tests: 73 passed. Existing PC/touch browser cases: 7 passed,
+  including chooser cancellation/reselection, restored text/photo input, editable
+  review copies and interrupted scene append. Read-only independent review found
+  no behavior differences. The final checkpoint passed: typecheck, 159 test files
+  (3611 passed, 16 expected failures, 21 todo), all five builds and offline
+  isolation. Existing tests and assertions were unchanged by this pass.
+- Deferred minor UI follow-up: remove the repeated current scene name beside the
+  shared reader's scene selector when a future UI pass is authorized. This pass
+  stops at verification of the code cleanup.
+
+## Previous — choose a file once and read the shared scene
 
 - The home picker starts inspection immediately. Preserve explicit creation, conversion,
   first restore, new editable import and updates. Reuse the inspected file and handle

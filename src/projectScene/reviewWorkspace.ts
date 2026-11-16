@@ -26,21 +26,29 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
   const stopHelp = mountContextHelp(document, root);
   const header = make('header'), heading = make('h1', view.title), files = make('details');
   const fileToggle = make('summary', 'ファイル'), actions = make('div');
-  header.className = 'lv-development-header lv-review-header'; heading.title = view.title; heading.tabIndex = -1;
-  files.className = 'lv-review-files'; files.append(fileToggle, actions);
+  header.className = 'lv-development-header lv-review-header';
+  heading.title = view.title;
+  heading.tabIndex = -1;
+  files.className = 'lv-review-files';
+  files.append(fileToggle, actions);
   files.hidden = !editCopy && !append && !openProject;
   header.append(heading, make('span', '閲覧中'), files);
-  const dismissFiles = (event: Event) => {
+  function dismissFiles(event: Event): void {
     if (files.open && !files.contains(event.target as Node)) files.open = false;
-  };
+  }
   document.addEventListener?.('pointerdown', dismissFiles);
   document.addEventListener?.('focusin', dismissFiles);
   files.addEventListener('keydown', event => {
     if (event.key === 'Escape' && files.open && !event.isComposing) {
-      event.preventDefault(); files.open = false; fileToggle.focus();
+      event.preventDefault();
+      files.open = false;
+      fileToggle.focus();
     }
   });
-  const restoreActionFocus = (button: HTMLButtonElement) => { files.open = true; button.focus(); };
+  function restoreActionFocus(button: HTMLButtonElement): void {
+    files.open = true;
+    button.focus();
+  }
   const content = make('div'); content.className = 'lv-development-content';
   const stage = make('section'); stage.className = 'lv-development-stage'; const viewport = make('section'); viewport.className = 'lv-development-viewport'; viewport.setAttribute('aria-label', '3D表示');
   const canvas = make('canvas'); canvas.tabIndex = 0; canvas.setAttribute('aria-label', '3Dモデルの表示');
@@ -72,11 +80,14 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
   confirmation.append(confirmCopy, cancelCopy); actions.append(copy); root.insertBefore(confirmation, content);
   copy.addEventListener('click', () => {
     if (disposed || handoffBusy || copy.disabled || composing || moving) return;
-    files.open = false; confirmation.hidden = false; confirmation.focus();
+    files.open = false;
+    confirmation.hidden = false;
+    confirmation.focus();
   });
   cancelCopy.addEventListener('click', () => {
     if (handoffBusy || cancelCopy.disabled) return;
-    confirmation.hidden = true; restoreActionFocus(copy);
+    confirmation.hidden = true;
+    restoreActionFocus(copy);
   });
   confirmCopy.addEventListener('click', () => {
     if (disposed || handoffBusy || composing || moving || confirmation.hidden || confirmCopy.disabled) return;
@@ -118,7 +129,15 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
     open.addEventListener('click', () => {
       if (disposed || handoffBusy || composing || moving || open.disabled) return;
       const current = ++revision;
-      files.open = false; panel.tabIndex = -1; confirmation.hidden = true; panel.hidden = false; panel.focus(); loading = true; hasProjects = false; pending = undefined; refreshAppend();
+      files.open = false;
+      panel.tabIndex = -1;
+      confirmation.hidden = true;
+      panel.hidden = false;
+      panel.focus();
+      loading = true;
+      hasProjects = false;
+      pending = undefined;
+      refreshAppend();
       select.replaceChildren(); note.textContent = 'プロジェクトを確認しています。';
       void append.projects().then(projects => {
         if (disposed || current !== revision) return;
@@ -136,7 +155,15 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
         .finally(() => { if (!disposed && current === revision) { loading = false; refreshAppend(); } });
     });
     select.addEventListener('change', () => { void selectProject(); });
-    cancel.addEventListener('click', () => { if(handoffBusy || cancel.disabled)return; revision++; loading = false; pending = undefined; panel.hidden = true; refreshAppend(); restoreActionFocus(open); });
+    cancel.addEventListener('click', () => {
+      if (handoffBusy || cancel.disabled) return;
+      revision++;
+      loading = false;
+      pending = undefined;
+      panel.hidden = true;
+      refreshAppend();
+      restoreActionFocus(open);
+    });
     copy.addEventListener('click', () => { if (!copy.disabled && !handoffBusy) { revision++; loading = false; pending = undefined; panel.hidden = true; refreshAppend(); } });
     confirm.addEventListener('click', () => {
       if (!pending || handoffBusy || confirm.disabled || disposed || composing || moving) return;
@@ -153,8 +180,12 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
     });
   }
   if (openProject) {
-    const back = make('button', '別のプロジェクトを開く'); back.type = 'button';
-    back.addEventListener('click', () => { if (!disposed && !handoffBusy && !moving && !composing) openProject(); });
+    const back = make('button', '別のプロジェクトを開く');
+    back.type = 'button';
+    back.addEventListener('click', () => {
+      if (disposed || handoffBusy || moving || composing) return;
+      openProject();
+    });
     actions.append(back);
   }
   const pins = new Map<string, HTMLButtonElement>();

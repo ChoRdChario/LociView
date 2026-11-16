@@ -97,12 +97,12 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   workspaceLabel.hidden = true; workspaceLabel.textContent = 'ファイルを選択'; workspaceInput.type = 'file'; workspaceInput.multiple = true; workspaceInput.setAttribute('aria-label', 'ファイルを選択'); workspaceLabel.append(workspaceInput);
   const fileHelp = document.createElement('p'); fileHelp.textContent = '3Dモデル・点群から新規作成、保存したファイルから再開できます。';
   openFile.type = 'button'; openFile.textContent = 'ファイルを開く'; workspaceForm.append(openFile, workspaceLabel, fileHelp, fallback);
-  const updatePanel = document.createElement('section'), updateNote = document.createElement('p');
-  const updateConfirm = document.createElement('button'), updateCancel = document.createElement('button');
-  updatePanel.className = 'lv-update-destination'; updatePanel.setAttribute('aria-label', '取り込み先'); updatePanel.hidden = true;
-  updateNote.id = 'lv-home-update-destination'; updateConfirm.setAttribute('aria-describedby', updateNote.id);
-  updateConfirm.type = updateCancel.type = 'button'; updateConfirm.textContent = '既存に取り込む'; updateCancel.textContent = '選択を取り消す';
-  updatePanel.append(updateNote, updateConfirm, updateCancel);
+  const importPanel = document.createElement('section'), importNote = document.createElement('p');
+  const importConfirm = document.createElement('button'), importCancel = document.createElement('button');
+  importPanel.className = 'lv-update-destination'; importPanel.setAttribute('aria-label', '取り込み先'); importPanel.hidden = true;
+  importNote.id = 'lv-home-update-destination'; importConfirm.setAttribute('aria-describedby', importNote.id);
+  importConfirm.type = importCancel.type = 'button'; importConfirm.textContent = '既存に取り込む'; importCancel.textContent = '選択を取り消す';
+  importPanel.append(importNote, importConfirm, importCancel);
   const conversionPanel = document.createElement('section'), conversionNote = document.createElement('p'), conversionHelp = document.createElement('p');
   const imageOmissions=document.createElement('details'),imageOmissionsSummary=document.createElement('summary'),imageOmissionsList=document.createElement('ul');
   imageOmissions.className='lv-conversion-images';imageOmissions.hidden=true;imageOmissions.append(imageOmissionsSummary,imageOmissionsList);
@@ -111,7 +111,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   const convert = document.createElement('button'), cancelConversion = document.createElement('button');
   convert.type = cancelConversion.type = 'button'; convert.textContent = '新しいプロジェクトに変換'; cancelConversion.textContent = '選択を取り消す';
   conversionHelp.textContent = '元ファイルは変更しません。チームでは変換後のファイルを使ってください。変換元のZIPと変換の説明は、別に保管してください。';
-  conversionPanel.append(conversionNote, conversionHelp, convert, cancelConversion); conversionPanel.hidden = true; workspaceForm.append(conversionPanel, updatePanel);
+  conversionPanel.append(conversionNote, conversionHelp, convert, cancelConversion); conversionPanel.hidden = true; workspaceForm.append(conversionPanel, importPanel);
   const lociChoices = document.createElement('div'), workbookLabel = document.createElement('label'), workbook = document.createElement('select'),
     conversionTitleLabel = document.createElement('label'), conversionTitle = document.createElement('input'), relationLabel = document.createElement('label'), relation = document.createElement('input'),
     relationNote = document.createElement('p'), previewAgain = document.createElement('button'), saveReport = document.createElement('button');
@@ -191,23 +191,27 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     if(navigation.hidden){if(status.parentElement!==root)root.insertBefore(status,navigation);}
     else navigation.insertBefore(status,form.hidden?form:listHeading);
     openFile.disabled = create.disabled = cancelConversion.disabled = inactive || composing;
-    if(offline&&homeSettings){if(offline.root.parentElement===homeSettings.body){
-      const parent = reviewWorkspace?.header ?? root;
-      if (homeSettings.root.parentElement !== parent) {
+    if (offline && homeSettings) {
+      if (offline.root.parentElement === homeSettings.body) {
+        const parent = reviewWorkspace?.header ?? root;
+        if (homeSettings.root.parentElement !== parent) {
+          homeSettings.root.open = false;
+          if (parent === root) root.insertBefore(homeSettings.root, navigation);
+          else parent.append(homeSettings.root);
+        }
+      } else {
         homeSettings.root.open = false;
-        if (parent === root) root.insertBefore(homeSettings.root, navigation);
-        else parent.append(homeSettings.root);
+        homeSettings.root.remove();
       }
     }
-      else{homeSettings.root.open=false;homeSettings.root.remove();}}
     status.setAttribute('data-busy',String(busy)); status.setAttribute('aria-busy',String(busy));
     for (const [control, blocked] of recoveryControls) control.disabled = inactive || blocked();
     workspaceInput.disabled = title.disabled = inactive || !!creationAttempt;
     cancelSelection.disabled = !!retirementFailure || busy && !nativeSelectionChecking || composing || !!creationAttempt;
     cancelSelection.hidden = !selectionPending || !conversionPanel.hidden || !!pendingImport || !!firstRecovery;
     openFile.hidden = !form.hidden || !conversionPanel.hidden || !!pendingImport;
-    updateConfirm.textContent = pendingImport?.kind === 'import' ? 'プロジェクトを取り込む' : '既存に取り込む';
-    updatePanel.hidden = !pendingImport; updateConfirm.disabled = updateCancel.disabled = inactive || composing;
+    importConfirm.textContent = pendingImport?.kind === 'import' ? 'プロジェクトを取り込む' : '既存に取り込む';
+    importPanel.hidden = !pendingImport; importConfirm.disabled = importCancel.disabled = inactive || composing;
     create.textContent = creationAttempt ? '作成を再試行' : 'プロジェクトを作成';
     convert.disabled = inactive || composing || !!lociPreview && (!lociCurrent() || lociEvaluation!.blocked);
     saveReport.hidden = !lociPreview && !(conversion && 'report' in conversion && conversion.report);
@@ -228,28 +232,37 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     if (busy || disposed || retirementFailure) return;
     const previousImport = pendingImport;
     const wasHome = !navigation.hidden;
-    const confirmFocused = document.activeElement === updateConfirm;
+    const confirmFocused = document.activeElement === importConfirm;
     busy = true; controls(); workspace?.render();
-    const work = action(); operation = work;
-    return work.catch(error => { if (!disposed) {
+    const work = action();
+    operation = work;
+    return work.catch(error => {
+      if (disposed) return;
       const storageError = storageFailureText(error);
       status.textContent = storageError ?? (error instanceof Error ? error.message : '処理できません。入力と再開用データは保持しています。');
       selectedFileError = fileInspection?.generation === selectionGeneration && !storageError && !host && !creationAttempt && !firstRecovery && !reviewEditAttempt ? status.textContent : undefined;
-    } })
-      .finally(() => { busy = false; if (operation === work) operation = undefined; if (!disposed) {
-        controls(); workspace?.render();
-        if (queuedFiles) {
-          const latest = queuedFiles; queuedFiles = undefined;
-          inspectPickedFiles(latest);
-        } else if (focusIsUnclaimed() || confirmFocused) {
-          if (pendingImport && (pendingImport !== previousImport || confirmFocused)) updateConfirm.focus();
-          else if (!navigation.hidden && (fileInspection || !wasHome)) {
-            if (!form.hidden) create.focus();
-            else if (!conversionPanel.hidden) (convert.disabled ? previewAgain : convert).focus();
-            else openFile.focus();
-          }
-        }
-      } });
+    }).finally(() => {
+      busy = false;
+      if (operation === work) operation = undefined;
+      if (disposed) return;
+
+      controls();
+      workspace?.render();
+      if (queuedFiles) {
+        const latest = queuedFiles;
+        queuedFiles = undefined;
+        inspectPickedFiles(latest);
+        return;
+      }
+      if (!focusIsUnclaimed() && !confirmFocused) return;
+
+      if (pendingImport && (pendingImport !== previousImport || confirmFocused)) importConfirm.focus();
+      else if (!navigation.hidden && (fileInspection || !wasHome)) {
+        if (!form.hidden) create.focus();
+        else if (!conversionPanel.hidden) (convert.disabled ? previewAgain : convert).focus();
+        else openFile.focus();
+      }
+    });
   };
   const closeCurrent = async () => {
     openingReading = undefined;
@@ -724,10 +737,10 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     if (!openFile.disabled) openFile.focus();
   }
   cancelSelection.addEventListener('click', () => { if ((!busy || nativeSelectionChecking) && !composing && !creationAttempt) cancelPickedFile(); });
-  updateCancel.addEventListener('click', () => {
+  importCancel.addEventListener('click', () => {
     if (!busy && !composing && pendingImport) cancelPickedFile();
   });
-  updateConfirm.addEventListener('click', () => execute(async () => {
+  importConfirm.addEventListener('click', () => execute(async () => {
     const target = pendingImport;
     if (!target || !guardSelection(target.generation, target.context)) return;
     if (target.kind === 'import') {
@@ -897,7 +910,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
       const run = manifest.identity.projectId.slice(4), destination = catalog.find(item => item.run === run);
       if (destination?.state === 'ready') {
         pendingImport = { kind: 'update', file, run, generation, context };
-        updateNote.textContent = `「${destination.title}」に更新を取り込みます。`;
+        importNote.textContent = `「${destination.title}」に更新を取り込みます。`;
         status.textContent = '';
         return;
       }
@@ -1009,7 +1022,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     if (!guardSelection(generation, context)) return;
     const run = (inspected.source.proof.identity.projectId as string).slice(4);
     pendingImport = { kind: 'import', archive: inspected.archive, newWorkspace: purpose === 'teamWorkspace', run, generation, context };
-    updateNote.textContent = `「${file.name}」をこのブラウザに取り込みます。`;
+    importNote.textContent = `「${file.name}」をこのブラウザに取り込みます。`;
     status.textContent = '';
   };
   function inspectPickedFiles(files: readonly File[]) {
