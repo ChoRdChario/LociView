@@ -194,7 +194,7 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
     if (disposed || !captionWindowPlanIsCurrent(plan, view.source, windowsMemory, memory.selectedCaptionId) || plan.kind === 'blocked') return false;
     windowsMemory = plan.memory; render(); return true;
   }
-  function openWindow(captionId: string) {
+  function selectCaption(captionId: string) {
     memory = { ...memory, selectedCaptionId: captionId };
     if (phone?.matches) return;
     const plan = planCaptionWindow(view.source, windowsMemory, captionId, { kind: 'open', captionId });
@@ -209,13 +209,21 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
       else list.render(context());
       return;
     }
-    if (plan.kind === 'change') { memory = plan.memory; if (plan.intent === 'select' && memory.selectedCaptionId) openWindow(memory.selectedCaptionId); }
-    else if (plan.kind === 'unchanged' && plan.explicitSelection) openWindow(plan.explicitSelection.captionId);
-    else if (plan.kind === 'effect' && plan.action === 'review') openWindow(plan.captionId);
-    else return;
-    failure = ''; render();
-    if (plan.kind === 'change' && (plan.intent === 'select' || plan.intent === 'revealSelection') ||
-      plan.kind === 'unchanged' && plan.explicitSelection || plan.kind === 'effect') list.revealSelected();
+    if (plan.kind === 'change') {
+      memory = plan.memory;
+      if (plan.intent === 'select' && memory.selectedCaptionId) selectCaption(memory.selectedCaptionId);
+    } else if (plan.kind === 'unchanged' && plan.explicitSelection) {
+      selectCaption(plan.explicitSelection.captionId);
+    } else if (plan.kind === 'effect' && plan.action === 'review') {
+      selectCaption(plan.captionId);
+    } else return;
+
+    failure = '';
+    render();
+    const explicitlySelected = plan.kind === 'change' && plan.intent === 'select' ||
+      plan.kind === 'unchanged' && !!plan.explicitSelection || plan.kind === 'effect';
+    const revealSelection = plan.kind === 'change' && plan.intent === 'revealSelection';
+    if (explicitlySelected || revealSelection) list.revealSelected();
   }
   const list = createCaptionListControls(document, accept, active => { composing = active; paint(); });
   const searchBlocked = () => disposed || composing || moving || handoffBusy || !!runtime?.read().dragging;
