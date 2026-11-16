@@ -1,5 +1,13 @@
 import { expect, type Page, type Locator } from '@playwright/test';
 
+export async function chooseHomeFiles(page: Page, files: Parameters<Locator['setInputFiles']>[0]) {
+  const [picker] = await Promise.all([
+    page.waitForEvent('filechooser'),
+    page.getByRole('button', { name: 'ファイルを開く', exact: true }).click(),
+  ]);
+  await picker.setFiles(files);
+}
+
 export async function expectResumedProject(page: Page, title: string, timeout: number) {
   await expect(page.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText(title, { timeout });
   const help = page.getByRole('group', { name: 'ヘルプ', exact: true });
@@ -119,7 +127,13 @@ export async function chooseSharedScene(area: Locator, name?: string) {
   }
 }
 
+export async function revealReviewFiles(root: Page | Locator) {
+  const menu = root.locator('.lv-review-files');
+  if (!await menu.evaluate(node => (node as HTMLDetailsElement).open)) await menu.locator('summary').click();
+}
+
 export async function revealProjectSelection(page: Page) {
+  if (await page.locator('.lv-review-files').count()) { await revealReviewFiles(page); return; }
   const menu = page.locator('details.lv-project-files');
   if (await menu.getByRole('button', { name: /^(?:プロジェクトを選ぶ|ファイルを開く|別のプロジェクトを開く)$/, includeHidden: true }).count()) {
     if (!await menu.evaluate(node => (node as HTMLDetailsElement).open)) await menu.locator(':scope > summary').click();

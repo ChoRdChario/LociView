@@ -1,4 +1,4 @@
-import {beginMaterialEditing} from './workspaceUi';
+import { chooseHomeFiles, beginMaterialEditing } from './workspaceUi';
 import { revealCameraPositions, revealWorkPanel, revealCoordinateAdd, revealProjectSelection, beginSceneCreation, revealModelManagement, selectShareOutput } from './workspaceUi';
 import { test, expect, chromium } from '@playwright/test';
 import { ownedServer } from '../offline-e2e/server';
@@ -17,8 +17,8 @@ test('content-first workspace keeps editing, pin completion and file exits coher
   const idle = async () => { await expect(p.locator('main.lv-project-workspace > header > .lv-operation-status')).toHaveAttribute('data-busy', 'false'); };
   const ready = async (text: string) => { await expect(p.getByText(text, { exact: true })).toBeVisible(); await idle(); };
   try {
-    await p.goto(server.url+(process.env.LOCIVIEW_E2E_TIMINGS==='1'?'?timings=1':'')); await p.getByLabel('ファイルを選択', { exact: true }).setInputFiles({ name: '建物.glb', mimeType: 'model/gltf-binary', buffer: triangleGlb() });
-    await p.getByRole('button', { name: 'ファイルを開く', exact: true }).click(); await p.getByRole('textbox', { name: 'プロジェクト名', exact: true }).fill('現地調査'); await p.getByRole('button', { name: 'プロジェクトを作成', exact: true }).click();
+    await p.goto(server.url+(process.env.LOCIVIEW_E2E_TIMINGS==='1'?'?timings=1':'')); await chooseHomeFiles(p, { name: '建物.glb', mimeType: 'model/gltf-binary', buffer: triangleGlb() });
+    await p.getByRole('textbox', { name: 'プロジェクト名', exact: true }).fill('現地調査'); await p.getByRole('button', { name: 'プロジェクトを作成', exact: true }).click();
     await expect(p.getByLabel('3Dモデルの表示', { exact: true })).toHaveAttribute('aria-busy', 'false', { timeout: 90_000 });
     await expect(p.getByRole('form', { name: 'シーンの変更', exact: true })).toBeHidden();
     await beginSceneCreation(p); await p.getByLabel('シーン名', { exact: true }).fill('接合部'); await p.getByRole('button', { name: 'シーンを追加', exact: true }).click(); await ready('シーンを追加しました。');
@@ -113,7 +113,7 @@ test('content-first workspace keeps editing, pin completion and file exits coher
     await detail.getByLabel('本文',{exact:true}).fill('手元でも同じ本文を更新しました。');await detail.getByRole('button',{name:'変更を適用',exact:true}).click();await ready('変更を適用しました。');
     const peerContext = await browser.newContext({ viewport: { width: 1440, height: 1000 }, serviceWorkers: 'block', acceptDownloads: true }), peer = await peerContext.newPage(); peer.on('pageerror', e => errors.push(e.message));
     await peerContext.route('**/*', route => { const u = new URL(route.request().url()); if (u.origin === new URL(server.url).origin || ['data:', 'blob:'].includes(u.protocol)) return route.continue(); remote.push(u.href); return route.abort(); });
-    await peer.goto(server.url); await peer.getByLabel('ファイルを選択', { exact: true }).setInputFiles(workspacePath); await peer.getByRole('button', { name: 'ファイルを開く', exact: true }).click(); await expect(peer.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText('現地調査', { timeout: 90_000 });
+    await peer.goto(server.url); await chooseHomeFiles(peer, workspacePath); await peer.getByRole('button', { name: 'プロジェクトを取り込む', exact: true }).click(); await expect(peer.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText('現地調査', { timeout: 90_000 });
     await peer.getByRole('region', { name: 'シーン', exact: true }).getByRole('button', { name: '接合部', exact: true }).click(); await peer.locator('.lv-caption-select').filter({ hasText: '柱の接合部' }).click();
     const peerDetail = peer.getByRole('region', { name: 'キャプションの詳細', exact: true }); await peerDetail.getByLabel('本文', { exact: true }).fill(receivedBody); await peerDetail.getByRole('button', { name: '変更を適用', exact: true }).click(); await expect(peer.getByText('変更を適用しました。', { exact: true })).toBeVisible();
     await peer.getByRole('button', { name: '共有', exact: true }).click(); const peerFiles = peer.getByRole('region', { name: 'ファイル', exact: true }); await selectShareOutput(peerFiles, 'contribution');
@@ -122,8 +122,7 @@ test('content-first workspace keeps editing, pin completion and file exits coher
     await revealProjectSelection(p); await p.getByRole('button', { name: 'プロジェクトを選ぶ', exact: true }).click();
     const preview = p.getByRole('region', { name: '取り込み先', exact: true });
     const selectUpdate = async () => {
-      await p.getByLabel('ファイルを選択', { exact: true }).setInputFiles(updatePath);
-      await p.getByRole('button', { name: 'ファイルを開く', exact: true }).click();
+      await chooseHomeFiles(p, updatePath);
       await expect(preview).toContainText('「現地調査」に更新を取り込みます。');
     };
     await selectUpdate(); await expect(p.locator('main.lv-project-workspace')).toHaveCount(0);

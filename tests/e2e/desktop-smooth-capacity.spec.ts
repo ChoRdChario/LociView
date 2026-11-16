@@ -1,5 +1,5 @@
 import { desktopOrigin, desktopEntry } from './desktopEntry';
-import { lookAlongFront } from './workspaceUi';
+import { chooseHomeFiles, lookAlongFront } from './workspaceUi';
 import {test,expect,type Page} from '@playwright/test';
 import {readFile,writeFile} from 'node:fs/promises';
 import {resolve,sep,extname} from 'node:path';
@@ -18,7 +18,7 @@ test('01g production500k SH4 matched120s camera cost and target lifecycle',async
     });
     const p=await context.newPage();p.on('pageerror',e=>errors.push(e.message));p.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
     try{
-      await p.goto(desktopEntry);await p.getByLabel('ファイルを選択',{exact:true}).setInputFiles([mesh,source]);await p.getByRole('button',{name:'ファイルを開く',exact:true}).click();await p.getByLabel('プロジェクト名',{exact:true}).fill('50万点の表示');await p.getByRole('button',{name:'プロジェクトを作成',exact:true}).click();
+      await p.goto(desktopEntry);await chooseHomeFiles(p, [mesh,source]);await p.getByLabel('プロジェクト名',{exact:true}).fill('50万点の表示');await p.getByRole('button',{name:'プロジェクトを作成',exact:true}).click();
       const canvas=p.getByLabel('3Dモデルの表示',{exact:true}),status=p.locator('.lv-project-viewport-status');await expect(canvas).toHaveAttribute('aria-busy','false',{timeout:240000});await expect(status).not.toContainText('表示の準備中');
       if(mode==='candidate')await expect(status).toContainText('透過表示（近似）');else await expect(status).toContainText('滑らかな透過表示は未対応');
       // Identical actual drawing-buffer size, below the36B/pixel budget in both builds.

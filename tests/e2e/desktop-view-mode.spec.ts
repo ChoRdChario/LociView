@@ -1,5 +1,5 @@
 import {test, createBrowserProfile} from '../helpers/browserProfile';
-import { revealCaptionList, revealCameraPositions, revealWorkPanel, revealCoordinateAdd, revealFileSurface, revealProjectSelection, lookAlongFront, revealOfflineUtilities } from './workspaceUi';
+import { chooseHomeFiles, revealCaptionList, revealCameraPositions, revealWorkPanel, revealCoordinateAdd, revealFileSurface, revealProjectSelection, lookAlongFront, revealOfflineUtilities } from './workspaceUi';
 import { expect, chromium, type Locator } from '@playwright/test';
 import { readFile} from 'node:fs/promises';
 
@@ -49,8 +49,8 @@ test('short Caption workspace keeps dense and filtered lists, Scene choices and 
     if (dense) expect(data.list.height).toBeGreaterThanOrEqual(3 * 44);
   };
   try {
-    await p.goto(server.url); await p.getByLabel('ファイルを選択', { exact: true }).setInputFiles({ name: '四つのシーン.zip', mimeType: 'application/zip', buffer: input });
-    await p.getByRole('button', { name: 'ファイルを開く', exact: true }).click(); await p.getByRole('button', { name: '新しいプロジェクトに変換', exact: true }).click();
+    await p.goto(server.url); await chooseHomeFiles(p, { name: '四つのシーン.zip', mimeType: 'application/zip', buffer: input });
+    await p.getByRole('button', { name: '新しいプロジェクトに変換', exact: true }).click();
     await expect(p.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText('小さな画面の記録', { timeout: 90_000 });
     await expect(p.getByLabel('3Dモデルの表示', { exact: true })).toHaveAttribute('aria-busy', 'false');
     await expect(strip.locator('button')).toHaveCount(4); await list.locator('.lv-caption-select').filter({ hasText: '既存のピン' }).click();
@@ -126,8 +126,8 @@ test('view mode hides editing while preserving reading, local display, existing 
     await menu.locator(':scope > summary').click(); return path;
   };
   try {
-    await p.goto(server.url); await p.getByLabel('ファイルを選択', { exact: true }).setInputFiles({ name: '閲覧するモデル.glb', mimeType: 'model/gltf-binary', buffer: triangleGlb() });
-    await p.getByRole('button', { name: 'ファイルを開く', exact: true }).click(); await p.getByRole('textbox', { name: 'プロジェクト名', exact: true }).fill('閲覧と編集'); await p.getByRole('button', { name: 'プロジェクトを作成', exact: true }).click();
+    await p.goto(server.url); await chooseHomeFiles(p, { name: '閲覧するモデル.glb', mimeType: 'model/gltf-binary', buffer: triangleGlb() });
+    await p.getByRole('textbox', { name: 'プロジェクト名', exact: true }).fill('閲覧と編集'); await p.getByRole('button', { name: 'プロジェクトを作成', exact: true }).click();
     await expect(p.getByLabel('3Dモデルの表示', { exact: true })).toHaveAttribute('aria-busy', 'false', { timeout: 90_000 });
     const gizmo = p.locator('.lv-project-camera'), axes = gizmo.locator('.lv-camera-axes'), z = gizmo.getByRole('button', { name: 'Z', exact: true });
     await expect(axes).toHaveText('XYZ'); await expect(gizmo.getByRole('button', { name: '全体表示', exact: true })).toHaveText(''); await expect(gizmo.locator('summary')).toHaveCount(0);
@@ -273,10 +273,10 @@ test('one PC app keeps the same Project through connected, cold offline and prep
     return { identity: archive.source.proof.identity, changes: archive.source.originalChanges().map(bytes => Buffer.from(bytes).toString('hex')), bodies };
   };
   try {
-    let p = await open(); await expect(p.getByLabel('ファイルを選択', { exact: true })).toBeVisible();
+    let p = await open(); await expect(p.getByRole('button', { name: 'ファイルを開く', exact: true })).toBeVisible();
     const offlineNode = await p.locator('.lv-offline-controls').elementHandle();
     await expect(p.locator('.lv-home-settings')).not.toHaveAttribute('open'); await expect(p.locator('.lv-offline-controls')).toBeHidden();
-    await expect(p.getByLabel('ファイルを選択', { exact: true })).toBeVisible();
+    await expect(p.getByRole('button', { name: 'ファイルを開く', exact: true })).toBeVisible();
     await p.screenshot({ path: info.outputPath('one-entry-home.png'), fullPage: false });
     await p.setViewportSize({ width: 390, height: 844 }); await revealOfflineUtilities(p);
     await expect(p.locator('.lv-offline-controls').getByRole('status')).toContainText('アプリを保存しました。',{timeout:90_000});
@@ -284,8 +284,8 @@ test('one PC app keeps the same Project through connected, cold offline and prep
     await p.locator('.lv-home-settings > summary').press('Escape'); await expect(p.locator('.lv-home-settings')).not.toHaveAttribute('open');
     await p.setViewportSize({ width: 1280, height: 800 });
     await p.evaluate(async () => { await navigator.serviceWorker.register('/foreign/worker.js', { scope: '/foreign/' }); await (await caches.open('foreign-retain')).put('/sentinel', new Response('unchanged')); });
-    await p.getByLabel('ファイルを選択', { exact: true }).setInputFiles({ name: '再開するモデル.glb', mimeType: 'model/gltf-binary', buffer: triangleGlb() });
-    await p.getByRole('button', { name: 'ファイルを開く', exact: true }).click(); await p.getByRole('textbox', { name: 'プロジェクト名', exact: true }).fill('オフライン配置'); await p.getByRole('button', { name: 'プロジェクトを作成', exact: true }).click();
+    await chooseHomeFiles(p, { name: '再開するモデル.glb', mimeType: 'model/gltf-binary', buffer: triangleGlb() });
+    await p.getByRole('textbox', { name: 'プロジェクト名', exact: true }).fill('オフライン配置'); await p.getByRole('button', { name: 'プロジェクトを作成', exact: true }).click();
     const selected = async () => { await expect(p.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText('オフライン配置', { timeout: 90_000 }); await expect(p.getByLabel('3Dモデルの表示', { exact: true })).toHaveAttribute('aria-busy', 'false', { timeout: 90_000 }); };
     await selected(); await expect(p.locator('.lv-home-settings')).toHaveCount(0); await expect(p.locator('.lv-offline-controls')).toHaveCount(1);
     await expect(p.getByRole('button', { name: '閲覧する', exact: true })).toBeEnabled();

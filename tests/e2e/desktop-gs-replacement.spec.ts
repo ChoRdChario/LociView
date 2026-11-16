@@ -1,6 +1,6 @@
 import {test, createBrowserProfile} from '../helpers/browserProfile';
 import { desktopEntry, desktopOrigin } from './desktopEntry';
-import { selectShareOutput,  closeFileSurface, revealFileSurface, revealModelManagement, lookAlongFront } from './workspaceUi';
+import { chooseHomeFiles, selectShareOutput,  closeFileSurface, revealFileSurface, revealModelManagement, lookAlongFront } from './workspaceUi';
 import {expect,chromium,type Page,type BrowserContext,type TestInfo} from '@playwright/test';
 
 import {openAsBlob} from 'node:fs';
@@ -41,7 +41,7 @@ test('50万点SH4を新しい本体へ差し替え、旧資源の解放・2世�
   if(tracing)await context.tracing.start({screenshots:true,snapshots:true,sources:true});const p=context.pages()[0]??await context.newPage();p.on('pageerror',e=>errors.push(e.message));p.on('console',m=>{if(m.type()==='error')errors.push(m.text());});await p.goto(entry);return p;};
  const close=async(label:string)=>{expect(await context!.pages()[0]!.evaluate(()=>(window as any).wholeGsReads)).toBe(0);if(tracing)await context!.tracing.stop({path:info.outputPath(label+'-trace.zip')});await context!.close();context=undefined;};
  try{
-  let p=await launch();await p.getByLabel('ファイルを選択',{exact:true}).setInputFiles(original);await p.getByRole('button',{name:'ファイルを開く',exact:true}).click();await p.getByLabel('プロジェクト名',{exact:true}).fill(title);await p.getByRole('button',{name:'プロジェクトを作成',exact:true}).click();await ready(p);await mark('created',p);
+  let p=await launch();await chooseHomeFiles(p, original);await p.getByLabel('プロジェクト名',{exact:true}).fill(title);await p.getByRole('button',{name:'プロジェクトを作成',exact:true}).click();await ready(p);await mark('created',p);
   await p.getByRole('tab',{name:'モデル',exact:true}).click();await models(p).locator('.lv-model-select').first().click();const proxy=p.waitForEvent('filechooser');await models(p).getByRole('button',{name:'ピン配置用モデルを追加',exact:true}).click();await(await proxy).setFiles({name:'以前の面.glb',mimeType:'model/gltf-binary',buffer:triangleGlb()});await models(p).getByRole('button',{name:'ピン配置用モデルを設定',exact:true}).click();await expect(p.getByText('ピン配置用モデルを登録しました。',{exact:true})).toBeVisible({timeout:240_000});await ready(p);
   await lookAlongFront(p);await p.getByRole('tab',{name:'キャプション',exact:true}).click();await p.getByRole('button',{name:'キャプションを追加',exact:true}).click();
   const canvas=p.getByLabel('3Dモデルの表示',{exact:true}),box=(await canvas.boundingBox())!,extent=4*Math.exp(Math.fround(Math.log(.0007))),bounds={min:[-500/300-extent,-250/300-extent,-extent] as const,max:[499/300+extent,249/300+extent,.0006+extent] as const},pose=fittedPose(bounds,defaultPose(),box.width/box.height,'+z');

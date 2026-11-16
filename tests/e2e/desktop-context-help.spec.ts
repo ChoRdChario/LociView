@@ -1,4 +1,4 @@
-import { revealCoordinateAdd, revealFileSurface, revealWorkPanel } from './workspaceUi';
+import { chooseHomeFiles, revealCoordinateAdd, revealFileSurface, revealWorkPanel } from './workspaceUi';
 import { test, expect, chromium } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import * as A from '@automerge/automerge';
@@ -18,8 +18,8 @@ test('delayed explanations stay readable and preserve a Caption draft through to
   await context.route('**/*', route => { const u = new URL(route.request().url()); if (u.origin === new URL(server.url).origin || ['blob:', 'data:'].includes(u.protocol)) return route.continue(); remote.push(u.href); return route.abort(); });
   const p = await context.newPage(); p.setDefaultTimeout(15_000); p.on('pageerror', e => errors.push(e.message));
   try {
-    await p.goto(server.url); await p.getByLabel('ファイルを選択', { exact: true }).setInputFiles({ name: '説明の確認.glb', mimeType: 'model/gltf-binary', buffer: triangleGlb() });
-    await p.getByRole('button', { name: 'ファイルを開く', exact: true }).click(); await p.getByRole('textbox', { name: 'プロジェクト名', exact: true }).fill('補足説明の確認'); await p.getByRole('button', { name: 'プロジェクトを作成', exact: true }).click();
+    await p.goto(server.url); await chooseHomeFiles(p, { name: '説明の確認.glb', mimeType: 'model/gltf-binary', buffer: triangleGlb() });
+    await p.getByRole('textbox', { name: 'プロジェクト名', exact: true }).fill('補足説明の確認'); await p.getByRole('button', { name: 'プロジェクトを作成', exact: true }).click();
     await expect(p.getByLabel('3Dモデルの表示', { exact: true })).toHaveAttribute('aria-busy', 'false', { timeout: 90_000 });
     await revealCoordinateAdd(p); const owner = p.getByLabel('追加先モデル', { exact: true }); await owner.focus(); await owner.selectOption({ label: '説明の確認.glb' }); await p.getByRole('button', { name: 'このモデルに追加', exact: true }).click();
     for (const axis of ['X', 'Y', 'Z']) await p.getByLabel('位置 ' + axis, { exact: true }).fill(axis === 'Y' ? '.5' : '0');

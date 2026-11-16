@@ -1,6 +1,6 @@
 import {test, createBrowserProfile} from '../helpers/browserProfile';
 import { desktopOrigin, desktopEntry } from './desktopEntry';
-import { selectShareOutput,  revealCoordinateAdd, revealFileSurface } from './workspaceUi';
+import { chooseHomeFiles, selectShareOutput,  revealCoordinateAdd, revealFileSurface } from './workspaceUi';
 import { expect, chromium, type Page, type BrowserContext, type TestInfo } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
@@ -37,11 +37,11 @@ test('daily Scene and Caption organization, tags, alignment, settings and files 
     const first = await launch(), p = first.page;
     const heicBytes=await readFile('tests/fixtures/daily-media/owned-still.heic'),nativeHeic=await p.evaluate(async bytes=>{try{const bitmap=await createImageBitmap(new Blob([new Uint8Array(bytes)],{type:'image/heic'}));const valid=bitmap.width===96&&bitmap.height===64;bitmap.close();return valid;}catch{return false;}},[...heicBytes]);
     if(!nativeHeic){
-      await p.getByLabel('ファイルを選択',{exact:true}).setInputFiles([{name:'基準.glb',mimeType:'model/gltf-binary',buffer:triangleGlb()},{name:'owned-still.heic',mimeType:'image/heic',buffer:heicBytes}]);await p.getByRole('button',{name:'ファイルを開く',exact:true}).click();
+      await chooseHomeFiles(p, [{name:'基準.glb',mimeType:'model/gltf-binary',buffer:triangleGlb()},{name:'owned-still.heic',mimeType:'image/heic',buffer:heicBytes}]);
       await expect(p.getByRole('status').filter({hasText:'端末で別のJPEG'}).first()).toBeVisible();await expect(p.getByRole('textbox',{name:'プロジェクト名',exact:true})).not.toBeVisible();await expect(p.getByRole('heading',{name:'プロジェクト名',exact:true})).toHaveCount(0);
     }
-    await p.getByLabel('ファイルを選択', { exact: true }).setInputFiles([{ name: '基準.glb', mimeType: 'model/gltf-binary', buffer: triangleGlb() }, { name: '移動するモデル.glb', mimeType: 'model/gltf-binary', buffer: triangleGlb(.25) }]);
-    await p.getByRole('button', { name: 'ファイルを開く', exact: true }).click(); await p.getByRole('textbox', { name: 'プロジェクト名', exact: true }).fill('日常の編集'); await p.getByRole('button', { name: 'プロジェクトを作成', exact: true }).click();
+    await chooseHomeFiles(p, [{ name: '基準.glb', mimeType: 'model/gltf-binary', buffer: triangleGlb() }, { name: '移動するモデル.glb', mimeType: 'model/gltf-binary', buffer: triangleGlb(.25) }]);
+    await p.getByRole('textbox', { name: 'プロジェクト名', exact: true }).fill('日常の編集'); await p.getByRole('button', { name: 'プロジェクトを作成', exact: true }).click();
     await expect(p.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText('日常の編集', { timeout: 90_000 }); await expect(p.getByLabel('3Dモデルの表示', { exact: true })).toHaveAttribute('aria-busy', 'false');
     console.log('daily: project created');
     const originalSceneName = await p.getByRole('region', { name: 'シーン', exact: true }).locator('button[aria-pressed="true"]').innerText();
@@ -134,7 +134,7 @@ test('daily Scene and Caption organization, tags, alignment, settings and files 
     const after = await backupRecords(await output(cold.page, info, 'daily-cold', 'backup')); expect(after.records).toEqual(before.records); expect(after.archive.source.token).toBe(before.archive.source.token);
     await cold.page.getByRole('tab',{name:'キャプション',exact:true}).click();await cold.page.getByRole('list',{name:'キャプション一覧',exact:true}).locator('.lv-caption-select').filter({hasText:'複製の記録'}).click();await play(cold.page,'audio','owned-audio.mp3');
     await cold.page.setViewportSize({width:320,height:740});await play(cold.page,'video','owned-video.mp4');await cold.page.screenshot({path:info.outputPath('daily-media-320.png'),fullPage:true});
-    const recipient=await launch(await createBrowserProfile('daily-recipient'));await recipient.page.getByLabel('ファイルを選択',{exact:true}).setInputFiles(workspace);await recipient.page.getByRole('button',{name:'ファイルを開く',exact:true}).click();await expect(recipient.page.getByRole('heading',{name:'プロジェクト名',exact:true})).toHaveText('日常の編集',{timeout:90000});await recipient.page.getByRole('list',{name:'キャプション一覧',exact:true}).locator('.lv-caption-select').filter({hasText:'複製の記録'}).click();await play(recipient.page,'video','owned-video.mp4');const received=await backupRecords(await output(recipient.page,info,'daily-recipient-backup','backup'));expect(received.records).toEqual(before.records);expect(received.archive.source.originalChanges()).toEqual(before.archive.source.originalChanges());
+    const recipient=await launch(await createBrowserProfile('daily-recipient'));await chooseHomeFiles(recipient.page, workspace);await recipient.page.getByRole('button',{name:'プロジェクトを取り込む',exact:true}).click();await expect(recipient.page.getByRole('heading',{name:'プロジェクト名',exact:true})).toHaveText('日常の編集',{timeout:90000});await recipient.page.getByRole('list',{name:'キャプション一覧',exact:true}).locator('.lv-caption-select').filter({hasText:'複製の記録'}).click();await play(recipient.page,'video','owned-video.mp4');const received=await backupRecords(await output(recipient.page,info,'daily-recipient-backup','backup'));expect(received.records).toEqual(before.records);expect(received.archive.source.originalChanges()).toEqual(before.archive.source.originalChanges());
     expect(errors).toEqual([]); expect(remote).toEqual([]);
   } finally { for (const context of contexts) await context.close(); }
 });

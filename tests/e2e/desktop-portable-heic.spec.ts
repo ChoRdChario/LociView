@@ -1,6 +1,6 @@
 import {test, createBrowserProfile} from '../helpers/browserProfile';
 import { writeCleanImportFixture } from './cleanImportFixture';
-import { selectShareOutput, closeFileSurface, revealCoordinateAdd, revealFileSurface, revealProjectSelection } from './workspaceUi';
+import { chooseHomeFiles, selectShareOutput, closeFileSurface, revealCoordinateAdd, revealFileSurface, revealProjectSelection } from './workspaceUi';
 import { desktopOrigin, desktopEntry } from './desktopEntry';
 import { expect, chromium, type Page, type BrowserContext, type TestInfo } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
@@ -30,7 +30,7 @@ async function output(p: Page, info: TestInfo, name: string, purpose: 'backup' |
   await expect(history).toContainText('HEIC原本と表示用PNGの組');
   const path = info.outputPath(name + '.zip'); await download.saveAs(path); expect(await download.failure()).toBeNull(); await closeFileSurface(p);return path;
 }
-async function open(p: Page, path: string) { await p.getByLabel('ファイルを選択', { exact: true }).setInputFiles(path); await p.getByRole('button', { name: 'ファイルを開く', exact: true }).click(); }
+async function open(p: Page, path: string) { await chooseHomeFiles(p, path);  }
 async function gallery(p: Page) {
   await p.locator('.lv-caption-select').first().click();
   const area = p.locator('.lv-caption-window').getByRole('region', { name: '添付メディア', exact: true }); const image = area.locator('img').first();
@@ -64,8 +64,8 @@ test('08c uses canvas generation, portable offline display/save/reopen and a por
   };
   try {
     const a = await launch(0), p = a.p;
-    await p.getByLabel('ファイルを選択', { exact: true }).setInputFiles({ name: 'model.glb', mimeType: 'model/gltf-binary', buffer: triangleGlb() });
-    await p.getByRole('button', { name: 'ファイルを開く', exact: true }).click(); await p.getByRole('textbox', { name: 'プロジェクト名', exact: true }).fill(title); await p.getByRole('button', { name: 'プロジェクトを作成', exact: true }).click();
+    await chooseHomeFiles(p, { name: 'model.glb', mimeType: 'model/gltf-binary', buffer: triangleGlb() });
+    await p.getByRole('textbox', { name: 'プロジェクト名', exact: true }).fill(title); await p.getByRole('button', { name: 'プロジェクトを作成', exact: true }).click();
     await expect(p.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText(title, { timeout: 90_000 }); await expect(p.getByLabel('3Dモデルの表示', { exact: true })).toHaveAttribute('aria-busy', 'false');
     await revealCoordinateAdd(p); const owner = p.getByLabel('追加先モデル', { exact: true }); await owner.focus(); await owner.selectOption({ label: 'model.glb' }); await p.getByRole('button', { name: 'このモデルに追加', exact: true }).click();
     for (const [axis,value] of [['X','0'],['Y','.5'],['Z','0']]) await p.getByLabel(`位置 ${axis}`, { exact: true }).fill(value!);
@@ -76,7 +76,7 @@ test('08c uses canvas generation, portable offline display/save/reopen and a por
     await gallery(p); expect(await p.evaluate(() => (window as any).__heicDecodes)).toBe(1);
     const workspace = await output(p, info, 'portable-workspace', 'teamWorkspace');
     const inspected = await WorkspaceArchive.inspect(new Blob([Uint8Array.from(await readFile(workspace)).buffer]), limits); expect(inspected.archive.control.manifest.requiredCapabilities).toEqual(['editor-attribution-v1','portable-heic-display-v1']);
-    const b = await launch(1); await open(b.p, workspace); await expect(b.p.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText(title, { timeout: 90_000 }); await gallery(b.p);
+    const b = await launch(1); await open(b.p, workspace); await b.p.getByRole('button', { name: 'プロジェクトを取り込む', exact: true }).click(); await expect(b.p.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText(title, { timeout: 90_000 }); await gallery(b.p);
     // Already-loaded shell only: no claim of offline app cold startup/PWA caching.
     await b.context.setOffline(true); await b.p.getByLabel('本文', { exact: true }).fill('オフラインの追記'); await b.p.getByRole('button', { name: '変更を適用', exact: true }).click(); await ready(b.p, '変更を適用しました。');
     const backup = await output(b.p, info, 'offline-backup', 'backup'); await gallery(b.p);

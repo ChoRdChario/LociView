@@ -1,5 +1,5 @@
 import { desktopOrigin, desktopEntry } from './desktopEntry';
-import {beginMaterialEditing} from './workspaceUi';
+import { chooseHomeFiles, beginMaterialEditing } from './workspaceUi';
 import { lookAlongFront } from './workspaceUi';
 import {test,expect} from '@playwright/test';
 import * as THREE from 'three';
@@ -13,8 +13,8 @@ test('01g small mixed Mesh and GS keeps current variants through preview, cancel
   await p.route('**/*',route=>{const url=new URL(route.request().url());return url.origin===desktopOrigin||['blob:','data:'].includes(url.protocol)?route.continue():route.abort('blockedbyclient');});
   const gs=Buffer.from(gsFixture(4,[[0,1.2,.5,0,0,0,1,-1,-1,...Array(72).fill(.001),0,...Array(3).fill(Math.log(.25)),1,0,0,0]]));
   await p.goto(desktopEntry);
-  await p.getByLabel('ファイルを選択',{exact:true}).setInputFiles([{name:'透過.glb',mimeType:'model/gltf-binary',buffer:sourceMaterialPanelsGlb(j=>{j.materials[2].alphaMode='BLEND';})},{name:'全係数.ply',mimeType:'application/ply',buffer:gs}]);
-  await p.getByRole('button',{name:'ファイルを開く',exact:true}).click();await p.getByLabel('プロジェクト名',{exact:true}).fill('小さい合成の確認');await p.getByRole('button',{name:'プロジェクトを作成',exact:true}).click();
+  await chooseHomeFiles(p, [{name:'透過.glb',mimeType:'model/gltf-binary',buffer:sourceMaterialPanelsGlb(j=>{j.materials[2].alphaMode='BLEND';})},{name:'全係数.ply',mimeType:'application/ply',buffer:gs}]);
+  await p.getByLabel('プロジェクト名',{exact:true}).fill('小さい合成の確認');await p.getByRole('button',{name:'プロジェクトを作成',exact:true}).click();
   const canvas=p.getByLabel('3Dモデルの表示',{exact:true}),status=p.locator('.lv-project-viewport-status');
   const ready=async()=>{await expect(status).toContainText('透過表示（近似）',{timeout:180000});await expect(canvas).toHaveAttribute('aria-busy','false');await expect(status).not.toContainText('確認できません');await expect(status).not.toContainText('非表示');};
   await ready();await lookAlongFront(p);const withGs=(await presentedCanvas(canvas)).red;
@@ -39,8 +39,8 @@ test('01g Mesh-only smooth displays with shared-depth budget, resize and local f
     return check.call(this,target);
   };});
   try{
-    await p.goto(desktopEntry);await p.getByLabel('ファイルを選択',{exact:true}).setInputFiles({name:'透過の面.glb',mimeType:'model/gltf-binary',buffer:sourceMaterialPanelsGlb(j=>{j.materials[2].alphaMode='BLEND';})});
-    await p.getByRole('button',{name:'ファイルを開く',exact:true}).click();await p.getByRole('textbox',{name:'プロジェクト名',exact:true}).fill('透過表示の統合');await p.getByRole('button',{name:'プロジェクトを作成',exact:true}).click();
+    await p.goto(desktopEntry);await chooseHomeFiles(p, {name:'透過の面.glb',mimeType:'model/gltf-binary',buffer:sourceMaterialPanelsGlb(j=>{j.materials[2].alphaMode='BLEND';})});
+    await p.getByRole('textbox',{name:'プロジェクト名',exact:true}).fill('透過表示の統合');await p.getByRole('button',{name:'プロジェクトを作成',exact:true}).click();
     const status=p.locator('.lv-project-viewport-status'),canvas=p.getByLabel('3Dモデルの表示',{exact:true});await expect(status).toContainText('透過表示（近似）',{timeout:180000});await expect(canvas).toHaveAttribute('aria-busy','false');
     await lookAlongFront(p);
     const sample=async(x:number)=>{const box=(await canvas.boundingBox())!,pose=fittedPose({min:[-4,-1,0],max:[4,1,0]},defaultPose(),box.width/box.height,'+z');if(pose.projection.kind!=='perspective')throw Error('camera');const camera=new THREE.PerspectiveCamera(pose.projection.verticalFov*180/Math.PI,box.width/box.height,.000001,1e9);camera.position.set(...pose.position);camera.up.set(...pose.up);camera.lookAt(new THREE.Vector3(...pose.target));camera.updateMatrixWorld(true);const n=new THREE.Vector3(x,0,0).project(camera);return(await presentedCanvas(canvas,n.x*box.width/2,-n.y*box.height/2)).sample;};
@@ -58,7 +58,7 @@ test('01g Mesh-only smooth displays with shared-depth budget, resize and local f
 
 test('01g OBJ Phong retains its lighting shader while opacity0 and fractional opacity render',async({page:p},info)=>{
   const errors:string[]=[];p.on('pageerror',e=>errors.push(e.message));p.on('console',m=>{if(m.type()==='error')errors.push(m.text());});await p.route('**/*',r=>{const u=new URL(r.request().url());return u.origin===desktopOrigin||['blob:','data:'].includes(u.protocol)?r.continue():r.abort('blockedbyclient');});
-  await p.goto(desktopEntry);await p.getByLabel('ファイルを選択',{exact:true}).setInputFiles({name:'照明あり.obj',mimeType:'text/plain',buffer:meshSources().find(s=>s.format==='obj')!.bytes});await p.getByRole('button',{name:'ファイルを開く',exact:true}).click();await p.getByRole('textbox',{name:'プロジェクト名',exact:true}).fill('Phongの透過');await p.getByRole('button',{name:'プロジェクトを作成',exact:true}).click();await expect(p.getByRole('heading',{name:'プロジェクト名',exact:true})).toHaveText('Phongの透過',{timeout:180000});
+  await p.goto(desktopEntry);await chooseHomeFiles(p, {name:'照明あり.obj',mimeType:'text/plain',buffer:meshSources().find(s=>s.format==='obj')!.bytes});await p.getByRole('textbox',{name:'プロジェクト名',exact:true}).fill('Phongの透過');await p.getByRole('button',{name:'プロジェクトを作成',exact:true}).click();await expect(p.getByRole('heading',{name:'プロジェクト名',exact:true})).toHaveText('Phongの透過',{timeout:180000});
   await p.getByRole('tab',{name:'描画',exact:true}).click();const panel=p.getByRole('region',{name:'材質',exact:true});await panel.getByLabel('モデル',{exact:true}).selectOption({label:'照明あり.obj'});await panel.getByLabel('マテリアル',{exact:true}).selectOption({label:'マテリアル 1'});
   const apply=async(value:string,lighting?:string)=>{await beginMaterialEditing(panel);await panel.getByLabel('不透明度（%）',{exact:true}).fill(value);if(lighting)await panel.getByLabel('照明',{exact:true}).selectOption(lighting);await panel.getByRole('button',{name:'変更を適用',exact:true}).click();await expect(p.getByText('材質の設定を適用しました。',{exact:true})).toBeVisible({timeout:180000});await expect(p.locator('.lv-project-viewport-status')).toContainText('透過表示（近似）');};
   await apply('0');await lookAlongFront(p);const canvas=p.getByLabel('3Dモデルの表示',{exact:true});
@@ -73,8 +73,8 @@ test('01g preparation resize discards stale layouts and raw FLOAT alpha2 is clam
   await p.addInitScript(()=>{const original=crypto.subtle.digest;let release!:()=>void;const gate=new Promise<void>(resolve=>{release=resolve;});(window as any).releaseSmoothPolicy=release;
     crypto.subtle.digest=async function(algorithm:AlgorithmIdentifier,data:BufferSource){if(data.byteLength<8192&&new TextDecoder().decode(data).includes('"id": "lociview-desktop-smooth-mrt-1"')){(window as any).smoothPolicyWaiting=true;await gate;}return Reflect.apply(original,this,[algorithm,data]);};
   });
-  await p.goto(desktopEntry);await p.getByLabel('ファイルを選択',{exact:true}).setInputFiles({name:'生alpha2.glb',mimeType:'model/gltf-binary',buffer:sourceMaterialPanelsGlb(j=>{j.materials[2].alphaMode='BLEND';j.materials[2].pbrMetallicRoughness.baseColorFactor[3]=1;},2)});
-  await p.getByRole('button',{name:'ファイルを開く',exact:true}).click();await p.getByRole('textbox',{name:'プロジェクト名',exact:true}).fill('最終alphaと準備世代');await p.getByRole('button',{name:'プロジェクトを作成',exact:true}).click();
+  await p.goto(desktopEntry);await chooseHomeFiles(p, {name:'生alpha2.glb',mimeType:'model/gltf-binary',buffer:sourceMaterialPanelsGlb(j=>{j.materials[2].alphaMode='BLEND';j.materials[2].pbrMetallicRoughness.baseColorFactor[3]=1;},2)});
+  await p.getByRole('textbox',{name:'プロジェクト名',exact:true}).fill('最終alphaと準備世代');await p.getByRole('button',{name:'プロジェクトを作成',exact:true}).click();
   await p.waitForFunction(()=>!!(window as any).smoothPolicyWaiting);const canvas=p.getByLabel('3Dモデルの表示',{exact:true}),status=p.locator('.lv-project-viewport-status'),old=await canvas.evaluate((c:HTMLCanvasElement)=>[c.width,c.height]);
   await p.setViewportSize({width:3840,height:2160});await expect.poll(()=>canvas.evaluate((c:HTMLCanvasElement)=>c.width*c.height)).toBeGreaterThan(old[0]!*old[1]!);await p.evaluate(()=>(window as any).releaseSmoothPolicy());
   await expect(status).toContainText('透過表示（近似）');await expect(canvas).toHaveAttribute('aria-busy','false');const actual=await canvas.evaluate((c:HTMLCanvasElement)=>({width:c.width,height:c.height,bytes:Number(c.dataset.compositionBytes),scale:Number(c.dataset.renderScale),css:c.getBoundingClientRect().toJSON(),dpr:devicePixelRatio}));expect(actual.bytes).toBe(actual.width*actual.height*36);expect(actual.width*actual.height).toBeGreaterThan(old[0]!*old[1]!);expect(actual.width).toBe(Math.floor(actual.css.width*actual.dpr*actual.scale+.5));expect(actual.height).toBe(Math.floor(actual.css.height*actual.dpr*actual.scale+.5));expect(actual.bytes).toBeLessThan(64*1024*1024);
@@ -85,7 +85,7 @@ test('01g preparation resize discards stale layouts and raw FLOAT alpha2 is clam
 
 test('01g sourceMASK predicate precedes fractional appearance on actual GPU pixels',async({page:p},info)=>{
   const errors:string[]=[];p.on('pageerror',e=>errors.push(e.message));await p.route('**/*',r=>{const u=new URL(r.request().url());return u.origin===desktopOrigin||['blob:','data:'].includes(u.protocol)?r.continue():r.abort('blockedbyclient');});
-  await p.goto(desktopEntry);await p.getByLabel('ファイルを選択',{exact:true}).setInputFiles({name:'元が切り抜き.glb',mimeType:'model/gltf-binary',buffer:sourceMaterialPanelsGlb()});await p.getByRole('button',{name:'ファイルを開く',exact:true}).click();await p.getByLabel('プロジェクト名',{exact:true}).fill('切り抜きと不透明度');await p.getByRole('button',{name:'プロジェクトを作成',exact:true}).click();await expect(p.getByLabel('3Dモデルの表示',{exact:true})).toHaveAttribute('aria-busy','false',{timeout:180000});
+  await p.goto(desktopEntry);await chooseHomeFiles(p, {name:'元が切り抜き.glb',mimeType:'model/gltf-binary',buffer:sourceMaterialPanelsGlb()});await p.getByLabel('プロジェクト名',{exact:true}).fill('切り抜きと不透明度');await p.getByRole('button',{name:'プロジェクトを作成',exact:true}).click();await expect(p.getByLabel('3Dモデルの表示',{exact:true})).toHaveAttribute('aria-busy','false',{timeout:180000});
   await p.getByRole('tab',{name:'描画',exact:true}).click();const m=p.getByRole('region',{name:'材質',exact:true});await m.getByLabel('モデル',{exact:true}).selectOption({label:'元が切り抜き.glb'});await m.getByLabel('マテリアル',{exact:true}).selectOption({label:'材質 3'});await beginMaterialEditing(m);await m.getByLabel('照明',{exact:true}).selectOption('unlit');await m.getByLabel('不透明度（%）',{exact:true}).fill('50');await m.getByRole('button',{name:'変更を適用',exact:true}).click();await expect(p.getByText('材質の設定を適用しました。',{exact:true})).toBeVisible({timeout:180000});await expect(p.locator('.lv-project-viewport-status')).toContainText('透過表示（近似）');await lookAlongFront(p);
   const canvas=p.getByLabel('3Dモデルの表示',{exact:true}),box=(await canvas.boundingBox())!,pose=fittedPose({min:[-4,-1,0],max:[4,1,0]},defaultPose(),box.width/box.height,'+z');if(pose.projection.kind!=='perspective')throw Error('camera');const camera=new THREE.PerspectiveCamera(pose.projection.verticalFov*180/Math.PI,box.width/box.height,.000001,1e9);camera.position.set(...pose.position);camera.up.set(...pose.up);camera.lookAt(new THREE.Vector3(...pose.target));camera.updateMatrixWorld(true);
   const sample=async(x:number)=>{const n=new THREE.Vector3(x,0,0).project(camera);return(await presentedCanvas(canvas,n.x*box.width/2,-n.y*box.height/2)).sample.slice(0,3);},expected=new THREE.Color(0x2878c8).lerp(new THREE.Color(0xe8e6e2),.5).getRGB({r:0,g:0,b:0},THREE.SRGBColorSpace),rgb=[expected.r,expected.g,expected.b].map(v=>Math.round(v*255));

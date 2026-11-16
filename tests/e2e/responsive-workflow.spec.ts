@@ -1,3 +1,4 @@
+import { chooseHomeFiles } from './workspaceUi';
 import { test, expect, chromium, type BrowserContext, type Page } from '@playwright/test';
 import { createHash } from 'node:crypto';
 import { mkdir, mkdtemp, readFile, writeFile, readdir } from 'node:fs/promises';
@@ -60,7 +61,7 @@ test('狭い画面とno-hover touchで100記録をキーボード移動し、編
   try {
     let page = await launch(); const html = await page.request.get('http://127.0.0.1:4182/dev.html'); expect(sha(await html.body())).toBe(sha(await readFile('validation-dist/dev.html')));
     await info.attach('実行環境', { body: JSON.stringify({ browser: context!.browser()!.version(), node: process.version, platform: process.platform, headless: true, touchEmulation: true, physicalDevice: false, browserZoomTested: false, offline: false, tracing, route: entry, inputSha256: sha(input), assets: await Promise.all((await readdir('validation-dist/assets')).map(async name => ({ name, sha256: sha(await readFile(join('validation-dist/assets', name))) }))) }), contentType: 'application/json' });
-    await page.getByLabel('ファイルを選択', { exact: true }).setInputFiles(inputPath); await page.getByRole('button', { name: 'ファイルを開く', exact: true }).tap();
+    await chooseHomeFiles(page, inputPath);
     await page.getByRole('button', { name: '新しいプロジェクトに変換', exact: true }).tap(); await expect(page.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText(title, { timeout: 90_000 });
     await expect(detail(page).getByLabel('タイトル', { exact: true })).toHaveAttribute('readonly', '');
     await expect(detail(page).getByLabel('タイトル', { exact: true })).toHaveCSS('border-style', 'dashed');

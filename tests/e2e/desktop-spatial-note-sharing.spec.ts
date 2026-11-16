@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { gsFixture } from '../helpers/gsFixture';
 import { smallPng, triangleGlb } from './fixtures';
-import { openAddOptions, beginSceneCreation, closeFileSurface, lookAlongFront, revealCameraPositions, revealCaptionList, revealFileSurface, selectShareOutput } from './workspaceUi';
+import { chooseHomeFiles, openAddOptions, beginSceneCreation, closeFileSurface, lookAlongFront, revealCameraPositions, revealCaptionList, revealFileSurface, selectShareOutput } from './workspaceUi';
 
 const points = Buffer.from([
   'ply', 'format ascii 1.0', 'element vertex 5', 'property float x', 'property float y', 'property float z',
@@ -46,16 +46,13 @@ for (const touch of [false, true])
       try {
         const page = await sender.newPage();
         await page.goto(baseURL!);
-        const input = page.getByLabel('ファイルを選択', exact);
-        await input.setInputFiles({ name: 'invalid.zip', mimeType: 'application/zip', buffer: Buffer.from('invalid') });
-        await action(page, 'ファイルを開く').click();
+        await chooseHomeFiles(page, { name: 'invalid.zip', mimeType: 'application/zip', buffer: Buffer.from('invalid') });
         const fileStatus = page.locator('.lv-validation-status');
         await expect(fileStatus).toHaveAttribute('data-busy', 'false');
         const error = await fileStatus.innerText();
         expect(error.trim()).not.toBe('');
-        await input.setInputFiles({ name: '外板.ply', mimeType: 'application/octet-stream', buffer: kind === '点群' ? points : gs });
+        await chooseHomeFiles(page, { name: '外板.ply', mimeType: 'application/octet-stream', buffer: kind === '点群' ? points : gs });
         await expect(fileStatus).not.toHaveText(error);
-        await action(page, 'ファイルを開く').click();
         await action(page, 'プロジェクトを作成').click();
         await expect(action(page, '閲覧する')).toBeEnabled({ timeout: 90000 });
         if (touch)
@@ -221,8 +218,18 @@ for (const touch of [false, true])
 
         const other = await receiver.newPage();
         await other.goto(baseURL!);
-        await other.getByLabel('ファイルを選択', exact).setInputFiles(path);
-        await action(other, 'ファイルを開く').click();
+        await chooseHomeFiles(other, path);
+        const reader = other.getByRole('main', { name: '閲覧用のシーン', ...exact });
+        const heading = reader.getByRole('heading', { level: 1 });
+        await expect(heading).toBeFocused();
+        const menu = reader.locator('.lv-review-files > summary');
+        const canvasBox = await reader.getByLabel('3Dモデルの表示', exact).boundingBox();
+        expect(canvasBox!.y).toBeLessThan(76);
+        expect(Math.min(options.viewport.height - canvasBox!.y, canvasBox!.height)).toBeGreaterThan(touch ? 320 : 600);
+        await expect(reader.getByRole('button', { name: '別のプロジェクトを開く', ...exact })).toBeHidden();
+        await menu.focus(); await menu.press('Enter');
+        await expect(reader.getByRole('button', { name: '別のプロジェクトを開く', ...exact })).toBeVisible();
+        await menu.press('Escape'); await expect(menu).toBeFocused();
         const scenes = other.getByLabel('表示するシーン', exact);
         await expect(scenes.locator('option:checked')).toHaveText('シーン 1');
         await expect(other.locator('.lv-caption-select').filter({ hasText: '塗装の確認' })).toHaveCount(1);
@@ -298,8 +305,7 @@ for (const touch of [false, true])
 
 test('配置用モデルのないGSに座標で記録し、再開して元の位置を確認する', async ({ page, baseURL }) => {
   await page.goto(baseURL!);
-  await page.getByLabel('ファイルを選択', exact).setInputFiles({ name: '外板.ply', mimeType: 'application/octet-stream', buffer: gs });
-  await action(page, 'ファイルを開く').click();
+  await chooseHomeFiles(page, { name: '外板.ply', mimeType: 'application/octet-stream', buffer: gs });
   await action(page, 'プロジェクトを作成').click();
   await expect(action(page, '閲覧する')).toBeEnabled({ timeout: 90000 });
   await action(page, 'キャプションを追加').click();

@@ -3,7 +3,7 @@ import {readFile} from 'node:fs/promises';
 import * as A from '@automerge/automerge';
 import {ownedServer} from '../offline-e2e/server';
 import {triangleGlb,smallPng} from './fixtures';
-import {revealCoordinateAdd,revealCameraPositions,revealModelManagement,revealFileSurface,revealWorkPanel} from './workspaceUi';
+import { chooseHomeFiles, revealCoordinateAdd,revealCameraPositions,revealModelManagement,revealFileSurface,revealWorkPanel } from './workspaceUi';
 import {BackupArchive} from '../../src/projectPackage/backupArchive';
 import {validationMetadataLimits} from '../../src/projectFiles/validation';
 
@@ -25,7 +25,7 @@ test('record list, pin actions and direct camera navigation remain coherent thro
   };
   const drag=async(area:ReturnType<Page['locator']>,dx:number,dy:number,button:'left'|'right'='left')=>{const r=(await area.boundingBox())!;await p.mouse.move(r.x+r.width/2,r.y+r.height/2);await p.mouse.down({button});await p.mouse.move(r.x+r.width/2+dx,r.y+r.height/2+dy,{steps:8});await p.mouse.up({button});};
   try{
-    await p.goto(server.url);await p.getByLabel('ファイルを選択',{exact:true}).setInputFiles({name:'模型A.glb',mimeType:'model/gltf-binary',buffer:triangleGlb()});await p.getByRole('button',{name:'ファイルを開く',exact:true}).click();await p.getByRole('textbox',{name:'プロジェクト名',exact:true}).fill('記録とカメラの確認');await p.getByRole('button',{name:'プロジェクトを作成',exact:true}).click();
+    await p.goto(server.url);await chooseHomeFiles(p, {name:'模型A.glb',mimeType:'model/gltf-binary',buffer:triangleGlb()});await p.getByRole('textbox',{name:'プロジェクト名',exact:true}).fill('記録とカメラの確認');await p.getByRole('button',{name:'プロジェクトを作成',exact:true}).click();
     const gizmo=p.locator('.lv-project-camera');await expect(gizmo.getByRole('button',{name:'Z',exact:true})).toBeEnabled({timeout:90_000});await expect(p.getByRole('tab')).toHaveText(['キャプション','モデル','描画']);await expect(p.locator('details.lv-comparison-actions')).toBeHidden();
     await task('モデル');await revealModelManagement(p);const choose=p.waitForEvent('filechooser');await p.getByRole('button',{name:'3Dモデルを追加',exact:true}).click();await(await choose).setFiles({name:'模型B.glb',mimeType:'model/gltf-binary',buffer:triangleGlb()});await ready('モデルを追加しました。');await task('キャプション');
     for(const [name,x] of [['確認点A','0'],['確認点B','.2'],['確認点C','-.2']]){

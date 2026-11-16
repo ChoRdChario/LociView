@@ -1,4 +1,4 @@
-import { revealCoordinateAdd, beginSceneCreation, revealCaptionList } from './workspaceUi';
+import { chooseHomeFiles, revealCoordinateAdd, beginSceneCreation, revealCaptionList } from './workspaceUi';
 import { test, expect, chromium, type BrowserContext, type Page, type TestInfo } from '@playwright/test';
 import { createHash } from 'node:crypto';
 import { mkdir, mkdtemp, readFile, readdir } from 'node:fs/promises';
@@ -163,8 +163,7 @@ test('独立した二人が実ファイルを二往復し、手元の画像と�
       node: process.version, platform: process.platform, headless: true, tracing, route: entry, independentProfiles: true,
       assets: await Promise.all(assets.map(async name => ({ name, sha256: sha256(await readFile(join('validation-dist/assets', name))) }))) }), contentType: 'application/json' });
     await step('Aがモデルと記録を作り、Bは実際の作業一式だけから開く', async () => {
-      await a.getByLabel('ファイルを選択', { exact: true }).setInputFiles({ name: 'team-model.glb', mimeType: 'model/gltf-binary', buffer: glb });
-      await a.getByRole('button', { name: 'ファイルを開く', exact: true }).click();
+      await chooseHomeFiles(a, { name: 'team-model.glb', mimeType: 'model/gltf-binary', buffer: glb });
       await a.getByRole('textbox', { name: 'プロジェクト名', exact: true }).fill(projectName);
       await a.getByRole('button', { name: 'プロジェクトを作成', exact: true }).click();
       await expect(a.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText(projectName);
@@ -189,8 +188,8 @@ test('独立した二人が実ファイルを二往復し、手元の画像と�
       const manifest = workspace.archive.control.manifest; if (manifest.purpose !== 'teamWorkspace') throw Error('workspace');
       evidence.base = { id: manifest.packageId, heads: manifest.targetHeads, identity: manifest.identity, history: history(workspace.source) };
       await expect(b.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveCount(0);
-      await b.getByLabel('ファイルを選択', { exact: true }).setInputFiles(initial);
-      await b.getByRole('button', { name: 'ファイルを開く', exact: true }).click();
+      await chooseHomeFiles(b, initial);
+      await b.getByRole('button', { name: 'プロジェクトを取り込む', exact: true }).click();
       await expect(b.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText(projectName, { timeout: 90_000 });
       await expect(b.getByLabel('3Dモデルの表示', { exact: true })).toBeVisible();
       await expect(b.locator('.lv-project-viewport-status')).toBeEmpty();

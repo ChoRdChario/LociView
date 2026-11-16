@@ -1,6 +1,6 @@
 import {test, createBrowserProfile} from '../helpers/browserProfile';
 import { desktopEntry, desktopOrigin } from './desktopEntry';
-import {beginMaterialEditing} from './workspaceUi';
+import { chooseHomeFiles, beginMaterialEditing } from './workspaceUi';
 import { revealModelManagement, lookAlongFront } from './workspaceUi';
 import {expect,chromium} from '@playwright/test';
 
@@ -12,7 +12,7 @@ import {presentedCanvas} from './presentedCanvas';
 test('01g 変換前に近似表示と環境別の非表示が分かる',async({page:p},info)=>{
   await p.route('**/*',r=>{const u=new URL(r.request().url());return u.origin===desktopOrigin||['blob:','data:'].includes(u.protocol)?r.continue():r.abort('blockedbyclient');});
   await p.goto(desktopEntry);const fixture=await nativeMeshBackup(true,true);
-  await p.getByLabel('ファイルを選択',{exact:true}).setInputFiles({name:'材質の変換.zip',mimeType:'application/zip',buffer:fixture.file});await p.getByRole('button',{name:'ファイルを開く',exact:true}).click();
+  await chooseHomeFiles(p, {name:'材質の変換.zip',mimeType:'application/zip',buffer:fixture.file});
   const notice=p.getByRole('region',{name:'材質の変換による変更',exact:true});await expect(notice).toBeVisible();await expect(notice.locator('details')).toHaveJSProperty('open',false);await expect(notice.locator(':scope > p')).toContainText('透過表示は近似です。');await expect(p.getByRole('button',{name:'新しいプロジェクトに変換',exact:true})).toBeEnabled();
   await p.screenshot({path:info.outputPath('conversion-warning.png'),fullPage:true});await p.getByRole('button',{name:'選択を取り消す',exact:true}).click();await expect(notice).toBeHidden();
 });
@@ -23,7 +23,7 @@ test('01g BLENDと色の透過は実画素と保守的な位置選択が一致�
   context.setDefaultTimeout(15_000);await context.route('**/*',r=>{const u=new URL(r.request().url());return u.origin===desktopOrigin||['blob:','data:'].includes(u.protocol)?r.continue():r.abort('blockedbyclient');});
   const p=context.pages()[0]??await context.newPage();p.on('pageerror',e=>errors.push(e.message));p.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
   try{
-    await p.goto(desktopEntry);await p.getByLabel('ファイルを選択',{exact:true}).setInputFiles({name:'透過の面.glb',mimeType:'model/gltf-binary',buffer:sourceMaterialPanelsGlb(j=>{j.materials[2].alphaMode='BLEND';})});await p.getByRole('button',{name:'ファイルを開く',exact:true}).click();await p.getByRole('textbox',{name:'プロジェクト名',exact:true}).fill('標準材質の画素と選択');await p.getByRole('button',{name:'プロジェクトを作成',exact:true}).click();
+    await p.goto(desktopEntry);await chooseHomeFiles(p, {name:'透過の面.glb',mimeType:'model/gltf-binary',buffer:sourceMaterialPanelsGlb(j=>{j.materials[2].alphaMode='BLEND';})});await p.getByRole('textbox',{name:'プロジェクト名',exact:true}).fill('標準材質の画素と選択');await p.getByRole('button',{name:'プロジェクトを作成',exact:true}).click();
     const status=p.locator('.lv-project-viewport-status');await expect(status).toContainText('透過表示（近似）',{timeout:180000});
     await p.getByRole('tab',{name:'モデル',exact:true}).click();const choosing=p.waitForEvent('filechooser');await revealModelManagement(p); await p.getByRole('tabpanel',{name:'モデル',exact:true}).getByRole('button',{name:'3Dモデルを追加',exact:true}).click();
     const points=Buffer.from('ply\nformat ascii 1.0\nelement vertex 3\nproperty float x\nproperty float y\nproperty float z\nproperty uchar red\nproperty uchar green\nproperty uchar blue\nend_header\n2.5 0 -0.1 255 0 0\n3.5 0 -0.1 255 0 0\n5 0 -0.1 255 0 0\n');

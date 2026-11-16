@@ -1,5 +1,5 @@
 import {ownedServer} from '../offline-e2e/server';
-import { revealFileSurface, revealModelManagement, lookAlongFront } from './workspaceUi';
+import { chooseHomeFiles, revealFileSurface, revealModelManagement, lookAlongFront } from './workspaceUi';
 import {test,expect,type Page,type TestInfo} from '@playwright/test';
 import {createHash} from 'node:crypto';
 import {openAsBlob} from 'node:fs';
@@ -26,8 +26,8 @@ test('PCでモデル読込中も記録を検索・閲覧し、準備済み点群
   window.createImageBitmap=((...args:any[])=>{if(!sessionStorage.getItem('lv-test-hold-bitmaps'))return original(...args);
    (window as any).__heldBitmaps++;return new Promise<ImageBitmap>((resolve,reject)=>{pending.push(()=>{original(...args).then(resolve,reject);});});}) as typeof createImageBitmap;
  });
- await page.goto(server.url+'?timings=1');await page.getByLabel('ファイルを選択',{exact:true}).setInputFiles({name:'先に見える点群.ply',mimeType:'application/ply',buffer:ply});
- await page.getByRole('button',{name:'ファイルを開く',exact:true}).click();await page.getByLabel('プロジェクト名',{exact:true}).fill('読み込み中の作業');await page.getByRole('button',{name:'プロジェクトを作成',exact:true}).click();
+ await page.goto(server.url+'?timings=1');await chooseHomeFiles(page, {name:'先に見える点群.ply',mimeType:'application/ply',buffer:ply});
+ await page.getByLabel('プロジェクト名',{exact:true}).fill('読み込み中の作業');await page.getByRole('button',{name:'プロジェクトを作成',exact:true}).click();
  const status=page.locator('.lv-project-viewport-status'),canvas=page.getByLabel('3Dモデルの表示',{exact:true});await expect(status).toHaveAttribute('data-busy','false',{timeout:90_000});
  await lookAlongFront(page);await page.getByRole('button',{name:'キャプションを追加',exact:true}).click();const box=(await canvas.boundingBox())!;await canvas.click({position:{x:box.width/2,y:box.height/2}});
  await page.getByRole('button',{name:'ここに記録を作る',exact:true}).click();await expect(page.getByText('ピンの位置を確定しました。',{exact:true})).toBeVisible();

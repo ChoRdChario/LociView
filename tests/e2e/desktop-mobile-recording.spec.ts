@@ -2,7 +2,7 @@ import { chromium, expect, test } from '@playwright/test';
 import { openAsBlob } from 'node:fs';
 import { PackageArchive } from '../../src/projectPackage/zipArchive';
 import { ownedServer } from '../offline-e2e/server';
-import { chooseSharedScene } from './workspaceUi';
+import { chooseHomeFiles, chooseSharedScene } from './workspaceUi';
 import { nativeConversionBackup, smallPng, triangleGlb } from './fixtures';
 
 test('phone record list, body and completion stay usable when the viewport shrinks', async ({}, info) => {
@@ -20,8 +20,7 @@ test('phone record list, body and completion stay usable when the viewport shrin
   try {
     await page.goto(server.url);
     const source = await nativeConversionBackup(triangleGlb(), smallPng(), 100);
-    await page.getByLabel('ファイルを選択', { exact: true }).setInputFiles({ name: 'records.zip', mimeType: 'application/zip', buffer: source });
-    await page.getByRole('button', { name: 'ファイルを開く', exact: true }).tap();
+    await chooseHomeFiles(page, { name: 'records.zip', mimeType: 'application/zip', buffer: source });
     await page.getByRole('button', { name: '新しいプロジェクトに変換', exact: true }).tap();
     await expect(page.getByRole('button', { name: '閲覧する', exact: true })).toBeEnabled({ timeout: 90_000 });
     await expect(list.locator('li')).toHaveCount(100);
@@ -130,8 +129,8 @@ test('phone record list, body and completion stay usable when the viewport shrin
     console.log('phone whole output', { previousReadyMs: wholeStarted - continuationStarted, handoffMs: Date.now() - wholeStarted });
     const workspace = info.outputPath('phone-workspace.zip'); await whole.saveAs(workspace);
     await page.locator('details.lv-project-files').getByRole('button', { name: 'プロジェクトを選ぶ', exact: true }).tap();
-    await page.getByLabel('ファイルを選択', { exact: true }).setInputFiles(workspace);
-    await page.getByRole('button', { name: 'ファイルを開く', exact: true }).tap();
+    await chooseHomeFiles(page, workspace);
+    await page.getByRole('button', { name: 'プロジェクトを取り込む', exact: true }).tap();
     const destination = page.getByRole('region', { name: '取り込み先', exact: true });
     await expect(destination).toContainText('「Nativeから引き継ぐ記録」に更新を取り込みます。');
     await destination.getByRole('button', { name: '既存に取り込む', exact: true }).tap();

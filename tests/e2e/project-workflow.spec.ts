@@ -1,4 +1,4 @@
-import {beginMaterialEditing} from './workspaceUi';
+import { chooseHomeFiles, beginMaterialEditing } from './workspaceUi';
 import { revealCoordinateAdd, lookAlongFront, revealCaptionList } from './workspaceUi';
 import { test, expect, chromium, type BrowserContext, type Page } from '@playwright/test';
 import { createHash } from 'node:crypto';
@@ -163,8 +163,7 @@ test('GLBと画像の編集を保存し、ブラウザ再起動と別端末相�
     await testInfo.attach('実行環境', { body: JSON.stringify({ browser: context!.browser()!.version(), headless: true, tracing,
       node: process.version, platform: process.platform, route: entry,
       assets: await Promise.all(assets.map(async name => ({ name, sha256: sha256(await readFile(join('validation-dist/assets', name))) }))) }, null, 2), contentType: 'application/json' });
-    await page.getByLabel('ファイルを選択', { exact: true }).setInputFiles({ name: 'triangle.glb', mimeType: 'model/gltf-binary', buffer: glb });
-    await page.getByRole('button', { name: 'ファイルを開く', exact: true }).click();
+    await chooseHomeFiles(page, { name: 'triangle.glb', mimeType: 'model/gltf-binary', buffer: glb });
     await page.getByRole('textbox', { name: 'プロジェクト名', exact: true }).fill(projectName);
     await page.getByRole('button', { name: 'プロジェクトを作成', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText(projectName);
@@ -249,8 +248,7 @@ test('GLBと画像の編集を保存し、ブラウザ再起動と別端末相�
     await close();
 
     page = await launch(restoredProfile); await page.goto(entry);
-    await page.getByLabel('ファイルを選択', { exact: true }).setInputFiles(backup);
-    await page.getByRole('button', { name: 'ファイルを開く', exact: true }).click();
+    await chooseHomeFiles(page, backup);
     await measure('空の保存領域への初回復元', async () => {
       await page.getByRole('button', { name: 'このファイルから再開', exact: true }).click();
       await expect(page.getByText('バックアップから復元しています。', { exact: true })).toBeVisible();

@@ -1,4 +1,4 @@
-import { expectResumedProject, openAddOptions, revealCoordinateAdd, beginSceneCreation, revealModelManagement, lookAlongFront, revealCaptionList } from './workspaceUi';
+import { chooseHomeFiles, expectResumedProject, openAddOptions, revealCoordinateAdd, beginSceneCreation, revealModelManagement, lookAlongFront, revealCaptionList } from './workspaceUi';
 import { test, expect, chromium, type BrowserContext, type Page, type TestInfo } from '@playwright/test';
 import { createHash } from 'node:crypto';
 import { mkdir, mkdtemp, readFile, readdir } from 'node:fs/promises';
@@ -118,8 +118,8 @@ test('差し替えと受信の中断を元のファイルから復旧し、手�
     let initialWorkspacePath = '', primaryScene = '';
     let base!: Awaited<ReturnType<typeof WorkspaceArchive.inspect>>, initialRecords!: Record<string, any>, originalColor = '';
     await step('配置済みモデルを二つのシーンで共有し、Bが作業一式を開く', async () => {
-      await a.getByLabel('ファイルを選択', { exact: true }).setInputFiles({ name: 'original.glb', mimeType: 'model/gltf-binary', buffer: oldGlb });
-      await a.getByRole('button', { name: 'ファイルを開く', exact: true }).click(); await a.getByRole('textbox', { name: 'プロジェクト名', exact: true }).fill(title);
+      await chooseHomeFiles(a, { name: 'original.glb', mimeType: 'model/gltf-binary', buffer: oldGlb });
+       await a.getByRole('textbox', { name: 'プロジェクト名', exact: true }).fill(title);
       await a.getByRole('button', { name: 'プロジェクトを作成', exact: true }).click(); await expect(a.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText(title);
       await revealCoordinateAdd(a); const target = a.getByLabel('追加先モデル', { exact: true }); await target.focus();
       const ids = await target.locator('option').evaluateAll(nodes => nodes.map(n => (n as HTMLOptionElement).value).filter(Boolean)); expect(ids).toHaveLength(1);
@@ -137,7 +137,7 @@ test('差し替えと受信の中断を元のファイルから復旧し、手�
       await expect(a.getByText('シーンを追加しました。', { exact: true })).toBeVisible({ timeout: actionTimeout }); await scenes.getByRole('button', { name: first, exact: true }).click(); await chooseCaption(a);
       const path = await download(a, info, 'W0-差し替え前', 'teamWorkspace'); initialWorkspacePath = path; base = await WorkspaceArchive.inspect(await blob(path), validationMetadataLimits);
       const inspected = await inspectProjectCandidates(base.source.read(), validationMetadataLimits); if (inspected.kind !== 'project-candidate-inspection') throw Error('initial metadata'); initialRecords = inspected.unambiguousRecords;
-      await b.getByLabel('ファイルを選択', { exact: true }).setInputFiles(path); await b.getByRole('button', { name: 'ファイルを開く', exact: true }).click();
+      await chooseHomeFiles(b, path); await b.getByRole('button', { name: 'プロジェクトを取り込む', exact: true }).click();
       await expect(b.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText(title, { timeout: actionTimeout }); await chooseCaption(b); await edit(b, localBody); await image(b, 'Bの追加画像.png', localPng);
       originalColor = await marker(b).evaluate(node => getComputedStyle(node).backgroundColor);
     });

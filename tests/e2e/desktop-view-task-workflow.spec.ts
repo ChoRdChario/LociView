@@ -1,4 +1,4 @@
-import { selectShareOutput,  revealCameraPositions, revealWorkPanel, revealFileSurface } from './workspaceUi';
+import { chooseHomeFiles, selectShareOutput,  revealCameraPositions, revealWorkPanel, revealFileSurface } from './workspaceUi';
 import { test, expect, type Page, type BrowserContext, type TestInfo } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import * as A from '@automerge/automerge';
@@ -58,8 +58,8 @@ test('PC task navigation retains model, View and material drafts through keyboar
   const errors: string[] = [], remote: string[] = []; await localOnly(context, remote,origin); page.on('pageerror', error => errors.push(error.message));
   const peer = await browser.newContext({ viewport: { width: 1440, height: 900 }, serviceWorkers: 'block', acceptDownloads: true }); await localOnly(peer, remote,origin);
   try {
-    await page.goto(server.url); await page.getByLabel('ファイルを選択', { exact: true }).setInputFiles({ name: '作業するモデル.glb', mimeType: 'model/gltf-binary', buffer: triangleGlb() });
-    await page.getByRole('button', { name: 'ファイルを開く', exact: true }).click(); await page.getByRole('textbox', { name: 'プロジェクト名', exact: true }).fill('視点と材質の整理'); await page.getByRole('button', { name: 'プロジェクトを作成', exact: true }).click();
+    await page.goto(server.url); await chooseHomeFiles(page, { name: '作業するモデル.glb', mimeType: 'model/gltf-binary', buffer: triangleGlb() });
+    await page.getByRole('textbox', { name: 'プロジェクト名', exact: true }).fill('視点と材質の整理'); await page.getByRole('button', { name: 'プロジェクトを作成', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText('視点と材質の整理', { timeout: 90_000 }); await expect(page.getByLabel('3Dモデルの表示', { exact: true })).toHaveAttribute('aria-busy', 'false');
     await page.evaluate(() => { (window as any).__taskCanvas = document.querySelector('.lv-project-stage canvas'); });
     await tab(page, 'モデル').click(); const modelPanel = page.getByRole('tabpanel', { name: 'モデル', exact: true }); await modelPanel.locator('.lv-model-select').filter({ hasText: '作業するモデル.glb' }).click();
@@ -88,7 +88,7 @@ test('PC task navigation retains model, View and material drafts through keyboar
     const file = await save(page, info, '視点と材質'), saved = await inspect(file), savedViews = Object.values(saved.records.viewsById) as any[];
     expect(savedViews).toHaveLength(2);expect(savedViews.map(v=>v.camera.projection.kind).sort()).toEqual(['orthographic','perspective']);const entry=(Object.values(saved.records.scenesById) as any[])[0]!.defaultViewId;expect(saved.records.viewsById[entry].camera.projection.kind).toBe('orthographic');
     const storedMaterials = Object.values(saved.records.materialOverridesById) as any[]; expect(storedMaterials).toHaveLength(1); expect(storedMaterials[0]).toMatchObject({ appearance: { lighting: 'unlit', opacity: 0.65 }, compositing: { coverage: { policy: 'mask', alphaCutoff: 0.4 } } });
-    const b = await peer.newPage(); b.setDefaultTimeout(15_000); b.on('pageerror', error => errors.push(error.message)); await b.goto(server.url); await b.getByLabel('ファイルを選択', { exact: true }).setInputFiles(file); await b.getByRole('button', { name: 'ファイルを開く', exact: true }).click();
+    const b = await peer.newPage(); b.setDefaultTimeout(15_000); b.on('pageerror', error => errors.push(error.message)); await b.goto(server.url); await chooseHomeFiles(b, file); await b.getByRole('button', { name: 'プロジェクトを取り込む', exact: true }).click();
     await expect(b.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText('視点と材質の整理', { timeout: 90_000 }); await expect(b.getByLabel('3Dモデルの表示', { exact: true })).toHaveAttribute('aria-busy', 'false'); await tabsVisible(b);
     await tab(b, 'モデル').click(); const peerModel = b.getByRole('tabpanel', { name: 'モデル', exact: true }); await peerModel.locator('.lv-model-select').filter({ hasText: '作業するモデル.glb' }).click(); await peerModel.getByRole('button', { name: '配置を調整', exact: true }).click();
     await expect(peerModel.getByLabel('モデル位置 X', { exact: true })).toHaveValue('1'); await expect(peerModel.getByLabel('モデル倍率', { exact: true })).toHaveValue('1.25'); await peerModel.getByRole('button', { name: '配置を取り消す', exact: true }).click();

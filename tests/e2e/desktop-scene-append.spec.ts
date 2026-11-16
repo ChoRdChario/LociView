@@ -8,14 +8,13 @@ import { selectCleanRecords } from '../../src/projectPackage/cleanRecords';
 import { validationMetadataLimits } from '../../src/projectFiles/validation';
 import { ownedServer } from '../offline-e2e/server';
 import { smallPng, triangleGlb } from './fixtures';
-import { openAddOptions,chooseSharedScene, beginSceneCreation, revealCoordinateAdd, revealFileSurface, selectShareOutput } from './workspaceUi';
+import { chooseHomeFiles, revealReviewFiles, openAddOptions,chooseSharedScene, beginSceneCreation, revealCoordinateAdd, revealFileSurface, selectShareOutput } from './workspaceUi';
 
 const button = (page: Page, name: string) => page.getByRole('button', { name, exact: true });
 const files = (page: Page) => page.getByRole('region', { name: 'ファイル', exact: true });
 const ready = (page: Page) => expect(button(page, '閲覧する')).toBeEnabled({ timeout: 90_000 });
 async function selectFile(page: Page, file: Parameters<ReturnType<Page['getByLabel']>['setInputFiles']>[0]) {
-  await page.getByLabel('ファイルを選択', { exact: true }).setInputFiles(file);
-  await button(page, 'ファイルを開く').click();
+  await chooseHomeFiles(page, file);
 }
 async function createProject(page: Page, title: string, z: number) {
   await selectFile(page, { name: '共通名.glb', mimeType: 'model/gltf-binary', buffer: triangleGlb(z) });
@@ -115,6 +114,7 @@ for (const scenario of [
     await page.locator('details.lv-project-files').getByRole('button', { name: 'プロジェクトを選ぶ', exact: true }).click(); await selectFile(page, zip);
     const review = page.getByRole('main', { name: '閲覧用のシーン' });
     const panel = review.getByRole('region', { name: 'シーンの追加' });
+    await revealReviewFiles(review);
     const open = review.getByRole('button', { name: '既存に追加', exact: true });
     await (scenario.touch ? open.tap() : open.click());
     await expect(panel).toContainText('モデル 1・キャプション 1・メディア 1');

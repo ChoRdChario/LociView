@@ -5,7 +5,7 @@ import { openAsBlob } from 'node:fs';
 import * as A from '@automerge/automerge';
 import { ownedServer } from './server';
 import { triangleGlb } from '../e2e/fixtures';
-import { revealFileSurface, closeFileSurface, revealCoordinateAdd, revealOfflineUtilities } from '../e2e/workspaceUi';
+import { chooseHomeFiles, revealFileSurface, closeFileSurface, revealCoordinateAdd, revealOfflineUtilities } from '../e2e/workspaceUi';
 import { BackupArchive } from '../../src/projectPackage/backupArchive';
 import { validationMetadataLimits } from '../../src/projectFiles/validation';
 
@@ -48,8 +48,8 @@ for (const base of ['/', '/LociView/']) test(`same-build cold boot repairs missi
   async function close() { await context?.close(); context = undefined; }
   try {
     let p = await launch(); await p.goto(server.url); await prepared(p);
-    await p.getByLabel('ファイルを選択', { exact: true }).setInputFiles({ name: 'original.glb', mimeType: 'model/gltf-binary', buffer: triangleGlb() });
-    await p.getByRole('button', { name: 'ファイルを開く', exact: true }).click(); await p.getByLabel('プロジェクト名', { exact: true }).fill(title);
+    await chooseHomeFiles(p, { name: 'original.glb', mimeType: 'model/gltf-binary', buffer: triangleGlb() });
+    await p.getByLabel('プロジェクト名', { exact: true }).fill(title);
     await p.getByRole('button', { name: 'プロジェクトを作成', exact: true }).click(); await selected(p);
     await revealCoordinateAdd(p); const model = p.getByLabel('追加先モデル', { exact: true }); await model.focus(); await model.selectOption({ label: 'original.glb' });
     await p.getByRole('button', { name: 'このモデルに追加', exact: true }).click();

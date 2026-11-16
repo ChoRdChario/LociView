@@ -1,5 +1,5 @@
 import {test, createBrowserProfile} from '../helpers/browserProfile';
-import { chooseSharedScene, selectShareOutput, revealCaptionList, revealCoordinateAdd, revealFileSurface, revealProjectSelection, revealOfflineUtilities } from '../e2e/workspaceUi';
+import { chooseHomeFiles, revealReviewFiles, chooseSharedScene, selectShareOutput, revealCaptionList, revealCoordinateAdd, revealFileSurface, revealProjectSelection, revealOfflineUtilities } from '../e2e/workspaceUi';
 import {expect,chromium,type BrowserContext,type Page,type TestInfo} from '@playwright/test';
 import {readFile,writeFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
@@ -23,8 +23,8 @@ async function selectedWithStage(p:Page,title:string){
   await selected(p,title);
 }
 async function ready(p:Page,text:string){await expect(p.getByText(text,{exact:true})).toBeVisible({timeout:180_000});await expect(p.locator('main.lv-project-workspace > header > p.lv-operation-status')).toHaveAttribute('data-busy','false');}
-async function file(p:Page,path:string){await expect(p.getByLabel('ファイルを選択',{exact:true})).toBeEnabled();await p.getByLabel('ファイルを選択',{exact:true}).setInputFiles(path);await p.getByRole('button',{name:'ファイルを開く',exact:true}).click();}
-async function home(p:Page){await revealProjectSelection(p);await p.getByRole('button',{name:/^(?:プロジェクトを選ぶ|ファイルを開く|別のプロジェクトを開く)$/}).click();await expect(p.getByLabel('ファイルを選択',{exact:true})).toBeVisible();await expect(p.locator('.lv-validation-status')).toHaveAttribute('data-busy','false');}
+async function file(p:Page,path:string){await expect(p.getByLabel('ファイルを選択',{exact:true})).toBeEnabled();await chooseHomeFiles(p, path);}
+async function home(p:Page){await revealProjectSelection(p);await p.getByRole('button',{name:/^(?:プロジェクトを選ぶ|ファイルを開く|別のプロジェクトを開く)$/}).click();await expect(p.getByRole('button', { name: 'ファイルを開く', exact: true })).toBeVisible();await expect(p.locator('.lv-validation-status')).toHaveAttribute('data-busy','false');}
 async function output(p:Page,info:TestInfo,name:string){
   const menu=p.locator('details.lv-project-files');if(!await menu.evaluate(n=>(n as HTMLDetailsElement).open))await menu.locator(':scope > summary').click();
   const area=p.getByRole('region',{name:'ファイル',exact:true});if(!await revealFileSurface(p,'共有'))await area.getByRole('button',{name:'相手に渡す',exact:true}).click();await selectShareOutput(area, 'teamWorkspace');
@@ -62,7 +62,7 @@ test('static data survives prepared cold offline Mesh/Point/500k SH4/Proxy/media
   try{
     let p=await open();const mesh=info.outputPath('基準.glb'),point=info.outputPath('点群.ply'),photo=info.outputPath('現地.png');await writeFile(mesh,triangleGlb());await writeFile(photo,smallPng());
     await writeFile(point,'ply\nformat ascii 1.0\nelement vertex 3\nproperty float x\nproperty float y\nproperty float z\nproperty uchar red\nproperty uchar green\nproperty uchar blue\nend_header\n0 0 0 255 0 0\n-1 0 0 0 255 0\n1 0 0 0 0 255\n');
-    const source=await largeGsFixture();await expect(p.getByLabel('ファイルを選択',{exact:true})).toBeEnabled();await p.getByLabel('ファイルを選択',{exact:true}).setInputFiles([mesh,point,source]);await p.getByRole('button',{name:'ファイルを開く',exact:true}).click();await p.getByLabel('プロジェクト名',{exact:true}).fill('オフライン現地作業');await p.getByRole('button',{name:'プロジェクトを作成',exact:true}).click();await selected(p,'オフライン現地作業');mark('static: mixed500k Project created');
+    const source=await largeGsFixture();await expect(p.getByLabel('ファイルを選択',{exact:true})).toBeEnabled();await chooseHomeFiles(p, [mesh,point,source]);await p.getByLabel('プロジェクト名',{exact:true}).fill('オフライン現地作業');await p.getByRole('button',{name:'プロジェクトを作成',exact:true}).click();await selected(p,'オフライン現地作業');mark('static: mixed500k Project created');
     await p.getByRole('tab',{name:'モデル',exact:true}).click();const models=p.getByRole('tabpanel',{name:'モデル',exact:true});await models.locator('.lv-model-select').filter({hasText:'500k'}).click();
     const chooser=p.waitForEvent('filechooser');await models.getByRole('button',{name:'ピン配置用モデルを追加',exact:true}).click();await(await chooser).setFiles(mesh);await models.getByRole('button',{name:'ピン配置用モデルを設定',exact:true}).click();await ready(p,'ピン配置用モデルを登録しました。');
     await p.getByRole('tab',{name:'キャプション',exact:true}).click();await revealCoordinateAdd(p);await p.getByLabel('追加先モデル',{exact:true}).focus();await p.getByLabel('追加先モデル',{exact:true}).selectOption({label:'基準.glb'});await p.getByRole('button',{name:'このモデルに追加',exact:true}).click();for(const[axis,value]of [['X','0'],['Y','.5'],['Z','0']])await p.getByLabel(`位置 ${axis}`,{exact:true}).fill(value!);await p.getByRole('button',{name:'ここに記録を作る',exact:true}).click();await ready(p,'ピンの位置を確定しました。');
@@ -196,7 +196,7 @@ test('touch can create a direct mixed Review copy offline, save and cold reopen 
     const review = await ReviewArchive.inspect(new Blob([Uint8Array.from(await readFile(reviewPath)).buffer]), limits);
     await context!.close(); context = undefined; await server.stop(); p = await open(true); await selectedWithStage(p, 'Native点群とGS');
     await home(p); await file(p, reviewPath); await expect(p.getByRole('main', { name: '閲覧用のシーン', exact: true })).toBeVisible();
-    await p.getByRole('button', { name: '編集コピーを作る', exact: true }).click(); await p.getByRole('button', { name: 'コピーを作成', exact: true }).click(); await selectedWithStage(p, 'Native点群とGS');
+    await revealReviewFiles(p); await p.getByRole('button', { name: '編集コピーを作る', exact: true }).click(); await p.getByRole('button', { name: 'コピーを作成', exact: true }).click(); await selectedWithStage(p, 'Native点群とGS');
     await revealCaptionList(p); await p.locator('.lv-caption-select').first().click(); await detail(p).getByLabel('本文', { exact: true }).fill('通信なしの直接コピー');
     await detail(p).getByRole('button', { name: '変更を適用', exact: true }).click(); await ready(p, '変更を適用しました。');
     const saved = await BackupArchive.inspect(new Blob([Uint8Array.from(await readFile(await backup(p, info, 'direct-offline'))).buffer]), limits);

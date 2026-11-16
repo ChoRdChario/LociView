@@ -1,4 +1,4 @@
-import { selectShareOutput,  revealCoordinateAdd, revealFileSurface, revealCaptionList, revealProjectSelection } from './workspaceUi';
+import { chooseHomeFiles, selectShareOutput,  revealCoordinateAdd, revealFileSurface, revealCaptionList, revealProjectSelection } from './workspaceUi';
 import { test, expect, type Page, type TestInfo } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import * as A from '@automerge/automerge';
@@ -80,8 +80,8 @@ test('PC Caption work continues after empty tag focus and cancelled file checks,
   const peer = await browser.newContext({ viewport: { width: 1440, height: 900 }, serviceWorkers: 'block', acceptDownloads: true }); await localOnly(peer);
   const b = await peer.newPage(); b.on('pageerror', error => errors.push(error.message));
   try {
-    await page.goto(entry); await page.getByLabel('ファイルを選択', { exact: true }).setInputFiles({ name: '現地モデル.glb', mimeType: 'model/gltf-binary', buffer: triangleGlb() });
-    await page.getByRole('button', { name: 'ファイルを開く', exact: true }).click(); await page.getByRole('textbox', { name: 'プロジェクト名', exact: true }).fill(projectTitle); await page.getByRole('button', { name: 'プロジェクトを作成', exact: true }).click();
+    await page.goto(entry); await chooseHomeFiles(page, { name: '現地モデル.glb', mimeType: 'model/gltf-binary', buffer: triangleGlb() });
+    await page.getByRole('textbox', { name: 'プロジェクト名', exact: true }).fill(projectTitle); await page.getByRole('button', { name: 'プロジェクトを作成', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText(projectTitle, { timeout: 90_000 });
     await expect(page.getByLabel('3Dモデルの表示', { exact: true })).toHaveAttribute('aria-busy', 'false');
     await revealCoordinateAdd(page); const owner = page.getByLabel('追加先モデル', { exact: true }); await owner.focus(); await owner.selectOption({ label: '現地モデル.glb' });
@@ -143,7 +143,7 @@ test('PC Caption work continues after empty tag focus and cancelled file checks,
     await page.getByRole('button', { name: 'プロジェクトを選ぶ', exact: true }).click(); await page.getByRole('button', { name: '編集で開く', exact: true }).first().click();
     await expect(page.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText(projectTitle, { timeout: 90_000 }); await chooseCaption(page, '確認する場所');
     const workspace = await output(page, info, '作業一式', 'teamWorkspace');await page.locator('details.lv-project-files').getByRole('button',{name:'閉じる',exact:true}).click();
-    await b.goto(entry); await b.getByLabel('ファイルを選択', { exact: true }).setInputFiles(workspace); await b.getByRole('button', { name: 'ファイルを開く', exact: true }).click();
+    await b.goto(entry); await chooseHomeFiles(b, workspace); await b.getByRole('button', { name: 'プロジェクトを取り込む', exact: true }).click();
     await expect(b.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText(projectTitle, { timeout: 90_000 }); await chooseCaption(b, '確認する場所');
     await edit(b, 'タイトル', '相手のタイトル'); const returned = await output(b, info, '相手の更新', 'teamWorkspace'); await edit(page, '本文', '手元の本文');
     await fileMenu(page); const incoming = receive(page), incomingStatus = incoming.locator(':scope > p[role="status"]');

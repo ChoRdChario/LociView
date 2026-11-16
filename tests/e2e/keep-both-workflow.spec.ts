@@ -1,4 +1,4 @@
-import { expectResumedProject, openAddOptions, revealCoordinateAdd, beginSceneCreation, revealCaptionList } from './workspaceUi';
+import { chooseHomeFiles, expectResumedProject, openAddOptions, revealCoordinateAdd, beginSceneCreation, revealCaptionList } from './workspaceUi';
 import { test, expect, chromium, type BrowserContext, type Page, type TestInfo } from '@playwright/test';
 import { createHash } from 'node:crypto';
 import { mkdir, mkdtemp, readFile, readdir } from 'node:fs/promises';
@@ -93,7 +93,7 @@ test('二人の重複登録を両方残し、元と独立コピーを別々に�
       assets: await Promise.all((await readdir('validation-dist/assets')).map(async name => ({ name, sha256: sha(await readFile(join('validation-dist/assets', name))) }))) }), contentType: 'application/json' });
     let base!: Awaited<ReturnType<typeof WorkspaceArchive.inspect>>, seed!: Record<string, any>, originalAsset = '', originalCaption = '', originalSceneId = '', targetSceneId = '';
     await step('元のシーンを保ち、二人が同じモデルと記録を別々に追加する', async () => {
-      await a.getByLabel('ファイルを選択', { exact: true }).setInputFiles({ name: 'shared.glb', mimeType: 'model/gltf-binary', buffer: glb }); await a.getByRole('button', { name: 'ファイルを開く', exact: true }).click();
+      await chooseHomeFiles(a, { name: 'shared.glb', mimeType: 'model/gltf-binary', buffer: glb });
       await a.getByRole('textbox', { name: 'プロジェクト名', exact: true }).fill(projectName); await a.getByRole('button', { name: 'プロジェクトを作成', exact: true }).click();
       await expect(a.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText(projectName);
       firstScene = (await a.getByRole('region', { name: 'シーン', exact: true }).locator('button[aria-pressed="true"]').textContent())!;
@@ -111,7 +111,7 @@ test('二人の重複登録を両方残し、元と独立コピーを別々に�
       const initial = await download(a, info, 'W0-登録前の作業一式', 'teamWorkspace'); base = await WorkspaceArchive.inspect(await fileBlob(initial), validationMetadataLimits); seed = await records(base.source);
       originalAsset = Object.keys(seed.assetsById)[0]!; originalCaption = Object.keys(seed.captionsById)[0]!;
       originalSceneId = Object.keys(seed.scenesById).find(id => seed.scenesById[id].name === firstScene)!; targetSceneId = Object.keys(seed.scenesById).find(id => seed.scenesById[id].name === targetScene)!;
-      await b.getByLabel('ファイルを選択', { exact: true }).setInputFiles(initial); await b.getByRole('button', { name: 'ファイルを開く', exact: true }).click(); await expect(b.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText(projectName, { timeout: actionTimeout });
+      await chooseHomeFiles(b, initial); await b.getByRole('button', { name: 'プロジェクトを取り込む', exact: true }).click(); await expect(b.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText(projectName, { timeout: actionTimeout });
       for (const page of [a, b]) {
         await scene(page, targetScene); await page.getByRole('tab', { name: 'モデル', exact: true }).click(); const toggle = modelPanel(page).getByRole('checkbox', { name: 'このシーンに表示', exact: true });
         await expect(toggle).not.toBeChecked(); await toggle.click(); await done(page, 'このシーンにモデルを追加しました。'); await expect(toggle).toBeChecked();

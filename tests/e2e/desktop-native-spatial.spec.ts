@@ -1,7 +1,7 @@
 import {test, createBrowserProfile} from '../helpers/browserProfile';
 import { writeCleanImportFixture } from './cleanImportFixture';
 import { desktopEntry, desktopOrigin } from './desktopEntry';
-import {chooseSharedScene, selectShareOutput,  closeFileSurface, revealFileSurface, lookAlongFront, revealCaptionList } from './workspaceUi';
+import { chooseHomeFiles, revealReviewFiles,chooseSharedScene, selectShareOutput,  closeFileSurface, revealFileSurface, lookAlongFront, revealCaptionList } from './workspaceUi';
 import {expect,chromium,type Page,type BrowserContext,type TestInfo} from '@playwright/test';
 import {writeFile} from 'node:fs/promises';
 import {openAsBlob} from 'node:fs';
@@ -21,7 +21,7 @@ const entry=desktopEntry+'?timings=1',title='Native点群とGS';
 const files=(p:Page)=>p.getByRole('region',{name:'ファイル',exact:true});
 const detail=(p:Page)=>p.getByRole('region',{name:'キャプションの詳細',exact:true});
 async function ready(p:Page){await expect(p.getByRole('heading',{name:'プロジェクト名',exact:true})).toHaveText(title,{timeout:240000});await expect(p.locator('.lv-project-viewport-status')).toBeEmpty({timeout:180000});}
-async function open(p:Page,path:string){await p.getByLabel('ファイルを選択',{exact:true}).setInputFiles(path);await p.getByRole('button',{name:'ファイルを開く',exact:true}).click();}
+async function open(p:Page,path:string){await chooseHomeFiles(p, path);}
 async function selectCaption(p:Page,label='既存のピン'){await revealCaptionList(p);await p.getByRole('tab',{name:'キャプション',exact:true}).click();await p.getByRole('list',{name:'キャプション一覧',exact:true}).locator('.lv-caption-select').filter({hasText:label}).click();}
 async function edit(p:Page,field:'タイトル'|'本文',text:string){await closeFileSurface(p);await detail(p).getByLabel(field,{exact:true}).fill(text);await detail(p).getByRole('button',{name:'変更を適用',exact:true}).click();await expect(p.getByText('変更を適用しました。',{exact:true})).toBeVisible({timeout:180000});}
 async function output(p:Page,info:TestInfo,name:string,purpose:'backup'|'teamWorkspace'|'contribution'|'review',base?:string){
@@ -125,7 +125,7 @@ test('Native07kの点群GSと面を変換し共有返送Review編集コピー独
     const placed=await backup(await output(a.p,info,'placed','backup')),captions=Object.values(placed.records.captionsById) as any[];
     expect(captions.find(c=>c.title==='引き継いだ点の指定').anchor).toMatchObject({positionAsset:[.5,0,0],hitEvidence:{method:'point-cloud',source:{surfaceRef:{pointIndex:0}}}});
     expect(captions.find(c=>c.title==='引き継いだ面の指定').anchor).toMatchObject({positionAsset:[.2,expect.any(Number),expect.any(Number)],hitEvidence:{method:'manual'}});
-    let workspace=await output(a.p,info,'workspace-1','teamWorkspace'),wire=await WorkspaceArchive.inspect(await openAsBlob(workspace),limits),b=await run.launch(1);await open(b.p,workspace);await ready(b.p);
+    let workspace=await output(a.p,info,'workspace-1','teamWorkspace'),wire=await WorkspaceArchive.inspect(await openAsBlob(workspace),limits),b=await run.launch(1);await open(b.p,workspace); await b.p.getByRole('button', { name: 'プロジェクトを取り込む', exact: true }).click();await ready(b.p);
     for(let round=1;round<=2;round++){
       const currentTitle=round===1?'既存のピン':`返送前${round-1}`;await selectCaption(a.p,currentTitle);await edit(a.p,'本文',`手元の本文${round}`);await selectCaption(b.p,currentTitle);await edit(b.p,'タイトル',`返送前${round}`);
       const returned=await output(b.p,info,'return-'+round,'contribution',wire.archive.control.manifest.packageId),receive=a.p.getByRole('region',{name:'更新ファイル',exact:true});
@@ -138,9 +138,9 @@ test('Native07kの点群GSと面を変換し共有返送Review編集コピー独
     const finalPath=await output(a.p,info,'final','backup'),final=await backup(finalPath),reviewPath=await output(a.p,info,'review','review'),cleanPath=await writeCleanImportFixture(finalPath,info.outputPath('clean.zip'));
     for(const path of [workspace,finalPath,reviewPath,cleanPath]){const archive=await PackageArchive.inspect(await openAsBlob(path));expect(archive.control.manifest.blobs.some(b=>b.sha256===fixture.originalDigest)).toBe(false);}
     await run.close(a.context);a=await run.launch(0);await ready(a.p);expect((await backup(await output(a.p,info,'cold','backup'))).archive.source.token).toBe(final.archive.source.token);await run.close(a.context);
-    const review=await run.launch(2);await open(review.p,reviewPath);await expect(review.p.getByText('閲覧用シーンを開きました。編集プロジェクトは作成していません。',{exact:true})).toBeVisible({timeout:180000});await review.p.getByRole('button',{name:'編集コピーを作る',exact:true}).click();await review.p.getByRole('button',{name:'コピーを作成',exact:true}).click();await ready(review.p);
+    const review=await run.launch(2);await open(review.p,reviewPath);await expect(review.p.getByRole('main', { name: '閲覧用のシーン', exact: true }).getByText('閲覧中', { exact: true })).toBeVisible({timeout:180000});await revealReviewFiles(review.p); await review.p.getByRole('button',{name:'編集コピーを作る',exact:true}).click();await review.p.getByRole('button',{name:'コピーを作成',exact:true}).click();await ready(review.p);
     const editable=await backup(await output(review.p,info,'review-edit','backup'));expect(editable.archive.source.proof.identity.projectId).not.toBe(final.archive.source.proof.identity.projectId);expect((Object.values(editable.records.representationsById) as any[]).find(r=>r.role==='interactionProxy').derivedFrom).toEqual([]);await run.close(review.context);
-    const clean=await run.launch(3);await open(clean.p,cleanPath);await ready(clean.p);const standalone=await backup(await output(clean.p,info,'clean-edit','backup')),reps=Object.values(standalone.records.representationsById) as any[];expect(reps.find(r=>r.role==='interactionProxy').derivedFrom).toEqual([reps.find(r=>r.role==='gsPrimary').id]);expect((await CleanArchive.inspect(await openAsBlob(cleanPath),limits)).source.proof.identity).toEqual(standalone.archive.source.proof.identity);await run.close(clean.context);
+    const clean=await run.launch(3);await open(clean.p,cleanPath); await clean.p.getByRole('button', { name: 'プロジェクトを取り込む', exact: true }).click();await ready(clean.p);const standalone=await backup(await output(clean.p,info,'clean-edit','backup')),reps=Object.values(standalone.records.representationsById) as any[];expect(reps.find(r=>r.role==='interactionProxy').derivedFrom).toEqual([reps.find(r=>r.role==='gsPrimary').id]);expect((await CleanArchive.inspect(await openAsBlob(cleanPath),limits)).source.proof.identity).toEqual(standalone.archive.source.proof.identity);await run.close(clean.context);
     const restored=await run.launch(4);await open(restored.p,finalPath);await restored.p.getByRole('button',{name:'このファイルから再開',exact:true}).click();await ready(restored.p);expect((await backup(await output(restored.p,info,'restored','backup'))).records).toEqual(final.records);await run.close(restored.context);
     const cold=await run.launch(4);await ready(cold.p);await run.mark('restored-cold',cold.p);await run.close(cold.context);expect(run.errors).toEqual([]);
   }finally{await run.finish();}

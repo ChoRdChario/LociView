@@ -4,7 +4,7 @@ import {readFile} from 'node:fs/promises';
 import * as A from '@automerge/automerge';
 import {ownedServer} from '../offline-e2e/server';
 import {nativeConversionBackup,smallPng,triangleGlb} from './fixtures';
-import {revealCaptionList,revealCoordinateAdd,revealWorkPanel,revealFileSurface} from './workspaceUi';
+import { chooseHomeFiles, revealCaptionList,revealCoordinateAdd,revealWorkPanel,revealFileSurface } from './workspaceUi';
 import {BackupArchive} from '../../src/projectPackage/backupArchive';
 import {inspectProjectCandidates} from '../../src/domain/projectCandidates';
 import {validationMetadataLimits} from '../../src/projectFiles/validation';
@@ -44,8 +44,8 @@ for(const touch of [false,true])test(`native capacity recovery retains drafts an
   };
   const fault=async(p:Page,kind:string)=>p.evaluate(value=>{(window as any).__capacityFault.kind=value;},kind);
   try{
-    const p=await launch();await p.getByLabel('ファイルを選択',{exact:true}).setInputFiles({name:'容量確認.glb',mimeType:'model/gltf-binary',buffer:triangleGlb()});
-    await p.getByRole('button',{name:'ファイルを開く',exact:true}).click();await p.getByRole('textbox',{name:'プロジェクト名',exact:true}).fill('容量から復旧');await p.getByRole('button',{name:'プロジェクトを作成',exact:true}).click();
+    const p=await launch();await chooseHomeFiles(p, {name:'容量確認.glb',mimeType:'model/gltf-binary',buffer:triangleGlb()});
+    await p.getByRole('textbox',{name:'プロジェクト名',exact:true}).fill('容量から復旧');await p.getByRole('button',{name:'プロジェクトを作成',exact:true}).click();
     if(touch)await p.getByRole('button',{name:'3D',exact:true}).click();
     await expect(p.getByLabel('3Dモデルの表示',{exact:true})).toHaveAttribute('aria-busy','false',{timeout:90_000});await revealWorkPanel(p);await revealCoordinateAdd(p);
     const model=p.getByLabel('追加先モデル',{exact:true});await model.focus();await model.selectOption({label:'容量確認.glb'});
@@ -161,17 +161,15 @@ for (const restored of [true, false]) for (const touch of [false, true]) test(`r
   };
   try {
     const author = await open(restored ? await createBrowserProfile('author') : receiver);
-    await author.getByLabel('ファイルを選択', { exact: true }).setInputFiles({
+    await chooseHomeFiles(author, {
       name: '記録.zip', mimeType: 'application/zip', buffer: await nativeConversionBackup(triangleGlb(), smallPng()) });
-    await author.getByRole('button', { name: 'ファイルを開く', exact: true }).click();
     await author.getByRole('button', { name: '新しいプロジェクトに変換', exact: true }).click();
     await expect(author.getByRole('button', { name: '閲覧する', exact: true })).toBeEnabled();
     const before = await backup(author, 'before');
     await context!.close();
     const page = await open(receiver);
     if (restored) {
-      await page.getByLabel('ファイルを選択', { exact: true }).setInputFiles(info.outputPath('before.zip'));
-      await page.getByRole('button', { name: 'ファイルを開く', exact: true }).click();
+      await chooseHomeFiles(page, info.outputPath('before.zip'));
       await page.getByRole('button', { name: 'このファイルから再開', exact: true }).click();
     }
     // Restore can already offer read-only captions while the editor is being

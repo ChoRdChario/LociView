@@ -1,7 +1,7 @@
 import {test,expect,chromium,type Page} from '@playwright/test';
 import {ownedServer} from '../offline-e2e/server';
 import {triangleGlb} from './fixtures';
-import {revealCoordinateAdd,revealFileSurface} from './workspaceUi';
+import { chooseHomeFiles, revealCoordinateAdd,revealFileSurface } from './workspaceUi';
 import {readFile} from 'node:fs/promises';
 import * as A from '@automerge/automerge';
 import {BackupArchive} from '../../src/projectPackage/backupArchive';
@@ -27,8 +27,8 @@ test('same-profile Project editing stays exclusive and resumes after the holder 
   await context.route('**/*',route=>{const u=new URL(route.request().url());if(u.origin===new URL(server.url).origin||['blob:','data:'].includes(u.protocol))return route.continue();remote.push(u.href);return route.abort();});
   try{
     const holder=await context.newPage();await holder.goto(server.url);
-    await holder.getByLabel('ファイルを選択',{exact:true}).setInputFiles({name:'共有モデル.glb',mimeType:'model/gltf-binary',buffer:triangleGlb()});
-    await holder.getByRole('button',{name:'ファイルを開く',exact:true}).click();await holder.getByLabel('プロジェクト名',{exact:true}).fill('同じプロジェクトの二窓');await holder.getByRole('button',{name:'プロジェクトを作成',exact:true}).click();await readable(holder);
+    await chooseHomeFiles(holder, {name:'共有モデル.glb',mimeType:'model/gltf-binary',buffer:triangleGlb()});
+    await holder.getByLabel('プロジェクト名',{exact:true}).fill('同じプロジェクトの二窓');await holder.getByRole('button',{name:'プロジェクトを作成',exact:true}).click();await readable(holder);
     await revealCoordinateAdd(holder);const model=holder.getByLabel('追加先モデル',{exact:true});await model.focus();await model.selectOption({label:'共有モデル.glb'});await holder.getByRole('button',{name:'このモデルに追加',exact:true}).click();
     for(const axis of ['X','Y','Z'])await holder.getByLabel(`位置 ${axis}`,{exact:true}).fill('0');
     await holder.getByRole('button',{name:'ここに記録を作る',exact:true}).click();await ready(holder,'ピンの位置を確定しました。');

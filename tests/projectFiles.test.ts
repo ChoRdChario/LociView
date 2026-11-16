@@ -680,19 +680,19 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     await vi.waitFor(() => expect(all(root).find(n => n.tag === 'button' && n.textContent === 'ファイルを開く')!.disabled).toBe(false));
     const model = glb(j => { j.images[0].mimeType = 'image/jpeg'; }, true, jpegBytes('rgb-progressive')), photo = imageFor(format);
     if(format==='heic'){
-      Object.assign(input,{files:[new File([model.slice().buffer],'model.data'),new File([photo.slice().buffer],'photo.bin')]});input.parent!.parent!.fire('submit',{preventDefault(){}});
+      Object.assign(input,{files:[new File([model.slice().buffer],'model.data'),new File([photo.slice().buffer],'photo.bin')]});input.fire('change');
       await vi.waitFor(()=>expect(finishHeic).toBeTypeOf('function'));const cancel=all(root).find(n=>n.tag==='button'&&n.textContent==='選択を取り消す')!;expect(cancel.disabled).toBe(false);cancel.fire('click');
       await vi.waitFor(()=>expect(input.disabled).toBe(false));expect(create.parent!.hidden).toBe(true);expect(host).toBeUndefined();expect(factories.size).toBe(0);expect(await r.fs.list('')).toEqual([]);
       const close=vi.fn();finishHeic!({width:96,height:64,close});await vi.waitFor(()=>expect(close).toHaveBeenCalledOnce());
     }
     if (format === 'jpeg') {
       Object.assign(input,{ files:[new File([model.slice().buffer],'model.data'),new File([syntheticHeif().buffer],'photo.jpg',{type:'image/jpeg'})] });
-      input.parent!.parent!.fire('submit',{preventDefault(){}});
+      input.fire('change');
       await vi.waitFor(() => expect(all(root).some(n => n.textContent.includes('端末で別のJPEGを書き出して選び直してください。'))).toBe(true),{timeout:10000});
       expect(host).toBeUndefined(); expect(await r.fs.list('')).toEqual([]); expect(factories.size).toBe(0);
     }
     Object.assign(input, { files: [new File([model.slice().buffer], 'model.data', { type: 'text/plain' }), new File([photo.slice().buffer], format === 'jpeg' ? 'photo.heic' : 'photo.bin', { type: 'application/octet-stream' })] });
-    input.parent!.parent!.fire('submit', { preventDefault() {} });
+    input.fire('change');
     await vi.waitFor(() => expect(!create.parent!.hidden && !create.disabled).toBe(true));
     expect(host).toBeUndefined(); expect(factories.size).toBe(0); expect(await r.fs.list('')).toEqual([]);
     if(format==='jpeg')r.fs.reject=path=>path.endsWith('/published.json');
@@ -738,11 +738,14 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       const next=owned(createValidationWorkspace(new RecordedDocument().asDocument(),{...peerOptions,productEditor:true,list:async()=>[],selected(){},render:async()=>({factory,dispose(){}}),open:opening})),page=record(next.root),input2=all(page).find(n=>n.attributes.get('aria-label')==='ファイルを選択')!;
       await vi.waitFor(()=>expect(all(page).find(n=>n.tag==='button'&&n.textContent==='ファイルを開く')!.disabled).toBe(false));
       // First-backup confirmation remains read-only until the user explicitly accepts it.
-      Object.assign(input2,{files:[backup]});input2.fire('change');input2.parent!.parent!.fire('submit',{preventDefault(){}});
+      Object.assign(input2,{files:[backup]});input2.fire('change');
       await vi.waitFor(()=>expect(all(page).some(n=>n.textContent==='このブラウザで編集できるようにします。元ファイルは変更しません。')).toBe(true));
       expect(opening).toHaveBeenCalledOnce();expect(await peer.fs.list('')).toEqual([]);expect(databases.size).toBe(0);
       all(page).filter(n=>n.tag==='button'&&n.textContent==='キャンセル').at(-1)!.fire('click');await vi.waitFor(()=>expect(next.hasChanges()).toBe(false));
-      Object.assign(input2,{files:[handoff]});input2.fire('change');input2.parent!.parent!.fire('submit',{preventDefault(){}});
+      Object.assign(input2,{files:[handoff]});input2.fire('change');
+    const confirmImport = () => all(page).find(n => n.tag === 'button' && n.textContent === 'プロジェクトを取り込む');
+    await vi.waitFor(() => expect(confirmImport()?.disabled).toBe(false)); expect(await peer.fs.list('')).toEqual([]); expect(databases.size).toBe(0);
+    confirmImport()!.fire('click');
       await vi.waitFor(()=>expect(received?.read().state).toBe('ready'),{timeout:10000});
       await vi.waitFor(()=>expect(all(page).some(n=>n.className==='lv-project-workspace')).toBe(true));
       expect(received!.read().source!.originalChanges()).toEqual(edited!.originalChanges());expect(await received!.content.image(media as unknown as JsonObject,true)).toEqual(photo);
@@ -755,7 +758,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const r=firstWorkspaceRecipient(), run=newId(), open=vi.fn<ValidationWorkspacePorts['open']>(async()=>{throw Error('opening refused');});
     const ui=owned(createValidationWorkspace(new RecordedDocument().asDocument(),{fileLimits:budget,decode,list:async()=>[{run,title:'保存済み',state:'ready'}],open,selected:vi.fn(),render:async()=>{throw Error('unused');}}));
     const root=record(ui.root),all=(n:RecordedNode):RecordedNode[]=>[n,...n.children.flatMap(all)],button=(text:string)=>all(root).find(n=>n.tag==='button'&&n.textContent===text)!,input=all(root).find(n=>n.attributes.get('aria-label')==='ファイルを選択')!,title=all(root).find(n=>n.attributes.get('aria-label')==='プロジェクト名')!;
-    const submit=()=>input.parent!.parent!.fire('submit',{preventDefault(){}}),cancel=()=>button('選択を取り消す').fire('click'),create=button('プロジェクトを作成');
+    const submit=()=>button('ファイルを開く').fire('click'),cancel=()=>button('選択を取り消す').fire('click'),create=button('プロジェクトを作成');
     await vi.waitFor(()=>expect(button('ファイルを開く').disabled).toBe(false));
     const picker=vi.spyOn(input,'click');submit();expect(picker).toHaveBeenCalledOnce();expect(ui.hasChanges()).toBe(false);expect(open).not.toHaveBeenCalled();
     title.fire('compositionstart');submit();expect(picker).toHaveBeenCalledOnce();title.fire('compositionend');
@@ -768,7 +771,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       [[packageFile,packageFile],'1つずつ'],
       [[{name:'too-big',size:budget.maxFileBytes+1,arrayBuffer:read}],'上限'],
     ] as const){
-      Object.assign(input,{files}); input.fire('change'); submit();
+      Object.assign(input,{files}); input.fire('change');
       await vi.waitFor(()=>expect(all(root).some(n=>n.textContent.includes(message))).toBe(true));
       const status=all(root).find(n=>n.className.includes('lv-validation-status'))!;expect(status.parent!.className).toBe('lv-validation-home');expect((status.parent as unknown as HTMLElement).inert).toBe(false);
       expect(open).not.toHaveBeenCalled(); expect(await r.fs.list('')).toEqual([]); expect(create.parent!.hidden).toBe(true);
@@ -779,7 +782,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     // Cancelled invalid input leaves the existing Project-list action available.
     button('閲覧で開く').fire('click');await vi.waitFor(()=>expect(open).toHaveBeenCalledOnce());open.mockClear();
     await vi.waitFor(()=>expect(button('ファイルを開く').disabled).toBe(false));
-    Object.assign(input,{files:[new File([glb().slice().buffer],'model-b'),new File([glb().slice().buffer],'model-a'),new File([png.slice().buffer],'photo')]});input.fire('change');submit();
+    Object.assign(input,{files:[new File([glb().slice().buffer],'model-b'),new File([glb().slice().buffer],'model-a'),new File([png.slice().buffer],'photo')]});input.fire('change');
     await vi.waitFor(()=>expect(!create.parent!.hidden&&!create.disabled).toBe(true));title.value='複数モデル';title.fire('input');
     button('編集で開く').fire('click');await vi.waitFor(()=>expect(all(root).some(n=>n.textContent.includes('選択を取り消してください'))).toBe(true));expect(open).not.toHaveBeenCalled();
     create.parent!.fire('submit',{preventDefault(){}});await vi.waitFor(()=>expect(open).toHaveBeenCalledOnce());
@@ -803,11 +806,11 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const root=record(ui.root),all=(n:RecordedNode):RecordedNode[]=>[n,...n.children.flatMap(all)],button=(text:string)=>all(root).find(n=>n.tag==='button'&&n.textContent===text)!;
     const input=all(root).find(n=>n.attributes.get('aria-label')==='ファイルを選択')!,create=button('プロジェクトを作成'),execute=button('ファイルを開く'),cancel=button('選択を取り消す');
     await vi.waitFor(()=>expect(execute.disabled).toBe(false));
-    const bytes=glb();Object.assign(input,{files:[{name:'pending.glb',size:bytes.length,arrayBuffer:async()=>{entered();await held;return bytes.slice().buffer;}}]});input.fire('change');input.parent!.parent!.fire('submit',{preventDefault(){}});await started;
+    const bytes=glb();Object.assign(input,{files:[{name:'pending.glb',size:bytes.length,arrayBuffer:async()=>{entered();await held;return bytes.slice().buffer;}}]});input.fire('change');await started;
     expect(cancel.disabled).toBe(false);expect(execute.disabled).toBe(true);cancel.fire('click');
     expect(execute.disabled).toBe(true);expect(input.disabled).toBe(true);expect(create.parent!.hidden).toBe(true);
     release();await vi.waitFor(()=>expect(execute.disabled).toBe(false));expect(open).not.toHaveBeenCalled();expect(create.parent!.hidden).toBe(true);expect(ui.hasChanges()).toBe(false);
-    Object.assign(input,{files:[new File([glb().slice().buffer],'next.glb')]});input.fire('change');input.parent!.parent!.fire('submit',{preventDefault(){}});
+    Object.assign(input,{files:[new File([glb().slice().buffer],'next.glb')]});input.fire('change');
     await vi.waitFor(()=>expect(!create.parent!.hidden&&!create.disabled).toBe(true));expect(open).not.toHaveBeenCalled();
   });
   it.each(['reselection','IME','dispose'] as const)('unified opening drops a late %s completion before creating a Project',async kind=>{
@@ -817,9 +820,9 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const ui=owned(createValidationWorkspace(new RecordedDocument().asDocument(),{fileLimits:budget,decode:decoder,list:async()=>[],open,selected:vi.fn(),render:async()=>{throw Error('unused');}}));
     caseDisposals.push(()=>{hold=false;release();});
     const root=record(ui.root),all=(n:RecordedNode):RecordedNode[]=>[n,...n.children.flatMap(all)],button=(text:string)=>all(root).find(n=>n.tag==='button'&&n.textContent===text)!,input=all(root).find(n=>n.attributes.get('aria-label')==='ファイルを選択')!,title=all(root).find(n=>n.attributes.get('aria-label')==='プロジェクト名')!,create=button('プロジェクトを作成');
-    const submit=()=>input.parent!.parent!.fire('submit',{preventDefault(){}}),bytes=glb(()=>{},kind==='IME');
+    const bytes=glb(()=>{},kind==='IME');
     await vi.waitFor(()=>expect(button('ファイルを開く').disabled).toBe(false));
-    Object.assign(input,{files:[{name:'old.glb',size:bytes.length,arrayBuffer:async()=>{if(kind!=='IME'){entered();await gate;}return bytes.slice().buffer;}}]});input.fire('change');submit();
+    Object.assign(input,{files:[{name:'old.glb',size:bytes.length,arrayBuffer:async()=>{if(kind!=='IME'){entered();await gate;}return bytes.slice().buffer;}}]});input.fire('change');
     if(kind==='IME'){
       await vi.waitFor(()=>expect(!create.parent!.hidden&&!create.disabled).toBe(true));create.parent!.fire('submit',{preventDefault(){}});
     }
@@ -828,7 +831,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     if(kind==='reselection'){Object.assign(input,{files:[new File([glb().slice().buffer],'new.glb')]});input.fire('change');}
     else{title.value='最新の名前';title.fire('compositionstart');title.fire('input');title.fire('compositionend');}
     hold=false;release();await vi.waitFor(()=>expect(create.disabled).toBe(false));expect(open).not.toHaveBeenCalled();
-    if(kind==='reselection'){expect(create.parent!.hidden).toBe(true);submit();await vi.waitFor(()=>expect(!create.parent!.hidden&&!create.disabled).toBe(true));}
+    if(kind==='reselection'){await vi.waitFor(()=>expect(!create.parent!.hidden&&!create.disabled).toBe(true));}
     create.parent!.fire('submit',{preventDefault(){}});await vi.waitFor(()=>expect(open).toHaveBeenCalledOnce());
     const records=(await open.mock.calls[0]![1]!.source.inspectOriginal(metadata)).candidates.unambiguousRecords;
     expect(records.project).toMatchObject({title:kind==='IME'?'最新の名前':'新しいプロジェクト'});
@@ -848,8 +851,9 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const root=record(ui.root),all=(n:RecordedNode):RecordedNode[]=>[n,...n.children.flatMap(all)],button=(text:string)=>all(root).find(n=>n.tag==='button'&&n.textContent===text)!,input=all(root).find(n=>n.attributes.get('aria-label')==='ファイルを選択')!;
     await vi.waitFor(()=>expect(all(root).some(n=>n.className==='lv-project-workspace')).toBe(true));
     const oldDispose=vi.spyOn(old!,'dispose');
-    // Exercise the guarded async replacement directly; recorded DOM does not emulate hidden/inert hit testing.
-    Object.assign(input,{files:[new File([glb().slice().buffer],'次のモデル')]});input.fire('change');input.parent!.parent!.fire('submit',{preventDefault(){}});
+    // Simulate a still-visible picker while an existing host is being replaced.
+    all(root).find(n=>n.className==='lv-validation-home')!.hidden=false;
+    Object.assign(input,{files:[new File([glb().slice().buffer],'次のモデル')]});input.fire('change');
     await vi.waitFor(()=>expect(!button('プロジェクトを作成').parent!.hidden&&!button('プロジェクトを作成').disabled).toBe(true));
     const put=vi.spyOn(r.store,'put');if(preInitialFailure)put.mockRejectedValueOnce(Error('pre-initial body failure'));
     button('プロジェクトを作成').parent!.fire('submit',{preventDefault(){}});await arrived;
@@ -1325,7 +1329,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const ui=owned(createValidationWorkspace(new RecordedDocument().asDocument(),{fileLimits:budget,decode,selected(){},list:async()=>[],open,render:async()=>{throw Error('must not render');}}));
     const root=record(ui.root), all=(n:RecordedNode):RecordedNode[]=>[n,...n.children.flatMap(all)], named=(name:string)=>all(root).find(n=>n.attributes.get('aria-label')===name)!,button=(name:string)=>all(root).find(n=>n.tag==='button'&&n.textContent===name&&!n.hidden)!;
     const file=await lociMyuFile((s,e)=>{lociMyuMaterials(s,e);if(blocked)s.push({...structuredClone(s.find(t=>t.name==='__LM_MATERIALS')!),name:'__LM_MATERIALS '});}), exact=await file.arrayBuffer();
-    await vi.waitFor(()=>expect(button('ファイルを開く').disabled).toBe(false));Object.assign(named('ファイルを選択'),{files:[file]});named('ファイルを選択').parent!.parent!.fire('submit',{preventDefault(){}});
+    await vi.waitFor(()=>expect(button('ファイルを開く').disabled).toBe(false));Object.assign(named('ファイルを選択'),{files:[file]});named('ファイルを選択').fire('change');
     await vi.waitFor(()=>expect(all(root).some(n=>n.tag==='p'&&n.textContent.includes(blocked?'材質表が重複':'材質の見え方：2シーン・4件'))).toBe(true));
     expect(button('新しいプロジェクトに変換').disabled).toBe(blocked);
     if(!blocked)expect(all(root).some(n=>n.textContent.includes('変換後の編集値には引き継ぎません'))).toBe(true);
@@ -1348,7 +1352,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const entries = await readZipEntries(new Uint8Array(await raw.arrayBuffer())), writer = new ZipWriter(new Uint8ArrayWriter());
     for (const e of entries) await writer.add(e.path, new Uint8ArrayReader(e.data), { level: 6 });
     const compressed = new File([(await writer.close()).buffer as ArrayBuffer], 'LociMyu圧縮.zip');
-    Object.assign(named('ファイルを選択'), { files: [compressed] }); named('ファイルを選択').parent!.parent!.fire('submit', { preventDefault() {} });
+    Object.assign(named('ファイルを選択'), { files: [compressed] }); named('ファイルを選択').fire('change');
     await vi.waitFor(() => expect(button('新しいプロジェクトに変換').disabled, all(root).filter(n => n.tag === 'p').map(n => n.textContent).join('|')).toBe(false));
     expect(named('変換する表').children).toHaveLength(2); expect(named('変換後のプロジェクト名').value).toBe('LociMyu圧縮'); expect(open).not.toHaveBeenCalled();
     named('変換する表').value = '0'; named('変換する表').fire('change');
@@ -1379,7 +1383,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       sheets[0]!.rows.push(['c_UNKNOWN','関連する画像が不明','','#ffffff','','','','private-unknown-file-id']);
     });
     await vi.waitFor(() => expect(button('ファイルを開く').disabled).toBe(false)); Object.assign(named('ファイルを選択'), { files: [file] });
-    named('ファイルを選択').parent!.parent!.fire('submit', { preventDefault() {} }); await vi.waitFor(() => expect(button('新しいプロジェクトに変換').disabled).toBe(false));
+    named('ファイルを選択').fire('change'); await vi.waitFor(() => expect(button('新しいプロジェクトに変換').disabled).toBe(false));
     const omission=all(root).find(n=>n.tag==='details'&&n.className==='lv-conversion-images')!,items=()=>omission.children.find(n=>n.tag==='ul')!.children;
     expect(omission.hidden).toBe(false);expect(omission.open).toBeFalsy();expect(omission.children[0]!.textContent).toBe('添付できない画像（2件）');expect(items()).toHaveLength(2);
     expect(items().map(n=>all(n).map(c=>c.textContent).join('|'))).toEqual([expect.stringContaining('全体・3行目／b.png'),expect.stringContaining('ファイル名を確認できません')]);
@@ -1824,7 +1828,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const file = await frozenV1File(variant === 'plain' ? undefined : ops => { if(variant==='material')exactV1Materials(ops);else placedV1Model(ops); if (variant === 'historical') {
       const model = ops.find(o => o.v?.kind === 'model'); ops.push({ ...model, op:30, hlc:model.hlc.replace('-0003-','-001e-'), t:'update', v:{ transform:{} } });
     } },png,variant==='material'?exactV1MaterialModel():glb()), bytes = await file.arrayBuffer();
-    Object.assign(input, { files: [file] }); const submit = () => input.parent!.parent!.fire('submit', { preventDefault() {} });
+    Object.assign(input, { files: [file] }); const submit = () => input.fire('change');
     submit(); await vi.waitFor(() => expect(button('新しいプロジェクトに変換').parent!.hidden,
       all(root).filter(n => n.tag === 'p').map(n => n.textContent).join(' | ')).toBe(false));
     expect(all(root).some(n => n.textContent.includes('旧LociViewファイル：モデル 1・シーン 2・キャプション 3・メディア 2'))).toBe(true);
@@ -2036,7 +2040,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     try{
       await vi.waitFor(()=>expect(button('ファイルを開く').disabled).toBe(false));
       for(let pass=0;pass<2;pass++){
-        Object.assign(input,{files:[file]});input.parent!.parent!.fire('submit',{preventDefault(){}});
+        Object.assign(input,{files:[file]});input.fire('change');
         await vi.waitFor(()=>expect(button('新しいプロジェクトに変換')?.disabled).toBe(false));
         const notice=all(root).find(n=>n.attributes.get('aria-label')==='材質の変換による変更'&&!n.hidden)!;expect(notice).toBeTruthy();
         const targets=all(notice).filter(n=>n.tag==='li').map(n=>n.textContent);expect(targets.length).toBeGreaterThan(0);expect(targets.some(t=>t.includes('観察 /'))).toBe(true);expect(targets.some(t=>t.includes('非表示になります'))).toBe(true);
@@ -2391,11 +2395,11 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const input = all(root).find(n => n.attributes.get('aria-label') === 'ファイルを選択')!;
     await vi.waitFor(() => expect(button('ファイルを開く').disabled).toBe(false));
     const file = await nativeConversionFile(), original = await file.arrayBuffer(); Object.assign(input, { files: [file] });
-    input.parent!.parent!.fire('submit', { preventDefault() {} });
+    input.fire('change');
     await vi.waitFor(() => expect(button('新しいプロジェクトに変換').parent!.hidden).toBe(false));
     expect(ports.open).not.toHaveBeenCalled(); expect(await fs.list('')).toEqual([]);
     button('選択を取り消す').fire('click'); expect(button('新しいプロジェクトに変換').parent!.hidden).toBe(true);
-    input.parent!.parent!.fire('submit', { preventDefault() {} });
+    input.fire('change');
     await vi.waitFor(() => expect(button('新しいプロジェクトに変換').parent!.hidden).toBe(false));
     fs.reject = path => path.endsWith('/published.json'); button('新しいプロジェクトに変換').fire('click');
     await vi.waitFor(() => expect(host?.read().state).toBe('pending'), { timeout: 8000 });
@@ -2828,15 +2832,16 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect(f.storage.mock.calls.length).toBeGreaterThan(0);expect(f.storage.mock.calls.every(([run])=>run===a.run)).toBe(true);
     expect(h.ui.selected).toBe(a.run);expect(vi.mocked(f.ports.open).mock.calls.every(([run])=>run===a.run)).toBe(true);
     vi.mocked(f.ports.list).mockClear();vi.mocked(f.ports.open).mockClear();
+    h.button('プロジェクトを選ぶ', h.editor()).fire('click'); await h.idle();
     const input=h.named('ファイルを選択');Object.assign(input,{files:[new File([file],'existing-work.zip')]});
-    input.parent!.parent!.fire('submit',{preventDefault(){}});await h.idle();
+    input.fire('change');await h.idle();
     expect(vi.mocked(f.ports.list).mock.calls).toEqual([[undefined]]);
     expect(f.storage.mock.calls.some(([run])=>run===b.run)).toBe(true);
     const destination=h.named('取り込み先');expect(destination.hidden).toBe(false);
     expect(h.all(destination).some(n=>n.textContent==='「別の記録」に更新を取り込みます。')).toBe(true);
-    expect(f.ports.open).not.toHaveBeenCalled();expect(h.ui.selected).toBe(a.run);
+    expect(f.ports.open).not.toHaveBeenCalled();expect(h.ui.selected).toBeNull();
     h.button('選択を取り消す',destination).fire('click');await h.idle();
-    h.button('プロジェクトを選ぶ', h.editor()).fire('click');await h.idle();
+
     expect(h.navigation.hidden).toBe(false);
     for(const title of ['再開する記録','別の記録'])expect(h.all(h.navigation).some(n=>n.className==='lv-recent-title'&&n.textContent===title)).toBe(true);
     listing.mockClear();f.storage.mockClear();
@@ -2907,7 +2912,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     body.fire('compositionstart'); expect(change.disabled).toBe(true); change.fire('click'); expect(h.ui.selected).toBe(a.run); body.fire('compositionend');
     body.value = '確定前の入力'; body.fire('input'); expect(change.disabled).toBe(true); change.fire('click'); expect(h.ui.selected).toBe(a.run);
     const fileInput = h.named('ファイルを選択'), file = new File([new Uint8Array([1])],'unread.bin'), read = vi.spyOn(file,'arrayBuffer'); Object.assign(fileInput,{files:[file]});
-    fileInput.parent!.parent!.fire('submit',{preventDefault(){}}); await h.idle(); expect(read).not.toHaveBeenCalled(); expect(h.ui.selected).toBe(a.run); expect(body.value).toBe('確定前の入力');
+    fileInput.fire('change'); await h.idle(); expect(read).not.toHaveBeenCalled(); expect(h.ui.selected).toBe(a.run); expect(body.value).toBe('確定前の入力');
     const captionDetail=h.named('キャプションの詳細',editor);expect(h.button('変更を適用',captionDetail).disabled).toBe(false); await h.edit(() => h.button('変更を適用',captionDetail).fire('click'));
     const source = f.host().read().source!, backup = await f.host().workspaceOutput.download(await f.host().workspaceOutput.generateBackup(source.token,'再開の保存'));
     expect((await BackupArchive.inspect(backup,metadata)).source.originalChanges()).toEqual(source.originalChanges());
@@ -3435,7 +3440,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const root = record(ui.root), all = (n: RecordedNode): RecordedNode[] => [n, ...n.children.flatMap(all)], input = all(root).find(n => n.attributes.get('aria-label') === 'ファイルを選択')!,
       button = (label: string) => all(root).filter(n => n.tag === 'button' && n.textContent === label).at(-1)!;
     await vi.waitFor(() => expect(button('ファイルを開く').disabled).toBe(false));
-    const choose = () => { Object.assign(input, { files: [new File([f.backupFile], '現地の保存.backup')] }); input.fire('change'); input.parent!.parent!.fire('submit', { preventDefault() {} }); };
+    const choose = () => { Object.assign(input, { files: [new File([f.backupFile], '現地の保存.backup')] }); input.fire('change'); };
     choose(); await vi.waitFor(() => expect(button('このファイルから再開')?.disabled).toBe(false)); expect(await r.base.list('')).toEqual([]);
     const original = await r.inspection.source.inspectOriginal(metadata), project = original.candidates.unambiguousRecords.project as JsonObject;
     expect(all(root).some(n => n.tag === 'h2' && n.textContent === project.title)).toBe(true);
@@ -3495,7 +3500,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     await ui.ready;
     const input = all(root).find(n => n.attributes.get('aria-label') === 'ファイルを選択')!;
     Object.assign(input, { files: [new File([f.backupFile], '復元する記録.zip')] });
-    input.fire('change'); input.parent!.parent!.fire('submit', { preventDefault() {} });
+    input.fire('change');
     await vi.waitFor(() => expect(button('このファイルから再開')?.disabled).toBe(false)); button('このファイルから再開')!.fire('click');
     await vi.waitFor(() => expect(all(root).some(n => n.attributes.get('aria-label') === '復元中のキャプション')).toBe(true), { timeout: 20000 });
     expect(all(root).some(n => n.className === 'lv-project-workspace')).toBe(false);
@@ -5803,7 +5808,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     await vi.waitFor(()=>expect(h.all(h.root).some(n=>n.textContent.includes('画面の終了処理を完了できませんでした'))).toBe(true));
     const input=h.named('ファイルを選択'),read=vi.fn(async()=>glb().slice().buffer);expect(input.disabled).toBe(true);
     for(let attempt=0;attempt<2;attempt++){
-      Object.assign(input,{files:[{name:'next.glb',size:glb().length,arrayBuffer:read}]});input.fire('change');input.parent!.parent!.fire('submit',{preventDefault(){}});
+      Object.assign(input,{files:[{name:'next.glb',size:glb().length,arrayBuffer:read}]});input.fire('change');
       await Promise.resolve();expect(read).not.toHaveBeenCalled();expect(starts).toBe(1);expect(h.ui.selected).toBeNull();
     }
     await expect(h.ui.dispose()).rejects.toThrow('画面の終了処理を完了できませんでした');
@@ -8302,8 +8307,8 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const input = all(page).find(n => n.attributes.get('aria-label') === 'ファイルを選択')!;
     const inspectSelection = vi.spyOn(PackageArchive, 'inspect');
     try {
-      Object.assign(input, { files: [file] }); input.parent!.parent!.fire('submit', { preventDefault() {} });
-      await vi.waitFor(() => expect(all(page).some(n => n.textContent.includes('編集プロジェクトは作成していません'))).toBe(true));
+      Object.assign(input, { files: [file] }); input.fire('change');
+      await vi.waitFor(() => expect(all(page).some(n => n.attributes.get('aria-label') === '閲覧用のシーン')).toBe(true));
       expect(inspectSelection).toHaveBeenCalledOnce();
       expect(inspectSelection.mock.calls[0]![0].size).toBe(file.size);
     } finally { inspectSelection.mockRestore(); }
@@ -8668,7 +8673,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       await reader.ready;
       const page = record(reader.root), all = (n: RecordedNode): RecordedNode[] => [n, ...n.children.flatMap(all)];
       const find = (label: string) => all(page).find(n => n.getAttribute('aria-label') === label || n.tag === 'button' && n.textContent === label && !n.hidden)!;
-      const input = find('ファイルを選択'); Object.assign(input, { files: [file] }); input.parent!.parent!.fire('submit', { preventDefault() {} });
+      const input = find('ファイルを選択'); Object.assign(input, { files: [file] }); input.fire('change');
       await vi.waitFor(() => expect(find('シーンを開く')?.disabled).toBe(false));
       const choose = find('表示するシーン'), other = choose.children.find(n => n.textContent === '別の角度')!, initialId = choose.value;
       choose.value = other.value; find('シーンを開く').click();
@@ -9063,7 +9068,10 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const page = record(u.root), open = () => all(page).find(n => n.tag === 'button' && n.textContent === 'ファイルを開く')!;
     await vi.waitFor(() => expect(open().disabled).toBe(false));
     const input = all(page).find(n => n.attributes.get('aria-label') === 'ファイルを選択')!;
-    Object.assign(input, { files: [file] }); input.parent!.parent!.fire('submit', { preventDefault() {} });
+    Object.assign(input, { files: [file] }); input.fire('change');
+    const confirmImport = () => all(page).find(n => n.tag === 'button' && n.textContent === 'プロジェクトを取り込む');
+    await vi.waitFor(() => expect(confirmImport()?.disabled).toBe(false)); expect(host).toBeUndefined();
+    confirmImport()!.fire('click');
     await vi.waitFor(() => expect(render).toHaveBeenCalledOnce(), { timeout: 10000 });
     expect(host!.read().source!.originalChanges()).toEqual(inspected.source.originalChanges());
     expect(host!.authority.read().modelVersions).toHaveLength(2);
@@ -9085,10 +9093,13 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const all = (n: RecordedNode): RecordedNode[] => [n, ...n.children.flatMap(all)];
     const button = (text: string) => all(root).find(n => n.tag === 'button' && n.textContent === text)!;
     await vi.waitFor(() => expect(button('ファイルを開く').disabled).toBe(false));
-    const input = all(root).find(n => n.attributes.get('aria-label') === 'ファイルを選択')!, form = input.parent!.parent!;
-    Object.assign(input, { files: [new Blob(['broken'])] }); form.fire('submit', { preventDefault() {} });
+    const input = all(root).find(n => n.attributes.get('aria-label') === 'ファイルを選択')!;
+    Object.assign(input, { files: [new Blob(['broken'])] }); input.fire('change');
     await vi.waitFor(() => expect(button('ファイルを開く').disabled).toBe(false)); expect(host).toBeUndefined();
-    Object.assign(input, { files: [f.file] }); form.fire('submit', { preventDefault() {} });
+    Object.assign(input, { files: [f.file] }); input.fire('change');
+    const confirmImport = () => all(root).find(n => n.tag === 'button' && n.textContent === 'プロジェクトを取り込む');
+    await vi.waitFor(() => expect(confirmImport()?.disabled).toBe(false)); expect(host).toBeUndefined();
+    confirmImport()!.fire('click');
     await vi.waitFor(() => expect(render).toHaveBeenCalledOnce(), { timeout: 10000 });
     await vi.waitFor(() => expect(all(root).some(n => n.textContent.startsWith('検証用プロジェクト。'))).toBe(true));
     expect(u.selected).toBe(run); expect(host!.read().source!.originalChanges()).toEqual(f.source.originalChanges());
@@ -9102,7 +9113,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     await expect(openValidationHost({ ...options, workspaceFile: f.file, standaloneWorkspace: true })).rejects.toThrow('同じプロジェクトのデータがあります');
     const preview = all(root).find(n => n.attributes.get('aria-label') === '取り込み先')!;
     const selectUpdate = async () => {
-      Object.assign(input, { files: [f.file] }); form.fire('submit', { preventDefault() {} });
+      Object.assign(input, { files: [f.file] }); input.fire('change');
       await vi.waitFor(() => { expect(preview.hidden).toBe(false); expect(button('既存に取り込む').disabled).toBe(false); });
     };
     await selectUpdate(); expect(render).toHaveBeenCalledOnce(); expect(u.selected).toBeNull();
@@ -9139,7 +9150,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     try {
       await ui.ready;
       const selection = all(root).find(n => n.attributes.get('aria-label') === 'ファイルを選択')!;
-      const select = () => { Object.assign(selection, { files: [sent.file] }); selection.parent!.parent!.fire('submit', { preventDefault() {} }); };
+      const select = () => { Object.assign(selection, { files: [sent.file] }); selection.fire('change'); };
       select();
       await vi.waitFor(() => expect(all(root).some(n => n.textContent === 'この変更分の元になった作業一式を先に開いてください。')).toBe(true));
       expect(host).toBeUndefined(); expect(button('既存に取り込む').parent!.hidden).toBe(true);
@@ -11926,7 +11937,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       } finally { settled = undefined; status.setAttribute = setAttribute; }
     };
     const title = all(root).find(n => n.attributes.get('aria-label') === 'プロジェクト名')!, files = all(root).find(n => n.attributes.get('aria-label') === 'ファイルを選択')!;
-    const form = files.parent!.parent!, submit = () => form.fire('submit', { preventDefault() {} });
+    const submit = () => files.fire('change');
     await vi.waitFor(() => expect(button('一覧を更新').parent && !u.hasChanges()).toBe(true));
     title.fire('compositionstart'); submit(); await new Promise(resolve => setTimeout(resolve, 0));
     expect(ports.open).not.toHaveBeenCalled(); expect(u.hasChanges()).toBe(true); title.fire('compositionend');

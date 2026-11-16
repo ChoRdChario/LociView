@@ -1,7 +1,7 @@
 import {test, createBrowserProfile} from '../helpers/browserProfile';
 import { writeCleanImportFixture } from './cleanImportFixture';
 import { desktopOrigin, desktopEntry } from './desktopEntry';
-import {chooseSharedScene, selectShareOutput,  closeFileSurface, revealCoordinateAdd, revealFileSurface } from './workspaceUi';
+import { chooseHomeFiles, chooseSharedScene, selectShareOutput,  closeFileSurface, revealCoordinateAdd, revealFileSurface } from './workspaceUi';
 import { expect, chromium, type Page, type BrowserContext, type TestInfo } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import * as A from '@automerge/automerge';
@@ -103,8 +103,8 @@ test('08b editor names remain exact through collaboration, purpose privacy, rest
   const close = async (context: BrowserContext) => { await context.close(); contexts.delete(context); };
   try {
     const a = await launch(profiles[0]!), b = await launch(profiles[1]!);
-    await a.p.getByLabel('ファイルを選択', { exact: true }).setInputFiles({ name: 'model.glb', mimeType: 'model/gltf-binary', buffer: triangleGlb() });
-    await a.p.getByRole('button', { name: 'ファイルを開く', exact: true }).click(); await a.p.getByRole('textbox', { name: 'プロジェクト名', exact: true }).fill(title);
+    await chooseHomeFiles(a.p, { name: 'model.glb', mimeType: 'model/gltf-binary', buffer: triangleGlb() });
+    await a.p.getByRole('textbox', { name: 'プロジェクト名', exact: true }).fill(title);
     await a.p.getByRole('button', { name: 'プロジェクトを作成', exact: true }).click(); await expect(a.p.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText(title, { timeout: 90_000 });
     await expect(a.p.getByLabel('3Dモデルの表示', { exact: true })).toHaveAttribute('aria-busy', 'false', { timeout: 90_000 });
     await revealCoordinateAdd(a.p); const owner = a.p.getByLabel('追加先モデル', { exact: true }); await owner.focus(); await owner.selectOption({ label: 'model.glb' });
@@ -120,7 +120,7 @@ test('08b editor names remain exact through collaboration, purpose privacy, rest
     await detail(a.p).getByText('編集者情報', { exact: true }).click(); await expect(detail(a.p)).toContainText(`編集者名：${nameA}`); await expect(detail(a.p)).toContainText('編集者情報なし');
     const initial = await output(a.p, info, 'named-workspace', 'teamWorkspace');
     console.log('08b: initial named Workspace downloaded');
-    await b.p.getByLabel('ファイルを選択', { exact: true }).setInputFiles(initial); await b.p.getByRole('button', { name: 'ファイルを開く', exact: true }).click();
+    await chooseHomeFiles(b.p, initial); await b.p.getByRole('button', { name: 'プロジェクトを取り込む', exact: true }).click();
     await expect(b.p.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText(title, { timeout: 90_000 }); await selected(b.p);
     const bs = b.p.getByLabel('設定', { exact: true }); await bs.locator(':scope > summary').click(); await expect(bs.getByRole('checkbox')).not.toBeChecked();
     await editor(b.p, nameB); await edit(b.p, '本文', 'Bの手元編集'); await edit(a.p, '本文', 'Aの変更');
@@ -148,7 +148,7 @@ test('08b editor names remain exact through collaboration, purpose privacy, rest
     copied.assertFreshInitialization(); expect(copied.editorDeclarations()).toEqual([]);
     const snapshot = new TextDecoder().decode(await review.entryBytes('review.json', 8_000_000)); expect(snapshot).not.toContain(nameA); expect(snapshot).not.toContain(nameB);
     console.log('08b: Review and Clean exclude editor declarations');
-    const restored = await launch(profiles[2]!); await restored.p.getByLabel('ファイルを選択', { exact: true }).setInputFiles(saved); await restored.p.getByRole('button', { name: 'ファイルを開く', exact: true }).click();
+    const restored = await launch(profiles[2]!); await chooseHomeFiles(restored.p, saved);
     await restored.p.getByRole('button', { name: 'このファイルから再開', exact: true }).click(); await expect(restored.p.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText(title, { timeout: 120_000 });
     const after = await records(await output(restored.p, info, 'restored', 'backup')); expect(after.records).toEqual(before.records); expect(after.backup.source.originalChanges()).toEqual(before.backup.source.originalChanges());
     await close(restored.context); const cold = await launch(profiles[2]!); await expect(cold.p.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText(title, { timeout: 90_000 }); await selected(cold.p);
@@ -171,8 +171,8 @@ test('08b GS confirmation keeps its editor when another tab changes the local se
   await context.route('**/*', route => { const u = new URL(route.request().url()); if (u.origin === desktopOrigin || ['blob:', 'data:'].includes(u.protocol)) return route.continue(); errors.push('unexpected network origin'); return route.abort(); });
   p.on('pageerror', error => errors.push(error.message));
   try {
-    await p.goto(desktopEntry); await p.getByLabel('ファイルを選択', { exact: true }).setInputFiles({ name: 'model.ply', mimeType: 'application/octet-stream', buffer: Buffer.from(gsFixture()) });
-    await p.getByRole('button', { name: 'ファイルを開く', exact: true }).click(); await p.getByRole('textbox', { name: 'プロジェクト名', exact: true }).fill(title);
+    await p.goto(desktopEntry); await chooseHomeFiles(p, { name: 'model.ply', mimeType: 'application/octet-stream', buffer: Buffer.from(gsFixture()) });
+    await p.getByRole('textbox', { name: 'プロジェクト名', exact: true }).fill(title);
     await p.getByRole('button', { name: 'プロジェクトを作成', exact: true }).click(); await expect(p.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText(title, { timeout: 90_000 });
     await expect(p.getByLabel('3Dモデルの表示', { exact: true })).toHaveAttribute('aria-busy', 'false', { timeout: 90_000 }); await editor(p, nameA);
     await p.getByRole('tab', { name: 'モデル', exact: true }).click(); const panel = p.getByRole('tabpanel', { name: 'モデル', exact: true }); await panel.locator('.lv-model-select').first().click();

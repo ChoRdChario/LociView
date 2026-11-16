@@ -1,3 +1,4 @@
+import { chooseHomeFiles } from './workspaceUi';
 import { chromium, expect, test } from '@playwright/test';
 import { openAsBlob } from 'node:fs';
 import * as A from '@automerge/automerge';
@@ -14,8 +15,7 @@ for (const phone of [false, true]) test(`saved records remain readable during ou
   const files=page.locator('details.lv-project-files'), panel=page.getByRole('region',{name:'ファイル操作',exact:true});
   try{
     await page.goto(server.url);
-    await page.getByLabel('ファイルを選択',{exact:true}).setInputFiles({name:'records.zip',mimeType:'application/zip',buffer:await nativeConversionBackup(triangleGlb(),smallPng(),100)});
-    await page.getByRole('button',{name:'ファイルを開く',exact:true}).click();
+    await chooseHomeFiles(page, {name:'records.zip',mimeType:'application/zip',buffer:await nativeConversionBackup(triangleGlb(),smallPng(),100)});
     await page.getByRole('button',{name:'新しいプロジェクトに変換',exact:true}).click();
     await expect(page.getByRole('button',{name:'閲覧する',exact:true})).toBeEnabled({timeout:90_000});
     await expect(page.getByLabel('キャプション一覧',{exact:true}).locator('li')).toHaveCount(100);

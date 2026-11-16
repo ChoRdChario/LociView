@@ -8,7 +8,29 @@ and [earlier working records](../docs/history/development-through-2026-10-28/tas
 retain qualifications and failures. Their Current/Next headings are not an active
 queue or renewed approval requirements.
 
-## Current — find and add a record, then read the shared scene
+## Current — choose a file once and read the shared scene
+
+- The home picker starts inspection immediately. Preserve explicit creation, conversion,
+  first restore, new editable import and updates. Reuse the inspected file and handle
+  cancellation, superseded reads, failed selection and the same-file retry.
+- Put the shared reader title, viewing state and file operations in one row.
+  Retain project selection, offline settings, visible errors, explicit copy/add
+  panels and keyboard focus. Compare actual visible canvas on PC and touch.
+- The 12 Desktop browser cases passed on PC and touch, including the real chooser,
+  same-file retry, restored text/photo editing, shared Point/GS scenes, editable
+  copies and interrupted append. All 9 offline cases passed, including cold boot,
+  file repair and mobile copy/save/reopen. Four matched before/after sizes (8
+  browser cases) kept the reader header in one row. Visible 3D height at 1280×720
+  grew from 538 to 667 CSS px, at 390×844 from 260 to 456, at 844×390 from 208 to
+  337, and at 320×568 from 260 to 307. These are Chromium viewport measurements.
+- The 65 focused service cases and independent selection/reader review passed.
+  Final checkpoint: 159 test files, 3611 passed, 16 expected failures, 21 todo;
+  ordinary, harness, validation, Desktop and offline builds passed, along with
+  offline and HEIC isolation. Source/test binding, preview and CI refer to the
+  same checkpoint. Next review the repeated current scene name beside its selector
+  on multi-scene shares. Physical iPhone/Safari picker and VoiceOver are pending.
+
+## Previous — find and add a record, then read the shared scene
 
 - Three independent reviews covered entry, search, daily edits, selection, sharing
   and recipient navigation. Reproduced two-line add controls on PC, a confirmation

@@ -1,7 +1,7 @@
 import { test, expect, chromium, type Page } from '@playwright/test';
 import { ownedServer } from '../offline-e2e/server';
 import { triangleGlb, smallPng } from './fixtures';
-import { revealWorkPanel, revealCaptionList, beginMaterialEditing, revealFileSurface, closeFileSurface } from './workspaceUi';
+import { chooseHomeFiles, revealWorkPanel, revealCaptionList, beginMaterialEditing, revealFileSurface, closeFileSurface } from './workspaceUi';
 
 for (const touch of [false, true]) test(`attachment ordering and Drawing completion retain the next input (${touch ? 'touch' : 'PC'})`, async ({}, info) => {
   test.setTimeout(180_000);
@@ -19,10 +19,16 @@ for (const touch of [false, true]) test(`attachment ordering and Drawing complet
     const cancelledPicker=page.waitForEvent('filechooser');await page.getByRole('button',{name:'ファイルを開く',exact:true}).click();
     await (await cancelledPicker).setFiles([]);await expect(page.getByText('ファイルを選択してください。',{exact:true})).toBeHidden();
     await expect(page.getByRole('button',{name:'プロジェクトを作成',exact:true})).toBeHidden();
+    const sample = { name: 'continuity.glb', mimeType: 'model/gltf-binary', buffer: triangleGlb() };
+    await chooseHomeFiles(page, sample);
+    const create = page.getByRole('button', { name: 'プロジェクトを作成', exact: true });
+    await expect(create).toBeFocused();
+    await page.getByRole('button', { name: '選択を取り消す', exact: true }).click();
+    await expect(create).toBeHidden();
+    await expect(page.getByRole('button', { name: 'ファイルを開く', exact: true })).toBeFocused();
     const firstPicker=page.waitForEvent('filechooser');await page.getByRole('button',{name:'ファイルを開く',exact:true}).click();
-    await (await firstPicker).setFiles({ name: 'continuity.glb', mimeType: 'model/gltf-binary', buffer: triangleGlb() });
+    await (await firstPicker).setFiles(sample);
     await expect(page.getByText('3Dモデル・点群から新規作成、保存したファイルから再開できます。', { exact: true })).toBeVisible();
-    await page.getByRole('button', { name: 'ファイルを開く', exact: true }).click();
     await page.getByRole('textbox', { name: 'プロジェクト名', exact: true }).fill('操作の継続'); await page.getByRole('button', { name: 'プロジェクトを作成', exact: true }).click();
     const stage = page.getByRole('button', { name: '3D', exact: true });
     if (touch) { await expect(stage).toBeVisible(); if (await stage.getAttribute('aria-pressed') !== 'true') await stage.click(); }
@@ -181,8 +187,10 @@ for (const touch of [false, true]) test(`attachment ordering and Drawing complet
     await recipient.route('**/*', route => { const url = new URL(route.request().url());
       if (url.origin === new URL(server.url).origin || ['blob:', 'data:'].includes(url.protocol)) return route.continue(); remote.push(url.origin); return route.abort(); });
     const resumed = resumedPage = await recipient.newPage(); resumed.setDefaultTimeout(15_000); resumed.on('pageerror', error => errors.push(error.message));
-    await resumed.goto(server.url + '?timings=1'); await resumed.getByLabel('ファイルを選択', { exact: true }).setInputFiles(backup);
-    await resumed.getByRole('button', { name: 'ファイルを開く', exact: true }).click(); restoreStarted = Date.now(); await resumed.getByRole('button', { name: 'このファイルから再開', exact: true }).click();
+    await resumed.goto(server.url + '?timings=1'); await chooseHomeFiles(resumed, backup);
+    const confirmRestore = resumed.getByRole('button', { name: 'このファイルから再開', exact: true });
+    await expect(confirmRestore).toBeEnabled();
+    restoreStarted = Date.now(); await confirmRestore.click();
     const restoreTimeLeft = () => Math.max(1, restoreStarted! + 90_000 - Date.now());
     const firstReader = resumed.getByRole('region', { name: '復元中のキャプション', exact: true });
     await expect(firstReader).toBeVisible(); await expect.poll(() => resumed.evaluate(() => (window as any).firstRestoreGate.held)).toBeGreaterThan(0);

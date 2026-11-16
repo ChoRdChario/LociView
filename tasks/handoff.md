@@ -8,8 +8,8 @@ Check actual branch/HEAD/worktree and preserve existing changes.
 
 ## Current workflow
 
-The current review follows finding and adding a record through the shared
-reader. Text filtering, scrolling and add options are local presentation work.
+The current workflow covers choosing a home file, confirming changes, and
+reading a shared scene with one header on desktop and small screens.
 The typed edit, original files, save verification and interruption recovery retain
 their existing authorities. [Todo](todo.md) owns the measured outcome and the
 remaining first-use, physical iPhone and large-file checks.

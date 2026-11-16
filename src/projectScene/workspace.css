@@ -313,7 +313,23 @@
 .lv-file-sheet [role="tab"][aria-selected="true"] { background: #e0e5d7; border-bottom: 3px solid #525f46; }
 .lv-file-sheet > [role="tabpanel"] { clear: both; padding-top: 12px; }
 .lv-file-sheet > [role="tabpanel"] > section > :is(form,details) { margin-block: 12px; }
+.lv-validation-host:has(> .lv-validation-content > .lv-review-workspace) > .lv-validation-status:empty { display: none; }
+.lv-review-header { flex: none; flex-wrap: nowrap; gap: 8px; padding: 4px 12px; }
+.lv-review-header h1 { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lv-review-header > span { white-space: nowrap; color: #565b50; }
+.lv-review-header > .lv-home-settings { position: relative; inset: auto; }
+.lv-review-files { position: relative; }
+.lv-review-files > summary { min-height: 44px; padding: 10px 12px; box-sizing: border-box; cursor: pointer; }
+.lv-review-files > div { position: absolute; z-index: 20; right: 0; top: 100%; display: grid; gap: 4px; width: max-content; padding: 6px; border: 1px solid #bcb9af; border-radius: 6px; background: #fbfaf6; box-shadow: 0 4px 12px #25282029; }
+.lv-review-files > div button { min-height: 44px; text-align: start; }
 .lv-review-workspace .lv-development-stage { padding: 0; }
+@media (max-width: 760px) {
+  .lv-review-header { padding-inline: 8px; gap: 4px; }
+  .lv-review-workspace .lv-development-viewport { flex-basis: clamp(260px, 54dvh, 560px); }
+}
+@media (pointer: coarse) and (min-width: 761px) and (max-height: 480px) {
+  .lv-review-workspace { min-height: 0; }
+}
 .lv-review-workspace .lv-development-viewport { border: 0; }
 .lv-review-workspace .lv-caption-windows { z-index: 4; }
 .lv-review-workspace .lv-development-sidebar { min-height: 0; }

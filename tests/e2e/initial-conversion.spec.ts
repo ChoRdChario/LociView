@@ -1,4 +1,4 @@
-import {beginMaterialEditing} from './workspaceUi';
+import { chooseHomeFiles, beginMaterialEditing } from './workspaceUi';
 import { test, expect, chromium, type BrowserContext, type Page } from '@playwright/test';
 import { createHash } from 'node:crypto';
 import { mkdir, mkdtemp, readFile, readdir } from 'node:fs/promises';
@@ -87,8 +87,7 @@ for (const lane of lanes) test(`${lane.kind}ファイルを内容確認して変
       assets: await Promise.all((await readdir('validation-dist/assets')).map(async name => ({ name, sha256: sha(await readFile(join('validation-dist/assets', name))) }))) }), contentType: 'application/json' });
     await step(`${lane.kind}の内容と原本保管を確認して変換し、既存の記録を編集する`, async () => {
       const preview = async () => {
-        await page.getByLabel('ファイルを選択', { exact: true }).setInputFiles({ name: `${lane.kind}-backup.zip`, mimeType: 'application/zip', buffer: input });
-        await page.getByRole('button', { name: 'ファイルを開く', exact: true }).click();
+        await chooseHomeFiles(page, { name: `${lane.kind}-backup.zip`, mimeType: 'application/zip', buffer: input });
         const convert = page.getByRole('button', { name: '新しいプロジェクトに変換', exact: true }); await expect(convert).toBeVisible({ timeout: 90_000 });
         if (lane.kind === 'LociMyu') {
           await expect(page.getByLabel('変換する表', { exact: true }).locator('option:checked')).toContainText('records.csv');
@@ -137,7 +136,7 @@ for (const lane of lanes) test(`${lane.kind}ファイルを内容確認して変
       peer.setDefaultTimeout(15_000);
       try {
         const remote=peer.pages()[0]??await peer.newPage();remote.on('pageerror',error=>errors.push(`peer: ${error.message}`));await remote.goto(entry);
-        await remote.getByLabel('ファイルを選択',{exact:true}).setInputFiles(work);await remote.getByRole('button',{name:'ファイルを開く',exact:true}).click();
+        await chooseHomeFiles(remote, work);await remote.getByRole('button',{name:'プロジェクトを取り込む',exact:true}).click();
         await expect(remote.getByRole('heading',{name:'プロジェクト名',exact:true})).toHaveText(title,{timeout:90_000});
         await expect((await chooseMaterial(remote)).getByLabel('照明',{exact:true})).toHaveValue('lit');await editMaterial(remote,'表示する面','front');
         const contribution=await share(remote,'材質の返送','contribution',base),incoming=page.getByRole('region',{name:'更新ファイル',exact:true});
