@@ -138,6 +138,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   const untilOpen=<T>(work:Promise<T>)=>Promise.race([work,presentationStopped.then(()=>{throw new DOMException('画面を閉じました。','AbortError');})]);
   let reviewEditAttempt:PreparedReviewCopy|undefined;
   let reviewWorkspace: ReturnType<typeof createReviewWorkspace> | undefined;
+  let reviewOpening: { root: HTMLElement; retry: HTMLButtonElement } | undefined;
   let firstRecovery: FirstBackupRecovery | undefined;
   const recoveryControls = new Map<HTMLButtonElement | HTMLInputElement, () => boolean>();
   let receiveTools: ReturnType<typeof createValidationReceiveControls> | undefined;
@@ -188,7 +189,10 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     // temporarily inert forms. The existing execute fence still owns actions.
     navigation.inert = false; workspaceForm.inert = form.inert = list.inert = inactive; refresh.disabled = inactive;
     for(const button of projectOpenButtons)button.disabled=inactive||composing;
-    if(navigation.hidden){if(status.parentElement!==root)root.insertBefore(status,navigation);}
+    if (reviewOpening) {
+      if (status.parentElement !== reviewOpening.root) reviewOpening.root.append(status);
+    }
+    else if(navigation.hidden){if(status.parentElement!==root)root.insertBefore(status,navigation);}
     else navigation.insertBefore(status,form.hidden?form:listHeading);
     openFile.disabled = create.disabled = cancelConversion.disabled = inactive || composing;
     if (offline && homeSettings) {
@@ -256,7 +260,8 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
       }
       if (!focusIsUnclaimed() && !confirmFocused) return;
 
-      if (pendingImport && (pendingImport !== previousImport || confirmFocused)) importConfirm.focus();
+      if (reviewOpening) reviewOpening.retry.focus();
+      else if (pendingImport && (pendingImport !== previousImport || confirmFocused)) importConfirm.focus();
       else if (!navigation.hidden && (fileInspection || !wasHome)) {
         if (!form.hidden) create.focus();
         else if (!conversionPanel.hidden) (convert.disabled ? previewAgain : convert).focus();
@@ -266,6 +271,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   };
   const closeCurrent = async () => {
     openingReading = undefined;
+    reviewOpening = undefined;
     clearResumeReading();
     const oldWorkspace=workspace,oldHost=host,oldResident=resident,oldReview=reviewWorkspace,oldTools=receiveTools,oldRecovery=firstRecovery;
     mounted=false;presentation=null;presentationState=()=>presentation;resumedLast=false;confirmingResume=false;workspace=undefined;host=undefined;resident=undefined;reviewWorkspace=undefined;reviewEditAttempt=undefined;receiveTools=undefined;firstRecovery=undefined;
@@ -932,25 +938,43 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
       if (!guardSelection(generation, context)) return;
       const scenes = reviewSceneChoices(archive.review.snapshot);
       const loadScene = async (id: string, previous?: ReviewView) => {
-        ensureMaySwitch(); await closeCurrent();
+        ensureMaySwitch();
+        status.textContent = 'シーンを切り替えています…';
+        await closeCurrent();
         previous?.releaseDisplayData();
         if (disposed) return;
         selected = null; ports.selected(null); clearSelection(); navigation.hidden = true;
         const attempt = selectionGeneration, expected = selectionContext();
+        const panel = document.createElement('section'), projectName = document.createElement('h1'), label = document.createElement('label');
         const choose = document.createElement('select'), retry = document.createElement('button'), leave = document.createElement('button');
-        choose.setAttribute('aria-label', '表示するシーン'); retry.type = 'button'; retry.textContent = 'シーンを開く';
+        const help = document.createElement('p'), actions = document.createElement('div');
+        panel.className = 'lv-review-opening'; panel.setAttribute('aria-label', 'シーンの読み込み');
+        projectName.textContent = String((archive.review.snapshot.project as JsonObject).title);
+        label.textContent = '表示するシーン'; label.append(choose);
+        choose.setAttribute('aria-label', '表示するシーン'); retry.type = 'button'; retry.textContent = '再試行';
+        retry.className = 'lv-review-retry';
+        help.textContent = '再試行するか、別のシーンを選んでください。'; help.hidden = true;
         leave.type = 'button'; leave.textContent = '別のプロジェクトを開く'; leave.addEventListener('click', () => selectProject());
         for (const scene of scenes) { const option = document.createElement('option'); option.value = String(scene.id); option.textContent = String(scene.name); choose.append(option); }
-        choose.value = id; content.append(choose, retry, leave);
-        const load = async () => {
-          if (!guardSelection(attempt, expected)) return;
+        choose.value = id;
+        actions.append(retry, leave);
+        panel.append(projectName, label, status, help, actions);
+        const opening = { root: panel, retry }; reviewOpening = opening;
+        content.append(panel);
+        async function load(): Promise<void> {
+          if (reviewOpening !== opening || !guardSelection(attempt, expected)) return;
           choose.disabled = retry.disabled = leave.disabled = true;
-          status.textContent = 'シーンを開いています。';
+          retry.hidden = help.hidden = true;
+          status.textContent = 'シーンを読み込んでいます…';
           try {
             const next = await prepareReviewView(archive, policy, ports.decode, ports.jpeg, ports.photo, ports.mediaDecoders, choose.value);
             if (guardSelection(attempt, expected)) await showScene(next, attempt, expected);
-          } finally { choose.disabled = retry.disabled = leave.disabled = false; }
-        };
+          } finally {
+            choose.disabled = retry.disabled = leave.disabled = false;
+            if (reviewOpening === opening) retry.hidden = help.hidden = false;
+          }
+        }
+        choose.addEventListener('change', () => execute(load));
         retry.addEventListener('click', () => execute(load));
         await load();
       };

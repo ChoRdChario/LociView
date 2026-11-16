@@ -21,6 +21,26 @@ const tab = (page: Page, name: string) => page.getByRole('tab', { name, ...exact
 const detail = (page: Page) => page.getByRole('region', { name: 'キャプションの詳細', ...exact });
 const status = (page: Page, text: string) => expect(page.getByText(text, exact)).toBeVisible();
 
+type SceneReadFault = { mode: 'normal' | 'hold' | 'fail'; held: boolean; release(): void };
+async function installSceneReadFault(page: Page) {
+  await page.evaluate(() => {
+    const state: SceneReadFault = { mode: 'normal', held: false, release() {} };
+    Object.assign(window, { sceneReadFault: state });
+    async function beforeRead() {
+      const mode = state.mode; state.mode = 'normal';
+      if (mode === 'fail') throw Error('確認用のシーン読み込み失敗');
+      if (mode === 'hold') {
+        state.held = true;
+        await new Promise<void>(resolve => { state.release = resolve; });
+      }
+    }
+    const digest = crypto.subtle.digest.bind(crypto.subtle);
+    crypto.subtle.digest = async (...args: Parameters<SubtleCrypto['digest']>) => { await beforeRead(); return digest(...args); };
+    const bitmap = window.createImageBitmap.bind(window);
+    window.createImageBitmap = (async (...args: Parameters<typeof bitmap>) => { await beforeRead(); return bitmap(...args); }) as typeof createImageBitmap;
+  });
+}
+
 async function selectRecord(page: Page) {
   await revealCaptionList(page);
   await page.locator('.lv-caption-select').filter({ hasText: '塗装の確認' }).click();
@@ -44,6 +64,7 @@ for (const touch of [false, true])
       const options = { viewport: touch ? { width: 390, height: 844 } : { width: 1280, height: 720 }, hasTouch: touch, serviceWorkers: 'block' as const };
       const sharedBody = '監修用シーンでも同じ記録を確認。' + (touch ? '\n' + '写真と照合しながら、表面の塗装と内部の状態を記録する。'.repeat(65) : '');
       const sharedTitle = touch && kind === 'GS' ? ('塗装の確認' + '対象の詳細を示す長い日本語の記録名'.repeat(32)).slice(0, 512) : '塗装の確認';
+      const reviewSceneName = touch && kind === 'GS' ? ('監修用' + '外板と内部の記録を照合する長い日本語のシーン名'.repeat(16)).slice(0, 256) : '監修用';
       const sender = await browser.newContext(options), receiver = await browser.newContext(options);
       try {
         const page = await sender.newPage();
@@ -163,7 +184,7 @@ for (const touch of [false, true])
         await closeFileSurface(page);
 
         await beginSceneCreation(page);
-        await page.getByLabel('シーン名', exact).fill('監修用');
+        await page.getByLabel('シーン名', exact).fill(reviewSceneName);
         await action(page, 'シーンを追加').click();
         await status(page, 'シーンを追加しました。');
         await revealCaptionList(page);
@@ -190,7 +211,7 @@ for (const touch of [false, true])
           await status(page, '変更を適用しました。');
         }
 
-        await action(page, '監修用').click();
+        await action(page, reviewSceneName).click();
         await revealCameraPositions(page);
         const projection = page.locator('.lv-project-camera').getByLabel('投影方式', exact);
         await action(page, '開始視点を記録').click();
@@ -204,7 +225,7 @@ for (const touch of [false, true])
         await selectShareOutput(files, 'review');
         const sharedScenes = files.getByRole('group', { name: '渡すシーン', ...exact });
         await sharedScenes.getByRole('checkbox', { name: 'シーン 1', ...exact }).check();
-        await sharedScenes.getByRole('checkbox', { name: '監修用', ...exact }).check();
+        await sharedScenes.getByRole('checkbox', { name: reviewSceneName, ...exact }).check();
         await files.getByRole('button', { name: '内容を確認', ...exact }).click();
         const contents = files.locator('.lv-share-contents');
         await expect(contents).toBeVisible(); await contents.locator(':scope > summary').click();
@@ -214,9 +235,9 @@ for (const touch of [false, true])
         await expect(files).toContainText('相手は編集用コピーを作れます');
         await page.screenshot({ path: info.outputPath('share-contents.png'), fullPage: false });
         // A changed selection cannot keep a formerly checked list/impact visible.
-        await sharedScenes.getByRole('checkbox', { name: '監修用', ...exact }).uncheck();
+        await sharedScenes.getByRole('checkbox', { name: reviewSceneName, ...exact }).uncheck();
         await expect(contents).toHaveCount(0);
-        await sharedScenes.getByRole('checkbox', { name: '監修用', ...exact }).check();
+        await sharedScenes.getByRole('checkbox', { name: reviewSceneName, ...exact }).check();
         await files.getByRole('button', { name: '内容を確認', ...exact }).click();
         const [download] = await Promise.all([page.waitForEvent('download'), files.getByRole('button', { name: 'ダウンロード', ...exact }).click()]);
         const path = info.outputPath('shared-scene.zip');
@@ -260,8 +281,43 @@ for (const touch of [false, true])
           await action(other, '3D表示を再試行').click();
           await expect(other.locator('.lv-development-pin').first()).toBeVisible();
         }
-        await scenes.selectOption({ label: '監修用' });
-        await expect(scenes.locator('option:checked')).toHaveText('監修用');
+        await expect(reader.locator('.lv-review-scene-header h2')).toHaveCount(0);
+        if (!touch && kind === '点群' || touch && kind === 'GS') {
+          await expect(other.locator('.lv-development-pin').first()).toBeVisible();
+          await installSceneReadFault(other);
+          await other.evaluate(() => { (window as unknown as { sceneReadFault: SceneReadFault }).sceneReadFault.mode = 'hold'; });
+          await scenes.selectOption({ label: reviewSceneName });
+          await expect.poll(() => other.evaluate(() => (window as unknown as { sceneReadFault: SceneReadFault }).sceneReadFault.held)).toBe(true);
+          const opening = other.getByRole('region', { name: 'シーンの読み込み', ...exact });
+          const progress = opening.locator('.lv-validation-status');
+          await expect(opening).toBeVisible();
+          await expect(progress).toHaveAttribute('data-busy', 'true');
+          await expect(progress).toContainText('シーンを読み込んでいます…');
+          await expect(scenes).toBeDisabled();
+          await expect(action(other, '再試行')).toBeHidden();
+          await other.screenshot({ path: info.outputPath('switch-loading.png') });
+          await other.evaluate(() => (window as unknown as { sceneReadFault: SceneReadFault }).sceneReadFault.release());
+          await expect(reader).toBeVisible();
+          await other.evaluate(() => { (window as unknown as { sceneReadFault: SceneReadFault }).sceneReadFault.mode = 'fail'; });
+          await scenes.selectOption({ label: 'シーン 1' });
+          const retry = action(other, '再試行');
+          await expect(progress).toHaveAttribute('data-busy', 'false');
+          await expect(progress).toContainText('確認用のシーン読み込み失敗');
+          await expect(retry).toBeFocused();
+          await expect(scenes.locator('option:checked')).toHaveText('シーン 1');
+          await other.screenshot({ path: info.outputPath('switch-failed.png') });
+          await other.evaluate(() => { (window as unknown as { sceneReadFault: SceneReadFault }).sceneReadFault.mode = 'fail'; });
+          await retry.press('Enter');
+          await expect(progress).toHaveAttribute('data-busy', 'false');
+          await expect(retry).toBeFocused();
+          await scenes.selectOption({ label: reviewSceneName });
+          await expect(reader).toBeVisible();
+          await expect(heading).toBeFocused();
+        } else await scenes.selectOption({ label: reviewSceneName });
+        await expect(scenes.locator('option:checked')).toHaveText(reviewSceneName);
+        const sceneBox = (await scenes.boundingBox())!;
+        expect(sceneBox.x).toBeGreaterThanOrEqual(0);
+        expect(sceneBox.x + sceneBox.width).toBeLessThanOrEqual(options.viewport.width);
         const readingCanvas = other.getByLabel('3Dモデルの表示', exact);
         await readingCanvas.focus(); await other.keyboard.press('Tab');
         await expect(action(other, '記録を検索')).toBeFocused(); await other.keyboard.press('Enter');
@@ -316,7 +372,7 @@ for (const touch of [false, true])
           await returnTo3D.press('Enter');
           await expect(readingCanvas).toBeFocused();
           await expect(readerSearch).toHaveValue('塗装');
-          await expect(scenes.locator('option:checked')).toHaveText('監修用');
+          await expect(scenes.locator('option:checked')).toHaveText(reviewSceneName);
           await expect(receivingProjection).toHaveValue('orthographic');
           await other.locator('.lv-development-pin').first().tap();
           await expect(reading).toBeFocused();
@@ -343,6 +399,8 @@ for (const touch of [false, true])
           await expect(readerSearch).toHaveValue('塗装');
           if (kind === 'GS') {
             await other.setViewportSize({ width: 320, height: 568 });
+            const narrowScene = (await scenes.boundingBox())!;
+            expect(narrowScene.x + narrowScene.width).toBeLessThanOrEqual(320);
             await action(other, '記録を検索').press('Enter');
             await readerSearch.fill('一致する記録がない検索');
             await expect(readerSearch).toBeFocused();

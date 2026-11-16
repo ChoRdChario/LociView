@@ -55,7 +55,7 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
   const searchRecords = make('button', '記録を検索'); searchRecords.type = 'button'; searchRecords.className = 'lv-stage-search';
   const overlay = make('div'); overlay.className = 'lv-development-pin-layer';
   const sidebar = make('aside'); sidebar.className = 'lv-development-sidebar'; sidebar.setAttribute('aria-label', '閲覧パネル');
-  const sceneName = make('h2', view.sceneName), emptyCaptions=make('p','このシーンにキャプションはありません。'),status = make('p'), retry = make('button', '3D表示を再試行'); status.setAttribute('role', 'status'); retry.type = 'button';
+  const emptyCaptions=make('p','このシーンにキャプションはありません。'),status = make('p'), retry = make('button', '3D表示を再試行'); status.setAttribute('role', 'status'); retry.type = 'button';
   const renderStatus = make('div'); renderStatus.className = 'lv-review-render-status'; renderStatus.append(status, retry);
   viewport.append(canvas, searchRecords, overlay, renderStatus); stage.append(viewport); content.append(stage, sidebar); root.append(header, content);
   const mediaWork = createMediaResidencyGate(document, render, () => runtime?.idle?.() ?? Promise.resolve(), () => !disposed);
@@ -251,7 +251,7 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
   };
   const windows = createCaptionWindowControls(document, windowPlan, active => { moving = active; paint(); }, gallery);
   const selectedMedia = make('section'); selectedMedia.setAttribute('aria-label', '選択中のキャプションのメディア');
-  const selectedText = make('section'), recordTitle = make('h3'), recordBody = make('p');
+  const selectedText = make('section'), recordTitle = make(switchScene && view.scenes.length > 1 ? 'h2' : 'h3'), recordBody = make('p');
   selectedText.setAttribute('aria-label', 'キャプションの詳細'); selectedText.tabIndex = -1; selectedText.className = 'lv-caption-value';
   const recordHeader = make('header'), returnTo3D = make('button', '3Dに戻る');
   recordHeader.className = 'lv-review-record-header'; returnTo3D.type = 'button';
@@ -263,7 +263,7 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
     canvas.focus({ preventScroll: true });
   });
   let panelGallery: ReturnType<typeof gallery> | null = null, panelCaption: string | null = null;
-  const sceneHeader = make('div'); sceneHeader.className = 'lv-review-scene-header'; sceneHeader.append(sceneName);
+  const sceneHeader = make('div'); sceneHeader.className = 'lv-review-scene-header';
   if (switchScene && view.scenes.length > 1) {
     const select = make('select'); select.setAttribute('aria-label', '表示するシーン');
     for (const scene of view.scenes) {
@@ -278,7 +278,7 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
       finally { if (!disposed) { select.disabled = false; content.inert = false; } }
     });
     sceneHeader.append(select);
-  }
+  } else sceneHeader.append(make('h2', view.sceneName));
   viewport.append(windows.root); sidebar.append(sceneHeader, emptyCaptions, list.root, selectedText);
   const views = make('details'); views.append(make('summary', 'その他の視点'));
   const cameraAction = (action: () => void) => {

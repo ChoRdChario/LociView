@@ -8657,15 +8657,19 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
   it('lets a reader choose another scene after a display failure and leave after a failed switch', async () => {
     const source = await openFileCaption(), second = `scn_${newId()}`, first = source.s.sceneId;
     let reader: ReturnType<typeof createValidationWorkspace> | undefined;
+    let releaseDisplay: () => void = () => {};
     try {
       await source.host.dispatch(source.host.read().source!.token, { kind: 'createScene', sceneId: second, activeSceneId: first, sourceSceneId: first,
         name: '別の角度', orderKey: 'B', membershipIds: [`sam_${newId()}`], eventId: `evt_${newId()}` });
       const job = await source.host.workspaceOutput.generateReview(source.host.read().source!.token, { sceneId: first, additionalSceneIds: [second] });
       const file = new File([await source.host.workspaceOutput.download(job)], 'angles.zip');
+      const original = await file.arrayBuffer(), sourceToken = source.host.read().source!.token;
+      const displayGate = new Promise<void>(resolve => { releaseDisplay = resolve; });
       const dispose = vi.fn(), factory: ViewportFactory = () => ({ update() {}, setActive() {}, camera() {}, retry() {}, dispose() {},
         read: () => ({ ready: false, token: '', pins: [], issue: null, dragging: false, projection: 'perspective', axis: null }) });
       const renderReview = vi.fn(async (view: Awaited<ReturnType<typeof prepareReviewView>>) => {
         if (view.sceneName !== '別の角度') throw Error('シーンの表示を準備できません');
+        await displayGate;
         return { factory, dispose };
       });
       reader = createValidationWorkspace(new RecordedDocument().asDocument(), { fileLimits: budget, decode, selected() {}, list: async () => [],
@@ -8674,17 +8678,37 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       const page = record(reader.root), all = (n: RecordedNode): RecordedNode[] => [n, ...n.children.flatMap(all)];
       const find = (label: string) => all(page).find(n => n.getAttribute('aria-label') === label || n.tag === 'button' && n.textContent === label && !n.hidden)!;
       const input = find('ファイルを選択'); Object.assign(input, { files: [file] }); input.fire('change');
-      await vi.waitFor(() => expect(find('シーンを開く')?.disabled).toBe(false));
+      await vi.waitFor(() => expect(find('再試行')?.disabled).toBe(false));
+      const opening = find('シーンの読み込み');
+      expect(opening.contains(find('再試行'))).toBe(true);
+      expect(find('再試行').document.activeElement).toBe(find('再試行'));
       const choose = find('表示するシーン'), other = choose.children.find(n => n.textContent === '別の角度')!, initialId = choose.value;
-      choose.value = other.value; find('シーンを開く').click();
+      choose.value = other.value; choose.fire('change');
+      await vi.waitFor(() => expect(renderReview).toHaveBeenCalledTimes(2));
+      expect(choose.disabled).toBe(true); expect(find('再試行')).toBeUndefined();
+      expect(all(opening).some(n => n.textContent === 'シーンを読み込んでいます…')).toBe(true);
+      releaseDisplay();
       await vi.waitFor(() => expect(all(page).some(n => n.className.includes('lv-review-workspace'))).toBe(true));
       const switcher = find('表示するシーン'); switcher.value = initialId; switcher.fire('change');
-      await vi.waitFor(() => expect(find('シーンを開く')?.disabled).toBe(false));
+      // Recorded DOM does not blur the focused node when its reader is removed.
+      switcher.document.activeElement = null;
+      await vi.waitFor(() => expect(find('再試行')?.disabled).toBe(false));
       expect(dispose).toHaveBeenCalledOnce(); expect(renderReview).toHaveBeenCalledTimes(3);
+      expect(find('再試行').document.activeElement).toBe(find('再試行'));
+      find('再試行').click();
+      await vi.waitFor(() => expect(renderReview).toHaveBeenCalledTimes(4));
+      await vi.waitFor(() => expect(find('再試行')?.disabled).toBe(false));
+      expect(source.host.read().source!.token).toBe(sourceToken);
+      expect(await file.arrayBuffer()).toEqual(original);
+      const staleChoose = find('表示するシーン');
       find('別のプロジェクトを開く').click();
       await vi.waitFor(() => expect(find('表示するシーン')).toBeUndefined());
       expect(find('ファイルを開く').disabled).toBe(false);
-    } finally { await reader?.dispose(); await source.workspace.dispose(); }
+      staleChoose.value = other.value; staleChoose.fire('change');
+      await vi.waitFor(() => expect(reader!.hasChanges()).toBe(false));
+      expect(renderReview).toHaveBeenCalledTimes(4);
+      expect(find('ファイルを開く').hidden).toBe(false);
+    } finally { releaseDisplay(); await reader?.dispose(); await source.workspace.dispose(); }
   });
   it('replays a bound multi-scene append after publication interruption without replacing the target or applying the change twice', async () => {
     const source = await openFileCaption(glb(j => { j.materials[0].name = '別モデル'; }), 'map2');

@@ -8,7 +8,38 @@ and [earlier working records](../docs/history/development-through-2026-10-28/tas
 retain qualifications and failures. Their Current/Next headings are not an active
 queue or renewed approval requirements.
 
-## Current — read a shared record and return to its 3D location
+## Current — switch a shared Scene and recover in the same place
+
+- Begin at `5571c6d`. Real PC/touch runs reproduced duplicate ready Scene names,
+  bare loading/error controls, focus falling to body after a failed switch, and
+  a second Open after choosing a replacement Scene. Keep evidence in the private
+  `.artifacts/e2e/shared-switch-20261116` folder.
+- Bound the repair to the shared selector and its existing guarded load owner.
+  Show one current Scene name, group target/progress/error/retry, automatically
+  load a newly selected Scene and keep explicit retry for the same failed target.
+  Preserve close/release order, stale-result fences, original data and all
+  edit/copy/append/save/recovery/compatibility contracts.
+- Finish after real PC/touch success, blocked loading, failure/reselection/retry,
+  exit, long Japanese and keyboard tests pass, followed by independent review
+  and required checkpoint. Minor new suggestions stay outside this boundary.
+- The focused selection/failure tests passed (9 cases). The existing browser
+  workflow passed all 10 selected cases, including parent Scene preparation
+  failure and local WebGL failure as distinct lanes, explicit retry, automatic
+  replacement choice, 256-character Scene names, 320px and 200% display,
+  single-Scene heading, media, copy/save/reopen and interrupted append.
+- Independent review found no final blockers. The removed duplicate scene h2
+  is compensated by the correct caption heading level with its visual size kept.
+  The recorded-DOM test explicitly models native blur, without broadening the
+  production focus policy. Owner identity rejects stale detached controls.
+- Final source and tests are fixed. The checkpoint passed typecheck, 159 files /
+  3611 tests (16 expected failures, 21 todo), all five builds, offline isolation
+  and HEIC isolation. Qualify the actual preview against these same source hashes.
+  Physical iPhone/Safari picker and VoiceOver stay pending.
+- Next candidate is measured large-share Scene-switch preparation, with original
+  quality and existing validation/release boundaries retained. Keep further minor
+  wording changes outside this unit.
+
+## Previous — read a shared record and return to its 3D location
 
 - Start at `e542c64` under the accepted mobile record-reading direction in
   `docs/ui-workspace-design.md` (2026-11-11). Actual 390×844 Chromium operation

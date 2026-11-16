@@ -39,6 +39,8 @@ test('review files use the same camera controls and create an independent editab
     await revealFileSurface(source,'共有');const files=source.getByRole('region',{name:'ファイル',exact:true});await selectShareOutput(files, 'review');await chooseSharedScene(files);await files.getByRole('button',{name:'内容を確認',exact:true}).click();await expect(files.locator('.lv-file-primary')).toHaveText('ダウンロード');
     const [download]=await Promise.all([source.waitForEvent('download'),files.locator('.lv-file-primary').click()]),path=info.outputPath('review.zip');await download.saveAs(path);expect(await download.failure()).toBeNull();
     const page=await launch();await chooseHomeFiles(page, path);const review=page.getByRole('main',{name:'閲覧用のシーン',exact:true}),gizmo=review.locator('.lv-project-camera');await expect(gizmo.getByRole('button',{name:'Z',exact:true})).toBeEnabled({timeout:90_000});
+    await expect(review.locator('.lv-review-scene-header > h2')).toHaveCount(1);
+    await expect(review.getByLabel('表示するシーン',{exact:true})).toHaveCount(0);
     await expect(review.getByRole('button',{name:'正面',exact:true})).toHaveCount(0);await expect(page.getByRole('heading',{name:'プロジェクト名',exact:true})).toHaveCount(0);
     await expect(review.getByRole('button',{name:'開始視点に戻る',exact:true})).toHaveCount(0);
     for(const name of ['X','−X','Y','−Y','Z','−Z']){const axis=gizmo.getByRole('button',{name,exact:true});await axis.press('Enter');await expect(axis).toHaveAttribute('aria-pressed','true');}

@@ -337,8 +337,20 @@
 .lv-review-render-status :is(p, button) { pointer-events: auto; }
 .lv-review-scene-header { display: flex; align-items: center; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; }
 .lv-review-scene-header h2 { min-width: 0; margin: 0; overflow-wrap: anywhere; }
+.lv-review-scene-header > select { flex: 1; min-width: 0; max-width: 100%; }
+.lv-review-opening { display: grid; gap: 16px; box-sizing: border-box; max-width: 640px; margin: 24px auto; padding: 24px; font: 400 14px/1.5 system-ui, sans-serif; color: #282828; color-scheme: light; overflow-wrap: anywhere; }
+.lv-review-opening h1 { margin: 0; font-size: 18px; font-weight: 500; }
+.lv-review-opening p { margin: 0; }
+.lv-review-opening label { display: grid; gap: 6px; min-width: 0; }
+.lv-review-opening :is(select, button) { min-width: 0; min-height: 44px; padding: 8px 12px; border: 1px solid #817c78; border-radius: 6px; font: inherit; color: inherit; background: #fbfaf6; }
+.lv-review-opening select { width: 100%; }
+.lv-review-opening > div { display: flex; flex-wrap: wrap; gap: 8px; }
+.lv-review-opening :is(select, button):focus-visible { outline: 2px solid #312f2d; outline-offset: 2px; }
+.lv-review-opening button:not(:disabled):hover { background: #edeae6; }
+.lv-review-opening .lv-review-retry { background: #3c4637; color: #fff; border-color: #3c4637; }
+.lv-review-opening .lv-review-retry:not(:disabled):hover { background: #525f46; }
 .lv-review-record-header { position: sticky; top: -12px; z-index: 1; display: flex; justify-content: flex-end; padding-block: 8px; border-bottom: 1px solid #b7b1aa; background: #f2f0ee; }
-.lv-review-workspace .lv-caption-value > h3 { margin-block: 8px; overflow-wrap: anywhere; }
+.lv-review-workspace .lv-caption-value > :is(h2, h3) { margin-block: 8px; font-size: 1.17em; overflow-wrap: anywhere; }
 .lv-review-record-header button { flex: none; min-height: 44px; padding: 8px 12px; touch-action: manipulation; }
 .lv-review-handoff {
   align-self: start;
