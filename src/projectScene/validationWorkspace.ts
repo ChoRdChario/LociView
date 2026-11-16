@@ -37,7 +37,7 @@ import { createValidationReceiveControls } from './validationReceiveControls';
 import { prepareReviewView, reviewSceneChoices, type ReviewView } from './reviewView';
 import { ReviewArchive } from '../projectPackage/reviewArchive';
 import type { JsonObject } from '../domain/values';
-import { createReviewWorkspace } from './reviewWorkspace';
+import { createReviewWorkspace, type ReviewReadingPosition, type ReviewTextSelection } from './reviewWorkspace';
 import type { PreparedReviewEdit } from '../projectPackage/reviewEdit';
 import { PreparedReviewCopy } from '../projectPackage/reviewCopyInput';
 import { sceneAppendCompatibility } from '../projectPackage/sceneAppend';
@@ -138,7 +138,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   const untilOpen=<T>(work:Promise<T>)=>Promise.race([work,presentationStopped.then(()=>{throw new DOMException('画面を閉じました。','AbortError');})]);
   let reviewEditAttempt:PreparedReviewCopy|undefined;
   let reviewWorkspace: ReturnType<typeof createReviewWorkspace> | undefined;
-  let reviewOpening: { root: HTMLElement; retry: HTMLButtonElement } | undefined;
+  let reviewOpening: { root: HTMLElement; retry: HTMLButtonElement; reading?: ReturnType<typeof createCaptionTextReading> } | undefined;
   let firstRecovery: FirstBackupRecovery | undefined;
   const recoveryControls = new Map<HTMLButtonElement | HTMLInputElement, () => boolean>();
   let receiveTools: ReturnType<typeof createValidationReceiveControls> | undefined;
@@ -271,6 +271,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   };
   const closeCurrent = async () => {
     openingReading = undefined;
+    reviewOpening?.reading?.dispose();
     reviewOpening = undefined;
     clearResumeReading();
     const oldWorkspace=workspace,oldHost=host,oldResident=resident,oldReview=reviewWorkspace,oldTools=receiveTools,oldRecovery=firstRecovery;
@@ -937,6 +938,8 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
       const archive = await ReviewArchive.fromSelectedArchive(selectedArchive, validationMetadataLimits);
       if (!guardSelection(generation, context)) return;
       const scenes = reviewSceneChoices(archive.review.snapshot);
+      const positions = new Map<string, ReviewReadingPosition>();
+      const textPositions = new Map<string, ReviewTextSelection>();
       const loadScene = async (id: string, previous?: ReviewView) => {
         ensureMaySwitch();
         status.textContent = 'シーンを切り替えています…';
@@ -958,30 +961,69 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
         for (const scene of scenes) { const option = document.createElement('option'); option.value = String(scene.id); option.textContent = String(scene.name); choose.append(option); }
         choose.value = id;
         actions.append(retry, leave);
-        panel.append(projectName, label, status, help, actions);
-        const opening = { root: panel, retry }; reviewOpening = opening;
+        label.hidden = scenes.length === 1;
+        const readingSlot = document.createElement('div'); readingSlot.className = 'lv-review-reading';
+        panel.append(projectName, label, status, help, actions, readingSlot);
+        const opening: NonNullable<typeof reviewOpening> = { root: panel, retry }; reviewOpening = opening;
+        let readingScene: string | undefined;
+        const readingSelection = (): ReviewTextSelection | undefined => {
+          if (!opening.reading) return;
+          const position = opening.reading.readingPosition();
+          return { ...opening.reading.selection(), ...position, picked: position.picked || !!textPositions.get(readingScene!)?.picked };
+        };
         content.append(panel);
         async function load(): Promise<void> {
           if (reviewOpening !== opening || !guardSelection(attempt, expected)) return;
+          const scene = choose.value;
+          if (opening.reading?.composition()) { choose.value = readingScene!; return; }
+          if (readingScene !== scene) {
+            const last = readingSelection();
+            if (readingScene && last) textPositions.set(readingScene, last);
+            opening.reading?.dispose(); opening.reading = undefined; readingScene = scene;
+          }
           choose.disabled = retry.disabled = leave.disabled = true;
-          retry.hidden = help.hidden = true;
-          status.textContent = 'シーンを読み込んでいます…';
+          actions.hidden = retry.hidden = help.hidden = true;
+          const readingStatus = '3Dと添付を準備しています。記録は読めます。';
+          status.textContent = opening.reading ? readingStatus : 'シーンを読み込んでいます…';
           try {
-            const next = await prepareReviewView(archive, policy, ports.decode, ports.jpeg, ports.photo, ports.mediaDecoders, choose.value);
-            if (guardSelection(attempt, expected)) await showScene(next, attempt, expected);
+            const next = await prepareReviewView(archive, policy, ports.decode, ports.jpeg, ports.photo, ports.mediaDecoders, scene, value => {
+              if (opening.reading || reviewOpening !== opening || !selectionCurrent(attempt, expected)) return;
+              const memory = positions.get(scene)?.memory;
+              const initial = textPositions.get(scene) ?? (memory && { query: memory.search, captionId: memory.selectedCaptionId });
+              const colors = memory?.pinColors;
+              const visible = colors ? { ...value, records: value.records.filter(row => colors.includes(row.color)) } : value;
+              opening.reading = createCaptionTextReading(document, visible, 'review', initial);
+              readingSlot.append(opening.reading.root);
+              opening.reading.restoreScroll(textPositions.get(scene)?.scrollTop ?? memory?.listScrollTop ?? 0);
+              status.textContent = readingStatus;
+            });
+            try {
+              if (guardSelection(attempt, expected)) await showScene(next, attempt, expected, opening.reading, readingSelection);
+            } finally { if (reviewOpening === opening || disposed) next.releaseDisplayData(); }
           } finally {
             choose.disabled = retry.disabled = leave.disabled = false;
-            if (reviewOpening === opening) retry.hidden = help.hidden = false;
+            if (reviewOpening === opening) {
+              help.textContent = opening.reading ? '本文は読めます。3Dと添付を開くには再試行してください。' :
+                scenes.length > 1 ? '再試行するか、別のシーンを選んでください。' : '再試行するか、別のファイルを開いてください。';
+              actions.hidden = retry.hidden = help.hidden = false;
+            }
           }
         }
         choose.addEventListener('change', () => execute(load));
         retry.addEventListener('click', () => execute(load));
         await load();
       };
-      const showScene = async (view: ReviewView, generation: number, context: ReturnType<typeof selectionContext>) => {
+      const showScene = async (view: ReviewView, generation: number, context: ReturnType<typeof selectionContext>,
+        textReader: ReturnType<typeof createCaptionTextReading> | undefined, getReading: () => ReviewTextSelection | undefined) => {
         const prepared = await ownRender(renderReview(view));
         try {
           if (!guardSelection(generation, context)) return;
+          while (textReader?.composition()) {
+            status.textContent = '準備ができました。文字入力を終えると3Dを表示します。';
+            await untilOpen(textReader.composition()!);
+          }
+          if (!guardSelection(generation, context)) return;
+          const reading = getReading();
           await closeCurrent(); resident = prepared;
           const currentReview = createReviewWorkspace(document, view, prepared.factory, () => execute(async () => {
             if (reviewWorkspace !== currentReview || resident !== prepared) return;
@@ -1028,18 +1070,15 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
             },
           }, id => execute(async () => {
             if (reviewWorkspace !== currentReview || resident !== prepared) return;
+            positions.set(view.source.sceneId, currentReview.readingPosition()); textPositions.delete(view.source.sceneId);
             await loadScene(id, view);
-          }), () => { void selectProject(); }); reviewWorkspace = currentReview; content.append(reviewWorkspace.root); reviewWorkspace.render();
+          }), () => { void selectProject(); }, positions.get(view.source.sceneId), reading); reviewWorkspace = currentReview; content.append(reviewWorkspace.root); reviewWorkspace.render();
           selected = null; ports.selected(null); navigation.hidden = true; clearSelection();
           status.textContent = ''; reviewWorkspace.focusTitle();
         } catch (error) { if (resident === prepared) resident = undefined; throw error; }
         finally { if (resident !== prepared) await releaseRender(prepared); }
       };
-      if (scenes.length > 1) await loadScene(String((archive.review.snapshot.project as JsonObject).defaultSceneId));
-      else {
-        const view = await prepareReviewView(archive, policy, ports.decode, ports.jpeg, ports.photo, ports.mediaDecoders);
-        await showScene(view, generation, context);
-      }
+      await loadScene(String((archive.review.snapshot.project as JsonObject).defaultSceneId));
       return;
     }
     const inspected = purpose === 'clean' ? await CleanArchive.fromSelectedArchive(selectedArchive, validationMetadataLimits) : await WorkspaceArchive.fromSelectedArchive(selectedArchive, validationMetadataLimits);

@@ -292,17 +292,38 @@ for (const touch of [false, true])
           const progress = opening.locator('.lv-validation-status');
           await expect(opening).toBeVisible();
           await expect(progress).toHaveAttribute('data-busy', 'true');
-          await expect(progress).toContainText('シーンを読み込んでいます…');
+          await expect(progress).toContainText('記録は読めます。');
           await expect(scenes).toBeDisabled();
           await expect(action(other, '再試行')).toBeHidden();
+          const early = opening.getByRole('region', { name: '共有シーンの記録' });
+          const earlySearch = early.getByRole('searchbox', { name: '検索' });
+          await earlySearch.fill('塗装');
+          await expect(early.getByRole('button', { name: sharedTitle, exact: true })).toBeVisible();
+          expect(await other.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(options.viewport.width);
+          const earlyBox = (await earlySearch.boundingBox())!;
+          expect(earlyBox.x + earlyBox.width).toBeLessThanOrEqual(options.viewport.width);
+          await expect(opening.locator('canvas, img')).toHaveCount(0);
+          await earlySearch.dispatchEvent('compositionstart');
           await other.screenshot({ path: info.outputPath('switch-loading.png') });
           await other.evaluate(() => (window as unknown as { sceneReadFault: SceneReadFault }).sceneReadFault.release());
+          await expect(progress).toContainText('文字入力を終えると');
+          await expect(earlySearch).toBeFocused();
+          if (!touch) await early.getByRole('button', { name: sharedTitle, exact: true }).focus();
+          await earlySearch.dispatchEvent('compositionend');
           await expect(reader).toBeVisible();
+          await expect(reader.getByRole('searchbox')).toHaveValue('塗装');
+          if (touch) await expect(reader.getByRole('searchbox')).toBeFocused();
+          else {
+            await expect(reader.locator('.lv-caption-select').filter({ hasText: sharedTitle })).toBeFocused();
+            await expect(reader.locator('.lv-caption-window')).toHaveCount(0);
+          }
           await other.evaluate(() => { (window as unknown as { sceneReadFault: SceneReadFault }).sceneReadFault.mode = 'fail'; });
           await scenes.selectOption({ label: 'シーン 1' });
           const retry = action(other, '再試行');
           await expect(progress).toHaveAttribute('data-busy', 'false');
           await expect(progress).toContainText('確認用のシーン読み込み失敗');
+          await expect(opening.getByRole('region', { name: '共有シーンの記録' })).toBeVisible();
+          await expect(action(other, '編集コピーを作る')).toHaveCount(0);
           await expect(retry).toBeFocused();
           await expect(scenes.locator('option:checked')).toHaveText('シーン 1');
           await other.screenshot({ path: info.outputPath('switch-failed.png') });
@@ -385,7 +406,8 @@ for (const touch of [false, true])
         const selectedPin = other.locator('.lv-development-pin[aria-current="true"]');
         await expect(selectedPin).toBeVisible();
         await expect(selectedPin).toHaveAccessibleName(sharedTitle);
-        await expect(selectedPin).toHaveCSS('box-shadow', /3px/);
+        await expect.poll(() => selectedPin.evaluate(node => getComputedStyle(node, '::before').boxShadow)).toContain('3px');
+        expect((await selectedPin.boundingBox())!.width).toBeGreaterThanOrEqual(44);
         await other.getByLabel('選択中のキャプションのメディア', exact).getByRole('button', { name: '画像を表示', ...exact }).click();
         await expect(other.getByRole('dialog', { name: 'メディアビューア', ...exact }).locator('img')).toHaveJSProperty('naturalWidth', 2);
         await other.getByRole('dialog', { name: 'メディアビューア', ...exact }).getByRole('button', { name: '閉じる', ...exact }).click();
@@ -429,6 +451,25 @@ for (const touch of [false, true])
         if (touch) expect(tops.length).toBeGreaterThan(1);
         expect(Math.max(...tops) - Math.min(...tops)).toBeLessThan(1);
         await other.screenshot({ path: info.outputPath('received-scene.png') });
+        await scenes.selectOption({ label: 'シーン 1' });
+        await expect(reader).toBeVisible();
+        await scenes.selectOption({ label: reviewSceneName });
+        await expect(readerSearch).toHaveValue('塗装');
+        await expect(reader.locator('.lv-caption-select')).toHaveCount(1);
+        await expect(reader.locator('.lv-development-pin[aria-current="true"]')).toHaveAccessibleName(sharedTitle);
+        if (!touch && kind === '点群') {
+          const filter = reader.locator('.lv-caption-colors');
+          const color = filter.getByRole('button', { name: /のピン$/ }).first();
+          await color.click();
+          await expect(reader.locator('.lv-caption-select')).toHaveCount(0);
+          await scenes.selectOption({ label: 'シーン 1' });
+          await expect(reader).toBeVisible();
+          await scenes.selectOption({ label: reviewSceneName });
+          await expect(reader).toBeVisible();
+          await expect(reader.locator('.lv-caption-select')).toHaveCount(0);
+          await color.click();
+          await expect(selectedPin).toHaveAccessibleName(sharedTitle);
+        }
       }
       finally {
         await receiver.close();

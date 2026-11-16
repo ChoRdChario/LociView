@@ -27,9 +27,16 @@ const table = (r: JsonObject, name: string) => object(r[name]) as Record<string,
 const compare = (a: string, b: string) => a < b ? -1 : a > b ? 1 : 0;
 const ordered = (rows: JsonObject[]) => rows.sort((a, b) => compare(string(a.orderKey), string(b.orderKey)) || compare(string(a.id), string(b.id)));
 export const reviewSceneChoices = (snapshot: JsonObject) => ordered(snapshot.scene ? [object(snapshot.scene)] : Object.values(table(snapshot, 'scenesById')));
+interface ReviewSceneText {
+  title: string; sceneId: string; sceneName: string;
+  records: { id: string; title: string; body: string; color: string }[];
+}
+const captionColor = (caption: JsonObject) => caption.colorSrgb === undefined ? '#a08045' :
+  '#' + list(caption.colorSrgb).map(n => Math.round(Number(n) * 255).toString(16).padStart(2, '0')).join('');
 
 /** Inspected read-only file content. No storage, history, synthetic Project or commands. */
-export async function prepareReviewView(file: Blob | PackageArchive | ReviewArchive, budget: ProjectFilePolicyInput, decode?: PngDecoder, jpeg?: JpegDecoder, photo?: PhotoDecoder, mediaDecoders?:MediaDecoders, selectedScene?: string) {
+export async function prepareReviewView(file: Blob | PackageArchive | ReviewArchive, budget: ProjectFilePolicyInput, decode?: PngDecoder, jpeg?: JpegDecoder, photo?: PhotoDecoder, mediaDecoders?:MediaDecoders, selectedScene?: string,
+  onText?: (reading: ReviewSceneText) => void) {
   const policy=projectFilePolicy(budget), limits=policy.nonGs;
   const inspection = file instanceof ReviewArchive ? file : file instanceof Blob ? await ReviewArchive.inspect(file, validationMetadataLimits) :
     await ReviewArchive.fromSelectedArchive(file, validationMetadataLimits);
@@ -42,6 +49,9 @@ export async function prepareReviewView(file: Blob | PackageArchive | ReviewArch
   const visibleAssets = new Set(membership('sceneAssetMembershipsById').map(row => row.assetId));
   if (review.closure.entries.reduce((n, b) => n + b.byteLength, 0) > policy.projectBodyBytes)
     throw Error('この検証画面の容量上限を超えています。元のファイルは変更していません。');
+  const edges = ordered(membership('sceneCaptionMembershipsById')), captions = table(snapshot, 'captionsById');
+  if (onText && edges.length) onText({ title: string(project.title), sceneId, sceneName: string(scene.name),
+    records: edges.map(edge => { const row = captions[string(edge.captionId)]!; return { id: string(row.id), title: string(row.title), body: string(row.body), color: captionColor(row) }; }) });
   const models: ReadonlyRenderModel[] = [], decoded = new Map<string, ValidatedModel>(), images = new Map<string, Blob>();
   // One handoff per GLB in this Scene; retain facts, never the inspected body or decoded textures.
   const preparedGlbs = new Map<string, Omit<ValidatedGlb, 'bytes'>>();
@@ -83,7 +93,7 @@ export async function prepareReviewView(file: Blob | PackageArchive | ReviewArch
     // Native Blob slices retain the immutable archive, not another materialized body copy.
     return view.slice(0, view.size, string(shownRef.mediaType));
   };
-  const edges = ordered(membership('sceneCaptionMembershipsById')), captionIds = new Set(edges.map(edge => edge.captionId));
+  const captionIds = new Set(edges.map(edge => edge.captionId));
   const attachments = ordered(Object.values(table(snapshot, 'captionAttachmentsById')).filter(edge => captionIds.has(edge.captionId)));
   for (const id of new Set(attachments.map(edge => string(edge.mediaResourceId)))) images.set(id, await verifyMedia(mediaRecords[id]!));
   const savedMaterials: Record<string, ValidationMaterialEffects> = {};
@@ -100,15 +110,13 @@ export async function prepareReviewView(file: Blob | PackageArchive | ReviewArch
     }
     savedMaterials[model.assetId] = effects;
   }
-  const captions = table(snapshot, 'captionsById');
   const items: CaptionListItem[] = edges.map(edge => {
     const caption = captions[string(edge.captionId)]!, anchor = object(caption.anchor);
     const ownerId = anchor.kind === 'asset' ? anchor.assetId : anchor.kind === 'unplaced' ? anchor.ownerAssetId : undefined;
     const owner = ownerId === undefined ? null : assets[string(ownerId)]!;
     const missing = !!owner && owner.kind !== 'visual', needsReview = anchor.kind === 'asset' && !!owner && owner.kind === 'visual' && !list(owner.compatibleAnchorClassIds).includes(anchor.authoredAnchorCompatibilityId!);
     return { id: string(caption.id), title: value(string(caption.title)), body: value(string(caption.body)),
-      color: value(caption.colorSrgb === undefined ? '#a08045' :
-        '#' + list(caption.colorSrgb).map(n => Math.round(Number(n) * 255).toString(16).padStart(2, '0')).join('')),
+      color: value(captionColor(caption)),
       owner: value(owner ? { kind: 'asset' as const, assetId: string(owner.id), name: value(missing ? '対応モデルなし' : string(owner.label)) }
         : { kind: anchor.kind === 'unplaced' ? 'none' as const : 'project' as const }),
       mediaCount: value(attachments.filter(a => a.captionId === caption.id).length), needsReview,

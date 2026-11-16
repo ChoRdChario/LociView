@@ -8243,6 +8243,23 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       view.releaseDisplayData(); failed.releaseDisplayData();
     } finally { await workspace.dispose(); }
   });
+  it('hands off only an actual scroll and the focused row from a paged shared text reader', () => {
+    const document = new RecordedDocument(), records = Array.from({ length: 130 }, (_, i) => ({ id: String(i), title: String(i), body: '本文' }));
+    const view = resumeReadingModule.createCaptionTextReading(document.asDocument(), { title: '資料', sceneId: 's', sceneName: '記録', records }, 'review');
+    const all = (node: RecordedNode): RecordedNode[] => [node, ...node.children.flatMap(all)];
+    const nodes = () => all(record(view.root)), list = nodes().find(node => node.tag === 'ul')!;
+    try {
+      expect(list.children).toHaveLength(100);
+      view.restoreScroll(80); list.fire('scroll');
+      expect(view.readingPosition().scrollTop).toBeUndefined();
+      list.scrollTop = 40; list.fire('scroll');
+      expect(view.readingPosition().scrollTop).toBe(40);
+      nodes().find(node => node.textContent === 'さらに表示')!.click();
+      expect(view.readingPosition().focusedRowId).toBe('100');
+      expect(view.selection().captionId).toBeNull();
+      expect(list.children).toHaveLength(130);
+    } finally { view.dispose(); }
+  });
   it('opens a review read-only, then explicitly creates an editable independent copy and cold reopens it (recorded DOM)', async () => {
     const { host, workspace, s, options } = await openFileCaption();
     s.media.addFile(s.mediaContext(), { name: '添付PNG', size: png.length, arrayBuffer: async () => png.slice().buffer });
@@ -8350,6 +8367,11 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const rows = all(page).filter(n => n.className === 'lv-caption-select'); expect(rows).toHaveLength(2);
     const pageButton = (text: string) => all(page).find(n => n.tag === 'button' && n.textContent === text)!;
     rows[0]!.fire('click');
+    expect(pageButton('次の記録').disabled).toBe(false);
+    pageButton('次の記録').click();
+    expect(all(page).filter(n => n.className === 'lv-caption-window')).toHaveLength(1);
+    expect(pageButton('次の記録').disabled).toBe(true);
+    pageButton('前の記録').click();
     rows[1]!.fire('click');
     expect(all(page).filter(n => n.className === 'lv-caption-window')).toHaveLength(2);
     const retry = all(page).find(n => n.tag === 'button' && n.textContent === '3D表示を再試行')!;
@@ -8698,6 +8720,11 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       const job = await source.host.workspaceOutput.generateReview(source.host.read().source!.token, { sceneId: first, additionalSceneIds: [second] });
       const file = new File([await source.host.workspaceOutput.download(job)], 'angles.zip');
       const original = await file.arrayBuffer(), sourceToken = source.host.read().source!.token;
+      const onText = vi.fn();
+      const admitted = await ReviewArchive.inspect(file, metadata);
+      await expect(prepareReviewView(admitted, { nonGs: budget, gs: budget, projectBodyBytes: 1 }, decode, undefined, undefined, undefined, undefined, onText)).rejects.toThrow('容量上限');
+      await expect(prepareReviewView(admitted, budget, decode, undefined, undefined, undefined, 'unlisted', onText)).rejects.toThrow('シーンを選び直して');
+      expect(onText).not.toHaveBeenCalled();
       const displayGate = new Promise<void>(resolve => { releaseDisplay = resolve; });
       const dispose = vi.fn(), factory: ViewportFactory = () => ({ update() {}, setActive() {}, camera() {}, retry() {}, dispose() {},
         read: () => ({ ready: false, token: '', pins: [], issue: null, dragging: false, projection: 'perspective', axis: null }) });
@@ -8715,12 +8742,15 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       await vi.waitFor(() => expect(find('再試行')?.disabled).toBe(false));
       const opening = find('シーンの読み込み');
       expect(opening.contains(find('再試行'))).toBe(true);
+      expect(opening.contains(find('共有シーンの記録'))).toBe(true);
+      expect(find('編集コピーを作る')).toBeUndefined();
       expect(find('再試行').document.activeElement).toBe(find('再試行'));
       const choose = find('表示するシーン'), other = choose.children.find(n => n.textContent === '別の角度')!, initialId = choose.value;
       choose.value = other.value; choose.fire('change');
       await vi.waitFor(() => expect(renderReview).toHaveBeenCalledTimes(2));
       expect(choose.disabled).toBe(true); expect(find('再試行')).toBeUndefined();
       expect(all(opening).some(n => n.textContent === 'シーンを読み込んでいます…')).toBe(true);
+      expect(find('共有シーンの記録')).toBeUndefined(); // The selected second Scene has no records.
       releaseDisplay();
       await vi.waitFor(() => expect(all(page).some(n => n.className.includes('lv-review-workspace'))).toBe(true));
       const switcher = find('表示するシーン'); switcher.value = initialId; switcher.fire('change');

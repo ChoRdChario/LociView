@@ -1,7 +1,8 @@
 import type { ResumeReading } from './validationCatalog';
 
 /** Transient text reader. It owns no Project or file commands. */
-export function createCaptionTextReading(document: Document, reading: Omit<ResumeReading, 'token'> & { incomplete?: boolean }, context: 'resume' | 'restore' | 'first-restore' = 'resume') {
+export function createCaptionTextReading(document: Document, reading: Omit<ResumeReading, 'token'> & { incomplete?: boolean }, context: 'resume' | 'restore' | 'first-restore' | 'review' = 'resume',
+  initial?: { query: string; captionId: string | null }) {
   const root = document.createElement('section'), header = document.createElement('header'), heading = document.createElement('h1');
   const identity = document.createElement('div'), status = document.createElement('p'), layout = document.createElement('div');
   const stage = document.createElement('div'), panel = document.createElement('aside'), panelHeading = document.createElement('h2');
@@ -9,11 +10,11 @@ export function createCaptionTextReading(document: Document, reading: Omit<Resum
   const label = document.createElement('label'), search = document.createElement('input');
   const list = document.createElement('ul'), detail = document.createElement('section');
   const title = document.createElement('h3'), body = document.createElement('p'), empty = document.createElement('p');
-  root.className = 'lv-project-workspace lv-resume-reading'; root.setAttribute('aria-label', context !== 'resume' ? '復元中のキャプション' : '再開中のキャプション');
+  root.className = 'lv-project-workspace lv-resume-reading'; root.setAttribute('aria-label', context === 'review' ? '共有シーンの記録' : context !== 'resume' ? '復元中のキャプション' : '再開中のキャプション');
   identity.className = 'lv-project-identity'; heading.textContent = reading.title;
   status.className = 'lv-operation-status'; status.dataset.busy = 'true';
   status.setAttribute('role', 'status'); status.textContent = context === 'first-restore' ? '復元中です。最初のシーンの記録を読めます。編集・保存は完了後に使えます。' : context === 'restore' ? '復元しています。完了後に編集できます。' : '再開を確認しています。';
-  identity.append(heading, status); header.append(identity);
+  identity.append(heading, status); header.append(identity); header.hidden = context === 'review';
   layout.className = 'lv-project-body'; layout.dataset.surface = 'panel';
   stage.className = 'lv-project-stage'; stage.setAttribute('aria-hidden', 'true');
   panelHeading.textContent = reading.sceneName ? `キャプション（${reading.sceneName}）` : 'キャプション';
@@ -28,19 +29,27 @@ export function createCaptionTextReading(document: Document, reading: Omit<Resum
   index.append(label, empty, list); panel.append(panelHeading, index, detail); layout.append(stage, panel); root.append(header, layout);
   let selected: string | null = null, composition: Promise<void> | undefined, finish: (() => void) | undefined;
   const mobile = () => document.defaultView?.matchMedia?.('(pointer: coarse) and (max-width: 760px), (pointer: coarse) and (max-width: 950px) and (max-height: 480px)').matches;
-  const rows = reading.records.map(record => {
+  let picked = false;
+  function showRecord(record: ResumeReading['records'][number]) {
+    selected = record.id; title.textContent = record.title.trim() ? record.title : '無題'; body.textContent = record.body; detail.hidden = false;
+  }
+  function makeRow(record: ResumeReading['records'][number]) {
     const row = document.createElement('li'), button = document.createElement('button');
     button.type = 'button'; button.textContent = record.title.trim() ? record.title : '無題'; button.setAttribute('aria-pressed', 'false');
     button.addEventListener('click', () => {
-      selected = record.id;
+      picked = true; showRecord(record);
       for (const item of rows) item.button.setAttribute('aria-pressed', String(item.record.id === selected));
-      title.textContent = button.textContent; body.textContent = record.body; detail.hidden = false;
       root.dataset.surface = 'detail';
       if (mobile()) title.focus?.({ preventScroll: true });
     });
     row.append(button); list.append(row);
     return { record, row, button, text: `${record.title}\n${record.body}`.toLowerCase() };
-  });
+  }
+  // A shared archive can contain more records than a bounded restore preview.
+  const batch = 100, paged = context === 'review' && reading.records.length > batch;
+  let rows = paged ? [] : reading.records.map(makeRow), shown = batch;
+  const more = document.createElement('button');
+  if (paged) { more.type = 'button'; more.textContent = 'さらに表示'; index.append(more); }
   back.addEventListener('click', () => {
     root.dataset.surface = 'list';
     const row = rows.find(item => item.record.id === selected && !item.row.hidden);
@@ -48,14 +57,33 @@ export function createCaptionTextReading(document: Document, reading: Omit<Resum
   });
   const filter = () => {
     const query = search.value.trim().toLowerCase();
+    if (paged) {
+      const matches = reading.records.filter(record => !query || `${record.title}\n${record.body}`.toLowerCase().includes(query));
+      list.replaceChildren(); rows = matches.slice(0, shown).map(makeRow);
+      for (const item of rows) item.button.setAttribute('aria-pressed', String(item.record.id === selected));
+      more.hidden = shown >= matches.length; empty.hidden = !!matches.length; return;
+    }
     for (const item of rows) item.row.hidden = !item.text.includes(query);
     empty.hidden = rows.some(item => !item.row.hidden);
   };
-  search.addEventListener('input', () => { if (!composition) filter(); });
+  more.addEventListener('click', () => { const at = shown; shown += batch; filter(); rows[at]?.button.focus?.(); });
+  if (initial) {
+    search.value = initial.query;
+    const record = reading.records.find(item => item.id === initial.captionId);
+    if (record) { showRecord(record); rows.find(item => item.record.id === selected)?.button.setAttribute('aria-pressed', 'true'); }
+  }
+  if (paged || initial) filter();
+  search.addEventListener('input', () => { shown = batch; if (!composition) filter(); });
   search.addEventListener('focus', () => { root.dataset.surface = 'list'; });
   search.addEventListener('compositionstart', () => { composition ??= new Promise(resolve => { finish = resolve; }); });
   search.addEventListener('compositionend', () => { filter(); finish?.(); composition = undefined; finish = undefined; });
-  return { root, composition: () => composition, selection: () => ({ query: search.value, captionId: selected, focus: document.activeElement === search ? 'search' as const :
+  let scrolled: number | undefined, observedTop = 0;
+  list.addEventListener('scroll', () => {
+    if (list.scrollTop !== observedTop) scrolled = observedTop = list.scrollTop;
+  });
+  return { root, restoreScroll(top: number) { list.scrollTop = top; observedTop = list.scrollTop; }, readingPosition: () => ({
+    focusedRowId: rows.find(item => item.button === document.activeElement)?.record.id, scrollTop: scrolled, picked
+  }), composition: () => composition, selection: () => ({ query: search.value, captionId: selected, focus: document.activeElement === search ? 'search' as const :
       root.contains(document.activeElement) ? mobile() && root.dataset.surface === 'list' ? 'row' as const : 'detail' as const : null,
     surface: root.dataset.surface === 'detail' ? 'detail' as const : 'list' as const }), setReady() { status.textContent = '復元が完了しました。入力を終えると編集画面に移ります。'; status.dataset.busy = 'false'; }, dispose() { finish?.(); root.remove(); } };
 }

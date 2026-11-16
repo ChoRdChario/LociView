@@ -160,8 +160,17 @@
 .lv-development-pin-layer { position: absolute; inset: 0; pointer-events: none; }
 .lv-development-pin-preview { position: absolute; pointer-events: none; transform: translate(-50%, -50%); border: 2px dashed #413d39; outline: 2px solid #faf9f8; background: #f2f0ee; color: #312f2d; padding: 3px 7px; font-size: 12px; }
 .lv-development .lv-development-pin { position: absolute; pointer-events: auto; transform: translate(-50%, -50%); width: 32px; height: 32px; min-height: 32px; border-radius: 50%; border: 3px solid #faf9f8; box-shadow: 0 0 0 1px #413d39; font-size: 0; }
-.lv-review-workspace .lv-development-pin[aria-current="true"],
 .lv-development .lv-development-pin[aria-pressed="true"] { box-shadow: 0 0 0 3px #413d39; }
+.lv-review-workspace .lv-development-pin {
+  width: 44px; height: 44px; min-height: 44px; padding: 0; border: 0; background: transparent; box-shadow: none; touch-action: none;
+}
+.lv-review-workspace .lv-development-pin::before {
+  content: ""; position: absolute; left: 50%; top: 50%; width: 12px; height: 12px; box-sizing: border-box;
+  transform: translate(-50%, -50%) scale(var(--lv-pin-scale, 1)); border-radius: 50%; border: 1px solid white;
+  background: var(--lv-pin-color); box-shadow: 0 0 0 1px #413d39; pointer-events: none;
+}
+.lv-review-workspace .lv-development-pin:is([aria-current="true"], :focus-visible) { z-index: 1; }
+.lv-review-workspace .lv-development-pin:is([aria-current="true"], :focus-visible)::before { box-shadow: 0 0 0 3px #413d39, 0 0 0 4px white; }
 .lv-review-workspace .lv-development-pin[data-status="needsReview"]::after,
 .lv-development .lv-development-pin[data-review="true"]::after { content: "!"; position: absolute; right: -7px; top: -7px; width: 16px; height: 16px; border: 1px solid #413d39; border-radius: 50%; background: #faf9f8; color: #413d39; font-size: 12px; font-weight: 700; line-height: 14px; }
 .lv-development-stage { overflow-y: auto; }
@@ -239,7 +248,8 @@
 .lv-home-settings .lv-offline-controls > p { margin-bottom: 8px; }
 .lv-home-settings .lv-offline-controls details > div { position: static; width: 100%; max-height: none; padding: 8px 0; border: 0; box-shadow: none; }
 .lv-home-settings :focus-visible { outline: 2px solid #312f2d; outline-offset: 2px; }
-.lv-validation-host:has(> .lv-home-settings):has(> .lv-validation-home[hidden]):not(:has(> .lv-validation-content > .lv-resume-reading, > .lv-validation-content > .lv-first-restore-panel .lv-resume-reading)) { padding-top: 64px; box-sizing: border-box; }
+.lv-validation-host:has(> .lv-home-settings):has(> .lv-validation-home[hidden]):not(:has(> .lv-validation-content > .lv-resume-reading, > .lv-validation-content > .lv-first-restore-panel .lv-resume-reading, > .lv-validation-content > .lv-review-opening)) { padding-top: 64px; box-sizing: border-box; }
+.lv-validation-host:has(> .lv-validation-content > .lv-review-opening) > .lv-home-settings { display: none; }
 .lv-startup-failure { padding: 24px; box-sizing: border-box; }
 .lv-startup-failure > h1 { margin: 0 80px 24px 0; font-size: 22px; font-weight: 500; }
 .lv-startup-failure > :is(p,button) { margin: 12px 0; }
@@ -338,20 +348,33 @@
 .lv-review-scene-header { display: flex; align-items: center; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; }
 .lv-review-scene-header h2 { min-width: 0; margin: 0; overflow-wrap: anywhere; }
 .lv-review-scene-header > select { flex: 1; min-width: 0; max-width: 100%; }
-.lv-review-opening { display: grid; gap: 16px; box-sizing: border-box; max-width: 640px; margin: 24px auto; padding: 24px; font: 400 14px/1.5 system-ui, sans-serif; color: #282828; color-scheme: light; overflow-wrap: anywhere; }
+.lv-review-opening { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; box-sizing: border-box; max-width: 640px; margin: 24px auto; padding: 24px; font: 400 14px/1.5 system-ui, sans-serif; color: #282828; color-scheme: light; overflow-wrap: anywhere; }
 .lv-review-opening h1 { margin: 0; font-size: 18px; font-weight: 500; }
 .lv-review-opening p { margin: 0; }
 .lv-review-opening label { display: grid; gap: 6px; min-width: 0; }
 .lv-review-opening :is(select, button) { min-width: 0; min-height: 44px; padding: 8px 12px; border: 1px solid #817c78; border-radius: 6px; font: inherit; color: inherit; background: #fbfaf6; }
-.lv-review-opening select { width: 100%; }
+.lv-review-opening select { box-sizing: border-box; width: 100%; max-width: 100%; }
 .lv-review-opening > div { display: flex; flex-wrap: wrap; gap: 8px; }
 .lv-review-opening :is(select, button):focus-visible { outline: 2px solid #312f2d; outline-offset: 2px; }
 .lv-review-opening button:not(:disabled):hover { background: #edeae6; }
 .lv-review-opening .lv-review-retry { background: #3c4637; color: #fff; border-color: #3c4637; }
 .lv-review-opening .lv-review-retry:not(:disabled):hover { background: #525f46; }
+.lv-review-opening:has(.lv-resume-reading) { width: min(100%, 48rem); gap: 8px; margin-block: 0; }
+.lv-review-reading:empty { display: none; }
+.lv-review-reading, .lv-review-reading :is(.lv-resume-reading, .lv-project-body, aside, .lv-resume-index) { min-width: 0; }
+.lv-review-opening:has(> label:not([hidden])) .lv-review-reading aside > h2 { display: none; }
+.lv-review-reading > .lv-resume-reading { width: 100%; min-height: 0; height: clamp(240px, 59dvh, 640px); }
+.lv-review-reading .lv-project-stage { display: none; }
+.lv-review-reading .lv-project-body { display: flex; }
+.lv-review-reading aside { flex: 1; min-height: 0; }
+.lv-review-opening .lv-resume-reading li > button { text-align: start; width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lv-review-opening .lv-resume-reading p { white-space: pre-wrap; }
+.lv-review-opening > [hidden], .lv-review-reading [hidden] { display: none; }
 .lv-review-record-header { position: sticky; top: -12px; z-index: 1; display: flex; justify-content: flex-end; padding-block: 8px; border-bottom: 1px solid #b7b1aa; background: #f2f0ee; }
 .lv-review-workspace .lv-caption-value > :is(h2, h3) { margin-block: 8px; font-size: 1.17em; overflow-wrap: anywhere; }
 .lv-review-record-header button { flex: none; min-height: 44px; padding: 8px 12px; touch-action: manipulation; }
+.lv-review-record-header { flex-wrap: wrap; gap: 4px; }
+.lv-review-record-header > :first-child { margin-right: auto; }
 .lv-review-handoff {
   align-self: start;
   display: grid;

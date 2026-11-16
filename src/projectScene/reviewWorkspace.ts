@@ -1,7 +1,7 @@
 import { createCaptionListControls } from '../ui/projectScene/captionListControls';
 import { captionListPlanIsCurrent, planCaptionList, type CaptionListContext, type CaptionListPlan } from '../ui/projectScene/captionListState';
 import { createCaptionWindowControls } from '../ui/projectScene/captionWindowControls';
-import { captionWindowPlanIsCurrent, newCaptionWindowMemory, planCaptionWindow, type CaptionWindowPlan } from '../ui/projectScene/captionWindowState';
+import { captionWindowPlanIsCurrent, captionWindowView, newCaptionWindowMemory, planCaptionWindow, type CaptionWindowMemory, type CaptionWindowPlan } from '../ui/projectScene/captionWindowState';
 import type { SceneUiMemory } from '../ui/projectScene/navigationState';
 import type { ViewCameraIntent } from '../ui/projectScene/viewState';
 import type { ReviewView } from './reviewView';
@@ -17,10 +17,23 @@ export interface ReviewAppendPort {
   projects(): Promise<readonly { run: string; title: string }[]>;
   inspect(run: string): Promise<{ reason: string; confirm(): Promise<void> }>;
 }
+export interface ReviewReadingPosition {
+  memory: SceneUiMemory;
+  windows: CaptionWindowMemory;
+}
+export interface ReviewTextSelection {
+  query: string;
+  captionId: string | null;
+  focus: 'row' | 'detail' | 'search' | null;
+  surface: 'list' | 'detail';
+  picked: boolean;
+  focusedRowId?: string;
+  scrollTop?: number;
+}
 
 /** Standalone snapshot viewing. Only an explicitly confirmed handoff may create an editing Project. */
 export function createReviewWorkspace(document: Document, view: ReviewView, factory: ViewportFactory, editCopy?: () => void | Promise<void>, append?: ReviewAppendPort,
-  switchScene?: (id: string) => Promise<void> | void, openProject?: () => void) {
+  switchScene?: (id: string) => Promise<void> | void, openProject?: () => void, position?: ReviewReadingPosition, reading?: ReviewTextSelection) {
   const make = <K extends keyof HTMLElementTagNameMap>(tag: K, text = '') => { const node = document.createElement(tag); node.textContent = text; return node; };
   const root = make('main'); root.className = 'lv-development lv-review-workspace'; root.setAttribute('aria-label', '閲覧用のシーン');
   const stopHelp = mountContextHelp(document, root);
@@ -58,11 +71,14 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
   const emptyCaptions=make('p','このシーンにキャプションはありません。'),status = make('p'), retry = make('button', '3D表示を再試行'); status.setAttribute('role', 'status'); retry.type = 'button';
   const renderStatus = make('div'); renderStatus.className = 'lv-review-render-status'; renderStatus.append(status, retry);
   viewport.append(canvas, searchRecords, overlay, renderStatus); stage.append(viewport); content.append(stage, sidebar); root.append(header, content);
-  const mediaWork = createMediaResidencyGate(document, render, () => runtime?.idle?.() ?? Promise.resolve(), () => !disposed);
+  let readingDetail = false;
+  const mediaWork = createMediaResidencyGate(document, render, () => runtime?.idle?.() ?? Promise.resolve(), () => !disposed, () => !!phone?.matches && readingDetail);
   const mediaViewer = createMediaViewer(document, view.rasterResources,view.imageDimensions,mediaWork.acquire); root.append(mediaViewer.root);
-  let memory: SceneUiMemory = { selectedCaptionId: null, search: '', pinColors: null, listScrollTop: 0, ownerFilter: { kind: 'all' } };
+  let memory: SceneUiMemory = position?.memory ?? { selectedCaptionId: null, search: '', pinColors: null, listScrollTop: 0, ownerFilter: { kind: 'all' } };
+  if (reading) memory = { ...memory, search: reading.query, selectedCaptionId: reading.captionId ?? memory.selectedCaptionId,
+    listScrollTop: reading.scrollTop ?? (reading.query === memory.search ? memory.listScrollTop : 0) };
   const phone = document.defaultView?.matchMedia?.('(pointer: coarse) and (max-width: 760px), (pointer: coarse) and (max-width: 950px) and (max-height: 480px)');
-  let windowsMemory = newCaptionWindowMemory(view.source.sceneId), composing = false, moving = false, disposed = false, rendering = false;
+  let windowsMemory = position?.windows ?? newCaptionWindowMemory(view.source.sceneId), composing = false, moving = false, disposed = false, rendering = false;
   let runtime: ProjectViewport | undefined, display = view.display(null, null), failure = '', rendererFailure = '';
   let retirement: Promise<void> | undefined;
   const copy = make('button', '編集コピーを作る'), confirmation = make('section'); copy.type = 'button'; copy.hidden = !editCopy;
@@ -196,7 +212,7 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
   }
   function selectCaption(captionId: string) {
     memory = { ...memory, selectedCaptionId: captionId };
-    if (phone?.matches) return;
+    if (phone?.matches) { readingDetail = true; return; }
     const plan = planCaptionWindow(view.source, windowsMemory, captionId, { kind: 'open', captionId });
     if (plan.kind === 'change') windowsMemory = plan.memory;
   }
@@ -206,7 +222,7 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
     if (plan.kind === 'change' && (plan.intent === 'scroll' || plan.intent === 'search')) {
       memory = plan.memory;
       if (plan.intent === 'scroll') list.acceptScroll(context());
-      else list.render(context());
+      else { list.render(context()); updateSteps(); }
       return;
     }
     if (plan.kind === 'change') {
@@ -255,10 +271,37 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
   selectedText.setAttribute('aria-label', 'キャプションの詳細'); selectedText.tabIndex = -1; selectedText.className = 'lv-caption-value';
   const recordHeader = make('header'), returnTo3D = make('button', '3Dに戻る');
   recordHeader.className = 'lv-review-record-header'; returnTo3D.type = 'button';
-  recordHeader.append(returnTo3D);
+  const previous = make('button', '前の記録'), next = make('button', '次の記録');
+  const activeWindow = () => !phone?.matches ? captionWindowView(view.source, windowsMemory, memory.selectedCaptionId).visibleIds.at(-1) : undefined;
+  function updateSteps() {
+    const neighbors = list.neighbors(activeWindow() ?? memory.selectedCaptionId);
+    previous.hidden = next.hidden = !neighbors.previous && !neighbors.next;
+    previous.disabled = !neighbors.previous || composing || moving || handoffBusy;
+    next.disabled = !neighbors.next || composing || moving || handoffBusy;
+    recordHeader.hidden = !memory.selectedCaptionId || (!phone?.matches && next.hidden);
+  }
+  function step(direction: 'previous' | 'next') {
+    if (searchBlocked() || content.inert) return;
+    const active = activeWindow(), base = context();
+    const stepContext = active ? { ...base, memory: { ...memory, selectedCaptionId: active } } : base;
+    const plan = planCaptionList(stepContext, { kind: 'step', direction });
+    if (plan.kind !== 'change') return;
+    const captionId = plan.memory.selectedCaptionId!;
+    const replace = active ? planCaptionWindow(view.source, windowsMemory, captionId,
+      { kind: 'replace', captionId, fromCaptionId: active, rect: windows.placement(active) }) : undefined;
+    if (replace?.kind === 'blocked') return;
+    if (replace) windowsMemory = replace.memory;
+    if (phone?.matches) readingDetail = true;
+    memory = plan.memory; render(); list.revealSelected();
+    if ((direction === 'next' ? next : previous).disabled) (direction === 'next' ? previous : next).focus({ preventScroll: true });
+  }
+  previous.type = next.type = 'button';
+  previous.addEventListener('click', () => step('previous')); next.addEventListener('click', () => step('next'));
+  recordHeader.append(returnTo3D, previous, next);
   selectedText.append(recordHeader, recordTitle, recordBody, selectedMedia);
   returnTo3D.addEventListener('click', () => {
     if (searchBlocked() || content.inert) return;
+    requestStage();
     viewport.scrollIntoView?.({ block: 'start', behavior: 'auto' });
     canvas.focus({ preventScroll: true });
   });
@@ -285,6 +328,14 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
     if (disposed || composing || moving) return; try { action(); failure = ''; } catch (error) { failure = (error as Error).message; } paint();
   };
   const cameraButtons: HTMLButtonElement[] = [];
+  const requestStage = () => { readingDetail = false; mediaWork.resume(); };
+  const resumeStage = (event: Event) => { if (event.target !== searchRecords && event.target !== retry) requestStage(); };
+  viewport.addEventListener('pointerdown', resumeStage, true);
+  viewport.addEventListener('focusin', resumeStage);
+  const stageObserver = typeof IntersectionObserver === 'undefined' ? null : new IntersectionObserver(entries => {
+    if (entries.some(entry => entry.intersectionRatio >= 0.95) && !mediaViewer.root.open) requestStage();
+  }, { threshold: 0.95 });
+  stageObserver?.observe(viewport);
   const cameraButton = (container: HTMLElement, text: string, viewId: string) => {
     const button = make('button', text); button.type = 'button';
     button.addEventListener('click', () => { if (!button.disabled) cameraAction(() => {
@@ -316,6 +367,57 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
     cameraButton(views, (names.get(name) ?? 0) > 1 ? `${index + 1} · ${name}` : name, String(saved.id));
   });
   views.hidden = !alternatives.length; sidebar.append(views);
+  let gesture: { pointer: number; node: HTMLButtonElement; x: number; y: number; startX: number; startY: number;
+    id: string; kind: 'orbit' | 'pan'; started: boolean } | undefined;
+  let suppressClick = false;
+  function endPinGesture() {
+    const held = gesture;
+    gesture = undefined;
+    if (!held) return;
+    if (held.started) runtime?.navigateCamera?.({ phase: 'end', id: held.id });
+    if (held.node.hasPointerCapture?.(held.pointer)) held.node.releasePointerCapture(held.pointer);
+  }
+  overlay.addEventListener('contextmenu', event => event.preventDefault());
+  overlay.addEventListener('pointerdown', event => {
+    suppressClick = false;
+    if (gesture) { suppressClick = true; endPinGesture(); return; }
+    if (searchBlocked() || content.inert || !runtime?.navigateCamera || !event.isPrimary || event.button !== 0 && event.button !== 2 ||
+        event.altKey || event.metaKey || event.ctrlKey || event.shiftKey) return;
+    const node = (event.target as Element).closest<HTMLButtonElement>('.lv-development-pin');
+    if (!node || !overlay.contains(node)) return;
+    gesture = { pointer: event.pointerId, node, x: event.clientX, y: event.clientY, startX: event.clientX, startY: event.clientY,
+      id: crypto.randomUUID(), kind: event.button === 2 ? 'pan' : 'orbit', started: false };
+    try { node.setPointerCapture(event.pointerId); } catch { endPinGesture(); }
+  });
+  overlay.addEventListener('pointermove', event => {
+    const held = gesture;
+    if (!held || held.pointer !== event.pointerId) return;
+    if (!event.buttons || disposed || handoffBusy || composing || moving || content.inert) { endPinGesture(); return; }
+    if (!held.started) {
+      if (Math.hypot(event.clientX-held.startX, event.clientY-held.startY) <= (event.pointerType === 'touch' ? 8 : 4)) return;
+      suppressClick = true;
+      held.started = runtime?.navigateCamera?.({ phase:'begin', id:held.id, kind:held.kind }) === true;
+      if (!held.started) { endPinGesture(); return; }
+    }
+    const dx = event.clientX-held.x, dy = event.clientY-held.y;
+    held.x = event.clientX; held.y = event.clientY;
+    event.preventDefault();
+    if (!runtime?.navigateCamera?.({ phase:'move', id:held.id, dx, dy })) endPinGesture();
+  });
+  for (const type of ['pointerup', 'pointercancel', 'lostpointercapture'] as const) overlay.addEventListener(type, event => {
+    if (gesture?.pointer === event.pointerId) endPinGesture();
+  });
+  function pickPin(event: MouseEvent, node: HTMLButtonElement, id: string) {
+    if (!event.detail) return id; // Native keyboard activation names one exact pin.
+    let nearest = node, distance = Infinity;
+    for (const hit of document.elementsFromPoint(event.clientX, event.clientY)) {
+      if (hit.parentElement !== overlay || !hit.hasAttribute('data-caption-id')) continue;
+      const box = hit.getBoundingClientRect();
+      const delta = Math.hypot(box.left + box.width / 2 - event.clientX, box.top + box.height / 2 - event.clientY);
+      if (delta < distance) { nearest = hit as HTMLButtonElement; distance = delta; }
+    }
+    return nearest.dataset.captionId ?? id;
+  }
   function paint() {
     if (disposed) return; const observation = runtime?.read(), ready = !!observation?.ready && observation.display === display;
     searchRecords.hidden = !view.source.captions.length; searchRecords.disabled = searchBlocked();
@@ -326,24 +428,33 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
     cameraGizmo.render({ camera: captured, axis: observation?.axis ?? null, blocked: cameraBlocked || !display.bounds,navigationBlocked:!cameraReady||composing||moving,navigating:observation?.navigating,navigationAvailable:!!runtime?.navigateCamera });
     projection.disabled = cameraBlocked; projection.value = observation?.projection ?? 'perspective';
     for (const button of cameraButtons) button.disabled = cameraBlocked || !runtime?.recall;
-    status.textContent = rendererFailure || failure || observation?.issue || observation?.notice || ''; retry.hidden = !!runtime && !observation?.issue&&!observation?.retryAvailable;
+    status.textContent = rendererFailure || failure || observation?.issue || observation?.notice || '';
+    const retryLabel = mediaWork.parked ? '3Dを表示' : '3D表示を再試行';
+    if (retry.textContent !== retryLabel) retry.textContent = retryLabel;
+    retry.hidden = !mediaWork.parked && !!runtime && !observation?.issue&&!observation?.retryAvailable;
     renderStatus.hidden = !status.textContent && retry.hidden;
     const wanted = new Set(display.pins.map(p => p.id));
-    for (const [id, pin] of pins) if (!wanted.has(id)) { pin.remove(); pins.delete(id); }
+    for (const [id, pin] of pins) if (!wanted.has(id)) { if (gesture?.node === pin) endPinGesture(); pin.remove(); pins.delete(id); }
     for (const pin of display.pins) {
       let button = pins.get(pin.id);
       if (!button) { button = make('button'); button.type = 'button'; button.className = 'lv-development-pin';
-        button.addEventListener('click', () => {
-          accept(planCaptionList(context(), { kind: 'select', captionId: pin.id }));
+        button.dataset.captionId = pin.id;
+        const node = button;
+        button.addEventListener('click', event => {
+          if ((event.detail && suppressClick) || searchBlocked() || content.inert) return;
+          accept(planCaptionList(context(), { kind: 'select', captionId: pickPin(event, node, pin.id) }));
         }); pins.set(pin.id, button); overlay.append(button); }
       const title = pin.title || '無題';
       button.textContent = title; button.setAttribute('aria-label', title);
-      button.style.backgroundColor = pin.color; button.setAttribute('aria-current', String(memory.selectedCaptionId === pin.id));
-      button.style.transform = `translate(-50%, -50%) scale(${pin.scale ?? 1})`;
+      button.style.setProperty?.('--lv-pin-color', pin.color); button.setAttribute('aria-current', String(memory.selectedCaptionId === pin.id));
+      button.style.setProperty?.('--lv-pin-scale', String(pin.scale ?? 1));
       button.dataset.status = pin.status;
       if (pin.status === 'needsReview') button.setAttribute('aria-description', '位置を要確認');
       else button.removeAttribute('aria-description');
-      const point = observation?.pins.find(p => p.id === pin.id); button.hidden = !ready || !point?.visible;
+      const point = observation?.pins.find(p => p.id === pin.id);
+      const offscreen = !ready || !point?.visible;
+      button.hidden = offscreen && gesture?.node !== button;
+      button.style.opacity = offscreen ? '0' : '';
       if (point) { button.style.left = `${point.x}px`; button.style.top = `${point.y}px`; }
     }
     const bounds = canvas.getBoundingClientRect?.() ?? { width: 0, height: 0 }; windows.project({ ready, width: bounds.width, height: bounds.height,
@@ -353,9 +464,10 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
     if (disposed || rendering) return; rendering = true;
     try { list.render(context());
       const selectedCaption = view.source.captions.find(row => row.id === memory.selectedCaptionId);
-      const item = phone?.matches ? selectedCaption : undefined;
+      const item = phone?.matches || !activeWindow() ? selectedCaption : undefined;
       selectedText.hidden = !selectedCaption;
-      recordHeader.hidden = recordTitle.hidden = recordBody.hidden = !item;
+      returnTo3D.hidden = !phone?.matches || !item; recordTitle.hidden = recordBody.hidden = !item;
+      updateSteps();
       recordTitle.textContent = item?.title.kind === 'value' ? item.title.value || '無題' : '無題';
       recordBody.textContent = item?.body.kind === 'value' ? item.body.value : '';
       if (panelCaption !== memory.selectedCaptionId) { panelGallery?.dispose(); panelCaption = memory.selectedCaptionId;
@@ -374,23 +486,34 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
   }
   retry.addEventListener('click', () => {
     if (disposed || composing || moving) return;
+    if (mediaWork.parked) { requestStage(); canvas.focus({ preventScroll: true }); return; }
     try { if (runtime) runtime.retry(); else startRenderer(); failure = ''; }
     catch (error) { failure = (error as Error).message; } paint();
   });
   document.addEventListener?.('visibilitychange',render);
-  phone?.addEventListener?.('change',render);
+  const layoutChanged = () => { if (!phone?.matches) requestStage(); render(); };
+  phone?.addEventListener?.('change',layoutChanged);
+  if (reading?.picked && reading.captionId) selectCaption(reading.captionId);
   render();
   startRenderer(); paint();
-  return { root, header, focusTitle: () => heading.focus(), render, hasChanges: () => composing || moving, dispose() {
+  return { root, header, readingPosition: (): ReviewReadingPosition => ({ memory, windows: windowsMemory }),
+    focusTitle: () => {
+      if (reading?.focus === 'search') list.focusSearch();
+      else if (reading?.focusedRowId) list.focusSelection(reading.focusedRowId);
+      else if (reading?.focus === 'detail' && reading.captionId && phone?.matches) selectedText.focus();
+      else if (reading?.focus) list.focusSelection();
+      else heading.focus();
+    }, render, hasChanges: () => composing || moving, dispose() {
     if (retirement) return retirement;
     let finish!: () => void, fail!: (error: unknown) => void;
     retirement = new Promise<void>((resolve, reject) => { finish = resolve; fail = reject; });
     void retirement.catch(() => {}); disposed = true;
     const errors: unknown[] = [], attempt = <T>(action: () => T): T | undefined => { try { return action(); } catch (error) { errors.push(error); } };
+    attempt(endPinGesture); stageObserver?.disconnect();
     attempt(() => document.removeEventListener?.('pointerdown', dismissFiles));
     attempt(() => document.removeEventListener?.('focusin', dismissFiles));
     attempt(() => document.removeEventListener?.('visibilitychange',render));
-    attempt(() => phone?.removeEventListener?.('change',render));
+    attempt(() => phone?.removeEventListener?.('change',layoutChanged));
     for (const stop of [() => cameraGizmo.dispose(), stopHelp, () => list.dispose(), () => panelGallery?.dispose(), () => windows.dispose()]) attempt(stop);
     const media = attempt(() => mediaViewer.dispose()); attempt(() => runtime?.dispose()); pins.clear(); attempt(() => root.remove());
     const viewport = attempt(() => runtime?.idle?.());

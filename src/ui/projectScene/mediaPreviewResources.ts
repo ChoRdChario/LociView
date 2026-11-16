@@ -4,15 +4,29 @@ import { rasterDimensions } from '../../viewer/rasterDimensions';
 type Source = () => Promise<Blob>;
 export type MediaDimensions=(bytes:Uint8Array,mime:string)=>{readonly width:number;readonly height:number}|null;
 export interface MediaResourceLease<T> { readonly ready: Promise<T>; release(): void }
-export type MediaResidency = (signal: AbortSignal) => Promise<{ release(): void }>;
+export type MediaResidency = (signal: AbortSignal, purpose?: 'thumbnail' | 'original') => Promise<{ release(): void }>;
 /** Presentation-only ownership, shared by editing and standalone viewing. */
-export function createMediaResidencyGate(document: Document, changed: () => void, idle: () => Promise<void>, live: () => boolean) {
+export function createMediaResidencyGate(document: Document, changed: () => void, idle: () => Promise<void>, live: () => boolean,
+  readingPhoto?: () => boolean) {
   const owners = new Set<symbol>();
-  const acquire: MediaResidency = async signal => {
+  let parked = false;
+  const resume = () => {
+    if (!parked) return;
+    parked = false;
+    if (live() && !owners.size) changed();
+  };
+  const acquire: MediaResidency = async (signal, purpose) => {
     signal.throwIfAborted(); if (!live()) throw new DOMException('画面を閉じました。', 'AbortError');
     if (!document.defaultView?.matchMedia?.('(pointer: coarse)').matches) return { release() {} };
+    parked = false;
     const owner = Symbol('image-residency'); owners.add(owner);
-    const release = () => { if (!owners.delete(owner) || !live()) return; try { changed(); } catch { /* Cleanup remains complete; a failed view cannot grant source authority. */ } };
+    const release = () => {
+      if (!owners.delete(owner) || !live()) return;
+      // A compact reader may stay with the record or open another photograph.
+      // Keep only that display intent after releasing the actual image lease.
+      if (!owners.size && purpose && readingPhoto?.()) parked = true;
+      try { changed(); } catch { /* Release succeeds even when its view has failed. */ }
+    };
     try {
       // A gallery may request a thumbnail during render; apply hidden state after that render.
       await Promise.resolve(); if (!live()) throw new DOMException('画面を閉じました。', 'AbortError');
@@ -20,7 +34,7 @@ export function createMediaResidencyGate(document: Document, changed: () => void
       return { release };
     } catch (error) { release(); throw error; }
   };
-  return { acquire, get active() { return owners.size > 0; } };
+  return { acquire, resume, get parked() { return parked; }, get active() { return owners.size > 0 || parked; } };
 }
 interface Thumbnail { users: number; stamp: number; bytes: number; controller: AbortController; ready: Promise<Blob>; blob?: Blob; lease?: RasterLease }
 
@@ -117,7 +131,7 @@ export function createMediaPreviewResources(document: Document, raster: RasterRe
         entry = { users: 0, stamp: ++stamp, bytes: 0, controller, ready: Promise.resolve(new Blob()) };
         const target = entry; thumbnails.set(key, entry);
         let residency: { release(): void } | undefined;
-        entry.ready = Promise.resolve().then(async () => { residency = await options.residency?.(controller.signal); check(controller.signal);
+        entry.ready = Promise.resolve().then(async () => { residency = await options.residency?.(controller.signal, 'thumbnail'); check(controller.signal);
           return input.decode(priority, async signal => {
           check(signal); makeRoom(edge * edge * 4); target.bytes = edge * edge * 4; bytes += target.bytes;
           const blob = await readSource(source, signal, byteLength); check(signal); const dimensions = await shape(blob, signal); check(signal);
@@ -141,7 +155,7 @@ export function createMediaPreviewResources(document: Document, raster: RasterRe
       const retire = () => { const owned = residency; residency = undefined; owned?.release(); };
       const release = () => { if (released) return; released = true; controller.abort(); releaseImage?.(); if (settled) retire(); originals.delete(release); };
       originals.add(release);
-      const ready = Promise.resolve().then(async () => { residency = await options.residency?.(controller.signal); check(controller.signal);
+      const ready = Promise.resolve().then(async () => { residency = await options.residency?.(controller.signal, 'original'); check(controller.signal);
         return input.decode('original', async signal => {
         check(signal); const blob = await readSource(source, signal, byteLength); check(signal); const dimensions = await shape(blob, signal); check(signal);
         return raster.decode('original', async nativeSignal => {

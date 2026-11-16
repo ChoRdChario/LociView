@@ -97,6 +97,21 @@ describe('UI-only shared image ownership', () => {
     const fine=createMediaResidencyGate({defaultView:{matchMedia:()=>({matches:false})}} as unknown as Document,changed,idle,()=>true);
     const calls=changed.mock.calls.length;const lease=await fine.acquire(new AbortController().signal);lease.release();expect(changed).toHaveBeenCalledTimes(calls);expect(fine.active).toBe(false);
   });
+  it('keeps the compact model retired between a thumbnail and its original until the reader returns to 3D', async () => {
+    const doc = { defaultView: { matchMedia: () => ({ matches: true }) } } as unknown as Document;
+    const idle = vi.fn(async () => {}), signal = new AbortController().signal;
+    let reading = true;
+    const residency = createMediaResidencyGate(doc, () => {}, idle, () => true, () => reading);
+    (await residency.acquire(signal, 'thumbnail')).release();
+    expect(residency.parked).toBe(true);
+    const original = await residency.acquire(signal, 'original');
+    expect(residency.active).toBe(true);
+    original.release();
+    expect(residency.parked).toBe(true);
+    reading = false; residency.resume();
+    expect(residency.active).toBe(false);
+    expect(idle).toHaveBeenCalledTimes(2);
+  });
   it('closes the acquired bitmap when canvas allocation fails',async()=>{
     const close=vi.fn();vi.stubGlobal('createImageBitmap',vi.fn(async()=>({width:8,height:4,close})));
     const raster=createRasterResources({cpuBytes:100000,gpuBytes:0}),manager=createMediaPreviewResources({createElement(){throw Error('canvas allocation');}} as unknown as Document,raster);

@@ -1,6 +1,6 @@
 # LociView active work
 
-Updated2026-11-16. This is the single current plan and check record.
+Updated2026-11-17. This is the single current plan and check record.
 [Inventory](implementation-inventory.md) owns route-specific coverage;
 [map](../PROJECT_MAP.md) and [document index](../docs/README.md) route contracts/code.
 Git owns checkpoint identity. [Retained checkpoint evidence](../docs/history/development-through-2026-10-29/tasks/todo-before-daily-authoring.md)
@@ -8,7 +8,17 @@ and [earlier working records](../docs/history/development-through-2026-10-28/tas
 retain qualifications and failures. Their Current/Next headings are not an active
 queue or renewed approval requirements.
 
-## Current — prepare large shared Scenes without duplicate work
+## Current — read and compare a shared record
+
+- Implement the four field-review outcomes on the standalone Review route: photo priority on compact touch, dense pin input, per-file reading position and record navigation, and checked text during Scene preparation. Compare the same Ki-84 photo, pin gestures and Scene transitions. Check PC/touch, failure/retry, saved file and restore using existing tests. Keep the storage, admission, renderer resource and compatibility boundaries.
+- Chromium 156 on Windows, PC 1280×720 and touch 390×844, identical four-Scene Ki-84. From the photo button to a decoded 506×390 original, three fresh trials per build/device gave touch medians 4.034 → 0.069 s and PC 0.059 → 0.051 s. Opening plus returning to the original 3D view, excluding reading time, was 9.016 → 4.878 s on touch and 0.090 → 0.080 s on PC. Touch retires the model once while reading the photograph. Returning to 3D still took 4.809 s.
+- File selection through search and visible matching body, one matched operation per device, was PC 7.518 → 1.585 s and touch 7.087 → 1.561 s. After visiting another Scene the same body was readable in 0.325/0.333 s. The 39-record Scene list appeared in 0.068/0.064 s, while the full workspace still took seconds. Text comes from checked Scene memberships; retry, current-scene identity and IME handoff are guarded.
+- Actual coordinate hits on all 39 visible Ki-84 pin centers: PC 19 → 39 and touch 11 → 39. The same pin-start drag orbits on both, and a right-button drag pans on PC without opening a record. No two tested centers were within one pixel. Identically located records can be chosen independently from the list. Desktop stepping reuses the active window; compact touch reuses the record detail. Original body bytes, saved pin coordinates/scale, Project identity and package contracts are unchanged.
+- Private measurements and screenshots are under `.artifacts/e2e/shared-record-20261117` and `.artifacts/e2e/shared-pin-20261117`. Device acceptance still needs actual iPhone Safari for touch accuracy, text input and model retirement/return under memory pressure.
+- The final candidate was also operated on the actual 30 Ki-84 search results on both devices. Three consecutive records matched source titles/order/body in both directions; a separate PC window stayed intact and compact touch returned to the original selected pin. A Scene round trip retained the 112 px list offset, search and selected record in both early and completed displays. Opening the file again reset the view. Connected Desktop tests exercised file export, independent restore and cold reopening; the targeted offline touch workflow also saved and cold reopened a mixed Review copy after shutting down browser and server.
+- Additional checks cover cancellation of a late photo, failed decode and retry, original-image hash, and long Japanese names in the early view at 320/390 px. Root checkpoint passed 159 suites (3,615 passed, 16 existing expected failures, 21 todo), all five builds and offline isolation. HEIC isolation also passed. Next evaluate the remaining compact 3D return time and memory pressure on physical Safari.
+
+## Previous — prepare large shared Scenes without duplicate work
 
 - Boundary: `ea45f07` → measured large Review Scene switching on PC/touch. Keep
   originals, full image/SH quality, prior-Scene retirement, save/recovery fences
