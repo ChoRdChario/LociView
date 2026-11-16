@@ -8,7 +8,52 @@ and [earlier working records](../docs/history/development-through-2026-10-28/tas
 retain qualifications and failures. Their Current/Next headings are not an active
 queue or renewed approval requirements.
 
-## Current — simplify the recent file-selection and shared-reader changes
+## Current — read a shared record and return to its 3D location
+
+- Start at `e542c64` under the accepted mobile record-reading direction in
+  `docs/ui-workspace-design.md` (2026-11-11). Actual 390×844 Chromium operation
+  reproduced list selection leaving focus on the row with detail below the
+  viewport (top 818px, bottom 908px). No explicit route returns from detail/photos
+  to the selected 3D pin. PC uses its existing independent caption windows.
+- Bound this unit to Review selection presentation and its direct UI dependencies.
+  First clarify the shared selection path with code-simplifier, then implement
+  mobile list/pin-to-detail and detail-to-3D navigation with frontend-design.
+  Preserve search, selection, camera, media ownership, source files, storage,
+  confirmations, recovery and compatibility. Leave renderer optimization paused.
+- Finish when real PC/touch selection, photo close/return, long Japanese, empty,
+  loading/failure, keyboard and narrow-screen cases pass using existing tests.
+  Measure selection-to-readable-detail and return under matched conditions,
+  review the rendered result against web-design-guidelines, run final checks and
+  independent diff review. New minor findings are deferred rather than extending
+  this completion boundary.
+- Internal-only cleanup passed the existing read-only Review/copy/reopen test
+  before UI changes. The final browser run passed nine adjacent cases. Its new
+  zoom check initially assumed the same viewport position immediately after CSS
+  zoom. Browser reproduction confirmed Tab brings the return button into view.
+  The case now exercises actual Tab/Enter navigation and passed independently.
+  Source was unchanged by that test correction. Failure and diagnostic evidence
+  remain in `.artifacts/e2e/shared-reading-20261116`.
+- Final browser evidence covers Point/GS list and pin selection, original photo
+  decode/close/focus, full 512-codepoint titles and long bodies, 320px and 200%
+  display, zero search results, injected unavailable 3D context and retry,
+  independent edit copies and interrupted scene append. Required final checkpoint
+  passed typecheck, 159 files / 3611 tests (16 expected failures, 21 todo), all
+  five builds and offline isolation on the fixed final source/test tree.
+- Matched small-share operation at 390×844 now focuses the detail and shows its
+  body at y670–691 within the viewport. Before, the detail began at y818 and its
+  body was below the viewport. Three warm click-to-detail-focus samples were
+  3.8 / 4.3 / 4.6ms, and return-to-canvas focus 0.4 / 0.6 / 0.4ms. These measure
+  synchronous UI navigation after loading, rather than model/image readiness.
+  Screenshots and raw state are retained under the same private evidence folder.
+- web-design-guidelines review retained native named buttons, visible keyboard
+  focus, a bounded sticky return action, fully wrapping normal-flow titles,
+  contextual failure/retry and no forced motion. Independent review's long-title
+  obstruction finding was fixed and re-reviewed. Physical iPhone Safari, VoiceOver
+  and OS zoom remain device acceptance.
+- Deferred minor follow-up remains the duplicated current Scene name beside its
+  selector. Keep that UI cleanup outside this unit's completion condition.
+
+## Previous — simplify the recent file-selection and shared-reader changes
 
 - Scope the code-simplifier pass to `c2be6b0` and its direct dependencies. Flatten
   operation completion, make settings placement readable, and use consistent

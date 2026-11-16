@@ -224,6 +224,10 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
       plan.kind === 'unchanged' && !!plan.explicitSelection || plan.kind === 'effect';
     const revealSelection = plan.kind === 'change' && plan.intent === 'revealSelection';
     if (explicitlySelected || revealSelection) list.revealSelected();
+    if (explicitlySelected && phone?.matches && !selectedText.hidden) {
+      selectedText.scrollIntoView?.({ block: 'start', behavior: 'auto' });
+      selectedText.focus({ preventScroll: true });
+    }
   }
   const list = createCaptionListControls(document, accept, active => { composing = active; paint(); });
   const searchBlocked = () => disposed || composing || moving || handoffBusy || !!runtime?.read().dragging;
@@ -249,7 +253,15 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
   const selectedMedia = make('section'); selectedMedia.setAttribute('aria-label', '選択中のキャプションのメディア');
   const selectedText = make('section'), recordTitle = make('h3'), recordBody = make('p');
   selectedText.setAttribute('aria-label', 'キャプションの詳細'); selectedText.tabIndex = -1; selectedText.className = 'lv-caption-value';
-  selectedText.append(recordTitle, recordBody);
+  const recordHeader = make('header'), returnTo3D = make('button', '3Dに戻る');
+  recordHeader.className = 'lv-review-record-header'; returnTo3D.type = 'button';
+  recordHeader.append(returnTo3D);
+  selectedText.append(recordHeader, recordTitle, recordBody, selectedMedia);
+  returnTo3D.addEventListener('click', () => {
+    if (searchBlocked() || content.inert) return;
+    viewport.scrollIntoView?.({ block: 'start', behavior: 'auto' });
+    canvas.focus({ preventScroll: true });
+  });
   let panelGallery: ReturnType<typeof gallery> | null = null, panelCaption: string | null = null;
   const sceneHeader = make('div'); sceneHeader.className = 'lv-review-scene-header'; sceneHeader.append(sceneName);
   if (switchScene && view.scenes.length > 1) {
@@ -267,7 +279,7 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
     });
     sceneHeader.append(select);
   }
-  viewport.append(windows.root); sidebar.append(sceneHeader, emptyCaptions, list.root, selectedText, selectedMedia);
+  viewport.append(windows.root); sidebar.append(sceneHeader, emptyCaptions, list.root, selectedText);
   const views = make('details'); views.append(make('summary', 'その他の視点'));
   const cameraAction = (action: () => void) => {
     if (disposed || composing || moving) return; try { action(); failure = ''; } catch (error) { failure = (error as Error).message; } paint();
@@ -307,6 +319,7 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
   function paint() {
     if (disposed) return; const observation = runtime?.read(), ready = !!observation?.ready && observation.display === display;
     searchRecords.hidden = !view.source.captions.length; searchRecords.disabled = searchBlocked();
+    returnTo3D.disabled = searchBlocked();
     const cameraReady=!!(observation?.cameraReady??observation?.ready)&&observation?.display===display;
     const cameraBlocked = !cameraReady || composing || moving || !!observation?.dragging;
     let captured: unknown=observation?.camera; try { captured ??= runtime?.capture?.().camera; } catch { /* Camera preparation remains local. */ }
@@ -322,7 +335,6 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
       if (!button) { button = make('button'); button.type = 'button'; button.className = 'lv-development-pin';
         button.addEventListener('click', () => {
           accept(planCaptionList(context(), { kind: 'select', captionId: pin.id }));
-          if (phone?.matches && memory.selectedCaptionId === pin.id) selectedText.focus();
         }); pins.set(pin.id, button); overlay.append(button); }
       const title = pin.title || '無題';
       button.textContent = title; button.setAttribute('aria-label', title);
@@ -340,9 +352,11 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
   function render() {
     if (disposed || rendering) return; rendering = true;
     try { list.render(context());
-      const item = phone?.matches ? view.source.captions.find(row => row.id === memory.selectedCaptionId) : undefined;
-      selectedText.hidden = !item;
-      recordTitle.textContent = item?.title.kind === 'value' ? item.title.value : '';
+      const selectedCaption = view.source.captions.find(row => row.id === memory.selectedCaptionId);
+      const item = phone?.matches ? selectedCaption : undefined;
+      selectedText.hidden = !selectedCaption;
+      recordHeader.hidden = recordTitle.hidden = recordBody.hidden = !item;
+      recordTitle.textContent = item?.title.kind === 'value' ? item.title.value || '無題' : '無題';
       recordBody.textContent = item?.body.kind === 'value' ? item.body.value : '';
       if (panelCaption !== memory.selectedCaptionId) { panelGallery?.dispose(); panelCaption = memory.selectedCaptionId;
         panelGallery = panelCaption ? gallery(panelCaption) : null; if (panelGallery) selectedMedia.append(panelGallery.root); }
