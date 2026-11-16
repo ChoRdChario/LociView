@@ -134,7 +134,8 @@ export async function prepareValidationResidents(versions: readonly DisplayModel
   return { ...core, label: c => versions.find(v=>v.assetId===renderModel(c).assetId)?.label??'3Dモデル', prepare: next => core.prepare(models(next)) };
 }
 export async function prepareReadonlyResidents(initial: readonly ReadonlyRenderModel[], content: { modelContent?(record: JsonObject): Promise<ValidatedModel>; model?(record: JsonObject): Promise<ValidatedGlb> },
-  decode: (source: ValidatedGlb, signal?: AbortSignal) => Promise<DecodedValidationModel> = decodeValidationModel, progressive = false, resources?: RasterResources, timing?: ResidentTiming) {
+  decode: (source: ValidatedGlb, signal?: AbortSignal) => Promise<DecodedValidationModel> = decodeValidationModel, progressive = false, resources?: RasterResources, timing?: ResidentTiming,
+  initialDemand?: readonly ReadonlyRenderModel[]) {
   const lifetime = new AbortController();
   const templates = new Map<string, { record: string; model: DecodedValidationModel }>();
   type Checked = { record: string; point: boolean; classes: { locator: JsonObject; kind: 'basic' | 'standard' | 'phong' | 'unsupported' }[] };
@@ -241,19 +242,24 @@ export async function prepareReadonlyResidents(initial: readonly ReadonlyRenderM
       }
     }
   };
+  const demand = (models: readonly (ValidationModelClosure | ReadonlyRenderModel)[]) => {
+    demanded = new Map(models.map(input => { const model = renderModel(input); return [keyFor(model), model]; }));
+    wanted = new Set(demanded.keys()); collect(); scheduleDemand();
+  };
   try {
+    // Keep visible templates, but start background demand only after the owner can be returned.
+    if (resources && initialDemand) wanted = new Set(initialDemand.map(keyFor));
     // Scheduling only: smaller admitted bodies can become usable before a large decode.
     const bytes=(model:ReadonlyRenderModel)=>{const blob=model.representation.blob;if(blob&&typeof blob==='object'&&!Array.isArray(blob)){const count=(blob as JsonObject).byteLength;if(typeof count==='number')return count;}return Number.MAX_SAFE_INTEGER;};
     const ready=prepare(progressive?[...initial].sort((a,b)=>bytes(a)-bytes(b)):initial,progressive);void ready.catch(()=>{});
     if(!progressive)await ready;
+    if (resources && initialDemand) demand(initialDemand);
     return { dispose, prepare, validate, ready, async idle() {
       if (cleanupFailure) throw cleanupFailure;
       while (preparations.size || demandTask || demandQueued) { await Promise.allSettled([...preparations, ...(demandTask ? [demandTask] : [])]); await Promise.resolve(); }
       if (cleanupFailure) throw cleanupFailure;
     }, ...(resources ? { rasterResources: resources } : {}),
-      ...(resources ? { demand(models: readonly (ValidationModelClosure | ReadonlyRenderModel)[]) {
-        demanded = new Map(models.map(input => { const model = renderModel(input); return [keyFor(model), model]; })); wanted = new Set(demanded.keys()); collect(); scheduleDemand();
-      }, retry() { for (const key of demanded.keys()) failures.delete(key); scheduleDemand(); } } : {}),
+      ...(resources ? { demand, retry() { for (const key of demanded.keys()) failures.delete(key); scheduleDemand(); } } : {}),
       state(input:ValidationModelClosure|ReadonlyRenderModel){const key=keyFor(input),issue=failures.get(key);return issue?{phase:'failed' as const,issue}:{phase:templates.has(key)?'ready' as const:'loading' as const};},
       subscribe(changed:()=>void){listeners.add(changed);return()=>{listeners.delete(changed);};},
       gsPending(models:readonly (ValidationModelClosure|ReadonlyRenderModel)[]){return models.some(c=>c.representation.contentKind==='gaussianSplat'&&!templates.has(keyFor(c)));},

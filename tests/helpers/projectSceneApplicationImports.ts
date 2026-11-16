@@ -322,6 +322,7 @@ export const projectSceneApplicationImports:Readonly<Record<string,readonly stri
     "./modelTypes"
   ],
   "src/projectScene/reviewView.ts": [
+    "../projectFiles/glb",
     "../projectFiles/streamSource",
     "../projectFiles/portableHeic",
     "../domain/portableMedia",

@@ -314,6 +314,9 @@ for (const touch of [false, true])
           await expect(reader).toBeVisible();
           await expect(heading).toBeFocused();
         } else await scenes.selectOption({ label: reviewSceneName });
+        // The loading selector already has the requested value; measure only the published reader.
+        await expect(reader).toBeVisible();
+        await expect(heading).toBeFocused();
         await expect(scenes.locator('option:checked')).toHaveText(reviewSceneName);
         const sceneBox = (await scenes.boundingBox())!;
         expect(sceneBox.x).toBeGreaterThanOrEqual(0);

@@ -98,7 +98,7 @@ export async function createValidationBrowserWorkspace(document: Document, compo
       return { factory: sceneViewportFactory(resident,composition.residency,undefined,composition.smoothDisplay), dispose: () => resident.dispose() };
     },
     renderReview: async view => {
-      const resident = await prepareReadonlyResidents(view.models, view.content, undefined, false, raster, timing);
+      const resident = await prepareReadonlyResidents(view.models, view.content, undefined, false, raster, timing, view.models);
       try {
         const display = view.display(null, null);
         for (const model of view.models) resident.validate(model, display.savedMaterials?.[model.assetId]);

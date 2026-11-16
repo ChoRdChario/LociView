@@ -107,6 +107,31 @@ cold再開／変換説明出力でも、保存原本のhash・size、全entry CR
 画像のsemantic検査とreport/mapping/initial proofの照合をやり直す。OPFS/native Blobと
 MemoryFSの全copy fallbackを区別し、後者へ同じ省メモリ効果を主張しない。
 
+### 4.1 Reviewの同一Scene準備内の受け渡し（2026-11-16）
+
+既存のimmutableな選択原本と表示所有期間内で、GLBの初回完全検査から
+最初の描画準備へ、bytesを除く検査済み事実だけを一度渡す。宣言の完全一致と
+新しい原本SHA／size照合・本体読取は維持する。使用時と表示データの解放時に
+事実を破棄し、以後の要求は従来の完全検査を行う。Point／GSの既存所有は変えず、
+展開済み配列を含むMeshSourceの再利用へは広げない。
+
+型情報は既存の`projectFiles/glb`の`ValidatedGlb`を型専用で参照する。静的なimport
+境界はこの1参照だけを明示し、実行時依存や一般的な型参照の免除は追加しない。
+
+Reviewでは選択Sceneの表示対象が既に確定しているため、既存residentへその需要を
+初期準備前に渡す。検査・デコード直後に不要と判断して解放し、同じ表示のために
+再準備する往復を省く。複数モデルのcanonical検査順・後続検査前のraster解放・
+資源予算・非表示時の解放・旧Sceneの終了後に次Sceneを準備する順序は保持する。
+初期化中は可視対象の保持だけを指定し、background再準備はblockingなcanonical検査の
+成功後に有効化する。途中のモデルが失敗したとき、返却前のownerを持たない再読込を
+始めない。既存のprogressive経路は返却したready／idleの所有内に留める。
+通常Projectの全Scene検査や、画面間／Scene間のdecoded cacheへ広げない。
+
+同一入力のPC／touchで準備・content・decode・3D使用可能時点を測定し、初回検査、
+宣言／原本不一致拒否、一度の消費後と解放後の再検査、非表示・終了・失敗の解放、
+複数モデルの予算と途中失敗時の再読込禁止、コピー／保存／再開の既存試験を確認する。契約・保存形式・
+検査時点の例外は追加せず、実行結果と効果の判定はtodoに記録する。
+
 ## 5. workbook補助部品の限定受入れ
 
 全XML/.relsをfatal UTF-8で読み、DTD/ENTITY・合計XML bytesの既存guardを維持する。

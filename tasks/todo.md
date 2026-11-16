@@ -8,7 +8,64 @@ and [earlier working records](../docs/history/development-through-2026-10-28/tas
 retain qualifications and failures. Their Current/Next headings are not an active
 queue or renewed approval requirements.
 
-## Current — switch a shared Scene and recover in the same place
+## Current — prepare large shared Scenes without duplicate work
+
+- Boundary: `ea45f07` → measured large Review Scene switching on PC/touch. Keep
+  originals, full image/SH quality, prior-Scene retirement, save/recovery fences
+  and package/ID compatibility. No new controls, dependencies or decoded cache
+  across Scenes. Private evidence: `.artifacts/e2e/large-shared-switch-20261116`.
+- GLB preparation now hands off bytes-free checked facts once, retaining fresh
+  declared SHA/size proof and body reads. Review seeds visible retention before
+  canonical checks and activates background demand only after blocking success.
+  Earlier canonical raster retirement, hidden release and fail-fast remain.
+- Matched Chromium: PC 1280×720 / touch 390×844 on the same Windows PC, three
+  switches each. Completion includes actual new-canvas draw and finished display
+  preparation; the normal transparency notice is allowed. Ki-84 is a 51,351,918B
+  four-Scene Review; generated two-Scene 500k SH4+Proxy is 178,012,127B. The model
+  target has no records; the separate populated target has 39 records.
+
+| Switch / device | Before, seconds | After, seconds | Median before → after |
+|---|---|---|---|
+| Ki-84 model / PC | 10.853 / 10.565 / 10.743 | 5.310 / 5.030 / 5.242 | 10.743 → 5.242 |
+| Ki-84 model / touch | 10.802 / 11.482 / 10.786 | 5.309 / 5.801 / 5.371 | 10.802 → 5.371 |
+| Ki-84 39 records / PC | 11.247 / 10.445 / 10.469 | 5.091 / 4.965 / 5.348 | 10.469 → 5.091 |
+| Ki-84 39 records / touch | 10.702 / 10.675 / 10.239 | 5.827 / 5.669 / 5.057 | 10.675 → 5.669 |
+| 500k SH4+Proxy / PC | 6.559 / 6.485 / 6.464 | 6.527 / 6.311 / 6.262 | 6.485 → 6.311 |
+| 500k SH4+Proxy / touch | 6.390 / 6.437 / 6.707 | 6.491 / 6.576 / 6.464 | 6.437 → 6.491 |
+
+- Model/Proxy decode stages fall from 2 to 1 per switch; Ki-84 native bitmap calls
+  fall from 21 to 9. All six matched screenshots are byte-identical PNGs and both
+  inputs retain their hashes. `comparison.json`, `populated-comparison.json`,
+  `screen-comparison.json` and `environment.json` retain raw conditions/results.
+  GS differences are small/mixed, not evidence of meaningful GS speedup.
+- Focused ownership/tamper/release tests passed (5). Second-model failure first
+  reproduced 3 reads instead of 2; the fixed ordering stops first/second failure
+  at 1/2 reads with zero held raster. Initial probes using empty status or onscreen
+  pins were unsuitable; excluded logs remain. No retry/timeout/assertion relaxation.
+- Final Review browser cases passed (7), including PC/touch Point/GS, media,
+  copy/save/cold reopen, failures/reselection and keyboard/long/narrow rendering.
+  A test-side detached-selector race was corrected by waiting for the published
+  reader and title focus. Final touch mixed-Review offline copy/save/full-close
+  reopen passed. Earlier ordinary PC cold500k/recovery passed on its unchanged
+  default preparation path; its evidence is kept separate.
+- Independent final/incremental reviews found no blockers on the fixed source.
+  One full run passed 3612 runtime tests but failed the exact import boundary:
+  the new type-only ValidatedGlb reference needed its explicit allowed edge.
+  This omission should have been caught earlier. The one-edge addition was
+  independently reviewed; sceneCore now passes all 12 cases. Interrupted/failed
+  checkpoint logs remain and are not counted as successful qualification.
+  The final fixed tree passed typecheck, 159 files / 3613 tests (16 expected
+  failures, 21 todo), all five builds and offline/HEIC isolation. The seven
+  reviewed source/test/contract hashes match the final qualification. Qualify
+  the actual preview against these artifacts and follow the pushed CI to completion.
+- Residual: GS full-source inspection (~5s) plus display setup (~1.5s); Ki-84's
+  first validation/decode/GPU work remains. Physical iPhone/Safari memory is not
+  verified by touch Chromium. Next candidate: reduce GS preparation work within
+  current quality/ownership limits. Separately review dense pins in the archived
+  39-record Scene while preserving its authored scale/view; this predates the
+  change and the matched images are identical.
+
+## Previous — switch a shared Scene and recover in the same place
 
 - Begin at `5571c6d`. Real PC/touch runs reproduced duplicate ready Scene names,
   bare loading/error controls, focus falling to body after a failed switch, and

@@ -8209,6 +8209,40 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect(host.hasPending()).toBe(false); expect(host.workspaceFiles.jobs.find(j => j.id === id)!.state).toBe('completed');
     await u.dispose();
   });
+  it('hands off checked Review GLB facts once without retaining bodies or bypassing fresh original proofs', async () => {
+    const { host, workspace, s } = await openFileCaption(glb(() => {}, true));
+    try {
+      const token = host.read().source!.token;
+      const file = await host.workspaceOutput.download(await host.workspaceOutput.generateReview(token, { sceneId: s.sceneId }));
+      const inspect = vi.fn(decodeImplementation), view = await prepareReviewView(file, budget, inspect);
+      const record = view.models[0]!.representation as unknown as JsonObject;
+      expect(inspect).toHaveBeenCalledOnce();
+      await expect(view.content.modelContent({ ...record, role: 'interactionProxy' })).rejects.toThrow('表示本体');
+      const first = await view.content.modelContent(record);
+      expect(inspect).toHaveBeenCalledOnce();
+      expect(first).toEqual(await view.content.modelContent(record));
+      expect(inspect).toHaveBeenCalledTimes(2);
+      // Release before consumption must discard the facts as well as displayed resources.
+      const released = await prepareReviewView(view.inspection, budget, inspect);
+      released.releaseDisplayData();
+      await released.content.modelContent(released.models[0]!.representation);
+      expect(inspect).toHaveBeenCalledTimes(4);
+      const failed = await prepareReviewView(view.inspection, budget, inspect);
+      const read = PackageArchive.prototype.entryBlob, ref = record.blob as JsonObject;
+      const fault = vi.spyOn(PackageArchive.prototype, 'entryBlob').mockImplementation(function(this: PackageArchive, path) {
+        if (path === `blobs/sha256/${ref.digest}`) return new Blob([new Uint8Array(Number(ref.byteLength))]);
+        return read.call(this, path);
+      });
+      try { await expect(failed.content.modelContent(record)).rejects.toThrow('原本が一致'); }
+      finally { fault.mockRestore(); }
+      // A failed proof consumes the handoff; retry performs the complete inspection.
+      await failed.content.modelContent(record);
+      expect(inspect).toHaveBeenCalledTimes(6);
+      expect(host.read().source!.token).toBe(token);
+      expect(await new Response(file.stream()).arrayBuffer()).toEqual(await new Response(view.original.stream()).arrayBuffer());
+      view.releaseDisplayData(); failed.releaseDisplayData();
+    } finally { await workspace.dispose(); }
+  });
   it('opens a review read-only, then explicitly creates an editable independent copy and cold reopens it (recorded DOM)', async () => {
     const { host, workspace, s, options } = await openFileCaption();
     s.media.addFile(s.mediaContext(), { name: '添付PNG', size: png.length, arrayBuffer: async () => png.slice().buffer });
@@ -11674,6 +11708,45 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const held=new Promise<void>(resolve=>{finish=resolve;}),startRead=vi.fn(async()=>source),single=await prepareReadonlyResidents([models[0]!],{modelContent:startRead},async()=>{await held;return decoder();},true,one);
     single.demand!([models[0]!]);finish();await single.ready;single.create(models[0]!).dispose!();
     expect(startRead).toHaveBeenCalledOnce();single.dispose();await one.dispose();expect(one.snapshot().cpuBytes).toBe(0);
+  });
+  it('keeps initially visible Review residents once, then releases hidden resources and rechecks on demand', async () => {
+    const bytes = glb(), source = { ...await inspectValidationGlb(bytes, budget, decode), raster: { cpuBytes: 6000, gpuBytes: 0, images: [{ width: 30, height: 50 }], maximumEdge: 50 } };
+    const placement = { translation: [0,0,0], rotationXYZW: [0,0,0,1], uniformScale: 1 };
+    const models = [0,1].map(i => ({ shape: 'render-glb', key: `visible${i}`, assetId: `a${i}`, assetToProject: placement,
+      representation: { id: `rep${i}`, contentKind: 'mesh', role: 'meshPrimary', blob: { byteLength: bytes.length }, representationToAsset: { ...placement, reflection: 'none' }, logicalBoundsAsset: source.bounds } } as unknown as ReadonlyRenderModel));
+    for (const rows of [[models[0]!], models]) {
+      const resources = createRasterResources({ cpuBytes: 12000 + 5 * bytes.length, gpuBytes: 0 });
+      const reads = vi.fn(async () => source), released = vi.fn();
+      const cache = await prepareReadonlyResidents(rows, { modelContent: reads }, async () => ({ root: new THREE.Group(), materialLocators: new Map(), dispose: released }), false, resources, undefined, rows);
+      try {
+        await cache.idle();
+        // Earlier canonical templates retire before later checks; the final visible one survives.
+        expect(reads.mock.calls.length).toBe(rows.length === 1 ? 1 : 3);
+        for (const row of rows) expect(cache.state(row).phase).toBe('ready');
+        cache.demand!([]); await cache.idle();
+        expect(resources.snapshot().cpuBytes).toBe(0);
+        const count = reads.mock.calls.length;
+        cache.demand!([rows[0]!]); await cache.idle();
+        expect(reads).toHaveBeenCalledTimes(count + 1);
+        expect(cache.state(rows[0]!).phase).toBe('ready');
+        expect(released.mock.calls.length).toBe(rows.length === 1 ? 1 : 3);
+      } finally { cache.dispose(); await cache.idle(); await resources.dispose(); }
+      expect(resources.snapshot().cpuBytes).toBe(0);
+    }
+    for (const failAt of [1, 2]) {
+      const resources = createRasterResources({ cpuBytes: 12000 + 5 * bytes.length, gpuBytes: 0 });
+      const reads = vi.fn(async () => source);
+      let calls = 0;
+      try {
+        await expect(prepareReadonlyResidents(models, { modelContent: reads }, async () => {
+          if (++calls === failAt) throw Error('visible decode failed');
+          return { root: new THREE.Group(), materialLocators: new Map(), dispose() {} };
+        }, false, resources, undefined, models)).rejects.toThrow('visible decode failed');
+        await resources.dispose();
+        expect(reads).toHaveBeenCalledTimes(failAt);
+        expect(resources.snapshot().cpuBytes).toBe(0);
+      } finally { await resources.dispose(); }
+    }
   });
   it('refuses a full legacy texture proof when its injected native runtime is closed instead of accepting a missing texture',async()=>{
     const resources=createRasterResources(),bitmap=vi.fn();await resources.dispose();vi.stubGlobal('self',globalThis);vi.stubGlobal('createImageBitmap',bitmap);

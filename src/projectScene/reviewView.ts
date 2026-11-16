@@ -1,5 +1,6 @@
 import { inspectDeclaredValidationModel, inspectDeclaredValidationBlob, readValidationBody } from '../projectFiles/content';
-import { isPointModel, isGsModel, type ValidatedModel } from '../projectFiles/pointPly';
+import { isPointModel, isGsModel, isGlbModel, type ValidatedModel } from '../projectFiles/pointPly';
+import type { ValidatedGlb } from '../projectFiles/glb';
 import { nativeSpatialModelBounds } from '../projectFiles/nativeSpatial';
 import type { PhotoDecoder } from '../projectFiles/photo';
 import { inspectProjectMedia, projectMediaKind, mediaDisplayDimensions, type MediaDecoders } from '../projectFiles/media';
@@ -42,6 +43,8 @@ export async function prepareReviewView(file: Blob | PackageArchive | ReviewArch
   if (review.closure.entries.reduce((n, b) => n + b.byteLength, 0) > policy.projectBodyBytes)
     throw Error('この検証画面の容量上限を超えています。元のファイルは変更していません。');
   const models: ReadonlyRenderModel[] = [], decoded = new Map<string, ValidatedModel>(), images = new Map<string, Blob>();
+  // One handoff per GLB in this Scene; retain facts, never the inspected body or decoded textures.
+  const preparedGlbs = new Map<string, Omit<ValidatedGlb, 'bytes'>>();
   const assets = table(snapshot, 'assetsById'), representations = table(snapshot, 'representationsById');
   for (const asset of Object.values(assets)) {
     if (asset.kind !== 'visual' || !visibleAssets.has(asset.id)) continue;
@@ -57,6 +60,10 @@ export async function prepareReviewView(file: Blob | PackageArchive | ReviewArch
       slots.some(s => !actual.delete(canonical({ sourceLocator: s.sourceLocator!, sourceSemantics: s.sourceSemantics! }))) || actual.size)
       throw Error('モデルの形状・材質と表示情報が一致しません。');
     if (isGsModel(source) || isPointModel(source)) decoded.set(string(record.id), source);
+    else if (isGlbModel(source)) {
+      const { bytes: _bytes, ...facts } = source;
+      preparedGlbs.set(string(record.id), facts);
+    }
     if(record===visuals[0])models.push({ shape: isGsModel(source) ? 'render-gs' : isPointModel(source) ? 'render-point' : source.kind==='mesh-source'?'render-mesh':'render-glb', key: `${review.token}/${record.id}`, assetId: string(asset.id),
       assetToProject: asset.assetToProject as unknown as ReadonlyRenderModel['assetToProject'], representation: record as ReadonlyRenderModel['representation'],...(proxies[0]?{proxy:proxies[0] as NonNullable<ReadonlyRenderModel['proxy']>}: {}) });
     }
@@ -128,15 +135,18 @@ export async function prepareReviewView(file: Blob | PackageArchive | ReviewArch
     bounds: box.isEmpty() ? null : { min: box.min.toArray() as [number, number, number], max: box.max.toArray() as [number, number, number] },
     entry: scene.defaultViewId ? { kind: 'ready', payload: capture(string(scene.defaultViewId)) } : { kind: 'none' } });
   return { original, inspection, source, models, images, attachments, scenes, views, entryViewId: scene.defaultViewId ? string(scene.defaultViewId) : null, capture, display, rasterResources: decode?.rasterResources,
-    releaseDisplayData() { decoded.clear(); images.clear(); },
+    releaseDisplayData() { decoded.clear(); preparedGlbs.clear(); images.clear(); },
     imageDimensions:(bytes:Uint8Array,mime:string)=>mediaDisplayDimensions(bytes,mime,limits,decode?.rasterResources),
     title: string(project.title), sceneName: string(scene.name),
     content: { async image(record: JsonObject) { const expected = mediaRecords[string(record.id)];
       if (!expected || !same(expected, record)) throw Error('画像の表示本体を確認してください。'); return verifyMedia(record);
     }, async modelContent(record: JsonObject) { const expected = representations[string(record.id)], body = decoded.get(string(record.id));
       if (!expected || !same(expected, record)) throw Error('モデルの表示本体を確認してください。'); if (body) return body;
+      const prepared = preparedGlbs.get(string(record.id));
+      preparedGlbs.delete(string(record.id));
       const ref = object(record.blob), file = inspection.archive.entryBlob(`blobs/sha256/${string(ref.digest)}`), proof = await sourceStreamProof(file);
       if (proof.digest !== ref.digest || proof.byteLength !== ref.byteLength) throw Error('モデルの原本が一致しません。');
+      if (prepared) return { ...prepared, bytes: await readValidationBody(file, limits.maxFileBytes) };
       return inspectDeclaredValidationBlob(record, file, policy, decode, jpeg, 'review'); } } };
 }
 export type ReviewView = Awaited<ReturnType<typeof prepareReviewView>>;
