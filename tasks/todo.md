@@ -8,7 +8,13 @@ and [earlier working records](../docs/history/development-through-2026-10-28/tas
 retain qualifications and failures. Their Current/Next headings are not an active
 queue or renewed approval requirements.
 
-## Current — material preparation on return from the Ki-84 photograph
+## Current — one palette from opening a project to reading its records
+
+- Home, editor and shared viewing now use a warm paper, ink and selection palette. Authored pin, model, photo and axis colors keep their own meaning. PC and compact-touch Ki-84 checks covered search, selection, camera tools, opening a photo and focus on return. The measured text contrast was 7.97:1 on stage controls and 8.35:1 on a selected row. The connected browser tests, full checkpoint, public-path isolation and independent palette review passed. Physical iPhone color and outdoor legibility remain unmeasured.
+- Next, keep rendering notices clear of window titles, reduce the camera controls' footprint, and make the point of return apparent after closing a photo. Preserve immediate input, keyboard navigation, reduced motion and the user's camera position.
+- The approved direction for cross-scene reuse is an independent record in the destination scene with shared original media bytes. Specify the transition for existing linked records and incoming updates before changing the current edit contract.
+
+## Previous — material preparation on return from the Ki-84 photograph
 
 - Time the legacy material proof and current display separately, then compare a real first camera drag on the same Ki-84 photo and view in paired PC/touch runs. Remove repeated work inside one checked preparation. Keep full-resolution source and texture checks, independent old/new comparisons, resource retirement and saved-file behavior. Verify pixels, camera, pin positions, cancellation and the affected browser routes. Physical Safari memory and gesture checks remain separate.
 

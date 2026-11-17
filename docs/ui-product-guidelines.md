@@ -554,15 +554,21 @@ than tan. Current worktree reference tokens are:
 
 | Role | Reference |
 |---|---|
-| application background | `#e6e4e2` |
-| panel | `#f2f0ee` |
-| field | `#faf9f8` |
-| primary text | `#312f2d` |
-| secondary text | `#504d4a` |
-| structural line | `#817c78` |
-| quiet divider | `#d2cfcb` |
-| primary action | `#413d39` |
-| destructive state | `#8b2c29` |
+| application background | `#dfdbcf` |
+| panel | `#eeeae0` |
+| field and text on dark controls | `#f8f5ed` |
+| primary text and focus ring on light panels | `#353229` |
+| secondary text | `#5e584b` |
+| control outline | `#817968` |
+| quiet divider | `#c8c1b2` |
+| hover / current selection | `#e6e0d2` / `#d9d0bc` |
+| primary action / pressed action | `#504b3e` / `#3b372e` |
+| error / destructive state | `#8b352d` |
+
+The ProjectScene home, editor and shared viewer use the same color for the
+same role. Over 3D, projection and search have an opaque dark surface and light
+text. Keyboard focus has a light and a dark edge there. Keep the authored
+scene background, images, pin and tag colors and orientation axes independent.
 
 These are a controlled starting palette, not an irrevocable brand standard.
 Rendered contrast, display variation and physical-device acceptance can tune a
