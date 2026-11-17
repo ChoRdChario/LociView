@@ -103,7 +103,7 @@ export function createProjectMedia(document: Document, host: ProjectPanelHost, c
   confirmation.append(question, detach, button('戻る', () => { if (!host.block('captions', false)) { removal = null; host.changed(); } }));
   root.append(galleryHost, waiting, stored, form, confirmation, status);
   editOnly(stored, form, confirmation);
-  function render(active = true) {
+  function render(active = true, showPreviews = true) {
     presentationActive = active;
     if (disposed) return; const s = source(), block = host.block('captions'), local = host.block('captions', false), uncertain = uncertainty(), currentScope = scope();
     if (registeredScope !== currentScope) { registeredScope = currentScope; registeredReader = reader(null); picker.dispose(); picker = newPicker();
@@ -111,7 +111,7 @@ export function createProjectMedia(document: Document, host: ProjectPanelHost, c
     const nextGallery = JSON.stringify([currentScope, s.captionId]);
     if (galleryKey !== nextGallery) { galleryKey = nextGallery; gallery?.dispose(); actionCards.clear();gallery = s.captionId ? createMediaThumbnails(document, reader(s.captionId), viewer, undefined, attachmentTools) : undefined;
       galleryHost.replaceChildren(); if (gallery) galleryHost.append(gallery.root); }
-    gallery?.render(active); picker.render(active && stored.open); viewer.render();
+    gallery?.render(active, showPreviews); picker.render(active && stored.open); viewer.render();
     const retained = new Set(s.captionId ? rows(s.captionId).map(row => row.id) : []);
     for (const id of actionCards.keys()) if (!retained.has(id)) actionCards.delete(id);
     waiting.hidden = active || !s.captionId || !rows(s.captionId).length;

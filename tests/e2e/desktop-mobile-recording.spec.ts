@@ -130,7 +130,6 @@ test('phone record list, body and completion stay usable when the viewport shrin
     const workspace = info.outputPath('phone-workspace.zip'); await whole.saveAs(workspace);
     await page.locator('details.lv-project-files').getByRole('button', { name: 'プロジェクトを選ぶ', exact: true }).tap();
     await chooseHomeFiles(page, workspace);
-    await page.getByRole('button', { name: 'プロジェクトを取り込む', exact: true }).tap();
     const destination = page.getByRole('region', { name: '取り込み先', exact: true });
     await expect(destination).toContainText('「Nativeから引き継ぐ記録」に更新を取り込みます。');
     await destination.getByRole('button', { name: '既存に取り込む', exact: true }).tap();

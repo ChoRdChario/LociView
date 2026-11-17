@@ -1,6 +1,6 @@
 # LociView active work
 
-Updated2026-11-17. This is the single current plan and check record.
+Updated2026-11-18. This is the single current plan and check record.
 [Inventory](implementation-inventory.md) owns route-specific coverage;
 [map](../PROJECT_MAP.md) and [document index](../docs/README.md) route contracts/code.
 Git owns checkpoint identity. [Retained checkpoint evidence](../docs/history/development-through-2026-10-29/tasks/todo-before-daily-authoring.md)
@@ -8,7 +8,15 @@ and [earlier working records](../docs/history/development-through-2026-10-28/tas
 retain qualifications and failures. Their Current/Next headings are not an active
 queue or renewed approval requirements.
 
-## Current — read a Ki-84 record without the rendering notice covering its title
+## Current — read photographs once and compare different records
+
+- Ki-84 reproduced the same photograph in both the PC window and sidebar. A selected record now shows its photograph in the visible window once. Closing its window restores the complete sidebar record even while another window remains. Compact reading uses its detail surface. The editor suspends the repeated preview while retaining attachment tools, drafts and focus. Window order stays independent of editing selection.
+- On the same input, shared and ordinary-editor PC/compact browser checks passed. Photograph 8 retained 506 × 390 pixels and the same SHA-256; a different record's photograph retained 477 × 356. Tests covered separate windows, closing one window to compare its sidebar detail with the other window, photo-close focus, next-record navigation, PC/touch/PC transitions, and attachment description IME/cancel. Private before/after evidence is in `.artifacts/e2e/photo-dedup-20261118`. Physical iPhone Safari remains pending.
+- Independent source/test review and 62 focused tests passed. Four connected browser scenarios passed, covering photo inspection, attachment editing, saving, separate environments, receiving and reopening. Old test steps were aligned with the existing nested name setting and automatic file inspection. The first long PC run reached its deadline. The isolated run completed in 2.6 minutes within its original three-minute budget. Its test server required a verified process shutdown after all cases passed. Failure evidence, original deadlines and assertions are retained.
+- The first full run passed 158 files and exposed two recorded-DOM tests assuming duplicate sidebar photographs. Their original image identity/read counts, retry, receive, save/reopen and copy-recovery assertions were preserved using the actual window/sidebar operation. The mock review renderer now declares its canvas bounds for window photographs. Both focused cases passed. The final checkpoint completed successfully (159 files, 3,632 passing tests, 16 expected failures, 21 pending), including the serial builds and offline isolation. Public HEIC isolation also passed. The exact offline candidate was frozen and all 20 files were matched to the tested build.
+- Next, review the camera controls' occupied area and discoverability on PC and compact touch. Keep real button hit areas, keyboard access, the selected record and the current view. Treat further minor suggestions as a separate unit.
+
+## Previous — read a Ki-84 record without the rendering notice covering its title
 
 - The editor reports approximate transparency and any automatic resolution adjustment in the Drawing tab. A shared scene shows the same information beside scene and view controls. Preparation, hidden faces and retry remain on the 3D stage, and positioning instructions remain at placement.
 - On the same Ki-84 shared file, the notice previously covered 113 × 13.5 CSS px of the photo 8 title on PC. The overlap is now zero. The drawing area stayed 920 × 667 on PC and 390 × 455.75 on compact touch. Both routes opened the photo and returned to the selected part. A forced drawing failure explained which faces were hidden and offered retry. Retrying restored the same view and all 64 pins. The ordinary editor was also checked on both screen sizes. Independent review passed. Physical iPhone Safari remains pending.

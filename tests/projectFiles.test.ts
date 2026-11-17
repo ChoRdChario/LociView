@@ -7874,6 +7874,9 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect(captionAttachments(host.authority.read().mediaData, firstCaption).ready).toHaveLength(1);
     const reused = host.read().provider!; if (reused.kind !== 'scene-provider') throw Error('provider'); expect(Object.keys(reused.details.immutable.mediaResourcesById)).toHaveLength(1);
     const editArea = named('添付メディア', media);
+    expect(all(editArea).some(n => n.tag === 'img')).toBe(false);
+    const selectedWindow = all(named('キャプションのウィンドウ', editor)).filter(n => n.className === 'lv-caption-window').at(-1)!;
+    named('閉じる', selectedWindow).fire('click');
     await vi.waitFor(() => expect(all(editArea).some(n => n.tag === 'img')).toBe(true));
     const descriptionImage = all(editArea).find(n => n.tag === 'img')!, descriptionReads = h.imageReads[0]!.mock.calls.length;
     button('説明を編集', editArea).fire('click'); const input = named('メディアの説明', media);
@@ -8369,6 +8372,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     let starts = 0;
     const renderReview = vi.fn(async () => ({ dispose() {}, factory: ((_canvas, _changed, pin, model) => {
       expect(pin).toBeUndefined(); expect(model).toBeUndefined();
+      Object.assign(_canvas, { getBoundingClientRect: () => ({ width: 900, height: 600, left: 0, top: 0 }) });
       if (++starts === 1) throw Error('injected renderer startup refusal');
       return { update(next) { display = next; }, setActive() {}, camera() {}, retry() {}, dispose() {},
         read: () => ({ display, token: 'recorded-review-camera', ready: true, issue: null, dragging: false, projection: 'perspective', axis: null,
@@ -8405,7 +8409,9 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const mediaCaption = prepared.source.captions.findIndex(c => c.mediaCount.kind === 'value' && c.mediaCount.value > 0);
     rows[mediaCaption]!.fire('click');
     const mediaPanel = all(page).find(n => n.attributes.get('aria-label') === '選択中のキャプションのメディア')!;
-    all(mediaPanel).find(n => n.tag === 'button' && n.textContent === '画像を表示')!.fire('click');
+    expect(mediaPanel.hidden).toBe(true);
+    const mediaWindow = all(page).find(n => n.className === 'lv-caption-window' && all(n).some(child => child.tag === 'button' && child.textContent === '画像を表示'))!;
+    all(mediaWindow).find(n => n.tag === 'button' && n.textContent === '画像を表示')!.fire('click');
     const mediaViewer = all(page).find(n => n.attributes.get('aria-label') === 'メディアビューア')!;
     expect(mediaViewer.open).toBe(true); await vi.waitFor(() => expect(all(mediaViewer).filter(n => n.tag === 'img')).toHaveLength(1));
     expect(all(page).filter(n => n.tag === 'dialog')).toHaveLength(1); expect(open).not.toHaveBeenCalled();

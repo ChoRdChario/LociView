@@ -15,6 +15,31 @@ const documentStub = (decoding: () => Promise<void> = async () => {}) => {
 const derive = async () => new Blob(['derived'], { type:'image/png' });
 
 describe('UI-only shared image ownership', () => {
+  it('retires a duplicate preview while preserving attachment controls and restores the same photo opener', () => {
+    const doc = new RecordedDocument(), viewer = createMediaViewer(doc.asDocument());
+    const group: MediaPreviewGroup = { scope: 'same-record', label: '写真', items: [{ id: 'a', resourceId: 'original', label: '原本', description: '', image: { blob: image() } }] };
+    const tools = doc.createElement('details'); tools.open = true;
+    const grid = createMediaThumbnails(doc.asDocument(), () => group, viewer, undefined, () => tools as unknown as HTMLElement);
+    const all = (node: RecordedNode): RecordedNode[] => [node, ...node.children.flatMap(all)];
+    const root = record(grid.root), revoke = vi.spyOn(URL, 'revokeObjectURL');
+    try {
+      grid.render();
+      const opener = all(root).find(n => n.tag === 'button' && n.textContent === '画像を表示')!;
+      const preview = all(root).find(n => n.className === 'lv-media-image')!;
+      expect(all(root).filter(n => n.tag === 'img')).toHaveLength(1);
+      tools.focus(); grid.render(true, false);
+      expect(preview.hidden).toBe(true); expect(revoke).toHaveBeenCalledOnce();
+      expect(all(root).filter(n => n.tag === 'img')).toHaveLength(0);
+      expect(all(root)).toContain(tools); expect(doc.activeElement).toBe(tools); expect(tools.open).toBe(true);
+      grid.render(); expect(preview.hidden).toBe(true); expect(revoke).toHaveBeenCalledOnce();
+      grid.render(true, true);
+      expect(preview.hidden).toBe(false); expect(all(root).filter(n => n.tag === 'img')).toHaveLength(1);
+      expect(all(root)).toContain(opener); expect(all(root)).toContain(tools);
+      opener.focus(); opener.click();
+      all(record(viewer.root)).find(n => n.attributes.get('aria-label') === '閉じる')!.click();
+      expect(doc.activeElement).toBe(opener);
+    } finally { grid.dispose(); viewer.dispose(); revoke.mockRestore(); }
+  });
   it.each(['gallery', 'picker'] as const)('returns focus to the same live attachment after thumbnail retirement (%s)', async kind => {
     const doc = new RecordedDocument(), viewer = createMediaViewer(doc.asDocument());
     const group: MediaPreviewGroup = { scope: 'owned', label: '写真', items: [{ id: 'photo', resourceId: 'original', label: '写真', description: '', image: { blob: image() } }] };
@@ -137,6 +162,14 @@ describe('UI-only shared image ownership', () => {
     const all=(node:RecordedNode):RecordedNode[]=>[node,...node.children.flatMap(all)],action=all(record(cards.root)).find(n=>n.tag==='button'&&n.textContent==='画像を表示')!;
     action.focus();manager.setThumbnailsActive(false);expect(doc.activeElement).toBe(action);expect(all(record(cards.root))).toContain(action);expect(all(record(cards.root)).filter(n=>n.tag==='img')).toHaveLength(0);
     manager.setThumbnailsActive(true);await Promise.resolve();await Promise.resolve();expect(source).toHaveBeenCalledOnce();expect(residency).toHaveBeenCalledOnce();
+    cards.render(true, false);
+    manager.setThumbnailsActive(false); manager.setThumbnailsActive(true);
+    await Promise.resolve(); await Promise.resolve();
+    expect(all(record(cards.root)).filter(n => n.tag === 'img')).toHaveLength(0);
+    expect(all(record(cards.root)).find(n => n.className === 'lv-media-image')!.hidden).toBe(true);
+    expect(source).toHaveBeenCalledOnce(); expect(all(record(cards.root))).toContain(action);
+    cards.render(true, true);
+    await vi.waitFor(() => expect(all(record(cards.root)).filter(n => n.tag === 'img')).toHaveLength(1));
     cards.dispose();viewer.dispose();again.release();await manager.dispose();await raster.dispose();
   });
   it('requests a bounded bitmap and reads only PNG headers, then closes a cancelled bitmap without encoding it',async()=>{
@@ -158,15 +191,23 @@ describe('UI-only shared image ownership', () => {
     let ended=false;const retirement=manager.dispose();expect(manager.dispose()).toBe(retirement);const closing=retirement.then(()=>{ended=true;});await Promise.resolve();expect(ended).toBe(false);drained.resolve();await rejected;await closing;
     expect(source).not.toHaveBeenCalled();expect(release).toHaveBeenCalledOnce();await raster.dispose();
   });
-  it('publishes the remaining real UI card after its shared first card closes while queued, and displays retry errors',async()=>{
+  it.each(['disposed', 'suspended'] as const)('publishes the remaining real UI card when its shared first card is %s while queued, and displays retry errors',async retirement=>{
     const document=new RecordedDocument(),dom=document.asDocument(),raster=createRasterResources({cpuBytes:100000,gpuBytes:0}),finish=gate(),started=gate();
     const manager=createMediaPreviewResources(dom,raster,{edge:8,derive}),viewer=createMediaViewer(dom),sharedViewer={...viewer,resources:manager};
     const block=manager.thumbnail('block',async()=>{started.resolve();await finish.promise;return image();});await started.promise;
     const source=vi.fn(async()=>image()),group:MediaPreviewGroup={scope:'same-project',label:'添付',items:[{id:'first',resourceId:'resource',label:'写真',description:'',image:{key:'immutable-display',load:source}}]};
     const first=createMediaThumbnails(dom,()=>group,sharedViewer),remaining=createMediaThumbnails(dom,()=>group,sharedViewer);
-    first.render();remaining.render();first.dispose();finish.resolve();await block.ready;
+    first.render(); remaining.render();
+    if (retirement === 'disposed') first.dispose();
+    else first.render(true, false);
+    finish.resolve(); await block.ready;
     const all=(node:RecordedNode):RecordedNode[]=>[node,...node.children.flatMap(all)];
     await vi.waitFor(()=>expect(all(record(remaining.root)).some(node=>node.tag==='img')).toBe(true));expect(source).toHaveBeenCalledOnce();
+    if (retirement === 'suspended') {
+      expect(all(record(first.root)).some(node => node.tag === 'img')).toBe(false);
+      expect(all(record(first.root)).find(node => node.className === 'lv-media-image')!.hidden).toBe(true);
+      first.dispose();
+    }
     all(record(remaining.root)).find(node=>node.tag==='img')!.fire('load');
     expect(all(record(remaining.root)).filter(node=>node.attributes.get('role')==='status').map(node=>node.textContent).join()).toBe('');
     const broken:MediaPreviewGroup={...group,items:[{...group.items[0]!,image:{key:'failed-source',load:async()=>{throw Error('表示を再試行してください。');}}}]};

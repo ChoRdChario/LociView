@@ -475,7 +475,9 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
     if (disposed || rendering) return; rendering = true;
     try { list.render(context());
       const selectedCaption = view.source.captions.find(row => row.id === memory.selectedCaptionId);
-      const item = phone?.matches || !activeWindow() ? selectedCaption : undefined;
+      const selectedWindowVisible = !phone?.matches && !!memory.selectedCaptionId &&
+        captionWindowView(view.source, windowsMemory, memory.selectedCaptionId).visibleIds.includes(memory.selectedCaptionId);
+      const item = selectedWindowVisible ? undefined : selectedCaption;
       selectedText.hidden = !selectedCaption;
       returnTo3D.hidden = !phone?.matches || !item; recordTitle.hidden = recordBody.hidden = !item;
       updateSteps();
@@ -483,10 +485,11 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
       recordBody.textContent = item?.body.kind === 'value' ? item.body.value : '';
       if (panelCaption !== memory.selectedCaptionId) { panelGallery?.dispose(); panelCaption = memory.selectedCaptionId;
         panelGallery = panelCaption ? gallery(panelCaption) : null; if (panelGallery) selectedMedia.append(panelGallery.root); }
-      panelGallery?.render(); mediaViewer.render();
+      selectedMedia.hidden = selectedWindowVisible || !selectedCaption;
+      panelGallery?.render(!selectedMedia.hidden); mediaViewer.render();
       windows.render({ source: view.source, memory: windowsMemory, selectedId: memory.selectedCaptionId,
       visible: !phone?.matches, moveBlock: composing ? '文字の入力を確定してください。' : null });
-      const empty=view.source.captions.length===0;emptyCaptions.hidden=!empty;list.root.hidden=selectedMedia.hidden=windows.tools.hidden=empty;
+      const empty=view.source.captions.length===0;emptyCaptions.hidden=!empty;list.root.hidden=windows.tools.hidden=empty;
       display = view.display(memory.pinColors, memory.selectedCaptionId); runtime?.setActive(!handoffBusy && !mediaWork.active && document.hidden !== true); runtime?.update(display); paint(); }
     catch (error) { failure = (error as Error).message; paint(); } finally { rendering = false; }
   }

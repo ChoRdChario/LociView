@@ -1227,8 +1227,10 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
         editorFields: memory().selectedCaptionId ? ports.captionEditors?.(memory().selectedCaptionId!) : undefined,
       });
       updateCaptionNavigation(captionList);
-      windows.render({ source: captionList.source, memory: windowMemory(), selectedId: selected, moveBlock: windowBlock(),
-        visible: !mobileLayout?.matches && stageVisible() && !drawingPreview() && document.hidden !== true });
+      const windowsVisible = !mobileLayout?.matches && stageVisible() && !drawingPreview() && document.hidden !== true;
+      const selectedWindowVisible = windowsVisible && !!selected &&
+        captionWindowView(captionList.source, windowMemory(), selected).visibleIds.includes(selected);
+      windows.render({ source: captionList.source, memory: windowMemory(), selectedId: selected, moveBlock: windowBlock(), visible: windowsVisible });
       addPin.disabled = !!blocked || dirty() || !sceneId;
       movePin.disabled = !!blocked || dirty() || !selected;movePin.hidden=!selected;
       excludeSelected.hidden = !selected; excludeSelected.disabled = !!blocked || dirty();
@@ -1293,7 +1295,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       if (mediaDraftNotice.textContent !== mediaNote) mediaDraftNotice.textContent = mediaNote;
       cancelMedia.hidden = !pickerScope && !selectedMedia; cancelMedia.disabled = !canCancelMedia();
       mediaManager!.render(!readDuringOutput() && task === 'captions' && !detailPane.hidden &&
-        (!compactLayout() || compactSurface === 'panel') && document.hidden !== true);
+        (!compactLayout() || compactSurface === 'panel') && document.hidden !== true, !selectedWindowVisible);
       recovery!.render();
       organization!.render();
       body.setAttribute('aria-busy', String(busy)); body.inert = busy || externalBusy && !readDuringOutput();

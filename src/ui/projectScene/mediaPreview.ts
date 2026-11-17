@@ -27,10 +27,10 @@ function createPngPreview(document: Document, read: () => MediaPreviewItem | nul
   const loading=(value:boolean)=>{error.dataset.busy=String(value);root.setAttribute('aria-busy',String(value));};
   let body: PreviewPng | null = null, image: HTMLImageElement | null = null, player:HTMLVideoElement|HTMLAudioElement|null=null, release: (() => void) | null = null, disposed = false, replacing = false, epoch = 0;
   const localKey = ++previewKey;
-  let visible = !resources || !lazy || typeof IntersectionObserver === 'undefined';
+  let visible = !resources || !lazy || typeof IntersectionObserver === 'undefined', presentationActive = true;
   function clear() { const retiring = release; release = null; image?.remove(); image = null; changedImage?.(null); if(player){player.pause();player.removeAttribute('src');player.load();player.remove();player=null;} retiring?.(); }
   function load(item: MediaPreviewItem | null, priority: RasterPriority = 'thumbnail') {
-    if (disposed || replacing || lazy && resources?.thumbnailsActive === false) return;
+    if (disposed || replacing || !presentationActive || lazy && resources?.thumbnailsActive === false) return;
     replacing = true;
     try { loadOwned(item, priority); } finally { replacing = false; }
   }
@@ -93,7 +93,15 @@ function createPngPreview(document: Document, read: () => MediaPreviewItem | nul
     const showing = entries.some(entry => entry.isIntersecting); if (disposed || showing === visible) return; visible = showing;
     if (showing) load(read()); else { epoch++; clear(); body = null; loading(false); error.textContent = ''; retry.hidden = true; }
   }) : null; observer?.observe(root);
-  function render() { if (disposed || replacing) return; const item = read();
+  function render(active = presentationActive) {
+    if (disposed || replacing) return;
+    root.hidden = !active;
+    if (!active) {
+      presentationActive = false; epoch++; clear(); body = null; loading(false); error.textContent = ''; retry.hidden = true;
+      return;
+    }
+    presentationActive = true;
+    const item = read();
     if (!visible || lazy && resources?.thumbnailsActive === false) return;
     if (!sameBody(body, item?.image ?? null) || !image && !player && !error.textContent) load(item);
     if (image && item) image.alt = item.description || item.label;
@@ -199,9 +207,9 @@ export function createMediaThumbnails(document: Document, read: MediaPreviewRead
   grid.className = 'lv-media-grid'; back.type = forward.type = 'button'; back.textContent = '前の一覧'; forward.textContent = '次の一覧';
   pages.setAttribute('aria-label', 'メディア一覧のページ'); pages.append(back, count, forward); root.append(grid, pages);
   type Card = { root: HTMLElement; label: HTMLElement; action: HTMLButtonElement; show?: HTMLButtonElement; preview: ReturnType<typeof createPngPreview>; resourceId: string; tools?: HTMLElement };
-  const cards = new Map<string, Card>(); let page = 0, scope = '', order = '', disposed = false, presentationActive = true;
-  function render(active = presentationActive) {
-    presentationActive = active;
+  const cards = new Map<string, Card>(); let page = 0, scope = '', order = '', disposed = false, presentationActive = true, previewsVisible = true;
+  function render(active = presentationActive, showPreviews = previewsVisible) {
+    presentationActive = active; previewsVisible = showPreviews;
     if (!active) { for (const card of cards.values()) { card.preview.dispose(); card.root.remove(); } cards.clear(); order = ''; root.hidden = true; return; }
     if (disposed) return; const group = read(); if (scope !== group?.scope) {
       for (const card of cards.values()) { card.preview.dispose(); card.root.remove(); } cards.clear();
@@ -237,7 +245,7 @@ export function createMediaThumbnails(document: Document, read: MediaPreviewRead
       }
       card.label.textContent = selection ? '' : `${item.label}${item.description ? ` — ${item.description}` : ''}`; card.label.hidden = !!selection;
       if (selection) card.action.setAttribute('aria-pressed', String(selection.selected() === item.id));
-      card.preview.render();
+      card.preview.render(showPreviews);
       if (card.tools) { const tools=cardTools!(item.id);if(card.tools.children[0]!==tools){card.tools.replaceChildren();if(tools)card.tools.append(tools);} }
     }
     const nextOrder = JSON.stringify([scope, visible.map(i => [i.id, i.resourceId])]);

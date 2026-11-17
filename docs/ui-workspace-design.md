@@ -665,6 +665,13 @@ scene and start-view controls. Leave the stage to the model and record windows
 during normal viewing. Loading, unavailable surfaces and retry still use the
 stage status. The placement restriction stays beside the position operation.
 
+When a selected record has a visible PC caption window, show its photographs in
+that window once. The shared sidebar restores that record's complete detail and
+photographs when its own window closes, even if another record's window remains.
+In the editor, keep attachment labels, editing tools and drafts in the sidebar
+while suspending only its repeated preview. Compact reading uses the detail
+surface. Window order remains independent of the selected editing record.
+
 Raster rollback verification must isolate the target through the existing local
 model-visibility UI after the earlier two-model/reparent checks. Two identical
 coplanar test meshes can change the visible winner when materials are cloned;

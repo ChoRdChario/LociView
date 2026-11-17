@@ -37,6 +37,8 @@ test('content-first workspace keeps editing, pin completion and file exits coher
     })).toBe(true);
     const comparison = p.locator('.lv-caption-window'), image = comparison.locator('img').first(); await expect(image).toBeVisible();
     const attached=detail.getByRole('region',{name:'メディアの整理',exact:true});await expect(attached.locator('figure')).toHaveCount(1);
+    await expect(attached.getByRole('button', { name: '画像を表示', exact: true })).toBeHidden();
+    await expect(attached.locator('img')).toHaveCount(0);
     await attached.getByText('添付を整理',{exact:true}).click();await attached.getByRole('button',{name:'説明を編集',exact:true}).click();
     const description=attached.getByLabel('メディアの説明',{exact:true});await expect(description).toBeFocused();await description.fill('柱と梁の写真');await description.dispatchEvent('compositionstart');
     await expect(attached.getByRole('button',{name:'説明を適用',exact:true})).toBeDisabled();await description.dispatchEvent('compositionend');await attached.getByRole('button',{name:'説明を適用',exact:true}).click();await ready('メディアの説明を適用しました。');

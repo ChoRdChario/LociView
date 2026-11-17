@@ -51,10 +51,14 @@ test('image details, Scene keyboard focus and dismissible header sheets retain P
     const before = await backup(page, info, 'before-inspection');
     await expect(notice).toBeEmpty();await helpSummary.click(); await page.keyboard.press('Escape'); await expect(help).not.toHaveAttribute('open'); await expect(helpSummary).toBeFocused();
     const settings = page.locator('details[aria-label="設定"]'), summary = settings.locator(':scope > summary'); await summary.click(); const displayName = settings.getByLabel('このブラウザの表示名', { exact: true });
+    await settings.locator('.lv-local-name > summary').click();
     await displayName.fill('保持する入力'); await displayName.dispatchEvent('compositionstart'); await page.keyboard.press('Escape'); await expect(settings).toHaveAttribute('open'); await displayName.dispatchEvent('compositionend');
     await page.keyboard.press('Escape'); await expect(settings).not.toHaveAttribute('open'); await expect(summary).toBeFocused(); await summary.click(); await expect(displayName).toHaveValue('保持する入力');
     await settings.getByRole('button', { name: '表示名の入力を取り消す', exact: true }).click(); await page.keyboard.press('Escape');
-    const show = page.getByRole('region', { name: 'メディアの整理', exact: true }).getByRole('region', { name: '添付メディア', exact: true }).getByRole('button', { name: '画像を表示', exact: true }); await show.click();
+    const sidebarPhoto = page.getByRole('region', { name: 'メディアの整理', exact: true }).getByRole('region', { name: '添付メディア', exact: true }).getByRole('button', { name: '画像を表示', exact: true });
+    await expect(sidebarPhoto).toBeHidden();
+    const recordWindow = page.locator('.lv-caption-window');
+    const show = recordWindow.getByRole('button', { name: '画像を表示', exact: true }); await show.click();
     const dialog = page.getByRole('dialog', { name: 'メディアビューア', exact: true }), image = dialog.locator('img'), viewport = dialog.getByRole('region', { name: '画像の表示領域', exact: true });
     await expect.poll(() => image.evaluate(n => { const img=n as HTMLImageElement;return img.complete && img.naturalWidth === 2048 && img.naturalHeight === 1024; })).toBe(true);
     await expect.poll(() => image.evaluate(n => n.getBoundingClientRect().width)).toBeLessThan(2048); await page.screenshot({ path: info.outputPath('fit-image.png'), fullPage: false });
@@ -67,6 +71,10 @@ test('image details, Scene keyboard focus and dismissible header sheets retain P
     await viewport.focus(); await page.keyboard.press('Shift+ArrowLeft'); await expect.poll(() => viewport.evaluate(n => n.scrollLeft)).toBeCloseTo(nextScroll.x - 40, 0);
     await dialog.getByRole('button', { name: '全体', exact: true }).click(); const fitted = await image.boundingBox(), area = await viewport.boundingBox(); expect(fitted!.width).toBeLessThanOrEqual(area!.width + 1); expect(fitted!.height).toBeLessThanOrEqual(area!.height + 1);
     await page.screenshot({ path: info.outputPath('inspected-image.png'), fullPage: false }); await dialog.getByRole('button', { name: '閉じる', exact: true }).click(); await expect(show).toBeFocused();
+    await recordWindow.getByRole('button', { name: '閉じる', exact: true }).click();
+    await expect(sidebarPhoto).toBeVisible(); await sidebarPhoto.click();
+    await expect.poll(() => image.evaluate(n => [(n as HTMLImageElement).naturalWidth, (n as HTMLImageElement).naturalHeight])).toEqual([2048, 1024]);
+    await dialog.getByRole('button', { name: '閉じる', exact: true }).click(); await expect(sidebarPhoto).toBeFocused();
     const after = await backup(page, info, 'after-inspection'); expect(after.source.originalChanges()).toEqual(before.source.originalChanges()); expect(after.source.proof.identity).toEqual(before.source.proof.identity);
     expect(after.archive.control.manifest.blobs).toEqual(before.archive.control.manifest.blobs); expect(after.archive.control.manifest.blobs.some(b => b.sha256 === createHash('sha256').update(png).digest('hex'))).toBe(true);
     const portrait = Buffer.from(jpegBytes('rgb-exif-6')), choosePortrait = page.waitForEvent('filechooser');
