@@ -86,7 +86,8 @@ async function selectRecord(page: Page) {
 }
 
 async function checkPhoto(page: Page) {
-  const open = detail(page).getByRole('button', { name: '画像を表示', ...exact });
+  const open = page.getByRole('button', { name: '画像を表示', ...exact });
+  await expect(open).toHaveCount(1);
   await open.click();
   const viewer = page.getByRole('dialog', { name: 'メディアビューア', ...exact });
   await expect(viewer.locator('img')).toBeVisible();
@@ -314,7 +315,7 @@ for (const touch of [false, true])
           await other.locator('.lv-caption-select').filter({ hasText: '塗装の確認' }).tap();
           const reading = other.getByRole('region', { name: 'キャプションの詳細', ...exact });
           await expect(reading).toBeFocused();
-          await reading.getByRole('button', { name: '3Dに戻る', ...exact }).tap();
+          await reader.getByRole('button', { name: '3Dに戻る', ...exact }).tap();
           await expect(other.getByLabel('3Dモデルの表示', exact)).toBeFocused();
           await expect(action(other, '3D表示を再試行')).toBeInViewport();
           await other.evaluate(() => Object.assign(window, { reviewContextUnavailable: false }));
@@ -430,8 +431,9 @@ for (const touch of [false, true])
           await expect(reading).toBeFocused();
           await expect(reading.getByRole('heading', { name: sharedTitle, ...exact })).toBeInViewport();
           await expect(reading).toContainText(sharedBody);
-          const returnTo3D = reading.getByRole('button', { name: '3Dに戻る', ...exact });
+          const returnTo3D = reader.getByRole('button', { name: '3Dに戻る', ...exact });
           await expect(returnTo3D).toBeInViewport();
+          await expect(reader.locator(':scope > header')).toBeInViewport({ ratio: 1 });
           await info.attach('shared-reading-entry', { body: JSON.stringify({ milliseconds: Date.now() - started, from: 'selected list row', to: 'focused visible detail heading', viewport: options.viewport }), contentType: 'application/json' });
           await returnTo3D.press('Enter');
           await expect(readingCanvas).toBeFocused();
@@ -454,20 +456,28 @@ for (const touch of [false, true])
         await expect(selectedPin).toHaveAccessibleName(sharedTitle);
         await expect.poll(() => selectedPin.evaluate(node => getComputedStyle(node, '::before').boxShadow)).toContain('3px');
         expect((await selectedPin.boundingBox())!.width).toBeGreaterThanOrEqual(44);
-        await other.getByLabel('選択中のキャプションのメディア', exact).getByRole('button', { name: '画像を表示', ...exact }).click();
+        const photoArea = touch ? other.getByLabel('選択中のキャプションのメディア', exact) : reader.locator('.lv-caption-window[data-active="true"]');
+        await photoArea.getByRole('button', { name: '画像を表示', ...exact }).click();
         await expect(other.getByRole('dialog', { name: 'メディアビューア', ...exact }).locator('img')).toHaveJSProperty('naturalWidth', 2);
         await other.getByRole('dialog', { name: 'メディアビューア', ...exact }).getByRole('button', { name: '閉じる', ...exact }).click();
         if (touch) {
           const reading = other.getByRole('region', { name: 'キャプションの詳細', ...exact });
           const photo = reading.getByRole('button', { name: '画像を表示', ...exact });
           await expect(photo).toBeFocused();
-          const returnTo3D = reading.getByRole('button', { name: '3Dに戻る', ...exact });
+          const returnTo3D = reader.getByRole('button', { name: '3Dに戻る', ...exact });
           await expect(returnTo3D).toBeInViewport();
           await other.screenshot({ path: info.outputPath('reading-long-record.png') });
           await returnTo3D.tap();
           await expect(readingCanvas).toBeFocused();
+          await expect(reader.locator(':scope > header')).toBeInViewport({ ratio: 1 });
+          await expect(returnTo3D).toBeHidden();
           await expect(selectedPin).toBeInViewport();
           await expect(readerSearch).toHaveValue('塗装');
+          await photo.scrollIntoViewIfNeeded();
+          await expect(returnTo3D).toBeInViewport();
+          await returnTo3D.tap();
+          await expect(readingCanvas).toBeFocused();
+          await expect(selectedPin).toBeInViewport();
           if (kind === 'GS') {
             await other.setViewportSize({ width: 320, height: 568 });
             const narrowScene = (await scenes.boundingBox())!;

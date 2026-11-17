@@ -343,6 +343,7 @@
 .lv-review-header { flex: none; flex-wrap: nowrap; gap: 8px; padding: 4px 12px; }
 .lv-review-header h1 { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lv-review-header > span { white-space: nowrap; color: var(--lv-muted); }
+.lv-review-return { flex: none; white-space: nowrap; }
 .lv-review-header > .lv-home-settings { position: relative; inset: auto; }
 .lv-review-files { position: relative; }
 .lv-review-files > summary { min-height: 44px; padding: 10px 12px; box-sizing: border-box; cursor: pointer; }
@@ -355,6 +356,9 @@
 }
 @media (pointer: coarse) and (min-width: 761px) and (max-height: 480px) {
   .lv-review-workspace { min-height: 0; }
+}
+@media (pointer: coarse) and (max-width: 760px), (pointer: coarse) and (max-width: 950px) and (max-height: 480px) {
+  .lv-review-header { position: sticky; top: 0; z-index: 7; background: var(--lv-panel); }
 }
 .lv-review-workspace .lv-development-viewport { border: 0; }
 .lv-review-workspace .lv-caption-windows { z-index: 4; }
@@ -393,7 +397,6 @@
 .lv-review-workspace .lv-caption-value > :is(h2, h3) { margin-block: 8px; font-size: 1.17em; overflow-wrap: anywhere; }
 .lv-review-record-header button { flex: none; min-height: 44px; padding: 8px 12px; touch-action: manipulation; }
 .lv-review-record-header { flex-wrap: wrap; gap: 4px; }
-.lv-review-record-header > :first-child { margin-right: auto; }
 .lv-review-handoff {
   align-self: start;
   display: grid;

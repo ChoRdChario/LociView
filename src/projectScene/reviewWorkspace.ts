@@ -38,7 +38,7 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
   const make = <K extends keyof HTMLElementTagNameMap>(tag: K, text = '') => { const node = document.createElement(tag); node.textContent = text; return node; };
   const root = make('main'); root.className = 'lv-development lv-review-workspace'; root.setAttribute('aria-label', '閲覧用のシーン');
   const stopHelp = mountContextHelp(document, root);
-  const header = make('header'), heading = make('h1', view.title), files = make('details');
+  const header = make('header'), heading = make('h1', view.title), readingBadge = make('span', '閲覧中'), files = make('details');
   const fileToggle = make('summary', 'ファイル'), actions = make('div');
   header.className = 'lv-development-header lv-review-header';
   heading.title = view.title;
@@ -46,7 +46,7 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
   files.className = 'lv-review-files';
   files.append(fileToggle, actions);
   files.hidden = !editCopy && !append && !openProject;
-  header.append(heading, make('span', '閲覧中'), files);
+  header.append(heading, readingBadge, files);
   function dismissFiles(event: Event): void {
     if (files.open && !files.contains(event.target as Node)) files.open = false;
   }
@@ -244,7 +244,7 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
     const revealSelection = plan.kind === 'change' && plan.intent === 'revealSelection';
     if (explicitlySelected || revealSelection) list.revealSelected();
     if (explicitlySelected && phone?.matches && !selectedText.hidden) {
-      selectedText.scrollIntoView?.({ block: 'start', behavior: 'auto' });
+      revealReading(selectedText, 'start');
       selectedText.focus({ preventScroll: true });
     }
   }
@@ -252,7 +252,7 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
   const searchBlocked = () => disposed || composing || moving || handoffBusy || !!runtime?.read().dragging;
   searchRecords.addEventListener('click', () => {
     if (searchBlocked() || content.inert || !view.source.captions.length) return;
-    list.focusSearch(); list.root.scrollIntoView?.({ block: 'nearest', behavior: 'auto' });
+    list.focusSearch(); revealReading(list.root, 'nearest');
   });
   const mediaGroup = (captionId: string): MediaPreviewGroup => {
     const caption = view.source.captions.find(c => c.id === captionId);
@@ -272,8 +272,12 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
   const selectedMedia = make('section'); selectedMedia.setAttribute('aria-label', '選択中のキャプションのメディア');
   const selectedText = make('section'), recordTitle = make(switchScene && view.scenes.length > 1 ? 'h2' : 'h3'), recordBody = make('p');
   selectedText.setAttribute('aria-label', 'キャプションの詳細'); selectedText.tabIndex = -1; selectedText.className = 'lv-caption-value';
+  function revealReading(target: HTMLElement, block: ScrollLogicalPosition): void {
+    target.style.scrollMarginTop = phone?.matches ? `${header.getBoundingClientRect().height + 8}px` : '';
+    target.scrollIntoView?.({ block, behavior: 'auto' });
+  }
   const recordHeader = make('header'), returnTo3D = make('button', '3Dに戻る');
-  recordHeader.className = 'lv-review-record-header'; returnTo3D.type = 'button';
+  recordHeader.className = 'lv-review-record-header'; returnTo3D.type = 'button'; returnTo3D.className = 'lv-review-return';
   const previous = make('button', '前の記録'), next = make('button', '次の記録');
   const activeWindow = () => !phone?.matches ? captionWindowView(view.source, windowsMemory, memory.selectedCaptionId).visibleIds.at(-1) : undefined;
   function updateSteps() {
@@ -281,7 +285,7 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
     previous.hidden = next.hidden = !neighbors.previous && !neighbors.next;
     previous.disabled = !neighbors.previous || composing || moving || handoffBusy;
     next.disabled = !neighbors.next || composing || moving || handoffBusy;
-    recordHeader.hidden = !memory.selectedCaptionId || (!phone?.matches && next.hidden);
+    recordHeader.hidden = !memory.selectedCaptionId || previous.hidden && next.hidden;
   }
   function step(direction: 'previous' | 'next') {
     if (searchBlocked() || content.inert) return;
@@ -300,12 +304,13 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
   }
   previous.type = next.type = 'button';
   previous.addEventListener('click', () => step('previous')); next.addEventListener('click', () => step('next'));
-  recordHeader.append(returnTo3D, previous, next);
+  recordHeader.append(previous, next);
+  header.insertBefore(returnTo3D, files);
   selectedText.append(recordHeader, recordTitle, recordBody, selectedMedia);
   returnTo3D.addEventListener('click', () => {
     if (searchBlocked() || content.inert) return;
     requestStage();
-    viewport.scrollIntoView?.({ block: 'start', behavior: 'auto' });
+    root.scrollIntoView?.({ block: 'start', behavior: 'auto' });
     canvas.focus({ preventScroll: true });
   });
   let panelGallery: ReturnType<typeof gallery> | null = null, panelCaption: string | null = null;
@@ -331,12 +336,24 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
     if (disposed || composing || moving) return; try { action(); failure = ''; } catch (error) { failure = (error as Error).message; } paint();
   };
   const cameraButtons: HTMLButtonElement[] = [];
-  const requestStage = () => { readingDetail = false; mediaWork.resume(); };
+  const requestStage = () => {
+    if (readingDetail) {
+      readingDetail = false;
+      returnTo3D.hidden = true;
+      readingBadge.hidden = false;
+    }
+    mediaWork.resume();
+  };
   const resumeStage = (event: Event) => { if (event.target !== searchRecords && event.target !== retry) requestStage(); };
   viewport.addEventListener('pointerdown', resumeStage, true);
   viewport.addEventListener('focusin', resumeStage);
   const stageObserver = typeof IntersectionObserver === 'undefined' ? null : new IntersectionObserver(entries => {
-    if (entries.some(entry => entry.intersectionRatio >= 0.95) && !mediaViewer.root.open) requestStage();
+    if (entries.some(entry => entry.intersectionRatio >= 0.95)) {
+      if (!mediaViewer.root.open) requestStage();
+    } else if (phone?.matches && memory.selectedCaptionId && !readingDetail) {
+      readingDetail = true;
+      render();
+    }
   }, { threshold: 0.95 });
   stageObserver?.observe(viewport);
   const cameraButton = (container: HTMLElement, text: string, viewId: string) => {
@@ -479,7 +496,9 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
         captionWindowView(view.source, windowsMemory, memory.selectedCaptionId).visibleIds.includes(memory.selectedCaptionId);
       const item = selectedWindowVisible ? undefined : selectedCaption;
       selectedText.hidden = !selectedCaption;
-      returnTo3D.hidden = !phone?.matches || !item; recordTitle.hidden = recordBody.hidden = !item;
+      returnTo3D.hidden = !phone?.matches || !item || !readingDetail;
+      readingBadge.hidden = !returnTo3D.hidden;
+      recordTitle.hidden = recordBody.hidden = !item;
       updateSteps();
       recordTitle.textContent = item?.title.kind === 'value' ? item.title.value || '無題' : '無題';
       recordBody.textContent = item?.body.kind === 'value' ? item.body.value : '';

@@ -672,6 +672,19 @@ In the editor, keep attachment labels, editing tools and drafts in the sidebar
 while suspending only its repeated preview. Compact reading uses the detail
 surface. Window order remains independent of the selected editing record.
 
+Shared compact reading keeps its existing `3Dに戻る` action in the same header
+row as the project title and files. The row stays visible while reading. Hide the
+passive viewing badge while that action is shown. Closing a photograph returns
+focus to its opener. Explicit return reveals the complete workspace header and
+3D surface and focuses its canvas while retaining the current camera and record.
+Explicit reading/search navigation clears the actual sticky header height.
+
+The camera toolkit uses the existing 112px compass, one 44px pan/fit row and the
+projection control in a content-sized grid. Preserve projected tip geometry,
+44px hit areas, keyboard access and transparent compass corners. Keep the ordinary
+editor's compact navigation as the route back from its record detail. Portrait
+and compact landscape use the same top-right camera position.
+
 Raster rollback verification must isolate the target through the existing local
 model-visibility UI after the earlier two-model/reparent checks. Two identical
 coplanar test meshes can change the visible winner when materials are cloned;

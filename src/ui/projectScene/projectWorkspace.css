@@ -81,9 +81,9 @@
 .lv-project-workspace .lv-project-marker:is([aria-pressed="true"],:focus-visible)::before { outline: 2px solid #fff; outline-offset: 1px; box-shadow: 0 0 0 4px #20251d; }
 .lv-project-workspace .lv-project-marker:focus-visible { outline: 0; }
 .lv-project-workspace .lv-project-marker[data-review="true"]::after { content: "!"; position: absolute; right: 6px; top: 50%; transform: translateY(-50%); width: 16px; height: 16px; border: 1px solid var(--lv-action); border-radius: 50%; background: var(--lv-field); color: var(--lv-action); font-size: 12px; font-weight: 700; line-height: 16px; text-align: center; }
-.lv-project-camera { position: absolute; top: 8px; right: 8px; z-index: 3; width: 112px; height: 156px; pointer-events: none; }
+.lv-project-camera { position: absolute; top: 8px; right: 8px; z-index: 3; display: grid; grid-template-columns: repeat(2, 1fr); grid-template-rows: 112px 44px; width: 112px; pointer-events: none; }
 .lv-project-camera > .lv-context-help { position: absolute; width: 0; height: 0; }
-.lv-camera-axes { position: relative; width: 112px; height: 112px; pointer-events: auto; touch-action: none; }
+.lv-camera-axes { position: relative; grid-column: 1 / -1; width: 112px; height: 112px; pointer-events: auto; touch-action: none; }
 .lv-camera-axes [data-axis="0"] { --lv-axis: #ee6378; }
 .lv-camera-axes [data-axis="1"] { --lv-axis: #92cf65; }
 .lv-camera-axes [data-axis="2"] { --lv-axis: #69a8f5; }
@@ -103,7 +103,7 @@
 .lv-camera-axes > button[data-hovered="true"]:not(:disabled)::before { box-shadow: 0 0 0 2px #fff, 0 0 0 3px #202833; }
 :is(.lv-project-workspace, .lv-review-workspace) .lv-project-camera button:disabled { opacity: .45; cursor: default; }
 :is(.lv-project-workspace, .lv-review-workspace) .lv-project-camera .lv-camera-fit,
-.lv-project-shell :is(.lv-project-workspace, .lv-review-workspace) .lv-project-camera .lv-camera-fit { position: absolute; right: 0; top: 112px; }
+.lv-project-shell :is(.lv-project-workspace, .lv-review-workspace) .lv-project-camera .lv-camera-fit { grid-column: 2; grid-row: 2; justify-self: end; }
 .lv-camera-fit > span { display: inline-block; width: 16px; height: 16px; vertical-align: middle; background: linear-gradient(currentColor,currentColor) left top/6px 2px, linear-gradient(currentColor,currentColor) left top/2px 6px, linear-gradient(currentColor,currentColor) right top/6px 2px, linear-gradient(currentColor,currentColor) right top/2px 6px, linear-gradient(currentColor,currentColor) left bottom/6px 2px, linear-gradient(currentColor,currentColor) left bottom/2px 6px, linear-gradient(currentColor,currentColor) right bottom/6px 2px, linear-gradient(currentColor,currentColor) right bottom/2px 6px; background-repeat: no-repeat; }
 
 .lv-camera-fit > span, .lv-camera-pan > span { color: var(--lv-field); }
@@ -130,7 +130,7 @@
   .lv-project-stage, .lv-project-body > aside { height: 100%; box-sizing: border-box; min-height: 0; }
   .lv-project-body[data-surface="panel"] > .lv-project-stage, .lv-project-body[data-surface="stage"] > aside { display: none; }
   .lv-project-body > aside { overflow-y: auto; border-left: 0; }
-  .lv-project-camera { right: 6px; top: auto; bottom: 72px; }
+  .lv-project-camera { right: 6px; top: 8px; bottom: auto; }
   .lv-project-body [role="tab"] { white-space: normal; flex: 1 1 21%; }
   .lv-project-workspace > header > .lv-operation-status:not(:empty) { bottom: 4px; max-height: 18dvh; }
 }
@@ -336,7 +336,7 @@
 .lv-camera-positions > summary:focus-visible { outline: 2px solid #fff; outline-offset: -2px; box-shadow: 0 0 0 2px #202833; }
 .lv-camera-sheet { position: absolute; top: 100%; right: 0; box-sizing: border-box; width: min(360px, calc(100vw - 24px)); max-height: min(560px, calc(100dvh - 180px)); display: flex; flex-direction: column; overflow: hidden; padding: 12px; border: 1px solid var(--lv-line); border-radius: 8px; background: var(--lv-field); box-shadow: 0 8px 24px #25282033; }
 .lv-camera-sheet [role="group"] { position: static; flex: 0 0 auto; background: var(--lv-field); }
-.lv-project-camera > .lv-camera-projection { position: absolute; top: 156px; right: 0; width: 112px; pointer-events: auto; font-size: 12px; }
+.lv-project-camera > .lv-camera-projection { grid-column: 1 / -1; grid-row: 3; min-width: 0; pointer-events: auto; font-size: 12px; }
 .lv-camera-projection select { width: 100%; min-height: 44px; font-size: 12px; }
 /* Opaque control faces stay readable over any authored scene background. */
 :is(.lv-project-workspace,.lv-review-workspace) .lv-camera-projection select {
@@ -346,16 +346,14 @@
   outline: 2px solid var(--lv-field); outline-offset: 0; box-shadow: 0 0 0 4px var(--lv-ink);
 }
 .lv-camera-projection > :is(p,div):empty { display: none; }
-.lv-project-camera { height: 222px; }
 @media (max-width: 760px) {
   .lv-camera-positions { right: 126px; top: 8px; }
   .lv-camera-sheet { position: fixed; top: 132px; right: 12px; max-height: calc(100dvh - 156px); }
-  .lv-project-camera { top: 8px; bottom: auto; }
 }
 @media (min-width: 761px) and (max-width: 900px) {
   .lv-camera-sheet { position: fixed; top: 132px; left: 12px; right: auto; max-height: calc(100dvh - 156px); }
 }
-:is(.lv-project-workspace,.lv-review-workspace) .lv-project-camera .lv-camera-pan, .lv-project-shell :is(.lv-project-workspace,.lv-review-workspace) .lv-project-camera .lv-camera-pan { position: absolute; top: 112px; left: 16px; touch-action: none; cursor: grab; }
+:is(.lv-project-workspace,.lv-review-workspace) .lv-project-camera .lv-camera-pan, .lv-project-shell :is(.lv-project-workspace,.lv-review-workspace) .lv-project-camera .lv-camera-pan { grid-column: 1; grid-row: 2; justify-self: end; touch-action: none; cursor: grab; }
 .lv-project-camera .lv-camera-pan:active { cursor: grabbing; }
 .lv-camera-pan > span { display: inline-block; width: 18px; height: 18px; vertical-align: middle; background: currentColor; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M8 12V5a2 2 0 0 1 4 0v7-9a2 2 0 0 1 4 0v9-6a2 2 0 0 1 4 0v8c0 5-3 8-7 8h-1c-2 0-4-1-5-3L3 13c-1-2 1-4 3-2l2 2' fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/contain no-repeat; }
 .lv-camera-sheet > [aria-label="視点の作業"] { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; max-height: none; }

@@ -142,7 +142,7 @@ test('view mode hides editing while preserving reading, local display, existing 
     await p.mouse.move(box.x + box.width * .45, box.y + box.height * .5); await p.mouse.down({ button: 'middle' }); await p.mouse.move(box.x + box.width * .6, box.y + box.height * .6, { steps: 12 }); await p.mouse.up({ button: 'middle' });
     await expect(z).toHaveAttribute('aria-pressed', 'false'); await expect(gizmo.getByRole('button', { name: 'X', exact: true })).not.toHaveAttribute('style', xBefore!);
     await gizmo.getByRole('button', { name: '全体表示', exact: true }).click(); await display.click({ position: { x: 20, y: 120 } }); await p.mouse.move(0, 0); await p.keyboard.press('Escape');
-    expect(await gizmo.boundingBox()).toMatchObject({ width: 112, height: 222 });
+    expect(await gizmo.boundingBox()).toMatchObject({ width: 112, height: 200 });
     await gizmo.screenshot({ path: info.outputPath('gizmo-light.png') }); await p.screenshot({ path: info.outputPath('gizmo-workspace.png'), fullPage: false });
     await lookAlongFront(p); await expect(z).toHaveAttribute('aria-pressed', 'true');
     const overlap = await axes.evaluate(node => {
@@ -195,7 +195,8 @@ test('view mode hides editing while preserving reading, local display, existing 
     const captions = p.getByRole('region', { name: 'キャプション', exact: true }); await captions.locator('.lv-caption-search').getByLabel('検索', { exact: true }).fill('現地'); await expect(p.locator('.lv-caption-select')).toHaveCount(1);
     await p.locator('.lv-caption-select').click(); await expect(detail).toBeVisible();
     await expect(p.getByRole('button', { name: '窓を残す', exact: true })).toHaveCount(0); await expect(p.locator('.lv-caption-window')).toBeVisible();
-    await expect(p.getByRole('region', { name: 'メディア', exact: true }).locator('img').first()).toBeVisible();
+    await expect(p.locator('.lv-caption-window img').first()).toBeVisible();
+    await expect(p.getByRole('region', { name: 'メディア', exact: true }).locator('img')).toHaveCount(0);
     if (await menu.evaluate(n => (n as HTMLDetailsElement).open)) await menu.locator(':scope > summary').click();
     await p.screenshot({ path: info.outputPath('view-caption.png'), fullPage: false });
     await revealWorkPanel(p); await tab('モデル').click(); const models = p.getByRole('tabpanel', { name: 'モデル', exact: true }); await models.locator('.lv-model-select').click();

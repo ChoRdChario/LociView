@@ -67,7 +67,7 @@ export function createCameraGizmo(document: Document, onAxis: (axis: AxisAction)
   fit.addEventListener('click', () => { if (!disposed && !blocked) onFit(); }); root.append(fit);
   help(fit, '表示中のモデル全体に視点を合わせます。');
   const pan=document.createElement('button'),panIcon=document.createElement('span');pan.type='button';pan.className='lv-camera-pan';pan.setAttribute('aria-label','平行移動');panIcon.setAttribute('aria-hidden','true');pan.append(panIcon);root.append(pan);pan.hidden=!navigate;
-  help(pan,'左ドラッグで視点を平行移動します。矢印キーでも移動できます。');
+  help(pan,'ドラッグで視点を平行移動します。矢印キーでも移動できます。');
   const finish=(cancel=false)=>{
     const held=down;down=null;if(!held)return;if(cancel)moved=true;
     try{if(held.started)navigate?.({phase:'end',id:held.owner});}finally{if(held.capture.hasPointerCapture?.(held.id))held.capture.releasePointerCapture(held.id);}
