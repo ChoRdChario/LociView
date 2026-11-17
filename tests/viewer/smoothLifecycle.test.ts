@@ -51,7 +51,21 @@ describe('01g resource ownership and presented geometry',()=>{
   it('borrowed GS base stays charged after MRT disposal until the actual base owner releases it',async()=>{
     vi.stubGlobal('WebGL2RenderingContext',Gl);const renderer=new Renderer(),budget=createTargetBudget(),layout=targetLayout(8,8,1,budget.available,8192),base=new THREE.WebGLRenderTarget(8,8,{depthTexture:new THREE.DepthTexture(8,8,THREE.UnsignedIntType)}),source=new THREE.ShaderMaterial(),object=new THREE.Mesh(new THREE.PlaneGeometry(),source);let lease:TargetLease|undefined;
     const frame:GsFrame={object,sourceMaterial:source,baseTarget:base,get baseBytes(){return lease?.bytes??0;},claimBase(){lease??=budget.reserve(8*8*12);},withMaterial(material,draw){const old=object.material;try{object.material=material;draw();}finally{object.material=old;}},renderBase(){}};
-    const port=await createSmoothComposite(renderer as unknown as THREE.WebGLRenderer,budget,layout,frame);expect(budget.used).toBe(layout.bytes);expect(port.leaseBytes).toBe(8*8*24);port.dispose();expect(budget.used).toBe(8*8*12);base.dispose();lease!.release();expect(budget.used).toBe(0);source.dispose();object.geometry.dispose();
+    const scissor = new THREE.Vector4(1,2,5,4);
+    base.scissor.copy(scissor); base.scissorTest = true;
+    const probe = vi.spyOn(renderer,'render').mockImplementation(()=>{
+      expect(renderer.target?.scissor.toArray()).toEqual([0,0,1,1]);
+      expect(renderer.target?.scissorTest).toBe(true);
+      expect(renderer.target?.viewport.toArray()).toEqual([0,0,8,8]);
+    });
+    const port=await createSmoothComposite(renderer as unknown as THREE.WebGLRenderer,budget,layout,frame);
+    expect(probe).toHaveBeenCalledTimes(4);expect(base.scissor).toEqual(scissor);expect(base.scissorTest).toBe(true);
+    expect(budget.used).toBe(layout.bytes);expect(port.leaseBytes).toBe(8*8*24);port.dispose();expect(budget.used).toBe(8*8*12);
+    base.scissorTest=false;
+    probe.mockImplementationOnce(()=>{throw Error('probe failed');});
+    await expect(createSmoothComposite(renderer as unknown as THREE.WebGLRenderer,budget,layout,frame)).rejects.toThrow('probe failed');
+    expect(base.scissor).toEqual(scissor);expect(base.scissorTest).toBe(false);expect(renderer.target).toBe(null);
+    base.dispose();lease!.release();expect(budget.used).toBe(0);source.dispose();object.geometry.dispose();
   });
   it('cancellation before policy verification cannot allocate or charge a target',async()=>{
     const budget=createTargetBudget(),abort=new AbortController();abort.abort();await expect(createSmoothComposite({} as THREE.WebGLRenderer,budget,targetLayout(10,10,1,budget.available,8192),undefined,abort.signal)).rejects.toMatchObject({name:'AbortError'});expect(budget.used).toBe(0);

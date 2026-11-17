@@ -90,6 +90,7 @@ export async function createValidationBrowserWorkspace(document: Document, compo
       maxChunkBytes: 16 * 1024 * 1024, maxChunks: 100_000, metadata: validationMetadataLimits }, locks) };
   const storage = (id: string, create: boolean) => openStorage(`${validationArea}-${id}`, create);
   const workspace = createValidationWorkspace(document, { ...options,offline:composition.offline,smoothDisplay:!!composition.smoothDisplay,progressivePresentation:composition.progressivePresentation,initialFiles:composition.initialFiles,openLegacy:composition.openLegacy,mountEditor:composition.mountEditor,introduction:composition.introduction,lastProject: uiState.lastProject,
+    reviewTextureJpeg: rasterDecoders?.reviewTextureJpeg,
     storageEstimate: typeof navigator.storage?.estimate === 'function' ? () => navigator.storage.estimate() : undefined, localSettings: uiState.localSettings,
     list: (reading,onlyRun) => measureValidation(timing, 'catalog.total', () => listValidationProjects(options, storage, composition.progressivePresentation ? reading : undefined,onlyRun)),
     open: (id, initial, mode, workspaceFile, reviewEdit, firstBackup, standaloneWorkspace, reading) => measureValidation(timing, 'host.open.total', () => openValidationEntry({ ...options, run: id, initial, mode, workspaceFile, reviewEdit, firstBackup, standaloneWorkspace, reading, openStorage: create => storage(id, create) })),

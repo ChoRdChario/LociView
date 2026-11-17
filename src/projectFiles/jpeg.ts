@@ -11,6 +11,27 @@ export const browserJpegDecoder: JpegDecoder = async (bytes, use) => {
     imageOrientation: 'from-image', colorSpaceConversion: use === 'photo' ? 'default' : 'none', premultiplyAlpha: 'none',
   });
 };
+/** Review already admitted this model. Check a complete native frame without requesting RGBA pixels. */
+export const reviewTextureJpegDecoder: JpegDecoder = async (bytes, use) => {
+  if (use !== 'glb-texture' || typeof ImageDecoder === 'undefined' || !await ImageDecoder.isTypeSupported('image/jpeg'))
+    return browserJpegDecoder(bytes, use);
+
+  let decoder: ImageDecoder | undefined;
+  try {
+    decoder = new ImageDecoder({ type: 'image/jpeg', data: bytes, colorSpaceConversion: 'none' });
+    const { image, complete } = await decoder.decode({ frameIndex: 0, completeFramesOnly: true });
+    if (!complete) {
+      image.close();
+      return fileError('JPEGの画像を最後まで表示できません。', 'decode');
+    }
+    return { width: image.displayWidth, height: image.displayHeight, close: () => image.close() };
+  } catch (error) {
+    if (!(error instanceof DOMException && error.name === 'NotSupportedError')) throw error;
+  } finally {
+    decoder?.close();
+  }
+  return browserJpegDecoder(bytes, use);
+};
 export const isJpeg = (bytes: Uint8Array) => bytes[0] === 0xff && bytes[1] === 0xd8;
 const bad = (): never => fileError('JPEGの内容が不正か、未対応の形式です。');
 

@@ -6093,9 +6093,17 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       const backupFile = await host.workspaceOutput.download(job.id), backup = await BackupArchive.inspect(backupFile, metadata); expect(job.label).toBe('写真を含む保存'); expect(backup.source.originalChanges()).toEqual(source.originalChanges());
       const workspace = await host.workspaceOutput.download(await host.workspaceOutput.generate(source.token)), peer = firstWorkspaceRecipient(decodeJpeg, decodePhoto);
       expect((await peer.receiver.importWorkspace(workspace)).state).toBe('ready'); expect((await peer.session.read()).source!.originalChanges()).toEqual(source.originalChanges());
-      const review = await prepareReviewView(await host.workspaceOutput.download(await host.workspaceOutput.generateReview(source.token, { sceneId: h.display()!.sceneId })), budget, decode, decodeJpeg, decodePhoto);
+      const returningTexture = vi.fn(decodeJpeg);
+      const review = await prepareReviewView(await host.workspaceOutput.download(await host.workspaceOutput.generateReview(source.token, { sceneId: h.display()!.sceneId })), budget, decode, decodeJpeg, decodePhoto, undefined, undefined, undefined, returningTexture);
       expect(review.images.size).toBe(3); expect([...review.images.values()].every(blob => blob.type === photoMime(photo))).toBe(true); expect(review.attachments).toHaveLength(3);
       expect(review.models.every(model => (model.representation.formatProfile as JsonObject).id === 'development-validation-glb-occurrence-jpeg-1')).toBe(true);
+      if (format === 'jpeg') {
+        const model = review.models[0]!.representation;
+        await review.content.modelContent(model);
+        expect(returningTexture).not.toHaveBeenCalled();
+        await review.content.modelContent(model);
+        expect(returningTexture).toHaveBeenCalledWith(expect.any(Uint8Array), 'glb-texture');
+      }
       expect((await peer.fs.list('')).some(p => /conversion|validation-origin/.test(p))).toBe(false);
       for (const archive of [backup.archive, (await WorkspaceArchive.inspect(workspace, metadata)).archive, review.inspection.archive]) expect(archive.control.entries.some(e => /conversion|source\.zip|^ops\//i.test(e.path))).toBe(false);
       expect(await file.arrayBuffer()).toEqual(original); expect(host.authority.read().mediaChoices).toHaveLength(3);

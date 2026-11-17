@@ -35,8 +35,19 @@ vi.mock('three', async importOriginal => {
     disposed = false; scene: any; camera: any; frames = 0;
     capabilities = { maxTextureSize: 8192 };
     getContext(){return{MAX_RENDERBUFFER_SIZE:1,getParameter:()=>8192};}
-    constructor() { if (tracker.fail) throw new Error('synthetic WebGL refusal'); tracker.renderers.push(this); }
-    setPixelRatio() {} setSize() {} setDrawingBufferSize() {}
+    width: number; height: number; ratio = 1; bufferResizes = 0;
+    constructor(private options: { canvas: HTMLCanvasElement }) {
+      if (tracker.fail) throw new Error('synthetic WebGL refusal');
+      this.width = options.canvas.width; this.height = options.canvas.height; tracker.renderers.push(this);
+    }
+    getSize(out: THREE.Vector2) { return out.set(this.width, this.height); }
+    getPixelRatio() { return this.ratio; }
+    setViewport() {}
+    setDrawingBufferSize(w: number, h: number, ratio: number) {
+      this.bufferResizes++;
+      this.width = w; this.height = h; this.ratio = ratio;
+      this.options.canvas.width = Math.floor(w * ratio); this.options.canvas.height = Math.floor(h * ratio);
+    }
     render(scene: any, camera: any) { this.scene = scene; this.camera = camera; scene.updateMatrixWorld(true); this.frames++; }
     dispose() { this.disposed = true; }
   } };
@@ -262,7 +273,11 @@ describe('synthetic Scene display; GPU mocked, not rendered/browser acceptance',
     v.update(display);v.setActive(true);canvas.show();const measure=vi.spyOn(canvas.canvas as unknown as HTMLCanvasElement,'getBoundingClientRect'),renderer=tracker.renderers[0],pose=v.read().token;
     for(let i=0;i<20;i++)v.setActive(true);expect(measure).not.toHaveBeenCalled();expect(tracker.renderers).toHaveLength(1);expect(v.read().token).toBe(pose);
     canvas.show(900,650);expect(measure).toHaveBeenCalledOnce();expect(v.read().ready).toBe(true);measure.mockClear();vi.stubGlobal('devicePixelRatio',2);const[id,tick]=[...tracker.raf][0]!;tracker.raf.delete(id);tick();expect(measure).toHaveBeenCalled();
-    v.setActive(false);expect(renderer.disposed).toBe(true);measure.mockClear();v.setActive(true);expect(measure).toHaveBeenCalled();expect(tracker.renderers).toHaveLength(2);expect(v.read().ready).toBe(true);v.dispose();
+    expect([renderer.width,renderer.height]).toEqual([1800,1300]);
+    v.setActive(false);expect(renderer.disposed).toBe(true);measure.mockClear();v.setActive(true);expect(measure).toHaveBeenCalled();expect(tracker.renderers).toHaveLength(2);expect(v.read().ready).toBe(true);
+    expect(tracker.renderers[1].bufferResizes).toBe(0);
+    canvas.show(650,900);expect(tracker.renderers[1].bufferResizes).toBe(1);
+    expect([tracker.renderers[1].width,tracker.renderers[1].height]).toEqual([1300,1800]);v.dispose();
   });
   it('draws after changes, keeps idle frames quiet, and retains hover/reentrant invalidation without UI edits', () => {
     const canvas = fakeCanvas(), changed = vi.fn();

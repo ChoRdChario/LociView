@@ -50,6 +50,12 @@ function allocateSmoothComposite(renderer:THREE.WebGLRenderer,budget:TargetBudge
       finally{renderer.debug.checkShaderErrors=check;renderer.debug.onShaderError=onError;renderer.setRenderTarget(target,cube,mip);renderer.setClearColor(color,alpha);renderer.autoClear=auto;}
     };
     const bind=(target:THREE.WebGLRenderTarget)=>{renderer.setRenderTarget(target);if(gl.checkFramebufferStatus(gl.FRAMEBUFFER)!==gl.FRAMEBUFFER_COMPLETE)throw Error('透過表示の領域を準備できません。');};
+    const restrictToProbePixel = (target: THREE.WebGLRenderTarget) => {
+      const scissor = target.scissor.clone(), enabled = target.scissorTest;
+      target.scissor.set(0, 0, 1, 1);
+      target.scissorTest = true;
+      return () => { target.scissor.copy(scissor); target.scissorTest = enabled; };
+    };
     let depthBits=0;
     // Exercise the actual attachments, float blending beyond16F, and shared opaque depth.
     withState(()=>{
@@ -58,12 +64,13 @@ function allocateSmoothComposite(renderer:THREE.WebGLRenderer,budget:TargetBudge
         vertexShader:'void main(){gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',
         fragmentShader:'layout(location=0) out vec4 color;layout(location=1) out vec4 optical;void main(){color=vec4(70000.,0.,0.,1.);optical=vec4(.25,1.,0.,0.);}'});
       configureAccumulation(probe);probe.depthTest=false;const mesh=new THREE.Mesh<THREE.PlaneGeometry,THREE.Material>(meshGeometry,opaque);mesh.position.z=1;scene.add(mesh);
+      const restoreBase = restrictToProbePixel(base!), restoreMrt = restrictToProbePixel(mrt!);
       try{bind(base!);renderer.setClearColor(0,0);renderer.clear(true,true,false);renderer.render(scene,camera);depthBits=gl.getParameter(gl.DEPTH_BITS) as number;
         mesh.material=probe;mesh.position.z=0;bind(mrt!);renderer.setClearColor(0,0);renderer.clear(true,false,false);renderer.render(scene,camera);renderer.render(scene,camera);
         const pixel=new Float32Array(4);gl.readBuffer(gl.COLOR_ATTACHMENT0);gl.readPixels(0,0,1,1,gl.RGBA,gl.FLOAT,pixel);if(Math.abs(pixel[0]!-140000)>1||pixel[3]!==2)throw Error('透過表示の色の精度を確認できません。');
         gl.readBuffer(gl.COLOR_ATTACHMENT1);gl.readPixels(0,0,1,1,gl.RGBA,gl.FLOAT,pixel);gl.readBuffer(gl.COLOR_ATTACHMENT0);if(pixel[0]!==.5||pixel[1]!==2)throw Error('透過表示の重なりを確認できません。');
         probe.depthTest=true;renderer.clear(true,false,false);renderer.render(scene,camera);gl.readPixels(0,0,1,1,gl.RGBA,gl.FLOAT,pixel);if(pixel.some(v=>v!==0))throw Error('透過表示の前後関係を確認できません。');
-      }finally{gl.readBuffer(gl.COLOR_ATTACHMENT0);meshGeometry.dispose();opaque.dispose();probe.dispose();}
+      }finally{restoreBase();restoreMrt();gl.readBuffer(gl.COLOR_ATTACHMENT0);meshGeometry.dispose();opaque.dispose();probe.dispose();}
     });
     const skip=new THREE.MeshBasicMaterial({visible:false});materials.set(skip,skip);
     const gsVariant=(frame:GsFrame)=>{let material=materials.get(frame.sourceMaterial) as THREE.ShaderMaterial|undefined;if(!material){material=frame.sourceMaterial.clone();material.uniforms=frame.sourceMaterial.uniforms;configureAccumulation(material);

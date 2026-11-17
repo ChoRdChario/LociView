@@ -37,7 +37,7 @@ const captionColor = (caption: JsonObject) => caption.colorSrgb === undefined ? 
 
 /** Inspected read-only file content. No storage, history, synthetic Project or commands. */
 export async function prepareReviewView(file: Blob | PackageArchive | ReviewArchive, budget: ProjectFilePolicyInput, decode?: PngDecoder, jpeg?: JpegDecoder, photo?: PhotoDecoder, mediaDecoders?:MediaDecoders, selectedScene?: string,
-  onText?: (reading: ReviewSceneText) => void) {
+  onText?: (reading: ReviewSceneText) => void, reviewTextureJpeg: JpegDecoder | undefined = jpeg) {
   const policy=projectFilePolicy(budget), limits=policy.nonGs;
   const inspection = file instanceof ReviewArchive ? file : file instanceof Blob ? await ReviewArchive.inspect(file, validationMetadataLimits) :
     await ReviewArchive.fromSelectedArchive(file, validationMetadataLimits);
@@ -79,6 +79,7 @@ export async function prepareReviewView(file: Blob | PackageArchive | ReviewArch
       assetToProject: asset.assetToProject as unknown as ReadonlyRenderModel['assetToProject'], representation: record as ReadonlyRenderModel['representation'],...(proxies[0]?{proxy:proxies[0] as NonNullable<ReadonlyRenderModel['proxy']>}: {}) });
     }
   }
+  const admittedGlbs = new Set(preparedGlbs.keys());
   const mediaRecords = table(snapshot, 'mediaResourcesById');
   const verifyMedia = async (record: JsonObject) => {
     const blob = object(record.blob); if (!projectMediaKind(blob.mediaType)||record.mediaKind!==projectMediaKind(blob.mediaType)) throw Error('このメディアの表示形式は未対応です。');
@@ -158,7 +159,7 @@ export async function prepareReviewView(file: Blob | PackageArchive | ReviewArch
         if (file.size !== ref.byteLength) throw Error('モデルの原本が一致しません。');
         const bytes = await readValidationBody(file, limits.maxFileBytes);
         if (await hashOwnedBytes(bytes) !== ref.digest) throw Error('モデルの原本が一致しません。');
-        return inspectDeclaredValidationModel(expected, bytes, policy, decode, jpeg, 'review');
+        return inspectDeclaredValidationModel(expected, bytes, policy, decode, admittedGlbs.has(string(record.id)) ? reviewTextureJpeg : jpeg, 'review');
       }
       const proof = await sourceStreamProof(file);
       if (proof.digest !== ref.digest || proof.byteLength !== ref.byteLength) throw Error('モデルの原本が一致しません。');

@@ -56,6 +56,7 @@ export type MountedEditorFactory=(host:Host,factory:ViewportFactory,tools:Return
 export interface ValidationWorkspacePorts {
   offline?:DesktopOfflinePort;
   fileLimits: FileValidationLimits; filePolicy?: ProjectFilePolicy; decode?: PngDecoder; jpeg?: JpegDecoder; photo?: PhotoDecoder; mediaDecoders?:MediaDecoders;
+  reviewTextureJpeg?: JpegDecoder;
   mountEditor:MountedEditorFactory;
   progressivePresentation?:boolean;
   smoothDisplay?:boolean;
@@ -996,7 +997,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
               readingSlot.append(opening.reading.root);
               opening.reading.restoreScroll(textPositions.get(scene)?.scrollTop ?? memory?.listScrollTop ?? 0);
               status.textContent = readingStatus;
-            });
+            }, ports.reviewTextureJpeg);
             try {
               if (guardSelection(attempt, expected)) await showScene(next, attempt, expected, opening.reading, readingSelection);
             } finally { if (reviewOpening === opening || disposed) next.releaseDisplayData(); }

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { inspectValidationJpeg, jpegStructure, browserJpegDecoder } from '../src/projectFiles/jpeg';
+import { inspectValidationJpeg, jpegStructure, browserJpegDecoder, reviewTextureJpegDecoder } from '../src/projectFiles/jpeg';
 import { digest } from '../src/projectMetadata/persistence';
 import { jpegBytes, jpegFixtures } from './helpers/jpegFixtures';
 import { mediaDisplayDimensions } from '../src/projectFiles/media';
@@ -117,6 +117,52 @@ describe('bounded JPEG admission', () => {
       expect(create.mock.calls[0]?.[1]).toEqual({ imageOrientation: 'from-image', colorSpaceConversion: 'default', premultiplyAlpha: 'none' });
       await browserJpegDecoder(jpegBytes('rgb-baseline'), 'glb-texture');
       expect(create.mock.calls[1]?.[1]).toEqual({ imageOrientation: 'from-image', colorSpaceConversion: 'none', premultiplyAlpha: 'none' });
+    } finally { vi.unstubAllGlobals(); }
+  });
+  it('checks the complete original-sized review frame and releases it on success or failure', async () => {
+    const bytes = jpegBytes('rgb-baseline'), frameClose = vi.fn(), decoderClose = vi.fn();
+    const frame = { displayWidth: 8, displayHeight: 4, close: frameClose };
+    const decode = vi.fn(async (_options: ImageDecodeOptions) => ({ image: frame, complete: true }));
+    const construct = vi.fn(), fallback = vi.fn();
+    vi.stubGlobal('createImageBitmap', fallback);
+    vi.stubGlobal('ImageDecoder', class {
+      static isTypeSupported = async () => true;
+      constructor(options: ImageDecoderInit) { construct(options); }
+      close = decoderClose;
+      decode = decode;
+    });
+    const inspect = () => inspectValidationJpeg(bytes, limits, 'glb-texture', reviewTextureJpegDecoder);
+    try {
+      await expect(inspect()).resolves.toMatchObject({ width: 8, height: 4 });
+      expect(construct).toHaveBeenCalledWith({ type: 'image/jpeg', data: bytes, colorSpaceConversion: 'none' });
+      expect(decode).toHaveBeenCalledWith({ frameIndex: 0, completeFramesOnly: true });
+      decode.mockResolvedValueOnce({ image: frame, complete: false });
+      await expect(inspect()).rejects.toThrow();
+      frame.displayWidth = 4;
+      await expect(inspect()).rejects.toThrow();
+      decode.mockRejectedValueOnce(new DOMException('broken JPEG', 'EncodingError'));
+      await expect(inspect()).rejects.toThrow();
+      expect(fallback).not.toHaveBeenCalled();
+      expect(frameClose).toHaveBeenCalledTimes(3);
+      expect(decoderClose).toHaveBeenCalledTimes(4);
+    } finally { vi.unstubAllGlobals(); }
+  });
+  it('keeps the original JPEG bitmap path when frame decoding is unavailable', async () => {
+    const bytes = jpegBytes('rgb-baseline'), bitmapClose = vi.fn(), decoderClose = vi.fn();
+    const fallback = vi.fn(async () => ({ width: 8, height: 4, close: bitmapClose }));
+    vi.stubGlobal('createImageBitmap', fallback);
+    try {
+      for (const codec of [undefined, class { static isTypeSupported = async () => false; }, class {
+        static isTypeSupported = async () => true;
+        decode = async () => { throw new DOMException('unavailable', 'NotSupportedError'); };
+        close = decoderClose;
+      }]) {
+        vi.stubGlobal('ImageDecoder', codec);
+        await inspectValidationJpeg(bytes, limits, 'glb-texture', reviewTextureJpegDecoder);
+      }
+      expect(fallback).toHaveBeenCalledTimes(3);
+      expect(bitmapClose).toHaveBeenCalledTimes(3);
+      expect(decoderClose).toHaveBeenCalledOnce();
     } finally { vi.unstubAllGlobals(); }
   });
 });

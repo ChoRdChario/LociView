@@ -87,6 +87,15 @@ export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: 
     return handled && active && !disposed && display===frame.display && frameGeneration===frame.generation && serial===beforeSerial && semanticRevision===beforeSemantic;
   }
   let width = 1, height = 1, rawPixelRatio = 0; let pointDiameterNotice: string | null = null; const pointDiameters = new Map<string, number>();
+  function sizeDrawingBuffer(w: number, h: number) {
+    if (!renderer) return;
+    // Reassigning even identical canvas dimensions clears and reallocates the drawing buffer.
+    if (canvas.width === w && canvas.height === h && renderer.getPixelRatio() === 1) {
+      const size = renderer.getSize(new THREE.Vector2());
+      if (size.x === w && size.y === h) { renderer.setViewport(0, 0, w, h); return; }
+    }
+    renderer.setDrawingBufferSize(w, h, 1);
+  }
   let pickEpoch = 0;
   let coverageProbe: ReturnType<typeof createValidationCoverage> | null = null, coverageIssue: string | null = null;
   let gsRender:GsRenderPort|null=null,gsGeneration=0,gsPreparing=false,gsIssue:string|null=null,gsPreparationAbort:AbortController|null=null;
@@ -335,12 +344,12 @@ export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: 
   function syncSmoothLayout(meshes:readonly SmoothMesh[]){
     if(!renderer||!presentation)return;
     if(!meshes.length||smoothIssue){const hadLayout=!!smoothLayout;smoothPresented=false;if(!meshes.length)clearSmooth();else{composite?.dispose();composite=null;smoothLayout=null;delete canvas.dataset.compositionBytes;delete canvas.dataset.renderScale;}
-      if(hadLayout){const ratio=Math.min(rawPixelRatio||1,2);renderer.setDrawingBufferSize(Math.max(1,Math.floor(width*ratio+.5)),Math.max(1,Math.floor(height*ratio+.5)),1);configurePoints();pickEpoch++;}return;}
+      if(hadLayout){const ratio=Math.min(rawPixelRatio||1,2);sizeDrawingBuffer(Math.max(1,Math.floor(width*ratio+.5)),Math.max(1,Math.floor(height*ratio+.5)));configurePoints();pickEpoch++;}return;}
     if(smoothLayout&&smoothLayout.cssWidth===width&&smoothLayout.cssHeight===height&&smoothLayout.devicePixelRatio===rawPixelRatio)return;
     try{const gl=renderer.getContext(),available=presentation.budget.available+(composite?.leaseBytes??0)+(gsRender?.targetBytes??0);
       const next=presentation.plan(width,height,rawPixelRatio,available,Math.min(renderer.capabilities.maxTextureSize,gl.getParameter(gl.MAX_RENDERBUFFER_SIZE) as number));
       if(smoothLayout)clearSmooth();
-      smoothLayout=next;renderer.setDrawingBufferSize(next.width,next.height,1);configurePoints();coverageProbe?.dispose();coverageProbe=null;pickEpoch++;serial++;
+      smoothLayout=next;sizeDrawingBuffer(next.width,next.height);configurePoints();coverageProbe?.dispose();coverageProbe=null;pickEpoch++;serial++;
     }catch(error){smoothIssue=errorText(error);waitingBudget=true;refusedAvailable=presentation.budget.available;serial++;notify();}
   }
   function drawSmooth(meshes:readonly SmoothMesh[],before:()=>void,frame?:GsFrame){
@@ -436,7 +445,6 @@ export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: 
         if (presentation && saved.rasterResources) rendererTarget = saved.rasterResources.reserve({ cpuBytes: 0,
           gpuBytes: presentation.budget.available + presentation.budget.used + 1 }, '透過表示の資源');
         renderer = new THREE.WebGLRenderer({ canvas, antialias: true }); renderer.outputColorSpace = THREE.SRGBColorSpace;renderer.toneMapping=THREE.NoToneMapping;
-        renderer.setPixelRatio(Math.min(globalThis.devicePixelRatio || 1, 2));
         if (entryPending) enterScene();
         else { pose = poses.get(display.sceneId) ?? pose; background = backgrounds.get(display.sceneId) ?? background; }
         installPose(); buildModels(); previewModels();
@@ -444,7 +452,7 @@ export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: 
       if (resized || !raf) {
         const ratio = Math.min(globalThis.devicePixelRatio || 1, 2);
         if(presentation)syncSmoothLayout(smoothMeshes());
-        if(!smoothLayout)renderer.setDrawingBufferSize(Math.max(1, Math.floor(width * ratio + .5)), Math.max(1, Math.floor(height * ratio + .5)), 1);
+        if(!smoothLayout)sizeDrawingBuffer(Math.max(1, Math.floor(width * ratio + .5)), Math.max(1, Math.floor(height * ratio + .5)));
         configurePoints();
         if (camera instanceof THREE.PerspectiveCamera) camera.aspect = width / height;
         else if (camera) { const half = (camera.top - camera.bottom) / 2; camera.left = -half * width / height; camera.right = half * width / height; }

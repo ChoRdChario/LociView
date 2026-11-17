@@ -1,7 +1,7 @@
 import { pngDimensions } from '../viewer/rasterDimensions';
 import { rasterBytes, type RasterResources } from '../viewer/rasterResources';
 import { browserPngDecoder, type PngDecoder, type DecodedPng } from './png';
-import { browserJpegDecoder, jpegStructure, type JpegDecoder } from './jpeg';
+import { browserJpegDecoder, jpegStructure, reviewTextureJpegDecoder, type JpegDecoder } from './jpeg';
 import { fileError, type FileValidationLimits } from './validation';
 import { browserPhotoDecoder, photoStructure, type PhotoDecoder } from './photo';
 import { browserHeicDecoder, type HeicDecoder, type MediaDecoders } from './media';
@@ -21,8 +21,8 @@ export function createRasterDecoders(limits: FileValidationLimits, resources: Ra
     const shape = pngDimensions(bytes); if (!shape) return fileError('PNGの大きさを確認してください。');
     return decode(bytes, shape.width, shape.height, () => browserPngDecoder(bytes));
   }, { rasterResources: resources });
-  const jpeg: JpegDecoder = async (bytes, use) => {
-    const shape = jpegStructure(bytes, limits, use); return decode(bytes, shape.width, shape.height, () => browserJpegDecoder(bytes, use));
+  const budgetJpeg = (native: JpegDecoder): JpegDecoder => async (bytes, use) => {
+    const shape = jpegStructure(bytes, limits, use); return decode(bytes, shape.width, shape.height, () => native(bytes, use));
   };
   const photo:PhotoDecoder=async(bytes,mime)=>{const shape=photoStructure(bytes,limits);return decode(bytes,shape.width,shape.height,()=>browserPhotoDecoder(bytes,mime));};
   const heic:HeicDecoder=async bytes=>{const shape=heicStructure(bytes,limits,resources);return decode(bytes,shape.width,shape.height,()=>browserHeicDecoder(bytes),true);};
@@ -31,5 +31,5 @@ export function createRasterDecoders(limits: FileValidationLimits, resources: Ra
     try{return await browserHeicRasterEncoder(bitmap,signal,true);}finally{lease.release();}
   },()=>{},signal);
   const media:MediaDecoders={heic,raster:encode};
-  return { png, jpeg, photo, media };
+  return { png, jpeg: budgetJpeg(browserJpegDecoder), reviewTextureJpeg: budgetJpeg(reviewTextureJpegDecoder), photo, media };
 }
