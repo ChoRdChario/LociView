@@ -8233,7 +8233,16 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
         if (path === `blobs/sha256/${ref.digest}`) return new Blob([new Uint8Array(Number(ref.byteLength))]);
         return read.call(this, path);
       });
-      try { await expect(failed.content.modelContent(record)).rejects.toThrow('原本が一致'); }
+      try {
+        await expect(failed.content.modelContent(record)).rejects.toThrow('原本が一致');
+        await expect(failed.content.modelContent(record)).rejects.toThrow('原本が一致');
+        const oversized = new Blob([new Uint8Array(Number(ref.byteLength) + 1)]);
+        const stream = vi.spyOn(oversized, 'stream');
+        fault.mockReturnValueOnce(oversized);
+        await expect(failed.content.modelContent(record)).rejects.toThrow('原本が一致');
+        expect(stream).not.toHaveBeenCalled();
+        expect(inspect).toHaveBeenCalledTimes(5);
+      }
       finally { fault.mockRestore(); }
       // A failed proof consumes the handoff; retry performs the complete inspection.
       await failed.content.modelContent(record);
@@ -12316,6 +12325,28 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const ref = prepared.blobs[0]!.ref, receipt = JSON.parse((await fs.readText(`v2/cas/sha256/${ref.digest.slice(0, 2)}/${ref.digest.slice(2)}.json`))!);
     const body = prepared.blobs[0]!.bytes.slice(); body[body.length - 1] = body[body.length - 1]! ^ 1; await fs.writeBytes(`v2/cas/objects/${receipt.objectId}.bin`, body);
     await expect(cold.content.model(rep)).rejects.toThrow(); expect((await cold.session.read()).state).toBe('repair-required'); otherLease.release();
+  });
+  it.each(['abort', 'digest failure', 'mismatch'] as const)('retires the old GLB textures before display when the second input check ends with %s', async failure => {
+    const source = await inspectValidationGlb(glb(undefined, true), budget, decode);
+    const controller = new AbortController(), close = vi.fn();
+    vi.stubGlobal('self', globalThis);
+    const bitmap = vi.fn(async () => ({ width: 64, height: 48, close }));
+    vi.stubGlobal('createImageBitmap', bitmap);
+    const actualDigest = crypto.subtle.digest.bind(crypto.subtle);
+    const hash = vi.spyOn(crypto.subtle, 'digest').mockImplementationOnce(actualDigest)
+      .mockImplementationOnce(async (...args) => {
+        expect(bitmap).toHaveBeenCalledOnce();
+        if (failure === 'abort') controller.abort();
+        if (failure === 'digest failure') throw Error('digest failed');
+        if (failure === 'mismatch') return new ArrayBuffer(32);
+        return actualDigest(...args);
+      });
+    const pending = decodeValidationModel(source, controller.signal);
+    if (failure === 'abort') await expect(pending).rejects.toMatchObject({ name: 'AbortError' });
+    else await expect(pending).rejects.toThrow(failure === 'digest failure' ? 'digest failed' : '変更されました');
+    expect(hash).toHaveBeenCalledTimes(2);
+    expect(bitmap).toHaveBeenCalledOnce();
+    expect(close).toHaveBeenCalledOnce();
   });
   it('keeps multi-node PNG/PBR/unlit/alpha source semantics and closes decoded bitmaps (injected raster, actual GLTF loader)', async () => {
     const bitmaps: { width: number; height: number; close: ReturnType<typeof vi.fn> }[] = [];

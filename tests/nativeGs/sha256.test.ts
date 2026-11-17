@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { digestNativeBytes, digestNativeStream, hashingNativeStream } from '../../src/nativeGs/sha256';
+import { describe, expect, it, vi } from 'vitest';
+import { digestNativeBytes, digestNativeStream, hashingNativeStream, hashOwnedBytes } from '../../src/nativeGs/sha256';
 
 function chunked(chunks: readonly string[]): ReadableStream<Uint8Array> {
   const encoder = new TextEncoder();
@@ -34,5 +34,14 @@ describe('native streaming SHA-256', () => {
     })).arrayBuffer();
     expect(new TextDecoder().decode(passed)).toBe('stream-verified');
     expect(completed).toEqual(digestNativeBytes(new TextEncoder().encode('stream-verified')));
+  });
+
+  it('hashes only the supplied buffer range with or without the browser digest', async () => {
+    const bytes = new TextEncoder().encode('[abc]').subarray(1, 4);
+    const expected = 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad';
+    expect(await hashOwnedBytes(bytes)).toBe(expected);
+    vi.stubGlobal('crypto', {});
+    try { expect(await hashOwnedBytes(bytes)).toBe(expected); }
+    finally { vi.unstubAllGlobals(); }
   });
 });

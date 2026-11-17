@@ -65,6 +65,19 @@ describe('bounded JPEG admission', () => {
     const entropyFill = new Uint8Array([...bytes.subarray(0, after), 0, ...Array(2000).fill(255), 0xd9]);
     expect(() => jpegStructure(entropyFill, { ...limits, maxValues: 1000 }, 'photo')).toThrow();
   });
+  it('charges long entropy runs up to the first refused byte and still checks the following marker', () => {
+    const original = jpegBytes('rgb-baseline');
+    const run = new Uint8Array(8192);
+    const encoded = new Uint8Array([...original.subarray(0, -2), ...run, 0xff, 0, ...run, 0xff, 0xd9]);
+    expect(jpegStructure(encoded, limits, 'glb-texture')).toMatchObject({ width: 8, height: 4 });
+    for (const maximum of [4096, 12000]) {
+      expect(() => jpegStructure(encoded, { ...limits, maxValues: maximum }, 'glb-texture')).toThrow(
+        expect.objectContaining({ reason: 'limit', limit: expect.objectContaining({ actual: maximum + 1, maximum }) }));
+    }
+    expect(() => jpegStructure(encoded.subarray(0, -2), limits, 'glb-texture')).toThrow();
+    encoded[encoded.length - 1] = 0xd0;
+    expect(() => jpegStructure(encoded, limits, 'glb-texture')).toThrow();
+  });
   it('accepts JFIF grayscale Adobe0 and ordered YCbCr Adobe1 while refusing contradictory transforms', () => {
     const insert = (bytes: Uint8Array, transform: number) => {
       const end = 4 + bytes[4]! * 256 + bytes[5]!;

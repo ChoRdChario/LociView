@@ -22,6 +22,7 @@ import { projectBounds, pointInProject, type ReadonlyDisplay, type V3 } from './
 import { readProjectCamera, readSolidBackground } from './viewDisplay';
 import { validationMaterialIssue, validationMaterialSlots, type ValidationMaterialEffects } from './validationMaterials';
 import { sourceStreamProof } from '../projectFiles/streamSource';
+import { hashOwnedBytes } from '../nativeGs/sha256';
 
 const table = (r: JsonObject, name: string) => object(r[name]) as Record<string, JsonObject>;
 const compare = (a: string, b: string) => a < b ? -1 : a > b ? 1 : 0;
@@ -152,7 +153,14 @@ export async function prepareReviewView(file: Blob | PackageArchive | ReviewArch
       if (!expected || !same(expected, record)) throw Error('モデルの表示本体を確認してください。'); if (body) return body;
       const prepared = preparedGlbs.get(string(record.id));
       preparedGlbs.delete(string(record.id));
-      const ref = object(record.blob), file = inspection.archive.entryBlob(`blobs/sha256/${string(ref.digest)}`), proof = await sourceStreamProof(file);
+      const ref = object(expected.blob), file = inspection.archive.entryBlob(`blobs/sha256/${string(ref.digest)}`);
+      if (!prepared && ref.mediaType === 'model/gltf-binary') {
+        if (file.size !== ref.byteLength) throw Error('モデルの原本が一致しません。');
+        const bytes = await readValidationBody(file, limits.maxFileBytes);
+        if (await hashOwnedBytes(bytes) !== ref.digest) throw Error('モデルの原本が一致しません。');
+        return inspectDeclaredValidationModel(expected, bytes, policy, decode, jpeg, 'review');
+      }
+      const proof = await sourceStreamProof(file);
       if (proof.digest !== ref.digest || proof.byteLength !== ref.byteLength) throw Error('モデルの原本が一致しません。');
       if (prepared) return { ...prepared, bytes: await readValidationBody(file, limits.maxFileBytes) };
       return inspectDeclaredValidationBlob(record, file, policy, decode, jpeg, 'review'); } } };

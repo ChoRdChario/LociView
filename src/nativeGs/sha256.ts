@@ -132,6 +132,14 @@ export function digestNativeBytes(bytes: Uint8Array): NativeStreamDigest {
   return { byteLength: bytes.byteLength, sha256: hash.digestHex() };
 }
 
+/** Only for callers already holding the complete bounded input. Do not buffer a stream for this. */
+export async function hashOwnedBytes(bytes: Uint8Array<ArrayBuffer>): Promise<string> {
+  const subtle = globalThis.crypto?.subtle;
+  if (!subtle) return digestNativeBytes(bytes).sha256;
+  const digest = new Uint8Array(await subtle.digest('SHA-256', bytes));
+  return Array.from(digest, byte => byte.toString(16).padStart(2, '0')).join('');
+}
+
 export async function digestNativeStream(
   stream: ReadableStream<Uint8Array>,
   signal?: AbortSignal,

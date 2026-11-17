@@ -306,6 +306,16 @@ captureを再度丸ごとsliceしない。180側の証明・解放、186側の�
 表示owner終了時の解放は維持する。別owner・非表示期間へdecode結果を保持するcacheではない。
 これはSafariのRAM上限やiPhone合格の追加ではない。
 
+写真から戻る際も、同じ私有GLBを180側へ渡せる。通常GLBでは省いた複製の代わりに
+ブラウザ標準SHA-256を一回ずつ使って、同じ入力の読込前後を照合できる。画像と3Dの排他、
+再表示ごとの原本検査、180の前後のdigest照合・解放、186の照合を維持する。
+JPEGの圧縮データは、markerのない区間をまとめて数えてよい。検査予算を超える
+最初のbyteで停止し、marker、詰め物、restart、各scanの検査と実decodeを維持する。
+閲覧用シーンのGLB再要求では元Blobを上限内で一度読み切り、その専有bytesの
+長さ・全量SHAを照合してから同じbytesを完全検査に渡す。初回の事実引継ぎと
+GSのstream経路は従来通り。共用するのは既存SHAモジュールの専有バッファ計算だけとする。
+同一写真・視点で3D復帰から実入力の反映までをPC／compactで確認する。
+
 MediaPreviewResourcesをworkspaceに1個置く。keyはProject/resource scopeとimmutable
 表示Blobのalgorithm/digest/byteLength/MIME。HEICはportableDisplay側を含める。attachment IDや
 毎renderのload closure identityだけをkeyにしない。同じ写真の多窓は共有し、本文・説明・

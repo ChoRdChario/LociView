@@ -146,8 +146,16 @@ export function jpegStructure(bytes: Uint8Array, limits: FileValidationLimits, u
     if (count > 1 && blocks > 10) return bad();
     scans++; let entropy = 0, restart = 0;
     while (at < bytes.length) {
-      charge(); if (bytes[at++] !== 0xff) { entropy++; continue; }
-      const markerAt = at - 1; let fill = false;
+      // Most bytes are entropy. Search only as far as the first byte the budget would reject.
+      const remaining = maximumWork - work;
+      const scanBytes = remaining >= bytes.length - at ? bytes : bytes.subarray(0, at + remaining + 1);
+      const next = scanBytes.indexOf(0xff, at);
+      const markerAt = next < 0 ? scanBytes.length : next;
+      const plain = markerAt - at;
+      charge(plain); entropy += plain; at = markerAt;
+      if (at === bytes.length) break;
+      charge(); at++;
+      let fill = false;
       while (bytes[at] === 0xff) { charge(); at++; fill = true; }
       const code = bytes[at]; if (code === undefined) return bad();
       if (code === 0) { if (fill) return bad(); at++; entropy++; continue; }

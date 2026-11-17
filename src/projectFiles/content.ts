@@ -30,7 +30,7 @@ import type { JpegDecoder } from './jpeg';
 import { fileError, fileObject, validationGlbProfile, occurrenceGlbProfile, jpegGlbProfile, occurrenceJpegGlbProfile, validationMetadataLimits, projectFilePolicy, type FileValidationLimits, type ProjectFilePolicy, type ProjectFilePolicyInput } from './validation';
 import { identityPlacement, prepareValidationModel, prepareValidationMedia, sealValidationRecord, validationFileLabel, type ValidationFile, type ValidationModelFile, type GsModelPreparation } from './initialProject';
 
-export async function readValidationBody(file: WorkspaceReadableFile, maxBytes: number): Promise<Uint8Array> {
+export async function readValidationBody(file: WorkspaceReadableFile, maxBytes: number): Promise<Uint8Array<ArrayBuffer>> {
   if (!Number.isSafeInteger(file.size) || file.size <= 0 || file.size > maxBytes) return fileError('保存した本体が検査の上限を超えています。');
   const bytes = new Uint8Array(file.size), reader = file.stream().getReader(); let offset = 0;
   try {
