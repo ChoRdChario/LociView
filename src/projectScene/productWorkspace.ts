@@ -231,6 +231,7 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
           dragging: seen.dragging || !!seen.manipulating,navigating:seen.navigating,camera:seen.camera,cameraReady:cameraAvailable,retryAvailable:seen.retryAvailable, pins: available ? seen.pins.filter(p => pins.has(p.id) && Number.isFinite(p.x) && Number.isFinite(p.y)).map(p => {
             const source = pins.get(p.id)!; return { ...p, scale: source.scale ?? 1, color: source.color, status: source.status, notice: source.notice };
           }) : [], issue: seen.issue, notice: seen.notice ?? null, placementNotice: seen.placementNotice, loading: seen.loading,
+          drawingNotice: current && !seen.issue ? seen.drawingNotice : null,
           assetIds: available ? seen.display!.models.map(m => m.binding.assetId) : [],
           view: cameraAvailable && !seen.dragging && !seen.manipulating ? { kind: 'ready' as const, token: seen.token, sceneId: state!.sceneId, projectFrameId: read().resources.projectFrameId,
             projection: seen.projection, axis: seen.axis, bounds: { kind: 'value' as const, value: seen.display!.bounds ? 'available' as const : 'empty' as const } } :

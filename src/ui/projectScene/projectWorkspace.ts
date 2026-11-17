@@ -745,7 +745,8 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   models = createProjectModels(document, panelHost); panels.set('models', models);
   pinScale = createProjectPinScale(document,panelHost); panels.set('captions',pinScale);
   recordTools.append(pinScale.root); registerRecordSheet(pinScale.root,pinScale.body);
-  const views=createProjectViews(document,panelHost), materials=createProjectMaterials(document,panelHost);panels.set('views',views);panels.set('materials',materials);
+  const drawingNotice = make('p'); drawingNotice.className = 'lv-drawing-notice';
+  const views=createProjectViews(document,panelHost), materials=createProjectMaterials(document,panelHost,drawingNotice);panels.set('views',views);panels.set('materials',materials);
   const cameraPositions=make('details'),cameraSheet=make('div');cameraPositions.className='lv-camera-positions';cameraPositions.setAttribute('aria-label','カメラ位置');
   const cameraHeader=make('div'),closeCamera=button('閉じる',()=>{if(!viewBlocked()&&!views.composing()){cameraPositions.open=false;render();(cameraPositions.children[0] as HTMLElement).focus?.({preventScroll:true});}});cameraHeader.className='lv-camera-sheet-header';cameraHeader.append(make('strong','カメラ位置'),closeCamera);
   cameraSheet.className='lv-camera-sheet';cameraSheet.append(cameraHeader,views.root);cameraPositions.append(make('summary','カメラ位置'),cameraSheet);stageDisplay.append(cameraPositions);
@@ -1331,6 +1332,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       canvas.setAttribute('aria-busy', viewportStatus.dataset.busy);
       viewportStatus.textContent = [mediaWork.active ? '画像のため3Dを休止しています。' : ports.presentation?.()?.reason, viewportFeedback, seen.issue, seen.notice, resolved?.kind !== 'ready' && 'シーンを選択し、表示状態を確認してください。'].filter(Boolean).join(' ');
       viewportStatus.hidden = !viewportStatus.textContent;
+      if (drawingNotice.textContent !== (seen.drawingNotice ?? '')) drawingNotice.textContent = seen.drawingNotice ?? '';
       retryViewport.hidden = !seen.issue && !viewportFeedback&&!seen.retryAvailable; retryViewport.disabled = viewBlocked();
       let camera: unknown=seen.camera; try { camera ??= viewport.capture().camera; } catch { /* Preparation has no camera yet. */ }
       const cameraState={ camera, axis: seen.view?.kind === 'ready' ? seen.view.axis : null, blocked: !(seen.cameraReady??seen.ready)||viewBlocked(),navigationBlocked:cameraNavigationBlocked()||!(seen.cameraReady??seen.ready),navigating:seen.navigating,navigationAvailable:!!viewport.navigateCamera };

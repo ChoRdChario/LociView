@@ -659,6 +659,12 @@ anchor the narrow-screen gizmo at the top while pin adjustment is open instead
 of lifting it by a guessed form height.
 This changes UI placement, not camera pose, renderer, pick or storage contracts.
 
+Successful approximation and automatic resolution adjustment are scene display
+information. Show them in the drawing panel, or beside the shared viewer's
+scene and start-view controls. Leave the stage to the model and record windows
+during normal viewing. Loading, unavailable surfaces and retry still use the
+stage status. The placement restriction stays beside the position operation.
+
 Raster rollback verification must isolate the target through the existing local
 model-visibility UI after the earlier two-model/reparent checks. Two identical
 coplanar test meshes can change the visible winner when materials are cloned;

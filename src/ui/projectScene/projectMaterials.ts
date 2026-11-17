@@ -5,7 +5,7 @@ import { materialPlanIsCurrent, materialView, newMaterialSelection, planMaterial
 import { newProjectId, panelNodes, sameProjectValue, type ProjectPanelHost, type ProjectMaterialPanel } from './projectPanel';
 import { fieldValue } from './projectRead';
 
-export function createProjectMaterials(document: Document, host: ProjectPanelHost): ProjectMaterialPanel {
+export function createProjectMaterials(document: Document, host: ProjectPanelHost, drawingNotice?: HTMLElement): ProjectMaterialPanel {
   const { make, button } = panelNodes(document), root = make('section'), review = make('section');
   root.className='lv-drawing-task';root.setAttribute('aria-label', '描画の作業'); review.setAttribute('aria-label', '材質の更新候補');
   const states = new Map<string, { selection: MaterialSelection; draft: MaterialDraft | null; followedModel?: string | null }>();
@@ -44,7 +44,7 @@ export function createProjectMaterials(document: Document, host: ProjectPanelHos
       const node=matchingReview().map(g=>reviewNodes.get(g.key)).find(Boolean);
       node?.focus?.({preventScroll:true});node?.scrollIntoView?.({block:'nearest'});
     }
-  },{direct:true});
+  },{direct:true, drawingNotice});
   function matchingReview() {
     const {provider,sceneId}=host.source(), target=state().selection.target;
     return host.ports.materials(sceneId).review.filter(g=>[g.overrideId,...g.owners.map(o=>o.id)].some(id=>{

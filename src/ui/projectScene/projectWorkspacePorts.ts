@@ -87,6 +87,7 @@ export interface WorkspaceViewport {
   reservePointer(active: boolean): void;
   read(): { token: string; sceneId: string; pickToken: string; ready: boolean; dragging: boolean; issue: string | null; notice: string | null;readonly loading?:boolean;readonly retryAvailable?:boolean;readonly camera?:CameraOrientation;readonly navigating?:boolean;readonly cameraReady?:boolean;
     readonly placementNotice?: string | null;
+    readonly drawingNotice?: string | null;
     pins: readonly { id: string; x: number; y: number; visible: boolean; scale?: number; color?: string; status?: 'normal' | 'needsReview'; notice?: string }[]; readonly assetIds?: readonly string[]; readonly view?: ViewRuntime };
   target(assetId: string): WorkspaceSurface | null;
   camera(action: 'fit' | 'front' | 'back' | 'left' | 'right' | 'top' | 'bottom'): void;

@@ -43,7 +43,8 @@ export function createModelCandidatePreview(document: Document, prepare: ModelCa
     if (disposed) return;
     const observation = runtime?.read(), ready = !!observation?.ready && observation.display === wanted;
     canvas.style.visibility = current() && ready && !loading && !failure ? 'visible' : 'hidden';
-    status.textContent = failure || (loading ? '候補を読み込んでいます。' : observation?.issue || observation?.notice || '');
+    status.textContent = failure || (loading ? '候補を読み込んでいます。' : observation?.issue ||
+      [observation?.drawingNotice, observation?.notice].filter(Boolean).join(' '));
     fit.disabled = front.disabled = !ready; retry.hidden = loading || !failure && !!runtime && !observation?.issue && !observation?.retryAvailable;
   };
   const start = async (display: ReadonlyDisplay) => {

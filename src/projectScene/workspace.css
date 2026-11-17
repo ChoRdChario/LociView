@@ -364,6 +364,9 @@
 .lv-review-scene-header { display: flex; align-items: center; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; }
 .lv-review-scene-header h2 { min-width: 0; margin: 0; overflow-wrap: anywhere; }
 .lv-review-scene-header > select { flex: 1; min-width: 0; max-width: 100%; }
+.lv-drawing-notice { margin: 0; color: var(--lv-muted); font-size: 13px; line-height: 1.4; overflow-wrap: anywhere; }
+.lv-drawing-notice:empty { display: none; }
+.lv-review-scene-header > .lv-drawing-notice { flex-basis: 100%; }
 .lv-review-opening { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; box-sizing: border-box; max-width: 640px; margin: 24px auto; padding: 24px; font: 400 14px/1.5 system-ui, sans-serif; color: var(--lv-ink); color-scheme: light; overflow-wrap: anywhere; }
 .lv-review-opening h1 { margin: 0; font-size: 18px; font-weight: 500; }
 .lv-review-opening p { margin: 0; }

@@ -63,8 +63,8 @@ test('content-first workspace keeps editing, pin completion and file exits coher
     await material.getByLabel('モデル', { exact: true }).selectOption({ label: '建物.glb' }); const surface = material.getByLabel('マテリアル', { exact: true });
     const slot = await surface.locator('option').evaluateAll(ns => ns.map(n => (n as HTMLOptionElement).value).find(Boolean)); await surface.selectOption(slot!);
     await beginMaterialEditing(material); await material.getByLabel('不透明度（%）', { exact: true }).fill('70'); await material.getByRole('button', { name: '変更を適用', exact: true }).click(); await ready('材質の設定を適用しました。');
-    const notice = p.getByRole('region', { name: '3D表示の操作', exact: true });
-    await expect(notice.getByText('透過表示（近似）', { exact: true })).toBeVisible();
+    await expect(material.getByText('透過表示（近似）', { exact: true })).toBeInViewport();
+    await expect(p.locator('.lv-stage-display')).not.toContainText('透過表示（近似）');
     const closeCaption = comparison.getByRole('button', { name: '閉じる', exact: true });
     await expect(closeCaption).toBeInViewport({ ratio: 1 });
     expect((await closeCaption.boundingBox())!.width).toBeGreaterThanOrEqual(44);

@@ -14,6 +14,8 @@ export interface ViewportObservation {
   readonly manipulating?: boolean;
   readonly camera?:CameraOrientation;readonly navigating?:boolean;readonly cameraReady?:boolean;
   readonly notice?: string | null;
+  /** Information about the current drawing, separate from warnings and work in progress. */
+  readonly drawingNotice?: string | null;
   readonly placementNotice?: string | null;
   readonly loading?: boolean;
   readonly retryAvailable?: boolean;

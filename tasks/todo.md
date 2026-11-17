@@ -8,7 +8,14 @@ and [earlier working records](../docs/history/development-through-2026-10-28/tas
 retain qualifications and failures. Their Current/Next headings are not an active
 queue or renewed approval requirements.
 
-## Current — navigate the model with two fingers starting on pins
+## Current — read a Ki-84 record without the rendering notice covering its title
+
+- The editor reports approximate transparency and any automatic resolution adjustment in the Drawing tab. A shared scene shows the same information beside scene and view controls. Preparation, hidden faces and retry remain on the 3D stage, and positioning instructions remain at placement.
+- On the same Ki-84 shared file, the notice previously covered 113 × 13.5 CSS px of the photo 8 title on PC. The overlap is now zero. The drawing area stayed 920 × 667 on PC and 390 × 455.75 on compact touch. Both routes opened the photo and returned to the selected part. A forced drawing failure explained which faces were hidden and offered retry. Retrying restored the same view and all 64 pins. The ordinary editor was also checked on both screen sizes. Independent review passed. Physical iPhone Safari remains pending.
+- The nine targeted browser scenarios and full checkpoint passed (159 test files, 3,630 passing tests, 16 expected failures, 21 pending). The offline build passed its isolation check.
+- Next, check whether the PC caption window and adjacent record detail need to show the same photo action at the same time. Verify access with the window closed and when comparing different records.
+
+## Previous — navigate the model with two fingers starting on pins
 
 - The editor and shared viewer now receive pin and canvas touches on a common camera surface. A single tap opens the nearest touched pin, including immediately after an orbit when the browser omits the click. A fresh single-finger drag rotates. Two fingers can zoom and pan, and lifting one early keeps the viewing direction through the last release.
 - Ki-84 reproduced the original rotation and missed tap. On the candidate the pin-to-canvas pinch enlarged the projected model 1.85×, the reverse start shrank it to 0.62×, and a two-pin pan moved 23.75 by 11.875 CSS px for a 24 by 12 px gesture. The six axis markers held their positions, including while the last finger moved after a staggered lift. Cancellation, the next tap, one-finger orbits and PC mouse controls passed. The compact detail opened exactly once on a rapid post-orbit tap. The five connected browser cases, independent review and full checkpoint passed. Physical iPhone Safari remains pending. Next, address the rendering notice overlapping a record title on PC.

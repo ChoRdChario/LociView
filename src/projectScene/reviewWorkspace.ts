@@ -362,6 +362,7 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
   (projectionHelp.children[0] as HTMLElement).hidden=true;projectionArea.append(projectionHelp);
   projection.addEventListener('change', () => { if (!projection.disabled) cameraAction(() => camera({ kind: 'projection', projection: projection.value === 'orthographic' ? 'orthographic' : 'perspective' })); });
   if (view.entryViewId) cameraButton(sceneHeader, '開始視点に戻る', view.entryViewId);
+  const drawingNotice = make('p'); drawingNotice.className = 'lv-drawing-notice'; sceneHeader.append(drawingNotice);
   const alternatives = view.views.filter(saved => saved.id !== view.entryViewId);
   const names = new Map<string, number>();
   for (const saved of view.views) names.set(String(saved.name), (names.get(String(saved.name)) ?? 0) + 1);
@@ -438,7 +439,10 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
     cameraGizmo.render({ camera: captured, axis: observation?.axis ?? null, blocked: cameraBlocked || !display.bounds,navigationBlocked:!cameraReady||composing||moving,navigating:observation?.navigating,navigationAvailable:!!runtime?.navigateCamera });
     projection.disabled = cameraBlocked; projection.value = observation?.projection ?? 'perspective';
     for (const button of cameraButtons) button.disabled = cameraBlocked || !runtime?.recall;
-    status.textContent = rendererFailure || failure || observation?.issue || observation?.notice || '';
+    const drawing = observation?.display === display && !rendererFailure && !observation?.issue ? observation?.drawingNotice ?? '' : '';
+    if (drawingNotice.textContent !== drawing) drawingNotice.textContent = drawing;
+    const nextStatus = rendererFailure || failure || observation?.issue || observation?.notice || '';
+    if (status.textContent !== nextStatus) status.textContent = nextStatus;
     const retryLabel = mediaWork.parked ? '3Dを表示' : '3D表示を再試行';
     if (retry.textContent !== retryLabel) retry.textContent = retryLabel;
     retry.hidden = !mediaWork.parked && !!runtime && !observation?.issue&&!observation?.retryAvailable;
