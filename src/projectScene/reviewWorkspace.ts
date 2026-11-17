@@ -248,7 +248,7 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
       selectedText.focus({ preventScroll: true });
     }
   }
-  const list = createCaptionListControls(document, accept, active => { composing = active; paint(); });
+  const list = createCaptionListControls(document, accept, active => { composing = active; paint(); }, { compact: true });
   const searchBlocked = () => disposed || composing || moving || handoffBusy || !!runtime?.read().dragging;
   searchRecords.addEventListener('click', () => {
     if (searchBlocked() || content.inert || !view.source.captions.length) return;
@@ -272,8 +272,16 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
   const selectedMedia = make('section'); selectedMedia.setAttribute('aria-label', '選択中のキャプションのメディア');
   const selectedText = make('section'), recordTitle = make(switchScene && view.scenes.length > 1 ? 'h2' : 'h3'), recordBody = make('p');
   selectedText.setAttribute('aria-label', 'キャプションの詳細'); selectedText.tabIndex = -1; selectedText.className = 'lv-caption-value';
+  const readingContent = make('div'); readingContent.className = 'lv-review-reading-content';
+  const updateHeaderHeight = () => root.style.setProperty('--lv-review-header-height', `${header.offsetHeight}px`);
+  const HeaderObserver = document.defaultView?.ResizeObserver;
+  const headerObserver = HeaderObserver ? new HeaderObserver(updateHeaderHeight) : null;
+  headerObserver?.observe(header);
   function revealReading(target: HTMLElement, block: ScrollLogicalPosition): void {
-    target.style.scrollMarginTop = phone?.matches ? `${header.getBoundingClientRect().height + 8}px` : '';
+    if (phone?.matches) {
+      updateHeaderHeight();
+      sidebar.scrollIntoView?.({ block: 'end', behavior: 'auto' });
+    }
     target.scrollIntoView?.({ block, behavior: 'auto' });
   }
   const recordHeader = make('header'), returnTo3D = make('button', '3Dに戻る');
@@ -315,8 +323,9 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
   });
   let panelGallery: ReturnType<typeof gallery> | null = null, panelCaption: string | null = null;
   const sceneHeader = make('div'); sceneHeader.className = 'lv-review-scene-header';
+  let sceneSelect: HTMLSelectElement | undefined;
   if (switchScene && view.scenes.length > 1) {
-    const select = make('select'); select.setAttribute('aria-label', '表示するシーン');
+    const select = make('select'); sceneSelect = select; select.setAttribute('aria-label', '表示するシーン');
     for (const scene of view.scenes) {
       const option = make('option', String(scene.name)); option.value = String(scene.id); select.append(option);
     }
@@ -329,8 +338,11 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
       finally { if (!disposed) { select.disabled = false; content.inert = false; } }
     });
     sceneHeader.append(select);
-  } else sceneHeader.append(make('h2', view.sceneName));
-  viewport.append(windows.root); sidebar.append(sceneHeader, emptyCaptions, list.root, selectedText);
+  } else {
+    const sceneTitle = make('h2', view.sceneName); sceneTitle.title = view.sceneName;
+    sceneHeader.append(sceneTitle);
+  }
+  viewport.append(windows.root); readingContent.append(emptyCaptions, list.root, selectedText); sidebar.append(sceneHeader, readingContent);
   const views = make('details'); views.append(make('summary', 'その他の視点'));
   const cameraAction = (action: () => void) => {
     if (disposed || composing || moving) return; try { action(); failure = ''; } catch (error) { failure = (error as Error).message; } paint();
@@ -387,7 +399,7 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
     const name = String(saved.name);
     cameraButton(views, (names.get(name) ?? 0) > 1 ? `${index + 1} · ${name}` : name, String(saved.id));
   });
-  views.hidden = !alternatives.length; sidebar.append(views);
+  views.hidden = !alternatives.length; readingContent.append(views);
   let gesture: { pointer: number; node: HTMLButtonElement; x: number; y: number; startX: number; startY: number;
     id: string; kind: 'orbit' | 'pan'; started: boolean } | undefined;
   let suppressClick = false;
@@ -450,6 +462,7 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
     if (disposed) return; const observation = runtime?.read(), ready = !!observation?.ready && observation.display === display;
     searchRecords.hidden = !view.source.captions.length; searchRecords.disabled = searchBlocked();
     returnTo3D.disabled = searchBlocked();
+    if (sceneSelect) sceneSelect.disabled = handoffBusy || composing || moving || content.inert;
     const cameraReady=!!(observation?.cameraReady??observation?.ready)&&observation?.display===display;
     const cameraBlocked = !cameraReady || composing || moving || !!observation?.dragging;
     let captured: unknown=observation?.camera; try { captured ??= runtime?.capture?.().camera; } catch { /* Camera preparation remains local. */ }
@@ -495,6 +508,8 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
       const selectedWindowVisible = !phone?.matches && !!memory.selectedCaptionId &&
         captionWindowView(view.source, windowsMemory, memory.selectedCaptionId).visibleIds.includes(memory.selectedCaptionId);
       const item = selectedWindowVisible ? undefined : selectedCaption;
+      const detailChanged = readingContent.dataset.detail !== String(!!item);
+      readingContent.dataset.detail = String(!!item);
       selectedText.hidden = !selectedCaption;
       returnTo3D.hidden = !phone?.matches || !item || !readingDetail;
       readingBadge.hidden = !returnTo3D.hidden;
@@ -509,6 +524,7 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
       windows.render({ source: view.source, memory: windowsMemory, selectedId: memory.selectedCaptionId,
       visible: !phone?.matches, moveBlock: composing ? '文字の入力を確定してください。' : null });
       const empty=view.source.captions.length===0;emptyCaptions.hidden=!empty;list.root.hidden=windows.tools.hidden=empty;
+      if (detailChanged) list.revealSelected();
       display = view.display(memory.pinColors, memory.selectedCaptionId); runtime?.setActive(!handoffBusy && !mediaWork.active && document.hidden !== true); runtime?.update(display); paint(); }
     catch (error) { failure = (error as Error).message; paint(); } finally { rendering = false; }
   }
@@ -542,7 +558,7 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
     retirement = new Promise<void>((resolve, reject) => { finish = resolve; fail = reject; });
     void retirement.catch(() => {}); disposed = true;
     const errors: unknown[] = [], attempt = <T>(action: () => T): T | undefined => { try { return action(); } catch (error) { errors.push(error); } };
-    attempt(endPinGesture); stageObserver?.disconnect();
+    attempt(endPinGesture); stageObserver?.disconnect(); headerObserver?.disconnect();
     attempt(() => document.removeEventListener?.('pointerdown', dismissFiles));
     attempt(() => document.removeEventListener?.('focusin', dismissFiles));
     attempt(() => document.removeEventListener?.('visibilitychange',render));

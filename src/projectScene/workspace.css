@@ -353,6 +353,7 @@
 @media (max-width: 760px) {
   .lv-review-header { padding-inline: 8px; gap: 4px; }
   .lv-review-workspace .lv-development-viewport { flex-basis: clamp(260px, 54dvh, 560px); }
+  .lv-review-workspace .lv-development-sidebar { flex: none; height: calc(100dvh - var(--lv-review-header-height, 0px)); max-height: none; }
 }
 @media (pointer: coarse) and (min-width: 761px) and (max-height: 480px) {
   .lv-review-workspace { min-height: 0; }
@@ -362,11 +363,22 @@
 }
 .lv-review-workspace .lv-development-viewport { border: 0; }
 .lv-review-workspace .lv-caption-windows { z-index: 4; }
-.lv-review-workspace .lv-development-sidebar { min-height: 0; }
+.lv-review-workspace .lv-development-sidebar { min-height: 0; padding: 0; gap: 0; overflow: hidden; box-sizing: border-box; }
+.lv-review-reading-content { display: flex; flex: 1; flex-direction: column; gap: 12px; min-height: 0; padding: 12px; overflow-y: auto; scroll-padding-block: 8px; }
+.lv-review-reading-content > * { flex: none; }
+.lv-review-reading-content[data-detail="true"] .lv-caption-list { max-height: clamp(88px, 24dvh, 180px); }
+.lv-review-reading-content[data-detail="false"] > .lv-caption-browser { display: flex; flex: 1; flex-direction: column; min-height: 0; }
+.lv-review-reading-content[data-detail="false"] .lv-caption-list { flex: 1; max-height: none; min-height: 44px; margin-block: 8px 0; }
+.lv-review-reading-content .lv-caption-search { flex-wrap: wrap; }
+.lv-review-reading-content .lv-caption-search > label { font-size: 0; line-height: 0; }
+.lv-review-reading-content .lv-caption-search input { min-width: 100px; font-size: 16px; line-height: 1.5; }
+.lv-review-reading-content .lv-caption-count { margin: 0; }
+.lv-review-reading-content .lv-caption-color-menu[open] { flex-basis: 100%; }
+.lv-review-reading-content .lv-caption-color-menu > .lv-caption-colors { position: static; width: 100%; box-sizing: border-box; }
 .lv-review-render-status { position: absolute; z-index: 5; top: 8px; left: 8px; display: grid; gap: 4px; box-sizing: border-box; max-width: calc(100% - 136px); max-height: calc(100% - 16px); padding: 6px 8px; overflow: auto; overflow-wrap: anywhere; border: 1px solid var(--lv-line); background: var(--lv-action); color: var(--lv-field); pointer-events: none; }
 .lv-review-render-status :is(p, button) { pointer-events: auto; }
-.lv-review-scene-header { display: flex; align-items: center; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; }
-.lv-review-scene-header h2 { min-width: 0; margin: 0; overflow-wrap: anywhere; }
+.lv-review-scene-header { display: flex; flex: none; align-items: center; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; padding: 8px 12px; border-bottom: 1px solid var(--lv-rule); }
+.lv-review-scene-header h2 { flex: 1; min-width: 0; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lv-review-scene-header > select { flex: 1; min-width: 0; max-width: 100%; }
 .lv-drawing-notice { margin: 0; color: var(--lv-muted); font-size: 13px; line-height: 1.4; overflow-wrap: anywhere; }
 .lv-drawing-notice:empty { display: none; }
@@ -393,7 +405,7 @@
 .lv-review-opening .lv-resume-reading li > button { text-align: start; width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .lv-review-opening .lv-resume-reading p { white-space: pre-wrap; }
 .lv-review-opening > [hidden], .lv-review-reading [hidden] { display: none; }
-.lv-review-record-header { position: sticky; top: -12px; z-index: 1; display: flex; justify-content: flex-end; padding-block: 8px; border-bottom: 1px solid var(--lv-rule); background: var(--lv-panel); }
+.lv-review-record-header { position: sticky; top: 0; z-index: 1; display: flex; justify-content: flex-end; padding-block: 8px; border-bottom: 1px solid var(--lv-rule); background: var(--lv-panel); }
 .lv-review-workspace .lv-caption-value > :is(h2, h3) { margin-block: 8px; font-size: 1.17em; overflow-wrap: anywhere; }
 .lv-review-record-header button { flex: none; min-height: 44px; padding: 8px 12px; touch-action: manipulation; }
 .lv-review-record-header { flex-wrap: wrap; gap: 4px; }

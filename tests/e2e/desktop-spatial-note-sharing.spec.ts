@@ -389,6 +389,10 @@ for (const touch of [false, true])
         const readerSearch = other.getByRole('searchbox', { name: '検索', ...exact });
         await expect(readerSearch).toBeFocused(); await expect(readerSearch).toBeInViewport();
         await readerSearch.fill('塗装'); await expect(other.locator('.lv-caption-select')).toHaveCount(1);
+        await readerSearch.dispatchEvent('compositionstart');
+        await expect(scenes).toBeDisabled();
+        await readerSearch.dispatchEvent('compositionend');
+        await expect(scenes).toBeEnabled();
         await action(other, '記録を検索').press('Enter'); await expect(readerSearch).toHaveValue('塗装');
         await readingCanvas.scrollIntoViewIfNeeded();
         const back = action(other, '開始視点に戻る'), receivingProjection = other.getByLabel('投影方式', exact);
@@ -460,19 +464,44 @@ for (const touch of [false, true])
         await photoArea.getByRole('button', { name: '画像を表示', ...exact }).click();
         await expect(other.getByRole('dialog', { name: 'メディアビューア', ...exact }).locator('img')).toHaveJSProperty('naturalWidth', 2);
         await other.getByRole('dialog', { name: 'メディアビューア', ...exact }).getByRole('button', { name: '閉じる', ...exact }).click();
+        await expect(photoArea.getByRole('button', { name: '画像を表示', ...exact })).toBeFocused();
+        if (!touch) {
+          await photoArea.getByRole('button', { name: '閉じる', ...exact }).click();
+          await expect(reader.locator('.lv-caption-select[aria-current="true"]')).toBeInViewport({ ratio: 1 });
+          await expect(reader.getByLabel('選択中のキャプションのメディア', exact).getByRole('button', { name: '画像を表示', ...exact })).toBeVisible();
+        }
+        const readingContent = reader.locator('.lv-review-reading-content');
+        await readingContent.evaluate(node => { node.scrollTop = node.scrollHeight; });
+        await expect(scenes).toBeInViewport({ ratio: 1 });
+        await expect(back).toBeInViewport({ ratio: 1 });
+        // A one-record search has no previous/next navigation to pin below the scene row.
+        await expect(reader.locator('.lv-review-record-header')).toBeHidden();
+        if (!touch) {
+          await back.click();
+          await expect(receivingProjection).toHaveValue('orthographic');
+        }
+        // Compact reading releases 3D resources; the pin becomes accessible again on return.
+        await expect(selectedPin).toHaveAttribute('aria-label', sharedTitle);
         if (touch) {
           const reading = other.getByRole('region', { name: 'キャプションの詳細', ...exact });
           const photo = reading.getByRole('button', { name: '画像を表示', ...exact });
-          await expect(photo).toBeFocused();
           const returnTo3D = reader.getByRole('button', { name: '3Dに戻る', ...exact });
           await expect(returnTo3D).toBeInViewport();
+          const panel = (await reader.locator('.lv-development-sidebar').boundingBox())!;
+          const projectHeader = (await reader.locator(':scope > header').boundingBox())!;
+          expect(panel.y).toBeGreaterThanOrEqual(projectHeader.y + projectHeader.height - 1);
+          expect(panel.y + panel.height).toBeLessThanOrEqual(options.viewport.height + 1);
           await other.screenshot({ path: info.outputPath('reading-long-record.png') });
           await returnTo3D.tap();
           await expect(readingCanvas).toBeFocused();
           await expect(reader.locator(':scope > header')).toBeInViewport({ ratio: 1 });
           await expect(returnTo3D).toBeHidden();
           await expect(selectedPin).toBeInViewport();
+          await expect(selectedPin).toHaveAccessibleName(sharedTitle);
           await expect(readerSearch).toHaveValue('塗装');
+          await expect(back).toBeEnabled();
+          await back.press('Enter');
+          await expect(receivingProjection).toHaveValue('orthographic');
           await photo.scrollIntoViewIfNeeded();
           await expect(returnTo3D).toBeInViewport();
           await returnTo3D.tap();
@@ -491,6 +520,14 @@ for (const touch of [false, true])
             await expect(reading).toBeFocused();
             await other.evaluate(() => { document.documentElement.style.zoom = '2'; });
             await reading.press('Tab');
+            await expect(photo).toBeFocused();
+            await expect(photo).toBeInViewport();
+            await photo.press('Tab');
+            await expect(alternatives).toBeFocused();
+            await expect(alternatives).toBeInViewport();
+            await other.keyboard.press('Tab');
+            // Some browsers cross their document boundary before wrapping to the header.
+            if (await other.evaluate(() => document.activeElement === document.body)) await other.keyboard.press('Tab');
             await expect(returnTo3D).toBeFocused();
             await expect(returnTo3D).toBeInViewport();
             expect(await other.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
@@ -516,6 +553,7 @@ for (const touch of [false, true])
         if (!touch && kind === '点群') {
           const filter = reader.locator('.lv-caption-colors');
           const color = filter.getByRole('button', { name: /のピン$/ }).first();
+          await reader.locator('.lv-caption-color-menu > summary').click();
           await color.click();
           await expect(reader.locator('.lv-caption-select')).toHaveCount(0);
           await scenes.selectOption({ label: 'シーン 1' });
@@ -523,8 +561,33 @@ for (const touch of [false, true])
           await scenes.selectOption({ label: reviewSceneName });
           await expect(reader).toBeVisible();
           await expect(reader.locator('.lv-caption-select')).toHaveCount(0);
+          await reader.locator('.lv-caption-color-menu > summary').click();
           await color.click();
           await expect(selectedPin).toHaveAccessibleName(sharedTitle);
+        }
+        if (touch && kind === 'GS') {
+          // Exercise the single-scene heading through an actual selected export, not a DOM substitute.
+          await sharedScenes.getByRole('checkbox', { name: 'シーン 1', ...exact }).uncheck();
+          await files.getByRole('button', { name: '内容を確認', ...exact }).click();
+          const [singleDownload] = await Promise.all([page.waitForEvent('download'), files.getByRole('button', { name: 'ダウンロード', ...exact }).click()]);
+          const singlePath = info.outputPath('single-long-scene.zip');
+          await singleDownload.saveAs(singlePath); expect(await singleDownload.failure()).toBeNull();
+          const single = await receiver.newPage();
+          await single.goto(baseURL!); await chooseHomeFiles(single, singlePath);
+          const singleReader = single.getByRole('main', { name: '閲覧用のシーン', ...exact });
+          const sceneHeading = singleReader.locator('.lv-review-scene-header').getByRole('heading', { name: reviewSceneName, ...exact });
+          await expect(sceneHeading).toBeVisible(); await expect(sceneHeading).toHaveAttribute('title', reviewSceneName);
+          await expect(singleReader.getByRole('combobox', { name: '表示するシーン', ...exact })).toHaveCount(0);
+          for (const viewport of [{ width: 320, height: 568 }, { width: 844, height: 390 }]) {
+            await single.setViewportSize(viewport);
+            const readingHeight = await singleReader.locator('.lv-review-reading-content').evaluate(node => node.clientHeight);
+            const sceneHeight = await singleReader.locator('.lv-review-scene-header').evaluate(node => node.clientHeight);
+            expect(readingHeight).toBeGreaterThan(sceneHeight);
+            expect(await single.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(viewport.width);
+            await single.screenshot({ path: info.outputPath(`single-scene-${viewport.width}.png`) });
+          }
+          await singleReader.locator('.lv-caption-select').filter({ hasText: '塗装の確認' }).press('Enter');
+          await expect(singleReader.getByRole('region', { name: 'キャプションの詳細', ...exact })).toContainText(sharedBody);
         }
       }
       finally {

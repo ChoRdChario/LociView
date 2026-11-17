@@ -679,6 +679,22 @@ focus to its opener. Explicit return reveals the complete workspace header and
 3D surface and focuses its canvas while retaining the current camera and record.
 Explicit reading/search navigation clears the actual sticky header height.
 
+The shared reader keeps scene selection and the entry-view action outside its
+record scroller. Search, colour filtering, the list, detail and alternative views
+reuse their existing nodes in one reading body; record navigation sticks within
+that body without covering the scene controls. Reuse the compact search/count/
+colour disclosure. Give unused detail space back to the list while a PC window
+owns that detail; when detail returns, bound the list and reveal the selected row
+in its own scroll area. Narrow layouts use the viewport height minus the measured
+project header for the reading panel, rather than a75dvh cap. Keep the document
+scroll and existing explicit return to3D; measure only header resizing, never
+camera frames. Preserve the list's own selection/scroll, gallery ownership,
+keyboard focus, camera and native-image release while reading photographs.
+Open colour choices in the reading flow so zoomed or short screens can scroll
+them without clipping options or covering scene actions.
+Keep a single scene's heading to one line; retain its complete name in the title
+and accessible heading text so a long name cannot consume the reading panel.
+
 The camera toolkit uses the existing 112px compass, one 44px pan/fit row and the
 projection control in a content-sized grid. Preserve projected tip geometry,
 44px hit areas, keyboard access and transparent compass corners. Keep the ordinary
