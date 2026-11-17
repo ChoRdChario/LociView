@@ -272,7 +272,8 @@ export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: 
     if (!renderer) return;
     endNavigation(undefined,false);
     pickEpoch++;
-    const previousCamera = camera, previousControls = controls, previousGizmo = gizmo, previousBackground = scene.background, previousTouchAction = canvas.style.touchAction;
+    const input = canvas.parentElement?.className === 'lv-pin-camera-surface' ? canvas.parentElement : canvas;
+    const previousCamera = camera, previousControls = controls, previousGizmo = gizmo, previousBackground = scene.background, previousTouchAction = input.style.touchAction;
     applying = true;
     try {
       const target = new THREE.Vector3(...pose.target), position = new THREE.Vector3(...pose.position);
@@ -295,7 +296,7 @@ export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: 
         const p = surface.asset.worldToLocal(new THREE.Vector3(...world));
         return [p.x, p.y, p.z].every(Number.isFinite) && proposePin(target, [p.x || 0, p.y || 0, p.z || 0], phase);
       }, busy => { syncOrbit(busy); serial++; if (!applying) notify(); }, () => { visualDirty = true; }) : null;
-      controls = new OrbitControls(camera, canvas); controls.enableDamping = false; controls.target.copy(target);
+      controls = new OrbitControls(camera, input); controls.enableDamping = false; controls.target.copy(target);
       controls.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.ROTATE, RIGHT: THREE.MOUSE.PAN };
       controls.addEventListener('start', () => { dragging = true; serial++; notify(); });
       controls.addEventListener('end', () => { dragging = false; observePose(); serial++; notify(); });
@@ -307,12 +308,12 @@ export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: 
       previousControls?.dispose();
       previousGizmo?.dispose(); gizmo?.update(display?.modelEdit ?? display?.pinEdit); syncOrbit();
       // The old OrbitControls.disconnect resets this shared element to auto.
-      canvas.style.touchAction = 'none';
+      input.style.touchAction = 'none';
     } catch (e) {
       if (controls !== previousControls) controls?.dispose();
       if (gizmo !== previousGizmo) gizmo?.dispose(); gizmo = previousGizmo;
       camera = previousCamera; controls = previousControls; scene.background = previousBackground;
-      canvas.style.touchAction = previousTouchAction;
+      input.style.touchAction = previousTouchAction;
       throw e;
     } finally { applying = false; }
   }

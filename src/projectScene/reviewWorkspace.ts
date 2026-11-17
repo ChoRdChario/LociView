@@ -9,6 +9,7 @@ import type { ViewportFactory, ProjectViewport } from './viewportPorts';
 import { createMediaViewer, createMediaThumbnails, mediaDisplayDescription, type MediaPreviewGroup } from '../ui/projectScene/mediaPreview';
 import { createMediaResidencyGate } from '../ui/projectScene/mediaPreviewResources';
 import { createCameraGizmo } from '../ui/projectScene/cameraGizmo';
+import { createPinCameraSurface } from '../ui/projectScene/pinCameraSurface';
 import { contextHelp, mountContextHelp } from '../ui/projectScene/contextHelp';
 import { displayBlobRef } from '../domain/portableMedia';
 import type { JsonObject } from '../domain/values';
@@ -70,7 +71,9 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
   const sidebar = make('aside'); sidebar.className = 'lv-development-sidebar'; sidebar.setAttribute('aria-label', '閲覧パネル');
   const emptyCaptions=make('p','このシーンにキャプションはありません。'),status = make('p'), retry = make('button', '3D表示を再試行'); status.setAttribute('role', 'status'); retry.type = 'button';
   const renderStatus = make('div'); renderStatus.className = 'lv-review-render-status'; renderStatus.append(status, retry);
-  viewport.append(canvas, searchRecords, overlay, renderStatus); stage.append(viewport); content.append(stage, sidebar); root.append(header, content);
+  const cameraSurface = createPinCameraSurface(document, canvas, searchRecords, overlay, viewport,
+    () => !disposed && !handoffBusy && !composing && !moving && !content.inert, activatePin);
+  viewport.append(cameraSurface, renderStatus); stage.append(viewport); content.append(stage, sidebar); root.append(header, content);
   let readingDetail = false;
   const mediaWork = createMediaResidencyGate(document, render, () => runtime?.idle?.() ?? Promise.resolve(), () => !disposed, () => !!phone?.matches && readingDetail);
   const mediaViewer = createMediaViewer(document, view.rasterResources,view.imageDimensions,mediaWork.acquire); root.append(mediaViewer.root);
@@ -379,6 +382,7 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
   }
   overlay.addEventListener('contextmenu', event => event.preventDefault());
   overlay.addEventListener('pointerdown', event => {
+    if (event.pointerType === 'touch') { suppressClick = false; return; }
     suppressClick = false;
     if (gesture) { suppressClick = true; endPinGesture(); return; }
     if (searchBlocked() || content.inert || !runtime?.navigateCamera || !event.isPrimary || event.button !== 0 && event.button !== 2 ||
@@ -394,7 +398,7 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
     if (!held || held.pointer !== event.pointerId) return;
     if (!event.buttons || disposed || handoffBusy || composing || moving || content.inert) { endPinGesture(); return; }
     if (!held.started) {
-      if (Math.hypot(event.clientX-held.startX, event.clientY-held.startY) <= (event.pointerType === 'touch' ? 8 : 4)) return;
+      if (Math.hypot(event.clientX-held.startX, event.clientY-held.startY) <= 4) return;
       suppressClick = true;
       held.started = runtime?.navigateCamera?.({ phase:'begin', id:held.id, kind:held.kind }) === true;
       if (!held.started) { endPinGesture(); return; }
@@ -407,8 +411,14 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
   for (const type of ['pointerup', 'pointercancel', 'lostpointercapture'] as const) overlay.addEventListener(type, event => {
     if (gesture?.pointer === event.pointerId) endPinGesture();
   });
+  function activatePin(node: HTMLButtonElement, event: MouseEvent) {
+    if ((event.detail && suppressClick) || searchBlocked() || content.inert) return;
+    const id = node.dataset.captionId;
+    if (!id) return;
+    accept(planCaptionList(context(), { kind: 'select', captionId: pickPin(event, node, id) }));
+  }
   function pickPin(event: MouseEvent, node: HTMLButtonElement, id: string) {
-    if (!event.detail) return id; // Native keyboard activation names one exact pin.
+    if (event.type !== 'pointerup' && !event.detail) return id; // Keyboard activation names the exact pin.
     let nearest = node, distance = Infinity;
     for (const hit of document.elementsFromPoint(event.clientX, event.clientY)) {
       if (hit.parentElement !== overlay || !hit.hasAttribute('data-caption-id')) continue;
@@ -440,10 +450,7 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
       if (!button) { button = make('button'); button.type = 'button'; button.className = 'lv-development-pin';
         button.dataset.captionId = pin.id;
         const node = button;
-        button.addEventListener('click', event => {
-          if ((event.detail && suppressClick) || searchBlocked() || content.inert) return;
-          accept(planCaptionList(context(), { kind: 'select', captionId: pickPin(event, node, pin.id) }));
-        }); pins.set(pin.id, button); overlay.append(button); }
+        button.addEventListener('click', event => activatePin(node, event)); pins.set(pin.id, button); overlay.append(button); }
       const title = pin.title || '無題';
       button.textContent = title; button.setAttribute('aria-label', title);
       button.style.setProperty?.('--lv-pin-color', pin.color); button.setAttribute('aria-current', String(memory.selectedCaptionId === pin.id));

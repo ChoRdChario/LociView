@@ -352,6 +352,7 @@ export const projectSceneApplicationImports:Readonly<Record<string,readonly stri
     "../domain/values",
     "../domain/portableMedia",
     "../ui/projectScene/cameraGizmo",
+    "../ui/projectScene/pinCameraSurface",
     "../ui/projectScene/contextHelp",
     "../ui/projectScene/captionListControls",
     "../ui/projectScene/captionListState",

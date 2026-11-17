@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import { gsFixture } from '../helpers/gsFixture';
 import { smallPng, triangleGlb } from './fixtures';
 import { chooseHomeFiles, openAddOptions, beginSceneCreation, closeFileSurface, lookAlongFront, revealCameraPositions, revealCaptionList, revealFileSurface, selectShareOutput } from './workspaceUi';
@@ -20,6 +20,45 @@ const action = (page: Page, name: string) => page.getByRole('button', { name, ..
 const tab = (page: Page, name: string) => page.getByRole('tab', { name, ...exact });
 const detail = (page: Page) => page.getByRole('region', { name: 'キャプションの詳細', ...exact });
 const status = (page: Page, text: string) => expect(page.getByText(text, exact)).toBeVisible();
+
+async function checkPinTouchNavigation(page: Page, pin: Locator, canvasFirst: boolean) {
+  await expect(pin).toBeInViewport();
+  const contacts = await pin.evaluate(node => {
+    const rect = node.getBoundingClientRect();
+    const mark = { x: Math.round(rect.left + rect.width / 2), y: Math.round(rect.top + rect.height / 2) };
+    if (document.elementFromPoint(mark.x, mark.y) !== node) throw Error('Pin is covered');
+    for (const dx of [-65, 65, 0]) for (const dy of [0, -65, 65]) {
+      const blank = { x: mark.x + dx, y: mark.y + dy };
+      if (document.elementFromPoint(blank.x, blank.y)?.tagName === 'CANVAS') return { mark, blank };
+    }
+    throw Error('No adjacent canvas for the second finger');
+  });
+  const axes = () => page.locator('.lv-camera-axes button').evaluateAll(nodes =>
+    nodes.map(node => [Math.round(parseFloat(node.style.left)), Math.round(parseFloat(node.style.top)), node.style.zIndex]));
+  const before = await axes(), client = await page.context().newCDPSession(page);
+  const start = canvasFirst ? [contacts.blank, contacts.mark] : [contacts.mark, contacts.blank];
+  const points = (dx: number, dy: number) => start.map((p, i) => ({ id: i+1, x: p.x+dx, y: p.y+dy }));
+  try {
+    await client.send('Input.dispatchTouchEvent', { type:'touchStart', touchPoints:points(0,0).slice(0,1) });
+    await client.send('Input.dispatchTouchEvent', { type:'touchStart', touchPoints:points(0,0) });
+    for (let step = 1; step <= 5; step++)
+      await client.send('Input.dispatchTouchEvent', { type:'touchMove', touchPoints:points(4*step,2*step) });
+    // Chromium takes the lifted contact here. The first finger stays on the surface.
+    await client.send('Input.dispatchTouchEvent', { type:'touchEnd', touchPoints:points(20,10).slice(1) });
+    await client.send('Input.dispatchTouchEvent', { type:'touchMove', touchPoints:points(25,14).slice(0,1) });
+    await client.send('Input.dispatchTouchEvent', { type:'touchEnd', touchPoints:[] });
+    await expect.poll(() => pin.evaluate(n => n.getBoundingClientRect().left+n.getBoundingClientRect().width/2))
+      .toBeGreaterThan(contacts.mark.x+10);
+    expect(await axes()).toEqual(before);
+    const box = (await pin.boundingBox())!;
+    const point = { x:box.x+box.width/2, y:box.y+box.height/2 };
+    await client.send('Input.dispatchTouchEvent', { type:'touchStart', touchPoints:[point] });
+    for (let step = 1; step <= 5; step++)
+      await client.send('Input.dispatchTouchEvent', { type:'touchMove', touchPoints:[{ x:point.x+5*step, y:point.y+step }] });
+    await client.send('Input.dispatchTouchEvent', { type:'touchEnd', touchPoints:[] });
+    await expect.poll(axes).not.toEqual(before);
+  } finally { await client.detach(); }
+}
 
 type SceneReadFault = { mode: 'normal' | 'hold' | 'fail'; held: boolean; release(): void };
 async function installSceneReadFault(page: Page) {
@@ -173,6 +212,7 @@ for (const touch of [false, true])
         if (touch) {
           await action(page, '3D').click();
           await expect(page.locator('.lv-project-marker[aria-pressed="true"]')).toBeVisible();
+          if (kind === '点群') await checkPinTouchNavigation(page, page.locator('.lv-project-marker').first(), false);
           await tab(page, 'キャプション').click();
         }
 
@@ -398,7 +438,13 @@ for (const touch of [false, true])
           await expect(readerSearch).toHaveValue('塗装');
           await expect(scenes.locator('option:checked')).toHaveText(reviewSceneName);
           await expect(receivingProjection).toHaveValue('orthographic');
-          await other.locator('.lv-development-pin').first().tap();
+          const pin = other.locator('.lv-development-pin').first();
+          if (kind === '点群') {
+            await checkPinTouchNavigation(other, pin, true);
+            // A quick genuine tap after orbit may arrive without a compatibility click.
+            await pin.evaluate(node => node.addEventListener('click', e => e.stopImmediatePropagation(), { capture: true, once: true }));
+          }
+          await pin.tap();
           await expect(reading).toBeFocused();
           await expect(other.locator('.lv-caption-window')).toHaveCount(0);
         } else await other.locator('.lv-caption-select').filter({ hasText: '塗装の確認' }).click();

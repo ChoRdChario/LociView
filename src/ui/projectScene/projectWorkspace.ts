@@ -2,6 +2,7 @@ import type { MetadataEdit } from '../../projectMetadata/commands';
 import { chooseStartupScene, resolveScene, memberships } from '../../scene/resolve';
 import type { Issue } from '../../scene/types';
 import { createCaptionListControls } from './captionListControls';
+import { createPinCameraSurface } from './pinCameraSurface';
 import { captionListPlanIsCurrent, planCaptionList, type CaptionListContext } from './captionListState';
 import { createCaptionDetailControls } from './captionDetailControls';
 import { createCaptionIncludeControls } from './captionIncludeControls';
@@ -117,7 +118,12 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     }
   });
   searchRecords.className = 'lv-stage-search';
-  markers.className = 'lv-project-markers'; stageDisplay.append(canvas, searchRecords, markers);
+  markers.className = 'lv-project-markers';
+  const cameraSurface = createPinCameraSurface(document, canvas, searchRecords, markers, stageDisplay, () => {
+    invalidateGesture();
+    return !disposed && !busy && !pending && !windowMoving && !ports.otherPending() && !composingInput() && !choosing;
+  }, activateMarker);
+  stageDisplay.append(cameraSurface);
   const markerById = new Map<string, HTMLButtonElement>(), markerNodes = new Set<HTMLButtonElement>();
   const viewportTools = make('section'); viewportTools.className = 'lv-project-viewport-tools'; viewportTools.setAttribute('aria-label', '3D表示の操作');
   viewportTools.append(viewportStatus, retryViewport);
@@ -1052,11 +1058,34 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     if (held.node.hasPointerCapture?.(held.pointer)) held.node.releasePointerCapture?.(held.pointer);
     if (!pressedPointers.size) viewport.reservePointer(false);
   }
+  function activateMarker(marker: HTMLButtonElement, event: MouseEvent) {
+    if (skipMarkerClick === marker) { skipMarkerClick = null; return; }
+    if (disposed || dirty() || busy || ports.otherPending()) return;
+    let captionId = marker.dataset.captionId;
+    if (!captionId) return;
+    if ('pointerType' in event && event.pointerType === 'touch') {
+      let closest = Infinity;
+      for (const pin of viewport.read().pins) {
+        const candidate = markerById.get(`${sceneId}:${pin.id}`);
+        if (!pin.visible || !candidate || !candidate.isConnected) continue;
+        const rect = candidate.getBoundingClientRect();
+        if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) continue;
+        const distance = Math.hypot(event.clientX - rect.left - rect.width / 2, event.clientY - rect.top - rect.height / 2);
+        if (distance < closest) { closest = distance; captionId = pin.id; }
+      }
+    }
+    selectCaption(captionId);
+    if (mobileLayout?.matches) { task = 'captions'; compactSurface = 'panel'; }
+    render();
+    if (mobileLayout?.matches) detailHeading.focus({ preventScroll: true });
+    else list.revealSelected();
+  }
   function bindMarkerNavigation(node: HTMLButtonElement) {
     node.addEventListener('contextmenu', event => event.preventDefault());
     node.addEventListener('keydown', () => { skipMarkerClick = null; });
     node.addEventListener('pointerdown', event => {
       skipMarkerClick = null;
+      if (event.pointerType === 'touch') return;
       const blocked = cameraNavigationBlocked(), wasHeld = !!markerNavigation;
       if (wasHeld) { skipMarkerClick = markerNavigation!.node; finishMarkerNavigation(); return; }
       if (blocked || !viewport.navigateCamera || !event.isPrimary ||
@@ -1076,7 +1105,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
         pressedPointers.size !== 1 || held.token !== installedViewportInput?.token || held.scene !== sceneId ||
         ![event.clientX,event.clientY].every(Number.isFinite) || event.buttons === 0) { finishMarkerNavigation(); return; }
       if (!held.started) {
-        if (Math.hypot(event.clientX-held.startX,event.clientY-held.startY) <= (event.pointerType === 'touch' ? 8 : 4)) return;
+        if (Math.hypot(event.clientX-held.startX,event.clientY-held.startY) <= 4) return;
         skipMarkerClick = node;
         held.started = viewport.navigateCamera?.({ phase: 'begin', id: held.id, kind: held.kind }) === true;
         if (!held.started) { finishMarkerNavigation(); return; }
@@ -1313,26 +1342,9 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
         const caption = p.resources.captions[projected.id]; if (!caption) continue;
         const key = `${sceneId}:${projected.id}`; activeMarkers.add(key);
         let marker = markerById.get(key);
-        if (!marker) { marker = button('', event => { if (skipMarkerClick === marker) { skipMarkerClick = null; return; }
-          if (!dirty() && !busy && !ports.otherPending()) {
-            let captionId = projected.id;
-            if ('pointerType' in event && event.pointerType === 'touch') {
-              let closest = Infinity;
-              for (const pin of viewport.read().pins) {
-                const candidate = markerById.get(`${sceneId}:${pin.id}`);
-                if (!pin.visible || !candidate || !candidate.isConnected) continue;
-                const rect = candidate.getBoundingClientRect();
-                if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) continue;
-                const distance = Math.hypot(event.clientX - rect.left - rect.width / 2, event.clientY - rect.top - rect.height / 2);
-                if (distance < closest) { closest = distance; captionId = pin.id; }
-              }
-            }
-            selectCaption(captionId);
-            if (mobileLayout?.matches) { task = 'captions'; compactSurface = 'panel'; }
-            render();
-            if (mobileLayout?.matches) detailHeading.focus({ preventScroll: true });
-            else list.revealSelected();
-          } });
+        if (!marker) { marker = make('button'); marker.type = 'button'; marker.dataset.captionId = projected.id;
+          const node = marker;
+          node.addEventListener('click', event => { if (!node.disabled) activateMarker(node, event); });
           bindMarkerNavigation(marker); markerById.set(key, marker); markerNodes.add(marker); }
         const markerName = fieldValue(caption.title) || '無題';
         marker.textContent = markerName; marker.setAttribute('aria-label', markerName);

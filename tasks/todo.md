@@ -8,7 +8,12 @@ and [earlier working records](../docs/history/development-through-2026-10-28/tas
 retain qualifications and failures. Their Current/Next headings are not an active
 queue or renewed approval requirements.
 
-## Current — one palette from opening a project to reading its records
+## Current — navigate the model with two fingers starting on pins
+
+- The editor and shared viewer now receive pin and canvas touches on a common camera surface. A single tap opens the nearest touched pin, including immediately after an orbit when the browser omits the click. A fresh single-finger drag rotates. Two fingers can zoom and pan, and lifting one early keeps the viewing direction through the last release.
+- Ki-84 reproduced the original rotation and missed tap. On the candidate the pin-to-canvas pinch enlarged the projected model 1.85×, the reverse start shrank it to 0.62×, and a two-pin pan moved 23.75 by 11.875 CSS px for a 24 by 12 px gesture. The six axis markers held their positions, including while the last finger moved after a staggered lift. Cancellation, the next tap, one-finger orbits and PC mouse controls passed. The compact detail opened exactly once on a rapid post-orbit tap. The five connected browser cases, independent review and full checkpoint passed. Physical iPhone Safari remains pending. Next, address the rendering notice overlapping a record title on PC.
+
+## Previous — one palette from opening a project to reading its records
 
 - Home, editor and shared viewing now use a warm paper, ink and selection palette. Authored pin, model, photo and axis colors keep their own meaning. PC and compact-touch Ki-84 checks covered search, selection, camera tools, opening a photo and focus on return. The measured text contrast was 7.97:1 on stage controls and 8.35:1 on a selected row. The connected browser tests, full checkpoint, public-path isolation and independent palette review passed. Physical iPhone color and outdoor legibility remain unmeasured.
 - Next, keep rendering notices clear of window titles, reduce the camera controls' footprint, and make the point of return apparent after closing a photo. Preserve immediate input, keyboard navigation, reduced motion and the user's camera position.

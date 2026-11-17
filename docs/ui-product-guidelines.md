@@ -439,6 +439,11 @@ existing touch alternatives and explicit view controls; do not imply full Blende
 keymap, frame conventions, fly/walk or input-emulation support. Reference:
 [Blender navigation](https://docs.blender.org/manual/en/5.0/editors/3dview/navigate/navigation.html).
 
+In the workspace and shared viewer, one finger selects a pin on tap and orbits
+on drag. Two fingers pinch to zoom and move together to pan, with the same
+behavior when either finger starts on a pin. Keep the viewing direction and
+selection through the last finger's release. A fresh touch can orbit or select again.
+
 ## 6. Decision-load policy
 
 > Classification: **Accepted requirement**.

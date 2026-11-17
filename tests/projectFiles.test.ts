@@ -5862,11 +5862,13 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const touch={...down,pointerId:33,pointerType:'touch'};
     marker.fire('pointerdown',touch);marker.fire('pointermove',{...touch,clientX:35});expect(h.navigateCamera).toHaveBeenCalledTimes(calls);
     marker.fire('pointermove',{...touch,clientX:52});
-    marker.fire('pointercancel',touch);marker.fire('click');
-    expect(h.navigateCamera.mock.calls.slice(calls)).toMatchObject([[{phase:'begin',kind:'orbit'}],[{phase:'move',dx:22,dy:0}],[{phase:'end'}]]);
+    marker.fire('pointercancel',touch);
+    // Real touch rotation belongs to the camera surface; the mouse-only pin
+    // handler must not start a second rotation. Browser tests cover the gesture.
+    expect(h.navigateCamera).toHaveBeenCalledTimes(calls);
     expect(capture.size).toBe(0);expect(h.named('本文',h.editor).value).toBe('');expect(h.dispatch).not.toHaveBeenCalled();
     marker.fire('pointerdown',{...down,pointerId:34});await h.ui.dispose();expect(capture.size).toBe(0);
-    marker.fire('pointermove',{...down,pointerId:34,clientX:90});expect(h.navigateCamera).toHaveBeenCalledTimes(calls+3);expect(h.host.read().source!.token).toBe(before);
+    marker.fire('pointermove',{...down,pointerId:34,clientX:90});expect(h.navigateCamera).toHaveBeenCalledTimes(calls);expect(h.host.read().source!.token).toBe(before);
   });
   it('keeps material preview local, preserves Scene precedence and restores canonical display on cancel or stale input', async () => {
     const h=await productWorkspaceFixture(true,false,false,'map2'),{host,editor,named,button}=h;
@@ -6993,11 +6995,14 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const retry = button('3D表示を再試行', editor), canvas = named('3Dモデルの表示', editor);
     const stage = all(editor).find(n => n.className === 'lv-project-stage')!;
     const overlay = all(stage).find(n => n.className === 'lv-stage-overlay')!;
-    expect(overlay.parent).toBe(canvas.parent);
+    const cameraSurface = canvas.parent!;
+    expect(cameraSurface.className).toBe('lv-pin-camera-surface');
+    expect(cameraSurface.contains(all(stage).find(n => n.className === 'lv-project-markers')!)).toBe(true);
+    expect(overlay.parent).toBe(cameraSurface.parent);
     expect(overlay.contains(retry)).toBe(true);
     expect(windows.contains(retry)).toBe(false);
     expect(canvas.contains(retry)).toBe(false);
-    expect(windows.parent).toBe(canvas.parent);
+    expect(windows.parent).toBe(cameraSurface.parent);
     button('3D表示を再試行', editor).fire('click'); expect(h.retryViewport).toHaveBeenCalledTimes(1); expect(all(windows)).toContain(card);
     await h.ui.dispose();
   });
