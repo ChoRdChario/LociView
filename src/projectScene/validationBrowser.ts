@@ -9,7 +9,7 @@ import { initializeBrowserMetadata, openBrowserMetadataStorage, browserMetadataD
 import { openValidationEntry, validationArea, measureValidation, type ValidationTiming } from './validationHost';
 import { listValidationProjects } from './validationCatalog';
 import { createValidationWorkspace, DisplayRetirementError, type MountedEditorFactory } from './validationWorkspace';
-import { prepareValidationResidents, prepareReadonlyResidents } from './validationRender';
+import { decodeValidationModel, prepareValidationResidents, prepareReadonlyResidents } from './validationRender';
 import { sceneViewportFactory } from './viewport';
 import { projectDisplay } from './viewportModel';
 import type { ProjectDisplay } from './displayTypes';
@@ -99,7 +99,8 @@ export async function createValidationBrowserWorkspace(document: Document, compo
       return { factory: sceneViewportFactory(resident,composition.residency,undefined,composition.smoothDisplay), dispose: () => resident.dispose() };
     },
     renderReview: async view => {
-      const resident = await prepareReadonlyResidents(view.models, view.content, undefined, false, raster, timing, view.models);
+      const resident = await prepareReadonlyResidents(view.models, view.content,
+        (source, signal) => decodeValidationModel(source, signal, raster, view.isReinspectedGlb(source)), false, raster, timing, view.models);
       try {
         const display = view.display(null, null);
         for (const model of view.models) resident.validate(model, display.savedMaterials?.[model.assetId]);

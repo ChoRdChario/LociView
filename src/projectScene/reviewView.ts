@@ -56,6 +56,7 @@ export async function prepareReviewView(file: Blob | PackageArchive | ReviewArch
   const models: ReadonlyRenderModel[] = [], decoded = new Map<string, ValidatedModel>(), images = new Map<string, Blob>();
   // One handoff per GLB in this Scene; retain facts, never the inspected body or decoded textures.
   const preparedGlbs = new Map<string, Omit<ValidatedGlb, 'bytes'>>();
+  const reinspectedGlbs = new WeakSet<ValidatedGlb>();
   const assets = table(snapshot, 'assetsById'), representations = table(snapshot, 'representationsById');
   for (const asset of Object.values(assets)) {
     if (asset.kind !== 'visual' || !visibleAssets.has(asset.id)) continue;
@@ -145,6 +146,7 @@ export async function prepareReviewView(file: Blob | PackageArchive | ReviewArch
     bounds: box.isEmpty() ? null : { min: box.min.toArray() as [number, number, number], max: box.max.toArray() as [number, number, number] },
     entry: scene.defaultViewId ? { kind: 'ready', payload: capture(string(scene.defaultViewId)) } : { kind: 'none' } });
   return { original, inspection, source, models, images, attachments, scenes, views, entryViewId: scene.defaultViewId ? string(scene.defaultViewId) : null, capture, display, rasterResources: decode?.rasterResources,
+    isReinspectedGlb: (source: ValidatedGlb) => reinspectedGlbs.has(source),
     releaseDisplayData() { decoded.clear(); preparedGlbs.clear(); images.clear(); },
     imageDimensions:(bytes:Uint8Array,mime:string)=>mediaDisplayDimensions(bytes,mime,limits,decode?.rasterResources),
     title: string(project.title), sceneName: string(scene.name),
@@ -159,7 +161,10 @@ export async function prepareReviewView(file: Blob | PackageArchive | ReviewArch
         if (file.size !== ref.byteLength) throw Error('モデルの原本が一致しません。');
         const bytes = await readValidationBody(file, limits.maxFileBytes);
         if (await hashOwnedBytes(bytes) !== ref.digest) throw Error('モデルの原本が一致しません。');
-        return inspectDeclaredValidationModel(expected, bytes, policy, decode, admittedGlbs.has(string(record.id)) ? reviewTextureJpeg : jpeg, 'review');
+        const admitted = admittedGlbs.has(string(record.id));
+        const source = await inspectDeclaredValidationModel(expected, bytes, policy, decode, admitted ? reviewTextureJpeg : jpeg, 'review');
+        if (admitted && isGlbModel(source) && source.jpeg && !source.occurrences) reinspectedGlbs.add(source);
+        return source;
       }
       const proof = await sourceStreamProof(file);
       if (proof.digest !== ref.digest || proof.byteLength !== ref.byteLength) throw Error('モデルの原本が一致しません。');

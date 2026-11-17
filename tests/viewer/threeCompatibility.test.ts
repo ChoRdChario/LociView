@@ -32,6 +32,20 @@ describe('07j private actual180 proof and checked186 display',()=>{
       b.geometry.getAttribute('position').setX(1,2);expect(()=>assertTargetTables(snapshotTargets(a.root),snapshotTargets(b.root))).toThrow('面・材質');}
     finally{disposeModelResources(a.root);disposeModelResources(b.root);}
   });
+  it('reads one shared position attribute once per snapshot and detects a later change', () => {
+    const { root, geometry, material } = scene(), other = new THREE.BufferGeometry();
+    const position = geometry.getAttribute('position'), read = vi.spyOn(position, 'getX');
+    other.setAttribute('position', position);
+    root.add(new THREE.Mesh(other, material));
+    try {
+      const before = snapshotTargets(root);
+      expect(before.rows).toHaveLength(2);
+      expect(read).toHaveBeenCalledTimes(position.count);
+      position.setX(1, 2);
+      expect(() => assertTargetTables(before, snapshotTargets(root))).toThrow('面・材質');
+      expect(read).toHaveBeenCalledTimes(2 * position.count);
+    } finally { disposeModelResources(root); }
+  });
   it('retains cloned-UV image identity and refuses an absent/swapped image source',()=>{
     const a=scene(),b=scene();
     const first=new THREE.Texture({width:1,height:1}),other=new THREE.Texture({width:1,height:1});

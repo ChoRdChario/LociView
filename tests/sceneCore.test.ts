@@ -415,7 +415,7 @@ describe('disconnected Scene domain (pure portions of SCN-DOM-01–09, not devic
           nativeSpatial: ['../domain/meshSource', '../../docs/specs/profiles/native-point-ply-rgb-1.profile.json?raw', '../../docs/specs/profiles/native-proxy-glb-1.profile.json?raw', '../../docs/specs/profiles/native-spatial-conversion-7.goldens.json?raw', '../domain/nativeSpatialSource', '../domain/projectGraphSupport', '../domain/values', '../projectMetadata/persistence', './pointPly'],
           nativeSpatialConversion: ['../domain/meshMaterialSource','./meshSource','./meshDecode','../domain/meshSource', '../nativeGs/portablePackage','../nativeGs/sha256','../nativeGs/schema','../nativeGs/materialSlots','../platform/fs','../projectMetadata/blobStore','../projectMetadata/source','../projectMetadata/journal','../projectMetadata/session','../projectMetadata/persistence','../domain/projectContentChecks','../domain/values','../scene/projectProvider','./nativeMapping','./nativeSpatial','./pointPly','./gsPly','./glb','./glbOccurrences','./content','./modelFacts','./photo','./initialProject','./creation','./validation','./png','./jpeg'],
           png: ['../viewer/rasterDimensions', '../viewer/rasterResources', './validation'],
-          jpeg: ['./validation', './png', '../viewer/rasterResources'],
+          jpeg: ['./validation', './png', '../viewer/rasterResources', '../viewer/nativeJpegFrame'],
           photo: ['./jpeg', './png', './validation','../viewer/rasterResources'],
           media: ['./portableHeic', './photo','./png','./jpeg','./heic','./mediaContainer','./validation','../viewer/rasterResources'],
           portableHeic: ['./heic','./png','./validation','../domain/portableMedia','../viewer/rasterResources'],

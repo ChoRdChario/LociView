@@ -12356,6 +12356,60 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect(bitmap).toHaveBeenCalledOnce();
     expect(close).toHaveBeenCalledOnce();
   });
+  it.each(['success', 'size mismatch', 'incomplete', 'abort'] as const)('binds the actual embedded JPEG frame to the old material on a shared return: %s', async outcome => {
+    const jpeg = jpegBytes('rgb-progressive');
+    const bytes = glb(j => { j.images[0].mimeType = 'image/jpeg'; }, true, jpeg);
+    const source = await inspectValidationJpegGlb(bytes, budget, decode, decodeJpeg);
+    const controller = new AbortController(), resources = createRasterResources();
+    const frame = { displayWidth: outcome === 'size mismatch' ? 7 : 8, displayHeight: 4, close: vi.fn() };
+    const decoderClose = vi.fn(), bitmapClose = vi.fn();
+    vi.stubGlobal('self', globalThis);
+    vi.stubGlobal('ImageDecoder', class {
+      static isTypeSupported = async (mime: string) => mime === 'image/jpeg';
+      constructor(options: ImageDecoderInit) {
+        expect(new Uint8Array(options.data as ArrayBuffer)).toEqual(jpeg);
+        expect(options.colorSpaceConversion).toBe('none');
+      }
+      async decode() {
+        if (outcome === 'abort') controller.abort();
+        return { image: frame, complete: outcome !== 'incomplete' };
+      }
+      close = decoderClose;
+    });
+    const displayBitmap = vi.fn(async () => {
+      expect(frame.close).toHaveBeenCalledOnce();
+      return { width: 8, height: 4, close: bitmapClose };
+    });
+    vi.stubGlobal('createImageBitmap', displayBitmap);
+    try {
+      const model = decodeValidationModel(source, controller.signal, resources, true);
+      if (outcome === 'success') (await model).dispose();
+      else await expect(model).rejects.toThrow();
+      expect(decoderClose).toHaveBeenCalledOnce();
+      expect(frame.close).toHaveBeenCalledOnce();
+      const reachesDisplay = outcome === 'success' || outcome === 'size mismatch';
+      expect(displayBitmap).toHaveBeenCalledTimes(reachesDisplay ? 1 : 0);
+      expect(bitmapClose).toHaveBeenCalledTimes(reachesDisplay ? 1 : 0);
+    } finally { await resources.dispose(); }
+  });
+  it.each(['first preparation', 'no raster budget', 'unavailable decoder'] as const)('keeps the actual bitmap loader for JPEG: %s', async mode => {
+    const bytes = glb(j => { j.images[0].mimeType = 'image/jpeg'; }, true, jpegBytes('rgb-progressive'));
+    const source = await inspectValidationJpegGlb(bytes, budget, decode, decodeJpeg);
+    const resources = mode === 'no raster budget' ? undefined : createRasterResources();
+    const supported = vi.fn(async () => false), bitmapClose = vi.fn();
+    vi.stubGlobal('self', globalThis);
+    vi.stubGlobal('ImageDecoder', class { static isTypeSupported = supported; });
+    const bitmap = vi.fn(async () => ({ width: 8, height: 4, close: bitmapClose }));
+    vi.stubGlobal('createImageBitmap', bitmap);
+    try {
+      const model = await decodeValidationModel(source, undefined, resources, mode !== 'first preparation');
+      expect(bitmap).toHaveBeenCalledTimes(2);
+      expect(bitmapClose).toHaveBeenCalledOnce();
+      expect(supported).toHaveBeenCalledTimes(mode === 'unavailable decoder' ? 1 : 0);
+      model.dispose();
+      expect(bitmapClose).toHaveBeenCalledTimes(2);
+    } finally { await resources?.dispose(); }
+  });
   it('keeps multi-node PNG/PBR/unlit/alpha source semantics and closes decoded bitmaps (injected raster, actual GLTF loader)', async () => {
     const bitmaps: { width: number; height: number; close: ReturnType<typeof vi.fn> }[] = [];
     vi.stubGlobal('self', globalThis);

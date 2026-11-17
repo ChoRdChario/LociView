@@ -1,4 +1,4 @@
-import { loadModel, disposeModelResources } from './modelRuntime';
+import { loadProofRoot, disposeModelResources } from './modelRuntime';
 import { snapshotTargets, type NeutralTarget, type NeutralTargetTable } from './sceneProof';
 import type { ModelFormat, LoadDeps } from '../modelLoader';
 import { digestNativeBytes, hashOwnedBytes } from '../../nativeGs/sha256';
@@ -31,23 +31,23 @@ export function readOwnedLegacyModelTargets(format:ModelFormat, bytes:Uint8Array
 
 /** Regular validated GLB already owns an exact buffer. Use its former proof-copy space
  * for one browser digest at a time, outside the native image decoder. */
-export function readOwnedGlbProof(bytes: Uint8Array<ArrayBuffer>, deps: Pick<LoadDeps, 'signal' | 'rasterResources'>): Promise<LegacyModelProof> {
-  return checkOwnedModel('glb', bytes, deps, async () => inputKey('glb', await hashOwnedBytes(bytes), deps));
+export function readOwnedGlbProof(bytes: Uint8Array<ArrayBuffer>, deps: Pick<LoadDeps, 'signal' | 'rasterResources'>, reviewTextureFrames = false): Promise<LegacyModelProof> {
+  return checkOwnedModel('glb', bytes, deps, async () => inputKey('glb', await hashOwnedBytes(bytes), deps), reviewTextureFrames);
 }
 
-async function checkOwnedModel(format: ModelFormat, bytes: Uint8Array, deps: LoadDeps, key: () => string | Promise<string>): Promise<LegacyModelProof> {
+async function checkOwnedModel(format: ModelFormat, bytes: Uint8Array, deps: LoadDeps, key: () => string | Promise<string>, reviewTextureFrames = false): Promise<LegacyModelProof> {
   deps.signal?.throwIfAborted();
   const first = key();
   const before = typeof first === 'string' ? first : await first;
   deps.signal?.throwIfAborted();
-  const model = await loadModel(format, bytes, deps);
+  const root = await loadProofRoot(format, bytes, deps, reviewTextureFrames);
   try {
     deps.signal?.throwIfAborted();
     const last = key();
     const after = typeof last === 'string' ? last : await last;
     if (before !== after) throw Error('元のモデル入力が変更されました。');
     deps.signal?.throwIfAborted();
-    const table = snapshotTargets(model.root);
+    const table = snapshotTargets(root);
     return Object.freeze({ inputKey: before, table: Object.freeze({ scene: table.scene, rows: freezeTargets(table.rows) }) });
-  } finally { disposeModelResources(model.root); }
+  } finally { disposeModelResources(root); }
 }

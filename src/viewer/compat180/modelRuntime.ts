@@ -1,7 +1,5 @@
 import { closeBitmapOnce, releaseOwnedModel, releaseOwnedMaterials, releaseOwnedResources, rememberModelOwner } from './resources';
 // Frozen 0.180 read implementation from80bc067. Private to proof.ts; never return these objects to a viewer.
-// ModelLoaderRegistry (docs/04 §1)
-// 全フォーマットを共通の LoadedModel に正規化する。原本は改変しない（表示用構築のみ）。
 
 import * as THREE from 'three-compat-180';
 import { GLTFLoader } from 'three-compat-180/addons/loaders/GLTFLoader.js';
@@ -13,31 +11,9 @@ import { trackGltfImages, trackMtlTextures } from './sceneProof';
 import { fitRasterWithinMaxEdge, rasterDimensions } from '../rasterDimensions';
 import type { RasterResources } from '../rasterResources';
 import { createRasterLoadScope } from '../rasterLoadScope';
+import { decodeNativeJpegFrame } from '../nativeJpegFrame';
 
 export type ModelFormat = 'glb' | 'gltf' | 'obj' | 'stl' | 'ply';
-
-export interface MaterialEntry {
-  /** 決定的マテリアルキー (docs/04 §4)。表示名に依存しない */
-  key: string;
-  /** UI表示名（重複時は連番付与済み） */
-  name: string;
-  materials: THREE.Material[];
-}
-
-export interface ModelStats {
-  vertices: number;
-  triangles: number;
-  points: number;
-  meshes: number;
-}
-
-export interface LoadedModel {
-  root: THREE.Object3D;
-  kind: 'mesh' | 'points' | 'mixed';
-  materials: MaterialEntry[];
-  stats: ModelStats;
-  warnings: string[];
-}
 
 const decoder = new TextDecoder();
 
@@ -70,11 +46,12 @@ export type GltfTexturePolicy =
   | { readonly kind: 'skip' }
   | { readonly kind: 'max-edge'; readonly maxEdge: number };
 
-export async function loadModel(
+export async function loadProofRoot(
   format: ModelFormat,
   bytes: Uint8Array,
   deps: LoadDeps = {},
-): Promise<LoadedModel> {
+  reviewTextureFrames = false,
+): Promise<THREE.Object3D> {
   if (THREE.REVISION !== '180' || !THREE.ColorManagement.enabled || THREE.ColorManagement.workingColorSpace !== THREE.LinearSRGBColorSpace) throw Error('旧モデルの検証環境を確認できません。');
   const warnings: string[] = [];
   let root: THREE.Object3D;
@@ -82,7 +59,7 @@ export async function loadModel(
   switch (format) {
     case 'glb':
     case 'gltf': {
-      root = await loadGltf(bytes, warnings, deps.gltfTextures, deps.rasterResources, deps.signal);
+      root = await loadGltf(bytes, warnings, deps.gltfTextures, deps.rasterResources, deps.signal, reviewTextureFrames);
       break;
     }
     case 'obj': {
@@ -120,11 +97,7 @@ export async function loadModel(
     });
   } catch(error) { disposeModelResources(root); throw error; }
 
-  const stats = computeStats(root);
-  const materials = buildMaterialRegistry(root);
-  const kind: LoadedModel['kind'] =
-    stats.points > 0 && stats.triangles > 0 ? 'mixed' : stats.points > 0 ? 'points' : 'mesh';
-  return { root, kind, materials, stats, warnings };
+  return root;
 }
 
 // ---- 各フォーマット --------------------------------------------------------------
@@ -295,6 +268,7 @@ function loadGltf(
   texturePolicy?: GltfTexturePolicy,
   resources?: RasterResources,
   signal?: AbortSignal,
+  reviewTextureFrames = false,
 ): Promise<THREE.Object3D> {
   const native = createRasterLoadScope(resources, signal);
   // 外部URI参照はオフライン原則により拒否する（docs/03 §5）。
@@ -318,12 +292,46 @@ function loadGltf(
   loader.register(parser => ({ name:'LOCIVIEW_full_image_ownership', beforeRoot: async () => {
     if (texturePolicy || !(parser.textureLoader instanceof THREE.ImageBitmapLoader)) return;
     class OwnedImages extends THREE.ImageBitmapLoader {
+      constructor(private readonly jpegBuffer?: () => Promise<ArrayBuffer>) { super(manager); }
       override load(url:string, done?:(bitmap:ImageBitmap)=>void, progress?:(event:ProgressEvent)=>void, error?:(e:unknown)=>void) {
-        return native.load((loaded, failed) => super.load(url, loaded, progress, failed), bitmap => { if(modelClosed){closeBitmapOnce(bitmap);error?.(Error('モデルの読込を取り消しました。'));return;}
-          decodedBitmaps.add(bitmap);done?.(bitmap); }, reason => { if (resources) textureFailures.push(reason instanceof Error ? reason : new Error('画像の準備を完了できません。')); error?.(reason); });
+        return native.load((loaded, failed) => {
+          const bitmap = () => super.load(url, loaded, progress, failed);
+          if (!this.jpegBuffer) return bitmap();
+          manager.itemStart(url);
+          void this.jpegBuffer().then(decodeNativeJpegFrame).then(frame => {
+            if (frame) loaded(frame);
+            else bitmap();
+          }).catch(reason => { manager.itemError(url); failed(reason); }).finally(() => manager.itemEnd(url));
+        }, bitmap => {
+          if (modelClosed) {
+            closeBitmapOnce(bitmap);
+            if (this.jpegBuffer && url.startsWith('blob:')) URL.revokeObjectURL(url);
+            error?.(Error('モデルの読込を取り消しました。'));
+            return;
+          }
+          decodedBitmaps.add(bitmap);
+          done?.(bitmap);
+        }, reason => {
+          if (this.jpegBuffer && url.startsWith('blob:')) URL.revokeObjectURL(url);
+          if (resources) textureFailures.push(reason instanceof Error ? reason : new Error('画像の準備を完了できません。'));
+          error?.(reason);
+        });
       }
     }
-    parser.textureLoader=new OwnedImages(manager).setOptions({...parser.textureLoader.options}).setCrossOrigin(parser.options.crossOrigin).setRequestHeader(parser.options.requestHeader);
+    const ownedImages = (jpegBuffer?: () => Promise<ArrayBuffer>) => new OwnedImages(jpegBuffer)
+      .setOptions({...parser.textureLoader.options}).setCrossOrigin(parser.options.crossOrigin).setRequestHeader(parser.options.requestHeader);
+    parser.textureLoader = ownedImages();
+    if (reviewTextureFrames && resources && typeof ImageDecoder !== 'undefined') {
+      const loadSource = parser.loadImageSource.bind(parser);
+      parser.loadImageSource = (index, imageLoader) => {
+        const image = parser.json.images[index];
+        if (imageLoader === parser.textureLoader && image.mimeType === 'image/jpeg' && Number.isSafeInteger(image.bufferView) && image.uri === undefined) {
+          // The pinned parser still constructs this texture and owns its source/UV/sampler binding.
+          return loadSource(index, ownedImages(() => parser.getDependency('bufferView', image.bufferView)));
+        }
+        return loadSource(index, imageLoader);
+      };
+    }
   } }));
   if (texturePolicy?.kind === 'skip') {
     loader.register((parser) => ({
@@ -478,54 +486,4 @@ function loadPly(bytes: Uint8Array): THREE.Object3D {
   const points = new THREE.Points(geom, mat);
   points.name = 'PLY points';
   return points;
-}
-
-// ---- 統計・マテリアル登記 ----------------------------------------------------------
-
-function computeStats(root: THREE.Object3D): ModelStats {
-  const stats: ModelStats = { vertices: 0, triangles: 0, points: 0, meshes: 0 };
-  root.traverse((o) => {
-    if (o instanceof THREE.Points) {
-      const pos = (o.geometry as THREE.BufferGeometry).getAttribute('position');
-      if (pos !== undefined) stats.points += pos.count;
-    } else if (o instanceof THREE.Mesh) {
-      stats.meshes++;
-      const geom = o.geometry as THREE.BufferGeometry;
-      const pos = geom.getAttribute('position');
-      if (pos !== undefined) stats.vertices += pos.count;
-      stats.triangles += Math.floor((geom.index !== null ? geom.index.count : pos?.count ?? 0) / 3);
-    }
-  });
-  return stats;
-}
-
-function nodePath(o: THREE.Object3D, root: THREE.Object3D): string {
-  const parts: string[] = [];
-  let cur: THREE.Object3D | null = o;
-  while (cur !== null && cur !== root) {
-    const parent: THREE.Object3D | null = cur.parent;
-    const label = cur.name !== '' ? cur.name : `#${parent !== null ? parent.children.indexOf(cur) : 0}`;
-    parts.unshift(label);
-    cur = parent;
-  }
-  return parts.join('|');
-}
-
-/** 決定的マテリアルキーの構築 (docs/04 §4): m/<nodePath>/<slot> */
-function buildMaterialRegistry(root: THREE.Object3D): MaterialEntry[] {
-  const entries: MaterialEntry[] = [];
-  const nameCount = new Map<string, number>();
-  root.traverse((o) => {
-    if (!(o instanceof THREE.Mesh) && !(o instanceof THREE.Points)) return;
-    const mats: THREE.Material[] = Array.isArray(o.material) ? o.material : [o.material];
-    mats.forEach((m, slot) => {
-      const key = `m/${nodePath(o, root)}/${slot}`;
-      let display = m.name !== '' ? m.name : '(unnamed)';
-      const n = nameCount.get(display) ?? 0;
-      nameCount.set(display, n + 1);
-      if (n > 0) display = `${display} (${n + 1})`;
-      entries.push({ key, name: display, materials: [m] });
-    });
-  });
-  return entries;
 }

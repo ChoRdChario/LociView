@@ -48,13 +48,13 @@ export interface ValidationResidentCache extends SavedModelResidentPort { prepar
 export interface DecodedValidationModel { readonly raster?: ModelRasterFacts; point?: ValidatedPoint; gs?: ValidatedGs; proxy?:DecodedValidationModel; proxyIssue?:string; root: THREE.Object3D; materialLocators: ReadonlyMap<THREE.Material, JsonObject>; occurrenceSlots?: readonly DecodedOccurrenceSlot[]; dispose(): void }
 
 /** No arbitrary URL/path input. The caller supplies already inspected, owned GLB bytes. */
-export async function decodeValidationModel(source: ValidatedGlb, signal?: AbortSignal, resources?: RasterResources): Promise<DecodedValidationModel> {
+export async function decodeValidationModel(source: ValidatedGlb, signal?: AbortSignal, resources?: RasterResources, reviewTextureFrames = false): Promise<DecodedValidationModel> {
   signal?.throwIfAborted();
   if (source.occurrences) return decodeOccurrenceGlb(source, signal, resources);
   const { bytes, ...metadata } = source;
   const ownedBytes = bytes.slice();
   source = { ...structuredClone(metadata), bytes: ownedBytes };
-  const legacy = await readOwnedGlbProof(ownedBytes, { signal, rasterResources: resources });
+  const legacy = await readOwnedGlbProof(ownedBytes, { signal, rasterResources: resources }, reviewTextureFrames);
   signal?.throwIfAborted();
   const manager = new THREE.LoadingManager(), owned = new Set<ImageBitmap>();
   const native = createRasterLoadScope(resources, signal);

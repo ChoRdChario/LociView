@@ -1,5 +1,6 @@
 import { checkFileLimits, fileError, fileLimitError, type FileValidationLimits } from './validation';
 import { RasterResourceError } from '../viewer/rasterResources';
+import { decodeNativeJpegFrame } from '../viewer/nativeJpegFrame';
 import { inspectValidationPng, type PngDecoder } from './png';
 
 export type JpegUse = 'photo' | 'glb-texture';
@@ -13,22 +14,9 @@ export const browserJpegDecoder: JpegDecoder = async (bytes, use) => {
 };
 /** Review already admitted this model. Check a complete native frame without requesting RGBA pixels. */
 export const reviewTextureJpegDecoder: JpegDecoder = async (bytes, use) => {
-  if (use !== 'glb-texture' || typeof ImageDecoder === 'undefined' || !await ImageDecoder.isTypeSupported('image/jpeg'))
-    return browserJpegDecoder(bytes, use);
-
-  let decoder: ImageDecoder | undefined;
-  try {
-    decoder = new ImageDecoder({ type: 'image/jpeg', data: bytes, colorSpaceConversion: 'none' });
-    const { image, complete } = await decoder.decode({ frameIndex: 0, completeFramesOnly: true });
-    if (!complete) {
-      image.close();
-      return fileError('JPEGの画像を最後まで表示できません。', 'decode');
-    }
-    return { width: image.displayWidth, height: image.displayHeight, close: () => image.close() };
-  } catch (error) {
-    if (!(error instanceof DOMException && error.name === 'NotSupportedError')) throw error;
-  } finally {
-    decoder?.close();
+  if (use === 'glb-texture') {
+    const frame = await decodeNativeJpegFrame(bytes);
+    if (frame) return frame;
   }
   return browserJpegDecoder(bytes, use);
 };

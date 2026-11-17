@@ -89,8 +89,9 @@ function attribute(v: unknown): unknown {
     view.setFloat64(used, n || 0, true); used += 8;
     if (used === chunk.length) { hash.update(chunk); used = 0; }
   };
+  const components = [a.getX, a.getY, a.getZ, a.getW], general = a.getComponent;
   for (let i = 0; i < count; i++) for (let c = 0; c < size; c++) {
-    const get = a[['getX','getY','getZ','getW'][c]!] ?? a.getComponent;
+    const get = components[c] ?? general;
     if (typeof get === 'function') add(Number(get.call(v, i, c)));
     else {
       if (a.normalized) throw Error('正規化属性の対応を確認できません。');
@@ -100,13 +101,13 @@ function attribute(v: unknown): unknown {
   if (used) hash.update(chunk.subarray(0, used));
   return [values.constructor.name, a.normalized === true, size, count, hash.digestHex()];
 }
-function geometry(v: unknown): string {
+function geometry(v: unknown, readAttribute: (value: unknown) => unknown): string {
   const g = object(v), attrs = object(g.attributes), morph = object(g.morphAttributes ?? {}), range = object(g.drawRange);
   const total = g.index ? Number(object(g.index).count) : Number(object(attrs.position).count);
   const start = Number(range.start), requested = Number(range.count);
   const end = requested === Infinity ? total : Math.min(total, start + requested);
-  return textHash([Object.keys(attrs).sort().map(k => [k, attribute(attrs[k])]), g.index ? attribute(g.index) : null,
-    Object.keys(morph).sort().map(k => [k, array(morph[k]).map(attribute)]), g.morphTargetsRelative === true,
+  return textHash([Object.keys(attrs).sort().map(k => [k, readAttribute(attrs[k])]), g.index ? readAttribute(g.index) : null,
+    Object.keys(morph).sort().map(k => [k, array(morph[k]).map(readAttribute)]), g.morphTargetsRelative === true,
     array(g.groups).map(x => { const r = object(x); return [r.start, r.count === Infinity ? 'all' : r.count, r.materialIndex]; }),
     [start, end]]);
 }
@@ -142,6 +143,13 @@ export function snapshotTargets(root: unknown, expected?: readonly NeutralTarget
   const r = object(root); if (typeof r.updateMatrixWorld !== 'function') throw Error('モデルの配置を確認できません。');
   if (descend) r.updateMatrixWorld.call(root, true);
   const rows: NeutralTarget[] = [], lights: unknown[] = [], geometries = new WeakMap<object, string>();
+  // Different primitives can share an accessor. Each engine still reads its own complete snapshot.
+  const attributes = new WeakMap<object, unknown>();
+  const readAttribute = (value: unknown) => {
+    const key = object(value);
+    if (!attributes.has(key)) attributes.set(key, attribute(key));
+    return attributes.get(key);
+  };
   const visit = (node: unknown, path: number[], names: string[]) => {
     const n = object(node), kind = n.isMesh ? 'mesh' : n.isPoints ? 'points' : n.isLine ? 'line' : null;
     if (n.isLight) lights.push([n.type, inheritedState(node), numbers(object(n.matrixWorld).elements),
@@ -150,7 +158,7 @@ export function snapshotTargets(root: unknown, expected?: readonly NeutralTarget
       n.shadow ? ['bias','normalBias','radius','mapSize'].map(k => [k,plain(object(n.shadow)[k])]) : null]);
     if (kind) {
       const g = object(n.geometry); let gd = geometries.get(g);
-      if (!gd) { gd = geometry(g); geometries.set(g, gd); }
+      if (!gd) { gd = geometry(g, readAttribute); geometries.set(g, gd); }
       const mats = Array.isArray(n.material) ? n.material : [n.material];
       const pose = textHash([n.isLineSegments === true,n.isLineLoop === true,n.isSkinnedMesh === true,n.isInstancedMesh === true,
         inheritedState(node), n.castShadow, n.receiveShadow, n.renderOrder, object(n.layers).mask,
@@ -158,7 +166,7 @@ export function snapshotTargets(root: unknown, expected?: readonly NeutralTarget
         n.bindMatrixInverse ? numbers(object(n.bindMatrixInverse).elements) : null,
         n.skeleton ? array(object(n.skeleton).bones).map(b => numbers(object(object(b).matrixWorld).elements)) : null,
         n.skeleton ? array(object(n.skeleton).boneInverses).map(b => numbers(object(b).elements)) : null,
-        n.instanceMatrix ? attribute(n.instanceMatrix) : null, n.instanceColor ? attribute(n.instanceColor) : null, n.count ?? null]);
+        n.instanceMatrix ? readAttribute(n.instanceMatrix) : null, n.instanceColor ? readAttribute(n.instanceColor) : null, n.count ?? null]);
       mats.forEach((m, slot) => {
         const md = material(m, expected?.[rows.length]?.materialKeys), f = object(m);
         rows.push({ kind, childPath: [...path], namePath: [...names], nativeKey: `m/${path.length ? path.join('.') : 'root'}/${slot}`,

@@ -6,6 +6,8 @@ declare module 'three-compat-180/addons/loaders/GLTFLoader.js' {
     json: { [key: string]: any };
     associations: Map<THREE.Object3D | THREE.Material | THREE.Texture, { nodes?: number; meshes?: number; primitives?: number; materials?: number; textures?: number }>;
     textureLoader: THREE.ImageBitmapLoader;
+    loadImageSource(index: number, loader: THREE.ImageBitmapLoader): Promise<THREE.Texture>;
+    getDependency(type: 'bufferView', index: number): Promise<ArrayBuffer>;
     options: { crossOrigin: string; requestHeader: Record<string,string> };
   }
   export interface GLTF { scene: THREE.Group; scenes: THREE.Group[]; parser: GLTFParser }
