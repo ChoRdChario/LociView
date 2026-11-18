@@ -364,7 +364,7 @@
 .lv-review-workspace .lv-development-viewport { border: 0; }
 .lv-review-workspace .lv-caption-windows { z-index: 4; }
 .lv-review-workspace .lv-development-sidebar { min-height: 0; padding: 0; gap: 0; overflow: hidden; box-sizing: border-box; }
-.lv-review-reading-content { display: flex; flex: 1; flex-direction: column; gap: 12px; min-height: 0; padding: 12px; overflow-y: auto; scroll-padding-block: 8px; }
+.lv-review-reading-content { display: flex; flex: 1; flex-direction: column; gap: 12px; min-height: 0; padding: 12px; overflow-y: auto; scroll-padding-block: 8px 0; }
 .lv-review-reading-content > * { flex: none; }
 .lv-review-reading-content[data-detail="true"] .lv-caption-list { max-height: clamp(88px, 24dvh, 180px); }
 .lv-review-reading-content[data-detail="false"] > .lv-caption-browser { display: flex; flex: 1; flex-direction: column; min-height: 0; }
@@ -424,6 +424,7 @@
 .lv-file-sheet label { display: grid; gap: 6px; margin: 8px 0; }
 .lv-file-sheet button { margin: 3px; padding: 8px 12px; }
 .lv-file-sheet .lv-file-primary { background: var(--lv-action); color: var(--lv-field); }
+.lv-file-output > .lv-operation-status:focus-visible { outline: 2px solid var(--lv-ink); outline-offset: 2px; }
 .lv-project-shell .lv-workspace-primary { background: var(--lv-action); color: var(--lv-field); border-color: var(--lv-action); }
 .lv-project-shell .lv-project-workspace :is(button,input,select,textarea) { border-radius: 6px; }
 .lv-project-shell .lv-project-workspace .lv-camera-axes > button { border-radius: 50%; }

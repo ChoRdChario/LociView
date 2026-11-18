@@ -312,6 +312,7 @@
 .lv-caption-reading .lv-caption-detail > .lv-caption-content { margin: 0; }
 .lv-caption-content > .lv-caption-heading { display: flex; align-items: start; gap: 8px; margin: 0 0 8px; }
 .lv-caption-heading > h2 { flex: 1; min-width: 0; margin: 0; font-size: 23px; overflow-wrap: anywhere; }
+.lv-caption-heading > h2:focus-visible { outline: 2px solid var(--lv-ink); outline-offset: 2px; }
 .lv-caption-heading > nav { display: flex; flex: 0 0 auto; gap: 4px; }
 .lv-project-workspace .lv-caption-heading :is(.lv-caption-previous,.lv-caption-next) { width: 44px; min-width: 44px; padding: 0; font-size: 0; }
 .lv-caption-previous::before { content: '‹'; font-size: 28px; line-height: 1; }

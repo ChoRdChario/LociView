@@ -10,7 +10,7 @@ export function createValidationOutputControls(document: Document, host: ReturnT
   const root = document.createElement('section'), heading = document.createElement('h2'), actions = document.createElement('div'),
     commands = document.createElement('div'), status = document.createElement('p'), list = document.createElement('div'), select = document.createElement('input');
   heading.textContent = 'ファイル'; root.setAttribute('aria-label', 'ファイル'); status.setAttribute('role', 'status');
-  status.className = 'lv-operation-status';
+  status.className = 'lv-operation-status'; status.tabIndex = -1;
   root.className = 'lv-file-output'; actions.className = 'lv-file-intents'; commands.className = 'lv-file-commands';
   select.type = 'file'; select.setAttribute('aria-label', '保存したファイルを選択'); select.hidden = true;
   const nameField = document.createElement('label'), nameInput = document.createElement('input');
@@ -96,8 +96,16 @@ export function createValidationOutputControls(document: Document, host: ReturnT
     try { a.click(); } finally { a.remove(); }
   };
   const handoffMessage = 'ダウンロードを開始しました。保存先で完了を確認してください。';
-  const perform = (action: () => Promise<unknown>, message: string, writes = true, consumeChoice = false, completed?: () => void,
-    workingMessage = 'ファイルを確認しています。', allowReading = false) => {
+  type PerformOptions = {
+    writes?: boolean;
+    completed?: () => void;
+    workingMessage?: string;
+    allowReading?: boolean;
+    focusOnSuccess?: 'primary' | 'result';
+  };
+  const perform = (action: () => Promise<unknown>, message: string, {
+    writes = true, completed, workingMessage = 'ファイルを確認しています。', allowReading = false, focusOnSuccess = 'primary',
+  }: PerformOptions = {}) => {
     if (disposed || busy || composing || otherBusy()) return;
     const s = session();
     if (writes && host.authority.readOnly) { completedFeedback = false; feedback = '編集を開始してから実行してください。'; render(); return; }
@@ -105,18 +113,19 @@ export function createValidationOutputControls(document: Document, host: ReturnT
       completedFeedback = false; feedback = '入力・操作を確定するか、取り消してから実行してください。'; render(); return;
     }
     const origin = document.activeElement;
-    let returnPrimary = (origin as HTMLElement | null)?.className === 'lv-file-primary';
-    const moved = (event: Event) => { if (event.target !== origin && event.target !== document.body) returnPrimary = false; };
+    let ownsFocus = (origin as HTMLElement | null)?.className === 'lv-file-primary';
+    const moved = (event: Event) => { if (event.target !== origin && event.target !== document.body) ownsFocus = false; };
     document.addEventListener?.('focusin', moved);
     let succeeded = false;
     completedFeedback = false; storageFailure=undefined; busy = true; readingToken = allowReading ? host.read().source?.token ?? null : null; feedback = workingMessage; render(); changed();
     void (async () => {
-      try { await action(); if (!disposed) { feedback = message; completedFeedback = true; if (consumeChoice) resetChoice(); completed?.(); succeeded = completedFeedback; } }
+      try { await action(); if (!disposed) { feedback = message; completedFeedback = true; completed?.(); succeeded = completedFeedback; } }
       catch (error) { completedFeedback = false; if (!disposed) {const text=storageFailureText(error);storageFailure=text?{diagnostic:host.workspaceOutput.error,text}:undefined;feedback=text??(error instanceof Error ? error.message : 'ファイル処理を完了できません。');} }
       finally { busy = false; readingToken = null; if (!disposed) { render(); changed(); }
         document.removeEventListener?.('focusin', moved);
-        const target = root.querySelector?.<HTMLButtonElement>('.lv-file-primary');
-        if (!disposed && succeeded && returnPrimary && target && !target.disabled &&
+        const primaryTarget = root.querySelector?.<HTMLButtonElement>('.lv-file-primary');
+        const target = focusOnSuccess === 'result' ? status : primaryTarget;
+        if (!disposed && succeeded && ownsFocus && target && (target === status || !primaryTarget?.disabled) &&
           (document.activeElement === origin || document.activeElement === document.body)) target.focus({ preventScroll: false });
       }
     })();
@@ -156,7 +165,8 @@ export function createValidationOutputControls(document: Document, host: ReturnT
     }
     await handoff(id, offered);
     } finally { accepting = false; offered = undefined; }
-  }, handoffMessage, true, false, () => { if (needsDisclosure) { feedback = '作成したファイルの内容を確認し、ダウンロードしてください。'; completedFeedback = false; } }, 'ファイルを作成しています。', true); };
+  }, handoffMessage, { completed: () => { if (needsDisclosure) { feedback = '作成したファイルの内容を確認し、ダウンロードしてください。'; completedFeedback = false; } },
+    workingMessage: 'ファイルを作成しています。', allowReading: true, focusOnSuccess: 'result' }); };
   const handoff = async (id: string, offered?: BackupFileHandoff) => {
     feedback = 'ダウンロードを準備しています。'; render();
     try { await download(id, offered); if (!disposed) handedOff.add(id); }
@@ -310,7 +320,8 @@ export function createValidationOutputControls(document: Document, host: ReturnT
     });
     status.dataset.busy = String(busy);
     const diagnostic=host.workspaceOutput.error;
-    status.textContent = busy ? feedback : storageFailure&&storageFailure.diagnostic===diagnostic ? storageFailure.text : diagnostic || feedback;
+    const nextStatusText = busy ? feedback : storageFailure&&storageFailure.diagnostic===diagnostic ? storageFailure.text : diagnostic || feedback;
+    if (status.textContent !== nextStatusText) status.textContent = nextStatusText;
     const currentToken = host.read().source?.token;
     for (const [i, job] of host.workspaceOutput.jobs.entries()) {
       if (['cancelled', 'abandoned'].includes(job.state)) continue;
@@ -327,7 +338,7 @@ export function createValidationOutputControls(document: Document, host: ReturnT
         const older = document.createElement('p'); older.textContent = '作成後の変更はこのファイルに含まれません。'; row.append(older);
       }
       if (complete) {
-        button(row, 'ダウンロード', () => perform(() => handoff(job.id), handoffMessage, false), false);
+        button(row, 'ダウンロード', () => perform(() => handoff(job.id), handoffMessage, { writes: false }), false);
         const details = document.createElement('details'), summary = document.createElement('summary'); summary.textContent = '保存したファイルを確認';
         editOnly(details);
         details.append(summary); row.append(details);
@@ -355,15 +366,15 @@ export function createValidationOutputControls(document: Document, host: ReturnT
           if (result.failedFiles) message += ' 一部を削除できませんでした。再試行できます。';
           if (result.retainedUncertain) message += ' 確認できないデータは残しました。';
           needsAttention = !!result.failedFiles || !!result.retainedUncertain;
-        }, '', true, false, () => { feedback = message; if (needsAttention) completedFeedback = false; }, '一時ファイルを確認しています。');
+        }, '', { completed: () => { feedback = message; if (needsAttention) completedFeedback = false; }, workingMessage: '一時ファイルを確認しています。' });
       });
       cleanup.title = 'このプロジェクトの失敗した書き出しを整理します。原本・記録・保存済みファイル・復旧データは残します。';
     }
     history.hidden = !completedFiles.children.length;
     if (cancellation) {
       const id = cancellation, text = document.createElement('p'); text.textContent = 'この生成を取りやめます。プロジェクトと生成途中のデータは削除しません。'; list.append(text);
-      button(list, '取りやめる', () => perform(() => host.workspaceOutput.cancel(id), '生成を取りやめました。', true, false,
-        () => { if (cancellation === id) cancellation = null; }));
+      button(list, '取りやめる', () => perform(() => host.workspaceOutput.cancel(id), '生成を取りやめました。',
+        { completed: () => { if (cancellation === id) cancellation = null; } }));
       button(list, '戻る', () => { cancellation = null; render(); changed(); });
     }
     if (selected) button(list, 'ファイル確認を取り消す', cancelFileSelection);
@@ -382,8 +393,8 @@ export function createValidationOutputControls(document: Document, host: ReturnT
   select.addEventListener('change', () => {
     const id = selected, file = select.files?.[0];
     if (!file) { cancelFileSelection(); return; }
-    if (id) perform(() => host.workspaceOutput.verifyFile(id, file), '選択したファイルの内容を確認しました。', true, false,
-      () => { if (selected === id) { selected = null; select.value = ''; } });
+    if (id) perform(() => host.workspaceOutput.verifyFile(id, file), '選択したファイルの内容を確認しました。',
+      { completed: () => { if (selected === id) { selected = null; select.value = ''; } } });
   });
   // Keep this input mounted across refreshes, including native IME composition.
   nameInput.addEventListener('input', () => { if (!nameInput.disabled) { checkpointName = nameInput.value; choicePending = true; changed(); } });

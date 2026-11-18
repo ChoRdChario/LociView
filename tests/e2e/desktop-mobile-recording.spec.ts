@@ -57,6 +57,13 @@ test('phone record list, body and completion stay usable when the viewport shrin
     await record.tap();
     await body.tap();
     await body.fill('狭い画面から本文を編集');
+    const unchangedStatus = await detail.locator(':scope > .lv-caption-content > [role="status"]').first().evaluateHandle(node => {
+      let changes = 0; const observer = new MutationObserver(records => { changes += records.length; });
+      observer.observe(node, { childList: true, characterData: true, subtree: true });
+      return { stop() { observer.disconnect(); return changes; } };
+    });
+    await body.press('End'); await body.press('x'); await body.press('Backspace');
+    expect(await unchangedStatus.evaluate(value => value.stop())).toBe(0); await unchangedStatus.dispose();
     await body.dispatchEvent('compositionstart');await expect(detail.getByRole('button',{name:'次の記録',exact:true})).toBeDisabled();
     await body.dispatchEvent('compositionend');
     await page.setViewportSize({ width: 320, height: 365 });
@@ -71,7 +78,17 @@ test('phone record list, body and completion stay usable when the viewport shrin
     await apply.tap();
     await expect(page.getByText('変更を適用しました。', { exact: true })).toBeVisible({ timeout: 90_000 });
     await expect(body).toHaveValue('狭い画面から本文を編集');
+    const completedRecord = detail.getByRole('heading', { name: '既存のピン', exact: true });
+    await expect(completedRecord).toBeFocused(); await expect(completedRecord).toBeInViewport();
+    await body.fill('取り消す前の未適用入力');
+    const cancelRecord = detail.getByRole('button', { name: '取り消す', exact: true });
+    await cancelRecord.tap(); await detail.getByRole('button', { name: '編集を続ける', exact: true }).tap();
+    await expect(body).toHaveValue('取り消す前の未適用入力'); await expect(cancelRecord).toBeFocused();
+    await cancelRecord.tap(); await detail.getByRole('button', { name: '変更を取り消す', exact: true }).tap();
+    await expect(body).toHaveValue('狭い画面から本文を編集');
+    await expect(completedRecord).toBeFocused(); await expect(completedRecord).toBeInViewport();
     await page.setViewportSize({ width: 390, height: 844 });
+    await expect(page.locator('.lv-workspace-actions').getByRole('button', { name: 'ファイルに保存', exact: true })).toBeEnabled();
     await page.getByRole('tab', { name: '描画', exact: true }).tap();
     const drawing = page.getByRole('region', { name: '材質', exact: true }), surface = drawing.getByLabel('マテリアル', { exact: true });
     const model = drawing.getByLabel('モデル', { exact: true });

@@ -465,6 +465,10 @@ for (const touch of [false, true])
         await expect(other.getByRole('dialog', { name: 'メディアビューア', ...exact }).locator('img')).toHaveJSProperty('naturalWidth', 2);
         await other.getByRole('dialog', { name: 'メディアビューア', ...exact }).getByRole('button', { name: '閉じる', ...exact }).click();
         await expect(photoArea.getByRole('button', { name: '画像を表示', ...exact })).toBeFocused();
+        if (touch) {
+          // Native end-alignment must keep the outer reading panel inside the viewport.
+          await photoArea.getByRole('button', { name: '画像を表示', ...exact }).evaluate(node => node.scrollIntoView({ block: 'end', behavior: 'auto' }));
+        }
         if (!touch) {
           await photoArea.getByRole('button', { name: '閉じる', ...exact }).click();
           await expect(reader.locator('.lv-caption-select[aria-current="true"]')).toBeInViewport({ ratio: 1 });

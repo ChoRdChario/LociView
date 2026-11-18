@@ -871,6 +871,21 @@ new/changed or unknown requirement keeps the existing history/reconfirmation
 path. Do not infer requirements only from currently visible media or strip
 capability/privacy warnings. Download initiation is not external-file completion.
 
+Completion focus follows the next decision. After a compact touch record's successful
+text/photo application or confirmed discard, use its existing heading instead of
+focusing a text input again. The parent supplies this UI-only target; preserve PC
+continuation, the keep-editing choice, IME, exact record/scene ownership, failure
+and deliberate focus changes.
+After an actual file handoff from the primary action, focus the existing result
+status. Content previews still return to the next primary action. Keep the
+download-started/destination-unconfirmed distinction, disclosure and exact-job
+retry. Do not add a verification step, history opening or another save action.
+Unchanged feedback keeps its existing text nodes; update only when content changes.
+The shared reading scroller keeps its top focus inset without an extra bottom
+scroll inset. Revealing the final photograph must not move the outer document
+above its aligned position and clip the viewport-sized panel. Retain the real
+content padding, normal scroll anchoring and photo-close focus restoration.
+
 Repeated file handoff resources have explicit workspace ownership. Never revoke
 a URL before the browser can acquire its file. An unchanged saved output can be
 downloaded again through its existing verified job; display resources do not

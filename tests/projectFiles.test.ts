@@ -5917,7 +5917,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect(h.all(detail).find(n => n.attributes.get('role') === 'status')!.textContent).toBe('変更を適用中です。'); expect(h.named('本文', h.editor).readOnly).toBe(true);
     await saving; expect(h.status.dataset.captionApplying).toBe('false'); expect(title.value).toBe('更新した題名'); await h.ui.dispose();
   });
-  it.each(['handoff', 'disclosure'] as const)('returns File primary focus only after a completed %s', async result => {
+  it.each(['handoff', 'disclosure'] as const)('focuses the File result only after a completed %s', async result => {
     const h = await productWorkspaceFixture(true), output = h.all(h.root).find(n => n.className === 'lv-file-output')!;
     const primary = () => h.all(output).find(n => n.className === 'lv-file-primary')!;
     // Supply only native selector behavior absent from the DOM recorder.
@@ -5929,11 +5929,12 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       if (result === 'disclosure') Object.assign(h.host.workspaceOutput.jobs.find(j => j.id === id)!, { requiresPortableMediaReader: true });
       return id;
     });
-    const origin = primary(); origin.focus(); const focused = origin.focusCalls.length; origin.click();
     const status = () => h.all(output).find(n => n.attributes.get('role') === 'status')!;
+    const origin = primary(); origin.focus(); const focused = origin.focusCalls.length, resultFocused = status().focusCalls.length; origin.click();
     await vi.waitFor(() => expect(status().dataset.busy).toBe('false'), { timeout: 10000 });
     expect(status().textContent).toBe(result === 'handoff' ? 'ダウンロードを開始しました。保存先で完了を確認してください。' : '作成したファイルの内容を確認し、ダウンロードしてください。');
-    expect(primary().focusCalls.length - focused).toBe(result === 'handoff' ? 1 : 0); expect(h.downloads).toHaveBeenCalledTimes(result === 'handoff' ? 1 : 0);
+    expect(primary().focusCalls.length - focused).toBe(0);
+    expect(status().focusCalls.length - resultFocused).toBe(result === 'handoff' ? 1 : 0); expect(h.downloads).toHaveBeenCalledTimes(result === 'handoff' ? 1 : 0);
     expect(fresh).not.toHaveBeenCalled();
     if (result === 'disclosure') {
       h.all(output).find(n => n.tag === 'button' && n.textContent === 'ダウンロード')!.click();
@@ -5942,7 +5943,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     }
     h.refresh(); h.refresh(); await Promise.resolve(); expect(primary() === origin).toBe(true);
     if (result === 'handoff') {
-      expect(origin.document.activeElement === primary()).toBe(true);
+      expect(origin.document.activeElement === status()).toBe(true);
       const row = h.host.workspaceOutput.jobs.find(j => j.purpose === 'backup')!, fileStatus = () => h.named('保存ファイルの状態', h.editor).textContent;
       expect(row.stale).toBeUndefined(); expect(fileStatus()).toBe('ダウンロード開始・保存先未確認');
       // Unknown freshness must never be promoted into a verified-file claim.

@@ -114,6 +114,38 @@ describe('Caption detail: local draft/intents, not durable editor acceptance', (
     expect(h.document.activeElement === (kind === 'other-focus' ? h.color : kind === 'disposed' ? h.apply : h.body)).toBe(true);
     h.controls.dispose();
   });
+  it.each(['apply', 'cancel'] as const)('uses a parent reading target only after the owned %s completes', async action => {
+    const h = host(), heading = h.document.createElement('h2'); h.root.append(heading);
+    h.render({ ...h.props, completionFocusTarget: heading as unknown as HTMLElement });
+    h.title.value = '変更'; h.title.fire('input');
+    if (action === 'cancel') {
+      h.cancel.focus(); h.cancel.click(); h.confirmation.children[1]!.focus(); h.confirmation.children[1]!.click();
+    } else {
+      h.apply.focus(); h.apply.click();
+      const plan = h.events.find(event => event.kind === 'apply') as CaptionApplyPlan;
+      h.render({ ...h.props, feedback: { kind: 'applying', plan } });
+      const current = { ...source(), caption: { ...source().caption, title: value('変更') } };
+      const completed: CaptionDetailProps = { ...context(), source: current, draft: beginCaptionDraft(current),
+        completionFocusTarget: heading as unknown as HTMLElement };
+      h.render({ ...completed, mediaDraft: { token: current.token, sceneId: scn, captionId: cap, selectionId: 'photo' } });
+      await Promise.resolve(); expect(h.document.activeElement).toBe(h.apply);
+      h.render(completed);
+    }
+    await Promise.resolve();
+    expect(h.document.activeElement).toBe(heading);
+    h.controls.dispose();
+  });
+  it.each(['hidden', 'detached'] as const)('does not reopen text input for an unusable %s completion target', async state => {
+    const h = host(), heading = h.document.createElement('h2'); h.root.append(heading);
+    const completionFocusTarget = heading as unknown as HTMLElement;
+    h.render({ ...h.props, completionFocusTarget }); h.title.value = '変更'; h.title.fire('input');
+    h.apply.focus(); h.apply.click();
+    const current = { ...source(), caption: { ...source().caption, title: value('変更') } };
+    h.render({ ...context(), source: current, draft: beginCaptionDraft(current), completionFocusTarget });
+    if (state === 'hidden') heading.hidden = true; else heading.remove();
+    await Promise.resolve(); expect(h.document.activeElement).toBe(h.apply);
+    expect(h.body.focusCalls).toHaveLength(0); h.controls.dispose();
+  });
   it('keeps one mounted draft with a media slot before secondary properties and the same completion controls', () => {
     const h = host(), slot = record(h.controls.mediaSlot), properties = h.root.children.find(n => n.className === 'lv-caption-properties')!;
     expect(h.root.children.indexOf(h.body.parent!.parent!)).toBeLessThan(h.root.children.indexOf(slot));

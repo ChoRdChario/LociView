@@ -1221,6 +1221,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       const captionList = listContext(captions);
       captionPanel.dataset.empty = String(!captions.length && !ports.readOnly);
       list.render(captionList); refreshPicker(); detail.render({ ...detailContext(captions),
+        completionFocusTarget: mobileLayout?.matches ? detailHeading : undefined,
         textOnly: readDuringOutput(),
         cancelBlock: pending?.owner === 'media' && canCancelMedia() ? null :
           mutationBlock() || (pickerScope || panelInput() || mediaManager?.hasChanges() ? '現在の入力・操作を完了してください。' : null),
