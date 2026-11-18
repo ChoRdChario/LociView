@@ -1,6 +1,6 @@
 import {test,createBrowserProfile} from '../helpers/browserProfile';
 import {expect,chromium,type BrowserContext,type Page} from '@playwright/test';
-import {readFile} from 'node:fs/promises';
+import {appendFile,readFile} from 'node:fs/promises';
 import * as A from '@automerge/automerge';
 import {ownedServer} from '../offline-e2e/server';
 import {nativeConversionBackup,smallPng,triangleGlb} from './fixtures';
@@ -113,23 +113,52 @@ for(const touch of [false,true])test(`native capacity recovery retains drafts an
 
 for (const restored of [true, false]) for (const touch of [false, true]) test(`renderer crashes before writing, before publication and immediately after success preserve the confirmed text exactly once (${touch ? 'touch' : 'desktop'}, ${restored ? 'restored' : 'original'})`, async ({}, info) => {
   A.getHeads(A.init());
+  const testStarted = Date.now(); let launches = 0;
+  const phase = (name: string) => appendFile(info.outputPath('crash-phases.jsonl'), JSON.stringify({ phase: name, milliseconds: Date.now() - testStarted }) + '\n');
   const server = await ownedServer(process.env.LOCIVIEW_E2E_ARTIFACT ?? 'desktop-dist');
   const receiver = await createBrowserProfile('restored-text');
   let context: BrowserContext | undefined;
   const open = async (profile: string, suffix = '') => {
+    const launch = ++launches; await phase(`launch.${launch}.start`);
     context = await chromium.launchPersistentContext(profile, { channel: 'chromium', serviceWorkers: 'block', acceptDownloads: true,
       viewport: touch ? { width: 390, height: 844 } : { width: 1280, height: 720 }, isMobile: touch, hasTouch: touch });
+    await phase(`launch.${launch}.ready`);
     const page = context.pages()[0]!;
-    await page.goto(server.url + suffix);
+    const url = new URL(server.url + suffix);
+    if (process.env.LOCIVIEW_E2E_TIMINGS === '1') url.searchParams.set('timings', '1');
+    await phase(`navigation.${launch}.start`); await page.goto(url.href); await phase(`navigation.${launch}.ready`);
     return page;
   };
   const backup = async (page: Page, name: string) => {
+    await phase(`backup.${name}.start`);
+    const started = Date.now(), measurements: Record<string, number | string> = { name };
     await revealFileSurface(page, '保存');
-    const [file] = await Promise.all([page.waitForEvent('download'),
-      page.getByRole('region', { name: 'ファイル', exact: true }).locator('.lv-file-primary').click()]);
-    const path = info.outputPath(name + '.zip');
-    await file.saveAs(path); expect(await file.failure()).toBeNull();
-    return BackupArchive.inspect(new Blob([Uint8Array.from(await readFile(path)).buffer]), validationMetadataLimits);
+    const files = page.getByRole('region', { name: 'ファイル', exact: true }), primary = files.locator('.lv-file-primary');
+    try {
+      const readiness = Date.now();
+      await expect(primary).toBeEnabled();
+      measurements.readinessMs = Date.now() - readiness;
+      const output = Date.now();
+      const [file] = await Promise.all([page.waitForEvent('download'), primary.click().then(() => { measurements.clickMs = Date.now() - output; })]);
+      measurements.downloadMs = Date.now() - output;
+      const path = info.outputPath(name + '.zip');
+      await file.saveAs(path); expect(await file.failure()).toBeNull();
+      measurements.fileSavedMs = Date.now() - output;
+      await phase(`backup.${name}.file-saved`);
+      const archive = await BackupArchive.inspect(new Blob([Uint8Array.from(await readFile(path)).buffer]), validationMetadataLimits);
+      await phase(`backup.${name}.inspected`); return archive;
+    } catch (error) {
+      measurements.failure = String(error);
+      await info.attach(name + '-save-failure', { body: JSON.stringify({
+        text: await files.innerText().catch(error => String(error)),
+        enabled: await primary.isEnabled().catch(error => String(error)),
+        timings: await page.evaluate(() => performance.getEntriesByType('measure').filter(entry => entry.name.startsWith('lociview.')).map(entry => entry.toJSON())).catch(error => String(error)),
+      }), contentType: 'application/json' });
+      throw error;
+    } finally {
+      measurements.totalMs = Date.now() - started;
+      await info.attach(name + '-save-timings', { body: JSON.stringify(measurements), contentType: 'application/json' });
+    }
   };
   const text = '強制終了しても一度だけ残る本文', detail = (page: Page) => page.getByRole('region', { name: 'キャプションの詳細', exact: true });
   const record = async (page: Page) => {
@@ -137,11 +166,16 @@ for (const restored of [true, false]) for (const touch of [false, true]) test(`r
     await page.locator('.lv-caption-select').filter({ hasText: '既存のピン' }).click();
     return detail(page).getByLabel('本文', { exact: true });
   };
+  const close = async () => {
+    if (!context) return;
+    await phase('browser-close.start'); await context.close(); context = undefined; await phase('browser-close.ready');
+  };
   const crash = async (page: Page) => {
+    await phase('renderer-crash.start');
     const protocol = await context!.newCDPSession(page), crashed = page.waitForEvent('crash');
     void protocol.send('Page.crash').catch(() => {});
     await crashed;
-    await context!.close();
+    await phase('renderer-crash.event'); await close();
   };
   const crashAt = async (page: Page, fileName: string) => {
     const signal = page.waitForEvent('console', msg => msg.text() === 'text write paused');
@@ -159,6 +193,22 @@ for (const restored of [true, false]) for (const touch of [false, true]) test(`r
     await signal;
     await crash(page);
   };
+  const projectFiles = (page: Page, run: string) => page.evaluate(async run => {
+    let root = await navigator.storage.getDirectory();
+    for (const name of ['lociview-development-validation-1', run]) root = await root.getDirectoryHandle(name);
+    const files: { path: string; size: number; sha256: string }[] = [];
+    const visit = async (directory: FileSystemDirectoryHandle, prefix: string) => {
+      for await (const [name, handle] of (directory as any).entries()) {
+        const path = prefix + name;
+        if (handle.kind === 'directory') await visit(handle, path + '/');
+        else {
+          const file = await handle.getFile(), hash = await crypto.subtle.digest('SHA-256', await file.arrayBuffer());
+          files.push({ path, size: file.size, sha256: [...new Uint8Array(hash)].map(byte => byte.toString(16).padStart(2, '0')).join('') });
+        }
+      }
+    };
+    await visit(root, ''); return files.sort((a, b) => a.path.localeCompare(b.path));
+  }, run);
   try {
     const author = await open(restored ? await createBrowserProfile('author') : receiver);
     await chooseHomeFiles(author, {
@@ -166,7 +216,7 @@ for (const restored of [true, false]) for (const touch of [false, true]) test(`r
     await author.getByRole('button', { name: '新しいプロジェクトに変換', exact: true }).click();
     await expect(author.getByRole('button', { name: '閲覧する', exact: true })).toBeEnabled();
     const before = await backup(author, 'before');
-    await context!.close();
+    await close();
     const page = await open(receiver);
     if (restored) {
       await chooseHomeFiles(page, info.outputPath('before.zip'));
@@ -220,5 +270,61 @@ for (const restored of [true, false]) for (const touch of [false, true]) test(`r
     expect(reopened.source.originalChanges()).toEqual(expect.arrayContaining(changes));
     expect(reopened.source.originalChanges()).toHaveLength(changes.length + 1);
     expect(reopened.archive.control.manifest.blobs).toEqual(before.archive.control.manifest.blobs);
-  } finally { await context?.close(); await server.stop(); }
+    {
+      // Persist a real staging start, then crash before writing its change data.
+      // Resolution is explicit and must retain every already-present byte.
+      await (await record(cold)).fill('準備データが確定する前に終了する本文');
+      await crashAt(cold, '00000000.amchange');
+      const blocked = await open(receiver, '?run=' + run);
+      const proceed = blocked.getByRole('button', { name: '最後に保存された内容で続ける', exact: true });
+      await expect(proceed).toBeEnabled();
+      const preserved = await projectFiles(blocked, run);
+      await expect(blocked.getByRole('region', { name: '再開の確認', exact: true })).toBeVisible();
+      await expect(blocked.getByRole('region', { name: '再開の確認', exact: true })).toContainText('保存途中の変更は反映されません。');
+      const leave = blocked.getByRole('button', { name: '別のプロジェクトを開く', exact: true });
+      await expect(blocked.getByRole('heading', { name: '更新ファイル', exact: true })).toBeHidden();
+      await blocked.screenshot({ path: info.outputPath('cold-unprepared-guidance.png') });
+      await leave.focus(); await leave.press('Enter');
+      await expect(blocked.getByRole('button', { name: 'ファイルを開く', exact: true })).toBeVisible();
+      expect(await projectFiles(blocked, run)).toEqual(preserved);
+      await chooseHomeFiles(blocked, { name: 'ほかの作業.glb', mimeType: 'model/gltf-binary', buffer: triangleGlb() });
+      await blocked.getByRole('textbox', { name: 'プロジェクト名', exact: true }).fill('ほかの正常な作業');
+      await blocked.getByRole('button', { name: 'プロジェクトを作成', exact: true }).click();
+      await expect(blocked.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText('ほかの正常な作業');
+      await revealFileSurface(blocked, '保存');
+      await blocked.getByRole('button', { name: 'プロジェクトを選ぶ', exact: true }).click();
+      await blocked.locator('.lv-recent-project').filter({ hasText: 'Nativeから引き継ぐ記録' }).getByRole('button', { name: '編集で開く', exact: true }).click();
+      await expect(proceed).toBeEnabled();
+      expect(await projectFiles(blocked, run)).toEqual(preserved);
+      const resolveStarted = Date.now();
+      await phase('local-recovery.resolve.start');
+      await proceed.focus(); await proceed.press('Enter');
+      try { await expect(await record(blocked)).toHaveValue(confirmed); }
+      catch (error) {
+        await blocked.screenshot({ path: info.outputPath('local-recovery-failure.png') });
+        await info.attach('local-recovery-failure', { body: JSON.stringify({ text: await blocked.locator('body').innerText(),
+          timings: await blocked.evaluate(() => performance.getEntriesByType('measure').filter(entry => entry.name.startsWith('lociview.')).map(entry => entry.toJSON())) }), contentType: 'application/json' });
+        throw error;
+      }
+      await phase('local-recovery.resolve.ready');
+      await info.attach('explicit-local-recovery', { body: JSON.stringify({ milliseconds: Date.now() - resolveStarted, restored, touch, physicalDevice: false }), contentType: 'application/json' });
+      const resolvedFiles = await projectFiles(blocked, run), priorPaths = new Set(preserved.map(file => file.path));
+      expect(resolvedFiles.filter(file => priorPaths.has(file.path))).toEqual(preserved);
+      expect(resolvedFiles.filter(file => !priorPaths.has(file.path)).map(file => file.path)).toEqual([expect.stringMatching(/\/closedLocal\.json$/)]);
+      const recoveredText = '中断から再開して保存した本文';
+      await (await record(blocked)).fill(recoveredText); await detail(blocked).getByRole('button', { name: '変更を適用', exact: true }).click();
+      await expect(blocked.getByText('変更を適用しました。', { exact: true })).toBeVisible();
+      const repaired = await backup(blocked, 'repaired');
+      expect(repaired.source.originalChanges()).toHaveLength(reopened.source.originalChanges().length + 1);
+      expect(repaired.source.originalChanges()).toEqual(expect.arrayContaining(reopened.source.originalChanges()));
+      expect(repaired.archive.control.manifest.blobs).toEqual(before.archive.control.manifest.blobs);
+      await close();
+      const fresh = await open(await createBrowserProfile('backup-rescue'));
+      await chooseHomeFiles(fresh, info.outputPath('repaired.zip'));
+      await fresh.getByRole('button', { name: 'このファイルから再開', exact: true }).click();
+      await expect(fresh.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText('Nativeから引き継ぐ記録', { timeout: 120_000 });
+      await expect(await record(fresh)).toHaveValue(recoveredText);
+      await fresh.screenshot({ path: info.outputPath('clean-browser-backup-resumed.png') });
+    }
+  } finally { await close(); await server.stop(); }
 });

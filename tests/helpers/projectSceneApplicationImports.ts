@@ -399,6 +399,7 @@ export const projectSceneApplicationImports:Readonly<Record<string,readonly stri
     "./viewportModel"
   ],
   "src/projectScene/validationCatalog.ts": [
+    "../projectMetadata/format",
     "../projectFiles/receiveWorkspace",
     "../projectFiles/sendWorkspace",
     "../projectFiles/validation",
@@ -424,6 +425,7 @@ export const projectSceneApplicationImports:Readonly<Record<string,readonly stri
     "./validationHost"
   ],
   "src/projectScene/validationHost.ts": [
+    "../projectMetadata/format",
     "../projectPackage/backupOutputJob",
     "./validationCatalog",
     "../platform/outputArtifactLock",
@@ -570,6 +572,7 @@ export const projectSceneApplicationImports:Readonly<Record<string,readonly stri
     "three/addons/loaders/GLTFLoader.js"
   ],
   "src/projectScene/validationWorkspace.ts": [
+    "../projectMetadata/format",
     "../projectPackage/reviewArchive",
     "../domain/values",
     "../ui/projectScene/storageFeedback",

@@ -169,9 +169,10 @@ export function createCaptionDetailControls(document: Document, onEvent: (event:
     const unapplied = hasCaptionDraft(owned) || !!next.mediaDraft;
     const emptyRecord = source.kind === 'ready' && source.caption.title.kind === 'value' && !source.caption.title.value.trim() &&
       source.caption.body.kind === 'value' && !source.caption.body.value.trim();
+    const applyHint = next.mediaDraft ? '選んだメディアと入力をまとめて適用します。' : '写真や動画も選んでから、まとめて適用できます。';
     const nextStatusText = [...new Set([next.feedback.kind === 'failed' && `適用できませんでした。${next.feedback.message} 入力は保持しています。`,
       inFlight && '変更を適用中です。', unapplied && !inFlight && (applyIssue === null && next.feedback.kind !== 'failed' && !next.textOnly
-        ? '「変更を適用」の後、「ファイルに保存」できます。' : '未適用の入力があります。'),
+        ? applyHint : '未適用の入力があります。'),
       emptyRecord && !unapplied && !inFlight && next.feedback.kind === 'idle' && !next.mutationBlock && !next.textOnly && 'タイトル・本文や写真を追加できます。',
       !inFlight && !next.textOnly && next.mutationBlock !== '閲覧中です。編集を開始してください。' && next.mutationBlock, source.kind !== 'ready' && (source.reason || 'キャプションを選択してください。'),
       (hasCaptionDraft(owned) || next.mediaDraft) && applyIssue && !inFlight && applyIssue].filter(Boolean))].join(' ');
@@ -199,5 +200,6 @@ export function createCaptionDetailControls(document: Document, onEvent: (event:
     return true;
   }
   function dispose(): void { disposed = true; for (const cleanup of cleanups) cleanup(); root.remove(); }
-  return { root, mediaSlot, actions, confirmation, focusBody: () => fields.get('body')!.input.focus?.({preventScroll:false}), render, dispose };
+  return { root, mediaSlot, actions, confirmation, focusBody: () => fields.get('body')!.input.focus?.({preventScroll:false}),
+    focusTitle: () => fields.get('title')!.input.focus?.({preventScroll:false}), render, dispose };
 }

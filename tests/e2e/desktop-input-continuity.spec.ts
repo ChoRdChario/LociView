@@ -1,6 +1,6 @@
 import { test, expect, chromium, type Page } from '@playwright/test';
 import { ownedServer } from '../offline-e2e/server';
-import { triangleGlb, smallPng } from './fixtures';
+import { triangleGlb, smallPng, nativeConversionBackup } from './fixtures';
 import { chooseHomeFiles, revealWorkPanel, revealCaptionList, beginMaterialEditing, revealFileSurface, closeFileSurface } from './workspaceUi';
 
 for (const touch of [false, true]) test(`attachment ordering and Drawing completion retain the next input (${touch ? 'touch' : 'PC'})`, async ({}, info) => {
@@ -66,7 +66,9 @@ for (const touch of [false, true]) test(`attachment ordering and Drawing complet
     if (touch) await firstCanvas.tap({ position: firstPosition }); else await firstCanvas.click({ position: firstPosition });
     await page.getByRole('button', { name: 'ここに記録を作る', exact: true }).click(); await ready('ピンの位置を確定しました。');
     await expect(detail).toBeVisible();await expect(detail.getByText('タイトル・本文や写真を追加できます。',{exact:true})).toBeVisible();
-    await expect(detail.getByRole('heading',{name:'無題',exact:true})).toBeFocused();
+    if (touch) await expect(detail.getByRole('heading',{name:'無題',exact:true})).toBeFocused();
+    else await expect(detail.getByLabel('タイトル',{exact:true})).toBeFocused();
+    await expect(page.locator('.lv-caption-window')).toHaveCount(0);
     // One tiny photo follows the same explicit text completion and survives the existing restore.
     await detail.getByLabel('タイトル', { exact: true }).fill('再開時の記録'); await detail.getByLabel('本文', { exact: true }).fill('元のバックアップ本文');
     const firstPhoto = page.waitForEvent('filechooser'); await page.getByLabel('メディアを追加', { exact: true }).click();
@@ -88,23 +90,35 @@ for (const touch of [false, true]) test(`attachment ordering and Drawing complet
     await expect(detail.getByRole('button', { name: '変更を適用', exact: true })).toBeDisabled();
     await expect(page.getByLabel('保存ファイルの状態', { exact: true })).toBeHidden();
     await detail.getByLabel('本文', { exact: true }).dispatchEvent('compositionend');
-    await expect(detail.getByText('「変更を適用」の後、「ファイルに保存」できます。',{exact:true})).toBeVisible();
-    await expect(page.locator('header').getByRole('button',{name:'ファイルに保存',exact:true})).toBeDisabled();
+    await expect(detail.getByText('選んだメディアと入力をまとめて適用します。',{exact:true})).toBeVisible();
+    await expect(page.locator('header').getByRole('button',{name:'保存…',exact:true})).toBeDisabled();
+    await Promise.all([
+      page.waitForEvent('dialog').then(async dialog => { expect(dialog.type()).toBe('beforeunload'); await dialog.dismiss(); }),
+      page.close({ runBeforeUnload: true }),
+    ]);
+    expect(page.isClosed()).toBe(false);
+    await expect(detail.getByLabel('本文', { exact: true })).toHaveValue('元のバックアップ本文');
+    await expect(detail.locator('.lv-record-media-draft')).toContainText('A.png');
     await page.screenshot({ path: info.outputPath('text-and-selected-photo.png') });
+    const completion = detail.getByRole('button', { name: '変更を適用', exact: true });
+    await expect(completion).toBeInViewport({ ratio: 1 });
+    expect(await completion.evaluate(node => { const rect=node.getBoundingClientRect();return node.contains(document.elementFromPoint(rect.x+rect.width/2,rect.y+rect.height/2)); })).toBe(true);
     await detail.getByRole('button', { name: '変更を適用', exact: true }).click(); await ready('変更を適用しました。');
     await expect(page.getByLabel('保存ファイルの状態', { exact: true })).toHaveText('保存未確認');
     const rowEdit = page.locator('.lv-caption-row').first().getByRole('button', { name: '編集', exact: true, includeHidden: true });
     const rowDescription = await rowEdit.getAttribute('aria-describedby'); expect(rowDescription).toBeTruthy();
     await expect(page.locator('#' + rowDescription)).toHaveText('再開時の記録');
     const headerBeforeSave = await page.locator('main.lv-project-workspace > header').boundingBox();
-    await page.locator('header').getByRole('button',{name:'ファイルに保存',exact:true}).click(); const files = page.getByRole('region', { name: 'ファイル', exact: true });
+    await page.locator('header').getByRole('button',{name:'保存…',exact:true}).click(); const files = page.getByRole('region', { name: 'ファイル', exact: true });
     await expect(files).toContainText('保存したファイルは「ファイルを開く」から再開できます。');
     await expect(files.getByLabel('保存名（任意）', { exact: true })).toBeVisible();
     const [download] = await Promise.all([page.waitForEvent('download'), files.locator('.lv-file-primary').click()]);
     const backup = info.outputPath('resume-fixture.zip'); await download.saveAs(backup); expect(await download.failure()).toBeNull();
     await expect(files.locator('.lv-operation-status')).toHaveAttribute('data-busy', 'false');
+    await expect(files.locator('.lv-operation-status')).toContainText(download.suggestedFilename());
     await closeFileSurface(page);
-    await expect(page.getByLabel('保存ファイルの状態', { exact: true })).toHaveText('ダウンロード開始・保存先未確認');
+    await expect(page.getByLabel('保存ファイルの状態', { exact: true })).toHaveText('ダウンロード開始・保存先で確認');
+    await expect(page.getByLabel('保存ファイルの状態', { exact: true })).toHaveAttribute('title','保存先で完了を確認してください。');
     expect((await page.locator('.lv-project-shell > .lv-operation-status').allTextContents()).join('')).not.toContain('ダウンロードを開始しました。');
     expect((await page.locator('main.lv-project-workspace > header').boundingBox())!.y).toBe(headerBeforeSave!.y);
     await page.screenshot({ path: info.outputPath('save-status-after-close.png') });
@@ -152,25 +166,6 @@ for (const touch of [false, true]) test(`attachment ordering and Drawing complet
     await opacity.fill('45'); await drawing.getByRole('button', { name: '取り消す', exact: true }).click(); await page.getByRole('button', { name: '変更を取り消す', exact: true }).press('Enter');
     await expect(opacity).toHaveValue('63'); await expect(opacity).toBeFocused(); await expect(opacity).toBeInViewport();
     await expect(page.getByRole('tooltip')).toHaveCount(0);
-    if (!touch) {
-      await revealCaptionList(page); await page.locator('.lv-caption-select').first().click();
-      const stored = media.getByRole('group', { name: '既存のメディアを添付', exact: true });
-      await stored.locator(':scope > summary').click();
-      for (let i = 0; i < 10; i++) {
-        await stored.getByRole('button', { name: 'A.png', exact: true }).click();
-        await stored.getByRole('button', { name: '選択したメディアを添付', exact: true }).click(); await ready('選択したメディアを添付しました。');
-      }
-      await gallery.locator('figure').first().getByText('添付を整理', { exact: true }).click();
-      const firstEdit = gallery.locator('figure').first().getByRole('button', { name: '説明を編集', exact: true });
-      await firstEdit.click(); await description.fill('保存しない説明');
-      await media.getByRole('region', { name: '説明の編集', exact: true }).getByRole('button', { name: '取り消す', exact: true }).click();
-      await expect(firstEdit).toBeFocused(); await expect(firstEdit).toBeInViewport();
-      const oldEdit = await firstEdit.elementHandle();
-      await gallery.getByRole('button', { name: '次の一覧', exact: true }).click();
-      expect(await oldEdit!.evaluate(node => node.isConnected)).toBe(false);
-      await oldEdit!.evaluate(node => (node as HTMLButtonElement).click());
-      await expect(media.getByRole('region', { name: '説明の編集', exact: true })).toBeHidden();
-    }
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
     await page.screenshot({ path: info.outputPath('continued-input.png') });
     await context.close(); resumePhase = 'restore-setup';
@@ -260,4 +255,51 @@ for (const touch of [false, true]) test(`attachment ordering and Drawing complet
     })).catch(() => null) }), contentType: 'application/json' }); throw error;
   }
   finally { await browser.close(); await server.stop(); }
+});
+
+test('attachment pagination keeps focus and rejects a detached edit action', async ({}, info) => {
+  test.setTimeout(180_000);
+  const server = await ownedServer(process.env.LOCIVIEW_E2E_ARTIFACT ?? 'offline-desktop-dist');
+  const browser = await chromium.launch({ channel: 'chromium', headless: true });
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, serviceWorkers: 'block' });
+  const page = await context.newPage(), errors: string[] = [], remote: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await context.route('**/*', route => {
+    const url = new URL(route.request().url());
+    if (url.origin === new URL(server.url).origin || ['blob:', 'data:'].includes(url.protocol)) return route.continue();
+    remote.push(url.origin); return route.abort();
+  });
+  try {
+    const fixture = await nativeConversionBackup(triangleGlb(), smallPng(), 2, false, {
+      bodies: new Map(),
+      update(snapshot) {
+        for (let number = 3; number <= 13; number++) snapshot.mediaResources.push({
+          ...snapshot.mediaResources[0], id: `med_${String(number).padStart(26, '0')}`, label: `画像 ${number}`,
+        });
+        snapshot.captions[0].attachmentMediaIds = snapshot.mediaResources.map((item: { id: string }) => item.id);
+      },
+    });
+    await page.goto(server.url);
+    await chooseHomeFiles(page, { name: 'ページ送り.zip', mimeType: 'application/zip', buffer: fixture });
+    await page.getByRole('button', { name: '新しいプロジェクトに変換', exact: true }).click();
+    await expect(page.getByRole('button', { name: '閲覧する', exact: true })).toBeEnabled({ timeout: 90_000 });
+    await revealCaptionList(page); await page.locator('.lv-caption-select').filter({ hasText: '既存のピン' }).click();
+    const detail = page.getByRole('region', { name: 'キャプションの詳細', exact: true });
+    const media = detail.getByRole('region', { name: 'メディアの整理', exact: true });
+    const gallery = media.getByRole('region', { name: '添付メディア', exact: true }), figures = gallery.locator('figure');
+    await expect(figures).toHaveCount(12);
+    await figures.first().getByText('添付を整理', { exact: true }).click();
+    const firstEdit = figures.first().getByRole('button', { name: '説明を編集', exact: true });
+    await firstEdit.click(); await media.getByLabel('メディアの説明', { exact: true }).fill('保存しない説明');
+    const description = media.getByRole('region', { name: '説明の編集', exact: true });
+    await description.getByRole('button', { name: '取り消す', exact: true }).click();
+    await expect(firstEdit).toBeFocused(); await expect(firstEdit).toBeInViewport();
+    const oldEdit = await firstEdit.elementHandle();
+    await gallery.getByRole('button', { name: '次の一覧', exact: true }).click(); await expect(figures).toHaveCount(1);
+    expect(await oldEdit!.evaluate(node => node.isConnected)).toBe(false);
+    await oldEdit!.evaluate(node => (node as HTMLButtonElement).click());
+    await expect(description).toBeHidden(); await expect(detail.getByLabel('本文', { exact: true })).toHaveValue('本文を保持');
+    await page.screenshot({ path: info.outputPath('detached-attachment-action.png') });
+    expect(errors).toEqual([]); expect(remote).toEqual([]);
+  } finally { await browser.close(); await server.stop(); }
 });

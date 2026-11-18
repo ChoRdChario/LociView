@@ -61,7 +61,7 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
     b.addEventListener('click',()=>{if(!fileMenu||b.disabled)return;if(!fileMenu.open)fileOrigin=b;
       if(tools!.showSurface(surface)){core?.dismissDisclosures();fileMenu.open=true;if(b.getAttribute('role')!=='tab')filePanel.focus?.({preventScroll:true});}}); return b;
   };
-  const saveEntry=fileEntry('ファイルに保存','save'), shareEntry=fileEntry('共有','share'), receiveEntry=fileEntry('更新を読み込む','receive'), restoreEntry=fileEntry('復元','restore');
+  const saveEntry=fileEntry('保存…','save'), shareEntry=fileEntry('共有','share'), receiveEntry=fileEntry('更新を読み込む','receive'), restoreEntry=fileEntry('復元','restore');
   saveEntry.className='lv-workspace-primary'; shareEntry.className='lv-workspace-share';
   filePanel.tabIndex=-1;
   const fileTabs = new Map([['save',fileEntry('保存','save')],['share',fileEntry('共有','share')],['receive',receiveEntry],['restore',restoreEntry]] as const);

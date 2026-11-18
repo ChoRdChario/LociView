@@ -200,7 +200,7 @@ test('GSの表示失敗を隔離し、点の選択とGPU復旧を同じ画面で
     await page.evaluate(()=>{(window as any).gsProbeFault=false;});await page.getByRole('button',{name:'3D表示を再試行',exact:true}).click();await gsReady(page);
     await page.getByRole('tab',{name:'モデル',exact:true}).click();await modelPanel(page).locator('.lv-model-select').filter({hasText:'全係数.ply'}).click();await page.getByRole('tab',{name:'キャプション',exact:true}).click();await page.getByRole('button',{name:'キャプションを追加',exact:true}).click();const picker=page.waitForEvent('filechooser');await page.getByRole('button',{name:'ピン配置用モデルを選ぶ',exact:true}).click();await (await picker).setFiles({name:'面.glb',mimeType:'model/gltf-binary',buffer:proxy});
     await expect(modelPanel(page).getByRole('button',{name:'このモデルでピンを配置する',exact:true})).toBeEnabled();
-    await modelPanel(page).getByRole('button',{name:'面の選択を取り消す',exact:true}).click();await expect(page.getByRole('button',{name:'座標を入力',exact:true})).toBeVisible();
+    await modelPanel(page).getByRole('region',{name:'ピン配置用モデル',exact:true}).getByRole('button',{name:'選択を取り消す',exact:true}).click();await expect(page.getByRole('button',{name:'座標を入力',exact:true})).toBeVisible();
     await page.getByRole('region',{name:'位置の調整',exact:true}).getByRole('button',{name:'取り消す',exact:true}).click();await page.getByRole('tab',{name:'モデル',exact:true}).click();
     await page.evaluate(()=>{(window as any).gsTargetFault=true;});await page.setViewportSize({width:1450,height:1000});await expect(page.locator('.lv-project-viewport-status')).toContainText('GSの表示領域を準備できません。');
     await lookAlongFront(page);expect((await pixels(page)).slice(0,3)).toEqual([255,0,0]);

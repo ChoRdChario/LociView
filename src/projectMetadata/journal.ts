@@ -15,6 +15,7 @@ import { assertContributionBaseInReceiver, frozenBaseSource } from '../projectPa
 import { readManifestControl } from '../projectPackage/manifest';
 import type { EvidenceRef } from '../projectPackage/contract';
 import { readSceneAppend } from '../projectPackage/sceneAppend';
+import { closedLocalReference, validateClosedLocal, type ClosedLocalReceipt } from './closedLocal';
 
 export interface JournalStart {
   requiredCapabilities?: ReaderCapabilities;
@@ -31,7 +32,32 @@ interface Part { ordinal: number; expectedChangeHash: string; dependencies: stri
 export interface PreparedJournal { start: JournalStart; changes: Part[]; exactChangeSetDigest: string; stagedBlobs?: JsonObject[]; remote?: JournalRemoteProof }
 interface Durable { transactionId: string; exactChangeSetDigest: string }
 export interface Publication extends Durable { heads: string[] }
-export interface JournalEntry { start: JournalStart; prepared: PreparedJournal | null; durable: Durable | null; publication: Publication | null }
+export interface JournalEntry { start: JournalStart; prepared: PreparedJournal | null; durable: Durable | null; publication: Publication | null; closedLocal?: ClosedLocalReceipt }
+export type PublishedJournalEntry = JournalEntry & { prepared: PreparedJournal; publication: Publication };
+export type JournalCommandBase = Pick<JournalStart, 'transactionId' | 'repositoryId' | 'proof' | 'requiredCapabilities'>;
+export interface JournalObservation {
+  readonly entries: readonly JournalEntry[];
+  readonly terminal: JournalEntry | undefined;
+  readonly effectivePublication: PublishedJournalEntry | undefined;
+  readonly pending: JournalEntry | undefined;
+}
+/** Consume the validated linear chain without confusing a closure with saved data. */
+export function observeJournal(entries: readonly JournalEntry[]): JournalObservation {
+  let terminal: JournalEntry | undefined, effectivePublication: PublishedJournalEntry | undefined, pending: JournalEntry | undefined;
+  for (const entry of entries) {
+    if (entry.publication) { terminal = entry; effectivePublication = entry as PublishedJournalEntry; }
+    else if (entry.closedLocal) terminal = entry;
+    else pending = entry;
+  }
+  return { entries, terminal, effectivePublication, pending };
+}
+/** Structural predecessor from the terminal, data capabilities from the publication. */
+export function journalCommandBase(observation: JournalObservation): JournalCommandBase {
+  const { terminal, effectivePublication } = observation;
+  if (!terminal || !effectivePublication) return fail('journal-command-base');
+  return { transactionId: terminal.start.transactionId, repositoryId: effectivePublication.start.repositoryId,
+    proof: effectivePublication.start.proof, ...(effectivePublication.start.requiredCapabilities ? { requiredCapabilities: effectivePublication.start.requiredCapabilities } : {}) };
+}
 interface RestoredBasesBinding {
   schema: 'lociview-workspace-restored-bases-1'; transactionId: string;
   journal: { sha256: string; byteLength: number }; publication: { sha256: string; byteLength: number };
@@ -85,7 +111,7 @@ export class TransactionJournal {
     const prefix = metadataPath(this.fs, 'journal/'), paths = await this.fs.list(prefix);
     const ids = [...new Set(paths.map(path => {
       const tail = path.slice(prefix.length);
-      if (!/^[0-9a-f]{32}\/(staging\.json|blobsVerified\.json|metadataDurable\.json|published\.json|source-metadata\.am|source-manifest\.(json|sha256)|source-protected-inventory\.json|source-exchange-bases\.json|changes\/[0-9]{8}\.amchange|wire-changes\/[0-9]{8}\.amchange|derived-target-metadata\.am|base-evidence\/[0-9a-f]{64})$/.test(tail)) fail('journal-path');
+      if (!/^[0-9a-f]{32}\/(staging\.json|blobsVerified\.json|metadataDurable\.json|published\.json|closedLocal\.json|source-metadata\.am|source-manifest\.(json|sha256)|source-protected-inventory\.json|source-exchange-bases\.json|changes\/[0-9]{8}\.amchange|wire-changes\/[0-9]{8}\.amchange|derived-target-metadata\.am|base-evidence\/[0-9a-f]{64})$/.test(tail)) fail('journal-path');
       return tail.split('/')[0]!;
     }))];
     if (ids.length > this.limits.maxChanges) fail('journal-count');
@@ -115,17 +141,27 @@ export class TransactionJournal {
         heads(publication.heads); if (!publication.heads.length || !durable) fail('publication-before-durable');
         if (prepared?.remote && json(publication.heads) !== json(prepared.remote.expectedFinalHeads)) fail('remote-publication-heads');
       }
-      entries.push({ start: start!, prepared, durable, publication });
+      const closedLocal = paths.includes(this.path(id, 'closedLocal.json'))
+        ? await readReceipt<ClosedLocalReceipt>(this.fs, this.path(id, 'closedLocal.json'), this.limits) : null;
+      if (closedLocal && (prepared || durable || publication || start!.purpose !== 'localCommand' ||
+        paths.filter(path => path.startsWith(this.path(id, ''))).some(path => path !== this.path(id, 'staging.json') && path !== this.path(id, 'closedLocal.json'))))
+        fail('closed-local-directory');
+      entries.push({ start: start!, prepared, durable, publication, ...(closedLocal ? { closedLocal } : {}) });
     }
     const chain: JournalEntry[] = []; let predecessor: string | null = null;
     while (chain.length < entries.length) {
       const children = entries.filter(e => e.start.predecessor === predecessor);
       if (children.length !== 1) fail('journal-chain');
       const child = children[0]!;
+      const previous = observeJournal(chain);
       if (chain.length) checkRequiredCapabilities(child.start.requiredCapabilities,
-        capabilityUnion(readRequiredCapabilities(child.start.requiredCapabilities), readRequiredCapabilities(chain.at(-1)!.start.requiredCapabilities)));
-      if (chain.length && (!chain.at(-1)!.publication || child.start.repositoryId !== chain[0]!.start.repositoryId ||
+        capabilityUnion(readRequiredCapabilities(child.start.requiredCapabilities), readRequiredCapabilities(previous.effectivePublication?.start.requiredCapabilities)));
+      if (chain.length && (previous.pending || !previous.terminal || child.start.repositoryId !== chain[0]!.start.repositoryId ||
         json(child.start.proof) !== json(chain[0]!.start.proof))) fail('journal-chain');
+      if (child.closedLocal) {
+        if (!previous.effectivePublication) return fail('closed-local-publication');
+        await validateClosedLocal(child.closedLocal, child.start, previous.effectivePublication, this.limits);
+      }
       chain.push(child); predecessor = child.start.transactionId;
     }
     return chain;
@@ -133,12 +169,34 @@ export class TransactionJournal {
 
   async begin(start: JournalStart): Promise<void> {
     validateStart(start, this.limits);
+    if (await readReceipt(this.fs, this.path(start.transactionId, 'closedLocal.json'), this.limits)) fail('closed-local-terminal');
     if (start.purpose === 'appendScene') await this.validateSceneAppend(start, null);
     await writeReceipt(this.fs, this.path(start.transactionId, 'staging.json'), start, this.limits);
+  }
+  /** Only the caller's fresh whole-repository proof can authorize this terminal. */
+  async closeLocal(start: JournalStart, baseChangeSet: ClosedLocalReceipt['baseChangeSet']): Promise<ClosedLocalReceipt> {
+    const entries = await this.entries(), observation = observeJournal(entries), entry = entries.at(-1), effective = observation.effectivePublication;
+    if (!entry || !effective || json(entry.start) !== json(start) || start.purpose !== 'localCommand' || entry.prepared || entry.durable || entry.publication)
+      return fail('closed-local-state');
+    const receipt: ClosedLocalReceipt = { schema: 'lociview-metadata-closed-local-1', transactionId: start.transactionId,
+      repositoryId: start.repositoryId, start: await closedLocalReference(start),
+      effectivePublication: { transactionId: effective.start.transactionId, receipt: await closedLocalReference(effective.publication), heads: [...effective.publication.heads] },
+      baseChangeSet: { ...baseChangeSet }, resolution: 'retain-published-state' };
+    await validateClosedLocal(receipt, start, effective, this.limits);
+    const paths = await this.fs.list(this.path(start.transactionId, ''));
+    const allowed = new Set([this.path(start.transactionId, 'staging.json'), ...(entry.closedLocal ? [this.path(start.transactionId, 'closedLocal.json')] : [])]);
+    if (paths.length !== allowed.size || paths.some(path => !allowed.has(path))) return fail('closed-local-directory');
+    if (entry.closedLocal) {
+      if (json(entry.closedLocal) !== json(receipt)) return fail('closed-local-conflict');
+      return entry.closedLocal;
+    }
+    await writeReceipt(this.fs, this.path(start.transactionId, 'closedLocal.json'), receipt, this.limits);
+    return receipt;
   }
   async stage(start: JournalStart, parts: readonly Uint8Array[], stagedBlobs: readonly JsonObject[] = [],
     remote?: JournalRemoteInput): Promise<PreparedJournal> {
     validateStart(start, this.limits);
+    if (await readReceipt(this.fs, this.path(start.transactionId, 'closedLocal.json'), this.limits)) fail('closed-local-terminal');
     parts = checkedChanges(parts, this.limits);
     if (remote) { remote = captureJournalRemote(remote, start.proof, this.limits); await validateJournalRemote(remote, start.proof, this.limits); }
     const changes: Part[] = [];
@@ -360,6 +418,7 @@ export class TransactionJournal {
   }
 
   async publish(p: PreparedJournal, source: ProjectMetadataSource): Promise<void> {
+    if (await readReceipt(this.fs, this.path(p.start.transactionId, 'closedLocal.json'), this.limits)) fail('closed-local-terminal');
     const receipt: Publication = { transactionId: p.start.transactionId, exactChangeSetDigest: p.exactChangeSetDigest, heads: source.heads };
     if (p.remote && json(receipt.heads) !== json(p.remote.expectedFinalHeads)) fail('remote-final-heads');
     if (p.start.purpose === 'restoreBackup') {

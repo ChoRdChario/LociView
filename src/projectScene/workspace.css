@@ -309,6 +309,13 @@
 .lv-validation-home button:disabled { border-style: dashed; }
 
 /* The same saved-file confirmation also starts a new browser's first session. */
+.lv-recovery-refusal { box-sizing: border-box; max-width: 640px; margin: 16px auto; padding: 16px 20px; background: var(--lv-panel); color: var(--lv-ink); border: 1px solid var(--lv-rule); border-radius: 6px; overflow-wrap: anywhere; }
+.lv-recovery-refusal > h2 { margin: 0 0 12px; font-size: 18px; line-height: 1.5; }
+.lv-recovery-refusal > p { margin: 12px 0; }
+.lv-recovery-refusal > .lv-recovery-exit { min-height: 44px; padding: 8px 12px; border: 1px solid var(--lv-action); border-radius: 4px; background: var(--lv-action); color: var(--lv-field); cursor: pointer; }
+.lv-recovery-refusal > .lv-recovery-exit:focus-visible { outline: 2px solid var(--lv-action); outline-offset: 3px; }
+.lv-recovery-refusal > details { margin-top: 12px; }
+.lv-recovery-refusal > details > summary { min-height: 44px; align-content: center; cursor: pointer; }
 .lv-first-restore-panel { min-width: 0; overflow-wrap: anywhere; }
 .lv-first-restore-panel:not(:has(.lv-resume-reading)) { box-sizing: border-box; max-width: 948px; margin: 16px auto; padding: 16px 20px; background: var(--lv-panel); border: 1px solid var(--lv-rule); border-radius: 6px; }
 .lv-first-restore-panel > h2 { margin: 0 0 12px; font-size: 18px; line-height: 1.5; }

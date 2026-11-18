@@ -12,7 +12,7 @@ import { createCaptionWindowControls } from './captionWindowControls';
 import { captionWindowPlanIsCurrent, captionWindowView, newCaptionWindowMemory, planCaptionWindow, type CaptionWindowMemory, type CaptionWindowPlan } from './captionWindowState';
 import { createMediaViewer } from './mediaPreview';
 import { createMediaResidencyGate } from './mediaPreviewResources';
-import {storageFailureText} from './storageFeedback';
+import {metadataFailureText,storageFailureText} from './storageFeedback';
 import type { SceneUiMemory } from './navigationState';
 import { fieldValue, projectAttachments, projectCaptions, projectCaptionSceneCount, projectCaptionInventory, projectModels, projectIdentity } from './projectRead';
 import { surfaceAnchor, type ProjectWorkspacePorts, type WorkspaceFileInteraction, type WorkspacePinProposal, type WorkspaceSurface, type WorkspaceViewportState, type WorkspaceViewportPresentation, type Point3 } from './projectWorkspacePorts';
@@ -55,7 +55,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   ]) help.append(make('h3', title), make('p', text));
   const storageHelp = make('details'), storageStatus = make('p'); let storageChecking = false, storageEpoch = 0;
   let storageFailure:{diagnostic:string|undefined;text:string}|undefined;
-  const failureMessage=(state=ports.status())=>storageFailure&&storageFailure.diagnostic===state.error?storageFailure.text:state.error;
+  const failureMessage=(state=ports.status())=>storageFailure&&storageFailure.diagnostic===state.error?storageFailure.text:metadataFailureText(state.error)??state.error;
   storageHelp.setAttribute('aria-label', 'このサイトの保存容量'); storageStatus.setAttribute('role', 'status');
   const storageCheck = button('保存容量を確認', () => { void queryStorage(); });
   storageHelp.append(make('summary', 'このサイトの保存容量'),
@@ -258,10 +258,15 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     if (!target || !sameTarget(target, captured.target)) { feedback = '表示が変わっています。場所を選び直してください。'; render(); return; }
     const command: MetadataEdit = captured.captionId ? { kind: pinAction!.kind === 'move' ? 'movePin' : 'reparentPin', sceneId, captionId: captured.captionId, anchor: surfaceAnchor(captured) } :
       { kind: 'addPin', sceneId, captionId: id('cap'), membershipId: id('scm'), eventId: id('evt'), anchor: surfaceAnchor(captured), colorSrgb: colorBytes(pinAction!.color!) };
+    const focusOrigin = document.activeElement;
     void run(command, () => {
       const captionId = command.kind === 'addPin' ? command.captionId : captured.captionId!;
-      clearPin(); selectCaption(captionId); feedback = 'ピンの位置を確定しました。';
-      queueMicrotask(() => { if (!disposed) detailHeading.focus?.({ preventScroll: true }); });
+      clearPin(); selectCaption(captionId, { openWindow: command.kind !== 'addPin' }); feedback = 'ピンの位置を確定しました。';
+      queueMicrotask(() => {
+        if (disposed || document.activeElement !== focusOrigin && document.activeElement !== document.body) return;
+        if (command.kind === 'addPin' && !mobileLayout?.matches) detail.focusTitle();
+        else detailHeading.focus?.({ preventScroll: true });
+      });
     });
   });
   const cancelPin = button('取り消す', () => {
@@ -785,7 +790,11 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     return true;
   }
   function resetDraft() { draft = null; draft = beginCaptionDraft(detailContext().source); }
-  function selectCaption(captionId: string) { memories.set(sceneId, { ...memory(), selectedCaptionId: captionId }); resetDraft(); openCaptionWindow(captionId); captionSurface = 'detail'; }
+  function selectCaption(captionId: string, { openWindow = true }: { openWindow?: boolean } = {}) {
+    memories.set(sceneId, { ...memory(), selectedCaptionId: captionId }); resetDraft();
+    if (openWindow) openCaptionWindow(captionId);
+    captionSurface = 'detail';
+  }
   function setPin(next: WorkspacePinProposal) { pin = next; numericTarget = null; choosing = false; rawPosition = next.position.map(String);parent.open=false;numericAdd.open=false;addSettings.open=false; }
   function clearPin() { compactSurface = 'panel'; gesture = null; gestureGeneration++; pin = null; numericTarget = null; pinAction = null; surfaceOpening = null; surfaceFocus = null; choosing = false; placingCaption = null; rawPosition = ['', '', '']; adjustment.open = false; }
   function candidateAssets() {
@@ -1191,8 +1200,9 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       fileStatus.hidden = !!(hasDraft || saving || failed);
       savedFileState.hidden = fileStatus.hidden;
       resumeStatus.dataset.state = saving ? 'busy' : failed ? 'error' : hasDraft ? 'draft' : summary.resumable ? 'ready' : 'attention';
-      fileStatus.textContent = summary.backup === 'verified' ? '選択ファイルと一致' : summary.backup === 'download-started' ? 'ダウンロード開始・保存先未確認' :
+      fileStatus.textContent = summary.backup === 'verified' ? '選択ファイルと一致' : summary.backup === 'download-started' ? 'ダウンロード開始・保存先で確認' :
         summary.backup === 'unavailable' ? '保存ファイルを確認してください。' : summary.backupOutdated ? '更新が必要' : '保存未確認';
+      fileStatus.title = summary.backup === 'download-started' ? '保存先で完了を確認してください。' : '';
       fileStatus.dataset.state = summary.backup === 'verified' ? 'verified' : summary.backup === 'unavailable' || summary.backupOutdated ? 'attention' : 'unconfirmed';
       const nextGestureContext = JSON.stringify([p.token, sceneId, ports.readOnly, ports.imageScope(), ports.otherPending(), models?.hidden(), memory().pinColors]);
       if (gestureContext !== nextGestureContext) { gestureContext = nextGestureContext; gesture = null; gestureGeneration++; }

@@ -56,6 +56,11 @@ test('image details, Scene keyboard focus and dismissible header sheets retain P
     await page.keyboard.press('Escape'); await expect(settings).not.toHaveAttribute('open'); await expect(summary).toBeFocused(); await summary.click(); await expect(displayName).toHaveValue('保持する入力');
     await settings.getByRole('button', { name: '表示名の入力を取り消す', exact: true }).click(); await page.keyboard.press('Escape');
     const sidebarPhoto = page.getByRole('region', { name: 'メディアの整理', exact: true }).getByRole('region', { name: '添付メディア', exact: true }).getByRole('button', { name: '画像を表示', exact: true });
+    await expect(page.locator('.lv-caption-window')).toHaveCount(0); await expect(sidebarPhoto).toBeVisible();
+    if (await settings.evaluate(node => (node as HTMLDetailsElement).open)) await summary.click();
+    await expect(settings).not.toHaveAttribute('open');
+    await page.locator('.lv-caption-select').filter({ hasText: '細部の記録' }).click();
+    await expect(page.locator('.lv-caption-window')).toHaveCount(1);
     await expect(sidebarPhoto).toBeHidden();
     const recordWindow = page.locator('.lv-caption-window');
     const show = recordWindow.getByRole('button', { name: '画像を表示', exact: true }); await show.click();

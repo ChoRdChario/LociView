@@ -1551,6 +1551,218 @@ describe('new-workspace metadata persistence service (memory ports, not device/a
     const done = await writer.retry(); expect(done.source!.originalChanges().at(-1)).toEqual(retained);
   });
 
+  it('06j closes consecutive start-only edits without changing saved bytes and continues the linear history', async () => {
+    const h = setup(), initial = await h.session().create(h.records);
+    const snapshot = async () => new Map(await Promise.all((await h.fs.list('')).map(async path => [path, (await h.fs.readBytes(path))!.slice()] as const)));
+    let current = initial, lastClosed = '';
+    for (let n = 0; n < 2; n++) {
+      const writer = h.session(); await writer.read();
+      h.fs.reject = path => path.endsWith('/changes/00000000.amchange');
+      await expect(writer.edit(current.source!.token, { kind: 'editCaption', captionId: id('cap'), edits: { body: `未保存${n}` } },
+        n === 0 ? { kind: 'self-declared', name: '未保存の編集者' } : { kind: 'none' })).rejects.toThrow();
+      h.fs.reject = () => false;
+      await expect(writer.inspectUnwrittenLocalEdit()).rejects.toThrow('closed-local-hot-command');
+      const journal = new TransactionJournal(h.fs, limits), pending = (await journal.entries()).at(-1)!;
+      expect(await h.fs.list(journal.path(pending.start.transactionId, ''))).toEqual([journal.path(pending.start.transactionId, 'staging.json')]);
+      const cold = h.session(), ticket = await cold.inspectUnwrittenLocalEdit(); expect(ticket).not.toBeNull();
+      const before = await snapshot(), rows = structuredClone([...h.rows]), writes = h.fs.writes;
+      current = await cold.resolveUnwrittenLocalEdit(ticket!);
+      expect(current.state).toBe('ready'); expect(current.publication).toBe(initial.publication);
+      expect(current.source!.originalChanges()).toEqual(initial.source!.originalChanges());
+      expect([...h.rows]).toEqual(rows); expect(h.fs.writes).toBe(writes + 1);
+      await expect(writer.retry()).rejects.toThrow('closed-local-terminal');
+      const after = await snapshot(), closure = journal.path(pending.start.transactionId, 'closedLocal.json');
+      expect([...after.keys()].filter(path => !before.has(path))).toEqual([closure]);
+      for (const [path, bytes] of before) expect(after.get(path), path).toEqual(bytes);
+      const receipt = JSON.parse(new TextDecoder().decode(after.get(closure)!));
+      expect(receipt.schema).toBe('lociview-metadata-closed-local-1');
+      expect(receipt.effectivePublication.transactionId).toBe(initial.publication);
+      expect(receipt.start.sha256).toBe(await digest(before.get(journal.path(pending.start.transactionId, 'staging.json'))!));
+      expect(receipt.baseChangeSet.count).toBe(initial.source!.originalChanges().length);
+      const acknowledgedWrites = h.fs.writes;
+      expect((await cold.resolveUnwrittenLocalEdit(ticket!)).state).toBe('ready');
+      expect(h.fs.writes).toBe(acknowledgedWrites); expect([...h.rows]).toEqual(rows);
+      lastClosed = pending.start.transactionId;
+    }
+    const cold = h.session(); expect((await cold.read()).state).toBe('ready');
+    const saved = await cold.editCaption(current.source!.token, id('cap'), 'body', '再開して保存');
+    expect((await new TransactionJournal(h.fs, limits).entries()).at(-1)!.start.predecessor).toBe(lastClosed);
+    expect((await h.session().read()).source!.originalChanges()).toEqual(saved.source!.originalChanges());
+    expect(textCandidates(saved.source!, 'body')).toEqual([{ kind: 'value', value: '再開して保存' }]);
+    expect(saved.source!.requiredCapabilities).toEqual([]);
+  });
+
+  it.each(['empty-part', 'partial-part', 'complete-part', 'extra-history', 'torn-closure', 'unknown-capability', 'corrupt-publication'] as const)
+    ('06j refuses %s without erasing or rewriting any evidence', async defect => {
+      const h = setup(), writer = h.session(), initial = await writer.create(h.records);
+      h.fs.reject = path => path.endsWith('/changes/00000000.amchange');
+      await expect(writer.editCaption(initial.source!.token, id('cap'), 'body', '中断')).rejects.toThrow(); h.fs.reject = () => false;
+      const journal = new TransactionJournal(h.fs, limits), entries = await journal.entries(), pending = entries.at(-1)!;
+      const part = journal.path(pending.start.transactionId, 'changes/00000000.amchange');
+      if (defect === 'empty-part') await h.fs.writeBytes(part, new Uint8Array());
+      if (defect === 'partial-part') await h.fs.writeBytes(part, Uint8Array.of(1, 2));
+      if (defect === 'complete-part') await h.fs.writeBytes(part, initial.source!.originalChanges()[0]!);
+      if (defect === 'extra-history') {
+        const other = await initial.source!.prepareCaptionText(initial.source!.token, id('cap'), 'body', '別の履歴');
+        await underWriteLease(h.fs, () => new MetadataRepository(h.fs, h.storage, limits).persist(pending.start.repositoryId, other));
+      }
+      if (defect === 'torn-closure') await h.fs.writeText(journal.path(pending.start.transactionId, 'closedLocal.json'), '{');
+      if (defect === 'unknown-capability') await h.fs.writeText(journal.path(pending.start.transactionId, 'staging.json'), json({ ...pending.start, requiredCapabilities: ['future-unknown'] }));
+      if (defect === 'corrupt-publication') await h.fs.writeText(journal.path(initial.publication!, 'published.json'), json({ ...entries[0]!.publication, exactChangeSetDigest: 'f'.repeat(64) }));
+      const before = new Map(await Promise.all((await h.fs.list('')).map(async path => [path, (await h.fs.readBytes(path))!.slice()] as const))), rows = structuredClone([...h.rows]), writes = h.fs.writes;
+      const candidate = h.session().inspectUnwrittenLocalEdit();
+      if (['empty-part', 'partial-part', 'complete-part'].includes(defect)) await expect(candidate).resolves.toBeNull();
+      else await expect(candidate).rejects.toThrow(defect === 'extra-history' ? 'closed-local-repository-changed' :
+        defect === 'torn-closure' ? 'receipt-invalid' : defect === 'corrupt-publication' ? 'publication-receipt' : '対応したLociView');
+      expect(h.fs.writes).toBe(writes); expect([...h.rows]).toEqual(rows);
+      expect(await h.fs.list('')).toEqual([...before.keys()]);
+      for (const [path, bytes] of before) expect(await h.fs.readBytes(path), path).toEqual(bytes);
+    });
+
+  it('06j rejects forged, cross-Session and stale tickets', async () => {
+    const h = setup(), writer = h.session(), initial = await writer.create(h.records);
+    h.fs.reject = path => path.endsWith('/changes/00000000.amchange');
+    await expect(writer.editCaption(initial.source!.token, id('cap'), 'body', '中断')).rejects.toThrow(); h.fs.reject = () => false;
+    const cold = h.session(), ticket = (await cold.inspectUnwrittenLocalEdit())!;
+    await expect(cold.resolveUnwrittenLocalEdit({ kind: 'unwritten-local-edit-recovery' })).rejects.toThrow('closed-local-ticket');
+    await expect(h.session().resolveUnwrittenLocalEdit(ticket)).rejects.toThrow('closed-local-ticket');
+    const ready = await cold.resolveUnwrittenLocalEdit(ticket);
+    await cold.editCaption(ready.source!.token, id('cap'), 'body', '次の保存'); const writes = h.fs.writes;
+    await expect(cold.resolveUnwrittenLocalEdit(ticket)).rejects.toThrow('closed-local-stale'); expect(h.fs.writes).toBe(writes);
+  });
+
+  it('06j never recreates a closure already acknowledged by its ticket', async () => {
+    const h = setup(), writer = h.session(), initial = await writer.create(h.records);
+    h.fs.reject = path => path.endsWith('/changes/00000000.amchange');
+    await expect(writer.editCaption(initial.source!.token, id('cap'), 'body', '中断')).rejects.toThrow(); h.fs.reject = () => false;
+    const cold = h.session(), ticket = (await cold.inspectUnwrittenLocalEdit())!;
+    await cold.resolveUnwrittenLocalEdit(ticket);
+    const journal = new TransactionJournal(h.fs, limits), closed = (await journal.entries()).at(-1)!;
+    await h.fs.remove(journal.path(closed.start.transactionId, 'closedLocal.json'));
+    const writes = h.fs.writes;
+    await expect(cold.resolveUnwrittenLocalEdit(ticket)).rejects.toThrow('closed-local-missing');
+    expect(h.fs.writes).toBe(writes); expect(await h.fs.exists(journal.path(closed.start.transactionId, 'closedLocal.json'))).toBe(false);
+  });
+
+  it.each(['before-close', 'after-close'] as const)('06j freshly refuses repository data added after issuing a ticket (%s)', async cut => {
+    const h = setup(), writer = h.session(), initial = await writer.create(h.records);
+    h.fs.reject = path => path.endsWith('/changes/00000000.amchange');
+    await expect(writer.editCaption(initial.source!.token, id('cap'), 'body', '中断')).rejects.toThrow(); h.fs.reject = () => false;
+    const cold = h.session(), ticket = (await cold.inspectUnwrittenLocalEdit())!;
+    const journal = new TransactionJournal(h.fs, limits), start = (await journal.entries()).at(-1)!.start;
+    const documentId = new MetadataRepository(h.fs, h.storage, limits).documentId(start.repositoryId);
+    const key = JSON.stringify([documentId, 'unexplained']), data = Uint8Array.of(1), rows = structuredClone([...h.rows]), writes = h.fs.writes;
+    const write = h.fs.writeText.bind(h.fs), fault = vi.spyOn(h.fs, 'writeText').mockImplementation(async (path, text) => {
+      await write(path, text); if (cut === 'after-close' && path.endsWith('/closedLocal.json')) h.rows.set(key, data);
+    });
+    if (cut === 'before-close') h.rows.set(key, data);
+    try { await expect(cold.resolveUnwrittenLocalEdit(ticket)).rejects.toThrow('closed-local-storage-key'); }
+    finally { fault.mockRestore(); }
+    expect([...h.rows]).toEqual([...rows, [key, data]]);
+    const closed = (await journal.entries()).at(-1)!.closedLocal;
+    if (cut === 'before-close') { expect(closed).toBeUndefined(); expect(h.fs.writes).toBe(writes); }
+    else expect(closed?.resolution).toBe('retain-published-state');
+  });
+
+  it.each(['before-write', 'complete-write', 'torn-write'] as const)('06j preserves originals and never overwrites failed closure bytes (%s)', async cut => {
+    const h = setup(), writer = h.session(), initial = await writer.create(h.records);
+    h.fs.reject = path => path.endsWith('/changes/00000000.amchange');
+    await expect(writer.editCaption(initial.source!.token, id('cap'), 'body', '中断')).rejects.toThrow(); h.fs.reject = () => false;
+    const cold = h.session(), ticket = (await cold.inspectUnwrittenLocalEdit())!, rows = structuredClone([...h.rows]);
+    const write = h.fs.writeText.bind(h.fs);
+    const fault = vi.spyOn(h.fs, 'writeText').mockImplementation(async (path, value) => {
+      if (!path.endsWith('/closedLocal.json')) return write(path, value);
+      if (cut !== 'before-write') await write(path, cut === 'torn-write' ? '{' : value);
+      throw Error('closure interrupted');
+    });
+    await expect(cold.resolveUnwrittenLocalEdit(ticket)).rejects.toThrow('closure interrupted'); fault.mockRestore();
+    expect([...h.rows]).toEqual(rows);
+    const journal = new TransactionJournal(h.fs, limits), paths = await h.fs.list('v2/metadata/journal/');
+    const closurePath = paths.find(path => path.endsWith('/closedLocal.json')), writes = h.fs.writes;
+    if (cut === 'torn-write') {
+      await expect(cold.resolveUnwrittenLocalEdit(ticket)).rejects.toThrow('receipt-invalid');
+      expect(h.fs.writes).toBe(writes); expect(await h.fs.readText(closurePath!)).toBe('{');
+    } else {
+      const saved = await cold.resolveUnwrittenLocalEdit(ticket);
+      expect(saved.source!.originalChanges()).toEqual(initial.source!.originalChanges());
+      expect(h.fs.writes).toBe(writes + (cut === 'before-write' ? 1 : 0));
+      expect((await journal.entries()).at(-1)!.closedLocal).toBeDefined();
+    }
+  });
+
+  it.each(['prepared', 'before-publication', 'published'] as const)('06j keeps exact-once cold recovery after a later %s interruption', async cut => {
+    const h = setup(), writer = h.session(), initial = await writer.create(h.records);
+    h.fs.reject = path => path.endsWith('/changes/00000000.amchange');
+    await expect(writer.editCaption(initial.source!.token, id('cap'), 'body', '中断')).rejects.toThrow(); h.fs.reject = () => false;
+    const resolved = h.session(), ready = await resolved.resolveUnwrittenLocalEdit((await resolved.inspectUnwrittenLocalEdit())!);
+    const write = h.fs.writeText.bind(h.fs), marker = cut === 'prepared' ? '/blobsVerified.json' : '/published.json';
+    const fault = vi.spyOn(h.fs, 'writeText').mockImplementation(async (path, value) => {
+      if (path.endsWith(marker) && cut === 'before-publication') throw Error('next edit interrupted');
+      await write(path, value); if (path.endsWith(marker)) throw Error('next edit interrupted');
+    });
+    await expect(resolved.editCaption(ready.source!.token, id('cap'), 'body', '次の編集は一度だけ')).rejects.toThrow(); fault.mockRestore();
+    const cold = h.session(), result = await cold.retry();
+    expect(result.state).toBe('ready'); expect(result.source!.originalChanges()).toHaveLength(initial.source!.originalChanges().length + 1);
+    expect(textCandidates(result.source!, 'body')).toEqual([{ kind: 'value', value: '次の編集は一度だけ' }]);
+    const writes = h.fs.writes; expect((await cold.retry()).source!.originalChanges()).toEqual(result.source!.originalChanges()); expect(h.fs.writes).toBe(writes);
+  });
+
+  it.each(['unknown-key', 'queued-change', 'snapshot-hash'] as const)('06j refuses unexplained physical repository data (%s)', async defect => {
+    const h = setup(), writer = h.session(), initial = await writer.create(h.records);
+    h.fs.reject = path => path.endsWith('/changes/00000000.amchange');
+    await expect(writer.editCaption(initial.source!.token, id('cap'), 'body', '中断')).rejects.toThrow(); h.fs.reject = () => false;
+    const journal = new TransactionJournal(h.fs, limits), start = (await journal.entries()).at(-1)!.start;
+    const documentId = new MetadataRepository(h.fs, h.storage, limits).documentId(start.repositoryId);
+    if (defect === 'unknown-key') h.rows.set(JSON.stringify([documentId, 'unexplained']), Uint8Array.of(1));
+    if (defect === 'queued-change') {
+      const first = await initial.source!.prepareCaptionText(initial.source!.token, id('cap'), 'body', '未保存の依存'),
+        later = await first.prepareCaptionText(first.token, id('cap'), 'body', '依存だけ欠損した変更');
+      const doc = A.load<Record<string, any>>(later.encodeFullSource()), bytes = A.saveSince(doc, first.heads);
+      h.rows.set(JSON.stringify([documentId, 'incremental', await digest(bytes)]), bytes);
+      // The normal loader cannot expose the queued operation through getAllChanges.
+      expect((await new MetadataRepository(h.fs, h.storage, limits).read(start.repositoryId, start.proof))!.originalChanges()).toEqual(initial.source!.originalChanges());
+    }
+    if (defect === 'snapshot-hash') {
+      const [key, bytes] = [...h.rows].find(([key]) => JSON.parse(key)[1] === 'snapshot')!;
+      h.rows.delete(key); h.rows.set(JSON.stringify([documentId, 'snapshot', 'f'.repeat(64)]), bytes);
+    }
+    const rows = structuredClone([...h.rows]), writes = h.fs.writes;
+    await expect(h.session().inspectUnwrittenLocalEdit()).rejects.toThrow(defect === 'queued-change' ? 'closed-local-storage-dependencies' : defect === 'snapshot-hash' ? 'closed-local-storage-hash' : 'closed-local-storage-key');
+    expect([...h.rows]).toEqual(rows); expect(h.fs.writes).toBe(writes);
+    expect((await journal.entries()).at(-1)!.closedLocal).toBeUndefined();
+  });
+
+  it('06j accepts valid overlapping snapshots in either row order without compaction or writes', async () => {
+    const h = setup(), writer = h.session(), initial = await writer.create(h.records);
+    const [old] = A.applyChanges(A.init<Record<string, any>>(), [initial.source!.originalChanges()[0]!]);
+    const oldBytes = A.save(old), journal = new TransactionJournal(h.fs, limits), root = (await journal.entries())[0]!;
+    const documentId = new MetadataRepository(h.fs, h.storage, limits).documentId(root.start.repositoryId);
+    h.rows.set(JSON.stringify([documentId, 'snapshot', await digest(new TextEncoder().encode(A.getHeads(old).join('')))]), oldBytes);
+    h.fs.reject = path => path.endsWith('/changes/00000000.amchange');
+    await expect(writer.editCaption(initial.source!.token, id('cap'), 'body', '中断')).rejects.toThrow(); h.fs.reject = () => false;
+    const rows = [...h.rows].reverse(); h.rows.clear(); for (const [key, bytes] of rows) h.rows.set(key, bytes);
+    const cold = h.session(), ticket = await cold.inspectUnwrittenLocalEdit(); expect(ticket).not.toBeNull();
+    expect((await cold.resolveUnwrittenLocalEdit(ticket!)).source!.originalChanges()).toEqual(initial.source!.originalChanges());
+    expect([...h.rows]).toEqual(rows);
+  });
+
+  it.each([1, 4, -1])('06j refuses a truncated incremental with a correct storage digest (%s bytes)', async length => {
+    const h = setup(), writer = h.session(), initial = await writer.create(h.records);
+    h.fs.reject = path => path.endsWith('/changes/00000000.amchange');
+    await expect(writer.editCaption(initial.source!.token, id('cap'), 'body', '中断')).rejects.toThrow(); h.fs.reject = () => false;
+    const journal = new TransactionJournal(h.fs, limits), start = (await journal.entries()).at(-1)!.start;
+    const next = await initial.source!.prepareCaptionText(initial.source!.token, id('cap'), 'body', '未保存');
+    const document = A.load<Record<string, any>>(next.encodeFullSource());
+    let bytes: Uint8Array;
+    try { bytes = A.saveSince(document, initial.source!.heads).slice(0, length); } finally { A.free(document); }
+    const documentId = new MetadataRepository(h.fs, h.storage, limits).documentId(start.repositoryId);
+    h.rows.set(JSON.stringify([documentId, 'incremental', await digest(bytes)]), bytes);
+    const rows = structuredClone([...h.rows]), writes = h.fs.writes;
+    await expect(h.session().inspectUnwrittenLocalEdit()).rejects.toThrow();
+    expect([...h.rows]).toEqual(rows); expect(h.fs.writes).toBe(writes);
+    expect((await journal.entries()).at(-1)!.closedLocal).toBeUndefined();
+  });
+
   it('rejects corrupt retained bytes without changing the previous publication or erasing evidence', async () => {
     const h = setup(), writer = h.session(), initial = await writer.create(h.records); h.fault.save = true;
     await expect(writer.editCaption(initial.source!.token, id('cap'), 'body', '保留')).rejects.toThrow();

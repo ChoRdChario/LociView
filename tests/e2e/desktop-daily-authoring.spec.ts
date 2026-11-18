@@ -58,8 +58,13 @@ test('daily Scene and Caption organization, tags, alignment, settings and files 
     await p.getByRole('button', { name: '記録の変更をやり直す', exact: true }).click(); await ready(p, '記録の変更をやり直しました。'); await expect(editedMedia.getByRole('figure')).toHaveCount(1);
     const timedFiles=await Promise.all(['owned-video.mp4','owned-audio.m4a','owned-audio.mp3'].map(async name=>({name,mimeType:name.endsWith('.mp4')?'video/mp4':name.endsWith('.m4a')?'audio/mp4':'audio/mpeg',buffer:await readFile(`tests/fixtures/daily-media/${name}`)})));
     const play=async(page:Page,kind:'video'|'audio',name:string)=>{
+      const currentTitle=await page.getByRole('region',{name:'キャプションの詳細',exact:true}).getByLabel('タイトル',{exact:true}).inputValue();
+      const currentWindow=page.locator('.lv-caption-window').filter({has:page.getByRole('button',{name:currentTitle,exact:true})}).filter({visible:true});
+      if(await currentWindow.count()){
+        await expect(currentWindow).toHaveCount(1);await currentWindow.getByRole('button',{name:'閉じる',exact:true}).click();await expect(currentWindow).toHaveCount(0);
+      }
       const gallery=page.getByRole('region',{name:'メディアの整理',exact:true});
-      await gallery.getByRole('figure').filter({hasText:name}).getByRole('button',{name:kind==='video'?'動画を再生':'音声を再生',exact:true}).click();
+      const playAction=gallery.getByRole('figure').filter({hasText:name}).getByRole('button',{name:kind==='video'?'動画を再生':'音声を再生',exact:true});await expect(playAction).toBeVisible();await playAction.click();
       const dialog=page.getByRole('dialog',{name:'メディアビューア',exact:true}),node=dialog.locator(kind);await expect(node).toBeVisible();expect(await node.getAttribute('autoplay')).toBeNull();
       await node.evaluate(async n=>{await(n as HTMLMediaElement).play();});await expect.poll(()=>node.evaluate(n=>(n as HTMLMediaElement).currentTime)).toBeGreaterThan(.2);
       if(kind==='video')expect(await node.evaluate(n=>(n as HTMLVideoElement).getVideoPlaybackQuality().totalVideoFrames)).toBeGreaterThan(0);

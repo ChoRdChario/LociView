@@ -13,7 +13,8 @@ import { readProjectScene, type ProjectProviderRead } from '../scene/projectProv
 import { checkLimits, fail, MetadataSourceError, type MetadataLimits } from './format';
 import { ProjectMetadataSource } from './source';
 import { MetadataRepository, type MetadataStorageFactory } from './repository';
-import { TransactionJournal, type JournalStart, type PreparedJournal, type JournalEntry } from './journal';
+import { TransactionJournal, observeJournal, journalCommandBase, type JournalCommandBase, type JournalStart, type PreparedJournal, type JournalEntry } from './journal';
+import { assertClosedLocalOriginals, closedLocalBase } from './closedLocal';
 import { digest, equalBytes, json, newId, underWriteLease, withMetadataRead, metadataPath, selectedTextCommit, type MetadataReadPorts, type TextCommitPorts } from './persistence';
 import { canonicalMetadataEdit, planMetadataEdit, type MetadataEdit } from './commands';
 import { checkRemoteStored, copyFullSource, initialWorkspaceChanges, planRemoteChanges, type FullMetadataSource, type RemoteBatchProof } from './remote';
@@ -79,6 +80,8 @@ export type MetadataSessionRead = Readonly<{
   /** Internal technical receipt, never an end-user label. */
   publication: string | null;
 }>;
+/** Opaque, same-Session recovery intent; it carries no provider or write port. */
+export interface UnwrittenLocalEditRecovery { readonly kind: 'unwritten-local-edit-recovery' }
 /** Synchronous presentation observation; never grants output/recovery authority. */
 export type BackupPresentationObserver = (read: MetadataSessionRead, output?: CompletedBackupDisplay) => void;
 /** One actual completed Backup, for same-command display only. No persisted capability. */
@@ -145,7 +148,8 @@ function incomingBlobs(blobs: readonly { sha256: string; byteLength: number }[])
 
 function matchesPublishedBase(chain: readonly JournalEntry[], base: readonly JournalEntry[], added: number): boolean {
   return chain.length === base.length + added && base.every((entry, i) =>
-    json(chain[i]!.start) === json(entry.start) && json(chain[i]!.publication) === json(entry.publication));
+    json(chain[i]!.start) === json(entry.start) && json(chain[i]!.publication) === json(entry.publication) &&
+    json(chain[i]!.closedLocal ?? null) === json(entry.closedLocal ?? null));
 }
 
 /** New synthetic-workspace service; ordinary ProjectStore/UI and old saved runs do not import it. */
@@ -164,6 +168,7 @@ export class MetadataProjectSession {
     remote?: JournalRemoteInput;
     introduction?: { source: ProjectMetadataSource; command: Extract<MetadataEdit, { kind: 'createAttachment' }>; editor: LocalEditorContext } } | null = null;
   private last: MetadataSessionRead = { state: 'empty', source: null, provider: null, publication: null };
+  private readonly unwrittenLocalTickets = new WeakMap<UnwrittenLocalEditRecovery, { transactionId: string; fingerprint: string; observedClosure: boolean }>();
   constructor(private readonly fs: ProjectWorkspaceFS, private readonly storage: MetadataStorageFactory, limits: MetadataLimits,
     /** Owned verifier, fresh durable inventory/evidence per request. Boolean permits initial fact creation only. */
     private readonly verifier: (allowNewEvidence: boolean, preparation?: MetadataReadPorts) => ProjectContentVerifier,
@@ -218,19 +223,19 @@ export class MetadataProjectSession {
     });
   }
   private async readCandidate(integrity?: OutputIntegrityRead, ports?: MetadataReadPorts, editingText = false, requireReadyPublished = false, preparation?: MetadataReadPorts, observedJournal?: readonly JournalEntry[]): Promise<{
-    read: MetadataSessionRead; acknowledged?: Set<string>; localChanges?: Set<string>; publishedStart?: JournalStart; priorPublications?: JournalEntry[]; witnessWork?: number
+    read: MetadataSessionRead; acknowledged?: Set<string>; localChanges?: Set<string>; commandBase?: JournalCommandBase; priorPublications?: JournalEntry[]; witnessWork?: number
   }> {
     try {
       if (ports && !ports.factory) return fail('generation-storage-binding');
       const fs = ports?.fs ?? this.fs, journal = ports ? new TransactionJournal(fs, this.limits) : this.journal;
       const repository = ports ? new MetadataRepository(fs, ports.factory!, this.limits) : this.repository;
       if (observedJournal) { if (!integrity) return fail('output-journal-owner'); integrity.assertOwner(fs, this.limits); }
-      const entries = observedJournal ?? await journal.entries(), published = entries.filter(e => e.publication).at(-1);
+      const entries = observedJournal ?? await journal.entries(), observation = observeJournal(entries), published = observation.effectivePublication;
       const restored = await journal.readRestoredBases(entries).then(result => ports && result ? {
         id: result.entry.start.transactionId, parts: result.source.originalChanges(),
         blobs: result.description.blobs, requiredCapabilities: result.description.requiredCapabilities,
       } : null);
-      const pending = entries.some(e => !e.publication) || !!this.retained || (await this.readSceneAppendStates(fs, journal, entries)).length > 0;
+      const pending = !!observation.pending || !!this.retained || (await this.readSceneAppendStates(fs, journal, entries)).length > 0;
       if (!published) return { read: Object.freeze({ state: pending ? 'pending' : 'empty', source: null, provider: null, publication: null }) };
       const heads = published.publication!.heads;
       const checkAllHeads = editingText && !pending;
@@ -238,6 +243,7 @@ export class MetadataProjectSession {
       if (!source) fail('published-source-missing');
       if (checkAllHeads && json(source!.heads) !== json(heads)) fail('command-base-changed');
       const originals = new Map(source!.originalChanges().map(b => [A.decodeChange(b).hash, b]));
+      await this.validateClosedSources(entries, repository);
       const acknowledged = new Set<string>(), localChanges = new Set<string>();
       let witnessWork = 0;
       const witness = () => { if (++witnessWork > this.limits.maxWork) fail('retained-media-limit'); };
@@ -277,7 +283,7 @@ export class MetadataProjectSession {
       if (pending || !ready) this.verifiedPublications = undefined;
       if (pending && requireReadyPublished && !ready) fail('provider-not-ready');
       return { read: Object.freeze({ state: pending ? 'pending' : ready ? 'ready' : 'repair-required',
-        source: source!, provider, publication: published.start.transactionId }), acknowledged, localChanges, publishedStart: published.start,
+        source: source!, provider, publication: published.start.transactionId }), acknowledged, localChanges, commandBase: journalCommandBase(observation),
         priorPublications: !pending ? [...entries] : undefined, witnessWork };
     } catch (error) {
       this.verifiedPublications = undefined;
@@ -291,13 +297,91 @@ export class MetadataProjectSession {
     if (!chain || read.state !== 'ready' || !read.source || read.provider?.kind !== 'scene-provider' ||
       !this.acknowledgmentsLoaded || this.retained) return this.readCandidate(undefined, ports, true, false, ports);
     const journal = new TransactionJournal(ports.fs, this.limits), entries = await journal.entries();
-    if (json(entries) !== json(chain) || entries.some(e => !e.publication) ||
+    if (json(entries) !== json(chain) || observeJournal(entries).pending ||
       (await this.readSceneAppendStates(ports.fs, journal, entries)).length) return fail('command-base-changed');
     await journal.checkRestoredBinding(entries);
-    const published = entries.at(-1)!;
+    const published = observeJournal(entries).effectivePublication!;
     await new MetadataRepository(ports.fs, ports.factory!, this.limits).confirmTextSource(published.start.repositoryId, read.source, captionId);
     return { read, acknowledged: this.acknowledgedMedia, localChanges: this.acknowledgedLocalChanges,
-      publishedStart: published.start, priorPublications: entries, witnessWork: this.verifiedWitnessWork };
+      commandBase: journalCommandBase(observeJournal(entries)), priorPublications: entries, witnessWork: this.verifiedWitnessWork };
+  }
+
+  private async validateClosedSources(entries: readonly JournalEntry[], repository: MetadataRepository) {
+    const bases = new Map<string, Promise<Awaited<ReturnType<typeof closedLocalBase>>>>();
+    for (const entry of entries) {
+      if (!entry.closedLocal) continue;
+      const receipt = entry.closedLocal, id = receipt.effectivePublication.transactionId;
+      let base = bases.get(id);
+      if (!base) {
+        base = (async () => {
+          const source = await repository.read(entry.start.repositoryId, entry.start.proof, receipt.effectivePublication.heads);
+          if (!source) return fail('closed-local-source');
+          return closedLocalBase(source.originalChanges(), this.limits);
+        })();
+        bases.set(id, base);
+      }
+      if (json((await base).seal) !== json(receipt.baseChangeSet)) return fail('closed-local-base');
+    }
+  }
+
+  private async inspectUnwrittenLocal(expectedTransaction?: string) {
+    if (this.retained) return fail('closed-local-hot-command');
+    const entries = await this.journal.entries(), observation = observeJournal(entries), entry = entries.at(-1), effective = observation.effectivePublication;
+    if (!entry || !effective || entry.start.purpose !== 'localCommand' || entry.prepared || entry.durable || entry.publication ||
+      (expectedTransaction ? entry.start.transactionId !== expectedTransaction : !!entry.closedLocal)) return null;
+    if (entry.closedLocal ? observation.terminal !== entry || observation.pending : observation.pending !== entry) return null;
+    const allowed = new Set([this.journal.path(entry.start.transactionId, 'staging.json'),
+      ...(entry.closedLocal ? [this.journal.path(entry.start.transactionId, 'closedLocal.json')] : [])]);
+    const paths = await this.fs.list(this.journal.path(entry.start.transactionId, ''));
+    if (paths.length !== allowed.size || paths.some(path => !allowed.has(path))) return null;
+    if (json(entry.start.baseHeads) !== json(effective.publication.heads) || entry.start.repositoryId !== effective.start.repositoryId ||
+      json(entry.start.proof) !== json(effective.start.proof)) return fail('closed-local-binding');
+    await this.assertReceiveSlot();
+    await this.assertOutputSlot();
+    const read = await this.read(true);
+    if (read.state !== (entry.closedLocal ? 'ready' : 'pending') || !read.source || read.provider?.kind !== 'scene-provider' ||
+      !this.providerReady(read.provider) || read.publication !== effective.start.transactionId ||
+      json(read.source.heads) !== json(entry.start.baseHeads)) return fail('closed-local-source');
+    const published = await closedLocalBase(read.source.originalChanges(), this.limits);
+    const whole = await this.repository.readForUnwrittenResolution(entry.start.repositoryId, entry.start.proof);
+    if (!whole || json(whole.heads) !== json(read.source.heads)) return fail('closed-local-repository-changed');
+    assertClosedLocalOriginals((await closedLocalBase(whole.originalChanges(), this.limits)).originals, published.originals);
+    if (entry.closedLocal && json(entry.closedLocal.baseChangeSet) !== json(published.seal)) return fail('closed-local-base');
+    const fingerprint = json({ start: entry.start, effectivePublication: effective.start.transactionId,
+      publication: effective.publication, baseChangeSet: published.seal });
+    return { start: entry.start, baseChangeSet: published.seal, fingerprint, closed: !!entry.closedLocal, read };
+  }
+
+  /** Cold start-only admission, not permission to ignore a pending transaction. */
+  async inspectUnwrittenLocalEdit(): Promise<UnwrittenLocalEditRecovery | null> {
+    return withMetadataRead(this.fs, this.storage, async () => {
+      if (this.retained) return fail('closed-local-hot-command');
+      if (this.last.state === 'ready') return null;
+      const candidate = await this.inspectUnwrittenLocal();
+      if (!candidate) return null;
+      const ticket = Object.freeze({ kind: 'unwritten-local-edit-recovery' as const });
+      this.unwrittenLocalTickets.set(ticket, { transactionId: candidate.start.transactionId, fingerprint: candidate.fingerprint, observedClosure: false });
+      return ticket;
+    });
+  }
+
+  /** One append-only closure, with fresh complete DB proof and normal readback. */
+  async resolveUnwrittenLocalEdit(ticket: UnwrittenLocalEditRecovery): Promise<MetadataSessionRead> {
+    return underWriteLease(this.fs, async () => {
+      const binding = this.unwrittenLocalTickets.get(ticket);
+      if (!binding) return fail('closed-local-ticket');
+      const candidate = await this.inspectUnwrittenLocal(binding.transactionId);
+      if (!candidate || candidate.fingerprint !== binding.fingerprint) return fail('closed-local-stale');
+      if (binding.observedClosure && !candidate.closed) return fail('closed-local-missing');
+      if (candidate.closed) binding.observedClosure = true;
+      await this.journal.closeLocal(candidate.start, candidate.baseChangeSet);
+      binding.observedClosure = true;
+      const confirmed = await this.inspectUnwrittenLocal(binding.transactionId);
+      if (!confirmed?.closed || confirmed.fingerprint !== binding.fingerprint) return fail('closed-local-readback');
+      const ready = confirmed.read;
+      if (ready.state !== 'ready' || !ready.source || !ready.provider || !this.providerReady(ready.provider)) return fail('closed-local-not-ready');
+      return ready;
+    });
   }
 
   /** Same live text edit only. All new metadata and requested facts are checked normally. */
@@ -393,7 +477,7 @@ export class MetadataProjectSession {
           await this.measure('text.slot', () => assertReviewEditSlot(ports.fs, this.limits, undefined, undefined, textChain));
           const candidate = await this.measure('text.base', () => this.readTextCandidate(ports, captionId));
           const { state, source, provider } = candidate.read;
-          if (state !== 'ready' || !source || !provider || source.token !== expectedToken || !candidate.publishedStart) return fail('command-not-ready');
+          if (state !== 'ready' || !source || !provider || source.token !== expectedToken || !candidate.commandBase) return fail('command-not-ready');
           if (provider.kind !== 'scene-provider' || provider.token !== source.token) return fail('provider-not-ready');
           const transactionId = newId(), prepared = await this.measure('text.plan', async () =>
             source.prepareEdit(expectedToken, command, provider, transactionId, undefined, editor));
@@ -402,9 +486,9 @@ export class MetadataProjectSession {
           if (parts.length !== 1 || command.kind !== 'editCaption') return fail('text-commit-state');
           source.assertCaptionTextChange(parts[0]!, command.captionId, provider);
           const projected = await this.measure('text.project', () => this.projectText(prepared, provider));
-          const transaction = { liveText: true as const, start: { transactionId, repositoryId: candidate.publishedStart.repositoryId,
-            predecessor: candidate.publishedStart.transactionId, purpose: 'localCommand' as const, proof: source.proof, baseHeads: source.heads,
-            ...capabilityFields(capabilityUnion(readRequiredCapabilities(candidate.publishedStart.requiredCapabilities), prepared.requiredCapabilities)) }, parts };
+          const transaction = { liveText: true as const, start: { transactionId, repositoryId: candidate.commandBase.repositoryId,
+            predecessor: candidate.commandBase.transactionId, purpose: 'localCommand' as const, proof: source.proof, baseHeads: source.heads,
+            ...capabilityFields(capabilityUnion(readRequiredCapabilities(candidate.commandBase.requiredCapabilities), prepared.requiredCapabilities)) }, parts };
           return { candidate, transaction, prepared, projected };
         });
         if (!transaction) {
@@ -438,7 +522,7 @@ export class MetadataProjectSession {
         : undefined;
       const read = candidate ? this.adoptRead(candidate) : await this.read();
       if (read.state !== 'ready' || !read.source || !read.provider || read.source.token !== expectedToken) return fail('command-not-ready');
-      const prior = candidate?.publishedStart ?? (await this.journal.entries()).at(-1)!.start;
+      const prior = candidate?.commandBase ?? journalCommandBase(observeJournal(await this.journal.entries()));
       const durable = candidate ? read.source : await this.repository.read(prior.repositoryId, prior.proof);
       if (!durable || durable.token !== read.source.token) return fail('command-base-changed');
       const provider = candidate ? read.provider : await this.checked(durable, false);
@@ -468,7 +552,7 @@ export class MetadataProjectSession {
     }, () => acceptText?.());
   }
 
-  private async prepareEditTransaction(durable: ProjectMetadataSource, provider: ProjectProviderRead, prior: JournalStart,
+  private async prepareEditTransaction(durable: ProjectMetadataSource, provider: ProjectProviderRead, prior: JournalCommandBase,
     command: MetadataEdit, expectedToken: string, transactionId: string, editor: LocalEditorContext | undefined, pointProof?: PointAnchorProof): Promise<MetadataProjectSession['retained']> {
     const prepared = durable.prepareEdit(expectedToken, command, provider, transactionId, pointProof, editor);
     const parts = durable.changesForPreparedEdit(prepared);
@@ -492,8 +576,8 @@ export class MetadataProjectSession {
       await assertReviewEditSlot(this.fs, this.limits);
       const read = await this.read();
       if (read.state !== 'ready' || !read.source || read.source.token !== expectedToken) return fail('receive-not-ready');
-      const prior = (await this.journal.entries()).at(-1)!;
-      const base = await this.repository.read(prior.start.repositoryId, prior.start.proof);
+      const prior = journalCommandBase(observeJournal(await this.journal.entries()));
+      const base = await this.repository.read(prior.repositoryId, prior.proof);
       if (!base || base.token !== read.source.token) return fail('receive-base-changed');
       const { parts, final } = planRemoteChanges(base, remote, this.limits);
       // Validate the final required content/candidates without observing a transient prefix.
@@ -501,9 +585,9 @@ export class MetadataProjectSession {
       if (facts?.stagedBlobs?.length) fail('receive-new-body-unconnected');
       if (!facts) await this.checked(final, false);
       if (!parts.length) return read;
-      this.retained = { start: { transactionId: newId(), repositoryId: prior.start.repositoryId,
-        predecessor: prior.start.transactionId, purpose: 'remotePackageMerge', proof: base.proof, baseHeads: base.heads,
-        ...capabilityFields(capabilityUnion(readRequiredCapabilities(prior.start.requiredCapabilities), final.requiredCapabilities)) },
+      this.retained = { start: { transactionId: newId(), repositoryId: prior.repositoryId,
+        predecessor: prior.transactionId, purpose: 'remotePackageMerge', proof: base.proof, baseHeads: base.heads,
+        ...capabilityFields(capabilityUnion(readRequiredCapabilities(prior.requiredCapabilities), final.requiredCapabilities)) },
         parts, ...(facts ? { modelFacts: { plan: facts, next: final } } : {}), remote: { bytes: captured.metadataBytes, proof: {
           source: { packageId: captured.packageId, metadataSha256, metadataByteLength: captured.metadataBytes.length,
             metadataEnvelope: captured.proof.envelope, remoteHeads: remote.heads }, expectedFinalHeads: final.heads } } };
@@ -555,17 +639,17 @@ export class MetadataProjectSession {
       const current = await this.read();
       if (current.state !== 'ready' || current.publication !== expectedPublication || current.source?.token !== expectedToken)
         throw Error('追加先が更新されました。選び直して内容を確認してください。');
-      const entries = await this.journal.entries(), prior = entries.at(-1)!;
-      const base = await this.repository.read(prior.start.repositoryId, prior.start.proof);
+      const entries = await this.journal.entries(), prior = journalCommandBase(observeJournal(entries));
+      const base = await this.repository.read(prior.repositoryId, prior.proof);
       if (!base || base.token !== expectedToken) return fail('scene-append-base');
       const plan = await planSceneAppend(base, review, this.limits, id, editor);
       const facts = await this.sceneAppendFacts(base, plan.next, review);
       const input: SceneAppendInput = { ...(plan.sceneIds.length === 1 ? { schema: 'lociview-scene-append-1' as const } :
         { schema: 'lociview-scene-append-2' as const, sceneIds: plan.sceneIds }), id, archive: plan.archive, snapshot: plan.snapshot,
-        proof: base.proof, predecessor: prior.start.transactionId, baseHeads: base.heads, sceneId: plan.sceneId, recipe: plan.reconstruction, records: plan.records,
+        proof: base.proof, predecessor: prior.transactionId, baseHeads: base.heads, sceneId: plan.sceneId, recipe: plan.reconstruction, records: plan.records,
         change: { sha256: await digest(plan.bytes), byteLength: plan.bytes.length }, blobs: plan.blobs, stagedBlobs: [...(facts.stagedBlobs ?? [])] };
       const job = await writeSceneAppend(this.fs, input, plan.bytes, this.limits);
-      const start = this.sceneAppendStart(input, job.binding!, prior.start, plan.next);
+      const start = this.sceneAppendStart(input, job.binding!, prior, plan.next);
       this.retained = { start, parts: [plan.bytes], stagedBlobs: input.stagedBlobs, modelFacts: { plan: facts, next: plan.next } };
       return { read: await this.resume(), sceneId: input.sceneId };
     });
@@ -588,7 +672,7 @@ export class MetadataProjectSession {
     return facts;
   }
 
-  private sceneAppendStart(input: SceneAppendInput, binding: NonNullable<JournalStart['sceneAppend']>, prior: JournalStart, next: ProjectMetadataSource): JournalStart {
+  private sceneAppendStart(input: SceneAppendInput, binding: NonNullable<JournalStart['sceneAppend']>, prior: JournalCommandBase, next: ProjectMetadataSource): JournalStart {
     return { transactionId: input.id, predecessor: prior.transactionId, repositoryId: prior.repositoryId, purpose: 'appendScene',
       sceneAppend: binding, proof: input.proof, baseHeads: [...input.baseHeads],
       ...capabilityFields(capabilityUnion(readRequiredCapabilities(prior.requiredCapabilities), next.requiredCapabilities)) };
@@ -606,8 +690,8 @@ export class MetadataProjectSession {
         return { read: await this.resume(), sceneId: input.sceneId };
       }
       if (!file) throw Error('続けるには元のシーンZIPを選んでください。');
-      const prior = entries.filter(e => e.publication).at(-1);
-      if (!prior || input.predecessor !== prior.start.transactionId || json(input.proof) !== json(prior.start.proof) ||
+      const observation = observeJournal(entries), prior = observation.effectivePublication;
+      if (!prior || input.predecessor !== observation.terminal?.start.transactionId || json(input.proof) !== json(prior.start.proof) ||
         json(input.baseHeads) !== json(prior.publication!.heads)) throw Error('追加先が更新されました。この追加を取りやめてから選び直してください。');
       const base = await this.repository.read(prior.start.repositoryId, prior.start.proof);
       if (!base || json(base.heads) !== json(input.baseHeads)) return fail('scene-append-base');
@@ -617,7 +701,7 @@ export class MetadataProjectSession {
       const review = await ReviewArchive.fromSelectedArchive(selected, this.limits);
       const plan = await planSceneAppend(base, review, this.limits, id, undefined, { input, bytes });
       const facts = await this.sceneAppendFacts(base, plan.next, review);
-      const start = this.sceneAppendStart(input, binding, prior.start, plan.next);
+      const start = this.sceneAppendStart(input, binding, journalCommandBase(observation), plan.next);
       this.retained = { start, parts: [bytes], stagedBlobs: input.stagedBlobs, modelFacts: { plan: facts, next: plan.next } };
       return { read: await this.resume(), sceneId: input.sceneId };
     });
@@ -1064,7 +1148,7 @@ export class MetadataProjectSession {
       if (!this.modelFacts?.planReceived || !this.media?.inventory || input.importing) return fail('workspace-receive-unconnected');
       let job = input;
       await job.preflightBase(); // Reject an incompatible/corrupt retained base before any Project write.
-      const entries = await this.journal.entries(), prior = entries.filter(e => e.publication).at(-1);
+      const entries = await this.journal.entries(), observation = observeJournal(entries), prior = observation.effectivePublication;
       if (!prior?.publication) return fail('receive-not-ready');
       const current = await this.read();
       if (!current.source || current.state === 'repair-required' || expectedToken !== null && current.source.token !== expectedToken ||
@@ -1086,7 +1170,7 @@ export class MetadataProjectSession {
       const base = await this.repository.read(prior.start.repositoryId, { identity: receiver.identity, envelope: receiver.metadataEnvelope }, receiver.heads);
       if (!base) return fail('receive-base-missing');
       if (!own && base.token !== current.source.token) return fail('receive-stale');
-      if (entries.some(e => !e.publication && e !== own)) return fail('receive-other-transaction');
+      if (!!observeJournal(entries).pending && observeJournal(entries).pending !== own) return fail('receive-other-transaction');
       const { parts, final } = planRemoteChanges(base, job.inspection.source, this.limits);
       await job.preflightBase({ identity: final.proof.identity, metadataEnvelope: final.proof.envelope, heads: final.heads });
       const inventory = await job.inventory();
@@ -1103,7 +1187,7 @@ export class MetadataProjectSession {
         }
         if (parts.length) {
           this.retained = { start: own?.start ?? { transactionId: job.id, repositoryId: prior.start.repositoryId,
-            predecessor: prior.start.transactionId, purpose: 'remotePackageMerge', proof: base.proof, baseHeads: base.heads,
+            predecessor: observation.terminal!.start.transactionId, purpose: 'remotePackageMerge', proof: base.proof, baseHeads: base.heads,
             ...capabilityFields(capabilityUnion(readRequiredCapabilities(prior.start.requiredCapabilities), final.requiredCapabilities)) },
             parts, ...(facts.stagedBlobs?.length ? { stagedBlobs: [...facts.stagedBlobs] } : {}), modelFacts: { plan: {
               ...facts, stage: async () => { await facts.stage(); await this.media!.inventory!(inventory); },
@@ -1142,7 +1226,7 @@ export class MetadataProjectSession {
       if (!this.media?.inventory) return fail('media-unconnected'); await this.media.inventory([{ ...ref }]); return 'verified-present' as const;
     } };
   }
-  private async assertReceiveSlot(ownId: string) {
+  private async assertReceiveSlot(ownId?: string) {
     await assertReviewEditSlot(this.fs, this.limits, ownId);
     if ((await this.sceneAppendStates()).some(state => state.id !== ownId)) return fail('scene-append-recovery-required');
     await withReceiveJobDiscovery(this.fs, this.receiveStore(), this.limits, async rows => { for (const row of rows) {
@@ -1159,7 +1243,7 @@ export class MetadataProjectSession {
       await this.assertReceiveSlot(input.id);
       if (!this.modelFacts?.planReceived || !this.media?.inventory) return fail('contribution-receive-unconnected');
       let job = input; await job.preflightBase();
-      const entries = await this.journal.entries(), prior = entries.filter(e => e.publication).at(-1), own = entries.find(e => e.start.transactionId === job.id);
+      const entries = await this.journal.entries(), observation = observeJournal(entries), prior = observation.effectivePublication, own = entries.find(e => e.start.transactionId === job.id);
       if (!prior?.publication || this.retained && this.retained.start.transactionId !== job.id) return fail('receive-not-ready');
       const current = await this.read();
       if (!current.source || current.state === 'repair-required' || expectedToken !== null && current.source.token !== expectedToken ||
@@ -1181,7 +1265,7 @@ export class MetadataProjectSession {
       const base = await this.repository.read(prior.start.repositoryId, { identity: receiver.identity, envelope: receiver.metadataEnvelope }, receiver.heads);
       if (!base) return fail('receive-base-missing');
       if (!own && base.token !== current.source.token) fail('receive-stale');
-      if (entries.some(e => !e.publication && e !== own)) fail('receive-other-transaction');
+      if (!!observeJournal(entries).pending && observeJournal(entries).pending !== own) fail('receive-other-transaction');
       assertContributionBaseInReceiver(job.inspection.base.source, base);
       const { parts, final } = planRemoteChanges(base, job.inspection.target, this.limits), inventory = await job.inventory();
       if (own && (json(own.start.proof) !== json(base.proof) || json(own.start.baseHeads) !== json(base.heads))) fail('receive-job-journal');
@@ -1197,7 +1281,7 @@ export class MetadataProjectSession {
             final.encodeFullSource().length * 2 + (facts?.stagedBlobs ?? []).reduce((n, b) => n + (b.byteLength as number), 0) + 4_194_304);
         }
         if (parts.length && facts) this.retained = { start: own?.start ?? { transactionId: job.id, repositoryId: prior.start.repositoryId,
-          predecessor: prior.start.transactionId, purpose: 'remotePackageMerge', proof: base.proof, baseHeads: base.heads,
+          predecessor: observation.terminal!.start.transactionId, purpose: 'remotePackageMerge', proof: base.proof, baseHeads: base.heads,
           ...capabilityFields(capabilityUnion(readRequiredCapabilities(prior.start.requiredCapabilities), final.requiredCapabilities)) }, parts,
           remote: await job.journalInput(final.heads), ...(facts.stagedBlobs?.length ? { stagedBlobs: [...facts.stagedBlobs] } : {}),
           modelFacts: { next: final, plan: { ...facts, stage: async () => { await facts.stage(); await this.media!.inventory!(inventory); } } } };
@@ -1229,7 +1313,7 @@ export class MetadataProjectSession {
   /** Owned initial-source receipt only. Complete an unprepared first initialization, never a merge. */
   async recoverInitialization(source: ProjectMetadataSource): Promise<MetadataSessionRead> {
     return underWriteLease(this.fs, async () => {
-      const entries = await this.journal.entries(), pending = entries.find(e => !e.publication);
+      const entries = await this.journal.entries(), pending = observeJournal(entries).pending;
       if (!pending || pending.prepared) return this.resume();
       const start = pending.start, parts = source.originalChanges();
       if (entries.length !== 1 || start.purpose !== 'initialize' || start.predecessor !== null || start.baseHeads.length ||
@@ -1256,12 +1340,12 @@ export class MetadataProjectSession {
     captionId: string, transaction: { start: JournalStart; parts: Uint8Array[] }) {
     const { fs, factory } = ports, { start, parts } = transaction;
     const journal = new TransactionJournal(fs, this.limits), repository = new MetadataRepository(fs, factory, this.limits);
-    const prior = entries.at(-1);
-    if (this.retained !== transaction || parts.length !== 1 || !prior?.publication || prior.start.transactionId !== start.predecessor ||
+    const observation = observeJournal(entries), prior = journalCommandBase(observation);
+    if (this.retained !== transaction || parts.length !== 1 || observation.pending || prior.transactionId !== start.predecessor ||
       start.purpose !== 'localCommand' || json(base.heads) !== json(start.baseHeads) || provider.token !== next.token ||
       (await ContributionReceiveJob.ids(fs)).includes(start.transactionId) || (await WorkspaceReceiveJob.ids(fs)).includes(start.transactionId))
       return fail('text-commit-state');
-    checkRequiredCapabilities(start.requiredCapabilities, capabilityUnion(readRequiredCapabilities(prior.start.requiredCapabilities), next.requiredCapabilities));
+    checkRequiredCapabilities(start.requiredCapabilities, capabilityUnion(readRequiredCapabilities(prior.requiredCapabilities), next.requiredCapabilities));
     const prepared = await this.measure('resume.journal-stage', () => journal.stage(start, parts));
     const [storedPart] = await journal.validateParts(prepared);
     if (!storedPart || !equalBytes(storedPart, parts[0]!)) return fail('journal-part-source');
@@ -1287,7 +1371,7 @@ export class MetadataProjectSession {
 
   private async resume(receiveJob?: ReceiveJob, restoreJob?: BackupRestoreJob, reviewCopy?: ReviewCopyInputJob): Promise<MetadataSessionRead> {
     const fs = this.fs, journal = this.journal, repository = this.repository;
-    const entries = await journal.entries(), pending = entries.find(e => !e.publication);
+    const entries = await journal.entries(), pending = observeJournal(entries).pending;
     if (!this.acknowledgmentsLoaded && entries.some(e => e.publication)) {
       await this.read();
       if (!this.acknowledgmentsLoaded) return fail('retained-media-witness');
@@ -1315,9 +1399,10 @@ export class MetadataProjectSession {
     if (this.retained) {
       if (pending && json(pending.start) !== json(this.retained.start)) fail('retry-other-transaction');
       if (!pending && entries.at(-1)?.start.transactionId === this.retained.start.transactionId) {
+        if (!entries.at(-1)!.publication) return fail('closed-local-terminal');
         this.retained = null; return this.read(); // Marker persisted but its acknowledgment was interrupted.
       }
-      const predecessor = entries.filter(e => e.publication).at(-1)?.start.transactionId ?? null;
+      const predecessor = observeJournal(entries).terminal?.start.transactionId ?? null;
       if (predecessor !== this.retained.start.predecessor) fail('retry-predecessor');
       if (this.retained.modelFacts) {
         const { plan, next } = this.retained.modelFacts;
@@ -1404,7 +1489,7 @@ export class MetadataProjectSession {
     const witness = () => { if (++witnessWork > this.limits.maxWork) fail('retained-media-limit'); };
     for (const ref of prepared.stagedBlobs ?? []) { witness(); this.acknowledgedMedia.add(blobKey(ref)); }
     const incoming = await journal.receivedInfo(prepared);
-    const predecessor = entries.find(e => e.start.transactionId === start.predecessor);
+    const predecessor = observeJournal(entries.filter(e => e.start.transactionId !== start.transactionId)).effectivePublication;
     checkRequiredCapabilities(start.requiredCapabilities, capabilityUnion(readRequiredCapabilities(predecessor?.start.requiredCapabilities), next.requiredCapabilities, incoming.requiredCapabilities));
     for (const ref of incoming.blobs) { witness(); this.acknowledgedMedia.add(`${ref.sha256}:${ref.byteLength}`); }
     if (['initialize', 'localCommand', 'importClean', 'copyReview', 'appendScene'].includes(start.purpose))

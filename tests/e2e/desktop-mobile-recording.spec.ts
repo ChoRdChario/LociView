@@ -88,7 +88,7 @@ test('phone record list, body and completion stay usable when the viewport shrin
     await expect(body).toHaveValue('狭い画面から本文を編集');
     await expect(completedRecord).toBeFocused(); await expect(completedRecord).toBeInViewport();
     await page.setViewportSize({ width: 390, height: 844 });
-    await expect(page.locator('.lv-workspace-actions').getByRole('button', { name: 'ファイルに保存', exact: true })).toBeEnabled();
+    await expect(page.locator('.lv-workspace-actions').getByRole('button', { name: '保存…', exact: true })).toBeEnabled();
     await page.getByRole('tab', { name: '描画', exact: true }).tap();
     const drawing = page.getByRole('region', { name: '材質', exact: true }), surface = drawing.getByLabel('マテリアル', { exact: true });
     const model = drawing.getByLabel('モデル', { exact: true });

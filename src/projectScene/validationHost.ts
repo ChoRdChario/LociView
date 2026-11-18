@@ -57,11 +57,12 @@ import { readOutputArtifacts } from '../platform/outputArtifactLock';
 import { WorkspaceArchive } from '../projectPackage/workspaceArchive';
 import { CleanArchive } from '../projectPackage/cleanArchive';
 import { PackageArchive } from '../projectPackage/zipArchive';
-import { BackupRestoreJob, type RestoreDatabasePorts } from '../projectPackage/backupRestoreJob';
+import { BackupRestoreJob, type RestoreDatabasePorts, type LocalEditRecoveryHandle } from '../projectPackage/backupRestoreJob';
+import { MetadataSourceError } from '../projectMetadata/format';
 import { readRestoreControls } from '../projectPackage/restoreControls';
 import { PACKAGE_LIMITS, type EvidenceRef } from '../projectPackage/contract';
 import { BackupArchive } from '../projectPackage/backupArchive';
-import { openValidationGeneration, validationGenerationDatabases, validationGenerationService, inspectValidationFirstBackup } from './validationGeneration';
+import { openValidationGeneration, openValidationLocalEditRecovery, validationGenerationDatabases, validationGenerationService, inspectValidationFirstBackup } from './validationGeneration';
 
 export const validationArea = 'lociview-development-validation-1';
 export type { MetadataSessionRead };
@@ -109,6 +110,43 @@ export interface ValidationHostOptions {
 }
 
 export type ValidationNormalHost = Awaited<ReturnType<typeof openValidationHost>>;
+interface OpeningLeaseOwner {
+  claimLease?: () => void;
+  recovery?: Omit<LocalEditRecoveryHandle, 'dispose'>;
+}
+export interface InterruptedLocalEditRecovery {
+  readonly kind: 'interrupted-local-edit-recovery';
+  readonly run: string;
+  readonly readOnly: false;
+  continueSaved(): Promise<ValidationNormalHost>;
+  dispose(): Promise<void>;
+}
+
+function localEditRecoveryEntry(run: string, lease: ProjectMutationSession, scope: LocalEditRecoveryHandle,
+  reopen: () => Promise<ValidationNormalHost>): InterruptedLocalEditRecovery {
+  let closed = false, transferred = false, resolved = false, operation: Promise<ValidationNormalHost> | undefined;
+  return { kind: 'interrupted-local-edit-recovery', run, readOnly: false,
+    continueSaved() {
+      if (closed || transferred || operation) return Promise.reject(Error('復旧処理の完了をお待ちください。'));
+      const work = (async () => {
+        if (!resolved) { await scope.resolve(); resolved = true; }
+        if (closed) throw Error('画面を閉じました。保存済みの内容から開き直してください。');
+        await scope.dispose();
+        const opened = await reopen(); transferred = true;
+        if (closed) { await opened.dispose(); throw Error('画面を閉じました。保存済みの内容から開き直してください。'); }
+        return opened;
+      })();
+      operation = work;
+      void work.finally(() => { if (operation === work) operation = undefined; }).catch(() => {});
+      return work;
+    },
+    async dispose() {
+      if (closed) return; closed = true;
+      try { await operation; } catch { /* Closure and all original evidence remain on disk. */ }
+      try { await scope.dispose(); }
+      finally { if (!transferred) { lease.beginClose(); await lease.waitForWorkspaceIdle(); lease.sealWorkspaceWritesForRelease(); lease.release(); } }
+    } };
+}
 type FirstRestoreDisplay = (next: ProjectDisplay, content: ValidationNormalHost['content']) => Promise<void>;
 /** Text only: this reference is never a Session token or storage authority. */
 export interface FirstRestoreCaptionPreview extends ProjectCaptionText {
@@ -121,12 +159,12 @@ export interface FirstBackupRecovery {
   confirm(prepare: FirstRestoreDisplay, preview?: FirstRestorePreviewObserver): Promise<ValidationNormalHost>;
   retry(prepare: FirstRestoreDisplay, preview?: FirstRestorePreviewObserver): Promise<ValidationNormalHost>;
   takePreview(preview: FirstRestoreCaptionPreview, host: ValidationNormalHost): ResumeReading | null;
-  edit(): Promise<ValidationNormalHost | FirstBackupRecovery>;
+  edit(): Promise<ValidationNormalHost | FirstBackupRecovery | InterruptedLocalEditRecovery>;
   cancel(): Promise<void>; abandon(): Promise<void>; dispose(): Promise<void>;
 }
 
 /** First-only recovery owns the root lease until a real selected Host accepts it once. */
-export async function openValidationEntry(options: ValidationHostOptions): Promise<ValidationNormalHost | FirstBackupRecovery> {
+export async function openValidationEntry(options: ValidationHostOptions): Promise<ValidationNormalHost | FirstBackupRecovery | InterruptedLocalEditRecovery> {
   const run = technicalId(options.run), root = `${validationArea}/${run}`;
   if (options.firstBackup && (options.initial || options.workspaceFile || options.reviewEdit || options.mode === 'view'))
     throw Error('バックアップを一つ選択し、編集で復元してください。');
@@ -179,7 +217,30 @@ export async function openValidationEntry(options: ValidationHostOptions): Promi
   const release = async () => { stopPreviewAccess(); lease.beginClose(); await lease.waitForWorkspaceIdle(); lease.sealWorkspaceWritesForRelease(); lease.release(); };
   try {
     control = await inspectValidationFirstBackup(lease.workspace, options);
-    if (!input && !control) { stopPreviewAccess(); const opened = await openNormalValidationHost(ordinary, lease); handedOff = true; return opened; }
+    if (!input && !control) {
+      stopPreviewAccess();
+      const opening: OpeningLeaseOwner = {};
+      let recovery: LocalEditRecoveryHandle | undefined;
+      try {
+        const opened = await openNormalValidationHost(ordinary, lease, opening);
+        if (!opening.recovery) { opening.claimLease!(); handedOff = true; return opened; }
+        recovery = { ...opening.recovery, dispose: () => opened.dispose() };
+      } catch (error) {
+        if (!(error instanceof MetadataSourceError) || error.code !== 'restore-destination-not-ready' || !lease.holdsWriteLock ||
+          options.mode === 'view' || options.initial || options.workspaceFile || options.reviewEdit) throw error;
+        recovery = await openValidationLocalEditRecovery(lease.workspace, ordinary) ?? undefined;
+        if (!recovery) throw error;
+        try {
+          if (recovery.projectId !== `prj_${run}`) throw Error('保存領域とプロジェクトが一致しません。');
+          lease.activateAfterDurableReload();
+        } catch (failure) { await recovery.dispose(); throw failure; }
+      }
+      handedOff = true;
+      const selectedRecovery = recovery;
+      return localEditRecoveryEntry(run, lease, { ...selectedRecovery,
+        resolve: () => measureValidation(options.timing, 'recovery.local.resolve', () => selectedRecovery.resolve()) },
+        () => measureValidation(options.timing, 'recovery.local.reopen', () => openNormalValidationHost(ordinary, lease)));
+    }
     // Recovery owns its dedicated reader; stripping firstBackup must not enable normal-resume notices.
     ordinary.reading = undefined;
     if (input && !control) {
@@ -319,14 +380,14 @@ export async function openValidationHost(options: ValidationHostOptions) {
   if (options.firstBackup) throw Error('バックアップの初回復元用の入口を使ってください。');
   return openNormalValidationHost(options);
 }
-async function openNormalValidationHost(options: ValidationHostOptions, inheritedLease?: ProjectMutationSession) {
+async function openNormalValidationHost(options: ValidationHostOptions, inheritedLease?: ProjectMutationSession, opening?: OpeningLeaseOwner) {
   const run = technicalId(options.run), root = `${validationArea}/${run}`;
   if (options.mode === 'view' && options.initial) throw Error('閲覧ではプロジェクトを作成できません。');
   if (options.mode === 'view' && options.workspaceFile) throw Error('閲覧では作業一式を取り込めません。');
   if (options.mode === 'view' && options.reviewEdit) throw Error('閲覧中は編集コピーを作成できません。');
   if ([options.initial, options.workspaceFile, options.reviewEdit].filter(Boolean).length > 1) throw Error('作成元を一つ選択してください。');
   if (options.reviewEdit && options.reviewEdit.run !== run) throw Error('編集コピーの作成先を確認してください。');
-  const open = (reviewBootstrap?: ReviewBootstrapOperation) => openValidationHostOwned(options, run, root, inheritedLease, reviewBootstrap);
+  const open = (reviewBootstrap?: ReviewBootstrapOperation) => openValidationHostOwned(options, run, root, inheritedLease, reviewBootstrap, opening);
   if (!options.reviewEdit) return open();
   // Admit the complete initial copy before activating its Project or creating a DB.
   // Only this immediate bootstrap borrows the lease; later Host actions acquire anew.
@@ -343,7 +404,7 @@ async function openNormalValidationHost(options: ValidationHostOptions, inherite
 }
 type ReviewBootstrapOperation = <T>(action: () => Promise<T>) => Promise<T>;
 async function openValidationHostOwned(options: ValidationHostOptions, run: string, root: string,
-  inheritedLease?: ProjectMutationSession, reviewBootstrap?: ReviewBootstrapOperation) {
+  inheritedLease?: ProjectMutationSession, reviewBootstrap?: ReviewBootstrapOperation, opening?: OpeningLeaseOwner) {
   const measure = <T>(stage: string, action: () => Promise<T>) => measureValidation(options.timing, stage, action);
   const inspectInput = async (file: Blob | PackageArchive) => {
     const selected = file instanceof PackageArchive ? await file.reopenCapturedControl() : await PackageArchive.inspect(file);
@@ -463,6 +524,14 @@ async function openValidationHostOwned(options: ValidationHostOptions, run: stri
     };
     try { await projectView(last); }
     catch (error) { receiveDisplayPending = true; receiveFailure = error instanceof Error ? error.message : '表示を準備できません。再開用データは保持しています。'; }
+    if (opening && !fresh && lease.holdsWriteLock && last.state === 'pending' && !connection.restorePending &&
+      !options.initial && !incoming && !options.reviewEdit && !receiveDisplayPending && !unfinishedReceive() && !unfinishedOutput()) {
+      try {
+        const ticket = await session.inspectUnwrittenLocalEdit();
+        if (ticket && last.source?.proof.identity.projectId === `prj_${run}`) opening.recovery = {
+          projectId: `prj_${run}`, resolve: async () => { await session.resolveUnwrittenLocalEdit(ticket); } };
+      } catch { /* Keep the existing strict refusal and byte-preserving exit. */ }
+    }
     if (!fresh && lease.holdsWriteLock && last.state !== 'repair-required') lease.activateAfterDurableReload();
     const ready = async (read: MetadataSessionRead) => { last = read; await projectView(read);
       if (read.state !== 'ready' || !project) throw Error('保存が未完了です。元の変更から再試行してください。'); return project; };
@@ -955,7 +1024,8 @@ async function openValidationHostOwned(options: ValidationHostOptions, run: stri
       refresh: () => execute(async () => { last = await session.read(); await reloadReceive(last); await projectView(last); return last; }),
       resolve: async (token, command) => (await commitCommand(token, command)).display,
       dispose: async () => { await dispose(); content.releasePreparedImages(); content.releasePreparedModels(); prepareDisplay = undefined; } };
-    ownsLease = true;
+    if (opening) opening.claimLease = () => { if (closed) throw Error('画面を閉じました。'); ownsLease = true; };
+    else ownsLease = true;
     return { ...host, dispatch, editorSettings, get content() { return content; }, workspaceFiles, workspaceOutput, backupRestore, sceneAppend, display: () => restoreRetired ? undefined : project,
       conversionReportAvailable: async () => {
         // Backup restores do not carry the originating device's conversion report.

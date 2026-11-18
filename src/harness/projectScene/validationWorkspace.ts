@@ -1,5 +1,5 @@
 import {createValidationWorkspace as selector,type ValidationWorkspacePorts as ApplicationPorts,type MountedEditorFactory} from '../../projectScene/validationWorkspace';
-import {legacyValidationHost,type ValidationNormalHost,type FirstBackupRecovery} from './validationHost';
+import {legacyValidationHost,type ValidationNormalHost,type FirstBackupRecovery,type InterruptedLocalEditRecovery} from './validationHost';
 import {createSavedWorkspace} from './metadataWorkspace';
 import {createProductWorkspace} from './productWorkspace';
 import {createMetadataConflictControls} from './metadataConflictControls';
@@ -7,7 +7,7 @@ import {createMetadataCaptionLifecycleControls} from './metadataCaptionLifecycle
 import {createMetadataMembershipControls} from './metadataMembershipControls';
 import {createMetadataAssetStatusControls} from './metadataAssetStatusControls';
 import {createMetadataMaterialControls} from './metadataMaterialControls';
-export type ValidationWorkspacePorts=Omit<ApplicationPorts,'mountEditor'|'open'> & {productEditor?:boolean;open(...args:Parameters<ApplicationPorts['open']>):Promise<ValidationNormalHost|FirstBackupRecovery>};
+export type ValidationWorkspacePorts=Omit<ApplicationPorts,'mountEditor'|'open'> & {productEditor?:boolean;open(...args:Parameters<ApplicationPorts['open']>):Promise<ValidationNormalHost|FirstBackupRecovery|InterruptedLocalEditRecovery>};
 export function validationEditorFactory(document:Document,productEditor=false):MountedEditorFactory {
 const withNotice=(editor:ReturnType<MountedEditorFactory>)=>{const notice=document.createElement('p');
   notice.textContent='検証用プロジェクト。通常画面・オフライン・実機での受入れは未完了です。';editor.root.append(notice);return editor;};

@@ -18,6 +18,16 @@ reopen using the existing ProjectScene PC candidate. UI sends finite typed
 MetadataEdit commands through MetadataProjectSession. The provider owns complete
 candidate reads and command preparation. No UI storage writes or generic patch API.
 
+## Product-direction amendment —Caption autosave,2026-11-18
+
+The owner's supplied followup discussion chooses automatic Caption saving without
+a routine Apply button, with immediate UI preview distinct from durable success.
+[08d](08d-caption-autosave-workflow-proposal.md) records the proposed engineering
+contract and the known interrupted-Journal admission dependency. This direction
+supersedes explicit Apply as the eventual Caption interaction; it is not evidence
+that autosave exists or that storage/recovery fences may be weakened. Until the
+replacement is qualified, the implemented continuation below remains operative.
+
 ## Authorized continuation —one record completion,2026-11-11
 
 PO authorized the grouped third-party review repairs and motion as directional

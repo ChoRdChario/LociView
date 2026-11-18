@@ -1,6 +1,7 @@
 import type { MetadataSessionRead, ValidationHostOptions } from './validationHost';
 import { measureValidation, validationArea, validatedResumeReading } from './validationHost';
-import { openValidationGeneration, inspectValidationFirstBackup } from './validationGeneration';
+import { openValidationGeneration, openValidationLocalEditRecovery, inspectValidationFirstBackup } from './validationGeneration';
+import { MetadataSourceError } from '../projectMetadata/format';
 import { WorkspaceReceiver } from '../projectFiles/receiveWorkspace';
 import { WorkspaceSender } from '../projectFiles/sendWorkspace';
 import { validationMetadataLimits } from '../projectFiles/validation';
@@ -28,6 +29,7 @@ export async function listValidationProjects(options: Omit<ValidationHostOptions
   for (const run of runs) {
     const lease = options.coordinator.openView(options.base, `${prefix}${run}`, `${validationArea}:${run}`);
     let storage: Awaited<ReturnType<typeof openValidationGeneration>> | undefined;
+    let checkedTitle: string | undefined;
     const show = (value: ResumeReading | null) => {
       if (reading?.run === run) try { reading.show(value); } catch { /* Reading does not decide catalog readiness. */ }
     };
@@ -46,6 +48,7 @@ export async function listValidationProjects(options: Omit<ValidationHostOptions
         .find(f => f.path.length === 2 && f.path[0] === 'project' && f.path[1] === 'title') : undefined;
       const candidate = title?.valid && title.candidates.length === 1 ? title.candidates[0]?.value : undefined;
       const label = candidate?.kind === 'value' && typeof candidate.value === 'string' ? candidate.value : '名前を確認できないプロジェクト';
+      checkedTitle = label;
       if (reading?.run === run && observation.selected && !storage.restorePending && read.state === 'ready' &&
         read.source?.proof.identity.projectId === `prj_${run}` && provider?.kind === 'scene-provider') {
         const text = validatedResumeReading(read, run, label);
@@ -61,7 +64,20 @@ export async function listValidationProjects(options: Omit<ValidationHostOptions
           outputs.some(j => !['generated', 'file-verified', 'cancelled', 'abandoned'].includes(j.state)) ? 'incomplete' : 'ready' };
       if (entry.state !== 'ready') show(null);
       result.push(entry);
-    } catch { show(null); result.push({ run, title: '保存内容を確認できないプロジェクト', state: 'unavailable' }); }
+    } catch (error) {
+      show(null);
+      if (error instanceof MetadataSourceError && error.code === 'restore-destination-not-ready') {
+        try {
+          const recovery = await openValidationLocalEditRecovery(lease.workspace, { ...options, run, openStorage: create => openStorage(run, create) });
+          if (recovery) {
+            const matches = recovery.projectId === `prj_${run}`, title = recovery.title;
+            await recovery.dispose();
+            if (matches) { result.push({ run, title: title ?? checkedTitle ?? '名前を確認できないプロジェクト', state: 'incomplete' }); continue; }
+          }
+        } catch { /* A display candidate never weakens ordinary opening or recovery. */ }
+      }
+      result.push({ run, title: checkedTitle ?? '保存内容を確認できないプロジェクト', state: 'unavailable' });
+    }
     finally { await storage?.dispose(); lease.release(); }
   }
   return result;

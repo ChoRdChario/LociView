@@ -2663,6 +2663,93 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     };
     return { ...r, ports, storage, seed, mount, remember, host: () => current!, reference: (next: ProjectResumeReference | null) => { reference = next; } };
   }
+  it('leaves a cold unprepared command after its typed refusal without cancelling or changing any saved bytes', async () => {
+    const f = resumeWorkspaceFixture(), a = await f.seed('中断した作業'), b = await f.seed('別の正常な作業');
+    const hot = await f.ports.open(a.run); if ('kind' in hot) throw Error('normal host');
+    f.fs.reject = path => path.endsWith('/changes/00000000.amchange');
+    await expect(hot.dispatch(hot.read().source!.token, { kind: 'editCaption', captionId: a.captionId, edits: { body: '未確定の更新' } })).rejects.toThrow();
+    await hot.dispose(); f.fs.reject = () => false;
+    const prefix = `${validationArea}/${a.run}/`, files = await f.fs.list(prefix), bytes = await Promise.all(files.map(path => f.fs.readBytes(path)));
+    const h = f.mount(); await h.idle();
+    const row = (title: string) => h.all(h.navigation).find(node => node.className === 'lv-recent-project' && h.all(node).some(child => child.textContent === title))!;
+    h.button('編集で開く', row('中断した作業')).fire('click'); await h.idle();
+    expect(h.navigation.hidden).toBe(true); expect(h.ui.selected).toBe(a.run);
+    h.button('別のプロジェクトを開く').fire('click'); await h.idle();
+    expect(h.ui.selected).toBe(a.run); // A generic pending state alone does not permit leaving.
+    h.button('更新を再試行').fire('click'); await h.idle();
+    expect(h.all(h.root).some(node => node.className === 'lv-operation-status lv-validation-status' && node.textContent.includes('中断した変更の情報が揃っていない'))).toBe(true);
+    expect(h.button('更新を再試行').disabled).toBe(true);
+    expect(h.all(h.root).find(node => node.className === 'lv-validation-content')!.hidden).toBe(true);
+    expect(h.all(h.root).find(node => node.className === 'lv-recovery-refusal')!.hidden).toBe(false);
+    h.button('別のプロジェクトを開く').fire('click'); await h.idle();
+    expect(h.navigation.hidden).toBe(false); expect(h.ui.selected).toBeNull();
+    expect(h.all(h.root).find(node => node.className === 'lv-validation-content')!.hidden).toBe(false);
+    expect(await f.fs.list(prefix)).toEqual(files); expect(await Promise.all(files.map(path => f.fs.readBytes(path)))).toEqual(bytes);
+    h.button('編集で開く', row('別の正常な作業')).fire('click'); await h.idle();
+    expect(h.ui.selected).toBe(b.run); expect(h.editor()).toBeDefined();
+    h.button('プロジェクトを選ぶ', h.editor()).fire('click'); await h.idle();
+    h.button('編集で開く', row('中断した作業')).fire('click'); await h.idle();
+    expect(h.ui.selected).toBe(a.run); expect(h.button('更新を再試行').disabled).toBe(false);
+    expect(await f.fs.list(prefix)).toEqual(files); expect(await Promise.all(files.map(path => f.fs.readBytes(path)))).toEqual(bytes);
+    await h.ui.dispose();
+  });
+  it('06j keeps the recovery choice explicit, permits a safe exit and retains the choice after a write failure', async () => {
+    const f = resumeWorkspaceFixture(), saved = await f.seed('再開する作業'), hot = await f.ports.open(saved.run);
+    if ('kind' in hot) throw Error('Expected ordinary Host');
+    f.fs.reject = path => path.endsWith('/changes/00000000.amchange');
+    await expect(hot.dispatch(hot.read().source!.token, { kind: 'editCaption', captionId: saved.captionId, edits: { body: '残らなかった本文' } })).rejects.toThrow();
+    f.fs.reject = () => false; await hot.dispose();
+    let resumed: Awaited<ReturnType<typeof openValidationHost>> | undefined;
+    const open: ValidationWorkspacePorts['open'] = async (run, initial, mode, workspaceFile, reviewEdit, firstBackup) => {
+      const entry = owned(await openValidationEntry({ base: f.fs, store: f.store, coordinator: ProjectMutationCoordinator.browser(f.locks),
+        packageLocks: f.locks, fileLimits: budget, decode, run, initial, mode, workspaceFile, reviewEdit, firstBackup, openStorage: create => f.storage(run, create) }));
+      if ('kind' in entry && entry.kind === 'interrupted-local-edit-recovery') return Object.assign(Object.create(entry) as typeof entry,
+        { continueSaved: async () => resumed = owned(await entry.continueSaved()) });
+      return entry;
+    };
+    const prefix = `${validationArea}/${saved.run}/`, paths = await f.fs.list(prefix), bytes = await Promise.all(paths.map(path => f.fs.readBytes(path)));
+    const h = f.mount(undefined, { open }); await h.idle();
+    const row = () => h.all(h.navigation).find(node => node.className === 'lv-recent-project' && h.all(node).some(child => child.textContent === '再開する作業'))!;
+    h.button('編集で開く', row()).fire('click'); await h.idle();
+    expect(h.named('再開の確認'), h.all(h.root).filter(node => node.tag === 'p').map(node => node.textContent).join(' | ')).toBeDefined();
+    expect(h.all(h.named('再開の確認')).some(node => node.textContent.includes('保存途中の変更は反映されません。'))).toBe(true);
+    expect(h.button('最後に保存された内容で続ける').disabled).toBe(false); expect(resumed).toBeUndefined();
+    expect(await f.fs.list(prefix)).toEqual(paths); expect(await Promise.all(paths.map(path => f.fs.readBytes(path)))).toEqual(bytes);
+    h.button('別のプロジェクトを開く').fire('click'); await h.idle(); expect(h.ui.selected).toBeNull();
+    h.button('編集で開く', row()).fire('click'); await h.idle();
+    const write = f.fs.writeText.bind(f.fs), fault = vi.spyOn(f.fs, 'writeText').mockImplementation(async (path, text) => {
+      if (path.endsWith('/closedLocal.json')) throw new DOMException('capacity', 'QuotaExceededError'); return write(path, text);
+    });
+    h.button('最後に保存された内容で続ける').fire('click'); await h.idle(); fault.mockRestore();
+    expect(h.all(h.named('再開の確認')).some(node => node.textContent.includes('保存容量が不足'))).toBe(true);
+    expect(h.button('最後に保存された内容で続ける').disabled).toBe(false); expect(resumed).toBeUndefined();
+    expect(await f.fs.list(prefix)).toEqual(paths); expect(await Promise.all(paths.map(path => f.fs.readBytes(path)))).toEqual(bytes);
+    h.button('最後に保存された内容で続ける').fire('click'); await h.idle();
+    expect(h.editor()).toBeDefined(); expect(resumed!.read().source!.originalChanges()).toEqual(saved.source.originalChanges());
+    expect((await f.fs.list(prefix)).filter(path => !paths.includes(path))).toEqual([expect.stringMatching(/\/closedLocal\.json$/)]);
+    expect(await Promise.all(paths.map(path => f.fs.readBytes(path)))).toEqual(bytes); await h.ui.dispose();
+  });
+  it('keeps a malformed saved receipt intact while showing Japanese failure and opening another healthy project', async () => {
+    const f = resumeWorkspaceFixture(), a = await f.seed('確認できない作業'), b = await f.seed('正常な作業');
+    const prefix = `${validationArea}/${a.run}/`;
+    await f.fs.writeBytes(`${prefix}v2/local-restore/jobs/${newId()}/start.json`, new TextEncoder().encode('{'));
+    const files = await f.fs.list(prefix), bytes = await Promise.all(files.map(path => f.fs.readBytes(path)));
+    const h = f.mount(); await h.idle();
+    const rows = () => h.all(h.navigation).filter(node => node.className === 'lv-recent-project');
+    const broken = rows().find(node => h.all(node).some(child => child.textContent === '保存内容を確認できないプロジェクト'))!;
+    h.button('編集で開く', broken).fire('click'); await h.idle();
+    const status = h.all(h.root).find(node => node.className === 'lv-operation-status lv-validation-status')!;
+    expect(status.textContent).toContain('保存情報を確認できない'); expect(status.textContent).not.toContain('Metadata source invalid');
+    const details = h.all(h.root).find(node => node.tag === 'details' && node.children.some(child => child.textContent === '詳しい情報'))!;
+    expect(details.hidden).toBe(false); expect(details.open).toBe(false);
+    expect(h.all(details).find(node => node.tag === 'p')!.textContent).toBe('Metadata source invalid (receipt-invalid)');
+    expect(h.button('ファイルを開く').disabled).toBe(false);
+    const healthy = rows().find(node => h.all(node).some(child => child.textContent === '正常な作業'))!;
+    h.button('編集で開く', healthy).fire('click'); await h.idle();
+    expect(h.ui.selected).toBe(b.run); expect(h.editor()).toBeDefined(); expect(details.hidden).toBe(true);
+    expect(await f.fs.list(prefix)).toEqual(files); expect(await Promise.all(files.map(path => f.fs.readBytes(path)))).toEqual(bytes);
+    await h.ui.dispose();
+  });
   it('direct resume exposes verified text before history discovery and transfers reading only after IME completes', async () => {
     const f = resumeWorkspaceFixture(), a = await f.seed('直接再開');
     const original = await f.ports.open(a.run); if ('kind' in original) throw Error('normal host');
@@ -3090,13 +3177,140 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
   async function restoredBodyFixture() {
     const file = await restoreFileFixture(true), restored = await firstBackupHostFixture(file.backupFile);
     const preview = owned(await openValidationEntry({ ...restored.options, firstBackup: restored.firstBackup }));
-    if (!('kind' in preview)) throw Error('first recovery');
+    if (!('kind' in preview) || preview.kind !== 'first-backup-recovery') throw Error('first recovery');
     const host = owned(await preview.confirm(async () => {})), body = '復元後に保存した本文';
     await host.dispatch(host.read().source!.token, { kind: 'editCaption', captionId: file.captionId, edits: { body } });
     const reading = validatedResumeReading(host.read(), restored.run)!, changes = host.read().source!.originalChanges();
     expect(reading.records.find(c => c.id === file.captionId)?.body).toBe(body); await host.dispose();
     return { ...restored, captionId: file.captionId, body, reading, changes };
   }
+  it.each(['original', 'restored'] as const)('06j explicitly resolves a %s start-only edit, preserves every old byte, then edits, exports and cold reopens', async lane => {
+    const f = lane === 'restored' ? await restoredBodyFixture() : await (async () => {
+      const original = await openFileCaption(glb(), 'map2'), body = '中断前に保存した本文';
+      await original.host.dispatch(original.host.read().source!.token, { kind: 'editCaption', captionId: original.captionId, edits: { body } });
+      const changes = original.host.read().source!.originalChanges();
+      await original.workspace.dispose(); await original.host.dispose();
+      return { options: original.options, base: original.fs, run: original.options.run, captionId: original.captionId, body, changes };
+    })();
+    const storageOpen = 'databases' in f ? vi.mocked(f.databases.open) : vi.spyOn(f.options, 'openStorage');
+    const hot = owned(await openTypedValidationHost(f.options)), write = f.base.writeText.bind(f.base);
+    const expectedTitle = validatedResumeReading(hot.read(), f.run)!.title;
+    const fault = vi.spyOn(f.base, 'writeText').mockImplementation(async (path, value) => {
+      await write(path, value); if (path.endsWith('/staging.json')) throw Error('stopped immediately after start');
+    });
+    try { await expect(hot.dispatch(hot.read().source!.token, { kind: 'editCaption', captionId: f.captionId, edits: { body: '保存されなかった本文' } })).rejects.toThrow(); }
+    finally { fault.mockRestore(); }
+    await hot.dispose();
+    const paths = await f.base.list(''), before = new Map(await Promise.all(paths.map(async path => [path, (await f.base.readBytes(path))!.slice()] as const)));
+    expect((await listValidationProjects(f.options, () => f.options.openStorage())).find(project => project.run === f.run))
+      .toMatchObject({ title: expectedTitle, state: 'incomplete' });
+    const entry = owned(await openTypedValidationEntry(f.options));
+    if (!('kind' in entry) || entry.kind !== 'interrupted-local-edit-recovery') throw Error('Expected narrow local recovery');
+    expect('authority' in entry).toBe(false); expect('session' in entry).toBe(false); expect('fs' in entry).toBe(false);
+    expect(await f.base.list('')).toEqual(paths);
+    for (const [path, bytes] of before) expect(await f.base.readBytes(path), path).toEqual(bytes);
+    storageOpen.mockRejectedValueOnce(Error('strict reopen stopped'));
+    await expect(entry.continueSaved()).rejects.toThrow('strict reopen stopped');
+    const resolvedPaths = await f.base.list(''), resolvedBytes = await Promise.all(resolvedPaths.map(path => f.base.readBytes(path)));
+    let reopened = owned(await entry.continueSaved()); await entry.dispose();
+    expect(await f.base.list('')).toEqual(resolvedPaths); expect(await Promise.all(resolvedPaths.map(path => f.base.readBytes(path)))).toEqual(resolvedBytes);
+    expect(reopened.read().state).toBe('ready'); expect(reopened.authority.readOnly).toBe(false);
+    expect(reopened.read().source!.originalChanges()).toEqual(f.changes);
+    expect(validatedResumeReading(reopened.read(), f.run)?.records.find(caption => caption.id === f.captionId)?.body).toBe(f.body);
+    expect((await f.base.list('')).filter(path => !before.has(path))).toEqual([expect.stringMatching(/\/closedLocal\.json$/)]);
+    for (const [path, bytes] of before) expect(await f.base.readBytes(path), path).toEqual(bytes);
+    const interruptPreparedBody = async (body: string) => {
+      const prior = reopened.read().source!.originalChanges();
+      const fault = vi.spyOn(f.base, 'writeText').mockImplementation(async (path, value) => {
+        await write(path, value); if (path.endsWith('/blobsVerified.json')) throw Error('later prepared edit stopped');
+      });
+      try { await expect(reopened.dispatch(reopened.read().source!.token, { kind: 'editCaption', captionId: f.captionId, edits: { body } })).rejects.toThrow(); }
+      finally { fault.mockRestore(); }
+      await reopened.dispose(); reopened = owned(await openTypedValidationHost(f.options));
+      expect(reopened.read().state).toBe('pending'); await reopened.authority.retry!();
+      const changes = reopened.read().source!.originalChanges(); expect(changes).toHaveLength(prior.length + 1); expect(changes).toEqual(expect.arrayContaining(prior));
+      await reopened.authority.retry!(); expect(reopened.read().source!.originalChanges()).toEqual(changes);
+    };
+    const closeAnotherUnwrittenEdit = async () => {
+      const prior = reopened.read().source!.originalChanges();
+      const fault = vi.spyOn(f.base, 'writeText').mockImplementation(async (path, value) => {
+        await write(path, value); if (path.endsWith('/staging.json')) throw Error('another start-only interruption');
+      });
+      try { await expect(reopened.dispatch(reopened.read().source!.token, { kind: 'editCaption', captionId: f.captionId, edits: { body: 'この変更は確定されない' } })).rejects.toThrow(); }
+      finally { fault.mockRestore(); }
+      await reopened.dispose(); const next = owned(await openTypedValidationEntry(f.options));
+      if (!('kind' in next) || next.kind !== 'interrupted-local-edit-recovery') throw Error('Expected another narrow local recovery');
+      reopened = owned(await next.continueSaved()); await next.dispose(); expect(reopened.read().source!.originalChanges()).toEqual(prior);
+    };
+    const peer = firstWorkspaceRecipient(), workspaceFile = await reopened.workspaceOutput.download(await reopened.workspaceOutput.generate(reopened.read().source!.token));
+    const imported = await peer.receiver.importWorkspace(workspaceFile);
+    await peer.session.editCaption(imported.source!.token, f.captionId, 'title', '受け取り側で編集した表題');
+    await reopened.workspaceFiles.receive(reopened.read().source!.token, (await contributionFile(peer.session, peer.fs, peer.store)).file);
+    expect(validatedResumeReading(reopened.read(), f.run)?.records.find(caption => caption.id === f.captionId)).toMatchObject({ title: '受け取り側で編集した表題', body: f.body });
+    await closeAnotherUnwrittenEdit();
+    const originalScene = reopened.authority.read().state.defaultSceneId; if (originalScene.kind !== 'value') throw Error('Expected default Scene');
+    const scenesBefore = Object.keys(reopened.authority.read().state.scenes);
+    const review = await ReviewArchive.inspect(await reopened.workspaceOutput.download(await reopened.workspaceOutput.generateReview(reopened.read().source!.token, { sceneId: originalScene.value })), metadata);
+    const scene = await reopened.sceneAppend.start(newId(), reopened.read().publication!, reopened.read().source!.token, review);
+    expect(typeof scene).toBe('string'); expect(Object.keys(reopened.authority.read().state.scenes)).toHaveLength(scenesBefore.length + 1);
+    expect(reopened.authority.read().state.defaultSceneId).toEqual(originalScene);
+    await closeAnotherUnwrittenEdit();
+    const body = '復旧後に編集して書き出した本文'; await interruptPreparedBody(body);
+    const changes = reopened.read().source!.originalChanges(); expect(changes).toHaveLength(f.changes.length + 3);
+    const output = await reopened.workspaceOutput.download(await reopened.workspaceOutput.generateBackup(reopened.read().source!.token));
+    const archive = await BackupArchive.inspect(output, metadata); expect(archive.source.originalChanges()).toEqual(changes);
+    await reopened.dispose();
+    const cold = owned(await openTypedValidationHost(f.options)); expect(cold.read().source!.originalChanges()).toEqual(changes); await cold.dispose();
+    const receiver = await firstBackupHostFixture(output), first = owned(await openTypedValidationEntry({ ...receiver.options, firstBackup: receiver.firstBackup }));
+    if (!('kind' in first) || first.kind !== 'first-backup-recovery') throw Error('Expected first restore in independent store');
+    const received = owned(await first.confirm(async () => {}));
+    expect(received.read().source!.originalChanges()).toEqual(changes);
+    expect(validatedResumeReading(received.read(), f.run)?.records.find(caption => caption.id === f.captionId)?.body).toBe(body);
+    expect(archive.archive.control.manifest.blobs.length).toBeGreaterThan(0);
+  }, 60_000);
+  it.each(['read-only', 'lease-loss', 'dispose-during-reopen'] as const)('06j keeps resolution ownership at %s', async guard => {
+    const f = await openFileCaption(glb(), 'map2'); await f.workspace.dispose(); await f.host.dispose();
+    const hot = owned(await openTypedValidationHost(f.options)), write = f.fs.writeText.bind(f.fs);
+    const start = vi.spyOn(f.fs, 'writeText').mockImplementation(async (path, text) => {
+      await write(path, text); if (path.endsWith('/staging.json')) throw Error('stopped after start');
+    });
+    try { await expect(hot.dispatch(hot.read().source!.token, { kind: 'editCaption', captionId: f.captionId, edits: { body: '未確定' } })).rejects.toThrow(); }
+    finally { start.mockRestore(); }
+    await hot.dispose();
+    const paths = await f.fs.list(''), bytes = await Promise.all(paths.map(path => f.fs.readBytes(path)));
+    if (guard === 'read-only') {
+      const view = owned(await openTypedValidationEntry({ ...f.options, mode: 'view' }));
+      if ('kind' in view) throw Error('A view must never receive resolution authority');
+      expect(view.authority.readOnly).toBe(true); expect(view.read().state).toBe('pending');
+      expect(await f.fs.list('')).toEqual(paths); expect(await Promise.all(paths.map(path => f.fs.readBytes(path)))).toEqual(bytes);
+      return;
+    }
+    const acquire = f.options.coordinator.tryAcquire.bind(f.options.coordinator);
+    let lease: Awaited<ReturnType<typeof acquire>> | undefined;
+    const capture = vi.spyOn(f.options.coordinator, 'tryAcquire').mockImplementation(async (...args) => lease = await acquire(...args));
+    const storage = f.options.openStorage.bind(f.options);
+    let pauseReopen = false, entered!: () => void, release!: () => void;
+    const held = new Promise<void>(resolve => entered = resolve), gate = new Promise<void>(resolve => release = resolve);
+    const pause = vi.spyOn(f.options, 'openStorage').mockImplementation(async () => {
+      if (pauseReopen) { pauseReopen = false; entered(); await gate; } return storage();
+    });
+    const entry = owned(await openTypedValidationEntry(f.options)); capture.mockRestore();
+    if (!('kind' in entry) || entry.kind !== 'interrupted-local-edit-recovery') throw Error('Expected narrow local recovery');
+    if (guard === 'lease-loss') {
+      lease!.failClosed('test ownership loss'); await expect(entry.continueSaved()).rejects.toThrow();
+      expect(await f.fs.list('')).toEqual(paths); expect(await Promise.all(paths.map(path => f.fs.readBytes(path)))).toEqual(bytes);
+      return;
+    }
+    pauseReopen = true;
+    const continuing = entry.continueSaved(), observed = continuing.then(value => ({ value }), error => ({ error }));
+    await Promise.race([held, observed.then(() => { throw Error('Reopen did not reach its owned storage boundary'); })]);
+    const closing = entry.dispose(); release(); const result = await observed; await closing; pause.mockRestore();
+    expect('error' in result && result.error.message).toContain('画面を閉じました');
+    expect(lease!.holdsWriteLock).toBe(false);
+    expect(await Promise.all(paths.map(path => f.fs.readBytes(path)))).toEqual(bytes);
+    const reopened = owned(await openTypedValidationHost(f.options)); expect(reopened.read().state).toBe('ready');
+    expect(reopened.read().source!.originalChanges()).toEqual(f.host.read().source!.originalChanges());
+  });
   it.each(['prepared', 'before publication', 'published'] as const)('cold reopens a restored project after an interrupted text publication (%s) and commits the exact edit once', async cut => {
     const f = await restoredBodyFixture(), host = owned(await openValidationHost(f.options));
     const before = host.read().source!, originalProvider = host.read().provider, body = '中断しても一度だけ反映';
@@ -3388,7 +3602,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const f = await restoreFileFixture(true), r = await firstBackupHostFixture(f.backupFile), show = vi.fn(), preview = owned(await openValidationEntry({ ...r.options, firstBackup: r.firstBackup, reading: { run: r.run, show } }));
     const original = await r.inspection.source.inspectOriginal({ maxNodes: 1_000_000, maxWork: 5_000_000 });
     expect(projectCaptionText(original.candidates, original.workUsed, { maxWork: 5_000_000 })).not.toBeNull();
-    if (!('kind' in preview)) throw Error('first recovery'); expect('authority' in preview).toBe(false); expect(preview.state().phase).toBe('preview');
+    if (!('kind' in preview) || preview.kind !== 'first-backup-recovery') throw Error('first recovery'); expect('authority' in preview).toBe(false); expect(preview.state().phase).toBe('preview');
     expect(await r.base.list('')).toEqual([]); expect(r.openStorage).not.toHaveBeenCalled();
     const failedPreview = vi.fn();
     r.base.reject = path => path.endsWith('/published.json'); await expect(preview.confirm(async () => {}, failedPreview)).rejects.toThrow('injected quota');
@@ -3396,11 +3610,11 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect(oldText).not.toHaveProperty('token'); expect(failedPreview).toHaveBeenLastCalledWith(null);
     expect(preview.state().phase).toBe('pending'); await preview.dispose(); r.base.reject = () => false;
     const catalog = await listValidationProjects(r.options, r.openStorage); expect(catalog[0]).toMatchObject({ run: r.run, firstRestore: 'pending', state: 'incomplete' });
-    const view = owned(await openValidationEntry({ ...r.options, mode: 'view' })); if (!('kind' in view)) throw Error('view recovery');
+    const view = owned(await openValidationEntry({ ...r.options, mode: 'view' })); if (!('kind' in view) || view.kind !== 'first-backup-recovery') throw Error('view recovery');
     expect(view.readOnly).toBe(true); const files = await r.base.list(''), bytes = await Promise.all(files.map(path => r.base.readBytes(path)));
     await expect(view.retry(async () => {})).rejects.toThrow('編集'); expect(await Promise.all(files.map(path => r.base.readBytes(path)))).toEqual(bytes); await view.dispose();
     const images=vi.spyOn(ValidationContent.prototype,'displayImage'),projectionReads:number[]=[];let beforeProjection=0;
-    const cold = owned(await openValidationEntry({...r.options,lazyImages:true,reading:{run:r.run,show},timing(stage){if(stage==='restore.first.projection.start')beforeProjection=images.mock.calls.length;else if(stage==='restore.first.projection')projectionReads.push(images.mock.calls.length-beforeProjection);}})); if (!('kind' in cold)) throw Error('cold recovery');
+    const cold = owned(await openValidationEntry({...r.options,lazyImages:true,reading:{run:r.run,show},timing(stage){if(stage==='restore.first.projection.start')beforeProjection=images.mock.calls.length;else if(stage==='restore.first.projection')projectionReads.push(images.mock.calls.length-beforeProjection);}})); if (!('kind' in cold) || cold.kind !== 'first-backup-recovery') throw Error('cold recovery');
     const prepared = vi.fn(async (next, content) => { expect(next.validationFiles).toBe(true); expect(next.modelVersions).toHaveLength(2);expect(next.mediaChoices?.length).toBeGreaterThan(0);
       for (const version of next.modelVersions!) expect((await content.model(version.closure.representation)).bytes).toEqual((await f.reopen().content.model(version.closure.representation)).bytes); });
     const early = vi.fn(), host = owned(await cold.retry(prepared, early));
@@ -3425,7 +3639,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const ui = owned(createValidationWorkspace(document.asDocument(), { ...r.options, productEditor: true, progressivePresentation: true,
       list: () => listValidationProjects(r.options, r.openStorage), selected() {}, render,
       open: async (run, initial, mode, workspaceFile, reviewEdit, firstBackup) => { const opened = await openValidationEntry({ ...r.options, run, initial, mode, workspaceFile, reviewEdit, firstBackup });
-        if (!('kind' in opened)) current = opened; else { const confirm = opened.confirm.bind(opened), dispose = opened.dispose.bind(opened);
+        if (!('kind' in opened)) current = opened; else if (opened.kind === 'first-backup-recovery') { const confirm = opened.confirm.bind(opened), dispose = opened.dispose.bind(opened);
           opened.confirm = async (prepare, preview) => current = await confirm(prepare, preview);
           opened.dispose = async () => { document.activeElement = null; await dispose(); };
         } return opened; } }));
@@ -3492,7 +3706,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       },
       open: async (run, initial, mode, workspaceFile, reviewEdit, firstBackup) => {
         const opened = await openValidationEntry({ ...r.options, run, initial, mode, workspaceFile, reviewEdit, firstBackup });
-        if ('kind' in opened) { const confirm = opened.confirm.bind(opened); opened.confirm = async (prepare, preview) => confirmed = await confirm(prepare, preview); }
+        if ('kind' in opened && opened.kind === 'first-backup-recovery') { const confirm = opened.confirm.bind(opened); opened.confirm = async (prepare, preview) => confirmed = await confirm(prepare, preview); }
         return opened;
       } }));
     const root = record(ui.root), all = (n: RecordedNode): RecordedNode[] => [n, ...n.children.flatMap(all)];
@@ -3524,7 +3738,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
   }, 60000);
   it.each(['sync', 'async'] as const)('06g optional %s observer failure withdraws only text, preserving restoration', async kind => {
     const f = await restoreFileFixture(true), r = await firstBackupHostFixture(f.backupFile), entry = owned(await openValidationEntry({ ...r.options, firstBackup: r.firstBackup }));
-    if (!('kind' in entry)) throw Error('first restore');
+    if (!('kind' in entry) || entry.kind !== 'first-backup-recovery') throw Error('first restore');
     const observer = vi.fn(value => { if (value) { if (kind === 'async') return Promise.reject(Error('optional observer')); throw Error('optional observer'); } });
     const host = owned(await entry.confirm(async () => {}, observer));
     expect(observer).toHaveBeenLastCalledWith(null); expect(host.read().state).toBe('ready');
@@ -3532,7 +3746,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
   }, 60000);
   it.each([false, true])('06g stopped producer ignores delayed rejection and rechecks actual history (changed=%s)', async changed => {
     const f = await restoreFileFixture(true), r = await firstBackupHostFixture(f.backupFile), entry = owned(await openTypedValidationEntry({ ...r.options, firstBackup: r.firstBackup }));
-    if (!('kind' in entry)) throw Error('first restore');
+    if (!('kind' in entry) || entry.kind !== 'first-backup-recovery') throw Error('first restore');
     let reject!: (error: Error) => void; const notification = new Promise<void>((_, fail) => { reject = fail; });
     const observer = vi.fn(value => value ? notification : undefined), host = owned(await entry.confirm(async () => {}, observer));
     const preview = observer.mock.calls[0]![0]!; expect(preview.kind).toBe('first-restore-caption-preview');
@@ -3545,7 +3759,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
   }, 60000);
   it('06g derives fresh text when the first write fails before any restore controls exist', async () => {
     const f = await restoreFileFixture(true), r = await firstBackupHostFixture(f.backupFile), entry = owned(await openTypedValidationEntry({ ...r.options, firstBackup: r.firstBackup }));
-    if (!('kind' in entry)) throw Error('first restore');
+    if (!('kind' in entry) || entry.kind !== 'first-backup-recovery') throw Error('first restore');
     const inspect = vi.spyOn(Object.getPrototypeOf(r.inspection.source), 'inspectOriginal');
     try {
       const notifications = vi.fn(); r.base.reject = () => true;
@@ -3562,17 +3776,17 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const f = await restoreFileFixture(), file = new File([f.backupFile], '選んだ保存点.backup'), r = await firstBackupHostFixture(file),
       holder = await r.options.coordinator.tryAcquire(r.base, `${validationArea}/${r.run}`, `${validationArea}:${r.run}`);
     owned({ dispose: async () => holder.release() });
-    const first = owned(await openValidationEntry({ ...r.options, firstBackup: r.firstBackup })); if (!('kind' in first)) throw Error('preview');
+    const first = owned(await openValidationEntry({ ...r.options, firstBackup: r.firstBackup })); if (!('kind' in first) || first.kind !== 'first-backup-recovery') throw Error('preview');
     expect(first.readOnly).toBe(true); await first.cancel(); expect(await r.base.list('')).toEqual([]); await first.dispose();
-    const preview = owned(await openValidationEntry({ ...r.options, firstBackup: r.firstBackup })); if (!('kind' in preview)) throw Error('preview');
+    const preview = owned(await openValidationEntry({ ...r.options, firstBackup: r.firstBackup })); if (!('kind' in preview) || preview.kind !== 'first-backup-recovery') throw Error('preview');
     await expect(preview.edit()).rejects.toThrow('別のタブ'); expect(preview.state()).toMatchObject({ phase: 'preview', fileName: '選んだ保存点.backup' });
-    holder.release(); const editable = owned(await preview.edit()); if (!('kind' in editable)) throw Error('editable preview');
+    holder.release(); const editable = owned(await preview.edit()); if (!('kind' in editable) || editable.kind !== 'first-backup-recovery') throw Error('editable preview');
     expect(editable.readOnly).toBe(false); expect(editable.state()).toMatchObject({ phase: 'preview', fileName: '選んだ保存点.backup' });
     expect(await r.base.list('')).toEqual([]); const host = owned(await editable.confirm(async () => {})); expect(host.read().source!.originalChanges()).toEqual(r.inspection.source.originalChanges());
   }, 60_000);
   it('rejects cold first-restore controls rehomed under another Project before any database probe or write', async () => {
     const f = await restoreFileFixture(), r = await firstBackupHostFixture(f.backupFile), warm = owned(await openValidationEntry({ ...r.options, firstBackup: r.firstBackup }));
-    if (!('kind' in warm)) throw Error('preview'); r.base.reject = path => path.endsWith('/published.json'); await expect(warm.confirm(async () => {})).rejects.toThrow(); r.base.reject = () => false; await warm.dispose();
+    if (!('kind' in warm) || warm.kind !== 'first-backup-recovery') throw Error('preview'); r.base.reject = path => path.endsWith('/published.json'); await expect(warm.confirm(async () => {})).rejects.toThrow(); r.base.reject = () => false; await warm.dispose();
     const wrong = newId(), originalRoot = `${validationArea}/${r.run}/`, wrongRoot = `${validationArea}/${wrong}/`;
     for (const path of await r.base.list(originalRoot)) await r.base.writeBytes(`${wrongRoot}${path.slice(originalRoot.length)}`, (await r.base.readBytes(path))!);
     const paths = await r.base.list(''), bytes = await Promise.all(paths.map(path => r.base.readBytes(path))), probeCalls = vi.mocked(r.databases.originalDatabasePresent!).mock.calls.length,
@@ -3583,14 +3797,14 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
   }, 60_000);
   it('opens terminal-only cancelled first-backup records without a Project or a pending-only archive reader', async () => {
     const f = await restoreFileFixture(), r = await firstBackupHostFixture(f.backupFile), preview = owned(await openValidationEntry({ ...r.options, firstBackup: r.firstBackup }));
-    if (!('kind' in preview)) throw Error('preview');
+    if (!('kind' in preview) || preview.kind !== 'first-backup-recovery') throw Error('preview');
     r.base.reject = path => path.endsWith('/published.json'); await expect(preview.confirm(async () => {})).rejects.toThrow(); r.base.reject = () => false;
     await preview.cancel(); await preview.dispose();
     expect((await listValidationProjects(r.options, r.openStorage))[0]).toMatchObject({ firstRestore: 'terminal', state: 'unavailable', title: 'プロジェクトなし・復元記録を保持' });
     const files = await r.base.list(''), bytes = await Promise.all(files.map(path => r.base.readBytes(path))), terminal = owned(await openValidationEntry(r.options));
-    if (!('kind' in terminal)) throw Error('terminal recovery'); expect(terminal.state()).toMatchObject({ phase: 'terminal', title: '名前を確認できないプロジェクト' });
+    if (!('kind' in terminal) || terminal.kind !== 'first-backup-recovery') throw Error('terminal recovery'); expect(terminal.state()).toMatchObject({ phase: 'terminal', title: '名前を確認できないプロジェクト' });
     expect('authority' in terminal).toBe(false); expect(await Promise.all(files.map(path => r.base.readBytes(path)))).toEqual(bytes); expect(r.openStorage).not.toHaveBeenCalled(); await terminal.dispose();
-    const again = owned(await openValidationEntry({ ...r.options, firstBackup: r.firstBackup })); if (!('kind' in again)) throw Error('new preview');
+    const again = owned(await openValidationEntry({ ...r.options, firstBackup: r.firstBackup })); if (!('kind' in again) || again.kind !== 'first-backup-recovery') throw Error('new preview');
     expect(again.state().phase).toBe('preview'); await again.cancel(); expect(await Promise.all(files.map(path => r.base.readBytes(path)))).toEqual(bytes);
   }, 60_000);
   it('first-opens an absent original from exact backup history and bases without opening or creating the original database', async () => {
@@ -5932,7 +6146,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const status = () => h.all(output).find(n => n.attributes.get('role') === 'status')!;
     const origin = primary(); origin.focus(); const focused = origin.focusCalls.length, resultFocused = status().focusCalls.length; origin.click();
     await vi.waitFor(() => expect(status().dataset.busy).toBe('false'), { timeout: 10000 });
-    expect(status().textContent).toBe(result === 'handoff' ? 'ダウンロードを開始しました。保存先で完了を確認してください。' : '作成したファイルの内容を確認し、ダウンロードしてください。');
+    expect(status().textContent).toBe(result === 'handoff' ? `${(h.downloads.mock.contexts[0] as unknown as HTMLAnchorElement).download} のダウンロードを開始しました。保存先で完了を確認してください。` : '作成したファイルの内容を確認し、ダウンロードしてください。');
     expect(primary().focusCalls.length - focused).toBe(0);
     expect(status().focusCalls.length - resultFocused).toBe(result === 'handoff' ? 1 : 0); expect(h.downloads).toHaveBeenCalledTimes(result === 'handoff' ? 1 : 0);
     expect(fresh).not.toHaveBeenCalled();
@@ -5945,10 +6159,10 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     if (result === 'handoff') {
       expect(origin.document.activeElement === status()).toBe(true);
       const row = h.host.workspaceOutput.jobs.find(j => j.purpose === 'backup')!, fileStatus = () => h.named('保存ファイルの状態', h.editor).textContent;
-      expect(row.stale).toBeUndefined(); expect(fileStatus()).toBe('ダウンロード開始・保存先未確認');
+      expect(row.stale).toBeUndefined(); expect(fileStatus()).toBe('ダウンロード開始・保存先で確認');
       // Unknown freshness must never be promoted into a verified-file claim.
       row.state = 'file-verified'; h.refresh(); expect(fileStatus()).toBe('保存未確認');
-      row.state = 'generated'; h.refresh(); expect(fileStatus()).toBe('ダウンロード開始・保存先未確認');
+      row.state = 'generated'; h.refresh(); expect(fileStatus()).toBe('ダウンロード開始・保存先で確認');
     }
     await h.ui.dispose();
   });
@@ -6005,7 +6219,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       h.refresh(); expect(host.workspaceOutput.privacy).toMatchObject({ sourceRequiresPortableMediaReader: true, backupRequiresPortableMediaReader: true });
       expect(h.all(output).some(n => n.textContent === 'HEIC原本と表示用PNGの組に対応したLociViewで開いてください。')).toBe(true);
       primary().click(); await vi.waitFor(() => expect(status().dataset.busy).toBe('false'), { timeout: 10000 });
-      expect(h.downloads).toHaveBeenCalledTimes(1); expect(status().textContent).toBe('ダウンロードを開始しました。保存先で完了を確認してください。');
+      expect(h.downloads).toHaveBeenCalledTimes(1); expect(status().textContent).toBe(`${(h.downloads.mock.contexts[0] as unknown as HTMLAnchorElement).download} のダウンロードを開始しました。保存先で完了を確認してください。`);
       expect(fresh).not.toHaveBeenCalled();
       const index = create.mock.calls.findLastIndex(args => args[0] instanceof Blob); expect(index).toBeGreaterThanOrEqual(0);
       expect((await BackupArchive.inspect(create.mock.calls[index]![0] as Blob, metadata)).archive.control.manifest.requiredCapabilities).toContain(PORTABLE_MEDIA_CAPABILITY);
@@ -6934,6 +7148,8 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     canvas.fire('pointerdown', pointer); canvas.fire('pointerup', pointer); await Promise.resolve(); await edited(() => button('ここに記録を作る', editor).fire('click'));
     const title = named('タイトル', editor); title.value = '比較する記録'; title.fire('input'); await edited(() => button('変更を適用', named('キャプションの詳細', editor)).fire('click'));
     const source = host.read().source!, windows = named('キャプションのウィンドウ', editor), cards = () => all(windows).filter(n => n.className === 'lv-caption-window');
+    expect(cards()).toHaveLength(1); // Creating a record leaves the existing comparison window alone.
+    named('キャプション一覧', editor).children.find(row => row.children[0]?.attributes.get('aria-current') === 'true')!.children[0]!.fire('click');
     expect(cards()).toHaveLength(2); const a = named('最初の記録', windows), b = named('比較する記録', windows), bClose = button('×', b);
     const body = named('本文', editor), detail = named('キャプションの詳細', editor), scroll = all(a).find(n => n.className === 'lv-caption-window-body')!;
     scroll.scrollTop = 70; body.value = '未適用の本文'; body.fire('input'); body.fire('compositionstart');
@@ -7576,7 +7792,8 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const backup = host.workspaceOutput.jobs.find(j => j.purpose === 'backup')!;
     expect((await BackupArchive.inspect(await host.workspaceOutput.download(backup.id), metadata)).source.originalChanges()).toEqual(host.read().source!.originalChanges());
     await vi.waitFor(() => expect(output.children.find(n => n.attributes.get('role') === 'status')!.dataset.busy).toBe('false'));
-    expect(named('保存ファイルの状態', editor).textContent).toBe('ダウンロード開始・保存先未確認');
+    expect(named('保存ファイルの状態', editor).textContent).toBe('ダウンロード開始・保存先で確認');
+    expect(named('保存ファイルの状態', editor).title).toBe('保存先で完了を確認してください。');
     expect(named('保存ファイルの状態', editor).hidden).toBe(false);
     button('ファイルを選択', output).fire('click');
     const verify = named('保存したファイルを選択', output); Object.assign(verify, { files: [await host.workspaceOutput.download(backup.id)] }); verify.fire('change');
@@ -7868,6 +8085,8 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     button('キャプションを追加', editor).fire('click'); const canvas = named('3Dモデルの表示', editor), pointer = { pointerId: 8, isPrimary: true, button: 0, clientX: 70, clientY: 80 };
     canvas.fire('pointerdown', pointer); canvas.fire('pointerup', pointer); await Promise.resolve(); await edited(() => button('ここに記録を作る', editor).fire('click'));
     const captionId = Object.keys(host.authority.read().resources.captions).find(id => id !== firstCaption)!;
+    expect(all(named('キャプションのウィンドウ', editor)).filter(n => n.className === 'lv-caption-window')).toHaveLength(0);
+    named('キャプション一覧', editor).children.find(row => row.children[0]?.attributes.get('aria-current') === 'true')!.children[0]!.fire('click');
     const media = named('メディアの整理', editor), stored = named('既存のメディアを添付', media); stored.open = true; stored.fire('toggle');
     for (let i = 0; i < 2; i++) { button('受信画像', named('メディアを選択', media)).fire('click'); await edited(() => button('選択したメディアを添付', media).fire('click')); }
     const rows = () => captionAttachments(host.authority.read().mediaData, captionId).ready;
@@ -9621,7 +9840,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     await outputCompletion(() => all(savedRow).find(n => n.tag === 'button' && n.textContent === 'ダウンロード')!.fire('click'));
     expect(tools.busy()).toBe(false);
     expect(host.workspaceOutput.jobs.filter(j => j.purpose === 'backup').map(j => j.id)).toEqual([result.id]);
-    expect(output.children.find(n => n.attributes.get('role') === 'status')!.textContent).toBe('ダウンロードを開始しました。保存先で完了を確認してください。');
+    expect(output.children.find(n => n.attributes.get('role') === 'status')!.textContent).toBe('LociView-調査前.zip のダウンロードを開始しました。保存先で完了を確認してください。');
     expect(download).toHaveBeenCalledTimes(3);
     expect((download.mock.contexts[2] as unknown as HTMLAnchorElement).download).toBe('LociView-調査前.zip');
     expect(all(output).some(n => n.textContent.includes('保存ファイル 調査前'))).toBe(true);

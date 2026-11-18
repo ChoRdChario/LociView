@@ -2,7 +2,7 @@ import * as A from '@automerge/automerge/slim';
 import { Repo, stringifyAutomergeUrl, parseAutomergeUrl, type DocumentId, type BinaryDocumentId } from '@automerge/automerge-repo/slim';
 import type { ProjectWorkspaceFS } from '../platform/fs';
 import { checkedChanges, checkedProof, checkLimits, fail, inspectPhysical, type MetadataLimits, type MetadataProof, type PhysicalDoc } from './format';
-import { assertTextDocumentWriter, equalBytes, json, technicalId, withMetadataRead } from './persistence';
+import { assertTextDocumentWriter, digest, equalBytes, json, technicalId, withMetadataRead } from './persistence';
 import { ProjectMetadataSource } from './source';
 
 /** Owned storage factory, bound to one new-workspace namespace; no library objects escape. */
@@ -95,6 +95,61 @@ export class MetadataRepository {
     const ownedId = id, ownedProof = checkedProof(proof, this.limits), ownedHeads = heads ? [...heads] : undefined;
     return withMetadataRead(this.fs, this.factory, ({ fs, factory }) =>
       new MetadataRepository(fs, factory!, this.limits).readDirect(ownedId, ownedProof, ownedHeads, allowUninitialized), 'repository.read');
+  }
+
+  /**06j only: account for every physical row, including data normal loadDoc skips. */
+  async readForUnwrittenResolution(id: string, proof: MetadataProof): Promise<ProjectMetadataSource | null> {
+    const ownedProof = checkedProof(proof, this.limits), documentId = this.documentId(id);
+    return withMetadataRead(this.fs, this.factory, async ({ factory }) => {
+      const raw = await factory!().loadRange([]), keys = new Set<string>();
+      if (raw.length > this.limits.maxChanges) return fail('closed-local-storage-budget');
+      let total = 0;
+      // Own all keys and bytes before any asynchronous hash/decode step.
+      const rows = raw.map(row => {
+        if (!Array.isArray(row.key) || !(row.data instanceof Uint8Array) || !row.data.length ||
+          (total += row.data.length) > this.limits.maxTotalBytes) return fail('closed-local-storage-row');
+        const identity = row.key.length === 1 && row.key[0] === 'storage-adapter-id';
+        if (!identity && (row.key.length !== 3 || row.key[0] !== documentId || !['snapshot', 'incremental'].includes(row.key[1]!) ||
+          typeof row.key[2] !== 'string' || !/^[0-9a-f]{64}$/.test(row.key[2]))) return fail('closed-local-storage-key');
+        return { key: [...row.key], bytes: row.data.slice() };
+      });
+      const chunks: { kind: 'snapshot' | 'incremental'; bytes: Uint8Array }[] = [];
+      let identity = false;
+      for (const row of rows) {
+        const key = json(row.key), bytes = row.bytes;
+        if (keys.has(key)) return fail('closed-local-storage-key'); keys.add(key);
+        if (key === json(['storage-adapter-id'])) {
+          if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(new TextDecoder().decode(bytes))) return fail('storage-identity');
+          identity = true; continue;
+        }
+        const kind = row.key[1] as 'snapshot' | 'incremental';
+        let hash: string;
+        if (kind === 'incremental') hash = await digest(bytes);
+        else {
+          const snapshot = A.load<Record<string, any>>(bytes);
+          try {
+            if (A.getMissingDeps(snapshot, []).length) return fail('closed-local-storage-dependencies');
+            hash = await digest(new TextEncoder().encode(A.getHeads(snapshot).join('')));
+          } finally { A.free(snapshot); }
+        }
+        if (hash !== row.key[2]) return fail('closed-local-storage-hash');
+        chunks.push({ kind, bytes });
+      }
+      if (!identity) return fail('storage-identity-missing');
+      if (!chunks.length) return null;
+      // A complete decode must reject torn chunks; incremental loading can hide
+      // unparsed trailing bytes even when getMissingDeps reports no missing heads.
+      const bytes = new Uint8Array(chunks.reduce((size, chunk) => size + chunk.bytes.length, 0));
+      let offset = 0;
+      for (const kind of ['snapshot', 'incremental'] as const) for (const chunk of chunks) if (chunk.kind === kind) {
+        bytes.set(chunk.bytes, offset); offset += chunk.bytes.length;
+      }
+      const document = A.load<Record<string, any>>(bytes);
+      try {
+        if (A.getMissingDeps(document, []).length) return fail('closed-local-storage-dependencies');
+        return ProjectMetadataSource.reopen(A.getAllChanges(document), ownedProof, this.limits);
+      } finally { A.free(document); }
+    }); // No additional staging-read exception is admitted by06j.
   }
 
   private async readDirect(id: string, proof: MetadataProof, heads: readonly string[] | undefined, allowUninitialized: boolean): Promise<ProjectMetadataSource | null> {

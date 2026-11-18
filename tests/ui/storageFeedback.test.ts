@@ -1,8 +1,16 @@
 import {describe,it,expect} from 'vitest';
-import {storageFailureText} from '../../src/ui/projectScene/storageFeedback';
+import {metadataFailureText,storageFailureText} from '../../src/ui/projectScene/storageFeedback';
 import {MetadataSourceError} from '../../src/projectMetadata/format';
 
 describe('storage recovery feedback',()=>{
+  it('explains unprepared recovery and unreadable receipts without claiming repair or masking other errors',()=>{
+    expect(metadataFailureText(new MetadataSourceError('incomplete-staging-repair').message)).toContain('再開できません');
+    expect(metadataFailureText(new MetadataSourceError('receipt-invalid').message)).toContain('データは削除しない');
+    expect(metadataFailureText(new MetadataSourceError('receipt-read').message)).toContain('処理を停止');
+    expect(metadataFailureText(new MetadataSourceError('receipt-readback').message)).toBeUndefined();
+    expect(metadataFailureText('receipt-invalid')).toBeUndefined();
+    expect(metadataFailureText(undefined)).toBeUndefined();
+  });
   it('identifies real native quota while warning that deleting site data destroys restart data',()=>{
     const message=storageFailureText(new DOMException('browser-specific quota text','QuotaExceededError'))!;
     expect(message).toContain('保存容量が不足');expect(message).toContain('再試行');expect(message).toContain('再開用データも消えます');

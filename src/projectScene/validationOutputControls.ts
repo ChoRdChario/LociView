@@ -33,6 +33,7 @@ export function createValidationOutputControls(document: Document, host: ReturnT
   editOnly(shareOptions, actions, nameField, commands, select, maintenance);
   let busy = false, disposed = false, feedback = '', selected: string | null = null, cancellation: string | null = null;
   let completedFeedback = false;
+  let handoffFileName = '';
   let storageFailure:{diagnostic:string|null|undefined;text:string}|undefined;
   let readingToken: string | null = null;
   let primaryAction = () => {};
@@ -94,8 +95,9 @@ export function createValidationOutputControls(document: Document, host: ReturnT
     if (job.purpose === 'backup' && label) a.download = `LociView-${label}.zip`;
     a.hidden = true; root.append(a);
     try { a.click(); } finally { a.remove(); }
+    return a.download;
   };
-  const handoffMessage = 'ダウンロードを開始しました。保存先で完了を確認してください。';
+  const handoffMessage = () => `${handoffFileName} のダウンロードを開始しました。保存先で完了を確認してください。`;
   type PerformOptions = {
     writes?: boolean;
     completed?: () => void;
@@ -103,7 +105,7 @@ export function createValidationOutputControls(document: Document, host: ReturnT
     allowReading?: boolean;
     focusOnSuccess?: 'primary' | 'result';
   };
-  const perform = (action: () => Promise<unknown>, message: string, {
+  const perform = (action: () => Promise<unknown>, message: string | (() => string), {
     writes = true, completed, workingMessage = 'ファイルを確認しています。', allowReading = false, focusOnSuccess = 'primary',
   }: PerformOptions = {}) => {
     if (disposed || busy || composing || otherBusy()) return;
@@ -119,7 +121,7 @@ export function createValidationOutputControls(document: Document, host: ReturnT
     let succeeded = false;
     completedFeedback = false; storageFailure=undefined; busy = true; readingToken = allowReading ? host.read().source?.token ?? null : null; feedback = workingMessage; render(); changed();
     void (async () => {
-      try { await action(); if (!disposed) { feedback = message; completedFeedback = true; completed?.(); succeeded = completedFeedback; } }
+      try { await action(); if (!disposed) { feedback = typeof message === 'function' ? message() : message; completedFeedback = true; completed?.(); succeeded = completedFeedback; } }
       catch (error) { completedFeedback = false; if (!disposed) {const text=storageFailureText(error);storageFailure=text?{diagnostic:host.workspaceOutput.error,text}:undefined;feedback=text??(error instanceof Error ? error.message : 'ファイル処理を完了できません。');} }
       finally { busy = false; readingToken = null; if (!disposed) { render(); changed(); }
         document.removeEventListener?.('focusin', moved);
@@ -169,7 +171,13 @@ export function createValidationOutputControls(document: Document, host: ReturnT
     workingMessage: 'ファイルを作成しています。', allowReading: true, focusOnSuccess: 'result' }); };
   const handoff = async (id: string, offered?: BackupFileHandoff) => {
     feedback = 'ダウンロードを準備しています。'; render();
-    try { await download(id, offered); if (!disposed) handedOff.add(id); }
+    try {
+      const name = await download(id, offered);
+      if (!disposed) {
+        if (name === undefined) throw Error('ダウンロードの結果を確認できません。');
+        handoffFileName = name; handedOff.add(id);
+      }
+    }
     catch (error) { history.open = true; throw Error(`${error instanceof Error ? error.message : 'ダウンロードを開始できません。'} 作成したファイルから再試行してください。`); }
   };
   const render = () => {

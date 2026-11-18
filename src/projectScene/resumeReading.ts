@@ -13,7 +13,7 @@ export function createCaptionTextReading(document: Document, reading: Omit<Resum
   root.className = 'lv-project-workspace lv-resume-reading'; root.setAttribute('aria-label', context === 'review' ? '共有シーンの記録' : context !== 'resume' ? '復元中のキャプション' : '再開中のキャプション');
   identity.className = 'lv-project-identity'; heading.textContent = reading.title;
   status.className = 'lv-operation-status'; status.dataset.busy = 'true';
-  status.setAttribute('role', 'status'); status.textContent = context === 'first-restore' ? '復元中です。最初のシーンの記録を読めます。編集・保存は完了後に使えます。' : context === 'restore' ? '復元しています。完了後に編集できます。' : '再開を確認しています。';
+  status.setAttribute('role', 'status'); status.textContent = context === 'first-restore' ? '復元中です。最初のシーンの記録を読めます。編集・保存は完了後に使えます。' : context === 'restore' ? '復元しています。完了後に編集できます。' : '保存データを確認中です。記録は閲覧・検索できます。';
   identity.append(heading, status); header.append(identity); header.hidden = context === 'review';
   layout.className = 'lv-project-body'; layout.dataset.surface = 'panel';
   stage.className = 'lv-project-stage'; stage.setAttribute('aria-hidden', 'true');

@@ -94,6 +94,7 @@ test('08c uses canvas generation, portable offline display/save/reopen and a por
     await revealProjectSelection(cold.p);
     await cold.p.locator('details.lv-project-files').getByRole('button', { name: 'プロジェクトを選ぶ', exact: true }).click();
     await open(cold.p, portableOnly);
+    await cold.p.getByRole('button', { name: 'プロジェクトを取り込む', exact: true }).click();
     await expect.poll(() => new URL(cold.p.url()).searchParams.get('run')).toBe(copyRun);
     await gallery(cold.p);
     expect(await cold.p.evaluate(() => (window as any).__heicDecodes)).toBe(0);

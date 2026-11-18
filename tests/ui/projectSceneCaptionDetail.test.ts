@@ -51,7 +51,7 @@ describe('Caption detail: local draft/intents, not durable editor acceptance', (
     const h=host({...context(),source:blank,draft:beginCaptionDraft(blank)});
     expect(h.status.textContent).toBe('タイトル・本文や写真を追加できます。');
     h.body.value='最初の本文';h.body.fire('input');expect(h.apply.disabled).toBe(false);
-    expect(h.status.textContent).toBe('「変更を適用」の後、「ファイルに保存」できます。');
+    expect(h.status.textContent).toBe('写真や動画も選んでから、まとめて適用できます。');
     const plan=apply(h.props);h.body.fire('compositionstart');expect(h.apply.disabled).toBe(true);
     expect(h.status.textContent).not.toContain('ファイルに保存');h.body.fire('compositionend');
     h.render({...h.props,feedback:{kind:'failed',plan,message:'書込を再試行してください。'}});

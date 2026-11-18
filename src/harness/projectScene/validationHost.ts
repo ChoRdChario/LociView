@@ -1,5 +1,5 @@
 import {openValidationHost as openTypedHost,openValidationEntry as openTypedEntry} from '../../projectScene/validationHost';
-import type {FirstBackupRecovery as TypedFirstBackup,ValidationHostOptions} from '../../projectScene/validationHost';
+import type {FirstBackupRecovery as TypedFirstBackup,InterruptedLocalEditRecovery as TypedLocalRecovery,ValidationHostOptions} from '../../projectScene/validationHost';
 import type {MetadataEdit} from '../../projectMetadata/commands';
 import {metadataIntent} from './metadataIntent';
 export {validationArea,measureValidation} from '../../projectScene/validationHost';
@@ -14,10 +14,13 @@ export type ValidationNormalHost=Awaited<ReturnType<typeof openValidationHost>>;
 export type FirstBackupRecovery=Omit<TypedFirstBackup,'confirm'|'retry'|'edit'> & {
   confirm(...args:Parameters<TypedFirstBackup['confirm']>):Promise<ValidationNormalHost>;
   retry(...args:Parameters<TypedFirstBackup['retry']>):Promise<ValidationNormalHost>;
-  edit():Promise<ValidationNormalHost|FirstBackupRecovery>;
+  edit():Promise<ValidationNormalHost|FirstBackupRecovery|InterruptedLocalEditRecovery>;
 };
-function legacyEntry(opened:Awaited<ReturnType<typeof openTypedEntry>>):ValidationNormalHost|FirstBackupRecovery {
+export type InterruptedLocalEditRecovery=Omit<TypedLocalRecovery,'continueSaved'> & {continueSaved():Promise<ValidationNormalHost>};
+function legacyEntry(opened:Awaited<ReturnType<typeof openTypedEntry>>):ValidationNormalHost|FirstBackupRecovery|InterruptedLocalEditRecovery {
   if(!('kind' in opened))return legacyValidationHost(opened);
+  if(opened.kind==='interrupted-local-edit-recovery')return Object.assign(Object.create(opened) as TypedLocalRecovery,
+    {continueSaved:async()=>legacyValidationHost(await opened.continueSaved())});
   const actualHosts=new WeakMap<ValidationNormalHost,Awaited<ReturnType<typeof openTypedHost>>>();
   const wrap=(host:Awaited<ReturnType<typeof openTypedHost>>)=>{const result=legacyValidationHost(host);actualHosts.set(result,host);return result;};
   return Object.assign(Object.create(opened) as TypedFirstBackup,{

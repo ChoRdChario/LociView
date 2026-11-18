@@ -8,11 +8,28 @@ Check actual branch/HEAD/worktree and preserve existing changes.
 
 ## Current workflow
 
-The current workflow covers choosing a home file, confirming changes, and
-reading a shared scene with one header on desktop and small screens.
-The typed edit, original files, save verification and interruption recovery retain
-their existing authorities. [Todo](todo.md) owns the measured outcome and the
-remaining first-use, physical iPhone and large-file checks.
+The current workflow investigates the external reopening failure and completes
+text/photo recording, file saving and resume on PC/touch. Approved06j adds one
+explicit continue-saved path for a cold start-only local edit whose entire
+repository still equals the last publication. Partial/corrupt changes retain
+strict refusal and a safe exit. Every old byte is retained; unfinished input is
+never called recovered. Save verification and ordinary recovery fences remain.
+[Todo](todo.md) owns
+the executed checks, unresolved receipt cause and physical iPhone acceptance.
+
+The owner's followup confirms Caption autosave, immediate preview distinct from
+durable saving, list-side editing/read-only windows and minimum camera
+intervention. [08d](../docs/specs/08d-caption-autosave-workflow-proposal.md) records
+that direction and the replacement's acceptance; it is not implemented. The
+current explicit Apply path is transitional. Do not implement autosave by clicking
+Apply on a timer or drop unresolved input during a save.
+[06j](../docs/specs/06j-interrupted-local-edit-resolution-proposal.md) is an
+independently reviewed contract for one proven start-only interrupted local edit.
+The PO approved implementation2026-11-19; the bounded implementation passed its
+full code checkpoint, PC/touch crash/file flows and offline suite. It does not
+repair arbitrary bad receipts or qualify every autosave interruption. Display
+lightening remains paused. Preserve existing window/camera, media breadth and
+truthful external-download state; not every external layout suggestion is policy.
 
 ## Accepted boundary
 

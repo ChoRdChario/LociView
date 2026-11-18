@@ -4,8 +4,8 @@ import type { OriginBlobStore } from '../projectMetadata/blobStore';
 import { checkLimits, fail, type MetadataLimits } from '../projectMetadata/format';
 import { openWorkspaceGeneration, type GenerationStorageOpener } from '../projectMetadata/generationScope';
 import { newId, underWriteLease } from '../projectMetadata/persistence';
-import type { MetadataProjectSession, MetadataSessionRead } from '../projectMetadata/session';
-import { TransactionJournal } from '../projectMetadata/journal';
+import type { MetadataProjectSession, MetadataSessionRead, UnwrittenLocalEditRecovery } from '../projectMetadata/session';
+import { TransactionJournal, observeJournal } from '../projectMetadata/journal';
 import { MetadataRepository, type MetadataStorageFactory } from '../projectMetadata/repository';
 import type { BackupRestoreInput } from '../projectMetadata/packageRemote';
 import { packageByteHash } from './manifest';
@@ -34,6 +34,27 @@ export interface RestoreDatabasePorts {
   open: GenerationStorageOpener;
 }
 type DestinationTiming = (stage: string, milliseconds: number) => void;
+interface SelectedOpenDiagnostics {
+  observeCatalogRead?: (read: MetadataSessionRead) => void;
+  observeMetadataRead?: (read: MetadataSessionRead) => void;
+  timing?: DestinationTiming;
+  ordinarySession?: boolean;
+  reopenTextRecovery?: boolean;
+}
+interface LocalRecoveryAdmission {
+  inspect(): Promise<UnwrittenLocalEditRecovery | null>;
+  ticket?: UnwrittenLocalEditRecovery;
+}
+export interface LocalEditRecoveryPorts extends RestoreSourcePorts {
+  readonly session: Pick<MetadataProjectSession, 'read' | 'inspectUnwrittenLocalEdit' | 'resolveUnwrittenLocalEdit'>;
+  readonly factory: MetadataStorageFactory;
+}
+export interface LocalEditRecoveryHandle {
+  readonly projectId: string;
+  readonly title?: string;
+  resolve(): Promise<void>;
+  dispose(): Promise<void>;
+}
 const evidence = ({ sha256, byteLength }: EvidenceRef): EvidenceRef => ({ sha256, byteLength });
 const terminal = (job: RestoreControlJob) => job.abandoned || job.result !== null;
 
@@ -270,7 +291,7 @@ export class BackupRestoreJob {
   inventory(): JsonObject[] { return this.inspection.description.bodyRefs.map(r => ({ ...r })); }
   private static async verifyDestination(root: ProjectWorkspaceFS, ports: RestoreSourcePorts, factory: MetadataStorageFactory, job: RestoreControlJob,
     limits: MetadataLimits, selected?: GenerationSelection, timing?: DestinationTiming, reopenSelected = false,
-    metadataReading?: (read: MetadataSessionRead) => Promise<void>) {
+    metadataReading?: (read: MetadataSessionRead) => Promise<void>, localRecovery?: LocalRecoveryAdmission) {
     const measure = async <T>(stage: string, action: () => Promise<T>): Promise<T> => {
       if (!timing) return action();
       const started = performance.now();
@@ -292,15 +313,19 @@ export class BackupRestoreJob {
     const destination = { journal: restoreRef(restored.entry.prepared), publication: restoreRef(restored.entry.publication), baseBinding: restoreRef(restored.binding) };
     if (selected && !restoreEqual(destination, selected.destination)) fail('restore-destination-binding');
     const read = await measure('session', () => ports.session.read(reopenSelected));
-    const recovery = reopenSelected && !!selected && job.result?.detail.kind === 'selected' && read.state === 'pending';
+    const recovery = (reopenSelected || !!localRecovery) && !!selected && job.result?.detail.kind === 'selected' && read.state === 'pending';
     if ((!recovery && read.state !== 'ready') || !read.source || !read.publication || read.provider?.kind !== 'scene-provider' ||
       read.provider.token !== read.source.token) return fail('restore-destination-not-ready');
     if (recovery) {
       // The restore itself already finished. Permit strict recovery of one later
       // documented text edit, never a new selection or a partially restored base.
-      const journal = new TransactionJournal(ports.fs, limits), tail = (await journal.entries()).at(-1);
-      if (!tail?.prepared || tail.publication || tail.start.purpose !== 'localCommand' ||
-        tail.start.predecessor !== read.publication || !restoreEqual(tail.start.baseHeads, read.source.heads) ||
+      const journal = new TransactionJournal(ports.fs, limits), entries = await journal.entries(), tail = observeJournal(entries).pending;
+      const previous = observeJournal(entries.filter(entry => entry !== tail));
+      if (!tail || tail.publication || tail.start.purpose !== 'localCommand' || tail.start.predecessor !== previous.terminal?.start.transactionId ||
+        previous.effectivePublication?.start.transactionId !== read.publication || !restoreEqual(tail.start.baseHeads, read.source.heads))
+        return fail('restore-destination-not-ready');
+      if (!localRecovery) {
+      if (!tail.prepared ||
         tail.prepared.remote || tail.prepared.stagedBlobs?.length || tail.prepared.changes.length !== 1)
         return fail('restore-destination-not-ready');
       const parts = await journal.validateParts(tail.prepared), next = read.source.appendOriginal(parts);
@@ -311,6 +336,7 @@ export class BackupRestoreJob {
       const current = await new MetadataRepository(ports.fs, factory, limits).read(tail.start.repositoryId, tail.start.proof);
       if (!current || current.token !== next.token && (tail.durable || current.token !== read.source.token))
         return fail('restore-destination-database');
+      }
     }
     const saved = await measure('repository', () => new MetadataRepository(ports.fs, factory, limits).read(restored.entry.start.repositoryId, restored.source.proof, read.source!.heads));
     if (saved?.token !== read.source.token) return fail('restore-destination-database');
@@ -323,16 +349,78 @@ export class BackupRestoreJob {
       }
     });
     await measure('bases', () => new WorkspaceBaseStore(ports.fs, limits, restored.source.proof).snapshot());
+    if (recovery && localRecovery && !localRecovery.ticket) {
+      // A retained ticket is only identity. The Session action below still
+      // repeats full fresh eligibility on both sides of its write.
+      const ticket = await localRecovery.inspect();
+      if (!ticket) return fail('restore-destination-not-ready');
+      localRecovery.ticket = ticket;
+    }
     return { destination, read };
   }
   /** Resolve existing selected data only. Read permission survives a pending restore; ordinary writes do not. */
   static async openSelected(root: ProjectWorkspaceFS, limits: MetadataLimits, databases: RestoreDatabasePorts,
     createPorts: (scope: Awaited<ReturnType<typeof openWorkspaceGeneration>>) => RestoreSourcePorts,
-    diagnostics?: { observeCatalogRead?: (read: MetadataSessionRead) => void; observeMetadataRead?: (read: MetadataSessionRead) => void;
-      timing?: DestinationTiming; ordinarySession?: boolean; reopenTextRecovery?: boolean }) {
+    diagnostics?: SelectedOpenDiagnostics) {
+    return this.openSelectedOwned(root, limits, databases, createPorts, diagnostics);
+  }
+
+  /** Recovery-only scope: it never returns a Session, provider, filesystem or factory. */
+  static async openUnwrittenLocalEdit(root: ProjectWorkspaceFS, limits: MetadataLimits, databases: RestoreDatabasePorts,
+    createPorts: (scope: Awaited<ReturnType<typeof openWorkspaceGeneration>>) => LocalEditRecoveryPorts): Promise<LocalEditRecoveryHandle | null> {
+    let ports: LocalEditRecoveryPorts | undefined;
+    const admission: LocalRecoveryAdmission = { inspect: () => ports!.session.inspectUnwrittenLocalEdit() };
+    const scope = await this.openSelectedOwned(root, limits, databases, selected => ports = createPorts(selected), undefined, admission);
+    let closed = false;
+    const check = async () => {
+      if (closed) return fail('closed-local-scope');
+      await scope.check();
+      const controls = await readRestoreControls(root, limits);
+      if (controls.pending || !restoreEqual(controls.selection, scope.selection) ||
+        controls.tail && (controls.tail.jobId !== scope.generationId || controls.jobs.find(job => job.id === controls.tail!.jobId)?.result?.detail.kind !== 'selected'))
+        return fail('closed-local-selection');
+      return controls;
+    };
+    try {
+      const controls = await check();
+      if (!scope.generationId) admission.ticket = await admission.inspect() ?? undefined;
+      const ticket = admission.ticket;
+      if (!ticket) { await scope.dispose(); closed = true; return null; }
+      const journal = new TransactionJournal(scope.fs, limits), pending = observeJournal(await journal.entries()).pending;
+      if (!pending) return fail('closed-local-stale');
+      const closurePath = journal.path(pending.start.transactionId, 'closedLocal.json');
+      const controlBinding = (value: typeof controls) => ({ ...value, jobs: value.jobs.map(job => job.id === scope.generationId
+        ? { ...job, destinationFiles: job.destinationFiles.filter(path => path !== closurePath) } : job) });
+      const expectedControls = controlBinding(controls);
+      const read = await ports!.session.read(true), projectId = read.source?.proof.identity.projectId;
+      if (typeof projectId !== 'string' || read.state !== 'pending' || read.provider?.kind !== 'scene-provider' || read.provider.token !== read.source?.token)
+        return fail('closed-local-project');
+      const field = read.provider.inspection.candidates.fields.find(field => field.path.length === 2 && field.path[0] === 'project' && field.path[1] === 'title');
+      const value = field?.valid && field.candidates.length === 1 ? field.candidates[0]?.value : undefined;
+      const title = value?.kind === 'value' && typeof value.value === 'string' ? value.value : undefined;
+      return { projectId, ...(title === undefined ? {} : { title }), resolve: async () => {
+        const fresh = await check();
+        if (!restoreEqual(controlBinding(fresh), expectedControls)) return fail('closed-local-selection');
+        if (scope.generationId) {
+          const job = fresh.jobs.find(job => job.id === scope.generationId);
+          if (!job || !fresh.tail) return fail('closed-local-selection');
+          await this.verifyDestination(root, ports!, scope.factory, job, limits, fresh.tail, undefined, true, undefined, admission);
+        }
+        await ports!.session.resolveUnwrittenLocalEdit(ticket);
+        const after = await check();
+        if (!restoreEqual(controlBinding(after), expectedControls)) return fail('closed-local-selection');
+      }, dispose: async () => { if (!closed) { closed = true; await scope.dispose(); } } };
+    } catch (error) { closed = true; await scope.dispose().catch(() => {}); throw error; }
+  }
+
+  private static async openSelectedOwned(root: ProjectWorkspaceFS, limits: MetadataLimits, databases: RestoreDatabasePorts,
+    createPorts: (scope: Awaited<ReturnType<typeof openWorkspaceGeneration>>) => RestoreSourcePorts,
+    diagnostics?: SelectedOpenDiagnostics, localRecovery?: LocalRecoveryAdmission) {
     const observeCatalogRead = diagnostics?.observeCatalogRead, timing = diagnostics?.timing;
     const state = await reconcileRestoreDatabases(root, limits, () => databases.listGenerations()), selected = state.selection,
       generationId = state.tail?.jobId ?? null;
+    if (localRecovery && (state.pending || state.tail && state.jobs.find(job => job.id === generationId)?.result?.detail.kind !== 'selected'))
+      return fail('closed-local-selection');
     let ordinary = false;
     const checkSelected = async (writing = false) => {
       const singleOpen = ordinary;
@@ -370,7 +458,7 @@ export class BackupRestoreJob {
             current.jobs.find(next => next.id === generationId)?.result?.detail.kind !== 'selected') return;
           try { diagnostics.observeMetadataRead!(read); } catch { /* Optional text never decides destination readiness. */ }
         } : undefined;
-        const verified = await this.verifyDestination(root, ports, scope.factory, job, limits, state.tail, timing, diagnostics?.reopenTextRecovery, metadataReading);
+        const verified = await this.verifyDestination(root, ports, scope.factory, job, limits, state.tail, timing, diagnostics?.reopenTextRecovery, metadataReading, localRecovery);
         fullyReady = verified.read.state === 'ready';
         if (observeCatalogRead) catalogRead = verified.read;
       }

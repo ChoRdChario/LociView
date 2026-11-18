@@ -23,6 +23,12 @@ export function validationGenerationService(scope: Pick<Awaited<ReturnType<typeo
     ...validationProjectService(scope.fs, scope.factory, options.store, options.filePolicy ?? options.fileLimits, options.decode, scope.check, options.jpeg, options.photo,options.mediaDecoders, options.timing) };
 }
 
+/** A generation-bound recovery action, without exposing its storage or Session. */
+export function openValidationLocalEditRecovery(root: ProjectWorkspaceFS, options: Options) {
+  return BackupRestoreJob.openUnwrittenLocalEdit(root, limits, validationGenerationDatabases(options),
+    scope => validationGenerationService(scope, options));
+}
+
 /** Inspect first-only controls before an original DB opener can be reached. No Session is fabricated. */
 export async function inspectValidationFirstBackup(root: ProjectWorkspaceFS, options: Options) {
   const controls = await readRestoreControls(root, limits, 'detect');

@@ -35,7 +35,9 @@ test('content-first workspace keeps editing, pin completion and file exits coher
       const body = root.querySelector('[data-caption-field="body"]')!.parentElement!, media = root.querySelector('.lv-caption-media-slot')!, props = root.querySelector('.lv-caption-properties')!;
       return !!(body.compareDocumentPosition(media) & Node.DOCUMENT_POSITION_FOLLOWING) && !!(media.compareDocumentPosition(props) & Node.DOCUMENT_POSITION_FOLLOWING);
     })).toBe(true);
-    const comparison = p.locator('.lv-caption-window'), image = comparison.locator('img').first(); await expect(image).toBeVisible();
+    const comparison = p.locator('.lv-caption-window'); await expect(comparison).toHaveCount(0);
+    await p.locator('.lv-caption-select').filter({ hasText: '柱の接合部' }).click(); await expect(comparison).toHaveCount(1);
+    const image = comparison.locator('img').first(); await expect(image).toBeVisible();
     const attached=detail.getByRole('region',{name:'メディアの整理',exact:true});await expect(attached.locator('figure')).toHaveCount(1);
     await expect(attached.getByRole('button', { name: '画像を表示', exact: true })).toBeHidden();
     await expect(attached.locator('img')).toHaveCount(0);
@@ -83,7 +85,7 @@ test('content-first workspace keeps editing, pin completion and file exits coher
     const settings = p.locator('details[aria-label="設定"]'); await settings.locator(':scope > summary').click(); await expect(settings.locator('.lv-local-name > summary')).toBeVisible(); await expect(settings.getByRole('heading', { name: '共有する編集者名', exact: true })).toBeVisible();
     await p.screenshot({ path: info.outputPath('settings.png'), fullPage: false }); await settings.locator(':scope > summary').click();
     await revealWorkPanel(p); await tab('キャプション').click(); const menu = p.locator('details.lv-project-files'), files = p.getByRole('region', { name: 'ファイル', exact: true });
-    await p.locator('.lv-workspace-actions').getByRole('button', {name:'ファイルに保存',exact:true}).click(); await expect(files.getByRole('button', { name: '保存', exact: true })).toHaveCount(0); await expect(files.getByRole('button', { name: '相手に渡す', exact: true })).toHaveCount(0);
+    await p.locator('.lv-workspace-actions').getByRole('button', {name:'保存…',exact:true}).click(); await expect(files.getByRole('button', { name: '保存', exact: true })).toHaveCount(0); await expect(files.getByRole('button', { name: '相手に渡す', exact: true })).toHaveCount(0);
     const name = files.getByLabel('保存名（任意）', { exact: true }); await name.fill('現地確認'); await name.dispatchEvent('compositionstart'); await expect(files.locator('.lv-file-primary')).toBeDisabled(); await expect(menu.getByRole('button', { name: '閉じる', exact: true })).toBeDisabled(); await name.dispatchEvent('compositionend');
     expect(await files.locator('.lv-file-primary').evaluate(n => getComputedStyle(n).backgroundColor)).not.toBe('rgba(0, 0, 0, 0)');
     let downloads = 0; const countDownload = () => { downloads++; }; p.on('download', countDownload);
@@ -91,10 +93,10 @@ test('content-first workspace keeps editing, pin completion and file exits coher
     await download.saveAs(info.outputPath('completed-backup.zip')); expect(await download.failure()).toBeNull();
     const result = files.locator('.lv-operation-status');
     await expect(result).toHaveAttribute('data-busy', 'false'); await expect(result).toBeFocused(); await expect(result).toBeInViewport();
-    await expect(result).toHaveText('ダウンロードを開始しました。保存先で完了を確認してください。');
+    await expect(result).toHaveText(`${download.suggestedFilename()} のダウンロードを開始しました。保存先で完了を確認してください。`);
     await result.press('Enter'); await idle(); expect(downloads).toBe(1); p.off('download', countDownload);
     await result.press('Escape'); await expect(menu).toHaveJSProperty('open', false);
-    await expect(p.locator('.lv-workspace-actions').getByRole('button', { name: 'ファイルに保存', exact: true })).toBeFocused();
+    await expect(p.locator('.lv-workspace-actions').getByRole('button', { name: '保存…', exact: true })).toBeFocused();
     await p.getByRole('button', { name: '共有', exact: true }).click();
     const partial = files.getByRole('checkbox', { name: '一部だけ出力', exact: true }), scope = files.getByLabel('出力する内容', { exact: true });
     await expect(partial).toBeChecked(); await expect(scope).toBeVisible();
