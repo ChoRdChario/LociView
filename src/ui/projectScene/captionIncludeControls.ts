@@ -7,11 +7,11 @@ import { captionIncludeIssue, captionIncludeView, planCaptionInclude,
 export function createCaptionIncludeControls(document: Document, onPlan: (plan: CaptionIncludePlan) => void, mode: 'manage' | 'add' = 'manage') {
   const make = <K extends keyof HTMLElementTagNameMap>(tag: K, text = '') => { const node = document.createElement(tag); node.textContent = text; return node; };
   const root = make('details'); root.className = 'lv-caption-include';
-  const summary = make('summary', mode === 'add' ? '既存の記録を追加' : 'キャプションの追加・除外');
+  const summary = make('summary', mode === 'add' ? '既存の記録を追加' : '記録の追加・除外');
   const searchName = mode === 'add' ? '追加する記録を検索' : '検索';
   const searchLabel = make('label', searchName), search = make('input'); search.type = 'search'; search.setAttribute('aria-label', searchName); searchLabel.append(search);
-  const choiceLabel = make('label', 'キャプション'), choices = make('select'); choices.size = 6;
-  choices.setAttribute('aria-label', 'キャプション'); choiceLabel.append(choices);
+  const choiceLabel = make('label', '記録'), choices = make('select'); choices.size = 6;
+  choices.setAttribute('aria-label', '記録'); choiceLabel.append(choices);
   const selected = make('p'), status = make('p'); status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
   const include = make('button', 'このシーンに追加'), review = make('button', '状態を確認'); include.type = review.type = 'button';
   editOnly(include);
@@ -49,10 +49,10 @@ export function createCaptionIncludeControls(document: Document, onPlan: (plan: 
       (row.entry.membership.kind !== 'value' || row.entry.lifecycle.kind !== 'value' ? '（要確認）' : row.entry.lifecycle.value === 'deleted'
         ? '（削除済み）' : row.entry.membership.value === 'included' ? '（追加済み）' : '') }));
     if (next.memory.captionId && !options.some(option => option.id === next.memory.captionId)) options.unshift({ id: next.memory.captionId,
-      label: view.selected ? `${captionTitle(view.selected.caption)}（検索条件の外）` : '選択したキャプション（状態を確認）' });
+      label: view.selected ? `${captionTitle(view.selected.caption)}（検索条件の外）` : '選択した記録（状態を確認）' });
     const key = JSON.stringify(options);
     if (fingerprint !== key) {
-      choices.replaceChildren(make('option', 'キャプションを選択'));
+      choices.replaceChildren(make('option', '記録を選択'));
       choices.children[0]!.setAttribute('value', '');
       for (const item of options) { const option = make('option', item.label); option.value = item.id; choices.append(option); }
       fingerprint = key;
@@ -60,7 +60,7 @@ export function createCaptionIncludeControls(document: Document, onPlan: (plan: 
     choices.value = next.memory.captionId ?? '';
     selected.textContent = view.selected ? `${captionTitle(view.selected.caption)} — ${captionOwnerLabel(view.selected.caption)}` +
       (view.selected.caption.pin === 'unplaced' ? '（未配置）' : '') +
-      (action === 'exclude' ? '。キャプション自体や他のシーンには影響しません。' :
+      (action === 'exclude' ? '。記録自体や他のシーンには影響しません。' :
         (mode === 'add' ? '。本文と添付はシーン間で共用します。' : '') +
         (view.selected.caption.pin === 'ownerHidden' ? ' モデルは非表示のままです。' : '')) : '';
     selected.hidden = !selected.textContent;
@@ -68,7 +68,7 @@ export function createCaptionIncludeControls(document: Document, onPlan: (plan: 
     if (emptyAdd && (document.activeElement === choices || document.activeElement === include)) search.focus();
     choiceLabel.hidden = include.hidden = emptyAdd;
     const actionableIssue = !emptyAdd || busy || next.mutationBlock !== null || next.pending || next.memory.composing;
-    const emptyNote = emptyAdd && !next.memory.query.trim() ? '追加できる記録はありません。' : '該当するキャプションはありません。';
+    const emptyNote = emptyAdd && !next.memory.query.trim() ? '追加できる記録はありません。' : '該当する記録はありません。';
     status.textContent = [next.feedback.kind === 'failed' && `変更できませんでした。${next.feedback.message} 選択は保持しています。`,
       actionableIssue && issue, !view.issue && !rows.length && emptyNote].filter(Boolean).join(' ');
     include.disabled = issue !== null;

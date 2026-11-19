@@ -162,7 +162,7 @@ function phaseClock(){const start=performance.now(),cpu=process.cpuUsage();retur
     phase('restore-returned');
     // Both parties see the restored parent, but neither sees the other's new registration yet.
     const include = all(root).find(n => n.className === 'lv-caption-include')!;
-    choose(named('キャプション', include), captionId); await clickWrite(button('このシーンに追加', include));
+    choose(named('記録', include), captionId); await clickWrite(button('このシーンに追加', include));
     await vi.waitFor(() => expect(button('このシーンから外す', include)?.disabled).toBe(false));
     selectCaption(captionId); const media = named('メディア');
     button(f.f.image.label as string, named('メディアを選択', media)).fire('click'); await clickWrite(button('選択したメディアを添付', media));
@@ -195,7 +195,7 @@ function phaseClock(){const start=performance.now(),cpu=process.cpuUsage();retur
     expect(Object.keys(host.authority.read().resources.captions)).toHaveLength(2);
     const copiedAttachment = captionAttachments(host.authority.read().mediaData, copyId).ready[0]!;
     expect(copiedAttachment.id).not.toBe(attachment.id); expect(copiedAttachment.mediaResourceId).toEqual(attachment.mediaResourceId);
-    selectCaption(copyId); const detail = named('キャプションの詳細');
+    selectCaption(copyId); const detail = named('記録の詳細');
     expect(named('本文', detail).readOnly, 'independent copy body must be editable').toBe(false);
     choose(named('本文', detail), 'コピーだけの追記');
     expect(button('変更を適用', detail).disabled, 'independent copy edit must be actionable').toBe(false);

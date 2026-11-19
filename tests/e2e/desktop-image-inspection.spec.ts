@@ -35,14 +35,14 @@ test('image details, Scene keyboard focus and dismissible header sheets retain P
     await chooseHomeFiles(page, { name: '検査用模型.glb', mimeType: 'model/gltf-binary', buffer: triangleGlb() });
     await page.getByLabel('プロジェクト名', { exact: true }).fill('細部の確認'); await page.getByRole('button', { name: 'プロジェクトを作成', exact: true }).click();
     await expect(page.getByLabel('3Dモデルの表示', { exact: true })).toHaveAttribute('aria-busy', 'false', { timeout: 90_000 });
-    const scenes = page.getByRole('region', { name: 'シーン', exact: true }), firstName = await scenes.locator('button[aria-pressed="true"]').innerText();
+    const scenes = page.getByRole('region', { name: 'シーン', exact: true }), firstName = await scenes.locator('select[aria-label="シーン"] option:checked').innerText();
     const manage = page.locator('details[aria-label="シーンの管理"]'); await manage.locator(':scope > summary').click(); await manage.getByRole('button', { name: 'シーンを作る', exact: true }).click();
     await page.getByLabel('シーン名', { exact: true }).fill('別のシーン'); await page.getByRole('button', { name: 'シーンを追加', exact: true }).click(); await ready('シーンを追加しました。');
-    const first = scenes.getByRole('button', { name: firstName, exact: true }); await first.focus(); await page.keyboard.press('Enter'); await expect(first).toBeFocused(); await expect(first).toHaveAttribute('aria-pressed', 'true');
+    const first = scenes.getByRole('combobox', { name: 'シーン', exact: true }); await first.focus(); await first.selectOption({ label: firstName }); await expect(first).toBeFocused(); await expect(first.locator('option:checked')).toHaveText(firstName);
     await revealCoordinateAdd(page); const owner = page.getByLabel('追加先モデル', { exact: true }); await owner.focus(); await owner.selectOption({ label: '検査用模型.glb' }); await page.getByRole('button', { name: 'このモデルに追加', exact: true }).click();
     for (const axis of ['X', 'Y', 'Z']) await page.getByLabel('位置 ' + axis, { exact: true }).fill(axis === 'Y' ? '.5' : '0');
     await page.getByRole('button', { name: 'ここに記録を作る', exact: true }).click(); await ready('ピンの位置を確定しました。');
-    const detail = page.getByRole('region', { name: 'キャプションの詳細', exact: true }); await detail.getByLabel('タイトル', { exact: true }).fill('細部の記録'); await finishCaptionEditing(page, {}, 15000);
+    const detail = page.getByRole('region', { name: '記録の詳細', exact: true }); await detail.getByLabel('タイトル', { exact: true }).fill('細部の記録'); await finishCaptionEditing(page, {}, 15000);
     const choose = page.waitForEvent('filechooser'); await page.getByLabel('メディアを追加', { exact: true }).click(); await (await choose).setFiles({ name: '細部の写真.png', mimeType: 'image/png', buffer: png }); await finishCaptionEditing(page, {}, 15000);
     const notice=page.locator('main.lv-project-workspace > header > .lv-operation-status'),help = page.locator('details[aria-label="ヘルプ"]'), helpSummary = help.locator(':scope > summary');
     await expect(notice).toBeEmpty();await expect(detail.locator('[data-save-state]')).toHaveAttribute('data-save-state','saved');await helpSummary.click();
@@ -107,7 +107,7 @@ test('image details, Scene keyboard focus and dismissible header sheets retain P
     await expect(phone.getByRole('button', { name: '3D', exact: true })).toBeEnabled({ timeout: 90_000 }); await phone.getByRole('button', { name: '3D', exact: true }).tap();
     const phoneCanvas = phone.getByLabel('3Dモデルの表示', { exact: true }), pin = phone.locator('.lv-project-marker').first();
     await expect(phoneCanvas).toHaveAttribute('aria-busy', 'false', { timeout: 90_000 }); await expect(pin).toBeVisible(); await pin.tap();
-    const showPhoto = phone.getByRole('region', { name: 'キャプションの詳細', exact: true }).getByRole('button', { name: '画像を表示', exact: true }).first();
+    const showPhoto = phone.getByRole('region', { name: '記録の詳細', exact: true }).getByRole('button', { name: '画像を表示', exact: true }).first();
     await expect(phone.locator('.lv-caption-window')).toHaveCount(0);
     await expect(showPhoto).toBeVisible(); await showPhoto.tap();
     const phoneDialog = phone.getByRole('dialog', { name: 'メディアビューア', exact: true }), phoneImage = phoneDialog.locator('img');

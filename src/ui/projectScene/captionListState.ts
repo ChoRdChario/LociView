@@ -62,7 +62,7 @@ export const captionTitle = (item: CaptionListItem): string => item.title.kind =
   ? item.title.value.trim() ? item.title.value : '無題' : 'タイトルを確認';
 
 export function captionSourceIssue(source: CaptionListSource): string | null {
-  if (source.kind === 'unavailable') return source.reason || 'キャプションを読み込めません。状態を確認してください。';
+  if (source.kind === 'unavailable') return source.reason || '記録を読み込めません。状態を確認してください。';
   if (!source.token || !source.sceneId || new Set(source.captions.map(item => item.id)).size !== source.captions.length)
     return '一覧の状態を確認してください。';
   return null;
@@ -135,11 +135,11 @@ export function planCaptionList(context: CaptionListContext, intent: CaptionList
     case 'scroll': return Number.isFinite(intent.top) && intent.top >= 0
       ? intent.top === memory.listScrollTop ? { kind: 'unchanged' } : change({ listScrollTop: intent.top })
       : { kind: 'blocked', reason: '一覧の位置を確認してください。' };
-    case 'revealSelection': return !(source.kind === 'ready' && source.captions.some(item => item.id === memory.selectedCaptionId)) ? { kind: 'blocked', reason: '選択したキャプションの状態を確認してください。' }
+    case 'revealSelection': return !(source.kind === 'ready' && source.captions.some(item => item.id === memory.selectedCaptionId)) ? { kind: 'blocked', reason: '選択した記録の状態を確認してください。' }
       : change({ search: '', ownerFilter: { kind: 'all' }, pinColors: null });
     default: {
       const item = source.kind === 'ready' ? source.captions.find(item => item.id === intent.captionId) : undefined;
-      if (!item) return { kind: 'blocked', reason: 'キャプションの状態を確認してください。' };
+      if (!item) return { kind: 'blocked', reason: '記録の状態を確認してください。' };
       // Preserve explicit reselection for host viewing aids without changing editor selection.
       if (intent.kind === 'select' && item.id === memory.selectedCaptionId) return { kind: 'unchanged', explicitSelection: { ...base, captionId: item.id } };
       const pending = intent.kind === 'showModel' && context.showModelPending !== undefined ? context.showModelPending : context.pending;
@@ -148,7 +148,7 @@ export function planCaptionList(context: CaptionListContext, intent: CaptionList
       if (intent.kind === 'review') return { ...base, kind: 'effect', action: 'review', captionId: item.id };
       if (context.mutationBlock) return { kind: 'blocked', reason: context.mutationBlock };
       if (item.pin !== 'ownerHidden' || item.owner.kind !== 'value' || item.owner.value.kind !== 'asset')
-        return { kind: 'blocked', reason: 'キャプションのモデルを確認してください。' };
+        return { kind: 'blocked', reason: '記録のモデルを確認してください。' };
       return { ...base, kind: 'effect', action: 'showModel', captionId: item.id, assetId: item.owner.value.assetId };
     }
   }

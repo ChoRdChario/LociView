@@ -23,7 +23,7 @@ async function localOnly(context: BrowserContext, remote: string[],origin:string
   });
 }
 async function tabsVisible(p: Page) {
-  for (const name of ['キャプション', 'モデル', '描画']) {
+  for (const name of ['記録', 'モデル', '描画']) {
     const control = tab(p, name); await expect(control).toBeInViewport();
     const box = await control.boundingBox(); expect(box).not.toBeNull(); expect(box!.width).toBeGreaterThanOrEqual(44); expect(box!.height).toBeGreaterThanOrEqual(44);
     const lines = await control.evaluate(n => { const r = document.createRange(); r.selectNodeContents(n); return [...r.getClientRects()].filter(b => b.width > 0 && b.height > 0).length; }); expect(lines).toBe(1);
@@ -96,7 +96,7 @@ test('PC task navigation retains model, View and material drafts through keyboar
     const peerFile = await save(b, info, '開き直した作業'), reopened = await inspect(peerFile); expect(reopened.archive.source.originalChanges()).toEqual(saved.archive.source.originalChanges());
     await page.reload(); await expect(page.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText('視点と材質の整理', { timeout: 90_000 }); await expect(page.getByLabel('3Dモデルの表示', { exact: true })).toHaveAttribute('aria-busy', 'false');
     await page.setViewportSize({ width: 320, height: 740 }); const enlarged = await page.addStyleTag({ content: '.lv-project-workspace [role="tab"] { font-size: 32px; }' });
-    const captionTab = tab(page, 'キャプション'), last = tab(page, '描画'); await captionTab.focus();
+    const captionTab = tab(page, '記録'), last = tab(page, '描画'); await captionTab.focus();
     const firstBox = await captionTab.boundingBox(); expect((await last.boundingBox())!.y).toBeGreaterThan(firstBox!.y); await page.evaluate(y => scrollTo(0, y + scrollY - innerHeight + 44), firstBox!.y);
     await page.keyboard.press('End'); await expect(last).toBeFocused(); const lastBox = await last.boundingBox(); expect(lastBox!.y).toBeGreaterThanOrEqual(0); expect(lastBox!.y + lastBox!.height).toBeLessThanOrEqual(741);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true); await page.screenshot({ path: info.outputPath('wrapped-keyboard-tabs.png'), fullPage: true }); await enlarged.evaluate(n => (n as HTMLElement).remove());

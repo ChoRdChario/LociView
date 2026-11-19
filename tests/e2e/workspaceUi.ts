@@ -11,7 +11,7 @@ export async function chooseHomeFiles(page: Page, files: Parameters<Locator['set
 /** Wait for the latest Caption input, never infer durable saving from its live preview. */
 export async function finishCaptionEditing(page: Page,
   expected: Readonly<{ title?: string; body?: string; color?: string }> = {}, timeout = 15_000) {
-  const detail = page.getByRole('region', { name: 'キャプションの詳細', exact: true });
+  const detail = page.getByRole('region', { name: /^(?:記録|キャプション)の詳細$/ });
   const state = detail.locator('[data-save-state]');
   if (await state.count()) {
     await expect(state).toHaveAttribute('data-save-state', 'saved', { timeout });
@@ -97,7 +97,8 @@ export async function revealCaptionList(page: Page) {
   await closeFileSurface(page);
   const panel = page.getByRole('button', { name: '作業パネル', exact: true });
   if (await panel.isVisible() && await panel.getAttribute('aria-pressed') !== 'true') await panel.click();
-  const tab = page.getByRole('tab', { name: 'キャプション', exact: true });
+  // The named locator waits for the actual surface, including a fixed old reader.
+  const tab = page.getByRole('tab', { name: /^(?:記録|キャプション)$/ });
   if (await tab.getAttribute('aria-selected') !== 'true') await tab.click();
   const back = page.getByRole('button', { name: '一覧へ戻る', exact: true });
   if (await back.isVisible()) await back.click();

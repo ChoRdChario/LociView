@@ -282,7 +282,7 @@ export function productSources(host: ReturnType<typeof createValidationModeHost>
         let copyReady = false; try { assetCopySource(p, sceneId, group.assetId, host.limits); copyReady = true; } catch { /* Keep-one does not require a complete copy. */ }
         return { ...group, label: `${scene}：${name}の重複登録`, copyReady,
           note: `同じモデルへの登録が${group.edgeIds.length}件あります。選んだ登録が元のモデルを引き継ぎます。` + (copyReady ?
-            '「両方残す」では、他方をこのシーンだけの独立したモデルにします。現在の配置・材質を引き継ぎ、別々に変更できます。既存のキャプションは元のモデルに残ります。' :
+            '「両方残す」では、他方をこのシーンだけの独立したモデルにします。現在の配置・材質を引き継ぎ、別々に変更できます。既存の記録は元のモデルに残ります。' :
             'モデル・材質に未解決の内容があるため、両方残す操作はできません。一つにまとめる操作はモデル本体を変更しません。'),
           details: otherSceneReferences(p, 'asset', group.assetId, sceneId) };
       }) };

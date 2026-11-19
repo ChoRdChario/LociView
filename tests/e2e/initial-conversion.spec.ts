@@ -19,7 +19,7 @@ const lanes = [
   { kind: 'LociMyu', summary: 'LociMyu', title: 'LociMyuから引き継ぐ記録', build: lociMyuConversionBackup, scene: 'records', caption: '配置済み', previousBody: '元の本文', emptyTitle: '未配置の記録', position: [0.2, 0.2, 0], assets: 1, scenes: 1, captions: 2, media: 1, attachments: 2, images: 1 },
 ];
 const sha = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex');
-const detail = (page: Page) => page.getByRole('region', { name: 'キャプションの詳細', exact: true });
+const detail = (page: Page) => page.getByRole('region', { name: '記録の詳細', exact: true });
 const history = (source: { originalChanges(): Uint8Array[] }) => source.originalChanges().map(bytes => [sha(bytes), Buffer.from(bytes).toString('hex')]).sort((a, b) => a[0]!.localeCompare(b[0]!));
 
 for (const lane of lanes) test(`${lane.kind}ファイルを内容確認して変換し、既存の記録と画像を編集・照合保存・完全再開できる`, async ({}, info) => {
@@ -46,8 +46,8 @@ for (const lane of lanes) test(`${lane.kind}ファイルを内容確認して変
   };
   const step = async (name: string, action: () => Promise<void>) => { const start = performance.now(); try { await test.step(name, action); } finally { stages[name] = Math.round(performance.now() - start); console.info(`${name}: ${stages[name]}ms`); } };
   const check = async (page: Page) => {
-    await expect(page.getByRole('region', { name: 'シーン', exact: true }).getByRole('button', { name: lane.scene, exact: true })).toHaveAttribute('aria-pressed', 'true');
-    const list = page.getByRole('list', { name: 'キャプション一覧', exact: true }); await expect(list.locator('.lv-caption-select')).toHaveCount(2);
+    await expect(page.getByRole('combobox', { name: 'シーン', exact: true }).locator('option:checked')).toHaveText(lane.scene);
+    const list = page.getByRole('list', { name: '記録一覧', exact: true }); await expect(list.locator('.lv-caption-select')).toHaveCount(2);
     await list.locator('.lv-caption-select').filter({ hasText: lane.caption }).click();
     await expect(detail(page).getByLabel('本文', { exact: true })).toHaveValue(body);
     const images = page.getByRole('region', { name: '画像の整理', exact: true }).locator('img'); await expect(images).toHaveCount(lane.images);
@@ -100,7 +100,7 @@ for (const lane of lanes) test(`${lane.kind}ファイルを内容確認して変
       await convert.scrollIntoViewIfNeeded(); await page.screenshot({ path: info.outputPath(`${lane.kind}変換前の確認.png`), fullPage: true });
       await page.getByRole('button', { name: '選択を取り消す', exact: true }).click(); await expect(convert).toBeHidden(); convert = await preview(); await convert.click();
       await expect(page.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText(title, { timeout: 90_000 });
-      await page.getByRole('list', { name: 'キャプション一覧', exact: true }).locator('.lv-caption-select').filter({ hasText: lane.caption }).click();
+      await page.getByRole('list', { name: '記録一覧', exact: true }).locator('.lv-caption-select').filter({ hasText: lane.caption }).click();
       await expect(detail(page).getByLabel('本文', { exact: true })).toHaveValue(lane.previousBody); await detail(page).getByLabel('本文', { exact: true }).fill(body);
       await detail(page).getByRole('button', { name: '変更を適用', exact: true }).click(); await expect(page.getByText('変更を適用しました。', { exact: true })).toBeVisible({ timeout: 90_000 }); await check(page);
     });
@@ -149,7 +149,7 @@ for (const lane of lanes) test(`${lane.kind}ファイルを内容確認して変
       } catch(error) {
         const remote=peer.pages()[0];if(remote){await info.attach('材質返送の別ブラウザの状態',{body:await remote.locator('body').innerText(),contentType:'text/plain'});await remote.screenshot({path:info.outputPath('material-peer-failure.png'),fullPage:true});}throw error;
       } finally {await peer.close();}
-      await page.getByRole('tab',{name:'キャプション',exact:true}).click();await check(page);
+      await page.getByRole('tab',{name:'記録',exact:true}).click();await check(page);
     });
     let saved!: Awaited<ReturnType<typeof save>>;
     await step('実際の保存ファイルを選び直して照合する', async () => { saved = await save(page, `${lane.kind}変換後の保存`, true); });

@@ -19,10 +19,10 @@ import {presentedCanvas} from './presentedCanvas';
 
 const entry=desktopEntry+'?timings=1',title='Native点群とGS';
 const files=(p:Page)=>p.getByRole('region',{name:'ファイル',exact:true});
-const detail=(p:Page)=>p.getByRole('region',{name:'キャプションの詳細',exact:true});
+const detail=(p:Page)=>p.getByRole('region',{name:'記録の詳細',exact:true});
 async function ready(p:Page){await expect(p.getByRole('heading',{name:'プロジェクト名',exact:true})).toHaveText(title,{timeout:240000});await expect(p.locator('.lv-project-viewport-status')).toBeEmpty({timeout:180000});}
 async function open(p:Page,path:string){await chooseHomeFiles(p, path);}
-async function selectCaption(p:Page,label='既存のピン'){await revealCaptionList(p);await p.getByRole('tab',{name:'キャプション',exact:true}).click();await p.getByRole('list',{name:'キャプション一覧',exact:true}).locator('.lv-caption-select').filter({hasText:label}).click();}
+async function selectCaption(p:Page,label='既存のピン'){await revealCaptionList(p);await p.getByRole('tab',{name:'記録',exact:true}).click();await p.getByRole('list',{name:'記録一覧',exact:true}).locator('.lv-caption-select').filter({hasText:label}).click();}
 async function edit(p:Page,field:'タイトル'|'本文',text:string){await closeFileSurface(p);await detail(p).getByLabel(field,{exact:true}).fill(text);await finishCaptionEditing(p, {}, 180000);}
 async function output(p:Page,info:TestInfo,name:string,purpose:'backup'|'teamWorkspace'|'contribution'|'review',base?:string){
   const menu=p.locator('details.lv-project-files');if(await menu.count()&&!await menu.evaluate(n=>(n as HTMLDetailsElement).open))await menu.locator(':scope > summary').click();
@@ -115,7 +115,7 @@ test('Native07kの点群GSと面を変換し共有返送Review編集コピー独
       // Hidden models release their resources; fitting needs the newly prepared
       // model bounds, not merely an enabled camera gizmo.
       await expect(canvas).toHaveAttribute('aria-busy','false');await lookAlongFront(a.p);
-      await a.p.getByRole('tab',{name:'キャプション',exact:true}).click();await a.p.getByRole('button',{name:'キャプションを追加',exact:true}).click();
+      await a.p.getByRole('tab',{name:'記録',exact:true}).click();await a.p.getByRole('button',{name:'記録を追加',exact:true}).click();
       await hit(kind,kind==='点群'?[.5,0,0]:[-1.4,.3,.05]);
       await a.p.getByText('座標で微調整',{exact:true}).click(); await expect(a.p.getByLabel('位置 X',{exact:true})).toBeVisible();
       if(kind==='GS'){await expect(a.p.getByLabel('位置 X',{exact:true})).toBeEnabled();await a.p.getByLabel('位置 X',{exact:true}).fill('.2');}

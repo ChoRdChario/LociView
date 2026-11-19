@@ -33,7 +33,7 @@ export function createCaptionWindowControls(document: Document, onPlan: (plan: C
   content?: (captionId: string) => { root: HTMLElement; render(active?: boolean): void; dispose(): void }) {
   const make = <K extends keyof HTMLElementTagNameMap>(tag: K, text = '') => { const n = document.createElement(tag); n.textContent = text; return n; };
   const button = (text: string) => { const n = make('button', text); n.type = 'button'; return n; };
-  const root = make('div'); root.className = 'lv-caption-windows'; root.setAttribute('aria-label', 'キャプションのウィンドウ');
+  const root = make('div'); root.className = 'lv-caption-windows'; root.setAttribute('aria-label', '記録のウィンドウ');
   const tools = make('div'); tools.className = 'lv-caption-window-tools';
   const label = make('label', 'ウィンドウ '), front = make('select'); front.setAttribute('aria-label', '前面にするウィンドウ');
   label.append(front); const arrange = button('ウィンドウを並べる'), status = make('p'); status.setAttribute('role', 'status');

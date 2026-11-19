@@ -50,7 +50,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   help.setAttribute('aria-label', 'ヘルプ'); help.append(make('summary', 'ヘルプ'), introduction);
   for (const [title, text] of [
     ['はじめる', 'プロジェクトを選び、変更するときは「編集する」を選択します。シーンを切り替えても「開始シーン」は変わりません。'],
-    ['記録する', '「キャプションを追加」でピンを置く場所を選び、「ここに記録を作る」で確定します。点群では点を選びます。「座標で追加」ではモデル内の位置を入力できます。'],
+    ['記録する', '「記録を追加」でピンを置く場所を選び、「ここに記録を作る」で確定します。点群では点を選びます。「座標で追加」ではモデル内の位置を入力できます。'],
     ['保存と共有', 'ブラウザのデータを削除すると、再開データも失われます。「ファイルに保存」でバックアップを作れます。「共有」では全体か一部を選んで書き出せます。更新ファイルは同じプロジェクトへ取り込めます。保存先のファイルは、必要に応じてファイル欄から照合できます。'],
     ['困ったとき', '更新に失敗したら入力を保持したまま「更新を再試行」を選択します。競合は「状態を確認」から残す内容を選択します。3D表示だけに問題がある場合は「3D表示を再試行」を選択してください。'],
   ]) help.append(make('h3', title), make('p', text));
@@ -151,18 +151,21 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   let taskTabsInNavigation = false;
   const panels = new Map<ProjectTask, ProjectPanel>(); let task: ProjectTask = 'captions', models: ProjectModelPanel | undefined, mediaManager: ReturnType<typeof createProjectMedia> | undefined;
   let pinScale: ReturnType<typeof createProjectPinScale> | undefined;
-  const sceneArea = make('section'), scenes = make('div'), sceneButtons = new Map<string, HTMLButtonElement>(); sceneArea.setAttribute('aria-label', 'シーン'); sceneArea.append(make('h2', 'シーン'), scenes);
-  let sceneStripState: { width: number; sceneId: string; shape: string } | undefined;
-  function revealSceneChoice(shape: string) {
-    if (disposed || !scenes.clientWidth) return;
-    const choice = sceneButtons.get(sceneId); if (!choice) return;
-    const width = scenes.clientWidth;
-    if (sceneStripState?.width === width && sceneStripState.sceneId === sceneId && sceneStripState.shape === shape) return;
-    sceneStripState = { width, sceneId, shape };
-    const strip = scenes.getBoundingClientRect(), item = choice.getBoundingClientRect();
-    const left = item.left - strip.left - 2, right = item.right - strip.right + 2;
-    if (left < 0 || right > 0) scenes.scrollLeft += item.width > width || left < 0 ? left : right;
-  }
+  const sceneArea = make('section'), sceneChoiceLabel = make('label', 'シーン'), sceneChoice = make('select');
+  const sceneOptions = new Map<string, HTMLOptionElement>();
+  sceneArea.setAttribute('aria-label', 'シーン'); sceneChoice.setAttribute('aria-label', 'シーン');
+  sceneChoiceLabel.className = 'lv-scene-choice'; sceneChoiceLabel.append(sceneChoice); sceneArea.append(sceneChoiceLabel);
+  sceneChoice.addEventListener('change', () => {
+    const target = sceneChoice.value;
+    // A failed save must not leave the control claiming a different Scene.
+    sceneChoice.value = sceneId;
+    if (disposed || sceneChoice.disabled || target === sceneId) return;
+    const change = () => {
+      if (disposed || dirty() || busy || ports.otherPending() || fieldValue(provider().state.scenes[target]?.lifecycle)?.state !== 'active') return;
+      sceneId = target; resetDraft(); feedback = ''; render();
+    };
+    if (needsCaptionFlush()) void afterCaptionFlush(change); else change();
+  });
   const sceneForm = make('form'), sceneLabel = make('label', 'シーン名'), sceneName = make('input');
   sceneForm.setAttribute('aria-label', 'シーンの変更');
   sceneName.setAttribute('aria-label', 'シーン名'); sceneLabel.append(sceneName);
@@ -189,7 +192,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     invalidateGesture(); feedback = ''; render();
   });
   pinArea.setAttribute('aria-label', 'ピンの操作');
-  const addPin = button('キャプションを追加', () => { const add = () => { if (guardInput()) { pinAction = { kind: 'add', token: provider().token, sceneId, captionId: null, assetId: visibleSelectedSurface(), color: addColorValue() }; choosing = true; placingCaption = null; render(); } };
+  const addPin = button('記録を追加', () => { const add = () => { if (guardInput()) { pinAction = { kind: 'add', token: provider().token, sceneId, captionId: null, assetId: visibleSelectedSurface(), color: addColorValue() }; choosing = true; placingCaption = null; render(); } };
     if (needsCaptionFlush()) void afterCaptionFlush(add); else add(); });
   const addColorLabel = make('label', '追加色'), addColor = make('input'); addColor.type = 'color'; addColor.setAttribute('aria-label', '追加色'); addColorLabel.append(addColor);
   const numericAdd = make('details'), numericLabel = make('label', '追加先モデル'), numericModel = make('select'), beginNumeric = button('このモデルに追加', () => {
@@ -304,7 +307,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   pinTaskContent.className = 'lv-pin-task-content'; pinTaskContent.append(pinStatus, placementLabel, adjustment, enterPosition, addSurface);
   pinTaskActions.className = 'lv-pin-task-actions'; pinTaskActions.append(repick, finishPin, cancelPin); pinTask.append(pinTaskContent, pinTaskActions);
   const deletionArea = make('section'), deletionBox = make('section'), deletionTitle = make('p'), deletionEffects = make('ul'), deletionNote = make('p'), referenceIssues = make('section');
-  deletionArea.setAttribute('aria-label', 'キャプションの削除'); deletionBox.setAttribute('aria-label', '削除の確認'); deletionNote.setAttribute('role', 'status');
+  deletionArea.setAttribute('aria-label', '記録の削除'); deletionBox.setAttribute('aria-label', '削除の確認'); deletionNote.setAttribute('role', 'status');
   referenceIssues.setAttribute('aria-label', '記録の状態');
   const deletionDiagnostics=make('details'),deletionDiagnosticList=make('ul'),referenceDiagnostics=make('details'),referenceDiagnosticList=make('ul'),referenceMessages=make('div');
   deletionDiagnostics.append(make('summary','技術情報'),deletionDiagnosticList);referenceDiagnostics.append(make('summary','技術情報'),referenceDiagnosticList);
@@ -439,12 +442,12 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     showModelPending: composingInput() || pressedPointers.size || pin || numericTarget || surfaceOpening || choosing || deletion || pickerScope || sceneEdit || recovery?.hasChanges() || panelInput() || mediaManager?.hasChanges() || windowMoving || viewport.read().dragging ? 'text' : null,
     mutationBlock: !canFlushCaption() && (busy || pending || windowMoving || ports.status().kind !== 'idle' || ports.otherPending()) ? '現在の操作を完了してください。' : null });
   const emptyCaptionReason = () => {
-    if (ports.readOnly) return 'このシーンにキャプションはありません。';
+    if (ports.readOnly) return 'このシーンに記録はありません。';
     const p = provider(), source = projectModels(p, sceneId, projectIdentity(p), models?.hidden() ?? [], viewport.read());
     if (source.kind !== 'ready') return source.reason;
     if (source.items.some(item => item.membership.kind !== 'value' || item.lifecycle.kind !== 'value')) return 'モデルの所属・状態を確認してください。';
     return source.items.some(item => item.lifecycle.kind === 'value' && item.lifecycle.value === 'active' && item.membership.kind === 'value' && item.membership.value.kind === 'included')
-      ? '「キャプションを追加」で、モデル上に最初の記録を作れます。' : 'モデルを追加すると、記録を作れます。';
+      ? '「記録を追加」で、モデル上に最初の記録を作れます。' : 'モデルを追加すると、記録を作れます。';
   };
   const detailContext = (captions = projectCaptions(provider(), sceneId, models?.hidden())): DetailContext => {
     const item = captions.find(c => c.id === memory().selectedCaptionId);
@@ -464,7 +467,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       if(disposed||sceneId!==ownerScene||provider().token!==token)return;
       const invoke=()=>{
         if(!projectCaptions(provider(),sceneId).some(c=>c.id===captionId))return;
-        if(memory().selectedCaptionId!==captionId){selectCaption(captionId);render();}
+        if(memory().selectedCaptionId!==captionId){selectCaption(captionId);render();list.revealSelected();}
         if(action==='edit')detail.focusBody();else beginDelete.click();
       };
       if(needsCaptionFlush())void afterCaptionFlush(invoke);else invoke();
@@ -508,7 +511,9 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     }
     render();
     if (plan.kind === 'effect' && plan.action === 'review') recovery?.reveal(group => 'captionId' in group.target && group.target.captionId === plan.captionId);
-    if (plan.kind === 'change' && plan.intent === 'select' || plan.kind === 'unchanged' && plan.explicitSelection) detailHeading.focus?.({ preventScroll: true });
+    if (plan.kind === 'change' && plan.intent === 'select' || plan.kind === 'unchanged' && plan.explicitSelection) {
+      list.revealSelected(); detailHeading.focus?.({ preventScroll: true });
+    }
   }
   const detail = createCaptionDetailControls(document, event => {
     if (event.kind === 'flush') { if (autosave) void flushCaption(); return; }
@@ -623,7 +628,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
         addSettings.open = false;
         queueMicrotask(() => { if (!disposed) (addSettings.children[0] as HTMLElement).focus?.({preventScroll:true}); });
       } else if (fromSelectedRow) queueMicrotask(() => { if (!disposed) list.focusSearch(); });
-      feedback = plan.kind === 'include' ? 'このシーンに追加しました。' : 'このシーンから外しました。キャプションは残っています。';
+      feedback = plan.kind === 'include' ? 'このシーンに追加しました。' : 'このシーンから外しました。記録は残っています。';
     });
   }
   const inclusion = createCaptionIncludeControls(document, changeInclusion, 'add');
@@ -642,7 +647,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   editOnly(excludeSelected, inclusion.root);
   const captionToolbar=make('div');captionToolbar.className='lv-caption-toolbar';
   captionToolbar.append(pinArea,list.root.children[0]!);list.root.insertBefore(captionToolbar,list.root.children[0]??null);
-  list.tools.append(recordTools);addPin.className='lv-caption-add';addPin.setAttribute('aria-label','キャプションを追加');editOnly(movePin,parent);
+  list.tools.append(recordTools);addPin.className='lv-caption-add';addPin.setAttribute('aria-label','記録を追加');editOnly(movePin,parent);
   captionPanel.className='lv-caption-task';
   const recordSheets=new Map<HTMLDetailsElement,HTMLElement>();
   function registerRecordSheet(disclosure: HTMLDetailsElement, existing?: HTMLElement) {
@@ -797,7 +802,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     const global = mutationBlock(); if (global) return global;
     if (selectedMedia || composingInput() || positionInput() || deletion || pickerScope || sceneEdit || panelInput() || mediaManager?.hasChanges() || viewport.read().dragging)
       return '現在の入力・操作を完了してください。';
-    if (group?.target.kind === 'startup' && hasCaptionDraft(draft)) return 'キャプションの変更を適用するか、取り消してください。';
+    if (group?.target.kind === 'startup' && hasCaptionDraft(draft)) return '記録の変更を適用するか、取り消してください。';
     return null;
   }
   recovery = createProjectRecovery(document, { token: () => provider().token, groups: () => ports.recovery(), block: recoveryBlock,
@@ -841,7 +846,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   });
   const taskEntryBlocked = (key: ProjectTask) => compactLayout() && compactSurface === 'stage' &&
     (positionInput() || viewBlocked() && !(key === 'captions' && readDuringOutput()));
-  for (const [key, label] of [['captions', 'キャプション'], ['models', 'モデル'], ['materials', '描画']] as const) {
+  for (const [key, label] of [['captions', '記録'], ['models', 'モデル'], ['materials', '描画']] as const) {
     const tab = button(label, () => {
       if (taskEntryBlocked(key) || (busy || pending) && !autosave?.saving || windowMoving ||
         ports.otherPending() && !(key === 'captions' && readDuringOutput()) || composingInput()) return;
@@ -1314,7 +1319,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       list.root.hidden = mobileDetail;
       // Explicit drafts/operations own the layout; focus alone cannot move native activation targets.
       const retainEditor = !!autosave && detail.hasTextFocus() && captionPanel.dataset.editing === 'true';
-      captionPanel.dataset.editing = String(retainEditor || hasCaptionDraft(draft) || !!selectedMedia || !!draft?.composing || composing || positionInput() ||
+      captionPanel.dataset.editing = String(retainEditor || hasCaptionDraft(draft) || !!selectedMedia || !!draft?.composing || positionInput() ||
         !!deletion || !!pickerScope || !!mediaManager?.hasChanges());
       displayMode(root, readDuringOutput() ? 'view' : ports.mode ?? (ports.readOnly ? 'view' : 'edit'));
       positionHeaderSheets();
@@ -1323,7 +1328,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       resumeNotice.textContent = ports.resumedLastProject?.() && summary.resumable && summary.title ? `最後のプロジェクトを再開しました：${summary.title}` : '';
       resumeNotice.hidden = !resumeNotice.textContent; otherProject.hidden = !ports.openProject;
       otherProject.disabled = !!ports.projectNavigationBlocked?.() || (busy || dirty()) && !canFlushCaption() || ports.otherPending() || !!ports.presentation?.()?.busy;
-      const hasDraft = draftInput() || panelInput() || recovery?.hasChanges() || mediaManager?.hasChanges();
+      const hasDraft = draftInput(false) || panelInput() || recovery?.hasChanges() || mediaManager?.hasChanges();
       const saving = busy || ports.status().kind === 'checking';
       const failed = pending || ports.status().kind === 'failed';
       resumeStatus.textContent = saving ? autosave?.saving ? '保存中…' : '変更を適用中' : failed ? '更新が未完了です。入力を保持しています。再試行してください。' :
@@ -1351,21 +1356,20 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       retry.textContent = autosave && (pending?.owner === 'caption' || pending?.owner === 'media') ? '保存を再試行' : '更新を再試行';
       if (autosave?.failed && (pending?.owner === 'caption' || pending?.owner === 'media')) retry.hidden = true;
       revise.hidden = !pending || busy || ports.status().kind !== 'idle';
-      const focusedScene=[...sceneButtons].find(([,choice])=>choice===document.activeElement)?.[0],activeScenes=new Set<string>();let sceneIndex=0;
+      const activeScenes = new Set<string>(); let sceneIndex = 0;
       for (const scene of Object.values(p.state.scenes).sort((a, b) => {
         const left = fieldValue(a.orderKey), right = fieldValue(b.orderKey); return left === undefined ? right === undefined ? a.id.localeCompare(b.id) : 1 : right === undefined ? -1 : left < right ? -1 : left > right ? 1 : a.id.localeCompare(b.id);
       })) {
         if (fieldValue(scene.lifecycle)?.state !== 'active') continue;
-        activeScenes.add(scene.id);let choice=sceneButtons.get(scene.id);
-        if(!choice){choice=button('',()=>{ const change=()=>{if(!dirty()&&!busy&&!ports.otherPending()&&fieldValue(provider().state.scenes[scene.id]?.lifecycle)?.state==='active'){sceneId=scene.id;resetDraft();feedback='';render();}};
-          if(needsCaptionFlush())void afterCaptionFlush(change);else change();});sceneButtons.set(scene.id,choice);}
-        choice.textContent=fieldValue(scene.name)??'名称を確認';choice.disabled=(busy||dirty())&&!canFlushCaption()||ports.otherPending();choice.setAttribute('aria-pressed',String(scene.id===sceneId));
-        if(scenes.children[sceneIndex]!==choice)scenes.insertBefore(choice,scenes.children[sceneIndex]??null);sceneIndex++;
+        activeScenes.add(scene.id); let option = sceneOptions.get(scene.id);
+        if (!option) { option = make('option'); option.value = scene.id; sceneOptions.set(scene.id, option); }
+        const name = fieldValue(scene.name) ?? '名称を確認'; if (option.textContent !== name) option.textContent = name;
+        if (sceneChoice.children[sceneIndex] !== option) sceneChoice.insertBefore(option, sceneChoice.children[sceneIndex] ?? null);
+        sceneIndex++;
       }
-      for(const [key,choice]of sceneButtons)if(!activeScenes.has(key)){choice.remove();sceneButtons.delete(key);}
-      if(focusedScene){const choice=sceneButtons.get(focusedScene);if(choice&&document.activeElement!==choice)choice.focus({preventScroll:true});}
-      const sceneStripShape = JSON.stringify([...activeScenes].map(key => [key, sceneButtons.get(key)!.textContent]));
-      queueMicrotask(() => revealSceneChoice(sceneStripShape));
+      for (const [key, option] of sceneOptions) if (!activeScenes.has(key)) { option.remove(); sceneOptions.delete(key); }
+      sceneChoice.value = sceneId;
+      sceneChoice.disabled = !activeScenes.size || (busy || dirty()) && !canFlushCaption() || ports.otherPending();
       const captions = projectCaptions(p, sceneId, models?.hidden());
       if (!draft) draft = beginCaptionDraft(detailContext(captions).source);
       if (autosave && draft && !hasCaptionDraft(draft) && !selectedMedia && !autosave.saving && !pending && ports.status().kind === 'idle' && captionToken !== p.token) {
@@ -1441,7 +1445,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       createScene.textContent = sceneEdit?.kind === 'rename' ? '名前を確定' : sceneEdit?.kind === 'default' ? '開始シーンを設定' : 'シーンを追加';
       createScene.disabled = !!sceneBlock() || !sceneEdit || sceneEdit.composing || staleScene || sceneEdit.kind !== 'default' && !sceneEdit.name.trim() || !sceneId;
       cancelScene.hidden = !sceneEdit; cancelScene.disabled = busy || !!pending || ports.status().kind !== 'idle' || ports.otherPending() || !!sceneEdit?.composing;
-      sceneNote.textContent = sceneEdit?.kind === 'create' ? 'このシーンのモデルを引き継ぎます。キャプションは追加されません。' : sceneEdit?.kind === 'default' ? '次にプロジェクトを開くときの開始シーンにします。' : ''; sceneNote.hidden = !sceneNote.textContent;
+      sceneNote.textContent = sceneEdit?.kind === 'create' ? 'このシーンのモデルを引き継ぎます。記録は追加されません。' : sceneEdit?.kind === 'default' ? '次にプロジェクトを開くときの開始シーンにします。' : ''; sceneNote.hidden = !sceneNote.textContent;
       sceneStatus.textContent = staleScene ? '内容が更新されています。入力は保持しています。取り消して選び直してください。' : start ? `開始シーン：${fieldValue(p.state.scenes[start]?.name) ?? '名称を確認'}` : '開始シーンの状態を確認してください。';
       mediaInput.disabled = mediaChoiceBlocked();
       mediaDraftNotice.hidden = !selectedMedia;
@@ -1475,9 +1479,9 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       retainedOwner = settingsInput ? task : hasCaptionInput && task !== 'captions' ? 'captions' : other?.[0] ?? task;
       const hiddenCaptionDraft = compactLayout() && retainedOwner === 'captions' && captionSurface === 'list' && hasCaptionInput;
       retainedEdit.hidden = retainedOwner === task && !organization!.hasChanges() && !hiddenCaptionDraft;
-      retainedNote.textContent = `${settingsInput?'設定':retainedOwner==='views'?'カメラ位置':tabButtons.get(retainedOwner)?.textContent ?? 'キャプション'}に未適用の変更があります。`;
+      retainedNote.textContent = `${settingsInput?'設定':retainedOwner==='views'?'カメラ位置':tabButtons.get(retainedOwner)?.textContent ?? '記録'}に未適用の変更があります。`;
       const previewTitle = textPreview()?.title;
-      detailHeading.textContent = previewTitle === undefined ? selected ? fieldValue(p.resources.captions[selected]?.title) || '無題' : 'キャプション' : previewTitle.trim() ? previewTitle : '無題';
+      detailHeading.textContent = previewTitle === undefined ? selected ? fieldValue(p.resources.captions[selected]?.title) || '無題' : '記録' : previewTitle.trim() ? previewTitle : '無題';
       sceneArea.hidden = false;captionBack.hidden = !mobileDetail;
       returnToEdit.disabled = showStage.disabled = viewBlocked();
       captionBack.disabled = viewBlocked() || hasCaptionInput || !!deletion;

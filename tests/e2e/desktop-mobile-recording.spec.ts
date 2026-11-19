@@ -12,8 +12,8 @@ test('phone record list, body and completion stay usable when the viewport shrin
     viewport: { width: 320, height: 568 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, serviceWorkers: 'block',
   });
   const page = await context.newPage();
-  const list = page.getByRole('list', { name: 'キャプション一覧', exact: true });
-  const detail = page.getByRole('region', { name: 'キャプションの詳細', exact: true });
+  const list = page.getByRole('list', { name: '記録一覧', exact: true });
+  const detail = page.getByRole('region', { name: '記録の詳細', exact: true });
   const record = list.locator('.lv-caption-select').filter({ hasText: '既存のピン' });
   const body = detail.getByLabel('本文', { exact: true });
   try {
@@ -43,7 +43,7 @@ test('phone record list, body and completion stay usable when the viewport shrin
     await expect(keyboardHelp).toBeVisible();await expect(keyboardHelp).toBeInViewport({ratio:1});
     expect(await keyboardHelp.evaluate(node=>getComputedStyle(node).pointerEvents)).toBe('none');
     await page.screenshot({path:info.outputPath('phone-camera-keyboard-focus.png')});
-    await page.getByRole('tab',{name:'キャプション',exact:true}).tap();
+    await page.getByRole('tab',{name:'記録',exact:true}).tap();
     await expect(detail.getByLabel('タイトル',{exact:true})).toHaveValue(titles[2]!);
     await detail.getByRole('button',{name:'一覧へ戻る',exact:true}).tap();
     await page.getByRole('searchbox', { name: '検索', exact: true }).fill('既存のピン');
@@ -121,10 +121,10 @@ test('phone record list, body and completion stay usable when the viewport shrin
     await expect(page.locator('.lv-project-stage canvas')).toHaveCount(1);
     await drawing.getByRole('button', { name: '取り消す', exact: true }).tap();
     await drawing.getByRole('region', { name: '操作の確認', exact: true }).getByRole('button', { name: '変更を取り消す', exact: true }).tap();
-    await page.setViewportSize({ width: 390, height: 844 }); await page.getByRole('tab', { name: 'キャプション', exact: true }).tap();
+    await page.setViewportSize({ width: 390, height: 844 }); await page.getByRole('tab', { name: '記録', exact: true }).tap();
     await page.getByRole('button', { name:'3D', exact:true }).tap();
     await expect(page.locator('.lv-caption-windows')).toBeHidden();
-    await page.getByRole('tab', { name:'キャプション', exact:true }).tap();
+    await page.getByRole('tab', { name:'記録', exact:true }).tap();
     await page.locator('details.lv-project-files > summary').tap();
     await page.getByRole('tab', { name: '共有', exact: true }).tap();
     const files = page.getByRole('region', { name: 'ファイル', exact: true });

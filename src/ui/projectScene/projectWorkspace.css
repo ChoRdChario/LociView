@@ -50,7 +50,7 @@
 .lv-caption-detail [data-caption-completion] > button:first-child:is(:hover,:active):not(:disabled) { background: var(--lv-action-hover); color: var(--lv-field); }
 .lv-caption-reading .lv-caption-value[data-caption-field="body"] p { line-height: 1.85; }
 .lv-caption-reading .lv-caption-value[data-caption-field="title"] { display: none; }
-.lv-caption-reading .lv-caption-detail-actions[aria-label="キャプションの表示"] > button:first-child:not(:disabled) { flex: 0 1 auto; background: transparent; color: var(--lv-action); font-weight: 400; }
+.lv-caption-reading .lv-caption-detail-actions[aria-label="記録の表示"] > button:first-child:not(:disabled) { flex: 0 1 auto; background: transparent; color: var(--lv-action); font-weight: 400; }
 .lv-project-body .lv-material-editor { overflow: visible; background: transparent; }
 .lv-project-body .lv-material-actions { position: sticky; bottom: -16px; z-index: 2; padding-block: 12px; background: var(--lv-panel); border-top: 1px solid var(--lv-rule); }
 .lv-project-body .lv-material-values > div { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; padding: 8px 0; border-bottom: 1px solid var(--lv-rule); }
@@ -263,25 +263,24 @@
 .lv-project-body > aside { overflow: hidden; gap: 8px; }
 .lv-sidebar-toolbar { display: contents; }
 .lv-project-body .lv-sidebar-toolbar > [aria-label="シーン"] { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; flex: 0 0 auto; max-height: 35%; overflow: auto; }
-.lv-project-body .lv-sidebar-toolbar > [aria-label="シーン"] > h2 { display: none; }
-.lv-project-body .lv-sidebar-toolbar > [aria-label="シーン"] > div { flex: 1; min-width: 0; flex-wrap: nowrap; overflow-x: auto; padding: 2px; scrollbar-width: thin; }
-.lv-project-body .lv-sidebar-toolbar > [aria-label="シーン"] > div > button { flex: 0 0 auto; white-space: nowrap; }
+.lv-project-body .lv-sidebar-toolbar .lv-scene-choice { display: flex; align-items: center; gap: 8px; flex: 1 1 0; min-width: 0; margin: 0; font-size: 13px; }
+.lv-project-body .lv-sidebar-toolbar .lv-scene-choice > select { flex: 1; width: 0; min-width: 0; padding: 8px; border: 1px solid var(--lv-line); border-radius: 4px; }
 .lv-project-body .lv-sidebar-toolbar > [aria-label="シーン"] > details { flex: 0 0 auto; }
 .lv-project-body .lv-sidebar-toolbar > [aria-label="シーン"] > form { flex-basis: 100%; }
 .lv-project-body .lv-sidebar-toolbar > [aria-label="シーン"] > details[open] { flex-basis: 100%; }
 .lv-project-body > aside > [role="tabpanel"] { flex: 1 1 0; min-height: 0; overflow: auto; }
-.lv-project-body > aside > .lv-caption-task { display: grid; grid-template-rows: minmax(0, 62fr) minmax(0, 38fr); gap: 8px; overflow: hidden; }
-.lv-project-body > aside > .lv-caption-task[data-editing="true"] { grid-template-rows: minmax(0, 35fr) minmax(0, 65fr); }
+.lv-project-body > aside > .lv-caption-task { display: grid; grid-template-rows: var(--lv-caption-rows, minmax(0, 62fr) minmax(0, 38fr)); gap: 8px; overflow: hidden; }
+.lv-project-body > aside > .lv-caption-task[data-editing="true"] { --lv-caption-rows: minmax(0, 35fr) minmax(0, 65fr); }
 @media (min-width: 761px) and (min-height: 641px) {
   .lv-project-body > aside > .lv-caption-task[data-selected="true"][data-editing="false"]:not([data-mobile-surface]):has(> .lv-caption-browser[data-few-rows="false"]) {
-    grid-template-rows: minmax(0, 7fr) minmax(0, 3fr);
+    --lv-caption-rows: minmax(0, 7fr) minmax(0, 3fr);
   }
 }
-.lv-project-body > aside > .lv-caption-task[data-selected="false"] { grid-template-rows: minmax(min-content, 1fr) auto; overflow: auto; }
+.lv-project-body > aside > .lv-caption-task[data-selected="false"] { --lv-caption-rows: minmax(min-content, 1fr) auto; overflow: auto; }
 .lv-caption-task[data-selected="false"] > .lv-caption-reading,
 .lv-caption-task[data-selected="false"] .lv-caption-detail { min-height: auto; overflow: visible; }
 .lv-caption-task[data-selected="false"] .lv-caption-content { flex: 0 0 auto; overflow: visible; }
-.lv-project-body > aside > .lv-caption-task[data-selected="true"]:not([data-editing="true"]):has(> .lv-caption-browser[data-few-rows="true"]):not([data-mobile-surface]) { grid-template-rows: fit-content(62%) minmax(0, 1fr); }
+.lv-project-body > aside > .lv-caption-task[data-selected="true"]:not([data-editing="true"]):has(> .lv-caption-browser[data-few-rows="true"]):not([data-mobile-surface]) { --lv-caption-rows: fit-content(62%) minmax(0, 1fr); }
 .lv-caption-task:not([data-editing="true"]) > .lv-caption-browser[data-few-rows="true"] .lv-caption-list { flex: 0 0 auto; height: auto; }
 .lv-caption-task, .lv-caption-browser, .lv-caption-reading { min-width: 0; }
 .lv-caption-task > .lv-caption-browser { min-height: 0; height: auto; display: flex; flex-direction: column; gap: 4px; overflow: auto; }
@@ -377,6 +376,30 @@
 .lv-caption-add::before { content: '+'; font-size: 26px; line-height: 1; }
 .lv-caption-row { display:grid;grid-template-columns: minmax(0,1fr) repeat(3,auto); }
 .lv-caption-row > button:not(.lv-caption-select) { padding-inline: 6px; }
+
+/* Wide pointer workspaces keep the selected record beside its list, not below it. */
+@media (min-width: 1180px) and (pointer: fine) {
+  .lv-project-body { grid-template-columns: minmax(0, 1fr) clamp(500px, 44vw, 680px); }
+  .lv-project-body > aside > .lv-caption-task[data-selected="true"]:not([data-mobile-surface]) {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); grid-template-rows: minmax(0, 1fr);
+  }
+  .lv-caption-task[data-selected="true"] > .lv-caption-reading {
+    border-top: 0; border-left: 1px solid var(--lv-rule); padding-left: 12px;
+  }
+  .lv-caption-task[data-selected="true"] .lv-caption-toolbar { flex-wrap: wrap; gap: 4px; }
+  .lv-caption-task[data-selected="true"] .lv-caption-toolbar > .lv-caption-search { flex: 1 0 100%; flex-wrap: wrap; }
+  .lv-caption-task[data-selected="true"] .lv-caption-search > label { flex: 1 0 100%; }
+  .lv-caption-task[data-selected="true"] .lv-caption-color-menu { min-width: 0; max-width: 100%; }
+  .lv-caption-task[data-selected="true"] .lv-caption-color-menu > .lv-caption-colors {
+    position: static; width: auto; max-width: 100%; box-sizing: border-box; box-shadow: none;
+  }
+  .lv-caption-task[data-selected="true"] .lv-caption-row { grid-template-columns: repeat(3, minmax(44px, 1fr)); }
+  .lv-caption-task[data-selected="true"] .lv-caption-row > .lv-caption-select { grid-column: 1 / -1; }
+  .lv-caption-task[data-selected="true"] .lv-caption-heading > h2 { font-size: 18px; }
+  .lv-caption-task[data-selected="true"] .lv-record-tools { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .lv-caption-task[data-selected="true"] .lv-record-tools > button,
+  .lv-caption-task[data-selected="true"] .lv-record-tools > details > summary { padding-inline: 3px; line-height: 1.4; }
+}
 .lv-caption-reading [aria-label="削除の確認"]:not([hidden]) { position:fixed;z-index:30;right:12px;bottom:12px;width:min(380px,calc(100vw - 24px));max-height:70dvh;overflow:auto;box-sizing:border-box;padding:16px;background:var(--lv-field);border:1px solid var(--lv-line);border-radius:8px;box-shadow:0 8px 24px #25282033; }
 
 .lv-material-numeric { cursor: ew-resize; touch-action: pan-y; }
@@ -392,8 +415,8 @@
 @media (max-height: 640px) {
   .lv-project-body > aside { gap: 4px; padding-block: 8px; }
   .lv-project-shell .lv-project-body [aria-label="シーン"] { padding-bottom: 0; }
-  .lv-project-body > aside > .lv-caption-task[data-selected="true"]:not([data-editing="true"]):not([data-mobile-surface]) { grid-template-rows: minmax(0, 1fr) minmax(0, 1fr); }
-  .lv-project-body > aside > .lv-caption-task[data-selected="true"]:not([data-editing="true"]):has(> .lv-caption-browser[data-few-rows="true"]):not([data-mobile-surface]) { grid-template-rows: fit-content(50%) minmax(0, 1fr); }
+  .lv-project-body > aside > .lv-caption-task[data-selected="true"]:not([data-editing="true"]):not([data-mobile-surface]) { --lv-caption-rows: minmax(0, 1fr) minmax(0, 1fr); }
+  .lv-project-body > aside > .lv-caption-task[data-selected="true"]:not([data-editing="true"]):has(> .lv-caption-browser[data-few-rows="true"]):not([data-mobile-surface]) { --lv-caption-rows: fit-content(50%) minmax(0, 1fr); }
 }
 
 /* The existing canvas stays visible while compact Drawing controls preview it. */

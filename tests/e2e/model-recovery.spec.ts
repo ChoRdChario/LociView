@@ -20,15 +20,15 @@ const fileTimeout = 180_000, actionTimeout = 90_000;
 const sha = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex');
 const blob = async (path: string) => new Blob([new Uint8Array(await readFile(path)).buffer]);
 const originals = (source: { originalChanges(): Uint8Array[] }) => source.originalChanges().map(bytes => [sha(bytes), Buffer.from(bytes).toString('hex')]).sort((a, b) => a[0]!.localeCompare(b[0]!));
-const detail = (page: Page) => page.getByRole('region', { name: 'キャプションの詳細', exact: true });
+const detail = (page: Page) => page.getByRole('region', { name: '記録の詳細', exact: true });
 const models = (page: Page) => page.getByRole('tabpanel', { name: 'モデル', exact: true });
 const pinArea = (page: Page) => page.getByRole('region', { name: '位置の調整', exact: true });
 const marker = (page: Page) => page.locator('.lv-project-marker');
 
 async function chooseCaption(page: Page, name = captionTitle) {
   await revealCaptionList(page);
-  await page.getByRole('tab', { name: 'キャプション', exact: true }).click();
-  await page.getByRole('list', { name: 'キャプション一覧', exact: true }).locator('.lv-caption-select').filter({ hasText: name }).click();
+  await page.getByRole('tab', { name: '記録', exact: true }).click();
+  await page.getByRole('list', { name: '記録一覧', exact: true }).locator('.lv-caption-select').filter({ hasText: name }).click();
 }
 async function edit(page: Page, body: string) {
   await detail(page).getByLabel('本文', { exact: true }).fill(body);
@@ -38,7 +38,7 @@ async function edit(page: Page, body: string) {
 async function image(page: Page, name: string, buffer: Buffer) {
   const picker = page.waitForEvent('filechooser'); await page.getByLabel('メディアを追加', { exact: true }).click();
   await (await picker).setFiles({ name, mimeType: 'image/png', buffer });
-  await page.getByRole('region',{name:'キャプションの詳細',exact:true}).getByRole('button',{name:'変更を適用',exact:true}).click(); await expect(page.getByText('メディアを追加しました。', { exact: true })).toBeVisible({ timeout: actionTimeout });
+  await page.getByRole('region',{name:'記録の詳細',exact:true}).getByRole('button',{name:'変更を適用',exact:true}).click(); await expect(page.getByText('メディアを追加しました。', { exact: true })).toBeVisible({ timeout: actionTimeout });
 }
 async function checkImages(page: Page, count: number) {
   const images = page.getByRole('region', { name: 'メディアの整理', exact: true }).locator('img');
@@ -131,10 +131,10 @@ test('差し替えと受信の中断を元のファイルから復旧し、手�
       await models(a).getByRole('button', { name: '配置を調整', exact: true }).click();
       await models(a).getByLabel('モデル位置 X', { exact: true }).fill('1.25'); await models(a).getByLabel('モデル倍率', { exact: true }).fill('1.5');
       await models(a).getByRole('button', { name: '配置を確定', exact: true }).click(); await expect(a.getByText('モデルの配置を確定しました。', { exact: true })).toBeVisible({ timeout: actionTimeout });
-      await a.getByRole('tab', { name: 'キャプション', exact: true }).click();
-      const scenes = a.getByRole('region', { name: 'シーン', exact: true }), first = (await scenes.locator('button[aria-pressed="true"]').textContent())!; primaryScene = first;
+      await a.getByRole('tab', { name: '記録', exact: true }).click();
+      const scenes = a.getByRole('region', { name: 'シーン', exact: true }), first = (await scenes.locator('select[aria-label="シーン"] option:checked').textContent())!; primaryScene = first;
       await beginSceneCreation(a); await a.getByLabel('シーン名', { exact: true }).fill('共有した別シーン'); await a.getByRole('button', { name: 'シーンを追加', exact: true }).click();
-      await expect(a.getByText('シーンを追加しました。', { exact: true })).toBeVisible({ timeout: actionTimeout }); await scenes.getByRole('button', { name: first, exact: true }).click(); await chooseCaption(a);
+      await expect(a.getByText('シーンを追加しました。', { exact: true })).toBeVisible({ timeout: actionTimeout }); await scenes.getByRole('combobox', { name: 'シーン', exact: true }).selectOption({ label: first }); await chooseCaption(a);
       const path = await download(a, info, 'W0-差し替え前', 'teamWorkspace'); initialWorkspacePath = path; base = await WorkspaceArchive.inspect(await blob(path), validationMetadataLimits);
       const inspected = await inspectProjectCandidates(base.source.read(), validationMetadataLimits); if (inspected.kind !== 'project-candidate-inspection') throw Error('initial metadata'); initialRecords = inspected.unambiguousRecords;
       await chooseHomeFiles(b, path); await b.getByRole('button', { name: 'プロジェクトを取り込む', exact: true }).click();
@@ -310,7 +310,7 @@ test('差し替えと受信の中断を元のファイルから復旧し、手�
       await expect(detail(b).getByLabel('本文', { exact: true })).toHaveValue(localBody); await checkImages(b, 2);
       await expect(marker(b)).toHaveAttribute('data-review', 'true'); await expect(marker(b)).toHaveAttribute('aria-description', '要確認');
       expect(await marker(b).evaluate(node => getComputedStyle(node).backgroundColor)).toBe(originalColor);
-      const row = b.getByRole('list', { name: 'キャプション一覧', exact: true }).getByRole('listitem'); await expect(row).toContainText('要確認');
+      const row = b.getByRole('list', { name: '記録一覧', exact: true }).getByRole('listitem'); await expect(row).toContainText('要確認');
       await b.screenshot({ path: info.outputPath('要確認のピン.png'), fullPage: true });
       await b.getByRole('button', { name: '位置を調整', exact: true }).click();
       await expect(pinArea(b).getByLabel('位置 X', { exact: true })).toBeHidden();
@@ -346,12 +346,12 @@ test('差し替えと受信の中断を元のファイルから復旧し、手�
       const secondScene = '共有した別シーン', aBody = `${localBody}。Aの復旧後の追記`, bBody = `${localBody}。Bの二巡目の追記`;
       await chooseCaption(a); await edit(a, aBody); await chooseCaption(b); await edit(b, bBody);
       for (const page of [a, b]) {
-        const scenes = page.getByRole('region', { name: 'シーン', exact: true }); await scenes.getByRole('button', { name: secondScene, exact: true }).click();
+        const scenes = page.getByRole('region', { name: 'シーン', exact: true }); await scenes.getByRole('combobox', { name: 'シーン', exact: true }).selectOption({ label: secondScene });
         await openAddOptions(page);
         const include = page.locator('details.lv-caption-include'); await include.getByText('既存の記録を追加', { exact: true }).click();
-        await include.getByLabel('キャプション', { exact: true }).selectOption(originalId); await include.getByRole('button', { name: 'このシーンに追加', exact: true }).click();
+        await include.getByLabel('記録', { exact: true }).selectOption(originalId); await include.getByRole('button', { name: 'このシーンに追加', exact: true }).click();
         await expect(page.getByText('このシーンに追加しました。', { exact: true })).toBeVisible({ timeout: actionTimeout });
-        await scenes.getByRole('button', { name: primaryScene, exact: true }).click();
+        await scenes.getByRole('combobox', { name: 'シーン', exact: true }).selectOption({ label: primaryScene });
       }
       const outward = await download(a, info, 'A-二巡目の変更分', 'contribution', base.archive.control.manifest.packageId); await checkContribution(outward); await receive(b, outward);
       const recovery = b.getByRole('region', { name: '記録の競合', exact: true });
@@ -367,7 +367,7 @@ test('差し替えと受信の中断を元のファイルから復旧し、手�
       await duplicate.getByRole('button', { name: '競合を解消', exact: true }).click(); await expect(duplicate).toBeHidden({ timeout: actionTimeout });
       // Original is unambiguous in its first Scene; its new name then distinguishes the copy.
       await chooseCaption(b); await detail(b).getByLabel('タイトル', { exact: true }).fill(originalTitle); await edit(b, finalBody);
-      await b.getByRole('region', { name: 'シーン', exact: true }).getByRole('button', { name: secondScene, exact: true }).click();
+      await b.getByRole('combobox', { name: 'シーン', exact: true }).selectOption({ label: secondScene });
       await chooseCaption(b); await detail(b).getByLabel('タイトル', { exact: true }).fill(copyTitle); await edit(b, copyBody); await checkImages(b, 2);
       const gallery = b.getByRole('region', { name: 'メディアの整理', exact: true });
       const attachment = gallery.locator('figure').first(); await attachment.getByText('添付を整理', { exact: true }).click();
@@ -394,8 +394,8 @@ test('差し替えと受信の中断を元のファイルから復旧し、手�
       for (const [who, page] of [['A', a], ['B', b]] as const) {
         await expectResumedProject(page, title, actionTimeout); await chooseCaption(page, originalTitle);
         await expect(marker(page)).toHaveAttribute('data-review', 'false'); await expect(detail(page).getByLabel('本文', { exact: true })).toHaveValue(finalBody); await checkImages(page, 2);
-        await page.getByRole('region', { name: 'シーン', exact: true }).getByRole('button', { name: '共有した別シーン', exact: true }).click();
-        await expect(page.getByRole('list', { name: 'キャプション一覧', exact: true }).locator('.lv-caption-select')).toHaveCount(2); await chooseCaption(page, copyTitle);
+        await page.getByRole('combobox', { name: 'シーン', exact: true }).selectOption({ label: '共有した別シーン' });
+        await expect(page.getByRole('list', { name: '記録一覧', exact: true }).locator('.lv-caption-select')).toHaveCount(2); await chooseCaption(page, copyTitle);
         await expect(detail(page).getByLabel('本文', { exact: true })).toHaveValue(copyBody); await checkImages(page, 2);
         await expect(page.getByRole('region', { name: 'メディアの整理', exact: true })).toContainText(copyAlt);
         await expect(marker(page)).toHaveCount(2); for (const pin of await marker(page).all()) await expect(pin).toHaveAttribute('data-review', 'false');

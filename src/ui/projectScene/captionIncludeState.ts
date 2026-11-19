@@ -46,10 +46,10 @@ export function captionIncludeIssue(context: CaptionIncludeContext, action: 'inc
   if (context.memory.composing) return '文字の入力を確定してください。';
   if (context.pending) return sceneSwitchReason(context.pending);
   if (view.issue) return view.issue;
-  if (!view.selected) return context.memory.captionId ? '選択したキャプションの状態を確認してください。' : 'キャプションを選択してください。';
+  if (!view.selected) return context.memory.captionId ? '選択した記録の状態を確認してください。' : '記録を選択してください。';
   const item = view.selected;
-  if (item.lifecycle.kind !== 'value' || item.membership.kind !== 'value') return 'キャプションとシーンの状態を確認してください。';
-  if (item.lifecycle.value === 'deleted') return '削除済みです。キャプションの状態を確認してください。';
+  if (item.lifecycle.kind !== 'value' || item.membership.kind !== 'value') return '記録とシーンの状態を確認してください。';
+  if (item.lifecycle.value === 'deleted') return '削除済みです。記録の状態を確認してください。';
   return action === 'exclude' ? (item.membership.value === 'absent' ? 'このシーンには含まれていません。' : null) :
     item.membership.value === 'included' ? 'このシーンに追加済みです。' : null;
 }
@@ -65,11 +65,11 @@ export function planCaptionInclude(context: CaptionIncludeContext, intent: Capti
   if (view.issue) return { kind: 'blocked', reason: view.issue };
   if (context.feedback.kind === 'applying') return { kind: 'blocked', reason: '変更中です。' };
   if (intent.kind === 'select') return intent.captionId === null || view.items.some(item => item.caption.id === intent.captionId)
-    ? change({ captionId: intent.captionId }) : { kind: 'blocked', reason: 'キャプションを選び直してください。' };
+    ? change({ captionId: intent.captionId }) : { kind: 'blocked', reason: '記録を選び直してください。' };
   if (intent.kind === 'include' || intent.kind === 'exclude') {
     const issue = captionIncludeIssue(context, intent.kind, view); if (issue) return { kind: 'blocked', reason: issue };
   } else if (!view.selected || context.pending || memory.composing) {
-    return { kind: 'blocked', reason: sceneSwitchReason(context.pending) || '入力を確定し、キャプションを選択してください。' };
+    return { kind: 'blocked', reason: sceneSwitchReason(context.pending) || '入力を確定し、記録を選択してください。' };
   }
   return Object.freeze({ ...base, kind: intent.kind, captionId: memory.captionId! });
 }

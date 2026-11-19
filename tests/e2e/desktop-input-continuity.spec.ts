@@ -35,7 +35,7 @@ for (const touch of [false, true]) test(`autosaved text and photos survive file 
     if (url.origin === new URL(server.url).origin || ['blob:', 'data:'].includes(url.protocol)) return route.continue(); remote.push(url.origin); return route.abort(); });
   const ready = async (text: string) => { await expect(page.getByText(text, { exact: true })).toBeVisible();
     await expect(page.locator('main.lv-project-workspace > header > .lv-operation-status')).toHaveAttribute('data-busy', 'false'); };
-  const detail = page.getByRole('region', { name: 'キャプションの詳細', exact: true });
+  const detail = page.getByRole('region', { name: '記録の詳細', exact: true });
   try {
     await page.goto(server.url);
     const cancelledPicker=page.waitForEvent('filechooser');await page.getByRole('button',{name:'ファイルを開く',exact:true}).click();
@@ -73,8 +73,8 @@ for (const touch of [false, true]) test(`autosaved text and photos survive file 
       await expect(tasks).toHaveCount(1);
     }
     await revealCaptionList(page);
-    const firstAdd = page.getByRole('button', { name: 'キャプションを追加', exact: true });
-    await expect(firstAdd).toHaveText('キャプションを追加');
+    const firstAdd = page.getByRole('button', { name: '記録を追加', exact: true });
+    await expect(firstAdd).toHaveText('記録を追加');
     expect(await firstAdd.evaluate(node => Number.parseFloat(getComputedStyle(node).fontSize))).toBeGreaterThanOrEqual(14);
     const sceneSearch = page.getByRole('searchbox', { name: '検索', exact: true });
     expect((await firstAdd.boundingBox())!.y).toBeLessThan((await sceneSearch.boundingBox())!.y);
@@ -204,7 +204,7 @@ for (const touch of [false, true]) test(`autosaved text and photos survive file 
     await expect(confirmRestore).toBeEnabled();
     restoreStarted = Date.now(); await confirmRestore.click();
     const restoreTimeLeft = () => Math.max(1, restoreStarted! + 90_000 - Date.now());
-    const firstReader = resumed.getByRole('region', { name: '復元中のキャプション', exact: true });
+    const firstReader = resumed.getByRole('region', { name: '復元中の記録', exact: true });
     await expect(firstReader).toBeVisible(); await expect.poll(() => resumed.evaluate(() => (window as any).firstRestoreGate.held)).toBeGreaterThan(0);
     await expect(resumed.locator('main.lv-project-workspace')).toHaveCount(0); await expect(firstReader.locator('textarea,input[type=file],canvas,img,video,audio')).toHaveCount(0);
     await expect(resumed.getByRole('button', { name: 'キャンセル', exact: true })).toBeDisabled();
@@ -230,7 +230,7 @@ for (const touch of [false, true]) test(`autosaved text and photos survive file 
     await expect(resumed.locator('.lv-caption-select').filter({ hasText: '再開時の記録' })).toHaveAttribute('aria-current', 'true');
     resumePhase = 'saved-body-edit'; await revealCaptionList(resumed);
     await resumed.locator('.lv-caption-select').filter({ hasText: '再開時の記録' }).click();
-    const resumedDetail = resumed.getByRole('region', { name: 'キャプションの詳細', exact: true }), body = '復元した端末で保存した本文';
+    const resumedDetail = resumed.getByRole('region', { name: '記録の詳細', exact: true }), body = '復元した端末で保存した本文';
     await expect(resumedDetail.getByRole('region', { name: '添付メディア', exact: true }).locator('figure')).toHaveCount(1);
     await expect(resumedDetail).toContainText('A.png');
     await resumedDetail.getByLabel('本文', { exact: true }).fill(body); await finishCaptionEditing(resumed, { body });
@@ -244,7 +244,7 @@ for (const touch of [false, true]) test(`autosaved text and photos survive file 
       FileSystemFileHandle.prototype.getFile = async function() { if (blocked && this.name.endsWith('.bin')) { state.held++; await gate; } return getFile.call(this); };
     });
     resumePhase = 'cold-held-read'; if (touch) await resumed.setViewportSize({ width: 320, height: 568 }); await resumed.goto(server.url + '?timings=1');
-    const reader = resumed.getByRole('region', { name: '再開中のキャプション', exact: true }); await expect(reader).toBeVisible();
+    const reader = resumed.getByRole('region', { name: '再開中の記録', exact: true }); await expect(reader).toBeVisible();
     await expect.poll(() => resumed.evaluate(() => (window as any).resumeReadGate.held)).toBeGreaterThan(0);
     expect(await resumed.evaluate(() => performance.getEntriesByName('lociview.host.destination.bodies').length)).toBe(0);
     await expect(resumed.locator('main.lv-project-workspace')).toHaveCount(0); await expect(reader.locator('textarea,input[type=file]')).toHaveCount(0);
@@ -344,7 +344,7 @@ test('attachment pagination keeps focus and rejects a detached edit action', asy
     await page.getByRole('button', { name: '新しいプロジェクトに変換', exact: true }).click();
     await expect(page.getByRole('button', { name: '閲覧する', exact: true })).toBeEnabled({ timeout: 90_000 });
     await revealCaptionList(page); await page.locator('.lv-caption-select').filter({ hasText: '既存のピン' }).click();
-    const detail = page.getByRole('region', { name: 'キャプションの詳細', exact: true });
+    const detail = page.getByRole('region', { name: '記録の詳細', exact: true });
     const media = detail.getByRole('region', { name: 'メディアの整理', exact: true });
     const gallery = media.getByRole('region', { name: '添付メディア', exact: true }), figures = gallery.locator('figure');
     await expect(figures).toHaveCount(12);

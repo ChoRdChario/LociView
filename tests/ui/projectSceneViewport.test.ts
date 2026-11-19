@@ -1054,7 +1054,7 @@ describe('synthetic Scene display; GPU mocked, not rendered/browser acceptance',
     expect(workspace.session.displayReady).toBe(false); ready = true; notified();
     expect(workspace.session.displayReady).toBe(true);
     expect(descendants(root).some(n => n.textContent.startsWith('3D描画・ピン配置は未接続'))).toBe(false);
-    const list = labeled(root, 'キャプション一覧'); list.clientHeight = 100; list.scrollTop = 0;
+    const list = labeled(root, '記録一覧'); list.clientHeight = 100; list.scrollTop = 0;
     list.children[0]!.offsetTop = 250; list.children[0]!.offsetHeight = 44;
     control(stage, '設備の確認箇所').fire('click'); expect(workspace.session.memory.selectedCaptionId).toBe(f.shared);
     expect(list.scrollTop).toBe(194); expect(workspace.session.memory.listScrollTop).toBe(194);

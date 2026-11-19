@@ -25,11 +25,11 @@ const history = (source: ProjectMetadataSource) => source.originalChanges()
   .map(bytes => [sha256(bytes), Buffer.from(bytes).toString('hex')]).sort((a, b) => a[0]!.localeCompare(b[0]!));
 const fileBlob = async (path: string) => new Blob([new Uint8Array(await readFile(path)).buffer]);
 const files = (page: Page) => page.getByRole('region', { name: 'ファイル', exact: true });
-const detail = (page: Page) => page.getByRole('region', { name: 'キャプションの詳細', exact: true });
+const detail = (page: Page) => page.getByRole('region', { name: '記録の詳細', exact: true });
 
 async function selectCaption(page: Page, title = captionName) {
   await revealCaptionList(page);
-  await page.getByRole('list', { name: 'キャプション一覧', exact: true })
+  await page.getByRole('list', { name: '記録一覧', exact: true })
     .locator('.lv-caption-select').filter({ hasText: title }).click();
 }
 async function edit(page: Page, field: 'タイトル' | '本文', value: string) {
@@ -43,7 +43,7 @@ async function addImage(page: Page, name: string, buffer: Buffer) {
   const choosing = page.waitForEvent('filechooser');
   await page.getByLabel('メディアを追加', { exact: true }).click();
   await (await choosing).setFiles({ name, mimeType: 'image/png', buffer });
-  await page.getByRole('region',{name:'キャプションの詳細',exact:true}).getByRole('button',{name:'変更を適用',exact:true}).click(); await expect(page.getByText('メディアを追加しました。', { exact: true })).toBeVisible({ timeout: 90_000 });
+  await page.getByRole('region',{name:'記録の詳細',exact:true}).getByRole('button',{name:'変更を適用',exact:true}).click(); await expect(page.getByText('メディアを追加しました。', { exact: true })).toBeVisible({ timeout: 90_000 });
 }
 async function checkImages(page: Page, count: number) {
   const images = page.getByRole('region', { name: 'メディアの整理', exact: true }).locator('img');
@@ -178,11 +178,11 @@ test('独立した二人が実ファイルを二往復し、手元の画像と�
       await detail(a).getByLabel('タイトル', { exact: true }).fill(captionName); await edit(a, '本文', originalBody);
       await addImage(a, '共有画像.png', png);
       const scenes = a.getByRole('region', { name: 'シーン', exact: true });
-      const initialName = (await scenes.locator('button[aria-pressed="true"]').textContent())!;
+      const initialName = (await scenes.locator('select[aria-label="シーン"] option:checked').textContent())!;
       await beginSceneCreation(a); await a.getByLabel('シーン名', { exact: true }).fill('現地のシーン');
       await a.getByRole('button', { name: 'シーンを追加', exact: true }).click();
       await expect(a.getByText('シーンを追加しました。', { exact: true })).toBeVisible({ timeout: 90_000 });
-      await scenes.getByRole('button', { name: initialName, exact: true }).click(); await selectCaption(a);
+      await scenes.getByRole('combobox', { name: 'シーン', exact: true }).selectOption({ label: initialName }); await selectCaption(a);
       const initial = await download(a, testInfo, 'W0-最初の作業一式', 'teamWorkspace');
       const workspace = await WorkspaceArchive.inspect(await fileBlob(initial), validationMetadataLimits);
       const manifest = workspace.archive.control.manifest; if (manifest.purpose !== 'teamWorkspace') throw Error('workspace');

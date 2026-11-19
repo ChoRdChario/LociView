@@ -10,19 +10,19 @@ export function createCaptionTextReading(document: Document, reading: Omit<Resum
   const label = document.createElement('label'), search = document.createElement('input');
   const list = document.createElement('ul'), detail = document.createElement('section');
   const title = document.createElement('h3'), body = document.createElement('p'), empty = document.createElement('p');
-  root.className = 'lv-project-workspace lv-resume-reading'; root.setAttribute('aria-label', context === 'review' ? '共有シーンの記録' : context !== 'resume' ? '復元中のキャプション' : '再開中のキャプション');
+  root.className = 'lv-project-workspace lv-resume-reading'; root.setAttribute('aria-label', context === 'review' ? '共有シーンの記録' : context !== 'resume' ? '復元中の記録' : '再開中の記録');
   identity.className = 'lv-project-identity'; heading.textContent = reading.title;
   status.className = 'lv-operation-status'; status.dataset.busy = 'true';
   status.setAttribute('role', 'status'); status.textContent = context === 'first-restore' ? '復元中です。最初のシーンの記録を読めます。編集・保存は完了後に使えます。' : context === 'restore' ? '復元しています。完了後に編集できます。' : '保存データを確認中です。記録は閲覧・検索できます。';
   identity.append(heading, status); header.append(identity); header.hidden = context === 'review';
   layout.className = 'lv-project-body'; layout.dataset.surface = 'panel';
   stage.className = 'lv-project-stage'; stage.setAttribute('aria-hidden', 'true');
-  panelHeading.textContent = reading.sceneName ? `キャプション（${reading.sceneName}）` : 'キャプション';
+  panelHeading.textContent = reading.sceneName ? `記録（${reading.sceneName}）` : '記録';
   index.className = 'lv-resume-index';
   back.type = 'button'; back.className = 'lv-resume-back'; back.textContent = '一覧へ戻る';
   title.tabIndex = -1;
   label.textContent = '検索'; search.type = 'search'; search.placeholder = 'タイトル・本文'; label.append(search);
-  list.setAttribute('aria-label', 'キャプション一覧'); detail.setAttribute('aria-label', 'キャプションの詳細');
+  list.setAttribute('aria-label', '記録一覧'); detail.setAttribute('aria-label', '記録の詳細');
   detail.className = 'lv-resume-detail'; detail.append(back, title, body); detail.hidden = true;
   empty.textContent = '一致する記録がありません。'; empty.hidden = true;
   if (reading.incomplete) { const note = document.createElement('p'); note.textContent = '一部の情報は復元後に確認してください。'; panel.append(note); }

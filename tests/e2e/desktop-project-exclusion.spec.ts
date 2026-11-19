@@ -12,7 +12,7 @@ test('same-profile Project editing stays exclusive and resumes after the holder 
   const server=await ownedServer('offline-desktop-dist'),browser=await chromium.launch({channel:'chromium',headless:true});
   const context=await browser.newContext({serviceWorkers:'block',viewport:{width:1440,height:1000}}),errors:string[]=[],remote:string[]=[];
   context.setDefaultTimeout(15_000);
-  const detail=(p:Page)=>p.getByRole('region',{name:'キャプションの詳細',exact:true});
+  const detail=(p:Page)=>p.getByRole('region',{name:'記録の詳細',exact:true});
   const ready=async(p:Page,text:string)=>{await expect(p.getByText(text,{exact:true})).toBeVisible();await expect(p.locator('main.lv-project-workspace > header > .lv-operation-status')).toHaveAttribute('data-busy','false');};
   const readable=async(p:Page)=>{await expect(p.getByRole('heading',{name:'プロジェクト名',exact:true})).toHaveText('同じプロジェクトの二窓');await expect(p.getByLabel('3Dモデルの表示',{exact:true})).toHaveAttribute('aria-busy','false');};
   const backup=async(p:Page,name:string)=>{

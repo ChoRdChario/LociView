@@ -51,7 +51,7 @@ for(const touch of [false,true])test(`native capacity recovery retains drafts an
     await expect(p.getByLabel('3Dモデルの表示',{exact:true})).toHaveAttribute('aria-busy','false',{timeout:90_000});await revealWorkPanel(p);await revealCoordinateAdd(p);
     const model=p.getByLabel('追加先モデル',{exact:true});await model.focus();await model.selectOption({label:'容量確認.glb'});
     await p.getByRole('button',{name:'このモデルに追加',exact:true}).click();for(const axis of ['X','Y','Z'])await p.getByLabel('位置 '+axis,{exact:true}).fill(axis==='Y'?'.5':'0');
-    await p.getByRole('button',{name:'ここに記録を作る',exact:true}).click();const detail=p.getByRole('region',{name:'キャプションの詳細',exact:true});
+    await p.getByRole('button',{name:'ここに記録を作る',exact:true}).click();const detail=p.getByRole('region',{name:'記録の詳細',exact:true});
     await expect(detail.getByLabel('タイトル',{exact:true})).toBeEditable();await fault(p,'edit');let started=Date.now();
     await detail.getByLabel('タイトル',{exact:true}).fill('保持する記録');await detail.getByLabel('本文',{exact:true}).fill('容量不足でも失わない本文');
     const retry=detail.getByRole('button',{name:'保存を再試行',exact:true});await expect(retry).toBeEnabled();
@@ -108,7 +108,7 @@ for(const touch of [false,true])test(`native capacity recovery retains drafts an
     await expect(p.getByRole('region',{name:'ファイル操作',exact:true})).toBeHidden();
     const hits=await p.evaluate(()=>(window as any).__capacityFault.hits as string[]);expect(hits.some(path=>path.endsWith('/published.json'))).toBe(true);expect(hits.some(path=>path.includes('/artifacts/'))).toBe(true);
     await context!.close();context=undefined;const cold=await launch();await expect(cold.getByRole('heading',{name:'プロジェクト名',exact:true})).toHaveText('容量から復旧',{timeout:90_000});await revealWorkPanel(cold);
-    await cold.locator('.lv-caption-select').filter({hasText:'保持する記録'}).click();await expect(cold.getByRole('region',{name:'キャプションの詳細',exact:true}).getByLabel('本文',{exact:true})).toHaveValue('容量不足でも失わない本文');
+    await cold.locator('.lv-caption-select').filter({hasText:'保持する記録'}).click();await expect(cold.getByRole('region',{name:'記録の詳細',exact:true}).getByLabel('本文',{exact:true})).toHaveValue('容量不足でも失わない本文');
     expect(errors).toEqual([]);expect(remote).toEqual([]);await info.attach('capacity-measurements',{body:JSON.stringify({measurements,hits,browser:await cold.evaluate(()=>navigator.userAgent),touchEmulated:touch,physicalDevice:false}),contentType:'application/json'});
   }finally{await context?.close();await server.stop();}
 });
@@ -162,7 +162,8 @@ for (const restored of [true, false]) for (const touch of [false, true]) test(`r
       await info.attach(name + '-save-timings', { body: JSON.stringify(measurements), contentType: 'application/json' });
     }
   };
-  const text = '強制終了しても一度だけ残る本文', detail = (page: Page) => page.getByRole('region', { name: 'キャプションの詳細', exact: true });
+  const text = '強制終了しても一度だけ残る本文', detail = (page: Page) => page.getByRole('region', {
+    name: process.env.LOCIVIEW_E2E_ARTIFACT ? /^(?:記録|キャプション)の詳細$/ : '記録の詳細', exact: true });
   const record = async (page: Page) => {
     await revealCaptionList(page);
     await page.locator('.lv-caption-select').filter({ hasText: '既存のピン' }).click();

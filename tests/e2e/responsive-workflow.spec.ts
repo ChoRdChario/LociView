@@ -13,7 +13,7 @@ const entry = `http://127.0.0.1:4182/dev.html?editor=project${process.env.LOCIVI
 const title = 'Nativeから引き継ぐ記録', lastTitle = '100：長い日本語の記録名を狭い画面でも省略せず確認するための現地観察記録', body = '狭い画面から日本語の記録を継続する';
 const imageDescription = '狭い画面で確認した現地写真';
 const sha = (b: Uint8Array) => createHash('sha256').update(b).digest('hex');
-const detail = (page: Page) => page.getByRole('region', { name: 'キャプションの詳細', exact: true });
+const detail = (page: Page) => page.getByRole('region', { name: '記録の詳細', exact: true });
 const history = (source: { originalChanges(): Uint8Array[] }) => source.originalChanges().map(b => [sha(b), Buffer.from(b).toString('hex')]).sort((a, b) => a[0]!.localeCompare(b[0]!));
 
 test('狭い画面とno-hover touchで100記録をキーボード移動し、編集・照合保存・完全再開できる', async ({}, info) => {
@@ -70,11 +70,11 @@ test('狭い画面とno-hover touchで100記録をキーボード移動し、編
       const box = await target.boundingBox(); expect(box).toBeTruthy(); expect(box!.height).toBeGreaterThanOrEqual(44); expect(box!.width).toBeGreaterThanOrEqual(44);
     }
     const scene = page.getByRole('region', { name: 'シーン', exact: true });
-    await distinctFill(scene.getByRole('button', { name: '観察', exact: true }), scene.getByRole('button', { name: '全体', exact: true }));
+    await expect(scene.getByRole('combobox', { name: 'シーン', exact: true }).locator('option:checked')).toHaveText('観察');
     const tabs = page.getByRole('tablist', { name: '作業', exact: true });
-    await distinctFill(tabs.getByRole('tab', { name: 'キャプション', exact: true }), tabs.getByRole('tab', { name: 'モデル', exact: true })); await tabs.getByRole('tab', { name: 'キャプション', exact: true }).focus(); await page.keyboard.press('ArrowRight');
+    await distinctFill(tabs.getByRole('tab', { name: '記録', exact: true }), tabs.getByRole('tab', { name: 'モデル', exact: true })); await tabs.getByRole('tab', { name: '記録', exact: true }).focus(); await page.keyboard.press('ArrowRight');
     await expect(tabs.getByRole('tab', { name: 'モデル', exact: true })).toBeFocused(); await page.keyboard.press('End'); await expect(tabs.getByRole('tab', { name: '描画', exact: true })).toBeFocused(); await page.keyboard.press('Home');
-    const list = page.getByRole('list', { name: 'キャプション一覧', exact: true }); await expect(list.locator('.lv-caption-select')).toHaveCount(100);
+    const list = page.getByRole('list', { name: '記録一覧', exact: true }); await expect(list.locator('.lv-caption-select')).toHaveCount(100);
     await list.locator('.lv-caption-select').first().focus();
     // At the accepted 100-row boundary the ordinary DOM tab order remains active.
     for (let n = 1; n < 100; n++) await page.keyboard.press('Tab');
@@ -82,11 +82,11 @@ test('狭い画面とno-hover touchで100記録をキーボード移動し、編
     expect(await last.evaluate(n => getComputedStyle(n).outlineStyle)).not.toBe('none'); await page.keyboard.press('Enter'); await expect(detail(page).getByLabel('タイトル', { exact: true })).toHaveValue(lastTitle);
     await distinctFill(last, list.locator('.lv-caption-select').first());
     const text = detail(page).getByLabel('本文', { exact: true }); await text.dispatchEvent('compositionstart'); await text.fill(body); await page.setViewportSize({ width: 568, height: 320 });
-    await expect(page.getByRole('region', { name: 'シーン', exact: true }).getByRole('button', { name: '全体', exact: true })).toBeDisabled();
+    await expect(page.getByRole('combobox', { name: 'シーン', exact: true })).toBeDisabled();
     await text.dispatchEvent('compositionend'); await expect(text).toHaveValue(body); await detail(page).getByRole('button', { name: '変更を適用', exact: true }).tap(); await expect(page.getByText('変更を適用しました。', { exact: true })).toBeVisible({ timeout: 90_000 });
     const pins = page.getByRole('region', { name: '位置の調整', exact: true }); await page.getByRole('button', { name: '位置を調整', exact: true }).tap(); await page.getByText('座標で微調整',{exact:true}).tap(); await pins.getByLabel('位置 X', { exact: true }).fill('4.25');
     await pins.getByRole('button', { name: '取り消す', exact: true }).tap(); await layout(page, 'shortHeight');
-    await page.setViewportSize({ width: 320, height: 720 }); await page.getByRole('region', { name: 'キャプション', exact: true }).locator('.lv-caption-search').getByLabel('検索', { exact: true }).fill('既存のピン'); await list.locator('.lv-caption-select').filter({ hasText: '既存のピン' }).tap();
+    await page.setViewportSize({ width: 320, height: 720 }); await page.getByRole('region', { name: '記録', exact: true }).locator('.lv-caption-search').getByLabel('検索', { exact: true }).fill('既存のピン'); await list.locator('.lv-caption-select').filter({ hasText: '既存のピン' }).tap();
     const gallery = page.getByRole('region', { name: 'メディアの整理', exact: true }), thumb = gallery.getByRole('button').filter({ has: page.locator('img') }).first();
     const attachment=gallery.getByRole('region', { name: '添付メディア', exact: true }).locator('figure').first();await attachment.getByText('添付を整理',{exact:true}).tap();await attachment.getByRole('button', { name: '説明を編集', exact: true }).tap();
     await gallery.getByLabel('メディアの説明', { exact: true }).fill(imageDescription); await gallery.getByRole('button', { name: '説明を適用', exact: true }).tap();
@@ -97,7 +97,7 @@ test('狭い画面とno-hover touchで100記録をキーボード移動し、編
     await page.screenshot({ path: info.outputPath('320pxのメディアビューア.png'), fullPage: true }); await page.keyboard.press('Escape'); await expect(thumb).toBeFocused();
     await layout(page, 'afterImage'); await page.screenshot({ path: info.outputPath('320pxで記録とファイル操作.png'), fullPage: true }); const first = await save(page, '狭い画面の保存', true);
     await close(); page = await launch(); await expect(page.getByText(`最後のプロジェクトを再開しました：${title}`, { exact: true })).toBeVisible({ timeout: 90_000 });
-    await page.getByRole('region', { name: 'キャプション', exact: true }).locator('.lv-caption-search').getByLabel('検索', { exact: true }).fill('100：'); await page.getByRole('list', { name: 'キャプション一覧', exact: true }).locator('.lv-caption-select').filter({ hasText: lastTitle }).tap();
+    await page.getByRole('region', { name: '記録', exact: true }).locator('.lv-caption-search').getByLabel('検索', { exact: true }).fill('100：'); await page.getByRole('list', { name: '記録一覧', exact: true }).locator('.lv-caption-select').filter({ hasText: lastTitle }).tap();
     await expect(detail(page).getByLabel('本文', { exact: true })).toHaveValue(body); await layout(page, 'cold320'); const cold = await save(page, '狭い画面から再開', false); expect(cold).toEqual(first);
     expect(errors).toEqual([]); await page.screenshot({ path: info.outputPath('320pxで末尾の記録を再開.png'), fullPage: true });
   } catch (error) { failed = true; if (current) await current.screenshot({ path: info.outputPath('narrow-failure.png'), fullPage: true }).catch(() => {}); throw error; }

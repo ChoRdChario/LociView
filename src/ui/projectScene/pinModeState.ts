@@ -71,7 +71,7 @@ export function pinActionIssue(context: PinModeContext, action: 'beginAdd' | 'ad
     if (captionBlock !== null) return captionBlock || 'ピンの状態を確認してください。';
     if (!caption.token || !reparent && caption.assetId.kind !== 'value') return 'ピンのモデルを確認してください。';
     const issue = countIssue(caption); if (issue) return issue;
-  } else if (action === 'move' || action === 'reparent') return 'キャプションを選択してください。';
+  } else if (action === 'move' || action === 'reparent') return '記録を選択してください。';
   const targetId = action === 'finish' ? mode!.target.assetId : action === 'reparent' ? parentId : caption?.assetId.kind === 'value' ? caption.assetId.value : memory.addTargetId;
   if (reparent && caption?.assetId.kind === 'value') {
     if (caption.unplaced && targetId && caption.assetId.value !== targetId) return '所有モデルに配置してください。';

@@ -85,8 +85,8 @@ function normalized(field: CaptionEditField, text: string): string {
 }
 export function captionDraftFieldIssue(context: DetailContext, field: CaptionEditField): string | null {
   const { source, draft } = context;
-  if (source.kind !== 'ready') return source.reason || 'キャプションの状態を確認してください。';
-  if (draft && draft.captionId !== source.caption.id) return '編集中のキャプションを確認してください。';
+  if (source.kind !== 'ready') return source.reason || '記録の状態を確認してください。';
+  if (draft && draft.captionId !== source.caption.id) return '編集中の記録を確認してください。';
   if (field === 'body' && draft?.bodyInputIssue) return draft.bodyInputIssue;
   if (source.caption[field].kind !== 'value') return `${captionFieldLabels[field]}の状態を確認してください。`;
   const raw = draft?.edits[field];
@@ -103,9 +103,9 @@ export function captionDraftFieldIssue(context: DetailContext, field: CaptionEdi
 export function captionApplyIssue(context: DetailContext): string | null {
   if (context.mutationBlock !== null) return context.mutationBlock || '現在は変更できません。状態を確認してください。';
   if (context.feedback.kind === 'applying') return '変更を適用中です。';
-  if (context.source.kind !== 'ready') return context.source.reason || 'キャプションを選択してください。';
-  if (!context.source.token) return 'キャプションの状態を確認してください。';
-  if (!context.draft || context.draft.captionId !== context.source.caption.id) return '編集中のキャプションを確認してください。';
+  if (context.source.kind !== 'ready') return context.source.reason || '記録を選択してください。';
+  if (!context.source.token) return '記録の状態を確認してください。';
+  if (!context.draft || context.draft.captionId !== context.source.caption.id) return '編集中の記録を確認してください。';
   if (context.draft.composing) return '文字の入力を確定してください。';
   if (context.draft.bodyInputIssue) return context.draft.bodyInputIssue;
   if (context.mediaDraft && (context.mediaDraft.token !== context.source.token ||
@@ -123,7 +123,7 @@ export function captionApplyIssue(context: DetailContext): string | null {
 export function planCaptionApply(context: DetailContext): CaptionApplyPlan | Readonly<{ kind: 'blocked'; reason: string }> {
   const issue = captionApplyIssue(context);
   if (issue || context.source.kind !== 'ready' || !context.draft || context.source.sceneCount.kind !== 'value')
-    return { kind: 'blocked', reason: issue || 'キャプションを確認してください。' };
+    return { kind: 'blocked', reason: issue || '記録を確認してください。' };
   const changes: Partial<Record<CaptionEditField, string>> = {};
   for (const field of Object.keys(context.draft.edits) as CaptionEditField[]) changes[field] = normalized(field, context.draft.edits[field]!);
   return Object.freeze({ kind: 'apply', token: context.source.token, sceneId: context.source.sceneId,

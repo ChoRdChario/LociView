@@ -223,11 +223,11 @@ describe('connected synthetic development host (not rendered, storage or TEAM-FL
     expect(sidebar.contains(button(root, 'ウィンドウを並べる'))).toBe(true);
     expect(stage.contains(button(root, 'ウィンドウを並べる'))).toBe(false);
     expect(stage.contains(label(root, 'ピンの操作'))).toBe(true);
-    expect(sidebar.contains(label(root, 'キャプションの詳細'))).toBe(true);
+    expect(sidebar.contains(label(root, '記録の詳細'))).toBe(true);
     expect(descendants(root).some(n => n.tag === 'button' && n.textContent === '窓を残す')).toBe(false);
     const numeric = by(root, n => n.className === 'lv-development-numeric');
     expect(numeric.tag).toBe('details'); expect(numeric.hidden).toBe(true);
-    expect(stage.contains(label(root, 'キャプションの詳細'))).toBe(false);
+    expect(stage.contains(label(root, '記録の詳細'))).toBe(false);
     w.dispose();
   });
   it('shares one Caption through A/B/A and keeps each Scene selection, search and color memory', () => {
@@ -303,7 +303,7 @@ describe('connected synthetic development host (not rendered, storage or TEAM-FL
 
   it('walks mounted controls through edits, tabs, cancel confirmation and A/B/A without remounting the form', () => {
     const document = new RecordedDocument(), workspace = createDevelopmentWorkspace(document.asDocument()), root = record(workspace.root);
-    const list = label(root, 'キャプション一覧'); by(list, n => n.className === 'lv-caption-select').fire('click');
+    const list = label(root, '記録一覧'); by(list, n => n.className === 'lv-caption-select').fire('click');
     const title = label(root, 'タイトル'), body = label(root, '本文'), scene = label(root, 'シーン');
     title.value = '画面で編集'; title.focus(); title.fire('input');
     expect(button(scene, '設備の確認').disabled).toBe(true); button(root, 'モデル').fire('click');
@@ -313,12 +313,12 @@ describe('connected synthetic development host (not rendered, storage or TEAM-FL
     const equipment = by(modelRoot, n => n.tag === 'li' && n.children.some(c => c.textContent === '設備'));
     const check = label(equipment, 'このシーンに表示'); check.checked = false; check.fire('change');
     expect(check.checked).toBe(false); expect(workspace.session.detailContext().draft).toBe(draft);
-    button(root, 'キャプション').fire('click'); button(root, '変更を適用').fire('click');
+    button(root, '記録').fire('click'); button(root, '変更を適用').fire('click');
     expect(button(scene, '設備の確認').disabled).toBe(false); button(scene, '設備の確認').fire('click');
-    by(label(root, 'キャプション一覧'), n => n.className === 'lv-caption-select').fire('click');
+    by(label(root, '記録一覧'), n => n.className === 'lv-caption-select').fire('click');
     expect(title.value).toBe('画面で編集'); button(scene, '全体').fire('click');
     expect(title.value).toBe('画面で編集'); expect(label(root, 'タイトル')).toBe(title);
-    title.value = '取り消す文章'; title.fire('input'); button(label(root, 'キャプションの詳細'), '取り消す').fire('click');
+    title.value = '取り消す文章'; title.fire('input'); button(label(root, '記録の詳細'), '取り消す').fire('click');
     expect(hasCaptionDraft(workspace.session.detailContext().draft)).toBe(true);
     button(root, '変更を取り消す').fire('click'); expect(title.value).toBe('画面で編集');
     expect(hasCaptionDraft(workspace.session.detailContext().draft)).toBe(false);

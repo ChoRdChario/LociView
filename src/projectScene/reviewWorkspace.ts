@@ -69,7 +69,7 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
   const searchRecords = make('button', '記録を検索'); searchRecords.type = 'button'; searchRecords.className = 'lv-stage-search';
   const overlay = make('div'); overlay.className = 'lv-development-pin-layer';
   const sidebar = make('aside'); sidebar.className = 'lv-development-sidebar'; sidebar.setAttribute('aria-label', '閲覧パネル');
-  const emptyCaptions=make('p','このシーンにキャプションはありません。'),status = make('p'), retry = make('button', '3D表示を再試行'); status.setAttribute('role', 'status'); retry.type = 'button';
+  const emptyCaptions=make('p','このシーンに記録はありません。'),status = make('p'), retry = make('button', '3D表示を再試行'); status.setAttribute('role', 'status'); retry.type = 'button';
   const renderStatus = make('div'); renderStatus.className = 'lv-review-render-status'; renderStatus.append(status, retry);
   const cameraSurface = createPinCameraSurface(document, canvas, searchRecords, overlay, viewport,
     () => !disposed && !handoffBusy && !composing && !moving && !content.inert, activatePin);
@@ -122,7 +122,7 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
     note.setAttribute('role', 'status'); select.setAttribute('aria-label', '追加先'); label.append(select);
     const count = (name: string) => view.inspection.review.summary.entityClasses.find(entry => entry.class === name)?.count ?? 0;
     const models = Object.values(view.inspection.review.snapshot.assetsById as JsonObject).filter(asset => (asset as JsonObject).kind === 'visual').length;
-    panel.append(make('h2', count('scenesById') > 1 ? `${count('scenesById')}シーンを追加` : view.sceneName), make('p', `モデル ${models}・キャプション ${count('captionsById')}・メディア ${count('mediaResourcesById')}`),
+    panel.append(make('h2', count('scenesById') > 1 ? `${count('scenesById')}シーンを追加` : view.sceneName), make('p', `モデル ${models}・記録 ${count('captionsById')}・メディア ${count('mediaResourcesById')}`),
       label, note, confirm, cancel);
     actions.append(open); root.insertBefore(panel, content);
     let revision = 0, pending: (() => Promise<void>) | undefined, loading = false, hasProjects = false;
@@ -256,7 +256,7 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
   });
   const mediaGroup = (captionId: string): MediaPreviewGroup => {
     const caption = view.source.captions.find(c => c.id === captionId);
-    return { scope: JSON.stringify([view.source.token, captionId]), label: caption?.title.kind === 'value' ? caption.title.value || 'キャプション' : 'キャプション',
+    return { scope: JSON.stringify([view.source.token, captionId]), label: caption?.title.kind === 'value' ? caption.title.value || '記録' : '記録',
       items: view.attachments.filter(a => a.captionId === captionId).map(a => {
         const media = (view.inspection.review.snapshot.mediaResourcesById as Record<string, JsonObject & { label: string;mediaKind:'image'|'video'|'audio';portableDisplay?:JsonObject }>)[String(a.mediaResourceId)];
         const blob = view.images.get(String(a.mediaResourceId));
@@ -269,9 +269,9 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
     return { root, render: thumbs.render, dispose() { thumbs.dispose(); root.remove(); } };
   };
   const windows = createCaptionWindowControls(document, windowPlan, active => { moving = active; paint(); }, gallery);
-  const selectedMedia = make('section'); selectedMedia.setAttribute('aria-label', '選択中のキャプションのメディア');
+  const selectedMedia = make('section'); selectedMedia.setAttribute('aria-label', '選択中の記録のメディア');
   const selectedText = make('section'), recordTitle = make(switchScene && view.scenes.length > 1 ? 'h2' : 'h3'), recordBody = make('p');
-  selectedText.setAttribute('aria-label', 'キャプションの詳細'); selectedText.tabIndex = -1; selectedText.className = 'lv-caption-value';
+  selectedText.setAttribute('aria-label', '記録の詳細'); selectedText.tabIndex = -1; selectedText.className = 'lv-caption-value';
   const readingContent = make('div'); readingContent.className = 'lv-review-reading-content';
   const updateHeaderHeight = () => root.style.setProperty('--lv-review-header-height', `${header.offsetHeight}px`);
   const HeaderObserver = document.defaultView?.ResizeObserver;

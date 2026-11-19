@@ -18,7 +18,7 @@ const gs = Buffer.from(gsFixture(4, Array.from({ length: 64 }, () => splat)));
 const exact = { exact: true } as const;
 const action = (page: Page, name: string) => page.getByRole('button', { name, ...exact });
 const tab = (page: Page, name: string) => page.getByRole('tab', { name, ...exact });
-const detail = (page: Page) => page.getByRole('region', { name: 'キャプションの詳細', ...exact });
+const detail = (page: Page) => page.getByRole('region', { name: '記録の詳細', ...exact });
 const status = (page: Page, text: string) => expect(page.getByText(text, exact)).toBeVisible();
 
 async function checkPinTouchNavigation(page: Page, pin: Locator, canvasFirst: boolean) {
@@ -124,7 +124,7 @@ for (const touch of [false, true])
         await expect(canvas).toHaveAttribute('aria-busy', 'false');
         await lookAlongFront(page);
         await revealCaptionList(page);
-        await action(page, 'キャプションを追加').click();
+        await action(page, '記録を追加').click();
         const task = page.getByRole('region', { name: '位置の調整', ...exact });
         if (kind === 'GS') {
           const target = task.getByLabel('記録するモデル', exact);
@@ -137,7 +137,7 @@ for (const touch of [false, true])
           await expect(action(page, 'ここに記録を作る')).toBeEnabled();
           await task.getByRole('button', { name: '取り消す', ...exact }).click();
           await expect(page.locator('.lv-caption-select')).toHaveCount(0);
-          await action(page, 'キャプションを追加').click();
+          await action(page, '記録を追加').click();
           await target.selectOption({ label: '外板.ply' });
           const pick = page.waitForEvent('filechooser');
           await action(page, 'ピン配置用モデルを選ぶ').click();
@@ -215,7 +215,7 @@ for (const touch of [false, true])
           await action(page, '3D').click();
           await expect(page.locator('.lv-project-marker[aria-pressed="true"]')).toBeVisible();
           if (kind === '点群') await checkPinTouchNavigation(page, page.locator('.lv-project-marker').first(), false);
-          await tab(page, 'キャプション').click();
+          await tab(page, '記録').click();
         }
 
         await revealFileSurface(page, '共有');
@@ -242,7 +242,7 @@ for (const touch of [false, true])
         await selectRecord(page);
         await detail(page).getByLabel('本文', exact).fill(sharedBody);
         await finishCaptionEditing(page, {}, 15000);
-        await action(page, 'シーン 1').click();
+        await page.getByRole('combobox', { name: 'シーン', exact: true }).selectOption({ label: 'シーン 1' });
         await selectRecord(page);
         await expect(detail(page).getByLabel('本文', exact)).toHaveValue(sharedBody);
         await checkPhoto(page);
@@ -251,7 +251,7 @@ for (const touch of [false, true])
           await finishCaptionEditing(page, {}, 15000);
         }
 
-        await action(page, reviewSceneName).click();
+        await page.getByRole('combobox', { name: 'シーン', exact: true }).selectOption({ label: reviewSceneName });
         await revealCameraPositions(page);
         const projection = page.locator('.lv-project-camera').getByLabel('投影方式', exact);
         await action(page, '開始視点を記録').click();
@@ -313,7 +313,7 @@ for (const touch of [false, true])
         if (touch && kind === '点群') {
           await expect(action(other, '3D表示を再試行')).toBeVisible();
           await other.locator('.lv-caption-select').filter({ hasText: '塗装の確認' }).tap();
-          const reading = other.getByRole('region', { name: 'キャプションの詳細', ...exact });
+          const reading = other.getByRole('region', { name: '記録の詳細', ...exact });
           await expect(reading).toBeFocused();
           await reader.getByRole('button', { name: '3Dに戻る', ...exact }).tap();
           await expect(other.getByLabel('3Dモデルの表示', exact)).toBeFocused();
@@ -429,7 +429,7 @@ for (const touch of [false, true])
           return { tops, stop: () => observer.disconnect() };
         });
         if (touch) {
-          const reading = other.getByRole('region', { name: 'キャプションの詳細', ...exact });
+          const reading = other.getByRole('region', { name: '記録の詳細', ...exact });
           const started = Date.now();
           await other.locator('.lv-caption-select').filter({ hasText: '塗装の確認' }).tap();
           await expect(reading).toBeFocused();
@@ -460,7 +460,7 @@ for (const touch of [false, true])
         await expect(selectedPin).toHaveAccessibleName(sharedTitle);
         await expect.poll(() => selectedPin.evaluate(node => getComputedStyle(node, '::before').boxShadow)).toContain('3px');
         expect((await selectedPin.boundingBox())!.width).toBeGreaterThanOrEqual(44);
-        const photoArea = touch ? other.getByLabel('選択中のキャプションのメディア', exact) : reader.locator('.lv-caption-window[data-active="true"]');
+        const photoArea = touch ? other.getByLabel('選択中の記録のメディア', exact) : reader.locator('.lv-caption-window[data-active="true"]');
         await photoArea.getByRole('button', { name: '画像を表示', ...exact }).click();
         await expect(other.getByRole('dialog', { name: 'メディアビューア', ...exact }).locator('img')).toHaveJSProperty('naturalWidth', 2);
         await other.getByRole('dialog', { name: 'メディアビューア', ...exact }).getByRole('button', { name: '閉じる', ...exact }).click();
@@ -472,7 +472,7 @@ for (const touch of [false, true])
         if (!touch) {
           await photoArea.getByRole('button', { name: '閉じる', ...exact }).click();
           await expect(reader.locator('.lv-caption-select[aria-current="true"]')).toBeInViewport({ ratio: 1 });
-          await expect(reader.getByLabel('選択中のキャプションのメディア', exact).getByRole('button', { name: '画像を表示', ...exact })).toBeVisible();
+          await expect(reader.getByLabel('選択中の記録のメディア', exact).getByRole('button', { name: '画像を表示', ...exact })).toBeVisible();
         }
         const readingContent = reader.locator('.lv-review-reading-content');
         await readingContent.evaluate(node => { node.scrollTop = node.scrollHeight; });
@@ -487,7 +487,7 @@ for (const touch of [false, true])
         // Compact reading releases 3D resources; the pin becomes accessible again on return.
         await expect(selectedPin).toHaveAttribute('aria-label', sharedTitle);
         if (touch) {
-          const reading = other.getByRole('region', { name: 'キャプションの詳細', ...exact });
+          const reading = other.getByRole('region', { name: '記録の詳細', ...exact });
           const photo = reading.getByRole('button', { name: '画像を表示', ...exact });
           const returnTo3D = reader.getByRole('button', { name: '3Dに戻る', ...exact });
           await expect(returnTo3D).toBeInViewport();
@@ -518,7 +518,7 @@ for (const touch of [false, true])
             await action(other, '記録を検索').press('Enter');
             await readerSearch.fill('一致する記録がない検索');
             await expect(readerSearch).toBeFocused();
-            await expect(other.getByText('このシーンに条件に合うキャプションはありません。', exact)).toBeVisible();
+            await expect(other.getByText('このシーンに条件に合う記録はありません。', exact)).toBeVisible();
             await readerSearch.fill('塗装');
             await other.locator('.lv-caption-select').filter({ hasText: '塗装の確認' }).press('Enter');
             await expect(reading).toBeFocused();
@@ -591,7 +591,7 @@ for (const touch of [false, true])
             await single.screenshot({ path: info.outputPath(`single-scene-${viewport.width}.png`) });
           }
           await singleReader.locator('.lv-caption-select').filter({ hasText: '塗装の確認' }).press('Enter');
-          await expect(singleReader.getByRole('region', { name: 'キャプションの詳細', ...exact })).toContainText(sharedBody);
+          await expect(singleReader.getByRole('region', { name: '記録の詳細', ...exact })).toContainText(sharedBody);
         }
       }
       catch (error) {
@@ -613,7 +613,7 @@ test('配置用モデルのないGSに座標で記録し、再開して元の位
   await chooseHomeFiles(page, { name: '外板.ply', mimeType: 'application/octet-stream', buffer: gs });
   await action(page, 'プロジェクトを作成').click();
   await expect(action(page, '閲覧する')).toBeEnabled({ timeout: 90000 });
-  await action(page, 'キャプションを追加').click();
+  await action(page, '記録を追加').click();
   const task = page.getByRole('region', { name: '位置の調整', ...exact });
   await task.getByLabel('記録するモデル', exact).selectOption({ label: '外板.ply' });
   await action(page, '座標を入力').click();

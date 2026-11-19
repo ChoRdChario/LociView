@@ -23,7 +23,7 @@ export function createModelListControls(document: Document, onPlan: (plan: Model
   const recovery = button('状態を確認'), reveal = button('選択したモデルを一覧に表示'), count = make('p');
   // Reveal changes the list only, never a model's membership or temporary visibility.
   reveal.setAttribute('aria-describedby', status.id);
-  const consequence = make('p', 'シーンから外してもモデルとキャプションは残ります。モデルに属する3Dピンは非表示になります。');
+  const consequence = make('p', 'シーンから外してもモデルと記録は残ります。モデルに属する3Dピンは非表示になります。');
   consequence.id = `lv-model-consequence-${++nextModelControl}`; consequence.className = 'lv-model-note';
   const list = make('ul'); list.className = 'lv-model-list'; list.setAttribute('aria-label', 'プロジェクトのモデル一覧'); const empty = make('li');
   const details = make('section'), selectedName = make('h3'), scope = make('p', 'このモデルの配置・差し替えは、使用するすべてのシーンで共通です。');

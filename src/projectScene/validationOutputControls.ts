@@ -283,7 +283,7 @@ export function createValidationOutputControls(document: Document, host: ReturnT
           for (const item of items) { const name = document.createElement('li'); name.textContent = item.label.trim() || '名称未設定'; names.append(name); }
           contents.append(group);
         }
-        const counts = document.createElement('p'); counts.textContent = `${reviewPreview.name} — モデル ${reviewPreview.models}・キャプション ${reviewPreview.captions}・メディア ${reviewPreview.media}`; actions.append(counts);
+        const counts = document.createElement('p'); counts.textContent = `${reviewPreview.name} — モデル ${reviewPreview.models}・記録 ${reviewPreview.captions}・メディア ${reviewPreview.media}`; actions.append(counts);
         if (reviewPreview.missingModelCaptions) { const note = document.createElement('p'); note.textContent = `モデルを含まない記録 ${reviewPreview.missingModelCaptions} 件は一覧だけに表示されます。`; actions.append(note); }
         if (reviewPreview.newlyNeedsReviewCaptions) { const note = document.createElement('p'); note.textContent = `受け手が編集コピーを作ると、${reviewPreview.newlyNeedsReviewCaptions} 件のピンが要確認になります。`; actions.append(note); }
         actions.append(contents);
@@ -296,7 +296,7 @@ export function createValidationOutputControls(document: Document, host: ReturnT
       actions.append(help);
       if (cleanPreview) {
         const counts = document.createElement('p');
-        counts.textContent = cleanConfirmed ? `シーン ${cleanPreview.scenes}・モデル ${cleanPreview.models}・キャプション ${cleanPreview.captions}・メディア ${cleanPreview.media}` : '内容が変わりました。もう一度確認してください。';
+        counts.textContent = cleanConfirmed ? `シーン ${cleanPreview.scenes}・モデル ${cleanPreview.models}・記録 ${cleanPreview.captions}・メディア ${cleanPreview.media}` : '内容が変わりました。もう一度確認してください。';
         actions.append(counts);
       }
       const privacy = document.createElement('p'); privacy.textContent = '記録の文章や名前、モデル・メディアに埋め込まれた情報は残ります。匿名化はしません。'; actions.append(privacy);

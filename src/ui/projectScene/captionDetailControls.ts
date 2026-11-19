@@ -25,7 +25,7 @@ let nextDetail = 0;
 export function createCaptionDetailControls(document: Document, onEvent: (event: CaptionDetailEvent) => void) {
   const make = <K extends keyof HTMLElementTagNameMap>(tag: K, text = '') => { const node = document.createElement(tag); node.textContent = text; return node; };
   const button = (text: string) => { const node = make('button', text); node.type = 'button'; return node; };
-  const root = make('section'); root.className = 'lv-caption-detail'; root.setAttribute('aria-label', 'キャプションの詳細');
+  const root = make('section'); root.className = 'lv-caption-detail'; root.setAttribute('aria-label', '記録の詳細');
   const status = make('p'); status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
   const impact = make('p'); impact.className = 'lv-caption-impact';
   const fields = new Map<CaptionEditField, { input: HTMLInputElement | HTMLTextAreaElement; note: HTMLParagraphElement;
@@ -187,7 +187,7 @@ export function createCaptionDetailControls(document: Document, onEvent: (event:
       inFlight && '変更を適用中です。', unapplied && !inFlight && (applyIssue === null && next.feedback.kind !== 'failed' && !next.textOnly
         ? applyHint : '未適用の入力があります。'),
       emptyRecord && !unapplied && !inFlight && next.feedback.kind === 'idle' && !next.mutationBlock && !next.textOnly && 'タイトル・本文や写真を追加できます。',
-      !inFlight && !next.textOnly && next.mutationBlock !== '閲覧中です。編集を開始してください。' && next.mutationBlock, source.kind !== 'ready' && (source.reason || 'キャプションを選択してください。'),
+      !inFlight && !next.textOnly && next.mutationBlock !== '閲覧中です。編集を開始してください。' && next.mutationBlock, source.kind !== 'ready' && (source.reason || '記録を選択してください。'),
       (hasCaptionDraft(owned) || next.mediaDraft) && applyIssue && !inFlight && applyIssue].filter(Boolean))].join(' ');
     if (next.autosave) {
       nextStatusText = source.kind !== 'ready' ? source.reason : next.autosave.saving ? '保存中…' :

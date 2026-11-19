@@ -24,7 +24,7 @@ test('delayed explanations stay readable and preserve a Caption draft through to
     await revealCoordinateAdd(p); const owner = p.getByLabel('追加先モデル', { exact: true }); await owner.focus(); await owner.selectOption({ label: '説明の確認.glb' }); await p.getByRole('button', { name: 'このモデルに追加', exact: true }).click();
     for (const axis of ['X', 'Y', 'Z']) await p.getByLabel('位置 ' + axis, { exact: true }).fill(axis === 'Y' ? '.5' : '0');
     await p.getByRole('button', { name: 'ここに記録を作る', exact: true }).click(); await expect(p.getByText('ピンの位置を確定しました。', { exact: true })).toBeVisible();
-    const title = p.getByRole('region', { name: 'キャプションの詳細', exact: true }).getByLabel('タイトル', { exact: true }); await title.fill('説明を開いても入力を保持');
+    const title = p.getByRole('region', { name: '記録の詳細', exact: true }).getByLabel('タイトル', { exact: true }); await title.fill('説明を開いても入力を保持');
     const help = p.getByLabel('記録の編集操作', { exact: true }).getByRole('button', { name: '説明', exact: true });
     const tooltip = p.getByRole('tooltip'); await help.hover(); await p.waitForTimeout(700); await expect(tooltip).toHaveCount(0);
     await expect(tooltip).toBeVisible({ timeout: 4_000 }); await expect(tooltip).toContainText('別の更新がある場合は戻せません。');
@@ -53,7 +53,7 @@ test('delayed explanations stay readable and preserve a Caption draft through to
     const bounds = await tooltip.boundingBox(); expect(bounds!.x).toBeGreaterThanOrEqual(0); expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(320); expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(740);
     await p.screenshot({ path: info.outputPath('narrow-context-help.png'), fullPage: true }); await p.keyboard.press('Escape'); await expect(title).toHaveValue('説明を開いても入力を保持');
     await finishCaptionEditing(p, { title: '説明を開いても入力を保持' });
-    await p.setViewportSize({width:720,height:500});await revealWorkPanel(p);const detail=p.getByRole('region',{name:'キャプションの詳細',exact:true}),cancel=detail.getByRole('button',{name:'取り消す',exact:true});
+    await p.setViewportSize({width:720,height:500});await revealWorkPanel(p);const detail=p.getByRole('region',{name:'記録の詳細',exact:true}),cancel=detail.getByRole('button',{name:'取り消す',exact:true});
     // A retained validation issue has a real recovery action; routine Apply no longer exists.
     await detail.getByLabel('本文',{exact:true}).fill('説明の下でも取り消せる入力\u2028');
     const largeText=await p.addStyleTag({content:'.lv-context-help-note {font-size:24px!important;line-height:1.6!important}'});await help.focus();await help.press('Enter');await expect(tooltip).toBeVisible();

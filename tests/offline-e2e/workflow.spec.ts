@@ -14,7 +14,7 @@ import {validationMetadataLimits as limits} from '../../src/projectFiles/validat
 
 const builds=()=>process.env.LOCIVIEW_OFFLINE_BUILDS!;
 const offline=(p:Page)=>p.getByRole('region',{name:'オフライン利用',exact:true});
-const detail=(p:Page)=>p.getByRole('region',{name:'キャプションの詳細',exact:true});
+const detail=(p:Page)=>p.getByRole('region',{name:'記録の詳細',exact:true});
 async function selected(p:Page,title:string){await expect(p.getByRole('heading',{name:'プロジェクト名',exact:true})).toHaveText(title,{timeout:180_000});await expect(p.getByLabel('3Dモデルの表示',{exact:true})).toHaveAttribute('aria-busy','false',{timeout:180_000});await expect(p.locator('.lv-project-viewport-status')).toBeEmpty({timeout:180_000});}
 async function selectedWithStage(p:Page,title:string){
   await expect(p.getByRole('heading',{name:'プロジェクト名',exact:true})).toHaveText(title,{timeout:180_000});
@@ -65,7 +65,7 @@ test('static data survives prepared cold offline Mesh/Point/500k SH4/Proxy/media
     const source=await largeGsFixture();await expect(p.getByLabel('ファイルを選択',{exact:true})).toBeEnabled();await chooseHomeFiles(p, [mesh,point,source]);await p.getByLabel('プロジェクト名',{exact:true}).fill('オフライン現地作業');await p.getByRole('button',{name:'プロジェクトを作成',exact:true}).click();await selected(p,'オフライン現地作業');mark('static: mixed500k Project created');
     await p.getByRole('tab',{name:'モデル',exact:true}).click();const models=p.getByRole('tabpanel',{name:'モデル',exact:true});await models.locator('.lv-model-select').filter({hasText:'500k'}).click();
     const chooser=p.waitForEvent('filechooser');await models.getByRole('button',{name:'ピン配置用モデルを追加',exact:true}).click();await(await chooser).setFiles(mesh);await models.getByRole('button',{name:'ピン配置用モデルを設定',exact:true}).click();await ready(p,'ピン配置用モデルを登録しました。');
-    await p.getByRole('tab',{name:'キャプション',exact:true}).click();await revealCoordinateAdd(p);await p.getByLabel('追加先モデル',{exact:true}).focus();await p.getByLabel('追加先モデル',{exact:true}).selectOption({label:'基準.glb'});await p.getByRole('button',{name:'このモデルに追加',exact:true}).click();for(const[axis,value]of [['X','0'],['Y','.5'],['Z','0']])await p.getByLabel(`位置 ${axis}`,{exact:true}).fill(value!);await p.getByRole('button',{name:'ここに記録を作る',exact:true}).click();await ready(p,'ピンの位置を確定しました。');
+    await p.getByRole('tab',{name:'記録',exact:true}).click();await revealCoordinateAdd(p);await p.getByLabel('追加先モデル',{exact:true}).focus();await p.getByLabel('追加先モデル',{exact:true}).selectOption({label:'基準.glb'});await p.getByRole('button',{name:'このモデルに追加',exact:true}).click();for(const[axis,value]of [['X','0'],['Y','.5'],['Z','0']])await p.getByLabel(`位置 ${axis}`,{exact:true}).fill(value!);await p.getByRole('button',{name:'ここに記録を作る',exact:true}).click();await ready(p,'ピンの位置を確定しました。');
     await p.getByLabel('タイトル',{exact:true}).fill('現地の記録');await p.getByLabel('本文',{exact:true}).fill('通信前の本文');await finishCaptionEditing(p, {}, 180_000);const media=p.waitForEvent('filechooser');await p.getByLabel('メディアを追加',{exact:true}).click();await(await media).setFiles(photo);await finishCaptionEditing(p, {}, 180_000);
     const before=await changes(await output(p,info,'static-before'));await close();server.setRoot(resolve(builds(),'a'));
     const preparedRecipient=await launch(firstRecipient,server.url,false,errors,true);recipientContext=preparedRecipient.context;
@@ -93,7 +93,7 @@ test('static data survives prepared cold offline Mesh/Point/500k SH4/Proxy/media
     });
     let receiver=recipient.page;expect((await receiver.goto(server.url+'?timings=1'))?.fromServiceWorker()).toBe(true);await receiver.setViewportSize({width:390,height:844});
     await file(receiver,firstFile);await receiver.getByRole('button',{name:'このファイルから再開',exact:true}).click();
-    const reading=receiver.getByRole('region',{name:'復元中のキャプション',exact:true});await expect(reading).toBeVisible();
+    const reading=receiver.getByRole('region',{name:'復元中の記録',exact:true});await expect(reading).toBeVisible();
     await expect.poll(()=>receiver.evaluate(()=>(window as any).firstRestoreGate.held)).toBeGreaterThan(0);
     await expect(receiver.locator('main.lv-project-workspace')).toHaveCount(0);await expect(reading.locator('textarea,input[type=file],canvas,img')).toHaveCount(0);
     await reading.getByRole('searchbox',{name:'検索',exact:true}).fill('既存');await reading.getByRole('button',{name:'既存のピン',exact:true}).click();

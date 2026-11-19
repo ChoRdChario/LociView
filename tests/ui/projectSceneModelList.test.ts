@@ -178,7 +178,7 @@ describe('disconnected Project model inventory (pure/DOM contracts, not browser 
     expect(check.indeterminate).toBe(true); expect(check.disabled).toBe(true); expect(check.checked).toBe(false);
     row.children[3]!.fire('click'); expect(h.plans.at(-1)).toMatchObject({ kind: 'review', assetId: a });
     expect(h.list.children[1]!.children[2]!.textContent).toContain('一時的に非表示');
-    expect(h.root.children[6]!.textContent).toContain('モデルとキャプションは残ります'); h.controls.dispose();
+    expect(h.root.children[6]!.textContent).toContain('モデルと記録は残ります'); h.controls.dispose();
   });
 
   it('keeps failures bound to the submitted model after selection/filter changes and renders untrusted text literally', () => {

@@ -22,11 +22,11 @@ async function projectReady(page: Page) {
 async function selectCaption(page: Page) {
   await revealCaptionList(page);
   await projectReady(page);
-  await page.getByRole('list', { name: 'キャプション一覧', exact: true })
+  await page.getByRole('list', { name: '記録一覧', exact: true })
     .locator('.lv-caption-select').filter({ hasText: captionName }).click();
 }
 async function checkCaption(page: Page, expectedBody = body) {
-  const detail = page.getByRole('region', { name: 'キャプションの詳細', exact: true });
+  const detail = page.getByRole('region', { name: '記録の詳細', exact: true });
   await expect(detail.getByLabel('タイトル', { exact: true })).toHaveValue(captionName);
   await expect(detail.getByLabel('本文', { exact: true })).toHaveValue(expectedBody);
   const image = page.getByRole('region', { name: 'メディアの整理', exact: true }).locator('img').first();
@@ -176,7 +176,7 @@ test('GLBと画像の編集を保存し、ブラウザ再起動と別端末相�
     for (const [axis, value] of [['X', '0.2'], ['Y', '0.2'], ['Z', '0']] as const) await page.getByLabel(`位置 ${axis}`, { exact: true }).fill(value);
     await page.getByRole('button', { name: 'ここに記録を作る', exact: true }).click();
     await expect(page.getByText('ピンの位置を確定しました。', { exact: true })).toBeVisible();
-    const detail = page.getByRole('region', { name: 'キャプションの詳細', exact: true });
+    const detail = page.getByRole('region', { name: '記録の詳細', exact: true });
     await detail.getByLabel('タイトル', { exact: true }).fill(captionName);
     await detail.getByLabel('本文', { exact: true }).fill(body);
     await detail.getByRole('button', { name: '変更を適用', exact: true }).click();
@@ -184,7 +184,7 @@ test('GLBと画像の編集を保存し、ブラウザ再起動と別端末相�
     const choosing = page.waitForEvent('filechooser');
     await page.getByLabel('メディアを追加', { exact: true }).click();
     await (await choosing).setFiles({ name: 'evidence.png', mimeType: 'image/png', buffer: png });
-    await page.getByRole('region',{name:'キャプションの詳細',exact:true}).getByRole('button',{name:'変更を適用',exact:true}).click(); await expect(page.getByText('メディアを追加しました。', { exact: true })).toBeVisible();
+    await page.getByRole('region',{name:'記録の詳細',exact:true}).getByRole('button',{name:'変更を適用',exact:true}).click(); await expect(page.getByText('メディアを追加しました。', { exact: true })).toBeVisible();
     await checkCaption(page);
     await measure('切り抜きの描画とピン配置の一致', async () => {
       await page.getByRole('tab', { name: '描画', exact: true }).click();
@@ -210,10 +210,10 @@ test('GLBと画像の編集を保存し、ブラウザ再起動と別端末相�
       await expect(page.getByText('材質の設定を適用しました。', { exact: true })).toBeVisible();
       const pinArea = page.getByRole('region', { name: '位置の調整', exact: true }), canvas = page.getByLabel('3Dモデルの表示', { exact: true });
       const pick = async () => {
-        await page.getByRole('tab', { name: 'キャプション', exact: true }).click();
+        await page.getByRole('tab', { name: '記録', exact: true }).click();
         await lookAlongFront(page);
         await page.getByRole('button', { name: '全体表示', exact: true }).click();
-        await page.getByRole('button', { name: 'キャプションを追加', exact: true }).click();
+        await page.getByRole('button', { name: '記録を追加', exact: true }).click();
         const box = await canvas.boundingBox(); expect(box).toBeTruthy();
         await canvas.click({ position: { x: box!.width / 2, y: box!.height / 2 } });
       };
@@ -257,7 +257,7 @@ test('GLBと画像の編集を保存し、ブラウザ再起動と別端末相�
     });
     await selectCaption(page); await checkCaption(page);
     const continued = `${body}\n復元後も編集を続けました。`;
-    const restoredDetail = page.getByRole('region', { name: 'キャプションの詳細', exact: true });
+    const restoredDetail = page.getByRole('region', { name: '記録の詳細', exact: true });
     await restoredDetail.getByLabel('本文', { exact: true }).fill(continued);
     await measure('復元後の本文適用', async () => {
       await restoredDetail.getByRole('button', { name: '変更を適用', exact: true }).click();

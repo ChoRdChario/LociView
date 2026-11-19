@@ -33,9 +33,9 @@ test('short Caption workspace keeps dense and filtered lists, Scene choices and 
     for (const n of [3, 4]) snapshot.displaySets.push({ id: `set_${String(n).padStart(26, '0')}`, name: `追加${n}：長い日本語のシーンを選択して確認する`, orderKey: `B${n}`, defaultSavedViewId: null });
     for (const n of [2, 3, 4]) snapshot.captions[n].title = `絞込三件 ${n}：現地の長い記録名`;
   } });
-  const scenes = p.getByRole('region', { name: 'シーン', exact: true }), strip = scenes.locator(':scope > div');
-  const task = p.locator('.lv-caption-task'), list = p.getByRole('list', { name: 'キャプション一覧', exact: true });
-  const detail = p.getByRole('region', { name: 'キャプションの詳細', exact: true }), search = p.locator('.lv-caption-search').getByRole('searchbox', { name: '検索', exact: true });
+  const scenes = p.getByRole('region', { name: 'シーン', exact: true }), sceneChoice = scenes.getByRole('combobox', { name: 'シーン', exact: true });
+  const task = p.locator('.lv-caption-task'), list = p.getByRole('list', { name: '記録一覧', exact: true });
+  const detail = p.getByRole('region', { name: '記録の詳細', exact: true }), search = p.locator('.lv-caption-search').getByRole('searchbox', { name: '検索', exact: true });
   const split = () => Promise.all([task.locator(':scope > .lv-caption-browser').boundingBox(), task.locator(':scope > .lv-caption-reading').boundingBox()]);
   const layout = async (name: string, dense = false) => {
     const data = await task.evaluate(root => {
@@ -53,9 +53,11 @@ test('short Caption workspace keeps dense and filtered lists, Scene choices and 
     await p.getByRole('button', { name: '新しいプロジェクトに変換', exact: true }).click();
     await expect(p.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText('小さな画面の記録', { timeout: 90_000 });
     await expect(p.getByLabel('3Dモデルの表示', { exact: true })).toHaveAttribute('aria-busy', 'false');
-    await expect(strip.locator('button')).toHaveCount(4); await list.locator('.lv-caption-select').filter({ hasText: '既存のピン' }).click();
-    const selected = strip.locator('button[aria-pressed="true"]');
-    await expect.poll(() => selected.evaluate(node => { const r = node.getBoundingClientRect(), parent = node.parentElement!.getBoundingClientRect(); return r.left >= parent.left - 1 && r.left < parent.right - 44; })).toBe(true);
+    await expect(sceneChoice.locator('option')).toHaveCount(4);
+    await list.locator('.lv-caption-select').nth(18).click();
+    await expect(list.locator('.lv-caption-select[aria-current="true"]')).toBeInViewport({ ratio: 1 });
+    await list.locator('.lv-caption-select').filter({ hasText: '既存のピン' }).click();
+    await expect(sceneChoice.locator('option:checked')).toHaveText('観察する部品と写真を切り替える長いシーン');
     await layout('dense-short', true); await p.screenshot({ path: info.outputPath('dense-short.png') });
     const header = p.locator('main.lv-project-workspace > header');
     await header.getByRole('button', { name: '閲覧する', exact: true }).click(); await expect(header.getByRole('button', { name: '編集する', exact: true })).toBeEnabled();
@@ -67,12 +69,22 @@ test('short Caption workspace keeps dense and filtered lists, Scene choices and 
     for (const name of ['前の記録', '次の記録']) expect((await detail.getByRole('button', { name, exact: true }).boundingBox())!.width).toBeGreaterThanOrEqual(44);
     await p.screenshot({ path: info.outputPath('reading-200percent.png') });
     await p.setViewportSize({ width: 1280, height: 720 }); await header.getByRole('button', { name: '編集する', exact: true }).click(); await expect(header.getByRole('button', { name: '閲覧する', exact: true })).toBeEnabled();
+    const colors = p.locator('.lv-caption-color-menu'); await colors.locator(':scope > summary').click();
+    expect(await colors.locator('button').evaluateAll(nodes => nodes.every(node => {
+      const rect = node.getBoundingClientRect(), hit = document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2);
+      return rect.width >= 44 && rect.height >= 44 && (hit === node || node.contains(hit));
+    }))).toBe(true);
+    await colors.getByRole('button', { name: '全色', exact: true }).click();
+    await colors.locator(':scope > summary').click();
     const beforeFocus = await split(); await search.focus(); expect(await split()).toEqual(beforeFocus); await expect(task).toHaveAttribute('data-editing', 'false');
+    const sceneBefore = await sceneChoice.inputValue(), savedState = header.getByLabel('再開データの状態', { exact: true });
+    await search.dispatchEvent('compositionstart', { data: '記録' });
+    await expect(task).toHaveAttribute('data-editing', 'false'); expect(await split()).toEqual(beforeFocus);
+    await expect(savedState).toHaveText('保存済み'); await expect(search).toBeFocused();
+    await search.dispatchEvent('compositionend', { data: '記録' });
     await list.hover(); await p.mouse.wheel(0, 500); await expect.poll(() => list.evaluate(node => node.scrollTop)).toBeGreaterThan(0);
     const manualTop = await list.evaluate(node => node.scrollTop); await search.focus(); expect(await list.evaluate(node => node.scrollTop)).toBe(manualTop);
-    const stripMotion = strip.evaluate(node => new Promise<number>(resolve => node.addEventListener('scrollend', () => resolve(node.scrollLeft), { once: true })));
-    await strip.hover(); await p.mouse.wheel(180, 0); const manualSceneLeft = await stripMotion; expect(manualSceneLeft).toBeGreaterThan(0);
-    await search.fill('絞込三件'); expect(await strip.evaluate(node => node.scrollLeft)).toBe(manualSceneLeft);
+    await search.fill('絞込三件'); await expect(sceneChoice).toHaveValue(sceneBefore);
     for (const [query, count] of [['絞込三件', 3], ['既存のピン', 1], ['該当しない長い日本語の検索文字列', 0]] as const) {
       await search.fill(query); await expect(list.locator('.lv-caption-select')).toHaveCount(count); await layout(`filtered-${count}`);
       await expect(detail.getByLabel('本文', { exact: true })).toHaveValue('本文を保持');
@@ -86,18 +98,33 @@ test('short Caption workspace keeps dense and filtered lists, Scene choices and 
     await expect(body).toBeFocused(); await expect(body).toHaveValue(retainedBody); await body.dispatchEvent('compositionend', { data: '入力中' });
     for (const size of [{ width: 1280, height: 600 }, { width: 720, height: 500 }]) {
       await p.setViewportSize(size); await revealWorkPanel(p); await layout(`edit-${size.width}`);
+      if (size.width === 1280) {
+        await p.screenshot({ path: info.outputPath('short-edit-layout.png') });
+        await info.attach('short-edit-controls', { body: JSON.stringify(await task.evaluate(node => [...node.querySelectorAll('.lv-caption-browser,.lv-caption-toolbar,.lv-caption-search,.lv-caption-list,.lv-caption-select,.lv-caption-list-tools')].map(element => ({name: element.className, rect: element.getBoundingClientRect().toJSON(), client: element.clientHeight, scroll: element.scrollTop})))), contentType: 'application/json' });
+        const visibleBody = await body.evaluate(node => {
+          const input = node.getBoundingClientRect(), content = node.closest('.lv-caption-content')!.getBoundingClientRect();
+          return Math.min(input.bottom, content.bottom) - Math.max(input.top, content.top);
+        });
+        expect(visibleBody).toBeGreaterThanOrEqual(96);
+        await expect(list.locator('.lv-caption-select')).toBeInViewport({ ratio: 1 });
+      }
       await expect(detail.getByRole('button', { name: '変更を適用', exact: true })).toBeHidden();
       await expect(detail.locator('[data-caption-completion]').getByRole('button', { name: '取り消す', exact: true })).toBeInViewport({ ratio: 1 });
       expect(await detail.locator('[data-caption-completion] > button:not([hidden])').evaluateAll(nodes => nodes.length > 0 && nodes.every(node => { const r = node.getBoundingClientRect(), hit = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2); return r.width >= 44 && r.height >= 44 && (hit === node || node.contains(hit)); }))).toBe(true);
     }
     await detail.getByRole('button', { name: '取り消す', exact: true }).click(); await detail.getByRole('button', { name: '変更を取り消す', exact: true }).click(); await expect(body).toHaveValue('本文を保持');
+    await p.setViewportSize({ width: 1280, height: 480 });
+    const positionAction = p.getByRole('button', { name: '位置を調整', exact: true });
+    await positionAction.scrollIntoViewIfNeeded(); await expect(positionAction).toBeInViewport({ ratio: 1 });
+    await expect(sceneChoice).toBeInViewport({ ratio: 1 });
+    await layout('wide-short-controls'); await p.screenshot({ path: info.outputPath('wide-short-controls.png') });
     await p.setViewportSize({ width: 1280, height: 720 }); await search.fill(''); await layout('return-dense', true);
-    const otherName = await strip.locator('button[aria-pressed="false"]').first().innerText(), other = strip.getByRole('button', { name: otherName, exact: true });
-    await other.focus(); await p.keyboard.press('Enter'); await expect(other).toHaveAttribute('aria-pressed', 'true');
+    await sceneChoice.focus(); await p.keyboard.press('ArrowDown'); await p.keyboard.press('Enter');
+    await expect(sceneChoice).not.toHaveValue(sceneBefore); await expect(sceneChoice).toBeFocused();
     await p.setViewportSize({ width: 720, height: 500 }); await revealWorkPanel(p); await expect(task).toHaveAttribute('data-selected', 'false');
-    await expect(search).toBeInViewport({ ratio: 1 }); await expect(p.getByRole('button', { name: 'キャプションを追加', exact: true })).toBeInViewport({ ratio: 1 });
+    await expect(search).toBeInViewport({ ratio: 1 }); await expect(p.getByRole('button', { name: '記録を追加', exact: true })).toBeInViewport({ ratio: 1 });
     await p.setViewportSize({ width: 1280, height: 720 });
-    await strip.getByRole('button', { name: '観察する部品と写真を切り替える長いシーン', exact: true }).focus(); await p.keyboard.press('Enter');
+    await sceneChoice.selectOption({ label: '観察する部品と写真を切り替える長いシーン' });
     await expect(list.locator('.lv-caption-select').filter({ hasText: '既存のピン' })).toBeVisible();
     await scenes.getByText('シーンを管理', { exact: true }).click(); await expect(scenes.getByRole('button', { name: 'シーンを作る', exact: true })).toBeInViewport();
     await scenes.getByText('シーンを管理', { exact: true }).click(); await p.screenshot({ path: info.outputPath('returned-short.png') });
@@ -112,7 +139,7 @@ test('view mode hides editing while preserving reading, local display, existing 
   const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, serviceWorkers: 'block', acceptDownloads: true });
   await context.route('**/*', route => { const u = new URL(route.request().url()); if (u.origin === new URL(server.url).origin || ['blob:', 'data:'].includes(u.protocol)) return route.continue(); remote.push(u.href); return route.abort(); });
   const p = await context.newPage(); p.setDefaultTimeout(15_000); p.on('pageerror', e => errors.push(e.message));
-  const detail = p.getByRole('region', { name: 'キャプションの詳細', exact: true });
+  const detail = p.getByRole('region', { name: '記録の詳細', exact: true });
   const tab = (name: string) => p.getByRole('tab', { name, exact: true });
   const ready = async (text: string) => { await expect(p.getByText(text, { exact: true })).toBeVisible(); await expect(p.locator('main.lv-project-workspace > header > p.lv-operation-status')).toHaveAttribute('data-busy', 'false'); };
   const menu = p.locator('details.lv-project-files'), files = p.getByRole('region', { name: 'ファイル', exact: true });
@@ -178,7 +205,7 @@ test('view mode hides editing while preserving reading, local display, existing 
     const pick = p.waitForEvent('filechooser'); await p.getByLabel('メディアを追加', { exact: true }).click(); await (await pick).setFiles({ name: '現地.png', mimeType: 'image/png', buffer: smallPng() }); await finishCaptionEditing(p, {}, 15000);
     await revealCameraPositions(p); const author = p.getByRole('region', { name: '視点の作成と管理', exact: true });
     await p.getByRole('button',{name:'開始視点を記録',exact:true}).click();await ready('開始視点を記録しました。');
-    await revealWorkPanel(p); await tab('キャプション').click(); await save('before-view');
+    await revealWorkPanel(p); await tab('記録').click(); await save('before-view');
     const help=p.locator('details[aria-label="ヘルプ"]'),settings=p.locator('details[aria-label="設定"]');
     await menu.locator(':scope > summary').click();await help.locator(':scope > summary').click();await expect(menu).not.toHaveAttribute('open');
     await settings.locator(':scope > summary').click();await expect(help).not.toHaveAttribute('open');
@@ -187,7 +214,7 @@ test('view mode hides editing while preserving reading, local display, existing 
     await expect(settings).toBeFocused();await expect(tab('モデル')).toHaveAttribute('aria-selected','true');
     await expect(settings.getByLabel('このブラウザの表示名',{exact:true})).toHaveValue('保持する入力');
     await settings.getByRole('button',{name:'表示名の入力を取り消す',exact:true}).click();await settings.locator(':scope > summary').click();
-    await revealWorkPanel(p); await tab('キャプション').click();
+    await revealWorkPanel(p); await tab('記録').click();
     for(const intent of ['受信','復元'] as const){
       await revealFileSurface(p,intent);
       await expect(menu.getByRole('region',{name:'ファイル',exact:true})).toBeHidden();
@@ -198,8 +225,8 @@ test('view mode hides editing while preserving reading, local display, existing 
     await expect(detail.getByRole('textbox')).toHaveCount(0); await expect(detail.getByRole('button', { name: '変更を適用', exact: true })).toHaveCount(0);
     await expect(detail.locator('[data-caption-field="title"] p')).toHaveText('現地の写真'); await expect(detail.locator('[data-caption-field="body"] p')).toHaveText('確認する本文\n二行目');
     await expect(p.getByLabel('メディアを追加', { exact: true })).toBeHidden(); await expect(p.getByRole('region', { name: 'ピンの操作', exact: true })).toHaveCount(0);
-    await expect(p.getByRole('region',{name:'キャプション',exact:true})).toBeVisible();
-    const captions = p.getByRole('region', { name: 'キャプション', exact: true }); await captions.locator('.lv-caption-search').getByLabel('検索', { exact: true }).fill('現地'); await expect(p.locator('.lv-caption-select')).toHaveCount(1);
+    await expect(p.getByRole('region',{name:'記録',exact:true})).toBeVisible();
+    const captions = p.getByRole('region', { name: '記録', exact: true }); await captions.locator('.lv-caption-search').getByLabel('検索', { exact: true }).fill('現地'); await expect(p.locator('.lv-caption-select')).toHaveCount(1);
     await p.locator('.lv-caption-select').click(); await expect(detail).toBeVisible();
     await expect(p.getByRole('button', { name: '窓を残す', exact: true })).toHaveCount(0); await expect(p.locator('.lv-caption-window')).toBeVisible();
     await expect(p.locator('.lv-caption-window img').first()).toBeVisible();
@@ -222,16 +249,16 @@ test('view mode hides editing while preserving reading, local display, existing 
     await info.attach('view-files', { body: await menu.innerText(), contentType: 'text/plain' });
     await expect(p.getByRole('button', { name: '更新を受け取る', exact: true })).toHaveCount(0);
     await files.getByText('作成したファイル', { exact: true }).click(); const [existing] = await Promise.all([p.waitForEvent('download'), files.getByRole('button', { name: 'ダウンロード', exact: true }).click()]); expect(await existing.failure()).toBeNull(); await menu.locator(':scope > summary').click();
-    await revealWorkPanel(p); await tab('キャプション').click(); await p.setViewportSize({ width: 390, height: 844 }); await p.screenshot({ path: info.outputPath('view-narrow.png'), fullPage: false });
+    await revealWorkPanel(p); await tab('記録').click(); await p.setViewportSize({ width: 390, height: 844 }); await p.screenshot({ path: info.outputPath('view-narrow.png'), fullPage: false });
     await p.getByRole('button',{name:'3D',exact:true}).click(); await expect(p.getByLabel('3Dモデルの表示',{exact:true})).toBeVisible();if(await p.locator('.lv-camera-sheet-header').getByRole('button',{name:'閉じる',exact:true}).isVisible())await p.locator('.lv-camera-sheet-header').getByRole('button',{name:'閉じる',exact:true}).click();
     const compass=p.locator('.lv-project-camera');await compass.getByRole('button',{name:'Y',exact:true}).press('Enter');await expect(compass.getByRole('button',{name:'Y',exact:true})).toHaveAttribute('aria-pressed','true');await p.getByRole('button',{name:'3D',exact:true}).focus();
     await expect(p.getByRole('tooltip')).toBeHidden();
     await expect(p.locator('.lv-caption-window').getByRole('button',{name:'閉じる',exact:true})).toBeInViewport();
     await p.screenshot({path:info.outputPath('narrow-stage.png'),fullPage:false});
     await p.locator('.lv-caption-window').getByRole('button',{name:'閉じる',exact:true}).click();await expect(p.locator('.lv-caption-window')).toHaveCount(0);
-    await p.getByRole('tab',{name:'キャプション',exact:true}).click();await expect(detail).toBeVisible();await revealCaptionList(p);await p.locator('.lv-caption-select').click();await p.setViewportSize({ width: 1440, height: 1000 });
+    await p.getByRole('tab',{name:'記録',exact:true}).click();await expect(detail).toBeVisible();await revealCaptionList(p);await p.locator('.lv-caption-select').click();await p.setViewportSize({ width: 1440, height: 1000 });
     await p.getByRole('button', { name: '編集する', exact: true }).click(); await expect(p.getByRole('button', { name: '閲覧する', exact: true })).toBeEnabled();
-    await expect(p.getByRole('list',{name:'キャプション一覧',exact:true})).toBeVisible();await expect(captions.locator('.lv-caption-search').getByLabel('検索', { exact: true })).toHaveValue('現地');await p.locator('.lv-caption-select').click(); await expect(detail.getByLabel('本文', { exact: true })).toHaveValue('確認する本文\n二行目');
+    await expect(p.getByRole('list',{name:'記録一覧',exact:true})).toBeVisible();await expect(captions.locator('.lv-caption-search').getByLabel('検索', { exact: true })).toHaveValue('現地');await p.locator('.lv-caption-select').click(); await expect(detail.getByLabel('本文', { exact: true })).toHaveValue('確認する本文\n二行目');
     const retainedBody = '閲覧から戻って編集\u2028';
     await detail.getByLabel('本文', { exact: true }).fill(retainedBody);
     await p.getByRole('button', { name: '閲覧する', exact: true }).click();
@@ -241,7 +268,7 @@ test('view mode hides editing while preserving reading, local display, existing 
     await expect(z).toBeDisabled();
     await expect(tab('モデル')).toBeDisabled();await expect(p.locator('.lv-compact-navigation button').first()).toBeDisabled();
     await detail.getByLabel('本文',{exact:true}).dispatchEvent('compositionend',{data:'編集中'});
-    await revealWorkPanel(p); await tab('モデル').click(); await expect(p.getByText('キャプションに未適用の変更があります。',{exact:true})).toBeVisible();
+    await revealWorkPanel(p); await tab('モデル').click(); await expect(p.getByText('記録に未適用の変更があります。',{exact:true})).toBeVisible();
     await p.getByRole('button',{name:'編集に戻る',exact:true}).click(); await expect(detail.getByLabel('本文',{exact:true})).toHaveValue(retainedBody);
     await expect(detail.getByRole('heading',{name:'現地の写真',exact:true})).toBeFocused();
     await p.setViewportSize({width:1280,height:600});
@@ -254,7 +281,7 @@ test('view mode hides editing while preserving reading, local display, existing 
     const completionHits=await detail.locator('[data-caption-completion] > button:not([hidden])').evaluateAll(nodes=>nodes.map(n=>{const r=n.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return{text:n.textContent,width:r.width,height:r.height,hit:hit===n||!!hit&&n.contains(hit)};}));
     await info.attach('short-edit-completion-hits',{body:JSON.stringify(completionHits),contentType:'application/json'});expect(completionHits.every(n=>n.hit&&n.width>=44&&n.height>=44)).toBe(true);
     await p.screenshot({path:info.outputPath('edit-short.png'),fullPage:false});await p.setViewportSize({width:1440,height:1000});
-    await expect(p.getByRole('list',{name:'キャプション一覧',exact:true})).toBeVisible(); await expect(captions.locator('.lv-caption-search').getByLabel('検索',{exact:true})).toHaveValue('現地');
+    await expect(p.getByRole('list',{name:'記録一覧',exact:true})).toBeVisible(); await expect(captions.locator('.lv-caption-search').getByLabel('検索',{exact:true})).toHaveValue('現地');
     await expect(detail.getByLabel('本文',{exact:true})).toHaveValue(retainedBody);
     await detail.getByRole('button',{name:'取り消す',exact:true}).click();await detail.getByRole('button',{name:'変更を取り消す',exact:true}).click();
     await detail.getByLabel('本文',{exact:true}).fill('閲覧から戻って編集');
@@ -305,7 +332,7 @@ test('one PC app keeps the same Project through connected, cold offline and prep
     await expect(p.getByRole('button', { name: '閲覧する', exact: true })).toBeEnabled();
     await revealCoordinateAdd(p); const owner = p.getByLabel('追加先モデル', { exact: true }); await owner.focus(); await owner.selectOption({ label: '再開するモデル.glb' }); await p.getByRole('button', { name: 'このモデルに追加', exact: true }).click();
     const pin = p.getByRole('region', { name: '位置の調整', exact: true }); for (const axis of ['X', 'Y', 'Z']) await pin.getByLabel('位置 ' + axis, { exact: true }).fill(axis === 'Y' ? '.5' : '0'); await pin.getByRole('button', { name: 'ここに記録を作る', exact: true }).click();
-    const detail = () => p.getByRole('region', { name: 'キャプションの詳細', exact: true });
+    const detail = () => p.getByRole('region', { name: '記録の詳細', exact: true });
     await detail().getByLabel('タイトル', { exact: true }).fill('同じ記録'); await detail().getByLabel('本文', { exact: true }).fill('接続中に記録した本文'); await finishCaptionEditing(p, {});
     const chooser = p.waitForEvent('filechooser'); await p.getByLabel('メディアを追加', { exact: true }).click(); await (await chooser).setFiles({ name: '現場.png', mimeType: 'image/png', buffer: smallPng() }); await finishCaptionEditing(p, {});
     const save = async (name: string) => {

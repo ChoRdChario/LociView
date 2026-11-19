@@ -18,10 +18,10 @@ import {validationMetadataLimits as limits} from '../../src/projectFiles/validat
 
 const title='元の材質を編集',entry=desktopEntry+'?timings=1';
 const materials=(p:Page)=>p.getByRole('region',{name:'材質',exact:true});
-const detail=(p:Page)=>p.getByRole('region',{name:'キャプションの詳細',exact:true});
+const detail=(p:Page)=>p.getByRole('region',{name:'記録の詳細',exact:true});
 async function ready(p:Page){await expect(p.getByRole('heading',{name:'プロジェクト名',exact:true})).toHaveText(title,{timeout:240000});await expect(p.locator('.lv-project-viewport-status')).toBeEmpty({timeout:180000});}
 async function open(p:Page,path:string){await chooseHomeFiles(p, path);}
-async function caption(p:Page){await revealCaptionList(p);await p.getByRole('tab',{name:'キャプション',exact:true}).click();await p.getByRole('list',{name:'キャプション一覧',exact:true}).locator('.lv-caption-select').first().click();}
+async function caption(p:Page){await revealCaptionList(p);await p.getByRole('tab',{name:'記録',exact:true}).click();await p.getByRole('list',{name:'記録一覧',exact:true}).locator('.lv-caption-select').first().click();}
 async function edit(p:Page,field:'タイトル'|'本文',value:string){await closeFileSurface(p);await detail(p).getByLabel(field,{exact:true}).fill(value);await finishCaptionEditing(p, {}, 180000);}
 async function output(p:Page,info:TestInfo,name:string,purpose:'backup'|'teamWorkspace'|'contribution'|'review',base?:string){
   const menu=p.locator('details.lv-project-files');if(await menu.count()&&!await menu.evaluate(n=>(n as HTMLDetailsElement).open))await menu.locator(':scope > summary').click();
@@ -50,7 +50,7 @@ test('元の両面・照明なし・切り抜きを編集解除しGPU選択と5�
     const canvas=p.getByLabel('3Dモデルの表示',{exact:true});
     const at=async(x:number,y=0,z=0)=>{const box=await canvas.boundingBox();if(!box)throw Error('canvas');const pose=fittedPose({min:[-4,-1,0],max:[4,1,0]},defaultPose(),box.width/box.height,'+z');if(pose.projection.kind!=='perspective')throw Error('camera');const camera=new THREE.PerspectiveCamera(pose.projection.verticalFov*180/Math.PI,box.width/box.height,.000001,1e9);camera.position.set(...pose.position);camera.up.set(...pose.up);camera.lookAt(new THREE.Vector3(...pose.target));camera.updateMatrixWorld(true);const ndc=new THREE.Vector3(x,y,z).project(camera);return{x:(ndc.x+1)*box.width/2,y:(1-ndc.y)*box.height/2,dx:ndc.x*box.width/2,dy:-ndc.y*box.height/2};};
     const sample=async(x:number)=>{const point=await at(x);return(await presentedCanvas(canvas,point.dx,point.dy)).sample;};
-    const pick=async(x:number,covered:boolean)=>{await p.getByRole('tab',{name:'キャプション',exact:true}).click();await p.getByRole('button',{name:'キャプションを追加',exact:true}).click();const point=await at(x);await canvas.click({position:{x:point.x,y:point.y}});const confirm=p.getByRole('button',{name:'ここに記録を作る',exact:true});if(covered)await expect(confirm).toBeVisible();else{await expect(p.getByText('この場所にはピンを置けません。別の場所を選んでください。',{exact:true})).toBeVisible();await expect(confirm).toBeHidden();}await expect(p.locator('.lv-project-viewport-status')).toBeEmpty();};
+    const pick=async(x:number,covered:boolean)=>{await p.getByRole('tab',{name:'記録',exact:true}).click();await p.getByRole('button',{name:'記録を追加',exact:true}).click();const point=await at(x);await canvas.click({position:{x:point.x,y:point.y}});const confirm=p.getByRole('button',{name:'ここに記録を作る',exact:true});if(covered)await expect(confirm).toBeVisible();else{await expect(p.getByText('この場所にはピンを置けません。別の場所を選んでください。',{exact:true})).toBeVisible();await expect(confirm).toBeHidden();}await expect(p.locator('.lv-project-viewport-status')).toBeEmpty();};
     const cancelPick=()=>p.getByRole('region',{name:'位置の調整',exact:true}).getByRole('button',{name:'取り消す',exact:true}).click();
     const baseOpaque=await sample(0),baseHole=await sample(2.5),baseMask=await sample(3.5);expect(baseHole).not.toEqual(baseMask);expect(baseOpaque).not.toEqual(baseHole);
     await pick(2.5,false);await cancelPick();await pick(3.5,true);await cancelPick();await pick(0,true);await p.getByRole('button',{name:'ここに記録を作る',exact:true}).click();await expect(p.getByText('ピンの位置を確定しました。',{exact:true})).toBeVisible({timeout:180000});await edit(p,'タイトル','元の材質の記録');

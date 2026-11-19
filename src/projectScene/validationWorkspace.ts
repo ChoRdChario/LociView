@@ -799,7 +799,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     relationLabel.hidden = evaluated.relation.kind !== 'confirmation-required';
     relationNote.textContent = evaluated.relation.kind === 'confirmation-required' ? `${evaluated.relation.relations.map(r => `${r.sheetGid} → ${r.sheetName}`).join(' / ')}。関連付けを確認すると、対応する視点・材質を引き継ぎます。` :
       evaluated.relation.kind === 'unavailable' ? '表との対応を確認できない視点・材質は有効にしません。' : '';
-    const n = evaluated.summary; conversionNote.textContent = evaluated.blocked ? `この内容は変換できません。${n.blockingReason ?? '問題の詳細は説明ファイルで確認できます。'}` : `LociMyuファイル：モデル ${n.models}・シーン ${n.scenes}・キャプション ${n.captions}・メディア ${n.media}・視点 ${n.views}`;
+    const n = evaluated.summary; conversionNote.textContent = evaluated.blocked ? `この内容は変換できません。${n.blockingReason ?? '問題の詳細は説明ファイルで確認できます。'}` : `LociMyuファイル：モデル ${n.models}・シーン ${n.scenes}・記録 ${n.captions}・メディア ${n.media}・視点 ${n.views}`;
     imageOmissionsSummary.textContent=`添付できない画像（${evaluated.imageOmissions.length}件）`;
     for(const item of evaluated.imageOmissions){const li=document.createElement('li'),caption=document.createElement('strong'),context=document.createElement('p'),reason=document.createElement('p');
       caption.textContent=item.caption||'題名なしの記録';context.textContent=`${item.scene}・${item.row}行目／${item.filename??'ファイル名を確認できません'}`;reason.textContent=item.reason;
@@ -990,7 +990,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     lociPreview = loci;
     if (native || legacy) {
       conversion = native ?? legacy; const n = conversion!.summary;
-      conversionNote.textContent = `${native ? 'Native' : '旧LociView'}ファイル：モデル ${n.models}・シーン ${n.scenes}・キャプション ${n.captions}・メディア ${n.media}`;
+      conversionNote.textContent = `${native ? 'Native' : '旧LociView'}ファイル：モデル ${n.models}・シーン ${n.scenes}・記録 ${n.captions}・メディア ${n.media}`;
       materialNotice.render(n.materialNotices);
       if (native?.summary.nativeSpatial) {
         conversionNote.textContent += '。元の単位・座標・記録を引き継ぎます。';

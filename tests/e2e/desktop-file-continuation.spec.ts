@@ -9,7 +9,7 @@ import { validationMetadataLimits as limits } from '../../src/projectFiles/valid
 
 const files = (p: Page) => p.getByRole('region', { name: 'ファイル', exact: true });
 const receive = (p: Page) => p.getByRole('region', { name: '更新ファイル', exact: true });
-const detail = (p: Page) => p.getByRole('region', { name: 'キャプションの詳細', exact: true });
+const detail = (p: Page) => p.getByRole('region', { name: '記録の詳細', exact: true });
 const chooseCaption = async (p: Page, title: string) => { await revealCaptionList(p); await p.locator('.lv-caption-select').filter({ hasText: title }).click(); };
 async function fileMenu(p: Page) {
   const menu = p.locator('details.lv-project-files');

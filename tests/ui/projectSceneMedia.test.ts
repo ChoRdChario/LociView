@@ -73,7 +73,7 @@ describe('same-host known PNG media connection; not decoder adoption, raster, IM
     const project = { ...s.snapshot, mediaData: data };
     const review = new SyntheticSession({ read: () => project, write: () => { throw Error('read-only check'); } });
     const ui = createDevelopmentWorkspace(new RecordedDocument().asDocument(), review), r = record(ui.root);
-    expect(nodes(named(r, 'キャプション')).some(n => n.textContent.includes('メディアを確認'))).toBe(true); ui.dispose();
+    expect(nodes(named(r, '記録')).some(n => n.textContent.includes('メディアを確認'))).toBe(true); ui.dispose();
   });
   it('excludes resolved deletion, preserves counts for alt-text conflicts and does not invent missing saved media', () => {
     const s = new SyntheticSession(); choose(s); s.media.add(s.mediaContext(), fixtureMedia[0]!.record.id);
@@ -112,13 +112,13 @@ describe('same-host known PNG media connection; not decoder adoption, raster, IM
     button(panel, '選択したメディアを添付').fire('click');
     button(picker, fixtureMedia[1]!.record.label).fire('click'); button(panel, '選択したメディアを添付').fire('click');
     expect(captionAttachments(session.snapshot.mediaData, f.shared).ready).toHaveLength(2);
-    expect(nodes(named(r, 'キャプション')).some(n => n.textContent === 'メディア 2')).toBe(true);
-    const windows = named(r, 'キャプションのウィンドウ'), gallery = named(windows, '添付メディア'), firstImage = nodes(gallery).find(n => n.tag === 'img')!;
+    expect(nodes(named(r, '記録')).some(n => n.textContent === 'メディア 2')).toBe(true);
+    const windows = named(r, '記録のウィンドウ'), gallery = named(windows, '添付メディア'), firstImage = nodes(gallery).find(n => n.tag === 'img')!;
     button(gallery, '画像を表示').fire('click'); expect(session.memory.selectedCaptionId).toBe(f.shared);
     const viewer = named(r, 'メディアビューア'); expect(viewer.open).toBe(true); named(viewer, '閉じる').fire('click'); expect(viewer.open).toBe(false);
     button(panel, '説明を編集').fire('click'); const input = named(panel, 'メディアの説明');
     input.fire('compositionstart'); input.value = '<script>説明</script>'; input.fire('input'); expect(session.pending).toBe('composition');
-    expect(named(r, 'シーン').children.every(n => n.disabled)).toBe(true); button(r, 'モデル').fire('click'); button(r, 'キャプション').fire('click'); expect(named(panel, 'メディアの説明')).toBe(input);
+    expect(named(r, 'シーン').children.every(n => n.disabled)).toBe(true); button(r, 'モデル').fire('click'); button(r, '記録').fire('click'); expect(named(panel, 'メディアの説明')).toBe(input);
     expect(nodes(gallery).some(n => n.textContent.includes('<script>'))).toBe(false);
     input.fire('compositionend'); button(panel, '説明を適用').fire('click'); expect(session.pending).toBeNull();
     expect(nodes(gallery).find(n => n.tag === 'img')).toBe(firstImage); expect(nodes(gallery).some(n => n.textContent.includes('<script>説明</script>'))).toBe(true);
@@ -130,7 +130,7 @@ describe('same-host known PNG media connection; not decoder adoption, raster, IM
     button(panel, '添付を削除').fire('click'); expect(captionAttachments(session.snapshot.mediaData, f.shared).ready).toHaveLength(2);
     const confirmation = nodes(panel).filter(n => n.tag === 'section').find(n => n.children.some(c => c.textContent.includes('画像本体と別キャプション')))!;
     button(confirmation, '添付を削除').fire('click'); expect(captionAttachments(session.snapshot.mediaData, f.shared).ready).toHaveLength(1);
-    expect(nodes(named(r, 'キャプション')).some(n => n.textContent === 'メディア 1')).toBe(true);
+    expect(nodes(named(r, '記録')).some(n => n.textContent === 'メディア 1')).toBe(true);
     expect(Object.keys(session.snapshot.mediaData!.records)).toHaveLength(2); expect(nodes(gallery).filter(n => n.tag === 'img')).toHaveLength(1); w.dispose();
   });
   it('rejects immutable resource mutation and invalid alt text, without interpreting any history URL', () => {
@@ -155,7 +155,7 @@ describe('same-host known PNG media connection; not decoder adoption, raster, IM
     expect(s.memory.selectedCaptionId).toBe(f.shared); viewer.fire('keydown', event('Escape'));
     expect(viewer.open).toBe(false); expect(document.activeElement).toBe(open);
     s.media.cancel();
-    const windows = named(root, 'キャプションのウィンドウ'); button(named(windows, '添付メディア'), '画像を表示').fire('click');
+    const windows = named(root, '記録のウィンドウ'); button(named(windows, '添付メディア'), '画像を表示').fire('click');
     expect(s.acceptList(planCaptionList(s.captionContext(), { kind: 'select', captionId: f.second }))).toBe(true); w.render();
     expect(viewer.open).toBe(true); expect(nodes(viewer).some(n => n.textContent === '1 / 2')).toBe(true);
     expect(s.acceptNavigation(planNavigation(s.snapshot.state, s.session, s.pending, { kind: 'scene', sceneId: f.detail }))).toBe(true); w.render();

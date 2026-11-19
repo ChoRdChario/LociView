@@ -931,7 +931,7 @@ describe('saved Caption deletion; synthetic ports and recorded DOM only', { time
   it('retains unapplied local input, blocks IME/readonly/stale choices, and enables scalar resolution only after parent recovery', async () => {
     const h = fixture(), host = await h.open(true); let readonly = false;
     const s = new SyntheticSession({ ...host.authority, get readOnly() { return readonly; } });
-    select(s); const w = createDevelopmentWorkspace(new RecordedDocument().asDocument(), s), detail = named(record(w.root), 'キャプションの詳細');
+    select(s); const w = createDevelopmentWorkspace(new RecordedDocument().asDocument(), s), detail = named(record(w.root), '記録の詳細');
     setInput(named(detail, '本文'), '未適用の原稿');
     const { seed } = await deleteAndEdit(host);
     const extra = rawChange(seed, d => { d.captionsById[f.shared].body = scalar('もう一つの原文'); });
@@ -1131,7 +1131,7 @@ describe('saved Caption deletion; synthetic ports and recorded DOM only', { time
   });
   it('keeps local unapplied text visible after remote deletion, then allows explicit cancellation without writes', async () => {
     const a = fixture(), ah = await a.open(true), seed = ah.read().source!, b = await clonePorts(a), bh = await b.open(), sb = new SyntheticSession(bh.authority), u = ui(sb);
-    const detail = named(record(u.w.root), 'キャプションの詳細'); setInput(named(detail, '本文'), 'まだ保存していない文章');
+    const detail = named(record(u.w.root), '記録の詳細'); setInput(named(detail, '本文'), 'まだ保存していない文章');
     await ah.authority.deleteCaption!(ah.read().source!.token, command(ah));
     await bh.receive(bh.read().source!.token, fullSource(ah.read().source!, 910)); sb.refreshHistory(); u.w.render();
     expect(sb.detailContext().source.kind).toBe('unavailable'); expect(named(detail, '本文').value).toBe('まだ保存していない文章');
@@ -2310,8 +2310,8 @@ describe('new synthetic saved host (memory ports and recorded DOM, not real brow
     await ui.add(0); expect(s.acknowledgment.state).toBe('idle'); await ui.add(1); expect(s.acknowledgment.state).toBe('idle');
     const rows = () => captionAttachments(s.snapshot.mediaData, f.shared).ready, first = rows()[0]!.id;
     expect(rows()).toHaveLength(2); expect(host.read().source!.originalChanges()).toHaveLength(originals.length + 2);
-    expect(descendants(named(ui.root, 'キャプション')).some(n => n.textContent === 'メディア 2')).toBe(true);
-    const gallery = area(named(ui.root, 'キャプションのウィンドウ'), '添付メディア');
+    expect(descendants(named(ui.root, '記録')).some(n => n.textContent === 'メディア 2')).toBe(true);
+    const gallery = area(named(ui.root, '記録のウィンドウ'), '添付メディア');
     expect(descendants(gallery).filter(n => n.tag === 'img').map(n => (n as unknown as HTMLImageElement).src)).toEqual(fixtureMedia.map(m => `data:image/png;base64,${m.base64}`));
     button(ui.panel, '説明を編集').fire('click'); setInput(named(ui.panel, 'メディアの説明'), '保存した説明');
     await acknowledge(s, () => button(ui.panel, '説明を適用').fire('click')); ui.w.render();
@@ -2319,12 +2319,12 @@ describe('new synthetic saved host (memory ports and recorded DOM, not real brow
     await acknowledge(s, () => button(ui.panel, '後へ').fire('click')); ui.w.render(); expect(rows()[1]!.id).toBe(first);
     const reader = await h.open(), readonly = new SyntheticSession(reader.authority), readUI = mediaHost(readonly);
     expect(button(readUI.panel, '選択したメディアを添付').disabled).toBe(true); expect(button(readUI.panel, '説明を編集').disabled).toBe(true);
-    const readGallery = area(named(readUI.root, 'キャプションのウィンドウ'), '添付メディア');
+    const readGallery = area(named(readUI.root, '記録のウィンドウ'), '添付メディア');
     button(readGallery, '画像を表示').fire('click'); expect(named(readUI.root, 'メディアビューア').open).toBe(true);
     expect(readonly.media.add(readonly.mediaContext(), fixtureMedia[0]!.record.id)).toBe(false);
     readUI.w.dispose(); await reader.dispose();
     await ui.remove(); await ui.remove(); expect(rows()).toHaveLength(0); expect(host.read().state).toBe('ready');
-    expect(descendants(named(ui.root, 'キャプション')).some(n => n.textContent.includes('メディア '))).toBe(false);
+    expect(descendants(named(ui.root, '記録')).some(n => n.textContent.includes('メディア '))).toBe(false);
     expect(Object.keys(s.snapshot.mediaData!.records)).toHaveLength(2);
     expect(s.snapshot.resources.captions[f.shared]!.title).toEqual({ kind: 'value', value: '先の作業を保持' });
     expect(await Promise.all(seedPaths.map(p => h.base.readBytes(p)))).toEqual(seedBytes);
@@ -2333,7 +2333,7 @@ describe('new synthetic saved host (memory ports and recorded DOM, not real brow
     expect(cold.read().state).toBe('ready'); expect(Object.keys(cs.snapshot.mediaData!.images!)).toHaveLength(2);
     expect(captionAttachments(cs.snapshot.mediaData, f.shared).ready).toHaveLength(0);
     await cu.add(0); expect(cs.acknowledgment.state).toBe('idle');
-    expect(descendants(named(cu.root, 'キャプション')).some(n => n.textContent === 'メディア 1')).toBe(true);
+    expect(descendants(named(cu.root, '記録')).some(n => n.textContent === 'メディア 1')).toBe(true);
     expect(captionAttachments(cs.snapshot.mediaData, f.shared).ready[0]!.id).not.toBe(first);
     const provider = cold.read().provider!; if (provider.kind !== 'scene-provider') throw Error('provider');
     expect(Object.keys(provider.details.immutable.mediaResourcesById)).toHaveLength(2); expect(cold.content.counts.bodyBytes).toBe(0);

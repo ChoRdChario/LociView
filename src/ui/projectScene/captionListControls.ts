@@ -10,7 +10,7 @@ export function createCaptionListControls(document: Document, onPlan: (plan: Cap
     const node = document.createElement(tag); node.textContent = text; return node;
   };
   const button = (text: string) => { const node = make('button', text); node.type = 'button'; return node; };
-  const root = make('section'); root.className = 'lv-caption-browser'; root.setAttribute('aria-label', 'キャプション');
+  const root = make('section'); root.className = 'lv-caption-browser'; root.setAttribute('aria-label', '記録');
   const filters = make('div'); filters.className = 'lv-caption-search';
   const searchLabel = make('label', '検索'), search = make('input');
   search.type = 'search'; search.placeholder = 'シーン内を検索'; search.title = 'タイトル・本文を検索'; search.setAttribute('aria-label', '検索');
@@ -25,7 +25,7 @@ export function createCaptionListControls(document: Document, onPlan: (plan: Cap
   const colorLabel = make('span', 'ピンの色'), colorChoices = make('div'), all = button('全色'), unknown = make('span');
   colorChoices.className = 'lv-caption-color-choices'; unknown.className = 'lv-caption-note';
   colorBar.append(colorLabel, colorChoices, all, unknown);
-  const list = make('ul'); list.className = 'lv-caption-list'; list.setAttribute('aria-label', 'キャプション一覧');
+  const list = make('ul'); list.className = 'lv-caption-list'; list.setAttribute('aria-label', '記録一覧');
   const empty = make('li'); empty.className = 'lv-caption-empty';
   const tools=make('section');tools.className='lv-caption-list-tools';tools.setAttribute('aria-label','記録の操作');
   root.append(filters, status, reveal, count, colorBar, list);
@@ -179,7 +179,7 @@ export function createCaptionListControls(document: Document, onPlan: (plan: Cap
       }
       if (virtual) space(end, view.rows.length);
       if (!view.rows.length) { empty.textContent = view.issue ? '一覧を表示できません。' : view.total
-        ? 'このシーンに条件に合うキャプションはありません。' : 'このシーンにキャプションはありません。'; nodes.push(empty); }
+        ? 'このシーンに条件に合う記録はありません。' : 'このシーンに記録はありません。'; nodes.push(empty); }
       orderChildren(list, nodes);
       if (virtual) {
         const anchor = layout.anchor(top); measureRows(); top = layout.restore(anchor, top);
@@ -249,8 +249,8 @@ export function createCaptionListControls(document: Document, onPlan: (plan: Cap
     if (!composing) search.value = next.memory.search;
     search.disabled = Boolean(view.issue) && !composing;
     const selectionMessage = next.memory.selectedCaptionId === null ? '' : !view.selected
-      ? '選択したキャプションはこのシーンにありません。別の項目を選択してください。'
-      : !view.selectionVisible ? '選択したキャプションは絞り込みで非表示です。' : '';
+      ? '選択した記録はこのシーンにありません。別の項目を選択してください。'
+      : !view.selectionVisible ? '選択した記録は絞り込みで非表示です。' : '';
     status.textContent = [view.issue, sceneSwitchReason(next.pending), !view.issue && selectionMessage].filter(Boolean).join(' ');
     status.hidden = !status.textContent;
     reveal.hidden = !view.selected || view.selectionVisible || Boolean(view.issue);

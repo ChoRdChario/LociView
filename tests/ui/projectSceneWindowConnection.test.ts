@@ -58,7 +58,7 @@ describe('same-host comparison windows; authored DOM only, not raster or native 
     const current = pin('設備の確認箇所'), color = current.style.backgroundColor;
     expect(current.hidden).toBe(false); expect(current.attributes.get('data-review')).toBe('true');
     expect(current.attributes.get('aria-description')).toBe('要確認'); current.fire('click');
-    const windows = named(stage, 'キャプションのウィンドウ');
+    const windows = named(stage, '記録のウィンドウ');
     const lines = () => descendants(windows).filter(n => n.className === 'lv-caption-window-line');
     expect(s.memory.selectedCaptionId).toBe(f.shared); expect(lines()[0]!.hidden).toBe(false);
     expect(descendants(named(windows, '設備の確認箇所')).some(n => n.textContent.startsWith('要確認'))).toBe(true);
@@ -83,12 +83,12 @@ describe('same-host comparison windows; authored DOM only, not raster or native 
   it('accumulates consecutive selections without a retain action, closes independently and explicitly reopens', () => {
     const doc = new RecordedDocument(), workspace = createDevelopmentWorkspace(doc.asDocument()), root = record(workspace.root), s = workspace.session;
     const original = s.snapshot; select(s, f.shared); workspace.render();
-    const detail = named(root, 'キャプションの表示');
+    const detail = named(root, '記録の表示');
     select(s, f.second); workspace.render();
     expect(visible(s)).toEqual([f.shared, f.second]);
     select(s, f.second); workspace.render(); expect(visible(s)).toEqual([f.shared, f.second]);
     expect(descendants(root).some(n => n.textContent === '比較に残す')).toBe(false);
-    const windows = named(root, 'キャプションのウィンドウ'), shared = named(windows, '設備の確認箇所');
+    const windows = named(root, '記録のウィンドウ'), shared = named(windows, '設備の確認箇所');
     const reading = named(windows, '比較ウィンドウの本文'), editor = descendants(root).find(n => n.tag === 'textarea' && n.attributes.get('aria-label') === '本文')!;
     expect(named(root, '本文').tag).toBe('textarea'); expect(named(root, '本文')).toBe(editor);
     expect(reading.attributes.get('role')).toBe('group'); expect((reading as unknown as HTMLElement).tabIndex).toBe(0);

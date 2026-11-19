@@ -714,6 +714,14 @@ Desktop keeps the 3D stage and right task area simultaneously visible. Caption
 list and details scroll within the task area so browser-page scrolling is not
 required to confirm a selected pin.
 
+Within a sufficiently wide fine-pointer task area, arrange the existing record
+list and details side by side; keep the 3D stage the larger region. Reflow the
+same list/search/row actions without tiny labels or targets. A Scene select is
+visually distinct from the record/model/drawing task tabs. Its displayed value
+must remain the actual Scene until any required save and target check succeed.
+Search composition changes neither the record editor's allocation nor the
+presentation of unsaved record content; command/composition guards still apply.
+
 On a narrow or short display, reflow the same concepts instead of shrinking the
 Desktop layout. Preserve object names, action labels, save/failure state,
 selection and mode exits. Caption list/detail remain accessible together;3D and

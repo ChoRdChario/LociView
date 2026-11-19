@@ -180,7 +180,7 @@ describe('Caption detail: local draft/intents, not durable editor acceptance', (
     expect(slot).toBe(record(h.controls.mediaSlot)); h.controls.dispose();
   });
   it('keeps secondary properties closed before selection while revealing retained color problems', () => {
-    const initial = context(), h = host({ ...initial, source: { kind: 'unavailable', captionId: null, sceneId: scn, token: 'none', reason: 'キャプションを選択してください。' }, draft: null });
+    const initial = context(), h = host({ ...initial, source: { kind: 'unavailable', captionId: null, sceneId: scn, token: 'none', reason: '記録を選択してください。' }, draft: null });
     const properties = h.root.children.find(n => n.className === 'lv-caption-properties')!;
     expect(properties.open).toBe(false); h.render(initial); expect(properties.open).toBe(false);
     h.color.value = 'invalid'; h.color.fire('input'); expect(properties.open).toBe(true);

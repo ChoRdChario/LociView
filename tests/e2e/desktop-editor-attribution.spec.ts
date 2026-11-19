@@ -17,9 +17,9 @@ import { validationMetadataLimits as limits } from '../../src/projectFiles/valid
 const title = '編集者名の共有', caption = '共有記録', nameA = '担当A・SHARED_EDITOR_A', nameB = '担当B・SHARED_EDITOR_B';
 const blob = async (path: string) => new Blob([Uint8Array.from(await readFile(path)).buffer]);
 const files = (p: Page) => p.getByRole('region', { name: 'ファイル', exact: true });
-const detail = (p: Page) => p.getByRole('region', { name: 'キャプションの詳細', exact: true });
+const detail = (p: Page) => p.getByRole('region', { name: '記録の詳細', exact: true });
 async function settled(p: Page) { await expect(p.locator('main.lv-project-workspace > header > p.lv-operation-status')).toHaveAttribute('data-busy', 'false', { timeout: 90_000 }); }
-async function selected(p: Page) { await p.getByRole('list', { name: 'キャプション一覧', exact: true }).locator('.lv-caption-select').first().click(); }
+async function selected(p: Page) { await p.getByRole('list', { name: '記録一覧', exact: true }).locator('.lv-caption-select').first().click(); }
 async function editor(p: Page, name: string, enabled = true) {
   const settings = p.getByLabel('設定', { exact: true });
   if (!await settings.evaluate(n => (n as HTMLDetailsElement).open)) await settings.locator(':scope > summary').click();

@@ -48,7 +48,7 @@ test('review files use the same camera controls and create an independent editab
     await gizmo.getByRole('button',{name:'Z',exact:true}).press('Enter');await drag('left',40,20);await expect(gizmo.getByRole('button',{name:'Z',exact:true})).toHaveAttribute('aria-pressed','false');
     const orbitPixels=await canvas.screenshot({path:info.outputPath('review-left-orbit.png')});await drag('right',30,15);const panPixels=await canvas.screenshot({path:info.outputPath('review-right-pan.png')});expect(Buffer.compare(orbitPixels,panPixels)).not.toBe(0);
     await gizmo.getByRole('button',{name:'全体表示',exact:true}).click();const projection=review.getByLabel('投影方式',{exact:true});await projection.selectOption('orthographic');await expect(projection).toHaveValue('orthographic');await projection.selectOption('perspective');await expect(projection).toHaveValue('perspective');
-    await gizmo.getByRole('button',{name:'Z',exact:true}).press('Enter');await expect(review.getByRole('textbox',{name:'検索',exact:true})).toHaveCount(0);const empty=review.getByRole('complementary',{name:'閲覧パネル',exact:true}).getByText('このシーンにキャプションはありません。',{exact:true}).filter({visible:true});await expect(empty).toHaveCount(1);await expect(empty).toHaveText('このシーンにキャプションはありません。');await expect(empty).toBeVisible();
+    await gizmo.getByRole('button',{name:'Z',exact:true}).press('Enter');await expect(review.getByRole('textbox',{name:'検索',exact:true})).toHaveCount(0);const empty=review.getByRole('complementary',{name:'閲覧パネル',exact:true}).getByText('このシーンに記録はありません。',{exact:true}).filter({visible:true});await expect(empty).toHaveCount(1);await expect(empty).toHaveText('このシーンに記録はありません。');await expect(empty).toBeVisible();
     await page.screenshot({path:info.outputPath('review-wide.png'),fullPage:false});await page.setViewportSize({width:390,height:844});await expect(gizmo).toBeInViewport();
     const narrowCanvas = (await canvas.boundingBox())!, pan = (await gizmo.getByRole('button', {name:'平行移動',exact:true}).boundingBox())!;
     expect(pan.y).toBeGreaterThanOrEqual(narrowCanvas.y);
@@ -88,7 +88,7 @@ test('touch Review copy preserves Mesh, Point, GS, Proxy and photos through actu
     const confirmation = p.getByRole('region', { name: '編集コピーの確認', exact: true });
     await expect(confirmation).toBeFocused(); await expect(confirmation).toBeInViewport();
     await p.getByRole('button', { name: 'コピーを作成', exact: true }).click(); await ready(p); await revealCaptionList(p);
-    await p.locator('.lv-caption-select').first().click(); const detail = p.getByRole('region', { name: 'キャプションの詳細', exact: true });
+    await p.locator('.lv-caption-select').first().click(); const detail = p.getByRole('region', { name: '記録の詳細', exact: true });
     await detail.getByLabel('本文', { exact: true }).fill('スマホで直接コピーを編集'); await finishCaptionEditing(p, {}); await p.screenshot({ path: info.outputPath('touch-edited.png') });
     await revealFileSurface(p, '保存'); const area = p.getByRole('region', { name: 'ファイル', exact: true }); const [saved] = await Promise.all([p.waitForEvent('download'), area.locator('.lv-file-primary').click()]);
     const path = info.outputPath('mixed-saved.zip'); await saved.saveAs(path); expect(await saved.failure()).toBeNull();
@@ -100,7 +100,7 @@ test('touch Review copy preserves Mesh, Point, GS, Proxy and photos through actu
     for (const body of original.archive.control.manifest.blobs) expect(backup.archive.control.manifest.blobs).toContainEqual(body);
     await closeFileSurface(p); const context = p.context(); await context.close(); contexts.delete(context); p = await launch(true);
     await ready(p); await revealCaptionList(p); await p.locator('.lv-caption-select').first().click();
-    await expect(p.getByRole('region', { name: 'キャプションの詳細', exact: true }).getByLabel('本文', { exact: true })).toHaveValue('スマホで直接コピーを編集');
+    await expect(p.getByRole('region', { name: '記録の詳細', exact: true }).getByLabel('本文', { exact: true })).toHaveValue('スマホで直接コピーを編集');
     expect(errors).toEqual([]); expect(remote).toEqual([]);
   } finally { for (const context of contexts) await context.close(); await server.stop(); }
 });

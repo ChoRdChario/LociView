@@ -57,8 +57,8 @@ export function planCaptionWindow(source: CaptionListSource, memory: CaptionWind
       dismissed: Object.freeze([...new Set([...memory.dismissed, id])]) });
   }
   if (view.issue || source.kind !== 'ready' || !source.captions.some(item => item.id === id))
-    return block(view.issue || 'このシーンのキャプションを選択してください。');
-  if ((intent.kind === 'open' || intent.kind === 'replace') && id !== selectedCaptionId) return block('選択したキャプションのウィンドウを開いてください。');
+    return block(view.issue || 'このシーンの記録を選択してください。');
+  if ((intent.kind === 'open' || intent.kind === 'replace') && id !== selectedCaptionId) return block('選択した記録のウィンドウを開いてください。');
   if (intent.kind === 'replace') {
     const from = intent.fromCaptionId;
     if (from !== view.visibleIds.at(-1) || intent.rect && !validRect(intent.rect)) return block('アクティブなウィンドウを確認してください。');

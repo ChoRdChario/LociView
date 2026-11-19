@@ -56,7 +56,7 @@ for (const base of ['/', '/LociView/']) test(`same-build cold boot repairs missi
     const position = p.getByRole('region', { name: '位置の調整', exact: true });
     for (const axis of ['X', 'Y', 'Z']) await position.getByLabel(`位置 ${axis}`, { exact: true }).fill('0');
     await position.getByRole('button', { name: 'ここに記録を作る', exact: true }).click();
-    const detail = () => p.getByRole('region', { name: 'キャプションの詳細', exact: true });
+    const detail = () => p.getByRole('region', { name: '記録の詳細', exact: true });
     await detail().getByLabel('本文', { exact: true }).fill('修復前の本文と原本を保持'); await finishCaptionEditing(p, {body:'修復前の本文と原本を保持'}, 20_000);
     const before = await backup(p, info, 'before-repair'), direct = p.url();
     const entry = await p.locator('script[type="module"][src]').first().getAttribute('src'); expect(entry).toBeTruthy();

@@ -54,7 +54,7 @@ for (const scenario of [
     const pin = source.getByRole('region', { name: '位置の調整', exact: true });
     for (const axis of ['X', 'Y', 'Z']) await pin.getByLabel(`位置 ${axis}`, { exact: true }).fill(axis === 'Y' ? '.5' : '0');
     await button(source, 'ここに記録を作る').click(); await expect(source.getByText('ピンの位置を確定しました。', { exact: true })).toBeVisible();
-    const detail = source.getByRole('region', { name: 'キャプションの詳細', exact: true });
+    const detail = source.getByRole('region', { name: '記録の詳細', exact: true });
     await detail.getByLabel('タイトル', { exact: true }).fill('継承したピン');
     await detail.getByLabel('本文', { exact: true }).fill('継承した本文');
     await finishCaptionEditing(source, {});
@@ -63,7 +63,7 @@ for (const scenario of [
     await (await chooser).setFiles({ name: '点検写真.png', mimeType: 'image/png', buffer: photo });
     await finishCaptionEditing(source, {});
     if (scenario.interrupt) {
-      await button(source, 'シーン 1').click();
+      await source.getByRole('combobox', { name: 'シーン', exact: true }).selectOption({ label: 'シーン 1' });
       await openAddOptions(source);
       const existing = source.getByLabel('既存の記録を追加', { exact: true });
       await existing.locator(':scope > summary').click();
@@ -116,7 +116,7 @@ for (const scenario of [
     await revealReviewFiles(review);
     const open = review.getByRole('button', { name: '既存に追加', exact: true });
     await (scenario.touch ? open.tap() : open.click());
-    await expect(panel).toContainText('モデル 1・キャプション 1・メディア 1');
+    await expect(panel).toContainText('モデル 1・記録 1・メディア 1');
     const select = panel.getByLabel('追加先', { exact: true });
     await select.selectOption({ label: '追加先プロジェクト' });
     const confirm = panel.getByRole('button', { name: 'シーンを追加', exact: true });
@@ -157,9 +157,9 @@ for (const scenario of [
       await (scenario.touch ? resume.tap() : resume.click());
     }
     await ready(page);
-    if (scenario.interrupt) await button(page, '点検シーン').click();
-    await expect(page.getByRole('button', { name: '点検シーン', exact: true })).toHaveAttribute('aria-pressed', 'true');
-    await expect(page.getByRole('list', { name: 'キャプション一覧', exact: true })).toContainText('継承したピン');
+    if (scenario.interrupt) await page.getByRole('combobox', { name: 'シーン', exact: true }).selectOption({ label: '点検シーン' });
+    await expect(page.getByRole('combobox', { name: 'シーン', exact: true }).locator('option:checked')).toHaveText('点検シーン');
+    await expect(page.getByRole('list', { name: '記録一覧', exact: true })).toContainText('継承したピン');
     await page.screenshot({ path: info.outputPath('appended.png') });
     const after = await backup(page, info.outputPath('after.zip'));
     const current = await selectCleanRecords(after.source, validationMetadataLimits);
@@ -175,9 +175,9 @@ for (const scenario of [
     const hashes = after.archive.control.manifest.blobs.map(entry => entry.sha256);
     for (const bytes of [triangleGlb(0), triangleGlb(2), photo]) expect(hashes).toContain(createHash('sha256').update(bytes).digest('hex'));
     await page.reload(); await ready(page);
-    await expect(button(page, '点検シーン')).toHaveCount(1);
-    await button(page, '点検シーン').click();
-    await expect(page.getByRole('list', { name: 'キャプション一覧', exact: true })).toContainText('継承したピン');
+    await expect(page.getByRole('combobox', { name: 'シーン', exact: true }).getByRole('option', { name: '点検シーン', exact: true })).toHaveCount(1);
+    await page.getByRole('combobox', { name: 'シーン', exact: true }).selectOption({ label: '点検シーン' });
+    await expect(page.getByRole('list', { name: '記録一覧', exact: true })).toContainText('継承したピン');
     expect(errors).toEqual([]);
   } finally { await browser.close(); await server.stop(); }
 });
